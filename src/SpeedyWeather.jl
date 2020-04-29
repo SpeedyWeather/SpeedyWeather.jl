@@ -4,6 +4,10 @@ using NetCDF, FFTW, LinearAlgebra, Parameters, Dates
 
 export run_speedy
 
+include("fourier.jl")
+include("legendre.jl")
+include("spectral_trans.jl")
+
 # include("params.jl")
 # include("constants.jl")
 # include("geometry.jl")
