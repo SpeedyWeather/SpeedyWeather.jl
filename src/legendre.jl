@@ -1,7 +1,7 @@
 """
 Calculate the Legendre weights. TODO reference
 """
-function get_legendre_weights(geometry::Geometry)
+function legendre_weights(geometry::Geometry)
 
     @unpack nlat = geometry
     nlat_half = nlat ÷ 2
@@ -37,10 +37,10 @@ end
 """
 Calculate the Legendre polynomials. TODO reference
 """
-function get_legendre_polynomials(  j::Int,
-                                    ε::AbstractMatrix,
-                                    ε⁻¹::AbstractMatrix,
-                                    geometry::Geometry)
+function legendre_polynomials(  j::Int,
+                                ε::AbstractMatrix,
+                                ε⁻¹::AbstractMatrix,
+                                geometry::Geometry)
 
     @unpack mx, nx, coslat_half, sinlat_half = geometry
 
@@ -83,8 +83,8 @@ end
 """
 Computes the inverse Legendre transform.
 """
-function legendre_inverse(  input::Array{T,2},
-                            spectral_trans::SpectralTrans{T}
+function legendre_inverse(  input::Array{Complex{T},2},
+                            spectral_trans::SpectralTrans{T},
                             geometry::Geometry{T}) where {T<:AbstractFloat}
 
     @unpack leg_weight, nsh2, leg_poly = spectral_trans
@@ -128,7 +128,7 @@ end
 """
 Computes the Legendre transform
 """
-function legendre(  input::Array{T,2},
+function legendre(  input::Array{Complex{T},2},
                     spectral_trans::SpectralTrans{T},
                     geometry::Geometry{T}) where {T<:AbstractFloat}
 
@@ -170,6 +170,6 @@ function legendre(  input::Array{T,2},
             output[m,n] = dot(leg_poly[m,n,:], odd[m,:])
         end
     end
-    
+
     return output
 end

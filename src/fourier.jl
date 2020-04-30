@@ -1,7 +1,7 @@
 """
 Inverse Fourier transform in zonal direction.
 """
-function fourier_inverse(   input::Array{T,2},
+function fourier_inverse(   input::Array{Complex{T},2},
                             geometry::Geometry{T},
                             scale::Bool=false) where {T<:AbstractFloat}
 

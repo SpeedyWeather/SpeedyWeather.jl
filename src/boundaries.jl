@@ -25,7 +25,7 @@ function Boundaries{T}( constants::Constants,
     nc = NetCDF.open(joinpath(path,"surface.nc"))
     orog = nc.vars["orog"][:,end:-1:1]      # latitude is North to South in file
     lsm = nc.vars["lsm"][:,end:-1:1]
-    alb = nc.vars["albedo"][:,end:-1:1]
+    alb = nc.vars["alb"][:,end:-1:1]
 
     # GEOPOTENTIAL, truncate in spectral space
     ϕ0 = g*orog

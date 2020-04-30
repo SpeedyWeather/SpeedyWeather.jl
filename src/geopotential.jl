@@ -3,7 +3,7 @@ Compute spectral geopotential from spectral temperature `Tabs`
 and spectral topography `ϕ0`.
 """
 function geopotential!( ϕ::Array{T,3},      # geopotential
-                        ϕ0::Array{T,2},     # topography
+                        ϕ0::Array{T,2},     # geop
                         Tabs::Array{T,3},   # absolute Temperature
                         geometry::Geometry{T}) where {T<:AbstractFloat}
 
