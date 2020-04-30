@@ -1,39 +1,40 @@
+"""
+Boundaries holds the boundary arrays in grid-point space
+
+ϕ0::Array{T,2}              # Surface geopotential (i.e. orography) [m^2/s^2]
+ϕ0trunc::Array{T,2}         # Spectrally truncated surface geopotential [m^2/s^2]
+land_sea_mask::Array{T,2}   # land-sea mask
+albedo::Array{T,2}          # Annual mean surface albedo
+"""
 struct Boundaries{T<:AbstractFloat}
-    ϕ0::Array{T,2}              # Surface geopotential (i.e. orography)
-    ϕ0trunc::Array{T,2}         # Spectrally truncated surface geopotential
+    ϕ0::Array{T,2}              # Surface geopotential (i.e. orography) [m^2/s^2]
+    ϕ0trunc::Array{T,2}         # Spectrally truncated surface geopotential [m^2/s^2]
     land_sea_mask::Array{T,2}   # land-sea mask
     albedo::Array{T,2}          # Annual mean surface albedo
 end
 
-function Boundaries(T, geometry::Geometry, spectral_trans::SpectralTrans, g)
-    # Read surface geopotential (i.e. orography)
-    ϕ₀ = g*load_boundary_file("surface.nc", "orog")
+""" Generator function for a Boundaries struct."""
+function Boundaries{T}( constants::Constants,
+                        geometry::Geometry,
+                        spectral_trans::SpectralTrans) where {T<:AbstractFloat}
 
-    # Also store spectrally truncated surface geopotential
-    ϕ₀ₛ = spectral_truncation(geometry, spectral_trans, ϕ₀)
+    @unpack g = constants
 
-    # Read land-sea mask
-    land_sea_mask = load_boundary_file("surface.nc", "lsm")
+    # LOAD NETCDF FILE
+    path = "data"   #TODO pass on through parameters
+    nc = NetCDF.open(joinpath(path,"surface.nc"))
+    orog = nc.vars["orog"][:,end:-1:1]      # latitude is North to South in file
+    lsm = nc.vars["lsm"][:,end:-1:1]
+    alb = nc.vars["alb"][:,end:-1:1]
 
-    # Annual-mean surface albedo
-    albedo = load_boundary_file("surface.nc", "alb")
+    # GEOPOTENTIAL, truncate in spectral space
+    ϕ0 = g*orog
+    ϕ0trunc = spectral_truncation(ϕ0,spectral_trans,geometry)
 
-    Boundaries(convert(Matrix{T}, ϕ₀), convert(Matrix{T}, ϕ₀ₛ), convert(Matrix{T}, land_sea_mask),
-               convert(Matrix{T}, albedo))
-end
+    # not necessary for orog, lsm, alb:
+    # Fix undefined values
+    # raw_input[raw_input .<= -999.0] .= 0.0
+    # raw_input
 
-# Compute a spectrally-filtered grid-point field.
-function spectral_truncation(geometry::Geometry, spectral_trans::SpectralTrans, input::AbstractMatrix)
-    input_sp = grid_to_spec(geometry, spectral_trans, input)
-
-    for n in 1:geometry.nx
-        for m in 1:geometry.mx
-            N = m + n - 2
-            if N > geometry.trunc
-                input_sp[m,n] = Complex{typeof(input[1,1])}(0.0)
-            end
-        end
-    end
-
-    spec_to_grid(geometry, spectral_trans, input_sp)
+    Boundaries{T}(ϕ0,ϕ0trunc,lsm,alb)
 end

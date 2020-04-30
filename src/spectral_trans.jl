@@ -1,10 +1,10 @@
 struct SpectralTrans{T<:AbstractFloat}
-    leg_weight::Array{T,1}      # Legendre weights
-    nsh2::Vector{Int}           # What's this?
-    leg_poly::Array{T,2}        # Legendre polynomials
-    el2::Array{T,2}             # el2 = l*(l+1)/(r^2)
-    el2⁻¹::Array{T,2}           # el2⁻¹ = 1/el2
-    el4::Array{T,2}             # el2^2.0, for biharmonic diffusion
+    leg_weight::Array{T,1}          # Legendre weights
+    nsh2::Vector{Int}               # What's this?
+    leg_poly::Array{Complex{T},3}   # Legendre polynomials
+    el2::Array{T,2}                 # el2 = l*(l+1)/(r^2)
+    el2⁻¹::Array{T,2}               # el2⁻¹ = 1/el2
+    el4::Array{T,2}                 # el2^2.0, for biharmonic diffusion
 
     # Quantities required by functions grad, uvspec, and vds
     gradx::Array{T,1}
@@ -17,14 +17,14 @@ struct SpectralTrans{T<:AbstractFloat}
     vddyp::Array{T,2}
 end
 
-function SpectralTrans{T}(constants::Constants{T},geometry::Geometry{T}) where T
+function SpectralTrans{T}(constants::Constants,geometry::Geometry) where T
     @unpack nlat, trunc, mx, nx = geometry
     @unpack R_earth = constants
     nlat_half = nlat ÷ 2
 
     # First compute Gaussian latitudes and weights at the nlat/2 points from pole to equator
     # wt contains the Gaussian weights for quadratures
-    leg_weight = get_leg_weights(T, geometry)
+    leg_weight = legendre_weights(geometry)
 
     #TODO what's this?
     nsh2 = zeros(Int, nx)
@@ -60,7 +60,7 @@ function SpectralTrans{T}(constants::Constants{T},geometry::Geometry{T}) where T
     # get_legendre_poly computes the polynomials at a particular latitiude
     leg_poly = zeros(Complex{T}, mx, nx, nlat_half)
     for j in 1:nlat_half
-        leg_poly[:,:,j] = get_legendre_poly(j, ε, ε⁻¹, geometry)
+        leg_poly[:,:,j] = legendre_polynomials(j, ε, ε⁻¹, geometry)
     end
 
     el2   = zeros(mx, nx)
@@ -122,7 +122,7 @@ end
 function spec_to_grid(  input::AbstractMatrix,
                         spectral_trans::SpectralTrans,
                         geometry::Geometry)
-    return fourier_inv(legendre_inv(input,spectral_trans,geometry),geometry)
+    return fourier_inverse(legendre_inverse(input,spectral_trans,geometry),geometry)
 end
 
 function grid_to_spec(  input::AbstractMatrix,
@@ -160,7 +160,7 @@ end
 
 function vds!(  ucosm::Array{T,2},
                 vcosm::Array{T,2},
-                vorm::Arry{T,2},
+                vorm::Array{T,2},
                 divm::Array{T,2},
                 spectral_trans::SpectralTrans{T},
                 geometry::Geometry{T}) where {T<:AbstractFloat}
@@ -260,15 +260,30 @@ end
 
 """ Set the spectral coefficients of the lower right triangle
 to zero. """
-function truncate!(A::AbstractMatrix)
+function truncate!(A::AbstractMatrix,trunc::Int)
     m,n = size(A)
     o = zero(eltype(A))
 
     @inbounds for j in 1:n
         for i in 1:m
-            if i+j-1 > m    #TODO dependency on trunc? was i+j-2 > trunc
+            if i+j-2 > trunc    # if total wavenumber larger than trunc
                 A[i,j] = o
             end
         end
     end
+end
+
+
+"""
+Truncate a grid-point field in spectral space.
+"""
+function spectral_truncation(   input::Array{T,2},
+                                spectral_trans::SpectralTrans{T},
+                                geometry::Geometry{T}) where {T<:AbstractFloat}
+
+    @unpack trunc = geometry
+
+    input_spectral = grid_to_spec(input, spectral_trans, geometry)
+    truncate!(input_spectral,trunc)
+    return spec_to_grid(input_spectral, spectral_trans, geometry)
 end
