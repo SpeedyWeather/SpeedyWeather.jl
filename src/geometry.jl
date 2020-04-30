@@ -36,8 +36,9 @@ struct Geometry{T<:AbstractFloat}
     f::Array{T,1}               # = 2Ω*sin(lat)
 
     # GEOPOTENTIAL CALCULATION WORK ARRAYS
-    xgeop1::Array{T,1}          # ?
-    xgeop2::Array{T,1}          # ?
+    xgeop1::Array{T,1}                  # ?
+    xgeop2::Array{T,1}                  # ?
+    lapserate_correction::Array{T,1}    # ?
 end
 
 """
@@ -62,6 +63,7 @@ function Geometry{T}(   nlon::Int,
     lon = Array(0:dlon:360-dlon)              # array of longitudes
 
     # VERTICAL SIGMA COORDINATE σ = p/p₀ (fraction of surface pressure)
+    # sorted such that σ_half[end] is at the planetary boundary
     #TODO make nlev-dependent
     σ_half = [0.0, 0.05, 0.14, 0.26, 0.42, 0.6, 0.77, 0.9, 1.0]
     σ_full = 0.5*(σ_half[2:end] + σ_half[1:end-1])
@@ -70,6 +72,7 @@ function Geometry{T}(   nlon::Int,
     σ_f = akap ./ (2.0σ_full)
 
     # SPECTRAL
+    # TODO make trunc a function of nlat,nlon?
     nx = trunc+2
     mx = trunc+1
 
@@ -81,14 +84,14 @@ function Geometry{T}(   nlon::Int,
     radang = 2π*lat/360                     # latitude in radians
     cosg   = coslat                         # ?
     cosg⁻¹ = 1 ./ cosg                      # ?
-    cosg⁻² = 1 ./ cosg^2                    # ?
+    cosg⁻² = cosg⁻¹.^2                      # ?
 
     # CORIOLIS FREQUENCY
     f = 2Ω*sinlat
 
-    # Coefficients to compute geopotential
-    xgeop1 = zeros(nlev)
-    xgeop2 = zeros(nlev)
+    # GEOPOTENTIAL
+    xgeop1 = zeros(nlev)                    # coefficients to calculate geopotential
+    xgeop2 = zeros(nlev)                    # coefficients to calculate geopotential
     for k in 1:nlev
         xgeop1[k] = R*log(σ_half[k+1]/σ_half[k])
         if k != nlev
@@ -96,9 +99,16 @@ function Geometry{T}(   nlon::Int,
         end
     end
 
+    lapserate_correction = zeros(nlev-2)
+    for k in 2:nlev-1
+        lapserate_correction[k-1] = 0.5*xgeop1[k]*
+                    log(σ_half[k+1]/σ_full[k]) / log(σ_full[k+1]/σ_full[k-1])
+    end
+
+    # conversion to T happens here
     Geometry{T}(nlon,nlat,nlev,dlat,dlon,lat,lon,
                 trunc,nx,mx,
-                σ_half, σ_full, σ_thick,σ_half⁻¹_2, σ_f,
-                sinlat, coslat, sinlat_half, coslat_half, radang,
-                cosg, cosg⁻¹, cosg⁻², f, xgeop1, xgeop2)
+                σ_half,σ_full,σ_thick,σ_half⁻¹_2,σ_f,
+                sinlat,coslat,sinlat_half,coslat_half,radang,
+                cosg,cosg⁻¹,cosg⁻²,f,xgeop1,xgeop2,lapserate_correction)
 end
