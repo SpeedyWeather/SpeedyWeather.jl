@@ -10,7 +10,12 @@ function run_speedy(::Type{T}=Float32;      # number format
                     kwargs...               # all additional parameters
                     ) where {T<:AbstractFloat}
 
-    constants = Constants()
+    P = Params(T=T,kwargs...)
+    C = Constants{T}(P)
+    G = GeoSpectral{T}(P,C)
+    B = Boundaries{T}(G,C)
+
+
 
     return RunModel(T,P)
 end
