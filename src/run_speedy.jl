@@ -1,21 +1,28 @@
-using Parameters, FFTW, LinearAlgebra, NetCDF
+using Parameters, FFTW, LinearAlgebra, NetCDF, FastGaussQuadrature
 
+include("parameters.jl")
 include("constants.jl")
 include("geometry.jl")
+include("spectral_transform.jl")
 include("legendre.jl")
 include("fourier.jl")
-include("spectral_trans.jl")
+include("boundaries.jl")
+include("diagnostics.jl")
 
 function run_speedy(::Type{T}=Float32;      # number format
                     kwargs...               # all additional parameters
                     ) where {T<:AbstractFloat}
 
-    constants = Constants()
+    P = Params(T=T,kwargs...)
+    C = Constants{T}(P)
+    G = GeoSpectral{T}(P,C)
+    B = Boundaries{T}(C,G,S)
 
-    return RunModel(T,P)
+    # # TODO
+    # Prog = PrognosticVars{T}()
+    # Diag = DiagnosticVars{T}()
+
+    #time_stepping!()
+
+    return G,S,B
 end
-
-constants = Constants()
-geometry = Geometry{Float64}(96,48,8,30,constants)
-spectral_trans = SpectralTrans{Float64}(constants,geometry)
-boundaries = Boundaries{Float64}(constants,geometry,spectral_trans)

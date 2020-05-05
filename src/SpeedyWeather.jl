@@ -1,6 +1,7 @@
 module SpeedyWeather
 
-using NetCDF, FFTW, LinearAlgebra, Parameters, Dates
+using NetCDF, FFTW, LinearAlgebra, Parameters, Dates,
+        FastGaussQuadrature
 
 export run_speedy
 
@@ -8,7 +9,7 @@ include("constants.jl")
 include("geometry.jl")
 include("fourier.jl")
 include("legendre.jl")
-include("spectral_trans.jl")
+include("spectral_transform.jl")
 
 # include("params.jl")
 # include("spectral_trans.jl")

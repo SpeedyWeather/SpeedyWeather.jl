@@ -1,54 +1,20 @@
 """
-Calculate the Legendre weights. TODO reference
-"""
-function legendre_weights(geometry::Geometry)
-
-    @unpack nlat = geometry
-    nlat_half = nlat ÷ 2
-
-    z1 = 2.0
-
-    # preallocate the weights
-    wt = zeros(nlat_half)
-
-    for i in 1:nlat_half
-        local pp
-        z = cos(π*(i - 0.25)/(nlat + 0.5))
-
-        while abs(z - z1) > eps(Float64)
-            p1 = 1.0
-            p2 = 0.0
-
-            for j in 1:nlat
-                p3, p2 = p2, p1
-                p1 = ((2j - 1.0)*z*p2 - (j - 1.0)*p3)/j
-            end
-
-            pp = nlat*(z*p1 - p2)/(z^2 - 1.0)
-            z1 = z
-            z = z1 - p1/pp
-        end
-
-        wt[i] = 2.0/((1.0 - z^2)*pp^2)
-    end
-    return wt
-end
-
-"""
 Calculate the Legendre polynomials. TODO reference
 """
 function legendre_polynomials(  j::Int,
                                 ε::AbstractMatrix,
                                 ε⁻¹::AbstractMatrix,
-                                geometry::Geometry)
+                                G::GeoSpectral)
 
-    @unpack mx, nx, coslat_half, sinlat_half = geometry
+    @unpack coslat_NH, sinlat_NH = G.geometry
+    @unpack mx, nx = G.spectral
 
     small = 1e-30
     alp = zeros(mx+1,nx)
 
-    y = coslat_half[j]
-    x = sinlat_half[j]
+    # swap cos/sin from the original in f90
+    y = sinlat_NH[j]
+    x = coslat_NH[j]
 
     # Start recursion with n = 1 (m = l) diagonal
     alp[1,1] = sqrt(0.45)
@@ -84,12 +50,10 @@ end
 Computes the inverse Legendre transform.
 """
 function legendre_inverse(  input::Array{Complex{T},2},
-                            spectral_trans::SpectralTrans{T},
-                            geometry::Geometry{T}) where {T<:AbstractFloat}
+                            G::GeoSpectral{T}) where {T<:AbstractFloat}
 
-    @unpack leg_weight, nsh2, leg_poly = spectral_trans
-    @unpack nlat, trunc, mx, nx = geometry
-    nlat_half = nlat ÷ 2
+    @unpack leg_weight, nsh2, leg_poly = G.spectral
+    @unpack nlat, nlat_half, trunc, mx, nx = G.geometry
 
     # Initialize output array
     output = zeros(Complex{T}, mx, nlat)
@@ -129,12 +93,10 @@ end
 Computes the Legendre transform
 """
 function legendre(  input::Array{Complex{T},2},
-                    spectral_trans::SpectralTrans{T},
-                    geometry::Geometry{T}) where {T<:AbstractFloat}
+                    G::GeoSpectral{T}) where {T<:AbstractFloat}
 
-    @unpack leg_weight, nsh2, leg_poly = spectral_trans
-    @unpack nlat, trunc, mx, nx = geometry
-    nlat_half = nlat ÷ 2
+    @unpack leg_weight, nsh2, leg_poly = G.spectral
+    @unpack nlat, nlat_half, trunc, mx, nx = G.geometry
 
     # Initialise output array
     output = zeros(Complex{T}, mx, nx)
