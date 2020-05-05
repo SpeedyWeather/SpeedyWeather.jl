@@ -5,14 +5,14 @@ and spectral topography `ϕ0`.
 function geopotential!( ϕ::Array{T,3},      # geopotential
                         ϕ0::Array{T,2},     # geop
                         Tabs::Array{T,3},   # absolute Temperature
-                        geometry::Geometry{T}) where {T<:AbstractFloat}
+                        G::GeoSpectral{T}) where {T<:AbstractFloat}
 
     mx,nx,nlev = size(ϕ)
 
     @boundscheck size(ϕ) == size(Tabs) || throw(BoundsError())
     @boundscheck (mx,nx) == size(ϕ0)   || throw(BoundsError())
 
-    @unpack xgeop1, xgeop2, lapserate_correction = geometry
+    @unpack xgeop1, xgeop2, lapserate_correction = G.geometry
 
     # Bottom layer (integration over half a layer) is last index
     ϕ[:,:,end] = ϕ0 + xgeop1[end]*Tabs[:,:,end]
