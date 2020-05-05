@@ -2,10 +2,10 @@
 Inverse Fourier transform in zonal direction.
 """
 function fourier_inverse(   input::Array{Complex{T},2},
-                            geometry::Geometry{T},
+                            G::GeoSpectral{T},
                             scale::Bool=false) where {T<:AbstractFloat}
 
-    @unpack nlon, nlat, mx, cosg⁻¹ = geometry
+    @unpack nlon, nlat, nlat_half, mx, cosg⁻¹ = G.geometry
 
     # preallocate, TODO turn into plan_irfft for performance
     output = zeros(T, nlon, nlat)
@@ -14,13 +14,13 @@ function fourier_inverse(   input::Array{Complex{T},2},
     for j in 1:nlat
         # Do inverse FFT then multiply by number of longitudes
         # add the truncated wavenumbers with zeros
-        output[:,j] = nlonT*irfft(vcat(input[:,j], zeros(Complex{T}, div(96,2)+1-mx)), nlon)
+        output[:,j] = nlonT*irfft(vcat(input[:,j], zeros(Complex{T}, nlat_half+1-mx)), nlon)
     end
 
     # Scale by cosine(lat) if needed
     if scale
         for j in 1:nlat
-            output[:,j] *= geometry.cosg⁻¹[j]
+            output[:,j] *= cosg⁻¹[j]
         end
     end
 
@@ -30,15 +30,16 @@ end
 """
 Fourier transform in the zonal direction.
 """
-function fourier(input::Array{T,2},geometry::Geometry{T}) where T
+function fourier(   input::Array{T,2},
+                    G::GeoSpectral{T}) where {T<:AbstractFloat}
 
-    @unpack nlon, nlat, mx = geometry
+    @unpack nlon, nlat, mx = G.geometry
 
     # preallocate output
     #TODO pass on output array as argument, turn fourier into fourier!
     output = zeros(Complex{T}, mx, nlat)
 
-    one_over_nlon = 1/T(nlon)
+    one_over_nlon = T(1/nlon)
 
     # Copy grid-point data into working array
     for j in 1:nlat
