@@ -2,90 +2,105 @@
 struct Prognostics{T<:AbstractFloat}
     ξ::Array{Complex{T},3}       # Vorticity [?]
     D::Array{Complex{T},3}       # Divergence [?]
-    Tabs::Array{Complex{T},3}    # Absolute temperature [?]
-    logp::Array{Complex{T},2}    # Log of surface pressure [?]
+    Tabs::Array{Complex{T},3}    # Absolute temperature [K]
+    logp::Array{Complex{T},2}    # Log of surface pressure [log(Pa)]
     humid::Array{Complex{T},3}   # Specific humidity [g/kg]
-    ϕ::Array{Complex{T},3}       # Atmospheric geopotential [?]
-    ϕ0::Array{Complex{T},2}      # Surface geopotential [?]
+    ϕ::Array{Complex{T},3}       # Atmospheric geopotential [m²/s²]
+    ϕ0::Array{Complex{T},2}      # Surface geopotential [m²/s²]
 end
 
-function initialize_from_rest(  ::Type{T},
-                                ϕ0_grid::AbstractMatrix,
-                                geometry::Geometry,
-                                constants::Constants,
-                                spectral_trans::SpectralTrans)
+function initial_conditions(    P::Params,
+                                B::Boundaries{T},
+                                G::GeoSpectral{T}) where T
 
-    @unpack nlon, nlat, nlev, mx, nx, σ_full = geometry
-    @unpack g, R, γ, hscale, hshum, refrh1 = constants
+    #if P.initial_conditions == "rest"
+    Progs = initialize_from_rest(P,B,G)
+    #TODO allow for restart from file
 
-    ξ     = zeros(Complex{T}, mx, nx, nlev)
-    D     = zeros(Complex{T}, mx, nx, nlev)
-    Tabs  = zeros(Complex{T}, mx, nx, nlev)
-    logp  = zeros(Complex{T}, mx, nx)
-    humid = zeros(Complex{T}, mx, nx, nlev)
-    ϕ     = zeros(Complex{T}, mx, nx, nlev)
+    return Progs
+end
+
+
+function initialize_from_rest(  P::Params,
+                                B::Boundaries{T},
+                                G::GeoSpectral{T}) where T
+
+    @unpack nlev = G.geometry
+    @unpack mx, nx = G.spectral
+    @unpack ϕ0 = B
+
+    # conversion to type T later when creating a Prognostics struct
+    ξ     = zeros(Complex{Float64}, mx, nx, nlev)   # Vorticity
+    D     = zeros(Complex{Float64}, mx, nx, nlev)   # Divergence
+    Tabs  = zeros(Complex{Float64}, mx, nx, nlev)   # Absolute Temperature
+    logp  = zeros(Complex{Float64}, mx, nx)         # logarithm of surface pressure
+    humid = zeros(Complex{Float64}, mx, nx, nlev)   # specific humidity
+    ϕ     = zeros(Complex{Float64}, mx, nx, nlev)   # geopotential
 
     # Compute spectral surface geopotential
-    ϕ0    = Complex{T}.(grid_to_spec(ϕ0_grid,spectral_trans, geometry))
+    ϕ0spectral    = spectral(Float64.(ϕ0),G)
 
-    surfg = zeros(T, nlon, nlat)
+    # TEMPERATURE
+    # Tabs_ref: Reference absolute T [K] at surface z = 0, constant lapse rate
+    # Tabs_top: Reference absolute T in the stratosphere [K], lapse rate = 0
+    @unpack Tabs_ref, Tabs_top, γ, g, R = P
+    @unpack σ_full = G.geometry
 
-    γ_g = γ/(1000.0g)   # Lapse rate [K/m] scaled by gravity
+    γ_g = γ/g/1000                  # Lapse rate [K/m] scaled by gravity
+    T0 = -γ_g*ϕ0spectral            # Surface air temperature
+    # adjust the mean value (spectral coefficient 1,1) with Tabs_ref
+    T0[1,1] += Complex(√2*Tabs_ref)
 
-
-
-    # 2. Start from reference atmosphere (at rest)
-
-    # 2.2 Set reference temperature :
-    #     tropos:  T = 288 degK at z = 0, constant lapse rate
-    #     stratos: T = 216 degK, lapse rate = 0
-    Tabs_ref  = 288.0   #TODO pass on from param
-    Tabs_top  = 216.0
-
-    # Surface and stratospheric air temperature
-    surfs = -γ_g*ϕₛ
-
-    Tₐ[1,1,1,1] = √(2.0)*Complex{T}(1.0)*Tₐ_top
-    Tₐ[1,1,2,1] = √(2.0)*Complex{T}(1.0)*Tₐ_top
-    surfs[1,1] = √(2.0)*Complex{T}(1.0)*Tₐ_ref - γ_g*ϕₛ[1,1]
+    # Stratosphere, set the first spectral coefficient (=mean value)
+    # in two uppermost levels (i.e. 1,2) for lapse rate = 0
+    #TODO why √2?
+    Tabs[1,1,1] = Complex(√2*Tabs_top)
+    Tabs[1,1,2] = Complex(√2*Tabs_top)
 
     # Temperature at tropospheric levels
     for k in 3:nlev
-        Tₐ[:,:,k,1] = surfs*σ_full[k]^(R*γ_g)
+        Tabs[:,:,k] = T0*σ_full[k]^(R*γ_g)
     end
 
-    # 2.3 Set log(ps) consistent with temperature profile
-    #     p_ref = 1013 hPa at z = 0
+    # PRESSURE
+    # Set logp - logarithm of surface pressure consistent with temperature profile
+    @unpack nlon, nlat, p_ref = P
+    logp_ref = log(p_ref)             # logarithm of reference surface pressure
+    logp0 = zeros(nlon, nlat)         # logarithm of surface pressure by grid point
+
     for j in 1:nlat
         for i in 1:nlon
-            surfg[i,j] = log(1.013) + log(1.0 - γ_g*ϕ₀ₛ[i,j]/Tₐ_ref)/(R*γ_g)
+            logp0[i,j] = logpref + log(1.0 - γ_g*ϕ0[i,j]/Tabs_ref)/(R*γ_g)
         end
     end
 
-    pₛ[:,:,1] = truncate(spectral_trans.trfilt, grid_to_spec(geometry, spectral_trans, surfg))
+    logp = spectral(T.(logp0),G)    # logarithm of surface pressure in spectral space
+    truncate!(logp)                 # spectral truncation
 
-    # 2.4 Set tropospheric specific humidity in g/kg
-    #     Qref = RHref * Qsat(288K, 1013hPa)
-    esref = 17.0
-    qref = refrh1*0.622*esref
-    qexp = hscale/hshum
+    # SPECIFIC HUMIDITY
+    @unpack es_ref, rh_ref, hsum, hscale = P
+    qref = rh_ref*0.622*es_ref      # reference specific humidity
+    qexp = hscale/hshum             # ratio of scale heights
+    q = zeros(nlon,nlat)            # specific humidity by grid point
 
     # Specific humidity at the surface
     for j in 1:nlat
         for i in 1:nlon
-            surfg[i,j] = qref*exp(qexp*surfg[i,j])
+            q[i,j] = qref*exp(qexp*logp0[i,j])
         end
     end
 
-    surfs = truncate(spectral_trans.trfilt, grid_to_spec(geometry, spectral_trans, surfg))
+    humid0 = spectral(T.(q),G)
+    truncate!(humid0,G.spectral.trunc)
 
-    # Specific humidity at tropospheric levels
+    # Specific humidity at tropospheric levels (zero in the stratosphere[?])
     for k in 3:nlev
-        tr[:,:,k,1,1] = surfs*σ_full[k]^qexp
+        humid[:,:,k] = humid0*σ_full[k]^qexp
     end
 
     # Print diagnostics from initial conditions
-    check_diagnostics(geometry, spectral_trans, ξ[:,:,:,1], D[:,:,:,1], Tₐ[:,:,:,1], 0)
+    check_global_mean_temperature(Tabs, P)
 
-    Prognostics(ξ, D, Tabs, logp, humid, ϕ, ϕ0)
+    # conversion to T happens here implicitly
+    return Prognostics(ξ, D, Tabs, logp, humid, ϕ, ϕ0spectral)
 end
