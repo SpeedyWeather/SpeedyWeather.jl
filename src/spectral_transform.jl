@@ -1,6 +1,12 @@
 struct SpectralTrans{T<:AbstractFloat}
+    # SIZE OF SPECTRAL GRID
+    trunc::Int      # Spectral truncation
+    nx::Int         # Number of total wavenumbers
+    mx::Int         # Number of zonal wavenumbers
+
+    # LEGENDRE ARRAYS
     leg_weight::Array{T,1}          # Legendre weights
-    nsh2::Vector{Int}               # What's this?
+    nsh2::Arry{Int,1}               # What's this?
     leg_poly::Array{Complex{T},3}   # Legendre polynomials
     el2::Array{T,2}                 # el2 = l*(l+1)/(r^2)
     el2⁻¹::Array{T,2}               # el2⁻¹ = 1/el2
@@ -17,14 +23,28 @@ struct SpectralTrans{T<:AbstractFloat}
     vddyp::Array{T,2}
 end
 
-function SpectralTrans{T}(constants::Constants,geometry::Geometry) where T
-    @unpack nlat, trunc, mx, nx = geometry
-    @unpack R_earth = constants
-    nlat_half = nlat ÷ 2
+struct GeoSpectral{T<:AbstractFloat}
+    geometry::Geometry{T}
+    spectral::SpectralTrans{T}
+end
 
-    # First compute Gaussian latitudes and weights at the nlat/2 points from pole to equator
-    # wt contains the Gaussian weights for quadratures
-    leg_weight = legendre_weights(geometry)
+function GeoSpectral{T}(C::Constants,P::Params) where T
+    G = Geometry{T}(C,P)
+    S = SpectralTrans{T}(C,G)
+    return GeoSpectral{T}(G,S)
+end
+
+function SpectralTrans{T}(C::Constants,G::Geometry) where T
+
+    @unpack nlat, nlat_half, trunc, mx, nx = G
+    @unpack R_earth = C
+
+    # SIZE OF SPECTRAL GRID
+    nx = trunc+2
+    mx = trunc+1
+
+    # First compute Gaussian weights from pole to equator (=first half or array)
+    leg_weight = gausslegendre(nlat)[2][1:nlat_half]
 
     #TODO what's this?
     nsh2 = zeros(Int, nx)
@@ -109,26 +129,42 @@ function SpectralTrans{T}(constants::Constants,geometry::Geometry) where T
         end
     end
 
-    SpectralTrans{T}(leg_weight, nsh2, leg_poly, el2, el2⁻¹, el4,
-                    gradx, uvdx, uvdym, uvdyp, gradym, gradyp, vddym, vddyp)
+    SpectralTrans{T}(trunc,nx,mx,
+                    leg_weight,nsh2,leg_poly,el2,el2⁻¹,el4,
+                    gradx,uvdx,uvdym,uvdyp,gradym,gradyp,vddym,vddyp)
 end
 
-# Laplacian and inverse Laplacian
-#TODO this is presumably faster with loops
-∇²(field, spectral_trans::SpectralTrans) = -field.*spectral_trans.el2
-∇⁻²(field, spectral_trans::SpectralTrans) = -field.*spectral_trans.el2⁻¹
-
-# Spectral transforms
-function spec_to_grid(  input::AbstractMatrix,
-                        spectral_trans::SpectralTrans,
-                        geometry::Geometry)
-    return fourier_inverse(legendre_inverse(input,spectral_trans,geometry),geometry)
+"""
+Laplacian in spectral space.
+"""
+function ∇²(    field::Array{Complex{T},2},
+                G::GeoSpectral{T}) where {T<:AbstractFloat}
+    #TODO this is presumably faster with loops
+    return -field.*G.spectral.el2
 end
 
-function grid_to_spec(  input::AbstractMatrix,
-                        spectral_trans::SpectralTrans,
-                        geometry::Geometry)
-    return legendre(fourier(input,geometry),spectral_trans,geometry)
+"""
+Inverse Laplacian in spectral space.
+"""
+function ∇⁻²(   field::Array{Complex{T},2},
+                G::GeoSpectral{T}) where {T<:AbstractFloat}
+    return -field.*G.spectral.el2⁻¹
+end
+
+"""
+Transform a spectral array into grid-point space.
+"""
+function gridded(   input::Array{Complex{T},2},
+                    G::GeoSpectral{T}) where {T<:AbstractFloat}
+    return fourier_inverse(legendre_inverse(input,G),G)
+end
+
+"""
+Transform a gridded array into spectral space.
+"""
+function spectral(  input::Array{T,2},
+                    G::GeoSpectral{T}) where {T<:AbstractFloat}
+    return legendre(fourier(input,G),G)
 end
 
 function grad!( ψ::Array{T,2},
@@ -253,8 +289,8 @@ function vdspec!(   ug::Array{T,2},
     end
 
     #TODO add spectral_trans and geometry as arguments
-    specu = grid_to_spec(ug1)
-    specv = grid_to_spec(vg1)
+    specu = spectral(ug1,G)
+    specv = spectral(vg1,G)
     vds!(specu, specv, vorm, divm)
 end
 
@@ -278,12 +314,11 @@ end
 Truncate a grid-point field in spectral space.
 """
 function spectral_truncation(   input::Array{T,2},
-                                spectral_trans::SpectralTrans{T},
-                                geometry::Geometry{T}) where {T<:AbstractFloat}
+                                G::GeoSpectral{T}) where {T<:AbstractFloat}
 
-    @unpack trunc = geometry
+    @unpack trunc = G.geometry
 
-    input_spectral = grid_to_spec(input, spectral_trans, geometry)
+    input_spectral = spectral(input, G)
     truncate!(input_spectral,trunc)
-    return spec_to_grid(input_spectral, spectral_trans, geometry)
+    return gridded(input_spectral, G)
 end
