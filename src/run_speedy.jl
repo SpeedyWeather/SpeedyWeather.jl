@@ -15,8 +15,8 @@ function run_speedy(::Type{T}=Float32;      # number format
 
     P = Params(T=T,kwargs...)
     C = Constants{T}(P)
-    G = GeoSpectral{T}(P,C)
-    B = Boundaries{T}(C,G,S)
+    G = GeoSpectral{T}(P)
+    B = Boundaries{T}(P,G)
 
     # # TODO
     # Prog = PrognosticVars{T}()
@@ -24,5 +24,5 @@ function run_speedy(::Type{T}=Float32;      # number format
 
     #time_stepping!()
 
-    return G,S,B
+    return G,B
 end

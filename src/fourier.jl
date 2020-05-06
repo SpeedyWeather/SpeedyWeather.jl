@@ -5,7 +5,8 @@ function fourier_inverse(   input::Array{Complex{T},2},
                             G::GeoSpectral{T},
                             scale::Bool=false) where {T<:AbstractFloat}
 
-    @unpack nlon, nlat, nlat_half, mx, cosg⁻¹ = G.geometry
+    @unpack nlon, nlat, nlon_half, cosg⁻¹ = G.geometry
+    @unpack mx = G.spectral
 
     # preallocate, TODO turn into plan_irfft for performance
     output = zeros(T, nlon, nlat)
@@ -14,7 +15,7 @@ function fourier_inverse(   input::Array{Complex{T},2},
     for j in 1:nlat
         # Do inverse FFT then multiply by number of longitudes
         # add the truncated wavenumbers with zeros
-        output[:,j] = nlonT*irfft(vcat(input[:,j], zeros(Complex{T}, nlat_half+1-mx)), nlon)
+        output[:,j] = nlonT*irfft(vcat(input[:,j], zeros(Complex{T}, nlon_half+1-mx)), nlon)
     end
 
     # Scale by cosine(lat) if needed
@@ -33,7 +34,8 @@ Fourier transform in the zonal direction.
 function fourier(   input::Array{T,2},
                     G::GeoSpectral{T}) where {T<:AbstractFloat}
 
-    @unpack nlon, nlat, mx = G.geometry
+    @unpack nlon, nlat = G.geometry
+    @unpack mx = G.spectral
 
     # preallocate output
     #TODO pass on output array as argument, turn fourier into fourier!

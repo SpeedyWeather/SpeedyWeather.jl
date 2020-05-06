@@ -5,6 +5,7 @@ struct Geometry{T<:AbstractFloat}
     nlat::Int           # Number of latitudes
     nlev::Int           # Number of vertical levels
     nlat_half::Int      # Number of latitudes in one hemisphere
+    nlon_half::Int      # Half the number of longitudes
 
     dlon::T             # grid spacing in longitude
     dlat::T             # average grid spacing in latitude
@@ -40,12 +41,13 @@ end
 """
 Defines the geometry.
 """
-function Geometry{T}(C::Constants,P::Params) where T
+function Geometry{T}(P::Params) where T
 
-    @unpack R,Ω,akap = C
     @unpack nlon,nlat,nlev,trunc = P
+    @unpack R,Ω,akap = P
 
     nlat_half = nlat ÷ 2
+    nlon_half = nlon ÷ 2
 
     # GRID SPACE ARRAYS GAUSSIAN GRID - lon is equi-spaced, lat is not!
     dlon = 360 / nlon                       # grid spacing in longitude
@@ -95,7 +97,8 @@ function Geometry{T}(C::Constants,P::Params) where T
     end
 
     # conversion to T happens here
-    Geometry{T}(nlon,nlat,nlev,nlat_half,dlon,dlat,lon,lat,
+    Geometry{T}(nlon,nlat,nlev,nlat_half,nlon_half,
+                dlon,dlat,lon,lat,
                 σ_half,σ_full,σ_thick,σ_half⁻¹_2,σ_f,
                 sinlat,coslat,sinlat_NH,coslat_NH,radang,
                 cosg,cosg⁻¹,cosg⁻²,f,xgeop1,xgeop2,lapserate_correction)

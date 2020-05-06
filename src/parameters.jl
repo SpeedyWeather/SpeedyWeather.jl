@@ -5,7 +5,7 @@ With keywords such that default values can be changed at creation.
 @with_kw struct Params
 
     # NUMBER FORMATS
-    T::DataType             # number format
+    T::DataType=Float64     # number format
 
     # RESOLUTION
     nlon::Int=96            # number of longitudes

@@ -6,7 +6,7 @@ struct SpectralTrans{T<:AbstractFloat}
 
     # LEGENDRE ARRAYS
     leg_weight::Array{T,1}          # Legendre weights
-    nsh2::Arry{Int,1}               # What's this?
+    nsh2::Array{Int,1}               # What's this?
     leg_poly::Array{Complex{T},3}   # Legendre polynomials
     el2::Array{T,2}                 # el2 = l*(l+1)/(r^2)
     el2⁻¹::Array{T,2}               # el2⁻¹ = 1/el2
@@ -23,21 +23,21 @@ struct SpectralTrans{T<:AbstractFloat}
     vddyp::Array{T,2}
 end
 
-struct GeoSpectral{T<:AbstractFloat}
+struct GeoSpectral{T}
     geometry::Geometry{T}
     spectral::SpectralTrans{T}
 end
 
-function GeoSpectral{T}(C::Constants,P::Params) where T
-    G = Geometry{T}(C,P)
-    S = SpectralTrans{T}(C,G)
+function GeoSpectral{T}(P::Params) where {T<:AbstractFloat}
+    G = Geometry{T}(P)
+    S = SpectralTrans{T}(P,G)
     return GeoSpectral{T}(G,S)
 end
 
-function SpectralTrans{T}(C::Constants,G::Geometry) where T
+function SpectralTrans{T}(P::Params,G::Geometry) where T
 
-    @unpack nlat, nlat_half, trunc, mx, nx = G
-    @unpack R_earth = C
+    @unpack nlat, nlat_half = G
+    @unpack R_earth, trunc = P
 
     # SIZE OF SPECTRAL GRID
     nx = trunc+2
@@ -78,9 +78,9 @@ function SpectralTrans{T}(C::Constants,G::Geometry) where T
 
     # Generate associated Legendre polynomials
     # get_legendre_poly computes the polynomials at a particular latitiude
-    leg_poly = zeros(Complex{T}, mx, nx, nlat_half)
+    leg_poly = zeros(mx, nx, nlat_half)
     for j in 1:nlat_half
-        leg_poly[:,:,j] = legendre_polynomials(j, ε, ε⁻¹, geometry)
+        leg_poly[:,:,j] = legendre_polynomials(j,ε,ε⁻¹,mx,nx,G)
     end
 
     el2   = zeros(mx, nx)
@@ -316,7 +316,7 @@ Truncate a grid-point field in spectral space.
 function spectral_truncation(   input::Array{T,2},
                                 G::GeoSpectral{T}) where {T<:AbstractFloat}
 
-    @unpack trunc = G.geometry
+    @unpack trunc = G.spectral
 
     input_spectral = spectral(input, G)
     truncate!(input_spectral,trunc)
