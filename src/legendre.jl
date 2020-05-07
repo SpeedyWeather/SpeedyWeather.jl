@@ -4,22 +4,22 @@ Calculate the Legendre polynomials. TODO reference
 function legendre_polynomials(  j::Int,
                                 ε::AbstractMatrix,
                                 ε⁻¹::AbstractMatrix,
-                                G::GeoSpectral)
+                                mx::Int,
+                                nx::Int,
+                                G::Geometry)
 
-    @unpack coslat_NH, sinlat_NH = G.geometry
-    @unpack mx, nx = G.spectral
+    @unpack coslat_NH, sinlat_NH = G
 
-    small = 1e-30
     alp = zeros(mx+1,nx)
 
     # swap cos/sin from the original in f90
-    y = sinlat_NH[j]
     x = coslat_NH[j]
+    y = sinlat_NH[j]
 
     # Start recursion with n = 1 (m = l) diagonal
-    alp[1,1] = sqrt(0.45)
+    alp[1,1] = sqrt(0.5)
     for m in 2:mx+1
-        alp[m,1] = sqrt(0.5*(2.0*(m - 1) + 1.0)/(m - 1))*y*alp[m-1,1]
+        alp[m,1] = sqrt(0.5*(2m - 1)/(m-1))*y*alp[m-1,1]
     end
 
     # Continue with other elements
@@ -34,13 +34,14 @@ function legendre_polynomials(  j::Int,
     end
 
     # Zero polynomials with absolute values smaller than 10^(-30)
-    for n in 1:nx
-        for m in 1:mx+1
-            if abs(alp[m,n]) <= small
-                alp[m,n] = 0.0
-            end
-        end
-    end
+    # small = 1e-30
+    # for n in 1:nx
+    #     for m in 1:mx+1
+    #         if abs(alp[m,n]) <= small
+    #             alp[m,n] = 0.0
+    #         end
+    #     end
+    # end
 
     # pick off the required polynomials
     return alp[1:mx,1:nx]
@@ -53,7 +54,8 @@ function legendre_inverse(  input::Array{Complex{T},2},
                             G::GeoSpectral{T}) where {T<:AbstractFloat}
 
     @unpack leg_weight, nsh2, leg_poly = G.spectral
-    @unpack nlat, nlat_half, trunc, mx, nx = G.geometry
+    @unpack trunc, mx, nx = G.spectral
+    @unpack nlat, nlat_half = G.geometry
 
     # Initialize output array
     output = zeros(Complex{T}, mx, nlat)
@@ -96,7 +98,8 @@ function legendre(  input::Array{Complex{T},2},
                     G::GeoSpectral{T}) where {T<:AbstractFloat}
 
     @unpack leg_weight, nsh2, leg_poly = G.spectral
-    @unpack nlat, nlat_half, trunc, mx, nx = G.geometry
+    @unpack trunc, mx, nx = G.spectral
+    @unpack nlat, nlat_half = G.geometry
 
     # Initialise output array
     output = zeros(Complex{T}, mx, nx)

@@ -10,7 +10,7 @@ Struct holding the parameters needed at runtime at data type T.
     γ::T            # Reference temperature lapse rate (-dT/dz in deg/km)
     hscale::T       # Reference scale height for pressure (in km)
     hshum::T        # Reference scale height for specific humidity (in km)
-    refrh1::T       # Reference relative humidity of near-surface air
+    rh_ref::T       # Reference relative humidity of near-surface air
 end
 
 """
@@ -18,8 +18,8 @@ Generator function for a Constants struct to convert parameters to data type T.
 """
 function Constants{T}(P::Params) where T
 
-    @unpack R_earth, Ω, g, akap, R, γ, hscale, hshum, refrh1 = P
+    @unpack R_earth, Ω, g, akap, R, γ, hscale, hshum, rh_ref = P
 
     # This implies conversion to T
-    return Constants{T}(R_earth,Ω,g,akap,R,γ,hscale,hshum,refrh1)
+    return Constants{T}(R_earth,Ω,g,akap,R,γ,hscale,hshum,rh_ref)
 end

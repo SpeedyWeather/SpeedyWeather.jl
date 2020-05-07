@@ -70,15 +70,15 @@ function initialize_from_rest(  P::Params,
 
     for j in 1:nlat
         for i in 1:nlon
-            logp0[i,j] = logpref + log(1.0 - γ_g*ϕ0[i,j]/Tabs_ref)/(R*γ_g)
+            logp0[i,j] = logp_ref + log(1.0 - γ_g*ϕ0[i,j]/Tabs_ref)/(R*γ_g)
         end
     end
 
     logp = spectral(T.(logp0),G)    # logarithm of surface pressure in spectral space
-    truncate!(logp)                 # spectral truncation
+    truncate!(logp,G.spectral.trunc)# spectral truncation
 
     # SPECIFIC HUMIDITY
-    @unpack es_ref, rh_ref, hsum, hscale = P
+    @unpack es_ref, rh_ref, hshum, hscale = P
     qref = rh_ref*0.622*es_ref      # reference specific humidity
     qexp = hscale/hshum             # ratio of scale heights
     q = zeros(nlon,nlat)            # specific humidity by grid point
@@ -97,6 +97,9 @@ function initialize_from_rest(  P::Params,
     for k in 3:nlev
         humid[:,:,k] = humid0*σ_full[k]^qexp
     end
+
+    # GEOPOTENTIAL [?]
+    geopotential!(ϕ,ϕ0spectral,Tabs,G)
 
     # Print diagnostics from initial conditions
     check_global_mean_temperature(Tabs, P)
