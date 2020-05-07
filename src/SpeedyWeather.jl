@@ -1,25 +1,22 @@
 module SpeedyWeather
 
-using NetCDF, FFTW, LinearAlgebra, Parameters, Dates,
-        FastGaussQuadrature
+    using NetCDF, FFTW, LinearAlgebra, Parameters, Dates, FastGaussQuadrature
 
-export run_speedy
+    export run_speedy, Params, GeoSpectral, Boundaries,
+        fourier, fourier_inverse,
+        legendre, legendre_inverse,
+        spectral, gridded
 
-include("constants.jl")
-include("geometry.jl")
-include("fourier.jl")
-include("legendre.jl")
-include("spectral_transform.jl")
-
-# include("params.jl")
-# include("spectral_trans.jl")
-# include("prognostics.jl")
-# include("input_output.jl")
-# include("boundaries.jl")
-# include("diagnostics.jl")
-# include("geopotential.jl")
-# include("horizontal_diffusion.jl")
-# include("implicit.jl")
-# include("models.jl")
+    include("parameters.jl")
+    include("constants.jl")
+    include("geometry.jl")
+    include("spectral_transform.jl")
+    include("legendre.jl")
+    include("fourier.jl")
+    include("boundaries.jl")
+    include("diagnostics.jl")
+    include("prognostics.jl")
+    include("geopotential.jl")
+    include("run_speedy.jl")
 
 end

@@ -43,38 +43,24 @@ function SpectralTrans{T}(P::Params,G::Geometry) where T
     nx = trunc+2
     mx = trunc+1
 
-    # First compute Gaussian weights from pole to equator (=first half or array)
+    # LEGENDRE WEIGHTS from pole to equator (=first half or array)
     leg_weight = gausslegendre(nlat)[2][1:nlat_half]
 
-    #TODO what's this?
+    # Spectral packing of speedy is m',n', where m' = m, n' = m+n with m,n being the
+    # conventional wavenumbers. Due to Julia's 1-based indexing subtract two, as
+    # the Legendre polynomials start with
     nsh2 = zeros(Int, nx)
     for n in 1:nx
-        nsh2[n] = 0
         for m in 1:mx
-            N = m + n - 2
-            if N <= trunc + 1
+            if m + n - 2 <= trunc + 1
                 nsh2[n] = nsh2[n] + 1
             end
         end
     end
 
-    #TODO what's this, separate into function
-    ε   = zeros(mx+1,nx+1)
-    ε⁻¹ = zeros(mx+1,nx+1)
-    for m in 1:mx+1
-        for n in 1:nx+1
-            if n == nx + 1
-                ε[m,n] = 0.0
-            elseif n == 1 && m == 1
-                ε[m,n] = 0.0
-            else
-                ε[m,n] = sqrt(((n+m-2)^2 - (m-1)^2)/(4*(n+m-2)^2 - 1))
-            end
-            if ε[m,n] > 0.0
-                ε⁻¹[m,n] = 1.0/ε[m,n]
-            end
-        end
-    end
+    # Epsilon-factors for the recurrence relation of the normalized associated
+    # Legendre polynomials.
+    ε,ε⁻¹ = ε_recurrence(mx,nx)
 
     # Generate associated Legendre polynomials
     # get_legendre_poly computes the polynomials at a particular latitiude
@@ -318,4 +304,38 @@ function spectral_truncation(   input::Array{T,2},
     input_spectral = spectral(input, G)
     truncate!(input_spectral,trunc)
     return gridded(input_spectral, G)
+end
+
+"""
+Epsilon-factors for the recurrence relation of the normalized associated
+Legendre polynomials. From Krishnamurti, Bedi, Hardiker, 2014. Introduction to
+global spectral modelling, Chapter 6.5 Recurrence Relations, Eq. (6.37)
+
+ε_n^m = sqrt( (n^2-m^2) / (4n^2 - 1) )
+
+with m,n being the wavenumbers of the associated Legendre polynomial P_n^m.
+Due to the spectral packing in speedy and Julia's 1-based indexing we substitute
+
+    m -> m-1
+    n -> n+m-2.
+"""
+function ε_recurrence(mx::Integer,nx::Integer)
+    ε   = zeros(mx+1,nx+1)
+    ε⁻¹ = zeros(mx+1,nx+1)
+    for m in 1:mx+1
+        for n in 1:nx+1
+            if n == nx + 1
+                ε[m,n] = 0.0
+            elseif n == 1 && m == 1
+                ε[m,n] = 0.0
+            else
+                ε[m,n] = sqrt(((n+m-2)^2 - (m-1)^2)/(4*(n+m-2)^2 - 1))
+            end
+            if ε[m,n] > 0.0
+                ε⁻¹[m,n] = 1.0/ε[m,n]
+            end
+        end
+    end
+
+    return ε,ε⁻¹
 end

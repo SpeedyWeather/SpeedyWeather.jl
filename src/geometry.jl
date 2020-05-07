@@ -53,7 +53,8 @@ function Geometry{T}(P::Params) where T
     dlon = 360 / nlon                       # grid spacing in longitude
     dlat = 180 / nlat                       # average grid spacing in latitude
     lon  = Array(0:dlon:360-dlon)           # array of longitudes
-    lat  = asind.(gausslegendre(nlat)[1])   # array of latitudes
+    lat  = reverse(asind.(gausslegendre(nlat)[1]))
+                                            # array of latitudes (North to South)
                                             # which correspond to the zeros
                                             # of the legendre polynomial order nlat
 
@@ -69,8 +70,8 @@ function Geometry{T}(P::Params) where T
     # SINES AND COSINES OF LATITUDE
     sinlat = sind.(lat)
     coslat = cosd.(lat)
-    sinlat_NH = sinlat[nlat_half+1:end]     # sinlat only for northern hemisphere
-    coslat_NH = coslat[nlat_half+1:end]
+    sinlat_NH = sinlat[1:nlat_half]     # sinlat only for northern hemisphere
+    coslat_NH = coslat[1:nlat_half]
     radang = asin.(sinlat)
     cosg   = sinlat                         # inconsistent here due to the sin/cos swap
     cosg⁻¹ = T(1.0)./cosg
