@@ -17,10 +17,15 @@ end
 function Boundaries{T}( P::Params,
                         G::GeoSpectral{T}) where {T<:AbstractFloat}
 
-    @unpack boundary_file_path, boundary_file_name, g = P
+    @unpack boundary_path, boundary_file, g = P
 
     # LOAD NETCDF FILE
-    path = joinpath(boundary_file_path,boundary_file_name)
+    if boundary_path == ""
+        path = joinpath(@__DIR__,"../data",boundary_file)
+    else
+        path = joinpath(boundary_path,boundary_file)
+    end
+    println(path)
     nc = NetCDF.open(path)
     orog = nc.vars["orog"][:,end:-1:1]  # latitude is North to South in file
     lsm = nc.vars["lsm"][:,end:-1:1]
