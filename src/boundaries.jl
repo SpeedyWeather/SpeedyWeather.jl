@@ -25,7 +25,6 @@ function Boundaries{T}( P::Params,
     else
         path = joinpath(boundary_path,boundary_file)
     end
-    println(path)
     nc = NetCDF.open(path)
     orog = nc.vars["orog"][:,end:-1:1]  # latitude is North to South in file
     lsm = nc.vars["lsm"][:,end:-1:1]
