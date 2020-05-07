@@ -12,9 +12,8 @@ function legendre_polynomials(  j::Int,
 
     alp = zeros(mx+1,nx)
 
-    # swap cos/sin from the original in f90
-    x = coslat_NH[j]
-    y = sinlat_NH[j]
+    x = sinlat_NH[j]
+    y = coslat_NH[j]
 
     # Start recursion with n = 1 (m = l) diagonal
     alp[1,1] = sqrt(0.5)

@@ -1,15 +1,15 @@
-using Parameters, FFTW, LinearAlgebra, NetCDF, FastGaussQuadrature
-
-include("parameters.jl")
-include("constants.jl")
-include("geometry.jl")
-include("spectral_transform.jl")
-include("legendre.jl")
-include("fourier.jl")
-include("boundaries.jl")
-include("diagnostics.jl")
-include("prognostics.jl")
-include("geopotential.jl")
+# using Parameters, FFTW, LinearAlgebra, NetCDF, FastGaussQuadrature
+#
+# include("parameters.jl")
+# include("constants.jl")
+# include("geometry.jl")
+# include("spectral_transform.jl")
+# include("legendre.jl")
+# include("fourier.jl")
+# include("boundaries.jl")
+# include("diagnostics.jl")
+# include("prognostics.jl")
+# include("geopotential.jl")
 
 function run_speedy(::Type{T}=Float64;      # number format
                     kwargs...               # all additional parameters

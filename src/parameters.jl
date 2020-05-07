@@ -58,8 +58,8 @@ With keywords such that default values can be changed at creation.
                                 # 0.5 -> centered implicit
 
     # BOUNDARY FILES
-    boundary_file_path::String="data"
-    boundary_file_name::String="surface.nc"
+    boundary_path::String=""      # package location is default
+    boundary_file::String="surface.nc"
 
     # INITIAL CONDITIONS
     initial_conditions::String="rest"
