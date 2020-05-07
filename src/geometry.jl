@@ -53,10 +53,10 @@ function Geometry{T}(P::Params) where T
     dlon = 360 / nlon                       # grid spacing in longitude
     dlat = 180 / nlat                       # average grid spacing in latitude
     lon  = Array(0:dlon:360-dlon)           # array of longitudes
+    # array of latitudes (North to South) corresponding to the zeros
+    # of the (unassociated) legendre polynomial order nlat
     lat  = reverse(asind.(gausslegendre(nlat)[1]))
-                                            # array of latitudes (North to South)
-                                            # which correspond to the zeros
-                                            # of the legendre polynomial order nlat
+
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     # sorted such that σ_half[end] is at the planetary boundary
@@ -68,21 +68,21 @@ function Geometry{T}(P::Params) where T
     σ_f = akap ./ (2σ_full)
 
     # SINES AND COSINES OF LATITUDE
-    sinlat = sind.(lat)
+    sinlat = sind.(lat)             
     coslat = cosd.(lat)
-    sinlat_NH = sinlat[1:nlat_half]     # sinlat only for northern hemisphere
+    sinlat_NH = sinlat[1:nlat_half] # sinlat only for northern hemisphere = NH
     coslat_NH = coslat[1:nlat_half]
     radang = asin.(sinlat)
-    cosg   = sinlat                         # inconsistent here due to the sin/cos swap
+    cosg   = sinlat                 # inconsistent here due to the sin/cos swap
     cosg⁻¹ = T(1.0)./cosg
     cosg⁻² = T(1.0)./cosg.^T(2.0)
 
     # CORIOLIS FREQUENCY
     f = 2Ω*sinlat
 
-    # GEOPOTENTIAL
-    xgeop1 = zeros(nlev)                    # coefficients to calculate geopotential
-    xgeop2 = zeros(nlev)                    # coefficients to calculate geopotential
+    # GEOPOTENTIAL coefficients to calculate geopotential (TODO reference)
+    xgeop1 = zeros(nlev)
+    xgeop2 = zeros(nlev)
     for k in 1:nlev
         xgeop1[k] = R*log(σ_half[k+1]/σ_half[k])
         if k != nlev
@@ -90,7 +90,7 @@ function Geometry{T}(P::Params) where T
         end
     end
 
-    # LAPSE RATE
+    # LAPSE RATE correction (TODO reference)
     lapserate_correction = zeros(nlev-2)
     for k in 2:nlev-1
         lapserate_correction[k-1] = 0.5*xgeop1[k]*

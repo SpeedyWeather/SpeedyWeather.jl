@@ -12,7 +12,6 @@ function legendre_polynomials(  j::Int,
 
     alp = zeros(mx+1,nx)
 
-    # swap cos/sin from the original in f90
     x = sinlat_NH[j]
     y = coslat_NH[j]
 
