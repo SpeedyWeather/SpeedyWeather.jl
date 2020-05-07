@@ -8,8 +8,10 @@ include("legendre.jl")
 include("fourier.jl")
 include("boundaries.jl")
 include("diagnostics.jl")
+include("prognostics.jl")
+include("geopotential.jl")
 
-function run_speedy(::Type{T}=Float32;      # number format
+function run_speedy(::Type{T}=Float64;      # number format
                     kwargs...               # all additional parameters
                     ) where {T<:AbstractFloat}
 
@@ -17,6 +19,8 @@ function run_speedy(::Type{T}=Float32;      # number format
     C = Constants{T}(P)
     G = GeoSpectral{T}(P)
     B = Boundaries{T}(P,G)
+
+    Prog = initial_conditions(P,B,G)
 
     # # TODO
     # Prog = PrognosticVars{T}()

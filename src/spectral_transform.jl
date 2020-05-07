@@ -170,13 +170,12 @@ end
 function grad!( ψ::Array{T,2},
                 psdx::Array{Complex{T},2},
                 psdy::Array{T,2},
-                spectral_trans::SpectralTrans{T},
-                geometry::Geometry{T}) where {T<:AbstractFloat}
+                G::GeoSpectral{T}) where {T<:AbstractFloat}
 
     #TODO boundscheck
 
-    @unpack trunc, mx, nx = geometry
-    @unpack gradx, gradyp, gradym = spectral_trans
+    @unpack trunc, mx, nx = G.spectral
+    @unpack gradx, gradyp, gradym = G.spectral
 
     for n in 1:nx
         psdx[:,n] = gradx.*ψ[:,n]*im
@@ -198,15 +197,14 @@ function vds!(  ucosm::Array{T,2},
                 vcosm::Array{T,2},
                 vorm::Array{T,2},
                 divm::Array{T,2},
-                spectral_trans::SpectralTrans{T},
-                geometry::Geometry{T}) where {T<:AbstractFloat}
+                G::GeoSpectral{T}) where {T<:AbstractFloat}
 
     #TODO boundscheck
 
-    @unpack trunc, mx, nx = geometry
-    @unpack gradx, vddym, vddyp = spectral_trans
+    @unpack trunc, mx, nx = G.spectral
+    @unpack gradx, vddym, vddyp = G.spectral
 
-    #TODO preallocate in a diagnostics struct
+    #TODO preallocate in a diagnosticvars struct
     zp = zeros(Complex{T}, mx,nx)
     zc = zeros(Complex{T}, mx,nx)
 
@@ -236,13 +234,12 @@ function uvspec!(   vorm::Array{T,2},
                     divm::Array{T,2},
                     ucosm::Array{T,2},
                     vcosm::Array{T,2},
-                    spectral_trans::SpectralTrans{T},
-                    geometry::Geometry{T}) where {T<:AbstractFloat}
+                    G::GeoSpectral{T}) where {T<:AbstractFloat}
 
     #TODO boundscheck
 
-    @unpack trunc, mx, nx = geometry
-    @unpack uvdx, uvdyp, uvdym = spectral_trans
+    @unpack trunc, mx, nx = G.spectral
+    @unpack uvdx, uvdyp, uvdym = G.spectral
 
     #TODO preallocate elsewhere
     zp = uvdx.*vorm*im
@@ -268,11 +265,11 @@ function vdspec!(   ug::Array{T,2},
                     vorm::Array{T,2},
                     divm::Array{T,2},
                     kcos::Bool,
-                    geometry::Geometry{T}) where {T<:AbstractFloat}
+                    G::GeoSpectral{T}) where {T<:AbstractFloat}
 
     #TODO boundscheck
 
-    @unpack nlat, nlon, cosgr, cosgr2 = geometry
+    @unpack nlat, nlon, cosgr, cosgr2 = G.geometry
 
     #TODO preallocate elsewhere
     ug1 = zeros(T, nlon, nlat)
