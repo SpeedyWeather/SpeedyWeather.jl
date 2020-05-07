@@ -1,7 +1,6 @@
 # Documentation: https://github.com/JuliaCI/Appveyor.jl
 environment:
   matrix:
-  - julia_version: 1.0
   - julia_version: 1.4
   - julia_version: nightly
 platform:
