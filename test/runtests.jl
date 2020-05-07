@@ -26,7 +26,8 @@ end
     G = GeoSpectral{P.T}(P)
     B = Boundaries{P.T}(P,G)
 
-    @unpack mx,nx = G.spectral
+    mx = G.spectral.mx
+    nx = G.spectral.nx
 
     A = Complex.(rand(mx,nx))
     At = spectral(gridded(A,G),G)   # the first transform includes truncation
