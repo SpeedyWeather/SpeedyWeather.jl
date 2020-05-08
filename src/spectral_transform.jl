@@ -6,11 +6,13 @@ struct SpectralTrans{T<:AbstractFloat}
 
     # LEGENDRE ARRAYS
     leg_weight::Array{T,1}          # Legendre weights
-    nsh2::Array{Int,1}               # What's this?
+    nsh2::Array{Int,1}              # What's this?
     leg_poly::Array{Complex{T},3}   # Legendre polynomials
-    el2::Array{T,2}                 # el2 = l*(l+1)/(r^2)
-    el2⁻¹::Array{T,2}               # el2⁻¹ = 1/el2
-    el4::Array{T,2}                 # el2^2.0, for biharmonic diffusion
+
+    # HARMONIC AND BIHARMONIC DIFFUSION
+    ∇²::Array{T,2}          # Laplacian = l*(l+1)/(R_earth^2)
+    ∇⁻²::Array{T,2}         # inverse Laplacian
+    ∇⁴::Array{T,2}          # Laplacian squared, for biharmonic diffusion
 
     # Quantities required by functions grad, uvspec, and vds
     gradx::Array{T,1}
@@ -23,7 +25,7 @@ struct SpectralTrans{T<:AbstractFloat}
     vddyp::Array{T,2}
 end
 
-struct GeoSpectral{T}
+struct GeoSpectral{T<:AbstractFloat}
     geometry::Geometry{T}
     spectral::SpectralTrans{T}
 end
@@ -58,8 +60,7 @@ function SpectralTrans{T}(P::Params,G::Geometry) where T
         end
     end
 
-    # Epsilon-factors for the recurrence relation of the normalized associated
-    # Legendre polynomials.
+    # Epsilon-factors for the recurrence relation of the associated Legendre polynomials.
     ε,ε⁻¹ = ε_recurrence(mx,nx)
 
     # Generate associated Legendre polynomials
@@ -69,20 +70,8 @@ function SpectralTrans{T}(P::Params,G::Geometry) where T
         leg_poly[:,:,j] = legendre_polynomials(j,ε,ε⁻¹,mx,nx,G)
     end
 
-    el2   = zeros(mx, nx)
-    el2⁻¹ = zeros(mx, nx)
-    el4   = zeros(mx, nx)
-
-    for n in 1:nx
-        for m in 1:mx
-            N = m+n-2
-            el2[m,n] = N*(N+1)/R_earth^2
-            el4[m,n] = el2[m,n]^2
-        end
-    end
-
-    el2⁻¹[1] = 0.0                      # don't divide by 0 for el2[1,1]
-    el2⁻¹[2:end] = 1.0 ./ el2[2:end]
+    # LAPLACIANS for harmonic & biharmonic diffusion
+    ∇²,∇⁻²,∇⁴ = Laplacians(mx,nx,R_earth)
 
     gradx   = zeros(mx)          #TODO what's this?
     uvdx    = zeros(mx, nx)
@@ -116,25 +105,44 @@ function SpectralTrans{T}(P::Params,G::Geometry) where T
     end
 
     SpectralTrans{T}(trunc,nx,mx,
-                    leg_weight,nsh2,leg_poly,el2,el2⁻¹,el4,
+                    leg_weight,nsh2,leg_poly,∇²,∇⁻²,∇⁴,
                     gradx,uvdx,uvdym,uvdyp,gradym,gradyp,vddym,vddyp)
 end
 
 """
-Laplacian in spectral space.
+Laplacian operator in spectral space via element-wise matrix-matrix multiplication.
 """
-function ∇²(    field::Array{Complex{T},2},
-                G::GeoSpectral{T}) where {T<:AbstractFloat}
-    #TODO this is presumably faster with loops
-    return -field.*G.spectral.el2
+function ∇²(A::Array{Complex{T},2},
+            G::GeoSpectral{T}) where {T<:AbstractFloat}
+    return -G.spectral.∇².*A
 end
 
 """
-Inverse Laplacian in spectral space.
+In-place version of ∇².
 """
-function ∇⁻²(   field::Array{Complex{T},2},
+function ∇²!(   Out::Array{Complex{T},2},
+                In::Array{Complex{T},2},
                 G::GeoSpectral{T}) where {T<:AbstractFloat}
-    return -field.*G.spectral.el2⁻¹
+
+    @unpack ∇² = G.spectral
+
+    mx,nx = size(In)
+    @boundscheck (mx,nx) == size(Out) || throw(BoundsError())
+    @boundscheck (mx,nx) == size(∇²) || throw(BoundsError())
+
+    for n in 1:nx
+        for m in 1:mx
+            @inbounds Out[m,n] = -∇²[m,n]*In[m,n]
+        end
+    end
+end
+
+"""
+Inverse Laplacian in spectral space via element-wise matrix-matrix multiplication.
+"""
+function ∇⁻²(   A::Array{Complex{T},2},
+                G::GeoSpectral{T}) where {T<:AbstractFloat}
+    return -G.spectral.∇⁻².*A
 end
 
 """
@@ -308,16 +316,24 @@ end
 
 """
 Epsilon-factors for the recurrence relation of the normalized associated
-Legendre polynomials. From Krishnamurti, Bedi, Hardiker, 2014. Introduction to
-global spectral modelling, Chapter 6.5 Recurrence Relations, Eq. (6.37)
+Legendre polynomials.
 
-ε_n^m = sqrt( (n^2-m^2) / (4n^2 - 1) )
+    ε_n^m = sqrt(((n+m-2)^2 - (m-1)^2)/(4*(n+m-2)^2 - 1))
+    ε⁻¹_n^m = 1/ε_n^m   if ε_n^m != 0 else 0.
 
 with m,n being the wavenumbers of the associated Legendre polynomial P_n^m.
-Due to the spectral packing in speedy and Julia's 1-based indexing we substitute
+Due to the spectral packing in speedy and Julia's 1-based indexing we have
+substituted
 
     m -> m-1
     n -> n+m-2.
+
+compared to the more conventional
+
+    ε_n^m = sqrt( (n^2-m^2) / (4n^2 - 1) )
+
+    From Krishnamurti, Bedi, Hardiker, 2014. Introduction to
+    global spectral modelling, Chapter 6.5 Recurrence Relations, Eq. (6.37)
 """
 function ε_recurrence(mx::Integer,nx::Integer)
     ε   = zeros(mx+1,nx+1)
@@ -338,4 +354,37 @@ function ε_recurrence(mx::Integer,nx::Integer)
     end
 
     return ε,ε⁻¹
+end
+
+
+"""
+Computes Laplacian matrix-operators (for element-wise multiplication).
+Laplacian, Laplacian squared and inverse Laplacian in spectral space
+correspond to a multiplication with the total wavenumber:
+
+    ∇²_n^m = N*(N+1)/R_earth^2
+
+with N = m+n-2 the total wavenumber -2 due to 1-based indexing. The biharmonic
+operator is ∇⁴ = (∇²)², the inverse Laplacian is ∇⁻² = 1 ./ ∇².
+"""
+function Laplacians(mx::Integer,nx::Integer,R_earth::Real)
+    ∇²   = zeros(mx, nx)
+    ∇⁻²  = zeros(mx, nx)
+    ∇⁴   = zeros(mx, nx)
+
+    for n in 1:nx
+        for m in 1:mx
+            # total wavenumber is m+n, -2 due to Julia's 1-based indexing
+            N = m+n-2
+            ∇²[m,n] = N*(N+1)/R_earth^2
+            ∇⁴[m,n] = ∇²[m,n]^2
+        end
+    end
+
+    # inverse Laplacian, the first coefficient being zero corresponds
+    # to some (?, TODO) boundary conditions
+    ∇⁻²[1,1] = 0.0                  # don't divide by 0
+    ∇⁻²[2:end] = 1 ./ ∇⁻²[2:end]    # all other elements in matrix
+
+    return ∇²,∇⁻²,∇⁴
 end

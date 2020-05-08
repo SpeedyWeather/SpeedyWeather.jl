@@ -1,3 +1,7 @@
+"""
+Geometry struct containing parameters and arrays describing the Gaussian grid
+and the vertical levels.
+"""
 struct Geometry{T<:AbstractFloat}
 
     # GRID-POINT SPACE
@@ -12,7 +16,7 @@ struct Geometry{T<:AbstractFloat}
     lon::Array{T,1}     # array of longitudes
     lat::Array{T,1}     # array of latitudes
 
-    # VERTICAL SIGMA COORDINATE σ = p/p₀ (fraction of surface pressure)
+    # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     σ_half::Array{T,1}      # σ at half levels
     σ_full::Array{T,1}      # σ at full levels
     σ_thick::Array{T,1}     # σ thicknesses
@@ -68,14 +72,14 @@ function Geometry{T}(P::Params) where T
     σ_f = akap ./ (2σ_full)
 
     # SINES AND COSINES OF LATITUDE
-    sinlat = sind.(lat)             
+    sinlat = sind.(lat)
     coslat = cosd.(lat)
     sinlat_NH = sinlat[1:nlat_half] # sinlat only for northern hemisphere = NH
     coslat_NH = coslat[1:nlat_half]
     radang = asin.(sinlat)
     cosg   = sinlat                 # inconsistent here due to the sin/cos swap
-    cosg⁻¹ = T(1.0)./cosg
-    cosg⁻² = T(1.0)./cosg.^T(2.0)
+    cosg⁻¹ = 1 ./ cosg
+    cosg⁻² = 1 ./ cosg.^2
 
     # CORIOLIS FREQUENCY
     f = 2Ω*sinlat

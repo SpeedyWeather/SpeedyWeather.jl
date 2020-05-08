@@ -1,10 +1,13 @@
 """
-Check global mean temperature
+Check global mean temperature at every vertical level from the m=n=1 coefficient
+of the associated Legendre polynomials.
 """
 function check_global_mean_temperature( Tabs::Array{Complex{T},3},
                                         P::Params) where T
     @unpack print_dialog = P
 
+    # The m=n=1 coefficent in spectral space is the mean value
+    # √2 is due to the normalization of the associated Legendre polynomials
     gmt = sqrt(0.5)*Float64.(real.(Tabs[1,1,:]))
 
     if print_dialog

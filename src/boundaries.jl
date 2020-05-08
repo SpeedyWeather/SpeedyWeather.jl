@@ -13,7 +13,9 @@ struct Boundaries{T<:AbstractFloat}
     albedo::Array{T,2}          # Annual mean surface albedo
 end
 
-""" Generator function for a Boundaries struct."""
+""" Generator function for a Boundaries struct. Loads the boundary conditions,
+orography, land-sea mask and albedo from an netCDF file and stores the in a
+Boundaries-struct."""
 function Boundaries{T}( P::Params,
                         G::GeoSpectral{T}) where {T<:AbstractFloat}
 
