@@ -1,5 +1,5 @@
 """
-Compute spectral geopotential from spectral temperature `Tabs`
+Compute spectral geopotential `ϕ` from spectral temperature `Tabs`
 and spectral topography `ϕ0`.
 """
 function geopotential!( ϕ::Array{Complex{T},3},      # geopotential
