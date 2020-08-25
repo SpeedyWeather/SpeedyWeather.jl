@@ -22,9 +22,9 @@ function Boundaries{T}( P::Params,
     @unpack boundary_path, boundary_file, g = P
 
     # LOAD NETCDF FILE
-    if boundary_path == ""
+    if boundary_path == ""  # default: take the surface.nc file in data
         path = joinpath(@__DIR__,"../data",boundary_file)
-    else
+    else                    
         path = joinpath(boundary_path,boundary_file)
     end
     nc = NetCDF.open(path)

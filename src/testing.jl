@@ -11,3 +11,5 @@ include("diagnostics.jl")
 include("prognostics.jl")
 include("geopotential.jl")
 include("run_speedy.jl")
+
+G,B = run_speedy()
