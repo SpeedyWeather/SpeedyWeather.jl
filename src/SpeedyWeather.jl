@@ -17,6 +17,10 @@ module SpeedyWeather
     include("diagnostics.jl")
     include("prognostics.jl")
     include("geopotential.jl")
+    include("horizontal_diffusion.jl")
+    include("implicit.jl")
+    include("tendencies.jl")
+
     include("run_speedy.jl")
 
 end
