@@ -9,6 +9,8 @@ function run_speedy(::Type{T}=Float64;      # number format
 
     Prog = initial_conditions(P,B,G)
 
+   
+
     # # TODO
     # Prog = PrognosticVars{T}()
     # Diag = DiagnosticVars{T}()
@@ -17,3 +19,6 @@ function run_speedy(::Type{T}=Float64;      # number format
 
     return G,B
 end
+
+
+println("hello world")
