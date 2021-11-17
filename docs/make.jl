@@ -10,6 +10,6 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/milankl/SpeedyWeatehr.jl.git",
+    repo = "github.com/milankl/SpeedyWeather.jl.git",
     devbranch = "main"
 )
