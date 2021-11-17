@@ -23,7 +23,7 @@ function Boundaries{T}( P::Params,
 
     # LOAD NETCDF FILE
     if boundary_path == ""
-        path = joinpath(@__DIR__,"../data",boundary_file)
+        path = joinpath(@__DIR__,"../input_data",boundary_file)
     else
         path = joinpath(boundary_path,boundary_file)
     end
