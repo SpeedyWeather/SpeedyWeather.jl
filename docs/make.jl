@@ -5,7 +5,7 @@ makedocs(
         prettyurls = get(ENV, "CI", nothing) == "true"),
     sitename="SpeedyWeather.jl",
     authors="M Klöwer",
-    modules=[BitInformation],
+    modules=[SpeedyWeather],
     pages=["Home"=>"index.md"]
 )
 
