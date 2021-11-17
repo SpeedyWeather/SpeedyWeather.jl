@@ -9,7 +9,7 @@ Requires: Julia 1.4
 ## Functionality
 
 For an overview of the functionality and explanation see the
-[documentation](https://milankl.github.io/BitInformation.jl/dev).
+[documentation](https://milankl.github.io/SpeedyWeather.jl/dev).
 
 
 ## Installation
