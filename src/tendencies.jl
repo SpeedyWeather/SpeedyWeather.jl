@@ -1,17 +1,37 @@
-function get_tendencies!(ξ_tend, D_tend, Tₐ_tend, pₛ_tend, tr_tend, j2)
+
+"""
+Compute the grid point and spectral tendencies 
+"""
+function get_tendencies!(vor::AbstractArray{NF,4},
+                         div::AbstractArray{NF,4}, 
+                         t::AbstractArray{NF,4},
+                         ps::AbstractArray{NF,4}, 
+                         tr::AbstractArray{NF,4},
+                         phi::AbstractArray{NF,3},
+                         vor_tend::AbstractArray{NF,3}, 
+                         div_tend::AbstractArray{NF,3},
+                         t_tend::AbstractArray{NF,3},
+                         ps_tend::AbstractArray{NF,3},
+                         tr_tend::AbstractArray{NF,3},
+                         j1::int,
+                         j2::int) where {NF<:AbstractFloat}
+
+
 
     # =========================================================================
     # Computation of grid-point tendencies (converted to spectral at the end of
     # grtend)
     # =========================================================================
 
-    get_grid_point_tendencies!(ξ_tend, D_tend, Tₐ_tend, pₛ_tend, tr_tend, 1, j2)
+    get_grid_point_tendencies!(vor,div,t,ps,tr,phi, 
+                               vor_tend, div_tend, t_tend, ps_tend,tr_tend,
+                               j1, j2)
 
     # =========================================================================
     # Computation of spectral tendencies
     # =========================================================================
 
-    if α < 0.5
+    if α < 0.5 #Coefficient for semi-implicit computations. Previously if alpha = 0?
         get_spectral_tendencies!(D_tend, Tₐ_tend, pₛ_tend, j2)
     else
         get_spectral_tendencies!(D_tend, Tₐ_tend, pₛ_tend, 1)
@@ -21,48 +41,140 @@ function get_tendencies!(ξ_tend, D_tend, Tₐ_tend, pₛ_tend, tr_tend, j2)
     end
 end
 
-# Compute non-linear tendencies in grid point space from dynamics and
-# physical parametrizations, and convert them to spectral tendencies
-# dF/dt = T_dyn(F(J2)) + T_phy(F(J1))
-#   Input:  j1 = time level index for physical tendencies
-#           j2 = time level index for dynamical tendencies
-#   Output: ξ_tend = spectral tendency of vorticity
-#           D_tend = spectral tendency of divergence
-#           Tₐ_tend   = spectral tendency of temperature
-#           pₛ_tend  = spectral tendency of log(p_s)
-#           tr_tend  = spectral tendency of tracers
-function get_grid_point_tendencies!(ξ_tend, D_tend, Tₐ_tend, pₛ_tend, tr_tend, j1, j2)
-    # =========================================================================
-    # Convert prognostics to grid point space
-    # =========================================================================
+"""
+Compute the grid point tendencies. These are composed of the dynamics and physical parameterisations. 
+"""
+function get_gridpoint_tendencies!(vor::AbstractArray{NF,4},
+                                   div::AbstractArray{NF,4}, 
+                                   t::AbstractArray{NF,4},
+                                   ps::AbstractArray{NF,4}, 
+                                   tr::AbstractArray{NF,4},
+                                   phi::AbstractArray{NF,4},
+                                   vor_tend::AbstractArray{NF,3}, 
+                                   div_tend::AbstractArray{NF,3},
+                                   t_tend::AbstractArray{NF,3},
+                                   ps_tend::AbstractArray{NF,3},
+                                   tr_tend::AbstractArray{NF,3},
+                                   j1::int,
+                                   j2::int) where {NF<:AbstractFloat}
 
-    u_grid = zeros(RealType, nlon, nlat, nlev)
-    v_grid = zeros(RealType, nlon, nlat, nlev)
-    Tₐ_grid = zeros(RealType, nlon, nlat, nlev)
-    ξ_grid = zeros(RealType, nlon, nlat, nlev)
-    D_grid = zeros(RealType, nlon, nlat, nlev)
-    tr_grid = zeros(RealType, nlon, nlat, nlev, n_trace)
-    dumc = zeros(Complex{RealType}, mx, nx, 2)
+    ### Declare/Allocate variables. Can we pre-allocate here?
+
+    #Grid point fields
+    vor_grid = Array{NF,3}(undef,nlon, nlat, nlev) #Gridpoint field of vorticity
+    div_grid = similar(vor_grid)                   #Gridpoint field of divergence
+    t_grid = similar(vor_grid)                     #Gridpoint field of temperature
+    tr_grid = similar(vor_grid)                    #Gridpoint field of tracers
+    u_grid = similar(vor_grid)                     #Gridpoint field of zonal velocity
+    v_grid = similar(vor_grid)                     #Gridpoint field of meridional velocity
+    q_grid = similar(vor_grid)                     #Gridpoint field of specific_humidity
+    ps_grid=Array{NF,2}(undef,nlon, nlat)          #Gridpoint field of surface pressure logarithm
+    phi_grid = similar(vor_grid)                   #Gridpoint field of geopotential
+
+
+    #1. Convert spectral prognostic to grid point space
+    get_grid_point_fields(
+                          
+                          vor_grid,div_grid,t_grid,tr_grid, u_grid,v_grid,q_grid, ps_grid,phi_grid)
+
+
+   # 2. Parameterised physics tendencies. NEEDS DEFINING in phypar.jl
+   phypar(ξ_tend, D_tend, Tₐ_tend, tr_tend)
+
+
+   ompute physical parametrization tendencies for u, v, t, q
+    !
+    ! Output arguments:
+    !     utend: u-wind tendency (gp)
+    !     vtend: v-wind tendency (gp)
+    !     ttend: temp. tendency (gp)
+    !     qtend: spec. hum. tendency (gp)
+
+
+   #3. Dynamics tendencies
+   dynamics_tendencies(,
+   )
+
+end
+
+
+"""
+Compute grid point fields of the spectral prognostic tendencies
+"""
+function get_grid_point_fields(
+                               vor,div,t,phi,ps,tr
+                               vor_grid,div_grid,t_grid,tr_grid, u_grid,v_grid, q_grid, ps_grid,phi_grid)
+
+
+
+    #1. Compute grid-point fields
+    #1.1 Update geopotential in spectral space
+    #COMMENT: THIS NEEDS TO BE CONFIGURED PROPERLY W.R.T ARGUMENTS.
+    geopotential!(phi)
+
+    #1.2 Grid point variables for physics tendencies
+    #Calculate u and v in grid-point space from vorticity and
+    #divergence in spectral space
+    for j in 1:nlev
+        uvspec!(vor[:,:,k,j2], div[:,:,k,j2], u_grid[:,:,k],v_grid[:,:,k]
+    end
+    
+    #Truncate variables where the spectral transform is still done at double
+    #precision
+    u_grid = u_grid / 3600.0
+    v_grid = v_grid / 3600.0
+
+
 
     for k in 1:nlev
-        ξ_grid[:,:,k] = spec_to_grid(ξ[:,:,k,j2])
-        D_grid[:,:,k] = spec_to_grid(D[:,:,k,j2])
-        Tₐ_grid[:,:,k]   = spec_to_grid(Tₐ[:,:,k,j2])
+        gridded(t[:,:,k,j2], t_grid[:,:,k])   #Transform from spectral to gridpoint space
+    end
 
-        for itr in 1:n_trace
-            tr_grid[:,:,k,itr] = spec_to_grid(tr[:,:,k,j2,itr])
-        end
+    #Normalise geopotential by cp to avoid overflows in physics
+    for k in 1:nlev
+        gridded(phi[:,:,k]*(1/cp), phi_grid[:,:,k])   #Transform from spectral to gridpoint space
+    end
 
-        uvspec!(ξ[:,:,k,j2], D[:,:,k,j2], @view(dumc[:,:,1]), @view(dumc[:,:,2]))
-        v_grid[:,:,k] = spec_to_grid(dumc[:,:,2], scale=true)
-        u_grid[:,:,k] = spec_to_grid(dumc[:,:,1], scale=true)
 
-        for j in 1:nlat
-            for i in 1:nlon
-                ξ_grid[i,j,k] += f[j]
-            end
+    #Don't transform the two stratospheric levels where humidity is set to zero
+    # because it leads to overflows 
+    for k in 3:nlev
+        gridded(tr(:,:,k,j1,1), q_grid(:.:,k), )
+    end 
+
+    #Surface pressure spectral transform to grid
+    gridded(ps(:,:,j1), ps_grid)
+
+
+    #1.3 Grid-point variables for dynamics tendencies
+    #Set units of vorticity and divergence to 'per hour' to reduce underflows 
+
+   for k in 1:nlev
+    vor_grid[:,:,k] = gridded(vor[:,:,k,j2])
+    div_grid[:,:,k] = gridded(div[:,:,k,j2])
+
+    for itr in 1:n_trace
+        tr_grid[:,:,k,itr] = gridded(tr[:,:,k,j2,itr])
+    end
+
+    for j in 1:nlat
+        for i in 1:nlon
+            vor_grid[i,j,k] += coriol[j] #add coriolo
         end
     end
+
+   end
+
+
+
+end
+
+"""
+Compute non-linear tendencies in grid-point space from ynamics and add to physics tendencies. Convert total
+gridpoint tendencies to spectral tendencies
+"""
+function dynamics_tendencies()
+
 
     umean = zeros(RealType, nlon, nlat)
     vmean = zeros(RealType, nlon, nlat)
@@ -162,6 +274,8 @@ function get_grid_point_tendencies!(ξ_tend, D_tend, Tₐ_tend, pₛ_tend, tr_te
         end
     end
 
+
+
     # =========================================================================
     # Convert tendencies to spectral space
     # =========================================================================
@@ -193,11 +307,12 @@ function get_grid_point_tendencies!(ξ_tend, D_tend, Tₐ_tend, pₛ_tend, tr_te
     end
 end
 
-# Compute spectral tendencies of divergence, temperature  and log(surface pressure)
-# Input/output : D_tend = divergence tendency (spectral)
-#                Tₐ_tend   = temperature tendency (spectral)
-#                pₛ_tend  = tendency of log_surf.pressure (spectral)
-#                j2    = time level index (1 or 2)
+
+
+
+"""
+Compute the spectral tendencies.  
+"""
 function get_spectral_tendencies!(D_tend, Tₐ_tend, pₛ_tend, j2)
     # Vertical mean div and pressure tendency
     dmeanc = zeros(Complex{RealType}, mx, nx)
