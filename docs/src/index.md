@@ -42,16 +42,14 @@ Sam Hatfield [translated SPEEDY to Fortran 90](https://github.com/samhatfield/sp
 
 SpeedyWeather.jl is not yet registered in the Julia Registry. So at the moment, open Julia's package manager from the REPL with `]` and
 `add` the github repository to install SpeedyWeather.jl and all dependencies
-
 ```julia
 (@v1.6) pkg> add https://github.com/milankl/SpeedyWeather.jl
 ```
-
 other branches can be installed by adding `#branch_name` to that line.
 
-## Developers
+## Developers
 
-SpeedyWeather.jl is currently developed by Milan Klöwer and Tom Kipson, any contributions are always welcome.
+SpeedyWeather.jl is currently developed by [Milan Klöwer](https://github.com/milankl) and [Tom Kipson](https://github.com/tomkimpson), any contributions are always welcome.
 
 ## Funding
 
