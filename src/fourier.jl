@@ -10,12 +10,12 @@ function fourier_inverse(   input::Array{Complex{NF},2},
 
     # preallocate, TODO turn into plan_irfft for performance
     output = zeros(NF, nlon, nlat)
-    nlonT = convert(NF,nlon)
+    nlonNF = convert(NF,nlon)
 
     for j in 1:nlat
         # Do inverse FFT then multiply by number of longitudes
         # add the truncated wavenumbers with zeros
-        output[:,j] = nlonT*irfft(vcat(input[:,j], zeros(Complex{T}, nlon_half+1-mx)), nlon)
+        output[:,j] = nlonNF*irfft(vcat(input[:,j], zeros(Complex{NF}, nlon_half+1-mx)), nlon)
     end
 
     # Scale by cosine(lat) if needed
