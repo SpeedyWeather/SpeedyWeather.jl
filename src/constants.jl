@@ -25,7 +25,7 @@ function Constants{NF}(P::Params) where NF      # number format NF
     @unpack R_earth, Ω, g, akap, R, γ, hscale, hshum, rh_ref = P
     @unpack robert_filter, williams_filter = P
 
-    # This implies conversion to T
+    # This implies conversion to NF
     return Constants{NF}(R_earth,Ω,g,akap,R,γ,hscale,hshum,rh_ref,
                             robert_filter,williams_filter)
 end

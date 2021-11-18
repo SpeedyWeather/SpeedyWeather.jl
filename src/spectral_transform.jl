@@ -1,42 +1,42 @@
-struct SpectralTrans{T<:AbstractFloat}
+struct SpectralTrans{NF<:AbstractFloat}
     # SIZE OF SPECTRAL GRID
     trunc::Int      # Spectral truncation
     nx::Int         # Number of total wavenumbers
     mx::Int         # Number of zonal wavenumbers
 
     # LEGENDRE ARRAYS
-    leg_weight::Array{T,1}          # Legendre weights
+    leg_weight::Array{NF,1}          # Legendre weights
     nsh2::Array{Int,1}              # What's this?
-    leg_poly::Array{Complex{T},3}   # Legendre polynomials
+    leg_poly::Array{Complex{NF},3}   # Legendre polynomials
 
     # HARMONIC AND BIHARMONIC DIFFUSION
-    ∇²::Array{T,2}          # Laplacian = l*(l+1)/(R_earth^2)
-    ∇⁻²::Array{T,2}         # inverse Laplacian
-    ∇⁴::Array{T,2}          # Laplacian squared, for biharmonic diffusion
+    ∇²::Array{NF,2}          # Laplacian = l*(l+1)/(R_earth^2)
+    ∇⁻²::Array{NF,2}         # inverse Laplacian
+    ∇⁴::Array{NF,2}          # Laplacian squared, for biharmonic diffusion
 
     # Quantities required by functions grad, uvspec, and vds
-    gradx::Array{T,1}
-    uvdx::Array{T,2}
-    uvdym::Array{T,2}
-    uvdyp::Array{T,2}
-    gradym::Array{T,2}
-    gradyp::Array{T,2}
-    vddym::Array{T,2}
-    vddyp::Array{T,2}
+    gradx::Array{NF,1}
+    uvdx::Array{NF,2}
+    uvdym::Array{NF,2}
+    uvdyp::Array{NF,2}
+    gradym::Array{NF,2}
+    gradyp::Array{NF,2}
+    vddym::Array{NF,2}
+    vddyp::Array{NF,2}
 end
 
-struct GeoSpectral{T<:AbstractFloat}
-    geometry::Geometry{T}
-    spectral::SpectralTrans{T}
+struct GeoSpectral{NF<:AbstractFloat}
+    geometry::Geometry{NF}
+    spectral::SpectralTrans{NF}
 end
 
-function GeoSpectral{T}(P::Params) where {T<:AbstractFloat}
-    G = Geometry{T}(P)
-    S = SpectralTrans{T}(P,G)
-    return GeoSpectral{T}(G,S)
+function GeoSpectral{NF}(P::Params) where {NF<:AbstractFloat}
+    G = Geometry{NF}(P)
+    S = SpectralTrans{NF}(P,G)
+    return GeoSpectral{NF}(G,S)
 end
 
-function SpectralTrans{T}(P::Params,G::Geometry) where T
+function SpectralTrans{NF}(P::Params,G::Geometry) where NF
 
     @unpack nlat, nlat_half = G
     @unpack R_earth, trunc = P
@@ -104,7 +104,7 @@ function SpectralTrans{T}(P::Params,G::Geometry) where T
         end
     end
 
-    SpectralTrans{T}(trunc,nx,mx,
+    SpectralTrans{NF}(trunc,nx,mx,
                     leg_weight,nsh2,leg_poly,∇²,∇⁻²,∇⁴,
                     gradx,uvdx,uvdym,uvdyp,gradym,gradyp,vddym,vddyp)
 end
@@ -112,17 +112,17 @@ end
 """
 Laplacian operator in spectral space via element-wise matrix-matrix multiplication.
 """
-function ∇²(A::Array{Complex{T},2},
-            G::GeoSpectral{T}) where {T<:AbstractFloat}
+function ∇²(A::Array{Complex{NF},2},
+            G::GeoSpectral{NF}) where {NF<:AbstractFloat}
     return -G.spectral.∇².*A
 end
 
 """
 In-place version of ∇².
 """
-function ∇²!(   Out::Array{Complex{T},2},
-                In::Array{Complex{T},2},
-                G::GeoSpectral{T}) where {T<:AbstractFloat}
+function ∇²!(   Out::Array{Complex{NF},2},
+                In::Array{Complex{NF},2},
+                G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
     @unpack ∇² = G.spectral
 
@@ -140,31 +140,31 @@ end
 """
 Inverse Laplacian in spectral space via element-wise matrix-matrix multiplication.
 """
-function ∇⁻²(   A::Array{Complex{T},2},
-                G::GeoSpectral{T}) where {T<:AbstractFloat}
+function ∇⁻²(   A::Array{Complex{NF},2},
+                G::GeoSpectral{NF}) where {NF<:AbstractFloat}
     return -G.spectral.∇⁻².*A
 end
 
 """
 Transform a spectral array into grid-point space.
 """
-function gridded(   input::Array{Complex{T},2},
-                    G::GeoSpectral{T}) where {T<:AbstractFloat}
+function gridded(   input::Array{Complex{NF},2},
+                    G::GeoSpectral{NF}) where {NF<:AbstractFloat}
     return fourier_inverse(legendre_inverse(input,G),G)
 end
 
 """
 Transform a gridded array into spectral space.
 """
-function spectral(  input::Array{T,2},
-                    G::GeoSpectral{T}) where {T<:AbstractFloat}
+function spectral(  input::Array{NF,2},
+                    G::GeoSpectral{NF}) where {NF<:AbstractFloat}
     return legendre(fourier(input,G),G)
 end
 
-function grad!( ψ::Array{T,2},
-                psdx::Array{Complex{T},2},
-                psdy::Array{T,2},
-                G::GeoSpectral{T}) where {T<:AbstractFloat}
+function grad!( ψ::Array{NF,2},
+                psdx::Array{Complex{NF},2},
+                psdy::Array{NF,2},
+                G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
     #TODO boundscheck
 
@@ -187,11 +187,11 @@ function grad!( ψ::Array{T,2},
     end
 end
 
-function vds!(  ucosm::Array{T,2},
-                vcosm::Array{T,2},
-                vorm::Array{T,2},
-                divm::Array{T,2},
-                G::GeoSpectral{T}) where {T<:AbstractFloat}
+function vds!(  ucosm::Array{NF,2},
+                vcosm::Array{NF,2},
+                vorm::Array{NF,2},
+                divm::Array{NF,2},
+                G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
     #TODO boundscheck
 
@@ -199,8 +199,8 @@ function vds!(  ucosm::Array{T,2},
     @unpack gradx, vddym, vddyp = G.spectral
 
     #TODO preallocate in a diagnosticvars struct
-    zp = zeros(Complex{T}, mx,nx)
-    zc = zeros(Complex{T}, mx,nx)
+    zp = zeros(Complex{NF}, mx,nx)
+    zc = zeros(Complex{NF}, mx,nx)
 
     for n in 1:nx
         zp[:,n] = gradx.*ucosm[:,n]*im
@@ -208,7 +208,7 @@ function vds!(  ucosm::Array{T,2},
     end
 
     for m in 1:mx
-        #TODO this has an implicit conversion to complex{T}, issue?
+        #TODO this has an implicit conversion to complex{NF}, issue?
         vorm[m,1]  = zc[m,1] - vddyp[m,1]*ucosm[m,2]
         vorm[m,nx] = vddym[m,nx]*ucosm[m,trunc+1]
         divm[m,1]  = zp[m,1] + vddyp[m,1]*vcosm[m,2]
@@ -224,11 +224,11 @@ function vds!(  ucosm::Array{T,2},
     end
 end
 
-function uvspec!(   vorm::Array{T,2},
-                    divm::Array{T,2},
-                    ucosm::Array{T,2},
-                    vcosm::Array{T,2},
-                    G::GeoSpectral{T}) where {T<:AbstractFloat}
+function uvspec!(   vorm::Array{NF,2},
+                    divm::Array{NF,2},
+                    ucosm::Array{NF,2},
+                    vcosm::Array{NF,2},
+                    G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
     #TODO boundscheck
 
@@ -254,20 +254,20 @@ function uvspec!(   vorm::Array{T,2},
     end
 end
 
-function vdspec!(   ug::Array{T,2},
-                    vg::Array{T,2},
-                    vorm::Array{T,2},
-                    divm::Array{T,2},
+function vdspec!(   ug::Array{NF,2},
+                    vg::Array{NF,2},
+                    vorm::Array{NF,2},
+                    divm::Array{NF,2},
                     kcos::Bool,
-                    G::GeoSpectral{T}) where {T<:AbstractFloat}
+                    G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
     #TODO boundscheck
 
     @unpack nlat, nlon, cosgr, cosgr2 = G.geometry
 
     #TODO preallocate elsewhere
-    ug1 = zeros(T, nlon, nlat)
-    vg1 = zeros(T, nlon, nlat)
+    ug1 = zeros(NF, nlon, nlat)
+    vg1 = zeros(NF, nlon, nlat)
 
     # either cosgr or cosgr2
     cosgr = kcos ? cosgr : cosgr2
@@ -304,8 +304,8 @@ end
 """
 Truncate a grid-point field in spectral space.
 """
-function spectral_truncation(   input::Array{T,2},
-                                G::GeoSpectral{T}) where {T<:AbstractFloat}
+function spectral_truncation(   input::Array{NF,2},
+                                G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
     @unpack trunc = G.spectral
 

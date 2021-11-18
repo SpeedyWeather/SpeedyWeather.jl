@@ -49,23 +49,23 @@ end
 """
 Computes the inverse Legendre transform.
 """
-function legendre_inverse(  input::Array{Complex{T},2},
-                            G::GeoSpectral{T}) where {T<:AbstractFloat}
+function legendre_inverse(  input::Array{Complex{NF},2},
+                            G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
     @unpack leg_weight, nsh2, leg_poly = G.spectral
     @unpack trunc, mx, nx = G.spectral
     @unpack nlat, nlat_half = G.geometry
 
     # Initialize output array
-    output = zeros(Complex{T}, mx, nlat)
+    output = zeros(Complex{NF}, mx, nlat)
 
     # Loop over Northern Hemisphere, computing odd and even decomposition of incoming field
     for j in 1:nlat_half
         j1 = nlat + 1 - j
 
         # Initialise arrays TODO preallocate them in a separate struct
-        even = zeros(Complex{T}, mx)
-        odd  = zeros(Complex{T}, mx)
+        even = zeros(Complex{NF}, mx)
+        odd  = zeros(Complex{NF}, mx)
 
         # Compute even decomposition
         for n in 1:2:nx
@@ -93,18 +93,18 @@ end
 """
 Computes the Legendre transform
 """
-function legendre(  input::Array{Complex{T},2},
-                    G::GeoSpectral{T}) where {T<:AbstractFloat}
+function legendre(  input::Array{Complex{NF},2},
+                    G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
     @unpack leg_weight, nsh2, leg_poly = G.spectral
     @unpack trunc, mx, nx = G.spectral
     @unpack nlat, nlat_half = G.geometry
 
     # Initialise output array
-    output = zeros(Complex{T}, mx, nx)
+    output = zeros(Complex{NF}, mx, nx)
 
-    even = zeros(Complex{T}, mx, nlat_half)
-    odd  = zeros(Complex{T}, mx, nlat_half)
+    even = zeros(Complex{NF}, mx, nlat_half)
+    odd  = zeros(Complex{NF}, mx, nlat_half)
 
     # Loop over Northern Hemisphere, computing odd and even decomposition of
     # incoming field. The Legendre weights (leg_weight) are applied here
