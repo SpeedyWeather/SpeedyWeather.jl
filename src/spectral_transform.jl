@@ -287,9 +287,9 @@ end
 
 """ Set the spectral coefficients of the lower right triangle
 to zero. """
-function truncate!(A::AbstractMatrix{NF},trunc::Int) where {NF<:AbstractFloat}
+function truncate!(A::AbstractMatrix{Complex{NF}},trunc::Int) where {NF<:AbstractFloat}
     m,n = size(A)
-    zeero = zero(NF)
+    zeero = zero(Complex{NF})
 
     @inbounds for j in 1:n
         for i in 1:m
