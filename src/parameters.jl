@@ -5,7 +5,7 @@ With keywords such that default values can be changed at creation.
 @with_kw struct Params
 
     # NUMBER FORMATS
-    T::DataType=Float64     # number format
+    NF::DataType=Float64    # number format
 
     # RESOLUTION
     nlon::Int=96            # number of longitudes
@@ -50,22 +50,22 @@ With keywords such that default values can be changed at creation.
     ndays::Real=10              # number of days to integrate for
 
     # NUMERICS
-    robert::Real=0.05           # damping factor in Robert time filter
-    williams::Real=0.53         # parameter of Williams filter
+    robert_filter::Real=0.05    # Robert (1966) time filter coefficeint for suppress comput. mode
+    williams_filter::Real=0.53  # Williams time filter (Amezcua 2011) coefficient for 3rd order acc
     α::Real=0.5                 # coefficient for semi-implicit computations
                                 # 0 -> forward step for gravity wave terms,
                                 # 1 -> backward implicit
                                 # 0.5 -> centered implicit
 
     # BOUNDARY FILES
-    boundary_path::String=""      # package location is default
+    boundary_path::String=""    # package location is default
     boundary_file::String="surface.nc"
 
     # INITIAL CONDITIONS
     initial_conditions::String="rest"
 
     # OUTPUT
-    print_dialog::Bool=true     # Print dialog for feedback
+    verbose::Bool=true          # print dialog for feedback
     output::Bool=false          # Store data in netCDF?
     output_dt::Real=6           # output time step [hours]
     outpath::String=pwd()       # path to output folder

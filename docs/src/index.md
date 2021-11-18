@@ -8,7 +8,7 @@ circulation model with simple parameterizations to represent physical processes 
 SpeedyWeather.jl is a spectral model that uses a Fourier and Legendre transform to calculcate tendencies of the prognostic variables
 vorticity, divergence, absolute temperature, logarithm of surface pressure and specific humidity. The time stepping uses a leapfrog scheme
 with additional filters and a semi-implicit formulation for gravity waves. The default resolution is T30 (96x48 grid points on a
-Gaussian grid) and 8 vertical levels.
+Gaussian grid, about 400km at the Equator) and 8 vertical levels.
 
 Simple parameterizations are used to represent the physical processes convection, large-scale condensation, clouds, short-wave radiation,
 long-waves radiation, surface fluxes of momentum and energy, and vertical diffusion.
@@ -45,7 +45,7 @@ SpeedyWeather.jl is not yet registered in the Julia Registry. So at the moment, 
 ```julia
 (@v1.6) pkg> add https://github.com/milankl/SpeedyWeather.jl
 ```
-other branches can be installed by adding `#branch_name` to that line.
+other branches can be installed by adding `#branch_name`, e.g. `add https://github.com/milankl/SpeedyWeather.jl#branch_name`.
 
 ## Developers
 
