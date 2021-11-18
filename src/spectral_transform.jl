@@ -287,14 +287,14 @@ end
 
 """ Set the spectral coefficients of the lower right triangle
 to zero. """
-function truncate!(A::AbstractMatrix,trunc::Int)
+function truncate!(A::AbstractMatrix{NF},trunc::Int) where {NF<:AbstractFloat}
     m,n = size(A)
-    o = zero(eltype(A))
+    zeero = zero(NF)
 
     @inbounds for j in 1:n
         for i in 1:m
             if i+j-2 > trunc    # if total wavenumber larger than trunc
-                A[i,j] = o
+                A[i,j] = zeero
             end
         end
     end

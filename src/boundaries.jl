@@ -1,23 +1,23 @@
 """
-Boundaries holds the boundary arrays in grid-point space
+Struct that holds the boundary arrays in grid-point space
 
-ϕ0::Array{T,2}              # Surface geopotential (i.e. orography) [m^2/s^2]
-ϕ0trunc::Array{T,2}         # Spectrally truncated surface geopotential [m^2/s^2]
-land_sea_mask::Array{T,2}   # land-sea mask
-albedo::Array{T,2}          # Annual mean surface albedo
+    ϕ0::Array{NF,2}              # surface geopotential [m^2/s^2]
+    ϕ0trunc::Array{NF,2}         # spectrally truncated surface geopotential [m^2/s^2]
+    land_sea_mask::Array{NF,2}   # land-sea mask
+    albedo::Array{NF,2}          # annual mean surface albedo
 """
-struct Boundaries{T<:AbstractFloat}
-    ϕ0::Array{T,2}              # Surface geopotential (i.e. orography) [m^2/s^2]
-    ϕ0trunc::Array{T,2}         # Spectrally truncated surface geopotential [m^2/s^2]
-    land_sea_mask::Array{T,2}   # land-sea mask
-    albedo::Array{T,2}          # Annual mean surface albedo
+struct Boundaries{NF<:AbstractFloat}    # number format NF
+    ϕ0::Array{NF,2}              # surface geopotential (i.e. orography) [m^2/s^2]
+    ϕ0trunc::Array{NF,2}         # spectrally truncated surface geopotential [m^2/s^2]
+    land_sea_mask::Array{NF,2}   # land-sea mask
+    albedo::Array{NF,2}          # annual mean surface albedo
 end
 
 """ Generator function for a Boundaries struct. Loads the boundary conditions,
 orography, land-sea mask and albedo from an netCDF file and stores the in a
 Boundaries-struct."""
-function Boundaries{T}( P::Params,
-                        G::GeoSpectral{T}) where {T<:AbstractFloat}
+function Boundaries{NF}( P::Params,
+                        G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
     @unpack boundary_path, boundary_file, g = P
 
@@ -36,5 +36,5 @@ function Boundaries{T}( P::Params,
     ϕ0 = g*orog
     ϕ0trunc = spectral_truncation(ϕ0,G)
 
-    Boundaries{T}(ϕ0,ϕ0trunc,lsm,alb)
+    Boundaries{NF}(ϕ0,ϕ0trunc,lsm,alb)
 end

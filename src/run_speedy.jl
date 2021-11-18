@@ -1,19 +1,25 @@
-function run_speedy(::Type{T}=Float64;      # number format
-                    kwargs...               # all additional parameters
-                    ) where {T<:AbstractFloat}
+"""
+`Prog = run_speedy(NF,kwargs...)`
+`Prog = run_speedy(kwargs...)`
 
-    P = Params(T=T,kwargs...)
-    C = Constants{T}(P)
-    G = GeoSpectral{T}(P)
-    B = Boundaries{T}(P,G)
+Runs SpeedyWeather.jl with number format `NF` and any additional parameters in the keyword arguments
+`kwargs...`. Any unspeficied parameters will use the default values as defined in `src/parameters.jl`."""
+function run_speedy(::Type{NF}=Float64;         # number format, use Float64 as default
+                    kwargs...                   # all additional non-default parameters
+                    ) where {NF<:AbstractFloat}
+
+    P = Params(NF=NF,kwargs...)
+    C = Constants{NF}(P)
+    G = GeoSpectral{NF}(P)
+    B = Boundaries{NF}(P,G)
 
     Prog = initial_conditions(P,B,G)
 
-    # # TODO
+    # TODO
     # Prog = PrognosticVars{T}()
     # Diag = DiagnosticVars{T}()
 
     #time_stepping!()
 
-    return G,B
+    return Prog
 end

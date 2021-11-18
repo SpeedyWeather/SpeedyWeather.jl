@@ -7,3 +7,8 @@ using SpeedyWeather
 run_speedy()
 ```
 
+## The `run_speedy` interface
+
+```@docs
+run_speedy
+```
