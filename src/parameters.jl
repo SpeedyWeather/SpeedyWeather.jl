@@ -39,6 +39,13 @@ With keywords such that default values can be changed at creation.
     rh_ref::Real=0.7        # Reference relative humidity of near-surface air
     es_ref::Real=17         # Reference saturation water vapour pressure [Pa]
 
+    # DIFFUSION
+    npowhd::Real=4          # Power of Laplacian in horizontal diffusion
+    thd::Real=2.4           # Damping time [hrs] for diffusion (del^6) of temperature and vorticity
+    thdd::Real=2.4          # Damping time [hrs] for diffusion (del^6) of divergence
+    thds::Real=12           # Damping time [hrs] for extra diffusion (del^2) in the stratosphere
+    tdrs::Real=24*30        # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
+
     # PARAMETERIZATIONS
     seasonal_cycle::Bool=true   # Seasonal cycle?
     n_shortwave::Int=3          # Compute shortwave radiation every n steps
