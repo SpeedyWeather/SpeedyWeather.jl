@@ -37,21 +37,16 @@ function timestep!( A::AbstractArray{NF,3},             # a prognostic variable
     # TODO this allocates memory, avoid?
     tendency = spectral_truncation(tendency,G)
 
-    # LEAP FROG time step
-    # TODO preallocate Anew
-    Anew = A[:,:,1] + Δt*tendency
-
-    # ROBERT TIME FILTER TO COMPRESS COMPUTATIONAL MODE
-    # WILLIAMS' FILTER FOR 3RD ORDER ACCURACY
-    williams_filter_eps = williams_filter*eps
-    one_minus_williams_filter_eps = (one(NF) - williams_filter)*eps
+    # LEAP FROG time step with
+    # Robert time filter to compress computational mode
+    # and Williams' filter for 3rd order accuracy
+    w1 = williams_filter*eps
+    w2 = (one(NF) - williams_filter)*eps
     @inbounds for j in 1:nlat
         for i in 1:nlon
-            # Robert's filter
-            A[i,j,1] = A[i,j,l1] + williams_filter_eps*(A[i,j,1] - two*A[i,j,l1] + Anew[i,j])
-
-            # Williams' filter
-            A[i,j,2] = Anew[i,j] - one_minus_williams_filter_eps*(A[i,j,1] - two*A[i,j,l1] + Anew[i,j])
+            Anew = A[i,j,1] + Δt*tendency[i,j]                          # forward step
+            A[i,j,1] = A[i,j,l1] + w1*(A[i,j,1] - two*A[i,j,l1] + Anew) # Robert's filter
+            A[i,j,2] = Anew - w2*(A[i,j,1] - two*A[i,j,l1] + Anew)      # Williams' filter
         end
     end
 end
@@ -59,7 +54,7 @@ end
 """3D version that loops over all vertical layers."""
 function timestep!( A::AbstractArray{NF,4},             # a prognostic variable
                     tendency::AbstractArray{NF,3},      # its tendency
-                    j1::Int,                            # index for time filtering
+                    l1::Int,                            # index for time filtering
                     C::Constants{NF}                    # struct containing all constants used at runtime
                     ) where {NF<:AbstractFloat}
 
@@ -71,7 +66,7 @@ function timestep!( A::AbstractArray{NF,4},             # a prognostic variable
         tendency_layer = view(tendency,:,:,k)
         
         # make a timestep forward for each layer
-        timestep!(A_layer,tendency_layer,j1,C)
+        timestep!(A_layer,tendency_layer,l1,C)
     end
 end
 
