@@ -28,7 +28,7 @@ end
 """
 Compute physical parametrization tendencies
 """
-function phypar{T}(utend, vtend, ttend, trtend) where {T<:AbstractFloat}
+function phypar{T}(utend, vtend, ttend, qtend) where {T<:AbstractFloat}
 
 
 end

@@ -1,6 +1,6 @@
 
 """
-Compute the grid point and spectral tendencies 
+Compute the grid point and spectral tendencies, including an implicit correction for the spectral tendencies. 
 """
 function get_tendencies!(vor::AbstractArray{NF,4},
                          div::AbstractArray{NF,4}, 
@@ -13,7 +13,7 @@ function get_tendencies!(vor::AbstractArray{NF,4},
                          t_tend::AbstractArray{NF,3},
                          ps_tend::AbstractArray{NF,3},
                          tr_tend::AbstractArray{NF,3},
-                         j1::int,
+                         j1::int, #COMMENT: Maybe j1/j2 should be read in from struct?
                          j2::int) where {NF<:AbstractFloat}
 
 
@@ -72,28 +72,28 @@ function get_gridpoint_tendencies!(vor::AbstractArray{NF,4},
     phi_grid = similar(vor_grid)                   #Gridpoint field of geopotential
 
 
-    #1. Convert spectral prognostic to grid point space
-    get_grid_point_fields(
-                          
+    #1. Convert spectral prognostic variables to grid point space
+    get_grid_point_fields(vor,div,t,phi,ps,tr,
                           vor_grid,div_grid,t_grid,tr_grid, u_grid,v_grid,q_grid, ps_grid,phi_grid)
 
 
-   # 2. Parameterised physics tendencies. NEEDS DEFINING in phypar.jl
-   phypar(ξ_tend, D_tend, Tₐ_tend, tr_tend)
-
-
-   ompute physical parametrization tendencies for u, v, t, q
-    !
-    ! Output arguments:
-    !     utend: u-wind tendency (gp)
-    !     vtend: v-wind tendency (gp)
-    !     ttend: temp. tendency (gp)
-    !     qtend: spec. hum. tendency (gp)
+   # 2. Parameterised physics tendencies. 
+   #COMMENT: NEEDS DEFINING in phypar.jl. There is a lot of physics here
+   phypar(u_tend, div_tend, t_tend, q_tend)
+    #utend: u-wind tendency (gp)
+    #vtend: v-wind tendency (gp)
+    #ttend: temp. tendency (gp)
+    #qtend: spec. hum. tendency (gp)
 
 
    #3. Dynamics tendencies
-   dynamics_tendencies(,
-   )
+   dynamics_tendencies(u_tend, div_tend, t_tend, q_tend, #IN, Parameterised physics tendencies
+                       vor_grid,div_grid,t_grid,tr_grid, u_grid,v_grid,q_grid, ps_grid,phi_grid, #IN, Grid point fields
+                       j2, #IN, timestep parameter
+                       vor_tend, div_tend,t_tend,ps_tend,tr_tend,#OUT, tendencies
+                       ps #IN, other. Typically defined globally in the fortran version.
+                       )
+
 
 end
 
@@ -101,9 +101,21 @@ end
 """
 Compute grid point fields of the spectral prognostic tendencies
 """
-function get_grid_point_fields(
-                               vor,div,t,phi,ps,tr
-                               vor_grid,div_grid,t_grid,tr_grid, u_grid,v_grid, q_grid, ps_grid,phi_grid)
+function get_grid_point_fields(vor::AbstractArray{NF,4}, #IN
+                               div::AbstractArray{NF,4}, #IN
+                               t::AbstractArray{NF,4},   #IN
+                               phi::AbstractArray{NF,4}, #IN
+                               ps::AbstractArray{NF,4},  #IN
+                               tr::AbstractArray{NF,4},  #IN
+                               vor_grid::AbstractArray{NF,3},#OUT
+                               div_grid::AbstractArray{NF,3},#OUT
+                               t_grid::AbstractArray{NF,3},  #OUT
+                               tr_grid::AbstractArray{NF,3}, #OUT
+                               u_grid::AbstractArray{NF,3},  #OUT
+                               v_grid::AbstractArray{NF,3},  #OUT 
+                               q_grid::AbstractArray{NF,3},  #OUT 
+                               ps_grid::AbstractArray{NF,2}, #OUT
+                               phi_grid::AbstractArray{NF,3}) #OUT
 
 
 
@@ -112,164 +124,164 @@ function get_grid_point_fields(
     #COMMENT: THIS NEEDS TO BE CONFIGURED PROPERLY W.R.T ARGUMENTS.
     geopotential!(phi)
 
-    #1.2 Grid point variables for physics tendencies
-    #Calculate u and v in grid-point space from vorticity and
-    #divergence in spectral space
-    for j in 1:nlev
+   for k in 1:nlev
+
+        
+        #Calculate u and v in grid-point space from vorticity and
+        #divergence in spectral space
         uvspec!(vor[:,:,k,j2], div[:,:,k,j2], u_grid[:,:,k],v_grid[:,:,k]
-    end
     
+        #Temperature in grid point space
+        convert_to_grid(t[:,:,k,j2], t_grid[:,:,k])  
+
+        #Normalise geopotential by cp to avoid overflows in physics
+        convert_to_grid(phi[:,:,k]*(1/cp), phi_grid[:,:,k]) 
+
+        #Vorticity and divergence grids. I think there is a conversion here to 'per hour' to reduce underflows 
+        vor_grid[:,:,k] = convert_to_grid(vor[:,:,k,j2])
+        div_grid[:,:,k] = convert_to_grid(div[:,:,k,j2])
+
+        for itr in 1:n_trace
+            tr_grid[:,:,k,itr] = convert_to_grid(tr[:,:,k,j2,itr])
+        end
+
+        for j in 1:nlat
+            for i in 1:nlon
+                vor_grid[i,j,k] += coriol[j] #COMMENT: coriol will need to be defined, perhaps in a struct?
+            end
+        end
+
+   end
+
+
     #Truncate variables where the spectral transform is still done at double
     #precision
     u_grid = u_grid / 3600.0
     v_grid = v_grid / 3600.0
 
-
-
-    for k in 1:nlev
-        gridded(t[:,:,k,j2], t_grid[:,:,k])   #Transform from spectral to gridpoint space
-    end
-
-    #Normalise geopotential by cp to avoid overflows in physics
-    for k in 1:nlev
-        gridded(phi[:,:,k]*(1/cp), phi_grid[:,:,k])   #Transform from spectral to gridpoint space
-    end
+    #Surface pressure spectral transform to grid
+    convert_to_grid(ps(:,:,j1), ps_grid)
 
 
     #Don't transform the two stratospheric levels where humidity is set to zero
     # because it leads to overflows 
     for k in 3:nlev
-        gridded(tr(:,:,k,j1,1), q_grid(:.:,k), )
+        convert_to_grid(tr(:,:,k,j1,1), q_grid(:.:,k), )
     end 
-
-    #Surface pressure spectral transform to grid
-    gridded(ps(:,:,j1), ps_grid)
-
-
-    #1.3 Grid-point variables for dynamics tendencies
-    #Set units of vorticity and divergence to 'per hour' to reduce underflows 
-
-   for k in 1:nlev
-    vor_grid[:,:,k] = gridded(vor[:,:,k,j2])
-    div_grid[:,:,k] = gridded(div[:,:,k,j2])
-
-    for itr in 1:n_trace
-        tr_grid[:,:,k,itr] = gridded(tr[:,:,k,j2,itr])
-    end
-
-    for j in 1:nlat
-        for i in 1:nlon
-            vor_grid[i,j,k] += coriol[j] #add coriolo
-        end
-    end
-
-   end
-
-
 
 end
 
 """
-Compute non-linear tendencies in grid-point space from ynamics and add to physics tendencies. Convert total
+Compute non-linear tendencies in grid-point space from dynamics and add to physics tendencies. Convert total
 gridpoint tendencies to spectral tendencies
 """
-function dynamics_tendencies()
+function dynamics_tendencies(u_tend, div_tend, t_tend, q_tend,#COMMENT. Need to declare physics tendencies types once phypar is completed
+                             vor_grid::AbstractArray{NF,3},
+                             div_grid::AbstractArray{NF,3},
+                             t_grid::AbstractArray{NF,3},
+                             tr_gri:::AbstractArray{NF,3}, 
+                             u_grid::AbstractArray{NF,3},
+                             v_grid::AbstractArray{NF,3},
+                             q_grid::AbstractArray{NF,3}, 
+                             ps_grid::AbstractArray{NF,2}
+                             phi_grid::AbstractArray{NF,3},
+                             j2 :: ::int
+                             vor_tend::AbstractArray{NF,3},
+                             div_tend::AbstractArray{NF,3},
+                             t_tend::AbstractArray{NF,3},
+                             ps_tend::AbstractArray{NF,3},
+                             tr_tend::AbstractArray{NF,3},
+                             ps::AbstractArray{NF,4}) where {NF<:AbstractFloat}
 
+#COMMENT: this is an ugly subroutine. Better to quantise this into smaller subroutines for readability and consistency
 
-    umean = zeros(RealType, nlon, nlat)
-    vmean = zeros(RealType, nlon, nlat)
-    dmean = zeros(RealType, nlon, nlat)
+    #Declare empty mean arrays which we will fill
+    umean = Array{NF,2}(undef,nlon, nlat) 
+    vmean = similar(umean)
+    dmean = similar(umean)
+    dumc = Array{NF,3}(mx,nx,3) #COMMENT: mx, nx will have to be defined, again in a struct like nlon, nlat
+
 
     for k in 1:nlev
-        umean += u_grid[:,:,k]*dhs[k]
+        umean += u_grid[:,:,k]*dhs[k] #COMMENT: dhs needs to be defined. 
         vmean += v_grid[:,:,k]*dhs[k]
-        dmean += D_grid[:,:,k]*dhs[k]
+        dmean += div_grid[:,:,k]*dhs[k]
     end
 
-    # Compute tendency of log(surface pressure)
-    # pₛ(1,1,j2)=zero
-    grad!(pₛ[:,:,j2], @view(dumc[:,:,1]), @view(dumc[:,:,2]))
-    px = spec_to_grid(dumc[:,:,1], scale=true)
-    py = spec_to_grid(dumc[:,:,2], scale=true)
+    # 1. Compute tendency of log(surface pressure)
+    grad!(pₛ[:,:,j2], @view(dumc[:,:,1]), @view(dumc[:,:,2])) #COMMENT: grad! needs to be defined
+    px = convert_to_grid(dumc[:,:,1], scale=true)
+    py = convert_to_grid(dumc[:,:,2], scale=true)
 
-    pₛ_tend = grid_to_spec(-umean.*px - vmean.*py)
-    pₛ_tend[1,1] = Complex{RealType}(zero)
+    ps_tend = convert_to_spectral(-umean.*px - vmean.*py)
+    ps_tend[1,1] = Complex{RealType}(zero) #COMMENT: how to do this?
 
-    # Compute "vertical" velocity
-    σ_tend = zeros(RealType, nlon, nlat, nlev+1)
-    σ_m = zeros(RealType, nlon, nlat, nlev+1)
+    # 2. Compute "vertical" velocity
+    sigma_tend = Array{NF,3}(undef,nlon, nlat,nlev+1) 
+    sigma_m = Array{NF,3}(undef,nlon, nlat,nlev+1) 
+    puv = Array{NF,3}(undef,nlon, nlat,nlev) 
 
-    # (The following combination of terms is utilized later in the
-    #     temperature equation)
-    puv = zeros(RealType, nlon, nlat, nlev)
     for k in 1:nlev
         puv[:,:,k] = (u_grid[:,:,k] - umean).*px + (v_grid[:,:,k] - vmean).*py
     end
 
     for k in 1:nlev
-        σ_tend[:,:,k+1] = σ_tend[:,:,k] - dhs[k]*(puv[:,:,k] + D_grid[:,:,k] - dmean)
-        σ_m[:,:,k+1] = σ_m[:,:,k] - dhs[k]*puv[:,:,k]
+        sigma_tend[:,:,k+1] = sigma_tend[:,:,k] - dhs[k]*(puv[:,:,k] + D_grid[:,:,k] - dmean)
+        sigma_m[:,:,k+1] = sigma_m[:,:,k] - dhs[k]*puv[:,:,k]
     end
 
-    # Subtract part of temperature field that is used as reference for implicit terms
-    t_grid_anom = zeros(RealType, nlon, nlat, nlev)
-
+    # 3. Subtract part of temperature field that is used as reference for implicit terms
+    t_grid_anom = Array{NF,3}(undef,nlon, nlat,nlev) 
     for k in 1:nlev
-        t_grid_anom[:,:,k] = Tₐ_grid[:,:,k] .- tref[k]
+        t_grid_anom[:,:,k] = t_grid[:,:,k] .- tref[k] #COMMENT: tref needs to be defined
     end
 
-    # Zonal wind tendency
-    temp = zeros(RealType, nlon, nlat, nlev+1)
-    u_tend = zeros(RealType, nlon, nlat, nlev)
+    # 4. Zonal wind tendency
+    temp = Array{NF,3}(undef,nlon, nlat,nlev+1) 
 
     for k in 2:nlev
-        temp[:,:,k] = σ_tend[:,:,k].*(u_grid[:,:,k] - u_grid[:,:,k-1])
+        temp[:,:,k] = sigma_tend[:,:,k].*(u_grid[:,:,k] - u_grid[:,:,k-1])
     end
 
     for k in 1:nlev
-        u_tend[:,:,k] = v_grid[:,:,k].*ξ_grid[:,:,k] - t_grid_anom[:,:,k]*R.*px
+        u_tend[:,:,k] = u_tend[:,:,k] + v_grid[:,:,k].*vor_grid[:,:,k] - t_grid_anom[:,:,k]*R.*px
             - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
     end
 
-    # Meridional wind tendency
-    v_tend = zeros(RealType, nlon, nlat, nlev)
-
+    # 5. Meridional wind tendency
     for k in 2:nlev
-        temp[:,:,k] = σ_tend[:,:,k].*(v_grid[:,:,k] - v_grid[:,:,k-1])
+        temp[:,:,k] = sigma_tend[:,:,k].*(v_grid[:,:,k] - v_grid[:,:,k-1])
     end
 
     for k in 1:nlev
-        v_tend[:,:,k] = -u_grid[:,:,k].*ξ_grid[:,:,k] - t_grid_anom[:,:,k]*R.*py
+        v_tend[:,:,k] = v_tend[:,:,k] -u_grid[:,:,k].*vor_grid[:,:,k] - t_grid_anom[:,:,k]*R.*py
             - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
     end
 
-    # Temperature tendency
-    Tₐ_tend_grid = zeros(RealType, nlon, nlat, nlev)
-
+    # 6. Temperature tendency
     for k in 2:nlev
-        temp[:,:,k] = σ_tend[:,:,k].*(t_grid_anom[:,:,k] - t_grid_anom[:,:,k-1])
-            + σ_m[:,:,k].*(tref[k] - tref[k-1])
+        temp[:,:,k] = sigma_tend[:,:,k].*(t_grid_anom[:,:,k] - t_grid_anom[:,:,k-1])
+            + sigma_m[:,:,k].*(tref[k] - tref[k-1])
     end
 
     for k in 1:nlev
-        Tₐ_tend_grid[:,:,k] = t_grid_anom[:,:,k].*D_grid[:,:,k]
+        t_tend[:,:,k] = t_tend[:,:,k]+ t_grid_anom[:,:,k].*div_grid[:,:,k]
             - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
-            + fsgr[k]*t_grid_anom[:,:,k].*(σ_tend[:,:,k+1] + σ_tend[:,:,k])
+            + fsgr[k]*t_grid_anom[:,:,k].*(σ_tend[:,:,k+1] + sigma_tend[:,:,k])
             + tref3[k]*(σ_m[:,:,k+1] + σ_m[:,:,k])
             + akap*(Tₐ_grid[:,:,k].*puv[:,:,k] - t_grid_anom[:,:,k].*dmean)
-    end
+    end #COMMENT: lots of extras to be defined here
 
-    # Tracer tendency
-    tr_tend_grid = zeros(RealType, nlon, nlat, nlev, n_trace)
+    # 7. Tracer tendency
     for itr in 1:n_trace
         for k in 2:nlev
-            temp[:,:,k] = σ_tend[:,:,k].*(tr_grid[:,:,k,itr] - tr_grid[:,:,k-1,itr])
+            temp[:,:,k] = sigma_tend[:,:,k].*(tr_grid[:,:,k,itr] - tr_grid[:,:,k-1,itr])
         end
 
         temp[:,:,2:3] .= zero
 
         for k in 1:nlev
-            tr_tend_grid[:,:,k,itr] = tr_grid[:,:,k,itr].*D_grid[:,:,k]
+            tr_tend[:,:,k,itr] = tr_tend + tr_grid[:,:,k,itr].*D_grid[:,:,k]
                 - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
         end
     end
@@ -285,24 +297,24 @@ function dynamics_tendencies()
         #  vdspec takes a grid u and a grid v and converts them to
         #  spectral vor and div
         vdspec!(u_tend[:,:,k], v_tend[:,:,k],
-            @view(ξ_tend[:,:,k]), @view(D_tend[:,:,k]), true)
+            @view(vor_tend[:,:,k]), @view(div_tend[:,:,k]), true)
 
         # Divergence tendency
         # add -lapl(0.5*(u**2+v**2)) to div tendency
-        D_tend[:,:,k] = D_tend[:,:,k]
-            - ∇²(grid_to_spec(half*(u_grid[:,:,k].^two + v_grid[:,:,k].^two)))
+        div_tend[:,:,k] = div_tend[:,:,k]
+            - ∇²(convert_to_spectral(half*(u_grid[:,:,k].^two + v_grid[:,:,k].^two)))
 
         # Temperature tendency
         # and add div(vT) to spectral t tendency
         vdspec!(-u_grid[:,:,k].*t_grid_anom[:,:,k], -v_grid[:,:,k].*t_grid_anom[:,:,k],
-            dumc[:,:,1], @view(Tₐ_tend[:,:,k]), true)
-        Tₐ_tend[:,:,k] += grid_to_spec(Tₐ_tend_grid[:,:,k])
+            dumc[:,:,1], @view(t_tend[:,:,k]), true)
+            t_tend[:,:,k] += convert_to_spectral(t_grid[:,:,k])
 
         # tracer tendency
         for itr in 1:n_trace
             vdspec!(-u_grid[:,:,k].*tr_grid[:,:,k,itr], -v_grid[:,:,k].*tr_grid[:,:,k,itr],
                 dumc[:,:,1], @view(tr_tend[:,:,k,itr]), true)
-            tr_tend[:,:,k,itr] += grid_to_spec(tr_tend_grid[:,:,k,itr])
+            tr_tend[:,:,k,itr] += convert_to_spectral(tr_tend_grid[:,:,k,itr])
         end
     end
 end
