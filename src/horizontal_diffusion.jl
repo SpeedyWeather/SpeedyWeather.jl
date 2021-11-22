@@ -99,7 +99,7 @@ end
 function do_horizontal_diffusion!(  A::AbstractArray{Complex{NF},2},        # spectral horizontal field
                                     tendency::AbstractArray{Complex{NF},2}, # its tendency
                                     dmp::AbstractArray{NF,2},               # damping coefficients (explicit)
-                                    dmp1::AbsrtactArray{NF,2}               # damping coefficients (implicit)
+                                    dmp1::AbstractArray{NF,2}               # damping coefficients (implicit)
                                     ) where {NF<:AbstractFloat}
 
     @boundscheck size(A) == size(tendency) || throw(BoundsError())
@@ -113,7 +113,7 @@ end
 function do_horizontal_diffusion!(  A::AbstractArray{Complex{NF},3}         # spectral horizontal field
                                     tendency::AbstractArray{Complex{NF},3}, # its tendency
                                     dmp::AbstractArray{NF,2},               # damping coefficients (explicit)
-                                    dmp1::AbsrtactArray{NF,2}               # damping coefficients (implicit)
+                                    dmp1::AbstractArray{NF,2}               # damping coefficients (implicit)
                                     ) where {NF<:AbstractFloat}
     mx,nx,nlev = size(A)
     @boundscheck (mx,nx,nlev) == size(tendency) || throw(BoundsError())
