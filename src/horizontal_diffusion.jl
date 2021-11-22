@@ -96,7 +96,7 @@ function HorizontalDiffusion(   P::Params,
 end
 
 """Apply horizontal diffusion to 2D field in spectral space."""
-function do_horizontal_diffusion!(  A::AbstractArray{Complex{NF},2}         # spectral horizontal field
+function do_horizontal_diffusion!(  A::AbstractArray{Complex{NF},2},        # spectral horizontal field
                                     tendency::AbstractArray{Complex{NF},2}, # its tendency
                                     dmp::AbstractArray{NF,2},               # damping coefficients (explicit)
                                     dmp1::AbsrtactArray{NF,2}               # damping coefficients (implicit)
