@@ -116,19 +116,19 @@ function do_horizontal_diffusion!(  A::AbstractArray{Complex{NF},2},        # sp
     @boundscheck size(A) == size(dmp) || throw(BoundsError())
     @boundscheck size(A) == size(dmp1) || throw(BoundsError())
     
-    for i in eachindex(A)
+    @inbounds for i in eachindex(A)
         tendency[i] = (tendency[i] - dmp[i]*A[i])*dmp1[i]
     end
 end
 
 """Apply horizontal diffusion to 3D field layer by layer in spectral space."""
-function do_horizontal_diffusion!(  A::AbstractArray{Complex{NF},3}         # spectral horizontal field
+function do_horizontal_diffusion!(  A::AbstractArray{Complex{NF},3},        # spectral horizontal field
                                     tendency::AbstractArray{Complex{NF},3}, # its tendency
                                     dmp::AbstractArray{NF,2},               # damping coefficients (explicit)
                                     dmp1::AbstractArray{NF,2}               # damping coefficients (implicit)
                                     ) where {NF<:AbstractFloat}
-    mx,nx,nlev = size(A)
-    @boundscheck (mx,nx,nlev) == size(tendency) || throw(BoundsError())
+    _,_,nlev = size(A)
+    @boundscheck size(A) == size(tendency) || throw(BoundsError())
     
     for k in 1:nlev
         A_layer = view(A,:,:,k)
