@@ -20,9 +20,10 @@ end
 """
 Generator function for a HorizontalDiffusion struct.
 """
-function HorizontalDiffusion(   P::Params,
-                                G::GeoSpectral{NF},
-                                B::Boundaries{NF}) where {NF<:AbstractFloat}
+function HorizontalDiffusion(   P::Params,                      # Parameter struct
+                                G::GeoSpectral{NF},             # Geometry and spectral struct
+                                B::Boundaries{NF                # Boundaries struct
+                                }) where {NF<:AbstractFloat}    # Number format NF
 
     @unpack nlev, σ_full = G.geometry
     @unpack trunc, mx, nx = G.spectral
@@ -44,18 +45,26 @@ function HorizontalDiffusion(   P::Params,
     rlap  = 1.0/(trunc*(trunc + 1))     # ?
 
     # preallocate (high precision, conversion to NF later)
-    dmp = zeros(mx, nx)                 # Damping coefficient for temperature and vorticity (explicit)
-    dmpd = zeros(mx, nx)                # Damping coefficient for divergence (explicit)
+    dmp = zeros(mx,nx)                  # Damping coefficient for temperature and vorticity (explicit)
+    dmpd = zeros(mx,nx)                 # Damping coefficient for divergence (explicit)
     dmps = zeros(mx,nx)                 # Damping coefficient for extra diffusion in the stratosphere (explicit)
 
+    dmp1 = zeros(mx,nx)                 # Damping coefficient for temperature and vorticity (implicit)
+    dmp1d = zeros(mx,nx)                # Damping coefficient for divergence (implicit)
+    dmp1s = zeros(mx,nx)                # Damping coefficient for extra diffusion in the stratosphere (implicit)
+
     for j in 1:nx
-        for k in 1:mx
-            N = k+j-2
+        for i in 1:mx
+            N = i+j-2
             elap = (N*(N + 1.0)*rlap)
             elapn = elap^npowhd
-            dmp[k,j]  = hdiff*elapn
-            dmpd[k,j] = hdifd*elapn
-            dmps[k,j] = hdifs*elap
+            dmp[i,j]  = hdiff*elapn     
+            dmpd[i,j] = hdifd*elapn
+            dmps[i,j] = hdifs*elap
+
+            dmp1[i,j]  = 1/(1+dmp*Δt)
+            dmp1d[i,j] = 1/(1+dmpd*Δt)
+            dmp1s[i,j] = 1/(1+dmps*Δt)
         end
     end
 
@@ -90,6 +99,7 @@ function HorizontalDiffusion(   P::Params,
     corh .= rh_ref                  # relative humidity reference value
     qcorh = convert_to_spectral(corh)
 
+    # convert to NF here
     return HorizontalDiffusion{NF}( dmp,dmpd,dmps,
                                     dmp1,dmpd1,dmps1,
                                     tcorv,qcorv,tcorh,qcorh)
@@ -106,7 +116,9 @@ function do_horizontal_diffusion!(  A::AbstractArray{Complex{NF},2},        # sp
     @boundscheck size(A) == size(dmp) || throw(BoundsError())
     @boundscheck size(A) == size(dmp1) || throw(BoundsError())
     
-    tendency = (tendency - dmp*field)*dmp1
+    for i in eachindex(A)
+        tendency[i] = (tendency[i] - dmp[i]*A[i])*dmp1[i]
+    end
 end
 
 """Apply horizontal diffusion to 3D field layer by layer in spectral space."""
