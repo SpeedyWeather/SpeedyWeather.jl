@@ -285,13 +285,12 @@ function vdspec!(   ug::Array{NF,2},
     vds!(specu, specv, vorm, divm)
 end
 
-""" Set the spectral coefficients of the lower right triangle
-to zero. """
-function spectral_truncation!(  A::AbstractMatrix{Complex{NF}},
-                                trunc::Int
-                                ) where {NF<:AbstractFloat}
+"""Truncate spectral field by seting the spectral coefficients of the lower right triangle to zero. """
+function spectral_truncation!(  A::AbstractArray{Complex{NF},2},    # spectral field to be truncated
+                                trunc::Int                          # truncate to total wave number `trunc`
+                                ) where {NF<:AbstractFloat}         # number format NF
     m,n = size(A)
-    zeero = zero(Complex{NF})
+    zeero = zero(Complex{NF})   # zero element of elements in A
 
     @inbounds for j in 1:n
         for i in 1:m
@@ -302,30 +301,39 @@ function spectral_truncation!(  A::AbstractMatrix{Complex{NF}},
     end
 end
 
-"""
-Truncate a grid-point field in spectral space.
-"""
-function spectral_truncation(   input::Array{NF,2},
-                                G::GeoSpectral{NF}) where {NF<:AbstractFloat}
-
-    @unpack trunc = G.spectral
-
-    input_spectral = spectral(input, G)
-    spectral_truncation!(input_spectral,trunc)
-    return gridded(input_spectral, G)
+"""Spectral truncation with unpacking Geospectral struct."""
+function spectral_truncation!(  A::AbstractArray{Complex{NF},2},
+                                G::GeoSpectral{NF}
+                                ) where NF
+    spectral_truncation!(A,G.spectral.trunc)    # unpack GeoSpectral struct
 end
 
-function spectral_truncation(   input::Array{NF,2},
-                                G::GeoSpectral{NF}) where {NF<:AbstractFloat}
+"""Spectral truncation of a grid-point field with memory allocation."""
+function spectral_truncation(   input::AbstractArray{NF,2},
+                                G::GeoSpectral{NF}
+                                ) where NF
+    input_spectral = spectral(input,G)          # allocates memory
+    spectral_truncation!(input_spectral,G)      # in-place truncation
 
-    @unpack trunc = G.spectral
-
-    input_spectral = spectral(input, G)
-    spectral_truncation!(input_spectral,trunc)
-    return gridded(input_spectral, G)
+    # allocates memory to return spectrally truncated gridded field
+    return gridded(input_spectral, G)       
 end
 
+"""In-place version of spectral trunction of a grid-point field."""
+function spectral_truncation!(  input::AbstractArray{NF,2},
+                                input_spectral::AbstractArray{Complex{NF},2},
+                                G::GeoSpectral{NF}
+                                ) where NF
+    spectral!(input_spectral,input,G)       # in-place spectral transform from input to input_spectral
+    spectral_truncation!(input_spectral,G)  # in-place truncation
+    gridded!(input,input_spectral,G)        # in-place backtransform
+end
 
+function spectral_truncation!(  input::Array{NF,2},
+                                G::GeoSpectral{NF}
+                                ) where NF
+    spectral_truncation!(input,spectral(input,G),G)
+end
 
 """
 Epsilon-factors for the recurrence relation of the normalized associated
