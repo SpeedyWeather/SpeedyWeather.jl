@@ -16,7 +16,7 @@ module SpeedyWeather
     include("fourier.jl")
     include("boundaries.jl")
     include("diagnostics.jl")
-    include("prognostics.jl")
+    include("prognostic_variables.jl")
     include("geopotential.jl")
     include("horizontal_diffusion.jl")
     include("implicit.jl")

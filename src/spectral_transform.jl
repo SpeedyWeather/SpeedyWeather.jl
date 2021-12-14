@@ -287,7 +287,9 @@ end
 
 """ Set the spectral coefficients of the lower right triangle
 to zero. """
-function truncate!(A::AbstractMatrix{Complex{NF}},trunc::Int) where {NF<:AbstractFloat}
+function spectral_truncation!(  A::AbstractMatrix{Complex{NF}},
+                                trunc::Int
+                                ) where {NF<:AbstractFloat}
     m,n = size(A)
     zeero = zero(Complex{NF})
 
@@ -300,7 +302,6 @@ function truncate!(A::AbstractMatrix{Complex{NF}},trunc::Int) where {NF<:Abstrac
     end
 end
 
-
 """
 Truncate a grid-point field in spectral space.
 """
@@ -310,9 +311,21 @@ function spectral_truncation(   input::Array{NF,2},
     @unpack trunc = G.spectral
 
     input_spectral = spectral(input, G)
-    truncate!(input_spectral,trunc)
+    spectral_truncation!(input_spectral,trunc)
     return gridded(input_spectral, G)
 end
+
+function spectral_truncation(   input::Array{NF,2},
+                                G::GeoSpectral{NF}) where {NF<:AbstractFloat}
+
+    @unpack trunc = G.spectral
+
+    input_spectral = spectral(input, G)
+    spectral_truncation!(input_spectral,trunc)
+    return gridded(input_spectral, G)
+end
+
+
 
 """
 Epsilon-factors for the recurrence relation of the normalized associated
