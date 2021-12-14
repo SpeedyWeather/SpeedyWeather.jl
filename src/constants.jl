@@ -13,6 +13,7 @@ Struct holding the parameters needed at runtime in number format NF.
     rh_ref::NF       # Reference relative humidity of near-surface air
 
     # TIME STEPPING
+    Δt::NF                  # time step [s] 
     robert_filter::NF       # Robert (1966) time filter coefficient to suppress comput. mode
     williams_filter::NF     # Williams time filter (Amezcua 2011) coefficient for 3rd order acc
 
