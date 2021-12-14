@@ -61,7 +61,6 @@ function Geometry{NF}(P::Params) where NF
     # of the (unassociated) legendre polynomial order nlat
     lat  = reverse(asind.(gausslegendre(nlat)[1]))
 
-
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     # sorted such that σ_half[end] is at the planetary boundary
     # TODO make nlev-dependent

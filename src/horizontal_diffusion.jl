@@ -28,15 +28,15 @@ function HorizontalDiffusion{NF}(   P::Params,                      # Parameter 
     @unpack nlev, σ_full = G.geometry
     @unpack trunc, mx, nx = G.spectral
     @unpack g, R, γ, hscale, hshum, rh_ref = P
-    # @unpack npowhd, thd, thdd, thds, tdrs = P
+    @unpack npowhd, thd, thdd, thds, tdrs = P
     @unpack ϕ0trunc = B
 
-    # TODO load from paramters struct instead
-    npowhd = 4.0        # Power of Laplacian in horizontal diffusion
-    thd    = 2.4        # Damping time [hrs] for diffusion (del^6) of temperature and vorticity
-    thdd   = 2.4        # Damping time [hrs] for diffusion (del^6) of divergence
-    thds   = 12.0       # Damping time [hrs] for extra diffusion (del^2) in the stratosphere
-    tdrs   = 24.0*30.0  # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
+    # TODO load from parameters struct instead
+    # npowhd = 4.0        # Power of Laplacian in horizontal diffusion
+    # thd    = 2.4        # Damping time [hrs] for diffusion (del^6) of temperature and vorticity
+    # thdd   = 2.4        # Damping time [hrs] for diffusion (del^6) of divergence
+    # thds   = 12.0       # Damping time [hrs] for extra diffusion (del^2) in the stratosphere
+    # tdrs   = 24.0*30.0  # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
 
     # Damping frequencies [1/s]
     hdiff = 1.0/(3600.0*thd)            # Spectral damping for temperature and vorticity

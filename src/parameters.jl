@@ -8,8 +8,8 @@ With keywords such that default values can be changed at creation.
     NF::DataType=Float64    # number format
 
     # RESOLUTION
-    nlon::Int=96            # number of longitudes
     nlat::Int=48            # number of latitudes
+    nlon::Int=2nlat         # number of longitudes
     nlev::Int=8             # number of vertical levels
     trunc::Int=30           # spectral truncation
     ntracers::Int=1         # number of tracers (specific humidity is one)
@@ -29,12 +29,12 @@ With keywords such that default values can be changed at creation.
     sbc::Real=5.67e-8       # Stefan-Boltzmann constant [W/m^2/K^4]
 
     # STANDARD ATMOSPHERE
-    γ::Real=6.0             # Reference temperature lapse rate -dT/dz [deg/km]
+    γ::Real=6.0             # Reference temperature lapse rate -dT/dz [K/km]
     Tabs_ref::Real=288      # Reference absolute temperature at surface z=0 [K]
     Tabs_top::Real=216      # Reference absolute temperature in stratosphere [K]
     hscale::Real=7.5        # Reference scale height for pressure [km]
     p0::Real=1e5            # Reference pressure [Pa]   TODO where is this needed?
-    p_ref::Real=1013        # Reference pressure [hPa]
+    p0_ref::Real=1013       # Reference surface pressure [hPa]
     hshum::Real=2.5         # Reference scale height for specific humidity [km]
     rh_ref::Real=0.7        # Reference relative humidity of near-surface air
     es_ref::Real=17         # Reference saturation water vapour pressure [Pa]
