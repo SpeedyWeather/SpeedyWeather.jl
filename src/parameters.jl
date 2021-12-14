@@ -69,7 +69,7 @@ With keywords such that default values can be changed at creation.
     boundary_file::String="surface.nc"
 
     # INITIAL CONDITIONS
-    initial_conditions::String="rest"
+    initial_conditions::Symbol=:rest    # :rest or :restart
 
     # OUTPUT
     verbose::Bool=true          # print dialog for feedback

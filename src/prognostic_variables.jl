@@ -1,20 +1,25 @@
 """Struct holding the prognostic spectral variables."""
-struct Prognostics{T<:AbstractFloat}
-    ξ::Array{Complex{T},3}       # Vorticity [?]
-    D::Array{Complex{T},3}       # Divergence [?]
-    Tabs::Array{Complex{T},3}    # Absolute temperature [K]
-    logp::Array{Complex{T},2}    # Log of surface pressure [log(Pa)]
-    humid::Array{Complex{T},3}   # Specific humidity [g/kg]
-    ϕ::Array{Complex{T},3}       # Atmospheric geopotential [m²/s²]
-    ϕ0::Array{Complex{T},2}      # Surface geopotential [m²/s²]
+struct PrognosticVariables{NF<:AbstractFloat}
+    vor     ::Array{Complex{NF},3}      # Vorticity of horizontal wind field
+    div     ::Array{Complex{NF},3}      # Divergence of horizontal wind field
+    Tabs    ::Array{Complex{NF},3}      # Absolute temperature [K]
+    logp    ::Array{Complex{NF},2}      # Log of surface pressure [log(Pa)]
+    humid   ::Array{Complex{NF},3}      # Specific humidity [g/kg]
+    # ϕ       ::Array{Complex{NF},3}      # Atmospheric geopotential [m²/s²]
+    # ϕ0      ::Array{Complex{NF},2}      # Surface geopotential [m²/s²]
 end
 
-function initial_conditions(    P::Params,
-                                B::Boundaries{T},
-                                G::GeoSpectral{T}) where T
+"""Initialize prognostic variables from rest or restart from file."""
+function initial_conditions(    P::Params,                      # Parameter struct
+                                B::Boundaries{NF},              # Boundaries struct
+                                G::GeoSpectral{NF}              # GeoSpectral struct
+                                ) where {NF<:AbstractFloat}     # number format NF
 
-    #if P.initial_conditions == "rest"
+    @unpack initial_conditions = P
+
+    # if initial_conditions == :rest
     Progs = initialize_from_rest(P,B,G)
+    # else initial_conditions == :rest
     #TODO allow for restart from file
 
     return Progs
@@ -23,7 +28,8 @@ end
 
 function initialize_from_rest(  P::Params,
                                 B::Boundaries{T},
-                                G::GeoSpectral{T}) where T
+                                G::GeoSpectral{T}
+                                ) where {NF<:AbstractFloat}
 
     @unpack nlev = G.geometry
     @unpack mx, nx = G.spectral
