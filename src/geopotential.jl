@@ -19,6 +19,8 @@ function geopotential!( ϕ::Array{Complex{NF},3},      # geopotential
     for j in 1:nx
         for i in 1:mx
             ϕ[i,j,end] = ϕ0[i,j] + xgeop1[end]*Tabs[i,j,end]
+        end
+    end
 
     # OTHER LAYERS
     # integrate two half-layers from bottom to top
