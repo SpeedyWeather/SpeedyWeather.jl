@@ -19,7 +19,7 @@ function run_speedy(::Type{NF}=Float64;         # number format, use Float64 as 
     # Prog = PrognosticVars{T}()
     # Diag = DiagnosticVars{T}()
 
-    M = ModelSetup(P,C,G,B,...)
+    M = ModelSetup(P,C,G,B)
 
     #time_stepping!(Prog,Diag,M)
 

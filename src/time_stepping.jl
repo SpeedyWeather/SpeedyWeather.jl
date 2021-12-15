@@ -34,7 +34,7 @@ function leapfrog!( A::AbstractArray{NF,3},             # a prognostic variable
     eps = one(NF) - two*eps
 
     # truncate the tendency to the spectral resolution
-    spectral_truncation!(tendency,G.trunc)
+    spectral_truncation!(tendency,G)
 
     # LEAP FROG time step with
     w1 = williams_filter*eps                # Robert time filter to compress computational mode
@@ -80,17 +80,16 @@ function first_step()
     initialize_implicit(2*Δt)
 end
 
-function timestep!( Prog::PrognosticVars{NF},
-                    Diag::DiagnosticVars{NF},
+function timestep!( Prog::PrognosticVariables{NF},
+                    Diag::PrognosticVariables{NF},
                     C::Constants{NF},
                     G::GeoSpectral{NF},
-                    TS::TimeStepping{NF},
-                    H::HorizontalDiffusion{NF}
+                    HD::HorizontalDiffusion{NF}
                     ) where {NF<:AbstractFloat}
                         
     @unpack vor,div,ps,temp = Prog
-    @unpack ... = Diag.Tendencies
-    @unpack dmp,dmpd,dmps,dmp1,dmp1d,dmp1s = H
+    @unpack vor_tend,div_tend,ps_tend,temp_tend = Diag.Tendencies
+    @unpack dmp,dmpd,dmps,dmp1,dmp1d,dmp1s = HD
     @unpack sdrag = C
 
     # Compute tendencies of prognostic variables
