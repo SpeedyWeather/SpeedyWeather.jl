@@ -39,6 +39,11 @@ With keywords such that default values can be changed at creation.
     rh_ref::Real=0.7        # Reference relative humidity of near-surface air
     es_ref::Real=17         # Reference saturation water vapour pressure [Pa]
 
+    # VERTICAL COORDINATE
+    # defined by a generalised logistic function, interpolating ECMWF's L31 configuration
+    # change only for more levels in the stratosphere vs troposphere vs boundary layer
+    GLcoefs::GenLogisticCoefs=GenLogisticCoefs()
+
     # DIFFUSION
     npowhd::Real=4          # Power of Laplacian in horizontal diffusion
     thd::Real=2.4           # Damping time [hrs] for diffusion (del^6) of temperature and vorticity
@@ -79,4 +84,19 @@ With keywords such that default values can be changed at creation.
 
     # TODO assert not allowed parameter values
     @assert α in [0,0.5,1] "Only semi-implicit α = 0, 0.5 or 1 allowed."
+end
+
+"""Coefficients of the generalised logistic function to describe the vertical coordinate.
+Default coefficients A,K,C,Q,B,M,ν are fitted to the old L31 configuration at ECMWF.
+See geometry.jl and function vertical_coordinate for more informaiton.
+
+Following the notation of https://en.wikipedia.org/wiki/Generalised_logistic_function (Dec 15 2021)."""
+@with_kw struct GenLogisticCoefs
+    A::Real=-0.283     # obtained from a fit in /input_date/vertical_coordinate/vertical_resolution.ipynb
+    K::Real= 0.871
+    C::Real= 0.414
+    Q::Real= 6.695
+    B::Real=10.336
+    M::Real= 0.602
+    ν::Real= 5.812
 end

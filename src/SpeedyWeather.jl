@@ -1,9 +1,12 @@
 module SpeedyWeather
 
-    using NetCDF, FFTW, LinearAlgebra, Parameters, Dates, FastGaussQuadrature
+    using NetCDF, FFTW, LinearAlgebra, Parameters, Dates
+    
+    import FastGaussQuadrature: gausslegendre
 
     export run_speedy, 
-        Params, GeoSpectral, Boundaries, Constants, Geometry,
+        Params, GenLogisticCoefs,
+        GeoSpectral, Boundaries, Constants, Geometry,
         fourier, fourier_inverse,
         legendre, legendre_inverse,
         spectral, gridded
@@ -22,6 +25,6 @@ module SpeedyWeather
     include("implicit.jl")
     include("tendencies.jl")
     include("time_stepping.jl")
+    include("utils.jl")
     include("run_speedy.jl")
-
 end
