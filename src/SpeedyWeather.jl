@@ -11,6 +11,7 @@ module SpeedyWeather
         legendre, legendre_inverse,
         spectral, gridded
 
+    include("parameter_structs.jl")
     include("parameters.jl")
     include("constants.jl")
     include("geometry.jl")
