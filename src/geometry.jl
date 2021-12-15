@@ -118,8 +118,8 @@ function vertical_coordinates(P::Params)
 
     halflevels_normalised = range(0,1,nlev+1)
     σ_half = generalised_logistic(halflevels_normalised,GLcoefs)
-    σ_half[0] = 0       # topmost half-level is at 0 pressure
-    σ_half[1] = 1       # lowermost half-level is at p=p_surface
+    σ_half[1] = 0           # topmost half-level is at 0 pressure
+    σ_half[end] = 1         # lowermost half-level is at p=p_surface
 
     @assert isincreasing(σ_half) "Vertical coordinates are not increasing."
     return σ_half
