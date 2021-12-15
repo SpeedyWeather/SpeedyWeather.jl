@@ -13,8 +13,12 @@ Struct holding the parameters needed at runtime in number format NF.
     rh_ref::NF       # Reference relative humidity of near-surface air
 
     # TIME STEPPING
+    Δt::NF                  # time step [s] 
     robert_filter::NF       # Robert (1966) time filter coefficient to suppress comput. mode
     williams_filter::NF     # Williams time filter (Amezcua 2011) coefficient for 3rd order acc
+
+    # DIFFUSION AND DRAG
+    sdrag::NF               # drag [1/s] for zonal wind in the stratosphere
 end
 
 """
@@ -24,8 +28,13 @@ function Constants{NF}(P::Params) where NF      # number format NF
 
     @unpack R_earth, Ω, g, akap, R, γ, hscale, hshum, rh_ref = P
     @unpack robert_filter, williams_filter = P
+    @unpack tdrs = P
+
+    # stratospheric drag [1/s] from drag time timescale tdrs [hrs]
+    sdrag = 1/(tdrs*3600)
 
     # This implies conversion to NF
     return Constants{NF}(R_earth,Ω,g,akap,R,γ,hscale,hshum,rh_ref,
-                            robert_filter,williams_filter)
+                            robert_filter,williams_filter,
+                            sdrag)
 end

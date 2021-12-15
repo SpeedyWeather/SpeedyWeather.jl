@@ -50,8 +50,8 @@ end
         A1 = A[:,:,1]
         tendency1 = copy(tendency[:,:,1])
 
-        SpeedyWeather.do_horizontal_diffusion!(A,tendency,D1,D2)
-        SpeedyWeather.do_horizontal_diffusion!(A1,tendency1,D1,D2)
+        SpeedyWeather.horizontal_diffusion!(A,tendency,D1,D2)
+        SpeedyWeather.horizontal_diffusion!(A1,tendency1,D1,D2)
 
         @test tendency1 == tendency[:,:,1]
     end

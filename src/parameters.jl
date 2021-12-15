@@ -8,8 +8,8 @@ With keywords such that default values can be changed at creation.
     NF::DataType=Float64    # number format
 
     # RESOLUTION
-    nlon::Int=96            # number of longitudes
     nlat::Int=48            # number of latitudes
+    nlon::Int=2nlat         # number of longitudes
     nlev::Int=8             # number of vertical levels
     trunc::Int=30           # spectral truncation
     ntracers::Int=1         # number of tracers (specific humidity is one)
@@ -29,15 +29,20 @@ With keywords such that default values can be changed at creation.
     sbc::Real=5.67e-8       # Stefan-Boltzmann constant [W/m^2/K^4]
 
     # STANDARD ATMOSPHERE
-    γ::Real=6.0             # Reference temperature lapse rate -dT/dz [deg/km]
+    γ::Real=6.0             # Reference temperature lapse rate -dT/dz [K/km]
     Tabs_ref::Real=288      # Reference absolute temperature at surface z=0 [K]
     Tabs_top::Real=216      # Reference absolute temperature in stratosphere [K]
     hscale::Real=7.5        # Reference scale height for pressure [km]
     p0::Real=1e5            # Reference pressure [Pa]   TODO where is this needed?
-    p_ref::Real=1013        # Reference pressure [hPa]
+    p0_ref::Real=1013       # Reference surface pressure [hPa]
     hshum::Real=2.5         # Reference scale height for specific humidity [km]
     rh_ref::Real=0.7        # Reference relative humidity of near-surface air
     es_ref::Real=17         # Reference saturation water vapour pressure [Pa]
+
+    # VERTICAL COORDINATE
+    # defined by a generalised logistic function, interpolating ECMWF's L31 configuration
+    # change only for more levels in the stratosphere vs troposphere vs boundary layer
+    GLcoefs::GenLogisticCoefs=GenLogisticCoefs()
 
     # DIFFUSION
     npowhd::Real=4          # Power of Laplacian in horizontal diffusion
@@ -69,7 +74,7 @@ With keywords such that default values can be changed at creation.
     boundary_file::String="surface.nc"
 
     # INITIAL CONDITIONS
-    initial_conditions::String="rest"
+    initial_conditions::Symbol=:rest    # :rest or :restart
 
     # OUTPUT
     verbose::Bool=true          # print dialog for feedback
@@ -79,4 +84,19 @@ With keywords such that default values can be changed at creation.
 
     # TODO assert not allowed parameter values
     @assert α in [0,0.5,1] "Only semi-implicit α = 0, 0.5 or 1 allowed."
+end
+
+"""Coefficients of the generalised logistic function to describe the vertical coordinate.
+Default coefficients A,K,C,Q,B,M,ν are fitted to the old L31 configuration at ECMWF.
+See geometry.jl and function vertical_coordinate for more informaiton.
+
+Following the notation of https://en.wikipedia.org/wiki/Generalised_logistic_function (Dec 15 2021)."""
+@with_kw struct GenLogisticCoefs
+    A::Real=-0.283     # obtained from a fit in /input_date/vertical_coordinate/vertical_resolution.ipynb
+    K::Real= 0.871
+    C::Real= 0.414
+    Q::Real= 6.695
+    B::Real=10.336
+    M::Real= 0.602
+    ν::Real= 5.812
 end

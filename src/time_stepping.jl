@@ -14,14 +14,14 @@ If j1 == 2, j2 == 2 : leapfrog time step with time filter (eps = ROB)
 dt = time step
 
 """
-function timestep!( A::AbstractArray{NF,3},             # a prognostic variable
+function leapfrog!( A::AbstractArray{NF,3},             # a prognostic variable
                     tendency::AbstractArray{NF,2},      # its tendency
                     l1::Int,                            # leapfrog index for time filtering
                     G::GeoSpectral{NF},                 # struct with precomputed arrays for spectral transform
                     C::Constants{NF}                    # struct with constants used at runtime
                     ) where {NF<:AbstractFloat}
 
-    nlon,nlat,nleapfrog = size(input)     # longitude, latitude, 2 leapfrog steps
+    nlon,nlat,nleapfrog = size(A)                       # longitude, latitude, 2 leapfrog steps
 
     @boundscheck (nlon,nlat) == size(tendency) || throw(BoundsError())
     @boundscheck nleapfrog == 2 || throw(BoundsError())     # last dim is 2 for leapfrog
@@ -34,14 +34,11 @@ function timestep!( A::AbstractArray{NF,3},             # a prognostic variable
     eps = one(NF) - two*eps
 
     # truncate the tendency to the spectral resolution
-    # TODO this allocates memory, avoid?
-    tendency = spectral_truncation(tendency,G)
+    spectral_truncation!(tendency,G)
 
     # LEAP FROG time step with
-    # Robert time filter to compress computational mode
-    # and Williams' filter for 3rd order accuracy
-    w1 = williams_filter*eps
-    w2 = (one(NF) - williams_filter)*eps
+    w1 = williams_filter*eps                # Robert time filter to compress computational mode
+    w2 = (one(NF) - williams_filter)*eps    # and Williams' filter for 3rd order accuracy
     @inbounds for j in 1:nlat
         for i in 1:nlon
             Anew = A[i,j,1] + Δt*tendency[i,j]                          # forward step
@@ -52,7 +49,7 @@ function timestep!( A::AbstractArray{NF,3},             # a prognostic variable
 end
 
 """3D version that loops over all vertical layers."""
-function timestep!( A::AbstractArray{NF,4},             # a prognostic variable
+function leapfrog!( A::AbstractArray{NF,4},             # a prognostic variable
                     tendency::AbstractArray{NF,3},      # its tendency
                     l1::Int,                            # index for time filtering
                     C::Constants{NF}                    # struct containing all constants used at runtime
@@ -66,7 +63,7 @@ function timestep!( A::AbstractArray{NF,4},             # a prognostic variable
         tendency_layer = view(tendency,:,:,k)
         
         # make a timestep forward for each layer
-        timestep!(A_layer,tendency_layer,l1,C)
+        leapfrog!(A_layer,tendency_layer,l1,C)
     end
 end
 
@@ -83,16 +80,18 @@ function first_step()
     initialize_implicit(2*Δt)
 end
 
+function timestep!( Prog::PrognosticVariables{NF},
+                    Diag::PrognosticVariables{NF},
+                    C::Constants{NF},
+                    G::GeoSpectral{NF},
+                    HD::HorizontalDiffusion{NF}
+                    ) where {NF<:AbstractFloat}
+                        
+    @unpack vor,div,ps,temp = Prog
+    @unpack vor_tend,div_tend,ps_tend,temp_tend = Diag.Tendencies
+    @unpack dmp,dmpd,dmps,dmp1,dmp1d,dmp1s = HD
+    @unpack sdrag = C
 
-function step(j1, j2, Δt)
-    vorU_tend = zeros(Complex{RealType}, mx, nx, nlev)
-    divU_tend = zeros(Complex{RealType}, mx, nx, nlev)
-    tem_tend  = zeros(Complex{RealType}, mx, nx, nlev)
-    pₛ_tend   = zeros(Complex{RealType}, mx, nx)
-    tr_tend   = zeros(Complex{RealType}, mx, nx, nlev, n_trace)
-    ctmp      = zeros(Complex{RealType}, mx, nx, nlev)
-
-    # =========================================================================
     # Compute tendencies of prognostic variables
     # =========================================================================
 
@@ -103,8 +102,8 @@ function step(j1, j2, Δt)
     # =========================================================================
 
     # Diffusion of wind and temperature
-    do_horizontal_diffusion_3d!(vorU[:,:,:,1], vorU_tend, dmp,  dmp1)
-    do_horizontal_diffusion_3d!(divU[:,:,:,1], divU_tend, dmpd, dmp1d)
+    horizontal_diffusion!(vorU[:,:,:,1], vorU_tend, dmp,  dmp1)
+    horizontal_diffusion!(divU[:,:,:,1], divU_tend, dmpd, dmp1d)
 
     for k in 1:nlev
         for m in 1:mx
@@ -114,18 +113,14 @@ function step(j1, j2, Δt)
         end
     end
 
-    do_horizontal_diffusion_3d!(ctmp, tem_tend, dmp, dmp1)
+    horizontal_diffusion!(ctmp, tem_tend, dmp, dmp1)
 
-    # Stratospheric diffusion and zonal wind damping
-    sdrag = one/(tdrs*RealType(3600.0))
-    for n in 1:nx
-        vorU_tend[1,n,1] = vorU_tend[1,n,1] - sdrag*vorU[1,n,1,1]
-        divU_tend[1,n,1] = divU_tend[1,n,1] - sdrag*divU[1,n,1,1]
-    end
+    stratospheric_zonal_drag!(vor,vor_tend,sdrag)
+    stratospheric_zonal_drag!(div,div_tend,sdrag)
 
-    do_horizontal_diffusion_3d!(vorU[:,:,:,1],  vorU_tend, dmps, dmp1s)
-    do_horizontal_diffusion_3d!(divU[:,:,:,1],  divU_tend, dmps, dmp1s)
-    do_horizontal_diffusion_3d!(ctmp, tem_tend,   dmps, dmp1s)
+    horizontal_diffusion!(vorU[:,:,:,1],  vorU_tend, dmps, dmp1s)
+    horizontal_diffusion!(divU[:,:,:,1],  divU_tend, dmps, dmp1s)
+    horizontal_diffusion!(ctmp, tem_tend,   dmps, dmp1s)
 
     # Diffusion of tracers
     for k in 1:nlev
@@ -136,30 +131,23 @@ function step(j1, j2, Δt)
         end
     end
 
-    do_horizontal_diffusion_3d!(ctmp, @view(tr_tend[:,:,:,1]), dmpd, dmp1d)
+    horizontal_diffusion!(ctmp, @view(tr_tend[:,:,:,1]), dmpd, dmp1d)
 
     if ntracers > 1
         for i in 2:ntracers
-            do_horizontal_diffusion_3d!(tr[:,:,:,1,itr], @view(tr_tend[:,:,:,itr]), dmp, dmp1)
+            tracer          = view(tracers,:,:,:,1,i)                   # the i-th tracer, leapfrog index 1
+            tracer_tendency = view(tracers_tendencies,:,:,:,i)          # its tendency
+            horizontal_diffusion!(tracer,tracer_tendency,dmp,dmp1)
+            leapfrog!(tracer,tracer_tendency,j1,C)
         end
     end
 
-    # =========================================================================
-    # Time integration with Robert filter
-    # =========================================================================
+    # Time integration
+    leapfrog!(ps,ps_tend,j1,G,C)
+    leapfrog!(vor,vor_tend,j1,G,C)
+    leapfrog!(div,div_tend,j1,G,C)
+    leapfrog!(temp,temp_tend,j1,G,C)
 
-    if j1 == 1
-        eps = zero
-    else
-        eps = rob
-    end
-
-    step_field_2d!(j1, Δt, eps, pₛ, pₛ_tend)
-    step_field_3d!(j1, Δt, eps, vorU, vorU_tend)
-    step_field_3d!(j1, Δt, eps, divU, divU_tend)
-    step_field_3d!(j1, Δt, eps, tem, tem_tend)
-
-    for itr in 1:n_trace
-        step_field_3d!(j1, Δt, eps, @view(tr[:,:,:,:,itr]), tr_tend[:,:,:,itr])
-    end
+    #TODO swap leapfrog indices here?
 end
+

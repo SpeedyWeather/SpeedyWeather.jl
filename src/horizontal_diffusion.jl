@@ -20,23 +20,23 @@ end
 """
 Generator function for a HorizontalDiffusion struct.
 """
-function HorizontalDiffusion(   P::Params,                      # Parameter struct
-                                G::GeoSpectral{NF},             # Geometry and spectral struct
-                                B::Boundaries{NF                # Boundaries struct
-                                }) where {NF<:AbstractFloat}    # Number format NF
+function HorizontalDiffusion{NF}(   P::Params,                      # Parameter struct
+                                    G::GeoSpectral{NF},             # Geometry and spectral struct
+                                    B::Boundaries{NF}               # Boundaries struct
+                                    ) where {NF<:AbstractFloat}    # Number format NF
 
     @unpack nlev, σ_full = G.geometry
     @unpack trunc, mx, nx = G.spectral
     @unpack g, R, γ, hscale, hshum, rh_ref = P
-    # @unpack npowhd, thd, thdd, thds, tdrs = P
+    @unpack npowhd, thd, thdd, thds, tdrs = P
     @unpack ϕ0trunc = B
 
-    # TODO load from paramters struct instead
-    npowhd = 4.0        # Power of Laplacian in horizontal diffusion
-    thd    = 2.4        # Damping time [hrs] for diffusion (del^6) of temperature and vorticity
-    thdd   = 2.4        # Damping time [hrs] for diffusion (del^6) of divergence
-    thds   = 12.0       # Damping time [hrs] for extra diffusion (del^2) in the stratosphere
-    tdrs   = 24.0*30.0  # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
+    # TODO load from parameters struct instead
+    # npowhd = 4.0        # Power of Laplacian in horizontal diffusion
+    # thd    = 2.4        # Damping time [hrs] for diffusion (del^6) of temperature and vorticity
+    # thdd   = 2.4        # Damping time [hrs] for diffusion (del^6) of divergence
+    # thds   = 12.0       # Damping time [hrs] for extra diffusion (del^2) in the stratosphere
+    # tdrs   = 24.0*30.0  # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
 
     # Damping frequencies [1/s]
     hdiff = 1.0/(3600.0*thd)            # Spectral damping for temperature and vorticity
@@ -106,11 +106,11 @@ function HorizontalDiffusion(   P::Params,                      # Parameter stru
 end
 
 """Apply horizontal diffusion to 2D field in spectral space."""
-function do_horizontal_diffusion!(  A::AbstractArray{Complex{NF},2},        # spectral horizontal field
-                                    tendency::AbstractArray{Complex{NF},2}, # its tendency
-                                    dmp::AbstractArray{NF,2},               # damping coefficients (explicit)
-                                    dmp1::AbstractArray{NF,2}               # damping coefficients (implicit)
-                                    ) where {NF<:AbstractFloat}
+function horizontal_diffusion!( A::AbstractArray{Complex{NF},2},        # spectral horizontal field
+                                tendency::AbstractArray{Complex{NF},2}, # its tendency
+                                dmp::AbstractArray{NF,2},               # damping coefficients (explicit)
+                                dmp1::AbstractArray{NF,2}               # damping coefficients (implicit)
+                                ) where {NF<:AbstractFloat}
 
     @boundscheck size(A) == size(tendency) || throw(BoundsError())
     @boundscheck size(A) == size(dmp) || throw(BoundsError())
@@ -122,17 +122,34 @@ function do_horizontal_diffusion!(  A::AbstractArray{Complex{NF},2},        # sp
 end
 
 """Apply horizontal diffusion to 3D field layer by layer in spectral space."""
-function do_horizontal_diffusion!(  A::AbstractArray{Complex{NF},3},        # spectral horizontal field
-                                    tendency::AbstractArray{Complex{NF},3}, # its tendency
-                                    dmp::AbstractArray{NF,2},               # damping coefficients (explicit)
-                                    dmp1::AbstractArray{NF,2}               # damping coefficients (implicit)
-                                    ) where {NF<:AbstractFloat}
+function horizontal_diffusion!( A::AbstractArray{Complex{NF},3},        # spectral horizontal field
+                                tendency::AbstractArray{Complex{NF},3}, # its tendency
+                                dmp::AbstractArray{NF,2},               # damping coefficients (explicit)
+                                dmp1::AbstractArray{NF,2}               # damping coefficients (implicit)
+                                ) where {NF<:AbstractFloat}             # number format NF
     _,_,nlev = size(A)
     @boundscheck size(A) == size(tendency) || throw(BoundsError())
     
     for k in 1:nlev
         A_layer = view(A,:,:,k)
         tendency_layer = view(tendency,:,:,k)
-        do_horizontal_diffusion!(A_layer, tendency_layer, dmp, dmp1)
+        horizontal_diffusion!(A_layer, tendency_layer, dmp, dmp1)
+    end
+end
+
+"""Zonal drag in the stratosphere (uppermost layer) for vorticity and divergence."""
+function stratospheric_zonal_drag!( A::AbstractArray{Complex{NF},4},        # spectral vorticity or divergence
+                                    tendency::AbstractArray{Complex{NF},3}, # its tendency
+                                    sdrag::NF                               # drag coefficient [1/s]
+                                    ) where {NF<:AbstractFloat}             # number format NF
+    
+    mx,nx,nlev,nleapfrog = size(A)
+    @boundscheck (mx,nx,nlev) == size(tendency) || throw(BoundsError())
+    @boundscheck nleapfrog == 2 || throw(BoundsError())
+
+    @inbounds for j in 1:nx
+        # size(A) = mx x nx x nlev, nlev = 1 is uppermost model level
+        # apply drag only to largest zonal wavenumber (mx = 1)
+        tendency[1,j,1] = tendency[1,j,1] - sdrag*A[1,j,1,1]
     end
 end

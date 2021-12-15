@@ -61,11 +61,10 @@ function Geometry{NF}(P::Params) where NF
     # of the (unassociated) legendre polynomial order nlat
     lat  = reverse(asind.(gausslegendre(nlat)[1]))
 
-
-    # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
+    # VERTICAL SIGMA COORDINATE 
+    # σ = p/p0 (fraction of surface pressure)
     # sorted such that σ_half[end] is at the planetary boundary
-    # TODO make nlev-dependent
-    σ_half = [0.0, 0.05, 0.14, 0.26, 0.42, 0.6, 0.77, 0.9, 1.0]
+    σ_half = vertical_coordinates(P)
     σ_full = 0.5*(σ_half[2:end] + σ_half[1:end-1])
     σ_thick = σ_half[2:end] - σ_half[1:end-1]
     σ_half⁻¹_2 = 1 ./ (2σ_thick)
@@ -107,4 +106,27 @@ function Geometry{NF}(P::Params) where NF
                 σ_half,σ_full,σ_thick,σ_half⁻¹_2,σ_f,
                 sinlat,coslat,sinlat_NH,coslat_NH,radang,
                 cosg,cosg⁻¹,cosg⁻²,f,xgeop1,xgeop2,lapserate_correction)
+end
+
+"""Vertical sigma coordinates defined by their nlev+1 half levels `σ_half`. Sigma coordinates are
+fraction of surface pressure (p/p0) and are sorted from top (stratosphere) to bottom (surface).
+The first half level is at 0 the last at 1. Evaluate a generalised logistic function with
+coefficients in `P` for the distribution of values in between. Default coefficients follow
+the L31 configuration historically used at ECMWF."""
+function vertical_coordinates(P::Params)
+    @unpack nlev,GLcoefs = P
+
+    halflevels_normalised = range(0,1,nlev+1)
+    σ_half = generalised_logistic(halflevels_normalised,GLcoefs)
+    σ_half[1] = 0           # topmost half-level is at 0 pressure
+    σ_half[end] = 1         # lowermost half-level is at p=p_surface
+
+    @assert isincreasing(σ_half) "Vertical coordinates are not increasing."
+    return σ_half
+end
+
+"""Generalised logistic function based on the coefficients in `coefs`."""
+function generalised_logistic(x,coefs::GenLogisticCoefs)
+    @unpack A,K,C,Q,B,M,ν = coefs
+    return @. A + (K-A)/(C+Q*exp(-B*(x-M)))^(1/ν)
 end
