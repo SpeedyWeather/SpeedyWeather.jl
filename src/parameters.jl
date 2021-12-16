@@ -8,10 +8,10 @@ With keywords such that default values can be changed at creation.
     NF::DataType=Float64    # number format
 
     # RESOLUTION
-    nlat::Int=48            # number of latitudes
+    trunc::Int=31           # spectral truncation
+    nlat::Int=trunc+1       # number of latitudes
     nlon::Int=2nlat         # number of longitudes
     nlev::Int=8             # number of vertical levels
-    trunc::Int=30           # spectral truncation
     ntracers::Int=1         # number of tracers (specific humidity is one)
 
     # PHYSICAL CONSTANTS
@@ -39,9 +39,9 @@ With keywords such that default values can be changed at creation.
     rh_ref::Real=0.7        # Reference relative humidity of near-surface air
     es_ref::Real=17         # Reference saturation water vapour pressure [Pa]
 
-    # VERTICAL COORDINATE
-    # defined by a generalised logistic function, interpolating ECMWF's L31 configuration
-    # change only for more levels in the stratosphere vs troposphere vs boundary layer
+    # VERTICAL COORDINATES
+    # of the nlev vertical levels, defined by a generalised logistic function,
+    # interpolating ECMWF's L31 configuration
     GLcoefs::GenLogisticCoefs=GenLogisticCoefs()
 
     # DIFFUSION
@@ -84,19 +84,4 @@ With keywords such that default values can be changed at creation.
 
     # TODO assert not allowed parameter values
     @assert α in [0,0.5,1] "Only semi-implicit α = 0, 0.5 or 1 allowed."
-end
-
-"""Coefficients of the generalised logistic function to describe the vertical coordinate.
-Default coefficients A,K,C,Q,B,M,ν are fitted to the old L31 configuration at ECMWF.
-See geometry.jl and function vertical_coordinate for more informaiton.
-
-Following the notation of https://en.wikipedia.org/wiki/Generalised_logistic_function (Dec 15 2021)."""
-@with_kw struct GenLogisticCoefs
-    A::Real=-0.283     # obtained from a fit in /input_date/vertical_coordinate/vertical_resolution.ipynb
-    K::Real= 0.871
-    C::Real= 0.414
-    Q::Real= 6.695
-    B::Real=10.336
-    M::Real= 0.602
-    ν::Real= 5.812
 end
