@@ -169,11 +169,15 @@ function Implicit(T, geometry::Geometry, constants::Constants, params::Params,
              elz, σ_thick_x)
 end
 
-# Correct tendencies for implicit gravity wave model
+# Correct 
 #  Input/output : D_tend  = divergence tendency
 #                 Tₐ_tend = temperature tendency
 #                 pₛ_tend = tendency of log(surface pressure)
-function implicit_terms!(D_tend, Tₐ_tend, pₛ_tend)
+
+"""
+Compute the tendencies for implicit gravity wave model
+"""
+function implicit_terms!(div_tend, t_tend, ps_tend)
     ye = zeros(Complex{T}, mx, nx, nlev)
     yf = zeros(Complex{T}, mx, nx, nlev)
 

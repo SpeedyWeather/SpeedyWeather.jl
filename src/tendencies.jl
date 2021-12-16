@@ -12,17 +12,19 @@ function get_tendencies!(
 
                          
                         #---Prognositic Variables, IN/OUT
-                        phi ::AbstractArray{NF,3} #Atmos. spectral geopotential. IN/OUT
-                        phi_surface::AbstractArray{NF,2} #Surface geopotential. IN(?)
+                        phi ::AbstractArray{NF,3}, #Atmos. spectral geopotential. IN/OUT
+                        phi_surface::AbstractArray{NF,2}, #Surface geopotential. IN(?)
 
-                         #Diagnostic variable tendencies
-                         vor_tend::AbstractArray{NF,3}, #Vorticity tendency. OUT
-                         div_tend::AbstractArray{NF,3}, #Divergence tendency. OUT
-                         t_tend::AbstractArray{NF,3},   #Temperature tendency. OUT
-                         ps_tend::AbstractArray{NF,3},  #Surface pressure tendency. OUT
-                         tr_tend::AbstractArray{NF,3},  #Tracers tendency. OUT
-                         M:: ModelSetup #Struct that holds all constants. IN
-                         ) where {NF<:AbstractFloat}
+                        #---Diagnostic variable tendencies, OUT
+                        vor_tend::AbstractArray{NF,3}, #Vorticity tendency. OUT
+                        div_tend::AbstractArray{NF,3}, #Divergence tendency. OUT
+                        t_tend::AbstractArray{NF,3},   #Temperature tendency. OUT
+                        ps_tend::AbstractArray{NF,3},  #Surface pressure tendency. OUT
+                        tr_tend::AbstractArray{NF,3},  #Tracers tendency. OUT
+                        
+                        #---Struct of constants
+                        M:: ModelSetup    # Struct that holds all constants. IN
+                        ) where {NF<:AbstractFloat}
 
 
 
@@ -41,12 +43,12 @@ function get_tendencies!(
     # =========================================================================
 
     if α < 0.5 #Coefficient for semi-implicit computations. Previously if alpha = 0?
-        get_spectral_tendencies!(D_tend, Tₐ_tend, pₛ_tend, j2)
+        get_spectral_tendencies!(div_tend, t_tend, ps_tend,2,M)
     else
-        get_spectral_tendencies!(D_tend, Tₐ_tend, pₛ_tend, 1)
+        get_spectral_tendencies!(div_tend, t_tend, ps_tend,2,M)
 
         # Implicit correction
-        implicit_terms!(D_tend, Tₐ_tend, pₛ_tend)
+        implicit_terms!(div_tend, t_tend, ps_tend)
     end
 end
 
@@ -60,8 +62,8 @@ function get_grid_point_tendencies!(vor::AbstractArray{NF,4}, #Vorticity.   IN
                                     t::AbstractArray{NF,4},   #Temperature. IN
                                     ps::AbstractArray{NF,4},  #Surface pressure (logarithm). IN
                                     tr::AbstractArray{NF,4},  #Tracers. IN
-                                    phi ::AbstractArray{NF,3} #Atmos. spectral geopotential. IN/OUT
-                                    phi_surface::AbstractArray{NF,2} #Surface geopotential. IN(?)
+                                    phi ::AbstractArray{NF,3}, #Atmos. spectral geopotential. IN/OUT
+                                    phi_surface::AbstractArray{NF,2}, #Surface geopotential. IN(?)
                                     vor_tend::AbstractArray{NF,3}, #Vorticity tendency. OUT
                                     div_tend::AbstractArray{NF,3}, #Divergence tendency. OUT
                                     t_tend::AbstractArray{NF,3},   #Temperature tendency. OUT
@@ -98,17 +100,18 @@ function get_grid_point_tendencies!(vor::AbstractArray{NF,4}, #Vorticity.   IN
                           vor_grid,div_grid,t_grid,ps_grid, tr_grid, u_grid,v_grid,q_grid,phi_grid,
                           M)
 
-   # 2. Parameterised physics tendencies. 
-   #COMMENT: NEEDS DEFINING in parameterisation_tendencies.jl. There is a lot of physics here
-   parametrization_tendencies(u_tend, v_tend, t_tend, q_tend)
+    # 2. Parameterised physics tendencies. 
+    #COMMENT: NEEDS DEFINING in parameterisation_tendencies.jl. There is a lot of physics here. Separate PR
     #utend: u-wind tendency (gp)
     #vtend: v-wind tendency (gp)
     #ttend: temp. tendency (gp)
     #qtend: spec. hum. tendency (gp)
+    parametrization_tendencies(u_tend, v_tend, t_tend, q_tend)
 
 
-   #3. Dynamics tendencies
-   dynamics_tendencies(vor,div,t,ps,tr, #Prognostic variables
+
+    #3. Dynamics tendencies
+    dynamics_tendencies(vor,div,t,ps,tr, #Prognostic variables
                        vor_grid,div_grid,t_grid,ps_grid, tr_grid, u_grid,v_grid,q_grid,phi_grid, #IN. Grid point fields from 1.
                        u_tend, v_tend, t_tend, q_tend, #IN. Parameterised physics tendencies from 2.
                        vor_tend, div_tend,t_tend,ps_tend,tr_tend # OUT. Spectral tendencies,
@@ -127,8 +130,8 @@ function get_grid_point_fields(vor::AbstractArray{NF,4}, #Vorticity. IN
                                t::AbstractArray{NF,4},   #Temperature IN
                                ps::AbstractArray{NF,4},  #Surface pressure (logarithm). IN
                                tr::AbstractArray{NF,4},  #Tracers. IN
-                               phi ::AbstractArray{NF,3}       #Atmos. spectral geopotential# #IN/OUT
-                               phi_surface::AbstractArray{NF,2} #Surface geopotential. IN(?)
+                               phi ::AbstractArray{NF,3},       #Atmos. spectral geopotential# #IN/OUT
+                               phi_surface::AbstractArray{NF,2}, #Surface geopotential. IN(?)
                                vor_grid::AbstractArray{NF,3}, #Gridpoint field of vorticity. OUT
                                div_grid::AbstractArray{NF,3}, #Gridpoint field of vorticity. OUT
                                t_grid::AbstractArray{NF,3},   #Gridpoint field of vorticity. OUT
@@ -197,14 +200,9 @@ function get_grid_point_fields(vor::AbstractArray{NF,4}, #Vorticity. IN
 
 end
 
-
-
-
-
-
 """
 Compute non-linear tendencies in grid-point space from dynamics and add to physics tendencies. Convert total
-gridpoint tendencies to spectral tendencies
+gridpoint tendencies to spectral tendencies.
 """
 function dynamics_tendencies(
                              vor,div,t,ps,tr, #Prognostics
@@ -215,7 +213,7 @@ function dynamics_tendencies(
                              u_grid::AbstractArray{NF,3},
                              v_grid::AbstractArray{NF,3},
                              q_grid::AbstractArray{NF,3}, 
-                             ps_grid::AbstractArray{NF,2}
+                             ps_grid::AbstractArray{NF,2},
                              phi_grid::AbstractArray{NF,3},
                              u_tend, v_tend, t_tend, q_tend, #Need to define after parametrization_tendencies() setup
                              vor_tend::AbstractArray{NF,3},
@@ -324,24 +322,22 @@ function dynamics_tendencies(
 
 
 
+
 """
 Compute the spectral tendencies.  
 """
 function get_spectral_tendencies!(
                                  div_tend::AbstractArray{NF,3}, 
                                  t_tend::AbstractArray{NF,3}, 
-                                 ps_tend::AbstractArray{NF,3}
-                                 
-                                 div #Prognostic variable, divergence
-                                 
-                                 
-                                 
+                                 ps_tend::AbstractArray{NF,3},
+                                 j :: int,
+                                 M:: ModelSetup
                                  ) where {NF<:AbstractFloat}
 
 
     
    #Get any constants you might need
-   @unpack mx, nx, nlev, dhs,j2,tref,tref2,tref3 = M #
+   @unpack mx, nx, nlev, dhs,j2,tref,tref2,tref3,rgas = M #
 
 
    #Declare local arrays   
@@ -378,6 +374,6 @@ function get_spectral_tendencies!(
     # Geopotential and divergence tendency
     get_geopotential(Tₐ[:,:,:,j2])
     for k in 1:nlev
-        D_tend[:,:,k] -= ∇²(ϕ[:,:,k] + R*tref[k]*pₛ[:,:,j2])
+        div_tend[:,:,k] -= ∇²(phi[:,:,k] + rgas*tref[k]*ps[:,:,j2])
     end
 end
