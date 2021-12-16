@@ -23,7 +23,7 @@ function get_tendencies!(
                         tr_tend::AbstractArray{NF,3},  #Tracers tendency. OUT
                         
                         #---Struct of constants
-                        M:: ModelSetup    # Struct that holds all constants. IN
+                        M:: Model    # Struct that holds all constants. IN
                         ) where {NF<:AbstractFloat}
 
 
@@ -69,7 +69,7 @@ function get_grid_point_tendencies!(vor::AbstractArray{NF,4}, #Vorticity.   IN
                                     t_tend::AbstractArray{NF,3},   #Temperature tendency. OUT
                                     ps_tend::AbstractArray{NF,3},  #Surface pressure tendency. OUT
                                     tr_tend::AbstractArray{NF,3},  #Tracers tendency. OUT
-                                    M:: ModelSetup #Struct that holds all constants. IN
+                                    M:: Model #Struct that holds all constants. IN
                                     ) where {NF<:AbstractFloat}
 
 
@@ -141,7 +141,7 @@ function get_grid_point_fields(vor::AbstractArray{NF,4}, #Vorticity. IN
                                v_grid::AbstractArray{NF,3},   #Gridpoint field of vorticity. OUT 
                                q_grid::AbstractArray{NF,3},   #Gridpoint field of vorticity. OUT
                                phi_grid::AbstractArray{NF,3}, #Gridpoint field of vorticity. OUT
-                               M:: ModelSetup) # Struct that holds all constants.
+                               M:: Model) # Struct that holds all constants.
 
 
     #Unpack any constants you might need
@@ -221,7 +221,7 @@ function dynamics_tendencies(
                              t_tend::AbstractArray{NF,3},
                              ps_tend::AbstractArray{NF,3},
                              tr_tend::AbstractArray{NF,3},
-                             M
+                             M :: Model
                              ) where {NF<:AbstractFloat}
 
     #Get any constants you might need
@@ -331,7 +331,7 @@ function get_spectral_tendencies!(
                                  t_tend::AbstractArray{NF,3}, 
                                  ps_tend::AbstractArray{NF,3},
                                  j :: int,
-                                 M:: ModelSetup
+                                 M:: Model
                                  ) where {NF<:AbstractFloat}
 
 
