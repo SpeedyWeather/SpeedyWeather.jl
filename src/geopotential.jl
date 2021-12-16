@@ -1,5 +1,5 @@
 """
-Compute spectral geopotential `ϕ` from spectral temperature `t`
+Compute spectral geopotential `ϕ` from spectral temperature `Tabs`
 and spectral topography `ϕ0`.
 """
 function geopotential!( ϕ::Array{Complex{NF},3},      # geopotential
@@ -9,7 +9,7 @@ function geopotential!( ϕ::Array{Complex{NF},3},      # geopotential
 
     mx,nx,nlev = size(ϕ)
 
-    @boundscheck size(ϕ) == size(t) || throw(BoundsError())
+    @boundscheck size(ϕ) == size(Tabs) || throw(BoundsError())
     @boundscheck (mx,nx) == size(ϕ0)   || throw(BoundsError())
 
     @unpack xgeop1, xgeop2, lapserate_correction = G.geometry
