@@ -21,8 +21,6 @@ function leapfrog!( A::AbstractArray{NF,3},             # a prognostic variable
                     C::Constants{NF}                    # struct with constants used at runtime
                     ) where {NF<:AbstractFloat}
 
-
-    Aorignal :: AbstractArray{NF,3}                     #For making a local copy of the original/input state of the prognostic variable
     nlon,nlat,nleapfrog = size(A)                       # longitude, latitude, 2 leapfrog steps
 
     @boundscheck (nlon,nlat) == size(tendency) || throw(BoundsError())
@@ -40,14 +38,14 @@ function leapfrog!( A::AbstractArray{NF,3},             # a prognostic variable
 
     # LEAP FROG time step with
     w1 = williams_filter*eps                # Robert time filter to compress computational mode
-    w2 = (one(NF) - williams_filter)*eps    # and Williams' filter for 3rd order accuracy
-    Aoriginal = A                           # Make a copy. We need this for the Williams filter
+    w2 = (one(NF) - williams_filter)*eps    # and Williams' filter for 3rd order accuracy                     
 
     @inbounds for j in 1:nlat
-        for i in 1:nlon    
-            Anew = A[i,j,1] + Δt*tendency[i,j]                                # forward step
-            A[i,j,1] = A[i,j,l1] + w1*(A[i,j,1] - two*A[i,j,l1] + Anew)       # Robert's filter
-            A[i,j,2] = Anew - w2*(Aoriginal[i,j,1] - two*A[i,j,l1] + Anew)    # Williams' filter
+        for i in 1:nlon
+            Aold = A[i,j,1]                                             # Copy for Williams filter
+            Anew = Aold + Δt*tendency[i,j]                              # forward step
+            A[i,j,1] = A[i,j,l1] + w1*(Aold - two*A[i,j,l1] + Anew)     # Robert's filter
+            A[i,j,2] = Anew - w2*(Aold - two*A[i,j,l1] + Anew)          # Williams' filter
         end
     end
 end
