@@ -1,29 +1,25 @@
 
+"""Struct holding the spectral prognostic variables in grid point space"""
+struct PrognosticVariablesGridded{NF<:AbstractFloat}
+    vor_grid = Array{NF,3}(undef,nlon, nlat, nlev) #Gridpoint field of vorticity
+    div_grid = similar(vor_grid)                   #Gridpoint field of divergence
+    t_grid = similar(vor_grid)                     #Gridpoint field of temperature
+    ps_grid=Array{NF,2}(undef,nlon, nlat)          #Gridpoint field of surface pressure logarithm
+    tr_grid = similar(vor_grid)                    #Gridpoint field of tracers
+    u_grid = similar(vor_grid)                     #Gridpoint field of zonal velocity
+    v_grid = similar(vor_grid)                     #Gridpoint field of meridional velocity
+    q_grid = similar(vor_grid)                     #Gridpoint field of specific_humidity
+    phi_grid = similar(vor_grid)                   #Gridpoint field of geopotential
+end
+
+
 """
 Compute the grid point and spectral tendencies, including an implicit correction for the spectral tendencies. 
 """
-function get_tendencies!(
-                         #---Diagnostic Variables, IN
-                         vor::AbstractArray{NF,4}, #Vorticity.   IN
-                         div::AbstractArray{NF,4}, #Divergence.  IN
-                         t::AbstractArray{NF,4},   #Temperature. IN
-                         ps::AbstractArray{NF,4},  #Surface pressure (logarithm). IN
-                         tr::AbstractArray{NF,4},  #Tracers. IN
 
-                         
-                        #---Prognositic Variables, IN/OUT
-                        phi ::AbstractArray{NF,3}, #Atmos. spectral geopotential. IN/OUT
-                        phi_surface::AbstractArray{NF,2}, #Surface geopotential. IN(?)
-
-                        #---Diagnostic variable tendencies, OUT
-                        vor_tend::AbstractArray{NF,3}, #Vorticity tendency. OUT
-                        div_tend::AbstractArray{NF,3}, #Divergence tendency. OUT
-                        t_tend::AbstractArray{NF,3},   #Temperature tendency. OUT
-                        ps_tend::AbstractArray{NF,3},  #Surface pressure tendency. OUT
-                        tr_tend::AbstractArray{NF,3},  #Tracers tendency. OUT
-                        
-                        #---Struct of constants
-                        M:: Model    # Struct that holds all constants. IN
+function get_tendencies(
+                         Prog::PrognosticVariables{NF}, #Prognostic variables. IN
+                         C::Constants{NF}
                         ) where {NF<:AbstractFloat}
 
 
@@ -33,10 +29,7 @@ function get_tendencies!(
     # grtend)
     # =========================================================================
 
-    get_grid_point_tendencies!(vor,div,t,ps,tr,
-                               phi, phi_surface, 
-                               vor_tend, div_tend, t_tend, ps_tend,tr_tend,
-                               M)
+    ProgTend = get_grid_point_tendencies(Prog, C)
 
     # =========================================================================
     # Computation of spectral tendencies
@@ -50,6 +43,10 @@ function get_tendencies!(
         # Implicit correction
         implicit_terms!(div_tend, t_tend, ps_tend)
     end
+
+
+    return PrognosticVariableTendencies
+
 end
 
 
@@ -57,67 +54,25 @@ end
 """
 Compute the grid point tendencies. These are composed of the dynamics and physical parameterisations. 
 """
-function get_grid_point_tendencies!(vor::AbstractArray{NF,4}, #Vorticity.   IN
-                                    div::AbstractArray{NF,4}, #Divergence.  IN
-                                    t::AbstractArray{NF,4},   #Temperature. IN
-                                    ps::AbstractArray{NF,4},  #Surface pressure (logarithm). IN
-                                    tr::AbstractArray{NF,4},  #Tracers. IN
-                                    phi ::AbstractArray{NF,3}, #Atmos. spectral geopotential. IN/OUT
-                                    phi_surface::AbstractArray{NF,2}, #Surface geopotential. IN(?)
-                                    vor_tend::AbstractArray{NF,3}, #Vorticity tendency. OUT
-                                    div_tend::AbstractArray{NF,3}, #Divergence tendency. OUT
-                                    t_tend::AbstractArray{NF,3},   #Temperature tendency. OUT
-                                    ps_tend::AbstractArray{NF,3},  #Surface pressure tendency. OUT
-                                    tr_tend::AbstractArray{NF,3},  #Tracers tendency. OUT
-                                    M:: Model #Struct that holds all constants. IN
+function get_grid_point_tendencies(
+                                    Prog::PrognosticVariables{NF}, #Prognostic variables. In/Out
+                                    C::Constants{NF}
                                     ) where {NF<:AbstractFloat}
 
 
-    ### Declare/Allocate local variables. Can we pre-allocate here?
-
-    #Unpack any constants you might need
-    @unpack nlon, nlat, nlev = M #
-
-    #Grid point fields
-    vor_grid = Array{NF,3}(undef,nlon, nlat, nlev) #Gridpoint field of vorticity
-    div_grid = similar(vor_grid)                   #Gridpoint field of divergence
-    t_grid = similar(vor_grid)                     #Gridpoint field of temperature
-    ps_grid=Array{NF,2}(undef,nlon, nlat)          #Gridpoint field of surface pressure logarithm
-    tr_grid = similar(vor_grid)                    #Gridpoint field of tracers
-    u_grid = similar(vor_grid)                     #Gridpoint field of zonal velocity
-    v_grid = similar(vor_grid)                     #Gridpoint field of meridional velocity
-    q_grid = similar(vor_grid)                     #Gridpoint field of specific_humidity
-    phi_grid = similar(vor_grid)                   #Gridpoint field of geopotential
-
-
-
-
-
-
     #1. Convert spectral prognostic variables to grid point space
-    get_grid_point_fields(vor,div,t,ps,tr
-                          phi,phi_surface 
-                          vor_grid,div_grid,t_grid,ps_grid, tr_grid, u_grid,v_grid,q_grid,phi_grid,
-                          M)
-
+    ProgGrid = get_grid_point_fields(Prog,C)
+ 
     # 2. Parameterised physics tendencies. 
     #COMMENT: NEEDS DEFINING in parameterisation_tendencies.jl. There is a lot of physics here. Separate PR
-    #utend: u-wind tendency (gp)
-    #vtend: v-wind tendency (gp)
-    #ttend: temp. tendency (gp)
-    #qtend: spec. hum. tendency (gp)
-    parametrization_tendencies(u_tend, v_tend, t_tend, q_tend)
-
+    ParameterisedTendencies = parametrization_tendencies(Prog,C)
 
 
     #3. Dynamics tendencies
-    dynamics_tendencies(vor,div,t,ps,tr, #Prognostic variables
-                       vor_grid,div_grid,t_grid,ps_grid, tr_grid, u_grid,v_grid,q_grid,phi_grid, #IN. Grid point fields from 1.
-                       u_tend, v_tend, t_tend, q_tend, #IN. Parameterised physics tendencies from 2.
-                       vor_tend, div_tend,t_tend,ps_tend,tr_tend # OUT. Spectral tendencies,
-                       M
-                       )
+    #vor_tend, div_tend,t_tend,ps_tend,tr_tend
+    ProgTend = dynamics_tendencies(Prog, ProgGrid,ParameterisedTendencies,C)
 
+    return ProgTend
 
 end
 
@@ -125,54 +80,49 @@ end
 """
 Compute grid point fields of the spectral prognostic tendencies
 """
-function get_grid_point_fields(vor::AbstractArray{NF,4}, #Vorticity. IN
-                               div::AbstractArray{NF,4}, #Divergence. IN
-                               t::AbstractArray{NF,4},   #Temperature IN
-                               ps::AbstractArray{NF,4},  #Surface pressure (logarithm). IN
-                               tr::AbstractArray{NF,4},  #Tracers. IN
-                               phi ::AbstractArray{NF,3},       #Atmos. spectral geopotential# #IN/OUT
-                               phi_surface::AbstractArray{NF,2}, #Surface geopotential. IN(?)
-                               vor_grid::AbstractArray{NF,3}, #Gridpoint field of vorticity. OUT
-                               div_grid::AbstractArray{NF,3}, #Gridpoint field of vorticity. OUT
-                               t_grid::AbstractArray{NF,3},   #Gridpoint field of vorticity. OUT
-                               ps_grid::AbstractArray{NF,2},  #Gridpoint field of vorticity. OUT
-                               tr_grid::AbstractArray{NF,3},  #Gridpoint field of vorticity. OUT
-                               u_grid::AbstractArray{NF,3},   #Gridpoint field of vorticity. OUT
-                               v_grid::AbstractArray{NF,3},   #Gridpoint field of vorticity. OUT 
-                               q_grid::AbstractArray{NF,3},   #Gridpoint field of vorticity. OUT
-                               phi_grid::AbstractArray{NF,3}, #Gridpoint field of vorticity. OUT
-                               M:: Model) # Struct that holds all constants.
+function get_grid_point_fields(
+                               Prog::PrognosticVariables{NF}, 
+                               C::Constants{NF}
+                               ) where {NF<:AbstractFloat}
 
 
-    #Unpack any constants you might need
-    @unpack cp, j2, n_trace,nlev,nlat,nlon,coriol = M #
+    #Unpack spectral prognostic fields
+    @unpack vor,div,t,ps,tr = Prog
+
+    #Unpack the gridded counterparts
+    @unpack vor_grid,div_grid,t_grid,ps_grid,tr_grid = PrognosticVariablesGridded
+
+    #Unpack constants
+    @unpack cp, j2, n_trace,nlev,nlat,nlon,coriol = C
 
 
     #1. Compute grid-point fields
     #1.1 Update geopotential in spectral space
     geopotential!(phi, phi_surface, t)
+
    
    for k in 1:nlev
 
-        
-        #Calculate u and v in grid-point space from vorticity and
-        #divergence in spectral space
-        uvspec!(vor[:,:,k,j2], div[:,:,k,j2], u_grid[:,:,k],v_grid[:,:,k]
     
-        #Temperature in grid point space
-        convert_to_grid(t[:,:,k,j2], t_grid[:,:,k])  
+        convert_to_grid!(vor[:,:,k,j2],vor_grid[:,:,k]) # vorticity 
+        convert_to_grid!(div[:,:,k,j2],div_grid[:,:,k]) # divergence
+        convert_to_grid!(t[:,:,k,j2], t_grid[:,:,k])    # temperature
+
+        for itr in 1:n_trace #tracers
+            convert_to_grid!(tr[:,:,k,j2,itr],tr_grid[:,:,k,itr] )
+        end
+
+
+        #Calculate zonal velocity u and meridional velocity v in grid-point space,
+        #from vorticity and divergence in spectral space
+        uvspec!(vor[:,:,k,j2], div[:,:,k,j2], u_grid[:,:,k],v_grid[:,:,k])
 
         #Normalise geopotential by cp to avoid overflows in physics
         convert_to_grid(phi[:,:,k]*(1/cp), phi_grid[:,:,k]) 
 
-        #Vorticity and divergence grids. I think there is a conversion here to 'per hour' to reduce underflows 
-        vor_grid[:,:,k] = convert_to_grid(vor[:,:,k,j2])
-        div_grid[:,:,k] = convert_to_grid(div[:,:,k,j2])
+       
 
-        for itr in 1:n_trace
-            tr_grid[:,:,k,itr] = convert_to_grid(tr[:,:,k,j2,itr])
-        end
-
+        #Correct vorticity grid point field
         for j in 1:nlat
             for i in 1:nlon
                 vor_grid[i,j,k] += coriol[j] 
@@ -189,7 +139,7 @@ function get_grid_point_fields(vor::AbstractArray{NF,4}, #Vorticity. IN
     v_grid = v_grid / 3600.0
 
     #Surface pressure spectral transform to grid
-    convert_to_grid(ps(:,:,j1), ps_grid)
+    convert_to_grid!(ps(:,:,j1), ps_grid)
 
 
     #Don't transform the two stratospheric levels where humidity is set to zero
@@ -197,6 +147,9 @@ function get_grid_point_fields(vor::AbstractArray{NF,4}, #Vorticity. IN
     for k in 3:nlev
         convert_to_grid(tr(:,:,k,j1,1), q_grid(:.:,k), )
     end 
+
+
+    return ProgGrid
 
 end
 
