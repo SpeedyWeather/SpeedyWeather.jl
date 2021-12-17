@@ -1,71 +1,60 @@
 """
-    timestep!()
-
-Time step of a 2D field `input` (a `Lon x Lat x 2` array)
-
-Perform one time step starting from F(1) and F(2) and using the following scheme:
-Fnew = F(1) + DT * [ T_dyn(F(J2)) + T_phy(F(1)) ]
-F(1) = (1-2*eps)*F(J1) + eps*[F(1)+Fnew]
-F(2) = Fnew
-Input:
-If j1 == 1, j2 == 1 : forward time step (eps = 0)
-If j1 == 1, j2 == 2 : initial leapfrog time step (eps = 0)
-If j1 == 2, j2 == 2 : leapfrog time step with time filter (eps = ROB)
-dt = time step
-
+Perform one leapfrog time step with Robert's or Robert+William's filter (see William (2009),
+Montly Weather Review, Eq. 7-9)
 """
-function leapfrog!( A::AbstractArray{NF,3},             # a prognostic variable
-                    tendency::AbstractArray{NF,2},      # its tendency
-                    l1::Int,                            # leapfrog index for time filtering
-                    G::GeoSpectral{NF},                 # struct with precomputed arrays for spectral transform
-                    C::Constants{NF}                    # struct with constants used at runtime
-                    ) where {NF<:AbstractFloat}
+function leapfrog!( A::AbstractArray{Complex{NF},3},        # a prognostic variable (spectral)
+                    tendency::AbstractArray{Complex{NF},2}, # its tendency (dynamics+physics)
+                    dt::NF,                                 # time step (=2Δt, but for init steps =Δt,Δt/2)
+                    l1::Int,                                # leapfrog index to dis/enable William's filter
+                    C::Constants{NF}                        # struct with constants used at runtime
+                    ) where {NF<:AbstractFloat}             # number format NF
 
-    nlon,nlat,nleapfrog = size(A)                       # longitude, latitude, 2 leapfrog steps
+    mx,nx,nleapfrog = size(A)                               # spectral mx x nx, 2 leapfrog steps
 
-    @boundscheck (nlon,nlat) == size(tendency) || throw(BoundsError())
+    @boundscheck (mx,nx) == size(tendency) || throw(BoundsError())
     @boundscheck nleapfrog == 2 || throw(BoundsError())     # last dim is 2 for leapfrog
-    @boundscheck l1 in [1,2] || throw(BoundsError())        # index l1 is calls leapfrog dim
+    @boundscheck l1 in [1,2] || throw(BoundsError())        # index l1 calls leapfrog dim
     
     # get coefficients for the Robert and Williams' filter for 3rd order accuracy in time stepping
-    @unpack robert_filter, williams_filter, Δt = C
-    eps = l1 == 1 ? zero(NF) : robert_filter
+    @unpack robert_filter, williams_filter = C
     two = convert(NF,2)
-    eps = one(NF) - two*eps
 
-    # truncate the tendency to the spectral resolution
-    spectral_truncation!(tendency,G)
+    # LEAP FROG time step with Robert or Robert+William's filter
+    # see William (2009), Eq. 7-9
+    # for l1 == 1 (initial time step) William's is disabled (α=1)
+    # for l1 == 2 (later steps) William's is included (α=0.53 by default)
+    α = l1 == 1 ? one(NF) : williams_filter # α=1 means no William's filter (=> w2=0)
+    w1 = robert_filter*α/two                # Robert time filter to compress computational mode
+    w2 = robert_filter*(one(NF) - α)/two    # and Williams' filter for 3rd order accuracy                     
 
-    # LEAP FROG time step with
-    w1 = williams_filter*eps                # Robert time filter to compress computational mode
-    w2 = (one(NF) - williams_filter)*eps    # and Williams' filter for 3rd order accuracy                     
-
-    @inbounds for j in 1:nlat
-        for i in 1:nlon
-            Aold = A[i,j,1]                                             # Copy for Williams filter
-            Anew = Aold + Δt*tendency[i,j]                              # forward step
-            A[i,j,1] = A[i,j,l1] + w1*(Aold - two*A[i,j,l1] + Anew)     # Robert's filter
-            A[i,j,2] = Anew - w2*(Aold - two*A[i,j,l1] + Anew)          # Williams' filter
+    @inbounds for j in 1:nx
+        for i in 1:mx
+            Aold = A[i,j,1]                         # double filtered value from previous time step (t-Δt)
+            Anew = Aold + dt*tendency[i,j]          # Leapfrog/Euler step depending on dt=Δt,2Δt (unfiltered at t+Δt)
+            Aupdate = Aold - two*A[i,j,l1] + Anew   # Eq. 8&9 in William (2009), calculate only once
+            A[i,j,1] = A[i,j,l1] + w1*Aupdate       # Robert's filter: A[i,j,1] becomes the double filtered value at t
+            A[i,j,2] = Anew - w2*Aupdate            # Williams' filter: A[i,j,2] becomes the single filtred value at t+Δt
         end
     end
 end
 
-"""3D version that loops over all vertical layers."""
-function leapfrog!( A::AbstractArray{NF,4},             # a prognostic variable
-                    tendency::AbstractArray{NF,3},      # its tendency
-                    l1::Int,                            # index for time filtering
-                    C::Constants{NF}                    # struct containing all constants used at runtime
-                    ) where {NF<:AbstractFloat}
+"""Leapfrog! for 3D arrays that loops over all vertical layers."""
+function leapfrog!( A::AbstractArray{Complex{NF},4},        # a prognostic variable (spectral)
+                    tendency::AbstractArray{Complex{NF},3}, # its tendency (dynamics + physics)
+                    dt::NF,                                 # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                    l1::Int,                                # leapfrog index to dis/enable William's filter
+                    C::Constants{NF}                        # struct containing all constants used at runtime
+                    ) where {NF<:AbstractFloat}             # number format NF
 
-    _,_,nlev,_ = size(A)        # A is of size nlon x nlat x nlev x 2
+    _,_,_,nlev = size(A)        # A is of size mx x nx x 2 x nlev
 
     for k in 1:nlev
         # extract vertical layers as views to not allocate any memory
-        A_layer = view(A,:,:,k,:)
+        A_layer = view(A,:,:,:,k)
         tendency_layer = view(tendency,:,:,k)
         
         # make a timestep forward for each layer
-        leapfrog!(A_layer,tendency_layer,l1,C)
+        leapfrog!(A_layer,tendency_layer,dt,l1,C)
     end
 end
 
@@ -143,6 +132,10 @@ function timestep!( Prog::PrognosticVariables{NF},
             leapfrog!(tracer,tracer_tendency,j1,C)
         end
     end
+
+    # TODO apply to all tendencies
+    # truncate the tendency to the spectral resolution
+    spectral_truncation!(tendency,G)
 
     # Time integration
     leapfrog!(ps,ps_tend,j1,G,C)
