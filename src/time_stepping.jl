@@ -1,5 +1,5 @@
 """
-Perform one leapfrog time step with Robert's or Robert+William's filter (see William (2009),
+Perform one leapfrog time step with or without Robert+William's filter (see William (2009),
 Montly Weather Review, Eq. 7-9)
 """
 function leapfrog!( A::AbstractArray{Complex{NF},3},        # a prognostic variable (spectral)
@@ -15,17 +15,16 @@ function leapfrog!( A::AbstractArray{Complex{NF},3},        # a prognostic varia
     @boundscheck nleapfrog == 2 || throw(BoundsError())     # last dim is 2 for leapfrog
     @boundscheck l1 in [1,2] || throw(BoundsError())        # index l1 calls leapfrog dim
     
-    # get coefficients for the Robert and Williams' filter for 3rd order accuracy in time stepping
+    # get coefficients for the Robert and Williams' filter
     @unpack robert_filter, williams_filter = C
     two = convert(NF,2)
 
-    # LEAP FROG time step with Robert or Robert+William's filter
-    # see William (2009), Eq. 7-9
-    # for l1 == 1 (initial time step) William's is disabled (α=1)
-    # for l1 == 2 (later steps) William's is included (α=0.53 by default)
-    α = l1 == 1 ? one(NF) : williams_filter # α=1 means no William's filter (=> w2=0)
-    w1 = robert_filter*α/two                # Robert time filter to compress computational mode
-    w2 = robert_filter*(one(NF) - α)/two    # and Williams' filter for 3rd order accuracy                     
+    # LEAP FROG time step with or without Robert+William's filter
+    # Robert time filter to compress computational mode, Williams' filter for 3rd order accuracy, see William (2009), Eq. 7-9
+    # for l1 == 1 (initial time step) no filter applied (w1=w2=0)
+    # for l1 == 2 (later steps) Robert+William's filter is applied
+    w1 = l1 == 1 ? zero(NF) : robert_filter*williams_filter/two         # = ν*α/2 in William (2009, Eq. 8)
+    w2 = l1 == 1 ? zero(NF) : robert_filter*(1-williams_filter)/two     # = ν(1-α)/2 in William (2009, Eq. 9)
 
     @inbounds for j in 1:nx
         for i in 1:mx
