@@ -31,13 +31,6 @@ function HorizontalDiffusion{NF}(   P::Params,                      # Parameter 
     @unpack npowhd, thd, thdd, thds, tdrs = P
     @unpack ϕ0trunc = B
 
-    # TODO load from parameters struct instead
-    # npowhd = 4.0        # Power of Laplacian in horizontal diffusion
-    # thd    = 2.4        # Damping time [hrs] for diffusion (del^6) of temperature and vorticity
-    # thdd   = 2.4        # Damping time [hrs] for diffusion (del^6) of divergence
-    # thds   = 12.0       # Damping time [hrs] for extra diffusion (del^2) in the stratosphere
-    # tdrs   = 24.0*30.0  # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
-
     # Damping frequencies [1/s]
     hdiff = 1.0/(3600.0*thd)            # Spectral damping for temperature and vorticity
     hdifd = 1.0/(3600.0*thdd)           # Spectral damping coefficient for divergence
@@ -151,5 +144,79 @@ function stratospheric_zonal_drag!( A::AbstractArray{Complex{NF},4},        # sp
         # size(A) = mx x nx x nlev, nlev = 1 is uppermost model level
         # apply drag only to largest zonal wavenumber (mx = 1)
         tendency[1,j,1] = tendency[1,j,1] - sdrag*A[1,j,1,1]
+    end
+end
+
+# """Orographic temperature correction for absolute temperature to be applied before the horizontal diffusion."""
+# function temperature_correction!(   Tabs_corrected::AbstractArray{Complex{NF},3},   # Corrected abs temperature T
+#                                     Tabs::AbstractArray{Complex{NF},4},             # Absolute temperature
+#                                     l::Int,                                         # leapfrog index
+#                                     HD::HorizontalDiffusion{NF}                     # struct for correction arrays
+#                                     ) where NF
+    
+#     @unpack tcorh, tcorv = HD   # load horizontal (tcorh) and vertical (tcorv) correction arrays
+
+#     mx,nx,nlev,nleapfrog = size(Tabs)
+#     @boundscheck (mx,nx,nlev) == size(Tabs_corrected) || throw(BoundsError())
+#     @boundscheck (mx,nx) == size(tcorh) || throw(BoundsError())
+#     @boundscheck (nlev,) == size(tcorv) || throw(BoundsError())
+#     @boundscheck nleapfrog == 2 || throw(BoundsError())
+#     @boundscheck l in [1,2] || throw(BoundsError())
+
+#     @inbounds for k in 1:nlev
+#         for j in 1:nx
+#             for i in 1:mx
+#                 Tabs_corrected[i,j,k] = Tabs[i,j,k,l] + tcorh[i,j]*tcorv[k]
+#             end
+#         end
+#     end
+# end
+
+# """Orographic temperature correction for absolute temperature to be applied before the horizontal diffusion."""
+# function humidity_correction!(  humid_corrected::AbstractArray{Complex{NF},3},  # Corrected abs temperature T
+#                                 humid::AbstractArray{Complex{NF},4},            # Absolute temperature
+#                                 l::Int,                                         # leapfrog index
+#                                 HD::HorizontalDiffusion{NF}                     # struct for correction arrays
+#                                 ) where NF
+    
+#     @unpack qcorh, qcorv = HD       # load horizontal (qcorh) and vertical (qcorv) correction arrays
+
+#     mx,nx,nlev,nleapfrog = size(humid)
+#     @boundscheck (mx,nx,nlev) == size(humid_corrected) || throw(BoundsError())
+#     @boundscheck (mx,nx) == size(qcorh) || throw(BoundsError())
+#     @boundscheck (nlev,) == size(qcorv) || throw(BoundsError())
+#     @boundscheck nleapfrog == 2 || throw(BoundsError())
+#     @boundscheck l in [1,2] || throw(BoundsError())
+
+#     @inbounds for k in 1:nlev
+#         for j in 1:nx
+#             for i in 1:mx
+#                 humid_corrected[i,j,k] = humid[i,j,k,l] + qcorh[i,j]*qcorv[k]
+#             end
+#         end
+#     end
+# end
+
+"""Orographic temperature correction for absolute temperature to be applied before the horizontal diffusion."""
+function orographic_correction!(A_corrected::AbstractArray{Complex{NF},3},  # Corrected variable
+                                A::AbstractArray{Complex{NF},4},            # Variable (temperature or humidity)
+                                l::Int,                                     # leapfrog index
+                                hori_correction::AbstractArray,             # horizontal correction array
+                                vert_correction::AbstractArray,             # vertical correction array
+                                ) where NF
+    
+    mx,nx,nlev,nleapfrog = size(A)
+    @boundscheck (mx,nx,nlev) == size(A_corrected) || throw(BoundsError())
+    @boundscheck (mx,nx) == size(hori_correction) || throw(BoundsError())
+    @boundscheck (nlev,) == size(vert_correction) || throw(BoundsError())
+    @boundscheck nleapfrog == 2 || throw(BoundsError())
+    @boundscheck l in [1,2] || throw(BoundsError())
+
+    @inbounds for k in 1:nlev
+        for j in 1:nx
+            for i in 1:mx
+                A_corrected[i,j,k] = A[i,j,k,l] + hori_correction[i,j]*vert_correction[k]
+            end
+        end
     end
 end

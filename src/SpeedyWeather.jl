@@ -1,7 +1,8 @@
 module SpeedyWeather
 
-    using NetCDF, FFTW, LinearAlgebra, Parameters, Dates
+    using NetCDF, FFTW, LinearAlgebra, Dates
     
+    import Parameters: @with_kw, @unpack
     import FastGaussQuadrature: gausslegendre
 
     export run_speedy, 
