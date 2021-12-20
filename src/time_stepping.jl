@@ -9,18 +9,18 @@ function leapfrog!( A::AbstractArray{Complex{NF},3},        # a prognostic varia
                     C::Constants{NF}                        # struct with constants used at runtime
                     ) where {NF<:AbstractFloat}             # number format NF
 
-    mx,nx,nleapfrog = size(A)                               # spectral mx x nx, 2 leapfrog steps
+    mx,nx,nleapfrog = size(A)                           # spectral mx x nx, 2 leapfrog steps
 
     @boundscheck (mx,nx) == size(tendency) || throw(BoundsError())
-    @boundscheck nleapfrog == 2 || throw(BoundsError())     # last dim is 2 for leapfrog
-    @boundscheck l1 in [1,2] || throw(BoundsError())        # index l1 calls leapfrog dim
+    @boundscheck nleapfrog == 2 || throw(BoundsError()) # last dim is 2 for leapfrog
+    @boundscheck l1 in [1,2] || throw(BoundsError())    # index l1 calls leapfrog dim
     
-    # get coefficients for the Robert and Williams' filter
-    @unpack robert_filter, williams_filter = C
+    @unpack robert_filter, williams_filter = C          # coefficients for the Robert and William's filter
     two = convert(NF,2)
 
     # LEAP FROG time step with or without Robert+William's filter
-    # Robert time filter to compress computational mode, Williams' filter for 3rd order accuracy, see William (2009), Eq. 7-9
+    # Robert time filter to compress computational mode, Williams' filter for 3rd order accuracy
+    # see William (2009), Eq. 7-9
     # for l1 == 1 (initial time step) no filter applied (w1=w2=0)
     # for l1 == 2 (later steps) Robert+William's filter is applied
     w1 = l1 == 1 ? zero(NF) : robert_filter*williams_filter/two         # = ν*α/2 in William (2009, Eq. 8)
@@ -57,91 +57,90 @@ function leapfrog!( A::AbstractArray{Complex{NF},4},        # a prognostic varia
     end
 end
 
-# Call initialization of semi-implicit scheme and perform initial time step
-function first_step()
-    initialize_implicit(half*Δt)
+"""Call initialization of semi-implicit scheme and perform initial time step."""
+function first_timestep!(   Prog::PrognosticVariables{NF},  # all prognostic variables
+                            Diag::PrognosticVariables{NF},  # all pre-allocated diagnostic variables
+                            C::Constants{NF},               # struct containing constants
+                            G::GeoSpectral{NF},             # struct containing geometry and spectral transform constants
+                            HD::HorizontalDiffusion{NF}     # struct containing horizontal diffusion constants
+                            ) where {NF<:AbstractFloat}
+    
+    @unpack Δt = C
 
-    step(1, 1, half*Δt)
+    # FIRST TIME STEP (l1=l2=1, dt=Δt/2)
+    IMP = initialize_implicit(half*Δt)
+    timestep!(Prog,Diag,1,1,Δt/2,C,G,HD)
 
-    initialize_implicit(Δt)
+    # SECOND TIME STEP (l1=1,l2=2,dt=Δt)
+    IMP = initialize_implicit(Δt)
+    timestep!(Prog,Diag,1,2,Δt,C,G,HD)
 
-    step(1, 2, Δt)
-
-    initialize_implicit(2*Δt)
+    # Initialize implicit arrays for further time steps (dt=2Δt)
+    IMP = initialize_implicit(2Δt)
+    return IMP
 end
 
-function timestep!( Prog::PrognosticVariables{NF},
-                    Diag::PrognosticVariables{NF},
-                    C::Constants{NF},
-                    G::GeoSpectral{NF},
-                    HD::HorizontalDiffusion{NF}
+"""Calculate a single time step for SpeedyWeather.jl"""
+function timestep!( Prog::PrognosticVariables{NF},  # all prognostic variables
+                    Diag::PrognosticVariables{NF},  # all pre-allocated diagnostic variables
+                    l1::Int,                        # leapfrog index 1 (en/disables Robert+William's filter)
+                    l2::Int,                        # leapfrog index 2 (time step used for tendencies)
+                    dt::NF,                         # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                    C::Constants{NF},               # struct containing constants
+                    G::GeoSpectral{NF},             # struct containing geometry and spectral transform constants
+                    HD::HorizontalDiffusion{NF}     # struct containing horizontal diffusion constants
                     ) where {NF<:AbstractFloat}
                         
     @unpack vor,div,ps,temp = Prog
     @unpack vor_tend,div_tend,ps_tend,temp_tend = Diag.Tendencies
     @unpack dmp,dmpd,dmps,dmp1,dmp1d,dmp1s = HD
+    @unpack tcorh,tcorv,qcorh,qcorv = HD
     @unpack sdrag = C
 
-    # Compute tendencies of prognostic variables
-    # =========================================================================
+    # COMPUTE TENDENCIES OF PROGNOSTIC VARIABLES
+    get_tendencies!(Prog,Diag,l2)                   
 
-    get_tendencies!(vorU_tend, divU_tend, tem_tend, pₛ_tend, tr_tend, j2)
+    # DIFFUSION FOR WIND
+    vor_l1 = view(vor,:,:,1,:)                                  # array view for leapfrog index
+    div_l1 = view(div,:,:,1,:)                                  # TODO l1/l2 dependent?
+    horizontal_diffusion!(vor_l1,vor_tend,dmp,dmp1)             # diffusion of vorticity
+    horizontal_diffusion!(div_l1,div_tend,dmpd,dmp1d)           # diffusion of divergence
 
-    # =========================================================================
-    # Horizontal diffusion
-    # =========================================================================
+    # DIFFUSION FOR TEMPERATURE
+    orographic_correction!(temp_corrected,temp,1,tcorh,tcorv)   # orographic correction for temperature
+    horizontal_diffusion!(temp_corrected,temp_tend,dmp,dmp1)    # diffusion for corrected abs temperature
 
-    # Diffusion of wind and temperature
-    horizontal_diffusion!(vorU[:,:,:,1], vorU_tend, dmp,  dmp1)
-    horizontal_diffusion!(divU[:,:,:,1], divU_tend, dmpd, dmp1d)
-
-    for k in 1:nlev
-        for m in 1:mx
-            for n in 1:nx
-                ctmp[m,n,k] = tem[m,n,k,1] + tcorh[m,n]*tcorv[k]
-            end
-        end
-    end
-
-    horizontal_diffusion!(ctmp, tem_tend, dmp, dmp1)
-
-    stratospheric_zonal_drag!(vor,vor_tend,sdrag)
+    # DISSIPATION IN THE STRATOSPHERE
+    stratospheric_zonal_drag!(vor,vor_tend,sdrag)               # zonal drag for wind
     stratospheric_zonal_drag!(div,div_tend,sdrag)
 
-    horizontal_diffusion!(vorU[:,:,:,1],  vorU_tend, dmps, dmp1s)
-    horizontal_diffusion!(divU[:,:,:,1],  divU_tend, dmps, dmp1s)
-    horizontal_diffusion!(ctmp, tem_tend,   dmps, dmp1s)
+    horizontal_diffusion!(vor_l1,vor_tend,dmps,dmp1s)           # stratospheric diffusion for wind
+    horizontal_diffusion!(div_l1,div_tend,dmps,dmp1s)           
+    horizontal_diffusion!(temp_corrected,temp_tend,dmps,dmp1s)  # stratospheric diffusion for temperature
 
-    # Diffusion of tracers
-    for k in 1:nlev
-        for m in 1:mx
-            for n in 1:nx
-                ctmp[m,n,k] = tr[m,n,k,1,1] + qcorh[m,n]*qcorv[k]
-            end
-        end
+    # DIFFUSION OF HUMIDITY
+    orographic_correction!(humid_corrected,humid,1,qcorh,qcorv) # orographic correction for humidity
+    horizontal_diffusion!(humid_corrected,humid_tend,dmp,dmp1)  # diffusion for corrected humidity
+
+    # if ntracers > 1
+    #     for i in 2:ntracers
+    #         tracer          = view(tracers,:,:,:,1,i)                   # the i-th tracer, leapfrog index 1
+    #         tracer_tendency = view(tracers_tendencies,:,:,:,i)          # its tendency
+    #         horizontal_diffusion!(tracer,tracer_tendency,dmp,dmp1)
+    #         leapfrog!(tracer,tracer_tendency,j1,C)
+    #     end
+    # end
+
+    # SPECTRAL TRUNCATION of all tendencies to the spectral resolution
+    for tendency in (logp0_tend,vor_tend,div_tend,temp_tend,humid_tend)
+        spectral_truncation!(tendency,G)
     end
 
-    horizontal_diffusion!(ctmp, @view(tr_tend[:,:,:,1]), dmpd, dmp1d)
-
-    if ntracers > 1
-        for i in 2:ntracers
-            tracer          = view(tracers,:,:,:,1,i)                   # the i-th tracer, leapfrog index 1
-            tracer_tendency = view(tracers_tendencies,:,:,:,i)          # its tendency
-            horizontal_diffusion!(tracer,tracer_tendency,dmp,dmp1)
-            leapfrog!(tracer,tracer_tendency,j1,C)
-        end
-    end
-
-    # TODO apply to all tendencies
-    # truncate the tendency to the spectral resolution
-    spectral_truncation!(tendency,G)
-
-    # Time integration
-    leapfrog!(ps,ps_tend,j1,G,C)
-    leapfrog!(vor,vor_tend,j1,G,C)
-    leapfrog!(div,div_tend,j1,G,C)
-    leapfrog!(temp,temp_tend,j1,G,C)
-
-    #TODO swap leapfrog indices here?
+    # Time integration via leapfrog step forward (filtered with Robert+William's depending on l1)
+    leapfrog!(logp0,logp0_tend,dt,l1,C)
+    leapfrog!(vor,vor_tend,dt,l1,C)
+    leapfrog!(div,div_tend,dt,l1,C)
+    leapfrog!(temp,temp_tend,dt,l1,C)
+    leapfrog!(humid,humid_tend,dt,l1,C)
 end
 
