@@ -9,7 +9,7 @@ module SpeedyWeather
     import LinearAlgebra
 
     # INPUT OUTPUT 
-    import Dates
+    import Dates: DateTime
     import Printf: @sprintf
     import NetCDF: NcFile, NcDim, NcVar
     import BitInformation: round, round!
