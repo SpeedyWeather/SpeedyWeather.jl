@@ -17,6 +17,7 @@ module SpeedyWeather
     export run_speedy, 
         Params, GenLogisticCoefs,
         GeoSpectral, Boundaries, Constants, Geometry,
+        PrognosticVariables, DiagnosticVariables,
         fourier, fourier_inverse,
         legendre, legendre_inverse,
         spectral, gridded

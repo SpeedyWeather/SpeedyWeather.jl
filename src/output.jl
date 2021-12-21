@@ -17,7 +17,7 @@ function get_run_id_path(P::Params)
 end
 
 
-function output_initialise( Diag::DiagnosticVars,   # output grid-space variables only
+function output_initialise( Diag::DiagnosticVariables,   # output grid-space variables only
                             G::GeoSpectral,
                             P::Params)
 
@@ -69,7 +69,7 @@ end
 function write_output!( iout::Int,
                         t::Real,
                         ncfile::NcFile,
-                        Diag::DiagnosticVars,
+                        Diag::DiagnosticVariables,
                         P::Params)
 
     @unpack u,v,Tabs,humid,logp0 = Diag.gridvars

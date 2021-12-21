@@ -16,7 +16,7 @@ struct GridVariables{NF<:AbstractFloat}
 end
 
 """Struct holding the diagnostic variables."""
-struct PrognosticVariables{NF<:AbstractFloat}
+struct DiagnosticVariables{NF<:AbstractFloat}
     tendencies  ::Tendencies{NF}
     gridvars    ::GridVariables{NF}
 end
