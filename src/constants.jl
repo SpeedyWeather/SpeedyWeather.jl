@@ -26,7 +26,7 @@ Generator function for a Constants struct.
 """
 function Constants{NF}(P::Params) where NF      # number format NF
 
-    @unpack R_earth, Ω, g, akap, R, γ, hscale, hshum, rh_ref = P
+    @unpack R_earth, Ω, g, akap, R, γ, hscale, hshum, rh_ref, Δt = P
     @unpack robert_filter, williams_filter = P
     @unpack tdrs = P
 
@@ -35,6 +35,6 @@ function Constants{NF}(P::Params) where NF      # number format NF
 
     # This implies conversion to NF
     return Constants{NF}(R_earth,Ω,g,akap,R,γ,hscale,hshum,rh_ref,
-                            robert_filter,williams_filter,
+                            Δt,robert_filter,williams_filter,
                             sdrag)
 end

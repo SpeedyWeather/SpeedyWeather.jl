@@ -45,11 +45,11 @@ function leapfrog!( A::AbstractArray{Complex{NF},4},        # a prognostic varia
                     C::Constants{NF}                        # struct containing all constants used at runtime
                     ) where {NF<:AbstractFloat}             # number format NF
 
-    _,_,_,nlev = size(A)        # A is of size mx x nx x 2 x nlev
+    _,_,_,nlev = size(A)        # A is of size mx x nx x nlev x 2
 
     for k in 1:nlev
         # extract vertical layers as views to not allocate any memory
-        A_layer = view(A,:,:,:,k)
+        A_layer = view(A,:,:,k,:)
         tendency_layer = view(tendency,:,:,k)
         
         # make a timestep forward for each layer
