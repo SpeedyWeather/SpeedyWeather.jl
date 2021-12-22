@@ -5,8 +5,8 @@ module SpeedyWeather
     
     # NUMERICS
     import FastGaussQuadrature: gausslegendre
-    import FFTW
-    import LinearAlgebra
+    import FFTW: rfft, irfft
+    import LinearAlgebra: dot
 
     # INPUT OUTPUT 
     import Dates: DateTime

@@ -17,7 +17,7 @@ The [primitive equations](https://en.wikipedia.org/wiki/Primitive_equations) sol
 
 more to come
 
-## Implementation details
+### Implementation details
 
 ```julia
 using SpeedyWeather
@@ -27,4 +27,15 @@ G = GeoSpectral{P.T}(P)
 B = Boundaries{P.T}(P,G)
 
 fourier(B.ϕ0trunc,G),G)
+```
+
+## Time integration
+
+SpeedyWeather.jl uses a leapfrog time scheme with a Robert's and William's filter
+to dampen the computational mode and achieve 3rd order accuracy.
+
+### Oscillation equation
+
+```math
+\frac{dF}{dt} = i\omega F
 ```
