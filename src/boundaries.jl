@@ -16,7 +16,7 @@ end
 """ Generator function for a Boundaries struct. Loads the boundary conditions,
 orography, land-sea mask and albedo from an netCDF file and stores the in a
 Boundaries-struct."""
-function Boundaries{NF}( P::Params,
+function Boundaries{NF}(P::Params,
                         G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
     @unpack boundary_path, boundary_file, g = P
@@ -27,10 +27,10 @@ function Boundaries{NF}( P::Params,
     else
         path = joinpath(boundary_path,boundary_file)
     end
-    nc = NetCDF.open(path)
-    orog = nc.vars["orog"][:,end:-1:1]  # latitude is North to South in file
-    lsm = nc.vars["lsm"][:,end:-1:1]
-    alb = nc.vars["alb"][:,end:-1:1]
+    ncfile = NetCDF.open(path)
+    orog = ncfile.vars["orog"][:,end:-1:1]  # latitude is North to South in file
+    lsm = ncfile.vars["lsm"][:,end:-1:1]
+    alb = ncfile.vars["alb"][:,end:-1:1]
 
     # GEOPOTENTIAL, truncate in spectral space
     ϕ0 = g*orog
