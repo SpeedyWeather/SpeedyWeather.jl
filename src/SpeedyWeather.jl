@@ -11,7 +11,7 @@ module SpeedyWeather
     # INPUT OUTPUT 
     import Dates: DateTime
     import Printf: @sprintf
-    import NetCDF: NcFile, NcDim, NcVar
+    import NetCDF: NetCDF, NcFile, NcDim, NcVar
     import BitInformation: round, round!
 
     export run_speedy, 
