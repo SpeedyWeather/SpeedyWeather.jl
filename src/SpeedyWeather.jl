@@ -1,13 +1,23 @@
 module SpeedyWeather
 
-    using NetCDF, FFTW, LinearAlgebra, Dates
-    
+    # STRUCTURE
     import Parameters: @with_kw, @unpack
+    
+    # NUMERICS
     import FastGaussQuadrature: gausslegendre
+    import FFTW: rfft, irfft
+    import LinearAlgebra: dot
+
+    # INPUT OUTPUT 
+    import Dates: DateTime
+    import Printf: @sprintf
+    import NetCDF: NetCDF, NcFile, NcDim, NcVar
+    import BitInformation: round, round!
 
     export run_speedy, 
         Params, GenLogisticCoefs,
         GeoSpectral, Boundaries, Constants, Geometry,
+        PrognosticVariables, DiagnosticVariables,
         fourier, fourier_inverse,
         legendre, legendre_inverse,
         spectral, gridded
@@ -22,11 +32,14 @@ module SpeedyWeather
     include("boundaries.jl")
     include("diagnostics.jl")
     include("prognostic_variables.jl")
+    include("diagnostic_variables.jl")
     include("geopotential.jl")
     include("horizontal_diffusion.jl")
     include("implicit.jl")
     include("tendencies.jl")
-    include("time_stepping.jl")
+    include("feedback.jl")
+    include("output.jl")
+    include("time_integration.jl")
     include("utils.jl")
     include("run_speedy.jl")
 end

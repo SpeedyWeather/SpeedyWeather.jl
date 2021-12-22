@@ -63,7 +63,7 @@ With keywords such that default values can be changed at creation.
 
     # NUMERICS
     robert_filter::Real=0.05    # Robert (1966) time filter coefficeint for suppress comput. mode
-    williams_filter::Real=0.53  # Williams time filter (Amezcua 2011) coefficient for 3rd order acc
+    williams_filter::Real=0.53  # William's time filter (Amezcua 2011) coefficient for 3rd order acc
     α::Real=0.5                 # coefficient for semi-implicit computations
                                 # 0 -> forward step for gravity wave terms,
                                 # 1 -> backward implicit
@@ -80,7 +80,11 @@ With keywords such that default values can be changed at creation.
     verbose::Bool=true          # print dialog for feedback
     output::Bool=false          # Store data in netCDF?
     output_dt::Real=6           # output time step [hours]
+    output_startdate::DateTime=DateTime(2000,1,1)
     outpath::String=pwd()       # path to output folder
+    output_vars::Vector{String}=["u","v","T","humid","logp0"]
+    compression_level::Int=3    # 1=low but fast, 9=high but slow
+    keepbits::Int=10            # mantissa bits to keep for every variable 
 
     # TODO assert not allowed parameter values
     @assert α in [0,0.5,1] "Only semi-implicit α = 0, 0.5 or 1 allowed."
