@@ -227,7 +227,7 @@ function dynamics_tendencies(Prog::PrognosticVariables{NF}, # Prognostic variabl
                              C)
 
     # 6. Temperature tendency
-    temperature_tendency(sigma_tend,t_grid_anom, sigma_m, ,puv, div_grid, t_grid, #IN
+    temperature_tendency(sigma_tend,t_grid_anom, sigma_m, puv, div_grid, t_grid, #IN
                          t_tend, #IN/OUT
                          C)
 

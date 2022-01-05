@@ -141,12 +141,12 @@ function temperature_tendency(
                                         div_grid::AbstractArray{NF,3},    #IN
                                         t_grid::AbstractArray{NF,3},      #IN
                                         t_tend::AbstractArray{NF,3},      #IN/OUT
-                                        M
+                                        C
                                         )where {NF<:AbstractFloat}
     
     
     
-    @unpack nlon, nlat,nlev,dhsr,tref,tref3,fsgr,akap = M 
+    @unpack nlon, nlat,nlev,dhsr,tref,tref3,fsgr,akap = C 
 
 
     #Temporary array
