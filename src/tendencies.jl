@@ -1,51 +1,58 @@
 
-"""Struct holding the spectral prognostic variables in grid point space"""
-struct PrognosticVariablesGridded{NF<:AbstractFloat}
-    vor_grid = Array{NF,3}(undef,nlon, nlat, nlev) #Gridpoint field of vorticity
-    div_grid = similar(vor_grid)                   #Gridpoint field of divergence
-    t_grid = similar(vor_grid)                     #Gridpoint field of temperature
-    ps_grid=Array{NF,2}(undef,nlon, nlat)          #Gridpoint field of surface pressure logarithm
-    tr_grid = similar(vor_grid)                    #Gridpoint field of tracers
-    u_grid = similar(vor_grid)                     #Gridpoint field of zonal velocity
-    v_grid = similar(vor_grid)                     #Gridpoint field of meridional velocity
-    q_grid = similar(vor_grid)                     #Gridpoint field of specific_humidity
-    phi_grid = similar(vor_grid)                   #Gridpoint field of geopotential
-end
+# """Struct holding the spectral prognostic variables in grid point space"""
+# struct PrognosticVariablesGridded{NF<:AbstractFloat}
+#     vor_grid = Array{NF,3}(undef,nlon, nlat, nlev) #Gridpoint field of vorticity
+#     div_grid = similar(vor_grid)                   #Gridpoint field of divergence
+#     t_grid = similar(vor_grid)                     #Gridpoint field of temperature
+#     ps_grid=Array{NF,2}(undef,nlon, nlat)          #Gridpoint field of surface pressure logarithm
+#     tr_grid = similar(vor_grid)                    #Gridpoint field of tracers
+#     u_grid = similar(vor_grid)                     #Gridpoint field of zonal velocity
+#     v_grid = similar(vor_grid)                     #Gridpoint field of meridional velocity
+#     q_grid = similar(vor_grid)                     #Gridpoint field of specific_humidity
+#     phi_grid = similar(vor_grid)                   #Gridpoint field of geopotential
+# end
+
+
+# """Struct holding the spectral prognostic variables tendencies"""
+# struct PrognosticVariableTendencies{NF<:AbstractFloat}
+#     vor_tend = Array{NF,3}(undef,mx, nx, nlev) #spectral tendency of vorticity
+#     div_tend = similar(vor_tend)               #spectral tendency of divergence
+#     t_tend   = similar(vor_tend)               #spectral tendency of temperature
+#     ps_tend  = similar(vor_tend)               #spectral tendency of surface pressure logarithm
+#     tr_tend  = similar(vor_tend)               #spectral tendency of tracers
+# end
+
 
 
 """
 Compute the grid point and spectral tendencies, including an implicit correction for the spectral tendencies. 
 """
-
-function get_tendencies(
-                         Prog::PrognosticVariables{NF}, #Prognostic variables. IN
+function get_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variables
+                         Diag::PrognosticVariables{NF}, # Diagnostic variables
                          C::Constants{NF}
                         ) where {NF<:AbstractFloat}
 
-
+    @unpack alpha = C
 
     # =========================================================================
     # Computation of grid-point tendencies (converted to spectral at the end of
-    # grtend)
+    # grtend) Diag.Tendencies.GridPoint
     # =========================================================================
 
-    ProgTend = get_grid_point_tendencies(Prog, C)
+    get_grid_point_tendencies!(Prog,Diag,C)
 
     # =========================================================================
-    # Computation of spectral tendencies
+    # Computation of spectral tendencies 
     # =========================================================================
-
-    if α < 0.5 #Coefficient for semi-implicit computations. Previously if alpha = 0?
-        get_spectral_tendencies!(div_tend, t_tend, ps_tend,2,M)
+    @unpack div_tend,t_tend,ps_tend = Diag.Tendencies #Get some of the tendencies calculated above
+    if alpha < 0.5 #Coefficient for semi-implicit computations. Previously if alpha = 0?
+        get_spectral_tendencies!(div_tend, t_tend, ps_tend,C)
     else
-        get_spectral_tendencies!(div_tend, t_tend, ps_tend,2,M)
+        get_spectral_tendencies!(div_tend, t_tend, ps_tend,C)
 
         # Implicit correction
-        implicit_terms!(div_tend, t_tend, ps_tend)
+        implicit_terms!(div_tend, t_tend, ps_tend) #TK: no edits have been made (yet!) to this implicit function
     end
-
-
-    return PrognosticVariableTendencies
 
 end
 
@@ -54,25 +61,23 @@ end
 """
 Compute the grid point tendencies. These are composed of the dynamics and physical parameterisations. 
 """
-function get_grid_point_tendencies(
-                                    Prog::PrognosticVariables{NF}, #Prognostic variables. In/Out
+function get_grid_point_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variables
+                                    Diag::PrognosticVariables{NF}, # Diagnostic variables
                                     C::Constants{NF}
                                     ) where {NF<:AbstractFloat}
-
-
+    
     #1. Convert spectral prognostic variables to grid point space
-    ProgGrid = get_grid_point_fields(Prog,C)
+    get_grid_point_fields!(Prog,C) #Updates Prog.Gridded
  
     # 2. Parameterised physics tendencies. 
-    #COMMENT: NEEDS DEFINING in parameterisation_tendencies.jl. There is a lot of physics here. Separate PR
-    ParameterisedTendencies = parametrization_tendencies(Prog,C)
+    #Needs to be defined in parameterisation_tendencies.jl. There is a lot of physics here, so would be best as separate, self-contained PR
+    parametrization_tendencies!(Prog,Diag,C)
 
 
     #3. Dynamics tendencies
-    #vor_tend, div_tend,t_tend,ps_tend,tr_tend
-    ProgTend = dynamics_tendencies(Prog, ProgGrid,ParameterisedTendencies,C)
+    dynamics_tendencies!(Prog,Diag,C) #Takes Prog.Grid and Diag.ParameterisedTendencies and calculates Diag.Tendencies in GP space
 
-    return ProgTend
+
 
 end
 
@@ -80,8 +85,7 @@ end
 """
 Compute grid point fields of the spectral prognostic tendencies
 """
-function get_grid_point_fields(
-                               Prog::PrognosticVariables{NF}, 
+function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic variables
                                C::Constants{NF}
                                ) where {NF<:AbstractFloat}
 
@@ -89,8 +93,8 @@ function get_grid_point_fields(
     #Unpack spectral prognostic fields
     @unpack vor,div,t,ps,tr = Prog
 
-    #Unpack the gridded counterparts
-    @unpack vor_grid,div_grid,t_grid,ps_grid,tr_grid = PrognosticVariablesGridded
+    #Unpack the gridded counterparts. This is what we will be calculating in this subroutine
+    @unpack vor_grid,div_grid,t_grid,ps_grid,tr_grid = Prog.Gridded
 
     #Unpack constants
     @unpack cp, j2, n_trace,nlev,nlat,nlon,coriol = C
@@ -134,7 +138,7 @@ function get_grid_point_fields(
 
 
     #Truncate variables where the spectral transform is still done at double
-    #precision
+    #precision. Convert to per second
     u_grid = u_grid / 3600.0
     v_grid = v_grid / 3600.0
 
@@ -145,40 +149,37 @@ function get_grid_point_fields(
     #Don't transform the two stratospheric levels where humidity is set to zero
     # because it leads to overflows 
     for k in 3:nlev
-        convert_to_grid(tr(:,:,k,j1,1), q_grid(:.:,k), )
+        convert_to_grid(tr(:,:,k,j1,1), tr_grid(:.:,k), )
     end 
 
 
-    return ProgGrid
-
 end
+
 
 """
 Compute non-linear tendencies in grid-point space from dynamics and add to physics tendencies. Convert total
 gridpoint tendencies to spectral tendencies.
 """
-function dynamics_tendencies(
-                             vor,div,t,ps,tr, #Prognostics
-                             vor_grid::AbstractArray{NF,3},
-                             div_grid::AbstractArray{NF,3},
-                             t_grid::AbstractArray{NF,3},
-                             tr_grid:::AbstractArray{NF,3}, 
-                             u_grid::AbstractArray{NF,3},
-                             v_grid::AbstractArray{NF,3},
-                             q_grid::AbstractArray{NF,3}, 
-                             ps_grid::AbstractArray{NF,2},
-                             phi_grid::AbstractArray{NF,3},
-                             u_tend, v_tend, t_tend, q_tend, #Need to define after parametrization_tendencies() setup
-                             vor_tend::AbstractArray{NF,3},
-                             div_tend::AbstractArray{NF,3},
-                             t_tend::AbstractArray{NF,3},
-                             ps_tend::AbstractArray{NF,3},
-                             tr_tend::AbstractArray{NF,3},
-                             M :: Model
+function dynamics_tendencies(Prog::PrognosticVariables{NF}, # Prognostic variables
+                             Diag::PrognosticVariables{NF}, # Diagnostic variables
+                             C::Constants{NF}
                              ) where {NF<:AbstractFloat}
+    
+    #Unpack spectral prognostic fields
+    @unpack vor,div,t,ps,tr = Prog
 
-    #Get any constants you might need
-    @unpack tref = M #
+    #Unpack the gridded counterparts
+    @unpack vor_grid,div_grid,t_grid,ps_grid,tr_grid = Prog.Gridded
+
+    #Unpack the parameterised physics tendencies
+    @unpack u_tend, v_tend, t_tend, q_tend = Diag.ParameterisedTendencies
+    
+    #Unpack the spectral prognostic tendencies. These are what we will be calculating in this subroutine
+    @unpack vor_tend, div_tend, t_tend, ps_tend, tr_tend  = Diag.Tendencies
+
+    #Unpack constants
+    @unpack cp, j2, n_trace,nlev,nlat,nlon,coriol = C
+
 
     #Declare some empty arrays which are shared between subroutines
 
@@ -198,13 +199,13 @@ function dynamics_tendencies(
 
     #1. Compute tendency of log(surface pressure)
     surface_pressure_tendency(u_grid,v_grid,div_grid,ps, #IN
-                                         ps_tend,u_mean,v_mean,d_mean,dumc,px,py,#OUT. Tendencies + other terms used later for other tendency calulcations
-                                         M)
+                              ps_tend,u_mean,v_mean,d_mean,dumc,px,py,#OUT. Tendencies + other terms used later for other tendency calulcations
+                              C)
  
     # 2. Compute "vertical" velocity
     vertical_velocity_tendency(u_grid, v_grid, div_grid,u_mean,px,v_mean,d_mean, #IN
-                                         puv,sigma_tend,sigma_m #OUT
-                                         M)
+                               puv,sigma_tend,sigma_m #OUT
+                               C)
    
 
     # 3. Subtract part of temperature field that is used as reference for implicit terms
@@ -216,25 +217,25 @@ function dynamics_tendencies(
 
     # 4. Zonal wind tendency
     zonal_wind_tendency(u_grid,v_grid,vor_grid,t_grid_anom,px,sigma_tend, # IN
-                                   u_tend, #OUT
-                                   M)
+                        u_tend, #OUT
+                        C)
 
 
     # 5. Meridional wind tendency
     meridional_wind_tendency(u_grid,v_grid,vor_grid,t_grid_anom,px,sigma_tend, # IN
-                                        v_tend, #OUT
-                                        M)
+                             v_tend, #OUT
+                             C)
 
     # 6. Temperature tendency
     temperature_tendency(sigma_tend,t_grid_anom, sigma_m, ,puv, div_grid, t_grid, #IN
-                                    t_tend, #IN/OUT
-                                    M)
+                         t_tend, #IN/OUT
+                         C)
 
     
     # 7. Tracer tendency
     tracer_tendency(sigma_tend, tr_grid,div_grid,#IN
                     tr_tend, #IN/OUT
-                    M)
+                    C)
 
 
 
@@ -247,11 +248,11 @@ function dynamics_tendencies(
         #  Convert u and v tendencies to vor and div spectral tendencies
         #  vdspec takes a grid u and a grid v and converts them to spectral vor and div
 
-        vdspec(utend[:,:,k], vtend[:,:,k], vor_tend[:,:,k], div_tend[:,:,k], true) #COMMENT: is vdspec working OK?
+        vdspec(utend[:,:,k], vtend[:,:,k], vor_tend[:,:,k], div_tend[:,:,k], true) 
 
         #Divergence tendency
         #add -laplacian(0.5*(u**2+v**2)) to divergence tendency
-        div_tend[:,:,k] = div_tend[:,:,k] - laplacian(convert_to_spectral(half*(u_grid[:,:,k]**two + v_grid[:,:,k]**two))) #COMMENT: need to define ints/floats in consistent way
+        div_tend[:,:,k] = div_tend[:,:,k] - laplacian(convert_to_spectral(half*(u_grid[:,:,k]**two + v_grid[:,:,k]**two))) 
 
         #Temperature tendency
         #and add div(vT) to spectral t tendency
@@ -277,28 +278,25 @@ function dynamics_tendencies(
 
 
 """
-Compute the spectral tendencies.  
+Compute the spectral tendencies of divergence, temperature
+and log_surf.pressure 
 """
-function get_spectral_tendencies!(
-                                 div_tend::AbstractArray{NF,3}, 
-                                 t_tend::AbstractArray{NF,3}, 
-                                 ps_tend::AbstractArray{NF,3},
-                                 j :: int,
-                                 M:: Model
+function get_spectral_tendencies!(div_tend::AbstractArray{NF,3}, #spectral tendency of divergence
+                                 t_tend::AbstractArray{NF,3}, #spectral tendency of temperature
+                                 ps_tend::AbstractArray{NF,3},#spectral tendency of surface pressure logarithm
+                                 C::Constants{NF}
                                  ) where {NF<:AbstractFloat}
 
 
     
    #Get any constants you might need
-   @unpack mx, nx, nlev, dhs,j2,tref,tref2,tref3,rgas = M #
+   @unpack mx, nx, nlev, dhs,j2,tref,tref2,tref3,rgas = C
 
 
    #Declare local arrays   
    dmeanc = Array{NF,2}(mx,nx) 
    sigma_tend_c = Array{NF,3}(mx, nx, nlev+1)
    dumk = Array{NF,3}(mx, nx, nlev+1)
-
-
 
 
     # Vertical mean divergence... 
@@ -325,7 +323,7 @@ function get_spectral_tendencies!(
     end
 
     # Geopotential and divergence tendency
-    get_geopotential(Tₐ[:,:,:,j2])
+    geopotential!(phi, phi_surface, t)
     for k in 1:nlev
         div_tend[:,:,k] -= ∇²(phi[:,:,k] + rgas*tref[k]*ps[:,:,j2])
     end

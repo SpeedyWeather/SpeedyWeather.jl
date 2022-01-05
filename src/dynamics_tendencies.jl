@@ -1,28 +1,22 @@
-struct dynamics_tendencies{T<:AbstractFloat}
-
-#Just a placeholder
-
-end
-
 """
 Compute the spectral tendency of the surface pressure logarithm
 """
-function surface_pressure_tendency(u_grid::AbstractArray{NF,3},              #IN
-                                              v_grid::AbstractArray{NF,3},   #IN
-                                              div_grid::AbstractArray{NF,3}, #IN
-                                              ps::AbstractArray{NF,4},       #IN
-                                              ps_tend::AbstractArray{NF,3},  #OUT
-                                              u_mean::AbstractArray{NF,2},   #OUT
-                                              v_mean::AbstractArray{NF,2},   #OUT
-                                              d_mean::AbstractArray{NF,2},   #OUT
-                                              dumc::AbstractArray{NF,3},     #OUT
-                                              px::AbstractArray{NF,2},       #OUT
-                                              py::AbstractArray{NF,2},       #OUT
-                                              M
-                                              )where {NF<:AbstractFloat}
+function surface_pressure_tendency(u_grid::AbstractArray{NF,3},   #IN
+                                   v_grid::AbstractArray{NF,3},   #IN
+                                   div_grid::AbstractArray{NF,3}, #IN
+                                   ps::AbstractArray{NF,4},       #IN
+                                   ps_tend::AbstractArray{NF,3},  #OUT
+                                   u_mean::AbstractArray{NF,2},   #OUT
+                                   v_mean::AbstractArray{NF,2},   #OUT
+                                   d_mean::AbstractArray{NF,2},   #OUT
+                                   dumc::AbstractArray{NF,3},     #OUT
+                                   px::AbstractArray{NF,2},       #OUT
+                                   py::AbstractArray{NF,2},       #OUT
+                                   C::Constants{NF}               #IN
+                                   )where {NF<:AbstractFloat}
 
 
-    @unpack nlev, dhs = M 
+    @unpack nlev, dhs = C 
 
     #Now do some calculation
     for k in 1:nlev
@@ -56,11 +50,11 @@ function vertical_velocity_tendency(
                                    puv::AbstractArray{NF,3},#OUT,
                                    sigma_tend::AbstractArray{NF,3},#OUT,
                                    sigma_m::AbstractArray{NF,3},#OUT,
-                                   M
+                                   C::Constants{NF} 
                                    )where {NF<:AbstractFloat}
 
     #Get constants
-    @unpack nlev,dhs = M #
+    @unpack nlev,dhs = C #
 
     #Declare empty arrays
     
@@ -210,34 +204,5 @@ function tracer_tendency(
     end
 
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
