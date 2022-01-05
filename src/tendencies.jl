@@ -143,13 +143,13 @@ function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic varia
     v_grid = v_grid / 3600.0
 
     #Surface pressure spectral transform to grid
-    convert_to_grid!(ps(:,:,j1), ps_grid)
+    convert_to_grid!(ps[:,:,j1], ps_grid)
 
 
     #Don't transform the two stratospheric levels where humidity is set to zero
     # because it leads to overflows 
     for k in 3:nlev
-        convert_to_grid(tr(:,:,k,j1,1), tr_grid(:.:,k), )
+        convert_to_grid(tr[:,:,k,j1,1], tr_grid[:.:,k])
     end 
 
 
