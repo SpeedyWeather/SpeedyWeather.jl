@@ -204,7 +204,7 @@ function dynamics_tendencies(Prog::PrognosticVariables{NF}, # Prognostic variabl
  
     # 2. Compute "vertical" velocity
     vertical_velocity_tendency(u_grid, v_grid, div_grid,u_mean,px,v_mean,d_mean, #IN
-                               puv,sigma_tend,sigma_m #OUT
+                               puv,sigma_tend,sigma_m, #OUT
                                C)
    
 
