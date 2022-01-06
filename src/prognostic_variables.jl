@@ -60,6 +60,7 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
                                     G::GeoSpectral{NF}                  # Geospectral struct
                                     ) where {NF<:AbstractFloat}         # number format NF
 
+    mx,nx,nlev = size(temp)
     @unpack geopot_surf = B     # spectral surface geopotential [m²/s²]
 
     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
@@ -69,7 +70,7 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
     # R:            Specific gas constant for dry air [J/kg/K]
     @unpack temp_ref, temp_top, lapse_rate, gravity, R = P
 
-    lapse_rate_scaled = lape_rate/gravity/1000      # Lapse rate scaled by gravity [K/m / (m²/s²)]
+    lapse_rate_scaled = lapse_rate/gravity/1000      # Lapse rate scaled by gravity [K/m / (m²/s²)]
 
     temp_surf = -lapse_rate_scaled*geopot_surf      # spectral surface air temperature from orography and lapse rate
     temp_surf[1,1] += Complex(√2*temp_ref)          # adjust mean value (spectral coefficient 1,1) with temp_ref
@@ -84,12 +85,16 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
     @unpack σ_full = G.geometry
 
     for k in 3:nlev
-        temp[:,:,k] .= temp_surf*σ_full[k]^(R*lapse_rate_scaled)
+        for j in 1:nx
+            for i in 1:mx
+                temp[i,j,k] = temp_surf[i,j]*σ_full[k]^(R*lapse_rate_scaled)
+            end
+        end
     end
 end
 
 """Initialize the logarithm of surface pressure `logp0` consistent with temperature profile."""
-function initiliaze_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # logarithm of surface pressure
+function initialize_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # logarithm of surface pressure
                                 P::Params,                                  # Parameters struct
                                 B::Boundaries{NF},                          # Boundaries struct
                                 G::GeoSpectral{NF}                          # Geospectral struct
@@ -107,7 +112,7 @@ function initiliaze_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # lo
     @unpack geopot_surf = B                     # spectral surface geopotential
     geopot_surf_grid = gridded(geopot_surf,G)   # convert to grid-point space
 
-    lapse_rate_scaled = lape_rate/gravity/1000  # Lapse rate scaled by gravity [K/m / (m²/s²)]
+    lapse_rate_scaled = lapse_rate/gravity/1000  # Lapse rate scaled by gravity [K/m / (m²/s²)]
     log_pres_ref = log(pres_ref)                # logarithm of reference surface pressure
     pres_surf_grid = zeros(nlon, nlat)          # logarithm of surface pressure by grid point
 
@@ -118,7 +123,7 @@ function initiliaze_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # lo
         end
     end
 
-    spectral!(pres_surf,pres_surf_grid,G)   # convert to spectral space
+    pres_surf .= spectral(pres_surf_grid,G) # convert to spectral space
     spectral_truncation!(pres_surf,G)       # truncate in spectral space
 
     return pres_surf_grid                   # return grid for use in initialize_humidity!
@@ -133,6 +138,7 @@ function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},    # spectr
 
     mx,nx,nlev = size(humid)
     @unpack nlon, nlat = P
+    @unpack σ_full = G.geometry
 
     # reference saturation water vapour pressure [Pa]
     # relative humidity reference [1]
@@ -156,7 +162,7 @@ function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},    # spectr
     for k in 3:nlev
         for j in 1:nx
             for i in 1:mx
-                humid[i,j,k] = humid0[i,j]*σ_full[k]^scale_height_ratio
+                humid[i,j,k] = humid_surf[i,j]*σ_full[k]^scale_height_ratio
             end
         end
     end
