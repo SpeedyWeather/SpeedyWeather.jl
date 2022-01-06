@@ -1,65 +1,61 @@
 """
 Compute the spectral tendency of the surface pressure logarithm
 """
-function surface_pressure_tendency(u_grid::AbstractArray{NF,3},   #IN
-                                   v_grid::AbstractArray{NF,3},   #IN
-                                   div_grid::AbstractArray{NF,3}, #IN
-                                   ps::AbstractArray{NF,4},       #IN
-                                   ps_tend::AbstractArray{NF,3},  #OUT
-                                   u_mean::AbstractArray{NF,2},   #OUT
-                                   v_mean::AbstractArray{NF,2},   #OUT
-                                   d_mean::AbstractArray{NF,2},   #OUT
-                                   dumc::AbstractArray{NF,3},     #OUT
-                                   px::AbstractArray{NF,2},       #OUT
-                                   py::AbstractArray{NF,2},       #OUT
-                                   C::Constants{NF}               #IN
-                                   )where {NF<:AbstractFloat}
+function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic variables
+                                   Diag::PrognosticVariables{NF}, # Diagnostic variables
+                                   l2::Int,                       # leapfrog index 2 (time step used for tendencies)
+                                   C::Constants{NF}
+                                   ) where {NF<:AbstractFloat}
 
 
+    @unpack logp0= Prog 
+    @unpack logp0_tend = Diag.Tendencies
+
+    @unpack u_grid,v_grid,div_grid = Diag.gridvars
+    @unpack u_mean,v_mean,d_mean,dumc,px,py = Diag.miscvars
     @unpack nlev, dhs = C 
 
-    #Now do some calculation
+    #Initialise mean fields. 
+    u_mean[:,:] = 0.0
+    v_mean[:,:] = 0.0
+    d_mean[:,:] = 0.0 #d-mean is calculated here but actually used in vertical_velocity_tendency!()
+
+    #..and calculate values
     for k in 1:nlev
         u_mean += u_grid[:,:,k]*dhs[k] 
         v_mean += v_grid[:,:,k]*dhs[k]
         d_mean += div_grid[:,:,k]*dhs[k]
     end
 
-    
-    grad!(ps[:,:,j2], @view(dumc[:,:,1]), @view(dumc[:,:,2]))
-    px = convert_to_grid(dumc[:,:,1], scale=true)
-    py = convert_to_grid(dumc[:,:,2], scale=true)
+    #Now use the mean fields
+    grad!(logp0[:,:,l2], dumc[:,:,2], dumc[:,:,3])
+    px = convert_to_grid(dumc[:,:,2]*3600, scale=true)
+    py = convert_to_grid(dumc[:,:,3]*3600, scale=true) #3600 factor from Paxton/Chantry. I think this is to correct for the underflow rescaling earlier
 
-    ps_tend = convert_to_spectral(-umean.*px - vmean.*py)
-    ps_tend[1,1] = Complex{NF}(zero)
+    logp0_tend = convert_to_spectral(-u_mean.*px - v_mean.*py)
+    logp0_tend[1,1] = Complex{NF}(zero)
 
 end
 
 """
 Compute the spectral tendency of the "vertical" velocity
 """
-function vertical_velocity_tendency(
-                                   u_grid::AbstractArray{NF,3}, #IN
-                                   v_grid::AbstractArray{NF,3}, #IN
-                                   div_grid::AbstractArray{NF,3}, #IN
-                                   u_mean::AbstractArray{NF,2}, #IN
-                                   px::AbstractArray{NF,2}, #IN
-                                   v_mean::AbstractArray{NF,2}, #IN
-                                   py::AbstractArray{NF,2},#IN
-                                   d_mean::AbstractArray{NF,2},#IN,
-                                   puv::AbstractArray{NF,3},#OUT,
-                                   sigma_tend::AbstractArray{NF,3},#OUT,
-                                   sigma_m::AbstractArray{NF,3},#OUT,
-                                   C::Constants{NF} 
-                                   )where {NF<:AbstractFloat}
+function vertical_velocity_tendency!(Prog::PrognosticVariables{NF}, # Prognostic variables
+                                     Diag::PrognosticVariables{NF}, # Diagnostic variables
+                                     C::Constants{NF}
+                                     ) where {NF<:AbstractFloat}
 
-    #Get constants
-    @unpack nlev,dhs = C #
+    @unpack u_grid,v_grid,div_grid = Diag.gridvars
+    @unpack u_mean,v_mean,d_mean,sigma_tend,sigma_m,puv,px,py = Diag.miscvars
+    @unpack nlev,dhs = C 
 
-    #Declare empty arrays
-    
+    #Initialise
+    sigma_tend[:,:,:] = 0.0
+    sigma_m[:,:,:] = 0.0
+
+
     for k in 1:nlev
-        puv[:,:,k] = (u_grid[:,:,k] - u_mean).*px + (v_grid[:,:,k] - v_mean).*py
+        puv[:,:,k] = (u_grid[:,:,k] - u_mean)*px + (v_grid[:,:,k] - v_mean)*py
     end
 
     for k in 1:nlev
@@ -70,100 +66,120 @@ function vertical_velocity_tendency(
 end
 
 
+
+"""
+Compute the temperature anomaly in grid point space
+"""
+function temperature_grid_anomaly!(Diag::PrognosticVariables{NF}, # Diagnostic variables
+                                   C::Constants{NF}
+                                   ) where {NF<:AbstractFloat}
+
+    @unpack Tabs_grid,Tabs_grid_anomaly = Diag.gridvars
+    @unpack nlev,tref = C  #Is tref a constant?
+
+    for k in 1:nlev
+        Tabs_grid_anomaly[:,:,k] = Tabs_grid[:,:,k] .- tref[k] 
+    end
+
+end
+
+
+
+
+
 """
 Compute the spectral tendency of the zonal wind
 """
-function zonal_wind_tendency(
-                                       u_grid::AbstractArray{NF,3}, #IN
-                                       v_grid::AbstractArray{NF,3}, #IN
-                                       vor_grid::AbstractArray{NF,3}, #IN
-                                       t_grid_anom::AbstractArray{NF,3}, #IN
-                                       px::AbstractArray{NF,2}, #IN
-                                       sigma_tend::AbstractArray{NF,3},#IN,
-                                       u_tend::AbstractArray{NF,3},#OUT
-                                       M
-                                       )where {NF<:AbstractFloat}
+function zonal_wind_tendency!(Diag::PrognosticVariables{NF}, # Diagnostic variables
+                              C::Constants{NF}
+                              )where {NF<:AbstractFloat}
+    
+    @unpack u_tend = Diag.Tendencies
+    @unpack u_grid,v_grid,vor_grid,Tabs_grid_anomaly= Diag.gridvars
+    @unpack sigma_tend,px,py,temp = Diag.miscvars
+    @unpack nlev,rgas,dhsr = C 
 
-    @unpack nlon, nlat,nlev,dhsr = M 
 
-    #Temporary array
-    temp = Array{NF,3}(undef,nlon, nlat,nlev+1) 
+    #Update px,py
+    px = rgas*px
+    py = rgas*py
 
+    #Initialise temp
+    temp[:,:,:] =0.0
+
+  
     for k in 2:nlev
         temp[:,:,k] = sigma_tend[:,:,k].*(u_grid[:,:,k] - u_grid[:,:,k-1])
     end
 
     for k in 1:nlev
-        u_tend[:,:,k] = u_tend[:,:,k] + v_grid[:,:,k].*vor_grid[:,:,k] - t_grid_anom[:,:,k]*px
-            - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
+        u_tend[:,:,k] = u_tend[:,:,k] 
+                        + v_grid[:,:,k].*vor_grid[:,:,k] 
+                        - Tabs_grid_anomaly[:,:,k]*px
+                         - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
     end
 
 end
+
 
 
 """
 Compute the spectral tendency of the meridional wind 
 """
-function meridional_wind_tendency(
-                                       u_grid::AbstractArray{NF,3}, #IN
-                                       v_grid::AbstractArray{NF,3}, #IN
-                                       vor_grid::AbstractArray{NF,3}, #IN
-                                       t_grid_anom::AbstractArray{NF,3}, #IN
-                                       px::AbstractArray{NF,2}, #IN
-                                       sigma_tend::AbstractArray{NF,3},#IN,
-                                       v_tend::AbstractArray{NF,3},#OUT
-                                       M
-                                       )where {NF<:AbstractFloat}
-    @unpack nlon, nlat,nlev,dhsr = M 
+function meridional_wind_tendency!(Diag::PrognosticVariables{NF}, # Diagnostic variables
+                                   C::Constants{NF}
+                                  )where {NF<:AbstractFloat}
 
-    #Temporary array
-    temp = Array{NF,3}(undef,nlon, nlat,nlev+1) 
+    @unpack v_tend = Diag.Tendencies
+    @unpack vor_grid,u_grid,v_grid,Tabs_grid_anomaly =Diag.gridvars
+    @unpack sigma_tend,temp,px,py = Diag.miscvars
+    @unpack nlev,dhsr= C 
+
+
     for k in 2:nlev
         temp[:,:,k] = sigma_tend[:,:,k].*(v_grid[:,:,k] - v_grid[:,:,k-1])
-      end
-                                
+    end
+                            
     for k in 1:nlev
-        v_tend[:,:,k] = v_tend[:,:,k] -u_grid[:,:,k].*vor_grid[:,:,k] - t_grid_anom[:,:,k]*R.*py
-            - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
+        v_tend[:,:,k] = v_tend[:,:,k] 
+                        -u_grid[:,:,k].*vor_grid[:,:,k] 
+                        - Tabs_grid_anomaly[:,:,k]*py
+                        - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
     end
 
 end
 
 
+
+
+
 """
 Compute the spectral temperature tendency
 """
-function temperature_tendency(
-                                        sigma_tend::AbstractArray{NF,3},  #IN,
-                                        t_grid_anom::AbstractArray{NF,3}, #IN
-                                        sigma_m::AbstractArray{NF,3},     #IN
-                                        puv::AbstractArray{NF,3},         #IN
-                                        div_grid::AbstractArray{NF,3},    #IN
-                                        t_grid::AbstractArray{NF,3},      #IN
-                                        t_tend::AbstractArray{NF,3},      #IN/OUT
-                                        C
-                                        )where {NF<:AbstractFloat}
+function temperature_tendency!(Diag::PrognosticVariables{NF}, # Diagnostic variables
+                               C::Constants{NF}
+                               )where {NF<:AbstractFloat}
     
-    
-    
-    @unpack nlon, nlat,nlev,dhsr,tref,tref3,fsgr,akap = C 
+    @unpack Tabs_tend = Diag.Tendencies
+    @unpack div_grid,Tabs_grid_anomaly =Diag.gridvars
+    @unpack d_mean,temp,sigma_tend,sigma_m,puv= Diag.miscvars
+    @unpack tref,tref3,nlev,dhsr,fsgr,akap = C
 
 
-    #Temporary array
-    temp = Array{NF,3}(undef,nlon, nlat,nlev+1) 
 
 
     for k in 2:nlev
-        temp[:,:,k] = sigma_tend[:,:,k].*(t_grid_anom[:,:,k] - t_grid_anom[:,:,k-1])
-            + sigma_m[:,:,k].*(tref[k] - tref[k-1])
+        temp[:,:,k] = sigma_tend[:,:,k].*(Tabs_grid_anomaly[:,:,k] - Tabs_grid_anomaly[:,:,k-1])
+                    + sigma_m[:,:,k].*(tref[k] - tref[k-1])
     end
 
     for k in 1:nlev
-        t_tend[:,:,k] = t_tend[:,:,k]+ t_grid_anom[:,:,k].*div_grid[:,:,k]
-            - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
-            + fsgr[k]*t_grid_anom[:,:,k].*(sigma_tend[:,:,k+1] + sigma_tend[:,:,k])
-            + tref3[k]*(sigma_m[:,:,k+1] + sigma_m[:,:,k])
-            + akap*(t_grid[:,:,k].*puv[:,:,k] - t_grid_anom[:,:,k].*dmean)
+        Tabs_tend[:,:,k] = Tabs_tend[:,:,k]
+                        + Tabs_grid_anomaly[:,:,k].*div_grid[:,:,k]
+                        - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
+                        + fsgr[k]*Tabs_grid_anomaly[:,:,k].*(sigma_tend[:,:,k+1] + sigma_tend[:,:,k])
+                        + tref3[k]*(sigma_m[:,:,k+1] + sigma_m[:,:,k])
+                        + akap*(t_grid[:,:,k].*puv[:,:,k] - Tabs_grid_anomaly[:,:,k].*d_mean)
     end 
 
 
@@ -175,20 +191,15 @@ end
 """
 Compute the tracer tendency
 """
-function tracer_tendency(
-                             sigma_tend::AbstractArray{NF,3},  #IN,
-                             tr_grid:::AbstractArray{NF,3}, 
-                             div_grid::AbstractArray{NF,3},
-                             tr_tend::AbstractArray{NF,3}
-                             M
-                            )where {NF<:AbstractFloat}
+function tracer_tendency!(Diag::PrognosticVariables{NF}, # Diagnostic variables
+                          C::Constants{NF}
+                          )where {NF<:AbstractFloat}
     
-    
-    
-    @unpack nlon, nlat,nlev,n_trace,dhsr = M 
 
-    #Temporary array
-    temp = Array{NF,3}(undef,nlon, nlat,nlev+1) 
+    @unpack div_grid,tr_grid = Diag.gridvars
+    @unpack temp,sigma_tend= Diag.miscvars
+    @unpack n_trace,dhsr, nlev = C
+
 
     for itr in 1:n_trace
         for k in 2:nlev

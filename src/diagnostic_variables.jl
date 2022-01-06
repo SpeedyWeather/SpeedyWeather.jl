@@ -4,19 +4,65 @@ struct Tendencies{NF<:AbstractFloat}
     Tabs_tend    ::Array{Complex{NF},3}      # Absolute temperature [K]
     logp0_tend   ::Array{Complex{NF},2}      # Log of surface pressure [log(Pa)]
     humid_tend   ::Array{Complex{NF},3}      # Specific humidity [g/kg]
+    u_tend       ::Array{Complex{NF},3}      # zonal velocity
+    v_tend       ::Array{Complex{NF},3}      # meridonal velocity
+
 end
 
+
+
+
 struct GridVariables{NF<:AbstractFloat}
-    u       ::Array{NF,3}       # Zonal velocity [m/s]
-    v       ::Array{NF,3}       # Meridional velocity [m/s]
-    Tabs    ::Array{NF,3}       # Absolute temperature [K]
-    logp0   ::Array{NF,2}       # Log of surface pressure [log(Pa)]
-    geopot  ::Array{NF,3}       # 
-    humid   ::Array{NF,3}      # Specific humidity [g/kg]
+   # u       ::Array{NF,3}       # Zonal velocity [m/s]
+    #v       ::Array{NF,3}       # Meridional velocity [m/s]
+   # Tabs    ::Array{NF,3}       # Absolute temperature [K]
+   # logp0   ::Array{NF,2}       # Log of surface pressure [log(Pa)]
+   # geopot  ::Array{NF,3}       # 
+   # humid   ::Array{NF,3}      # Specific humidity [g/kg]
+
+    vor_grid    ::Array{NF,3}  # Gridpoint field of vorticity
+    div_grid    ::Array{NF,3}  # Gridpoint field of divergence
+    Tabs_grid   ::Array{NF,3}  # Gridpoint field of absolute temperature [K]
+    logp0_grid  :: Array{NF,2} # Gridpoint field of surface pressure logarithm [log(Pa)]
+    humid_grid  ::Array{NF,3}  # Gridpoint field of specific_humidity
+    geopot_grid ::Array{NF,3}  # Gridpoint field of geopotential
+    tr_grid     ::Array{NF,3}  # Gridpoint field of tracers
+    u_grid      ::Array{NF,3}  # Gridpoint field of zonal velocity
+    v_grid      ::Array{NF,3}  # Gridpoint field of meridional velocity
+
+
+    Tabs_grid_anomaly   ::Array{NF,3}  # Gridpoint field of absolute temperature anomaly [K]
+
+    
 end
+
+
+struct MiscellaneousVariables{NF<:AbstractFloat}
+    u_mean ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
+    v_mean ::Array{NF,2}  # Mean gridpoint meridional velocity over all levels
+    d_mean ::Array{NF,2}  # Mean gridpoint divergence over all levels
+
+    dumc ::Array{NF,3}  # Array for holding x/y gradients of surface pressure
+
+    px ::Array{NF,2}  # X Grad of pressure in grid point space 
+    py ::Array{NF,2}  # Y Grad of pressure in grid point space 
+
+
+    sigma_tend ::Array{NF,3} #vertical velocity in sigma coords
+    sigma_m    ::Array{NF,3}
+    puv ::Array{NF,3}
+
+    temp ::Array{NF,3} #temporary array? Or temperature? Used in zonal_wind_tendency!()
+
+    d_meanc ::Array{NF,2} #used in get_spectral_tendencies  
+    sigma_tend_c ::Array{NF,3} 
+    dumk ::Array{NF,3} 
+     
+ end
 
 """Struct holding the diagnostic variables."""
 struct DiagnosticVariables{NF<:AbstractFloat}
     tendencies  ::Tendencies{NF}
     gridvars    ::GridVariables{NF}
+    miscvars    ::MiscellaneousVariables{NF}
 end
