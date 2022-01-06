@@ -1,27 +1,34 @@
 @testset "FFT of geopotential" begin
 
-    P = Params(NF=Float64)
+    # original speedy T30 with 96x48 grid
+    P = Params(NF=Float64;trunc=30,nlat=48,nlon=96)
     G = GeoSpectral{P.NF}(P)
     B = Boundaries{P.NF}(P,G)
 
-    @test all(B.ϕ0trunc .≈ fourier_inverse(fourier(B.ϕ0trunc,G),G))
+    geopot_surf_spectral = B.geopot_surf
+    geopot_surf_grid = gridded(geopot_surf_spectral,G)
+
+    @test all(geopot_surf_grid .≈ fourier_inverse(fourier(geopot_surf_grid,G),G))
 end
 
 @testset "Legendre transform of geopotential" begin
 
-    P = Params(NF=Float64)
+    # original speedy T30 with 96x48 grid
+    P = Params(NF=Float64;trunc=30,nlat=48,nlon=96)
     G = GeoSpectral{P.NF}(P)
     B = Boundaries{P.NF}(P,G)
 
+    geopot_surf_spectral = B.geopot_surf
+    geopot_surf_grid = gridded(geopot_surf_spectral,G)
+
     # using the already spectrally truncated geopotential
-    @test all(B.ϕ0trunc .≈ gridded(spectral(B.ϕ0trunc,G),G))
+    @test all(geopot_surf_grid .≈ gridded(spectral(geopot_surf_grid,G),G))
 end
 
 @testset "Spectral transform of spectral noise" begin
     # original speedy T30 with 96x48 grid
     P = Params(NF=Float64;trunc=30,nlat=48,nlon=96)
     G = GeoSpectral{P.NF}(P)
-    B = Boundaries{P.NF}(P,G)
 
     mx = G.spectral.mx
     nx = G.spectral.nx

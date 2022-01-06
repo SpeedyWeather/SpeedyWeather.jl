@@ -4,13 +4,9 @@ Struct holding the parameters needed at runtime in number format NF.
 @with_kw struct Constants{NF<:AbstractFloat}
     R_earth::NF      # Radius of Earth
     Ω::NF            # Angular frequency of Earth's rotation
-    g::NF            # Gravitational acceleration
+    gravity::NF      # Gravitational acceleration
     akap::NF         # Ratio of gas constant to specific heat of dry air at constant pressure
     R::NF            # Gas constant
-    γ::NF            # Reference temperature lapse rate (-dT/dz in deg/km)
-    hscale::NF       # Reference scale height for pressure (in km)
-    hshum::NF        # Reference scale height for specific humidity (in km)
-    rh_ref::NF       # Reference relative humidity of near-surface air
 
     # TIME STEPPING
     Δt::NF                  # time step [s] 
@@ -26,7 +22,7 @@ Generator function for a Constants struct.
 """
 function Constants{NF}(P::Params) where NF      # number format NF
 
-    @unpack R_earth, Ω, g, akap, R, γ, hscale, hshum, rh_ref, Δt = P
+    @unpack R_earth, Ω, gravity, akap, R, Δt = P
     @unpack robert_filter, williams_filter = P
     @unpack tdrs = P
 
@@ -34,7 +30,7 @@ function Constants{NF}(P::Params) where NF      # number format NF
     sdrag = 1/(tdrs*3600)
 
     # This implies conversion to NF
-    return Constants{NF}(R_earth,Ω,g,akap,R,γ,hscale,hshum,rh_ref,
+    return Constants{NF}(   R_earth,Ω,gravity,akap,R,
                             Δt,robert_filter,williams_filter,
                             sdrag)
 end
