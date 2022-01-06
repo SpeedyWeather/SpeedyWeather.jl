@@ -17,7 +17,7 @@ orography, land-sea mask and albedo from an netCDF file and stores the in a
 function Boundaries{NF}(P::Params,
                         G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
-    @unpack boundary_path, boundary_file, g = P
+    @unpack boundary_path, boundary_file, gravity = P
 
     # LOAD NETCDF FILE
     if boundary_path == ""
@@ -34,8 +34,8 @@ function Boundaries{NF}(P::Params,
 
     # GEOPOTENTIAL
     # transform to spectral space and truncate
-    geopot_surf = spectral(g*orography,G)
+    geopot_surf = spectral(gravity*orography,G)
     spectral_truncation!(geopot_surf,G)
 
-    Boundaries{NF}(gepot_surf,landsea_mask,albedo)
+    Boundaries{NF}(geopot_surf,landsea_mask,albedo)
 end
