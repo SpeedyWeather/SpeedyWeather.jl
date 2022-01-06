@@ -66,8 +66,8 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
     # gravity:      Gravitational acceleration [m/s^2]
-    # R_earth:      Radius of Earth [m]
-    @unpack temp_ref, temp_top, lapse_rate, gravity, R_earth = P
+    # R:            Specific gas constant for dry air [J/kg/K]
+    @unpack temp_ref, temp_top, lapse_rate, gravity, R = P
 
     lapse_rate_scaled = lape_rate/gravity/1000      # Lapse rate scaled by gravity [K/m / (m²/s²)]
 
@@ -84,7 +84,7 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
     @unpack σ_full = G.geometry
 
     for k in 3:nlev
-        temp[:,:,k] .= temp_surf*σ_full[k]^(R_earth*lapse_rate_scaled)
+        temp[:,:,k] .= temp_surf*σ_full[k]^(R*lapse_rate_scaled)
     end
 end
 
@@ -101,9 +101,9 @@ function initiliaze_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # lo
     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
     # gravity:      Gravitational acceleration [m/s^2]
-    # R_earth:      Radius of Earth [m]
+    # R:            Specific gas constant for dry air [J/kg/K]
     # pres_ref:     Reference surface pressure [hPa]
-    @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R_earth = P
+    @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R = P
     @unpack geopot_surf = B                     # spectral surface geopotential
     geopot_surf_grid = gridded(geopot_surf,G)   # convert to grid-point space
 
@@ -114,7 +114,7 @@ function initiliaze_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # lo
     for j in 1:nlat
         for i in 1:nlon
             pres_surf_grid[i,j] = log_pres_ref + 
-                log(1 - lapse_rate_scaled*geopot_surf_grid[i,j]/temp_ref)/(R_earth*lapse_rate_scaled)
+                log(1 - lapse_rate_scaled*geopot_surf_grid[i,j]/temp_ref)/(R*lapse_rate_scaled)
         end
     end
 

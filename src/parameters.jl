@@ -17,7 +17,7 @@ With keywords such that default values can be changed at creation.
     # PHYSICAL CONSTANTS
     R_earth::Real=6.371e6   # Radius of Earth [m]
     Ω::Real=7.292e-5        # Angular frequency of Earth's rotation [1/s]
-    g::Real=9.81            # Gravitational acceleration [m/s^2]
+    gravity::Real=9.81      # Gravitational acceleration [m/s^2]
     akap::Real=2/7          # Ratio of gas constant to specific heat of dry air
                             # at constant pressure = 1 - 1/γ where γ is the
                             # heat capacity ratio of a perfect diatomic gas (7/5)
