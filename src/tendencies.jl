@@ -20,7 +20,7 @@
 #└───get_spectral_tendencies() ---> returns logp0_tend,Tabs_tend,div_tend
 #
 #
-# Note that get_spectral_tendencies() is quite badly named. It really modifies/updates the already calculated spectral tendencies
+# Note that get_spectral_tendencies() is quite badly named. It really modifies/updates the **already calculated** spectral tendencies
 # We are also currently dealing with tracers rather than e.g. humidity explicitly. For now, lets scrap tracers and just deal with humidity directly?
 # =========================================================================
 
@@ -102,7 +102,7 @@ function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic varia
     @unpack vor_grid,div_grid,Tabs_grid, geopot_grid,tr_grid ,u_grid, v_grid = Diag.gridvars
 
     #Unpack constants
-    @unpack nlev, n_trace,cp,nlat,nlon,coriol
+    @unpack nlev, n_trace,cp,nlat,nlon,coriol = C
 
 
     #1. Compute grid-point fields
@@ -165,7 +165,6 @@ function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic varia
 
 end
 
-
 """
 Compute non-linear tendencies in grid-point space from dynamics and add to physics tendencies. Convert total
 gridpoint tendencies to spectral tendencies.
@@ -210,13 +209,12 @@ function dynamics_tendencies(Prog::PrognosticVariables{NF}, # Prognostic variabl
     vor_div_tendency_and_corrections!(Diag,C)
 
 
-
+end
 
 """
 Convert a set of tendencies in grid point space to spectral space and calculate ...
 """
-function vor_div_tendency_and_corrections!(
-                                            Diag::PrognosticVariables{NF}
+function vor_div_tendency_and_corrections!( Diag::PrognosticVariables{NF},
                                             C::Constants{NF}
                                             ) where {NF<:AbstractFloat}
 
@@ -246,13 +244,13 @@ function vor_div_tendency_and_corrections!(
         Tabs_tend[:,:,k] = Tabs_tend[:,:,k] + convert_to_spectral(t_grid[:,:,k])
 
         #4. Tracer tendency
-        do itr = 1, n_trace
-            call vdspec(-u_grid[:,:,k]*tr_grid[:,:,k,itr], 
-                        -v_grid[:,:,k]*tr_grid[:,:,k,itr], 
-                        dumc[:,:,1], tr_tend[:,:,k,itr], 
-                        true)
+        for itr in 1:n_trace
+            vdspec!(-u_grid[:,:,k]*tr_grid[:,:,k,itr], 
+                    -v_grid[:,:,k]*tr_grid[:,:,k,itr], 
+                    dumc[:,:,1], tr_tend[:,:,k,itr], 
+                    true)
         tr_tend[:,:,k,itr] = tr_tend[:,:,k,itr] + convert_to_spectral(tr_grid[:,:,k,itr])
-    end do
+        end 
 
     end
 
