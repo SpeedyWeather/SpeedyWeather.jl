@@ -20,7 +20,7 @@ end
 """
 Generator function for a HorizontalDiffusion struct.
 """
-function HorizontalDiffusion{NF}(   P::Params,                      # Parameter struct
+function HorizontalDiffusion{NF}(   P::Parameters,                      # Parameter struct
                                     G::GeoSpectral{NF},             # Geometry and spectral struct
                                     B::Boundaries{NF}               # Boundaries struct
                                     ) where {NF<:AbstractFloat}    # Number format NF

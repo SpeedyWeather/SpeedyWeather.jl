@@ -15,7 +15,7 @@ module SpeedyWeather
     import BitInformation: round, round!
 
     export run_speedy, 
-        Params, GenLogisticCoefs,
+        Parameters, GenLogisticCoefs,
         GeoSpectral, Boundaries, Constants, Geometry,
         PrognosticVariables, DiagnosticVariables,
         fourier, fourier_inverse,

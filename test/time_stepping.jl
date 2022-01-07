@@ -10,7 +10,7 @@
 
     # loop over different precisions
     for NF in (Float16,Float32,Float64)
-        P = Params(NF=NF)
+        P = Parameters(NF=NF)
         C = Constants{NF}(P)
 
         # INITIAL CONDITIONS
@@ -41,7 +41,7 @@
     n_timesteps = round(Int,2π*n_rotations/(ω*Δt))
 
     for NF in (Float16,Float32,Float64)
-        P = Params(NF=NF)
+        P = Parameters(NF=NF)
         C = Constants{NF}(P)
 
         # INITIAL CONDITIONS
@@ -66,7 +66,7 @@
         @test M_RAW < 1
 
         # CHECK THAT NO WILLIAM'S FILTER IS WORSE
-        P = Params(NF=NF,williams_filter=1)     # Robert's filter only
+        P = Parameters(NF=NF,williams_filter=1)     # Robert's filter only
         C = Constants{NF}(P)
 
         # INITIAL CONDITIONS

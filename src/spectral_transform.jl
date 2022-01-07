@@ -30,13 +30,13 @@ struct GeoSpectral{NF<:AbstractFloat}
     spectral::SpectralTrans{NF}
 end
 
-function GeoSpectral{NF}(P::Params) where {NF<:AbstractFloat}
+function GeoSpectral{NF}(P::Parameters) where {NF<:AbstractFloat}
     G = Geometry{NF}(P)
     S = SpectralTrans{NF}(P,G)
     return GeoSpectral{NF}(G,S)
 end
 
-function SpectralTrans{NF}(P::Params,G::Geometry) where NF
+function SpectralTrans{NF}(P::Parameters,G::Geometry) where NF
 
     @unpack nlat, nlat_half = G
     @unpack R_earth, trunc = P

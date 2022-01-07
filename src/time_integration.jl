@@ -150,7 +150,7 @@ function time_stepping!(Prog::PrognosticVariables{NF},  # all prognostic variabl
                         C::Constants{NF},               # struct containing constants
                         G::GeoSpectral{NF},             # struct containing geometry and spectral transform constants
                         HD::HorizontalDiffusion{NF},    # struct containing horizontal diffusion constants
-                        P::Params                       # struct containing all model parameters
+                        P::Parameters                   # struct containing all model parameters
                         ) where {NF<:AbstractFloat}
     
     @unpack n_timesteps, Δt = C
