@@ -148,8 +148,8 @@ end
 """
 Transform a spectral array into grid-point space.
 """
-function gridded(   input::Array{Complex{NF},2},
-                    G::GeoSpectral{NF}) where {NF<:AbstractFloat}
+function gridded(  input::Array{Complex{NF},2},
+                   G::GeoSpectral{NF}) where {NF<:AbstractFloat}
     return fourier_inverse(legendre_inverse(input,G),G)
 end
 

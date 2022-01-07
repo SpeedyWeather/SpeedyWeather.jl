@@ -98,7 +98,7 @@ function timestep!( Prog::PrognosticVariables{NF},  # all prognostic variables
     @unpack sdrag = C
 
     # COMPUTE TENDENCIES OF PROGNOSTIC VARIABLES
-    get_tendencies!(Prog,Diag,l2)                   
+    get_tendencies!(Prog,Diag,l2,C)                   
 
     # DIFFUSION FOR WIND
     vor_l1 = view(vor,:,:,1,:)                                  # array view for leapfrog index
