@@ -42,6 +42,7 @@ With keywords such that default values can be changed at creation.
     # of the nlev vertical levels, defined by a generalised logistic function,
     # interpolating ECMWF's L31 configuration
     GLcoefs::GenLogisticCoefs=GenLogisticCoefs()
+    n_stratosphere_levels::Int=2    # number of vertical levels used for the stratosphere
 
     # DIFFUSION
     npowhd::Real=4          # Power of Laplacian in horizontal diffusion

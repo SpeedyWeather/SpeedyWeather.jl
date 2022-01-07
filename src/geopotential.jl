@@ -9,8 +9,8 @@ function geopotential!( geopot::Array{Complex{NF},3},       # spectral geopotent
 
     mx,nx,nlev = size(geopot)
 
-    @boundscheck size(ϕ) == size(Tabs) || throw(BoundsError())
-    @boundscheck (mx,nx) == size(ϕ0)   || throw(BoundsError())
+    @boundscheck size(geopot) == size(temp) || throw(BoundsError())
+    @boundscheck (mx,nx) == size(geopot_surf)   || throw(BoundsError())
 
     @unpack xgeop1, xgeop2, lapserate_correction = G.geometry
 
@@ -18,7 +18,7 @@ function geopotential!( geopot::Array{Complex{NF},3},       # spectral geopotent
     # is last index k=end, integration over half a layer
     for j in 1:nx
         for i in 1:mx
-            ϕ[i,j,end] = ϕ0[i,j] + xgeop1[end]*Tabs[i,j,end]
+            geopot[i,j,end] = geopot_surf[i,j] + xgeop1[end]*temp[i,j,end]
         end
     end
 
@@ -27,7 +27,7 @@ function geopotential!( geopot::Array{Complex{NF},3},       # spectral geopotent
     for k in nlev-1:-1:1
         for j in 1:nx
             for i in 1:mx
-                ϕ[i,j,k] = ϕ[i,j,k+1] + xgeop2[k+1]*Tabs[i,j,k+1] + xgeop1[k]*Tabs[i,j,k]
+                geopot[i,j,k] = geopot[i,j,k+1] + xgeop2[k+1]*temp[i,j,k+1] + xgeop1[k]*temp[i,j,k]
             end
         end
     end
@@ -36,8 +36,8 @@ function geopotential!( geopot::Array{Complex{NF},3},       # spectral geopotent
     # TODO only for spectral coefficients 1,: ?
     for k in 2:nlev-1
         for j in 1:nx
-            ϕ[1,j,k] = ϕ[1,j,k] +
-                    lapserate_correction[k-1]*(Tabs[1,j,k+1] - Tabs[1,j,k-1])
+            geopot[1,j,k] = geopot[1,j,k] +
+                    lapserate_correction[k-1]*(temp[1,j,k+1] - temp[1,j,k-1])
         end
     end
 end
