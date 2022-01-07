@@ -103,7 +103,9 @@ function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic varia
     @unpack vor_grid,div_grid,temp_grid, geopot_grid,tr_grid ,u_grid, v_grid = Diag.gridvars
 
     #Unpack constants
-    @unpack nlev, n_trace,cp,nlat,nlon,coriol = C
+    @unpack cp,coriol = C
+
+    nlat,nlon,nlev = size(vor_grid)
 
 
     #1. Compute grid-point fields
@@ -216,8 +218,8 @@ function vor_div_tendency_and_corrections!( Diag::PrognosticVariables{NF},
     @unpack u_tend, v_tend, vor_tend,div_tend = Diag.tendencies
     @unpack u_grid,v_grid,temp_grid_anomaly,tr_grid = Diag.gridvars
     @unpack dumc = Diag.miscvars
-    @unpack nlev,n_trace = C 
-
+    
+    _,_,nlev = size(u_tend)
 
     for k in 1:nlev
         #  1. Calculate vor and div spectral tendencies from u and v tendencies
@@ -268,7 +270,9 @@ function get_spectral_tendencies!(Prog::PrognosticVariables{NF},
     @unpack div,temp,pres_surf = Prog
     @unpack pres_surf_tend,temp_tend,div_tend = Diag.tendencies
     @unpack d_meanc, sigma_tend_c,dumk = Diag.miscvars
-    @unpack nlev,dhs,dhsr,tref,tref2,tref3 = C
+    @unpack dhs,dhsr,temp_ref,tref2,tref3 = C
+
+    _,_,nlev = size(div)
 
     # 1. Vertical mean divergence and pressure tendency 
     d_meanc[:,:] = 0.0
@@ -285,7 +289,7 @@ function get_spectral_tendencies!(Prog::PrognosticVariables{NF},
     end
 
     for k in 2:nlev
-        dumk[:,:,k] = sigma_tend_c[:,:,k]*(tref[k] - tref[k-1])
+        dumk[:,:,k] = sigma_tend_c[:,:,k]*(temp_ref[k] - temp_ref[k-1])
     end
 
     for k in 1:nlev
@@ -296,6 +300,6 @@ function get_spectral_tendencies!(Prog::PrognosticVariables{NF},
     # 3. Geopotential and divergence tendency
     geopotential!(geopot,ϕ0spectral,temp,G) # Paxton/Chantry have a geopotential call here. Do we actually need this?       
     for k in 1:nlev
-        div_tend[:,:,k] -= ∇²(geopot[:,:,k] + rgas*tref[k]*pres_surf[:,:,l2])
+        div_tend[:,:,k] -= ∇²(geopot[:,:,k] + rgas*temp_ref[k]*pres_surf[:,:,l2])
     end
 end
