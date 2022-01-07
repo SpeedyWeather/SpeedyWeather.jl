@@ -8,8 +8,8 @@ function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic 
                                    ) where {NF<:AbstractFloat}
 
 
-    @unpack logp0= Prog 
-    @unpack logp0_tend = Diag.Tendencies
+    @unpack pres_surf= Prog 
+    @unpack pres_surf_tend = Diag.Tendencies
 
     @unpack u_grid,v_grid,div_grid = Diag.gridvars
     @unpack u_mean,v_mean,d_mean,dumc,px,py = Diag.miscvars
@@ -28,12 +28,12 @@ function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic 
     end
 
     #Now use the mean fields
-    grad!(logp0[:,:,l2], dumc[:,:,2], dumc[:,:,3])
+    grad!(pres_surf[:,:,l2], dumc[:,:,2], dumc[:,:,3])
     px = convert_to_grid(dumc[:,:,2]*3600, scale=true)
     py = convert_to_grid(dumc[:,:,3]*3600, scale=true) #3600 factor from Paxton/Chantry. I think this is to correct for the underflow rescaling earlier
 
-    logp0_tend = convert_to_spectral(-u_mean.*px - v_mean.*py)
-    logp0_tend[1,1] = Complex{NF}(zero)
+    pres_surf_tend = convert_to_spectral(-u_mean.*px - v_mean.*py)
+    pres_surf_tend[1,1] = Complex{NF}(zero)
 
 end
 
@@ -74,11 +74,11 @@ function temperature_grid_anomaly!(Diag::PrognosticVariables{NF}, # Diagnostic v
                                    C::Constants{NF}
                                    ) where {NF<:AbstractFloat}
 
-    @unpack Tabs_grid,Tabs_grid_anomaly = Diag.gridvars
+    @unpack temp_grid,temp_grid_anomaly = Diag.gridvars
     @unpack nlev,tref = C  #Is tref a constant?
 
     for k in 1:nlev
-        Tabs_grid_anomaly[:,:,k] = Tabs_grid[:,:,k] .- tref[k] 
+        temp_grid_anomaly[:,:,k] = temp_grid[:,:,k] .- tref[k] 
     end
 
 end
@@ -95,8 +95,8 @@ function zonal_wind_tendency!(Diag::PrognosticVariables{NF}, # Diagnostic variab
                               )where {NF<:AbstractFloat}
     
     @unpack u_tend = Diag.Tendencies
-    @unpack u_grid,v_grid,vor_grid,Tabs_grid_anomaly= Diag.gridvars
-    @unpack sigma_tend,px,py,temp = Diag.miscvars
+    @unpack u_grid,v_grid,vor_grid,temp_grid_anomaly= Diag.gridvars
+    @unpack sigma_tend,px,py,arbitrary_array = Diag.miscvars
     @unpack nlev,rgas,dhsr = C 
 
 
@@ -104,19 +104,19 @@ function zonal_wind_tendency!(Diag::PrognosticVariables{NF}, # Diagnostic variab
     px = rgas*px
     py = rgas*py
 
-    #Initialise temp
-    temp[:,:,:] =0.0
+    #Initialise arbitrary_array
+    arbitrary_array[:,:,:] =0.0
 
   
     for k in 2:nlev
-        temp[:,:,k] = sigma_tend[:,:,k].*(u_grid[:,:,k] - u_grid[:,:,k-1])
+        arbitrary_array[:,:,k] = sigma_tend[:,:,k].*(u_grid[:,:,k] - u_grid[:,:,k-1])
     end
 
     for k in 1:nlev
         u_tend[:,:,k] = u_tend[:,:,k] 
                         + v_grid[:,:,k].*vor_grid[:,:,k] 
-                        - Tabs_grid_anomaly[:,:,k]*px
-                         - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
+                        - temp_grid_anomaly[:,:,k]*px
+                         - (arbitrary_array[:,:,k+1] + arbitrary_array[:,:,k])*dhsr[k]
     end
 
 end
@@ -131,20 +131,20 @@ function meridional_wind_tendency!(Diag::PrognosticVariables{NF}, # Diagnostic v
                                   )where {NF<:AbstractFloat}
 
     @unpack v_tend = Diag.Tendencies
-    @unpack vor_grid,u_grid,v_grid,Tabs_grid_anomaly =Diag.gridvars
-    @unpack sigma_tend,temp,px,py = Diag.miscvars
+    @unpack vor_grid,u_grid,v_grid,temp_grid_anomaly =Diag.gridvars
+    @unpack sigma_tend,arbitrary_array,px,py = Diag.miscvars
     @unpack nlev,dhsr= C 
 
 
     for k in 2:nlev
-        temp[:,:,k] = sigma_tend[:,:,k].*(v_grid[:,:,k] - v_grid[:,:,k-1])
+        arbitrary_array[:,:,k] = sigma_tend[:,:,k].*(v_grid[:,:,k] - v_grid[:,:,k-1])
     end
                             
     for k in 1:nlev
         v_tend[:,:,k] = v_tend[:,:,k] 
                         -u_grid[:,:,k].*vor_grid[:,:,k] 
-                        - Tabs_grid_anomaly[:,:,k]*py
-                        - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
+                        - temp_grid_anomaly[:,:,k]*py
+                        - (arbitrary_array[:,:,k+1] + arbitrary_array[:,:,k])*dhsr[k]
     end
 
 end
@@ -160,26 +160,26 @@ function temperature_tendency!(Diag::PrognosticVariables{NF}, # Diagnostic varia
                                C::Constants{NF}
                                )where {NF<:AbstractFloat}
     
-    @unpack Tabs_tend = Diag.Tendencies
-    @unpack div_grid,Tabs_grid_anomaly =Diag.gridvars
-    @unpack d_mean,temp,sigma_tend,sigma_m,puv= Diag.miscvars
+    @unpack temp_tend = Diag.Tendencies
+    @unpack div_grid,temp_grid_anomaly =Diag.gridvars
+    @unpack d_mean,arbitrary_array,sigma_tend,sigma_m,puv= Diag.miscvars
     @unpack tref,tref3,nlev,dhsr,fsgr,akap = C
 
 
 
 
     for k in 2:nlev
-        temp[:,:,k] = sigma_tend[:,:,k].*(Tabs_grid_anomaly[:,:,k] - Tabs_grid_anomaly[:,:,k-1])
+        arbitrary_array[:,:,k] = sigma_tend[:,:,k].*(temp_grid_anomaly[:,:,k] - temp_grid_anomaly[:,:,k-1])
                     + sigma_m[:,:,k].*(tref[k] - tref[k-1])
     end
 
     for k in 1:nlev
-        Tabs_tend[:,:,k] = Tabs_tend[:,:,k]
-                        + Tabs_grid_anomaly[:,:,k].*div_grid[:,:,k]
-                        - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
-                        + fsgr[k]*Tabs_grid_anomaly[:,:,k].*(sigma_tend[:,:,k+1] + sigma_tend[:,:,k])
+        temp_tend[:,:,k] = temp_tend[:,:,k]
+                        + temp_grid_anomaly[:,:,k].*div_grid[:,:,k]
+                        - (arbitrary_array[:,:,k+1] + arbitrary_array[:,:,k])*dhsr[k]
+                        + fsgr[k]*temp_grid_anomaly[:,:,k].*(sigma_tend[:,:,k+1] + sigma_tend[:,:,k])
                         + tref3[k]*(sigma_m[:,:,k+1] + sigma_m[:,:,k])
-                        + akap*(t_grid[:,:,k].*puv[:,:,k] - Tabs_grid_anomaly[:,:,k].*d_mean)
+                        + akap*(t_grid[:,:,k].*puv[:,:,k] - temp_grid_anomaly[:,:,k].*d_mean)
     end 
 
 
@@ -189,30 +189,27 @@ end
 
 
 """
-Compute the tracer tendency
+Compute the humidity tendency
 """
-function tracer_tendency!(Diag::PrognosticVariables{NF}, # Diagnostic variables
+function humidity_tendency!(Diag::PrognosticVariables{NF}, # Diagnostic variables
                           C::Constants{NF}
                           )where {NF<:AbstractFloat}
     
 
-    @unpack div_grid,tr_grid = Diag.gridvars
-    @unpack temp,sigma_tend= Diag.miscvars
-    @unpack n_trace,dhsr, nlev = C
+    @unpack div_grid,humid_grid = Diag.gridvars
+    @unpack arbitrary_array,sigma_tend= Diag.miscvars
+    @unpack dhsr, nlev = C
 
-
-    for itr in 1:n_trace
-        for k in 2:nlev
-            temp[:,:,k] = sigma_tend[:,:,k].*(tr_grid[:,:,k,itr] - tr_grid[:,:,k-1,itr])
-        end
-    
-        temp[:,:,2:3] .= zero
-    
-        for k in 1:nlev
-            tr_tend[:,:,k,itr] = tr_tend + tr_grid[:,:,k,itr].*div_grid[:,:,k]
-                - (temp[:,:,k+1] + temp[:,:,k])*dhsr[k]
-        end
+    for k in 2:nlev
+        arbitrary_array[:,:,k] = sigma_tend[:,:,k].*(humid_grid[:,:,k,itr] - humid_grid[:,:,k-1,itr])
     end
+    
+    arbitrary_array[:,:,2:3] .= zero
+    
+    for k in 1:nlev
+        humid_tend[:,:,k,itr] = humid_tend + humid_grid[:,:,k,itr].*div_grid[:,:,k]
+                - (arbitrary_array[:,:,k+1] + arbitrary_array[:,:,k])*dhsr[k]
+        end
 
 end
 

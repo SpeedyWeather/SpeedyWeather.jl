@@ -4,24 +4,25 @@
 #
 #get_tendencies()      
 #│
-#└───get_grid_point_tendencies() ---> returns vor_tend, div_tend,Tabs_tend,logp0_tend,tr_tend + some extras
+#└───get_grid_point_tendencies() ---> returns vor_tend, div_tend,temp_tend,pres_surf_tend,tr_tend + some extras
 #│   │   
 #│   │   
 #│   │
-#│   └───get_grid_point_fields()  
+#│   └───get_grid_point_fields() ---> Updates Diag.gridvars 
 #|   └───parametrization_tendencies()
-#|   └───dynamics_tendencies()
+#|   └───dynamics_tendencies() ---> Returns Diag.Tendencies 
 #│        │   
 #│        │   
 #│        │ 
 #|        └───`src/dynamics_tendencies.jl`
 #|        └───vor_div_tendency_and_corrections()
 #│   
-#└───get_spectral_tendencies() ---> returns logp0_tend,Tabs_tend,div_tend
+#└───get_spectral_tendencies() ---> returns pres_surf_tend,temp_tend,div_tend
 #
 #
 # Note that get_spectral_tendencies() is quite badly named. It really modifies/updates the **already calculated** spectral tendencies
 # We are also currently dealing with tracers rather than e.g. humidity explicitly. For now, lets scrap tracers and just deal with humidity directly?
+# Constants struct C will probably really be a model setup var M. See L22 of run_speedy.jl
 # =========================================================================
 
 
@@ -70,7 +71,7 @@ function get_grid_point_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic 
                                     ) where {NF<:AbstractFloat}
     
     #1. Convert spectral prognostic variables to grid point space
-    get_grid_point_fields!(Prog,Diag,l2,C) 
+    get_grid_point_fields!(Prog,Diag,l2,C) #Updates Diag.gridvars
  
     # 2. Parameterised physics tendencies. 
     #Needs to be defined in parameterisation_tendencies.jl. There is a lot of physics here, so would be best as separate, self-contained PR
@@ -78,7 +79,7 @@ function get_grid_point_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic 
 
 
     #3. Dynamics tendencies
-    dynamics_tendencies!(Prog,Diag,C) #Takes Prog.Grid and Diag.ParameterisedTendencies and calculates Diag.Tendencies in GP space
+    dynamics_tendencies!(Prog,Diag,C) #Takes Diag.gridvars and Diag.ParameterisedTendencies and calculates Diag.Tendencies 
 
 
 
@@ -96,10 +97,10 @@ function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic varia
 
 
     #Unpack spectral prognostic fields
-    @unpack vor,div,Tabs,logp0,humid,geopot,tr = Prog #tracers, tr, not currently in Prog. 
+    @unpack vor,div,temp,pres_surf,humid,geopot,tr = Prog 
 
     #Unpack the gridded counterparts. This is what we will be calculating in this subroutine
-    @unpack vor_grid,div_grid,Tabs_grid, geopot_grid,tr_grid ,u_grid, v_grid = Diag.gridvars
+    @unpack vor_grid,div_grid,temp_grid, geopot_grid,tr_grid ,u_grid, v_grid = Diag.gridvars
 
     #Unpack constants
     @unpack nlev, n_trace,cp,nlat,nlon,coriol = C
@@ -107,12 +108,12 @@ function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic varia
 
     #1. Compute grid-point fields
     #1.1 Update geopotential in spectral space
-    geopotential!(geopot,ϕ0spectral,Tabs,G)         # geopotential from surface geopotential. Need to get phi0_spectral and G from somewhere
+    geopotential!(geopot,ϕ0spectral,temp,G)         # geopotential from surface geopotential. Need to get phi0_spectral and G from somewhere
 
    for k in 1:nlev
         convert_to_grid!(vor[:,:,k,l2], vor_grid[:,:,k])  # vorticity 
         convert_to_grid!(div[:,:,k,l2], div_grid[:,:,k])  # divergence
-        convert_to_grid!(Tabs[:,:,k,l2],Tabs_grid[:,:,k]) # temperature
+        convert_to_grid!(temp[:,:,k,l2],temp_grid[:,:,k]) # temperature
 
 
         #Correct vorticity grid point field
@@ -121,12 +122,6 @@ function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic varia
                 vor_grid[i,j,k] += coriol[j] 
             end
         end
-
-        #Tracers
-        for itr in 1:n_trace 
-            convert_to_grid!(tr[:,:,k,l2,itr],tr_grid[:,:,k,itr] )
-        end
-
 
         #Calculate zonal velocity u and meridional velocity v in grid-point space,
         #from vorticity and divergence in spectral space
@@ -152,14 +147,14 @@ function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic varia
 
 
     #Surface pressure
-    convert_to_grid!(logp0[:,:,l2], logp0_grid)
+    convert_to_grid!(pres_surf[:,:,l2], pres_surf_grid)
 
 
     #Humidity
     #From Paxton/Chantry: "Don't transform the two stratospheric levels where humidity is set to zero
     # because it leads to overflows" 
     for k in 3:nlev
-        convert_to_grid!(tr[:,:,k,l2,1], humid_grid[:,:,k])
+        convert_to_grid!(humid[:,:,k,l2,1], humid_grid[:,:,k])
     end 
 
 
@@ -181,13 +176,13 @@ function dynamics_tendencies(Prog::PrognosticVariables{NF}, # Prognostic variabl
     # =========================================================================
 
     #1. Compute tendency of log(surface pressure)
-    surface_pressure_tendency!(Prog,Diag,l2,C)               # Calculates logp0_tend
+    surface_pressure_tendency!(Prog,Diag,l2,C)               # Calculates pres_surf_tend
 
     #2. Compute "vertical" velocity
     vertical_velocity_tendency!(Prog,Diag,C)                 # Calculates sigma_tend,sigma_m
 
     # 3. Subtract part of temperature field that is used as reference for implicit terms
-    temperature_grid_anomaly!(Diag,C)                        # Calculates Tabs_grid_anomaly
+    temperature_grid_anomaly!(Diag,C)                        # Calculates temp_grid_anomaly
 
     # 4. Zonal wind tendency
     zonal_wind_tendency!(Diag,C)                             # Calculates u_tend
@@ -196,15 +191,15 @@ function dynamics_tendencies(Prog::PrognosticVariables{NF}, # Prognostic variabl
     meridional_wind_tendency!(Diag,C)                        # Calculates v_tend
 
     # 6. Temperature tendency
-    temperature_tendency!(Diag,C)                            # Calculates Tabs_tend
+    temperature_tendency!(Diag,C)                            # Calculates temp_tend
 
-    # 7. Tracer tendency
-    tracer_tendency!(Diag,C)                                 # Calculates tr_tend
+    # 7. Humidity tendency
+    humidity_tendency!(Diag,C)                               # Calculates humid_tend
 
 
 
     # =========================================================================
-    # Calculate vor_tend,div_tend and then update Tabs_tend and tr_tend
+    # Calculate vor_tend,div_tend and then update temp_tend and tr_tend
     # =========================================================================
     vor_div_tendency_and_corrections!(Diag,C)
 
@@ -219,7 +214,7 @@ function vor_div_tendency_and_corrections!( Diag::PrognosticVariables{NF},
                                             ) where {NF<:AbstractFloat}
 
     @unpack u_tend, v_tend, vor_tend,div_tend = Diag.tendencies
-    @unpack u_grid,v_grid,Tabs_grid_anomaly,tr_grid = Diag.gridvars
+    @unpack u_grid,v_grid,temp_grid_anomaly,tr_grid = Diag.gridvars
     @unpack dumc = Diag.miscvars
     @unpack nlev,n_trace = C 
 
@@ -236,12 +231,12 @@ function vor_div_tendency_and_corrections!( Diag::PrognosticVariables{NF},
         
         #3. Temperature tendency
         # add div(vT) to spectral t tendency
-        vdspec!(-u_grid[:,:,k]*Tabs_grid_anomaly[:,:,k], 
-               -v_grid[:,:,k]*Tabs_grid_anomaly[:,:,k], 
-               dumc[:,:,1], Tabs_tend[:,:,k], 
+        vdspec!(-u_grid[:,:,k]*temp_grid_anomaly[:,:,k], 
+               -v_grid[:,:,k]*temp_grid_anomaly[:,:,k], 
+               dumc[:,:,1], temp_tend[:,:,k], 
                true)
     
-        Tabs_tend[:,:,k] = Tabs_tend[:,:,k] + convert_to_spectral(t_grid[:,:,k])
+        temp_tend[:,:,k] = temp_tend[:,:,k] + convert_to_spectral(t_grid[:,:,k])
 
         #4. Tracer tendency
         for itr in 1:n_trace
@@ -270,8 +265,8 @@ function get_spectral_tendencies!(Prog::PrognosticVariables{NF},
                                  ) where {NF<:AbstractFloat}
 
 
-    @unpack div,Tabs,logp0 = Prog
-    @unpack logp0_tend,Tabs_tend,div_tend = Diag.tendencies
+    @unpack div,temp,pres_surf = Prog
+    @unpack pres_surf_tend,temp_tend,div_tend = Diag.tendencies
     @unpack d_meanc, sigma_tend_c,dumk = Diag.miscvars
     @unpack nlev,dhs,dhsr,tref,tref2,tref3 = C
 
@@ -281,8 +276,8 @@ function get_spectral_tendencies!(Prog::PrognosticVariables{NF},
         d_meanc = d_meanc + div[:,:,k,l2]*dhs[k]
     end
 
-    logp0_tend = logp0_tend - d_meanc
-    logp0_tend[1,1] = Complex{RealType}(0.0)
+    pres_surf_tend = pres_surf_tend - d_meanc
+    pres_surf_tend[1,1] = Complex{RealType}(0.0)
 
     # 2. Sigma-dot "velocity" and temperature tendency
     for k in 1:nlev - 1
@@ -294,13 +289,13 @@ function get_spectral_tendencies!(Prog::PrognosticVariables{NF},
     end
 
     for k in 1:nlev
-        Tabs_tend[:,:,k] -= (dumk[:,:,k+1] + dumk[:,:,k])*dhsr[k]
+        temp_tend[:,:,k] -= (dumk[:,:,k+1] + dumk[:,:,k])*dhsr[k]
             + tref3[k]*(sigma_tend_c[:,:,k+1] + sigma_tend_c[:,:,k]) - tref2[k]*d_meanc
     end
 
     # 3. Geopotential and divergence tendency
-    geopotential!(geopot,ϕ0spectral,Tabs,G) # Paxton/Chantry have a geopotential call here. Do we actually need this?       
+    geopotential!(geopot,ϕ0spectral,temp,G) # Paxton/Chantry have a geopotential call here. Do we actually need this?       
     for k in 1:nlev
-        div_tend[:,:,k] -= ∇²(geopot[:,:,k] + rgas*tref[k]*logp0[:,:,l2])
+        div_tend[:,:,k] -= ∇²(geopot[:,:,k] + rgas*tref[k]*pres_surf[:,:,l2])
     end
 end
