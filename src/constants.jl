@@ -6,7 +6,7 @@ Struct holding the parameters needed at runtime in number format NF.
     Ω::NF            # Angular frequency of Earth's rotation
     gravity::NF      # Gravitational acceleration
     akap::NF         # Ratio of gas constant to specific heat of dry air at constant pressure
-    R::NF            # Gas constant
+    R::NF            # Gas constantσ
 
     # TIME STEPPING
     Δt::NF                  # time step [s] 
@@ -20,7 +20,7 @@ end
 """
 Generator function for a Constants struct.
 """
-function Constants{NF}(P::Params) where NF      # number format NF
+function Constants{NF}(P::Parameters) where NF      # number format NF
 
     @unpack R_earth, Ω, gravity, akap, R, Δt = P
     @unpack robert_filter, williams_filter = P
@@ -33,4 +33,4 @@ function Constants{NF}(P::Params) where NF      # number format NF
     return Constants{NF}(   R_earth,Ω,gravity,akap,R,
                             Δt,robert_filter,williams_filter,
                             sdrag)
-end
+end  
