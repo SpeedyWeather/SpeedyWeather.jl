@@ -6,7 +6,7 @@
     B = Boundaries{P.NF}(P,G)
 
     geopot_surf_spectral = B.geopot_surf
-    geopot_surf_grid = convert_to_grid(geopot_surf_convert_to_spectral,G)
+    geopot_surf_grid = convert_to_grid(geopot_surf_spectral,G)
 
     @test all(geopot_surf_grid .≈ fourier_inverse(fourier(geopot_surf_grid,G),G))
 end

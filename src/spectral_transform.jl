@@ -280,8 +280,8 @@ function vdspec!(   ug::Array{NF,2},
     end
 
     #TODO add spectral_trans and geometry as arguments
-    specu = spectral(ug1,G)
-    specv = spectral(vg1,G)
+    specu =convert_to_spectral(ug1,G)
+    specv =convert_to_spectral(vg1,G)
     vds!(specu, specv, vorm, divm)
 end
 
@@ -312,11 +312,11 @@ end
 function spectral_truncation(   input::AbstractArray{NF,2},
                                 G::GeoSpectral{NF}
                                 ) where NF
-    input_spectral = spectral(input,G)          # allocates memory
+    input_spectral =convert_to_spectral(input,G)          # allocates memory
     spectral_truncation!(input_spectral,G)      # in-place truncation
 
     # allocates memory to return spectrally truncated gridded field
-    return gridded(input_spectral, G)       
+    return convert_to_grid(input_spectral, G)       
 end
 
 """In-place version of spectral trunction of a grid-point field."""

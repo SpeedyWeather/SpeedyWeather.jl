@@ -11,9 +11,9 @@
     @test all(Prog.div .== 0)
 
     # test surface layer only at the moment
-    temp_grid = gridded(Prog.temp[:,:,end],G)
-    pres_surf_grid = gridded(Prog.pres_surf,G)
-    humid_grid = gridded(Prog.humid[:,:,end],G)
+    temp_grid = convert_to_grid(Prog.temp[:,:,end],G)
+    pres_surf_grid = convert_to_grid(Prog.pres_surf,G)
+    humid_grid = convert_to_grid(Prog.humid[:,:,end],G)
 
     # temperature between 200K and 350K everywhere
     @test all(temp_grid .> 200)
