@@ -169,7 +169,7 @@ function Implicit(T, geometry::Geometry, constants::Constants, params::Params,
              elz, σ_thick_x)
 end
 
-# Correct 
+# Correct tendencies for implicit gravity wave model
 #  Input/output : D_tend  = divergence tendency
 #                 Tₐ_tend = temperature tendency
 #                 pₛ_tend = tendency of log(surface pressure)

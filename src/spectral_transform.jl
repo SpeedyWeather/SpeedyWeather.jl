@@ -148,8 +148,8 @@ end
 """
 Transform a spectral array into grid-point space.
 """
-function gridded(input::Array{Complex{NF},2},
-                         G::GeoSpectral{NF}) where {NF<:AbstractFloat}
+function gridded(  input::Array{Complex{NF},2},
+                   G::GeoSpectral{NF}) where {NF<:AbstractFloat}
     return fourier_inverse(legendre_inverse(input,G),G)
 end
 
@@ -280,8 +280,8 @@ function vdspec!(   ug::Array{NF,2},
     end
 
     #TODO add spectral_trans and geometry as arguments
-    specu =spectral(ug1,G)
-    specv =spectral(vg1,G)
+    specu = spectral(ug1,G)
+    specv = spectral(vg1,G)
     vds!(specu, specv, vorm, divm)
 end
 
@@ -312,7 +312,7 @@ end
 function spectral_truncation(   input::AbstractArray{NF,2},
                                 G::GeoSpectral{NF}
                                 ) where NF
-    input_spectral =spectral(input,G)          # allocates memory
+    input_spectral = spectral(input,G)          # allocates memory
     spectral_truncation!(input_spectral,G)      # in-place truncation
 
     # allocates memory to return spectrally truncated gridded field
@@ -326,7 +326,7 @@ function spectral_truncation!(  input::AbstractArray{NF,2},
                                 ) where NF
     spectral!(input_spectral,input,G)       # in-place spectral transform from input to input_spectral
     spectral_truncation!(input_spectral,G)  # in-place truncation
-    gridded(input,input_spectral,G)        # in-place backtransform
+    gridded!(input,input_spectral,G)        # in-place backtransform
 end
 
 function spectral_truncation!(  input::Array{NF,2},
