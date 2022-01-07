@@ -2,7 +2,7 @@
 Parameter struct that holds all parameters that define the default model setup.
 With keywords such that default values can be changed at creation.
 """
-@with_kw struct Params
+@with_kw struct Parameters
 
     # NUMBER FORMATS
     NF::DataType=Float64    # number format

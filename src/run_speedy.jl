@@ -8,7 +8,7 @@ function run_speedy(::Type{NF}=Float64;         # number format, use Float64 as 
                     kwargs...                   # all additional non-default parameters
                     ) where {NF<:AbstractFloat}
 
-    P = Params(NF=NF,kwargs...)
+    P = Parameters(NF=NF,kwargs...)
     C = Constants{NF}(P)
     G = GeoSpectral{NF}(P)
     B = Boundaries{NF}(P,G)

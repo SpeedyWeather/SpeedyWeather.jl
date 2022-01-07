@@ -8,7 +8,7 @@ struct PrognosticVariables{NF<:AbstractFloat}
 end
 
 """Initialize prognostic variables from rest or restart from file."""
-function initial_conditions(    P::Params,                      # Parameter struct
+function initial_conditions(    P::Parameters,                  # Parameter struct
                                 B::Boundaries{NF},              # Boundaries struct
                                 G::GeoSpectral{NF}              # GeoSpectral struct
                                 ) where {NF<:AbstractFloat}     # number format NF
@@ -29,7 +29,7 @@ end
 """Initialize a PrognosticVariables struct for an atmosphere at rest. No winds,
 hence zero vorticity and divergence, but temperature, pressure and humidity are
 initialised """
-function initialize_from_rest(  P::Params,
+function initialize_from_rest(  P::Parameters,
                                 B::Boundaries{NF},
                                 G::GeoSpectral{NF}
                                 ) where {NF<:AbstractFloat}
@@ -55,7 +55,7 @@ end
 """Initialize spectral temperature from surface absolute temperature and constant
 lapse rate (troposphere) and zero lapse rate (stratosphere)."""
 function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectral temperature in 3D
-                                    P::Params,                          # Parameters struct
+                                    P::Parameters,                      # Parameters struct
                                     B::Boundaries{NF},                  # Boundaries struct
                                     G::GeoSpectral{NF}                  # Geospectral struct
                                     ) where {NF<:AbstractFloat}         # number format NF
@@ -95,7 +95,7 @@ end
 
 """Initialize the logarithm of surface pressure `logp0` consistent with temperature profile."""
 function initialize_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # logarithm of surface pressure
-                                P::Params,                                  # Parameters struct
+                                P::Parameters,                              # Parameters struct
                                 B::Boundaries{NF},                          # Boundaries struct
                                 G::GeoSpectral{NF}                          # Geospectral struct
                                 ) where {NF<:AbstractFloat}                 # number format NF
@@ -132,7 +132,7 @@ end
 """Initialize specific humidity in spectral space."""
 function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},    # spectral specific humidity
                                 pres_surf_grid::AbstractArray{NF,2},    # logarithm of surface pressure (grid space)
-                                P::Params,                              # Parameters struct
+                                P::Parameters,                          # Parameters struct
                                 G::GeoSpectral{NF}                      # Geospectral struct
                                 ) where {NF<:AbstractFloat}             # number format NF
 
