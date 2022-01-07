@@ -30,7 +30,7 @@ end
 # terms anyway to reduce roundoff error; also the constants needed for
 # the biharmonic diffusion, which is assumed always to be backwards
 # implicit, are defined in initialize_implicit)
-function Implicit(T, geometry::Geometry, constants::Constants, params::Params,
+function Implicit(T, geometry::Geometry, constants::Constants, params::Parameters,
                   horizontal_diffusion::HorizontalDiffusion, Δt)
     @unpack nlev, mx, nx, σ_half, σ_full, σ_thick = geometry
     @unpack Rₑ, g, akap, R, γ = constants

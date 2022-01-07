@@ -1,7 +1,7 @@
 @testset "FFT of geopotential" begin
 
     # original speedy T30 with 96x48 grid
-    P = Params(NF=Float64;trunc=30,nlat=48,nlon=96)
+    P = Parameters(NF=Float64;trunc=30,nlat=48,nlon=96)
     G = GeoSpectral{P.NF}(P)
     B = Boundaries{P.NF}(P,G)
 
@@ -14,7 +14,7 @@ end
 @testset "Legendre transform of geopotential" begin
 
     # original speedy T30 with 96x48 grid
-    P = Params(NF=Float64;trunc=30,nlat=48,nlon=96)
+    P = Parameters(NF=Float64;trunc=30,nlat=48,nlon=96)
     G = GeoSpectral{P.NF}(P)
     B = Boundaries{P.NF}(P,G)
 
@@ -27,7 +27,7 @@ end
 
 @testset "Spectral transform of spectral noise" begin
     # original speedy T30 with 96x48 grid
-    P = Params(NF=Float64;trunc=30,nlat=48,nlon=96)
+    P = Parameters(NF=Float64;trunc=30,nlat=48,nlon=96)
     G = GeoSpectral{P.NF}(P)
 
     mx = G.spectral.mx

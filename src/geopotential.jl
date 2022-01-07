@@ -1,13 +1,13 @@
 """
-Compute spectral geopotential `ϕ` from spectral temperature `Tabs`
-and spectral topography `ϕ0`.
+Compute spectral geopotential `geopot` from spectral temperature `temp`
+and spectral surface geopotential `geopot_surf` (orography*gravity).
 """
-function geopotential!( ϕ::Array{Complex{NF},3},      # geopotential
-                        ϕ0::Array{Complex{NF},2},     # surface geopotential
-                        Tabs::Array{Complex{NF},3},   # absolute Temperature
+function geopotential!( geopot::Array{Complex{NF},3},       # spectral geopotential
+                        geopot_surf::Array{Complex{NF},2},  # spectral surface geopotential
+                        temp::Array{Complex{NF},3},         # spectral absolute Temperature
                         G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
-    mx,nx,nlev = size(ϕ)
+    mx,nx,nlev = size(geopot)
 
     @boundscheck size(ϕ) == size(Tabs) || throw(BoundsError())
     @boundscheck (mx,nx) == size(ϕ0)   || throw(BoundsError())

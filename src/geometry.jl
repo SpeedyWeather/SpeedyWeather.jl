@@ -45,7 +45,7 @@ end
 """
 Defines the geometry.
 """
-function Geometry{NF}(P::Params) where NF
+function Geometry{NF}(P::Parameters) where NF
 
     @unpack nlon,nlat,nlev,trunc = P
     @unpack R,Ω,akap = P
@@ -113,7 +113,7 @@ fraction of surface pressure (p/p0) and are sorted from top (stratosphere) to bo
 The first half level is at 0 the last at 1. Evaluate a generalised logistic function with
 coefficients in `P` for the distribution of values in between. Default coefficients follow
 the L31 configuration historically used at ECMWF."""
-function vertical_coordinates(P::Params)
+function vertical_coordinates(P::Parameters)
     @unpack nlev,GLcoefs = P
 
     halflevels_normalised = range(0,1,nlev+1)

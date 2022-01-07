@@ -1,5 +1,5 @@
 """Checks output folders to determine a 4-digit run id number."""
-function get_run_id_path(P::Params)
+function get_run_id_path(P::Parameters)
 
     @unpack output,outpath = P
 
@@ -19,7 +19,7 @@ end
 
 function output_initialise( Diag::DiagnosticVariables,   # output grid-space variables only
                             G::GeoSpectral,
-                            P::Params)
+                            P::Parameters)
 
     @unpack nlon,nlat,nlev = G.geometry
     @unpack lon,lat = G.geometry
@@ -70,7 +70,7 @@ function write_output!( iout::Int,
                         t::Real,
                         ncfile::NcFile,
                         Diag::DiagnosticVariables,
-                        P::Params)
+                        P::Parameters)
 
     @unpack u,v,Tabs,humid,logp0 = Diag.gridvars
     @unpack keepbits = P

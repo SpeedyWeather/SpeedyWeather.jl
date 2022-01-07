@@ -1,6 +1,6 @@
 struct Model
     T::DataType
-    params::Params
+    params::Parameters
     constants::Constants
     geometry::Geometry
     current_datetime::DateTime
@@ -52,7 +52,7 @@ function Model(;
 
     current_datetime = start_datetime
 
-    params = Params(n_diag, n_steps_day, 86400.0/real_type(n_steps_day), real_type(0.5),)
+    params = Parameters(n_diag, n_steps_day, 86400.0/real_type(n_steps_day), real_type(0.5),)
     constants = Constants(real_type, Rₑ, Ω, g, akap, R, γ, hscale, hshum, refrh1)
     geometry = Geometry(real_type, constants, nlon, nlat, nlev, trunc)
     spectral_trans = SpectralTrans(real_type, geometry, constants.Rₑ)
