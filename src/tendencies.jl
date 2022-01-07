@@ -111,9 +111,9 @@ function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic varia
     geopotential!(geopot,ϕ0spectral,temp,G)         # geopotential from surface geopotential. Need to get phi0_spectral and G from somewhere
 
    for k in 1:nlev
-        convert_to_grid!(vor[:,:,k,l2], vor_grid[:,:,k])  # vorticity 
-        convert_to_grid!(div[:,:,k,l2], div_grid[:,:,k])  # divergence
-        convert_to_grid!(temp[:,:,k,l2],temp_grid[:,:,k]) # temperature
+        gridded(vor[:,:,k,l2], vor_grid[:,:,k])  # vorticity 
+        gridded(div[:,:,k,l2], div_grid[:,:,k])  # divergence
+        gridded(temp[:,:,k,l2],temp_grid[:,:,k]) # temperature
 
 
         #Correct vorticity grid point field
@@ -128,7 +128,7 @@ function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic varia
         uvspec!(vor[:,:,k,l2], div[:,:,k,l2], u_grid[:,:,k],v_grid[:,:,k])
 
         #Geopotential. Normalised by cp to avoid overflows. Feature from Paxton/Chantry
-        convert_to_grid(geopot[:,:,k]*(1/cp),geopot_grid[:,:,k]) 
+        gridded(geopot[:,:,k]*(1/cp),geopot_grid[:,:,k]) 
 
    end
 
@@ -147,14 +147,14 @@ function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic varia
 
 
     #Surface pressure
-    convert_to_grid!(pres_surf[:,:,l2], pres_surf_grid)
+    gridded(pres_surf[:,:,l2], pres_surf_grid)
 
 
     #Humidity
     #From Paxton/Chantry: "Don't transform the two stratospheric levels where humidity is set to zero
     # because it leads to overflows" 
     for k in 3:nlev
-        convert_to_grid!(humid[:,:,k,l2,1], humid_grid[:,:,k])
+        gridded(humid[:,:,k,l2,1], humid_grid[:,:,k])
     end 
 
 
@@ -225,7 +225,7 @@ function vor_div_tendency_and_corrections!( Diag::PrognosticVariables{NF},
 
         #2. Divergence tendency
         #add -laplacian(0.5*(u**2+v**2)) to divergence tendency
-        dumc[:,:,1] = convert_to_spectral(0.50*(u_grid[:,:,k]^2 + v_grid[:,:,k]^2))
+        dumc[:,:,1] = spectral(0.50*(u_grid[:,:,k]^2 + v_grid[:,:,k]^2))
         div_tend[:,:,k] = div_tend[:,:,k] - laplacian(dumc[:,:,1]) 
 
         
@@ -236,7 +236,7 @@ function vor_div_tendency_and_corrections!( Diag::PrognosticVariables{NF},
                dumc[:,:,1], temp_tend[:,:,k], 
                true)
     
-        temp_tend[:,:,k] = temp_tend[:,:,k] + convert_to_spectral(t_grid[:,:,k])
+        temp_tend[:,:,k] = temp_tend[:,:,k] + spectral(t_grid[:,:,k])
 
         #4. Tracer tendency
         for itr in 1:n_trace
@@ -244,7 +244,7 @@ function vor_div_tendency_and_corrections!( Diag::PrognosticVariables{NF},
                     -v_grid[:,:,k]*tr_grid[:,:,k,itr], 
                     dumc[:,:,1], tr_tend[:,:,k,itr], 
                     true)
-        tr_tend[:,:,k,itr] = tr_tend[:,:,k,itr] + convert_to_spectral(tr_grid[:,:,k,itr])
+        tr_tend[:,:,k,itr] = tr_tend[:,:,k,itr] + spectral(tr_grid[:,:,k,itr])
         end 
 
     end

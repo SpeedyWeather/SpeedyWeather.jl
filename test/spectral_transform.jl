@@ -6,7 +6,7 @@
     B = Boundaries{P.NF}(P,G)
 
     geopot_surf_spectral = B.geopot_surf
-    geopot_surf_grid = convert_to_grid(geopot_surf_spectral,G)
+    geopot_surf_grid = gridded(geopot_surf_spectral,G)
 
     @test all(geopot_surf_grid .≈ fourier_inverse(fourier(geopot_surf_grid,G),G))
 end
@@ -19,10 +19,10 @@ end
     B = Boundaries{P.NF}(P,G)
 
     geopot_surf_spectral = B.geopot_surf
-    geopot_surf_grid = convert_to_grid(geopot_surf_spectral,G)
+    geopot_surf_grid = gridded(geopot_surf_spectral,G)
 
     # using the already spectrally truncated geopotential
-    @test all(geopot_surf_grid .≈ convert_to_grid(convert_to_spectral(geopot_surf_grid,G),G))
+    @test all(geopot_surf_grid .≈ gridded(spectral(geopot_surf_grid,G),G))
 end
 
 @testset "Spectral transform of spectral noise" begin
@@ -34,11 +34,11 @@ end
     nx = G.spectral.nx
 
     A = rand(mx,nx) + im*rand(mx,nx)
-    At = convert_to_spectral(convert_to_grid(A,G),G)   # the first transform includes truncation
+    At = spectral(gridded(A,G),G)   # the first transform includes truncation
 
     # the next should be exact to machine precision
-    At2 = convert_to_spectral(convert_to_grid(At,G),G)
-    At3 = convert_to_spectral(convert_to_grid(At2,G),G)
+    At2 = spectral(gridded(At,G),G)
+    At3 = spectral(gridded(At2,G),G)
     @test all(At .≈ At2)
     @test all(At2 .≈ At3)
 end

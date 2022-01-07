@@ -148,7 +148,7 @@ end
 """
 Transform a spectral array into grid-point space.
 """
-function convert_to_grid(input::Array{Complex{NF},2},
+function gridded(input::Array{Complex{NF},2},
                          G::GeoSpectral{NF}) where {NF<:AbstractFloat}
     return fourier_inverse(legendre_inverse(input,G),G)
 end
@@ -156,7 +156,7 @@ end
 """
 Transform a gridded array into spectral space.
 """
-function convert_to_spectral(  input::Array{NF,2},
+function spectral(  input::Array{NF,2},
                     G::GeoSpectral{NF}) where {NF<:AbstractFloat}
     return legendre(fourier(input,G),G)
 end
@@ -280,8 +280,8 @@ function vdspec!(   ug::Array{NF,2},
     end
 
     #TODO add spectral_trans and geometry as arguments
-    specu =convert_to_spectral(ug1,G)
-    specv =convert_to_spectral(vg1,G)
+    specu =spectral(ug1,G)
+    specv =spectral(vg1,G)
     vds!(specu, specv, vorm, divm)
 end
 
@@ -312,11 +312,11 @@ end
 function spectral_truncation(   input::AbstractArray{NF,2},
                                 G::GeoSpectral{NF}
                                 ) where NF
-    input_spectral =convert_to_spectral(input,G)          # allocates memory
+    input_spectral =spectral(input,G)          # allocates memory
     spectral_truncation!(input_spectral,G)      # in-place truncation
 
     # allocates memory to return spectrally truncated gridded field
-    return convert_to_grid(input_spectral, G)       
+    return gridded(input_spectral, G)       
 end
 
 """In-place version of spectral trunction of a grid-point field."""
@@ -326,7 +326,7 @@ function spectral_truncation!(  input::AbstractArray{NF,2},
                                 ) where NF
     spectral!(input_spectral,input,G)       # in-place spectral transform from input to input_spectral
     spectral_truncation!(input_spectral,G)  # in-place truncation
-    gridded!(input,input_spectral,G)        # in-place backtransform
+    gridded(input,input_spectral,G)        # in-place backtransform
 end
 
 function spectral_truncation!(  input::Array{NF,2},

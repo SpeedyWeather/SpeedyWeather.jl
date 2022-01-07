@@ -29,10 +29,10 @@ function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic 
 
     #Now use the mean fields
     grad!(pres_surf[:,:,l2], dumc[:,:,2], dumc[:,:,3])
-    px = convert_to_grid(dumc[:,:,2]*3600, scale=true)
-    py = convert_to_grid(dumc[:,:,3]*3600, scale=true) #3600 factor from Paxton/Chantry. I think this is to correct for the underflow rescaling earlier
+    px = gridded(dumc[:,:,2]*3600, scale=true)
+    py = gridded(dumc[:,:,3]*3600, scale=true) #3600 factor from Paxton/Chantry. I think this is to correct for the underflow rescaling earlier
 
-    pres_surf_tend = convert_to_spectral(-u_mean.*px - v_mean.*py)
+    pres_surf_tend = spectral(-u_mean.*px - v_mean.*py)
     pres_surf_tend[1,1] = Complex{NF}(zero)
 
 end

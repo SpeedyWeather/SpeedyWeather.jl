@@ -1,4 +1,4 @@
-using SpeedyWeather
+#using SpeedyWeather
 using Test
 
 include("spectral_transform.jl")

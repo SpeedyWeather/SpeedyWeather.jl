@@ -86,11 +86,11 @@ function HorizontalDiffusion{NF}(   P::Params,                      # Parameter 
         end
     end
 
-    tcorh = convert_to_spectral(corh,G) # correction in spectral space
+    tcorh = spectral(corh,G) # correction in spectral space
 
     # Orographic correction terms for humidity (horizontal component)
     corh .= rh_ref                  # relative humidity reference value
-    qcorh = convert_to_spectral(corh)
+    qcorh = spectral(corh)
 
     # convert to NF here
     return HorizontalDiffusion{NF}( dmp,dmpd,dmps,

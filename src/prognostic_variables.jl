@@ -110,7 +110,7 @@ function initialize_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # lo
     # pres_ref:     Reference surface pressure [hPa]
     @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R = P
     @unpack geopot_surf = B                     # spectral surface geopotential
-    geopot_surf_grid =convert_to_grid(geopot_surf,G)   # convert to grid-point space
+    geopot_surf_grid =gridded(geopot_surf,G)   # convert to grid-point space
 
     lapse_rate_scaled = lapse_rate/gravity/1000  # Lapse rate scaled by gravity [K/m / (m²/s²)]
     log_pres_ref = log(pres_ref)                # logarithm of reference surface pressure
@@ -123,7 +123,7 @@ function initialize_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # lo
         end
     end
 
-    pres_surf .=convert_to_spectral(pres_surf_grid,G) # convert to spectral space
+    pres_surf .=spectral(pres_surf_grid,G) # convert to spectral space
     spectral_truncation!(pres_surf,G)       # truncate in spectral space
 
     return pres_surf_grid                   # return grid for use in initialize_humidity!
@@ -152,7 +152,7 @@ function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},    # spectr
     humid_surf_grid = humid_ref*exp.(scale_height_ratio*pres_surf_grid)
 
     # Convert to spectral space and truncate
-    humid_surf =convert_to_spectral(humid_surf_grid,G)
+    humid_surf =spectral(humid_surf_grid,G)
     spectral_truncation!(humid_surf,G)
 
     # stratospheric humidity zero
