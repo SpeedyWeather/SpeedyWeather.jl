@@ -17,11 +17,12 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     lat::Array{NF,1}    # array of latitudes
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
-    σ_half::Array{NF,1}         # σ at half levels
-    σ_full::Array{NF,1}         # σ at full levels
-    σ_thick::Array{NF,1}        # σ thicknesses
-    σ_half⁻¹_2::Array{NF,1}     # 1/(2σ_full)       #TODO rename?
-    σ_f::Array{NF,1}            # akap/(2σ_thick)   #TODO rename?
+    n_stratosphere_levels::Int      # number of upper levels for stratosphere
+    σ_levels_half::Array{NF,1}      # σ at half levels
+    σ_levels_full::Array{NF,1}      # σ at full levels
+    σ_levels_thick::Array{NF,1}     # σ level thicknesses
+    σ_levels_half⁻¹_2::Array{NF,1}  # 1/(2σ_levels_full)       #TODO rename?
+    σ_f::Array{NF,1}                # akap/(2σ_levels_thick)   #TODO rename?
 
     # SINES AND COSINES OF LATITUDE
     sinlat::Array{NF,1}         # sin of latitudes
@@ -49,6 +50,7 @@ function Geometry{NF}(P::Parameters) where NF
 
     @unpack nlon,nlat,nlev,trunc = P
     @unpack R,Ω,akap = P
+    @unpack n_stratosphere_levels = P
 
     nlat_half = nlat ÷ 2
     nlon_half = nlon ÷ 2
@@ -63,12 +65,12 @@ function Geometry{NF}(P::Parameters) where NF
 
     # VERTICAL SIGMA COORDINATE 
     # σ = p/p0 (fraction of surface pressure)
-    # sorted such that σ_half[end] is at the planetary boundary
-    σ_half = vertical_coordinates(P)
-    σ_full = 0.5*(σ_half[2:end] + σ_half[1:end-1])
-    σ_thick = σ_half[2:end] - σ_half[1:end-1]
-    σ_half⁻¹_2 = 1 ./ (2σ_thick)
-    σ_f = akap ./ (2σ_full)
+    # sorted such that σ_levels_half[end] is at the planetary boundary
+    σ_levels_half = vertical_coordinates(P)
+    σ_levels_full = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])
+    σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
+    σ_levels_half⁻¹_2 = 1 ./ (2σ_levels_thick)
+    σ_f = akap ./ (2σ_levels_full)
 
     # SINES AND COSINES OF LATITUDE
     sinlat = sind.(lat)
@@ -87,9 +89,9 @@ function Geometry{NF}(P::Parameters) where NF
     xgeop1 = zeros(nlev)
     xgeop2 = zeros(nlev)
     for k in 1:nlev
-        xgeop1[k] = R*log(σ_half[k+1]/σ_half[k])
+        xgeop1[k] = R*log(σ_levels_half[k+1]/σ_levels_half[k])
         if k != nlev
-            xgeop2[k+1] = R*log(σ_full[k+1]/σ_half[k+1])
+            xgeop2[k+1] = R*log(σ_levels_full[k+1]/σ_levels_half[k+1])
         end
     end
 
@@ -97,18 +99,19 @@ function Geometry{NF}(P::Parameters) where NF
     lapserate_correction = zeros(nlev-2)
     for k in 2:nlev-1
         lapserate_correction[k-1] = 0.5*xgeop1[k]*
-                    log(σ_half[k+1]/σ_full[k]) / log(σ_full[k+1]/σ_full[k-1])
+                    log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
     end
 
     # conversion to number format NF happens here
     Geometry{NF}(nlon,nlat,nlev,nlat_half,nlon_half,
                 dlon,dlat,lon,lat,
-                σ_half,σ_full,σ_thick,σ_half⁻¹_2,σ_f,
+                n_stratosphere_levels,
+                σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
                 sinlat,coslat,sinlat_NH,coslat_NH,radang,
                 cosg,cosg⁻¹,cosg⁻²,f,xgeop1,xgeop2,lapserate_correction)
 end
 
-"""Vertical sigma coordinates defined by their nlev+1 half levels `σ_half`. Sigma coordinates are
+"""Vertical sigma coordinates defined by their nlev+1 half levels `σ_levels_half`. Sigma coordinates are
 fraction of surface pressure (p/p0) and are sorted from top (stratosphere) to bottom (surface).
 The first half level is at 0 the last at 1. Evaluate a generalised logistic function with
 coefficients in `P` for the distribution of values in between. Default coefficients follow
@@ -116,13 +119,13 @@ the L31 configuration historically used at ECMWF."""
 function vertical_coordinates(P::Parameters)
     @unpack nlev,GLcoefs = P
 
-    halflevels_normalised = range(0,1,nlev+1)
-    σ_half = generalised_logistic(halflevels_normalised,GLcoefs)
-    σ_half[1] = 0           # topmost half-level is at 0 pressure
-    σ_half[end] = 1         # lowermost half-level is at p=p_surface
+    halflevels_normalised = range(0,1,nlev+1)   # normalised = level/nlev 
+    σ_levels_half = generalised_logistic(halflevels_normalised,GLcoefs)
+    σ_levels_half[1] = 0           # topmost half-level is at 0 pressure
+    σ_levels_half[end] = 1         # lowermost half-level is at p=p_surface
 
-    @assert isincreasing(σ_half) "Vertical coordinates are not increasing."
-    return σ_half
+    @assert isincreasing(σ_levels_half) "Vertical coordinates are not increasing."
+    return σ_levels_half
 end
 
 """Generalised logistic function based on the coefficients in `coefs`."""

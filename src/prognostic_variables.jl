@@ -69,25 +69,26 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
     # gravity:      Gravitational acceleration [m/s^2]
     # R:            Specific gas constant for dry air [J/kg/K]
     @unpack temp_ref, temp_top, lapse_rate, gravity, R = P
+    @unpack n_stratosphere_levels = P
 
-    lapse_rate_scaled = lapse_rate/gravity/1000      # Lapse rate scaled by gravity [K/m / (m²/s²)]
+    lapse_rate_scaled = lapse_rate/gravity/1000     # Lapse rate scaled by gravity [K/m / (m²/s²)]
 
     temp_surf = -lapse_rate_scaled*geopot_surf      # spectral surface air temperature from orography and lapse rate
     temp_surf[1,1] += Complex(√2*temp_ref)          # adjust mean value (spectral coefficient 1,1) with temp_ref
 
     # Stratosphere, set the first spectral coefficient (=mean value)
-    # in two uppermost levels (i.e. k=1,2) for lapse rate = 0
-    #TODO why √2? (normalisation?)
-    temp[1,1,1] = Complex(√2*temp_top)
-    temp[1,1,2] = Complex(√2*temp_top)
+    # in uppermost levels (default: k=1,2) for lapse rate = 0
+    for k in 1:n_stratosphere_levels
+        temp[1,1,k] = Complex(√2*temp_top)
+    end
 
     # Temperature at tropospheric levels
-    @unpack σ_full = G.geometry
+    @unpack σ_levels_full = G.geometry
 
-    for k in 3:nlev
+    for k in n_stratosphere_levels+1:nlev
         for j in 1:nx
             for i in 1:mx
-                temp[i,j,k] = temp_surf[i,j]*σ_full[k]^(R*lapse_rate_scaled)
+                temp[i,j,k] = temp_surf[i,j]*σ_levels_full[k]^(R*lapse_rate_scaled)
             end
         end
     end
@@ -137,8 +138,8 @@ function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},    # spectr
                                 ) where {NF<:AbstractFloat}             # number format NF
 
     mx,nx,nlev = size(humid)
-    @unpack nlon, nlat = P
-    @unpack σ_full = G.geometry
+    @unpack nlon, nlat, n_stratosphere_levels = P
+    @unpack σ_levels_full = G.geometry
 
     # reference saturation water vapour pressure [Pa]
     # relative humidity reference [1]
@@ -156,13 +157,13 @@ function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},    # spectr
     spectral_truncation!(humid_surf,G)
 
     # stratospheric humidity zero
-    humid[:,:,1:2] .= 0
+    fill!(view(humid,:,:,1:n_stratosphere_levels),0)
 
     # Specific humidity at tropospheric levels
-    for k in 3:nlev
+    for k in n_stratosphere_levels+1:nlev
         for j in 1:nx
             for i in 1:mx
-                humid[i,j,k] = humid_surf[i,j]*σ_full[k]^scale_height_ratio
+                humid[i,j,k] = humid_surf[i,j]*σ_levels_full[k]^scale_height_ratio
             end
         end
     end
