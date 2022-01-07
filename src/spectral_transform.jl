@@ -148,16 +148,16 @@ end
 """
 Transform a spectral array into grid-point space.
 """
-function convert_to_grid(input::Array{Complex{T},2},
-                         G::GeoSpectral{T}) where {T<:AbstractFloat}
+function convert_to_grid(input::Array{Complex{NF},2},
+                         G::GeoSpectral{NF}) where {NF<:AbstractFloat}
     return fourier_inverse(legendre_inverse(input,G),G)
 end
 
 """
 Transform a gridded array into spectral space.
 """
-function convert_to_spectral(  input::Array{T,2},
-                    G::GeoSpectral{T}) where {T<:AbstractFloat}
+function convert_to_spectral(  input::Array{NF,2},
+                    G::GeoSpectral{NF}) where {NF<:AbstractFloat}
     return legendre(fourier(input,G),G)
 end
 
