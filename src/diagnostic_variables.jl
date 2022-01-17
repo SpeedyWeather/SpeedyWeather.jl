@@ -27,6 +27,9 @@ struct GridVariables{NF<:AbstractFloat}
     v_grid      ::Array{NF,3}  # Gridpoint field of meridional velocity
     temp_grid_anomaly   ::Array{NF,3}  # Gridpoint field of absolute temperature anomaly [K]
 
+    humid_grid_saturation     ::Array{NF,3}  # Gridpoint field of saturation specific humidity
+    humid_grid_relative       ::Array{NF,3}  # Gridpoint field of relative specific humidity
+
     
 end
 
