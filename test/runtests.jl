@@ -1,6 +1,7 @@
 using SpeedyWeather
 using Test
 
+include("utils.jl")
 include("spectral_transform.jl")
 include("diffusion.jl")
 include("time_stepping.jl")

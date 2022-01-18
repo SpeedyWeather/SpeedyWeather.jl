@@ -14,12 +14,9 @@ function run_speedy(::Type{NF}=Float64;         # number format, use Float64 as 
     B = Boundaries{NF}(P,G)
 
     Prog = initial_conditions(P,B,G)
+    # Diag = initial_conditions(Prog,P,B,G)
 
-    # TODO
-    # Prog = PrognosticVars{T}()
-    # Diag = DiagnosticVars{T}()
-
-    M = ModelSetup(P,C,G,B)
+    # M = ModelSetup(P,C,G,B)
 
     #time_stepping!(Prog,Diag,M)
 
