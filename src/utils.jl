@@ -6,3 +6,10 @@ function isincreasing(x::Vector)
     end
     return is_increasing
 end
+
+"""Set all negative entries in an array to zero."""
+function clip_negatives!(A::AbstractArray{T}) where T
+    @inbounds for i in eachindex(A)
+        A[i] = max(A[i],zero(T))
+    end
+end
