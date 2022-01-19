@@ -36,14 +36,7 @@ function parametrization_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic
     pres_surf_grid_exp_inv = 1/pres_surf_grid_exp
 
     #1.2 Remove negative humidity grid values
-    #TK: don't really want to iterate in this way. Is there a nice inbuilt function to do the same thing?
-    for k in 1:nlat
-        for l in 1:nlon
-            for m in 1:nlev
-                humid_grid[k,l,m] = max(humid_grid[k,l,m],0)
-            end
-        end
-    end
+    clip_negatives!(humid_grid)
 
     #1.3 Static energy as an anomaly from temperature and geopotential
     static_energy_grid = temp_grid + geopot_grid #Following Paxton/Chantry with a normalised cp
