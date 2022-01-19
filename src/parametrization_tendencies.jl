@@ -16,6 +16,12 @@ function parametrization_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic
                                      ) where {T<:AbstractFloat}
 
 
+    # =========================================================================
+    # This function has not been completed and returns all relevant tendencies as zero 
+    # =========================================================================
+
+
+
     #Unpack relevant variables
     @unpack temp_tend, humid_tend,u_tend,v_tend = Diag.Tendencies
     @unpack pres_surf_grid,humid_grid,temp_grid,geopot_grid = Diag.gridvars
@@ -45,7 +51,7 @@ function parametrization_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic
 
     #1.4...
     for k in 1:nlev
-        compute_relative_and_saturation_humidity!(Diag,G) #defined in humidity.jl
+        relative_and_saturation_humidity!(Diag,G,C) #defined in humidity.jl
     end
 
 
@@ -65,10 +71,12 @@ function parametrization_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic
 
 
     #Sum of all tendencies
+
+    #Everything zero
     u_tend = 0.0
     v_tend = 0.0
-    temp_tend = temp_convection   # +... other terms
-    humid_tend = humid_convection # +...
+    temp_tend = 0.0  
+    humid_tend = 0.0 
 
     #SSPT noise
 
