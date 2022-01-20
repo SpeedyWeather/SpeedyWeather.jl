@@ -67,3 +67,35 @@ struct DiagnosticVariables{NF<:AbstractFloat}
     gridvars    ::GridVariables{NF}
     miscvars    ::MiscellaneousVariables{NF}
 end
+
+
+
+
+"""Initialize a DiagnosticVariables struct, with all quantities zero-valued"""
+function initialize_diagnostics( G::GeoSpectral{NF}
+                                ) where {NF<:AbstractFloat}
+
+    @unpack nlon,nlat,nlev = G.geometry
+    @unpack mx, nx = G.spectral
+
+
+
+    #Empty tendencies in spectral space
+    vor_tend        =     zeros(Complex{Float64},mx,nx,nlev)     # Vorticity of horizontal wind field
+    div_tend        =     zeros(Complex{Float64},mx,nx,nlev)     # Divergence of horizontal wind field
+    temp_tend       =     zeros(Complex{Float64},mx,nx,nlev)     # Absolute temperature [K]
+    pres_surf_tend  =     zeros(Complex{Float64},mx,nx)          # Log of surface pressure [log(Pa)]
+    humid_tend      =     zeros(Complex{Float64},mx,nx,nlev)     # Specific humidity [g/kg]
+    u_tend          =     zeros(Complex{Float64},mx,nx,nlev)     # zonal velocity
+    v_tend          =     zeros(Complex{Float64},mx,nx,nlev)     # meridonal velocity
+    tendencies_struct = Tendencies{NF}(vor_tend,div_tend,temp_tend,pres_surf_tend,humid_tend,u_tend,v_tend)
+
+
+ 
+    #Todo...
+    #Grid point quantities
+    #Miscellaneous struct - this will likely be renamed/restructured in future
+
+    # conversion to NF happens here implicitly
+    return DiagnosticVariables{NF}(tendencies_struct, ...)
+end

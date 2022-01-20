@@ -14,6 +14,17 @@ function relative_and_saturation_humidity!(Diag::PrognosticVariables{NF}
 nlat,nlon,nlev = size(humid_grid_saturation)
 
 
+e0 = 6.108e-3
+c1 = 17.269
+c2 = 21.875
+t0 = 273.16 #Paxton/Chantry have a zero_c term here? 
+t1 = 35.86 
+t2 = 7.66 
+
+c3 = 622.0
+c4 =0.378 
+
+
 #Iterate over every point. Can we vectorize this?
 for k in 1:nlat
     for l in 1:nlon

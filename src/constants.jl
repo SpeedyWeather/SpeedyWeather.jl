@@ -6,15 +6,15 @@ struct HumidityConstants{NF<:AbstractFloat}
 #Set of constants used in the saturation humidity calculations
 #Where do these come from? What do they represent?
 
-e0 ::NF= 6.108e-3
-c1 ::NF= 17.269
-c2 ::NF= 21.875
-t0 ::NF= 273.16 #Paxton/Chantry have a zero_c term here? 
-t1 ::NF= 35.86 
-t2 ::NF= 7.66 
+e0 ::NF
+c1 ::NF
+c2 ::NF
+t0 ::NF 
+t1 ::NF 
+t2 ::NF 
 
-c3 ::NF= 622.0
-c4 ::NF=0.378 
+c3 ::NF
+c4 ::NF 
 
 end
 
