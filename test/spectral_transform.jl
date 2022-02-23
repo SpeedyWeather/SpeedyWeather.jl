@@ -1,12 +1,13 @@
+spectral_resolutions = (31,42,85,170,341,682)
+
 @testset "FFT of geopotential" begin
 
     # Test for variable resolution
-    for trunc in (31,42,63,85,127,255,511)
+    for trunc in resolutions
     
-        # trunc = 30
         P = Parameters(NF=Float64;trunc=trunc)
-        G = GeoSpectral{P.NF}(P)
-        B = Boundaries{P.NF}(P,G)
+        G = GeoSpectral(P)
+        B = Boundaries(P,G)
 
         geopot_surf_spectral = B.geopot_surf
         geopot_surf_grid = gridded(geopot_surf_spectral,G)
@@ -18,12 +19,11 @@ end
 @testset "Legendre transform of geopotential" begin
 
     # Test for variable resolution
-    for trunc in (31,42,63,85,127,255,511)
+    for trunc in spectral_resolutions
     
-        # trunc = 30
         P = Parameters(NF=Float64;trunc=trunc)
-        G = GeoSpectral{P.NF}(P)
-        B = Boundaries{P.NF}(P,G)
+        G = GeoSpectral(P)
+        B = Boundaries(P,G)
 
         geopot_surf_spectral = B.geopot_surf
         geopot_surf_grid = gridded(geopot_surf_spectral,G)
@@ -40,10 +40,10 @@ end
 @testset "Spectral transform of spectral noise" begin
     
     # Test for variable resolution
-    for trunc in (31,42,63,85,127,255,511)
+    for trunc in spectral_resolutions
     
         P = Parameters(NF=Float64;trunc=trunc)
-        G = GeoSpectral{P.NF}(P)
+        G = GeoSpectral(P)
 
         mx = G.spectral.mx
         nx = G.spectral.nx

@@ -4,8 +4,8 @@ using .SpeedyWeather
 
 # original speedy T30 with 96x48 grid
 P = Parameters(NF=Float64;trunc=30,nlat=48,nlon=96)
-G = GeoSpectral{P.NF}(P)
-B = Boundaries{P.NF}(P,G)
+G = GeoSpectral(P)
+B = Boundaries(P,G)
 
 geopot_surf_spectral = B.geopot_surf
 geopot_surf_grid = gridded(geopot_surf_spectral,G)

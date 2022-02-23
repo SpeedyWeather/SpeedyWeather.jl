@@ -14,8 +14,8 @@ end
 """ Generator function for a Boundaries struct. Loads the boundary conditions,
 orography, land-sea mask and albedo from an netCDF file and stores the in a
 `Boundaries` struct."""
-function Boundaries{NF}(P::Parameters,
-                        G::GeoSpectral{NF}) where {NF<:AbstractFloat}
+function Boundaries(P::Parameters,
+                    G::GeoSpectral)
 
     @unpack boundary_path, boundary_file, gravity = P
 
@@ -42,5 +42,5 @@ function Boundaries{NF}(P::Parameters,
     geopot_surf = zeros(Complex{NF},G.spectral.mx,G.spectral.nx)
     geopot_surf[1:G_inputdata.spectral.mx,1:G_inputdata.spectral.nx] .= geopot_surf_lowres
 
-    Boundaries{NF}(geopot_surf,landsea_mask,albedo)
+    Boundaries{P.NF}(geopot_surf,landsea_mask,albedo)
 end

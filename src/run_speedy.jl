@@ -9,9 +9,9 @@ function run_speedy(::Type{NF}=Float64;         # number format, use Float64 as 
                     ) where {NF<:AbstractFloat}
 
     P = Parameters(NF=NF,kwargs...)
-    C = Constants{NF}(P)
-    G = GeoSpectral{NF}(P)
-    B = Boundaries{NF}(P,G)
+    C = Constants(P)
+    G = GeoSpectral(P)
+    B = Boundaries(P,G)
 
     Prog = initial_conditions(P,B,G)
     # Diag = initial_conditions(Prog,P,B,G)
