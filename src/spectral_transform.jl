@@ -43,11 +43,12 @@ end
 function SpectralTransform{NF}(P::Parameters,G::Geometry) where NF
 
     @unpack nlon, nlat, nlon_half, nlat_half = G
+    @unpack coslat_NH = G
     @unpack R_earth, trunc = P
 
     # SIZE OF SPECTRAL GRID
     mx = trunc+1
-    nx = trunc+2
+    nx = trunc+1
 
     # PLAN THE FFTs
     # rfft_plan = plan_rfft(rand(NF,nlon))
@@ -77,6 +78,11 @@ function SpectralTransform{NF}(P::Parameters,G::Geometry) where NF
     for j in 1:nlat_half
         leg_poly[:,:,j] = legendre_polynomials(j,ε,ε⁻¹,mx,nx,G)
     end
+
+    # leg_poly = zeros(mx, nx, nlat_half)
+    # for j in 1:nlat_half
+    #     leg_poly[:,:,j] = AssociatedLegendrePolynomials.λlm(0:mx-1,0:nx-1,coslat_NH[j])
+    # end
 
     # LAPLACIANS for harmonic & biharmonic diffusion
     ∇²,∇⁻²,∇⁴ = Laplacians(mx,nx,R_earth)
@@ -342,48 +348,6 @@ function spectral_truncation!(  input::Array{NF,2},
                                 G::GeoSpectral{NF}
                                 ) where NF
     spectral_truncation!(input,spectral(input,G),G)
-end
-
-"""
-Epsilon-factors for the recurrence relation of the normalized associated
-Legendre polynomials.
-
-    ε_n^m = sqrt(((n+m-2)^2 - (m-1)^2)/(4*(n+m-2)^2 - 1))
-    ε⁻¹_n^m = 1/ε_n^m   if ε_n^m != 0 else 0.
-
-with m,n being the wavenumbers of the associated Legendre polynomial P_n^m.
-Due to the spectral packing in speedy and Julia's 1-based indexing we have
-substituted
-
-    m -> m-1
-    n -> n+m-2.
-
-compared to the more conventional
-
-    ε_n^m = sqrt( (n^2-m^2) / (4n^2 - 1) )
-
-    From Krishnamurti, Bedi, Hardiker, 2014. Introduction to
-    global spectral modelling, Chapter 6.5 Recurrence Relations, Eq. (6.37)
-"""
-function ε_recurrence(mx::Integer,nx::Integer)
-    ε   = zeros(mx+1,nx+1)
-    ε⁻¹ = zeros(mx+1,nx+1)
-    for m in 1:mx+1
-        for n in 1:nx+1
-            if n == nx + 1
-                ε[m,n] = 0.0
-            elseif n == 1 && m == 1
-                ε[m,n] = 0.0
-            else
-                ε[m,n] = sqrt(((n+m-2)^2 - (m-1)^2)/(4*(n+m-2)^2 - 1))
-            end
-            if ε[m,n] > 0.0
-                ε⁻¹[m,n] = 1.0/ε[m,n]
-            end
-        end
-    end
-
-    return ε,ε⁻¹
 end
 
 

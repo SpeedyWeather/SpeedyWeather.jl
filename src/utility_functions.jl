@@ -15,7 +15,7 @@ function clip_negatives!(A::AbstractArray{T}) where T
 end
 
 """Returns an integer `m >= n` of argument `n` with only prime factors 2 and 3
-to obtain an easily fourier-transformable number of longitudes.
+to obtain an efficiently fourier-transformable number of longitudes.
     m = 2^i * 3^j >= n, with i>=0 but j = 0,1
 """
 function roundup_fft(n::Int)

@@ -12,3 +12,14 @@ end
         @test all(A .>= 0)
     end
 end
+
+@testset "roundup nlon for FFT" begin
+    for i in 1:10
+        @test 2^i == SpeedyWeather.roundup_fft(2^i)
+        @test 2^i*3 == SpeedyWeather.roundup_fft(2^i*3)
+    end
+    for n in 1:10
+        i = rand(1:1000)
+        @test i <= SpeedyWeather.roundup_fft(i)
+    end
+end
