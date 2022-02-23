@@ -17,7 +17,7 @@ orography, land-sea mask and albedo from an netCDF file and stores the in a
 function Boundaries(P::Parameters,
                     G::GeoSpectral)
 
-    @unpack boundary_path, boundary_file, gravity = P
+    @unpack boundary_path, boundary_file, gravity, NF = P
 
     # LOAD NETCDF FILE
     if boundary_path == ""
@@ -44,5 +44,5 @@ function Boundaries(P::Parameters,
     @unpack mx,nx = G_inputdata.spectral                            # lowres mx,nx matching input data
     geopot_surf[1:mx,1:nx] .= geopot_surf_lowres
 
-    Boundaries{P.NF}(geopot_surf,landsea_mask,albedo)
+    Boundaries{NF}(geopot_surf,landsea_mask,albedo)
 end

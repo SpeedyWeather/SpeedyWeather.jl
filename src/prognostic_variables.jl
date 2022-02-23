@@ -8,10 +8,9 @@ struct PrognosticVariables{NF<:AbstractFloat}
 end
 
 """Initialize prognostic variables from rest or restart from file."""
-function initial_conditions(    P::Parameters,                  # Parameter struct
-                                B::Boundaries{NF},              # Boundaries struct
-                                G::GeoSpectral{NF}              # GeoSpectral struct
-                                ) where {NF<:AbstractFloat}     # number format NF
+function initial_conditions(    P::Parameters,      # Parameter struct
+                                B::Boundaries,      # Boundaries struct
+                                G::GeoSpectral)     # GeoSpectral struct
 
     @unpack initial_conditions = P
 

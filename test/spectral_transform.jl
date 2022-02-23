@@ -1,4 +1,4 @@
-spectral_resolutions = (31,42,85,170,341,682)
+spectral_resolutions = (31,42,85,170,341)
 
 @testset "FFT of geopotential" begin
 

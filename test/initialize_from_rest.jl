@@ -1,7 +1,7 @@
 @testset "Initialize from rest" begin
 
     # original speedy T30 with 96x48 grid
-    P = Parameters(NF=Float64,trunc=30,nlat=48,nlon=96)
+    P = Parameters(NF=Float64)
     G = GeoSpectral(P)
     B = Boundaries(P,G)
 
