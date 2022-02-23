@@ -1,8 +1,12 @@
-struct SpectralTrans{NF<:AbstractFloat}
+struct SpectralTransform{NF<:AbstractFloat}
     # SIZE OF SPECTRAL GRID
     trunc::Int      # Spectral truncation
-    nx::Int         # Number of total wavenumbers
     mx::Int         # Number of zonal wavenumbers
+    nx::Int         # Number of total wavenumbers
+
+    # FFT plans
+    # rfft_plan::FFTW.rFFTWPlan
+    # irfft_plan::AbstractFFTs.ScaledPlan
 
     # LEGENDRE ARRAYS
     leg_weight::Array{NF,1}          # Legendre weights
@@ -27,23 +31,27 @@ end
 
 struct GeoSpectral{NF<:AbstractFloat}
     geometry::Geometry{NF}
-    spectral::SpectralTrans{NF}
+    spectral::SpectralTransform{NF}
 end
 
 function GeoSpectral{NF}(P::Parameters) where {NF<:AbstractFloat}
     G = Geometry{NF}(P)
-    S = SpectralTrans{NF}(P,G)
+    S = SpectralTransform{NF}(P,G)
     return GeoSpectral{NF}(G,S)
 end
 
-function SpectralTrans{NF}(P::Parameters,G::Geometry) where NF
+function SpectralTransform{NF}(P::Parameters,G::Geometry) where NF
 
-    @unpack nlat, nlat_half = G
+    @unpack nlon, nlat, nlon_half, nlat_half = G
     @unpack R_earth, trunc = P
 
     # SIZE OF SPECTRAL GRID
-    nx = trunc+2
     mx = trunc+1
+    nx = trunc+2
+
+    # PLAN THE FFTs
+    # rfft_plan = plan_rfft(rand(NF,nlon))
+    # irfft_plan = plan_irfft(rand(Complex{NF},nlon_half+1),nlon)
 
     # LEGENDRE WEIGHTS from pole to equator (=first half or array)
     leg_weight = gausslegendre(nlat)[2][1:nlat_half]
@@ -104,7 +112,8 @@ function SpectralTrans{NF}(P::Parameters,G::Geometry) where NF
         end
     end
 
-    SpectralTrans{NF}(trunc,nx,mx,
+    SpectralTransform{NF}(trunc,mx,nx,
+                    # rfft_plan,irfft_plan,
                     leg_weight,nsh2,leg_poly,∇²,∇⁻²,∇⁴,
                     gradx,uvdx,uvdym,uvdyp,gradym,gradyp,vddym,vddyp)
 end

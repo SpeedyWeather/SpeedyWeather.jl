@@ -5,6 +5,7 @@ module SpeedyWeather
     
     # NUMERICS
     import FastGaussQuadrature: gausslegendre
+    import AssociatedLegendrePolynomials
     import FFTW: rfft, irfft
     import LinearAlgebra: dot
 
@@ -22,6 +23,7 @@ module SpeedyWeather
         legendre, legendre_inverse,
         spectral, gridded
 
+    include("utility_functions.jl")
     include("parameter_structs.jl")
     include("parameters.jl")
     include("constants.jl")
@@ -40,6 +42,5 @@ module SpeedyWeather
     include("feedback.jl")
     include("output.jl")
     include("time_integration.jl")
-    include("utils.jl")
     include("run_speedy.jl")
 end
