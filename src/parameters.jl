@@ -8,9 +8,10 @@ With keywords such that default values can be changed at creation.
     NF::DataType=Float64    # number format
 
     # RESOLUTION
-    trunc::Int=31           # spectral truncation
-    nlat::Int=trunc+1       # number of latitudes
-    nlon::Int=2nlat         # number of longitudes
+    trunc::Int=30                      # spectral truncation
+    nlon::Int=roundup_fft(3*trunc+1)   # number of longitudes 
+    nlat::Int=nlon÷2                   # number of latitudes
+    
     nlev::Int=8             # number of vertical levels
     ntracers::Int=1         # number of tracers (specific humidity is one)
 
