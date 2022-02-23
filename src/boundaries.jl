@@ -34,8 +34,13 @@ function Boundaries{NF}(P::Parameters,
 
     # GEOPOTENTIAL
     # transform to spectral space and truncate
-    geopot_surf = spectral(gravity*orography,G)
-    spectral_truncation!(geopot_surf,G)
+    P_inputdata = Parameters(trunc=30,nlat=48,nlon=96)
+    G_inputdata = GeoSpectral{NF}(P_inputdata)
+    geopot_surf_lowres = spectral(gravity*orography,G_inputdata)
+    spectral_truncation!(geopot_surf_lowres,G_inputdata)
+
+    geopot_surf = zeros(Complex{NF},G.spectral.mx,G.spectral.nx)
+    geopot_surf[1:G_inputdata.spectral.mx,1:G_inputdata.spectral.nx] .= geopot_surf_lowres
 
     Boundaries{NF}(geopot_surf,landsea_mask,albedo)
 end
