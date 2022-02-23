@@ -34,13 +34,13 @@ struct GeoSpectral{NF<:AbstractFloat}
     spectral::SpectralTransform{NF}
 end
 
-function GeoSpectral{NF}(P::Parameters) where {NF<:AbstractFloat}
-    G = Geometry{NF}(P)
-    S = SpectralTransform{NF}(P,G)
-    return GeoSpectral{NF}(G,S)
+function GeoSpectral(P::Parameters)
+    G = Geometry(P)
+    S = SpectralTransform(P,G)
+    return GeoSpectral{P.NF}(G,S)
 end
 
-function SpectralTransform{NF}(P::Parameters,G::Geometry) where NF
+function SpectralTransform(P::Parameters,G::Geometry)
 
     @unpack nlon, nlat, nlon_half, nlat_half = G
     @unpack coslat_NH = G
@@ -118,10 +118,10 @@ function SpectralTransform{NF}(P::Parameters,G::Geometry) where NF
         end
     end
 
-    SpectralTransform{NF}(trunc,mx,nx,
-                    # rfft_plan,irfft_plan,
-                    leg_weight,nsh2,leg_poly,∇²,∇⁻²,∇⁴,
-                    gradx,uvdx,uvdym,uvdyp,gradym,gradyp,vddym,vddyp)
+    SpectralTransform{P.NF}(    trunc,mx,nx,
+                                # rfft_plan,irfft_plan,
+                                leg_weight,nsh2,leg_poly,∇²,∇⁻²,∇⁴,
+                                gradx,uvdx,uvdym,uvdyp,gradym,gradyp,vddym,vddyp)
 end
 
 """

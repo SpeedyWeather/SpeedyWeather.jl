@@ -3,7 +3,7 @@ spectral_resolutions = (31,42,85,170,341,682)
 @testset "FFT of geopotential" begin
 
     # Test for variable resolution
-    for trunc in resolutions
+    for trunc in spectral_resolutions
     
         P = Parameters(NF=Float64;trunc=trunc)
         G = GeoSpectral(P)
