@@ -34,13 +34,15 @@ function Boundaries(P::Parameters,
 
     # GEOPOTENTIAL
     # transform to spectral space and truncate
-    P_inputdata = Parameters(trunc=30,nlat=48,nlon=96)
-    G_inputdata = GeoSpectral{NF}(P_inputdata)
+    P_inputdata = Parameters(trunc=31,nlat=48,nlon=96)  # orography only avail on default grid
+    G_inputdata = GeoSpectral(P_inputdata)              # spectral transform for default grid    
     geopot_surf_lowres = spectral(gravity*orography,G_inputdata)
     spectral_truncation!(geopot_surf_lowres,G_inputdata)
 
-    geopot_surf = zeros(Complex{NF},G.spectral.mx,G.spectral.nx)
-    geopot_surf[1:G_inputdata.spectral.mx,1:G_inputdata.spectral.nx] .= geopot_surf_lowres
+    # interpolate orography by adding 0 coefficients to high resolution spectral geopotential
+    geopot_surf = zeros(Complex{NF},G.spectral.mx,G.spectral.nx)    # highres with mx,nx from G
+    @unpack mx,nx = G_inputdata.spectral                            # lowres mx,nx matching input data
+    geopot_surf[1:mx,1:nx] .= geopot_surf_lowres
 
     Boundaries{P.NF}(geopot_surf,landsea_mask,albedo)
 end
