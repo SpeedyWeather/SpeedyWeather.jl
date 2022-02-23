@@ -1,7 +1,7 @@
 @testset "FFT of geopotential" begin
 
-    # Test for T30,85,127,255,511
-    for trunc in (30,63,85,127,255,511)
+    # Test for variable resolution
+    for trunc in (30,42,63,85,127,255,511)
     
         P = Parameters(NF=Float64;trunc=trunc)
         G = GeoSpectral{P.NF}(P)
@@ -16,8 +16,8 @@ end
 
 @testset "Legendre transform of geopotential" begin
 
-    # Test for T30,85,127,255,511
-    for trunc in (30,63,85,127,255,511)
+    # Test for variable resolution
+    for trunc in (30,42,63,85,127,255,511)
     
         P = Parameters(NF=Float64;trunc=trunc)
         G = GeoSpectral{P.NF}(P)
@@ -33,8 +33,8 @@ end
 
 @testset "Spectral transform of spectral noise" begin
     
-    # Test for T30,85,127,255,511
-    for trunc in (30,63,85,127,255,511)
+    # Test for variable resolution
+    for trunc in (30,42,63,85,127,255,511)
     
         P = Parameters(NF=Float64;trunc=trunc)
         G = GeoSpectral{P.NF}(P)
