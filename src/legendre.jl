@@ -1,4 +1,47 @@
 """
+Epsilon-factors for the recurrence relation of the normalized associated
+Legendre polynomials.
+
+    ε_n^m = sqrt(((n+m-2)^2 - (m-1)^2)/(4*(n+m-2)^2 - 1))
+    ε⁻¹_n^m = 1/ε_n^m   if ε_n^m != 0 else 0.
+
+with m,n being the wavenumbers of the associated Legendre polynomial P_n^m.
+Due to the spectral packing in speedy and Julia's 1-based indexing we have
+substituted
+
+    m -> m-1
+    n -> n+m-2.
+
+compared to the more conventional
+
+    ε_n^m = sqrt( (n^2-m^2) / (4n^2 - 1) )
+
+    From Krishnamurti, Bedi, Hardiker, 2014. Introduction to
+    global spectral modelling, Chapter 6.5 Recurrence Relations, Eq. (6.37)
+"""
+function ε_recurrence(mx::Integer,nx::Integer)
+    ε   = zeros(mx+1,nx+1)
+    ε⁻¹ = zeros(mx+1,nx+1)
+    for m in 1:mx+1
+        for n in 1:nx+1
+            if n == nx + 1
+                ε[m,n] = 0.0
+            elseif n == 1 && m == 1
+                ε[m,n] = 0.0
+            else
+                ε[m,n] = sqrt(((n+m-2)^2 - (m-1)^2)/(4*(n+m-2)^2 - 1))
+            end
+            if ε[m,n] > 0.0
+                ε⁻¹[m,n] = 1.0/ε[m,n]
+            end
+        end
+    end
+
+    return ε,ε⁻¹
+end
+
+
+"""
 Calculate the Legendre polynomials. TODO reference
 """
 function legendre_polynomials(  j::Int,

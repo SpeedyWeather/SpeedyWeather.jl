@@ -20,10 +20,9 @@ end
 """
 Generator function for a HorizontalDiffusion struct.
 """
-function HorizontalDiffusion{NF}(   P::Parameters,                      # Parameter struct
-                                    G::GeoSpectral{NF},             # Geometry and spectral struct
-                                    B::Boundaries{NF}               # Boundaries struct
-                                    ) where {NF<:AbstractFloat}    # Number format NF
+function HorizontalDiffusion(   P::Parameters,      # Parameter struct
+                                G::GeoSpectral,     # Geometry and spectral struct
+                                B::Boundaries)      # Boundaries struct
 
     @unpack nlev, σ_full = G.geometry
     @unpack trunc, mx, nx = G.spectral
@@ -90,12 +89,12 @@ function HorizontalDiffusion{NF}(   P::Parameters,                      # Parame
 
     # Orographic correction terms for humidity (horizontal component)
     corh .= rh_ref                  # relative humidity reference value
-    qcorh = spectral(corh)
+    qcorh = spectral(corh,G)
 
-    # convert to NF here
-    return HorizontalDiffusion{NF}( dmp,dmpd,dmps,
-                                    dmp1,dmpd1,dmps1,
-                                    tcorv,qcorv,tcorh,qcorh)
+    # convert to number format NF here
+    return HorizontalDiffusion{P.NF}(   dmp,dmpd,dmps,
+                                        dmp1,dmpd1,dmps1,
+                                        tcorv,qcorv,tcorh,qcorh)
 end
 
 """Apply horizontal diffusion to 2D field in spectral space."""

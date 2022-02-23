@@ -20,7 +20,7 @@ end
 """
 Generator function for a Constants struct.
 """
-function Constants{NF}(P::Parameters) where NF      # number format NF
+function Constants(P::Parameters)
 
     @unpack R_earth, Ω, gravity, akap, R, Δt = P
     @unpack robert_filter, williams_filter = P
@@ -30,7 +30,7 @@ function Constants{NF}(P::Parameters) where NF      # number format NF
     sdrag = 1/(tdrs*3600)
 
     # This implies conversion to NF
-    return Constants{NF}(   R_earth,Ω,gravity,akap,R,
+    return Constants{P.NF}( R_earth,Ω,gravity,akap,R,
                             Δt,robert_filter,williams_filter,
                             sdrag)
 end  

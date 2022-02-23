@@ -8,7 +8,7 @@ With keywords such that default values can be changed at creation.
     NF::DataType=Float64    # number format
 
     # RESOLUTION
-    trunc::Int=30                      # spectral truncation
+    trunc::Int=31                      # spectral truncation
     nlon::Int=roundup_fft(3*trunc+1)   # number of longitudes 
     nlat::Int=nlon÷2                   # number of latitudes
     

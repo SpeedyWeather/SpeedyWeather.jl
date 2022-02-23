@@ -8,10 +8,9 @@ struct PrognosticVariables{NF<:AbstractFloat}
 end
 
 """Initialize prognostic variables from rest or restart from file."""
-function initial_conditions(    P::Parameters,                  # Parameter struct
-                                B::Boundaries{NF},              # Boundaries struct
-                                G::GeoSpectral{NF}              # GeoSpectral struct
-                                ) where {NF<:AbstractFloat}     # number format NF
+function initial_conditions(    P::Parameters,      # Parameter struct
+                                B::Boundaries,      # Boundaries struct
+                                G::GeoSpectral)     # GeoSpectral struct
 
     @unpack initial_conditions = P
 
@@ -30,9 +29,8 @@ end
 hence zero vorticity and divergence, but temperature, pressure and humidity are
 initialised """
 function initialize_from_rest(  P::Parameters,
-                                B::Boundaries{NF},
-                                G::GeoSpectral{NF}
-                                ) where {NF<:AbstractFloat}
+                                B::Boundaries,
+                                G::GeoSpectral)
 
     @unpack nlev = G.geometry
     @unpack mx, nx = G.spectral
@@ -49,7 +47,7 @@ function initialize_from_rest(  P::Parameters,
     initialize_humidity!(humid,pres_surf_grid,P,G)          # specific humidity from pressure
 
     # conversion to NF happens here implicitly
-    return PrognosticVariables{NF}(vor,div,temp,pres_surf,humid)
+    return PrognosticVariables{P.NF}(vor,div,temp,pres_surf,humid)
 end
 
 """Initialize spectral temperature from surface absolute temperature and constant

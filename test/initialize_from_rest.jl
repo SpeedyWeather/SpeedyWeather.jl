@@ -1,9 +1,9 @@
 @testset "Initialize from rest" begin
 
     # original speedy T30 with 96x48 grid
-    P = Parameters(NF=Float64,trunc=30,nlat=48,nlon=96)
-    G = GeoSpectral{P.NF}(P)
-    B = Boundaries{P.NF}(P,G)
+    P = Parameters(NF=Float64)
+    G = GeoSpectral(P)
+    B = Boundaries(P,G)
 
     Prog = SpeedyWeather.initialize_from_rest(P,B,G)
 

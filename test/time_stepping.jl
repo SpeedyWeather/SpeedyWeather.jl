@@ -11,7 +11,7 @@
     # loop over different precisions
     for NF in (Float16,Float32,Float64)
         P = Parameters(NF=NF)
-        C = Constants{NF}(P)
+        C = Constants(P)
 
         # INITIAL CONDITIONS
         # with 3x3x2 some spectral coeffs, x2 for leapfrog dimension
@@ -42,7 +42,7 @@
 
     for NF in (Float16,Float32,Float64)
         P = Parameters(NF=NF)
-        C = Constants{NF}(P)
+        C = Constants(P)
 
         # INITIAL CONDITIONS
         # with 3x3 some spectral coeffs, x2 for leapfrog dimension
@@ -67,7 +67,7 @@
 
         # CHECK THAT NO WILLIAM'S FILTER IS WORSE
         P = Parameters(NF=NF,williams_filter=1)     # Robert's filter only
-        C = Constants{NF}(P)
+        C = Constants(P)
 
         # INITIAL CONDITIONS
         # with 3x3 some spectral coeffs, x2 for leapfrog dimension
