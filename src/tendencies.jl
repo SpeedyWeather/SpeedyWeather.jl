@@ -9,7 +9,7 @@
 #│   │   
 #│   │
 #│   └───get_grid_point_fields() ---> Updates Diag.gridvars 
-#|   └───parametrization_tendencies()
+#|   └───parametrizationd_tendencies()
 #|   └───dynamics_tendencies() ---> Returns Diag.Tendencies 
 #│        │   
 #│        │   
@@ -30,32 +30,34 @@
 Compute the grid point and spectral tendencies, including an implicit correction for the spectral tendencies. 
 """
 function get_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variables
-                         Diag::PrognosticVariables{NF}, # Diagnostic variables
+                         Diag::DiagnosticVariables{NF}, # Diagnostic variables
                          l2::Int,                       # leapfrog index 2 (time step used for tendencies)
-                         C::Constants{NF},              # struct containing constants
+                         M,              # struct containing constants
                         ) where {NF<:AbstractFloat}
 
-    @unpack alpha = C
+   # @unpack alpha = C
 
     # =========================================================================
     # Computation of grid-point tendencies (converted to spectral at the end of
     # grtend) Diag.Tendencies.GridPoint
     # =========================================================================
 
-    get_grid_point_tendencies!(Prog,Diag,l2,C)
+    println("Hello from get_tendencies")
+    get_grid_point_tendencies!(Prog,Diag,l2,M)
 
     # =========================================================================
     # Computation of spectral tendencies 
     # =========================================================================
-    if alpha < 0.5 #Coefficient for semi-implicit computations. Previously if alpha = 0?
-        get_spectral_tendencies!(Diag,C)
-    else
-        get_spectral_tendencies!(Diag,C)
+    #if alpha < 0.5 #Coefficient for semi-implicit computations. Previously if alpha = 0?
+       # get_spectral_tendencies!(Diag,C)
+    #else
+        
+        #get_spectral_tendencies!(Diag,C)
 
         # Implicit correction
-        @unpack div_tend,t_tend,ps_tend = Diag.Tendencies #Get some of the tendencies calculated above
-        implicit_terms!(div_tend, t_tend, ps_tend) #TK: no edits have been made (yet!) to this implicit function
-    end
+        #@unpack div_tend,t_tend,ps_tend = Diag.Tendencies #Get some of the tendencies calculated above
+        #implicit_terms!(div_tend, t_tend, ps_tend) #TK: no edits have been made (yet!) to this implicit function
+   # end
 
 end
 
@@ -65,21 +67,21 @@ end
 Compute the grid point tendencies. These are composed of the dynamics and physical parameterisations. 
 """
 function get_grid_point_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variables
-                                    Diag::PrognosticVariables{NF}, # Diagnostic variables
+                                    Diag::DiagnosticVariables{NF}, # Diagnostic variables
                                     l2::Int,                       # leapfrog index 2 (time step used for tendencies)
-                                    C::Constants{NF}
+                                    M
                                     ) where {NF<:AbstractFloat}
     
     #1. Convert spectral prognostic variables to grid point space
-    get_grid_point_fields!(Prog,Diag,l2,C) #Updates Diag.gridvars
+    get_grid_point_fields!(Prog,Diag,l2,M) #Updates Diag.gridvars
  
     # 2. Parameterised physics tendencies. 
     #Needs to be defined in parameterisation_tendencies.jl. There is a lot of physics here, so would be best as separate, self-contained PR
-    parametrization_tendencies!(Prog,Diag,C)
+   # parametrization_tendencies!(Prog,Diag,M)
 
 
     #3. Dynamics tendencies
-    dynamics_tendencies!(Prog,Diag,C) #Takes Diag.gridvars and Diag.ParameterisedTendencies and calculates Diag.Tendencies 
+   # dynamics_tendencies!(Prog,Diag,M) #Takes Diag.gridvars and Diag.ParameterisedTendencies and calculates Diag.Tendencies 
 
 
 
@@ -89,28 +91,28 @@ end
 """
 Compute grid point fields of the spectral prognostic tendencies
 """
-function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic variables
-                               Diag::PrognosticVariables{NF}, # Diagnostic variables
+function get_grid_point_fields!(Prog::PrognosticVariables{NF}, # Prognostic variables
+                               Diag::DiagnosticVariables{NF}, # Diagnostic variables
                                l2::Int,                       # leapfrog index 2 (time step used for tendencies)
-                               C::Constants{NF}
+                               M
                                ) where {NF<:AbstractFloat}
 
 
     #Unpack spectral prognostic fields
-    @unpack vor,div,temp,pres_surf,humid,geopot,tr = Prog 
+    @unpack vor,div,temp,pres_surf,humid = Prog 
 
     #Unpack the gridded counterparts. This is what we will be calculating in this subroutine
-    @unpack vor_grid,div_grid,temp_grid, geopot_grid,tr_grid ,u_grid, v_grid = Diag.gridvars
+    @unpack vor_grid,div_grid,temp_grid,pres_surf_grid,humid_grid, u_grid, v_grid = Diag.grid_variables
 
     #Unpack constants
-    @unpack cp,coriol = C
+    @unpack cp,coriol = M.P #model.parameters
 
     nlat,nlon,nlev = size(vor_grid)
 
 
     #1. Compute grid-point fields
     #1.1 Update geopotential in spectral space
-    geopotential!(geopot,ϕ0spectral,temp,G)         # geopotential from surface geopotential. Need to get phi0_spectral and G from somewhere
+    #geopotential!(geopot,ϕ0spectral,temp,G)         # geopotential from surface geopotential. Need to get phi0_spectral and G from somewhere
 
    for k in 1:nlev
         gridded(vor[:,:,k,l2], vor_grid[:,:,k])  # vorticity 
@@ -130,7 +132,7 @@ function get_grid_point_fields(Prog::PrognosticVariables{NF}, # Prognostic varia
         uvspec!(vor[:,:,k,l2], div[:,:,k,l2], u_grid[:,:,k],v_grid[:,:,k])
 
         #Geopotential. Normalised by cp to avoid overflows. Feature from Paxton/Chantry
-        gridded(geopot[:,:,k]*(1/cp),geopot_grid[:,:,k]) 
+       # gridded(geopot[:,:,k]*(1/cp),geopot_grid[:,:,k]) 
 
    end
 
@@ -167,7 +169,7 @@ Compute non-linear tendencies in grid-point space from dynamics and add to physi
 gridpoint tendencies to spectral tendencies.
 """
 function dynamics_tendencies(Prog::PrognosticVariables{NF}, # Prognostic variables
-                             Diag::PrognosticVariables{NF}, # Diagnostic variables
+                             Diag::DiagnosticVariables{NF}, # Diagnostic variables
                              l2::Int,                       # leapfrog index 2 (time step used for tendencies)
                              C::Constants{NF}
                              ) where {NF<:AbstractFloat}
@@ -211,7 +213,7 @@ end
 """
 Convert a set of tendencies in grid point space to spectral space and calculate ...
 """
-function vor_div_tendency_and_corrections!( Diag::PrognosticVariables{NF},
+function vor_div_tendency_and_corrections!( Diag::DiagnosticVariables{NF},
                                             C::Constants{NF}
                                             ) where {NF<:AbstractFloat}
 
@@ -261,7 +263,7 @@ Compute the spectral tendencies of divergence, temperature
 and log_surf.pressure 
 """
 function get_spectral_tendencies!(Prog::PrognosticVariables{NF},
-                                  Diag::PrognosticVariables{NF},
+                                  Diag::DiagnosticVariables{NF},
                                   l2::Int,                       # leapfrog index 2 (time step used for tendencies)
                                   C::Constants{NF}
                                  ) where {NF<:AbstractFloat}
