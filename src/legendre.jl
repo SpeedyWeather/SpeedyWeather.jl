@@ -180,3 +180,64 @@ function legendre(  input::Array{Complex{NF},2},
 
     return output
 end
+
+function synthesize(alms::Matrix{Complex{NF}},                  # spectral coefficients
+                    nlon::Int,                                  # number of longitudes
+                    nlat::Int,                                  # number of latitudes
+                    brfft_plan::FFTW.rFFTWPlan{Complex{NF}}     # FFT plan
+                    ) where {NF<:AbstractFloat}                 # number format NF
+
+    
+    lmax, mmax = size(alms) .- 1        # 1-based indexing: coefficient in alms from 0:lmax, 0:mmax
+
+    colat = NF(π)/nlat/2:NF(π)/nlat:π   # colatitudes from north to south pole
+    lon_offset = NF(π/nlon)             # offset of the first longitude from prime meridian
+    nfreq = nlon÷2 + 1                  # length real-only half of FFT axis; see `rfft()`
+    nlat_nh = (nlat + 1)÷2              # number of latitudes in northern hemisphere
+
+    # preallocate
+    Λ = Matrix{NF}(undef, size(alms)...)    # legendre polynomials (1 latitude only)
+    gn = zeros(Complex{NF}, nfreq)          # phase factors for northern latitudes
+    gs = zeros(Complex{NF}, nfreq)          # phase factors for southern latitudes
+    map = zeros(NF, nlon, nlat)             # output array
+
+    @inbounds for ilat in 1:nlat_nh         # loop over northern latitudes only due to symmetry
+        ilat_s = nlat - ilat + 1            # southern latitude index
+
+        # Recalculate the (normalized) λ_l^m(cos(colat)) factors of the ass. Legendre polynomials
+        AssociatedLegendrePolynomials.λlm!(Λ, lmax, mmax, cos(colat[ilat]))
+
+        # inverse Legendre transform by looping over wavenumbers l,m
+        for m in 1:mmax+1                   # Σ_{m=0}^{mmax}, but 1-based index
+            accn = zero(Complex{NF})        # accumulators for northern/southern hemisphere
+            accs = zero(Complex{NF})        
+
+            for l in m:lmax+1                       # Σ_{l=m}^{lmax}, but 1-based index
+                term = alms[l,m] * Λ[l,m]
+                accn += term
+                accs += isodd(l+m) ? -term : term   # flip sign for southern odd wavenumbers
+            end
+            accn, accs = (accn, accs) .* cis((m-1)*lon_offset)    # longitude offset rotation
+            gn[m] += accn
+            gs[m] += accs
+        end
+
+        map[:,ilat]   = brfft_plan*gn   # Fourier transform in zonal direction
+        map[:,ilat_s] = brfft_plan*gs
+
+        fill!(gn, zero(Complex{NF}))    # set phase factors back to zero
+        fill!(gs, zero(Complex{NF}))
+    end
+    return map
+end
+
+function synthesize(alms::Matrix{Complex{NF}},      # spectral coefficients
+                    nlon::Int,                      # number of longitudes
+                    nlat::Int,                      # number of latitudes
+                    ) where {NF<:AbstractFloat}     # number format NF
+
+    nfreq = nlon÷2 + 1                              # length real-only half of FFT axis; see `rfft()`
+    gn = zeros(Complex{NF}, nfreq)                  # phase factors for northern ring
+    brfft_plan = FFTW.plan_brfft(gn,nlon)           # plan the FFT
+    return synthesize(alms,nlon,nlat,brfft_plan)    # call with planned FFT 
+end

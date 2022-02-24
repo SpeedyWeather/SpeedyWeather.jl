@@ -6,7 +6,7 @@ module SpeedyWeather
     # NUMERICS
     import FastGaussQuadrature: gausslegendre
     import AssociatedLegendrePolynomials
-    import FFTW: rfft, irfft
+    import FFTW: FFTW, rfft, irfft
     import LinearAlgebra: dot
 
     # INPUT OUTPUT 
