@@ -41,6 +41,15 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     xgeop1::Array{NF,1}                  # ?
     xgeop2::Array{NF,1}                  # ?
     lapserate_correction::Array{NF,1}    # ?
+
+
+    #TEMPORARY, development area
+    tref ::Array{NF,1}   #temporarily defined here. Also defined in the Implict struct which is incomplete at the time of writing
+    rgas ::NF
+
+
+
+
 end
 
 """
@@ -72,6 +81,7 @@ function Geometry(P::Parameters)
     σ_levels_half⁻¹_2 = 1 ./ (2σ_levels_thick)
     σ_f = akap ./ (2σ_levels_full)
 
+
     # SINES AND COSINES OF LATITUDE
     sinlat = sind.(lat)
     coslat = cosd.(lat)
@@ -101,6 +111,15 @@ function Geometry(P::Parameters)
         lapserate_correction[k-1] = 0.5*xgeop1[k]*
                     log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
     end
+
+
+    #Extra definitions. These will need to be defined consistently either here or somewhere else
+    #Just defined here to proivide basic structure to allow for testing of other components of code
+
+
+    tref = 288.0max.(0.2, σ_levels_full) #more corrections needed here 
+    rgas = (2.0/7.0) / 1004.0
+
 
     # conversion to number format NF happens here
     Geometry{P.NF}( nlon,nlat,nlev,nlat_half,nlon_half,

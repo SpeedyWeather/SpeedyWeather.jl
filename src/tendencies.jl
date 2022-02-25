@@ -77,11 +77,11 @@ function get_grid_point_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic 
  
     # 2. Parameterised physics tendencies. 
     #Needs to be defined in parameterisation_tendencies.jl. There is a lot of physics here, so would be best as separate, self-contained PR
-   # parametrization_tendencies!(Prog,Diag,M)
+    parametrization_tendencies!(Prog,Diag,M)
 
 
     #3. Dynamics tendencies
-   # dynamics_tendencies!(Prog,Diag,M) #Takes Diag.gridvars and Diag.ParameterisedTendencies and calculates Diag.Tendencies 
+    dynamics_tendencies!(Prog,Diag,l2,M) #Takes Diag.gridvars and Diag.ParameterisedTendencies and calculates Diag.Tendencies 
 
 
 
@@ -106,7 +106,7 @@ function get_grid_point_fields!(Prog::PrognosticVariables{NF}, # Prognostic vari
 
     #Unpack constants
     @unpack cp = M.Parameters 
-    @unpack f_coriolis = M.Geometry
+    @unpack f_coriolis = M.GeoSpectral.geometry
     
 
     #Get dimensions of the grid. Can also read from M.Geometry
@@ -170,10 +170,10 @@ end
 Compute non-linear tendencies in grid-point space from dynamics and add to physics tendencies. Convert total
 gridpoint tendencies to spectral tendencies.
 """
-function dynamics_tendencies(Prog::PrognosticVariables{NF}, # Prognostic variables
+function dynamics_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variables
                              Diag::DiagnosticVariables{NF}, # Diagnostic variables
                              l2::Int,                       # leapfrog index 2 (time step used for tendencies)
-                             C::Constants{NF}
+                             M
                              ) where {NF<:AbstractFloat}
     
 
@@ -182,32 +182,32 @@ function dynamics_tendencies(Prog::PrognosticVariables{NF}, # Prognostic variabl
     # =========================================================================
 
     #1. Compute tendency of log(surface pressure)
-    surface_pressure_tendency!(Prog,Diag,l2,C)               # Calculates pres_surf_tend
+    surface_pressure_tendency!(Prog,Diag,l2,M)               # Calculates pres_surf_tend and associated intermediate fields
 
     #2. Compute "vertical" velocity
-    vertical_velocity_tendency!(Prog,Diag,C)                 # Calculates sigma_tend,sigma_m
+    vertical_velocity_tendency!(Diag,M)                 # Calculates sigma_tend,sigma_m
 
     # 3. Subtract part of temperature field that is used as reference for implicit terms
-    temperature_grid_anomaly!(Diag,C)                        # Calculates temp_grid_anomaly
+    temperature_grid_anomaly!(Diag,M)                        # Calculates temp_grid_anomaly
 
     # 4. Zonal wind tendency
-    zonal_wind_tendency!(Diag,C)                             # Calculates u_tend
+    zonal_wind_tendency!(Diag,M)                             # Calculates u_tend
 
     # 5. Meridional wind tendency
-    meridional_wind_tendency!(Diag,C)                        # Calculates v_tend
+    meridional_wind_tendency!(Diag,M)                        # Calculates v_tend
 
     # 6. Temperature tendency
-    temperature_tendency!(Diag,C)                            # Calculates temp_tend
+    #temperature_tendency!(Diag,M)                            # Calculates temp_tend
 
     # 7. Humidity tendency
-    humidity_tendency!(Diag,C)                               # Calculates humid_tend
+    #humidity_tendency!(Diag,M)                               # Calculates humid_tend
 
 
 
     # =========================================================================
     # Calculate vor_tend,div_tend and then update temp_tend and tr_tend
     # =========================================================================
-    vor_div_tendency_and_corrections!(Diag,C)
+    #vor_div_tendency_and_corrections!(Diag,M)
 
 
 end
