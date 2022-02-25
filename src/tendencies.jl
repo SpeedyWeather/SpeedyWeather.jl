@@ -105,31 +105,33 @@ function get_grid_point_fields!(Prog::PrognosticVariables{NF}, # Prognostic vari
     @unpack vor_grid,div_grid,temp_grid,pres_surf_grid,humid_grid, u_grid, v_grid = Diag.grid_variables
 
     #Unpack constants
-    @unpack cp,coriol = M.P #model.parameters
+    @unpack cp = M.Parameters 
+    @unpack f_coriolis = M.Geometry
+    
 
-    nlat,nlon,nlev = size(vor_grid)
-
+    #Get dimensions of the grid. Can also read from M.Geometry
+    nlon,nlat,nlev = size(vor_grid)
 
     #1. Compute grid-point fields
     #1.1 Update geopotential in spectral space
     #geopotential!(geopot,ϕ0spectral,temp,G)         # geopotential from surface geopotential. Need to get phi0_spectral and G from somewhere
 
    for k in 1:nlev
-        gridded(vor[:,:,k,l2], vor_grid[:,:,k])  # vorticity 
-        gridded(div[:,:,k,l2], div_grid[:,:,k])  # divergence
-        gridded(temp[:,:,k,l2],temp_grid[:,:,k]) # temperature
+        vor_grid[:,:,k]  = gridded(vor[:,:,k],M.GeoSpectral )  # vorticity 
+        div_grid[:,:,k]  = gridded(div[:,:,k],M.GeoSpectral )  # divergence
+        temp_grid[:,:,k] = gridded(temp[:,:,k],M.GeoSpectral) # temperature
 
 
         #Correct vorticity grid point field
-        for j in 1:nlat
-            for i in 1:nlon
-                vor_grid[i,j,k] += coriol[j] 
-            end
+        for j in 1:nlat 
+            vor_grid[:,j,k] .+= f_coriolis[j]
         end
+
+
 
         #Calculate zonal velocity u and meridional velocity v in grid-point space,
         #from vorticity and divergence in spectral space
-        uvspec!(vor[:,:,k,l2], div[:,:,k,l2], u_grid[:,:,k],v_grid[:,:,k])
+        uvspec!(vor[:,:,k], div[:,:,k], u_grid[:,:,k],v_grid[:,:,k],M.GeoSpectral)
 
         #Geopotential. Normalised by cp to avoid overflows. Feature from Paxton/Chantry
        # gridded(geopot[:,:,k]*(1/cp),geopot_grid[:,:,k]) 
@@ -151,14 +153,14 @@ function get_grid_point_fields!(Prog::PrognosticVariables{NF}, # Prognostic vari
 
 
     #Surface pressure
-    gridded(pres_surf[:,:,l2], pres_surf_grid)
+    pres_surf_grid = gridded(pres_surf, M.GeoSpectral)
 
 
     #Humidity
     #From Paxton/Chantry: "Don't transform the two stratospheric levels where humidity is set to zero
     # because it leads to overflows" 
     for k in 3:nlev
-        gridded(humid[:,:,k,l2,1], humid_grid[:,:,k])
+        humid_grid[:,:,k] = gridded(humid[:,:,k],M.GeoSpectral)
     end 
 
 

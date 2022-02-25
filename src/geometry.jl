@@ -35,7 +35,7 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     cosg⁻²::Array{NF,1}         # rename to sinlat⁻²?
 
     # CORIOLIS FREQUENCY
-    f::Array{NF,1}              # = 2Ω*sin(lat)
+    f_coriolis::Array{NF,1}              # = 2Ω*sin(lat)
 
     # GEOPOTENTIAL CALCULATION WORK ARRAYS
     xgeop1::Array{NF,1}                  # ?
@@ -83,7 +83,7 @@ function Geometry(P::Parameters)
     cosg⁻² = 1 ./ cosg.^2
 
     # CORIOLIS FREQUENCY
-    f = 2Ω*sinlat
+    f_coriolis = 2Ω*sinlat
 
     # GEOPOTENTIAL coefficients to calculate geopotential (TODO reference)
     xgeop1 = zeros(nlev)
