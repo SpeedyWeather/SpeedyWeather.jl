@@ -197,7 +197,7 @@ function dynamics_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variab
     meridional_wind_tendency!(Diag,M)                        # Calculates v_tend
 
     # 6. Temperature tendency
-    #temperature_tendency!(Diag,M)                            # Calculates temp_tend
+    temperature_tendency!(Diag,M)                            # Calculates temp_tend
 
     # 7. Humidity tendency
     #humidity_tendency!(Diag,M)                               # Calculates humid_tend

@@ -43,10 +43,11 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     lapserate_correction::Array{NF,1}    # ?
 
 
-    #TEMPORARY, development area
+    #TEMPORARY, development area. All these variables need to be checked for consistency and potentially defined somewhere else
     tref ::Array{NF,1}   #temporarily defined here. Also defined in the Implict struct which is incomplete at the time of writing
     rgas ::NF
-
+    fsgr ::Array{NF,1} 
+    tref3 ::Array{NF,1} 
 
 
 
@@ -119,6 +120,8 @@ function Geometry(P::Parameters)
 
     tref = 288.0max.(0.2, σ_levels_full) #more corrections needed here 
     rgas = (2.0/7.0) / 1004.0
+    fsgr = (tref * 0.0) #arbitrary definition. Must be defined elsewhere 
+    tref3=fsgr.*tref #this actually is the correct definition. Needs better naming convention 
 
 
     # conversion to number format NF happens here

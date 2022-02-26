@@ -80,7 +80,7 @@ function temperature_grid_anomaly!(Diag::DiagnosticVariables{NF}, # Diagnostic v
 
 
     for k in 1:nlev
-        temp_grid_anomaly[:,:,k] = temp_grid[:,:,k] .- tref[k] 
+        temp_grid_anomaly[:,:,k] = temp_grid[:,:,k] .- tref[k] #+ 0K correction?
     end
 
 end
@@ -173,31 +173,43 @@ end
 """
 Compute the spectral temperature tendency
 """
-function temperature_tendency!(Diag::PrognosticVariables{NF}, # Diagnostic variables
-                               C::Constants{NF}
+function temperature_tendency!(Diag::DiagnosticVariables{NF}, # Diagnostic variables
+                               M
                                )where {NF<:AbstractFloat}
     
-    @unpack temp_tend = Diag.Tendencies
-    @unpack div_grid,temp_grid_anomaly =Diag.gridvars
-    @unpack d_mean,arbitrary_array,sigma_tend,sigma_m,puv= Diag.miscvars
-    @unpack temp_ref,tref3,dhsr,fsgr,akap = C
+    
+
+    #@unpack div_grid,temp_grid_anomaly =Diag.grid_variables
+
+
+    #@unpack div_mean,sigma_u,sigma_tend,sigma_m,puv= Diag.intermediate_variables
+
+
+    #@unpack temp_ref,tref3,dhsr,fsgr,akap = M.
+
+    @unpack temp_tend = Diag.tendencies
+    @unpack temp_tend = Diag.tendencies
+    @unpack div_grid,temp_grid,temp_grid_anomaly = Diag.grid_variables
+    @unpack sigma_u,sigma_tend,sigma_m,puv,div_mean = Diag.intermediate_variables
+    @unpack tref,σ_levels_half⁻¹_2,fsgr,tref3 = M.GeoSpectral.geometry #Note that tref is currenrtly not defined correctly 
+    @unpack akap = M.Parameters
 
     _,_,nlev = size(div_grid)
 
 
 
     for k in 2:nlev
-        arbitrary_array[:,:,k] = sigma_tend[:,:,k].*(temp_grid_anomaly[:,:,k] - temp_grid_anomaly[:,:,k-1])
-                    + sigma_m[:,:,k].*(temp_ref[k] - temp_ref[k-1])
+        sigma_u[:,:,k] = sigma_tend[:,:,k].*(temp_grid_anomaly[:,:,k] - temp_grid_anomaly[:,:,k-1])
+                    + sigma_m[:,:,k].*(tref[k] - tref[k-1])
     end
 
     for k in 1:nlev
         temp_tend[:,:,k] = temp_tend[:,:,k]
                         + temp_grid_anomaly[:,:,k].*div_grid[:,:,k]
-                        - (arbitrary_array[:,:,k+1] + arbitrary_array[:,:,k])*dhsr[k]
+                        - (sigma_u[:,:,k+1] + sigma_u[:,:,k])*σ_levels_half⁻¹_2[k]
                         + fsgr[k]*temp_grid_anomaly[:,:,k].*(sigma_tend[:,:,k+1] + sigma_tend[:,:,k])
                         + tref3[k]*(sigma_m[:,:,k+1] + sigma_m[:,:,k])
-                        + akap*(t_grid[:,:,k].*puv[:,:,k] - temp_grid_anomaly[:,:,k].*d_mean)
+                        + akap*(temp_grid[:,:,k].*puv[:,:,k] - temp_grid_anomaly[:,:,k].*div_mean)
     end 
 
 
