@@ -181,9 +181,13 @@ function legendre(  input::Array{Complex{NF},2},
     return output
 end
 
-function synthesize(alms::Matrix{Complex{NF}},                  # spectral coefficients
-                    nlon::Int,                                  # number of longitudes
-                    nlat::Int,                                  # number of latitudes
+import FFTW
+import AssociatedLegendrePolynomials
+import LinearAlgebra
+
+function synthesize(alms::AbstractMatrix{Complex{NF}},          # spectral coefficients
+                    nlon::Integer,                              # number of longitudes
+                    nlat::Integer,                              # number of latitudes
                     brfft_plan::FFTW.rFFTWPlan{Complex{NF}}     # FFT plan
                     ) where {NF<:AbstractFloat}                 # number format NF
 
@@ -193,7 +197,7 @@ function synthesize(alms::Matrix{Complex{NF}},                  # spectral coeff
     colat = NF(π)/nlat/2:NF(π)/nlat:π   # colatitudes from north to south pole
     lon_offset = NF(π/nlon)             # offset of the first longitude from prime meridian
     nfreq = nlon÷2 + 1                  # length real-only half of FFT axis; see `rfft()`
-    nlat_nh = (nlat + 1)÷2              # number of latitudes in northern hemisphere
+    nlat_nh = (nlat+1) ÷ 2              # number of latitudes in northern hemisphere
 
     # preallocate
     Λ = Matrix{NF}(undef, size(alms)...)    # legendre polynomials (1 latitude only)
@@ -240,4 +244,56 @@ function synthesize(alms::Matrix{Complex{NF}},      # spectral coefficients
     gn = zeros(Complex{NF}, nfreq)                  # phase factors for northern ring
     brfft_plan = FFTW.plan_brfft(gn,nlon)           # plan the FFT
     return synthesize(alms,nlon,nlat,brfft_plan)    # call with planned FFT 
+end
+
+function analyze(   map::AbstractMatrix{NF},
+                    lmax::Integer,
+                    mmax::Integer,
+                    rfft_plan::FFTW.rFFTWPlan{NF}) where {NF<:AbstractFloat}
+    
+    nlon, nlat = size(map)      # number of longitudes, latitudes
+    nlon_half = nlon÷2 + 1      # real-symmetric FFT's Nyquist length (index)
+    nlat_nh = (nlat+1) ÷ 2      # number of rings in northern hemisphere
+
+    colat = NF(π)/nlat/2:NF(π)/nlat:π   # colatitudes from north to south pole
+    lon0 = NF(π)/nlon                   # offset of the first longitude from prime meridian
+    ΔΩ = 2NF(π)^2 / (nlat*nlon)
+
+    alms = zeros(Complex{NF},lmax+1,mmax+1)
+    Λ = zeros(NF,lmax+1,mmax+1)
+    Λw = AssociatedLegendrePolynomials.Work(
+            AssociatedLegendrePolynomials.λlm!, Λ, zero(NF))
+    f₁ = zeros(Complex{NF},nlon_half)   # northern ring
+    f₂ = zeros(Complex{NF},nlon_half)   # southern ring
+
+    @inbounds for ilat in 1:nlat_nh     # loop over northern latitudes only due to symmetry
+        ilat_s = nlat - ilat + 1        # corresponding southern latitude index
+
+        # Fourier transform in zonal direction
+        LinearAlgebra.mul!(f₁, rfft_plan, @view(map[:,ilat]))       # Northern latitude
+        LinearAlgebra.mul!(f₂, rfft_plan, @view(map[:,ilat_s]))     # Southern latitude
+
+        # Legendre transform in meridional direction
+        slat, clat = sincos(colat[ilat])
+        AssociatedLegendrePolynomials.unsafe_legendre!(Λw, Λ, lmax, mmax, clat)
+
+        # Σ_{m=0}^{mmax}, but 1-based index
+        for m in 1:mmax+1                                                     
+            a₁, a₂ = (f₁[m], f₂[m]) .* (slat * ΔΩ * cis((m-1) * -lon0))
+            for l in m:lmax+1
+                c = isodd(l+m) ? a₁ - a₂ : a₁ + a₂
+                alms[l,m] += c * Λ[l,m]
+            end
+        end
+    end
+    return alms
+end
+
+function analyze(   map::AbstractMatrix{NF},
+                    lmax::Integer
+                    ) where {NF<:AbstractFloat}
+
+    nlon,_ = size(map)                          # number of longitudes
+    rfft_plan = FFTW.plan_rfft(zeros(NF,nlon))
+    return analyze(map,lmax,lmax,rfft_plan)
 end
