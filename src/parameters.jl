@@ -72,7 +72,8 @@ With keywords such that default values can be changed at creation.
 
     # BOUNDARY FILES
     boundary_path::String=""    # package location is default
-    boundary_file::String="surface.nc"
+    orography_path::String=boundary_path
+    orography_file::String="orography_F512.nc"
 
     # INITIAL CONDITIONS
     initial_conditions::Symbol=:rest    # :rest or :restart
