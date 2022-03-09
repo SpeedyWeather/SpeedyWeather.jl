@@ -69,10 +69,12 @@ With keywords such that default values can be changed at creation.
                                 # 0 -> forward step for gravity wave terms,
                                 # 1 -> backward implicit
                                 # 0.5 -> centered implicit
+    recompute_legendre::Bool=false
 
     # BOUNDARY FILES
     boundary_path::String=""    # package location is default
-    boundary_file::String="surface.nc"
+    orography_path::String=boundary_path
+    orography_file::String="orography_F512.nc"
 
     # INITIAL CONDITIONS
     initial_conditions::Symbol=:rest    # :rest or :restart

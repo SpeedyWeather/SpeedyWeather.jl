@@ -191,7 +191,6 @@ function synthesize(alms::AbstractMatrix{Complex{NF}},          # spectral coeff
                     brfft_plan::FFTW.rFFTWPlan{Complex{NF}}     # FFT plan
                     ) where {NF<:AbstractFloat}                 # number format NF
 
-    
     lmax, mmax = size(alms) .- 1        # 1-based indexing: coefficient in alms from 0:lmax, 0:mmax
 
     colat = NF(π)/nlat/2:NF(π)/nlat:π   # colatitudes from north to south pole
@@ -221,13 +220,14 @@ function synthesize(alms::AbstractMatrix{Complex{NF}},          # spectral coeff
                 accn += term
                 accs += isodd(l+m) ? -term : term   # flip sign for southern odd wavenumbers
             end
-            accn, accs = (accn, accs) .* cis((m-1)*lon_offset)    # longitude offset rotation
-            gn[m] += accn
-            gs[m] += accs
+            w = cis((m-1)*lon_offset)               # longitude offset rotation
+            gn[m] += accn*w
+            gs[m] += accs*w
         end
 
-        map[:,ilat]   = brfft_plan*gn   # Fourier transform in zonal direction
-        map[:,ilat_s] = brfft_plan*gs
+        # Fourier transform in zonal direction
+        LinearAlgebra.mul!(@view(map[:,ilat]),  brfft_plan,gn)  # Northern latitude
+        LinearAlgebra.mul!(@view(map[:,ilat_s]),brfft_plan,gs)  # Southern latitude
 
         fill!(gn, zero(Complex{NF}))    # set phase factors back to zero
         fill!(gs, zero(Complex{NF}))
@@ -263,29 +263,31 @@ function analyze(   map::AbstractMatrix{NF},
     Λ = zeros(NF,lmax+1,mmax+1)
     Λw = AssociatedLegendrePolynomials.Work(
             AssociatedLegendrePolynomials.λlm!, Λ, zero(NF))
-    f₁ = zeros(Complex{NF},nlon_half)   # northern ring
-    f₂ = zeros(Complex{NF},nlon_half)   # southern ring
+    fn = zeros(Complex{NF},nlon_half)   # northern ring
+    fs = zeros(Complex{NF},nlon_half)   # southern ring
 
     @inbounds for ilat in 1:nlat_nh     # loop over northern latitudes only due to symmetry
         ilat_s = nlat - ilat + 1        # corresponding southern latitude index
 
         # Fourier transform in zonal direction
-        LinearAlgebra.mul!(f₁, rfft_plan, @view(map[:,ilat]))       # Northern latitude
-        LinearAlgebra.mul!(f₂, rfft_plan, @view(map[:,ilat_s]))     # Southern latitude
+        LinearAlgebra.mul!(fn, rfft_plan, @view(map[:,ilat]))       # Northern latitude
+        LinearAlgebra.mul!(fs, rfft_plan, @view(map[:,ilat_s]))     # Southern latitude
 
         # Legendre transform in meridional direction
         slat, clat = sincos(colat[ilat])
         AssociatedLegendrePolynomials.unsafe_legendre!(Λw, Λ, lmax, mmax, clat)
 
-        # Σ_{m=0}^{mmax}, but 1-based index
-        for m in 1:mmax+1                                                     
-            a₁, a₂ = (f₁[m], f₂[m]) .* (slat * ΔΩ * cis((m-1) * -lon0))
+        for m in 1:mmax+1                                           # Σ_{m=0}^{mmax}, but 1-based index
+            w = slat * ΔΩ * cis((m-1) * -lon0)
+            an = fn[m] * w
+            as = fs[m] * w
             for l in m:lmax+1
-                c = isodd(l+m) ? a₁ - a₂ : a₁ + a₂
+                c = isodd(l+m) ? an - as : an + as
                 alms[l,m] += c * Λ[l,m]
             end
         end
     end
+
     return alms
 end
 

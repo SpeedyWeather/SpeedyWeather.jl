@@ -4,10 +4,10 @@ module SpeedyWeather
     import Parameters: @with_kw, @unpack
     
     # NUMERICS
-    import FastGaussQuadrature: gausslegendre
+    import FastGaussQuadrature
     import AssociatedLegendrePolynomials
-    import FFTW: FFTW, rfft, irfft
-    import LinearAlgebra: dot
+    import FFTW
+    import LinearAlgebra
 
     # INPUT OUTPUT 
     import Dates: DateTime
@@ -17,11 +17,12 @@ module SpeedyWeather
 
     export run_speedy, 
         Parameters, GenLogisticCoefs,
-        GeoSpectral, Boundaries, Constants, Geometry,
+        GeoSpectral, Boundaries, Constants, Geometry, SpectralTransform,
         PrognosticVariables, DiagnosticVariables,
         fourier, fourier_inverse,
         legendre, legendre_inverse,
-        spectral, gridded
+        spectral, gridded,
+        spectral!, gridded!
 
     include("utility_functions.jl")
     include("parameter_structs.jl")
