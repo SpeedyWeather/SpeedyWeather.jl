@@ -33,14 +33,14 @@ function initialize_from_rest(  P::Parameters,
                                 G::GeoSpectral)
 
     @unpack nlev = G.geometry
-    @unpack mx, nx = G.spectral
+    @unpack lmax, mmax = G.spectral
 
     # conversion to type NF later when creating a PrognosticVariables struct
-    vor         = zeros(Complex{Float64},mx,nx,nlev)  # vorticity
-    div         = zeros(Complex{Float64},mx,nx,nlev)  # divergence
-    temp        = zeros(Complex{Float64},mx,nx,nlev)  # absolute Temperature
-    pres_surf   = zeros(Complex{Float64},mx,nx)       # logarithm of surface pressure
-    humid       = zeros(Complex{Float64},mx,nx,nlev)  # specific humidity
+    vor         = zeros(Complex{Float64},lmax+1,mmax+1,nlev)  # vorticity
+    div         = zeros(Complex{Float64},lmax+1,mmax+1,nlev)  # divergence
+    temp        = zeros(Complex{Float64},lmax+1,mmax+1,nlev)  # absolute Temperature
+    pres_surf   = zeros(Complex{Float64},lmax+1,mmax+1)       # logarithm of surface pressure
+    humid       = zeros(Complex{Float64},lmax+1,mmax+1,nlev)  # specific humidity
 
     initialize_temperature!(temp,P,B,G)                     # temperature from lapse rates    
     pres_surf_grid = initialize_pressure!(pres_surf,P,B,G)  # pressure from temperature profile
@@ -58,8 +58,9 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
                                     G::GeoSpectral{NF}                  # Geospectral struct
                                     ) where {NF<:AbstractFloat}         # number format NF
 
-    mx,nx,nlev = size(temp)
-    @unpack geopot_surf = B     # spectral surface geopotential [m²/s²]
+    lmax,mmax,nlev = size(temp)     # of size lmax+1, mmax+1, nlev
+    lmax, mmax = lmax-1, mmax-1     # hence correct with -1
+    @unpack geopot_surf = B         # spectral surface geopotential [m²/s²]
 
     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
@@ -71,22 +72,23 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
 
     lapse_rate_scaled = lapse_rate/gravity/1000     # Lapse rate scaled by gravity [K/m / (m²/s²)]
 
+    # TODO introduce spectral scaling, should be 2√π instead of √2
     temp_surf = -lapse_rate_scaled*geopot_surf      # spectral surface air temperature from orography and lapse rate
-    temp_surf[1,1] += √2*temp_ref                   # adjust mean value (spectral coefficient 1,1) with temp_ref
+    temp_surf[1,1] += 2√π*temp_ref                  # adjust mean value (spectral coefficient 1,1) with temp_ref
 
     # Stratosphere, set the first spectral coefficient (=mean value)
     # in uppermost levels (default: k=1,2) for lapse rate = 0
     for k in 1:n_stratosphere_levels
-        temp[1,1,k] = √2*temp_top
+        temp[1,1,k] = 2√π*temp_top
     end
 
     # Temperature at tropospheric levels
     @unpack σ_levels_full = G.geometry
 
     for k in n_stratosphere_levels+1:nlev
-        for j in 1:nx
-            for i in 1:mx
-                temp[i,j,k] = temp_surf[i,j]*σ_levels_full[k]^(R*lapse_rate_scaled)
+        for m in 1:mmax+1
+            for l in 1:lmax+1
+                temp[l,m,k] = temp_surf[l,m]*σ_levels_full[k]^(R*lapse_rate_scaled)
             end
         end
     end
@@ -108,10 +110,10 @@ function initialize_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # lo
     # R:            Specific gas constant for dry air [J/kg/K]
     # pres_ref:     Reference surface pressure [hPa]
     @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R = P
-    @unpack geopot_surf = B                     # spectral surface geopotential
-    geopot_surf_grid = gridded(geopot_surf,G)   # convert to grid-point space
+    @unpack geopot_surf = B                             # spectral surface geopotential
+    geopot_surf_grid = gridded(geopot_surf,G.spectral)  # convert to grid-point space
 
-    lapse_rate_scaled = lapse_rate/gravity/1000  # Lapse rate scaled by gravity [K/m / (m²/s²)]
+    lapse_rate_scaled = lapse_rate/gravity/1000 # Lapse rate scaled by gravity [K/m / (m²/s²)]
     log_pres_ref = log(pres_ref)                # logarithm of reference surface pressure
     pres_surf_grid = zeros(nlon, nlat)          # logarithm of surface pressure by grid point
 
@@ -122,10 +124,9 @@ function initialize_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # lo
         end
     end
 
-    pres_surf .= spectral(pres_surf_grid,G) # convert to spectral space
-    spectral_truncation!(pres_surf,G)       # truncate in spectral space
-
-    return pres_surf_grid                   # return grid for use in initialize_humidity!
+    # convert to spectral space
+    spectral!(pres_surf,pres_surf_grid,G.spectral) 
+    return pres_surf_grid                       # return grid for use in initialize_humidity!
 end
 
 """Initialize specific humidity in spectral space."""
@@ -135,7 +136,8 @@ function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},    # spectr
                                 G::GeoSpectral{NF}                      # Geospectral struct
                                 ) where {NF<:AbstractFloat}             # number format NF
 
-    mx,nx,nlev = size(humid)
+    lmax,mmax,nlev = size(humid)    # of size lmax+1, mmax+1, nlev
+    lmax, mmax = lmax-1, mmax-1     # hence correct with -1
     @unpack nlon, nlat, n_stratosphere_levels = P
     @unpack σ_levels_full = G.geometry
 
@@ -150,18 +152,17 @@ function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},    # spectr
     # Specific humidity at the surface (grid space)
     humid_surf_grid = humid_ref*exp.(scale_height_ratio*pres_surf_grid)
 
-    # Convert to spectral space and truncate
-    humid_surf = spectral(humid_surf_grid,G)
-    spectral_truncation!(humid_surf,G)
+    # Convert to spectral space
+    humid_surf = spectral(humid_surf_grid,G.spectral)
 
     # stratospheric humidity zero
     fill!(view(humid,:,:,1:n_stratosphere_levels),0)
 
     # Specific humidity at tropospheric levels
     for k in n_stratosphere_levels+1:nlev
-        for j in 1:nx
-            for i in 1:mx
-                humid[i,j,k] = humid_surf[i,j]*σ_levels_full[k]^scale_height_ratio
+        for m in 1:mmax+1
+            for l in 1:lmax+1
+                humid[l,m,k] = humid_surf[l,m]*σ_levels_full[k]^scale_height_ratio
             end
         end
     end

@@ -1,3 +1,8 @@
+import FastGaussQuadrature
+import AssociatedLegendrePolynomials
+import FFTW
+import LinearAlgebra
+
 struct SpectralTransform{NF<:AbstractFloat}
     # SPECTRAL RESOLUTION
     lmax::Int       # Maximum degree l=[0,lmax] of spherical harmonics
@@ -45,23 +50,28 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
     brfft_plan = FFTW.plan_brfft(zeros(Complex{NF},nfreq),nlon)
 
     # GAUSSIAN LATITUDES (0,π) North to South
-    colat = π .- acos.(FastGaussQuadrature.gausslegendre(nlat)[1])
+    # colat = π .- acos.(FastGaussQuadrature.gausslegendre(nlat)[1])
+
+    # EQUI-DISTANCE LATITUDES (0,π) North to South
+    colat = collect(π/nlat/2:π/nlat:π)
     sin_colat = sin.(colat)
     cos_colat = cos.(colat)
 
     lon_offset = π/nlon
     ΔΩ = 2π^2/(nlat*nlon)
 
-    # Preallocate Legendre polynomials
+    # PREALLOCATE LEGENDRE POLYNOMIALS
     Λ = zeros(lmax+1,mmax+1)                # Legendre polynomials for one latitude
 
+    # allocate memory for polynomials at all latitudes or allocate dummy array if precomputed
+    # for recomputed only Λ is used, not Λs
+    b = ~recompute_legendre                 # true for precomputed
+    Λs = zeros(b*lmax + 1, b*mmax + 1, b*(nlat_half-1) + 1)
+
     if recompute_legendre == false          # then precompute all polynomials
-        Λs = zeros(lmax+1,mmax+1,nlat_half) # allocate memory for polynomials at all latitudes
         for ilat in 1:nlat_half             # only one hemisphere due to symmetry
-            AssociatedLegendrePolynomials.λlm!(Λs[:,:,ilat], lmax, mmax, cos_colat[ilat])
+            AssociatedLegendrePolynomials.λlm!(@view(Λs[:,:,ilat]), lmax, mmax, cos_colat[ilat])
         end
-    else                                    # for recomputed polynomials Λs is not used
-        Λs = zeros(1,1,1)                   # dummy array
     end
 
     # conversion to NF happens here
@@ -136,8 +146,8 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
                 accs += isodd(l+m) ? -term : term   # flip sign for southern odd wavenumbers
             end
             w = cis((m-1)*lon_offset)               # longitude offset rotation
-            gn[m] += accn*w
-            gs[m] += accs*w
+            gn[m] += accn*w                         # no aliasing here as we are always close
+            gs[m] += accs*w                         # to the triangular truncation
         end
 
         # Fourier transform in zonal direction
@@ -164,8 +174,21 @@ function gridded(alms::AbstractMatrix{Complex{NF}}  # spectral coefficients
     recompute_legendre = true       # saves memory
 
     S = SpectralTransform(NF,nlon,nlat,lmax,recompute_legendre)
-    output = Matrix{NF}(undef,nlon,nlat)    # preallocate output
-    return gridded!(output,alms,S)          # now execute the in-place version
+    return gridded(alms,S)          # now execute the in-place version
+end
+
+function gridded(   alms::AbstractMatrix{Complex{NF}},  # spectral coefficients
+                    S::SpectralTransform{NF}            # struct for spectral transform parameters
+                    ) where NF                          # number format NF
+
+    # check for square matrix of coefficients
+    lmax, mmax = size(alms) .- 1
+    @boundscheck lmax == mmax || throw(BoundsError)
+    @boundscheck lmax == S.lmax || throw(BoundsError)
+
+    output = Matrix{NF}(undef,S.nlon,S.nlat)    # preallocate output
+    gridded!(output,alms,S)                     # now execute the in-place version
+    return output
 end
 
 function spectral!( alms::AbstractMatrix{Complex{NF}},
@@ -221,15 +244,41 @@ function spectral(  map::AbstractMatrix{NF} # gridded field nlon x nlat
     nlon, nlat = size(map)
     @boundscheck nlon == 2nlat || throw(BoundsError)
 
-    trunc = ceil(Int,nlon/3-1)      # get spectral resolution from triangular truncation
+    # make assumptions about the spectral resolution from triangular truncation
+    trunc = ceil(Int,nlon/3-1)
     recompute_legendre = true       # saves memory
 
-    # get SpectralTransform struct and preallocate output
+    # allocate spectral transform struct
     S = SpectralTransform(NF,nlon,nlat,trunc,recompute_legendre)
-    output = Matrix{Complex{NF}}(undef,trunc+1,trunc+1)
+    return spectral(map,S)
+end
+
+function spectral(  map::AbstractMatrix{NF},    # gridded field nlon x nlat
+                    S::SpectralTransform{NF}    # spectral transform struct
+                    ) where NF                  # number format NF
+
+    # check grid is compatible with triangular spectral truncation
+    nlon, nlat = size(map)
+    @boundscheck nlon == 2nlat || throw(BoundsError)
+    @boundscheck nlon == S.nlon || throw(BoundsError)
+
+    output = Matrix{Complex{NF}}(undef,S.lmax+1,S.mmax+1)
     return spectral!(output,map,S)  # in-place version
 end
 
+# function show_leakage(l,m,trunc=31)
+#     alms = zeros(ComplexF64,trunc+1,trunc+1)
+#     alms[l+1,m+1] = 1
+
+#     map = gridded(alms)
+#     alms2 = spectral(map)
+#     imshow(log10.(abs.(alms-alms2)))
+#     colorbar(label="Absolute error, log10(abs(alms-alms2))")
+#     xlabel("order m")
+#     ylabel("degree l")
+#     title("Spectral leakage from a(l=$l,m=$m) = 1", loc="left")
+#     return alms2[l+1,m+1]
+# end
 
 # function SpectralTransform(P::Parameters,G::Geometry)
 
