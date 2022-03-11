@@ -15,23 +15,30 @@ module SpeedyWeather
     import NetCDF: NetCDF, NcFile, NcDim, NcVar
     import BitInformation: round, round!
 
-    export run_speedy, 
-        Parameters, GenLogisticCoefs,
+    # EXPORT MAIN INTERFACE TO SPEEDY
+    export run_speedy
+
+    # EXPORT STRUCTS
+    export Parameters, GenLogisticCoefs,
         GeoSpectral, Boundaries, Constants, Geometry, SpectralTransform,
-        PrognosticVariables, DiagnosticVariables,
-        fourier, fourier_inverse,
-        legendre, legendre_inverse,
-        spectral, gridded,
-        spectral!, gridded!
+        PrognosticVariables, DiagnosticVariables
+    
+    # EXPORT SPECTRAL FUNCTIONS
+    export  spectral, gridded,
+        spectral!, gridded!,
+        spectral_truncation, spectral_truncation!,
+        spectral_interpolation, triangular_truncation
 
     include("utility_functions.jl")
     include("parameter_structs.jl")
+    include("spectral_truncation.jl")
+
     include("parameters.jl")
     include("constants.jl")
     include("geometry.jl")
     include("spectral_transform.jl")
-    include("legendre.jl")
-    include("fourier.jl")
+    include("spectral_gradients.jl")
+
     include("boundaries.jl")
     include("diagnostics.jl")
     include("prognostic_variables.jl")

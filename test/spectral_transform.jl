@@ -1,7 +1,15 @@
-# using Test
-# include("../src/SpeedyWeather.jl")
-# using .SpeedyWeather
+@testset "Transform: Triangular truncation" begin
+    Ts = (31,42,85,170,341,682)     # spectral resolutions
+    nlons = (96,128,256,512,1024)   # number of longitudes
+    nlats = (48,64,128,256,512)     # number of latitudes
+    for (T,nlon,nlat) in zip(Ts,nlons,nlats)
+        @test (nlon,nlat) == SpeedyWeather.triangular_truncation(T)
+        @test T == SpeedyWeather.triangular_truncation(nlon,nlat)
+    end
+end
 
+# for the following testsets test some spectral truncations
+# but not too large ones as they take so long
 spectral_resolutions = (31,42,85,170)#,341)
 
 @testset "Transform: l=0,m=0 is constant > 0" begin

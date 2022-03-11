@@ -22,6 +22,8 @@ SpeedyWeather.spectral
 SpeedyWeather.spectral!
 SpeedyWeather.gridded
 SpeedyWeather.gridded!
+SpeedyWeather.triangular_truncation
+SpeedyWeather.roundup_fft
 SpeedyWeather.spectral_truncation
 SpeedyWeather.spectral_truncation!
 SpeedyWeather.get_legendre_polynomials!
