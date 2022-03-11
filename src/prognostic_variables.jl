@@ -74,12 +74,12 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
 
     # TODO introduce spectral scaling, should be 2√π instead of √2
     temp_surf = -lapse_rate_scaled*geopot_surf      # spectral surface air temperature from orography and lapse rate
-    temp_surf[1,1] += 2√π*temp_ref                  # adjust mean value (spectral coefficient 1,1) with temp_ref
+    temp_surf[1,1] += 2*sqrt(π)*temp_ref            # adjust mean value (spectral coefficient 1,1) with temp_ref
 
     # Stratosphere, set the first spectral coefficient (=mean value)
     # in uppermost levels (default: k=1,2) for lapse rate = 0
     for k in 1:n_stratosphere_levels
-        temp[1,1,k] = 2√π*temp_top
+        temp[1,1,k] = 2*sqrt(π)*temp_top
     end
 
     # Temperature at tropospheric levels
