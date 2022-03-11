@@ -3,24 +3,46 @@
 ## Parameters and constants
 
 ```@docs
-Params
-Constants
+SpeedyWeather.Parameters
+SpeedyWeather.Constants
 ```
 
-## Boundaries
+## Boundaries and boundary conditions
 
 ```@docs
-Boundaries
+SpeedyWeather.Boundaries
 ```
 
 ## Spectral transform
 
 ```@docs
-Geometry
-fourier
-fourier_inverse
-legendre
-legendre_inverse
-spectral
-gridded
+SpeedyWeather.GeoSpectral
+SpeedyWeather.SpectralTransform
+SpeedyWeather.spectral
+SpeedyWeather.spectral!
+SpeedyWeather.gridded
+SpeedyWeather.gridded!
+SpeedyWeather.triangular_truncation
+SpeedyWeather.roundup_fft
+SpeedyWeather.spectral_truncation
+SpeedyWeather.spectral_truncation!
+SpeedyWeather.get_legendre_polynomials!
+```
+
+## Geometry
+
+```@docs
+SpeedyWeather.Geometry
+SpeedyWeather.vertical_coordinates
+SpeedyWeather.GenLogisticCoefs
+SpeedyWeather.generalised_logistic
+```
+
+## Time stepping
+
+```@docs
+SpeedyWeather.time_stepping!
+SpeedyWeather.time_step!
+SpeedyWeather.first_timestep!
+SpeedyWeather.leapfrog!
 ```

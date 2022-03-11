@@ -69,6 +69,7 @@ With keywords such that default values can be changed at creation.
                                 # 0 -> forward step for gravity wave terms,
                                 # 1 -> backward implicit
                                 # 0.5 -> centered implicit
+    recompute_legendre::Bool=false
 
     # BOUNDARY FILES
     boundary_path::String=""    # package location is default

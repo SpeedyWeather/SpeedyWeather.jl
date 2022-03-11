@@ -61,7 +61,7 @@ function Geometry(P::Parameters)
     lon  = Array(0:dlon:360-dlon)           # array of longitudes
     # array of latitudes (North to South) corresponding to the zeros
     # of the (unassociated) legendre polynomial order nlat
-    lat  = reverse(asind.(gausslegendre(nlat)[1]))
+    lat  = reverse(asind.(FastGaussQuadrature.gausslegendre(nlat)[1]))
 
     # VERTICAL SIGMA COORDINATE 
     # σ = p/p0 (fraction of surface pressure)

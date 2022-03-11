@@ -3,14 +3,22 @@ include("../src/SpeedyWeather.jl")
 using .SpeedyWeather
 
 # original speedy T30 with 96x48 grid
-P = Parameters(NF=Float64;trunc=30,nlat=48,nlon=96)
+trunc = 31
+nlon = 96
+nlat = 48
+
+P = Parameters(NF=Float64;trunc,nlat,nlon)
 G = GeoSpectral(P)
 B = Boundaries(P,G)
+S = G.spectral
 
 geopot_surf_spectral = B.geopot_surf
-geopot_surf_grid = gridded(geopot_surf_spectral,G)
-geopot_surf_fourier = fourier(geopot_surf_grid,G)
+geopot_surf_grid = gridded(geopot_surf_spectral)
+geopot_surf_spectral2 = spectral(geopot_surf_grid)
+geopot_surf_grid2 = gridded(geopot_surf_spectral2)
 
-@btime fourier_inverse(fourier($geopot_surf_grid,$G),$G);
-@btime legendre_inverse(legendre($geopot_surf_fourier,$G),$G);
-@btime gridded(spectral($geopot_surf_grid,$G),$G);
+spectral_truncation!(geopot_surf_spectral)
+spectral_truncation!(geopot_surf_spectral2)
+
+@btime spectral!($geopot_surf_spectral,$geopot_surf_grid,$S);
+@btime gridded!($geopot_surf_grid,$geopot_surf_spectral,$S);
