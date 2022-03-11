@@ -1,7 +1,7 @@
-import FastGaussQuadrature
-import AssociatedLegendrePolynomials
-import FFTW
-import LinearAlgebra
+# import FastGaussQuadrature
+# import AssociatedLegendrePolynomials
+# import FFTW
+# import LinearAlgebra
 
 struct SpectralTransform{NF<:AbstractFloat}
     # SPECTRAL RESOLUTION
@@ -19,16 +19,16 @@ struct SpectralTransform{NF<:AbstractFloat}
     cos_colat::Vector{NF}   # Cosine of colatitudes
     sin_colat::Vector{NF}   # Sine of colatitudes
     lon_offset::NF          # Offset of first longitude from prime meridian
-    ΔΩ::NF                  # Solid angle (?)
 
     # FFT plans
     rfft_plan::FFTW.rFFTWPlan{NF}           # grid to spectral transform
     brfft_plan::FFTW.rFFTWPlan{Complex{NF}} # spectral to grid transform (inverse)
 
     # LEGENDRE POLYNOMIALS
-    recompute_legendre::Bool    # Pre or recompute Legendre polynomials
-    Λ::Matrix{NF}               # Legendre polynomials for one latitude (requires recomputing)
-    Λs::Array{NF,3}             # Legendre polynomials for all latitudes (all precomputed)
+    recompute_legendre::Bool        # Pre or recompute Legendre polynomials
+    Λ::Matrix{NF}                   # Legendre polynomials for one latitude (requires recomputing)
+    Λs::Array{NF,3}                 # Legendre polynomials for all latitudes (all precomputed)
+    legendre_weights::Vector{NF}    # Legendre weights (extra normalisation of 1/π included)
 end
 
 function SpectralTransform( ::Type{NF},                 # Number format NF
@@ -50,15 +50,12 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
     brfft_plan = FFTW.plan_brfft(zeros(Complex{NF},nfreq),nlon)
 
     # GAUSSIAN LATITUDES (0,π) North to South
-    # colat = π .- acos.(FastGaussQuadrature.gausslegendre(nlat)[1])
+    colat = π .- acos.(FastGaussQuadrature.gausslegendre(nlat)[1])
 
     # EQUI-DISTANCE LATITUDES (0,π) North to South
-    colat = collect(π/nlat/2:π/nlat:π)
     sin_colat = sin.(colat)
     cos_colat = cos.(colat)
-
     lon_offset = π/nlon
-    ΔΩ = 2π^2/(nlat*nlon)
 
     # PREALLOCATE LEGENDRE POLYNOMIALS
     Λ = zeros(lmax+1,mmax+1)                # Legendre polynomials for one latitude
@@ -74,13 +71,16 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
         end
     end
 
+    legendre_weights = FastGaussQuadrature.gausslegendre(nlat)[2][1:nlat_half]
+    legendre_weights *= π/nlat              # extra normalisation for forward transform included
+
     # conversion to NF happens here
     SpectralTransform{NF}(  lmax,mmax,
                             nlon,nlat,nlat_half,nfreq,
-                            colat,cos_colat,sin_colat,
-                            lon_offset,ΔΩ,
+                            colat,cos_colat,sin_colat,lon_offset,
                             rfft_plan,brfft_plan,
-                            recompute_legendre,Λ,Λs)
+                            recompute_legendre,Λ,Λs,
+                            legendre_weights)
 end
 
 SpectralTransform(args...) = SpectralTransform(Float64,args...)
@@ -197,8 +197,8 @@ function spectral!( alms::AbstractMatrix{Complex{NF}},
                     ) where {NF<:AbstractFloat}
 
     @unpack lmax, mmax, nlon, nlat, nfreq, nlat_half = S
-    @unpack cos_colat, sin_colat, lon_offset, ΔΩ = S
-    @unpack recompute_legendre, Λ, Λs = S
+    @unpack cos_colat, sin_colat, lon_offset = S
+    @unpack recompute_legendre, Λ, Λs, legendre_weights = S
     @unpack rfft_plan = S
     
     @boundscheck (nlon, nlat) == size(map) || throw(BoundsError)
@@ -221,10 +221,12 @@ function spectral!( alms::AbstractMatrix{Complex{NF}},
         # Legendre transform in meridional direction
         # Recalculate or use precomputed Legendre polynomials
         get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
-        sin_colat_ΔΩ = sin_colat[ilat] * ΔΩ
+        # sin_colat_ΔΩ = sin_colat[ilat] * ΔΩ
+        legendre_weight = legendre_weights[ilat]
 
         for m in 1:mmax+1                                           # Σ_{m=0}^{mmax}, but 1-based index
-            w = sin_colat_ΔΩ * cis((m-1) * -lon_offset)
+            # w = sin_colat_ΔΩ * cis((m-1) * -lon_offset)
+            w = legendre_weight * cis((m-1) * -lon_offset)
             an = fn[m] * w
             as = fs[m] * w
             for l in m:lmax+1
