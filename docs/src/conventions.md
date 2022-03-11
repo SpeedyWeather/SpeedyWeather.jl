@@ -52,7 +52,7 @@ We follow Julia's [style guide](https://docs.julialang.org/en/v1/manual/style-gu
 
 - __Bang (!) convention__. A function `func` does not change its input arguments, however, `func!` does.
 Hence, `func!` is often the in-place version of `func`, avoiding as much memory allocation as possible
-and often changing it's first argument, e.g. `func!(out,in)` so that argument `in` is used to calculate
+and often changing its first argument, e.g. `func!(out,in)` so that argument `in` is used to calculate
 `out` which has been preallocated before function call.
 - __Number format flexibility__. Numeric literals such as `2.0` or `1/3` are only used in the model setup
 but avoided throughout the code to obtain a fully number format-flexible package using the number format
