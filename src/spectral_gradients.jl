@@ -290,3 +290,120 @@
 
 #     return ∇²,∇⁻²,∇⁴
 # end
+
+function ∇²!(   ∇²alms::AbstractMatrix{Complex{T}},     # Output: Laplacian of alms
+                alms::AbstractMatrix{Complex{T}},       # spectral coefficients
+                R::Real                                 # radius of the Earth
+                ) where {T<:AbstractFloat}
+
+    @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
+
+    lmax,mmax = size(alms) .- 1         # degree l, order m of the legendre polynomials
+    R_inv = convert(Complex{T},inv(R))  # =1/R, 1 over radius
+
+    @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
+        for l in m:lmax+1           # degree l = 0:lmax but 1-based
+            # ∇²alms = -l(l+1)/R²*alms, but 1-based
+            # R⁻² is split to avoid under/overflows
+            ∇²alms[l,m] = ((1-l)*R_inv)*(l*R_inv)*alms[l,m]
+        end
+    end
+    return ∇²alms
+end
+
+function ∇²!(   ∇²alms::AbstractMatrix{Complex{T}},     # Output: Laplacian of alms
+                alms::AbstractMatrix{Complex{T}},       # spectral coefficients
+                ) where {T<:AbstractFloat}
+
+    @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
+
+    lmax,mmax = size(alms) .- 1     # degree l, order m of the legendre polynomials
+
+    @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
+        for l in m:lmax+1           # degree l = 0:lmax but 1-based
+            # ∇²alms = -l(l+1)/R²*alms, but 1-based and R=1
+            ∇²alms[l,m] = (l*(1-l))*alms[l,m]
+        end
+    end
+    return ∇²alms
+end
+
+function ∇²(alms::AbstractMatrix{Complex{T}},       # spectral coefficients
+            R::Real=1                               # radius of the Earth
+            ) where T
+
+    ∇²alms = copy(alms)
+    return R == 1 ? ∇²!(∇²alms,alms) : ∇²!(∇²alms,alms,R)
+end
+
+
+function ∇⁴!(   ∇⁴alms::AbstractMatrix{Complex{T}},     # Output: Bi-Laplacian of alms
+                alms::AbstractMatrix{Complex{T}},       # spectral coefficients
+                R::Real=1
+                ) where {T<:AbstractFloat}
+    
+    if R == 1                       # execute the non-R version
+        ∇²!(∇⁴alms,alms)            # apply first Laplacian
+        ∇²!(∇⁴alms,∇⁴alms)          # apply 2nd Laplacian
+    else                            # scale by 1/R²
+        ∇²!(∇⁴alms,alms,R)          # apply first Laplacian
+        ∇²!(∇⁴alms,∇⁴alms,R)        # apply 2nd Laplacian
+    end
+    return ∇⁴alms
+end
+
+function ∇⁴(alms::AbstractMatrix{Complex{T}},   # spectral coefficients
+            R::Real=1                           # radius of the Earth
+            ) where {T<:AbstractFloat}
+    
+    ∇⁴alms = copy(alms)
+    return R == 1 ? ∇⁴!(∇⁴alms,alms) : ∇⁴!(∇⁴alms,alms,R)
+end
+
+function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{T}},    # Output: inverse Laplacian of alms
+                alms::AbstractMatrix{Complex{T}}        # spectral coefficients
+                ) where {T<:AbstractFloat}
+
+    @boundscheck size(alms) == size(∇⁻²alms) || throw(BoundsError)
+    lmax,mmax = size(alms) .- 1     # degree l, order m of the legendre polynomials
+
+    @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
+        for l in m:lmax+1           # degree l = 0:lmax but 1-based
+            # ∇²alms = R²/(-l(l+1))*alms, but 1-based and R=1
+            ∇⁻²alms[l,m] = alms[l,m]/(l*(1-l))
+        end
+    end
+
+    ∇⁻²alms[1,1] = zero(Complex{T})
+
+    return ∇⁻²alms
+end
+
+function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{T}},    # Output: inverse Laplacian of alms
+                alms::AbstractMatrix{Complex{T}},       # spectral coefficients
+                R::Real
+                ) where {T<:AbstractFloat}
+
+    @boundscheck size(alms) == size(∇⁻²alms) || throw(BoundsError)
+    lmax,mmax = size(alms) .- 1     # degree l, order m of the legendre polynomials
+    R² = convert(T,R^2)
+
+    @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
+        for l in m:lmax+1           # degree l = 0:lmax but 1-based
+            # ∇²alms = R²/(-l(l+1))*alms, but 1-based and R=1
+            ∇⁻²alms[l,m] = alms[l,m]/(l*(1-l))*R²
+        end
+    end
+
+    ∇⁻²alms[1,1] = zero(Complex{T})
+
+    return ∇⁻²alms
+end
+
+function ∇⁻²(   alms::AbstractMatrix{Complex{T}},   # spectral coefficients
+                R::Real=1                           # radius of the Earth
+                ) where {T<:AbstractFloat}
+    
+    ∇⁻²alms = copy(alms)
+    return R == 1 ? ∇⁻²!(∇⁻²alms,alms) : ∇⁻²!(∇⁻²alms,alms,R)
+end
