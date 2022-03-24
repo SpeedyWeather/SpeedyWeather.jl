@@ -203,7 +203,7 @@ function dynamics_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variab
 
 
     # =========================================================================
-    # Calculate vor_tend,div_tend and then update temp_tend and tr_tend
+    # Calculate vor_tend,div_tend and then update temp_tend and humid_tend
     # =========================================================================
     vor_div_tendency_and_corrections!(Diag,M)
 
@@ -211,15 +211,15 @@ function dynamics_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variab
 end
 
 """
-Convert a set of tendencies in grid point space to spectral space and calculate ...
+Calculate vor_tend,div_tend and then update temp_tend and humid_tend
 """
 function vor_div_tendency_and_corrections!( Diag::DiagnosticVariables{NF},
                                             M
                                             ) where {NF<:AbstractFloat}
 
 
-    @unpack u_tend,v_tend,vor_tend,div_tend = Diag.tendencies
-    @unpack u_grid,v_grid = Diag.grid_variables
+    @unpack u_tend,v_tend,vor_tend,div_tend,temp_tend,humid_tend = Diag.tendencies
+    @unpack u_grid,v_grid,temp_grid_anomaly,temp_grid,humid_grid = Diag.grid_variables
     _,_,nlev = size(u_grid)
 
     @unpack L2_velocity_complex = Diag.intermediate_variables
@@ -233,51 +233,34 @@ function vor_div_tendency_and_corrections!( Diag::DiagnosticVariables{NF},
 
         #2. Divergence tendency
         ## add -laplacian(0.5*(u**2+v**2)) to divergence tendency
-        L2_velocity_complex = spectral(0.50*(u_grid[:,:,k]^2 + v_grid[:,:,k]^2))
-        div_tend[:,:,k] = div_tend[:,:,k] - laplacian(L2_velocity_complex) 
+        L2_velocity_complex = spectral(0.50*(u_grid[:,:,k].^2 + v_grid[:,:,k].^2),M.GeoSpectral)
+        div_tend[:,:,k] = div_tend[:,:,k] - ∇²(L2_velocity_complex,M.GeoSpectral) 
+
+        #3. Temperature tendency
+        # add div(vT) to spectral t tendency
+        vdspec!(-u_grid[:,:,k].*temp_grid_anomaly[:,:,k], 
+                -v_grid[:,:,k].*temp_grid_anomaly[:,:,k], 
+                L2_velocity_complex, temp_tend[:,:,k], 
+                true,
+                M.GeoSpectral)
+    
+        temp_tend[:,:,k] = temp_tend[:,:,k] + spectral(temp_grid[:,:,k],M.GeoSpectral)
+
+
+        #4. Humidity (tracer) tendency
+        vdspec!(-u_grid[:,:,k].*humid_grid[:,:,k], 
+                    -v_grid[:,:,k].*humid_grid[:,:,k], 
+                    L2_velocity_complex, humid_tend[:,:,k], 
+                    true,
+                    M.GeoSpectral)
+
+        humid_tend[:,:,k] = humid_tend[:,:,k] + spectral(humid_grid[:,:,k],M.GeoSpectral)
+         
 
     end 
 
-
-
-    #u_grid
-                                    
-
-    # @unpack u_tend, v_tend, vor_tend,div_tend = Diag.tendencies
-    # @unpack u_grid,v_grid,temp_grid_anomaly,tr_grid = Diag.gridvars
-    # @unpack dumc = Diag.miscvars
-    
-    # _,_,nlev = size(u_tend)
-
-    # for k in 1:nlev
-    #     #  1. Calculate vor and div spectral tendencies from u and v tendencies
-    #     
-
-    #     
-
-        
-    #     #3. Temperature tendency
-    #     # add div(vT) to spectral t tendency
-    #     vdspec!(-u_grid[:,:,k]*temp_grid_anomaly[:,:,k], 
-    #            -v_grid[:,:,k]*temp_grid_anomaly[:,:,k], 
-    #            dumc[:,:,1], temp_tend[:,:,k], 
-    #            true)
-    
-    #     temp_tend[:,:,k] = temp_tend[:,:,k] + spectral(t_grid[:,:,k])
-
-    #     #4. Tracer tendency
-    #     for itr in 1:n_trace
-    #         vdspec!(-u_grid[:,:,k]*tr_grid[:,:,k,itr], 
-    #                 -v_grid[:,:,k]*tr_grid[:,:,k,itr], 
-    #                 dumc[:,:,1], tr_tend[:,:,k,itr], 
-    #                 true)
-    #     tr_tend[:,:,k,itr] = tr_tend[:,:,k,itr] + spectral(tr_grid[:,:,k,itr])
-    #     end 
-
-    # end
-
-
-
+ 
+                                
 end 
 
 
