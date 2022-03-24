@@ -21,8 +21,6 @@
 #
 #
 # Note that get_spectral_tendencies() is quite badly named. It really modifies/updates the **already calculated** spectral tendencies
-# We are also currently dealing with tracers rather than e.g. humidity explicitly. For now, lets scrap tracers and just deal with humidity directly?
-# Constants struct C will probably really be a model setup var M. See L22 of run_speedy.jl
 # =========================================================================
 
 
@@ -200,14 +198,14 @@ function dynamics_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variab
     temperature_tendency!(Diag,M)                            # Calculates temp_tend
 
     # 7. Humidity tendency
-    #humidity_tendency!(Diag,M)                               # Calculates humid_tend
+    humidity_tendency!(Diag,M)                               # Calculates humid_tend
 
 
 
     # =========================================================================
     # Calculate vor_tend,div_tend and then update temp_tend and tr_tend
     # =========================================================================
-    #vor_div_tendency_and_corrections!(Diag,M)
+    vor_div_tendency_and_corrections!(Diag,M)
 
 
 end
@@ -216,44 +214,67 @@ end
 Convert a set of tendencies in grid point space to spectral space and calculate ...
 """
 function vor_div_tendency_and_corrections!( Diag::DiagnosticVariables{NF},
-                                            C::Constants{NF}
+                                            M
                                             ) where {NF<:AbstractFloat}
 
-    @unpack u_tend, v_tend, vor_tend,div_tend = Diag.tendencies
-    @unpack u_grid,v_grid,temp_grid_anomaly,tr_grid = Diag.gridvars
-    @unpack dumc = Diag.miscvars
-    
-    _,_,nlev = size(u_tend)
 
-    for k in 1:nlev
-        #  1. Calculate vor and div spectral tendencies from u and v tendencies
-        vdspec!(u_tend[:,:,k], v_tend[:,:,k], vor_tend[:,:,k], div_tend[:,:,k], true) 
+    @unpack u_tend,v_tend,vor_tend,div_tend = Diag.tendencies
+    @unpack u_grid,v_grid = Diag.grid_variables
+    _,_,nlev = size(u_grid)
+
+    @unpack L2_velocity_complex = Diag.intermediate_variables
+
+
+
+    for k in 1:nlev 
+
+        #1. Calculate vor and div spectral tendencies from u and v grid tendencies 
+        vdspec!(u_tend[:,:,k], v_tend[:,:,k], vor_tend[:,:,k], div_tend[:,:,k], true,M.GeoSpectral) 
 
         #2. Divergence tendency
-        #add -laplacian(0.5*(u**2+v**2)) to divergence tendency
-        dumc[:,:,1] = spectral(0.50*(u_grid[:,:,k]^2 + v_grid[:,:,k]^2))
-        div_tend[:,:,k] = div_tend[:,:,k] - laplacian(dumc[:,:,1]) 
+        ## add -laplacian(0.5*(u**2+v**2)) to divergence tendency
+        L2_velocity_complex = spectral(0.50*(u_grid[:,:,k]^2 + v_grid[:,:,k]^2))
+        div_tend[:,:,k] = div_tend[:,:,k] - laplacian(L2_velocity_complex) 
+
+    end 
+
+
+
+    #u_grid
+                                    
+
+    # @unpack u_tend, v_tend, vor_tend,div_tend = Diag.tendencies
+    # @unpack u_grid,v_grid,temp_grid_anomaly,tr_grid = Diag.gridvars
+    # @unpack dumc = Diag.miscvars
+    
+    # _,_,nlev = size(u_tend)
+
+    # for k in 1:nlev
+    #     #  1. Calculate vor and div spectral tendencies from u and v tendencies
+    #     
+
+    #     
 
         
-        #3. Temperature tendency
-        # add div(vT) to spectral t tendency
-        vdspec!(-u_grid[:,:,k]*temp_grid_anomaly[:,:,k], 
-               -v_grid[:,:,k]*temp_grid_anomaly[:,:,k], 
-               dumc[:,:,1], temp_tend[:,:,k], 
-               true)
+    #     #3. Temperature tendency
+    #     # add div(vT) to spectral t tendency
+    #     vdspec!(-u_grid[:,:,k]*temp_grid_anomaly[:,:,k], 
+    #            -v_grid[:,:,k]*temp_grid_anomaly[:,:,k], 
+    #            dumc[:,:,1], temp_tend[:,:,k], 
+    #            true)
     
-        temp_tend[:,:,k] = temp_tend[:,:,k] + spectral(t_grid[:,:,k])
+    #     temp_tend[:,:,k] = temp_tend[:,:,k] + spectral(t_grid[:,:,k])
 
-        #4. Tracer tendency
-        for itr in 1:n_trace
-            vdspec!(-u_grid[:,:,k]*tr_grid[:,:,k,itr], 
-                    -v_grid[:,:,k]*tr_grid[:,:,k,itr], 
-                    dumc[:,:,1], tr_tend[:,:,k,itr], 
-                    true)
-        tr_tend[:,:,k,itr] = tr_tend[:,:,k,itr] + spectral(tr_grid[:,:,k,itr])
-        end 
+    #     #4. Tracer tendency
+    #     for itr in 1:n_trace
+    #         vdspec!(-u_grid[:,:,k]*tr_grid[:,:,k,itr], 
+    #                 -v_grid[:,:,k]*tr_grid[:,:,k,itr], 
+    #                 dumc[:,:,1], tr_tend[:,:,k,itr], 
+    #                 true)
+    #     tr_tend[:,:,k,itr] = tr_tend[:,:,k,itr] + spectral(tr_grid[:,:,k,itr])
+    #     end 
 
-    end
+    # end
 
 
 

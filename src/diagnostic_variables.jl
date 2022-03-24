@@ -98,9 +98,11 @@ struct IntermediateTendencyVariables{NF<:AbstractFloat}
     puv        :: Array{NF,3} #(ug -umean)*px + (vg -vmean)*py
 
     ###------Defined in zonal_wind_tendency!()
-
     sigma_u ::Array{NF,3}  #some quantity used for later calculations 
 
+
+    ###------Defined in vor_div_tendency_and_corrections!()
+    L2_velocity_complex :: Array{Complex{NF},2} # -laplacian(0.5*(u**2+v**2))
 
 
 end
@@ -135,10 +137,14 @@ function IntermediateTendencyVariables{NF}(G::GeoSpectral{NF}) where NF
 
     sigma_u = zeros(Float64,nlon,nlat,nlev+1)
 
+
+    L2_velocity_complex         = zeros(Complex{Float64},mx,nx)  
+
+
     return IntermediateTendencyVariables{NF}(u_mean,v_mean,div_mean,
                                              pres_surf_gradient_spectral_x,pres_surf_gradient_spectral_y,
                                              pres_surf_gradient_grid_x,pres_surf_gradient_grid_y,
-                                             sigma_tend,sigma_m,puv,sigma_u)
+                                             sigma_tend,sigma_m,puv,sigma_u,L2_velocity_complex)
 
 end
 

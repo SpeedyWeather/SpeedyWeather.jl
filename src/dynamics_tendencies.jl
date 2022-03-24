@@ -177,17 +177,7 @@ function temperature_tendency!(Diag::DiagnosticVariables{NF}, # Diagnostic varia
                                M
                                )where {NF<:AbstractFloat}
     
-    
 
-    #@unpack div_grid,temp_grid_anomaly =Diag.grid_variables
-
-
-    #@unpack div_mean,sigma_u,sigma_tend,sigma_m,puv= Diag.intermediate_variables
-
-
-    #@unpack temp_ref,tref3,dhsr,fsgr,akap = M.
-
-    @unpack temp_tend = Diag.tendencies
     @unpack temp_tend = Diag.tendencies
     @unpack div_grid,temp_grid,temp_grid_anomaly = Diag.grid_variables
     @unpack sigma_u,sigma_tend,sigma_m,puv,div_mean = Diag.intermediate_variables
@@ -221,29 +211,40 @@ end
 """
 Compute the humidity tendency
 """
-function humidity_tendency!(Diag::PrognosticVariables{NF}, # Diagnostic variables
-                          C::Constants{NF}
-                          )where {NF<:AbstractFloat}
+function humidity_tendency!(Diag::DiagnosticVariables{NF}, # Diagnostic variables
+                            M
+                            )where {NF<:AbstractFloat}
     
+    @unpack humid_tend = Diag.tendencies
+    @unpack div_grid,humid_grid = Diag.grid_variables
+    @unpack sigma_u,sigma_tend,= Diag.intermediate_variables
 
-    @unpack div_grid,humid_grid = Diag.gridvars
-    @unpack arbitrary_array,sigma_tend= Diag.miscvars
-    @unpack dhsr = C
-
+    @unpack σ_levels_half⁻¹_2 = M.GeoSpectral.geometry 
 
     _,_,nlev = size(div_grid)
 
 
     for k in 2:nlev
-        arbitrary_array[:,:,k] = sigma_tend[:,:,k].*(humid_grid[:,:,k,itr] - humid_grid[:,:,k-1,itr])
+        sigma_u[:,:,k] = sigma_tend[:,:,k].*(humid_grid[:,:,k] - humid_grid[:,:,k-1])
     end
     
-    arbitrary_array[:,:,2:3] .= zero(NF)
-    
+
+    # From Paxton/Chantry: dyngrtend.f90. Unsure if we need this here since we are dealing solely with humidity,
+        # !spj for moisture, vertical advection is not possible between top
+        # !spj two layers
+        # !kuch three layers
+        # !if(iinewtrace==1)then
+        # do k=2,3
+        #     temp(:,:,k)=0.0_dp # temp is equivalent to sigma_u. i.e a temporary array that is reused for calculations 
+        # enddo
+        # !endif
+
+
     for k in 1:nlev
-        humid_tend[:,:,k,itr] = humid_tend + humid_grid[:,:,k,itr].*div_grid[:,:,k]
-                - (arbitrary_array[:,:,k+1] + arbitrary_array[:,:,k])*dhsr[k]
-        end
+        humid_tend[:,:,k] = humid_tend[:,:,k]
+                            + humid_grid[:,:,k].*div_grid[:,:,k]
+                            - (sigma_u[:,:,k+1] + sigma_u[:,:,k])*σ_levels_half⁻¹_2[k]
+        end 
 
 end
 
