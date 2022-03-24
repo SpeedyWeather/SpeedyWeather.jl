@@ -82,57 +82,6 @@
 #                                 gradx,uvdx,uvdym,uvdyp,gradym,gradyp,vddym,vddyp)
 # end
 
-# """
-# Laplacian operator in spectral space via element-wise matrix-matrix multiplication.
-# """
-# function ∇²(A::Array{Complex{NF},2},
-#             G::GeoSpectral{NF}) where {NF<:AbstractFloat}
-#     return -G.spectral.∇².*A
-# end
-
-# """
-# In-place version of ∇².
-# """
-# function ∇²!(   Out::Array{Complex{NF},2},
-#                 In::Array{Complex{NF},2},
-#                 G::GeoSpectral{NF}) where {NF<:AbstractFloat}
-
-#     @unpack ∇² = G.spectral
-
-#     mx,nx = size(In)
-#     @boundscheck (mx,nx) == size(Out) || throw(BoundsError())
-#     @boundscheck (mx,nx) == size(∇²) || throw(BoundsError())
-
-#     for n in 1:nx
-#         for m in 1:mx
-#             @inbounds Out[m,n] = -∇²[m,n]*In[m,n]
-#         end
-#     end
-# end
-
-# """
-# Inverse Laplacian in spectral space via element-wise matrix-matrix multiplication.
-# """
-# function ∇⁻²(   A::Array{Complex{NF},2},
-#                 G::GeoSpectral{NF}) where {NF<:AbstractFloat}
-#     return -G.spectral.∇⁻².*A
-# end
-
-# """
-# Transform a spectral array into grid-point space.
-# """
-# function gridded(  input::Array{Complex{NF},2},
-#                    G::GeoSpectral{NF}) where {NF<:AbstractFloat}
-#     return fourier_inverse(legendre_inverse(input,G),G)
-# end
-
-# """
-# Transform a gridded array into spectral space.
-# """
-# function spectral(  input::Array{NF,2},
-#                     G::GeoSpectral{NF}) where {NF<:AbstractFloat}
-#     return legendre(fourier(input,G),G)
-# end
 
 # function grad!( ψ::Array{NF,2},
 #                 psdx::Array{Complex{NF},2},
@@ -259,51 +208,32 @@
 # end
 
 
-# """
-# Computes Laplacian matrix-operators (for element-wise multiplication).
-# Laplacian, Laplacian squared and inverse Laplacian in spectral space
-# correspond to a multiplication with the total wavenumber:
+"""
+    ∇²!(∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacian of alms
+        alms::AbstractMatrix{Complex{NF}},      # spectral coefficients
+        R::Real                                 # radius of the Earth
+        ) where {NF<:AbstractFloat}             # number format NF
 
-#     ∇²_n^m = N*(N+1)/R_earth^2
+Spherical Laplace operator ∇² applied to the spectral coefficients `alms` on a sphere
+of radius `R`. The spherical Laplace operator is
 
-# with N = m+n-2 the total wavenumber -2 due to 1-based indexing. The biharmonic
-# operator is ∇⁴ = (∇²)², the inverse Laplacian is ∇⁻² = 1 ./ ∇².
-# """
-# function Laplacians(mx::Integer,nx::Integer,R_earth::Real)
-#     ∇²   = zeros(mx, nx)
-#     ∇⁻²  = zeros(mx, nx)
-#     ∇⁴   = zeros(mx, nx)
+    ∇²alms = -l(l+1)/R²*alms
 
-#     for n in 1:nx
-#         for m in 1:mx
-#             # total wavenumber is m+n, -2 due to Julia's 1-based indexing
-#             N = m+n-2
-#             ∇²[m,n] = N*(N+1)/R_earth^2
-#             ∇⁴[m,n] = ∇²[m,n]^2
-#         end
-#     end
-
-#     # inverse Laplacian, the first coefficient being zero corresponds
-#     # to some (?, TODO) boundary conditions
-#     ∇⁻²[1,1] = 0.0                  # don't divide by 0
-#     ∇⁻²[2:end] = 1 ./ ∇⁻²[2:end]    # all other elements in matrix
-
-#     return ∇²,∇⁻²,∇⁴
-# end
-
-function ∇²!(   ∇²alms::AbstractMatrix{Complex{T}},     # Output: Laplacian of alms
-                alms::AbstractMatrix{Complex{T}},       # spectral coefficients
-                R::Real                                 # radius of the Earth
-                ) where {T<:AbstractFloat}
+with the degree `l` of the Legendre polynomial. ∇²! is the in-place version, storing
+the result directly in ∇²alms."""
+function ∇²!(   ∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacian of alms
+                alms::AbstractMatrix{Complex{NF}},      # spectral coefficients
+                R::Real                                 # radius of the sphere/Earth
+                ) where {NF<:AbstractFloat}             # number format NF
 
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
 
-    lmax,mmax = size(alms) .- 1         # degree l, order m of the legendre polynomials
-    R_inv = convert(Complex{T},inv(R))  # =1/R, 1 over radius
+    lmax,mmax = size(alms) .- 1         # degree l, order m of the Legendre polynomials
+    R_inv = convert(Complex{NF},inv(R))  # =1/R, 1 over radius
 
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
         for l in m:lmax+1           # degree l = 0:lmax but 1-based
-            # ∇²alms = -l(l+1)/R²*alms, but 1-based
+            # ∇²alms = -l(l+1)/R²*alms, but 1-based (l=>l-1)
             # R⁻² is split to avoid under/overflows
             ∇²alms[l,m] = ((1-l)*R_inv)*(l*R_inv)*alms[l,m]
         end
@@ -311,36 +241,52 @@ function ∇²!(   ∇²alms::AbstractMatrix{Complex{T}},     # Output: Laplacia
     return ∇²alms
 end
 
-function ∇²!(   ∇²alms::AbstractMatrix{Complex{T}},     # Output: Laplacian of alms
-                alms::AbstractMatrix{Complex{T}},       # spectral coefficients
-                ) where {T<:AbstractFloat}
+"""
+    ∇²!(∇²alms::AbstractMatrix{Complex},    # Output: Laplacian of alms
+        alms::AbstractMatrix{Complex})      # spectral coefficients
+
+Same as ∇²!(::AbstractMatrix,::AbstractMatrix,R::Real) but assuming a sphere of radius `R=1`.
+"""
+function ∇²!(   ∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacian of alms
+                alms::AbstractMatrix{Complex{NF}}       # spectral coefficients
+            ) where NF                                  # number format
 
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
 
-    lmax,mmax = size(alms) .- 1     # degree l, order m of the legendre polynomials
+    lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
 
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
         for l in m:lmax+1           # degree l = 0:lmax but 1-based
-            # ∇²alms = -l(l+1)/R²*alms, but 1-based and R=1
+            # ∇²alms = -l(l+1)/R²*alms, but 1-based (l=>l-1) and R=1
             ∇²alms[l,m] = (l*(1-l))*alms[l,m]
         end
     end
     return ∇²alms
 end
 
-function ∇²(alms::AbstractMatrix{Complex{T}},       # spectral coefficients
-            R::Real=1                               # radius of the Earth
-            ) where T
+"""
+    ∇²alms = ∇²(alms::AbstractMatrix{Complex},R::Real=1)
 
-    ∇²alms = copy(alms)
+Spherical Laplace operator ∇² applied to the spectral coefficients `alms` on a sphere
+of radius `R`. ∇²(alms,R) is the non-in-place version of ∇²! which first allocates the
+output array ∇²alms before calling ∇²!."""
+function ∇²(alms::AbstractMatrix{Complex},      # spectral coefficients
+            R::Real=1)                          # radius of the sphere/Earth
+    ∇²alms = copy(alms)                         # allocate output
     return R == 1 ? ∇²!(∇²alms,alms) : ∇²!(∇²alms,alms,R)
 end
 
+"""
+    ∇⁴!(∇⁴alms::AbstractMatrix{Complex},    # Output: Laplacian of alms
+        alms::AbstractMatrix{Complex},      # spectral coefficients
+        R::Real=1)                          # radius of the sphere/Earth
 
-function ∇⁴!(   ∇⁴alms::AbstractMatrix{Complex{T}},     # Output: Bi-Laplacian of alms
-                alms::AbstractMatrix{Complex{T}},       # spectral coefficients
-                R::Real=1
-                ) where {T<:AbstractFloat}
+Spherical Bi-Laplace operator ∇⁴ = ∇²(∇²) applied to the spectral coefficients `alms` on a sphere
+of radius `R`. ∇⁴! operates by applying ∇²! twice. ∇⁴! is the in-place version, storing
+the result directly in the argument ∇⁴alms."""
+function ∇⁴!(   ∇⁴alms::AbstractMatrix{Complex},     # Output: Bi-Laplacian of alms
+                alms::AbstractMatrix{Complex},       # spectral coefficients
+                R::Real=1)
     
     if R == 1                       # execute the non-R version
         ∇²!(∇⁴alms,alms)            # apply first Laplacian
@@ -352,41 +298,65 @@ function ∇⁴!(   ∇⁴alms::AbstractMatrix{Complex{T}},     # Output: Bi-Lap
     return ∇⁴alms
 end
 
-function ∇⁴(alms::AbstractMatrix{Complex{T}},   # spectral coefficients
-            R::Real=1                           # radius of the Earth
-            ) where {T<:AbstractFloat}
+"""
+    ∇⁴alms = ∇⁴(alms::AbstractMatrix{Complex},R::Real=1)
+
+Spherical Bi-Laplace operator ∇⁴ = ∇²(∇²) applied to the spectral coefficients `alms` on a sphere
+of radius `R`. ∇⁴ operates by applying ∇² twice. ∇⁴ is the non-in-place version of ∇⁴! which first
+allocates the output array ∇⁴alms before calling ∇⁴!."""
+function ∇⁴(alms::AbstractMatrix{Complex},  # spectral coefficients
+            R::Real=1)                      # radius of the Earth
     
-    ∇⁴alms = copy(alms)
+    ∇⁴alms = copy(alms)                     # allocate output array
     return R == 1 ? ∇⁴!(∇⁴alms,alms) : ∇⁴!(∇⁴alms,alms,R)
 end
 
-function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{T}},    # Output: inverse Laplacian of alms
-                alms::AbstractMatrix{Complex{T}}        # spectral coefficients
-                ) where {T<:AbstractFloat}
+"""
+    ∇⁻²!(   ∇⁻²alms::AbstractMatrix{Complex},       # Out: inverse Laplace of alms
+            alms::AbstractMatrix{Complex})          # In: spectral coefficients alms
+
+Inverse spherical Laplace operator ∇⁻² applied to the spectral coefficients `alms` on a sphere
+of radius `R=1`. ∇⁻²! is the in-place version which directly stores the output in the argument
+∇⁻²alms. The integration constant for Legendre polynomial `l=m=0` is zero."""
+function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex},   # Output: inverse Laplacian of alms
+                alms::AbstractMatrix{Complex})      # spectral coefficients
 
     @boundscheck size(alms) == size(∇⁻²alms) || throw(BoundsError)
-    lmax,mmax = size(alms) .- 1     # degree l, order m of the legendre polynomials
+    lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
 
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
         for l in m:lmax+1           # degree l = 0:lmax but 1-based
-            # ∇²alms = R²/(-l(l+1))*alms, but 1-based and R=1
+            # ∇⁻²alms = R²/(-l(l+1))*alms, but 1-based (l=>l-1) and R=1
             ∇⁻²alms[l,m] = alms[l,m]/(l*(1-l))
         end
     end
 
-    ∇⁻²alms[1,1] = zero(Complex{T})
-
+    # set the integration constant (l=m=0 polynomial) to zero 
+    ∇⁻²alms[1,1] = zero(∇⁻²alms[1,1]) 
     return ∇⁻²alms
 end
 
-function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{T}},    # Output: inverse Laplacian of alms
-                alms::AbstractMatrix{Complex{T}},       # spectral coefficients
-                R::Real
-                ) where {T<:AbstractFloat}
+"""
+    ∇⁻²!(   ∇⁻²alms::AbstractMatrix{Complex},
+            alms::AbstractMatrix{Complex},
+            R::Real=1)
+
+Inverse spherical Laplace operator ∇⁻² applied to the spectral coefficients `alms` on a sphere
+of radius `R`. ∇⁻²! is the in-place version which directly stores the output in the argument
+∇⁻²alms. The integration constant for Legendre polynomial `l=m=0` is zero. The inverse spherical
+Laplace operator is
+
+    ∇⁻²alms = alms*R²/(-l(l+1))
+    
+with the degree `l` (0-based) of the Legendre polynomial."""
+function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{NF}},   # Output: inverse Laplacian of alms
+                alms::AbstractMatrix{Complex{NF}},      # spectral coefficients
+                R::Real                                 # radius of the sphere/Earth
+                ) where {NF<:AbstractFloat}
 
     @boundscheck size(alms) == size(∇⁻²alms) || throw(BoundsError)
-    lmax,mmax = size(alms) .- 1     # degree l, order m of the legendre polynomials
-    R² = convert(T,R^2)
+    lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
+    R² = convert(NF,R^2)
 
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
         for l in m:lmax+1           # degree l = 0:lmax but 1-based
@@ -395,15 +365,19 @@ function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{T}},    # Output: inve
         end
     end
 
-    ∇⁻²alms[1,1] = zero(Complex{T})
-
+    # set integration constant for Legendre polynomial l=m=0 (0-based index) to zero
+    ∇⁻²alms[1,1] = zero(Complex{NF})
     return ∇⁻²alms
 end
 
-function ∇⁻²(   alms::AbstractMatrix{Complex{T}},   # spectral coefficients
-                R::Real=1                           # radius of the Earth
-                ) where {T<:AbstractFloat}
-    
-    ∇⁻²alms = copy(alms)
+"""
+    ∇⁻²alms = ∇⁻²(alms::AbstractMatrix{Complex},R::Real=1)
+
+Inverse spherical Laplace operator ∇⁻² applied to the spectral coefficients `alms` on a sphere
+of radius `R`. ∇⁻² is the non-in-place version of ∇⁻²! and therefore first allocates the output array
+∇⁻²alms before calling ∇⁻²!. The integration constant for Legendre polynomial `l=m=0` is zero."""
+function ∇⁻²(   alms::AbstractMatrix{Complex},  # spectral coefficients
+                R::Real=1)                      # radius of the Earth
+    ∇⁻²alms = copy(alms)                        # preallocate output
     return R == 1 ? ∇⁻²!(∇⁻²alms,alms) : ∇⁻²!(∇⁻²alms,alms,R)
 end

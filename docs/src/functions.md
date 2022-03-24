@@ -27,6 +27,12 @@ SpeedyWeather.roundup_fft
 SpeedyWeather.spectral_truncation
 SpeedyWeather.spectral_truncation!
 SpeedyWeather.get_legendre_polynomials!
+SpeedyWeather.∇²!
+SpeedyWeather.∇²
+SpeedyWeather.∇⁴!
+SpeedyWeather.∇⁴
+SpeedyWeather.∇⁻²!
+SpeedyWeather.∇⁻²
 ```
 
 ## Geometry
