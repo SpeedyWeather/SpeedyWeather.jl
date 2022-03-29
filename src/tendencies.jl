@@ -33,7 +33,7 @@ function get_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variables
                          M,              # struct containing constants
                         ) where {NF<:AbstractFloat}
 
-   # @unpack alpha = C
+    @unpack α = M.Parameters
 
     # =========================================================================
     # Computation of grid-point tendencies (converted to spectral at the end of
@@ -46,6 +46,15 @@ function get_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variables
     # =========================================================================
     # Computation of spectral tendencies 
     # =========================================================================
+    if  α == 0
+
+        #get_spectral_tendencies!(Diag,C)
+
+    else
+        get_spectral_tendencies!(Prog,Diag,l2,M)
+
+    end
+
     #if alpha < 0.5 #Coefficient for semi-implicit computations. Previously if alpha = 0?
        # get_spectral_tendencies!(Diag,C)
     #else
@@ -271,43 +280,57 @@ and log_surf.pressure
 function get_spectral_tendencies!(Prog::PrognosticVariables{NF},
                                   Diag::DiagnosticVariables{NF},
                                   l2::Int,                       # leapfrog index 2 (time step used for tendencies)
-                                  C::Constants{NF}
+                                  M
                                  ) where {NF<:AbstractFloat}
 
 
-    @unpack div,temp,pres_surf = Prog
-    @unpack pres_surf_tend,temp_tend,div_tend = Diag.tendencies
-    @unpack d_meanc, sigma_tend_c,dumk = Diag.miscvars
-    @unpack dhs,dhsr,temp_ref,tref2,tref3 = C
 
-    _,_,nlev = size(div)
 
-    # 1. Vertical mean divergence and pressure tendency 
-    d_meanc[:,:] = 0.0
-    for k in 1:nlev
-        d_meanc = d_meanc + div[:,:,k,l2]*dhs[k]
-    end
 
-    pres_surf_tend = pres_surf_tend - d_meanc
-    pres_surf_tend[1,1] = Complex{RealType}(0.0)
 
-    # 2. Sigma-dot "velocity" and temperature tendency
-    for k in 1:nlev - 1
-        sigma_tend_c[:,:,k+1] = sigma_tend_c[:,:,k] - dhs[k]*(div[:,:,k,j2] - d_meanc)
-    end
 
-    for k in 2:nlev
-        dumk[:,:,k] = sigma_tend_c[:,:,k]*(temp_ref[k] - temp_ref[k-1])
-    end
 
-    for k in 1:nlev
-        temp_tend[:,:,k] -= (dumk[:,:,k+1] + dumk[:,:,k])*dhsr[k]
-            + tref3[k]*(sigma_tend_c[:,:,k+1] + sigma_tend_c[:,:,k]) - tref2[k]*d_meanc
-    end
+                                 
+    # @unpack div,temp,pres_surf = Prog
+    # @unpack pres_surf_tend,temp_tend,div_tend = Diag.tendencies
+    # @unpack d_meanc, sigma_tend_c,dumk = Diag.miscvars
+    # @unpack dhs,dhsr,temp_ref,tref2,tref3 = C
 
-    # 3. Geopotential and divergence tendency
-    geopotential!(geopot,ϕ0spectral,temp,G) # Paxton/Chantry have a geopotential call here. Do we actually need this?       
-    for k in 1:nlev
-        div_tend[:,:,k] -= ∇²(geopot[:,:,k] + rgas*temp_ref[k]*pres_surf[:,:,l2])
-    end
+    # _,_,nlev = size(div)
+
+    # # 1. Vertical mean divergence and pressure tendency 
+    # d_meanc[:,:] = 0.0
+    # for k in 1:nlev
+    #     d_meanc = d_meanc + div[:,:,k,l2]*dhs[k]
+    # end
+
+    # pres_surf_tend = pres_surf_tend - d_meanc
+    # pres_surf_tend[1,1] = Complex{RealType}(0.0)
+
+    # # 2. Sigma-dot "velocity" and temperature tendency
+    # for k in 1:nlev - 1
+    #     sigma_tend_c[:,:,k+1] = sigma_tend_c[:,:,k] - dhs[k]*(div[:,:,k,j2] - d_meanc)
+    # end
+
+    # for k in 2:nlev
+    #     dumk[:,:,k] = sigma_tend_c[:,:,k]*(temp_ref[k] - temp_ref[k-1])
+    # end
+
+    # for k in 1:nlev
+    #     temp_tend[:,:,k] -= (dumk[:,:,k+1] + dumk[:,:,k])*dhsr[k]
+    #         + tref3[k]*(sigma_tend_c[:,:,k+1] + sigma_tend_c[:,:,k]) - tref2[k]*d_meanc
+    # end
+
+    # # 3. Geopotential and divergence tendency
+    # geopotential!(geopot,ϕ0spectral,temp,G) # Paxton/Chantry have a geopotential call here. Do we actually need this?       
+    # for k in 1:nlev
+    #     div_tend[:,:,k] -= ∇²(geopot[:,:,k] + rgas*temp_ref[k]*pres_surf[:,:,l2])
+    # end
+
+
+
+
+
+
+
 end
