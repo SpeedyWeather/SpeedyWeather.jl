@@ -15,15 +15,15 @@ Defines the Tendencies struct.
 """
 function Tendencies{NF}(G::GeoSpectral{NF}) where NF
 
-    @unpack mx, nx = G.spectral
+    @unpack lmax, mmax = G.spectral
     @unpack nlev,nlon,nlat = G.geometry
 
     # conversion to type NF later when creating a PrognosticVariables struct
-    vor_tend         = zeros(Complex{Float64},mx,nx,nlev)  # vorticity
-    div_tend         = zeros(Complex{Float64},mx,nx,nlev)  # divergence
-    temp_tend        = zeros(Complex{Float64},mx,nx,nlev)  # absolute Temperature
-    pres_surf_tend   = zeros(Complex{Float64},mx,nx)       # logarithm of surface pressure. CHECK
-    humid_tend       = zeros(Complex{Float64},mx,nx,nlev)  # specific humidity
+    vor_tend         = zeros(Complex{Float64},lmax+1,mmax+1,nlev)  # vorticity
+    div_tend         = zeros(Complex{Float64},lmax+1,mmax+1,nlev)  # divergence
+    temp_tend        = zeros(Complex{Float64},lmax+1,mmax+1,nlev)  # absolute Temperature
+    pres_surf_tend   = zeros(Complex{Float64},lmax+1,mmax+1)       # logarithm of surface pressure. CHECK
+    humid_tend       = zeros(Complex{Float64},lmax+1,mmax+1,nlev)  # specific humidity
     u_tend           = zeros(Float64,nlon,nlat,nlev)      # zonal velocity
     v_tend           = zeros(Float64,nlon,nlat,nlev)  # meridonal velocity
 
@@ -115,15 +115,15 @@ function IntermediateTendencyVariables{NF}(G::GeoSpectral{NF}) where NF
 
 
     @unpack nlev,nlon,nlat = G.geometry
-    @unpack mx, nx = G.spectral
+    @unpack lmax, mmax = G.spectral
 
     u_mean             = zeros(Float64,nlon,nlat)  # Mean gridpoint zonal velocity over all levels
     v_mean             = zeros(Float64,nlon,nlat)  # Mean gridpoint meridional velocity over all levels
     div_mean             = zeros(Float64,nlon,nlat)  # Mean gridpoint divergence over all levels
 
 
-    pres_surf_gradient_spectral_x         = zeros(Complex{Float64},mx,nx)  #X Gradient of the surface pressure, spectral space
-    pres_surf_gradient_spectral_y         = zeros(Complex{Float64},mx,nx)  #Y Gradient of the surface pressure, spectral space
+    pres_surf_gradient_spectral_x         = zeros(Complex{Float64},lmax+1,mmax+1)  #X Gradient of the surface pressure, spectral space
+    pres_surf_gradient_spectral_y         = zeros(Complex{Float64},lmax+1,mmax+1)  #Y Gradient of the surface pressure, spectral space
 
     pres_surf_gradient_grid_x         = zeros(Float64,nlon,nlat)  #X Gradient of the surface pressure, grid point space
     pres_surf_gradient_grid_y         = zeros(Float64,nlon,nlat)  #Y Gradient of the surface pressure, grid point space
@@ -138,7 +138,7 @@ function IntermediateTendencyVariables{NF}(G::GeoSpectral{NF}) where NF
     sigma_u = zeros(Float64,nlon,nlat,nlev+1)
 
 
-    L2_velocity_complex         = zeros(Complex{Float64},mx,nx)  
+    L2_velocity_complex         = zeros(Complex{Float64},lmax+1,mmax+1)  
 
 
     return IntermediateTendencyVariables{NF}(u_mean,v_mean,div_mean,

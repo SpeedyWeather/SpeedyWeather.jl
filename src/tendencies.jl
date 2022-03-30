@@ -124,9 +124,9 @@ function get_grid_point_fields!(Prog::PrognosticVariables{NF}, # Prognostic vari
     #geopotential!(geopot,ϕ0spectral,temp,G)         # geopotential from surface geopotential. Need to get phi0_spectral and G from somewhere
 
    for k in 1:nlev
-        vor_grid[:,:,k]  = gridded(vor[:,:,k],M.GeoSpectral )  # vorticity 
-        div_grid[:,:,k]  = gridded(div[:,:,k],M.GeoSpectral )  # divergence
-        temp_grid[:,:,k] = gridded(temp[:,:,k],M.GeoSpectral) # temperature
+        vor_grid[:,:,k]  = gridded(vor[:,:,k])  # vorticity 
+        div_grid[:,:,k]  = gridded(div[:,:,k])  # divergence
+        temp_grid[:,:,k] = gridded(temp[:,:,k]) # temperature
 
 
         #Correct vorticity grid point field
@@ -137,8 +137,9 @@ function get_grid_point_fields!(Prog::PrognosticVariables{NF}, # Prognostic vari
 
 
         #Calculate zonal velocity u and meridional velocity v in grid-point space,
-        #from vorticity and divergence in spectral space
-        uvspec!(vor[:,:,k], div[:,:,k], u_grid[:,:,k],v_grid[:,:,k],M.GeoSpectral)
+        #from vorticity and divergence in spectral space.
+        #This function is currently not well defined and returns all 0s
+        uvspec!(vor[:,:,k], div[:,:,k], u_grid[:,:,k],v_grid[:,:,k])
 
         #Geopotential. Normalised by cp to avoid overflows. Feature from Paxton/Chantry
        # gridded(geopot[:,:,k]*(1/cp),geopot_grid[:,:,k]) 
@@ -160,14 +161,14 @@ function get_grid_point_fields!(Prog::PrognosticVariables{NF}, # Prognostic vari
 
 
     #Surface pressure
-    pres_surf_grid = gridded(pres_surf, M.GeoSpectral)
+    pres_surf_grid = gridded(pres_surf)
 
 
     #Humidity
     #From Paxton/Chantry: "Don't transform the two stratospheric levels where humidity is set to zero
     # because it leads to overflows" 
     for k in 3:nlev
-        humid_grid[:,:,k] = gridded(humid[:,:,k],M.GeoSpectral)
+        humid_grid[:,:,k] = gridded(humid[:,:,k])
     end 
 
 
@@ -242,7 +243,7 @@ function vor_div_tendency_and_corrections!( Diag::DiagnosticVariables{NF},
 
         #2. Divergence tendency
         ## add -laplacian(0.5*(u**2+v**2)) to divergence tendency
-        L2_velocity_complex = spectral(0.50*(u_grid[:,:,k].^2 + v_grid[:,:,k].^2),M.GeoSpectral)
+        L2_velocity_complex = spectral(0.50*(u_grid[:,:,k].^2 + v_grid[:,:,k].^2))
         div_tend[:,:,k] = div_tend[:,:,k] - ∇²(L2_velocity_complex,M.GeoSpectral) 
 
         #3. Temperature tendency
@@ -253,7 +254,7 @@ function vor_div_tendency_and_corrections!( Diag::DiagnosticVariables{NF},
                 true,
                 M.GeoSpectral)
     
-        temp_tend[:,:,k] = temp_tend[:,:,k] + spectral(temp_grid[:,:,k],M.GeoSpectral)
+        temp_tend[:,:,k] = temp_tend[:,:,k] + spectral(temp_grid[:,:,k])
 
 
         #4. Humidity (tracer) tendency
@@ -263,7 +264,7 @@ function vor_div_tendency_and_corrections!( Diag::DiagnosticVariables{NF},
                     true,
                     M.GeoSpectral)
 
-        humid_tend[:,:,k] = humid_tend[:,:,k] + spectral(humid_grid[:,:,k],M.GeoSpectral)
+        humid_tend[:,:,k] = humid_tend[:,:,k] + spectral(humid_grid[:,:,k])
          
 
     end 

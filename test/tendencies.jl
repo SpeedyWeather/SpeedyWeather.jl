@@ -18,11 +18,11 @@ using Test
 @testset "Calculate Tendencies" begin
     NF = Float64 
 
-    P,D,M = initialize_model(NF)
+    P,D,M = SpeedyWeather.initialize_model(NF)
 
     l2 = 2
 
-    get_tendencies!(P,D,l2,M) 
+    SpeedyWeather.get_tendencies!(P,D,l2,M) 
 
     # P = Parameters(NF=NF)
     # C = Constants{NF}(P)

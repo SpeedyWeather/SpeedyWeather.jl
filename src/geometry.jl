@@ -130,7 +130,8 @@ function Geometry(P::Parameters)
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
                     sinlat,coslat,sinlat_NH,coslat_NH,radang,
-                    cosg,cosg⁻¹,cosg⁻²,f,xgeop1,xgeop2,lapserate_correction)
+                    cosg,cosg⁻¹,cosg⁻²,f_coriolis,xgeop1,xgeop2,lapserate_correction,
+                    tref,rgas,fsgr,tref3)
 end
 
 """Vertical sigma coordinates defined by their nlev+1 half levels `σ_levels_half`. Sigma coordinates are

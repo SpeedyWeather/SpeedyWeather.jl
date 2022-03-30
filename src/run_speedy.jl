@@ -31,9 +31,9 @@ function initialize_model(::Type{NF}=Float64;         # number format, use Float
                           ) where {NF<:AbstractFloat}
 
     P          = Parameters(NF=NF,kwargs...)
-    C          = Constants{NF}(P)
-    G          = GeoSpectral{NF}(P)
-    B          = Boundaries{NF}(P,G)
+    C          = Constants(P)
+    G          = GeoSpectral(P)
+    B          = Boundaries(P,G)
  
     DiagnosticVars = DiagnosticVariables{NF}(G)
     PrognosticVars = initial_conditions(P,B,G)

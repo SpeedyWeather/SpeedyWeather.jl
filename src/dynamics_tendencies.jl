@@ -32,10 +32,10 @@ function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic 
 
     #Now use the mean fields
     grad!(pres_surf, pres_surf_gradient_spectral_x, pres_surf_gradient_spectral_y, M.GeoSpectral)
-    pres_surf_gradient_grid_x = gridded(pres_surf_gradient_spectral_x*3600, M.GeoSpectral)
-    pres_surf_gradient_grid_y = gridded(pres_surf_gradient_spectral_x*3600, M.GeoSpectral) #3600 factor from Paxton/Chantry. I think this is to correct for the underflow rescaling earlier
+    pres_surf_gradient_grid_x = gridded(pres_surf_gradient_spectral_x*3600)
+    pres_surf_gradient_grid_y = gridded(pres_surf_gradient_spectral_x*3600) #3600 factor from Paxton/Chantry. I think this is to correct for the underflow rescaling earlier
 
-    pres_surf_tend = spectral(-u_mean.*pres_surf_gradient_grid_x - v_mean.*pres_surf_gradient_grid_y,M.GeoSpectral)
+    pres_surf_tend = spectral(-u_mean.*pres_surf_gradient_grid_x - v_mean.*pres_surf_gradient_grid_y)
     pres_surf_tend[1,1] = pres_surf_tend[1,1]*0.0 
 
 end
@@ -74,7 +74,7 @@ function temperature_grid_anomaly!(Diag::DiagnosticVariables{NF}, # Diagnostic v
                                    ) where {NF<:AbstractFloat}
 
     @unpack temp_grid,temp_grid_anomaly = Diag.grid_variables
-    @unpack tref = M.GeoSpectral.geometry #Note that tref is currenrtly not defined correctly 
+    @unpack tref = M.GeoSpectral.geometry #Note that tref is currently not defined correctly 
 
     _,_,nlev = size(temp_grid)
 
