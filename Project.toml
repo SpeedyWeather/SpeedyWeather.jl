@@ -18,7 +18,7 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 [compat]
 AbstractFFTs = "1"
 AssociatedLegendrePolynomials = "1"
-BitInformation = "0.3, 0.4"
+BitInformation = "0.3, 0.4, 0.5"
 FFTW = "1"
 FastGaussQuadrature = "0.4"
 NetCDF = "0.10, 0.11"
