@@ -82,13 +82,20 @@
 #                                 gradx,uvdx,uvdym,uvdyp,gradym,gradyp,vddym,vddyp)
 # end
 
-# """
-# Laplacian operator in spectral space via element-wise matrix-matrix multiplication.
-# """
-# function ∇²(A::Array{Complex{NF},2},
-#             G::GeoSpectral{NF}) where {NF<:AbstractFloat}
-#     return -G.spectral.∇².*A
-# end
+"""
+Laplacian operator in spectral space via element-wise matrix-matrix multiplication.
+
+Since ∇² is no longer defined in G.spectral, for now we just return the small value * input as a placeholder
+"""
+function ∇²(A::Array{Complex{NF},2},
+            G::GeoSpectral{NF}) where {NF<:AbstractFloat}
+    #return -G.spectral.∇².*A
+
+    
+    #Place holder
+    @unpack lmax, mmax = G.spectral
+    return zeros(Complex{Float64},lmax+1,mmax+1)
+end
 
 # """
 # In-place version of ∇².
@@ -134,31 +141,35 @@
 #     return legendre(fourier(input,G),G)
 # end
 
-# function grad!( ψ::Array{NF,2},
-#                 psdx::Array{Complex{NF},2},
-#                 psdy::Array{NF,2},
-#                 G::GeoSpectral{NF}) where {NF<:AbstractFloat}
+function grad!( ψ::Array{Complex{NF},2},
+                psdx::Array{Complex{NF},2},
+                psdy::Array{Complex{NF},2},
+                G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
-#     #TODO boundscheck
+    #Placeholder.
+    psdx .= zero(Float64)
+    psdy .= zero(Float64)
 
-#     @unpack trunc, mx, nx = G.spectral
-#     @unpack gradx, gradyp, gradym = G.spectral
+    #TODO boundscheck
 
-#     for n in 1:nx
-#         psdx[:,n] = gradx.*ψ[:,n]*im
-#     end
+    # @unpack trunc, mx, nx = G.spectral
+    # @unpack gradx, gradyp, gradym = G.spectral
 
-#     for m in 1:mx
-#         psdy[m,1]  =  gradyp[m,1]*ψ[m,2]
-#         psdy[m,nx] = -gradym[m,nx]*ψ[m,trunc+1]
-#     end
+    # for n in 1:nx
+    #     psdx[:,n] = gradx.*ψ[:,n]*im
+    # end
 
-#     for n in 2:trunc+1
-#         for m in 1:mx
-#             psdy[m,n] = -gradym[m,n]*ψ[m,n-1] + gradyp[m,n]*ψ[m,n+1]
-#         end
-#     end
-# end
+    # for m in 1:mx
+    #     psdy[m,1]  =  gradyp[m,1]*ψ[m,2]
+    #     psdy[m,nx] = -gradym[m,nx]*ψ[m,trunc+1]
+    # end
+
+    # for n in 2:trunc+1
+    #     for m in 1:mx
+    #         psdy[m,n] = -gradym[m,n]*ψ[m,n-1] + gradyp[m,n]*ψ[m,n+1]
+    #     end
+    # end
+end
 
 # function vds!(  ucosm::Array{NF,2},
 #                 vcosm::Array{NF,2},
@@ -197,66 +208,81 @@
 #     end
 # end
 
-# function uvspec!(   vorm::Array{NF,2},
-#                     divm::Array{NF,2},
-#                     ucosm::Array{NF,2},
-#                     vcosm::Array{NF,2},
-#                     G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
-#     #TODO boundscheck
+"""Placeholder to allow tedencies.jl structure to run """
+function uvspec!(   vorm::Array{Complex{NF},2},
+                    divm::Array{Complex{NF},2},
+                    ucosm::Array{NF,2},
+                    vcosm::Array{NF,2}) where {NF<:AbstractFloat}
 
-#     @unpack trunc, mx, nx = G.spectral
-#     @unpack uvdx, uvdyp, uvdym = G.spectral
 
-#     #TODO preallocate elsewhere
-#     zp = uvdx.*vorm*im
-#     zc = uvdx.*divm*im
+    #Artificially set all grid points to 0
+    ucosm .= zero(Float64)
+    vcosm .= zero(Float64)
 
-#     for m in 1:mx
-#         ucosm[m,1]  =  zc[m,1] - uvdyp[m,1]*vorm[m,2]
-#         ucosm[m,nx] =  uvdym[m,nx]*vorm[m,trunc+1]
-#         vcosm[m,1]  =  zp[m,1] + uvdyp[m,1]*divm[m,2]
-#         vcosm[m,nx] = -uvdym[m,nx]*divm[m,trunc+1]
-#     end
 
-#     for n in 2:trunc+1
-#         for m in 1:mx
-#           vcosm[m,n] = -uvdym[m,n]*divm[m,n-1] + uvdyp[m,n]*divm[m,n+1] + zp[m,n]
-#           ucosm[m,n] =  uvdym[m,n]*vorm[m,n-1] - uvdyp[m,n]*vorm[m,n+1] + zc[m,n]
-#         end
-#     end
-# end
+    # #TODO boundscheck
+    # @unpack lmax, mmax = G.spectral
+    # @unpack trunc = P
+    # #@unpack trunc, mx, nx = G.spectral
+    # @unpack uvdx, uvdyp, uvdym = G.spectral
 
-# function vdspec!(   ug::Array{NF,2},
-#                     vg::Array{NF,2},
-#                     vorm::Array{NF,2},
-#                     divm::Array{NF,2},
-#                     kcos::Bool,
-#                     G::GeoSpectral{NF}) where {NF<:AbstractFloat}
+    # #TODO preallocate elsewhere
+    # zp = uvdx.*vorm*im
+    # zc = uvdx.*divm*im
 
-#     #TODO boundscheck
+    # for m in 1:lmax
+    #     ucosm[m,1]  =  zc[m,1] - uvdyp[m,1]*vorm[m,2]
+    #     ucosm[m,mmax] =  uvdym[m,mmax]*vorm[m,trunc+1]
+    #     vcosm[m,1]  =  zp[m,1] + uvdyp[m,1]*divm[m,2]
+    #     vcosm[m,mmax] = -uvdym[m,mmax]*divm[m,trunc+1]
+    # end
 
-#     @unpack nlat, nlon, cosgr, cosgr2 = G.geometry
+    # for n in 2:trunc+1
+    #     for m in 1:lmax
+    #       vcosm[m,n] = -uvdym[m,n]*divm[m,n-1] + uvdyp[m,n]*divm[m,n+1] + zp[m,n]
+    #       ucosm[m,n] =  uvdym[m,n]*vorm[m,n-1] - uvdyp[m,n]*vorm[m,n+1] + zc[m,n]
+    #     end
+    # end
+end
 
-#     #TODO preallocate elsewhere
-#     ug1 = zeros(NF, nlon, nlat)
-#     vg1 = zeros(NF, nlon, nlat)
 
-#     # either cosgr or cosgr2
-#     cosgr = kcos ? cosgr : cosgr2
+"""Placeholder to allow tedencies.jl structure to run """
+function vdspec!(   ug::Array{NF,2},
+                    vg::Array{NF,2},
+                    vorm::Array{Complex{NF},2},
+                    divm::Array{Complex{NF},2},
+                    kcos::Bool,
+                    G::GeoSpectral{NF}) where {NF<:AbstractFloat}
 
-#     for j in 1:nlat
-#         for i in 1:nlon
-#             ug1[i,j] = ug[i,j]*cosgr[j]
-#             vg1[i,j] = vg[i,j]*cosgr[j]
-#         end
-#     end
+
+    #Artificially set all points to 0
+    vorm .= zero(Float64)
+    divm .= zero(Float64)
+
+    # #TODO boundscheck
+
+    # @unpack nlat, nlon, cosgr, cosgr2 = G.geometry
+
+    # #TODO preallocate elsewhere
+    # ug1 = zeros(NF, nlon, nlat)
+    # vg1 = zeros(NF, nlon, nlat)
+
+    # # either cosgr or cosgr2
+    # cosgr = kcos ? cosgr : cosgr2
+
+    # for j in 1:nlat
+    #     for i in 1:nlon
+    #         ug1[i,j] = ug[i,j]*cosgr[j]
+    #         vg1[i,j] = vg[i,j]*cosgr[j]
+    #     end
+    # end
 
 #     #TODO add spectral_trans and geometry as arguments
 #     specu = spectral(ug1,G)
 #     specv = spectral(vg1,G)
 #     vds!(specu, specv, vorm, divm)
-# end
+end
 
 
 # """

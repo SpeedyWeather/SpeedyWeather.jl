@@ -15,6 +15,7 @@ Struct holding the parameters needed at runtime in number format NF.
 
     # DIFFUSION AND DRAG
     sdrag::NF               # drag [1/s] for zonal wind in the stratosphere
+
 end
 
 """
