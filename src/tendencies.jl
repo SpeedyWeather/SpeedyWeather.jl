@@ -66,6 +66,7 @@ function get_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variables
         #implicit_terms!(div_tend, t_tend, ps_tend) #TK: no edits have been made (yet!) to this implicit function
    # end
 
+
 end
 
 
