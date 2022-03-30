@@ -55,11 +55,12 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
     rfft_plan = FFTW.plan_rfft(zeros(NF,nlon))
     brfft_plan = FFTW.plan_brfft(zeros(Complex{NF},nfreq),nlon)
 
-    # GAUSSIAN LATITUDES (0,π) North to South
-    colat = π .- acos.(FastGaussQuadrature.gausslegendre(nlat)[1])
-    sin_colat = sin.(colat)
+    # GAUSSIAN COLATITUDES (0,π) North to South
+    nodes = FastGaussQuadrature.gausslegendre(nlat)[1]  # zeros of the Legendre polynomial
+    colat = π .- acos.(nodes)                           # corresponding colatitudes
+    sin_colat = sin.(colat)                             
     cos_colat = cos.(colat)
-    lon_offset = π/nlon
+    lon_offset = π/nlon                                 # offset of first longitude from prime meridian
 
     # PREALLOCATE LEGENDRE POLYNOMIALS
     Λ = zeros(lmax+1,mmax+1)                # Legendre polynomials for one latitude

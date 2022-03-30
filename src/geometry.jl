@@ -13,8 +13,12 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
 
     dlon::NF            # grid spacing in longitude
     dlat::NF            # average grid spacing in latitude
-    lon::Array{NF,1}    # array of longitudes
-    lat::Array{NF,1}    # array of latitudes
+    lon::Array{NF,1}    # array of longitudes (0...2π)
+    lond::Array{NF,1}   # array of longitudes in degrees (0...360˚)
+    lat::Array{NF,1}    # array of latitudes (π/2...-π/2)
+    latd::Array{NF,1}   # array of latitudes in degrees (90˚...-90˚)
+    colat::Array{NF,1}  # array of colatitudes (0...π)
+    colatd::Array{NF,1} # array of colatitudes in degrees (0...180˚)
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     n_stratosphere_levels::Int      # number of upper levels for stratosphere
@@ -27,12 +31,7 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     # SINES AND COSINES OF LATITUDE
     sinlat::Array{NF,1}         # sin of latitudes
     coslat::Array{NF,1}         # cos of latitudes
-    sinlat_NH::Array{NF,1}      # only northern hemisphere
-    coslat_NH::Array{NF,1}      # only northern hemisphere
-    radang::Array{NF,1}         # radians of latitudes TODO rename to radlat?
-    cosg::Array{NF,1}           # this should be sinlat?!
-    cosg⁻¹::Array{NF,1}         # rename to sinlat⁻¹?
-    cosg⁻²::Array{NF,1}         # rename to sinlat⁻²?
+    coslat⁻¹::Array{NF,1}       # =1/cos(lat)
 
     # CORIOLIS FREQUENCY
     f::Array{NF,1}              # = 2Ω*sin(lat)
@@ -55,13 +54,19 @@ function Geometry(P::Parameters)
     nlat_half = nlat ÷ 2
     nlon_half = nlon ÷ 2
 
-    # GRID SPACE ARRAYS GAUSSIAN GRID - lon is equi-spaced, lat is not!
+    # GRID SPACE ARRAYS lon is equi-spaced
     dlon = 360 / nlon                       # grid spacing in longitude
     dlat = 180 / nlat                       # average grid spacing in latitude
-    lon  = Array(0:dlon:360-dlon)           # array of longitudes
-    # array of latitudes (North to South) corresponding to the zeros
-    # of the (unassociated) legendre polynomial order nlat
-    lat  = reverse(asind.(FastGaussQuadrature.gausslegendre(nlat)[1]))
+    lond = Array(0:dlon:360-dlon)           # array of longitudes in degrees 0...360˚
+    lon = lond/360*2π                       # array of longitudes 0...2π
+    
+    # REGULAR GAUSSIAN GRID, latitudes are not equi-distant
+    # Zero nodes of the (unassociated) legendre polynomial order nlat
+    nodes = FastGaussQuadrature.gausslegendre(nlat)[1]
+    colat = π .- acos.(nodes)               # colatitudes 0...π
+    colatd = 180 .- cosd.(nodes)            # colatitudes in degrees 0...180˚
+    lat = -sin.(nodes)                      # latitudes π/2...-π/2
+    latd = -sind.(nodes)                    # latitudes in degrees 90˚...-90˚
 
     # VERTICAL SIGMA COORDINATE 
     # σ = p/p0 (fraction of surface pressure)
@@ -73,14 +78,9 @@ function Geometry(P::Parameters)
     σ_f = akap ./ (2σ_levels_full)
 
     # SINES AND COSINES OF LATITUDE
-    sinlat = sind.(lat)
-    coslat = cosd.(lat)
-    sinlat_NH = sinlat[1:nlat_half] # sinlat only for northern hemisphere = NH
-    coslat_NH = coslat[1:nlat_half]
-    radang = asin.(sinlat)
-    cosg   = sinlat                 # inconsistent here due to the sin/cos swap
-    cosg⁻¹ = 1 ./ cosg
-    cosg⁻² = 1 ./ cosg.^2
+    sinlat = sin.(lat)
+    coslat = cos.(lat)
+    coslat⁻¹ = 1 ./ coslat
 
     # CORIOLIS FREQUENCY
     f = 2Ω*sinlat
@@ -104,11 +104,12 @@ function Geometry(P::Parameters)
 
     # conversion to number format NF happens here
     Geometry{P.NF}( nlon,nlat,nlev,nlat_half,nlon_half,
-                    dlon,dlat,lon,lat,
+                    dlon,dlat,lon,lond,lat,latd,colat,colatd,
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
-                    sinlat,coslat,sinlat_NH,coslat_NH,radang,
-                    cosg,cosg⁻¹,cosg⁻²,f,xgeop1,xgeop2,lapserate_correction)
+                    sinlat,coslat,coslat⁻¹,
+                    f,
+                    xgeop1,xgeop2,lapserate_correction)
 end
 
 """Vertical sigma coordinates defined by their nlev+1 half levels `σ_levels_half`. Sigma coordinates are
