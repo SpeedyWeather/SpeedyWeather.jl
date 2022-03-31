@@ -13,7 +13,7 @@ SpeedyWeather.Constants
 SpeedyWeather.Boundaries
 ```
 
-## Spectral transform
+## Spherical harmonic transform
 
 ```@docs
 SpeedyWeather.GeoSpectral
@@ -33,6 +33,12 @@ SpeedyWeather.∇⁴!
 SpeedyWeather.∇⁴
 SpeedyWeather.∇⁻²!
 SpeedyWeather.∇⁻²
+SpeedyWeather.gradient_latitude!
+SpeedyWeather.gradient_latitude
+SpeedyWeather.gradient_longitude!
+SpeedyWeather.gradient_longitude
+SpeedyWeather.divergence_uvω_spectral
+SpeedyWeather.ϵlm     
 ```
 
 ## Geometry

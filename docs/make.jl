@@ -4,10 +4,11 @@ makedocs(
     format = Documenter.HTML(
     prettyurls = get(ENV, "CI", nothing) == "true"),
     sitename="SpeedyWeather.jl",
-    authors="M Klöwer",
+    authors="M Klöwer, T Kimpson",
     modules=[SpeedyWeather],
     pages=["Home"=>"index.md",
             "How to run SpeedyWeather.jl"=>"how_to_run_speedy.md",
+            "Spherical harmonic transform"=>"spectral_transform.md",
             "Dynamical core"=>"dynamical_core.md",
             "Parameterizations"=>"parameterizations.md",
             "Boundary conditions"=>"boundary_conditions.md",
@@ -18,5 +19,7 @@ makedocs(
 
 deploydocs(
     repo = "github.com/milankl/SpeedyWeather.jl.git",
-    devbranch = "main"
+    devbranch = "main",
+    devurl = "dev",
+    versions = ["stable" => "v^", "v#.#", devurl => devurl]
 )
