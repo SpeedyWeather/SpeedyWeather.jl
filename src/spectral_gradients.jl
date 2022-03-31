@@ -207,10 +207,23 @@
 #     vds!(specu, specv, vorm, divm)
 # end
 
+"""
+    cosθ_u = gradient_latitude!(cosθ_u::AbstractArray{Complex{NF}},
+                                Ψ::AbstractArray{Complex{NF}},
+                                R::Real=1
+                                ) where {NF<:AbstractFloat}
+
+Meridional gradient in spectral space of spherical harmonic coefficients `Ψ` on a sphere with
+radius R. Returns `cosθ_u`, i.e. the gradient ∂Ψ/∂θ with an additional cosine of latitude θ scaling.
+This function uses the recursion relation (0-based degree l, order m)
+
+    (cosθ u)_lm = -1/R*(-(l-1)*ϵ_lm*Ψ_l-1,m + (l+2)*ϵ_l+1,m*Ψ_l+1,m ).
+    
+As u = -1/R*∂Ψ/∂θ, this function can be generally used to compute the gradient in latitude."""
 function gradient_latitude!(cosθ_u::AbstractArray{Complex{NF}}, # output: cos(θ)*u
                             Ψ::AbstractArray{Complex{NF}},      # input: streamfunction Ψ
                             R::Real=1                           # radius of the sphere/Earth
-                            ) where {NF<:AbstractFloat}
+                            ) where {NF<:AbstractFloat}         # number format NF
 
     lmax,mmax = size(Ψ) .- 1                                    # degree l, order m of spherical harmonics
     
@@ -243,7 +256,7 @@ function gradient_latitude( Ψ::AbstractArray{Complex{NF}},  # input: streamfunc
                             R::Real=1                       # radius of the sphere/Earth
                             ) where {NF<:AbstractFloat}     # number format NF
     lmax,mmax = size(Ψ) .- 1                                # degree l, order m of spherical harmonics
-    cosθ_u = zeros(Complex{NF},lmax+2,mmax+1)               # preallocate output
+    cosθ_u = zeros(Complex{NF},lmax+2,mmax+1)               # preallocate output, one more l for recursion
     return gradient_latitude!(cosθ_u,Ψ,R)                   # call in-place version
 end
 
@@ -329,8 +342,9 @@ function divergence_uvω_spectral(   u_grid::AbstractMatrix{NF,2},       # zonal
         end
     end
 
-    uω_coslat⁻¹ = spectral(uω_grid_coslat⁻¹,G.spectral)         # TODO preallocate elsewhere
-    vω_coslat⁻¹ = spectral(vω_grid_coslat⁻¹,G.spectral)
+    # TODO preallocate returned coefficients elsewhere
+    uω_coslat⁻¹ = spectral(uω_grid_coslat⁻¹,G.spectral,one_more_l=true)         
+    vω_coslat⁻¹ = spectral(vω_grid_coslat⁻¹,G.spectral,one_more_l=true)
     
     ∂uω_∂ϕ = gradient_longitude(uω_coslat⁻¹)                    # spectral gradients
     ∂vω_∂θ = gradient_latitude(vω_coslat⁻¹)                     # TODO always correct cosθ scaling?
@@ -380,7 +394,7 @@ Same as ∇²!(::AbstractMatrix,::AbstractMatrix,R::Real) but assuming a sphere 
 """
 function ∇²!(   ∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacian of alms
                 alms::AbstractMatrix{Complex{NF}}       # spectral coefficients
-            ) where NF                                  # number format
+                ) where NF                              # number format NF
 
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
 
