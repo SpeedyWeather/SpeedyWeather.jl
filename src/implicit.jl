@@ -30,9 +30,11 @@ end
 # terms anyway to reduce roundoff error; also the constants needed for
 # the biharmonic diffusion, which is assumed always to be backwards
 # implicit, are defined in initialize_implicit)
+
+
 function Implicit(T, geometry::Geometry, constants::Constants, params::Parameters,
                   horizontal_diffusion::HorizontalDiffusion, Δt)
-    @unpack nlev, mx, nx, σ_half, σ_full, σ_thick = geometry
+    @unpack nlev, mx, nx, σ_levels_half, σ_levels_full, σ_thick = geometry
     @unpack Rₑ, g, akap, R, γ = constants
     @unpack α = params
     @unpack dmp, dmpd, dmps = horizontal_diffusion
@@ -66,10 +68,10 @@ function Implicit(T, geometry::Geometry, constants::Constants, params::Parameter
     # reference atmosphere, function of sigma only
     γ_g = γ/(1000.0*g)
 
-    tref = 288.0max.(0.2, σ_full).^(R*γ_g)
+    tref = 288.0max.(0.2, σ_levels_full).^(R*γ_g)
     tref1 = R*tref
     tref2 = akap*tref
-    tref3 = σ_full.*tref
+    tref3 = σ_levels_full.*tref
 
     # Other constants
     xi = Δt*α
@@ -91,11 +93,11 @@ function Implicit(T, geometry::Geometry, constants::Constants, params::Parameter
     end
 
     for k in 2:nlev
-        xa[k,k-1] = 0.5*(akap*tref[k]/σ_full[k] - (tref[k] - tref[k-1])/σ_thick[k])
+        xa[k,k-1] = 0.5*(akap*tref[k]/σ_levels_full[k] - (tref[k] - tref[k-1])/σ_thick[k])
     end
 
     for k in 1:nlev-1
-        xa[k,k] = 0.5*(akap*tref[k]/σ_full[k] - (tref[k+1] - tref[k])/σ_thick[k])
+        xa[k,k] = 0.5*(akap*tref[k]/σ_levels_full[k] - (tref[k+1] - tref[k])/σ_thick[k])
     end
 
     #sig(k)=xb(k,k')*d(k')
@@ -127,11 +129,11 @@ function Implicit(T, geometry::Geometry, constants::Constants, params::Parameter
     #P(K)=XD(K,K')*T(K')
     for k in 1:nlev
         for k1 in k+1:nlev
-            xd[k,k1] = R*log(σ_half[k1+1]/σ_half[k1])
+            xd[k,k1] = R*log(σ_levels_half[k1+1]/σ_levels_half[k1])
         end
     end
     for k in 1:nlev
-        xd[k,k] = R*log(σ_half[k+1]/σ_full[k])
+        xd[k,k] = R*log(σ_levels_half[k+1]/σ_levels_full[k])
     end
 
     #P(K)=YE(K)+XE(K,K')*D(K')

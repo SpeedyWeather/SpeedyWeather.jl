@@ -46,6 +46,8 @@ module SpeedyWeather
     include("geopotential.jl")
     include("horizontal_diffusion.jl")
     include("implicit.jl")
+    include("parametrization_tendencies.jl")
+    include("dynamics_tendencies.jl")
     include("tendencies.jl")
     include("feedback.jl")
     include("output.jl")

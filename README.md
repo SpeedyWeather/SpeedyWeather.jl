@@ -15,7 +15,29 @@ For an overview of the functionality and explanation see the
 
 ## Example use
 
-coming soon.
+SpeedyWeather.jl is currently developed. The spherical harmonic transform is already implemented
+```julia
+julia> using SpeedyWeather
+julia> alms = zeros(ComplexF64,3,3)    # spectral coefficients
+julia> alms[2,2] = 1                   # only l=1,m=1 spherical harmonic
+julia> map = gridded(alms)             # convert to grid space
+8×4 Matrix{Float64}:
+ -0.324541  -0.600363  -0.600363  -0.324541
+ -0.134429  -0.248678  -0.248678  -0.134429
+  0.134429   0.248678   0.248678   0.134429
+  0.324541   0.600363   0.600363   0.324541
+  0.324541   0.600363   0.600363   0.324541
+  0.134429   0.248678   0.248678   0.134429
+ -0.134429  -0.248678  -0.248678  -0.134429
+ -0.324541  -0.600363  -0.600363  -0.324541
+ 
+julia> spectral(map)                   # back to spectral space
+3×3 Matrix{ComplexF64}:
+ 0.0+0.0im  0.0+0.0im          0.0+0.0im
+ 0.0+0.0im  1.0+3.60727e-17im  0.0+0.0im
+ 0.0+0.0im  0.0+0.0im          0.0+0.0im
+```
+And we have succesfully reobtained the `l=1,m=1` spherical harmonic.
 
 ## History
 
