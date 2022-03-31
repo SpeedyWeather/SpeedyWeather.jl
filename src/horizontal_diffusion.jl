@@ -2,61 +2,78 @@
 Struct containing all the preallocated arrays for the calculation of horizontal diffusion.
 """
 struct HorizontalDiffusion{NF<:AbstractFloat}   # Number format NF
-    dmp::Array{NF,2}                # Damping coefficient for temperature and vorticity (explicit)
-    dmpd::Array{NF,2}               # Damping coefficient for divergence (explicit)
-    dmps::Array{NF,2}               # Damping coefficient for extra diffusion in the stratosphere (explicit)
+    # Explicit part of the diffusion, precalculated damping coefficients for each spectral mode
+    damping::Array{NF,2}            # for temperature and vorticity (explicit)
+    damping_div::Array{NF,2}        # for divergence (explicit)
+    damping_strat::Array{NF,2}      # for extra diffusion in the stratosphere (explicit)
     
-    dmp1::Array{NF,2}               # Damping coefficient for temperature and vorticity (implicit)
-    dmp1d::Array{NF,2}              # Damping coefficient for divergence (implicit)
-    dmp1s::Array{NF,2}              # Damping coefficient for extra diffusion in the stratosphere (implicit)
-
-    tcorv::Array{NF,1}              # Vertical component of orographic correction for temperature
-    qcorv::Array{NF,1}              # Vertical component of orographic correction for humidity
+    # Implicit part of the diffusion, precalculated damping coefficients for each spectral mode
+    damping_impl::Array{NF,2}       # for temperature and vorticity (implicit)
+    damping_div_impl::Array{NF,2}   # for divergence (implicit)
+    damping_strat_impl::Array{NF,2} # for extra diffusion in the stratosphere (implicit)
     
-    tcorh::Array{Complex{NF},2}     # Horizontal component of orographic correction for temperature
-    qcorh::Array{Complex{NF},2}     # Horizontal component of orographic correction for humidity
+    # Vertical component of orographic correction
+    tcorv::Array{NF,1}              # for temperature
+    qcorv::Array{NF,1}              # for humidity
+    
+    # Horizontal component of orographic correction
+    tcorh::Array{Complex{NF},2}     # for temperature
+    qcorh::Array{Complex{NF},2}     # for humidity
 end
 
 """
 Generator function for a HorizontalDiffusion struct.
 """
-function HorizontalDiffusion(   P::Parameters,      # Parameter struct
-                                G::GeoSpectral,     # Geometry and spectral struct
-                                B::Boundaries)      # Boundaries struct
+function HorizontalDiffusion(   P::Parameters{NF},      # Parameter struct
+                                G::GeoSpectral{NF},     # Geometry and spectral struct
+                                B::Boundaries{NF}       # Boundaries struct
+                                ) where NF              # number format NF
 
+    # for diffusion
+    @unpack lmax,mmax = G.spectral
+    @unpack diffusion_power, diffusion_time, diffusion_time_div = P
+    @unpack diffusion_time_strat, damping_time_strat = P
+    
+    # for orographic correction
     @unpack nlev, σ_levels_full = G.geometry
-    @unpack trunc, mx, nx = G.spectral
     @unpack g, R, γ, hscale, hshum, rh_ref = P
-    @unpack npowhd, thd, thdd, thds, tdrs = P
     @unpack ϕ0trunc = B
 
-    # Damping frequencies [1/s]
-    hdiff = 1.0/(3600.0*thd)            # Spectral damping for temperature and vorticity
-    hdifd = 1.0/(3600.0*thdd)           # Spectral damping coefficient for divergence
-    hdifs = 1.0/(3600.0*thds)           # Spectral damping coefficient for stratosphere
-    rlap  = 1.0/(trunc*(trunc + 1))     # ?
+    # Diffusion is applied by multiplication of the (absolute) eigenvalues of the Laplacian l*(l+1)
+    # normalise by the largest eigenvalue lmax*(lmax+1) such that the highest wavenumber lmax
+    # is dampened to 0 at the time scale diffusion_time
+    # raise to a power of the Laplacian for hyperdiffusion (=less damping for smaller wavenumbers)
+    largest_eigenvalue = lmax*(lmax+1)
 
-    # preallocate (high precision, conversion to NF later)
-    dmp = zeros(mx,nx)                  # Damping coefficient for temperature and vorticity (explicit)
-    dmpd = zeros(mx,nx)                 # Damping coefficient for divergence (explicit)
-    dmps = zeros(mx,nx)                 # Damping coefficient for extra diffusion in the stratosphere (explicit)
+    # PREALLOCATE
+    # conversion to number format NF later, one more degree l for meridional gradient recursion
+    # Damping coefficients for explicit part of the diffusion (=ν∇²ⁿ)
+    damping = zeros(lmax+2,mmax+1)              # for temperature and vorticity (explicit)
+    damping_div = zeros(lmax+2,mmax+1)          # for divergence (explicit)
+    damping_strat = zeros(lmax+2,mmax+1)        # for extra diffusion in the stratosphere (explicit)
 
-    dmp1 = zeros(mx,nx)                 # Damping coefficient for temperature and vorticity (implicit)
-    dmp1d = zeros(mx,nx)                # Damping coefficient for divergence (implicit)
-    dmp1s = zeros(mx,nx)                # Damping coefficient for extra diffusion in the stratosphere (implicit)
+    # Damping coefficients for implicit part of the diffusion (= 1/(1+2Δtν∇²ⁿ))
+    damping_impl = zeros(lmax+2,mmax+1)         # for temperature and vorticity (implicit)
+    damping_div_impl = zeros(lmax+2,mmax+1)     # for divergence (implicit)
+    damping_strat_impl = zeros(lmax+2,mmax+1)   # for extra diffusion in the stratosphere (implicit)
 
-    for j in 1:nx
-        for i in 1:mx
-            N = i+j-2
-            elap = (N*(N + 1.0)*rlap)
-            elapn = elap^npowhd
-            dmp[i,j]  = hdiff*elapn     
-            dmpd[i,j] = hdifd*elapn
-            dmps[i,j] = hdifs*elap
+    # PRECALCULATE the damping coefficients for every spectral mode
+    for m in 1:mmax+1                           # fill only the lower triangle
+        for l in m:lmax+2
+            # eigenvalue is l*(l+1), but 1-based here l→l-1
+            norm_eigenvalue = l*(l-1)/largest_eigenvalue        # normal diffusion ∇²
+            norm_eigenvalueⁿ = norm_eigenvalue^diffusion_power  # hyper diffusion ∇²ⁿ
 
-            dmp1[i,j]  = 1/(1+dmp*Δt)
-            dmp1d[i,j] = 1/(1+dmpd*Δt)
-            dmp1s[i,j] = 1/(1+dmps*Δt)
+            # Explicit part (=ν∇²ⁿ)
+            # convert diffusion time scales to damping frequencies [1/s] times norm. eigenvalue
+            damping[l,m] = norm_eigenvalueⁿ/(3600*diffusion_time)               # temperature/vorticity
+            damping_div[l,m] = norm_eigenvalueⁿ/(3600*diffusion_time_div)       # divergence
+            damping_strat[l,m] = norm_eigenvalue/(3600*diffusion_time_strat)    # stratosphere (no hyperdiff)
+
+            # and implicit part of the diffusion (= 1/(1+2Δtν∇²ⁿ))
+            damping_impl[l,m] = 1/(1+2Δt*damping[l,m])              # for temperature/vorticity
+            damping_div_impl[l,m] = 1/(1+2Δt*damping_div[l,m])      # for divergence
+            damping_strat_impl[l,m] = 1/(1+2Δt*damping_strat[l,m])  # for stratosphere (no hyperdiffusion)
         end
     end
 
@@ -92,9 +109,9 @@ function HorizontalDiffusion(   P::Parameters,      # Parameter struct
     qcorh = spectral(corh,G)
 
     # convert to number format NF here
-    return HorizontalDiffusion{P.NF}(   dmp,dmpd,dmps,
-                                        dmp1,dmpd1,dmps1,
-                                        tcorv,qcorv,tcorh,qcorh)
+    return HorizontalDiffusion{NF}( damping,damping_div,damping_strat,
+                                    damping_impl,damping_div_impl,damping_strat_impl,
+                                    tcorv,qcorv,tcorh,qcorh)
 end
 
 """Apply horizontal diffusion to 2D field in spectral space."""
@@ -112,6 +129,8 @@ function horizontal_diffusion!( A::AbstractArray{Complex{NF},2},        # spectr
         tendency[i] = (tendency[i] - dmp[i]*A[i])*dmp1[i]
     end
 end
+
+
 
 """Apply horizontal diffusion to 3D field layer by layer in spectral space."""
 function horizontal_diffusion!( A::AbstractArray{Complex{NF},3},        # spectral horizontal field
@@ -145,56 +164,6 @@ function stratospheric_zonal_drag!( A::AbstractArray{Complex{NF},4},        # sp
         tendency[1,j,1] = tendency[1,j,1] - sdrag*A[1,j,1,1]
     end
 end
-
-# """Orographic temperature correction for absolute temperature to be applied before the horizontal diffusion."""
-# function temperature_correction!(   Tabs_corrected::AbstractArray{Complex{NF},3},   # Corrected abs temperature T
-#                                     Tabs::AbstractArray{Complex{NF},4},             # Absolute temperature
-#                                     l::Int,                                         # leapfrog index
-#                                     HD::HorizontalDiffusion{NF}                     # struct for correction arrays
-#                                     ) where NF
-    
-#     @unpack tcorh, tcorv = HD   # load horizontal (tcorh) and vertical (tcorv) correction arrays
-
-#     mx,nx,nlev,nleapfrog = size(Tabs)
-#     @boundscheck (mx,nx,nlev) == size(Tabs_corrected) || throw(BoundsError())
-#     @boundscheck (mx,nx) == size(tcorh) || throw(BoundsError())
-#     @boundscheck (nlev,) == size(tcorv) || throw(BoundsError())
-#     @boundscheck nleapfrog == 2 || throw(BoundsError())
-#     @boundscheck l in [1,2] || throw(BoundsError())
-
-#     @inbounds for k in 1:nlev
-#         for j in 1:nx
-#             for i in 1:mx
-#                 Tabs_corrected[i,j,k] = Tabs[i,j,k,l] + tcorh[i,j]*tcorv[k]
-#             end
-#         end
-#     end
-# end
-
-# """Orographic temperature correction for absolute temperature to be applied before the horizontal diffusion."""
-# function humidity_correction!(  humid_corrected::AbstractArray{Complex{NF},3},  # Corrected abs temperature T
-#                                 humid::AbstractArray{Complex{NF},4},            # Absolute temperature
-#                                 l::Int,                                         # leapfrog index
-#                                 HD::HorizontalDiffusion{NF}                     # struct for correction arrays
-#                                 ) where NF
-    
-#     @unpack qcorh, qcorv = HD       # load horizontal (qcorh) and vertical (qcorv) correction arrays
-
-#     mx,nx,nlev,nleapfrog = size(humid)
-#     @boundscheck (mx,nx,nlev) == size(humid_corrected) || throw(BoundsError())
-#     @boundscheck (mx,nx) == size(qcorh) || throw(BoundsError())
-#     @boundscheck (nlev,) == size(qcorv) || throw(BoundsError())
-#     @boundscheck nleapfrog == 2 || throw(BoundsError())
-#     @boundscheck l in [1,2] || throw(BoundsError())
-
-#     @inbounds for k in 1:nlev
-#         for j in 1:nx
-#             for i in 1:mx
-#                 humid_corrected[i,j,k] = humid[i,j,k,l] + qcorh[i,j]*qcorv[k]
-#             end
-#         end
-#     end
-# end
 
 """Orographic temperature correction for absolute temperature to be applied before the horizontal diffusion."""
 function orographic_correction!(A_corrected::AbstractArray{Complex{NF},3},  # Corrected variable
