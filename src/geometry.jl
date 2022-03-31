@@ -34,12 +34,18 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     coslat⁻¹::Array{NF,1}       # =1/cos(lat)
 
     # CORIOLIS FREQUENCY
-    f::Array{NF,1}              # = 2Ω*sin(lat)
+    f_coriolis::Array{NF,1}              # = 2Ω*sin(lat)
 
     # GEOPOTENTIAL CALCULATION WORK ARRAYS
     xgeop1::Array{NF,1}                  # ?
     xgeop2::Array{NF,1}                  # ?
     lapserate_correction::Array{NF,1}    # ?
+
+    # TEMPORARY, development area. All these variables need to be checked for consistency and potentially defined somewhere else
+    # tref ::Array{NF,1}   #temporarily defined here. Also defined in the Implict struct which is incomplete at the time of writing
+    # rgas ::NF
+    # fsgr ::Array{NF,1} 
+    # tref3 ::Array{NF,1} 
 end
 
 """
@@ -77,13 +83,14 @@ function Geometry(P::Parameters)
     σ_levels_half⁻¹_2 = 1 ./ (2σ_levels_thick)
     σ_f = akap ./ (2σ_levels_full)
 
+
     # SINES AND COSINES OF LATITUDE
     sinlat = sin.(lat)
     coslat = cos.(lat)
     coslat⁻¹ = 1 ./ coslat
 
     # CORIOLIS FREQUENCY
-    f = 2Ω*sinlat
+    f_coriolis = 2Ω*sinlat
 
     # GEOPOTENTIAL coefficients to calculate geopotential (TODO reference)
     xgeop1 = zeros(nlev)
@@ -102,6 +109,14 @@ function Geometry(P::Parameters)
                     log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
     end
 
+
+    # Extra definitions. These will need to be defined consistently either here or somewhere else
+    # Just defined here to proivide basic structure to allow for testing of other components of code
+    # tref = 288.0max.(0.2, σ_levels_full) #more corrections needed here 
+    # rgas = (2.0/7.0) / 1004.0
+    # fsgr = (tref * 0.0) #arbitrary definition. Must be defined elsewhere 
+    # tref3=fsgr.*tref #this actually is the correct definition. Needs better naming convention 
+
     # conversion to number format NF happens here
     Geometry{P.NF}( nlon,nlat,nlev,nlat_half,nlon_half,
                     dlon,dlat,lon,lond,lat,latd,colat,colatd,
@@ -110,6 +125,7 @@ function Geometry(P::Parameters)
                     sinlat,coslat,coslat⁻¹,
                     f,
                     xgeop1,xgeop2,lapserate_correction)
+                    # tref,rgas,fsgr,tref3)
 end
 
 """Vertical sigma coordinates defined by their nlev+1 half levels `σ_levels_half`. Sigma coordinates are

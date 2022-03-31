@@ -24,7 +24,7 @@ function HorizontalDiffusion(   P::Parameters,      # Parameter struct
                                 G::GeoSpectral,     # Geometry and spectral struct
                                 B::Boundaries)      # Boundaries struct
 
-    @unpack nlev, σ_full = G.geometry
+    @unpack nlev, σ_levels_full = G.geometry
     @unpack trunc, mx, nx = G.spectral
     @unpack g, R, γ, hscale, hshum, rh_ref = P
     @unpack npowhd, thd, thdd, thds, tdrs = P
@@ -70,9 +70,9 @@ function HorizontalDiffusion(   P::Parameters,      # Parameter struct
     qcorv = zeros(nlev)    # Vertical component of orographic correction for humidity
 
     for k in 2:nlev
-        tcorv[k] = σ_full[k]^rgam
+        tcorv[k] = σ_levels_full[k]^rgam
         if k > 2
-            qcorv[k] = σ_full[k]^qexp
+            qcorv[k] = σ_levels_full[k]^qexp
         end
     end
 
