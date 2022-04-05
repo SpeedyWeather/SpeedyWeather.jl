@@ -320,10 +320,10 @@ Step 4 (spectral space): convert uω/cosθ, vω/cosθ from grid to spectral spac
 Step 5 (spectral space): Compute gradients ∂/∂ϕ(uω/cosθ) and ∂/∂θ(vω/cosθ)
 Step 6 (spectral space): Add ∂/∂ϕ(uω/cosθ)+∂/∂θ(vω/cosθ) and return.
 """
-function divergence_uvω_spectral(   u_grid::AbstractMatrix{NF,2},       # zonal velocity in grid space
-                                    v_grid::AbstractMatrix{NF,2},       # meridional velocity in grid space
-                                    vor_grid::AbstractMatrix{NF,2},     # relative vorticity in grid space       
-                                    G::GeoSpectral{NF}                  # struct with geometry and spectral transform
+function divergence_uvω_spectral(   u_grid::AbstractMatrix{NF},     # zonal velocity in grid space
+                                    v_grid::AbstractMatrix{NF},     # meridional velocity in grid space
+                                    vor_grid::AbstractMatrix{NF},   # relative vorticity in grid space       
+                                    G::GeoSpectral{NF}              # struct with geometry and spectral transform
                                     ) where {NF<:AbstractFloat}
 
     nlon,nlat = size(u_grid)
