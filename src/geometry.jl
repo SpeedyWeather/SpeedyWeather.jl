@@ -48,6 +48,8 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     rgas ::NF
     fsgr ::Array{NF,1} 
     tref3 ::Array{NF,1} 
+    tref2 ::Array{NF,1} 
+
 
 
 
@@ -121,6 +123,9 @@ function Geometry(P::Parameters)
     tref = 288.0max.(0.2, σ_levels_full) #more corrections needed here 
     rgas = (2.0/7.0) / 1004.0
     fsgr = (tref * 0.0) #arbitrary definition. Must be defined elsewhere 
+
+
+    tref2=akap.*tref
     tref3=fsgr.*tref #this actually is the correct definition. Needs better naming convention 
 
 
@@ -131,7 +136,7 @@ function Geometry(P::Parameters)
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
                     sinlat,coslat,sinlat_NH,coslat_NH,radang,
                     cosg,cosg⁻¹,cosg⁻²,f_coriolis,xgeop1,xgeop2,lapserate_correction,
-                    tref,rgas,fsgr,tref3)
+                    tref,rgas,fsgr,tref3,tref2)
 end
 
 """Vertical sigma coordinates defined by their nlev+1 half levels `σ_levels_half`. Sigma coordinates are
