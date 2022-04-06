@@ -3,7 +3,7 @@
     # original speedy T30 with 96x48 grid
     P = Parameters(NF=Float64)
     G = GeoSpectral(P)
-    B = Boundaries(P,G)
+    B = Boundaries(P)
     S = G.spectral
 
     Prog = SpeedyWeather.initialize_from_rest(P,B,G)

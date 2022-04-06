@@ -5,7 +5,9 @@ Struct that holds the boundary arrays in grid-point space
     albedo          ::Array{NF,2}           # annual mean surface albedo, grid-point
 """
 struct Boundaries{NF<:AbstractFloat}        # number format NF
-    geopot_surf     ::Array{Complex{NF},2}  # spectral surface geopotential (i.e. orography) [m^2/s^2]
+    geopot_surf_grid::Matrix{NF}            # surface geopotential (i.e. orography) [m^2/s^2]
+    geopot_surf     ::Matrix{Complex{NF}}   # spectral surface geopotential
+
     # landsea_mask    ::Array{NF,2}           # land-sea mask
     # albedo          ::Array{NF,2}           # annual mean surface albedo
 end
@@ -13,8 +15,7 @@ end
 """ Generator function for a Boundaries struct. Loads the boundary conditions,
 orography, land-sea mask and albedo from an netCDF file and stores the in a
 `Boundaries` struct."""
-function Boundaries(P::Parameters,
-                    G::GeoSpectral)
+function Boundaries(P::Parameters)
 
     @unpack orography_path, orography_file, gravity, NF = P
 
@@ -34,6 +35,8 @@ function Boundaries(P::Parameters,
     # GEOPOTENTIAL, transform to spectral space and truncate accordingly   
     geopot_surf_highres = spectral(gravity*orography)
     geopot_surf = spectral_truncation(geopot_surf_highres,P.trunc)
+    geopot_surf_grid = gridded(geopot_surf)
     
-    Boundaries{NF}(geopot_surf) #,landsea_mask,albedo)
+    # convert to number format NF here
+    return Boundaries{NF}(geopot_surf_grid,geopot_surf) #,landsea_mask,albedo)
 end

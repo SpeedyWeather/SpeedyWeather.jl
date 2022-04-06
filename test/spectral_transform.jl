@@ -92,7 +92,7 @@ end
         for NF in (Float64,)#Float32)
             P = Parameters(;NF,trunc)
             G = GeoSpectral(P)
-            B = Boundaries(P,G)
+            B = Boundaries(P)
             S = G.spectral
 
             geopot_surf_spectral = B.geopot_surf

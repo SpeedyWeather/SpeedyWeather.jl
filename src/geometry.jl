@@ -53,9 +53,10 @@ Defines the geometry.
 """
 function Geometry(P::Parameters)
 
-    @unpack nlon,nlat,nlev,trunc = P
-    @unpack R,Ω,akap = P
-    @unpack n_stratosphere_levels = P
+    # number of longitudes, latitudes, vertical levels, spectral truncation
+    @unpack nlon, nlat, nlev, trunc = P     
+    @unpack R_earth,Ω,akap = P          # radius of earth, angular frequency, ratio of gas consts
+    @unpack n_stratosphere_levels = P   # number of vertical levels used for stratosphere
 
     nlat_half = nlat ÷ 2
     nlon_half = nlon ÷ 2
@@ -82,7 +83,6 @@ function Geometry(P::Parameters)
     σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
     σ_levels_half⁻¹_2 = 1 ./ (2σ_levels_thick)
     σ_f = akap ./ (2σ_levels_full)
-
 
     # SINES AND COSINES OF LATITUDE
     sinlat = sin.(lat)
@@ -123,7 +123,7 @@ function Geometry(P::Parameters)
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
                     sinlat,coslat,coslat⁻¹,
-                    f,
+                    f_coriolis,
                     xgeop1,xgeop2,lapserate_correction)
                     # tref,rgas,fsgr,tref3)
 end
