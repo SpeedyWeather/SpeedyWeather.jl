@@ -9,7 +9,7 @@ nlat = 48
 
 P = Parameters(NF=Float64;trunc,nlat,nlon)
 G = GeoSpectral(P)
-B = Boundaries(P,G)
+B = Boundaries(P)
 S = G.spectral
 
 geopot_surf_spectral = B.geopot_surf

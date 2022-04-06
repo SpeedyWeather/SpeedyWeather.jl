@@ -13,8 +13,12 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
 
     dlon::NF            # grid spacing in longitude
     dlat::NF            # average grid spacing in latitude
-    lon::Array{NF,1}    # array of longitudes
-    lat::Array{NF,1}    # array of latitudes
+    lon::Array{NF,1}    # array of longitudes (0...2π)
+    lond::Array{NF,1}   # array of longitudes in degrees (0...360˚)
+    lat::Array{NF,1}    # array of latitudes (π/2...-π/2)
+    latd::Array{NF,1}   # array of latitudes in degrees (90˚...-90˚)
+    colat::Array{NF,1}  # array of colatitudes (0...π)
+    colatd::Array{NF,1} # array of colatitudes in degrees (0...180˚)
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     n_stratosphere_levels::Int      # number of upper levels for stratosphere
@@ -27,12 +31,7 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     # SINES AND COSINES OF LATITUDE
     sinlat::Array{NF,1}         # sin of latitudes
     coslat::Array{NF,1}         # cos of latitudes
-    sinlat_NH::Array{NF,1}      # only northern hemisphere
-    coslat_NH::Array{NF,1}      # only northern hemisphere
-    radang::Array{NF,1}         # radians of latitudes TODO rename to radlat?
-    cosg::Array{NF,1}           # this should be sinlat?!
-    cosg⁻¹::Array{NF,1}         # rename to sinlat⁻¹?
-    cosg⁻²::Array{NF,1}         # rename to sinlat⁻²?
+    coslat⁻¹::Array{NF,1}       # =1/cos(lat)
 
     # CORIOLIS FREQUENCY
     f_coriolis::Array{NF,1}              # = 2Ω*sin(lat)
@@ -42,17 +41,11 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     xgeop2::Array{NF,1}                  # ?
     lapserate_correction::Array{NF,1}    # ?
 
-
-    #TEMPORARY, development area. All these variables need to be checked for consistency and potentially defined somewhere else
-    tref ::Array{NF,1}   #temporarily defined here. Also defined in the Implict struct which is incomplete at the time of writing
-    rgas ::NF
-    fsgr ::Array{NF,1} 
-    tref3 ::Array{NF,1} 
-    tref2 ::Array{NF,1} 
-
-
-
-
+    # TEMPORARY, development area. All these variables need to be checked for consistency and potentially defined somewhere else
+    # tref ::Array{NF,1}   #temporarily defined here. Also defined in the Implict struct which is incomplete at the time of writing
+    # rgas ::NF
+    # fsgr ::Array{NF,1} 
+    # tref3 ::Array{NF,1} 
 end
 
 """
@@ -60,20 +53,27 @@ Defines the geometry.
 """
 function Geometry(P::Parameters)
 
-    @unpack nlon,nlat,nlev,trunc = P
-    @unpack R,Ω,akap = P
-    @unpack n_stratosphere_levels = P
+    # number of longitudes, latitudes, vertical levels, spectral truncation
+    @unpack nlon, nlat, nlev, trunc = P     
+    @unpack R_earth,Ω,akap = P          # radius of earth, angular frequency, ratio of gas consts
+    @unpack n_stratosphere_levels = P   # number of vertical levels used for stratosphere
 
     nlat_half = nlat ÷ 2
     nlon_half = nlon ÷ 2
 
-    # GRID SPACE ARRAYS GAUSSIAN GRID - lon is equi-spaced, lat is not!
+    # GRID SPACE ARRAYS lon is equi-spaced
     dlon = 360 / nlon                       # grid spacing in longitude
     dlat = 180 / nlat                       # average grid spacing in latitude
-    lon  = Array(0:dlon:360-dlon)           # array of longitudes
-    # array of latitudes (North to South) corresponding to the zeros
-    # of the (unassociated) legendre polynomial order nlat
-    lat  = reverse(asind.(FastGaussQuadrature.gausslegendre(nlat)[1]))
+    lond = Array(0:dlon:360-dlon)           # array of longitudes in degrees 0...360˚
+    lon = lond/360*2π                       # array of longitudes 0...2π
+    
+    # REGULAR GAUSSIAN GRID, latitudes are not equi-distant
+    # Zero nodes of the (unassociated) legendre polynomial order nlat
+    nodes = FastGaussQuadrature.gausslegendre(nlat)[1]
+    colat = π .- acos.(nodes)               # colatitudes 0...π
+    colatd = 180 .- cosd.(nodes)            # colatitudes in degrees 0...180˚
+    lat = -sin.(nodes)                      # latitudes π/2...-π/2
+    latd = -sind.(nodes)                    # latitudes in degrees 90˚...-90˚
 
     # VERTICAL SIGMA COORDINATE 
     # σ = p/p0 (fraction of surface pressure)
@@ -84,16 +84,10 @@ function Geometry(P::Parameters)
     σ_levels_half⁻¹_2 = 1 ./ (2σ_levels_thick)
     σ_f = akap ./ (2σ_levels_full)
 
-
     # SINES AND COSINES OF LATITUDE
-    sinlat = sind.(lat)
-    coslat = cosd.(lat)
-    sinlat_NH = sinlat[1:nlat_half] # sinlat only for northern hemisphere = NH
-    coslat_NH = coslat[1:nlat_half]
-    radang = asin.(sinlat)
-    cosg   = sinlat                 # inconsistent here due to the sin/cos swap
-    cosg⁻¹ = 1 ./ cosg
-    cosg⁻² = 1 ./ cosg.^2
+    sinlat = sin.(lat)
+    coslat = cos.(lat)
+    coslat⁻¹ = 1 ./ coslat
 
     # CORIOLIS FREQUENCY
     f_coriolis = 2Ω*sinlat
@@ -102,9 +96,9 @@ function Geometry(P::Parameters)
     xgeop1 = zeros(nlev)
     xgeop2 = zeros(nlev)
     for k in 1:nlev
-        xgeop1[k] = R*log(σ_levels_half[k+1]/σ_levels_half[k])
+        xgeop1[k] = R_earth*log(σ_levels_half[k+1]/σ_levels_half[k])
         if k != nlev
-            xgeop2[k+1] = R*log(σ_levels_full[k+1]/σ_levels_half[k+1])
+            xgeop2[k+1] = R_earth*log(σ_levels_full[k+1]/σ_levels_half[k+1])
         end
     end
 
@@ -115,28 +109,22 @@ function Geometry(P::Parameters)
                     log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
     end
 
-
-    #Extra definitions. These will need to be defined consistently either here or somewhere else
-    #Just defined here to proivide basic structure to allow for testing of other components of code
-
-
-    tref = 288.0max.(0.2, σ_levels_full) #more corrections needed here 
-    rgas = (2.0/7.0) / 1004.0
-    fsgr = (tref * 0.0) #arbitrary definition. Must be defined elsewhere 
-
-
-    tref2=akap.*tref
-    tref3=fsgr.*tref #this actually is the correct definition. Needs better naming convention 
-
+    # Extra definitions. These will need to be defined consistently either here or somewhere else
+    # Just defined here to proivide basic structure to allow for testing of other components of code
+    # tref = 288.0max.(0.2, σ_levels_full) #more corrections needed here 
+    # rgas = (2.0/7.0) / 1004.0
+    # fsgr = (tref * 0.0) #arbitrary definition. Must be defined elsewhere 
+    # tref3=fsgr.*tref #this actually is the correct definition. Needs better naming convention 
 
     # conversion to number format NF happens here
     Geometry{P.NF}( nlon,nlat,nlev,nlat_half,nlon_half,
-                    dlon,dlat,lon,lat,
+                    dlon,dlat,lon,lond,lat,latd,colat,colatd,
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
-                    sinlat,coslat,sinlat_NH,coslat_NH,radang,
-                    cosg,cosg⁻¹,cosg⁻²,f_coriolis,xgeop1,xgeop2,lapserate_correction,
-                    tref,rgas,fsgr,tref3,tref2)
+                    sinlat,coslat,coslat⁻¹,
+                    f_coriolis,
+                    xgeop1,xgeop2,lapserate_correction)
+                    # tref,rgas,fsgr,tref3)
 end
 
 """Vertical sigma coordinates defined by their nlev+1 half levels `σ_levels_half`. Sigma coordinates are

@@ -23,7 +23,7 @@ With keywords such that default values can be changed at creation.
                             # at constant pressure = 1 - 1/γ where γ is the
                             # heat capacity ratio of a perfect diatomic gas (7/5)
     cp::Real=1004.0         # Specific heat at constant pressure [J/K/kg]
-    R::Real=akap*cp         # Specific gas constant for dry air [J/kg/K]
+    R_gas::Real=akap*cp     # Specific gas constant for dry air [J/kg/K]
     alhc::Real=2501.0       # Latent heat of condensation [J/g] for consistency with
                             # specific humidity [g/Kg]
     alhs::Real=2801.0       # Latent heat of sublimation [?]
@@ -45,14 +45,14 @@ With keywords such that default values can be changed at creation.
     GLcoefs::GenLogisticCoefs=GenLogisticCoefs()
     n_stratosphere_levels::Int=2    # number of vertical levels used for the stratosphere
 
-    # DIFFUSION
-    npowhd::Real=4          # Power of Laplacian in horizontal diffusion
-    thd::Real=2.4           # Damping time [hrs] for diffusion (del^6) of temperature and vorticity
-    thdd::Real=2.4          # Damping time [hrs] for diffusion (del^6) of divergence
-    thds::Real=12           # Damping time [hrs] for extra diffusion (del^2) in the stratosphere
-    tdrs::Real=24*30        # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
+    # DIFFUSION AND DRAG
+    diffusion_power::Real=4                 # Power n of Laplacian in horizontal diffusion ∇²ⁿ
+    diffusion_time::Real=2.4                # Diffusion time scale [hrs] for temperature and vorticity
+    diffusion_time_div::Real=diffusion_time # Diffusion time scale [hrs] for divergence           
+    diffusion_time_strat::Real=12           # Diffusion time scale [hrs] for extra ∇² in the stratosphere
+    damping_time_strat::Real=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere     
 
-    # PARAMETERIZATIONS
+    # PARAMETRIZATIONS
     seasonal_cycle::Bool=true   # Seasonal cycle?
     n_shortwave::Int=3          # Compute shortwave radiation every n steps
     sppt_on::Bool=false         # Turn on SPPT?
@@ -88,8 +88,6 @@ With keywords such that default values can be changed at creation.
     output_vars::Vector{String}=["u","v","T","humid","logp0"]
     compression_level::Int=3    # 1=low but fast, 9=high but slow
     keepbits::Int=10            # mantissa bits to keep for every variable 
-
-
 
     # TODO assert not allowed parameter values
     @assert α in [0,0.5,1] "Only semi-implicit α = 0, 0.5 or 1 allowed."
