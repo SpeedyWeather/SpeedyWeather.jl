@@ -10,7 +10,7 @@ makedocs(
             "How to run SpeedyWeather.jl"=>"how_to_run_speedy.md",
             "Spherical harmonic transform"=>"spectral_transform.md",
             "Dynamical core"=>"dynamical_core.md",
-            "Parameterizations"=>"parameterizations.md",
+            "Parameterizations"=>"parametrizations.md",
             "Boundary conditions"=>"boundary_conditions.md",
             "New model setups"=>"new_model_setups.md",
             "Function and type index"=>"functions.md",

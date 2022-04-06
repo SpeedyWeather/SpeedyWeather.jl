@@ -51,6 +51,7 @@ and an explicit term. Also precalculates correction terms (horizontal and vertic
 temperature and humidity.
 """
 function HorizontalDiffusion(   P::Parameters,      # Parameter struct
+                                C::Constants,       # Constants struct
                                 G::GeoSpectral,     # Geometry and spectral struct
                                 B::Boundaries)      # Boundaries struct
 
@@ -58,6 +59,7 @@ function HorizontalDiffusion(   P::Parameters,      # Parameter struct
     @unpack lmax,mmax = G.spectral
     @unpack diffusion_power, diffusion_time, diffusion_time_div = P
     @unpack diffusion_time_strat, damping_time_strat = P
+    @unpack Δt = C
 
     # Diffusion is applied by multiplication of the (absolute) eigenvalues of the Laplacian l*(l+1)
     # normalise by the largest eigenvalue lmax*(lmax+1) such that the highest wavenumber lmax
