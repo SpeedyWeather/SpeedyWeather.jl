@@ -50,10 +50,9 @@ horizontal hyperdiffusion for temperature, vorticity and divergence, with an imp
 and an explicit term. Also precalculates correction terms (horizontal and vertical) for
 temperature and humidity.
 """
-function HorizontalDiffusion(   P::Parameters{NF},      # Parameter struct
-                                G::GeoSpectral{NF},     # Geometry and spectral struct
-                                B::Boundaries{NF}       # Boundaries struct
-                                ) where NF              # number format NF
+function HorizontalDiffusion(   P::Parameters,      # Parameter struct
+                                G::GeoSpectral,     # Geometry and spectral struct
+                                B::Boundaries)      # Boundaries struct
 
     # DIFFUSION
     @unpack lmax,mmax = G.spectral
@@ -137,10 +136,10 @@ function HorizontalDiffusion(   P::Parameters{NF},      # Parameter struct
     humid_correction_horizontal = spectral(horizontal_correction,G.spectral,one_more_l=true)
 
     # convert to number format NF here
-    return HorizontalDiffusion{NF}( damping,damping_div,damping_strat,
-                                    damping_impl,damping_div_impl,damping_strat_impl,
-                                    temp_correction_vert,humid_correction_vert,
-                                    temp_correction_horizontal,humid_correction_horizontal)
+    return HorizontalDiffusion{P.NF}(   damping,damping_div,damping_strat,
+                                        damping_impl,damping_div_impl,damping_strat_impl,
+                                        temp_correction_vert,humid_correction_vert,
+                                        temp_correction_horizontal,humid_correction_horizontal)
 end
 
 """
