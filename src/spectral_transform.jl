@@ -122,18 +122,19 @@ Base on `recompute_legendre` (true/false) this function either updates the Legen
 `Λ` for a given latitude `ilat, cos_colat` by recomputation (`recompute_legendre == true`), or
 `Λ` is changed by copying over the polynomials from precomputed `Λs`. Recomputation takes usually
 longer, but precomputation requires a large amount of memory for high resolution."""
-function get_legendre_polynomials!( Λ::Matrix{NF},
-                                    Λs::Array{NF,3},
-                                    ilat::Int,
-                                    cos_colat::NF,
-                                    recompute_legendre::Bool) where NF
+function get_legendre_polynomials!( Λ::Matrix{NF},      # Out: Legendre polynomials for given latitude
+                                    Λs::Array{NF,3},    # Precomputed array of all Legendre polynomials
+                                    ilat::Int,          # latitude index
+                                    cos_colat::NF,      # cosine of colatitude
+                                    recompute_legendre::Bool    # recompute ignores Λs, but uses cos_colat
+                                    ) where NF          # Number format NF
 
-    @boundscheck size(Λ) == size(Λs[:,:,1]) || throw(BoundsError)
     if recompute_legendre
         # Recalculate the (normalized) λ_l^m(cos(colat)) factors of the ass. Legendre polynomials
         lmax,mmax = size(Λ) .- 1
         AssociatedLegendrePolynomials.λlm!(Λ, lmax, mmax, cos_colat)
     else    # copy over precomputed values
+        @boundscheck size(Λ) == size(Λs[:,:,1]) || throw(BoundsError)
         copyto!(Λ,@view(Λs[:,:,ilat]))
     end
 end

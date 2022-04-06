@@ -66,8 +66,8 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
     # gravity:      Gravitational acceleration [m/s^2]
-    # R:            Specific gas constant for dry air [J/kg/K]
-    @unpack temp_ref, temp_top, lapse_rate, gravity, R = P
+    # R_gas:        Specific gas constant for dry air [J/kg/K]
+    @unpack temp_ref, temp_top, lapse_rate, gravity, R_gas = P
     @unpack n_stratosphere_levels = P
 
     lapse_rate_scaled = lapse_rate/gravity/1000     # Lapse rate scaled by gravity [K/m / (m²/s²)]
@@ -88,7 +88,7 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
     for k in n_stratosphere_levels+1:nlev
         for m in 1:mmax+1
             for l in 1:lmax+1
-                temp[l,m,k] = temp_surf[l,m]*σ_levels_full[k]^(R*lapse_rate_scaled)
+                temp[l,m,k] = temp_surf[l,m]*σ_levels_full[k]^(R_gas*lapse_rate_scaled)
             end
         end
     end
@@ -109,7 +109,7 @@ function initialize_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # lo
     # gravity:      Gravitational acceleration [m/s^2]
     # R:            Specific gas constant for dry air [J/kg/K]
     # pres_ref:     Reference surface pressure [hPa]
-    @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R = P
+    @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R_gas = P
     @unpack geopot_surf = B                             # spectral surface geopotential
     geopot_surf_grid = gridded(geopot_surf,G.spectral)  # convert to grid-point space
 
@@ -120,7 +120,7 @@ function initialize_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # lo
     for j in 1:nlat
         for i in 1:nlon
             pres_surf_grid[i,j] = log_pres_ref + 
-                log(1 - lapse_rate_scaled*geopot_surf_grid[i,j]/temp_ref)/(R*lapse_rate_scaled)
+                log(1 - lapse_rate_scaled*geopot_surf_grid[i,j]/temp_ref)/(R_gas*lapse_rate_scaled)
         end
     end
 
@@ -137,7 +137,7 @@ function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},    # spectr
                                 ) where {NF<:AbstractFloat}             # number format NF
 
     lmax,mmax,nlev = size(humid)    # of size lmax+1, mmax+1, nlev
-    lmax, mmax = lmax-1, mmax-1     # hence correct with -1
+    lmax, mmax = lmax-1, mmax-1     # hence correct with -1 for 0-based l,m
     @unpack nlon, nlat, n_stratosphere_levels = P
     @unpack σ_levels_full = G.geometry
 
@@ -161,7 +161,7 @@ function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},    # spectr
     # Specific humidity at tropospheric levels
     for k in n_stratosphere_levels+1:nlev
         for m in 1:mmax+1
-            for l in 1:lmax+1
+            for l in m:lmax+1
                 humid[l,m,k] = humid_surf[l,m]*σ_levels_full[k]^scale_height_ratio
             end
         end

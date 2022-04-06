@@ -96,9 +96,9 @@ function Geometry(P::Parameters)
     xgeop1 = zeros(nlev)
     xgeop2 = zeros(nlev)
     for k in 1:nlev
-        xgeop1[k] = R*log(σ_levels_half[k+1]/σ_levels_half[k])
+        xgeop1[k] = R_earth*log(σ_levels_half[k+1]/σ_levels_half[k])
         if k != nlev
-            xgeop2[k+1] = R*log(σ_levels_full[k+1]/σ_levels_half[k+1])
+            xgeop2[k+1] = R_earth*log(σ_levels_full[k+1]/σ_levels_half[k+1])
         end
     end
 
