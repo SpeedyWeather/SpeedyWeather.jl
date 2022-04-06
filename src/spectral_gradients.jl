@@ -373,11 +373,11 @@ function ∇²!(   ∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacia
 
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
 
-    lmax,mmax = size(alms) .- 1         # degree l, order m of the Legendre polynomials
-    R_inv = convert(Complex{NF},inv(R))  # =1/R, 1 over radius
+    lmax,mmax = size(alms) .- 1             # degree l, order m of the Legendre polynomials
+    R_inv = convert(Complex{NF},inv(R))     # =1/R, 1 over radius
 
-    @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
-        for l in m:lmax+1           # degree l = 0:lmax but 1-based
+    @inbounds for m in 1:mmax+1             # order m = 0:mmax but 1-based
+        for l in m:lmax+1                   # degree l = 0:lmax but 1-based
             # ∇²alms = -l(l+1)/R²*alms, but 1-based (l=>l-1)
             # R⁻² is split to avoid under/overflows
             ∇²alms[l,m] = ((1-l)*R_inv)*(l*R_inv)*alms[l,m]
