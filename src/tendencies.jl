@@ -48,10 +48,10 @@ function get_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variables
     # =========================================================================
     if  α == 0
 
-        #get_spectral_tendencies!(Diag,C)
+        get_spectral_tendencies!(Prog,Diag,1,M)
 
     else
-        get_spectral_tendencies!(Prog,Diag,l2,M)
+        get_spectral_tendencies!(Prog,Diag,l2,M) #Note: l2 currently not used. Needs to be implemented 
 
     end
 
@@ -289,50 +289,68 @@ function get_spectral_tendencies!(Prog::PrognosticVariables{NF},
 
 
 
+    @unpack σ_levels_thick = M.GeoSpectral.geometry # This is dhs in Fortran version
+    @unpack div,temp,pres_surf= Prog 
+    @unpack pres_surf_tend,temp_tend,div_tend = Diag.tendencies
+    @unpack vertical_mean_divergence,sigdtc,dumk,spectral_geopotential = Diag.intermediate_variables
+    @unpack tref,σ_levels_half⁻¹_2,tref2,tref3,rgas = M.GeoSpectral.geometry 
+    @unpack geopot_surf = M.Boundaries 
+
+    #Get number of levels
+    _,_,nlev = size(div)
+
+
+    #1. Pressure surface tendency 
+
+    #Zero out pre-defined array 
+    vertical_mean_divergence .= zero(NF)
+    for k in 1:nlev
+
+        vertical_mean_divergence = vertical_mean_divergence + div[:,:,k] * σ_levels_thick[k]
+
+    end 
+
+    
+    pres_surf_tend = pres_surf_tend - vertical_mean_divergence
+    pres_surf_tend[1,1] = zero(NF) 
+    
+    
+
+    #2. Temperature tendency 
+    sigdtc[:,:,1] .= zero(NF)
+    sigdtc[:,:,nlev+1] .= zero(NF) #What exactly is this quantity?
+    
+
+    for k in 1:nlev-1
+        sigdtc[:,:,k+1] = sigdtc[:,:,k] - σ_levels_thick[k] * (div[:,:,k] - vertical_mean_divergence)
+    end 
+
+
+    dumk[:,:,1] .= zero(NF)
+    dumk[:,:,nlev+1] .= zero(NF) #What exactly is this quantity?
+
+    for k in 2:nlev
+        dumk[:,:,k] = sigdtc[:,:,k] * (tref[k] - tref[k-1])
+    end
+
+    for k in 1:nlev 
+        temp_tend[:,:,k] = temp_tend[:,:,k] 
+                          -(dumk[:,:,k+1] + dumk[:,:,k])*σ_levels_half⁻¹_2[k]
+                          +(sigdtc[:,:,k+1]+sigdtc[:,:,k])*tref3[k]
+                          -vertical_mean_divergence*tref2[k]
+    end 
 
 
 
-                                 
-    # @unpack div,temp,pres_surf = Prog
-    # @unpack pres_surf_tend,temp_tend,div_tend = Diag.tendencies
-    # @unpack d_meanc, sigma_tend_c,dumk = Diag.miscvars
-    # @unpack dhs,dhsr,temp_ref,tref2,tref3 = C
+    #3. Divergence tendency 
 
-    # _,_,nlev = size(div)
+    #First calculate the spectral_geopotential
+    geopotential!(spectral_geopotential,geopot_surf,temp, M.GeoSpectral)
 
-    # # 1. Vertical mean divergence and pressure tendency 
-    # d_meanc[:,:] = 0.0
-    # for k in 1:nlev
-    #     d_meanc = d_meanc + div[:,:,k,l2]*dhs[k]
-    # end
-
-    # pres_surf_tend = pres_surf_tend - d_meanc
-    # pres_surf_tend[1,1] = Complex{RealType}(0.0)
-
-    # # 2. Sigma-dot "velocity" and temperature tendency
-    # for k in 1:nlev - 1
-    #     sigma_tend_c[:,:,k+1] = sigma_tend_c[:,:,k] - dhs[k]*(div[:,:,k,j2] - d_meanc)
-    # end
-
-    # for k in 2:nlev
-    #     dumk[:,:,k] = sigma_tend_c[:,:,k]*(temp_ref[k] - temp_ref[k-1])
-    # end
-
-    # for k in 1:nlev
-    #     temp_tend[:,:,k] -= (dumk[:,:,k+1] + dumk[:,:,k])*dhsr[k]
-    #         + tref3[k]*(sigma_tend_c[:,:,k+1] + sigma_tend_c[:,:,k]) - tref2[k]*d_meanc
-    # end
-
-    # # 3. Geopotential and divergence tendency
-    # geopotential!(geopot,ϕ0spectral,temp,G) # Paxton/Chantry have a geopotential call here. Do we actually need this?       
-    # for k in 1:nlev
-    #     div_tend[:,:,k] -= ∇²(geopot[:,:,k] + rgas*temp_ref[k]*pres_surf[:,:,l2])
-    # end
-
-
-
-
-
+    #Then calculate the divergence tendency:
+    for k in 1:nlev 
+        div_tend[:,:,k] = div_tend[:,:,k] - ∇²(spectral_geopotential[:,:,k] + rgas*tref[k]*pres_surf,M.GeoSpectral) 
+    end 
 
 
 end

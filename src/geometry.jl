@@ -109,7 +109,6 @@ function Geometry(P::Parameters)
                     log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
     end
 
-
     # Extra definitions. These will need to be defined consistently either here or somewhere else
     # Just defined here to proivide basic structure to allow for testing of other components of code
     # tref = 288.0max.(0.2, σ_levels_full) #more corrections needed here 
