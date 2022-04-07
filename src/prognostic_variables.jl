@@ -36,11 +36,12 @@ function initialize_from_rest(  P::Parameters,
     @unpack lmax, mmax = G.spectral
 
     # conversion to type NF later when creating a PrognosticVariables struct
-    vor         = zeros(Complex{Float64},lmax+1,mmax+1,nlev)  # vorticity
-    div         = zeros(Complex{Float64},lmax+1,mmax+1,nlev)  # divergence
-    temp        = zeros(Complex{Float64},lmax+1,mmax+1,nlev)  # absolute Temperature
-    pres_surf   = zeros(Complex{Float64},lmax+1,mmax+1)       # logarithm of surface pressure
-    humid       = zeros(Complex{Float64},lmax+1,mmax+1,nlev)  # specific humidity
+    # one more degree l than order m for recursion in meridional gradient
+    vor         = zeros(Complex{Float64},lmax+2,mmax+1,nlev)  # vorticity
+    div         = zeros(Complex{Float64},lmax+2,mmax+1,nlev)  # divergence
+    temp        = zeros(Complex{Float64},lmax+2,mmax+1,nlev)  # absolute Temperature
+    pres_surf   = zeros(Complex{Float64},lmax+2,mmax+1)       # logarithm of surface pressure
+    humid       = zeros(Complex{Float64},lmax+2,mmax+1,nlev)  # specific humidity
 
     initialize_temperature!(temp,P,B,G)                     # temperature from lapse rates    
     pres_surf_grid = initialize_pressure!(pres_surf,P,B,G)  # pressure from temperature profile
@@ -52,14 +53,14 @@ end
 
 """Initialize spectral temperature from surface absolute temperature and constant
 lapse rate (troposphere) and zero lapse rate (stratosphere)."""
-function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectral temperature in 3D
-                                    P::Parameters,                      # Parameters struct
-                                    B::Boundaries{NF},                  # Boundaries struct
-                                    G::GeoSpectral{NF}                  # Geospectral struct
-                                    ) where {NF<:AbstractFloat}         # number format NF
+function initialize_temperature!(   temp::AbstractArray{Complex{NF},3},    # spectral temperature in 3D
+                                    P::Parameters,                         # Parameters struct
+                                    B::Boundaries,                         # Boundaries struct
+                                    G::GeoSpectral                         # Geospectral struct
+                                    ) where NF
 
-    lmax,mmax,nlev = size(temp)     # of size lmax+1, mmax+1, nlev
-    lmax, mmax = lmax-1, mmax-1     # hence correct with -1
+    lmax,mmax,nlev = size(temp)     # number of vertical levels nlev
+    lmax, mmax = lmax-2, mmax-1     # get 0-based max degree l, order m of spherical harmonics
     @unpack geopot_surf = B         # spectral surface geopotential [m²/s²]
 
     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
@@ -68,18 +69,17 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
     # gravity:      Gravitational acceleration [m/s^2]
     # R_gas:        Specific gas constant for dry air [J/kg/K]
     @unpack temp_ref, temp_top, lapse_rate, gravity, R_gas = P
-    @unpack n_stratosphere_levels = P
+    @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
+    @unpack norm_sphere = G.spectral                # normalization of the l=m=0 spherical harmonic
 
     lapse_rate_scaled = lapse_rate/gravity/1000     # Lapse rate scaled by gravity [K/m / (m²/s²)]
-
-    # TODO introduce spectral scaling, should be 2√π instead of √2
     temp_surf = -lapse_rate_scaled*geopot_surf      # spectral surface air temperature from orography and lapse rate
-    temp_surf[1,1] += 2*sqrt(π)*temp_ref            # adjust mean value (spectral coefficient 1,1) with temp_ref
+    temp_surf[1,1] += norm_sphere*temp_ref          # adjust mean value (spectral coefficient 1,1) with temp_ref
 
     # Stratosphere, set the first spectral coefficient (=mean value)
     # in uppermost levels (default: k=1,2) for lapse rate = 0
     for k in 1:n_stratosphere_levels
-        temp[1,1,k] = 2*sqrt(π)*temp_top
+        temp[1,1,k] = norm_sphere*temp_top
     end
 
     # Temperature at tropospheric levels
@@ -87,7 +87,7 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
 
     for k in n_stratosphere_levels+1:nlev
         for m in 1:mmax+1
-            for l in 1:lmax+1
+            for l in m:lmax+2
                 temp[l,m,k] = temp_surf[l,m]*σ_levels_full[k]^(R_gas*lapse_rate_scaled)
             end
         end
@@ -95,11 +95,10 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3}, # spectr
 end
 
 """Initialize the logarithm of surface pressure `logp0` consistent with temperature profile."""
-function initialize_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # logarithm of surface pressure
-                                P::Parameters,                              # Parameters struct
-                                B::Boundaries{NF},                          # Boundaries struct
-                                G::GeoSpectral{NF}                          # Geospectral struct
-                                ) where {NF<:AbstractFloat}                 # number format NF
+function initialize_pressure!(  pres_surf::AbstractMatrix{Complex{NF}}, # logarithm of surface pressure
+                                P::Parameters,                          # Parameters struct
+                                B::Boundaries,                          # Boundaries struct
+                                G::GeoSpectral) where NF                # Geospectral struct
     
     @unpack nlon, nlat = P
 
@@ -125,16 +124,15 @@ function initialize_pressure!(  pres_surf::AbstractArray{Complex{NF},2},    # lo
     end
 
     # convert to spectral space
-    spectral!(pres_surf,pres_surf_grid,G.spectral) 
+    spectral!(pres_surf,pres_surf_grid,SpectralTransform(NF,nlon,nlat,P.trunc,true)) 
     return pres_surf_grid                       # return grid for use in initialize_humidity!
 end
 
 """Initialize specific humidity in spectral space."""
-function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},    # spectral specific humidity
-                                pres_surf_grid::AbstractArray{NF,2},    # logarithm of surface pressure (grid space)
-                                P::Parameters,                          # Parameters struct
-                                G::GeoSpectral{NF}                      # Geospectral struct
-                                ) where {NF<:AbstractFloat}             # number format NF
+function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},# spectral specific humidity
+                                pres_surf_grid::AbstractMatrix,     # log of surf pressure (grid space)
+                                P::Parameters,                      # Parameters struct
+                                G::GeoSpectral) where NF            # Geospectral struct
 
     lmax,mmax,nlev = size(humid)    # of size lmax+1, mmax+1, nlev
     lmax, mmax = lmax-1, mmax-1     # hence correct with -1 for 0-based l,m
@@ -146,14 +144,13 @@ function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},    # spectr
     @unpack water_pres_ref, relhumid_ref = P
     humid_ref = relhumid_ref*0.622*water_pres_ref   # reference specific humidity [Pa]
 
-    @unpack scale_height, scale_height_humid = P            # scale height [km], scale height for spec humidity [km]   
+    # scale height [km], scale height for spec humidity [km]
+    @unpack scale_height, scale_height_humid = P            
     scale_height_ratio = scale_height/scale_height_humid    # ratio of scale heights [1]
 
     # Specific humidity at the surface (grid space)
     humid_surf_grid = humid_ref*exp.(scale_height_ratio*pres_surf_grid)
-
-    # Convert to spectral space
-    humid_surf = spectral(humid_surf_grid,G.spectral)
+    humid_surf = spectral(humid_surf_grid,one_more_l=true)
 
     # stratospheric humidity zero
     fill!(view(humid,:,:,1:n_stratosphere_levels),0)

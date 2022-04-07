@@ -131,11 +131,11 @@ function HorizontalDiffusion(   P::Parameters,      # Parameter struct
     end
 
     # transform correction to spectral space
-    temp_correction_horizontal = spectral(horizontal_correction,G.spectral,one_more_l=true)
+    temp_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
 
     # Orographic correction terms for humidity (horizontal component)
     horizontal_correction .= relhumid_ref           # relative humidity reference value
-    humid_correction_horizontal = spectral(horizontal_correction,G.spectral,one_more_l=true)
+    humid_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
 
     # convert to number format NF here
     return HorizontalDiffusion{P.NF}(   damping,damping_div,damping_strat,
@@ -216,7 +216,7 @@ function stratospheric_zonal_drag!( tendency::AbstractArray{Complex{NF},3}, # te
                                     ) where {NF<:AbstractFloat}             # number format NF
     
     lmax,mmax,nlev = size(A)    # spherical harmonic degree l, order m, number of vertical levels nlev
-    lmax -= 1                   # 0-based l,m
+    lmax -= 1                   # convert to 0-based l,m
     mmax -= 1
     @boundscheck size(A) == size(tendency) || throw(BoundsError())
 
@@ -237,7 +237,7 @@ function orographic_correction!(A_corrected::AbstractArray{Complex{NF},3},  # co
                                 ) where NF
     
     lmax,mmax,nlev = size(A)    # degree l, order m of the spherical harmonics
-    lmax -= 1                   # 0-based
+    lmax -= 1                   # convert to 0-based
     mmax -= 1
 
     @boundscheck size(A) == size(A_corrected) || throw(BoundsError())

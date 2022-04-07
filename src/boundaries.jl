@@ -34,7 +34,9 @@ function Boundaries(P::Parameters)
 
     # GEOPOTENTIAL, transform to spectral space and truncate accordingly   
     geopot_surf_highres = spectral(gravity*orography)
-    geopot_surf = spectral_truncation(geopot_surf_highres,P.trunc)
+    geopot_surf = spectral_truncation(geopot_surf_highres,  # truncate to
+                                        P.trunc+1,P.trunc)  # lmax+1,mmax matrix
+    spectral_truncation!(geopot_surf,P.trunc)               # but set l=lmax+1 row to zero
     geopot_surf_grid = gridded(geopot_surf)
     
     # convert to number format NF here
