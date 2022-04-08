@@ -17,6 +17,10 @@ struct SpectralTransform{NF<:AbstractFloat}
     sin_colat::Vector{NF}   # Sine of colatitudes
     lon_offset::NF          # Offset of first longitude from prime meridian
 
+    # NORMALIZATION
+    norm_sphere::NF         # normalization of the l=0,m=0 mode
+    norm_forward::NF        # normalization of the Legendre weights for forward transform
+
     # FFT plans
     rfft_plan::FFTW.rFFTWPlan{NF}           # grid to spectral transform
     brfft_plan::FFTW.rFFTWPlan{Complex{NF}} # spectral to grid transform (inverse)
@@ -26,6 +30,9 @@ struct SpectralTransform{NF<:AbstractFloat}
     Λ::Matrix{NF}                   # Legendre polynomials for one latitude (requires recomputing)
     Λs::Array{NF,3}                 # Legendre polynomials for all latitudes (all precomputed)
     legendre_weights::Vector{NF}    # Legendre weights (extra normalisation of π/nlat included)
+
+    # RECURSION FACTORS
+    ϵlms::Array{NF}
 end
 
 """
@@ -62,6 +69,10 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
     cos_colat = cos.(colat)
     lon_offset = π/nlon                                 # offset of first longitude from prime meridian
 
+    # NORMALIZATION
+    norm_sphere = 2sqrt(π)      # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
+    norm_forward = π/nlat       # normalization for forward transform to be baked into the Legendre weights
+
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
     Λ = zeros(lmax+2,mmax+1)                            # Legendre polynomials for one latitude
 
@@ -77,16 +88,22 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
         end
     end
 
+    # Legendre weights
     legendre_weights = FastGaussQuadrature.gausslegendre(nlat)[2][1:nlat_half]
-    legendre_weights *= π/nlat              # extra normalisation for forward transform included
+    legendre_weights *= norm_forward        # extra normalisation for forward transform included
 
+    # RECURSION FACTORS
+    ϵlms = get_recursion_factors(lmax,mmax)
+        
     # conversion to NF happens here
     SpectralTransform{NF}(  lmax,mmax,nfreq,
                             nlon,nlat,nlat_half,
                             colat,cos_colat,sin_colat,lon_offset,
+                            norm_sphere,norm_forward,
                             rfft_plan,brfft_plan,
                             recompute_legendre,Λ,Λs,
-                            legendre_weights)
+                            legendre_weights,
+                            ϵlms)
 end
 
 """Generator function for a SpectralTransform struct in case the number format is not provided.
@@ -114,6 +131,38 @@ function GeoSpectral(P::Parameters)
     S = SpectralTransform(P)
     return GeoSpectral{P.NF}(G,S)
 end
+
+"""
+    ϵ = ϵ(NF,l,m) 
+
+Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of the spherical harmonics.
+ϵ(l,m) = sqrt((l^2-m^2)/(4*l^2-1)) and then converted to number format NF."""
+function ϵlm(::Type{NF},l::Int,m::Int) where NF
+    return convert(NF,sqrt((l^2-m^2)/(4*l^2-1)))
+end
+
+"""
+    ϵ = ϵ(l,m) 
+
+Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of the spherical harmonics.
+ϵ(l,m) = sqrt((l^2-m^2)/(4*l^2-1)) with default number format Float64."""
+ϵlm(l::Int,m::Int) = ϵlm(Float64,l,m)
+
+function get_recursion_factors( ::Type{NF}, # number format NF
+                                lmax::Int,  # max degree l of spherical harmonics (0-based here)
+                                mmax::Int   # max order m of spherical harmonics
+                                ) where {NF<:AbstractFloat}
+
+    ϵlms = zeros(NF,lmax+2,mmax+1)      # preallocate array with one more l for meridional gradients
+    for m in 1:mmax+1                   # loop over 1-based l,m
+        for l in m:lmax+2
+            ϵlms[l,m] = ϵlm(NF,l-1,m-1) # convert to 0-based l,m for function call
+        end
+    end
+    return ϵlms
+end
+
+get_recursion_factors(lmax::Int,mmax::Int) = get_recursion_factors(Float64,lmax,mmax)
 
 """
     get_legendre_polynomials!(Λ,Λs,ilat,cos_colat,recompute_legendre)
@@ -303,8 +352,9 @@ Forward spectral transform (grid to spectral space) from the gridded field `map`
 grid (with Gaussian latitudes) into the spectral coefficients of the Legendre polynomials `alms`. Based
 on the size of `map` this function retrieves the corresponding spectral resolution via triangular
 truncation and sets up a SpectralTransform struct `S` to execute `spectral(map,S)`."""
-function spectral(  map::AbstractMatrix{NF} # gridded field nlon x nlat
-                    ) where NF              # number format NF
+function spectral(  map::AbstractMatrix{NF};    # gridded field nlon x nlat
+                    kwargs...                   # additional keyword arguments
+                    ) where NF                  # number format NF
 
     # check grid is compatible with triangular spectral truncation
     nlon, nlat = size(map)
@@ -316,7 +366,7 @@ function spectral(  map::AbstractMatrix{NF} # gridded field nlon x nlat
 
     # allocate spectral transform struct
     S = SpectralTransform(NF,nlon,nlat,trunc,recompute_legendre)
-    return spectral(map,S)
+    return spectral(map,S;kwargs...)
 end
 
 """
