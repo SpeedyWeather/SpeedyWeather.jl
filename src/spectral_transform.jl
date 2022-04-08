@@ -70,7 +70,7 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
     lon_offset = π/nlon                                 # offset of first longitude from prime meridian
 
     # NORMALIZATION
-    norm_sphere = 2√π           # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
+    norm_sphere = 2sqrt(π)      # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
     norm_forward = π/nlat       # normalization for forward transform to be baked into the Legendre weights
 
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
