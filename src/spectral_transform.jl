@@ -93,12 +93,7 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
     legendre_weights *= norm_forward        # extra normalisation for forward transform included
 
     # RECURSION FACTORS
-    ϵlms = zeros(lmax+2,mmax+1)
-    for m in 1:mmax+1                   # loop over 1-based l,m
-        for l in m:lmax+2
-            ϵlms[l,m] = ϵlm(l-1,m-1)    # convert to 0-based l,m for function call
-        end
-    end
+    ϵlms = get_recursion_factors(lmax,mmax)
         
     # conversion to NF happens here
     SpectralTransform{NF}(  lmax,mmax,nfreq,
@@ -142,8 +137,8 @@ end
 
 Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of the spherical harmonics.
 ϵ(l,m) = sqrt((l^2-m^2)/(4*l^2-1)) and then converted to number format NF."""
-function ϵlm(::Type{T},l::Int,m::Int) where T
-    return convert(T,sqrt((l^2-m^2)/(4*l^2-1)))
+function ϵlm(::Type{NF},l::Int,m::Int) where NF
+    return convert(NF,sqrt((l^2-m^2)/(4*l^2-1)))
 end
 
 """
@@ -152,6 +147,22 @@ end
 Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of the spherical harmonics.
 ϵ(l,m) = sqrt((l^2-m^2)/(4*l^2-1)) with default number format Float64."""
 ϵlm(l::Int,m::Int) = ϵlm(Float64,l,m)
+
+function get_recursion_factors( ::Type{NF}, # number format NF
+                                lmax::Int,  # max degree l of spherical harmonics (0-based here)
+                                mmax::Int   # max order m of spherical harmonics
+                                ) where {NF<:AbstractFloat}
+
+    ϵlms = zeros(NF,lmax+2,mmax+1)      # preallocate array with one more l for meridional gradients
+    for m in 1:mmax+1                   # loop over 1-based l,m
+        for l in m:lmax+2
+            ϵlms[l,m] = ϵlm(NF,l-1,m-1) # convert to 0-based l,m for function call
+        end
+    end
+    return ϵlms
+end
+
+get_recursion_factors(lmax::Int,mmax::Int) = get_recursion_factors(Float64,lmax,mmax)
 
 """
     get_legendre_polynomials!(Λ,Λs,ilat,cos_colat,recompute_legendre)
