@@ -124,7 +124,8 @@ function initialize_pressure!(  pres_surf::AbstractMatrix{Complex{NF}}, # logari
     end
 
     # convert to spectral space
-    spectral!(pres_surf,pres_surf_grid,SpectralTransform(NF,nlon,nlat,P.trunc,true)) 
+    spectral!(pres_surf,pres_surf_grid,SpectralTransform(NF,nlon,nlat,P.trunc,true))
+    spectral_truncation!(pres_surf,P.trunc)     # set lmax+1 row to zero
     return pres_surf_grid                       # return grid for use in initialize_humidity!
 end
 
@@ -151,6 +152,7 @@ function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},# spectral s
     # Specific humidity at the surface (grid space)
     humid_surf_grid = humid_ref*exp.(scale_height_ratio*pres_surf_grid)
     humid_surf = spectral(humid_surf_grid,one_more_l=true)
+    spectral_truncation!(humid_surf,P.trunc)                # set the lmax+1 row to zero
 
     # stratospheric humidity zero
     fill!(view(humid,:,:,1:n_stratosphere_levels),0)
