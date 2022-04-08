@@ -88,8 +88,8 @@ end
 @testset "Transform: Geopotential" begin
 
     # Test for variable resolution
-    for trunc in spectral_resolutions
-        for NF in (Float64,)#Float32)
+    for trunc in spectral_resolutions[1:2]
+        for NF in (Float64,Float32)
             P = Parameters(;NF,trunc)
             G = GeoSpectral(P)
             B = Boundaries(P)
@@ -97,11 +97,12 @@ end
 
             geopot_surf_spectral = B.geopot_surf
             geopot_surf_grid = gridded(geopot_surf_spectral,S)
-            geopot_surf_spectral2 = spectral(geopot_surf_grid,S)
+            geopot_surf_spectral2 = spectral(geopot_surf_grid,S,one_more_l=true)
+            spectral_truncation!(geopot_surf_spectral2,trunc)
             geopot_surf_grid2 = gridded(geopot_surf_spectral2,S)
 
             for i in eachindex(geopot_surf_spectral)
-                @test geopot_surf_spectral[i] ≈ geopot_surf_spectral2[i]
+                @test geopot_surf_spectral[i] ≈ geopot_surf_spectral2[i] rtol=30*sqrt(eps(NF))
             end
             for i in eachindex(geopot_surf_grid)
                 @test geopot_surf_grid[i] ≈ geopot_surf_grid2[i] rtol=30*sqrt(eps(NF))
