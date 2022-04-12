@@ -15,6 +15,9 @@
         v_surf_grid = diag_vars.grid_variables.v_grid[:,:,end]
         vor_surf_grid = diag_vars.grid_variables.vor_grid[:,:,end]
 
-        SpeedyWeather.divergence_uvω_spectral(u_grid,v_grid,vor_grid,model_setup.geospectral)
+        SpeedyWeather.divergence_uvω_spectral(  u_surf_grid,
+                                                v_surf_grid,
+                                                vor_surf_grid,
+                                                model_setup.geospectral)
     end
 end
