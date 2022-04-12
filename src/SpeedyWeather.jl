@@ -51,6 +51,7 @@ module SpeedyWeather
     include("tendencies.jl")
     include("feedback.jl")
     include("output.jl")
-    include("time_integration.jl")
     include("run_speedy.jl")
+
+    include("time_integration.jl")
 end

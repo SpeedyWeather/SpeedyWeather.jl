@@ -147,29 +147,26 @@ end
 """Calculate a single time step for SpeedyWeather.jl"""
 function time_stepping!(Prog::PrognosticVariables{NF},  # all prognostic variables
                         Diag::PrognosticVariables{NF},  # all pre-allocated diagnostic variables
-                        C::Constants{NF},               # struct containing constants
-                        G::GeoSpectral{NF},             # struct containing geometry and spectral transform constants
-                        HD::HorizontalDiffusion{NF},    # struct containing horizontal diffusion constants
-                        P::Parameters                   # struct containing all model parameters
-                        ) where {NF<:AbstractFloat}
+                        M::ModelSetup{NF}               # all precalculated structs
+                        ) where {NF<:AbstractFloat}     # number format NF
     
-    @unpack n_timesteps, Δt = C
-    @unpack output = P
+    @unpack n_timesteps, Δt = M.constants
+    @unpack output = M.parameters
 
     # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS
     # feedback = feedback_initialise(S)
     # ncfile = output_initialise(feedback,S)
 
-    first_timestep!(Prog,Diag,C,G,HD)
+    # first_timestep!(Prog,Diag,C,G,HD)
 
-    for i in 1:n_timesteps
-        timestep!(Prog,Diag,2,2,2Δt,C,G,HD)
+    # for i in 1:n_timesteps
+    #     timestep!(Prog,Diag,2,2,2Δt,C,G,HD)
 
-        # FEEDBACK AND OUTPUT
-        # feedback.i = i
-        # feedback!(Prog,feedback,S)
-        # output_nc!(i,netCDFfiles,Prog,Diag,S)
-    end
+    #     # FEEDBACK AND OUTPUT
+    #     # feedback.i = i
+    #     # feedback!(Prog,feedback,S)
+    #     # output_nc!(i,netCDFfiles,Prog,Diag,S)
+    # end
 
     return Prog
 end
