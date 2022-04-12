@@ -25,7 +25,7 @@ function run_speedy(::Type{NF}=Float64;             # number format, use Float64
                     ) where {NF<:AbstractFloat}
 
     # INITALIZE MODEL
-    prog_vars,diag_vars,model_setup = initialize_model(NF,kwargs...)
+    prog_vars,diag_vars,model_setup = initialize_model(NF;kwargs...)
 
     # START MODEL INTEGRATION
     time_stepping!(prog_vars,diag_vars,model_setup) 
@@ -44,7 +44,7 @@ function initialize_model(::Type{NF}=Float64;       # number format, use Float64
                           kwargs...                 # all additional non-default parameters
                           ) where {NF<:AbstractFloat}
 
-    P = Parameters(NF=NF,kwargs...)                 # all model parameters chosen through kwargs
+    P = Parameters(NF=NF;kwargs...)                 # all model parameters chosen through kwargs
     C = Constants(P)                                # constants used in model integration
     G = GeoSpectral(P)                              # geometry and spectral transform structs
     B = Boundaries(P)                               # arrays for boundary conditions

@@ -10,6 +10,7 @@ module SpeedyWeather
     import LinearAlgebra
 
     # INPUT OUTPUT 
+    import Dates
     import Dates: DateTime
     import Printf: @sprintf
     import NetCDF: NetCDF, NcFile, NcDim, NcVar
@@ -33,7 +34,7 @@ module SpeedyWeather
     include("parameter_structs.jl")
     include("spectral_truncation.jl")
 
-    include("parameters.jl")
+    include("default_parameters.jl")
     include("constants.jl")
     include("geometry.jl")
     include("spectral_transform.jl")
@@ -49,9 +50,9 @@ module SpeedyWeather
     include("parametrization_tendencies.jl")
     include("dynamics_tendencies.jl")
     include("tendencies.jl")
+    include("run_speedy.jl")
     include("feedback.jl")
     include("output.jl")
-    include("run_speedy.jl")
 
     include("time_integration.jl")
 end

@@ -23,3 +23,13 @@ end
         @test i <= SpeedyWeather.roundup_fft(i)
     end
 end
+
+@testset "readable secs feedback" begin
+    @test SpeedyWeather.readable_secs(123456) == "1d, 10h"
+    @test SpeedyWeather.readable_secs(12345) == "3h, 25min"
+    @test SpeedyWeather.readable_secs(1234) == "20min, 34s"
+    @test SpeedyWeather.readable_secs(123) == "2min, 3s"
+    @test SpeedyWeather.readable_secs(12.3) == "12.3s"
+    @test SpeedyWeather.readable_secs(1.23) == "1.23s"
+    @test SpeedyWeather.readable_secs(0.123) == "0.12s"
+end
