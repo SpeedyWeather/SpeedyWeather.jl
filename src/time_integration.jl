@@ -62,6 +62,16 @@ function leapfrog!( A::AbstractArray{Complex{NF},4},        # a prognostic varia
     end
 end
 
+"""TODO write a leapfrog! function that loops over all prognostic variables."""
+function leapfrog!( Prog::PrognosticVariables,
+                    Tend::Tendencies)
+    
+    # @distributed 
+    for (var,tend) in zip((pres_surf,),(pres_surf_tend,))
+        leapfrog!(var,tend,)
+    end 
+end    
+
 """Call initialization of semi-implicit scheme and perform initial time step."""
 function first_timestep!(   Prog::PrognosticVariables{NF},  # all prognostic variables
                             Diag::PrognosticVariables{NF},  # all pre-allocated diagnostic variables
@@ -150,8 +160,8 @@ function timestep!( Prog::PrognosticVariables{NF},  # all prognostic variables
 end
 
 """Calculate a single time step for SpeedyWeather.jl"""
-function time_stepping!(Prog::PrognosticVariables{NF},  # all prognostic variables
-                        Diag::DiagnosticVariables{NF},  # all pre-allocated diagnostic variables
+function time_stepping!(prog::PrognosticVariables{NF},  # all prognostic variables
+                        diag::DiagnosticVariables{NF},  # all pre-allocated diagnostic variables
                         M::ModelSetup{NF}               # all precalculated structs
                         ) where {NF<:AbstractFloat}     # number format NF
     
@@ -160,20 +170,20 @@ function time_stepping!(Prog::PrognosticVariables{NF},  # all prognostic variabl
 
     # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS
     feedback = initialize_feedback(M)
-    # ncfile = output_initialise(feedback,S)
+    netcdf_files = initialize_output(diag,feedback,M)
 
-    # first_timestep!(Prog,Diag,C,G,HD)
+    # first_timestep!(prog,diag,C,G,HD)
 
     for i in 1:n_timesteps
-        # timestep!(Prog,Diag,2,2,2Δt,C,G,HD)
+        # timestep!(prog,diag,2,2,2Δt,C,G,HD)
 
         # FEEDBACK AND OUTPUT
         feedback!(feedback,i)
-        # output_nc!(i,netCDFfiles,Prog,Diag,S)
+        output_netcdf!(i,netcdf_files,diag,M)
     end
 
     feedback_end!(feedback)
 
-    return Prog
+    return prog
 end
     

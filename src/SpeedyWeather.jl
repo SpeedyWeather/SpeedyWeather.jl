@@ -15,6 +15,7 @@ module SpeedyWeather
     import Printf: @sprintf
     import NetCDF: NetCDF, NcFile, NcDim, NcVar
     import BitInformation: round, round!
+    import UnicodePlots
 
     # EXPORT MAIN INTERFACE TO SPEEDY
     export run_speedy
@@ -55,4 +56,5 @@ module SpeedyWeather
     include("output.jl")
 
     include("time_integration.jl")
+    include("pretty_printing.jl")
 end

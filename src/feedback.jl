@@ -64,8 +64,8 @@ function initialize_feedback(M::ModelSetup)
         write(progress_txt,s*"\n")      # and in file
 
         # add some information on resolution and number format
-        write(progress_txt,"Integrating $(n_days) days at a spectral resolution of
-                    T$trunc with $(nlon)x$(nlat) grid points.\n")
+        write(progress_txt,"Integrating $(n_days) days at a spectral resolution of"*
+                            "T$trunc with $(nlon)x$(nlat) grid points.\n")
         write(progress_txt,"Number format is "*string(NF)*".\n")
         write(progress_txt,"All data will be stored in $run_path.\n")
 
