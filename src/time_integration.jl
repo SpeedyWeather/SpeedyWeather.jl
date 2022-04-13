@@ -170,7 +170,7 @@ function time_stepping!(prog::PrognosticVariables{NF},  # all prognostic variabl
 
     # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS
     feedback = initialize_feedback(M)
-    netcdf_files = initialize_output(diag,feedback,M)
+    # netcdf_files = initialize_output(diag,feedback,M)
 
     # first_timestep!(prog,diag,C,G,HD)
 
@@ -179,7 +179,7 @@ function time_stepping!(prog::PrognosticVariables{NF},  # all prognostic variabl
 
         # FEEDBACK AND OUTPUT
         feedback!(feedback,i)
-        output_netcdf!(i,netcdf_files,diag,M)
+        # output_netcdf!(i,netcdf_files,diag,M)
     end
 
     feedback_end!(feedback)
