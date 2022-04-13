@@ -2,6 +2,8 @@
 Struct holding the parameters needed at runtime in number format NF.
 """
 @with_kw struct Constants{NF<:AbstractFloat}
+
+    # PHYSICAL CONSTANTS
     R_earth::NF      # Radius of Earth
     Ω::NF            # Angular frequency of Earth's rotation
     gravity::NF      # Gravitational acceleration
@@ -12,6 +14,11 @@ Struct holding the parameters needed at runtime in number format NF.
     Δt::NF                  # time step [s], use 2Δt for leapfrog
     robert_filter::NF       # Robert (1966) time filter coefficient to suppress comput. mode
     williams_filter::NF     # Williams time filter (Amezcua 2011) coefficient for 3rd order acc
+    n_timesteps::Int        # number of time steps to integrate for
+
+    # OUTPUT TIME STEPPING
+    output_every_n_steps::Int   # output every n time steps
+    n_outputsteps::Int          # total number of output time steps
 
     # DIFFUSION AND DRAG
     drag_strat::NF               # drag [1/s] for zonal wind in the stratosphere
@@ -22,15 +29,24 @@ Generator function for a Constants struct.
 """
 function Constants(P::Parameters)
 
-    @unpack R_earth, Ω, gravity, akap, R_gas, Δt = P
+    # PHYSICAL CONSTANTS
+    @unpack R_earth, Ω, gravity, akap, R_gas = P
+    
+    # TIME INTEGRATION CONSTANTS
     @unpack robert_filter, williams_filter = P
-    @unpack damping_time_strat = P
+    @unpack n_days, output_dt = P
+    Δt = P.Δt*60                                # convert time step Δt from minutes to seconds
+    n_timesteps = ceil(Int,60*24*n_days/P.Δt)   # number of time steps to integrate for
+    output_every_n_steps = max(1,floor(Int,output_dt*3600/Δt))  # output every n time steps
+    n_outputsteps = (n_timesteps ÷ output_every_n_steps)+1      # total number of output time steps
 
     # stratospheric drag [1/s] from drag time timescale tdrs [hrs]
+    @unpack damping_time_strat = P
     drag_strat = 1/(damping_time_strat*3600)
 
     # This implies conversion to NF
     return Constants{P.NF}( R_earth,Ω,gravity,akap,R_gas,
-                            Δt,robert_filter,williams_filter,
+                            Δt,robert_filter,williams_filter,n_timesteps,
+                            output_every_n_steps, n_outputsteps,
                             drag_strat)
 end  

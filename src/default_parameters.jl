@@ -22,15 +22,15 @@ With keywords such that default values can be changed at creation.
     akap::Real=2/7          # Ratio of gas constant to specific heat of dry air
                             # at constant pressure = 1 - 1/γ where γ is the
                             # heat capacity ratio of a perfect diatomic gas (7/5)
-    cp::Real=1004.0         # Specific heat at constant pressure [J/K/kg]
+    cp::Real=1004           # Specific heat at constant pressure [J/K/kg]
     R_gas::Real=akap*cp     # Specific gas constant for dry air [J/kg/K]
-    alhc::Real=2501.0       # Latent heat of condensation [J/g] for consistency with
+    alhc::Real=2501         # Latent heat of condensation [J/g] for consistency with
                             # specific humidity [g/Kg]
-    alhs::Real=2801.0       # Latent heat of sublimation [?]
+    alhs::Real=2801         # Latent heat of sublimation [?]
     sbc::Real=5.67e-8       # Stefan-Boltzmann constant [W/m^2/K^4]
 
     # STANDARD ATMOSPHERE
-    lapse_rate::Real=6.0    # Reference temperature lapse rate -dT/dz [K/km]
+    lapse_rate::Real=6      # Reference temperature lapse rate -dT/dz [K/km]
     temp_ref::Real=288      # Reference absolute temperature at surface z=0 [K]
     temp_top::Real=216      # Reference absolute temperature in stratosphere [K]
     scale_height::Real=7.5  # Reference scale height for pressure [km]
@@ -58,9 +58,8 @@ With keywords such that default values can be changed at creation.
     sppt_on::Bool=false         # Turn on SPPT?
 
     # TIME STEPPING
-    nstepsday::Int=36           # number of time steps in one day
-    Δt::Real=86400/nstepsday    # time step in seconds
-    ndays::Real=10              # number of days to integrate for
+    Δt::Real=40                 # time step in minutes
+    n_days::Real=10             # number of days to integrate for
 
     # NUMERICS
     robert_filter::Real=0.05    # Robert (1966) time filter coefficeint for suppress comput. mode
@@ -84,7 +83,7 @@ With keywords such that default values can be changed at creation.
     output::Bool=false          # Store data in netCDF?
     output_dt::Real=6           # output time step [hours]
     output_startdate::DateTime=DateTime(2000,1,1)
-    outpath::String=pwd()       # path to output folder
+    out_path::String=pwd()      # path to output folder
     output_vars::Vector{String}=["u","v","T","humid","logp0"]
     compression_level::Int=3    # 1=low but fast, 9=high but slow
     keepbits::Int=10            # mantissa bits to keep for every variable 

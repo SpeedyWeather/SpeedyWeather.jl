@@ -1,16 +1,23 @@
 """Checks output folders to determine a 4-digit run id number."""
 function get_run_id_path(P::Parameters)
 
-    @unpack output,outpath = P
+    @unpack output,out_path = P
 
     if output
-        runlist = filter(x->startswith(x,"run"),readdir(outpath))
+        # pull list of existing run???? folders via readdir
+        runlist = filter(x->startswith(x,"run"),readdir(out_path))
         existing_runs = [parse(Int,id[4:end]) for id in runlist]
-        run_id = maximum(existing_runs)+1
-        runpath = joinpath(outpath,@sprintf("run%04d",run_id))
-        mkdir(runpath)
 
-        return run_id,runpath
+        # get the run id from existing folders
+        if length(existing_runs) == 0           # if no runfolder exists yet
+            run_id = 1                          # start with run0001
+        else
+            run_id = maximum(existing_runs)+1   # next run gets id +1
+        end
+
+        run_path = joinpath(out_path,@sprintf("run%04d",run_id))
+        mkdir(run_path)             # actually create the folder
+        return run_id,run_path
     else
         return 0,"no runpath"
     end
