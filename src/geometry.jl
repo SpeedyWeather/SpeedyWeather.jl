@@ -71,9 +71,9 @@ function Geometry(P::Parameters)
     # Zero nodes of the (unassociated) legendre polynomial order nlat
     nodes = FastGaussQuadrature.gausslegendre(nlat)[1]
     colat = π .- acos.(nodes)               # colatitudes 0...π
-    colatd = 180 .- cosd.(nodes)            # colatitudes in degrees 0...180˚
-    lat = -sin.(nodes)                      # latitudes π/2...-π/2
-    latd = -sind.(nodes)                    # latitudes in degrees 90˚...-90˚
+    colatd = 180 .- acosd.(nodes)           # colatitudes in degrees 0...180˚
+    lat = -asin.(nodes)                     # latitudes π/2...-π/2
+    latd = -asind.(nodes)                   # latitudes in degrees 90˚...-90˚
 
     # VERTICAL SIGMA COORDINATE 
     # σ = p/p0 (fraction of surface pressure)
