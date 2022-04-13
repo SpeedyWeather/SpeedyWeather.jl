@@ -160,30 +160,42 @@ function timestep!( Prog::PrognosticVariables{NF},  # all prognostic variables
 end
 
 """Calculate a single time step for SpeedyWeather.jl"""
-function time_stepping!(prog::PrognosticVariables{NF},  # all prognostic variables
-                        diag::DiagnosticVariables{NF},  # all pre-allocated diagnostic variables
+function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variables
+                        diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                         M::ModelSetup{NF}               # all precalculated structs
                         ) where {NF<:AbstractFloat}     # number format NF
     
-    @unpack n_timesteps, Δt = M.constants
+    @unpack n_timesteps, Δt, Δt_hrs = M.constants
     @unpack output = M.parameters
 
     # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS
     feedback = initialize_feedback(M)
-    # netcdf_files = initialize_output(diag,feedback,M)
+    netcdf_file = initialize_netcdf_output(diagn,feedback,M)
 
     # first_timestep!(prog,diag,C,G,HD)
 
+    time_hrs = 0.0
     for i in 1:n_timesteps
+        time_hrs += Δt_hrs
+
         # timestep!(prog,diag,2,2,2Δt,C,G,HD)
+
+        @unpack temp = progn
+        @unpack temp_grid = diagn.grid_variables
+        @unpack nlev = M.parameters
+
+        temp_surf_grid = view(temp_grid,:,:,nlev)
+        temp_surf = view(temp,:,:,nlev)
+
+        gridded!(temp_surf_grid,temp_surf,M.geospectral.spectral)
 
         # FEEDBACK AND OUTPUT
         feedback!(feedback,i)
-        # output_netcdf!(i,netcdf_files,diag,M)
+        write_netcdf_output!(netcdf_file,feedback,i,time_hrs,diagn,M)
     end
 
     feedback_end!(feedback)
 
-    return prog
+    return progn
 end
     

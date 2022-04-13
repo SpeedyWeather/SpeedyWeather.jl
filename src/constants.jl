@@ -12,6 +12,7 @@ Struct holding the parameters needed at runtime in number format NF.
 
     # TIME STEPPING
     Δt::NF                  # time step [s], use 2Δt for leapfrog
+    Δt_hrs::Float64         # time step [hrs]
     robert_filter::NF       # Robert (1966) time filter coefficient to suppress comput. mode
     williams_filter::NF     # Williams time filter (Amezcua 2011) coefficient for 3rd order acc
     n_timesteps::Int        # number of time steps to integrate for
@@ -35,18 +36,20 @@ function Constants(P::Parameters)
     # TIME INTEGRATION CONSTANTS
     @unpack robert_filter, williams_filter = P
     @unpack n_days, output_dt = P
-    Δt = P.Δt*60                                # convert time step Δt from minutes to seconds
-    n_timesteps = ceil(Int,60*24*n_days/P.Δt)   # number of time steps to integrate for
-    output_every_n_steps = max(1,floor(Int,output_dt*3600/Δt))  # output every n time steps
+    Δt      = P.Δt*60                           # convert time step Δt from minutes to seconds
+    Δt_hrs  = P.Δt/60                           # convert time step Δt from minutes to hours
+    n_timesteps = ceil(Int,24*n_days/Δt_hrs)    # number of time steps to integrate for
+    output_every_n_steps = max(1,floor(Int,output_dt/Δt_hrs))   # output every n time steps
     n_outputsteps = (n_timesteps ÷ output_every_n_steps)+1      # total number of output time steps
 
-    # stratospheric drag [1/s] from drag time timescale tdrs [hrs]
+    # stratospheric drag [1/s] from damping_time_strat [hrs]
     @unpack damping_time_strat = P
     drag_strat = 1/(damping_time_strat*3600)
 
     # This implies conversion to NF
     return Constants{P.NF}( R_earth,Ω,gravity,akap,R_gas,
-                            Δt,robert_filter,williams_filter,n_timesteps,
+                            Δt,Δt_hrs,
+                            robert_filter,williams_filter,n_timesteps,
                             output_every_n_steps, n_outputsteps,
                             drag_strat)
 end  
