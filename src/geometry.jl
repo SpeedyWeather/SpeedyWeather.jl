@@ -14,11 +14,11 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     dlon::NF            # grid spacing in longitude
     dlat::NF            # average grid spacing in latitude
     lon::Array{NF,1}    # array of longitudes (0...2π)
-    lond::Array{NF,1}   # array of longitudes in degrees (0...360˚)
+    lond::Array{Float64,1}  # array of longitudes in degrees (0...360˚)
     lat::Array{NF,1}    # array of latitudes (π/2...-π/2)
-    latd::Array{NF,1}   # array of latitudes in degrees (90˚...-90˚)
+    latd::Array{Float64,1}  # array of latitudes in degrees (90˚...-90˚)
     colat::Array{NF,1}  # array of colatitudes (0...π)
-    colatd::Array{NF,1} # array of colatitudes in degrees (0...180˚)
+    colatd::Array{Float64,1}# array of colatitudes in degrees (0...180˚)
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     n_stratosphere_levels::Int      # number of upper levels for stratosphere

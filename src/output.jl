@@ -37,12 +37,12 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,  # output grid v
     # DEFINE DIMENSIONS, TIME
     time_string = "hours since $(Dates.format(output_startdate, "yyyy-mm-dd HH:MM:0.0"))"
     dim_time = NcDim("time",0,unlimited=true)
-    var_time = NcVar("time",dim_time,t=Int64,atts=Dict("units"=>time_string))
+    var_time = NcVar("time",dim_time,t=Int32,atts=Dict("units"=>time_string,"long_name"=>"time"))
 
     # AND SPACE
-    dim_lon = NcDim("lon",nlon,values=lond)                # longitude
-    dim_lat = NcDim("lat",nlat,values=latd)                # latitude
-    dim_lev = NcDim("lev",nlev,values=collect(1:nlev))     # vertical model levels
+    dim_lon = NcDim("lon",nlon,values=lond,atts=Dict("units"=>"degrees_east","long_name"=>"longitude"))
+    dim_lat = NcDim("lat",nlat,values=latd,atts=Dict("units"=>"degrees_north","long_name"=>"latitude"))
+    dim_lev = NcDim("lev",nlev,values=collect(Int32,1:nlev),atts=Dict("units"=>"1","long_name"=>"vertical model levels"))
 
     # VARIABLES
     var_u       = NcVar("u",[dim_lon,dim_lat,dim_lev,dim_time],t=Float32,compress=compression_level,
@@ -64,12 +64,6 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,  # output grid v
     netcdf_file = NetCDF.create(joinpath(run_path,file_name),
                     [var_time,var_u,var_v,var_vor,var_temp,var_humid,var_pres],mode=NetCDF.NC_NETCDF4)
 
-    # ADD DIMENSION INFORMATION AS ATTRIBUTES
-    NetCDF.putatt(netcdf_file,"time",Dict("units"=>"hours","long_name"=>"time"))
-    NetCDF.putatt(netcdf_file,"lon",Dict("units"=>"˚E","long_name"=>"longitude"))
-    NetCDF.putatt(netcdf_file,"lat",Dict("units"=>"˚N","long_name"=>"latitude"))
-    NetCDF.putatt(netcdf_file,"lev",Dict("units"=>"1","long_name"=>"vertical model levels"))
-
     # WRITE INITIAL CONDITIONS TO FILE
     initial_time_hrs = 0        # start at 0 hours after output_startdate
     initial_timestep = 0        # start at i=0
@@ -90,7 +84,6 @@ function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf
 
     feedback.i_out += 1                         # increase counter
     @unpack i_out = feedback
-    println(i_out)
 
     # CONVERT TO FLOAT32 FOR OUTPUT
     @unpack u_grid,v_grid,vor_grid,temp_grid,humid_grid,pres_surf_grid = diagn.grid_variables
@@ -116,5 +109,6 @@ function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf
     NetCDF.putvar(netcdf_file,"pres",pres_output,start=[1,1,i_out],count=[-1,-1,1])
 
     # WRITE TIME
-    NetCDF.putvar(netcdf_file,"time",[round(Int64,time_hrs)],start=[i_out])
+    NetCDF.putvar(netcdf_file,"time",[round(Int32,time_hrs)],start=[i_out])
+    NetCDF.sync(netcdf_file)
 end
