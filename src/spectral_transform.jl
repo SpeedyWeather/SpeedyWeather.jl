@@ -250,6 +250,18 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
     return map
 end
 
+function gridded!(  map::AbstractArray{NF,3},
+                    alms::AbstractArray{Complex{NF},3},
+                    S::SpectralTransform{NF}
+                    ) where {NF<:AbstractFloat}
+    
+    for k in 1:size(alms)[end]
+        map_layer = view(map,:,:,k)
+        alms_layer = view(alms,:,:,k)
+        gridded!(map_layer,alms_layer,S)
+    end
+end
+
 """
     map = gridded(alms)
 
@@ -343,6 +355,18 @@ function spectral!( alms::AbstractMatrix{Complex{NF}},
     end
 
     return alms
+end
+
+function spectral!( alms::AbstractArray{Complex{NF},3},
+                    map::AbstractArray{NF,3},
+                    S::SpectralTransform{NF}
+                    ) where {NF<:AbstractFloat}
+    
+    for k in 1:size(alms)[end]
+        alms_layer = view(alms,:,:,k)
+        map_layer = view(map,:,:,k)
+        spectral!(alms_layer,map_layer,S)
+    end
 end
 
 """

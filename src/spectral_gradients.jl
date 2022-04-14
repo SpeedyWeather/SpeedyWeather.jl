@@ -267,8 +267,8 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},   # output: c
 end
 
 """gradient_latitude! but precalculate the recursion factors `ϵlms` in case they are not provided."""
-function gradient_latitude!(coslat_u::AbstractArray{Complex{NF}},   # output: cos(lat)*u
-                            Ψ::AbstractArray{Complex{NF}},          # input: streamfunction Ψ
+function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: cos(lat)*u
+                            Ψ::AbstractMatrix{Complex{NF}},         # input: streamfunction Ψ
                             R::Real=1                               # radius of the sphere/Earth
                             ) where {NF<:AbstractFloat}             # number format NF
     _,mmax = size(Ψ) .- 1                                           # degree l, order m of spherical harmonics   
@@ -276,7 +276,7 @@ function gradient_latitude!(coslat_u::AbstractArray{Complex{NF}},   # output: co
     return gradient_latitude!(coslat_u,Ψ,ϵlms,R)                    # call in-place function
 end
 
-function gradient_latitude( Ψ::AbstractArray{Complex{NF}},  # input: streamfunction Ψ
+function gradient_latitude( Ψ::AbstractMatrix{Complex{NF}}, # input: streamfunction Ψ
                             R::Real=1                       # radius of the sphere/Earth
                             ) where {NF<:AbstractFloat}     # number format NF
     _,mmax = size(Ψ) .- 1                                   # max degree l, order m of spherical harmonics
@@ -360,6 +360,48 @@ function divergence_uvω_spectral(   u_grid::AbstractMatrix{NF},     # zonal vel
     return ∂uω_∂lon + ∂vω_∂lat                                  # add for divergence
 end
 
+function unscale_coslat!(   A::AbstractMatrix{NF},
+                            G::Geometry{NF}) where NF
+    
+    nlon, nlat = size(A)
+    @boundscheck (nlon, nlat) == (G.nlon, G.nlat) || throw(BoundsError)
+
+    @unpack coslat⁻¹ = G
+
+    @inbounds for j in 1:nlat
+        for i in 1:nlon
+            A[i,j] *= coslat⁻¹[j]
+        end
+    end
+end
+
+function scale_coslat!( A::AbstractMatrix{NF},
+                        G::Geometry{NF}) where NF
+    
+    nlon, nlat = size(A)
+    @boundscheck (nlon, nlat) == (G.nlon, G.nlat) || throw(BoundsError)
+
+    @unpack coslat = G
+
+    @inbounds for j in 1:nlat
+        for i in 1:nlon
+            A[i,j] *= coslat[j]
+        end
+    end
+end
+
+for func_name in (:unscale_coslat!,:scale_coslat!)
+    @eval begin
+        function $func_name(A::AbstractArray{NF,3},
+                            G::Geometry{NF}) where NF
+
+            for k in 1:size(A)[end]
+                A_layer = view(A,:,:,k)
+                $func_name(A_layer,G)
+            end
+        end
+    end
+end
 
 """
     ∇²!(∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacian of alms
@@ -524,6 +566,18 @@ function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{NF}},   # Output: inve
     return ∇⁻²alms
 end
 
+function ∇⁻²!(  ∇⁻²alms::AbstractArray{Complex{NF},3},  # Output: inverse Laplacian of alms
+                alms::AbstractArray{Complex{NF},3},     # spectral coefficients
+                R::Real                                 # radius of the sphere/Earth
+                ) where {NF<:AbstractFloat}
+
+    for k in 1:size(alms)[end]
+        ∇⁻²alms_layer = view(∇⁻²alms,:,:,k)
+        alms_layer = view(alms,:,:,k)
+        ∇⁻²!(∇⁻²alms_layer,alms_layer,R)
+    end
+end
+
 """
     ∇⁻²alms = ∇⁻²(alms::AbstractMatrix{Complex},R::Real=1)
 
@@ -534,4 +588,19 @@ function ∇⁻²(   alms::AbstractMatrix{Complex{NF}},  # spectral coefficients
                 R::Real=1) where NF                 # radius of the Earth
     ∇⁻²alms = copy(alms)                            # preallocate output
     return R == 1 ? ∇⁻²!(∇⁻²alms,alms) : ∇⁻²!(∇⁻²alms,alms,R)
+end
+
+for func_name in (:gradient_longitude!, :gradient_latitude!)
+    @eval begin
+        function $func_name(Out::AbstractArray{NF1,3},
+                            In::AbstractArray{NF2,3},
+                            args...) where {NF1,NF2}
+            
+            for k in 1:size(Out)[end]
+                Out_layer = view(Out,:,:,k)
+                In_layer = view(In,:,:,k)
+                $func_name(Out_layer,In_layer,args...)
+            end
+        end
+    end
 end

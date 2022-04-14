@@ -17,7 +17,7 @@ module SpeedyWeather
     import UnicodePlots
 
     # EXPORT MAIN INTERFACE TO SPEEDY
-    export run_speedy
+    export run_speedy, initialize_speedy
 
     # EXPORT STRUCTS
     export Parameters, GenLogisticCoefs,

@@ -2,8 +2,8 @@
     leapfrog!(  A::AbstractArray{Complex{NF},3},        # a prognostic variable (spectral)
                 tendency::AbstractMatrix{Complex{NF}},  # tendency (dynamics+physics) of A
                 dt::NF,                                 # time step (=2Δt, but for init steps =Δt,Δt/2)
-                lf::Int,                                # leapfrog index to dis/enable William's filter
-                C::Constants{NF}                        # struct with constants used at runtime
+                C::Constants{NF},                       # struct with constants used at runtime
+                lf::Int=2                               # leapfrog index to dis/enable(default) William's filter
                 ) where {NF<:AbstractFloat}             # number format NF
 
 Performs one leapfrog time step with or without Robert+William's filter (see William (2009),
@@ -11,9 +11,9 @@ Montly Weather Review, Eq. 7-9).
 """
 function leapfrog!( A::AbstractArray{Complex{NF},3},        # a prognostic variable (spectral)
                     tendency::AbstractMatrix{Complex{NF}},  # tendency (dynamics+physics) of A
-                    dt::NF,                                 # time step (=2Δt, but for init steps =Δt,Δt/2)
-                    lf::Int,                                # leapfrog index to dis/enable William's filter
-                    C::Constants{NF}                        # struct with constants used at runtime
+                    dt::Real,                               # time step (=2Δt, but for init steps =Δt,Δt/2)
+                    C::Constants{NF},                       # struct with constants used at runtime
+                    lf::Int=2,                              # leapfrog index to dis/enable William's filter
                     ) where {NF<:AbstractFloat}             # number format NF
 
     lmax,mmax,nleapfrog = size(A)                           # 1-based max degree l, order m of sph harmonics
@@ -25,6 +25,7 @@ function leapfrog!( A::AbstractArray{Complex{NF},3},        # a prognostic varia
     
     @unpack robert_filter, williams_filter = C          # coefficients for the Robert and William's filter
     two = convert(NF,2)                                 # 2 in number format NF
+    dt_NF = convert(NF,dt)                              # time step dt in number format NF
 
     # LEAP FROG time step with or without Robert+William's filter
     # Robert time filter to compress computational mode, Williams' filter for 3rd order accuracy
@@ -37,7 +38,7 @@ function leapfrog!( A::AbstractArray{Complex{NF},3},        # a prognostic varia
     @inbounds for m in 1:mmax                       # 1-based max degree l, order m 
         for l in m:lmax                             # skip upper right triangle as they should be zero anyway
             Aold = A[l,m,1]                         # double filtered value from previous time step (t-Δt)
-            Anew = Aold + dt*tendency[l,m]          # Leapfrog/Euler step depending on dt=Δt,2Δt (unfiltered at t+Δt)
+            Anew = Aold + dt_NF*tendency[l,m]       # Leapfrog/Euler step depending on dt=Δt,2Δt (unfiltered at t+Δt)
             Aupdate = Aold - two*A[l,m,lf] + Anew   # Eq. 8&9 in William (2009), calculate only once
             A[l,m,1] = A[l,m,lf] + w1*Aupdate       # Robert's filter: A[l,m,1] becomes 2xfiltered value at t
             A[l,m,2] = Anew - w2*Aupdate            # Williams' filter: A[l,m,2] becomes 1xfiltred value at t+Δt
@@ -48,94 +49,122 @@ end
 """Leapfrog! for 3D arrays that loops over all vertical layers."""
 function leapfrog!( A::AbstractArray{Complex{NF},4},        # a prognostic variable (spectral)
                     tendency::AbstractArray{Complex{NF},3}, # tendency (dynamics + physics) of A
-                    dt::NF,                                 # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
-                    lf::Int,                                # leapfrog index to dis/enable William's filter
-                    C::Constants{NF}                        # struct containing all constants used at runtime
+                    dt::Real,                               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                    C::Constants{NF},                       # struct containing all constants used at runtime
+                    lf::Int=2                               # leapfrog index to dis/enable(default) William's filter
                     ) where {NF<:AbstractFloat}             # number format NF
 
-    _,_,_,nlev = size(A)        # A is of size lmax x mmax x nlev x 2
-
-    for k in 1:nlev
-        A_layer = view(A,:,:,k,:)                   # extract vertical layers as views to not allocate any memory
+    for k in 1:size(A)[end]                         # loop over vertical levels (last dimension)
+        A_layer = view(A,:,:,:,k)                   # extract vertical layers as views to not allocate any memory
         tendency_layer = view(tendency,:,:,k)
-        leapfrog!(A_layer,tendency_layer,dt,lf,C)   # make a timestep forward for each layer
+        leapfrog!(A_layer,tendency_layer,dt,C,lf)   # make a timestep forward for each layer
     end
 end
 
 """TODO write a leapfrog! function that loops over all prognostic variables."""
-function leapfrog!( Prog::PrognosticVariables,
-                    Tend::Tendencies)
+function leapfrog!( progn::PrognosticVariables{NF},         # all prognostic variables
+                    tend::Tendencies{NF},                   # all tendencies
+                    dt::Real,                               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                    C::Constants{NF},                       # struct containing all constants used at runtime
+                    lf::Int) where NF                       # leapfrog index to dis/enable William's filter        
     
-    # @distributed 
-    for (var,tend) in zip((pres_surf,),(pres_surf_tend,))
-        leapfrog!(var,tend,)
+    # convert fields in progn, tend to a generator tuple for for-loop
+    all_progn_variables = (getproperty(progn,prop) for prop in propertynames(progn))
+    all_tend_variables  = (getproperty(tend, prop) for prop in propertynames(tend))
+
+    for (var,var_tend) in zip(all_progn_variables,all_tend_variables)
+        leapfrog!(var,var_tend,dt,C,lf)
     end 
 end    
 
 """Call initialization of semi-implicit scheme and perform initial time step."""
-function first_timestep!(   Prog::PrognosticVariables{NF},  # all prognostic variables
-                            Diag::PrognosticVariables{NF},  # all pre-allocated diagnostic variables
-                            C::Constants{NF},               # struct containing constants
-                            G::GeoSpectral{NF},             # struct containing geometry and spectral transform constants
-                            HD::HorizontalDiffusion{NF}     # struct containing horizontal diffusion constants
-                            ) where {NF<:AbstractFloat}
+function first_timestep!(   progn::PrognosticVariables{NF}, # all prognostic variables
+                            diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
+                            M::ModelSetup                   # everything that is constant at runtime
+                            ) where NF
     
-    @unpack Δt = C
+    @unpack Δt,Δt_sec = M.constants
+    time_sec = 0
+
+    # PROPAGATE SPECTRAL STATE INTO DIAGNOSTIC VARIABLES
+    @unpack vor = progn
+    @unpack vor_grid, u_grid, v_grid = diagn.grid_variables
+    @unpack stream_function, coslat_u, coslat_v = diagn.intermediate_variables
+    @unpack geometry, spectral = M.geospectral
+    @unpack R_earth = M.constants
+
+    vor_lf1 = view(vor,:,:,1,:)
+    println(size(vor_grid))
+    println(size(vor_lf1))
+    gridded!(vor_grid,vor_lf1,spectral)
+    ∇⁻²!(stream_function,vor_lf1,R_earth)
+    gradient_longitude!(coslat_v,stream_function,R_earth)
+    gradient_latitude!( coslat_u,stream_function,R_earth)
+    
+    gridded!(u_grid,coslat_u,spectral)
+    gridded!(v_grid,coslat_v,spectral)
+    unscale_coslat!(u_grid,geometry)
+    unscale_coslat!(v_grid,geometry)
 
     # FIRST TIME STEP (l1=l2=1, dt=Δt/2)
-    IMP = initialize_implicit(half*Δt)
-    timestep!(Prog,Diag,1,1,Δt/2,C,G,HD)
+    # IMP = initialize_implicit(half*Δt)
+    lf1, lf2 = 1, 1
+    timestep!(progn,diagn,Δt/2,M,lf1,lf2)
+    time_sec += Δt_sec÷2
 
     # SECOND TIME STEP (l1=1,l2=2,dt=Δt)
-    IMP = initialize_implicit(Δt)
-    timestep!(Prog,Diag,1,2,Δt,C,G,HD)
+    # IMP = initialize_implicit(Δt)
+    lf1, lf2 = 1, 2
+    timestep!(progn,diagn,Δt,M,lf1,lf2)
+    time_sec += Δt_sec
 
     # Initialize implicit arrays for further time steps (dt=2Δt)
-    IMP = initialize_implicit(2Δt)
-    return IMP
+    # IMP = initialize_implicit(2Δt)
+    # return IMP
+    return time_sec
 end
 
 """Calculate a single time step for SpeedyWeather.jl"""
-function timestep!( Prog::PrognosticVariables{NF},  # all prognostic variables
-                    Diag::PrognosticVariables{NF},  # all pre-allocated diagnostic variables
-                    l1::Int,                        # leapfrog index 1 (en/disables Robert+William's filter)
-                    l2::Int,                        # leapfrog index 2 (time step used for tendencies)
-                    dt::NF,                         # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
-                    C::Constants{NF},               # struct containing constants
-                    G::GeoSpectral{NF},             # struct containing geometry and spectral transform constants
-                    HD::HorizontalDiffusion{NF}     # struct containing horizontal diffusion constants
+function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
+                    diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
+                    dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                    M::ModelSetup,                  # everything that's constant at runtime
+                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
+                    lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
-                        
-    @unpack vor,div,ps,temp = Prog
-    @unpack vor_tend,div_tend,ps_tend,temp_tend = Diag.Tendencies
-    @unpack dmp,dmpd,dmps,dmp1,dmp1d,dmp1s = HD
-    @unpack tcorh,tcorv,qcorh,qcorv = HD
-    @unpack sdrag = C
+    
+    @unpack vor = progn
+    @unpack vor_tend = diagn.tendencies
+    @unpack damping, damping_impl = M.horizontal_diffusion
+
+    # @unpack tcorh,tcorv,qcorh,qcorv = HD
+    # @unpack sdrag = C
 
     # COMPUTE TENDENCIES OF PROGNOSTIC VARIABLES
-    get_tendencies!(Prog,Diag,l2,C)                   
+    # get_tendencies!(prog,diagn,lf2,M.constants)                   
 
     # DIFFUSION FOR WIND
-    vor_l1 = view(vor,:,:,1,:)                                  # array view for leapfrog index
-    div_l1 = view(div,:,:,1,:)                                  # TODO l1/l2 dependent?
-    horizontal_diffusion!(vor_l1,vor_tend,dmp,dmp1)             # diffusion of vorticity
-    horizontal_diffusion!(div_l1,div_tend,dmpd,dmp1d)           # diffusion of divergence
+    lf = 1
+    vor_lf1 = view(vor,:,:,lf,:)                                # array view for leapfrog index
+    # div_l1 = view(div,:,:,1,:)                                  # TODO l1/l2 dependent?
+    horizontal_diffusion!(vor_lf1,vor_tend,damping,damping_impl)# diffusion of vorticity
+    # horizontal_diffusion!(div_l1,div_tend,dmpd,dmp1d)           # diffusion of divergence
 
-    # DIFFUSION FOR TEMPERATURE
-    orographic_correction!(temp_corrected,temp,1,tcorh,tcorv)   # orographic correction for temperature
-    horizontal_diffusion!(temp_corrected,temp_tend,dmp,dmp1)    # diffusion for corrected abs temperature
+    # # DIFFUSION FOR TEMPERATURE
+    # orographic_correction!(temp_corrected,temp,1,tcorh,tcorv)   # orographic correction for temperature
+    # horizontal_diffusion!(temp_corrected,temp_tend,dmp,dmp1)    # diffusion for corrected abs temperature
 
-    # DISSIPATION IN THE STRATOSPHERE
-    stratospheric_zonal_drag!(vor,vor_tend,sdrag)               # zonal drag for wind
-    stratospheric_zonal_drag!(div,div_tend,sdrag)
+    # # DISSIPATION IN THE STRATOSPHERE
+    # stratospheric_zonal_drag!(vor,vor_tend,sdrag)               # zonal drag for wind
+    # stratospheric_zonal_drag!(div,div_tend,sdrag)
 
-    horizontal_diffusion!(vor_l1,vor_tend,dmps,dmp1s)           # stratospheric diffusion for wind
-    horizontal_diffusion!(div_l1,div_tend,dmps,dmp1s)           
-    horizontal_diffusion!(temp_corrected,temp_tend,dmps,dmp1s)  # stratospheric diffusion for temperature
+    # horizontal_diffusion!(vor_l1,vor_tend,dmps,dmp1s)           # stratospheric diffusion for wind
+    # horizontal_diffusion!(div_l1,div_tend,dmps,dmp1s)           
+    # horizontal_diffusion!(temp_corrected,temp_tend,dmps,dmp1s)  # stratospheric diffusion for temperature
 
-    # DIFFUSION OF HUMIDITY
-    orographic_correction!(humid_corrected,humid,1,qcorh,qcorv) # orographic correction for humidity
-    horizontal_diffusion!(humid_corrected,humid_tend,dmp,dmp1)  # diffusion for corrected humidity
+    # # DIFFUSION OF HUMIDITY
+    # orographic_correction!(humid_corrected,humid,1,qcorh,qcorv) # orographic correction for humidity
+    # horizontal_diffusion!(humid_corrected,humid_tend,dmp,dmp1)  # diffusion for corrected humidity
 
     # if ntracers > 1
     #     for i in 2:ntracers
@@ -146,17 +175,14 @@ function timestep!( Prog::PrognosticVariables{NF},  # all prognostic variables
     #     end
     # end
 
-    # SPECTRAL TRUNCATION of all tendencies to the spectral resolution
-    for tendency in (logp0_tend,vor_tend,div_tend,temp_tend,humid_tend)
-        spectral_truncation!(tendency,G)
-    end
+    # # SPECTRAL TRUNCATION of all tendencies to the spectral resolution
+    # for tendency in (logp0_tend,vor_tend,div_tend,temp_tend,humid_tend)
+    #     spectral_truncation!(tendency,G)
+    # end
 
-    # Time integration via leapfrog step forward (filtered with Robert+William's depending on l1)
-    leapfrog!(logp0,logp0_tend,dt,l1,C)
-    leapfrog!(vor,vor_tend,dt,l1,C)
-    leapfrog!(div,div_tend,dt,l1,C)
-    leapfrog!(temp,temp_tend,dt,l1,C)
-    leapfrog!(humid,humid_tend,dt,l1,C)
+    # time integration via leapfrog step forward (filtered with Robert+William's depending on l1)
+    # leapfrog!(progn,diagn,dt,C,lf1)
+    leapfrog!(vor,vor_tend,dt,M.constants,lf1)
 end
 
 """Calculate a single time step for SpeedyWeather.jl"""
@@ -165,33 +191,24 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
                         M::ModelSetup{NF}               # all precalculated structs
                         ) where {NF<:AbstractFloat}     # number format NF
     
-    @unpack n_timesteps, Δt, Δt_hrs = M.constants
+    @unpack n_timesteps, Δt, Δt_sec = M.constants
     @unpack output = M.parameters
 
     # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS
     feedback = initialize_feedback(M)
     netcdf_file = initialize_netcdf_output(diagn,feedback,M)
 
-    # first_timestep!(prog,diag,C,G,HD)
+    # FIRST TIMESTEP: EULER FORWARD THEN LEAPFROG IN MAIN LOOP
+    time_sec = first_timestep!(progn,diagn,M)
 
-    time_hrs = 0.0
     for i in 1:n_timesteps
-        time_hrs += Δt_hrs
+        time_sec += Δt_sec
 
-        # timestep!(prog,diag,2,2,2Δt,C,G,HD)
-
-        @unpack temp = progn
-        @unpack temp_grid = diagn.grid_variables
-        @unpack nlev = M.parameters
-
-        temp_surf_grid = view(temp_grid,:,:,nlev)
-        temp_surf = view(temp,:,:,nlev)
-
-        gridded!(temp_surf_grid,temp_surf,M.geospectral.spectral)
+        timestep!(progn,diagn,2Δt,M)
 
         # FEEDBACK AND OUTPUT
         feedback!(feedback,i)
-        write_netcdf_output!(netcdf_file,feedback,i,time_hrs,diagn,M)
+        write_netcdf_output!(netcdf_file,feedback,i,time_sec,diagn,M)
     end
 
     feedback_end!(feedback)

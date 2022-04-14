@@ -1,6 +1,6 @@
 function Base.show(io::IO, P::PrognosticVariables)
     
-    temp_surf_grid_degC = gridded(P.temp[:,:,end]) .- 273.15    # to grid space and ˚C
+    temp_surf_grid_degC = gridded(P.temp[:,:,end,1]) .- 273.15  # to grid space and ˚C
     temp_surf_grid_degC = temp_surf_grid_degC[:,end:-1:1]       # flip latitudes
 
     nlon,nlat = size(temp_surf_grid_degC)
