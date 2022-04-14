@@ -24,84 +24,91 @@ function get_run_id_path(P::Parameters)
 end
 
 
-function output_initialise( Diag::DiagnosticVariables,   # output grid-space variables only
-                            G::GeoSpectral,
-                            P::Parameters)
+function initialize_netcdf_output(  diagn::DiagnosticVariables,  # output grid variables only
+                                    feedback::Feedback,         # Feedback struct
+                                    M::ModelSetup)              # ModelSetup struct
 
-    @unpack nlon,nlat,nlev = G.geometry
-    @unpack lon,lat = G.geometry
-    @unpack output_startdate, compression_level = P
+    feedback.output || return nothing                   # escape directly when no netcdf output
 
-    # INITIALISE FOLDER
-    run_id,runpath = get_run_id_path(P)
-    file_name = @sprintf("run%04d",run_id)
+    @unpack nlon,nlat,nlev = M.geospectral.geometry     # number of longitudes, latitudes, vertical levels
+    @unpack lond,latd = M.geospectral.geometry          # lon, lat vectors in degree
+    @unpack output_startdate, compression_level = M.parameters
     
-    # TIME
+    # DEFINE DIMENSIONS, TIME
     time_string = "hours since $(Dates.format(output_startdate, "yyyy-mm-dd HH:MM:0.0"))"
-    timedim = NcDim("time",0,unlimited=true)
-    timevar = NcVar("time",timedim,t=Int32,atts=Dict("units"=>time_string))
+    dim_time = NcDim("time",0,unlimited=true)
+    var_time = NcVar("time",dim_time,t=Int32,atts=Dict("units"=>time_string,"long_name"=>"time"))
 
-    # SPACE
-    londim  = NcDim("lon",nlon,values=lon)
-    latdim  = NcDim("lat",nlat,values=lat)
-    levdim  = NcDim("lev",nlev,values=collect(1:nlev))
-    lonvar  = NcVar("lon",londim,t=Float32,atts=Dict("long_name"=>"longitude"))
-    latvar  = NcVar("lat",latdim,t=Float32,atts=Dict("long_name"=>"latitude"))
-    levvar  = NcVar("lev",levdim,t=Int32,atts=Dict("long_name"=>"model level"))
+    # AND SPACE
+    dim_lon = NcDim("lon",nlon,values=lond,atts=Dict("units"=>"degrees_east","long_name"=>"longitude"))
+    dim_lat = NcDim("lat",nlat,values=latd,atts=Dict("units"=>"degrees_north","long_name"=>"latitude"))
+    dim_lev = NcDim("lev",nlev,values=collect(Int32,1:nlev),atts=Dict("units"=>"1","long_name"=>"vertical model levels"))
 
     # VARIABLES
-    uvar        = NcVar("u",[londim,latdim,levdim,timedim],t=Float32,compress=compression_level,
+    var_u       = NcVar("u",[dim_lon,dim_lat,dim_lev,dim_time],t=Float32,compress=compression_level,
                     atts=Dict("long_name"=>"zonal wind","units"=>"m/s","missing_value"=>-999999f0))
-    vvar        = NcVar("v",[londim,latdim,levdim,timedim],t=Float32,compress=compression_level,
+    var_v       = NcVar("v",[dim_lon,dim_lat,dim_lev,dim_time],t=Float32,compress=compression_level,
                     atts=Dict("long_name"=>"meridional wind","units"=>"m/s","missing_value"=>-999999f0))
-    Tvar        = NcVar("T",[londim,latdim,levdim,timedim],t=Float32,compress=compression_level,
+    var_vor     = NcVar("vor",[dim_lon,dim_lat,dim_lev,dim_time],t=Float32,compress=compression_level,
+                    atts=Dict("long_name"=>"relative vorticity","units"=>"1/s","missing_value"=>-999999f0))
+    var_temp    = NcVar("temp",[dim_lon,dim_lat,dim_lev,dim_time],t=Float32,compress=compression_level,
                     atts=Dict("long_name"=>"temperature","units"=>"K","missing_value"=>-999999f0))
-    humidvar    = NcVar("humid",[londim,latdim,levdim,timedim],t=Float32,compress=compression_level,
+    var_humid   = NcVar("humid",[dim_lon,dim_lat,dim_lev,dim_time],t=Float32,compress=compression_level,
                     atts=Dict("long_name"=>"specific humidity","units"=>"1","missing_value"=>-999999f0))
-    geopotvar   = NcVar("geopot",[londim,latdim,levdim,timedim],t=Float32,compress=compression_level,
-                    atts=Dict("long_name"=>"geopotential height","units"=>"m","missing_value"=>-999999f0))
-    logp0var    = NcVar("logp0",[londim,latdim,timedim],t=Float32,compress=compression_level,
+    var_pres    = NcVar("pres",[dim_lon,dim_lat,dim_time],t=Float32,compress=compression_level,
                     atts=Dict("long_name"=>"surface pressure","units"=>"Pa","missing_value"=>-999999f0))
 
     # CREATE NETCDF FILE
-    netcdffile = NetCDF.create("$file_name",
-                    [timevar,lonvar,latvar,levvar,uvar,vvar,Tvar,humidvar,geopotvar,logp0var],mode=NetCDF.NC_NETCDF4)
+    @unpack run_id, run_path = feedback
+    file_name = @sprintf("run%04d.nc",run_id)
+    netcdf_file = NetCDF.create(joinpath(run_path,file_name),
+                    [var_time,var_u,var_v,var_vor,var_temp,var_humid,var_pres],mode=NetCDF.NC_NETCDF4)
 
     # WRITE INITIAL CONDITIONS TO FILE
-    write_output!(0,0,netcdffile,Diag,P)
+    initial_time_hrs = 0        # start at 0 hours after output_startdate
+    initial_timestep = 0        # start at i=0
+    write_netcdf_output!(netcdf_file,feedback,initial_timestep,initial_time_hrs,diagn,M)
 
-    return netcdffile
+    return netcdf_file
 end
 
-function write_output!( iout::Int,
-                        t::Real,
-                        ncfile::NcFile,
-                        Diag::DiagnosticVariables,
-                        P::Parameters)
+function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf file to output into
+                                feedback::Feedback,                     # feedback struct to increment output counter
+                                i::Int,                                 # time step index
+                                time_hrs::Real,                         # model time [hours] for output
+                                diagn::DiagnosticVariables,             # all diagnostic variables
+                                M::ModelSetup)                          # all parameters
 
-    @unpack u,v,Tabs,humid,logp0 = Diag.gridvars
-    @unpack keepbits = P
+    isnothing(netcdf_file) && return nothing                        # escape immediately for no netcdf output
+    i % M.constants.output_every_n_steps == 0 || return nothing     # escape if output shouldn't be written on this step
 
-    # always convert to float32 for output
-    u_output = Float32.(u)
-    v_output = Float32.(v)
-    T_output = Float32.(Tabs)
-    humid_output = Float32.(humid)
-    logp0 = Float32.(logp0)
+    feedback.i_out += 1                         # increase counter
+    @unpack i_out = feedback
+
+    # CONVERT TO FLOAT32 FOR OUTPUT
+    @unpack u_grid,v_grid,vor_grid,temp_grid,humid_grid,pres_surf_grid = diagn.grid_variables
+    u_output = convert.(Float32,u_grid)
+    v_output = convert.(Float32,v_grid)
+    vor_output = convert.(Float32,vor_grid)
+    temp_output = convert.(Float32,temp_grid)
+    humid_output = convert.(Float32,humid_grid)
+    pres_output = convert.(Float32,pres_surf_grid)
 
     # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
-    for var in (u_output,v_output,T_output,humid_output)
+    @unpack keepbits = M.parameters
+    for var in (u_output,v_output,vor_output,temp_output,humid_output,pres_output)
         round!(var,keepbits)
     end
 
-    # WRITE TO FILE
-    NetCDF.putvar(ncfile,"u",u_output,start=[1,1,1,iout],count=[-1,-1,-1,1])
-    NetCDF.putvar(ncfile,"v",v_output,start=[1,1,1,iout],count=[-1,-1,-1,1])
-    NetCDF.putvar(ncfile,"T",T_output,start=[1,1,1,iout],count=[-1,-1,-1,1])
-    NetCDF.putvar(ncfile,"humid",humid_output,start=[1,1,1,iout],count=[-1,-1,-1,1])
-    NetCDF.putvar(ncfile,"geopot",geopot_output,start=[1,1,1,iout],count=[-1,-1,-1,1])
-    NetCDF.putvar(ncfile,"logp0",logp0_output,start=[1,1,iout],count=[-1,-1,1])
+    # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
+    NetCDF.putvar(netcdf_file,"u",u_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"v",v_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"vor",v_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"temp",temp_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"humid",humid_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"pres",pres_output,start=[1,1,i_out],count=[-1,-1,1])
 
     # WRITE TIME
-    NetCDF.putvar(ncfile,"time",Int32[t],start=[iout])
+    NetCDF.putvar(netcdf_file,"time",[round(Int32,time_hrs)],start=[i_out])
+    NetCDF.sync(netcdf_file)
 end

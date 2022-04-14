@@ -11,6 +11,7 @@
     
     # OUTPUT
     output::Bool                            # output to netCDF?
+    i_out::Int=0                            # output step counter
     n_timesteps::Int                        # number of time steps
     n_outputsteps::Int                      # number of time steps with output
     run_id::Int                             # run identification number
