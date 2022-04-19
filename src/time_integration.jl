@@ -86,26 +86,6 @@ function first_timestep!(   progn::PrognosticVariables{NF}, # all prognostic var
     @unpack Δt,Δt_sec = M.constants
     time_sec = 0
 
-    # PROPAGATE SPECTRAL STATE INTO DIAGNOSTIC VARIABLES
-    @unpack vor = progn
-    @unpack vor_grid, u_grid, v_grid = diagn.grid_variables
-    @unpack stream_function, coslat_u, coslat_v = diagn.intermediate_variables
-    @unpack geometry, spectral = M.geospectral
-    @unpack R_earth = M.constants
-
-    vor_lf1 = view(vor,:,:,1,:)
-    println(size(vor_grid))
-    println(size(vor_lf1))
-    gridded!(vor_grid,vor_lf1,spectral)
-    ∇⁻²!(stream_function,vor_lf1,R_earth)
-    gradient_longitude!(coslat_v,stream_function,R_earth)
-    gradient_latitude!( coslat_u,stream_function,R_earth)
-    
-    gridded!(u_grid,coslat_u,spectral)
-    gridded!(v_grid,coslat_v,spectral)
-    unscale_coslat!(u_grid,geometry)
-    unscale_coslat!(v_grid,geometry)
-
     # FIRST TIME STEP (l1=l2=1, dt=Δt/2)
     # IMP = initialize_implicit(half*Δt)
     lf1, lf2 = 1, 1
@@ -140,15 +120,18 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     # @unpack tcorh,tcorv,qcorh,qcorv = HD
     # @unpack sdrag = C
 
+    # PROPAGATE THE SPECTRAL STATE INTO THE DIAGNOSTIC VARIABLES
+    gridded!(diagn,progn,M)
+
     # COMPUTE TENDENCIES OF PROGNOSTIC VARIABLES
-    # get_tendencies!(prog,diagn,lf2,M.constants)                   
+    get_tendencies!(diagn,progn,M,lf2)                   
 
     # DIFFUSION FOR WIND
     lf = 1
-    vor_lf1 = view(vor,:,:,lf,:)                                # array view for leapfrog index
-    # div_l1 = view(div,:,:,1,:)                                  # TODO l1/l2 dependent?
-    horizontal_diffusion!(vor_lf1,vor_tend,damping,damping_impl)# diffusion of vorticity
-    # horizontal_diffusion!(div_l1,div_tend,dmpd,dmp1d)           # diffusion of divergence
+    vor_lf1 = view(vor,:,:,lf,:)                                    # array view for leapfrog index
+    # div_l1 = view(div,:,:,1,:)                                    # TODO l1/l2 dependent?
+    horizontal_diffusion!(vor_tend,vor_lf1,damping,damping_impl)    # diffusion of vorticity
+    # horizontal_diffusion!(div_l1,div_tend,dmpd,dmp1d)             # diffusion of divergence
 
     # # DIFFUSION FOR TEMPERATURE
     # orographic_correction!(temp_corrected,temp,1,tcorh,tcorv)   # orographic correction for temperature
@@ -193,6 +176,8 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
     
     @unpack n_timesteps, Δt, Δt_sec = M.constants
     @unpack output = M.parameters
+
+    progn.vor[10,5,:,:] .= 1e-5
 
     # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS
     feedback = initialize_feedback(M)

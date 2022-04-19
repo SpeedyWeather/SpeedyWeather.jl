@@ -25,11 +25,11 @@ function run_speedy(::Type{NF}=Float64;             # number format, use Float64
                     ) where {NF<:AbstractFloat}
 
     # INITALIZE MODEL
-    prog_vars,diag_vars,model_setup = initialize_speedy(NF;kwargs...)
+    progn_vars,diagn_vars,model_setup = initialize_speedy(NF;kwargs...)
 
     # START MODEL INTEGRATION
-    time_stepping!(prog_vars,diag_vars,model_setup) 
-    return prog_vars                                # return prognostic variables when finished
+    time_stepping!(progn_vars,diagn_vars,model_setup) 
+    return progn_vars, diagn_vars                   # return prognostic variables when finished
 end
 
 """
