@@ -124,7 +124,7 @@ function spectral_truncation(   alms::AbstractMatrix{Complex{NF}},  # spectral f
     return alms_trunc
 end
 
-spectral_truncation(alms::AbstractMatrix{Complex{NF}},trunc::Int) where NF = spectral_truncation(alms,trunc,trunc)
+spectral_truncation(alms::AbstractMatrix,trunc::Int) = spectral_truncation(alms,trunc,trunc)
 
 """
     alms_interp = spectral_interp(alms,trunc)
@@ -146,4 +146,4 @@ function spectral_interpolation(    alms::AbstractMatrix{Complex{NF}},  # spectr
     return alms_interp
 end
 
-spectral_interpolation(alms::AbstractMatrix{Complex{NF}},trunc::Int) where NF = spectral_interpolation(alms,trunc,trunc)
+spectral_interpolation(alms::AbstractMatrix,trunc::Int) = spectral_interpolation(alms,trunc,trunc)
