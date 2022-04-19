@@ -26,33 +26,34 @@ module SpeedyWeather
     
     # EXPORT SPECTRAL FUNCTIONS
     export  spectral, gridded,
-        spectral!, gridded!,
-        spectral_truncation, spectral_truncation!,
-        spectral_interpolation, triangular_truncation
+        spectral_truncation, spectral_interpolation,
+        triangular_truncation
 
     include("utility_functions.jl")
     include("parameter_structs.jl")
     include("spectral_truncation.jl")
 
-    include("default_parameters.jl")
-    include("constants.jl")
-    include("geometry.jl")
-    include("spectral_transform.jl")
+    include("default_parameters.jl")        # defines Parameters
+    include("constants.jl")                 # defines Constants
+    include("geometry.jl")                  # defines Geometry
+    include("spectral_transform.jl")        # defines SpectralTransform, Geospectral
     include("spectral_gradients.jl")
+    include("distributed_vertical.jl")
 
-    include("boundaries.jl")
+    include("boundaries.jl")                # defines Boundaries
     include("diagnostics.jl")
-    include("prognostic_variables.jl")
-    include("diagnostic_variables.jl")
+    include("prognostic_variables.jl")      # defines PrognosticVariables
+    include("diagnostic_variables.jl")      # defines DiagnosticVariables
     include("geopotential.jl")
-    include("horizontal_diffusion.jl")
+    include("horizontal_diffusion.jl")      # defines HorizontalDiffusion
     include("implicit.jl")
-    include("parametrization_tendencies.jl")
-    include("dynamics_tendencies.jl")
+
+    include("run_speedy.jl")                # defines ModelSetup
+    include("tendencies_parametrizations.jl")
+    include("tendencies_dynamics.jl")
     include("tendencies.jl")
-    include("run_speedy.jl")
-    include("feedback.jl")
-    include("output.jl")
+    include("feedback.jl")                  # defines Feedback
+    include("output.jl")                    
 
     include("time_integration.jl")
     include("pretty_printing.jl")

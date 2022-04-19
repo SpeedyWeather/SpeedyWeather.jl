@@ -2,7 +2,7 @@
 
 #     @unpack nlon, nlat, nlon_half, nlat_half = G
 #     @unpack coslat_NH = G
-#     @unpack R_earth, trunc = P
+#     @unpack radius_earth, trunc = P
 
 #     # SIZE OF SPECTRAL GRID
 #     mx = trunc+1
@@ -43,7 +43,7 @@
 #     # end
 
 #     # LAPLACIANS for harmonic & biharmonic diffusion
-#     ∇²,∇⁻²,∇⁴ = Laplacians(mx,nx,R_earth)
+#     ∇²,∇⁻²,∇⁴ = Laplacians(mx,nx,radius_earth)
 
 #     gradx   = zeros(mx)          #TODO what's this?
 #     uvdx    = zeros(mx, nx)
@@ -60,19 +60,19 @@
 #             m2  = m1 + 1
 #             el1 = m + n - 2
 #             if n == 1
-#                 gradx[m]   = m1/R_earth
-#                 uvdx[m,1]  = -R_earth/(m1 + 1)
+#                 gradx[m]   = m1/radius_earth
+#                 uvdx[m,1]  = -radius_earth/(m1 + 1)
 #                 uvdym[m,1] = 0.0
 #                 vddym[m,1] = 0.0
 #             else
-#                 uvdx[m,n]   = -R_earth*m1/(el1*(el1 + 1.0))
-#                 gradym[m,n] = (el1 - 1.0)*ε[m2,n]/R_earth
-#                 uvdym[m,n]  = -R_earth*ε[m2,n]/el1
-#                 vddym[m,n]  = (el1 + 1.0)*ε[m2,n]/R_earth
+#                 uvdx[m,n]   = -radius_earth*m1/(el1*(el1 + 1.0))
+#                 gradym[m,n] = (el1 - 1.0)*ε[m2,n]/radius_earth
+#                 uvdym[m,n]  = -radius_earth*ε[m2,n]/el1
+#                 vddym[m,n]  = (el1 + 1.0)*ε[m2,n]/radius_earth
 #             end
-#             gradyp[m,n] = (el1 + 2.0)*ε[m2,n+1]/R_earth
-#             uvdyp[m,n]  = -R_earth*ε[m2,n+1]/(el1 + 1.0)
-#             vddyp[m,n]  = el1*ε[m2,n+1]/R_earth
+#             gradyp[m,n] = (el1 + 2.0)*ε[m2,n+1]/radius_earth
+#             uvdyp[m,n]  = -radius_earth*ε[m2,n+1]/(el1 + 1.0)
+#             vddyp[m,n]  = el1*ε[m2,n+1]/radius_earth
 #         end
 #     end
 
@@ -244,21 +244,21 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},   # output: c
     @inbounds for m in 1:mmax         # exclude m=mmax+1 as for m=l=mmax+1 term1=term2=0
 
         # 1. Diagonal (l=m), term 1 = 0 for the l=m modes
-        # coslat_u[m,m] = -R⁻¹*(m+1)*ϵlms[m+1,m]*Ψ[m+1,m]         # recursion term 2 only
-        coslat_u[m,m] = (1-m)*ϵlms[m+1,m]*Ψ[m+1,m]              # recursion term 2 only
+        coslat_u[m,m] = -R⁻¹*(m+1)*ϵlms[m+1,m]*Ψ[m+1,m]         # recursion term 2 only
+        # coslat_u[m,m] = (1-m)*ϵlms[m+1,m]*Ψ[m+1,m]              # recursion term 2 only
 
         # 2. Below diagonal modes (l>m, but l<=lmax)
         for l in m+1:lmax
-            # coslat_u[l,m] = -R⁻¹*(-(l-2)*ϵlms[l  ,m]*Ψ[l-1,m] + # term 1
-            #                        (l+1)*ϵlms[l+1,m]*Ψ[l+1,m])  # term 2
-            coslat_u[l,m] = (l-2)*ϵlms[l  ,m]*Ψ[l-1,m] -        # term 1
-                            (l+1)*ϵlms[l+1,m]*Ψ[l+1,m]          # term 2
+            coslat_u[l,m] = -R⁻¹*(-(l-2)*ϵlms[l  ,m]*Ψ[l-1,m] + # term 1
+                                   (l+1)*ϵlms[l+1,m]*Ψ[l+1,m])  # term 2
+            # coslat_u[l,m] = (l-2)*ϵlms[l  ,m]*Ψ[l-1,m] -        # term 1
+                            # (l+1)*ϵlms[l+1,m]*Ψ[l+1,m]          # term 2
         end
 
         # 3. Last two rows
         for l in lmax+1:lmax+2                                  # recursion term 1 only
-            # coslat_u[l,m] = R⁻¹*(l-2)*ϵlms[l,m]*Ψ[l-1,m]
-            coslat_u[l,m] = (l-2)*ϵlms[l,m]*Ψ[l-1,m]
+            coslat_u[l,m] = R⁻¹*(l-2)*ϵlms[l,m]*Ψ[l-1,m]
+            # coslat_u[l,m] = (l-2)*ϵlms[l,m]*Ψ[l-1,m]
         end
     end
     # coslat_u[end,end] not needed as ϵ(l=m) = 0 in this case (l=lmax+1,m=mmax)
@@ -320,46 +320,6 @@ function gradient_longitude(alms::AbstractMatrix{Complex{NF}},  # input array: s
     return gradient_longitude!(∂alms_∂lon,alms,R)       # call in-place version
 end
 
-"""Spectral tendency of ∇⋅(uv*ω) from vector uv=(u,v) in grid space and absolute vorticity ω.
-Step 1 (grid space): Add Coriolis f to the relative vorticity ζ (=`vor_grid`) to obtain abs vorticity ω.
-Step 2 (grid space): Multiply u,v with abs vorticity ω.
-Step 3 (grid space): Unscale with coslat, cosine of latitude, as the gradients will include a coslat term.
-Step 4 (spectral space): convert uω/coslat, vω/coslat from grid to spectral space
-Step 5 (spectral space): Compute gradients ∂/∂lon(uω/coslat) and ∂/∂lat(vω/coslat)
-Step 6 (spectral space): Add ∂/∂lon(uω/coslat)+∂/∂θ(vω/coslat) and return.
-"""
-function divergence_uvω_spectral(   u_grid::AbstractMatrix{NF},     # zonal velocity in grid space
-                                    v_grid::AbstractMatrix{NF},     # meridional velocity in grid space
-                                    vor_grid::AbstractMatrix{NF},   # relative vorticity in grid space       
-                                    G::GeoSpectral{NF}              # struct with geometry and spectral transform
-                                    ) where {NF<:AbstractFloat}
-
-    nlon,nlat = size(u_grid)
-    @boundscheck size(u_grid) == size(v_grid) || throw(BoundsError)
-
-    @unpack f_coriolis,coslat⁻¹ = G.geometry
-
-    uω_grid_coslat⁻¹ = zero(u_grid)                             # TODO preallocate elsewhere
-    vω_grid_coslat⁻¹ = zero(v_grid)
-
-    @inbounds for j in 1:nlat
-        for i in 1:nlon
-            ω = vor_grid[i,j] + f_coriolis[j]                   # = relative vorticity + coriolis
-            uω_grid_coslat⁻¹[i,j] = ω*u_grid[i,j]*coslat⁻¹[j]   # = u(vor+f)/cos(ϕ)
-            vω_grid_coslat⁻¹[i,j] = ω*v_grid[i,j]*coslat⁻¹[j]   # = v(vor+f)/cos(ϕ)
-        end
-    end
-
-    # TODO preallocate returned coefficients elsewhere
-    uω_coslat⁻¹ = spectral(uω_grid_coslat⁻¹,G.spectral,one_more_l=true)         
-    vω_coslat⁻¹ = spectral(vω_grid_coslat⁻¹,G.spectral,one_more_l=true)
-    
-    ∂uω_∂lon = gradient_longitude(uω_coslat⁻¹)                  # spectral gradients
-    ∂vω_∂lat = gradient_latitude(vω_coslat⁻¹)
-
-    return ∂uω_∂lon + ∂vω_∂lat                                  # add for divergence
-end
-
 function unscale_coslat!(   A::AbstractMatrix{NF},
                             G::Geometry{NF}) where NF
     
@@ -386,19 +346,6 @@ function scale_coslat!( A::AbstractMatrix{NF},
     @inbounds for j in 1:nlat
         for i in 1:nlon
             A[i,j] *= coslat[j]
-        end
-    end
-end
-
-for func_name in (:unscale_coslat!,:scale_coslat!)
-    @eval begin
-        function $func_name(A::AbstractArray{NF,3},
-                            G::Geometry{NF}) where NF
-
-            for k in 1:size(A)[end]
-                A_layer = view(A,:,:,k)
-                $func_name(A_layer,G)
-            end
         end
     end
 end
