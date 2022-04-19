@@ -1,6 +1,6 @@
 @testset "Spectral gradients no error test" begin
     for NF in (Float32,Float64)
-        prog_vars,diag_vars,model_setup = SpeedyWeather.initialize_model(NF)
+        prog_vars,diag_vars,model_setup = SpeedyWeather.initialize_speedy(NF)
 
         temp_surf = prog_vars.temp[:,:,end]
         SpeedyWeather.gradient_longitude(temp_surf)
