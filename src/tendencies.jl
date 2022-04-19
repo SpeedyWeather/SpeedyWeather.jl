@@ -50,9 +50,7 @@ function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic var
     @unpack u_grid, v_grid, vor_grid = diagn.grid_variables
     @unpack vor_tend = diagn.tendencies
 
-    # println(sum(abs.(vor_tend[:,:,end]) .> 0)) 
     divergence_uvω_spectral!(vor_tend,u_grid,v_grid,vor_grid,M.geospectral)
-    println(sum(abs.(vor_tend[:,:,end]) .> 0)) 
 
     # if  α == 0
 

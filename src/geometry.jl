@@ -56,7 +56,7 @@ function Geometry(P::Parameters)
 
     # number of longitudes, latitudes, vertical levels, spectral truncation
     @unpack nlon, nlat, nlev, trunc = P     
-    @unpack radius_earth, Ω, akap = P       # radius of earth, angular frequency, ratio of gas consts
+    @unpack radius_earth, rotation_earth, akap = P       # radius of earth, angular frequency, ratio of gas consts
     @unpack n_stratosphere_levels = P       # number of vertical levels used for stratosphere
 
     nlat_half = nlat ÷ 2
@@ -91,7 +91,7 @@ function Geometry(P::Parameters)
     coslat⁻¹ = 1 ./ coslat
 
     # CORIOLIS FREQUENCY
-    f_coriolis = 2Ω*sinlat
+    f_coriolis = 2rotation_earth*sinlat
 
     # GEOPOTENTIAL coefficients to calculate geopotential (TODO reference)
     xgeop1 = zeros(nlev)

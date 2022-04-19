@@ -5,7 +5,7 @@ Struct holding the parameters needed at runtime in number format NF.
 
     # PHYSICAL CONSTANTS
     radius_earth::NF # Radius of Earth
-    Ω::NF            # Angular frequency of Earth's rotation
+    rotation_earth::NF            # Angular frequency of Earth's rotation
     gravity::NF      # Gravitational acceleration
     akap::NF         # Ratio of gas constant to specific heat of dry air at constant pressure
     R_gas::NF        # Universal gas constant
@@ -32,7 +32,7 @@ Generator function for a Constants struct.
 function Constants(P::Parameters)
 
     # PHYSICAL CONSTANTS
-    @unpack radius_earth, Ω, gravity, akap, R_gas = P
+    @unpack radius_earth, rotation_earth, gravity, akap, R_gas = P
     
     # TIME INTEGRATION CONSTANTS
     @unpack robert_filter, williams_filter = P
@@ -49,7 +49,7 @@ function Constants(P::Parameters)
     drag_strat = 1/(damping_time_strat*3600)
 
     # This implies conversion to NF
-    return Constants{P.NF}( radius_earth,Ω,gravity,akap,R_gas,
+    return Constants{P.NF}( radius_earth,rotation_earth,gravity,akap,R_gas,
                             Δt,Δt_sec,Δt_hrs,
                             robert_filter,williams_filter,n_timesteps,
                             output_every_n_steps, n_outputsteps,

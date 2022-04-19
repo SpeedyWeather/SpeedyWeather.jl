@@ -65,7 +65,8 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,  # output grid v
 
     # CREATE NETCDF FILE
     @unpack run_id, run_path = feedback
-    file_name = @sprintf("run%04d.nc",run_id)
+    # file_name = @sprintf("run%04d.nc",run_id)
+    file_name = @sprintf("output.nc",run_id)
     netcdf_file = NetCDF.create(joinpath(run_path,file_name),
                     [var_time,var_u,var_v,var_vor,var_temp,var_humid,var_pres],mode=NetCDF.NC_NETCDF4)
 

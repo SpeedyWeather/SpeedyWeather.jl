@@ -26,7 +26,7 @@ function Model(;
     # Radius of Earth
     Rₑ = 6.371e+6,
     # Angular frequency of Earth's rotation
-    Ω = 7.292e-05,
+    rotation_earth = 7.292e-05,
     # Gravitational acceleration
     g = 9.81,
     # Start and end datetimes
@@ -53,7 +53,7 @@ function Model(;
     current_datetime = start_datetime
 
     params = Parameters(n_diag, n_steps_day, 86400.0/real_type(n_steps_day), real_type(0.5),)
-    constants = Constants(real_type, Rₑ, Ω, g, akap, R, γ, hscale, hshum, refrh1)
+    constants = Constants(real_type, Rₑ, rotation_earth, g, akap, R, γ, hscale, hshum, refrh1)
     geometry = Geometry(real_type, constants, nlon, nlat, nlev, trunc)
     spectral_trans = SpectralTrans(real_type, geometry, constants.Rₑ)
     boundaries = Boundaries(real_type, geometry, spectral_trans, g)

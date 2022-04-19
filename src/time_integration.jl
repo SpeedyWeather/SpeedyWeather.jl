@@ -177,7 +177,9 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
     @unpack n_timesteps, Δt, Δt_sec = M.constants
     @unpack output = M.parameters
 
-    progn.vor[10,5,:,:] .= 1e-5
+    progn.vor[1:10,1:10,1,:] .= convert(NF,1e-6)*randn(Complex{NF},10,10,M.parameters.nlev)
+    spectral_truncation!(progn.vor[:,:,1,:],M.parameters.trunc)
+    gridded!(diagn,progn,M)
 
     # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS
     feedback = initialize_feedback(M)

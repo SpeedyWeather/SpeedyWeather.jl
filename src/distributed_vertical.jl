@@ -14,14 +14,15 @@ for func_name in (:gradient_longitude!, :gradient_latitude!,
     end
 end
 
-for func_name in (:unscale_coslat!,:scale_coslat!)
+for func_name in (:unscale_coslat!,:scale_coslat!,
+                    :spectral_truncation!)
     @eval begin
         function $func_name(A::AbstractArray{NF,3},
-                            G::Geometry{NF}) where NF
+                            args...) where NF
 
             for k in 1:size(A)[end]
                 A_layer = view(A,:,:,k)
-                $func_name(A_layer,G)
+                $func_name(A_layer,args...)
             end
         end
     end
