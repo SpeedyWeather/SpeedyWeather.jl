@@ -8,30 +8,18 @@ const T₁ = 35.86
 const T₂ = 7.66
 
 """
-    get_saturation_specific_humidity(T::Array{NF,2}, P::Array{NF,2}, σ::NF, M::Model)
-
 Compute the saturation specific humidity for a single atmospheric level using the
     Clausius-Clapeyron relation.
-
-NF is the number format used by the current model instance.
-
-All arguments are grid-point values.
-
-# Arguments
-- `T::Array{NF,2}`: Absolute temperature for the given atmospheric level.
-- `P::Array{NF,2}`: Surface pressure.
-- `σ::NF`: σ at the given atmospheric level.
-- `M::Model`: The current model.
 """
 function get_saturation_specific_humidity(
-    T::Array{NF,2},
-    P::Array{NF,2},
-    σ::NF,
+    T::Array{NF,2},  # Absolute temperature for a single atmospheric level
+    P::Array{NF,2},  # Surface pressure
+    σ::NF,           # σ at the current atmospheric level
     M::Model,
 ) where {NF<:AbstractFloat}
     @unpack nlon, nlat = M.geometry
 
-    Qsat = zeros(nlon, nlat)
+    Qsat = zeros(nlon, nlat)  # Saturation specific humidity
 
     for i = 1:nlon
         for j = 1:nlat
@@ -53,27 +41,16 @@ function get_saturation_specific_humidity(
 end
 
 """
-    get_saturation_specific_humidity(T::Array{NF,3}, P::Array{NF,2}, M::Model)
-
 Compute the saturation specific humidity using the Clausius-Clapeyron relation.
-
-NF is the number format used by the current model instance.
-
-All arguments are grid-point values.
-
-# Arguments
-- `T::Array{NF,3}`: Absolute temperature.
-- `P::Array{NF,2}`: Surface pressure.
-- `M::Model`: The current model.
 """
 function get_saturation_specific_humidity(
-    T::Array{NF,3},
-    P::Array{NF,2},
+    T::Array{NF,3},  # Absolute temperature
+    P::Array{NF,2},  # Surface pressure
     M::Model,
 ) where {NF<:AbstractFloat}
     @unpack nlon, nlat, nlev, σ_levels_full = M.geometry
 
-    Qsat = zeros(nlon, nlat, nlev)
+    Qsat = zeros(nlon, nlat, nlev)  # Saturation specific humidity
 
     for k = 1:nlev
         σ = σ_levels_full[k]
@@ -84,24 +61,12 @@ function get_saturation_specific_humidity(
 end
 
 """
-    get_relative_humidity(Q::Array{NF,3}, T::Array{NF,3}, P::Array{NF,2}, M::Model)
-
 Convert humidity into relative humidity.
-
-NF is the number format used by the current model instance.
-
-All arguments are grid-point values.
-
-# Arguments
-- `Q::Array{NF,3}`: Humidity.
-- `T::Array{NF,2}`: Absolute temperature.
-- `P::Array{NF,2}`: Surface pressure.
-- `M::Model`: The current model.
 """
 function get_relative_humidity(
-    Q::Array{NF,3},
-    T::Array{NF,3},
-    P::Array{NF,2},
+    Q::Array{NF,3},  # Specific humidity
+    T::Array{NF,3},  # Absolute temperature
+    P::Array{NF,2},  # Surface pressure
     M::Model,
 ) where {NF<:AbstractFloat}
     Qsat = get_saturation_specific_humidity(T, P, M)
