@@ -10,6 +10,7 @@
     progress_txt::Union{IOStream,Nothing}   # txt is a Nothing in case of no output
     
     # OUTPUT
+    verbose::Bool                           # print stuff to REPL?
     output::Bool                            # output to netCDF?
     i_out::Int=0                            # output step counter
     n_timesteps::Int                        # number of time steps
@@ -49,7 +50,7 @@ end
 
 """Initialises the progress txt file."""
 function initialize_feedback(M::ModelSetup)
-    @unpack output = M.parameters
+    @unpack verbose, output = M.parameters
     @unpack n_timesteps, n_outputsteps = M.constants
 
     if output   # with netcdf output
@@ -61,7 +62,7 @@ function initialize_feedback(M::ModelSetup)
         progress_txt = open(joinpath(run_path,"progress.txt"),"w")
         s = "Starting SpeedyWeather.jl run $run_id on "*
                 Dates.format(Dates.now(),Dates.RFC1123Format)
-        println(s)                      # also write to REPL
+        verbose && println(s)           # also write to REPL
         write(progress_txt,s*"\n")      # and in file
 
         # add some information on resolution and number format
@@ -76,14 +77,14 @@ function initialize_feedback(M::ModelSetup)
         close(parameters_txt)
 
     else        # no netcdf output
-        println("Starting SpeedyWeather.jl on "*
+        verbose && println("Starting SpeedyWeather.jl on "*
                     Dates.format(Dates.now(),Dates.RFC1123Format)*" without output.")
         progress_txt = nothing      # for no ouput, allocate dummies for Feedback struct
         run_id = -1                 # dummy
         run_path = ""               # dummy
     end
 
-    return Feedback(;progress_txt,output,n_timesteps,n_outputsteps,run_id,run_path)
+    return Feedback(;progress_txt,verbose,output,n_timesteps,n_outputsteps,run_id,run_path)
 end
 
 """Feedback function that calls duration estimate, nan_detection and progress."""
@@ -106,13 +107,13 @@ end
 
 """Finalises the progress txt file."""
 function feedback_end!(feedback::Feedback)
-    @unpack output,t_start,progress_txt = feedback
+    @unpack verbose, output,t_start,progress_txt = feedback
     
     t_end = time()          # time when the simulation ends
     feedback.t_end = t_end  # store in struct
 
     s = " Integration done in "*readable_secs(t_end-t_start)*"."
-    println(s)
+    verbose && println(s)
     if output
         write(progress_txt,"\n"*s[2:end]*"\n")  # close txt file with last output
         flush(progress_txt)
@@ -122,13 +123,13 @@ end
 """Converts time step into percent for feedback."""
 function progress!(feedback::Feedback)
 
-    @unpack i,n_timesteps,progress_txt,output = feedback
+    @unpack i, n_timesteps, progress_txt, output, verbose = feedback
 
     # update every 1% steps in REPL
     if (i/n_timesteps*100 % 1) > ((i+1)/n_timesteps*100 % 1)  
         percent = round(Int,(i+1)/n_timesteps*100)  # % of time steps completed
-        print("\r\u1b[K")                           # remove previous p% in the REPL
-        print("$percent%")                          # print new
+        verbose && print("\r\u1b[K")                # remove previous p% in the REPL
+        verbose && print("$percent%")               # print new
         if output && (percent % 5 == 0)             # write every 5% step in txt 
             write(progress_txt,"\n$percent%")
             flush(progress_txt)
