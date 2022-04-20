@@ -20,6 +20,7 @@ UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 [compat]
 AbstractFFTs = "1"
 AssociatedLegendrePolynomials = "1"
+BenchmarkTools = "1"
 BitInformation = "0.3, 0.4, 0.5"
 FFTW = "1"
 FastGaussQuadrature = "0.4"
