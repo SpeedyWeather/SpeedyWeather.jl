@@ -25,7 +25,8 @@ end
 """Estimates the total time the model integration will take."""
 function duration_estimate(feedback::Feedback)
 
-    @unpack t_start_durest,i,n_timesteps,output,progress_txt = feedback
+    @unpack verbose, output = feedback
+    @unpack t_start_durest, i, n_timesteps, progress_txt = feedback
 
     # time estimates
     time_per_step = (time()-t_start_durest) / (i-1)
@@ -37,9 +38,9 @@ function duration_estimate(feedback::Feedback)
             Dates.format(Dates.now() + Dates.Second(time_to_go),Dates.RFC1123Format)
 
     # print time information inline
-    print("\r\u1b[K")   
-    println(s1)
-    println(s2)
+    verbose && print("\r\u1b[K")   
+    verbose && println(s1)
+    verbose && println(s2)
 
     if output           # print in txt file
         write(progress_txt,"\n"*s1*"\n")
