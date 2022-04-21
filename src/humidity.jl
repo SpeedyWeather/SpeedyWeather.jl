@@ -21,7 +21,7 @@ function get_saturation_specific_humidity(
 
     Qsat = zeros(nlon, nlat)  # Saturation specific humidity
 
-    for j = 1:nlat, i = 1:nlon
+    @inbounds for j = 1:nlat, i = 1:nlon
         if T[i, j] > T₀
             Qsat[i, j] = e0 * exp(C₁ * (T[i, j] - T₀) / (T[i, j] - T₁))
         else
@@ -50,7 +50,7 @@ function get_saturation_specific_humidity(
 
     Qsat = zeros(nlon, nlat, nlev)  # Saturation specific humidity
 
-    for k = 1:nlev
+    @inbounds for k = 1:nlev
         σ = σ_levels_full[k]
         Qsat[:, :, k] = get_saturation_specific_humidity(T[:, :, k], P, σ, M)
     end
