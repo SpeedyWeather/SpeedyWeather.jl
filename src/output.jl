@@ -28,7 +28,6 @@ function get_run_id_path(P::Parameters)
     end
 end
 
-
 function initialize_netcdf_output(  diagn::DiagnosticVariables,  # output grid variables only
                                     feedback::Feedback,         # Feedback struct
                                     M::ModelSetup)              # ModelSetup struct
@@ -109,7 +108,7 @@ function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf
     # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
     NetCDF.putvar(netcdf_file,"u",u_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"v",v_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
-    NetCDF.putvar(netcdf_file,"vor",v_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"temp",temp_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"humid",humid_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"pres",pres_output,start=[1,1,i_out],count=[-1,-1,1])
