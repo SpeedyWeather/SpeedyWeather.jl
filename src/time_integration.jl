@@ -117,20 +117,22 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     @unpack vor_tend = diagn.tendencies
     @unpack damping, damping_impl = M.horizontal_diffusion
 
+    # set all tendencies to zero
+    fill!(vor_tend,0)
+
     # @unpack tcorh,tcorv,qcorh,qcorv = HD
     # @unpack sdrag = C
 
     # PROPAGATE THE SPECTRAL STATE INTO THE DIAGNOSTIC VARIABLES
-    gridded!(diagn,progn,M)
+    gridded!(diagn,progn,M,lf2)
 
     # COMPUTE TENDENCIES OF PROGNOSTIC VARIABLES
     get_tendencies!(diagn,progn,M,lf2)                   
 
     # DIFFUSION FOR WIND
-    lf = 1
-    vor_lf1 = view(vor,:,:,lf,:)                                    # array view for leapfrog index
+    vor_lf = view(vor,:,:,lf2,:)                                    # array view for leapfrog index
     # div_l1 = view(div,:,:,1,:)                                    # TODO l1/l2 dependent?
-    horizontal_diffusion!(vor_tend,vor_lf1,damping,damping_impl)    # diffusion of vorticity
+    horizontal_diffusion!(vor_tend,vor_lf,damping,damping_impl)    # diffusion of vorticity
     # horizontal_diffusion!(div_l1,div_tend,dmpd,dmp1d)             # diffusion of divergence
 
     # # DIFFUSION FOR TEMPERATURE
@@ -177,9 +179,12 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
     @unpack n_timesteps, Δt, Δt_sec = M.constants
     @unpack output = M.parameters
 
-    progn.vor[1:10,1:10,1,:] .= convert(NF,1e-6)*randn(Complex{NF},10,10,M.parameters.nlev)
-    spectral_truncation!(progn.vor[:,:,1,:],M.parameters.trunc)
-    gridded!(diagn,progn,M)
+    # lmax, mmax = 25,25
+    # progn.vor[1:lmax,1:mmax,1,:] = 1e-5*randn(Complex{NF},lmax,mmax,M.parameters.nlev)
+    # spectral_truncation!(progn.vor[:,:,1,:],M.parameters.trunc)
+    progn.vor[20,20,1,:] .= 1e-5
+
+    gridded!(diagn,progn,M,1)
 
     # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS
     feedback = initialize_feedback(M)
@@ -190,7 +195,6 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
 
     for i in 1:n_timesteps
         time_sec += Δt_sec
-
         timestep!(progn,diagn,2Δt,M)
 
         # FEEDBACK AND OUTPUT

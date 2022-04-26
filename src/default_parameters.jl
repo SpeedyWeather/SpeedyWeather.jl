@@ -86,7 +86,7 @@ With keywords such that default values can be changed at creation.
     out_path::String=pwd()      # path to output folder
     output_vars::Vector{String}=["u","v","T","humid","logp0"]
     compression_level::Int=3    # 1=low but fast, 9=high but slow
-    keepbits::Int=7             # mantissa bits to keep for every variable 
+    keepbits::Int=10            # mantissa bits to keep for every variable 
 
     # TODO assert not allowed parameter values
     @assert α in [0,0.5,1] "Only semi-implicit α = 0, 0.5 or 1 allowed."

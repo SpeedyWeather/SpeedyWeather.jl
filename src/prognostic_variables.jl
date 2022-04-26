@@ -1,6 +1,7 @@
 """Struct holding the prognostic spectral variables."""
 struct PrognosticVariables{NF<:AbstractFloat}
     # variables are lmax x mmax x nleapfrog x nlev
+    # except for pres_surf lmax x mmax x nleapfrog
     vor         ::Array{Complex{NF},4}      # Vorticity of horizontal wind field
     div         ::Array{Complex{NF},4}      # Divergence of horizontal wind field
     temp        ::Array{Complex{NF},4}      # Absolute temperature [K]

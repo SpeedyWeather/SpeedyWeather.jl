@@ -41,12 +41,9 @@ module SpeedyWeather
     include("distributed_vertical.jl")
 
     include("boundaries.jl")                # defines Boundaries
-    include("diagnostics.jl")
     include("prognostic_variables.jl")      # defines PrognosticVariables
     include("diagnostic_variables.jl")      # defines DiagnosticVariables
-    include("geopotential.jl")
     include("horizontal_diffusion.jl")      # defines HorizontalDiffusion
-    include("implicit.jl")
 
     include("run_speedy.jl")                # defines ModelSetup
     include("tendencies_parametrizations.jl")
