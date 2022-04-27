@@ -59,6 +59,39 @@ julia> spectral(map)                   # back to spectral space
  0.0+0.0im  0.0+0.0im          0.0+0.0im
 ```
 
+## Spectral packing
+
+Conventional packing $l,m$ versus alternative packing $l',m'$ and arbitrary numbering $i$.
+
+| degree $l$ | order $m$ |  $l'=m$ |  $m'=l-m$ | $i$ |
+|-|-|-|-|-|
+|0|0|0|0|1|
+|1|0|0|1|2|
+|1|1|1|0|3|
+|2|0|0|2|4|
+|2|1|1|1|5|
+|2|2|2|0|6|
+|3|0|0|3|7|
+|...|...|...|...|...|
+
+Degree $l$, order $m$
+
+| |m| | | |
+|-|-|-|-|-|
+|l|1| | | |
+| |2|3| | |
+| |4|5|6| |
+| |7|8|9|10|
+
+Alternative packing
+
+| |m'| | | |
+|-|-|-|-|-|
+|l'|1|2|4|7|
+| |3|5|8| |
+| |6|9| | |
+| |10| | | |
+
 ## References
 
 [^1]: Justin Willmert, 2020. [Introduction to Associated Legendre Polynomials (Legendre.jl Series, Part I)](https://justinwillmert.com/articles/2020/introduction-to-associated-legendre-polynomials/)  

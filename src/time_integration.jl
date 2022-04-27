@@ -86,17 +86,19 @@ function first_timestep!(   progn::PrognosticVariables{NF}, # all prognostic var
     @unpack Δt,Δt_sec = M.constants
     time_sec = 0
 
-    # FIRST TIME STEP (l1=l2=1, dt=Δt/2)
+    # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
     # IMP = initialize_implicit(half*Δt)
-    lf1, lf2 = 1, 1
+    lf1 = 1     # without Robert+William's filter
+    lf2 = 1     # evaluates all tendencies at t=0, the first leapfrog index (=>Euler forward)
     timestep!(progn,diagn,Δt/2,M,lf1,lf2)
     time_sec += Δt_sec÷2
 
-    # SECOND TIME STEP (l1=1,l2=2,dt=Δt)
+    # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt)
     # IMP = initialize_implicit(Δt)
-    lf1, lf2 = 1, 2
+    lf1 = 1     # without Robert+William's filter
+    lf2 = 2     # evaluate all tendencies at t=dt/2, the 2nd leapfrog index (=>Leapfrog)
     timestep!(progn,diagn,Δt,M,lf1,lf2)
-    time_sec += Δt_sec
+    time_sec += Δt_sec÷2
 
     # Initialize implicit arrays for further time steps (dt=2Δt)
     # IMP = initialize_implicit(2Δt)
@@ -118,7 +120,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     @unpack damping, damping_impl = M.horizontal_diffusion
 
     # set all tendencies to zero
-    fill!(vor_tend,0)
+    fill!(vor_tend,zero(Complex{NF}))
 
     # @unpack tcorh,tcorv,qcorh,qcorv = HD
     # @unpack sdrag = C
@@ -130,9 +132,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     get_tendencies!(diagn,progn,M,lf2)                   
 
     # DIFFUSION FOR WIND
-    vor_lf = view(vor,:,:,lf2,:)                                    # array view for leapfrog index
+    vor_lf = view(vor,:,:,1,:)                                    # array view for leapfrog index
     # div_l1 = view(div,:,:,1,:)                                    # TODO l1/l2 dependent?
-    horizontal_diffusion!(vor_tend,vor_lf,damping,damping_impl)    # diffusion of vorticity
+    horizontal_diffusion!(vor_tend,vor_lf,damping,damping_impl)     # diffusion of vorticity
     # horizontal_diffusion!(div_l1,div_tend,dmpd,dmp1d)             # diffusion of divergence
 
     # # DIFFUSION FOR TEMPERATURE
@@ -179,11 +181,11 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
     @unpack n_timesteps, Δt, Δt_sec = M.constants
     @unpack output = M.parameters
 
-    # lmax, mmax = 25,25
-    # progn.vor[1:lmax,1:mmax,1,:] = 1e-5*randn(Complex{NF},lmax,mmax,M.parameters.nlev)
-    # spectral_truncation!(progn.vor[:,:,1,:],M.parameters.trunc)
-    progn.vor[20,20,1,:] .= 1e-5
-
+    progn.vor[4,3,1,:] .= 5e-6
+    lmax, mmax = 15,15
+    progn.vor[1:lmax,1:mmax,1,:] += 1e-7*randn(Complex{NF},lmax,mmax,M.parameters.nlev)
+    spectral_truncation!(progn.vor[:,:,1,:],M.parameters.trunc)
+    
     gridded!(diagn,progn,M,1)
 
     # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS

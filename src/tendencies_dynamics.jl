@@ -261,7 +261,7 @@ function divergence_uvω_spectral(   u_grid::AbstractMatrix{NF},     # zonal vel
     nlon,nlat = size(u_grid)
     @boundscheck size(u_grid) == size(v_grid) || throw(BoundsError)
 
-    @unpack f_coriolis,coslat⁻¹,radius_earth = G.geometry
+    @unpack f_coriolis,coslat,coslat⁻¹,radius_earth = G.geometry
 
     uω_grid_coslat⁻¹ = zero(u_grid)                             # TODO preallocate elsewhere
     vω_grid_coslat⁻¹ = zero(v_grid)
@@ -269,19 +269,22 @@ function divergence_uvω_spectral(   u_grid::AbstractMatrix{NF},     # zonal vel
     @inbounds for j in 1:nlat
         for i in 1:nlon
             ω = vor_grid[i,j] + f_coriolis[j]                   # = relative vorticity + coriolis
-            uω_grid_coslat⁻¹[i,j] = ω*u_grid[i,j]*coslat⁻¹[j]   # = u(vor+f)/cos(ϕ)
+            uω_grid_coslat⁻¹[i,j] = -ω*u_grid[i,j]*coslat⁻¹[j]   # = u(vor+f)/cos(ϕ)
             vω_grid_coslat⁻¹[i,j] = ω*v_grid[i,j]*coslat⁻¹[j]   # = v(vor+f)/cos(ϕ)
+            # uω_grid_coslat⁻¹[i,j] = ω*10*coslat⁻¹[j]   # = u(vor+f)/cos(ϕ)
+            # vω_grid_coslat⁻¹[i,j] = ω*10*coslat⁻¹[j]   # = v(vor+f)/cos(ϕ)
+
         end
     end
 
     # TODO preallocate returned coefficients elsewhere
-    uω_coslat⁻¹ = spectral(uω_grid_coslat⁻¹,G.spectral,one_more_l=true)         
-    vω_coslat⁻¹ = spectral(vω_grid_coslat⁻¹,G.spectral,one_more_l=true)
-    
-    ∂uω_∂lon = gradient_longitude(uω_coslat⁻¹,radius_earth)                  # spectral gradients
-    ∂vω_∂lat = gradient_latitude(vω_coslat⁻¹,radius_earth)
+    uω_coslat⁻¹ = spectral(uω_grid_coslat⁻¹,G.spectral,one_more_l=false)         
+    vω_coslat⁻¹ = spectral(vω_grid_coslat⁻¹,G.spectral,one_more_l=false)
 
-    return ∂uω_∂lon + ∂vω_∂lat                                  # add for divergence
+    ∂uω_∂lon = gradient_longitude(uω_coslat⁻¹,radius_earth,one_more_l=true)                  # spectral gradients
+    ∂vω_∂lat = gradient_latitude(vω_coslat⁻¹,G.spectral,-radius_earth)
+
+    return -(∂uω_∂lon+∂vω_∂lat)                                  # add for divergence
 end
 
 function divergence_uvω_spectral!(  vor_tend::AbstractArray{Complex{NF},3}, # vorticity tendency  
@@ -297,7 +300,7 @@ function divergence_uvω_spectral!(  vor_tend::AbstractArray{Complex{NF},3}, # v
         vor_grid_layer = view(vor_grid,:,:,k)
         tend = divergence_uvω_spectral(u_grid_layer,v_grid_layer,vor_grid_layer,G)
         
-        lmax,mmax = size(tend)[1:2]
+        lmax,mmax = size(vor_tend)[1:2]
 
         for m in 1:mmax
             for l in m:lmax
@@ -310,14 +313,17 @@ end
 function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
                     progn::PrognosticVariables{NF}, # all prognostic variables
                     M::ModelSetup,                  # everything that's constant
-                    lf::Int=1                       # leapfrog index
+                    lf::Int=2                       # leapfrog index
                     ) where NF
     
     @unpack vor = progn                             # relative vorticity
     @unpack vor_grid, u_grid, v_grid = diagn.grid_variables
     @unpack stream_function, coslat_u, coslat_v = diagn.intermediate_variables
     @unpack geometry, spectral = M.geospectral
+    @unpack lmax,ϵlms = spectral
     @unpack radius_earth = M.constants
+
+    fill!(view(vor,lmax+1,:,:,:),0)
 
     vor_lf = view(vor,:,:,lf,:)                     # pick leapfrog index with mem allocation
     gridded!(vor_grid,vor_lf,spectral)              # get vorticity on grid from spectral vor_lf
@@ -325,8 +331,8 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     
     # coslat*v = zonal gradient of stream function
     # coslat*u = meridional gradient of stream function
-    gradient_longitude!(coslat_v,stream_function,radius_earth)
-    gradient_latitude!( coslat_u,stream_function,radius_earth)
+    gradient_longitude!(coslat_v, stream_function,            radius_earth)
+    gradient_latitude!( coslat_u, stream_function, spectral, -radius_earth)
     
     gridded!(u_grid,coslat_u,spectral)              # get u,v on grid from spectral
     gridded!(v_grid,coslat_v,spectral)

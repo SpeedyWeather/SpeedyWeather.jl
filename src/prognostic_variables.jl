@@ -40,11 +40,11 @@ function initialize_from_rest(  P::Parameters,
 
     # conversion to type NF later when creating a PrognosticVariables struct
     # one more degree l than order m for recursion in meridional gradient
-    vor         = zeros(Complex{Float64},lmax+2,mmax+1,nleapfrog,nlev)  # vorticity
-    div         = zeros(Complex{Float64},lmax+2,mmax+1,nleapfrog,nlev)  # divergence
-    temp        = zeros(Complex{Float64},lmax+2,mmax+1,nleapfrog,nlev)  # absolute Temperature
-    pres_surf   = zeros(Complex{Float64},lmax+2,mmax+1,nleapfrog)       # logarithm of surface pressure
-    humid       = zeros(Complex{Float64},lmax+2,mmax+1,nleapfrog,nlev)  # specific humidity
+    vor         = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # vorticity
+    div         = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # divergence
+    temp        = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # absolute Temperature
+    pres_surf   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog)       # logarithm of surface pressure
+    humid       = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # specific humidity
 
     # initialize only the first leapfrog index
     temp_lf1 = view(temp,:,:,1,:)
@@ -68,7 +68,7 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3},    # spe
                                     ) where NF
 
     lmax,mmax,nlev = size(temp)     # number of vertical levels nlev
-    lmax, mmax = lmax-2, mmax-1     # get 0-based max degree l, order m of spherical harmonics
+    lmax, mmax = lmax-1, mmax-1     # get 0-based max degree l, order m of spherical harmonics
     @unpack geopot_surf = B         # spectral surface geopotential [m²/s²]
 
     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
@@ -95,7 +95,7 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3},    # spe
 
     for k in n_stratosphere_levels+1:nlev
         for m in 1:mmax+1
-            for l in m:lmax+2
+            for l in m:lmax+1
                 temp[l,m,k] = temp_surf[l,m]*σ_levels_full[k]^(R_gas*lapse_rate_scaled)
             end
         end

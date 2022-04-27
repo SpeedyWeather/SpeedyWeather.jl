@@ -18,11 +18,11 @@ function Tendencies(G::GeoSpectral{NF}) where NF
     @unpack nlon,nlat,nlev = G.geometry     # number of longitudes, latitudes, vertical levels
 
     # one more l for recursion in meridional gradients
-    vor_tend         = zeros(Complex{NF},lmax+2,mmax+1,nlev)    # vorticity
-    div_tend         = zeros(Complex{NF},lmax+2,mmax+1,nlev)    # divergence
-    temp_tend        = zeros(Complex{NF},lmax+2,mmax+1,nlev)    # absolute Temperature
-    pres_surf_tend   = zeros(Complex{NF},lmax+2,mmax+1)         # logarithm of surface pressure
-    humid_tend       = zeros(Complex{NF},lmax+2,mmax+1,nlev)    # specific humidity
+    vor_tend         = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # vorticity
+    div_tend         = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # divergence
+    temp_tend        = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # absolute Temperature
+    pres_surf_tend   = zeros(Complex{NF},lmax+1,mmax+1)         # logarithm of surface pressure
+    humid_tend       = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # specific humidity
     u_tend           = zeros(NF,nlon,nlat,nlev)                 # zonal velocity
     v_tend           = zeros(NF,nlon,nlat,nlev)                 # meridonal velocity
 
@@ -112,7 +112,7 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
     @unpack lmax, mmax = G.spectral             # 0-based max degree l, order m of the spherical harmonics
 
     # BAROTROPIC VORTIICTY EQUATION
-    stream_function = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    stream_function = zeros(Complex{NF},lmax+1,mmax+1,nlev)
     coslat_u = zeros(Complex{NF},lmax+2,mmax+1,nlev)
     coslat_v = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
