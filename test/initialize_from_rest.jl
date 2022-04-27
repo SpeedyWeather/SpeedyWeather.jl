@@ -11,23 +11,24 @@
     @test all(Prog.vor .== 0)
     @test all(Prog.div .== 0)
 
-    # test surface layer only at the moment
-    temp_grid = gridded(Prog.temp[:,:,end],S)
-    pres_surf_grid = gridded(Prog.pres_surf,S)
-    humid_grid = gridded(Prog.humid[:,:,end],S)
+    k = P.nlev    # test surface layer only at the moment
+    lf = 1          # first leapfrog index
+    temp_grid = gridded(Prog.temp[:,:,lf,k],S)
+    pres_surf_grid = gridded(Prog.pres_surf[:,:,lf],S)
+    humid_grid = gridded(Prog.humid[:,:,lf,k],S)
 
     # temperature between 200K and 350K everywhere
-    println((sum(temp_grid)/length(temp_grid),minimum(temp_grid),maximum(temp_grid)))
+    # println((sum(temp_grid)/length(temp_grid),minimum(temp_grid),maximum(temp_grid)))
     @test all(temp_grid .> 200)
     @test all(temp_grid .< 350)
 
     # surface pressure between log(300hPa) and log(2000hPa) everywhere
-    println((sum(pres_surf_grid)/length(pres_surf_grid),minimum(pres_surf_grid),maximum(pres_surf_grid)))
+    # println((sum(pres_surf_grid)/length(pres_surf_grid),minimum(pres_surf_grid),maximum(pres_surf_grid)))
     @test all(pres_surf_grid .> log(300))
     @test all(pres_surf_grid .< log(2000))
 
     # humidity non-negative everywhere
     # humidity has currently values of O(1e9)...
-    println((sum(humid_grid)/length(humid_grid),minimum(humid_grid),maximum(humid_grid)))
+    # println((sum(humid_grid)/length(humid_grid),minimum(humid_grid),maximum(humid_grid)))
     @test_skip all(humid_grid .>= 0) 
 end

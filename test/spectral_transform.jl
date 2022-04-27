@@ -98,7 +98,7 @@ end
             geopot_surf_spectral = B.geopot_surf
             geopot_surf_grid = gridded(geopot_surf_spectral,S)
             geopot_surf_spectral2 = spectral(geopot_surf_grid,S,one_more_l=true)
-            spectral_truncation!(geopot_surf_spectral2,trunc)
+            SpeedyWeather.spectral_truncation!(geopot_surf_spectral2,trunc)
             geopot_surf_grid2 = gridded(geopot_surf_spectral2,S)
 
             for i in eachindex(geopot_surf_spectral)

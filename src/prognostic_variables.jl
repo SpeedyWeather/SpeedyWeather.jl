@@ -1,10 +1,12 @@
 """Struct holding the prognostic spectral variables."""
 struct PrognosticVariables{NF<:AbstractFloat}
-    vor         ::Array{Complex{NF},3}      # Vorticity of horizontal wind field
-    div         ::Array{Complex{NF},3}      # Divergence of horizontal wind field
-    temp        ::Array{Complex{NF},3}      # Absolute temperature [K]
-    pres_surf   ::Array{Complex{NF},2}      # Logarithm of surface pressure [log(Pa)]
-    humid       ::Array{Complex{NF},3}      # Specific humidity [g/kg]
+    # variables are lmax x mmax x nleapfrog x nlev
+    # except for pres_surf lmax x mmax x nleapfrog
+    vor         ::Array{Complex{NF},4}      # Vorticity of horizontal wind field
+    div         ::Array{Complex{NF},4}      # Divergence of horizontal wind field
+    temp        ::Array{Complex{NF},4}      # Absolute temperature [K]
+    pres_surf   ::Array{Complex{NF},3}      # Logarithm of surface pressure [log(Pa)]
+    humid       ::Array{Complex{NF},4}      # Specific humidity [g/kg]
 end
 
 """Initialize prognostic variables from rest or restart from file."""
@@ -15,14 +17,14 @@ function initial_conditions(    P::Parameters,      # Parameter struct
     @unpack initial_conditions = P
 
     if initial_conditions == :rest
-        ProgVars = initialize_from_rest(P,B,G)
+        progn = initialize_from_rest(P,B,G)
     elseif initial_conditions == :restart
-        ProgVars = initialize_from_file(P,B,G)
+        progn = initialize_from_file(P,B,G)
     else
         throw(error("Incorrect initialization option, $initial_conditions given."))
     end
 
-    return ProgVars
+    return progn
 end
 
 """Initialize a PrognosticVariables struct for an atmosphere at rest. No winds,
@@ -34,18 +36,24 @@ function initialize_from_rest(  P::Parameters,
 
     @unpack nlev = G.geometry
     @unpack lmax, mmax = G.spectral
+    nleapfrog = 2
 
     # conversion to type NF later when creating a PrognosticVariables struct
     # one more degree l than order m for recursion in meridional gradient
-    vor         = zeros(Complex{Float64},lmax+2,mmax+1,nlev)  # vorticity
-    div         = zeros(Complex{Float64},lmax+2,mmax+1,nlev)  # divergence
-    temp        = zeros(Complex{Float64},lmax+2,mmax+1,nlev)  # absolute Temperature
-    pres_surf   = zeros(Complex{Float64},lmax+2,mmax+1)       # logarithm of surface pressure
-    humid       = zeros(Complex{Float64},lmax+2,mmax+1,nlev)  # specific humidity
+    vor         = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # vorticity
+    div         = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # divergence
+    temp        = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # absolute Temperature
+    pres_surf   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog)       # logarithm of surface pressure
+    humid       = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # specific humidity
 
-    initialize_temperature!(temp,P,B,G)                     # temperature from lapse rates    
-    pres_surf_grid = initialize_pressure!(pres_surf,P,B,G)  # pressure from temperature profile
-    initialize_humidity!(humid,pres_surf_grid,P,G)          # specific humidity from pressure
+    # initialize only the first leapfrog index
+    temp_lf1 = view(temp,:,:,1,:)
+    pres_surf_lf1 = view(pres_surf,:,:,1)
+    humid_lf1 = view(humid,:,:,1,:)
+
+    initialize_temperature!(temp_lf1 ,P,B,G)                    # temperature from lapse rates    
+    pres_surf_grid = initialize_pressure!(pres_surf_lf1,P,B,G)  # pressure from temperature profile
+    initialize_humidity!(humid_lf1,pres_surf_grid,P,G)          # specific humidity from pressure
 
     # conversion to NF happens here implicitly
     return PrognosticVariables{P.NF}(vor,div,temp,pres_surf,humid)
@@ -60,7 +68,7 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3},    # spe
                                     ) where NF
 
     lmax,mmax,nlev = size(temp)     # number of vertical levels nlev
-    lmax, mmax = lmax-2, mmax-1     # get 0-based max degree l, order m of spherical harmonics
+    lmax, mmax = lmax-1, mmax-1     # get 0-based max degree l, order m of spherical harmonics
     @unpack geopot_surf = B         # spectral surface geopotential [m²/s²]
 
     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
@@ -87,7 +95,7 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3},    # spe
 
     for k in n_stratosphere_levels+1:nlev
         for m in 1:mmax+1
-            for l in m:lmax+2
+            for l in m:lmax+1
                 temp[l,m,k] = temp_surf[l,m]*σ_levels_full[k]^(R_gas*lapse_rate_scaled)
             end
         end

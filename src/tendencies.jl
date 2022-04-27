@@ -27,33 +27,39 @@
 """
 Compute the grid point and spectral tendencies, including an implicit correction for the spectral tendencies. 
 """
-function get_tendencies!(Prog::PrognosticVariables{NF}, # Prognostic variables
-                         Diag::DiagnosticVariables{NF}, # Diagnostic variables
-                         l2::Int,                       # leapfrog index 2 (time step used for tendencies)
-                         M,              # struct containing constants
-                        ) where {NF<:AbstractFloat}
+function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
+                            progn::PrognosticVariables{NF}, # all prognostic variables
+                            M::ModelSetup{NF},              # struct containing all constants
+                            lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
+                            ) where {NF<:AbstractFloat}
 
-    @unpack α = M.Parameters
+    # @unpack α = M.Parameters
 
     # =========================================================================
     # Computation of grid-point tendencies (converted to spectral at the end of
     # grtend) Diag.Tendencies.GridPoint
     # =========================================================================
 
-    println("Hello from get_tendencies")
-    get_grid_point_tendencies!(Prog,Diag,l2,M)
+    # println("Hello from get_tendencies")
+    # get_grid_point_tendencies!(Prog,Diag,l2,M)
 
     # =========================================================================
     # Computation of spectral tendencies 
     # =========================================================================
-    if  α == 0
+    
+    @unpack u_grid, v_grid, vor_grid = diagn.grid_variables
+    @unpack vor_tend = diagn.tendencies
 
-        get_spectral_tendencies!(Prog,Diag,1,M)
+    divergence_uvω_spectral!(vor_tend,u_grid,v_grid,vor_grid,M.geospectral)
 
-    else
-        get_spectral_tendencies!(Prog,Diag,l2,M) #Note: l2 currently not used. Needs to be implemented 
+    # if  α == 0
 
-    end
+    #     get_spectral_tendencies!(Prog,Diag,1,M)
+
+    # else
+    #     get_spectral_tendencies!(Prog,Diag,l2,M) #Note: l2 currently not used. Needs to be implemented 
+
+    # end
 
     #if alpha < 0.5 #Coefficient for semi-implicit computations. Previously if alpha = 0?
        # get_spectral_tendencies!(Diag,C)

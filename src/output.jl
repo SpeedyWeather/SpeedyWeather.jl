@@ -1,4 +1,9 @@
-"""Checks output folders to determine a 4-digit run id number."""
+"""
+    run_id, run_path = get_run_id_path(P::Parameters)
+
+Checks existing `run????` folders in output path to determine a 4-digit `run_id` number
+and creates a new folder `run????` with that `run_id`. Also returns the full path
+`run_path` of that folder. Returns `0,"no runpath"` in the case of no output."""
 function get_run_id_path(P::Parameters)
 
     @unpack output,out_path = P
@@ -22,7 +27,6 @@ function get_run_id_path(P::Parameters)
         return 0,"no runpath"
     end
 end
-
 
 function initialize_netcdf_output(  diagn::DiagnosticVariables,  # output grid variables only
                                     feedback::Feedback,         # Feedback struct
@@ -60,7 +64,8 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,  # output grid v
 
     # CREATE NETCDF FILE
     @unpack run_id, run_path = feedback
-    file_name = @sprintf("run%04d.nc",run_id)
+    # file_name = @sprintf("run%04d.nc",run_id)
+    file_name = "output.nc"
     netcdf_file = NetCDF.create(joinpath(run_path,file_name),
                     [var_time,var_u,var_v,var_vor,var_temp,var_humid,var_pres],mode=NetCDF.NC_NETCDF4)
 
@@ -75,7 +80,7 @@ end
 function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf file to output into
                                 feedback::Feedback,                     # feedback struct to increment output counter
                                 i::Int,                                 # time step index
-                                time_hrs::Real,                         # model time [hours] for output
+                                time_sec::Int,                          # model time [s] for output
                                 diagn::DiagnosticVariables,             # all diagnostic variables
                                 M::ModelSetup)                          # all parameters
 
@@ -103,12 +108,13 @@ function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf
     # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
     NetCDF.putvar(netcdf_file,"u",u_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"v",v_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
-    NetCDF.putvar(netcdf_file,"vor",v_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"temp",temp_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"humid",humid_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"pres",pres_output,start=[1,1,i_out],count=[-1,-1,1])
 
     # WRITE TIME
-    NetCDF.putvar(netcdf_file,"time",[round(Int32,time_hrs)],start=[i_out])
-    NetCDF.sync(netcdf_file)
+    time_hrs = Int32[round(time_sec/3600)]                      # convert from seconds to hours
+    NetCDF.putvar(netcdf_file,"time",time_hrs,start=[i_out])    # write time [hrs] of next output step
+    NetCDF.sync(netcdf_file)                                    # sync to flush variables to disc
 end

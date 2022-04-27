@@ -71,18 +71,18 @@ function HorizontalDiffusion(   P::Parameters,      # Parameter struct
     # conversion to number format NF later, one more degree l for meridional gradient recursion
     # Damping coefficients for explicit part of the diffusion (=ν∇²ⁿ)
     # while precalculated for spectral space, store only the real part as entries are real
-    damping = zeros(lmax+2,mmax+1)              # for temperature and vorticity (explicit)
-    damping_div = zeros(lmax+2,mmax+1)          # for divergence (explicit)
-    damping_strat = zeros(lmax+2,mmax+1)        # for extra diffusion in the stratosphere (explicit)
+    damping = zeros(lmax+1,mmax+1)              # for temperature and vorticity (explicit)
+    damping_div = zeros(lmax+1,mmax+1)          # for divergence (explicit)
+    damping_strat = zeros(lmax+1,mmax+1)        # for extra diffusion in the stratosphere (explicit)
 
     # Damping coefficients for implicit part of the diffusion (= 1/(1+2Δtν∇²ⁿ))
-    damping_impl = zeros(lmax+2,mmax+1)         # for temperature and vorticity (implicit)
-    damping_div_impl = zeros(lmax+2,mmax+1)     # for divergence (implicit)
-    damping_strat_impl = zeros(lmax+2,mmax+1)   # for extra diffusion in the stratosphere (implicit)
+    damping_impl = zeros(lmax+1,mmax+1)         # for temperature and vorticity (implicit)
+    damping_div_impl = zeros(lmax+1,mmax+1)     # for divergence (implicit)
+    damping_strat_impl = zeros(lmax+1,mmax+1)   # for extra diffusion in the stratosphere (implicit)
 
     # PRECALCULATE the damping coefficients for every spectral mode
     for m in 1:mmax+1                           # fill only the lower triangle
-        for l in m:lmax+2
+        for l in m:lmax+1
             # eigenvalue is l*(l+1), but 1-based here l→l-1
             norm_eigenvalue = l*(l-1)/largest_eigenvalue        # normal diffusion ∇²
             norm_eigenvalueⁿ = norm_eigenvalue^diffusion_power  # hyper diffusion ∇²ⁿ

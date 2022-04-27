@@ -65,20 +65,20 @@ end
 Truncate spectral coefficients `alms` in-place by setting (a) the upper right triangle to zero and (b)
 all coefficients for which the degree `l` is larger than the truncation `ltrunc` or order `m` larger than
 the truncaction `mtrunc`."""
-function spectral_truncation!(  alms::AbstractMatrix{Complex{NF}},  # spectral field to be truncated
-                                ltrunc::Int,                        # truncate to max degree ltrunc
-                                mtrunc::Int                         # truncate to max order mtrunc
-                                ) where {NF<:AbstractFloat}         # number format NF
+function spectral_truncation!(  alms::AbstractMatrix{NF},   # spectral field to be truncated
+                                ltrunc::Int,                # truncate to max degree ltrunc
+                                mtrunc::Int                 # truncate to max order mtrunc
+                                ) where NF                  # number format NF (can be complex)
     
     lmax,mmax = size(alms) .- 1    # 0-based degree l, order m of the legendre polynomials
 
-    @inbounds for m in 1:mmax+1                 # order m = 0,mmax but 1-based
-        for l in 1:lmax+1                       # degree l = 0,lmax but 1-based
-            if m > l ||                         # upper triangle (m>l)
-                l > ltrunc+1 ||                 # and degrees l>ltrunc
-                m > mtrunc+1                    # and orders m>mtrunc
+    @inbounds for m in 1:mmax+1         # order m = 0,mmax but 1-based
+        for l in 1:lmax+1               # degree l = 0,lmax but 1-based
+            if m > l ||                 # upper triangle (m>l)
+                l > ltrunc+1 ||         # and degrees l>ltrunc
+                m > mtrunc+1            # and orders m>mtrunc
 
-                alms[l,m] = zero(Complex{NF})   # set that coefficient to zero
+                alms[l,m] = zero(NF)    # set that coefficient to zero
             end
         end
     end
@@ -90,10 +90,10 @@ end
 
 Truncate spectral coefficients `alms` in-place by setting (a) the upper right triangle to zero and (b)
 all coefficients for which the degree l is larger than the truncation `trunc`."""
-function spectral_truncation!(  alms::AbstractMatrix{Complex{NF}},  # spectral field to be truncated
-                                trunc::Int                          # truncate to degree/order trunc
-                                ) where {NF<:AbstractFloat}         # number format NF
-    return spectral_truncation!(alms,trunc,trunc)                   # use trunc=ltrunc=mtrunc
+function spectral_truncation!(  alms::AbstractMatrix{NF},       # spectral field to be truncated
+                                trunc::Int                      # truncate to degree/order trunc
+                                ) where NF                      # number format NF (can be complex)
+    return spectral_truncation!(alms,trunc,trunc)               # use trunc=ltrunc=mtrunc
 end
 
 """
@@ -111,20 +111,20 @@ Returns a spectral coefficient matrix `alms_trunc` that is truncated from `alms`
 `trunc` is larger than the implicit truncation in `alms` obtained from its size than `spectral_interpolation`
 is automatically called instead, returning `alms_interp`, a coefficient matrix that is larger than `alms`
 with padded zero coefficients."""
-function spectral_truncation(   alms::AbstractMatrix{Complex{NF}},  # spectral field to be truncated
-                                ltrunc::Int,                        # truncate to max degree ltrunc
-                                mtrunc::Int                         # truncate to max order mtrunc
-                                ) where {NF<:AbstractFloat}         # number format NF
+function spectral_truncation(   alms::AbstractMatrix{NF},   # spectral field to be truncated
+                                ltrunc::Int,                # truncate to max degree ltrunc
+                                mtrunc::Int                 # truncate to max order mtrunc
+                                ) where NF                  # number format NF (can be complex)
     
     lmax,mmax = size(alms) .- 1    # 0-based degree l, order m of the spherical harmonics
     (ltrunc > lmax || mtrunc > mmax) && return spectral_interpolation(alms,ltrunc,mtrunc)
-    alms_trunc = Matrix{Complex{NF}}(undef,ltrunc+1,mtrunc+1)
+    alms_trunc = Matrix{NF}(undef,ltrunc+1,mtrunc+1)
     copyto!(alms_trunc,@view(alms[1:ltrunc+1,1:mtrunc+1]))
     spectral_truncation!(alms_trunc,ltrunc,mtrunc)
     return alms_trunc
 end
 
-spectral_truncation(alms::AbstractMatrix{Complex{NF}},trunc::Int) where NF = spectral_truncation(alms,trunc,trunc)
+spectral_truncation(alms::AbstractMatrix,trunc::Int) = spectral_truncation(alms,trunc,trunc)
 
 """
     alms_interp = spectral_interp(alms,trunc)
@@ -133,17 +133,17 @@ Returns a spectral coefficient matrix `alms_interp` that is `alms` padded with z
 spectral space. If `trunc` is smaller or equal to the implicit truncation in `alms` obtained from its size
 than `spectral_truncation` is automatically called instead, returning `alms_trunc`, a coefficient matrix that
 is smaller than `alms`, implicitly setting higher degrees and orders to zero."""
-function spectral_interpolation(    alms::AbstractMatrix{Complex{NF}},  # spectral field to be truncated
-                                    ltrunc::Int,                        # truncate to max degree ltrunc
-                                    mtrunc::Int                         # truncate to max order mtrunc
-                                    ) where {NF<:AbstractFloat}         # number format NF
+function spectral_interpolation(    alms::AbstractMatrix{NF},   # spectral field to be truncated
+                                    ltrunc::Int,                # truncate to max degree ltrunc
+                                    mtrunc::Int                 # truncate to max order mtrunc
+                                    ) where NF                  # number format NF (can be complex)
     
     lmax,mmax = size(alms) .- 1    # 0-based degree l, order m of the spherical harmonics
     (ltrunc <= lmax && mtrunc <= mmax) && return spectral_truncation(alms,ltrunc,mtrunc)
-    alms_interp = zeros(Complex{NF},ltrunc+1,mtrunc+1)      # allocate larger array
+    alms_interp = zeros(NF,ltrunc+1,mtrunc+1)               # allocate larger array
     copyto!(@view(alms_interp[1:lmax+1,1:mmax+1]),alms)     # copy over coeffs from alms
     spectral_truncation!(alms_interp,ltrunc,mtrunc)         # set other coeffs to zero
     return alms_interp
 end
 
-spectral_interpolation(alms::AbstractMatrix{Complex{NF}},trunc::Int) where NF = spectral_interpolation(alms,trunc,trunc)
+spectral_interpolation(alms::AbstractMatrix,trunc::Int) = spectral_interpolation(alms,trunc,trunc)

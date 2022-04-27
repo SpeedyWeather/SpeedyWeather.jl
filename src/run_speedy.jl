@@ -25,22 +25,22 @@ function run_speedy(::Type{NF}=Float64;             # number format, use Float64
                     ) where {NF<:AbstractFloat}
 
     # INITALIZE MODEL
-    prog_vars,diag_vars,model_setup = initialize_model(NF;kwargs...)
+    progn_vars,diagn_vars,model_setup = initialize_speedy(NF;kwargs...)
 
     # START MODEL INTEGRATION
-    time_stepping!(prog_vars,diag_vars,model_setup) 
-    return prog_vars                                # return prognostic variables when finished
+    time_stepping!(progn_vars,diagn_vars,model_setup) 
+    return progn_vars, diagn_vars                   # return prognostic variables when finished
 end
 
 """
-    prog_vars, diag_vars, model_setup = initialize_model(NF,kwargs...)
+    prog_vars, diag_vars, model_setup = initialize_speedy(NF,kwargs...)
     
 Initialize the model by returning
 - `prog_vars`, the initial conditions of the prognostic variables
 - `diag_vars`, the preallocated the diagnotic variables (initialised to zero)
 - `model_setup`, the collected pre-calculated structs that don't change throughout integration:
 parametes, constants, geometry, spectral transform, boundaries, diffusion."""
-function initialize_model(::Type{NF}=Float64;       # number format, use Float64 as default
+function initialize_speedy(::Type{NF}=Float64;       # number format, use Float64 as default
                           kwargs...                 # all additional non-default parameters
                           ) where {NF<:AbstractFloat}
 

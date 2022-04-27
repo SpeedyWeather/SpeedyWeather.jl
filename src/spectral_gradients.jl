@@ -2,7 +2,7 @@
 
 #     @unpack nlon, nlat, nlon_half, nlat_half = G
 #     @unpack coslat_NH = G
-#     @unpack R_earth, trunc = P
+#     @unpack radius_earth, trunc = P
 
 #     # SIZE OF SPECTRAL GRID
 #     mx = trunc+1
@@ -43,7 +43,7 @@
 #     # end
 
 #     # LAPLACIANS for harmonic & biharmonic diffusion
-#     ∇²,∇⁻²,∇⁴ = Laplacians(mx,nx,R_earth)
+#     ∇²,∇⁻²,∇⁴ = Laplacians(mx,nx,radius_earth)
 
 #     gradx   = zeros(mx)          #TODO what's this?
 #     uvdx    = zeros(mx, nx)
@@ -60,19 +60,19 @@
 #             m2  = m1 + 1
 #             el1 = m + n - 2
 #             if n == 1
-#                 gradx[m]   = m1/R_earth
-#                 uvdx[m,1]  = -R_earth/(m1 + 1)
+#                 gradx[m]   = m1/radius_earth
+#                 uvdx[m,1]  = -radius_earth/(m1 + 1)
 #                 uvdym[m,1] = 0.0
 #                 vddym[m,1] = 0.0
 #             else
-#                 uvdx[m,n]   = -R_earth*m1/(el1*(el1 + 1.0))
-#                 gradym[m,n] = (el1 - 1.0)*ε[m2,n]/R_earth
-#                 uvdym[m,n]  = -R_earth*ε[m2,n]/el1
-#                 vddym[m,n]  = (el1 + 1.0)*ε[m2,n]/R_earth
+#                 uvdx[m,n]   = -radius_earth*m1/(el1*(el1 + 1.0))
+#                 gradym[m,n] = (el1 - 1.0)*ε[m2,n]/radius_earth
+#                 uvdym[m,n]  = -radius_earth*ε[m2,n]/el1
+#                 vddym[m,n]  = (el1 + 1.0)*ε[m2,n]/radius_earth
 #             end
-#             gradyp[m,n] = (el1 + 2.0)*ε[m2,n+1]/R_earth
-#             uvdyp[m,n]  = -R_earth*ε[m2,n+1]/(el1 + 1.0)
-#             vddyp[m,n]  = el1*ε[m2,n+1]/R_earth
+#             gradyp[m,n] = (el1 + 2.0)*ε[m2,n+1]/radius_earth
+#             uvdyp[m,n]  = -radius_earth*ε[m2,n+1]/(el1 + 1.0)
+#             vddyp[m,n]  = el1*ε[m2,n+1]/radius_earth
 #         end
 #     end
 
@@ -244,21 +244,21 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},   # output: c
     @inbounds for m in 1:mmax         # exclude m=mmax+1 as for m=l=mmax+1 term1=term2=0
 
         # 1. Diagonal (l=m), term 1 = 0 for the l=m modes
-        # coslat_u[m,m] = -R⁻¹*(m+1)*ϵlms[m+1,m]*Ψ[m+1,m]         # recursion term 2 only
-        coslat_u[m,m] = (1-m)*ϵlms[m+1,m]*Ψ[m+1,m]              # recursion term 2 only
+        coslat_u[m,m] = -R⁻¹*(m+1)*ϵlms[m+1,m]*Ψ[m+1,m]         # recursion term 2 only
+        # coslat_u[m,m] = (1-m)*ϵlms[m+1,m]*Ψ[m+1,m]              # recursion term 2 only
 
         # 2. Below diagonal modes (l>m, but l<=lmax)
         for l in m+1:lmax
-            # coslat_u[l,m] = -R⁻¹*(-(l-2)*ϵlms[l  ,m]*Ψ[l-1,m] + # term 1
-            #                        (l+1)*ϵlms[l+1,m]*Ψ[l+1,m])  # term 2
-            coslat_u[l,m] = (l-2)*ϵlms[l  ,m]*Ψ[l-1,m] -        # term 1
-                            (l+1)*ϵlms[l+1,m]*Ψ[l+1,m]          # term 2
+            coslat_u[l,m] = -R⁻¹*(-(l-2)*ϵlms[l  ,m]*Ψ[l-1,m] + # term 1
+                                   (l+1)*ϵlms[l+1,m]*Ψ[l+1,m])  # term 2
+            # coslat_u[l,m] = (l-2)*ϵlms[l  ,m]*Ψ[l-1,m] -        # term 1
+                            # (l+1)*ϵlms[l+1,m]*Ψ[l+1,m]          # term 2
         end
 
         # 3. Last two rows
         for l in lmax+1:lmax+2                                  # recursion term 1 only
-            # coslat_u[l,m] = R⁻¹*(l-2)*ϵlms[l,m]*Ψ[l-1,m]
-            coslat_u[l,m] = (l-2)*ϵlms[l,m]*Ψ[l-1,m]
+            coslat_u[l,m] = R⁻¹*(l-2)*ϵlms[l,m]*Ψ[l-1,m]
+            # coslat_u[l,m] = (l-2)*ϵlms[l,m]*Ψ[l-1,m]
         end
     end
     # coslat_u[end,end] not needed as ϵ(l=m) = 0 in this case (l=lmax+1,m=mmax)
@@ -266,9 +266,40 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},   # output: c
     return coslat_u
 end
 
+function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: cos(lat)*zonal velocity u
+                            Ψ::AbstractMatrix{Complex{NF}},         # input: streamfunction Ψ
+                            S::SpectralTransform{NF},               # 
+                            R::Real=1                               # radius of the sphere/Earth
+                            ) where {NF<:AbstractFloat}             # number format NF
+
+    _,mmax = size(Ψ)                # degree l, order m of spherical harmonics
+    lmax, mmax = mmax-1, mmax-1     # convert to 0-based l,m, but use mmax for lmax/lmax+1 flexibility
+    
+    # u needs one more degree/meridional mode l for each m than Ψ due to the recursion
+    # Ψ can have size n+1 x n but then the last row is not used in the loop
+    size_compat = size(coslat_u) == size(Ψ) || (size(coslat_u) .- (1,0)) == size(Ψ)
+    @boundscheck size_compat || throw(BoundsError)
+    R⁻¹ = convert(Complex{NF},1/R)                              # 1/radius of the sphere
+
+    @unpack grad_y1, grad_y2 = S
+
+    coslat_u[1,1] = grad_y2[1,1]*Ψ[2,1]*R⁻¹
+
+    for m in 1:mmax
+        for l in max(2,m):lmax
+            coslat_u[l,m] = (grad_y1[l,m]*Ψ[l-1,m] + grad_y2[l,m]*Ψ[l+1,m])*R⁻¹
+        end
+        for l in lmax+1:lmax+2
+            coslat_u[l,m] = grad_y1[l,m]*Ψ[l-1,m]*R⁻¹
+        end
+    end
+
+    return coslat_u
+end
+
 """gradient_latitude! but precalculate the recursion factors `ϵlms` in case they are not provided."""
-function gradient_latitude!(coslat_u::AbstractArray{Complex{NF}},   # output: cos(lat)*u
-                            Ψ::AbstractArray{Complex{NF}},          # input: streamfunction Ψ
+function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: cos(lat)*u
+                            Ψ::AbstractMatrix{Complex{NF}},         # input: streamfunction Ψ
                             R::Real=1                               # radius of the sphere/Earth
                             ) where {NF<:AbstractFloat}             # number format NF
     _,mmax = size(Ψ) .- 1                                           # degree l, order m of spherical harmonics   
@@ -276,7 +307,7 @@ function gradient_latitude!(coslat_u::AbstractArray{Complex{NF}},   # output: co
     return gradient_latitude!(coslat_u,Ψ,ϵlms,R)                    # call in-place function
 end
 
-function gradient_latitude( Ψ::AbstractArray{Complex{NF}},  # input: streamfunction Ψ
+function gradient_latitude( Ψ::AbstractMatrix{Complex{NF}}, # input: streamfunction Ψ
                             R::Real=1                       # radius of the sphere/Earth
                             ) where {NF<:AbstractFloat}     # number format NF
     _,mmax = size(Ψ) .- 1                                   # max degree l, order m of spherical harmonics
@@ -284,82 +315,110 @@ function gradient_latitude( Ψ::AbstractArray{Complex{NF}},  # input: streamfunc
     return gradient_latitude!(coslat_u,Ψ,R)                 # call in-place version
 end
 
-"""
-    coslat_∂alms_∂lon = gradient_longitude!(  coslat_∂alms_∂lon::AbstractMatrix{Complex{NF}},
-                                            alms::AbstractMatrix{Complex{NF}};
-                                            R::Real=1
-                                            ) where {NF<:AbstractFloat}
+function gradient_latitude( Ψ::AbstractMatrix{Complex{NF}}, # input: streamfunction Ψ
+                            S::SpectralTransform{NF},
+                            R::Real=1                       # radius of the sphere/Earth
+                            ) where {NF<:AbstractFloat}     # number format NF
+    _,mmax = size(Ψ) .- 1                                   # max degree l, order m of spherical harmonics
+    coslat_u = zeros(Complex{NF},mmax+2,mmax+1)             # preallocate output, one more l for recursion
+    return gradient_latitude!(coslat_u,Ψ,S,R)               # call in-place version
+end
 
-Zonal gradient in spectral space of spherical harmonic coefficients `alms` on a sphere with radius `R`.
+"""
+    coslat_v = gradient_longitude!( coslat_v::AbstractMatrix{Complex{NF}},
+                                    Ψ::AbstractMatrix{Complex{NF}};
+                                    R::Real=1
+                                    ) where {NF<:AbstractFloat}
+
+Zonal gradient in spectral space of spherical harmonic coefficients `Ψ` on a sphere with radius `R`.
 While the zonal gradient is 1/coslat*∂/∂lon in spherical coordinates, this functions omits the 1/coslat scaling
 such that the return array is coslat*∂alms/∂lon.
 """
-function gradient_longitude!(   coslat_∂alms_∂lon::AbstractMatrix{Complex{NF}}, # output: coslat*zonal gradient
-                                alms::AbstractMatrix{Complex{NF}},          # input: spectral coefficients
-                                R::Real=1                                   # radius of the sphere/Earth
-                                ) where {NF<:AbstractFloat}                 # number format NF
+function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # output: cos(latitude)*meridional velocity
+                                Ψ::AbstractMatrix{Complex{NF}},         # input: spectral coefficients of stream function
+                                R::Real=1                               # radius of the sphere/Earth
+                                ) where {NF<:AbstractFloat}             # number format NF
 
-    @boundscheck size(alms) == size(coslat_∂alms_∂lon) || throw(BoundsError)
-    lmax,mmax = size(alms) .- 1                         # maximum degree l, order m of spherical harmonics
-    iR⁻¹ = convert(Complex{NF},im/R)                    # = imaginary/radius converted to NF
+    lmax,mmax = size(Ψ)     # 1-based max degree l, order m of spherical harmonics
+    @boundscheck (lmax+1,mmax) == size(coslat_v) || throw(BoundsError)
+    lmax -= 1               # convert to 0-based
+    mmax -= 1  
 
-    @inbounds for m in 1:mmax+1                         # loop over all coefficients, order m
-        for l in m:lmax+1                               # degree l
-            coslat_∂alms_∂lon[l,m] = (m-1)*iR⁻¹*alms[l,m] # gradient in lon = *i*m/R but order m is 1-based
+    iR⁻¹ = convert(Complex{NF},im/R)            # = imaginary/radius converted to NF
+
+    @inbounds for m in 1:mmax+1                 # loop over all coefficients, order m
+        for l in m:lmax+1                       # degree l
+            coslat_v[l,m] = (m-1)*iR⁻¹*Ψ[l,m]   # gradient in lon = *i*m/R but order m is 1-based
         end
+        coslat_v[end,m] = zero(Complex{NF})     # grad in lon does not project onto the last degree
     end
 
-    return coslat_∂alms_∂lon
+    return coslat_v
 end
+
+# function gradient_longitude!(   coslat_∂alms_∂lon::AbstractMatrix{Complex{NF}}, # output: coslat*zonal gradient
+#                                 alms::AbstractMatrix{Complex{NF}},          # input: spectral coefficients
+#                                 S::SpectralTransform,
+#                                 R::Real=1                                   # radius of the sphere/Earth
+#                                 ) where {NF<:AbstractFloat}                 # number format NF
+
+#     lmax,mmax = size(alms) .- 1                             # maximum degree l, order m of spherical harmonics
+#     @unpack gradx = S
+    
+#     @boundscheck size(gradx) == size(alms) || throw(BoundsError)
+#     @boundscheck size(gradx) == size(coslat_∂alms_∂lon) || throw(BoundsError)
+
+#     R⁻¹ = convert(NF,1/R)
+
+#     @inbounds for m in 1:mmax+1                         # loop over all coefficients, order m
+#         for l in m:lmax+1                               # degree l
+#             coslat_∂alms_∂lon[l,m] = R⁻¹*gradx[l,m]*alms[l,m] # gradient in lon = *i*m/R
+#         end
+#     end
+
+#     return coslat_∂alms_∂lon
+# end
+
 
 """Gradient in longitude in spectral space. Input: coefficients `alms` of the spherical harmonics."""
-function gradient_longitude(alms::AbstractMatrix{Complex{NF}},  # input array: spectral coefficients
-                            R::Real=1                           # radius of the sphere/Earth
-                            ) where NF                          # number format NF
-    ∂alms_∂lon = zero(alms)                             # preallocate output array (gradient in longitude)
-    return gradient_longitude!(∂alms_∂lon,alms,R)       # call in-place version
+function gradient_longitude(Ψ::AbstractMatrix{NF},  # input array: spectral coefficients
+                            R::Real=1;              # radius of the sphere/Earth
+                            one_more_l::Bool=true   # allocate output with one more degree l
+                            ) where NF              # number format NF
+    lmax,mmax = size(Ψ)
+    coslat_v = zeros(NF,lmax+one_more_l,mmax)       # preallocate output array (gradient in longitude)
+    return gradient_longitude!(coslat_v,Ψ,R)        # call in-place version
 end
 
-"""Spectral tendency of ∇⋅(uv*ω) from vector uv=(u,v) in grid space and absolute vorticity ω.
-Step 1 (grid space): Add Coriolis f to the relative vorticity ζ (=`vor_grid`) to obtain abs vorticity ω.
-Step 2 (grid space): Multiply u,v with abs vorticity ω.
-Step 3 (grid space): Unscale with coslat, cosine of latitude, as the gradients will include a coslat term.
-Step 4 (spectral space): convert uω/coslat, vω/coslat from grid to spectral space
-Step 5 (spectral space): Compute gradients ∂/∂lon(uω/coslat) and ∂/∂lat(vω/coslat)
-Step 6 (spectral space): Add ∂/∂lon(uω/coslat)+∂/∂θ(vω/coslat) and return.
-"""
-function divergence_uvω_spectral(   u_grid::AbstractMatrix{NF},     # zonal velocity in grid space
-                                    v_grid::AbstractMatrix{NF},     # meridional velocity in grid space
-                                    vor_grid::AbstractMatrix{NF},   # relative vorticity in grid space       
-                                    G::GeoSpectral{NF}              # struct with geometry and spectral transform
-                                    ) where {NF<:AbstractFloat}
+function unscale_coslat!(   A::AbstractMatrix{NF},
+                            G::Geometry{NF}) where NF
+    
+    nlon, nlat = size(A)
+    @boundscheck nlat == G.nlat || throw(BoundsError)
 
-    nlon,nlat = size(u_grid)
-    @boundscheck size(u_grid) == size(v_grid) || throw(BoundsError)
-
-    @unpack f_coriolis,coslat⁻¹ = G.geometry
-
-    uω_grid_coslat⁻¹ = zero(u_grid)                             # TODO preallocate elsewhere
-    vω_grid_coslat⁻¹ = zero(v_grid)
+    @unpack coslat⁻¹ = G
 
     @inbounds for j in 1:nlat
         for i in 1:nlon
-            ω = vor_grid[i,j] + f_coriolis[j]                   # = relative vorticity + coriolis
-            uω_grid_coslat⁻¹[i,j] = ω*u_grid[i,j]*coslat⁻¹[j]   # = u(vor+f)/cos(ϕ)
-            vω_grid_coslat⁻¹[i,j] = ω*v_grid[i,j]*coslat⁻¹[j]   # = v(vor+f)/cos(ϕ)
+            A[i,j] *= coslat⁻¹[j]
         end
     end
-
-    # TODO preallocate returned coefficients elsewhere
-    uω_coslat⁻¹ = spectral(uω_grid_coslat⁻¹,G.spectral,one_more_l=true)         
-    vω_coslat⁻¹ = spectral(vω_grid_coslat⁻¹,G.spectral,one_more_l=true)
-    
-    ∂uω_∂lon = gradient_longitude(uω_coslat⁻¹)                  # spectral gradients
-    ∂vω_∂lat = gradient_latitude(vω_coslat⁻¹)
-
-    return ∂uω_∂lon + ∂vω_∂lat                                  # add for divergence
 end
 
+function scale_coslat!( A::AbstractMatrix{NF},
+                        G::Geometry{NF}) where NF
+    
+    nlon, nlat = size(A)
+    @boundscheck nlat == G.nlat || throw(BoundsError)
+
+    @unpack coslat = G
+
+    @inbounds for j in 1:nlat
+        for i in 1:nlon
+            A[i,j] *= coslat[j]
+        end
+    end
+end
 
 """
     ∇²!(∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacian of alms
@@ -524,6 +583,18 @@ function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{NF}},   # Output: inve
     return ∇⁻²alms
 end
 
+function ∇⁻²!(  ∇⁻²alms::AbstractArray{Complex{NF},3},  # Output: inverse Laplacian of alms
+                alms::AbstractArray{Complex{NF},3},     # spectral coefficients
+                R::Real                                 # radius of the sphere/Earth
+                ) where {NF<:AbstractFloat}
+
+    for k in 1:size(alms)[end]
+        ∇⁻²alms_layer = view(∇⁻²alms,:,:,k)
+        alms_layer = view(alms,:,:,k)
+        ∇⁻²!(∇⁻²alms_layer,alms_layer,R)
+    end
+end
+
 """
     ∇⁻²alms = ∇⁻²(alms::AbstractMatrix{Complex},R::Real=1)
 
@@ -534,4 +605,19 @@ function ∇⁻²(   alms::AbstractMatrix{Complex{NF}},  # spectral coefficients
                 R::Real=1) where NF                 # radius of the Earth
     ∇⁻²alms = copy(alms)                            # preallocate output
     return R == 1 ? ∇⁻²!(∇⁻²alms,alms) : ∇⁻²!(∇⁻²alms,alms,R)
+end
+
+for func_name in (:gradient_longitude!, :gradient_latitude!)
+    @eval begin
+        function $func_name(Out::AbstractArray{NF1,3},
+                            In::AbstractArray{NF2,3},
+                            args...) where {NF1,NF2}
+            
+            for k in 1:size(Out)[end]
+                Out_layer = view(Out,:,:,k)
+                In_layer = view(In,:,:,k)
+                $func_name(Out_layer,In_layer,args...)
+            end
+        end
+    end
 end

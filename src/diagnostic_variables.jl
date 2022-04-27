@@ -18,11 +18,11 @@ function Tendencies(G::GeoSpectral{NF}) where NF
     @unpack nlon,nlat,nlev = G.geometry     # number of longitudes, latitudes, vertical levels
 
     # one more l for recursion in meridional gradients
-    vor_tend         = zeros(Complex{NF},lmax+2,mmax+1,nlev)    # vorticity
-    div_tend         = zeros(Complex{NF},lmax+2,mmax+1,nlev)    # divergence
-    temp_tend        = zeros(Complex{NF},lmax+2,mmax+1,nlev)    # absolute Temperature
-    pres_surf_tend   = zeros(Complex{NF},lmax+2,mmax+1)         # logarithm of surface pressure
-    humid_tend       = zeros(Complex{NF},lmax+2,mmax+1,nlev)    # specific humidity
+    vor_tend         = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # vorticity
+    div_tend         = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # divergence
+    temp_tend        = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # absolute Temperature
+    pres_surf_tend   = zeros(Complex{NF},lmax+1,mmax+1)         # logarithm of surface pressure
+    humid_tend       = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # specific humidity
     u_tend           = zeros(NF,nlon,nlat,nlev)                 # zonal velocity
     v_tend           = zeros(NF,nlon,nlat,nlev)                 # meridonal velocity
 
@@ -67,8 +67,13 @@ function GridVariables(G::GeoSpectral{NF}) where NF
 end
 
 """Struct holding intermediate quantities that are used and shared when calculating tendencies"""
-struct IntermediateTendencyVariables{NF<:AbstractFloat}
+struct IntermediateVariables{NF<:AbstractFloat}
     
+    ### USED FOR THE BAROTROPIC VORITICITY EQUATION
+    stream_function ::Array{Complex{NF},3}
+    coslat_u        ::Array{Complex{NF},3}
+    coslat_v        ::Array{Complex{NF},3}
+
     ###------Defined in surface_pressure_tendency!()
     u_mean             ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
     v_mean             ::Array{NF,2}  # Mean gridpoint meridional velocity over all levels
@@ -99,12 +104,17 @@ struct IntermediateTendencyVariables{NF<:AbstractFloat}
 end
 
 """
-Generator function for the IntermediateTendencyVariables struct. Initialises with zeros.
+Generator function for the IntermediateVariables struct. Initialises with zeros.
 """
-function IntermediateTendencyVariables(G::GeoSpectral{NF}) where NF
+function IntermediateVariables(G::GeoSpectral{NF}) where NF
 
     @unpack nlon,nlat,nlev = G.geometry         # number of longitudes, latitudes, vertical levels
     @unpack lmax, mmax = G.spectral             # 0-based max degree l, order m of the spherical harmonics
+
+    # BAROTROPIC VORTIICTY EQUATION
+    stream_function = zeros(Complex{NF},lmax+1,mmax+1,nlev)
+    coslat_u = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    coslat_v = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
     u_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint zonal velocity over all levels
     v_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint meridional velocity over all levels
@@ -131,27 +141,28 @@ function IntermediateTendencyVariables(G::GeoSpectral{NF}) where NF
     dumk                        = zeros(Complex{NF},lmax+2,mmax+1,nlev+1)  
     spectral_geopotential       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
-    return IntermediateTendencyVariables(   u_mean,v_mean,div_mean,
-                                            pres_surf_gradient_spectral_x,pres_surf_gradient_spectral_y,
-                                            pres_surf_gradient_grid_x,pres_surf_gradient_grid_y,
-                                            sigma_tend,sigma_m,puv,sigma_u,L2_velocity_complex,
-                                            vertical_mean_divergence,sigdtc,dumk,spectral_geopotential)
+    return IntermediateVariables(   stream_function, coslat_u, coslat_v,
+                                    u_mean,v_mean,div_mean,
+                                    pres_surf_gradient_spectral_x,pres_surf_gradient_spectral_y,
+                                    pres_surf_gradient_grid_x,pres_surf_gradient_grid_y,
+                                    sigma_tend,sigma_m,puv,sigma_u,L2_velocity_complex,
+                                    vertical_mean_divergence,sigdtc,dumk,spectral_geopotential)
 end
 
 """Struct holding the diagnostic variables."""
 struct DiagnosticVariables{NF<:AbstractFloat}
     tendencies             ::Tendencies{NF}
     grid_variables         ::GridVariables{NF}
-    intermediate_variables ::IntermediateTendencyVariables{NF}
+    intermediate_variables ::IntermediateVariables{NF}
 end
 
 """Generator function for Diagnostic Variables """
 function DiagnosticVariables(G::GeoSpectral)
-    tendencies_struct             = Tendencies(G)
-    grid_variables_struct         = GridVariables(G)
-    intermediate_variables_struct = IntermediateTendencyVariables(G)
-    return DiagnosticVariables( tendencies_struct,
-                                grid_variables_struct,
-                                intermediate_variables_struct)
+    tendencies             = Tendencies(G)
+    grid_variables         = GridVariables(G)
+    intermediate_variables = IntermediateVariables(G)
+    return DiagnosticVariables( tendencies,
+                                grid_variables,
+                                intermediate_variables)
 end
 

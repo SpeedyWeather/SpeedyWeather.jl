@@ -10,6 +10,7 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     nlev::Int           # Number of vertical levels
     nlat_half::Int      # Number of latitudes in one hemisphere
     nlon_half::Int      # Half the number of longitudes
+    radius_earth::Real  # Earth's radius [m]
 
     dlon::NF            # grid spacing in longitude
     dlat::NF            # average grid spacing in latitude
@@ -55,8 +56,8 @@ function Geometry(P::Parameters)
 
     # number of longitudes, latitudes, vertical levels, spectral truncation
     @unpack nlon, nlat, nlev, trunc = P     
-    @unpack R_earth,Ω,akap = P          # radius of earth, angular frequency, ratio of gas consts
-    @unpack n_stratosphere_levels = P   # number of vertical levels used for stratosphere
+    @unpack radius_earth, rotation_earth, akap = P       # radius of earth, angular frequency, ratio of gas consts
+    @unpack n_stratosphere_levels = P       # number of vertical levels used for stratosphere
 
     nlat_half = nlat ÷ 2
     nlon_half = nlon ÷ 2
@@ -90,15 +91,15 @@ function Geometry(P::Parameters)
     coslat⁻¹ = 1 ./ coslat
 
     # CORIOLIS FREQUENCY
-    f_coriolis = 2Ω*sinlat
+    f_coriolis = 2rotation_earth*sinlat
 
     # GEOPOTENTIAL coefficients to calculate geopotential (TODO reference)
     xgeop1 = zeros(nlev)
     xgeop2 = zeros(nlev)
     for k in 1:nlev
-        xgeop1[k] = R_earth*log(σ_levels_half[k+1]/σ_levels_half[k])
+        xgeop1[k] = radius_earth*log(σ_levels_half[k+1]/σ_levels_half[k])
         if k != nlev
-            xgeop2[k+1] = R_earth*log(σ_levels_full[k+1]/σ_levels_half[k+1])
+            xgeop2[k+1] = radius_earth*log(σ_levels_full[k+1]/σ_levels_half[k+1])
         end
     end
 
@@ -117,7 +118,7 @@ function Geometry(P::Parameters)
     # tref3=fsgr.*tref #this actually is the correct definition. Needs better naming convention 
 
     # conversion to number format NF happens here
-    Geometry{P.NF}( nlon,nlat,nlev,nlat_half,nlon_half,
+    Geometry{P.NF}( nlon,nlat,nlev,nlat_half,nlon_half,radius_earth,
                     dlon,dlat,lon,lond,lat,latd,colat,colatd,
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,

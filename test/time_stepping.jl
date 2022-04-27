@@ -14,19 +14,21 @@
         C = Constants(P)
 
         # INITIAL CONDITIONS
-        # with 3x3x2 some spectral coeffs, x2 for leapfrog dimension
+        # with lmax x mmax x nleapfrog x nlev
         X = ones(Complex{NF},3,3,2,2)
         
         # store only 1 of the 3x3x2 values (all the same) per time step
         Xout = zeros(Complex{NF},n_timesteps+1)
 
         # exact 2nd leapfrog step 
-        X[:,:,:,2] = X[:,:,:,1]*Complex{NF}(exp(im*ω*Δt))
+        X[:,:,2,:] = X[:,:,1,:]*Complex{NF}(exp(im*ω*Δt))
         Xout[1] = X[1,1,1,1]      # store initial conditions
 
         # leapfrog forward
+        lf = 2  # leapfrog index to be used for tendency
         for i in 2:n_timesteps+1
-            SpeedyWeather.leapfrog!(X,F.(X[:,:,:,2],NF(ω)),NF(2Δt),2,C)
+            # always evaluate F with lf=2
+            SpeedyWeather.leapfrog!(X,F.(X[:,:,lf,:],NF(ω)),NF(2Δt),C)
             Xout[i] = X[1,1,1,1]
         end
 
@@ -45,7 +47,7 @@
         C = Constants(P)
 
         # INITIAL CONDITIONS
-        # with 3x3 some spectral coeffs, x2 for leapfrog dimension
+        # with lmax x mmax x nleapfrog
         X = ones(Complex{NF},3,3,2)
         
         # store only 1 of the 3x3 values (all the same) per time step
@@ -56,8 +58,9 @@
         Xout[1] = X[1,1,1]      # store initial conditions
 
         # leapfrog forward
+        lf = 2  # leapfrog index to be used for tendency
         for i in 2:n_timesteps+1
-            SpeedyWeather.leapfrog!(X,F.(X[:,:,2],NF(ω)),NF(2Δt),2,C)
+            SpeedyWeather.leapfrog!(X,F.(X[:,:,lf],NF(ω)),NF(2Δt),C)
             Xout[i] = X[1,1,1]
         end
 
@@ -82,7 +85,7 @@
 
         # leapfrog forward
         for i in 2:n_timesteps+1
-            SpeedyWeather.leapfrog!(X,F.(X[:,:,2],NF(ω)),NF(2Δt),2,C)
+            SpeedyWeather.leapfrog!(X,F.(X[:,:,lf],NF(ω)),NF(2Δt),C)
             Xout[i] = X[1,1,1]
         end
 

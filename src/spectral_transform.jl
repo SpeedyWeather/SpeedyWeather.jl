@@ -33,6 +33,11 @@ struct SpectralTransform{NF<:AbstractFloat}
 
     # RECURSION FACTORS
     ϵlms::Array{NF}
+
+    # GRADIENT MATRICES
+    grad_x::Matrix{NF}              # precomputed zonal gradient factors
+    grad_y1::Matrix{NF}             # precomputed meridional gradient factors, term 1
+    grad_y2::Matrix{NF}             # term 2
 end
 
 """
@@ -93,7 +98,27 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
     legendre_weights *= norm_forward        # extra normalisation for forward transform included
 
     # RECURSION FACTORS
-    ϵlms = get_recursion_factors(lmax,mmax)
+    ϵlms = get_recursion_factors(lmax+1,mmax)
+
+    # GRADIENTS
+    gradx = zeros(NF,lmax+2,mmax+1)
+    grad_y1 = zeros(NF,lmax+2,mmax+1)    # term 1
+    grad_y2 = zeros(NF,lmax+2,mmax+1)    # term 2
+
+    for m in 0:mmax
+        gradx[:,m+1] .= m
+    end 
+
+    for m in 0:mmax
+        for l in m:lmax+1
+            grad_y1[l+1,m+1] = (l-1)*ϵlms[l+1,m+1]
+            grad_y2[l+1,m+1] = -(l+2)*ϵlms[l+2,m+1]
+        end
+    end
+
+    spectral_truncation!(gradx, lmax+1,mmax)
+    spectral_truncation!(grad_y1,lmax+1,mmax)
+    spectral_truncation!(grad_y2,lmax+1,mmax)
         
     # conversion to NF happens here
     SpectralTransform{NF}(  lmax,mmax,nfreq,
@@ -103,7 +128,7 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
                             rfft_plan,brfft_plan,
                             recompute_legendre,Λ,Λs,
                             legendre_weights,
-                            ϵlms)
+                            ϵlms,gradx,grad_y1,grad_y2)
 end
 
 """Generator function for a SpectralTransform struct in case the number format is not provided.
@@ -250,6 +275,18 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
     return map
 end
 
+function gridded!(  map::AbstractArray{NF,3},
+                    alms::AbstractArray{Complex{NF},3},
+                    S::SpectralTransform{NF}
+                    ) where {NF<:AbstractFloat}
+    
+    for k in 1:size(alms)[end]
+        map_layer = view(map,:,:,k)
+        alms_layer = view(alms,:,:,k)
+        gridded!(map_layer,alms_layer,S)
+    end
+end
+
 """
     map = gridded(alms)
 
@@ -343,6 +380,18 @@ function spectral!( alms::AbstractMatrix{Complex{NF}},
     end
 
     return alms
+end
+
+function spectral!( alms::AbstractArray{Complex{NF},3},
+                    map::AbstractArray{NF,3},
+                    S::SpectralTransform{NF}
+                    ) where {NF<:AbstractFloat}
+    
+    for k in 1:size(alms)[end]
+        alms_layer = view(alms,:,:,k)
+        map_layer = view(map,:,:,k)
+        spectral!(alms_layer,map_layer,S)
+    end
 end
 
 """
