@@ -95,7 +95,35 @@ julia> spectral(map)                   # back to spectral space
  0.0+0.0im  0.0+0.0im          0.0+0.0im
 ```
 
-and we have reobtained the ``l=m=1`` spheri
+and we have successfully reobtained the ``l=m=1`` spherical harmonic.
+
+## Available horizontal resolutions
+
+SpeedyWeather.jl uses triangular truncation such that only spherical harmonics with ``l \leq l_{max}`` and ``|m| \leq m_{max}``
+are explicitly represented. This is usually described as ``Tm_{max}``, with ``l_{max} = m_{max}`` (although in vector quantities
+require one more degree ``l`` in the recursion relation of meridional gradients). For example, T31 is the spectral resolution
+with ``l_{max} = m_{max} = 31``. Note that the degree ``l`` and order ``m`` are mathematically 0-based, such that the
+corresponding coefficient matrix is of size 32x32.
+
+Using triangular truncation, there are constraints on the corresponding grid resolution. Let `nlon`, `nlat` be the number of
+longitudes, latitudes on a regular Gaussian grid. Then spectral and grid resolution have to be chosen such that
+
+- ``nlon \geq 3l_{max}+1``
+- ``nlat \geq (3l_{max}+1)/2``
+
+In general, we choose ``nlon = 2nlat``, and ideally ``nlon`` is easily Fourier-transformable, e.g. ``nlon = 2^i3^j5^k`` with some
+integers ``i,j,k``. SpeedyWeather.jl is tested at the following horizontal resolutions
+
+| ``l_max``   | nlon | nlat |
+| ----------- | ---- | ---- |
+| 31 (default)| 96   | 48   |
+| 42          | 128  | 64   |
+| 85          | 256  | 128  |
+| 170         | 512  | 256  |
+| 341         | 1024 | 512  |
+| 682         | 2048 | 1024 |
+
+Choosing `trunc` as argument in `run_speedy` will automatically choose `nlon`,`nlat` as presented in the table.
 
 ## References
 
