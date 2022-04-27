@@ -1,7 +1,7 @@
-# Spectral Transform
+# Spherical Harmonic Transform
 
-The following sections outline the implementation of the spectral transform between the coefficients of 
-the spherical harmonics (the _spectral_ space) and the grid space on a longitude-latitude
+The following sections outline the implementation of the spherical harmonic transform (in short _spectral_ transform)
+between the coefficients of the spherical harmonics (the _spectral_ space) and the grid space on a longitude-latitude
 [regular Gaussian grid](https://confluence.ecmwf.int/display/FCST/Gaussian+grids).
 
 ## Inspiration
@@ -9,11 +9,11 @@ the spherical harmonics (the _spectral_ space) and the grid space on a longitude
 The spectral transform implemented by SpeedyWeather.jl follows largely Justin Willmert's
 [CMB.jl](https://github.com/jmert/CMB.jl) package and makes use of
 [AssociatedLegendrePolynomials.jl](https://github.com/jmert/AssociatedLegendrePolynomials.jl) and
-[FFTW.jl](https://github.com/JuliaMath/FFTW.jl)/[FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) for the Fourier transform. Justin's work is described in a Blog series [^1]
+[FFTW.jl](https://github.com/JuliaMath/FFTW.jl)/[FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) for the Fourier transform. Justin described his work in a Blog series [^1]``^-``[^8],[^1],[^1],[^1],[^1],[^1],[^1],[^1]
 
 ## Spherical harmonics
 
-The [spherical harmonics](https://en.wikipedia.org/wiki/Spherical_harmonics) $Y_{lm}$ of order $l$ and degree $m$
+The [spherical harmonics](https://en.wikipedia.org/wiki/Spherical_harmonics) ``Y_{lm}`` of degree ``l`` and order ``m``
 over the longitude $\theta = (0,2\pi)$ and latitude $\phi = (-\tfrac{\pi}{2},\tfrac{\pi}{2})$, or
 using colatitudes $\phi = (0,\pi)$, are
 
@@ -21,7 +21,8 @@ $$
 Y_{lm}(\theta,\phi) = \lambda_l^m(\cos\theta) e^{im\phi}
 $$
 
-with $\lambda_l^m$ being the pre-normalized associated Legendre polynomials, and $e^{im\phi}$ are the complex exponentials (the Fourier modes). Together they form a set of orthogonal basis functions on the sphere.
+with $\lambda_l^m$ being the pre-normalized associated Legendre polynomials, and $e^{im\phi}$ are the
+complex exponentials (the Fourier modes). Together they form a set of orthogonal basis functions on the sphere.
 
 ## Synthesis or inverse spectral transform (spectral to grid)
 
@@ -34,30 +35,6 @@ $$
 $$
 \hat{a}_{lm} = \sum_{i=1}^N f(\theta_i,\phi_i) Y_{lm}(\theta_i,\phi_i) \sin(\theta_i) \Delta \theta_i \Delta \phi_i
 $$
-
-## Examples
-
-```julia
-julia> using SpeedyWeather
-julia> alms = zeros(ComplexF64,3,3)    # spectral coefficients
-julia> alms[2,2] = 1                   # only l=1,m=1 Legendre polynomial
-julia> map = gridded(alms)             # convert to grid space
-8×4 Matrix{Float64}:
- -0.324541  -0.600363  -0.600363  -0.324541
- -0.134429  -0.248678  -0.248678  -0.134429
-  0.134429   0.248678   0.248678   0.134429
-  0.324541   0.600363   0.600363   0.324541
-  0.324541   0.600363   0.600363   0.324541
-  0.134429   0.248678   0.248678   0.134429
- -0.134429  -0.248678  -0.248678  -0.134429
- -0.324541  -0.600363  -0.600363  -0.324541
- 
-julia> spectral(map)                   # back to spectral space
-3×3 Matrix{ComplexF64}:
- 0.0+0.0im  0.0+0.0im          0.0+0.0im
- 0.0+0.0im  1.0+3.60727e-17im  0.0+0.0im
- 0.0+0.0im  0.0+0.0im          0.0+0.0im
-```
 
 ## Spectral packing
 
@@ -91,6 +68,30 @@ Alternative packing
 | |3|5|8| |
 | |6|9| | |
 | |10| | | |
+
+## Examples
+
+```julia
+julia> using SpeedyWeather
+julia> alms = zeros(ComplexF64,3,3)    # spectral coefficients
+julia> alms[2,2] = 1                   # only l=1,m=1 Legendre polynomial
+julia> map = gridded(alms)             # convert to grid space
+8×4 Matrix{Float64}:
+ -0.324541  -0.600363  -0.600363  -0.324541
+ -0.134429  -0.248678  -0.248678  -0.134429
+  0.134429   0.248678   0.248678   0.134429
+  0.324541   0.600363   0.600363   0.324541
+  0.324541   0.600363   0.600363   0.324541
+  0.134429   0.248678   0.248678   0.134429
+ -0.134429  -0.248678  -0.248678  -0.134429
+ -0.324541  -0.600363  -0.600363  -0.324541
+ 
+julia> spectral(map)                   # back to spectral space
+3×3 Matrix{ComplexF64}:
+ 0.0+0.0im  0.0+0.0im          0.0+0.0im
+ 0.0+0.0im  1.0+3.60727e-17im  0.0+0.0im
+ 0.0+0.0im  0.0+0.0im          0.0+0.0im
+```
 
 ## References
 
