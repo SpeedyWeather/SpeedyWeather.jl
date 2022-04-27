@@ -78,7 +78,7 @@ function leapfrog!( progn::PrognosticVariables{NF},         # all prognostic var
 end    
 
 """Call initialization of semi-implicit scheme and perform initial time step."""
-function first_timestep!(   progn::PrognosticVariables{NF}, # all prognostic variables
+function first_timesteps!(  progn::PrognosticVariables{NF}, # all prognostic variables
                             diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                             M::ModelSetup                   # everything that is constant at runtime
                             ) where NF
@@ -132,7 +132,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     get_tendencies!(diagn,progn,M,lf2)                   
 
     # DIFFUSION FOR WIND
-    vor_lf = view(vor,:,:,1,:)                                    # array view for leapfrog index
+    vor_lf = view(vor,:,:,1,:)                                      # array view for leapfrog index
     # div_l1 = view(div,:,:,1,:)                                    # TODO l1/l2 dependent?
     horizontal_diffusion!(vor_tend,vor_lf,damping,damping_impl)     # diffusion of vorticity
     # horizontal_diffusion!(div_l1,div_tend,dmpd,dmp1d)             # diffusion of divergence
@@ -183,7 +183,7 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
 
     progn.vor[4,3,1,:] .= 5e-6
     lmax, mmax = 15,15
-    progn.vor[1:lmax,1:mmax,1,:] += 1e-7*randn(Complex{NF},lmax,mmax,M.parameters.nlev)
+    progn.vor[1:lmax,1:mmax,1,:] .+= 1e-7*randn(Complex{NF},lmax,mmax,M.parameters.nlev)
     spectral_truncation!(progn.vor[:,:,1,:],M.parameters.trunc)
     
     gridded!(diagn,progn,M,1)
@@ -193,7 +193,7 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
     netcdf_file = initialize_netcdf_output(diagn,feedback,M)
 
     # FIRST TIMESTEP: EULER FORWARD THEN LEAPFROG IN MAIN LOOP
-    time_sec = first_timestep!(progn,diagn,M)
+    time_sec = first_timesteps!(progn,diagn,M)
 
     for i in 1:n_timesteps
         time_sec += Δt_sec

@@ -9,7 +9,7 @@
     n_timesteps = round(Int,2π*n_rotations/(ω*Δt))
 
     # loop over different precisions
-    for NF in (Float16,Float32,Float64)
+    for NF in (Float32,Float64)
         P = Parameters(NF=NF)
         C = Constants(P)
 
@@ -40,7 +40,7 @@
     n_rotations = 10
     n_timesteps = round(Int,2π*n_rotations/(ω*Δt))
 
-    for NF in (Float16,Float32,Float64)
+    for NF in (Float32,Float64)
         P = Parameters(NF=NF)
         C = Constants(P)
 
