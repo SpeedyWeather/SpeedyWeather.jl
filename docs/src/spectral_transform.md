@@ -9,38 +9,40 @@ between the coefficients of the spherical harmonics (the _spectral_ space) and t
 The spectral transform implemented by SpeedyWeather.jl follows largely Justin Willmert's
 [CMB.jl](https://github.com/jmert/CMB.jl) package and makes use of
 [AssociatedLegendrePolynomials.jl](https://github.com/jmert/AssociatedLegendrePolynomials.jl) and
-[FFTW.jl](https://github.com/JuliaMath/FFTW.jl)/[FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) for the Fourier transform. Justin described his work in a Blog series [^1]``^-``[^8],[^1],[^1],[^1],[^1],[^1],[^1],[^1]
+[FFTW.jl](https://github.com/JuliaMath/FFTW.jl)/[FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) for the Fourier transform. Justin described his work in a Blog series [^1],[^2],[^3],[^4],[^5],[^6],[^7],[^8]
 
 ## Spherical harmonics
 
 The [spherical harmonics](https://en.wikipedia.org/wiki/Spherical_harmonics) ``Y_{lm}`` of degree ``l`` and order ``m``
-over the longitude $\theta = (0,2\pi)$ and latitude $\phi = (-\tfrac{\pi}{2},\tfrac{\pi}{2})$, or
-using colatitudes $\phi = (0,\pi)$, are
+over the longitude ``\theta = (0,2\pi)`` and latitude ``\phi = (-\tfrac{\pi}{2},\tfrac{\pi}{2})`` (or
+using colatitudes ``\phi = (0,\pi)``), are
 
-$$
+```math
 Y_{lm}(\theta,\phi) = \lambda_l^m(\cos\theta) e^{im\phi}
-$$
+```
 
-with $\lambda_l^m$ being the pre-normalized associated Legendre polynomials, and $e^{im\phi}$ are the
+with ``\lambda_l^m`` being the pre-normalized associated Legendre polynomials, and ``e^{im\phi}`` are the
 complex exponentials (the Fourier modes). Together they form a set of orthogonal basis functions on the sphere.
+For an interactive visualisation of the spherical harmonics, see
+[here](https://justinwillmert.com/posts/2020/plots-of-the-spherical-harmonics-eigenmodes/).
 
 ## Synthesis or inverse spectral transform (spectral to grid)
 
-$$
+```math
 f(\theta,\phi) = \sum_{l=0}^{l_{max}} \sum_{m=-l}^l a_{lm} Y_{lm}(\theta,\phi)
-$$
+```
 
 ## Analysis or forward spectral transform (grid to spectral)
 
-$$
+```math
 \hat{a}_{lm} = \sum_{i=1}^N f(\theta_i,\phi_i) Y_{lm}(\theta_i,\phi_i) \sin(\theta_i) \Delta \theta_i \Delta \phi_i
-$$
+```
 
 ## Spectral packing
 
-Conventional packing $l,m$ versus alternative packing $l',m'$ and arbitrary numbering $i$.
+Conventional packing ``l,m`` versus alternative packing ``l',m'`` and arbitrary numbering ``i``.
 
-| degree $l$ | order $m$ |  $l'=m$ |  $m'=l-m$ | $i$ |
+| degree ``l`` | order ``m`` |  ``l'=m`` |  ``m'=l-m`` | ``i`` |
 |-|-|-|-|-|
 |0|0|0|0|1|
 |1|0|0|1|2|
@@ -53,7 +55,7 @@ Conventional packing $l,m$ versus alternative packing $l',m'$ and arbitrary numb
 
 Degree $l$, order $m$
 
-| |m| | | |
+| |``m``| | | |
 |-|-|-|-|-|
 |l|1| | | |
 | |2|3| | |
@@ -62,9 +64,9 @@ Degree $l$, order $m$
 
 Alternative packing
 
-| |m'| | | |
+| |``m'``| | | |
 |-|-|-|-|-|
-|l'|1|2|4|7|
+|``l'``|1|2|4|7|
 | |3|5|8| |
 | |6|9| | |
 | |10| | | |
@@ -92,6 +94,8 @@ julia> spectral(map)                   # back to spectral space
  0.0+0.0im  1.0+3.60727e-17im  0.0+0.0im
  0.0+0.0im  0.0+0.0im          0.0+0.0im
 ```
+
+and we have reobtained the ``l=m=1`` spheri
 
 ## References
 
