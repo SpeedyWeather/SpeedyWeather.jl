@@ -20,7 +20,7 @@ spectral_resolutions = (31,42,85,170)#,341)
         NF = Float64
         P = Parameters(recompute_legendre=true;NF,trunc)
         G = GeoSpectral(P)
-        S = G.spectral
+        S = G.spectral_transform
 
         alms = zeros(Complex{NF},S.lmax+1,S.mmax+1)
         alms[1,1] = 1
@@ -41,11 +41,11 @@ end
         NF = Float64
         P1 = Parameters(recompute_legendre=true;NF,trunc)
         G1 = GeoSpectral(P1)
-        S1 = G1.spectral
+        S1 = G1.spectral_transform
 
         P2 = Parameters(recompute_legendre=false;NF,trunc)
         G2 = GeoSpectral(P2)
-        S2 = G2.spectral
+        S2 = G2.spectral_transform
 
         alms = rand(Complex{NF},S1.lmax+1,S1.mmax+1)
         map1 = gridded(alms,S1)
@@ -63,7 +63,7 @@ end
         for NF in (Float32,Float64)
             P = Parameters(;NF,trunc)
             G = GeoSpectral(P)
-            S = G.spectral
+            S = G.spectral_transform
 
             lmax = 3
             for l in 1:lmax
@@ -93,7 +93,7 @@ end
             P = Parameters(;NF,trunc)
             G = GeoSpectral(P)
             B = Boundaries(P)
-            S = G.spectral
+            S = G.spectral_transform
 
             geopot_surf_spectral = B.geopot_surf
             geopot_surf_grid = gridded(geopot_surf_spectral,S)

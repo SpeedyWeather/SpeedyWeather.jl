@@ -4,7 +4,7 @@
     P = Parameters(NF=Float64)
     G = GeoSpectral(P)
     B = Boundaries(P)
-    S = G.spectral
+    S = G.spectral_transform
 
     Prog = SpeedyWeather.initialize_from_rest(P,B,G)
 

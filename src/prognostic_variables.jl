@@ -78,7 +78,7 @@ function initialize_temperature!(   temp::AbstractArray{Complex{NF},3},    # spe
     # R_gas:        Specific gas constant for dry air [J/kg/K]
     @unpack temp_ref, temp_top, lapse_rate, gravity, R_gas = P
     @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
-    @unpack norm_sphere = G.spectral                # normalization of the l=m=0 spherical harmonic
+    @unpack norm_sphere = G.spectral_transform      # normalization of the l=m=0 spherical harmonic
 
     lapse_rate_scaled = lapse_rate/gravity/1000     # Lapse rate scaled by gravity [K/m / (m²/s²)]
     temp_surf = -lapse_rate_scaled*geopot_surf      # spectral surface air temperature from orography and lapse rate

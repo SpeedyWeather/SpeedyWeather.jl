@@ -14,8 +14,8 @@ Generator function for the Tendencies struct. Initialises with zeros.
 """
 function Tendencies(G::GeoSpectral{NF}) where NF
 
-    @unpack lmax, mmax = G.spectral         # 0-based degree l, order m of the spherical harmonics
-    @unpack nlon,nlat,nlev = G.geometry     # number of longitudes, latitudes, vertical levels
+    @unpack lmax, mmax = G.spectral_transform   # 0-based degree l, order m of the spherical harmonics
+    @unpack nlon,nlat,nlev = G.geometry         # number of longitudes, latitudes, vertical levels
 
     # one more l for recursion in meridional gradients
     vor_tend         = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # vorticity
@@ -109,7 +109,7 @@ Generator function for the IntermediateVariables struct. Initialises with zeros.
 function IntermediateVariables(G::GeoSpectral{NF}) where NF
 
     @unpack nlon,nlat,nlev = G.geometry         # number of longitudes, latitudes, vertical levels
-    @unpack lmax, mmax = G.spectral             # 0-based max degree l, order m of the spherical harmonics
+    @unpack lmax, mmax = G.spectral_transform   # 0-based max degree l, order m of the spherical harmonics
 
     # BAROTROPIC VORTIICTY EQUATION
     stream_function = zeros(Complex{NF},lmax+1,mmax+1,nlev)

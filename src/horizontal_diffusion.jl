@@ -56,7 +56,7 @@ function HorizontalDiffusion(   P::Parameters,      # Parameter struct
                                 B::Boundaries)      # Boundaries struct
 
     # DIFFUSION
-    @unpack lmax,mmax = G.spectral
+    @unpack lmax,mmax = G.spectral_transform
     @unpack diffusion_power, diffusion_time, diffusion_time_div = P
     @unpack diffusion_time_strat, damping_time_strat = P
     @unpack Δt = C

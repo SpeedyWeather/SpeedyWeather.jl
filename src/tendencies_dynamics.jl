@@ -262,6 +262,7 @@ function divergence_uvω_spectral(   u_grid::AbstractMatrix{NF},     # zonal vel
     @boundscheck size(u_grid) == size(v_grid) || throw(BoundsError)
 
     @unpack f_coriolis,coslat,coslat⁻¹,radius_earth = G.geometry
+    S = G.spectral_transform
 
     uω_grid_coslat⁻¹ = zero(u_grid)                             # TODO preallocate elsewhere
     vω_grid_coslat⁻¹ = zero(v_grid)
@@ -278,11 +279,11 @@ function divergence_uvω_spectral(   u_grid::AbstractMatrix{NF},     # zonal vel
     end
 
     # TODO preallocate returned coefficients elsewhere
-    uω_coslat⁻¹ = spectral(uω_grid_coslat⁻¹,G.spectral,one_more_l=false)         
-    vω_coslat⁻¹ = spectral(vω_grid_coslat⁻¹,G.spectral,one_more_l=false)
+    uω_coslat⁻¹ = spectral(uω_grid_coslat⁻¹,S,one_more_l=false)         
+    vω_coslat⁻¹ = spectral(vω_grid_coslat⁻¹,S,one_more_l=false)
 
     ∂uω_∂lon = gradient_longitude(uω_coslat⁻¹,radius_earth,one_more_l=true)                  # spectral gradients
-    ∂vω_∂lat = gradient_latitude(vω_coslat⁻¹,G.spectral,-radius_earth)
+    ∂vω_∂lat = gradient_latitude(vω_coslat⁻¹,S,-radius_earth)
 
     return -(∂uω_∂lon+∂vω_∂lat)                                  # add for divergence
 end
@@ -323,7 +324,7 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     @unpack lmax,ϵlms = spectral
     @unpack radius_earth = M.constants
 
-    fill!(view(vor,lmax+1,:,:,:),0)
+    # fill!(view(vor,lmax+1,:,:,:),0)
 
     vor_lf = view(vor,:,:,lf,:)                     # pick leapfrog index with mem allocation
     gridded!(vor_grid,vor_lf,spectral)              # get vorticity on grid from spectral vor_lf

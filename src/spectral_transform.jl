@@ -32,10 +32,9 @@ struct SpectralTransform{NF<:AbstractFloat}
     legendre_weights::Vector{NF}    # Legendre weights (extra normalisation of π/nlat included)
 
     # RECURSION FACTORS
-    ϵlms::Array{NF}
+    ϵlms::Array{NF}                 # precomputed for meridional gradients gradients grad_y1, grad_y2
 
     # GRADIENT MATRICES
-    grad_x::Matrix{NF}              # precomputed zonal gradient factors
     grad_y1::Matrix{NF}             # precomputed meridional gradient factors, term 1
     grad_y2::Matrix{NF}             # term 2
 end
@@ -101,13 +100,8 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
     ϵlms = get_recursion_factors(lmax+1,mmax)
 
     # GRADIENTS
-    gradx = zeros(NF,lmax+2,mmax+1)
-    grad_y1 = zeros(NF,lmax+2,mmax+1)    # term 1
-    grad_y2 = zeros(NF,lmax+2,mmax+1)    # term 2
-
-    for m in 0:mmax
-        gradx[:,m+1] .= m
-    end 
+    grad_y1 = zeros(lmax+2,mmax+1)    # term 1
+    grad_y2 = zeros(lmax+2,mmax+1)    # term 2
 
     for m in 0:mmax
         for l in m:lmax+1
@@ -116,7 +110,6 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
         end
     end
 
-    spectral_truncation!(gradx, lmax+1,mmax)
     spectral_truncation!(grad_y1,lmax+1,mmax)
     spectral_truncation!(grad_y2,lmax+1,mmax)
         
@@ -128,7 +121,7 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
                             rfft_plan,brfft_plan,
                             recompute_legendre,Λ,Λs,
                             legendre_weights,
-                            ϵlms,gradx,grad_y1,grad_y2)
+                            ϵlms,grad_y1,grad_y2)
 end
 
 """Generator function for a SpectralTransform struct in case the number format is not provided.
@@ -139,12 +132,12 @@ SpectralTransform(args...) = SpectralTransform(Float64,args...)
 SpectralTransform(P::Parameters) = SpectralTransform(P.NF,P.nlon,P.nlat,P.trunc,P.recompute_legendre)
 
 """
-    G = Geospectral{NF}(geometry,spectraltrans)
+    G = Geospectral{NF}(geometry,spectral_transform)
 
-Struct that holds both a Geometry struct `geometry` and a SpectralTransform struct `spectraltrans`."""
+Struct that holds both a Geometry struct `geometry` and a SpectralTransform struct `spectral_transform`."""
 struct GeoSpectral{NF<:AbstractFloat}
     geometry::Geometry{NF}
-    spectral::SpectralTransform{NF}
+    spectral_transform::SpectralTransform{NF}
 end
 
 """
@@ -275,18 +268,6 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
     return map
 end
 
-function gridded!(  map::AbstractArray{NF,3},
-                    alms::AbstractArray{Complex{NF},3},
-                    S::SpectralTransform{NF}
-                    ) where {NF<:AbstractFloat}
-    
-    for k in 1:size(alms)[end]
-        map_layer = view(map,:,:,k)
-        alms_layer = view(alms,:,:,k)
-        gridded!(map_layer,alms_layer,S)
-    end
-end
-
 """
     map = gridded(alms)
 
@@ -380,18 +361,6 @@ function spectral!( alms::AbstractMatrix{Complex{NF}},
     end
 
     return alms
-end
-
-function spectral!( alms::AbstractArray{Complex{NF},3},
-                    map::AbstractArray{NF,3},
-                    S::SpectralTransform{NF}
-                    ) where {NF<:AbstractFloat}
-    
-    for k in 1:size(alms)[end]
-        alms_layer = view(alms,:,:,k)
-        map_layer = view(map,:,:,k)
-        spectral!(alms_layer,map_layer,S)
-    end
 end
 
 """
