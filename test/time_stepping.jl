@@ -26,7 +26,7 @@
 
         # leapfrog forward
         for i in 2:n_timesteps+1
-            SpeedyWeather.leapfrog!(X,F.(X[:,:,:,2],NF(ω)),NF(2Δt),2,C)
+            SpeedyWeather.leapfrog!(X,F.(X[:,:,:,2],NF(ω)),NF(2Δt),C)
             Xout[i] = X[1,1,1,1]
         end
 
@@ -57,7 +57,7 @@
 
         # leapfrog forward
         for i in 2:n_timesteps+1
-            SpeedyWeather.leapfrog!(X,F.(X[:,:,2],NF(ω)),NF(2Δt),2,C)
+            SpeedyWeather.leapfrog!(X,F.(X[:,:,2],NF(ω)),NF(2Δt),C)
             Xout[i] = X[1,1,1]
         end
 
@@ -82,7 +82,7 @@
 
         # leapfrog forward
         for i in 2:n_timesteps+1
-            SpeedyWeather.leapfrog!(X,F.(X[:,:,2],NF(ω)),NF(2Δt),2,C)
+            SpeedyWeather.leapfrog!(X,F.(X[:,:,2],NF(ω)),NF(2Δt),C)
             Xout[i] = X[1,1,1]
         end
 
