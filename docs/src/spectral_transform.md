@@ -43,33 +43,33 @@ f(\theta,\phi) = \sum_{l=0}^{l_{max}} \sum_{m=-l}^l a_{lm} Y_{lm}(\theta,\phi)
 Conventional packing ``l,m`` versus alternative packing ``l',m'`` and arbitrary numbering ``i``.
 
 | degree ``l`` | order ``m`` |  ``l'=m`` |  ``m'=l-m`` | ``i`` |
-|-|-|-|-|-|
-|0|0|0|0|1|
-|1|0|0|1|2|
-|1|1|1|0|3|
-|2|0|0|2|4|
-|2|1|1|1|5|
-|2|2|2|0|6|
-|3|0|0|3|7|
-|...|...|...|...|...|
+| ------------ | ----------- | --------- | ----------- | ----- |
+|0             |0            |0          |0            |1      |
+|1             |0            |0          |1            |2      |
+|1             |1            |1          |0            |3      |
+|2             |0            |0          |2            |4      |
+|2             |1            |1          |1            |5      |
+|2             |2            |2          |0            |6      |
+|3             |0            |0          |3            |7      |
+|...           |...          |...        |...          |...    |
 
-Degree $l$, order $m$
+Degree ``l``, order ``m``
 
-| |``m``| | | |
-|-|-|-|-|-|
-|l|1| | | |
-| |2|3| | |
-| |4|5|6| |
-| |7|8|9|10|
+|     |``m``| | |  |
+|-----| --- |-|-|--|
+|``l``|1    | | |  |
+|     |2    |3| |  |
+|     |4    |5|6|  |
+|     |7    |8|9|10|
 
 Alternative packing
 
-| |``m'``| | | |
-|-|-|-|-|-|
-|``l'``|1|2|4|7|
-| |3|5|8| |
-| |6|9| | |
-| |10| | | |
+|      |``m'``| | | |
+|------|------|-|-|-|
+|``l'``|1     |2|4|7|
+|      |3     |5|8| |
+|      |6     |9| | |
+|      |10    | | | |
 
 ## Examples
 
@@ -114,7 +114,7 @@ longitudes, latitudes on a regular Gaussian grid. Then spectral and grid resolut
 In general, we choose ``nlon = 2nlat``, and ideally ``nlon`` is easily Fourier-transformable, e.g. ``nlon = 2^i3^j5^k`` with some
 integers ``i,j,k``. SpeedyWeather.jl is tested at the following horizontal resolutions
 
-| ``l_max``   | nlon | nlat |
+| ``l_{max}``   | nlon | nlat |
 | ----------- | ---- | ---- |
 | 31 (default)| 96   | 48   |
 | 42          | 128  | 64   |
