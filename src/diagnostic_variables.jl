@@ -73,6 +73,12 @@ struct IntermediateVariables{NF<:AbstractFloat}
     stream_function ::Array{Complex{NF},3}
     coslat_u        ::Array{Complex{NF},3}
     coslat_v        ::Array{Complex{NF},3}
+    uω_grid_coslat⁻¹::Array{NF,3}
+    vω_grid_coslat⁻¹::Array{NF,3}
+    uω_coslat⁻¹     ::Array{Complex{NF},3}
+    vω_coslat⁻¹     ::Array{Complex{NF},3}
+    ∂uω_∂lon        ::Array{Complex{NF},3}
+    ∂vω_∂lat        ::Array{Complex{NF},3}
 
     ###------Defined in surface_pressure_tendency!()
     u_mean             ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
@@ -115,6 +121,13 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
     stream_function = zeros(Complex{NF},lmax+1,mmax+1,nlev)
     coslat_u = zeros(Complex{NF},lmax+2,mmax+1,nlev)
     coslat_v = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    
+    uω_grid_coslat⁻¹ = zeros(NF,nlon,nlat,nlev)
+    vω_grid_coslat⁻¹ = zeros(NF,nlon,nlat,nlev)
+    uω_coslat⁻¹      = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    vω_coslat⁻¹      = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    ∂uω_∂lon         = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    ∂vω_∂lat         = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
     u_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint zonal velocity over all levels
     v_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint meridional velocity over all levels
@@ -142,6 +155,8 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
     spectral_geopotential       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
     return IntermediateVariables(   stream_function, coslat_u, coslat_v,
+                                    uω_grid_coslat⁻¹,vω_grid_coslat⁻¹,
+                                    uω_coslat⁻¹,vω_coslat⁻¹,∂uω_∂lon,∂vω_∂lat,         
                                     u_mean,v_mean,div_mean,
                                     pres_surf_gradient_spectral_x,pres_surf_gradient_spectral_y,
                                     pres_surf_gradient_grid_x,pres_surf_gradient_grid_y,

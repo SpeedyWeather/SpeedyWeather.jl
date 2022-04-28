@@ -26,6 +26,12 @@ struct SpectralTransform{NF<:AbstractFloat}
     rfft_plan::FFTW.rFFTWPlan{NF}           # grid to spectral transform
     brfft_plan::FFTW.rFFTWPlan{Complex{NF}} # spectral to grid transform (inverse)
 
+    # FFT work arrays (currently not used)
+    gn::Vector{Complex{NF}}         # phase factors north
+    gs::Vector{Complex{NF}}         # phase factors south
+    fn::Vector{Complex{NF}}         # Fourier-transformed latitude north
+    fs::Vector{Complex{NF}}         # Fourier-transformed latitude south
+
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool        # Pre or recompute Legendre polynomials
     Λ::Matrix{NF}                   # Legendre polynomials for one latitude (requires recomputing)
@@ -36,6 +42,7 @@ struct SpectralTransform{NF<:AbstractFloat}
     ϵlms::Array{NF}                 # precomputed for meridional gradients gradients grad_y1, grad_y2
 
     # GRADIENT MATRICES
+    grad_x ::Vector{Complex{NF}}    # = i*m/R but precomputed
     grad_y1::Matrix{NF}             # precomputed meridional gradient factors, term 1
     grad_y2::Matrix{NF}             # term 2
 
@@ -72,6 +79,12 @@ function SpectralTransform( ::Type{NF},     # Number format NF
     rfft_plan = FFTW.plan_rfft(zeros(NF,nlon))
     brfft_plan = FFTW.plan_brfft(zeros(Complex{NF},nfreq),nlon)
 
+    # FFT work arrays (currently not used)
+    gn = zeros(Complex{NF},nfreq)       # phase factors north
+    gs = zeros(Complex{NF},nfreq)       # phase factors south
+    fn = zeros(Complex{NF},nfreq)       # Fourier-transformed latitude north
+    fs = zeros(Complex{NF},nfreq)       # Fourier-transformed latitude south
+
     # GAUSSIAN COLATITUDES (0,π) North to South
     nodes = FastGaussQuadrature.gausslegendre(nlat)[1]  # zeros of the Legendre polynomial
     colat = π .- acos.(nodes)                           # corresponding colatitudes
@@ -106,13 +119,14 @@ function SpectralTransform( ::Type{NF},     # Number format NF
     ϵlms = get_recursion_factors(lmax+1,mmax)
 
     # GRADIENTS
-    grad_y1 = zeros(lmax+2,mmax+1)  # term 1
-    grad_y2 = zeros(lmax+2,mmax+1)  # term 2
+    grad_x = [im*m/radius for m in 0:mmax+1]    # zonal gradient (precomputed currently not used)
+    grad_y1 = zeros(lmax+2,mmax+1)              # meridional gradient, term 1
+    grad_y2 = zeros(lmax+2,mmax+1)              # term 2
 
-    for m in 0:mmax                     
-        for l in m:lmax+1           # 0-based degree l, order m
-            grad_y1[l+1,m+1] = (l-1)*ϵlms[l+1,m+1]
-            grad_y2[l+1,m+1] = -(l+2)*ϵlms[l+2,m+1]
+    for m in 0:mmax                             # 0-based degree l, order m
+        for l in m:lmax+1           
+            grad_y1[l+1,m+1] = (l-1)*ϵlms[l+1,m+1]/radius
+            grad_y2[l+1,m+1] = -(l+2)*ϵlms[l+2,m+1]/radius
         end
     end
 
@@ -127,9 +141,10 @@ function SpectralTransform( ::Type{NF},     # Number format NF
                             colat,cos_colat,sin_colat,lon_offset,
                             norm_sphere,norm_forward,
                             rfft_plan,brfft_plan,
+                            gn,gs,fn,fs,
                             recompute_legendre,Λ,Λs,
                             legendre_weights,
-                            ϵlms,grad_y1,grad_y2,
+                            ϵlms,grad_x,grad_y1,grad_y2,
                             eigen_values,eigen_values⁻¹)
 end
 
@@ -192,12 +207,13 @@ end
 get_recursion_factors(lmax::Int,mmax::Int) = get_recursion_factors(Float64,lmax,mmax)
 
 """
-    get_legendre_polynomials!(Λ,Λs,ilat,cos_colat,recompute_legendre)
+    Λview = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat,recompute_legendre)
 
 Base on `recompute_legendre` (true/false) this function either updates the Legendre polynomials
 `Λ` for a given latitude `ilat, cos_colat` by recomputation (`recompute_legendre == true`), or
-`Λ` is changed by copying over the polynomials from precomputed `Λs`. Recomputation takes usually
-longer, but precomputation requires a large amount of memory for high resolution."""
+`Λ` is changed by creating a view on the corresponding latitude in precomputed `Λs`.
+Recomputation takes usually longer, but precomputation requires a large amount of memory for high resolution.
+Returns a view in both cases."""
 function get_legendre_polynomials!( Λ::Matrix{NF},      # Out: Legendre polynomials for given latitude
                                     Λs::Array{NF,3},    # Precomputed array of all Legendre polynomials
                                     ilat::Int,          # latitude index
@@ -209,9 +225,9 @@ function get_legendre_polynomials!( Λ::Matrix{NF},      # Out: Legendre polynom
         # Recalculate the (normalized) λ_l^m(cos(colat)) factors of the ass. Legendre polynomials
         lmax,mmax = size(Λ) .- 1
         AssociatedLegendrePolynomials.λlm!(Λ, lmax, mmax, cos_colat)
-    else    # copy over precomputed values
-        @boundscheck size(Λ) == size(Λs[:,:,1]) || throw(BoundsError)
-        copyto!(Λ,@view(Λs[:,:,ilat]))
+        return view(Λ,:,:)
+    else    # view on precomputed values
+        return view(Λs,:,:,ilat)
     end
 end
 
@@ -248,8 +264,8 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
     @inbounds for ilat in 1:nlat_half       # loop over northern latitudes only due to symmetry
         ilat_s = nlat - ilat + 1            # southern latitude index
 
-        # Recalculate or use precomputed Legendre polynomials
-        get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
+        # Recalculate or use precomputed Legendre polynomials Λ
+        Λview = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
 
         # inverse Legendre transform by looping over wavenumbers l,m
         for m in 1:mmax+1                   # Σ_{m=0}^{mmax}, but 1-based index
@@ -257,7 +273,7 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
             accs = zero(Complex{NF})        # and southern hemisphere
 
             for l in m:lmax+1                       # Σ_{l=m}^{lmax}, but 1-based index
-                term = alms[l,m] * Λ[l,m]           # Legendre polynomials in Λ
+                term = alms[l,m] * Λview[l,m]       # Legendre polynomials in Λ
                 accn += term
                 accs += isodd(l+m) ? -term : term   # flip sign for southern odd wavenumbers
             end
@@ -354,8 +370,8 @@ function spectral!( alms::AbstractMatrix{Complex{NF}},
         LinearAlgebra.mul!(fs, rfft_plan, @view(map[:,ilat_s]))     # Southern latitude
 
         # Legendre transform in meridional direction
-        # Recalculate or use precomputed Legendre polynomials
-        get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
+        # Recalculate or use precomputed Legendre polynomials Λ
+        Λview = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
         legendre_weight = legendre_weights[ilat]                    # weights normalised with π/nlat
 
         for m in 1:mmax+1                                           # Σ_{m=0}^{mmax}, but 1-based index
@@ -364,7 +380,7 @@ function spectral!( alms::AbstractMatrix{Complex{NF}},
             as = fs[m] * w
             for l in m:lmax+1
                 c = isodd(l+m) ? an - as : an + as                  # odd/even wavenumbers
-                alms[l,m] += c * Λ[l,m]                             # Legendre polynomials in Λ
+                alms[l,m] += c * Λview[l,m]                         # Legendre polynomials in Λ
             end
         end
     end

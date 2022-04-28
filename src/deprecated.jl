@@ -195,3 +195,21 @@
 #         ∇⁻²!(∇⁻²alms_layer,alms_layer,R)
 #     end
 # end
+
+# """gradient_latitude! but precalculate the recursion factors `ϵlms` in case they are not provided."""
+# function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: cos(lat)*u
+#                             Ψ::AbstractMatrix{Complex{NF}},         # input: streamfunction Ψ
+#                             R::Real=1                               # radius of the sphere/Earth
+#                             ) where {NF<:AbstractFloat}             # number format NF
+#     _,mmax = size(Ψ) .- 1                                           # degree l, order m of spherical harmonics   
+#     ϵlms = get_recursion_factors(NF,mmax,mmax)                      # precalculate recursion factors
+#     return gradient_latitude!(coslat_u,Ψ,ϵlms,R)                    # call in-place function
+# end
+
+# function gradient_latitude( Ψ::AbstractMatrix{Complex{NF}}, # input: streamfunction Ψ
+#                             R::Real=1                       # radius of the sphere/Earth
+#                             ) where {NF<:AbstractFloat}     # number format NF
+#     _,mmax = size(Ψ) .- 1                                   # max degree l, order m of spherical harmonics
+#     coslat_u = zeros(Complex{NF},mmax+2,mmax+1)             # preallocate output, one more l for recursion
+#     return gradient_latitude!(coslat_u,Ψ,R)                 # call in-place version
+# end
