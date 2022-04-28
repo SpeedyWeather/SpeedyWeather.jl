@@ -1,5 +1,6 @@
+# TWO ARGUMENT FUNCTIONS
 for func_name in (:gradient_longitude!, :gradient_latitude!,
-                    :gridded!, :spectral!)
+                    :gridded!, :spectral!, :∇⁻²!)
     @eval begin
         function $func_name(Out::AbstractArray{NF1,3},
                             In::AbstractArray{NF2,3},
@@ -14,6 +15,7 @@ for func_name in (:gradient_longitude!, :gradient_latitude!,
     end
 end
 
+# ONE ARGUMENT FUNCTIONS
 for func_name in (:unscale_coslat!,:scale_coslat!,
                     :spectral_truncation!)
     @eval begin
@@ -25,30 +27,6 @@ for func_name in (:unscale_coslat!,:scale_coslat!,
                 $func_name(A_layer,args...)
             end
         end
-    end
-end
-
-function spectral!( alms::AbstractArray{Complex{NF},3},
-                    map::AbstractArray{NF,3},
-                    S::SpectralTransform{NF}
-                    ) where {NF<:AbstractFloat}
-    
-    for k in 1:size(alms)[end]
-        alms_layer = view(alms,:,:,k)
-        map_layer = view(map,:,:,k)
-        spectral!(alms_layer,map_layer,S)
-    end
-end
-
-function gridded!(  map::AbstractArray{NF,3},
-                    alms::AbstractArray{Complex{NF},3},
-                    S::SpectralTransform{NF}
-                    ) where {NF<:AbstractFloat}
-    
-    for k in 1:size(alms)[end]
-        map_layer = view(map,:,:,k)
-        alms_layer = view(alms,:,:,k)
-        gridded!(map_layer,alms_layer,S)
     end
 end
 
