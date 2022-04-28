@@ -1,7 +1,7 @@
-# Spectral Transform
+# Spherical Harmonic Transform
 
-The following sections outline the implementation of the spectral transform between the coefficients of 
-the spherical harmonics (the _spectral_ space) and the grid space on a longitude-latitude
+The following sections outline the implementation of the spherical harmonic transform (in short _spectral_ transform)
+between the coefficients of the spherical harmonics (the _spectral_ space) and the grid space on a longitude-latitude
 [regular Gaussian grid](https://confluence.ecmwf.int/display/FCST/Gaussian+grids).
 
 ## Inspiration
@@ -9,31 +9,67 @@ the spherical harmonics (the _spectral_ space) and the grid space on a longitude
 The spectral transform implemented by SpeedyWeather.jl follows largely Justin Willmert's
 [CMB.jl](https://github.com/jmert/CMB.jl) package and makes use of
 [AssociatedLegendrePolynomials.jl](https://github.com/jmert/AssociatedLegendrePolynomials.jl) and
-[FFTW.jl](https://github.com/JuliaMath/FFTW.jl)/[FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) for the Fourier transform. Justin's work is described in a Blog series [^1]
+[FFTW.jl](https://github.com/JuliaMath/FFTW.jl)/[FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) for the Fourier transform. Justin described his work in a Blog series [^1],[^2],[^3],[^4],[^5],[^6],[^7],[^8]
 
 ## Spherical harmonics
 
-The [spherical harmonics](https://en.wikipedia.org/wiki/Spherical_harmonics) $Y_{lm}$ of order $l$ and degree $m$
-over the longitude $\theta = (0,2\pi)$ and latitude $\phi = (-\tfrac{\pi}{2},\tfrac{\pi}{2})$, or
-using colatitudes $\phi = (0,\pi)$, are
+The [spherical harmonics](https://en.wikipedia.org/wiki/Spherical_harmonics) ``Y_{lm}`` of degree ``l`` and order ``m``
+over the longitude ``\theta = (0,2\pi)`` and latitude ``\phi = (-\tfrac{\pi}{2},\tfrac{\pi}{2})`` (or
+using colatitudes ``\phi = (0,\pi)``), are
 
-$$
+```math
 Y_{lm}(\theta,\phi) = \lambda_l^m(\cos\theta) e^{im\phi}
-$$
+```
 
-with $\lambda_l^m$ being the pre-normalized associated Legendre polynomials, and $e^{im\phi}$ are the complex exponentials (the Fourier modes). Together they form a set of orthogonal basis functions on the sphere.
+with ``\lambda_l^m`` being the pre-normalized associated Legendre polynomials, and ``e^{im\phi}`` are the
+complex exponentials (the Fourier modes). Together they form a set of orthogonal basis functions on the sphere.
+For an interactive visualisation of the spherical harmonics, see
+[here](https://justinwillmert.com/posts/2020/plots-of-the-spherical-harmonics-eigenmodes/).
 
 ## Synthesis or inverse spectral transform (spectral to grid)
 
-$$
+```math
 f(\theta,\phi) = \sum_{l=0}^{l_{max}} \sum_{m=-l}^l a_{lm} Y_{lm}(\theta,\phi)
-$$
+```
 
 ## Analysis or forward spectral transform (grid to spectral)
 
-$$
+```math
 \hat{a}_{lm} = \sum_{i=1}^N f(\theta_i,\phi_i) Y_{lm}(\theta_i,\phi_i) \sin(\theta_i) \Delta \theta_i \Delta \phi_i
-$$
+```
+
+## Spectral packing
+
+Conventional packing ``l,m`` versus alternative packing ``l',m'`` and arbitrary numbering ``i``.
+
+| degree ``l`` | order ``m`` |  ``l'=m`` |  ``m'=l-m`` | ``i`` |
+|-|-|-|-|-|
+|0|0|0|0|1|
+|1|0|0|1|2|
+|1|1|1|0|3|
+|2|0|0|2|4|
+|2|1|1|1|5|
+|2|2|2|0|6|
+|3|0|0|3|7|
+|...|...|...|...|...|
+
+Degree $l$, order $m$
+
+| |``m``| | | |
+|-|-|-|-|-|
+|l|1| | | |
+| |2|3| | |
+| |4|5|6| |
+| |7|8|9|10|
+
+Alternative packing
+
+| |``m'``| | | |
+|-|-|-|-|-|
+|``l'``|1|2|4|7|
+| |3|5|8| |
+| |6|9| | |
+| |10| | | |
 
 ## Examples
 
@@ -59,38 +95,35 @@ julia> spectral(map)                   # back to spectral space
  0.0+0.0im  0.0+0.0im          0.0+0.0im
 ```
 
-## Spectral packing
+and we have successfully reobtained the ``l=m=1`` spherical harmonic.
 
-Conventional packing $l,m$ versus alternative packing $l',m'$ and arbitrary numbering $i$.
+## Available horizontal resolutions
 
-| degree $l$ | order $m$ |  $l'=m$ |  $m'=l-m$ | $i$ |
-|-|-|-|-|-|
-|0|0|0|0|1|
-|1|0|0|1|2|
-|1|1|1|0|3|
-|2|0|0|2|4|
-|2|1|1|1|5|
-|2|2|2|0|6|
-|3|0|0|3|7|
-|...|...|...|...|...|
+SpeedyWeather.jl uses triangular truncation such that only spherical harmonics with ``l \leq l_{max}`` and ``|m| \leq m_{max}``
+are explicitly represented. This is usually described as ``Tm_{max}``, with ``l_{max} = m_{max}`` (although in vector quantities
+require one more degree ``l`` in the recursion relation of meridional gradients). For example, T31 is the spectral resolution
+with ``l_{max} = m_{max} = 31``. Note that the degree ``l`` and order ``m`` are mathematically 0-based, such that the
+corresponding coefficient matrix is of size 32x32.
 
-Degree $l$, order $m$
+Using triangular truncation, there are constraints on the corresponding grid resolution. Let `nlon`, `nlat` be the number of
+longitudes, latitudes on a regular Gaussian grid. Then spectral and grid resolution have to be chosen such that
 
-| |m| | | |
-|-|-|-|-|-|
-|l|1| | | |
-| |2|3| | |
-| |4|5|6| |
-| |7|8|9|10|
+- ``nlon \geq 3l_{max}+1``
+- ``nlat \geq (3l_{max}+1)/2``
 
-Alternative packing
+In general, we choose ``nlon = 2nlat``, and ideally ``nlon`` is easily Fourier-transformable, e.g. ``nlon = 2^i3^j5^k`` with some
+integers ``i,j,k``. SpeedyWeather.jl is tested at the following horizontal resolutions
 
-| |m'| | | |
-|-|-|-|-|-|
-|l'|1|2|4|7|
-| |3|5|8| |
-| |6|9| | |
-| |10| | | |
+| ``l_max``   | nlon | nlat |
+| ----------- | ---- | ---- |
+| 31 (default)| 96   | 48   |
+| 42          | 128  | 64   |
+| 85          | 256  | 128  |
+| 170         | 512  | 256  |
+| 341         | 1024 | 512  |
+| 682         | 2048 | 1024 |
+
+Choosing `trunc` as argument in `run_speedy` will automatically choose `nlon`,`nlat` as presented in the table.
 
 ## References
 

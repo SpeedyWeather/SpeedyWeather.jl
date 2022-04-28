@@ -5,6 +5,7 @@ struct SpectralTransform{NF<:AbstractFloat}
     lmax::Int       # Maximum degree l=[0,lmax] of spherical harmonics
     mmax::Int       # Maximum order m=[0,l] of spherical harmonics
     nfreq::Int      # Number of fourier frequencies (real FFT)
+    radius::Real    # radius of the sphere/Earth
 
     # CORRESPONDING GRID SIZE
     nlon::Int               # Number of longitudes
@@ -32,12 +33,15 @@ struct SpectralTransform{NF<:AbstractFloat}
     legendre_weights::Vector{NF}    # Legendre weights (extra normalisation of π/nlat included)
 
     # RECURSION FACTORS
-    ϵlms::Array{NF}
+    ϵlms::Array{NF}                 # precomputed for meridional gradients gradients grad_y1, grad_y2
 
     # GRADIENT MATRICES
-    grad_x::Matrix{NF}              # precomputed zonal gradient factors
     grad_y1::Matrix{NF}             # precomputed meridional gradient factors, term 1
     grad_y2::Matrix{NF}             # term 2
+
+    # EIGENVALUES
+    eigen_values::Vector{NF}        # = -l*(l+1)/R², degree l of spherical harmonic
+    eigen_values⁻¹::Vector{NF}      # = -R²/(l*(l+1))
 end
 
 """
@@ -49,10 +53,11 @@ spectral resolution, plans the Fourier transforms, retrieves the Gaussian colati
 and preallocates the Legendre polynomials (if recompute_legendre == false) and legendre
 weights.
 """
-function SpectralTransform( ::Type{NF},                 # Number format NF
-                            nlon::Int,                  # Number of longitudes
-                            nlat::Int,                  # Number of latitudes
-                            trunc::Int,                 # Spectral truncation
+function SpectralTransform( ::Type{NF},     # Number format NF
+                            nlon::Int,      # Number of longitudes
+                            nlat::Int,      # Number of latitudes
+                            trunc::Int,     # Spectral truncation
+                            radius::Real,   # radius of sphere/Earth
                             recompute_legendre::Bool) where NF
 
     # SPECTRAL RESOLUTION
@@ -101,34 +106,31 @@ function SpectralTransform( ::Type{NF},                 # Number format NF
     ϵlms = get_recursion_factors(lmax+1,mmax)
 
     # GRADIENTS
-    gradx = zeros(NF,lmax+2,mmax+1)
-    grad_y1 = zeros(NF,lmax+2,mmax+1)    # term 1
-    grad_y2 = zeros(NF,lmax+2,mmax+1)    # term 2
+    grad_y1 = zeros(lmax+2,mmax+1)  # term 1
+    grad_y2 = zeros(lmax+2,mmax+1)  # term 2
 
-    for m in 0:mmax
-        gradx[:,m+1] .= m
-    end 
-
-    for m in 0:mmax
-        for l in m:lmax+1
+    for m in 0:mmax                     
+        for l in m:lmax+1           # 0-based degree l, order m
             grad_y1[l+1,m+1] = (l-1)*ϵlms[l+1,m+1]
             grad_y2[l+1,m+1] = -(l+2)*ϵlms[l+2,m+1]
         end
     end
 
-    spectral_truncation!(gradx, lmax+1,mmax)
-    spectral_truncation!(grad_y1,lmax+1,mmax)
-    spectral_truncation!(grad_y2,lmax+1,mmax)
+    # EIGENVALUES 
+    eigen_values = [-l*(l+1)/radius^2 for l in 0:lmax+1]
+    eigen_values⁻¹ = inv.(eigen_values)
+    eigen_values⁻¹[1] = 0
         
     # conversion to NF happens here
-    SpectralTransform{NF}(  lmax,mmax,nfreq,
+    SpectralTransform{NF}(  lmax,mmax,nfreq,radius,
                             nlon,nlat,nlat_half,
                             colat,cos_colat,sin_colat,lon_offset,
                             norm_sphere,norm_forward,
                             rfft_plan,brfft_plan,
                             recompute_legendre,Λ,Λs,
                             legendre_weights,
-                            ϵlms,gradx,grad_y1,grad_y2)
+                            ϵlms,grad_y1,grad_y2,
+                            eigen_values,eigen_values⁻¹)
 end
 
 """Generator function for a SpectralTransform struct in case the number format is not provided.
@@ -136,15 +138,15 @@ Use Float64 as default."""
 SpectralTransform(args...) = SpectralTransform(Float64,args...)
 
 "Generator function for a SpectralTransform struct pulling in parameters from a Parameters struct."
-SpectralTransform(P::Parameters) = SpectralTransform(P.NF,P.nlon,P.nlat,P.trunc,P.recompute_legendre)
+SpectralTransform(P::Parameters) = SpectralTransform(P.NF,P.nlon,P.nlat,P.trunc,P.radius_earth,P.recompute_legendre)
 
 """
-    G = Geospectral{NF}(geometry,spectraltrans)
+    G = Geospectral{NF}(geometry,spectral_transform)
 
-Struct that holds both a Geometry struct `geometry` and a SpectralTransform struct `spectraltrans`."""
+Struct that holds both a Geometry struct `geometry` and a SpectralTransform struct `spectral_transform`."""
 struct GeoSpectral{NF<:AbstractFloat}
     geometry::Geometry{NF}
-    spectral::SpectralTransform{NF}
+    spectral_transform::SpectralTransform{NF}
 end
 
 """
@@ -275,18 +277,6 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
     return map
 end
 
-function gridded!(  map::AbstractArray{NF,3},
-                    alms::AbstractArray{Complex{NF},3},
-                    S::SpectralTransform{NF}
-                    ) where {NF<:AbstractFloat}
-    
-    for k in 1:size(alms)[end]
-        map_layer = view(map,:,:,k)
-        alms_layer = view(alms,:,:,k)
-        gridded!(map_layer,alms_layer,S)
-    end
-end
-
 """
     map = gridded(alms)
 
@@ -303,8 +293,8 @@ function gridded(alms::AbstractMatrix{Complex{NF}}  # spectral coefficients
     nlon, nlat = triangular_truncation(mmax)        # number of longitudes, number of latitudes
     recompute_legendre = true                       # saves memory as Legendre precomputation is
                                                     # unnecessary as S is not stored
-
-    S = SpectralTransform(NF,nlon,nlat,mmax,recompute_legendre)
+    radius = 1                                      # only needed for SpectralTransform() but not used
+    S = SpectralTransform(NF,nlon,nlat,mmax,radius,recompute_legendre)
     return gridded(alms,S)          # now execute the in-place version
 end
 
@@ -382,18 +372,6 @@ function spectral!( alms::AbstractMatrix{Complex{NF}},
     return alms
 end
 
-function spectral!( alms::AbstractArray{Complex{NF},3},
-                    map::AbstractArray{NF,3},
-                    S::SpectralTransform{NF}
-                    ) where {NF<:AbstractFloat}
-    
-    for k in 1:size(alms)[end]
-        alms_layer = view(alms,:,:,k)
-        map_layer = view(map,:,:,k)
-        spectral!(alms_layer,map_layer,S)
-    end
-end
-
 """
     alms = spectral(map)
 
@@ -414,7 +392,8 @@ function spectral(  map::AbstractMatrix{NF};    # gridded field nlon x nlat
     recompute_legendre = true                   # saves memory
 
     # allocate spectral transform struct
-    S = SpectralTransform(NF,nlon,nlat,trunc,recompute_legendre)
+    radius = 1  # only needed for argument compatibility
+    S = SpectralTransform(NF,nlon,nlat,trunc,radius,recompute_legendre)
     return spectral(map,S;kwargs...)
 end
 

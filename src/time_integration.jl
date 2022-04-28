@@ -46,22 +46,7 @@ function leapfrog!( A::AbstractArray{Complex{NF},3},        # a prognostic varia
     end
 end
 
-"""Leapfrog! for 3D arrays that loops over all vertical layers."""
-function leapfrog!( A::AbstractArray{Complex{NF},4},        # a prognostic variable (spectral)
-                    tendency::AbstractArray{Complex{NF},3}, # tendency (dynamics + physics) of A
-                    dt::Real,                               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
-                    C::Constants{NF},                       # struct containing all constants used at runtime
-                    lf::Int=2                               # leapfrog index to dis/enable(default) William's filter
-                    ) where {NF<:AbstractFloat}             # number format NF
-
-    for k in 1:size(A)[end]                         # loop over vertical levels (last dimension)
-        A_layer = view(A,:,:,:,k)                   # extract vertical layers as views to not allocate any memory
-        tendency_layer = view(tendency,:,:,k)
-        leapfrog!(A_layer,tendency_layer,dt,C,lf)   # make a timestep forward for each layer
-    end
-end
-
-"""TODO write a leapfrog! function that loops over all prognostic variables."""
+"""A leapfrog! function that loops over all prognostic variables."""
 function leapfrog!( progn::PrognosticVariables{NF},         # all prognostic variables
                     tend::Tendencies{NF},                   # all tendencies
                     dt::Real,                               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
@@ -77,14 +62,14 @@ function leapfrog!( progn::PrognosticVariables{NF},         # all prognostic var
     end 
 end    
 
-"""Call initialization of semi-implicit scheme and perform initial time step."""
+"""Performs the first two initial time steps (Euler forward, unfiltered leapfrog)."""
 function first_timesteps!(  progn::PrognosticVariables{NF}, # all prognostic variables
                             diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                             M::ModelSetup                   # everything that is constant at runtime
                             ) where NF
     
     @unpack Δt,Δt_sec = M.constants
-    time_sec = 0
+    time_sec = 0    # overall time counter in seconds using Int64 for error free accumulation
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
     # IMP = initialize_implicit(half*Δt)
@@ -132,6 +117,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     get_tendencies!(diagn,progn,M,lf2)                   
 
     # DIFFUSION FOR WIND
+    # always use first leapfrog index for diffusion (otherwise unstable)
     vor_lf = view(vor,:,:,1,:)                                      # array view for leapfrog index
     # div_l1 = view(div,:,:,1,:)                                    # TODO l1/l2 dependent?
     horizontal_diffusion!(vor_tend,vor_lf,damping,damping_impl)     # diffusion of vorticity
@@ -172,7 +158,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     leapfrog!(vor,vor_tend,dt,M.constants,lf1)
 end
 
-"""Calculate a single time step for SpeedyWeather.jl"""
+"""Main time loop."""
 function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variables
                         diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                         M::ModelSetup{NF}               # all precalculated structs
@@ -181,11 +167,13 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
     @unpack n_timesteps, Δt, Δt_sec = M.constants
     @unpack output = M.parameters
 
+    # some initial conditions for vorticity
     progn.vor[4,3,1,:] .= 5e-6
     lmax, mmax = 15,15
     progn.vor[1:lmax,1:mmax,1,:] .+= 1e-7*randn(Complex{NF},lmax,mmax,M.parameters.nlev)
     spectral_truncation!(progn.vor[:,:,1,:],M.parameters.trunc)
     
+    # propagate spectral state (at leapfrog index 1) to grid variables for initial condition output
     gridded!(diagn,progn,M,1)
 
     # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS

@@ -19,7 +19,7 @@ end
         @test 2^i*3 == SpeedyWeather.roundup_fft(2^i*3)
     end
     for n in 1:10
-        i = rand(1:1000)
+        i = rand(2:1000)
         @test i <= SpeedyWeather.roundup_fft(i)
     end
 end

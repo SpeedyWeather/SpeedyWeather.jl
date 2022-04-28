@@ -28,7 +28,15 @@ function get_run_id_path(P::Parameters)
     end
 end
 
-function initialize_netcdf_output(  diagn::DiagnosticVariables,  # output grid variables only
+"""
+    netcdf_file = initialize_netcdf_output( diagn::DiagnosticVariables, # output grid variables only
+                                            feedback::Feedback,         # Feedback struct
+                                            M::ModelSetup)              # ModelSetup struct
+
+Creates a netcdf file on disk and the corresponding `netcdf_file` object preallocated with output variables
+and dimensions. `write_netcdf_output!` then writes consecuitive time steps into this file.
+"""
+function initialize_netcdf_output(  diagn::DiagnosticVariables, # output grid variables only
                                     feedback::Feedback,         # Feedback struct
                                     M::ModelSetup)              # ModelSetup struct
 
@@ -77,6 +85,16 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,  # output grid v
     return netcdf_file
 end
 
+"""write_netcdf_output!(netcdf_file::Union{NcFile,Nothing},     # netcdf file to output into
+                        feedback::Feedback,                     # feedback struct to increment output counter
+                        i::Int,                                 # time step index
+                        time_sec::Int,                          # model time [s] for output
+                        diagn::DiagnosticVariables,             # all diagnostic variables
+                        M::ModelSetup)                          # all parameters
+
+Writes the variables from `diagn` of time step `i` at time `time_sec` into `netcdf_file`. Simply escapes for no
+netcdf output of if output shouldn't be written on this time step. Converts variables from `diagn` to float32
+for output, truncates the mantissa for higher compression and applies lossless compression."""
 function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf file to output into
                                 feedback::Feedback,                     # feedback struct to increment output counter
                                 i::Int,                                 # time step index

@@ -15,7 +15,7 @@
         SpeedyWeather.horizontal_diffusion!(vor_tend,vor_lf1,damping,damping_impl)
 
         (;nlev) = m.geospectral.geometry
-        (;lmax,mmax) = m.geospectral.spectral
+        (;lmax,mmax) = m.geospectral.spectral_transform
 
         # diffusion tendency has opposite sign (real/imag respectively)
         # than prognostic variable to act as a dissipation 
