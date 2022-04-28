@@ -1,6 +1,11 @@
 function Base.show(io::IO, P::PrognosticVariables)
+
+    lf = 1                      # first leapfrog index
+    lev = size(P.temp)[end]     # surface level
+    temp = view(P.temp,:,:,lf,lev)
     
-    temp_surf_grid_degC = gridded(P.temp[:,:,1,end]) .- 273.15  # to grid space and ˚C
+    temp_surf_grid_degC = gridded(temp)     # to grid space
+    temp_surf_grid_degC .-= 273.15          # and ˚C
     temp_surf_grid_degC = temp_surf_grid_degC[:,end:-1:1]       # flip latitudes
 
     nlon,nlat = size(temp_surf_grid_degC)

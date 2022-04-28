@@ -35,7 +35,7 @@ function initialize_from_rest(  P::Parameters,
                                 G::GeoSpectral)
 
     @unpack nlev = G.geometry
-    @unpack lmax, mmax = G.spectral
+    @unpack lmax, mmax = G.spectral_transform
     nleapfrog = 2
 
     # conversion to type NF later when creating a PrognosticVariables struct
@@ -109,6 +109,7 @@ function initialize_pressure!(  pres_surf::AbstractMatrix{Complex{NF}}, # logari
                                 G::GeoSpectral) where NF                # Geospectral struct
     
     @unpack nlon, nlat = P
+    S = G.spectral_transform
 
     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
@@ -117,8 +118,8 @@ function initialize_pressure!(  pres_surf::AbstractMatrix{Complex{NF}}, # logari
     # R:            Specific gas constant for dry air [J/kg/K]
     # pres_ref:     Reference surface pressure [hPa]
     @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R_gas = P
-    @unpack geopot_surf = B                             # spectral surface geopotential
-    geopot_surf_grid = gridded(geopot_surf,G.spectral)  # convert to grid-point space
+    @unpack geopot_surf = B                     # spectral surface geopotential
+    geopot_surf_grid = gridded(geopot_surf,S)   # convert to grid-point space
 
     lapse_rate_scaled = lapse_rate/gravity/1000 # Lapse rate scaled by gravity [K/m / (m²/s²)]
     log_pres_ref = log(pres_ref)                # logarithm of reference surface pressure
@@ -132,7 +133,7 @@ function initialize_pressure!(  pres_surf::AbstractMatrix{Complex{NF}}, # logari
     end
 
     # convert to spectral space
-    spectral!(pres_surf,pres_surf_grid,SpectralTransform(NF,nlon,nlat,P.trunc,true))
+    spectral!(pres_surf,pres_surf_grid,SpectralTransform(NF,nlon,nlat,P.trunc,P.radius_earth,true))
     spectral_truncation!(pres_surf,P.trunc)     # set lmax+1 row to zero
     return pres_surf_grid                       # return grid for use in initialize_humidity!
 end

@@ -320,25 +320,27 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     @unpack vor = progn                             # relative vorticity
     @unpack vor_grid, u_grid, v_grid = diagn.grid_variables
     @unpack stream_function, coslat_u, coslat_v = diagn.intermediate_variables
-    @unpack geometry, spectral = M.geospectral
-    @unpack lmax,ϵlms = spectral
+    
+    G = M.geospectral.geometry
+    S = M.geospectral.spectral_transform
+    @unpack lmax,ϵlms = S
     @unpack radius_earth = M.constants
 
     # fill!(view(vor,lmax+1,:,:,:),0)
 
-    vor_lf = view(vor,:,:,lf,:)                     # pick leapfrog index with mem allocation
-    gridded!(vor_grid,vor_lf,spectral)              # get vorticity on grid from spectral vor_lf
-    ∇⁻²!(stream_function,vor_lf,radius_earth)       # invert Laplacian ∇² for stream function
+    vor_lf = view(vor,:,:,lf,:)     # pick leapfrog index with mem allocation
+    gridded!(vor_grid,vor_lf,S)     # get vorticity on grid from spectral vor_lf
+    ∇⁻²!(stream_function,vor_lf,S)  # invert Laplacian ∇² for stream function
     
     # coslat*v = zonal gradient of stream function
     # coslat*u = meridional gradient of stream function
-    gradient_longitude!(coslat_v, stream_function,            radius_earth)
-    gradient_latitude!( coslat_u, stream_function, spectral, -radius_earth)
+    gradient_longitude!(coslat_v, stream_function,     radius_earth)
+    gradient_latitude!( coslat_u, stream_function, S, -radius_earth)
     
-    gridded!(u_grid,coslat_u,spectral)              # get u,v on grid from spectral
-    gridded!(v_grid,coslat_v,spectral)
-    unscale_coslat!(u_grid,geometry)                # undo the coslat scaling from gradients
-    unscale_coslat!(v_grid,geometry)
+    gridded!(u_grid,coslat_u,S)              # get u,v on grid from spectral
+    gridded!(v_grid,coslat_v,S)
+    unscale_coslat!(u_grid,G)                # undo the coslat scaling from gradients
+    unscale_coslat!(v_grid,G)
 
     return nothing
 end
