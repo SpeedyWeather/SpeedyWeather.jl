@@ -326,16 +326,14 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     @unpack lmax,ϵlms = S
     @unpack radius_earth = M.constants
 
-    # fill!(view(vor,lmax+1,:,:,:),0)
-
     vor_lf = view(vor,:,:,lf,:)     # pick leapfrog index with mem allocation
     gridded!(vor_grid,vor_lf,S)     # get vorticity on grid from spectral vor_lf
     ∇⁻²!(stream_function,vor_lf,S)  # invert Laplacian ∇² for stream function
     
-    # coslat*v = zonal gradient of stream function
-    # coslat*u = meridional gradient of stream function
-    gradient_longitude!(coslat_v, stream_function,     radius_earth)
-    gradient_latitude!( coslat_u, stream_function, S, -radius_earth)
+    # # coslat*v = zonal gradient of stream function
+    # # coslat*u = meridional gradient of stream function
+    gradient_longitude!(coslat_v, stream_function, radius_earth)
+    gradient_latitude!( coslat_u, stream_function, S)
     
     gridded!(u_grid,coslat_u,S)              # get u,v on grid from spectral
     gridded!(v_grid,coslat_v,S)

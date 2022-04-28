@@ -14,8 +14,7 @@ This function uses the recursion relation (0-based degree l, order m)
 As u = -1/R*∂Ψ/∂lat, this function can be generally used to compute the gradient in latitude."""
 function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: cos(lat)*zonal velocity u
                             Ψ::AbstractMatrix{Complex{NF}},         # input: streamfunction Ψ
-                            S::SpectralTransform{NF},               # 
-                            R::Real=1                               # radius of the sphere/Earth
+                            S::SpectralTransform{NF}                # use precomputed recursion factors
                             ) where {NF<:AbstractFloat}             # number format NF
 
     _,mmax = size(Ψ)                # degree l, order m of spherical harmonics
@@ -25,49 +24,28 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: co
     # Ψ can have size n+1 x n but then the last row is not used in the loop
     size_compat = size(coslat_u) == size(Ψ) || (size(coslat_u) .- (1,0)) == size(Ψ)
     @boundscheck size_compat || throw(BoundsError)
-    R⁻¹ = convert(Complex{NF},1/R)                              # 1/radius of the sphere
-
     @unpack grad_y1, grad_y2 = S
 
-    coslat_u[1,1] = grad_y2[1,1]*Ψ[2,1]*R⁻¹
+    coslat_u[1,1] = grad_y2[1,1]*Ψ[2,1]     # l=m=0 mode only with term 2
 
-    for m in 1:mmax
+    @inbounds for m in 1:mmax
         for l in max(2,m):lmax
-            coslat_u[l,m] = (grad_y1[l,m]*Ψ[l-1,m] + grad_y2[l,m]*Ψ[l+1,m])*R⁻¹
+            coslat_u[l,m] = grad_y1[l,m]*Ψ[l-1,m] + grad_y2[l,m]*Ψ[l+1,m]
         end
         for l in lmax+1:lmax+2
-            coslat_u[l,m] = grad_y1[l,m]*Ψ[l-1,m]*R⁻¹
+            coslat_u[l,m] = grad_y1[l,m]*Ψ[l-1,m]
         end
     end
 
     return coslat_u
 end
 
-"""gradient_latitude! but precalculate the recursion factors `ϵlms` in case they are not provided."""
-function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: cos(lat)*u
-                            Ψ::AbstractMatrix{Complex{NF}},         # input: streamfunction Ψ
-                            R::Real=1                               # radius of the sphere/Earth
-                            ) where {NF<:AbstractFloat}             # number format NF
-    _,mmax = size(Ψ) .- 1                                           # degree l, order m of spherical harmonics   
-    ϵlms = get_recursion_factors(NF,mmax,mmax)                      # precalculate recursion factors
-    return gradient_latitude!(coslat_u,Ψ,ϵlms,R)                    # call in-place function
-end
-
 function gradient_latitude( Ψ::AbstractMatrix{Complex{NF}}, # input: streamfunction Ψ
-                            R::Real=1                       # radius of the sphere/Earth
+                            S::SpectralTransform{NF}        # precomputed gradient arrays
                             ) where {NF<:AbstractFloat}     # number format NF
     _,mmax = size(Ψ) .- 1                                   # max degree l, order m of spherical harmonics
     coslat_u = zeros(Complex{NF},mmax+2,mmax+1)             # preallocate output, one more l for recursion
-    return gradient_latitude!(coslat_u,Ψ,R)                 # call in-place version
-end
-
-function gradient_latitude( Ψ::AbstractMatrix{Complex{NF}}, # input: streamfunction Ψ
-                            S::SpectralTransform{NF},
-                            R::Real=1                       # radius of the sphere/Earth
-                            ) where {NF<:AbstractFloat}     # number format NF
-    _,mmax = size(Ψ) .- 1                                   # max degree l, order m of spherical harmonics
-    coslat_u = zeros(Complex{NF},mmax+2,mmax+1)             # preallocate output, one more l for recursion
-    return gradient_latitude!(coslat_u,Ψ,S,R)               # call in-place version
+    return gradient_latitude!(coslat_u,Ψ,S)                 # call in-place version
 end
 
 """
