@@ -63,10 +63,10 @@ function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # outpu
                                 R::Real=1                               # radius of the sphere/Earth
                                 ) where {NF<:AbstractFloat}             # number format NF
 
-    lmax,mmax = size(Ψ)     # 1-based max degree l, order m of spherical harmonics
-    @boundscheck (lmax+1,mmax) == size(coslat_v) || throw(BoundsError)
-    lmax -= 1               # convert to 0-based
-    mmax -= 1  
+    # Ψ can have size n+1 x n but then the last row is not used in the loop
+    size_compat = size(coslat_v) == size(Ψ) || (size(coslat_v) .- (1,0)) == size(Ψ)
+    @boundscheck size_compat || throw(BoundsError)
+    lmax,mmax = size(Ψ) .- 1    # 0-based max degree l, order m of spherical harmonics
 
     iR⁻¹ = convert(Complex{NF},im/R)            # = imaginary/radius converted to NF
 
@@ -74,7 +74,13 @@ function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # outpu
         for l in m:lmax+1                       # degree l
             coslat_v[l,m] = (m-1)*iR⁻¹*Ψ[l,m]   # gradient in lon = *i*m/R but order m is 1-based
         end
-        coslat_v[end,m] = zero(Complex{NF})     # grad in lon does not project onto the last degree l
+    end
+
+    # grad in lon does not project onto the last degree l, set explicitly to zero in that case
+    if size(Ψ) != size(coslat_v)
+        for m in 1:mmax+1        
+            coslat_v[end,m] = zero(Complex{NF}) 
+        end
     end
 
     return coslat_v

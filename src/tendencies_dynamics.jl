@@ -20,9 +20,6 @@ function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic 
 
     _,_,nlev = size(u_grid)
 
-
-    
-  
     #Calculate mean fields
     for k in 1:nlev
         u_mean += u_grid[:,:,k]  *σ_levels_thick[k] 
@@ -64,8 +61,6 @@ function vertical_velocity_tendency!(Diag::DiagnosticVariables{NF}, # Diagnostic
 
 end
 
-
-
 """
 Compute the temperature anomaly in grid point space
 """
@@ -84,10 +79,6 @@ function temperature_grid_anomaly!(Diag::DiagnosticVariables{NF}, # Diagnostic v
     end
 
 end
-
-
-
-
 
 """
 Compute the spectral tendency of the zonal wind
@@ -201,9 +192,6 @@ function temperature_tendency!(Diag::DiagnosticVariables{NF}, # Diagnostic varia
 
 end
 
-
-
-
 """
 Compute the humidity tendency
 """
@@ -252,61 +240,51 @@ Step 4 (spectral space): convert uω/coslat, vω/coslat from grid to spectral sp
 Step 5 (spectral space): Compute gradients ∂/∂lon(uω/coslat) and ∂/∂lat(vω/coslat)
 Step 6 (spectral space): Add ∂/∂lon(uω/coslat)+∂/∂θ(vω/coslat) and return.
 """
-function divergence_uvω_spectral(   u_grid::AbstractMatrix{NF},     # zonal velocity in grid space
-                                    v_grid::AbstractMatrix{NF},     # meridional velocity in grid space
-                                    vor_grid::AbstractMatrix{NF},   # relative vorticity in grid space       
-                                    G::GeoSpectral{NF}              # struct with geometry and spectral transform
-                                    ) where {NF<:AbstractFloat}
+function divergence_uvω!(   D::DiagnosticVariables{NF}, # all diagnostic variables   
+                            G::GeoSpectral{NF}          # struct with geometry and spectral transform
+                            ) where {NF<:AbstractFloat}                                   
 
-    nlon,nlat = size(u_grid)
-    @boundscheck size(u_grid) == size(v_grid) || throw(BoundsError)
-
-    @unpack f_coriolis,coslat,coslat⁻¹,radius_earth = G.geometry
     S = G.spectral_transform
+    @unpack u_grid, v_grid, vor_grid = D.grid_variables
+    @unpack uω_grid_coslat⁻¹,vω_grid_coslat⁻¹ = D.intermediate_variables
+    @unpack uω_coslat⁻¹,vω_coslat⁻¹ = D.intermediate_variables
+    @unpack ∂uω_∂lon,∂vω_∂lat = D.intermediate_variables
+    @unpack vor_tend = D.tendencies
+    @unpack radius = G.spectral_transform
 
-    uω_grid_coslat⁻¹ = zero(u_grid)                             # TODO preallocate elsewhere
-    vω_grid_coslat⁻¹ = zero(v_grid)
+    # STEP 1-3: Abs vorticity, velocity times abs vort, unscale with coslat
+    uvω_grid!(uω_grid_coslat⁻¹,vω_grid_coslat⁻¹,u_grid,v_grid,vor_grid,G.geometry)
+
+    spectral!(uω_coslat⁻¹,uω_grid_coslat⁻¹,S)           # STEP 4: to spectral space
+    spectral!(vω_coslat⁻¹,vω_grid_coslat⁻¹,S)
+
+    gradient_longitude!(∂uω_∂lon,-uω_coslat⁻¹,radius)    # STEP 5: spectral gradients
+    gradient_latitude!( ∂vω_∂lat,vω_coslat⁻¹,S)
+
+    add_tendencies!(vor_tend,∂uω_∂lon,∂vω_∂lat)         # STEP 6: Add tendencies
+end
+
+function uvω_grid!( uω::AbstractMatrix{NF},    # Output: u*(vor+coriolis)/coslat in grid space
+                    vω::AbstractMatrix{NF},    # Output: v*(vor+coriolis)/coslat in grid space
+                    u::AbstractMatrix{NF},     # Input: zonal velocity in grid space
+                    v::AbstractMatrix{NF},     # Input: meridional velocity in grid space
+                    vor::AbstractMatrix{NF},   # Input: relative vorticity in grid space       
+                    G::Geometry{NF}            # struct with precomputed geometry arrays
+                    ) where {NF<:AbstractFloat}# number format NF
+
+    nlon,nlat = size(u)
+    @boundscheck size(u) == size(v) || throw(BoundsError)
+    @boundscheck size(u) == size(vor) || throw(BoundsError)
+    @boundscheck size(u) == size(uω) || throw(BoundsError)
+    @boundscheck size(u) == size(vω) || throw(BoundsError)
+
+    @unpack f_coriolis, coslat⁻¹ = G
 
     @inbounds for j in 1:nlat
         for i in 1:nlon
-            ω = vor_grid[i,j] + f_coriolis[j]                   # = relative vorticity + coriolis
-            uω_grid_coslat⁻¹[i,j] = -ω*u_grid[i,j]*coslat⁻¹[j]   # = u(vor+f)/cos(ϕ)
-            vω_grid_coslat⁻¹[i,j] = ω*v_grid[i,j]*coslat⁻¹[j]   # = v(vor+f)/cos(ϕ)
-            # uω_grid_coslat⁻¹[i,j] = ω*10*coslat⁻¹[j]   # = u(vor+f)/cos(ϕ)
-            # vω_grid_coslat⁻¹[i,j] = ω*10*coslat⁻¹[j]   # = v(vor+f)/cos(ϕ)
-
-        end
-    end
-
-    # TODO preallocate returned coefficients elsewhere
-    uω_coslat⁻¹ = spectral(uω_grid_coslat⁻¹,S,one_more_l=false)         
-    vω_coslat⁻¹ = spectral(vω_grid_coslat⁻¹,S,one_more_l=false)
-
-    ∂uω_∂lon = gradient_longitude(uω_coslat⁻¹,radius_earth,one_more_l=true)                  # spectral gradients
-    ∂vω_∂lat = gradient_latitude(vω_coslat⁻¹,S,-radius_earth)
-
-    return -(∂uω_∂lon+∂vω_∂lat)                                  # add for divergence
-end
-
-function divergence_uvω_spectral!(  vor_tend::AbstractArray{Complex{NF},3}, # vorticity tendency  
-                                    u_grid::AbstractArray{NF,3},            # zonal velocity in grid space
-                                    v_grid::AbstractArray{NF,3},            # meridional velocity in grid space
-                                    vor_grid::AbstractArray{NF,3},          # relative vorticity in grid space       
-                                    G::GeoSpectral{NF}                      # struct with geometry and spectral transform
-                                    ) where {NF<:AbstractFloat}
-    
-    for k in 1:size(vor_tend)[end]
-        u_grid_layer = view(u_grid,:,:,k)
-        v_grid_layer = view(v_grid,:,:,k)
-        vor_grid_layer = view(vor_grid,:,:,k)
-        tend = divergence_uvω_spectral(u_grid_layer,v_grid_layer,vor_grid_layer,G)
-        
-        lmax,mmax = size(vor_tend)[1:2]
-
-        for m in 1:mmax
-            for l in m:lmax
-                vor_tend[l,m,k] = tend[l,m]
-            end
+            ω = vor[i,j] + f_coriolis[j]    # = relative vorticity + coriolis
+            uω[i,j] = ω*u[i,j]*coslat⁻¹[j]  # = u(vor+f)/cos(ϕ)
+            vω[i,j] = ω*v[i,j]*coslat⁻¹[j]  # = v(vor+f)/cos(ϕ)
         end
     end
 end
@@ -330,8 +308,8 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     gridded!(vor_grid,vor_lf,S)     # get vorticity on grid from spectral vor_lf
     ∇⁻²!(stream_function,vor_lf,S)  # invert Laplacian ∇² for stream function
     
-    # # coslat*v = zonal gradient of stream function
-    # # coslat*u = meridional gradient of stream function
+    # coslat*v = zonal gradient of stream function
+    # coslat*u = meridional gradient of stream function
     gradient_longitude!(coslat_v, stream_function, radius_earth)
     gradient_latitude!( coslat_u, stream_function, S)
     

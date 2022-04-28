@@ -47,10 +47,12 @@ function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic var
     # Computation of spectral tendencies 
     # =========================================================================
     
-    @unpack u_grid, v_grid, vor_grid = diagn.grid_variables
-    @unpack vor_tend = diagn.tendencies
+    # @unpack u_grid, v_grid, vor_grid = diagn.grid_variables
+    # @unpack vor_tend = diagn.tendencies
 
-    divergence_uvω_spectral!(vor_tend,u_grid,v_grid,vor_grid,M.geospectral)
+    # divergence_uvω_spectral!(vor_tend,u_grid,v_grid,vor_grid,M.geospectral)
+    divergence_uvω!(diagn,M.geospectral)
+
 
     # if  α == 0
 
@@ -359,4 +361,40 @@ function get_spectral_tendencies!(Prog::PrognosticVariables{NF},
     end 
 
 
+end
+
+function add_tendencies!(   tend::AbstractMatrix{NF},   # tendency to accumulate into
+                            term1::AbstractMatrix{NF},  # with term1
+                            term2::AbstractMatrix{NF}   # and term2
+                            ) where NF                  # number format real or complex
+
+    # term1, term2 can have one more degree l which will be ignored in the loop though
+    size_compat1 = size(tend) == size(term1) || (size(term1) .- (1,0)) == size(tend)
+    size_compat2 = size(tend) == size(term2) || (size(term2) .- (1,0)) == size(tend)
+    @boundscheck size_compat1 || throw(BoundsError)
+    @boundscheck size_compat2 || throw(BoundsError)
+
+    lmax,mmax = size(tend) .- 1
+
+    @inbounds for m in 1:mmax+1
+        for l in m:lmax+1
+            tend[l,m] += (term1[l,m] + term2[l,m])
+        end
+    end
+end
+
+function add_tendencies!(   tend::AbstractMatrix{Complex{NF}},  # tendency to accumulate into
+                            term::AbstractMatrix{Complex{NF}}   # with term
+                            ) where NF                          # number format real or complex
+
+    # term can have one more degree l which will be ignored in the loop though
+    size_compat = size(tend) == size(term) || (size(term) .- (1,0)) == size(tend)
+    @boundscheck size_compat || throw(BoundsError)
+    lmax,mmax = size(tend) .- 1
+
+    @inbounds for m in 1:mmax+1
+        for l in m:lmax+1
+            tend[l,m] += term[l,m]
+        end
+    end
 end

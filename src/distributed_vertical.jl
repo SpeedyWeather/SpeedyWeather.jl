@@ -1,6 +1,21 @@
+# ONE ARGUMENT FUNCTIONS
+for func_name in (:unscale_coslat!,:scale_coslat!,
+                    :spectral_truncation!)
+    @eval begin
+        function $func_name(A::AbstractArray{NF,3},
+                            args...) where NF
+
+            for k in 1:size(A)[end]
+                A_layer = view(A,:,:,k)
+                $func_name(A_layer,args...)
+            end
+        end
+    end
+end
+
 # TWO ARGUMENT FUNCTIONS
 for func_name in (:gradient_longitude!, :gradient_latitude!,
-                    :gridded!, :spectral!, :∇⁻²!)
+                    :gridded!, :spectral!, :∇⁻²!, :add_tendencies!)
     @eval begin
         function $func_name(Out::AbstractArray{NF1,3},
                             In::AbstractArray{NF2,3},
@@ -15,16 +30,46 @@ for func_name in (:gradient_longitude!, :gradient_latitude!,
     end
 end
 
-# ONE ARGUMENT FUNCTIONS
-for func_name in (:unscale_coslat!,:scale_coslat!,
-                    :spectral_truncation!)
+# THREE ARGUMENT FUNCTIONS
+for func_name in (:add_tendencies!,)
     @eval begin
-        function $func_name(A::AbstractArray{NF,3},
-                            args...) where NF
+        function $func_name(Out::AbstractArray{NF1,3},
+                            In1::AbstractArray{NF2,3},
+                            In2::AbstractArray{NF2,3},
+                            args...) where {NF1,NF2}
+            
+            for k in 1:size(Out)[end]
+                Out_layer = view(Out,:,:,k)
+                In1_layer = view(In1,:,:,k)
+                In2_layer = view(In2,:,:,k)
+                $func_name(Out_layer,In1_layer,In2_layer,args...)
+            end
+        end
+    end
+end
 
-            for k in 1:size(A)[end]
-                A_layer = view(A,:,:,k)
-                $func_name(A_layer,args...)
+# FIVE ARGUMENT FUNCTIONS
+for func_name in (:uvω_grid!,)
+    @eval begin
+        function $func_name(Out1::AbstractArray{NF1,3},
+                            Out2::AbstractArray{NF1,3},
+                            In1::AbstractArray{NF2,3},
+                            In2::AbstractArray{NF2,3},
+                            In3::AbstractArray{NF2,3},
+                            args...) where {NF1,NF2}
+            
+            for k in 1:size(Out1)[end]
+                Out1_layer = view(Out1,:,:,k)
+                Out2_layer = view(Out2,:,:,k)
+                In1_layer = view(In1,:,:,k)
+                In2_layer = view(In2,:,:,k)
+                In3_layer = view(In3,:,:,k)
+                $func_name( Out1_layer,
+                            Out2_layer,
+                            In1_layer,
+                            In2_layer,
+                            In3_layer,
+                            args...)
             end
         end
     end
