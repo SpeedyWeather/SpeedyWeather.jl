@@ -33,7 +33,7 @@ function duration_estimate(feedback::Feedback)
     time_total = round(Int,time_per_step*n_timesteps)
     time_to_go = round(Int,time_per_step*(n_timesteps-i))
 
-    s1 = "Model integration will take approximately "*readable_secs(time_total)*","
+    s1 = "Model integration will take approximately $(readable_secs(time_total)),"
     s2 = "and is hopefully done on "*
             Dates.format(Dates.now() + Dates.Second(time_to_go),Dates.RFC1123Format)
 
@@ -113,7 +113,7 @@ function feedback_end!(feedback::Feedback)
     t_end = time()          # time when the simulation ends
     feedback.t_end = t_end  # store in struct
 
-    s = " Integration done in "*readable_secs(t_end-t_start)*"."
+    s = " Integration done in $(readable_secs(t_end-t_start))."
     verbose && println(s)
     if output
         write(progress_txt,"\n"*s[2:end]*"\n")  # close txt file with last output
