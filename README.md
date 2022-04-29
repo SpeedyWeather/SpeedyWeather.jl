@@ -24,11 +24,8 @@ The main interface to SpeedyWeather.jl is
 
 ```julia
 julia> using SpeedyWeather
-julia> run_speedy(Float32,output=true,rotation_earth=0,n_days=30,trunc=85)
-Starting SpeedyWeather.jl run 1 on Wed, 27 Apr 2022 13:38:29
-Model integration will take approximately 15.0s,
-and is hopefully done on Wed, 27 Apr 2022 13:38:44
-100% Integration done in 30.1s.
+julia> run_speedy(Float32,n_days=100,output=true);
+Weather is speedy run 1:  49%|███████▍       |  ETA: 0:00:09 ( 3.71 ms/it)
 ```
 
 and the arguments for `run_speedy` are described in [`src/default_parameters.jl`](https://github.com/milankl/SpeedyWeather.jl/blob/main/src/default_parameters.jl).
