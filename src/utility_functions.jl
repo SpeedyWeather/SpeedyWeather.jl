@@ -15,28 +15,26 @@ function clip_negatives!(A::AbstractArray{T}) where T
 end
 
 """
-    time_string = readable_secs(secs::Real)
+    readable_secs(secs::Real) -> Dates.CompoundPeriod
 
-Returns a human readable string representing seconds in terms of days, hours, minutes or seconds,
-rounding to either (days, hours), (hours, minutes), (minutes, seconds), or seconds with 1 decimal
-place accuracy for >10s and two for less.
-E.g. 
+Returns `Dates.CompoundPeriod` rounding to either (days, hours), (hours, minutes), (minutes,
+seconds), or seconds with 1 decimal place accuracy for >10s and two for less.
+E.g.
 ```julia
 julia> readable_secs(12345)
-"3h, 25min"
+3 hours, 26 minutes
 ```
 """
 function readable_secs(secs::Real)
-    days = floor(Int,secs/3600/24)
-    hours = floor(Int,(secs/3600) % 24)
-    minutes = floor(Int,(secs/60) % 60)
-    seconds = floor(Int,secs%3600%60)
-    secs1f = @sprintf "%.1fs" secs%3600%60
-    secs2f = @sprintf "%.2fs" secs%3600%60
-
-    days > 0 && return "$(days)d, $(hours)h"
-    hours > 0 && return "$(hours)h, $(minutes)min"
-    minutes > 0 && return "$(minutes)min, $(seconds)s"
-    seconds > 10 && return secs1f
-    return secs2f
+    millisecs = Dates.Millisecond(round(secs * 10 ^ 3))
+    if millisecs >= Dates.Day(1)
+        return Dates.canonicalize(round(millisecs, Dates.Hour))
+    elseif millisecs >= Dates.Hour(1)
+        return Dates.canonicalize(round(millisecs, Dates.Minute))
+    elseif millisecs >= Dates.Minute(1)
+        return Dates.canonicalize(round(millisecs, Dates.Second))
+    elseif millisecs >= Dates.Second(10)
+        return Dates.canonicalize(round(millisecs, Dates.Millisecond(100)))
+    end
+    return Dates.canonicalize(round(millisecs, Dates.Millisecond(10)))
 end
