@@ -34,8 +34,8 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     coslat::Array{NF,1}         # cos of latitudes
     coslat⁻¹::Array{NF,1}       # =1/cos(lat)
 
-    # CORIOLIS FREQUENCY
-    f_coriolis::Array{NF,1}              # = 2Ω*sin(lat)
+    # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
+    f_coriolis::Array{NF,1}              # = 2Ω*sin(lat)*radius_earth
 
     # GEOPOTENTIAL CALCULATION WORK ARRAYS
     xgeop1::Array{NF,1}                  # ?
@@ -90,8 +90,8 @@ function Geometry(P::Parameters)
     coslat = cos.(lat)
     coslat⁻¹ = 1 ./ coslat
 
-    # CORIOLIS FREQUENCY
-    f_coriolis = 2rotation_earth*sinlat
+    # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
+    f_coriolis = 2rotation_earth*sinlat*radius_earth
 
     # GEOPOTENTIAL coefficients to calculate geopotential (TODO reference)
     xgeop1 = zeros(nlev)

@@ -11,7 +11,7 @@ Struct holding the parameters needed at runtime in number format NF.
     R_gas::NF        # Universal gas constant
 
     # TIME STEPPING
-    Δt::NF                  # time step [s], use 2Δt for leapfrog
+    Δt::NF                  # time step [ms], use 2Δt for leapfrog, scaled by Earth's radius
     Δt_sec::Int             # time step [s] but encoded as 64-bit integer for rounding error-free accumulation
     Δt_hrs::Float64         # time step [hrs]
     robert_filter::NF       # Robert (1966) time filter coefficient to suppress comput. mode
@@ -47,6 +47,9 @@ function Constants(P::Parameters)
     # stratospheric drag [1/s] from damping_time_strat [hrs]
     @unpack damping_time_strat = P
     drag_strat = 1/(damping_time_strat*3600)
+
+    # SCALING
+    Δt /= radius_earth
 
     # This implies conversion to NF
     return Constants{P.NF}( radius_earth,rotation_earth,gravity,akap,R_gas,
