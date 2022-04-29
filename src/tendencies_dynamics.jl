@@ -292,7 +292,7 @@ end
 function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
                     progn::PrognosticVariables{NF}, # all prognostic variables
                     M::ModelSetup,                  # everything that's constant
-                    lf::Int=2                       # leapfrog index
+                    lf::Int=1                       # leapfrog index
                     ) where NF
     
     @unpack vor = progn                             # relative vorticity

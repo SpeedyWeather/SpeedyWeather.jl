@@ -72,15 +72,13 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables, # output grid va
 
     # CREATE NETCDF FILE
     @unpack run_id, run_path = feedback
-    # file_name = @sprintf("run%04d.nc",run_id)
     file_name = "output.nc"
     netcdf_file = NetCDF.create(joinpath(run_path,file_name),
                     [var_time,var_u,var_v,var_vor,var_temp,var_humid,var_pres],mode=NetCDF.NC_NETCDF4)
 
     # WRITE INITIAL CONDITIONS TO FILE
-    initial_time_hrs = 0        # start at 0 hours after output_startdate
-    initial_timestep = 0        # start at i=0
-    write_netcdf_output!(netcdf_file,feedback,initial_timestep,initial_time_hrs,diagn,M)
+    initial_time_sec = 0        # start at 0 hours after output_startdate
+    write_netcdf_output!(netcdf_file,feedback,initial_time_sec,diagn,M)
 
     return netcdf_file
 end
@@ -97,13 +95,13 @@ netcdf output of if output shouldn't be written on this time step. Converts vari
 for output, truncates the mantissa for higher compression and applies lossless compression."""
 function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf file to output into
                                 feedback::Feedback,                     # feedback struct to increment output counter
-                                i::Int,                                 # time step index
                                 time_sec::Int,                          # model time [s] for output
                                 diagn::DiagnosticVariables,             # all diagnostic variables
                                 M::ModelSetup)                          # all parameters
 
-    isnothing(netcdf_file) && return nothing                        # escape immediately for no netcdf output
-    i % M.constants.output_every_n_steps == 0 || return nothing     # escape if output shouldn't be written on this step
+    @unpack counter = feedback.progress_meter
+    isnothing(netcdf_file) && return nothing                            # escape immediately for no netcdf output
+    counter % M.constants.output_every_n_steps == 0 || return nothing   # escape if output not written on this step
 
     feedback.i_out += 1                         # increase counter
     @unpack i_out = feedback
