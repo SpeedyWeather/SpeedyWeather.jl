@@ -15,7 +15,8 @@ module SpeedyWeather
     import NetCDF: NetCDF, NcFile, NcDim, NcVar
     import BitInformation: round, round!
     import UnicodePlots
-
+    import ProgressMeter
+    
     # EXPORT MAIN INTERFACE TO SPEEDY
     export run_speedy, initialize_speedy
 

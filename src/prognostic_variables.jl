@@ -18,8 +18,17 @@ function initial_conditions(    P::Parameters,      # Parameter struct
 
     if initial_conditions == :rest
         progn = initialize_from_rest(P,B,G)
+    elseif initial_conditions == :test
+        progn = initialize_from_rest(P,B,G)
+
+        # some initial conditions for vorticity
+        progn.vor[4,3,1,:] .= 5e-6
+        lmax, mmax = 15,15
+        progn.vor[1:lmax,1:mmax,1,:] .+= 1e-7*randn(Complex{P.NF},lmax,mmax,P.nlev)
+        spectral_truncation!(view(progn.vor,:,:,1,:),P.trunc)
+    
     elseif initial_conditions == :restart
-        progn = initialize_from_file(P,B,G)
+        progn = initialize_from_file(P,B,G)         # TODO this is not implemented yet
     else
         throw(error("Incorrect initialization option, $initial_conditions given."))
     end

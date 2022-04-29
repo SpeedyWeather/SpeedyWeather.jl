@@ -76,7 +76,7 @@ With keywords such that default values can be changed at creation.
     orography_file::String="orography_F512.nc"
 
     # INITIAL CONDITIONS
-    initial_conditions::Symbol=:rest    # :rest or :restart
+    initial_conditions::Symbol=:test    # :test, :rest or :restart
 
     # OUTPUT
     verbose::Bool=true          # print dialog for feedback

@@ -65,7 +65,8 @@ end
 """Performs the first two initial time steps (Euler forward, unfiltered leapfrog)."""
 function first_timesteps!(  progn::PrognosticVariables{NF}, # all prognostic variables
                             diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
-                            M::ModelSetup                   # everything that is constant at runtime
+                            M::ModelSetup,                  # everything that is constant at runtime
+                            feedback::Feedback              # feedback struct
                             ) where NF
     
     @unpack Δt,Δt_sec = M.constants
@@ -77,6 +78,7 @@ function first_timesteps!(  progn::PrognosticVariables{NF}, # all prognostic var
     lf2 = 1     # evaluates all tendencies at t=0, the first leapfrog index (=>Euler forward)
     timestep!(progn,diagn,Δt/2,M,lf1,lf2)
     time_sec += Δt_sec÷2
+    progress!(feedback)
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt)
     # IMP = initialize_implicit(Δt)
@@ -84,6 +86,7 @@ function first_timesteps!(  progn::PrognosticVariables{NF}, # all prognostic var
     lf2 = 2     # evaluate all tendencies at t=dt/2, the 2nd leapfrog index (=>Leapfrog)
     timestep!(progn,diagn,Δt,M,lf1,lf2)
     time_sec += Δt_sec÷2
+    progress!(feedback)
 
     # Initialize implicit arrays for further time steps (dt=2Δt)
     # IMP = initialize_implicit(2Δt)
@@ -166,33 +169,28 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
     
     @unpack n_timesteps, Δt, Δt_sec = M.constants
     @unpack output = M.parameters
-
-    # some initial conditions for vorticity
-    progn.vor[4,3,1,:] .= 5e-6
-    lmax, mmax = 15,15
-    progn.vor[1:lmax,1:mmax,1,:] .+= 1e-7*randn(Complex{NF},lmax,mmax,M.parameters.nlev)
-    spectral_truncation!(progn.vor[:,:,1,:],M.parameters.trunc)
     
-    # propagate spectral state (at leapfrog index 1) to grid variables for initial condition output
-    gridded!(diagn,progn,M,1)
+    # propagate spectral state to grid variables for initial condition output
+    gridded!(diagn,progn,M)
 
     # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS
     feedback = initialize_feedback(M)
     netcdf_file = initialize_netcdf_output(diagn,feedback,M)
 
     # FIRST TIMESTEP: EULER FORWARD THEN LEAPFROG IN MAIN LOOP
-    time_sec = first_timesteps!(progn,diagn,M)
+    time_sec = first_timesteps!(progn,diagn,M,feedback)
 
-    for i in 1:n_timesteps
+    # MAIN LOOP
+    for i in 1:n_timesteps-1            # first Δt time step in first_timesteps!
         time_sec += Δt_sec
         timestep!(progn,diagn,2Δt,M)
 
         # FEEDBACK AND OUTPUT
-        feedback!(feedback,i)
-        write_netcdf_output!(netcdf_file,feedback,i,time_sec,diagn,M)
+        progress!(feedback)
+        write_netcdf_output!(netcdf_file,feedback,time_sec,diagn,M)
     end
 
-    feedback_end!(feedback)
+    progress_finish!(feedback)
 
     return progn
 end
