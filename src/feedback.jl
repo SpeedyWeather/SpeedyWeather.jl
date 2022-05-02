@@ -1,36 +1,90 @@
-@with_kw mutable struct Feedback
-    t0::Float64=time()                      # start time
-    t1::Float64=time()                      # time for duration estimation
-    tend::Float64=t0                        # end time
-    nans_detected::Bool=false               # did NaNs occur in the simulation?
+mutable struct Feedback
+    # PROGRESS
+    progress_meter::ProgressMeter.Progress  # struct containing everything progress related
     progress_txt::Union{IOStream,Nothing}   # txt is a Nothing in case of no output
+    
+    # OUTPUT
+    verbose::Bool                           # print stuff to REPL?
     output::Bool                            # output to netCDF?
-    i::Int=0                                # time step increment
+    i_out::Int                              # output step counter
     n_timesteps::Int                        # number of time steps
-    n_outputs::Int                          # number of time steps with output
+    n_outputsteps::Int                      # number of time steps with output
     run_id::Int                             # run identification number
-    runpath::String                         # output path plus run????/
+    run_path::String                        # output path plus run????/
+
+    # NANS AND OTHER MODEL STATE FEEDBACK
+    nans_detected::Bool                     # did NaNs occur in the simulation?
 end
 
-"""Returns a human readable string representing seconds in terms of days, hours, minutes or seconds."""
-function readable_secs(secs::Real)
-    days = Int(floor(secs/3600/24))
-    hours = Int(floor((secs/3600) % 24))
-    minutes = Int(floor((secs/60) % 60))
-    seconds = Int(floor(secs%3600%60))
-    secs1f = @sprintf "%.1fs" secs%3600%60
-    secs2f = @sprintf "%.2fs" secs%3600%60
+"""Initialises the progress txt file."""
+function initialize_feedback(M::ModelSetup)
+    @unpack verbose, output = M.parameters
+    @unpack n_timesteps, n_outputsteps = M.constants
 
-    if days > 0
-        return "$(days)d, $(hours)h"
-    elseif hours > 0
-        return "$(hours)h, $(minutes)min"
-    elseif minutes > 0
-        return "$(minutes)min, $(seconds)s"
-    elseif seconds > 10
-        return secs1f
-    else
-        return secs2f
+    if output   # with netcdf output
+        @unpack NF,n_days,trunc,nlon,nlat = M.parameters
+
+        run_id,run_path = get_run_id_path(M.parameters)     # create output folder and get its id and path
+        
+        # create progress.txt file in run????/
+        progress_txt = open(joinpath(run_path,"progress.txt"),"w")
+        s = "Starting SpeedyWeather.jl run $run_id on "*
+                Dates.format(Dates.now(),Dates.RFC1123Format)
+        write(progress_txt,s*"\n")      # and in file
+
+        # add some information on resolution and number format
+        write(progress_txt,"Integrating $(n_days) days at a spectral resolution of "*
+                            "T$trunc with $(nlon)x$(nlat) grid points.\n")
+        write(progress_txt,"Number format is "*string(NF)*".\n")
+        write(progress_txt,"All data will be stored in $run_path.\n")
+
+        # also export parameters into run????/parameters.txt
+        parameters_txt = open(joinpath(run_path,"parameters.txt"),"w")
+        print(parameters_txt,M.parameters)
+        close(parameters_txt)
+
+    else        # no netcdf output
+        progress_txt = nothing      # for no ouput, allocate dummies for Feedback struct
+        run_id = -1                 # dummy
+        run_path = ""               # dummy
+    end
+
+    i_out = 0                       # start netcdf output counter at 0
+    nans_detected = false           # currently not used
+
+    # PROGRESSMETER
+    desc = "Weather is speedy$(output ? " run $run_id: " : ": ")"
+    progress_meter = ProgressMeter.Progress(n_timesteps,enabled=verbose,showspeed=true;desc)
+
+    return Feedback(progress_meter,progress_txt,
+                    verbose,output,i_out,n_timesteps,
+                    n_outputsteps,run_id,run_path,
+                    nans_detected)
+end
+
+"""Calls the progress meter and writes every 5% progress increase to txt."""
+function progress!(F::Feedback)
+    ProgressMeter.next!(F.progress_meter)           # update progress meter
+    @unpack counter,n = F.progress_meter
+
+    # write progress to txt file too
+    if (counter/n*100 % 1) > ((counter+1)/n*100 % 1)  
+        percent = round(Int,(counter+1)/n*100)      # % of time steps completed
+        if F.output && (percent % 5 == 0)           # write every 5% step in txt 
+            write(F.progress_txt,"\n$percent%")
+            flush(F.progress_txt)
+        end
     end
 end
 
+"""Finalises the progress meter and the progress txt file."""
+function progress_finish!(F::Feedback)
+    ProgressMeter.finish!(F.progress_meter)
+    
+    if F.output     # write final progress to txt file
+        time_elapsed = F.progress_meter.tlast - F.progress_meter.tinit
+        s = "Integration done in $(readable_secs(time_elapsed))."
+        write(F.progress_txt,"\n$s\n")
+        flush(F.progress_txt)
+    end
+end

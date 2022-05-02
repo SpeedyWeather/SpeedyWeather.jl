@@ -10,13 +10,15 @@ module SpeedyWeather
     import LinearAlgebra
 
     # INPUT OUTPUT 
-    import Dates: DateTime
+    import Dates: Dates, DateTime
     import Printf: @sprintf
     import NetCDF: NetCDF, NcFile, NcDim, NcVar
     import BitInformation: round, round!
-
+    import UnicodePlots
+    import ProgressMeter
+    
     # EXPORT MAIN INTERFACE TO SPEEDY
-    export run_speedy
+    export run_speedy, initialize_speedy
 
     # EXPORT STRUCTS
     export Parameters, GenLogisticCoefs,
@@ -25,32 +27,32 @@ module SpeedyWeather
     
     # EXPORT SPECTRAL FUNCTIONS
     export  spectral, gridded,
-        spectral!, gridded!,
-        spectral_truncation, spectral_truncation!,
-        spectral_interpolation, triangular_truncation
+        spectral_truncation, spectral_interpolation,
+        triangular_truncation
 
     include("utility_functions.jl")
     include("parameter_structs.jl")
     include("spectral_truncation.jl")
 
-    include("parameters.jl")
-    include("constants.jl")
-    include("geometry.jl")
-    include("spectral_transform.jl")
+    include("default_parameters.jl")        # defines Parameters
+    include("constants.jl")                 # defines Constants
+    include("geometry.jl")                  # defines Geometry
+    include("spectral_transform.jl")        # defines SpectralTransform, Geospectral
     include("spectral_gradients.jl")
+    include("distributed_vertical.jl")
 
-    include("boundaries.jl")
-    include("diagnostics.jl")
-    include("prognostic_variables.jl")
-    include("diagnostic_variables.jl")
-    include("geopotential.jl")
-    include("horizontal_diffusion.jl")
-    include("implicit.jl")
-    include("parametrization_tendencies.jl")
-    include("dynamics_tendencies.jl")
+    include("boundaries.jl")                # defines Boundaries
+    include("prognostic_variables.jl")      # defines PrognosticVariables
+    include("diagnostic_variables.jl")      # defines DiagnosticVariables
+    include("horizontal_diffusion.jl")      # defines HorizontalDiffusion
+
+    include("run_speedy.jl")                # defines ModelSetup
+    include("tendencies_parametrizations.jl")
+    include("tendencies_dynamics.jl")
     include("tendencies.jl")
-    include("feedback.jl")
-    include("output.jl")
+    include("feedback.jl")                  # defines Feedback
+    include("output.jl")                    
+
     include("time_integration.jl")
-    include("run_speedy.jl")
+    include("pretty_printing.jl")
 end
