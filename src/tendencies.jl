@@ -50,7 +50,6 @@ function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic var
     # @unpack u_grid, v_grid, vor_grid = diagn.grid_variables
     # @unpack vor_tend = diagn.tendencies
 
-    # divergence_uvω_spectral!(vor_tend,u_grid,v_grid,vor_grid,M.geospectral)
     divergence_uvω!(diagn,M.geospectral)
 
 

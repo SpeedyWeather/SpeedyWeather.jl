@@ -33,6 +33,9 @@ function initial_conditions(    P::Parameters,      # Parameter struct
         throw(error("Incorrect initialization option, $initial_conditions given."))
     end
 
+    # SCALING
+    progn.vor .*= G.geometry.radius_earth
+
     return progn
 end
 

@@ -1,19 +1,28 @@
 """
-    m = roundup_fft(n::Int)
+    m = roundup_fft(n::Int;
+                    small_primes::Vector{Int}=[2,3,5])
 
-Returns an integer `m >= n` with only prime factors 2 and 3 to obtain an efficiently
-fourier-transformable number of longitudes, m = 2^i * 3^j >= n, with i>=0 but j = 0,1.
+Returns an integer `m >= n` with only small prime factors 2, 3, 5 (default, others can be specified
+with the keyword argument `small_primes`) to obtain an efficiently fourier-transformable number of
+longitudes, m = 2^i * 3^j * 5^k >= n, with i,j,k >=0.
 """
-function roundup_fft(n::Int)
-    lz = leading_zeros(n)                   # determine scale of n
-
-    # create a mask that's 1 for all but the two most significant figures of n
-    # for finding the next largest integer of n with factors 2 and 3
-    mask = (1 << (8*sizeof(n)-lz-2))-1    
+function roundup_fft(n::Int;small_primes::Vector{Int}=[2,3,5])
+    factors_not_in_small_primes = true      # starting condition for while loop
+    while factors_not_in_small_primes
+        
+        factors = Primes.factor(n)          # prime factorization
+        all_factors_small = true            
+        
+        for i in length(factors)            # loop over factors and check they are small
+            factor = factors.pe[i].first
+            all_factors_small &= factor in small_primes
+        end
+        
+        factors_not_in_small_primes = ~all_factors_small    # all factors small will abort while loop
+        n += 1                                              # test for next larger n
     
-    # round up by adding mask as offset and then masking all insignificant bits
-    n_roundedup = (n + mask) & ~mask
-    return n_roundedup
+    end
+    return n-1      # subtract unnecessary last += 1 addition
 end
 
 """

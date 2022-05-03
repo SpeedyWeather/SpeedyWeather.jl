@@ -115,6 +115,11 @@ function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf
     humid_output = convert.(Float32,humid_grid)
     pres_output = convert.(Float32,pres_surf_grid)
 
+    # UNSCALE SCALED VARIABLES
+    vor_output ./= M.geospectral.geometry.radius_earth
+    # u_output ./= M.geospectral.geometry.radius_earth
+    # v_output ./= M.geospectral.geometry.radius_earth
+
     # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
     @unpack keepbits = M.parameters
     for var in (u_output,v_output,vor_output,temp_output,humid_output,pres_output)
