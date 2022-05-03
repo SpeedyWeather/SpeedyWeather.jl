@@ -4,14 +4,15 @@ Struct holding the parameters needed at runtime in number format NF.
 @with_kw struct Constants{NF<:AbstractFloat}
 
     # PHYSICAL CONSTANTS
-    radius_earth::NF # Radius of Earth
-    rotation_earth::NF            # Angular frequency of Earth's rotation
-    gravity::NF      # Gravitational acceleration
-    akap::NF         # Ratio of gas constant to specific heat of dry air at constant pressure
-    R_gas::NF        # Universal gas constant
+    radius_earth::NF        # Radius of Earth
+    rotation_earth::NF      # Angular frequency of Earth's rotation
+    gravity::NF             # Gravitational acceleration
+    akap::NF                # Ratio of gas constant to specific heat of dry air at constant pressure
+    R_gas::NF               # Universal gas constant
 
     # TIME STEPPING
-    Δt::NF                  # time step [ms], use 2Δt for leapfrog, scaled by Earth's radius
+    Δt::NF                  # time step [s/m], use 2Δt for leapfrog, scaled by Earth's radius
+    Δt_unscaled::NF         # time step [s], as Δt but not scaled with Earth's radius
     Δt_sec::Int             # time step [s] but encoded as 64-bit integer for rounding error-free accumulation
     Δt_hrs::Float64         # time step [hrs]
     robert_filter::NF       # Robert (1966) time filter coefficient to suppress comput. mode
@@ -49,11 +50,12 @@ function Constants(P::Parameters)
     drag_strat = 1/(damping_time_strat*3600)
 
     # SCALING
-    Δt /= radius_earth
-
+    Δt_unscaled = Δt        # [s] not scaled
+    Δt /= radius_earth      # scale with Earth's radius
+    
     # This implies conversion to NF
     return Constants{P.NF}( radius_earth,rotation_earth,gravity,akap,R_gas,
-                            Δt,Δt_sec,Δt_hrs,
+                            Δt,Δt_unscaled,Δt_sec,Δt_hrs,
                             robert_filter,williams_filter,n_timesteps,
                             output_every_n_steps, n_outputsteps,
                             drag_strat)

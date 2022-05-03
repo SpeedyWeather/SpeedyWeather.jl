@@ -10,7 +10,7 @@ function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic 
 
     @unpack pres_surf                            = Prog 
     @unpack pres_surf_tend                       = Diag.tendencies
-    @unpack u_grid,v_grid,div_grid               =   Diag.grid_variables
+    @unpack u_grid,v_grid,div_grid               = Diag.grid_variables
     @unpack u_mean,v_mean,div_mean,
             pres_surf_gradient_spectral_x,
             pres_surf_gradient_spectral_y,
@@ -282,9 +282,9 @@ function uvω_grid!( uω::AbstractMatrix{NF},    # Output: u*(vor+coriolis)/cos
 
     @inbounds for j in 1:nlat
         for i in 1:nlon
-            ω = vor[i,j] + f_coriolis[j]  # = relative vorticity + coriolis
-            uω[i,j] = ω*u[i,j]*coslat⁻¹[j]      # = u(vor+f)/cos(ϕ)
-            vω[i,j] = ω*v[i,j]*coslat⁻¹[j]      # = v(vor+f)/cos(ϕ)
+            ω = vor[i,j] + f_coriolis[j]    # = relative vorticity + coriolis
+            uω[i,j] = ω*u[i,j]*coslat⁻¹[j]  # = u(vor+f)/cos(ϕ)
+            vω[i,j] = ω*v[i,j]*coslat⁻¹[j]  # = v(vor+f)/cos(ϕ)
         end
     end
 end
@@ -301,7 +301,6 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     
     G = M.geospectral.geometry
     S = M.geospectral.spectral_transform
-    @unpack lmax,ϵlms = S
 
     vor_lf = view(vor,:,:,lf,:)     # pick leapfrog index with mem allocation
     gridded!(vor_grid,vor_lf,S)     # get vorticity on grid from spectral vor_lf

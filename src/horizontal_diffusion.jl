@@ -56,7 +56,7 @@ function HorizontalDiffusion(   P::Parameters,      # Parameter struct
                                 B::Boundaries)      # Boundaries struct
 
     # DIFFUSION
-    @unpack lmax,mmax = G.spectral_transform
+    @unpack lmax,mmax,radius = G.spectral_transform
     @unpack diffusion_power, diffusion_time, diffusion_time_div = P
     @unpack diffusion_time_strat, damping_time_strat = P
     @unpack Δt = C
@@ -89,14 +89,14 @@ function HorizontalDiffusion(   P::Parameters,      # Parameter struct
 
             # Explicit part (=ν∇²ⁿ)
             # convert diffusion time scales to damping frequencies [1/s] times norm. eigenvalue
-            damping[l,m] = norm_eigenvalueⁿ/(3600*diffusion_time)               # temperature/vorticity
-            damping_div[l,m] = norm_eigenvalueⁿ/(3600*diffusion_time_div)       # divergence
-            damping_strat[l,m] = norm_eigenvalue/(3600*diffusion_time_strat)    # stratosphere (no hyperdiff)
+            damping[l,m] = norm_eigenvalueⁿ/(3600*diffusion_time)*radius                # temperature/vorticity
+            damping_div[l,m] = norm_eigenvalueⁿ/(3600*diffusion_time_div)*radius        # divergence
+            damping_strat[l,m] = norm_eigenvalue/(3600*diffusion_time_strat)*radius     # stratosphere (no hyperdiff)
 
             # and implicit part of the diffusion (= 1/(1+2Δtν∇²ⁿ))
-            damping_impl[l,m] = 1/(1+2Δt*damping[l,m])              # for temperature/vorticity
-            damping_div_impl[l,m] = 1/(1+2Δt*damping_div[l,m])      # for divergence
-            damping_strat_impl[l,m] = 1/(1+2Δt*damping_strat[l,m])  # for stratosphere (no hyperdiffusion)
+            damping_impl[l,m] = 1/(1+2Δt*damping[l,m])                 # for temperature/vorticity
+            damping_div_impl[l,m] = 1/(1+2Δt*damping_div[l,m])         # for divergence
+            damping_strat_impl[l,m] = 1/(1+2Δt*damping_strat[l,m])     # for stratosphere (no hyperdiffusion)
         end
     end
 
