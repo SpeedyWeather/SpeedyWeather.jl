@@ -19,6 +19,7 @@ end
     for i in 1:10
         @test 2^i == SpeedyWeather.roundup_fft(2^i)
         @test 2^i*3 == SpeedyWeather.roundup_fft(2^i*3)
+        @test 2^i*5 == SpeedyWeather.roundup_fft(2^i*5)
     end
     for n in 1:10
         i = rand(2:1000)
