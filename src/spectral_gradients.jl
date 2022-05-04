@@ -22,7 +22,8 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: co
     
     # u needs one more degree/meridional mode l for each m than Ψ due to the recursion
     # Ψ can have size n+1 x n but then the last row is not used in the loop
-    size_compat = size(coslat_u) == size(Ψ) || (size(coslat_u) .- (1,0)) == size(Ψ)
+    size_same = size(coslat_u) == size(Ψ)
+    size_compat = size_same || (size(coslat_u) .- (1,0)) == size(Ψ)
     @boundscheck size_compat || throw(BoundsError)
     @unpack grad_y1, grad_y2 = S
 
@@ -32,7 +33,7 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: co
         for l in max(2,m):lmax
             coslat_u[l,m] = grad_y1[l,m]*Ψ[l-1,m] + grad_y2[l,m]*Ψ[l+1,m]
         end
-        for l in lmax+1:lmax+2
+        for l in lmax+1:lmax+2-size_same
             coslat_u[l,m] = grad_y1[l,m]*Ψ[l-1,m]
         end
     end
@@ -41,10 +42,11 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: co
 end
 
 function gradient_latitude( Ψ::AbstractMatrix{Complex{NF}}, # input: streamfunction Ψ
-                            S::SpectralTransform{NF}        # precomputed gradient arrays
+                            S::SpectralTransform{NF};       # precomputed gradient arrays
+                            one_more_l::Bool=true           # allocate output with one more degree l?
                             ) where {NF<:AbstractFloat}     # number format NF
     _,mmax = size(Ψ) .- 1                                   # max degree l, order m of spherical harmonics
-    coslat_u = zeros(Complex{NF},mmax+2,mmax+1)             # preallocate output, one more l for recursion
+    coslat_u = zeros(Complex{NF},mmax+one_more_l+1,mmax+1)  # preallocate output, one more l for recursion
     return gradient_latitude!(coslat_u,Ψ,S)                 # call in-place version
 end
 
