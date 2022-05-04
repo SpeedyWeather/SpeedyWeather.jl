@@ -37,10 +37,12 @@ function Constants(P::Parameters)
     
     # TIME INTEGRATION CONSTANTS
     @unpack robert_filter, williams_filter = P
-    @unpack n_days, output_dt = P
-    Δt      = P.Δt*60                           # convert time step Δt from minutes to seconds
-    Δt_sec  = round(Int,Δt)                     # encode time step Δt [s] as integer
-    Δt_hrs  = P.Δt/60                           # convert time step Δt from minutes to hours
+    @unpack trunc, Δt_at_T85, n_days, output_dt = P
+
+    Δt_min_at_trunc = Δt_at_T85*(85/trunc)      # scale time step Δt to specified resolution
+    Δt      = round(Δt_min_at_trunc*60)         # convert time step Δt from minutes to whole seconds
+    Δt_sec  = convert(Int,Δt)                   # encode time step Δt [s] as integer
+    Δt_hrs  = Δt/3600                           # convert time step Δt from minutes to hours
     n_timesteps = ceil(Int,24*n_days/Δt_hrs)    # number of time steps to integrate for
     output_every_n_steps = max(1,floor(Int,output_dt/Δt_hrs))   # output every n time steps
     n_outputsteps = (n_timesteps ÷ output_every_n_steps)+1      # total number of output time steps

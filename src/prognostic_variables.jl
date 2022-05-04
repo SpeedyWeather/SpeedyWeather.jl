@@ -26,7 +26,33 @@ function initial_conditions(    P::Parameters,      # Parameter struct
         lmax, mmax = 15,15
         progn.vor[1:lmax,1:mmax,1,:] .+= 1e-7*randn(Complex{P.NF},lmax,mmax,P.nlev)
         spectral_truncation!(view(progn.vor,:,:,1,:),P.trunc)
-    
+
+    elseif initial_conditions == :barotropic_vorticity
+        progn = initialize_from_rest(P,B,G)
+
+        @unpack nlon, nlat, latd, lon, coslat, sinlat, radius_earth = G.geometry
+        @unpack lmax, mmax = G.spectral_transform
+
+        # zonal wind
+        u_grid1 = @. (25*coslat - 30*coslat^3 + 300*sinlat^2*coslat^6)/coslat+100
+        u_grid = repeat(u_grid1',nlon,1)
+        u = zeros(Complex{P.NF},lmax+1,mmax+1)
+        u = spectral!(u,u_grid,G.spectral_transform)
+        ζ = gradient_latitude(u,G.spectral_transform,one_more_l=false)
+        progn.vor[:,:,1,1] .= ζ/radius_earth
+
+        # zonal wave perturbation
+        A = 1e-4
+        m = 6
+        θ0 = 45
+        θw = 10
+
+        ζp = convert.(P.NF,A/2*cos.(m*lon)) * convert.(P.NF,coslat .* exp.(-((latd .- θ0)/θw).^2))'
+        progn.vor[:,:,1,1] .+= spectral(ζp,G.spectral_transform)
+
+        # make it less symmetric
+        progn.vor[15,1:14,1,1] .+= 5e-6*randn(Complex{P.NF},14)
+
     elseif initial_conditions == :restart
         progn = initialize_from_file(P,B,G)         # TODO this is not implemented yet
     else

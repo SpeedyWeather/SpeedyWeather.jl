@@ -58,7 +58,7 @@ With keywords such that default values can be changed at creation.
     sppt_on::Bool=false         # Turn on SPPT?
 
     # TIME STEPPING
-    Δt::Real=30                 # time step in minutes
+    Δt_at_T85::Real=20          # time step in minutes for T85 scale linearly for specified trunc
     n_days::Real=10             # number of days to integrate for
 
     # NUMERICS
@@ -76,7 +76,7 @@ With keywords such that default values can be changed at creation.
     orography_file::String="orography_F512.nc"
 
     # INITIAL CONDITIONS
-    initial_conditions::Symbol=:test    # :test, :rest or :restart
+    initial_conditions::Symbol=:barotropic_vorticity    # :test, :rest, :barotropic_vorticity or :restart
 
     # OUTPUT
     verbose::Bool=true          # print dialog for feedback

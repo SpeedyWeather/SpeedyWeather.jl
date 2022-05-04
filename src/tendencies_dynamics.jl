@@ -313,8 +313,11 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
 
     gridded!(u_grid,coslat_u,S)              # get u,v on grid from spectral
     gridded!(v_grid,coslat_v,S)
-    unscale_coslat!(u_grid,G)                # undo the coslat scaling from gradients
-    unscale_coslat!(v_grid,G)
+    # unscale_coslat!(u_grid,G)                # undo the coslat scaling from gradients
+    # unscale_coslat!(v_grid,G)
+
+    # unscale_coslat!(u_grid,G)                # undo the coslat scaling from gradients
+    # unscale_coslat!(v_grid,G)
 
     return nothing
 end
