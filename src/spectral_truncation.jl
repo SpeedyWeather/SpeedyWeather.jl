@@ -8,6 +8,7 @@ longitudes, m = 2^i * 3^j * 5^k >= n, with i,j,k >=0.
 """
 function roundup_fft(n::Int;small_primes::Vector{Int}=[2,3,5])
     factors_not_in_small_primes = true      # starting condition for while loop
+    n += isodd(n) ? 1 : 0                   # start with an even n
     while factors_not_in_small_primes
         
         factors = Primes.factor(n)          # prime factorization
@@ -19,10 +20,10 @@ function roundup_fft(n::Int;small_primes::Vector{Int}=[2,3,5])
         end
         
         factors_not_in_small_primes = ~all_factors_small    # all factors small will abort while loop
-        n += 1                                              # test for next larger n
+        n += 2                                              # test for next larger even n
     
     end
-    return n-1      # subtract unnecessary last += 1 addition
+    return n-2      # subtract unnecessary last += 1 addition
 end
 
 """
