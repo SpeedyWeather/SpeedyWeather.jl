@@ -23,7 +23,7 @@ function roundup_fft(n::Int;small_primes::Vector{Int}=[2,3,5])
         n += 2                                              # test for next larger even n
     
     end
-    return n-2      # subtract unnecessary last += 1 addition
+    return n-2      # subtract unnecessary last += 2 addition
 end
 
 """
