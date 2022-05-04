@@ -47,7 +47,7 @@ function initial_conditions(    P::Parameters,      # Parameter struct
         θ0 = 45
         θw = 10
 
-        ζp = (A/2*cos.(m*lon)) * (coslat .* exp.(-((latd .- θ0)/θw).^2))'
+        ζp = convert.(P.NF,A/2*cos.(m*lon)) * convert.(P.NF,coslat .* exp.(-((latd .- θ0)/θw).^2))'
         progn.vor[:,:,1,1] .+= spectral(ζp,G.spectral_transform)
 
         # make it less symmetric
