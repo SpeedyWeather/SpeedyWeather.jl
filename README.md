@@ -16,7 +16,7 @@ For an overview of the functionality and explanation see the
 ## Example use
 
 SpeedyWeather.jl is currently developed. Some things work, some don't.
-Stay tuned. Here is a teaser picture of some barotropic vorticity
+Stay tuned. Here is a teaser picture of some barotropic vorticity, simulated at T341 spectral resolution in single precision.
 
 ![vor](docs/img/barotropic_vorticity.png?raw=true "First simulation of barotropic vorticity with SpeedyWeather.jl")
 
