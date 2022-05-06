@@ -45,5 +45,9 @@ SpeedyWeather.jl is registered in Julia's registry, so open the package manager 
 ```julia
 (@v1.7) pkg> add SpeedyWeather
 ```
-which will install the `main` branch and all dependencies automatically.
-Please use the current minor version of Julia, compatibilities with older versions are not guaranteed.
+which will install the latest release and all dependencies automatically. The very latest version is installed with
+```julia
+(@v1.7) pkg> add https://github.com/milankl/SpeedyWeather.jl#main
+```
+which pulls directly from the `#main` branch. Please use the current minor version of Julia,
+compatibilities with older versions are not guaranteed.
