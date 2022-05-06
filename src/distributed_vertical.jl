@@ -49,7 +49,7 @@ for func_name in (:add_tendencies!,)
 end
 
 # FIVE ARGUMENT FUNCTIONS
-for func_name in (:uvω_grid!,)
+for func_name in (:vorticity_fluxes!,)
     @eval begin
         function $func_name(Out1::AbstractArray{NF1,3},
                             Out2::AbstractArray{NF1,3},
