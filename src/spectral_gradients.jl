@@ -53,16 +53,16 @@ end
 """
     coslat_v = gradient_longitude!( coslat_v::AbstractMatrix{Complex{NF}},
                                     Ψ::AbstractMatrix{Complex{NF}};
-                                    R::Real=1
+                                    radius::Real=1
                                     ) where {NF<:AbstractFloat}
 
-Zonal gradient in spectral space of spherical harmonic coefficients `Ψ` on a sphere with radius `R`.
-While the zonal gradient is 1/coslat*∂/∂lon in spherical coordinates, this functions omits the 1/coslat scaling
-such that the return array is coslat*∂alms/∂lon.
+Zonal gradient in spectral space of spherical harmonic coefficients `Ψ` on a sphere with radius `radius`.
+While the zonal gradient has a 1/cos(lat) scaling in spherical coordinates, this functions omits the scaling
+such that the returned array is scaled with coslat.
 """
 function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # output: cos(latitude)*meridional velocity
                                 Ψ::AbstractMatrix{Complex{NF}},         # input: spectral coefficients of stream function
-                                R::Real=1                               # radius of the sphere/Earth
+                                radius::Real=1                          # radius of the sphere/Earth
                                 ) where {NF<:AbstractFloat}             # number format NF
 
     # Ψ can have size n+1 x n but then the last row is not used in the loop
@@ -70,11 +70,11 @@ function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # outpu
     @boundscheck size_compat || throw(BoundsError)
     lmax,mmax = size(Ψ) .- 1    # 0-based max degree l, order m of spherical harmonics
 
-    iR⁻¹ = convert(Complex{NF},im/R)            # = imaginary/radius converted to NF
+    iradius⁻¹ = convert(Complex{NF},im/radius)      # = imaginary/radius converted to NF
 
-    @inbounds for m in 1:mmax+1                 # loop over all coefficients, order m
-        for l in m:lmax+1                       # degree l
-            coslat_v[l,m] = (m-1)*iR⁻¹*Ψ[l,m]   # gradient in lon = *i*m/R but order m is 1-based
+    @inbounds for m in 1:mmax+1                     # loop over all coefficients, order m
+        for l in m:lmax+1                           # degree l
+            coslat_v[l,m] = (m-1)*iradius⁻¹*Ψ[l,m]  # gradient in lon = *i*m/radius but 1-based order
         end
     end
 
