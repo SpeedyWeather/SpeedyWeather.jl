@@ -7,6 +7,7 @@ module SpeedyWeather
     import FastGaussQuadrature
     import AssociatedLegendrePolynomials
     import FFTW
+    import Primes
     import LinearAlgebra
 
     # INPUT OUTPUT 

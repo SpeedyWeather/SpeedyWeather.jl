@@ -41,14 +41,14 @@ struct SpectralTransform{NF<:AbstractFloat}
     # RECURSION FACTORS
     ϵlms::Array{NF}                 # precomputed for meridional gradients gradients grad_y1, grad_y2
 
-    # GRADIENT MATRICES
-    grad_x ::Vector{Complex{NF}}    # = i*m/R but precomputed
+    # GRADIENT MATRICES (on unit sphere, no 1/radius-scaling included)
+    grad_x ::Vector{Complex{NF}}    # = i*m but precomputed
     grad_y1::Matrix{NF}             # precomputed meridional gradient factors, term 1
     grad_y2::Matrix{NF}             # term 2
 
-    # EIGENVALUES
-    eigen_values::Vector{NF}        # = -l*(l+1)/R², degree l of spherical harmonic
-    eigen_values⁻¹::Vector{NF}      # = -R²/(l*(l+1))
+    # EIGENVALUES (on unit sphere, no 1/radius²-scaling included)
+    eigen_values::Vector{NF}        # = -l*(l+1), degree l of spherical harmonic
+    eigen_values⁻¹::Vector{NF}      # = -1/(l*(l+1))
 end
 
 """
@@ -118,20 +118,20 @@ function SpectralTransform( ::Type{NF},     # Number format NF
     # RECURSION FACTORS
     ϵlms = get_recursion_factors(lmax+1,mmax)
 
-    # GRADIENTS
-    grad_x = [im*m/radius for m in 0:mmax+1]    # zonal gradient (precomputed currently not used)
-    grad_y1 = zeros(lmax+2,mmax+1)              # meridional gradient, term 1
-    grad_y2 = zeros(lmax+2,mmax+1)              # term 2
+    # GRADIENTS (on unit sphere, hence 1/radius-scaling is omitted)
+    grad_x = [im*m for m in 0:mmax+1]       # zonal gradient (precomputed currently not used)
+    grad_y1 = zeros(lmax+2,mmax+1)          # meridional gradient, term 1
+    grad_y2 = zeros(lmax+2,mmax+1)          # term 2
 
-    for m in 0:mmax                             # 0-based degree l, order m
+    for m in 0:mmax                         # 0-based degree l, order m
         for l in m:lmax+1           
-            grad_y1[l+1,m+1] = (l-1)*ϵlms[l+1,m+1]/radius
-            grad_y2[l+1,m+1] = -(l+2)*ϵlms[l+2,m+1]/radius
+            grad_y1[l+1,m+1] = (l-1)*ϵlms[l+1,m+1]
+            grad_y2[l+1,m+1] = -(l+2)*ϵlms[l+2,m+1]
         end
     end
 
-    # EIGENVALUES 
-    eigen_values = [-l*(l+1)/radius^2 for l in 0:lmax+1]
+    # EIGENVALUES (on unit sphere, hence 1/radius²-scaling is omitted)
+    eigen_values = [-l*(l+1) for l in 0:lmax+1]
     eigen_values⁻¹ = inv.(eigen_values)
     eigen_values⁻¹[1] = 0
         
