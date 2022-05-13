@@ -9,7 +9,7 @@ With keywords such that default values can be changed at creation.
 
     # RESOLUTION
     trunc::Int=31                       # spectral truncation
-    nlon::Int=roundup_fft(3*trunc+1)    # number of longitudes 
+    nlon::Int=roundup_fft(3*trunc+1)    # number of longitudes
     nlat::Int=nlon÷2                    # number of latitudes
     nlev::Int=8                         # number of vertical levels
 
@@ -48,7 +48,7 @@ With keywords such that default values can be changed at creation.
     # DIFFUSION AND DRAG
     diffusion_power::Real=4                 # Power n of Laplacian in horizontal diffusion ∇²ⁿ
     diffusion_time::Real=2.4                # Diffusion time scale [hrs] for temperature and vorticity
-    diffusion_time_div::Real=diffusion_time # Diffusion time scale [hrs] for divergence           
+    diffusion_time_div::Real=diffusion_time # Diffusion time scale [hrs] for divergence
     diffusion_time_strat::Real=12           # Diffusion time scale [hrs] for extra ∇² in the stratosphere
     damping_time_strat::Real=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere     
 
@@ -56,6 +56,7 @@ With keywords such that default values can be changed at creation.
     seasonal_cycle::Bool=true   # Seasonal cycle?
     n_shortwave::Int=3          # Compute shortwave radiation every n steps
     sppt_on::Bool=false         # Turn on SPPT?
+    humidity_coefs::HumidityCoefs = HumidityCoefs()
 
     # TIME STEPPING
     Δt_at_T85::Real=20          # time step in minutes for T85 scale linearly for specified trunc
@@ -86,7 +87,7 @@ With keywords such that default values can be changed at creation.
     out_path::String=pwd()      # path to output folder
     output_vars::Vector{String}=["u","v","T","humid","logp0"]
     compression_level::Int=3    # 1=low but fast, 9=high but slow
-    keepbits::Int=10            # mantissa bits to keep for every variable 
+    keepbits::Int=10            # mantissa bits to keep for every variable
 
     # TODO assert not allowed parameter values
     @assert α in [0,0.5,1] "Only semi-implicit α = 0, 0.5 or 1 allowed."

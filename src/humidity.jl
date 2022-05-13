@@ -1,12 +1,3 @@
-# These numbers are hard-coded in the original fortran function
-# TODO(alistair): make this better - maybe move them into constants.jl?
-const e₀ = 6.108e-3  # TODO(alistair): Check the precise meaning of the fortran literal: 6.108e-3_p
-const C₁ = 17.269
-const C₂ = 21.875
-const T₀ = 273.16
-const T₁ = 35.86
-const T₂ = 7.66
-
 """
 Compute the saturation specific humidity for a single atmospheric level.
 """
@@ -17,6 +8,7 @@ function get_saturation_specific_humidity(
     M::Model,
 ) where {NF<:AbstractFloat}
     @unpack nlon, nlat = M.geometry
+    @unpack e₀, C₁, C₂, T₀, T₁, T₂ = M.params.humidity_coefs
 
     Qsat = zeros(nlon, nlat)  # Saturation specific humidity
 
