@@ -164,7 +164,7 @@ end
 """Main time loop."""
 function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variables
                         diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
-                        M::ModelSetup{NF}               # all precalculated structs
+                        M::ModelSetup                   # all precalculated structs
                         ) where {NF<:AbstractFloat}     # number format NF
     
     @unpack n_timesteps, Δt, Δt_sec = M.constants
