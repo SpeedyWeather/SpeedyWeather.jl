@@ -14,6 +14,12 @@ function clip_negatives!(A::AbstractArray{T}) where T
     end
 end
 
+function flipsign!(A::AbstractArray)
+    @inbounds for i in eachindex(A)
+        A[i] = -A[i]
+    end
+end
+
 """
     readable_secs(secs::Real) -> Dates.CompoundPeriod
 

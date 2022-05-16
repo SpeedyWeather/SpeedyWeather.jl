@@ -14,7 +14,8 @@ This function uses the recursion relation (0-based degree l, order m)
 As u = -1/R*∂Ψ/∂lat, this function can be generally used to compute the gradient in latitude."""
 function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: cos(lat)*zonal velocity u
                             Ψ::AbstractMatrix{Complex{NF}},         # input: streamfunction Ψ
-                            S::SpectralTransform{NF}                # use precomputed recursion factors
+                            S::SpectralTransform{NF};               # use precomputed recursion factors
+                            flipsign::Bool=false                    # flip the sign to obtain u from Ψ
                             ) where {NF<:AbstractFloat}             # number format NF
 
     _,mmax = size(Ψ)                # degree l, order m of spherical harmonics
@@ -25,7 +26,14 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: co
     size_same = size(coslat_u) == size(Ψ)
     size_compat = size_same || (size(coslat_u) .- (1,0)) == size(Ψ)
     @boundscheck size_compat || throw(BoundsError)
-    @unpack grad_y1, grad_y2 = S
+
+    if flipsign                     # used to get u from streamfunction Ψ (u ~ -∂Ψ/∂lat)
+        grad_y1 = S.minus_grad_y1
+        grad_y2 = S.minus_grad_y2
+    else                            # no sign flip otherwise
+        grad_y1 = S.grad_y1
+        grad_y2 = S.grad_y2
+    end
 
     coslat_u[1,1] = grad_y2[1,1]*Ψ[2,1]     # l=m=0 mode only with term 2
 
@@ -43,11 +51,12 @@ end
 
 function gradient_latitude( Ψ::AbstractMatrix{Complex{NF}}, # input: streamfunction Ψ
                             S::SpectralTransform{NF};       # precomputed gradient arrays
-                            one_more_l::Bool=true           # allocate output with one more degree l?
+                            one_more_l::Bool=true,          # allocate output with one more degree l?
+                            flipsign::Bool=false            # flip the sign to obtain u from Ψ?
                             ) where {NF<:AbstractFloat}     # number format NF
     _,mmax = size(Ψ) .- 1                                   # max degree l, order m of spherical harmonics
     coslat_u = zeros(Complex{NF},mmax+one_more_l+1,mmax+1)  # preallocate output, one more l for recursion
-    return gradient_latitude!(coslat_u,Ψ,S)                 # call in-place version
+    return gradient_latitude!(coslat_u,Ψ,S;flipsign)        # call in-place version
 end
 
 """

@@ -256,8 +256,11 @@ function vorticity_advection!(  D::DiagnosticVariables{NF}, # all diagnostic var
     spectral!(uω,uω_grid,S)                     # STEP 4: to spectral space
     spectral!(vω,vω_grid,S)
 
-    gradient_longitude!(∂uω_∂lon,-uω)           # STEP 5: spectral gradients
+    gradient_longitude!(∂uω_∂lon,uω)            # STEP 5: spectral gradients
     gradient_latitude!( ∂vω_∂lat,vω,S)
+
+    flipsign!(∂uω_∂lon)                         # because ∂ζ/∂t = -∇⋅(uv*ζ)       
+    flipsign!(∂vω_∂lat)
 
     add_tendencies!(vor_tend,∂uω_∂lon,∂vω_∂lat) # STEP 6: Add tendencies
 end
@@ -305,7 +308,7 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     ∇⁻²!(stream_function,vor_lf,S)  # invert Laplacian ∇² for stream function
     
     gradient_longitude!(coslat_v, stream_function)
-    gradient_latitude!( coslat_u, stream_function, S)
+    gradient_latitude!( coslat_u, stream_function, S, flipsign=true)
 
     gridded!(u_grid,coslat_u,S)     # get u,v on grid from spectral
     gridded!(v_grid,coslat_v,S)
