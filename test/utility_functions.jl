@@ -15,6 +15,16 @@ end
     end
 end
 
+@testset "flip sign" begin
+    for T in (Float16,Float32,Float64)
+        A = randn(T,30,50)
+        A2 = copy(A)
+        SpeedyWeather.flipsign!(A)
+        SpeedyWeather.flipsign!(A)
+        @test all(A .== A2)
+    end
+end
+
 @testset "roundup nlon for FFT" begin
     for i in 1:10
         @test 2^i == SpeedyWeather.roundup_fft(2^i)
