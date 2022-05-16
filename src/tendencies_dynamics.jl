@@ -240,36 +240,38 @@ Step 4 (spectral space): convert uω/coslat, vω/coslat from grid to spectral sp
 Step 5 (spectral space): Compute gradients ∂/∂lon(uω/coslat) and ∂/∂lat(vω/coslat)
 Step 6 (spectral space): Add ∂/∂lon(uω/coslat)+∂/∂θ(vω/coslat) and return.
 """
-function divergence_uvω!(   D::DiagnosticVariables{NF}, # all diagnostic variables   
-                            G::GeoSpectral{NF}          # struct with geometry and spectral transform
-                            ) where {NF<:AbstractFloat}                                   
+function vorticity_advection!(  D::DiagnosticVariables{NF}, # all diagnostic variables   
+                                G::GeoSpectral{NF}          # struct with geometry and spectral transform
+                                ) where {NF<:AbstractFloat}                                   
 
     S = G.spectral_transform
     @unpack u_grid, v_grid, vor_grid = D.grid_variables
-    @unpack uω_grid_coslat⁻¹,vω_grid_coslat⁻¹ = D.intermediate_variables
-    @unpack uω_coslat⁻¹,vω_coslat⁻¹ = D.intermediate_variables
+    @unpack uω, vω, uω_grid,vω_grid = D.intermediate_variables
     @unpack ∂uω_∂lon,∂vω_∂lat = D.intermediate_variables
     @unpack vor_tend = D.tendencies
 
-    # STEP 1-3: Abs vorticity, velocity times abs vort, unscale with coslat
-    uvω_grid!(uω_grid_coslat⁻¹,vω_grid_coslat⁻¹,u_grid,v_grid,vor_grid,G.geometry)
+    # STEP 1-3: Abs vorticity, velocity times abs vort
+    vorticity_fluxes!(uω_grid,vω_grid,u_grid,v_grid,vor_grid,G.geometry)
 
-    spectral!(uω_coslat⁻¹,uω_grid_coslat⁻¹,S)           # STEP 4: to spectral space
-    spectral!(vω_coslat⁻¹,vω_grid_coslat⁻¹,S)
+    spectral!(uω,uω_grid,S)                     # STEP 4: to spectral space
+    spectral!(vω,vω_grid,S)
 
-    gradient_longitude!(∂uω_∂lon,-uω_coslat⁻¹)          # STEP 5: spectral gradients
-    gradient_latitude!( ∂vω_∂lat,vω_coslat⁻¹,S)
+    gradient_longitude!(∂uω_∂lon,uω)            # STEP 5: spectral gradients
+    gradient_latitude!( ∂vω_∂lat,vω,S)
 
-    add_tendencies!(vor_tend,∂uω_∂lon,∂vω_∂lat)         # STEP 6: Add tendencies
+    flipsign!(∂uω_∂lon)                         # because ∂ζ/∂t = -∇⋅(uv*ζ)       
+    flipsign!(∂vω_∂lat)
+
+    add_tendencies!(vor_tend,∂uω_∂lon,∂vω_∂lat) # STEP 6: Add tendencies
 end
 
-function uvω_grid!( uω::AbstractMatrix{NF},    # Output: u*(vor+coriolis)/coslat in grid space
-                    vω::AbstractMatrix{NF},    # Output: v*(vor+coriolis)/coslat in grid space
-                    u::AbstractMatrix{NF},     # Input: zonal velocity in grid space
-                    v::AbstractMatrix{NF},     # Input: meridional velocity in grid space
-                    vor::AbstractMatrix{NF},   # Input: relative vorticity in grid space       
-                    G::Geometry{NF}            # struct with precomputed geometry arrays
-                    ) where {NF<:AbstractFloat}# number format NF
+function vorticity_fluxes!( uω::AbstractMatrix{NF},    # Output: u*(vor+coriolis) in grid space
+                            vω::AbstractMatrix{NF},    # Output: v*(vor+coriolis) in grid space
+                            u::AbstractMatrix{NF},     # Input: zonal velocity in grid space
+                            v::AbstractMatrix{NF},     # Input: meridional velocity in grid space
+                            vor::AbstractMatrix{NF},   # Input: relative vorticity in grid space       
+                            G::Geometry{NF}            # struct with precomputed geometry arrays
+                            ) where {NF<:AbstractFloat}# number format NF
 
     nlon,nlat = size(u)
     @boundscheck size(u) == size(v) || throw(BoundsError)
@@ -277,14 +279,13 @@ function uvω_grid!( uω::AbstractMatrix{NF},    # Output: u*(vor+coriolis)/cos
     @boundscheck size(u) == size(uω) || throw(BoundsError)
     @boundscheck size(u) == size(vω) || throw(BoundsError)
 
-    @unpack f_coriolis, coslat⁻¹, radius_earth = G
-    R⁻¹ = convert(NF,1/radius_earth)
+    @unpack f_coriolis = G
 
     @inbounds for j in 1:nlat
         for i in 1:nlon
             ω = vor[i,j] + f_coriolis[j]    # = relative vorticity + coriolis
-            uω[i,j] = ω*u[i,j]*coslat⁻¹[j]  # = u(vor+f)/cos(ϕ)
-            vω[i,j] = ω*v[i,j]*coslat⁻¹[j]  # = v(vor+f)/cos(ϕ)
+            uω[i,j] = ω*u[i,j]              # = u(vor+f)
+            vω[i,j] = ω*v[i,j]              # = v(vor+f)
         end
     end
 end
@@ -302,22 +303,18 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     G = M.geospectral.geometry
     S = M.geospectral.spectral_transform
 
-    vor_lf = view(vor,:,:,lf,:)     # pick leapfrog index with mem allocation
-    gridded!(vor_grid,vor_lf,S)     # get vorticity on grid from spectral vor_lf
+    vor_lf = view(vor,:,:,lf,:)     # pick leapfrog index without memory allocation
+    gridded!(vor_grid,vor_lf,S)     # get vorticity on grid from spectral vor
     ∇⁻²!(stream_function,vor_lf,S)  # invert Laplacian ∇² for stream function
     
-    # coslat*v = zonal gradient of stream function
-    # coslat*u = meridional gradient of stream function
     gradient_longitude!(coslat_v, stream_function)
-    gradient_latitude!( coslat_u, stream_function, S)
+    gradient_latitude!( coslat_u, stream_function, S, flipsign=true)
 
-    gridded!(u_grid,coslat_u,S)              # get u,v on grid from spectral
+    gridded!(u_grid,coslat_u,S)     # get u,v on grid from spectral
     gridded!(v_grid,coslat_v,S)
-    # unscale_coslat!(u_grid,G)                # undo the coslat scaling from gradients
-    # unscale_coslat!(v_grid,G)
 
-    # unscale_coslat!(u_grid,G)                # undo the coslat scaling from gradients
-    # unscale_coslat!(v_grid,G)
+    unscale_coslat!(u_grid,G)       # undo the coslat scaling from gradients     
+    unscale_coslat!(v_grid,G)
 
     return nothing
 end

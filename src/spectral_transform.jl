@@ -45,6 +45,8 @@ struct SpectralTransform{NF<:AbstractFloat}
     grad_x ::Vector{Complex{NF}}    # = i*m but precomputed
     grad_y1::Matrix{NF}             # precomputed meridional gradient factors, term 1
     grad_y2::Matrix{NF}             # term 2
+    minus_grad_y1::Matrix{NF}       # as above but sign flipped (to get u from Ψ)
+    minus_grad_y2::Matrix{NF}
 
     # EIGENVALUES (on unit sphere, no 1/radius²-scaling included)
     eigen_values::Vector{NF}        # = -l*(l+1), degree l of spherical harmonic
@@ -125,10 +127,13 @@ function SpectralTransform( ::Type{NF},     # Number format NF
 
     for m in 0:mmax                         # 0-based degree l, order m
         for l in m:lmax+1           
-            grad_y1[l+1,m+1] = (l-1)*ϵlms[l+1,m+1]
-            grad_y2[l+1,m+1] = -(l+2)*ϵlms[l+2,m+1]
+            grad_y1[l+1,m+1] = -(l-1)*ϵlms[l+1,m+1]
+            grad_y2[l+1,m+1] = (l+2)*ϵlms[l+2,m+1]
         end
     end
+
+    minus_grad_y1 = -grad_y1                # gradient arrays with a minus sign
+    minus_grad_y2 = -grad_y2                # (to get u from stream function directly)
 
     # EIGENVALUES (on unit sphere, hence 1/radius²-scaling is omitted)
     eigen_values = [-l*(l+1) for l in 0:lmax+1]
@@ -144,7 +149,7 @@ function SpectralTransform( ::Type{NF},     # Number format NF
                             gn,gs,fn,fs,
                             recompute_legendre,Λ,Λs,
                             legendre_weights,
-                            ϵlms,grad_x,grad_y1,grad_y2,
+                            ϵlms,grad_x,grad_y1,grad_y2,minus_grad_y1,minus_grad_y2,
                             eigen_values,eigen_values⁻¹)
 end
 
