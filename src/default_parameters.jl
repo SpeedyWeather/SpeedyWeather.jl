@@ -5,7 +5,7 @@ With keywords such that default values can be changed at creation.
 @with_kw struct Parameters
 
     # NUMBER FORMATS
-    NF::DataType=Float64    # number format
+    NF::DataType=Float32        # number format
 
     # RESOLUTION
     trunc::Int=31                       # spectral truncation
@@ -13,9 +13,8 @@ With keywords such that default values can be changed at creation.
     nlat::Int=nlon÷2                    # number of latitudes
     nlev::Int=8                         # number of vertical levels
 
-    # ntracers::Int=1                     # number of tracers (specific humidity is one)
-
     # PHYSICAL CONSTANTS
+    model::Symbol=:barotropic   # :barotropic, :shallowwater, or :primitive
     radius_earth::Real=6.371e6          # radius of Earth [m]
     rotation_earth::Real=7.292e-5       # angular frequency of Earth's rotation [1/s]
     gravity::Real=9.81          # gravitational acceleration [m/s^2]
@@ -58,7 +57,7 @@ With keywords such that default values can be changed at creation.
     sppt_on::Bool=false         # Turn on SPPT?
 
     # TIME STEPPING
-    Δt_at_T85::Real=20          # time step in minutes for T85 scale linearly for specified trunc
+    Δt_at_T85::Real=20          # time step in minutes for T85, scale linearly for specified trunc
     n_days::Real=10             # number of days to integrate for
 
     # NUMERICS
