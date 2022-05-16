@@ -30,7 +30,8 @@ function initial_conditions(    P::Parameters,      # Parameter struct
     elseif initial_conditions == :barotropic_vorticity
         progn = initialize_from_rest(P,B,G)
 
-        @unpack nlon, nlat, latd, lon, coslat, sinlat, radius_earth = G.geometry
+        @unpack nlon, nlat, nlev = G.geometry
+        @unpack latd, lon, coslat, sinlat, radius_earth = G.geometry
         @unpack lmax, mmax = G.spectral_transform
 
         # zonal wind
@@ -50,8 +51,12 @@ function initial_conditions(    P::Parameters,      # Parameter struct
         ζp = convert.(P.NF,A/2*cos.(m*lon)) * convert.(P.NF,coslat .* exp.(-((latd .- θ0)/θw).^2))'
         progn.vor[:,:,1,1] .+= spectral(ζp,G.spectral_transform)
 
+        for k in 2:nlev
+            progn.vor[:,:,1,k] .= progn.vor[:,:,1,1]
+        end
+
         # make it less symmetric
-        progn.vor[15,1:14,1,1] .+= 5e-6*randn(Complex{P.NF},14)
+        progn.vor[15,1:14,1,:] .+= 5e-6*randn(Complex{P.NF},14,nlev)
 
     elseif initial_conditions == :restart
         progn = initialize_from_file(P,B,G)         # TODO this is not implemented yet

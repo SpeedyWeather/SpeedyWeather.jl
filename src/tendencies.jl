@@ -29,7 +29,7 @@ Compute the grid point and spectral tendencies, including an implicit correction
 """
 function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
                             progn::PrognosticVariables{NF}, # all prognostic variables
-                            M::ModelSetup{NF},              # struct containing all constants
+                            M::ModelSetup,                  # struct containing all constants
                             lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                             ) where {NF<:AbstractFloat}
 
