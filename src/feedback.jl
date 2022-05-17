@@ -2,7 +2,7 @@ mutable struct Feedback
     # PROGRESS
     progress_meter::ProgressMeter.Progress  # struct containing everything progress related
     progress_txt::Union{IOStream,Nothing}   # txt is a Nothing in case of no output
-    
+
     # OUTPUT
     verbose::Bool                           # print stuff to REPL?
     output::Bool                            # output to netCDF?
@@ -15,6 +15,7 @@ mutable struct Feedback
     # NANS AND OTHER MODEL STATE FEEDBACK
     nans_detected::Bool                     # did NaNs occur in the simulation?
 end
+
 
 """Initialises the progress txt file."""
 function initialize_feedback(M::ModelSetup)
@@ -53,6 +54,8 @@ function initialize_feedback(M::ModelSetup)
     nans_detected = false           # currently not used
 
     # PROGRESSMETER
+    dt_in_sec[1] = M.constants.Δt_sec       # hack: redefine element in global constant dt_in_sec
+                                            # used to pass on the time step to ProgressMeter.speedstring
     desc = "Weather is speedy$(output ? " run $run_id: " : ": ")"
     progress_meter = ProgressMeter.Progress(n_timesteps,enabled=verbose,showspeed=true;desc)
 
@@ -64,8 +67,8 @@ end
 
 """Calls the progress meter and writes every 5% progress increase to txt."""
 function progress!(F::Feedback)
-    ProgressMeter.next!(F.progress_meter)           # update progress meter
-    @unpack counter,n = F.progress_meter
+    ProgressMeter.next!(F.progress_meter) # update progress meter
+    @unpack counter,n = F.progress_meter            # unpack counter after update
 
     # write progress to txt file too
     if (counter/n*100 % 1) > ((counter+1)/n*100 % 1)  
