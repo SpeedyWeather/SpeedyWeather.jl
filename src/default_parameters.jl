@@ -50,13 +50,18 @@ With keywords such that default values can be changed at creation.
     diffusion_time::Real=2.4                # Diffusion time scale [hrs] for temperature and vorticity
     diffusion_time_div::Real=diffusion_time # Diffusion time scale [hrs] for divergence
     diffusion_time_strat::Real=12           # Diffusion time scale [hrs] for extra ∇² in the stratosphere
-    damping_time_strat::Real=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere     
+    damping_time_strat::Real=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
 
     # PARAMETRIZATIONS
     seasonal_cycle::Bool=true   # Seasonal cycle?
     n_shortwave::Int=3          # Compute shortwave radiation every n steps
     sppt_on::Bool=false         # Turn on SPPT?
     humidity_coefs::HumidityCoefs = HumidityCoefs()
+    # Large-scale condensation (from table B10)
+    τ::Real = 4.0           # Relaxation time for humidity (hours)
+    RH¹::Real = 0.9         # Relative humidity threshold at σ = 1
+    ΔRH::Real = 0.1         # Vertical range of relative humidity threshold
+    rhb::Real = 0.95            # Relative humidity threshold for boundary layer - TODO(alistair): rename this
 
     # TIME STEPPING
     Δt_at_T85::Real=20          # time step in minutes for T85 scale linearly for specified trunc

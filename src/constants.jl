@@ -25,6 +25,14 @@ Struct holding the parameters needed at runtime in number format NF.
 
     # DIFFUSION AND DRAG
     drag_strat::NF               # drag [1/s] for zonal wind in the stratosphere
+
+    # PARAMETRIZATIONS
+    # Large-scale condensation
+    τ::NF                   # Relaxation time for humidity (hours)
+    RH¹::NF                 # Relative humidity threshold at σ = 1
+    ΔRH::NF                 # Vertical range of relative humidity threshold
+    rhb::NF                 # Relative humidity threshold for boundary layer - TODO(alistair): rename this
+
 end
 
 """
@@ -34,10 +42,13 @@ function Constants(P::Parameters)
 
     # PHYSICAL CONSTANTS
     @unpack radius_earth, rotation_earth, gravity, akap, R_gas = P
-    
+
     # TIME INTEGRATION CONSTANTS
     @unpack robert_filter, williams_filter = P
     @unpack trunc, Δt_at_T85, n_days, output_dt = P
+
+    # PARAMETRIZATION CONSTANTS
+    @unpack τ, RH¹, ΔRH, rhb = P  # Large-scale condensation
 
     Δt_min_at_trunc = Δt_at_T85*(85/trunc)      # scale time step Δt to specified resolution
     Δt      = round(Δt_min_at_trunc*60)         # convert time step Δt from minutes to whole seconds
@@ -54,11 +65,11 @@ function Constants(P::Parameters)
     # SCALING
     Δt_unscaled = Δt        # [s] not scaled
     Δt /= radius_earth      # scale with Earth's radius
-    
+
     # This implies conversion to NF
     return Constants{P.NF}( radius_earth,rotation_earth,gravity,akap,R_gas,
                             Δt,Δt_unscaled,Δt_sec,Δt_hrs,
                             robert_filter,williams_filter,n_timesteps,
                             output_every_n_steps, n_outputsteps,
-                            drag_strat)
-end  
+                            drag_strat, τ, RH¹, ΔRH, rhb)
+end

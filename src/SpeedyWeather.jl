@@ -2,7 +2,7 @@ module SpeedyWeather
 
     # STRUCTURE
     import Parameters: @with_kw, @unpack
-    
+
     # NUMERICS
     import FastGaussQuadrature
     import AssociatedLegendrePolynomials
@@ -10,29 +10,29 @@ module SpeedyWeather
     import Primes
     import LinearAlgebra
 
-    # INPUT OUTPUT 
+    # INPUT OUTPUT
     import Dates: Dates, DateTime
     import Printf: @sprintf
     import NetCDF: NetCDF, NcFile, NcDim, NcVar
     import BitInformation: round, round!
     import UnicodePlots
     import ProgressMeter
-    
+
     # EXPORT MAIN INTERFACE TO SPEEDY
     export run_speedy, initialize_speedy
 
     # EXPORT STRUCTS
-    export Parameters, GenLogisticCoefs,
+    export Parameters, GenLogisticCoefs, HumidityCoefs,
         GeoSpectral, Boundaries, Constants, Geometry, SpectralTransform,
         PrognosticVariables, DiagnosticVariables
-    
+
     # EXPORT SPECTRAL FUNCTIONS
     export  spectral, gridded,
         spectral_truncation, spectral_interpolation,
         triangular_truncation
 
     include("utility_functions.jl")
-    include("parameter_structs.jl")
+    include("coefficient_structs.jl")
     include("spectral_truncation.jl")
 
     include("default_parameters.jl")        # defines Parameters
@@ -52,7 +52,7 @@ module SpeedyWeather
     include("tendencies_dynamics.jl")
     include("tendencies.jl")
     include("feedback.jl")                  # defines Feedback
-    include("output.jl")                    
+    include("output.jl")
 
     include("time_integration.jl")
     include("pretty_printing.jl")

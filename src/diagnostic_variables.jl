@@ -41,6 +41,8 @@ struct GridVariables{NF<:AbstractFloat}
     u_grid             ::Array{NF,3}  # Gridpoint field of zonal velocity
     v_grid             ::Array{NF,3}  # Gridpoint field of meridional velocity
     temp_grid_anomaly  ::Array{NF,3}  # Gridpoint field of absolute temperature anomaly [K]
+    cloud_top          ::Array{NF,2}  # Cloud top diagnosed from precipitation due to convection and large-scale condensation
+    precipitation_ls   ::Array{NF,2}  # Large-scale precipitation
 end
 
 """
@@ -60,15 +62,17 @@ function GridVariables(G::GeoSpectral{NF}) where NF
     u_grid             = zeros(NF,nlon,nlat,nlev)  # zonal velocity
     v_grid             = zeros(NF,nlon,nlat,nlev)  # meridonal velocity
     temp_grid_anomaly  = zeros(NF,nlon,nlat,nlev)  # absolute temperature anolamy
+    cloud_top          = zeros(NF,nlon,nlat)       # Cloud top
+    precipitation_ls   = zeros(NF,nlon,nlat)       # Large-scale precipitation
 
     return GridVariables(vor_grid,div_grid,temp_grid,pres_surf_grid,humid_grid,geopot_grid,
                         # tr_grid,
-                        u_grid,v_grid,temp_grid_anomaly)
+                        u_grid,v_grid,temp_grid_anomaly,cloud_top,precipitation_ls)
 end
 
 """Struct holding intermediate quantities that are used and shared when calculating tendencies"""
 struct IntermediateVariables{NF<:AbstractFloat}
-    
+
     ### USED FOR THE BAROTROPIC VORITICITY EQUATION
     stream_function ::Array{Complex{NF},3}
     coslat_u        ::Array{Complex{NF},3}
@@ -97,16 +101,16 @@ struct IntermediateVariables{NF<:AbstractFloat}
     puv        ::Array{NF,3} #(ug -umean)*px + (vg -vmean)*py
 
     ###------Defined in zonal_wind_tendency!()
-    sigma_u ::Array{NF,3}  #some quantity used for later calculations 
+    sigma_u ::Array{NF,3}  #some quantity used for later calculations
 
     ###------Defined in vor_div_tendency_and_corrections!()
     L2_velocity_complex ::Array{Complex{NF},2} # -laplacian(0.5*(u**2+v**2))
 
-    ###-----Defined in tendencies.jl/get_spectral_tendencies!() 
+    ###-----Defined in tendencies.jl/get_spectral_tendencies!()
     vertical_mean_divergence ::Array{Complex{NF},2}
     sigdtc ::Array{Complex{NF},3} # what is this quantity, physically?
     dumk ::Array{Complex{NF},3} #ditto
-    spectral_geopotential ::Array{Complex{NF},3} #This should probably go elsewhere 
+    spectral_geopotential ::Array{Complex{NF},3} #This should probably go elsewhere
 end
 
 """
@@ -121,7 +125,7 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
     stream_function = zeros(Complex{NF},lmax+1,mmax+1,nlev)
     coslat_u = zeros(Complex{NF},lmax+2,mmax+1,nlev)
     coslat_v = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    
+
     uω_grid_coslat⁻¹ = zeros(NF,nlon,nlat,nlev)
     vω_grid_coslat⁻¹ = zeros(NF,nlon,nlat,nlev)
     uω_coslat⁻¹      = zeros(Complex{NF},lmax+2,mmax+1,nlev)
@@ -135,11 +139,11 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
 
     # one more l for recursion in meridional gradients
     # X,Y gradient of the surface pressure in spectral space
-    pres_surf_gradient_spectral_x = zeros(Complex{NF},lmax+2,mmax+1)  
+    pres_surf_gradient_spectral_x = zeros(Complex{NF},lmax+2,mmax+1)
     pres_surf_gradient_spectral_y = zeros(Complex{NF},lmax+2,mmax+1)
 
     # X,Y gradient of the surface pressure in grid space
-    pres_surf_gradient_grid_x = zeros(NF,nlon,nlat)  
+    pres_surf_gradient_grid_x = zeros(NF,nlon,nlat)
     pres_surf_gradient_grid_y = zeros(NF,nlon,nlat)
 
     sigma_tend  = zeros(NF,nlon,nlat,nlev+1)
@@ -147,16 +151,16 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
     puv         = zeros(NF,nlon,nlat,nlev)
     sigma_u     = zeros(NF,nlon,nlat,nlev+1)
 
-    L2_velocity_complex         = zeros(Complex{NF},lmax+2,mmax+1)  
+    L2_velocity_complex         = zeros(Complex{NF},lmax+2,mmax+1)
 
-    vertical_mean_divergence    = zeros(Complex{NF},lmax+2,mmax+1)  
-    sigdtc                      = zeros(Complex{NF},lmax+2,mmax+1,nlev+1)  
-    dumk                        = zeros(Complex{NF},lmax+2,mmax+1,nlev+1)  
+    vertical_mean_divergence    = zeros(Complex{NF},lmax+2,mmax+1)
+    sigdtc                      = zeros(Complex{NF},lmax+2,mmax+1,nlev+1)
+    dumk                        = zeros(Complex{NF},lmax+2,mmax+1,nlev+1)
     spectral_geopotential       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
     return IntermediateVariables(   stream_function, coslat_u, coslat_v,
                                     uω_grid_coslat⁻¹,vω_grid_coslat⁻¹,
-                                    uω_coslat⁻¹,vω_coslat⁻¹,∂uω_∂lon,∂vω_∂lat,         
+                                    uω_coslat⁻¹,vω_coslat⁻¹,∂uω_∂lon,∂vω_∂lat,
                                     u_mean,v_mean,div_mean,
                                     pres_surf_gradient_spectral_x,pres_surf_gradient_spectral_y,
                                     pres_surf_gradient_grid_x,pres_surf_gradient_grid_y,
@@ -180,4 +184,3 @@ function DiagnosticVariables(G::GeoSpectral)
                                 grid_variables,
                                 intermediate_variables)
 end
-
