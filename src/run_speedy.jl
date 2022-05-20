@@ -1,21 +1,4 @@
 """
-    model_setup = ModelSetup(   ::Parameters,
-                                ::Constants,
-                                ::GeoSpectral,
-                                ::Boundaries,
-                                ::HorizontalDiffusion)
-
-The ModelSetup struct holds all other structs that contain precalculated constants, whether scalars or
-arrays that do not change throughout model integration."""
-struct ModelSetup{NF<:AbstractFloat}
-    parameters::Parameters
-    constants::Constants{NF}
-    geospectral::GeoSpectral{NF}
-    boundaries::Boundaries{NF}
-    horizontal_diffusion::HorizontalDiffusion{NF}
-end
-
-"""
     prog_vars = run_speedy(NF,kwargs...)
 
 Runs SpeedyWeather.jl with number format `NF` and any additional parameters in the keyword arguments
@@ -49,7 +32,14 @@ function initialize_speedy(::Type{NF}=Float64;       # number format, use Float6
     G = GeoSpectral(P)                              # geometry and spectral transform structs
     B = Boundaries(P)                               # arrays for boundary conditions
     H = HorizontalDiffusion(P,C,G,B)                # precomputed arrays for horizontal diffusion
-    M = ModelSetup(P,C,G,B,H)                       # pack all of the above into a ModelSetup struct
+
+    if P.model == :barotropic                       # pack all of the above into a *Model struct
+        M = BarotropicModel(P,C,G,B,H)
+    elseif P.model == :shallowwater
+        M = ShallowWaterModel(P,C,G,B,H)
+    elseif P.model == :primitive
+        M = PrimitiveEquationModel(P,C,G,B,H)
+    end
 
     prognostic_vars = initial_conditions(P,B,G)     # initialize prognostic variables
     diagnostic_vars = DiagnosticVariables(G)        # preallocate all diagnostic variables with zeros

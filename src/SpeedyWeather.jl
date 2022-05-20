@@ -47,7 +47,8 @@ module SpeedyWeather
     include("diagnostic_variables.jl")      # defines DiagnosticVariables
     include("horizontal_diffusion.jl")      # defines HorizontalDiffusion
 
-    include("run_speedy.jl")                # defines ModelSetup
+    include("models.jl")                    # defines ModelSetups
+    include("run_speedy.jl")                
     include("tendencies_parametrizations.jl")
     include("tendencies_dynamics.jl")
     include("tendencies.jl")
