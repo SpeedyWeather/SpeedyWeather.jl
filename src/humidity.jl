@@ -20,11 +20,7 @@ function get_saturation_specific_humidity(
         end
     end
 
-    if σ <= 0
-        @. Qsat = 622.0 * Qsat / (p[1, 1] - 0.378 * Qsat)
-    else
-        @. Qsat = 622.0 * Qsat / (σ * p - 0.378 * Qsat)
-    end
+    @. Qsat = 622.0 * Qsat / (σ * p - 0.378 * Qsat)  # WWhat does this do?
 
     return Qsat
 end
