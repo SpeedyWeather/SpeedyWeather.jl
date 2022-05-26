@@ -7,7 +7,6 @@ function get_large_scale_condensation_tendencies!(
         M.geospectral.geometry
     @unpack temp_grid, humid_grid, pres_surf_grid, cloud_top, precipitation_ls = Diag.grid_variables
     @unpack temp_tend, humid_tend = Diag.parametrization_tendencies
-    @unpack cloud_top = Diag.intermediate_variables
 
     # Use mathematical notation for consistency with the documentation
     Q = humid_grid
@@ -19,7 +18,7 @@ function get_large_scale_condensation_tendencies!(
     Qsat = get_saturation_specific_humidity(T, p, M)
 
     # 1. Tendencies of humidity and temperature due to large-scale condensation
-    @inbounds for k = 2:nlev
+    for k = 2:nlev
         σₖ = σ_levels_full[k]
         RH_threshold = RH¹ + ΔRH * (σₖ^2 - 1)  # Relative humidity threshold for condensation (Formula 24)
         if k == nlev
@@ -29,7 +28,7 @@ function get_large_scale_condensation_tendencies!(
         # Impose a maximum heating rate to avoid grid-point storm instability
         ∂Q_max = 10σₖ^2 / 3600τ  # This formula does not appear in the documentation
 
-        @inbounds for j = 1:nlat, i = 1:nlon
+        for j = 1:nlat, i = 1:nlon
             Q_threshold = RH_threshold * Qsat[i, j, k]  # Specific humidity threshold for condensation
             if Q[i, j, k] > Q_threshold
                 ∂Q[i, j, k] += -(Q[i, j, k] - Q_threshold) / τ  # Formula 22
@@ -40,7 +39,7 @@ function get_large_scale_condensation_tendencies!(
     end
 
     # 2. Precipitation due to large-scale condensation#
-    @inbounds for k = 2:nlev
+    for k = 2:nlev
         Δpₖ = p * σ_levels_thick[k]  # Formula 4
         @. precipitation = -1 / grav * Δpₖ * ∂Q[:, :, k]  # Formula 25
     end
