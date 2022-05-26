@@ -62,12 +62,33 @@ function GridVariables(G::GeoSpectral{NF}) where NF
     u_grid             = zeros(NF,nlon,nlat,nlev)  # zonal velocity
     v_grid             = zeros(NF,nlon,nlat,nlev)  # meridonal velocity
     temp_grid_anomaly  = zeros(NF,nlon,nlat,nlev)  # absolute temperature anolamy
-    cloud_top          = zeros(NF,nlon,nlat)       # Cloud top
-    precipitation_ls   = zeros(NF,nlon,nlat)       # Large-scale precipitation
 
     return GridVariables(vor_grid,div_grid,temp_grid,pres_surf_grid,humid_grid,geopot_grid,
                         # tr_grid,
                         u_grid,v_grid,temp_grid_anomaly,cloud_top,precipitation_ls)
+end
+
+"""
+Struct holding quantities calculated from the physical parameterisations. All quantities
+are in grid-point space.
+"""
+struct ParametrizationVariables{NF<:AbstractFloat}
+    humid_saturation ::Array{NF,3}  # Saturation specific humidity
+    cloud_top        ::Array{NF,2}  # Cloud-top
+    precipitation_ls ::Array{NF,2}  # Large-scale precipitation
+end
+
+"""
+Generator function for the ParametrizationVariables struct. Initialises with zeros.
+"""
+function ParametrizationVariables(G::GeoSpectral{NF}) where NF
+    @unpack nlon, nlat, nlev = G.geometry
+
+    humid_saturation = zeros(NF,nlon,nlat,nlev)  # Saturation specific humidity
+    cloud_top        = zeros(NF,nlon,nlat)       # Cloud-top
+    precipitation_ls = zeros(NF,nlon,nlat)       # Large-scale precipitation
+
+    return ParametrizationVariables(humid_saturation, cloud_top, precipitation_ls)
 end
 
 """Struct holding intermediate quantities that are used and shared when calculating tendencies"""
@@ -173,17 +194,21 @@ end
 
 """Struct holding the diagnostic variables."""
 struct DiagnosticVariables{NF<:AbstractFloat}
-    tendencies             ::Tendencies{NF}
-    grid_variables         ::GridVariables{NF}
-    intermediate_variables ::IntermediateVariables{NF}
+    tendencies                ::Tendencies{NF}
+    grid_variables            ::GridVariables{NF}
+    intermediate_variables    ::IntermediateVariables{NF}
+    parametrization_variables ::ParametrizationVariables{NF}
 end
 
 """Generator function for Diagnostic Variables """
 function DiagnosticVariables(G::GeoSpectral)
-    tendencies             = Tendencies(G)
-    grid_variables         = GridVariables(G)
-    intermediate_variables = IntermediateVariables(G)
+    tendencies                = Tendencies(G)
+    grid_variables            = GridVariables(G)
+    intermediate_variables    = IntermediateVariables(G)
+    parametrization_variables = ParametrizationVariables(G)
     return DiagnosticVariables( tendencies,
                                 grid_variables,
-                                intermediate_variables)
+                                intermediate_variables,
+                                parametrization_variables,
+                                )
 end

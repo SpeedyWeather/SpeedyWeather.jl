@@ -1,48 +1,26 @@
 """
-Compute the saturation specific humidity for a single atmospheric level.
-"""
-function get_saturation_specific_humidity(
-    T::Array{NF,2},  # Absolute temperature for a single atmospheric level
-    p::Array{NF,2},  # Normalised surface pressure
-    σ::NF,           # σ of the current atmospheric level
-    M::ModelSetup{NF},
-) where {NF<:AbstractFloat}
-    @unpack nlon, nlat = M.geospectral.geometry
-    @unpack e₀, C₁, C₂, T₀, T₁, T₂ = M.parameters.humidity_coefs
-
-    Qsat = zeros(nlon, nlat)  # Saturation specific humidity
-
-    for j = 1:nlat, i = 1:nlon
-        if T[i, j] > T₀
-            Qsat[i, j] = e₀ * exp(C₁ * (T[i, j] - T₀) / (T[i, j] - T₁))
-        else
-            Qsat[i, j] = e₀ * exp(C₂ * (T[i, j] - T₀) / (T[i, j] - T₂))
-        end
-    end
-
-    @. Qsat = 622.0 * Qsat / (σ * p - 0.378 * Qsat)  # WWhat does this do?
-
-    return Qsat
-end
-
-"""
 Compute the saturation specific humidity.
 """
-function get_saturation_specific_humidity(
+function get_saturation_specific_humidity!(
     T::Array{NF,3},  # Absolute temperature
     p::Array{NF,2},  # Normalised surface pressure
     M::ModelSetup{NF},
 ) where {NF<:AbstractFloat}
     @unpack nlon, nlat, nlev, σ_levels_full = M.geospectral.geometry
+    @unpack humid_saturation = Diag.parametrization_variables
+    @unpack e₀, C₁, C₂, T₀, T₁, T₂ = M.parameters.humidity_coefs
 
-    Qsat = zeros(nlon, nlat, nlev)  # Saturation specific humidity
-
-    for k = 1:nlev
-        σ = σ_levels_full[k]
-        Qsat[:, :, k] = get_saturation_specific_humidity(T[:, :, k], p, σ, M)
+    for k = 1:nlev, j = 1:nlat, i = 1:nlon
+        if T[i, j, k] > T₀
+            Qsat[i, j, k] = e₀ * exp(C₁ * (T[i, j, k] - T₀) / (T[i, j, k] - T₁))
+        else
+            Qsat[i, j, k] = e₀ * exp(C₂ * (T[i, j, k] - T₀) / (T[i, j, k] - T₂))
+        end
     end
 
-    return Qsat
+    @. Qsat = 622.0 * Qsat / (σ_levels_full * p - 0.378 * Qsat)  # What does this do?
+
+    return nothing
 end
 
 """

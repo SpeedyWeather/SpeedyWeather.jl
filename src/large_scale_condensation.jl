@@ -5,17 +5,20 @@ function get_large_scale_condensation_tendencies!(
     @unpack pres_ref, cp, alhc, alhs, gravity, τ, RH¹, ΔRH, rhb = M.constants  # Let's give some of these constants better names?
     @unpack nlon, nlat, nlev, σ_levels_half, σ_levels_full, σ_levels_thick =
         M.geospectral.geometry
-    @unpack temp_grid, humid_grid, pres_surf_grid, cloud_top, precipitation_ls = Diag.grid_variables
-    @unpack temp_tend, humid_tend = Diag.parametrization_tendencies
+    @unpack temp_grid, humid_grid, pres_surf_grid = Diag.grid_variables
+    @unpack humid_saturation, cloud_top, precipitation_ls = Diag.parametrization_variables
+    @unpack temp_tend, humid_tend = Diag.tendencies
 
     # Use mathematical notation for consistency with the documentation
     Q = humid_grid
     T = temp_grid
     ∂Q = humid_tend
     ∂T = temp_tend
+    Qsat = humid_saturation
 
     p = exp.(pres_surf_grid)  # Normalised surface pressure - TODO(alistair): check pressure units throughout
-    Qsat = get_saturation_specific_humidity(T, p, M)
+
+    get_saturation_specific_humidity!(T, p, M)
 
     # 1. Tendencies of humidity and temperature due to large-scale condensation
     for k = 2:nlev
