@@ -8,7 +8,7 @@ function get_saturation_specific_humidity(
     M::ModelSetup{NF},
 ) where {NF<:AbstractFloat}
     @unpack nlon, nlat = M.geospectral.geometry
-    @unpack e₀, C₁, C₂, T₀, T₁, T₂ = M.params.humidity_coefs
+    @unpack e₀, C₁, C₂, T₀, T₁, T₂ = M.parameters.humidity_coefs
 
     Qsat = zeros(nlon, nlat)  # Saturation specific humidity
 
