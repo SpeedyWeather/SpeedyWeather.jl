@@ -32,7 +32,7 @@ module SpeedyWeather
         triangular_truncation
 
     include("utility_functions.jl")
-    include("coefficient_structs.jl")
+    include("parameter_structs.jl")
     include("spectral_truncation.jl")
 
     include("default_parameters.jl")        # defines Parameters
@@ -48,7 +48,7 @@ module SpeedyWeather
     include("horizontal_diffusion.jl")      # defines HorizontalDiffusion
 
     include("models.jl")                    # defines ModelSetups
-    include("run_speedy.jl")                
+    include("run_speedy.jl")
     include("tendencies_parametrizations.jl")
     include("tendencies_dynamics.jl")
     include("tendencies.jl")
