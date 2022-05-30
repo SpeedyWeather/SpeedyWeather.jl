@@ -18,16 +18,17 @@ Change default parameters for more/fewer levels in the stratosphere vs troposphe
 end
 
 """
-Parameters for computing saturation specific humidity.
+Parameters for computing saturation vapour pressure using the August-Roche-Magnus formula,
 
-These parameters, and the formula where they are used, do not appear in the original
-Speedy documentation.
+    eᵢ(T) = e₀ * exp(Cᵢ * (T - T₀) / (T - Tᵢ)),
+
+    where i = 1,2 for saturation with respect to water and ice, respectively.
 """
-@with_kw struct HumidityCoefs{NF<:Real} <: Coefficients
-    e₀::NF = 6.108
-    C₁::NF = 17.269
-    C₂::NF = 21.875
-    T₀::NF = 273.16
+@with_kw struct MagnusCoefs{NF<:Real} <: Coefficients
+    e₀::NF = 6.108   # Saturation vapour pressure at 0°C
+    T₀::NF = 273.16  # 0°C
     T₁::NF = 35.86
     T₂::NF = 7.66
+    C₁::NF = 17.269
+    C₂::NF = 21.875
 end

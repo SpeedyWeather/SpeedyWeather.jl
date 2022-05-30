@@ -1,5 +1,10 @@
 """
-Compute the saturation vapour pressure.
+Compute the saturation vapour pressure as a function of temperature using the
+    August-Roche-Magnus formula,
+
+    eᵢ(T) = e₀ * exp(Cᵢ * (T - T₀) / (T - Tᵢ)),
+
+    where i = 1,2 for saturation with respect to water and ice, respectively.
 """
 function get_saturation_vapour_pressure!(
     sat_vap_pressure ::Array{NF,3},
@@ -7,7 +12,7 @@ function get_saturation_vapour_pressure!(
     model            ::ModelSetup,
     ) where {NF<:AbstractFloat}
     @unpack nlon, nlat, nlev = model.geospectral.geometry
-    @unpack e₀, C₁, C₂, T₀, T₁, T₂ = model.parameters.humidity_coefs
+    @unpack e₀, T₀, C₁, C₂, T₁, T₂ = model.parameters.magnus_coefs
 
     for k = 1:nlev, j = 1:nlat, i = 1:nlon
         if temp_grid[i, j, k] > T₀
@@ -23,7 +28,12 @@ function get_saturation_vapour_pressure!(
 end
 
 """
-Compute the saturation specific humidity.
+Compute the saturation specific humidity according to the formula,
+
+    0.622 * e / (p - (1 - 0.622) * e),
+
+    where e is the saturation vapour pressure, p is the pressure, and 0.622 is the ratio of
+    the molecular weight of water to dry air.
 """
 function get_saturation_specific_humidity!(
     sat_spec_humidity ::Array{NF,3},
@@ -37,7 +47,8 @@ function get_saturation_specific_humidity!(
     get_saturation_vapour_pressure!(sat_vap_pressure, temp_grid, model)
 
     for k = 1:nlev, j = 1:nlat, i = 1:nlon
-        sat_spec_humidity[i, j, k] = 0.622 * sat_vap_pressure[i, j, k] / (pres[i, j] * σ_levels_full[k] - 0.378 * sat_vap_pressure[i, j, k])
+        sat_spec_humidity[i, j, k] = 0.622 * sat_vap_pressure[i, j, k] /
+            (pres[i, j] * σ_levels_full[k] - (1 - 0.622) * sat_vap_pressure[i, j, k])
     end
 
     return nothing

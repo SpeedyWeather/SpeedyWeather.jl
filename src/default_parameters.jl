@@ -52,10 +52,10 @@ With keywords such that default values can be changed at creation.
     damping_time_strat::Real=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
 
     # PARAMETRIZATIONS
-    seasonal_cycle::Bool=true   # Seasonal cycle?
-    n_shortwave::Int=3          # Compute shortwave radiation every n steps
-    sppt_on::Bool=false         # Turn on SPPT?
-    humidity_coefs::HumidityCoefs = HumidityCoefs()
+    seasonal_cycle::Bool=true                  # Seasonal cycle?
+    n_shortwave::Int=3                         # Compute shortwave radiation every n steps
+    sppt_on::Bool=false                        # Turn on SPPT?
+    magnus_coefs::MagnusCoefs = MagnusCoefs()  # For computing saturation vapour pressure
 
     # Large-scale condensation (from table B10)
     RH_thresh_boundary::Real = 0.95  # Relative humidity threshold for boundary layer
