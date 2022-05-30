@@ -26,7 +26,7 @@ Parameters for computing saturation vapour pressure using the August-Roche-Magnu
 """
 @with_kw struct MagnusCoefs{NF<:Real} <: Coefficients
     e₀::NF = 6.108   # Saturation vapour pressure at 0°C
-    T₀::NF = 273.16  # 0°C
+    T₀::NF = 273.16  # 0°C in Kelvin
     T₁::NF = 35.86
     T₂::NF = 7.66
     C₁::NF = 17.269
