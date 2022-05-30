@@ -55,6 +55,10 @@ module SpeedyWeather
     include("feedback.jl")                  # defines Feedback
     include("output.jl")
 
+    # PHYSICS
+    include("humidity.jl")
+    include("large_scale_condensation.jl")
+
     include("time_integration.jl")
     include("pretty_printing.jl")
 end

@@ -41,8 +41,6 @@ struct GridVariables{NF<:AbstractFloat}
     u_grid             ::Array{NF,3}  # Gridpoint field of zonal velocity
     v_grid             ::Array{NF,3}  # Gridpoint field of meridional velocity
     temp_grid_anomaly  ::Array{NF,3}  # Gridpoint field of absolute temperature anomaly [K]
-    cloud_top          ::Array{NF,2}  # Cloud top diagnosed from precipitation due to convection and large-scale condensation
-    precipitation_ls   ::Array{NF,2}  # Large-scale precipitation
 end
 
 """
@@ -65,7 +63,7 @@ function GridVariables(G::GeoSpectral{NF}) where NF
 
     return GridVariables(vor_grid,div_grid,temp_grid,pres_surf_grid,humid_grid,geopot_grid,
                         # tr_grid,
-                        u_grid,v_grid,temp_grid_anomaly,cloud_top,precipitation_ls)
+                        u_grid,v_grid,temp_grid_anomaly)
 end
 
 """
@@ -73,9 +71,12 @@ Struct holding quantities calculated from the physical parameterisations. All qu
 are in grid-point space.
 """
 struct ParametrizationVariables{NF<:AbstractFloat}
-    humid_saturation ::Array{NF,3}  # Saturation specific humidity
-    cloud_top        ::Array{NF,2}  # Cloud-top
-    precipitation_ls ::Array{NF,2}  # Large-scale precipitation
+    sat_vap_pressure   ::Array{NF,3}   # Saturation vapour pressure
+    sat_spec_humidity  ::Array{NF,3}   # Saturation specific humidity
+    cloud_top          ::Array{Int,2}  # Cloud-top
+    precip_large_scale ::Array{NF,2}   # Large-scale precipitation
+    humid_tend         ::Array{NF,3}
+    temp_tend          ::Array{NF,3}
 end
 
 """
@@ -84,11 +85,20 @@ Generator function for the ParametrizationVariables struct. Initialises with zer
 function ParametrizationVariables(G::GeoSpectral{NF}) where NF
     @unpack nlon, nlat, nlev = G.geometry
 
-    humid_saturation = zeros(NF,nlon,nlat,nlev)  # Saturation specific humidity
-    cloud_top        = zeros(NF,nlon,nlat)       # Cloud-top
-    precipitation_ls = zeros(NF,nlon,nlat)       # Large-scale precipitation
+    sat_vap_pressure   = zeros(NF,nlon,nlat,nlev)  # Saturation vapour pressure
+    sat_spec_humidity  = zeros(NF,nlon,nlat,nlev)  # Saturation specific humidity
+    cloud_top          = zeros(Int,nlon,nlat)      # Cloud-top
+    precip_large_scale = zeros(NF,nlon,nlat)       # Large-scale precipitation
+    humid_tend         = zeros(NF,nlon,nlat,nlev)
+    temp_tend          = zeros(NF,nlon,nlat,nlev)
 
-    return ParametrizationVariables(humid_saturation, cloud_top, precipitation_ls)
+    return ParametrizationVariables(sat_vap_pressure,
+                                    sat_spec_humidity,
+                                    cloud_top,
+                                    precip_large_scale,
+                                    humid_tend,
+                                    temp_tend,
+                                    )
 end
 
 """Struct holding intermediate quantities that are used and shared when calculating tendencies"""

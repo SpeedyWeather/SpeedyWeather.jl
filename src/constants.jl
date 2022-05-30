@@ -28,10 +28,10 @@ Struct holding the parameters needed at runtime in number format NF.
 
     # PARAMETRIZATIONS
     # Large-scale condensation
-    τ::NF                   # Relaxation time for humidity (hours)
-    RH¹::NF                 # Relative humidity threshold at σ = 1
+    humid_relax_time::NF    # Relaxation time for humidity (hours)
+    RH_thresh_max ::NF      # Maximum relative humidity threshold (at σ = 1)
     ΔRH::NF                 # Vertical range of relative humidity threshold
-    rhb::NF                 # Relative humidity threshold for boundary layer - TODO(alistair): rename this
+    RH_thresh_boundary::NF  # Relative humidity threshold for boundary layer
 
 end
 
@@ -48,7 +48,7 @@ function Constants(P::Parameters)
     @unpack trunc, Δt_at_T85, n_days, output_dt = P
 
     # PARAMETRIZATION CONSTANTS
-    @unpack τ, RH¹, ΔRH, rhb = P  # Large-scale condensation
+    @unpack humid_relax_time, RH_thresh_max, ΔRH, RH_thresh_boundary = P  # Large-scale condensation
 
     Δt_min_at_trunc = Δt_at_T85*(85/trunc)      # scale time step Δt to specified resolution
     Δt      = round(Δt_min_at_trunc*60)         # convert time step Δt from minutes to whole seconds
@@ -71,5 +71,6 @@ function Constants(P::Parameters)
                             Δt,Δt_unscaled,Δt_sec,Δt_hrs,
                             robert_filter,williams_filter,n_timesteps,
                             output_every_n_steps, n_outputsteps,
-                            drag_strat, τ, RH¹, ΔRH, rhb)
+                            drag_strat, humid_relax_time, RH_thresh_max, ΔRH,
+                            RH_thresh_boundary)
 end

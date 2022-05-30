@@ -57,10 +57,10 @@ With keywords such that default values can be changed at creation.
     sppt_on::Bool=false         # Turn on SPPT?
     humidity_coefs::HumidityCoefs = HumidityCoefs()
     # Large-scale condensation (from table B10)
-    τ::Real = 4.0           # Relaxation time for humidity (hours)
-    RH¹::Real = 0.9         # Relative humidity threshold at σ = 1
-    ΔRH::Real = 0.1         # Vertical range of relative humidity threshold
-    rhb::Real = 0.95            # Relative humidity threshold for boundary layer - TODO(alistair): rename this
+    humid_relax_time::Real = 4.0     # Relaxation time for humidity (hours)
+    RH_thresh_max::Real = 0.9        # Maximum relative humidity threshold (at σ = 1)
+    ΔRH::Real = 0.1                  # Vertical range of relative humidity threshold
+    RH_thresh_boundary::Real = 0.95  # Relative humidity threshold for boundary layer - TODO(alistair): rename this
 
     # TIME STEPPING
     Δt_at_T85::Real=20          # time step in minutes for T85, scale linearly for specified trunc

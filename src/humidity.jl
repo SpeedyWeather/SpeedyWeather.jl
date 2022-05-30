@@ -1,37 +1,44 @@
 """
-Compute the saturation specific humidity.
+Compute the saturation vapour pressure.
 """
-function get_saturation_specific_humidity!(
-    T::Array{NF,3},  # Absolute temperature
-    p::Array{NF,2},  # Normalised surface pressure
-    M::ModelSetup{NF},
-) where {NF<:AbstractFloat}
-    @unpack nlon, nlat, nlev, σ_levels_full = M.geospectral.geometry
-    @unpack humid_saturation = Diag.parametrization_variables
-    @unpack e₀, C₁, C₂, T₀, T₁, T₂ = M.parameters.humidity_coefs
+function get_saturation_vapour_pressure!(
+    sat_vap_pressure ::Array{NF,3},
+    temp_grid        ::Array{NF,3},
+    model            ::ModelSetup,
+    ) where {NF<:AbstractFloat}
+    @unpack nlon, nlat, nlev = model.geospectral.geometry
+    @unpack e₀, C₁, C₂, T₀, T₁, T₂ = model.parameters.humidity_coefs
 
     for k = 1:nlev, j = 1:nlat, i = 1:nlon
-        if T[i, j, k] > T₀
-            Qsat[i, j, k] = e₀ * exp(C₁ * (T[i, j, k] - T₀) / (T[i, j, k] - T₁))
+        if temp_grid[i, j, k] > T₀
+            # Saturation vapour pressure over water
+            sat_vap_pressure[i, j, k] = e₀ * exp(C₁ * (temp_grid[i, j, k] - T₀) / (temp_grid[i, j, k] - T₁))
         else
-            Qsat[i, j, k] = e₀ * exp(C₂ * (T[i, j, k] - T₀) / (T[i, j, k] - T₂))
+            # Saturation vapour pressure over ice
+            sat_vap_pressure[i, j, k] = e₀ * exp(C₂ * (temp_grid[i, j, k] - T₀) / (temp_grid[i, j, k] - T₂))
         end
     end
-
-    @. Qsat = 622.0 * Qsat / (σ_levels_full * p - 0.378 * Qsat)  # What does this do?
 
     return nothing
 end
 
 """
-Convert specific humidity into relative humidity.
+Compute the saturation specific humidity.
 """
-function get_relative_humidity(
-    Q::Array{NF,3},  # Specific humidity
-    T::Array{NF,3},  # Absolute temperature
-    p::Array{NF,2},  # Normalised surface pressure
-    M::ModelSetup{NF},
+function get_saturation_specific_humidity!(
+    sat_spec_humidity ::Array{NF,3},
+    sat_vap_pressure  ::Array{NF,3},
+    temp_grid         ::Array{NF,3},
+    pres              ::Array{NF,2},
+    model             ::ModelSetup,
 ) where {NF<:AbstractFloat}
-    Qsat = get_saturation_specific_humidity(T, p, M)
-    return Q ./ Qsat
+    @unpack nlon, nlat, nlev, σ_levels_full = model.geospectral.geometry
+
+    get_saturation_vapour_pressure!(sat_vap_pressure, temp_grid, model)
+
+    for k = 1:nlev, j = 1:nlat, i = 1:nlon
+        sat_spec_humidity[i, j, k] = 0.622 * sat_vap_pressure[i, j, k] / (pres[i, j] * σ_levels_full[k] - 0.378 * sat_vap_pressure[i, j, k])
+    end
+
+    return nothing
 end

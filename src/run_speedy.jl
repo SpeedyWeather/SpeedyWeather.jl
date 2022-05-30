@@ -11,13 +11,13 @@ function run_speedy(::Type{NF}=Float64;             # number format, use Float64
     progn_vars,diagn_vars,model_setup = initialize_speedy(NF;kwargs...)
 
     # START MODEL INTEGRATION
-    time_stepping!(progn_vars,diagn_vars,model_setup) 
+    time_stepping!(progn_vars,diagn_vars,model_setup)
     return progn_vars                               # return prognostic variables when finished
 end
 
 """
     progn_vars, diagn_vars, model_setup = initialize_speedy(NF,kwargs...)
-    
+
 Initialize the model by returning
 - `progn_vars`, the initial conditions of the prognostic variables
 - `diagn_vars`, the preallocated the diagnotic variables (initialised to zero)
@@ -43,6 +43,6 @@ function initialize_speedy(::Type{NF}=Float64;       # number format, use Float6
 
     prognostic_vars = initial_conditions(P,B,G)     # initialize prognostic variables
     diagnostic_vars = DiagnosticVariables(G)        # preallocate all diagnostic variables with zeros
-    
+
     return prognostic_vars, diagnostic_vars, M
 end

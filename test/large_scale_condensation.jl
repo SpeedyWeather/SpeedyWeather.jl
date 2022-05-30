@@ -1,5 +1,3 @@
-using Parameters
-
 @testset "large_scale_condensation.jl" begin
     @testset "get_large_scale_condensation_tendencies!" begin
         _, diag, model = SpeedyWeather.initialize_speedy()

@@ -24,7 +24,7 @@ These parameters, and the formula where they are used, do not appear in the orig
 Speedy documentation.
 """
 @with_kw struct HumidityCoefs{NF<:Real} <: Coefficients
-    e₀::NF = 6.108e-3
+    e₀::NF = 6.108
     C₁::NF = 17.269
     C₂::NF = 21.875
     T₀::NF = 273.16
