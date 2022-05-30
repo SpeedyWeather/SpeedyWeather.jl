@@ -27,12 +27,11 @@ Struct holding the parameters needed at runtime in number format NF.
     drag_strat::NF               # drag [1/s] for zonal wind in the stratosphere
 
     # PARAMETRIZATIONS
-    # Large-scale condensation
-    humid_relax_time::NF    # Relaxation time for humidity (hours)
-    RH_thresh_max ::NF      # Maximum relative humidity threshold (at σ = 1)
-    ΔRH::NF                 # Vertical range of relative humidity threshold
+    # Large-scale condensation (occurs when relative humidity exceeds a given threshold)
     RH_thresh_boundary::NF  # Relative humidity threshold for boundary layer
-
+    RH_thresh_range::NF     # Vertical range of relative humidity threshold
+    RH_thresh_max ::NF      # Maximum relative humidity threshold
+    humid_relax_time::NF    # Relaxation time for humidity (hours)
 end
 
 """
@@ -48,7 +47,7 @@ function Constants(P::Parameters)
     @unpack trunc, Δt_at_T85, n_days, output_dt = P
 
     # PARAMETRIZATION CONSTANTS
-    @unpack humid_relax_time, RH_thresh_max, ΔRH, RH_thresh_boundary = P  # Large-scale condensation
+    @unpack RH_thresh_boundary, RH_thresh_range, RH_thresh_max, humid_relax_time = P  # Large-scale condensation
 
     Δt_min_at_trunc = Δt_at_T85*(85/trunc)      # scale time step Δt to specified resolution
     Δt      = round(Δt_min_at_trunc*60)         # convert time step Δt from minutes to whole seconds
@@ -71,6 +70,6 @@ function Constants(P::Parameters)
                             Δt,Δt_unscaled,Δt_sec,Δt_hrs,
                             robert_filter,williams_filter,n_timesteps,
                             output_every_n_steps, n_outputsteps,
-                            drag_strat, humid_relax_time, RH_thresh_max, ΔRH,
-                            RH_thresh_boundary)
+                            drag_strat, RH_thresh_boundary, RH_thresh_range,
+                            RH_thresh_max, humid_relax_time)
 end

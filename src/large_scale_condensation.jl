@@ -2,7 +2,7 @@ function get_large_scale_condensation_tendencies!(
     Diag::DiagnosticVariables{NF},
     M   ::ModelSetup,
 ) where {NF<:AbstractFloat}
-    @unpack gravity, humid_relax_time, RH_thresh_max, ΔRH, RH_thresh_boundary = M.constants  # Let's give some of these constants better names?
+    @unpack gravity, RH_thresh_max, RH_thresh_range, RH_thresh_boundary, humid_relax_time = M.constants
     @unpack cp, alhc = M.parameters
     @unpack nlon, nlat, nlev, σ_levels_full, σ_levels_thick = M.geospectral.geometry
     @unpack temp_grid, humid_grid, pres_surf_grid = Diag.grid_variables
@@ -15,7 +15,7 @@ function get_large_scale_condensation_tendencies!(
     # 1. Tendencies of humidity and temperature due to large-scale condensation
     for k = 2:nlev
         σₖ = σ_levels_full[k]
-        RH_threshold = RH_thresh_max + ΔRH * (σₖ^2 - 1)  # Relative humidity threshold for condensation (Formula 24)
+        RH_threshold = RH_thresh_max + RH_thresh_range * (σₖ^2 - 1)  # Relative humidity threshold for condensation (Formula 24)
         if k == nlev
             RH_threshold = max(RH_threshold, RH_thresh_boundary)
         end
@@ -33,7 +33,7 @@ function get_large_scale_condensation_tendencies!(
         end
     end
 
-    # 2. Precipitation due to large-scale condensation#
+    # 2. Precipitation due to large-scale condensation
     for k = 2:nlev
         Δpₖ = pres * σ_levels_thick[k]  # Formula 4
         for j = 1:nlat, i = 1:nlon
