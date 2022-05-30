@@ -22,7 +22,7 @@ module SpeedyWeather
     export run_speedy, initialize_speedy
 
     # EXPORT STRUCTS
-    export Parameters, GenLogisticCoefs, HumidityCoefs,
+    export Parameters, GenLogisticCoefs,
         GeoSpectral, Boundaries, Constants, Geometry, SpectralTransform,
         PrognosticVariables, DiagnosticVariables
 
