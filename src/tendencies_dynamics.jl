@@ -290,9 +290,19 @@ function vorticity_fluxes!( uω::AbstractMatrix{NF},    # Output: u*(vor+coriol
     end
 end
 
+"""
+    gridded!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
+                progn::PrognosticVariables{NF}, # all prognostic variables
+                M::BarotropicModel,             # everything that's constant
+                lf::Int=1                       # leapfrog index
+                ) where NF
+
+Propagate the spectral state of the prognostic variables `progn` to the
+diagnostic variables in `diagn`. Updates grid vorticity, spectral stream function
+and spectral and grid velocities u,v."""
 function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
                     progn::PrognosticVariables{NF}, # all prognostic variables
-                    M::ModelSetup,                  # everything that's constant
+                    M::BarotropicModel,             # everything that's constant
                     lf::Int=1                       # leapfrog index
                     ) where NF
     
