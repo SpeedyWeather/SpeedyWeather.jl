@@ -100,42 +100,52 @@ function HorizontalDiffusion(   P::Parameters,      # Parameter struct
         end
     end
 
-    # OROGRAPHIC CORRECTION
-    @unpack nlon, nlat, nlev, σ_levels_full = G.geometry
-    @unpack gravity, R_gas, lapse_rate, scale_height, scale_height_humid, relhumid_ref = P
-    @unpack geopot_surf_grid = B    #TODO is currently not contained in the Boundaries struct B
+    if P.model == :barotropic || P.model == :shallowwater               # orographic correction not needed
+        
+        temp_correction_vert        = zeros(1)                          # create dummy arrays
+        humid_correction_vert       = zeros(1)
+        temp_correction_horizontal  = zeros(complex(P.NF),1,1) 
+        humid_correction_horizontal = zeros(complex(P.NF),1,1) 
 
-    # Orographic correction terms for temperature and humidity (vertical component)
-    lapse_rate_gravity = lapse_rate/(1000gravity)       # lapse rate in [K/km] convert to [K/m] with /1000
-    R_lapse_rate_gravity = R_gas*lapse_rate_gravity     
-    scale_height_ratio = scale_height/scale_height_humid
+    else    # P.model == :primitive, orographic correction only needed then
 
-    # preallocate (high precision, conversion to NF later)
-    temp_correction_vert = zeros(nlev)      # Vertical component of orographic correction for temperature
-    humid_correction_vert = zeros(nlev)     # Vertical component of orographic correction for humidity
+        # OROGRAPHIC CORRECTION
+        @unpack nlon, nlat, nlev, σ_levels_full = G.geometry
+        @unpack gravity, R_gas, lapse_rate, scale_height, scale_height_humid, relhumid_ref = P
+        @unpack geopot_surf_grid = B    #TODO is currently not contained in the Boundaries struct B
 
-    for k in 2:nlev
-        temp_correction_vert[k] = σ_levels_full[k]^R_lapse_rate_gravity
-        if k > 2
-            humid_correction_vert[k] = σ_levels_full[k]^scale_height_ratio
+        # Orographic correction terms for temperature and humidity (vertical component)
+        lapse_rate_gravity = lapse_rate/(1000gravity)       # lapse rate in [K/km] convert to [K/m] with /1000
+        R_lapse_rate_gravity = R_gas*lapse_rate_gravity     
+        scale_height_ratio = scale_height/scale_height_humid
+
+        # preallocate (high precision, conversion to NF later)
+        temp_correction_vert = zeros(nlev)      # Vertical component of orographic correction for temperature
+        humid_correction_vert = zeros(nlev)     # Vertical component of orographic correction for humidity
+
+        for k in 2:nlev
+            temp_correction_vert[k] = σ_levels_full[k]^R_lapse_rate_gravity
+            if k > 2
+                humid_correction_vert[k] = σ_levels_full[k]^scale_height_ratio
+            end
         end
-    end
 
-    # Orographic correction term for temperature (horizontal component)
-    horizontal_correction = zeros(nlon, nlat)       # in grid-point space
+        # Orographic correction term for temperature (horizontal component)
+        horizontal_correction = zeros(nlon, nlat)       # in grid-point space
 
-    for j in 1:nlat
-        for i = 1:nlon
-            horizontal_correction[i,j] = lapse_rate_gravity*geopot_surf_grid[i,j]
+        for j in 1:nlat
+            for i = 1:nlon
+                horizontal_correction[i,j] = lapse_rate_gravity*geopot_surf_grid[i,j]
+            end
         end
+
+        # transform correction to spectral space
+        temp_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
+
+        # Orographic correction terms for humidity (horizontal component)
+        horizontal_correction .= relhumid_ref           # relative humidity reference value
+        humid_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
     end
-
-    # transform correction to spectral space
-    temp_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
-
-    # Orographic correction terms for humidity (horizontal component)
-    horizontal_correction .= relhumid_ref           # relative humidity reference value
-    humid_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
 
     # convert to number format NF here
     return HorizontalDiffusion{P.NF}(   damping,damping_div,damping_strat,
