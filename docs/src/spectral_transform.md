@@ -9,7 +9,7 @@ between the coefficients of the spherical harmonics (the _spectral_ space) and t
 The spectral transform implemented by SpeedyWeather.jl follows largely Justin Willmert's
 [CMB.jl](https://github.com/jmert/CMB.jl) package and makes use of
 [AssociatedLegendrePolynomials.jl](https://github.com/jmert/AssociatedLegendrePolynomials.jl) and
-[FFTW.jl](https://github.com/JuliaMath/FFTW.jl)/[FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) for the Fourier transform. Justin described his work in a Blog series [^1],[^2],[^3],[^4],[^5],[^6],[^7],[^8]
+[FFTW.jl](https://github.com/JuliaMath/FFTW.jl)/[FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) for the Fourier transform. Justin described his work in a Blog series [^1][^2][^3][^4][^5][^6][^7][^8]
 
 ## Spherical harmonics
 
@@ -112,16 +112,17 @@ longitudes, latitudes on a regular Gaussian grid. Then spectral and grid resolut
 - ``nlat \geq (3l_{max}+1)/2``
 
 In general, we choose ``nlon = 2nlat``, and ideally ``nlon`` is easily Fourier-transformable, e.g. ``nlon = 2^i3^j5^k`` with some
-integers ``i,j,k``. SpeedyWeather.jl is tested at the following horizontal resolutions
+integers ``i,j,k``. SpeedyWeather.jl is tested at the following horizontal resolutions, with ``\Delta x`` as the approximate grid
+spacing at the Equator (``2\pi R / nlon``)
 
-| ``l_{max}``   | nlon | nlat |
-| ----------- | ---- | ---- |
-| 31 (default)| 96   | 48   |
-| 42          | 128  | 64   |
-| 85          | 256  | 128  |
-| 170         | 512  | 256  |
-| 341         | 1024 | 512  |
-| 682         | 2048 | 1024 |
+| ``l_{max}``   | nlon | nlat | ``\Delta x`` |
+| ------------- | ---- | ---- | ------------ |
+| 31 (default)  | 96   | 48   | 400 km       |
+| 42            | 128  | 64   | 300 km       |
+| 85            | 256  | 128  | 160 km       |
+| 170           | 512  | 256  | 80 km        |
+| 341           | 1024 | 512  | 40 km        |
+| 682           | 2048 | 1024 | 20 km        |
 
 Choosing `trunc` as argument in `run_speedy` will automatically choose `nlon`,`nlat` as presented in the table.
 
