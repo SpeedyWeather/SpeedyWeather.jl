@@ -15,7 +15,8 @@ As u = -1/R*∂Ψ/∂lat, this function can be generally used to compute the gra
 function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: cos(lat)*zonal velocity u
                             Ψ::AbstractMatrix{Complex{NF}},         # input: streamfunction Ψ
                             S::SpectralTransform{NF};               # use precomputed recursion factors
-                            flipsign::Bool=false                    # flip the sign to obtain u from Ψ
+                            flipsign::Bool=false,                   # flip the sign to obtain u from Ψ
+                            add::Bool=false                         # coslat_u += (add) or = (overwrite)
                             ) where {NF<:AbstractFloat}             # number format NF
 
     _,mmax = size(Ψ)                # degree l, order m of spherical harmonics
@@ -35,14 +36,14 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: co
         grad_y2 = S.grad_y2
     end
 
-    coslat_u[1,1] = grad_y2[1,1]*Ψ[2,1]     # l=m=0 mode only with term 2
+    coslat_u[1,1] = coslat_u[1,1]*add + grad_y2[1,1]*Ψ[2,1]         # l=m=0 mode only with term 2
 
     @inbounds for m in 1:mmax
         for l in max(2,m):lmax
-            coslat_u[l,m] = grad_y1[l,m]*Ψ[l-1,m] + grad_y2[l,m]*Ψ[l+1,m]
+            coslat_u[l,m] = coslat_u[l,m]*add + grad_y1[l,m]*Ψ[l-1,m] + grad_y2[l,m]*Ψ[l+1,m]
         end
         for l in lmax+1:lmax+2-size_same
-            coslat_u[l,m] = grad_y1[l,m]*Ψ[l-1,m]
+            coslat_u[l,m] = coslat_u[l,m]*add + grad_y1[l,m]*Ψ[l-1,m]
         end
     end
 
@@ -71,7 +72,8 @@ such that the returned array is scaled with coslat.
 """
 function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # output: cos(latitude)*meridional velocity
                                 Ψ::AbstractMatrix{Complex{NF}},         # input: spectral coefficients of stream function
-                                radius::Real=1                          # radius of the sphere/Earth
+                                radius::Real=1;                         # radius of the sphere/Earth
+                                add::Bool=false                         # coslat_u += (add) or = (overwrite)
                                 ) where {NF<:AbstractFloat}             # number format NF
 
     # Ψ can have size n+1 x n but then the last row is not used in the loop
@@ -83,7 +85,8 @@ function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # outpu
 
     @inbounds for m in 1:mmax+1                     # loop over all coefficients, order m
         for l in m:lmax+1                           # degree l
-            coslat_v[l,m] = (m-1)*iradius⁻¹*Ψ[l,m]  # gradient in lon = *i*m/radius but 1-based order
+                                                    # gradient in lon = *i*m/radius but 1-based order
+            coslat_v[l,m] = coslat_v[l,m]*add + (m-1)*iradius⁻¹*Ψ[l,m] 
         end
     end
 
