@@ -70,9 +70,10 @@ end
 struct IntermediateVariables{NF<:AbstractFloat}
     
     ### VORTICITY INVERSION
-    stream_function ::Array{Complex{NF},3}
-    coslat_u        ::Array{Complex{NF},3}
-    coslat_v        ::Array{Complex{NF},3}
+    velocity_potential  ::Array{Complex{NF},3}
+    stream_function     ::Array{Complex{NF},3}
+    coslat_u            ::Array{Complex{NF},3}
+    coslat_v            ::Array{Complex{NF},3}
 
     # VORTICITY ADVECTION
     uω_grid         ::Array{NF,3}
@@ -119,7 +120,8 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
     @unpack nlon,nlat,nlev = G.geometry         # number of longitudes, latitudes, vertical levels
     @unpack lmax, mmax = G.spectral_transform   # 0-based max degree l, order m of the spherical harmonics
 
-    # BAROTROPIC VORTIICTY EQUATION
+    # BAROTROPIC VORTICITY EQUATION
+    velocity_potential = zeros(Complex{NF},lmax+1,mmax+1,nlev)
     stream_function = zeros(Complex{NF},lmax+1,mmax+1,nlev)
     coslat_u = zeros(Complex{NF},lmax+2,mmax+1,nlev)
     coslat_v = zeros(Complex{NF},lmax+2,mmax+1,nlev)
@@ -157,7 +159,8 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
     dumk                        = zeros(Complex{NF},lmax+2,mmax+1,nlev+1)  
     spectral_geopotential       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
-    return IntermediateVariables(   stream_function, coslat_u, coslat_v,
+    return IntermediateVariables(   velocity_potential, stream_function,
+                                    coslat_u, coslat_v,
                                     uω_grid,vω_grid,
                                     uω,vω,∂uω_∂lon,∂vω_∂lat,         
                                     u_mean,v_mean,div_mean,
