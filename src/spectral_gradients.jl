@@ -36,14 +36,17 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: co
         grad_y2 = S.grad_y2
     end
 
-    coslat_u[1,1] = coslat_u[1,1]*add + grad_y2[1,1]*Ψ[2,1]         # l=m=0 mode only with term 2
+    g = grad_y2[1,1]*Ψ[2,1]
+    coslat_u[1,1] = add ? coslat_u[1,1] + g : g        # l=m=0 mode only with term 2
 
     @inbounds for m in 1:mmax
         for l in max(2,m):lmax
-            coslat_u[l,m] = coslat_u[l,m]*add + grad_y1[l,m]*Ψ[l-1,m] + grad_y2[l,m]*Ψ[l+1,m]
+            g = grad_y1[l,m]*Ψ[l-1,m] + grad_y2[l,m]*Ψ[l+1,m]
+            coslat_u[l,m] = add ? coslat_u[l,m] + g : g
         end
         for l in lmax+1:lmax+2-size_same
-            coslat_u[l,m] = coslat_u[l,m]*add + grad_y1[l,m]*Ψ[l-1,m]
+            g = grad_y1[l,m]*Ψ[l-1,m]
+            coslat_u[l,m] = add ? coslat_u[l,m] + g : g
         end
     end
 
@@ -85,8 +88,9 @@ function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # outpu
 
     @inbounds for m in 1:mmax+1                     # loop over all coefficients, order m
         for l in m:lmax+1                           # degree l
-                                                    # gradient in lon = *i*m/radius but 1-based order
-            coslat_v[l,m] = coslat_v[l,m]*add + (m-1)*iradius⁻¹*Ψ[l,m] 
+            g = (m-1)*iradius⁻¹*Ψ[l,m]              # gradient in lon = *i*m/radius but 1-based order
+            coslat_v[l,m] = add ? coslat_v[l,m] + g : g 
+            # coslat_v[l,m] = coslat_v[l,m]*add + (m-1)*iradius⁻¹*Ψ[l,m] 
         end
     end
 

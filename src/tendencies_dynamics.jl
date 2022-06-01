@@ -346,7 +346,7 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
                     ) where NF
     
     @unpack vor, div = progn                        # relative vorticity, divergence
-    @unpack vor_grid, u_grid, v_grid = diagn.grid_variables
+    @unpack vor_grid, div_grid, u_grid, v_grid = diagn.grid_variables
     @unpack stream_function, coslat_u, coslat_v, velocity_potential = diagn.intermediate_variables
     
     G = M.geospectral.geometry
