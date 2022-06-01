@@ -123,7 +123,7 @@ function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf
     feedback.i_out += 1                                         # increase counter
     @unpack i_out = feedback
 
-    write_netcdf_variables!(netcdf_file,diagn,M)                # depending on ModelSetup M write variables to file
+    write_netcdf_variables!(i_out,netcdf_file,diagn,M)          # depending on ModelSetup M write variables to file
 
     # WRITE TIME
     time_hrs = Int32[round(time_sec/3600)]                      # convert from seconds to hours
@@ -131,7 +131,8 @@ function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf
     NetCDF.sync(netcdf_file)                                    # sync to flush variables to disc
 end
 
-function write_netcdf_variables!(   netcdf_file::NcFile,
+function write_netcdf_variables!(   i_out::Integer,
+                                    netcdf_file::NcFile,
                                     diagn::DiagnosticVariables,
                                     M::ModelSetup)
 
