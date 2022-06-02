@@ -57,7 +57,8 @@ With keywords such that default values can be changed at creation.
     sppt_on::Bool=false                        # Turn on SPPT?
     magnus_coefs::MagnusCoefs = MagnusCoefs()  # For computing saturation vapour pressure
 
-    # Large-scale condensation (from table B10)
+    # Large-Scale Condensation (from table B10)
+    k_lsc::Int = 2                   # Index of atmospheric level at which large-scale condensation begins
     RH_thresh_boundary::Real = 0.95  # Relative humidity threshold for boundary layer
     RH_thresh_range::Real = 0.1      # Vertical range of relative humidity threshold
     RH_thresh_max::Real = 0.9        # Maximum relative humidity threshold

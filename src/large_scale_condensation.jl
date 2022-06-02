@@ -3,7 +3,7 @@ function get_large_scale_condensation_tendencies!(
     M   ::ModelSetup,
 ) where {NF<:AbstractFloat}
     @unpack gravity, RH_thresh_max, RH_thresh_range, RH_thresh_boundary, humid_relax_time = M.constants
-    @unpack cp, alhc = M.parameters
+    @unpack cp, alhc, k_lsc = M.parameters
     @unpack nlon, nlat, nlev, σ_levels_full, σ_levels_thick = M.geospectral.geometry
     @unpack temp_grid, humid_grid, pres_surf_grid = Diag.grid_variables
     @unpack temp_tend, humid_tend, sat_spec_humidity, sat_vap_pressure, cloud_top, precip_large_scale = Diag.parametrization_variables
@@ -13,7 +13,7 @@ function get_large_scale_condensation_tendencies!(
     get_saturation_specific_humidity!(sat_spec_humidity, sat_vap_pressure, temp_grid, pres, M)
 
     # 1. Tendencies of humidity and temperature due to large-scale condensation
-    for k = 2:nlev
+    for k = k_lsc:nlev  # Used to be 2:nlev in original Speedy
         σₖ = σ_levels_full[k]
         RH_threshold = RH_thresh_max + RH_thresh_range * (σₖ^2 - 1)  # Relative humidity threshold for condensation (Formula 24)
         if k == nlev
@@ -34,7 +34,7 @@ function get_large_scale_condensation_tendencies!(
     end
 
     # 2. Precipitation due to large-scale condensation
-    for k = 2:nlev
+    for k = k_lsc:nlev
         Δpₖ = pres * σ_levels_thick[k]  # Formula 4
         for j = 1:nlat, i = 1:nlon
             precip_large_scale[i, j] += -1 / gravity * Δpₖ[i, j] * humid_tend[i, j, k]  # Formula 25
