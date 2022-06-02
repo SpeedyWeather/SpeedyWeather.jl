@@ -4,7 +4,8 @@ Compute the saturation vapour pressure as a function of temperature using the
 
     eᵢ(T) = e₀ * exp(Cᵢ * (T - T₀) / (T - Tᵢ)),
 
-    where i = 1,2 for saturation with respect to water and ice, respectively.
+    where T is in Kelvin and i = 1,2 for saturation with respect to water and ice,
+    respectively.
 """
 function get_saturation_vapour_pressure!(
     sat_vap_pressure ::Array{NF,3},
