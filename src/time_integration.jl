@@ -161,6 +161,44 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     leapfrog!(vor,vor_tend,dt,M.constants,lf1)
 end
 
+"""
+    timestep!(  progn::PrognosticVariables{NF}, # all prognostic variables
+                diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
+                dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                M::BarotropicModel,             # everything that's constant at runtime
+                lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
+                lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
+                ) where {NF<:AbstractFloat}
+
+Calculate a single time step for the barotropic vorticity equation model of SpeedyWeather.jl """
+function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
+                    diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
+                    dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                    M::BarotropicModel,             # everything that's constant at runtime
+                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
+                    lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
+                    ) where {NF<:AbstractFloat}
+    
+    @unpack vor = progn
+    @unpack vor_tend = diagn.tendencies
+    @unpack damping, damping_impl = M.horizontal_diffusion
+
+    fill!(vor_tend,zero(Complex{NF}))               # set all tendencies to zero
+
+    # PROPAGATE THE SPECTRAL STATE INTO THE DIAGNOSTIC VARIABLES
+    gridded!(diagn,progn,M,lf2)
+
+    # COMPUTE TENDENCIES OF PROGNOSTIC VARIABLES
+    get_tendencies!(diagn,progn,M,lf2)                   
+
+    # DIFFUSION FOR WIND, always use first leapfrog index for diffusion (otherwise unstable)
+    vor_lf = view(vor,:,:,1,:)                                      # array view for leapfrog index
+    horizontal_diffusion!(vor_tend,vor_lf,damping,damping_impl)     # diffusion of vorticity
+  
+    # TIME INTEGRATION, via leapfrog step forward (filtered with Robert+William's depending on l1)
+    leapfrog!(vor,vor_tend,dt,M.constants,lf1)
+end
+
 """Main time loop."""
 function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variables
                         diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables

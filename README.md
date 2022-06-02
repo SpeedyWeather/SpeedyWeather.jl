@@ -3,7 +3,7 @@
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://milankl.github.io/SpeedyWeather.jl/dev)
 
 The focus of SpeedyWeather.jl is to develop a global atmospheric model with simple physics, that can run at various levels of
-precision (16, 32 and 64-bit) on different architectures (x86 and ARM are currently planned, GPUs maybe in the future).
+precision (16, 32 and 64-bit) on different architectures (x86 and arm are supported, GPUs planned).
 
 Additionally, the model is written in an entirely number format-flexible way, such that any custom number format can
 be used and Julia will compile to the format automatically. In contrast to the original speedy the resolution

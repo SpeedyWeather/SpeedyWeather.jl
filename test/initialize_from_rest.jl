@@ -1,21 +1,26 @@
 @testset "Initialize from rest" begin
 
-    # original speedy T30 with 96x48 grid
-    P = Parameters(NF=Float64)
-    G = GeoSpectral(P)
-    B = Boundaries(P)
-    S = G.spectral_transform
+    # BAROTROPIC MODEL
+    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:barotropic)
+    @test all(progn.vor .== 0)
 
-    Prog = SpeedyWeather.initialize_from_rest(P,B,G)
+    """ TODO: uncomment when models are properly defined
+    # SHALLOW WATER MODEL
+    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:shallowwater)
+    @test all(progn.vor .== 0)
+    @test all(progn.div .== 0)
+    @test all(progn.pres .== 0)
 
-    @test all(Prog.vor .== 0)
-    @test all(Prog.div .== 0)
+    # PRIMITIVE EQUATION MODEL
+    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:primitive)
+    @test all(progn.vor .== 0)
 
-    k = P.nlev    # test surface layer only at the moment
-    lf = 1          # first leapfrog index
-    temp_grid = gridded(Prog.temp[:,:,lf,k],S)
-    pres_surf_grid = gridded(Prog.pres_surf[:,:,lf],S)
-    humid_grid = gridded(Prog.humid[:,:,lf,k],S)
+    S = model.geospectral.spectral_transform
+    k = model.parameters.nlev       # test surface layer only at the moment
+    lf = 1                          # first leapfrog index
+    temp_grid = gridded(progn.temp[:,:,lf,k],S)
+    pres_surf_grid = gridded(progn.pres_surf[:,:,lf],S)
+    humid_grid = gridded(progn.humid[:,:,lf,k],S)
 
     # temperature between 200K and 350K everywhere
     # println((sum(temp_grid)/length(temp_grid),minimum(temp_grid),maximum(temp_grid)))
@@ -30,5 +35,6 @@
     # humidity non-negative everywhere
     # humidity has currently values of O(1e9)...
     # println((sum(humid_grid)/length(humid_grid),minimum(humid_grid),maximum(humid_grid)))
-    @test_skip all(humid_grid .>= 0) 
+    @test_skip all(humid_grid .>= 0)
+    """
 end

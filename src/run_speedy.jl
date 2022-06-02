@@ -3,7 +3,7 @@
 
 Runs SpeedyWeather.jl with number format `NF` and any additional parameters in the keyword arguments
 `kwargs...`. Any unspeficied parameters will use the default values as defined in `src/parameters.jl`."""
-function run_speedy(::Type{NF}=Float64;             # number format, use Float64 as default
+function run_speedy(::Type{NF}=Float32;             # number format, use Float32 as default
                     kwargs...                       # all additional non-default parameters
                     ) where {NF<:AbstractFloat}
 
@@ -23,7 +23,7 @@ Initialize the model by returning
 - `diagn_vars`, the preallocated the diagnotic variables (initialised to zero)
 - `model_setup`, the collected pre-calculated structs that don't change throughout integration:
 parametes, constants, geometry, spectral transform, boundaries, diffusion."""
-function initialize_speedy(::Type{NF}=Float64;       # number format, use Float64 as default
+function initialize_speedy(::Type{NF}=Float32;      # number format, use Float32 as default
                           kwargs...                 # all additional non-default parameters
                           ) where {NF<:AbstractFloat}
 
@@ -34,14 +34,14 @@ function initialize_speedy(::Type{NF}=Float64;       # number format, use Float6
     H = HorizontalDiffusion(P,C,G,B)                # precomputed arrays for horizontal diffusion
 
     if P.model == :barotropic                       # pack all of the above into a *Model struct
-        M = BarotropicModel(P,C,G,B,H)
-    elseif P.model == :shallowwater
+        M = BarotropicModel(P,C,G,H)                # typeof(M) is used to dispatch dynamically
+    elseif P.model == :shallowwater                 # to the supported model types
         M = ShallowWaterModel(P,C,G,B,H)
     elseif P.model == :primitive
         M = PrimitiveEquationModel(P,C,G,B,H)
     end
 
-    prognostic_vars = initial_conditions(P,B,G)     # initialize prognostic variables
+    prognostic_vars = initial_conditions(M)         # initialize prognostic variables
     diagnostic_vars = DiagnosticVariables(G)        # preallocate all diagnostic variables with zeros
 
     return prognostic_vars, diagnostic_vars, M

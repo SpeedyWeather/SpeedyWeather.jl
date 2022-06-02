@@ -12,10 +12,10 @@ function roundup_fft(n::Int;small_primes::Vector{Int}=[2,3,5])
     while factors_not_in_small_primes
         
         factors = Primes.factor(n)          # prime factorization
-        all_factors_small = true            
+        all_factors_small = true            # starting condition
         
-        for i in length(factors)            # loop over factors and check they are small
-            factor = factors.pe[i].first
+        for i in 1:length(factors)          # loop over factors and check they are small
+            factor = factors.pe[i].first    # extract factor from factors
             all_factors_small &= factor in small_primes
         end
         

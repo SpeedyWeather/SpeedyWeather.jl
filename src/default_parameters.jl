@@ -1,11 +1,14 @@
 """
-Parameter struct that holds all parameters that define the default model setup.
-With keywords such that default values can be changed at creation.
+    P = Parameters(kwargs...)
+
+A struct to hold all model parameters that may be changed by the user.
+The struct uses keywords such that default values can be changed at creation.
+The default values of the keywords define the default model setup.
 """
 @with_kw struct Parameters
 
     # NUMBER FORMATS
-    NF::DataType=Float32        # number format
+    NF::DataType                        # number format (default is defined in run_speedy.jl)
 
     # RESOLUTION
     trunc::Int=31                       # spectral truncation
@@ -14,7 +17,7 @@ With keywords such that default values can be changed at creation.
     nlev::Int=8                         # number of vertical levels
 
     # PHYSICAL CONSTANTS
-    model::Symbol=:barotropic   # :barotropic, :shallowwater, or :primitive
+    model::Symbol=:barotropic           # :barotropic, :shallowwater, or :primitive
     radius_earth::Real=6.371e6          # radius of Earth [m]
     rotation_earth::Real=7.292e-5       # angular frequency of Earth's rotation [1/s]
     gravity::Real=9.81          # gravitational acceleration [m/s^2]
@@ -83,7 +86,7 @@ With keywords such that default values can be changed at creation.
     orography_file::String="orography_F512.nc"
 
     # INITIAL CONDITIONS
-    initial_conditions::Symbol=:barotropic_vorticity    # :test, :rest, :barotropic_vorticity or :restart
+    initial_conditions::Symbol=:barotropic_vorticity    # :rest, :barotropic_vorticity or :restart
 
     # OUTPUT
     verbose::Bool=true          # print dialog for feedback

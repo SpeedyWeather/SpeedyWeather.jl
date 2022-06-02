@@ -29,7 +29,7 @@ Parameters = "0.10, 0.11, 0.12"
 Primes = "0.5"
 ProgressMeter = "1.7"
 UnicodePlots = "2.10"
-julia = "1"
+julia = "1.7"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
