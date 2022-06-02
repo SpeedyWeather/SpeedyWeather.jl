@@ -22,7 +22,8 @@ Parameters for computing saturation vapour pressure using the August-Roche-Magnu
 
     eᵢ(T) = e₀ * exp(Cᵢ * (T - T₀) / (T - Tᵢ)),
 
-    where i = 1,2 for saturation with respect to water and ice, respectively.
+    where T is in Kelvin and i = 1,2 for saturation with respect to water and ice,
+    respectively.
 """
 @with_kw struct MagnusCoefs{NF<:Real} <: Coefficients
     e₀::NF = 6.108   # Saturation vapour pressure at 0°C
