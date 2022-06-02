@@ -45,11 +45,14 @@ function get_saturation_specific_humidity!(
 ) where {NF<:AbstractFloat}
     @unpack nlon, nlat, nlev, σ_levels_full = model.geospectral.geometry
 
+    mol_ratio = convert(NF, 0.622)
+    one_minus_mol_ratio = convert(NF, 1 - mol_ratio)
+
     get_saturation_vapour_pressure!(sat_vap_pressure, temp_grid, model)
 
     for k = 1:nlev, j = 1:nlat, i = 1:nlon
-        sat_spec_humidity[i, j, k] = 0.622 * sat_vap_pressure[i, j, k] /
-            (pres[i, j] * σ_levels_full[k] - (1 - 0.622) * sat_vap_pressure[i, j, k])
+        sat_spec_humidity[i, j, k] = mol_ratio * sat_vap_pressure[i, j, k] /
+            (pres[i, j] * σ_levels_full[k] - one_minus_mol_ratio * sat_vap_pressure[i, j, k])
     end
 
     return nothing
