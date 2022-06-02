@@ -1,13 +1,10 @@
-import Parameters: @unpack
-using Distributions
-
 @testset "humidity.jl" begin
     @testset "get_saturation_vapour_pressure!" begin
         _, diag, model = SpeedyWeather.initialize_speedy()
-        @unpack nlon, nlat, nlev = model.geospectral.geometry
-        @unpack sat_vap_pressure = diag.parametrization_variables
+        (;nlon, nlat, nlev) = model.geospectral.geometry
+        (;sat_vap_pressure) = diag.parametrization_variables
 
-        temp_grid = rand(Uniform(200, 350), nlon, nlat, nlev)  # Typical values in K
+        temp_grid = 200 .+ 150 * rand(nlon, nlat, nlev)  # Typical values between 200-350K
 
         SpeedyWeather.get_saturation_vapour_pressure!(sat_vap_pressure, temp_grid, model)
 
@@ -16,11 +13,11 @@ using Distributions
 
     @testset "get_saturation_specific_humidity!" begin
         _, diag, model = SpeedyWeather.initialize_speedy()
-        @unpack nlon, nlat, nlev = model.geospectral.geometry
-        @unpack sat_vap_pressure, sat_spec_humidity = diag.parametrization_variables
+        (;nlon, nlat, nlev) = model.geospectral.geometry
+        (;sat_vap_pressure, sat_spec_humidity) = diag.parametrization_variables
 
-        temp_grid = rand(Uniform(200, 350), nlon, nlat, nlev)  # Typical values in K
-        pres_grid = rand(Uniform(300, 2000), nlon, nlat)       # Typical values in hPa
+        temp_grid = 200 .+ 150 * rand(nlon, nlat, nlev)  # Typical values between 200-350 K
+        pres_grid = 300 .* 1700 * rand(nlon, nlat)       # Typical values between 300-2000 hPa
 
         SpeedyWeather.get_saturation_specific_humidity!(sat_spec_humidity, sat_vap_pressure, temp_grid, pres_grid, model)
 
