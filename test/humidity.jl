@@ -19,8 +19,8 @@ using Distributions
         @unpack nlon, nlat, nlev = model.geospectral.geometry
         @unpack sat_vap_pressure, sat_spec_humidity = diag.parametrization_variables
 
-        temp_grid = rand(Uniform(200, 350), nlon, nlat, nlev)       # Typical values in K
-        pres_grid = rand(Uniform(log(300), log(2000)), nlon, nlat)  # Typical values in log(hPa)
+        temp_grid = rand(Uniform(200, 350), nlon, nlat, nlev)  # Typical values in K
+        pres_grid = rand(Uniform(300, 2000), nlon, nlat)       # Typical values in hPa
 
         SpeedyWeather.get_saturation_specific_humidity!(sat_spec_humidity, sat_vap_pressure, temp_grid, pres_grid, model)
 

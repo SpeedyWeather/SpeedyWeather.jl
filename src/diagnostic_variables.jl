@@ -75,8 +75,8 @@ struct ParametrizationVariables{NF<:AbstractFloat}
     sat_spec_humidity  ::Array{NF,3}   # Saturation specific humidity
     cloud_top          ::Array{Int,2}  # Cloud-top
     precip_large_scale ::Array{NF,2}   # Large-scale precipitation
-    humid_tend         ::Array{NF,3}   # Humidity tendencies due to physics
-    temp_tend          ::Array{NF,3}   # Temperature tendencies due to physics
+    humid_tend_lsc     ::Array{NF,3}   # Humidity tendencies due to large-scale condensation
+    temp_tend_lsc      ::Array{NF,3}   # Temperature tendencies due to large-scale condensation
 end
 
 """
@@ -89,15 +89,15 @@ function ParametrizationVariables(G::GeoSpectral{NF}) where NF
     sat_spec_humidity  = zeros(NF,nlon,nlat,nlev)  # Saturation specific humidity
     cloud_top          = zeros(Int,nlon,nlat)      # Cloud-top
     precip_large_scale = zeros(NF,nlon,nlat)       # Large-scale precipitation
-    humid_tend         = zeros(NF,nlon,nlat,nlev)  # Humidity tendencies due to physics
-    temp_tend          = zeros(NF,nlon,nlat,nlev)  # Temperature tendencies due to physics
+    humid_tend_lsc     = zeros(NF,nlon,nlat,nlev)  # Humidity tendencies due to large-scale condensation
+    temp_tend_lsc      = zeros(NF,nlon,nlat,nlev)  # Temperature tendencies due to large-scale condensation
 
     return ParametrizationVariables(sat_vap_pressure,
                                     sat_spec_humidity,
                                     cloud_top,
                                     precip_large_scale,
-                                    humid_tend,
-                                    temp_tend,
+                                    humid_tend_lsc,
+                                    temp_tend_lsc,
                                     )
 end
 
