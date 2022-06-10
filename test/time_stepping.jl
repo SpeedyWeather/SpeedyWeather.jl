@@ -3,7 +3,7 @@
     # William (2009), MWR oscillation test case
     # dF/dt = iωF 
     F(x::Complex{T},ω::T) where T = im*ω*x
-    ω = 1.0             # frequency
+    ω = 1               # frequency
     Δt = 2π/100         # time step 
     n_rotations = 1     # times around the circle
     n_timesteps = round(Int,2π*n_rotations/(ω*Δt))
@@ -39,7 +39,7 @@
     end
 
     # LONG TERM STABILITY
-    n_rotations = 10
+    n_rotations = 35
     n_timesteps = round(Int,2π*n_rotations/(ω*Δt))
 
     for NF in (Float16,Float32,Float64)
@@ -63,9 +63,14 @@
             SpeedyWeather.leapfrog!(X,F.(X[:,:,lf],NF(ω)),NF(2Δt),C)
             Xout[i] = X[1,1,1]
         end
+        #println(Xout)
+        # absolute error to exact result 1+0i
+        error = abs(Xout[end]-1)
 
         # magnitude at last time step < 1 for stability
         M_RAW = abs(Xout[end])
+        println("Error after " * string(n_timesteps) * " timesteps for NF " * string(NF) * " is: ", error)
+
         @test M_RAW < 1
 
         # CHECK THAT NO WILLIAM'S FILTER IS WORSE
@@ -90,6 +95,7 @@
         end
 
         M_Ronly = abs(Xout[end])
+
         @test M_Ronly <= M_RAW
     end
 end
