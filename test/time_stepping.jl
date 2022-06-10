@@ -3,9 +3,9 @@
     # William (2009), MWR oscillation test case
     # dF/dt = iωF 
     F(x::Complex{T},ω::T) where T = im*ω*x
-    ω = 1.0               # frequency
+    ω = 1.143               # frequency
     Δt = 2π/113        # time step 
-    n_rotations = 1000     # times around the circle
+    n_rotations = 1101     # times around the circle
     n_timesteps = round(Int,2π*n_rotations/(ω*Δt))
 
     # loop over different precisions
