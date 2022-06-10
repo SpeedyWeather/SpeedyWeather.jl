@@ -3,7 +3,7 @@
     # William (2009), MWR oscillation test case
     # dF/dt = iωF 
     F(x::Complex{T},ω::T) where T = im*ω*x
-    ω = 1               # frequency
+    ω = 1.0               # frequency
     Δt = 2π/100         # time step 
     n_rotations = 1     # times around the circle
     n_timesteps = round(Int,2π*n_rotations/(ω*Δt))
@@ -63,7 +63,7 @@
             SpeedyWeather.leapfrog!(X,F.(X[:,:,lf],NF(ω)),NF(2Δt),C)
             Xout[i] = X[1,1,1]
         end
-        #println(Xout)
+        
         # absolute error to exact result 1+0i
         error = abs(Xout[end]-1)
 
@@ -95,7 +95,6 @@
         end
 
         M_Ronly = abs(Xout[end])
-
         @test M_Ronly <= M_RAW
     end
 end
