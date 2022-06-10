@@ -15,7 +15,7 @@
 
         # INITIAL CONDITIONS
         # with lmax x mmax x nleapfrog
-        X = ones(Complex{NF},3,3,2)
+        X = ones(Complex{NF},3,3,2) #.* Complex{NF}(1.1+0im) #Modify initial conditions slightly
         
         # store only 1 of the 3x3 values (all the same) per time step
         Xout = zeros(Complex{NF},n_timesteps+1)
@@ -31,7 +31,7 @@
             Xout[i] = X[1,1,1]
         end
         
-        # Error in the magnitude - ideally should always be = 1
+        # Error in the magnitude - ideally should always be = 1 if on unit circle
         error = abs(Xout[end]) - 1
         println("Error after " * string(n_timesteps) * " timesteps for NF " * string(NF) * " is: ", error)
 
