@@ -12,7 +12,7 @@ The default values of the keywords define the default model setup.
 
     # RESOLUTION
     trunc::Int=31                       # spectral truncation
-    nlon::Int=roundup_fft(3*trunc+1)    # number of longitudes 
+    nlon::Int=roundup_fft(3*trunc+1)    # number of longitudes
     nlat::Int=nlon÷2                    # number of latitudes
     nlev::Int=8                         # number of vertical levels
 
@@ -50,14 +50,22 @@ The default values of the keywords define the default model setup.
     # DIFFUSION AND DRAG
     diffusion_power::Real=4                 # Power n of Laplacian in horizontal diffusion ∇²ⁿ
     diffusion_time::Real=2.4                # Diffusion time scale [hrs] for temperature and vorticity
-    diffusion_time_div::Real=diffusion_time # Diffusion time scale [hrs] for divergence           
+    diffusion_time_div::Real=diffusion_time # Diffusion time scale [hrs] for divergence
     diffusion_time_strat::Real=12           # Diffusion time scale [hrs] for extra ∇² in the stratosphere
-    damping_time_strat::Real=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere     
+    damping_time_strat::Real=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
 
     # PARAMETRIZATIONS
-    seasonal_cycle::Bool=true   # Seasonal cycle?
-    n_shortwave::Int=3          # Compute shortwave radiation every n steps
-    sppt_on::Bool=false         # Turn on SPPT?
+    seasonal_cycle::Bool=true                  # Seasonal cycle?
+    n_shortwave::Int=3                         # Compute shortwave radiation every n steps
+    sppt_on::Bool=false                        # Turn on SPPT?
+    magnus_coefs::MagnusCoefs = MagnusCoefs()  # For computing saturation vapour pressure
+
+    # Large-Scale Condensation (from table B10)
+    k_lsc::Int = 2                   # Index of atmospheric level at which large-scale condensation begins
+    RH_thresh_boundary::Real = 0.95  # Relative humidity threshold for boundary layer
+    RH_thresh_range::Real = 0.1      # Vertical range of relative humidity threshold
+    RH_thresh_max::Real = 0.9        # Maximum relative humidity threshold
+    humid_relax_time::Real = 4.0     # Relaxation time for humidity (hours)
 
     # TIME STEPPING
     Δt_at_T85::Real=20          # time step in minutes for T85, scale linearly for specified trunc
@@ -88,7 +96,7 @@ The default values of the keywords define the default model setup.
     out_path::String=pwd()      # path to output folder
     output_vars::Vector{String}=["u","v","T","humid","logp0"]
     compression_level::Int=3    # 1=low but fast, 9=high but slow
-    keepbits::Int=10            # mantissa bits to keep for every variable 
+    keepbits::Int=10            # mantissa bits to keep for every variable
 
     # TODO assert not allowed parameter values
     @assert α in [0,0.5,1] "Only semi-implicit α = 0, 0.5 or 1 allowed."

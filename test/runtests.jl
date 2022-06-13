@@ -8,3 +8,7 @@ include("diffusion.jl")
 include("time_stepping.jl")
 include("initialize_from_rest.jl")
 include("run_speedy.jl")
+
+# PHYSICS
+include("humidity.jl")
+include("large_scale_condensation.jl")
