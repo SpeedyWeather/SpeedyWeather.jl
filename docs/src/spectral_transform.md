@@ -170,6 +170,7 @@ velocity ``v`` is the zonal gradient of ``\Psi``. The zonal gradient scales with
 longitudes converge towards the poles (note that ``\theta`` describes latitudes here, defintions using colatitudes
 replace the ``\cos`` with a ``\sin``.)
 
+
 ### Zonal derivative
 
 The zonal derivative of a field ``\Psi`` in spectral space is the zonal derivative of all its respective
@@ -178,13 +179,17 @@ spherical harmonics ``\Psi_{lm}(\phi,\theta)``.
 ```math
 v = \frac{1}{R \cos(\theta)} \frac{\partial}{\partial \phi} \left( \lambda_l^m(\cos\theta) e^{im\phi} \right)
   = \frac{\lambda_l^m(\cos\theta)}{R \cos(\theta)} \frac{\partial e^{im\phi}}{\partial \phi}
-  = \frac{im}{R \cos(\theta)} \lambda_l^m(\cos\theta) e^{im\phi}
+  = \frac{im}{R \cos(\theta)} \lambda_l^m(\cos\theta) e^{im\phi} = \frac{im}{R \cos(\theta)} \Psi_{lm}
 ```
 So for every spectral harmonic, ``\cos(\theta)v_{lm}`` is simply obtained from ``\Psi_{lm}`` via a multiplication
 with ``im/R``. Unscaling the ``\cos(\theta)``-factor is usually done after transforming
-the spectral coefficients ``v_{lm}`` into grid-point space.
+the spectral coefficients ``v_{lm}`` into grid-point space. As discussed in [Radius scaling](@ref), SpeedyWeather.jl
+scales the stream function as ``\Psi \to R^{-1}\Psi`` such that the division by ``R`` in the gradients
+can be omitted.
 
 ### Meridional derivative
+
+The meridional derivative of a field ``\Psi`` in spectral space
 
 ### Laplacian
 

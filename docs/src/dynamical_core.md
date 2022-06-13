@@ -86,6 +86,19 @@ D^\text{explicit,n}_{l,m} = \nu^* \left(\frac{l(l+1)}{l_\text{max}(l_\text{max}+
 ```
 and the implicit part is accordingly ``D^\text{implicit,n}_{l,m} = 1 + 2\Delta t D^\text{explicit,n}_{l,m}``.
 
+## Radius scaling
+
+SpeedyWeather.jl uses a scaling for vorticity ``\zeta`` and stream function ``\Psi`` that is
+```math
+\tilde{\zeta} = \zeta R, \tilde{\Psi} = \Psi R^{-1}.
+```
+In the barotropic voriticity equation model the inversion of the Laplcians in order to obtain
+``\Psi`` from ``\zeta`` therefore becomes
+```math
+\tilde{\zeta} = \tilde{\nabla}^2 \tilde{\Psi}
+```
+where the dimensionless gradients simply omit the scaling with ``1/R``, ``\tilde{\nabla} = R\nabla``.
+
 ## Time integration
 
 SpeedyWeather.jl uses a leapfrog time scheme with a Robert's and William's filter
