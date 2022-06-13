@@ -9,13 +9,12 @@ between the coefficients of the spherical harmonics (the _spectral_ space) and t
 The spectral transform implemented by SpeedyWeather.jl follows largely Justin Willmert's
 [CMB.jl](https://github.com/jmert/CMB.jl) package and makes use of
 [AssociatedLegendrePolynomials.jl](https://github.com/jmert/AssociatedLegendrePolynomials.jl) and
-[FFTW.jl](https://github.com/JuliaMath/FFTW.jl)/[FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) for the Fourier transform. Justin described his work in a Blog series [^1][^2][^3][^4][^5][^6][^7][^8]
+[FFTW.jl](https://github.com/JuliaMath/FFTW.jl) (for `Float32/64`) or [FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) (for generic) for the Fourier transform. Justin described his work in a Blog series [^1][^2][^3][^4][^5][^6][^7][^8].
 
 ## Spherical harmonics
 
 The [spherical harmonics](https://en.wikipedia.org/wiki/Spherical_harmonics) ``Y_{lm}`` of degree ``l`` and order ``m``
-over the longitude ``\theta = (0,2\pi)`` and latitude ``\phi = (-\tfrac{\pi}{2},\tfrac{\pi}{2})`` (or
-using colatitudes ``\phi = (0,\pi)``), are
+over the longitude ``\theta = (0,2\pi)`` and colatitudes ``\phi = (0,\pi)`` (north to south), are
 
 ```math
 Y_{lm}(\theta,\phi) = \lambda_l^m(\cos\theta) e^{im\phi}
@@ -26,13 +25,23 @@ complex exponentials (the Fourier modes). Together they form a set of orthogonal
 For an interactive visualisation of the spherical harmonics, see
 [here](https://justinwillmert.com/posts/2020/plots-of-the-spherical-harmonics-eigenmodes/).
 
-## Synthesis or inverse spectral transform (spectral to grid)
+!!! info "Latitudes versus colatitudes"
+    The spherical transforms in SpeedyWeather.jl use colatitudes ``\phi = (0,\pi)`` (north to south) but the dynamical core
+    uses latitudes ``\phi = (-\pi/2,\pi/2)`` (south to north). However, all arrays are always sorted south to north such that
+    `[i,1]` will access the southern-most grid points. Note: This may change in the future for consistency. 
+
+## Synthesis (spectral to grid)
+
+The synthesis (or inverse transform) takes the spectral coefficients ``a_{lm}`` and transforms them to grid-point values
+``f(\theta,\phi)``. The synthesis is a linear combination of the spherical harmonics ``Y_{lm}`` with non-zero coefficients.
 
 ```math
 f(\theta,\phi) = \sum_{l=0}^{l_{max}} \sum_{m=-l}^l a_{lm} Y_{lm}(\theta,\phi)
 ```
 
-## Analysis or forward spectral transform (grid to spectral)
+
+
+## Analysis (grid to spectral)
 
 ```math
 \hat{a}_{lm} = \sum_{i=1}^N f(\theta_i,\phi_i) Y_{lm}(\theta_i,\phi_i) \sin(\theta_i) \Delta \theta_i \Delta \phi_i
@@ -40,43 +49,61 @@ f(\theta,\phi) = \sum_{l=0}^{l_{max}} \sum_{m=-l}^l a_{lm} Y_{lm}(\theta,\phi)
 
 ## Spectral packing
 
-Conventional packing ``l,m`` versus alternative packing ``l',m'`` and arbitrary numbering ``i``.
+SpeedyWeather.jl uses the conventional spectral packing of degree ``l`` and order ``m`` as illustrated in the following image [(Cyp, CC BY-SA 3.0, via Wikimedia Commons)](https://commons.wikimedia.org/wiki/File:Rotating_spherical_harmonics.gif)
+```@raw html
+<img src="../img/Rotating_spherical_harmonics.gif">
+```
+Every row represents an order ``l \leq 0``, starting from ``l=0`` at the top. Every column represents an order ``m\leq 0``, starting from ``m=0`` on the left. The coefficients of these spherical harmonics are directly mapped into a matrix ``a_{lm}`` as 
 
-| degree ``l`` | order ``m`` |  ``l'=m`` |  ``m'=l-m`` | ``i`` |
-| :----------: | :---------: | :-------: | :---------: | :---: |
-|0             |0            |0          |0            |1      |
-|1             |0            |0          |1            |2      |
-|1             |1            |1          |0            |3      |
-|2             |0            |0          |2            |4      |
-|2             |1            |1          |1            |5      |
-|2             |2            |2          |0            |6      |
-|3             |0            |0          |3            |7      |
-|...           |...          |...        |...          |...    |
+|     |``m``     |          |          |          |
+| :-: | :------: | :------: | :------: | :------: | 
+|``l``|``a_{00}``|          |          |          |
+|     |``a_{10}``|``a_{11}``|          |          |
+|     |``a_{20}``|``a_{12}``|``a_{22}``|          |
+|     |``a_{30}``|``a_{13}``|``a_{23}``|``a_{33}``|
 
-Degree ``l``, order ``m``
+which is consistently extended for higher degrees and orders. Consequently, all spectral fields are lower-triangular matrices,
+but note that internally some fields may include an additional degree, such that ``l_{max} = m_{max} + 1``, see the calculation
+of spectral gradients for more information.
 
-|     |``m``|     |     |     |
-| :-: | :-: | :-: | :-: | :-: | 
-|``l``|1    |     |     |     |
-|     |2    |3    |     |     |
-|     |4    |5    |6    |     |
-|     |7    |8    |9    |10   |
+!!! info "Array indices"
+    For a spectral field `alms` note that due to Julia's 1-based indexing the coefficient ``a_{lm}`` is obtained via
+    `alms[l+1,m+1]`.
 
-Alternative packing
+Fortran speedy does not use the same spectral packing as SpeedyWeather.jl. The alternative packing ``l',m'`` therein
+uses ``l'=m`` and ``m'=l-m`` as summarized in the following table.
 
-|      |``m`` |     |     |     |
-| :--: | :-:  | :-: | :-: | :-: | 
-|``l'``|1     |2    |4    |7    |
-|      |3     |5    |8    |     |
-|      |6     |9    |     |     |
-|      |10    |     |     |     |
+| degree ``l`` | order ``m`` |  ``l'=m`` |  ``m'=l-m`` |
+| :----------: | :---------: | :-------: | :---------: |
+|0             |0            |0          |0            |
+|1             |0            |0          |1            |
+|1             |1            |1          |0            |
+|2             |0            |0          |2            |
+|2             |1            |1          |1            |
+|2             |2            |2          |0            |
+|3             |0            |0          |3            |
+|...           |...          |...        |...          |
 
-## Examples
+
+This alternative packing uses the top-left triangle of a coefficient matrix, and the degrees and orders from above are
+stored at the following indices
+
+|      |``m'``    |          |          |          |
+| :--: | :-:      | :-------:| :-------:| :-------:| 
+|``l'``|``a_{00}``|``a_{10}``|``a_{20}``|``a_{30}``|
+|      |``a_{11}``|``a_{21}``|``a_{31}``|          |
+|      |``a_{22}``|``a_{32}``|          |          |
+|      |``a_{33}``|          |          |          |
+
+This spectral packing is not used in SpeedyWeather.jl but illustrated here for completeness and comparison with
+Fortran-speedy.
+
+## Example transforms
 
 ```julia
 julia> using SpeedyWeather
 julia> alms = zeros(ComplexF64,3,3)    # spectral coefficients
-julia> alms[2,2] = 1                   # only l=1,m=1 Legendre polynomial
+julia> alms[2,2] = 1                   # only l=1,m=1 harmonic
 julia> map = gridded(alms)             # convert to grid space
 8×4 Matrix{Float64}:
  -0.324541  -0.600363  -0.600363  -0.324541
@@ -105,7 +132,7 @@ require one more degree ``l`` in the recursion relation of meridional gradients)
 with ``l_{max} = m_{max} = 31``. Note that the degree ``l`` and order ``m`` are mathematically 0-based, such that the
 corresponding coefficient matrix is of size 32x32.
 
-Using triangular truncation, there are constraints on the corresponding grid resolution. Let `nlon`, `nlat` be the number of
+Using triangular truncation[^9], there are constraints on the corresponding grid resolution. Let `nlon`, `nlat` be the number of
 longitudes, latitudes on a regular Gaussian grid. Then spectral and grid resolution have to be chosen such that
 
 - ``nlon \geq 3l_{max}+1``
@@ -124,7 +151,8 @@ spacing at the Equator (``2\pi R / nlon``)
 | 341           | 1024 | 512  | 40 km        |
 | 682           | 2048 | 1024 | 20 km        |
 
-Choosing `trunc` as argument in `run_speedy` will automatically choose `nlon`,`nlat` as presented in the table.
+Choosing `trunc` as argument in `run_speedy` will automatically choose `nlon`,`nlat` as presented in the table. Other common choices are
+T63 (192x96), T127 (384x192), T255 (768x384), T511 (1536x768), among others.
 
 ## References
 
@@ -135,4 +163,5 @@ Choosing `trunc` as argument in `run_speedy` will automatically choose `nlon`,`n
 [^5]: Justin Willmert, 2020. [Introducing Legendre.jl (Legendre.jl Series, Part V)](https://justinwillmert.com/articles/2020/introducing-legendre.jl/)  
 [^6]: Justin Willmert, 2020. [Numerical Accuracy of the Spherical Harmonic Recurrence Coefficient (Legendre.jl Series Addendum)](https://justinwillmert.com/posts/2020/pre-normalizing-legendre-polynomials-addendum/)  
 [^7]: Justin Willmert, 2020. [Notes on Calculating the Spherical Harmonics](https://justinwillmert.com/articles/2020/notes-on-calculating-the-spherical-harmonics)  
-[^8]: Justin Willmert, 2022. [More Notes on Calculating the Spherical Harmonics: Analysis of maps to harmonic coefficients](https://justinwillmert.com/articles/2022/more-notes-on-calculating-the-spherical-harmonics/)  
+[^8]: Justin Willmert, 2022. [More Notes on Calculating the Spherical Harmonics: Analysis of maps to harmonic coefficients](https://justinwillmert.com/articles/2022/more-notes-on-calculating-the-spherical-harmonics/)
+[^9]: David Randall, 2021. [An Introduction to Numerical Modeling of the Atmosphere](http://hogback.atmos.colostate.edu/group/dave/at604pdf/An_Introduction_to_Numerical_Modeling_of_the_Atmosphere.pdf), Chapter 22.
