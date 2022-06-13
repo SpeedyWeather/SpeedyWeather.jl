@@ -9,15 +9,15 @@ between the coefficients of the spherical harmonics (the _spectral_ space) and t
 The spectral transform implemented by SpeedyWeather.jl follows largely Justin Willmert's
 [CMB.jl](https://github.com/jmert/CMB.jl) package and makes use of
 [AssociatedLegendrePolynomials.jl](https://github.com/jmert/AssociatedLegendrePolynomials.jl) and
-[FFTW.jl](https://github.com/JuliaMath/FFTW.jl) (for `Float32/64`) or [FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) (for generic) for the Fourier transform. Justin described his work in a Blog series [^1][^2][^3][^4][^5][^6][^7][^8].
+[FFTW.jl](https://github.com/JuliaMath/FFTW.jl) (for `Float32/64`) or [FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) (for generic) for the Fourier transform. Justin described his work in a Blog series [^1-8].
 
 ## Spherical harmonics
 
 The [spherical harmonics](https://en.wikipedia.org/wiki/Spherical_harmonics) ``Y_{lm}`` of degree ``l`` and order ``m``
-over the longitude ``\theta = (0,2\pi)`` and colatitudes ``\phi = (0,\pi)`` (north to south), are
+over the longitude ``\phi = (0,2\pi)`` and colatitudes ``\theta = (0,\pi)`` (north to south), are
 
 ```math
-Y_{lm}(\theta,\phi) = \lambda_l^m(\cos\theta) e^{im\phi}
+Y_{lm}(\phi, \theta) = \lambda_l^m(\cos\theta) e^{im\phi}
 ```
 
 with ``\lambda_l^m`` being the pre-normalized associated Legendre polynomials, and ``e^{im\phi}`` are the
@@ -26,25 +26,23 @@ For an interactive visualisation of the spherical harmonics, see
 [here](https://justinwillmert.com/posts/2020/plots-of-the-spherical-harmonics-eigenmodes/).
 
 !!! info "Latitudes versus colatitudes"
-    The spherical transforms in SpeedyWeather.jl use colatitudes ``\phi = (0,\pi)`` (north to south) but the dynamical core
-    uses latitudes ``\phi = (-\pi/2,\pi/2)`` (south to north). However, all arrays are always sorted south to north such that
+    The spherical transforms in SpeedyWeather.jl use colatitudes ``\theta = (0,\pi)`` (north to south) but the dynamical core
+    uses latitudes ``\theta = (-\pi/2,\pi/2)`` (south to north). However, all arrays are always sorted south to north such that
     `[i,1]` will access the southern-most grid points. Note: This may change in the future for consistency. 
 
 ## Synthesis (spectral to grid)
 
 The synthesis (or inverse transform) takes the spectral coefficients ``a_{lm}`` and transforms them to grid-point values
-``f(\theta,\phi)``. The synthesis is a linear combination of the spherical harmonics ``Y_{lm}`` with non-zero coefficients.
+``f(\phi,\theta)``. The synthesis is a linear combination of the spherical harmonics ``Y_{lm}`` with non-zero coefficients.
 
 ```math
-f(\theta,\phi) = \sum_{l=0}^{l_{max}} \sum_{m=-l}^l a_{lm} Y_{lm}(\theta,\phi)
+f(\phi,\theta) = \sum_{l=0}^{l_{max}} \sum_{m=-l}^l a_{lm} Y_{lm}(\phi,\theta)
 ```
-
-
 
 ## Analysis (grid to spectral)
 
 ```math
-\hat{a}_{lm} = \sum_{i=1}^N f(\theta_i,\phi_i) Y_{lm}(\theta_i,\phi_i) \sin(\theta_i) \Delta \theta_i \Delta \phi_i
+\hat{a}_{lm} = \sum_{i=1}^N f(\phi_i,\theta_i) Y_{lm}(\phi_i,\theta_i) \sin(\theta_i) \Delta \phi_i \Delta \theta_i
 ```
 
 ## Spectral packing
@@ -151,17 +149,48 @@ spacing at the Equator (``2\pi R / nlon``)
 | 341           | 1024 | 512  | 40 km        |
 | 682           | 2048 | 1024 | 20 km        |
 
-Choosing `trunc` as argument in `run_speedy` will automatically choose `nlon`,`nlat` as presented in the table. Other common choices are
-T63 (192x96), T127 (384x192), T255 (768x384), T511 (1536x768), among others.
+Choosing `trunc` as argument in `run_speedy` will automatically choose `nlon`,`nlat` as presented in the table.
+Other common choices are T63 (192x96), T127 (384x192), T255 (768x384), T511 (1536x768), among others.
+
+## Gradients in spectral space
+
+Gradients in spectral space are discussed in the following using the conversion between the stream function ``\Psi``
+and the zonal and meridional velocity components ``u,v`` as an example.
+
+```math
+\begin{aligned}
+u &= -\frac{1}{R}\frac{\partial \Psi}{\partial \theta} \\
+v &= \frac{1}{R \cos(\theta)}\frac{\partial \Psi}{\partial \phi} \\
+\end{aligned}
+```
+
+The radius of the sphere (i.e. Earth) is ``R``, ``\theta`` the latitude and ``\phi`` the longitude. So the zonal
+velocity ``u`` is the (negative) meridional gradient of the stream function ``\Psi``, and the meridional
+velocity ``v`` is the zonal gradient of ``\Psi``. The zonal gradient scales with ``1/\cos(\theta)`` as the 
+longitudes converge towards the poles (note that ``\theta`` describes latitudes here, defintions using colatitudes
+replace the ``\cos`` with a ``\sin``.)
+
+### Zonal derivative
+
+The zonal derivative of a field ``\Psi`` in spectral space is the zonal derivative of all its respective
+spherical harmonics ``\Psi_{lm}(\phi,\theta)``.
+
+```math
+v = \frac{1}{R \cos(\theta)} \frac{\partial}{\partial \phi} \left( \lambda_l^m(\cos\theta) e^{im\phi} \right)
+  = \frac{\lambda_l^m(\cos\theta)}{R \cos(\theta)} \frac{\partial e^{im\phi}}{\partial \phi}
+  = \frac{im}{R \cos(\theta)} \lambda_l^m(\cos\theta) e^{im\phi}
+```
+So for every spectral harmonic, ``\cos(\theta)v_{lm}`` is simply obtained from ``\Psi_{lm}`` via a multiplication
+with ``im/R``. Unscaling the ``\cos(\theta)``-factor is usually done after transforming
+the spectral coefficients ``v_{lm}`` into grid-point space.
+
+### Meridional derivative
+
+### Laplacian
+
+Laplacians in spectral space are discussed in [Horizontal Diffusion](@ref).
 
 ## References
 
-[^1]: Justin Willmert, 2020. [Introduction to Associated Legendre Polynomials (Legendre.jl Series, Part I)](https://justinwillmert.com/articles/2020/introduction-to-associated-legendre-polynomials/)  
-[^2]: Justin Willmert, 2020. [Calculating Legendre Polynomials (Legendre.jl Series, Part II)](https://justinwillmert.com/articles/2020/calculating-legendre-polynomials/)  
-[^3]: Justin Willmert, 2020. [Pre-normalizing Legendre Polynomials (Legendre.jl Series, Part III)](https://justinwillmert.com/articles/2020/pre-normalizing-legendre-polynomials/)  
-[^4]: Justin Willmert, 2020. [Maintaining numerical accuracy in the Legendre recurrences (Legendre.jl Series, Part IV)](https://justinwillmert.com/articles/2020/maintaining-numerical-accuracy-in-the-legendre-recurrences/)  
-[^5]: Justin Willmert, 2020. [Introducing Legendre.jl (Legendre.jl Series, Part V)](https://justinwillmert.com/articles/2020/introducing-legendre.jl/)  
-[^6]: Justin Willmert, 2020. [Numerical Accuracy of the Spherical Harmonic Recurrence Coefficient (Legendre.jl Series Addendum)](https://justinwillmert.com/posts/2020/pre-normalizing-legendre-polynomials-addendum/)  
-[^7]: Justin Willmert, 2020. [Notes on Calculating the Spherical Harmonics](https://justinwillmert.com/articles/2020/notes-on-calculating-the-spherical-harmonics)  
-[^8]: Justin Willmert, 2022. [More Notes on Calculating the Spherical Harmonics: Analysis of maps to harmonic coefficients](https://justinwillmert.com/articles/2022/more-notes-on-calculating-the-spherical-harmonics/)
+[^1-8]: Justin Willmert, 2020-2022. [Introduction to Associated Legendre Polynomials (Legendre.jl Series, Part I)](https://justinwillmert.com/articles/2020/introduction-to-associated-legendre-polynomials/), [Calculating Legendre Polynomials (Legendre.jl Series, Part II)](https://justinwillmert.com/articles/2020/calculating-legendre-polynomials/), [Pre-normalizing Legendre Polynomials (Legendre.jl Series, Part III)](https://justinwillmert.com/articles/2020/pre-normalizing-legendre-polynomials/), [Maintaining numerical accuracy in the Legendre recurrences (Legendre.jl Series, Part IV)](https://justinwillmert.com/articles/2020/maintaining-numerical-accuracy-in-the-legendre-recurrences/), [Introducing Legendre.jl (Legendre.jl Series, Part V)](https://justinwillmert.com/articles/2020/introducing-legendre.jl/), [Numerical Accuracy of the Spherical Harmonic Recurrence Coefficient (Legendre.jl Series Addendum)](https://justinwillmert.com/posts/2020/pre-normalizing-legendre-polynomials-addendum/), [Notes on Calculating the Spherical Harmonics](https://justinwillmert.com/articles/2020/notes-on-calculating-the-spherical-harmonics), [More Notes on Calculating the Spherical Harmonics: Analysis of maps to harmonic coefficients](https://justinwillmert.com/articles/2022/more-notes-on-calculating-the-spherical-harmonics/)
 [^9]: David Randall, 2021. [An Introduction to Numerical Modeling of the Atmosphere](http://hogback.atmos.colostate.edu/group/dave/at604pdf/An_Introduction_to_Numerical_Modeling_of_the_Atmosphere.pdf), Chapter 22.

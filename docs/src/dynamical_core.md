@@ -17,7 +17,7 @@ The [primitive equations](https://en.wikipedia.org/wiki/Primitive_equations) sol
 
 more to come
 
-## Horizontal diffusion
+## Horizontal Diffusion
 
 The horizontal diffusion in SpeedyWeather.jl is implemented as an ``n``-th power Laplacian ``\nabla^{2n}`` in spectral space
 that is applied implicitly.
