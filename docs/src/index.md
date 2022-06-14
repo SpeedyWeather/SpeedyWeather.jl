@@ -65,7 +65,7 @@ other branches than `#main` can be installed by adding `#branch_name` instead.
 SpeedyWeather.jl is currently developed by
 
 - [Milan Klöwer](https://github.com/milankl)
-- [Tom Kipson](https://github.com/tomkimpson)
+- [Tom Kimpson](https://github.com/tomkimpson)
 - [Alistair White](https://github.com/white-alistair)
 
 Any contributions are always welcome!

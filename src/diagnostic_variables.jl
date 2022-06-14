@@ -3,7 +3,7 @@ struct Tendencies{NF<:AbstractFloat}
     vor_tend        ::Array{Complex{NF},3}      # Vorticity of horizontal wind field
     div_tend        ::Array{Complex{NF},3}      # Divergence of horizontal wind field
     temp_tend       ::Array{Complex{NF},3}      # Absolute temperature [K]
-    pres_surf_tend  ::Array{Complex{NF},2}      # Log of surface pressure [log(Pa)]
+    pres_tend       ::Array{Complex{NF},2}      # Log of surface pressure [log(Pa)]
     humid_tend      ::Array{Complex{NF},3}      # Specific humidity [g/kg]
     u_tend          ::Array{NF,3}               # zonal velocity
     v_tend          ::Array{NF,3}               # meridonal velocity
@@ -17,30 +17,30 @@ function Tendencies(G::GeoSpectral{NF}) where NF
     @unpack lmax, mmax = G.spectral_transform   # 0-based degree l, order m of the spherical harmonics
     @unpack nlon,nlat,nlev = G.geometry         # number of longitudes, latitudes, vertical levels
 
-    # one more l for recursion in meridional gradients
-    vor_tend         = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # vorticity
-    div_tend         = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # divergence
-    temp_tend        = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # absolute Temperature
-    pres_surf_tend   = zeros(Complex{NF},lmax+1,mmax+1)         # logarithm of surface pressure
-    humid_tend       = zeros(Complex{NF},lmax+1,mmax+1,nlev)    # specific humidity
-    u_tend           = zeros(NF,nlon,nlat,nlev)                 # zonal velocity
-    v_tend           = zeros(NF,nlon,nlat,nlev)                 # meridonal velocity
+    lmax, mmax = lmax+1,mmax+1                  # convert to 1-based
+    vor_tend    = zeros(Complex{NF},lmax,mmax,nlev)     # vorticity
+    div_tend    = zeros(Complex{NF},lmax,mmax,nlev)     # divergence
+    temp_tend   = zeros(Complex{NF},lmax,mmax,nlev)     # absolute Temperature
+    pres_tend   = zeros(Complex{NF},lmax,mmax)          # logarithm of surface pressure
+    humid_tend  = zeros(Complex{NF},lmax,mmax,nlev)     # specific humidity
+    u_tend      = zeros(NF,nlon,nlat,nlev)                  # zonal velocity
+    v_tend      = zeros(NF,nlon,nlat,nlev)                  # meridonal velocity
 
-    return Tendencies(vor_tend,div_tend,temp_tend,pres_surf_tend,humid_tend,u_tend,v_tend)
+    return Tendencies(vor_tend,div_tend,temp_tend,pres_tend,humid_tend,u_tend,v_tend)
 end
 
 """Struct holding the core prognostic spectral variables in grid point space, plus some additional grid quantities"""
 struct GridVariables{NF<:AbstractFloat}
-    vor_grid           ::Array{NF,3}  # Gridpoint field of vorticity
-    div_grid           ::Array{NF,3}  # Gridpoint field of divergence
-    temp_grid          ::Array{NF,3}  # Gridpoint field of absolute temperature [K]
-    pres_surf_grid     ::Array{NF,2}  # Gridpoint field of surface pressure logarithm [log(Pa)]
-    humid_grid         ::Array{NF,3}  # Gridpoint field of specific_humidity
-    geopot_grid        ::Array{NF,3}  # Gridpoint field of geopotential
-    # tr_grid            ::Array{NF,3}  # Gridpoint field of tracers
-    u_grid             ::Array{NF,3}  # Gridpoint field of zonal velocity
-    v_grid             ::Array{NF,3}  # Gridpoint field of meridional velocity
-    temp_grid_anomaly  ::Array{NF,3}  # Gridpoint field of absolute temperature anomaly [K]
+    vor_grid            ::Array{NF,3}   # Gridpoint field of vorticity
+    div_grid            ::Array{NF,3}   # Gridpoint field of divergence
+    temp_grid           ::Array{NF,3}   # Gridpoint field of absolute temperature [K]
+    pres_grid           ::Array{NF,2}   # Gridpoint field of surface pressure logarithm [log(Pa)]
+    humid_grid          ::Array{NF,3}   # Gridpoint field of specific_humidity
+    geopot_grid         ::Array{NF,3}   # Gridpoint field of geopotential
+    # tr_grid             ::Array{NF,3}   # Gridpoint field of tracers
+    u_grid              ::Array{NF,3}   # Gridpoint field of zonal velocity
+    v_grid              ::Array{NF,3}   # Gridpoint field of meridional velocity
+    temp_grid_anomaly   ::Array{NF,3}   # Gridpoint field of absolute temperature anomaly [K]
 end
 
 """
@@ -50,18 +50,18 @@ function GridVariables(G::GeoSpectral{NF}) where NF
 
     @unpack nlon,nlat,nlev = G.geometry     # number of longitudes, latitudes, vertical levels
 
-    vor_grid           = zeros(NF,nlon,nlat,nlev)  # vorticity
-    div_grid           = zeros(NF,nlon,nlat,nlev)  # divergence
-    temp_grid          = zeros(NF,nlon,nlat,nlev)  # absolute Temperature
-    pres_surf_grid     = zeros(NF,nlon,nlat)       # logarithm of surface pressure
-    humid_grid         = zeros(NF,nlon,nlat,nlev)  # specific humidity
-    geopot_grid        = zeros(NF,nlon,nlat,nlev)  # geopotential
+    vor_grid            = zeros(NF,nlon,nlat,nlev)  # vorticity
+    div_grid            = zeros(NF,nlon,nlat,nlev)  # divergence
+    temp_grid           = zeros(NF,nlon,nlat,nlev)  # absolute Temperature
+    pres_grid           = zeros(NF,nlon,nlat)       # logarithm of surface pressure
+    humid_grid          = zeros(NF,nlon,nlat,nlev)  # specific humidity
+    geopot_grid         = zeros(NF,nlon,nlat,nlev)  # geopotential
     # tr_grid            = zeros(NF,nlon,nlat,nlev)  # tracers
-    u_grid             = zeros(NF,nlon,nlat,nlev)  # zonal velocity
-    v_grid             = zeros(NF,nlon,nlat,nlev)  # meridonal velocity
-    temp_grid_anomaly  = zeros(NF,nlon,nlat,nlev)  # absolute temperature anolamy
+    u_grid              = zeros(NF,nlon,nlat,nlev)  # zonal velocity
+    v_grid              = zeros(NF,nlon,nlat,nlev)  # meridonal velocity
+    temp_grid_anomaly   = zeros(NF,nlon,nlat,nlev)  # absolute temperature anolamy
 
-    return GridVariables(vor_grid,div_grid,temp_grid,pres_surf_grid,humid_grid,geopot_grid,
+    return GridVariables(vor_grid,div_grid,temp_grid,pres_grid,humid_grid,geopot_grid,
                         # tr_grid,
                         u_grid,v_grid,temp_grid_anomaly)
 end
@@ -123,11 +123,11 @@ struct IntermediateVariables{NF<:AbstractFloat}
     v_mean             ::Array{NF,2}  # Mean gridpoint meridional velocity over all levels
     div_mean           ::Array{NF,2}  # Mean gridpoint divergence over all levels
 
-    pres_surf_gradient_spectral_x ::Array{Complex{NF},2} #X Gradient of the surface pressure, spectral space
-    pres_surf_gradient_spectral_y ::Array{Complex{NF},2} #Y Gradient of the surface pressure, spectral space
+    pres_gradient_spectral_x ::Array{Complex{NF},2} #X Gradient of the surface pressure, spectral space
+    pres_gradient_spectral_y ::Array{Complex{NF},2} #Y Gradient of the surface pressure, spectral space
 
-    pres_surf_gradient_grid_x ::Array{NF,2} #X Gradient of the surface pressure, grid point space
-    pres_surf_gradient_grid_y ::Array{NF,2} #X Gradient of the surface pressure, grid point space
+    pres_gradient_grid_x ::Array{NF,2} #X Gradient of the surface pressure, grid point space
+    pres_gradient_grid_y ::Array{NF,2} #X Gradient of the surface pressure, grid point space
 
     ###------Defined in vertical_velocity_tendency!()
     sigma_tend ::Array{NF,3} #vertical velocity in sigma coords
@@ -175,12 +175,12 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
 
     # one more l for recursion in meridional gradients
     # X,Y gradient of the surface pressure in spectral space
-    pres_surf_gradient_spectral_x = zeros(Complex{NF},lmax+2,mmax+1)
-    pres_surf_gradient_spectral_y = zeros(Complex{NF},lmax+2,mmax+1)
+    pres_gradient_spectral_x = zeros(Complex{NF},lmax+2,mmax+1)
+    pres_gradient_spectral_y = zeros(Complex{NF},lmax+2,mmax+1)
 
     # X,Y gradient of the surface pressure in grid space
-    pres_surf_gradient_grid_x = zeros(NF,nlon,nlat)
-    pres_surf_gradient_grid_y = zeros(NF,nlon,nlat)
+    pres_gradient_grid_x = zeros(NF,nlon,nlat)
+    pres_gradient_grid_y = zeros(NF,nlon,nlat)
 
     sigma_tend  = zeros(NF,nlon,nlat,nlev+1)
     sigma_m     = zeros(NF,nlon,nlat,nlev+1)
@@ -199,8 +199,8 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
                                     uω_grid,vω_grid,
                                     uω,vω,∂uω_∂lon,∂vω_∂lat,
                                     u_mean,v_mean,div_mean,
-                                    pres_surf_gradient_spectral_x,pres_surf_gradient_spectral_y,
-                                    pres_surf_gradient_grid_x,pres_surf_gradient_grid_y,
+                                    pres_gradient_spectral_x,pres_gradient_spectral_y,
+                                    pres_gradient_grid_x,pres_gradient_grid_y,
                                     sigma_tend,sigma_m,puv,sigma_u,L2_velocity_complex,
                                     vertical_mean_divergence,sigdtc,dumk,spectral_geopotential)
 end

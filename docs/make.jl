@@ -4,7 +4,7 @@ makedocs(
     format = Documenter.HTML(
     prettyurls = get(ENV, "CI", nothing) == "true"),
     sitename="SpeedyWeather.jl",
-    authors="M Klöwer, T Kimpson",
+    authors="M Klöwer, T Kimpson, A White",
     modules=[SpeedyWeather],
     pages=["Home"=>"index.md",
             "How to run SpeedyWeather.jl"=>"how_to_run_speedy.md",
