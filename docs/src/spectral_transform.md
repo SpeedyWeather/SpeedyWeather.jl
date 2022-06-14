@@ -9,7 +9,7 @@ between the coefficients of the spherical harmonics (the _spectral_ space) and t
 The spectral transform implemented by SpeedyWeather.jl follows largely Justin Willmert's
 [CMB.jl](https://github.com/jmert/CMB.jl) package and makes use of
 [AssociatedLegendrePolynomials.jl](https://github.com/jmert/AssociatedLegendrePolynomials.jl) and
-[FFTW.jl](https://github.com/JuliaMath/FFTW.jl) (for `Float32/64`) or [FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) (for generic) for the Fourier transform. Justin described his work in a Blog series [^1-8].
+[FFTW.jl](https://github.com/JuliaMath/FFTW.jl) (for `Float32/64`) or [FastTransforms.jl](https://github.com/JuliaApproximation/FastTransforms.jl) (for generic) for the Fourier transform. Justin described his work in a Blog series [^1][^2][^3][^4][^5][^6][^7][^8].
 
 ## Spherical harmonics
 
@@ -47,11 +47,16 @@ f(\phi,\theta) = \sum_{l=0}^{l_{max}} \sum_{m=-l}^l a_{lm} Y_{lm}(\phi,\theta)
 
 ## Spectral packing
 
-SpeedyWeather.jl uses the conventional spectral packing of degree ``l`` and order ``m`` as illustrated in the following image [(Cyp, CC BY-SA 3.0, via Wikimedia Commons)](https://commons.wikimedia.org/wiki/File:Rotating_spherical_harmonics.gif)
+Spectral packing is the way how the coefficients ``a_{lm}`` of the spherical harmonics of a given spectral field are
+stored in an array. SpeedyWeather.jl uses the conventional spectral packing of degree ``l`` and order ``m`` as
+illustrated in the following image
+[(Cyp, CC BY-SA 3.0, via Wikimedia Commons)](https://commons.wikimedia.org/wiki/File:Rotating_spherical_harmonics.gif)
 ```@raw html
 <img src="../img/Rotating_spherical_harmonics.gif">
 ```
-Every row represents an order ``l \leq 0``, starting from ``l=0`` at the top. Every column represents an order ``m\leq 0``, starting from ``m=0`` on the left. The coefficients of these spherical harmonics are directly mapped into a matrix ``a_{lm}`` as 
+Every row represents an order ``l \leq 0``, starting from ``l=0`` at the top. Every column represents an order
+``m\leq 0``, starting from ``m=0`` on the left. The coefficients of these spherical harmonics are directly
+mapped into a matrix ``a_{lm}`` as 
 
 |     |``m``     |          |          |          |
 | :-: | :------: | :------: | :------: | :------: | 
@@ -60,9 +65,12 @@ Every row represents an order ``l \leq 0``, starting from ``l=0`` at the top. Ev
 |     |``a_{20}``|``a_{12}``|``a_{22}``|          |
 |     |``a_{30}``|``a_{13}``|``a_{23}``|``a_{33}``|
 
-which is consistently extended for higher degrees and orders. Consequently, all spectral fields are lower-triangular matrices,
-but note that internally some fields may include an additional degree, such that ``l_{max} = m_{max} + 1``, see the calculation
-of spectral gradients for more information.
+which is consistently extended for higher degrees and orders. Consequently, all spectral fields are lower-triangular matrices
+with complex entries. The upper triangle excluding the diagnol explicitly stores zeros. Note that internally some fields may
+include an additional degree, such that ``l_{max} = m_{max} + 1`` (see [Gradients in spectral space](@ref) for more information).
+The harmonics with ``a_{l0}`` (the first column) are also called _zonal_ harmonics as they are constant with longitude ``\phi``.
+The harmonics with ``a_{ll}`` (the main diagonal) are also called _sectoral_ harmonics as they essentially split the sphere
+into ``2l`` sectors in longitude ``\phi`` without a zero-crossing in latitude.
 
 !!! info "Array indices"
     For a spectral field `alms` note that due to Julia's 1-based indexing the coefficient ``a_{lm}`` is obtained via
@@ -96,7 +104,7 @@ stored at the following indices
 This spectral packing is not used in SpeedyWeather.jl but illustrated here for completeness and comparison with
 Fortran-speedy.
 
-## Example transforms
+### Example transforms
 
 ```julia
 julia> using SpeedyWeather
@@ -170,32 +178,75 @@ velocity ``v`` is the zonal gradient of ``\Psi``. The zonal gradient scales with
 longitudes converge towards the poles (note that ``\theta`` describes latitudes here, defintions using colatitudes
 replace the ``\cos`` with a ``\sin``.)
 
-
 ### Zonal derivative
 
 The zonal derivative of a field ``\Psi`` in spectral space is the zonal derivative of all its respective
 spherical harmonics ``\Psi_{lm}(\phi,\theta)``.
 
 ```math
-v = \frac{1}{R \cos(\theta)} \frac{\partial}{\partial \phi} \left( \lambda_l^m(\cos\theta) e^{im\phi} \right)
-  = \frac{\lambda_l^m(\cos\theta)}{R \cos(\theta)} \frac{\partial e^{im\phi}}{\partial \phi}
+v_{lm} = \frac{1}{R \cos(\theta)} \frac{\partial}{\partial \phi} \left( \lambda_l^m(\cos\theta) e^{im\phi} \right)
   = \frac{im}{R \cos(\theta)} \lambda_l^m(\cos\theta) e^{im\phi} = \frac{im}{R \cos(\theta)} \Psi_{lm}
 ```
-So for every spectral harmonic, ``\cos(\theta)v_{lm}`` is simply obtained from ``\Psi_{lm}`` via a multiplication
+
+So for every spectral harmonic, ``\cos(\theta)v_{lm}`` is obtained from ``\Psi_{lm}`` via a multiplication
 with ``im/R``. Unscaling the ``\cos(\theta)``-factor is usually done after transforming
 the spectral coefficients ``v_{lm}`` into grid-point space. As discussed in [Radius scaling](@ref), SpeedyWeather.jl
-scales the stream function as ``\Psi \to R^{-1}\Psi`` such that the division by ``R`` in the gradients
-can be omitted.
+scales the stream function as ``\tilde{\Psi} = R^{-1}\Psi`` such that the division by radius ``R`` in the gradients
+can be omitted. The zonal derivative becomes therefore effectively for each spherical harmonic a scaling with its
+(imaginary) order ``im``. The spherical harmonics are essentially just a Fourier transform
+in zonal direction and the derivative a multiplication with the respective wave number ``m`` times imaginary ``i``.
 
 ### Meridional derivative
 
-The meridional derivative of a field ``\Psi`` in spectral space
+The meridional derivative of a field ``\Psi`` in spectral space is more complicated than the zonal derivative.
+To obtain the coefficient of each spherical harmonic of the meridional gradient of a spectral field, two 
+coefficients have to be combined following a recursion relation
+
+```math
+(\cos(\theta)u)_{l,m} = -\frac{1}{R}(-(l-1)\epsilon_{l,m}\Psi_{l-1,m} + (l+2)\epsilon_{l+1,m}\Psi_{l+1,m})
+```
+
+Here we used the example of obtaining the zonal velocity ``u`` from the stream function ``\Psi``, which is through the
+negative meridional gradient. For the meridional derivative itself the leading minus sign has to be omitted.
+The recursion factors are
+
+```math
+\epsilon_{l,m} = \sqrt{\frac{l^2-m^2}{4l^2-1}}
+```
+
+The recursion relation means that the coefficient of a gradient ``u_{lm}`` is a linear combination of the coefficients
+of one higher and one lower degree ``\Psi_{l+1,m},\Psi_{l-1,m}``. As the coefficient ``\Psi_{lm}`` with ``m<l`` are
+zero, the sectoral harmonics (``l=m``) of the gradients are obtained from the first off-diagonal only. However,
+the ``l=l_{max}`` harmonics of the gradients require the ``l_{max}-1`` as well as the ``l_{max}+1`` harmonics.
+In SpeedyWeather.jl vector quantities like ``u,v`` use therefore one more meridional mode than scalar quantities
+such as vorticity ``\zeta`` or stream function ``\Psi``. The meridional derivative in SpeedyWeather.jl also
+omits the ``1/R``-scaling as explained for the [Zonal derivative](@ref) and in [Radius scaling](@ref).
 
 ### Laplacian
 
-Laplacians in spectral space are discussed in [Horizontal Diffusion](@ref).
+The spectral Laplacian is easily applied to the coefficients ``\Psi_{lm}`` of a spectral field
+as the spherical harmonics are eigenfunctions of the Laplace operator ``\nabla^2`` in spherical coordinates with
+eigenvalues ``-l(l+1)`` divided by the radius squared ``R^2``, i.e. ``\nabla^2 \Psi`` becomes ``\tfrac{-l(l+1)}{R^2}\Psi_{lm}``
+in spectral space. For example, vorticity ``\zeta`` and streamfunction ``\Psi`` are related by ``\zeta = \nabla^2\Psi``
+in the barotropic vorticity model. Hence, in spectral space this is equivalent for every spectral mode of
+degree ``l`` and order ``m`` to
+
+```math
+\zeta_{l,m} = \frac{-l(l+1)}{R^2}\Psi_{l,m}
+```
+
+This can be easily inverted to obtain the stream function ``\Psi`` from vorticity ``\zeta`` instead. In order to avoid
+division by zero, we set ``\Psi_{0,0}`` here, given that the stream function is only defined up to a constant anyway.
+
+See also [Horizontal diffusion](@ref) and [Normalization of diffusion](@ref).
 
 ## References
-
-[^1-8]: Justin Willmert, 2020-2022. [Introduction to Associated Legendre Polynomials (Legendre.jl Series, Part I)](https://justinwillmert.com/articles/2020/introduction-to-associated-legendre-polynomials/), [Calculating Legendre Polynomials (Legendre.jl Series, Part II)](https://justinwillmert.com/articles/2020/calculating-legendre-polynomials/), [Pre-normalizing Legendre Polynomials (Legendre.jl Series, Part III)](https://justinwillmert.com/articles/2020/pre-normalizing-legendre-polynomials/), [Maintaining numerical accuracy in the Legendre recurrences (Legendre.jl Series, Part IV)](https://justinwillmert.com/articles/2020/maintaining-numerical-accuracy-in-the-legendre-recurrences/), [Introducing Legendre.jl (Legendre.jl Series, Part V)](https://justinwillmert.com/articles/2020/introducing-legendre.jl/), [Numerical Accuracy of the Spherical Harmonic Recurrence Coefficient (Legendre.jl Series Addendum)](https://justinwillmert.com/posts/2020/pre-normalizing-legendre-polynomials-addendum/), [Notes on Calculating the Spherical Harmonics](https://justinwillmert.com/articles/2020/notes-on-calculating-the-spherical-harmonics), [More Notes on Calculating the Spherical Harmonics: Analysis of maps to harmonic coefficients](https://justinwillmert.com/articles/2022/more-notes-on-calculating-the-spherical-harmonics/)
+[^1]: Justin Willmert, 2020. [Introduction to Associated Legendre Polynomials (Legendre.jl Series, Part I)](https://justinwillmert.com/articles/2020/introduction-to-associated-legendre-polynomials/)
+[^2]: Justin Willmert, 2020. [Calculating Legendre Polynomials (Legendre.jl Series, Part II)](https://justinwillmert.com/articles/2020/calculating-legendre-polynomials/)
+[^3]: Justin Willmert, 2020. [Pre-normalizing Legendre Polynomials (Legendre.jl Series, Part III)](https://justinwillmert.com/articles/2020/pre-normalizing-legendre-polynomials/)
+[^4]: Justin Willmert, 2020. [Maintaining numerical accuracy in the Legendre recurrences (Legendre.jl Series, Part IV)](https://justinwillmert.com/articles/2020/maintaining-numerical-accuracy-in-the-legendre-recurrences/)
+[^5]: Justin Willmert, 2020. [Introducing Legendre.jl (Legendre.jl Series, Part V)](https://justinwillmert.com/articles/2020/introducing-legendre.jl/)
+[^6]: Justin Willmert, 2020. [Numerical Accuracy of the Spherical Harmonic Recurrence Coefficient (Legendre.jl Series Addendum)](https://justinwillmert.com/posts/2020/pre-normalizing-legendre-polynomials-addendum/)
+[^7]: Justin Willmert, 2020. [Notes on Calculating the Spherical Harmonics](https://justinwillmert.com/articles/2020/notes-on-calculating-the-spherical-harmonics)
+[^8]: Justin Willmert, 2022. [More Notes on Calculating the Spherical Harmonics: Analysis of maps to harmonic coefficients](https://justinwillmert.com/articles/2022/more-notes-on-calculating-the-spherical-harmonics/)
 [^9]: David Randall, 2021. [An Introduction to Numerical Modeling of the Atmosphere](http://hogback.atmos.colostate.edu/group/dave/at604pdf/An_Introduction_to_Numerical_Modeling_of_the_Atmosphere.pdf), Chapter 22.
