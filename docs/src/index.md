@@ -1,16 +1,16 @@
 # SpeedyWeather.jl documentation
 
 Welcome to the documentation for [SpeedyWeather.jl](https://github.com/milankl/SpeedyWeather.jl) a global
-atmospheric circulation model with simple parameterizations to represent physical processes such as clouds,
+atmospheric circulation model with simple parametrizations to represent physical processes such as clouds,
 precipitation and radiation.
 
 ## Overview
 
-SpeedyWeather.jl is a spectral model that uses a Fourier and Legendre transform to calculcate tendencies of
-the prognostic variables vorticity, divergence, absolute temperature, logarithm of surface pressure and
-specific humidity. The time stepping uses a leapfrog scheme with additional filters and a semi-implicit
-formulation for gravity waves. The default resolution is T31 (96x48 grid points on a Gaussian grid, about
-400km at the Equator) and 8 vertical levels.
+SpeedyWeather.jl is a global spectral model that uses a Fourier and Legendre transform to calculcate
+tendencies of the prognostic variables vorticity, divergence, absolute temperature, logarithm of surface
+pressure and specific humidity. The time stepping uses a leapfrog scheme with additional filters and a
+semi-implicit formulation for gravity waves. The default resolution is T31 (96x48 grid points on a
+Gaussian grid, about 400km at the Equator) and 8 vertical levels.
 
 Simple parameterizations are used to represent the physical processes convection, large-scale condensation,
 clouds, short-wave radiation, long-waves radiation, surface fluxes of momentum and energy, and vertical diffusion.
@@ -48,18 +48,27 @@ that a single line of code survived.
 
 ## Installation
 
-SpeedyWeather.jl is not yet registered in the Julia Registry. So at the moment, open Julia's package
-manager from the REPL with `]` and `add` the github repository to install SpeedyWeather.jl and all dependencies
+SpeedyWeather.jl is registered in the Julia Registry. Open Julia's package manager from the REPL with `]`
+and `add` the github repository to install SpeedyWeather.jl and all dependencies
 ```julia
-(@v1.7) pkg> add https://github.com/milankl/SpeedyWeather.jl
+(@v1.7) pkg> add SpeedyWeather
 ```
-other branches can be installed by adding `#branch_name`, e.g.
-`add https://github.com/milankl/SpeedyWeather.jl#branch_name`.
+which will automatically install the latest release. However, you may want to install directly from the
+main branch with
+```julia
+(@v1.7) pkg> add https://github.com/milankl/SpeedyWeather.jl#main
+```
+other branches than `#main` can be installed by adding `#branch_name` instead.
 
 ## Developers
 
-SpeedyWeather.jl is currently developed by [Milan Klöwer](https://github.com/milankl) and
-[Tom Kipson](https://github.com/tomkimpson), any contributions are always welcome.
+SpeedyWeather.jl is currently developed by
+
+- [Milan Klöwer](https://github.com/milankl)
+- [Tom Kipson](https://github.com/tomkimpson)
+- [Alistair White](https://github.com/white-alistair)
+
+Any contributions are always welcome!
 
 ## Funding
 

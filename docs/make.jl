@@ -19,5 +19,6 @@ makedocs(
 
 deploydocs(
     repo = "github.com/milankl/SpeedyWeather.jl.git",
-    devbranch = "main"
+    devbranch = "main",
+    versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"]
 )

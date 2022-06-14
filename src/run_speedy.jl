@@ -1,8 +1,8 @@
 """
-    prog_vars = run_speedy(NF,kwargs...)
+    progn_vars = run_speedy(NF,kwargs...)
 
 Runs SpeedyWeather.jl with number format `NF` and any additional parameters in the keyword arguments
-`kwargs...`. Any unspeficied parameters will use the default values as defined in `src/parameters.jl`."""
+`kwargs...`. Any unspecified parameters will use the default values as defined in `src/parameters.jl`."""
 function run_speedy(::Type{NF}=Float32;             # number format, use Float32 as default
                     kwargs...                       # all additional non-default parameters
                     ) where {NF<:AbstractFloat}
@@ -21,8 +21,10 @@ end
 Initialize the model by returning
 - `progn_vars`, the initial conditions of the prognostic variables
 - `diagn_vars`, the preallocated the diagnotic variables (initialised to zero)
-- `model_setup`, the collected pre-calculated structs that don't change throughout integration:
-parametes, constants, geometry, spectral transform, boundaries, diffusion."""
+- `model_setup`, the collected pre-calculated structs that don't change throughout integration.
+
+The keyword arguments `kwargs` are the same as for `run_speedy`. The `model_setup` contains
+fields that hold the parameters, constants, geometry, spectral transform, boundaries and diffusion."""
 function initialize_speedy(::Type{NF}=Float32;      # number format, use Float32 as default
                           kwargs...                 # all additional non-default parameters
                           ) where {NF<:AbstractFloat}
