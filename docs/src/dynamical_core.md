@@ -5,6 +5,10 @@ We start by describing the barotropic vorticity equations which is one set of eq
 SpeedyWeather.jl can solve (see [How to run SpeedyWeather.jl](@ref)) as many details therein also
 apply to the [Shallow water equations](@ref) and [Primitive equations](@ref) explained thereafter.
 
+The dynamical core presented here largely follows the idealized models with spectral dynamics developed
+at the Geophysical Fluid Dynamics Laboratory[^1]: A barotropic vorticity model[^2], a shallow water
+model [^3] and a primitive equation model[^4]. 
+
 ## Barotropic vorticity equation
 
 The barotropic vorticity equation is the prognostic equation that describes the time evolution of
@@ -53,6 +57,14 @@ We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrat
 10. Repeat from 1.
 
 ## Shallow water equations
+
+```math
+\begin{aligned}
+\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) &= \nu\nabla^{2n}\zeta \\
+\frac{\partial \mathcal{D}}{\partial t} - \nabla \times (\mathbf{u}(\zeta + f)) &= -\nabla^2(\tfrac{1}{2}(u^2 + v^2) + g\eta) + \nu\nabla^{2n}\eta \\
+\frac{\partial \eta}{\partial t} + \nabla \cdot (\mathbf{u}h) &= 0. \\
+\end{aligned}
+```
 
 more to come
 
@@ -164,3 +176,11 @@ to dampen the computational mode and achieve 3rd order accuracy.
 ```math
 \frac{dF}{dt} = i\omega F
 ```
+
+
+## References
+
+[^1]: Geophysical Fluid Dynamics Laboratory, [Idealized models with spectral dynamics](https://www.gfdl.noaa.gov/idealized-models-with-spectral-dynamics/)
+[^2]: Geophysical Fluid Dynamics Laboratory, [The barotropic vorticity equation](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/barotropic.pdf).
+[^3]: Geophysical Fluid Dynamics Laboratory, [The Shallow Water Equations](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/shallow.pdf).
+[^4]: Geophysical Fluid Dynamics Laboratory, [The Spectral Dynamical Core](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/spectral_core.pdf)
