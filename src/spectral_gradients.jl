@@ -76,7 +76,8 @@ such that the returned array is scaled with coslat.
 function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # output: cos(latitude)*meridional velocity
                                 Ψ::AbstractMatrix{Complex{NF}},         # input: spectral coefficients of stream function
                                 radius::Real=1;                         # radius of the sphere/Earth
-                                add::Bool=false                         # coslat_u += (add) or = (overwrite)
+                                add::Bool=false,                        # coslat_u += (add) or = (overwrite)
+                                flipsign::Bool=false                    # flip sign of output?
                                 ) where {NF<:AbstractFloat}             # number format NF
 
     # Ψ can have size n+1 x n but then the last row is not used in the loop
@@ -84,7 +85,7 @@ function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # outpu
     @boundscheck size_compat || throw(BoundsError)
     lmax,mmax = size(Ψ) .- 1    # 0-based max degree l, order m of spherical harmonics
 
-    iradius⁻¹ = convert(Complex{NF},im/radius)      # = imaginary/radius converted to NF
+    iradius⁻¹ = convert(Complex{NF},(-1)^flipsign*im/radius)            # = ±imaginary/radius converted to NF
 
     @inbounds for m in 1:mmax+1                     # loop over all coefficients, order m
         for l in m:lmax+1                           # degree l
