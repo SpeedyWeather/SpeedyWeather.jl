@@ -42,6 +42,7 @@ function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic var
     G = M.geospectral
     B = M.boundaries
     g = M.constants.gravity
+    H₀ = M.parameters.layer_thickness
     
     # tendencies for vorticity
     vorticity_advection!(diagn,G)               # = -∇⋅(u(ζ+f),v(ζ+f))
@@ -51,7 +52,7 @@ function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic var
     curl_vorticity_fluxes!(diagn,G)             # =  ∇×(u(ζ+f),v(ζ+f))
     
     # tendencies for pressure pres = interface displacement η
-    volume_fluxes!(diagn,G,B)                   # = -∇⋅(uh,vh)
+    volume_fluxes!(diagn,G,B,H₀)                # = -∇⋅(uh,vh)
 end
 
 

@@ -259,19 +259,34 @@ function vorticity_advection!(  D::DiagnosticVariables{NF}, # all diagnostic var
     gradient_longitude!(∂uω_∂lon,uω)            # STEP 5: spectral gradients
     gradient_latitude!( ∂vω_∂lat,vω,S)
 
-    flipsign!(∂uω_∂lon)                         # because ∂ζ/∂t = -∇⋅(uv*ζ)       
+    flipsign!(∂uω_∂lon)                         # because ∂ζ/∂t = -∇⋅(uv*(ζ+f))       
     flipsign!(∂vω_∂lat)
 
     add_tendencies!(vor_tend,∂uω_∂lon,∂vω_∂lat) # STEP 6: Add tendencies
 end
 
-function vorticity_fluxes!( uω::AbstractMatrix{NF},    # Output: u*(vor+coriolis) in grid space
-                            vω::AbstractMatrix{NF},    # Output: v*(vor+coriolis) in grid space
-                            u::AbstractMatrix{NF},     # Input: zonal velocity in grid space
-                            v::AbstractMatrix{NF},     # Input: meridional velocity in grid space
-                            vor::AbstractMatrix{NF},   # Input: relative vorticity in grid space       
-                            G::Geometry{NF}            # struct with precomputed geometry arrays
-                            ) where {NF<:AbstractFloat}# number format NF
+function curl_vorticity_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables   
+                                G::GeoSpectral{NF}          # struct with geometry and spectral transform
+                                ) where {NF<:AbstractFloat}                                   
+
+    S = G.spectral_transform
+    @unpack uω, vω = D.intermediate_variables
+    @unpack ∂uω_∂lat, ∂vω_∂lon = D.intermediate_variables
+    @unpack div_tend = D.tendencies
+
+    gradient_longitude!(∂vω_∂lon,vω)                    # 1st component of ∇×(uv(ζ+f))
+    gradient_latitude!( ∂uω_∂lat,uω,S,flipsign=true)    # 2nd component of ∇×(uv(ζ+f))
+    
+    add_tendencies!(div_tend,∂uω_∂lon,∂vω_∂lat)         # evaluate after bernoulli_potential!
+end
+
+function vorticity_fluxes!( uω::AbstractMatrix{NF},     # Output: u*(vor+coriolis) in grid space
+                            vω::AbstractMatrix{NF},     # Output: v*(vor+coriolis) in grid space
+                            u::AbstractMatrix{NF},      # Input: zonal velocity in grid space
+                            v::AbstractMatrix{NF},      # Input: meridional velocity in grid space
+                            vor::AbstractMatrix{NF},    # Input: relative vorticity in grid space       
+                            G::Geometry{NF}             # struct with precomputed geometry arrays
+                            ) where {NF<:AbstractFloat} # number format NF
 
     nlon,nlat = size(u)
     @boundscheck size(u) == size(v) || throw(BoundsError)
@@ -280,6 +295,7 @@ function vorticity_fluxes!( uω::AbstractMatrix{NF},    # Output: u*(vor+coriol
     @boundscheck size(u) == size(vω) || throw(BoundsError)
 
     @unpack f_coriolis = G
+    @boundscheck length(f_coriolis) == nlat || throw(BoundsError)
 
     @inbounds for j in 1:nlat
         for i in 1:nlon
@@ -288,6 +304,97 @@ function vorticity_fluxes!( uω::AbstractMatrix{NF},    # Output: u*(vor+coriol
             vω[i,j] = ω*v[i,j]              # = v(vor+f)
         end
     end
+end
+
+function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables   
+                        G::GeoSpectral{NF},         # struct with geometry and spectral transform
+                        B::Boundaries,              # used for orography
+                        H₀::Real                    # layer thickness
+                        ) where {NF<:AbstractFloat}                                   
+
+    @unpack pres_tend = D.tendencies
+    @unpack u_grid, v_grid, pres_grid = D.grid_variables
+    @unpack uh, vh, uh_grid, vh_grid = D.intermediate_variables
+    @unpack ∂uh_∂lon, ∂vh_∂lon = D.intermediate_variables
+    @unpack orography = B
+    S = G.spectral_transform
+
+    @unpack nlon, nlat = G.geometry
+    @boundscheck size(pres_grid) == (lon,nlat) || throw(BoundsError)
+    @boundscheck size(pres_grid) == size(orography) || throw(BoundsError)
+    @boundscheck size(uh_grid) == size(u) || throw(BoundsError)
+    @boundscheck size(vh_grid) == size(v) || throw(BoundsError)
+
+    H₀ = convert(NF,H₀)
+
+    # compute (uh,vh) on the grid
+    # pres_grid is η, the interface displacement
+    # layer thickness h = η + H, H is the layer thickness at rest
+    # H = H₀ - orography, H₀ is the layer thickness without mountains
+
+    @inbounds for j in 1:nlat
+        for i in 1:nlon
+            h = pres_grid[i,j] + H₀ - orography[i,j]    # h = η + H₀ - orography
+            uh_grid[i,j] = u[i,j]*h                     # = uh
+            vh_grid[i,j] = v[i,j]*h                     # = vh
+        end
+    end
+
+    spectral!(uh,uh_grid,S)
+    spectral!(vh,vh_grid,S)
+
+    gradient_longitude!(∂uh_∂lon,uh,  flipsign=true)    # 1st component of -∇⋅(uh)
+    gradient_latitude!( ∂vh_∂lat,vh,S,flipsign=true)    # 2nd component of -∇⋅(uh)
+    add_tendencies!(pres_tend,∂uh_∂lon,∂vh_∂lat)        # add
+end
+
+"""
+    bernoulli_potential!(   B::AbstractMatrix{NF},  # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
+                            u::AbstractMatrix{NF},  # zonal velocity
+                            v::AbstractMatrix{NF},  # meridional velocity
+                            η::AbstractMatrix{NF},  # interface displacement
+                            g::Real                 # gravity
+                            ) where {NF<:AbstractFloat}
+
+Computes the Bernoulli potential 1/2*(u^2 + v^2) + g*η."""
+function bernoulli_potential!(  B::AbstractMatrix{NF},  # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
+                                u::AbstractMatrix{NF},  # zonal velocity
+                                v::AbstractMatrix{NF},  # meridional velocity
+                                η::AbstractMatrix{NF},  # interface displacement
+                                g::Real                 # gravity
+                                ) where {NF<:AbstractFloat}
+    
+    nlon,nlat = size(B)
+    @boundscheck (nlon,nlat) == size(u) || throw(BoundsError)
+    @boundscheck (nlon,nlat) == size(v) || throw(BoundsError)
+    @boundscheck (nlon,nlat) == size(η) || throw(BoundsError)
+
+    one_half = convert(NF,0.5)
+    gravity = convert(NF,g)
+
+    @inbounds for j in 1:nlat
+        for i in 1:nlon
+            B[i,j] = one_half*(u[i,j]^2 + v[i,j]^2) + gravity*η[i,j]
+        end
+    end
+end
+
+function bernoulli_potential!(  D::DiagnosticVariables{NF}, # all diagnostic variables   
+                                G::GeoSpectral{NF},         # struct with geometry and spectral transform
+                                g::Real                     # gravity
+                                ) where {NF<:AbstractFloat}   
+    
+    @unpack u_grid,v_grid,pres_grid = D.grid_variables
+    @unpack bernoulli, bernoulli_grid = D.intermediate_variables
+    @unpack div_tend = D.tendencies
+    S = G.spectral_transform
+
+    bernoulli_potential!(bernoulli_grid,u_grid,v_grid,pres_grid,g)  # = 1/2(u^2 + v^2) + gη on grid
+    spectral!(bernoulli,bernoulli_grid,S)                           # to spectral space
+
+    # write directly in div_tend, ie bernoulli potential has to be the first tendency
+    ∇²!(div_tend,bernoulli)                                         # = ∇²(1/2(u^2 + v^2) + gη)
+    flipsign(div_tend)                                              # = -∇²(1/2(u^2 + v^2) + gη) on RHS
 end
 
 """
@@ -378,53 +485,4 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     unscale_coslat!(v_grid,G)
 
     return nothing
-end
-
-"""
-    bernoulli_potential!(   B::AbstractMatrix{NF},  # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
-                            u::AbstractMatrix{NF},  # zonal velocity
-                            v::AbstractMatrix{NF},  # meridional velocity
-                            η::AbstractMatrix{NF},  # interface displacement
-                            g::Real                 # gravity
-                            ) where {NF<:AbstractFloat}
-
-Computes the Bernoulli potential 1/2*(u^2 + v^2) + g*η."""
-function bernoulli_potential!(  B::AbstractMatrix{NF},  # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
-                                u::AbstractMatrix{NF},  # zonal velocity
-                                v::AbstractMatrix{NF},  # meridional velocity
-                                η::AbstractMatrix{NF},  # interface displacement
-                                g::Real                 # gravity
-                                ) where {NF<:AbstractFloat}
-    
-    nlon,nlat = size(B)
-    @boundscheck (nlon,nlat) == size(u) || throw(BoundsError)
-    @boundscheck (nlon,nlat) == size(v) || throw(BoundsError)
-    @boundscheck (nlon,nlat) == size(η) || throw(BoundsError)
-
-    one_half = convert(NF,0.5)
-    gravity = convert(NF,g)
-
-    @inbounds for j in 1:nlat
-        for i in 1:nlon
-            B[i,j] = one_half*(u[i,j]^2 + v[i,j]^2) + gravity*η[i,j]
-        end
-    end
-end
-
-function bernoulli_potential!(  D::DiagnosticVariables{NF}, # all diagnostic variables   
-                                G::GeoSpectral{NF},         # struct with geometry and spectral transform
-                                g::Real                     # gravity
-                                ) where {NF<:AbstractFloat}   
-    
-    @unpack u_grid,v_grid,pres_grid = D.grid_variables
-    @unpack bernoulli, bernoulli_grid = D.intermediate_variables
-    @unpack div_tend = D.tendencies
-    S = G.spectral_transform
-
-    bernoulli_potential!(bernoulli_grid,u_grid,v_grid,pres_grid,g)  # = 1/2(u^2 + v^2) + gη on grid
-    spectral!(bernoulli,bernoulli_grid,S)                           # to spectral space
-
-    # write directly in div_tend, ie bernoulli potential has to be the first tendency
-    ∇²!(div_tend,bernoulli)                                         # = ∇²(1/2(u^2 + v^2) + gη)
-    flipsign(div_tend)                                              # = -∇²(1/2(u^2 + v^2) + gη) on RHS
 end

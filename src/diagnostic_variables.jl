@@ -121,6 +121,15 @@ struct IntermediateVariables{NF<:AbstractFloat}
     # SHALLOW WATER
     bernoulli_grid  ::Array{NF,3}           # bernoulli potential on the grid = 1/2(u^2+v^2) + gη
     bernoulli       ::Array{Complex{NF},3}  # spectral bernoulli potential
+    ∂uω_∂lat        ::Array{Complex{NF},3}  # off-diagonal derivatives of vorticity fluxes
+    ∂vω_∂lon        ::Array{Complex{NF},3}
+
+    uh_grid         ::Array{NF,3}           # volume flux u*h on grid
+    vh_grid         ::Array{NF,3}           # volume flux v*h on grid
+    uh              ::Array{Complex{NF},3}  # uh in spectral
+    vh              ::Array{Complex{NF},3}  # vh in spectral
+    ∂uh_∂lon        ::Array{Complex{NF},3}  # 1st component of ∇⋅(uv*h)
+    ∂vh_∂lat        ::Array{Complex{NF},3}  # 2nd component of ∇⋅(uv*h)
 
     ###------Defined in surface_pressure_tendency!()
     u_mean             ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
@@ -176,6 +185,15 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
     # SHALLOW WATER
     bernoulli_grid  = zeros(NF,nlon,nlat,nlev)
     bernoulli       = zeros(Complex{NF},lmax+1,mmax+1,nlev)
+    ∂uω_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    ∂vω_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+
+    uh_grid = zeros(NF,nlon,nlat,nlev)
+    vh_grid = zeros(NF,nlon,nlat,nlev)
+    uh = zeros(Complex{NF},lmax+1,mmax+1,nlev)
+    vh = zeros(Complex{NF},lmax+1,mmax+1,nlev)
+    ∂uh_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    ∂vh_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
     u_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint zonal velocity over all levels
     v_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint meridional velocity over all levels
@@ -206,6 +224,9 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
                                     coslat_u, coslat_v,
                                     uω_grid,vω_grid,
                                     uω,vω,∂uω_∂lon,∂vω_∂lat,
+                                    bernoulli_grid,bernoulli,
+                                    ∂uω_∂lat,∂vω_∂lon,
+                                    uh_grid,vh_grid,uh,vh,∂uh_∂lon,∂vh_∂lat,
                                     u_mean,v_mean,div_mean,
                                     pres_gradient_spectral_x,pres_gradient_spectral_y,
                                     pres_gradient_grid_x,pres_gradient_grid_y,
