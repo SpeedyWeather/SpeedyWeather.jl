@@ -32,7 +32,7 @@ function initial_conditions(M::BarotropicModel)
         u_grid = repeat(u_grid1',nlon,1)
         u = zeros(Complex{P.NF},lmax+1,mmax+1)
         u = spectral!(u,u_grid,G.spectral_transform)
-        ζ = gradient_latitude(u,G.spectral_transform,one_more_l=false)
+        ζ = gradient_latitude(u,G.spectral_transform,one_more_l=false,flipsign=true)
         progn.vor[:,:,1,1] .= ζ/radius_earth
 
         # zonal wave perturbation
