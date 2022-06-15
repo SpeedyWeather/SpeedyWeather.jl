@@ -10,7 +10,7 @@ struct PrognosticVariables{NF<:AbstractFloat}
 end
 
 """Initialize prognostic variables from rest or restart from file."""
-function initial_conditions(M::BarotropicModel)
+function initial_conditions(M::Union{BarotropicModel,ShallowWaterModel})
 
     @unpack initial_conditions = M.parameters
 
