@@ -166,13 +166,35 @@ function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{NF}},   # Output: inve
 
     @boundscheck size(alms) == size(∇⁻²alms) || throw(BoundsError)
     lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
+    
     @unpack eigen_values⁻¹ = S
+    @boundscheck size(eigen_values⁻¹) >= lmax+1 || throw(BoundsError)
 
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
-        for l in m:lmax+1           # degree l = 0:lmax but 1-based
+        for l in m:lmax+1           # degree l = m:lmax but 1-based
             ∇⁻²alms[l,m] = alms[l,m]*eigen_values⁻¹[l]
         end
     end
 
     return ∇⁻²alms
+end
+
+function ∇²!(   ∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacian of alms
+                alms::AbstractMatrix{Complex{NF}},      # spectral coefficients
+                S::SpectralTransform{NF}                # precomputed arrays for spectral space
+                ) where {NF<:AbstractFloat}
+
+    @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
+    lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
+    
+    @unpack eigen_values = S
+    @boundscheck size(eigen_values) >= lmax+1 || throw(BoundsError)
+
+    @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
+        for l in m:lmax+1           # degree l = m:lmax but 1-based
+            ∇²alms[l,m] = alms[l,m]*eigen_values[l]
+        end
+    end
+
+    return ∇²alms
 end
