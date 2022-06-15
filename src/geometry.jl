@@ -103,11 +103,15 @@ function Geometry(P::Parameters)
         end
     end
 
-    # LAPSE RATE correction (TODO reference)
-    lapserate_correction = zeros(nlev-2)
-    for k in 2:nlev-1
-        lapserate_correction[k-1] = 0.5*xgeop1[k]*
-                    log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
+    if P.model == :primitive
+        # LAPSE RATE correction (TODO reference)
+        lapserate_correction = zeros(nlev-2)
+        for k in 2:nlev-1
+            lapserate_correction[k-1] = 0.5*xgeop1[k]*
+                        log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
+        end
+    else
+        lapserate_correction = zeros(1)
     end
 
     # Extra definitions. These will need to be defined consistently either here or somewhere else

@@ -10,16 +10,18 @@ The default values of the keywords define the default model setup.
     # NUMBER FORMATS
     NF::DataType                        # number format (default is defined in run_speedy.jl)
 
+    # MODEL
+    model::Symbol=:barotropic           # :barotropic, :shallowwater, or :primitive
+
     # RESOLUTION
     trunc::Int=31                       # spectral truncation
     nlon::Int=roundup_fft(3*trunc+1)    # number of longitudes
     nlat::Int=nlon÷2                    # number of latitudes
-    nlev::Int=8                         # number of vertical levels
+    nlev::Int=nlev_default(model)       # number of vertical levels 
 
     # PHYSICAL CONSTANTS
-    model::Symbol=:barotropic           # :barotropic, :shallowwater, or :primitive
     radius_earth::Real=6.371e6          # radius of Earth [m]
-    rotation_earth::Real=7.292e-5       # angular frequency of Earth's rotation [1/s]
+    rotation_earth::Real=1e-5           # angular frequency of Earth's rotation [1/s]
     gravity::Real=9.81          # gravitational acceleration [m/s^2]
     akap::Real=2/7              # ratio of gas constant to specific heat of dry air
                                 # at constant pressure = 1 - 1/γ where γ is the
@@ -40,6 +42,7 @@ The default values of the keywords define the default model setup.
     scale_height_humid::Real=2.5# reference scale height for specific humidity [km]
     relhumid_ref::Real=0.7      # reference relative humidity of near-surface air [1]
     water_pres_ref::Real=17     # reference saturation water vapour pressure [Pa]
+    layer_thickness::Real=10    # layer thickness for the shallow water model [km]
 
     # VERTICAL COORDINATES
     # of the nlev vertical levels, defined by a generalised logistic function,
@@ -100,4 +103,10 @@ The default values of the keywords define the default model setup.
 
     # TODO assert not allowed parameter values
     @assert α in [0,0.5,1] "Only semi-implicit α = 0, 0.5 or 1 allowed."
+end
+
+function nlev_default(model::Symbol)
+    model == :barotropic && return 1
+    model == :shallowwater && return 1
+    model == :primitive && return 8
 end
