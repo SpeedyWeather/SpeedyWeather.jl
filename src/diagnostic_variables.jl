@@ -118,6 +118,10 @@ struct IntermediateVariables{NF<:AbstractFloat}
     ∂uω_∂lon        ::Array{Complex{NF},3}
     ∂vω_∂lat        ::Array{Complex{NF},3}
 
+    # SHALLOW WATER
+    bernoulli_grid  ::Array{NF,3}           # bernoulli potential on the grid = 1/2(u^2+v^2) + gη
+    bernoulli       ::Array{Complex{NF},3}  # spectral bernoulli potential
+
     ###------Defined in surface_pressure_tendency!()
     u_mean             ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
     v_mean             ::Array{NF,2}  # Mean gridpoint meridional velocity over all levels
@@ -168,6 +172,10 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
     vω       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
     ∂uω_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
     ∂vω_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+
+    # SHALLOW WATER
+    bernoulli_grid  = zeros(NF,nlon,nlat,nlev)
+    bernoulli       = zeros(Complex{NF},lmax+1,mmax+1,nlev)
 
     u_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint zonal velocity over all levels
     v_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint meridional velocity over all levels
