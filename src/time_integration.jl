@@ -170,17 +170,14 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
     
-    @unpack vor = progn
-    @unpack vor_tend = diagn.tendencies
+    @unpack vor, div, pres = progn
+    @unpack vor_tend, div_tend, pres_tend = diagn.tendencies
     @unpack damping, damping_impl = M.horizontal_diffusion
 
     # set all tendencies to zero
     fill!(vor_tend,zero(Complex{NF}))
     fill!(div_tend,zero(Complex{NF}))
     fill!(pres_tend,zero(Complex{NF}))
-
-    # @unpack tcorh,tcorv,qcorh,qcorv = HD
-    # @unpack sdrag = C
 
     # PROPAGATE THE SPECTRAL STATE INTO THE DIAGNOSTIC VARIABLES
     gridded!(diagn,progn,M,lf2)
@@ -191,43 +188,14 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     # DIFFUSION FOR WIND
     # always use first leapfrog index for diffusion (otherwise unstable)
     vor_lf = view(vor,:,:,1,:)                                      # array view for leapfrog index
-    # div_l1 = view(div,:,:,1,:)                                    # TODO l1/l2 dependent?
+    div_lf = view(div,:,:,1,:)                                      # array view for leapfrog index
     horizontal_diffusion!(vor_tend,vor_lf,damping,damping_impl)     # diffusion of vorticity
-    # horizontal_diffusion!(div_l1,div_tend,dmpd,dmp1d)             # diffusion of divergence
-
-    # # DIFFUSION FOR TEMPERATURE
-    # orographic_correction!(temp_corrected,temp,1,tcorh,tcorv)   # orographic correction for temperature
-    # horizontal_diffusion!(temp_corrected,temp_tend,dmp,dmp1)    # diffusion for corrected abs temperature
-
-    # # DISSIPATION IN THE STRATOSPHERE
-    # stratospheric_zonal_drag!(vor,vor_tend,sdrag)               # zonal drag for wind
-    # stratospheric_zonal_drag!(div,div_tend,sdrag)
-
-    # horizontal_diffusion!(vor_l1,vor_tend,dmps,dmp1s)           # stratospheric diffusion for wind
-    # horizontal_diffusion!(div_l1,div_tend,dmps,dmp1s)           
-    # horizontal_diffusion!(temp_corrected,temp_tend,dmps,dmp1s)  # stratospheric diffusion for temperature
-
-    # # DIFFUSION OF HUMIDITY
-    # orographic_correction!(humid_corrected,humid,1,qcorh,qcorv) # orographic correction for humidity
-    # horizontal_diffusion!(humid_corrected,humid_tend,dmp,dmp1)  # diffusion for corrected humidity
-
-    # if ntracers > 1
-    #     for i in 2:ntracers
-    #         tracer          = view(tracers,:,:,:,1,i)                   # the i-th tracer, leapfrog index 1
-    #         tracer_tendency = view(tracers_tendencies,:,:,:,i)          # its tendency
-    #         horizontal_diffusion!(tracer,tracer_tendency,dmp,dmp1)
-    #         leapfrog!(tracer,tracer_tendency,j1,C)
-    #     end
-    # end
-
-    # # SPECTRAL TRUNCATION of all tendencies to the spectral resolution
-    # for tendency in (logp0_tend,vor_tend,div_tend,temp_tend,humid_tend)
-    #     spectral_truncation!(tendency,G)
-    # end
+    horizontal_diffusion!(div_tend,div_lf,damping,damping_impl)     # diffusion of divergence
 
     # time integration via leapfrog step forward (filtered with Robert+William's depending on l1)
-    # leapfrog!(progn,diagn,dt,C,lf1)
-    leapfrog!(vor,vor_tend,dt,M.constants,lf1)
+    leapfrog!(vor, vor_tend, dt,M.constants,lf1)
+    leapfrog!(div, div_tend, dt,M.constants,lf1)
+    leapfrog!(pres,pres_tend,dt,M.constants,lf1)
 end
 
 """
