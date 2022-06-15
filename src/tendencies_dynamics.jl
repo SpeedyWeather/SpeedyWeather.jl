@@ -345,7 +345,7 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
                     lf::Int=1                       # leapfrog index
                     ) where NF
     
-    @unpack vor, div = progn                        # relative vorticity, divergence
+    @unpack vor, div, pres = progn                  # relative vorticity, divergence, pressure
     @unpack vor_grid, div_grid, u_grid, v_grid = diagn.grid_variables
     @unpack stream_function, coslat_u, coslat_v, velocity_potential = diagn.intermediate_variables
     
@@ -353,10 +353,12 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     S = M.geospectral.spectral_transform
 
     vor_lf = view(vor,:,:,lf,:)         # pick leapfrog index without memory allocation
-    div_lf = view(div,:,:,lf,:)         # same here
+    div_lf = view(div,:,:,lf,:)
+    pres_lf = view(pres,:,:,lf,:)       
 
     gridded!(vor_grid,vor_lf,S)         # get vorticity on grid from spectral vor
     gridded!(div_grid,div_lf,S)         # get divergence on grid from spectral div
+    gridded!(pres_grid,pres_lf,S)       # get pressure on grid from spectral pres
 
     ∇⁻²!(stream_function,vor_lf,S)      # invert Laplacian ∇² for stream function
     ∇⁻²!(velocity_potential,div_lf,S)   # invert Laplacian ∇² for velocity potential
@@ -379,30 +381,50 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
 end
 
 """
-    bernoulli_potential!(   b::AbstractMatrix{NF},  # Output: Bernoulli potential b = 1/2*(u^2+v^2)+Φ
+    bernoulli_potential!(   B::AbstractMatrix{NF},  # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
                             u::AbstractMatrix{NF},  # zonal velocity
                             v::AbstractMatrix{NF},  # meridional velocity
-                            Φ::AbstractMatrix{NF}   # geopotential Φ = gravity*layer_thickness
+                            η::AbstractMatrix{NF},  # interface displacement
+                            g::Real                 # gravity
                             ) where {NF<:AbstractFloat}
 
-Computes the Bernoulli potential 1/2*(u^2 + v^2) + Φ."""
-function bernoulli_potential!(  b::AbstractMatrix{NF},  # Output: Bernoulli potential b = 1/2*(u^2+v^2)+Φ
+Computes the Bernoulli potential 1/2*(u^2 + v^2) + g*η."""
+function bernoulli_potential!(  B::AbstractMatrix{NF},  # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
                                 u::AbstractMatrix{NF},  # zonal velocity
                                 v::AbstractMatrix{NF},  # meridional velocity
-                                Φ::AbstractMatrix{NF}   # geopotential Φ = gravity*layer_thickness
+                                η::AbstractMatrix{NF},  # interface displacement
+                                g::Real                 # gravity
                                 ) where {NF<:AbstractFloat}
     
-    nlon,nlat = size(b)
+    nlon,nlat = size(B)
     @boundscheck (nlon,nlat) == size(u) || throw(BoundsError)
     @boundscheck (nlon,nlat) == size(v) || throw(BoundsError)
-    @boundscheck (nlon,nlat) == size(Φ) || throw(BoundsError)
+    @boundscheck (nlon,nlat) == size(η) || throw(BoundsError)
 
     one_half = convert(NF,0.5)
+    gravity = convert(NF,g)
 
     @inbounds for j in 1:nlat
         for i in 1:nlon
-            b[i,j] = one_half*(u[i,j]^2 + v[i,j]^2) + Φ[i,j]
+            B[i,j] = one_half*(u[i,j]^2 + v[i,j]^2) + gravity*η[i,j]
         end
     end
 end
 
+function bernoulli_potential!(  D::DiagnosticVariables{NF}, # all diagnostic variables   
+                                G::GeoSpectral{NF},         # struct with geometry and spectral transform
+                                g::Real                     # gravity
+                                ) where {NF<:AbstractFloat}   
+    
+    @unpack u_grid,v_grid,pres_grid = D.grid_variables
+    @unpack bernoulli, bernoulli_grid = D.intermediate_variables
+    @unpack div_tend = D.tendencies
+    S = G.spectral_transform
+
+    bernoulli_potential!(bernoulli_grid,u_grid,v_grid,pres_grid,g)  # = 1/2(u^2 + v^2) + gη on grid
+    spectral!(bernoulli,bernoulli_grid,S)                           # to spectral space
+
+    # write directly in div_tend, ie bernoulli potential has to be the first tendency
+    ∇²!(div_tend,bernoulli)                                         # = ∇²(1/2(u^2 + v^2) + gη)
+    flipsign(div_tend)                                              # = -∇²(1/2(u^2 + v^2) + gη) on RHS
+end

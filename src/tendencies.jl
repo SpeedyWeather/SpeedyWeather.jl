@@ -23,6 +23,37 @@
 # Note that get_spectral_tendencies() is quite badly named. It really modifies/updates the **already calculated** spectral tendencies
 # =========================================================================
 
+function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
+                            progn::PrognosticVariables{NF}, # all prognostic variables
+                            M::BarotropicModel,             # struct containing all constants
+                            lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
+                            ) where {NF<:AbstractFloat}
+
+    # only (planetary) vorticity advection for the barotropic model
+    vorticity_advection!(diagn,M.geospectral)               # = -∇⋅(u(ζ+f),v(ζ+f))
+end
+
+function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
+                            progn::PrognosticVariables{NF}, # all prognostic variables
+                            M::ShallowWaterModel,           # struct containing all constants
+                            lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
+                            ) where {NF<:AbstractFloat}
+
+    G = M.geospectral
+    B = M.boundaries
+    g = M.constants.gravity
+    
+    # tendencies for vorticity
+    vorticity_advection!(diagn,G)               # = -∇⋅(u(ζ+f),v(ζ+f))
+
+    # tendencies for divergence
+    bernoulli_potential!(diagn,G,g)             # = -∇²(E+gη)
+    curl_vorticity_fluxes!(diagn,G)             # =  ∇×(u(ζ+f),v(ζ+f))
+    
+    # tendencies for pressure pres = interface displacement η
+    volume_fluxes!(diagn,G,B)                   # = -∇⋅(uh,vh)
+end
+
 
 """
 Compute the grid point and spectral tendencies, including an implicit correction for the spectral tendencies. 
