@@ -38,7 +38,8 @@ function initialize_speedy(::Type{NF}=Float32;      # number format, use Float32
     if P.model == :barotropic                       # pack all of the above into a *Model struct
         M = BarotropicModel(P,C,G,H)                # typeof(M) is used to dispatch dynamically
     elseif P.model == :shallowwater                 # to the supported model types
-        M = ShallowWaterModel(P,C,G,B,H)
+        I = Implicit(P,C,G)
+        M = ShallowWaterModel(P,C,G,B,H,I)
     elseif P.model == :primitive
         M = PrimitiveEquationModel(P,C,G,B,H)
     end

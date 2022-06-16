@@ -169,7 +169,7 @@ function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{NF}},   # Output: inve
     lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
     
     @unpack eigen_values⁻¹ = S
-    @boundscheck size(eigen_values⁻¹) >= lmax+1 || throw(BoundsError)
+    @boundscheck length(eigen_values⁻¹) >= lmax+1 || throw(BoundsError)
 
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
         for l in m:lmax+1           # degree l = m:lmax but 1-based
@@ -189,7 +189,7 @@ function ∇²!(   ∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacia
     lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
     
     @unpack eigen_values = S
-    @boundscheck size(eigen_values) >= lmax+1 || throw(BoundsError)
+    @boundscheck length(eigen_values) >= lmax+1 || throw(BoundsError)
 
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
         for l in m:lmax+1           # degree l = m:lmax but 1-based

@@ -75,13 +75,10 @@ The default values of the keywords define the default model setup.
     n_days::Real=10             # number of days to integrate for
 
     # NUMERICS
-    robert_filter::Real=0.05    # Robert (1966) time filter coefficeint for suppress comput. mode
-    williams_filter::Real=0.53  # William's time filter (Amezcua 2011) coefficient for 3rd order acc
-    α::Real=0.5                 # coefficient for semi-implicit computations
-                                # 0 -> forward step for gravity wave terms,
-                                # 1 -> backward implicit
-                                # 0.5 -> centered implicit
-    recompute_legendre::Bool=false
+    robert_filter::Real=0.05        # Robert (1966) time filter coefficeint for suppress comput. mode
+    williams_filter::Real=0.53      # William's time filter (Amezcua 2011) coefficient for 3rd order acc
+    implicit_α::Real=0.5            # coefficient for semi-implicit computations to filter gravity waves
+    recompute_legendre::Bool=false  # recomputation is slower but requires less memory
 
     # BOUNDARY FILES
     boundary_path::String=""    # package location is default
