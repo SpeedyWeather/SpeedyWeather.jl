@@ -9,6 +9,7 @@ Struct holding the parameters needed at runtime in number format NF.
     gravity::NF             # Gravitational acceleration
     akap::NF                # Ratio of gas constant to specific heat of dry air at constant pressure
     R_gas::NF               # Universal gas constant
+    layer_thickness::NF     # shallow water layer thickness [m]
 
     # TIME STEPPING
     Δt::NF                  # time step [s/m], use 2Δt for leapfrog, scaled by Earth's radius
@@ -41,6 +42,8 @@ function Constants(P::Parameters)
 
     # PHYSICAL CONSTANTS
     @unpack radius_earth, rotation_earth, gravity, akap, R_gas = P
+    @unpack layer_thickness = P
+    H₀ = layer_thickness*1000                   # convert from [km]s to [m]
 
     # TIME INTEGRATION CONSTANTS
     @unpack robert_filter, williams_filter = P
@@ -66,7 +69,7 @@ function Constants(P::Parameters)
     Δt /= radius_earth      # scale with Earth's radius
 
     # This implies conversion to NF
-    return Constants{P.NF}( radius_earth,rotation_earth,gravity,akap,R_gas,
+    return Constants{P.NF}( radius_earth,rotation_earth,gravity,akap,R_gas,H₀,
                             Δt,Δt_unscaled,Δt_sec,Δt_hrs,
                             robert_filter,williams_filter,n_timesteps,
                             output_every_n_steps, n_outputsteps,

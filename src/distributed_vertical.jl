@@ -1,6 +1,6 @@
 # ONE ARGUMENT FUNCTIONS
 for func_name in (:unscale_coslat!,:scale_coslat!,
-                    :spectral_truncation!)
+                    :spectral_truncation!,:flipsign!)
     @eval begin
         function $func_name(A::AbstractArray{NF,3},
                             args...) where NF
@@ -15,7 +15,7 @@ end
 
 # TWO ARGUMENT FUNCTIONS
 for func_name in (:gradient_longitude!, :gradient_latitude!,
-                    :gridded!, :spectral!, :∇⁻²!, :add_tendencies!)
+                    :gridded!, :spectral!, :∇⁻²!, :∇²!, :add_tendencies!)
     @eval begin
         function $func_name(Out::AbstractArray{NF1,3},
                             In::AbstractArray{NF2,3},
@@ -44,6 +44,26 @@ for func_name in (:add_tendencies!,)
                 In1_layer = view(In1,:,:,k)
                 In2_layer = view(In2,:,:,k)
                 $func_name(Out_layer,In1_layer,In2_layer,args...)
+            end
+        end
+    end
+end
+
+# THREE ARGUMENT FUNCTIONS
+for func_name in (:bernoulli_potential!,)
+    @eval begin
+        function $func_name(Out::AbstractArray{NF,3},
+                            In1::AbstractArray{NF,3},
+                            In2::AbstractArray{NF,3},
+                            In3::AbstractArray{NF,2},
+                            args...) where NF
+            
+            for k in 1:size(Out)[end]
+                Out_layer = view(Out,:,:,k)
+                In1_layer = view(In1,:,:,k)
+                In2_layer = view(In2,:,:,k)
+                In3_layer = view(In3,:,:)
+                $func_name(Out_layer,In1_layer,In2_layer,In3_layer,args...)
             end
         end
     end

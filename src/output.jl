@@ -67,7 +67,7 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables, # output grid va
     # pressure is only used for ShallowWaterModel and PrimitiveEquationModel
     if typeof(M) <: ShallowWaterModel || typeof(M) <: PrimitiveEquationModel
         var_pres    = NcVar("pres",[dim_lon,dim_lat,dim_time],t=Float32,compress=compression_level,
-                atts=Dict("long_name"=>"surface pressure","units"=>"Pa","missing_value"=>-999999f0))
+                atts=Dict("long_name"=>"interface displacement","units"=>"m","missing_value"=>-999999f0))
     end
 
     # temperature and humidity only used for PrimitiveEquationModel
@@ -114,7 +114,7 @@ function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf
                                 feedback::Feedback,                     # feedback struct to increment output counter
                                 time_sec::Int,                          # model time [s] for output
                                 diagn::DiagnosticVariables,             # all diagnostic variables
-                                M::BarotropicModel)                     # all parameters
+                                M::ModelSetup)                          # all parameters
 
     @unpack counter = feedback.progress_meter
     isnothing(netcdf_file) && return nothing                            # escape immediately for no netcdf output
@@ -134,7 +134,7 @@ end
 function write_netcdf_variables!(   i_out::Integer,
                                     netcdf_file::NcFile,
                                     diagn::DiagnosticVariables,
-                                    M::ModelSetup)
+                                    M::BarotropicModel)
 
     # CONVERT TO FLOAT32 FOR OUTPUT
     @unpack u_grid,v_grid,vor_grid = diagn.grid_variables
@@ -155,4 +155,32 @@ function write_netcdf_variables!(   i_out::Integer,
     NetCDF.putvar(netcdf_file,"u",u_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"v",v_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+end
+
+function write_netcdf_variables!(   i_out::Integer,
+                                    netcdf_file::NcFile,
+                                    diagn::DiagnosticVariables,
+                                    M::ShallowWaterModel)
+
+    # CONVERT TO FLOAT32 FOR OUTPUT
+    @unpack u_grid,v_grid,vor_grid,pres_grid = diagn.grid_variables
+    u_output = convert.(Float32,u_grid)
+    v_output = convert.(Float32,v_grid)
+    vor_output = convert.(Float32,vor_grid)
+    pres_output = convert.(Float32,pres_grid)
+
+    # UNSCALE SCALED VARIABLES
+    vor_output ./= M.geospectral.geometry.radius_earth
+
+    # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
+    @unpack keepbits = M.parameters
+    for var in (u_output,v_output,vor_output,pres_output)
+        round!(var,keepbits)
+    end
+
+    # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
+    NetCDF.putvar(netcdf_file,"u",u_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"v",v_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"pres",pres_output,start=[1,1,i_out],count=[-1,-1,1])
 end

@@ -277,7 +277,7 @@ function curl_vorticity_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic var
     gradient_longitude!(∂vω_∂lon,vω)                    # 1st component of ∇×(uv(ζ+f))
     gradient_latitude!( ∂uω_∂lat,uω,S,flipsign=true)    # 2nd component of ∇×(uv(ζ+f))
     
-    add_tendencies!(div_tend,∂uω_∂lon,∂vω_∂lat)         # evaluate after bernoulli_potential!
+    add_tendencies!(div_tend,∂vω_∂lon,∂uω_∂lat)         # evaluate after bernoulli_potential!
 end
 
 function vorticity_fluxes!( uω::AbstractMatrix{NF},     # Output: u*(vor+coriolis) in grid space
@@ -315,15 +315,15 @@ function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables
     @unpack pres_tend = D.tendencies
     @unpack u_grid, v_grid, pres_grid = D.grid_variables
     @unpack uh, vh, uh_grid, vh_grid = D.intermediate_variables
-    @unpack ∂uh_∂lon, ∂vh_∂lon = D.intermediate_variables
+    @unpack ∂uh_∂lon, ∂vh_∂lat = D.intermediate_variables
     @unpack orography = B
     S = G.spectral_transform
 
     @unpack nlon, nlat = G.geometry
-    @boundscheck size(pres_grid) == (lon,nlat) || throw(BoundsError)
+    @boundscheck size(pres_grid) == (nlon,nlat) || throw(BoundsError)
     @boundscheck size(pres_grid) == size(orography) || throw(BoundsError)
-    @boundscheck size(uh_grid) == size(u) || throw(BoundsError)
-    @boundscheck size(vh_grid) == size(v) || throw(BoundsError)
+    @boundscheck size(uh_grid) == size(u_grid) || throw(BoundsError)
+    @boundscheck size(vh_grid) == size(v_grid) || throw(BoundsError)
 
     H₀ = convert(NF,H₀)
 
@@ -335,8 +335,8 @@ function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables
     @inbounds for j in 1:nlat
         for i in 1:nlon
             h = pres_grid[i,j] + H₀ - orography[i,j]    # h = η + H₀ - orography
-            uh_grid[i,j] = u[i,j]*h                     # = uh
-            vh_grid[i,j] = v[i,j]*h                     # = vh
+            uh_grid[i,j] = u_grid[i,j]*h                # = uh
+            vh_grid[i,j] = v_grid[i,j]*h                # = vh
         end
     end
 
@@ -345,7 +345,11 @@ function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables
 
     gradient_longitude!(∂uh_∂lon,uh,  flipsign=true)    # 1st component of -∇⋅(uh)
     gradient_latitude!( ∂vh_∂lat,vh,S,flipsign=true)    # 2nd component of -∇⋅(uh)
-    add_tendencies!(pres_tend,∂uh_∂lon,∂vh_∂lat)        # add
+
+    ∂uh_∂lon_surf = view(∂uh_∂lon,:,:,1)                # create views of surface layer
+    ∂vh_∂lat_surf = view(∂vh_∂lat,:,:,1)
+
+    add_tendencies!(pres_tend,∂uh_∂lon_surf,∂vh_∂lat_surf)
 end
 
 """
@@ -393,8 +397,8 @@ function bernoulli_potential!(  D::DiagnosticVariables{NF}, # all diagnostic var
     spectral!(bernoulli,bernoulli_grid,S)                           # to spectral space
 
     # write directly in div_tend, ie bernoulli potential has to be the first tendency
-    ∇²!(div_tend,bernoulli)                                         # = ∇²(1/2(u^2 + v^2) + gη)
-    flipsign(div_tend)                                              # = -∇²(1/2(u^2 + v^2) + gη) on RHS
+    ∇²!(div_tend,bernoulli,S)                                       # = ∇²(1/2(u^2 + v^2) + gη)
+    flipsign!(div_tend)                                              # = -∇²(1/2(u^2 + v^2) + gη) on RHS
 end
 
 """
@@ -453,7 +457,7 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
                     ) where NF
     
     @unpack vor, div, pres = progn                  # relative vorticity, divergence, pressure
-    @unpack vor_grid, div_grid, u_grid, v_grid = diagn.grid_variables
+    @unpack vor_grid, div_grid, u_grid, v_grid, pres_grid = diagn.grid_variables
     @unpack stream_function, coslat_u, coslat_v, velocity_potential = diagn.intermediate_variables
     
     G = M.geospectral.geometry
@@ -461,7 +465,7 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
 
     vor_lf = view(vor,:,:,lf,:)         # pick leapfrog index without memory allocation
     div_lf = view(div,:,:,lf,:)
-    pres_lf = view(pres,:,:,lf,:)       
+    pres_lf = view(pres,:,:,lf)       
 
     gridded!(vor_grid,vor_lf,S)         # get vorticity on grid from spectral vor
     gridded!(div_grid,div_lf,S)         # get divergence on grid from spectral div

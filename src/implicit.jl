@@ -1,6 +1,6 @@
 struct Implicit{NF<:AbstractFloat}
     ξH₀::Vector{NF}
-    ξ∇²::Vector{NF}
+    ξg∇²::Vector{NF}
     div_impl::Vector{NF}
 end
 
@@ -19,61 +19,14 @@ function Implicit(  P::Parameters,
     # α = 0.5 evaluates at i+1 and i-1 (centered implicit)
     # α = 1   evaluates at i+1 (backward implicit)
 
-    ξ = 2implicit_α*Δt      # = [0,2Δt], time step within the [forward,backward] range for implicit terms
-    ξ∇² = ξ*eigen_values    # = -ξl(l+1)
-    ξH₀ = ξ*layer_thickness # = ξ*H₀
+    ξ = 2implicit_α*Δt              # = [0,2Δt], time step within [forward,backward] range for implicit terms
+    ξg∇² = ξ*gravity*eigen_values   # = -ξgl(l+1), gravity g, degree l of harmonics
+    ξH₀ = ξ*layer_thickness         # = ξ*H₀
 
     # (inverse of) implicit denominator for divergence tendency correction (inverse)
-    div_impl = 1 ./ (1 - ξH₀*ξ∇²)   # = 1/(1+l(l+1)*ξ²H₀)
+    div_impl = 1 ./ (1 .- ξH₀*ξg∇²) # = 1/(1+l(l+1)*ξ²gH₀)
 
-    return Implicit{NF}([ξH₀],ξ∇²,div_impl)
-end
-
-initialize_implicit!(Δt::Real,M::BarotropicModel{NF}) where NF = nothing
-
-function initialize_implicit!(  Δt::Real,                   # time step to update implicit terms with
-                                M::ShallowWaterModel{NF}    # update Implicit struct in M
-                                ) where NF
-
-    @unpack implicit_α, layer_thickness = M.parameters
-    @unpack eigen_values = M.geospectral.spectral_transform
-    @unpack ξH₀,ξ∇²,div_impl = M.implicit
-
-    ξ = convert(NF,2implicit_α*Δt)  # create a new implicit timestep ξ = 2αΔt based on input Δt
-    ξH₀[1] = convert(NF,ξ*layer_thickness)
-
-    @inbounds for i in eachindex(ξ∇²,div_impl,eigen_values)
-        ξ∇²[i] = ξ*eigenvalues[i]
-        div_impl[i] = inv(1 - ξH₀[1]*ξ∇²[i])
-    end
-end
-
-function implicit_correction!(  diagn::DiagnosticVariables{NF},
-                                progn::PrognosticVariables{NF},
-                                M::ShallowWaterModel{NF}
-                                ) where NF
-    
-    @unpack div,pres = progn
-    @unpack div_tend, pres_tend = diagn.tendencies
-    @unpack ξH₀,ξ∇²,div_impl = M.implicit
-    @unpack lmax,mmax = M.geospectral.spectral_transform
-    @unpack implicit_α, layer_thickness = M.parameters
-
-    @boundscheck (lmax+1,mmax+1) == size(div)[1:2] || throw(BoundsError)
-    @boundscheck (lmax+1,mmax+1) == size(div_tend)[1:2] || throw(BoundsError)
-    @boundscheck size(div) == size(pres) || throw(BoundsError)
-    @boundscheck size(div_tend) == size(pres_tend) || throw(BoundsError)
-
-    k = 1       # only one vertical level for shallow water model
-    @inbounds for m in 1:mmax+1
-        for l in m:lmax+1
-            G_div = div_tend[l,m,k] - ξ∇²[l]*(pres[l,m,1] - pres[l,m,2])
-            G_η  = pres_tend[l,m,k] - ξH₀[1]*(div[l,m,1,k] - div[l,m,2,k])
-            δdiv = (G_div - ξ∇²[l]*Gη)*div_impl[l]
-            div_tend[l,m,k] = δdiv
-            pres_tend[l,m,k] = G_η - ξH₀[1]*δdiv
-        end
-    end
+    return Implicit{NF}([ξH₀],ξg∇²,div_impl)
 end
 
 # struct Implicit{M1<:AbstractMatrix, M2<:AbstractMatrix, A<:AbstractArray, V<:AbstractVector}

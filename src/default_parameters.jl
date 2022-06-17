@@ -97,9 +97,6 @@ The default values of the keywords define the default model setup.
     output_vars::Vector{String}=["u","v","T","humid","logp0"]
     compression_level::Int=3    # 1=low but fast, 9=high but slow
     keepbits::Int=10            # mantissa bits to keep for every variable
-
-    # TODO assert not allowed parameter values
-    @assert α in [0,0.5,1] "Only semi-implicit α = 0, 0.5 or 1 allowed."
 end
 
 function nlev_default(model::Symbol)

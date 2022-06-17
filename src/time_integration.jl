@@ -73,7 +73,7 @@ function first_timesteps!(  progn::PrognosticVariables{NF}, # all prognostic var
     time_sec = 0    # overall time counter in seconds using Int64 for error free accumulation
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
-    initialize_implicit!(half*Δt,M)     # update precomputed implicit terms with time step Δt/2
+    initialize_implicit!(Δt/2,M)        # update precomputed implicit terms with time step Δt/2
     lf1 = 1                             # without Robert+William's filter
     lf2 = 1                             # evaluates all tendencies at t=0,
                                         # the first leapfrog index (=>Euler forward)
