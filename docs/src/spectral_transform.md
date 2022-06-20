@@ -26,9 +26,10 @@ For an interactive visualisation of the spherical harmonics, see
 [here](https://justinwillmert.com/posts/2020/plots-of-the-spherical-harmonics-eigenmodes/).
 
 !!! info "Latitudes versus colatitudes"
-    The spherical transforms in SpeedyWeather.jl use colatitudes ``\theta = (0,\pi)`` (north to south) but the dynamical core
-    uses latitudes ``\theta = (-\pi/2,\pi/2)`` (south to north). However, all arrays are always sorted south to north such that
-    `[i,1]` will access the southern-most grid points. Note: This may change in the future for consistency. 
+    The spherical transforms in SpeedyWeather.jl use colatitudes ``\theta = (0,\pi)`` (0 at the north pole)
+    but the dynamical core uses latitudes ``\theta = (-\pi/2,\pi/2)`` (``\pi/2`` at the north pole).
+    However, all arrays are always sorted north to south such that `[i,1]` will access the northern-most grid points.
+    Note: We may also use latitudes in the spherical harmonic transfom in the future for consistency. 
 
 ## Synthesis (spectral to grid)
 
@@ -168,7 +169,7 @@ and the zonal and meridional velocity components ``u,v`` as an example.
 ```math
 \begin{aligned}
 u &= -\frac{1}{R}\frac{\partial \Psi}{\partial \theta} \\
-v &= \frac{1}{R \cos(\theta)}\frac{\partial \Psi}{\partial \phi} \\
+v &= \frac{1}{R \cos(\theta)}\frac{\partial \Psi}{\partial \phi}
 \end{aligned}
 ```
 
@@ -178,14 +179,14 @@ velocity ``v`` is the zonal gradient of ``\Psi``. The zonal gradient scales with
 longitudes converge towards the poles (note that ``\theta`` describes latitudes here, defintions using colatitudes
 replace the ``\cos`` with a ``\sin``.)
 
-### Zonal derivative
+### Zonal derivative
 
 The zonal derivative of a field ``\Psi`` in spectral space is the zonal derivative of all its respective
 spherical harmonics ``\Psi_{lm}(\phi,\theta)``.
 
 ```math
-v_{lm} = \frac{1}{R \cos(\theta)} \frac{\partial}{\partial \phi} \left( \lambda_l^m(\cos\theta) e^{im\phi} \right)
-  = \frac{im}{R \cos(\theta)} \lambda_l^m(\cos\theta) e^{im\phi} = \frac{im}{R \cos(\theta)} \Psi_{lm}
+v_{lm} = \frac{1}{R \cos(\theta)} \frac{\partial}{\partial \phi} \left( \lambda_l^m(\cos\theta) e^{im\phi} \right) =
+\frac{im}{R \cos(\theta)} \lambda_l^m(\cos\theta) e^{im\phi} = \frac{im}{R \cos(\theta)} \Psi_{lm}
 ```
 
 So for every spectral harmonic, ``\cos(\theta)v_{lm}`` is obtained from ``\Psi_{lm}`` via a multiplication
