@@ -68,6 +68,8 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables, # output grid va
     if typeof(M) <: ShallowWaterModel || typeof(M) <: PrimitiveEquationModel
         var_pres    = NcVar("pres",[dim_lon,dim_lat,dim_time],t=Float32,compress=compression_level,
                 atts=Dict("long_name"=>"interface displacement","units"=>"m","missing_value"=>-999999f0))
+        var_div     = NcVar("div",[dim_lon,dim_lat,dim_lev,dim_time],t=Float32,compress=compression_level,
+                atts=Dict("long_name"=>"divergence","units"=>"1/s","missing_value"=>-999999f0))
     end
 
     # temperature and humidity only used for PrimitiveEquationModel
@@ -85,12 +87,12 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables, # output grid va
     if typeof(M) <: BarotropicModel                 # output only u,v,vor
         netcdf_file = NetCDF.create(joinpath(run_path,file_name),[var_time,var_u,var_v,var_vor],
                         mode=NetCDF.NC_NETCDF4)
-    elseif typeof(M) <: ShallowWaterModel           # output also pressure
-        netcdf_file = NetCDF.create(joinpath(run_path,file_name),[var_time,var_u,var_v,var_vor,var_pres],
+    elseif typeof(M) <: ShallowWaterModel           # output also divergence and pressure
+        netcdf_file = NetCDF.create(joinpath(run_path,file_name),[var_time,var_u,var_v,var_vor,var_div,var_pres],
                         mode=NetCDF.NC_NETCDF4)
     elseif typeof(M) <: PrimitiveEquationModel      # output also temperature and humidity
         netcdf_file = NetCDF.create(joinpath(run_path,file_name),
-                        [var_time,var_u,var_v,var_vor,var_pres,var_temp,var_humid],mode=NetCDF.NC_NETCDF4)
+                        [var_time,var_u,var_v,var_vor,var_div,var_pres,var_temp,var_humid],mode=NetCDF.NC_NETCDF4)
     end
 
     # WRITE INITIAL CONDITIONS TO FILE
@@ -163,24 +165,27 @@ function write_netcdf_variables!(   i_out::Integer,
                                     M::ShallowWaterModel)
 
     # CONVERT TO FLOAT32 FOR OUTPUT
-    @unpack u_grid,v_grid,vor_grid,pres_grid = diagn.grid_variables
+    @unpack u_grid,v_grid,vor_grid,div_grid,pres_grid = diagn.grid_variables
     u_output = convert.(Float32,u_grid)
     v_output = convert.(Float32,v_grid)
     vor_output = convert.(Float32,vor_grid)
+    div_output = convert.(Float32,div_grid)
     pres_output = convert.(Float32,pres_grid)
 
     # UNSCALE SCALED VARIABLES
     vor_output ./= M.geospectral.geometry.radius_earth
+    div_output ./= M.geospectral.geometry.radius_earth
 
     # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
     @unpack keepbits = M.parameters
-    for var in (u_output,v_output,vor_output,pres_output)
+    for var in (u_output,v_output,vor_output,div_output,pres_output)
         round!(var,keepbits)
     end
 
     # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
-    NetCDF.putvar(netcdf_file,"u",u_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
-    NetCDF.putvar(netcdf_file,"v",v_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"u",  u_output,  start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"v",  v_output,  start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    NetCDF.putvar(netcdf_file,"div",div_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"pres",pres_output,start=[1,1,i_out],count=[-1,-1,1])
 end
