@@ -49,7 +49,20 @@ function initial_conditions(M::Union{BarotropicModel,ShallowWaterModel})
         end
 
         # make it less symmetric
-        progn.vor[15,1:14,1,:] .+= 5e-6*randn(Complex{P.NF},14,nlev)
+        progn.vor[15,1:14,1,:] .+= 3e-6*randn(Complex{P.NF},14,nlev)
+    
+    elseif initial_conditions == :barotropic_divergence
+        progn = initialize_from_rest(M)
+
+        P = M.parameters    # unpack and rename
+        G = M.geospectral
+
+        @unpack nlon, nlat, nlev = G.geometry
+        @unpack latd, lon, coslat, sinlat, radius_earth = G.geometry
+        @unpack lmax, mmax = G.spectral_transform
+
+        progn.div[5,4,1,1] = 2e-5
+        progn.vor[15,1:14,1,:] .+= 3e-6*randn(ComplexF64,14,nlev)
 
     elseif initial_conditions == :restart
         progn = initialize_from_file(M)         # TODO this is not implemented yet
@@ -59,6 +72,7 @@ function initial_conditions(M::Union{BarotropicModel,ShallowWaterModel})
 
     # SCALING
     progn.vor .*= M.geospectral.geometry.radius_earth
+    progn.div .*= M.geospectral.geometry.radius_earth
 
     return progn
 end
@@ -95,7 +109,7 @@ function initialize_from_rest(M::ShallowWaterModel)
     # conversion to type NF later when creating a PrognosticVariables struct
     vor     = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # vorticity
     div     = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # divergence
-    pres    = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog)       # logarithm of surface pressure
+    pres    = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog)       # interface displacement
 
     # dummy arrays for the rest, not used in this ModelSetup
     temp    = zeros(Complex{Float64},1,1,1,1)

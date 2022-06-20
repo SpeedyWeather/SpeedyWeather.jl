@@ -1,6 +1,8 @@
 struct Implicit{NF<:AbstractFloat}
     ξH₀::Vector{NF}
+    ξRH₀::Vector{NF}
     ξg∇²::Vector{NF}
+    ξgR∇²::Vector{NF}
     div_impl::Vector{NF}
 end
 
@@ -9,7 +11,7 @@ function Implicit(  P::Parameters,
                     G::GeoSpectral{NF}
                     ) where NF
     
-    @unpack Δt,gravity = C                          # time step Δt (scaled), gravity g [m/s²]
+    @unpack Δt,gravity,radius_earth = C             # time step Δt (scaled), gravity g [m/s²], radius [m]
     @unpack implicit_α = P                          # implicit time step fraction between i-1 and i+1
     @unpack eigen_values = G.spectral_transform     # = -(l(l+1)), degree l of harmonics (0-based)
     @unpack layer_thickness = P                     # = H₀, layer thickness at rest without mountains
@@ -21,12 +23,14 @@ function Implicit(  P::Parameters,
 
     ξ = 2implicit_α*Δt              # = [0,2Δt], time step within [forward,backward] range for implicit terms
     ξg∇² = ξ*gravity*eigen_values   # = -ξgl(l+1), gravity g, degree l of harmonics
-    ξH₀ = ξ*layer_thickness         # = ξ*H₀
+    ξgR∇² = ξg∇²*radius_earth       # 
+    ξH₀ = ξ*layer_thickness         #
+    ξRH₀ = ξH₀*radius_earth         #
 
     # (inverse of) implicit denominator for divergence tendency correction (inverse)
     div_impl = 1 ./ (1 .- ξH₀*ξg∇²) # = 1/(1+l(l+1)*ξ²gH₀)
 
-    return Implicit{NF}([ξH₀],ξg∇²,div_impl)
+    return Implicit{NF}([ξH₀],[ξRH₀],ξg∇²,ξgR∇²,div_impl)
 end
 
 # struct Implicit{M1<:AbstractMatrix, M2<:AbstractMatrix, A<:AbstractArray, V<:AbstractVector}

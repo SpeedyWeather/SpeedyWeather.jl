@@ -276,7 +276,7 @@ function curl_vorticity_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic var
 
     gradient_longitude!(∂vω_∂lon,vω)                    # 1st component of ∇×(uv(ζ+f))
     gradient_latitude!( ∂uω_∂lat,uω,S,flipsign=true)    # 2nd component of ∇×(uv(ζ+f))
-    
+
     add_tendencies!(div_tend,∂vω_∂lon,∂uω_∂lat)         # evaluate after bernoulli_potential!
 end
 
@@ -318,12 +318,14 @@ function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables
     @unpack ∂uh_∂lon, ∂vh_∂lat = D.intermediate_variables
     @unpack orography = B
     S = G.spectral_transform
+    @unpack coslat = G.geometry
 
     @unpack nlon, nlat = G.geometry
     @boundscheck size(pres_grid) == (nlon,nlat) || throw(BoundsError)
     @boundscheck size(pres_grid) == size(orography) || throw(BoundsError)
     @boundscheck size(uh_grid) == size(u_grid) || throw(BoundsError)
     @boundscheck size(vh_grid) == size(v_grid) || throw(BoundsError)
+    @boundscheck length(coslat) == nlat || throw(BoundsError) 
 
     H₀ = convert(NF,H₀)
 
@@ -332,11 +334,13 @@ function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables
     # layer thickness h = η + H, H is the layer thickness at rest
     # H = H₀ - orography, H₀ is the layer thickness without mountains
 
+    k = 1
     @inbounds for j in 1:nlat
         for i in 1:nlon
-            h = pres_grid[i,j] + H₀ - orography[i,j]    # h = η + H₀ - orography
-            uh_grid[i,j] = u_grid[i,j]*h                # = uh
-            vh_grid[i,j] = v_grid[i,j]*h                # = vh
+            # h = η + H₀ - orography
+            hcoslat = coslat[j]*(pres_grid[i,j,k] + H₀ - orography[i,j])
+            uh_grid[i,j,k] = u_grid[i,j,k]*hcoslat      # = uh
+            vh_grid[i,j,k] = v_grid[i,j,k]*hcoslat      # = vh
         end
     end
 
@@ -368,18 +372,11 @@ function bernoulli_potential!(  B::AbstractMatrix{NF},  # Output: Bernoulli pote
                                 g::Real                 # gravity
                                 ) where {NF<:AbstractFloat}
     
-    nlon,nlat = size(B)
-    @boundscheck (nlon,nlat) == size(u) || throw(BoundsError)
-    @boundscheck (nlon,nlat) == size(v) || throw(BoundsError)
-    @boundscheck (nlon,nlat) == size(η) || throw(BoundsError)
-
     one_half = convert(NF,0.5)
     gravity = convert(NF,g)
 
-    @inbounds for j in 1:nlat
-        for i in 1:nlon
-            B[i,j] = one_half*(u[i,j]^2 + v[i,j]^2) + gravity*η[i,j]
-        end
+    @inbounds for i in eachindex(B,u,v,η)
+        B[i] = one_half*(u[i]^2 + v[i]^2) + gravity*η[i]
     end
 end
 
@@ -398,7 +395,7 @@ function bernoulli_potential!(  D::DiagnosticVariables{NF}, # all diagnostic var
 
     # write directly in div_tend, ie bernoulli potential has to be the first tendency
     ∇²!(div_tend,bernoulli,S)                                       # = ∇²(1/2(u^2 + v^2) + gη)
-    flipsign!(div_tend)                                              # = -∇²(1/2(u^2 + v^2) + gη) on RHS
+    flipsign!(div_tend)                                             # = -∇²(1/2(u^2 + v^2) + gη) on RHS
 end
 
 """
