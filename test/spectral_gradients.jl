@@ -2,7 +2,7 @@
 
     for NF in (Float32,Float64)
 
-        p,d,m = initialize_speedy(NF,initial_conditions=:rest);
+        p,d,m = initialize_speedy(NF,initial_conditions=:rest)
 
         fill!(p.vor,0)                  # make sure vorticity and divergence are 0
         fill!(p.div,0)
@@ -31,7 +31,7 @@ end
         p,d,m = initialize_speedy(  NF,
                                     model=:shallowwater,
                                     initial_conditions=:rest,
-                                    layer_thickness=0);
+                                    layer_thickness=0)
 
         fill!(p.vor,0)                  # make sure vorticity and divergence are 0
         fill!(p.div,0)
@@ -61,7 +61,7 @@ end
         p,d,m = initialize_speedy(  NF,
                                     model=:shallowwater,
                                     initial_conditions=:rest,
-                                    layer_thickness=0);
+                                    layer_thickness=0)
 
         fill!(p.vor,0)                  # make sure vorticity and divergence are 0
         fill!(p.div,0)
@@ -83,5 +83,51 @@ end
         SpeedyWeather.curl_vorticity_fluxes!(d,m.geospectral)
 
         @test all(abs.(d.tendencies.div_tend) .< sqrt(eps(NF)))
+    end
+end
+
+@testset "Vor,Div -> u,v -> vor,div" begin
+    @testset for NF in (Float32,Float64)
+
+        p,d,m = initialize_speedy(  NF,
+                                    model=:shallowwater,
+                                    initial_conditions=:rest,
+                                    layer_thickness=0)
+
+        vor0 = zero(p.vor[:,:,1,1])
+        div0 = zero(p.div[:,:,1,1])
+
+        fill!(p.vor,0)                  # make sure vorticity and divergence are 0
+        fill!(p.div,0)
+        fill!(d.tendencies.vor_tend,0)                  # make sure vorticity and divergence are 0
+        fill!(d.tendencies.div_tend,0)
+
+        vor0[5,4] = 1                   # create initial conditions
+        div0[8,7] = 1
+
+        p.vor[:,:,1,1] .= vor0
+        p.div[:,:,1,1] .= div0
+        SpeedyWeather.gridded!(d,p,m)   # get corresponding irrotational u_grid, v_grid
+
+        # check we've actually created non-zero u,v
+        @test all(d.grid_variables.u_grid .!= 0)
+        @test all(d.grid_variables.v_grid .!= 0)
+
+        G = m.geospectral.geometry
+        SpeedyWeather.unscale_coslat!(d.grid_variables.u_grid,G)
+        SpeedyWeather.unscale_coslat!(d.grid_variables.u_grid,G)
+        SpeedyWeather.unscale_coslat!(d.grid_variables.v_grid,G)
+        SpeedyWeather.unscale_coslat!(d.grid_variables.v_grid,G)
+
+        S = m.geospectral.spectral_transform
+        SpeedyWeather.spectral!(d.intermediate_variables.coslat_u,d.grid_variables.u_grid,S)
+        SpeedyWeather.spectral!(d.intermediate_variables.coslat_v,d.grid_variables.v_grid,S)
+
+        SpeedyWeather.gradient_longitude!(d.tendencies.vor_tend,d.intermediate_variables.coslat_v)
+        SpeedyWeather.gradient_latitude!( d.tendencies.vor_tend,d.intermediate_variables.coslat_u,S,flipsign=true,add=true)
+
+        for i in eachindex(vor0)
+            @test d.tendencies.vor_tend[i] ≈ vor0[i] rtol=sqrt(eps(NF)) atol=1e-5
+        end
     end
 end
