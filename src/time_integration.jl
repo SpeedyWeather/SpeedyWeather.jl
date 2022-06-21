@@ -262,7 +262,7 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
     time_sec = first_timesteps!(progn,diagn,M,feedback)
 
     # MAIN LOOP
-    for i in 1:n_timesteps-1            # first Δt time step in first_timesteps!
+    for i in 2:n_timesteps              # first Δt time step in first_timesteps!
         time_sec += Δt_sec
         timestep!(progn,diagn,2Δt,M)
 

@@ -253,16 +253,14 @@ function vorticity_advection!(  D::DiagnosticVariables{NF}, # all diagnostic var
     # STEP 1-3: Abs vorticity, velocity times abs vort
     vorticity_fluxes!(uω_grid,vω_grid,u_grid,v_grid,vor_grid,G.geometry)
 
-    spectral!(uω,uω_grid,S)                     # STEP 4: to spectral space
+    spectral!(uω,uω_grid,S)
     spectral!(vω,vω_grid,S)
 
-    gradient_longitude!(∂uω_∂lon,uω)            # STEP 5: spectral gradients
-    gradient_latitude!( ∂vω_∂lat,vω,S)
+    # flipsign as RHS is negative ∂ζ/∂t = -∇⋅(uv*(ζ+f))
+    gradient_longitude!(∂uω_∂lon,uω,flipsign=true)
+    gradient_latitude!( ∂vω_∂lat,vω,S,flipsign=true)
 
-    flipsign!(∂uω_∂lon)                         # because ∂ζ/∂t = -∇⋅(uv*(ζ+f))       
-    flipsign!(∂vω_∂lat)
-
-    add_tendencies!(vor_tend,∂uω_∂lon,∂vω_∂lat) # STEP 6: Add tendencies
+    add_tendencies!(vor_tend,∂uω_∂lon,∂vω_∂lat)
 end
 
 function curl_vorticity_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables   
@@ -338,9 +336,9 @@ function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables
     @inbounds for j in 1:nlat
         for i in 1:nlon
             # h = η + H₀ - orography
-            hcoslat = coslat[j]*(pres_grid[i,j,k] + H₀ - orography[i,j])
-            uh_grid[i,j,k] = u_grid[i,j,k]*hcoslat      # = uh
-            vh_grid[i,j,k] = v_grid[i,j,k]*hcoslat      # = vh
+            h = pres_grid[i,j,k] + H₀ - orography[i,j]
+            uh_grid[i,j,k] = u_grid[i,j,k]*h      # = uh
+            vh_grid[i,j,k] = v_grid[i,j,k]*h      # = vh
         end
     end
 
@@ -356,7 +354,7 @@ function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables
     add_tendencies!(pres_tend,∂uh_∂lon_surf,∂vh_∂lat_surf)
 end
 
-"""
+fi"""
     bernoulli_potential!(   B::AbstractMatrix{NF},  # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
                             u::AbstractMatrix{NF},  # zonal velocity
                             v::AbstractMatrix{NF},  # meridional velocity
@@ -431,8 +429,8 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     gridded!(u_grid,coslat_u,S)     # get u,v on grid from spectral
     gridded!(v_grid,coslat_v,S)
 
-    unscale_coslat!(u_grid,G)       # undo the coslat scaling from gradients     
-    unscale_coslat!(v_grid,G)
+    # unscale_coslat!(u_grid,G)       # undo the coslat scaling from gradients     
+    # unscale_coslat!(v_grid,G)
 
     return nothing
 end
@@ -482,8 +480,8 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     gridded!(u_grid,coslat_u,S)     # get u,v on grid from spectral
     gridded!(v_grid,coslat_v,S)
 
-    unscale_coslat!(u_grid,G)       # undo the coslat scaling from gradients     
-    unscale_coslat!(v_grid,G)
+    # unscale_coslat!(u_grid,G)       # undo the coslat scaling from gradients     
+    # unscale_coslat!(v_grid,G)
 
     return nothing
 end
