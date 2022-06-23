@@ -280,8 +280,8 @@ end
 
 function vorticity_fluxes!( uω::AbstractMatrix{NF},     # Output: u*(vor+coriolis) in grid space
                             vω::AbstractMatrix{NF},     # Output: v*(vor+coriolis) in grid space
-                            u::AbstractMatrix{NF},      # Input: zonal velocity in grid space
-                            v::AbstractMatrix{NF},      # Input: meridional velocity in grid space
+                            u::AbstractMatrix{NF},      # Input: zonal velocity in grid space (*coslat)
+                            v::AbstractMatrix{NF},      # Input: meridional velocity in grid space (*coslat)
                             vor::AbstractMatrix{NF},    # Input: relative vorticity in grid space       
                             G::Geometry{NF}             # struct with precomputed geometry arrays
                             ) where {NF<:AbstractFloat} # number format NF
@@ -298,8 +298,8 @@ function vorticity_fluxes!( uω::AbstractMatrix{NF},     # Output: u*(vor+corio
     @inbounds for j in 1:nlat
         for i in 1:nlon
             ω = vor[i,j] + f_coriolis[j]    # = relative vorticity + coriolis
-            uω[i,j] = ω*u[i,j]              # = u(vor+f)
-            vω[i,j] = ω*v[i,j]              # = v(vor+f)
+            uω[i,j] = ω*u[i,j]              # = u(vor+f)*coslat
+            vω[i,j] = ω*v[i,j]              # = v(vor+f)*coslat
         end
     end
 end
@@ -337,8 +337,10 @@ function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables
         for i in 1:nlon
             # h = η + H₀ - orography
             h = pres_grid[i,j,k] + H₀ - orography[i,j]
-            uh_grid[i,j,k] = u_grid[i,j,k]*h      # = uh
-            vh_grid[i,j,k] = v_grid[i,j,k]*h      # = vh
+
+            # u,v_grid has coslat scaling included, so uh,vh_grid too
+            uh_grid[i,j,k] = u_grid[i,j,k]*h      # = uh*coslat
+            vh_grid[i,j,k] = v_grid[i,j,k]*h      # = vh*coslat
         end
     end
 
@@ -354,7 +356,7 @@ function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables
     add_tendencies!(pres_tend,∂uh_∂lon_surf,∂vh_∂lat_surf)
 end
 
-fi"""
+"""
     bernoulli_potential!(   B::AbstractMatrix{NF},  # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
                             u::AbstractMatrix{NF},  # zonal velocity
                             v::AbstractMatrix{NF},  # meridional velocity
@@ -426,10 +428,12 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     gradient_longitude!(coslat_v, stream_function)
     gradient_latitude!( coslat_u, stream_function, S, flipsign=true)
 
-    gridded!(u_grid,coslat_u,S)     # get u,v on grid from spectral
+    # transform to u,v on grid which are actually u,v_grid = u,v*coslat
+    gridded!(u_grid,coslat_u,S)
     gridded!(v_grid,coslat_v,S)
 
-    # unscale_coslat!(u_grid,G)       # undo the coslat scaling from gradients     
+    # unscaling would be done via
+    # unscale_coslat!(u_grid,G)    
     # unscale_coslat!(v_grid,G)
 
     return nothing
@@ -477,10 +481,12 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     gradient_longitude!(coslat_u, velocity_potential,    add=true)
     gradient_latitude!( coslat_v, velocity_potential, S, add=true)
 
-    gridded!(u_grid,coslat_u,S)     # get u,v on grid from spectral
+    # transform to u,v on grid which are actually u,v_grid = u,v*coslat
+    gridded!(u_grid,coslat_u,S)
     gridded!(v_grid,coslat_v,S)
 
-    # unscale_coslat!(u_grid,G)       # undo the coslat scaling from gradients     
+    # unscaling would be done via
+    # unscale_coslat!(u_grid,G)    
     # unscale_coslat!(v_grid,G)
 
     return nothing
