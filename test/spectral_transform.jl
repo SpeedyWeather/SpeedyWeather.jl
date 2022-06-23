@@ -88,7 +88,7 @@ end
 @testset "Transform: Geopotential" begin
 
     # Test for variable resolution
-    for trunc in spectral_resolutions[1:2]
+    @testset for trunc in spectral_resolutions[1:2]
         for NF in (Float64,Float32)
             P = Parameters(;NF,trunc)
             G = GeoSpectral(P)
@@ -106,6 +106,60 @@ end
             end
             for i in eachindex(geopot_surf_grid)
                 @test geopot_surf_grid[i] ≈ geopot_surf_grid2[i] rtol=30*sqrt(eps(NF))
+            end
+        end
+    end
+end
+
+@testset "Transform: with one more l" begin
+    for NF in (Float32,Float64)
+        p,d,m = initialize_speedy(  NF,
+                                    model=:shallowwater,
+                                    initial_conditions=:rest,
+                                    layer_thickness=0)
+
+        # make sure vorticity and divergence are 0
+        fill!(p.vor,0)
+        fill!(p.div,0)
+
+        # make sure vorticity and divergence are 0
+        fill!(d.tendencies.vor_tend,0)                  
+        fill!(d.tendencies.div_tend,0)
+
+        # create initial conditions
+        vor0 = zero(p.vor[:,:,1,1])
+        div0 = zero(p.div[:,:,1,1])
+        vor0[:,:] .= randn(Complex{NF},size(vor0)...)
+        div0[:,:] .= randn(Complex{NF},size(div0)...)
+
+        # remove non-zero entries in upper triangle
+        SpeedyWeather.spectral_truncation!(vor0)
+        SpeedyWeather.spectral_truncation!(div0)
+
+        p.vor[:,:,1,1] .= vor0
+        p.div[:,:,1,1] .= div0
+
+        # get corresponding irrotational u_grid, v_grid (incl *coslat scaling)
+        SpeedyWeather.gridded!(d,p,m)   
+
+        # check we've actually created non-zero u,v
+        @test all(d.grid_variables.u_grid .!= 0)
+        @test all(d.grid_variables.v_grid .!= 0)
+
+        lmax,mmax = size(vor0)      # 1-based maximum l,m
+        
+        @testset for lmax in (lmax,lmax+1)
+            println(lmax)
+
+            u = zeros(Complex{NF},lmax,mmax,1)
+            u_grid = zero(d.grid_variables.u_grid)
+
+            S = m.geospectral.spectral_transform
+            SpeedyWeather.spectral!(u,d.grid_variables.u_grid,S)
+            SpeedyWeather.gridded!(u_grid,u,S)
+
+            for i in eachindex(u_grid, d.grid_variables.u_grid)
+                @test u_grid[i] ≈ d.grid_variables.u_grid[i] rtol=30*sqrt(eps(NF))
             end
         end
     end
