@@ -49,7 +49,7 @@ function initial_conditions(M::Union{BarotropicModel,ShallowWaterModel})
         end
 
         # make it less symmetric
-        progn.vor[15,1:14,1,:] .+= 3e-6*randn(Complex{P.NF},14,nlev)
+        progn.vor[15,1:14,1,:] .+= 5e-6*randn(Complex{P.NF},14,nlev)
     
     elseif initial_conditions == :barotropic_divergence
         progn = initialize_from_rest(M)

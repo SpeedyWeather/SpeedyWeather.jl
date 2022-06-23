@@ -28,7 +28,7 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: co
     mmax = mmax_out - 1                 # 0-based max order m of harmonics
 
     @boundscheck abs(lmax_out-lmax_in) <= 1 || throw(BoundsError)
-    lmax = min(lmax_out,lmax_in) - 1    # 0-based max degree l of harmonics
+    lmax = lmax_in - 1                  # 0-based max degree l of harmonics
     output_larger = lmax_out - lmax_in
 
     if flipsign                     # used to get u from streamfunction Ψ (u ~ -∂Ψ/∂lat)
@@ -42,7 +42,7 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: co
     g = grad_y2[1,1]*Ψ[2,1]
     coslat_u[1,1] = add ? coslat_u[1,1] + g : g         # l=m=0 mode only with term 2
 
-    @inbounds for m in 1:mmax
+    for m in 1:mmax+1
         for l in max(2,m):lmax
             g = grad_y1[l,m]*Ψ[l-1,m] + grad_y2[l,m]*Ψ[l+1,m]
             coslat_u[l,m] = add ? coslat_u[l,m] + g : g
