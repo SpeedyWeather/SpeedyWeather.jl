@@ -145,6 +145,8 @@ function write_netcdf_variables!(   i_out::Integer,
     vor_output = convert.(Float32,vor_grid)
 
     # UNSCALE SCALED VARIABLES
+    unscale_coslat!(u_output,M.geospectral.geometry)
+    unscale_coslat!(v_output,M.geospectral.geometry)
     vor_output ./= M.geospectral.geometry.radius_earth
 
     # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
@@ -173,6 +175,8 @@ function write_netcdf_variables!(   i_out::Integer,
     pres_output = convert.(Float32,pres_grid)
 
     # UNSCALE SCALED VARIABLES
+    unscale_coslat!(u_output,M.geospectral.geometry)
+    unscale_coslat!(v_output,M.geospectral.geometry)
     vor_output ./= M.geospectral.geometry.radius_earth
     div_output ./= M.geospectral.geometry.radius_earth
 
