@@ -23,8 +23,8 @@ function Tendencies(G::GeoSpectral{NF}) where NF
     temp_tend   = zeros(Complex{NF},lmax,mmax,nlev)     # absolute Temperature
     pres_tend   = zeros(Complex{NF},lmax,mmax)          # logarithm of surface pressure
     humid_tend  = zeros(Complex{NF},lmax,mmax,nlev)     # specific humidity
-    u_tend      = zeros(NF,nlon,nlat,nlev)                  # zonal velocity
-    v_tend      = zeros(NF,nlon,nlat,nlev)                  # meridonal velocity
+    u_tend      = zeros(NF,nlon,nlat,nlev)              # zonal velocity
+    v_tend      = zeros(NF,nlon,nlat,nlev)              # meridonal velocity
 
     return Tendencies(vor_tend,div_tend,temp_tend,pres_tend,humid_tend,u_tend,v_tend)
 end
@@ -38,8 +38,8 @@ struct GridVariables{NF<:AbstractFloat}
     humid_grid          ::Array{NF,3}   # Gridpoint field of specific_humidity
     geopot_grid         ::Array{NF,3}   # Gridpoint field of geopotential
     # tr_grid             ::Array{NF,3}   # Gridpoint field of tracers
-    u_grid              ::Array{NF,3}   # Gridpoint field of zonal velocity
-    v_grid              ::Array{NF,3}   # Gridpoint field of meridional velocity
+    U_grid              ::Array{NF,3}   # Gridpoint field of zonal velocity *coslat [m/s]
+    V_grid              ::Array{NF,3}   # Gridpoint field of meridional velocity *coslat [m/s]
     temp_grid_anomaly   ::Array{NF,3}   # Gridpoint field of absolute temperature anomaly [K]
 end
 
@@ -57,13 +57,13 @@ function GridVariables(G::GeoSpectral{NF}) where NF
     humid_grid          = zeros(NF,nlon,nlat,nlev)  # specific humidity
     geopot_grid         = zeros(NF,nlon,nlat,nlev)  # geopotential
     # tr_grid            = zeros(NF,nlon,nlat,nlev)  # tracers
-    u_grid              = zeros(NF,nlon,nlat,nlev)  # zonal velocity
-    v_grid              = zeros(NF,nlon,nlat,nlev)  # meridonal velocity
+    U_grid              = zeros(NF,nlon,nlat,nlev)  # zonal velocity *coslat
+    V_grid              = zeros(NF,nlon,nlat,nlev)  # meridonal velocity *coslat
     temp_grid_anomaly   = zeros(NF,nlon,nlat,nlev)  # absolute temperature anolamy
 
     return GridVariables(vor_grid,div_grid,temp_grid,pres_grid,humid_grid,geopot_grid,
                         # tr_grid,
-                        u_grid,v_grid,temp_grid_anomaly)
+                        U_grid,V_grid,temp_grid_anomaly)
 end
 
 """
@@ -105,31 +105,31 @@ end
 struct IntermediateVariables{NF<:AbstractFloat}
 
     ### VORTICITY INVERSION
-    velocity_potential  ::Array{Complex{NF},3}
-    stream_function     ::Array{Complex{NF},3}
-    coslat_u            ::Array{Complex{NF},3}
-    coslat_v            ::Array{Complex{NF},3}
+    velocity_potential  ::Array{Complex{NF},3}      # = ϕ/R, scaled by 1/radius
+    stream_function     ::Array{Complex{NF},3}      # = ΨR, scaled by radius
+    coslat_u            ::Array{Complex{NF},3}      # = U = cosθ*u, zonal velocity *cos(latitude)
+    coslat_v            ::Array{Complex{NF},3}      # = V = cosθ*v, meridional velocity *cos(latitude)
 
     # VORTICITY ADVECTION
-    uω_grid         ::Array{NF,3}
-    vω_grid         ::Array{NF,3}
-    uω              ::Array{Complex{NF},3}
-    vω              ::Array{Complex{NF},3}
-    ∂uω_∂lon        ::Array{Complex{NF},3}
-    ∂vω_∂lat        ::Array{Complex{NF},3}
+    Uω_grid         ::Array{NF,3}                   # = U(ζ+f) on the grid
+    Vω_grid         ::Array{NF,3}                   # = V(ζ+f) on the grid
+    Uω              ::Array{Complex{NF},3}          # = U(ζ+f) in spectral space
+    Vω              ::Array{Complex{NF},3}          # = V(ζ+f) in spectral space
+    ∂Uω_∂lon        ::Array{Complex{NF},3}          # their zonal and
+    ∂Vω_∂lat        ::Array{Complex{NF},3}          # meridional derivatives
 
     # SHALLOW WATER
     bernoulli_grid  ::Array{NF,3}           # bernoulli potential on the grid = 1/2(u^2+v^2) + gη
     bernoulli       ::Array{Complex{NF},3}  # spectral bernoulli potential
-    ∂uω_∂lat        ::Array{Complex{NF},3}  # off-diagonal derivatives of vorticity fluxes
-    ∂vω_∂lon        ::Array{Complex{NF},3}
+    ∂Uω_∂lat        ::Array{Complex{NF},3}  # off-diagonal derivatives of vorticity fluxes
+    ∂Vω_∂lon        ::Array{Complex{NF},3}
 
-    uh_grid         ::Array{NF,3}           # volume flux u*h on grid
-    vh_grid         ::Array{NF,3}           # volume flux v*h on grid
-    uh              ::Array{Complex{NF},3}  # uh in spectral
-    vh              ::Array{Complex{NF},3}  # vh in spectral
-    ∂uh_∂lon        ::Array{Complex{NF},3}  # 1st component of ∇⋅(uv*h)
-    ∂vh_∂lat        ::Array{Complex{NF},3}  # 2nd component of ∇⋅(uv*h)
+    Uh_grid         ::Array{NF,3}           # volume flux U*h on grid
+    Vh_grid         ::Array{NF,3}           # volume flux V*h on grid
+    Uh              ::Array{Complex{NF},3}  # Uh in spectral
+    Vh              ::Array{Complex{NF},3}  # Vh in spectral
+    ∂Uh_∂lon        ::Array{Complex{NF},3}  # 1st component of ∇⋅(UV*h)
+    ∂Vh_∂lat        ::Array{Complex{NF},3}  # 2nd component of ∇⋅(UV*h)
 
     ###------Defined in surface_pressure_tendency!()
     u_mean             ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
@@ -175,25 +175,25 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
     coslat_v = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
     # VORTICITY ADVECTION
-    uω_grid  = zeros(NF,nlon,nlat,nlev)
-    vω_grid  = zeros(NF,nlon,nlat,nlev)
-    uω       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    vω       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    ∂uω_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    ∂vω_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    Uω_grid  = zeros(NF,nlon,nlat,nlev)
+    Vω_grid  = zeros(NF,nlon,nlat,nlev)
+    Uω       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    Vω       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    ∂Uω_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    ∂Vω_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
     # SHALLOW WATER
     bernoulli_grid  = zeros(NF,nlon,nlat,nlev)
     bernoulli       = zeros(Complex{NF},lmax+1,mmax+1,nlev)
-    ∂uω_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    ∂vω_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    ∂Uω_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    ∂Vω_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
-    uh_grid = zeros(NF,nlon,nlat,nlev)
-    vh_grid = zeros(NF,nlon,nlat,nlev)
-    uh = zeros(Complex{NF},lmax+1,mmax+1,nlev)
-    vh = zeros(Complex{NF},lmax+1,mmax+1,nlev)
-    ∂uh_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    ∂vh_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    Uh_grid = zeros(NF,nlon,nlat,nlev)
+    Vh_grid = zeros(NF,nlon,nlat,nlev)
+    Uh = zeros(Complex{NF},lmax+1,mmax+1,nlev)
+    Vh = zeros(Complex{NF},lmax+1,mmax+1,nlev)
+    ∂Uh_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    ∂Vh_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
     u_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint zonal velocity over all levels
     v_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint meridional velocity over all levels
@@ -222,11 +222,11 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
 
     return IntermediateVariables(   velocity_potential, stream_function,
                                     coslat_u, coslat_v,
-                                    uω_grid,vω_grid,
-                                    uω,vω,∂uω_∂lon,∂vω_∂lat,
+                                    Uω_grid,Vω_grid,
+                                    Uω,Vω,∂Uω_∂lon,∂Vω_∂lat,
                                     bernoulli_grid,bernoulli,
-                                    ∂uω_∂lat,∂vω_∂lon,
-                                    uh_grid,vh_grid,uh,vh,∂uh_∂lon,∂vh_∂lat,
+                                    ∂Uω_∂lat,∂Vω_∂lon,
+                                    Uh_grid,Vh_grid,Uh,Vh,∂Uh_∂lon,∂Vh_∂lat,
                                     u_mean,v_mean,div_mean,
                                     pres_gradient_spectral_x,pres_gradient_spectral_y,
                                     pres_gradient_grid_x,pres_gradient_grid_y,

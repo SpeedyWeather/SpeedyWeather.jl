@@ -245,22 +245,22 @@ function vorticity_advection!(  D::DiagnosticVariables{NF}, # all diagnostic var
                                 ) where {NF<:AbstractFloat}                                   
 
     S = G.spectral_transform
-    @unpack u_grid, v_grid, vor_grid = D.grid_variables
-    @unpack uω, vω, uω_grid,vω_grid = D.intermediate_variables
-    @unpack ∂uω_∂lon,∂vω_∂lat = D.intermediate_variables
+    @unpack U_grid, V_grid, vor_grid = D.grid_variables
+    @unpack Uω, Vω, Uω_grid, Vω_grid = D.intermediate_variables
+    @unpack ∂Uω_∂lon,∂Vω_∂lat = D.intermediate_variables
     @unpack vor_tend = D.tendencies
 
     # STEP 1-3: Abs vorticity, velocity times abs vort
-    vorticity_fluxes!(uω_grid,vω_grid,u_grid,v_grid,vor_grid,G.geometry)
+    vorticity_fluxes!(Uω_grid,Vω_grid,U_grid,V_grid,vor_grid,G.geometry)
 
-    spectral!(uω,uω_grid,S)
-    spectral!(vω,vω_grid,S)
+    spectral!(Uω,Uω_grid,S)
+    spectral!(Vω,Vω_grid,S)
 
     # flipsign as RHS is negative ∂ζ/∂t = -∇⋅(uv*(ζ+f))
-    gradient_longitude!(∂uω_∂lon,uω,flipsign=true)
-    gradient_latitude!( ∂vω_∂lat,vω,S,flipsign=true)
+    gradient_longitude!(∂Uω_∂lon,Uω,flipsign=true)
+    gradient_latitude!( ∂Vω_∂lat,Vω,S,flipsign=true)
 
-    add_tendencies!(vor_tend,∂uω_∂lon,∂vω_∂lat)
+    add_tendencies!(vor_tend,∂Uω_∂lon,∂Vω_∂lat)
 end
 
 function curl_vorticity_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables   
@@ -268,29 +268,29 @@ function curl_vorticity_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic var
                                 ) where {NF<:AbstractFloat}                                   
 
     S = G.spectral_transform
-    @unpack uω, vω = D.intermediate_variables
-    @unpack ∂uω_∂lat, ∂vω_∂lon = D.intermediate_variables
+    @unpack Uω, Vω = D.intermediate_variables
+    @unpack ∂Uω_∂lat, ∂Vω_∂lon = D.intermediate_variables
     @unpack div_tend = D.tendencies
 
-    gradient_longitude!(∂vω_∂lon,vω)                    # 1st component of ∇×(uv(ζ+f))
-    gradient_latitude!( ∂uω_∂lat,uω,S,flipsign=true)    # 2nd component of ∇×(uv(ζ+f))
+    gradient_longitude!(∂Vω_∂lon,Vω)                    # 1st component of ∇×(UV(ζ+f))
+    gradient_latitude!( ∂Uω_∂lat,Uω,S,flipsign=true)    # 2nd component of ∇×(UV(ζ+f))
 
-    add_tendencies!(div_tend,∂vω_∂lon,∂uω_∂lat)         # evaluate after bernoulli_potential!
+    add_tendencies!(div_tend,∂Vω_∂lon,∂Uω_∂lat)         # evaluate after bernoulli_potential!
 end
 
-function vorticity_fluxes!( uω::AbstractMatrix{NF},     # Output: u*(vor+coriolis) in grid space
-                            vω::AbstractMatrix{NF},     # Output: v*(vor+coriolis) in grid space
-                            u::AbstractMatrix{NF},      # Input: zonal velocity in grid space (*coslat)
-                            v::AbstractMatrix{NF},      # Input: meridional velocity in grid space (*coslat)
+function vorticity_fluxes!( Uω::AbstractMatrix{NF},     # Output: U*(vor+coriolis) in grid space
+                            Vω::AbstractMatrix{NF},     # Output: V*(vor+coriolis) in grid space
+                            U::AbstractMatrix{NF},      # Input: zonal velocity in grid space (*coslat)
+                            V::AbstractMatrix{NF},      # Input: meridional velocity in grid space (*coslat)
                             vor::AbstractMatrix{NF},    # Input: relative vorticity in grid space       
                             G::Geometry{NF}             # struct with precomputed geometry arrays
                             ) where {NF<:AbstractFloat} # number format NF
 
-    nlon,nlat = size(u)
-    @boundscheck size(u) == size(v) || throw(BoundsError)
-    @boundscheck size(u) == size(vor) || throw(BoundsError)
-    @boundscheck size(u) == size(uω) || throw(BoundsError)
-    @boundscheck size(u) == size(vω) || throw(BoundsError)
+    nlon,nlat = size(U)
+    @boundscheck size(U) == size(V) || throw(BoundsError)
+    @boundscheck size(U) == size(vor) || throw(BoundsError)
+    @boundscheck size(U) == size(Uω) || throw(BoundsError)
+    @boundscheck size(U) == size(Vω) || throw(BoundsError)
 
     @unpack f_coriolis = G
     @boundscheck length(f_coriolis) == nlat || throw(BoundsError)
@@ -298,8 +298,8 @@ function vorticity_fluxes!( uω::AbstractMatrix{NF},     # Output: u*(vor+corio
     @inbounds for j in 1:nlat
         for i in 1:nlon
             ω = vor[i,j] + f_coriolis[j]    # = relative vorticity + coriolis
-            uω[i,j] = ω*u[i,j]              # = u(vor+f)*coslat
-            vω[i,j] = ω*v[i,j]              # = v(vor+f)*coslat
+            Uω[i,j] = ω*U[i,j]              # = u(vor+f)*coslat
+            Vω[i,j] = ω*V[i,j]              # = v(vor+f)*coslat
         end
     end
 end
@@ -311,9 +311,9 @@ function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables
                         ) where {NF<:AbstractFloat}                                   
 
     @unpack pres_tend = D.tendencies
-    @unpack u_grid, v_grid, pres_grid = D.grid_variables
-    @unpack uh, vh, uh_grid, vh_grid = D.intermediate_variables
-    @unpack ∂uh_∂lon, ∂vh_∂lat = D.intermediate_variables
+    @unpack U_grid, V_grid, pres_grid = D.grid_variables
+    @unpack Uh, Vh, Uh_grid, Vh_grid = D.intermediate_variables
+    @unpack ∂Uh_∂lon, ∂Vh_∂lat = D.intermediate_variables
     @unpack orography = B
     S = G.spectral_transform
     @unpack coslat = G.geometry
@@ -321,8 +321,8 @@ function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables
     @unpack nlon, nlat = G.geometry
     @boundscheck size(pres_grid) == (nlon,nlat) || throw(BoundsError)
     @boundscheck size(pres_grid) == size(orography) || throw(BoundsError)
-    @boundscheck size(uh_grid) == size(u_grid) || throw(BoundsError)
-    @boundscheck size(vh_grid) == size(v_grid) || throw(BoundsError)
+    @boundscheck size(Uh_grid) == size(U_grid) || throw(BoundsError)
+    @boundscheck size(Vh_grid) == size(V_grid) || throw(BoundsError)
     @boundscheck length(coslat) == nlat || throw(BoundsError) 
 
     H₀ = convert(NF,H₀)
@@ -337,23 +337,21 @@ function volume_fluxes!(D::DiagnosticVariables{NF}, # all diagnostic variables
         for i in 1:nlon
             # h = η + H₀ - orography
             h = pres_grid[i,j,k] + H₀ - orography[i,j]
-
-            # u,v_grid has coslat scaling included, so uh,vh_grid too
-            uh_grid[i,j,k] = u_grid[i,j,k]*h      # = uh*coslat
-            vh_grid[i,j,k] = v_grid[i,j,k]*h      # = vh*coslat
+            Uh_grid[i,j,k] = U_grid[i,j,k]*h      # = uh*coslat
+            Vh_grid[i,j,k] = V_grid[i,j,k]*h      # = vh*coslat
         end
     end
 
-    spectral!(uh,uh_grid,S)
-    spectral!(vh,vh_grid,S)
+    spectral!(Uh,Uh_grid,S)
+    spectral!(Vh,Vh_grid,S)
 
-    gradient_longitude!(∂uh_∂lon,uh,  flipsign=true)    # 1st component of -∇⋅(uh)
-    gradient_latitude!( ∂vh_∂lat,vh,S,flipsign=true)    # 2nd component of -∇⋅(uh)
+    gradient_longitude!(∂Uh_∂lon,Uh,  flipsign=true)    # 1st component of -∇⋅(uh)
+    gradient_latitude!( ∂Vh_∂lat,Vh,S,flipsign=true)    # 2nd component of -∇⋅(uh)
 
-    ∂uh_∂lon_surf = view(∂uh_∂lon,:,:,1)                # create views of surface layer
-    ∂vh_∂lat_surf = view(∂vh_∂lat,:,:,1)
+    ∂Uh_∂lon_surf = view(∂Uh_∂lon,:,:,1)                # create views of surface layer
+    ∂Vh_∂lat_surf = view(∂Vh_∂lat,:,:,1)
 
-    add_tendencies!(pres_tend,∂uh_∂lon_surf,∂vh_∂lat_surf)
+    add_tendencies!(pres_tend,∂Uh_∂lon_surf,∂Vh_∂lat_surf)
 end
 
 """
@@ -366,31 +364,43 @@ end
 
 Computes the Bernoulli potential 1/2*(u^2 + v^2) + g*η."""
 function bernoulli_potential!(  B::AbstractMatrix{NF},  # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
-                                u::AbstractMatrix{NF},  # zonal velocity
-                                v::AbstractMatrix{NF},  # meridional velocity
+                                U::AbstractMatrix{NF},  # zonal velocity *coslat
+                                V::AbstractMatrix{NF},  # meridional velocity *coslat
                                 η::AbstractMatrix{NF},  # interface displacement
-                                g::Real                 # gravity
+                                g::Real,                # gravity
+                                G::Geometry{NF}         # used for precomputed cos²(lat)
                                 ) where {NF<:AbstractFloat}
     
+    @unpack coslat⁻² = G
+    nlon, nlat = size(B)
+    @boundscheck nlat == length(coslat⁻²) || throw(BoundsError)
+    @boundscheck size(B) == size(U) || throw(BoundsError)
+    @boundscheck size(B) == size(V) || throw(BoundsError)
+    @boundscheck size(B) == size(η) || throw(BoundsError)
+
     one_half = convert(NF,0.5)
     gravity = convert(NF,g)
 
-    @inbounds for i in eachindex(B,u,v,η)
-        B[i] = one_half*(u[i]^2 + v[i]^2) + gravity*η[i]
+    @inbounds for j in 1:nlat
+        one_half_coslat⁻² = one_half*coslat⁻²[j]
+        for i in 1:nlon
+            B[i,j] = one_half_coslat⁻²*(U[i,j]^2 + V[i,j]^2) + gravity*η[i,j]
+        end
     end
 end
 
 function bernoulli_potential!(  D::DiagnosticVariables{NF}, # all diagnostic variables   
-                                G::GeoSpectral{NF},         # struct with geometry and spectral transform
+                                GS::GeoSpectral{NF},        # struct with geometry and spectral transform
                                 g::Real                     # gravity
                                 ) where {NF<:AbstractFloat}   
     
-    @unpack u_grid,v_grid,pres_grid = D.grid_variables
+    @unpack U_grid,V_grid,pres_grid = D.grid_variables
     @unpack bernoulli, bernoulli_grid = D.intermediate_variables
     @unpack div_tend = D.tendencies
-    S = G.spectral_transform
+    S = GS.spectral_transform
+    G = GS.geometry
 
-    bernoulli_potential!(bernoulli_grid,u_grid,v_grid,pres_grid,g)  # = 1/2(u^2 + v^2) + gη on grid
+    bernoulli_potential!(bernoulli_grid,U_grid,V_grid,pres_grid,g,G)# = 1/2(u^2 + v^2) + gη on grid
     spectral!(bernoulli,bernoulli_grid,S)                           # to spectral space
 
     # write directly in div_tend, ie bernoulli potential has to be the first tendency
@@ -415,26 +425,21 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
                     ) where NF
     
     @unpack vor = progn                             # relative vorticity
-    @unpack vor_grid, u_grid, v_grid = diagn.grid_variables
+    @unpack vor_grid, U_grid, V_grid = diagn.grid_variables
     @unpack stream_function, coslat_u, coslat_v = diagn.intermediate_variables
-    
-    G = M.geospectral.geometry
     S = M.geospectral.spectral_transform
 
     vor_lf = view(vor,:,:,lf,:)     # pick leapfrog index without memory allocation
     gridded!(vor_grid,vor_lf,S)     # get vorticity on grid from spectral vor
     ∇⁻²!(stream_function,vor_lf,S)  # invert Laplacian ∇² for stream function
     
+    # U = u*coslat = -coslat*∂Ψ/∂lat, V = v*coslat = ∂Ψ/∂lon, radius omitted in both cases
     gradient_longitude!(coslat_v, stream_function)
     gradient_latitude!( coslat_u, stream_function, S, flipsign=true)
 
-    # transform to u,v on grid which are actually u,v_grid = u,v*coslat
-    gridded!(u_grid,coslat_u,S)
-    gridded!(v_grid,coslat_v,S)
-
-    # unscaling would be done via
-    # unscale_coslat!(u_grid,G)    
-    # unscale_coslat!(v_grid,G)
+    # transform to U,V on grid (U,V = u,v*coslat)
+    gridded!(U_grid,coslat_u,S)
+    gridded!(V_grid,coslat_v,S)
 
     return nothing
 end
@@ -456,10 +461,9 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
                     ) where NF
     
     @unpack vor, div, pres = progn                  # relative vorticity, divergence, pressure
-    @unpack vor_grid, div_grid, u_grid, v_grid, pres_grid = diagn.grid_variables
-    @unpack stream_function, coslat_u, coslat_v, velocity_potential = diagn.intermediate_variables
-    
-    G = M.geospectral.geometry
+    @unpack vor_grid, div_grid, U_grid, V_grid, pres_grid = diagn.grid_variables
+    @unpack stream_function, velocity_potential = diagn.intermediate_variables
+    @unpack coslat_u, coslat_v = diagn.intermediate_variables
     S = M.geospectral.spectral_transform
 
     vor_lf = view(vor,:,:,lf,:)         # pick leapfrog index without memory allocation
@@ -470,9 +474,11 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     gridded!(div_grid,div_lf,S)         # get divergence on grid from spectral div
     gridded!(pres_grid,pres_lf,S)       # get pressure on grid from spectral pres
 
-    ∇⁻²!(stream_function,vor_lf,S)      # invert Laplacian ∇² for stream function
-    ∇⁻²!(velocity_potential,div_lf,S)   # invert Laplacian ∇² for velocity potential
+    ∇⁻²!(stream_function,vor_lf,S)      # invert Laplacian ∇² for stream function Ψ
+    ∇⁻²!(velocity_potential,div_lf,S)   # invert Laplacian ∇² for velocity potential ϕ
 
+    # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
+    # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
     # contribution from stream function (non-divergent component)
     gradient_longitude!(coslat_v, stream_function)
     gradient_latitude!( coslat_u, stream_function, S, flipsign=true)
@@ -481,13 +487,9 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     gradient_longitude!(coslat_u, velocity_potential,    add=true)
     gradient_latitude!( coslat_v, velocity_potential, S, add=true)
 
-    # transform to u,v on grid which are actually u,v_grid = u,v*coslat
-    gridded!(u_grid,coslat_u,S)
-    gridded!(v_grid,coslat_v,S)
-
-    # unscaling would be done via
-    # unscale_coslat!(u_grid,G)    
-    # unscale_coslat!(v_grid,G)
+    # transform to U,V on grid (U,V = u,v*coslat)
+    gridded!(U_grid,coslat_u,S)
+    gridded!(V_grid,coslat_v,S)
 
     return nothing
 end

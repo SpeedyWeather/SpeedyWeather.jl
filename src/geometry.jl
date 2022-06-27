@@ -14,33 +14,35 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
 
     dlon::NF            # grid spacing in longitude
     dlat::NF            # average grid spacing in latitude
-    lon::Array{NF,1}    # array of longitudes (0...2π)
-    lond::Array{Float64,1}  # array of longitudes in degrees (0...360˚)
-    lat::Array{NF,1}    # array of latitudes (π/2...-π/2)
-    latd::Array{Float64,1}  # array of latitudes in degrees (90˚...-90˚)
-    colat::Array{NF,1}  # array of colatitudes (0...π)
-    colatd::Array{Float64,1}# array of colatitudes in degrees (0...180˚)
+    lon::Vector{NF}     # array of longitudes (0...2π)
+    lond::Vector{Float64}  # array of longitudes in degrees (0...360˚)
+    lat::Vector{NF}     # array of latitudes (π/2...-π/2)
+    latd::Vector{Float64}  # array of latitudes in degrees (90˚...-90˚)
+    colat::Vector{NF}   # array of colatitudes (0...π)
+    colatd::Vector{Float64}# array of colatitudes in degrees (0...180˚)
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     n_stratosphere_levels::Int      # number of upper levels for stratosphere
-    σ_levels_half::Array{NF,1}      # σ at half levels
-    σ_levels_full::Array{NF,1}      # σ at full levels
-    σ_levels_thick::Array{NF,1}     # σ level thicknesses
-    σ_levels_half⁻¹_2::Array{NF,1}  # 1/(2σ_levels_full)       #TODO rename?
-    σ_f::Array{NF,1}                # akap/(2σ_levels_thick)   #TODO rename?
+    σ_levels_half::Vector{NF}       # σ at half levels
+    σ_levels_full::Vector{NF}       # σ at full levels
+    σ_levels_thick::Vector{NF}      # σ level thicknesses
+    σ_levels_half⁻¹_2::Vector{NF}   # 1/(2σ_levels_full)       #TODO rename?
+    σ_f::Vector{NF}                 # akap/(2σ_levels_thick)   #TODO rename?
 
     # SINES AND COSINES OF LATITUDE
-    sinlat::Array{NF,1}         # sin of latitudes
-    coslat::Array{NF,1}         # cos of latitudes
-    coslat⁻¹::Array{NF,1}       # =1/cos(lat)
+    sinlat::Vector{NF}              # sin of latitudes
+    coslat::Vector{NF}              # cos of latitudes
+    coslat⁻¹::Vector{NF}            # =1/cos(lat)
+    coslat²::Vector{NF}             # = cos²(lat)
+    coslat⁻²::Vector{NF}            # = 1/cos²(lat)
 
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
-    f_coriolis::Array{NF,1}              # = 2Ω*sin(lat)*radius_earth
+    f_coriolis::Vector{NF}          # = 2Ω*sin(lat)*radius_earth
 
     # GEOPOTENTIAL CALCULATION WORK ARRAYS
-    xgeop1::Array{NF,1}                  # ?
-    xgeop2::Array{NF,1}                  # ?
-    lapserate_correction::Array{NF,1}    # ?
+    xgeop1::Vector{NF}                  # ?
+    xgeop2::Vector{NF}                  # ?
+    lapserate_correction::Vector{NF}    # ?
 
     # TEMPORARY, development area. All these variables need to be checked for consistency and potentially defined somewhere else
     # tref ::Array{NF,1}   #temporarily defined here. Also defined in the Implict struct which is incomplete at the time of writing
@@ -89,6 +91,8 @@ function Geometry(P::Parameters)
     sinlat = sin.(lat)
     coslat = cos.(lat)
     coslat⁻¹ = 1 ./ coslat
+    coslat²  = coslat.^2    
+    coslat⁻² = 1 ./ coslat²
 
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
     f_coriolis = 2rotation_earth*sinlat*radius_earth
@@ -126,7 +130,7 @@ function Geometry(P::Parameters)
                     dlon,dlat,lon,lond,lat,latd,colat,colatd,
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
-                    sinlat,coslat,coslat⁻¹,
+                    sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,
                     f_coriolis,
                     xgeop1,xgeop2,lapserate_correction)
                     # tref,rgas,fsgr,tref3)

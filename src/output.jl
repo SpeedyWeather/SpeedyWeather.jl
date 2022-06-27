@@ -139,9 +139,9 @@ function write_netcdf_variables!(   i_out::Integer,
                                     M::BarotropicModel)
 
     # CONVERT TO FLOAT32 FOR OUTPUT
-    @unpack u_grid,v_grid,vor_grid = diagn.grid_variables
-    u_output = convert.(Float32,u_grid)
-    v_output = convert.(Float32,v_grid)
+    @unpack U_grid,V_grid,vor_grid = diagn.grid_variables
+    u_output = convert.(Float32,U_grid)
+    v_output = convert.(Float32,V_grid)
     vor_output = convert.(Float32,vor_grid)
 
     # UNSCALE SCALED VARIABLES
@@ -167,9 +167,9 @@ function write_netcdf_variables!(   i_out::Integer,
                                     M::ShallowWaterModel)
 
     # CONVERT TO FLOAT32 FOR OUTPUT
-    @unpack u_grid,v_grid,vor_grid,div_grid,pres_grid = diagn.grid_variables
-    u_output = convert.(Float32,u_grid)
-    v_output = convert.(Float32,v_grid)
+    @unpack U_grid,V_grid,vor_grid,div_grid,pres_grid = diagn.grid_variables
+    u_output = convert.(Float32,U_grid)
+    v_output = convert.(Float32,V_grid)
     vor_output = convert.(Float32,vor_grid)
     div_output = convert.(Float32,div_grid)
     pres_output = convert.(Float32,pres_grid)
