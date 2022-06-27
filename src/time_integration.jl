@@ -73,24 +73,25 @@ function first_timesteps!(  progn::PrognosticVariables{NF}, # all prognostic var
     time_sec = 0    # overall time counter in seconds using Int64 for error free accumulation
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
-    # IMP = initialize_implicit(half*Δt)
-    lf1 = 1     # without Robert+William's filter
-    lf2 = 1     # evaluates all tendencies at t=0, the first leapfrog index (=>Euler forward)
+    initialize_implicit!(Δt/2,M)        # update precomputed implicit terms with time step Δt/2
+    lf1 = 1                             # without Robert+William's filter
+    lf2 = 1                             # evaluates all tendencies at t=0,
+                                        # the first leapfrog index (=>Euler forward)
     timestep!(progn,diagn,Δt/2,M,lf1,lf2)
     time_sec += Δt_sec÷2
     progress!(feedback)
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt)
-    # IMP = initialize_implicit(Δt)
-    lf1 = 1     # without Robert+William's filter
-    lf2 = 2     # evaluate all tendencies at t=dt/2, the 2nd leapfrog index (=>Leapfrog)
+    initialize_implicit!(Δt,M)          # update precomputed implicit terms with time step Δt
+    lf1 = 1                             # without Robert+William's filter
+    lf2 = 2                             # evaluate all tendencies at t=dt/2,
+                                        # the 2nd leapfrog index (=>Leapfrog)
     timestep!(progn,diagn,Δt,M,lf1,lf2)
     time_sec += Δt_sec÷2
     progress!(feedback)
 
-    # Initialize implicit arrays for further time steps (dt=2Δt)
-    # IMP = initialize_implicit(2Δt)
-    # return IMP
+    # update precomputed implicit terms with time step 2Δt for further time steps
+    initialize_implicit!(2Δt,M)
     return time_sec
 end
 
@@ -98,7 +99,7 @@ end
 function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
-                    M::ModelSetup,                  # everything that's constant at runtime
+                    M::PrimitiveEquationModel,      # everything that's constant at runtime
                     lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
@@ -161,6 +162,48 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     leapfrog!(vor,vor_tend,dt,M.constants,lf1)
 end
 
+"""Calculate a single time step for SpeedyWeather.jl"""
+function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
+                    diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
+                    dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                    M::ShallowWaterModel,           # everything that's constant at runtime
+                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
+                    lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
+                    ) where {NF<:AbstractFloat}
+    
+    @unpack vor, div, pres = progn
+    @unpack vor_tend, div_tend, pres_tend = diagn.tendencies
+    @unpack damping, damping_impl = M.horizontal_diffusion
+
+    # set all tendencies to zero
+    fill!(vor_tend,zero(Complex{NF}))
+    fill!(div_tend,zero(Complex{NF}))
+    fill!(pres_tend,zero(Complex{NF}))
+
+    # PROPAGATE THE SPECTRAL STATE INTO THE DIAGNOSTIC VARIABLES
+    gridded!(diagn,progn,M,lf2)
+
+    # COMPUTE TENDENCIES OF PROGNOSTIC VARIABLES
+    get_tendencies!(diagn,progn,M,lf2)
+    
+    # IMPLICIT CORRECTION TO FILTER OUT GRAVITY WAVES
+    implicit_correction!(diagn,progn,M)
+
+    # DIFFUSION FOR WIND
+    # always use first leapfrog index for diffusion (otherwise unstable)
+    vor_lf  = view(vor, :,:,1,:)                                    # array view for leapfrog index
+    div_lf  = view(div, :,:,1,:)                                    # array view for leapfrog index
+    # pres_lf = view(pres,:,:,1)
+    horizontal_diffusion!(vor_tend, vor_lf, damping,damping_impl)   # diffusion of vorticity
+    horizontal_diffusion!(div_tend, div_lf, damping,damping_impl)   # diffusion of divergence
+    # horizontal_diffusion!(pres_tend,pres_lf,damping,damping_impl)   # diffusion of divergence
+
+    # time integration via leapfrog step forward (filtered with Robert+William's depending on lf1)
+    leapfrog!(vor, vor_tend, dt,M.constants,lf1)
+    leapfrog!(div, div_tend, dt,M.constants,lf1)
+    leapfrog!(pres,pres_tend,dt,M.constants,lf1)
+end
+
 """
     timestep!(  progn::PrognosticVariables{NF}, # all prognostic variables
                 diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
@@ -219,7 +262,7 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
     time_sec = first_timesteps!(progn,diagn,M,feedback)
 
     # MAIN LOOP
-    for i in 1:n_timesteps-1            # first Δt time step in first_timesteps!
+    for i in 2:n_timesteps              # first Δt time step in first_timesteps!
         time_sec += Δt_sec
         timestep!(progn,diagn,2Δt,M)
 

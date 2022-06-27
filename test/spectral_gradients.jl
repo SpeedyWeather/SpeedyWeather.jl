@@ -1,122 +1,258 @@
-# @testset "Spectral gradients no error test" begin
-#     for NF in (Float32,Float64)
-#         prog_vars,diag_vars,model_setup = initialize_speedy(NF)
+@testset "Divergence of a non-divergent flow zero?" begin
+    @testset for NF in (Float32,Float64)
 
-#         temp_surf = prog_vars.temp[:,:,1,end]
-#         SpeedyWeather.gradient_longitude(temp_surf)
-#         SpeedyWeather.gradient_latitude(temp_surf)
+        p,d,m = initialize_speedy(  NF,
+                                    model=:barotropic,
+                                    initial_conditions=:rest)
 
-#         SpeedyWeather.∇²(temp_surf)
-#         SpeedyWeather.∇⁻²(temp_surf)
+        fill!(p.vor,0)                  # make sure vorticity and divergence are 0
+        fill!(p.div,0)
+        fill!(d.tendencies.vor_tend,0)
 
-#         temp_surf_grid = gridded(temp_surf)
+        # start with some vorticity only
+        p.vor[:,:,1,1] .= randn(Complex{NF},size(p.vor)[1:2])  
+        SpeedyWeather.spectral_truncation!(p.vor[:,:,1,1])            
+        SpeedyWeather.gridded!(d,p,m)   # get corresponding non-divergent u_grid, v_grid
+
+        # check we've actually created non-zero u*coslat,v*coslat
+        @test all(d.grid_variables.U_grid .!= 0)
+        @test all(d.grid_variables.V_grid .!= 0)
+
+        # to evaluate ∇⋅(uv) use vorticity adv (=∇⋅(uv(ζ+f))) with ζ=1,f=0
+        fill!(d.grid_variables.vor_grid,1)
+        fill!(m.geospectral.geometry.f_coriolis,0)
+        SpeedyWeather.vorticity_advection!(d,m.geospectral)
+
+        @test all(abs.(d.tendencies.vor_tend) .< sqrt(eps(NF)))
+    end
+end
+
+@testset "Continuity: Div of a non-divergent flow zero?" begin
+    @testset for NF in (Float32,Float64)
+
+        p,d,m = initialize_speedy(  NF,
+                                    model=:shallowwater,
+                                    initial_conditions=:rest,
+                                    layer_thickness=0)
+
+        fill!(p.vor,0)                  # make sure vorticity and divergence are 0
+        fill!(p.div,0)
+        fill!(d.tendencies.pres_tend,0) # and tendency where the result goes
+        fill!(m.boundaries.orography,0) # no mountains
+
+        # start with some vorticity only
+        p.vor[:,:,1,1] .= randn(Complex{NF},size(p.vor)[1:2])  
+        SpeedyWeather.spectral_truncation!(p.vor[:,:,1,1])      
+        SpeedyWeather.gridded!(d,p,m)   # get corresponding non-divergent u_grid, v_grid
+
+        # check we've actually created non-zero u,v (which include coslat scaling)
+        @test all(d.grid_variables.U_grid .!= 0)
+        @test all(d.grid_variables.V_grid .!= 0)
         
-#         u_surf_grid = diag_vars.grid_variables.u_grid[:,:,end]
-#         v_surf_grid = diag_vars.grid_variables.v_grid[:,:,end]
-#         vor_surf_grid = diag_vars.grid_variables.vor_grid[:,:,end]
+        # to evaluate ∇⋅(uv) use vorticity adv (=∇⋅(uv(η+H₀))) with η=1,H₀=0
+        H₀ = 0
+        fill!(d.grid_variables.pres_grid,1)
+        SpeedyWeather.volume_fluxes!(d,m.geospectral,m.boundaries,H₀)
 
-#         SpeedyWeather.divergence_uvω_spectral(  u_surf_grid,
-#                                                 v_surf_grid,
-#                                                 vor_surf_grid,
-#                                                 model_setup.geospectral)
-#     end
-# end
+        @test all(abs.(d.tendencies.pres_tend) .< sqrt(eps(NF)))
+    end
+end
 
-# @testset "gradient_latitude, with/without precalculated ϵlms" begin
-#     for NF in (Float32,Float64)
-#         prog_vars,diag_vars,model_setup = initialize_speedy(NF)
+@testset "Curl of a irrotational flow zero?" begin
+    @testset for NF in (Float32,Float64)
 
-#         (;coslat_u,stream_function) = diag_vars.intermediate_variables
-#         ϵlms = model_setup.geospectral.spectral.ϵlms
+        p,d,m = initialize_speedy(  NF,
+                                    model=:shallowwater,
+                                    initial_conditions=:rest,
+                                    layer_thickness=0)
 
-#         # some random entries
-#         lmax,mmax = 5,5
-#         stream_function[1:lmax,1:mmax,:] = convert(NF,1e-6)*randn(Complex{NF},lmax,mmax,
-#                                                     model_setup.parameters.nlev)
-#         SpeedyWeather.spectral_truncation!(stream_function,lmax,mmax)   # set upper triangle to 0
-#         radius_earth = 2
+        fill!(p.vor,0)                  # make sure vorticity and divergence are 0
+        fill!(p.div,0)
+        fill!(d.tendencies.div_tend,0)  # and tendency where the result goes
 
-#         # calculates ϵlms upfront
-#         SpeedyWeather.gradient_latitude!(coslat_u,stream_function,radius_earth)
-#         coslat_u2 = copy(coslat_u)      # store for comparison
+        # start with some divergence only
+        p.div[:,:,1,1] .= randn(Complex{NF},size(p.div)[1:2])  
+        SpeedyWeather.spectral_truncation!(p.div[:,:,1,1])
 
-#         # uses ϵlms from SpectralTransform
-#         SpeedyWeather.gradient_latitude!(coslat_u,stream_function,ϵlms,radius_earth)
+        # get corresponding irrotational u_grid, v_grid (incl *coslat scaling)
+        SpeedyWeather.gridded!(d,p,m)   
 
-#         @test coslat_u == coslat_u2
-#     end
-# end
+        # check we've actually created non-zero (u,v)*coslat
+        @test all(d.grid_variables.U_grid .!= 0)
+        @test all(d.grid_variables.V_grid .!= 0)
 
-# @testset "Spectral vorticity->stream function->u,v->vorticity" begin
-    # for NF in (Float32,Float64)
-        NF = Float64
-        prog_vars,diag_vars,model_setup = initialize_speedy(NF,trunc=85)
-        (;spectral,geometry) = model_setup.geospectral
-        (;radius_earth) = model_setup.parameters
+        # to evaluate ∇×(uv) use curl of vorticity fluxes (=∇×(uv(ζ+f))) with ζ=1,f=0
+        fill!(d.grid_variables.vor_grid,1)
+        fill!(m.geospectral.geometry.f_coriolis,0)
 
-        vor = view(prog_vars.vor,:,:,1,:)    # use only one leapfrog index
+        # calculate uω,vω in spectral space
+        SpeedyWeather.vorticity_advection!(d,m.geospectral)
+        SpeedyWeather.curl_vorticity_fluxes!(d,m.geospectral)
 
-        # some large scale initial conditions
-        lmax,mmax = 50,50
-        vor[2:lmax,2:mmax,:] = randn(Complex{NF},lmax-1,mmax-1,
-                                        model_setup.parameters.nlev)
-        SpeedyWeather.spectral_truncation!(vor,lmax,mmax)   # set upper triangle to 0
+        @test all(abs.(d.tendencies.div_tend) .< sqrt(eps(NF)))
+    end
+end
 
-        SpeedyWeather.gridded!(diag_vars,prog_vars,model_setup)
+@testset "Flipsign in gradient_longitude!" begin
+    @testset for NF in (Float32,Float64)
+        A = randn(Complex{NF},32,32)
+        B = zero(A)
+        SpeedyWeather.gradient_longitude!(B,A,flipsign=true)
+        @test SpeedyWeather.gradient_longitude(A,one_more_l=false) == -B
+    end
+end
 
-        (;u_grid, v_grid) = diag_vars.grid_variables
-        u = zero(vor)
-        v = zero(vor)
+@testset "Flipsign in gradient_latitude!" begin
+    @testset for NF in (Float32,Float64)
 
-        SpeedyWeather.scale_coslat!(v_grid,geometry)
+        p,d,m = initialize_speedy(  NF,
+                                    model=:shallowwater)
 
-        SpeedyWeather.spectral!(u,u_grid,spectral)
-        SpeedyWeather.spectral!(v,v_grid,spectral)
+        S = m.geospectral.spectral_transform
+        A = randn(Complex{NF},size(p.vor)[1:2])
+        B = zero(A)
+        SpeedyWeather.gradient_latitude!(B,A,S,flipsign=true)
+        @test SpeedyWeather.gradient_latitude(A,S,one_more_l=false) == -B
+    end
+end
 
-        (;coslat_u,coslat_v) = diag_vars.intermediate_variables
-        SpeedyWeather.gradient_longitude!(coslat_v,v,radius_earth)
-        SpeedyWeather.gradient_latitude!(coslat_u,u,spectral,radius_earth)
+@testset "Add in gradient_longitude!" begin
+    @testset for NF in (Float32,Float64)
+        A = randn(Complex{NF},32,32)
+        SpeedyWeather.spectral_truncation!(A)
 
-        vor2 = coslat_v - coslat_u
-        vor_grid2 = gridded(vor2[:,:,1])
-        SpeedyWeather.unscale_coslat!(vor_grid2,geometry)
+        B = zero(A)
+        B2 = zero(A)
+        SpeedyWeather.gradient_longitude!(B,A,add=false)
+        SpeedyWeather.gradient_longitude!(B2,A,add=true)
+        @test B == B2       # starting from 0 add doesn't make a difference?
 
-        SpeedyWeather.spectral!(view(vor2,:,:,1),vor_grid2,spectral)
+        SpeedyWeather.gradient_longitude!(B2,A,add=true)
+        @test 2B == B2      # adding the gradient twice is =x2?
 
-        fig,(ax1,ax2,ax3) = subplots(3,1)
-        q1 = ax1.imshow(abs.(vor[:,:,1]))
-        colorbar(q1,ax=ax1)
-        q2 = ax2.imshow(abs.(vor2[:,:,1]))
-        colorbar(q2,ax=ax2)
-        q3 = ax3.imshow(abs.(vor[:,:,1])-abs.(vor2[:,:,1]))
-        colorbar(q3,ax=ax3)
-        ax1.set_title("Vorticity, random",loc="left")
-        ax1.set_title("a",loc="right")
-        ax2.set_title("Vorticity->stream function->u,v->vorticity")
-        ax2.set_title("b",loc="right")
-        ax3.set_title("Error: a-b")
+        SpeedyWeather.gradient_longitude!(B2,A,add=true,flipsign=true)
+        @test B == B2       # subtracting the gradient again returns to 1x gradient?
+    end
+end
 
-    # end
-# end
+@testset "Add in gradient_latitude!" begin
+    @testset for NF in (Float32,Float64)
 
-# @testset "Scale/unscale grid variables with coslat" begin
-#     for NF in (Float32,Float64)
-#         prog_vars,diag_vars,model_setup = initialize_speedy(NF)
+        p,d,m = initialize_speedy(NF)
 
-#         (;u_grid) = diag_vars.grid_variables
-#         u_grid = randn(NF,size(u_grid)...)
-#         u_grid2 = copy(u_grid)
+        S = m.geospectral.spectral_transform
 
-#         # first unscale then scale with coslat
-#         SpeedyWeather.unscale_coslat!(u_grid2,model_setup.geospectral.geometry)
-#         SpeedyWeather.scale_coslat!(u_grid2,model_setup.geospectral.geometry)
+        A = randn(Complex{NF},size(p.vor)[1:2])
+        SpeedyWeather.spectral_truncation!(A)
 
-#         @test all(u_grid .≈ u_grid2)
+        B = zero(A)
+        B2 = zero(A)
+        SpeedyWeather.gradient_latitude!(B,A,S,add=false)
+        SpeedyWeather.gradient_latitude!(B2,A,S,add=true)
+        @test B == B2       # starting from 0 add doesn't make a difference?
 
-#         # first scale then unscale with coslat
-#         SpeedyWeather.scale_coslat!(u_grid2,model_setup.geospectral.geometry)
-#         SpeedyWeather.unscale_coslat!(u_grid2,model_setup.geospectral.geometry)
+        SpeedyWeather.gradient_latitude!(B2,A,S,add=true)
+        @test 2B == B2      # adding the gradient twice is =x2?
 
-#         @test all(u_grid .≈ u_grid2)
-#     end
-# end
+        SpeedyWeather.gradient_latitude!(B2,A,S,add=true,flipsign=true)
+        @test B == B2       # subtracting the gradient again returns to 1x gradient?
+    end
+end
+
+@testset "D,ζ -> u,v -> D,ζ" begin
+    @testset for NF in (Float32,Float64)
+
+        p,d,m = initialize_speedy(  NF,
+                                    model=:shallowwater,
+                                    initial_conditions=:rest,
+                                    layer_thickness=0)
+
+        # make sure vorticity and divergence are 0
+        fill!(p.vor,0)
+        fill!(p.div,0)
+
+        # make sure vorticity and divergence are 0
+        fill!(d.tendencies.vor_tend,0)                  
+        fill!(d.tendencies.div_tend,0)
+
+        # create initial conditions
+        vor0 = zero(p.vor[:,:,1,1])
+        div0 = zero(p.div[:,:,1,1])
+        vor0[:,:] .= randn(Complex{NF},size(vor0)...)
+        div0[:,:] .= randn(Complex{NF},size(div0)...)
+        
+        vor0[1,1] = 0                   # zero mean
+        div0[1,1] = 0
+        vor0[:,1] .= real(vor0[:,1])    # set imaginary component of m=0 to 0
+        div0[:,1] .= real(div0[:,1])    # as the rotation of zonal modes is arbitrary
+
+        # remove non-zero entries in upper triangle
+        SpeedyWeather.spectral_truncation!(vor0)
+        SpeedyWeather.spectral_truncation!(div0)
+
+        p.vor[:,:,1,1] .= vor0
+        p.div[:,:,1,1] .= div0
+
+        # get corresponding irrotational u_grid, v_grid (incl *coslat scaling)
+        SpeedyWeather.gridded!(d,p,m)   
+
+        # check we've actually created non-zero u,v
+        @test all(d.grid_variables.U_grid .!= 0)
+        @test all(d.grid_variables.V_grid .!= 0)
+
+        coslat_u = d.intermediate_variables.coslat_u[:,:,1]
+        coslat_v = d.intermediate_variables.coslat_v[:,:,1]
+
+        # check that highest degree is non-zero
+        @test all(coslat_u[end,:] .!= 0)
+        @test all(coslat_v[end,:] .!= 0)
+
+        # create coslat²*(div,vor) in spectral space
+        div_grid = d.grid_variables.div_grid[:,:,1]
+        vor_grid = d.grid_variables.vor_grid[:,:,1]
+
+        # times coslat² in grid space
+        G = m.geospectral.geometry
+        SpeedyWeather.scale_coslat!(div_grid,G)
+        SpeedyWeather.scale_coslat!(div_grid,G)
+        SpeedyWeather.scale_coslat!(vor_grid,G)
+        SpeedyWeather.scale_coslat!(vor_grid,G)
+
+        # transform back
+        S = m.geospectral.spectral_transform
+        coslat²_div = spectral(div_grid,S,one_more_l=true)
+        coslat²_vor = spectral(vor_grid,S,one_more_l=true)
+
+        # zonal derivative in spectral space
+        dUdlon = SpeedyWeather.gradient_longitude(coslat_u)
+        dVdlon = SpeedyWeather.gradient_longitude(coslat_v)
+
+        # meridional derivative of U,V in spectral space
+        coslat_dVdθ = SpeedyWeather.gradient_latitude(coslat_v,S)
+        coslat_dUdθ = SpeedyWeather.gradient_latitude(coslat_u,S)
+
+        # test that
+        # 1) coslat_dV/dlat = coslat²*D - dU/dlon
+        # 2) coslat_dU/dlat = dV/dlon - coslat²*ζ
+        for i in eachindex( coslat²_div,coslat²_vor,
+                            coslat_dVdθ,coslat_dUdθ,
+                            dUdlon,dVdlon)
+            @test coslat_dVdθ[i] ≈ (coslat²_div[i] - dUdlon[i])
+            @test coslat_dUdθ[i] ≈ (dVdlon[i] - coslat²_vor[i]) 
+        end
+
+        # # PLOTTING
+        # fig,axs = subplots(3,2,figsize=(8,9))
+        # levs = (0,3)
+        # axs[1,1].imshow(abs.(coslat_dVdθ),vmin=levs[1],vmax=levs[2])
+        # axs[1,2].imshow(abs.(coslat_dUdθ),vmin=levs[1],vmax=levs[2])
+        # axs[2,1].imshow(abs.(coslat²_div),vmin=levs[1],vmax=levs[2])
+        # q1 = axs[2,2].imshow(abs.(coslat²_vor),vmin=levs[1],vmax=levs[2])
+
+        # levs2 = (0,0.1)
+        # axs[3,1].imshow(abs.(coslat_dVdθ-coslat²_div),vmin=levs2[1],vmax=levs2[2])
+        # q2 = axs[3,2].imshow(abs.(coslat_dUdθ-coslat²_vor),vmin=levs2[1],vmax=levs2[2])
+        # colorbar(ax=axs[1:2,:],q1)
+        # colorbar(ax=axs[3,:],q2)
+    end
+end

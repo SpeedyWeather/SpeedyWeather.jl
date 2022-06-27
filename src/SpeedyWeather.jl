@@ -44,6 +44,7 @@ module SpeedyWeather
 
     include("boundaries.jl")                # defines Boundaries
     include("horizontal_diffusion.jl")      # defines HorizontalDiffusion
+    include("implicit.jl")                  # defines Implicit
     include("models.jl")                    # defines ModelSetups
 
     include("prognostic_variables.jl")      # defines PrognosticVariables
@@ -53,6 +54,7 @@ module SpeedyWeather
     include("tendencies_parametrizations.jl")
     include("tendencies_dynamics.jl")
     include("tendencies.jl")
+    include("implicit_correction.jl")
     include("feedback.jl")                  # defines Feedback
     include("output.jl")
 

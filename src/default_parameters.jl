@@ -10,16 +10,18 @@ The default values of the keywords define the default model setup.
     # NUMBER FORMATS
     NF::DataType                        # number format (default is defined in run_speedy.jl)
 
+    # MODEL
+    model::Symbol=:barotropic           # :barotropic, :shallowwater, or :primitive
+
     # RESOLUTION
     trunc::Int=31                       # spectral truncation
     nlon::Int=roundup_fft(3*trunc+1)    # number of longitudes
     nlat::Int=nlon÷2                    # number of latitudes
-    nlev::Int=8                         # number of vertical levels
+    nlev::Int=nlev_default(model)       # number of vertical levels 
 
     # PHYSICAL CONSTANTS
-    model::Symbol=:barotropic           # :barotropic, :shallowwater, or :primitive
     radius_earth::Real=6.371e6          # radius of Earth [m]
-    rotation_earth::Real=7.292e-5       # angular frequency of Earth's rotation [1/s]
+    rotation_earth::Real=1e-5           # angular frequency of Earth's rotation [rad/s]
     gravity::Real=9.81          # gravitational acceleration [m/s^2]
     akap::Real=2/7              # ratio of gas constant to specific heat of dry air
                                 # at constant pressure = 1 - 1/γ where γ is the
@@ -40,6 +42,7 @@ The default values of the keywords define the default model setup.
     scale_height_humid::Real=2.5# reference scale height for specific humidity [km]
     relhumid_ref::Real=0.7      # reference relative humidity of near-surface air [1]
     water_pres_ref::Real=17     # reference saturation water vapour pressure [Pa]
+    layer_thickness::Real=10    # layer thickness for the shallow water model [km]
 
     # VERTICAL COORDINATES
     # of the nlev vertical levels, defined by a generalised logistic function,
@@ -72,13 +75,10 @@ The default values of the keywords define the default model setup.
     n_days::Real=10             # number of days to integrate for
 
     # NUMERICS
-    robert_filter::Real=0.05    # Robert (1966) time filter coefficeint for suppress comput. mode
-    williams_filter::Real=0.53  # William's time filter (Amezcua 2011) coefficient for 3rd order acc
-    α::Real=0.5                 # coefficient for semi-implicit computations
-                                # 0 -> forward step for gravity wave terms,
-                                # 1 -> backward implicit
-                                # 0.5 -> centered implicit
-    recompute_legendre::Bool=false
+    robert_filter::Real=0.05        # Robert (1966) time filter coefficeint for suppress comput. mode
+    williams_filter::Real=0.53      # William's time filter (Amezcua 2011) coefficient for 3rd order acc
+    implicit_α::Real=0.5            # coefficient for semi-implicit computations to filter gravity waves
+    recompute_legendre::Bool=false  # recomputation is slower but requires less memory
 
     # BOUNDARY FILES
     boundary_path::String=""    # package location is default
@@ -97,7 +97,10 @@ The default values of the keywords define the default model setup.
     output_vars::Vector{String}=["u","v","T","humid","logp0"]
     compression_level::Int=3    # 1=low but fast, 9=high but slow
     keepbits::Int=10            # mantissa bits to keep for every variable
+end
 
-    # TODO assert not allowed parameter values
-    @assert α in [0,0.5,1] "Only semi-implicit α = 0, 0.5 or 1 allowed."
+function nlev_default(model::Symbol)
+    model == :barotropic && return 1
+    model == :shallowwater && return 1
+    model == :primitive && return 8
 end

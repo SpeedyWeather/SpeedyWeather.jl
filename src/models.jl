@@ -32,6 +32,7 @@ struct ShallowWaterModel{NF<:AbstractFloat} <: ModelSetup
     geospectral::GeoSpectral{NF}
     boundaries::Boundaries{NF}
     horizontal_diffusion::HorizontalDiffusion{NF}
+    implicit::Implicit{NF}
 end
 
 """

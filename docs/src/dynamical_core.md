@@ -5,6 +5,10 @@ We start by describing the barotropic vorticity equations which is one set of eq
 SpeedyWeather.jl can solve (see [How to run SpeedyWeather.jl](@ref)) as many details therein also
 apply to the [Shallow water equations](@ref) and [Primitive equations](@ref) explained thereafter.
 
+The dynamical core presented here largely follows the idealized models with spectral dynamics developed
+at the Geophysical Fluid Dynamics Laboratory[^1]: A barotropic vorticity model[^2], a shallow water
+model [^3] and a primitive equation model[^4]. 
+
 ## Barotropic vorticity equation
 
 The barotropic vorticity equation is the prognostic equation that describes the time evolution of
@@ -54,6 +58,14 @@ We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrat
 
 ## Shallow water equations
 
+```math
+\begin{aligned}
+\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) &= \nu\nabla^{2n}\zeta \\
+\frac{\partial \mathcal{D}}{\partial t} - \nabla \times (\mathbf{u}(\zeta + f)) &= -\nabla^2(\tfrac{1}{2}(u^2 + v^2) + g\eta) + \nu\nabla^{2n}\mathcal{D} \\
+\frac{\partial \eta}{\partial t} + \nabla \cdot (\mathbf{u}h) &= 0.
+\end{aligned}
+```
+
 more to come
 
 ## Primitive equations
@@ -65,7 +77,7 @@ The [primitive equations](https://en.wikipedia.org/wiki/Primitive_equations) sol
 \partial_t u = ... \\
 \partial_t v = ... \\
 \partial_t T = ... \\ 
-\partial_t Q = ... \\
+\partial_t Q = ...
 \end{aligned}
 ```
 
@@ -142,17 +154,29 @@ In the barotropic voriticity equation model the inversion of the Laplcians in or
 \tilde{\zeta} = \tilde{\nabla}^2 \tilde{\Psi}
 ```
 where the dimensionless gradients simply omit the scaling with ``1/R``, ``\tilde{\nabla} = R\nabla``.
-The scaled [Barotropic vorticity equation](@ref) is
-
+The [Barotropic vorticity equation](@ref) scaled with ``R^2`` is
 ```math
 \partial_{\tilde{t}}\tilde{\zeta} + \tilde{\nabla} \cdot (\mathbf{u}(\tilde{\zeta} + \tilde{f})) = \tilde{\nu}\tilde{\nabla}^{2n}\tilde{\zeta}
 ```
 with
-
-- ``\tilde{t} = tR``, the scaled time ``t``
+- ``\tilde{t} = tR^{-1}``, the scaled time ``t``
 - ``\mathbf{u} = (u,v)``, the velocity vector (no scaling applied)
 - ``\tilde{f} = fR``, the scaled Coriolis parameter ``f``
 - ``\tilde{\nu} = \nu^* R``, the scaled viscosity ``\nu^*``, which itself is normalized to a damping time scale, see [Normalization of diffusion](@ref).
+
+### Scaled shallow water equations
+
+Similar to the scaled barotropic vorticity equations, the scaled shallow water equations scale the vorticity and the divergence equation with ``R^2``, but the continuity equation with ``R``
+
+```math
+\begin{aligned}
+\frac{\partial \tilde{\zeta}}{\partial \tilde{t}} + \tilde{\nabla} \cdot (\mathbf{u}(\tilde{\zeta} + \tilde{f})) &=
+\tilde{\nu}\tilde{\nabla}^{2n}\tilde{\zeta} \\
+\frac{\partial \tilde{\mathcal{D}}}{\partial \tilde{t}} - \tilde{\nabla} \times (\mathbf{u}(\tilde{\zeta} + \tilde{f})) &=
+-\tilde{\nabla}^2\left(\tfrac{1}{2}(u^2 + v^2) + g\eta \right) + \tilde{\nu}\tilde{\nabla}^{2n}\tilde{\mathcal{D}} \\
+\frac{\partial \eta}{\partial \tilde{t}} + \tilde{\nabla} \cdot (\mathbf{u}h) &= 0.
+\end{aligned}
+```
 
 ## Time integration
 
@@ -164,3 +188,10 @@ to dampen the computational mode and achieve 3rd order accuracy.
 ```math
 \frac{dF}{dt} = i\omega F
 ```
+
+## References
+
+[^1]: Geophysical Fluid Dynamics Laboratory, [Idealized models with spectral dynamics](https://www.gfdl.noaa.gov/idealized-models-with-spectral-dynamics/)
+[^2]: Geophysical Fluid Dynamics Laboratory, [The barotropic vorticity equation](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/barotropic.pdf).
+[^3]: Geophysical Fluid Dynamics Laboratory, [The Shallow Water Equations](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/shallow.pdf).
+[^4]: Geophysical Fluid Dynamics Laboratory, [The Spectral Dynamical Core](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/spectral_core.pdf)

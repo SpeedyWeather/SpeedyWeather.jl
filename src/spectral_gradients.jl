@@ -19,14 +19,17 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: co
                             add::Bool=false                         # coslat_u += (add) or = (overwrite)
                             ) where {NF<:AbstractFloat}             # number format NF
 
-    _,mmax = size(Ψ)                # degree l, order m of spherical harmonics
-    lmax, mmax = mmax-1, mmax-1     # convert to 0-based l,m, but use mmax for lmax/lmax+1 flexibility
-    
     # u needs one more degree/meridional mode l for each m than Ψ due to the recursion
     # Ψ can have size n+1 x n but then the last row is not used in the loop
-    size_same = size(coslat_u) == size(Ψ)
-    size_compat = size_same || (size(coslat_u) .- (1,0)) == size(Ψ)
-    @boundscheck size_compat || throw(BoundsError)
+    lmax_out, mmax_out = size(coslat_u)
+    lmax_in,  mmax_in  = size(Ψ)
+
+    @boundscheck mmax_out == mmax_in || throw(BoundsError)
+    mmax = mmax_out - 1                 # 0-based max order m of harmonics
+
+    @boundscheck abs(lmax_out-lmax_in) <= 1 || throw(BoundsError)
+    lmax = lmax_in - 1                  # 0-based max degree l of harmonics
+    output_larger = lmax_out - lmax_in
 
     if flipsign                     # used to get u from streamfunction Ψ (u ~ -∂Ψ/∂lat)
         grad_y1 = S.minus_grad_y1
@@ -37,15 +40,15 @@ function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: co
     end
 
     g = grad_y2[1,1]*Ψ[2,1]
-    coslat_u[1,1] = add ? coslat_u[1,1] + g : g        # l=m=0 mode only with term 2
+    coslat_u[1,1] = add ? coslat_u[1,1] + g : g         # l=m=0 mode only with term 2
 
-    @inbounds for m in 1:mmax
+    for m in 1:mmax+1
         for l in max(2,m):lmax
             g = grad_y1[l,m]*Ψ[l-1,m] + grad_y2[l,m]*Ψ[l+1,m]
             coslat_u[l,m] = add ? coslat_u[l,m] + g : g
         end
-        for l in lmax+1:lmax+2-size_same
-            g = grad_y1[l,m]*Ψ[l-1,m]
+        for l in lmax+1:lmax+1+output_larger            # execute 2x for out > in, 1x for out == in and
+            g = grad_y1[l,m]*Ψ[l-1,m]                   # 0x for out < in
             coslat_u[l,m] = add ? coslat_u[l,m] + g : g
         end
     end
@@ -76,26 +79,31 @@ such that the returned array is scaled with coslat.
 function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # output: cos(latitude)*meridional velocity
                                 Ψ::AbstractMatrix{Complex{NF}},         # input: spectral coefficients of stream function
                                 radius::Real=1;                         # radius of the sphere/Earth
-                                add::Bool=false                         # coslat_u += (add) or = (overwrite)
+                                add::Bool=false,                        # coslat_u += (add) or = (overwrite)
+                                flipsign::Bool=false                    # flip sign of output?
                                 ) where {NF<:AbstractFloat}             # number format NF
 
-    # Ψ can have size n+1 x n but then the last row is not used in the loop
-    size_compat = size(coslat_v) == size(Ψ) || (size(coslat_v) .- (1,0)) == size(Ψ)
-    @boundscheck size_compat || throw(BoundsError)
-    lmax,mmax = size(Ψ) .- 1    # 0-based max degree l, order m of spherical harmonics
+    lmax_out, mmax_out = size(coslat_v)
+    lmax_in,  mmax_in  = size(Ψ)
 
-    iradius⁻¹ = convert(Complex{NF},im/radius)      # = imaginary/radius converted to NF
+    @boundscheck mmax_out == mmax_in || throw(BoundsError)
+    mmax = mmax_out - 1                 # 0-based max order m of harmonics
+
+    @boundscheck abs(lmax_out-lmax_in) <= 1 || throw(BoundsError)
+    lmax = min(lmax_out,lmax_in) - 1    # 0-based max degree l of harmonics
+    output_larger = lmax_out > lmax_in
+
+    iradius⁻¹ = convert(Complex{NF},(-1)^flipsign*im/radius)            # = ±imaginary/radius converted to NF
 
     @inbounds for m in 1:mmax+1                     # loop over all coefficients, order m
         for l in m:lmax+1                           # degree l
             g = (m-1)*iradius⁻¹*Ψ[l,m]              # gradient in lon = *i*m/radius but 1-based order
             coslat_v[l,m] = add ? coslat_v[l,m] + g : g 
-            # coslat_v[l,m] = coslat_v[l,m]*add + (m-1)*iradius⁻¹*Ψ[l,m] 
         end
     end
 
-    # grad in lon does not project onto the last degree l, set explicitly to zero in that case
-    if size(Ψ) != size(coslat_v)
+    # if grad in lon does not project onto the last degree l, set explicitly to zero in that case
+    if output_larger & ~add
         for m in 1:mmax+1        
             coslat_v[end,m] = zero(Complex{NF}) 
         end
@@ -109,8 +117,8 @@ function gradient_longitude(Ψ::AbstractMatrix{NF},  # input array: spectral coe
                             R::Real=1;              # radius of the sphere/Earth
                             one_more_l::Bool=true   # allocate output with one more degree l
                             ) where NF              # number format NF
-    lmax,mmax = size(Ψ)
-    coslat_v = zeros(NF,lmax+one_more_l,mmax)       # preallocate output array (gradient in longitude)
+    _,mmax = size(Ψ)
+    coslat_v = zeros(NF,mmax+one_more_l,mmax)       # preallocate output array (gradient in longitude)
     return gradient_longitude!(coslat_v,Ψ,R)        # call in-place version
 end
 
@@ -166,13 +174,35 @@ function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{NF}},   # Output: inve
 
     @boundscheck size(alms) == size(∇⁻²alms) || throw(BoundsError)
     lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
+    
     @unpack eigen_values⁻¹ = S
+    @boundscheck length(eigen_values⁻¹) >= lmax+1 || throw(BoundsError)
 
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
-        for l in m:lmax+1           # degree l = 0:lmax but 1-based
+        for l in m:lmax+1           # degree l = m:lmax but 1-based
             ∇⁻²alms[l,m] = alms[l,m]*eigen_values⁻¹[l]
         end
     end
 
     return ∇⁻²alms
+end
+
+function ∇²!(   ∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacian of alms
+                alms::AbstractMatrix{Complex{NF}},      # spectral coefficients
+                S::SpectralTransform{NF}                # precomputed arrays for spectral space
+                ) where {NF<:AbstractFloat}
+
+    @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
+    lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
+    
+    @unpack eigen_values = S
+    @boundscheck length(eigen_values) >= lmax+1 || throw(BoundsError)
+
+    @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
+        for l in m:lmax+1           # degree l = m:lmax but 1-based
+            ∇²alms[l,m] = alms[l,m]*eigen_values[l]
+        end
+    end
+
+    return ∇²alms
 end

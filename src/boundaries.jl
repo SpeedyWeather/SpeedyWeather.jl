@@ -5,6 +5,7 @@ Struct that holds the boundary arrays in grid-point space
     albedo          ::Array{NF,2}           # annual mean surface albedo, grid-point
 """
 struct Boundaries{NF<:AbstractFloat}        # number format NF
+    orography       ::Matrix{NF}            # orography [m]
     geopot_surf_grid::Matrix{NF}            # surface geopotential (i.e. orography) [m^2/s^2]
     geopot_surf     ::Matrix{Complex{NF}}   # spectral surface geopotential
 
@@ -17,24 +18,35 @@ orography, land-sea mask and albedo from an netCDF file and stores the in a
 `Boundaries` struct."""
 function Boundaries(P::Parameters)
 
+    @unpack orography_path, orography_file, gravity = P
+
+    # LOAD NETCDF FILE (but not its data yet)
+    if orography_path == ""
+        path = joinpath(@__DIR__,"../input_data",orography_file)
+    else
+        path = joinpath(orography_path,orography_file)
+    end
+    ncfile = NetCDF.open(path)
+
+
     if P.model == :barotropic   # no boundary data needed with the barotropic model
-        # create dummy arrays
-        geopot_surf         = zeros(complex(P.NF),1,1)
-        geopot_surf_grid    = zeros(P.NF,1,1)
-    
-    else                        # load orography for the shallowwater model
-                                # TODO: change for primitive equation model accordingly
-
-        @unpack orography_path, orography_file, gravity = P
-
-        # LOAD NETCDF FILE
-        if orography_path == ""
-            path = joinpath(@__DIR__,"../input_data",orography_file)
-        else
-            path = joinpath(orography_path,orography_file)
-        end
-        ncfile = NetCDF.open(path)
         
+        orography           = zeros(P.NF,1,1)               # create dummy arrays
+        geopot_surf         = zeros(complex(P.NF),1,1)  
+        geopot_surf_grid    = zeros(P.NF,1,1)
+
+    elseif P.model == :shallowwater
+
+        orography_highres = ncfile.vars["orog"][:,:]        # height [m]
+        orography = gridded(spectral_truncation(spectral(orography_highres),P.trunc))
+        fill!(orography,zero(P.NF))       # make mountains smaller
+        # reverse!(orography,dims=2)
+
+        geopot_surf         = zeros(complex(P.NF),1,1)  
+        geopot_surf_grid    = zeros(P.NF,1,1)
+
+    else # primitive equation model 
+
         # READ, TODO check which latitude ordering is required, it's North to South in file
         orography = ncfile.vars["orog"][:,:]        # height [m]
         # landsea_mask = ncfile.vars["lsm"][:,:]    # fraction of land [0-1]
@@ -49,5 +61,5 @@ function Boundaries(P::Parameters)
     end
 
     # convert to number format NF here
-    return Boundaries{P.NF}(geopot_surf_grid,geopot_surf) #,landsea_mask,albedo)
+    return Boundaries{P.NF}(orography,geopot_surf_grid,geopot_surf) #,landsea_mask,albedo)
 end
