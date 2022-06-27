@@ -7,8 +7,8 @@
         (;vor_tend) = d.tendencies
         (;damping,damping_impl) = m.horizontal_diffusion
 
-        vor       = randn(Complex{T},size(vor)...)
-        vor_tend  = zeros(Complex{T},size(vor_tend)...)
+        vor       .= randn(Complex{T},size(vor)...)
+        vor_tend  .= zeros(Complex{T},size(vor_tend)...)
 
         vor_lf1 = view(vor,:,:,1,:)
 
@@ -28,9 +28,17 @@
             end
         end
 
-        # damping increases with higher wave number l statistically (sum over m and k)
-        for l in 2:lmax+1
-            @test sum(abs.(vor_tend[l,1:l,:])) > sum(abs.(vor_tend[l-1,1:l,:]))
+        vor0 = copy(vor_lf1)
+        SpeedyWeather.leapfrog!(vor,vor_tend,m.constants.Δt,m.constants,1)
+        vor1 = view(vor,:,:,2,:)
+
+        @test any(vor0 .!= vor1)    # check that at least some coefficients are different
+        @test any(vor0 .== vor1)    # check that at least some coefficients are identical
+
+        # damping should not increase real or imaginary part of variable
+        for lm in eachindex(vor0,vor_lf1)
+            @test real(vor0[lm]) >= real(vor_lf1[lm])
+            @test imag(vor0[lm]) >= imag(vor_lf1[lm])
         end
     end
 end
