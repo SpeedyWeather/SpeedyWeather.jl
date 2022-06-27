@@ -102,8 +102,8 @@ function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # outpu
         end
     end
 
-    # grad in lon does not project onto the last degree l, set explicitly to zero in that case
-    if output_larger
+    # if grad in lon does not project onto the last degree l, set explicitly to zero in that case
+    if output_larger & ~add
         for m in 1:mmax+1        
             coslat_v[end,m] = zero(Complex{NF}) 
         end
@@ -117,8 +117,8 @@ function gradient_longitude(Ψ::AbstractMatrix{NF},  # input array: spectral coe
                             R::Real=1;              # radius of the sphere/Earth
                             one_more_l::Bool=true   # allocate output with one more degree l
                             ) where NF              # number format NF
-    lmax,mmax = size(Ψ)
-    coslat_v = zeros(NF,lmax+one_more_l,mmax)       # preallocate output array (gradient in longitude)
+    _,mmax = size(Ψ)
+    coslat_v = zeros(NF,mmax+one_more_l,mmax)       # preallocate output array (gradient in longitude)
     return gradient_longitude!(coslat_v,Ψ,R)        # call in-place version
 end
 

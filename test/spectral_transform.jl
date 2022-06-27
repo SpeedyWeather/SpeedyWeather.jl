@@ -149,7 +149,6 @@ end
         lmax,mmax = size(vor0)      # 1-based maximum l,m
         
         @testset for lmax in (lmax,lmax+1)
-            println(lmax)
 
             u = zeros(Complex{NF},lmax,mmax,1)
             u_grid = zero(d.grid_variables.u_grid)
