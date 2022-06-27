@@ -28,7 +28,7 @@ NetCDF = "0.10, 0.11"
 Parameters = "0.10, 0.11, 0.12"
 Primes = "0.5"
 ProgressMeter = "1.7"
-UnicodePlots = "2.10"
+UnicodePlots = "2.10, 3"
 julia = "1.7"
 
 [extras]
