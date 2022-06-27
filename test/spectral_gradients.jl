@@ -1,5 +1,4 @@
 @testset "Divergence of a non-divergent flow zero?" begin
-
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
@@ -16,8 +15,8 @@
         SpeedyWeather.gridded!(d,p,m)   # get corresponding non-divergent u_grid, v_grid
 
         # check we've actually created non-zero u*coslat,v*coslat
-        @test all(d.grid_variables.u_grid .!= 0)
-        @test all(d.grid_variables.v_grid .!= 0)
+        @test all(d.grid_variables.U_grid .!= 0)
+        @test all(d.grid_variables.V_grid .!= 0)
 
         # to evaluate ∇⋅(uv) use vorticity adv (=∇⋅(uv(ζ+f))) with ζ=1,f=0
         fill!(d.grid_variables.vor_grid,1)
@@ -47,8 +46,8 @@ end
         SpeedyWeather.gridded!(d,p,m)   # get corresponding non-divergent u_grid, v_grid
 
         # check we've actually created non-zero u,v (which include coslat scaling)
-        @test all(d.grid_variables.u_grid .!= 0)
-        @test all(d.grid_variables.v_grid .!= 0)
+        @test all(d.grid_variables.U_grid .!= 0)
+        @test all(d.grid_variables.V_grid .!= 0)
         
         # to evaluate ∇⋅(uv) use vorticity adv (=∇⋅(uv(η+H₀))) with η=1,H₀=0
         H₀ = 0
@@ -79,8 +78,8 @@ end
         SpeedyWeather.gridded!(d,p,m)   
 
         # check we've actually created non-zero (u,v)*coslat
-        @test all(d.grid_variables.u_grid .!= 0)
-        @test all(d.grid_variables.v_grid .!= 0)
+        @test all(d.grid_variables.U_grid .!= 0)
+        @test all(d.grid_variables.V_grid .!= 0)
 
         # to evaluate ∇×(uv) use curl of vorticity fluxes (=∇×(uv(ζ+f))) with ζ=1,f=0
         fill!(d.grid_variables.vor_grid,1)
@@ -198,8 +197,8 @@ end
         SpeedyWeather.gridded!(d,p,m)   
 
         # check we've actually created non-zero u,v
-        @test all(d.grid_variables.u_grid .!= 0)
-        @test all(d.grid_variables.v_grid .!= 0)
+        @test all(d.grid_variables.U_grid .!= 0)
+        @test all(d.grid_variables.V_grid .!= 0)
 
         coslat_u = d.intermediate_variables.coslat_u[:,:,1]
         coslat_v = d.intermediate_variables.coslat_v[:,:,1]

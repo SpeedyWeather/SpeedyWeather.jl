@@ -142,23 +142,28 @@ end
         # get corresponding irrotational u_grid, v_grid (incl *coslat scaling)
         SpeedyWeather.gridded!(d,p,m)   
 
-        # check we've actually created non-zero u,v
-        @test all(d.grid_variables.u_grid .!= 0)
-        @test all(d.grid_variables.v_grid .!= 0)
+        # check we've actually created non-zero U,V
+        @test all(d.grid_variables.U_grid .!= 0)
+        @test all(d.grid_variables.V_grid .!= 0)
 
         lmax,mmax = size(vor0)      # 1-based maximum l,m
         
         @testset for lmax in (lmax,lmax+1)
 
-            u = zeros(Complex{NF},lmax,mmax,1)
-            u_grid = zero(d.grid_variables.u_grid)
+            U = zeros(Complex{NF},lmax,mmax,1)
+            U_grid = zero(d.grid_variables.U_grid)
+            U_grid2 = zero(d.grid_variables.U_grid)
 
+            # transform back and forth first as the original U_grid
+            # is not exactly representable for lmax=lmax,lmax+1 (spectral truncation)
             S = m.geospectral.spectral_transform
-            SpeedyWeather.spectral!(u,d.grid_variables.u_grid,S)
-            SpeedyWeather.gridded!(u_grid,u,S)
+            SpeedyWeather.spectral!(U,d.grid_variables.U_grid,S)
+            SpeedyWeather.gridded!(U_grid,U,S)
+            SpeedyWeather.spectral!(U,U_grid,S)
+            SpeedyWeather.gridded!(U_grid2,U,S)
 
-            for i in eachindex(u_grid, d.grid_variables.u_grid)
-                @test u_grid[i] ≈ d.grid_variables.u_grid[i] rtol=30*sqrt(eps(NF))
+            for i in eachindex(U_grid, U_grid2)
+                @test U_grid[i] ≈ U_grid2[i] rtol=30*sqrt(eps(NF))
             end
         end
     end

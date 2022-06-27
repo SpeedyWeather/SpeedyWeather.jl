@@ -5,10 +5,10 @@ function get_large_scale_condensation_tendencies!(
     @unpack gravity, RH_thresh_max, RH_thresh_range, RH_thresh_boundary, humid_relax_time = M.constants
     @unpack cp, alhc, k_lsc = M.parameters
     @unpack nlon, nlat, nlev, σ_levels_full, σ_levels_thick = M.geospectral.geometry
-    @unpack temp_grid, humid_grid, pres_surf_grid = Diag.grid_variables
+    @unpack temp_grid, humid_grid, pres_grid = Diag.grid_variables
     @unpack temp_tend_lsc, humid_tend_lsc, sat_spec_humidity, sat_vap_pressure, cloud_top, precip_large_scale = Diag.parametrization_variables
 
-    pres = exp.(pres_surf_grid)  # Normalised surface pressure - TODO(alistair): check pressure units throughout
+    pres = exp.(pres_grid)  # Normalised surface pressure - TODO(alistair): check pressure units throughout
 
     get_saturation_specific_humidity!(sat_spec_humidity, sat_vap_pressure, temp_grid, pres, M)
 
