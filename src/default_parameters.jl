@@ -21,7 +21,7 @@ The default values of the keywords define the default model setup.
 
     # PHYSICAL CONSTANTS
     radius_earth::Real=6.371e6          # radius of Earth [m]
-    rotation_earth::Real=1e-5           # angular frequency of Earth's rotation [rad/s]
+    rotation_earth::Real=7.29e-5        # angular frequency of Earth's rotation [rad/s]
     gravity::Real=9.81          # gravitational acceleration [m/s^2]
     akap::Real=2/7              # ratio of gas constant to specific heat of dry air
                                 # at constant pressure = 1 - 1/γ where γ is the
@@ -42,7 +42,7 @@ The default values of the keywords define the default model setup.
     scale_height_humid::Real=2.5# reference scale height for specific humidity [km]
     relhumid_ref::Real=0.7      # reference relative humidity of near-surface air [1]
     water_pres_ref::Real=17     # reference saturation water vapour pressure [Pa]
-    layer_thickness::Real=10    # layer thickness for the shallow water model [km]
+    layer_thickness::Real=7     # layer thickness for the shallow water model [km]
 
     # VERTICAL COORDINATES
     # of the nlev vertical levels, defined by a generalised logistic function,
