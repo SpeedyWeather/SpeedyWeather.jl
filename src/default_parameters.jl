@@ -21,7 +21,7 @@ The default values of the keywords define the default model setup.
 
     # PHYSICAL CONSTANTS
     radius_earth::Real=6.371e6          # radius of Earth [m]
-    rotation_earth::Real=1e-5           # angular frequency of Earth's rotation [rad/s]
+    rotation_earth::Real=7.29e-5        # angular frequency of Earth's rotation [rad/s]
     gravity::Real=9.81          # gravitational acceleration [m/s^2]
     akap::Real=2/7              # ratio of gas constant to specific heat of dry air
                                 # at constant pressure = 1 - 1/γ where γ is the

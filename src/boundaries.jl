@@ -39,9 +39,6 @@ function Boundaries(P::Parameters)
 
         orography_highres = ncfile.vars["orog"][:,:]        # height [m]
         orography = gridded(spectral_truncation(spectral(orography_highres),P.trunc))
-        fill!(orography,zero(P.NF))       # make mountains smaller
-        # reverse!(orography,dims=2)
-
         geopot_surf         = zeros(complex(P.NF),1,1)  
         geopot_surf_grid    = zeros(P.NF,1,1)
 

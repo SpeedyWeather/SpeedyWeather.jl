@@ -68,7 +68,7 @@ mapped into a matrix ``a_{lm}`` as
 
 which is consistently extended for higher degrees and orders. Consequently, all spectral fields are lower-triangular matrices
 with complex entries. The upper triangle excluding the diagnol explicitly stores zeros. Note that internally some fields may
-include an additional degree, such that ``l_{max} = m_{max} + 1`` (see [Gradients in spectral space](@ref) for more information).
+include an additional degree, such that ``l_{max} = m_{max} + 1`` (see [Gradients in spherical coordinates](@ref) for more information).
 The harmonics with ``a_{l0}`` (the first column) are also called _zonal_ harmonics as they are constant with longitude ``\phi``.
 The harmonics with ``a_{ll}`` (the main diagonal) are also called _sectoral_ harmonics as they essentially split the sphere
 into ``2l`` sectors in longitude ``\phi`` without a zero-crossing in latitude.
@@ -161,28 +161,70 @@ spacing at the Equator (``2\pi R / nlon``)
 Choosing `trunc` as argument in `run_speedy` will automatically choose `nlon`,`nlat` as presented in the table.
 Other common choices are T63 (192x96), T127 (384x192), T255 (768x384), T511 (1536x768), among others.
 
-## Gradients in spectral space
+## Gradients in spherical coordinates
 
-Gradients in spectral space are discussed in the following using the conversion between the stream function ``\Psi``
-and the zonal and meridional velocity components ``u,v`` as an example.
+Horizontal gradients in spherical coordinates are defined for a scalar field ``A`` and a vector field ``\mathbf{u} = (u,v)`` and the latitudes ``\theta`` and longitudes ``\lambda`` as
 
 ```math
 \begin{aligned}
-u &= -\frac{1}{R}\frac{\partial \Psi}{\partial \theta} \\
-v &= \frac{1}{R \cos(\theta)}\frac{\partial \Psi}{\partial \phi}
+\nabla A &= \left(\frac{1}{R}\frac{\partial A}{\partial \theta}, \frac{1}{R\cos\theta}\frac{\partial A}{\partial \lambda} \right)\\
+\nabla \cdot \mathbf{u} &= \frac{1}{R\cos\theta}\frac{\partial u}{\partial \lambda} + \frac{1}{R\cos\theta}\frac{\partial (v \cos\theta)}{\partial \lambda}.
 \end{aligned}
 ```
 
-The radius of the sphere (i.e. Earth) is ``R``, ``\theta`` the latitude and ``\phi`` the longitude. So the zonal
-velocity ``u`` is the (negative) meridional gradient of the stream function ``\Psi``, and the meridional
-velocity ``v`` is the zonal gradient of ``\Psi``. The zonal gradient scales with ``1/\cos(\theta)`` as the 
+The radius of the sphere (i.e. Earth) is ``R``. The zonal gradient scales with ``1/\cos(\theta)`` as the 
 longitudes converge towards the poles (note that ``\theta`` describes latitudes here, defintions using colatitudes
 replace the ``\cos`` with a ``\sin``.)
+
+Starting with a spectral field of vorticity ``\zeta`` and divergence ``\mathcal{D}`` one can obtain stream function ``\Psi``
+and velocity potential ``\Phi`` by inverting the Laplace operator ``\nabla^2``:
+
+```math
+\Psi = \nabla^{-2}\zeta, \quad \Phi = \nabla^{-2}\mathcal{D}.
+```
+
+The velocities ``u,v`` are then obtained from ``(u,v) = \nabla^\bot\Psi + \nabla\Phi`` following the defintion from above
+and ``\nabla^\bot = R^{-1}\partial_\theta, (R\cos\theta)^{-1}\partial_\lambda``
+
+```math
+\begin{aligned}
+u &= -\frac{1}{R}\partial_\theta\Psi + \frac{1}{R\cos\theta}\partial_\lambda\Phi \\
+v &= +\frac{1}{R}\partial_\theta\Phi + \frac{1}{R\cos\theta}\partial_\lambda\Psi.
+\end{aligned}
+```
+
+Alternatively, we can use the velocities ``U = u\cos\theta, V = v\cos\theta``, which we do as the meridional gradient
+for spherical harmonics is easier implemented with a ``\cos\theta``-scaling included, and because the divergence and 
+curl in spherical coordinates evaluates the meridional gradient with ``U,V`` and not ``u,v``. From ``u,v`` we can
+return to ``\zeta, \mathcal{D}`` via
+
+```math
+\begin{aligned}
+\zeta &= \frac{1}{R\cos\theta}\partial_\lambda v - \frac{1}{R\cos\theta}\partial_\theta (u \cos\theta) \\
+\mathcal{D} &= \frac{1}{R\cos\theta}\partial_\lambda u + \frac{1}{R\cos\theta}\partial_\theta (v \cos\theta).
+\end{aligned}
+```
+
+Equivalently, we have
+
+```math
+\begin{aligned}
+U &= -\frac{\cos\theta}{R}\partial_\theta\Psi + \frac{1}{R}\partial_\lambda\Phi \\
+V &= +\frac{\cos\theta}{R}\partial_\theta\Phi + \frac{1}{R}\partial_\lambda\Psi \\
+(\cos^2\theta)\zeta &= \frac{1}{R}\partial_\lambda V - \frac{\cos\theta}{R}\partial_\theta U \\
+(\cos^2\theta)\mathcal{D} &= \frac{1}{R}\partial_\lambda U + \frac{\cos\theta}{R}\partial_\theta V.
+\end{aligned}
+```
+
+which is a more convenient formulation as required ``\cos\theta`` scalings are reduced to a minimum. As described in
+[Meridional derivative](@ref), it is more convenient to implement ``\cos\theta \partial_\theta`` via a recursion
+relation for the Legendre polynomials than ``\partial_\theta`` directly.
 
 ### Zonal derivative
 
 The zonal derivative of a field ``\Psi`` in spectral space is the zonal derivative of all its respective
-spherical harmonics ``\Psi_{lm}(\phi,\theta)``.
+spherical harmonics ``\Psi_{lm}(\phi,\theta)`` (now we use ``\phi`` for longitudes to avoid confusion with the
+Legendre polynomials ``lambda_{lm}``)
 
 ```math
 v_{lm} = \frac{1}{R \cos(\theta)} \frac{\partial}{\partial \phi} \left( \lambda_l^m(\cos\theta) e^{im\phi} \right) =
@@ -215,7 +257,7 @@ The recursion factors are
 \epsilon_{l,m} = \sqrt{\frac{l^2-m^2}{4l^2-1}}
 ```
 
-The recursion relation means that the coefficient of a gradient ``u_{lm}`` is a linear combination of the coefficients
+The recursion relation means that the coefficient of a gradient ``((\cos\theta) u)_{lm}`` is a linear combination of the coefficients
 of one higher and one lower degree ``\Psi_{l+1,m},\Psi_{l-1,m}``. As the coefficient ``\Psi_{lm}`` with ``m<l`` are
 zero, the sectoral harmonics (``l=m``) of the gradients are obtained from the first off-diagonal only. However,
 the ``l=l_{max}`` harmonics of the gradients require the ``l_{max}-1`` as well as the ``l_{max}+1`` harmonics.

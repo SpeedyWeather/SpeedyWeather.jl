@@ -1,8 +1,7 @@
 struct Implicit{NF<:AbstractFloat}
     ξH₀::Vector{NF}
-    ξRH₀::Vector{NF}
+    g∇²::Vector{NF}
     ξg∇²::Vector{NF}
-    ξgR∇²::Vector{NF}
     div_impl::Vector{NF}
 end
 
@@ -14,7 +13,7 @@ function Implicit(  P::Parameters,
     @unpack Δt,gravity,radius_earth = C             # time step Δt (scaled), gravity g [m/s²], radius [m]
     @unpack implicit_α = P                          # implicit time step fraction between i-1 and i+1
     @unpack eigen_values = G.spectral_transform     # = -(l(l+1)), degree l of harmonics (0-based)
-    @unpack layer_thickness = P                     # = H₀, layer thickness at rest without mountains
+    @unpack layer_thickness = C                     # = H₀, layer thickness at rest without mountains
 
     # implicit time step between i-1 and i+1
     # α = 0   means the implicit terms (gravity waves) are evaluated at i-1 (forward)
@@ -22,15 +21,14 @@ function Implicit(  P::Parameters,
     # α = 1   evaluates at i+1 (backward implicit)
 
     ξ = 2implicit_α*Δt              # = [0,2Δt], time step within [forward,backward] range for implicit terms
-    ξg∇² = ξ*gravity*eigen_values   # = -ξgl(l+1), gravity g, degree l of harmonics
-    ξgR∇² = ξg∇²*radius_earth       # 
-    ξH₀ = ξ*layer_thickness         #
-    ξRH₀ = ξH₀*radius_earth         #
+    g∇² = gravity*eigen_values      # = -gl(l+1), gravity g, degree l of harmonics
+    ξg∇² = ξ*g∇²                    # = -ξgl(l+1)
+    ξH₀ = ξ*layer_thickness         # = ξ*H₀
 
     # (inverse of) implicit denominator for divergence tendency correction (inverse)
     div_impl = 1 ./ (1 .- ξH₀*ξg∇²) # = 1/(1+l(l+1)*ξ²gH₀)
 
-    return Implicit{NF}([ξH₀],[ξRH₀],ξg∇²,ξgR∇²,div_impl)
+    return Implicit{NF}([ξH₀],g∇²,ξg∇²,div_impl)
 end
 
 # struct Implicit{M1<:AbstractMatrix, M2<:AbstractMatrix, A<:AbstractArray, V<:AbstractVector}
