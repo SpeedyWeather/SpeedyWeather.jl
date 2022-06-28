@@ -42,7 +42,7 @@ The default values of the keywords define the default model setup.
     scale_height_humid::Real=2.5# reference scale height for specific humidity [km]
     relhumid_ref::Real=0.7      # reference relative humidity of near-surface air [1]
     water_pres_ref::Real=17     # reference saturation water vapour pressure [Pa]
-    layer_thickness::Real=7     # layer thickness for the shallow water model [km]
+    layer_thickness::Real=10    # layer thickness for the shallow water model [km]
 
     # VERTICAL COORDINATES
     # of the nlev vertical levels, defined by a generalised logistic function,
