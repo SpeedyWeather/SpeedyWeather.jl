@@ -10,7 +10,9 @@ function get_run_id_path(P::Parameters)
 
     if output
         # pull list of existing run???? folders via readdir
-        runlist = filter(x->startswith(x,"run"),readdir(out_path))
+        pattern = r"run\d\d\d\d"                # run???? in regex
+        runlist = filter(x->startswith(x,pattern),readdir(out_path))
+        runlist = filter(x->endswith(  x,pattern),runlist)
         existing_runs = [parse(Int,id[4:end]) for id in runlist]
 
         # get the run id from existing folders
