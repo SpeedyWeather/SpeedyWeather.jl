@@ -1,7 +1,7 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
 authors = ["milankl"]
-version = "0.1.1"
+version = "0.2"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
