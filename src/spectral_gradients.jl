@@ -122,37 +122,152 @@ function gradient_longitude(Ψ::AbstractMatrix{NF},  # input array: spectral coe
     return gradient_longitude!(coslat_v,Ψ,R)        # call in-place version
 end
 
-"""Divide a gridded field `A` by the cosine of latitude."""
-function unscale_coslat!(   A::AbstractMatrix{NF},
-                            G::Geometry{NF}) where NF
-    
-    nlon, nlat = size(A)
-    @boundscheck nlat == G.nlat || throw(BoundsError)
 
-    @unpack coslat⁻¹ = G
+function curl!( curl::AbstractMatrix{Complex{NF}},
+                u::AbstractMatrix{Complex{NF}},
+                v::AbstractMatrix{Complex{NF}},
+                S::SpectralTransform{NF};
+                flipsign::Bool=false,
+                add::Bool=false
+                ) where {NF<:AbstractFloat}
 
-    @inbounds for j in 1:nlat
-        for i in 1:nlon
-            A[i,j] *= coslat⁻¹[j]
+    # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
+    kernel(o,a,b,c) = flipsign ? (add ? o+c-a-b : c+a-b) :
+                                 (add ? o+a+b-c : a+b-c)    
+    _divergence!(kernel,curl,v,u,S)             # flip u,v -> v,u
+end
+
+function divergence!(   div::AbstractMatrix{Complex{NF}},
+                        u::AbstractMatrix{Complex{NF}},
+                        v::AbstractMatrix{Complex{NF}},
+                        S::SpectralTransform{NF};
+                        flipsign::Bool=false,
+                        add::Bool=false
+                        ) where {NF<:AbstractFloat}
+
+    # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
+    kernel(o,a,b,c) = flipsign ? (add ? o+b-a-c : b-a-c) :
+                                 (add ? o+a-b+c : a-b+c)                
+    _divergence!(kernel,div,u,v,S)
+end
+
+function _divergence!(  kernel,
+                        div::AbstractMatrix{Complex{NF}},
+                        u::AbstractMatrix{Complex{NF}},
+                        v::AbstractMatrix{Complex{NF}},
+                        S::SpectralTransform{NF}
+                        ) where {NF<:AbstractFloat}
+
+    lmax,mmax = size(div) .- (1,1)                  # 0-based lmax,mmax 
+    @boundscheck size(u) == (lmax+2,mmax+1) || throw(BoundsError)
+    @boundscheck size(v) == (lmax+2,mmax+1) || throw(BoundsError)
+
+    @unpack grad_y_vordiv1,grad_y_vordiv2 = S
+
+    z = zero(Complex{NF})
+    div[1,1] = kernel(div[1,1],z,z,z)               # l=m=0 harmonic is zero
+
+    @inbounds for m in 1:mmax+1                     # 1-based l,m
+        for l in max(2,m):lmax+1                    # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+            ∂u∂λ  = ((m-1)*im)*u[l,m]
+            ∂v∂θ1 = grad_y_vordiv1[l,m]*v[l-1,m]
+            ∂v∂θ2 = grad_y_vordiv2[l,m]*v[l+1,m]
+            div[l,m] = kernel(div[l,m],∂u∂λ,∂v∂θ1,∂v∂θ2)
         end
+    end
+
+    return nothing
+end
+
+function curl_div!( curl::AbstractMatrix{Complex{NF}},
+                    div::AbstractMatrix{Complex{NF}},
+                    u::AbstractMatrix{Complex{NF}},
+                    v::AbstractMatrix{Complex{NF}},
+                    S::SpectralTransform{NF}
+                    ) where {NF<:AbstractFloat}
+
+    lmax,mmax = size(div) .- (1,1)                  # 0-based lmax,mmax
+    @boundscheck size(curl) == size(div) || throw(BoundsError)
+    @boundscheck size(u) == (lmax+2,mmax+1) || throw(BoundsError)
+    @boundscheck size(v) == (lmax+2,mmax+1) || throw(BoundsError)
+
+    @unpack grad_y_vordiv1,grad_y_vordiv2 = S
+
+    div[1,1]  = zero(Complex{NF})                   # l=m=0 harmonic is zero
+    curl[1,1] = zero(Complex{NF})                   # l=m=0 harmonic is zero
+    for m in 1:mmax+1                               # 1-based l,m
+        for l in max(2,m):lmax+1                    # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+            ∂u∂λ  = ((m-1)*im)*u[l,m]
+            ∂v∂λ  = ((m-1)*im)*v[l,m]
+            ∂v∂θ1 = grad_y_vordiv1[l,m]*v[l-1,m]
+            ∂u∂θ1 = grad_y_vordiv1[l,m]*u[l-1,m]
+            ∂v∂θ2 = grad_y_vordiv2[l,m]*v[l+1,m]
+            ∂u∂θ2 = grad_y_vordiv2[l,m]*u[l+1,m]
+            div[l,m]  = ∂u∂λ - ∂v∂θ1 + ∂v∂θ2
+            curl[l,m] = ∂v∂λ + ∂u∂θ1 - ∂u∂θ2
+        end
+    end
+
+    return nothing
+end
+
+function UV_from_vor!(  U::AbstractMatrix{Complex{NF}},
+                        V::AbstractMatrix{Complex{NF}},
+                        vor::AbstractMatrix{Complex{NF}},
+                        S::SpectralTransform{NF}
+                        ) where {NF<:AbstractFloat}
+
+    return nothing
+end
+
+function UV_from_vordiv!(   U::AbstractMatrix{Complex{NF}},
+                            V::AbstractMatrix{Complex{NF}},
+                            vor::AbstractMatrix{Complex{NF}},
+                            div::AbstractMatrix{Complex{NF}},
+                            S::SpectralTransform{NF}
+                            ) where {NF<:AbstractFloat}
+
+    lmax,mmax = size(vor) .- (1,1)                  # 0-based lmax,mmax
+    @boundscheck size(vor) == size(div) || throw(BoundsError)
+    @boundscheck size(U) == (lmax+2,mmax+1) || throw(BoundsError)
+    @boundscheck size(V) == (lmax+2,mmax+1) || throw(BoundsError)
+
+    @unpack vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 = S
+
+    U[1,1] =  vordiv_to_uv2[1,1]*vor[2,1]           # l=m=0 harmonic has only one contribution
+    V[1,1] = -vordiv_to_uv2[1,1]*div[2,1]
+
+    @inbounds for m in 1:mmax+1                     # 1-based l,m
+        for l in max(2,m):lmax                      # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+            ∂Dλ = im*vordiv_to_uv_x[l,m]*div[l,m]   # divergence contribution to zonal gradient
+            ∂ζλ = im*vordiv_to_uv_x[l,m]*vor[l,m]   # vorticity contribution to zonal gradient
+
+            # div,vor contribution to meridional gradient
+            ∂ζθ = vordiv_to_uv2[l,m]*vor[l+1,m] - vordiv_to_uv1[l,m]*vor[l-1,m]
+            ∂Dθ = vordiv_to_uv1[l,m]*div[l-1,m] - vordiv_to_uv2[l,m]*div[l+1,m]
+            U[l,m] = ∂Dλ + ∂ζθ
+            V[l,m] = ∂ζλ + ∂Dθ
+        end
+    end
+
+    @inbounds for m in 1:mmax+1
+        l = lmax+1                                  # second last row, l+1 index is out of bounds (=0 entry)
+        U[l,m] = im*vordiv_to_uv_x[l,m]*div[l,m] - vordiv_to_uv1[l,m]*vor[l-1,m]
+        V[l,m] = im*vordiv_to_uv_x[l,m]*vor[l,m] + vordiv_to_uv1[l,m]*div[l-1,m]
+
+        l = lmax+2                                  # last row, l,l+1 indices are out of bounds (=0 entries)
+        U[l,m] = -vordiv_to_uv1[l,m]*vor[l-1,m]
+        V[l,m] =  vordiv_to_uv1[l,m]*div[l-1,m]
     end
 end
 
-"""Multiply a gridded field `A` by the cosine of latitude."""
-function scale_coslat!( A::AbstractMatrix{NF},
-                        G::Geometry{NF}) where NF
-    
-    nlon, nlat = size(A)
-    @boundscheck nlat == G.nlat || throw(BoundsError)
+scale_coslat!(  A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat'
+scale_coslat²!( A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat²'
+scale_coslat⁻¹!(A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat⁻¹'
+scale_coslat⁻²!(A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat⁻²'
 
-    @unpack coslat = G
-
-    @inbounds for j in 1:nlat
-        for i in 1:nlon
-            A[i,j] *= coslat[j]
-        end
-    end
-end
+∇⁻²!(alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigen_values⁻¹
+∇²!( alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigen_values
 
 """
     ∇⁻²!(   ∇⁻²alms::AbstractMatrix{Complex},

@@ -190,8 +190,8 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
 
     Uh_grid = zeros(NF,nlon,nlat,nlev)
     Vh_grid = zeros(NF,nlon,nlat,nlev)
-    Uh = zeros(Complex{NF},lmax+1,mmax+1,nlev)
-    Vh = zeros(Complex{NF},lmax+1,mmax+1,nlev)
+    Uh = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    Vh = zeros(Complex{NF},lmax+2,mmax+1,nlev)
     ∂Uh_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
     ∂Vh_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
