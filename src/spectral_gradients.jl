@@ -166,7 +166,7 @@ function _divergence!(  kernel,
 
     z = zero(Complex{NF})
     div[1,1] = kernel(div[1,1],z,z,z)               # l=m=0 harmonic is zero
-    
+
     @inbounds for m in 1:mmax+1                     # 1-based l,m
         for l in max(2,m):lmax+1                    # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
             ∂u∂λ  = ((m-1)*im)*u[l,m]
@@ -224,7 +224,38 @@ function UV_from_vordiv!(   U::AbstractMatrix{Complex{NF}},
                             S::SpectralTransform{NF}
                             ) where {NF<:AbstractFloat}
 
-    return nothing
+    lmax,mmax = size(vor) .- (1,1)                  # 0-based lmax,mmax
+    @boundscheck size(vor) == size(div) || throw(BoundsError)
+    @boundscheck size(U) == (lmax+2,mmax+1) || throw(BoundsError)
+    @boundscheck size(V) == (lmax+2,mmax+1) || throw(BoundsError)
+
+    @unpack vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 = S
+
+    U[1,1] =  vordiv_to_uv2[1,1]*vor[2,1]           # l=m=0 harmonic has only one contribution
+    V[1,1] = -vordiv_to_uv2[1,1]*div[2,1]
+
+    @inbounds for m in 1:mmax+1                               # 1-based l,m
+        for l in max(2,m):lmax                      # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+            ∂Dλ = im*vordiv_to_uv_x[l,m]*div[l,m]   # divergence contribution to zonal gradient
+            ∂ζλ = im*vordiv_to_uv_x[l,m]*vor[l,m]   # vorticity contribution to zonal gradient
+
+            # div,vor contribution to meridional gradient
+            ∂ζθ = vordiv_to_uv2[l,m]*vor[l+1,m] - vordiv_to_uv1[l,m]*vor[l-1,m]
+            ∂Dθ = vordiv_to_uv1[l,m]*div[l-1,m] - vordiv_to_uv2[l,m]*div[l+1,m]
+            U[l,m] = ∂Dλ + ∂ζθ
+            V[l,m] = ∂ζλ + ∂Dθ
+        end
+    end
+
+    @inbounds for m in 1:mmax+1
+        l = lmax+1                                  # second last row, l+1 index is out of bounds (=0 entry)
+        U[l,m] = im*vordiv_to_uv_x[l,m]*div[l,m] - vordiv_to_uv1[l,m]*vor[l-1,m]
+        V[l,m] = im*vordiv_to_uv_x[l,m]*vor[l,m] + vordiv_to_uv1[l,m]*div[l-1,m]
+
+        l = lmax+2                                  # last row, l,l+1 indices are out of bounds (=0 entries)
+        U[l,m] = -vordiv_to_uv1[l,m]*vor[l-1,m]
+        V[l,m] =  vordiv_to_uv1[l,m]*div[l-1,m]
+    end
 end
 
 scale_coslat!(  A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat'

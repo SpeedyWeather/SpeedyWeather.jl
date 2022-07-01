@@ -70,6 +70,26 @@ for func_name in (:bernoulli_potential!,)
     end
 end
 
+# FOUR ARGUMENT FUNCTIONS
+for func_name in (:UV_from_vordiv!,)
+    @eval begin
+        function $func_name(Out1::AbstractArray{NF,3},
+                            Out2::AbstractArray{NF,3},
+                            In1::AbstractArray{NF,3},
+                            In2::AbstractArray{NF,3},
+                            args...) where NF
+            
+            for k in 1:size(Out1)[end]
+                Out1_layer = view(Out1,:,:,k)
+                Out2_layer = view(Out2,:,:,k)
+                In1_layer = view(In1,:,:,k)
+                In2_layer = view(In2,:,:)
+                $func_name(Out1_layer,Out2_layer,In1_layer,In2_layer,args...)
+            end
+        end
+    end
+end
+
 # FIVE ARGUMENT FUNCTIONS
 for func_name in (:vorticity_fluxes!,)
     @eval begin

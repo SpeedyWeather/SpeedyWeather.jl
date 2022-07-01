@@ -474,20 +474,20 @@ function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
     gridded!(div_grid,div_lf,S)         # get divergence on grid from spectral div
     gridded!(pres_grid,pres_lf,S)       # get pressure on grid from spectral pres
 
-    ∇⁻²!(stream_function,vor_lf,S)      # invert Laplacian ∇² for stream function Ψ
-    ∇⁻²!(velocity_potential,div_lf,S)   # invert Laplacian ∇² for velocity potential ϕ
+    # ∇⁻²!(stream_function,vor_lf,S)      # invert Laplacian ∇² for stream function Ψ
+    # ∇⁻²!(velocity_potential,div_lf,S)   # invert Laplacian ∇² for velocity potential ϕ
 
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
-    # UV_from_vordiv!(coslat_u,coslat_v,vor_lf,div_lf,S)
+    UV_from_vordiv!(coslat_u,coslat_v,vor_lf,div_lf,S)
 
-    # # contribution from stream function (non-divergent component)
-    gradient_longitude!(coslat_v, stream_function)
-    gradient_latitude!( coslat_u, stream_function, S, flipsign=true)
+    # # # contribution from stream function (non-divergent component)
+    # gradient_longitude!(coslat_v, stream_function)
+    # gradient_latitude!( coslat_u, stream_function, S, flipsign=true)
 
-    # # add contribution from velocity potential (non-rotational component)
-    gradient_longitude!(coslat_u, velocity_potential,    add=true)
-    gradient_latitude!( coslat_v, velocity_potential, S, add=true)
+    # # # add contribution from velocity potential (non-rotational component)
+    # gradient_longitude!(coslat_u, velocity_potential,    add=true)
+    # gradient_latitude!( coslat_v, velocity_potential, S, add=true)
 
     # transform to U,V on grid (U,V = u,v*coslat)
     gridded!(U_grid,coslat_u,S)

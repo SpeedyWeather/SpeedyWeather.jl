@@ -53,7 +53,7 @@ struct SpectralTransform{NF<:AbstractFloat}
     grad_y_vordiv2::Matrix{NF}
 
     # GRADIENT MATRICES FOR Vorticity,Divergence -> U,V
-    vordiv_to_uv_x::Matrix{Complex{NF}}
+    vordiv_to_uv_x::Matrix{NF}
     vordiv_to_uv1::Matrix{NF}
     vordiv_to_uv2::Matrix{NF}
 
@@ -168,10 +168,13 @@ function SpectralTransform( ::Type{NF},     # Number format NF
 
     for m in 0:mmax                         # 0-based degree l, order m
         for l in m:lmax+1           
-            vordiv_to_uv1[l+1,m+1] = -ϵlms[l+1,m+1]/l
-            vordiv_to_uv2[l+1,m+1] = -ϵlms[l+2,m+1]/(l+1)
+            vordiv_to_uv1[l+1,m+1] = ϵlms[l+1,m+1]/l
+            vordiv_to_uv2[l+1,m+1] = ϵlms[l+2,m+1]/(l+1)
         end
     end
+
+    vordiv_to_uv1[1,1] = 0                  # remove NaN from 0/0
+
 
     # EIGENVALUES (on unit sphere, hence 1/radius²-scaling is omitted)
     eigen_values = [-l*(l+1) for l in 0:lmax+1]
