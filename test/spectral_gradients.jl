@@ -100,15 +100,13 @@ end
 
         A = randn(NF,96,48)
         B = copy(A)
-        SpeedyWeather.unscale_coslat!(A,G)
+        SpeedyWeather.scale_coslat⁻¹!(A,G)
         SpeedyWeather.scale_coslat!(A,G)
 
         @test all(isapprox.(A,B,rtol=10*eps(NF)))
 
-        SpeedyWeather.scale_coslat!(A,G)
-        SpeedyWeather.scale_coslat!(A,G)
-        SpeedyWeather.unscale_coslat!(A,G)
-        SpeedyWeather.unscale_coslat!(A,G)
+        SpeedyWeather.scale_coslat²!(A,G)
+        SpeedyWeather.scale_coslat⁻²!(A,G)
 
         @test all(isapprox.(A,B,rtol=10*eps(NF)))
     end
@@ -180,6 +178,35 @@ end
     end
 end
 
+@testset "curl_div! same as curl! and divergence!" begin
+    @testset for NF in (Float32,Float64)
+
+        p,d,m = initialize_speedy(NF)
+
+        lmax,mmax,_,_ = size(p.vor)
+        
+        U = randn(Complex{NF},lmax+1,mmax)
+        V = randn(Complex{NF},lmax+1,mmax)
+
+        div0 = zeros(Complex{NF},lmax,mmax)
+        div1 = zeros(Complex{NF},lmax,mmax)
+        vor0 = zeros(Complex{NF},lmax,mmax)
+        vor1 = zeros(Complex{NF},lmax,mmax)
+
+        S = m.geospectral.spectral_transform
+        SpeedyWeather.divergence!(div0,U,V,S)
+        SpeedyWeather.curl!(vor0,U,V,S)
+
+        SpeedyWeather.curl_div!(vor1,div1,U,V,S)
+
+        for i in eachindex(vor0,vor1,div0,div1)
+            @test vor0[i] == vor1[i]
+            @test div0[i] == div1[i]
+        end
+    end
+end
+
+
 @testset "D,ζ -> u,v -> D,ζ" begin
     @testset for NF in (Float32,Float64)
 
@@ -234,10 +261,8 @@ end
 
         # times coslat² in grid space
         G = m.geospectral.geometry
-        SpeedyWeather.scale_coslat!(div_grid,G)
-        SpeedyWeather.scale_coslat!(div_grid,G)
-        SpeedyWeather.scale_coslat!(vor_grid,G)
-        SpeedyWeather.scale_coslat!(vor_grid,G)
+        SpeedyWeather.scale_coslat²!(div_grid,G)
+        SpeedyWeather.scale_coslat²!(vor_grid,G)
 
         # transform back
         S = m.geospectral.spectral_transform
@@ -335,10 +360,8 @@ end
 #         V_grid = gridded(coslat_v)
 
 #         G = m.geospectral.geometry
-#         SpeedyWeather.unscale_coslat!(U_grid,G)
-#         SpeedyWeather.unscale_coslat!(U_grid,G)
-#         SpeedyWeather.unscale_coslat!(V_grid,G)
-#         SpeedyWeather.unscale_coslat!(V_grid,G)
+#         SpeedyWeather.scale_coslat⁻²!(U_grid,G)
+#         SpeedyWeather.scale_coslat⁻²!(V_grid,G)
 
 #         S = m.geospectral.spectral_transform
 #         SpeedyWeather.spectral!(coslat_u,U_grid,S)
@@ -348,41 +371,22 @@ end
 #         @test all(coslat_u[end,:] .!= 0)
 #         @test all(coslat_v[end,:] .!= 0)
 
-#         div_grid = d.grid_variables.div_grid[:,:,1]
-#         vor_grid = d.grid_variables.vor_grid[:,:,1]
-
 #         # zonal derivative in spectral space
 #         S = m.geospectral.spectral_transform
-#         dUdlon = d.intermediate_variables.∂Uω_∂lon[:,:,1]
-#         dVdlon = d.intermediate_variables.∂Vω_∂lon[:,:,1]
-#         SpeedyWeather.gradient_longitude!(dUdlon,coslat_u)
-#         SpeedyWeather.gradient_longitude!(dVdlon,coslat_v)
+#         vor1 = zero(vor0)
+#         div1 = zero(div0)
 
-#         # meridional derivative of U,V in spectral space
-#         coslat_dVdθ = d.intermediate_variables.∂Vω_∂lat[:,:,1]
-#         coslat_dUdθ = d.intermediate_variables.∂Uω_∂lat[:,:,1]
-#         SpeedyWeather.gradient_latitude!(coslat_dVdθ,coslat_v,S)
-#         SpeedyWeather.gradient_latitude!(coslat_dUdθ,coslat_u,S)
-
-#         vor1_grid = SpeedyWeather.gridded(dVdlon - coslat_dUdθ)
-#         div1_grid = SpeedyWeather.gridded(dUdlon + coslat_dVdθ)
-
-#         # G = m.geospectral.geometry
-#         # SpeedyWeather.unscale_coslat!(vor1_grid,G)
-#         # SpeedyWeather.unscale_coslat!(vor1_grid,G)
-#         # SpeedyWeather.unscale_coslat!(div1_grid,G)
-#         # SpeedyWeather.unscale_coslat!(div1_grid,G)
-
-#         vor1 = SpeedyWeather.spectral(vor1_grid,one_more_l=false)
-#         div1 = SpeedyWeather.spectral(div1_grid,one_more_l=false)
+#         # SpeedyWeather.divergence!(div1,coslat_u,coslat_v,S)
+#         # SpeedyWeather.curl!(vor1,coslat_u,coslat_v,S)
+#         SpeedyWeather.curl_div!(vor1,div1,coslat_u,coslat_v,S)
 
 #         # test that
 #         # 1) coslat_dV/dlat = coslat²*D - dU/dlon
 #         # 2) coslat_dU/dlat = dV/dlon - coslat²*ζ
-#         # for i in 1:5
-#         #     # @test vor_grid[i] ≈ vor1_grid[i]
-#         #     @test div_grid[i] ≈ div1_grid[i]
-#         # end
+#         for i in eachindex(vor0,vor1,div0,div1)
+#             @test vor0[i] ≈ vor1[i]
+#             # @test div0[i] ≈ div1[i]
+#         end
 
 #         # fig,axs = subplots(3,2,figsize=(6,8))
 #         # levs = (-10,10)
@@ -395,17 +399,17 @@ end
 #         # axs[3,2].pcolormesh(vor_grid'-vor1_grid',vmin=levs[1],vmax=levs[2])
 
 #         # PLOTTING
-#         fig,axs = subplots(3,2,figsize=(8,9))
-#         levs = (0,3)
-#         axs[1,1].imshow(abs.(div1),vmin=levs[1],vmax=levs[2])
-#         axs[1,2].imshow(abs.(vor1),vmin=levs[1],vmax=levs[2])
-#         axs[2,1].imshow(abs.(div0),vmin=levs[1],vmax=levs[2])
-#         q1 = axs[2,2].imshow(abs.(vor0),vmin=levs[1],vmax=levs[2])
+#         # fig,axs = subplots(3,2,figsize=(8,9))
+#         # levs = (0,3)
+#         # axs[1,1].imshow(abs.(div1),vmin=levs[1],vmax=levs[2])
+#         # axs[1,2].imshow(abs.(vor1),vmin=levs[1],vmax=levs[2])
+#         # axs[2,1].imshow(abs.(div0),vmin=levs[1],vmax=levs[2])
+#         # q1 = axs[2,2].imshow(abs.(vor0),vmin=levs[1],vmax=levs[2])
 
-#         levs2 = (0,0.1)
-#         axs[3,1].imshow(abs.(div1-div0),vmin=levs2[1],vmax=levs2[2])
-#         q2 = axs[3,2].imshow(abs.(vor1-vor0),vmin=levs2[1],vmax=levs2[2])
-#         colorbar(ax=axs[1:2,:],q1)
-#         colorbar(ax=axs[3,:],q2)
+#         # levs2 = (0,0.1)
+#         # axs[3,1].imshow(abs.(div1-div0),vmin=levs2[1],vmax=levs2[2])
+#         # q2 = axs[3,2].imshow(abs.(vor1-vor0),vmin=levs2[1],vmax=levs2[2])
+#         # colorbar(ax=axs[1:2,:],q1)
+#         # colorbar(ax=axs[3,:],q2)
 #     end
 # end

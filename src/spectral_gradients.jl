@@ -198,10 +198,13 @@ function curl_div!( curl::AbstractMatrix{Complex{NF}},
     for m in 1:mmax+1                               # 1-based l,m
         for l in max(2,m):lmax+1                    # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
             ∂u∂λ  = ((m-1)*im)*u[l,m]
+            ∂v∂λ  = ((m-1)*im)*v[l,m]
             ∂v∂θ1 = grad_y_vordiv1[l,m]*v[l-1,m]
+            ∂u∂θ1 = grad_y_vordiv1[l,m]*u[l-1,m]
             ∂v∂θ2 = grad_y_vordiv2[l,m]*v[l+1,m]
+            ∂u∂θ2 = grad_y_vordiv2[l,m]*u[l+1,m]
             div[l,m]  = ∂u∂λ - ∂v∂θ1 + ∂v∂θ2
-            curl[l,m] = ∂u∂λ + ∂v∂θ1 - ∂v∂θ2
+            curl[l,m] = ∂v∂λ + ∂u∂θ1 - ∂u∂θ2
         end
     end
 
@@ -234,7 +237,7 @@ function UV_from_vordiv!(   U::AbstractMatrix{Complex{NF}},
     U[1,1] =  vordiv_to_uv2[1,1]*vor[2,1]           # l=m=0 harmonic has only one contribution
     V[1,1] = -vordiv_to_uv2[1,1]*div[2,1]
 
-    @inbounds for m in 1:mmax+1                               # 1-based l,m
+    @inbounds for m in 1:mmax+1                     # 1-based l,m
         for l in max(2,m):lmax                      # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
             ∂Dλ = im*vordiv_to_uv_x[l,m]*div[l,m]   # divergence contribution to zonal gradient
             ∂ζλ = im*vordiv_to_uv_x[l,m]*vor[l,m]   # vorticity contribution to zonal gradient
