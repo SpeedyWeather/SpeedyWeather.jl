@@ -6,6 +6,7 @@ Struct that holds the boundary arrays in grid-point space
 """
 struct Boundaries{NF<:AbstractFloat}        # number format NF
     orography       ::Matrix{NF}            # orography [m]
+    H₀_spec         ::Matrix{Complex{NF}}   # spectral layer thickness at rest
     geopot_surf_grid::Matrix{NF}            # surface geopotential (i.e. orography) [m^2/s^2]
     geopot_surf     ::Matrix{Complex{NF}}   # spectral surface geopotential
 
@@ -19,6 +20,7 @@ orography, land-sea mask and albedo from an netCDF file and stores the in a
 function Boundaries(P::Parameters)
 
     @unpack orography_path, orography_file, gravity = P
+    @unpack layer_thickness = P
 
     # LOAD NETCDF FILE (but not its data yet)
     if orography_path == ""
@@ -32,6 +34,7 @@ function Boundaries(P::Parameters)
     if P.model == :barotropic   # no boundary data needed with the barotropic model
         
         orography           = zeros(P.NF,1,1)               # create dummy arrays
+        H₀_spec             = zeros(complex(P.NF),1,1)      # create dummy arrays
         geopot_surf         = zeros(complex(P.NF),1,1)  
         geopot_surf_grid    = zeros(P.NF,1,1)
 
@@ -39,6 +42,9 @@ function Boundaries(P::Parameters)
 
         orography_highres = ncfile.vars["orog"][:,:]        # height [m]
         orography = gridded(spectral_truncation(spectral(orography_highres),P.trunc))
+        # fill!(orography,0)
+        
+        H₀_spec = spectral(1000*layer_thickness .- orography)
         geopot_surf         = zeros(complex(P.NF),1,1)  
         geopot_surf_grid    = zeros(P.NF,1,1)
 
@@ -58,5 +64,5 @@ function Boundaries(P::Parameters)
     end
 
     # convert to number format NF here
-    return Boundaries{P.NF}(orography,geopot_surf_grid,geopot_surf) #,landsea_mask,albedo)
+    return Boundaries{P.NF}(orography,H₀_spec,geopot_surf_grid,geopot_surf) #,landsea_mask,albedo)
 end

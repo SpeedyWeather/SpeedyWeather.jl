@@ -93,6 +93,27 @@ end
     end
 end
 
+@testset "Scale, unscale coslat" begin
+    @testset for NF in (Float32,Float64)
+        p,d,m = initialize_speedy(NF)
+        G = m.geospectral.geometry
+
+        A = randn(NF,96,48)
+        B = copy(A)
+        SpeedyWeather.unscale_coslat!(A,G)
+        SpeedyWeather.scale_coslat!(A,G)
+
+        @test all(isapprox.(A,B,rtol=10*eps(NF)))
+
+        SpeedyWeather.scale_coslat!(A,G)
+        SpeedyWeather.scale_coslat!(A,G)
+        SpeedyWeather.unscale_coslat!(A,G)
+        SpeedyWeather.unscale_coslat!(A,G)
+
+        @test all(isapprox.(A,B,rtol=10*eps(NF)))
+    end
+end
+
 @testset "Flipsign in gradient_longitude!" begin
     @testset for NF in (Float32,Float64)
         A = randn(Complex{NF},32,32)
@@ -220,16 +241,22 @@ end
 
         # transform back
         S = m.geospectral.spectral_transform
-        coslat²_div = spectral(div_grid,S,one_more_l=true)
-        coslat²_vor = spectral(vor_grid,S,one_more_l=true)
+        coslat²_div = zero(coslat_u)
+        coslat²_vor = zero(coslat_u)
+        SpeedyWeather.spectral!(coslat²_div,div_grid,S)
+        SpeedyWeather.spectral!(coslat²_vor,vor_grid,S)
 
         # zonal derivative in spectral space
-        dUdlon = SpeedyWeather.gradient_longitude(coslat_u)
-        dVdlon = SpeedyWeather.gradient_longitude(coslat_v)
+        dUdlon = d.intermediate_variables.∂Uω_∂lon[:,:,1]
+        dVdlon = d.intermediate_variables.∂Vω_∂lon[:,:,1]
+        SpeedyWeather.gradient_longitude!(dUdlon,coslat_u)
+        SpeedyWeather.gradient_longitude!(dVdlon,coslat_v)
 
         # meridional derivative of U,V in spectral space
-        coslat_dVdθ = SpeedyWeather.gradient_latitude(coslat_v,S)
-        coslat_dUdθ = SpeedyWeather.gradient_latitude(coslat_u,S)
+        coslat_dVdθ = d.intermediate_variables.∂Vω_∂lat[:,:,1]
+        coslat_dUdθ = d.intermediate_variables.∂Uω_∂lat[:,:,1]
+        SpeedyWeather.gradient_latitude!(coslat_dVdθ,coslat_v,S)
+        SpeedyWeather.gradient_latitude!(coslat_dUdθ,coslat_u,S)
 
         # test that
         # 1) coslat_dV/dlat = coslat²*D - dU/dlon
@@ -241,18 +268,144 @@ end
             @test coslat_dUdθ[i] ≈ (dVdlon[i] - coslat²_vor[i]) 
         end
 
+        # same in grid space, but higher tolerance from spectral transform
+        @test all(isapprox.(gridded(coslat²_div),gridded(coslat_dVdθ+dUdlon),rtol=10*sqrt(eps(NF))))
+        @test all(isapprox.(gridded(coslat²_vor),gridded(dVdlon-coslat_dUdθ),rtol=10*sqrt(eps(NF))))
+
         # # PLOTTING
         # fig,axs = subplots(3,2,figsize=(8,9))
         # levs = (0,3)
-        # axs[1,1].imshow(abs.(coslat_dVdθ),vmin=levs[1],vmax=levs[2])
-        # axs[1,2].imshow(abs.(coslat_dUdθ),vmin=levs[1],vmax=levs[2])
+        # axs[1,1].imshow(abs.(coslat_dVdθ+dUdlon),vmin=levs[1],vmax=levs[2])
+        # axs[1,2].imshow(abs.(dVdlon-coslat_dUdθ),vmin=levs[1],vmax=levs[2])
         # axs[2,1].imshow(abs.(coslat²_div),vmin=levs[1],vmax=levs[2])
         # q1 = axs[2,2].imshow(abs.(coslat²_vor),vmin=levs[1],vmax=levs[2])
 
-        # levs2 = (0,0.1)
-        # axs[3,1].imshow(abs.(coslat_dVdθ-coslat²_div),vmin=levs2[1],vmax=levs2[2])
-        # q2 = axs[3,2].imshow(abs.(coslat_dUdθ-coslat²_vor),vmin=levs2[1],vmax=levs2[2])
+        # levs2 = (0,0.0001)
+        # axs[3,1].imshow(abs.(coslat_dVdθ+dUdlon-coslat²_div),vmin=levs2[1],vmax=levs2[2])
+        # q2 = axs[3,2].imshow(abs.(dVdlon-coslat_dUdθ-coslat²_vor),vmin=levs2[1],vmax=levs2[2])
         # colorbar(ax=axs[1:2,:],q1)
         # colorbar(ax=axs[3,:],q2)
+    end
+end
+
+@testset "D,ζ -> u,v -> D,ζ" begin
+    @testset for NF in (Float64,)#,Float64)
+        p,d,m = initialize_speedy(  NF,
+                                    model=:shallowwater,
+                                    initial_conditions=:rest,
+                                    layer_thickness=0)
+
+        # make sure vorticity and divergence are 0
+        fill!(p.vor,0)
+        fill!(p.div,0)
+
+        # make sure vorticity and divergence are 0
+        fill!(d.tendencies.vor_tend,0)                  
+        fill!(d.tendencies.div_tend,0)
+
+        # create initial conditions
+        vor0 = zero(p.vor[:,:,1,1])
+        div0 = zero(p.div[:,:,1,1])
+        vor0[:,:] .= randn(Complex{NF},size(vor0)...)
+        div0[:,:] .= randn(Complex{NF},size(div0)...)
+        
+        vor0[1,1] = 0                   # zero mean
+        div0[1,1] = 0
+        vor0[:,1] .= real(vor0[:,1])    # set imaginary component of m=0 to 0
+        div0[:,1] .= real(div0[:,1])    # as the rotation of zonal modes is arbitrary
+
+        # remove non-zero entries in upper triangle
+        SpeedyWeather.spectral_truncation!(vor0)
+        SpeedyWeather.spectral_truncation!(div0)
+
+        p.vor[:,:,1,1] .= vor0
+        p.div[:,:,1,1] .= div0
+
+        # get corresponding irrotational u_grid, v_grid (incl *coslat scaling)
+        SpeedyWeather.gridded!(d,p,m)   
+
+        # check we've actually created non-zero u,v
+        @test all(d.grid_variables.U_grid .!= 0)
+        @test all(d.grid_variables.V_grid .!= 0)
+
+        coslat_u = d.intermediate_variables.coslat_u[:,:,1]
+        coslat_v = d.intermediate_variables.coslat_v[:,:,1]
+
+        U_grid = gridded(coslat_u)
+        V_grid = gridded(coslat_v)
+
+        G = m.geospectral.geometry
+        SpeedyWeather.unscale_coslat!(U_grid,G)
+        SpeedyWeather.unscale_coslat!(U_grid,G)
+        SpeedyWeather.unscale_coslat!(V_grid,G)
+        SpeedyWeather.unscale_coslat!(V_grid,G)
+
+        S = m.geospectral.spectral_transform
+        SpeedyWeather.spectral!(coslat_u,U_grid,S)
+        SpeedyWeather.spectral!(coslat_u,U_grid,S)
+
+        # check that highest degree is non-zero
+        @test all(coslat_u[end,:] .!= 0)
+        @test all(coslat_v[end,:] .!= 0)
+
+        div_grid = d.grid_variables.div_grid[:,:,1]
+        vor_grid = d.grid_variables.vor_grid[:,:,1]
+
+        # zonal derivative in spectral space
+        S = m.geospectral.spectral_transform
+        dUdlon = d.intermediate_variables.∂Uω_∂lon[:,:,1]
+        dVdlon = d.intermediate_variables.∂Vω_∂lon[:,:,1]
+        SpeedyWeather.gradient_longitude!(dUdlon,coslat_u)
+        SpeedyWeather.gradient_longitude!(dVdlon,coslat_v)
+
+        # meridional derivative of U,V in spectral space
+        coslat_dVdθ = d.intermediate_variables.∂Vω_∂lat[:,:,1]
+        coslat_dUdθ = d.intermediate_variables.∂Uω_∂lat[:,:,1]
+        SpeedyWeather.gradient_latitude!(coslat_dVdθ,coslat_v,S)
+        SpeedyWeather.gradient_latitude!(coslat_dUdθ,coslat_u,S)
+
+        vor1_grid = SpeedyWeather.gridded(dVdlon - coslat_dUdθ)
+        div1_grid = SpeedyWeather.gridded(dUdlon + coslat_dVdθ)
+
+        # G = m.geospectral.geometry
+        # SpeedyWeather.unscale_coslat!(vor1_grid,G)
+        # SpeedyWeather.unscale_coslat!(vor1_grid,G)
+        # SpeedyWeather.unscale_coslat!(div1_grid,G)
+        # SpeedyWeather.unscale_coslat!(div1_grid,G)
+
+        vor1 = SpeedyWeather.spectral(vor1_grid,one_more_l=false)
+        div1 = SpeedyWeather.spectral(div1_grid,one_more_l=false)
+
+        # test that
+        # 1) coslat_dV/dlat = coslat²*D - dU/dlon
+        # 2) coslat_dU/dlat = dV/dlon - coslat²*ζ
+        # for i in 1:5
+        #     # @test vor_grid[i] ≈ vor1_grid[i]
+        #     @test div_grid[i] ≈ div1_grid[i]
+        # end
+
+        # fig,axs = subplots(3,2,figsize=(6,8))
+        # levs = (-10,10)
+        # axs[1,1].pcolormesh(div_grid',vmin=levs[1],vmax=levs[2])
+        # axs[2,1].pcolormesh(div1_grid',vmin=levs[1],vmax=levs[2])
+        # axs[3,1].pcolormesh(div_grid'-div1_grid',vmin=levs[1],vmax=levs[2])
+        
+        # axs[1,2].pcolormesh(vor_grid',vmin=levs[1],vmax=levs[2])
+        # axs[2,2].pcolormesh(vor1_grid',vmin=levs[1],vmax=levs[2])
+        # axs[3,2].pcolormesh(vor_grid'-vor1_grid',vmin=levs[1],vmax=levs[2])
+
+        # PLOTTING
+        fig,axs = subplots(3,2,figsize=(8,9))
+        levs = (0,3)
+        axs[1,1].imshow(abs.(div1),vmin=levs[1],vmax=levs[2])
+        axs[1,2].imshow(abs.(vor1),vmin=levs[1],vmax=levs[2])
+        axs[2,1].imshow(abs.(div0),vmin=levs[1],vmax=levs[2])
+        q1 = axs[2,2].imshow(abs.(vor0),vmin=levs[1],vmax=levs[2])
+
+        levs2 = (0,0.1)
+        axs[3,1].imshow(abs.(div1-div0),vmin=levs2[1],vmax=levs2[2])
+        q2 = axs[3,2].imshow(abs.(vor1-vor0),vmin=levs2[1],vmax=levs2[2])
+        colorbar(ax=axs[1:2,:],q1)
+        colorbar(ax=axs[3,:],q2)
     end
 end

@@ -48,6 +48,15 @@ struct SpectralTransform{NF<:AbstractFloat}
     minus_grad_y1::Matrix{NF}       # as above but sign flipped (to get u from Ψ)
     minus_grad_y2::Matrix{NF}
 
+    # GRADIENT MATRICES FOR U,V -> Vorticity,Divergence
+    grad_y_vordiv1::Matrix{NF}
+    grad_y_vordiv2::Matrix{NF}
+
+    # GRADIENT MATRICES FOR Vorticity,Divergence -> U,V
+    vordiv_to_uv_x::Matrix{Complex{NF}}
+    vordiv_to_uv1::Matrix{NF}
+    vordiv_to_uv2::Matrix{NF}
+
     # EIGENVALUES (on unit sphere, no 1/radius²-scaling included)
     eigen_values::Vector{NF}        # = -l*(l+1), degree l of spherical harmonic
     eigen_values⁻¹::Vector{NF}      # = -1/(l*(l+1))
@@ -122,8 +131,10 @@ function SpectralTransform( ::Type{NF},     # Number format NF
 
     # GRADIENTS (on unit sphere, hence 1/radius-scaling is omitted)
     grad_x = [im*m for m in 0:mmax+1]       # zonal gradient (precomputed currently not used)
-    grad_y1 = zeros(lmax+2,mmax+1)          # meridional gradient, term 1
-    grad_y2 = zeros(lmax+2,mmax+1)          # term 2
+
+    # meridional gradient for scalars (coslat scaling included)
+    grad_y1 = zeros(lmax+2,mmax+1)          # term 1, to be multiplied with harmonic l-1,m
+    grad_y2 = zeros(lmax+2,mmax+1)          # term 2, to be multiplied with harmonic l+1,m
 
     for m in 0:mmax                         # 0-based degree l, order m
         for l in m:lmax+1           
@@ -134,6 +145,33 @@ function SpectralTransform( ::Type{NF},     # Number format NF
 
     minus_grad_y1 = -grad_y1                # gradient arrays with a minus sign
     minus_grad_y2 = -grad_y2                # (to get u from stream function directly)
+
+    # meridional gradient used to get from u,v/coslat to vorticity and divergence
+    grad_y_vordiv1 = zeros(lmax+2,mmax+1)   # term 1, to be multiplied with harmonic l-1,m
+    grad_y_vordiv2 = zeros(lmax+2,mmax+1)   # term 2, to be multiplied with harmonic l+1,m
+
+    for m in 0:mmax                         # 0-based degree l, order m
+        for l in m:lmax+1           
+            grad_y_vordiv1[l+1,m+1] = (l+1)*ϵlms[l+1,m+1]
+            grad_y_vordiv2[l+1,m+1] = l*ϵlms[l+2,m+1]
+        end
+    end
+
+    # zonal integration (sort of) to get from vorticity and divergence to u,v*coslat
+    vordiv_to_uv_x = [-m/(l*(l+1)) for l in 0:lmax+1, m in 0:mmax]
+    spectral_truncation!(vordiv_to_uv_x,lmax+1,mmax)
+    vordiv_to_uv_x[1,1] = 0
+
+    # meridional integration (sort of) to get from vorticity and divergence to u,v*coslat
+    vordiv_to_uv1 = zeros(lmax+2,mmax+1)    # term 1, to be multiplied with harmonic l-1,m
+    vordiv_to_uv2 = zeros(lmax+2,mmax+1)    # term 2, to be multiplied with harmonic l+1,m
+
+    for m in 0:mmax                         # 0-based degree l, order m
+        for l in m:lmax+1           
+            vordiv_to_uv1[l+1,m+1] = -ϵlms[l+1,m+1]/l
+            vordiv_to_uv2[l+1,m+1] = -ϵlms[l+2,m+1]/(l+1)
+        end
+    end
 
     # EIGENVALUES (on unit sphere, hence 1/radius²-scaling is omitted)
     eigen_values = [-l*(l+1) for l in 0:lmax+1]
@@ -147,9 +185,10 @@ function SpectralTransform( ::Type{NF},     # Number format NF
                             norm_sphere,norm_forward,
                             rfft_plan,brfft_plan,
                             gn,gs,fn,fs,
-                            recompute_legendre,Λ,Λs,
-                            legendre_weights,
+                            recompute_legendre,Λ,Λs,legendre_weights,
                             ϵlms,grad_x,grad_y1,grad_y2,minus_grad_y1,minus_grad_y2,
+                            grad_y_vordiv1,grad_y_vordiv2,vordiv_to_uv_x,
+                            vordiv_to_uv1,vordiv_to_uv2,
                             eigen_values,eigen_values⁻¹)
 end
 

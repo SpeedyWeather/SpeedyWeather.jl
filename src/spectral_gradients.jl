@@ -122,37 +122,118 @@ function gradient_longitude(Ψ::AbstractMatrix{NF},  # input array: spectral coe
     return gradient_longitude!(coslat_v,Ψ,R)        # call in-place version
 end
 
-"""Divide a gridded field `A` by the cosine of latitude."""
-function unscale_coslat!(   A::AbstractMatrix{NF},
-                            G::Geometry{NF}) where NF
-    
-    nlon, nlat = size(A)
-    @boundscheck nlat == G.nlat || throw(BoundsError)
 
-    @unpack coslat⁻¹ = G
+function curl!( curl::AbstractMatrix{Complex{NF}},
+                u::AbstractMatrix{Complex{NF}},
+                v::AbstractMatrix{Complex{NF}},
+                S::SpectralTransform{NF};
+                flipsign::Bool=false,
+                add::Bool=false
+                ) where {NF<:AbstractFloat}
 
-    @inbounds for j in 1:nlat
-        for i in 1:nlon
-            A[i,j] *= coslat⁻¹[j]
-        end
-    end
+    # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
+    kernel(o,a,b,c) = flipsign ? (add ? o+c-a-b : c+a-b) :
+                                 (add ? o+a+b-c : a+b-c)    
+    _divergence!(kernel,curl,v,u,S)             # flip u,v -> v,u
 end
 
-"""Multiply a gridded field `A` by the cosine of latitude."""
-function scale_coslat!( A::AbstractMatrix{NF},
-                        G::Geometry{NF}) where NF
+function divergence!(   div::AbstractMatrix{Complex{NF}},
+                        u::AbstractMatrix{Complex{NF}},
+                        v::AbstractMatrix{Complex{NF}},
+                        S::SpectralTransform{NF};
+                        flipsign::Bool=false,
+                        add::Bool=false
+                        ) where {NF<:AbstractFloat}
+
+    # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
+    kernel(o,a,b,c) = flipsign ? (add ? o+b-a-c : b-a-c) :
+                                 (add ? o+a-b+c : a-b+c)                
+    _divergence!(kernel,div,u,v,S)
+end
+
+function _divergence!(  kernel,
+                        div::AbstractMatrix{Complex{NF}},
+                        u::AbstractMatrix{Complex{NF}},
+                        v::AbstractMatrix{Complex{NF}},
+                        S::SpectralTransform{NF}
+                        ) where {NF<:AbstractFloat}
+
+    lmax,mmax = size(div) .- (1,1)                  # 0-based lmax,mmax 
+    @boundscheck size(u) == (lmax+2,mmax+1) || throw(BoundsError)
+    @boundscheck size(v) == (lmax+2,mmax+1) || throw(BoundsError)
+
+    @unpack grad_y_vordiv1,grad_y_vordiv2 = S
+
+    z = zero(Complex{NF})
+    div[1,1] = kernel(div[1,1],z,z,z)               # l=m=0 harmonic is zero
     
-    nlon, nlat = size(A)
-    @boundscheck nlat == G.nlat || throw(BoundsError)
-
-    @unpack coslat = G
-
-    @inbounds for j in 1:nlat
-        for i in 1:nlon
-            A[i,j] *= coslat[j]
+    @inbounds for m in 1:mmax+1                     # 1-based l,m
+        for l in max(2,m):lmax+1                    # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+            ∂u∂λ  = ((m-1)*im)*u[l,m]
+            ∂v∂θ1 = grad_y_vordiv1[l,m]*v[l-1,m]
+            ∂v∂θ2 = grad_y_vordiv2[l,m]*v[l+1,m]
+            div[l,m] = kernel(div[l,m],∂u∂λ,∂v∂θ1,∂v∂θ2)
         end
     end
+
+    return nothing
 end
+
+function curl_div!( curl::AbstractMatrix{Complex{NF}},
+                    div::AbstractMatrix{Complex{NF}},
+                    u::AbstractMatrix{Complex{NF}},
+                    v::AbstractMatrix{Complex{NF}},
+                    S::SpectralTransform{NF}
+                    ) where {NF<:AbstractFloat}
+
+    lmax,mmax = size(div) .- (1,1)                  # 0-based lmax,mmax
+    @boundscheck size(curl) == size(div) || throw(BoundsError)
+    @boundscheck size(u) == (lmax+2,mmax+1) || throw(BoundsError)
+    @boundscheck size(v) == (lmax+2,mmax+1) || throw(BoundsError)
+
+    @unpack grad_y_vordiv1,grad_y_vordiv2 = S
+
+    div[1,1]  = zero(Complex{NF})                   # l=m=0 harmonic is zero
+    curl[1,1] = zero(Complex{NF})                   # l=m=0 harmonic is zero
+    for m in 1:mmax+1                               # 1-based l,m
+        for l in max(2,m):lmax+1                    # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+            ∂u∂λ  = ((m-1)*im)*u[l,m]
+            ∂v∂θ1 = grad_y_vordiv1[l,m]*v[l-1,m]
+            ∂v∂θ2 = grad_y_vordiv2[l,m]*v[l+1,m]
+            div[l,m]  = ∂u∂λ - ∂v∂θ1 + ∂v∂θ2
+            curl[l,m] = ∂u∂λ + ∂v∂θ1 - ∂v∂θ2
+        end
+    end
+
+    return nothing
+end
+
+function UV_from_vor!(  U::AbstractMatrix{Complex{NF}},
+                        V::AbstractMatrix{Complex{NF}},
+                        vor::AbstractMatrix{Complex{NF}},
+                        S::SpectralTransform{NF}
+                        ) where {NF<:AbstractFloat}
+
+    return nothing
+end
+
+function UV_from_vordiv!(   U::AbstractMatrix{Complex{NF}},
+                            V::AbstractMatrix{Complex{NF}},
+                            vor::AbstractMatrix{Complex{NF}},
+                            div::AbstractMatrix{Complex{NF}},
+                            S::SpectralTransform{NF}
+                            ) where {NF<:AbstractFloat}
+
+    return nothing
+end
+
+scale_coslat!(  A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat'
+scale_coslat²!( A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat²'
+scale_coslat⁻¹!(A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat⁻¹'
+scale_coslat⁻²!(A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat⁻²'
+
+∇⁻²!(alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigen_values⁻¹
+∇²!( alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigen_values
 
 """
     ∇⁻²!(   ∇⁻²alms::AbstractMatrix{Complex},

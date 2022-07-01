@@ -1,5 +1,5 @@
 # ONE ARGUMENT FUNCTIONS
-for func_name in (:unscale_coslat!,:scale_coslat!,
+for func_name in (:scale_coslat!,:scale_coslat²!,:scale_coslat⁻¹!,:scale_coslat⁻²!,
                     :spectral_truncation!,:flipsign!)
     @eval begin
         function $func_name(A::AbstractArray{NF,3},
@@ -32,18 +32,19 @@ for func_name in (:gradient_longitude!, :gradient_latitude!,
 end
 
 # THREE ARGUMENT FUNCTIONS
-for func_name in (:add_tendencies!,)
+for func_name in (:add_tendencies!,:divergence!,:_divergence!,:curl!)
     @eval begin
         function $func_name(Out::AbstractArray{NF1,3},
                             In1::AbstractArray{NF2,3},
                             In2::AbstractArray{NF2,3},
-                            args...) where {NF1,NF2}
+                            args...;
+                            kwargs...) where {NF1,NF2}
             
             for k in 1:size(Out)[end]
                 Out_layer = view(Out,:,:,k)
                 In1_layer = view(In1,:,:,k)
                 In2_layer = view(In2,:,:,k)
-                $func_name(Out_layer,In1_layer,In2_layer,args...)
+                $func_name(Out_layer,In1_layer,In2_layer,args...;kwargs...)
             end
         end
     end
