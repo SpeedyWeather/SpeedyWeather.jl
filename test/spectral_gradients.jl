@@ -294,8 +294,8 @@ end
         end
 
         # same in grid space, but higher tolerance from spectral transform
-        @test all(isapprox.(gridded(coslat²_div),gridded(coslat_dVdθ+dUdlon),rtol=10*sqrt(eps(NF))))
-        @test all(isapprox.(gridded(coslat²_vor),gridded(dVdlon-coslat_dUdθ),rtol=10*sqrt(eps(NF))))
+        @test all(isapprox.(gridded(coslat²_div),gridded(coslat_dVdθ+dUdlon),rtol=20*sqrt(eps(NF))))
+        @test all(isapprox.(gridded(coslat²_vor),gridded(dVdlon-coslat_dUdθ),rtol=20*sqrt(eps(NF))))
 
         # # PLOTTING
         # fig,axs = subplots(3,2,figsize=(8,9))
