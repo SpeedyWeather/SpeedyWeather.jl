@@ -261,10 +261,23 @@ function UV_from_vordiv!(   U::AbstractMatrix{Complex{NF}},
     end
 end
 
-scale_coslat!(  A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat'
-scale_coslat²!( A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat²'
-scale_coslat⁻¹!(A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat⁻¹'
-scale_coslat⁻²!(A::AbstractMatrix{NF},G::Geometry{NF}) where NF = A .*= G.coslat⁻²'
+scale_coslat!(  A::AbstractMatrix,G::Geometry) = _scale_lat!(A,G.coslat)
+scale_coslat²!( A::AbstractMatrix,G::Geometry) = _scale_lat!(A,G.coslat²)
+scale_coslat⁻¹!(A::AbstractMatrix,G::Geometry) = _scale_lat!(A,G.coslat⁻¹)
+scale_coslat⁻²!(A::AbstractMatrix,G::Geometry) = _scale_lat!(A,G.coslat⁻²)
+
+function _scale_lat!(A::AbstractMatrix{NF},v::AbstractVector) where {NF<:AbstractFloat}
+    nlon,nlat = size(A)
+    @boundscheck nlat == length(v) || throw(BoundsError)
+
+    for j in 1:nlat
+        vj = convert(NF,v[j])
+        for i in 1:nlon
+            A[i,j] *= vj
+        end
+    end
+end 
+
 
 ∇⁻²!(alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigen_values⁻¹
 ∇²!( alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigen_values
