@@ -270,7 +270,7 @@ function _scale_lat!(A::AbstractMatrix{NF},v::AbstractVector) where {NF<:Abstrac
     nlon,nlat = size(A)
     @boundscheck nlat == length(v) || throw(BoundsError)
 
-    for j in 1:nlat
+    @inbounds for j in 1:nlat
         vj = convert(NF,v[j])
         for i in 1:nlon
             A[i,j] *= vj
