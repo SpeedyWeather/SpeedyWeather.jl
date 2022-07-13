@@ -193,10 +193,10 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     # always use first leapfrog index for diffusion (otherwise unstable)
     vor_lf  = view(vor, :,:,1,:)                                    # array view for leapfrog index
     div_lf  = view(div, :,:,1,:)                                    # array view for leapfrog index
-    # pres_lf = view(pres,:,:,1)
+    pres_lf = view(pres,:,:,1)
     horizontal_diffusion!(vor_tend, vor_lf, damping,damping_impl)   # diffusion of vorticity
     horizontal_diffusion!(div_tend, div_lf, damping,damping_impl)   # diffusion of divergence
-    # horizontal_diffusion!(pres_tend,pres_lf,damping,damping_impl)   # diffusion of divergence
+    horizontal_diffusion!(pres_tend,pres_lf,damping,damping_impl)   # diffusion of divergence
 
     # time integration via leapfrog step forward (filtered with Robert+William's depending on lf1)
     leapfrog!(vor, vor_tend, dt,M.constants,lf1)

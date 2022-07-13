@@ -346,16 +346,16 @@ end
 Backward or inverse spectral transform (spectral to grid space) from coefficients `alms`. Based on the size
 of `alms` the corresponding grid space resolution is retrieved based on triangular truncation and a 
 SpectralTransform struct `S` is allocated to execute `gridded(alms,S)`."""
-function gridded(alms::AbstractMatrix{Complex{NF}}  # spectral coefficients
-                ) where NF                          # number format NF
+function gridded(   alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
+                    recompute_legendre::Bool=true       # saves memory
+                    ) where NF                          # number format NF
 
     lmax, mmax = size(alms) .- 1                    # -1 for 0-based degree l, order m
 
     # get grid size from spectral resolution via triangular_truncation
     # use mmax instead of lmax in case lmax = mmax + 1 (required in the meridional gradient recursion)
     nlon, nlat = triangular_truncation(mmax)        # number of longitudes, number of latitudes
-    recompute_legendre = true                       # saves memory as Legendre precomputation is
-                                                    # unnecessary as S is not stored
+    
     radius = 1                                      # only needed for SpectralTransform() but not used
     S = SpectralTransform(NF,nlon,nlat,mmax,radius,recompute_legendre)
     return gridded(alms,S)          # now execute the in-place version
@@ -442,9 +442,10 @@ Forward spectral transform (grid to spectral space) from the gridded field `map`
 grid (with Gaussian latitudes) into the spectral coefficients of the Legendre polynomials `alms`. Based
 on the size of `map` this function retrieves the corresponding spectral resolution via triangular
 truncation and sets up a SpectralTransform struct `S` to execute `spectral(map,S)`."""
-function spectral(  map::AbstractMatrix{NF};    # gridded field nlon x nlat
-                    kwargs...                   # additional keyword arguments
-                    ) where NF                  # number format NF
+function spectral(  map::AbstractMatrix{NF};        # gridded field nlon x nlat
+                    recompute_legendre::Bool=true,  # saves memory
+                    kwargs...                       # additional keyword arguments
+                    ) where NF                      # number format NF
 
     # check grid is compatible with triangular spectral truncation
     nlon, nlat = size(map)
@@ -452,7 +453,6 @@ function spectral(  map::AbstractMatrix{NF};    # gridded field nlon x nlat
 
     # Spectral resolution via triangular truncation
     trunc = triangular_truncation(nlon,nlat)    # largest trunc that satisfies the constraints
-    recompute_legendre = true                   # saves memory
 
     # allocate spectral transform struct
     radius = 1  # only needed for argument compatibility
