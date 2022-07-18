@@ -105,31 +105,22 @@ end
 struct IntermediateVariables{NF<:AbstractFloat}
 
     ### VORTICITY INVERSION
-    velocity_potential  ::Array{Complex{NF},3}      # = ϕ/R, scaled by 1/radius
-    stream_function     ::Array{Complex{NF},3}      # = ΨR, scaled by radius
-    coslat_u            ::Array{Complex{NF},3}      # = U = cosθ*u, zonal velocity *cos(latitude)
-    coslat_v            ::Array{Complex{NF},3}      # = V = cosθ*v, meridional velocity *cos(latitude)
+    u_coslat        ::Array{Complex{NF},3}      # = U = cosθ*u, zonal velocity *cos(latitude)
+    v_coslat        ::Array{Complex{NF},3}      # = V = cosθ*v, meridional velocity *cos(latitude)
 
     # VORTICITY ADVECTION
-    Uω_grid         ::Array{NF,3}                   # = U(ζ+f) on the grid
-    Vω_grid         ::Array{NF,3}                   # = V(ζ+f) on the grid
-    Uω              ::Array{Complex{NF},3}          # = U(ζ+f) in spectral space
-    Vω              ::Array{Complex{NF},3}          # = V(ζ+f) in spectral space
-    ∂Uω_∂lon        ::Array{Complex{NF},3}          # their zonal and
-    ∂Vω_∂lat        ::Array{Complex{NF},3}          # meridional derivatives
+    uω_coslat⁻¹_grid::Array{NF,3}               # = u(ζ+f)/coslat on the grid
+    vω_coslat⁻¹_grid::Array{NF,3}               # = v(ζ+f)/coslat on the grid
+    uω_coslat⁻¹     ::Array{Complex{NF},3}      # = u(ζ+f)/coslat in spectral space
+    vω_coslat⁻¹     ::Array{Complex{NF},3}      # = v(ζ+f)/coslat in spectral space
 
     # SHALLOW WATER
-    bernoulli_grid  ::Array{NF,3}           # bernoulli potential on the grid = 1/2(u^2+v^2) + gη
+    bernoulli_grid  ::Array{NF,3}           # bernoulli potential on the grid = 1/2(u^2+v^2) + g*η
     bernoulli       ::Array{Complex{NF},3}  # spectral bernoulli potential
-    ∂Uω_∂lat        ::Array{Complex{NF},3}  # off-diagonal derivatives of vorticity fluxes
-    ∂Vω_∂lon        ::Array{Complex{NF},3}
-
-    Uh_grid         ::Array{NF,3}           # volume flux U*h on grid
-    Vh_grid         ::Array{NF,3}           # volume flux V*h on grid
-    Uh              ::Array{Complex{NF},3}  # Uh in spectral
-    Vh              ::Array{Complex{NF},3}  # Vh in spectral
-    ∂Uh_∂lon        ::Array{Complex{NF},3}  # 1st component of ∇⋅(UV*h)
-    ∂Vh_∂lat        ::Array{Complex{NF},3}  # 2nd component of ∇⋅(UV*h)
+    uh_coslat⁻¹_grid::Array{NF,3}           # volume flux uh/coslat on grid
+    vh_coslat⁻¹_grid::Array{NF,3}           # volume flux vh/coslat on grid
+    uh_coslat⁻¹     ::Array{Complex{NF},3}  # uh/coslat in spectral
+    vh_coslat⁻¹     ::Array{Complex{NF},3}  # vh/coslat in spectral
 
     ###------Defined in surface_pressure_tendency!()
     u_mean             ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
@@ -169,31 +160,23 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
     @unpack lmax, mmax = G.spectral_transform   # 0-based max degree l, order m of the spherical harmonics
 
     # BAROTROPIC VORTICITY EQUATION
-    velocity_potential = zeros(Complex{NF},lmax+1,mmax+1,nlev)
-    stream_function = zeros(Complex{NF},lmax+1,mmax+1,nlev)
-    coslat_u = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    coslat_v = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    u_coslat = zeros(Complex{NF},lmax+2,mmax+1,nlev)    # vector quantity, require one more degree l
+    v_coslat = zeros(Complex{NF},lmax+2,mmax+1,nlev)    # same
 
     # VORTICITY ADVECTION
-    Uω_grid  = zeros(NF,nlon,nlat,nlev)
-    Vω_grid  = zeros(NF,nlon,nlat,nlev)
-    Uω       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    Vω       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    ∂Uω_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    ∂Vω_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    uω_coslat⁻¹_grid = zeros(NF,nlon,nlat,nlev)
+    vω_coslat⁻¹_grid = zeros(NF,nlon,nlat,nlev)
+    uω_coslat⁻¹      = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    vω_coslat⁻¹      = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
     # SHALLOW WATER
-    bernoulli_grid  = zeros(NF,nlon,nlat,nlev)
-    bernoulli       = zeros(Complex{NF},lmax+1,mmax+1,nlev)
-    ∂Uω_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    ∂Vω_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    bernoulli_grid   = zeros(NF,nlon,nlat,nlev)         
+    bernoulli        = zeros(Complex{NF},lmax+1,mmax+1,nlev)
 
-    Uh_grid = zeros(NF,nlon,nlat,nlev)
-    Vh_grid = zeros(NF,nlon,nlat,nlev)
-    Uh = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    Vh = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    ∂Uh_∂lon = zeros(Complex{NF},lmax+2,mmax+1,nlev)
-    ∂Vh_∂lat = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    uh_coslat⁻¹_grid = zeros(NF,nlon,nlat,nlev)
+    vh_coslat⁻¹_grid = zeros(NF,nlon,nlat,nlev)
+    uh_coslat⁻¹      = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    vh_coslat⁻¹      = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
     u_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint zonal velocity over all levels
     v_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint meridional velocity over all levels
@@ -220,13 +203,13 @@ function IntermediateVariables(G::GeoSpectral{NF}) where NF
     dumk                        = zeros(Complex{NF},lmax+2,mmax+1,nlev+1)
     spectral_geopotential       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
-    return IntermediateVariables(   velocity_potential, stream_function,
-                                    coslat_u, coslat_v,
-                                    Uω_grid,Vω_grid,
-                                    Uω,Vω,∂Uω_∂lon,∂Vω_∂lat,
+    return IntermediateVariables(   u_coslat, v_coslat,
+                                    uω_coslat⁻¹_grid,vω_coslat⁻¹_grid,
+                                    uω_coslat⁻¹,vω_coslat⁻¹,
+
                                     bernoulli_grid,bernoulli,
-                                    ∂Uω_∂lat,∂Vω_∂lon,
-                                    Uh_grid,Vh_grid,Uh,Vh,∂Uh_∂lon,∂Vh_∂lat,
+                                    uh_coslat⁻¹_grid,vh_coslat⁻¹_grid,uh_coslat⁻¹,vh_coslat⁻¹,
+
                                     u_mean,v_mean,div_mean,
                                     pres_gradient_spectral_x,pres_gradient_spectral_y,
                                     pres_gradient_grid_x,pres_gradient_grid_y,
