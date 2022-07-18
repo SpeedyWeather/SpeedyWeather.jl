@@ -58,8 +58,8 @@ struct SpectralTransform{NF<:AbstractFloat}
     vordiv_to_uv2::Matrix{NF}
 
     # EIGENVALUES (on unit sphere, no 1/radius²-scaling included)
-    eigen_values::Vector{NF}        # = -l*(l+1), degree l of spherical harmonic
-    eigen_values⁻¹::Vector{NF}      # = -1/(l*(l+1))
+    eigenvalues  ::Vector{NF}       # = -l*(l+1), degree l of spherical harmonic
+    eigenvalues⁻¹::Vector{NF}       # = -1/(l*(l+1))
 end
 
 """
@@ -175,11 +175,10 @@ function SpectralTransform( ::Type{NF},     # Number format NF
 
     vordiv_to_uv1[1,1] = 0                  # remove NaN from 0/0
 
-
     # EIGENVALUES (on unit sphere, hence 1/radius²-scaling is omitted)
-    eigen_values = [-l*(l+1) for l in 0:lmax+1]
-    eigen_values⁻¹ = inv.(eigen_values)
-    eigen_values⁻¹[1] = 0
+    eigenvalues = [-l*(l+1) for l in 0:lmax+1]
+    eigenvalues⁻¹ = inv.(eigenvalues)
+    eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
         
     # conversion to NF happens here
     SpectralTransform{NF}(  lmax,mmax,nfreq,radius,
@@ -192,7 +191,7 @@ function SpectralTransform( ::Type{NF},     # Number format NF
                             ϵlms,grad_x,grad_y1,grad_y2,minus_grad_y1,minus_grad_y2,
                             grad_y_vordiv1,grad_y_vordiv2,vordiv_to_uv_x,
                             vordiv_to_uv1,vordiv_to_uv2,
-                            eigen_values,eigen_values⁻¹)
+                            eigenvalues,eigenvalues⁻¹)
 end
 
 """Generator function for a SpectralTransform struct in case the number format is not provided.
@@ -237,6 +236,13 @@ Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of th
 ϵ(l,m) = sqrt((l^2-m^2)/(4*l^2-1)) with default number format Float64."""
 ϵlm(l::Int,m::Int) = ϵlm(Float64,l,m)
 
+"""
+    get_recursion_factors(  ::Type{NF}, # number format NF
+                            lmax::Int,  # max degree l of spherical harmonics (0-based here)
+                            mmax::Int   # max order m of spherical harmonics
+                            ) where {NF<:AbstractFloat}
+        
+Returns a matrix of recursion factors `ϵ` up to degree `lmax` and order `mmax` of number format `NF`."""
 function get_recursion_factors( ::Type{NF}, # number format NF
                                 lmax::Int,  # max degree l of spherical harmonics (0-based here)
                                 mmax::Int   # max order m of spherical harmonics
@@ -251,6 +257,7 @@ function get_recursion_factors( ::Type{NF}, # number format NF
     return ϵlms
 end
 
+# if number format not provided use Float64
 get_recursion_factors(lmax::Int,mmax::Int) = get_recursion_factors(Float64,lmax,mmax)
 
 """

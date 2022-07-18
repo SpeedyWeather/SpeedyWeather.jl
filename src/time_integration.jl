@@ -62,7 +62,15 @@ function leapfrog!( progn::PrognosticVariables{NF},         # all prognostic var
     end 
 end    
 
-"""Performs the first two initial time steps (Euler forward, unfiltered leapfrog)."""
+"""
+first_timesteps!(   progn::PrognosticVariables{NF}, # all prognostic variables
+                    diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
+                    M::ModelSetup,                  # everything that is constant at runtime
+                    feedback::Feedback              # feedback struct
+                    ) where NF
+
+Performs the first two initial time steps (Euler forward, unfiltered leapfrog) to populate the
+prognostic variables with two time steps (t=0,Δt) that can then be used in the normal leap frogging."""
 function first_timesteps!(  progn::PrognosticVariables{NF}, # all prognostic variables
                             diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                             M::ModelSetup,                  # everything that is constant at runtime
@@ -81,13 +89,13 @@ function first_timesteps!(  progn::PrognosticVariables{NF}, # all prognostic var
     time_sec += Δt_sec÷2
     progress!(feedback)
 
-    # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt)
+    # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
     initialize_implicit!(Δt,M)          # update precomputed implicit terms with time step Δt
     lf1 = 1                             # without Robert+William's filter
     lf2 = 2                             # evaluate all tendencies at t=dt/2,
                                         # the 2nd leapfrog index (=>Leapfrog)
     timestep!(progn,diagn,Δt,M,lf1,lf2)
-    time_sec += Δt_sec÷2
+    time_sec += Δt_sec÷2                # update by half the leapfrog time step Δt used here
     progress!(feedback)
 
     # update precomputed implicit terms with time step 2Δt for further time steps
@@ -95,7 +103,16 @@ function first_timesteps!(  progn::PrognosticVariables{NF}, # all prognostic var
     return time_sec
 end
 
-"""Calculate a single time step for SpeedyWeather.jl"""
+"""
+    timestep!(  progn::PrognosticVariables{NF}, # all prognostic variables
+                diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
+                dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                M::PrimitiveEquationModel,      # everything that's constant at runtime
+                lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
+                lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
+                ) where {NF<:AbstractFloat}
+
+Calculate a single time step for the primitive equation model of SpeedyWeather.jl """
 function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
@@ -162,7 +179,16 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     leapfrog!(vor,vor_tend,dt,M.constants,lf1)
 end
 
-"""Calculate a single time step for SpeedyWeather.jl"""
+"""
+    timestep!(  progn::PrognosticVariables{NF}, # all prognostic variables
+                diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
+                dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                M::ShallowWaterModel,           # everything that's constant at runtime
+                lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
+                lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
+                ) where {NF<:AbstractFloat}
+
+Calculate a single time step for the shallow water model of SpeedyWeather.jl """
 function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
@@ -196,7 +222,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     pres_lf = view(pres,:,:,1)
     horizontal_diffusion!(vor_tend, vor_lf, damping,damping_impl)   # diffusion of vorticity
     horizontal_diffusion!(div_tend, div_lf, damping,damping_impl)   # diffusion of divergence
-    horizontal_diffusion!(pres_tend,pres_lf,damping,damping_impl)   # diffusion of divergence
+    horizontal_diffusion!(pres_tend,pres_lf,damping,damping_impl)   # diffusion of divergence (necessary?)
 
     # time integration via leapfrog step forward (filtered with Robert+William's depending on lf1)
     leapfrog!(vor, vor_tend, dt,M.constants,lf1)
@@ -242,7 +268,14 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     leapfrog!(vor,vor_tend,dt,M.constants,lf1)
 end
 
-"""Main time loop."""
+"""
+    time_stepping!( progn::PrognosticVariables{NF}, # all prognostic variables
+                    diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
+                    M::ModelSetup                   # all precalculated structs
+                    ) where {NF<:AbstractFloat}     # number format NF
+
+Main time loop that that initialises output and feedback, loops over all time steps
+and calls the output and feedback functions."""
 function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variables
                         diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                         M::ModelSetup                   # all precalculated structs
@@ -267,11 +300,11 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
         timestep!(progn,diagn,2Δt,M)
 
         # FEEDBACK AND OUTPUT
-        progress!(feedback)
+        progress!(feedback)             # updates the progress meter bar
         write_netcdf_output!(netcdf_file,feedback,time_sec,diagn,M)
     end
 
-    progress_finish!(feedback)
+    progress_finish!(feedback)          # finishes the progress meter bar
 
     return progn
 end
