@@ -5,7 +5,7 @@ function initialize_implicit!(  dt::Real,                   # time step to updat
                                 ) where NF
 
     @unpack implicit_α = M.parameters                       # = [0,0.5,1], time step fraction for implicit
-    @unpack eigen_values = M.geospectral.spectral_transform # =-l*(l+1), degree l of harmonics
+    @unpack eigenvalues = M.geospectral.spectral_transform  # =-l*(l+1), degree l of harmonics
     @unpack ξH₀,ξg∇²,div_impl = M.implicit                  # pull precomputed arrays to be updated
     @unpack layer_thickness = M.constants                   # shallow water layer thickness [m]
     @unpack radius_earth, gravity = M.constants             # gravitational acceleration [m/s²]                  
@@ -14,8 +14,8 @@ function initialize_implicit!(  dt::Real,                   # time step to updat
     ξ = α*convert(NF,dt)                                    # new implicit timestep ξ = α*dt = 2αΔt from input dt
     ξH₀[1] = ξ*layer_thickness                              # update ξ*H₀ with new ξ
 
-    @inbounds for i in eachindex(ξg∇²,div_impl,eigen_values)
-        ξg∇²[i] = ξ*gravity*eigen_values[i]                 # update precomputed ξ∇² with new ξ
+    @inbounds for i in eachindex(ξg∇²,div_impl,eigenvalues)
+        ξg∇²[i] = ξ*gravity*eigenvalues[i]                  # update precomputed ξ∇² with new ξ
         div_impl[i] = inv(1 - ξH₀[1]*ξg∇²[i])               # update precomputed 1/(1-ξ²gH₀∇²) with new ξ
     end
 end
