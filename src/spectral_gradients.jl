@@ -147,8 +147,8 @@ function curl!( curl::AbstractMatrix{Complex{NF}},
                 ) where {NF<:AbstractFloat}
 
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
-    kernel(o,a,b,c) = flipsign ? (add ? o+c-a-b : c+a-b) :
-                                 (add ? o+a+b-c : a+b-c)    
+    kernel(o,a,b,c) = flipsign ? (add ? o-(a+b-c) : -(a+b-c)) :
+                                 (add ? o+(a+b-c) :   a+b-c )    
     _divergence!(kernel,curl,v,u,S)             # flip u,v -> v,u
 end
 
@@ -176,8 +176,8 @@ function divergence!(   div::AbstractMatrix{Complex{NF}},
                         ) where {NF<:AbstractFloat}
 
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    kernel(o,a,b,c) = flipsign ? (add ? o+b-a-c : b-a-c) :
-                                 (add ? o+a-b+c : a-b+c)                
+    kernel(o,a,b,c) = flipsign ? (add ? o-(a-b+c) : -(a+b-c)) :
+                                 (add ? o+(a-b+c) :   a-b+c )                
     _divergence!(kernel,div,u,v,S)
 end
 
