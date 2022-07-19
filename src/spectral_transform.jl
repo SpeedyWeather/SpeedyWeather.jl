@@ -199,7 +199,13 @@ Use Float64 as default."""
 SpectralTransform(args...) = SpectralTransform(Float64,args...)
 
 "Generator function for a SpectralTransform struct pulling in parameters from a Parameters struct."
-SpectralTransform(P::Parameters) = SpectralTransform(P.NF,P.nlon,P.nlat,P.trunc,P.radius_earth,P.recompute_legendre)
+function SpectralTransform(P::Parameters)
+    T = triangular_truncation(trunc=P.trunc)
+    return SpectralTransform(P.NF,T.nlon,T.nlat,P.trunc,P.radius_earth,P.recompute_legendre)
+end
+
+# don't recompute triangular truncation if Geometry is already available
+SpectralTransform(P::Parameters,G::Geometry) = SpectralTransform(P.NF,G.nlon,G.nlat,P.trunc,P.radius_earth,P.recompute_legendre)
 
 """
     G = Geospectral{NF}(geometry,spectral_transform)
@@ -216,7 +222,7 @@ end
 Generator function for a GeoSpectral struct based on a Parameters struct `P`."""
 function GeoSpectral(P::Parameters)
     G = Geometry(P)
-    S = SpectralTransform(P)
+    S = SpectralTransform(P,G)
     return GeoSpectral{P.NF}(G,S)
 end
 
@@ -357,13 +363,14 @@ function gridded(   alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
                     recompute_legendre::Bool=true       # saves memory
                     ) where NF                          # number format NF
 
-    lmax, mmax = size(alms) .- 1                    # -1 for 0-based degree l, order m
+    lmax, mmax = size(alms) .- 1                        # -1 for 0-based degree l, order m
 
     # get grid size from spectral resolution via triangular_truncation
     # use mmax instead of lmax in case lmax = mmax + 1 (required in the meridional gradient recursion)
-    nlon, nlat = triangular_truncation(mmax)        # number of longitudes, number of latitudes
+    T = triangular_truncation(trunc=mmax)           
+    @unpack nlon, nlat = T                              # number of longitudes, number of latitudes
     
-    radius = 1                                      # only needed for SpectralTransform() but not used
+    radius = 1                                          # only needed for SpectralTransform() but not used
     S = SpectralTransform(NF,nlon,nlat,mmax,radius,recompute_legendre)
     return gridded(alms,S)          # now execute the in-place version
 end
@@ -459,7 +466,8 @@ function spectral(  map::AbstractMatrix{NF};        # gridded field nlon x nlat
     @boundscheck nlon == 2nlat || throw(BoundsError)
 
     # Spectral resolution via triangular truncation
-    trunc = triangular_truncation(nlon,nlat)    # largest trunc that satisfies the constraints
+    T = triangular_truncation(;nlon)                # largest trunc that satisfies the constraints
+    @unpack trunc = T                               # spectral truncation
 
     # allocate spectral transform struct
     radius = 1  # only needed for argument compatibility

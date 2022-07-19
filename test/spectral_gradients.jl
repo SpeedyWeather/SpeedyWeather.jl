@@ -21,7 +21,7 @@
         # to evaluate ∇⋅(uv) use vorticity adv (=∇⋅(uv(ζ+f))) with ζ=1,f=0
         fill!(d.grid_variables.vor_grid,1)
         fill!(m.geospectral.geometry.f_coriolis,0)
-        SpeedyWeather.vorticity_advection!(d,m.geospectral)
+        SpeedyWeather.vorticity_flux_divergence!(d,m.geospectral)
 
         @test all(abs.(d.tendencies.vor_tend) .< sqrt(eps(NF)))
     end
@@ -52,7 +52,7 @@ end
         # to evaluate ∇⋅(uv) use vorticity adv (=∇⋅(uv(η+H₀))) with η=1,H₀=0
         H₀ = 0
         fill!(d.grid_variables.pres_grid,1)
-        SpeedyWeather.volume_fluxes!(d,m.geospectral,m.boundaries,H₀)
+        SpeedyWeather.volume_flux_divergence!(d,m.geospectral,m.boundaries,H₀)
 
         @test all(abs.(d.tendencies.pres_tend) .< sqrt(eps(NF)))
     end
@@ -86,8 +86,8 @@ end
         fill!(m.geospectral.geometry.f_coriolis,0)
 
         # calculate uω,vω in spectral space
-        SpeedyWeather.vorticity_advection!(d,m.geospectral)
-        SpeedyWeather.curl_vorticity_fluxes!(d,m.geospectral)
+        SpeedyWeather.vorticity_flux_divergence!(d,m.geospectral)
+        SpeedyWeather.vorticity_flux_curl!(d,m.geospectral)
 
         @test all(abs.(d.tendencies.div_tend) .< sqrt(eps(NF)))
     end

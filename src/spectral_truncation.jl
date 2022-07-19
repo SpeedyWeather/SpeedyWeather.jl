@@ -26,8 +26,17 @@ function roundup_fft(n::Int;small_primes::Vector{Int}=[2,3,5])
     return n-2      # subtract unnecessary last += 2 addition
 end
 
+struct TriangularTruncation
+    trunc::Int      # spectral truncation (trunc=lmax=mmax)
+    nlon::Int       # number of longitudes
+    nlat::Int       # number of latitudes
+
+    TriangularTruncation(trunc,nlon,nlat) = is_triangular_truncation(trunc,nlon,nlat) ?
+        new(trunc,nlon,nlat) : error("Not a triangular truncation.")
+end
+
 """
-    triangular_truncation(trunc::Int,nlon::Int,nlat::Int)
+    is_triangular_truncation(trunc::Int,nlon::Int,nlat::Int)
 
 Tests whether the inputs `trunc, nlon, nlat` satisfy the triangular truncation constraints.
 `trunc` is the maximum degree and order of the Legendre polynomials (0-based), `nlon` is the
@@ -36,37 +45,54 @@ number of longitudes, `nlat` the number of latitudes on the spatial grid. The co
     - nlon >= 3T+1
     - nlat >= (3T+1)/2
     - nlon = 2nlat."""
-function triangular_truncation(trunc::Int,nlon::Int,nlat::Int)
+function is_triangular_truncation(trunc::Int,nlon::Int,nlat::Int)
     info = "$(nlon)x$(nlat) grid and T$trunc violate triangular truncation constraints, "
-    constraints = "nlon >= 3T+1, nlat >= (3T+1)/2, nlon = 2nlat."
+    constraints = "nlon >= 3T+1, nlat >= (3T+1)/2, nlon = 2nlat, nlat even."
     feedback = info*constraints
     @assert nlon >= 3*trunc+1 feedback
     @assert nlat >= (3*trunc+1)/2 feedback
     @assert nlon == 2nlat feedback
+    @assert iseven(nlat) feedback
+    return true     # return true if all @asserts pass the constraints
 end
 
-"""
-    nlon, nlat = triangular_truncation(trunc::Int)
-
-Returns the grid size `nlon,nlat` for a spectral truncation `trunc` that satisfies the
-triangular truncation constraints. Returns the smallest pair `nlon,nlat` that is also
-easily Fast Fourier-transformable, as determined in `roundup_fft`."""
-function triangular_truncation(trunc::Int)
-    nlon = roundup_fft(3*trunc+1)
-    nlat = nlon÷2
-    triangular_truncation(trunc,nlon,nlat)
-    return nlon,nlat
-end
+# unpack 
+is_triangular_truncation(T::TriangularTruncation) = is_triangular_truncation(T.trunc,T.nlon,T.nlat)
 
 """
-    trunc = triangular_truncation(nlon::Int,nlat::Int)
+    tri_trunc = triangular_truncation(;trunc::Int=0,nlon::Int=0,nlat::Int=0)
 
-Returns the largest spectral truncation `trunc` that satisfies the triangular truncation constraints
-based on the grid size `nlon,nlat`, which may or may not be easily Fast Fourier-transformable."""
-function triangular_truncation(nlon::Int,nlat::Int)
-    trunc = floor(Int,(nlon-1)/3)
-    triangular_truncation(trunc,nlon,nlat)
-    return trunc
+Returns a `tri_trunc::TriangularTruncation` struct, that contains the spectral truncation `trunc`,
+and the grid sizes `nlon,nlat` that satisfy the triangular truncation constraints.
+Provide either `trunc`, `nlon`, or `nlat` but not a combination. If `trunc` is provided,
+`nlon` will be easily Fast Fourier-transformable, as determined in `roundup_fft`.
+If `nlon` or `nlat` are provided, `tri_trunc.trunc` is the largest spectral truncation
+that satisfies the constraints."""
+function triangular_truncation(;trunc::Int=0,nlon::Int=0,nlat::Int=0)
+    # if all trunc, nlon, nlat are provided, test if triangular truncation
+    if trunc > 0 && nlon > 0 && nlat > 0    
+        is_triangular_truncation(trunc,nlon,nlat)
+
+    # if only trunc is provided, get nlon,nlat
+    elseif trunc > 0 && nlon == 0 && nlat == 0
+        nlon = roundup_fft(3*trunc+1)
+        nlat = nlon÷2
+
+    # if only nlon is provided, get trunc,nlat
+    elseif trunc == 0 && nlon > 0 && nlat == 0
+        nlat = nlon ÷ 2
+        trunc = floor(Int,(nlon-1)/3)
+
+    # if only nlat is provided, get trunc,nlon
+    elseif trunc == 0 && nlon == 0 && nlat > 0
+        nlon = 2nlat
+        trunc = floor(Int,(nlon-1)/3)
+
+    else
+        throw(error("Please use either trunc, nlon or nlat keywords, not a combination of them."))
+    end
+
+    return TriangularTruncation(trunc,nlon,nlat)
 end
 
 """

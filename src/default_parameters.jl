@@ -15,8 +15,6 @@ The default values of the keywords define the default model setup.
 
     # RESOLUTION
     trunc::Int=31                       # spectral truncation
-    nlon::Int=roundup_fft(3*trunc+1)    # number of longitudes
-    nlat::Int=nlon÷2                    # number of latitudes
     nlev::Int=nlev_default(model)       # number of vertical levels 
 
     # PHYSICAL CONSTANTS
