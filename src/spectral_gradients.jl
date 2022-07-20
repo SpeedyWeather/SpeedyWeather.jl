@@ -176,7 +176,7 @@ function divergence!(   div::AbstractMatrix{Complex{NF}},
                         ) where {NF<:AbstractFloat}
 
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    kernel(o,a,b,c) = flipsign ? (add ? o-(a-b+c) : -(a+b-c)) :
+    kernel(o,a,b,c) = flipsign ? (add ? o-(a-b+c) : -(a-b+c)) :
                                  (add ? o+(a-b+c) :   a-b+c )                
     _divergence!(kernel,div,u,v,S)
 end
