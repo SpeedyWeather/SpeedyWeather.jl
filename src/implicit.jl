@@ -12,7 +12,7 @@ function Implicit(  P::Parameters,
     
     @unpack Δt,gravity,radius_earth = C             # time step Δt (scaled), gravity g [m/s²], radius [m]
     @unpack implicit_α = P                          # implicit time step fraction between i-1 and i+1
-    @unpack eigen_values = G.spectral_transform     # = -(l(l+1)), degree l of harmonics (0-based)
+    @unpack eigenvalues = G.spectral_transform      # = -(l(l+1)), degree l of harmonics (0-based)
     @unpack layer_thickness = C                     # = H₀, layer thickness at rest without mountains
 
     # implicit time step between i-1 and i+1
@@ -21,7 +21,7 @@ function Implicit(  P::Parameters,
     # α = 1   evaluates at i+1 (backward implicit)
 
     ξ = 2implicit_α*Δt              # = [0,2Δt], time step within [forward,backward] range for implicit terms
-    g∇² = gravity*eigen_values      # = -gl(l+1), gravity g, degree l of harmonics
+    g∇² = gravity*eigenvalues       # = -gl(l+1), gravity g, degree l of harmonics
     ξg∇² = ξ*g∇²                    # = -ξgl(l+1)
     ξH₀ = ξ*layer_thickness         # = ξ*H₀
 

@@ -122,7 +122,22 @@ function gradient_longitude(Ψ::AbstractMatrix{NF},  # input array: spectral coe
     return gradient_longitude!(coslat_v,Ψ,R)        # call in-place version
 end
 
+"""
+    curl!(  curl::AbstractMatrix{Complex{NF}},
+            u::AbstractMatrix{Complex{NF}},
+            v::AbstractMatrix{Complex{NF}},
+            S::SpectralTransform{NF};
+            flipsign::Bool=false,
+            add::Bool=false
+            ) where {NF<:AbstractFloat}
 
+Curl of a vector `u,v` written into `curl`, `curl = ∇×(u,v)`. 
+`u,v` are expected to have a 1/coslat-scaling included, then
+`curl` is not scaled. `flipsign` option calculates -∇×(u,v) instead.
+`add` option calculates `curl += ∇×(u,v)` instead. `flipsign` and `add`
+can be combined. This functions only creates the kernel and calls
+the generic divergence function _divergence! subsequently with flipped
+u,v -> v,u for the curl."""
 function curl!( curl::AbstractMatrix{Complex{NF}},
                 u::AbstractMatrix{Complex{NF}},
                 v::AbstractMatrix{Complex{NF}},
@@ -132,11 +147,26 @@ function curl!( curl::AbstractMatrix{Complex{NF}},
                 ) where {NF<:AbstractFloat}
 
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
-    kernel(o,a,b,c) = flipsign ? (add ? o+c-a-b : c+a-b) :
-                                 (add ? o+a+b-c : a+b-c)    
+    kernel(o,a,b,c) = flipsign ? (add ? o-(a+b-c) : -(a+b-c)) :
+                                 (add ? o+(a+b-c) :   a+b-c )    
     _divergence!(kernel,curl,v,u,S)             # flip u,v -> v,u
 end
 
+"""
+    divergence!(div::AbstractMatrix{Complex{NF}},
+                u::AbstractMatrix{Complex{NF}},
+                v::AbstractMatrix{Complex{NF}},
+                S::SpectralTransform{NF};
+                flipsign::Bool=false,
+                add::Bool=false
+                ) where {NF<:AbstractFloat}
+
+Divergence of a vector `u,v` written into `div`, `div = ∇⋅(u,v)`. 
+`u,v` are expected to have a 1/coslat-scaling included, then
+`div` is not scaled. `flipsign` option calculates -∇⋅(u,v) instead.
+`add` option calculates `div += ∇⋅(u,v)` instead. `flipsign` and `add`
+can be combined. This functions only creates the kernel and calls
+the generic divergence function _divergence! subsequently."""
 function divergence!(   div::AbstractMatrix{Complex{NF}},
                         u::AbstractMatrix{Complex{NF}},
                         v::AbstractMatrix{Complex{NF}},
@@ -146,11 +176,22 @@ function divergence!(   div::AbstractMatrix{Complex{NF}},
                         ) where {NF<:AbstractFloat}
 
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    kernel(o,a,b,c) = flipsign ? (add ? o+b-a-c : b-a-c) :
-                                 (add ? o+a-b+c : a-b+c)                
+    kernel(o,a,b,c) = flipsign ? (add ? o-(a-b+c) : -(a-b+c)) :
+                                 (add ? o+(a-b+c) :   a-b+c )                
     _divergence!(kernel,div,u,v,S)
 end
 
+"""
+    _divergence!(   kernel,
+                    div::AbstractMatrix{Complex{NF}},
+                    u::AbstractMatrix{Complex{NF}},
+                    v::AbstractMatrix{Complex{NF}},
+                    S::SpectralTransform{NF}
+                    ) where {NF<:AbstractFloat}
+
+Generic divergence function of vector `u`,`v` that writes into the output into `div`.
+Generic as it uses the kernel `kernel` such that curl, div, add or flipsign
+options are provided through `kernel`, but otherwise a single function is used."""
 function _divergence!(  kernel,
                         div::AbstractMatrix{Complex{NF}},
                         u::AbstractMatrix{Complex{NF}},
@@ -179,6 +220,7 @@ function _divergence!(  kernel,
     return nothing
 end
 
+"""Compute curl and divergence of vectors u,v in one go. Currently not used."""
 function curl_div!( curl::AbstractMatrix{Complex{NF}},
                     div::AbstractMatrix{Complex{NF}},
                     u::AbstractMatrix{Complex{NF}},
@@ -195,7 +237,7 @@ function curl_div!( curl::AbstractMatrix{Complex{NF}},
 
     div[1,1]  = zero(Complex{NF})                   # l=m=0 harmonic is zero
     curl[1,1] = zero(Complex{NF})                   # l=m=0 harmonic is zero
-    for m in 1:mmax+1                               # 1-based l,m
+    @inbounds for m in 1:mmax+1                     # 1-based l,m
         for l in max(2,m):lmax+1                    # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
             ∂u∂λ  = ((m-1)*im)*u[l,m]
             ∂v∂λ  = ((m-1)*im)*v[l,m]
@@ -211,15 +253,66 @@ function curl_div!( curl::AbstractMatrix{Complex{NF}},
     return nothing
 end
 
+"""
+    UV_from_vor!(   U::AbstractMatrix{Complex{NF}},
+                    V::AbstractMatrix{Complex{NF}},
+                    vor::AbstractMatrix{Complex{NF}},
+                    S::SpectralTransform{NF}
+                    ) where {NF<:AbstractFloat}
+
+Get U,V (=(u,v)*coslat) from vorticity ζ spectral space (divergence D=0)
+Two operations are combined into a single linear operation. First, invert the
+spherical Laplace ∇² operator to get stream function from vorticity. Then
+compute zonal and meridional gradients to get U,V."""
 function UV_from_vor!(  U::AbstractMatrix{Complex{NF}},
                         V::AbstractMatrix{Complex{NF}},
                         vor::AbstractMatrix{Complex{NF}},
                         S::SpectralTransform{NF}
                         ) where {NF<:AbstractFloat}
 
-    return nothing
+    lmax,mmax = size(vor) .- (1,1)                  # 0-based lmax,mmax
+    @boundscheck size(U) == (lmax+2,mmax+1) || throw(BoundsError)
+    @boundscheck size(V) == (lmax+2,mmax+1) || throw(BoundsError)
+
+    @unpack vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 = S
+
+    U[1,1] = vordiv_to_uv2[1,1]*vor[2,1]            # l=m=0 harmonic has only one contribution
+    V[1,1] = zero(Complex{NF})                      # obtained via zonal derivative (*i*m) = 0 
+
+    @inbounds for m in 1:mmax+1                     # 1-based l,m
+        for l in max(2,m):lmax                      # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+            # meridional gradient, u = -∂/∂lat(Ψ), omit radius R scaling
+            U[l,m] = vordiv_to_uv2[l,m]*vor[l+1,m] - vordiv_to_uv1[l,m]*vor[l-1,m]
+
+            # zonal gradient, V = ∂/∂λ(Ψ), omit radius R scaling
+            V[l,m] = im*vordiv_to_uv_x[l,m]*vor[l,m]
+        end
+    end
+
+    @inbounds for m in 1:mmax+1
+        l = lmax+1                                  # second last row, l+1 index is out of bounds (=0 entry)
+        U[l,m] = -vordiv_to_uv1[l,m]*vor[l-1,m]     # meridional gradient again (but only 2nd term from above)
+        V[l,m] = im*vordiv_to_uv_x[l,m]*vor[l,m]    # zonal gradient again (as above)
+
+        l = lmax+2                                  # last row, l,l+1 indices are out of bounds (=0 entries)
+        U[l,m] = -vordiv_to_uv1[l,m]*vor[l-1,m]     # meridional gradient again (but only 2nd term from above)
+        V[l,m] = zero(Complex{NF})                  # set explicitly to 0 as Ψ does not contribute to last row of V
+    end
 end
 
+"""
+    UV_from_vordiv!(U::AbstractMatrix{Complex{NF}},
+                    V::AbstractMatrix{Complex{NF}},
+                    vor::AbstractMatrix{Complex{NF}},
+                    div::AbstractMatrix{Complex{NF}},
+                    S::SpectralTransform{NF}
+                    ) where {NF<:AbstractFloat}
+
+Get U,V (=(u,v)*coslat) from vorticity ζ and divergence D in spectral space.
+Two operations are combined into a single linear operation. First, invert the
+spherical Laplace ∇² operator to get stream function from vorticity and
+velocity potential from divergence. Then compute zonal and meridional gradients
+to get U,V."""
 function UV_from_vordiv!(   U::AbstractMatrix{Complex{NF}},
                             V::AbstractMatrix{Complex{NF}},
                             vor::AbstractMatrix{Complex{NF}},
@@ -261,11 +354,16 @@ function UV_from_vordiv!(   U::AbstractMatrix{Complex{NF}},
     end
 end
 
+# alias functions to scale the latitude of lat-lon map `A`
 scale_coslat!(  A::AbstractMatrix,G::Geometry) = _scale_lat!(A,G.coslat)
 scale_coslat²!( A::AbstractMatrix,G::Geometry) = _scale_lat!(A,G.coslat²)
 scale_coslat⁻¹!(A::AbstractMatrix,G::Geometry) = _scale_lat!(A,G.coslat⁻¹)
 scale_coslat⁻²!(A::AbstractMatrix,G::Geometry) = _scale_lat!(A,G.coslat⁻²)
 
+"""
+    _scale_lat!(A::AbstractMatrix{NF},v::AbstractVector) where {NF<:AbstractFloat}
+
+Generic latitude scaling applied to `A` in-place with latitude-like vector `v`."""
 function _scale_lat!(A::AbstractMatrix{NF},v::AbstractVector) where {NF<:AbstractFloat}
     nlon,nlat = size(A)
     @boundscheck nlat == length(v) || throw(BoundsError)
@@ -278,19 +376,20 @@ function _scale_lat!(A::AbstractMatrix{NF},v::AbstractVector) where {NF<:Abstrac
     end
 end 
 
-
-∇⁻²!(alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigen_values⁻¹
-∇²!( alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigen_values
+# In-place update of spectral coeffs alms with their (inverse) Laplace operator-ed version 
+∇⁻²!(alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigenvalues⁻¹
+∇²!( alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigenvalues
 
 """
     ∇⁻²!(   ∇⁻²alms::AbstractMatrix{Complex},
             alms::AbstractMatrix{Complex},
-            R::Real=1)
+            S::SpectralTransform)
 
-Inverse spherical Laplace operator ∇⁻² applied to the spectral coefficients `alms` on a sphere
-of radius `R`. ∇⁻²! is the in-place version which directly stores the output in the argument
-∇⁻²alms. The integration constant for Legendre polynomial `l=m=0` is zero. The inverse spherical
-Laplace operator is
+Inverse Laplace operator ∇⁻² applied to the spectral coefficients `alms` in spherical
+coordinates. The radius `R` is omitted in the eigenvalues which are precomputed in `S`.
+∇⁻²! is the in-place version which directly stores the output in the first argument `∇⁻²alms`.
+The integration constant for Legendre polynomial `l=m=0` is zero. The inverse spherical
+Laplace operator is generally
 
     ∇⁻²alms = alms*R²/(-l(l+1))
 
@@ -303,18 +402,31 @@ function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{NF}},   # Output: inve
     @boundscheck size(alms) == size(∇⁻²alms) || throw(BoundsError)
     lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
     
-    @unpack eigen_values⁻¹ = S
-    @boundscheck length(eigen_values⁻¹) >= lmax+1 || throw(BoundsError)
+    @unpack eigenvalues⁻¹ = S
+    @boundscheck length(eigenvalues⁻¹) >= lmax+1 || throw(BoundsError)
 
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
         for l in m:lmax+1           # degree l = m:lmax but 1-based
-            ∇⁻²alms[l,m] = alms[l,m]*eigen_values⁻¹[l]
+            ∇⁻²alms[l,m] = alms[l,m]*eigenvalues⁻¹[l]
         end
     end
 
     return ∇⁻²alms
 end
 
+"""
+    ∇²!(    ∇⁻²alms::AbstractMatrix{Complex},
+            alms::AbstractMatrix{Complex},
+            S::SpectralTransform)
+
+Laplace operator ∇² applied to the spectral coefficients `alms` in spherical
+coordinates. The radius `R` is omitted in the eigenvalues which are precomputed in `S`.
+∇²! is the in-place version which directly stores the output in the first argument `∇²alms`.
+The spherical Laplace operator is generally
+
+    ∇⁻²alms = alms*(-l(l+1))/R²
+
+with the degree `l` (0-based) of the Legendre polynomial."""
 function ∇²!(   ∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacian of alms
                 alms::AbstractMatrix{Complex{NF}},      # spectral coefficients
                 S::SpectralTransform{NF}                # precomputed arrays for spectral space
@@ -323,12 +435,12 @@ function ∇²!(   ∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacia
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
     lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
     
-    @unpack eigen_values = S
-    @boundscheck length(eigen_values) >= lmax+1 || throw(BoundsError)
+    @unpack eigenvalues = S
+    @boundscheck length(eigenvalues) >= lmax+1 || throw(BoundsError)
 
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
         for l in m:lmax+1           # degree l = m:lmax but 1-based
-            ∇²alms[l,m] = alms[l,m]*eigen_values[l]
+            ∇²alms[l,m] = alms[l,m]*eigenvalues[l]
         end
     end
 

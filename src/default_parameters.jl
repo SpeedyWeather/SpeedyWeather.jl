@@ -15,8 +15,6 @@ The default values of the keywords define the default model setup.
 
     # RESOLUTION
     trunc::Int=31                       # spectral truncation
-    nlon::Int=roundup_fft(3*trunc+1)    # number of longitudes
-    nlat::Int=nlon÷2                    # number of latitudes
     nlev::Int=nlev_default(model)       # number of vertical levels 
 
     # PHYSICAL CONSTANTS
@@ -71,11 +69,11 @@ The default values of the keywords define the default model setup.
     humid_relax_time::Real = 4.0     # Relaxation time for humidity (hours)
 
     # TIME STEPPING
-    Δt_at_T85::Real=20          # time step in minutes for T85, scale linearly for specified trunc
-    n_days::Real=10             # number of days to integrate for
+    Δt_at_T85::Real=20              # time step in minutes for T85, scale linearly to trunc
+    n_days::Real=10                 # number of days to integrate for
 
     # NUMERICS
-    robert_filter::Real=0.05        # Robert (1966) time filter coefficeint for suppress comput. mode
+    robert_filter::Real=0.05        # Robert (1966) time filter coefficeint to suppress comput. mode
     williams_filter::Real=0.53      # William's time filter (Amezcua 2011) coefficient for 3rd order acc
     implicit_α::Real=0.5            # coefficient for semi-implicit computations to filter gravity waves
     recompute_legendre::Bool=false  # recomputation is slower but requires less memory
@@ -94,9 +92,9 @@ The default values of the keywords define the default model setup.
     output_dt::Real=6           # output time step [hours]
     output_startdate::DateTime=DateTime(2000,1,1)
     out_path::String=pwd()      # path to output folder
-    output_vars::Vector{String}=["u","v","T","humid","logp0"]
+    output_vars::Vector{String}=["u","v","temp","humid","pres"]
     compression_level::Int=3    # 1=low but fast, 9=high but slow
-    keepbits::Int=10            # mantissa bits to keep for every variable
+    keepbits::Int=7             # mantissa bits to keep for every variable
 end
 
 function nlev_default(model::Symbol)

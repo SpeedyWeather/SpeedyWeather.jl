@@ -23,7 +23,8 @@ function initialize_feedback(M::ModelSetup)
     @unpack n_timesteps, n_outputsteps = M.constants
 
     if output   # with netcdf output
-        @unpack NF,n_days,trunc,nlon,nlat = M.parameters
+        @unpack NF,n_days,trunc = M.parameters
+        @unpack nlon,nlat = M.geospectral.geometry
 
         run_id,run_path = get_run_id_path(M.parameters)     # create output folder and get its id and path
         
@@ -57,6 +58,7 @@ function initialize_feedback(M::ModelSetup)
     dt_in_sec[1] = M.constants.Δt_sec       # hack: redefine element in global constant dt_in_sec
                                             # used to pass on the time step to ProgressMeter.speedstring
     desc = "Weather is speedy$(output ? " run $run_id: " : ": ")"
+                                            # show progress meter via `enabled` through verbose parameter
     progress_meter = ProgressMeter.Progress(n_timesteps,enabled=verbose,showspeed=true;desc)
 
     return Feedback(progress_meter,progress_txt,

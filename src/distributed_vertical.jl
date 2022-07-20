@@ -70,6 +70,24 @@ for func_name in (:bernoulli_potential!,)
     end
 end
 
+# THREE ARGUMENT FUNCTIONS
+for func_name in (:UV_from_vor!,)
+    @eval begin
+        function $func_name(Out1::AbstractArray{NF,3},
+                            Out2::AbstractArray{NF,3},
+                            In::AbstractArray{NF,3},
+                            args...) where NF
+            
+            for k in 1:size(Out1)[end]
+                Out1_layer = view(Out1,:,:,k)
+                Out2_layer = view(Out2,:,:,k)
+                In_layer = view(In,:,:,k)
+                $func_name(Out1_layer,Out2_layer,In_layer,args...)
+            end
+        end
+    end
+end
+
 # FOUR ARGUMENT FUNCTIONS
 for func_name in (:UV_from_vordiv!,)
     @eval begin

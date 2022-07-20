@@ -30,7 +30,7 @@ function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic var
                             ) where {NF<:AbstractFloat}
 
     # only (planetary) vorticity advection for the barotropic model
-    vorticity_advection!(diagn,M.geospectral)               # = -∇⋅(u(ζ+f),v(ζ+f))
+    vorticity_flux_divergence!(diagn,M.geospectral)         # = -∇⋅(u(ζ+f),v(ζ+f))
 end
 
 function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
@@ -45,14 +45,14 @@ function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic var
     H₀ = M.constants.layer_thickness
     
     # tendencies for vorticity
-    vorticity_advection!(diagn,G)               # = -∇⋅(u(ζ+f),v(ζ+f))
+    vorticity_flux_divergence!(diagn,G)         # = -∇⋅(u(ζ+f),v(ζ+f))
 
     # tendencies for divergence
     bernoulli_potential!(diagn,G,g)             # = -∇²(E+gη)
-    curl_vorticity_fluxes!(diagn,G)             # =  ∇×(u(ζ+f),v(ζ+f))
+    vorticity_flux_curl!(diagn,G)               # =  ∇×(u(ζ+f),v(ζ+f))
     
     # tendencies for pressure pres = interface displacement η
-    volume_fluxes!(diagn,G,B,H₀)                # = -∇⋅(uh,vh)
+    volume_flux_divergence!(diagn,G,B,H₀)       # = -∇⋅(uh,vh)
 end
 
 

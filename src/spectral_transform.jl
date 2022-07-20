@@ -58,8 +58,8 @@ struct SpectralTransform{NF<:AbstractFloat}
     vordiv_to_uv2::Matrix{NF}
 
     # EIGENVALUES (on unit sphere, no 1/radius²-scaling included)
-    eigen_values::Vector{NF}        # = -l*(l+1), degree l of spherical harmonic
-    eigen_values⁻¹::Vector{NF}      # = -1/(l*(l+1))
+    eigenvalues  ::Vector{NF}       # = -l*(l+1), degree l of spherical harmonic
+    eigenvalues⁻¹::Vector{NF}       # = -1/(l*(l+1))
 end
 
 """
@@ -175,11 +175,10 @@ function SpectralTransform( ::Type{NF},     # Number format NF
 
     vordiv_to_uv1[1,1] = 0                  # remove NaN from 0/0
 
-
     # EIGENVALUES (on unit sphere, hence 1/radius²-scaling is omitted)
-    eigen_values = [-l*(l+1) for l in 0:lmax+1]
-    eigen_values⁻¹ = inv.(eigen_values)
-    eigen_values⁻¹[1] = 0
+    eigenvalues = [-l*(l+1) for l in 0:lmax+1]
+    eigenvalues⁻¹ = inv.(eigenvalues)
+    eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
         
     # conversion to NF happens here
     SpectralTransform{NF}(  lmax,mmax,nfreq,radius,
@@ -192,7 +191,7 @@ function SpectralTransform( ::Type{NF},     # Number format NF
                             ϵlms,grad_x,grad_y1,grad_y2,minus_grad_y1,minus_grad_y2,
                             grad_y_vordiv1,grad_y_vordiv2,vordiv_to_uv_x,
                             vordiv_to_uv1,vordiv_to_uv2,
-                            eigen_values,eigen_values⁻¹)
+                            eigenvalues,eigenvalues⁻¹)
 end
 
 """Generator function for a SpectralTransform struct in case the number format is not provided.
@@ -200,7 +199,13 @@ Use Float64 as default."""
 SpectralTransform(args...) = SpectralTransform(Float64,args...)
 
 "Generator function for a SpectralTransform struct pulling in parameters from a Parameters struct."
-SpectralTransform(P::Parameters) = SpectralTransform(P.NF,P.nlon,P.nlat,P.trunc,P.radius_earth,P.recompute_legendre)
+function SpectralTransform(P::Parameters)
+    T = triangular_truncation(trunc=P.trunc)
+    return SpectralTransform(P.NF,T.nlon,T.nlat,P.trunc,P.radius_earth,P.recompute_legendre)
+end
+
+# don't recompute triangular truncation if Geometry is already available
+SpectralTransform(P::Parameters,G::Geometry) = SpectralTransform(P.NF,G.nlon,G.nlat,P.trunc,P.radius_earth,P.recompute_legendre)
 
 """
     G = Geospectral{NF}(geometry,spectral_transform)
@@ -217,7 +222,7 @@ end
 Generator function for a GeoSpectral struct based on a Parameters struct `P`."""
 function GeoSpectral(P::Parameters)
     G = Geometry(P)
-    S = SpectralTransform(P)
+    S = SpectralTransform(P,G)
     return GeoSpectral{P.NF}(G,S)
 end
 
@@ -237,6 +242,13 @@ Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of th
 ϵ(l,m) = sqrt((l^2-m^2)/(4*l^2-1)) with default number format Float64."""
 ϵlm(l::Int,m::Int) = ϵlm(Float64,l,m)
 
+"""
+    get_recursion_factors(  ::Type{NF}, # number format NF
+                            lmax::Int,  # max degree l of spherical harmonics (0-based here)
+                            mmax::Int   # max order m of spherical harmonics
+                            ) where {NF<:AbstractFloat}
+        
+Returns a matrix of recursion factors `ϵ` up to degree `lmax` and order `mmax` of number format `NF`."""
 function get_recursion_factors( ::Type{NF}, # number format NF
                                 lmax::Int,  # max degree l of spherical harmonics (0-based here)
                                 mmax::Int   # max order m of spherical harmonics
@@ -251,6 +263,7 @@ function get_recursion_factors( ::Type{NF}, # number format NF
     return ϵlms
 end
 
+# if number format not provided use Float64
 get_recursion_factors(lmax::Int,mmax::Int) = get_recursion_factors(Float64,lmax,mmax)
 
 """
@@ -350,13 +363,14 @@ function gridded(   alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
                     recompute_legendre::Bool=true       # saves memory
                     ) where NF                          # number format NF
 
-    lmax, mmax = size(alms) .- 1                    # -1 for 0-based degree l, order m
+    lmax, mmax = size(alms) .- 1                        # -1 for 0-based degree l, order m
 
     # get grid size from spectral resolution via triangular_truncation
     # use mmax instead of lmax in case lmax = mmax + 1 (required in the meridional gradient recursion)
-    nlon, nlat = triangular_truncation(mmax)        # number of longitudes, number of latitudes
+    T = triangular_truncation(trunc=mmax)           
+    @unpack nlon, nlat = T                              # number of longitudes, number of latitudes
     
-    radius = 1                                      # only needed for SpectralTransform() but not used
+    radius = 1                                          # only needed for SpectralTransform() but not used
     S = SpectralTransform(NF,nlon,nlat,mmax,radius,recompute_legendre)
     return gridded(alms,S)          # now execute the in-place version
 end
@@ -452,7 +466,8 @@ function spectral(  map::AbstractMatrix{NF};        # gridded field nlon x nlat
     @boundscheck nlon == 2nlat || throw(BoundsError)
 
     # Spectral resolution via triangular truncation
-    trunc = triangular_truncation(nlon,nlat)    # largest trunc that satisfies the constraints
+    T = triangular_truncation(;nlon)                # largest trunc that satisfies the constraints
+    @unpack trunc = T                               # spectral truncation
 
     # allocate spectral transform struct
     radius = 1  # only needed for argument compatibility

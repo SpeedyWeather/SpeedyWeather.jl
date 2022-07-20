@@ -12,14 +12,14 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     nlon_half::Int      # Half the number of longitudes
     radius_earth::Real  # Earth's radius [m]
 
-    dlon::NF            # grid spacing in longitude
-    dlat::NF            # average grid spacing in latitude
-    lon::Vector{NF}     # array of longitudes (0...2π)
-    lond::Vector{Float64}  # array of longitudes in degrees (0...360˚)
-    lat::Vector{NF}     # array of latitudes (π/2...-π/2)
-    latd::Vector{Float64}  # array of latitudes in degrees (90˚...-90˚)
-    colat::Vector{NF}   # array of colatitudes (0...π)
-    colatd::Vector{Float64}# array of colatitudes in degrees (0...180˚)
+    dlon::NF                # grid spacing in longitude
+    dlat::NF                # average grid spacing in latitude
+    lon::Vector{NF}         # array of longitudes (0...2π)
+    lond::Vector{Float64}   # array of longitudes in degrees (0...360˚)
+    lat::Vector{NF}         # array of latitudes (π/2...-π/2)
+    latd::Vector{Float64}   # array of latitudes in degrees (90˚...-90˚)
+    colat::Vector{NF}       # array of colatitudes (0...π)
+    colatd::Vector{Float64} # array of colatitudes in degrees (0...180˚)
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     n_stratosphere_levels::Int      # number of upper levels for stratosphere
@@ -32,7 +32,7 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     # SINES AND COSINES OF LATITUDE
     sinlat::Vector{NF}              # sin of latitudes
     coslat::Vector{NF}              # cos of latitudes
-    coslat⁻¹::Vector{NF}            # =1/cos(lat)
+    coslat⁻¹::Vector{NF}            # = 1/cos(lat)
     coslat²::Vector{NF}             # = cos²(lat)
     coslat⁻²::Vector{NF}            # = 1/cos²(lat)
 
@@ -56,10 +56,12 @@ Defines the geometry.
 """
 function Geometry(P::Parameters)
 
-    # number of longitudes, latitudes, vertical levels, spectral truncation
-    @unpack nlon, nlat, nlev, trunc = P     
-    @unpack radius_earth, rotation_earth, akap = P       # radius of earth, angular frequency, ratio of gas consts
-    @unpack n_stratosphere_levels = P       # number of vertical levels used for stratosphere
+    @unpack trunc, nlev = P                         # spectral truncation, number of vertical levels
+    @unpack radius_earth, rotation_earth, akap = P  # radius of earth, angular frequency, ratio of gas consts
+    @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
+
+    tri_trunc = triangular_truncation(;trunc)       # get grid size via triangular truncation
+    @unpack nlon, nlat = tri_trunc                  # number of longitudes, latitudes
 
     nlat_half = nlat ÷ 2
     nlon_half = nlon ÷ 2
@@ -136,7 +138,10 @@ function Geometry(P::Parameters)
                     # tref,rgas,fsgr,tref3)
 end
 
-"""Vertical sigma coordinates defined by their nlev+1 half levels `σ_levels_half`. Sigma coordinates are
+"""
+    σ_levels_half = vertical_coordinates(P::Parameters)
+
+Vertical sigma coordinates defined by their nlev+1 half levels `σ_levels_half`. Sigma coordinates are
 fraction of surface pressure (p/p0) and are sorted from top (stratosphere) to bottom (surface).
 The first half level is at 0 the last at 1. Evaluate a generalised logistic function with
 coefficients in `P` for the distribution of values in between. Default coefficients follow

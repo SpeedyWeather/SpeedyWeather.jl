@@ -16,28 +16,29 @@ For an overview of the functionality and explanation see the
 ## Example use
 
 SpeedyWeather.jl is currently developed. Some things work, some don't.
-Stay tuned. Here is a teaser picture of some barotropic vorticity, simulated at T341 spectral resolution in single precision.
+Stay tuned. Here is a teaser picture of some relative vorticity, simulated at T682 (20km at the Equator) spectral resolution in single precision.
 
-![vor](docs/img/barotropic_vorticity.png?raw=true "First simulation of barotropic vorticity with SpeedyWeather.jl")
+![vor](docs/img/frame0240_small.jpg?raw=true "Relative vorticity simulated with SpeedyWeather.jl")
 
 The main interface to SpeedyWeather.jl is 
 
 ```julia
 julia> using SpeedyWeather
 julia> run_speedy(Float32,n_days=100,output=true);
-Weather is speedy run 1:  49%|███████▍       |  ETA: 0:00:09 ( 3.71 ms/it)
+Weather is speedy run 2: 100%|████████████| Time: 0:00:08 (14.69 millenia/day)
 ```
 
 and the arguments for `run_speedy` are described in [`src/default_parameters.jl`](https://github.com/milankl/SpeedyWeather.jl/blob/main/src/default_parameters.jl).
 
 ## History
 
-SpeedyWeather.jl is the Julia version of the atmospheric general circulation model
-[SPEEDY](http://users.ictp.it/~kucharsk/speedy-net.html). Speedy's dynamical core is originally written by Isaac Held
+SpeedyWeather.jl is a reinvention of the atmospheric general circulation model
+[SPEEDY](http://users.ictp.it/~kucharsk/speedy-net.html) in Julia. While conceptually the same model,
+it is entirely restructured, features have been added, changed and removed, such that only the core
+algorithms share similarities. Speedy's dynamical core is originally written by Isaac Held
 at GFDL and the physical parametrizations by Fred Kucharski, Franco Molteni and Martin P. King in Fortran77.
 Speedy was then translated to Fortran90 by Sam Hatfield in [speedy.f90](https://github.com/samhatfield/speedy.f90).
-SpeedyWeather.jl is then adopted from [first translations to Julia](https://github.com/samhatfield/speedy.jl) by Sam Hatfield,
-but entirely restructured and only the parts of the conceptual algorithms are shared with the original Fortran versions.
+SpeedyWeather.jl is then adopted from [first translations to Julia](https://github.com/samhatfield/speedy.jl) by Sam Hatfield.
 
 ## Installation
 
