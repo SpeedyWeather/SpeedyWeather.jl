@@ -119,7 +119,7 @@ end
 end
 
 @testset "Transform: with one more l" begin
-    for NF in (Float32,Float64)
+    @testset for NF in (Float32,Float64)
         p,d,m = initialize_speedy(  NF,
                                     model=:shallowwater,
                                     initial_conditions=:rest,
@@ -169,8 +169,11 @@ end
             SpeedyWeather.spectral!(U,U_grid,S)
             SpeedyWeather.gridded!(U_grid2,U,S)
 
+            testall = .≈(U_grid,U_grid2,rtol=sqrt(eps(NF)))
+            @test sum(testall) > 0.99*length(testall)
+
             for i in eachindex(U_grid, U_grid2)
-                @test U_grid[i] ≈ U_grid2[i] rtol=30*sqrt(eps(NF))
+                @test U_grid[i] ≈ U_grid2[i] rtol=5*sqrt(sqrt(eps(NF)))
             end
         end
     end
