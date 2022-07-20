@@ -26,19 +26,34 @@ SpeedyWeather.triangular_truncation
 SpeedyWeather.roundup_fft
 SpeedyWeather.spectral_truncation
 SpeedyWeather.spectral_truncation!
+SpeedyWeather.spectral_interpolation!
 SpeedyWeather.get_legendre_polynomials!
 SpeedyWeather.∇²!
 SpeedyWeather.∇²
-SpeedyWeather.∇⁴!
-SpeedyWeather.∇⁴
 SpeedyWeather.∇⁻²!
 SpeedyWeather.∇⁻²
 SpeedyWeather.gradient_latitude!
 SpeedyWeather.gradient_latitude
 SpeedyWeather.gradient_longitude!
 SpeedyWeather.gradient_longitude
-SpeedyWeather.divergence_uvω_spectral
-SpeedyWeather.ϵlm     
+SpeedyWeather.divergence!
+SpeedyWeather.curl!
+SpeedyWeather._divergence!
+SpeedyWeather.curl_div!
+SpeedyWeather.UV_from_vordiv!
+SpeedyWeather.UV_from_vor!
+SpeedyWeather.ϵlm
+SpeedyWeather.get_recursion_factors
+```
+
+## Dynamics
+
+```@docs
+SpeedyWeather.bernoulli_potential!
+SpeedyWeather.volume_flux_divergence!
+SpeedyWeather.vorticity_fluxes!
+SpeedyWeather.vorticity_flux_curl!
+SpeedyWeather.vorticity_flux_divergence!
 ```
 
 ## Geometry
