@@ -31,8 +31,6 @@ developed this is by no means complete.
 | ----------------- | ------------- | --------- |
 | `NF::DataType`    | `Float32`     | Number format (not keyword, first positional, but optional argument) |
 | `trunc::Int`      | `31`          | Spectral triangular truncation , i.e. the maximum order and degree of the spherical harmonics | 
-| `nlon::Int`       | `96`          | Number of grid points in longitude (determined from `trunc` automatically) |
-| `nlat::Int`       | `48`          | Number of grid points in latitude (determined from `nlon` automatically) |
 | `nlev::Int`       | `8`           | Number of vertical levels |
 
 
