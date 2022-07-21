@@ -69,7 +69,7 @@ SpeedyWeather.generalised_logistic
 
 ```@docs
 SpeedyWeather.time_stepping!
-SpeedyWeather.time_step!
-SpeedyWeather.first_timestep!
+SpeedyWeather.timestep!
+SpeedyWeather.first_timesteps!
 SpeedyWeather.leapfrog!
 ```
