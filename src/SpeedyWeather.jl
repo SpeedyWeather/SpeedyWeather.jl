@@ -32,6 +32,8 @@ module SpeedyWeather
         triangular_truncation
 
     include("utility_functions.jl")
+    include("lower_triangular_matrix.jl")
+
     include("parameter_structs.jl")
     include("spectral_truncation.jl")
 

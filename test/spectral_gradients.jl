@@ -313,7 +313,9 @@ end
         SpeedyWeather.curl!(vor1,u_coslat⁻¹,v_coslat⁻¹,S)
         SpeedyWeather.divergence!(div1,u_coslat⁻¹,v_coslat⁻¹,S)
 
-        @test all(vor1 .≈ vor0)
-        @test all(div1 .≈ div0)
+        for i in eachindex(vor0,vor1,div0,div1)
+            @test vor0[i] ≈ vor1[i] rtol=sqrt(eps(NF))
+            @test div0[i] ≈ div1[i] rtol=sqrt(eps(NF))
+        end
     end
 end
