@@ -14,11 +14,11 @@ end
 
 ij2k(i::Integer,j::Integer,m::Integer) = i+(j-1)*m-fibonacci(j)
 Base.size(L::LowerTriangularMatrix) = (L.m,L.n)
+Base.sizeof(L::LowerTriangularMatrix) = sizeof(L.v)
 
 function Base.getindex(L::LowerTriangularMatrix{T},i::Integer,j::Integer) where T
+    @boundscheck (i > L.m || j > L.n) && throw(BoundsError(L,(i,j)))
     j > i && return zero(T)
-    @boundscheck (i > L.m || j > L.n) && throw(
-        BoundsError("attempt to access $(L.m)x$(L.n) LowerTriangularMatrix{$T} at index [$i,$j]"))
     k = ij2k(i,j,L.m)
     return getindex(L.v,k)
 end
