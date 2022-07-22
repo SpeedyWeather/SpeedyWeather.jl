@@ -7,6 +7,8 @@
 
             L = SpeedyWeather.LowerTriangularMatrix(A)
 
+            @test size(L) == size(A)
+
             for m in 1:mmax
                 for l in 1:lmax
                     @test A[l,m] == L[l,m]

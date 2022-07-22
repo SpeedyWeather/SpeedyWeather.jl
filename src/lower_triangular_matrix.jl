@@ -25,7 +25,7 @@ Base.sizeof(L::LowerTriangularMatrix) = sizeof(L.v)
 end
 
 @inline function Base.getindex(L::LowerTriangularMatrix{T},i::Integer,j::Integer) where T
-    @boundscheck (0 < i <= L.m || 0 < j <= L.n) || throw(BoundsError(L,(i,j)))
+    @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L,(i,j)))
     j > i && return zero(T)
     k = ij2k(i,j,L.m)
     @inbounds r = L.v[k]
@@ -40,5 +40,5 @@ function LowerTriangularMatrix(M::AbstractMatrix{T}) where T
             v[ij2k(i,j,m)] = M[i,j]
         end
     end
-    return LowerTriangularMatrix{T}(v,m,n)
+    return LowerTriangularMatrix(v,m,n)
 end
