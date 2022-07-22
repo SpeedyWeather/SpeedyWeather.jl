@@ -63,11 +63,11 @@ function leapfrog!( progn::PrognosticVariables{NF},         # all prognostic var
 end    
 
 """
-first_timesteps!(   progn::PrognosticVariables{NF}, # all prognostic variables
-                    diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
-                    M::ModelSetup,                  # everything that is constant at runtime
-                    feedback::Feedback              # feedback struct
-                    ) where NF
+    first_timesteps!(   progn::PrognosticVariables{NF}, # all prognostic variables
+                        diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
+                        M::ModelSetup,                  # everything that is constant at runtime
+                        feedback::Feedback              # feedback struct
+                        ) where NF
 
 Performs the first two initial time steps (Euler forward, unfiltered leapfrog) to populate the
 prognostic variables with two time steps (t=0,Δt) that can then be used in the normal leap frogging."""

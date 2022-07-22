@@ -3,6 +3,7 @@ using Test
 
 # GENERAL
 include("utility_functions.jl")
+include("lower_triangular_matrix.jl")
 
 # SPECTRAL TRANSFORM
 include("spectral_transform.jl")
