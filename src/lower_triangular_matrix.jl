@@ -18,12 +18,18 @@ ij2k(i::Integer,j::Integer,m::Integer) = i+(j-1)*m-fibonacci(j)
 Base.size(L::LowerTriangularMatrix) = (L.m,L.n)
 Base.sizeof(L::LowerTriangularMatrix) = sizeof(L.v)
 
-Base.getindex(L::LowerTriangularMatrix,k::Integer) = getindex(@inbounds L.v[k])
+@inline function Base.getindex(L::LowerTriangularMatrix,k::Integer)
+    @boundscheck 0 < k <= length(L.v) || throw(BoundsError(L,k))
+    @inbounds r = L.v[k]
+    return r
+end
 
-function Base.getindex(L::LowerTriangularMatrix{T},i::Integer,j::Integer) where T
-    @boundscheck (i > L.m || j > L.n) && throw(BoundsError(L,(i,j)))
+@inline function Base.getindex(L::LowerTriangularMatrix{T},i::Integer,j::Integer) where T
+    @boundscheck (0 < i <= L.m || 0 < j <= L.n) || throw(BoundsError(L,(i,j)))
     j > i && return zero(T)
-    return getindex(L.v,ij2k(i,j,L.m))
+    k = ij2k(i,j,L.m)
+    @inbounds r = L.v[k]
+    return r
 end
 
 function LowerTriangularMatrix(M::AbstractMatrix{T}) where T
