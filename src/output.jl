@@ -195,3 +195,23 @@ function write_netcdf_variables!(   i_out::Integer,
     NetCDF.putvar(netcdf_file,"div",div_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
     NetCDF.putvar(netcdf_file,"pres",pres_output,start=[1,1,i_out],count=[-1,-1,1])
 end
+
+function write_restart_file(progn::PrognosticVariables,
+                            feedback::Feedback,
+                            M::ModelSetup)
+    
+    @unpack run_path, write_restart = feedback
+    write_restart || return nothing                 # exit immediately if no restart file desired
+
+    # bitround to output precision
+    # all_progn_variables = (getproperty(progn,prop) for prop in propertynames(progn))
+
+    # @unpack keepbits = M.parameters
+    # for var in all_progn_variables
+    #     round!(var,keepbits)
+    # end 
+
+    jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
+        f["prognostic_variables"] = progn
+    end
+end

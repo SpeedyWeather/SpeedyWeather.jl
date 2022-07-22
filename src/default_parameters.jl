@@ -87,14 +87,19 @@ The default values of the keywords define the default model setup.
     initial_conditions::Symbol=:barotropic_vorticity    # :rest, :barotropic_vorticity or :restart
 
     # OUTPUT
-    verbose::Bool=true          # print dialog for feedback
-    output::Bool=false          # Store data in netCDF?
-    output_dt::Real=6           # output time step [hours]
+    verbose::Bool=true              # print dialog for feedback
+    output::Bool=false              # Store data in netCDF?
+    output_dt::Real=6               # output time step [hours]
     output_startdate::DateTime=DateTime(2000,1,1)
-    out_path::String=pwd()      # path to output folder
+    out_path::String=pwd()          # path to output folder
     output_vars::Vector{String}=["u","v","temp","humid","pres"]
-    compression_level::Int=3    # 1=low but fast, 9=high but slow
-    keepbits::Int=7             # mantissa bits to keep for every variable
+    compression_level::Int=3        # 1=low but fast, 9=high but slow
+    keepbits::Int=7                 # mantissa bits to keep for every variable
+
+    # RESTART
+    write_restart::Bool=true        # also write restart file if output==true?
+    restart_path::String=out_path   # path for restart file
+    restart_id::Integer=1           # run_id of restart file in run????/restart.jld2
 end
 
 function nlev_default(model::Symbol)

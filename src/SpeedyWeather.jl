@@ -14,6 +14,8 @@ module SpeedyWeather
     import Dates: Dates, DateTime
     import Printf: @sprintf
     import NetCDF: NetCDF, NcFile, NcDim, NcVar
+    import JLD2: jldopen
+    import CodecZlib
     import BitInformation: round, round!
     import UnicodePlots
     import ProgressMeter

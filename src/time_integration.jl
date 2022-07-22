@@ -304,6 +304,7 @@ function time_stepping!(progn::PrognosticVariables{NF}, # all prognostic variabl
         write_netcdf_output!(netcdf_file,feedback,time_sec,diagn,M)
     end
 
+    write_restart_file(progn,feedback,M)
     progress_finish!(feedback)          # finishes the progress meter bar
 
     return progn

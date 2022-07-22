@@ -77,6 +77,25 @@ function initial_conditions(M::Union{BarotropicModel,ShallowWaterModel})
     return progn
 end
 
+function initialize_from_file(M::ModelSetup)
+    @unpack restart_path, restart_id = M
+    restart_file = jldopen(joinpath(restart_path,@sprintf("run%04d",restart_id),"restart.jld2"))
+    progn = restart_file["prognostic_variables"]
+
+    @unpack lmax,mmax = M.geospectral.spectral_transform
+    vor = spectral_truncation(progn.vor,lmax)
+
+    # check whether they are not dummy arrays, truncate/interpolate to match resolution
+    div   = prod(size(progn.div)) > 1   ? spectral_truncation(progn.div,  lmax) : progn.div
+    temp  = prod(size(progn.temp)) > 1  ? spectral_truncation(progn.temp, lmax) : progn.temp
+    pres  = prod(size(progn.div)) > 1   ? spectral_truncation(progn.pres, lmax) : progn.pres
+    humid = prod(size(progn.humid)) > 1 ? spectral_truncation(progn.humid,lmax) : progn.humid
+
+    # conversion to NF happens here
+    @unpack NF = M.parameters
+    return PrognosticVariables{NF}(vor,div,temp,pres,humid)
+end
+
 """Initialize a PrognosticVariables struct for an atmosphere at rest. No winds,
 hence zero vorticity and divergence, but temperature, pressure and humidity are
 initialised """
