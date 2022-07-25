@@ -6,6 +6,7 @@ mutable struct Feedback
     # OUTPUT
     verbose::Bool                           # print stuff to REPL?
     output::Bool                            # output to netCDF?
+    write_restart::Bool                     # also write restart file if output==true?
     i_out::Int                              # output step counter
     n_timesteps::Int                        # number of time steps
     n_outputsteps::Int                      # number of time steps with output
@@ -19,7 +20,7 @@ end
 
 """Initialises the progress txt file."""
 function initialize_feedback(M::ModelSetup)
-    @unpack verbose, output = M.parameters
+    @unpack verbose, output, write_restart = M.parameters
     @unpack n_timesteps, n_outputsteps = M.constants
 
     if output   # with netcdf output
@@ -62,7 +63,7 @@ function initialize_feedback(M::ModelSetup)
     progress_meter = ProgressMeter.Progress(n_timesteps,enabled=verbose,showspeed=true;desc)
 
     return Feedback(progress_meter,progress_txt,
-                    verbose,output,i_out,n_timesteps,
+                    verbose,output,write_restart,i_out,n_timesteps,
                     n_outputsteps,run_id,run_path,
                     nans_detected)
 end

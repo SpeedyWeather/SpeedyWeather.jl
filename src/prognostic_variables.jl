@@ -10,7 +10,7 @@ struct PrognosticVariables{NF<:AbstractFloat}
 end
 
 """Initialize prognostic variables from rest or restart from file."""
-function initial_conditions(M::Union{BarotropicModel,ShallowWaterModel})
+function initial_conditions(M::Union{BarotropicModel,ShallowWaterModel,PrimitiveEquationModel})
 
     @unpack initial_conditions = M.parameters
 
@@ -77,6 +77,26 @@ function initial_conditions(M::Union{BarotropicModel,ShallowWaterModel})
     return progn
 end
 
+function initialize_from_file(M::ModelSetup)
+    @unpack restart_path, restart_id = M.parameters
+    restart_file = jldopen(joinpath(restart_path,@sprintf("run%04d",restart_id),"restart.jld2"))
+    progn = restart_file["prognostic_variables"]
+    # time = restart_file["time"]     # currently unused
+
+    @unpack lmax,mmax = M.geospectral.spectral_transform
+    vor = spectral_truncation(progn.vor,lmax)
+
+    # check whether they are not dummy arrays, truncate/interpolate to match resolution
+    div   = prod(size(progn.div)) > 1   ? spectral_truncation(progn.div,  lmax) : progn.div
+    temp  = prod(size(progn.temp)) > 1  ? spectral_truncation(progn.temp, lmax) : progn.temp
+    pres  = prod(size(progn.div)) > 1   ? spectral_truncation(progn.pres, lmax) : progn.pres
+    humid = prod(size(progn.humid)) > 1 ? spectral_truncation(progn.humid,lmax) : progn.humid
+
+    # conversion to NF happens here
+    @unpack NF = M.parameters
+    return PrognosticVariables{NF}(vor,div,temp,pres,humid)
+end
+
 """Initialize a PrognosticVariables struct for an atmosphere at rest. No winds,
 hence zero vorticity and divergence, but temperature, pressure and humidity are
 initialised """
@@ -87,13 +107,13 @@ function initialize_from_rest(M::BarotropicModel)
     nleapfrog = 2
 
     # conversion to type NF later when creating a PrognosticVariables struct
-    vor     = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # vorticity
+    vor   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # vorticity
 
     # dummy arrays for the rest, not used in this ModelSetup
-    div     = zeros(Complex{Float64},1,1,1,1)
-    temp    = zeros(Complex{Float64},1,1,1,1)
-    pres    = zeros(Complex{Float64},1,1,1)
-    humid   = zeros(Complex{Float64},1,1,1,1)
+    div   = zeros(Complex{Float64},1,1,1,1)
+    temp  = zeros(Complex{Float64},1,1,1,1)
+    pres  = zeros(Complex{Float64},1,1,1)
+    humid = zeros(Complex{Float64},1,1,1,1)
 
     # conversion to NF happens here
     @unpack NF = M.parameters
@@ -107,13 +127,13 @@ function initialize_from_rest(M::ShallowWaterModel)
     nleapfrog = 2
 
     # conversion to type NF later when creating a PrognosticVariables struct
-    vor     = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # vorticity
-    div     = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # divergence
-    pres    = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog)       # interface displacement
+    vor   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # vorticity
+    div   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # divergence
+    pres  = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog)         # interface displacement
 
     # dummy arrays for the rest, not used in this ModelSetup
-    temp    = zeros(Complex{Float64},1,1,1,1)
-    humid   = zeros(Complex{Float64},1,1,1,1)
+    temp  = zeros(Complex{Float64},1,1,1,1)
+    humid = zeros(Complex{Float64},1,1,1,1)
 
     # conversion to NF happens here
     @unpack NF = M.parameters
@@ -135,20 +155,20 @@ function initialize_from_rest(M::PrimitiveEquationModel)
 
     # conversion to type NF later when creating a PrognosticVariables struct
     # one more degree l than order m for recursion in meridional gradient
-    vor     = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # vorticity
-    div     = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # divergence
-    temp    = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # absolute Temperature
-    pres    = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog)       # logarithm of surface pressure
-    humid   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)  # specific humidity
+    vor   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # vorticity
+    div   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # divergence
+    temp  = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # absolute Temperature
+    pres  = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog)         # logarithm of surface pressure
+    humid = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # specific humidity
 
-    # initialize only the first leapfrog index
-    temp_lf1 = view(temp,:,:,1,:)
-    pres_lf1 = view(pres,:,:,1)
-    humid_lf1 = view(humid,:,:,1,:)
+    # # initialize only the first leapfrog index
+    # temp_lf1 = view(temp,:,:,1,:)
+    # pres_lf1 = view(pres,:,:,1)
+    # humid_lf1 = view(humid,:,:,1,:)
 
-    initialize_temperature!(temp_lf1,P,B,G)                    # temperature from lapse rates    
-    pres_grid = initialize_pressure!(pres_lf1,P,B,G)  # pressure from temperature profile
-    initialize_humidity!(humid_lf1,pres_grid,P,G)          # specific humidity from pressure
+    # initialize_temperature!(temp_lf1,P,B,G)                    # temperature from lapse rates    
+    # pres_grid = initialize_pressure!(pres_lf1,P,B,G)  # pressure from temperature profile
+    # initialize_humidity!(humid_lf1,pres_grid,P,G)          # specific humidity from pressure
 
     # conversion to NF happens here
     @unpack NF = M.parameters

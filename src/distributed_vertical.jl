@@ -10,6 +10,15 @@ for func_name in (:scale_coslat!,:scale_coslat²!,:scale_coslat⁻¹!,:scale_cos
                 $func_name(A_layer,args...)
             end
         end
+
+        function $func_name(A::AbstractArray{NF,4},
+                            args...) where NF
+
+            for k in 1:size(A)[end]
+                A_layer = view(A,:,:,:,k)
+                $func_name(A_layer,args...)
+            end
+        end
     end
 end
 
