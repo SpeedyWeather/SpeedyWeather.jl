@@ -204,13 +204,30 @@ function write_restart_file(time_sec::Real,
     @unpack run_path, write_restart = feedback
     write_restart || return nothing                 # exit immediately if no restart file desired
 
-    # bitround to output precision
-    # all_progn_variables = (getproperty(progn,prop) for prop in propertynames(progn))
+    # unscale variables
+    progn.vor ./= M.geospectral.geometry.radius_earth
+    progn.div ./= M.geospectral.geometry.radius_earth
 
-    # @unpack keepbits = M.parameters
-    # for var in all_progn_variables
-    #     round!(var,keepbits)
-    # end 
+    # remove 2nd leapfrog step (compression makes the restart file then smaller)
+    fill!(@view(progn.vor[:,:,2,:]),0)
+
+    if M isa Union{ShallowWaterModel,PrimitiveEquationModel}
+        fill!(@view(progn.div[:,:,2,:]),0)
+        fill!(@view(progn.pres[:,:,2,:]),0)
+    end
+
+    if M isa PrimitiveEquationModel
+        fill!(@view(progn.temp[:,:,2,:]),0)
+        fill!(@view(progn.humid[:,:,2,:]),0)
+    end
+
+    # bitround to output precision
+    all_progn_variables = (getproperty(progn,prop) for prop in propertynames(progn))
+
+    @unpack keepbits = M.parameters
+    for var in all_progn_variables
+        round!(var,keepbits)
+    end 
 
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
         f["prognostic_variables"] = progn
