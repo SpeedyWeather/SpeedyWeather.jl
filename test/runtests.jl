@@ -20,3 +20,4 @@ include("large_scale_condensation.jl")
 # INITIALIZATION AND INTEGRATION
 include("initialize_from_rest.jl")
 include("run_speedy.jl")
+include("model_hierarchy.jl")
