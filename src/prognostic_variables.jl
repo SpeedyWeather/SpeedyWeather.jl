@@ -78,9 +78,10 @@ function initial_conditions(M::Union{BarotropicModel,ShallowWaterModel})
 end
 
 function initialize_from_file(M::ModelSetup)
-    @unpack restart_path, restart_id = M
+    @unpack restart_path, restart_id = M.parameters
     restart_file = jldopen(joinpath(restart_path,@sprintf("run%04d",restart_id),"restart.jld2"))
     progn = restart_file["prognostic_variables"]
+    # time = restart_file["time"]     # currently unused
 
     @unpack lmax,mmax = M.geospectral.spectral_transform
     vor = spectral_truncation(progn.vor,lmax)
