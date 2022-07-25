@@ -23,7 +23,7 @@ UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 [compat]
 AbstractFFTs = "1"
 AssociatedLegendrePolynomials = "1"
-BitInformation = "0.3,0.4,0.5,0.6"
+BitInformation = "0.6"
 FFTW = "1"
 FastGaussQuadrature = "0.4"
 NetCDF = "0.10, 0.11"
