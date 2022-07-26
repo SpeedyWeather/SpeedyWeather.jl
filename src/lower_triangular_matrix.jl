@@ -6,15 +6,8 @@ struct LowerTriangularMatrix{T} <: AbstractMatrix{T}
     n::Int          # number of columns
 end
 
-function fibonacci(j::Integer)
-    ∑ = zero(j)
-    for jj in 1:j-1
-        ∑ += jj
-    end
-    return ∑
-end
-
-ij2k(i::Integer,j::Integer,m::Integer) = i+(j-1)*m-fibonacci(j)
+triangle_number(n::Integer) = n*(n-1)÷2
+ij2k(i::Integer,j::Integer,m::Integer) = i+(j-1)*m-triangle_number(j)
 Base.size(L::LowerTriangularMatrix) = (L.m,L.n)
 Base.sizeof(L::LowerTriangularMatrix) = sizeof(L.v)
 
@@ -34,7 +27,7 @@ end
 
 function LowerTriangularMatrix(M::AbstractMatrix{T}) where T
     m,n = size(M)
-    v = Vector{T}(undef,m*n-fibonacci(n))
+    v = Vector{T}(undef,m*n-triangle_number(n))
     @inbounds for j in 1:n
         for i in j:m
             v[ij2k(i,j,m)] = M[i,j]
