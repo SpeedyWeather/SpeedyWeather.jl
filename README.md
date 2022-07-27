@@ -20,6 +20,8 @@ Stay tuned. Here is a teaser picture of some relative vorticity, simulated at T6
 
 ![vor](docs/img/frame0240_small.jpg?raw=true "Relative vorticity simulated with SpeedyWeather.jl")
 
+https://raw.githubusercontent.com/milankl/milankl.github.io/main/files/ortho_europe.mp4
+
 The main interface to SpeedyWeather.jl is 
 
 ```julia
