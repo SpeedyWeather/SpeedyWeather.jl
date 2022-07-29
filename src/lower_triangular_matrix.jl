@@ -79,6 +79,10 @@ end
 end
 
 # CONVERSIONS
+""" 
+    L = LowerTriangularMatrix(M)
+
+Create a LowerTriangularMatrix `L` from Matrix `M` by copying over the non-zero elements in `M`."""
 function LowerTriangularMatrix(M::AbstractMatrix{T}) where T
     m,n = size(M)
     L = LowerTriangularMatrix{T}(undef,m,n)
@@ -94,4 +98,17 @@ end
 
 function Base.convert(::Type{LowerTriangularMatrix{T1}},L::LowerTriangularMatrix{T2}) where {T1,T2}
     return LowerTriangularMatrix{T1}(L.v,L.m,L.n)
+end
+
+"""
+    fill!(L::LowerTriangularMatrix,x)
+
+Fills the elements of `L` with `x`. Faster than fill!(::AbstractArray,x)
+as only the non-zero elements in `L` are assigned with x."""
+function Base.fill!(L::LowerTriangularMatrix{T}, x) where T
+    xT = convert(T, x)
+    @inbounds for i in eachindex(L.v)
+        L[i] = xT
+    end
+    A
 end
