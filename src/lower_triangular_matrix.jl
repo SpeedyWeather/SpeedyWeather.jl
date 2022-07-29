@@ -91,3 +91,7 @@ function LowerTriangularMatrix(M::AbstractMatrix{T}) where T
     end
     return L
 end
+
+function Base.convert(::Type{LowerTriangularMatrix{T1}},L::LowerTriangularMatrix{T2}) where {T1,T2}
+    return LowerTriangularMatrix{T1}(L.v,L.m,L.n)
+end
