@@ -56,7 +56,7 @@ function initialize_feedback(M::ModelSetup)
     nans_detected = false           # currently not used
 
     # PROGRESSMETER
-    dt_in_sec[1] = M.constants.Δt_sec       # hack: redefine element in global constant dt_in_sec
+    DT_IN_SEC[1] = M.constants.Δt_sec       # hack: redefine element in global constant dt_in_sec
                                             # used to pass on the time step to ProgressMeter.speedstring
     desc = "Weather is speedy$(output ? " run $run_id: " : ": ")"
                                             # show progress meter via `enabled` through verbose parameter

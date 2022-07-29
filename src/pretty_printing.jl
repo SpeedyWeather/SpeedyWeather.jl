@@ -34,9 +34,9 @@ end
 # hack: define global constant whose element will be changed in initialize_feedback
 # used to pass on the time step to ProgressMeter.speedstring via calling this
 # constant from the ProgressMeter module
-const dt_in_sec = [1800]
+const DT_IN_SEC = [1800]
 
-function ProgressMeter.speedstring(sec_per_iter,dt_in_sec=SpeedyWeather.dt_in_sec)
+function ProgressMeter.speedstring(sec_per_iter,dt_in_sec=SpeedyWeather.DT_IN_SEC)
     if sec_per_iter == Inf
         return "  N/A  days/day"
     end
