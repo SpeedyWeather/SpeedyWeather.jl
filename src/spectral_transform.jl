@@ -33,29 +33,27 @@ struct SpectralTransform{NF<:AbstractFloat}
     fs::Vector{Complex{NF}}         # Fourier-transformed latitude south
 
     # LEGENDRE POLYNOMIALS
-    recompute_legendre::Bool        # Pre or recompute Legendre polynomials
-    Λ::Matrix{NF}                   # Legendre polynomials for one latitude (requires recomputing)
-    Λs::Array{NF,3}                 # Legendre polynomials for all latitudes (all precomputed)
-    legendre_weights::Vector{NF}    # Legendre weights (extra normalisation of π/nlat included)
+    recompute_legendre::Bool                # Pre or recompute Legendre polynomials
+    Λ::LowerTriangularMatrix{NF}            # Legendre polynomials for one latitude (requires recomputing)
+    Λs::Vector{LowerTriangularMatrix{NF}}   # Legendre polynomials for all latitudes (all precomputed)
+    legendre_weights::Vector{NF}            # Legendre weights (extra normalisation of π/nlat included)
 
     # RECURSION FACTORS
-    ϵlms::Array{NF}                 # precomputed for meridional gradients gradients grad_y1, grad_y2
+    ϵlms::LowerTriangularMatrix{NF}         # precomputed for meridional gradients gradients grad_y1, grad_y2
 
     # GRADIENT MATRICES (on unit sphere, no 1/radius-scaling included)
-    grad_x ::Vector{Complex{NF}}    # = i*m but precomputed
-    grad_y1::Matrix{NF}             # precomputed meridional gradient factors, term 1
-    grad_y2::Matrix{NF}             # term 2
-    minus_grad_y1::Matrix{NF}       # as above but sign flipped (to get u from Ψ)
-    minus_grad_y2::Matrix{NF}
+    grad_x ::Vector{Complex{NF}}                    # = i*m but precomputed
+    grad_y1::LowerTriangularMatrix{NF}              # precomputed meridional gradient factors, term 1
+    grad_y2::LowerTriangularMatrix{NF}              # term 2
 
     # GRADIENT MATRICES FOR U,V -> Vorticity,Divergence
-    grad_y_vordiv1::Matrix{NF}
-    grad_y_vordiv2::Matrix{NF}
+    grad_y_vordiv1::LowerTriangularMatrix{NF}
+    grad_y_vordiv2::LowerTriangularMatrix{NF}
 
     # GRADIENT MATRICES FOR Vorticity,Divergence -> U,V
-    vordiv_to_uv_x::Matrix{NF}
-    vordiv_to_uv1::Matrix{NF}
-    vordiv_to_uv2::Matrix{NF}
+    vordiv_to_uv_x::LowerTriangularMatrix{NF}
+    vordiv_to_uv1::LowerTriangularMatrix{NF}
+    vordiv_to_uv2::LowerTriangularMatrix{NF}
 
     # EIGENVALUES (on unit sphere, no 1/radius²-scaling included)
     eigenvalues  ::Vector{NF}       # = -l*(l+1), degree l of spherical harmonic
@@ -108,17 +106,18 @@ function SpectralTransform( ::Type{NF},     # Number format NF
     norm_forward = π/nlat       # normalization for forward transform to be baked into the Legendre weights
 
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
-    Λ = zeros(lmax+2,mmax+1)                            # Legendre polynomials for one latitude
+    Λ = zeros(LowerTriangularMatrix,lmax+2,mmax+1)  # Legendre polynomials for one latitude
 
     # allocate memory in Λs for polynomials at all latitudes or allocate dummy array if precomputed
     # Λs is of size (lmax+2) x (mmax+1) x nlat_half unless recomputed, one more degree l as before
     # for recomputed only Λ is used, not Λs, create dummy array of size 1x1x1 instead
     b = ~recompute_legendre                 # true for precomputed
-    Λs = zeros(b*lmax + 1 + b, b*mmax + 1, b*(nlat_half-1) + 1) 
+    # Λs = zeros(b*lmax + 1 + b, b*mmax + 1, b*(nlat_half-1) + 1) 
+    Λs = [zeros(LowerTriangularMatrix,b*lmax+1+b,b*mmax+1) for _ in 1:b*(nlat_half-1)+1]
 
     if recompute_legendre == false          # then precompute all polynomials
         for ilat in 1:nlat_half             # only one hemisphere due to symmetry
-            AssociatedLegendrePolynomials.λlm!(@view(Λs[:,:,ilat]), lmax+1, mmax, cos_colat[ilat])
+            AssociatedLegendrePolynomials.λlm!(Λs[ilat], lmax+1, mmax, cos_colat[ilat])
         end
     end
 
@@ -133,8 +132,8 @@ function SpectralTransform( ::Type{NF},     # Number format NF
     grad_x = [im*m for m in 0:mmax+1]       # zonal gradient (precomputed currently not used)
 
     # meridional gradient for scalars (coslat scaling included)
-    grad_y1 = zeros(lmax+2,mmax+1)          # term 1, to be multiplied with harmonic l-1,m
-    grad_y2 = zeros(lmax+2,mmax+1)          # term 2, to be multiplied with harmonic l+1,m
+    grad_y1 = zeros(LowerTriangularMatrix,lmax+2,mmax+1)          # term 1, mul with harmonic l-1,m
+    grad_y2 = zeros(LowerTriangularMatrix,lmax+2,mmax+1)          # term 2, mul with harmonic l+1,m
 
     for m in 0:mmax                         # 0-based degree l, order m
         for l in m:lmax+1           
@@ -143,12 +142,9 @@ function SpectralTransform( ::Type{NF},     # Number format NF
         end
     end
 
-    minus_grad_y1 = -grad_y1                # gradient arrays with a minus sign
-    minus_grad_y2 = -grad_y2                # (to get u from stream function directly)
-
     # meridional gradient used to get from u,v/coslat to vorticity and divergence
-    grad_y_vordiv1 = zeros(lmax+2,mmax+1)   # term 1, to be multiplied with harmonic l-1,m
-    grad_y_vordiv2 = zeros(lmax+2,mmax+1)   # term 2, to be multiplied with harmonic l+1,m
+    grad_y_vordiv1 = zeros(LowerTriangularMatrix,lmax+2,mmax+1)   # term 1, mul with harmonic l-1,m
+    grad_y_vordiv2 = zeros(LowerTriangularMatrix,lmax+2,mmax+1)   # term 2, mul with harmonic l+1,m
 
     for m in 0:mmax                         # 0-based degree l, order m
         for l in m:lmax+1           
@@ -158,13 +154,12 @@ function SpectralTransform( ::Type{NF},     # Number format NF
     end
 
     # zonal integration (sort of) to get from vorticity and divergence to u,v*coslat
-    vordiv_to_uv_x = [-m/(l*(l+1)) for l in 0:lmax+1, m in 0:mmax]
-    spectral_truncation!(vordiv_to_uv_x,lmax+1,mmax)
+    vordiv_to_uv_x = LowerTriangularMatrix([-m/(l*(l+1)) for l in 0:lmax+1, m in 0:mmax])
     vordiv_to_uv_x[1,1] = 0
 
     # meridional integration (sort of) to get from vorticity and divergence to u,v*coslat
-    vordiv_to_uv1 = zeros(lmax+2,mmax+1)    # term 1, to be multiplied with harmonic l-1,m
-    vordiv_to_uv2 = zeros(lmax+2,mmax+1)    # term 2, to be multiplied with harmonic l+1,m
+    vordiv_to_uv1 = zeros(LowerTriangularMatrix,lmax+2,mmax+1)    # term 1, to be mul with harmonic l-1,m
+    vordiv_to_uv2 = zeros(LowerTriangularMatrix,lmax+2,mmax+1)    # term 2, to be mul with harmonic l+1,m
 
     for m in 0:mmax                         # 0-based degree l, order m
         for l in m:lmax+1           
@@ -205,7 +200,8 @@ function SpectralTransform(P::Parameters)
 end
 
 # don't recompute triangular truncation if Geometry is already available
-SpectralTransform(P::Parameters,G::Geometry) = SpectralTransform(P.NF,G.nlon,G.nlat,P.trunc,P.radius_earth,P.recompute_legendre)
+SpectralTransform(P::Parameters,G::Geometry) = SpectralTransform(P.NF,G.nlon,G.nlat,P.trunc,
+                                                                P.radius_earth,P.recompute_legendre)
 
 """
     G = Geospectral{NF}(geometry,spectral_transform)
@@ -254,7 +250,8 @@ function get_recursion_factors( ::Type{NF}, # number format NF
                                 mmax::Int   # max order m of spherical harmonics
                                 ) where {NF<:AbstractFloat}
 
-    ϵlms = zeros(NF,lmax+2,mmax+1)      # preallocate array with one more l for meridional gradients
+    # preallocate array with one more l for meridional gradients
+    ϵlms = zeros(LowerTriangularMatrix{NF},lmax+2,mmax+1)      
     for m in 1:mmax+1                   # loop over 1-based l,m
         for l in m:lmax+2
             ϵlms[l,m] = ϵlm(NF,l-1,m-1) # convert to 0-based l,m for function call
@@ -267,27 +264,26 @@ end
 get_recursion_factors(lmax::Int,mmax::Int) = get_recursion_factors(Float64,lmax,mmax)
 
 """
-    Λview = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat,recompute_legendre)
+    Λ_ilat = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat,recompute_legendre)
 
 Base on `recompute_legendre` (true/false) this function either updates the Legendre polynomials
 `Λ` for a given latitude `ilat, cos_colat` by recomputation (`recompute_legendre == true`), or
 `Λ` is changed by creating a view on the corresponding latitude in precomputed `Λs`.
-Recomputation takes usually longer, but precomputation requires a large amount of memory for high resolution.
-Returns a view in both cases."""
-function get_legendre_polynomials!( Λ::Matrix{NF},      # Out: Legendre polynomials for given latitude
-                                    Λs::Array{NF,3},    # Precomputed array of all Legendre polynomials
-                                    ilat::Int,          # latitude index
-                                    cos_colat::NF,      # cosine of colatitude
-                                    recompute_legendre::Bool    # recompute ignores Λs, but uses cos_colat
-                                    ) where NF          # Number format NF
+Recomputation takes usually longer, but precomputation requires a large amount of memory for high resolution."""
+function get_legendre_polynomials!( Λ::LowerTriangularMatrix{NF},           # Out: Polynomials at lat
+                                    Λs::Vector{LowerTriangularMatrix{NF}},  # Precomputed polynomials
+                                    ilat::Int,                              # latitude index
+                                    cos_colat::NF,                          # cosine of colatitude
+                                    recompute_legendre::Bool                # recompute ignores Λs, but uses cos_colat
+                                    ) where NF                              # Number format NF
 
     if recompute_legendre
         # Recalculate the (normalized) λ_l^m(cos(colat)) factors of the ass. Legendre polynomials
         lmax,mmax = size(Λ) .- 1
         AssociatedLegendrePolynomials.λlm!(Λ, lmax, mmax, cos_colat)
-        return view(Λ,:,:)
+        return Λ
     else    # view on precomputed values
-        return view(Λs,:,:,ilat)
+        return Λs[ilat]
     end
 end
 
@@ -300,7 +296,7 @@ zonal direction and a Legendre Transform in the meridional direction exploiting 
 Either recomputes the Legendre polynomials to save memory, or uses precomputed polynomials from `S` depending on
 `S.recompute_legendre`."""
 function gridded!(  map::AbstractMatrix{NF},                    # gridded output
-                    alms::AbstractMatrix{Complex{NF}},          # spectral coefficients input
+                    alms::LowerTriangularMatrix{Complex{NF}},   # spectral coefficients input
                     S::SpectralTransform{NF}                    # precomputed parameters struct
                     ) where {NF<:AbstractFloat}                 # number format NF
 
@@ -325,15 +321,17 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
         ilat_s = nlat - ilat + 1            # southern latitude index
 
         # Recalculate or use precomputed Legendre polynomials Λ
-        Λview = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
+        Λ_ilat = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
 
         # inverse Legendre transform by looping over wavenumbers l,m
+        k = 0                               # single index k for non-zero l,m indices in LowerTriangularMatrix
         for m in 1:mmax+1                   # Σ_{m=0}^{mmax}, but 1-based index
             accn = zero(Complex{NF})        # accumulators for northern
             accs = zero(Complex{NF})        # and southern hemisphere
 
-            for l in m:lmax+1                       # Σ_{l=m}^{lmax}, but 1-based index
-                term = alms[l,m] * Λview[l,m]       # Legendre polynomials in Λ
+            for l in m:lmax+1               # Σ_{l=m}^{lmax}, but 1-based index
+                k += 1                      # next non-zero coeffs
+                term = alms[k] * Λ_ilat[k]  # Legendre polynomials in Λ at latitude
                 accn += term
                 accs += isodd(l+m) ? -term : term   # flip sign for southern odd wavenumbers
             end
@@ -363,7 +361,7 @@ function gridded(   alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
                     recompute_legendre::Bool=true       # saves memory
                     ) where NF                          # number format NF
 
-    lmax, mmax = size(alms) .- 1                        # -1 for 0-based degree l, order m
+    _, mmax = size(alms) .- 1                           # -1 for 0-based degree l, order m
 
     # get grid size from spectral resolution via triangular_truncation
     # use mmax instead of lmax in case lmax = mmax + 1 (required in the meridional gradient recursion)
@@ -386,7 +384,8 @@ function gridded(   alms::AbstractMatrix{Complex{NF}},  # spectral coefficients
                     ) where NF                          # number format NF
 
     output = Matrix{NF}(undef,S.nlon,S.nlat)    # preallocate output
-    gridded!(output,alms,S)                     # now execute the in-place version
+    input = LowerTriangularMatrix(alms)         # drop the upper triangle entries
+    gridded!(output,input,S)                    # now execute the in-place version
     return output
 end
 
@@ -399,8 +398,8 @@ and a Legendre Transform in the meridional direction exploiting symmetries.Eithe
 polynomials `Λ` for each latitude on one hemisphere or uses precomputed polynomials from `S.Λs`, depending
 on `S.recompute_legendre`. Further uses Legendre weights on Gaussian latitudes for a leakage-free
 transform."""
-function spectral!( alms::AbstractMatrix{Complex{NF}},
-                    map::AbstractMatrix{NF},
+function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectral coefficients
+                    map::AbstractMatrix{NF},                    # input: gridded values
                     S::SpectralTransform{NF}
                     ) where {NF<:AbstractFloat}
     
@@ -421,7 +420,7 @@ function spectral!( alms::AbstractMatrix{Complex{NF}},
     fs = zeros(Complex{NF},nfreq)   # Fourier-transformed southern latitude
 
     # partial sums are accumulated in alms, force zeros initially.
-    fill!(alms,zero(Complex{NF}))   
+    fill!(alms,0)   
 
     @inbounds for ilat in 1:nlat_half   # loop over northern latitudes only due to symmetry
         ilat_s = nlat - ilat + 1        # corresponding southern latitude index
@@ -432,16 +431,18 @@ function spectral!( alms::AbstractMatrix{Complex{NF}},
 
         # Legendre transform in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
-        Λview = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
+        Λ_ilat = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
         legendre_weight = legendre_weights[ilat]                    # weights normalised with π/nlat
 
+        k = 0                                                       # single index for spherical harmonics
         for m in 1:mmax+1                                           # Σ_{m=0}^{mmax}, but 1-based index
             w = legendre_weight * cis((m-1) * -lon_offset)          # apply Legendre weights on Gaussian
             an = fn[m] * w                                          # latitudes for leakage-free transform
             as = fs[m] * w
             for l in m:lmax+1
+                k += 1                                              # next coefficient of spherical harmonics
                 c = isodd(l+m) ? an - as : an + as                  # odd/even wavenumbers
-                alms[l,m] += c * Λview[l,m]                         # Legendre polynomials in Λ
+                alms[k] += c * Λ_ilat[k]                            # Legendre polynomials in Λ at latitude
             end
         end
     end
@@ -491,6 +492,6 @@ function spectral(  map::AbstractMatrix{NF},    # gridded field nlon x nlat
     @boundscheck nlon == 2nlat || throw(BoundsError)
     @boundscheck nlon == S.nlon || throw(BoundsError)
 
-    alms = Matrix{Complex{NF}}(undef,S.lmax+1+one_more_l,S.mmax+1)
+    alms = LowerTriangularMatrix{Complex{NF}}(undef,S.lmax+1+one_more_l,S.mmax+1)
     return spectral!(alms,map,S)                # in-place version
 end
