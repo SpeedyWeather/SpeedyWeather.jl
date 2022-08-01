@@ -183,7 +183,7 @@ function SpectralTransform( ::Type{NF},     # Number format NF
                             rfft_plan,brfft_plan,
                             gn,gs,fn,fs,
                             recompute_legendre,Λ,Λs,legendre_weights,
-                            ϵlms,grad_x,grad_y1,grad_y2,minus_grad_y1,minus_grad_y2,
+                            ϵlms,grad_x,grad_y1,grad_y2,
                             grad_y_vordiv1,grad_y_vordiv2,vordiv_to_uv_x,
                             vordiv_to_uv1,vordiv_to_uv2,
                             eigenvalues,eigenvalues⁻¹)

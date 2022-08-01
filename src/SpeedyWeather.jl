@@ -54,6 +54,7 @@ module SpeedyWeather
     include("prognostic_variables.jl")      # defines PrognosticVariables
     include("diagnostic_variables.jl")      # defines DiagnosticVariables
     include("initial_conditions.jl")
+    include("scaling.jl")
 
     include("run_speedy.jl")
     include("tendencies_parametrizations.jl")

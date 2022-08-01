@@ -47,12 +47,9 @@ function initial_conditions(M::ModelSetup)
     end
 
     # SCALING
-    progn.vor .*= M.geospectral.geometry.radius_earth
-    progn.div .*= M.geospectral.geometry.radius_earth
-
-    # @unpack radius_earth = M.geospectral.geometry
-    # scale!(progn,:vor,radius_earth)
-    # scale!(progn,:div,radius_earth)
+    @unpack radius_earth = M.geospectral.geometry
+    scale!(progn,:vor,radius_earth)
+    scale!(progn,:div,radius_earth)
 
     return progn
 end
@@ -87,60 +84,40 @@ function initialize_from_rest(M::ModelSetup)
     return zeros(PrognosticVariables{NF},M,lmax+1,mmax+1,nlev)
 end
 
-function initialize_from_rest(M::ShallowWaterModel)
+# """Initialize a PrognosticVariables struct for an atmosphere at rest. No winds,
+# hence zero vorticity and divergence, but temperature, pressure and humidity are
+# initialised """
+# function initialize_from_rest(M::PrimitiveEquationModel)
 
-    @unpack nlev = M.geospectral.geometry
-    @unpack lmax, mmax = M.geospectral.spectral_transform
-    nleapfrog = 2
+#     P = M.parameters    # unpack and rename
+#     G = M.geospectral
+#     B = M.boundaries
 
-    # conversion to type NF later when creating a PrognosticVariables struct
-    vor   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # vorticity
-    div   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # divergence
-    pres  = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog)         # interface displacement
+#     @unpack nlev = G.geometry
+#     @unpack lmax, mmax = G.spectral_transform
+#     nleapfrog = 2
 
-    # dummy arrays for the rest, not used in this ModelSetup
-    temp  = zeros(Complex{Float64},1,1,1,1)
-    humid = zeros(Complex{Float64},1,1,1,1)
+#     # conversion to type NF later when creating a PrognosticVariables struct
+#     # one more degree l than order m for recursion in meridional gradient
+#     vor   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # vorticity
+#     div   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # divergence
+#     temp  = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # absolute Temperature
+#     pres  = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog)         # logarithm of surface pressure
+#     humid = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # specific humidity
 
-    # conversion to NF happens here
-    @unpack NF = M.parameters
-    return PrognosticVariables{NF}(vor,div,temp,pres,humid)
-end
+#     # # initialize only the first leapfrog index
+#     # temp_lf1 = view(temp,:,:,1,:)
+#     # pres_lf1 = view(pres,:,:,1)
+#     # humid_lf1 = view(humid,:,:,1,:)
 
-"""Initialize a PrognosticVariables struct for an atmosphere at rest. No winds,
-hence zero vorticity and divergence, but temperature, pressure and humidity are
-initialised """
-function initialize_from_rest(M::PrimitiveEquationModel)
+#     # initialize_temperature!(temp_lf1,P,B,G)                    # temperature from lapse rates    
+#     # pres_grid = initialize_pressure!(pres_lf1,P,B,G)  # pressure from temperature profile
+#     # initialize_humidity!(humid_lf1,pres_grid,P,G)          # specific humidity from pressure
 
-    P = M.parameters    # unpack and rename
-    G = M.geospectral
-    B = M.boundaries
-
-    @unpack nlev = G.geometry
-    @unpack lmax, mmax = G.spectral_transform
-    nleapfrog = 2
-
-    # conversion to type NF later when creating a PrognosticVariables struct
-    # one more degree l than order m for recursion in meridional gradient
-    vor   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # vorticity
-    div   = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # divergence
-    temp  = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # absolute Temperature
-    pres  = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog)         # logarithm of surface pressure
-    humid = zeros(Complex{Float64},lmax+1,mmax+1,nleapfrog,nlev)    # specific humidity
-
-    # # initialize only the first leapfrog index
-    # temp_lf1 = view(temp,:,:,1,:)
-    # pres_lf1 = view(pres,:,:,1)
-    # humid_lf1 = view(humid,:,:,1,:)
-
-    # initialize_temperature!(temp_lf1,P,B,G)                    # temperature from lapse rates    
-    # pres_grid = initialize_pressure!(pres_lf1,P,B,G)  # pressure from temperature profile
-    # initialize_humidity!(humid_lf1,pres_grid,P,G)          # specific humidity from pressure
-
-    # conversion to NF happens here
-    @unpack NF = M.parameters
-    return PrognosticVariables{NF}(vor,div,temp,pres,humid)
-end
+#     # conversion to NF happens here
+#     @unpack NF = M.parameters
+#     return PrognosticVariables{NF}(vor,div,temp,pres,humid)
+# end
 
 """Initialize spectral temperature from surface absolute temperature and constant
 lapse rate (troposphere) and zero lapse rate (stratosphere)."""
