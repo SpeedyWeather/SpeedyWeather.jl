@@ -15,8 +15,15 @@ struct PrognosticVariablesLeapfrog{NF<:AbstractFloat}
 end
 
 struct PrognosticVariables{NF<:AbstractFloat}
+    # data
     layers::Vector{PrognosticVariablesLeapfrog{NF}} # each element = 1 vertical layer (incl leapfrog dim)    
     pres::Vector{LowerTriangularMatrix{NF}}         # 2-element leapfrog vec of log of surface pressure [log(hPa)]
+
+    # dimensions
+    lmax::Int
+    mmax::Int
+    n_leapfrog::Int
+    n_layers::Int
 end
 
 # ZERO GENERATOR FUNCTIONS
@@ -56,7 +63,7 @@ end
 function Base.zeros(::Type{PrognosticVariables{NF}},m::Integer,n::Integer,k::Integer) where NF
     layers = [zeros(PrognosticVariablesLeapfrog{NF},m,n) for _ in 1:k]  # k layers
     pres = [zeros(LowerTriangularMatrix{NF},m,n) for _ in 1:N_LEAPFROG]          # 2 leapfrog time steps for pres
-    return PrognosticVariables{NF}(layers,pres)
+    return PrognosticVariables{NF}(layers,pres,m,n,N_LEAPFROG,k)
 end
 
 # pass on model to reduce size
@@ -64,5 +71,5 @@ function Base.zeros(::Type{PrognosticVariables{NF}},model::ModelSetup,m::Integer
     layers = [zeros(PrognosticVariablesLeapfrog{NF},model,m,n) for _ in 1:k]    # k layers
     m,n = model isa BarotropicModel ? (0,0) : (m,n)                             # pressure not needed for BarotropicModel
     pres = [zeros(LowerTriangularMatrix{NF},m,n) for _ in 1:N_LEAPFROG]         # 2 leapfrog time steps for pres
-    return PrognosticVariables{NF}(layers,pres)
+    return PrognosticVariables{NF}(layers,pres,m,n,N_LEAPFROG,k)
 end
