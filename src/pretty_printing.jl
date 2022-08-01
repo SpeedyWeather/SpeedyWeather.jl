@@ -1,11 +1,8 @@
 function Base.show(io::IO, P::PrognosticVariables)
 
-    lf = 1                      # first leapfrog index
-    lev = size(P.vor)[end]      # surface level
-    ζ = view(P.vor,:,:,lf,lev)  # create a view on vorticity
-    
-    ζ_grid = gridded(ζ)         # to grid space
-    ζ_grid = ζ_grid[:,end:-1:1] # flip latitudes
+    ζ = P.layers[end].leapfrog[1].vor   # create a view on vorticity
+    ζ_grid = gridded(ζ)                 # to grid space
+    ζ_grid = ζ_grid[:,end:-1:1]         # flip latitudes
 
     nlon,nlat = size(ζ_grid)
 
