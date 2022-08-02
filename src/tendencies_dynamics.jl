@@ -239,11 +239,10 @@ end
 
 Compute the vorticity advection as the (negative) divergence of the vorticity fluxes -∇⋅(uv*(ζ+f)).
 First, compute the uv*(ζ+f), then transform to spectral space and take the divergence and flip the sign."""
-function vorticity_flux_divergence!(D::DiagnosticVariables{NF}, # all diagnostic variables   
-                                    G::GeoSpectral{NF}          # struct with geometry and spectral transform
+function vorticity_flux_divergence!(D::DiagnosticVariables{NF},
+                                    S::SpectralTransform{NF}
                                     ) where {NF<:AbstractFloat}                                   
 
-    S = G.spectral_transform
     @unpack U_grid, V_grid, vor_grid = D.grid_variables
     @unpack uω_coslat⁻¹, vω_coslat⁻¹, uω_coslat⁻¹_grid, vω_coslat⁻¹_grid = D.intermediate_variables
     @unpack vor_tend = D.tendencies
@@ -259,16 +258,15 @@ function vorticity_flux_divergence!(D::DiagnosticVariables{NF}, # all diagnostic
 end
 
 """
-    vorticity_flux_curl!(   D::DiagnosticVariables{NF}, # all diagnostic variables   
-                            G::GeoSpectral{NF}          # struct with geometry and spectral transform
+    vorticity_flux_curl!(   D::DiagnosticVariables{NF},
+                            G::GeoSpectral{NF}
                             ) where {NF<:AbstractFloat}
     
 Compute the curl of the vorticity fluxes ∇×(uω,vω) and add to divergence tendency."""
-function vorticity_flux_curl!(  D::DiagnosticVariables{NF}, # all diagnostic variables   
-                                G::GeoSpectral{NF}          # struct with geometry and spectral transform
+function vorticity_flux_curl!(  D::DiagnosticVariables{NF},
+                                S::SpectralTransform{NF}
                                 ) where {NF<:AbstractFloat}                                   
 
-    S = G.spectral_transform
     @unpack uω_coslat⁻¹, vω_coslat⁻¹ = D.intermediate_variables
     @unpack div_tend = D.tendencies
 
@@ -315,15 +313,17 @@ function vorticity_fluxes!( uω_coslat⁻¹::AbstractMatrix{NF},    # Output: u
 end
 
 """
-    volume_fluxes!( D::DiagnosticVariables{NF}, # all diagnostic variables   
-                    G::GeoSpectral{NF},         # struct with geometry and spectral transform
-                    B::Boundaries,              # contains orography
+    volume_fluxes!( D::DiagnosticVariables{NF},
+                    G::Geometry{NF},
+                    S::SpectralTransform{NF},
+                    B::Boundaries,
                     H₀::Real                    # layer thickness
                     ) where {NF<:AbstractFloat}   
 
 Computes the (negative) divergence of the volume fluxes `uh,vh` for the continuity equation, -∇⋅(uh,vh)"""
 function volume_flux_divergence!(   D::DiagnosticVariables{NF}, # all diagnostic variables   
-                                    G::GeoSpectral{NF},         # struct with geometry and spectral transform
+                                    G::Geometry{NF},            # struct with geometry
+                                    S::SpectralTransform{NF},   # struct with spectral transform
                                     B::Boundaries,              # contains orography
                                     H₀::Real                    # layer thickness
                                     ) where {NF<:AbstractFloat}                                   
@@ -332,8 +332,7 @@ function volume_flux_divergence!(   D::DiagnosticVariables{NF}, # all diagnostic
     @unpack U_grid, V_grid, pres_grid = D.grid_variables
     @unpack uh_coslat⁻¹, vh_coslat⁻¹, uh_coslat⁻¹_grid, vh_coslat⁻¹_grid = D.intermediate_variables
     @unpack orography = B
-    S = G.spectral_transform
-    @unpack coslat⁻² = G.geometry
+    @unpack coslat⁻² = G
 
     @unpack nlon, nlat = G.geometry
     @boundscheck size(pres_grid) == (nlon,nlat) || throw(BoundsError)
@@ -413,15 +412,14 @@ end
 Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral space. First, computes the Bernoulli potential
 on the grid, then transforms to spectral space and takes the Laplace operator."""
 function bernoulli_potential!(  D::DiagnosticVariables{NF}, # all diagnostic variables   
-                                GS::GeoSpectral{NF},        # struct with geometry and spectral transform
+                                G::Geometry{NF},            # struct with spectral transform
+                                S::SpectralTransform{NF},   # struct with geometry
                                 g::Real                     # gravity
                                 ) where {NF<:AbstractFloat}   
     
     @unpack U_grid,V_grid,pres_grid = D.grid_variables
     @unpack bernoulli, bernoulli_grid = D.intermediate_variables
     @unpack div_tend = D.tendencies
-    S = GS.spectral_transform
-    G = GS.geometry
 
     bernoulli_potential!(bernoulli_grid,U_grid,V_grid,pres_grid,g,G)# = 1/2(u^2 + v^2) + gη on grid
     spectral!(bernoulli,bernoulli_grid,S)                           # to spectral space

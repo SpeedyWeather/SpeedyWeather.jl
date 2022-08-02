@@ -11,6 +11,7 @@ module SpeedyWeather
     import LinearAlgebra
 
     # INPUT OUTPUT
+    import TOML
     import Dates: Dates, DateTime
     import Printf: @sprintf
     import NetCDF: NetCDF, NcFile, NcDim, NcVar
@@ -24,17 +25,23 @@ module SpeedyWeather
     export run_speedy, initialize_speedy
 
     # EXPORT STRUCTS
-    export Parameters, GenLogisticCoefs,
-        GeoSpectral, Boundaries, Constants, Geometry, SpectralTransform,
-        PrognosticVariables, DiagnosticVariables
+    export  LowerTriangularMatrix,
+            Parameters, 
+            Constants,
+            Geometry,
+            SpectralTransform,
+            Boundaries,
+            PrognosticVariables,
+            DiagnosticVariables
 
     # EXPORT SPECTRAL FUNCTIONS
-    export  spectral, gridded,
-        spectral_truncation, spectral_interpolation,
-        triangular_truncation
+    export  spectral,
+            gridded,
+            spectral_truncation,
+            triangular_truncation
 
     include("utility_functions.jl")
-    include("lower_triangular_matrix.jl")
+    include("lower_triangular_matrix.jl")   # defines LowerTriangularMatrix
 
     include("parameter_structs.jl")
     include("spectral_truncation.jl")

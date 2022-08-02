@@ -7,12 +7,12 @@ end
 
 function Implicit(  P::Parameters,
                     C::Constants{NF},
-                    G::GeoSpectral{NF}
+                    S::SpectralTransform{NF}
                     ) where NF
     
     @unpack Δt,gravity,radius_earth = C             # time step Δt (scaled), gravity g [m/s²], radius [m]
     @unpack implicit_α = P                          # implicit time step fraction between i-1 and i+1
-    @unpack eigenvalues = G.spectral_transform      # = -(l(l+1)), degree l of harmonics (0-based)
+    @unpack eigenvalues = S                         # = -(l(l+1)), degree l of harmonics (0-based)
     @unpack layer_thickness = C                     # = H₀, layer thickness at rest without mountains
 
     # implicit time step between i-1 and i+1
