@@ -14,6 +14,7 @@ The default values of the keywords define the default model setup.
     model::Symbol=:barotropic           # :barotropic, :shallowwater, or :primitive
 
     # RESOLUTION
+    grid::Symbol=:regular_Gaussian      # define the grid type
     trunc::Int=31                       # spectral truncation
     nlev::Int=nlev_default(model)       # number of vertical levels 
 
@@ -95,6 +96,7 @@ The default values of the keywords define the default model setup.
     output_vars::Vector{String}=["u","v","temp","humid","pres"]
     compression_level::Int=3        # 1=low but fast, 9=high but slow
     keepbits::Int=7                 # mantissa bits to keep for every variable
+    version::VersionNumber=VersionNumber(TOML.parsefile("Project.toml")["version"])
 
     # RESTART
     write_restart::Bool=true        # also write restart file if output==true?

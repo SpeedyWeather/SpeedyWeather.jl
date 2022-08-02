@@ -23,53 +23,64 @@ struct PrognosticVariables{NF<:AbstractFloat}
     lmax::Int
     mmax::Int
     n_leapfrog::Int
-    n_layers::Int
+    nlev::Int
 end
 
 # ZERO GENERATOR FUNCTIONS
 # general version
-function Base.zeros(::Type{PrognosticVariablesLayer{NF}},m::Integer,n::Integer) where NF
-    vor   = zeros(LowerTriangularMatrix{Complex{NF}},m,n)
-    div   = zeros(LowerTriangularMatrix{Complex{NF}},m,n)
-    temp  = zeros(LowerTriangularMatrix{Complex{NF}},m,n)
-    humid = zeros(LowerTriangularMatrix{Complex{NF}},m,n)
-    return PrognosticVariablesLayer{NF}(vor,div,temp,humid)
+function Base.zeros(::Type{PrognosticVariablesLayer{NF}},lmax::Integer,mmax::Integer) where NF
+    vor   = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+    div   = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+    temp  = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+    humid = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+    return PrognosticVariablesLayer(vor,div,temp,humid)
 end
 
 # reduce size of unneeded variables if ModelSetup is provided
-function Base.zeros(::Type{PrognosticVariablesLayer{NF}},model::ModelSetup,m::Integer,n::Integer) where NF
-    vor   = zeros(LowerTriangularMatrix{Complex{NF}},m,n)
-    m,n = model isa BarotropicModel ? (0,0) : (m,n)         # other variables not needed for BarotropicModel
-    div   = zeros(LowerTriangularMatrix{Complex{NF}},m,n)
-    m,n = model isa ShallowWaterModel ? (0,0) : (m,n)       # other variables not needed for ShallowWaterModel
-    temp  = zeros(LowerTriangularMatrix{Complex{NF}},m,n)
-    humid = zeros(LowerTriangularMatrix{Complex{NF}},m,n)
-    return PrognosticVariablesLayer{NF}(vor,div,temp,humid)
+function Base.zeros(::Type{PrognosticVariablesLayer{NF}},model::ModelSetup,lmax::Integer,mmax::Integer) where NF
+    vor   = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+    lmax,mmax = model isa BarotropicModel   ? (-1,-1) : (lmax,mmax)   # other variables not needed for BarotropicModel
+    div   = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+    lmax,mmax = model isa ShallowWaterModel ? (-1,-1) : (lmax,mmax)   # other variables not needed for ShallowWaterModel
+    temp  = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+    humid = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+    return PrognosticVariablesLayer(vor,div,temp,humid)
 end
 
 # create leapfrog time steps as 2-element vector of PrognosticVariablesLayer
-function Base.zeros(::Type{PrognosticVariablesLeapfrog{NF}},m::Integer,n::Integer) where NF
-    return PrognosticVariablesLeapfrog{NF}(
-        [zeros(PrognosticVariablesLayer{NF},m,n) for _ in 1:N_LEAPFROG])
+function Base.zeros(::Type{PrognosticVariablesLeapfrog{NF}},lmax::Integer,mmax::Integer) where NF
+    return PrognosticVariablesLeapfrog([zeros(PrognosticVariablesLayer{NF},lmax,mmax) for _ in 1:N_LEAPFROG])
 end
 
 # also pass on model if available
-function Base.zeros(::Type{PrognosticVariablesLeapfrog{NF}},model::ModelSetup,m::Integer,n::Integer) where NF
-    return PrognosticVariablesLeapfrog{NF}(
-        [zeros(PrognosticVariablesLayer{NF},model,m,n) for _ in 1:N_LEAPFROG])   # 2 leapfrog time steps for vor,div,temp,humid
+function Base.zeros(::Type{PrognosticVariablesLeapfrog{NF}},
+                    model::ModelSetup,
+                    lmax::Integer,
+                    mmax::Integer) where NF
+    # 2 leapfrog time steps for vor,div,temp,humid
+    return PrognosticVariablesLeapfrog([zeros(PrognosticVariablesLayer{NF},model,lmax,mmax) for _ in 1:N_LEAPFROG])   
 end
 
 # general function to initiate all prognostic variables with zeros
-function Base.zeros(::Type{PrognosticVariables{NF}},m::Integer,n::Integer,k::Integer) where NF
-    layers = [zeros(PrognosticVariablesLeapfrog{NF},m,n) for _ in 1:k]  # k layers
-    pres = [zeros(LowerTriangularMatrix{NF},m,n) for _ in 1:N_LEAPFROG]          # 2 leapfrog time steps for pres
-    return PrognosticVariables{NF}(layers,pres,m,n,N_LEAPFROG,k)
+function Base.zeros(::Type{PrognosticVariables{NF}},
+                    lmax::Integer,
+                    mmax::Integer,
+                    nlev::Integer) where NF
+
+    layers = [zeros(PrognosticVariablesLeapfrog{NF},lmax,mmax) for _ in 1:nlev]     # k layers
+    pres = [zeros(LowerTriangularMatrix{NF},lmax,mmax) for _ in 1:N_LEAPFROG]       # 2 leapfrog time steps for pres
+    return PrognosticVariables(layers,pres,lmax,mmax,N_LEAPFROG,nlev)
 end
 
 # pass on model to reduce size
-function Base.zeros(::Type{PrognosticVariables{NF}},model::ModelSetup,m::Integer,n::Integer,k::Integer) where NF
-    layers = [zeros(PrognosticVariablesLeapfrog{NF},model,m,n) for _ in 1:k]    # k layers
-    m,n = model isa BarotropicModel ? (0,0) : (m,n)                             # pressure not needed for BarotropicModel
-    pres = [zeros(LowerTriangularMatrix{NF},m,n) for _ in 1:N_LEAPFROG]         # 2 leapfrog time steps for pres
-    return PrognosticVariables{NF}(layers,pres,m,n,N_LEAPFROG,k)
+function Base.zeros(::Type{PrognosticVariables{NF}},
+                    model::ModelSetup,
+                    lmax::Integer,
+                    mmax::Integer,
+                    nlev::Integer) where NF
+
+    layers = [zeros(PrognosticVariablesLeapfrog{NF},model,lmax,mmax) for _ in 1:nlev]   # k layers
+    lmax,mmax = model isa BarotropicModel ? (-1,-1) : (lmax,mmax)                       # pressure not needed for BarotropicModel
+    pres = [zeros(LowerTriangularMatrix{NF},lmax+1,mmax+1) for _ in 1:N_LEAPFROG]       # 2 leapfrog time steps for pres
+    return PrognosticVariables(layers,pres,lmax,mmax,N_LEAPFROG,nlev)
 end

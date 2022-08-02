@@ -67,7 +67,7 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables, # output grid va
                 atts=Dict("long_name"=>"relative vorticity","units"=>"1/s","missing_value"=>-999999f0))
 
     # pressure is only used for ShallowWaterModel and PrimitiveEquationModel
-    if typeof(M) <: ShallowWaterModel || typeof(M) <: PrimitiveEquationModel
+    if M isa ShallowWaterModel || M isa PrimitiveEquationModel
         var_pres    = NcVar("pres",[dim_lon,dim_lat,dim_time],t=Float32,compress=compression_level,
                 atts=Dict("long_name"=>"interface displacement","units"=>"m","missing_value"=>-999999f0))
         var_div     = NcVar("div",[dim_lon,dim_lat,dim_lev,dim_time],t=Float32,compress=compression_level,
@@ -75,7 +75,7 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables, # output grid va
     end
 
     # temperature and humidity only used for PrimitiveEquationModel
-    if typeof(M) <: PrimitiveEquationModel
+    if M isa PrimitiveEquationModel
         var_temp    = NcVar("temp",[dim_lon,dim_lat,dim_lev,dim_time],t=Float32,compress=compression_level,
                         atts=Dict("long_name"=>"temperature","units"=>"K","missing_value"=>-999999f0))
         var_humid   = NcVar("humid",[dim_lon,dim_lat,dim_lev,dim_time],t=Float32,compress=compression_level,
@@ -86,13 +86,13 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables, # output grid va
     @unpack run_id, run_path = feedback
     file_name = "output.nc"
 
-    if typeof(M) <: BarotropicModel                 # output only u,v,vor
+    if M isa BarotropicModel                 # output only u,v,vor
         netcdf_file = NetCDF.create(joinpath(run_path,file_name),[var_time,var_u,var_v,var_vor],
                         mode=NetCDF.NC_NETCDF4)
-    elseif typeof(M) <: ShallowWaterModel           # output also divergence and pressure
+    elseif M isa ShallowWaterModel           # output also divergence and pressure
         netcdf_file = NetCDF.create(joinpath(run_path,file_name),[var_time,var_u,var_v,var_vor,var_div,var_pres],
                         mode=NetCDF.NC_NETCDF4)
-    elseif typeof(M) <: PrimitiveEquationModel      # output also temperature and humidity
+    elseif M isa PrimitiveEquationModel      # output also temperature and humidity
         netcdf_file = NetCDF.create(joinpath(run_path,file_name),
                         [var_time,var_u,var_v,var_vor,var_div,var_pres,var_temp,var_humid],mode=NetCDF.NC_NETCDF4)
     end
@@ -205,32 +205,34 @@ function write_restart_file(time_sec::Real,
     write_restart || return nothing                 # exit immediately if no restart file desired
 
     # unscale variables
-    progn.vor ./= M.geospectral.geometry.radius_earth
-    progn.div ./= M.geospectral.geometry.radius_earth
+    @unpack radius_earth = M.geometry
+    scale!(progn,:vor,1/radius_earth)
+    scale!(progn,:div,1/radius_earth)
 
-    # remove 2nd leapfrog step (compression makes the restart file then smaller)
-    fill!(@view(progn.vor[:,:,2,:]),0)
+    # # remove 2nd leapfrog step (compression makes the restart file then smaller)
+    # fill!(@view(progn.vor[:,:,2,:]),0)
 
-    if M isa Union{ShallowWaterModel,PrimitiveEquationModel}
-        fill!(@view(progn.div[:,:,2,:]),0)
-        fill!(@view(progn.pres[:,:,2,:]),0)
-    end
+    # if M isa Union{ShallowWaterModel,PrimitiveEquationModel}
+    #     fill!(@view(progn.div[:,:,2,:]),0)
+    #     fill!(@view(progn.pres[:,:,2,:]),0)
+    # end
 
-    if M isa PrimitiveEquationModel
-        fill!(@view(progn.temp[:,:,2,:]),0)
-        fill!(@view(progn.humid[:,:,2,:]),0)
-    end
+    # if M isa PrimitiveEquationModel
+    #     fill!(@view(progn.temp[:,:,2,:]),0)
+    #     fill!(@view(progn.humid[:,:,2,:]),0)
+    # end
 
     # bitround to output precision
-    all_progn_variables = (getproperty(progn,prop) for prop in propertynames(progn))
+    # all_progn_variables = (getproperty(progn,prop) for prop in propertynames(progn))
 
-    @unpack keepbits = M.parameters
-    for var in all_progn_variables
-        round!(var,keepbits)
-    end 
+    # @unpack keepbits = M.parameters
+    # for var in all_progn_variables
+    #     round!(var,keepbits)
+    # end 
 
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
         f["prognostic_variables"] = progn
         f["time"] = M.parameters.output_startdate + Dates.Second(time_sec)
+        f["version"] = M.parameters.version
     end
 end

@@ -34,16 +34,14 @@ function scale!(progn::PrognosticVariables{NF},
     s_NF = convert(Complex{NF},s)
     
     if var == :pres     # surface pressure is not stored in layers
-        for lf in 1:progn.n_leapfrog
-            progn.pres[lf] *= s_NF
+        for leapfrog_step in progn.pres
+            leapfrog_step *= s_NF
         end
     else
-        for k in 1:progn.n_layers
-            for lf in 1:progn.n_leapfrog
-                @eval progn.layers[k].leapfrog[lf].$var *= s_NF
+        for layer in progn.layers
+            for leapfrog_step in layer.leapfrog
+                @eval $leapfrog_step.$var .*= $s_NF
             end
         end
     end
-
-    return nothing
 end
