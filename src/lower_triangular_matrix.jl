@@ -78,6 +78,14 @@ end
     setindex!(L.v,x,k)
 end
 
+eachharmonic(L::LowerTriangularMatrix) = 1:length(L)
+function eachharmonic(Ls::LowerTriangularMatrix...)
+    for L in Ls
+        @boundscheck size(L) == size(Ls[1]) || throw(BoundsError)
+    end
+    return eachharmonic(Ls[1])
+end
+
 # CONVERSIONS
 """ 
     L = LowerTriangularMatrix(M)
