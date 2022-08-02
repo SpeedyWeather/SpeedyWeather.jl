@@ -40,7 +40,7 @@ function initialize_from_rest(M::ModelSetup)
     @unpack nlev = M.geometry
     @unpack lmax, mmax = M.spectral_transform
 
-    return zeros(PrognosticVariables{NF},M,lmax+1,mmax+1,nlev)
+    return zeros(PrognosticVariables{NF},M,lmax,mmax,nlev)
 end
 
 """Initialize a PrognosticVariables struct for an atmosphere at rest. No winds,
@@ -52,7 +52,7 @@ function initialize_from_rest(M::PrimitiveEquationModel)
     @unpack nlev = M.geometry
     @unpack lmax, mmax = M.spectral_transform
 
-    progn = zeros(PrognosticVariables{NF},M,lmax+1,mmax+1,nlev)
+    progn = zeros(PrognosticVariables{NF},M,lmax,mmax,nlev)
 
     # TODO adjust temp and pres to rest
     # initialize_temperature!(temp_lf1,P,B,G)                    # temperature from lapse rates    
