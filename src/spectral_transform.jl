@@ -42,9 +42,9 @@ struct SpectralTransform{NF<:AbstractFloat}
     ϵlms::LowerTriangularMatrix{NF}         # precomputed for meridional gradients gradients grad_y1, grad_y2
 
     # GRADIENT MATRICES (on unit sphere, no 1/radius-scaling included)
-    grad_x ::Vector{Complex{NF}}                    # = i*m but precomputed
-    grad_y1::LowerTriangularMatrix{NF}              # precomputed meridional gradient factors, term 1
-    grad_y2::LowerTriangularMatrix{NF}              # term 2
+    grad_x ::Vector{Complex{NF}}            # = i*m but precomputed
+    grad_y1::LowerTriangularMatrix{NF}      # precomputed meridional gradient factors, term 1
+    grad_y2::LowerTriangularMatrix{NF}      # term 2
 
     # GRADIENT MATRICES FOR U,V -> Vorticity,Divergence
     grad_y_vordiv1::LowerTriangularMatrix{NF}
@@ -56,8 +56,8 @@ struct SpectralTransform{NF<:AbstractFloat}
     vordiv_to_uv2::LowerTriangularMatrix{NF}
 
     # EIGENVALUES (on unit sphere, no 1/radius²-scaling included)
-    eigenvalues  ::Vector{NF}       # = -l*(l+1), degree l of spherical harmonic
-    eigenvalues⁻¹::Vector{NF}       # = -1/(l*(l+1))
+    eigenvalues  ::Vector{NF}               # = -l*(l+1), degree l of spherical harmonic
+    eigenvalues⁻¹::Vector{NF}               # = -1/(l*(l+1))
 end
 
 """
@@ -204,25 +204,6 @@ SpectralTransform(P::Parameters,G::Geometry) = SpectralTransform(P.NF,G.nlon,G.n
                                                                 P.radius_earth,P.recompute_legendre)
 
 """
-    G = Geospectral{NF}(geometry,spectral_transform)
-
-Struct that holds both a Geometry struct `geometry` and a SpectralTransform struct `spectral_transform`."""
-struct GeoSpectral{NF<:AbstractFloat}
-    geometry::Geometry{NF}
-    spectral_transform::SpectralTransform{NF}
-end
-
-"""
-    G = GeoSpectral(P)
-
-Generator function for a GeoSpectral struct based on a Parameters struct `P`."""
-function GeoSpectral(P::Parameters)
-    G = Geometry(P)
-    S = SpectralTransform(P,G)
-    return GeoSpectral{P.NF}(G,S)
-end
-
-"""
     ϵ = ϵ(NF,l,m) 
 
 Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of the spherical harmonics.
@@ -324,14 +305,14 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
         Λ_ilat = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
 
         # inverse Legendre transform by looping over wavenumbers l,m
-        k = 0                               # single index k for non-zero l,m indices in LowerTriangularMatrix
+        lm = 0                              # single index for non-zero l,m indices in LowerTriangularMatrix
         for m in 1:mmax+1                   # Σ_{m=0}^{mmax}, but 1-based index
             accn = zero(Complex{NF})        # accumulators for northern
             accs = zero(Complex{NF})        # and southern hemisphere
 
             for l in m:lmax+1               # Σ_{l=m}^{lmax}, but 1-based index
-                k += 1                      # next non-zero coeffs
-                term = alms[k] * Λ_ilat[k]  # Legendre polynomials in Λ at latitude
+                lm += 1                     # next non-zero coeffs
+                term = alms[lm] * Λ_ilat[lm]# Legendre polynomials in Λ at latitude
                 accn += term
                 accs += isodd(l+m) ? -term : term   # flip sign for southern odd wavenumbers
             end
@@ -434,15 +415,15 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         Λ_ilat = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
         legendre_weight = legendre_weights[ilat]                    # weights normalised with π/nlat
 
-        k = 0                                                       # single index for spherical harmonics
+        lm = 0                                                      # single index for spherical harmonics
         for m in 1:mmax+1                                           # Σ_{m=0}^{mmax}, but 1-based index
             w = legendre_weight * cis((m-1) * -lon_offset)          # apply Legendre weights on Gaussian
             an = fn[m] * w                                          # latitudes for leakage-free transform
             as = fs[m] * w
             for l in m:lmax+1
-                k += 1                                              # next coefficient of spherical harmonics
+                lm += 1                                             # next coefficient of spherical harmonics
                 c = isodd(l+m) ? an - as : an + as                  # odd/even wavenumbers
-                alms[k] += c * Λ_ilat[k]                            # Legendre polynomials in Λ at latitude
+                alms[lm] += c * Λ_ilat[lm]                          # Legendre polynomials in Λ at latitude
             end
         end
     end

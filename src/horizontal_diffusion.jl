@@ -3,43 +3,25 @@
 
 Horizontal Diffusion struct containing all the preallocated arrays for the calculation of horizontal diffusion
 and orographic correction for temperature and humidity.
-
-    # Explicit part of the diffusion, precalculated damping coefficients for each spectral mode
-    damping::Matrix{NF}                 # for temperature and vorticity (explicit)
-    damping_div::Matrix{NF}             # for divergence (explicit)
-    damping_strat::Matrix{NF}           # for extra diffusion in the stratosphere (explicit)
-    
-    # Implicit part of the diffusion, precalculated damping coefficients for each spectral mode
-    damping_impl::Matrix{NF}            # for temperature and vorticity (implicit)
-    damping_div_impl::Matrix{NF}        # for divergence (implicit)
-    damping_strat_impl::Matrix{NF}      # for extra diffusion in the stratosphere (implicit)
-    
-    # Vertical component of orographic correction
-    temp_correction_vert::Vector{NF}    # for temperature
-    humid_correction_vert::Vector{NF}   # for humidity
-    
-    # Horizontal component of orographic correction (in spectral space)
-    temp_correction_horizontal::Matrix{Complex{NF}}     # for temperature
-    humid_correction_horizontal::Matrix{Complex{NF}}    # for humidity.
 """
-struct HorizontalDiffusion{NF<:AbstractFloat}   # Number format NF
+struct HorizontalDiffusion{NF<:AbstractFloat}       # Number format NF
     # Explicit part of the diffusion, precalculated damping coefficients for each spectral mode
-    damping::Matrix{NF}                 # for temperature and vorticity (explicit)
-    damping_div::Matrix{NF}             # for divergence (explicit)
-    damping_strat::Matrix{NF}           # for extra diffusion in the stratosphere (explicit)
+    damping::LowerTriangularMatrix{NF}              # for temperature and vorticity (explicit)
+    damping_div::LowerTriangularMatrix{NF}          # for divergence (explicit)
+    damping_strat::LowerTriangularMatrix{NF}        # for extra diffusion in the stratosphere (explicit)
     
-    # Implicit part of the diffusion, precalculated damping coefficients for each spectral mode
-    damping_impl::Matrix{NF}            # for temperature and vorticity (implicit)
-    damping_div_impl::Matrix{NF}        # for divergence (implicit)
-    damping_strat_impl::Matrix{NF}      # for extra diffusion in the stratosphere (implicit)
+    # Implicit part of LowerTriangular diffusion, precalculated damping coefficients for each spectral mode
+    damping_impl::LowerTriangularMatrix{NF}         # for temperature and vorticity (implicit)
+    damping_div_impl::LowerTriangularMatrix{NF}     # for divergence (implicit)
+    damping_strat_impl::LowerTriangularMatrix{NF}   # for extra diffusion in the stratosphere (implicit)
     
     # Vertical component of orographic correction
-    temp_correction_vert::Vector{NF}    # for temperature
-    humid_correction_vert::Vector{NF}   # for humidity
+    temp_correction_vert::Vector{NF}                # for temperature
+    humid_correction_vert::Vector{NF}               # for humidity
     
     # Horizontal component of orographic correction (in spectral space)
-    temp_correction_horizontal::Matrix{Complex{NF}}     # for temperature
-    humid_correction_horizontal::Matrix{Complex{NF}}    # for humidity
+    temp_correction_horizontal::LowerTriangularMatrix{Complex{NF}}
+    humid_correction_horizontal::LowerTriangularMatrix{Complex{NF}}
 end
 
 """
@@ -50,13 +32,14 @@ horizontal hyperdiffusion for temperature, vorticity and divergence, with an imp
 and an explicit term. Also precalculates correction terms (horizontal and vertical) for
 temperature and humidity.
 """
-function HorizontalDiffusion(   P::Parameters,      # Parameter struct
-                                C::Constants,       # Constants struct
-                                G::GeoSpectral,     # Geometry and spectral struct
-                                B::Boundaries)      # Boundaries struct
+function HorizontalDiffusion(   P::Parameters,          # Parameter struct
+                                C::Constants,           # Constants struct
+                                G::Geometry,            # Geometry struct
+                                S::SpectralTransform,   # SpectralTransform struct 
+                                B::Boundaries)          # Boundaries struct
 
     # DIFFUSION
-    @unpack lmax,mmax,radius = G.spectral_transform
+    @unpack lmax,mmax,radius = S
     @unpack diffusion_power, diffusion_time, diffusion_time_div = P
     @unpack diffusion_time_strat, damping_time_strat = P
     @unpack Δt = C
@@ -71,14 +54,15 @@ function HorizontalDiffusion(   P::Parameters,      # Parameter struct
     # conversion to number format NF later, one more degree l for meridional gradient recursion
     # Damping coefficients for explicit part of the diffusion (=ν∇²ⁿ)
     # while precalculated for spectral space, store only the real part as entries are real
-    damping = zeros(lmax+1,mmax+1)              # for temperature and vorticity (explicit)
-    damping_div = zeros(lmax+1,mmax+1)          # for divergence (explicit)
-    damping_strat = zeros(lmax+1,mmax+1)        # for extra diffusion in the stratosphere (explicit)
+    LTM = LowerTriangularMatrix
+    damping = zeros(LTM,lmax+1,mmax+1)              # for temperature and vorticity (explicit)
+    damping_div = zeros(LTM,lmax+1,mmax+1)          # for divergence (explicit)
+    damping_strat = zeros(LTM,lmax+1,mmax+1)        # for extra diffusion in the stratosphere (explicit)
 
     # Damping coefficients for implicit part of the diffusion (= 1/(1+2Δtν∇²ⁿ))
-    damping_impl = zeros(lmax+1,mmax+1)         # for temperature and vorticity (implicit)
-    damping_div_impl = zeros(lmax+1,mmax+1)     # for divergence (implicit)
-    damping_strat_impl = zeros(lmax+1,mmax+1)   # for extra diffusion in the stratosphere (implicit)
+    damping_impl = zeros(LTM,lmax+1,mmax+1)         # for temperature and vorticity (implicit)
+    damping_div_impl = zeros(LTM,lmax+1,mmax+1)     # for divergence (implicit)
+    damping_strat_impl = zeros(LTM,lmax+1,mmax+1)   # for extra diffusion in the stratosphere (implicit)
 
     # PRECALCULATE the damping coefficients for every spectral mode
     for m in 1:mmax+1                           # fill only the lower triangle
@@ -102,15 +86,15 @@ function HorizontalDiffusion(   P::Parameters,      # Parameter struct
 
     if P.model == :barotropic || P.model == :shallowwater               # orographic correction not needed
         
-        temp_correction_vert        = zeros(1)                          # create dummy arrays
-        humid_correction_vert       = zeros(1)
-        temp_correction_horizontal  = zeros(complex(P.NF),1,1) 
-        humid_correction_horizontal = zeros(complex(P.NF),1,1) 
+        temp_correction_vert        = zeros(0)                          # create dummy arrays
+        humid_correction_vert       = zeros(0)
+        temp_correction_horizontal  = zeros(LowerTriangularMatrix{Complex{P.NF}},0,0) 
+        humid_correction_horizontal = zeros(LowerTriangularMatrix{Complex{P.NF}},0,0) 
 
     else    # P.model == :primitive, orographic correction only needed then
 
         # OROGRAPHIC CORRECTION
-        @unpack nlon, nlat, nlev, σ_levels_full = G.geometry
+        @unpack nlon, nlat, nlev, σ_levels_full = G
         @unpack gravity, R_gas, lapse_rate, scale_height, scale_height_humid, relhumid_ref = P
         @unpack geopot_surf_grid = B    #TODO is currently not contained in the Boundaries struct B
 
