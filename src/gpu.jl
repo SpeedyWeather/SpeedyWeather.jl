@@ -56,16 +56,16 @@ struct DeviceSetup{S<:AbstractDevice}
     n # workgroup size
 end 
 
-DeviceSetup() = DeviceSetup(Device(), Device_KernelAbstractions(Device()), workgrop_size(Device()))
-DeviceSetup(device::AbstractDevice) = DeviceSetup(device, Device_KernelAbstractions(device), workgrop_size(device))
+DeviceSetup() = DeviceSetup(Device(), Device_KernelAbstractions(Device()), workgroup_size(Device()))
+DeviceSetup(device::AbstractDevice) = DeviceSetup(device, Device_KernelAbstractions(device), workgroup_size(device))
 DeviceSetup(device::AbstractDevice, n::Integer) = DeviceSetup(device, Device_KernelAbstractions(device), n)
 
 """
-    workgrop_size(dev::AbstractDevice)
+    workgroup_size(dev::AbstractDevice)
 
 Returns a workgroup size depending on `dev`. WIP: Will be expended in the future to also include grid information. 
 """
-function workgrop_size(device::AbstractDevice)
+function workgroup_size(device::AbstractDevice)
     return device isa GPUDevice ? 32 : 4 
 end
 
