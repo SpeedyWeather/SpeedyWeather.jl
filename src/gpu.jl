@@ -50,10 +50,10 @@ Holds information about the device the model is running on and workgroup size.
 * `device_KA::KernelAbstractions.Device`: Device for use with KernelAbstractions
 * `n`: workgroup size  
 """
-struct DeviceSetup{S<:AbstractDevice}
+struct DeviceSetup{S<:AbstractDevice,T}
     device::S # for internal purposes
-    device_KA # for KernelAbstractions
-    n # workgroup size
+    device_KA::T # for KernelAbstractions
+    n::Int # workgroup size
 end 
 
 DeviceSetup() = DeviceSetup(Device(), Device_KernelAbstractions(Device()), workgroup_size(Device()))
