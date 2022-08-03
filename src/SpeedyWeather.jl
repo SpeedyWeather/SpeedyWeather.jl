@@ -10,6 +10,12 @@ module SpeedyWeather
     import Primes
     import LinearAlgebra
 
+    # GPU 
+    import KernelAbstractions 
+    import CUDA 
+    import CUDAKernels
+    import Adapt: Adapt, adapt, adapt_structure
+
     # INPUT OUTPUT
     import Dates: Dates, DateTime
     import Printf: @sprintf
@@ -35,6 +41,8 @@ module SpeedyWeather
 
     include("utility_functions.jl")
     include("lower_triangular_matrix.jl")
+    
+    include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
 
     include("parameter_structs.jl")
     include("spectral_truncation.jl")

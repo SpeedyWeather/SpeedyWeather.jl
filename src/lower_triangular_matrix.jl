@@ -35,3 +35,5 @@ function LowerTriangularMatrix(M::AbstractMatrix{T}) where T
     end
     return LowerTriangularMatrix(v,m,n)
 end
+
+Adapt.adapt_structure(to, x::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix(Adapt.adapt(to, x.v), x.m, x.n)
