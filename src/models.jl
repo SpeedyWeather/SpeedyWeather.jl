@@ -1,4 +1,4 @@
-abstract type ModelSetup end
+abstract type ModelSetup{D} end
 
 """
     M = BarotropicModel(::Parameters,
@@ -10,11 +10,12 @@ The BarotropicModel struct holds all other structs that contain precalculated co
 whether scalars or arrays that do not change throughout model integration. In contrast to
 `ShallowWaterModel` or `PrimitiveEquationModel` it does not contain a `Boundaries` struct
 as not needed."""
-struct BarotropicModel{NF<:AbstractFloat} <: ModelSetup
+struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: ModelSetup{D}
     parameters::Parameters
     constants::Constants{NF}
     geospectral::GeoSpectral{NF}
     horizontal_diffusion::HorizontalDiffusion{NF}
+    device_setup::DeviceSetup{D}
 end
 
 """
@@ -26,13 +27,14 @@ end
 
 The ShallowWaterModel struct holds all other structs that contain precalculated constants, whether scalars or
 arrays that do not change throughout model integration."""
-struct ShallowWaterModel{NF<:AbstractFloat} <: ModelSetup
+struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ModelSetup{D}
     parameters::Parameters
     constants::Constants{NF}
     geospectral::GeoSpectral{NF}
     boundaries::Boundaries{NF}
     horizontal_diffusion::HorizontalDiffusion{NF}
     implicit::Implicit{NF}
+    device_setup::DeviceSetup{D}
 end
 
 """
@@ -44,12 +46,13 @@ end
 
 The PrimitiveEquationModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration."""
-struct PrimitiveEquationModel{NF<:AbstractFloat} <: ModelSetup
+struct PrimitiveEquationModel{NF<:AbstractFloat,D<:AbstractDevice} <: ModelSetup{D}
     parameters::Parameters
     constants::Constants{NF}
     geospectral::GeoSpectral{NF}
     boundaries::Boundaries{NF}
     horizontal_diffusion::HorizontalDiffusion{NF}
+    device_setup::DeviceSetup{D}
 end
 
 # create a model hierarchy: BarotropicModel < ShallowWaterModel < PrimitiveEquationModel

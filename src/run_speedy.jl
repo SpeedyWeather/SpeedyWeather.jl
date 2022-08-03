@@ -34,14 +34,15 @@ function initialize_speedy(::Type{NF}=Float32;      # number format, use Float32
     G = GeoSpectral(P)                              # geometry and spectral transform structs
     B = Boundaries(P)                               # arrays for boundary conditions
     H = HorizontalDiffusion(P,C,G,B)                # precomputed arrays for horizontal diffusion
+    D = DeviceSetup(CPUDevice())                    # device the model is running on, so far only CPU
 
     if P.model == :barotropic                       # pack all of the above into a *Model struct
-        M = BarotropicModel(P,C,G,H)                # typeof(M) is used to dispatch dynamically
+        M = BarotropicModel(P,C,G,H,D)                # typeof(M) is used to dispatch dynamically
     elseif P.model == :shallowwater                 # to the supported model types
         I = Implicit(P,C,G)
-        M = ShallowWaterModel(P,C,G,B,H,I)
+        M = ShallowWaterModel(P,C,G,B,H,I,D)
     elseif P.model == :primitive
-        M = PrimitiveEquationModel(P,C,G,B,H)
+        M = PrimitiveEquationModel(P,C,G,B,H,D)
     end
 
     prognostic_vars = initial_conditions(M)         # initialize prognostic variables
