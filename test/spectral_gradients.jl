@@ -314,8 +314,8 @@ end
         SpeedyWeather.divergence!(div1,u_coslat⁻¹,v_coslat⁻¹,S)
 
         for i in eachindex(vor0,vor1,div0,div1)
-            @test vor0[i] ≈ vor1[i] rtol=sqrt(eps(NF))
-            @test div0[i] ≈ div1[i] rtol=sqrt(eps(NF))
+            @test vor0[i] ≈ vor1[i] rtol=10*sqrt(eps(NF))
+            @test div0[i] ≈ div1[i] rtol=10*sqrt(eps(NF))
         end
     end
 end
