@@ -73,7 +73,7 @@ end
 """
     DeviceArray(device::AbstractDevice, x) 
 
-Returns a `CuArray` when `device<:GPUDevice` is used, otherwise a regular `Array`. Uses `adapt`, thus also can return SubArrays etc.
+Adapts `x` to a `CuArray` when `device<:GPUDevice` is used, otherwise a regular `Array`. Uses `adapt`, thus also can return SubArrays etc.
 """
 DeviceArray(::GPUDevice, x) = Adapt.adapt(CuArray, x)
 DeviceArray(::CPUDevice, x) = Adapt.adapt(Array, x)
@@ -89,7 +89,7 @@ DeviceArrayNotAdapt(::CPUDevice, x) = Array(x)
 DeviceArrayNotAdapt(dev::DeviceSetup, x) = DeviceArrayNotAdapt(dev.device, x)
 
 """
-    launch_kernel!(kernel!, ndrange, kernel_args..., device_setup::DeviceSetup)
+    launch_kernel!(device_setup::DeviceSetup, kernel!, ndrange, kernel_args...)
 
 Launches the `kernel!` on the `device_setup` with `ndrange` computations over the kernel and arguments `kernel_args`. Returns an event.
 """
