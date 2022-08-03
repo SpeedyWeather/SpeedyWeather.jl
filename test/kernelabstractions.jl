@@ -10,8 +10,8 @@ using KernelAbstractions
         A[i,j] = B[i,j] * C[i,j]
     end
     
-    B = rand(10,10)
-    C = rand(10,10)
+    B = SpeedyWeather.DeviceArray(device_setup, rand(10,10))
+    C = SpeedyWeather.DeviceArray(device_setup, rand(10,10))
     A = zero(B)
 
     ev = SpeedyWeather.launch_kernel!(device_setup, mul_test!, size(B), A, B, C)

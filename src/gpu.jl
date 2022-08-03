@@ -63,7 +63,8 @@ DeviceSetup(device::AbstractDevice, n::Integer) = DeviceSetup(device, Device_Ker
 """
     workgroup_size(dev::AbstractDevice)
 
-Returns a workgroup size depending on `dev`. WIP: Will be expended in the future to also include grid information. 
+Returns a workgroup size depending on `dev`. 
+WIP: Will be expanded in the future to also include grid information. 
 """
 function workgroup_size(device::AbstractDevice)
     return device isa GPUDevice ? 32 : 4 
@@ -73,11 +74,10 @@ end
     DeviceArray(device::AbstractDevice, x) 
 
 Returns a `CuArray` when `device<:GPUDevice` is used, otherwise a regular `Array`. Uses `adapt`, thus also can return SubArrays etc.
-
 """
 DeviceArray(::GPUDevice, x) = Adapt.adapt(CuArray, x)
 DeviceArray(::CPUDevice, x) = Adapt.adapt(Array, x)
-DeviceArray(dev::DeviceSetup, x) = DeviceArray(x, dev.device)
+DeviceArray(dev::DeviceSetup, x) = DeviceArray(dev.device, x)
 
 """
     DeviceArrayNotAdapt(device::AbstractDevice, x) 
@@ -86,7 +86,7 @@ Returns a `CuArray` when `device<:GPUDevice` is used, otherwise a regular `Array
 """
 DeviceArrayNotAdapt(::GPUDevice, x) = CuArray(x)
 DeviceArrayNotAdapt(::CPUDevice, x) = Array(x)
-DeviceArrayNotAdapt(dev::DeviceSetup, x) = DeviceArrayNotAdapt(x, dev.device)
+DeviceArrayNotAdapt(dev::DeviceSetup, x) = DeviceArrayNotAdapt(dev.device, x)
 
 """
     launch_kernel!(kernel!, ndrange, kernel_args..., device_setup::DeviceSetup)
