@@ -78,7 +78,19 @@ end
     setindex!(L.v,x,k)
 end
 
+"""
+    unit_range = eachharmonic(L::LowerTriangular)
+
+creates `unit_range::UnitRange` to loop over all non-zeros in a LowerTriangularMatrix `L`.
+Like `eachindex` but skips the upper triangle with zeros in `L`."""
 eachharmonic(L::LowerTriangularMatrix) = 1:length(L)
+
+"""
+    unit_range = eachharmonic(Ls::LowerTriangularMatrix...)
+
+creates `unit_range::UnitRange` to loop over all non-zeros in the LowerTriangularMatrices
+provided as arguments. Checks bounds first. All LowerTriangularMatrixs need to be of the same size.
+Like `eachindex` but skips the upper triangle with zeros in `L`."""
 function eachharmonic(Ls::LowerTriangularMatrix...)
     for L in Ls
         @boundscheck size(L) == size(Ls[1]) || throw(BoundsError)
@@ -118,5 +130,4 @@ function Base.fill!(L::LowerTriangularMatrix{T}, x) where T
     @inbounds for i in eachindex(L.v)
         L[i] = xT
     end
-    A
 end
