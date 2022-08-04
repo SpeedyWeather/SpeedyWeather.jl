@@ -138,61 +138,6 @@ function HorizontalDiffusion(   P::Parameters,          # Parameter struct
                                         temp_correction_horizontal,humid_correction_horizontal)
 end
 
-"""
-    horizontal_diffusion!(  tendency::AbstractMatrix{Complex{NF}}, # tendency of a 
-                            A::AbstractMatrix{Complex{NF}},        # spectral horizontal field
-                            damp_expl::AbstractMatrix{NF},         # explicit spectral damping
-                            damp_impl::AbstractMatrix{NF}          # implicit spectral damping
-                            ) where {NF<:AbstractFloat}
-
-Apply horizontal diffusion to a 2D field `A` in spectral space by updating its tendency `tendency`
-with an implicitly calculated diffusion term. The implicit diffusion of the next time step is split
-into an explicit part `damp_expl` and an implicit part `damp_impl`, such that both can be calculated
-in a single forward step by using `A` as well as its tendency `tendency`."""
-function horizontal_diffusion!( tendency::AbstractMatrix{Complex{NF}}, # tendency of a 
-                                A::AbstractMatrix{Complex{NF}},        # spectral horizontal field
-                                damp_expl::AbstractMatrix{NF},         # explicit spectral damping
-                                damp_impl::AbstractMatrix{NF}          # implicit spectral damping
-                                ) where {NF<:AbstractFloat}
-
-    lmax,mmax = size(A) .- 1            # degree l, order m but 0-based
-    @boundscheck size(A) == size(tendency) || throw(BoundsError())
-    @boundscheck size(A) == size(damp_expl) || throw(BoundsError())
-    @boundscheck size(A) == size(damp_impl) || throw(BoundsError())
-    
-    @inbounds for m in 1:mmax+1         # loop through all spectral modes 
-        for l in m:lmax+1
-            tendency[l,m] = (tendency[l,m] - damp_expl[l,m]*A[l,m])*damp_impl[l,m]
-        end
-    end
-end
-
-"""
-    horizontal_diffusion!(  tendency::AbstractArray{Complex{NF},3}, # tendency of a
-                            A::AbstractArray{Complex{NF},3},        # spectral spatial field
-                            damp_expl::AbstractMatrix{NF},          # explicit spectral damping
-                            damp_impl::AbstractMatrix{NF}           # implicit spectral damping
-                            ) where {NF<:AbstractFloat}             # number format NF
-
-Apply horizontal diffusion to a 3D field `A` in spectral space by updating its tendency `tendency`
-with an implicitly calculated diffusion term. The diffusion is applied layer by layer. The implicit
-diffusion of the next time step is split into an explicit part `damp_expl` and an implicit part
-`damp_impl`, such that both can be calculated in a single forward step by using `A` as well as
-its tendency `tendency`."""
-function horizontal_diffusion!( tendency::AbstractArray{Complex{NF},3}, # tendency of a
-                                A::AbstractArray{Complex{NF},3},        # spectral spatial field
-                                damp_expl::AbstractMatrix{NF},          # explicit spectral damping
-                                damp_impl::AbstractMatrix{NF}           # implicit spectral damping
-                                ) where {NF<:AbstractFloat}             # number format NF
-    _,_,nlev = size(A)
-    @boundscheck size(A) == size(tendency) || throw(BoundsError())
-    
-    for k in 1:nlev
-        A_layer = view(A,:,:,k)
-        tendency_layer = view(tendency,:,:,k)
-        horizontal_diffusion!(tendency_layer, A_layer, damp_expl, damp_impl)
-    end
-end
 
 """
     stratospheric_zonal_drag!(  tendency::AbstractArray{Complex{NF},3}, # tendency of

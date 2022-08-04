@@ -68,6 +68,7 @@ module SpeedyWeather
     include("tendencies_dynamics.jl")
     include("tendencies.jl")
     include("implicit_correction.jl")
+    include("do_diffusion.jl")
     include("feedback.jl")                  # defines Feedback
     include("output.jl")
 
