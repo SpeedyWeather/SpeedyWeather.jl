@@ -23,14 +23,13 @@
 # Note that get_spectral_tendencies() is quite badly named. It really modifies/updates the **already calculated** spectral tendencies
 # =========================================================================
 
-function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
-                            progn::PrognosticVariables{NF}, # all prognostic variables
-                            M::BarotropicModel,             # struct containing all constants
-                            lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
-                            ) where {NF<:AbstractFloat}
-
+function get_tendencies!(   diagn::DiagnosticVariablesLayer,
+                            M::BarotropicModel,
+                            )
+    
     # only (planetary) vorticity advection for the barotropic model
-    vorticity_flux_divergence!(diagn,M.geospectral)         # = -∇⋅(u(ζ+f),v(ζ+f))
+    G,S = M.geometry, M.spectral_transform
+    vorticity_flux_divergence!(diagn,G,S)         # = -∇⋅(u(ζ+f),v(ζ+f))
 end
 
 function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables

@@ -239,16 +239,17 @@ end
 
 Compute the vorticity advection as the (negative) divergence of the vorticity fluxes -∇⋅(uv*(ζ+f)).
 First, compute the uv*(ζ+f), then transform to spectral space and take the divergence and flip the sign."""
-function vorticity_flux_divergence!(D::DiagnosticVariables{NF},
-                                    S::SpectralTransform{NF}
-                                    ) where {NF<:AbstractFloat}                                   
+function vorticity_flux_divergence!(diagn::DiagnosticVariablesLayer,
+                                    G::Geometry,
+                                    S::SpectralTransform,
+                                    )
 
-    @unpack U_grid, V_grid, vor_grid = D.grid_variables
-    @unpack uω_coslat⁻¹, vω_coslat⁻¹, uω_coslat⁻¹_grid, vω_coslat⁻¹_grid = D.intermediate_variables
-    @unpack vor_tend = D.tendencies
+    @unpack U_grid, V_grid, vor_grid = diagn.grid_variables
+    @unpack uω_coslat⁻¹, vω_coslat⁻¹, uω_coslat⁻¹_grid, vω_coslat⁻¹_grid = diagn.dynamics_variables
+    @unpack vor_tend = diagn.tendencies
 
     # STEP 1-3: Abs vorticity, velocity times abs vort
-    vorticity_fluxes!(uω_coslat⁻¹_grid,vω_coslat⁻¹_grid,U_grid,V_grid,vor_grid,G.geometry)
+    vorticity_fluxes!(uω_coslat⁻¹_grid,vω_coslat⁻¹_grid,U_grid,V_grid,vor_grid,G)
 
     spectral!(uω_coslat⁻¹,uω_coslat⁻¹_grid,S)
     spectral!(vω_coslat⁻¹,vω_coslat⁻¹_grid,S)
@@ -439,19 +440,36 @@ end
 Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the barotropic vorticity model.
 Updates grid vorticity, spectral stream function and spectral and grid velocities u,v."""
-function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
-                    progn::PrognosticVariables{NF}, # all prognostic variables
-                    M::BarotropicModel,             # everything that's constant
-                    lf::Int=1                       # leapfrog index
-                    ) where NF
-    
-    @unpack vor = progn                             # relative vorticity
-    @unpack vor_grid, U_grid, V_grid = diagn.grid_variables
-    @unpack u_coslat, v_coslat = diagn.intermediate_variables
-    S = M.geospectral.spectral_transform
+function gridded!(  diagn::DiagnosticVariables,     # all diagnostic variables
+                    progn::PrognosticVariables,     # all prognostic variables
+                    lf::Int,                        # leapfrog index
+                    M::ModelSetup,
+                    )
 
-    vor_lf = view(vor,:,:,lf,:)     # pick leapfrog index without memory allocation
-    gridded!(vor_grid,vor_lf,S)     # get vorticity on grid from spectral vor
+    # all variables on layers
+    for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
+        gridded!(diagn_layer,progn_layer,lf,M)
+    end
+
+    # surface only for ShallowWaterModel or PrimitiveEquationModel
+    S = M.spectral_transform
+    M isa BarotropicModel ? nothing : gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf],S)
+
+    return nothing
+end
+
+function gridded!(  diagn::DiagnosticVariablesLayer,   
+                    progn::PrognosticVariablesLeapfrog,
+                    lf::Int,                            # leapfrog index
+                    M::BarotropicModel,
+                    )
+    
+    @unpack vor_grid, U_grid, V_grid = diagn.grid_variables
+    @unpack u_coslat, v_coslat = diagn.dynamics_variables
+    S = M.spectral_transform
+
+    vor_lf = progn.leapfrog[lf].vor     # relative vorticity at leapfrog step lf
+    gridded!(vor_grid,vor_lf,S)         # get vorticity on grid from spectral vor
     
     # get spectral U,V from spectral vorticity via stream function Ψ
     # U = u*coslat = -coslat*∂Ψ/∂lat
@@ -476,24 +494,21 @@ Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the shallow water model. Updates grid vorticity,
 grid divergence, grid interface displacement (`pres_grid`) and the velocities
 U,V (scaled by cos(lat))."""
-function gridded!(  diagn::DiagnosticVariables{NF}, # all diagnostic variables
-                    progn::PrognosticVariables{NF}, # all prognostic variables
-                    M::ShallowWaterModel,           # everything that's constant
-                    lf::Int=1                       # leapfrog index
-                    ) where NF
+function gridded!(  diagn::DiagnosticVariablesLayer,    # all diagnostic variables
+                    progn::PrognosticVariablesLayer,    # all prognostic variables
+                    lf::Int,                            # leapfrog index
+                    M::ShallowWaterModel,               # everything that's constant
+                    )
     
-    @unpack vor, div, pres = progn                  # relative vorticity, divergence, pressure
+    @unpack vor, div = progn            # relative vorticity, divergence
     @unpack vor_grid, div_grid, U_grid, V_grid, pres_grid = diagn.grid_variables
-    @unpack u_coslat, v_coslat = diagn.intermediate_variables
+    @unpack u_coslat, v_coslat = diagn.dynamics_variables
     S = M.geospectral.spectral_transform
 
-    vor_lf = view(vor,:,:,lf,:)         # pick leapfrog index without memory allocation
-    div_lf = view(div,:,:,lf,:)
-    pres_lf = view(pres,:,:,lf)       
-
+    vor_lf = progn.leapfrog[lf].vor     # pick leapfrog index without memory allocation
+    div_lf = progn.leapfrog[lf].div   
     gridded!(vor_grid,vor_lf,S)         # get vorticity on grid from spectral vor
     gridded!(div_grid,div_lf,S)         # get divergence on grid from spectral div
-    gridded!(pres_grid,pres_lf,S)       # get pressure on grid from spectral pres
 
     # get spectral U,V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
