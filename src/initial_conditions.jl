@@ -10,14 +10,14 @@ function initial_conditions(M::ModelSetup)
 
     elseif initial_conditions == :barotropic_vorticity              # zonal wind with perturbation
         for progn_layer in progn.layers
-            progn_layer.leapfrog[1].vor[2,1]  =  -40/radius_earth   # zonal wind
-            progn_layer.leapfrog[1].vor[4,1]  =  125/radius_earth
-            progn_layer.leapfrog[1].vor[6,1]  = -160/radius_earth
-            progn_layer.leapfrog[1].vor[8,1]  =   80/radius_earth
-            progn_layer.leapfrog[1].vor[10,1] =  -10/radius_earth
+            progn_layer.leapfrog[1].vor[2,1]  = -20/radius_earth   # zonal wind
+            progn_layer.leapfrog[1].vor[4,1]  =  60/radius_earth
+            progn_layer.leapfrog[1].vor[6,1]  = -80/radius_earth
+            progn_layer.leapfrog[1].vor[8,1]  =  40/radius_earth
+            progn_layer.leapfrog[1].vor[10,1] = -5/radius_earth
 
                                                                     # perturbation
-            progn_layer.leapfrog[1].vor[5:15,2:15] .= 3/radius_earth*randn(ComplexF64,11,14);
+            progn_layer.leapfrog[1].vor[5:15,2:15] .= 10/radius_earth*randn(ComplexF64,11,14);
         end
 
     elseif initial_conditions == :restart
