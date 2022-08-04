@@ -195,12 +195,12 @@ function Base.zeros(::Type{DiagnosticVariablesLayer},
     return DiagnosticVariablesLayer(tendencies,grid_variables,dynamics_variables)
 end
 
-struct SurfaceLayerVariables{NF<:AbstractFloat}
-    pres_grid           ::Matrix{NF}
-    pres_tend           ::LowerTriangularMatrix{Complex{NF}}
+struct SurfaceVariables{NF<:AbstractFloat}
+    pres_grid::Matrix{NF}
+    pres_tend::LowerTriangularMatrix{Complex{NF}}
 end
 
-function Base.zeros(::Type{SurfaceLayerVariables},
+function Base.zeros(::Type{SurfaceVariables},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
 
@@ -210,7 +210,7 @@ function Base.zeros(::Type{SurfaceLayerVariables},
     pres_grid = zeros(NF,nlon,nlat)
     pres_tend = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
 
-    return SurfaceLayerVariables(pres_grid,pres_tend)
+    return SurfaceVariables(pres_grid,pres_tend)
 end
 
 """
@@ -219,7 +219,7 @@ end
 Struct holding the diagnostic variables."""
 struct DiagnosticVariables{NF<:AbstractFloat}
     layers  ::Vector{DiagnosticVariablesLayer{NF}}
-    surface ::SurfaceLayerVariables{NF}
+    surface ::SurfaceVariables{NF}
     nlev    ::Int
 end
 
@@ -230,7 +230,7 @@ function Base.zeros(::Type{DiagnosticVariables},
     @unpack nlev = G
 
     layers = [zeros(DiagnosticVariablesLayer,G,S) for _ in 1:nlev]
-    surface = zeros(SurfaceLayerVariables,G,S)
+    surface = zeros(SurfaceVariables,G,S)
 
     return DiagnosticVariables(layers,surface,nlev)
 end

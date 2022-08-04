@@ -123,28 +123,26 @@ function gradient_longitude(Ψ::AbstractMatrix{NF},  # input array: spectral coe
 end
 
 """
-    curl!(  curl::AbstractMatrix{Complex{NF}},
-            u::AbstractMatrix{Complex{NF}},
-            v::AbstractMatrix{Complex{NF}},
-            S::SpectralTransform{NF};
+    curl!(  curl::LowerTriangularMatrix,
+            u::LowerTriangularMatrix,
+            v::LowerTriangularMatrix,
+            S::SpectralTransform;
             flipsign::Bool=false,
-            add::Bool=false
-            ) where {NF<:AbstractFloat}
+            add::Bool=false,
+            )
 
-Curl of a vector `u,v` written into `curl`, `curl = ∇×(u,v)`. 
-`u,v` are expected to have a 1/coslat-scaling included, then
-`curl` is not scaled. `flipsign` option calculates -∇×(u,v) instead.
-`add` option calculates `curl += ∇×(u,v)` instead. `flipsign` and `add`
-can be combined. This functions only creates the kernel and calls
-the generic divergence function _divergence! subsequently with flipped
-u,v -> v,u for the curl."""
-function curl!( curl::AbstractMatrix{Complex{NF}},
-                u::AbstractMatrix{Complex{NF}},
-                v::AbstractMatrix{Complex{NF}},
-                S::SpectralTransform{NF};
+Curl of a vector `u,v` written into `curl`, `curl = ∇×(u,v)`.
+`u,v` are expected to have a 1/coslat-scaling included, then `curl` is not scaled.
+`flipsign` option calculates -∇×(u,v) instead. `add` option calculates `curl += ∇×(u,v)` instead.
+`flipsign` and `add` can be combined. This functions only creates the kernel and calls the generic
+divergence function _divergence! subsequently with flipped u,v -> v,u for the curl."""
+function curl!( curl::LowerTriangularMatrix,
+                u::LowerTriangularMatrix,
+                v::LowerTriangularMatrix,
+                S::SpectralTransform;
                 flipsign::Bool=false,
-                add::Bool=false
-                ) where {NF<:AbstractFloat}
+                add::Bool=false,
+                )
 
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
     kernel(o,a,b,c) = flipsign ? (add ? o-(a+b-c) : -(a+b-c)) :
@@ -153,27 +151,26 @@ function curl!( curl::AbstractMatrix{Complex{NF}},
 end
 
 """
-    divergence!(div::AbstractMatrix{Complex{NF}},
-                u::AbstractMatrix{Complex{NF}},
-                v::AbstractMatrix{Complex{NF}},
+    divergence!(div::LowerTriangularMatrix,
+                u::LowerTriangularMatrix,
+                v::LowerTriangularMatrix,
                 S::SpectralTransform{NF};
                 flipsign::Bool=false,
-                add::Bool=false
-                ) where {NF<:AbstractFloat}
+                add::Bool=false,
+                )
 
 Divergence of a vector `u,v` written into `div`, `div = ∇⋅(u,v)`. 
-`u,v` are expected to have a 1/coslat-scaling included, then
-`div` is not scaled. `flipsign` option calculates -∇⋅(u,v) instead.
-`add` option calculates `div += ∇⋅(u,v)` instead. `flipsign` and `add`
-can be combined. This functions only creates the kernel and calls
+`u,v` are expected to have a 1/coslat-scaling included, then `div` is not scaled.
+`flipsign` option calculates -∇⋅(u,v) instead. `add` option calculates `div += ∇⋅(u,v)` instead.
+`flipsign` and `add` can be combined. This functions only creates the kernel and calls
 the generic divergence function _divergence! subsequently."""
-function divergence!(   div::AbstractMatrix{Complex{NF}},
-                        u::AbstractMatrix{Complex{NF}},
-                        v::AbstractMatrix{Complex{NF}},
-                        S::SpectralTransform{NF};
+function divergence!(   div::LowerTriangularMatrix,
+                        u::LowerTriangularMatrix,
+                        v::LowerTriangularMatrix,
+                        S::SpectralTransform;
                         flipsign::Bool=false,
-                        add::Bool=false
-                        ) where {NF<:AbstractFloat}
+                        add::Bool=false,
+                        )
 
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
     kernel(o,a,b,c) = flipsign ? (add ? o-(a-b+c) : -(a-b+c)) :
@@ -193,9 +190,9 @@ Generic divergence function of vector `u`,`v` that writes into the output into `
 Generic as it uses the kernel `kernel` such that curl, div, add or flipsign
 options are provided through `kernel`, but otherwise a single function is used."""
 function _divergence!(  kernel,
-                        div::AbstractMatrix{Complex{NF}},
-                        u::AbstractMatrix{Complex{NF}},
-                        v::AbstractMatrix{Complex{NF}},
+                        div::LowerTriangularMatrix{Complex{NF}},
+                        u::LowerTriangularMatrix{Complex{NF}},
+                        v::LowerTriangularMatrix{Complex{NF}},
                         S::SpectralTransform{NF}
                         ) where {NF<:AbstractFloat}
 
@@ -204,50 +201,22 @@ function _divergence!(  kernel,
     @boundscheck size(v) == (lmax+2,mmax+1) || throw(BoundsError)
 
     @unpack grad_y_vordiv1,grad_y_vordiv2 = S
+    @boundscheck size(grad_y_vordiv1) == (lmax+2,mmax+1) || throw(BoundsError)
+    @boundscheck size(grad_y_vordiv2) == (lmax+2,mmax+1) || throw(BoundsError)
 
     z = zero(Complex{NF})
-    div[1,1] = kernel(div[1,1],z,z,z)               # l=m=0 harmonic is zero
+    div[1] = kernel(div[1],z,z,z)               # l=m=0 harmonic is zero
 
-    @inbounds for m in 1:mmax+1                     # 1-based l,m
+    lm = 1
+    for m in 1:mmax+1                     # 1-based l,m
         for l in max(2,m):lmax+1                    # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
-            ∂u∂λ  = ((m-1)*im)*u[l,m]
-            ∂v∂θ1 = grad_y_vordiv1[l,m]*v[l-1,m]
-            ∂v∂θ2 = grad_y_vordiv2[l,m]*v[l+1,m]
+            lm += 1
+            ∂u∂λ  = ((m-1)*im)*u[lm]
+            ∂v∂θ1 = grad_y_vordiv1[lm]*v[l-1,m]
+            ∂v∂θ2 = grad_y_vordiv2[lm]*v[lm+1]
             div[l,m] = kernel(div[l,m],∂u∂λ,∂v∂θ1,∂v∂θ2)
         end
-    end
-
-    return nothing
-end
-
-"""Compute curl and divergence of vectors u,v in one go. Currently not used."""
-function curl_div!( curl::AbstractMatrix{Complex{NF}},
-                    div::AbstractMatrix{Complex{NF}},
-                    u::AbstractMatrix{Complex{NF}},
-                    v::AbstractMatrix{Complex{NF}},
-                    S::SpectralTransform{NF}
-                    ) where {NF<:AbstractFloat}
-
-    lmax,mmax = size(div) .- (1,1)                  # 0-based lmax,mmax
-    @boundscheck size(curl) == size(div) || throw(BoundsError)
-    @boundscheck size(u) == (lmax+2,mmax+1) || throw(BoundsError)
-    @boundscheck size(v) == (lmax+2,mmax+1) || throw(BoundsError)
-
-    @unpack grad_y_vordiv1,grad_y_vordiv2 = S
-
-    div[1,1]  = zero(Complex{NF})                   # l=m=0 harmonic is zero
-    curl[1,1] = zero(Complex{NF})                   # l=m=0 harmonic is zero
-    @inbounds for m in 1:mmax+1                     # 1-based l,m
-        for l in max(2,m):lmax+1                    # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
-            ∂u∂λ  = ((m-1)*im)*u[l,m]
-            ∂v∂λ  = ((m-1)*im)*v[l,m]
-            ∂v∂θ1 = grad_y_vordiv1[l,m]*v[l-1,m]
-            ∂u∂θ1 = grad_y_vordiv1[l,m]*u[l-1,m]
-            ∂v∂θ2 = grad_y_vordiv2[l,m]*v[l+1,m]
-            ∂u∂θ2 = grad_y_vordiv2[l,m]*u[l+1,m]
-            div[l,m]  = ∂u∂λ - ∂v∂θ1 + ∂v∂θ2
-            curl[l,m] = ∂v∂λ + ∂u∂θ1 - ∂u∂θ2
-        end
+        lm += 1         # loop skips last row, add one to keep lm corresponding to l,m accordingly
     end
 
     return nothing
@@ -264,9 +233,9 @@ Get U,V (=(u,v)*coslat) from vorticity ζ spectral space (divergence D=0)
 Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity. Then
 compute zonal and meridional gradients to get U,V."""
-function UV_from_vor!(  U::AbstractMatrix{Complex{NF}},
-                        V::AbstractMatrix{Complex{NF}},
-                        vor::AbstractMatrix{Complex{NF}},
+function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
+                        V::LowerTriangularMatrix{Complex{NF}},
+                        vor::LowerTriangularMatrix{Complex{NF}},
                         S::SpectralTransform{NF}
                         ) where {NF<:AbstractFloat}
 
@@ -276,8 +245,8 @@ function UV_from_vor!(  U::AbstractMatrix{Complex{NF}},
 
     @unpack vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 = S
 
-    U[1,1] = vordiv_to_uv2[1,1]*vor[2,1]            # l=m=0 harmonic has only one contribution
-    V[1,1] = zero(Complex{NF})                      # obtained via zonal derivative (*i*m) = 0 
+    U[1] = vordiv_to_uv2[1]*vor[2]                  # l=m=0 harmonic has only one contribution
+    V[1] = zero(Complex{NF})                        # obtained via zonal derivative (*i*m) = 0 
 
     @inbounds for m in 1:mmax+1                     # 1-based l,m
         for l in max(2,m):lmax                      # skip l=m=0 harmonic (mean) to avoid access to v[0,1]

@@ -44,8 +44,8 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables, # output grid va
 
     feedback.output || return nothing                   # escape directly when no netcdf output
 
-    @unpack nlon,nlat,nlev = M.geospectral.geometry     # number of longitudes, latitudes, vertical levels
-    @unpack lond,latd = M.geospectral.geometry          # lon, lat vectors in degree
+    @unpack nlon,nlat,nlev = M.geometry                 # number of longitudes, latitudes, vertical levels
+    @unpack lond,latd = M.geometry                      # lon, lat vectors in degree
     @unpack output_startdate, compression_level = M.parameters
     
     # DEFINE DIMENSIONS, TIME
@@ -140,27 +140,29 @@ function write_netcdf_variables!(   i_out::Integer,
                                     diagn::DiagnosticVariables,
                                     M::BarotropicModel)
 
-    # CONVERT TO FLOAT32 FOR OUTPUT
-    @unpack U_grid,V_grid,vor_grid = diagn.grid_variables
-    u_output = convert.(Float32,U_grid)
-    v_output = convert.(Float32,V_grid)
-    vor_output = convert.(Float32,vor_grid)
+    for (k,diagn_layer) in enumerate(diagn.layers)                         
+        # CONVERT TO FLOAT32 FOR OUTPUT
+        @unpack U_grid,V_grid,vor_grid = diagn_layer.grid_variables
+        u_output = convert.(Float32,U_grid)
+        v_output = convert.(Float32,V_grid)
+        vor_output = convert.(Float32,vor_grid)
 
-    # UNSCALE SCALED VARIABLES
-    scale_coslat⁻¹!(u_output,M.geospectral.geometry)
-    scale_coslat⁻¹!(v_output,M.geospectral.geometry)
-    vor_output ./= M.geospectral.geometry.radius_earth
+        # UNSCALE SCALED VARIABLES
+        scale_coslat⁻¹!(u_output,M.geometry)
+        scale_coslat⁻¹!(v_output,M.geometry)
+        vor_output ./= M.geometry.radius_earth
 
-    # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
-    @unpack keepbits = M.parameters
-    for var in (u_output,v_output,vor_output)
-        round!(var,keepbits)
+        # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
+        @unpack keepbits = M.parameters
+        for var in (u_output,v_output,vor_output)
+            round!(var,keepbits)
+        end
+
+        # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
+        NetCDF.putvar(netcdf_file,"u",u_output,start=[1,1,k,i_out],count=[-1,-1,-1,1])
+        NetCDF.putvar(netcdf_file,"v",v_output,start=[1,1,k,i_out],count=[-1,-1,-1,1])
+        NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,k,i_out],count=[-1,-1,-1,1])
     end
-
-    # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
-    NetCDF.putvar(netcdf_file,"u",u_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
-    NetCDF.putvar(netcdf_file,"v",v_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
-    NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
 end
 
 function write_netcdf_variables!(   i_out::Integer,

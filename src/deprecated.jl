@@ -245,3 +245,35 @@
 # Base.:(<)(M::ModelSetup{NF},::Type{ShallowWaterModel}) where NF = typeof(M) < ShallowWaterModel{NF}
 # Base.:(<)(M::ModelSetup{NF},::Type{PrimitiveEquationModel}) where NF = typeof(M) < PrimitiveEquationModel{NF}
 
+# """Compute curl and divergence of vectors u,v in one go. Currently not used."""
+# function curl_div!( curl::AbstractMatrix{Complex{NF}},
+#                     div::AbstractMatrix{Complex{NF}},
+#                     u::AbstractMatrix{Complex{NF}},
+#                     v::AbstractMatrix{Complex{NF}},
+#                     S::SpectralTransform{NF}
+#                     ) where {NF<:AbstractFloat}
+
+#     lmax,mmax = size(div) .- (1,1)                  # 0-based lmax,mmax
+#     @boundscheck size(curl) == size(div) || throw(BoundsError)
+#     @boundscheck size(u) == (lmax+2,mmax+1) || throw(BoundsError)
+#     @boundscheck size(v) == (lmax+2,mmax+1) || throw(BoundsError)
+
+#     @unpack grad_y_vordiv1,grad_y_vordiv2 = S
+
+#     div[1,1]  = zero(Complex{NF})                   # l=m=0 harmonic is zero
+#     curl[1,1] = zero(Complex{NF})                   # l=m=0 harmonic is zero
+#     @inbounds for m in 1:mmax+1                     # 1-based l,m
+#         for l in max(2,m):lmax+1                    # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+#             ∂u∂λ  = ((m-1)*im)*u[l,m]
+#             ∂v∂λ  = ((m-1)*im)*v[l,m]
+#             ∂v∂θ1 = grad_y_vordiv1[l,m]*v[l-1,m]
+#             ∂u∂θ1 = grad_y_vordiv1[l,m]*u[l-1,m]
+#             ∂v∂θ2 = grad_y_vordiv2[l,m]*v[l+1,m]
+#             ∂u∂θ2 = grad_y_vordiv2[l,m]*u[l+1,m]
+#             div[l,m]  = ∂u∂λ - ∂v∂θ1 + ∂v∂θ2
+#             curl[l,m] = ∂v∂λ + ∂u∂θ1 - ∂u∂θ2
+#         end
+#     end
+
+#     return nothing
+# end

@@ -112,8 +112,7 @@ function SpectralTransform( ::Type{NF},     # Number format NF
     # Λs is of size (lmax+2) x (mmax+1) x nlat_half unless recomputed, one more degree l as before
     # for recomputed only Λ is used, not Λs, create dummy array of size 1x1x1 instead
     b = ~recompute_legendre                 # true for precomputed
-    # Λs = zeros(b*lmax + 1 + b, b*mmax + 1, b*(nlat_half-1) + 1) 
-    Λs = [zeros(LowerTriangularMatrix,b*lmax+1+b,b*mmax+1) for _ in 1:b*(nlat_half-1)+1]
+    Λs = [zeros(LowerTriangularMatrix,b*(lmax+2),b*(mmax+1)) for _ in 1:b*nlat_half]
 
     if recompute_legendre == false          # then precompute all polynomials
         for ilat in 1:nlat_half             # only one hemisphere due to symmetry
@@ -312,7 +311,7 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
 
             for l in m:lmax+1               # Σ_{l=m}^{lmax}, but 1-based index
                 lm += 1                     # next non-zero coeffs
-                term = alms[lm] * Λ_ilat[lm]# Legendre polynomials in Λ at latitude
+                term = alms[lm] * Λ_ilat[l,m]# Legendre polynomials in Λ at latitude
                 accn += term
                 accs += isodd(l+m) ? -term : term   # flip sign for southern odd wavenumbers
             end
@@ -423,7 +422,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
             for l in m:lmax+1
                 lm += 1                                             # next coefficient of spherical harmonics
                 c = isodd(l+m) ? an - as : an + as                  # odd/even wavenumbers
-                alms[lm] += c * Λ_ilat[lm]                          # Legendre polynomials in Λ at latitude
+                alms[lm] += c * Λ_ilat[l,m]                         # Legendre polynomials in Λ at latitude
             end
         end
     end

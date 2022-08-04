@@ -1,4 +1,4 @@
-initialize_implicit!(Δt::Real,M::BarotropicModel) = nothing
+initialize_implicit!(::Real,::BarotropicModel) = nothing
 
 function initialize_implicit!(  dt::Real,                   # time step to update implicit terms with
                                 M::ShallowWaterModel{NF}    # update Implicit struct in M

@@ -14,10 +14,14 @@ struct PrognosticVariablesLeapfrog{NF<:AbstractFloat}
     leapfrog::Vector{PrognosticVariablesLayer{NF}}  # 2-element vector for two leapfrog time steps
 end
 
+struct SurfaceLeapfrog{NF<:AbstractFloat}
+    leapfrog::Vector{LowerTriangularMatrix{Complex{NF}}}     # 2-element vector for two leapfrog time steps
+end
+
 struct PrognosticVariables{NF<:AbstractFloat}
     # data
     layers::Vector{PrognosticVariablesLeapfrog{NF}} # each element = 1 vertical layer (incl leapfrog dim)    
-    pres::Vector{LowerTriangularMatrix{NF}}         # 2-element leapfrog vec of log of surface pressure [log(hPa)]
+    pres::SurfaceLeapfrog{NF}                       # 2-element leapfrog vec of log of surface pressure [log(hPa)]
 
     # dimensions
     lmax::Int
@@ -52,6 +56,10 @@ function Base.zeros(::Type{PrognosticVariablesLeapfrog{NF}},lmax::Integer,mmax::
     return PrognosticVariablesLeapfrog([zeros(PrognosticVariablesLayer{NF},lmax,mmax) for _ in 1:N_LEAPFROG])
 end
 
+function Base.zeros(::Type{SurfaceLeapfrog{NF}},lmax::Integer,mmax::Integer) where NF
+    return SurfaceLeapfrog([zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1) for _ in 1:N_LEAPFROG])
+end
+
 # also pass on model if available
 function Base.zeros(::Type{PrognosticVariablesLeapfrog{NF}},
                     model::ModelSetup,
@@ -68,7 +76,7 @@ function Base.zeros(::Type{PrognosticVariables{NF}},
                     nlev::Integer) where NF
 
     layers = [zeros(PrognosticVariablesLeapfrog{NF},lmax,mmax) for _ in 1:nlev]     # k layers
-    pres = [zeros(LowerTriangularMatrix{NF},lmax,mmax) for _ in 1:N_LEAPFROG]       # 2 leapfrog time steps for pres
+    pres = zeros(SurfaceLeapfrog{NF},lmax,mmax)                                     # 2 leapfrog time steps for pres
     return PrognosticVariables(layers,pres,lmax,mmax,N_LEAPFROG,nlev)
 end
 
@@ -80,7 +88,7 @@ function Base.zeros(::Type{PrognosticVariables{NF}},
                     nlev::Integer) where NF
 
     layers = [zeros(PrognosticVariablesLeapfrog{NF},model,lmax,mmax) for _ in 1:nlev]   # k layers
-    lmax,mmax = model isa BarotropicModel ? (-1,-1) : (lmax,mmax)                       # pressure not needed for BarotropicModel
-    pres = [zeros(LowerTriangularMatrix{NF},lmax+1,mmax+1) for _ in 1:N_LEAPFROG]       # 2 leapfrog time steps for pres
+    lmax,mmax = model isa BarotropicModel ? (-1,-1) : (lmax,mmax)   # pressure not needed for BarotropicModel
+    pres = zeros(SurfaceLeapfrog{NF},lmax,mmax)                     # 2 leapfrog time steps for pres
     return PrognosticVariables(layers,pres,lmax,mmax,N_LEAPFROG,nlev)
 end

@@ -25,7 +25,7 @@ function initialize_feedback(M::ModelSetup)
 
     if output   # with netcdf output
         @unpack NF,n_days,trunc = M.parameters
-        @unpack nlon,nlat = M.geospectral.geometry
+        @unpack nlon,nlat = M.geometry
 
         run_id,run_path = get_run_id_path(M.parameters)     # create output folder and get its id and path
         
