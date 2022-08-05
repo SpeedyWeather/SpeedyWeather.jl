@@ -55,14 +55,14 @@ function HorizontalDiffusion(   P::Parameters,          # Parameter struct
     # Damping coefficients for explicit part of the diffusion (=ν∇²ⁿ)
     # while precalculated for spectral space, store only the real part as entries are real
     LTM = LowerTriangularMatrix
-    damping = zeros(LTM,lmax+1,mmax+1)              # for temperature and vorticity (explicit)
-    damping_div = zeros(LTM,lmax+1,mmax+1)          # for divergence (explicit)
-    damping_strat = zeros(LTM,lmax+1,mmax+1)        # for extra diffusion in the stratosphere (explicit)
+    damping = zeros(LTM,lmax+2,mmax+1)              # for temperature and vorticity (explicit)
+    damping_div = zeros(LTM,lmax+2,mmax+1)          # for divergence (explicit)
+    damping_strat = zeros(LTM,lmax+2,mmax+1)        # for extra diffusion in the stratosphere (explicit)
 
     # Damping coefficients for implicit part of the diffusion (= 1/(1+2Δtν∇²ⁿ))
-    damping_impl = zeros(LTM,lmax+1,mmax+1)         # for temperature and vorticity (implicit)
-    damping_div_impl = zeros(LTM,lmax+1,mmax+1)     # for divergence (implicit)
-    damping_strat_impl = zeros(LTM,lmax+1,mmax+1)   # for extra diffusion in the stratosphere (implicit)
+    damping_impl = zeros(LTM,lmax+2,mmax+1)         # for temperature and vorticity (implicit)
+    damping_div_impl = zeros(LTM,lmax+2,mmax+1)     # for divergence (implicit)
+    damping_strat_impl = zeros(LTM,lmax+2,mmax+1)   # for extra diffusion in the stratosphere (implicit)
 
     # PRECALCULATE the damping coefficients for every spectral mode
     for m in 1:mmax+1                           # fill only the lower triangle
@@ -136,58 +136,4 @@ function HorizontalDiffusion(   P::Parameters,          # Parameter struct
                                         damping_impl,damping_div_impl,damping_strat_impl,
                                         temp_correction_vert,humid_correction_vert,
                                         temp_correction_horizontal,humid_correction_horizontal)
-end
-
-
-"""
-    stratospheric_zonal_drag!(  tendency::AbstractArray{Complex{NF},3}, # tendency of
-                                A::AbstractArray{Complex{NF},3},        # spectral vorticity or divergence
-                                drag::Real                              # drag coefficient [1/s]
-                                ) where {NF<:AbstractFloat}             # number format NF
-
-Zonal drag in the uppermost layer of the stratosphere of 3D spectral field `A` (vorticity or divergence).
-Drag is applied explicitly to the time step in `A` and its tendency `tendency` is changed in-place.
-`drag` is the drag coefficient of unit 1/s.
-"""
-function stratospheric_zonal_drag!( tendency::AbstractArray{Complex{NF},3}, # tendency of
-                                    A::AbstractArray{Complex{NF},3},        # spectral vorticity or divergence
-                                    drag::Real                              # drag coefficient [1/s]
-                                    ) where {NF<:AbstractFloat}             # number format NF
-    
-    lmax,mmax,nlev = size(A)    # spherical harmonic degree l, order m, number of vertical levels nlev
-    lmax -= 1                   # convert to 0-based l,m
-    mmax -= 1
-    @boundscheck size(A) == size(tendency) || throw(BoundsError())
-
-    drag_NF = convert(NF,drag)
-
-    @inbounds for l in 1:lmax+1     # loop over degree l, but 1-based
-        # size(A) = lmax x mmax x nlev, nlev = 1 is uppermost model level
-        # apply drag only to largest zonal wavenumber (m = 0) and in the uppermost model level (k=1)
-        tendency[l,1,1] = tendency[l,1,1] - drag_NF*A[l,1,1]
-    end
-end
-
-"""Orographic temperature correction for absolute temperature to be applied before the horizontal diffusion."""
-function orographic_correction!(A_corrected::AbstractArray{Complex{NF},3},  # correction of 
-                                A::AbstractArray{Complex{NF},3},            # 3D spectral temperature or humidity
-                                correction_horizontal::Matrix{Complex{NF}}, # horizontal correction matrix
-                                correction_vertical::Vector{NF},            # vertical correction vector
-                                ) where NF
-    
-    lmax,mmax,nlev = size(A)    # degree l, order m of the spherical harmonics
-    lmax -= 1                   # convert to 0-based
-    mmax -= 1
-
-    @boundscheck size(A) == size(A_corrected) || throw(BoundsError())
-    @boundscheck (lmax+1,mmax+1) == size(correction_horizontal) || throw(BoundsError())
-    @boundscheck (nlev,) == size(correction_vertical) || throw(BoundsError())
-
-    @inbounds for k in 1:nlev       # vertical levels
-        for m in 1:mmax+1           # order of spherical harmonics
-            for l in m:lmax+1       # degree of spherical harmonics
-                A_corrected[l,m,k] = A[l,m,k] + hori_correction[l,m]*vert_correction[k]
-            end
-        end
-    end
 end

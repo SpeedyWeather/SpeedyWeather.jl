@@ -277,3 +277,303 @@
 
 #     return nothing
 # end
+# """
+#     gradient_latitude!( coslat_u::AbstractArray{Complex{NF}},   # output: cos(lat)*zonal velocity u
+#                         Ψ::AbstractArray{Complex{NF}},          # input: streamfunction Ψ
+#                         ϵlms::AbstractArray{NF},                # recursion factors
+#                         R::Real=1                               # radius of the sphere/Earth
+#                         ) where {NF<:AbstractFloat}             # number format NF
+
+# Meridional gradient in spectral space of spherical harmonic coefficients `Ψ` on a sphere with
+# radius R. Returns `coslat_u`, i.e. the gradient ∂Ψ/∂lat with an additional cosine of latitude scaling.
+# This function uses the recursion relation (0-based degree l, order m)
+
+#     (coslat u)_lm = -1/R*(-(l-1)*ϵ_lm*Ψ_l-1,m + (l+2)*ϵ_l+1,m*Ψ_l+1,m ).
+    
+# As u = -1/R*∂Ψ/∂lat, this function can be generally used to compute the gradient in latitude."""
+# function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: cos(lat)*zonal velocity u
+#                             Ψ::AbstractMatrix{Complex{NF}},         # input: streamfunction Ψ
+#                             S::SpectralTransform{NF};               # use precomputed recursion factors
+#                             flipsign::Bool=false,                   # flip the sign to obtain u from Ψ
+#                             add::Bool=false                         # coslat_u += (add) or = (overwrite)
+#                             ) where {NF<:AbstractFloat}             # number format NF
+
+#     # u needs one more degree/meridional mode l for each m than Ψ due to the recursion
+#     # Ψ can have size n+1 x n but then the last row is not used in the loop
+#     lmax_out, mmax_out = size(coslat_u)
+#     lmax_in,  mmax_in  = size(Ψ)
+
+#     @boundscheck mmax_out == mmax_in || throw(BoundsError)
+#     mmax = mmax_out - 1                 # 0-based max order m of harmonics
+
+#     @boundscheck abs(lmax_out-lmax_in) <= 1 || throw(BoundsError)
+#     lmax = lmax_in - 1                  # 0-based max degree l of harmonics
+#     output_larger = lmax_out - lmax_in
+
+#     if flipsign                     # used to get u from streamfunction Ψ (u ~ -∂Ψ/∂lat)
+#         grad_y1 = S.minus_grad_y1
+#         grad_y2 = S.minus_grad_y2
+#     else                            # no sign flip otherwise
+#         grad_y1 = S.grad_y1
+#         grad_y2 = S.grad_y2
+#     end
+
+#     g = grad_y2[1,1]*Ψ[2,1]
+#     coslat_u[1,1] = add ? coslat_u[1,1] + g : g         # l=m=0 mode only with term 2
+
+#     for m in 1:mmax+1
+#         for l in max(2,m):lmax
+#             g = grad_y1[l,m]*Ψ[l-1,m] + grad_y2[l,m]*Ψ[l+1,m]
+#             coslat_u[l,m] = add ? coslat_u[l,m] + g : g
+#         end
+#         for l in lmax+1:lmax+1+output_larger            # execute 2x for out > in, 1x for out == in and
+#             g = grad_y1[l,m]*Ψ[l-1,m]                   # 0x for out < in
+#             coslat_u[l,m] = add ? coslat_u[l,m] + g : g
+#         end
+#     end
+
+#     return coslat_u
+# end
+
+# function gradient_latitude( Ψ::AbstractMatrix{Complex{NF}}, # input: streamfunction Ψ
+#                             S::SpectralTransform{NF};       # precomputed gradient arrays
+#                             one_more_l::Bool=true,          # allocate output with one more degree l?
+#                             flipsign::Bool=false            # flip the sign to obtain u from Ψ?
+#                             ) where {NF<:AbstractFloat}     # number format NF
+#     _,mmax = size(Ψ) .- 1                                   # max degree l, order m of spherical harmonics
+#     coslat_u = zeros(Complex{NF},mmax+one_more_l+1,mmax+1)  # preallocate output, one more l for recursion
+#     return gradient_latitude!(coslat_u,Ψ,S;flipsign)        # call in-place version
+# end
+
+# """
+#     coslat_v = gradient_longitude!( coslat_v::AbstractMatrix{Complex{NF}},
+#                                     Ψ::AbstractMatrix{Complex{NF}};
+#                                     radius::Real=1
+#                                     ) where {NF<:AbstractFloat}
+
+# Zonal gradient in spectral space of spherical harmonic coefficients `Ψ` on a sphere with radius `radius`.
+# While the zonal gradient has a 1/cos(lat) scaling in spherical coordinates, this functions omits the scaling
+# such that the returned array is scaled with coslat.
+# """
+# function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # output: cos(latitude)*meridional velocity
+#                                 Ψ::AbstractMatrix{Complex{NF}},         # input: spectral coefficients of stream function
+#                                 radius::Real=1;                         # radius of the sphere/Earth
+#                                 add::Bool=false,                        # coslat_u += (add) or = (overwrite)
+#                                 flipsign::Bool=false                    # flip sign of output?
+#                                 ) where {NF<:AbstractFloat}             # number format NF
+
+#     lmax_out, mmax_out = size(coslat_v)
+#     lmax_in,  mmax_in  = size(Ψ)
+
+#     @boundscheck mmax_out == mmax_in || throw(BoundsError)
+#     mmax = mmax_out - 1                 # 0-based max order m of harmonics
+
+#     @boundscheck abs(lmax_out-lmax_in) <= 1 || throw(BoundsError)
+#     lmax = min(lmax_out,lmax_in) - 1    # 0-based max degree l of harmonics
+#     output_larger = lmax_out > lmax_in
+
+#     iradius⁻¹ = convert(Complex{NF},(-1)^flipsign*im/radius)            # = ±imaginary/radius converted to NF
+
+#     @inbounds for m in 1:mmax+1                     # loop over all coefficients, order m
+#         for l in m:lmax+1                           # degree l
+#             g = (m-1)*iradius⁻¹*Ψ[l,m]              # gradient in lon = *i*m/radius but 1-based order
+#             coslat_v[l,m] = add ? coslat_v[l,m] + g : g 
+#         end
+#     end
+
+#     # if grad in lon does not project onto the last degree l, set explicitly to zero in that case
+#     if output_larger & ~add
+#         for m in 1:mmax+1        
+#             coslat_v[end,m] = zero(Complex{NF}) 
+#         end
+#     end
+
+#     return coslat_v
+# end
+
+# """Gradient in longitude in spectral space. Input: coefficients `alms` of the spherical harmonics."""
+# function gradient_longitude(Ψ::AbstractMatrix{NF},  # input array: spectral coefficients
+#                             R::Real=1;              # radius of the sphere/Earth
+#                             one_more_l::Bool=true   # allocate output with one more degree l
+#                             ) where NF              # number format NF
+#     _,mmax = size(Ψ)
+#     coslat_v = zeros(NF,mmax+one_more_l,mmax)       # preallocate output array (gradient in longitude)
+#     return gradient_longitude!(coslat_v,Ψ,R)        # call in-place version
+# end
+
+# """A leapfrog! function that loops over all prognostic variables."""
+# function leapfrog!( progn::PrognosticVariables{NF},         # all prognostic variables
+#                     tend::Tendencies{NF},                   # all tendencies
+#                     dt::Real,                               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+#                     C::Constants{NF},                       # struct containing all constants used at runtime
+#                     lf::Int) where NF                       # leapfrog index to dis/enable William's filter        
+    
+#     # convert fields in progn, tend to a generator tuple for for-loop
+#     all_progn_variables = (getproperty(progn,prop) for prop in propertynames(progn))
+#     all_tend_variables  = (getproperty(tend, prop) for prop in propertynames(tend))
+
+#     for (var,var_tend) in zip(all_progn_variables,all_tend_variables)
+#         leapfrog!(var,var_tend,dt,C,lf)
+#     end 
+# end  
+
+# ONE ARGUMENT FUNCTIONS
+# for func_name in (:scale_coslat!,:scale_coslat²!,:scale_coslat⁻¹!,:scale_coslat⁻²!,
+#                     :spectral_truncation!,:flipsign!)
+#     @eval begin
+#         function $func_name(A::AbstractArray{NF,3},
+#                             args...) where NF
+
+#             for k in 1:size(A)[end]
+#                 A_layer = view(A,:,:,k)
+#                 $func_name(A_layer,args...)
+#             end
+#         end
+
+#         function $func_name(A::AbstractArray{NF,4},
+#                             args...) where NF
+
+#             for k in 1:size(A)[end]
+#                 A_layer = view(A,:,:,:,k)
+#                 $func_name(A_layer,args...)
+#             end
+#         end
+#     end
+# end
+
+# # TWO ARGUMENT FUNCTIONS
+# for func_name in (:gradient_longitude!, :gradient_latitude!,
+#                     :gridded!, :spectral!, :∇⁻²!, :∇²!, :add_tendencies!)
+#     @eval begin
+#         function $func_name(Out::AbstractArray{NF1,3},
+#                             In::AbstractArray{NF2,3},
+#                             args...;
+#                             kwargs...) where {NF1,NF2}
+            
+#             for k in 1:size(Out)[end]
+#                 Out_layer = view(Out,:,:,k)
+#                 In_layer = view(In,:,:,k)
+#                 $func_name(Out_layer,In_layer,args...;kwargs...)
+#             end
+#         end
+#     end
+# end
+
+# # THREE ARGUMENT FUNCTIONS
+# for func_name in (:add_tendencies!,:divergence!,:_divergence!,:curl!)
+#     @eval begin
+#         function $func_name(Out::AbstractArray{NF1,3},
+#                             In1::AbstractArray{NF2,3},
+#                             In2::AbstractArray{NF2,3},
+#                             args...;
+#                             kwargs...) where {NF1,NF2}
+            
+#             for k in 1:size(Out)[end]
+#                 Out_layer = view(Out,:,:,k)
+#                 In1_layer = view(In1,:,:,k)
+#                 In2_layer = view(In2,:,:,k)
+#                 $func_name(Out_layer,In1_layer,In2_layer,args...;kwargs...)
+#             end
+#         end
+#     end
+# end
+
+# # THREE ARGUMENT FUNCTIONS
+# for func_name in (:bernoulli_potential!,)
+#     @eval begin
+#         function $func_name(Out::AbstractArray{NF,3},
+#                             In1::AbstractArray{NF,3},
+#                             In2::AbstractArray{NF,3},
+#                             In3::AbstractArray{NF,2},
+#                             args...) where NF
+            
+#             for k in 1:size(Out)[end]
+#                 Out_layer = view(Out,:,:,k)
+#                 In1_layer = view(In1,:,:,k)
+#                 In2_layer = view(In2,:,:,k)
+#                 In3_layer = view(In3,:,:)
+#                 $func_name(Out_layer,In1_layer,In2_layer,In3_layer,args...)
+#             end
+#         end
+#     end
+# end
+
+# # THREE ARGUMENT FUNCTIONS
+# for func_name in (:UV_from_vor!,)
+#     @eval begin
+#         function $func_name(Out1::AbstractArray{NF,3},
+#                             Out2::AbstractArray{NF,3},
+#                             In::AbstractArray{NF,3},
+#                             args...) where NF
+            
+#             for k in 1:size(Out1)[end]
+#                 Out1_layer = view(Out1,:,:,k)
+#                 Out2_layer = view(Out2,:,:,k)
+#                 In_layer = view(In,:,:,k)
+#                 $func_name(Out1_layer,Out2_layer,In_layer,args...)
+#             end
+#         end
+#     end
+# end
+
+# # FOUR ARGUMENT FUNCTIONS
+# for func_name in (:UV_from_vordiv!,)
+#     @eval begin
+#         function $func_name(Out1::AbstractArray{NF,3},
+#                             Out2::AbstractArray{NF,3},
+#                             In1::AbstractArray{NF,3},
+#                             In2::AbstractArray{NF,3},
+#                             args...) where NF
+            
+#             for k in 1:size(Out1)[end]
+#                 Out1_layer = view(Out1,:,:,k)
+#                 Out2_layer = view(Out2,:,:,k)
+#                 In1_layer = view(In1,:,:,k)
+#                 In2_layer = view(In2,:,:)
+#                 $func_name(Out1_layer,Out2_layer,In1_layer,In2_layer,args...)
+#             end
+#         end
+#     end
+# end
+
+# # FIVE ARGUMENT FUNCTIONS
+# for func_name in (:vorticity_fluxes!,)
+#     @eval begin
+#         function $func_name(Out1::AbstractArray{NF1,3},
+#                             Out2::AbstractArray{NF1,3},
+#                             In1::AbstractArray{NF2,3},
+#                             In2::AbstractArray{NF2,3},
+#                             In3::AbstractArray{NF2,3},
+#                             args...) where {NF1,NF2}
+            
+#             for k in 1:size(Out1)[end]
+#                 Out1_layer = view(Out1,:,:,k)
+#                 Out2_layer = view(Out2,:,:,k)
+#                 In1_layer = view(In1,:,:,k)
+#                 In2_layer = view(In2,:,:,k)
+#                 In3_layer = view(In3,:,:,k)
+#                 $func_name( Out1_layer,
+#                             Out2_layer,
+#                             In1_layer,
+#                             In2_layer,
+#                             In3_layer,
+#                             args...)
+#             end
+#         end
+#     end
+# end
+
+# """Leapfrog! for 3D arrays that loops over all vertical layers."""
+# function leapfrog!( A::AbstractArray{Complex{NF},4},        # a prognostic variable (spectral)
+#                     tendency::AbstractArray{Complex{NF},3}, # tendency (dynamics + physics) of A
+#                     dt::Real,                               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+#                     C::Constants{NF},                       # struct containing all constants used at runtime
+#                     lf::Int=2                               # leapfrog index to dis/enable(default) William's filter
+#                     ) where {NF<:AbstractFloat}             # number format NF
+
+#     for k in 1:size(A)[end]                         # loop over vertical levels (last dimension)
+#         A_layer = view(A,:,:,:,k)                   # extract vertical layers as views to not allocate any memory
+#         tendency_layer = view(tendency,:,:,k)
+#         leapfrog!(A_layer,tendency_layer,dt,C,lf)   # make a timestep forward for each layer
+#     end
+# end

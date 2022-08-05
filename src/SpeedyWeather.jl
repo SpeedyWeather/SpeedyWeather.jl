@@ -51,11 +51,10 @@ module SpeedyWeather
     include("geometry.jl")                  # defines Geometry
     include("spectral_transform.jl")        # defines SpectralTransform, Geospectral
     include("spectral_gradients.jl")
-    include("distributed_vertical.jl")
 
     include("boundaries.jl")                # defines Boundaries
-    include("horizontal_diffusion.jl")      # defines HorizontalDiffusion
-    include("implicit.jl")                  # defines Implicit
+    include("define_diffusion.jl")          # defines HorizontalDiffusion
+    include("define_implicit.jl")           # defines Implicit
     include("models.jl")                    # defines ModelSetups
 
     include("prognostic_variables.jl")      # defines PrognosticVariables
@@ -68,7 +67,7 @@ module SpeedyWeather
     include("tendencies_dynamics.jl")
     include("tendencies.jl")
     include("implicit_correction.jl")
-    include("do_diffusion.jl")
+    include("diffusion.jl")
     include("feedback.jl")                  # defines Feedback
     include("output.jl")
 

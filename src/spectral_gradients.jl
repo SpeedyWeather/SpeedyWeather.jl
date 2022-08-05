@@ -1,128 +1,4 @@
 """
-    gradient_latitude!( coslat_u::AbstractArray{Complex{NF}},   # output: cos(lat)*zonal velocity u
-                        Ψ::AbstractArray{Complex{NF}},          # input: streamfunction Ψ
-                        ϵlms::AbstractArray{NF},                # recursion factors
-                        R::Real=1                               # radius of the sphere/Earth
-                        ) where {NF<:AbstractFloat}             # number format NF
-
-Meridional gradient in spectral space of spherical harmonic coefficients `Ψ` on a sphere with
-radius R. Returns `coslat_u`, i.e. the gradient ∂Ψ/∂lat with an additional cosine of latitude scaling.
-This function uses the recursion relation (0-based degree l, order m)
-
-    (coslat u)_lm = -1/R*(-(l-1)*ϵ_lm*Ψ_l-1,m + (l+2)*ϵ_l+1,m*Ψ_l+1,m ).
-    
-As u = -1/R*∂Ψ/∂lat, this function can be generally used to compute the gradient in latitude."""
-function gradient_latitude!(coslat_u::AbstractMatrix{Complex{NF}},  # output: cos(lat)*zonal velocity u
-                            Ψ::AbstractMatrix{Complex{NF}},         # input: streamfunction Ψ
-                            S::SpectralTransform{NF};               # use precomputed recursion factors
-                            flipsign::Bool=false,                   # flip the sign to obtain u from Ψ
-                            add::Bool=false                         # coslat_u += (add) or = (overwrite)
-                            ) where {NF<:AbstractFloat}             # number format NF
-
-    # u needs one more degree/meridional mode l for each m than Ψ due to the recursion
-    # Ψ can have size n+1 x n but then the last row is not used in the loop
-    lmax_out, mmax_out = size(coslat_u)
-    lmax_in,  mmax_in  = size(Ψ)
-
-    @boundscheck mmax_out == mmax_in || throw(BoundsError)
-    mmax = mmax_out - 1                 # 0-based max order m of harmonics
-
-    @boundscheck abs(lmax_out-lmax_in) <= 1 || throw(BoundsError)
-    lmax = lmax_in - 1                  # 0-based max degree l of harmonics
-    output_larger = lmax_out - lmax_in
-
-    if flipsign                     # used to get u from streamfunction Ψ (u ~ -∂Ψ/∂lat)
-        grad_y1 = S.minus_grad_y1
-        grad_y2 = S.minus_grad_y2
-    else                            # no sign flip otherwise
-        grad_y1 = S.grad_y1
-        grad_y2 = S.grad_y2
-    end
-
-    g = grad_y2[1,1]*Ψ[2,1]
-    coslat_u[1,1] = add ? coslat_u[1,1] + g : g         # l=m=0 mode only with term 2
-
-    for m in 1:mmax+1
-        for l in max(2,m):lmax
-            g = grad_y1[l,m]*Ψ[l-1,m] + grad_y2[l,m]*Ψ[l+1,m]
-            coslat_u[l,m] = add ? coslat_u[l,m] + g : g
-        end
-        for l in lmax+1:lmax+1+output_larger            # execute 2x for out > in, 1x for out == in and
-            g = grad_y1[l,m]*Ψ[l-1,m]                   # 0x for out < in
-            coslat_u[l,m] = add ? coslat_u[l,m] + g : g
-        end
-    end
-
-    return coslat_u
-end
-
-function gradient_latitude( Ψ::AbstractMatrix{Complex{NF}}, # input: streamfunction Ψ
-                            S::SpectralTransform{NF};       # precomputed gradient arrays
-                            one_more_l::Bool=true,          # allocate output with one more degree l?
-                            flipsign::Bool=false            # flip the sign to obtain u from Ψ?
-                            ) where {NF<:AbstractFloat}     # number format NF
-    _,mmax = size(Ψ) .- 1                                   # max degree l, order m of spherical harmonics
-    coslat_u = zeros(Complex{NF},mmax+one_more_l+1,mmax+1)  # preallocate output, one more l for recursion
-    return gradient_latitude!(coslat_u,Ψ,S;flipsign)        # call in-place version
-end
-
-"""
-    coslat_v = gradient_longitude!( coslat_v::AbstractMatrix{Complex{NF}},
-                                    Ψ::AbstractMatrix{Complex{NF}};
-                                    radius::Real=1
-                                    ) where {NF<:AbstractFloat}
-
-Zonal gradient in spectral space of spherical harmonic coefficients `Ψ` on a sphere with radius `radius`.
-While the zonal gradient has a 1/cos(lat) scaling in spherical coordinates, this functions omits the scaling
-such that the returned array is scaled with coslat.
-"""
-function gradient_longitude!(   coslat_v::AbstractMatrix{Complex{NF}},  # output: cos(latitude)*meridional velocity
-                                Ψ::AbstractMatrix{Complex{NF}},         # input: spectral coefficients of stream function
-                                radius::Real=1;                         # radius of the sphere/Earth
-                                add::Bool=false,                        # coslat_u += (add) or = (overwrite)
-                                flipsign::Bool=false                    # flip sign of output?
-                                ) where {NF<:AbstractFloat}             # number format NF
-
-    lmax_out, mmax_out = size(coslat_v)
-    lmax_in,  mmax_in  = size(Ψ)
-
-    @boundscheck mmax_out == mmax_in || throw(BoundsError)
-    mmax = mmax_out - 1                 # 0-based max order m of harmonics
-
-    @boundscheck abs(lmax_out-lmax_in) <= 1 || throw(BoundsError)
-    lmax = min(lmax_out,lmax_in) - 1    # 0-based max degree l of harmonics
-    output_larger = lmax_out > lmax_in
-
-    iradius⁻¹ = convert(Complex{NF},(-1)^flipsign*im/radius)            # = ±imaginary/radius converted to NF
-
-    @inbounds for m in 1:mmax+1                     # loop over all coefficients, order m
-        for l in m:lmax+1                           # degree l
-            g = (m-1)*iradius⁻¹*Ψ[l,m]              # gradient in lon = *i*m/radius but 1-based order
-            coslat_v[l,m] = add ? coslat_v[l,m] + g : g 
-        end
-    end
-
-    # if grad in lon does not project onto the last degree l, set explicitly to zero in that case
-    if output_larger & ~add
-        for m in 1:mmax+1        
-            coslat_v[end,m] = zero(Complex{NF}) 
-        end
-    end
-
-    return coslat_v
-end
-
-"""Gradient in longitude in spectral space. Input: coefficients `alms` of the spherical harmonics."""
-function gradient_longitude(Ψ::AbstractMatrix{NF},  # input array: spectral coefficients
-                            R::Real=1;              # radius of the sphere/Earth
-                            one_more_l::Bool=true   # allocate output with one more degree l
-                            ) where NF              # number format NF
-    _,mmax = size(Ψ)
-    coslat_v = zeros(NF,mmax+one_more_l,mmax)       # preallocate output array (gradient in longitude)
-    return gradient_longitude!(coslat_v,Ψ,R)        # call in-place version
-end
-
-"""
     curl!(  curl::LowerTriangularMatrix,
             u::LowerTriangularMatrix,
             v::LowerTriangularMatrix,
@@ -196,25 +72,25 @@ function _divergence!(  kernel,
                         S::SpectralTransform{NF}
                         ) where {NF<:AbstractFloat}
 
-    lmax,mmax = size(div) .- (1,1)                  # 0-based lmax,mmax 
-    @boundscheck size(u) == (lmax+2,mmax+1) || throw(BoundsError)
-    @boundscheck size(v) == (lmax+2,mmax+1) || throw(BoundsError)
+    @boundscheck size(u) == size(div) || throw(BoundsError)
+    @boundscheck size(v) == size(div) || throw(BoundsError)
 
     @unpack grad_y_vordiv1,grad_y_vordiv2 = S
-    @boundscheck size(grad_y_vordiv1) == (lmax+2,mmax+1) || throw(BoundsError)
-    @boundscheck size(grad_y_vordiv2) == (lmax+2,mmax+1) || throw(BoundsError)
+    @boundscheck size(grad_y_vordiv1) == size(div) || throw(BoundsError)
+    @boundscheck size(grad_y_vordiv2) == size(div) || throw(BoundsError)
+    lmax,mmax = size(div) .- (2,1)              # 0-based lmax,mmax 
 
     z = zero(Complex{NF})
     div[1] = kernel(div[1],z,z,z)               # l=m=0 harmonic is zero
 
     lm = 1
-    for m in 1:mmax+1                     # 1-based l,m
-        for l in max(2,m):lmax+1                    # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+    for m in 1:mmax+1                           # 1-based l,m
+        for l in max(2,m):lmax+1                # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
             lm += 1
             ∂u∂λ  = ((m-1)*im)*u[lm]
             ∂v∂θ1 = grad_y_vordiv1[lm]*v[l-1,m]
             ∂v∂θ2 = grad_y_vordiv2[lm]*v[lm+1]
-            div[l,m] = kernel(div[l,m],∂u∂λ,∂v∂θ1,∂v∂θ2)
+            div[lm] = kernel(div[lm],∂u∂λ,∂v∂θ1,∂v∂θ2)
         end
         lm += 1         # loop skips last row, add one to keep lm corresponding to l,m accordingly
     end
@@ -239,23 +115,28 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
                         S::SpectralTransform{NF}
                         ) where {NF<:AbstractFloat}
 
-    lmax,mmax = size(vor) .- (1,1)                  # 0-based lmax,mmax
-    @boundscheck size(U) == (lmax+2,mmax+1) || throw(BoundsError)
-    @boundscheck size(V) == (lmax+2,mmax+1) || throw(BoundsError)
-
     @unpack vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 = S
+    @boundscheck size(U) == size(vor) || throw(BoundsError)
+    @boundscheck size(V) == size(vor) || throw(BoundsError)
+    @boundscheck size(vordiv_to_uv_x) == size(vor) || throw(BoundsError)
+    @boundscheck size(vordiv_to_uv1) == size(vor) || throw(BoundsError)
+    @boundscheck size(vordiv_to_uv2) == size(vor) || throw(BoundsError)
+    lmax,mmax = size(vor) .- (2,1)                  # 0-based lmax,mmax
 
     U[1] = vordiv_to_uv2[1]*vor[2]                  # l=m=0 harmonic has only one contribution
     V[1] = zero(Complex{NF})                        # obtained via zonal derivative (*i*m) = 0 
 
+    lm = 1
     @inbounds for m in 1:mmax+1                     # 1-based l,m
         for l in max(2,m):lmax                      # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+            lm += 1
             # meridional gradient, u = -∂/∂lat(Ψ), omit radius R scaling
-            U[l,m] = vordiv_to_uv2[l,m]*vor[l+1,m] - vordiv_to_uv1[l,m]*vor[l-1,m]
+            U[lm] = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[l-1,m]
 
             # zonal gradient, V = ∂/∂λ(Ψ), omit radius R scaling
-            V[l,m] = im*vordiv_to_uv_x[l,m]*vor[l,m]
+            V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
         end
+        lm += 2
     end
 
     @inbounds for m in 1:mmax+1
@@ -289,27 +170,32 @@ function UV_from_vordiv!(   U::AbstractMatrix{Complex{NF}},
                             S::SpectralTransform{NF}
                             ) where {NF<:AbstractFloat}
 
-    lmax,mmax = size(vor) .- (1,1)                  # 0-based lmax,mmax
-    @boundscheck size(vor) == size(div) || throw(BoundsError)
-    @boundscheck size(U) == (lmax+2,mmax+1) || throw(BoundsError)
-    @boundscheck size(V) == (lmax+2,mmax+1) || throw(BoundsError)
-
     @unpack vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 = S
+    @boundscheck size(div) == size(vor) || throw(BoundsError)
+    @boundscheck size(U) == size(vor) || throw(BoundsError)
+    @boundscheck size(V) == size(vor) || throw(BoundsError)
+    @boundscheck size(vordiv_to_uv_x) == size(vor) || throw(BoundsError)
+    @boundscheck size(vordiv_to_uv1) == size(vor) || throw(BoundsError)
+    @boundscheck size(vordiv_to_uv1) == size(vor) || throw(BoundsError)
+    lmax,mmax = size(vor) .- (2,1)                  # 0-based lmax,mmax
 
-    U[1,1] =  vordiv_to_uv2[1,1]*vor[2,1]           # l=m=0 harmonic has only one contribution
-    V[1,1] = -vordiv_to_uv2[1,1]*div[2,1]
+    U[1] =  vordiv_to_uv2[1]*vor[2]                 # l=m=0 harmonic has only one contribution
+    V[1] = -vordiv_to_uv2[1]*div[2]
 
+    lm = 1
     @inbounds for m in 1:mmax+1                     # 1-based l,m
         for l in max(2,m):lmax                      # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
-            ∂Dλ = im*vordiv_to_uv_x[l,m]*div[l,m]   # divergence contribution to zonal gradient
-            ∂ζλ = im*vordiv_to_uv_x[l,m]*vor[l,m]   # vorticity contribution to zonal gradient
+            lm += 1
+            ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]     # divergence contribution to zonal gradient
+            ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]     # vorticity contribution to zonal gradient
 
             # div,vor contribution to meridional gradient
-            ∂ζθ = vordiv_to_uv2[l,m]*vor[l+1,m] - vordiv_to_uv1[l,m]*vor[l-1,m]
-            ∂Dθ = vordiv_to_uv1[l,m]*div[l-1,m] - vordiv_to_uv2[l,m]*div[l+1,m]
-            U[l,m] = ∂Dλ + ∂ζθ
-            V[l,m] = ∂ζλ + ∂Dθ
+            ∂ζθ = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[l-1,m]
+            ∂Dθ = vordiv_to_uv1[lm]*div[l-1,m] - vordiv_to_uv2[lm]*div[lm+1]
+            U[lm] = ∂Dλ + ∂ζθ
+            V[lm] = ∂ζλ + ∂Dθ
         end
+        lm += 2
     end
 
     @inbounds for m in 1:mmax+1
@@ -374,21 +260,29 @@ The spherical Laplace operator is generally
     ∇⁻²alms = alms*(-l(l+1))/R²
 
 with the degree `l` (0-based) of the Legendre polynomial."""
-function ∇²!(   ∇²alms::AbstractMatrix{Complex{NF}},    # Output: Laplacian of alms
-                alms::AbstractMatrix{Complex{NF}},      # spectral coefficients
-                S::SpectralTransform{NF}                # precomputed arrays for spectral space
+function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: Laplacian of alms
+                alms::LowerTriangularMatrix{Complex{NF}},   # Input: spectral coefficients
+                S::SpectralTransform{NF};                   # precomputed eigenvalues
+                add::Bool=false,                            # add to output array or overwrite
+                flipsign::Bool=false,                       # -∇² or ∇²
                 ) where {NF<:AbstractFloat}
 
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
-    lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
+    lmax,mmax = size(alms) .- (2,1)     # degree l, order m of the Legendre polynomials
     
     @unpack eigenvalues = S
     @boundscheck length(eigenvalues) >= lmax+1 || throw(BoundsError)
 
+    kernel(o,a) = flipsign ? (add ? (o-a) : -a) :
+                             (add ? (o+a) :  a)    
+
+    lm = 0
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
         for l in m:lmax+1           # degree l = m:lmax but 1-based
-            ∇²alms[l,m] = alms[l,m]*eigenvalues[l]
+            lm += 1
+            ∇²alms[lm] = kernel(∇²alms[lm],alms[lm]*eigenvalues[l])
         end
+        lm += 1
     end
 
     return ∇²alms

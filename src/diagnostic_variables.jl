@@ -17,11 +17,12 @@ function Base.zeros(::Type{Tendencies},
     
     @unpack nlon, nlat = G
     @unpack lmax, mmax = S
-        
-    vor_tend    = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)     # vorticity
-    div_tend    = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)     # divergence
-    temp_tend   = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)     # absolute Temperature
-    humid_tend  = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)     # specific humidity
+    
+    # use one more l for size compat with vector quantities
+    vor_tend    = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)     # vorticity
+    div_tend    = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)     # divergence
+    temp_tend   = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)     # absolute Temperature
+    humid_tend  = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)     # specific humidity
     u_tend      = zeros(NF,nlon,nlat)                                         # zonal velocity
     v_tend      = zeros(NF,nlon,nlat)                                         # meridional velocity
 
@@ -132,7 +133,7 @@ function Base.zeros(::Type{DynamicsVariables},
 
     # SHALLOW WATER (bernoulli is a scalar quantity of size lmax+1,mmax+1)
     bernoulli_grid   = zeros(NF,nlon,nlat)
-    bernoulli        = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+    bernoulli        = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
     uh_coslat⁻¹_grid = zeros(NF,nlon,nlat)
     vh_coslat⁻¹_grid = zeros(NF,nlon,nlat)
@@ -208,7 +209,7 @@ function Base.zeros(::Type{SurfaceVariables},
     @unpack lmax, mmax = S
 
     pres_grid = zeros(NF,nlon,nlat)
-    pres_tend = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+    pres_tend = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
     return SurfaceVariables(pres_grid,pres_tend)
 end

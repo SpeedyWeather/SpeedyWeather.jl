@@ -289,7 +289,7 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
     @unpack recompute_legendre, Λ, Λs = S
     @unpack brfft_plan = S
 
-    @boundscheck (lmax, mmax) <= size(Λ) .- 1 || throw(BoundsError) # -1 for 0-based lmax,mmax
+    @boundscheck size(alms) == size(Λ) || throw(BoundsError) # -1 for 0-based lmax,mmax
     @boundscheck mmax+1 <= nfreq || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
 
@@ -311,7 +311,7 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
 
             for l in m:lmax+1               # Σ_{l=m}^{lmax}, but 1-based index
                 lm += 1                     # next non-zero coeffs
-                term = alms[lm] * Λ_ilat[l,m]# Legendre polynomials in Λ at latitude
+                term = alms[lm] * Λ_ilat[lm]# Legendre polynomials in Λ at latitude
                 accn += term
                 accs += isodd(l+m) ? -term : term   # flip sign for southern odd wavenumbers
             end
@@ -422,7 +422,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
             for l in m:lmax+1
                 lm += 1                                             # next coefficient of spherical harmonics
                 c = isodd(l+m) ? an - as : an + as                  # odd/even wavenumbers
-                alms[lm] += c * Λ_ilat[l,m]                         # Legendre polynomials in Λ at latitude
+                alms[lm] += c * Λ_ilat[lm]                          # Legendre polynomials in Λ at latitude
             end
         end
     end
