@@ -2,19 +2,28 @@
 
     # BAROTROPIC MODEL
     progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:barotropic)
-    @test all(progn.vor .== 0)
+    for layers in progn.layers
+        for leapfrog in layers.leapfrog
+            @test all(leapfrog.vor .== 0)
+        end
+    end
 
-    """ TODO: uncomment when models are properly defined
     # SHALLOW WATER MODEL
     progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:shallowwater)
-    @test all(progn.vor .== 0)
-    @test all(progn.div .== 0)
-    @test all(progn.pres .== 0)
+    for layers in progn.layers
+        for leapfrog in layers.leapfrog
+            @test all(leapfrog.vor .== 0)
+            @test all(leapfrog.div .== 0)
+        end
+    end
+    @test all(progn.pres.leapfrog[1] .== 0)
+    @test all(progn.pres.leapfrog[2] .== 0)
 
-    # PRIMITIVE EQUATION MODEL
-    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:primitive)
-    @test all(progn.vor .== 0)
+    # # PRIMITIVE EQUATION MODEL
+    # progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:primitive)
+    # @test all(progn.vor .== 0)
 
+    """
     S = model.geospectral.spectral_transform
     k = model.parameters.nlev       # test surface layer only at the moment
     lf = 1                          # first leapfrog index

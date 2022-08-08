@@ -20,62 +20,53 @@ end
 spectral_resolutions = (31,42,85,170)
 
 @testset "Transform: l=0,m=0 is constant > 0" begin
-
-    # Test for variable resolution
     for trunc in spectral_resolutions
-    
-        NF = Float64
-        P = Parameters(recompute_legendre=true;NF,trunc)
-        G = GeoSpectral(P)
-        S = G.spectral_transform
+        for NF in (Float32,Float64)
 
-        alms = zeros(Complex{NF},S.lmax+1,S.mmax+1)
-        alms[1,1] = 1
+            p,d,m = initialize_speedy(NF;trunc)
+            S = m.spectral_transform
 
-        map = gridded(alms,S)
+            alms = copy(p.layers[1].leapfrog[1].vor)
+            fill!(alms,0)
+            alms[1,1] = 1
+
+            map = gridded(alms,S)
         
-        for i in eachindex(map)
-            @test map[i] == map[1] > zero(NF)
+            for i in eachindex(map)
+                @test map[i] == map[1] > zero(NF)
+            end
         end
     end
 end
 
 @testset "Transform: Recompute, precompute identical results" begin
-
-    # Test for variable resolution
     for trunc in spectral_resolutions
-    
-        NF = Float64
-        P1 = Parameters(recompute_legendre=true;NF,trunc)
-        G1 = GeoSpectral(P1)
-        S1 = G1.spectral_transform
+        for NF in (Float32,Float64)
+            p1,d1,m1 = initialize_speedy(NF;trunc,recompute_legendre=false)
+            p2,d2,m2 = initialize_speedy(NF;trunc,recompute_legendre=true)
 
-        P2 = Parameters(recompute_legendre=false;NF,trunc)
-        G2 = GeoSpectral(P2)
-        S2 = G2.spectral_transform
+            alms = copy(p1.layers[1].leapfrog[1].vor)
+            alms .= randn(Complex{NF},size(alms)...)
 
-        alms = rand(Complex{NF},S1.lmax+1,S1.mmax+1)
-        map1 = gridded(alms,S1)
-        map2 = gridded(alms,S2)
+            map1 = gridded(alms,m1.spectral_transform)
+            map2 = gridded(alms,m2.spectral_transform)
         
-        @test map1 == map2
+            # is only approx as recompute_legendre may use a different precision
+            @test map1 ≈ map2
+        end
     end
 end
 
 @testset "Transform: Individual Legendre polynomials" begin
-
-    # Test for variable resolution
-    for trunc in spectral_resolutions
-    
+    @testset for trunc in spectral_resolutions
         for NF in (Float32,Float64)
             P = Parameters(;NF,trunc)
-            G = GeoSpectral(P)
-            S = G.spectral_transform
+            S = SpectralTransform(P)
 
             lmax = 3
             for l in 1:lmax
                 for m in 1:l
-                    alms = zeros(Complex{NF},S.lmax+1,S.mmax+1)
+                    alms = zeros(LowerTriangularMatrix{Complex{NF}},S.lmax+2,S.mmax+1)
                     alms[l,m] = 1
 
                     map = gridded(alms,S)

@@ -1,3 +1,10 @@
 @testset "Zero generators" begin
-    P = zeros(PrognosticVariables{Float32},5,5,3)
+    @testset for NF in (Float32,Float64)
+        P = Parameters(;NF)
+        G = Geometry(P)
+        S = SpectralTransform(P)
+        
+        P = zeros(PrognosticVariables{NF},5,5,3)
+        P = zeros(DiagnosticVariables,G,S)
+    end
 end
