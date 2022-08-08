@@ -128,10 +128,9 @@ end
 
 Truncate spectral coefficients `alms` in-place by setting (a) the upper right triangle to zero and (b)
 all coefficients for which the degree l is larger than the truncation `trunc`."""
-function spectral_truncation!(  alms::AbstractMatrix{NF},       # spectral field to be truncated
-                                trunc::Int                      # truncate to degree/order trunc
-                                ) where NF                      # number format NF (can be complex)
-    return spectral_truncation!(alms,trunc,trunc)               # use trunc=ltrunc=mtrunc
+function spectral_truncation!(  alms::AbstractMatrix,   # spectral field to be truncated
+                                trunc::Int)             # truncate to degree/order trunc
+    return spectral_truncation!(alms,trunc,trunc)       # use trunc=ltrunc=mtrunc
 end
 
 """
@@ -167,7 +166,7 @@ function spectral_truncation(   alms::AbstractArray{NF},    # spectral field to 
     size_alms_new[1] = ltrunc+1                     # new (smaller) size
     size_alms_new[2] = mtrunc+1
     size_alms_new = tuple(size_alms_new...)
-    alms_trunc = Array{NF}(undef,size_alms_new...)  # preallocate new (smaller) array
+    alms_trunc = LowerTriangularMatrix{NF}(undef,size_alms_new...)  # preallocate new (smaller) array
 
     # copy data over
     copyto!(alms_trunc,@view(alms[CartesianIndices(size_alms_new)]))
@@ -205,7 +204,7 @@ function spectral_interpolation(alms::AbstractArray{NF},    # spectral field to 
     size_alms_new[1] = ltrunc+1                     # new size
     size_alms_new[2] = mtrunc+1
     size_alms_new = tuple(size_alms_new...)         # convert back to tuple
-    alms_trunc = zeros(NF,size_alms_new...)         # allocate new (larger) array
+    alms_trunc = zeros(LowerTriangularMatrix{NF},size_alms_new...)  # allocate new (larger) array
 
     # copy data over
     copyto!(@view(alms_trunc[CartesianIndices(size_alms)]),alms)
