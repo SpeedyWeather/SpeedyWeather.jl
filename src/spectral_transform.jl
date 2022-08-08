@@ -34,7 +34,7 @@ struct SpectralTransform{NF<:AbstractFloat}
 
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool                # Pre or recompute Legendre polynomials
-    Λ::LowerTriangularMatrix{NF}            # Legendre polynomials for one latitude (requires recomputing)
+    Λ::LowerTriangularMatrix{Float64}       # Legendre polynomials for one latitude (requires recomputing)
     Λs::Vector{LowerTriangularMatrix{NF}}   # Legendre polynomials for all latitudes (all precomputed)
     legendre_weights::Vector{NF}            # Legendre weights (extra normalisation of π/nlat included)
 
@@ -250,17 +250,18 @@ Base on `recompute_legendre` (true/false) this function either updates the Legen
 `Λ` for a given latitude `ilat, cos_colat` by recomputation (`recompute_legendre == true`), or
 `Λ` is changed by creating a view on the corresponding latitude in precomputed `Λs`.
 Recomputation takes usually longer, but precomputation requires a large amount of memory for high resolution."""
-function get_legendre_polynomials!( Λ::LowerTriangularMatrix{NF},           # Out: Polynomials at lat
-                                    Λs::Vector{LowerTriangularMatrix{NF}},  # Precomputed polynomials
+function get_legendre_polynomials!( Λ::LowerTriangularMatrix{NF1},          # Out: Polynomials at lat
+                                    Λs::Vector{LowerTriangularMatrix{NF2}}, # Precomputed polynomials
                                     ilat::Int,                              # latitude index
-                                    cos_colat::NF,                          # cosine of colatitude
+                                    cos_colat::Real,                        # cosine of colatitude
                                     recompute_legendre::Bool                # recompute ignores Λs, but uses cos_colat
-                                    ) where NF                              # Number format NF
+                                    ) where {NF1,NF2}                       # number formats
 
     if recompute_legendre
         # Recalculate the (normalized) λ_l^m(cos(colat)) factors of the ass. Legendre polynomials
         lmax,mmax = size(Λ) .- 1
-        AssociatedLegendrePolynomials.λlm!(Λ, lmax, mmax, cos_colat)
+        cos_colat_NF = convert(NF1,cos_colat)
+        AssociatedLegendrePolynomials.λlm!(Λ, lmax, mmax, cos_colat_NF)
         return Λ
     else    # view on precomputed values
         return Λs[ilat]
@@ -280,16 +281,18 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
                     S::SpectralTransform{NF}                    # precomputed parameters struct
                     ) where {NF<:AbstractFloat}                 # number format NF
 
+    @unpack cos_colat, lon_offset = S
+    @unpack recompute_legendre, Λ, Λs = S
+    @unpack brfft_plan = S
+
+    recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
+    recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
+
     lmax, mmax = size(alms) .- 1            # maximum degree l, order m of spherical harmonics
     nlon, nlat = size(map)                  # number of longitudes, latitudes in grid space
     nlat_half = (nlat+1) ÷ 2                # half the number of longitudes
     nfreq = nlon÷2 + 1                      # Number of fourier frequencies (real FFTs)
 
-    @unpack cos_colat, lon_offset = S
-    @unpack recompute_legendre, Λ, Λs = S
-    @unpack brfft_plan = S
-
-    @boundscheck size(alms) == size(Λ) || throw(BoundsError) # -1 for 0-based lmax,mmax
     @boundscheck mmax+1 <= nfreq || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
 
@@ -383,16 +386,17 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
                     S::SpectralTransform{NF}
                     ) where {NF<:AbstractFloat}
     
-    lmax, mmax = size(alms) .- 1            # maximum degree l, order m of spherical harmonics
-    nlon, nlat = size(map)                  # number of longitudes, latitudes in grid space
-    nlat_half = (nlat+1) ÷ 2                # half the number of longitudes
-    nfreq = nlon÷2 + 1                      # Number of fourier frequencies (real FFTs)
-
     @unpack cos_colat, sin_colat, lon_offset = S
     @unpack recompute_legendre, Λ, Λs, legendre_weights = S
     @unpack rfft_plan = S
     
-    @boundscheck (lmax, mmax) <= size(Λ) .- 1 || throw(BoundsError)
+    recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
+    recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
+
+    lmax, mmax = size(alms) .- 1            # maximum degree l, order m of spherical harmonics
+    nlon, nlat = size(map)                  # number of longitudes, latitudes in grid space
+    nlat_half = (nlat+1) ÷ 2                # half the number of longitudes
+    nfreq = nlon÷2 + 1                      # Number of fourier frequencies (real FFTs)
     @boundscheck mmax+1 <= nfreq || throw(BoundsError)
 
     # preallocate work warrays
@@ -439,7 +443,6 @@ on the size of `map` this function retrieves the corresponding spectral resoluti
 truncation and sets up a SpectralTransform struct `S` to execute `spectral(map,S)`."""
 function spectral(  map::AbstractMatrix{NF};        # gridded field nlon x nlat
                     recompute_legendre::Bool=true,  # saves memory
-                    kwargs...                       # additional keyword arguments
                     ) where NF                      # number format NF
 
     # check grid is compatible with triangular spectral truncation
@@ -453,7 +456,7 @@ function spectral(  map::AbstractMatrix{NF};        # gridded field nlon x nlat
     # allocate spectral transform struct
     radius = 1  # only needed for argument compatibility
     S = SpectralTransform(NF,nlon,nlat,trunc,radius,recompute_legendre)
-    return spectral(map,S;kwargs...)
+    return spectral(map,S)
 end
 
 """
@@ -463,8 +466,7 @@ Forward spectral transform (grid to spectral space) from the gridded field `map`
 grid (with Gaussian latitudes) and the SpectralTransform struct `S` into the spectral coefficients of
 the Legendre polynomials `alms`. This function allocates `alms` and executes `spectral!(alms,map,S)`."""
 function spectral(  map::AbstractMatrix{NF},    # gridded field nlon x nlat
-                    S::SpectralTransform{NF};   # spectral transform struct
-                    one_more_l::Bool=false      # additional degree l for recursion?
+                    S::SpectralTransform{NF},   # spectral transform struct
                     ) where NF                  # number format NF
 
     # check grid is compatible with triangular spectral truncation
@@ -472,6 +474,7 @@ function spectral(  map::AbstractMatrix{NF},    # gridded field nlon x nlat
     @boundscheck nlon == 2nlat || throw(BoundsError)
     @boundscheck nlon == S.nlon || throw(BoundsError)
 
-    alms = LowerTriangularMatrix{Complex{NF}}(undef,S.lmax+1+one_more_l,S.mmax+1)
+    # always use one more l for consistency with 
+    alms = LowerTriangularMatrix{Complex{NF}}(undef,S.lmax+2,S.mmax+1)
     return spectral!(alms,map,S)                # in-place version
 end
