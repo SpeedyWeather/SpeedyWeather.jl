@@ -1,5 +1,13 @@
+"""
+    nothing = initialize_implicit!(::Real,::BarotropicModel)
+
+Just passes, as implicit terms are not used in the barotropic model."""
 initialize_implicit!(::Real,::BarotropicModel) = nothing
 
+"""
+    initialize_implicit!(dt::Real,M::BarotropicModel)
+
+Update the implicit terms in `M` for the shallow water model as they depend on the time step `dt`."""
 function initialize_implicit!(  dt::Real,                   # time step to update implicit terms with
                                 M::ShallowWaterModel{NF}    # update Implicit struct in M
                                 ) where NF
@@ -20,6 +28,16 @@ function initialize_implicit!(  dt::Real,                   # time step to updat
     end
 end
 
+"""
+    implicit_correction!(   diagn::DiagnosticVariablesLayer,
+                            progn::PrognosticVariablesLeapfrog,
+                            surface::SurfaceVariables,
+                            pres::SurfaceLeapfrog,
+                            M::ShallowWaterModel)
+
+Apply correction to the tendencies in `diag` to prevent the gravity waves from amplifying.
+The correction is implicitly evaluated using the parameter `implicit_α` to switch between
+forward, centered implicit or backward evaluation of the gravity wave terms."""
 function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
                                 progn::PrognosticVariablesLeapfrog{NF},
                                 surface::SurfaceVariables{NF},
@@ -34,7 +52,7 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
     @unpack pres_tend = surface             # tendency of pressure/η
 
     @unpack g∇²,ξg∇²,div_impl = M.implicit
-    ξH₀ = M.implicit.ξH₀[1]
+    ξH₀ = M.implicit.ξH₀[1]                 # unpack as it's stored in a vec for mutation
     H₀ = M.constants.layer_thickness
 
     @boundscheck size(div_old) == size(div_new) || throw(BoundsError)
@@ -48,14 +66,13 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
     @boundscheck length(g∇²) == lmax+2 || throw(BoundsError)
 
     lm = 0
-    for m in 1:mmax+1
+    @inbounds for m in 1:mmax+1
         for l in m:lmax+1
-            lm += 1
+            lm += 1     # single index lm corresponding to harmonic l,m with a LowerTriangularMatrix
             G_div = div_tend[lm] - g∇²[l]*(pres_old[lm] - pres_new[lm])
             G_η   = pres_tend[lm] - H₀*(div_old[lm] - div_new[lm])
-            δdiv = (G_div - ξg∇²[l]*G_η)*div_impl[l]
-            div_tend[lm] = δdiv
-            pres_tend[lm] = G_η - ξH₀*δdiv
+            div_tend[lm] = (G_div - ξg∇²[l]*G_η)*div_impl[l]
+            pres_tend[lm] = G_η - ξH₀*div_tend[lm]
         end
         lm += 1     # loop skips last row
     end
