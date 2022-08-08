@@ -170,31 +170,37 @@ function write_netcdf_variables!(   i_out::Integer,
                                     diagn::DiagnosticVariables,
                                     M::ShallowWaterModel)
 
-    # CONVERT TO FLOAT32 FOR OUTPUT
-    @unpack U_grid,V_grid,vor_grid,div_grid,pres_grid = diagn.grid_variables
-    u_output = convert.(Float32,U_grid)
-    v_output = convert.(Float32,V_grid)
-    vor_output = convert.(Float32,vor_grid)
-    div_output = convert.(Float32,div_grid)
-    pres_output = convert.(Float32,pres_grid)
+    for (k,diagn_layer) in enumerate(diagn.layers)
 
-    # UNSCALE SCALED VARIABLES
-    scale_coslat⁻¹!(u_output,M.geospectral.geometry)
-    scale_coslat⁻¹!(v_output,M.geospectral.geometry)
-    vor_output ./= M.geospectral.geometry.radius_earth
-    div_output ./= M.geospectral.geometry.radius_earth
+        # CONVERT TO FLOAT32 FOR OUTPUT
+        @unpack U_grid,V_grid,vor_grid,div_grid = diagn_layer.grid_variables
+        u_output = convert.(Float32,U_grid)
+        v_output = convert.(Float32,V_grid)
+        vor_output = convert.(Float32,vor_grid)
+        div_output = convert.(Float32,div_grid)
 
-    # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
-    @unpack keepbits = M.parameters
-    for var in (u_output,v_output,vor_output,div_output,pres_output)
-        round!(var,keepbits)
+        # UNSCALE SCALED VARIABLES
+        scale_coslat⁻¹!(u_output,M.geometry)
+        scale_coslat⁻¹!(v_output,M.geometry)
+        vor_output ./= M.geometry.radius_earth
+        div_output ./= M.geometry.radius_earth
+
+        # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
+        @unpack keepbits = M.parameters
+        for var in (u_output,v_output,vor_output,div_output)
+            round!(var,keepbits)
+        end
+
+        # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
+        NetCDF.putvar(netcdf_file,"u",  u_output,  start=[1,1,k,i_out],count=[-1,-1,-1,1])
+        NetCDF.putvar(netcdf_file,"v",  v_output,  start=[1,1,k,i_out],count=[-1,-1,-1,1])
+        NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,k,i_out],count=[-1,-1,-1,1])
+        NetCDF.putvar(netcdf_file,"div",div_output,start=[1,1,k,i_out],count=[-1,-1,-1,1])
     end
 
-    # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
-    NetCDF.putvar(netcdf_file,"u",  u_output,  start=[1,1,1,i_out],count=[-1,-1,-1,1])
-    NetCDF.putvar(netcdf_file,"v",  v_output,  start=[1,1,1,i_out],count=[-1,-1,-1,1])
-    NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
-    NetCDF.putvar(netcdf_file,"div",div_output,start=[1,1,1,i_out],count=[-1,-1,-1,1])
+    # surface pressure, i.e. interface displacement η
+    pres_output = convert.(Float32,diagn.surface.pres_grid)
+    round!(pres_output,M.parameters.keepbits)
     NetCDF.putvar(netcdf_file,"pres",pres_output,start=[1,1,i_out],count=[-1,-1,1])
 end
 
@@ -211,30 +217,30 @@ function write_restart_file(time_sec::Real,
     scale!(progn,:vor,1/radius_earth)
     scale!(progn,:div,1/radius_earth)
 
-    # # remove 2nd leapfrog step (compression makes the restart file then smaller)
-    # fill!(@view(progn.vor[:,:,2,:]),0)
+    # COMPRESSION OF RESTART FILE
+    @unpack keepbits = M.parameters
+    for layer in progn.layers
+        # bitround 1st leapfrog step to output precision
+        round!(layer.leapfrog[1].vor,keepbits)
+        round!(layer.leapfrog[1].div,keepbits)
+        round!(layer.leapfrog[1].temp,keepbits)
+        round!(layer.leapfrog[1].humid,keepbits)
 
-    # if M isa Union{ShallowWaterModel,PrimitiveEquationModel}
-    #     fill!(@view(progn.div[:,:,2,:]),0)
-    #     fill!(@view(progn.pres[:,:,2,:]),0)
-    # end
+        # remove 2nd leapfrog step
+        fill!(layer.leapfrog[2].vor,0)
+        fill!(layer.leapfrog[2].div,0)
+        fill!(layer.leapfrog[2].temp,0)
+        fill!(layer.leapfrog[2].humid,0)
+    end
 
-    # if M isa PrimitiveEquationModel
-    #     fill!(@view(progn.temp[:,:,2,:]),0)
-    #     fill!(@view(progn.humid[:,:,2,:]),0)
-    # end
-
-    # bitround to output precision
-    # all_progn_variables = (getproperty(progn,prop) for prop in propertynames(progn))
-
-    # @unpack keepbits = M.parameters
-    # for var in all_progn_variables
-    #     round!(var,keepbits)
-    # end 
+    # same for surface pressure
+    round!(progn.pres.leapfrog[1],keepbits)
+    fill!(progn.pres.leapfrog[2],0)
 
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
         f["prognostic_variables"] = progn
         f["time"] = M.parameters.output_startdate + Dates.Second(time_sec)
         f["version"] = M.parameters.version
+        f["description"] = "Restart file created for SpeedyWeather.jl"
     end
 end

@@ -99,7 +99,7 @@ The default values of the keywords define the default model setup.
     version::VersionNumber=VersionNumber(TOML.parsefile("Project.toml")["version"])
 
     # RESTART
-    write_restart::Bool=true        # also write restart file if output==true?
+    write_restart::Bool=output      # also write restart file if output==true?
     restart_path::String=out_path   # path for restart file
     restart_id::Integer=1           # run_id of restart file in run????/restart.jld2
 end

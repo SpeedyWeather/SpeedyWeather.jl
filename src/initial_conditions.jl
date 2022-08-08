@@ -1,4 +1,8 @@
-"""Initialize prognostic variables from rest or restart from file."""
+"""
+    prognostic_variables = initial_conditions(M::ModelSetup)
+
+Initialize the prognostic variables from rest, with some initial vorticity,
+or restart from file."""
 function initial_conditions(M::ModelSetup)
 
     progn = initialize_from_rest(M)             # allocate variables in any case
@@ -10,12 +14,9 @@ function initial_conditions(M::ModelSetup)
 
     elseif initial_conditions == :barotropic_vorticity              # zonal wind with perturbation
         for progn_layer in progn.layers
-            progn_layer.leapfrog[1].vor[2,1]  = -20/radius_earth   # zonal wind
-            progn_layer.leapfrog[1].vor[4,1]  =  60/radius_earth
-            progn_layer.leapfrog[1].vor[6,1]  = -80/radius_earth
-            progn_layer.leapfrog[1].vor[8,1]  =  40/radius_earth
-            progn_layer.leapfrog[1].vor[10,1] = -5/radius_earth
-
+            progn_layer.leapfrog[1].vor[4,1]  =  80/radius_earth    # zonal wind
+            progn_layer.leapfrog[1].vor[6,1]  = -160/radius_earth
+            progn_layer.leapfrog[1].vor[8,1]  =  80/radius_earth
                                                                     # perturbation
             progn_layer.leapfrog[1].vor[5:15,2:15] .= 10/radius_earth*randn(ComplexF64,11,14);
         end
@@ -62,25 +63,36 @@ function initialize_from_rest(M::PrimitiveEquationModel)
     return progn
 end
 
-function initialize_from_file!(progn::PrognosticVariables{T},M::ModelSetup) where T
+function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup) where NF
     @unpack restart_path, restart_id = M.parameters
     restart_file = jldopen(joinpath(restart_path,@sprintf("run%04d",restart_id),"restart.jld2"))
-    progn = restart_file["prognostic_variables"]
+    progn_old = restart_file["prognostic_variables"]
     version = restart_file["version"]   # currently unused, TODO check for compat with version
     time = restart_file["time"]         # currently unused
 
-    @unpack lmax,mmax = M.spectral_transform
-    vor = spectral_truncation(progn.vor,lmax)
+    # SPECTRAL TRUNCATION/INTERPOLATION to new resolution and conversion to NF
+    for (layer_old,layer_new) in zip(progn_old.layers,progn_new.layers)
 
-    # check whether they are not dummy arrays, truncate/interpolate to match resolution
-    div   = prod(size(progn.div)) > 1   ? spectral_truncation(progn.div,  lmax) : progn.div
-    temp  = prod(size(progn.temp)) > 1  ? spectral_truncation(progn.temp, lmax) : progn.temp
-    pres  = prod(size(progn.div)) > 1   ? spectral_truncation(progn.pres, lmax) : progn.pres
-    humid = prod(size(progn.humid)) > 1 ? spectral_truncation(progn.humid,lmax) : progn.humid
+        layer_old_lf1 = layer_old.leapfrog[1]
+        layer_new_lf1 = layer_new.leapfrog[1]
 
-    # conversion to NF happens here
-    @unpack NF = M.parameters
-    return PrognosticVariables{NF}(vor,div,temp,pres,humid)
+        vars_old = (getproperty(layer_old_lf1,prop) for prop in propertynames(layer_old_lf1))
+        vars_new = (getproperty(layer_new_lf1,prop) for prop in propertynames(layer_new_lf1))
+    
+        for (var_old,var_new) in zip(vars_old,vars_new)
+            lmax,mmax = size(var_new) .- (2,1)
+            var_old_trunc = spectral_truncation(var_old,lmax+1,mmax)
+            var_new .= convert(LowerTriangularMatrix{Complex{NF}},var_old_trunc)
+        end
+    end
+
+    # same for surface pressure
+    pres = progn_new.pres.leapfrog[1]
+    lmax,mmax = size(pres) .- (2,1)
+    pres .= convert(LowerTriangularMatrix{Complex{NF}},
+                                    spectral_truncation(progn_old.pres.leapfrog[1],lmax+1,mmax))
+
+    return progn_new
 end
 
 # """Initialize spectral temperature from surface absolute temperature and constant
