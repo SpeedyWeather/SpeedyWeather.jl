@@ -1,3 +1,11 @@
+"""
+    I = Implicit(   ξH₀::Vector{NF}
+                    g∇²::Vector{NF}
+                    ξg∇²::Vector{NF}
+                    div_impl::Vector{NF})
+
+Struct that holds various precomputed arrays for the implicit correction to
+prevent gravity waves from amplifying. See generator function for details."""
 struct Implicit{NF<:AbstractFloat}
     ξH₀::Vector{NF}
     g∇²::Vector{NF}
@@ -5,6 +13,13 @@ struct Implicit{NF<:AbstractFloat}
     div_impl::Vector{NF}
 end
 
+"""
+    I = Implicit(   P::Parameters,
+                    C::Constants,
+                    S::SpectralTransform)
+
+Generator function for an `Implicit` struct, which holds precomputed arrays for
+the implicit correction that """
 function Implicit(  P::Parameters,
                     C::Constants{NF},
                     S::SpectralTransform{NF}
@@ -19,6 +34,9 @@ function Implicit(  P::Parameters,
     # α = 0   means the implicit terms (gravity waves) are evaluated at i-1 (forward)
     # α = 0.5 evaluates at i+1 and i-1 (centered implicit)
     # α = 1   evaluates at i+1 (backward implicit)
+    # α ∈ [0.5,1] are also possible which controls the strength of the gravity wave dampening.
+    # α = 0.5 only prevents the waves from amplifying
+    # α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
 
     ξ = 2implicit_α*Δt              # = [0,2Δt], time step within [forward,backward] range for implicit terms
     g∇² = gravity*eigenvalues       # = -gl(l+1), gravity g, degree l of harmonics
