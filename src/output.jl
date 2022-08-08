@@ -159,9 +159,9 @@ function write_netcdf_variables!(   i_out::Integer,
         end
 
         # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
-        NetCDF.putvar(netcdf_file,"u",u_output,start=[1,1,k,i_out],count=[-1,-1,-1,1])
-        NetCDF.putvar(netcdf_file,"v",v_output,start=[1,1,k,i_out],count=[-1,-1,-1,1])
-        NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,k,i_out],count=[-1,-1,-1,1])
+        NetCDF.putvar(netcdf_file,"u",u_output,start=[1,1,k,i_out],count=[-1,-1,1,1])
+        NetCDF.putvar(netcdf_file,"v",v_output,start=[1,1,k,i_out],count=[-1,-1,1,1])
+        NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,k,i_out],count=[-1,-1,1,1])
     end
 end
 
@@ -192,10 +192,10 @@ function write_netcdf_variables!(   i_out::Integer,
         end
 
         # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
-        NetCDF.putvar(netcdf_file,"u",  u_output,  start=[1,1,k,i_out],count=[-1,-1,-1,1])
-        NetCDF.putvar(netcdf_file,"v",  v_output,  start=[1,1,k,i_out],count=[-1,-1,-1,1])
-        NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,k,i_out],count=[-1,-1,-1,1])
-        NetCDF.putvar(netcdf_file,"div",div_output,start=[1,1,k,i_out],count=[-1,-1,-1,1])
+        NetCDF.putvar(netcdf_file,"u",  u_output,  start=[1,1,k,i_out],count=[-1,-1,1,1])
+        NetCDF.putvar(netcdf_file,"v",  v_output,  start=[1,1,k,i_out],count=[-1,-1,1,1])
+        NetCDF.putvar(netcdf_file,"vor",vor_output,start=[1,1,k,i_out],count=[-1,-1,1,1])
+        NetCDF.putvar(netcdf_file,"div",div_output,start=[1,1,k,i_out],count=[-1,-1,1,1])
     end
 
     # surface pressure, i.e. interface displacement η
