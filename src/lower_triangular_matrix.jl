@@ -116,6 +116,15 @@ function LowerTriangularMatrix(M::AbstractMatrix{T}) where T
     return L
 end
 
+Base.copy(L::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix(L)
+
+function LowerTriangularMatrix(M::LowerTriangularMatrix{T}) where T
+    m,n = size(M)
+    L = LowerTriangularMatrix{T}(undef,m,n)
+    L.v .= M.v  # copy data over
+    return L
+end
+
 function Base.convert(::Type{LowerTriangularMatrix{T1}},L::LowerTriangularMatrix{T2}) where {T1,T2}
     return LowerTriangularMatrix{T1}(L.v,L.m,L.n)
 end
@@ -131,3 +140,5 @@ function Base.fill!(L::LowerTriangularMatrix{T}, x) where T
         L[i] = xT
     end
 end
+
+
