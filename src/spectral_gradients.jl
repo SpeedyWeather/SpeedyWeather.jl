@@ -163,10 +163,10 @@ Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity and
 velocity potential from divergence. Then compute zonal and meridional gradients
 to get U,V."""
-function UV_from_vordiv!(   U::AbstractMatrix{Complex{NF}},
-                            V::AbstractMatrix{Complex{NF}},
-                            vor::AbstractMatrix{Complex{NF}},
-                            div::AbstractMatrix{Complex{NF}},
+function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
+                            V::LowerTriangularMatrix{Complex{NF}},
+                            vor::LowerTriangularMatrix{Complex{NF}},
+                            div::LowerTriangularMatrix{Complex{NF}},
                             S::SpectralTransform{NF}
                             ) where {NF<:AbstractFloat}
 
@@ -210,42 +210,42 @@ function UV_from_vordiv!(   U::AbstractMatrix{Complex{NF}},
 end
 
 # In-place update of spectral coeffs alms with their (inverse) Laplace operator-ed version 
-∇⁻²!(alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigenvalues⁻¹
-∇²!( alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigenvalues
+# ∇⁻²!(alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigenvalues⁻¹
+# ∇²!( alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigenvalues
 
-"""
-    ∇⁻²!(   ∇⁻²alms::AbstractMatrix{Complex},
-            alms::AbstractMatrix{Complex},
-            S::SpectralTransform)
+# """
+#     ∇⁻²!(   ∇⁻²alms::AbstractMatrix{Complex},
+#             alms::AbstractMatrix{Complex},
+#             S::SpectralTransform)
 
-Inverse Laplace operator ∇⁻² applied to the spectral coefficients `alms` in spherical
-coordinates. The radius `R` is omitted in the eigenvalues which are precomputed in `S`.
-∇⁻²! is the in-place version which directly stores the output in the first argument `∇⁻²alms`.
-The integration constant for Legendre polynomial `l=m=0` is zero. The inverse spherical
-Laplace operator is generally
+# Inverse Laplace operator ∇⁻² applied to the spectral coefficients `alms` in spherical
+# coordinates. The radius `R` is omitted in the eigenvalues which are precomputed in `S`.
+# ∇⁻²! is the in-place version which directly stores the output in the first argument `∇⁻²alms`.
+# The integration constant for Legendre polynomial `l=m=0` is zero. The inverse spherical
+# Laplace operator is generally
 
-    ∇⁻²alms = alms*R²/(-l(l+1))
+#     ∇⁻²alms = alms*R²/(-l(l+1))
 
-with the degree `l` (0-based) of the Legendre polynomial."""
-function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{NF}},   # Output: inverse Laplacian of alms
-                alms::AbstractMatrix{Complex{NF}},      # spectral coefficients
-                S::SpectralTransform{NF}                # precomputed arrays for spectral space
-                ) where {NF<:AbstractFloat}
+# with the degree `l` (0-based) of the Legendre polynomial."""
+# function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{NF}},   # Output: inverse Laplacian of alms
+#                 alms::AbstractMatrix{Complex{NF}},      # spectral coefficients
+#                 S::SpectralTransform{NF}                # precomputed arrays for spectral space
+#                 ) where {NF<:AbstractFloat}
 
-    @boundscheck size(alms) == size(∇⁻²alms) || throw(BoundsError)
-    lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
+#     @boundscheck size(alms) == size(∇⁻²alms) || throw(BoundsError)
+#     lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
     
-    @unpack eigenvalues⁻¹ = S
-    @boundscheck length(eigenvalues⁻¹) >= lmax+1 || throw(BoundsError)
+#     @unpack eigenvalues⁻¹ = S
+#     @boundscheck length(eigenvalues⁻¹) >= lmax+1 || throw(BoundsError)
 
-    @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
-        for l in m:lmax+1           # degree l = m:lmax but 1-based
-            ∇⁻²alms[l,m] = alms[l,m]*eigenvalues⁻¹[l]
-        end
-    end
+#     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
+#         for l in m:lmax+1           # degree l = m:lmax but 1-based
+#             ∇⁻²alms[l,m] = alms[l,m]*eigenvalues⁻¹[l]
+#         end
+#     end
 
-    return ∇⁻²alms
-end
+#     return ∇⁻²alms
+# end
 
 """
     ∇²!(    ∇⁻²alms::AbstractMatrix{Complex},
