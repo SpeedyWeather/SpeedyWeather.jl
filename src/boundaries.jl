@@ -40,7 +40,7 @@ function Boundaries(P::Parameters)
         orography_highres = ncfile.vars["orog"][:,:]        # height [m]
 
         #TODO also read lat,lon from file and flip array in case it's not as expected
-        recompute_legendre = false                          # triggers Float64 precomputation
+        recompute_legendre = true                          # triggers Float64 precomputation
         orography_spec = spectral(orography_highres;recompute_legendre)
 
         lmax,mmax = P.trunc,P.trunc
