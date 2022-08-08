@@ -14,8 +14,8 @@ include("diffusion.jl")
 include("time_stepping.jl")
 
 # PHYSICS
-include("humidity.jl")
-include("large_scale_condensation.jl")
+# include("humidity.jl")
+# include("large_scale_condensation.jl")
 
 # INITIALIZATION AND INTEGRATION
 include("initialize_prognostics.jl")
