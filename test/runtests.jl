@@ -18,7 +18,5 @@ include("time_stepping.jl")
 # include("large_scale_condensation.jl")
 
 # INITIALIZATION AND INTEGRATION
-include("initialize_prognostics.jl")
-include("initialize_from_rest.jl")
+include("initialize.jl")
 include("run_speedy.jl")
-include("model_hierarchy.jl")

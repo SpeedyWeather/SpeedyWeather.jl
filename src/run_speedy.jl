@@ -42,7 +42,7 @@ function initialize_speedy(::Type{NF}=Float32;      # number format, use Float32
         I = Implicit(P,C,S)
         M = ShallowWaterModel(P,C,G,S,B,H,I)
     elseif P.model == :primitive
-        I = Implicit(P,C,G,S)
+        I = Implicit(P,C,S)
         M = PrimitiveEquationModel(P,C,G,S,B,H,I)
     end
 

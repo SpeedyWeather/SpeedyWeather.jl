@@ -93,42 +93,47 @@ function HorizontalDiffusion(   P::Parameters,          # Parameter struct
 
     else    # P.model == :primitive, orographic correction only needed then
 
-        # OROGRAPHIC CORRECTION
-        @unpack nlon, nlat, nlev, σ_levels_full = G
-        @unpack gravity, R_gas, lapse_rate, scale_height, scale_height_humid, relhumid_ref = P
-        @unpack geopot_surf_grid = B    #TODO is currently not contained in the Boundaries struct B
+        temp_correction_vert        = zeros(0)                          # create dummy arrays
+        humid_correction_vert       = zeros(0)
+        temp_correction_horizontal  = zeros(LowerTriangularMatrix{Complex{P.NF}},0,0) 
+        humid_correction_horizontal = zeros(LowerTriangularMatrix{Complex{P.NF}},0,0) 
 
-        # Orographic correction terms for temperature and humidity (vertical component)
-        lapse_rate_gravity = lapse_rate/(1000gravity)       # lapse rate in [K/km] convert to [K/m] with /1000
-        R_lapse_rate_gravity = R_gas*lapse_rate_gravity     
-        scale_height_ratio = scale_height/scale_height_humid
+        # # OROGRAPHIC CORRECTION
+        # @unpack nlon, nlat, nlev, σ_levels_full = G
+        # @unpack gravity, R_gas, lapse_rate, scale_height, scale_height_humid, relhumid_ref = P
+        # @unpack geopot_surf_grid = B    #TODO is currently not contained in the Boundaries struct B
 
-        # preallocate (high precision, conversion to NF later)
-        temp_correction_vert = zeros(nlev)      # Vertical component of orographic correction for temperature
-        humid_correction_vert = zeros(nlev)     # Vertical component of orographic correction for humidity
+        # # Orographic correction terms for temperature and humidity (vertical component)
+        # lapse_rate_gravity = lapse_rate/(1000gravity)       # lapse rate in [K/km] convert to [K/m] with /1000
+        # R_lapse_rate_gravity = R_gas*lapse_rate_gravity     
+        # scale_height_ratio = scale_height/scale_height_humid
 
-        for k in 2:nlev
-            temp_correction_vert[k] = σ_levels_full[k]^R_lapse_rate_gravity
-            if k > 2
-                humid_correction_vert[k] = σ_levels_full[k]^scale_height_ratio
-            end
-        end
+        # # preallocate (high precision, conversion to NF later)
+        # temp_correction_vert = zeros(nlev)      # Vertical component of orographic correction for temperature
+        # humid_correction_vert = zeros(nlev)     # Vertical component of orographic correction for humidity
 
-        # Orographic correction term for temperature (horizontal component)
-        horizontal_correction = zeros(nlon, nlat)       # in grid-point space
+        # for k in 2:nlev
+        #     temp_correction_vert[k] = σ_levels_full[k]^R_lapse_rate_gravity
+        #     if k > 2
+        #         humid_correction_vert[k] = σ_levels_full[k]^scale_height_ratio
+        #     end
+        # end
 
-        for j in 1:nlat
-            for i = 1:nlon
-                horizontal_correction[i,j] = lapse_rate_gravity*geopot_surf_grid[i,j]
-            end
-        end
+        # # Orographic correction term for temperature (horizontal component)
+        # horizontal_correction = zeros(nlon, nlat)       # in grid-point space
 
-        # transform correction to spectral space
-        temp_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
+        # for j in 1:nlat
+        #     for i = 1:nlon
+        #         horizontal_correction[i,j] = lapse_rate_gravity*geopot_surf_grid[i,j]
+        #     end
+        # end
 
-        # Orographic correction terms for humidity (horizontal component)
-        horizontal_correction .= relhumid_ref           # relative humidity reference value
-        humid_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
+        # # transform correction to spectral space
+        # temp_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
+
+        # # Orographic correction terms for humidity (horizontal component)
+        # horizontal_correction .= relhumid_ref           # relative humidity reference value
+        # humid_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
     end
 
     # convert to number format NF here
