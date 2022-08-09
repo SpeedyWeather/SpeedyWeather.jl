@@ -92,7 +92,7 @@ function Base.zeros(::Type{PrognosticVariables{NF}},
                     nlev::Integer) where NF
 
     layers = [zeros(PrognosticVariablesLeapfrog{NF},model,lmax,mmax) for _ in 1:nlev]   # k layers
-    lmax,mmax = model isa BarotropicModel ? (-2,-1) : (lmax,mmax)   # pressure not needed for BarotropicModel
-    pres = zeros(SurfaceLeapfrog{NF},lmax,mmax)                     # 2 leapfrog time steps for pres
+    _lmax,_mmax = model isa BarotropicModel ? (-2,-1) : (lmax,mmax)   # pressure not needed for BarotropicModel
+    pres = zeros(SurfaceLeapfrog{NF},_lmax,_mmax)                     # 2 leapfrog time steps for pres
     return PrognosticVariables(layers,pres,lmax,mmax,N_LEAPFROG,nlev)
 end
