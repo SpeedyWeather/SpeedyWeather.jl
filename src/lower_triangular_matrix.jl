@@ -33,6 +33,9 @@ for zeros_or_ones in (:zeros,:ones)
     end
 end
 
+Base.zero(L::LowerTriangularMatrix{T}) where T = zeros(LowerTriangularMatrix{T},size(L)...)
+Base.one(L::LowerTriangularMatrix{T}) where T = ones(LowerTriangularMatrix{T},size(L)...)
+
 function LowerTriangularMatrix{T}(::UndefInitializer,m::Integer,n::Integer) where T
     return LowerTriangularMatrix(Vector{T}(undef,nonzeros(m,n)),m,n)
 end
