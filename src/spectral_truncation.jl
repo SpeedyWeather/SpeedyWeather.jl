@@ -1,32 +1,6 @@
-"""
-    m = roundup_fft(n::Int;
-                    small_primes::Vector{Int}=[2,3,5])
+abstract type AbstractTruncation end
 
-Returns an integer `m >= n` with only small prime factors 2, 3, 5 (default, others can be specified
-with the keyword argument `small_primes`) to obtain an efficiently fourier-transformable number of
-longitudes, m = 2^i * 3^j * 5^k >= n, with i,j,k >=0.
-"""
-function roundup_fft(n::Int;small_primes::Vector{Int}=[2,3,5])
-    factors_not_in_small_primes = true      # starting condition for while loop
-    n += isodd(n) ? 1 : 0                   # start with an even n
-    while factors_not_in_small_primes
-        
-        factors = Primes.factor(n)          # prime factorization
-        all_factors_small = true            # starting condition
-        
-        for i in 1:length(factors)          # loop over factors and check they are small
-            factor = factors.pe[i].first    # extract factor from factors
-            all_factors_small &= factor in small_primes
-        end
-        
-        factors_not_in_small_primes = ~all_factors_small    # all factors small will abort while loop
-        n += 2                                              # test for next larger even n
-    
-    end
-    return n-2      # subtract unnecessary last += 2 addition
-end
-
-struct TriangularTruncation
+struct TriangularTruncation <: AbstractTruncation
     trunc::Int      # spectral truncation (trunc=lmax=mmax)
     nlon::Int       # number of longitudes
     nlat::Int       # number of latitudes
@@ -58,6 +32,34 @@ end
 
 # unpack 
 is_triangular_truncation(T::TriangularTruncation) = is_triangular_truncation(T.trunc,T.nlon,T.nlat)
+
+"""
+    m = roundup_fft(n::Int;
+                    small_primes::Vector{Int}=[2,3,5])
+
+Returns an integer `m >= n` with only small prime factors 2, 3, 5 (default, others can be specified
+with the keyword argument `small_primes`) to obtain an efficiently fourier-transformable number of
+longitudes, m = 2^i * 3^j * 5^k >= n, with i,j,k >=0.
+"""
+function roundup_fft(n::Int;small_primes::Vector{Int}=[2,3,5])
+    factors_not_in_small_primes = true      # starting condition for while loop
+    n += isodd(n) ? 1 : 0                   # start with an even n
+    while factors_not_in_small_primes
+        
+        factors = Primes.factor(n)          # prime factorization
+        all_factors_small = true            # starting condition
+        
+        for i in 1:length(factors)          # loop over factors and check they are small
+            factor = factors.pe[i].first    # extract factor from factors
+            all_factors_small &= factor in small_primes
+        end
+        
+        factors_not_in_small_primes = ~all_factors_small    # all factors small will abort while loop
+        n += 2                                              # test for next larger even n
+    
+    end
+    return n-2      # subtract unnecessary last += 2 addition
+end
 
 """
     tri_trunc = triangular_truncation(;trunc::Int=0,nlon::Int=0,nlat::Int=0)
@@ -126,10 +128,9 @@ end
 
 Truncate spectral coefficients `alms` in-place by setting (a) the upper right triangle to zero and (b)
 all coefficients for which the degree l is larger than the truncation `trunc`."""
-function spectral_truncation!(  alms::AbstractMatrix{NF},       # spectral field to be truncated
-                                trunc::Int                      # truncate to degree/order trunc
-                                ) where NF                      # number format NF (can be complex)
-    return spectral_truncation!(alms,trunc,trunc)               # use trunc=ltrunc=mtrunc
+function spectral_truncation!(  alms::AbstractMatrix,   # spectral field to be truncated
+                                trunc::Int)             # truncate to degree/order trunc
+    return spectral_truncation!(alms,trunc,trunc)       # use trunc=ltrunc=mtrunc
 end
 
 """
@@ -165,7 +166,7 @@ function spectral_truncation(   alms::AbstractArray{NF},    # spectral field to 
     size_alms_new[1] = ltrunc+1                     # new (smaller) size
     size_alms_new[2] = mtrunc+1
     size_alms_new = tuple(size_alms_new...)
-    alms_trunc = Array{NF}(undef,size_alms_new...)  # preallocate new (smaller) array
+    alms_trunc = LowerTriangularMatrix{NF}(undef,size_alms_new...)  # preallocate new (smaller) array
 
     # copy data over
     copyto!(alms_trunc,@view(alms[CartesianIndices(size_alms_new)]))
@@ -203,7 +204,7 @@ function spectral_interpolation(alms::AbstractArray{NF},    # spectral field to 
     size_alms_new[1] = ltrunc+1                     # new size
     size_alms_new[2] = mtrunc+1
     size_alms_new = tuple(size_alms_new...)         # convert back to tuple
-    alms_trunc = zeros(NF,size_alms_new...)         # allocate new (larger) array
+    alms_trunc = zeros(LowerTriangularMatrix{NF},size_alms_new...)  # allocate new (larger) array
 
     # copy data over
     copyto!(@view(alms_trunc[CartesianIndices(size_alms)]),alms)

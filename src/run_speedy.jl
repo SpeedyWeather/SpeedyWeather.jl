@@ -31,21 +31,23 @@ function initialize_speedy(::Type{NF}=Float32;      # number format, use Float32
 
     P = Parameters(NF=NF;kwargs...)                 # all model parameters chosen through kwargs
     C = Constants(P)                                # constants used in model integration
-    G = GeoSpectral(P)                              # geometry and spectral transform structs
+    G = Geometry(P)                                 # everything grid
+    S = SpectralTransform(P)                        # everything spectral transform
     B = Boundaries(P)                               # arrays for boundary conditions
-    H = HorizontalDiffusion(P,C,G,B)                # precomputed arrays for horizontal diffusion
+    H = HorizontalDiffusion(P,C,G,S,B)              # precomputed arrays for horizontal diffusion
 
     if P.model == :barotropic                       # pack all of the above into a *Model struct
-        M = BarotropicModel(P,C,G,H)                # typeof(M) is used to dispatch dynamically
+        M = BarotropicModel(P,C,G,S,H)              # typeof(M) is used to dispatch dynamically
     elseif P.model == :shallowwater                 # to the supported model types
-        I = Implicit(P,C,G)
-        M = ShallowWaterModel(P,C,G,B,H,I)
+        I = Implicit(P,C,S)
+        M = ShallowWaterModel(P,C,G,S,B,H,I)
     elseif P.model == :primitive
-        M = PrimitiveEquationModel(P,C,G,B,H)
+        I = Implicit(P,C,S)
+        M = PrimitiveEquationModel(P,C,G,S,B,H,I)
     end
 
     prognostic_vars = initial_conditions(M)         # initialize prognostic variables
-    diagnostic_vars = DiagnosticVariables(G)        # preallocate all diagnostic variables with zeros
+    diagnostic_vars = DiagnosticVariables(G,S)      # preallocate all diagnostic variables with zeros
 
     return prognostic_vars, diagnostic_vars, M
 end

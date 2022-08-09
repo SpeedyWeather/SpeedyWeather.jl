@@ -6,8 +6,8 @@ Struct that holds the boundary arrays in grid-point space
 """
 struct Boundaries{NF<:AbstractFloat}        # number format NF
     orography       ::Matrix{NF}            # orography [m]
-    geopot_surf_grid::Matrix{NF}            # surface geopotential (i.e. orography) [m^2/s^2]
-    geopot_surf     ::Matrix{Complex{NF}}   # spectral surface geopotential
+    # geopot_surf_grid::Matrix{NF}            # surface geopotential (i.e. orography) [m^2/s^2]
+    # geopot_surf     ::Matrix{Complex{NF}}   # spectral surface geopotential
 
     # landsea_mask    ::Array{NF,2}           # land-sea mask
     # albedo          ::Array{NF,2}           # annual mean surface albedo
@@ -31,22 +31,24 @@ function Boundaries(P::Parameters)
 
     if P.model == :barotropic   # no boundary data needed with the barotropic model
         
-        orography           = zeros(P.NF,1,1)               # create dummy arrays
-        geopot_surf         = zeros(complex(P.NF),1,1)  
-        geopot_surf_grid    = zeros(P.NF,1,1)
+        orography           = zeros(P.NF,0,0)               # create dummy arrays
+        # geopot_surf         = zeros(complex(P.NF),1,1)  
+        # geopot_surf_grid    = zeros(P.NF,1,1)
 
     elseif P.model == :shallowwater
 
         orography_highres = ncfile.vars["orog"][:,:]        # height [m]
 
         #TODO also read lat,lon from file and flip array in case it's not as expected
-        recompute_legendre = false                          # triggers Float64 precomputation
+        recompute_legendre = true                          # triggers Float64 precomputation
         orography_spec = spectral(orography_highres;recompute_legendre)
-        orography_spec = spectral_truncation(orography_spec,P.trunc)
+
+        lmax,mmax = P.trunc,P.trunc
+        orography_spec = spectral_truncation(orography_spec,lmax+1,mmax)
         orography = gridded(orography_spec;recompute_legendre)
         
-        geopot_surf         = zeros(complex(P.NF),1,1)  
-        geopot_surf_grid    = zeros(P.NF,1,1)
+        # geopot_surf         = zeros(complex(P.NF),1,1)  
+        # geopot_surf_grid    = zeros(P.NF,1,1)
 
     else # primitive equation model 
 
@@ -56,13 +58,13 @@ function Boundaries(P::Parameters)
         # albedo = ncfile.vars["alb"][:,:]          # annual-mean albedo [0-1]
 
         # GEOPOTENTIAL, transform to spectral space and truncate accordingly   
-        geopot_surf_highres = spectral(gravity*orography)
-        geopot_surf = spectral_truncation(geopot_surf_highres,  # truncate to
-                                            P.trunc+1,P.trunc)  # lmax+1,mmax matrix
-        spectral_truncation!(geopot_surf,P.trunc)               # but set l=lmax+1 row to zero
-        geopot_surf_grid = gridded(geopot_surf)
+        # geopot_surf_highres = spectral(gravity*orography)
+        # geopot_surf = spectral_truncation(geopot_surf_highres,  # truncate to
+        #                                     P.trunc+1,P.trunc)  # lmax+1,mmax matrix
+        # spectral_truncation!(geopot_surf,P.trunc)               # but set l=lmax+1 row to zero
+        # geopot_surf_grid = gridded(geopot_surf)
     end
 
     # convert to number format NF here
-    return Boundaries{P.NF}(orography,geopot_surf_grid,geopot_surf) #,landsea_mask,albedo)
+    return Boundaries{P.NF}(orography,)#geopot_surf_grid,geopot_surf,landsea_mask,albedo)
 end
