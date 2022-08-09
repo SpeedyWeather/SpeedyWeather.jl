@@ -224,8 +224,8 @@ end
         SpeedyWeather.divergence!(div1,u_coslat⁻¹,v_coslat⁻¹,S)
 
         for lm in SpeedyWeather.eachharmonic(vor0,vor1,div0,div1)
-            @test vor0[lm] ≈ vor1[lm] rtol=sqrt(eps(NF))
-            @test div0[lm] ≈ div1[lm] rtol=sqrt(eps(NF))
+            @test vor0[lm] ≈ vor1[lm] rtol=10*sqrt(eps(NF))
+            @test div0[lm] ≈ div1[lm] rtol=10*sqrt(eps(NF))
         end
     end
 end

@@ -5,6 +5,9 @@ using Test
 include("utility_functions.jl")
 include("lower_triangular_matrix.jl")
 
+# GPU/KERNELABSTRACTIONS 
+include("kernelabstractions.jl")
+
 # SPECTRAL TRANSFORM
 include("spectral_transform.jl")
 include("spectral_gradients.jl")

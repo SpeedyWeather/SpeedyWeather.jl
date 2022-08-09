@@ -144,4 +144,5 @@ function Base.fill!(L::LowerTriangularMatrix{T}, x) where T
     end
 end
 
-
+# GPU methods
+Adapt.adapt_structure(to, x::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix(Adapt.adapt(to, x.v), x.m, x.n)
