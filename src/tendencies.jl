@@ -23,36 +23,28 @@
 # Note that get_spectral_tendencies() is quite badly named. It really modifies/updates the **already calculated** spectral tendencies
 # =========================================================================
 
-function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
-                            progn::PrognosticVariables{NF}, # all prognostic variables
-                            M::BarotropicModel,             # struct containing all constants
-                            lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
-                            ) where {NF<:AbstractFloat}
-
+function get_tendencies!(   diagn::DiagnosticVariablesLayer,
+                            M::BarotropicModel,
+                            )
+    
     # only (planetary) vorticity advection for the barotropic model
-    vorticity_flux_divergence!(diagn,M.geospectral)         # = -∇⋅(u(ζ+f),v(ζ+f))
+    G,S = M.geometry, M.spectral_transform
+    vorticity_flux_divergence!(diagn,G,S)         # = -∇⋅(u(ζ+f),v(ζ+f))
 end
 
-function get_tendencies!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
-                            progn::PrognosticVariables{NF}, # all prognostic variables
+function get_tendencies!(   diagn::DiagnosticVariablesLayer,
+                            surface::SurfaceVariables,
                             M::ShallowWaterModel,           # struct containing all constants
-                            lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
-                            ) where {NF<:AbstractFloat}
+                            )
 
-    G = M.geospectral
-    B = M.boundaries
-    g = M.constants.gravity
-    H₀ = M.constants.layer_thickness
-    
-    # tendencies for vorticity
-    vorticity_flux_divergence!(diagn,G)         # = -∇⋅(u(ζ+f),v(ζ+f))
+    G,S,B = M.geometry, M.spectral_transform, M.boundaries
+    g,H₀  = M.constants.gravity, M.constants.layer_thickness
 
-    # tendencies for divergence
-    bernoulli_potential!(diagn,G,g)             # = -∇²(E+gη)
-    vorticity_flux_curl!(diagn,G)               # =  ∇×(u(ζ+f),v(ζ+f))
-    
-    # tendencies for pressure pres = interface displacement η
-    volume_flux_divergence!(diagn,G,B,H₀)       # = -∇⋅(uh,vh)
+    # for compatibility with other ModelSetups pressure pres = interface displacement η here
+    vorticity_flux_divergence!(diagn,G,S)           # = -∇⋅(u(ζ+f),v(ζ+f)), tendency for vorticity
+    vorticity_flux_curl!(diagn,S)                 # =  ∇×(u(ζ+f),v(ζ+f)), tendency for divergence
+    bernoulli_potential!(diagn,surface,G,S,g)       # = -∇²(E+gη), tendency for divergence
+    volume_flux_divergence!(diagn,surface,G,S,B,H₀) # = -∇⋅(uh,vh), tendency pressure
 end
 
 
