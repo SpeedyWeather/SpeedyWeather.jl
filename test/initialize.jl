@@ -1,3 +1,14 @@
+@testset "Zero generators" begin
+    @testset for NF in (Float32,Float64)
+        P = Parameters(;NF)
+        G = Geometry(P)
+        S = SpectralTransform(P)
+        
+        P = zeros(PrognosticVariables{NF},5,5,3)
+        P = zeros(DiagnosticVariables,G,S)
+    end
+end
+
 @testset "Initialize from rest" begin
 
     # BAROTROPIC MODEL
@@ -46,4 +57,29 @@
     # println((sum(humid_grid)/length(humid_grid),minimum(humid_grid),maximum(humid_grid)))
     @test_skip all(humid_grid .>= 0)
     """
+end
+
+@testset "Initialize speedy with different models" begin
+    _,_,m_barotrop = initialize_speedy(model=:barotropic)
+    _,_,m_shalloww = initialize_speedy(model=:shallowwater)
+    _,_,m_primitive = initialize_speedy(model=:primitive)
+
+    # @test m_barotrop < m_shalloww
+    # @test m_shalloww < m_primitive
+    
+    # @test (m_barotrop < m_barotrop) == false
+    # @test (m_shalloww < m_shalloww) == false
+    # @test (m_primitive < m_primitive) == false
+
+    # @test m_barotrop == m_barotrop
+    # @test m_shalloww == m_shalloww
+    # @test m_primitive == m_primitive
+
+    # @test typeof(m_barotrop) <: SpeedyWeather.BarotropicModel
+    # @test typeof(m_shalloww) <: SpeedyWeather.ShallowWaterModel
+    # @test typeof(m_primitive) <: SpeedyWeather.PrimitiveEquationModel
+
+    # @test SpeedyWeather.BarotropicModel < SpeedyWeather.ShallowWaterModel
+    # @test SpeedyWeather.ShallowWaterModel < SpeedyWeather.PrimitiveEquationModel
+    # @test SpeedyWeather.BarotropicModel < SpeedyWeather.PrimitiveEquationModel
 end
