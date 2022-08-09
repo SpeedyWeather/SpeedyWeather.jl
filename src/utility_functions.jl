@@ -44,3 +44,6 @@ function readable_secs(secs::Real)
     end
     return Dates.canonicalize(round(millisecs, Dates.Millisecond(10)))
 end
+
+# define as will only become availale in Julia 1.9
+pkgversion(m::Module) = VersionNumber(TOML.parsefile(joinpath(dirname(string(first(methods(m.eval)).file)), "..", "Project.toml"))["version"])

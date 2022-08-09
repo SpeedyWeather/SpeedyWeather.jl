@@ -96,7 +96,7 @@ The default values of the keywords define the default model setup.
     output_vars::Vector{String}=["u","v","temp","humid","pres"]
     compression_level::Int=3        # 1=low but fast, 9=high but slow
     keepbits::Int=7                 # mantissa bits to keep for every variable
-    version::VersionNumber=VersionNumber(TOML.parsefile("Project.toml")["version"])
+    version::VersionNumber=pkgversion(SpeedyWeather)
 
     # RESTART
     write_restart::Bool=output      # also write restart file if output==true?
