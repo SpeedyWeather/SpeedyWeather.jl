@@ -204,6 +204,16 @@ function write_netcdf_variables!(   i_out::Integer,
     NetCDF.putvar(netcdf_file,"pres",pres_output,start=[1,1,i_out],count=[-1,-1,1])
 end
 
+"""
+    write_restart_file( time_sec::Real,
+                        progn::PrognosticVariables,
+                        feedback::Feedback,
+                        M::ModelSetup)
+
+A restart file `restart.jld2` with the prognostic variables is written
+to the output folder (or current path) that can be used to restart the model.
+`restart.jld2` will then be used as initial conditions. The prognostic variables
+are bitround and the 2nd leapfrog time step is discarded."""
 function write_restart_file(time_sec::Real,
                             progn::PrognosticVariables,
                             feedback::Feedback,
@@ -220,6 +230,8 @@ function write_restart_file(time_sec::Real,
     # COMPRESSION OF RESTART FILE
     @unpack keepbits = M.parameters
     for layer in progn.layers
+        # TODO copy from leapfrog 2 into 1 for storage
+
         # bitround 1st leapfrog step to output precision
         round!(layer.leapfrog[1].vor,keepbits)
         round!(layer.leapfrog[1].div,keepbits)
