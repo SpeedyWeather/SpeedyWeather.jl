@@ -13,10 +13,11 @@ The default values of the keywords define the default model setup.
     # MODEL
     model::Symbol=:barotropic           # :barotropic, :shallowwater, or :primitive
 
-    # RESOLUTION
-    grid::Symbol=:regular_Gaussian      # define the grid type
+    # RESOLUTION AND GRID
     trunc::Int=31                       # spectral truncation
     nlev::Int=nlev_default(model)       # number of vertical levels 
+    grid::Symbol=:full_Gaussian         # define the grid type
+    quadrature::Symbol=:Gaussian        # or :clenshaw_curtis, :riemann
 
     # PHYSICAL CONSTANTS
     radius_earth::Real=6.371e6          # radius of Earth [m]

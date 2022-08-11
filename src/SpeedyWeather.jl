@@ -28,11 +28,18 @@ module SpeedyWeather
     import ProgressMeter
 
     # EXPORT MAIN INTERFACE TO SPEEDY
-    export run_speedy, initialize_speedy
+    export  run_speedy,
+            initialize_speedy
 
-    # EXPORT STRUCTS
+    # EXPORT GRIDS
     export  LowerTriangularMatrix,
-            Parameters, 
+            FullLatLonGrid,
+            FullGaussianGrid,
+            OctahedralGaussianGrid,
+            HEALPixGrid
+            
+    # EXPORT STRUCTS
+    export  Parameters, 
             Constants,
             Geometry,
             SpectralTransform,
@@ -56,7 +63,9 @@ module SpeedyWeather
     include("default_parameters.jl")        # defines Parameters
     include("constants.jl")                 # defines Constants
     include("geometry.jl")                  # defines Geometry
-    include("spectral_transform.jl")        # defines SpectralTransform, Geospectral
+    include("grids.jl")                     # defines FullGaussianGrid, OctahedralGaussianGrid, ...
+
+    include("spectral_transform.jl")        # defines SpectralTransform
     include("spectral_gradients.jl")
 
     include("boundaries.jl")                # defines Boundaries
