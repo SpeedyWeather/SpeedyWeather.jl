@@ -8,6 +8,9 @@ include("lower_triangular_matrix.jl")
 # GPU/KERNELABSTRACTIONS 
 include("kernelabstractions.jl")
 
+# AD/ENZYME 
+include("enzyme.jl")
+
 # SPECTRAL TRANSFORM
 include("spectral_transform.jl")
 include("spectral_gradients.jl")

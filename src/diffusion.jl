@@ -20,6 +20,27 @@ function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   
     end
 end
 
+@kernel function horizontal_diffusion_kernel!(tendency, @Const(A), @Const(damp_expl), @Const(damp_impl))
+    lm = @index(Global, Linear)
+   
+    tendency[lm] = (tendency[lm] - damp_expl[lm]*A[lm])*damp_impl[lm]
+end
+
+function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   # tendency of a 
+                                A::LowerTriangularMatrix{Complex{NF}},          # spectral horizontal field
+                                damp_expl::LowerTriangularMatrix{NF},           # explicit spectral damping
+                                damp_impl::LowerTriangularMatrix{NF},           # implicit spectral damping
+                                device_setup::DeviceSetup,        # device the function is executed on, we have to add that
+                                ) where {NF<:AbstractFloat}
+
+    @boundscheck size(A) == size(tendency) || throw(BoundsError())
+    @boundscheck size(A) == size(damp_expl) || throw(BoundsError())
+    @boundscheck size(A) == size(damp_impl) || throw(BoundsError())
+
+    ev = launch_kernel!(device_setup, horizontal_diffusion_kernel!, length(tendency), tendency, A, damp_expl, damp_impl)
+    wait(ev)
+end 
+
 function horizontal_diffusion!( progn::PrognosticVariablesLeapfrog,
                                 diagn::DiagnosticVariablesLayer,
                                 M::BarotropicModel,
