@@ -1,9 +1,21 @@
 @testset "Grid indexing" begin
     for NF in (Float32,Float64)
+
+        # with vector and resolution parameter provided
         L = FullLatLonGrid(randn(NF,96*48),24)          # L24 grid
         F = FullGaussianGrid(randn(NF,96*48),24)        # F24 grid
         O = OctahedralGaussianGrid(randn(NF,3168),24)   # O24 grid
         H = HEALPixGrid(randn(NF,3072),16)              # H16 grid
+
+        # without resolution parameter provided (inferred from vector length)
+        L2 = FullLatLonGrid(randn(NF,96*48))            # L24 grid
+        F2 = FullGaussianGrid(randn(NF,96*48))          # F24 grid
+        O2 = OctahedralGaussianGrid(randn(NF,3168))     # O24 grid
+        H2 = HEALPixGrid(randn(NF,3072))                # H16 grid
+
+        for (grid1,grid2) in zip([L,F,O,H],[L2,F2,O2,H2])
+            @test size(grid1) == size(grid2)
+        end
 
         # getindex
         for ij in eachindex(L) L[ij] end

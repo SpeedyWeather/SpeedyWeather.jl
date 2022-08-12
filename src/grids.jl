@@ -96,13 +96,11 @@ nlon_healpix(nside::Integer,ilat::Integer) = nside_assert(nside) ? min(4ilat,4ns
 nlon_healpix(nside::Integer) = nside_assert(nside) ? 4nside : nothing
 
 # define for all grids that the type T can be infered from the elements in data vector
-for grid in [Symbol(grid) for grid in subtypes(AbstractGrid)]
-    @eval begin
-        # n is the resolution parameter, either nlat_half for Gaussian/LatLon grids, or nside for HEALPix
-        $grid(v::AbstractVector{T},n::Integer) where T = $grid{T}(v,n)
-        $grid(v::AbstractVector{T}) where T = $grid{T}(v)
-    end
-end
+# whether the resolution parameter n is provided or not (hence the ...)
+FullLatLonGrid(v::AbstractVector,n::Integer...) = FullLatLonGrid{eltype(v)}(v,n...)
+FullGaussianGrid(v::AbstractVector,n::Integer...) = FullGaussianGrid{eltype(v)}(v,n...)
+OctahedralGaussianGrid(v::AbstractVector,n::Integer...) = OctahedralGaussianGrid{eltype(v)}(v,n...)
+HEALPixGrid(v::AbstractVector,n::Integer...) = HEALPixGrid{eltype(v)}(v,n...)
 
 # infer resolution parameter nlat_half or nside from length of vector
 FullLatLonGrid{T}(v::AbstractVector) where T = FullLatLonGrid(v,round(Int,sqrt(length(v)/8)))
