@@ -1,17 +1,14 @@
-@testset "Transform: Triangular truncation" begin
+@testset "FullGaussianGrid: Test grid and spectral resolution match" begin
     Ts = (31,42,85,170,341,682)     # spectral resolutions
     nlons = (96,128,256,512,1024)   # number of longitudes
     nlats = (48,64,128,256,512)     # number of latitudes
     for (T,nlon,nlat) in zip(Ts,nlons,nlats)
         
-        tri_trunc = SpeedyWeather.triangular_truncation(trunc=T)    # trunc -> nlon, nlat
-        @test (nlon,nlat) == (tri_trunc.nlon,tri_trunc.nlat)
+        nlat_half = SpeedyWeather.get_resolution(FullGaussianGrid,T)
+        @test (nlon,nlat) == (4nlat_half,2nlat_half)
 
-        tri_trunc = SpeedyWeather.triangular_truncation(;nlon)      # nlon -> trunc
-        @test T == tri_trunc.trunc
-        
-        tri_trunc = SpeedyWeather.triangular_truncation(;nlat)      # nlat -> trunc
-        @test T == tri_trunc.trunc
+        trunc = SpeedyWeather.get_truncation(FullGaussianGrid,nlat÷2)
+        @test T == trunc
     end
 end
 

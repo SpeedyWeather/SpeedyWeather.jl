@@ -7,6 +7,8 @@ function isincreasing(x::Vector)
     return is_increasing
 end
 
+is_power_2(i::Integer) = i & (i-1) == 0
+
 """Set all negative entries in an array to zero."""
 function clip_negatives!(A::AbstractArray{T}) where T
     @inbounds for i in eachindex(A)

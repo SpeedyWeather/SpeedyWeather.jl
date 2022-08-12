@@ -2,10 +2,12 @@ module SpeedyWeather
 
     # STRUCTURE
     import Parameters: @with_kw, @unpack
+    import InteractiveUtils: subtypes
 
     # NUMERICS
     import FastGaussQuadrature
     import AssociatedLegendrePolynomials
+    import Healpix
     import FFTW
     import Primes
     import LinearAlgebra
@@ -28,11 +30,19 @@ module SpeedyWeather
     import ProgressMeter
 
     # EXPORT MAIN INTERFACE TO SPEEDY
-    export run_speedy, initialize_speedy
+    export  run_speedy,
+            initialize_speedy
 
-    # EXPORT STRUCTS
+    # EXPORT GRIDS
     export  LowerTriangularMatrix,
-            Parameters, 
+            AbstractGrid,
+            FullLatLonGrid,
+            FullGaussianGrid,
+            OctahedralGaussianGrid,
+            HEALPixGrid
+            
+    # EXPORT STRUCTS
+    export  Parameters, 
             Constants,
             Geometry,
             SpectralTransform,
@@ -48,6 +58,7 @@ module SpeedyWeather
 
     include("utility_functions.jl")
     include("lower_triangular_matrix.jl")   # defines LowerTriangularMatrix
+    include("grids.jl")                     # defines FullGaussianGrid, OctahedralGaussianGrid, ...
     include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
 
     include("parameter_structs.jl")
@@ -56,7 +67,8 @@ module SpeedyWeather
     include("default_parameters.jl")        # defines Parameters
     include("constants.jl")                 # defines Constants
     include("geometry.jl")                  # defines Geometry
-    include("spectral_transform.jl")        # defines SpectralTransform, Geospectral
+
+    include("spectral_transform.jl")        # defines SpectralTransform
     include("spectral_gradients.jl")
 
     include("boundaries.jl")                # defines Boundaries

@@ -13,11 +13,11 @@ The default values of the keywords define the default model setup.
     # MODEL
     model::Symbol=:barotropic           # :barotropic, :shallowwater, or :primitive
 
-    # RESOLUTION
-    grid::Symbol=:regular_Gaussian      # define the grid type
-    trunc::Int=31                       # spectral truncation
-    nlev::Int=nlev_default(model)       # number of vertical levels 
-
+    # RESOLUTION AND GRID
+    trunc::Int=31                                   # spectral truncation
+    grid::Type{<:AbstractGrid}=FullGaussianGrid     # define the grid type
+    nlev::Int=nlev_default(model)                   # number of vertical levels 
+    
     # PHYSICAL CONSTANTS
     radius_earth::Real=6.371e6          # radius of Earth [m]
     rotation_earth::Real=7.29e-5        # angular frequency of Earth's rotation [rad/s]

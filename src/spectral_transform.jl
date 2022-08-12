@@ -1,42 +1,45 @@
 """SpectralTransform struct that contains all parameters and preallocated arrays
 for the spectral transform."""
 struct SpectralTransform{NF<:AbstractFloat}
+
+    # GRID
+    grid::Type{<:AbstractGrid}
+
     # SPECTRAL RESOLUTION
     lmax::Int       # Maximum degree l=[0,lmax] of spherical harmonics
     mmax::Int       # Maximum order m=[0,l] of spherical harmonics
     nfreq::Int      # Number of fourier frequencies (real FFT)
-    radius::Real    # radius of the sphere/Earth
 
     # CORRESPONDING GRID SIZE
-    nlon::Int               # Number of longitudes
-    nlat::Int               # Number of latitudes
-    nlat_half::Int          # nlat on one hemisphere
+    nlon::Int               # Maximum number of longitude points (at Equator)
+    # nlons::Vector{Int}      # Number of longitude points per latitude ring
+    nlat::Int               # Number of latitude rings
+    nlat_half::Int          # nlat on one hemisphere (incl equator if nlat odd)
     
     # CORRESPONDING GRID VECTORS
     colat::Vector{NF}       # Gaussian colatitudes (0,π) North to South Pole 
     cos_colat::Vector{NF}   # Cosine of colatitudes
     sin_colat::Vector{NF}   # Sine of colatitudes
     lon_offset::NF          # Offset of first longitude from prime meridian
+    # lon_offsets::Vector{NF} # Offsets for each latitude ring
 
     # NORMALIZATION
     norm_sphere::NF         # normalization of the l=0,m=0 mode
-    norm_forward::NF        # normalization of the Legendre weights for forward transform
+    norm_forward::NF        # normalization of the Legendre weights for forward transform (spectral)
 
     # FFT plans
     rfft_plan::FFTW.rFFTWPlan{NF}           # grid to spectral transform
     brfft_plan::FFTW.rFFTWPlan{Complex{NF}} # spectral to grid transform (inverse)
-
-    # FFT work arrays (currently not used)
-    gn::Vector{Complex{NF}}         # phase factors north
-    gs::Vector{Complex{NF}}         # phase factors south
-    fn::Vector{Complex{NF}}         # Fourier-transformed latitude north
-    fs::Vector{Complex{NF}}         # Fourier-transformed latitude south
+    # rfft_plans::Vector{FFTW.rFFTWPlan{NF}}  # one plan for each latitude ring for variable nlon
+    # brfft_plans::Vector{FFTW.rFFTWPlan{Complex{NF}}}
 
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool                # Pre or recompute Legendre polynomials
     Λ::LowerTriangularMatrix{Float64}       # Legendre polynomials for one latitude (requires recomputing)
     Λs::Vector{LowerTriangularMatrix{NF}}   # Legendre polynomials for all latitudes (all precomputed)
-    legendre_weights::Vector{NF}            # Legendre weights (extra normalisation of π/nlat included)
+    
+    # QUADRATURE (integration for the Legendre polynomials, extra normalisation of π/nlat included)
+    quadrature_weights::Vector{NF}
 
     # RECURSION FACTORS
     ϵlms::LowerTriangularMatrix{NF}         # precomputed for meridional gradients gradients grad_y1, grad_y2
@@ -69,30 +72,32 @@ spectral resolution, plans the Fourier transforms, retrieves the Gaussian colati
 and preallocates the Legendre polynomials (if recompute_legendre == false) and legendre
 weights.
 """
-function SpectralTransform( ::Type{NF},     # Number format NF
-                            nlon::Int,      # Number of longitudes
-                            nlat::Int,      # Number of latitudes
-                            trunc::Int,     # Spectral truncation
-                            radius::Real,   # radius of sphere/Earth
+function SpectralTransform( ::Type{NF},                     # Number format NF
+                            grid::Type{<:AbstractGrid},     # type of spatial grid used
+                            trunc::Int,                     # Spectral truncation
                             recompute_legendre::Bool) where NF
 
     # SPECTRAL RESOLUTION
     lmax = trunc                # Maximum degree l=[0,lmax] of spherical harmonics
     mmax = trunc                # Maximum order m=[0,l] of spherical harmonics
-    nfreq = nlon÷2 + 1          # Number of fourier frequencies (real FFTs)
 
-    # SIZE OF GRID
-    nlat_half = (nlat+1) ÷ 2    # number of latitudes in one hemisphere
-    
+    # RESOLUTION PARAMETERS
+    nresolution = get_resolution(grid,trunc)        # resolution parameter, nlat_half/nside for HEALPixGrid
+    nlat_half = get_nlat_half(grid,nresolution)     # contains equator for HEALPix
+    nlat = 2nlat_half - nlat_odd(grid)              # one less if grids have odd # of latitude rings
+    nlon = get_nlon(grid,nresolution)               # number of longitudes around the equator
+    nfreq = nlon÷2 + 1          # Number of fourier frequencies (real FFTs)
+    # nside = grid isa HEALPixGrid ? nresolution : 0  # nside is only defined for HEALPixGrid (npoints)
+    # npoints = get_npoints(grid,nresolution)         # total number of grid points
+
+    # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
+    colat = get_colat(grid,nresolution)             # colatitude in radians
+    sin_colat = sin.(colat)                             
+    cos_colat = cos.(colat)
+
     # PLAN THE FFTs
     rfft_plan = FFTW.plan_rfft(zeros(NF,nlon))
     brfft_plan = FFTW.plan_brfft(zeros(Complex{NF},nfreq),nlon)
-
-    # FFT work arrays (currently not used)
-    gn = zeros(Complex{NF},nfreq)       # phase factors north
-    gs = zeros(Complex{NF},nfreq)       # phase factors south
-    fn = zeros(Complex{NF},nfreq)       # Fourier-transformed latitude north
-    fs = zeros(Complex{NF},nfreq)       # Fourier-transformed latitude south
 
     # GAUSSIAN COLATITUDES (0,π) North to South
     nodes = FastGaussQuadrature.gausslegendre(nlat)[1]  # zeros of the Legendre polynomial
@@ -103,7 +108,7 @@ function SpectralTransform( ::Type{NF},     # Number format NF
 
     # NORMALIZATION
     norm_sphere = 2sqrt(π)      # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
-    norm_forward = π/nlat       # normalization for forward transform to be baked into the Legendre weights
+    norm_forward = π/nlat       # normalization for forward transform to be baked into the quadrature weights
 
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
     Λ = zeros(LowerTriangularMatrix,lmax+2,mmax+1)  # Legendre polynomials for one latitude
@@ -120,9 +125,9 @@ function SpectralTransform( ::Type{NF},     # Number format NF
         end
     end
 
-    # Legendre weights
-    legendre_weights = FastGaussQuadrature.gausslegendre(nlat)[2][1:nlat_half]
-    legendre_weights *= norm_forward        # extra normalisation for forward transform included
+    # QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
+    quadrature_weights = get_quadrature_weights(grid,nresolution)
+    quadrature_weights *= norm_forward
 
     # RECURSION FACTORS
     ϵlms = get_recursion_factors(lmax+1,mmax)
@@ -175,32 +180,31 @@ function SpectralTransform( ::Type{NF},     # Number format NF
     eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
         
     # conversion to NF happens here
-    SpectralTransform{NF}(  lmax,mmax,nfreq,radius,
+    SpectralTransform{NF}(  grid,lmax,mmax,nfreq,
                             nlon,nlat,nlat_half,
                             colat,cos_colat,sin_colat,lon_offset,
                             norm_sphere,norm_forward,
                             rfft_plan,brfft_plan,
-                            gn,gs,fn,fs,
-                            recompute_legendre,Λ,Λs,legendre_weights,
+                            recompute_legendre,Λ,Λs,quadrature_weights,
                             ϵlms,grad_x,grad_y1,grad_y2,
                             grad_y_vordiv1,grad_y_vordiv2,vordiv_to_uv_x,
                             vordiv_to_uv1,vordiv_to_uv2,
                             eigenvalues,eigenvalues⁻¹)
 end
 
-"""Generator function for a SpectralTransform struct in case the number format is not provided.
-Use Float64 as default."""
-SpectralTransform(args...) = SpectralTransform(Float64,args...)
+# """Generator function for a SpectralTransform struct in case the number format is not provided.
+# Use Float64 as default."""
+# SpectralTransform(args...) = SpectralTransform(Float64,args...)
 
 "Generator function for a SpectralTransform struct pulling in parameters from a Parameters struct."
 function SpectralTransform(P::Parameters)
-    T = triangular_truncation(trunc=P.trunc)
-    return SpectralTransform(P.NF,T.nlon,T.nlat,P.trunc,P.radius_earth,P.recompute_legendre)
+    @unpack NF, grid, trunc, recompute_legendre = P
+    return SpectralTransform(NF,grid,trunc,recompute_legendre)
 end
 
-# don't recompute triangular truncation if Geometry is already available
-SpectralTransform(P::Parameters,G::Geometry) = SpectralTransform(P.NF,G.nlon,G.nlat,P.trunc,
-                                                                P.radius_earth,P.recompute_legendre)
+# # don't recompute triangular truncation if Geometry is already available
+# SpectralTransform(P::Parameters,G::Geometry) = SpectralTransform(P.NF,P.grid,G.nlon,G.nlat,P.trunc,
+#                                                                 P.radius_earth,P.recompute_legendre)
 
 """
     ϵ = ϵ(NF,l,m) 
@@ -341,19 +345,13 @@ Backward or inverse spectral transform (spectral to grid space) from coefficient
 of `alms` the corresponding grid space resolution is retrieved based on triangular truncation and a 
 SpectralTransform struct `S` is allocated to execute `gridded(alms,S)`."""
 function gridded(   alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
-                    recompute_legendre::Bool=true       # saves memory
+                    recompute_legendre::Bool=true,      # saves memory
+                    grid::Type{<:AbstractGrid}=FullGaussianGrid,
                     ) where NF                          # number format NF
 
     _, mmax = size(alms) .- 1                           # -1 for 0-based degree l, order m
-
-    # get grid size from spectral resolution via triangular_truncation
-    # use mmax instead of lmax in case lmax = mmax + 1 (required in the meridional gradient recursion)
-    T = triangular_truncation(trunc=mmax)           
-    @unpack nlon, nlat = T                              # number of longitudes, number of latitudes
-    
-    radius = 1                                          # only needed for SpectralTransform() but not used
-    S = SpectralTransform(NF,nlon,nlat,mmax,radius,recompute_legendre)
-    return gridded(alms,S)          # now execute the in-place version
+    S = SpectralTransform(NF,grid,mmax,recompute_legendre)
+    return gridded(alms,S)
 end
 
 """
@@ -387,7 +385,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
                     ) where {NF<:AbstractFloat}
     
     @unpack cos_colat, sin_colat, lon_offset = S
-    @unpack recompute_legendre, Λ, Λs, legendre_weights = S
+    @unpack recompute_legendre, Λ, Λs, quadrature_weights = S
     @unpack rfft_plan = S
     
     recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
@@ -416,11 +414,11 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         # Legendre transform in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
         Λ_ilat = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
-        legendre_weight = legendre_weights[ilat]                    # weights normalised with π/nlat
+        quadrature_weight = quadrature_weights[ilat]                # weights normalised with π/nlat
 
         lm = 0                                                      # single index for spherical harmonics
         for m in 1:mmax+1                                           # Σ_{m=0}^{mmax}, but 1-based index
-            w = legendre_weight * cis((m-1) * -lon_offset)          # apply Legendre weights on Gaussian
+            w = quadrature_weight * cis((m-1) * -lon_offset)          # apply Legendre weights on Gaussian
             an = fn[m] * w                                          # latitudes for leakage-free transform
             as = fs[m] * w
             for l in m:lmax+1
@@ -443,19 +441,17 @@ on the size of `map` this function retrieves the corresponding spectral resoluti
 truncation and sets up a SpectralTransform struct `S` to execute `spectral(map,S)`."""
 function spectral(  map::AbstractMatrix{NF};        # gridded field nlon x nlat
                     recompute_legendre::Bool=true,  # saves memory
+                    grid::Type{<:AbstractGrid}=FullGaussianGrid
                     ) where NF                      # number format NF
 
     # check grid is compatible with triangular spectral truncation
     nlon, nlat = size(map)
     @boundscheck nlon == 2nlat || throw(BoundsError)
+    @boundscheck iseven(nlat) || throw(BoundsError)
+    nlat_half = nlat÷2
+    trunc = get_truncation(grid,nlat_half)
 
-    # Spectral resolution via triangular truncation
-    T = triangular_truncation(;nlon)                # largest trunc that satisfies the constraints
-    @unpack trunc = T                               # spectral truncation
-
-    # allocate spectral transform struct
-    radius = 1  # only needed for argument compatibility
-    S = SpectralTransform(NF,nlon,nlat,trunc,radius,recompute_legendre)
+    S = SpectralTransform(NF,grid,trunc,recompute_legendre)
     return spectral(map,S)
 end
 
@@ -474,7 +470,7 @@ function spectral(  map::AbstractMatrix{NF},    # gridded field nlon x nlat
     @boundscheck nlon == 2nlat || throw(BoundsError)
     @boundscheck nlon == S.nlon || throw(BoundsError)
 
-    # always use one more l for consistency with 
+    # always use one more l for consistency with vector quantities and 
     alms = LowerTriangularMatrix{Complex{NF}}(undef,S.lmax+2,S.mmax+1)
     return spectral!(alms,map,S)                # in-place version
 end

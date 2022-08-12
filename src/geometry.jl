@@ -1,25 +1,37 @@
 """
-Geometry struct containing parameters and arrays describing the Gaussian grid
+    Geometry{NF<:AbstractFloat}
+
+Geometry struct containing parameters and arrays describing an iso-latitude grid <:AbstractGrid
 and the vertical levels. NF is the number format used for the precomputed constants.
 """
 struct Geometry{NF<:AbstractFloat}      # NF: Number format
 
+    # GRID TYPE AND RESOLUTION
+    grid::Type{<:AbstractGrid}
+    nresolution::Int    # resolution parameter nlat_half or nside for HEALPix
+
     # GRID-POINT SPACE
-    nlon::Int           # Number of longitudes
+    nlon::Int           # Maximum number of longitudes (at/around Equator)
     nlat::Int           # Number of latitudes
     nlev::Int           # Number of vertical levels
     nlat_half::Int      # Number of latitudes in one hemisphere
-    nlon_half::Int      # Half the number of longitudes
+    nside::Int          # HEALPix only, nside^2 are the # of grid points in each of the 12 base pixels
+    npoints::Int        # total number of grid points
     radius_earth::Real  # Earth's radius [m]
 
-    dlon::NF                # grid spacing in longitude
-    dlat::NF                # average grid spacing in latitude
-    lon::Vector{NF}         # array of longitudes (0...2π)
-    lond::Vector{Float64}   # array of longitudes in degrees (0...360˚)
+    # LATITUDES (either Gaussian, equi-angle or HEALPix lats, depending on grid)
     lat::Vector{NF}         # array of latitudes (π/2...-π/2)
     latd::Vector{Float64}   # array of latitudes in degrees (90˚...-90˚)
     colat::Vector{NF}       # array of colatitudes (0...π)
     colatd::Vector{Float64} # array of colatitudes in degrees (0...180˚)
+
+    # LONGITUDES
+    lon::Vector{NF}         # full grids only: array of longitudes (0...2π)
+    lond::Vector{Float64}   # array of longitudes in degrees (0...360˚)
+
+    # COORDINATES
+    lons::Vector{NF}        # longitude (0...2π) for each grid point in ring order
+    lats::Vector{NF}        # latitude (π/2...-π/2) for each grid point in ring order
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     n_stratosphere_levels::Int      # number of upper levels for stratosphere
@@ -52,33 +64,36 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
 end
 
 """
-Defines the geometry.
+    G = Geometry(P::Parameters)
+
+Generator function to create the Geometry struct from parameters in `P`.
 """
 function Geometry(P::Parameters)
 
-    @unpack trunc, nlev = P                         # spectral truncation, number of vertical levels
+    @unpack grid, trunc, nlev = P                   # grid type, spectral truncation, # of vertical levels
     @unpack radius_earth, rotation_earth, akap = P  # radius of earth, angular frequency, ratio of gas consts
     @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
 
-    tri_trunc = triangular_truncation(;trunc)       # get grid size via triangular truncation
-    @unpack nlon, nlat = tri_trunc                  # number of longitudes, latitudes
+    # RESOLUTION PARAMETERS
+    nresolution = get_resolution(grid,trunc)        # resolution parameter, nlat_half/nside for HEALPixGrid
+    nlat_half = get_nlat_half(grid,nresolution)     # contains equator for HEALPix
+    nlat = 2nlat_half - nlat_odd(grid)              # one less if grids have odd # of latitude rings
+    nlon = get_nlon(grid,nresolution)               # number of longitudes around the equator
+    nside = grid isa HEALPixGrid ? nresolution : 0  # nside is only defined for HEALPixGrid (npoints)
+    npoints = get_npoints(grid,nresolution)         # total number of grid points
 
-    nlat_half = nlat ÷ 2
-    nlon_half = nlon ÷ 2
+    # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
+    colat = get_colat(grid,nresolution)             # colatitude in radians
+    lat = π/2 .- colat                              # latitude in radians
+    colatd = colat*360/2π                           # and the same in degree 0...180˚
+    latd = lat*360/2π                               # 90˚...-90˚
 
-    # GRID SPACE ARRAYS lon is equi-spaced
-    dlon = 360 / nlon                       # grid spacing in longitude
-    dlat = 180 / nlat                       # average grid spacing in latitude
-    lond = Array(0:dlon:360-dlon)           # array of longitudes in degrees 0...360˚
-    lon = lond/360*2π                       # array of longitudes 0...2π
-    
-    # REGULAR GAUSSIAN GRID, latitudes are not equi-distant
-    # Zero nodes of the (unassociated) legendre polynomial order nlat
-    nodes = FastGaussQuadrature.gausslegendre(nlat)[1]
-    colat = π .- acos.(nodes)               # colatitudes 0...π
-    colatd = 180 .- acosd.(nodes)           # colatitudes in degrees 0...180˚
-    lat = -asin.(nodes)                     # latitudes π/2...-π/2
-    latd = -asind.(nodes)                   # latitudes in degrees 90˚...-90˚
+    # LONGITUDE VECTORS (empty for reduced grids)
+    lon = get_lon(grid,nresolution)                 # array of longitudes 0...2π
+    lond = lon*360/2π                               # array of longitudes in degrees 0...360˚
+
+    # COORDINATES for every grid point in ring order
+    lats,lons = get_colatlons(grid,nresolution)     # in radians
 
     # VERTICAL SIGMA COORDINATE 
     # σ = p/p0 (fraction of surface pressure)
@@ -128,8 +143,9 @@ function Geometry(P::Parameters)
     # tref3=fsgr.*tref #this actually is the correct definition. Needs better naming convention 
 
     # conversion to number format NF happens here
-    Geometry{P.NF}( nlon,nlat,nlev,nlat_half,nlon_half,radius_earth,
-                    dlon,dlat,lon,lond,lat,latd,colat,colatd,
+    Geometry{P.NF}( grid,nresolution,
+                    nlon,nlat,nlev,nlat_half,nside,npoints,radius_earth,
+                    lat,latd,colat,colatd,lon,lond,lons,lats,
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,
