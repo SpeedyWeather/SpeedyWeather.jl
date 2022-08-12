@@ -7,6 +7,7 @@ module SpeedyWeather
     # NUMERICS
     import FastGaussQuadrature
     import AssociatedLegendrePolynomials
+    import Healpix
     import FFTW
     import Primes
     import LinearAlgebra
