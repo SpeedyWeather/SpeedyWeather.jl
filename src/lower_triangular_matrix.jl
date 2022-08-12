@@ -14,7 +14,7 @@ struct LowerTriangularMatrix{T} <: AbstractMatrix{T}
             "$(m)x$(n) LowerTriangularMatrix{$T} with $(nonzeros(m,n)) non-zero entries.")
 end
 
-LowerTriangularMatrix(v::AbstractVector{T},m::Integer,n::Integer) where T= LowerTriangularMatrix{T}(v,m,n)
+LowerTriangularMatrix(v::AbstractVector{T},m::Integer,n::Integer) where T = LowerTriangularMatrix{T}(v,m,n)
 
 # SIZE ETC
 Base.length(L::LowerTriangularMatrix) = length(L.v)     # define length as number of non-zero elements

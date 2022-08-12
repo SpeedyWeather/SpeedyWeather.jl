@@ -21,13 +21,6 @@ function Base.show(io::IO, P::PrognosticVariables)
     print(io,UnicodePlots.heatmap(ζ_grid';plot_kwargs...))
 end
 
-function Base.show(io::IO,T::TriangularTruncation)
-    print(io,"TriangularTruncation:\n"*
-                " trunc = $(T.trunc)\n"*
-                " nlon = $(T.nlon)\n"*
-                " nlat = $(T.nlat)")
-end
-
 # hack: define global constant whose element will be changed in initialize_feedback
 # used to pass on the time step to ProgressMeter.speedstring via calling this
 # constant from the ProgressMeter module
