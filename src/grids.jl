@@ -86,7 +86,7 @@ end
 
 # number of points and longitudes per ring on the HEALPix grid
 function nside_assert(nside::Integer)
-    @assert is_power_2(nside) "nside=$nside is not a power of two."
+    @assert is_power_2(nside) "HEALPixGrid: nside=$nside is not a power of 2."
     return true
 end
 
@@ -122,15 +122,111 @@ get_resolution(::Type{FullGaussianGrid},trunc::Integer) = roundup_fft(ceil(Int,(
 get_resolution(::Type{OctahedralGaussianGrid},trunc::Integer) = roundup_fft(trunc+1)
 get_resolution(::Type{HEALPixGrid},trunc::Integer) = roundup_fft(ceil(Int,(trunc+1)/2),small_primes=[2])
 
+# common interface for the resolution parameter nlat_half/nside
+get_nresolution(G::FullLatLonGrid) = G.nlat_half
+get_nresolution(G::FullGaussianGrid) = G.nlat_half
+get_nresolution(G::OctahedralGaussianGrid) = G.nlat_half
+get_nresolution(G::HEALPixGrid) = G.nside
+
+# define nlat_half for all grids (HEALPixGrid is different as it doesn't use nlat_half as resolution parameter)
+get_nlat_half(::Type{G},nlat_half::Integer) where {G<:AbstractGrid} = nlat_half
+get_nlat_half(::Type{HEALPixGrid},nside::Integer) = (nlat_healpix(nside)+1)÷2
+
+# define whether there's an odd number of latitude rings for a grid
+nlat_odd(::Type{G}) where {G<:AbstractGrid} = false
+nlat_odd(::Type{HEALPixGrid}) = true
+
+# return the maxmimum number of longitude points for a grid and its resolution parameter nlat_half/nside
+get_nlon(::Type{FullLatLonGrid},nlat_half::Integer) = 4nlat_half
+get_nlon(::Type{FullGaussianGrid},nlat_half::Integer) = 4nlat_half
+get_nlon(::Type{OctahedralGaussianGrid},nlat_half::Integer) = nlon_octahedral(nlat_half)
+get_nlon(::Type{HEALPixGrid},nside::Integer) = nside_assert(nside) ? nlon_healpix(nside) : nothing
+
+get_nlon_per_ring(::Type{FullLatLonGrid},nlat_half::Integer,iring::Integer) = 4nlat_half
+get_nlon_per_ring(::Type{FullGaussianGrid},nlat_half::Integer,iring::Integer) = 4nlat_half
+function get_nlon_per_ring(::Type{OctahedralGaussianGrid},nlat_half::Integer,iring::Integer)
+    @assert 0 < iring <= 2nlat_half "Ring $iring is outside O$nlat_half grid."
+    iring = iring > nlat_half ? 2nlat_half - iring : iring      # flip north south due to symmetry
+    return nlon_octahedral(iring)
+end
+function get_nlon_per_ring(::Type{HEALPixGrid},nside::Integer,iring::Integer)
+    nlat = nlat_healpix(nside)
+    @assert 0 < iring <= nlat "Ring $iring is outside H$nside grid."
+    nlat_half = (nlat+1)÷2
+    iring = iring > nlat_half ? nlat - iring : iring      # flip north south due to symmetry
+    return nlon_healpix(iring)
+end
+
+# total number of grid points per grid type
+get_npoints(::Type{FullLatLonGrid},nlat_half::Integer) = 8nlat_half^2
+get_npoints(::Type{FullGaussianGrid},nlat_half::Integer) = 8nlat_half^2
+get_npoints(::Type{OctahedralGaussianGrid},nlat_half::Integer) = npoints_octahedral(nlat_half)
+get_npoints(::Type{HEALPixGrid},nside::Integer) = nside_assert(nside) ? npoints_healpix(nside) : nothing
+
+# colatitude [radians] vectors
+get_colat(::Type{FullLatLonGrid},nlat_half::Integer) = [j/(2nlat_half+1)*π for j in 1:nlat_half]
+get_colat(::Type{FullGaussianGrid},nlat_half::Integer) =
+            π .- acos.(FastGaussQuadrature.gausslegendre(2nlat_half)[1])
+get_colat(::Type{OctahedralGaussianGrid},nlat_half::Integer) = get_colat(OctahedralGaussianGrid,nlat_half)
+get_colat(::Type{HEALPixGrid},nside::Integer) =
+            [acos(Healpix.ring2z(Healpix.Resolution(nside),i)) for i in nlat_healpix(nside)]
+
+# lon [radians] vectors for full grids (empty vectors otherwise)
+get_lon(::Type{FullLatLonGrid},nlat_half::Integer) = 
+            collect(range(0,2π,step=2π/get_nlon(FullLatLonGrid,nlat_half))[1:end-1])
+get_lon(::Type{FullGaussianGrid},nlat_half::Integer) = get_lon(FullLatLonGrid,nlat_half)
+get_lon(::Type{OctahedralGaussianGrid},nlat_half::Integer) = Float64[]
+get_lon(::Type{HEALPixGrid},nside::Integer) = Float64[]
+
+# get coordinates
+function get_colatlons(::Type{G},nlat_half::Integer) where {G<:Union{FullLatLonGrid,FullGaussianGrid}}
+
+    colat = get_colat(G,nlat_half)
+    lon = get_lon(G,nlat_half)
+
+    colats = zeros(get_npoints(G,nlat_half))
+    lons = zeros(get_npoints(G,nlat_half))
+
+    for j in 1:2nlat_half
+        for i in 1:get_nlon(G,nlat_half)
+            ij = i + (j-1)*2nlat_half
+            colats[ij] = colat[j]
+            lons[ij] = lon[i]
+        end
+    end
+
+    return colats,lons
+end
+
+# function get_colatlons(::Type{OctahedralGaussianGrid},nlat_half::Integer)
+
+# QUADRATURE WEIGHTS
+# gaussian_weights are exact for Gaussian latitudes when nlat > (2T+1)/2
+# clenshaw_curtis_weights are exact for equi-angle latitudes when nlat > 2T+1
+# riemann_weights not exact but used for HEALPix
+gaussian_weights(nlat_half::Integer) = FastGaussQuadrature.gausslegendre(2nlat_half)[2][1:nlat_half]
+
+function clenshaw_curtis_weights(nlat_half::Integer)
+    nlat = 2nlat_half
+    θs = get_colat(FullLatLonGrid,nlat_half)
+    return [4sin(θj)/(nlat+1)*sum([sin(p*θj)/p for p in 1:2:nlat]) for θj in θs[1:nlat_half]]
+end
+
+get_quadrature_weights(::Type{FullLatLonGrid},nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
+get_quadrature_weights(::Type{FullGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
+get_quadrature_weights(::Type{OctahedralGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
+get_quadrature_weights(::Type{HEALPixGrid},nside::Integer) =
+                nside_assert(nside) ? 2/12nside^2*[min(4iring,4nside) for iring in 1:2nside+1] : nothing
+
 # generator functions for grid
 Base.zeros(::Type{FullLatLonGrid{T}},nlat_half::Integer) where T = 
-                    FullLatLonGrid(zeros(T,8nlat_half^2),nlat_half)
+                FullLatLonGrid(zeros(T,8nlat_half^2),nlat_half)
 Base.zeros(::Type{FullGaussianGrid{T}},nlat_half::Integer) where T =
-                    FullGaussianGrid(zeros(T,8nlat_half^2),nlat_half)
+                FullGaussianGrid(zeros(T,8nlat_half^2),nlat_half)
 Base.zeros(::Type{OctahedralGaussianGrid{T}},nlat_half::Integer) where T =
-                    OctahedralGaussianGrid(zeros(T,npoints_octahedral(nlat_half)),nlat_half)
+                OctahedralGaussianGrid(zeros(T,npoints_octahedral(nlat_half)),nlat_half)
 Base.zeros(::Type{HEALPixGrid{T}},nside::Integer) where T =
-                    HEALPixGrid(zeros(T,npoints_healpix(nside)),nside)
+                HEALPixGrid(zeros(T,npoints_healpix(nside)),nside)
 
 # use Float64 if not provided
 Base.zeros(::Type{G},n::Integer) where {G<:AbstractGrid} = zeros(G{Float64},n)
