@@ -23,3 +23,30 @@
         @test all(H .== 0)
     end
 end
+
+@testset "Grid generators" begin
+    for NF in (Float32,Float64)
+        for G in (  FullLatLonGrid,
+                    FullGaussianGrid,
+                    OctahedralGaussianGrid,
+                    HEALPixGrid,
+                    )
+
+            n = 32      # resolution parameter nlat_half/nside
+            G1 = zeros(G,n)
+            G2 = zero(G1)
+            G3 = G(G2)
+
+            @test G1 == G2
+            @test G1 == G3
+            @test all(G1 .== G2)
+            @test all(G1 .== G3)
+
+            # check that G2, G3 are deep copies
+            G1[1] = 1
+            @test G1[1] == 1
+            @test G2[1] == 0
+            @test G3[1] == 0
+        end
+    end
+end
