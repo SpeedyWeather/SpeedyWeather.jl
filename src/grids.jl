@@ -135,7 +135,7 @@ Base.zeros(::Type{HEALPixGrid{T}},nside::Integer) where T =
                     HEALPixGrid(zeros(T,npoints_healpix(nside)),nside)
 
 # use Float64 if not provided
-Base.zeros(::Type{G},n::Integer) where {G<:AbstractGrid} = zero(G{Float64},n)
+Base.zeros(::Type{G},n::Integer) where {G<:AbstractGrid} = zeros(G{Float64},n)
 
 # zero element of an AbstractGrid instance G by packing a zero(::Vector) into G
 Base.zero(g::G) where {G<:AbstractGrid} = G(zero(g.v))
