@@ -2,6 +2,7 @@ module SpeedyWeather
 
     # STRUCTURE
     import Parameters: @with_kw, @unpack
+    import InteractiveUtils: subtypes
 
     # NUMERICS
     import FastGaussQuadrature
@@ -55,6 +56,7 @@ module SpeedyWeather
 
     include("utility_functions.jl")
     include("lower_triangular_matrix.jl")   # defines LowerTriangularMatrix
+    include("grids.jl")                     # defines FullGaussianGrid, OctahedralGaussianGrid, ...
     include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
 
     include("parameter_structs.jl")
@@ -63,7 +65,6 @@ module SpeedyWeather
     include("default_parameters.jl")        # defines Parameters
     include("constants.jl")                 # defines Constants
     include("geometry.jl")                  # defines Geometry
-    include("grids.jl")                     # defines FullGaussianGrid, OctahedralGaussianGrid, ...
 
     include("spectral_transform.jl")        # defines SpectralTransform
     include("spectral_gradients.jl")
