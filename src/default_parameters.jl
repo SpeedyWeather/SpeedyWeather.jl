@@ -46,7 +46,7 @@ The default values of the keywords define the default model setup.
     # VERTICAL COORDINATES
     # of the nlev vertical levels, defined by a generalised logistic function,
     # interpolating ECMWF's L31 configuration
-    GLcoefs::GenLogisticCoefs=GenLogisticCoefs()
+    GLcoefs::GenLogisticCoefs = GenLogisticCoefs{NF}()
     n_stratosphere_levels::Int=2        # number of vertical levels used for the stratosphere
 
     # DIFFUSION AND DRAG
@@ -60,7 +60,7 @@ The default values of the keywords define the default model setup.
     seasonal_cycle::Bool=true                  # Seasonal cycle?
     n_shortwave::Int=3                         # Compute shortwave radiation every n steps
     sppt_on::Bool=false                        # Turn on SPPT?
-    magnus_coefs::MagnusCoefs = MagnusCoefs()  # For computing saturation vapour pressure
+    magnus_coefs::MagnusCoefs = MagnusCoefs{NF}()  # For computing saturation vapour pressure
 
     # Large-Scale Condensation (from table B10)
     k_lsc::Int = 2                      # Index of atmospheric level at which large-scale condensation begins
