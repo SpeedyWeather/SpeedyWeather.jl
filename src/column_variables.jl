@@ -3,7 +3,8 @@
 
 Mutable struct that contains all prognostic (copies thereof) and diagnostic variables in a single column
 needed to evaluate the physical parametrizations. For now the struct is mutable as we will reuse the struct
-to iterate over horizontal grid points."""
+to iterate over horizontal grid points. Every column vector has `nlev` entries, from [1] at the top to
+[end] at the lowermost model level at the planetary boundary layer."""
 @with_kw mutable struct ColumnVariables{NF<:AbstractFloat}
 
     # COORDINATES
@@ -33,7 +34,7 @@ to iterate over horizontal grid points."""
     ## HUMIDITY AND CLOUDS
     sat_vap_pres::Vector{NF} = zeros(NF,nlev)   # Saturation vapour pressure
     sat_spec_humid::Vector{NF} = zeros(NF,nlev) # Saturation specific humidity
-    cloud_top::Int = 0                          # level of cloud top
+    cloud_top::Int = nlev+1                     # level of cloud top ()
     precip_large_scale::NF = 0                  # large-scale precipitation
 end
 
@@ -57,8 +58,8 @@ function get_column!(   C::ColumnVariables,
     C.lon = G.lons[ij]
     coslat⁻¹ = 1/cos(C.lat)
 
-    # surface pressure
-    C.log_pres = D.surface.pres.grid[ij]
+    # surface pressure (logarithm used in dynamics, convert back here)
+    C.log_pres = D.surface.pres_grid[ij]
     C.pres = exp(C.log_pres)
 
     @inbounds for (k,layer) =  enumerate(D.layers)
@@ -91,4 +92,21 @@ function write_column_tendencies!(  D::DiagnosticVariables,
     end
 end
 
-eachlayer(column::ColumnVariables) = 1:column.nlev
+"""
+    reset_column!(column::ColumnVariables)
+
+Set the accumulators (tendencies but also vertical sums and similar) back to zero
+for `column` to be reused at other grid points."""
+function reset_column!(column::ColumnVariables{NF}) where NF
+
+    fill!(column.u_tend,0)      # set tendencies to 0 for += accumulation
+    fill!(column.v_tend,0)
+    fill!(column.temp_tend,0)
+    fill!(column.humid_tend,0)
+
+    column.cloud_top = column.nlev+1
+    column.precip_large_scale = zero(NF)
+end
+
+# iterator for convenience
+eachlayer(column::ColumnVariables) = Base.OneTo(column.nlev)

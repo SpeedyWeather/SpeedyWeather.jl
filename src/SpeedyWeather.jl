@@ -48,13 +48,13 @@ module SpeedyWeather
             SpectralTransform,
             Boundaries,
             PrognosticVariables,
-            DiagnosticVariables
+            DiagnosticVariables,
+            ColumnVariables
 
     # EXPORT SPECTRAL FUNCTIONS
     export  spectral,
             gridded,
-            spectral_truncation,
-            triangular_truncation
+            spectral_truncation
 
     include("utility_functions.jl")
     include("lower_triangular_matrix.jl")   # defines LowerTriangularMatrix
@@ -91,7 +91,7 @@ module SpeedyWeather
     include("output.jl")
 
     # PHYSICS
-    include("column_variables.jl")
+    include("column_variables.jl")          # defines ColumnVariables     
     include("large_scale_condensation.jl")
 
     include("time_integration.jl")

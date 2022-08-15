@@ -32,12 +32,13 @@ function large_scale_condensation!( column::ColumnVariables{NF},
             # accumulate in tendencies (nothing is added if humidity not above threshold)
             humid_tend[k] += -(humid[k] - humid_threshold) / humid_relax_time       # Formula 22
             temp_tend[k] += -alhc / cp * min(humid_tend[k], humid_tend_max*pres)    # Formula 23
+
+            # highest model level where condensation occurs (=cloud top), initialised with nlev+1 for min here
             column.cloud_top = min(column.cloud_top, k)                             # Page 7 (last sentence)
         end
     end
 
     # 2. Precipitation due to large-scale condensation
-    column.precip_large_scale = 0
     for k in eachlayer(column)[k_lsc:end]
         Δpₖ = pres*σ_levels_thick[k]                                        # Formula 4
         column.precip_large_scale += -1 / gravity * Δpₖ * humid_tend[k]     # Formula 25
@@ -90,10 +91,10 @@ function get_saturation_specific_humidity!( column::ColumnVariables{NF},
     @unpack sat_spec_humid, sat_vap_pres, pres = column
 
     mol_ratio = convert(NF, 0.622)
-    one_minus_mol_ratio = convert(NF, 1 - mol_ratio)
+    one_minus_mol_ratio = convert(NF, 1-mol_ratio)
 
     for k in eachlayer(column)
-        pres_at_k = pres*σ_levels_full[k]       # pressure in layer k
-        sat_spec_humid[k] = mol_ratio*sat_vap_pres[k] / (pres_at_k - one_minus_mol_ratio*sat_vap_pres[k])
+        pₖ = pres*σ_levels_full[k]       # pressure in layer k
+        sat_spec_humid[k] = mol_ratio*sat_vap_pres[k] / (pₖ - one_minus_mol_ratio*sat_vap_pres[k])
     end
 end

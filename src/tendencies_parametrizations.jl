@@ -15,15 +15,10 @@ function parametrization_tendencies!(   diagn::DiagnosticVariables{NF},
     G = M.geometry
     column = ColumnVariables{NF}(nlev=diagn.nlev)
 
-    for ij in eachgridpoint(diagn)
+    for ij in eachgridpoint(diagn)      # loop over all horizontal grid points
 
-        # extract a single atmospheric column for contiguous memory access
-        get_column!(column,diagn,ij,G)
-
-        fill!(column.u_tend,0)      # set tendencies to 0 to accumulate +=
-        fill!(column.v_tend,0)      # parametrizations into
-        fill!(column.temp_tend,0)
-        fill!(column.humid_tend,0)
+        reset_column!(column)           # set accumulators back to zero for next grid point
+        get_column!(column,diagn,ij,G)  # extract an atmospheric column for contiguous memory access
 
         # calculate parametrizations
         # convection!(column, M)
