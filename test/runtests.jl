@@ -17,8 +17,8 @@ include("spectral_gradients.jl")
 include("diffusion.jl")
 include("time_stepping.jl")
 
-# PHYSICS (tests need to be updated)
-# include("humidity.jl")
+# PHYSICS
+include("column_variables.jl")
 # include("large_scale_condensation.jl")
 
 # INITIALIZATION AND INTEGRATION
