@@ -66,7 +66,7 @@ function get_column!(   C::ColumnVariables,
         C.vor[k] = layer.grid_variables.vor_grid[ij]
         C.div[k] = layer.grid_variables.div_grid[ij]
         C.u[k] = layer.grid_variables.U_grid[ij]*coslat⁻¹
-        C.v[k] = layer.grid_variables.vor_grid[ij]*coslat⁻¹
+        C.v[k] = layer.grid_variables.V_grid[ij]*coslat⁻¹
         C.temp[k] = layer.grid_variables.temp_grid[ij]
         C.humid[k] = layer.grid_variables.humid_grid[ij]
     end

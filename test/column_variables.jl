@@ -1,8 +1,8 @@
 @testset "ColumnVariables initialisation" begin
 
     # no number format provided
-    column = ColumnVariables(nlev=8)
-    @test eltype(column.temp) == Float64
+    # column = ColumnVariables(nlev=8)
+    # @test eltype(column.temp) == Float64
 
     @testset for NF in (Float16,Float32,Float64)
         column = ColumnVariables{NF}(nlev=8)
