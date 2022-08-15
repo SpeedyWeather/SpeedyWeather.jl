@@ -1,34 +1,94 @@
 """
-Struct holding quantities calculated from the physical parameterisations. All quantities
-are in grid-point space.
+    column = ColumnVariables{NF<:AbstractFloat}
+
+Mutable struct that contains all prognostic (copies thereof) and diagnostic variables in a single column
+needed to evaluate the physical parametrizations. For now the struct is mutable as we will reuse the struct
+to iterate over horizontal grid points."""
+@with_kw mutable struct ColumnVariables{NF<:AbstractFloat}
+
+    # COORDINATES
+    lat::NF = 0                         # latitude [˚N], needed for radiation?
+    lon::NF = 0                         # longitude [˚E], needed for radiation?
+    nlev::Int = 0                       # number of vertical levels
+
+    # PROGNOSTIC VARIABLES
+    vor::Vector{NF} = zeros(NF,nlev)    # vorticity, actually needed in column?
+    div::Vector{NF} = zeros(NF,nlev)    # divergence, actually needed in column?
+    u::Vector{NF} = zeros(NF,nlev)      # zonal velocity
+    v::Vector{NF} = zeros(NF,nlev)      # meridional velocity
+    temp::Vector{NF} = zeros(NF,nlev)   # temperature
+    humid::Vector{NF} = zeros(NF,nlev)  # specific humidity
+
+    # surface layer prognostic variables
+    log_pres::NF = 0                    # logarithm of surface pressure [log(hPa)]
+    pres::NF = 0                        # surface pressure [hPa]
+
+    # TENDENCIES to accumulate the parametrizations into
+    u_tend::Vector{NF} = zeros(NF,nlev)
+    v_tend::Vector{NF} = zeros(NF,nlev)
+    temp_tend::Vector{NF} = zeros(NF,nlev)
+    humid_tend::Vector{NF} = zeros(NF,nlev)
+
+    # DIAGNOSTIC VARIABLES
+    ## HUMIDITY AND CLOUDS
+    sat_vap_pres::Vector{NF} = zeros(NF,nlev)   # Saturation vapour pressure
+    sat_spec_humid::Vector{NF} = zeros(NF,nlev) # Saturation specific humidity
+    cloud_top::Int = 0                          # level of cloud top
+    precip_large_scale::NF = 0                  # large-scale precipitation
+end
+
+# use Float64 if not provided
+ColumnVariables(;kwargs...) = ColumnVariables{Float64}(;kwargs...)
+
 """
-struct ParametrizationVariables{NF<:AbstractFloat}
-    sat_vap_pressure   ::Array{NF,3}   # Saturation vapour pressure
-    sat_spec_humidity  ::Array{NF,3}   # Saturation specific humidity
-    cloud_top          ::Array{Int,2}  # Cloud-top
-    precip_large_scale ::Array{NF,2}   # Large-scale precipitation
-    humid_tend_lsc     ::Array{NF,3}   # Humidity tendencies due to large-scale condensation
-    temp_tend_lsc      ::Array{NF,3}   # Temperature tendencies due to large-scale condensation
+    get_column!(C,D,ij,G)
+
+Update `C::ColumnVariables` by copying the prognostic variables from `D::DiagnosticVariables`
+at gridpoint index `ij`. Provide `G::Geometry` for coordinate information."""
+function get_column!(   C::ColumnVariables,
+                        D::DiagnosticVariables,
+                        ij::Int,            # grid point index
+                        G::Geometry,
+                        )
+
+    @boundscheck C.nlev == D.nlev || throw(BoundsError)
+
+    C.lat = G.lats[ij]      # pull latitude, longitude for gridpoint ij from Geometry
+    C.lon = G.lons[ij]
+    coslat⁻¹ = 1/cos(C.lat)
+
+    # surface pressure
+    C.log_pres = D.surface.pres.grid[ij]
+    C.pres = exp(C.log_pres)
+
+    @inbounds for (k,layer) =  enumerate(D.layers)
+        C.vor[k] = layer.grid_variables.vor_grid[ij]
+        C.div[k] = layer.grid_variables.div_grid[ij]
+        C.u[k] = layer.grid_variables.U_grid[ij]*coslat⁻¹
+        C.v[k] = layer.grid_variables.vor_grid[ij]*coslat⁻¹
+        C.temp[k] = layer.grid_variables.temp_grid[ij]
+        C.humid[k] = layer.grid_variables.humid_grid[ij]
+    end
 end
 
 """
-Generator function for the ParametrizationVariables struct. Initialises with zeros.
-"""
-function ParametrizationVariables(G::GeoSpectral{NF}) where NF
-    @unpack nlon, nlat, nlev = G.geometry
+    write_column_tendencies!(D,C,ij,G)
 
-    sat_vap_pressure   = zeros(NF,nlon,nlat,nlev)  # Saturation vapour pressure
-    sat_spec_humidity  = zeros(NF,nlon,nlat,nlev)  # Saturation specific humidity
-    cloud_top          = zeros(Int,nlon,nlat)      # Cloud-top
-    precip_large_scale = zeros(NF,nlon,nlat)       # Large-scale precipitation
-    humid_tend_lsc     = zeros(NF,nlon,nlat,nlev)  # Humidity tendencies due to large-scale condensation
-    temp_tend_lsc      = zeros(NF,nlon,nlat,nlev)  # Temperature tendencies due to large-scale condensation
-
-    return ParametrizationVariables(sat_vap_pressure,
-                                    sat_spec_humidity,
-                                    cloud_top,
-                                    precip_large_scale,
-                                    humid_tend_lsc,
-                                    temp_tend_lsc,
+Write the parametrization tendencies from `C::ColumnVariables` into the horizontal fields
+of tendencies stored in `D::DiagnosticVariables` at gridpoint index `ij`."""
+function write_column_tendencies!(  D::DiagnosticVariables,
+                                    C::ColumnVariables,
+                                    ij::Int,            # grid point index
                                     )
+
+    @boundscheck C.nlev == D.nlev || throw(BoundsError)
+
+    @inbounds for (k,layer) =  enumerate(D.layers)
+        layer.tendencies.u_tend[ij] = C.u_tend[k]
+        layer.tendencies.v_tend[ij] = C.v_tend[k]
+        layer.tendencies.temp_grid_tend[ij] = C.temp_tend[k]
+        layer.tendencies.humid_grid_tend[ij] = C.humid_tend[k]
+    end
 end
+
+eachlayer(column::ColumnVariables) = 1:column.nlev

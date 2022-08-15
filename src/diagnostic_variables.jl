@@ -7,8 +7,11 @@ struct Tendencies{NF<:AbstractFloat}
     div_tend  ::LowerTriangularMatrix{Complex{NF}}      # Divergence of horizontal wind field [1/s]
     temp_tend ::LowerTriangularMatrix{Complex{NF}}      # Absolute temperature [K]
     humid_tend::LowerTriangularMatrix{Complex{NF}}      # Specific humidity [g/kg]
+    
     u_tend    ::Matrix{NF}                              # zonal velocity
     v_tend    ::Matrix{NF}                              # meridional velocity
+    humid_grid_tend::Matrix{NF}                         # specific humidity
+    temp_grid_tend ::Matrix{NF}                         # temperature
 end
 
 function Base.zeros(::Type{Tendencies},
@@ -19,14 +22,19 @@ function Base.zeros(::Type{Tendencies},
     @unpack lmax, mmax = S
     
     # use one more l for size compat with vector quantities
-    vor_tend    = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)     # vorticity
-    div_tend    = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)     # divergence
-    temp_tend   = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)     # absolute Temperature
-    humid_tend  = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)     # specific humidity
-    u_tend      = zeros(NF,nlon,nlat)                                         # zonal velocity
-    v_tend      = zeros(NF,nlon,nlat)                                         # meridional velocity
+    vor_tend    = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # vorticity
+    div_tend    = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # divergence
+    temp_tend   = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # absolute Temperature
+    humid_tend  = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # specific humidity
+    
+    # tendencies from parametrizations in grid-point space
+    u_tend          = zeros(NF,nlon,nlat)                                   # zonal velocity
+    v_tend          = zeros(NF,nlon,nlat)                                   # meridional velocity
+    humid_grid_tend = zeros(NF,nlon,nlat)                                   # specific humidity
+    temp_grid_tend  = zeros(NF,nlon,nlat)                                   # temperature
 
-    return Tendencies(vor_tend,div_tend,temp_tend,humid_tend,u_tend,v_tend)
+    return Tendencies(  vor_tend,div_tend,temp_tend,humid_tend,
+                        u_tend,v_tend,humid_grid_tend,temp_grid_tend)
 end
 
 """
@@ -183,35 +191,39 @@ struct DiagnosticVariablesLayer{NF<:AbstractFloat}
     tendencies          ::Tendencies{NF}
     grid_variables      ::GridVariables{NF}
     dynamics_variables  ::DynamicsVariables{NF}
+    npoints             ::Int       # number of grid points
 end
 
 function Base.zeros(::Type{DiagnosticVariablesLayer},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
 
+    @unpack npoints = G
+
     tendencies = zeros(Tendencies,G,S)
     grid_variables = zeros(GridVariables,G)
     dynamics_variables = zeros(DynamicsVariables,G,S)
 
-    return DiagnosticVariablesLayer(tendencies,grid_variables,dynamics_variables)
+    return DiagnosticVariablesLayer(tendencies,grid_variables,dynamics_variables,npoints)
 end
 
 struct SurfaceVariables{NF<:AbstractFloat}
     pres_grid::Matrix{NF}
     pres_tend::LowerTriangularMatrix{Complex{NF}}
+    npoints::Int        # number of grid points
 end
 
 function Base.zeros(::Type{SurfaceVariables},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
 
-    @unpack nlon, nlat = G
+    @unpack npoints, nlon, nlat = G
     @unpack lmax, mmax = S
 
     pres_grid = zeros(NF,nlon,nlat)
     pres_tend = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
-    return SurfaceVariables(pres_grid,pres_tend)
+    return SurfaceVariables(pres_grid,pres_tend,npoints)
 end
 
 """
@@ -221,19 +233,25 @@ Struct holding the diagnostic variables."""
 struct DiagnosticVariables{NF<:AbstractFloat}
     layers  ::Vector{DiagnosticVariablesLayer{NF}}
     surface ::SurfaceVariables{NF}
-    nlev    ::Int
+    nlev    ::Int       # number of vertical levels
+    npoints ::Int       # number of grid points
 end
 
 function Base.zeros(::Type{DiagnosticVariables},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
 
-    @unpack nlev = G
+    @unpack nlev,npoints = G
 
     layers = [zeros(DiagnosticVariablesLayer,G,S) for _ in 1:nlev]
     surface = zeros(SurfaceVariables,G,S)
 
-    return DiagnosticVariables(layers,surface,nlev)
+    return DiagnosticVariables(layers,surface,nlev,npoints)
 end
 
 DiagnosticVariables(G::Geometry{NF},S::SpectralTransform{NF}) where NF = zeros(DiagnosticVariables,G,S)
+
+# LOOP OVER ALL GRID POINTS
+eachgridpoint(diagn::DiagnosticVariables) = 1:diagn.npoints
+eachgridpoint(layer::DiagnosticVariablesLayer) = 1:layer.npoints
+eachgridpoint(surface::SurfaceVariables) = 1:surface.npoints
