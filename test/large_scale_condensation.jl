@@ -28,7 +28,6 @@ end
         SpeedyWeather.get_saturation_vapour_pressure!(column, model)
         SpeedyWeather.get_saturation_specific_humidity!(column, model)
 
-        println(column.sat_spec_humid)
         @test all(isfinite.(sat_spec_humid))
         @test !any(iszero.(sat_spec_humid))
     end
