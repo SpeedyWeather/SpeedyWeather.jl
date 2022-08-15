@@ -91,6 +91,7 @@ module SpeedyWeather
     include("output.jl")
 
     # PHYSICS
+    include("column_variables.jl")
     include("large_scale_condensation.jl")
 
     include("time_integration.jl")
