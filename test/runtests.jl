@@ -19,7 +19,7 @@ include("time_stepping.jl")
 
 # PHYSICS
 include("column_variables.jl")
-# include("large_scale_condensation.jl")
+include("large_scale_condensation.jl")
 
 # INITIALIZATION AND INTEGRATION
 include("initialize.jl")
