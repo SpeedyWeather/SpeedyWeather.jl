@@ -1,6 +1,6 @@
 abstract type AbstractGrid{T} <: AbstractVector{T} end
 
-# all Abstract grids have their grid points stored in a vector field `v`
+# all AbstractGrids have their grid points stored in a vector field `v`
 # propagate length, size, getindex, setindex! for that
 Base.length(G::AbstractGrid) = length(G.v)
 Base.size(G::AbstractGrid) = size(G.v)
@@ -12,16 +12,38 @@ end
 
 @inline Base.setindex!(G::AbstractGrid,x,k::Integer) = setindex!(G.v,x,k)
 
+
+"""
+    abstract type AbstractFullGrid{T} <: AbstractGrid{T} end
+
+An `AbstractFullGrid` is a horizontal grid with a constant number of longitude
+points across latitude rings. Different latitudes can be used, Gaussian latitudes,
+equi-angle latitdes, or others."""
+abstract type AbstractFullGrid{T} <: AbstractGrid{T} end
+
+"""
+    abstract type AbstractOctahedralGrid{T} <: AbstractGrid{T} end
+
+An `AbstractOctahedralGrid` is a horizontal grid with 16+4i longitude
+points on the latitude ring i starting with i=1 around the pole.
+Different latitudes can be used, Gaussian latitudes, equi-angle latitdes, or others."""
+abstract type AbstractOctahedralGrid{T} <: AbstractGrid{T} end
+
+"""
+    abstract type AbstractHEALPixGrid{T} <: AbstractGrid{T} end
+
+An `AbstractHEALPixGrid` is a horizontal grid similar to the standard HEALPixGrid,
+but different latitudes can be used, the default HEALPix latitudes or others."""
+abstract type AbstractHEALPixGrid{T} <: AbstractGrid{T} end
+
 """
     G = FullLatLonGrid{T}
 
-A FullLatLonGrid is a regular latitude-longitude grid that is de
-
-`nlat` equi-spaced latitudes,
+A FullLatLonGrid is a regular latitude-longitude grid with `nlat` equi-spaced latitudes,
 and the same `nlon` longitudes for every latitude ring. The grid points are closer in zonal direction
 around the poles. The values of all grid points are stored in a vector field `v` that unravels
 the data 0 to 360˚, then ring by ring, which are sorted north to south."""
-struct FullLatLonGrid{T} <: AbstractGrid{T}
+struct FullLatLonGrid{T} <: AbstractFullGrid{T}
     v::Vector{T}    # data vector, ring by ring, north to south
     nlat_half::Int  # number of latitudes on one hemisphere
 
@@ -37,7 +59,7 @@ A full Gaussian grid is a regular latitude-longitude grid that uses `nlat` Gauss
 and the same `nlon` longitudes for every latitude ring. The grid points are closer in zonal direction
 around the poles. The values of all grid points are stored in a vector field `v` that unravels
 the data 0 to 360˚, then ring by ring, which are sorted north to south."""
-struct FullGaussianGrid{T} <: AbstractGrid{T}
+struct FullGaussianGrid{T} <: AbstractFullGrid{T}
     v::Vector{T}    # data vector, ring by ring, north to south
     nlat_half::Int  # number of latitudes on one hemisphere
 
@@ -55,7 +77,7 @@ on the rings around the poles, each latitude ring towards the equator has consec
 one for each face of the octahedron. E.g. 20,24,28,32,...nlon-4,nlon,nlon,nlon-4,...,32,28,24,20.
 The maximum number of longitue points is `nlon`. The values of all grid points are stored in a vector
 field `v` that unravels the data 0 to 360˚, then ring by ring, which are sorted north to south."""
-struct OctahedralGaussianGrid{T} <: AbstractGrid{T}
+struct OctahedralGaussianGrid{T} <: AbstractOctahedralGrid{T}
     v::Vector{T}    # data vector, ring by ring, north to south
     nlat_half::Int  # number of latitudes on one hemisphere
 
@@ -75,7 +97,7 @@ nlon_octahedral(ilat::Integer) = 16+4ilat
 A HEALPix grid with 12 faces, each `nside`x`nside` grid points, each covering the same area.
 The values of all grid points are stored in a vector field `v` that unravels the data 0 to 360˚,
 then ring by ring, which are sorted north to south."""
-struct HEALPixGrid{T} <: AbstractGrid{T}
+struct HEALPixGrid{T} <: AbstractHEALPixGrid{T}
     v::Vector{T}    # data vector, ring by ring, north to south
     nside::Int      # nside^2 is the number of pixel in each of the 12 base pixel
 
@@ -111,75 +133,88 @@ HEALPixGrid{T}(v::AbstractVector) where T = HEALPixGrid(v,round(Int,sqrt(length(
 nlat_half_octahedral(npoints::Integer) = round(Int,-9/2+sqrt((9/2)^2 + npoints/4))
 OctahedralGaussianGrid{T}(v::AbstractVector) where T = OctahedralGaussianGrid(v,nlat_half_octahedral(length(v)))
 
-# MATCHING SPECTRAL TO GRID POINT RESOLUTION
-get_truncation(::Type{FullLatLonGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
-get_truncation(::Type{FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
-get_truncation(::Type{OctahedralGaussianGrid},nlat_half::Integer) = nlat_half-1
-get_truncation(::Type{HEALPixGrid},nside::Integer) = nside_assert(nside) ? 2nside-1 : nothing
+# generator functions for grid
+Base.zeros(::Type{FullLatLonGrid{T}},nlat_half::Integer) where T = 
+                FullLatLonGrid(zeros(T,8nlat_half^2),nlat_half)
+Base.zeros(::Type{FullGaussianGrid{T}},nlat_half::Integer) where T =
+                FullGaussianGrid(zeros(T,8nlat_half^2),nlat_half)
+Base.zeros(::Type{OctahedralGaussianGrid{T}},nlat_half::Integer) where T =
+                OctahedralGaussianGrid(zeros(T,npoints_octahedral(nlat_half)),nlat_half)
+Base.zeros(::Type{HEALPixGrid{T}},nside::Integer) where T =
+                HEALPixGrid(zeros(T,npoints_healpix(nside)),nside)
 
-get_resolution(::Type{FullLatLonGrid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
-get_resolution(::Type{FullGaussianGrid},trunc::Integer) = roundup_fft(ceil(Int,(3*trunc+1)/4))
-get_resolution(::Type{OctahedralGaussianGrid},trunc::Integer) = roundup_fft(trunc+1)
-get_resolution(::Type{HEALPixGrid},trunc::Integer) = roundup_fft(ceil(Int,(trunc+1)/2),small_primes=[2])
+# use Float64 if not provided
+Base.zeros(::Type{G},n::Integer) where {G<:AbstractGrid} = zeros(G{Float64},n)
+
+# zero element of an AbstractGrid instance G by packing a zero(::Vector) into G
+Base.zero(g::G) where {G<:AbstractGrid} = G(zero(g.v))
+
+# MATCHING SPECTRAL TO GRID POINT RESOLUTION
+get_truncation(::Type{<:FullLatLonGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
+get_truncation(::Type{<:FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
+get_truncation(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = nlat_half-1
+get_truncation(::Type{<:HEALPixGrid},nside::Integer) = nside_assert(nside) ? 2nside-1 : nothing
+
+get_resolution(::Type{<:FullLatLonGrid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
+get_resolution(::Type{<:FullGaussianGrid},trunc::Integer) = roundup_fft(ceil(Int,(3*trunc+1)/4))
+get_resolution(::Type{<:OctahedralGaussianGrid},trunc::Integer) = roundup_fft(trunc+1)
+get_resolution(::Type{<:HEALPixGrid},trunc::Integer) = roundup_fft(ceil(Int,(trunc+1)/2),small_primes=[2])
 
 # common interface for the resolution parameter nlat_half/nside
-get_nresolution(G::FullLatLonGrid) = G.nlat_half
-get_nresolution(G::FullGaussianGrid) = G.nlat_half
-get_nresolution(G::OctahedralGaussianGrid) = G.nlat_half
-get_nresolution(G::HEALPixGrid) = G.nside
+get_nresolution(G::AbstractFullGrid) = G.nlat_half
+get_nresolution(G::AbstractOctahedralGrid) = G.nlat_half
+get_nresolution(G::AbstractHEALPixGrid) = G.nside
 
 # define nlat_half for all grids (HEALPixGrid is different as it doesn't use nlat_half as resolution parameter)
-get_nlat_half(::Type{G},nlat_half::Integer) where {G<:AbstractGrid} = nlat_half
-get_nlat_half(::Type{HEALPixGrid},nside::Integer) = (nlat_healpix(nside)+1)÷2
+get_nlat_half(::Type{<:AbstractGrid},nlat_half::Integer) where {G<:AbstractGrid} = nlat_half
+get_nlat_half(::Type{<:AbsrtactHEALPixGrid},nside::Integer) = (nlat_healpix(nside)+1)÷2
 
 # define whether there's an odd number of latitude rings for a grid
-nlat_odd(::Type{G}) where {G<:AbstractGrid} = false
-nlat_odd(::Type{HEALPixGrid}) = true
+nlat_odd(::Type{<:AbstractFullGrid}) = false
+nlat_odd(::Type{<:AbstractOctahedralGrid}) = false
+nlat_odd(::Type{<:AbstractHEALPixGrid}) = true
 
 # return the maxmimum number of longitude points for a grid and its resolution parameter nlat_half/nside
-get_nlon(::Type{FullLatLonGrid},nlat_half::Integer) = 4nlat_half
-get_nlon(::Type{FullGaussianGrid},nlat_half::Integer) = 4nlat_half
-get_nlon(::Type{OctahedralGaussianGrid},nlat_half::Integer) = nlon_octahedral(nlat_half)
-get_nlon(::Type{HEALPixGrid},nside::Integer) = nside_assert(nside) ? nlon_healpix(nside) : nothing
+get_nlon(::Type{<:AbstractFullGrid},nlat_half::Integer) = 4nlat_half
+get_nlon(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = nlon_octahedral(nlat_half)
+get_nlon(::Type{<:AbstractHEALPixGrid},nside::Integer) = nside_assert(nside) ? nlon_healpix(nside) : nothing
 
-get_nlon_per_ring(::Type{FullLatLonGrid},nlat_half::Integer,iring::Integer) = 4nlat_half
-get_nlon_per_ring(::Type{FullGaussianGrid},nlat_half::Integer,iring::Integer) = 4nlat_half
-function get_nlon_per_ring(::Type{OctahedralGaussianGrid},nlat_half::Integer,iring::Integer)
+# get the number of longitude points at given latitude ring i number 1...J from north to south
+get_nlon_per_ring(::Type{<:AbstractFullGrid},nlat_half::Integer,iring::Integer) = 4nlat_half
+function get_nlon_per_ring(::Type{<:AbstractOctahedralGrid},nlat_half::Integer,iring::Integer)
     @assert 0 < iring <= 2nlat_half "Ring $iring is outside O$nlat_half grid."
-    iring = iring > nlat_half ? 2nlat_half - iring : iring      # flip north south due to symmetry
+    iring = iring > nlat_half ? 2nlat_half - iring + 1 : iring      # flip north south due to symmetry
     return nlon_octahedral(iring)
 end
-function get_nlon_per_ring(::Type{HEALPixGrid},nside::Integer,iring::Integer)
+function get_nlon_per_ring(::Type{<:AbstractHEALPixGrid},nside::Integer,iring::Integer)
     nlat = nlat_healpix(nside)
     @assert 0 < iring <= nlat "Ring $iring is outside H$nside grid."
     nlat_half = (nlat+1)÷2
-    iring = iring > nlat_half ? nlat - iring : iring      # flip north south due to symmetry
-    return nlon_healpix(iring)
+    iring = iring > nlat_half ? nlat - iring + 1 : iring      # flip north south due to symmetry
+    return nlon_healpix(nside,iring)
 end
 
 # total number of grid points per grid type
-get_npoints(::Type{FullLatLonGrid},nlat_half::Integer) = 8nlat_half^2
-get_npoints(::Type{FullGaussianGrid},nlat_half::Integer) = 8nlat_half^2
-get_npoints(::Type{OctahedralGaussianGrid},nlat_half::Integer) = npoints_octahedral(nlat_half)
-get_npoints(::Type{HEALPixGrid},nside::Integer) = nside_assert(nside) ? npoints_healpix(nside) : nothing
+get_npoints(::Type{<:AbstractFullGrid},nlat_half::Integer) = 8nlat_half^2
+get_npoints(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = npoints_octahedral(nlat_half)
+get_npoints(::Type{<:AbstractHEALPixGrid},nside::Integer) = nside_assert(nside) ? npoints_healpix(nside) : nothing
 
 # colatitude [radians] vectors
-get_colat(::Type{FullLatLonGrid},nlat_half::Integer) = [j/(2nlat_half+1)*π for j in 1:nlat_half]
-get_colat(::Type{FullGaussianGrid},nlat_half::Integer) =
+get_colat(::Type{<:FullLatLonGrid},nlat_half::Integer) = [j/(2nlat_half+1)*π for j in 1:nlat_half]
+get_colat(::Type{<:FullGaussianGrid},nlat_half::Integer) =
             π .- acos.(FastGaussQuadrature.gausslegendre(2nlat_half)[1])
-get_colat(::Type{OctahedralGaussianGrid},nlat_half::Integer) = get_colat(OctahedralGaussianGrid,nlat_half)
-get_colat(::Type{HEALPixGrid},nside::Integer) =
-            [acos(Healpix.ring2z(Healpix.Resolution(nside),i)) for i in nlat_healpix(nside)]
+get_colat(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = get_colat(FullGaussianGrid,nlat_half)
+get_colat(::Type{<:HEALPixGrid},nside::Integer) =
+            [acos(Healpix.ring2z(Healpix.Resolution(nside),i)) for i in 1:nlat_healpix(nside)]
 
 # lon [radians] vectors for full grids (empty vectors otherwise)
-get_lon(::Type{FullLatLonGrid},nlat_half::Integer) = 
+get_lon(::Type{<:AbstractFullGrid},nlat_half::Integer) = 
             collect(range(0,2π,step=2π/get_nlon(FullLatLonGrid,nlat_half))[1:end-1])
-get_lon(::Type{FullGaussianGrid},nlat_half::Integer) = get_lon(FullLatLonGrid,nlat_half)
-get_lon(::Type{OctahedralGaussianGrid},nlat_half::Integer) = Float64[]
-get_lon(::Type{HEALPixGrid},nside::Integer) = Float64[]
+get_lon(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = Float64[]
+get_lon(::Type{<:AbstractHEALPixGrid},nside::Integer) = Float64[]
 
 # get coordinates
-function get_colatlons(::Type{G},nlat_half::Integer) where {G<:Union{FullLatLonGrid,FullGaussianGrid}}
+function get_colatlons(G::Type{<:AbstractFullGrid},nlat_half::Integer)
 
     colat = get_colat(G,nlat_half)
     lon = get_lon(G,nlat_half)
@@ -198,7 +233,55 @@ function get_colatlons(::Type{G},nlat_half::Integer) where {G<:Union{FullLatLonG
     return colats,lons
 end
 
-# function get_colatlons(::Type{OctahedralGaussianGrid},nlat_half::Integer)
+function get_colatlons(G::Type{<:AbstractOctahedralGrid},nlat_half::Integer)
+    
+    npoints = get_npoints(G,nlat_half)
+    colat = get_colat(G,nlat_half)
+
+    colats = zeros(npoints)
+    lons = zeros(npoints)
+
+    j = 1
+    for i in 1:2nlat_half
+        nlon = get_nlon_per_ring(G,nlat_half,i)
+        lon = collect(0:2π/nlon:2π-π/nlon)
+
+        colats[j:j+nlon-1] .= colat[i]
+        lons[j:j+nlon-1] .= lon
+        println((j,j+nlon-1,j+nlon-1-j+1))
+
+        j += nlon
+    end
+
+    return colats, lons
+end
+
+function get_colatlons(G::Type{HEALPixGrid},nside::Integer)
+    npoints = get_npoints(G,nside)
+    colats_lons = [Healpix.pix2angRing(Healpix.Resolution(nside),i) for i in 1:npoints]
+    colats = [colat_lon[1] for colat_lon in colats_lons]
+    lons = [colat_lon[2] for colat_lon in colats_lons]
+    return colats, lons
+end
+
+# INDEXING HELPERS
+function get_last_index_per_ring(G::Type{<:AbstractGrid},nresolution::Integer)
+    nlat_half = get_nlat_half(G,nresolution)    # contains equator for HEALPix
+    nlat = 2nlat_half - nlat_odd(G)             # one less if grids have odd # of latitude rings
+    nlons = [get_nlon_per_ring(G,nresolution,i) for i in 1:nlat]
+    last_indices = cumsum(nlons)                # last index is always sum of all previous points
+    return last_indices
+end
+
+function get_first_index_per_ring(G::Type{<:AbstractGrid},nresolution::Integer)
+    last_indices = get_last_index_per_ring(G,nresolution)
+    first_indices = zero(last_indices)
+    first_indices[1] = 1
+    for i in 1:length(first_indices)-1
+        first_indices[i+1] = last_indices[i]-1
+    end
+    return first_indices
+end
 
 # QUADRATURE WEIGHTS
 # gaussian_weights are exact for Gaussian latitudes when nlat > (2T+1)/2
@@ -212,52 +295,8 @@ function clenshaw_curtis_weights(nlat_half::Integer)
     return [4sin(θj)/(nlat+1)*sum([sin(p*θj)/p for p in 1:2:nlat]) for θj in θs[1:nlat_half]]
 end
 
-get_quadrature_weights(::Type{FullLatLonGrid},nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
-get_quadrature_weights(::Type{FullGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
-get_quadrature_weights(::Type{OctahedralGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
-get_quadrature_weights(::Type{HEALPixGrid},nside::Integer) =
+get_quadrature_weights(::Type{<:FullLatLonGrid},nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
+get_quadrature_weights(::Type{<:FullGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
+get_quadrature_weights(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
+get_quadrature_weights(::Type{<:HEALPixGrid},nside::Integer) =
                 nside_assert(nside) ? 2/12nside^2*[min(4iring,4nside) for iring in 1:2nside+1] : nothing
-
-# generator functions for grid
-Base.zeros(::Type{FullLatLonGrid{T}},nlat_half::Integer) where T = 
-                FullLatLonGrid(zeros(T,8nlat_half^2),nlat_half)
-Base.zeros(::Type{FullGaussianGrid{T}},nlat_half::Integer) where T =
-                FullGaussianGrid(zeros(T,8nlat_half^2),nlat_half)
-Base.zeros(::Type{OctahedralGaussianGrid{T}},nlat_half::Integer) where T =
-                OctahedralGaussianGrid(zeros(T,npoints_octahedral(nlat_half)),nlat_half)
-Base.zeros(::Type{HEALPixGrid{T}},nside::Integer) where T =
-                HEALPixGrid(zeros(T,npoints_healpix(nside)),nside)
-
-# use Float64 if not provided
-Base.zeros(::Type{G},n::Integer) where {G<:AbstractGrid} = zeros(G{Float64},n)
-
-# zero element of an AbstractGrid instance G by packing a zero(::Vector) into G
-Base.zero(g::G) where {G<:AbstractGrid} = G(zero(g.v))
-
-"""
-    m = roundup_fft(n::Int;
-                    small_primes::Vector{Int}=[2,3,5])
-
-Returns an integer `m >= n` with only small prime factors 2, 3, 5 (default, others can be specified
-with the keyword argument `small_primes`) to obtain an efficiently fourier-transformable number of
-longitudes, m = 2^i * 3^j * 5^k >= n, with i,j,k >=0.
-"""
-function roundup_fft(n::Integer;small_primes::Vector{T}=[2,3,5]) where {T<:Integer}
-    factors_not_in_small_primes = true      # starting condition for while loop
-    n += isodd(n) ? 1 : 0                   # start with an even n
-    while factors_not_in_small_primes
-        
-        factors = Primes.factor(n)          # prime factorization
-        all_factors_small = true            # starting condition
-        
-        for i in 1:length(factors)          # loop over factors and check they are small
-            factor = factors.pe[i].first    # extract factor from factors
-            all_factors_small &= factor in small_primes
-        end
-        
-        factors_not_in_small_primes = ~all_factors_small    # all factors small will abort while loop
-        n += 2                                              # test for next larger even n
-    
-    end
-    return n-2      # subtract unnecessary last += 2 addition
-end
