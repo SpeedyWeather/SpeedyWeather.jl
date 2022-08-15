@@ -1,39 +1,49 @@
-@testset "humidity.jl" begin
-    @testset "get_saturation_vapour_pressure!" begin
-        NF = Float32
-        _, diag, model = SpeedyWeather.initialize_speedy(NF)
-        (;nlon, nlat, nlev) = model.geospectral.geometry
-        (;sat_vap_pressure) = diag.parametrization_variables
+@testset "Parametrization: Saturation vapour pressure" begin
+    @testset for NF in (Float32,Float64)
+        _, diagn, model = SpeedyWeather.initialize_speedy(NF,model=:primitive)
+        (;nlev) = model.geometry
 
-        temp_grid = 200 .+ 150 * rand(NF, nlon, nlat, nlev)  # Typical values between 200-350K
+        column = ColumnVariables{NF}(;nlev)
+        column.temp .= 200 .+ 150 * rand(NF, nlev)  # Typical values between 200-350K
 
-        SpeedyWeather.get_saturation_vapour_pressure!(sat_vap_pressure, temp_grid, model)
+        SpeedyWeather.get_saturation_vapour_pressure!(column, model)
+        (;sat_vap_pres) = column
 
-        @test all(sat_vap_pressure .> 0.0) && all(sat_vap_pressure .< 500.0)
-    end
-
-    @testset "get_saturation_specific_humidity!" begin
-        NF = Float32
-        _, diag, model = SpeedyWeather.initialize_speedy(NF)
-        (;nlon, nlat, nlev) = model.geospectral.geometry
-        (;sat_vap_pressure, sat_spec_humidity) = diag.parametrization_variables
-
-        temp_grid = 200 .+ 150 * rand(NF, nlon, nlat, nlev)  # Typical values between 200-350 K
-        pres_grid = 300 .* 1700 * rand(NF, nlon, nlat)       # Typical values between 300-2000 hPa
-
-        SpeedyWeather.get_saturation_specific_humidity!(sat_spec_humidity, sat_vap_pressure, temp_grid, pres_grid, model)
-
-        @test all(isfinite.(sat_spec_humidity))
-        @test !any(iszero.(sat_spec_humidity))
+        @test all(sat_vap_pres .> 0.0)
+        @test all(sat_vap_pres .< 500.0)
     end
 end
 
+@testset "Parametrization: Saturation specific humidity" begin
+    @testset for NF in (Float32,Float64)
+        _, diag, model = SpeedyWeather.initialize_speedy(NF,model=:primitive)
+        (;nlev) = model.geometry
 
-@testset "large_scale_condensation.jl" begin
-    @testset "get_large_scale_condensation_tendencies!" begin
-        _, diag, model = SpeedyWeather.initialize_speedy()
+        column = ColumnVariables{NF}(;nlev)
+        (;sat_vap_pres, sat_spec_humid) = column
 
-        # For now, just check that it runs without errors
-        SpeedyWeather.get_large_scale_condensation_tendencies!(diag, model)
+        column.temp = 200 .+ 150*rand(NF, nlev)     # Typical values between 200-350 K
+        column.pres = 300 + 1700*rand(NF)           # Typical values between 300-2000 hPa
+
+        SpeedyWeather.get_saturation_vapour_pressure!(column, model)
+        SpeedyWeather.get_saturation_specific_humidity!(column, model)
+
+        println(column.sat_spec_humid)
+        @test all(isfinite.(sat_spec_humid))
+        @test !any(iszero.(sat_spec_humid))
+    end
+end
+
+@testset "Parametrization: large scale condensation" begin
+    @testset for NF in (Float32,Float64)
+        _, diagn, model = SpeedyWeather.initialize_speedy(NF,model=:primitive)
+
+        column = ColumnVariables{NF}(nlev=diagn.nlev)
+
+        for ij in SpeedyWeather.eachgridpoint(diagn)
+            SpeedyWeather.reset_column!(column)
+            SpeedyWeather.get_column!(column,diagn,ij,model.geometry)
+            SpeedyWeather.large_scale_condensation!(column, model)
+        end
     end
 end

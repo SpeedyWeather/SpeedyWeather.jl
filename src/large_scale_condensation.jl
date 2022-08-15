@@ -11,10 +11,11 @@ function large_scale_condensation!( column::ColumnVariables{NF},
 
     @unpack humid, pres = column            # prognostic variables: specific humidity, surface pressure
     @unpack temp_tend, humid_tend = column  # tendencies to write into
+    @unpack sat_spec_humid = column         # intermediate variable
+    @unpack nlev = column
 
     # 1. Tendencies of humidity and temperature due to large-scale condensation
-    # skip the planetary boundary layer, k_lsc is lowest level for precip 
-    for k in eachlayer(column)[k_lsc:end]
+    for k in eachlayer(column)[k_lsc:end]   # top to bottom, skip stratospheric levels via k_lsc
         
         # Relative humidity threshold for condensation (Formula 24)
         σₖ² = σ_levels_full[k]^2
@@ -26,7 +27,7 @@ function large_scale_condensation!( column::ColumnVariables{NF},
         # Impose a maximum heating rate to avoid grid-point storm instability
         # This formula does not appear in the original Speedy documentation
         humid_tend_max = 10σₖ² / 3600humid_relax_time
-        humid_threshold = RH_threshold * sat_spec_humidity[k]  # Specific humidity threshold for condensation
+        humid_threshold = RH_threshold * sat_spec_humid[k]      # Specific humidity threshold for condensation
 
         if humid[k] > humid_threshold
             # accumulate in tendencies (nothing is added if humidity not above threshold)
@@ -39,7 +40,7 @@ function large_scale_condensation!( column::ColumnVariables{NF},
     end
 
     # 2. Precipitation due to large-scale condensation
-    for k in eachlayer(column)[k_lsc:end]
+    for k in eachlayer(column)[k_lsc:end]                                   # top to bottom, skip stratosphere
         Δpₖ = pres*σ_levels_thick[k]                                        # Formula 4
         column.precip_large_scale += -1 / gravity * Δpₖ * humid_tend[k]     # Formula 25
     end
