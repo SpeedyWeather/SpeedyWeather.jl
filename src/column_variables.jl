@@ -13,8 +13,6 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     nlev::Int = 0                       # number of vertical levels
 
     # PROGNOSTIC VARIABLES
-    vor::Vector{NF} = zeros(NF,nlev)    # vorticity, actually needed in column?
-    div::Vector{NF} = zeros(NF,nlev)    # divergence, actually needed in column?
     u::Vector{NF} = zeros(NF,nlev)      # zonal velocity
     v::Vector{NF} = zeros(NF,nlev)      # meridional velocity
     temp::Vector{NF} = zeros(NF,nlev)   # temperature
@@ -33,9 +31,10 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     # DIAGNOSTIC VARIABLES
     ## HUMIDITY AND CLOUDS
     sat_vap_pres::Vector{NF} = zeros(NF,nlev)   # Saturation vapour pressure
-    sat_spec_humid::Vector{NF} = zeros(NF,nlev) # Saturation specific humidity
-    cloud_top::Int = nlev+1                     # level of cloud top ()
+    sat_humid::Vector{NF} = zeros(NF,nlev)      # Saturation specific humidity
+    cloud_top::Int = nlev+1                     # highest level with condensation
     precip_large_scale::NF = 0                  # large-scale precipitation
+    precip_convection::NF = 0                   # convective precipitation
 end
 
 # use Float64 if not provided
@@ -63,8 +62,6 @@ function get_column!(   C::ColumnVariables,
     C.pres = exp(C.log_pres)
 
     @inbounds for (k,layer) =  enumerate(D.layers)
-        C.vor[k] = layer.grid_variables.vor_grid[ij]
-        C.div[k] = layer.grid_variables.div_grid[ij]
         C.u[k] = layer.grid_variables.U_grid[ij]*coslat⁻¹
         C.v[k] = layer.grid_variables.V_grid[ij]*coslat⁻¹
         C.temp[k] = layer.grid_variables.temp_grid[ij]
@@ -90,6 +87,11 @@ function write_column_tendencies!(  D::DiagnosticVariables,
         layer.tendencies.temp_grid_tend[ij] = C.temp_tend[k]
         layer.tendencies.humid_grid_tend[ij] = C.humid_tend[k]
     end
+
+    D.surface.precip_large_scale[ij] = C.precip_large_scale
+    D.surface.precip_convection[ij] = C.precip_convection
+
+    return nothing
 end
 
 """
@@ -106,6 +108,9 @@ function reset_column!(column::ColumnVariables{NF}) where NF
 
     column.cloud_top = column.nlev+1
     column.precip_large_scale = zero(NF)
+    column.precip_convection = zero(NF)
+
+    return nothing
 end
 
 # iterator for convenience
