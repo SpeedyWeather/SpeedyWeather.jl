@@ -1,4 +1,7 @@
-"""Check whether elements of a vector are increasing."""
+"""
+    true/false = isincreasing(v::Vector)
+
+Check whether elements of a vector `v` are increasing."""
 function isincreasing(x::Vector)
     is_increasing = true
     for i in 2:length(x)
@@ -7,7 +10,11 @@ function isincreasing(x::Vector)
     return is_increasing
 end
 
-is_power_2(i::Integer) = i & (i-1) == 0
+"""
+    true/false = is_power_2(i::Integer)
+
+Checks whether an integer `i` is a power of 2, i.e. i = 2^k, with k = 0,1,2,3,...."""
+is_power_2(i::Integer) = i != 0 ? i & (i-1) == 0 : false
 
 """
     m = roundup_fft(n::Int;
@@ -41,6 +48,13 @@ end
 function clip_negatives!(A::AbstractArray{T}) where T
     @inbounds for i in eachindex(A)
         A[i] = max(A[i],zero(T))
+    end
+end
+
+function underflow_small!(A::AbstractArray{T},ϵ::Real) where T
+    ϵT = convert(T,abs(ϵ))
+    @inbounds for i in eachindex(A)
+        A[i] = abs(A[i]) < ϵT ? zero(T) : A[i]
     end
 end
 

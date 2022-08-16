@@ -167,7 +167,7 @@ get_nresolution(G::AbstractHEALPixGrid) = G.nside
 
 # define nlat_half for all grids (HEALPixGrid is different as it doesn't use nlat_half as resolution parameter)
 get_nlat_half(::Type{<:AbstractGrid},nlat_half::Integer) where {G<:AbstractGrid} = nlat_half
-get_nlat_half(::Type{<:AbsrtactHEALPixGrid},nside::Integer) = (nlat_healpix(nside)+1)÷2
+get_nlat_half(::Type{<:AbstractHEALPixGrid},nside::Integer) = (nlat_healpix(nside)+1)÷2
 
 # define whether there's an odd number of latitude rings for a grid
 nlat_odd(::Type{<:AbstractFullGrid}) = false
@@ -200,7 +200,7 @@ get_npoints(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = npoints_octah
 get_npoints(::Type{<:AbstractHEALPixGrid},nside::Integer) = nside_assert(nside) ? npoints_healpix(nside) : nothing
 
 # colatitude [radians] vectors
-get_colat(::Type{<:FullLatLonGrid},nlat_half::Integer) = [j/(2nlat_half+1)*π for j in 1:nlat_half]
+get_colat(::Type{<:FullLatLonGrid},nlat_half::Integer) = [j/(2nlat_half+1)*π for j in 1:2nlat_half]
 get_colat(::Type{<:FullGaussianGrid},nlat_half::Integer) =
             π .- acos.(FastGaussQuadrature.gausslegendre(2nlat_half)[1])
 get_colat(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = get_colat(FullGaussianGrid,nlat_half)
@@ -218,13 +218,14 @@ function get_colatlons(G::Type{<:AbstractFullGrid},nlat_half::Integer)
 
     colat = get_colat(G,nlat_half)
     lon = get_lon(G,nlat_half)
+    nlon = get_nlon(G,nlat_half)
 
     colats = zeros(get_npoints(G,nlat_half))
     lons = zeros(get_npoints(G,nlat_half))
 
     for j in 1:2nlat_half
-        for i in 1:get_nlon(G,nlat_half)
-            ij = i + (j-1)*2nlat_half
+        for i in 1:nlon
+            ij = i + (j-1)*nlon
             colats[ij] = colat[j]
             lons[ij] = lon[i]
         end
@@ -248,7 +249,6 @@ function get_colatlons(G::Type{<:AbstractOctahedralGrid},nlat_half::Integer)
 
         colats[j:j+nlon-1] .= colat[i]
         lons[j:j+nlon-1] .= lon
-        println((j,j+nlon-1,j+nlon-1-j+1))
 
         j += nlon
     end
