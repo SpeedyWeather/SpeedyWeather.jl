@@ -210,6 +210,10 @@ end
 struct SurfaceVariables{NF<:AbstractFloat}
     pres_grid::Matrix{NF}
     pres_tend::LowerTriangularMatrix{Complex{NF}}
+
+    precip_large_scale::Matrix{NF}
+    precip_convection::Matrix{NF}
+
     npoints::Int        # number of grid points
 end
 
@@ -223,7 +227,12 @@ function Base.zeros(::Type{SurfaceVariables},
     pres_grid = zeros(NF,nlon,nlat)
     pres_tend = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
-    return SurfaceVariables(pres_grid,pres_tend,npoints)
+    precip_large_scale = zeros(NF,nlon,nlat)
+    precip_convection = zeros(NF,nlon,nlat)
+
+    return SurfaceVariables(pres_grid,pres_tend,
+                            precip_large_scale,precip_convection,
+                            npoints)
 end
 
 """
