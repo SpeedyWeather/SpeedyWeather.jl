@@ -113,7 +113,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
 
     if recompute_legendre == false          # then precompute all polynomials
         for ilat in 1:nlat_half             # only one hemisphere due to symmetry
-            AssociatedLegendrePolynomials.λlm!(Λs[ilat], lmax+1, mmax, cos_colat[ilat])
+            Legendre.λlm!(Λs[ilat], lmax+1, mmax, cos_colat[ilat])
             # underflow_small!(Λs[ilat],sqrt(floatmin(NF)))
         end
     end
@@ -236,31 +236,6 @@ end
 get_recursion_factors(lmax::Int,mmax::Int) = get_recursion_factors(Float64,lmax,mmax)
 
 """
-    Λ_ilat = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat,recompute_legendre)
-
-Base on `recompute_legendre` (true/false) this function either updates the Legendre polynomials
-`Λ` for a given latitude `ilat, cos_colat` by recomputation (`recompute_legendre == true`), or
-`Λ` is changed by creating a view on the corresponding latitude in precomputed `Λs`.
-Recomputation takes usually longer, but precomputation requires a large amount of memory for high resolution."""
-function get_legendre_polynomials!( Λ::LowerTriangularMatrix{NF1},          # Out: Polynomials at lat
-                                    Λs::Vector{LowerTriangularMatrix{NF2}}, # Precomputed polynomials
-                                    ilat::Int,                              # latitude index
-                                    cos_colat::Real,                        # cosine of colatitude
-                                    recompute_legendre::Bool                # recompute ignores Λs, but uses cos_colat
-                                    ) where {NF1,NF2}                       # number formats
-
-    if recompute_legendre
-        # Recalculate the (normalized) λ_l^m(cos(colat)) factors of the ass. Legendre polynomials
-        lmax,mmax = size(Λ) .- 1
-        cos_colat_NF = convert(NF1,cos_colat)
-        AssociatedLegendrePolynomials.λlm!(Λ, lmax, mmax, cos_colat_NF)
-        return Λ
-    else    # view on precomputed values
-        return Λs[ilat]
-    end
-end
-
-"""
     gridded!(map,alms,S)
 
 Backward or inverse spectral transform (spectral to grid space) from coefficients `alms` and SpectralTransform
@@ -289,11 +264,13 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
     gn = zeros(Complex{NF}, nfreq)          # phase factors for northern latitudes
     gs = zeros(Complex{NF}, nfreq)          # phase factors for southern latitudes
 
+    Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(NF)))
+
     @inbounds for ilat in 1:nlat_half       # symmetry: loop over northern latitudes (possibly incl Equator) only
         ilat_s = nlat - ilat + 1            # southern latitude index
 
         # Recalculate or use precomputed Legendre polynomials Λ
-        Λ_ilat = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
+        Λ_ilat = recompute_legendre ? Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, cos_colat[ilat]) : Λs[ilat]
 
         # inverse Legendre transform by looping over wavenumbers l,m
         lm = 1                              # single index for non-zero l,m indices in LowerTriangularMatrix
@@ -396,7 +373,9 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     fs = zeros(Complex{NF},nfreq)   # Fourier-transformed southern latitude
 
     # partial sums are accumulated in alms, force zeros initially.
-    fill!(alms,0)   
+    fill!(alms,0)
+
+    Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(NF)))
 
     @inbounds for ilat in 1:nlat_half   # loop over northern latitudes only due to symmetry
         ilat_s = nlat - ilat + 1        # corresponding southern latitude index
@@ -407,7 +386,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
 
         # Legendre transform in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
-        Λ_ilat = get_legendre_polynomials!(Λ,Λs,ilat,cos_colat[ilat],recompute_legendre)
+        Λ_ilat = recompute_legendre ? Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, cos_colat[ilat]) : Λs[ilat]
         quadrature_weight = quadrature_weights[ilat]                # weights normalised with π/nlat
 
         lm = 1                                                      # single index for spherical harmonics

@@ -6,7 +6,7 @@ module SpeedyWeather
 
     # NUMERICS
     import FastGaussQuadrature
-    import AssociatedLegendrePolynomials
+    import AssociatedLegendrePolynomials as Legendre
     import Healpix
     import FFTW
     import Primes
