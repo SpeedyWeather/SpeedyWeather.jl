@@ -27,7 +27,7 @@ function large_scale_condensation!( column::ColumnVariables{NF},
         # Impose a maximum heating rate to avoid grid-point storm instability
         # This formula does not appear in the original Speedy documentation
         humid_tend_max = 10σₖ² / 3600humid_relax_time
-        humid_threshold = RH_threshold * sat_spec_humid[k]      # Specific humidity threshold for condensation
+        humid_threshold = RH_threshold * sat_humid[k]               # Specific humidity threshold for condensation
 
         if humid[k] > humid_threshold
             # accumulate in tendencies (nothing is added if humidity not above threshold)
