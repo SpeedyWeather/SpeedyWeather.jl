@@ -20,7 +20,7 @@ struct SpectralTransform{NF<:AbstractFloat}
     colat::Vector{NF}       # Gaussian colatitudes (0,π) North to South Pole 
     cos_colat::Vector{NF}   # Cosine of colatitudes
     sin_colat::Vector{NF}   # Sine of colatitudes
-    lon_offset::NF          # Offset of first longitude from prime meridian
+    lon_offset::Vector{Complex{NF}}     # Offset of first longitude from prime meridian (function of m)
     # lon_offsets::Vector{NF} # Offsets for each latitude ring
 
     # NORMALIZATION
@@ -92,7 +92,8 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     colat = get_colat(grid,nresolution)             # colatitude in radians                             
     cos_colat = cos.(colat)
     sin_colat = sin.(colat)                             
-    lon_offset = π/nlon                             # offset of first longitude from prime meridian
+    offset = π/nlon                                 # offset of first longitude from prime meridian
+    lon_offset = [cis((m-1) * offset) for m in 1:mmax+1]
 
     # NORMALIZATION
     norm_sphere = 2sqrt(π)      # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
@@ -280,17 +281,24 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
 
             # integration over l = m:lmax+1
             lm_end = lm + lmax-m+1                  # first index lm plus lmax-m+1 (length of column minus 1)
+            even_degrees = iseven(lm+lm_end)        # is there an even number of degrees in column m?
 
-                                                    # for sign change of odd harmonics on southern hemisphere:
-            for lm_even in lm:2:lm_end              # split into even, iseven(l+m)
-                acc_even += alms[lm_even] * Λ_ilat[lm_even]
+            # anti-symmetry: sign change of odd harmonics on southern hemisphere
+            # but put both into one loop for contiguous memory access
+            for lm_even in lm:2:lm_end-even_degrees     
+                # split into even, i.e. iseven(l+m)
+                # acc_even += alms[lm_even] * Λ_ilat[lm_even], but written with muladd
+                acc_even = muladd(alms[lm_even],Λ_ilat[lm_even],acc_even)
+
+                # and odd (isodd(l+m)) harmonics
+                # acc_odd += alms[lm_odd] * Λ_ilat[lm_odd], but written with muladd
+                acc_odd = muladd(alms[lm_even+1],Λ_ilat[lm_even+1],acc_odd)
             end
 
-            for lm_odd in lm+1:2:lm_end             # and odd (isodd(l+m)) harmonics
-                acc_odd += alms[lm_odd] * Λ_ilat[lm_odd]
-            end
+            # for even number of degrees, one acc_even iteration is skipped, do now
+            acc_even = even_degrees ? muladd(alms[lm_end],Λ_ilat[lm_end],acc_even) : acc_even
 
-            w = cis((m-1)*lon_offset)               # longitude offset rotation
+            w = lon_offset[m]                       # longitude offset rotation
             gn[m] += (acc_even + acc_odd)*w         # accumulators for northern
             gs[m] += (acc_even - acc_odd)*w         # and southern hemisphere
 
@@ -306,38 +314,6 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
     end
 
     return map
-end
-
-"""
-    map = gridded(alms)
-
-Backward or inverse spectral transform (spectral to grid space) from coefficients `alms`. Based on the size
-of `alms` the corresponding grid space resolution is retrieved based on triangular truncation and a 
-SpectralTransform struct `S` is allocated to execute `gridded(alms,S)`."""
-function gridded(   alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
-                    recompute_legendre::Bool=true,      # saves memory
-                    grid::Type{<:AbstractGrid}=FullGaussianGrid,
-                    ) where NF                          # number format NF
-
-    _, mmax = size(alms) .- 1                           # -1 for 0-based degree l, order m
-    S = SpectralTransform(NF,grid,mmax,recompute_legendre)
-    return gridded(alms,S)
-end
-
-"""
-    map = gridded(alms,S)
-
-Backward or inverse spectral transform (spectral to grid space) from coefficients `alms` and the 
-SpectralTransform struct `S`. Allocates the output `map` with Gaussian latitudes and executes
-`gridded!(map,alms,S)`."""
-function gridded(   alms::AbstractMatrix{Complex{NF}},  # spectral coefficients
-                    S::SpectralTransform{NF}            # struct for spectral transform parameters
-                    ) where NF                          # number format NF
-
-    output = Matrix{NF}(undef,S.nlon,S.nlat)    # preallocate output
-    input = LowerTriangularMatrix(alms)         # drop the upper triangle entries
-    gridded!(output,input,S)                    # now execute the in-place version
-    return output
 end
 
 """
@@ -389,30 +365,70 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         Λ_ilat = recompute_legendre ? Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, cos_colat[ilat]) : Λs[ilat]
         quadrature_weight = quadrature_weights[ilat]                # weights normalised with π/nlat
 
-        lm = 1                                                      # single index for spherical harmonics
-        for m in 1:mmax+1                                           # Σ_{m=0}^{mmax}, but 1-based index
-            w = quadrature_weight * cis((m-1) * -lon_offset)        # apply Legendre weights on Gaussian
-            an = fn[m] * w                                          # weighted northern latitude
-            as = fs[m] * w                                          # weighted southern latitude
-            a_even = an + as                                        # sign flip due to anti-symmetry with
-            a_odd = an - as                                         # odd polynomials 
+        lm = 1                                          # single index for spherical harmonics
+        for m in 1:mmax+1                               # Σ_{m=0}^{mmax}, but 1-based index
+            w = quadrature_weight * conj(lon_offset[m]) # apply Legendre weights on Gaussian
+            an = fn[m] * w                              # weighted northern latitude
+            as = fs[m] * w                              # weighted southern latitude
+            a_even = an + as                            # sign flip due to anti-symmetry with
+            a_odd = an - as                             # odd polynomials 
 
             # integration over l = m:lmax+1
-            lm_end = lm + lmax-m+1                  # first index lm plus lmax-m+1 (length of column minus 1)
-                                                    # for sign change of odd harmonics on southern hemisphere:
-            for lm_even in lm:2:lm_end              # split into even, iseven(l+m)
-                alms[lm_even] += a_even * Λ_ilat[lm_even]
+            lm_end = lm + lmax-m+1                      # first index lm plus lmax-m+1 (length of column minus 1)
+            even_degrees = iseven(lm+lm_end)            # is there an even number of degrees in column m?
+            
+            # anti-symmetry: sign change of odd harmonics on southern hemisphere
+            # but put both into one loop for contiguous memory access
+            for lm_even in lm:2:lm_end-even_degrees
+                # split into even, i.e. iseven(l+m)
+                # alms[lm_even] += a_even * Λ_ilat[lm_even], but written with muladd
+                alms[lm_even] = muladd(a_even,Λ_ilat[lm_even],alms[lm_even])
+                
+                # and odd (isodd(l+m)) haxwxwrmonics
+                # alms[lm_odd] += a_odd * Λ_ilat[lm_odd], but written with muladd
+                alms[lm_even+1] = muladd(a_odd,Λ_ilat[lm_even+1],alms[lm_even+1])
             end
 
-            for lm_odd in lm+1:2:lm_end             # and odd (isodd(l+m)) haxwxwrmonics
-                alms[lm_odd] += a_odd * Λ_ilat[lm_odd]
-            end
+            # for even number of degrees, one even iteration is skipped, do now
+            alms[lm_end] = even_degrees ? muladd(a_even,Λ_ilat[lm_end],alms[lm_end]) : alms[lm_end]
 
-            lm = lm_end + 1                         # first index of next m column
+            lm = lm_end + 1                             # first index of next m column
         end
     end
 
     return alms
+end
+
+"""
+    map = gridded(alms)
+
+Backward or inverse spectral transform (spectral to grid space) from coefficients `alms`. Based on the size
+of `alms` the corresponding grid space resolution is retrieved based on triangular truncation and a 
+SpectralTransform struct `S` is allocated to execute `gridded(alms,S)`."""
+function gridded(   alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
+                    recompute_legendre::Bool=true,      # saves memory
+                    grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                    ) where NF                          # number format NF
+
+    _, mmax = size(alms) .- 1                           # -1 for 0-based degree l, order m
+    S = SpectralTransform(NF,grid,mmax,recompute_legendre)
+    return gridded(alms,S)
+end
+
+"""
+    map = gridded(alms,S)
+
+Backward or inverse spectral transform (spectral to grid space) from coefficients `alms` and the 
+SpectralTransform struct `S`. Allocates the output `map` with Gaussian latitudes and executes
+`gridded!(map,alms,S)`."""
+function gridded(   alms::AbstractMatrix{Complex{NF}},  # spectral coefficients
+                    S::SpectralTransform{NF}            # struct for spectral transform parameters
+                    ) where NF                          # number format NF
+
+    output = Matrix{NF}(undef,S.nlon,S.nlat)    # preallocate output
+    input = LowerTriangularMatrix(alms)         # drop the upper triangle entries
+    gridded!(output,input,S)                    # now execute the in-place version
+    return output
 end
 
 """
