@@ -74,12 +74,16 @@ end
     return r
 end
 
+@inline Base.getindex(L::LowerTriangularMatrix,r::AbstractRange) = L.v[r]
+
 @inline Base.setindex!(L::LowerTriangularMatrix,x,k::Integer) = setindex!(L.v,x,k)
 @inline function Base.setindex!(L::LowerTriangularMatrix{T},x,i::Integer,j::Integer) where T
     j > i && return zero(T)
     k = ij2k(i,j,L.m)
     setindex!(L.v,x,k)
 end
+
+# @inline Base.setindex!(L::LowerTriangularMatrix,x::AbstractVector,r::AbstractRange) = setindex!(L.v,x,r)
 
 """
     unit_range = eachharmonic(L::LowerTriangular)
