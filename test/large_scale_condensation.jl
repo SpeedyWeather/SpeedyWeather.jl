@@ -20,7 +20,7 @@ end
         (;nlev) = model.geometry
 
         column = ColumnVariables{NF}(;nlev)
-        (;sat_vap_pres, sat_spec_humid) = column
+        (;sat_vap_pres, sat_humid) = column
 
         column.temp = 200 .+ 150*rand(NF, nlev)     # Typical values between 200-350 K
         column.pres = 300 + 1700*rand(NF)           # Typical values between 300-2000 hPa
@@ -28,8 +28,8 @@ end
         SpeedyWeather.get_saturation_vapour_pressure!(column, model)
         SpeedyWeather.get_saturation_specific_humidity!(column, model)
 
-        @test all(isfinite.(sat_spec_humid))
-        @test !any(iszero.(sat_spec_humid))
+        @test all(isfinite.(sat_humid))
+        @test !any(iszero.(sat_humid))
     end
 end
 
