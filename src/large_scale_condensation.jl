@@ -6,16 +6,16 @@ function large_scale_condensation!( column::ColumnVariables{NF},
     get_saturation_specific_humidity!(column, model)
     
     @unpack gravity, RH_thresh_max, RH_thresh_range, RH_thresh_boundary, humid_relax_time = model.constants
-    @unpack cp, alhc, k_lsc = model.parameters
+    @unpack cp, alhc, n_stratosphere_levels = model.parameters
     @unpack σ_levels_full, σ_levels_thick = model.geometry
 
     @unpack humid, pres = column            # prognostic variables: specific humidity, surface pressure
     @unpack temp_tend, humid_tend = column  # tendencies to write into
-    @unpack sat_spec_humid = column         # intermediate variable
+    @unpack sat_humid = column              # intermediate variable
     @unpack nlev = column
 
     # 1. Tendencies of humidity and temperature due to large-scale condensation
-    for k in eachlayer(column)[k_lsc:end]   # top to bottom, skip stratospheric levels via k_lsc
+    for k in eachlayer(column)[n_stratosphere_levels:end]           # top to bottom, skip stratospheric levels
         
         # Relative humidity threshold for condensation (Formula 24)
         σₖ² = σ_levels_full[k]^2
@@ -40,7 +40,7 @@ function large_scale_condensation!( column::ColumnVariables{NF},
     end
 
     # 2. Precipitation due to large-scale condensation
-    for k in eachlayer(column)[k_lsc:end]                                   # top to bottom, skip stratosphere
+    for k in eachlayer(column)[n_stratosphere_levels:end]                   # top to bottom, skip stratosphere
         Δpₖ = pres*σ_levels_thick[k]                                        # Formula 4
         column.precip_large_scale += -1 / gravity * Δpₖ * humid_tend[k]     # Formula 25
     end
@@ -67,8 +67,8 @@ function get_saturation_vapour_pressure!(   column::ColumnVariables{NF},
 
     for k in eachlayer(column)
         # change coefficients for water (temp > T₀) or ice (else)
-        C₁or₂, T₁or₂ = temp[k] > T₀ ? (C₁,T₁) : (C₂,T₂)
-        sat_vap_pres[k] = e₀ * exp(C₁or₂ * (temp[k] - T₀) / (temp[k] - T₁or₂))
+        C, T = temp[k] > T₀ ? (C₁,T₁) : (C₂,T₂)
+        sat_vap_pres[k] = e₀ * exp(C * (temp[k] - T₀) / (temp[k] - T))
     end
 end
 
@@ -89,13 +89,13 @@ function get_saturation_specific_humidity!( column::ColumnVariables{NF},
                                             ) where {NF<:AbstractFloat}
 
     @unpack σ_levels_full = model.geometry
-    @unpack sat_spec_humid, sat_vap_pres, pres = column
+    @unpack sat_humid, sat_vap_pres, pres = column
 
     mol_ratio = convert(NF, 0.622)
     one_minus_mol_ratio = convert(NF, 1-mol_ratio)
 
     for k in eachlayer(column)
         pₖ = pres*σ_levels_full[k]       # pressure in layer k
-        sat_spec_humid[k] = mol_ratio*sat_vap_pres[k] / (pₖ - one_minus_mol_ratio*sat_vap_pres[k])
+        sat_humid[k] = mol_ratio*sat_vap_pres[k] / (pₖ - one_minus_mol_ratio*sat_vap_pres[k])
     end
 end
