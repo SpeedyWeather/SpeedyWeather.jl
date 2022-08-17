@@ -138,7 +138,7 @@ FullClenshawGrid(M::AbstractMatrix{T}) where T = FullClenshawGrid{T}(vec(M))
 FullGaussianGrid(M::AbstractMatrix{T}) where T = FullGaussianGrid{T}(vec(M))
 
 # and vice versa
-Matrix(G::AbstractFullGrid{T}) where T = Matrix{T}(reshape(G.v,:,2G.nlat_half))
+Base.Matrix(G::AbstractFullGrid{T}) where T = Matrix{T}(reshape(G.v,:,2G.nlat_half))
 
 # generator functions for grid
 Base.zeros(::Type{FullClenshawGrid{T}},nlat_half::Integer) where T = 
