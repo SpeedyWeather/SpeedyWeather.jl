@@ -37,19 +37,19 @@ but different latitudes can be used, the default HEALPix latitudes or others."""
 abstract type AbstractHEALPixGrid{T} <: AbstractGrid{T} end
 
 """
-    G = FullLatLonGrid{T}
+    G = FullClenshawGrid{T}
 
-A FullLatLonGrid is a regular latitude-longitude grid with `nlat` equi-spaced latitudes,
+A FullClenshawGrid is a regular latitude-longitude grid with `nlat` equi-spaced latitudes,
 and the same `nlon` longitudes for every latitude ring. The grid points are closer in zonal direction
 around the poles. The values of all grid points are stored in a vector field `v` that unravels
 the data 0 to 360˚, then ring by ring, which are sorted north to south."""
-struct FullLatLonGrid{T} <: AbstractFullGrid{T}
+struct FullClenshawGrid{T} <: AbstractFullGrid{T}
     v::Vector{T}    # data vector, ring by ring, north to south
     nlat_half::Int  # number of latitudes on one hemisphere
 
-    FullLatLonGrid{T}(v,nlat_half) where T = length(v) == 8nlat_half^2 ?
+    FullClenshawGrid{T}(v,nlat_half) where T = length(v) == 8nlat_half^2 ?
     new(v,nlat_half) : error("$(length(v))-element Vector{$(eltype(v))} cannot be used to create a "*
-        "L$nlat_half ($(4nlat_half)x$(2nlat_half)) FullLatLonGrid{$T}.")
+        "L$nlat_half ($(4nlat_half)x$(2nlat_half)) FullClenshawGrid{$T}.")
 end
 
 """
@@ -119,13 +119,13 @@ nlon_healpix(nside::Integer) = nside_assert(nside) ? 4nside : nothing
 
 # define for all grids that the type T can be infered from the elements in data vector
 # whether the resolution parameter n is provided or not (hence the ...)
-FullLatLonGrid(v::AbstractVector,n::Integer...) = FullLatLonGrid{eltype(v)}(v,n...)
+FullClenshawGrid(v::AbstractVector,n::Integer...) = FullClenshawGrid{eltype(v)}(v,n...)
 FullGaussianGrid(v::AbstractVector,n::Integer...) = FullGaussianGrid{eltype(v)}(v,n...)
 OctahedralGaussianGrid(v::AbstractVector,n::Integer...) = OctahedralGaussianGrid{eltype(v)}(v,n...)
 HEALPixGrid(v::AbstractVector,n::Integer...) = HEALPixGrid{eltype(v)}(v,n...)
 
 # infer resolution parameter nlat_half or nside from length of vector
-FullLatLonGrid{T}(v::AbstractVector) where T = FullLatLonGrid(v,round(Int,sqrt(length(v)/8)))
+FullClenshawGrid{T}(v::AbstractVector) where T = FullClenshawGrid(v,round(Int,sqrt(length(v)/8)))
 FullGaussianGrid{T}(v::AbstractVector) where T = FullGaussianGrid(v,round(Int,sqrt(length(v)/8)))
 HEALPixGrid{T}(v::AbstractVector) where T = HEALPixGrid(v,round(Int,sqrt(length(v)/12)))
 
@@ -133,9 +133,12 @@ HEALPixGrid{T}(v::AbstractVector) where T = HEALPixGrid(v,round(Int,sqrt(length(
 nlat_half_octahedral(npoints::Integer) = round(Int,-9/2+sqrt((9/2)^2 + npoints/4))
 OctahedralGaussianGrid{T}(v::AbstractVector) where T = OctahedralGaussianGrid(v,nlat_half_octahedral(length(v)))
 
+# convert an AbstractMatrix to the full grids
+Full
+
 # generator functions for grid
-Base.zeros(::Type{FullLatLonGrid{T}},nlat_half::Integer) where T = 
-                FullLatLonGrid(zeros(T,8nlat_half^2),nlat_half)
+Base.zeros(::Type{FullClenshawGrid{T}},nlat_half::Integer) where T = 
+                FullClenshawGrid(zeros(T,8nlat_half^2),nlat_half)
 Base.zeros(::Type{FullGaussianGrid{T}},nlat_half::Integer) where T =
                 FullGaussianGrid(zeros(T,8nlat_half^2),nlat_half)
 Base.zeros(::Type{OctahedralGaussianGrid{T}},nlat_half::Integer) where T =
@@ -150,12 +153,12 @@ Base.zeros(::Type{G},n::Integer) where {G<:AbstractGrid} = zeros(G{Float64},n)
 Base.zero(g::G) where {G<:AbstractGrid} = G(zero(g.v))
 
 # MATCHING SPECTRAL TO GRID POINT RESOLUTION
-get_truncation(::Type{<:FullLatLonGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
+get_truncation(::Type{<:FullClenshawGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
 get_truncation(::Type{<:FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
 get_truncation(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = nlat_half-1
 get_truncation(::Type{<:HEALPixGrid},nside::Integer) = nside_assert(nside) ? 2nside-1 : nothing
 
-get_resolution(::Type{<:FullLatLonGrid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
+get_resolution(::Type{<:FullClenshawGrid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
 get_resolution(::Type{<:FullGaussianGrid},trunc::Integer) = roundup_fft(ceil(Int,(3*trunc+1)/4))
 get_resolution(::Type{<:OctahedralGaussianGrid},trunc::Integer) = roundup_fft(trunc+1)
 get_resolution(::Type{<:HEALPixGrid},trunc::Integer) = roundup_fft(ceil(Int,(trunc+1)/2),small_primes=[2])
@@ -200,7 +203,7 @@ get_npoints(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = npoints_octah
 get_npoints(::Type{<:AbstractHEALPixGrid},nside::Integer) = nside_assert(nside) ? npoints_healpix(nside) : nothing
 
 # colatitude [radians] vectors
-get_colat(::Type{<:FullLatLonGrid},nlat_half::Integer) = [j/(2nlat_half+1)*π for j in 1:2nlat_half]
+get_colat(::Type{<:FullClenshawGrid},nlat_half::Integer) = [j/(2nlat_half+1)*π for j in 1:2nlat_half]
 get_colat(::Type{<:FullGaussianGrid},nlat_half::Integer) =
             π .- acos.(FastGaussQuadrature.gausslegendre(2nlat_half)[1])
 get_colat(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = get_colat(FullGaussianGrid,nlat_half)
@@ -209,7 +212,7 @@ get_colat(::Type{<:HEALPixGrid},nside::Integer) =
 
 # lon [radians] vectors for full grids (empty vectors otherwise)
 get_lon(::Type{<:AbstractFullGrid},nlat_half::Integer) = 
-            collect(range(0,2π,step=2π/get_nlon(FullLatLonGrid,nlat_half))[1:end-1])
+            collect(range(0,2π,step=2π/get_nlon(FullClenshawGrid,nlat_half))[1:end-1])
 get_lon(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = Float64[]
 get_lon(::Type{<:AbstractHEALPixGrid},nside::Integer) = Float64[]
 
@@ -291,11 +294,11 @@ gaussian_weights(nlat_half::Integer) = FastGaussQuadrature.gausslegendre(2nlat_h
 
 function clenshaw_curtis_weights(nlat_half::Integer)
     nlat = 2nlat_half
-    θs = get_colat(FullLatLonGrid,nlat_half)
+    θs = get_colat(FullClenshawGrid,nlat_half)
     return [4sin(θj)/(nlat+1)*sum([sin(p*θj)/p for p in 1:2:nlat]) for θj in θs[1:nlat_half]]
 end
 
-get_quadrature_weights(::Type{<:FullLatLonGrid},nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
+get_quadrature_weights(::Type{<:FullClenshawGrid},nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
 get_quadrature_weights(::Type{<:FullGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
 get_quadrature_weights(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
 get_quadrature_weights(::Type{<:HEALPixGrid},nside::Integer) =

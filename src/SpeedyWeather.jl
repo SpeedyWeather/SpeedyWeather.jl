@@ -36,7 +36,7 @@ module SpeedyWeather
     # EXPORT GRIDS
     export  LowerTriangularMatrix,
             AbstractGrid,
-            FullLatLonGrid,
+            FullClenshawGrid,
             FullGaussianGrid,
             OctahedralGaussianGrid,
             HEALPixGrid
