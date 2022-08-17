@@ -125,16 +125,20 @@ OctahedralGaussianGrid(v::AbstractVector,n::Integer...) = OctahedralGaussianGrid
 HEALPixGrid(v::AbstractVector,n::Integer...) = HEALPixGrid{eltype(v)}(v,n...)
 
 # infer resolution parameter nlat_half or nside from length of vector
-FullClenshawGrid{T}(v::AbstractVector) where T = FullClenshawGrid(v,round(Int,sqrt(length(v)/8)))
-FullGaussianGrid{T}(v::AbstractVector) where T = FullGaussianGrid(v,round(Int,sqrt(length(v)/8)))
-HEALPixGrid{T}(v::AbstractVector) where T = HEALPixGrid(v,round(Int,sqrt(length(v)/12)))
+FullClenshawGrid(v::AbstractVector{T}) where T = FullClenshawGrid(v,round(Int,sqrt(length(v)/8)))
+FullGaussianGrid(v::AbstractVector{T}) where T = FullGaussianGrid(v,round(Int,sqrt(length(v)/8)))
+HEALPixGrid(v::AbstractVector{T}) where T = HEALPixGrid(v,round(Int,sqrt(length(v)/12)))
 
 # for octahedral define the inverse of npoints_octahedral first
 nlat_half_octahedral(npoints::Integer) = round(Int,-9/2+sqrt((9/2)^2 + npoints/4))
 OctahedralGaussianGrid{T}(v::AbstractVector) where T = OctahedralGaussianGrid(v,nlat_half_octahedral(length(v)))
 
 # convert an AbstractMatrix to the full grids
-Full
+FullClenshawGrid(M::AbstractMatrix{T}) where T = FullClenshawGrid{T}(vec(M))
+FullGaussianGrid(M::AbstractMatrix{T}) where T = FullGaussianGrid{T}(vec(M))
+
+# and vice versa
+Matrix(G::AbstractFullGrid{T}) where T = Matrix{T}(reshape(G.v,:,2G.nlat_half))
 
 # generator functions for grid
 Base.zeros(::Type{FullClenshawGrid{T}},nlat_half::Integer) where T = 
