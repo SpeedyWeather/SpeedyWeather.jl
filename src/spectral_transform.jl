@@ -3,12 +3,14 @@ for the spectral transform."""
 struct SpectralTransform{NF<:AbstractFloat}
 
     # GRID
-    grid::Type{<:AbstractGrid}
+    grid::Type{<:AbstractGrid}  # grid type used
+    nresolution::Int            # resolution parameter of grid
 
     # SPECTRAL RESOLUTION
     lmax::Int       # Maximum degree l=[0,lmax] of spherical harmonics
     mmax::Int       # Maximum order m=[0,l] of spherical harmonics
     nfreq::Int      # Number of fourier frequencies (real FFT)
+    nfreq_max::Int
 
     # CORRESPONDING GRID SIZE
     nlon::Int               # Maximum number of longitude points (at Equator)
@@ -28,10 +30,15 @@ struct SpectralTransform{NF<:AbstractFloat}
     norm_forward::NF        # normalization of the Legendre weights for forward transform (spectral)
 
     # FFT plans
+    nlons::Vector{Int}
     rfft_plan::FFTW.rFFTWPlan{NF}           # grid to spectral transform
     brfft_plan::FFTW.rFFTWPlan{Complex{NF}} # spectral to grid transform (inverse)
-    # rfft_plans::Vector{FFTW.rFFTWPlan{NF}}  # one plan for each latitude ring for variable nlon
-    # brfft_plans::Vector{FFTW.rFFTWPlan{Complex{NF}}}
+    rfft_plans::Vector{FFTW.rFFTWPlan{NF}}  # one plan for each latitude ring for variable nlon
+    brfft_plans::Vector{FFTW.rFFTWPlan{Complex{NF}}}
+
+    # GRID INDICES
+    ring_indices_1st::Vector{Int}           # for each latitude ring the first and last index in
+    ring_indices_end::Vector{Int}           # grid.v data vector spanning all longitudes per ring
 
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool                # Pre or recompute Legendre polynomials
@@ -84,7 +91,8 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     nlat_half = get_nlat_half(grid,nresolution)     # contains equator for HEALPix
     nlat = 2nlat_half - nlat_odd(grid)              # one less if grids have odd # of latitude rings
     nlon = get_nlon(grid,nresolution)               # number of longitudes around the equator
-    nfreq = nlon÷2 + 1          # Number of fourier frequencies (real FFTs)
+    nfreq     = nlon÷2 + 1                          # maximum number of fourier frequencies (real FFTs)
+    nfreq_max = nlon÷2 + 1                          # maximum number of fourier frequencies (real FFTs)
     # nside = grid isa HEALPixGrid ? nresolution : 0  # nside is only defined for HEALPixGrid (npoints)
     # npoints = get_npoints(grid,nresolution)         # total number of grid points
 
@@ -100,9 +108,16 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     norm_forward = π/nlat       # normalization for forward transform to be baked into the quadrature weights
 
     # PLAN THE FFTs
+    nlons = [get_nlon_per_ring(grid,nresolution,i) for i in 1:nlat_half]
     rfft_plan = FFTW.plan_rfft(zeros(NF,nlon))
-    brfft_plan = FFTW.plan_brfft(zeros(Complex{NF},nfreq),nlon)
-    
+    brfft_plan = FFTW.plan_brfft(zeros(Complex{NF},nlon÷2+1),nlon)
+    rfft_plans = [FFTW.plan_rfft(zeros(NF,nlon)) for nlon in nlons]
+    brfft_plans = [FFTW.plan_brfft(zeros(Complex{NF},nlon÷2+1),nlon) for nlon in nlons]
+
+    # GRID INDICES PER RING
+    ring_indices_1st = get_first_index_per_ring(grid,nresolution)
+    ring_indices_end =  get_last_index_per_ring(grid,nresolution)
+
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
     Λ = zeros(LowerTriangularMatrix,lmax+2,mmax+1)  # Legendre polynomials for one latitude
 
@@ -174,11 +189,13 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
         
     # conversion to NF happens here
-    SpectralTransform{NF}(  grid,lmax,mmax,nfreq,
+    SpectralTransform{NF}(  grid,nresolution,
+                            lmax,mmax,nfreq,nfreq_max,
                             nlon,nlat,nlat_half,
                             colat,cos_colat,sin_colat,lon_offset,
                             norm_sphere,norm_forward,
-                            rfft_plan,brfft_plan,
+                            nlons,rfft_plan,brfft_plan,rfft_plans,brfft_plans,
+                            ring_indices_1st,ring_indices_end,
                             recompute_legendre,Λ,Λs,quadrature_weights,
                             ϵlms,grad_x,grad_y1,grad_y2,
                             grad_y_vordiv1,grad_y_vordiv2,vordiv_to_uv_x,
@@ -310,6 +327,90 @@ function gridded!(  map::AbstractMatrix{NF},                    # gridded output
         LinearAlgebra.mul!(@view(map[:,ilat_s]),brfft_plan,gs)  # Southern latitude
 
         fill!(gn, zero(Complex{NF}))        # set phase factors back to zero
+        fill!(gs, zero(Complex{NF}))
+    end
+
+    return map
+end
+
+function gridded!(  map::AbstractGrid{NF},                      # gridded output
+                    alms::LowerTriangularMatrix{Complex{NF}},   # spectral coefficients input
+                    S::SpectralTransform{NF}                    # precomputed parameters struct
+                    ) where {NF<:AbstractFloat}                 # number format NF
+
+    @unpack nlat, nlons, nlat_half, nfreq_max = S
+    @unpack cos_colat, lon_offset = S
+    @unpack recompute_legendre, Λ, Λs = S
+    @unpack brfft_plans = S
+    @unpack ring_indices_1st, ring_indices_end = S
+
+    recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
+    recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
+    lmax, mmax = size(alms) .- 1            # maximum degree l, order m of spherical harmonics
+
+    @boundscheck mmax+1 <= nfreq_max || throw(BoundsError)
+    @boundscheck nlat == length(cos_colat) || throw(BoundsError)
+    @boundscheck typeof(map) <: S.grid || throw(BoundsError)
+    @boundscheck get_nresolution(map) == S.nresolution || throw(BoundsError)
+
+    # preallocate work arrays
+    gn = zeros(Complex{NF}, nfreq_max)      # phase factors for northern latitudes
+    gs = zeros(Complex{NF}, nfreq_max)      # phase factors for southern latitudes
+
+    Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(NF)))
+
+    @inbounds for ilat_n in 1:nlat_half     # symmetry: loop over northern latitudes (possibly incl Equator) only
+        ilat_s = nlat - ilat_n + 1          # southern latitude index
+
+        # Recalculate or use precomputed Legendre polynomials Λ
+        Λ_ilat = recompute_legendre ? Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, cos_colat[ilat]) : Λs[ilat_n]
+
+        # inverse Legendre transform by looping over wavenumbers l,m
+        lm = 1                              # single index for non-zero l,m indices in LowerTriangularMatrix
+        for m in 1:mmax+1                   # Σ_{m=0}^{mmax}, but 1-based index
+            acc_odd  = zero(Complex{NF})    # accumulator for isodd(l+m)
+            acc_even = zero(Complex{NF})    # accumulator for iseven(l+m)
+
+            # integration over l = m:lmax+1
+            lm_end = lm + lmax-m+1                  # first index lm plus lmax-m+1 (length of column minus 1)
+            even_degrees = iseven(lm+lm_end)        # is there an even number of degrees in column m?
+
+            # anti-symmetry: sign change of odd harmonics on southern hemisphere
+            # but put both into one loop for contiguous memory access
+            for lm_even in lm:2:lm_end-even_degrees     
+                # split into even, i.e. iseven(l+m)
+                # acc_even += alms[lm_even] * Λ_ilat[lm_even], but written with muladd
+                acc_even = muladd(alms[lm_even],Λ_ilat[lm_even],acc_even)
+
+                # and odd (isodd(l+m)) harmonics
+                # acc_odd += alms[lm_odd] * Λ_ilat[lm_odd], but written with muladd
+                acc_odd = muladd(alms[lm_even+1],Λ_ilat[lm_even+1],acc_odd)
+            end
+
+            # for even number of degrees, one acc_even iteration is skipped, do now
+            acc_even = even_degrees ? muladd(alms[lm_end],Λ_ilat[lm_end],acc_even) : acc_even
+
+            w = lon_offset[m]                       # longitude offset rotation
+            gn[m] += (acc_even + acc_odd)*w         # accumulators for northern
+            gs[m] += (acc_even - acc_odd)*w         # and southern hemisphere
+
+            lm = lm_end + 1                         # first index of next m column
+        end
+
+        # Inverse Fourier transform in zonal direction
+        brfft_plan = brfft_plans[ilat_n]            # FFT planned wrt nlon on this ring
+        nlon = nlons[ilat_n]                        # number of longitudes on this ring
+        nfreq = nlon÷2+1                            # max Fourier frequency wrt to nlon
+
+        idx0 = ring_indices_1st[ilat_n]             # indices in grid for northern ring
+        idx1 = ring_indices_end[ilat_n]
+        LinearAlgebra.mul!(view(map.v,idx0:idx1),brfft_plan,view(gn,1:nfreq))
+        
+        idx0 = ring_indices_1st[ilat_s]             # indices in grid for southern ring
+        idx1 = ring_indices_end[ilat_s]       
+        LinearAlgebra.mul!(view(map.v,idx0:idx1),brfft_plan,view(gs,1:nfreq))
+
+        fill!(gn, zero(Complex{NF}))                # set phase factors back to zero
         fill!(gs, zero(Complex{NF}))
     end
 

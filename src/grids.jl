@@ -125,9 +125,9 @@ OctahedralGaussianGrid(v::AbstractVector,n::Integer...) = OctahedralGaussianGrid
 HEALPixGrid(v::AbstractVector,n::Integer...) = HEALPixGrid{eltype(v)}(v,n...)
 
 # infer resolution parameter nlat_half or nside from length of vector
-FullClenshawGrid(v::AbstractVector{T}) where T = FullClenshawGrid(v,round(Int,sqrt(length(v)/8)))
-FullGaussianGrid(v::AbstractVector{T}) where T = FullGaussianGrid(v,round(Int,sqrt(length(v)/8)))
-HEALPixGrid(v::AbstractVector{T}) where T = HEALPixGrid(v,round(Int,sqrt(length(v)/12)))
+FullClenshawGrid{T}(v::AbstractVector) where T = FullClenshawGrid(v,round(Int,sqrt(length(v)/8)))
+FullGaussianGrid{T}(v::AbstractVector) where T = FullGaussianGrid(v,round(Int,sqrt(length(v)/8)))
+HEALPixGrid{T}(v::AbstractVector) where T = HEALPixGrid(v,round(Int,sqrt(length(v)/12)))
 
 # for octahedral define the inverse of npoints_octahedral first
 nlat_half_octahedral(npoints::Integer) = round(Int,-9/2+sqrt((9/2)^2 + npoints/4))
@@ -285,7 +285,7 @@ function get_first_index_per_ring(G::Type{<:AbstractGrid},nresolution::Integer)
     first_indices = zero(last_indices)
     first_indices[1] = 1
     for i in 1:length(first_indices)-1
-        first_indices[i+1] = last_indices[i]-1
+        first_indices[i+1] = last_indices[i]+1
     end
     return first_indices
 end
