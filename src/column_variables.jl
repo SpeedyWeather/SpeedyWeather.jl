@@ -29,12 +29,19 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     humid_tend::Vector{NF} = zeros(NF,nlev)
 
     # DIAGNOSTIC VARIABLES
+    geopot::Vector{NF} = zeros(NF,nlev)
+
     ## HUMIDITY AND CLOUDS
     sat_vap_pres::Vector{NF} = zeros(NF,nlev)   # Saturation vapour pressure
     sat_humid::Vector{NF} = zeros(NF,nlev)      # Saturation specific humidity
     cloud_top::Int = nlev+1                     # highest level with condensation
     precip_large_scale::NF = 0                  # large-scale precipitation
     precip_convection::NF = 0                   # convective precipitation
+    dry_static_energy::Vector{NF} = zeros(NF,nlev)
+    moist_static_energy::Vector{NF} = zeros(NF,nlev)
+    sat_moist_static_energy::Vector{NF} = zeros(NF,nlev)
+    sat_moist_static_energy_half::Vector{NF} = zeros(NF,nlev)
+    excess_humidity::NF = 0
 end
 
 # use Float64 if not provided
@@ -61,11 +68,12 @@ function get_column!(   C::ColumnVariables,
     C.log_pres = D.surface.pres_grid[ij]
     C.pres = exp(C.log_pres)
 
-    @inbounds for (k,layer) =  enumerate(D.layers)
+    @inbounds for (k,layer) = enumerate(D.layers)
         C.u[k] = layer.grid_variables.U_grid[ij]*coslat⁻¹
         C.v[k] = layer.grid_variables.V_grid[ij]*coslat⁻¹
         C.temp[k] = layer.grid_variables.temp_grid[ij]
         C.humid[k] = layer.grid_variables.humid_grid[ij]
+        C.geopot[k] = layer.grid_variables.geopot_grid[ij]
     end
 end
 
@@ -109,6 +117,7 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     column.cloud_top = column.nlev+1
     column.precip_large_scale = zero(NF)
     column.precip_convection = zero(NF)
+    column.excess_humidity = zero(NF)
 
     return nothing
 end

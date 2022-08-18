@@ -6,7 +6,7 @@ include("utility_functions.jl")
 include("lower_triangular_matrix.jl")
 include("grids.jl")
 
-# GPU/KERNELABSTRACTIONS 
+# GPU/KERNELABSTRACTIONS
 include("kernelabstractions.jl")
 
 # SPECTRAL TRANSFORM
@@ -19,6 +19,7 @@ include("time_stepping.jl")
 
 # PHYSICS
 include("column_variables.jl")
+include("thermodynamics.jl")
 include("large_scale_condensation.jl")
 
 # INITIALIZATION AND INTEGRATION
