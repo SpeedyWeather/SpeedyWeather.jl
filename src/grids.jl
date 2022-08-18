@@ -271,6 +271,12 @@ function get_colatlons(G::Type{HEALPixGrid},nside::Integer)
     return colats, lons
 end
 
+# OFFSETS OF FIRST GRID POINT PER RING FROM PRIME MERIDIAN
+get_lon_offsets(G::Type{<:AbstractFullGrid},nlat_half::Integer) = zeros(nlat_half)
+get_lon_offsets(G::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = zeros(nlat_half)
+
+# get_lon_offsets(G::Type{<:AbstractHEALPixGrid})
+
 # INDEXING HELPERS
 function get_last_index_per_ring(G::Type{<:AbstractGrid},nresolution::Integer)
     nlat_half = get_nlat_half(G,nresolution)    # contains equator for HEALPix
