@@ -94,6 +94,7 @@ module SpeedyWeather
     include("thermodynamics.jl")
     include("tendencies_parametrizations.jl")
     include("large_scale_condensation.jl")
+    include("convection.jl")
 
     include("time_integration.jl")
     include("pretty_printing.jl")
