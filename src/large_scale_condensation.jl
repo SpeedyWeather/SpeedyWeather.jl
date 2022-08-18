@@ -4,8 +4,8 @@ function large_scale_condensation!( column::ColumnVariables{NF},
 
     get_saturation_vapour_pressure!(column, model)
     get_saturation_specific_humidity!(column, model)
-    
-    @unpack gravity, RH_thresh_max, RH_thresh_range, RH_thresh_boundary, humid_relax_time = model.constants
+
+    @unpack gravity, RH_thresh_max_lsc, RH_thresh_range_lsc, RH_thresh_PBL_lsc, humid_relax_time_lsc = model.constants
     @unpack cp, alhc, n_stratosphere_levels = model.parameters
     @unpack σ_levels_full, σ_levels_thick = model.geometry
 
@@ -16,22 +16,22 @@ function large_scale_condensation!( column::ColumnVariables{NF},
 
     # 1. Tendencies of humidity and temperature due to large-scale condensation
     for k in eachlayer(column)[n_stratosphere_levels:end]           # top to bottom, skip stratospheric levels
-        
+
         # Relative humidity threshold for condensation (Formula 24)
         σₖ² = σ_levels_full[k]^2
-        RH_threshold = RH_thresh_max + RH_thresh_range * (σₖ² - 1)
+        RH_threshold = RH_thresh_max_lsc + RH_thresh_range_lsc * (σₖ² - 1)
         if k == nlev
-            RH_threshold = max(RH_threshold, RH_thresh_boundary)
+            RH_threshold = max(RH_threshold, RH_thresh_PBL_lsc)
         end
 
         # Impose a maximum heating rate to avoid grid-point storm instability
         # This formula does not appear in the original Speedy documentation
-        humid_tend_max = 10σₖ² / 3600humid_relax_time
+        humid_tend_max = 10σₖ² / 3600humid_relax_time_lsc
         humid_threshold = RH_threshold * sat_humid[k]               # Specific humidity threshold for condensation
 
         if humid[k] > humid_threshold
             # accumulate in tendencies (nothing is added if humidity not above threshold)
-            humid_tend[k] += -(humid[k] - humid_threshold) / humid_relax_time       # Formula 22
+            humid_tend[k] += -(humid[k] - humid_threshold) / humid_relax_time_lsc   # Formula 22
             temp_tend[k] += -alhc / cp * min(humid_tend[k], humid_tend_max*pres)    # Formula 23
 
             # highest model level where condensation occurs (=cloud top), initialised with nlev+1 for min here

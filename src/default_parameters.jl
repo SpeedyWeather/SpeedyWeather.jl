@@ -16,8 +16,8 @@ The default values of the keywords define the default model setup.
     # RESOLUTION AND GRID
     trunc::Int=31                                   # spectral truncation
     grid::Type{<:AbstractGrid}=FullGaussianGrid     # define the grid type
-    nlev::Int=nlev_default(model)                   # number of vertical levels 
-    
+    nlev::Int=nlev_default(model)                   # number of vertical levels
+
     # PHYSICAL CONSTANTS
     radius_earth::Real=6.371e6          # radius of Earth [m]
     rotation_earth::Real=7.29e-5        # angular frequency of Earth's rotation [rad/s]
@@ -63,11 +63,16 @@ The default values of the keywords define the default model setup.
     magnus_coefs::MagnusCoefs = MagnusCoefs{NF}()  # For computing saturation vapour pressure
 
     # Large-Scale Condensation (from table B10)
-    k_lsc::Int = 2                      # Index of atmospheric level at which large-scale condensation begins
-    RH_thresh_boundary::Real = 0.95     # Relative humidity threshold for boundary layer
-    RH_thresh_range::Real = 0.1         # Vertical range of relative humidity threshold
-    RH_thresh_max::Real = 0.9           # Maximum relative humidity threshold
-    humid_relax_time::Real = 4.0        # Relaxation time for humidity (hours)
+    k_lsc::Int = 2                    # Index of atmospheric level at which large-scale condensation begins
+    RH_thresh_PBL_lsc::Real = 0.95    # Relative humidity threshold for boundary layer
+    RH_thresh_range_lsc::Real = 0.1   # Vertical range of relative humidity threshold
+    RH_thresh_max_lsc::Real = 0.9     # Maximum relative humidity threshold
+    humid_relax_time_lsc::Real = 4.0  # Relaxation time for humidity (hours)
+
+    # Convection
+    RH_thresh_PBL_cnv::Real = 0.9
+    RH_thresh_layers_cnv::Real = 0.7
+    humid_relax_time_cnv::Real = 6.0
 
     # TIME STEPPING
     Δt_at_T85::Real=20                  # time step in minutes for T85, scale linearly to trunc

@@ -29,10 +29,15 @@ Struct holding the parameters needed at runtime in number format NF.
 
     # PARAMETRIZATIONS
     # Large-scale condensation (occurs when relative humidity exceeds a given threshold)
-    RH_thresh_boundary::NF  # Relative humidity threshold for boundary layer
-    RH_thresh_range::NF     # Vertical range of relative humidity threshold
-    RH_thresh_max ::NF      # Maximum relative humidity threshold
-    humid_relax_time::NF    # Relaxation time for humidity (hours)
+    RH_thresh_PBL_lsc::NF    # Relative humidity threshold for LSC in PBL
+    RH_thresh_range_lsc::NF  # Vertical range of relative humidity threshold
+    RH_thresh_max_lsc ::NF   # Maximum relative humidity threshold
+    humid_relax_time_lsc::NF # Relaxation time for humidity (hours)
+
+    # Convection
+    RH_thresh_PBL_cnv::NF     # Relative humidity threshold for convection in PBL
+    RH_thresh_layers_cnv::NF  # Relative humidity threshold for convection in intermediate layers
+    humid_relax_time_cnv::NF  # Relaxation time for PBL humidity (hours)
 end
 
 """
@@ -50,7 +55,8 @@ function Constants(P::Parameters)
     @unpack trunc, Δt_at_T85, n_days, output_dt = P
 
     # PARAMETRIZATION CONSTANTS
-    @unpack RH_thresh_boundary, RH_thresh_range, RH_thresh_max, humid_relax_time = P  # Large-scale condensation
+    @unpack RH_thresh_PBL_lsc, RH_thresh_range_lsc, RH_thresh_max_lsc, humid_relax_time_lsc = P  # Large-scale condensation
+    @unpack RH_thresh_PBL_cnv, RH_thresh_layers_cnv, humid_relax_time_cnv = P  # Convection
 
     Δt_min_at_trunc = Δt_at_T85*(85/trunc)      # scale time step Δt to specified resolution
     Δt      = round(Δt_min_at_trunc*60)         # convert time step Δt from minutes to whole seconds
@@ -73,6 +79,8 @@ function Constants(P::Parameters)
                             Δt,Δt_unscaled,Δt_sec,Δt_hrs,
                             robert_filter,williams_filter,n_timesteps,
                             output_every_n_steps, n_outputsteps,
-                            drag_strat, RH_thresh_boundary, RH_thresh_range,
-                            RH_thresh_max, humid_relax_time)
+                            drag_strat, RH_thresh_PBL_lsc, RH_thresh_range_lsc,
+                            RH_thresh_max_lsc, humid_relax_time_lsc, RH_thresh_PBL_cnv,
+                            RH_thresh_layers_cnv, humid_relax_time_cnv,
+                            )
 end
