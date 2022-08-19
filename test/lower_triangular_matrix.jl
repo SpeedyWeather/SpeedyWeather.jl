@@ -17,6 +17,9 @@
 
             @test_throws BoundsError L[lmax+1,mmax]
             @test_throws BoundsError L[lmax,mmax+1]
+            
+            @test_throws BoundsError L[1,2] = 1
+            @test_throws BoundsError L[lmax*mmax+1] = 1
 
             @test Matrix(L) == A
         end

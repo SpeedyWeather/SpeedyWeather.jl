@@ -76,7 +76,7 @@ end
 
 @inline Base.setindex!(L::LowerTriangularMatrix,x,k::Integer) = setindex!(L.v,x,k)
 @inline function Base.setindex!(L::LowerTriangularMatrix{T},x,i::Integer,j::Integer) where T
-    j > i && return zero(T)
+    @boundscheck i >= j || throw(BoundsError(L,(i,j)))
     k = ij2k(i,j,L.m)
     setindex!(L.v,x,k)
 end
@@ -145,4 +145,4 @@ function Base.fill!(L::LowerTriangularMatrix{T}, x) where T
 end
 
 # GPU methods
-Adapt.adapt_structure(to, x::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix(Adapt.adapt(to, x.v), x.m, x.n)
+# Adapt.adapt_structure(to, x::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix(Adapt.adapt(to, x.v), x.m, x.n)
