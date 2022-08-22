@@ -14,7 +14,7 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     nlon::Int           # Maximum number of longitudes (at/around Equator)
     nlat::Int           # Number of latitudes
     nlev::Int           # Number of vertical levels
-    nlat_half::Int      # Number of latitudes in one hemisphere
+    nlat_half::Int      # Number of latitudes in one hemisphere (incl Equator)
     nside::Int          # HEALPix only, nside^2 are the # of grid points in each of the 12 base pixels
     npoints::Int        # total number of grid points
     radius_earth::Real  # Earth's radius [m]
