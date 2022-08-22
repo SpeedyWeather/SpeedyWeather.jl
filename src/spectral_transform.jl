@@ -37,10 +37,6 @@ struct SpectralTransform{NF<:AbstractFloat}
     rfft_plans::Vector{FFTW.rFFTWPlan{NF}}  # one plan for each latitude ring for variable nlon
     brfft_plans::Vector{FFTW.rFFTWPlan{Complex{NF}}}
 
-    # GRID INDICES
-    ring_indices_1st::Vector{Int}           # for each latitude ring the first and last index in
-    ring_indices_end::Vector{Int}           # grid.v data vector spanning all longitudes per ring
-
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool                # Pre or recompute Legendre polynomials
     Λ::LowerTriangularMatrix{Float64}       # Legendre polynomials for one latitude (requires recomputing)
@@ -113,13 +109,9 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     rfft_plans = [FFTW.plan_rfft(zeros(NF,nlon)) for nlon in nlons]
     brfft_plans = [FFTW.plan_brfft(zeros(Complex{NF},nlon÷2+1),nlon) for nlon in nlons]
 
-    # GRID INDICES PER RING
-    ring_indices_1st = get_first_index_per_ring(grid,nresolution)
-    ring_indices_end =  get_last_index_per_ring(grid,nresolution)
-
-    # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (not for full and octahedral grids)
+    # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
     _, lons = get_colatlons(grid,nresolution)
-    lon0s = lons[ring_indices_1st[1:nlat_half]]
+    lon0s = [lons[each_index_in_ring(grid,i,nresolution)[1]] for i in 1:nlat]
     lon_offsets = [cispi(m*lon0/π) for m in 0:mmax, lon0 in lon0s]
 
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
@@ -199,7 +191,6 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
                             colat,cos_colat,sin_colat,lon_offsets,
                             norm_sphere,norm_forward,
                             nlons,rfft_plan,brfft_plan,rfft_plans,brfft_plans,
-                            ring_indices_1st,ring_indices_end,
                             recompute_legendre,Λ,Λs,quadrature_weights,
                             ϵlms,grad_x,grad_y1,grad_y2,
                             grad_y_vordiv1,grad_y_vordiv2,vordiv_to_uv_x,
