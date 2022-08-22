@@ -62,3 +62,27 @@ end
         end
     end
 end
+
+@testset "Grid indices" begin
+    for G in (  FullClenshawGrid,
+                FullGaussianGrid,
+                OctahedralGaussianGrid,
+                HEALPixGrid,
+                )
+
+        n = 32      # resolution parameter nlat_half/nside
+        grid = zeros(G,n)
+
+        for i in SpeedyWeather.eachring(grid)
+            for ij in SpeedyWeather.each_index_in_ring(grid,i)
+                grid[ij] += 1
+            end
+        end
+
+        for ij in SpeedyWeather.eachgridpoint(grid)
+            @test grid[ij] == 1
+        end
+
+        @test sum(grid) == SpeedyWeather.get_npoints(G,n)
+    end
+end

@@ -78,7 +78,7 @@ function Geometry(P::Parameters)
     nresolution = get_resolution(grid,trunc)        # resolution parameter, nlat_half/nside for HEALPixGrid
     nlat_half = get_nlat_half(grid,nresolution)     # contains equator for HEALPix
     nlat = 2nlat_half - nlat_odd(grid)              # one less if grids have odd # of latitude rings
-    nlon = get_nlon(grid,nresolution)           # number of longitudes around the equator
+    nlon = get_nlon(grid,nresolution)               # number of longitudes around the equator
     nside = grid isa HEALPixGrid ? nresolution : 0  # nside is only defined for HEALPixGrid (npoints)
     npoints = get_npoints(grid,nresolution)         # total number of grid points
 

@@ -294,9 +294,15 @@ function get_first_index_per_ring(G::Type{<:AbstractGrid},nresolution::Integer)
     return first_indices
 end
 
-@inline function each_index_in_ring(::Type{<:AbstractFullGrid},     # function for full grids
-                                    i::Integer,                     # ring index north to south
-                                    nlat_half::Integer)             # resolution param
+function eachring(grid::G) where {G<:AbstractGrid}
+    nlat_half = get_nlat_half(G,get_nresolution(grid))  # contains equator for HEALPix
+    nlat = 2nlat_half - nlat_odd(G)                     # -1 for odd # of latitude rings
+    return Base.OneTo(nlat)                             # return iterable range
+end
+
+function each_index_in_ring(::Type{<:AbstractFullGrid},     # function for full grids
+                                    i::Integer,             # ring index north to south
+                                    nlat_half::Integer)     # resolution param
 
     @boundscheck 0 < i <= 2nlat_half || throw(BoundsError)  # valid ring index?
     nlon = 4nlat_half                                       # number of longitudes per ring (const)
@@ -305,9 +311,9 @@ end
     return index_1st:index_end                              # range of js in ring
 end
 
-@inline function each_index_in_ring(::Type{<:AbstractOctahedralGrid},   # function for octahedral
-                                    i::Integer,                         # ring index north to south
-                                    nlat_half::Integer)                 # resolution param
+function each_index_in_ring(::Type{<:AbstractOctahedralGrid},   # function for octahedral
+                                    i::Integer,                 # ring index north to south
+                                    nlat_half::Integer)         # resolution param
 
     @boundscheck 0 < i <= 2nlat_half || throw(BoundsError)  # ring index valid?
     if i <= nlat_half                                       # northern hemisphere
@@ -319,12 +325,12 @@ end
         index_1st = n - 2i*(i+9)                            # count backwards
         index_end = n - (2i*(i+7) - 15)
     end
-    return index_1st:index_end                               # range of js in ring
+    return index_1st:index_end                              # range of js in ring
 end
 
-@inline function each_index_in_ring(::Type{<:AbstractHEALPixGrid},  # function for HEALPix grids
-                                    i::Integer,                     # ring index north to south
-                                    nside::Integer)                 # resolution param
+function each_index_in_ring(::Type{<:AbstractHEALPixGrid},  # function for HEALPix grids
+                                    i::Integer,             # ring index north to south
+                                    nside::Integer)         # resolution param
 
     @boundscheck 0 < i < 4nside || throw(BoundsError)       # ring index valid?
     if i < nside                                            # northern polar cap
@@ -348,6 +354,8 @@ end
 @inline function each_index_in_ring(grid::G,i::Integer) where {G<:AbstractGrid}
     return each_index_in_ring(G,i,get_nresolution(grid))
 end
+
+eachgridpoint(grid::G) where {G<:AbstractGrid} = Base.OneTo(get_npoints(G,get_nresolution(grid)))
 
 # QUADRATURE WEIGHTS
 # gaussian_weights are exact for Gaussian latitudes when nlat > (2T+1)/2
