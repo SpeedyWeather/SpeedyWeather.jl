@@ -34,14 +34,29 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     ## HUMIDITY AND CLOUDS
     sat_vap_pres::Vector{NF} = zeros(NF,nlev)   # Saturation vapour pressure
     sat_humid::Vector{NF} = zeros(NF,nlev)      # Saturation specific humidity
+    sat_humid_half::Vector{NF} = zeros(NF,nlev)      # Saturation specific humidity
     cloud_top::Int = nlev+1                     # highest level with condensation
     precip_large_scale::NF = 0                  # large-scale precipitation
     precip_convection::NF = 0                   # convective precipitation
+
+    humid_half::Vector{NF} = zeros(NF,nlev)
+
     dry_static_energy::Vector{NF} = zeros(NF,nlev)
+    dry_static_energy_half::Vector{NF} = zeros(NF,nlev)
+
     moist_static_energy::Vector{NF} = zeros(NF,nlev)
+
     sat_moist_static_energy::Vector{NF} = zeros(NF,nlev)
     sat_moist_static_energy_half::Vector{NF} = zeros(NF,nlev)
+
     excess_humidity::NF = 0
+
+    # Convection
+    cloud_base_mass_flux::NF = 0
+    precip_cnv::NF = 0
+    flux_humid::Vector{NF} = zeros(NF,nlev)
+    flux_dry_static_energy::Vector{NF} = zeros(NF,nlev)
+    entrainment_profile::Vector{NF} = zeros(NF,nlev)
 end
 
 # use Float64 if not provided

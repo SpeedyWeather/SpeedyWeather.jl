@@ -1,4 +1,41 @@
 @testset "Thermodynamics" begin
+    @testset "get_thermodynamics!" begin
+        @testset for NF in (Float32, Float64)
+            _, _, model = SpeedyWeather.initialize_speedy(NF, model = :primitive)
+            (; nlev) = model.geometry
+
+            column = ColumnVariables{NF}(; nlev)
+            column.temp .= 200 .+ 150 * rand(NF, nlev)  # Typical values between 200-350K
+            column.humid .= rand(NF, nlev)              # What are typical values for humidity?
+            column.pres = 300 + 1700 * rand(NF)         # Typical values between 300-2000 hPa
+            column.geopot .= rand(NF, nlev)             # What are typical values for geopotential?
+
+            # For now, test that it runs with no errors
+            SpeedyWeather.get_thermodynamics!(column, model)
+        end
+    end
+
+    @testset "interpolate!" begin
+        @testset for NF in (Float32, Float64)
+            _, _, model = SpeedyWeather.initialize_speedy(NF, model = :primitive)
+            (; nlev) = model.geometry
+
+            column = ColumnVariables{NF}(; nlev)
+
+            A_full_level = rand(NF, nlev)
+            A_half_level = zeros(NF, nlev)
+
+            SpeedyWeather.interpolate!(A_full_level, A_half_level, column, model)
+
+            # Test that the half-level values lie between the enclosing full level values.
+            @test all(
+                (A_full_level[2:nlev] .> A_half_level[1:nlev-1] .> A_full_level[1:nlev-1])
+                .||
+                (A_full_level[2:nlev] .< A_half_level[1:nlev-1] .< A_full_level[1:nlev-1])
+                )
+        end
+    end
+
     @testset "Saturation vapour pressure" begin
         @testset for NF in (Float32, Float64)
             _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive)
@@ -82,22 +119,6 @@
 
             @test all(isfinite.(sat_moist_static_energy))
             @test !any(iszero.(sat_moist_static_energy))
-        end
-    end
-
-    @testset "Interpolate" begin
-        @testset for NF in (Float32, Float64)
-            _, _, model = SpeedyWeather.initialize_speedy(NF, model = :primitive)
-            (; nlev) = model.geometry
-
-            column = ColumnVariables{NF}(; nlev)
-            A_full_level = rand(NF, nlev)
-            A_half_level = zeros(NF, nlev)
-
-            SpeedyWeather.interpolate!(A_full_level, A_half_level, column, model)
-
-            @test all(isfinite.(A_half_level))
-            @test !any(iszero.(A_half_level))
         end
     end
 end

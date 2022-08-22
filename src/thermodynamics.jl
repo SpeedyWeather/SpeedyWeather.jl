@@ -4,18 +4,96 @@
         model::PrimitiveEquationModel{NF},
     )
 """
-function get_thermodynamics!(column, model)
+function get_thermodynamics!(
+    column::ColumnVariables{NF},
+    model::PrimitiveEquationModel{NF},
+) where {NF<:AbstractFloat}
+    # Calculate thermodynamic quantities at full levels
     saturation_vapour_pressure!(column, model)
     saturation_specific_humidity!(column, model)
     dry_static_energy!(column, model)
     moist_static_energy!(column, model)
     saturation_moist_static_energy!(column, model)
+
+    # Interpolate certain variables to half-levels
+    interpolate!(column, model)
+
     return nothing
 end
 
 """
-saturation_vapour_pressure!(column::ColumnVariables,
-                            model::PrimitiveEquationModel)
+    interpolate!(
+        column::ColumnVariables{NF},
+        model::PrimitiveEquationModel,
+    )
+"""
+function interpolate!(
+    column::ColumnVariables{NF},
+    model::PrimitiveEquationModel,
+) where {NF<:AbstractFloat}
+    @unpack humid, humid_half = column
+    @unpack sat_humid, sat_humid_half = column
+    @unpack dry_static_energy, dry_static_energy_half = column
+    @unpack sat_moist_static_energy, sat_moist_static_energy_half = column
+
+    for (full, half) in (
+        (humid, humid_half),
+        (sat_humid, sat_humid_half),
+        (dry_static_energy, dry_static_energy_half),
+        (sat_moist_static_energy, sat_moist_static_energy_half),
+    )
+        interpolate!(full, half, column, model)
+    end
+
+    return nothing
+end
+
+"""
+    interpolate!(
+        A_full_level::Vector{NF},
+        A_half_level::Vector{NF},
+        column::ColumnVariables{NF},
+        model::PrimitiveEquationModel,
+    )
+
+Given some generic column variable A defined at full levels, do a linear interpolation in
+log(σ) to calculate its values at half-levels.
+"""
+function interpolate!(
+    A_full_level::Vector{NF},
+    A_half_level::Vector{NF},
+    column::ColumnVariables{NF},
+    model::PrimitiveEquationModel,
+) where {NF<:AbstractFloat}
+    @unpack nlev = column
+    @unpack σ_levels_full, σ_levels_half = model.geometry
+
+    # For A at each full level k, compute A at the half-level below, i.e. at the boundary
+    # between the full levels k and k+1.
+    for k = 1:nlev-1
+        A_half_level[k] =
+            A_full_level[k] +
+            (A_full_level[k+1] - A_full_level[k]) *
+            (log(σ_levels_half[k+1]) - log(σ_levels_full[k])) /
+            (log(σ_levels_full[k+1]) - log(σ_levels_full[k]))
+    end
+
+    # Compute the values at the surface separately
+    A_half_level[nlev] =
+        A_full_level[nlev] +
+        (A_full_level[nlev] - A_full_level[nlev-1]) *
+        (log(0.99) - log(σ_levels_full[nlev])) /
+        (log(σ_levels_full[nlev]) - log(σ_levels_full[nlev-1]))
+
+    return nothing
+end
+
+
+"""
+    function saturation_vapour_pressure!(
+        column::ColumnVariables{NF},
+        model::PrimitiveEquationModel{NF},
+    )
 
 Compute the saturation vapour pressure as a function of temperature using the
 August-Roche-Magnus formula,
@@ -75,7 +153,7 @@ function saturation_specific_humidity!(
 end
 
 """
-    dry_moist_static_energy!(
+    dry_static_energy!(
         column::ColumnVariables{NF},
         model::PrimitiveEquationModel{NF},
     )
@@ -125,50 +203,14 @@ function saturation_moist_static_energy!(
     model::PrimitiveEquationModel{NF},
 ) where {NF<:AbstractFloat}
     @unpack alhc = model.parameters
-    @unpack sat_moist_static_energy, sat_moist_static_energy_half, dry_static_energy, sat_humid = column
+    @unpack sat_moist_static_energy,
+    sat_moist_static_energy_half,
+    dry_static_energy,
+    sat_humid = column
 
-    # Full levels
     for k in eachlayer(column)
         sat_moist_static_energy[k] = dry_static_energy[k] + alhc * sat_humid[k]
     end
-
-    # Half-levels
-    interpolate!(sat_moist_static_energy, sat_moist_static_energy_half, column, model)
-
-    return nothing
-end
-
-"""
-    interpolate!(A_full_level, A_half_level, column, model)
-
-Given some generic column variable A defined at full levels, do a linear interpolation in
-log(σ) to calculate its values at half-levels.
-"""
-function interpolate!(
-    A_full_level::Vector{NF},
-    A_half_level::Vector{NF},
-    column::ColumnVariables{NF},
-    model::PrimitiveEquationModel,
-) where {NF<:AbstractFloat}
-    @unpack nlev = column
-    @unpack σ_levels_full, σ_levels_half = model.geometry
-
-    # For A at each full level k, compute A at the half-level below, i.e. at the boundary
-    # between the full levels k and k+1.
-    for k = 1:nlev-1
-        A_half_level[k] =
-            A_full_level[k] +
-            (A_full_level[k+1] - A_full_level[k]) *
-            (log(σ_levels_half[k+1]) - log(σ_levels_full[k])) /
-            (log(σ_levels_full[k+1]) - log(σ_levels_full[k]))
-    end
-
-    # Compute the values at the surface separately
-    A_half_level[nlev] =
-        A_full_level[nlev] +
-        (A_full_level[nlev] - A_full_level[nlev-1]) *
-        (log(0.99) - log(σ_levels_full[nlev])) /
-        (log(σ_levels_full[nlev]) - log(σ_levels_full[nlev-1]))
 
     return nothing
 end
