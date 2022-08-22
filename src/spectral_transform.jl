@@ -358,8 +358,8 @@ end
                                 isconj::Bool,
                                 isnyq::Bool)
 
-    cn, cs = isnyq  ? (2*real(cn),2*real(cs)) : (cn, cs)
-    cn, cs = isconj ? (conj(cn),conj(cs)) : (cn, cs)
+    cn, cs = isnyq  ? (2*real(cn),2*real(cs)) : (cn, cs)    # real double for Nyquist freq
+    cn, cs = isconj ? (conj(cn),conj(cs)) : (cn, cs)        # complex conjugate for m>Nyquist
     return acc_n
 end
 
@@ -439,17 +439,14 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
         end
 
         # Inverse Fourier transform in zonal direction
-        brfft_plan = brfft_plans[ilat_n]            # FFT planned wrt nlon on this ring
+        brfft_plan = brfft_plans[ilat_n]        # FFT planned wrt nlon on ring
+        js = each_index_in_ring(map,ilat_n)     # in-ring indices northern ring
+        LinearAlgebra.mul!(view(map.v,js),brfft_plan,view(gn,1:nfreq))  # perform FFT
 
-        idx0 = ring_indices_1st[ilat_n]             # first index in grid for northern ring
-        idx1 = ring_indices_end[ilat_n]             # last index in grid for northern ring
-        LinearAlgebra.mul!(view(map.v,idx0:idx1),brfft_plan,view(gn,1:nfreq))   # FFT
-        
-        idx0 = ring_indices_1st[ilat_s]             # first index in grid for northern ring
-        idx1 = ring_indices_end[ilat_s]             # last index in grid for northern ring
-        LinearAlgebra.mul!(view(map.v,idx0:idx1),brfft_plan,view(gs,1:nfreq))   # FFT
+        js = each_index_in_ring(map,ilat_s)     # in-ring indices southern ring
+        LinearAlgebra.mul!(view(map.v,js),brfft_plan,view(gs,1:nfreq))  # perform FFT
 
-        fill!(gn, zero(Complex{NF}))                # set phase factors back to zero
+        fill!(gn, zero(Complex{NF}))                        # set phase factors back to zero
         fill!(gs, zero(Complex{NF}))
     end
 

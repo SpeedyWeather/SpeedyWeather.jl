@@ -12,6 +12,10 @@ end
 
 @inline Base.setindex!(G::AbstractGrid,x,k::Integer) = setindex!(G.v,x,k)
 
+# with ranges
+@inline Base.getindex(G::AbstractGrid,r::AbstractRange) = G.v[r]
+@inline Base.setindex!(G::AbstractGrid,x::AbstractVector,r::AbstractRange) = setindex!(G.v,x,r)
+
 
 """
     abstract type AbstractFullGrid{T} <: AbstractGrid{T} end
@@ -173,7 +177,7 @@ get_nresolution(G::AbstractOctahedralGrid) = G.nlat_half
 get_nresolution(G::AbstractHEALPixGrid) = G.nside
 
 # define nlat_half for all grids (HEALPixGrid is different as it doesn't use nlat_half as resolution parameter)
-get_nlat_half(::Type{<:AbstractGrid},nlat_half::Integer) where {G<:AbstractGrid} = nlat_half
+get_nlat_half(::Type{<:AbstractGrid},nlat_half::Integer) = nlat_half
 get_nlat_half(::Type{<:AbstractHEALPixGrid},nside::Integer) = (nlat_healpix(nside)+1)÷2
 
 # define whether there's an odd number of latitude rings for a grid
@@ -272,8 +276,8 @@ function get_colatlons(G::Type{HEALPixGrid},nside::Integer)
 end
 
 # OFFSETS OF FIRST GRID POINT PER RING FROM PRIME MERIDIAN
-get_lon_offsets(G::Type{<:AbstractFullGrid},nlat_half::Integer) = zeros(nlat_half)
-get_lon_offsets(G::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = zeros(nlat_half)
+get_lon_offsets(::Type{<:AbstractFullGrid},nlat_half::Integer) = zeros(nlat_half)
+get_lon_offsets(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = zeros(nlat_half)
 
 # get_lon_offsets(G::Type{<:AbstractHEALPixGrid})
 
@@ -294,6 +298,61 @@ function get_first_index_per_ring(G::Type{<:AbstractGrid},nresolution::Integer)
         first_indices[i+1] = last_indices[i]+1
     end
     return first_indices
+end
+
+@inline function each_index_in_ring(::Type{<:AbstractFullGrid},     # function for full grids
+                                    i::Integer,                     # ring index north to south
+                                    nlat_half::Integer)             # resolution param
+
+    @boundscheck 0 < i <= 2nlat_half || throw(BoundsError)  # valid ring index?
+    nlon = 4nlat_half                                       # number of longitudes per ring (const)
+    index_1st = (i-1)*nlon + 1                              # first in-ring index j
+    index_end = i*nlon                                      # last in-ring index j      
+    return index_1st:index_end                              # range of js in ring
+end
+
+@inline function each_index_in_ring(::Type{<:AbstractOctahedralGrid},   # function for octahedral
+                                    i::Integer,                         # ring index north to south
+                                    nlat_half::Integer)                 # resolution param
+
+    @boundscheck 0 < i <= 2nlat_half || throw(BoundsError)  # ring index valid?
+    if i <= nlat_half                                       # northern hemisphere
+        index_1st = 2i*(i+7) - 15                           # last in-ring index j      
+        index_end = 2i*(i+9)                                # last in-ring index j
+    else                                                    # southern hemisphere
+        i = 2nlat_half - i + 1                              # mirror ring index around Equator
+        n = npoints_octahedral(nlat_half)+1                 # number of grid points + 1
+        index_1st = n - 2i*(i+9)                            # count backwards
+        index_end = n - (2i*(i+7) - 15)
+    end
+    return index_1st:index_end                               # range of js in ring
+end
+
+@inline function each_index_in_ring(::Type{<:AbstractHEALPixGrid},  # function for HEALPix grids
+                                    i::Integer,                     # ring index north to south
+                                    nside::Integer)                 # resolution param
+
+    @boundscheck 0 < i < 4nside || throw(BoundsError)       # ring index valid?
+    if i < nside                                            # northern polar cap
+        index_1st = 2i*(i-1) + 1                            # first in-ring index j
+        index_end = 2i*(i+1)                                # last in-ring index j
+    elseif i <= 3nside                                      # equatorial zone with const nlon
+        n = 2nside^2-2nside                                 # points in polar cap
+        nlon = 4nside                                       # points on latitude rings
+        i = i - nside + 1                                   # offset ring index into eq zone
+        index_1st = n + (i-1)*nlon + 1                      # add constant nlon per ring
+        index_end = n + i*nlon
+    else                                                    # southern polar cap
+        n = 12nside^2                                       # total number of points
+        i = 4nside - i                                      # count ring index from south pole
+        index_1st = n - 2i*(i+1) + 1                        # count backwards
+        index_end = n - 2i*(i-1)
+    end
+    return index_1st:index_end                              # range of js in ring
+end
+
+@inline function each_index_in_ring(grid::G,i::Integer) where {G<:AbstractGrid}
+    return each_index_in_ring(G,i,get_nresolution(grid))
 end
 
 # QUADRATURE WEIGHTS
