@@ -207,6 +207,24 @@ function SpectralTransform(P::Parameters)
     return SpectralTransform(NF,grid,trunc,recompute_legendre)
 end
 
+function SpectralTransform( alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
+                            recompute_legendre::Bool=true,      # saves memory
+                            grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                            ) where NF                          # number format NF
+
+    _, mmax = size(alms) .- 1                           # -1 for 0-based degree l, order m
+    return SpectralTransform(NF,grid,mmax,recompute_legendre)
+end
+
+function SpectralTransform( map::AbstractGrid{NF};          # gridded field
+                            recompute_legendre::Bool=true,  # saves memory
+                            ) where NF                      # number format NF
+
+    grid = typeof(map)
+    trunc = get_truncation(map)
+    return SpectralTransform(NF,grid,trunc,recompute_legendre)
+end
+
 """
     ϵ = ϵ(NF,l,m) 
 
@@ -248,14 +266,7 @@ end
 # if number format not provided use Float64
 get_recursion_factors(lmax::Int,mmax::Int) = get_recursion_factors(Float64,lmax,mmax)
 
-"""
-    gridded!(map,alms,S)
 
-Backward or inverse spectral transform (spectral to grid space) from coefficients `alms` and SpectralTransform
-struct `S` into the preallocated output `map`. Uses a planned inverse Fast Fourier Transform for efficiency in the
-zonal direction and a Legendre Transform in the meridional direction exploiting symmetries for effciency.
-Either recomputes the Legendre polynomials to save memory, or uses precomputed polynomials from `S` depending on
-`S.recompute_legendre`."""
 function gridded!(  map::AbstractMatrix{NF},                    # gridded output
                     alms::LowerTriangularMatrix{Complex{NF}},   # spectral coefficients input
                     S::SpectralTransform{NF}                    # precomputed parameters struct
@@ -532,7 +543,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
                     S::SpectralTransform{NF}
                     ) where {NF<:AbstractFloat}
     
-    @unpack nlat, nlat_half, nfreq_max, cos_colat, lon_offsets = S
+    @unpack nlat, nlat_half, nlons, nfreq_max, cos_colat, lon_offsets = S
     @unpack recompute_legendre, Λ, Λs, quadrature_weights = S
     @unpack rfft_plans = S
     
@@ -570,8 +581,8 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         # Legendre transform in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
         Λ_ilat = recompute_legendre ?
-            Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, cos_colat[ilat]) : Λs[ilat]
-        quadrature_weight = quadrature_weights[ilat]                # weights normalised with π/nlat
+            Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, cos_colat[ilat_n]) : Λs[ilat_n]
+        quadrature_weight = quadrature_weights[ilat_n]  # weights normalised with π/nlat
 
         lm = 1                                          # single index for spherical harmonics
         for m in 1:mmax+1                               # Σ_{m=0}^{mmax}, but 1-based index
@@ -669,6 +680,16 @@ function spectral(  map::AbstractMatrix{NF};        # gridded field nlon x nlat
     return spectral(map,S)
 end
 
+function spectral(  map::AbstractGrid{NF};          # gridded field
+                    recompute_legendre::Bool=true,  # saves memory
+                    ) where NF                      # number format NF
+
+    grid = typeof(map)
+    trunc = get_truncation(map)
+    S = SpectralTransform(NF,grid,trunc,recompute_legendre)
+    return spectral(map,S)
+end
+
 """
     alms = spectral(map,S)
 
@@ -685,6 +706,15 @@ function spectral(  map::AbstractMatrix{NF},    # gridded field nlon x nlat
     @boundscheck nlon == S.nlon || throw(BoundsError)
 
     # always use one more l for consistency with vector quantities and 
+    alms = LowerTriangularMatrix{Complex{NF}}(undef,S.lmax+2,S.mmax+1)
+    return spectral!(alms,map,S)                # in-place version
+end
+
+function spectral(  map::AbstractGrid{NF},      # gridded field
+                    S::SpectralTransform{NF},   # spectral transform struct
+                    ) where NF                  # number format NF
+
+    # always use one more l for consistency with vector quantities
     alms = LowerTriangularMatrix{Complex{NF}}(undef,S.lmax+2,S.mmax+1)
     return spectral!(alms,map,S)                # in-place version
 end

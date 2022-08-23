@@ -165,6 +165,7 @@ get_truncation(::Type{<:FullClenshawGrid},nlat_half::Integer) = floor(Int,(4nlat
 get_truncation(::Type{<:FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
 get_truncation(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = nlat_half-1
 get_truncation(::Type{<:HEALPixGrid},nside::Integer) = nside_assert(nside) ? 2nside-1 : nothing
+get_truncation(grid::G) where {G<:AbstractGrid} = get_truncation(G,get_nresolution(grid))
 
 get_resolution(::Type{<:FullClenshawGrid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
 get_resolution(::Type{<:FullGaussianGrid},trunc::Integer) = roundup_fft(ceil(Int,(3*trunc+1)/4))
@@ -267,7 +268,7 @@ function get_colatlons(G::Type{<:AbstractOctahedralGrid},nlat_half::Integer)
     return colats, lons
 end
 
-function get_colatlons(G::Type{HEALPixGrid},nside::Integer)
+function get_colatlons(G::Type{<:AbstractHEALPixGrid},nside::Integer)
     npoints = get_npoints(G,nside)
     colats_lons = [Healpix.pix2angRing(Healpix.Resolution(nside),i) for i in 1:npoints]
     colats = [colat_lon[1] for colat_lon in colats_lons]
