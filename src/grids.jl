@@ -161,6 +161,11 @@ Base.zeros(::Type{G},n::Integer) where {G<:AbstractGrid} = zeros(G{Float64},n)
 Base.zero(g::G) where {G<:AbstractGrid} = G(zero(g.v))
 
 # MATCHING SPECTRAL TO GRID POINT RESOLUTION
+truncation_order(::Type{<:FullClenshawGrid}) = 3            # cubic
+truncation_order(::Type{<:FullGaussianGrid}) = 2            # quadratic
+truncation_order(::Type{<:OctahedralGaussianGrid}) = 3      # cubic
+truncation_order(::Type{<:HEALPixGrid}) = 1                 # linear (in longitude)
+
 get_truncation(::Type{<:FullClenshawGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
 get_truncation(::Type{<:FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
 get_truncation(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = nlat_half-1
