@@ -49,9 +49,10 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     sat_moist_static_energy::Vector{NF} = zeros(NF,nlev)
     sat_moist_static_energy_half::Vector{NF} = zeros(NF,nlev)
 
-    excess_humidity::NF = 0
-
     # Convection
+    conditional_instability::Bool = false
+    convection_is_active::Bool = false
+    excess_humidity::NF = 0
     cloud_base_mass_flux::NF = 0
     precip_cnv::NF = 0
     flux_humid::Vector{NF} = zeros(NF,nlev)
@@ -130,6 +131,8 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     fill!(column.humid_tend,0)
 
     column.cloud_top = column.nlev+1
+    column.conditional_instability = false
+    column.convection_is_active = false
     column.precip_large_scale = zero(NF)
     column.precip_convection = zero(NF)
     column.excess_humidity = zero(NF)

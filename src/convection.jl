@@ -1,4 +1,72 @@
 """
+    conditional_instability!(
+        column::ColumnVariables{NF},
+        model::PrimitiveEquationModel,
+    )
+"""
+function conditional_instability!(
+    column::ColumnVariables{NF},
+    model::PrimitiveEquationModel,
+) where {NF<:AbstractFloat}
+    @unpack pres_thresh_cnv, RH_thresh_PBL_cnv = model.constants
+    @unpack alhc = model.parameters
+    @unpack nlev = column
+    @unpack humid, pres = column
+    @unpack sat_humid,
+    dry_static_energy,
+    moist_static_energy,
+    sat_moist_static_energy,
+    sat_moist_static_energy_half = column
+
+    if pres > pres_thresh_cnv
+        # Saturation (or super-saturated) moist static energy in the PBL
+        sat_moist_static_energy_pbl =
+            max(moist_static_energy[nlev], sat_moist_static_energy[nlev])
+
+        # Minimum of moist static energy in the lowest two levels
+        moist_static_energy_lower_trop =
+            min(moist_static_energy[nlev], moist_static_energy[nlev-1])
+
+        # Humidity threshold for convection, defined in the PBL and one level above
+        humid_threshold_pbl = RH_thresh_PBL_cnv * sat_humid[nlev]
+        humid_threshold_above_pbl = RH_thresh_PBL_cnv * sat_humid[nlev-1]
+
+        # The range of this loop requires clarification, but in its current form it means
+        # that the top-of-convection level may be any tropospheric level, excluding the two
+        # layers directly above the PBL.
+        for k = (nlev-3):-1:3
+            # Condition 1: Conditional instability (MSS in PBL < MSS at this half-level)
+            if sat_moist_static_energy_pbl > sat_moist_static_energy_half[k]
+                column.conditional_instability = true
+                column.cloud_top = k
+            end
+
+            # Condition 2a: Gradient of actual moist static energy between lower and upper troposphere
+            if moist_static_energy_lower_trop > sat_moist_static_energy_half[k]
+                column.convection_is_active = true
+                column.excess_humidity = max(
+                    humid[nlev] - humid_threshold_pbl,
+                    (moist_static_energy[nlev] - sat_moist_static_energy_half[k]) / alhc,
+                )
+            end
+        end
+
+        if column.convection_is_active
+            return nothing  # Conditions 1 and 2a already satisfied
+        end
+
+        # Condition 2b: Humidity exceeds threshold in both PBL and one layer above
+        if column.conditional_instability &&
+           (humid[nlev] > humid_threshold_pbl) &&
+           (humid[nlev-1] > humid_threshold_above_pbl)
+            column.convection_is_active = true
+            column.excess_humidity = humid[nlev] - humid_threshold_pbl
+        end
+    end
+    return nothing
+end
+
+"""
     convection!(
         column::ColumnVariables{NF},
         model::PrimitiveEquationModel,
@@ -16,11 +84,23 @@ function convection!(
 
     @unpack alhc, g = model.constants
     @unpack pres_ref = model.parameters
-    @unpack RH_thresh_pbl_cnv, RH_thresh_layers_cnv, pres_thresh_cnv, humid_relax_time_cnv,
-    max_entrainment, ratio_secondary_mass_flux = model.constants  # Constants for convection
+    @unpack RH_thresh_pbl_cnv,
+    RH_thresh_layers_cnv,
+    pres_thresh_cnv,
+    humid_relax_time_cnv,
+    max_entrainment,
+    ratio_secondary_mass_flux = model.constants  # Constants for convection
     @unpack σ_levels_full, σ_levels_thick = model.geometry
-    @unpack pres, humid, humid_half, sat_humid, sat_humid_half, dry_static_energy,
-    dry_static_energy_half, entrainment_coefficients, cloud_top, nlev = column
+    @unpack pres,
+    humid,
+    humid_half,
+    sat_humid,
+    sat_humid_half,
+    dry_static_energy,
+    dry_static_energy_half,
+    entrainment_coefficients,
+    cloud_top,
+    nlev = column
     @unpack cloud_base_mass_flux, flux_humid, flux_dry_static_energy, precip_cnv = column
 
     # Compute the entrainment coefficients for the column. Mass entrainment in layer k is
@@ -43,7 +123,8 @@ function convection!(
     # Cloud-base mass flux
     Δp = pres * σ_levels_thick[nlev-1]  # Pressure difference between bottom and top of PBL  # Check index
     # This is the formula as it appears in Fortran Speedy
-    mass_flux = pres_ref * Δp / (g * 3600humid_relax_time_cnv) *            # Why?
+    mass_flux =
+        pres_ref * Δp / (g * 3600humid_relax_time_cnv) *            # Why?
         min(1.0, 2.0 * (pres - pres_thresh_cnv) / (1 - pres_thresh_cnv)) *  # Why?
         min(5.0, excess_humidity / (humid_max_pbl - humid_top_of_pbl))      # Why?
 
@@ -66,7 +147,7 @@ function convection!(
     flux_humid[nlev] = flux_down_humid - flux_up_humid
 
     # 2. Fluxes for intermediate layers
-    for k in (nlev-1):-1:(cloud_top+1)
+    for k = (nlev-1):-1:(cloud_top+1)
         # Fluxes at lower boundary
         flux_dry_static_energy[k] = flux_up_dry_static_energy - flux_down_dry_static_energy  # Change of sign??
         flux_humid[k] = flux_up_humid - flux_down_humid
@@ -101,62 +182,9 @@ function convection!(
     column.precip_cnv = max(flux_up_humid - mass_flux * sat_humid_half[cloud_top], 0.0)
 
     # Net flux of dry static energy and moisture
-    flux_dry_static_energy[cloud_top] = flux_up_dry_static_energy - flux_down_dry_static_energy + alhc * precip_cnv
+    flux_dry_static_energy[cloud_top] =
+        flux_up_dry_static_energy - flux_down_dry_static_energy + alhc * precip_cnv
     flux_humid[cloud_top] = flux_up_humid - flux_down_humid - precip_cnv
 
     return nothing
-end
-
-"""
-    conditional_instability!(
-        column::ColumnVariables{NF},
-        model::PrimitiveEquationModel,
-    )
-"""
-function conditional_instability!(
-    column::ColumnVariables{NF},
-    model::PrimitiveEquationModel,
-) where {NF<:AbstractFloat}
-    @unpack pres_thresh_cnv, RH_thresh_PBL_cnv = model.constants
-    @unpack alhc = model.parameters
-
-    @unpack nlev = column
-    @unpack humid, pres = column
-    @unpack sat_humid,
-    dry_static_energy,
-    moist_static_energy,
-    sat_moist_static_energy,
-    sat_moist_static_energy_half = column
-
-    if pres > pres_thresh_cnv
-        # Saturation (or super-saturated) moist static energy in the PBL
-        sat_moist_static_energy_pbl =
-            max(moist_static_energy[nlev], sat_moist_static_energy[nlev])
-
-        # Humidity threshold for convection, defined in the PBL and one level above
-        humid_threshold_pbl = RH_thresh_PBL_cnv * sat_humid[nlev]
-        humid_threshold_above_pbl = RH_thresh_PBL_cnv * sat_humid[nlev-1]
-
-        for k = 3:nlev-3
-            # Condition 1: Conditional instability (MSS in PBL < MSS at this half-level)
-            if sat_moist_static_energy_pbl > sat_moist_static_energy_half[k]
-                # Condition 2a: Gradient of actual moist static energy between lower and upper troposphere
-                if moist_static_energy[nlev-1] > sat_moist_static_energy_half[k]
-                    column.cloud_top = k
-                    column.excess_humidity = max(
-                        humid[nlev] - humid_threshold_pbl,
-                        (moist_static_energy[nlev] - sat_moist_static_energy_half[k]) /
-                        alhc,
-                    )
-                    break
-                    # Condition 2b: Humidity exceeds threshold in both PBL and one layer above
-                elseif (humid[nlev] > humid_threshold_pbl) &&
-                       (humid[nlev-1] > humid_threshold_above_pbl)
-                    column.cloud_top = k
-                    column.excess_humidity = humid[nlev] - humid_threshold_pbl
-                    break
-                end
-            end
-        end
-    end
 end
