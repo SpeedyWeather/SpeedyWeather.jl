@@ -16,15 +16,16 @@ function conditional_instability!(
     sat_moist_static_energy_half = column
 
     if pres > pres_thresh_cnv
-        # Saturation (or super-saturated) moist static energy in the PBL
+        # First we pre-compute some values which we will need inside the loop
+        # 1. Saturation (or super-saturated) moist static energy in the PBL
         sat_moist_static_energy_pbl =
             max(moist_static_energy[nlev], sat_moist_static_energy[nlev])
 
-        # Minimum of moist static energy in the lowest two levels
+        # 2. Minimum of moist static energy in the lowest two levels
         moist_static_energy_lower_trop =
             min(moist_static_energy[nlev], moist_static_energy[nlev-1])
 
-        # Humidity threshold for convection, defined in the PBL and one level above
+        # 3. Humidity threshold for convection, defined in the PBL and one level above
         humid_threshold_pbl = RH_thresh_pbl_cnv * sat_humid[nlev]
         humid_threshold_above_pbl = RH_thresh_pbl_cnv * sat_humid[nlev-1]
 
@@ -76,17 +77,20 @@ function convection!(
     conditional_instability!(column, model)  # Diagnose convection
 
     if !(column.conditional_instability && column.activate_convection)
-        return nothing
+        return nothing  # No convection
     end
 
     @unpack gravity = model.constants
     @unpack alhc, pres_ref = model.parameters
     @unpack σ_levels_full, σ_levels_thick = model.geometry
+    # Constants for convection
     @unpack RH_thresh_pbl_cnv, RH_thresh_trop_cnv, pres_thresh_cnv, humid_relax_time_cnv,
-    max_entrainment, ratio_secondary_mass_flux = model.constants  # Constants for convection
+    max_entrainment, ratio_secondary_mass_flux = model.constants
+    # Column variables for calculating fluxes due to convection
     @unpack pres, humid, humid_half, sat_humid, sat_humid_half, dry_static_energy,
     dry_static_energy_half, entrainment_profile, cloud_top, excess_humidity,
-    nlev = column  # Column variables for calculating fluxes due to convection
+    nlev = column
+    # Quantities calculated by this parameterization
     @unpack cloud_base_mass_flux, net_flux_humid, net_flux_dry_static_energy,
     precip_cnv = column
 
@@ -97,7 +101,7 @@ function convection!(
         entrainment_profile[k] = max(0.0, (σ_levels_full[k] - 0.5)^2)
     end
     entrainment_profile /= sum(entrainment_profile)  # Normalise
-    entrainment_profile *= max_entrainment                # Scale by maximum entrainment (as a fraction of cloud-base mass flux)
+    entrainment_profile *= max_entrainment           # Scale by maximum entrainment (as a fraction of cloud-base mass flux)
 
     # 1. Fluxes in the PBL
     humid_top_of_pbl = min(humid_half[nlev-1], humid[nlev])   # Humidity at the upper boundary of the PBL
