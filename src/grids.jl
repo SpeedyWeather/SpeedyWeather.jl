@@ -378,5 +378,10 @@ end
 get_quadrature_weights(::Type{<:FullClenshawGrid},nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
 get_quadrature_weights(::Type{<:FullGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
 get_quadrature_weights(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
-get_quadrature_weights(::Type{<:HEALPixGrid},nside::Integer) =
-                nside_assert(nside) ? 2/12nside^2*[min(4iring,4nside) for iring in 1:2nside+1] : nothing
+# get_quadrature_weights(::Type{<:HEALPixGrid},nside::Integer) =
+#                 nside_assert(nside) ? 2/12nside^2*[min(4iring,4nside) for iring in 1:2nside] : nothing
+function get_quadrature_weights(::Type{<:HEALPixGrid},nside::Integer)
+    colat = get_colat(HEALPixGrid,nside)
+    riemann_weights = 2*sin.(colat)/sum(sin.(colat))
+    return riemann_weights[1:get_nlat_half(HEALPixGrid,nside)]
+end

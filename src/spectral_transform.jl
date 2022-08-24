@@ -11,35 +11,28 @@ struct SpectralTransform{NF<:AbstractFloat}
     order::Int                  # 1,2,3 for linear, quadratic, cubic grid
 
     # SPECTRAL RESOLUTION
-    lmax::Int       # Maximum degree l=[0,lmax] of spherical harmonics
-    mmax::Int       # Maximum order m=[0,l] of spherical harmonics
-    nfreq::Int      # Number of fourier frequencies (real FFT)
-    nfreq_max::Int
+    lmax::Int               # Maximum degree l=[0,lmax] of spherical harmonics
+    mmax::Int               # Maximum order m=[0,l] of spherical harmonics
+    nfreq_max::Int          # Maximum (at Equator) number of Fourier frequencies (real FFT)
 
     # CORRESPONDING GRID SIZE
-    nlon::Int               # Maximum number of longitude points (at Equator)
-    # nlons::Vector{Int}      # Number of longitude points per latitude ring
+    nlon_max::Int           # Maximum number of longitude points (at Equator)
+    nlons::Vector{Int}      # Number of longitude points per ring
     nlat::Int               # Number of latitude rings
     nlat_half::Int          # nlat on one hemisphere (incl equator if nlat odd)
     
     # CORRESPONDING GRID VECTORS
-    colat::Vector{NF}       # Gaussian colatitudes (0,π) North to South Pole 
-    cos_colat::Vector{NF}   # Cosine of colatitudes
-    sin_colat::Vector{NF}   # Sine of colatitudes
-
-    # Offset of first longitude from prime meridian (function of m and latitude)
-    lon_offsets::Matrix{Complex{NF}}
+    colat::Vector{NF}                   # Gaussian colatitudes (0,π) North to South Pole 
+    cos_colat::Vector{NF}               # Cosine of colatitudes
+    sin_colat::Vector{NF}               # Sine of colatitudes
+    lon_offsets::Matrix{Complex{NF}}    # Offset of first lon per ring from prime meridian
 
     # NORMALIZATION
     norm_sphere::NF         # normalization of the l=0,m=0 mode
-    norm_forward::NF        # normalization of the quadrature weights for forward transform (spectral)
 
-    # FFT plans
-    nlons::Vector{Int}                      # number of longitude points per ring
-    rfft_plan::FFTW.rFFTWPlan{NF}           # FFT plan for grid to spectral transform
-    brfft_plan::FFTW.rFFTWPlan{Complex{NF}} # spectral to grid transform (inverse)
-    rfft_plans::Vector{FFTW.rFFTWPlan{NF}}  # one plan for each latitude ring for variable nlon
-    brfft_plans::Vector{FFTW.rFFTWPlan{Complex{NF}}}
+    # FFT plans, one plan for each latitude ring
+    rfft_plans::Vector{FFTW.rFFTWPlan{NF}}              # FFT plan for grid to spectral transform
+    brfft_plans::Vector{FFTW.rFFTWPlan{Complex{NF}}}    # spectral to grid transform (inverse)
 
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool                # Pre or recompute Legendre polynomials
@@ -47,7 +40,7 @@ struct SpectralTransform{NF<:AbstractFloat}
     Λs::Vector{LowerTriangularMatrix{NF}}   # Legendre polynomials for all latitudes (all precomputed)
     
     # QUADRATURE (integration for the Legendre polynomials, extra normalisation of π/nlat included)
-    quadrature_weights::Vector{NF}
+    quadrature_weights::Vector{NF}          # including Δlon in ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
 
     # RECURSION FACTORS
     ϵlms::LowerTriangularMatrix{NF}         # precomputed for meridional gradients gradients grad_y1, grad_y2
@@ -92,27 +85,23 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     nresolution = get_resolution(grid,trunc)        # resolution parameter, nlat_half/nside for HEALPixGrid
     nlat_half = get_nlat_half(grid,nresolution)     # contains equator for HEALPix
     nlat = 2nlat_half - nlat_odd(grid)              # one less if grids have odd # of latitude rings
-    nlon = get_nlon(grid,nresolution)               # number of longitudes around the equator
-    nfreq     = nlon÷2 + 1                          # maximum number of fourier frequencies (real FFTs)
-    nfreq_max = nlon÷2 + 1                          # maximum number of fourier frequencies (real FFTs)
-    # nside = grid isa HEALPixGrid ? nresolution : 0  # nside is only defined for HEALPixGrid (npoints)
-    # npoints = get_npoints(grid,nresolution)         # total number of grid points
+    nlon_max = get_nlon(grid,nresolution)           # number of longitudes around the equator
+                                                    # number of longitudes per latitude ring (one hemisphere only)
+    nlons = [get_nlon_per_ring(grid,nresolution,i) for i in 1:nlat_half]
+    nfreq_max = nlon_max÷2 + 1                      # maximum number of fourier frequencies (real FFTs)
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
     colat = get_colat(grid,nresolution)             # colatitude in radians                             
-    cos_colat = cos.(colat)
-    sin_colat = sin.(colat)                             
-
-    # NORMALIZATION
-    norm_sphere = 2sqrt(π)      # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
-    norm_forward = π/nlat       # normalization for forward transform to be baked into the quadrature weights
+    cos_colat = cos.(colat)                         # cos(colat)
+    sin_colat = sin.(colat)                         # sin(colat)
 
     # PLAN THE FFTs
-    nlons = [get_nlon_per_ring(grid,nresolution,i) for i in 1:nlat_half]
-    rfft_plan = FFTW.plan_rfft(zeros(NF,nlon))
-    brfft_plan = FFTW.plan_brfft(zeros(Complex{NF},nlon÷2 + 1),nlon)
     rfft_plans = [FFTW.plan_rfft(zeros(NF,nlon)) for nlon in nlons]
     brfft_plans = [FFTW.plan_brfft(zeros(Complex{NF},nlon÷2 + 1),nlon) for nlon in nlons]
+
+    # NORMALIZATION
+    norm_sphere = 2sqrt(π)  # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
+    Δlons = 2π./nlons       # normalization for forward transform to be baked into the quadrature weights
 
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
     _, lons = get_colatlons(grid,nresolution)
@@ -124,7 +113,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
 
     # allocate memory in Λs for polynomials at all latitudes or allocate dummy array if precomputed
     # Λs is of size (lmax+2) x (mmax+1) x nlat_half unless recomputed, one more degree l as before
-    # for recomputed only Λ is used, not Λs, create dummy array of size 1x1x1 instead
+    # for recomputed only Λ is used, not Λs, create dummy array of 0-size instead
     b = ~recompute_legendre                 # true for precomputed
     Λs = [zeros(LowerTriangularMatrix,b*(lmax+2),b*(mmax+1)) for _ in 1:b*nlat_half]
 
@@ -137,7 +126,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
 
     # QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
     quadrature_weights = get_quadrature_weights(grid,nresolution)
-    quadrature_weights *= norm_forward
+    quadrature_weights .*= Δlons
 
     # RECURSION FACTORS
     ϵlms = get_recursion_factors(lmax+1,mmax)
@@ -191,11 +180,11 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
         
     # conversion to NF happens here
     SpectralTransform{NF}(  grid,nresolution,order,
-                            lmax,mmax,nfreq,nfreq_max,
-                            nlon,nlat,nlat_half,
+                            lmax,mmax,nfreq_max,
+                            nlon_max,nlons,nlat,nlat_half,
                             colat,cos_colat,sin_colat,lon_offsets,
-                            norm_sphere,norm_forward,
-                            nlons,rfft_plan,brfft_plan,rfft_plans,brfft_plans,
+                            norm_sphere,
+                            rfft_plans,brfft_plans,
                             recompute_legendre,Λ,Λs,quadrature_weights,
                             ϵlms,grad_x,grad_y1,grad_y2,
                             grad_y_vordiv1,grad_y_vordiv2,vordiv_to_uv_x,
@@ -359,7 +348,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
         # inverse Legendre transform by looping over wavenumbers l,m
         lm = 1                              # single index for non-zero l,m indices
-        for m in 1:min(nfreqm,mmax+1)       # Σ_{m=0}^{mmax}, but 1-based index
+        for m in 1:min(nfreq,mmax+1)        # Σ_{m=0}^{mmax}, but 1-based index
             acc_odd  = zero(Complex{NF})    # accumulator for isodd(l+m)
             acc_even = zero(Complex{NF})    # accumulator for iseven(l+m)
 
@@ -391,8 +380,8 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
             # m_alias, isconj, isnyq = alias_index(nlon, m)   # polar zones, alias m if > Nyquist
             # acc_n, acc_s = alias_coeffs(acc_n, acc_s, isconj, isnyq)
 
-            gn[m] += acc_n                # accumulate in phase factors for northern
-            gs[m] += acc_s                # and southern hemisphere
+            gn[m] += acc_n                      # accumulate in phase factors for northern
+            gs[m] += acc_s                      # and southern hemisphere
 
             lm = lm_end + 1                     # first index of next m column
         end
@@ -471,7 +460,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         quadrature_weight = quadrature_weights[ilat_n]  # weights normalised with π/nlat
 
         lm = 1                                          # single index for spherical harmonics
-        for m in 1:min(nfreqm,mmax+1)                   # Σ_{m=0}^{mmax}, but 1-based index
+        for m in 1:min(nfreq,mmax+1)                    # Σ_{m=0}^{mmax}, but 1-based index
 
             # ALIAS ZONAL WAVENUMBERS and LONGITUDE OFFSET
             # m_alias, isconj, isnyq = alias_index(nlon, m)   # polar zones, alias m if > Nyquist
