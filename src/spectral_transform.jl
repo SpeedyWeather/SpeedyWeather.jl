@@ -273,35 +273,6 @@ end
 # if number format not provided use Float64
 get_recursion_factors(lmax::Int,mmax::Int) = get_recursion_factors(Float64,lmax,mmax)
 
-@inline function alias_index(   nlon::Int,  # number of longitude points
-                                m::Int)     # order m of harmonics (=zonal wavenumber)
-
-    m -= 1                                  # convert from 1-based to 0-based (convert back at return)
-    
-    # equatorial zone, zonal wavenumber m is smaller than Nyquist = no aliasing
-    isconj, isnyq = false, false
-    nyq = max(1, nlon ÷ 2)                  # Nyquist frequency
-    m < nyq && return (m+1, isconj, isnyq)  # escape for equatorial zone
-    
-    # if zonal wavenumber m is >= Nyquist than alias, and indicate conjugate
-    # or real doubling through isconj and isnyq
-    m = mod(m, nlon)
-    m, isconj = m > nyq ? (nlon-m, true) : (m,isconj)   # alias m and conjugate
-    isnyq = m == 0 || (iseven(nlon) && m == nyq)        # is Nyquist frequency?
-    return (m+1, isconj, isnyq)                         # convert to 1-based indexing
-end
-
-
-@inline function alias_coeffs(  cn::Complex{<:AbstractFloat},
-                                cs::Complex{<:AbstractFloat},
-                                isconj::Bool,
-                                isnyq::Bool)
-
-    cn, cs = isnyq  ? (2*real(cn),2*real(cs)) : (cn, cs)    # real double for Nyquist freq
-    cn, cs = isconj ? (conj(cn),conj(cs)) : (cn, cs)        # complex conjugate for m>Nyquist
-    return cn, cs
-end
-
 """
     gridded!(   map::AbstractGrid,
                 alms::LowerTriangularMatrix,
@@ -341,6 +312,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
         nlon = nlons[ilat_n]                # number of longitudes on this ring
         nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
         nfreqm = nlon÷(order+1) + 1         # (lin/quad/cub) max frequency to shorten loop over m
+        not_equator = ilat_n != ilat_s      # is the latitude ring not on equator?
 
         # Recalculate or use precomputed Legendre polynomials Λ
         Λ_ilat = recompute_legendre ? 
@@ -376,10 +348,6 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
             acc_n = (acc_even + acc_odd)*w      # accumulators for northern
             acc_s = (acc_even - acc_odd)*w      # and southern hemisphere
             
-            # ALIAS ZONAL WAVENUMBERS
-            # m_alias, isconj, isnyq = alias_index(nlon, m)   # polar zones, alias m if > Nyquist
-            # acc_n, acc_s = alias_coeffs(acc_n, acc_s, isconj, isnyq)
-
             gn[m] += acc_n                      # accumulate in phase factors for northern
             gs[m] += acc_s                      # and southern hemisphere
 
@@ -391,10 +359,11 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
         js = each_index_in_ring(map,ilat_n)     # in-ring indices northern ring
         LinearAlgebra.mul!(view(map.v,js),brfft_plan,view(gn,1:nfreq))  # perform FFT
 
+        # southern latitude, don't call redundant 2nd fft if ring is on equator 
         js = each_index_in_ring(map,ilat_s)     # in-ring indices southern ring
-        LinearAlgebra.mul!(view(map.v,js),brfft_plan,view(gs,1:nfreq))  # perform FFT
+        not_equator && LinearAlgebra.mul!(view(map.v,js),brfft_plan,view(gs,1:nfreq))  # perform FFT
 
-        fill!(gn, zero(Complex{NF}))                        # set phase factors back to zero
+        fill!(gn, zero(Complex{NF}))            # set phase factors back to zero
         fill!(gs, zero(Complex{NF}))
     end
 
@@ -444,6 +413,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         nlon = nlons[ilat_n]                # number of longitudes on this ring
         nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
         nfreqm = nlon÷(order+1) + 1         # (lin/quad/cub) max frequency to shorten loop over m
+        not_equator = ilat_n != ilat_s      # is the latitude ring not on equator?
 
         # Fourier transform in zonal direction
         rfft_plan = rfft_plans[ilat_n]          # FFT planned wrt nlon on ring
@@ -451,7 +421,13 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         LinearAlgebra.mul!(view(fn,1:nfreq),rfft_plan,view(map.v,js))   # Northern latitude
 
         js = each_index_in_ring(map,ilat_s)     # in-ring indices northern ring
-        LinearAlgebra.mul!(view(fs,1:nfreq),rfft_plan,view(map.v,js))   # Southern latitude
+                                                # Southern latitude (don't call FFT on Equator)
+                                                # then fill fs with zeros and no changes needed further down
+        not_equator ? LinearAlgebra.mul!(view(fs,1:nfreq),rfft_plan,view(map.v,js)) : fill!(fs,0)
+
+        if ~not_equator
+            println(fs)
+        end
 
         # Legendre transform in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
@@ -462,14 +438,12 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         lm = 1                                          # single index for spherical harmonics
         for m in 1:min(nfreq,mmax+1)                    # Σ_{m=0}^{mmax}, but 1-based index
 
-            # ALIAS ZONAL WAVENUMBERS and LONGITUDE OFFSET
-            # m_alias, isconj, isnyq = alias_index(nlon, m)   # polar zones, alias m if > Nyquist
+            # QUADRATURE WEIGHTS and LONGITUDE OFFSET
             w = lon_offsets[m,ilat_n]                   # longitude offset rotation
             quadrature_weight *= conj(w)                # complex conjugate for back transform
-            an = fn[m] * quadrature_weight        # weighted northern latitude
-            as = fs[m] * quadrature_weight        # weighted southern latitude
-            # an, as = alias_coeffs(an, as, isconj, isnyq)
-
+            an = fn[m] * quadrature_weight              # weighted northern latitude
+            as = fs[m] * quadrature_weight              # weighted southern latitude
+            
             # LEGENDRE TRANSFORM
             a_even = an + as                            # sign flip due to anti-symmetry with
             a_odd = an - as                             # odd polynomials 
