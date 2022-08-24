@@ -12,10 +12,7 @@ function conditional_instability!(
     @unpack alhc = model.parameters
     @unpack nlev = column
     @unpack humid, pres = column
-    @unpack sat_humid,
-    dry_static_energy,
-    moist_static_energy,
-    sat_moist_static_energy,
+    @unpack sat_humid, dry_static_energy, moist_static_energy, sat_moist_static_energy,
     sat_moist_static_energy_half = column
 
     if pres > pres_thresh_cnv
@@ -88,7 +85,7 @@ function convection!(
     @unpack RH_thresh_pbl_cnv, RH_thresh_trop_cnv, pres_thresh_cnv, humid_relax_time_cnv,
     max_entrainment, ratio_secondary_mass_flux = model.constants  # Constants for convection
     @unpack pres, humid, humid_half, sat_humid, sat_humid_half, dry_static_energy,
-    dry_static_energy_half, entrainment_coefficients, cloud_top, excess_humidity,
+    dry_static_energy_half, entrainment_profile, cloud_top, excess_humidity,
     nlev = column  # Column variables for calculating fluxes due to convection
     @unpack cloud_base_mass_flux, net_flux_humid, net_flux_dry_static_energy,
     precip_cnv = column
@@ -97,10 +94,10 @@ function convection!(
     # equal to the entrainment coefficient in layer k * the mass flux at the lower boundary.
     # TODO(alistair) pre-compute and reuse these.
     for k = 2:nlev-1
-        entrainment_coefficients[k] = max(0.0, (σ_levels_full[k] - 0.5)^2)
+        entrainment_profile[k] = max(0.0, (σ_levels_full[k] - 0.5)^2)
     end
-    entrainment_coefficients /= sum(entrainment_coefficients)  # Normalise
-    entrainment_coefficients *= max_entrainment                # Scale by maximum entrainment (as a fraction of cloud-base mass flux)
+    entrainment_profile /= sum(entrainment_profile)  # Normalise
+    entrainment_profile *= max_entrainment                # Scale by maximum entrainment (as a fraction of cloud-base mass flux)
 
     # 1. Fluxes in the PBL
     humid_top_of_pbl = min(humid_half[nlev-1], humid[nlev])   # Humidity at the upper boundary of the PBL
@@ -133,7 +130,7 @@ function convection!(
         net_flux_humid[k] = flux_up_humid - flux_down_humid
 
         # Mass entrainment
-        mass_entrainment = entrainment_coefficients[k] * pres * cloud_base_mass_flux  # Why multiply by pres here?
+        mass_entrainment = entrainment_profile[k] * pres * cloud_base_mass_flux  # Why multiply by pres here?
         mass_flux += mass_entrainment
 
         # Upward fluxes at upper boundary

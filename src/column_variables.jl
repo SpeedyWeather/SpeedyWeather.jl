@@ -44,15 +44,15 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     sat_moist_static_energy_half::Vector{NF} = zeros(NF,nlev)  # Saturation moist static energy interpolated to half-levels
 
     # Convection
-    conditional_instability::Bool = false                # Whether a conditional instability exists in this column
-    convection_is_active::Bool = false                   # Whether convection is activated in this column
-    cloud_top::Int = nlev+1                              # Top-of-convection layer
-    excess_humidity::NF = 0                              # Excess humidity due to convection
-    cloud_base_mass_flux::NF = 0                         # Mass flux at the top of the PBL
-    precip_cnv::NF = 0                                   # Precipitation due to convection
-    flux_humid::Vector{NF} = zeros(NF,nlev)              # Fluxes of moisture in this column
-    flux_dry_static_energy::Vector{NF} = zeros(NF,nlev)  # Fluxes of dry static energy in this column
-    entrainment_profile::Vector{NF} = zeros(NF,nlev)     # Entrainment coefficients
+    conditional_instability::Bool = false                    # Whether a conditional instability exists in this column
+    convection_is_active::Bool = false                       # Whether convection is activated in this column
+    cloud_top::Int = nlev+1                                  # Top-of-convection layer
+    excess_humidity::NF = 0                                  # Excess humidity due to convection
+    cloud_base_mass_flux::NF = 0                             # Mass flux at the top of the PBL
+    precip_cnv::NF = 0                                       # Precipitation due to convection
+    net_flux_humid::Vector{NF} = zeros(NF,nlev)              # Fluxes of moisture in this column
+    net_flux_dry_static_energy::Vector{NF} = zeros(NF,nlev)  # Fluxes of dry static energy in this column
+    entrainment_profile::Vector{NF} = zeros(NF,nlev)         # Entrainment coefficients
 
     # Large-scale condensation
     precip_large_scale::NF = 0  # Precipitation due to large-scale condensation
@@ -128,13 +128,18 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     fill!(column.temp_tend,0)
     fill!(column.humid_tend,0)
 
+    # Convection
     column.cloud_top = column.nlev+1
     column.conditional_instability = false
     column.convection_is_active = false
-    column.precip_large_scale = zero(NF)
-    column.precip_convection = zero(NF)
     column.excess_humidity = zero(NF)
+    column.precip_convection = zero(NF)
+    column.cloud_base_mass_flux = zero(NF)
+    fill!(column.net_flux_humid, 0)
+    fill!(column.net_flux_dry_static_energy, 0)
 
+    # Large-scale condensation
+    column.precip_large_scale = zero(NF)
     return nothing
 end
 
