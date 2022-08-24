@@ -45,7 +45,7 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
 
     # Convection
     conditional_instability::Bool = false                    # Whether a conditional instability exists in this column
-    convection_is_active::Bool = false                       # Whether convection is activated in this column
+    activate_convection::Bool = false                        # Whether convection is activated in this column
     cloud_top::Int = nlev+1                                  # Top-of-convection layer
     excess_humidity::NF = 0                                  # Excess humidity due to convection
     cloud_base_mass_flux::NF = 0                             # Mass flux at the top of the PBL
@@ -131,7 +131,7 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     # Convection
     column.cloud_top = column.nlev+1
     column.conditional_instability = false
-    column.convection_is_active = false
+    column.activate_convection = false
     column.excess_humidity = zero(NF)
     column.precip_convection = zero(NF)
     column.cloud_base_mass_flux = zero(NF)

@@ -40,7 +40,7 @@ function conditional_instability!(
 
             # Condition 2a: Gradient of actual moist static energy between lower and upper troposphere
             if moist_static_energy_lower_trop > sat_moist_static_energy_half[k]
-                column.convection_is_active = true
+                column.activate_convection = true
                 column.excess_humidity = max(
                     humid[nlev] - humid_threshold_pbl,
                     (moist_static_energy[nlev] - sat_moist_static_energy_half[k]) / alhc,
@@ -48,7 +48,7 @@ function conditional_instability!(
             end
         end
 
-        if column.convection_is_active
+        if column.conditional_instability && column.activate_convection
             return nothing  # Conditions 1 and 2a already satisfied
         end
 
@@ -56,7 +56,7 @@ function conditional_instability!(
         if column.conditional_instability &&
            (humid[nlev] > humid_threshold_pbl) &&
            (humid[nlev-1] > humid_threshold_above_pbl)
-            column.convection_is_active = true
+            column.activate_convection = true
             column.excess_humidity = humid[nlev] - humid_threshold_pbl
         end
     end
@@ -75,7 +75,7 @@ function convection!(
 ) where {NF<:AbstractFloat}
     conditional_instability!(column, model)  # Diagnose convection
 
-    if !column.convection_is_active
+    if !(column.conditional_instability && column.activate_convection)
         return nothing
     end
 
