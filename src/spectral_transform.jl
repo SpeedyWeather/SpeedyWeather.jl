@@ -101,7 +101,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
 
     # NORMALIZATION
     norm_sphere = 2sqrt(π)  # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
-    Δlons = 2π./nlons       # normalization for forward transform to be baked into the quadrature weights
+    Δlons = 2π./nlons       # integration of longitude, i.e. dϕ, discretised, used to scale the quadrature weights
 
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
     _, lons = get_colatlons(grid,nresolution)
@@ -125,8 +125,10 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     end
 
     # QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
+    # weights approximate the integration over latitudes, i.e. sin(θ)dθ
+    # and have to sum up to 2 over all latitudes as ∫sin(θ)dθ = 2 over 0...π.
     quadrature_weights = get_quadrature_weights(grid,nresolution)
-    quadrature_weights .*= Δlons
+    quadrature_weights .*= Δlons    # scale with discretised dϕ for integration over sphere
 
     # RECURSION FACTORS
     ϵlms = get_recursion_factors(lmax+1,mmax)
@@ -345,8 +347,8 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
             # CORRECT FOR LONGITUDE OFFSETTS
             w = lon_offsets[m,ilat_n]           # longitude offset rotation
-            acc_n = (acc_even + acc_odd)*w      # accumulators for northern
-            acc_s = (acc_even - acc_odd)*w      # and southern hemisphere
+            acc_n = (acc_even + acc_odd)#*w      # accumulators for northern
+            acc_s = (acc_even - acc_odd)#*w      # and southern hemisphere
             
             gn[m] += acc_n                      # accumulate in phase factors for northern
             gs[m] += acc_s                      # and southern hemisphere
@@ -436,7 +438,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
 
             # QUADRATURE WEIGHTS and LONGITUDE OFFSET
             w = lon_offsets[m,ilat_n]                   # longitude offset rotation
-            quadrature_weight *= conj(w)                # complex conjugate for back transform
+            # quadrature_weight *= conj(w)                # complex conjugate for back transform
             an = fn[m] * quadrature_weight              # weighted northern latitude
             as = fs[m] * quadrature_weight              # weighted southern latitude
             

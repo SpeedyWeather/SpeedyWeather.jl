@@ -197,6 +197,7 @@ nlat_odd(::Type{<:FullGaussianGrid}) = false
 nlat_odd(::Type{<:FullClenshawGrid}) = true
 nlat_odd(::Type{<:AbstractOctahedralGrid}) = false
 nlat_odd(::Type{<:AbstractHEALPixGrid}) = true
+nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))
 
 # return the maxmimum number of longitude points for a grid and its resolution parameter nlat_half/nside
 get_nlon(::Type{<:AbstractFullGrid},nlat_half::Integer) = 4nlat_half
@@ -204,9 +205,9 @@ get_nlon(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = nlon_octahedral(
 get_nlon(::Type{<:AbstractHEALPixGrid},nside::Integer) = nside_assert(nside) ? nlon_healpix(nside) : nothing
 
 # get the number of longitude points at given latitude ring j number 1...J from north to south
-get_nlon_per_ring(::Type{<:AbstractFullGrid},nlat_half::Integer,jring::Integer) = 4nlat_half
+get_nlon_per_ring(::Type{<:AbstractFullGrid},nlat_half::Integer,j::Integer) = 4nlat_half
 function get_nlon_per_ring(::Type{<:AbstractOctahedralGrid},nlat_half::Integer,j::Integer)
-    @assert 0 < jring <= 2nlat_half "Ring $J is outside O$nlat_half grid."
+    @assert 0 < j <= 2nlat_half "Ring $J is outside O$nlat_half grid."
     j = j > nlat_half ? 2nlat_half - j + 1 : j      # flip north south due to symmetry
     return nlon_octahedral(j)
 end
@@ -390,6 +391,17 @@ get_quadrature_weights(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = ga
 #                 nside_assert(nside) ? 2/12nside^2*[min(4iring,4nside) for iring in 1:2nside] : nothing
 function get_quadrature_weights(::Type{<:HEALPixGrid},nside::Integer)
     colat = get_colat(HEALPixGrid,nside)
-    riemann_weights = 2*sin.(colat)/sum(sin.(colat))
-    return riemann_weights[1:get_nlat_half(HEALPixGrid,nside)]
+    sin_colat_Δθ = zero(colat)
+    sin_colat_Δθ[1] = sin(colat[1])*colat[2]/2
+    for j in 2:length(colat)-1
+        sin_colat_Δθ[j] = sin(colat[j])*(colat[j+1]-colat[j-1])/2
+    end
+    sin_colat_Δθ[end] = sin(colat[end])*(π-colat[end])/2
+    
+    # sin.(colat)
+    # riemann_weights = 2*sin_colat/sum(sin_colat)
+    # nlat = nlat_healpix(nside)
+    # riemann_weights = fill(2/nlat,nlat)
+    # return riemann_weights#[1:get_nlat_half(HEALPixGrid,nside)]
+    return sin_colat_Δθ[1:get_nlat_half(HEALPixGrid,nside)]
 end
