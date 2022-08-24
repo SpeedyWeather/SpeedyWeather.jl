@@ -8,7 +8,7 @@ function conditional_instability!(
     column::ColumnVariables{NF},
     model::PrimitiveEquationModel,
 ) where {NF<:AbstractFloat}
-    @unpack pres_thresh_cnv, RH_thresh_PBL_cnv = model.constants
+    @unpack pres_thresh_cnv, RH_thresh_pbl_cnv = model.constants
     @unpack alhc = model.parameters
     @unpack nlev = column
     @unpack humid, pres = column
@@ -28,8 +28,8 @@ function conditional_instability!(
             min(moist_static_energy[nlev], moist_static_energy[nlev-1])
 
         # Humidity threshold for convection, defined in the PBL and one level above
-        humid_threshold_pbl = RH_thresh_PBL_cnv * sat_humid[nlev]
-        humid_threshold_above_pbl = RH_thresh_PBL_cnv * sat_humid[nlev-1]
+        humid_threshold_pbl = RH_thresh_pbl_cnv * sat_humid[nlev]
+        humid_threshold_above_pbl = RH_thresh_pbl_cnv * sat_humid[nlev-1]
 
         # The range of this loop requires clarification, but in its current form it means
         # that the top-of-convection level may be any tropospheric level, excluding the two
@@ -82,10 +82,10 @@ function convection!(
         return nothing
     end
 
-    @unpack alhc, g = model.constants
-    @unpack pres_ref = model.parameters
+    @unpack gravity = model.constants
+    @unpack alhc, pres_ref = model.parameters
     @unpack σ_levels_full, σ_levels_thick = model.geometry
-    @unpack RH_thresh_pbl_cnv, RH_thresh_layers_cnv, pres_thresh_cnv, humid_relax_time_cnv,
+    @unpack RH_thresh_pbl_cnv, RH_thresh_trop_cnv, pres_thresh_cnv, humid_relax_time_cnv,
     max_entrainment, ratio_secondary_mass_flux = model.constants  # Constants for convection
     @unpack pres, humid, humid_half, sat_humid, sat_humid_half, dry_static_energy,
     dry_static_energy_half, entrainment_coefficients, cloud_top, excess_humidity,
@@ -95,7 +95,7 @@ function convection!(
 
     # Compute the entrainment coefficients for the column. Mass entrainment in layer k is
     # equal to the entrainment coefficient in layer k * the mass flux at the lower boundary.
-    # We should pre-compute and reuse these!
+    # TODO(alistair) pre-compute and reuse these.
     for k = 2:nlev-1
         entrainment_coefficients[k] = max(0.0, (σ_levels_full[k] - 0.5)^2)
     end
@@ -109,7 +109,7 @@ function convection!(
     # Cloud-base mass flux
     Δp = pres_ref * pres * σ_levels_thick[nlev]  # Pressure difference between bottom and top of PBL
     mass_flux =
-        Δp / (g * 3600humid_relax_time_cnv) *
+        Δp / (gravity * 3600humid_relax_time_cnv) *
         min(1.0, 2.0 * (pres - pres_thresh_cnv) / (1 - pres_thresh_cnv)) *
         min(5.0, excess_humidity / (max_humid_pbl - humid_top_of_pbl))
     column.cloud_base_mass_flux = mass_flux
@@ -133,7 +133,7 @@ function convection!(
         net_flux_humid[k] = flux_up_humid - flux_down_humid
 
         # Mass entrainment
-        mass_entrainment = entrainment_coefficients[k] * pres * cloud_base_mass_flux  # Why multiply by pres?
+        mass_entrainment = entrainment_coefficients[k] * pres * cloud_base_mass_flux  # Why multiply by pres here?
         mass_flux += mass_entrainment
 
         # Upward fluxes at upper boundary
@@ -148,8 +148,9 @@ function convection!(
         net_flux_dry_static_energy[k] += flux_down_dry_static_energy - flux_up_dry_static_energy
         net_flux_humid[k] = flux_down_humid - flux_up_humid
 
-        # Secondary moisture flux
-        Δhumid = RH_thresh_layers_cnv * sat_humid[k] - humid[k]
+        # Secondary moisture flux representing shallower, non-precipitating convective systems
+        # Occurs when RH in an intermediate layer falls below a threshold
+        Δhumid = RH_thresh_trop_cnv * sat_humid[k] - humid[k]
         if Δhumid > 0.0
             Δflux_humid = ratio_secondary_mass_flux * cloud_base_mass_flux * Δhumid
             net_flux_humid[k] += Δflux_humid

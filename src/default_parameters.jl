@@ -70,12 +70,12 @@ The default values of the keywords define the default model setup.
     humid_relax_time_lsc::Real = 4.0  # Relaxation time for humidity (hours)
 
     # Convection
-    pres_thresh_cnv::Real = 0.8
-    RH_thresh_PBL_cnv::Real = 0.9
-    RH_thresh_layers_cnv::Real = 0.7
-    humid_relax_time_cnv::Real = 6.0
-    max_entrainment::Real = 0.5
-    ratio_secondary_mass_flux::Real = 0.8
+    pres_thresh_cnv::Real = 0.8            # Minimum (normalised) surface pressure for the occurrence of convection
+    RH_thresh_pbl_cnv::Real = 0.9          # Relative humidity threshold for convection in PBL
+    RH_thresh_trop_cnv::Real = 0.7         # Relative humidity threshold for convection in the troposphere
+    humid_relax_time_cnv::Real = 6.0       # Relaxation time for PBL humidity (hours)
+    max_entrainment::Real = 0.5            # Maximum entrainment as a fraction of cloud-base mass flux
+    ratio_secondary_mass_flux::Real = 0.8  # Ratio between secondary and primary mass flux at cloud-base
 
     # TIME STEPPING
     Δt_at_T85::Real=20                  # time step in minutes for T85, scale linearly to trunc
