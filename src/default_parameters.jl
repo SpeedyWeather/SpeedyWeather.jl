@@ -64,7 +64,7 @@ The default values of the keywords define the default model setup.
 
     # Large-Scale Condensation (from table B10)
     k_lsc::Int = 2                    # Index of atmospheric level at which large-scale condensation begins
-    RH_thresh_PBL_lsc::Real = 0.95    # Relative humidity threshold for boundary layer
+    RH_thresh_pbl_lsc::Real = 0.95    # Relative humidity threshold for boundary layer
     RH_thresh_range_lsc::Real = 0.1   # Vertical range of relative humidity threshold
     RH_thresh_max_lsc::Real = 0.9     # Maximum relative humidity threshold
     humid_relax_time_lsc::Real = 4.0  # Relaxation time for humidity (hours)

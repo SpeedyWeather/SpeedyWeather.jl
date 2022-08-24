@@ -29,7 +29,7 @@ Struct holding the parameters needed at runtime in number format NF.
 
     # PARAMETRIZATIONS
     # Large-scale condensation (occurs when relative humidity exceeds a given threshold)
-    RH_thresh_PBL_lsc::NF    # Relative humidity threshold for LSC in PBL
+    RH_thresh_pbl_lsc::NF    # Relative humidity threshold for LSC in PBL
     RH_thresh_range_lsc::NF  # Vertical range of relative humidity threshold
     RH_thresh_max_lsc ::NF   # Maximum relative humidity threshold
     humid_relax_time_lsc::NF # Relaxation time for humidity (hours)
@@ -58,7 +58,7 @@ function Constants(P::Parameters)
     @unpack trunc, Δt_at_T85, n_days, output_dt = P
 
     # PARAMETRIZATION CONSTANTS
-    @unpack RH_thresh_PBL_lsc, RH_thresh_range_lsc, RH_thresh_max_lsc, humid_relax_time_lsc = P  # Large-scale condensation
+    @unpack RH_thresh_pbl_lsc, RH_thresh_range_lsc, RH_thresh_max_lsc, humid_relax_time_lsc = P  # Large-scale condensation
     @unpack pres_thresh_cnv, RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv, max_entrainment, ratio_secondary_mass_flux = P  # Convection
 
     Δt_min_at_trunc = Δt_at_T85*(85/trunc)      # scale time step Δt to specified resolution
@@ -82,7 +82,7 @@ function Constants(P::Parameters)
                             Δt,Δt_unscaled,Δt_sec,Δt_hrs,
                             robert_filter,williams_filter,n_timesteps,
                             output_every_n_steps, n_outputsteps,
-                            drag_strat, RH_thresh_PBL_lsc, RH_thresh_range_lsc,
+                            drag_strat, RH_thresh_pbl_lsc, RH_thresh_range_lsc,
                             RH_thresh_max_lsc, humid_relax_time_lsc, pres_thresh_cnv,
                             RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv,
                             max_entrainment, ratio_secondary_mass_flux,

@@ -92,7 +92,7 @@ function convection!(
     nlev = column
     # Quantities calculated by this parameterization
     @unpack cloud_base_mass_flux, net_flux_humid, net_flux_dry_static_energy,
-    precip_cnv = column
+    precip_convection = column
 
     # Compute the entrainment coefficients for the column. Mass entrainment in layer k is
     # equal to the entrainment coefficient in layer k * the mass flux at the lower boundary.
@@ -161,12 +161,12 @@ function convection!(
 
     # 3. Fluxes for top-of-convection layer
     # Flux of convective precipitation
-    column.precip_cnv = max(flux_up_humid - mass_flux * sat_humid_half[cloud_top], 0.0)
+    column.precip_convection = max(flux_up_humid - mass_flux * sat_humid_half[cloud_top], 0.0)
 
     # Net flux of dry static energy and moisture
     net_flux_dry_static_energy[cloud_top] =
-        flux_up_dry_static_energy - flux_down_dry_static_energy + alhc * precip_cnv
-    net_flux_humid[cloud_top] = flux_up_humid - flux_down_humid - precip_cnv
+        flux_up_dry_static_energy - flux_down_dry_static_energy + alhc * precip_convection
+    net_flux_humid[cloud_top] = flux_up_humid - flux_down_humid - precip_convection
 
     return nothing
 end

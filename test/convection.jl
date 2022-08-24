@@ -39,7 +39,7 @@
             SpeedyWeather.convection!(column, model)
 
             @test isfinite(column.cloud_base_mass_flux)
-            @test isfinite(column.precip_cnv)
+            @test isfinite(column.precip_convection)
             @test all(isfinite.(column.net_flux_humid))
             @test all(isfinite.(column.net_flux_dry_static_energy))
         end

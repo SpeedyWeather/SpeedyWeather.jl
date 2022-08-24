@@ -2,7 +2,7 @@ function large_scale_condensation!( column::ColumnVariables{NF},
                                     model::PrimitiveEquationModel,
                                     ) where {NF<:AbstractFloat}
 
-    @unpack gravity, RH_thresh_max_lsc, RH_thresh_range_lsc, RH_thresh_PBL_lsc, humid_relax_time_lsc = model.constants
+    @unpack gravity, RH_thresh_max_lsc, RH_thresh_range_lsc, RH_thresh_pbl_lsc, humid_relax_time_lsc = model.constants
     @unpack cp, alhc, n_stratosphere_levels = model.parameters
     @unpack σ_levels_full, σ_levels_thick = model.geometry
 
@@ -18,7 +18,7 @@ function large_scale_condensation!( column::ColumnVariables{NF},
         σₖ² = σ_levels_full[k]^2
         RH_threshold = RH_thresh_max_lsc + RH_thresh_range_lsc * (σₖ² - 1)
         if k == nlev
-            RH_threshold = max(RH_threshold, RH_thresh_PBL_lsc)
+            RH_threshold = max(RH_threshold, RH_thresh_pbl_lsc)
         end
 
         # Impose a maximum heating rate to avoid grid-point storm instability
@@ -38,7 +38,7 @@ function large_scale_condensation!( column::ColumnVariables{NF},
 
     # 2. Precipitation due to large-scale condensation
     for k in eachlayer(column)[n_stratosphere_levels:end]                   # top to bottom, skip stratosphere
-        Δpₖ = pres*σ_levels_thick[k]                                        # Formula 4
+        Δpₖ = pres*σ_levels_thick[k]                                        # Formula 4  # Correct index?
         column.precip_large_scale += -1 / gravity * Δpₖ * humid_tend[k]     # Formula 25
     end
 end

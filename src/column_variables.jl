@@ -49,7 +49,7 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     cloud_top::Int = nlev+1                                  # Top-of-convection layer
     excess_humidity::NF = 0                                  # Excess humidity due to convection
     cloud_base_mass_flux::NF = 0                             # Mass flux at the top of the PBL
-    precip_cnv::NF = 0                                       # Precipitation due to convection
+    precip_convection::NF = 0                                # Precipitation due to convection
     net_flux_humid::Vector{NF} = zeros(NF,nlev)              # Fluxes of moisture in this column
     net_flux_dry_static_energy::Vector{NF} = zeros(NF,nlev)  # Fluxes of dry static energy in this column
     entrainment_profile::Vector{NF} = zeros(NF,nlev)         # Entrainment coefficients
