@@ -425,10 +425,6 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
                                                 # then fill fs with zeros and no changes needed further down
         not_equator ? LinearAlgebra.mul!(view(fs,1:nfreq),rfft_plan,view(map.v,js)) : fill!(fs,0)
 
-        if ~not_equator
-            println(fs)
-        end
-
         # Legendre transform in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
         Λ_ilat = recompute_legendre ?
