@@ -26,7 +26,7 @@ boundary of the full level k.
             Q(N)   > RH_cnv * Qˢᵃᵗ(N)
             Q(N-1) > RH_cnv * Qˢᵃᵗ(N-1)
 
-The top-of-convection (TCN) layer, or cloud top, is the largest value of k for which
+The top-of-convection (TCN) layer, or cloud-top, is the largest value of k for which
 condition 1 is satisfied.
 """
 function diagnose_convection!(
@@ -97,8 +97,8 @@ end
 Compute fluxes and precipitation due to convection in the given atmospheric column.
 
 The scheme computes fluxes of mass, humidity and dry static energy. A part of the upward
-moisture flux at the lower boundary of the cloud-top (TCN) layer isconverted into convective
-precipitation.
+moisture flux at the lower boundary of the cloud-top (TCN) layer is converted into
+convective precipitation.
 
 For full details of the scheme see: http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf
 """
