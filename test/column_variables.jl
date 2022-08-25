@@ -15,8 +15,18 @@
         @test all(column.u_tend .=== zero(NF))
         @test all(column.v_tend .=== zero(NF))
 
-        @test column.precip_large_scale === zero(NF)
+        # Convection
         @test column.cloud_top === column.nlev+1
+        @test column.conditional_instability === false
+        @test column.activate_convection === false
+        @test column.excess_humidity === zero(NF)
+        @test column.precip_convection === zero(NF)
+        @test column.cloud_base_mass_flux === zero(NF)
+        @test all(column.net_flux_humid .=== zero(NF))
+        @test all(column.net_flux_dry_static_energy .=== zero(NF))
+
+        # Large-scale condensation
+        @test column.precip_large_scale === zero(NF)
     end
 end
 
