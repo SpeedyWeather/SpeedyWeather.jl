@@ -230,7 +230,7 @@ get_colat(::Type{<:FullClenshawGrid},nlat_half::Integer) = [j/(2nlat_half)*π fo
 get_colat(::Type{<:FullGaussianGrid},nlat_half::Integer) =
             π .- acos.(FastGaussQuadrature.gausslegendre(2nlat_half)[1])
 get_colat(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = get_colat(FullGaussianGrid,nlat_half)
-get_colat(::Type{<:HEALPixGrid},nside::Integer) =
+get_colat(G::Type{<:HEALPixGrid},nside::Integer) = #get_colat(FullClenshawGrid,get_nlat_half(G,nside))
             [acos(Healpix.ring2z(Healpix.Resolution(nside),i)) for i in 1:nlat_healpix(nside)]
 
 # lon [radians] vectors for full grids (empty vectors otherwise)
@@ -387,21 +387,4 @@ end
 get_quadrature_weights(::Type{<:FullClenshawGrid},nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
 get_quadrature_weights(::Type{<:FullGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
 get_quadrature_weights(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
-# get_quadrature_weights(::Type{<:HEALPixGrid},nside::Integer) =
-#                 nside_assert(nside) ? 2/12nside^2*[min(4iring,4nside) for iring in 1:2nside] : nothing
-function get_quadrature_weights(::Type{<:HEALPixGrid},nside::Integer)
-    colat = get_colat(HEALPixGrid,nside)
-    sin_colat_Δθ = zero(colat)
-    sin_colat_Δθ[1] = sin(colat[1])*colat[2]/2
-    for j in 2:length(colat)-1
-        sin_colat_Δθ[j] = sin(colat[j])*(colat[j+1]-colat[j-1])/2
-    end
-    sin_colat_Δθ[end] = sin(colat[end])*(π-colat[end])/2
-    
-    # sin.(colat)
-    # riemann_weights = 2*sin_colat/sum(sin_colat)
-    # nlat = nlat_healpix(nside)
-    # riemann_weights = fill(2/nlat,nlat)
-    # return riemann_weights#[1:get_nlat_half(HEALPixGrid,nside)]
-    return sin_colat_Δθ[1:get_nlat_half(HEALPixGrid,nside)]
-end
+get_quadrature_weights(G::Type{<:HEALPixGrid},nside::Integer) = 4π/get_npoints(G,nside)*ones(get_nlat_half(G,nside))
