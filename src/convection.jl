@@ -3,17 +3,41 @@
         column::ColumnVariables{NF},
         model::PrimitiveEquationModel,
     )
+
+Check whether the convection scheme should be activated in the given atmospheric column.
+
+1. A conditional instability exists when the saturation moist energy (MSS) decreases with
+height, that is, there exists an atmospheric level k such that,
+
+    MSS(N) > MSS(k+h)
+
+where N is the planetary boundary layer (PBL) and k+h is the half-level at the lower
+boundary of the full level k.
+
+2. When a conditional instability exists, the convection scheme is activated when, either,
+
+    a. the actual moist static energy (MSE) at level N-1 (directly above the PBL) is greater
+       than the saturation moist static energy at some half-level k+h,
+
+            MSE(N-1) > MSS(k+h)
+
+    b. the humidity in both the PBL and one layer above exceeds a prescribed threshold,
+
+            Q(N)   > RH_cnv * Qˢᵃᵗ(N)
+            Q(N-1) > RH_cnv * Qˢᵃᵗ(N-1)
+
+The top-of-convection (TCN) layer, or cloud top, is the largest value of k for which
+condition 1 is satisfied.
 """
 function conditional_instability!(
     column::ColumnVariables{NF},
     model::PrimitiveEquationModel,
 ) where {NF<:AbstractFloat}
-    @unpack pres_thresh_cnv, RH_thresh_pbl_cnv = model.constants
     @unpack alhc = model.parameters
+    @unpack pres_thresh_cnv, RH_thresh_pbl_cnv = model.constants
     @unpack nlev = column
-    @unpack humid, pres = column
-    @unpack sat_humid, dry_static_energy, moist_static_energy, sat_moist_static_energy,
-    sat_moist_static_energy_half = column
+    @unpack humid, pres, sat_humid, dry_static_energy, moist_static_energy,
+    sat_moist_static_energy, sat_moist_static_energy_half = column
 
     if pres > pres_thresh_cnv
         # First we pre-compute some values which we will need inside the loop
@@ -50,7 +74,7 @@ function conditional_instability!(
         end
 
         if column.conditional_instability && column.activate_convection
-            return nothing  # Conditions 1 and 2a already satisfied
+            return nothing  # Condition for convection already satisfied
         end
 
         # Condition 2b: Humidity exceeds threshold in both PBL and one layer above
@@ -69,6 +93,14 @@ end
         column::ColumnVariables{NF},
         model::PrimitiveEquationModel,
     )
+
+Compute fluxes and precipitation due to convection in the given atmospheric column.
+
+The scheme computes fluxes of mass, humidity and dry static energy. A part of the upward
+moisture flux at the lower boundary of the cloud-top (TCN) layer isconverted into convective
+precipitation.
+
+For full details of the scheme see: http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf
 """
 function convection!(
     column::ColumnVariables{NF},

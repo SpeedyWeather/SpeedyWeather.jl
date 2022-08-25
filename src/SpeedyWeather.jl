@@ -93,8 +93,8 @@ module SpeedyWeather
     include("column_variables.jl")          # defines ColumnVariables
     include("thermodynamics.jl")
     include("tendencies_parametrizations.jl")
-    include("large_scale_condensation.jl")
     include("convection.jl")
+    include("large_scale_condensation.jl")
 
     include("time_integration.jl")
     include("pretty_printing.jl")
