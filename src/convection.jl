@@ -129,22 +129,23 @@ function convection!(
     # Compute the entrainment coefficients for the column. Mass entrainment in layer k is
     # equal to the entrainment coefficient in layer k * the mass flux at the lower boundary.
     # TODO(alistair) pre-compute and reuse these.
+    half = one(NF)/2
     for k = 2:nlev-1
-        entrainment_profile[k] = max(0.0, (σ_levels_full[k] - 0.5)^2)
+        entrainment_profile[k] = max(zero(NF), (σ_levels_full[k] - half)^2)
     end
     entrainment_profile /= sum(entrainment_profile)  # Normalise
     entrainment_profile *= max_entrainment           # Scale by maximum entrainment (as a fraction of cloud-base mass flux)
 
     # 1. Fluxes in the PBL
     humid_top_of_pbl = min(humid_half[nlev-1], humid[nlev])   # Humidity at the upper boundary of the PBL
-    max_humid_pbl = max(1.01 * humid[nlev], sat_humid[nlev])  # Maximum specific humidity in the PBL
+    max_humid_pbl = max(NF(1.01) * humid[nlev], sat_humid[nlev])  # Maximum specific humidity in the PBL
 
     # Cloud-base mass flux
     Δp = pres_ref * pres * σ_levels_thick[nlev]  # Pressure difference between bottom and top of PBL
     mass_flux =
         Δp / (gravity * 3600humid_relax_time_cnv) *
-        min(1.0, 2.0 * (pres - pres_thresh_cnv) / (1 - pres_thresh_cnv)) *
-        min(5.0, excess_humidity / (max_humid_pbl - humid_top_of_pbl))
+        min(1, 2 * (pres - pres_thresh_cnv) / (1 - pres_thresh_cnv)) *
+        min(5, excess_humidity / (max_humid_pbl - humid_top_of_pbl))
     column.cloud_base_mass_flux = mass_flux
 
     # Upward fluxes at upper boundary
@@ -184,7 +185,7 @@ function convection!(
         # Secondary moisture flux representing shallower, non-precipitating convective systems
         # Occurs when RH in an intermediate layer falls below a threshold
         Δhumid = RH_thresh_trop_cnv * sat_humid[k] - humid[k]
-        if Δhumid > 0.0
+        if Δhumid > 0
             Δflux_humid = ratio_secondary_mass_flux * cloud_base_mass_flux * Δhumid
             net_flux_humid[k] += Δflux_humid
             net_flux_humid[nlev] -= Δflux_humid
@@ -193,7 +194,7 @@ function convection!(
 
     # 3. Fluxes for top-of-convection layer
     # Flux of convective precipitation
-    column.precip_convection = max(flux_up_humid - mass_flux * sat_humid_half[cloud_top], 0.0)
+    column.precip_convection = max(flux_up_humid - mass_flux * sat_humid_half[cloud_top], 0)
 
     # Net flux of dry static energy and moisture
     net_flux_dry_static_energy[cloud_top] =
