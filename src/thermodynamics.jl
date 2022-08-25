@@ -82,7 +82,7 @@ function interpolate!(
     A_half_level[nlev] =
         A_full_level[nlev] +
         (A_full_level[nlev] - A_full_level[nlev-1]) *
-        (log(0.99) - log(σ_levels_full[nlev])) /
+        (log(NF(0.99)) - log(σ_levels_full[nlev])) /
         (log(σ_levels_full[nlev]) - log(σ_levels_full[nlev-1]))
 
     return nothing
@@ -90,7 +90,7 @@ end
 
 
 """
-    function saturation_vapour_pressure!(
+    saturation_vapour_pressure!(
         column::ColumnVariables{NF},
         model::PrimitiveEquationModel{NF},
     )
@@ -121,9 +121,9 @@ function saturation_vapour_pressure!(
 end
 
 """
-saturation_specific_humidity!(  column::ColumnVariables{NF},
-                                model::PrimitiveEquationModel{NF}
-                                ) where {NF<:AbstractFloat}
+    saturation_specific_humidity!(  column::ColumnVariables{NF},
+                                    model::PrimitiveEquationModel{NF}
+                                    ) where {NF<:AbstractFloat}
 
 Compute the saturation specific humidity according to the formula,
 
