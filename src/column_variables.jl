@@ -132,9 +132,7 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     column.cloud_top = column.nlev+1
     column.conditional_instability = false
     column.activate_convection = false
-    column.excess_humidity = zero(NF)
     column.precip_convection = zero(NF)
-    column.cloud_base_mass_flux = zero(NF)
     fill!(column.net_flux_humid, 0)
     fill!(column.net_flux_dry_static_energy, 0)
 
