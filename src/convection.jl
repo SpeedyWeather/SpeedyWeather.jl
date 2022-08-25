@@ -1,5 +1,5 @@
 """
-    conditional_instability!(
+    diagnose_convection!(
         column::ColumnVariables{NF},
         model::PrimitiveEquationModel,
     )
@@ -29,7 +29,7 @@ boundary of the full level k.
 The top-of-convection (TCN) layer, or cloud top, is the largest value of k for which
 condition 1 is satisfied.
 """
-function conditional_instability!(
+function diagnose_convection!(
     column::ColumnVariables{NF},
     model::PrimitiveEquationModel,
 ) where {NF<:AbstractFloat}
@@ -106,7 +106,7 @@ function convection!(
     column::ColumnVariables{NF},
     model::PrimitiveEquationModel,
 ) where {NF<:AbstractFloat}
-    conditional_instability!(column, model)  # Diagnose convection
+    diagnose_convection!(column, model)  # Diagnose convection
 
     if !(column.conditional_instability && column.activate_convection)
         return nothing  # No convection

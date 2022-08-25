@@ -1,5 +1,5 @@
 @testset "Parametrization: convection" begin
-    @testset "conditional_instability!" begin
+    @testset "diagnose_convection!" begin
         @testset for NF in (Float32, Float64)
             _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive)
             nlev = diagn.nlev
@@ -14,7 +14,7 @@
             column.sat_moist_static_energy .= rand(NF, nlev)
             column.sat_moist_static_energy_half .= rand(NF, nlev)
 
-            SpeedyWeather.conditional_instability!(column, model)
+            SpeedyWeather.diagnose_convection!(column, model)
 
             @test isfinite(column.excess_humidity)
             @test column.excess_humidity >= 0
