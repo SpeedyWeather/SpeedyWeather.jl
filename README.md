@@ -16,9 +16,9 @@ For an overview of the functionality and explanation see the
 ## Example use
 
 SpeedyWeather.jl is currently developed. Some things work, some don't. Stay tuned.
-Here is video of some relative vorticity, simulated at T682 (20km at the Equator) spectral resolution in single precision.
+Here is video of some relative vorticity, simulated at T682 (20km at the Equator) spectral resolution.
 
-https://user-images.githubusercontent.com/25530332/181252295-7f634be5-e252-4d03-b57d-d5ed18ac05d0.mp4
+https://user-images.githubusercontent.com/25530332/185218396-620a0887-3860-496f-a265-aa59a2079768.mp4
 
 The main interface to SpeedyWeather.jl is 
 
