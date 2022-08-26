@@ -25,6 +25,35 @@ function spectral_truncation!(  alms::AbstractMatrix{NF},   # spectral field to 
 end
 
 """
+    spectral_truncation!(alms::LowerTriangularMatrix,ltrunc::Integer,mtrunc::Integer)
+
+Truncate spectral coefficients `alms` in-place by setting all coefficients for which the degree `l`
+is larger than the truncation `ltrunc` or order `m` larger than the truncaction `mtrunc`.
+Similar to `spectral_truncation!(::AbstractMatrix,...) but skips the upper triangle which is
+zero by design for LowerTriangularMatrix."""
+function spectral_truncation!(  alms::LowerTriangularMatrix{NF},    # spectral field to be truncated
+                                ltrunc::Integer,                    # truncate to max degree ltrunc
+                                mtrunc::Integer,                    # truncate to max order mtrunc
+                                ) where NF                          # number format NF (can be complex)
+    
+    lmax,mmax = size(alms) .- 1         # 0-based degree l, order m of the legendre polynomials
+
+    lm = 1
+    @inbounds for m in 1:mmax+1         # order m = 0,mmax but 1-based
+        for l in m:lmax+1               # degree l = 0,lmax but 1-based
+            if  l > ltrunc+1 ||         # and degrees l>ltrunc
+                m > mtrunc+1            # and orders m>mtrunc
+
+                alms[lm] = zero(NF)     # set that coefficient to zero
+                
+            end
+            lm += 1
+        end
+    end
+    return alms
+end
+
+"""
     spectral_truncation!(alms,trunc)
 
 Truncate spectral coefficients `alms` in-place by setting (a) the upper right triangle to zero and (b)
