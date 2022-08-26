@@ -5,8 +5,8 @@ Truncate spectral coefficients `alms` in-place by setting (a) the upper right tr
 all coefficients for which the degree `l` is larger than the truncation `ltrunc` or order `m` larger than
 the truncaction `mtrunc`."""
 function spectral_truncation!(  alms::AbstractMatrix{NF},   # spectral field to be truncated
-                                ltrunc::Int,                # truncate to max degree ltrunc
-                                mtrunc::Int                 # truncate to max order mtrunc
+                                ltrunc::Integer,            # truncate to max degree ltrunc
+                                mtrunc::Integer,            # truncate to max order mtrunc
                                 ) where NF                  # number format NF (can be complex)
     
     lmax,mmax = size(alms) .- 1    # 0-based degree l, order m of the legendre polynomials
