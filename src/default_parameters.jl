@@ -15,7 +15,7 @@ The default values of the keywords define the default model setup.
 
     # RESOLUTION AND GRID
     trunc::Int=31                                   # spectral truncation
-    grid::Type{<:AbstractGrid}=FullGaussianGrid     # define the grid type
+    Grid::Type{<:AbstractGrid}=FullGaussianGrid     # define the grid type
     nlev::Int=nlev_default(model)                   # number of vertical levels 
     
     # PHYSICAL CONSTANTS

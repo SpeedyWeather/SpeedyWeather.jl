@@ -7,7 +7,7 @@ and the vertical levels. NF is the number format used for the precomputed consta
 struct Geometry{NF<:AbstractFloat}      # NF: Number format
 
     # GRID TYPE AND RESOLUTION
-    grid::Type{<:AbstractGrid}
+    Grid::Type{<:AbstractGrid}
     nresolution::Int    # resolution parameter nlat_half or nside for HEALPix
 
     # GRID-POINT SPACE
@@ -70,30 +70,30 @@ Generator function to create the Geometry struct from parameters in `P`.
 """
 function Geometry(P::Parameters)
 
-    @unpack grid, trunc, nlev = P                   # grid type, spectral truncation, # of vertical levels
+    @unpack Grid, trunc, nlev = P                   # grid type, spectral truncation, # of vertical levels
     @unpack radius_earth, rotation_earth, akap = P  # radius of earth, angular frequency, ratio of gas consts
     @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
 
     # RESOLUTION PARAMETERS
-    nresolution = get_resolution(grid,trunc)        # resolution parameter, nlat_half or nside for HEALPixGrid
-    nlat_half = get_nlat_half(grid,nresolution)     # contains equator for HEALPix
-    nlat = 2nlat_half - nlat_odd(grid)              # one less if grids have odd # of latitude rings
-    nlon = get_nlon(grid,nresolution)               # number of longitudes around the equator
-    nside = grid isa HEALPixGrid ? nresolution : 0  # nside is only defined for HEALPixGrid (npoints)
-    npoints = get_npoints(grid,nresolution)         # total number of grid points
+    nresolution = get_resolution(Grid,trunc)        # resolution parameter, nlat_half or nside for HEALPixGrid
+    nlat_half = get_nlat_half(Grid,nresolution)     # contains equator for HEALPix
+    nlat = 2nlat_half - nlat_odd(Grid)              # one less if grids have odd # of latitude rings
+    nlon = get_nlon(Grid,nresolution)               # number of longitudes around the equator
+    nside = Grid isa HEALPixGrid ? nresolution : 0  # nside is only defined for HEALPixGrid (npoints)
+    npoints = get_npoints(Grid,nresolution)         # total number of grid points
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
-    colat = get_colat(grid,nresolution)             # colatitude in radians
+    colat = get_colat(Grid,nresolution)             # colatitude in radians
     lat = π/2 .- colat                              # latitude in radians
     colatd = colat*360/2π                           # and the same in degree 0...180˚
     latd = lat*360/2π                               # 90˚...-90˚
 
     # LONGITUDE VECTORS (empty for reduced grids)
-    lon = get_lon(grid,nresolution)                 # array of longitudes 0...2π
+    lon = get_lon(Grid,nresolution)                 # array of longitudes 0...2π
     lond = lon*360/2π                               # array of longitudes in degrees 0...360˚
 
     # COORDINATES for every grid point in ring order
-    lats,lons = get_colatlons(grid,nresolution)     # in radians
+    lats,lons = get_colatlons(Grid,nresolution)     # in radians
 
     # VERTICAL SIGMA COORDINATE 
     # σ = p/p0 (fraction of surface pressure)
@@ -143,7 +143,7 @@ function Geometry(P::Parameters)
     # tref3=fsgr.*tref #this actually is the correct definition. Needs better naming convention 
 
     # conversion to number format NF happens here
-    Geometry{P.NF}( grid,nresolution,
+    Geometry{P.NF}( Grid,nresolution,
                     nlon,nlat,nlev,nlat_half,nside,npoints,radius_earth,
                     lat,latd,colat,colatd,lon,lond,lons,lats,
                     n_stratosphere_levels,
