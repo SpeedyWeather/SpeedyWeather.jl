@@ -71,9 +71,9 @@ end
 
 Generator function to create the Geometry struct from parameters in `P`.
 """
-function Geometry(P::Parameters)
+function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
-    @unpack Grid, trunc, nlev = P                   # grid type, spectral truncation, # of vertical levels
+    @unpack trunc, nlev = P                         # grid type, spectral truncation, # of vertical levels
     @unpack radius_earth, rotation_earth, akap = P  # radius of earth, angular frequency, ratio of gas consts
     @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
 
@@ -165,6 +165,9 @@ function Geometry(P::Parameters)
                     xgeop1,xgeop2,lapserate_correction, entrainment_profile)
                     # tref,rgas,fsgr,tref3)
 end
+
+# use Grid in Parameters if not provided
+Geometry(P::Parameters) = Geometry(P,P.Grid)
 
 """
     σ_levels_half = vertical_coordinates(P::Parameters)

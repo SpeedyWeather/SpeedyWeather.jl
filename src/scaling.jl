@@ -1,8 +1,14 @@
-# alias functions to scale the latitude of lat-lon map `A`
+# alias functions to scale the latitude of any gridded map A
 scale_coslat!(  A::AbstractGrid,G::Geometry) = _scale_lat!(A,G.coslat)
 scale_coslat²!( A::AbstractGrid,G::Geometry) = _scale_lat!(A,G.coslat²)
 scale_coslat⁻¹!(A::AbstractGrid,G::Geometry) = _scale_lat!(A,G.coslat⁻¹)
 scale_coslat⁻²!(A::AbstractGrid,G::Geometry) = _scale_lat!(A,G.coslat⁻²)
+
+# matrix versions used for output
+scale_coslat!(  A::AbstractMatrix,G::Geometry) = A.*G.coslat'
+scale_coslat²!( A::AbstractMatrix,G::Geometry) = A.*G.coslat²'
+scale_coslat⁻¹!(A::AbstractMatrix,G::Geometry) = A.*G.coslat⁻¹'
+scale_coslat⁻²!(A::AbstractMatrix,G::Geometry) = A.*G.coslat⁻²'
 
 """
     _scale_lat!(A::AbstractGrid,v::AbstractVector)
