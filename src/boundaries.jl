@@ -36,7 +36,7 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
         # geopot_surf         = zeros(complex(P.NF),1,1)  
         # geopot_surf_grid    = zeros(P.NF,1,1)
 
-    elseif P.model == :shallowwater
+    elseif P.model == :shallowwater || P.model == :primitive
 
         orography_highres = ncfile.vars["orog"][:,:]        # height [m]
 
@@ -51,10 +51,10 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
         # geopot_surf         = zeros(complex(P.NF),1,1)  
         # geopot_surf_grid    = zeros(P.NF,1,1)
 
-    else # primitive equation model 
+    else # primitive equation model only
 
         # READ, TODO check which latitude ordering is required, it's North to South in file
-        orography = ncfile.vars["orog"][:,:]        # height [m]
+        # orography = ncfile.vars["orog"][:,:]        # height [m]
         # landsea_mask = ncfile.vars["lsm"][:,:]    # fraction of land [0-1]
         # albedo = ncfile.vars["alb"][:,:]          # annual-mean albedo [0-1]
 
