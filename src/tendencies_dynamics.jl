@@ -275,39 +275,36 @@ function vorticity_flux_curl!(  diagn::DiagnosticVariablesLayer,
 end
 
 """
-    vorticity_fluxes!(  uω_coslat⁻¹::AbstractMatrix{NF},    # Output: u*(ζ+f)/coslat in grid space
-                        vω_coslat⁻¹::AbstractMatrix{NF},    # Output: v*(ζ+f)/coslat in grid space
-                        U::AbstractMatrix{NF},              # Input: u*coslat in grid space
-                        V::AbstractMatrix{NF},              # Input: v*coslat in grid space
-                        vor::AbstractMatrix{NF},            # Input: relative vorticity ζ in grid space       
+    vorticity_fluxes!(  uω_coslat⁻¹::AbstractGrid{NF},      # Output: u*(ζ+f)/coslat
+                        vω_coslat⁻¹::AbstractGrid{NF},      # Output: v*(ζ+f)/coslat
+                        U::AbstractGrid{NF},                # Input: u*coslat
+                        V::AbstractGrid{NF},                # Input: v*coslat
+                        vor::AbstractGrid{NF},              # Input: relative vorticity ζ
                         G::Geometry{NF}                     # struct with precomputed geometry arrays
                         ) where {NF<:AbstractFloat}         # number format NF
 
 Compute the vorticity fluxes (u,v)*(ζ+f)/coslat in grid-point space from U,V and vorticity ζ."""
-function vorticity_fluxes!( uω_coslat⁻¹::AbstractMatrix{NF},    # Output: u*(ζ+f)/coslat in grid space
-                            vω_coslat⁻¹::AbstractMatrix{NF},    # Output: v*(ζ+f)/coslat in grid space
-                            U::AbstractMatrix{NF},              # Input: u*coslat in grid space
-                            V::AbstractMatrix{NF},              # Input: v*coslat in grid space
-                            vor::AbstractMatrix{NF},            # Input: relative vorticity ζ in grid space       
-                            G::Geometry{NF}                     # struct with precomputed geometry arrays
-                            ) where {NF<:AbstractFloat}         # number format NF
+function vorticity_fluxes!( uω_coslat⁻¹::Grid{NF},  # Output: u*(ζ+f)/coslat
+                            vω_coslat⁻¹::Grid{NF},  # Output: v*(ζ+f)/coslat
+                            U::Grid{NF},            # Input: u*coslat
+                            V::Grid{NF},            # Input: v*coslat
+                            vor::Grid{NF},          # Input: relative vorticity ζ
+                            G::Geometry{NF}         # struct with precomputed geometry arrays
+                            ) where {Grid<:AbstractGrid,NF<:AbstractFloat}     # number format NF
 
-    nlon,nlat = size(U)
-    @boundscheck size(U) == size(V) || throw(BoundsError)
-    @boundscheck size(U) == size(vor) || throw(BoundsError)
-    @boundscheck size(U) == size(uω_coslat⁻¹) || throw(BoundsError)
-    @boundscheck size(U) == size(vω_coslat⁻¹) || throw(BoundsError)
-
+    nlat = length(eachring(U))
     @unpack f_coriolis, coslat⁻² = G
     @boundscheck length(f_coriolis) == nlat || throw(BoundsError)
     @boundscheck length(coslat⁻²) == nlat || throw(BoundsError)
 
-    @inbounds for j in 1:nlat
-        for i in 1:nlon
+    @inbounds for j in eachring(uω_coslat⁻¹,vω_coslat⁻¹,U,V,vor)
+        coslat⁻²j = coslat⁻²[j]
+        f = f_coriolis[j]
+        for ij in each_index_in_ring(U,j)
             # ω = relative vorticity + coriolis and unscale with coslat²
-            ω = coslat⁻²[j]*(vor[i,j] + f_coriolis[j])
-            uω_coslat⁻¹[i,j] = ω*U[i,j]              # = u(ζ+f)/coslat
-            vω_coslat⁻¹[i,j] = ω*V[i,j]              # = v(ζ+f)/coslat
+            ω = coslat⁻²j*(vor[ij] + f)
+            uω_coslat⁻¹[ij] = ω*U[ij]              # = u(ζ+f)/coslat
+            vω_coslat⁻¹[ij] = ω*V[ij]              # = v(ζ+f)/coslat
         end
     end
 end
@@ -338,60 +335,48 @@ function bernoulli_potential!(  diagn::DiagnosticVariablesLayer,
 end
 
 """
-    bernoulli_potential!(   B::AbstractMatrix{NF},  # Output: Bernoulli potential B = 1/2*(u^2+v^2)+g*η
-                            u::AbstractMatrix{NF},  # zonal velocity
-                            v::AbstractMatrix{NF},  # meridional velocity
-                            η::AbstractMatrix{NF},  # interface displacement
-                            g::Real                 # gravity
+    bernoulli_potential!(   B::Grid{NF},    # Output: Bernoulli potential B = 1/2*(u^2+v^2)+g*η
+                            u::Grid{NF},    # zonal velocity
+                            v::Grid{NF},    # meridional velocity
+                            η::Grid{NF},    # interface displacement
+                            g::Real         # gravity
                             ) where {NF<:AbstractFloat}
 
 Computes the Bernoulli potential 1/2*(u^2 + v^2) + g*η in grid-point space."""
-function bernoulli_potential!(  B::AbstractMatrix{NF},  # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
-                                U::AbstractMatrix{NF},  # zonal velocity *coslat
-                                V::AbstractMatrix{NF},  # meridional velocity *coslat
-                                η::AbstractMatrix{NF},  # interface displacement
-                                g::Real,                # gravity
-                                G::Geometry{NF}         # used for precomputed cos²(lat)
-                                ) where {NF<:AbstractFloat}
+function bernoulli_potential!(  B::Grid{NF},        # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
+                                U::Grid{NF},        # zonal velocity *coslat
+                                V::Grid{NF},        # meridional velocity *coslat
+                                η::Grid{NF},        # interface displacement
+                                g::Real,            # gravity
+                                G::Geometry{NF}     # used for precomputed cos²(lat)
+                                ) where {Grid<:AbstractGrid,NF<:AbstractFloat}
     
     @unpack coslat⁻² = G
-    nlon, nlat = size(B)
-    @boundscheck nlat == length(coslat⁻²) || throw(BoundsError)
-    @boundscheck size(B) == size(U) || throw(BoundsError)
-    @boundscheck size(B) == size(V) || throw(BoundsError)
-    @boundscheck size(B) == size(η) || throw(BoundsError)
+    @boundscheck length(coslat⁻²) == length(eachring(U)) || throw(BoundsError)
 
-    one_half = convert(NF,0.5)                          # convert to number format NF
+    one_half = convert(NF,0.5)                      # convert to number format NF
     gravity = convert(NF,g)
 
-    @inbounds for j in 1:nlat
+    @inbounds for j in eachring(B,U,V,η)
         one_half_coslat⁻² = one_half*coslat⁻²[j]
-        for i in 1:nlon
-            B[i,j] = one_half_coslat⁻²*(U[i,j]^2 + V[i,j]^2) + gravity*η[i,j]
+        for ij in each_index_in_ring(B,j)
+            B[ij] = one_half_coslat⁻²*(U[ij]^2 + V[ij]^2) + gravity*η[ij]
         end
     end
 end
 
-function volume_fluxes!(    uh_coslat⁻¹::AbstractMatrix{NF},
-                            vh_coslat⁻¹::AbstractMatrix{NF},
-                            U::AbstractMatrix{NF},
-                            V::AbstractMatrix{NF},
-                            η::AbstractMatrix{NF},
-                            orography::AbstractMatrix{NF},
-                            H₀::Real,                   # layer thickness
+function volume_fluxes!(    uh_coslat⁻¹::Grid{NF},  # Output: zonal volume flux uh/coslat
+                            vh_coslat⁻¹::Grid{NF},  # Output: meridional volume flux vh/coslat
+                            U::Grid{NF},            # U = u*coslat, zonal velocity
+                            V::Grid{NF},            # V = v*coslat, meridional velocity
+                            η::Grid{NF},            # interface displacement
+                            orography::Grid{NF},    # orography
+                            H₀::Real,               # layer thickness at rest
                             G::Geometry{NF},
-                            ) where {NF<:AbstractFloat}                                   
-
-
-    @boundscheck size(V) == size(U) || throw(BoundsError)
-    @boundscheck size(η) == size(U) || throw(BoundsError)
-    @boundscheck size(orography) == size(U) || throw(BoundsError)
-    @boundscheck size(uh_coslat⁻¹) == size(U) || throw(BoundsError)
-    @boundscheck size(vh_coslat⁻¹) == size(U) || throw(BoundsError)
+                            ) where {Grid<:AbstractGrid,NF<:AbstractFloat}                                   
 
     @unpack coslat⁻² = G
-    nlon, nlat = size(U)
-    @boundscheck length(coslat⁻²) == nlat || throw(BoundsError) 
+    @boundscheck length(coslat⁻²) == length(eachring(η)) || throw(BoundsError) 
 
     H₀ = convert(NF,H₀)
 
@@ -400,11 +385,12 @@ function volume_fluxes!(    uh_coslat⁻¹::AbstractMatrix{NF},
     # layer thickness h = η + H, H is the layer thickness at rest
     # H = H₀ - orography, H₀ is the layer thickness without mountains
 
-    @inbounds for j in 1:nlat
-        for i in 1:nlon
-            h = coslat⁻²[j]*(η[i,j] + H₀ - orography[i,j])
-            uh_coslat⁻¹[i,j] = U[i,j]*h      # = uh/coslat
-            vh_coslat⁻¹[i,j] = V[i,j]*h      # = vh/coslat
+    @inbounds for j in eachring(uh_coslat⁻¹,vh_coslat⁻¹,U,V,η,orography)
+        coslat⁻²j = coslat⁻²[j]
+        for ij in each_index_in_ring(U,j)
+            h = coslat⁻²j*(η[ij] + H₀ - orography[ij])
+            uh_coslat⁻¹[ij] = U[ij]*h       # = uh/coslat
+            vh_coslat⁻¹[ij] = V[ij]*h       # = vh/coslat
         end
     end
 end
