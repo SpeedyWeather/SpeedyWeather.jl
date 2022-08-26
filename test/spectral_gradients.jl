@@ -85,20 +85,26 @@ end
 
 @testset "Scale, unscale coslat" begin
     @testset for NF in (Float32,Float64)
-        p,d,m = initialize_speedy(NF)
-        G = m.geometry
+        for Grid in (   FullGaussianGrid,
+                        FullClenshawGrid,
+                        OctahedralGaussianGrid,
+                        HEALPixGrid)
 
-        A = randn(NF,96,48)
-        B = copy(A)
-        SpeedyWeather.scale_coslat⁻¹!(A,G)
-        SpeedyWeather.scale_coslat!(A,G)
+            p,d,m = initialize_speedy(NF;Grid)
+            G = m.geometry
 
-        @test all(isapprox.(A,B,rtol=10*eps(NF)))
+            A = Grid(randn(NF,G.npoints))
+            B = copy(A)
+            SpeedyWeather.scale_coslat⁻¹!(A,G)
+            SpeedyWeather.scale_coslat!(A,G)
 
-        SpeedyWeather.scale_coslat²!(A,G)
-        SpeedyWeather.scale_coslat⁻²!(A,G)
+            @test all(isapprox.(A,B,rtol=10*eps(NF)))
 
-        @test all(isapprox.(A,B,rtol=10*eps(NF)))
+            SpeedyWeather.scale_coslat²!(A,G)
+            SpeedyWeather.scale_coslat⁻²!(A,G)
+
+            @test all(isapprox.(A,B,rtol=10*eps(NF)))
+        end
     end
 end
 

@@ -90,7 +90,7 @@ end
 
 creates `unit_range::UnitRange` to loop over all non-zeros in a LowerTriangularMatrix `L`.
 Like `eachindex` but skips the upper triangle with zeros in `L`."""
-eachharmonic(L::LowerTriangularMatrix) = 1:length(L)
+eachharmonic(L::LowerTriangularMatrix) = Base.OneTo(length(L))
 
 """
     unit_range = eachharmonic(Ls::LowerTriangularMatrix...)
@@ -125,12 +125,15 @@ end
 
 Base.copy(L::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix(L)
 
-function LowerTriangularMatrix(M::LowerTriangularMatrix{T}) where T
-    m,n = size(M)
-    L = LowerTriangularMatrix{T}(undef,m,n)
-    L.v .= M.v  # copy data over
+function LowerTriangularMatrix{T}(M::LowerTriangularMatrix) where T
+    L = LowerTriangularMatrix{T}(undef,size(M)...)
+    for i in eachindex(L,M)
+        L[i] = convert(T,M[i])  # copy data over
+    end
     return L
 end
+
+LowerTriangularMatrix(M::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix{T}(M)
 
 function Base.convert(::Type{LowerTriangularMatrix{T1}},L::LowerTriangularMatrix{T2}) where {T1,T2}
     return LowerTriangularMatrix{T1}(L.v,L.m,L.n)

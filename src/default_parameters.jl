@@ -15,9 +15,9 @@ The default values of the keywords define the default model setup.
 
     # RESOLUTION AND GRID
     trunc::Int=31                                   # spectral truncation
-    grid::Type{<:AbstractGrid}=FullGaussianGrid     # define the grid type
-    nlev::Int=nlev_default(model)                   # number of vertical levels
-
+    Grid::Type{<:AbstractGrid}=FullGaussianGrid     # define the grid type
+    nlev::Int=nlev_default(model)                   # number of vertical levels 
+    
     # PHYSICAL CONSTANTS
     radius_earth::Real=6.371e6          # radius of Earth [m]
     rotation_earth::Real=7.29e-5        # angular frequency of Earth's rotation [rad/s]
@@ -93,6 +93,7 @@ The default values of the keywords define the default model setup.
     orography_file::String="orography_F512.nc"
 
     # INITIAL CONDITIONS
+    seed::Int=abs(rand(Int))            # a random seed that's used in initialize_speedy for the global RNG
     initial_conditions::Symbol=:barotropic_vorticity    # :rest, :barotropic_vorticity or :restart
 
     # OUTPUT
