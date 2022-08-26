@@ -359,7 +359,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
     Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(NF)))
 
-    for ilat_n in 1:nlat_half     # symmetry: loop over northern latitudes only
+    @inbounds for ilat_n in 1:nlat_half     # symmetry: loop over northern latitudes only
         ilat_s = nlat - ilat_n + 1          # southern latitude index
         nlon = nlons[ilat_n]                # number of longitudes on this ring
         nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
@@ -467,7 +467,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
 
     Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(NF)))
 
-    for ilat_n in 1:nlat_half     # symmetry: loop over northern latitudes only
+    @inbounds for ilat_n in 1:nlat_half     # symmetry: loop over northern latitudes only
         ilat_s = nlat - ilat_n + 1          # corresponding southern latitude index
         nlon = nlons[ilat_n]                # number of longitudes on this ring
         nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
