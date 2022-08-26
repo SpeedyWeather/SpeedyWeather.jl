@@ -315,6 +315,13 @@ function eachring(grid::G) where {G<:AbstractGrid}
     return Base.OneTo(nlat)                             # return iterable range
 end
 
+function eachring(grids::Grid...) where {Grid<:AbstractGrid}
+    for grid in grids
+        @boundscheck length(grid) == length(grids[1]) || throw(BoundsError)
+    end
+    return eachring(grids[1])
+end
+
 function each_index_in_ring(G::Type{<:AbstractFullGrid},    # function for full grids
                             j::Integer,                     # ring index north to south
                             nlat_half::Integer)             # resolution param
