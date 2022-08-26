@@ -106,7 +106,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
     _, lons = get_colatlons(grid,nresolution)
     lon1s = [lons[each_index_in_ring(grid,j,nresolution)[1]] for j in 1:nlat_half]
-    lon_offsets = [cis(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
+    lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
     
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
     Λ = zeros(LowerTriangularMatrix,lmax+2,mmax+1)  # Legendre polynomials for one latitude
@@ -372,7 +372,8 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
         # inverse Legendre transform by looping over wavenumbers l,m
         lm = 1                              # single index for non-zero l,m indices
-        for m in 1:mmax+1                   # Σ_{m=0}^{mmax}, but 1-based index
+        # for m in 1:mmax+1                   # Σ_{m=0}^{mmax}, but 1-based index
+        for m in 1:min(nfreq,mmax+1)        # Σ_{m=0}^{mmax}, but 1-based index
             acc_odd  = zero(Complex{NF})    # accumulator for isodd(l+m)
             acc_even = zero(Complex{NF})    # accumulator for iseven(l+m)
 
@@ -400,14 +401,14 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
             acc_s = (acc_even - acc_odd)        # and southern hemisphere
             
             # ALIAS ZONAL WAVENUMBERS
-            m_alias, isconj, isnyq = alias_index(nlon, m)   # polar zones, alias m if > Nyquist
-            o = lon_offsets[m,ilat_n]           # longitude offset rotation            
-            acc_n *= o
-            acc_s *= o
-            acc_n, acc_s = alias_coeffs((acc_n, acc_s), isconj, isnyq)
+            # m_alias, isconj, isnyq = alias_index(nlon, m)   # polar zones, alias m if > Nyquist
+            # o = lon_offsets[m,ilat_n]           # longitude offset rotation            
+            # acc_n *= o
+            # acc_s *= o
+            # acc_n, acc_s = alias_coeffs((acc_n, acc_s), isconj, isnyq)
             
-            gn[m_alias] += acc_n                # accumulate in phase factors for northern
-            gs[m_alias] += acc_s                # and southern hemisphere
+            gn[m] += acc_n                # accumulate in phase factors for northern
+            gs[m] += acc_s                # and southern hemisphere
 
             lm = lm_end + 1                     # first index of next m column
         end
@@ -490,15 +491,16 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         quadrature_weight = quadrature_weights[ilat_n]  # weights normalised with π/nlat
 
         lm = 1                                          # single index for spherical harmonics
-        for m in 1:mmax+1                               # Σ_{m=0}^{mmax}, but 1-based index
+        # for m in 1:mmax+1                               # Σ_{m=0}^{mmax}, but 1-based index
+        for m in 1:min(nfreq,mmax+1)                    # Σ_{m=0}^{mmax}, but 1-based index
 
-            m_alias, isconj, isnyq = alias_index(nlon, m)   # polar zones, alias m if > Nyquist
-            an, as = alias_coeffs((fn[m_alias], fs[m_alias]), isconj, isnyq)
-            # an, as = fn[m], fs[m]
+            # m_alias, isconj, isnyq = alias_index(nlon, m)   # polar zones, alias m if > Nyquist
+            # an, as = alias_coeffs((fn[m_alias], fs[m_alias]), isconj, isnyq)
+            an, as = fn[m], fs[m]
 
             # QUADRATURE WEIGHTS and LONGITUDE OFFSET
-            o = lon_offsets[m,ilat_n]                   # longitude offset rotation
-            quadrature_weight *= conj(o)                # complex conjugate for rotation back to prime meridian
+            # o = lon_offsets[m,ilat_n]                   # longitude offset rotation
+            # quadrature_weight *= conj(o)                # complex conjugate for rotation back to prime meridian
             an *= quadrature_weight                     # weighted northern latitude
             as *= quadrature_weight                     # weighted southern latitude
 
@@ -581,7 +583,7 @@ function spectral(  map::AbstractMatrix;            # gridded field
 end
 
 """
-    alms = spectral(    map::AbstractMatrix;
+    alms = spectral(    map::AbstractGrid;
                         grid::Type{<:AbstractGrid}=FullGaussianGrid,
                         kwargs...)
 

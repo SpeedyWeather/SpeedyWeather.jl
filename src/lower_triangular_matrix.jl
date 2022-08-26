@@ -90,7 +90,7 @@ end
 
 creates `unit_range::UnitRange` to loop over all non-zeros in a LowerTriangularMatrix `L`.
 Like `eachindex` but skips the upper triangle with zeros in `L`."""
-eachharmonic(L::LowerTriangularMatrix) = 1:length(L)
+eachharmonic(L::LowerTriangularMatrix) = Base.OneTo(length(L))
 
 """
     unit_range = eachharmonic(Ls::LowerTriangularMatrix...)
