@@ -23,7 +23,7 @@ function parametrization_tendencies!(
         # Pre-compute thermodynamic quantities
         get_thermodynamics!(column, M)
 
-        # calculate parametrizations
+        # Calculate parametrizations (order of execution is important!)
         convection!(column, M)
         large_scale_condensation!(column, M)
         # clouds!(column, M)

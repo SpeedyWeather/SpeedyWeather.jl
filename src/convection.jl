@@ -27,7 +27,8 @@ boundary of the full level k.
             Q(N-1) > RH_cnv * Qˢᵃᵗ(N-1)
 
 The top-of-convection (TCN) layer, or cloud-top, is the largest value of k for which
-condition 1 is satisfied.
+condition 1 is satisfied. The cloud-top layer may be subsequently adjusted upwards by the
+large-scale condensation parameterization, which is executed after this one.
 """
 function diagnose_convection!(
     column::ColumnVariables{NF},

@@ -31,7 +31,9 @@ function large_scale_condensation!( column::ColumnVariables{NF},
             humid_tend[k] += -(humid[k] - humid_threshold) / humid_relax_time_lsc   # Formula 22
             temp_tend[k] += -alhc / cp * min(humid_tend[k], humid_tend_max*pres)    # Formula 23
 
-            # highest model level where condensation occurs (=cloud top), initialised with nlev+1 for min here
+            # If there is large-scale condensation at a level higher (i.e. smaller k) than
+            # the cloud-top previously diagnosed due to convection, then increase the
+            # cloud-top.
             column.cloud_top = min(column.cloud_top, k)                             # Page 7 (last sentence)
         end
     end
