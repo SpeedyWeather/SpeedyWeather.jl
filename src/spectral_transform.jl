@@ -6,7 +6,7 @@ for the spectral transform."""
 struct SpectralTransform{NF<:AbstractFloat}
 
     # GRID
-    grid::Type{<:AbstractGrid}  # grid type used
+    Grid::Type{<:AbstractGrid}  # grid type used
     nresolution::Int            # resolution parameter of grid
     order::Int                  # 1,2,3 for linear, quadratic, cubic grid
 
@@ -65,33 +65,33 @@ struct SpectralTransform{NF<:AbstractFloat}
 end
 
 """
-    S = SpectralTransform(NF,grid,trunc,recompute_legendre)
+    S = SpectralTransform(NF,Grid,trunc,recompute_legendre)
 
 Generator function for a SpectralTransform struct. With `NF` the number format,
-`grid` the grid type `<:AbstractGrid` and spectral truncation `trunc` this function sets up
+`Grid` the grid type `<:AbstractGrid` and spectral truncation `trunc` this function sets up
 necessary constants for the spetral transform. Also plans the Fourier transforms, retrieves the colatitudes,
 and preallocates the Legendre polynomials (if recompute_legendre == false) and quadrature weights."""
 function SpectralTransform( ::Type{NF},                     # Number format NF
-                            grid::Type{<:AbstractGrid},     # type of spatial grid used
+                            Grid::Type{<:AbstractGrid},     # type of spatial grid used
                             trunc::Int,                     # Spectral truncation
                             recompute_legendre::Bool) where NF
 
     # SPECTRAL RESOLUTION
     lmax = trunc                # Maximum degree l=[0,lmax] of spherical harmonics
     mmax = trunc                # Maximum order m=[0,l] of spherical harmonics
-    order = truncation_order(grid)
+    order = truncation_order(Grid)
 
     # RESOLUTION PARAMETERS
-    nresolution = get_resolution(grid,trunc)        # resolution parameter, nlat_half/nside for HEALPixGrid
-    nlat_half = get_nlat_half(grid,nresolution)     # contains equator for HEALPix
-    nlat = 2nlat_half - nlat_odd(grid)              # one less if grids have odd # of latitude rings
-    nlon_max = get_nlon(grid,nresolution)           # number of longitudes around the equator
+    nresolution = get_resolution(Grid,trunc)        # resolution parameter, nlat_half/nside for HEALPixGrid
+    nlat_half = get_nlat_half(Grid,nresolution)     # contains equator for HEALPix
+    nlat = 2nlat_half - nlat_odd(Grid)              # one less if grids have odd # of latitude rings
+    nlon_max = get_nlon(Grid,nresolution)           # number of longitudes around the equator
                                                     # number of longitudes per latitude ring (one hemisphere only)
-    nlons = [get_nlon_per_ring(grid,nresolution,i) for i in 1:nlat_half]
+    nlons = [get_nlon_per_ring(Grid,nresolution,i) for i in 1:nlat_half]
     nfreq_max = nlon_max÷2 + 1                      # maximum number of fourier frequencies (real FFTs)
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
-    colat = get_colat(grid,nresolution)             # colatitude in radians                             
+    colat = get_colat(Grid,nresolution)             # colatitude in radians                             
     cos_colat = cos.(colat)                         # cos(colat)
     sin_colat = sin.(colat)                         # sin(colat)
 
@@ -104,8 +104,8 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     Δlons = 2π./nlons       # integration of longitude, i.e. dϕ, discretised, used to scale the quadrature weights
 
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
-    _, lons = get_colatlons(grid,nresolution)
-    lon1s = [lons[each_index_in_ring(grid,j,nresolution)[1]] for j in 1:nlat_half]
+    _, lons = get_colatlons(Grid,nresolution)
+    lon1s = [lons[each_index_in_ring(Grid,j,nresolution)[1]] for j in 1:nlat_half]
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
     
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
@@ -129,8 +129,8 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     # and have to sum up to 2 over all latitudes as ∫sin(θ)dθ = 2 over 0...π.
     # Exception: HEALPix, weights are always 4π/npoints due to equal area 
     # non-HEALPix: scale with discretised dϕ for integration over sphere
-    quadrature_weights = get_quadrature_weights(grid,nresolution)
-    grid <: AbstractHEALPixGrid || (quadrature_weights .*= Δlons)
+    quadrature_weights = get_quadrature_weights(Grid,nresolution)
+    Grid <: AbstractHEALPixGrid || (quadrature_weights .*= Δlons)
 
     # RECURSION FACTORS
     ϵlms = get_recursion_factors(lmax+1,mmax)
@@ -183,7 +183,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
         
     # conversion to NF happens here
-    SpectralTransform{NF}(  grid,nresolution,order,
+    SpectralTransform{NF}(  Grid,nresolution,order,
                             lmax,mmax,nfreq_max,
                             nlon_max,nlons,nlat,nlat_half,
                             colat,cos_colat,sin_colat,lon_offsets,
@@ -201,24 +201,24 @@ end
 
 Generator function for a SpectralTransform struct pulling in parameters from a Parameters struct."""
 function SpectralTransform(P::Parameters)
-    @unpack NF, grid, trunc, recompute_legendre = P
-    return SpectralTransform(NF,grid,trunc,recompute_legendre)
+    @unpack NF, Grid, trunc, recompute_legendre = P
+    return SpectralTransform(NF,Grid,trunc,recompute_legendre)
 end
 
 """
     S = SpectralTransform(  alms::AbstractMatrix{Complex{NF}};
                             recompute_legendre::Bool=true,
-                            grid::Type{<:AbstractGrid}=FullGaussianGrid)
+                            Grid::Type{<:AbstractGrid}=FullGaussianGrid)
 
 Generator function for a `SpectralTransform` struct based on the size of the spectral
-coefficients `alms` and the grid `grid`. Recomputes the Legendre polynomials by default."""
+coefficients `alms` and the grid `Grid`. Recomputes the Legendre polynomials by default."""
 function SpectralTransform( alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
                             recompute_legendre::Bool=true,      # saves memory
-                            grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                            Grid::Type{<:AbstractGrid}=FullGaussianGrid,
                             ) where NF                          # number format NF
 
     _, mmax = size(alms) .- 1                           # -1 for 0-based degree l, order m
-    return SpectralTransform(NF,grid,mmax,recompute_legendre)
+    return SpectralTransform(NF,Grid,mmax,recompute_legendre)
 end
 
 """
@@ -231,9 +231,9 @@ function SpectralTransform( map::AbstractGrid{NF};          # gridded field
                             recompute_legendre::Bool=true,  # saves memory
                             ) where NF                      # number format NF
 
-    grid = typeof(map)
+    Grid = typeof(map)
     trunc = get_truncation(map)
-    return SpectralTransform(NF,grid,trunc,recompute_legendre)
+    return SpectralTransform(NF,Grid,trunc,recompute_legendre)
 end
 
 """
@@ -350,7 +350,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
     @boundscheck mmax+1 <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
-    @boundscheck typeof(map) <: S.grid || throw(BoundsError)
+    @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
     @boundscheck get_nresolution(map) == S.nresolution || throw(BoundsError)
 
     # preallocate work arrays
@@ -455,7 +455,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
 
     @boundscheck mmax+1 <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
-    @boundscheck typeof(map) <: S.grid || throw(BoundsError)
+    @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
     @boundscheck get_nresolution(map) == S.nresolution || throw(BoundsError)
 
     # preallocate work warrays
@@ -544,11 +544,11 @@ field `map`. Based on the size of `alms` the grid type `grid`, the spatial resol
 on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `gridded(alms,S)`."""
 function gridded(   alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
                     recompute_legendre::Bool=true,      # saves memory
-                    grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                    Grid::Type{<:AbstractGrid}=FullGaussianGrid,
                     ) where NF                          # number format NF
 
     _, mmax = size(alms) .- 1                           # -1 for 0-based degree l, order m
-    S = SpectralTransform(NF,grid,mmax,recompute_legendre)
+    S = SpectralTransform(NF,Grid,mmax,recompute_legendre)
     return gridded(alms,S)
 end
 
@@ -563,7 +563,7 @@ function gridded(   alms::AbstractMatrix{Complex{NF}},  # spectral coefficients
                     S::SpectralTransform{NF}            # struct for spectral transform parameters
                     ) where NF                          # number format NF
  
-    map = zeros(S.grid{NF},S.nresolution)       # preallocate output
+    map = zeros(S.Grid{NF},S.nresolution)       # preallocate output
     almsᴸ = LowerTriangularMatrix(alms)         # drop the upper triangle entries
     gridded!(map,almsᴸ,S)                       # now execute the in-place version
     return map
@@ -571,36 +571,36 @@ end
 
 """
     alms = spectral(    map::AbstractMatrix;
-                        grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                        Grid::Type{<:AbstractGrid}=FullGaussianGrid,
                         kwargs...)
 
 Converts `map` to `grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""
 function spectral(  map::AbstractMatrix;            # gridded field
-                    grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                    Grid::Type{<:AbstractGrid}=FullGaussianGrid,
                     kwargs...)
 
-    return spectral(grid(map),kwargs...)
+    return spectral(Grid(map),kwargs...)
 end
 
 """
     alms = spectral(    map::AbstractGrid;
-                        grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                        Grid::Type{<:AbstractGrid}=FullGaussianGrid,
                         kwargs...)
 
-Converts `map` to `grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""
+Converts `map` to `Grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""
 function spectral(  map::AbstractGrid{NF};          # gridded field
                     recompute_legendre::Bool=true,  # saves memory
                     ) where NF                      # number format NF
 
-    grid = typeof(map)
+    Grid = typeof(map)
     trunc = get_truncation(map)
-    S = SpectralTransform(NF,grid,trunc,recompute_legendre)
+    S = SpectralTransform(NF,Grid,trunc,recompute_legendre)
     return spectral(map,S)
 end
 
 """
     alms = spectral(    map::AbstractMatrix;
-                        grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                        Grid::Type{<:AbstractGrid}=FullGaussianGrid,
                         kwargs...)
 
 Spectral transform (grid to spectral) `map` to `grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""
