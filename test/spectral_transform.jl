@@ -1,39 +1,41 @@
-@testset "Transform: Triangular truncation" begin
+@testset "FullGaussianGrid: Test grid and spectral resolution match" begin
     Ts = (31,42,85,170,341,682)     # spectral resolutions
     nlons = (96,128,256,512,1024)   # number of longitudes
     nlats = (48,64,128,256,512)     # number of latitudes
     for (T,nlon,nlat) in zip(Ts,nlons,nlats)
         
-        tri_trunc = SpeedyWeather.triangular_truncation(trunc=T)    # trunc -> nlon, nlat
-        @test (nlon,nlat) == (tri_trunc.nlon,tri_trunc.nlat)
+        nlat_half = SpeedyWeather.get_resolution(FullGaussianGrid,T)
+        @test (nlon,nlat) == (4nlat_half,2nlat_half)
 
-        tri_trunc = SpeedyWeather.triangular_truncation(;nlon)      # nlon -> trunc
-        @test T == tri_trunc.trunc
-        
-        tri_trunc = SpeedyWeather.triangular_truncation(;nlat)      # nlat -> trunc
-        @test T == tri_trunc.trunc
+        trunc = SpeedyWeather.get_truncation(FullGaussianGrid,nlat÷2)
+        @test T == trunc
     end
 end
 
 # for the following testsets test some spectral truncations
 # but not too large ones as they take so long
-spectral_resolutions = (31,42,85,170)
+spectral_resolutions = (31,63,127)
 
 @testset "Transform: l=0,m=0 is constant > 0" begin
     for trunc in spectral_resolutions
         for NF in (Float32,Float64)
+            for Grid in (   FullGaussianGrid,
+                            FullClenshawGrid,
+                            OctahedralGaussianGrid,
+                            HEALPixGrid)
 
-            p,d,m = initialize_speedy(NF;trunc)
-            S = m.spectral_transform
+                p,d,m = initialize_speedy(NF;trunc,Grid)
+                S = m.spectral_transform
 
-            alms = copy(p.layers[1].leapfrog[1].vor)
-            fill!(alms,0)
-            alms[1,1] = 1
+                alms = copy(p.layers[1].leapfrog[1].vor)
+                fill!(alms,0)
+                alms[1,1] = 1
 
-            map = gridded(alms,S)
-        
-            for i in eachindex(map)
-                @test map[i] == map[1] > zero(NF)
+                map = gridded(alms,S)
+            
+                for ij in SpeedyWeather.eachgridpoint(map)
+                    @test map[ij] ≈ map[1] > zero(NF)
+                end
             end
         end
     end
@@ -60,21 +62,24 @@ end
 @testset "Transform: Individual Legendre polynomials" begin
     @testset for trunc in spectral_resolutions
         for NF in (Float32,Float64)
-            P = Parameters(;NF,trunc)
-            S = SpectralTransform(P)
+            for Grid in (   FullGaussianGrid,
+                            FullClenshawGrid,
+                            OctahedralGaussianGrid,)
+                            # HEALPixGrid)
+                P = Parameters(;NF,trunc,Grid)
+                S = SpectralTransform(P)
 
-            lmax = 3
-            for l in 1:lmax
-                for m in 1:l
-                    alms = zeros(LowerTriangularMatrix{Complex{NF}},S.lmax+2,S.mmax+1)
-                    alms[l,m] = 1
+                lmax = 3
+                for l in 1:lmax
+                    for m in 1:l
+                        alms = zeros(LowerTriangularMatrix{Complex{NF}},S.lmax+2,S.mmax+1)
+                        alms[l,m] = 1
 
-                    map = gridded(alms,S)
-                    alms2 = spectral(map,S)
+                        map = gridded(alms,S)
+                        alms2 = spectral(map,S)
 
-                    for i in 1:S.lmax
-                        for j in 1:i
-                            @test alms[i,j] ≈ alms2[i,j] atol=100*eps(NF)
+                        for lm in SpeedyWeather.eachharmonic(alms,alms2)
+                            @test alms[lm] ≈ alms2[lm] atol=100*eps(NF)
                         end
                     end
                 end
@@ -88,22 +93,27 @@ end
     # Test for variable resolution
     @testset for trunc in spectral_resolutions[1:2]
         for NF in (Float64,Float32)
-            P = Parameters(;NF,trunc,model=:shallowwater)
-            S = SpectralTransform(P)
-            B = Boundaries(P)
+            for Grid in (   FullGaussianGrid,
+                            FullClenshawGrid,
+                            OctahedralGaussianGrid,)
+                            # HEALPixGrid)
+                P = Parameters(;NF,trunc,model=:shallowwater)
+                S = SpectralTransform(P)
+                B = Boundaries(P,S)
 
-            oro_grid = B.orography
-            oro_spec = spectral(oro_grid,S)
-            oro_grid1 = gridded(oro_spec,S)
-            oro_spec1 = spectral(oro_grid1,S)
-            oro_grid2 = gridded(oro_spec1,S)
-            oro_spec2 = spectral(oro_grid2,S)
+                oro_grid = B.orography
+                oro_spec = spectral(oro_grid,S)
+                oro_grid1 = gridded(oro_spec,S)
+                oro_spec1 = spectral(oro_grid1,S)
+                oro_grid2 = gridded(oro_spec1,S)
+                oro_spec2 = spectral(oro_grid2,S)
 
-            for lm in SpeedyWeather.eachharmonic(oro_spec1,oro_spec2)
-                @test oro_grid1[lm] ≈ oro_grid2[lm] rtol=200*sqrt(eps(NF))
-            end
-            for ij in eachindex(oro_grid1,oro_grid2)
-                @test oro_grid1[ij] ≈ oro_grid2[ij] rtol=200*sqrt(eps(NF))
+                for lm in SpeedyWeather.eachharmonic(oro_spec1,oro_spec2)
+                    @test oro_grid1[lm] ≈ oro_grid2[lm] rtol=200*sqrt(eps(NF))
+                end
+                for ij in eachindex(oro_grid1,oro_grid2)
+                    @test oro_grid1[ij] ≈ oro_grid2[ij] rtol=200*sqrt(eps(NF))
+                end
             end
         end
     end

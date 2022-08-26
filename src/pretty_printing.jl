@@ -1,7 +1,7 @@
 function Base.show(io::IO, P::PrognosticVariables)
 
     ζ = P.layers[end].leapfrog[1].vor   # create a view on vorticity
-    ζ_grid = gridded(ζ)                 # to grid space
+    ζ_grid = Matrix(gridded(ζ))         # to grid space
     ζ_grid = ζ_grid[:,end:-1:1]         # flip latitudes
 
     nlon,nlat = size(ζ_grid)
@@ -19,13 +19,6 @@ function Base.show(io::IO, P::PrognosticVariables)
                             height=30))
 
     print(io,UnicodePlots.heatmap(ζ_grid';plot_kwargs...))
-end
-
-function Base.show(io::IO,T::TriangularTruncation)
-    print(io,"TriangularTruncation:\n"*
-                " trunc = $(T.trunc)\n"*
-                " nlon = $(T.nlon)\n"*
-                " nlat = $(T.nlat)")
 end
 
 # hack: define global constant whose element will be changed in initialize_feedback

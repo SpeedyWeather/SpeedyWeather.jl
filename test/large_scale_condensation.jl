@@ -1,8 +1,13 @@
-@testset "large_scale_condensation.jl" begin
-    @testset "get_large_scale_condensation_tendencies!" begin
-        _, diag, model = SpeedyWeather.initialize_speedy()
+@testset "Parametrization: large scale condensation" begin
+    @testset for NF in (Float32,Float64)
+        _, diagn, model = SpeedyWeather.initialize_speedy(NF,model=:primitive)
 
-        # For now, just check that it runs without errors
-        SpeedyWeather.get_large_scale_condensation_tendencies!(diag, model)
+        column = ColumnVariables{NF}(nlev=diagn.nlev)
+
+        for ij in SpeedyWeather.eachgridpoint(diagn)
+            SpeedyWeather.reset_column!(column)
+            SpeedyWeather.get_column!(column,diagn,ij,model.geometry)
+            SpeedyWeather.large_scale_condensation!(column, model)
+        end
     end
 end

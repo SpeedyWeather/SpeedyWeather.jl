@@ -13,11 +13,11 @@ The default values of the keywords define the default model setup.
     # MODEL
     model::Symbol=:barotropic           # :barotropic, :shallowwater, or :primitive
 
-    # RESOLUTION
-    grid::Symbol=:regular_Gaussian      # define the grid type
-    trunc::Int=31                       # spectral truncation
-    nlev::Int=nlev_default(model)       # number of vertical levels 
-
+    # RESOLUTION AND GRID
+    trunc::Int=31                                   # spectral truncation
+    Grid::Type{<:AbstractGrid}=FullGaussianGrid     # define the grid type
+    nlev::Int=nlev_default(model)                   # number of vertical levels 
+    
     # PHYSICAL CONSTANTS
     radius_earth::Real=6.371e6          # radius of Earth [m]
     rotation_earth::Real=7.29e-5        # angular frequency of Earth's rotation [rad/s]
@@ -46,7 +46,7 @@ The default values of the keywords define the default model setup.
     # VERTICAL COORDINATES
     # of the nlev vertical levels, defined by a generalised logistic function,
     # interpolating ECMWF's L31 configuration
-    GLcoefs::GenLogisticCoefs=GenLogisticCoefs()
+    GLcoefs::GenLogisticCoefs = GenLogisticCoefs{NF}()
     n_stratosphere_levels::Int=2        # number of vertical levels used for the stratosphere
 
     # DIFFUSION AND DRAG
@@ -60,14 +60,22 @@ The default values of the keywords define the default model setup.
     seasonal_cycle::Bool=true                  # Seasonal cycle?
     n_shortwave::Int=3                         # Compute shortwave radiation every n steps
     sppt_on::Bool=false                        # Turn on SPPT?
-    magnus_coefs::MagnusCoefs = MagnusCoefs()  # For computing saturation vapour pressure
+    magnus_coefs::MagnusCoefs = MagnusCoefs{NF}()  # For computing saturation vapour pressure
 
     # Large-Scale Condensation (from table B10)
-    k_lsc::Int = 2                      # Index of atmospheric level at which large-scale condensation begins
-    RH_thresh_boundary::Real = 0.95     # Relative humidity threshold for boundary layer
-    RH_thresh_range::Real = 0.1         # Vertical range of relative humidity threshold
-    RH_thresh_max::Real = 0.9           # Maximum relative humidity threshold
-    humid_relax_time::Real = 4.0        # Relaxation time for humidity (hours)
+    k_lsc::Int = 2                    # Index of atmospheric level at which large-scale condensation begins
+    RH_thresh_pbl_lsc::Real = 0.95    # Relative humidity threshold for boundary layer
+    RH_thresh_range_lsc::Real = 0.1   # Vertical range of relative humidity threshold
+    RH_thresh_max_lsc::Real = 0.9     # Maximum relative humidity threshold
+    humid_relax_time_lsc::Real = 4.0  # Relaxation time for humidity (hours)
+
+    # Convection
+    pres_thresh_cnv::Real = 0.8            # Minimum (normalised) surface pressure for the occurrence of convection
+    RH_thresh_pbl_cnv::Real = 0.9          # Relative humidity threshold for convection in PBL
+    RH_thresh_trop_cnv::Real = 0.7         # Relative humidity threshold for convection in the troposphere
+    humid_relax_time_cnv::Real = 6.0       # Relaxation time for PBL humidity (hours)
+    max_entrainment::Real = 0.5            # Maximum entrainment as a fraction of cloud-base mass flux
+    ratio_secondary_mass_flux::Real = 0.8  # Ratio between secondary and primary mass flux at cloud-base
 
     # TIME STEPPING
     Δt_at_T85::Real=20                  # time step in minutes for T85, scale linearly to trunc
@@ -85,6 +93,7 @@ The default values of the keywords define the default model setup.
     orography_file::String="orography_F512.nc"
 
     # INITIAL CONDITIONS
+    seed::Int=abs(rand(Int))            # a random seed that's used in initialize_speedy for the global RNG
     initial_conditions::Symbol=:barotropic_vorticity    # :rest, :barotropic_vorticity or :restart
 
     # OUTPUT

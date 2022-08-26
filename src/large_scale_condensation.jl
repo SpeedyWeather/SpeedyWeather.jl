@@ -1,46 +1,46 @@
-function get_large_scale_condensation_tendencies!(
-    Diag::DiagnosticVariables{NF},
-    M   ::ModelSetup,
-) where {NF<:AbstractFloat}
-    @unpack gravity, RH_thresh_max, RH_thresh_range, RH_thresh_boundary, humid_relax_time = M.constants
-    @unpack cp, alhc, k_lsc = M.parameters
-    @unpack nlon, nlat, nlev, σ_levels_full, σ_levels_thick = M.geospectral.geometry
-    @unpack temp_grid, humid_grid, pres_grid = Diag.grid_variables
-    @unpack temp_tend_lsc, humid_tend_lsc, sat_spec_humidity, sat_vap_pressure, cloud_top, precip_large_scale = Diag.parametrization_variables
+function large_scale_condensation!( column::ColumnVariables{NF},
+                                    model::PrimitiveEquationModel,
+                                    ) where {NF<:AbstractFloat}
 
-    get_saturation_specific_humidity!(sat_spec_humidity, sat_vap_pressure, temp_grid, pres_grid, M)
+    @unpack gravity, RH_thresh_max_lsc, RH_thresh_range_lsc, RH_thresh_pbl_lsc, humid_relax_time_lsc = model.constants
+    @unpack cp, alhc, n_stratosphere_levels = model.parameters
+    @unpack σ_levels_full, σ_levels_thick = model.geometry
+
+    @unpack humid, pres = column            # prognostic variables: specific humidity, surface pressure
+    @unpack temp_tend, humid_tend = column  # tendencies to write into
+    @unpack sat_humid = column              # intermediate variable
+    @unpack nlev = column
 
     # 1. Tendencies of humidity and temperature due to large-scale condensation
-    for k = k_lsc:nlev  # Used to be 2:nlev in original Speedy
-        σₖ = σ_levels_full[k]
-        RH_threshold = RH_thresh_max + RH_thresh_range * (σₖ^2 - 1)  # Relative humidity threshold for condensation (Formula 24)
+    for k in eachlayer(column)[n_stratosphere_levels:end]           # top to bottom, skip stratospheric levels
+
+        # Relative humidity threshold for condensation (Formula 24)
+        σₖ² = σ_levels_full[k]^2
+        RH_threshold = RH_thresh_max_lsc + RH_thresh_range_lsc * (σₖ² - 1)
         if k == nlev
-            RH_threshold = max(RH_threshold, RH_thresh_boundary)
+            RH_threshold = max(RH_threshold, RH_thresh_pbl_lsc)
         end
 
         # Impose a maximum heating rate to avoid grid-point storm instability
         # This formula does not appear in the original Speedy documentation
-        humid_tend_max = 10σₖ^2 / 3600humid_relax_time
+        humid_tend_max = 10σₖ² / 3600humid_relax_time_lsc
+        humid_threshold = RH_threshold * sat_humid[k]               # Specific humidity threshold for condensation
 
-        for j = 1:nlat, i = 1:nlon
-            humid_threshold = RH_threshold * sat_spec_humidity[i, j, k]  # Specific humidity threshold for condensation
-            if humid_grid[i, j, k] > humid_threshold
-                humid_tend_lsc[i, j, k] = -(humid_grid[i, j, k] - humid_threshold) / humid_relax_time                 # Formula 22
-                temp_tend_lsc[i, j, k] = -alhc / cp * min(humid_tend_lsc[i, j, k], humid_tend_max * pres_grid[i, j])  # Formula 23
-                cloud_top[i, j] = min(cloud_top[i, j], k)                                                             # Page 7 (last sentence)
-            else
-                humid_tend_lsc[i, j, k] = zero(NF)
-                temp_tend_lsc[i, j, k] = zero(NF)
-            end
+        if humid[k] > humid_threshold
+            # accumulate in tendencies (nothing is added if humidity not above threshold)
+            humid_tend[k] += -(humid[k] - humid_threshold) / humid_relax_time_lsc   # Formula 22
+            temp_tend[k] += -alhc / cp * min(humid_tend[k], humid_tend_max*pres)    # Formula 23
+
+            # If there is large-scale condensation at a level higher (i.e. smaller k) than
+            # the cloud-top previously diagnosed due to convection, then increase the
+            # cloud-top.
+            column.cloud_top = min(column.cloud_top, k)                             # Page 7 (last sentence)
         end
     end
 
     # 2. Precipitation due to large-scale condensation
-    fill!(precip_large_scale, zero(NF))
-    for k = k_lsc:nlev
-        Δpₖ = pres_grid * σ_levels_thick[k]  # Formula 4
-        for j = 1:nlat, i = 1:nlon
-            precip_large_scale[i, j] += -1 / gravity * Δpₖ[i, j] * humid_tend_lsc[i, j, k]  # Formula 25
-        end
+    for k in eachlayer(column)[n_stratosphere_levels:end]                   # top to bottom, skip stratosphere
+        Δpₖ = pres*σ_levels_thick[k]                                        # Formula 4  # Correct index?
+        column.precip_large_scale += -1 / gravity * Δpₖ * humid_tend[k]     # Formula 25
     end
 end

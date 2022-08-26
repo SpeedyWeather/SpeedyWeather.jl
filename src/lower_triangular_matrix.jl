@@ -14,7 +14,7 @@ struct LowerTriangularMatrix{T} <: AbstractMatrix{T}
             "$(m)x$(n) LowerTriangularMatrix{$T} with $(nonzeros(m,n)) non-zero entries.")
 end
 
-LowerTriangularMatrix(v::AbstractVector{T},m::Integer,n::Integer) where T= LowerTriangularMatrix{T}(v,m,n)
+LowerTriangularMatrix(v::AbstractVector{T},m::Integer,n::Integer) where T = LowerTriangularMatrix{T}(v,m,n)
 
 # SIZE ETC
 Base.length(L::LowerTriangularMatrix) = length(L.v)     # define length as number of non-zero elements
@@ -74,6 +74,8 @@ end
     return r
 end
 
+@inline Base.getindex(L::LowerTriangularMatrix,r::AbstractRange) = L.v[r]
+
 @inline Base.setindex!(L::LowerTriangularMatrix,x,k::Integer) = setindex!(L.v,x,k)
 @inline function Base.setindex!(L::LowerTriangularMatrix{T},x,i::Integer,j::Integer) where T
     j > i && return zero(T)
@@ -81,12 +83,14 @@ end
     setindex!(L.v,x,k)
 end
 
+# @inline Base.setindex!(L::LowerTriangularMatrix,x::AbstractVector,r::AbstractRange) = setindex!(L.v,x,r)
+
 """
     unit_range = eachharmonic(L::LowerTriangular)
 
 creates `unit_range::UnitRange` to loop over all non-zeros in a LowerTriangularMatrix `L`.
 Like `eachindex` but skips the upper triangle with zeros in `L`."""
-eachharmonic(L::LowerTriangularMatrix) = 1:length(L)
+eachharmonic(L::LowerTriangularMatrix) = Base.OneTo(length(L))
 
 """
     unit_range = eachharmonic(Ls::LowerTriangularMatrix...)
@@ -121,12 +125,15 @@ end
 
 Base.copy(L::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix(L)
 
-function LowerTriangularMatrix(M::LowerTriangularMatrix{T}) where T
-    m,n = size(M)
-    L = LowerTriangularMatrix{T}(undef,m,n)
-    L.v .= M.v  # copy data over
+function LowerTriangularMatrix{T}(M::LowerTriangularMatrix) where T
+    L = LowerTriangularMatrix{T}(undef,size(M)...)
+    for i in eachindex(L,M)
+        L[i] = convert(T,M[i])  # copy data over
+    end
     return L
 end
+
+LowerTriangularMatrix(M::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix{T}(M)
 
 function Base.convert(::Type{LowerTriangularMatrix{T1}},L::LowerTriangularMatrix{T2}) where {T1,T2}
     return LowerTriangularMatrix{T1}(L.v,L.m,L.n)

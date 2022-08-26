@@ -1,9 +1,8 @@
 """
-    horizontal_diffusion!(  tendency::AbstractMatrix{Complex{NF}}, # tendency of a 
-                            A::AbstractMatrix{Complex{NF}},        # spectral horizontal field
-                            damp_expl::AbstractMatrix{NF},         # explicit spectral damping
-                            damp_impl::AbstractMatrix{NF}          # implicit spectral damping
-                            ) where {NF<:AbstractFloat}
+    horizontal_diffusion!(  tendency::LowerTriangularMatrix{Complex},
+                            A::LowerTriangularMatrix{Complex},
+                            damp_expl::LowerTriangularMatrix,
+                            damp_impl::LowerTriangularMatrix)
 
 Apply horizontal diffusion to a 2D field `A` in spectral space by updating its tendency `tendency`
 with an implicitly calculated diffusion term. The implicit diffusion of the next time step is split
