@@ -127,16 +127,6 @@ function convection!(
     @unpack cloud_base_mass_flux, net_flux_humid, net_flux_dry_static_energy,
     precip_convection = column
 
-    # Compute the entrainment coefficients for the column. Mass entrainment in layer k is
-    # equal to the entrainment coefficient in layer k * the mass flux at the lower boundary.
-    # TODO(alistair) pre-compute and reuse these.
-    half = one(NF)/2
-    for k = 2:nlev-1
-        entrainment_profile[k] = max(zero(NF), (σ_levels_full[k] - half)^2)
-    end
-    entrainment_profile /= sum(entrainment_profile)  # Normalise
-    entrainment_profile *= max_entrainment           # Scale by maximum entrainment (as a fraction of cloud-base mass flux)
-
     # 1. Fluxes in the PBL
     humid_top_of_pbl = min(humid_half[nlev-1], humid[nlev])   # Humidity at the upper boundary of the PBL
     max_humid_pbl = max(NF(1.01) * humid[nlev], sat_humid[nlev])  # Maximum specific humidity in the PBL
