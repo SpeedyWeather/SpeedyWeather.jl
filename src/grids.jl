@@ -1,3 +1,8 @@
+# Make AbstractGrid subtype of AbstractVector as the data within is unravelled into a vec
+"""
+    abstract type AbstractGrid{T} <: AbstractVector{T} end
+
+The abstract supertype for all spatial grids on the sphere supported by SpeedyWeather.jl."""
 abstract type AbstractGrid{T} <: AbstractVector{T} end
 
 # all AbstractGrids have their grid points stored in a vector field `v`
@@ -101,7 +106,7 @@ end
 # number of points and longitudes per ring on the octahedral grid
 npoints_octahedral(nlat_half::Integer) = 4nlat_half^2 + 36nlat_half
 nlat_half_octahedral(npoints::Integer) = round(Int,-9/2+sqrt((9/2)^2 + npoints/4))  # inverse
-nlon_octahedral(ilat::Integer) = 16+4ilat
+nlon_octahedral(j::Integer) = 16+4j
 
 """
     H = HEALPixGrid{T}
@@ -120,14 +125,14 @@ end
 
 # number of points and longitudes per ring on the HEALPix grid
 function nside_assert(nside::Integer)
-    @assert is_power_2(nside) "HEALPixGrid: nside=$nside is not a power of 2."
+    @assert is_power_2_or_0(nside) "HEALPixGrid: nside=$nside is not a power of 2."
     return true
 end
 
 npoints_healpix(nside::Integer) = nside_assert(nside) ? 12nside^2 : nothing
 nside_healpix(npoints::Integer) = round(Int,sqrt(npoints/12))  # inverse of npoints_healpix
 nlat_healpix(nside::Integer) = nside_assert(nside) ? 4nside-1 : nothing
-nlon_healpix(nside::Integer,ilat::Integer) = nside_assert(nside) ? min(4ilat,4nside) : nothing
+nlon_healpix(nside::Integer,j::Integer) = nside_assert(nside) ? min(4j,4nside) : nothing
 nlon_healpix(nside::Integer) = nside_assert(nside) ? 4nside : nothing
 
 # define for all grids that the type T can be infered from the elements in data vector
@@ -230,8 +235,8 @@ get_colat(::Type{<:FullClenshawGrid},nlat_half::Integer) = [j/(2nlat_half)*π fo
 get_colat(::Type{<:FullGaussianGrid},nlat_half::Integer) =
             π .- acos.(FastGaussQuadrature.gausslegendre(2nlat_half)[1])
 get_colat(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = get_colat(FullGaussianGrid,nlat_half)
-get_colat(G::Type{<:HEALPixGrid},nside::Integer) = #get_colat(FullClenshawGrid,get_nlat_half(G,nside))
-            [acos(Healpix.ring2z(Healpix.Resolution(nside),i)) for i in 1:nlat_healpix(nside)]
+get_colat(G::Type{<:HEALPixGrid},nside::Integer) =
+            [acos(Healpix.ring2z(Healpix.Resolution(nside),j)) for j in 1:nlat_healpix(nside)]
 
 # lon [radians] vectors for full grids (empty vectors otherwise)
 get_lon(::Type{<:AbstractFullGrid},nlat_half::Integer) = 
@@ -394,4 +399,6 @@ end
 get_quadrature_weights(::Type{<:FullClenshawGrid},nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
 get_quadrature_weights(::Type{<:FullGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
 get_quadrature_weights(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
+
+# HEALPix's solid angle is always 4π/npoints
 get_quadrature_weights(G::Type{<:HEALPixGrid},nside::Integer) = 4π/get_npoints(G,nside)*ones(get_nlat_half(G,nside))

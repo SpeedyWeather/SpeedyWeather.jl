@@ -559,13 +559,13 @@ end
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map` with precalculated properties based on the SpectralTransform struct `S`. `alms` is converted to
 a `LowerTriangularMatrix` to execute the in-place `gridded!`."""
-function gridded(   alms::AbstractMatrix{Complex{NF}},  # spectral coefficients
-                    S::SpectralTransform{NF}            # struct for spectral transform parameters
-                    ) where NF                          # number format NF
+function gridded(   alms::AbstractMatrix,       # spectral coefficients
+                    S::SpectralTransform{NF},   # struct for spectral transform parameters
+                    ) where NF                  # number format NF
  
-    map = zeros(S.Grid{NF},S.nresolution)       # preallocate output
-    almsᴸ = LowerTriangularMatrix(alms)         # drop the upper triangle entries
-    gridded!(map,almsᴸ,S)                       # now execute the in-place version
+    map = zeros(S.Grid{NF},S.nresolution)               # preallocate output
+    almsᴸ = LowerTriangularMatrix{Complex{NF}}(alms)    # drop the upper triangle and convert to NF
+    gridded!(map,almsᴸ,S)                               # now execute the in-place version
     return map
 end
 
@@ -579,7 +579,7 @@ function spectral(  map::AbstractMatrix;            # gridded field
                     Grid::Type{<:AbstractGrid}=FullGaussianGrid,
                     kwargs...)
 
-    return spectral(Grid(map),kwargs...)
+    return spectral(Grid(map);kwargs...)
 end
 
 """
