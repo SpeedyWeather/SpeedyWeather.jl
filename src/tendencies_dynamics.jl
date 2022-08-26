@@ -284,13 +284,13 @@ end
                         ) where {NF<:AbstractFloat}         # number format NF
 
 Compute the vorticity fluxes (u,v)*(ζ+f)/coslat in grid-point space from U,V and vorticity ζ."""
-function vorticity_fluxes!( uω_coslat⁻¹::Grid{NF},  # Output: u*(ζ+f)/coslat
-                            vω_coslat⁻¹::Grid{NF},  # Output: v*(ζ+f)/coslat
-                            U::Grid{NF},            # Input: u*coslat
-                            V::Grid{NF},            # Input: v*coslat
-                            vor::Grid{NF},          # Input: relative vorticity ζ
-                            G::Geometry{NF}         # struct with precomputed geometry arrays
-                            ) where {Grid<:AbstractGrid,NF<:AbstractFloat}     # number format NF
+function vorticity_fluxes!( uω_coslat⁻¹::AbstractGrid{NF},  # Output: u*(ζ+f)/coslat
+                            vω_coslat⁻¹::AbstractGrid{NF},  # Output: v*(ζ+f)/coslat
+                            U::AbstractGrid{NF},            # Input: u*coslat
+                            V::AbstractGrid{NF},            # Input: v*coslat
+                            vor::AbstractGrid{NF},          # Input: relative vorticity ζ
+                            G::Geometry{NF}                 # struct with precomputed geometry arrays
+                            ) where {NF<:AbstractFloat}     # number format NF
 
     nlat = length(eachring(U))
     @unpack f_coriolis, coslat⁻² = G
@@ -335,21 +335,21 @@ function bernoulli_potential!(  diagn::DiagnosticVariablesLayer,
 end
 
 """
-    bernoulli_potential!(   B::Grid{NF},    # Output: Bernoulli potential B = 1/2*(u^2+v^2)+g*η
-                            u::Grid{NF},    # zonal velocity
-                            v::Grid{NF},    # meridional velocity
-                            η::Grid{NF},    # interface displacement
-                            g::Real         # gravity
-                            ) where {NF<:AbstractFloat}
+    bernoulli_potential!(   B::AbstractGrid,    # Output: Bernoulli potential B = 1/2*(u^2+v^2)+g*η
+                            u::AbstractGrid,    # zonal velocity
+                            v::AbstractGrid,    # meridional velocity
+                            η::AbstractGrid,    # interface displacement
+                            g::Real,            # gravity
+                            G::Geometry)
 
 Computes the Bernoulli potential 1/2*(u^2 + v^2) + g*η in grid-point space."""
-function bernoulli_potential!(  B::Grid{NF},        # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
-                                U::Grid{NF},        # zonal velocity *coslat
-                                V::Grid{NF},        # meridional velocity *coslat
-                                η::Grid{NF},        # interface displacement
-                                g::Real,            # gravity
-                                G::Geometry{NF}     # used for precomputed cos²(lat)
-                                ) where {Grid<:AbstractGrid,NF<:AbstractFloat}
+function bernoulli_potential!(  B::AbstractGrid{NF},    # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
+                                U::AbstractGrid{NF},    # zonal velocity *coslat
+                                V::AbstractGrid{NF},    # meridional velocity *coslat
+                                η::AbstractGrid{NF},    # interface displacement
+                                g::Real,                # gravity
+                                G::Geometry{NF}         # used for precomputed cos²(lat)
+                                ) where {NF<:AbstractFloat}
     
     @unpack coslat⁻² = G
     @boundscheck length(coslat⁻²) == length(eachring(U)) || throw(BoundsError)
@@ -365,15 +365,15 @@ function bernoulli_potential!(  B::Grid{NF},        # Output: Bernoulli potentia
     end
 end
 
-function volume_fluxes!(    uh_coslat⁻¹::Grid{NF},  # Output: zonal volume flux uh/coslat
-                            vh_coslat⁻¹::Grid{NF},  # Output: meridional volume flux vh/coslat
-                            U::Grid{NF},            # U = u*coslat, zonal velocity
-                            V::Grid{NF},            # V = v*coslat, meridional velocity
-                            η::Grid{NF},            # interface displacement
-                            orography::Grid{NF},    # orography
-                            H₀::Real,               # layer thickness at rest
+function volume_fluxes!(    uh_coslat⁻¹::AbstractGrid{NF},  # Output: zonal volume flux uh/coslat
+                            vh_coslat⁻¹::AbstractGrid{NF},  # Output: meridional volume flux vh/coslat
+                            U::AbstractGrid{NF},            # U = u*coslat, zonal velocity
+                            V::AbstractGrid{NF},            # V = v*coslat, meridional velocity
+                            η::AbstractGrid{NF},            # interface displacement
+                            orography::AbstractGrid{NF},    # orography
+                            H₀::Real,                       # layer thickness at rest
                             G::Geometry{NF},
-                            ) where {Grid<:AbstractGrid,NF<:AbstractFloat}                                   
+                            ) where {NF<:AbstractFloat}                                   
 
     @unpack coslat⁻² = G
     @boundscheck length(coslat⁻²) == length(eachring(η)) || throw(BoundsError) 
