@@ -7,8 +7,11 @@ struct Tendencies{NF<:AbstractFloat}
     div_tend  ::LowerTriangularMatrix{Complex{NF}}      # Divergence of horizontal wind field [1/s]
     temp_tend ::LowerTriangularMatrix{Complex{NF}}      # Absolute temperature [K]
     humid_tend::LowerTriangularMatrix{Complex{NF}}      # Specific humidity [g/kg]
+    
     u_tend    ::Matrix{NF}                              # zonal velocity
     v_tend    ::Matrix{NF}                              # meridional velocity
+    humid_grid_tend::Matrix{NF}                         # specific humidity
+    temp_grid_tend ::Matrix{NF}                         # temperature
 end
 
 function Base.zeros(::Type{Tendencies},
@@ -19,14 +22,31 @@ function Base.zeros(::Type{Tendencies},
     @unpack lmax, mmax = S
     
     # use one more l for size compat with vector quantities
-    vor_tend    = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)     # vorticity
-    div_tend    = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)     # divergence
-    temp_tend   = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)     # absolute Temperature
-    humid_tend  = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)     # specific humidity
-    u_tend      = zeros(NF,nlon,nlat)                                         # zonal velocity
-    v_tend      = zeros(NF,nlon,nlat)                                         # meridional velocity
+    vor_tend    = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # vorticity
+    div_tend    = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # divergence
+    temp_tend   = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # absolute Temperature
+    humid_tend  = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # specific humidity
+    
+    # tendencies from parametrizations in grid-point space
+    u_tend          = zeros(NF,nlon,nlat)                                   # zonal velocity
+    v_tend          = zeros(NF,nlon,nlat)                                   # meridional velocity
+    humid_grid_tend = zeros(NF,nlon,nlat)                                   # specific humidity
+    temp_grid_tend  = zeros(NF,nlon,nlat)                                   # temperature
 
-    return Tendencies(vor_tend,div_tend,temp_tend,humid_tend,u_tend,v_tend)
+    return Tendencies(  vor_tend,div_tend,temp_tend,humid_tend,
+                        u_tend,v_tend,humid_grid_tend,temp_grid_tend)
+end
+
+# GPU methods for Tendencies
+function Adapt.adapt_structure(to, tend::Tendencies{NF}) where NF
+    Tendencies(Adapt.adapt(to, tend.vor_tend), 
+               Adapt.adapt(to, tend.div_tend), 
+               Adapt.adapt(to, tend.temp_tend), 
+               Adapt.adapt(to, tend.humid_tend),
+               Adapt.adapt(to, tend.u_tend),
+               Adapt.adapt(to, tend.v_tend),
+               Adapt.adapt(to, tend.humid_grid_tend),
+               Adapt.adapt(to, tend.temp_grid_tend))
 end
 
 """
@@ -59,6 +79,18 @@ function Base.zeros(::Type{GridVariables},G::Geometry{NF}) where NF
 
     return GridVariables(   vor_grid,div_grid,temp_grid,humid_grid,geopot_grid,
                             U_grid,V_grid,temp_grid_anomaly)
+end
+
+# GPU methods for GridVariables
+function Adapt.adapt_structure(to, gv::GridVariables{NF}) where NF
+    GridVariables(Adapt.adapt(to, gv.vor_grid),
+                  Adapt.adapt(to, gv.div_grid),
+                  Adapt.adapt(to, gv.temp_grid),
+                  Adapt.adapt(to, gv.humid_grid),
+                  Adapt.adapt(to, gv.geopot_grid),
+                  Adapt.adapt(to, gv.U_grid),
+                  Adapt.adapt(to, gv.V_grid),
+                  Adapt.adapt(to, gv.temp_grid_anomaly))
 end
 
 """
@@ -179,39 +211,82 @@ function Base.zeros(::Type{DynamicsVariables},
                                 # vertical_mean_divergence,sigdtc,dumk,spectral_geopotential)
 end
 
+# GPU methods for DynamicsVariables
+function Adapt.adapt_structure(to, dv::DynamicsVariables{NF}) where NF
+    DynamicsVariables(Adapt.adapt(to, dv.u_coslat),             # vorticity inversion
+                      Adapt.adapt(to, dv.v_coslat),
+                      Adapt.adapt(to, dv.uω_coslat⁻¹_grid),     # vorticity advection
+                      Adapt.adapt(to, dv.vω_coslat⁻¹_grid),
+                      Adapt.adapt(to, dv.uω_coslat⁻¹),
+                      Adapt.adapt(to, dv.vω_coslat⁻¹),
+                      Adapt.adapt(to, dv.bernoulli_grid),       # shallow water
+                      Adapt.adapt(to, dv.bernoulli),
+                      Adapt.adapt(to, dv.uh_coslat⁻¹_grid),
+                      Adapt.adapt(to, dv.vh_coslat⁻¹_grid),
+                      Adapt.adapt(to, dv.uh_coslat⁻¹),
+                      Adapt.adapt(to, dv.vh_coslat⁻¹))
+end
+
 struct DiagnosticVariablesLayer{NF<:AbstractFloat}
     tendencies          ::Tendencies{NF}
     grid_variables      ::GridVariables{NF}
     dynamics_variables  ::DynamicsVariables{NF}
+    npoints             ::Int       # number of grid points
 end
 
 function Base.zeros(::Type{DiagnosticVariablesLayer},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
 
+    @unpack npoints = G
+
     tendencies = zeros(Tendencies,G,S)
     grid_variables = zeros(GridVariables,G)
     dynamics_variables = zeros(DynamicsVariables,G,S)
 
-    return DiagnosticVariablesLayer(tendencies,grid_variables,dynamics_variables)
+    return DiagnosticVariablesLayer(tendencies,grid_variables,dynamics_variables,npoints)
+end
+
+# GPU methods for DiagnosticVariablesLayer
+function Adapt.adapt_structure(to, dvl::DiagnosticVariablesLayer{NF}) where NF
+    DiagnosticVariablesLayer(dvl.tendencies, dvl.grid_variables, dvl.dynamics_variables, dvl.npoints)
 end
 
 struct SurfaceVariables{NF<:AbstractFloat}
     pres_grid::Matrix{NF}
     pres_tend::LowerTriangularMatrix{Complex{NF}}
+
+    precip_large_scale::Matrix{NF}
+    precip_convection::Matrix{NF}
+
+    npoints::Int        # number of grid points
 end
 
 function Base.zeros(::Type{SurfaceVariables},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
 
-    @unpack nlon, nlat = G
+    @unpack npoints, nlon, nlat = G
     @unpack lmax, mmax = S
 
     pres_grid = zeros(NF,nlon,nlat)
     pres_tend = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
-    return SurfaceVariables(pres_grid,pres_tend)
+    precip_large_scale = zeros(NF,nlon,nlat)
+    precip_convection = zeros(NF,nlon,nlat)
+
+    return SurfaceVariables(pres_grid,pres_tend,
+                            precip_large_scale,precip_convection,
+                            npoints)
+end
+
+# GPU methods for SurfaceVariables
+function Adapt.adapt_structure(to, sv::SurfaceVariables{NF}) where NF
+    SurfaceVariables(Adapt.adapt(to, sv.pres_grid),
+                     Adapt.adapt(to, sv.pres_tend),
+                     Adapt.adapt(to, sv.precip_large_scale),
+                     Adapt.adapt(to, sv.precip_convection),
+                     sv.npoints)
 end
 
 """
@@ -221,19 +296,31 @@ Struct holding the diagnostic variables."""
 struct DiagnosticVariables{NF<:AbstractFloat}
     layers  ::Vector{DiagnosticVariablesLayer{NF}}
     surface ::SurfaceVariables{NF}
-    nlev    ::Int
+    nlev    ::Int       # number of vertical levels
+    npoints ::Int       # number of grid points
 end
 
 function Base.zeros(::Type{DiagnosticVariables},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
 
-    @unpack nlev = G
+    @unpack nlev,npoints = G
 
     layers = [zeros(DiagnosticVariablesLayer,G,S) for _ in 1:nlev]
     surface = zeros(SurfaceVariables,G,S)
 
-    return DiagnosticVariables(layers,surface,nlev)
+    return DiagnosticVariables(layers,surface,nlev,npoints)
 end
 
 DiagnosticVariables(G::Geometry{NF},S::SpectralTransform{NF}) where NF = zeros(DiagnosticVariables,G,S)
+
+# LOOP OVER ALL GRID POINTS
+eachgridpoint(diagn::DiagnosticVariables) = 1:diagn.npoints
+eachgridpoint(layer::DiagnosticVariablesLayer) = 1:layer.npoints
+eachgridpoint(surface::SurfaceVariables) = 1:surface.npoints
+
+# GPU methods for DiagnosticVariables
+function Adapt.adapt_structure(to, dv::DiagnosticVariables{NF}) where NF
+    DiagnosticVariables(Adapt.adapt(to, dv.layers), 
+                        dv.surface, dv.nlev, dv.npoints)
+end
