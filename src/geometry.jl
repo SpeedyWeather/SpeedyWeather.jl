@@ -56,11 +56,14 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     xgeop2::Vector{NF}                  # ?
     lapserate_correction::Vector{NF}    # ?
 
+    # PARAMETERIZATIONS
+    entrainment_profile::Vector{NF}
+
     # TEMPORARY, development area. All these variables need to be checked for consistency and potentially defined somewhere else
     # tref ::Array{NF,1}   #temporarily defined here. Also defined in the Implict struct which is incomplete at the time of writing
     # rgas ::NF
-    # fsgr ::Array{NF,1} 
-    # tref3 ::Array{NF,1} 
+    # fsgr ::Array{NF,1}
+    # tref3 ::Array{NF,1}
 end
 
 """
@@ -95,7 +98,7 @@ function Geometry(P::Parameters)
     # COORDINATES for every grid point in ring order
     lats,lons = get_colatlons(Grid,nresolution)     # in radians
 
-    # VERTICAL SIGMA COORDINATE 
+    # VERTICAL SIGMA COORDINATE
     # σ = p/p0 (fraction of surface pressure)
     # sorted such that σ_levels_half[end] is at the planetary boundary
     σ_levels_half = vertical_coordinates(P)
@@ -108,7 +111,7 @@ function Geometry(P::Parameters)
     sinlat = sin.(lat)
     coslat = cos.(lat)
     coslat⁻¹ = 1 ./ coslat
-    coslat²  = coslat.^2    
+    coslat²  = coslat.^2
     coslat⁻² = 1 ./ coslat²
 
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
@@ -135,12 +138,21 @@ function Geometry(P::Parameters)
         lapserate_correction = zeros(1)
     end
 
+    # Compute the entrainment coefficients for the convection parameterization.
+    @unpack max_entrainment = P
+    entrainment_profile = zeros(nlev)
+    for k = 2:nlev-1
+        entrainment_profile[k] = max(0, (σ_levels_full[k] - 0.5)^2)
+    end
+    entrainment_profile /= sum(entrainment_profile)  # Normalise
+    entrainment_profile *= max_entrainment           # Scale by maximum entrainment (as a fraction of cloud-base mass flux)
+
     # Extra definitions. These will need to be defined consistently either here or somewhere else
     # Just defined here to proivide basic structure to allow for testing of other components of code
-    # tref = 288.0max.(0.2, σ_levels_full) #more corrections needed here 
+    # tref = 288.0max.(0.2, σ_levels_full) #more corrections needed here
     # rgas = (2.0/7.0) / 1004.0
-    # fsgr = (tref * 0.0) #arbitrary definition. Must be defined elsewhere 
-    # tref3=fsgr.*tref #this actually is the correct definition. Needs better naming convention 
+    # fsgr = (tref * 0.0) #arbitrary definition. Must be defined elsewhere
+    # tref3=fsgr.*tref #this actually is the correct definition. Needs better naming convention
 
     # conversion to number format NF happens here
     Geometry{P.NF}( Grid,nresolution,
@@ -150,7 +162,7 @@ function Geometry(P::Parameters)
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,
                     f_coriolis,
-                    xgeop1,xgeop2,lapserate_correction)
+                    xgeop1,xgeop2,lapserate_correction, entrainment_profile)
                     # tref,rgas,fsgr,tref3)
 end
 
@@ -165,7 +177,7 @@ the L31 configuration historically used at ECMWF."""
 function vertical_coordinates(P::Parameters)
     @unpack nlev,GLcoefs = P
 
-    halflevels_normalised = range(0,1,nlev+1)   # normalised = level/nlev 
+    halflevels_normalised = range(0,1,nlev+1)   # normalised = level/nlev
     σ_levels_half = generalised_logistic(halflevels_normalised,GLcoefs)
     σ_levels_half[1] = 0           # topmost half-level is at 0 pressure
     σ_levels_half[end] = 1         # lowermost half-level is at p=p_surface

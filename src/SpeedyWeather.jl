@@ -13,9 +13,9 @@ module SpeedyWeather
     import Primes
     import LinearAlgebra
 
-    # GPU 
-    import KernelAbstractions 
-    import CUDA 
+    # GPU
+    import KernelAbstractions
+    import CUDA
     import CUDAKernels
     import Adapt: Adapt, adapt, adapt_structure
 
@@ -41,9 +41,9 @@ module SpeedyWeather
             FullGaussianGrid,
             OctahedralGaussianGrid,
             HEALPixGrid
-            
+
     # EXPORT STRUCTS
-    export  Parameters, 
+    export  Parameters,
             Constants,
             Geometry,
             SpectralTransform,
@@ -83,7 +83,6 @@ module SpeedyWeather
     include("scaling.jl")
 
     include("run_speedy.jl")
-    include("tendencies_parametrizations.jl")
     include("tendencies_dynamics.jl")
     include("tendencies.jl")
     include("implicit_correction.jl")
@@ -92,7 +91,10 @@ module SpeedyWeather
     include("output.jl")
 
     # PHYSICS
-    include("column_variables.jl")          # defines ColumnVariables     
+    include("column_variables.jl")          # defines ColumnVariables
+    include("thermodynamics.jl")
+    include("tendencies_parametrizations.jl")
+    include("convection.jl")
     include("large_scale_condensation.jl")
 
     include("time_integration.jl")
