@@ -30,10 +30,12 @@ function initialize_speedy(::Type{NF}=Float64;      # default number format
                           ) where {NF<:AbstractFloat}
 
     P = Parameters(NF=NF;kwargs...)                 # all model parameters chosen through kwargs
+    Random.seed!(P.seed)                            # seed Julia's default RNG for reproducibility
+    
     C = Constants(P)                                # constants used in model integration
     G = Geometry(P)                                 # everything grid
     S = SpectralTransform(P)                        # everything spectral transform
-    B = Boundaries(P)                               # arrays for boundary conditions
+    B = Boundaries(P,S)                             # arrays for boundary conditions
     H = HorizontalDiffusion(P,C,G,S,B)              # precomputed arrays for horizontal diffusion
     D = DeviceSetup(CPUDevice())                    # device the model is running on, so far only CPU
 

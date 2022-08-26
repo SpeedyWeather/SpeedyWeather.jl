@@ -5,6 +5,7 @@ module SpeedyWeather
     import InteractiveUtils: subtypes
 
     # NUMERICS
+    import Random
     import FastGaussQuadrature
     import AssociatedLegendrePolynomials as Legendre
     import Healpix
