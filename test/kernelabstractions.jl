@@ -1,6 +1,4 @@
 using KernelAbstractions    
-import Parameters: @with_kw, @unpack
-
 
 @testset "KernelAbstractions tests" begin 
 
@@ -24,7 +22,7 @@ import Parameters: @with_kw, @unpack
     @test A ≈ B .* C 
 
     # ----------------------------------
-    # Tests for the individual functions 
+    # Tests for the individual functions and functions of KernelAbstractions
 
     # first some preperation 
     progn_vars, diagn_vars, model_setup = initialize_speedy();
@@ -38,20 +36,20 @@ import Parameters: @with_kw, @unpack
     device = model_setup.device_setup
 
     # ---------------------------------
+    # transferring all arrays to the device
+    diagn_vars = SpeedyWeather.DeviceArray(device, diagn_vars)
+    progn_vars = SpeedyWeather.DeviceArray(device, progn_vars)
+    model_setup = SpeedyWeather.DeviceArray(device, model_setup)
+
+    # ---------------------------------
     # now the individual functions 
 
     # horizontal_diffusion! 
     SpeedyWeather.get_tendencies!(diagn, M)   
 
-    @unpack vor = progn.leapfrog[lf]
-    @unpack vor_tend = diagn.tendencies
-    @unpack damping, damping_impl = M.horizontal_diffusion
-                                      
-    # we have to convert everything to CuArrays, incase we are on GPU, later we will not have to do this anymore when we have fitting `adapt` defined for all structs 
-    vor_tend = SpeedyWeather.DeviceArray(device, vor_tend)
-    vor = SpeedyWeather.DeviceArray(device, vor)
-    damping = SpeedyWeather.DeviceArray(device, damping)
-    damping_impl = SpeedyWeather.DeviceArray(device, damping_impl)
+    (;vor) = progn.leapfrog[lf]
+    (;vor_tend) = diagn.tendencies
+    (;damping, damping_impl) = M.horizontal_diffusion
 
     vor_tend_old = deepcopy(vor_tend)
     vor_tend_new = deepcopy(vor_tend)

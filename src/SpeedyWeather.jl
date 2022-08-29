@@ -14,9 +14,9 @@ module SpeedyWeather
     import LinearAlgebra
 
     # GPU
-    import KernelAbstractions
-    import CUDA
-    import CUDAKernels
+    using KernelAbstractions
+    import CUDA: CuArray
+    import CUDAKernels: CUDADevice
     import Adapt: Adapt, adapt, adapt_structure
 
     # INPUT OUTPUT
