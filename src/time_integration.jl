@@ -274,7 +274,7 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
 
     # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS
     feedback = initialize_feedback(M)
-    netcdf_file = initialize_netcdf_output(diagn,feedback,M)
+    netcdf_file = initialize_netcdf_output(progn,diagn,feedback,M)
 
     # FIRST TIMESTEP: EULER FORWARD THEN LEAPFROG IN MAIN LOOP
     time_sec = first_timesteps!(progn,diagn,M,feedback)
@@ -286,7 +286,7 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
 
         # FEEDBACK AND OUTPUT
         progress!(feedback)             # updates the progress meter bar
-        write_netcdf_output!(netcdf_file,feedback,time_sec,diagn,M)
+        write_netcdf_output!(netcdf_file,feedback,time_sec,progn,diagn,M)
     end
 
     write_restart_file(time_sec,progn,feedback,M)

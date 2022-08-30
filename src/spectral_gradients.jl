@@ -56,11 +56,10 @@ end
 
 """
     _divergence!(   kernel,
-                    div::AbstractMatrix{Complex{NF}},
-                    u::AbstractMatrix{Complex{NF}},
-                    v::AbstractMatrix{Complex{NF}},
-                    S::SpectralTransform{NF}
-                    ) where {NF<:AbstractFloat}
+                    div::LowerTriangularMatrix,
+                    u::LowerTriangularMatrix,
+                    v::LowerTriangularMatrix,
+                    S::SpectralTransform)
 
 Generic divergence function of vector `u`,`v` that writes into the output into `div`.
 Generic as it uses the kernel `kernel` such that curl, div, add or flipsign
@@ -99,11 +98,10 @@ function _divergence!(  kernel,
 end
 
 """
-    UV_from_vor!(   U::AbstractMatrix{Complex{NF}},
-                    V::AbstractMatrix{Complex{NF}},
-                    vor::AbstractMatrix{Complex{NF}},
-                    S::SpectralTransform{NF}
-                    ) where {NF<:AbstractFloat}
+    UV_from_vor!(   U::LowerTriangularMatrix,
+                    V::LowerTriangularMatrix,
+                    vor::LowerTriangularMatrix,
+                    S::SpectralTransform)
 
 Get U,V (=(u,v)*coslat) from vorticity ζ spectral space (divergence D=0)
 Two operations are combined into a single linear operation. First, invert the
@@ -151,12 +149,11 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
 end
 
 """
-    UV_from_vordiv!(U::AbstractMatrix{Complex{NF}},
-                    V::AbstractMatrix{Complex{NF}},
-                    vor::AbstractMatrix{Complex{NF}},
-                    div::AbstractMatrix{Complex{NF}},
-                    S::SpectralTransform{NF}
-                    ) where {NF<:AbstractFloat}
+    UV_from_vordiv!(U::LowerTriangularMatrix,
+                    V::LowerTriangularMatrix,
+                    vor::LowerTriangularMatrix,
+                    div::LowerTriangularMatrix,
+                    S::SpectralTransform)
 
 Get U,V (=(u,v)*coslat) from vorticity ζ and divergence D in spectral space.
 Two operations are combined into a single linear operation. First, invert the
@@ -248,8 +245,8 @@ end
 # end
 
 """
-    ∇²!(    ∇⁻²alms::AbstractMatrix{Complex},
-            alms::AbstractMatrix{Complex},
+    ∇²!(    ∇⁻²alms::LowerTriangularMatrix,
+            alms::LowerTriangularMatrix,
             S::SpectralTransform)
 
 Laplace operator ∇² applied to the spectral coefficients `alms` in spherical

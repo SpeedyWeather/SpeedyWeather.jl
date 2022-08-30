@@ -31,21 +31,25 @@ function get_run_id_path(P::Parameters)
 end
 
 """
-    netcdf_file = initialize_netcdf_output( diagn::DiagnosticVariables, # output grid variables only
+    netcdf_file = initialize_netcdf_output( progn::PrognosticVariables, #
+                                            diagn::DiagnosticVariables, # output grid variables only
                                             feedback::Feedback,         # Feedback struct
                                             M::ModelSetup)              # ModelSetup struct
 
 Creates a netcdf file on disk and the corresponding `netcdf_file` object preallocated with output variables
 and dimensions. `write_netcdf_output!` then writes consecuitive time steps into this file.
 """
-function initialize_netcdf_output(  diagn::DiagnosticVariables, # output grid variables only
+function initialize_netcdf_output(  progn::PrognosticVariables, # 
+                                    diagn::DiagnosticVariables, # output grid variables only
                                     feedback::Feedback,         # Feedback struct
                                     M::ModelSetup)              # ModelSetup struct
 
     feedback.output || return nothing                   # escape directly when no netcdf output
 
-    @unpack nlon,nlat,nlev = M.geometry                 # number of longitudes, latitudes, vertical levels
-    @unpack lond,latd = M.geometry                      # lon, lat vectors in degree
+    G = Geometry(M.parameters,FullGaussianGrid)         # use FullGaussianGrid as output grid
+
+    @unpack nlon,nlat,nlev = G                          # number of longitudes, latitudes, vertical levels
+    @unpack lond,latd = G                               # lon, lat vectors in degree
     @unpack output_startdate, compression_level = M.parameters
     
     # DEFINE DIMENSIONS, TIME
@@ -99,7 +103,7 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables, # output grid va
 
     # WRITE INITIAL CONDITIONS TO FILE
     initial_time_sec = 0        # start at 0 hours after output_startdate
-    write_netcdf_output!(netcdf_file,feedback,initial_time_sec,diagn,M)
+    write_netcdf_output!(netcdf_file,feedback,initial_time_sec,progn,diagn,M)
 
     return netcdf_file
 end
@@ -108,6 +112,7 @@ end
                         feedback::Feedback,                     # feedback struct to increment output counter
                         i::Int,                                 # time step index
                         time_sec::Int,                          # model time [s] for output
+                        progn::PrognosticVariables,             # all prognostic variables
                         diagn::DiagnosticVariables,             # all diagnostic variables
                         M::ModelSetup)                          # all parameters
 
@@ -117,6 +122,7 @@ for output, truncates the mantissa for higher compression and applies lossless c
 function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf file to output into
                                 feedback::Feedback,                     # feedback struct to increment output counter
                                 time_sec::Int,                          # model time [s] for output
+                                progn::PrognosticVariables,             # all prognostic variables
                                 diagn::DiagnosticVariables,             # all diagnostic variables
                                 M::ModelSetup)                          # all parameters
 
@@ -127,7 +133,7 @@ function write_netcdf_output!(  netcdf_file::Union{NcFile,Nothing},     # netcdf
     feedback.i_out += 1                                         # increase counter
     @unpack i_out = feedback
 
-    write_netcdf_variables!(i_out,netcdf_file,diagn,M)          # depending on ModelSetup M write variables to file
+    write_netcdf_variables!(i_out,netcdf_file,progn,diagn,M)    # depending on ModelSetup M write variables to file
 
     # WRITE TIME
     time_hrs = Int32[round(time_sec/3600)]                      # convert from seconds to hours
@@ -137,20 +143,26 @@ end
 
 function write_netcdf_variables!(   i_out::Integer,
                                     netcdf_file::NcFile,
+                                    progn::PrognosticVariables,
                                     diagn::DiagnosticVariables,
                                     M::BarotropicModel)
 
-    for (k,diagn_layer) in enumerate(diagn.layers)                         
+    G = Geometry(M.parameters,FullGaussianGrid)         # use FullGaussianGrid as output grid
+
+    for (k,(progn_layer,diagn_layer)) in enumerate(zip(progn.layers,diagn.layers))
+        
         # CONVERT TO FLOAT32 FOR OUTPUT
-        @unpack U_grid,V_grid,vor_grid = diagn_layer.grid_variables
-        u_output = convert.(Float32,U_grid)
-        v_output = convert.(Float32,V_grid)
-        vor_output = convert.(Float32,vor_grid)
+        @unpack u_coslat,v_coslat = diagn_layer.dynamics_variables
+        @unpack vor = progn_layer.leapfrog[2]
+
+        u_output = convert.(Float32,Matrix(gridded(u_coslat)))
+        v_output = convert.(Float32,Matrix(gridded(v_coslat)))
+        vor_output = convert.(Float32,Matrix(gridded(vor)))
 
         # UNSCALE SCALED VARIABLES
-        scale_coslat⁻¹!(u_output,M.geometry)
-        scale_coslat⁻¹!(v_output,M.geometry)
-        vor_output ./= M.geometry.radius_earth
+        scale_coslat⁻¹!(u_output,G)
+        scale_coslat⁻¹!(v_output,G)
+        vor_output ./= G.radius_earth
 
         # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
         @unpack keepbits = M.parameters
@@ -167,23 +179,28 @@ end
 
 function write_netcdf_variables!(   i_out::Integer,
                                     netcdf_file::NcFile,
+                                    progn::PrognosticVariables,
                                     diagn::DiagnosticVariables,
                                     M::ShallowWaterModel)
 
-    for (k,diagn_layer) in enumerate(diagn.layers)
+    G = Geometry(M.parameters,FullGaussianGrid)         # use FullGaussianGrid as output grid
+
+    for (k,(progn_layer,diagn_layer)) in enumerate(zip(progn.layers,diagn.layers))
 
         # CONVERT TO FLOAT32 FOR OUTPUT
-        @unpack U_grid,V_grid,vor_grid,div_grid = diagn_layer.grid_variables
-        u_output = convert.(Float32,U_grid)
-        v_output = convert.(Float32,V_grid)
-        vor_output = convert.(Float32,vor_grid)
-        div_output = convert.(Float32,div_grid)
+        @unpack u_coslat,v_coslat = diagn_layer.dynamics_variables
+        @unpack vor,div = progn_layer.leapfrog[2]
+
+        u_output = convert.(Float32,Matrix(gridded(u_coslat)))
+        v_output = convert.(Float32,Matrix(gridded(v_coslat)))
+        vor_output = convert.(Float32,Matrix(gridded(vor)))
+        div_output = convert.(Float32,Matrix(gridded(div)))
 
         # UNSCALE SCALED VARIABLES
-        scale_coslat⁻¹!(u_output,M.geometry)
-        scale_coslat⁻¹!(v_output,M.geometry)
-        vor_output ./= M.geometry.radius_earth
-        div_output ./= M.geometry.radius_earth
+        scale_coslat⁻¹!(u_output,G)
+        scale_coslat⁻¹!(v_output,G)
+        vor_output ./= G.radius_earth
+        div_output ./= G.radius_earth
 
         # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
         @unpack keepbits = M.parameters
@@ -199,7 +216,7 @@ function write_netcdf_variables!(   i_out::Integer,
     end
 
     # surface pressure, i.e. interface displacement η
-    pres_output = convert.(Float32,diagn.surface.pres_grid)
+    pres_output = convert.(Float32,Matrix(gridded(progn.pres.leapfrog[2])))
     round!(pres_output,M.parameters.keepbits)
     NetCDF.putvar(netcdf_file,"pres",pres_output,start=[1,1,i_out],count=[-1,-1,1])
 end

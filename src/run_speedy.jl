@@ -3,7 +3,7 @@
 
 Runs SpeedyWeather.jl with number format `NF` and any additional parameters in the keyword arguments
 `kwargs...`. Any unspecified parameters will use the default values as defined in `src/parameters.jl`."""
-function run_speedy(::Type{NF}=Float32;             # number format, use Float32 as default
+function run_speedy(::Type{NF}=Float64;             # default number format
                     kwargs...                       # all additional non-default parameters
                     ) where {NF<:AbstractFloat}
 
@@ -25,15 +25,17 @@ Initialize the model by returning
 
 The keyword arguments `kwargs` are the same as for `run_speedy`. The `model_setup` contains
 fields that hold the parameters, constants, geometry, spectral transform, boundaries and diffusion."""
-function initialize_speedy(::Type{NF}=Float32;      # number format, use Float32 as default
+function initialize_speedy(::Type{NF}=Float64;      # default number format
                           kwargs...                 # all additional non-default parameters
                           ) where {NF<:AbstractFloat}
 
     P = Parameters(NF=NF;kwargs...)                 # all model parameters chosen through kwargs
+    Random.seed!(P.seed)                            # seed Julia's default RNG for reproducibility
+    
     C = Constants(P)                                # constants used in model integration
     G = Geometry(P)                                 # everything grid
     S = SpectralTransform(P)                        # everything spectral transform
-    B = Boundaries(P)                               # arrays for boundary conditions
+    B = Boundaries(P,S)                             # arrays for boundary conditions
     H = HorizontalDiffusion(P,C,G,S,B)              # precomputed arrays for horizontal diffusion
     D = DeviceSetup(CPUDevice())                    # device the model is running on, so far only CPU
 
