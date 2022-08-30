@@ -60,7 +60,7 @@ end
 
 @testset "LowerTriangularMatrix: *,+,eachindex,similar" begin
     @testset for NF in (Float16,Float32,Float64)
-        L = LowerTriangularMatrix{NF}(undef,3,3)
+        L = randn(LowerTriangularMatrix{NF},3,3)
 
         @test (L+L) == 2L
         @test (L+L) == L*2
