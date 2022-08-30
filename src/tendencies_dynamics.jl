@@ -292,15 +292,17 @@ function vorticity_fluxes!( uω_coslat⁻¹::AbstractGrid{NF},  # Output: u*(ζ
                             G::Geometry{NF}                 # struct with precomputed geometry arrays
                             ) where {NF<:AbstractFloat}     # number format NF
 
-    nlat = length(eachring(U))
+    nlat = get_nlat(U)
     @unpack f_coriolis, coslat⁻² = G
     @boundscheck length(f_coriolis) == nlat || throw(BoundsError)
     @boundscheck length(coslat⁻²) == nlat || throw(BoundsError)
 
-    @inbounds for j in eachring(uω_coslat⁻¹,vω_coslat⁻¹,U,V,vor)
+    rings = eachring(uω_coslat⁻¹,vω_coslat⁻¹,U,V,vor)       # precompute ring indices
+
+    @inbounds for (j,ring) in enumerate(rings)
         coslat⁻²j = coslat⁻²[j]
         f = f_coriolis[j]
-        for ij in each_index_in_ring(U,j)
+        for ij in ring
             # ω = relative vorticity + coriolis and unscale with coslat²
             ω = coslat⁻²j*(vor[ij] + f)
             uω_coslat⁻¹[ij] = ω*U[ij]              # = u(ζ+f)/coslat
@@ -352,14 +354,16 @@ function bernoulli_potential!(  B::AbstractGrid{NF},    # Output: Bernoulli pote
                                 ) where {NF<:AbstractFloat}
     
     @unpack coslat⁻² = G
-    @boundscheck length(coslat⁻²) == length(eachring(U)) || throw(BoundsError)
+    @boundscheck length(coslat⁻²) == length(get_nlat(U)) || throw(BoundsError)
 
     one_half = convert(NF,0.5)                      # convert to number format NF
     gravity = convert(NF,g)
 
-    @inbounds for j in eachring(B,U,V,η)
+    rings = eachring(B,U,V,η)
+
+    @inbounds for (j,ring) in enumerate(rings)
         one_half_coslat⁻² = one_half*coslat⁻²[j]
-        for ij in each_index_in_ring(B,j)
+        for ij in ring
             B[ij] = one_half_coslat⁻²*(U[ij]^2 + V[ij]^2) + gravity*η[ij]
         end
     end
@@ -376,7 +380,7 @@ function volume_fluxes!(    uh_coslat⁻¹::AbstractGrid{NF},  # Output: zonal v
                             ) where {NF<:AbstractFloat}                                   
 
     @unpack coslat⁻² = G
-    @boundscheck length(coslat⁻²) == length(eachring(η)) || throw(BoundsError) 
+    @boundscheck length(coslat⁻²) == length(get_nlat(η)) || throw(BoundsError) 
 
     H₀ = convert(NF,H₀)
 
@@ -385,9 +389,11 @@ function volume_fluxes!(    uh_coslat⁻¹::AbstractGrid{NF},  # Output: zonal v
     # layer thickness h = η + H, H is the layer thickness at rest
     # H = H₀ - orography, H₀ is the layer thickness without mountains
 
-    @inbounds for j in eachring(uh_coslat⁻¹,vh_coslat⁻¹,U,V,η,orography)
+    rings = eachring(uh_coslat⁻¹,vh_coslat⁻¹,U,V,η,orography)   # precompute ring indices
+
+    @inbounds for (j,ring) in enumerate(rings)
         coslat⁻²j = coslat⁻²[j]
-        for ij in each_index_in_ring(U,j)
+        for ij in ring
             h = coslat⁻²j*(η[ij] + H₀ - orography[ij])
             uh_coslat⁻¹[ij] = U[ij]*h       # = uh/coslat
             vh_coslat⁻¹[ij] = V[ij]*h       # = vh/coslat

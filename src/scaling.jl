@@ -15,10 +15,13 @@ scale_coslat⁻²!(A::AbstractMatrix,G::Geometry) = A.*G.coslat⁻²'
 
 Generic latitude scaling applied to `A` in-place with latitude-like vector `v`."""
 function _scale_lat!(A::AbstractGrid{NF},v::AbstractVector) where {NF<:AbstractFloat}
-    @boundscheck length(eachring(A)) == length(v) || throw(BoundsError)
-    @inbounds for j in eachring(A)
+    @boundscheck length(get_nlat(A)) == length(v) || throw(BoundsError)
+    
+    rings = eachring(A)
+    
+    @inbounds for (j,ring) in enumerate(rings)
         vj = convert(NF,v[j])
-        for ij in each_index_in_ring(A,j)
+        for ij in ring
             A[ij] *= vj
         end
     end
