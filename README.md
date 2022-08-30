@@ -9,7 +9,7 @@ with an everything-flexible attitude as long as it is speedy. With minimal code 
 - different architectures (x86 and arm, GPUs in development)
 - different physical models (barotropic vorticity and shallow water, primitive equations in development)
 - different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix)
-- different horizontal resolutions (T31 to T1023, 400km to 20km using linear, quadratic or cubic truncation)
+- different horizontal resolutions (T31 to T1023, i.e. 400km to 10km using linear, quadratic or cubic truncation)
 
 and Julia will compile to these choices just-in-time. Parallelisation is designed (but not fully implemented yet)
 towards efficiency within a compute node and at rather low resolutions: The dynamical core layer-by-layer in the vertical
