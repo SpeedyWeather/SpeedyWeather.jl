@@ -75,18 +75,17 @@ end
 
 Adapts `x` to a `CuArray` when `device<:GPUDevice` is used, otherwise a regular `Array`. Uses `adapt`, thus also can return SubArrays etc.
 """
-DeviceArray(::GPUDevice, x) = Adapt.adapt(CuArray, x)
-DeviceArray(::CPUDevice, x) = Adapt.adapt(Array, x)
+DeviceArray(dev::GPUDevice, x) = Adapt.adapt(ArrayType(dev), x)
+DeviceArray(dev::CPUDevice, x) = Adapt.adapt(ArrayType(dev), x)
 DeviceArray(dev::DeviceSetup, x) = DeviceArray(dev.device, x)
 
 """
-    DeviceArrayNotAdapt(device::AbstractDevice, x) 
+    ArrayType(device::AbstractDevice)
 
-Returns a `CuArray` when `device<:GPUDevice` is used, otherwise a regular `Array`. Doesn't uses `adapt`, therefore always returns CuArray/Array
+Returns the type of Array used, either `Array` or `CuArray`
 """
-DeviceArrayNotAdapt(::GPUDevice, x) = CuArray(x)
-DeviceArrayNotAdapt(::CPUDevice, x) = Array(x)
-DeviceArrayNotAdapt(dev::DeviceSetup, x) = DeviceArrayNotAdapt(dev.device, x)
+ArrayType(::GPUDevice) = CuArray 
+ArrayType(::CPUDevice) = Array 
 
 """
     launch_kernel!(device_setup::DeviceSetup, kernel!, ndrange, kernel_args...)
