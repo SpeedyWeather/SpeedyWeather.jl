@@ -2,13 +2,13 @@
     for NF in (Float32,Float64)
 
         # with vector and resolution parameter provided
-        L = FullLatLonGrid(randn(NF,96*48),24)          # L24 grid
+        L = FullClenshawGrid(randn(NF,96*47),24)        # L24 grid
         F = FullGaussianGrid(randn(NF,96*48),24)        # F24 grid
         O = OctahedralGaussianGrid(randn(NF,3168),24)   # O24 grid
         H = HEALPixGrid(randn(NF,3072),16)              # H16 grid
 
         # without resolution parameter provided (inferred from vector length)
-        L2 = FullLatLonGrid(randn(NF,96*48))            # L24 grid
+        L2 = FullClenshawGrid(randn(NF,96*47))          # L24 grid
         F2 = FullGaussianGrid(randn(NF,96*48))          # F24 grid
         O2 = OctahedralGaussianGrid(randn(NF,3168))     # O24 grid
         H2 = HEALPixGrid(randn(NF,3072))                # H16 grid
@@ -38,7 +38,7 @@ end
 
 @testset "Grid generators" begin
     for NF in (Float32,Float64)
-        for G in (  FullLatLonGrid,
+        for G in (  FullClenshawGrid,
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
                     HEALPixGrid,
@@ -60,5 +60,29 @@ end
             @test G2[1] == 0
             @test G3[1] == 0
         end
+    end
+end
+
+@testset "Grid indices" begin
+    for G in (  FullClenshawGrid,
+                FullGaussianGrid,
+                OctahedralGaussianGrid,
+                HEALPixGrid,
+                )
+
+        n = 32      # resolution parameter nlat_half/nside
+        grid = zeros(G,n)
+
+        for i in SpeedyWeather.eachring(grid)
+            for ij in SpeedyWeather.each_index_in_ring(grid,i)
+                grid[ij] += 1
+            end
+        end
+
+        for ij in SpeedyWeather.eachgridpoint(grid)
+            @test grid[ij] == 1
+        end
+
+        @test sum(grid) == SpeedyWeather.get_npoints(G,n)
     end
 end

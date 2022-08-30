@@ -74,6 +74,8 @@ end
     return r
 end
 
+@inline Base.getindex(L::LowerTriangularMatrix,r::AbstractRange) = L.v[r]
+
 @inline Base.setindex!(L::LowerTriangularMatrix,x,k::Integer) = setindex!(L.v,x,k)
 @inline function Base.setindex!(L::LowerTriangularMatrix{T},x,i::Integer,j::Integer) where T
     @boundscheck i >= j || throw(BoundsError(L,(i,j)))
@@ -81,8 +83,12 @@ end
     setindex!(L.v,x,k)
 end
 
+@inline Base.setindex!(L::LowerTriangularMatrix,x::AbstractVector,r::AbstractRange) = setindex!(L.v,x,r)
+
+# propagate index to data vector
 Base.eachindex(L ::LowerTriangularMatrix)    = eachindex(L.v)
 Base.eachindex(Ls::LowerTriangularMatrix...) = eachindex((L.v for L in Ls)...)
+
 """
     unit_range = eachharmonic(L::LowerTriangular)
 
@@ -131,12 +137,15 @@ end
             
 Base.copy(L::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix(L)
 
-function LowerTriangularMatrix(M::LowerTriangularMatrix{T}) where T
-    m,n = size(M)
-    L = LowerTriangularMatrix{T}(undef,m,n)
-    L.v .= M.v  # copy data over
+function LowerTriangularMatrix{T}(M::LowerTriangularMatrix) where T
+    L = LowerTriangularMatrix{T}(undef,size(M)...)
+    for i in eachindex(L,M)
+        L[i] = convert(T,M[i])  # copy data over
+    end
     return L
 end
+
+LowerTriangularMatrix(M::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix{T}(M)
 
 function Base.convert(::Type{LowerTriangularMatrix{T1}},L::LowerTriangularMatrix{T2}) where {T1,T2}
     return LowerTriangularMatrix{T1}(L.v,L.m,L.n)

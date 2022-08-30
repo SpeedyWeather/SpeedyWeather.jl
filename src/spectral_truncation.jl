@@ -1,5 +1,5 @@
 """
-    spectral_truncation!(alms,ltrunc,mtrunc)
+    spectral_truncation!(alms::AbstractMatrix,ltrunc::Integer,mtrunc::Integer)
 
 Truncate spectral coefficients `alms` in-place by setting (a) the upper right triangle to zero and (b)
 all coefficients for which the degree `l` is larger than the truncation `ltrunc` or order `m` larger than
@@ -9,7 +9,7 @@ function spectral_truncation!(  alms::AbstractMatrix{NF},   # spectral field to 
                                 mtrunc::Integer,            # truncate to max order mtrunc
                                 ) where NF                  # number format NF (can be complex)
     
-    lmax,mmax = size(alms) .- 1    # 0-based degree l, order m of the legendre polynomials
+    lmax,mmax = size(alms) .- 1         # 0-based degree l, order m of the legendre polynomials
 
     @inbounds for m in 1:mmax+1         # order m = 0,mmax but 1-based
         for l in 1:lmax+1               # degree l = 0,lmax but 1-based
@@ -79,10 +79,11 @@ If `trunc` is larger than the implicit truncation in `alms` obtained from its si
 is automatically called instead, returning `alms_interp`, a coefficient matrix that is larger than `alms`
 with padded zero coefficients. Also works with higher dimensional arrays, but truncation is only applied to
 the first two dimensions."""
-function spectral_truncation(   alms::AbstractArray{NF},    # spectral field to be truncated
-                                ltrunc::Int,                # truncate to max degree ltrunc
-                                mtrunc::Int                 # truncate to max order mtrunc
-                                ) where NF                  # number format NF (can be complex)
+function spectral_truncation(   ::Type{NF},                 # number format NF (can be complex)
+                                alms::AbstractMatrix,       # spectral field to be truncated
+                                ltrunc::Integer,            # truncate to max degree ltrunc
+                                mtrunc::Integer,            # truncate to max order mtrunc
+                                ) where NF
     
     @boundscheck length(size(alms)) >= 2 || throw(BoundsError(alms,(ltrunc,mtrunc)))
 
@@ -104,10 +105,13 @@ function spectral_truncation(   alms::AbstractArray{NF},    # spectral field to 
     return alms_trunc
 end
 
-spectral_truncation(alms::AbstractArray,trunc::Int) = spectral_truncation(alms,trunc,trunc)
+spectral_truncation(alms::AbstractMatrix{NF},ltrunc::Integer,mtrunc::Integer) where NF =
+    spectral_truncation(NF,alms,ltrunc,mtrunc)
+spectral_truncation(alms::AbstractMatrix,trunc::Int) = spectral_truncation(alms,trunc,trunc)
 
 """
-    alms_interp = spectral_interpolation(   alms::AbstractArray{NF},    # spectral field to be truncated
+    alms_interp = spectral_interpolation(   ::Type{NF},
+                                            alms::AbstractMatrix,       # spectral field to be truncated
                                             ltrunc::Int,                # truncate to max degree ltrunc
                                             mtrunc::Int                 # truncate to max order mtrunc
                                             ) where NF                  # number format NF (can be complex)
@@ -117,10 +121,11 @@ spectral space. If `trunc` is smaller or equal to the implicit truncation in `al
 than `spectral_truncation` is automatically called instead, returning `alms_trunc`, a coefficient matrix that
 is smaller than `alms`, implicitly setting higher degrees and orders to zero. Also works with higher
 dimensional arrays, but interpolation is only applied to the first two dimensions."""
-function spectral_interpolation(alms::AbstractArray{NF},    # spectral field to be truncated
+function spectral_interpolation(::Type{NF},                 # number format NF (can be complex)
+                                alms::AbstractMatrix,       # spectral field to be truncated
                                 ltrunc::Int,                # truncate to max degree ltrunc
                                 mtrunc::Int                 # truncate to max order mtrunc
-                                ) where NF                  # number format NF (can be complex)
+                                ) where NF                  
     
     @boundscheck length(size(alms)) >= 2 || throw(BoundsError(alms,(ltrunc,mtrunc)))
 
@@ -142,4 +147,6 @@ function spectral_interpolation(alms::AbstractArray{NF},    # spectral field to 
     return alms_trunc
 end
 
-spectral_interpolation(alms::AbstractArray,trunc::Int) = spectral_interpolation(alms,trunc,trunc)
+spectral_interpolation(alms::AbstractMatrix{NF},ltrunc::Integer,mtrunc::Integer) where NF =
+    spectral_interpolation(NF,alms,ltrunc,mtrunc)
+spectral_interpolation(alms::AbstractMatrix,trunc::Int) = spectral_interpolation(alms,trunc,trunc)
