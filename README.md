@@ -2,15 +2,20 @@
 [![CI](https://github.com/milankl/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/milankl/SpeedyWeather.jl/actions/workflows/CI.yml)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://milankl.github.io/SpeedyWeather.jl/dev)
 
-The focus of SpeedyWeather.jl is to develop a global atmospheric model with simple physics, that can run at various levels of
-precision (16, 32 and 64-bit) on different architectures (x86 and arm are supported, GPUs planned).
+SpeedyWeather.jl is a global atmospheric model with simple physics which is developed as a computational playground
+with an everything-flexible attitude as long as it is speedy. With minimal code redundancies it supports
 
-Additionally, the model is written in an entirely number format-flexible way, such that any custom number format can
-be used and Julia will compile to the format automatically. In contrast to the original speedy the resolution
-(horizontal and vertical) is adjustable and some simple parallelism is included to run SpeedyWeather.jl efficiently
-on small clusters.
+- any number format and precision (32 and 64 bits, 16 bits in development)
+- different architectures (x86 and arm, GPUs in development)
+- different physical models (barotropic vorticity and shallow water, primitive equations in development)
+- different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix)
+- different horizontal resolutions (T31 to T1023, 400km to 20km using linear, quadratic or cubic truncation)
 
-For an overview of the functionality and explanation see the
+and Julia will compile to these choices just-in-time. Parallelisation is designed (but not fully implemented yet)
+towards efficiency within a compute node and at rather low resolutions: The dynamical core layer-by-layer in the vertical
+and the physical parameterizations gridpoint-by-gridpoint in the horizontal.
+
+For an overview of the functionality and explanation see the (always somehow incomplete)
 [documentation](https://milankl.github.io/SpeedyWeather.jl/dev).
 
 ## Example use
@@ -24,11 +29,14 @@ The main interface to SpeedyWeather.jl is
 
 ```julia
 julia> using SpeedyWeather
-julia> run_speedy(Float32,n_days=100,output=true);
-Weather is speedy run 2: 100%|████████████| Time: 0:00:08 (14.69 millenia/day)
+julia> run_speedy(n_days=30, trunc=63, Grid=OctahedralGaussianGrid, model=:shallowwater, output=true)
+Weather is speedy run 1: 100%|███████████████████████████████████| Time: 0:00:04 (1498.70 years/day)
 ```
 
-and the arguments for `run_speedy` are described in [`src/default_parameters.jl`](https://github.com/milankl/SpeedyWeather.jl/blob/main/src/default_parameters.jl).
+Hurray! In 4 seconds we just simulated 30 days of the Earth's atmosphere at a speed of 1500 years per day.
+This simulation used a T63 spectral resolution on an octahedral Gaussian grid (165km resolution) solving
+the shallow water equations. The arguments for `run_speedy` are described in
+[`src/default_parameters.jl`](https://github.com/milankl/SpeedyWeather.jl/blob/main/src/default_parameters.jl).
 
 ## History
 
