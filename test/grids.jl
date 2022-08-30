@@ -73,8 +73,11 @@ end
         n = 32      # resolution parameter nlat_half/nside
         grid = zeros(G,n)
 
-        for i in SpeedyWeather.eachring(grid)
-            for ij in SpeedyWeather.each_index_in_ring(grid,i)
+        # precompute indices and boundscheck
+        rings = SpeedyWeather.eachring(grid,grid)   
+
+        for (j,ring) in enumerate(rings)
+            for ij in ring
                 grid[ij] += 1
             end
         end
