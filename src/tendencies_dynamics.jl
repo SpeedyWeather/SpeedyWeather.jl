@@ -354,7 +354,7 @@ function bernoulli_potential!(  B::AbstractGrid{NF},    # Output: Bernoulli pote
                                 ) where {NF<:AbstractFloat}
     
     @unpack coslat⁻² = G
-    @boundscheck length(coslat⁻²) == length(get_nlat(U)) || throw(BoundsError)
+    @boundscheck length(coslat⁻²) == get_nlat(U) || throw(BoundsError)
 
     one_half = convert(NF,0.5)                      # convert to number format NF
     gravity = convert(NF,g)
@@ -380,7 +380,7 @@ function volume_fluxes!(    uh_coslat⁻¹::AbstractGrid{NF},  # Output: zonal v
                             ) where {NF<:AbstractFloat}                                   
 
     @unpack coslat⁻² = G
-    @boundscheck length(coslat⁻²) == length(get_nlat(η)) || throw(BoundsError) 
+    @boundscheck length(coslat⁻²) == get_nlat(η) || throw(BoundsError) 
 
     H₀ = convert(NF,H₀)
 
