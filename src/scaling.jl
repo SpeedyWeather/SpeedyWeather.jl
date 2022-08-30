@@ -35,9 +35,7 @@ function scale!(progn::PrognosticVariables{NF},
     
     if var == :pres     # surface pressure is not stored in layers
         for leapfrog_step in progn.pres.leapfrog
-            for lm in eachharmonic(leapfrog_step)
-                leapfrog_step[lm] *= s_NF
-            end
+            leapfrog_step *= s_NF
         end
     else
         for layer in progn.layers

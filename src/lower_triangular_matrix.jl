@@ -81,25 +81,22 @@ end
     setindex!(L.v,x,k)
 end
 
+Base.eachindex(L ::LowerTriangularMatrix)    = eachindex(L.v)
+Base.eachindex(Ls::LowerTriangularMatrix...) = eachindex((L.v for L in Ls)...)
 """
     unit_range = eachharmonic(L::LowerTriangular)
 
 creates `unit_range::UnitRange` to loop over all non-zeros in a LowerTriangularMatrix `L`.
 Like `eachindex` but skips the upper triangle with zeros in `L`."""
-eachharmonic(L::LowerTriangularMatrix) = 1:length(L)
+eachharmonic(L::LowerTriangularMatrix) = eachindex(L.v)
 
 """
     unit_range = eachharmonic(Ls::LowerTriangularMatrix...)
 
 creates `unit_range::UnitRange` to loop over all non-zeros in the LowerTriangularMatrices
-provided as arguments. Checks bounds first. All LowerTriangularMatrixs need to be of the same size.
+provided as arguments. Checks bounds first. All LowerTriangularMatrix's need to be of the same size.
 Like `eachindex` but skips the upper triangle with zeros in `L`."""
-function eachharmonic(Ls::LowerTriangularMatrix...)
-    for L in Ls
-        @boundscheck size(L) == size(Ls[1]) || throw(BoundsError)
-    end
-    return eachharmonic(Ls[1])
-end
+eachharmonic(Ls::LowerTriangularMatrix...) = eachindex(Ls...)
 
 # CONVERSIONS
 """ 
@@ -119,6 +116,19 @@ function LowerTriangularMatrix(M::AbstractMatrix{T}) where T
     return L
 end
 
+function Base.Matrix(L::LowerTriangularMatrix{T}) where T
+    m,n = size(L)
+    M = zeros(T,m,n)
+    k = 0
+    @inbounds for j in 1:n
+        for i in j:m
+            k += 1
+            M[i,j] = L[k]
+        end
+    end
+    return M
+end
+            
 Base.copy(L::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix(L)
 
 function LowerTriangularMatrix(M::LowerTriangularMatrix{T}) where T
@@ -132,6 +142,40 @@ function Base.convert(::Type{LowerTriangularMatrix{T1}},L::LowerTriangularMatrix
     return LowerTriangularMatrix{T1}(L.v,L.m,L.n)
 end
 
+function Base.similar(::LowerTriangularMatrix{T},size::Integer...) where T
+    return LowerTriangularMatrix{T}(undef,size...)
+end
+
+function Base.similar(::LowerTriangularMatrix{T},size::NTuple{2,Integer}) where T
+    return LowerTriangularMatrix{T}(undef,size...)
+end
+
+function Base.similar(L::LowerTriangularMatrix,::Type{T}) where T
+    return LowerTriangularMatrix{T}(undef,size(L)...)
+end
+
+Base.similar(L::LowerTriangularMatrix{T}) where T = similar(L,T)
+
+# ARITHMETIC
+# only mul with scalar and addition others are converted to Matrix
+function Base.:(*)(L::LowerTriangularMatrix{T},s::Number) where T
+    M = similar(L)
+    sT = convert(T,s)
+    @inbounds for i in eachindex(L,M)
+        M[i] = L[i] * sT
+    end
+    M
+end
+
+function Base.:(+)(L1::LowerTriangularMatrix,L2::LowerTriangularMatrix)
+    T = promote_type(eltype(L1),eltype(L2))
+    M = similar(L1,T)
+    @inbounds for i in eachindex(M,L1,L2)
+        M[i] = L1[i] + L2[i]
+    end
+    M
+end
+
 """
     fill!(L::LowerTriangularMatrix,x)
 
@@ -139,7 +183,7 @@ Fills the elements of `L` with `x`. Faster than fill!(::AbstractArray,x)
 as only the non-zero elements in `L` are assigned with x."""
 function Base.fill!(L::LowerTriangularMatrix{T}, x) where T
     xT = convert(T, x)
-    @inbounds for i in eachindex(L.v)
+    @inbounds for i in eachindex(L)
         L[i] = xT
     end
 end
