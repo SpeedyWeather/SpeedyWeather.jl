@@ -41,9 +41,7 @@ function scale!(progn::PrognosticVariables{NF},
         for layer in progn.layers
             for leapfrog_step in layer.leapfrog
                 @eval v = $leapfrog_step.$var
-                for lm in eachharmonic(v)
-                    v[lm] *= s_NF
-                end
+                v *= s_NF
             end
         end
     end

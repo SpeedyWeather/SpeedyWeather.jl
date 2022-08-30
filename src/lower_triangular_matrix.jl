@@ -157,7 +157,7 @@ end
 Base.similar(L::LowerTriangularMatrix{T}) where T = similar(L,T)
 
 # ARITHMETIC
-# only mul with scalar and addition others are converted to Matrix
+# only mul/div with scalar and addition/subtraction, others are converted to Matrix
 function Base.:(*)(L::LowerTriangularMatrix{T},s::Number) where T
     M = similar(L)
     sT = convert(T,s)
@@ -167,11 +167,24 @@ function Base.:(*)(L::LowerTriangularMatrix{T},s::Number) where T
     M
 end
 
+Base.:(*)(s::Number,L::LowerTriangularMatrix) = L*s         # commutative
+Base.:(/)(L::LowerTriangularMatrix,s::Number) = L*inv(s)
+Base.:(/)(s::Number,L::LowerTriangularMatrix) = L/s
+
 function Base.:(+)(L1::LowerTriangularMatrix,L2::LowerTriangularMatrix)
     T = promote_type(eltype(L1),eltype(L2))
     M = similar(L1,T)
     @inbounds for i in eachindex(M,L1,L2)
         M[i] = L1[i] + L2[i]
+    end
+    M
+end
+
+function Base.:(-)(L1::LowerTriangularMatrix,L2::LowerTriangularMatrix)
+    T = promote_type(eltype(L1),eltype(L2))
+    M = similar(L1,T)
+    @inbounds for i in eachindex(M,L1,L2)
+        M[i] = L1[i] - L2[i]
     end
     M
 end

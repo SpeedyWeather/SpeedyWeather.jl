@@ -58,3 +58,23 @@ end
     end
 end
 
+@testset "LowerTriangularMatrix: *,+,eachindex,similar" begin
+    @testset for NF in (Float16,Float32,Float64)
+        L = LowerTriangularMatrix{NF}(undef,3,3)
+
+        @test (L+L) == 2L
+        @test (L+L) == L*2
+        @test (L-L) == zero(L)
+
+        @test eachindex(L) == eachindex(L.v)
+        @test eachindex(L,L) == eachindex(L.v,L.v)
+
+        @test size(similar(L)) == size(L)
+        @test eltype(L) == eltype(similar(L,eltype(L)))
+
+        @test (5,7) == size(similar(L,5,7))
+        @test (5,7) == size(similar(L,(5,7)))
+        @test similar(L) isa LowerTriangularMatrix
+        @test similar(L,Float64) isa LowerTriangularMatrix{Float64}
+    end
+end
