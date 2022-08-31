@@ -37,17 +37,16 @@ Scale the variable `var` inside `progn` with scalar `s`.
 function scale!(progn::PrognosticVariables{NF},
                 var::Symbol,
                 s::Number) where NF
-
-    s_NF = convert(Complex{NF},s)
     
     if var == :pres     # surface pressure is not stored in layers
-        for leapfrog_step in progn.pres
-            leapfrog_step *= s_NF
+        for pres in progn.pres.leapfrog
+            scale!(pres,s)              # pres*s but in-place
         end
     else
         for layer in progn.layers
             for leapfrog_step in layer.leapfrog
-                @eval $leapfrog_step.$var .*= $s_NF
+                variable = getfield(leapfrog_step,var)
+                scale!(variable,s)      # var*s but in-place
             end
         end
     end

@@ -7,7 +7,7 @@
         (;vor_tend) = d.layers[1].tendencies
         (;damping,damping_impl) = m.horizontal_diffusion
 
-        vor       .= randn(Complex{T},size(vor)...)
+        vor = randn(typeof(vor),size(vor)...)
 
         SpeedyWeather.horizontal_diffusion!(vor_tend,vor,damping,damping_impl)
 
