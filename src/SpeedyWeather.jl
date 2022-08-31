@@ -40,6 +40,7 @@ module SpeedyWeather
             FullClenshawGrid,
             FullGaussianGrid,
             OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
             HEALPixGrid
 
     # EXPORT STRUCTS
