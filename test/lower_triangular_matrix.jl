@@ -17,6 +17,9 @@
 
             @test_throws BoundsError L[lmax+1,mmax]
             @test_throws BoundsError L[lmax,mmax+1]
+            
+            @test_throws BoundsError L[1,2] = 1
+            @test_throws BoundsError L[lmax*mmax+1] = 1
 
             @test Matrix(L) == A
         end
@@ -55,3 +58,46 @@ end
     end
 end
 
+@testset "LowerTriangularMatrix: *,+,eachindex,similar" begin
+    @testset for NF in (Float16,Float32,Float64)
+        L = randn(LowerTriangularMatrix{NF},3,3)
+
+        @test (L+L) == 2L
+        @test (L+L) == L*2
+        @test (L-L) == zero(L)
+
+        @test eachindex(L) == eachindex(L.data)
+        @test eachindex(L,L) == eachindex(L.data,L.data)
+
+        @test size(similar(L)) == size(L)
+        @test eltype(L) == eltype(similar(L,eltype(L)))
+
+        @test (5,7) == size(similar(L,5,7))
+        @test (5,7) == size(similar(L,(5,7)))
+        @test similar(L) isa LowerTriangularMatrix
+        @test similar(L,Float64) isa LowerTriangularMatrix{Float64}
+    end
+end
+
+@testset "LowerTriangularMatrix: copyto!" begin
+    @testset for NF in (Float16,Float32,Float64)
+        L1 = randn(LowerTriangularMatrix{NF},10,10)
+        L2 = randn(LowerTriangularMatrix{NF},5,5)
+        L1c = copy(L1)
+
+        copyto!(L2,L1)  # bigger into smaller
+        copyto!(L1,L2)  # and back should be identical
+
+        @test L1 == L1c
+
+        # now smaller into bigger
+        L1 = randn(LowerTriangularMatrix{NF},10,10)
+        L2 = randn(LowerTriangularMatrix{NF},5,5)
+        L2c = copy(L2)
+
+        copyto!(L1,L2)
+        copyto!(L2,L1)
+
+        @test L2 == L2c
+    end
+end

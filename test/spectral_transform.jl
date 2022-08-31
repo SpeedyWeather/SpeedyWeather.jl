@@ -48,8 +48,8 @@ end
             p1,d1,m1 = initialize_speedy(NF;trunc,recompute_legendre=false)
             p2,d2,m2 = initialize_speedy(NF;trunc,recompute_legendre=true)
 
-            alms = copy(p1.layers[1].leapfrog[1].vor)
-            alms .= randn(Complex{NF},size(alms)...)
+            (;vor) = p1.layers[1].leapfrog[1]
+            alms = randn(typeof(vor),size(vor)...)
 
             map1 = gridded(alms,m1.spectral_transform)
             map2 = gridded(alms,m2.spectral_transform)
