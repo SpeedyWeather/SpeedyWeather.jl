@@ -36,7 +36,7 @@ struct SpectralTransform{NF<:AbstractFloat}
 
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool                # Pre or recompute Legendre polynomials
-    Λ::LowerTriangularMatrix{Float64}       # Legendre polynomials for one latitude (requires recomputing)
+    Λ::LowerTriangularMatrix{NF}            # Legendre polynomials for one latitude (requires recomputing)
     Λs::Vector{LowerTriangularMatrix{NF}}   # Legendre polynomials for all latitudes (all precomputed)
     
     # QUADRATURE (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -101,7 +101,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
 
     # NORMALIZATION
     norm_sphere = 2sqrt(π)  # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
-    Δlons = 2π./nlons       # integration of longitude, i.e. dϕ, discretised, used to scale the quadrature weights
+    Δlons = 2π./nlons       # integration of longitude, i.e. dϕ, discretised, used to scale the quad weights
 
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
     _, lons = get_colatlons(Grid,nresolution)
@@ -109,18 +109,20 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
     
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
-    Λ = zeros(LowerTriangularMatrix,lmax+2,mmax+1)  # Legendre polynomials for one latitude
+    Λ = zeros(LowerTriangularMatrix{NF},lmax+2,mmax+1)  # Legendre polynomials for one latitude
 
     # allocate memory in Λs for polynomials at all latitudes or allocate dummy array if precomputed
     # Λs is of size (lmax+2) x (mmax+1) x nlat_half unless recomputed, one more degree l as before
     # for recomputed only Λ is used, not Λs, create dummy array of 0-size instead
     b = ~recompute_legendre                 # true for precomputed
-    Λs = [zeros(LowerTriangularMatrix,b*(lmax+2),b*(mmax+1)) for _ in 1:b*nlat_half]
+    Λs = [zeros(LowerTriangularMatrix{NF},b*(lmax+2),b*(mmax+1)) for _ in 1:nlat_half]
 
     if recompute_legendre == false          # then precompute all polynomials
-        for ilat in 1:nlat_half             # only one hemisphere due to symmetry
-            Legendre.λlm!(Λs[ilat], lmax+1, mmax, cos_colat[ilat])
-            # underflow_small!(Λs[ilat],sqrt(floatmin(NF)))
+        Λtemp = zeros(NF,lmax+2,mmax+1)     # preallocate matrix
+        for j in 1:nlat_half                # only one hemisphere due to symmetry
+            Legendre.λlm!(Λtemp, lmax+1, mmax, Float64(cos_colat[j]))   # always precalculate in Float64
+            # underflow!(Λtemp,sqrt(floatmin(NF)))
+            copyto!(Λs[j],Λtemp)
         end
     end
 
@@ -277,54 +279,6 @@ end
 # if number format not provided use Float64
 get_recursion_factors(lmax::Int,mmax::Int) = get_recursion_factors(Float64,lmax,mmax)
 
-# @inline function alias_index(   nlon::Int,  # number of longitude points
-#                                 m::Int)     # order m of harmonics (=zonal wavenumber)
-#     m -= 1                                  # convert from 1 to 0-based zonal wavenumber m 
-
-#     # equatorial zone, zonal wavenumber m is smaller than Nyquist = no aliasing
-#     isconj, isnyq = false, false
-#     nyq = max(1, nlon ÷ 2)                  # Nyquist frequency
-#     m < nyq && return (m+1, isconj, isnyq)    # escape for equatorial zone
-    
-#     # if zonal wavenumber m is >= Nyquist than alias, and indicate conjugate
-#     # or real doubling through isconj and isnyq
-#     m = mod(m, nlon)
-#     m, isconj = m > nyq ? (nlon-m, true) : (m,isconj)   # alias m and conjugate
-#     isnyq = m == 0 || (iseven(nlon) && m == nyq)        # is Nyquist frequency?
-#     return (m+1, isconj, isnyq)
-# end
-
-@inline function alias_index(len::Int, i::Int)
-    i -= 1
-    isconj, isnyq = false, false
-    nyq = max(1, len ÷ 2)
-    i < nyq && return (i+1, isconj, isnyq)
-    i = mod(i, len)
-    if i > nyq
-        i = len - i
-        isconj = true
-    elseif i == 0 || (iseven(len) && i == nyq)
-        isnyq = true
-    end
-    return (i+1, isconj, isnyq)
-end
-
-
-@inline function alias_coeffs(  cn::Complex{<:AbstractFloat},
-                                cs::Complex{<:AbstractFloat},
-                                isconj::Bool,
-                                isnyq::Bool)
-
-    cn, cs = isnyq  ? (2*real(cn),2*real(cs)) : (cn, cs)    # real double for Nyquist freq
-    cn, cs = isconj ? (conj(cn),conj(cs)) : (cn, cs)        # complex conjugate for m>Nyquist
-    return cn,cs
-end
-
-@inline function alias_coeffs(coeffs, isconj::Bool, isnyq::Bool)
-    return ifelse(isnyq, complex.(2 .* real.(coeffs)),
-                  ifelse(isconj, conj.(coeffs), coeffs))
-end
-
 """
     gridded!(   map::AbstractGrid,
                 alms::LowerTriangularMatrix,
@@ -357,23 +311,22 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
     gn = zeros(Complex{NF}, nfreq_max)      # phase factors for northern latitudes
     gs = zeros(Complex{NF}, nfreq_max)      # phase factors for southern latitudes
 
-    Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(NF)))
+    Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
 
-    @inbounds for ilat_n in 1:nlat_half     # symmetry: loop over northern latitudes only
-        ilat_s = nlat - ilat_n + 1          # southern latitude index
-        nlon = nlons[ilat_n]                # number of longitudes on this ring
+    for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
+        j_south = nlat - j_north + 1        # southern latitude index
+        nlon = nlons[j_north]               # number of longitudes on this ring
         nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
         nfreqm = nlon÷(order+1) + 1         # (lin/quad/cub) max frequency to shorten loop over m
-        not_equator = ilat_n != ilat_s      # is the latitude ring not on equator?
+        not_equator = j_north != j_south    # is the latitude ring not on equator?
 
         # Recalculate or use precomputed Legendre polynomials Λ
-        Λ_ilat = recompute_legendre ? 
-            Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, cos_colat[ilat_n]) : Λs[ilat_n]
+        recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
+        Λj = recompute_legendre ? Λ : Λs[j_north]
 
         # inverse Legendre transform by looping over wavenumbers l,m
         lm = 1                              # single index for non-zero l,m indices
-        # for m in 1:mmax+1                   # Σ_{m=0}^{mmax}, but 1-based index
-        for m in 1:min(nfreq,mmax+1)        # Σ_{m=0}^{mmax}, but 1-based index
+        @inbounds for m in 1:min(nfreq,mmax+1)        # Σ_{m=0}^{mmax}, but 1-based index
             acc_odd  = zero(Complex{NF})    # accumulator for isodd(l+m)
             acc_even = zero(Complex{NF})    # accumulator for iseven(l+m)
 
@@ -385,27 +338,24 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
             # but put both into one loop for contiguous memory access
             for lm_even in lm:2:lm_end-even_degrees     
                 # split into even, i.e. iseven(l+m)
-                # acc_even += alms[lm_even] * Λ_ilat[lm_even], but written with muladd
-                acc_even = muladd(alms[lm_even],Λ_ilat[lm_even],acc_even)
+                # acc_even += alms[lm_even] * Λj[lm_even], but written with muladd
+                acc_even = muladd(alms[lm_even],Λj[lm_even],acc_even)
 
                 # and odd (isodd(l+m)) harmonics
-                # acc_odd += alms[lm_odd] * Λ_ilat[lm_odd], but written with muladd
-                acc_odd = muladd(alms[lm_even+1],Λ_ilat[lm_even+1],acc_odd)
+                # acc_odd += alms[lm_odd] * Λj[lm_odd], but written with muladd
+                acc_odd = muladd(alms[lm_even+1],Λj[lm_even+1],acc_odd)
             end
 
             # for even number of degrees, one acc_even iteration is skipped, do now
-            acc_even = even_degrees ? muladd(alms[lm_end],Λ_ilat[lm_end],acc_even) : acc_even
+            acc_even = even_degrees ? muladd(alms[lm_end],Λj[lm_end],acc_even) : acc_even
 
-            # CORRECT FOR LONGITUDE OFFSETTS
             acc_n = (acc_even + acc_odd)        # accumulators for northern
             acc_s = (acc_even - acc_odd)        # and southern hemisphere
             
-            # ALIAS ZONAL WAVENUMBERS
-            # m_alias, isconj, isnyq = alias_index(nlon, m)   # polar zones, alias m if > Nyquist
-            # o = lon_offsets[m,ilat_n]           # longitude offset rotation            
+            # CORRECT FOR LONGITUDE OFFSETTS
+            # o = lon_offsets[m,j_north]           # longitude offset rotation            
             # acc_n *= o
             # acc_s *= o
-            # acc_n, acc_s = alias_coeffs((acc_n, acc_s), isconj, isnyq)
             
             gn[m] += acc_n                # accumulate in phase factors for northern
             gs[m] += acc_s                # and southern hemisphere
@@ -414,13 +364,13 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
         end
 
         # Inverse Fourier transform in zonal direction
-        brfft_plan = brfft_plans[ilat_n]        # FFT planned wrt nlon on ring
-        js = each_index_in_ring(map,ilat_n)     # in-ring indices northern ring
-        LinearAlgebra.mul!(view(map.v,js),brfft_plan,view(gn,1:nfreq))  # perform FFT
+        brfft_plan = brfft_plans[j_north]       # FFT planned wrt nlon on ring
+        ilons = each_index_in_ring(map,j_north) # in-ring indices northern ring
+        LinearAlgebra.mul!(view(map.v,ilons),brfft_plan,view(gn,1:nfreq))  # perform FFT
 
         # southern latitude, don't call redundant 2nd fft if ring is on equator 
-        js = each_index_in_ring(map,ilat_s)     # in-ring indices southern ring
-        not_equator && LinearAlgebra.mul!(view(map.v,js),brfft_plan,view(gs,1:nfreq))  # perform FFT
+        ilons = each_index_in_ring(map,j_south) # in-ring indices southern ring
+        not_equator && LinearAlgebra.mul!(view(map.v,ilons),brfft_plan,view(gs,1:nfreq))  # perform FFT
 
         fill!(gn, zero(Complex{NF}))            # set phase factors back to zero
         fill!(gs, zero(Complex{NF}))
@@ -465,41 +415,39 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     # partial sums are accumulated in alms, force zeros initially.
     fill!(alms,0)
 
-    Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(NF)))
+    Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
 
-    @inbounds for ilat_n in 1:nlat_half     # symmetry: loop over northern latitudes only
-        ilat_s = nlat - ilat_n + 1          # corresponding southern latitude index
-        nlon = nlons[ilat_n]                # number of longitudes on this ring
+    for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
+        j_south = nlat - j_north + 1        # corresponding southern latitude index
+        nlon = nlons[j_north]               # number of longitudes on this ring
         nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
         nfreqm = nlon÷(order+1) + 1         # (lin/quad/cub) max frequency to shorten loop over m
-        not_equator = ilat_n != ilat_s      # is the latitude ring not on equator?
+        not_equator = j_north != j_south    # is the latitude ring not on equator?
 
         # Fourier transform in zonal direction
-        rfft_plan = rfft_plans[ilat_n]          # FFT planned wrt nlon on ring
-        js = each_index_in_ring(map,ilat_n)     # in-ring indices northern ring
-        LinearAlgebra.mul!(view(fn,1:nfreq),rfft_plan,view(map.v,js))   # Northern latitude
+        rfft_plan = rfft_plans[j_north]         # FFT planned wrt nlon on ring
+        ilons = each_index_in_ring(map,j_north) # in-ring indices northern ring
+        LinearAlgebra.mul!(view(fn,1:nfreq),rfft_plan,view(map.v,ilons))   # Northern latitude
 
-        js = each_index_in_ring(map,ilat_s)     # in-ring indices northern ring
+        ilons = each_index_in_ring(map,j_south) # in-ring indices northern ring
                                                 # Southern latitude (don't call FFT on Equator)
                                                 # then fill fs with zeros and no changes needed further down
-        not_equator ? LinearAlgebra.mul!(view(fs,1:nfreq),rfft_plan,view(map.v,js)) : fill!(fs,0)
+        not_equator ? LinearAlgebra.mul!(view(fs,1:nfreq),rfft_plan,view(map.v,ilons)) : fill!(fs,0)
 
         # Legendre transform in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
-        Λ_ilat = recompute_legendre ?
-            Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, cos_colat[ilat_n]) : Λs[ilat_n]
-        quadrature_weight = quadrature_weights[ilat_n]  # weights normalised with π/nlat
+        recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax+1, mmax, Float64(cos_colat[j_north]))
+        Λj = recompute_legendre ? Λ : Λs[j_north]
+        
+        quadrature_weight = quadrature_weights[j_north]  # weights normalised with π/nlat
 
         lm = 1                                          # single index for spherical harmonics
-        # for m in 1:mmax+1                               # Σ_{m=0}^{mmax}, but 1-based index
-        for m in 1:min(nfreq,mmax+1)                    # Σ_{m=0}^{mmax}, but 1-based index
+        @inbounds for m in 1:min(nfreq,mmax+1)                    # Σ_{m=0}^{mmax}, but 1-based index
 
-            # m_alias, isconj, isnyq = alias_index(nlon, m)   # polar zones, alias m if > Nyquist
-            # an, as = alias_coeffs((fn[m_alias], fs[m_alias]), isconj, isnyq)
             an, as = fn[m], fs[m]
 
             # QUADRATURE WEIGHTS and LONGITUDE OFFSET
-            # o = lon_offsets[m,ilat_n]                   # longitude offset rotation
+            # o = lon_offsets[m,j_north]                  # longitude offset rotation
             # quadrature_weight *= conj(o)                # complex conjugate for rotation back to prime meridian
             an *= quadrature_weight                     # weighted northern latitude
             as *= quadrature_weight                     # weighted southern latitude
@@ -516,16 +464,16 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
             # but put both into one loop for contiguous memory access
             for lm_even in lm:2:lm_end-even_degrees
                 # split into even, i.e. iseven(l+m)
-                # alms[lm_even] += a_even * Λ_ilat[lm_even], but written with muladd
-                alms[lm_even] = muladd(a_even,Λ_ilat[lm_even],alms[lm_even])
+                # alms[lm_even] += a_even * Λj[lm_even], but written with muladd
+                alms[lm_even] = muladd(a_even,Λj[lm_even],alms[lm_even])
                 
                 # and odd (isodd(l+m)) harmonics
-                # alms[lm_odd] += a_odd * Λ_ilat[lm_odd], but written with muladd
-                alms[lm_even+1] = muladd(a_odd,Λ_ilat[lm_even+1],alms[lm_even+1])
+                # alms[lm_odd] += a_odd * Λj[lm_odd], but written with muladd
+                alms[lm_even+1] = muladd(a_odd,Λj[lm_even+1],alms[lm_even+1])
             end
 
             # for even number of degrees, one even iteration is skipped, do now
-            alms[lm_end] = even_degrees ? muladd(a_even,Λ_ilat[lm_end],alms[lm_end]) : alms[lm_end]
+            alms[lm_end] = even_degrees ? muladd(a_even,Λj[lm_end],alms[lm_end]) : alms[lm_end]
 
             lm = lm_end + 1                             # first index of next m column
         end
