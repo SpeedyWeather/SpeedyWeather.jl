@@ -1,4 +1,3 @@
-# Make AbstractGrid subtype of AbstractVector as the data within is unravelled into a vec
 """
     abstract type AbstractGrid{T} <: AbstractVector{T} end
 
@@ -226,7 +225,8 @@ get_nresolution(G::AbstractHEALPixGrid) = G.nside
 
 # define nlat_half for all grids (HEALPixGrid is different as it doesn't use nlat_half as resolution parameter)
 get_nlat_half(::Type{<:AbstractGrid},nlat_half::Integer) = nlat_half
-get_nlat_half(::Type{<:AbstractHEALPixGrid},nside::Integer) = (nlat_healpix(nside)+1)÷2
+get_nlat_half(::Type{<:AbstractHEALPixGrid},nside::Integer) = 2nside
+get_nlat_half(::G,n::Integer) where {G<:AbstractGrid} = get_nlat_half(G,n) 
 
 # define whether there's an odd number of latitude rings for a grid
 nlat_odd(::Type{<:FullGaussianGrid}) = false
@@ -235,6 +235,9 @@ nlat_odd(::Type{<:OctahedralGaussianGrid}) = false
 nlat_odd(::Type{<:OctahedralClenshawGrid}) = true
 nlat_odd(::Type{<:AbstractHEALPixGrid}) = true
 nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))
+
+get_nlat(Grid::Type{<:AbstractGrid},n::Integer) = 2get_nlat_half(Grid,n) - nlat_odd(Grid)
+get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,get_nresolution(grid))
 
 # return the maxmimum number of longitude points for a grid and its resolution parameter nlat_half/nside
 get_nlon(::Type{<:AbstractFullGrid},nlat_half::Integer) = 4nlat_half
@@ -330,29 +333,9 @@ function get_colatlons(G::Type{<:AbstractHEALPixGrid},nside::Integer)
     return colats, lons
 end
 
-# INDEXING HELPERS
-# function get_last_index_per_ring(G::Type{<:AbstractGrid},nresolution::Integer)
-#     nlat_half = get_nlat_half(G,nresolution)    # contains equator for HEALPix
-#     nlat = 2nlat_half - nlat_odd(G)             # one less if grids have odd # of latitude rings
-#     nlons = [get_nlon_per_ring(G,nresolution,i) for i in 1:nlat]
-#     last_indices = cumsum(nlons)                # last index is always sum of all previous points
-#     return last_indices
-# end
-
-# function get_first_index_per_ring(G::Type{<:AbstractGrid},nresolution::Integer)
-#     last_indices = get_last_index_per_ring(G,nresolution)
-#     first_indices = zero(last_indices)
-#     first_indices[1] = 1
-#     for i in 1:length(first_indices)-1
-#         first_indices[i+1] = last_indices[i]+1
-#     end
-#     return first_indices
-# end
-
 function eachring(grid::G) where {G<:AbstractGrid}
-    nlat_half = get_nlat_half(G,get_nresolution(grid))  # contains equator for HEALPix
-    nlat = 2nlat_half - nlat_odd(G)                     # -1 for odd # of latitude rings
-    return Base.OneTo(nlat)                             # return iterable range
+    rings = [each_index_in_ring(grid,j) for j in 1:get_nlat(grid)]
+    return rings                                            # return Vector{UnitRange}
 end
 
 function eachring(grids::Grid...) where {Grid<:AbstractGrid}
@@ -414,7 +397,7 @@ function each_index_in_ring(::Type{<:AbstractHEALPixGrid},  # function for HEALP
     return index_1st:index_end                              # range of i's in ring
 end
 
-@inline function each_index_in_ring(grid::G,j::Integer) where {G<:AbstractGrid}
+function each_index_in_ring(grid::G,j::Integer) where {G<:AbstractGrid}
     return each_index_in_ring(G,j,get_nresolution(grid))
 end
 
