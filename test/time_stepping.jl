@@ -30,7 +30,7 @@ end
         X_out = zeros(Complex{NF},n_timesteps+1)
 
         # exact 2nd leapfrog step
-        X_new .*= Complex{NF}(exp(im*ω*Δt))
+        SpeedyWeather.scale!(X_new,Complex{NF}(exp(im*ω*Δt)))
         X_out[1] = X_old[1,1]      # store initial conditions
 
         # leapfrog forward
@@ -69,7 +69,7 @@ end
         X_out = zeros(Complex{NF},n_timesteps+1)
 
         # exact 2nd leapfrog step
-        X_new .*= Complex{NF}(exp(im*ω*Δt))
+        SpeedyWeather.scale!(X_new,Complex{NF}(exp(im*ω*Δt)))
         X_out[1] = X_old[1,1]      # store initial conditions
 
         # leapfrog forward
