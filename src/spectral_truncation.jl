@@ -77,31 +77,23 @@ Returns a spectral coefficient matrix `alms_trunc` that is truncated from `alms`
 `alms_trunc` only contains those coefficient of `alms` for which m,l <= trunc, and l>=m are zero anyway.
 If `trunc` is larger than the implicit truncation in `alms` obtained from its size than `spectral_interpolation`
 is automatically called instead, returning `alms_interp`, a coefficient matrix that is larger than `alms`
-with padded zero coefficients. Also works with higher dimensional arrays, but truncation is only applied to
-the first two dimensions."""
-function spectral_truncation(   ::Type{NF},                 # number format NF (can be complex)
-                                alms::AbstractMatrix,       # spectral field to be truncated
-                                ltrunc::Integer,            # truncate to max degree ltrunc
-                                mtrunc::Integer,            # truncate to max order mtrunc
+with padded zero coefficients."""
+function spectral_truncation(   ::Type{NF},                     # number format NF (can be complex)
+                                alms::LowerTriangularMatrix,    # spectral field to be truncated
+                                ltrunc::Integer,                # truncate to max degree ltrunc
+                                mtrunc::Integer,                # truncate to max order mtrunc
                                 ) where NF
     
-    @boundscheck length(size(alms)) >= 2 || throw(BoundsError(alms,(ltrunc,mtrunc)))
-
-    size_alms = size(alms)
-    lmax,mmax = size_alms[1:2] .- 1     # 0-based degree l, order m of the spherical harmonics
+    lmax,mmax = size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics
     
     # interpolate to higher resolution if output larger than input
     (ltrunc > lmax || mtrunc > mmax) && return spectral_interpolation(alms,ltrunc,mtrunc)
 
-    size_alms_new = collect(size_alms)              # convert to vector for mutability
-    size_alms_new[1] = ltrunc+1                     # new (smaller) size
-    size_alms_new[2] = mtrunc+1
-    size_alms_new = tuple(size_alms_new...)
-    alms_trunc = LowerTriangularMatrix{NF}(undef,size_alms_new...)  # preallocate new (smaller) array
+    # preallocate new (smaller) array
+    alms_trunc = zeros(LowerTriangularMatrix{NF},ltrunc+1,mtrunc+1)  
 
-    # copy data over
-    copyto!(alms_trunc,@view(alms[CartesianIndices(size_alms_new)]))
-    spectral_truncation!(alms_trunc,ltrunc,mtrunc)  # make sure undef is replaced with zero
+    # copy data over, copyto! copies the largest matching subset of harmonics
+    copyto!(alms_trunc,alms)
     return alms_trunc
 end
 
@@ -111,39 +103,31 @@ spectral_truncation(alms::AbstractMatrix,trunc::Int) = spectral_truncation(alms,
 
 """
     alms_interp = spectral_interpolation(   ::Type{NF},
-                                            alms::AbstractMatrix,       # spectral field to be truncated
-                                            ltrunc::Int,                # truncate to max degree ltrunc
-                                            mtrunc::Int                 # truncate to max order mtrunc
-                                            ) where NF                  # number format NF (can be complex)
+                                            alms::LowerTriangularMatrix,
+                                            ltrunc::Integer,
+                                            mtrunc::Integer
+                                            ) where NF
 
 Returns a spectral coefficient matrix `alms_interp` that is `alms` padded with zeros to interpolate in
 spectral space. If `trunc` is smaller or equal to the implicit truncation in `alms` obtained from its size
 than `spectral_truncation` is automatically called instead, returning `alms_trunc`, a coefficient matrix that
-is smaller than `alms`, implicitly setting higher degrees and orders to zero. Also works with higher
-dimensional arrays, but interpolation is only applied to the first two dimensions."""
-function spectral_interpolation(::Type{NF},                 # number format NF (can be complex)
-                                alms::AbstractMatrix,       # spectral field to be truncated
-                                ltrunc::Int,                # truncate to max degree ltrunc
-                                mtrunc::Int                 # truncate to max order mtrunc
+is smaller than `alms`, implicitly setting higher degrees and orders to zero."""
+function spectral_interpolation(::Type{NF},                     # number format NF (can be complex)
+                                alms::LowerTriangularMatrix,    # spectral field to be truncated
+                                ltrunc::Integer,                # truncate to max degree ltrunc
+                                mtrunc::Integer                 # truncate to max order mtrunc
                                 ) where NF                  
     
-    @boundscheck length(size(alms)) >= 2 || throw(BoundsError(alms,(ltrunc,mtrunc)))
-
-    size_alms = size(alms)
-    lmax,mmax = size_alms[1:2] .- 1     # 0-based degree l, order m of the spherical harmonics
+    lmax,mmax = size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics 
     
-    # interpolate to higher resolution if output larger than input
-    (ltrunc <= lmax && mtrunc <= mmax) && return spectral_interpolation(alms,ltrunc,mtrunc)
+    # truncate to lower resolution if output smaller than input
+    (ltrunc <= lmax && mtrunc <= mmax) && return spectral_truncation(alms,ltrunc,mtrunc)
 
-    size_alms_new = collect(size_alms)              # convert to vector for mutability
-    size_alms_new[1] = ltrunc+1                     # new size
-    size_alms_new[2] = mtrunc+1
-    size_alms_new = tuple(size_alms_new...)         # convert back to tuple
-    alms_trunc = zeros(LowerTriangularMatrix{NF},size_alms_new...)  # allocate new (larger) array
+    # allocate new (larger) array
+    alms_trunc = zeros(LowerTriangularMatrix{NF},ltrunc+1,mtrunc+1)  
 
     # copy data over
-    copyto!(@view(alms_trunc[CartesianIndices(size_alms)]),alms)
-    spectral_truncation!(alms_trunc,ltrunc,mtrunc)  # make sure upper triangle is zero
+    copyto!(alms_trunc,alms)
     return alms_trunc
 end
 
