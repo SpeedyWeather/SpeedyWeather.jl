@@ -313,7 +313,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
     Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
 
-    for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
+    @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
         j_south = nlat - j_north + 1        # southern latitude index
         nlon = nlons[j_north]               # number of longitudes on this ring
         nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
@@ -326,7 +326,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
         # inverse Legendre transform by looping over wavenumbers l,m
         lm = 1                              # single index for non-zero l,m indices
-        @inbounds for m in 1:min(nfreq,mmax+1)        # Σ_{m=0}^{mmax}, but 1-based index
+        @simd for m in 1:min(nfreq,mmax+1)  # Σ_{m=0}^{mmax}, but 1-based index
             acc_odd  = zero(Complex{NF})    # accumulator for isodd(l+m)
             acc_even = zero(Complex{NF})    # accumulator for iseven(l+m)
 
@@ -353,12 +353,10 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
             acc_s = (acc_even - acc_odd)        # and southern hemisphere
             
             # CORRECT FOR LONGITUDE OFFSETTS
-            # o = lon_offsets[m,j_north]           # longitude offset rotation            
-            # acc_n *= o
-            # acc_s *= o
-            
-            gn[m] += acc_n                # accumulate in phase factors for northern
-            gs[m] += acc_s                # and southern hemisphere
+            o = lon_offsets[m,j_north]          # longitude offset rotation            
+
+            gn[m] = muladd(acc_n,o,gn[m])       # accumulate in phase factors for northern
+            gs[m] = muladd(acc_s,o,gs[m])       # and southern hemisphere
 
             lm = lm_end + 1                     # first index of next m column
         end
@@ -417,7 +415,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
 
     Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
 
-    for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
+    @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
         j_south = nlat - j_north + 1        # corresponding southern latitude index
         nlon = nlons[j_north]               # number of longitudes on this ring
         nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
@@ -442,13 +440,13 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         quadrature_weight = quadrature_weights[j_north]  # weights normalised with π/nlat
 
         lm = 1                                          # single index for spherical harmonics
-        @inbounds for m in 1:min(nfreq,mmax+1)                    # Σ_{m=0}^{mmax}, but 1-based index
+        @simd for m in 1:min(nfreq,mmax+1)              # Σ_{m=0}^{mmax}, but 1-based index
 
             an, as = fn[m], fs[m]
 
             # QUADRATURE WEIGHTS and LONGITUDE OFFSET
-            # o = lon_offsets[m,j_north]                  # longitude offset rotation
-            # quadrature_weight *= conj(o)                # complex conjugate for rotation back to prime meridian
+            o = lon_offsets[m,j_north]                  # longitude offset rotation
+            quadrature_weight *= conj(o)                # complex conjugate for rotation back to prime meridian
             an *= quadrature_weight                     # weighted northern latitude
             as *= quadrature_weight                     # weighted southern latitude
 
@@ -463,12 +461,13 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
             # anti-symmetry: sign change of odd harmonics on southern hemisphere
             # but put both into one loop for contiguous memory access
             for lm_even in lm:2:lm_end-even_degrees
+                # lm_odd = lm_even+1
                 # split into even, i.e. iseven(l+m)
-                # alms[lm_even] += a_even * Λj[lm_even], but written with muladd
+                # alms[lm_even] += a_even * Λj[lm_even]#, but written with muladd
                 alms[lm_even] = muladd(a_even,Λj[lm_even],alms[lm_even])
                 
                 # and odd (isodd(l+m)) harmonics
-                # alms[lm_odd] += a_odd * Λj[lm_odd], but written with muladd
+                # alms[lm_odd] += a_odd * Λj[lm_odd]#, but written with muladd
                 alms[lm_even+1] = muladd(a_odd,Λj[lm_even+1],alms[lm_even+1])
             end
 
