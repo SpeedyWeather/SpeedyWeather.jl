@@ -227,6 +227,11 @@ function get_nlon_per_ring(::Type{<:AbstractHEALPixGrid},nside::Integer,j::Integ
     return nlon_healpix(nside,j)
 end
 
+function get_nlons(Grid::Type{<:AbstractGrid},nresolution::Integer;both_hemispheres::Bool=false)
+    n = both_hemispheres ? get_nlat(Grid,nresolution) : get_nlat_half(Grid,nresolution)
+    return [get_nlon_per_ring(Grid,nresolution,j) for j in 1:n]
+end
+
 # total number of grid points per grid type
 get_npoints(::Type{<:FullGaussianGrid},nlat_half::Integer) = npoints_gaussian(nlat_half)
 get_npoints(::Type{<:FullClenshawGrid},nlat_half::Integer) = npoints_clenshaw(nlat_half)
@@ -370,7 +375,6 @@ eachgridpoint(grid::G) where {G<:AbstractGrid} = Base.OneTo(get_npoints(G,get_nr
 # QUADRATURE WEIGHTS
 # gaussian_weights are exact for Gaussian latitudes when nlat > (2T+1)/2
 # clenshaw_curtis_weights are exact for equi-angle latitudes when nlat > 2T+1
-# riemann_weights not exact but used for HEALPix
 gaussian_weights(nlat_half::Integer) = FastGaussQuadrature.gausslegendre(2nlat_half)[2][1:nlat_half]
 
 function clenshaw_curtis_weights(nlat_half::Integer)
@@ -383,5 +387,8 @@ get_quadrature_weights(::Type{<:FullClenshawGrid},nlat_half::Integer) = clenshaw
 get_quadrature_weights(::Type{<:FullGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
 get_quadrature_weights(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
 
-# HEALPix's solid angle is always 4π/npoints
-get_quadrature_weights(G::Type{<:HEALPixGrid},nside::Integer) = 4π/get_npoints(G,nside)*ones(get_nlat_half(G,nside))
+# SOLID ANGLES ΔΩ = sinθ Δθ Δϕ
+get_solid_angles(Grid::Type{<:AbstractGrid},nlat_half::Integer) = 
+    get_quadrature_weights(Grid,nlat_half) .* (2π./get_nlons(Grid,nlat_half))
+get_solid_angles(Grid::Type{<:HEALPixGrid},nside::Integer) =
+    4π/get_npoints(Grid,nside)*ones(get_nlat_half(Grid,nside))
