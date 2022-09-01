@@ -31,8 +31,8 @@ struct SpectralTransform{NF<:AbstractFloat}
     norm_sphere::NF         # normalization of the l=0,m=0 mode
 
     # FFT plans, one plan for each latitude ring
-    rfft_plans::Vector{FFTW.rFFTWPlan{NF}}              # FFT plan for grid to spectral transform
-    brfft_plans::Vector{FFTW.rFFTWPlan{Complex{NF}}}    # spectral to grid transform (inverse)
+    rfft_plans::Vector{AbstractFFTs.Plan}     # FFT plan for grid to spectral transform
+    brfft_plans::Vector{AbstractFFTs.Plan}    # spectral to grid transform (inverse)
 
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool                # Pre or recompute Legendre polynomials
@@ -96,9 +96,10 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     sin_colat = sin.(colat)                         # sin(colat)
 
     # PLAN THE FFTs
-    rfft_plans = [FFTW.plan_rfft(zeros(NF,nlon)) for nlon in nlons]
-    brfft_plans = [FFTW.plan_brfft(zeros(Complex{NF},nlon÷2 + 1),nlon) for nlon in nlons]
-
+    FFT_package = NF <: Union{Float32,Float64} ? FFTW : GenericFFT
+    rfft_plans = [FFT_package.plan_rfft(zeros(NF,nlon)) for nlon in nlons]
+    brfft_plans = [FFT_package.plan_brfft(zeros(Complex{NF},nlon÷2 + 1),nlon) for nlon in nlons]
+    
     # NORMALIZATION
     norm_sphere = 2sqrt(π)  # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
     Δlons = 2π./nlons       # integration of longitude, i.e. dϕ, discretised, used to scale the quad weights
@@ -107,7 +108,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     _, lons = get_colatlons(Grid,nresolution)
     lon1s = [lons[each_index_in_ring(Grid,j,nresolution)[1]] for j in 1:nlat_half]
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
-    Grid <: AbstractHEALPixGrid || fill!(lon_offsets,1)     # no rotation for HEALPix at the moment
+    Grid <: AbstractHEALPixGrid && fill!(lon_offsets,1)     # no rotation for HEALPix at the moment
     
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
     Λ = zeros(LowerTriangularMatrix{NF},lmax+2,mmax+1)  # Legendre polynomials for one latitude
