@@ -434,7 +434,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
 
         # Legendre transform in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
-        recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax+1, mmax, Float64(cos_colat[j_north]))
+        recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
         Λj = recompute_legendre ? Λ : Λs[j_north]
         
         quadrature_weight = quadrature_weights[j_north]  # weights normalised with π/nlat
