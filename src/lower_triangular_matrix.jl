@@ -168,6 +168,42 @@ function Base.copyto!(  L1::LowerTriangularMatrix{T},   # copy to L1
     L1
 end
 
+function Base.copyto!(  L::LowerTriangularMatrix{T},    # copy to L
+                        M::AbstractMatrix) where T      # copy from M
+
+    @boundscheck size(L) == size(M) || throw(BoundsError)
+    lmax,mmax = size(L)
+
+    lm = 0
+    @inbounds for m in 1:mmax
+        for l in m:lmax
+            lm += 1
+            L[lm] = convert(T,M[l,m])
+        end
+    end
+    L
+end
+
+function Base.copyto!(  M::AbstractMatrix{T},               # copy to L
+                        L::LowerTriangularMatrix) where T   # copy from M
+
+    @boundscheck size(L) == size(M) || throw(BoundsError)
+    lmax,mmax = size(L)
+
+    lm = 0
+    @inbounds for m in 1:mmax
+        for l in 1:m-1          # zero for upper triangle (excl diagonal)
+            M[l,m] = zero(T)
+        end
+
+        for l in m:lmax         # convert and copy for lower triangle
+            lm += 1
+            M[l,m] = convert(T,M[lm])
+        end
+    end
+    L
+end
+
 function LowerTriangularMatrix{T}(M::LowerTriangularMatrix) where T
     L = LowerTriangularMatrix{T}(undef,size(M)...)
     copyto!(L,M)

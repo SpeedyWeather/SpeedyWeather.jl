@@ -337,10 +337,7 @@ HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid(data,nside_healpix(le
 truncation_order(::Type{<:HEALPixGrid}) = 1                 # linear (in longitude)
 get_truncation(::Type{<:HEALPixGrid},nside::Integer) = nside_assert(nside) ? 2nside-1 : nothing
 get_resolution(::Type{<:HEALPixGrid},trunc::Integer) = roundup_fft(ceil(Int,(trunc+1)/2),small_primes=[2])
-# get_nresolution() is already implemented for AbstractHEALPixGrid
-# get_nlon() is already implemented for AbstractHEALPixGrid
-# get_nlon_per_ring() is already implemented for AbstractHEALPixGrid
-# get_npoints() is already implemented for AbstractHEALPixGrid
+
 get_colat(G::Type{<:HEALPixGrid},nside::Integer) =
             [acos(Healpix.ring2z(Healpix.Resolution(nside),j)) for j in 1:nlat_healpix(nside)]
 # get_lon() is already implemented for AbstractHEALPixGrid
@@ -369,10 +366,15 @@ Base.Matrix(G::AbstractFullGrid{T}) where T = Matrix{T}(reshape(G.data,:,2G.nlat
 # QUADRATURE WEIGHTS
 # gaussian_weights are exact for Gaussian latitudes when nlat > (2T+1)/2
 # clenshaw_curtis_weights are exact for equi-angle latitudes when nlat > 2T+1
-# riemann_weights not exact but used for HEALPix
 gaussian_weights(nlat_half::Integer) = FastGaussQuadrature.gausslegendre(2nlat_half)[2][1:nlat_half]
 function clenshaw_curtis_weights(nlat_half::Integer)
     nlat = 2nlat_half - 1
     θs = get_colat(FullClenshawGrid,nlat_half)
     return [4sin(θj)/(nlat+1)*sum([sin(p*θj)/p for p in 1:2:nlat]) for θj in θs[1:nlat_half]]
 end
+
+# SOLID ANGLES ΔΩ = sinθ Δθ Δϕ
+get_solid_angles(Grid::Type{<:AbstractGrid},nlat_half::Integer) = 
+    get_quadrature_weights(Grid,nlat_half) .* (2π./get_nlons(Grid,nlat_half))
+get_solid_angles(Grid::Type{<:HEALPixGrid},nside::Integer) =
+    4π/get_npoints(Grid,nside)*ones(get_nlat_half(Grid,nside))

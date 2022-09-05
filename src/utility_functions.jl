@@ -45,24 +45,36 @@ function roundup_fft(n::Integer;small_primes::Vector{T}=[2,3,5]) where {T<:Integ
     return n-2      # subtract unnecessary last += 2 addition
 end
 
-"""Set all negative entries in an array to zero."""
+"""
+    clip_negatives!(A::AbstractArray)
+
+Set all negative entries `a` in `A` to zero."""
 function clip_negatives!(A::AbstractArray{T}) where T
     @inbounds for i in eachindex(A)
         A[i] = max(A[i],zero(T))
     end
 end
 
-function underflow_small!(A::AbstractArray{T},ϵ::Real) where T
+"""
+    underflow!(A::AbstractArray,ϵ::Real)
+
+Underflows element `a` in `A` to zero if `abs(a) < ϵ`."""
+function underflow!(A::AbstractArray{T},ϵ::Real) where T
     ϵT = convert(T,abs(ϵ))
     @inbounds for i in eachindex(A)
         A[i] = abs(A[i]) < ϵT ? zero(T) : A[i]
     end
 end
 
+"""
+    flipgsign!(A::AbstractArray)
+
+Like `-A` but in-place."""
 function flipsign!(A::AbstractArray)
     @inbounds for i in eachindex(A)
         A[i] = -A[i]
     end
+    A
 end
 
 """
@@ -91,4 +103,5 @@ function readable_secs(secs::Real)
 end
 
 # define as will only become availale in Julia 1.9
-pkgversion(m::Module) = VersionNumber(TOML.parsefile(joinpath(dirname(string(first(methods(m.eval)).file)), "..", "Project.toml"))["version"])
+pkgversion(m::Module) = VersionNumber(TOML.parsefile(joinpath(
+    dirname(string(first(methods(m.eval)).file)), "..", "Project.toml"))["version"])

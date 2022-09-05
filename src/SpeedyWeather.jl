@@ -9,7 +9,9 @@ module SpeedyWeather
     import FastGaussQuadrature
     import AssociatedLegendrePolynomials as Legendre
     import Healpix
+    import AbstractFFTs
     import FFTW
+    import GenericFFT
     import Primes
     import LinearAlgebra
 
