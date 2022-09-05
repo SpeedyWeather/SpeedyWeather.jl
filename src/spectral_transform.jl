@@ -416,11 +416,11 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
         # Inverse Fourier transform in zonal direction
         brfft_plan = brfft_plans[ilat_n]        # FFT planned wrt nlon on ring
         js = each_index_in_ring(map,ilat_n)     # in-ring indices northern ring
-        LinearAlgebra.mul!(view(map.v,js),brfft_plan,view(gn,1:nfreq))  # perform FFT
+        LinearAlgebra.mul!(view(map.data,js),brfft_plan,view(gn,1:nfreq))  # perform FFT
 
         # southern latitude, don't call redundant 2nd fft if ring is on equator 
         js = each_index_in_ring(map,ilat_s)     # in-ring indices southern ring
-        not_equator && LinearAlgebra.mul!(view(map.v,js),brfft_plan,view(gs,1:nfreq))  # perform FFT
+        not_equator && LinearAlgebra.mul!(view(map.data,js),brfft_plan,view(gs,1:nfreq))  # perform FFT
 
         fill!(gn, zero(Complex{NF}))            # set phase factors back to zero
         fill!(gs, zero(Complex{NF}))
@@ -477,12 +477,12 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         # Fourier transform in zonal direction
         rfft_plan = rfft_plans[ilat_n]          # FFT planned wrt nlon on ring
         js = each_index_in_ring(map,ilat_n)     # in-ring indices northern ring
-        LinearAlgebra.mul!(view(fn,1:nfreq),rfft_plan,view(map.v,js))   # Northern latitude
+        LinearAlgebra.mul!(view(fn,1:nfreq),rfft_plan,view(map.data,js))   # Northern latitude
 
         js = each_index_in_ring(map,ilat_s)     # in-ring indices northern ring
                                                 # Southern latitude (don't call FFT on Equator)
                                                 # then fill fs with zeros and no changes needed further down
-        not_equator ? LinearAlgebra.mul!(view(fs,1:nfreq),rfft_plan,view(map.v,js)) : fill!(fs,0)
+        not_equator ? LinearAlgebra.mul!(view(fs,1:nfreq),rfft_plan,view(map.data,js)) : fill!(fs,0)
 
         # Legendre transform in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
