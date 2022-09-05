@@ -6,23 +6,24 @@ points across latitude rings. Different latitudes can be used, Gaussian latitude
 equi-angle latitdes, or others."""
 abstract type AbstractFullGrid{T} <: AbstractGrid{T} end
 
-get_nresolution(G::AbstractFullGrid) = G.nlat_half
+get_nresolution(grid::AbstractFullGrid) = grid.nlat_half
 get_nlon(::Type{<:AbstractFullGrid},nlat_half::Integer) = 4nlat_half
 get_nlon_per_ring(::Type{<:AbstractFullGrid},nlat_half::Integer,j::Integer) = 4nlat_half
-get_lon(::Type{<:AbstractFullGrid},nlat_half::Integer) = 
-            collect(range(0,2π,step=2π/get_nlon(FullClenshawGrid,nlat_half))[1:end-1])
-function get_colatlons(G::Type{<:AbstractFullGrid},nlat_half::Integer)
+get_lon(Grid::Type{<:AbstractFullGrid},nlat_half::Integer) = 
+            collect(range(0,2π,step=2π/get_nlon(Grid,nlat_half))[1:end-1])
 
-    colat = get_colat(G,nlat_half)
-    lon = get_lon(G,nlat_half)
-    nlon = get_nlon(G,nlat_half)
+function get_colatlons(Grid::Type{<:AbstractFullGrid},nlat_half::Integer)
 
-    colats = zeros(get_npoints(G,nlat_half))
-    lons = zeros(get_npoints(G,nlat_half))
+    colat = get_colat(Grid,nlat_half)
+    lon = get_lon(Grid,nlat_half)
+    nlon = get_nlon(Grid,nlat_half)
 
-    for j in 1:2nlat_half-nlat_odd(G)
+    colats = zeros(get_npoints(Grid,nlat_half))    # preallocate
+    lons = zeros(get_npoints(Grid,nlat_half))
+
+    for j in 1:2nlat_half-nlat_odd(Grid)           # populate preallocated colats,lons
         for i in 1:nlon
-            ij = i + (j-1)*nlon
+            ij = i + (j-1)*nlon                    # continuous index ij
             colats[ij] = colat[j]
             lons[ij] = lon[i]
         end
@@ -30,11 +31,12 @@ function get_colatlons(G::Type{<:AbstractFullGrid},nlat_half::Integer)
 
     return colats,lons
 end
-function each_index_in_ring(G::Type{<:AbstractFullGrid},    # function for full grids
-                            j::Integer,                     # ring index north to south
-                            nlat_half::Integer)             # resolution param
 
-    @boundscheck 0 < j <= (2nlat_half-nlat_odd(G)) || throw(BoundsError)    # valid ring index?
+function each_index_in_ring(Grid::Type{<:AbstractFullGrid},     # function for full grids
+                            j::Integer,                         # ring index north to south
+                            nlat_half::Integer)                 # resolution param
+
+    @boundscheck 0 < j <= (2nlat_half-nlat_odd(Grid)) || throw(BoundsError)    # valid ring index?
     nlon = 4nlat_half                                       # number of longitudes per ring (const)
     index_1st = (j-1)*nlon + 1                              # first in-ring index i
     index_end = j*nlon                                      # last in-ring index i  
@@ -48,48 +50,52 @@ An `AbstractOctahedralGrid` is a horizontal grid with 16+4i longitude
 points on the latitude ring i starting with i=1 around the pole.
 Different latitudes can be used, Gaussian latitudes, equi-angle latitdes, or others."""
 abstract type AbstractOctahedralGrid{T} <: AbstractGrid{T} end
-get_nresolution(G::AbstractOctahedralGrid) = G.nlat_half
+
+get_nresolution(grid::AbstractOctahedralGrid) = grid.nlat_half
 get_nlon(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = nlon_octahedral(nlat_half)
-function get_nlon_per_ring(G::Type{<:AbstractOctahedralGrid},nlat_half::Integer,j::Integer)
-    nlat = 2nlat_half-nlat_odd(G)
+
+function get_nlon_per_ring(Grid::Type{<:AbstractOctahedralGrid},nlat_half::Integer,j::Integer)
+    nlat = 2nlat_half-nlat_odd(Grid)
     @assert 0 < j <= nlat "Ring $j is outside O$nlat_half grid."
     j = j > nlat_half ? nlat - j + 1 : j      # flip north south due to symmetry
     return nlon_octahedral(j)
 end
-get_lon(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = Float64[]
-function get_colatlons(G::Type{<:AbstractOctahedralGrid},nlat_half::Integer)
-    
-    npoints = get_npoints(G,nlat_half)
-    colat = get_colat(G,nlat_half)
 
-    colats = zeros(npoints)
+get_lon(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = Float64[]    # only defined for full grids
+
+function get_colatlons(Grid::Type{<:AbstractOctahedralGrid},nlat_half::Integer)
+    
+    npoints = get_npoints(Grid,nlat_half)
+    colat = get_colat(Grid,nlat_half)
+
+    colats = zeros(npoints)                 # preallocate arrays
     lons = zeros(npoints)
 
-    j = 1
-    for i in 1:2nlat_half-nlat_odd(G)
-        nlon = get_nlon_per_ring(G,nlat_half,i)
+    ij = 1                                  # continuous index
+    for j in 1:2nlat_half-nlat_odd(Grid)    # populate arrays ring by ring
+        nlon = get_nlon_per_ring(Grid,nlat_half,j)
         lon = collect(0:2π/nlon:2π-π/nlon)
 
-        colats[j:j+nlon-1] .= colat[i]
-        lons[j:j+nlon-1] .= lon
+        colats[ij:ij+nlon-1] .= colat[j]
+        lons[ij:ij+nlon-1] .= lon
 
-        j += nlon
+        ij += nlon
     end
 
     return colats, lons
 end
 
-function each_index_in_ring(G::Type{<:AbstractOctahedralGrid},   # function for octahedral grids
+function each_index_in_ring(Grid::Type{<:AbstractOctahedralGrid},
                             j::Integer,                     # ring index north to south
                             nlat_half::Integer)             # resolution param
 
-    @boundscheck 0 < j <= (2nlat_half-nlat_odd(G)) || throw(BoundsError)  # ring index valid?
+    @boundscheck 0 < j <= (2nlat_half-nlat_odd(Grid)) || throw(BoundsError)  # ring index valid?
     if j <= nlat_half                                       # northern hemisphere incl Equator
         index_1st = 2j*(j+7) - 15                           # first in-ring index i
         index_end = 2j*(j+9)                                # last in-ring index i
     else                                                    # southern hemisphere excl Equator
-        j = 2nlat_half-nlat_odd(G) - j + 1                  # mirror ring index around Equator
-        n = npoints_octahedral(nlat_half,nlat_odd(G))+1     # number of grid points + 1
+        j = 2nlat_half-nlat_odd(Grid) - j + 1               # mirror ring index around Equator
+        n = npoints_octahedral(nlat_half,nlat_odd(Grid))+1  # number of grid points + 1
         index_1st = n - 2j*(j+9)                            # count backwards
         index_end = n - (2j*(j+7) - 15)
     end
@@ -102,10 +108,12 @@ end
 An `AbstractHEALPixGrid` is a horizontal grid similar to the standard HEALPixGrid,
 but different latitudes can be used, the default HEALPix latitudes or others."""
 abstract type AbstractHEALPixGrid{T} <: AbstractGrid{T} end
+
 get_nresolution(G::AbstractHEALPixGrid) = G.nside
 get_nlat_half(::Type{<:AbstractHEALPixGrid},nside::Integer) = 2nside
 nlat_odd(::Type{<:AbstractHEALPixGrid}) = true
 get_nlon(::Type{<:AbstractHEALPixGrid},nside::Integer) = nside_assert(nside) ? nlon_healpix(nside) : nothing
+
 function get_nlon_per_ring(::Type{<:AbstractHEALPixGrid},nside::Integer,j::Integer)
     nlat = nlat_healpix(nside)
     @assert 0 < j <= nlat "Ring $j is outside H$nside grid."
@@ -113,15 +121,18 @@ function get_nlon_per_ring(::Type{<:AbstractHEALPixGrid},nside::Integer,j::Integ
     j = j > nlat_half ? nlat - j + 1 : j      # flip north south due to symmetry
     return nlon_healpix(nside,j)
 end
+
 get_npoints(::Type{<:AbstractHEALPixGrid},nside::Integer) = npoints_healpix(nside)
-get_lon(::Type{<:AbstractHEALPixGrid},nside::Integer) = Float64[]
-function get_colatlons(G::Type{<:AbstractHEALPixGrid},nside::Integer)
-    npoints = get_npoints(G,nside)
+get_lon(::Type{<:AbstractHEALPixGrid},nside::Integer) = Float64[]    # only defined for full grids
+
+function get_colatlons(Grid::Type{<:AbstractHEALPixGrid},nside::Integer)
+    npoints = get_npoints(Grid,nside)
     colats_lons = [Healpix.pix2angRing(Healpix.Resolution(nside),i) for i in 1:npoints]
     colats = [colat_lon[1] for colat_lon in colats_lons]
     lons = [colat_lon[2] for colat_lon in colats_lons]
     return colats, lons
 end
+
 function each_index_in_ring(::Type{<:AbstractHEALPixGrid},  # function for HEALPix grids
                             j::Integer,                     # ring index north to south
                             nside::Integer)                 # resolution param
@@ -151,13 +162,13 @@ end
 A FullClenshawGrid is a regular latitude-longitude grid with an odd number of `nlat` equi-spaced
 latitudes, the central latitude ring is on the Equator. The same `nlon` longitudes for every latitude ring.
 The grid points are closer in zonal direction around the poles. The values of all grid points are stored
-in a vector field `v` that unravels the data 0 to 360˚, then ring by ring, which are sorted north to south."""
+in a vector field `data` that unravels the data 0 to 360˚, then ring by ring, which are sorted north to south."""
 struct FullClenshawGrid{T} <: AbstractFullGrid{T}
-    v::Vector{T}    # data vector, ring by ring, north to south
+    data::Vector{T}    # data vector, ring by ring, north to south
     nlat_half::Int  # number of latitudes on one hemisphere (incl Equator)
 
-    FullClenshawGrid{T}(v,nlat_half) where T = length(v) == npoints_clenshaw(nlat_half) ?
-    new(v,nlat_half) : error("$(length(v))-element Vector{$(eltype(v))} cannot be used to create a "*
+    FullClenshawGrid{T}(data,nlat_half) where T = length(data) == npoints_clenshaw(nlat_half) ?
+    new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))} cannot be used to create a "*
         "L$nlat_half ($(4nlat_half)x$(2nlat_half - 1)) FullClenshawGrid{$T}.")
 end
 
@@ -165,7 +176,7 @@ end
 npoints_clenshaw(nlat_half::Integer) = 8nlat_half^2 - 4nlat_half
 nlat_half_clenshaw(npoints::Integer) = round(Int,1/4 + sqrt(1/16 + npoints/8))  # inverse
 # infer resolution parameter nlat_half from length of vector
-FullClenshawGrid{T}(v::AbstractVector) where T = FullClenshawGrid(v,nlat_half_clenshaw(length(v)))
+FullClenshawGrid{T}(data::AbstractVector) where T = FullClenshawGrid(data,nlat_half_clenshaw(length(data)))
 
 truncation_order(::Type{<:FullClenshawGrid}) = 3            # cubic
 get_truncation(::Type{<:FullClenshawGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
@@ -189,18 +200,18 @@ and the same `nlon` longitudes for every latitude ring. The grid points are clos
 around the poles. The values of all grid points are stored in a vector field `v` that unravels
 the data 0 to 360˚, then ring by ring, which are sorted north to south."""
 struct FullGaussianGrid{T} <: AbstractFullGrid{T}
-    v::Vector{T}    # data vector, ring by ring, north to south
+    data::Vector{T}    # data vector, ring by ring, north to south
     nlat_half::Int  # number of latitudes on one hemisphere
 
-    FullGaussianGrid{T}(v,nlat_half) where T = length(v) == 8nlat_half^2 ?
-    new(v,nlat_half) : error("$(length(v))-element Vector{$(eltype(v))} cannot be used to create a "*
+    FullGaussianGrid{T}(data,nlat_half) where T = length(data) == 8nlat_half^2 ?
+    new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))} cannot be used to create a "*
         "F$nlat_half ($(4nlat_half)x$(2nlat_half)) FullGaussianGrid{$T}.")
 end
 
 npoints_gaussian(nlat_half::Integer) = 8nlat_half^2
 nlat_half_gaussian(npoints::Integer) = round(Int,sqrt(npoints/8))
 # infer resolution parameter nlat_half from length of vector
-FullGaussianGrid{T}(v::AbstractVector) where T = FullGaussianGrid(v,nlat_half_gaussian(length(v)))
+FullGaussianGrid{T}(data::AbstractVector) where T = FullGaussianGrid(data,nlat_half_gaussian(length(data)))
 
 truncation_order(::Type{<:FullGaussianGrid}) = 2            # quadratic
 get_truncation(::Type{<:FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
@@ -227,12 +238,12 @@ one for each face of the octahedron. E.g. 20,24,28,32,...nlon-4,nlon,nlon,nlon-4
 The maximum number of longitue points is `nlon`. The values of all grid points are stored in a vector
 field `v` that unravels the data 0 to 360˚, then ring by ring, which are sorted north to south."""
 struct OctahedralGaussianGrid{T} <: AbstractOctahedralGrid{T}
-    v::Vector{T}    # data vector, ring by ring, north to south
+    data::Vector{T}    # data vector, ring by ring, north to south
     nlat_half::Int  # number of latitudes on one hemisphere
 
     # check that `nlat_half` match the vector `v` length
-    OctahedralGaussianGrid{T}(v,nlat_half) where T = length(v) == npoints_octahedral(nlat_half,false) ?
-    new(v,nlat_half) : error("$(length(v))-element Vector{$(eltype(v))}"*
+    OctahedralGaussianGrid{T}(data,nlat_half) where T = length(data) == npoints_octahedral(nlat_half,false) ?
+    new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))}"*
     "cannot be used to create a O$(nlat_half) OctahedralGaussianGrid{$T}.")
 end
 
@@ -242,7 +253,7 @@ npoints_octahedral(nlat_half::Integer,nlat_oddp::Bool) =
 nlat_half_octahedral(npoints::Integer,nlat_oddp::Bool) =
     nlat_oddp ? round(Int,-4+sqrt(20 + npoints/4)) : round(Int,-9/2+sqrt((9/2)^2 + npoints/4))  # inverse
 nlon_octahedral(j::Integer) = 16+4j
-OctahedralGaussianGrid{T}(v::AbstractVector) where T = OctahedralGaussianGrid(v,nlat_half_octahedral(length(v),false))
+OctahedralGaussianGrid{T}(data::AbstractVector) where T = OctahedralGaussianGrid(data,nlat_half_octahedral(length(data),false))
 
 truncation_order(::Type{<:OctahedralGaussianGrid}) = 3      # cubic
 get_truncation(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = nlat_half-1
@@ -269,16 +280,16 @@ one for each face of the octahedron. E.g. 20,24,28,32,...nlon-4,nlon,nlon,nlon-4
 The maximum number of longitue points is `nlon`. The values of all grid points are stored in a vector
 field `v` that unravels the data 0 to 360˚, then ring by ring, which are sorted north to south."""
 struct OctahedralClenshawGrid{T} <: AbstractOctahedralGrid{T}
-    v::Vector{T}    # data vector, ring by ring, north to south
+    data::Vector{T}    # data vector, ring by ring, north to south
     nlat_half::Int  # number of latitudes on one hemisphere (incl Equator)
 
     # check that `nlat_half` match the vector `v` length
-    OctahedralClenshawGrid{T}(v,nlat_half) where T = length(v) == npoints_octahedral(nlat_half,true) ?
-    new(v,nlat_half) : error("$(length(v))-element Vector{$(eltype(v))}"*
+    OctahedralClenshawGrid{T}(data,nlat_half) where T = length(data) == npoints_octahedral(nlat_half,true) ?
+    new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))}"*
     "cannot be used to create a O$(nlat_half) OctahedralClenshawGrid{$T}.")
 end
 
-OctahedralClenshawGrid{T}(v::AbstractVector) where T = OctahedralClenshawGrid(v,nlat_half_octahedral(length(v),true))
+OctahedralClenshawGrid{T}(data::AbstractVector) where T = OctahedralClenshawGrid(data,nlat_half_octahedral(length(data),true))
 
 truncation_order(::Type{<:OctahedralClenshawGrid}) = 3      # cubic
 get_truncation(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = nlat_half-1
@@ -301,11 +312,11 @@ A HEALPix grid with 12 faces, each `nside`x`nside` grid points, each covering th
 The values of all grid points are stored in a vector field `v` that unravels the data 0 to 360˚,
 then ring by ring, which are sorted north to south."""
 struct HEALPixGrid{T} <: AbstractHEALPixGrid{T}
-    v::Vector{T}    # data vector, ring by ring, north to south
+    data::Vector{T}    # data vector, ring by ring, north to south
     nside::Int      # nside^2 is the number of pixel in each of the 12 base pixel
 
-    HEALPixGrid{T}(v,nside) where T = length(v) == npoints_healpix(nside) ?
-    new(v,nside) : error("$(length(v))-element Vector{$(eltype(v))}"*
+    HEALPixGrid{T}(data,nside) where T = length(data) == npoints_healpix(nside) ?
+    new(data,nside) : error("$(length(data))-element Vector{$(eltype(data))}"*
     "cannot be used to create an H$nside HEALPixGrid{$T}.")
 end
 
@@ -321,7 +332,7 @@ nlat_healpix(nside::Integer) = nside_assert(nside) ? 4nside-1 : nothing
 nlon_healpix(nside::Integer,j::Integer) = nside_assert(nside) ? min(4j,4nside) : nothing
 nlon_healpix(nside::Integer) = nside_assert(nside) ? 4nside : nothing
 
-HEALPixGrid{T}(v::AbstractVector) where T = HEALPixGrid(v,nside_healpix(length(v)))
+HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid(data,nside_healpix(length(data)))
 
 truncation_order(::Type{<:HEALPixGrid}) = 1                 # linear (in longitude)
 get_truncation(::Type{<:HEALPixGrid},nside::Integer) = nside_assert(nside) ? 2nside-1 : nothing
@@ -346,7 +357,7 @@ supported_grids=(:FullClenshawGrid,
                  :OctahedralClenshawGrid,
                  :HEALPixGrid)
 for G in supported_grids
-    eval(:($G(v::AbstractVector,n::Integer...) = $G{eltype(v)}(v,n...)))
+    eval(:($G(data::AbstractVector,n::Integer...) = $G{eltype(data)}(data,n...)))
 end
 
 # convert an AbstractMatrix to the full grids
