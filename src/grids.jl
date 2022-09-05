@@ -175,8 +175,10 @@ end
 # subtract the otherwise double-counted 4nlat_half equator points
 npoints_clenshaw(nlat_half::Integer) = 8nlat_half^2 - 4nlat_half
 nlat_half_clenshaw(npoints::Integer) = round(Int,1/4 + sqrt(1/16 + npoints/8))  # inverse
-# infer resolution parameter nlat_half from length of vector
+
+# infer nside from data vector length, infer parametric type from eltype of data
 FullClenshawGrid{T}(data::AbstractVector) where T = FullClenshawGrid(data,nlat_half_clenshaw(length(data)))
+FullClenshawGrid(data::AbstractVector,n::Integer...) = FullClenshawGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:FullClenshawGrid}) = 3            # cubic
 get_truncation(::Type{<:FullClenshawGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
@@ -210,8 +212,10 @@ end
 
 npoints_gaussian(nlat_half::Integer) = 8nlat_half^2
 nlat_half_gaussian(npoints::Integer) = round(Int,sqrt(npoints/8))
-# infer resolution parameter nlat_half from length of vector
+
+# infer nside from data vector length, infer parametric type from eltype of data
 FullGaussianGrid{T}(data::AbstractVector) where T = FullGaussianGrid(data,nlat_half_gaussian(length(data)))
+FullGaussianGrid(data::AbstractVector,n::Integer...) = FullGaussianGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:FullGaussianGrid}) = 2            # quadratic
 get_truncation(::Type{<:FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
@@ -253,7 +257,10 @@ npoints_octahedral(nlat_half::Integer,nlat_oddp::Bool) =
 nlat_half_octahedral(npoints::Integer,nlat_oddp::Bool) =
     nlat_oddp ? round(Int,-4+sqrt(20 + npoints/4)) : round(Int,-9/2+sqrt((9/2)^2 + npoints/4))  # inverse
 nlon_octahedral(j::Integer) = 16+4j
+
+# infer nside from data vector length, infer parametric type from eltype of data
 OctahedralGaussianGrid{T}(data::AbstractVector) where T = OctahedralGaussianGrid(data,nlat_half_octahedral(length(data),false))
+OctahedralGaussianGrid(data::AbstractVector,n::Integer...) = OctahedralGaussianGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:OctahedralGaussianGrid}) = 3      # cubic
 get_truncation(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = nlat_half-1
@@ -289,7 +296,9 @@ struct OctahedralClenshawGrid{T} <: AbstractOctahedralGrid{T}
     "cannot be used to create a O$(nlat_half) OctahedralClenshawGrid{$T}.")
 end
 
+# infer nside from data vector length, infer parametric type from eltype of data
 OctahedralClenshawGrid{T}(data::AbstractVector) where T = OctahedralClenshawGrid(data,nlat_half_octahedral(length(data),true))
+OctahedralClenshawGrid(data::AbstractVector,n::Integer...) = OctahedralClenshawGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:OctahedralClenshawGrid}) = 3      # cubic
 get_truncation(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = nlat_half-1
@@ -332,7 +341,9 @@ nlat_healpix(nside::Integer) = nside_assert(nside) ? 4nside-1 : nothing
 nlon_healpix(nside::Integer,j::Integer) = nside_assert(nside) ? min(4j,4nside) : nothing
 nlon_healpix(nside::Integer) = nside_assert(nside) ? 4nside : nothing
 
+# infer nside from data vector length, infer parametric type from eltype of data
 HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid(data,nside_healpix(length(data)))
+HEALPixGrid(data::AbstractVector,n::Integer...) = HEALPixGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:HEALPixGrid}) = 1                 # linear (in longitude)
 get_truncation(::Type{<:HEALPixGrid},nside::Integer) = nside_assert(nside) ? 2nside-1 : nothing
@@ -342,10 +353,6 @@ get_colat(G::Type{<:HEALPixGrid},nside::Integer) =
 # get_lon() is already implemented for AbstractHEALPixGrid
 # get_colatlons() is already implemented for AbstractHEALPixGrid
 # each_index_in_ring() is already implemented for AbstractHEALPixGrid
-
-# define for all grids that the type T can be infered from the elements in data vector
-# whether the resolution parameter n is provided or not (hence the ...)
-(Grid::Type{<:AbstractGrid})(data::AbstractVector,n::Integer...) = Grid{eltype(data)}(data,n...)
 
 # convert an AbstractMatrix to the full grids, and vice versa
 (Grid::Type{<:AbstractFullGrid})(M::AbstractMatrix{T}) where T = Grid{T}(vec(M))
