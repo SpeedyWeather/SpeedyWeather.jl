@@ -4,21 +4,21 @@
 The abstract supertype for all spatial grids on the sphere supported by SpeedyWeather.jl."""
 abstract type AbstractGrid{T} <: AbstractVector{T} end
 
-# all AbstractGrids have their grid points stored in a vector field `v`
+# all AbstractGrids have their grid points stored in a vector field `data`
 # propagate length, size, getindex, setindex! for that
-Base.length(G::AbstractGrid) = length(G.v)
-Base.size(G::AbstractGrid) = size(G.v)
+Base.length(G::AbstractGrid) = length(G.data)
+Base.size(G::AbstractGrid) = size(G.data)
 @inline function Base.getindex(G::AbstractGrid,k::Integer)
-    @boundscheck 0 < k <= length(G.v) || throw(BoundsError(G,k))
-    @inbounds r = G.v[k]
+    @boundscheck 0 < k <= length(G.data) || throw(BoundsError(G,k))
+    @inbounds r = G.data[k]
     return r
 end
 
-@inline Base.setindex!(G::AbstractGrid,x,k::Integer) = setindex!(G.v,x,k)
+@inline Base.setindex!(G::AbstractGrid,x,k::Integer) = setindex!(G.data,x,k)
 
 # with ranges
-@inline Base.getindex(G::AbstractGrid,r::AbstractRange) = G.v[r]
-@inline Base.setindex!(G::AbstractGrid,x::AbstractVector,r::AbstractRange) = setindex!(G.v,x,r)
+@inline Base.getindex(G::AbstractGrid,r::AbstractRange) = G.data[r]
+@inline Base.setindex!(G::AbstractGrid,x::AbstractVector,r::AbstractRange) = setindex!(G.data,x,r)
 
 
 # List all the methods required to be implemented for any Grid types here
@@ -67,7 +67,7 @@ Base.zeros(::Type{G},n::Integer) where {G<:AbstractGrid{T}} where T =
 # use Float64 if not provided
 Base.zeros(::Type{G},n::Integer) where {G<:AbstractGrid} = zeros(G{Float64},n)
 # zero element of an AbstractGrid instance G by packing a zero(::Vector) into G
-Base.zero(g::G) where {G<:AbstractGrid} = G(zero(g.v))
+Base.zero(g::G) where {G<:AbstractGrid} = G(zero(g.data))
 
 get_truncation(grid::G) where {G<:AbstractGrid} = get_truncation(G,get_nresolution(grid))
 get_nlat_half(::G,n::Integer) where {G<:AbstractGrid} = get_nlat_half(G,n) 
