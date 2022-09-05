@@ -88,6 +88,7 @@ end
         for Grid in (   FullGaussianGrid,
                         FullClenshawGrid,
                         OctahedralGaussianGrid,
+                        OctahedralClenshawGrid,
                         HEALPixGrid)
 
             p,d,m = initialize_speedy(NF;Grid)

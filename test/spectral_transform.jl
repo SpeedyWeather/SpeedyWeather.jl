@@ -22,6 +22,7 @@ spectral_resolutions = (31,63,127)
             for Grid in (   FullGaussianGrid,
                             FullClenshawGrid,
                             OctahedralGaussianGrid,
+                            OctahedralClenshawGrid,
                             HEALPixGrid)
 
                 p,d,m = initialize_speedy(NF;trunc,Grid)
@@ -64,7 +65,8 @@ end
         for NF in (Float32,Float64)
             for Grid in (   FullGaussianGrid,
                             FullClenshawGrid,
-                            OctahedralGaussianGrid,)
+                            OctahedralGaussianGrid,
+                            OctahedralClenshawGrid)
                             # HEALPixGrid)
                 P = Parameters(;NF,trunc,Grid)
                 S = SpectralTransform(P)
@@ -92,12 +94,13 @@ end
 
     # Test for variable resolution
     @testset for trunc in [31,42]
-        @testset for NF in (Float64,Float32)
-            @testset for Grid in (  FullGaussianGrid,
-                                    FullClenshawGrid,
-                                    OctahedralGaussianGrid,)
-                                    # HEALPixGrid)
-                                    
+        for NF in (Float64,Float32)
+            for Grid in (   FullGaussianGrid,
+                            FullClenshawGrid,
+                            OctahedralGaussianGrid,
+                            OctahedralClenshawGrid,)
+                            # HEALPixGrid)
+                            
                 P = Parameters(;NF,trunc,model=:shallowwater)
                 S = SpectralTransform(P)
                 B = Boundaries(P,S)
