@@ -337,23 +337,18 @@ HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid(data,nside_healpix(le
 truncation_order(::Type{<:HEALPixGrid}) = 1                 # linear (in longitude)
 get_truncation(::Type{<:HEALPixGrid},nside::Integer) = nside_assert(nside) ? 2nside-1 : nothing
 get_resolution(::Type{<:HEALPixGrid},trunc::Integer) = roundup_fft(ceil(Int,(trunc+1)/2),small_primes=[2])
-
 get_colat(G::Type{<:HEALPixGrid},nside::Integer) =
             [acos(Healpix.ring2z(Healpix.Resolution(nside),j)) for j in 1:nlat_healpix(nside)]
 # get_lon() is already implemented for AbstractHEALPixGrid
 # get_colatlons() is already implemented for AbstractHEALPixGrid
 # each_index_in_ring() is already implemented for AbstractHEALPixGrid
-# HEALPix's solid angle is always 4π/npoints
-get_quadrature_weights(G::Type{<:HEALPixGrid},nside::Integer) = 4π/get_npoints(G,nside)*ones(get_nlat_half(G,nside))
 
 # define for all grids that the type T can be infered from the elements in data vector
 # whether the resolution parameter n is provided or not (hence the ...)
 (Grid::Type{<:AbstractGrid})(data::AbstractVector,n::Integer...) = Grid{eltype(data)}(data,n...)
 
-# convert an AbstractMatrix to the full grids
-FullClenshawGrid(M::AbstractMatrix{T}) where T = FullClenshawGrid{T}(vec(M))
-FullGaussianGrid(M::AbstractMatrix{T}) where T = FullGaussianGrid{T}(vec(M))
-# and vice versa
+# convert an AbstractMatrix to the full grids, and vice versa
+(Grid::Type{<:AbstractFullGrid})(M::AbstractMatrix{T}) where T = Grid{T}(vec(M))
 Base.Matrix(G::AbstractFullGrid{T}) where T = Matrix{T}(reshape(G.data,:,2G.nlat_half - nlat_odd(G)))
 
 # QUADRATURE WEIGHTS
