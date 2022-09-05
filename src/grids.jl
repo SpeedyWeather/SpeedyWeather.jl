@@ -348,14 +348,7 @@ get_quadrature_weights(G::Type{<:HEALPixGrid},nside::Integer) = 4π/get_npoints(
 
 # define for all grids that the type T can be infered from the elements in data vector
 # whether the resolution parameter n is provided or not (hence the ...)
-supported_grids=(:FullClenshawGrid,
-                 :FullGaussianGrid,
-                 :OctahedralGaussianGrid,
-                 :OctahedralClenshawGrid,
-                 :HEALPixGrid)
-for G in supported_grids
-    eval(:($G(data::AbstractVector,n::Integer...) = $G{eltype(data)}(data,n...)))
-end
+(Grid::Type{<:AbstractGrid})(data::AbstractVector,n::Integer...) = Grid{eltype(data)}(data,n...)
 
 # convert an AbstractMatrix to the full grids
 FullClenshawGrid(M::AbstractMatrix{T}) where T = FullClenshawGrid{T}(vec(M))
