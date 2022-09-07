@@ -46,10 +46,9 @@ The default values of the keywords define the default model setup.
     # of the nlev vertical levels, defined by a generalised logistic function,
     # interpolating ECMWF's L31 configuration
     GLcoefs::GenLogisticCoefs = GenLogisticCoefs{NF}()
-    n_stratosphere_levels::Int=2                                        # number of vertical levels used for the stratosphere
-    initialize_σ_manually::Bool=false                                   # initialize the σ vertical levels manually by providing a σ_levels_half 
-    σ_levels_half::Vector{Real}=Vector{Real}()                          # vector of σ half levels, only if set manually
-    nlev::Int=nlev_default(model, initialize_σ_manually, σ_levels_half) # number of vertical levels 
+    n_stratosphere_levels::Int=2                    # number of vertical levels used for the stratosphere
+    σ_levels_half::Vector{Real}=Vector{Real}()      # vector of σ half levels, only if set manually, otherwise an empty vector
+    nlev::Int=nlev_default(model, σ_levels_half)    # number of vertical levels 
 
     # DIFFUSION AND DRAG
     diffusion_power::Real=4                 # Power n of Laplacian in horizontal diffusion ∇²ⁿ
@@ -115,12 +114,12 @@ The default values of the keywords define the default model setup.
     restart_id::Integer=1           # run_id of restart file in run????/restart.jld2
 end
 
-function nlev_default(model::Symbol, initialize_σ_manually::Bool, σ_half::Vector{T}) where T<:Real
-    if !(initialize_σ_manually)
+function nlev_default(model::Symbol, σ_levels_half::Vector{T}) where T<:Real
+    if length(σ_levels_half) == 0   # choose nlev automatically 
         model == :barotropic && return 1
         model == :shallowwater && return 1
         model == :primitive && return 8
-    else 
-        return length(σ_half) - 1
+    else                            # use manually set levels 
+        return length(σ_levels_half) - 1
     end
 end
