@@ -178,15 +178,17 @@ The first half level is at 0 the last at 1. Evaluate a generalised logistic func
 coefficients in `P` for the distribution of values in between. Default coefficients follow
 the L31 configuration historically used at ECMWF."""
 function vertical_coordinates(P::Parameters)
-    @unpack nlev,GLcoefs = P
+    @unpack nlev,GLcoefs,initialize_σ_manually,σ_levels_half = P
 
-    halflevels_normalised = range(0,1,nlev+1)   # normalised = level/nlev
-    σ_levels_half = generalised_logistic(halflevels_normalised,GLcoefs)
-    σ_levels_half[1] = 0           # topmost half-level is at 0 pressure
-    σ_levels_half[end] = 1         # lowermost half-level is at p=p_surface
+    if !initialize_σ_manually 
+        halflevels_normalised = range(0,1,nlev+1)   # normalised = level/nlev
+        σ_levels_half = generalised_logistic(halflevels_normalised,GLcoefs)
+        σ_levels_half[1] = 0           # topmost half-level is at 0 pressure
+        σ_levels_half[end] = 1         # lowermost half-level is at p=p_surface
+    end
 
     @assert isincreasing(σ_levels_half) "Vertical coordinates are not increasing."
-    return σ_levels_half
+    return σ_levels_half 
 end
 
 """Generalised logistic function based on the coefficients in `coefs`."""
