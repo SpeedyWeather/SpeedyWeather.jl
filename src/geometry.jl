@@ -188,7 +188,7 @@ function vertical_coordinates(P::Parameters)
     end
 
     @assert isincreasing(σ_levels_half) "Vertical coordinates are not increasing."
-    return σ_levels_half 
+    return σ_levels_half
 end
 
 """Generalised logistic function based on the coefficients in `coefs`."""
