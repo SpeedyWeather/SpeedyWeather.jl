@@ -48,7 +48,7 @@ The default values of the keywords define the default model setup.
     GLcoefs::GenLogisticCoefs = GenLogisticCoefs{NF}()
     n_stratosphere_levels::Int=2                                        # number of vertical levels used for the stratosphere
     initialize_σ_manually::Bool=false                                   # initialize the σ vertical levels manually by providing a σ_levels_half 
-    σ_levels_half::Vector{Real}=Vector{Real}()                          # vector of σ half levels 
+    σ_levels_half::Vector{Real}=Vector{Real}()                          # vector of σ half levels, only if set manually
     nlev::Int=nlev_default(model, initialize_σ_manually, σ_levels_half) # number of vertical levels 
 
     # DIFFUSION AND DRAG
