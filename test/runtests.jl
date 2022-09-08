@@ -17,6 +17,9 @@ include("spectral_gradients.jl")
 include("diffusion.jl")
 include("time_stepping.jl")
 
+# VERTICAL LEVELS
+include("vertical_levels.jl")
+
 # PHYSICS
 include("column_variables.jl")
 include("thermodynamics.jl")
