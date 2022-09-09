@@ -224,7 +224,7 @@ Options:
     - `inverse=true` computes ∇⁻²(alms) instead
 
 Default is `add=false`, `flipsign=false`, `inverse=false`. These options can be combined."""
-function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: Laplacian of alms
+function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: (inverse) Laplacian of alms
                 alms::LowerTriangularMatrix{Complex{NF}},   # Input: spectral coefficients
                 S::SpectralTransform{NF};                   # precomputed eigenvalues
                 add::Bool=false,                            # add to output array or overwrite
@@ -232,25 +232,16 @@ function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: Lapl
                 inverse::Bool=false,                        # ∇⁻² or ∇²
                 ) where {NF<:AbstractFloat}
 
-    @inline kernel(o,a,b) = inverse ?   (flipsign ? (add ? (o - a/b) : -a/b)  :
-                                                    (add ? (o + a/b) :  a/b)) :
-                                        (flipsign ? (add ? (o - a*b) : -a*b)  :
-                                                    (add ? (o + a*b) :  a*b))
-              
-    return _∇²!(kernel,∇²alms,alms,S)
-end
-
-function _∇²!(  kernel,
-                ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: (inverse) Laplacian of alms
-                alms::LowerTriangularMatrix{Complex{NF}},   # Input: spectral coefficients
-                S::SpectralTransform{NF},                   # precomputed eigenvalues
-                ) where {NF<:AbstractFloat}
-
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
     lmax,mmax = size(alms) .- (2,1)     # degree l, order m of the Legendre polynomials
     
     @unpack eigenvalues = S
     @boundscheck length(eigenvalues) >= lmax+1 || throw(BoundsError)
+
+    @inline kernel(o,a,b) = inverse ?   (flipsign ? (add ? (o - a/b) : -a/b)  :
+                                                    (add ? (o + a/b) :  a/b)) :
+                                        (flipsign ? (add ? (o - a*b) : -a*b)  :
+                                                    (add ? (o + a*b) :  a*b))
 
     lm = 0
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
