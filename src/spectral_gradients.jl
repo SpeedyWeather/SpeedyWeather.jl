@@ -206,62 +206,44 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
     end
 end
 
-# In-place update of spectral coeffs alms with their (inverse) Laplace operator-ed version 
-# ∇⁻²!(alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigenvalues⁻¹
-# ∇²!( alms::AbstractMatrix{Complex{NF}},S::SpectralTransform{NF}) where NF = alms .* S.eigenvalues
-
-# """
-#     ∇⁻²!(   ∇⁻²alms::AbstractMatrix{Complex},
-#             alms::AbstractMatrix{Complex},
-#             S::SpectralTransform)
-
-# Inverse Laplace operator ∇⁻² applied to the spectral coefficients `alms` in spherical
-# coordinates. The radius `R` is omitted in the eigenvalues which are precomputed in `S`.
-# ∇⁻²! is the in-place version which directly stores the output in the first argument `∇⁻²alms`.
-# The integration constant for Legendre polynomial `l=m=0` is zero. The inverse spherical
-# Laplace operator is generally
-
-#     ∇⁻²alms = alms*R²/(-l(l+1))
-
-# with the degree `l` (0-based) of the Legendre polynomial."""
-# function ∇⁻²!(  ∇⁻²alms::AbstractMatrix{Complex{NF}},   # Output: inverse Laplacian of alms
-#                 alms::AbstractMatrix{Complex{NF}},      # spectral coefficients
-#                 S::SpectralTransform{NF}                # precomputed arrays for spectral space
-#                 ) where {NF<:AbstractFloat}
-
-#     @boundscheck size(alms) == size(∇⁻²alms) || throw(BoundsError)
-#     lmax,mmax = size(alms) .- 1     # degree l, order m of the Legendre polynomials
-    
-#     @unpack eigenvalues⁻¹ = S
-#     @boundscheck length(eigenvalues⁻¹) >= lmax+1 || throw(BoundsError)
-
-#     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
-#         for l in m:lmax+1           # degree l = m:lmax but 1-based
-#             ∇⁻²alms[l,m] = alms[l,m]*eigenvalues⁻¹[l]
-#         end
-#     end
-
-#     return ∇⁻²alms
-# end
-
 """
-    ∇²!(    ∇⁻²alms::LowerTriangularMatrix,
+    ∇²!(    ∇²alms::LowerTriangularMatrix,
             alms::LowerTriangularMatrix,
-            S::SpectralTransform)
+            S::SpectralTransform;
+            add::Bool=false,
+            flipsign::Bool=false,
+            inverse::Bool=false)
 
 Laplace operator ∇² applied to the spectral coefficients `alms` in spherical
 coordinates. The radius `R` is omitted in the eigenvalues which are precomputed in `S`.
 ∇²! is the in-place version which directly stores the output in the first argument `∇²alms`.
-The spherical Laplace operator is generally
 
-    ∇⁻²alms = alms*(-l(l+1))/R²
+Options:
+    - `add=true` adds the ∇²(alms) to the output
+    - `flipsign=true` computes -∇²(alms) instead
+    - `inverse=true` computes ∇⁻²(alms) instead
 
-with the degree `l` (0-based) of the Legendre polynomial."""
+Default is `add=false`, `flipsign=false`, `inverse=false`. These options can be combined."""
 function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: Laplacian of alms
                 alms::LowerTriangularMatrix{Complex{NF}},   # Input: spectral coefficients
                 S::SpectralTransform{NF};                   # precomputed eigenvalues
                 add::Bool=false,                            # add to output array or overwrite
                 flipsign::Bool=false,                       # -∇² or ∇²
+                inverse::Bool=false,                        # ∇⁻² or ∇²
+                ) where {NF<:AbstractFloat}
+
+    @inline kernel(o,a,b) = inverse ?   (flipsign ? (add ? (o - a/b) : -a/b)  :
+                                                    (add ? (o + a/b) :  a/b)) :
+                                        (flipsign ? (add ? (o - a*b) : -a*b)  :
+                                                    (add ? (o + a*b) :  a*b))
+              
+    return _∇²!(kernel,∇²alms,alms,S)
+end
+
+function _∇²!(  kernel,
+                ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: (inverse) Laplacian of alms
+                alms::LowerTriangularMatrix{Complex{NF}},   # Input: spectral coefficients
+                S::SpectralTransform{NF},                   # precomputed eigenvalues
                 ) where {NF<:AbstractFloat}
 
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
@@ -270,14 +252,11 @@ function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: Lapl
     @unpack eigenvalues = S
     @boundscheck length(eigenvalues) >= lmax+1 || throw(BoundsError)
 
-    kernel(o,a) = flipsign ? (add ? (o-a) : -a) :
-                             (add ? (o+a) :  a)    
-
     lm = 0
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
         for l in m:lmax+1           # degree l = m:lmax but 1-based
             lm += 1
-            ∇²alms[lm] = kernel(∇²alms[lm],alms[lm]*eigenvalues[l])
+            ∇²alms[lm] = kernel(∇²alms[lm],alms[lm],eigenvalues[l])
         end
         lm += 1
     end
