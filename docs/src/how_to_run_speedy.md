@@ -59,7 +59,7 @@ developed this is by no means complete.
 
 | parameter keyword | default value | meaning   |
 | ----------------- | ------------- | --------- |
-| `Δt_at_T85::Real` | `20`          | Time step in minutes for T85, scale linearly for specified `trunc` |
+| `Δt_at_T31::Real` | `60`          | Time step in minutes for T31, scale linearly for specified `trunc` |
 | `n_days::Real`    | `10`          | Number of days to integrate for |
 | `robert_filter::Real` | `0.05`    | Robert (1966) time filter coefficeint to suppress computational mode |
 | `williams_filter::Real` | `0.53`  | William's time filter (Amezcua 2011) coefficient for 3rd order acc |
@@ -80,7 +80,7 @@ developed this is by no means complete.
 | `output::Bool`    | `false`       | Store data in netCDF? |
 | `output_dt::Real` | `6`           | Output time step [``hrs``] |
 | `output_startdate::DateTime` |  `DateTime(2000,1,1)` | Start date of the time axis (default: Jan 1, 2000) |
-| `out_path::String`| `pwd()`       | Path to output folder (default is current directory) |
+| `output_path::String`| `pwd()`       | Path to output folder (default is current directory) |
 
 
 ## The `run_speedy` interface

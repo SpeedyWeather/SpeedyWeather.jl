@@ -55,13 +55,13 @@ function Constants(P::Parameters)
 
     # TIME INTEGRATION CONSTANTS
     @unpack robert_filter, williams_filter = P
-    @unpack trunc, Δt_at_T85, n_days, output_dt = P
+    @unpack trunc, Δt_at_T31, n_days, output_dt = P
 
     # PARAMETRIZATION CONSTANTS
     @unpack RH_thresh_pbl_lsc, RH_thresh_range_lsc, RH_thresh_max_lsc, humid_relax_time_lsc = P  # Large-scale condensation
     @unpack pres_thresh_cnv, RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv, max_entrainment, ratio_secondary_mass_flux = P  # Convection
 
-    Δt_min_at_trunc = Δt_at_T85*(85/trunc)      # scale time step Δt to specified resolution
+    Δt_min_at_trunc = Δt_at_T31*(31/trunc)      # scale time step Δt to specified resolution
     Δt      = round(Δt_min_at_trunc*60)         # convert time step Δt from minutes to whole seconds
     Δt_sec  = convert(Int,Δt)                   # encode time step Δt [s] as integer
     Δt_hrs  = Δt/3600                           # convert time step Δt from minutes to hours
