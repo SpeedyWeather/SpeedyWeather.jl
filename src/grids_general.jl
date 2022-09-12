@@ -76,6 +76,7 @@ nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))
 get_nlat_half(::Type{<:AbstractGrid},nlat_half::Integer) = nlat_half
 get_nlat(Grid::Type{<:AbstractGrid},n::Integer) = 2get_nlat_half(Grid,n) - nlat_odd(Grid)
 get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,get_nresolution(grid))
+get_npoints(grid::Grid) where {Grid<:AbstractGrid} = get_npoints(Grid,get_nresolution(grid))
 
 function each_index_in_ring(grid::G,j::Integer) where {G<:AbstractGrid}
     return each_index_in_ring(G,j,get_nresolution(grid))

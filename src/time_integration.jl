@@ -266,15 +266,14 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
                         )
     
     @unpack n_timesteps, Δt, Δt_sec = M.constants
-    @unpack output = M.parameters
     
     # propagate spectral state to grid variables for initial condition output
     lf = 1                              # use first leapfrog index
     gridded!(diagn,progn,lf,M)
 
-    # FEEDBACK, OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS
-    feedback = initialize_feedback(M)
-    netcdf_file = initialize_netcdf_output(progn,diagn,feedback,M)
+    # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
+    outputter = initialize_netcdf_output(progn,diagn,M)
+    feedback = initialize_feedback(outputter,M)
 
     # FIRST TIMESTEP: EULER FORWARD THEN LEAPFROG IN MAIN LOOP
     time_sec = first_timesteps!(progn,diagn,M,feedback)
@@ -286,10 +285,10 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
 
         # FEEDBACK AND OUTPUT
         progress!(feedback)             # updates the progress meter bar
-        write_netcdf_output!(netcdf_file,feedback,time_sec,progn,diagn,M)
+        write_netcdf_output!(outputter,feedback,time_sec,progn,diagn,M)
     end
 
-    write_restart_file(time_sec,progn,feedback,M)
+    write_restart_file(time_sec,progn,outputter,M)
     progress_finish!(feedback)          # finishes the progress meter bar
 
     return progn
