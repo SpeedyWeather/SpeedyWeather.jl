@@ -96,3 +96,26 @@ function Base.zeros(::Type{PrognosticVariables{NF}},
     pres = zeros(SurfaceLeapfrog{NF},_lmax,_mmax)                     # 2 leapfrog time steps for pres
     return PrognosticVariables(layers,pres,lmax,mmax,N_LEAPFROG,nlev)
 end
+
+
+# GPU methods
+function Adapt.adapt_structure(to, pvl::PrognosticVariablesLayer)
+    PrognosticVariablesLayer(Adapt.adapt(to, pvl.vor), 
+                             Adapt.adapt(to, pvl.div), 
+                             Adapt.adapt(to, pvl.temp),
+                             Adapt.adapt(to, pvl.humid))
+end
+
+function Adapt.adapt_structure(to, p_leap::PrognosticVariablesLeapfrog)
+    PrognosticVariablesLeapfrog(Adapt.adapt(to, p_leap.leapfrog))
+end
+
+function Adapt.adapt_structure(to, s_leap::SurfaceLeapfrog)
+    SurfaceLeapfrog(Adapt.adapt(to, s_leap.leapfrog))
+end
+
+function Adapt.adapt_structure(to , pv::PrognosticVariables)
+    PrognosticVariables(Adapt.adapt(to, pv.layers),
+                        Adapt.adapt(to, pv.pres)
+                        pv.lmax, pv.mmax, pv.n_leapfrog, nlev)
+end
