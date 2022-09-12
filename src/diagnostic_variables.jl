@@ -79,7 +79,7 @@ function Base.zeros(::Type{GridVariables},G::Geometry{NF}) where NF
 end
 
 # GPU methods for GridVariables
-function Adapt.adapt_structure(to, gv::GridVariables{NF}) where NF
+function Adapt.adapt_structure(to, gv::GridVariables)
     GridVariables(Adapt.adapt(to, gv.vor_grid),
                   Adapt.adapt(to, gv.div_grid),
                   Adapt.adapt(to, gv.temp_grid),
@@ -245,7 +245,10 @@ end
 
 # GPU methods for DiagnosticVariablesLayer
 function Adapt.adapt_structure(to, dvl::DiagnosticVariablesLayer)
-    DiagnosticVariablesLayer(dvl.tendencies, dvl.grid_variables, dvl.dynamics_variables, dvl.npoints)
+    DiagnosticVariablesLayer(Adapt.adapt(to, dvl.tendencies), 
+                             Adapt.adapt(to, dvl.grid_variables), 
+                             Adapt.adapt(to, dvl.dynamics_variables),
+                             dvl.npoints)
 end
 
 struct SurfaceVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
@@ -310,9 +313,10 @@ end
 DiagnosticVariables(G::Geometry{NF},S::SpectralTransform{NF}) where NF = zeros(DiagnosticVariables,G,S)
 
 # GPU methods for DiagnosticVariables
-function Adapt.adapt_structure(to, dv::DiagnosticVariables{NF}) where NF
+function Adapt.adapt_structure(to, dv::DiagnosticVariables)
     DiagnosticVariables(Adapt.adapt(to, dv.layers), 
-                        dv.surface, dv.nlev, dv.npoints)
+                        Adapt.adapt(to, dv.surface),
+                        dv.nlev, dv.npoints)
 end
 
 # LOOP OVER ALL GRID POINTS
