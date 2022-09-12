@@ -85,9 +85,9 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     nresolution = get_resolution(Grid,trunc)        # resolution parameter, nlat_half/nside for HEALPixGrid
     nlat_half = get_nlat_half(Grid,nresolution)     # contains equator for HEALPix
     nlat = 2nlat_half - nlat_odd(Grid)              # one less if grids have odd # of latitude rings
-    nlon_max = get_nlon(Grid,nresolution)           # number of longitudes around the equator
+    nlon_max = get_nlon_max(Grid,nresolution)       # number of longitudes around the equator
                                                     # number of longitudes per latitude ring (one hemisphere only)
-    nlons = [get_nlon_per_ring(Grid,nresolution,i) for i in 1:nlat_half]
+    nlons = [get_nlon_per_ring(Grid,nresolution,j) for j in 1:nlat_half]
     nfreq_max = nlon_max÷2 + 1                      # maximum number of fourier frequencies (real FFTs)
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
@@ -102,7 +102,6 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     
     # NORMALIZATION
     norm_sphere = 2sqrt(π)  # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
-    Δlons = 2π./nlons       # integration of longitude, i.e. dϕ, discretised, used to scale the quad weights
 
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
     _, lons = get_colatlons(Grid,nresolution)
@@ -200,12 +199,61 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
 end
 
 """
+    S2 = spectral_transform_for_full_grid(S::SpectralTransform)
+
+Create a spectral transform struct `S2` similar to the input `S`, but for the corresponding
+full grid of the grid in `S`. The FFT is replanned and lon_offsets are set to 1 (i.e. no rotation).
+Solid angles for the Legendre transform are recomputed, but all other arrays fields for S, S2
+point to the same place in memory, e.g. the Legendre polynomials aren't recomputed or stored twice."""
+function spectral_transform_for_full_grid(S::SpectralTransform{NF}) where NF
+
+    FullGrid = full_grid(S.Grid)    # corresponding full grid
+    
+    # unpack everything that does not have to be recomputed for the full grid
+    @unpack nresolution, order, lmax, mmax, nfreq_max, nlon_max, nlat, nlat_half = S
+    @unpack colat, cos_colat, sin_colat, norm_sphere, recompute_legendre, Λ, Λs = S
+    @unpack ϵlms, grad_x, grad_y1, grad_y2, grad_y_vordiv1, grad_y_vordiv2 = S
+    @unpack vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2, eigenvalues, eigenvalues⁻¹ = S
+
+    # recalculate what changes on the full grid: FFT and offsets (always 1)
+    nlons = [get_nlon_per_ring(FullGrid,nresolution,j) for j in 1:nlat_half]
+    FFT_package = NF <: Union{Float32,Float64} ? FFTW : GenericFFT
+    rfft_plans = [FFT_package.plan_rfft(zeros(NF,nlon)) for nlon in nlons]
+    brfft_plans = [FFT_package.plan_brfft(zeros(Complex{NF},nlon÷2 + 1),nlon) for nlon in nlons]
+    
+    lon_offsets = copy(S.lon_offsets)
+    fill!(lon_offsets,1)            # =*1, i.e. no longitude offset rotation on full grid
+
+    solid_angles = get_solid_angles(FullGrid,nresolution)
+
+    return SpectralTransform{NF}(   FullGrid,nresolution,order,
+                                    lmax,mmax,nfreq_max,
+                                    nlon_max,nlons,nlat,nlat_half,
+                                    colat,cos_colat,sin_colat,lon_offsets,
+                                    norm_sphere,
+                                    rfft_plans,brfft_plans,
+                                    recompute_legendre,Λ,Λs,solid_angles,
+                                    ϵlms,grad_x,grad_y1,grad_y2,
+                                    grad_y_vordiv1,grad_y_vordiv2,vordiv_to_uv_x,
+                                    vordiv_to_uv1,vordiv_to_uv2,
+                                    eigenvalues,eigenvalues⁻¹)
+end
+
+"""
     S = SpectralTransform(P::Parameters)
 
 Generator function for a SpectralTransform struct pulling in parameters from a Parameters struct."""
 function SpectralTransform(P::Parameters)
     @unpack NF, Grid, trunc, recompute_legendre = P
     return SpectralTransform(NF,Grid,trunc,recompute_legendre)
+end
+
+"""
+    S = SpectralTransform()
+
+As-empty-as-possible constructor for an instance of SpectralTransform."""
+function SpectralTransform()
+    return SpectralTransform(Float64,FullGaussianGrid,0,true)
 end
 
 """
@@ -291,7 +339,8 @@ are identical. The spectral transform is grid-flexible as long as the `typeof(ma
 Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`."""
 function gridded!(  map::AbstractGrid{NF},                      # gridded output
                     alms::LowerTriangularMatrix{Complex{NF}},   # spectral coefficients input
-                    S::SpectralTransform{NF}                    # precomputed parameters struct
+                    S::SpectralTransform{NF};                   # precomputed parameters struct
+                    unscale_coslat::Bool=false                  # unscale with cos(lat) on the fly?
                     ) where {NF<:AbstractFloat}                 # number format NF
 
     @unpack nlat, nlons, nlat_half, nfreq_max, order = S
@@ -360,6 +409,12 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
             gs[m] = muladd(acc_s,o,gs[m])       # and southern hemisphere
 
             lm = lm_end + 1                     # first index of next m column
+        end
+
+        if unscale_coslat
+            @inbounds cosθ = sin_colat[j_north] # sin(colat) = cos(lat)
+            gn ./= cosθ                         # scale in place          
+            gs ./= cosθ
         end
 
         # INVERSE FOURIER TRANSFORM in zonal direction
