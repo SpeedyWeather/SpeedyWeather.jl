@@ -116,6 +116,6 @@ end
 
 function Adapt.adapt_structure(to , pv::PrognosticVariables)
     PrognosticVariables(Adapt.adapt(to, pv.layers),
-                        Adapt.adapt(to, pv.pres)
+                        Adapt.adapt(to, pv.pres),
                         pv.lmax, pv.mmax, pv.n_leapfrog, nlev)
 end
