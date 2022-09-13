@@ -10,8 +10,17 @@ get_nresolution(grid::AbstractFullGrid) = grid.nlat_half
 get_nlon(G::Type{<:AbstractFullGrid},nlat_half::Integer) = get_nlon_max(G,nlat_half)
 get_nlon_max(::Type{<:AbstractFullGrid},nlat_half::Integer) = 4nlat_half
 get_nlon_per_ring(G::Type{<:AbstractFullGrid},nlat_half::Integer,j::Integer) = get_nlon_max(G,nlat_half)
-get_lon(Grid::Type{<:AbstractFullGrid},nlat_half::Integer) = 
-            collect(range(0,2π,step=2π/get_nlon(Grid,nlat_half))[1:end-1])
+
+function get_lon(Grid::Type{<:AbstractFullGrid},nlat_half::Integer)
+    nlon = get_nlon(Grid,nlat_half)
+    return collect(range(0,2π-π/nlon,step=2π/nlon))
+end
+
+function get_lond(Grid::Type{<:AbstractFullGrid},nlat_half::Integer)
+    lon = get_lon(Grid,nlat_half)
+    lon .*= 360/2π     # convert to lond in-place
+    return lon
+end
 
 # convert an AbstractMatrix to the full grids, and vice versa
 (Grid::Type{<:AbstractFullGrid})(M::AbstractMatrix{T}) where T = Grid{T}(vec(M))
@@ -67,7 +76,8 @@ function get_nlon_per_ring(Grid::Type{<:AbstractOctahedralGrid},nlat_half::Integ
     return nlon_octahedral(j)
 end
 
-get_lon(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = Float64[]    # only defined for full grids
+# return the longitude vector for the full grid equivalent
+get_lon(G::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = get_lon(full_grid(G),nlat_half)
 
 function get_colatlons(Grid::Type{<:AbstractOctahedralGrid},nlat_half::Integer)
     
@@ -308,7 +318,8 @@ struct OctahedralClenshawGrid{T} <: AbstractOctahedralGrid{T}
 end
 
 # infer nside from data vector length, infer parametric type from eltype of data
-OctahedralClenshawGrid{T}(data::AbstractVector) where T = OctahedralClenshawGrid{T}(data,nlat_half_octahedral(length(data),true))
+OctahedralClenshawGrid{T}(data::AbstractVector) where T = OctahedralClenshawGrid{T}(data,
+                                                        nlat_half_octahedral(length(data),true))
 OctahedralClenshawGrid(data::AbstractVector,n::Integer...) = OctahedralClenshawGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:OctahedralClenshawGrid}) = 3      # cubic
