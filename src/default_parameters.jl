@@ -115,7 +115,7 @@ The default values of the keywords define the default model setup.
 
     # OUTPUT GRID
     output_NF::DataType = NF        # number format used for output
-    missing_value::Real = -999999   # missing value to be used in netcdf output
+    missing_value::Real = NaN       # missing value to be used in netcdf output
     output_grid::Symbol=:full       # :full, pick the corresponding full grid for reduced grids
                                     # or :matrix, sort gridpoints into a matrix
     output_quadrant_rotation::NTuple{4,Integer}=(0,1,2,3)
