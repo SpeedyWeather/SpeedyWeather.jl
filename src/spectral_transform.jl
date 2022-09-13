@@ -344,7 +344,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
                     ) where {NF<:AbstractFloat}                 # number format NF
 
     @unpack nlat, nlons, nlat_half, nfreq_max, order = S
-    @unpack cos_colat, lon_offsets = S
+    @unpack cos_colat, sin_colat, lon_offsets = S
     @unpack recompute_legendre, Λ, Λs = S
     @unpack brfft_plans = S
 
