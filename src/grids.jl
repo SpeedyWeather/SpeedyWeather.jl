@@ -26,6 +26,7 @@ end
 (Grid::Type{<:AbstractFullGrid})(M::AbstractMatrix{T}) where T = Grid{T}(vec(M))
 Base.Matrix(G::AbstractFullGrid{T}) where T = Matrix{T}(reshape(G.data,:,2G.nlat_half - nlat_odd(G)))
 matrix_size(G::AbstractFullGrid) = (get_nlon_max(G),get_nlat(G))
+matrix_size(G::Type{<:AbstractFullGrid},n::Integer) = (get_nlon_max(G,n),get_nlat(G,n))
 
 function get_colatlons(Grid::Type{<:AbstractFullGrid},nlat_half::Integer)
 
@@ -365,8 +366,8 @@ All matrices and grids have to be of the same size respectively."""
 function Matrix!(   MGs::Tuple{AbstractMatrix{T},OctahedralClenshawGrid}...;
                     quadrant_rotation::NTuple{4,Integer}=(0,1,2,3),     # = 0˚, 90˚, 180˚, 270˚ anti-clockwise
                     matrix_quadrant::NTuple{4,Tuple{Integer,Integer}}=((2,2),(1,2),(1,1),(2,1)),
-                    unscale_coslat::Bool=false,                         # also divide by cos(latitude)
                     ) where T
+                    
     ntuples = length(MGs)
 
     # check that the first (matrix,grid) tuple has corresponding sizes
