@@ -236,3 +236,52 @@ end
         end
     end
 end
+
+@testset "(Inverse) Laplace operator" begin
+
+    for NF in (Float32,Float64)
+        alms = LowerTriangularMatrix(randn(Complex{NF},33,32))
+        alms2 = copy(alms)
+        alms3 = copy(alms)
+
+        S = SpectralTransform(alms,recompute_legendre=false)
+
+        # ∇⁻²! same as inverse=true
+        SpeedyWeather.∇²!(alms2,alms,S,inverse=true);
+        SpeedyWeather.∇⁻²!(alms3,alms,S);
+        @test alms2 == alms3
+
+        # test add=true
+        fill!(alms2,0)
+        SpeedyWeather.∇²!(alms2,alms,S,add=true);
+        SpeedyWeather.∇²!(alms3,alms,S);
+        @test alms2 == alms3
+
+        # also for inverse
+        fill!(alms2,0)
+        SpeedyWeather.∇⁻²!(alms2,alms,S,add=true);
+        SpeedyWeather.∇⁻²!(alms3,alms,S);
+        @test alms2 == alms3
+
+        # test flipsign
+        SpeedyWeather.∇²!(alms2,alms,S,flipsign=true);
+        SpeedyWeather.∇²!(alms3,alms,S);
+        @test alms2 == -alms3
+
+        # also for inverse
+        SpeedyWeather.∇⁻²!(alms2,alms,S,flipsign=true);
+        SpeedyWeather.∇⁻²!(alms3,alms,S);
+        @test alms2 == -alms3
+
+        # test ∇²(∇⁻²) = 1
+        alms[1] = 0     # remove 0-mode which is set to zero
+        SpeedyWeather.∇²!(alms2,alms,S);
+        SpeedyWeather.∇⁻²!(alms3,alms2,S);
+        @test alms ≈ alms3
+
+        # and ∇⁻²(∇²) = 1
+        SpeedyWeather.∇⁻²!(alms2,alms,S);
+        SpeedyWeather.∇²!(alms3,alms2,S);
+        @test alms ≈ alms3
+    end
+end
