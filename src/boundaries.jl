@@ -34,7 +34,7 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
     if P.model == :barotropic   # no boundary data needed with the barotropic model
         
         orography           = zeros(Grid{NF},0)               # create dummy arrays
-        η⁰                  = zeros(LowerTriangularMatrix,0,0)
+        η⁰                  = zeros(LowerTriangularMatrix{NF},0,0)
         # geopot_surf         = zeros(complex(P.NF),1,1)  
         # geopot_surf_grid    = zeros(P.NF,1,1)
 
@@ -51,7 +51,7 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
         orography = gridded(orography_spec,S)
 
         η⁰ = zeros(LowerTriangularMatrix{NF},lmax+2,mmax+1)
-        η⁰[3] = -500
+        η⁰[3] = -P.interface_relax_amplitude
         
         # geopot_surf         = zeros(complex(P.NF),1,1)  
         # geopot_surf_grid    = zeros(P.NF,1,1)

@@ -60,6 +60,7 @@ The default values of the keywords define the default model setup.
     # FORCING
     interface_relaxation::Bool = false      # turn on interface relaxation for shallow water?
     interface_relax_time::Real = 12         # time scale [hrs] of interface relaxation
+    interface_relax_amplitude::Real = 500   # Amplitude [m] of interface relaxation
 
     # PARAMETRIZATIONS
     seasonal_cycle::Bool = true             # Seasonal cycle?
