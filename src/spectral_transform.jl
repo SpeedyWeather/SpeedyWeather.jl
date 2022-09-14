@@ -183,7 +183,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     eigenvalues = [-l*(l+1) for l in 0:lmax+1]
     eigenvalues⁻¹ = inv.(eigenvalues)
     eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
-        
+
     # conversion to NF happens here
     SpectralTransform{NF}(  Grid,nresolution,order,
                             lmax,mmax,nfreq_max,
