@@ -432,6 +432,24 @@ function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
     divergence!(pres_tend,uh_coslat⁻¹,vh_coslat⁻¹,S,flipsign=true)
 end
 
+function interface_relaxation!( η::LowerTriangularMatrix{Complex{NF}},
+                                surface::SurfaceVariables{NF},
+                                τ::NF,                  # time scale of relaxation
+                                B::Boundaries{NF},      # contains η⁰, which η is relaxed to
+                                ) where NF    
+
+    @unpack pres_tend = surface
+    @unpack η⁰ = B
+
+    τ⁻¹ = inv(τ)
+    @inbounds for lm in eachharmonic(η,η⁰,pres_tend)
+        if ~iszero(η⁰[lm])
+            pres_tend[lm] += τ⁻¹*(η⁰[lm]-η[lm])
+        end
+    end
+end
+
+
 """
     gridded!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
                 progn::PrognosticVariables{NF}, # all prognostic variables

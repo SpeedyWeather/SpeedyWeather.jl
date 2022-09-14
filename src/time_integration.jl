@@ -211,9 +211,10 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     diagn_layer = diagn.layers[1]
     diagn_surface = diagn.surface
     @unpack pres = progn
+    pres_lf = pres.leapfrog[lf2]
 
-    get_tendencies!(diagn_layer,diagn_surface,M)        # tendency of vorticity, divergence, pressure
-    implicit_correction!(diagn_layer,progn_layer,diagn_surface,pres,M)     # correct divergence
+    get_tendencies!(pres_lf,diagn_layer,diagn_surface,M)   # tendency of vor, div, pres
+    implicit_correction!(diagn_layer,progn_layer,diagn_surface,pres,M)      # correct divergence
     horizontal_diffusion!(progn_layer,diagn_layer,M)    # diffusion for vorticity and divergence
     leapfrog!(progn_layer,diagn_layer,dt,lf1,M)         # leapfrog vorticity forward
     gridded!(diagn_layer,progn_layer,lf2,M)             # propagate spectral state to grid

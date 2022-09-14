@@ -32,7 +32,8 @@ function get_tendencies!(   diagn::DiagnosticVariablesLayer,
     vorticity_flux_divergence!(diagn,G,S)         # = -∇⋅(u(ζ+f),v(ζ+f))
 end
 
-function get_tendencies!(   diagn::DiagnosticVariablesLayer,
+function get_tendencies!(   pres::LowerTriangularMatrix,
+                            diagn::DiagnosticVariablesLayer,
                             surface::SurfaceVariables,
                             M::ShallowWaterModel,           # struct containing all constants
                             )
@@ -42,9 +43,14 @@ function get_tendencies!(   diagn::DiagnosticVariablesLayer,
 
     # for compatibility with other ModelSetups pressure pres = interface displacement η here
     vorticity_flux_divergence!(diagn,G,S)           # = -∇⋅(u(ζ+f),v(ζ+f)), tendency for vorticity
-    vorticity_flux_curl!(diagn,S)                 # =  ∇×(u(ζ+f),v(ζ+f)), tendency for divergence
+    vorticity_flux_curl!(diagn,S)                   # =  ∇×(u(ζ+f),v(ζ+f)), tendency for divergence
     bernoulli_potential!(diagn,surface,G,S,g)       # = -∇²(E+gη), tendency for divergence
     volume_flux_divergence!(diagn,surface,G,S,B,H₀) # = -∇⋅(uh,vh), tendency pressure
+
+    # interface forcing
+    @unpack interface_relaxation = M.parameters
+    τ = M.constants.interface_relax_time
+    interface_relaxation && interface_relaxation!(pres,surface,τ,B)        # = + 1/τ(η⁰-η)
 end
 
 

@@ -25,7 +25,10 @@ Struct holding the parameters needed at runtime in number format NF.
     n_outputsteps::Int          # total number of output time steps
 
     # DIFFUSION AND DRAG
-    drag_strat::NF               # drag [1/s] for zonal wind in the stratosphere
+    drag_strat::NF              # drag [1/s] for zonal wind in the stratosphere
+
+    # INTERFACE FORCING
+    interface_relax_time::NF    # time scale [1/s] for interface relaxation 
 
     # PARAMETRIZATIONS
     # Large-scale condensation (occurs when relative humidity exceeds a given threshold)
@@ -73,6 +76,10 @@ function Constants(P::Parameters)
     @unpack damping_time_strat = P
     drag_strat = 1/(damping_time_strat*3600)
 
+    # interface relaxation forcing
+    @unpack interface_relax_time = P
+    interface_relax_time *= 3600       # convert from hours to seconds
+
     # SCALING
     Δt_unscaled = Δt        # [s] not scaled
     Δt /= radius_earth      # scale with Earth's radius
@@ -82,7 +89,8 @@ function Constants(P::Parameters)
                             Δt,Δt_unscaled,Δt_sec,Δt_hrs,
                             robert_filter,williams_filter,n_timesteps,
                             output_every_n_steps, n_outputsteps,
-                            drag_strat, RH_thresh_pbl_lsc, RH_thresh_range_lsc,
+                            drag_strat, interface_relax_time,
+                            RH_thresh_pbl_lsc, RH_thresh_range_lsc,
                             RH_thresh_max_lsc, humid_relax_time_lsc, pres_thresh_cnv,
                             RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv,
                             max_entrainment, ratio_secondary_mass_flux,

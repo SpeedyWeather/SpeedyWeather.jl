@@ -57,6 +57,10 @@ The default values of the keywords define the default model setup.
     diffusion_time_strat::Real=12           # Diffusion time scale [hrs] for extra ∇² in the stratosphere
     damping_time_strat::Real=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
 
+    # FORCING
+    interface_relaxation::Bool = false      # turn on interface relaxation for shallow water?
+    interface_relax_time::Real = 1          # time scale [hrs] of interface relaxation
+
     # PARAMETRIZATIONS
     seasonal_cycle::Bool=true               # Seasonal cycle?
     n_shortwave::Integer=3                  # Compute shortwave radiation every n steps
