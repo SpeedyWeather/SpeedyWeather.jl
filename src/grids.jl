@@ -7,10 +7,26 @@ equi-angle latitdes, or others."""
 abstract type AbstractFullGrid{T} <: AbstractGrid{T} end
 
 get_nresolution(grid::AbstractFullGrid) = grid.nlat_half
-get_nlon(::Type{<:AbstractFullGrid},nlat_half::Integer) = 4nlat_half
-get_nlon_per_ring(::Type{<:AbstractFullGrid},nlat_half::Integer,j::Integer) = 4nlat_half
-get_lon(Grid::Type{<:AbstractFullGrid},nlat_half::Integer) = 
-            collect(range(0,2π,step=2π/get_nlon(Grid,nlat_half))[1:end-1])
+get_nlon(G::Type{<:AbstractFullGrid},nlat_half::Integer) = get_nlon_max(G,nlat_half)
+get_nlon_max(::Type{<:AbstractFullGrid},nlat_half::Integer) = 4nlat_half
+get_nlon_per_ring(G::Type{<:AbstractFullGrid},nlat_half::Integer,j::Integer) = get_nlon_max(G,nlat_half)
+
+function get_lon(Grid::Type{<:AbstractFullGrid},nlat_half::Integer)
+    nlon = get_nlon(Grid,nlat_half)
+    return collect(range(0,2π-π/nlon,step=2π/nlon))
+end
+
+function get_lond(Grid::Type{<:AbstractFullGrid},nlat_half::Integer)
+    lon = get_lon(Grid,nlat_half)
+    lon .*= 360/2π     # convert to lond in-place
+    return lon
+end
+
+# convert an AbstractMatrix to the full grids, and vice versa
+(Grid::Type{<:AbstractFullGrid})(M::AbstractMatrix{T}) where T = Grid{T}(vec(M))
+Base.Matrix(G::AbstractFullGrid{T}) where T = Matrix{T}(reshape(G.data,:,2G.nlat_half - nlat_odd(G)))
+matrix_size(G::AbstractFullGrid) = (get_nlon_max(G),get_nlat(G))
+matrix_size(G::Type{<:AbstractFullGrid},n::Integer) = (get_nlon_max(G,n),get_nlat(G,n))
 
 function get_colatlons(Grid::Type{<:AbstractFullGrid},nlat_half::Integer)
 
@@ -52,7 +68,7 @@ Different latitudes can be used, Gaussian latitudes, equi-angle latitdes, or oth
 abstract type AbstractOctahedralGrid{T} <: AbstractGrid{T} end
 
 get_nresolution(grid::AbstractOctahedralGrid) = grid.nlat_half
-get_nlon(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = nlon_octahedral(nlat_half)
+get_nlon_max(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = nlon_octahedral(nlat_half)
 
 function get_nlon_per_ring(Grid::Type{<:AbstractOctahedralGrid},nlat_half::Integer,j::Integer)
     nlat = 2nlat_half-nlat_odd(Grid)
@@ -61,7 +77,8 @@ function get_nlon_per_ring(Grid::Type{<:AbstractOctahedralGrid},nlat_half::Integ
     return nlon_octahedral(j)
 end
 
-get_lon(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = Float64[]    # only defined for full grids
+# return the longitude vector for the full grid equivalent
+get_lon(G::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = get_lon(full_grid(G),nlat_half)
 
 function get_colatlons(Grid::Type{<:AbstractOctahedralGrid},nlat_half::Integer)
     
@@ -112,7 +129,7 @@ abstract type AbstractHEALPixGrid{T} <: AbstractGrid{T} end
 get_nresolution(G::AbstractHEALPixGrid) = G.nside
 get_nlat_half(::Type{<:AbstractHEALPixGrid},nside::Integer) = 2nside
 nlat_odd(::Type{<:AbstractHEALPixGrid}) = true
-get_nlon(::Type{<:AbstractHEALPixGrid},nside::Integer) = nside_assert(nside) ? nlon_healpix(nside) : nothing
+get_nlon_max(::Type{<:AbstractHEALPixGrid},nside::Integer) = nside_assert(nside) ? nlon_healpix(nside) : nothing
 
 function get_nlon_per_ring(::Type{<:AbstractHEALPixGrid},nside::Integer,j::Integer)
     nlat = nlat_healpix(nside)
@@ -177,7 +194,7 @@ npoints_clenshaw(nlat_half::Integer) = 8nlat_half^2 - 4nlat_half
 nlat_half_clenshaw(npoints::Integer) = round(Int,1/4 + sqrt(1/16 + npoints/8))  # inverse
 
 # infer nside from data vector length, infer parametric type from eltype of data
-FullClenshawGrid{T}(data::AbstractVector) where T = FullClenshawGrid(data,nlat_half_clenshaw(length(data)))
+FullClenshawGrid{T}(data::AbstractVector) where T = FullClenshawGrid{T}(data,nlat_half_clenshaw(length(data)))
 FullClenshawGrid(data::AbstractVector,n::Integer...) = FullClenshawGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:FullClenshawGrid}) = 3            # cubic
@@ -193,6 +210,7 @@ get_colat(::Type{<:FullClenshawGrid},nlat_half::Integer) = [j/(2nlat_half)*π fo
 # get_colatlons() is already implemented for AbstractFullGrid
 # each_index_in_ring() is already implemented for AbstractFullGrid
 get_quadrature_weights(::Type{<:FullClenshawGrid},nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
+full_grid(::Type{<:FullClenshawGrid}) = FullClenshawGrid    # the full grid with same latitudes
 
 """
     G = FullGaussianGrid{T}
@@ -214,7 +232,7 @@ npoints_gaussian(nlat_half::Integer) = 8nlat_half^2
 nlat_half_gaussian(npoints::Integer) = round(Int,sqrt(npoints/8))
 
 # infer nside from data vector length, infer parametric type from eltype of data
-FullGaussianGrid{T}(data::AbstractVector) where T = FullGaussianGrid(data,nlat_half_gaussian(length(data)))
+FullGaussianGrid{T}(data::AbstractVector) where T = FullGaussianGrid{T}(data,nlat_half_gaussian(length(data)))
 FullGaussianGrid(data::AbstractVector,n::Integer...) = FullGaussianGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:FullGaussianGrid}) = 2            # quadratic
@@ -231,6 +249,7 @@ get_colat(::Type{<:FullGaussianGrid},nlat_half::Integer) =
 # get_colatlons() is already implemented for AbstractFullGrid
 # each_index_in_ring() is already implemented for AbstractFullGrid
 get_quadrature_weights(::Type{<:FullGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
+full_grid(::Type{<:FullGaussianGrid}) = FullGaussianGrid    # the full grid with same latitudes
 
 """
     G = OctahedralGaussianGrid{T}
@@ -259,7 +278,7 @@ nlat_half_octahedral(npoints::Integer,nlat_oddp::Bool) =
 nlon_octahedral(j::Integer) = 16+4j
 
 # infer nside from data vector length, infer parametric type from eltype of data
-OctahedralGaussianGrid{T}(data::AbstractVector) where T = OctahedralGaussianGrid(data,nlat_half_octahedral(length(data),false))
+OctahedralGaussianGrid{T}(data::AbstractVector) where T = OctahedralGaussianGrid{T}(data,nlat_half_octahedral(length(data),false))
 OctahedralGaussianGrid(data::AbstractVector,n::Integer...) = OctahedralGaussianGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:OctahedralGaussianGrid}) = 3      # cubic
@@ -275,6 +294,9 @@ get_colat(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = get_colat(FullG
 # get_colatlons() is already implemented for AbstractOctaherdalGrid
 # each_index_in_ring() is already implemented for AbstractOctaherdalGrid
 get_quadrature_weights(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = gaussian_weights(nlat_half)
+full_grid(::Type{<:OctahedralGaussianGrid}) = FullGaussianGrid    # the full grid with same latitudes
+matrix_size(G::OctahedralGaussianGrid) = (2*(4+G.nlat_half),2*(4+G.nlat_half+1))
+
 
 """
     G = OctahedralClenshawGrid{T}
@@ -297,7 +319,8 @@ struct OctahedralClenshawGrid{T} <: AbstractOctahedralGrid{T}
 end
 
 # infer nside from data vector length, infer parametric type from eltype of data
-OctahedralClenshawGrid{T}(data::AbstractVector) where T = OctahedralClenshawGrid(data,nlat_half_octahedral(length(data),true))
+OctahedralClenshawGrid{T}(data::AbstractVector) where T = OctahedralClenshawGrid{T}(data,
+                                                        nlat_half_octahedral(length(data),true))
 OctahedralClenshawGrid(data::AbstractVector,n::Integer...) = OctahedralClenshawGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:OctahedralClenshawGrid}) = 3      # cubic
@@ -313,6 +336,93 @@ get_colat(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = get_colat(FullC
 # get_colatlons() is already implemented for AbstractOctaherdalGrid
 # each_index_in_ring() is already implemented for AbstractOctaherdalGrid
 get_quadrature_weights(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
+full_grid(::Type{<:OctahedralClenshawGrid}) = FullClenshawGrid    # the full grid with same latitudes
+
+matrix_size(G::OctahedralClenshawGrid) = (2*(4+G.nlat_half),2*(4+G.nlat_half))
+matrix_size(::Type{OctahedralClenshawGrid},nlat_half::Integer) = (2*(4+nlat_half),2*(4+nlat_half))
+Base.Matrix(G::OctahedralClenshawGrid{T};kwargs...) where T = Matrix!(zeros(T,matrix_size(G)...),G;kwargs...)
+
+"""
+    Matrix!(M::AbstractMatrix,
+            G::OctahedralClenshawGrid;
+            quadrant_rotation=(0,1,2,3),
+            matrix_quadrant=((2,2),(1,2),(1,1),(2,1)),
+            )
+
+Sorts the gridpoints in `G` into the matrix `M` without interpolation.
+Every quadrant of the grid `G` is rotated as specified in `quadrant_rotation`,
+0 is no rotation, 1 is 90˚ clockwise, 2 is 180˚ etc. Grid quadrants are counted
+eastward starting from 0˚E. The grid quadrants are moved into the matrix quadrant
+(i,j) as specified. Defaults are equivalent to centered at 0˚E and a rotation
+such that the North Pole is at M's midpoint."""
+Matrix!(M::AbstractMatrix,G::OctahedralClenshawGrid;kwargs...) = Matrix!((M,G);kwargs...)
+
+"""
+    Matrix!(MGs::Tuple{AbstractMatrix{T},OctahedralClenshawGrid}...;kwargs...)
+
+Like `Matrix!(::AbstractMatrix,::OctahedralClenshawGrid)` but for simultaneous
+processing of tuples `((M1,G1),(M2,G2),...)` with matrices `Mi` and grids `Gi`.
+All matrices and grids have to be of the same size respectively."""
+function Matrix!(   MGs::Tuple{AbstractMatrix{T},OctahedralClenshawGrid}...;
+                    quadrant_rotation::NTuple{4,Integer}=(0,1,2,3),     # = 0˚, 90˚, 180˚, 270˚ anti-clockwise
+                    matrix_quadrant::NTuple{4,Tuple{Integer,Integer}}=((2,2),(1,2),(1,1),(2,1)),
+                    ) where T
+                    
+    ntuples = length(MGs)
+
+    # check that the first (matrix,grid) tuple has corresponding sizes
+    M,G = MGs[1]
+    m,n = size(M)
+    @boundscheck m == n || throw(BoundsError)
+    @boundscheck m == 2*(4+G.nlat_half) || throw(BoundsError)
+
+    for MG in MGs   # check that all matrices and all grids are of same size
+        Mi,Gi = MG
+        @boundscheck size(Mi) == size(M) || throw(BoundsError)
+        @boundscheck size(Gi) == size(G) || throw(BoundsError)
+    end
+
+    for q in matrix_quadrant    # check always in 2x2
+        sr,sc = q
+        @boundscheck ((sr in (1,2)) && (sc in (1,2))) || throw(BoundsError)
+    end
+
+    rings = eachring(G)         # index ranges for all rings
+    nlat_half = G.nlat_half     # number of latitude rings on one hemisphere incl Equator
+    nside = 4+G.nlat_half       # side length of a basepixel matrix (=nside in HEALPix)
+
+    # sort grid indices from G into matrix M
+    # 1) loop over each grid point per ring
+    # 2) determine quadrant (0,1,2,3) via modulo
+    # 3) get longitude index iq within quadrant
+    # 4) determine corresponding indices r,c in matrix M
+
+    @inbounds for (j,ring) in enumerate(rings)
+        nlon = length(ring)                         # number of grid points in ring
+        for ij in ring                              # continuous index in grid
+            i = ij-ring[1]                          # 0-based index in ring
+            grid_quadrant = floor(Int,mod(4*i/nlon,4))  # either 0,1,2,3
+            iq = i - grid_quadrant*(nlon÷4)             # 0-based index i relative to quadrant
+            r = 4+min(j,nlat_half) - iq             # row in matrix m (1-based)
+            c = (iq+1) + max(0,j-nlat_half)         # column in matrix m (1-based)
+
+            # rotate indices in quadrant
+            r,c = rotate_matrix_indices(r,c,nside,quadrant_rotation[grid_quadrant+1])
+
+            # shift grid quadrant to matrix quadrant
+            sr,sc = matrix_quadrant[grid_quadrant+1]
+            r += (sr-1)*nside                       # shift row into matrix quadrant
+            c += (sc-1)*nside                       # shift column into matrix quadrant
+
+            for (Mi,Gi) in MGs                      # for every (matrix,grid) tuple
+                Mi[r,c] = convert(T,Gi[ij])         # convert data and copy over
+            end
+        end
+    end
+
+    ntuples == 1 && return M
+    return Tuple(Mi for (Mi,Gi) in MGs)
+end
 
 """
     H = HEALPixGrid{T}
@@ -342,7 +452,7 @@ nlon_healpix(nside::Integer,j::Integer) = nside_assert(nside) ? min(4j,4nside) :
 nlon_healpix(nside::Integer) = nside_assert(nside) ? 4nside : nothing
 
 # infer nside from data vector length, infer parametric type from eltype of data
-HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid(data,nside_healpix(length(data)))
+HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid{T}(data,nside_healpix(length(data)))
 HEALPixGrid(data::AbstractVector,n::Integer...) = HEALPixGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:HEALPixGrid}) = 1                 # linear (in longitude)
@@ -353,10 +463,8 @@ get_colat(G::Type{<:HEALPixGrid},nside::Integer) =
 # get_lon() is already implemented for AbstractHEALPixGrid
 # get_colatlons() is already implemented for AbstractHEALPixGrid
 # each_index_in_ring() is already implemented for AbstractHEALPixGrid
-
-# convert an AbstractMatrix to the full grids, and vice versa
-(Grid::Type{<:AbstractFullGrid})(M::AbstractMatrix{T}) where T = Grid{T}(vec(M))
-Base.Matrix(G::AbstractFullGrid{T}) where T = Matrix{T}(reshape(G.data,:,2G.nlat_half - nlat_odd(G)))
+full_grid(::Type{<:HEALPixGrid}) = FullHEALPixGrid    # the full grid with same latitudes
+matrix_size(G::HEALPixGrid) = (5G.nside,5G.nside)
 
 # QUADRATURE WEIGHTS
 # gaussian_weights are exact for Gaussian latitudes when nlat > (2T+1)/2

@@ -91,9 +91,9 @@ module SpeedyWeather
     include("tendencies.jl")
     include("implicit_correction.jl")
     include("diffusion.jl")
+    include("output.jl")                    # defines Output
     include("feedback.jl")                  # defines Feedback
-    include("output.jl")
-
+    
     # PHYSICS
     include("column_variables.jl")          # defines ColumnVariables
     include("thermodynamics.jl")

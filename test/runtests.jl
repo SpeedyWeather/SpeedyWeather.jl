@@ -29,3 +29,4 @@ include("convection.jl")
 # INITIALIZATION AND INTEGRATION
 include("initialize.jl")
 include("run_speedy.jl")
+include("run_speedy_with_output.jl")

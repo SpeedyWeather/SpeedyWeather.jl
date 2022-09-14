@@ -11,7 +11,8 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     nresolution::Int    # resolution parameter nlat_half or nside for HEALPix
 
     # GRID-POINT SPACE
-    nlon::Int           # Maximum number of longitudes (at/around Equator)
+    nlon_max::Int       # Maximum number of longitudes (at/around Equator)
+    nlon::Int           # Same (used for compatibility)
     nlat::Int           # Number of latitudes
     nlev::Int           # Number of vertical levels
     nlat_half::Int      # Number of latitudes in one hemisphere (incl Equator)
@@ -81,7 +82,8 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     nresolution = get_resolution(Grid,trunc)        # resolution parameter, nlat_half or nside for HEALPixGrid
     nlat_half = get_nlat_half(Grid,nresolution)     # contains equator for HEALPix
     nlat = 2nlat_half - nlat_odd(Grid)              # one less if grids have odd # of latitude rings
-    nlon = get_nlon(Grid,nresolution)               # number of longitudes around the equator
+    nlon_max = get_nlon_max(Grid,nresolution)       # number of longitudes around the equator
+    nlon = nlon_max                                 # same (used for compatibility)
     nside = Grid isa HEALPixGrid ? nresolution : 0  # nside is only defined for HEALPixGrid (npoints)
     npoints = get_npoints(Grid,nresolution)         # total number of grid points
 
@@ -92,7 +94,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     latd = lat*360/2π                               # 90˚...-90˚
 
     # LONGITUDE VECTORS (empty for reduced grids)
-    lon = get_lon(Grid,nresolution)                 # array of longitudes 0...2π
+    lon = get_lon(Grid,nresolution)                 # array of longitudes 0...2π (full grids only)
     lond = lon*360/2π                               # array of longitudes in degrees 0...360˚
 
     # COORDINATES for every grid point in ring order
@@ -156,7 +158,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
     # conversion to number format NF happens here
     Geometry{P.NF}( Grid,nresolution,
-                    nlon,nlat,nlev,nlat_half,nside,npoints,radius_earth,
+                    nlon_max,nlon,nlat,nlev,nlat_half,nside,npoints,radius_earth,
                     lat,latd,colat,colatd,lon,lond,lons,lats,
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
