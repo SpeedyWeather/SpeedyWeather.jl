@@ -235,6 +235,7 @@ function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: (inv
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
     lmax,mmax = size(alms) .- (1,1)     # 0-based degree l, order m of the Legendre polynomials
     
+    # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
     eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
     @boundscheck length(eigenvalues) >= lmax+1 || throw(BoundsError)
 
