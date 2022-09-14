@@ -78,7 +78,7 @@ function Constants(P::Parameters)
 
     # interface relaxation forcing
     @unpack interface_relax_time = P
-    interface_relax_time *= 3600       # convert from hours to seconds
+    interface_relax_time *= 3600/radius_earth   # convert from hours to seconds
 
     # SCALING
     Δt_unscaled = Δt        # [s] not scaled

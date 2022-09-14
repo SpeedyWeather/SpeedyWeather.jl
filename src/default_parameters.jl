@@ -59,12 +59,12 @@ The default values of the keywords define the default model setup.
 
     # FORCING
     interface_relaxation::Bool = false      # turn on interface relaxation for shallow water?
-    interface_relax_time::Real = 1          # time scale [hrs] of interface relaxation
+    interface_relax_time::Real = 12         # time scale [hrs] of interface relaxation
 
     # PARAMETRIZATIONS
-    seasonal_cycle::Bool=true               # Seasonal cycle?
-    n_shortwave::Integer=3                  # Compute shortwave radiation every n steps
-    sppt_on::Bool=false                     # Turn on SPPT?
+    seasonal_cycle::Bool = true             # Seasonal cycle?
+    n_shortwave::Integer = 3                # Compute shortwave radiation every n steps
+    sppt_on::Bool = false                   # Turn on SPPT?
     magnus_coefs::MagnusCoefs = MagnusCoefs{NF}()  # For computing saturation vapour pressure
 
     # Large-Scale Condensation (from table B10)
