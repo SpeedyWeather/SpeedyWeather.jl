@@ -20,13 +20,13 @@
     nlat::Int = 0
 
     # fields to output (only one layer, reuse over layers)
-    u::Matrix{NF} = zeros(0,0)           # zonal velocity
-    v::Matrix{NF} = zeros(0,0)           # meridional velocity
-    vor::Matrix{NF} = zeros(0,0)         # relative vorticity
-    div::Matrix{NF} = zeros(0,0)         # divergence
-    pres::Matrix{NF} = zeros(0,0)        # pressure
-    temp::Matrix{NF} = zeros(0,0)        # temperature
-    humid::Matrix{NF} = zeros(0,0)       # humidity
+    u::Matrix{NF} = zeros(0,0)              # zonal velocity
+    v::Matrix{NF} = zeros(0,0)              # meridional velocity
+    vor::Matrix{NF} = zeros(0,0)            # relative vorticity
+    div::Matrix{NF} = zeros(0,0)            # divergence
+    pres::Matrix{NF} = zeros(0,0)           # pressure
+    temp::Matrix{NF} = zeros(0,0)           # temperature
+    humid::Matrix{NF} = zeros(0,0)          # humidity
 end
 
 Output() = Output{Float32}()
