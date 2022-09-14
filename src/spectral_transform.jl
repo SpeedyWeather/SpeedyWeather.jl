@@ -61,6 +61,7 @@ struct SpectralTransform{NF<:AbstractFloat}
 
     # EIGENVALUES (on unit sphere, no 1/radius²-scaling included)
     eigenvalues  ::Vector{NF}               # = -l*(l+1), degree l of spherical harmonic
+    eigenvalues⁻¹::Vector{NF}               # = -1/(l*(l+1))
 end
 
 """
@@ -181,7 +182,9 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
 
     # EIGENVALUES (on unit sphere, hence 1/radius²-scaling is omitted)
     eigenvalues = [-l*(l+1) for l in 0:lmax+1]
-        
+    eigenvalues⁻¹ = inv.(eigenvalues)
+    eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
+
     # conversion to NF happens here
     SpectralTransform{NF}(  Grid,nresolution,order,
                             lmax,mmax,nfreq_max,
@@ -193,7 +196,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
                             ϵlms,grad_x,grad_y1,grad_y2,
                             grad_y_vordiv1,grad_y_vordiv2,vordiv_to_uv_x,
                             vordiv_to_uv1,vordiv_to_uv2,
-                            eigenvalues)
+                            eigenvalues,eigenvalues⁻¹)
 end
 
 """

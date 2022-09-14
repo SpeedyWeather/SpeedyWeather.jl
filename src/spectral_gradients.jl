@@ -235,22 +235,39 @@ function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: (inv
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
     lmax,mmax = size(alms) .- (2,1)     # degree l, order m of the Legendre polynomials
     
-    @unpack eigenvalues = S
+    eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
     @boundscheck length(eigenvalues) >= lmax+1 || throw(BoundsError)
 
-    @inline kernel(o,a,b) = inverse ?   (flipsign ? (add ? (o - a/b) : -a/b)  :
-                                                    (add ? (o + a/b) :  a/b)) :
-                                        (flipsign ? (add ? (o - a*b) : -a*b)  :
-                                                    (add ? (o + a*b) :  a*b))
+    @inline kernel(o,a) = flipsign ? (add ? (o-a) : -a)  :
+                                     (add ? (o+a) :  a)
 
     lm = 0
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
         for l in m:lmax+1           # degree l = m:lmax but 1-based
             lm += 1
-            ∇²alms[lm] = kernel(∇²alms[lm],alms[lm],eigenvalues[l])
+            ∇²alms[lm] = kernel(∇²alms[lm],alms[lm]*eigenvalues[l])
         end
         lm += 1
     end
 
     return ∇²alms
+end
+
+"""
+    ∇⁻²!(   ∇⁻²alms::LowerTriangularMatrix,
+            alms::LowerTriangularMatrix,
+            S::SpectralTransform;
+            add::Bool=false,
+            flipsign::Bool=false)
+
+Calls ∇²!(∇⁻²alms,alms,S;add,flipsign,inverse=true)."""
+function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}},# Output: inverse Laplacian of alms
+                alms::LowerTriangularMatrix{Complex{NF}},   # Input: spectral coefficients
+                S::SpectralTransform{NF};                   # precomputed eigenvalues
+                add::Bool=false,                            # add to output array or overwrite
+                flipsign::Bool=false,                       # -∇⁻² or ∇⁻²
+                ) where {NF<:AbstractFloat}
+
+    inverse = true
+    return ∇²!(∇⁻²alms,alms,S;add,flipsign,inverse)
 end
