@@ -21,9 +21,11 @@ For an overview of the functionality and explanation see the (always somehow inc
 ## Example use
 
 SpeedyWeather.jl is currently developed. Some things work, some don't. Stay tuned.
-Here is video of some relative vorticity, simulated at T682 (20km at the Equator) spectral resolution.
+Here is video of some relative vorticity, simulated at T1023 spectral resolution (about 10km),
+simulated on an [octahedral Clenshaw-Curtis grid](https://github.com/milankl/SpeedyWeather.jl/issues/112#issuecomment-1219644323)
+with more than 4 million grid points
 
-https://user-images.githubusercontent.com/25530332/188216272-5517385b-c02a-41ec-a2ea-f3025d0c8894.mp4
+https://user-images.githubusercontent.com/25530332/190443050-d5b8d093-86c0-46c9-b515-8420059ac8dc.mp4
 
 The main interface to SpeedyWeather.jl is 
 
