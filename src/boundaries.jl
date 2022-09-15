@@ -51,6 +51,7 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
         orography = gridded(orography_spec,S)
 
         η⁰ = zeros(LowerTriangularMatrix{NF},lmax+2,mmax+1)
+        η⁰[2] = -P.interface_relax_amplitude
         η⁰[3] = -P.interface_relax_amplitude
         
         # geopot_surf         = zeros(complex(P.NF),1,1)  

@@ -35,6 +35,7 @@ end
 function get_tendencies!(   pres::LowerTriangularMatrix,
                             diagn::DiagnosticVariablesLayer,
                             surface::SurfaceVariables,
+                            time::DateTime,                 # time to evaluate the tendencies at
                             M::ShallowWaterModel,           # struct containing all constants
                             )
 
@@ -49,8 +50,7 @@ function get_tendencies!(   pres::LowerTriangularMatrix,
 
     # interface forcing
     @unpack interface_relaxation = M.parameters
-    τ = M.constants.interface_relax_time
-    interface_relaxation && interface_relaxation!(pres,surface,τ,B)        # = + 1/τ(η⁰-η)
+    interface_relaxation && interface_relaxation!(pres,surface,time,M)
 end
 
 
