@@ -15,7 +15,7 @@ The default values of the keywords define the default model setup.
 
     # RESOLUTION AND GRID
     trunc::Int = 31                                     # spectral truncation
-    Grid::Type{<:AbstractGrid} = OctahedralClenshawGrid # grid used
+    Grid::Type{<:AbstractGrid} = FullGaussianGrid       # grid used
     
     # EARTH'S PROPERTIES
     radius_earth::Real = 6.371e6            # radius of Earth [m]
