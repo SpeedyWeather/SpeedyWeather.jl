@@ -11,11 +11,11 @@ The default values of the keywords define the default model setup.
     NF::DataType                        # number format (default defined in run_speedy)
 
     # MODEL
-    model::Symbol = :barotropic         # :barotropic, :shallowwater, or :primitive
+    model::Symbol = :shallowwater       # :barotropic, :shallowwater, or :primitive
 
     # RESOLUTION AND GRID
     trunc::Int = 31                                     # spectral truncation
-    Grid::Type{<:AbstractGrid} = FullGaussianGrid       # grid used
+    Grid::Type{<:AbstractGrid} = OctahedralClenshawGrid # grid used
     
     # EARTH'S PROPERTIES
     radius_earth::Real = 6.371e6            # radius of Earth [m]
