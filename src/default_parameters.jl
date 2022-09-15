@@ -14,13 +14,18 @@ The default values of the keywords define the default model setup.
     model::Symbol = :barotropic         # :barotropic, :shallowwater, or :primitive
 
     # RESOLUTION AND GRID
-    trunc::Int = 31                                 # spectral truncation
-    Grid::Type{<:AbstractGrid} = FullGaussianGrid   # define the grid type
+    trunc::Int = 31                                     # spectral truncation
+    Grid::Type{<:AbstractGrid} = FullGaussianGrid       # grid used
     
-    # PHYSICAL CONSTANTS
-    radius_earth::Real=6.371e6          # radius of Earth [m]
-    rotation_earth::Real=7.29e-5        # angular frequency of Earth's rotation [rad/s]
-    gravity::Real=9.81                  # gravitational acceleration [m/s^2]
+    # EARTH'S PROPERTIES
+    radius_earth::Real = 6.371e6            # radius of Earth [m]
+    rotation_earth::Real = 7.29e-5          # angular frequency of Earth's rotation [rad/s]
+    gravity::Real = 9.81                    # gravitational acceleration [m/s^2]
+    seasonal_cycle::Bool = true             # Seasonal cycle?
+    equinox::DateTime = DateTime(2000,3,20) # Spring equinox (year irrelevant)
+    tropic_cancer::Real = 23.5              # latitude [˚N] of the tropic of cancer
+    
+    # ATMOSPHERE
     akap::Real=2/7                      # ratio of gas constant to specific heat of dry air
                                         # at constant pressure = 1 - 1/γ where γ is the
                                         # heat capacity ratio of a perfect diatomic gas (7/5)
@@ -40,7 +45,7 @@ The default values of the keywords define the default model setup.
     scale_height_humid::Real=2.5        # reference scale height for specific humidity [km]
     relhumid_ref::Real=0.7              # reference relative humidity of near-surface air [1]
     water_pres_ref::Real=17             # reference saturation water vapour pressure [Pa]
-    layer_thickness::Real=10            # layer thickness for the shallow water model [km]
+    layer_thickness::Real=8.5           # layer thickness for the shallow water model [km]
 
     # VERTICAL COORDINATES
     # of the nlev vertical levels, defined by a generalised logistic function,
@@ -57,10 +62,14 @@ The default values of the keywords define the default model setup.
     diffusion_time_strat::Real=12           # Diffusion time scale [hrs] for extra ∇² in the stratosphere
     damping_time_strat::Real=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
 
+    # FORCING
+    interface_relaxation::Bool = false      # turn on interface relaxation for shallow water?
+    interface_relax_time::Real = 96         # time scale [hrs] of interface relaxation
+    interface_relax_amplitude::Real = 300   # Amplitude [m] of interface relaxation
+
     # PARAMETRIZATIONS
-    seasonal_cycle::Bool=true               # Seasonal cycle?
-    n_shortwave::Integer=3                  # Compute shortwave radiation every n steps
-    sppt_on::Bool=false                     # Turn on SPPT?
+    n_shortwave::Integer = 3                # Compute shortwave radiation every n steps
+    sppt_on::Bool = false                   # Turn on SPPT?
     magnus_coefs::MagnusCoefs = MagnusCoefs{NF}()  # For computing saturation vapour pressure
 
     # Large-Scale Condensation (from table B10)
@@ -79,8 +88,9 @@ The default values of the keywords define the default model setup.
     ratio_secondary_mass_flux::Real = 0.8   # Ratio between secondary and primary mass flux at cloud-base
 
     # TIME STEPPING
-    Δt_at_T31::Real = 60                # time step in minutes for T31, scale linearly to trunc
-    n_days::Real = 10                   # number of days to integrate for
+    startdate::DateTime = DateTime(2000,1,1)# time at which the integration starts
+    n_days::Real = 10                       # number of days to integrate for
+    Δt_at_T31::Real = 60                    # time step in minutes for T31, scale linearly to trunc
 
     # NUMERICS
     robert_filter::Real = 0.05          # Robert (1966) time filter coefficeint to suppress comput. mode
@@ -105,7 +115,6 @@ The default values of the keywords define the default model setup.
     verbose::Bool = true            # print dialog for feedback
     output::Bool = false            # Store data in netCDF?
     output_dt::Real = 6             # output time step [hours]
-    output_startdate::DateTime = DateTime(2000,1,1)
     output_path::String = pwd()     # path to output folder
     output_filename::String="output.nc"     # name of the output netcdf file
     output_vars::Vector{Symbol}=[:vor]      # variables to output: :u, :v, :vor, :div, :

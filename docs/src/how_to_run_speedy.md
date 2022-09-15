@@ -79,7 +79,7 @@ developed this is by no means complete.
 | `verbose::Bool`   | `true`        | Print dialog for feedback |
 | `output::Bool`    | `false`       | Store data in netCDF? |
 | `output_dt::Real` | `6`           | Output time step [``hrs``] |
-| `output_startdate::DateTime` |  `DateTime(2000,1,1)` | Start date of the time axis (default: Jan 1, 2000) |
+| `startdate::DateTime` |  `DateTime(2000,1,1)` | Start date of the time axis (default: Jan 1, 2000) |
 | `output_path::String`| `pwd()`       | Path to output folder (default is current directory) |
 
 

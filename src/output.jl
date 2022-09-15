@@ -1,18 +1,23 @@
 @with_kw mutable struct Output{NF<:Union{Float32,Float64}}
+    
     output::Bool = false                    # output to netCDF?
-    output_vars::Vector{Symbol}=[:none]     # vector of
+    output_vars::Vector{Symbol}=[:none]     # vector of output variables as Symbols
     write_restart::Bool = false             # also write restart file if output==true?
+    
+    startdate::DateTime = DateTime(2000,1,1)
     timestep_counter::Int = 0               # time step counter
-    i_out::Int = 0                          # output step counter
+    output_counter::Int = 0                 # output step counter
     n_timesteps::Int = 0                    # number of time steps
     n_outputsteps::Int = 0                  # number of time steps with output
     output_every_n_steps::Int = 0           # output every n time steps
+    
     run_id::Int = -1                        # run identification number
     run_path::String = ""                   # output path plus run????/
 
     # the netcdf file to be written into
     netcdf_file::Union{NcFile,Nothing} = nothing
 
+    # grid specifications
     output_grid::Symbol = :full                     # or :matrix
     Grid::Type{<:AbstractGrid} = FullGaussianGrid   # full grid for output if output_grid == :full
     spectral_transform::SpectralTransform = SpectralTransform() # spectral transform for that grid
@@ -78,8 +83,8 @@ function initialize_netcdf_output(  progn::PrognosticVariables,
     M.parameters.output || return Output()          # escape directly when no netcdf output
 
     # DEFINE NETCDF DIMENSIONS TIME
-    @unpack output_startdate = M.parameters
-    time_string = "hours since $(Dates.format(output_startdate, "yyyy-mm-dd HH:MM:0.0"))"
+    @unpack startdate = M.parameters
+    time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     dim_time = NcDim("time",0,unlimited=true)
     var_time = NcVar("time",dim_time,t=Int32,atts=Dict("units"=>time_string,"long_name"=>"time"))
 
@@ -150,7 +155,7 @@ function initialize_netcdf_output(  progn::PrognosticVariables,
     netcdf_file = NetCDF.create(joinpath(run_path,output_filename),vars_out,mode=NetCDF.NC_NETCDF4)
     
     # CREATE OUTPUT STRUCT
-    @unpack write_restart = M.parameters
+    @unpack write_restart, startdate = M.parameters
     @unpack n_timesteps, n_outputsteps, output_every_n_steps = M.constants
     spectral_transform = spectral_transform_for_full_grid(M.spectral_transform)
 
@@ -162,16 +167,16 @@ function initialize_netcdf_output(  progn::PrognosticVariables,
     temp = :temp in output_vars ?   fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
     humid = :humid in output_vars ? fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
 
-    outputter = Output( output=true; output_vars, write_restart, n_timesteps, n_outputsteps,
+    outputter = Output( output=true; output_vars, write_restart, 
+                        startdate, n_timesteps, n_outputsteps,
                         output_every_n_steps, run_id, run_path,
                         netcdf_file, output_grid, Grid, spectral_transform, nlon, nlat,
                         u, v, vor, div, pres, temp, humid)
 
     # WRITE INITIAL CONDITIONS TO FILE
-    initial_time = 0                    # start at output_startdate
     lf = 1                              # output first leapfrog time step for initial conditions
     write_netcdf_variables!(outputter,progn,diagn,M,lf)
-    write_netcdf_time!(outputter,initial_time)
+    write_netcdf_time!(outputter,startdate)
 
     return outputter
 end
@@ -186,7 +191,7 @@ Writes the variables from `diagn` of time step `i` at time `time_sec` into `netc
 netcdf output of if output shouldn't be written on this time step. Converts variables from `diagn` to float32
 for output, truncates the mantissa for higher compression and applies lossless compression."""
 function write_netcdf_output!(  outputter::Output,              # everything for netcdf output
-                                time_sec::Integer,              # model time [s] for output
+                                time::DateTime,                 # model time for output
                                 progn::PrognosticVariables,     # all prognostic variables
                                 diagn::DiagnosticVariables,     # all diagnostic variables
                                 M::ModelSetup,                  # all parameters
@@ -198,16 +203,18 @@ function write_netcdf_output!(  outputter::Output,              # everything for
 
     # WRITE VARIABLES
     write_netcdf_variables!(outputter,progn,diagn,M,lf)
-    write_netcdf_time!(outputter,time_sec)
+    write_netcdf_time!(outputter,time)
 end
 
 function write_netcdf_time!(outputter::Output,
-                            time_sec::Integer)
+                            time::DateTime)
     
-    @unpack i_out, netcdf_file = outputter
-    time_hrs = Int32[round(time_sec/3600)]                      # convert from seconds to hours
-    NetCDF.putvar(netcdf_file,"time",time_hrs,start=[i_out])    # write time [hrs] of next output step
-    NetCDF.sync(netcdf_file)                                    # sync to flush variables to disc
+    @unpack netcdf_file, startdate = outputter
+    i = outputter.output_counter
+
+    time_hrs = [round(Int32,Dates.Second(time-startdate).value/3600)]
+    NetCDF.putvar(netcdf_file,"time",time_hrs,start=[i])    # write time [hrs] of next output step
+    NetCDF.sync(netcdf_file)                                # sync to flush variables to disc
 
     return nothing
 end
@@ -218,8 +225,9 @@ function write_netcdf_variables!(   outputter::Output,
                                     M::ModelSetup,
                                     lf::Integer=2)  # leapfrog time step to output
 
-    outputter.i_out += 1                            # increase output step counter
-    @unpack i_out, output_vars = outputter          # Vector{Symbol} of variables to output
+    outputter.output_counter += 1                   # increase output step counter
+    @unpack output_vars = outputter                 # Vector{Symbol} of variables to output
+    i = outputter.output_counter
 
     @unpack u, v, vor, div, pres, temp, humid = outputter
     @unpack output_grid, Grid = outputter           # output_grid = :matrix or :full, Grid actual grid type
@@ -288,12 +296,12 @@ function write_netcdf_variables!(   outputter::Output,
 
         # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
         @unpack netcdf_file = outputter
-        :u in output_vars     && NetCDF.putvar(netcdf_file,"u",    u,    start=[1,1,k,i_out],count=[-1,-1,1,1])
-        :v in output_vars     && NetCDF.putvar(netcdf_file,"v",    v,    start=[1,1,k,i_out],count=[-1,-1,1,1])
-        :vor in output_vars   && NetCDF.putvar(netcdf_file,"vor",  vor,  start=[1,1,k,i_out],count=[-1,-1,1,1])
-        :div in output_vars   && NetCDF.putvar(netcdf_file,"div",  div,  start=[1,1,k,i_out],count=[-1,-1,1,1])
-        :temp in output_vars  && NetCDF.putvar(netcdf_file,"temp", temp, start=[1,1,k,i_out],count=[-1,-1,1,1])
-        :humid in output_vars && NetCDF.putvar(netcdf_file,"humid",humid,start=[1,1,k,i_out],count=[-1,-1,1,1])
+        :u in output_vars     && NetCDF.putvar(netcdf_file,"u",    u,    start=[1,1,k,i],count=[-1,-1,1,1])
+        :v in output_vars     && NetCDF.putvar(netcdf_file,"v",    v,    start=[1,1,k,i],count=[-1,-1,1,1])
+        :vor in output_vars   && NetCDF.putvar(netcdf_file,"vor",  vor,  start=[1,1,k,i],count=[-1,-1,1,1])
+        :div in output_vars   && NetCDF.putvar(netcdf_file,"div",  div,  start=[1,1,k,i],count=[-1,-1,1,1])
+        :temp in output_vars  && NetCDF.putvar(netcdf_file,"temp", temp, start=[1,1,k,i],count=[-1,-1,1,1])
+        :humid in output_vars && NetCDF.putvar(netcdf_file,"humid",humid,start=[1,1,k,i],count=[-1,-1,1,1])
     end
 
     # surface pressure, i.e. interface displacement η
@@ -305,14 +313,14 @@ function write_netcdf_variables!(   outputter::Output,
             output_grid == :full && gridded!(Grid(pres),progn.pres.leapfrog[lf],S)
         end
         round!(pres,M.parameters.keepbits)
-        NetCDF.putvar(outputter.netcdf_file,"pres",pres,start=[1,1,i_out],count=[-1,-1,1])
+        NetCDF.putvar(outputter.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
     end
 
     return nothing
 end
 
 """
-    write_restart_file( time_sec::Real,
+    write_restart_file( time::DateTime,
                         progn::PrognosticVariables,
                         outputter::Output,
                         M::ModelSetup)
@@ -321,7 +329,7 @@ A restart file `restart.jld2` with the prognostic variables is written
 to the output folder (or current path) that can be used to restart the model.
 `restart.jld2` will then be used as initial conditions. The prognostic variables
 are bitround and the 2nd leapfrog time step is discarded."""
-function write_restart_file(time_sec::Real,
+function write_restart_file(time::DateTime,
                             progn::PrognosticVariables,
                             outputter::Output,
                             M::ModelSetup)
@@ -364,7 +372,7 @@ function write_restart_file(time_sec::Real,
 
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
         f["prognostic_variables"] = progn
-        f["time"] = M.parameters.output_startdate + Dates.Second(time_sec)
+        f["time"] = time
         f["version"] = M.parameters.version
         f["description"] = "Restart file created for SpeedyWeather.jl"
     end

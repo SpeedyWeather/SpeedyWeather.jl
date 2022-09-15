@@ -6,6 +6,7 @@ Struct that holds the boundary arrays in grid-point space
 """
 struct Boundaries{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}        # number format NF
     orography       ::Grid            # orography [m]
+    # η⁰              ::LowerTriangularMatrix{NF}
     # geopot_surf_grid::Matrix{NF}            # surface geopotential (i.e. orography) [m^2/s^2]
     # geopot_surf     ::Matrix{Complex{NF}}   # spectral surface geopotential
 
@@ -19,7 +20,7 @@ orography, land-sea mask and albedo from an netCDF file and stores the in a
 function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
 
     @unpack orography_path, orography_file, gravity = P
-    @unpack Grid, nresolution = S
+    @unpack Grid, nresolution, lmax, mmax = S
 
     # LOAD NETCDF FILE (but not its data yet)
     if orography_path == ""
@@ -33,6 +34,7 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
     if P.model == :barotropic   # no boundary data needed with the barotropic model
         
         orography           = zeros(Grid{NF},0)               # create dummy arrays
+        # η⁰                  = zeros(LowerTriangularMatrix{NF},0,0)
         # geopot_surf         = zeros(complex(P.NF),1,1)  
         # geopot_surf_grid    = zeros(P.NF,1,1)
 
@@ -42,11 +44,15 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
 
         #TODO also read lat,lon from file and flip array in case it's not as expected
         recompute_legendre = true                          # triggers Float64 precomputation
-        orography_spec = spectral(orography_highres;recompute_legendre)
+        orography_spec = spectral(orography_highres;Grid=FullGaussianGrid,recompute_legendre)
 
         lmax,mmax = P.trunc,P.trunc
         orography_spec = spectral_truncation(orography_spec,lmax+1,mmax)
         orography = gridded(orography_spec,S)
+
+        # η⁰ = zeros(LowerTriangularMatrix{NF},lmax+2,mmax+1)
+        # η⁰[2] = -P.interface_relax_amplitude
+        # η⁰[3] = -P.interface_relax_amplitude
         
         # geopot_surf         = zeros(complex(P.NF),1,1)  
         # geopot_surf_grid    = zeros(P.NF,1,1)
@@ -67,5 +73,5 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
     end
 
     # convert to number format NF here
-    return Boundaries(orography,)#geopot_surf_grid,geopot_surf,landsea_mask,albedo)
+    return Boundaries(orography)#,η⁰,geopot_surf_grid,geopot_surf,landsea_mask,albedo)
 end

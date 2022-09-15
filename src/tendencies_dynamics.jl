@@ -432,6 +432,26 @@ function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
     divergence!(pres_tend,uh_coslat⁻¹,vh_coslat⁻¹,S,flipsign=true)
 end
 
+function interface_relaxation!( η::LowerTriangularMatrix{Complex{NF}},
+                                surface::SurfaceVariables{NF},
+                                time::DateTime,         # time of relaxation
+                                M::ShallowWaterModel,   # contains η⁰, which η is relaxed to
+                                ) where NF    
+
+    @unpack pres_tend = surface
+    @unpack seasonal_cycle, equinox, tropic_cancer = M.parameters
+    A = M.parameters.interface_relax_amplitude
+
+    s = 45/23.5     # heuristic conversion to Legendre polynomials
+    θ = seasonal_cycle ? s*tropic_cancer*sin(Dates.days(time - equinox)/365.25*2π) : 0
+    η2 = convert(NF,A*(2sind(θ)))           # l=1,m=0 harmonic
+    η3 = convert(NF,A*(0.2-1.5cosd(θ)))     # l=2,m=0 harmonic
+
+    τ⁻¹ = inv(M.constants.interface_relax_time)
+    pres_tend[2] += τ⁻¹*(η2-η[2])
+    pres_tend[3] += τ⁻¹*(η3-η[3])
+end
+
 """
     gridded!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
                 progn::PrognosticVariables{NF}, # all prognostic variables
