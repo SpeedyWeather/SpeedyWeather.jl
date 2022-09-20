@@ -3,10 +3,11 @@ on:
   pull_request:
     branches:
       - main
-      - kernelabstractions_adtests
+      - gpu
   push:
     branches:
       - main
+      - gpu
 jobs:
   test:
     runs-on: ubuntu-latest
