@@ -5,6 +5,9 @@
     p = run_speedy(Float32,output=true)
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
 
+    p = run_speedy(Float64,output=true, output_dense=true)
+    @test all(isfinite.(p.layers[1].leapfrog[1].vor))
+
     p = run_speedy(Float64,Grid=FullClenshawGrid,output=true)
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
 

@@ -58,7 +58,7 @@ function Constants(P::Parameters)
 
     # TIME INTEGRATION CONSTANTS
     @unpack robert_filter, williams_filter = P
-    @unpack trunc, Δt_at_T31, n_days, output_dt = P
+    @unpack trunc, Δt_at_T31, n_days, output_dt, output_dense = P
 
     # PARAMETRIZATION CONSTANTS
     @unpack RH_thresh_pbl_lsc, RH_thresh_range_lsc, RH_thresh_max_lsc, humid_relax_time_lsc = P  # Large-scale condensation
@@ -69,7 +69,7 @@ function Constants(P::Parameters)
     Δt_sec  = convert(Int,Δt)                   # encode time step Δt [s] as integer
     Δt_hrs  = Δt/3600                           # convert time step Δt from minutes to hours
     n_timesteps = ceil(Int,24*n_days/Δt_hrs)    # number of time steps to integrate for
-    output_every_n_steps = max(1,floor(Int,output_dt/Δt_hrs))   # output every n time steps
+    output_every_n_steps = output_dense ? 1 : max(1,floor(Int,output_dt/Δt_hrs))   # output every n time steps
     n_outputsteps = (n_timesteps ÷ output_every_n_steps)+1      # total number of output time steps
 
     # stratospheric drag [1/s] from damping_time_strat [hrs]

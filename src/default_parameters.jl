@@ -115,6 +115,7 @@ The default values of the keywords define the default model setup.
     verbose::Bool = true            # print dialog for feedback
     output::Bool = false            # Store data in netCDF?
     output_dt::Real = 6             # output time step [hours]
+    output_dense::Bool = false      # outputs every timestep, ignores output_dt kwarg
     output_path::String = pwd()     # path to output folder
     output_filename::String="output.nc"     # name of the output netcdf file
     output_vars::Vector{Symbol}=[:vor]      # variables to output: :u, :v, :vor, :div, :
