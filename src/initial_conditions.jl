@@ -17,8 +17,13 @@ function initial_conditions(M::ModelSetup)
             progn_layer.leapfrog[1].vor[4,1]  =  80/radius_earth    # zonal wind
             progn_layer.leapfrog[1].vor[6,1]  = -160/radius_earth
             progn_layer.leapfrog[1].vor[8,1]  =  80/radius_earth
-                                                                    # perturbation
-            progn_layer.leapfrog[1].vor[5:15,2:15] .= 10/radius_earth*randn(ComplexF64,11,14);
+
+            # perturbation
+            for m in 2:min(15,progn.mmax+1)
+                for l in m:min(15,progn.lmax+1)
+                    progn_layer.leapfrog[1].vor[l,m] = 10/radius_earth*randn(ComplexF64)
+                end
+            end
         end
 
     elseif initial_conditions == :restart

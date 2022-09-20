@@ -2,12 +2,15 @@
     p = run_speedy(Float32)
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
     
-    p = run_speedy(Float32,output=true)
-    @test all(isfinite.(p.layers[1].leapfrog[1].vor))
-    
     p = run_speedy(Float64)
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
-
-    p = run_speedy(Float64,output=true)
+    
+    p = run_speedy(Float32,Grid=OctahedralClenshawGrid)
+    @test all(isfinite.(p.layers[1].leapfrog[1].vor))
+    
+    p = run_speedy(Float64,Grid=HEALPixGrid)
+    @test all(isfinite.(p.layers[1].leapfrog[1].vor))
+    
+    p = run_speedy(Float64,Grid=OctahedralGaussianGrid)
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
 end

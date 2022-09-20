@@ -20,6 +20,9 @@ include("spectral_gradients.jl")
 include("diffusion.jl")
 include("time_stepping.jl")
 
+# VERTICAL LEVELS
+include("vertical_levels.jl")
+
 # PHYSICS
 include("column_variables.jl")
 include("thermodynamics.jl")
@@ -29,3 +32,4 @@ include("convection.jl")
 # INITIALIZATION AND INTEGRATION
 include("initialize.jl")
 include("run_speedy.jl")
+include("run_speedy_with_output.jl")

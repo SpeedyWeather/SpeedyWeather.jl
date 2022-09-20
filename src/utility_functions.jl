@@ -45,24 +45,36 @@ function roundup_fft(n::Integer;small_primes::Vector{T}=[2,3,5]) where {T<:Integ
     return n-2      # subtract unnecessary last += 2 addition
 end
 
-"""Set all negative entries in an array to zero."""
+"""
+    clip_negatives!(A::AbstractArray)
+
+Set all negative entries `a` in `A` to zero."""
 function clip_negatives!(A::AbstractArray{T}) where T
     @inbounds for i in eachindex(A)
         A[i] = max(A[i],zero(T))
     end
 end
 
-function underflow_small!(A::AbstractArray{T},ϵ::Real) where T
+"""
+    underflow!(A::AbstractArray,ϵ::Real)
+
+Underflows element `a` in `A` to zero if `abs(a) < ϵ`."""
+function underflow!(A::AbstractArray{T},ϵ::Real) where T
     ϵT = convert(T,abs(ϵ))
     @inbounds for i in eachindex(A)
         A[i] = abs(A[i]) < ϵT ? zero(T) : A[i]
     end
 end
 
+"""
+    flipgsign!(A::AbstractArray)
+
+Like `-A` but in-place."""
 function flipsign!(A::AbstractArray)
     @inbounds for i in eachindex(A)
         A[i] = -A[i]
     end
+    A
 end
 
 """
@@ -91,4 +103,51 @@ function readable_secs(secs::Real)
 end
 
 # define as will only become availale in Julia 1.9
-pkgversion(m::Module) = VersionNumber(TOML.parsefile(joinpath(dirname(string(first(methods(m.eval)).file)), "..", "Project.toml"))["version"])
+pkgversion(m::Module) = VersionNumber(TOML.parsefile(joinpath(
+    dirname(string(first(methods(m.eval)).file)), "..", "Project.toml"))["version"])
+
+
+# MATRIX rotations
+"""
+    i_new,j_new = rotate_matrix_indices_90(i,j,s)
+
+Rotate indices `i,j` of a square matrix of size s x s anti-clockwise by 90˚.""" 
+@inline function rotate_matrix_indices_90(i::Integer,j::Integer,s::Integer)
+    @boundscheck 0 < i <= s || throw(BoundsError)
+    @boundscheck 0 < j <= s || throw(BoundsError)
+    i_new = s+1-j   # new i from rotation
+    j_new = i       # corresponding new j
+    return i_new, j_new
+end
+
+"""
+    i_new,j_new = rotate_matrix_indices_180(i,j,s)
+
+Rotate indices `i,j` of a square matrix of size s x s by 180˚.""" 
+@inline function rotate_matrix_indices_180(i::Integer,j::Integer,s::Integer)
+    @boundscheck 0 < i <= s || throw(BoundsError)
+    @boundscheck 0 < j <= s || throw(BoundsError)
+    i_new = s+1-i   # new i from rotation
+    j_new = s+1-j   # corresponding new j
+    return i_new, j_new
+end
+
+"""
+    i_new,j_new = rotate_matrix_indices_270(i,j,s)
+
+Rotate indices `i,j` of a square matrix of size s x s anti-clockwise by 270˚.""" 
+@inline function rotate_matrix_indices_270(i::Integer,j::Integer,s::Integer)
+    @boundscheck 0 < i <= s || throw(BoundsError)
+    @boundscheck 0 < j <= s || throw(BoundsError)
+    i_new = j       # new i from rotation
+    j_new = s+1-i   # corresponding new j
+    return i_new, j_new
+end
+
+@inline function rotate_matrix_indices(i::Integer,j::Integer,s::Integer,r::Integer)
+    r = mod(r,4)    # map 4 to 0 rotation, 5 to 1 rotation etc.
+    r == 0 && return i,j
+    r == 1 && return rotate_matrix_indices_90(i,j,s)
+    r == 2 && return rotate_matrix_indices_180(i,j,s)
+    r == 3 && return rotate_matrix_indices_270(i,j,s)
+end

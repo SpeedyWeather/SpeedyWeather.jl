@@ -9,7 +9,9 @@ module SpeedyWeather
     import FastGaussQuadrature
     import AssociatedLegendrePolynomials as Legendre
     import Healpix
+    import AbstractFFTs
     import FFTW
+    import GenericFFT
     import Primes
     import LinearAlgebra
 
@@ -40,6 +42,7 @@ module SpeedyWeather
             FullClenshawGrid,
             FullGaussianGrid,
             OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
             HEALPixGrid
 
     # EXPORT STRUCTS
@@ -59,7 +62,8 @@ module SpeedyWeather
 
     include("utility_functions.jl")
     include("lower_triangular_matrix.jl")   # defines LowerTriangularMatrix
-    include("grids.jl")                     # defines FullGaussianGrid, OctahedralGaussianGrid, ...
+    include("grids_general.jl")             # defines AbstractGrid and interfaces
+    include("grids.jl")                     # defines concrete Grid types
     include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
 
     include("parameter_structs.jl")
@@ -87,9 +91,9 @@ module SpeedyWeather
     include("tendencies.jl")
     include("implicit_correction.jl")
     include("diffusion.jl")
+    include("output.jl")                    # defines Output
     include("feedback.jl")                  # defines Feedback
-    include("output.jl")
-
+    
     # PHYSICS
     include("column_variables.jl")          # defines ColumnVariables
     include("thermodynamics.jl")
