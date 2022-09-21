@@ -41,6 +41,7 @@ module SpeedyWeather
             AbstractGrid,
             FullClenshawGrid,
             FullGaussianGrid,
+            FullHEALPixGrid,
             OctahedralGaussianGrid,
             OctahedralClenshawGrid,
             HEALPixGrid

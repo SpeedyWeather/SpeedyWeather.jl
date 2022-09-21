@@ -101,7 +101,7 @@ end
                             OctahedralClenshawGrid,)
                             # HEALPixGrid)
                             
-                P = Parameters(;NF,Grid,trunc,model=:shallowwater)
+                P = Parameters(;NF,trunc,model=:shallowwater)
                 S = SpectralTransform(P)
                 B = Boundaries(P,S)
 

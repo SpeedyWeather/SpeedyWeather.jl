@@ -252,6 +252,45 @@ get_quadrature_weights(::Type{<:FullGaussianGrid},nlat_half::Integer) = gaussian
 full_grid(::Type{<:FullGaussianGrid}) = FullGaussianGrid    # the full grid with same latitudes
 
 """
+    G = FullHEALPixGrid{T}
+
+A full HEALPix grid is a regular latitude-longitude grid that uses `nlat` latitudes from the HEALPix grid,
+and the same `nlon` longitudes for every latitude ring. The grid points are closer in zonal direction
+around the poles. The values of all grid points are stored in a vector field `v` that unravels
+the data 0 to 360˚, then ring by ring, which are sorted north to south."""
+struct FullHEALPixGrid{T} <: AbstractFullGrid{T}
+    data::Vector{T}     # data vector, ring by ring, north to south
+    nlat_half::Int      # number of latitudes on one hemisphere
+
+    FullHEALPixGrid{T}(data,nlat_half) where T = length(data) == npoints_fullhealpix(nlat_half) ?
+    new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))} cannot be used to create a "*
+        "H$nlat_half ($(2nlat_half)x$(2nlat_half-1)) FullHEALPixGrid{$T}.")
+end
+
+npoints_fullhealpix(nlat_half::Integer) = 2nlat_half*(2nlat_half-1)
+nlat_half_fullhealpix(npoints::Integer) = round(Int,1/2*(1+sqrt(1+npoints)))
+nside_fullhealpix(nlat_half::Integer) = nlat_half÷2
+
+# infer nside from data vector length, infer parametric type from eltype of data
+FullHEALPixGrid{T}(data::AbstractVector) where T = FullHEALPixGrid{T}(data,nlat_half_fullhealpix(length(data)))
+FullHEALPixGrid(data::AbstractVector,n::Integer...) = FullHEALPixGrid{eltype(data)}(data,n...)
+
+truncation_order(::Type{<:FullHEALPixGrid}) = 2            # quadratic
+get_truncation(::Type{<:FullHEALPixGrid},nlat_half::Integer) = get_truncation(HEALPixGrid,nside_fullhealpix(nlat_half))
+get_resolution(::Type{<:FullHEALPixGrid},trunc::Integer) = get_resolution(HEALPixGrid,trunc)
+get_nresolution(grid::FullHEALPixGrid) = grid.nlat_half
+nlat_odd(::Type{<:FullHEALPixGrid}) = true
+# get_nlon() is already implemented for AbstractFullGrid
+# get_nlon_per_ring() is already implemented for AbstractFullGrid
+get_npoints(::Type{<:FullHEALPixGrid},nlat_half::Integer) = npoints_fullhealpix(nlat_half)
+get_colat(::Type{<:FullHEALPixGrid},nlat_half::Integer) = get_colat(HEALPixGrid,nside_fullhealpix(nlat_half))
+# get_lon() is already implemented for AbstractFullGrid
+# get_colatlons() is already implemented for AbstractFullGrid
+# each_index_in_ring() is already implemented for AbstractFullGrid
+full_grid(::Type{<:FullHEALPixGrid}) = FullHEALPixGrid    # the full grid with same latitudes
+get_quadrature_weights(::Type{<:FullHEALPixGrid},nlat_half::Integer) = riemann_weights(nlat_half)
+
+"""
     G = OctahedralGaussianGrid{T}
 
 An Octahedral Gaussian grid that uses `nlat` Gaussian latitudes, but a decreasing number of longitude
@@ -469,6 +508,7 @@ matrix_size(G::HEALPixGrid) = (5G.nside,5G.nside)
 # QUADRATURE WEIGHTS
 # gaussian_weights are exact for Gaussian latitudes when nlat > (2T+1)/2
 # clenshaw_curtis_weights are exact for equi-angle latitudes when nlat > 2T+1
+riemann_weights(nlat_half::Integer) = gaussian_weights(nlat_half)
 gaussian_weights(nlat_half::Integer) = FastGaussQuadrature.gausslegendre(2nlat_half)[2][1:nlat_half]
 function clenshaw_curtis_weights(nlat_half::Integer)
     nlat = 2nlat_half - 1
@@ -477,7 +517,7 @@ function clenshaw_curtis_weights(nlat_half::Integer)
 end
 
 # SOLID ANGLES ΔΩ = sinθ Δθ Δϕ
-get_solid_angles(Grid::Type{<:AbstractGrid},nlat_half::Integer) = 
-    get_quadrature_weights(Grid,nlat_half) .* (2π./get_nlons(Grid,nlat_half))
+get_solid_angles(Grid::Type{<:AbstractGrid},n::Integer) = 
+    get_quadrature_weights(Grid,get_nlat_half(Grid,n)) .* (2π./get_nlons(Grid,n))
 get_solid_angles(Grid::Type{<:HEALPixGrid},nside::Integer) =
     4π/get_npoints(Grid,nside)*ones(get_nlat_half(Grid,nside))
