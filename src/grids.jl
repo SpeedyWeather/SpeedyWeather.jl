@@ -129,7 +129,7 @@ abstract type AbstractHEALPixGrid{T} <: AbstractGrid{T} end
 get_nresolution(G::AbstractHEALPixGrid) = G.nside
 get_nlat_half(::Type{<:AbstractHEALPixGrid},nside::Integer) = 2nside
 nlat_odd(::Type{<:AbstractHEALPixGrid}) = true
-get_nlon_max(::Type{<:AbstractHEALPixGrid},nside::Integer) = nside_assert(nside) ? nlon_healpix(nside) : nothing
+get_nlon_max(::Type{<:AbstractHEALPixGrid},nside::Integer) = nlon_healpix(nside)
 
 function get_nlon_per_ring(::Type{<:AbstractHEALPixGrid},nside::Integer,j::Integer)
     nlat = nlat_healpix(nside)
@@ -478,25 +478,19 @@ struct HEALPixGrid{T} <: AbstractHEALPixGrid{T}
     "cannot be used to create an H$nside HEALPixGrid{$T}.")
 end
 
-# number of points and longitudes per ring on the HEALPix grid
-function nside_assert(nside::Integer)
-    @assert is_power_2_or_0(nside) "HEALPixGrid: nside=$nside is not a power of 2."
-    return true
-end
-
-npoints_healpix(nside::Integer) = nside_assert(nside) ? 12nside^2 : nothing
+npoints_healpix(nside::Integer) = 12nside^2
 nside_healpix(npoints::Integer) = round(Int,sqrt(npoints/12))  # inverse of npoints_healpix
-nlat_healpix(nside::Integer) = nside_assert(nside) ? 4nside-1 : nothing
-nlon_healpix(nside::Integer,j::Integer) = nside_assert(nside) ? min(4j,4nside) : nothing
-nlon_healpix(nside::Integer) = nside_assert(nside) ? 4nside : nothing
+nlat_healpix(nside::Integer) = 4nside-1
+nlon_healpix(nside::Integer,j::Integer) = min(4j,4nside)
+nlon_healpix(nside::Integer) = 4nside
 
 # infer nside from data vector length, infer parametric type from eltype of data
 HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid{T}(data,nside_healpix(length(data)))
 HEALPixGrid(data::AbstractVector,n::Integer...) = HEALPixGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:HEALPixGrid}) = 1                 # linear (in longitude)
-get_truncation(::Type{<:HEALPixGrid},nside::Integer) = nside_assert(nside) ? 2nside-1 : nothing
-get_resolution(::Type{<:HEALPixGrid},trunc::Integer) = roundup_fft(ceil(Int,(trunc+1)/2),small_primes=[2])
+get_truncation(::Type{<:HEALPixGrid},nside::Integer) = 2nside-1
+get_resolution(::Type{<:HEALPixGrid},trunc::Integer) = roundup_fft(ceil(Int,(trunc+1)/2))
 get_colat(G::Type{<:HEALPixGrid},nside::Integer) =
             [acos(Healpix.ring2z(Healpix.Resolution(nside),j)) for j in 1:nlat_healpix(nside)]
 # get_lon() is already implemented for AbstractHEALPixGrid
