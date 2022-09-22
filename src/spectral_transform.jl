@@ -82,16 +82,16 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     order = truncation_order(Grid)
 
     # RESOLUTION PARAMETERS
-    nresolution = get_resolution(Grid,trunc)        # resolution parameter, nlat_half/nside for HEALPixGrid
-    nlat_half = get_nlat_half(Grid,nresolution)     # contains equator for HEALPix
-    nlat = 2nlat_half - nlat_odd(Grid)              # one less if grids have odd # of latitude rings
-    nlon_max = get_nlon_max(Grid,nresolution)       # number of longitudes around the equator
+    nresolution = get_resolution(Grid,trunc)        # resolution parameter nlat_half
+    nlat_half = nresolution                         # number of latitude rings on one hemisphere incl equator
+    nlat = get_nlat(Grid,nlat_half)                 # 2nlat_half but one less if grids have odd # of lat rings
+    nlon_max = get_nlon_max(Grid,nlat_half)         # number of longitudes around the equator
                                                     # number of longitudes per latitude ring (one hemisphere only)
-    nlons = [get_nlon_per_ring(Grid,nresolution,j) for j in 1:nlat_half]
+    nlons = [get_nlon_per_ring(Grid,nlat_half,j) for j in 1:nlat_half]
     nfreq_max = nlon_max÷2 + 1                      # maximum number of fourier frequencies (real FFTs)
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
-    colat = get_colat(Grid,nresolution)             # colatitude in radians                             
+    colat = get_colat(Grid,nlat_half)               # colatitude in radians                             
     cos_colat = cos.(colat)                         # cos(colat)
     sin_colat = sin.(colat)                         # sin(colat)
 
@@ -104,8 +104,8 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     norm_sphere = 2sqrt(π)  # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
 
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
-    _, lons = get_colatlons(Grid,nresolution)
-    lon1s = [lons[each_index_in_ring(Grid,j,nresolution)[1]] for j in 1:nlat_half]
+    _, lons = get_colatlons(Grid,nlat_half)
+    lon1s = [lons[each_index_in_ring(Grid,j,nlat_half)[1]] for j in 1:nlat_half]
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
     Grid <: AbstractHEALPixGrid && fill!(lon_offsets,1)     # no rotation for HEALPix at the moment
     
@@ -132,7 +132,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
     # and sum up to 2 over all latitudes as ∫sin(θ)dθ = 2 over 0...π.
     # Δϕ = 2π/nlon is the azimuth every grid point covers
-    solid_angles = get_solid_angles(Grid,nresolution)
+    solid_angles = get_solid_angles(Grid,nlat_half)
 
     # RECURSION FACTORS
     ϵlms = get_recursion_factors(lmax+1,mmax)
@@ -216,7 +216,7 @@ function spectral_transform_for_full_grid(S::SpectralTransform{NF}) where NF
     @unpack vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2, eigenvalues, eigenvalues⁻¹ = S
 
     # recalculate what changes on the full grid: FFT and offsets (always 1)
-    nlons = [get_nlon_per_ring(FullGrid,nresolution,j) for j in 1:nlat_half]
+    nlons = [get_nlon_per_ring(FullGrid,nlat_half,j) for j in 1:nlat_half]
     FFT_package = NF <: Union{Float32,Float64} ? FFTW : GenericFFT
     rfft_plans = [FFT_package.plan_rfft(zeros(NF,nlon)) for nlon in nlons]
     brfft_plans = [FFT_package.plan_brfft(zeros(Complex{NF},nlon÷2 + 1),nlon) for nlon in nlons]
@@ -224,7 +224,7 @@ function spectral_transform_for_full_grid(S::SpectralTransform{NF}) where NF
     lon_offsets = copy(S.lon_offsets)
     fill!(lon_offsets,1)            # =*1, i.e. no longitude offset rotation on full grid
 
-    solid_angles = get_solid_angles(FullGrid,nresolution)
+    solid_angles = get_solid_angles(FullGrid,nlat_half)
 
     return SpectralTransform{NF}(   FullGrid,nresolution,order,
                                     lmax,mmax,nfreq_max,

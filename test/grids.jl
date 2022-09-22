@@ -50,7 +50,7 @@ end
                     HEALPixGrid,
                     )
 
-            n = 32      # resolution parameter nlat_half/nside
+            n = 32      # resolution parameter nlat_half
             G1 = zeros(G,n)
             G2 = zero(G1)
             G3 = G(G2)
@@ -77,7 +77,7 @@ end
                 HEALPixGrid,
                 )
 
-        n = 32      # resolution parameter nlat_half/nside
+        n = 32      # resolution parameter nlat_half
         grid = zeros(G,n)
 
         # precompute indices and boundscheck

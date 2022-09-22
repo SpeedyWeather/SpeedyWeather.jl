@@ -6,7 +6,6 @@ points across latitude rings. Different latitudes can be used, Gaussian latitude
 equi-angle latitdes, or others."""
 abstract type AbstractFullGrid{T} <: AbstractGrid{T} end
 
-get_nresolution(grid::AbstractFullGrid) = grid.nlat_half
 get_nlon(G::Type{<:AbstractFullGrid},nlat_half::Integer) = get_nlon_max(G,nlat_half)
 get_nlon_max(::Type{<:AbstractFullGrid},nlat_half::Integer) = 4nlat_half
 get_nlon_per_ring(G::Type{<:AbstractFullGrid},nlat_half::Integer,j::Integer) = get_nlon_max(G,nlat_half)
@@ -67,7 +66,6 @@ points on the latitude ring i starting with i=1 around the pole.
 Different latitudes can be used, Gaussian latitudes, equi-angle latitdes, or others."""
 abstract type AbstractOctahedralGrid{T} <: AbstractGrid{T} end
 
-get_nresolution(grid::AbstractOctahedralGrid) = grid.nlat_half
 get_nlon_max(::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = nlon_octahedral(nlat_half)
 
 function get_nlon_per_ring(Grid::Type{<:AbstractOctahedralGrid},nlat_half::Integer,j::Integer)
@@ -126,21 +124,23 @@ An `AbstractHEALPixGrid` is a horizontal grid similar to the standard HEALPixGri
 but different latitudes can be used, the default HEALPix latitudes or others."""
 abstract type AbstractHEALPixGrid{T} <: AbstractGrid{T} end
 
-get_nresolution(G::AbstractHEALPixGrid) = G.nside
-get_nlat_half(::Type{<:AbstractHEALPixGrid},nside::Integer) = 2nside
-nlat_odd(::Type{<:AbstractHEALPixGrid}) = true
-get_nlon_max(::Type{<:AbstractHEALPixGrid},nside::Integer) = nlon_healpix(nside)
+npoints_healpix(nlat_half::Integer) = 3*nlat_half^2
+nside_healpix(nlat_half::Integer) = nlat_half÷2
+nlat_half_healpix(npoints::Integer) = round(Int,sqrt(npoints/3))  # inverse of npoints_healpix
+nlon_healpix(nlat_half::Integer,j::Integer) = min(4j,2nlat_half,4nlat_half-4j)
+nlon_max_healpix(nlat_half::Integer) = 2nlat_half
 
-function get_nlon_per_ring(::Type{<:AbstractHEALPixGrid},nside::Integer,j::Integer)
-    nlat = nlat_healpix(nside)
-    @assert 0 < j <= nlat "Ring $j is outside H$nside grid."
-    nlat_half = (nlat+1)÷2
-    j = j > nlat_half ? nlat - j + 1 : j      # flip north south due to symmetry
-    return nlon_healpix(nside,j)
+nlat_odd(::Type{<:AbstractHEALPixGrid}) = true
+get_nlon_max(::Type{<:AbstractHEALPixGrid},nlat_half::Integer) = nlon_max_healpix(nlat_half)
+
+function get_nlon_per_ring(G::Type{<:AbstractHEALPixGrid},nlat_half::Integer,j::Integer)
+    nlat = get_nlat(G,nlat_half)
+    @assert 0 < j <= nlat "Ring $j is outside H$nlat_half grid."
+    return nlon_healpix(nlat_half,j)
 end
 
-get_npoints(::Type{<:AbstractHEALPixGrid},nside::Integer) = npoints_healpix(nside)
-get_lon(::Type{<:AbstractHEALPixGrid},nside::Integer) = Float64[]    # only defined for full grids
+get_npoints(::Type{<:AbstractHEALPixGrid},nlat_half::Integer) = npoints_healpix(nlat_half)
+get_lon(::Type{<:AbstractHEALPixGrid},nlat_half::Integer) = Float64[]    # only defined for full grids
 
 function get_colatlons(Grid::Type{<:AbstractHEALPixGrid},nside::Integer)
     npoints = get_npoints(Grid,nside)
@@ -152,7 +152,8 @@ end
 
 function each_index_in_ring(::Type{<:AbstractHEALPixGrid},  # function for HEALPix grids
                             j::Integer,                     # ring index north to south
-                            nside::Integer)                 # resolution param
+                            nlat_half::Integer)             # resolution param
+    nside = nside_healpix(nlat_half)
 
     @boundscheck 0 < j < 4nside || throw(BoundsError)       # ring index valid?
     if j < nside                                            # northern polar cap
@@ -193,14 +194,13 @@ end
 npoints_clenshaw(nlat_half::Integer) = 8nlat_half^2 - 4nlat_half
 nlat_half_clenshaw(npoints::Integer) = round(Int,1/4 + sqrt(1/16 + npoints/8))  # inverse
 
-# infer nside from data vector length, infer parametric type from eltype of data
+# infer nlat_half from data vector length, infer parametric type from eltype of data
 FullClenshawGrid{T}(data::AbstractVector) where T = FullClenshawGrid{T}(data,nlat_half_clenshaw(length(data)))
 FullClenshawGrid(data::AbstractVector,n::Integer...) = FullClenshawGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:FullClenshawGrid}) = 3            # cubic
 get_truncation(::Type{<:FullClenshawGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
 get_resolution(::Type{<:FullClenshawGrid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
-# get_nresolution() is already implemented for AbstractFullGrid
 nlat_odd(::Type{<:FullClenshawGrid}) = true
 # get_nlon() is already implemented for AbstractFullGrid
 # get_nlon_per_ring() is already implemented for AbstractFullGrid
@@ -231,14 +231,13 @@ end
 npoints_gaussian(nlat_half::Integer) = 8nlat_half^2
 nlat_half_gaussian(npoints::Integer) = round(Int,sqrt(npoints/8))
 
-# infer nside from data vector length, infer parametric type from eltype of data
+# infer nlat_half from data vector length, infer parametric type from eltype of data
 FullGaussianGrid{T}(data::AbstractVector) where T = FullGaussianGrid{T}(data,nlat_half_gaussian(length(data)))
 FullGaussianGrid(data::AbstractVector,n::Integer...) = FullGaussianGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:FullGaussianGrid}) = 2            # quadratic
 get_truncation(::Type{<:FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
 get_resolution(::Type{<:FullGaussianGrid},trunc::Integer) = roundup_fft(ceil(Int,(3*trunc+1)/4))
-# get_nresolution() is already defined for AbstractFullGrid
 nlat_odd(::Type{<:FullGaussianGrid}) = false
 # get_nlon() is already implemented for AbstractFullGrid
 # get_nlon_per_ring() is already implemented for AbstractFullGrid
@@ -271,14 +270,13 @@ npoints_fullhealpix(nlat_half::Integer) = 2nlat_half*(2nlat_half-1)
 nlat_half_fullhealpix(npoints::Integer) = round(Int,1/2*(1+sqrt(1+npoints)))
 nside_fullhealpix(nlat_half::Integer) = nlat_half÷2
 
-# infer nside from data vector length, infer parametric type from eltype of data
+# infer nlat_half from data vector length, infer parametric type from eltype of data
 FullHEALPixGrid{T}(data::AbstractVector) where T = FullHEALPixGrid{T}(data,nlat_half_fullhealpix(length(data)))
 FullHEALPixGrid(data::AbstractVector,n::Integer...) = FullHEALPixGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:FullHEALPixGrid}) = 2            # quadratic
-get_truncation(::Type{<:FullHEALPixGrid},nlat_half::Integer) = get_truncation(HEALPixGrid,nside_fullhealpix(nlat_half))
+get_truncation(::Type{<:FullHEALPixGrid},nlat_half::Integer) = get_truncation(HEALPixGrid,nlat_half)
 get_resolution(::Type{<:FullHEALPixGrid},trunc::Integer) = get_resolution(HEALPixGrid,trunc)
-get_nresolution(grid::FullHEALPixGrid) = grid.nlat_half
 nlat_odd(::Type{<:FullHEALPixGrid}) = true
 # get_nlon() is already implemented for AbstractFullGrid
 # get_nlon_per_ring() is already implemented for AbstractFullGrid
@@ -323,7 +321,6 @@ OctahedralGaussianGrid(data::AbstractVector,n::Integer...) = OctahedralGaussianG
 truncation_order(::Type{<:OctahedralGaussianGrid}) = 3      # cubic
 get_truncation(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = nlat_half-1
 get_resolution(::Type{<:OctahedralGaussianGrid},trunc::Integer) = roundup_fft(trunc+1)
-# get_nresolution() is already implemented for AbstractOctahedralGrid
 nlat_odd(::Type{<:OctahedralGaussianGrid}) = false
 # get_nlon() is already implemented for AbstractOctahedralGrid
 # get_nlon_per_ring() is already implemented for AbstractOctahedralGrid
@@ -357,7 +354,7 @@ struct OctahedralClenshawGrid{T} <: AbstractOctahedralGrid{T}
     "cannot be used to create a O$(nlat_half) OctahedralClenshawGrid{$T}.")
 end
 
-# infer nside from data vector length, infer parametric type from eltype of data
+# infer nlat_half from data vector length, infer parametric type from eltype of data
 OctahedralClenshawGrid{T}(data::AbstractVector) where T = OctahedralClenshawGrid{T}(data,
                                                         nlat_half_octahedral(length(data),true))
 OctahedralClenshawGrid(data::AbstractVector,n::Integer...) = OctahedralClenshawGrid{eltype(data)}(data,n...)
@@ -365,7 +362,6 @@ OctahedralClenshawGrid(data::AbstractVector,n::Integer...) = OctahedralClenshawG
 truncation_order(::Type{<:OctahedralClenshawGrid}) = 3      # cubic
 get_truncation(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = nlat_half-1
 get_resolution(::Type{<:OctahedralClenshawGrid},trunc::Integer) = roundup_fft(trunc+1)
-# get_nresolution() is already implemented for AbstractOctahedralGrid
 nlat_odd(::Type{<:OctahedralClenshawGrid}) = true
 # get_nlon() is already implemented for AbstractOctahedralGrid
 # get_nlon_per_ring() is already implemented for AbstractOctahedralGrid
@@ -428,7 +424,7 @@ function Matrix!(   MGs::Tuple{AbstractMatrix{T},OctahedralClenshawGrid}...;
 
     rings = eachring(G)         # index ranges for all rings
     nlat_half = G.nlat_half     # number of latitude rings on one hemisphere incl Equator
-    nside = 4+G.nlat_half       # side length of a basepixel matrix (=nside in HEALPix)
+    nside = 4+G.nlat_half       # side length of a basepixel matrix
 
     # sort grid indices from G into matrix M
     # 1) loop over each grid point per ring
@@ -467,37 +463,46 @@ end
     H = HEALPixGrid{T}
 
 A HEALPix grid with 12 faces, each `nside`x`nside` grid points, each covering the same area.
+The number of latitude rings on one hemisphere (incl Equator) `nlat_half` is used as resolution parameter.
 The values of all grid points are stored in a vector field `v` that unravels the data 0 to 360˚,
 then ring by ring, which are sorted north to south."""
 struct HEALPixGrid{T} <: AbstractHEALPixGrid{T}
     data::Vector{T}    # data vector, ring by ring, north to south
-    nside::Int      # nside^2 is the number of pixel in each of the 12 base pixel
+    nlat_half::Int     # number of latitude rings on one hemisphere (Equator included)
 
-    HEALPixGrid{T}(data,nside) where T = length(data) == npoints_healpix(nside) ?
-    new(data,nside) : error("$(length(data))-element Vector{$(eltype(data))}"*
-    "cannot be used to create an H$nside HEALPixGrid{$T}.")
+    HEALPixGrid{T}(data,nlat_half) where T = length(data) == npoints_healpix(nlat_half) ?
+    new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))}"*
+    "cannot be used to create an H$nlat_half HEALPixGrid{$T}.")
 end
 
-npoints_healpix(nside::Integer) = 12nside^2
-nside_healpix(npoints::Integer) = round(Int,sqrt(npoints/12))  # inverse of npoints_healpix
-nlat_healpix(nside::Integer) = 4nside-1
-nlon_healpix(nside::Integer,j::Integer) = min(4j,4nside)
-nlon_healpix(nside::Integer) = 4nside
-
-# infer nside from data vector length, infer parametric type from eltype of data
-HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid{T}(data,nside_healpix(length(data)))
+# infer nlat_half from data vector length, infer parametric type from eltype of data
+HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid{T}(data,nlat_half_healpix(length(data)))
 HEALPixGrid(data::AbstractVector,n::Integer...) = HEALPixGrid{eltype(data)}(data,n...)
 
 truncation_order(::Type{<:HEALPixGrid}) = 1                 # linear (in longitude)
-get_truncation(::Type{<:HEALPixGrid},nside::Integer) = 2nside-1
-get_resolution(::Type{<:HEALPixGrid},trunc::Integer) = roundup_fft(ceil(Int,(trunc+1)/2))
-get_colat(G::Type{<:HEALPixGrid},nside::Integer) =
-            [acos(Healpix.ring2z(Healpix.Resolution(nside),j)) for j in 1:nlat_healpix(nside)]
+get_truncation(::Type{<:HEALPixGrid},nlat_half::Integer) = nlat_half-1
+get_resolution(::Type{<:HEALPixGrid},trunc::Integer) = trunc+1
+
+function get_colat(::Type{<:HEALPixGrid},nlat_half::Integer)
+    nlat = get_nlat(HEALPixGrid,nlat_half)
+    nside = nside_healpix(nlat_half)
+    colat = zeros(nlat)
+    
+    for j in 1:nside        colat[j] = acos(1-j^2/3nside^2)                 end     # north polar cap
+    for j in nside+1:3nside colat[j] = acos(4/3 - 2j/3nside)                end     # equatorial belt
+    for j in 3nside+1:nlat  colat[j] = acos((2nlat_half-j)^2/3nside^2-1)    end     # south polar cap
+
+    return colat
+end
+
 # get_lon() is already implemented for AbstractHEALPixGrid
 # get_colatlons() is already implemented for AbstractHEALPixGrid
 # each_index_in_ring() is already implemented for AbstractHEALPixGrid
 full_grid(::Type{<:HEALPixGrid}) = FullHEALPixGrid    # the full grid with same latitudes
-matrix_size(G::HEALPixGrid) = (5G.nside,5G.nside)
+function matrix_size(G::HEALPixGrid)
+    nside = nside_healpix(G.nlat_half)
+    return (5nside,5nside)
+end
 
 # QUADRATURE WEIGHTS
 # gaussian_weights are exact for Gaussian latitudes when nlat > (2T+1)/2

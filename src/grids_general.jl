@@ -25,7 +25,7 @@ Every new grid has to be of the form
     abstract type AbstractGridClass{T} <: AbstractGrid{T} end
     struct MyNewGrid{T} <: AbstractGridClass{T}
         data::Vector{T}     # all grid points unravelled into a vector
-        n::Int              # resolution parameter, like `nlat_half`, `nside` etc
+        nlat_half::Int      # resolution: latitude rings on one hemisphere (Equator incl)
     end
     
 `MyNewGrid` should belong to a grid class like `AbstractFullGrid`, `AbstractOctahedralGrid` or
@@ -35,7 +35,6 @@ have different latitudes or offset rotations. Each new grid `Grid` (or grid clas
 implement the following methods (see grids.jl)
     
 Fundamental grid properties
-    get_nresolution     # returns the resolution parameter nlat_half, nside, etc.
     get_npoints         # total number of grid points
     nlat_odd            # does the grid have an odd number of latitude rings?
     get_nlat            # total number of latitude rings
@@ -63,30 +62,29 @@ AbstractGrid
 
 # Define methods that are universally applicable to any G<:AbstractGrid here
 # generator functions for grid
-Base.zeros(::Type{Grid},n::Integer) where {Grid<:AbstractGrid{T}} where T =
-    Grid(zeros(T,get_npoints(Grid,n)),n)
+Base.zeros(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid{T}} where T =
+    Grid(zeros(T,get_npoints(Grid,nlat_half)),nlat_half)
 # use Float64 if not provided
-Base.zeros(::Type{Grid},n::Integer) where {Grid<:AbstractGrid} = zeros(Grid{Float64},n)
+Base.zeros(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid} = zeros(Grid{Float64},nlat_half)
 # zero element of an AbstractGrid instance grid by packing a zero(::Vector) into grid
 Base.zero(grid::Grid) where {Grid<:AbstractGrid} = Grid(zero(grid.data))
 
-get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,get_nresolution(grid))
-get_nlat_half(::Grid,n::Integer) where {Grid<:AbstractGrid} = get_nlat_half(Grid,n) 
+get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,get_nlat_half(grid))
+get_nlat_half(grid::AbstractGrid) = grid.nlat_half
 nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))
-get_nlat_half(::Type{<:AbstractGrid},nlat_half::Integer) = nlat_half
-get_nlat(Grid::Type{<:AbstractGrid},n::Integer) = 2get_nlat_half(Grid,n) - nlat_odd(Grid)
-get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,get_nresolution(grid))
-get_npoints(grid::Grid) where {Grid<:AbstractGrid} = get_npoints(Grid,get_nresolution(grid))
+get_nlat(Grid::Type{<:AbstractGrid},nlat_half::Integer) = 2nlat_half - nlat_odd(Grid)
+get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,get_nlat_half(grid))
+get_npoints(grid::Grid) where {Grid<:AbstractGrid} = get_npoints(Grid,get_nlat_half(grid))
 
 function each_index_in_ring(grid::G,j::Integer) where {G<:AbstractGrid}
-    return each_index_in_ring(G,j,get_nresolution(grid))
+    return each_index_in_ring(G,j,get_nlat_half(grid))
 end
 
-eachgridpoint(grid::G) where {G<:AbstractGrid} = Base.OneTo(get_npoints(G,get_nresolution(grid)))
+eachgridpoint(grid::AbstractGrid) = Base.OneTo(get_npoints(grid))
 
-function eachring(grid::G) where {G<:AbstractGrid}
+function eachring(grid::AbstractGrid)
     rings = [each_index_in_ring(grid,j) for j in 1:get_nlat(grid)]
-    return rings                                            # return Vector{UnitRange}
+    return rings    # returns Vector{UnitRange}
 end
 
 function eachring(grids::Grid...) where {Grid<:AbstractGrid}
@@ -98,15 +96,15 @@ end
 
 """
     nlons = get_nlons(  Grid::Type{<:AbstractGrid},
-                        nresolution::Integer;
+                        nlat_half::Integer;
                         both_hemispheres::Bool=false)
 
 Returns a vector `nlons` for the number of longitude points per latitude ring, north to south.
-Provide grid `Grid` and its resolution parameter `nresolution`. For both_hemisphere==false only
+Provide grid `Grid` and its resolution parameter `nlat_half`. For both_hemisphere==false only
 the northern hemisphere (incl Equator) is returned."""
-function get_nlons(Grid::Type{<:AbstractGrid},nresolution::Integer;both_hemispheres::Bool=false)
-    n = both_hemispheres ? get_nlat(Grid,nresolution) : get_nlat_half(Grid,nresolution)
-    return [get_nlon_per_ring(Grid,nresolution,j) for j in 1:n]
+function get_nlons(Grid::Type{<:AbstractGrid},nlat_half::Integer;both_hemispheres::Bool=false)
+    n = both_hemispheres ? get_nlat(Grid,nlat_half) : nlat_half
+    return [get_nlon_per_ring(Grid,nlat_half,j) for j in 1:n]
 end
 
-get_nlon_max(grid::Grid) where {Grid<:AbstractGrid} = get_nlon_max(Grid,get_nresolution(grid)) 
+get_nlon_max(grid::Grid) where {Grid<:AbstractGrid} = get_nlon_max(Grid,get_nlat_half(grid)) 
