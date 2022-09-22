@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      - gpu
 jobs:
   test:
     runs-on: ubuntu-latest
