@@ -109,7 +109,8 @@ The default values of the keywords define the default model setup.
 
     # INITIAL CONDITIONS
     seed::Int = abs(rand(Int))          # a random seed that's used in initialize_speedy for the global RNG
-    initial_conditions::Symbol=:barotropic_vorticity    # :rest, :barotropic_vorticity or :restart
+    initial_conditions::Union{Symbol, Vector}=:barotropic_vorticity    # :rest, :barotropic_vorticity, :restart
+                                                                       # or Vector of LowerTriangularMatrix of Vorticity 
 
     # OUTPUT
     verbose::Bool = true            # print dialog for feedback

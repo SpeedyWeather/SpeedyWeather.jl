@@ -59,6 +59,36 @@ end
     """
 end
 
+
+@testset "Initialize from Vorticity IC" begin
+
+    # BAROTROPIC MODEL
+    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:barotropic)
+
+    ic = [layer.leapfrog[1].vor for layer in progn.layers]
+    progn, diagn, model = initialize_speedy(initial_conditions=ic,model=:barotropic)
+    for layers in progn.layers
+        for leapfrog in layers.leapfrog
+            @test all(leapfrog.vor .== 0)
+        end
+    end
+
+    # SHALLOW WATER MODE
+    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:shallowwater)
+
+    ic = [layer.leapfrog[1].vor for layer in progn.layers]
+    progn, diagn, model = initialize_speedy(initial_conditions=ic,model=shallowwater)
+    for layers in progn.layers
+        for leapfrog in layers.leapfrog
+            @test all(leapfrog.vor .== 0)
+            @test all(leapfrog.div .== 0)
+        end
+    end
+    @test all(progn.pres.leapfrog[1] .== 0)
+    @test all(progn.pres.leapfrog[2] .== 0)
+end
+
+
 @testset "Initialize speedy with different models" begin
     _,_,m_barotrop = initialize_speedy(model=:barotropic)
     _,_,m_shalloww = initialize_speedy(model=:shallowwater)

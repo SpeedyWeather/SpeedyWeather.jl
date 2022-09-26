@@ -25,6 +25,9 @@ function initial_conditions(M::ModelSetup)
                 end
             end
         end
+    
+    elseif typeof(initial_conditions) <: Vector
+        initialize_from_vector!(progn, initial_conditions, M)
 
     elseif initial_conditions == :restart
         initialize_from_file!(progn,M)
@@ -67,6 +70,29 @@ function initialize_from_rest(M::PrimitiveEquationModel)
 
     return progn
 end
+
+function initialize_from_vector!(progn_new::PrognosticVariables{NF}, ic::Vector, M::ModelSetup) where NF
+   
+    @unpack nlev = M.geometry
+    @unpack lmax, mmax = M.spectral_transform
+
+    @assert length(ic) == nlev
+
+    # SPECTRAL TRUNCATION/INTERPOLATION to new resolution and conversion to NF
+    for (layer_new, layer_ic) in zip(progn_new.layers, ic)
+
+        @assert typeof(layer_ic) <: LowerTriangularMatrix 
+
+        layer_new_lf1 = layer_new.leapfrog[1]
+        vor_new = layer_new_lf1.vor
+        lmax,mmax = size(vor_new) .- (2,1)
+
+        vor_ic_trunc = spectral_truncation(layer_ic, lmax+1, mmax)
+        vor_new .=  convert(LowerTriangularMatrix{Complex{NF}}, vor_ic_trunc)
+    end 
+
+    progn_new
+end 
 
 function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup) where NF
     @unpack restart_path, restart_id = M.parameters
