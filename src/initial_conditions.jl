@@ -26,7 +26,7 @@ function initial_conditions(M::ModelSetup)
             end
         end
     
-    elseif typeof(initial_conditions) <: Vector
+    elseif typeof(initial_conditions) <: Vector{<:LowerTriangularMatrix}
         initialize_from_vector!(progn, initial_conditions, M)
 
     elseif initial_conditions == :restart
@@ -86,7 +86,7 @@ function initialize_from_vector!(progn_new::PrognosticVariables{NF}, ic::Vector{
         vor_new .=  convert(LowerTriangularMatrix{Complex{NF}}, vor_ic_trunc)
     end 
 
-    progn_new
+    return progn_new
 end 
 
 function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup) where NF
