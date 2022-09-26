@@ -74,8 +74,6 @@ end
 function initialize_from_vector!(progn_new::PrognosticVariables{NF}, ic::Vector, M::ModelSetup) where NF
    
     @unpack nlev = M.geometry
-    @unpack lmax, mmax = M.spectral_transform
-
     @assert length(ic) == nlev
 
     # SPECTRAL TRUNCATION/INTERPOLATION to new resolution and conversion to NF
