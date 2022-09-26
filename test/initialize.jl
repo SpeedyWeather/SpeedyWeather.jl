@@ -77,7 +77,7 @@ end
     progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:shallowwater)
 
     ic = [layer.leapfrog[1].vor for layer in progn.layers]
-    progn, diagn, model = initialize_speedy(initial_conditions=ic,model=shallowwater)
+    progn, diagn, model = initialize_speedy(initial_conditions=ic,model=:shallowwater)
     for layers in progn.layers
         for leapfrog in layers.leapfrog
             @test all(leapfrog.vor .== 0)
