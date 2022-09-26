@@ -71,16 +71,13 @@ function initialize_from_rest(M::PrimitiveEquationModel)
     return progn
 end
 
-function initialize_from_vector!(progn_new::PrognosticVariables{NF}, ic::Vector, M::ModelSetup) where NF
+function initialize_from_vector!(progn_new::PrognosticVariables{NF}, ic::Vector{T}, M::ModelSetup) where {NF, T<:LowerTriangularMatrix}
    
     @unpack nlev = M.geometry
     @assert length(ic) == nlev
 
     # SPECTRAL TRUNCATION/INTERPOLATION to new resolution and conversion to NF
     for (layer_new, layer_ic) in zip(progn_new.layers, ic)
-
-        @assert typeof(layer_ic) <: LowerTriangularMatrix 
-
         layer_new_lf1 = layer_new.leapfrog[1]
         vor_new = layer_new_lf1.vor
         lmax,mmax = size(vor_new) .- (2,1)
