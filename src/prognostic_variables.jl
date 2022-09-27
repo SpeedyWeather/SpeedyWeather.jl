@@ -96,3 +96,85 @@ function Base.zeros(::Type{PrognosticVariables{NF}},
     pres = zeros(SurfaceLeapfrog{NF},_lmax,_mmax)                     # 2 leapfrog time steps for pres
     return PrognosticVariables(layers,pres,lmax,mmax,N_LEAPFROG,nlev)
 end
+
+# SET_VAR FUNCTIONS TO ASSIGN NEW VALUES TO PrognosticVariables
+
+function set_var!(progn::PrognosticVariables{NF}, 
+                  varname::Symbol, 
+                  var::Vector{<:LowerTriangularMatrix},
+                  lf::Integer=1) where NF
+
+    @assert length(var) == length(progn.layers)
+
+    for (progn_layer, var_layer) in zip(progn.layers, var)
+        _set_var_core!(getfield(progn_layer.leapfrog[lf], varname), var_layer)
+    end 
+
+    return progn 
+end 
+
+function _set_var_core!(var_old::LowerTriangularMatrix{T}, var_new::LowerTriangularMatrix{R}) where {T,R}
+    @assert size(var_old) != (0,0)
+    lmax,mmax = size(var_old) .- (2,1)
+    var_new_trunc = spectral_truncation!(var_new, lmax+1, mmax)
+    copyto!(var_old, var_new_trunc)
+end 
+
+function set_var!(progn::PrognosticVariables{NF}, 
+                  varname::Symbol, 
+                  var::Vector{<:AbstractGrid},
+                  lf::Integer=1) where NF
+
+    @assert length(var) == length(progn.layers)
+
+    var_sph = [spectral(var_layer) for var_layer in var]
+
+    return set_var!(progn, varname, var_sph, lf)
+end 
+
+function set_var!(progn::PrognosticVariables{NF}, 
+                  varname::Symbol, 
+                  var::Vector{<:AbstractGrid}, 
+                  M::ModelSetup,
+                  lf::Integer=1) where NF
+
+    @assert length(var) == length(progn.layers)
+
+    var_sph = [spectral(var_layer, M.spectral_transform) for var_layer in var]
+
+    return set_var!(progn, varname, var_sph, lf)
+end 
+
+function set_var!(progn::PrognosticVariables{NF}, 
+                  varname::Symbol, 
+                  var::Vector{<:AbstractMatrix}, 
+                  Grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                  lf::Integer=1) where NF
+
+    @assert length(var) == length(progn.layers)
+
+    var_grid = [spectral(var_layer, Grid) for var_layer in var]
+
+    return set_var!(progn, varname, var_grid, lf)
+end 
+
+set_vorticity!(progn::PrognosticVariables, varargs...) = set_var!(progn, :vor, varargs...)
+set_divergence!(progn::PrognosticVariables, varargs...) = set_var!(progn, :div, varargs...)
+set_temperature!(progn::PrognosticVariables, varargs...) = set_var!(progn, :temp, varargs...)
+set_humidity!(progn::PrognosticVariables, varargs...) = set_var!(progn, :humid, varargs...)
+
+function set_pressure!(progn::PrognosticVariables{NF}, 
+                       pressure::LowerTriangularMatrix,
+                       lf::Integer=1) where NF
+
+    _set_var_core!(progn.pres.leapfrog[lf], pressure)
+
+    return progn
+end
+
+set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid, M::ModelSetup, lf::Integer=1) = set_pressure!(progn, spectral(pressure, M.spectral_transform), lf)
+
+set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid, lf::Integer=1) = set_pressure!(progn, spectral(pressure), lf)
+
+set_pressure!(progn::PrognosticVariables, pressure::AbstractMatrix, Grid::Type{<:AbstractGrid}, lf::Integer=1) = set_pressure!(progn, spectral(pressure, Grid), lf)
+                  

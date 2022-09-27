@@ -5,6 +5,7 @@ using Test
 include("utility_functions.jl")
 include("lower_triangular_matrix.jl")
 include("grids.jl")
+include("set_vars.jl")
 
 # GPU/KERNELABSTRACTIONS
 include("kernelabstractions.jl")
