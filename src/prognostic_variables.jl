@@ -105,7 +105,8 @@ has(progn::PrognosticVariables{NF,M}, var_name::Symbol) where {NF,M} = has(M, va
              var::Vector{<:LowerTriangularMatrix};
              lf::Integer=1) where NF
 
-Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` with values given in `var` a vector with all information for all layers in spectral space.
+Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
+with values given in `var` a vector with all information for all layers in spectral space.
 """
 function set_var!(progn::PrognosticVariables{NF}, 
                   varname::Symbol, 
@@ -134,7 +135,8 @@ end
              var::Vector{<:AbstractGrid};
              lf::Integer=1) where NF
 
-Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` with values given in `var` a vector with all information for all layers in grid space.
+Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
+with values given in `var` a vector with all information for all layers in grid space.
 """
 function set_var!(progn::PrognosticVariables{NF}, 
                   varname::Symbol, 
@@ -155,7 +157,8 @@ end
              M::ModelSetup;
              lf::Integer=1) where NF
 
-Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` with values given in `var` a vector with all information for all layers in grid space.
+Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
+with values given in `var` a vector with all information for all layers in grid space.
 """
 function set_var!(progn::PrognosticVariables{NF}, 
                   varname::Symbol, 
@@ -177,7 +180,8 @@ end
              Grid::Type{<:AbstractGrid}=FullGaussianGrid;
              lf::Integer=1) where NF
 
-Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` with values given in `var` a vector with all information for all layers in grid space.
+Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
+with values given in `var` a vector with all information for all layers in grid space.
 """
 function set_var!(progn::PrognosticVariables{NF}, 
                   varname::Symbol, 

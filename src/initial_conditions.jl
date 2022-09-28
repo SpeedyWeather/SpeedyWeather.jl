@@ -75,11 +75,13 @@ function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup)
     version = restart_file["version"]   # currently unused, TODO check for compat with version
     time = restart_file["time"]         # currently unused
 
-    var_names = [propertynames(progn_old.layers[1].leapfrog[1])]
+    var_names = propertynames(progn_old.layers[1].leapfrog[1])
 
-    for var_name in var_names 
-        var = get_var(progn_old, var_name) 
-        set_var!(progn_new, var_name, var)
+    for var_name in var_names
+        if has(progn_new, var_name) 
+            var = get_var(progn_old, var_name) 
+            set_var!(progn_new, var_name, var)
+        end
     end 
 
     return progn_new

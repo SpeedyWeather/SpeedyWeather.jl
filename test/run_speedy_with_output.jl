@@ -21,6 +21,6 @@
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
 end
 
-@testset "Initialize from file" begin 
+@testset "Restart from output file" begin 
     progn, diagn, model = initialize_speedy(initial_conditions=:restart, restart_id=1)
 end 
