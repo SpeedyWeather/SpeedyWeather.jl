@@ -105,7 +105,7 @@ has(progn::PrognosticVariables{NF,M}, var_name::Symbol) where {NF,M} = has(M, va
              var::Vector{<:LowerTriangularMatrix};
              lf::Integer=1) where NF
 
-Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` with values given in `var` a vector with all information for all layers.
+Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` with values given in `var` a vector with all information for all layers in spectral space.
 """
 function set_var!(progn::PrognosticVariables{NF}, 
                   varname::Symbol, 
@@ -128,6 +128,14 @@ function _set_var_core!(var_old::LowerTriangularMatrix{T}, var_new::LowerTriangu
     copyto!(var_old, var_new_trunc)
 end 
 
+"""
+    set_var!(progn::PrognosticVariables{NF},        
+             varname::Symbol, 
+             var::Vector{<:AbstractGrid};
+             lf::Integer=1) where NF
+
+Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` with values given in `var` a vector with all information for all layers in grid space.
+"""
 function set_var!(progn::PrognosticVariables{NF}, 
                   varname::Symbol, 
                   var::Vector{<:AbstractGrid};
@@ -140,6 +148,15 @@ function set_var!(progn::PrognosticVariables{NF},
     return set_var!(progn, varname, var_sph; lf=lf)
 end 
 
+"""
+    set_var!(progn::PrognosticVariables{NF}, 
+             varname::Symbol, 
+             var::Vector{<:AbstractGrid}, 
+             M::ModelSetup;
+             lf::Integer=1) where NF
+
+Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` with values given in `var` a vector with all information for all layers in grid space.
+"""
 function set_var!(progn::PrognosticVariables{NF}, 
                   varname::Symbol, 
                   var::Vector{<:AbstractGrid}, 
@@ -153,6 +170,15 @@ function set_var!(progn::PrognosticVariables{NF},
     return set_var!(progn, varname, var_sph; lf=lf)
 end 
 
+"""
+    set_var!(progn::PrognosticVariables{NF}, 
+             varname::Symbol, 
+             var::Vector{<:AbstractGrid}, 
+             Grid::Type{<:AbstractGrid}=FullGaussianGrid;
+             lf::Integer=1) where NF
+
+Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` with values given in `var` a vector with all information for all layers in grid space.
+"""
 function set_var!(progn::PrognosticVariables{NF}, 
                   varname::Symbol, 
                   var::Vector{<:AbstractMatrix}, 
@@ -166,11 +192,41 @@ function set_var!(progn::PrognosticVariables{NF},
     return set_var!(progn, varname, var_grid; lf=lf)
 end 
 
+"""
+    set_vorticity!(progn::PrognosticVariables, varargs...; kwargs...)
+
+See [`get_var`](@ref)
+"""
 set_vorticity!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :vor, varargs...; kwargs...)
+
+"""
+    set_divergence!(progn::PrognosticVariables, varargs...; kwargs...)
+
+See [`get_var`](@ref)
+"""
 set_divergence!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :div, varargs...; kwargs...)
+
+"""
+    set_temperature!(progn::PrognosticVariables, varargs...; kwargs...)
+
+See [`get_var`](@ref)
+"""
 set_temperature!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :temp, varargs...; kwargs...)
+
+"""
+    set_humidity!(progn::PrognosticVariables, varargs...; kwargs...)
+
+See [`get_var`](@ref)
+"""
 set_humidity!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :humid, varargs...; kwargs...)
 
+"""
+    set_pressure!(progn::PrognosticVariables{NF}, 
+                  pressure::LowerTriangularMatrix;
+                  lf::Integer=1) where NF
+
+Sets the prognostic variable with the surface pressure in spectral space at leapfrog index `lf`.
+"""
 function set_pressure!(progn::PrognosticVariables{NF}, 
                        pressure::LowerTriangularMatrix;
                        lf::Integer=1) where NF
@@ -180,12 +236,40 @@ function set_pressure!(progn::PrognosticVariables{NF},
     return progn
 end
 
+"""
+    set_pressure!(progn::PrognosticVariables{NF}, 
+                  pressure::AbstractGrid, 
+                  M::ModelSetup;
+                  lf::Integer=1) where NF
+
+Sets the prognostic variable with the surface pressure in grid space at leapfrog index `lf`.
+"""
 set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid, M::ModelSetup; lf::Integer=1) = set_pressure!(progn, spectral(pressure, M.spectral_transform); lf=lf)
 
+"""
+    set_pressure!(progn::PrognosticVariables{NF}, 
+                  pressure::AbstractGrid, 
+                  lf::Integer=1) where NF
+
+Sets the prognostic variable with the surface pressure in grid space at leapfrog index `lf`.
+"""
 set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid, lf::Integer=1) = set_pressure!(progn, spectral(pressure); lf=lf)
 
+"""
+    set_pressure!(progn::PrognosticVariables{NF}, 
+                  pressure::AbstractMatrix, 
+                  Grid::Type{<:AbstractGrid}, 
+                  lf::Integer=1) where NF
+
+Sets the prognostic variable with the surface pressure in grid space at leapfrog index `lf`.
+"""
 set_pressure!(progn::PrognosticVariables, pressure::AbstractMatrix, Grid::Type{<:AbstractGrid}, lf::Integer=1) = set_pressure!(progn, spectral(pressure, Grid); lf=lf)
-                  
+  
+"""
+    get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1)
+
+Returns the prognostic variable `var_name` at leapfrog index `lf` as a `Vector{LowerTriangularMatrices}`.
+"""
 function get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1)
     @assert has(progn, var_name)
     return [getfield(layer.leapfrog[lf], var_name) for layer in progn.layers]
