@@ -24,6 +24,12 @@
     end 
     @test P.pres.leapfrog[lf] == sph_data[1]
 
+    @test SpeedyWeather.get_vorticity(P) == sph_data
+    @test SpeedyWeather.get_divergence(P) == sph_data
+    @test SpeedyWeather.get_temperature(P) == sph_data
+    @test SpeedyWeather.get_humidity(P) == sph_data
+    @test SpeedyWeather.get_pressure(P) == sph_data[1]
+
     # test setting grids 
     P, D, M = initialize_speedy(initial_conditions=:rest,model=:primitive)
 

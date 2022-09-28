@@ -20,6 +20,8 @@ struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: ModelSetup{D}
     device_setup::DeviceSetup{D}
 end
 
+has(::Type{BarotropicModel{NF,D}}, var_name::Symbol) where {NF,D} = var_name in [:vor]
+
 """
     M = ShallowWaterModel(  ::Parameters,
                             ::Constants,
@@ -40,6 +42,9 @@ struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ModelSetup{D}
     implicit::Implicit{NF}
     device_setup::DeviceSetup{D}
 end
+
+has(::Type{ShallowWaterModel{NF,D}}, var_name::Symbol) where {NF,D} = var_name in [:vor, :div, :pres]
+
 
 """
     M = PrimitiveEquationModel( ::Parameters,
@@ -62,3 +67,13 @@ struct PrimitiveEquationModel{NF<:AbstractFloat,D<:AbstractDevice} <: ModelSetup
     implicit::Implicit{NF}
     device_setup::DeviceSetup{D}
 end
+
+has(::Type{PrimitiveEquationModel{NF,D}}, var_name::Symbol) where {NF,D} = var_name in [:vor, :div, :temp, :humid, :pres]
+
+"""
+    has(::ModelSetup, var_name::Symbol)
+
+Returns true if the model `M` has a prognostic variable `var_name`, false otherwise. The default fallback is that all variables are included. 
+"""
+has(::Type{ModelSetup{D}}, var_name::Symbol) where D = var_name in [:vor, :div, :temp, :humid, :pres] 
+has(M::ModelSetup, var_name) = has(typeof(M), var_name)
