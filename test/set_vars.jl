@@ -1,4 +1,4 @@
-@testset "Test set_vars!" begin 
+@testset "Test PrognosticVariables set_vars! and get_var" begin 
 
     # test setting LowerTriangularMatrices
     P, D, M = initialize_speedy(initial_conditions=:rest,model=:primitive)
@@ -29,6 +29,11 @@
     @test SpeedyWeather.get_temperature(P) == sph_data
     @test SpeedyWeather.get_humidity(P) == sph_data
     @test SpeedyWeather.get_pressure(P) == sph_data[1]
+
+    SpeedyWeather.set_vorticity!(P, 0)
+    for i=1:nlev 
+        @test all(P.layers[i].leapfrog[lf].vor .== 0)
+    end
 
     # test setting grids 
     P, D, M = initialize_speedy(initial_conditions=:rest,model=:primitive)

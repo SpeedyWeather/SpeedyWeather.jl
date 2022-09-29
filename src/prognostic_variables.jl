@@ -176,7 +176,7 @@ end
 """
     set_var!(progn::PrognosticVariables{NF}, 
              varname::Symbol, 
-             var::Vector{<:AbstractGrid}, 
+             var::Vector{<:AbstractMatrix}, 
              Grid::Type{<:AbstractGrid}=FullGaussianGrid;
              lf::Integer=1) where NF
 
@@ -197,30 +197,50 @@ function set_var!(progn::PrognosticVariables{NF},
 end 
 
 """
+    function set_var!(progn::PrognosticVariables{NF}, 
+                      varname::Symbol, 
+                      s::Number;
+                      lf::Integer=1) where NF
+
+Sets all values of prognostic variable `varname` at leapfrog index `lf` to the scalar `s`.
+"""
+function set_var!(progn::PrognosticVariables{NF}, 
+                  varname::Symbol, 
+                  s::Number;
+                  lf::Integer=1) where NF
+
+    for progn_layer in progn.layers
+        fill!(getfield(progn_layer.leapfrog[lf], varname), s)
+    end 
+
+    return progn 
+end 
+
+"""
     set_vorticity!(progn::PrognosticVariables, varargs...; kwargs...)
 
-See [`get_var`](@ref)
+See [`set_var!`](@ref)
 """
 set_vorticity!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :vor, varargs...; kwargs...)
 
 """
     set_divergence!(progn::PrognosticVariables, varargs...; kwargs...)
 
-See [`get_var`](@ref)
+See [`set_var!`](@ref)
 """
 set_divergence!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :div, varargs...; kwargs...)
 
 """
     set_temperature!(progn::PrognosticVariables, varargs...; kwargs...)
 
-See [`get_var`](@ref)
+See [`set_var!`](@ref)
 """
 set_temperature!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :temp, varargs...; kwargs...)
 
 """
     set_humidity!(progn::PrognosticVariables, varargs...; kwargs...)
 
-See [`get_var`](@ref)
+See [`set_var!`](@ref)
 """
 set_humidity!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :humid, varargs...; kwargs...)
 
