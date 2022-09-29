@@ -75,27 +75,14 @@ function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup)
     version = restart_file["version"]   # currently unused, TODO check for compat with version
     time = restart_file["time"]         # currently unused
 
-    # SPECTRAL TRUNCATION/INTERPOLATION to new resolution and conversion to NF
-    for (layer_old,layer_new) in zip(progn_old.layers,progn_new.layers)
+    var_names = [propertynames(progn_old.layers[1].leapfrog[1])..., :pres]
 
-        layer_old_lf1 = layer_old.leapfrog[1]
-        layer_new_lf1 = layer_new.leapfrog[1]
-
-        vars_old = (getproperty(layer_old_lf1,prop) for prop in propertynames(layer_old_lf1))
-        vars_new = (getproperty(layer_new_lf1,prop) for prop in propertynames(layer_new_lf1))
-    
-        for (var_old,var_new) in zip(vars_old,vars_new)
-            lmax,mmax = size(var_new) .- (2,1)
-            var_old_trunc = spectral_truncation(var_old,lmax+1,mmax)
-            var_new .= convert(LowerTriangularMatrix{Complex{NF}},var_old_trunc)
+    for var_name in var_names
+        if has(progn_new, var_name) 
+            var = get_var(progn_old, var_name) 
+            set_var!(progn_new, var_name, var)
         end
-    end
-
-    # same for surface pressure
-    pres = progn_new.pres.leapfrog[1]
-    lmax,mmax = size(pres) .- (2,1)
-    pres .= convert(LowerTriangularMatrix{Complex{NF}},
-                                    spectral_truncation(progn_old.pres.leapfrog[1],lmax+1,mmax))
+    end 
 
     return progn_new
 end
