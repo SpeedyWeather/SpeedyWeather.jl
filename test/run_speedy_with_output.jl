@@ -22,5 +22,7 @@
 end
 
 @testset "Restart from output file" begin 
-    progn, diagn, model = initialize_speedy(initial_conditions=:restart, restart_id=1)
+    p, d, m = initialize_speedy(Float32,model=:shallowwater, output=true)
+    SpeedyWeather.time_stepping!(p, d, m)
+    progn, diagn, model = initialize_speedy(initial_conditions=:restart, restart_id=m.parameters.restart_id)
 end 
