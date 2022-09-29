@@ -116,10 +116,14 @@ function set_var!(progn::PrognosticVariables{NF},
     @assert length(var) == length(progn.layers)
     @assert has(progn, varname)
 
-    for (progn_layer, var_layer) in zip(progn.layers, var)
-        _set_var_core!(getfield(progn_layer.leapfrog[lf], varname), var_layer)
+    if varname == :pres 
+        return set_pressure!(progn, var; lf=lf)
+    else 
+        for (progn_layer, var_layer) in zip(progn.layers, var)
+            _set_var_core!(getfield(progn_layer.leapfrog[lf], varname), var_layer)
+        end 
     end 
-
+    
     return progn 
 end 
 
