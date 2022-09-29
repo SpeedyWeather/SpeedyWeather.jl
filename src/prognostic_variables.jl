@@ -296,7 +296,11 @@ Returns the prognostic variable `var_name` at leapfrog index `lf` as a `Vector{L
 """
 function get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1)
     @assert has(progn, var_name)
-    return [getfield(layer.leapfrog[lf], var_name) for layer in progn.layers]
+    if var_name == :pres 
+        return get_pressure(progn; lf=lf)
+    else 
+        return [getfield(layer.leapfrog[lf], var_name) for layer in progn.layers]
+    end
 end 
 
 get_vorticity(progn::PrognosticVariables; kwargs...) = get_var(progn, :vor; kwargs...)
