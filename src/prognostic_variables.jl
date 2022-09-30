@@ -114,16 +114,12 @@ function set_var!(progn::PrognosticVariables{NF},
                   lf::Integer=1) where NF
 
     @assert length(var) == length(progn.layers)
-    @assert has(progn, varname)
+    @assert has(progn, varname) "PrognosticVariables has no variable $var_name"
 
-    if varname == :pres 
-        return set_pressure!(progn, var; lf=lf)
-    else 
-        for (progn_layer, var_layer) in zip(progn.layers, var)
-            _set_var_core!(getfield(progn_layer.leapfrog[lf], varname), var_layer)
-        end 
+    for (progn_layer, var_layer) in zip(progn.layers, var)
+        _set_var_core!(getfield(progn_layer.leapfrog[lf], varname), var_layer)
     end 
-    
+
     return progn 
 end 
 
@@ -299,12 +295,8 @@ set_pressure!(progn::PrognosticVariables, pressure::AbstractMatrix, Grid::Type{<
 Returns the prognostic variable `var_name` at leapfrog index `lf` as a `Vector{LowerTriangularMatrices}`.
 """
 function get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1)
-    @assert has(progn, var_name)
-    if var_name == :pres 
-        return get_pressure(progn; lf=lf)
-    else 
-        return [getfield(layer.leapfrog[lf], var_name) for layer in progn.layers]
-    end
+    @assert has(progn, var_name) "PrognosticVariables has no variable $var_name"
+    return [getfield(layer.leapfrog[lf], var_name) for layer in progn.layers]
 end 
 
 get_vorticity(progn::PrognosticVariables; kwargs...) = get_var(progn, :vor; kwargs...)
@@ -312,6 +304,3 @@ get_divergence(progn::PrognosticVariables; kwargs...) = get_var(progn, :div; kwa
 get_temperature(progn::PrognosticVariables; kwargs...) = get_var(progn, :temp; kwargs...)
 get_humidity(progn::PrognosticVariables; kwargs...) = get_var(progn, :humid; kwargs...)
 get_pressure(progn::PrognosticVariables; lf::Integer=1) = progn.pres.leapfrog[lf]
-
-
-
