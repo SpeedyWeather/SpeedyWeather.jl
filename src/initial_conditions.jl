@@ -26,16 +26,16 @@ function initial_conditions(M::ModelSetup)
             end
         end
 
+        # SCALING
+        @unpack radius_earth = M.geometry
+        scale!(progn,:vor,radius_earth)
+        scale!(progn,:div,radius_earth)
+
     elseif initial_conditions == :restart
         initialize_from_file!(progn,M)
     else
         throw(error("Incorrect initialization option, $initial_conditions given."))
     end
-
-    # SCALING
-    @unpack radius_earth = M.geometry
-    scale!(progn,:vor,radius_earth)
-    scale!(progn,:div,radius_earth)
 
     return progn
 end
@@ -75,7 +75,7 @@ function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup)
     version = restart_file["version"]   # currently unused, TODO check for compat with version
     time = restart_file["time"]         # currently unused
 
-    var_names = [propertynames(progn_old.layers[1].leapfrog[1])..., :pres]
+    var_names = propertynames(progn_old.layers[1].leapfrog[1])
 
     for var_name in var_names
         if has(progn_new, var_name) 
@@ -83,6 +83,8 @@ function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup)
             set_var!(progn_new, var_name, var)
         end
     end 
+    pres = get_pressure(progn_old)
+    set_pressure!(progn_new, pres)
 
     return progn_new
 end
