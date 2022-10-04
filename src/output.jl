@@ -338,9 +338,9 @@ function write_restart_file(time::DateTime,
     write_restart || return nothing                 # exit immediately if no restart file desired
 
     # unscale variables
-    @unpack radius_earth = M.geometry
-    scale!(progn,:vor,1/radius_earth)
-    scale!(progn,:div,1/radius_earth)
+    #@unpack radius_earth = M.geometry
+    #scale!(progn,:vor,1/radius_earth)
+    #scale!(progn,:div,1/radius_earth)
 
     # COMPRESSION OF RESTART FILE
     @unpack keepbits = M.parameters
