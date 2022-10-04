@@ -15,6 +15,7 @@ end
 # for the following testsets test some spectral truncations
 # but not too large ones as they take so long
 spectral_resolutions = (31,63,127)
+spectral_resolutions_inexact = (127,191)
 
 @testset "Transform: l=0,m=0 is constant > 0" begin
     for trunc in spectral_resolutions
@@ -23,7 +24,9 @@ spectral_resolutions = (31,63,127)
                             FullClenshawGrid,
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid,
-                            HEALPixGrid)
+                            HEALPixGrid,
+                            HEALPix4Grid,
+                            FullHEALPix4Grid)
 
                 p,d,m = initialize_speedy(NF;trunc,Grid)
                 S = m.spectral_transform
@@ -90,6 +93,34 @@ end
     end
 end
 
+@testset "Transform: Individual Legendre polynomials (inexact transforms)" begin
+    @testset for trunc in spectral_resolutions_inexact
+        for NF in (Float32,Float64)
+            for Grid in (   HEALPixGrid,
+                            HEALPix4Grid,
+                            FullHEALPix4Grid)
+                P = Parameters(;NF,trunc,Grid)
+                S = SpectralTransform(P)
+
+                lmax = 3
+                for l in 1:lmax
+                    for m in 1:l
+                        alms = zeros(LowerTriangularMatrix{Complex{NF}},S.lmax+2,S.mmax+1)
+                        alms[l,m] = 1
+
+                        map = gridded(alms,S)
+                        alms2 = spectral(map,S)
+
+                        for lm in SpeedyWeather.eachharmonic(alms,alms2)
+                            @test alms[lm] ≈ alms2[lm] atol=1e-3
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 @testset "Transform: Geopotential" begin
 
     # Test for variable resolution
@@ -98,7 +129,7 @@ end
             for Grid in (   FullGaussianGrid,
                             FullClenshawGrid,
                             OctahedralGaussianGrid,
-                            OctahedralClenshawGrid,)
+                            OctahedralClenshawGrid)
                             # HEALPixGrid)
                             
                 P = Parameters(;NF,trunc,model=:shallowwater)

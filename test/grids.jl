@@ -7,6 +7,8 @@
         O = OctahedralGaussianGrid(randn(NF,3168),24)   # O24 grid
         C = OctahedralClenshawGrid(randn(NF,3056),24)   # C24 grid
         H = HEALPixGrid(randn(NF,3072),16)              # H16 grid
+        J = HEALPix4Grid(randn(NF,1024),16)             # J16 grid
+        K = FullHEALPix4Grid(randn(NF,64*31),16)        # K16 grid
 
         # without resolution parameter provided (inferred from vector length)
         L2 = FullClenshawGrid(randn(NF,96*47))          # L24 grid
@@ -14,8 +16,10 @@
         O2 = OctahedralGaussianGrid(randn(NF,3168))     # O24 grid
         C2 = OctahedralClenshawGrid(randn(NF,3056))     # C24 grid
         H2 = HEALPixGrid(randn(NF,3072))                # H16 grid
+        J2 = HEALPix4Grid(randn(NF,1024))               # J16 grid
+        K2 = FullHEALPix4Grid(randn(NF,64*31))          # K16 grid
 
-        for (grid1,grid2) in zip([L,F,O,C,H],[L2,F2,O2,C2,H2])
+        for (grid1,grid2) in zip([L,F,O,C,H,J,K],[L2,F2,O2,C2,H2,J2,K2])
             @test size(grid1) == size(grid2)
         end
 
@@ -25,6 +29,8 @@
         for ij in eachindex(O) O[ij] end
         for ij in eachindex(C) C[ij] end
         for ij in eachindex(H) H[ij] end
+        for ij in eachindex(J) J[ij] end
+        for ij in eachindex(K) K[ij] end
 
         # set index
         for ij in eachindex(L) L[ij] = 0 end
@@ -32,12 +38,16 @@
         for ij in eachindex(O) O[ij] = 0 end
         for ij in eachindex(C) C[ij] = 0 end
         for ij in eachindex(H) H[ij] = 0 end
+        for ij in eachindex(J) J[ij] = 0 end
+        for ij in eachindex(K) K[ij] = 0 end
 
         @test all(L .== 0)
         @test all(F .== 0)
         @test all(O .== 0)
         @test all(C .== 0)
         @test all(H .== 0)
+        @test all(J .== 0)
+        @test all(K .== 0)
     end
 end
 
@@ -48,6 +58,8 @@ end
                     OctahedralGaussianGrid,
                     OctahedralClenshawGrid,
                     HEALPixGrid,
+                    HEALPix4Grid,
+                    FullHEALPix4Grid
                     )
 
             n = 32      # resolution parameter nlat_half/nside
@@ -75,6 +87,8 @@ end
                 OctahedralGaussianGrid,
                 OctahedralClenshawGrid,
                 HEALPixGrid,
+                HEALPix4Grid,
+                FullHEALPix4Grid
                 )
 
         n = 32      # resolution parameter nlat_half/nside
