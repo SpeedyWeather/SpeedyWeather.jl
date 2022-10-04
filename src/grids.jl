@@ -604,7 +604,7 @@ matrix_size(::Type{HEALPix4Grid},nside::Integer)=(2nside,2nside)
 Base.Matrix(G::HEALPix4Grid{T};kwargs...) where T = Matrix!(zeros(T,matrix_size(G)...),G;kwargs...)
 """
     Matrix!(M::AbstractMatrix,
-            G::OctahedralClenshawGrid;
+            G::HEALPix4Grid;
             quadrant_rotation=(0,1,2,3),
             matrix_quadrant=((2,2),(1,2),(1,1),(2,1)),
             )
@@ -615,7 +615,7 @@ Every quadrant of the grid `G` is rotated as specified in `quadrant_rotation`,
 eastward starting from 0˚E. The grid quadrants are moved into the matrix quadrant
 (i,j) as specified. Defaults are equivalent to centered at 0˚E and a rotation
 such that the North Pole is at M's midpoint."""
-Matrix!(M::AbstractMatrix,G::OctahedralClenshawGrid;kwargs...) = Matrix!((M,G);kwargs...)
+Matrix!(M::AbstractMatrix,G::HEALPix4Grid;kwargs...) = Matrix!((M,G);kwargs...)
 
 """
     Matrix!(MGs::Tuple{AbstractMatrix{T},HEALPix4Grid}...;kwargs...)
