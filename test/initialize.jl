@@ -4,7 +4,7 @@
         G = Geometry(P)
         S = SpectralTransform(P)
         
-        P = zeros(PrognosticVariables{NF},5,5,3)
+        P = zeros(PrognosticVariables{NF},5,5,3,SpeedyWeather.init_scale(NF))
         P = zeros(DiagnosticVariables,G,S)
     end
 end

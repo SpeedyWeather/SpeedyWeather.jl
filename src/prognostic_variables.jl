@@ -28,6 +28,9 @@ struct PrognosticVariables{NF<:AbstractFloat, M<:ModelSetup}
     mmax::Int
     n_leapfrog::Int
     nlev::Int
+
+    # scale 
+    scale::NamedTuple
 end
 
 # ZERO GENERATOR FUNCTIONS
@@ -76,11 +79,13 @@ end
 function Base.zeros(::Type{PrognosticVariables{NF}},
                     lmax::Integer,
                     mmax::Integer,
-                    nlev::Integer) where NF
+                    nlev::Integer,
+                    scale::NamedTuple) where NF
 
     layers = [zeros(PrognosticVariablesLeapfrog{NF},lmax,mmax) for _ in 1:nlev]     # k layers
     pres = zeros(SurfaceLeapfrog{NF},lmax,mmax)                                     # 2 leapfrog time steps for pres
-    return PrognosticVariables{NF,ModelSetup}(layers,pres,lmax,mmax,N_LEAPFROG,nlev)
+    verify_scale(scale)
+    return PrognosticVariables{NF,ModelSetup}(layers,pres,lmax,mmax,N_LEAPFROG,nlev,scale)
 end
 
 # pass on model to reduce size
@@ -91,11 +96,38 @@ function Base.zeros(::Type{PrognosticVariables{NF}},
                     nlev::Integer) where NF
 
     layers = [zeros(PrognosticVariablesLeapfrog{NF},model,lmax,mmax) for _ in 1:nlev]   # k layers
-    pres = has(model, :pres) ? zeros(SurfaceLeapfrog{NF},lmax,mmax) : zeros(SurfaceLeapfrog{NF},-2,-1)  # 2 leapfrog time steps for pres       
-    return PrognosticVariables{NF,typeof(model)}(layers,pres,lmax,mmax,N_LEAPFROG,nlev)
+    pres = has(model, :pres) ? zeros(SurfaceLeapfrog{NF},lmax,mmax) : zeros(SurfaceLeapfrog{NF},-2,-1)  # 2 leapfrog time steps for pres 
+    scale = init_scale(model)
+    verify_scale(scale)     
+    return PrognosticVariables{NF,typeof(model)}(layers,pres,lmax,mmax,N_LEAPFROG,nlev,scale)
 end
 
 has(progn::PrognosticVariables{NF,M}, var_name::Symbol) where {NF,M} = has(M, var_name)
+
+function verify_scale(scale::NamedTuple)
+    @assert length(scale) == 5 "Scale has to contain all five prognostic variables"
+    @assert :vor in keys(scale) "No voriticity in scale"
+    @assert :div in keys(scale) "No divegence in scale "
+    @assert :temp in keys(scale) "No temperature in scale "
+    @assert :humid in keys(scale) "No humidity in scale "
+    @assert :pres in keys(scale) "No pressure in scale "
+end
+
+"""
+    init_scale(::NF; vor=one(NF), div=one(NF), temp=one(NF), humid=one(NF), pres=one(NF))
+
+Initializes the scale for [`PrognosticVariables`](@ref), defaults to one. 
+"""
+init_scale(::Type{NF}; vor=one(NF), div=one(NF), temp=one(NF), humid=one(NF), pres=one(NF)) where NF = (vor=vor, div=div, temp=temp, humid=humid, pres=pres)
+
+"""
+    init_scale(M::ModelSetup{NF})
+
+Initializes the scale for [`PrognosticVariables`](@ref), defaults to one except for the 
+vorticity and divergence where it defaults to the Earth's radius. 
+"""
+init_scale(M::ModelSetup{NF,D}) where {NF,D} = (vor=M.geometry.radius_earth, div=M.geometry.radius_earth, temp=one(NF), humid=one(NF), pres=one(NF)) 
+
 
 # SET_VAR FUNCTIONS TO ASSIGN NEW VALUES TO PrognosticVariables
 
@@ -103,21 +135,28 @@ has(progn::PrognosticVariables{NF,M}, var_name::Symbol) where {NF,M} = has(M, va
     set_var!(progn::PrognosticVariables{NF},        
              varname::Symbol, 
              var::Vector{<:LowerTriangularMatrix};
-             lf::Integer=1) where NF
+             lf::Integer=1,
+             scale::Bool=false) where NF
 
 Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
-with values given in `var` a vector with all information for all layers in spectral space.
+with values given in `var` a vector with all information for all layers in spectral space. 
+If `scale==true` it scales the input `var` with the scale set in `progn`.
 """
 function set_var!(progn::PrognosticVariables{NF}, 
                   varname::Symbol, 
                   var::Vector{<:LowerTriangularMatrix};
-                  lf::Integer=1) where NF
+                  lf::Integer=1,
+                  scale::Bool=false) where NF
 
     @assert length(var) == length(progn.layers)
     @assert has(progn, varname) "PrognosticVariables has no variable $var_name"
 
     for (progn_layer, var_layer) in zip(progn.layers, var)
         _set_var_core!(getfield(progn_layer.leapfrog[lf], varname), var_layer)
+    end 
+
+    if scale 
+        scale!(progn, varname, progn.scale[varname])
     end 
 
     return progn 
@@ -141,13 +180,13 @@ with values given in `var` a vector with all information for all layers in grid 
 function set_var!(progn::PrognosticVariables{NF}, 
                   varname::Symbol, 
                   var::Vector{<:AbstractGrid};
-                  lf::Integer=1) where NF
+                  lf::Integer=1, kwargs...) where NF
 
     @assert length(var) == length(progn.layers)
 
     var_sph = [spectral(var_layer) for var_layer in var]
 
-    return set_var!(progn, varname, var_sph; lf=lf)
+    return set_var!(progn, varname, var_sph; lf=lf, kwargs...)
 end 
 
 """
@@ -164,13 +203,13 @@ function set_var!(progn::PrognosticVariables{NF},
                   varname::Symbol, 
                   var::Vector{<:AbstractGrid}, 
                   M::ModelSetup;
-                  lf::Integer=1) where NF
+                  lf::Integer=1, kwargs...) where NF
 
     @assert length(var) == length(progn.layers)
 
     var_sph = [spectral(var_layer, M.spectral_transform) for var_layer in var]
 
-    return set_var!(progn, varname, var_sph; lf=lf)
+    return set_var!(progn, varname, var_sph; lf=lf, kwargs...)
 end 
 
 """
@@ -187,13 +226,13 @@ function set_var!(progn::PrognosticVariables{NF},
                   varname::Symbol, 
                   var::Vector{<:AbstractMatrix}, 
                   Grid::Type{<:AbstractGrid}=FullGaussianGrid;
-                  lf::Integer=1) where NF
+                  lf::Integer=1, kwargs...) where NF
 
     @assert length(var) == length(progn.layers)
 
     var_grid = [spectral(var_layer, Grid) for var_layer in var]
 
-    return set_var!(progn, varname, var_grid; lf=lf)
+    return set_var!(progn, varname, var_grid; lf=lf, kwargs...)
 end 
 
 """
@@ -290,13 +329,18 @@ Sets the prognostic variable with the surface pressure in grid space at leapfrog
 set_pressure!(progn::PrognosticVariables, pressure::AbstractMatrix, Grid::Type{<:AbstractGrid}, lf::Integer=1) = set_pressure!(progn, spectral(pressure, Grid); lf=lf)
   
 """
-    get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1)
+    get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1, unscale::Bool=false)
 
 Returns the prognostic variable `var_name` at leapfrog index `lf` as a `Vector{LowerTriangularMatrices}`.
 """
-function get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1)
+function get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1, unscale::Bool=false)
     @assert has(progn, var_name) "PrognosticVariables has no variable $var_name"
-    return [getfield(layer.leapfrog[lf], var_name) for layer in progn.layers]
+
+    if unscale 
+        return [scale!(getfield(layer.leapfrog[lf], var_name), inv(progn.scale[var_name])) for layer in progn.layers]
+    else 
+        return [getfield(layer.leapfrog[lf], var_name) for layer in progn.layers]
+    end
 end 
 
 get_vorticity(progn::PrognosticVariables; kwargs...) = get_var(progn, :vor; kwargs...)

@@ -51,3 +51,38 @@ function scale!(progn::PrognosticVariables{NF},
         end
     end
 end
+
+"""
+    scale!(progn::PrognosticVariables{NF}) where NF 
+
+Scales all variables within `progn` with the scale set when initializing it.
+"""
+function scale!(progn::PrognosticVariables{NF}) where NF 
+    for (var,scale) in progn.scale 
+        scale!(progn, var, scale)
+    end 
+end 
+
+"""
+    unscale!(progn::PrognosticVariables{NF}) where NF 
+
+Scales  all variables within `progn` with the inverse of scale set when initializing it.
+"""
+function unscale!(progn::PrognosticVariables{NF}) where NF 
+    for (var,scale) in progn.scale 
+        scale!(progn, var, inv(scale))
+    end
+end  
+
+"""
+    unscale(progn::PrognosticVariables{NF}) where NF 
+
+Scales all variables within `progn` with the inverse of scale set when initializing it.
+"""
+function unscale(progn::PrognosticVariables{NF}) where NF 
+    unscaled_progn = copy(progn)
+    for (var,scale) in progn.scale 
+        scale!(unscaled_progn, var, inv(scale))
+    end
+    return unscaled_progn
+end  
