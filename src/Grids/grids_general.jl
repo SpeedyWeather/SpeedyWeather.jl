@@ -137,4 +137,4 @@ function get_nlons(Grid::Type{<:AbstractGrid},nlat_half::Integer;both_hemisphere
     return [get_nlon_per_ring(Grid,nlat_half,j) for j in 1:n]
 end
 
-get_nlon_max(grid::Grid) where {Grid<:AbstractGrid} = get_nlon_max(Grid,grid.nlat_half) 
+get_nlon_max(grid::Grid) where {Grid<:AbstractGrid} = get_nlon_max(Grid,grid.nlat_half)
