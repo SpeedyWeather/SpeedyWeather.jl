@@ -44,7 +44,9 @@ module SpeedyWeather
             FullHEALPixGrid,
             OctahedralGaussianGrid,
             OctahedralClenshawGrid,
-            HEALPixGrid
+            HEALPixGrid,
+            HEALPix4Grid,
+            FullHEALPix4Grid
 
     # EXPORT STRUCTS
     export  Parameters,

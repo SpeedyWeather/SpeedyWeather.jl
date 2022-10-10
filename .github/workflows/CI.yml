@@ -3,6 +3,7 @@ on:
   pull_request:
     branches:
       - main
+      - gpu
   push:
     branches:
       - main
