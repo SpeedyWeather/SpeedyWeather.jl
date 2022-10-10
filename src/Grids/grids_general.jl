@@ -69,24 +69,54 @@ Base.zeros(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid} = zeros(G
 # zero element of an AbstractGrid instance grid by packing a zero(::Vector) into grid
 Base.zero(grid::Grid) where {Grid<:AbstractGrid} = Grid(zero(grid.data))
 
-get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,get_nlat_half(grid))
-get_nlat_half(grid::AbstractGrid) = grid.nlat_half
-nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))
-get_nlat(Grid::Type{<:AbstractGrid},nlat_half::Integer) = 2nlat_half - nlat_odd(Grid)
-get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,get_nlat_half(grid))
-get_npoints(grid::Grid) where {Grid<:AbstractGrid} = get_npoints(Grid,get_nlat_half(grid))
+# truncation is the spectral truncation corresponding to size of grid and lin/quad/cubic truncation
+get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,grid.nlat_half)
 
-function each_index_in_ring(grid::G,j::Integer) where {G<:AbstractGrid}
-    return each_index_in_ring(G,j,get_nlat_half(grid))
+# does the grid have an odd number of latitudes?
+nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))
+
+# get total number of latitude rings
+get_nlat(Grid::Type{<:AbstractGrid},nlat_half::Integer) = 2nlat_half - nlat_odd(Grid)
+get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,grid.nlat_half)
+
+# get total number of grid points
+get_npoints(grid::Grid) where {Grid<:AbstractGrid} = get_npoints(Grid,grid.nlat_half)
+
+"""
+    i = each_index_in_ring(grid,j)
+
+UnitRange `i` to access data on grid `grid` on ring `j`."""
+function each_index_in_ring(grid::Grid,j::Integer) where {Grid<:AbstractGrid}
+    return each_index_in_ring(Grid,j,grid.nlat_half)
 end
 
+"""
+    ijs = eachgridpoint(grid)
+
+UnitRange `ijs` to access each grid point on grid `grid`."""
 eachgridpoint(grid::AbstractGrid) = Base.OneTo(get_npoints(grid))
 
+"""
+    rings = eachring(grid)
+
+Vector{UnitRange} `rings` to loop over every ring of grid `grid`
+and then each grid point per ring. To be used like
+
+    rings = eachring(grid)
+    for ring in rings
+        for ij in ring
+            grid[ij]
+"""
 function eachring(grid::AbstractGrid)
     rings = [each_index_in_ring(grid,j) for j in 1:get_nlat(grid)]
     return rings    # returns Vector{UnitRange}
 end
 
+"""
+    rings = eachring(grids...)
+
+Same as `eachring(grid)` but performs a bounds check to assess that all grids
+in `grids` are of same size."""
 function eachring(grids::Grid...) where {Grid<:AbstractGrid}
     for grid in grids
         @boundscheck length(grid) == length(grids[1]) || throw(BoundsError)
@@ -107,4 +137,4 @@ function get_nlons(Grid::Type{<:AbstractGrid},nlat_half::Integer;both_hemisphere
     return [get_nlon_per_ring(Grid,nlat_half,j) for j in 1:n]
 end
 
-get_nlon_max(grid::Grid) where {Grid<:AbstractGrid} = get_nlon_max(Grid,get_nlat_half(grid)) 
+get_nlon_max(grid::Grid) where {Grid<:AbstractGrid} = get_nlon_max(Grid,grid.nlat_half) 
