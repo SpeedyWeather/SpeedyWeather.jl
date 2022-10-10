@@ -83,14 +83,14 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
 
     # RESOLUTION PARAMETERS
     nresolution = get_resolution(Grid,trunc)        # resolution parameter, nlat_half/nside for HEALPixGrid
-    nlat_half = get_nlat_half(Grid,nresolution)     # contains equator for HEALPix
+    nlat_half = get_nlat_half(Grid,nresolution)     # contains equator for HEALPix, HEALPix4 and Clenshaw
     nlat = 2nlat_half - nlat_odd(Grid)              # one less if grids have odd # of latitude rings
     nlon_max = get_nlon_max(Grid,nresolution)       # number of longitudes around the equator
                                                     # number of longitudes per latitude ring (one hemisphere only)
     nlons = [get_nlon_per_ring(Grid,nresolution,j) for j in 1:nlat_half]
     nfreq_max = nlon_max÷2 + 1                      # maximum number of fourier frequencies (real FFTs)
 
-    # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
+    # LATITUDE VECTORS (based on Gaussian, equi-angle HEALPix or HEALPix4 latitudes)
     colat = get_colat(Grid,nresolution)             # colatitude in radians                             
     cos_colat = cos.(colat)                         # cos(colat)
     sin_colat = sin.(colat)                         # sin(colat)
@@ -108,6 +108,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     lon1s = [lons[each_index_in_ring(Grid,j,nresolution)[1]] for j in 1:nlat_half]
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
     Grid <: AbstractHEALPixGrid && fill!(lon_offsets,1)     # no rotation for HEALPix at the moment
+    Grid <: AbstractHEALPix4Grid && fill!(lon_offsets,1)    # no rotation for HEALPix4 at the moment
     
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
     Λ = zeros(LowerTriangularMatrix{NF},lmax+2,mmax+1)  # Legendre polynomials for one latitude
