@@ -79,7 +79,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
     # RESOLUTION PARAMETERS
     nresolution = get_resolution(Grid,trunc)        # resolution parameter nlat_half
-    nlat_half = nlat_half                           # number of latitude rings on one hemisphere (Equator incl)
+    nlat_half = nresolution                         # number of latitude rings on one hemisphere (Equator incl)
     nlat = get_nlat(Grid,nlat_half)                 # 2nlat_half but one less if grids have odd # of lat rings
     nlon_max = get_nlon_max(Grid,nlat_half)         # number of longitudes around the equator
     nlon = nlon_max                                 # same (used for compatibility)

@@ -140,25 +140,23 @@ struct FullHEALPixGrid{T} <: AbstractFullGrid{T}
 
     FullHEALPixGrid{T}(data,nlat_half) where T = length(data) == npoints_fullhealpix(nlat_half) ?
     new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))} cannot be used to create a "*
-        "H$nlat_half ($(2nlat_half)x$(2nlat_half-1)) FullHEALPixGrid{$T}.")
+        "H$nlat_half ($(4nlat_half)x$(2nlat_half-1)) FullHEALPixGrid{$T}.")
 end
 
-npoints_fullhealpix(nlat_half::Integer) = 2nlat_half*(2nlat_half-1)
-nlat_half_fullhealpix(npoints::Integer) = round(Int,1/2*(1+sqrt(1+npoints)))
-nside_fullhealpix(nlat_half::Integer) = nlat_half÷2
+npoints_fullhealpix(nlat_half::Integer) = 4nlat_half*(2nlat_half-1)
+nlat_half_fullhealpix(npoints::Integer) = round(Int,1/4 + sqrt(1/16 + npoints/8))
 
 # infer nlat_half from data vector length, infer parametric type from eltype of data
 FullHEALPixGrid{T}(data::AbstractVector) where T = FullHEALPixGrid{T}(data,nlat_half_fullhealpix(length(data)))
 FullHEALPixGrid(data::AbstractVector,n::Integer...) = FullHEALPixGrid{eltype(data)}(data,n...)
-
 truncation_order(::Type{<:FullHEALPixGrid}) = 2            # quadratic
 get_truncation(::Type{<:FullHEALPixGrid},nlat_half::Integer) = get_truncation(HEALPixGrid,nlat_half)
 get_resolution(::Type{<:FullHEALPixGrid},trunc::Integer) = get_resolution(HEALPixGrid,trunc)
 nlat_odd(::Type{<:FullHEALPixGrid}) = true
 get_npoints(::Type{<:FullHEALPixGrid},nlat_half::Integer) = npoints_fullhealpix(nlat_half)
-get_colat(::Type{<:FullHEALPixGrid},nlat_half::Integer) = get_colat(HEALPixGrid,nside_fullhealpix(nlat_half))
+get_colat(::Type{<:FullHEALPixGrid},nlat_half::Integer) = get_colat(HEALPixGrid,nlat_half)
 full_grid(::Type{<:FullHEALPixGrid}) = FullHEALPixGrid      # the full grid with same latitudes
-get_quadrature_weights(::Type{<:FullHEALPixGrid},nlat_half::Integer) = riemann_weights(nlat_half)
+get_quadrature_weights(::Type{<:FullHEALPixGrid},nlat_half::Integer) = healpix_weights(nlat_half)
 
 """
     G = FullHEALPix4Grid{T}
@@ -185,14 +183,8 @@ FullHEALPix4Grid(data::AbstractVector,n::Integer...) = FullHEALPix4Grid{eltype(d
 truncation_order(::Type{<:FullHEALPix4Grid}) = 3            # cubic
 get_truncation(::Type{<:FullHEALPix4Grid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
 get_resolution(::Type{<:FullHEALPix4Grid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
-# get_nresolution() is already defined for AbstractFullGrid
 nlat_odd(::Type{<:FullHEALPix4Grid}) = true
-# get_nlon() is already implemented for AbstractFullGrid
-# get_nlon_per_ring() is already implemented for AbstractFullGrid
 get_npoints(::Type{<:FullHEALPix4Grid},nlat_half::Integer) = npoints_fullhealpix4(nlat_half)
 get_colat(::Type{<:FullHEALPix4Grid},nlat_half::Integer) = get_colat(HEALPix4Grid,nlat_half)
-# get_lon() is already implemented for AbstractFullGrid
-# get_colatlons() is already implemented for AbstractFullGrid
-# each_index_in_ring() is already implemented for AbstractFullGrid
 get_quadrature_weights(::Type{<:FullHEALPix4Grid},nlat_half::Integer) = healpix4_weights(nlat_half)
 full_grid(::Type{<:FullHEALPix4Grid}) = FullHEALPix4Grid    # the full grid with same latitudes

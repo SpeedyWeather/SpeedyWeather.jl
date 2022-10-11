@@ -8,7 +8,7 @@ abstract type AbstractHEALPixGrid{T} <: AbstractGrid{T} end
 npoints_healpix(nlat_half::Integer) = 3*nlat_half^2
 nside_healpix(nlat_half::Integer) = nlat_half÷2
 nlat_half_healpix(npoints::Integer) = round(Int,sqrt(npoints/3))  # inverse of npoints_healpix
-nlon_healpix(nlat_half::Integer,j::Integer) = min(4j,2nlat_half,4nlat_half-4j)
+nlon_healpix(nlat_half::Integer,j::Integer) = min(4j,2nlat_half,8nlat_half-4j)
 nlon_max_healpix(nlat_half::Integer) = 2nlat_half
 
 nlat_odd(::Type{<:AbstractHEALPixGrid}) = true
@@ -23,9 +23,10 @@ end
 get_npoints(::Type{<:AbstractHEALPixGrid},nlat_half::Integer) = npoints_healpix(nlat_half)
 get_lon(::Type{<:AbstractHEALPixGrid},nlat_half::Integer) = Float64[]    # only defined for full grids
 
-function get_colatlons(Grid::Type{<:AbstractHEALPixGrid},nside::Integer)
-    npoints = get_npoints(Grid,nside)
-    colats_lons = [Healpix.pix2angRing(Healpix.Resolution(nside),i) for i in 1:npoints]
+function get_colatlons(Grid::Type{<:AbstractHEALPixGrid},nlat_half::Integer)
+    npoints = get_npoints(Grid,nlat_half)
+    nside = nside_healpix(nlat_half)
+    colats_lons = [Healpix.pix2angRing(Healpix.Resolution(nside),ij) for ij in 1:npoints]
     colats = [colat_lon[1] for colat_lon in colats_lons]
     lons = [colat_lon[2] for colat_lon in colats_lons]
     return colats, lons

@@ -90,7 +90,7 @@ OctahedralGaussianGrid(data::AbstractVector,n::Integer...) = OctahedralGaussianG
 
 truncation_order(::Type{<:OctahedralGaussianGrid}) = 3      # cubic
 get_truncation(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = nlat_half-1
-get_resolution(::Type{<:OctahedralGaussianGrid},trunc::Integer) = roundup_fft(trunc+1)
+get_resolution(::Type{<:OctahedralGaussianGrid},trunc::Integer) = trunc+1
 nlat_odd(::Type{<:OctahedralGaussianGrid}) = false
 get_npoints(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = npoints_octahedral(nlat_half,false)
 get_colat(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = get_colat(FullGaussianGrid,nlat_half)

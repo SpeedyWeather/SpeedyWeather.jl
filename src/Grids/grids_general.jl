@@ -32,7 +32,7 @@ Every new grid has to be of the form
 `AbstractHEALPixGrid` (that already exist but you may introduce a new class of grids) that share
 certain features such as the number of longitude points per latitude ring and indexing, but may
 have different latitudes or offset rotations. Each new grid `Grid` (or grid class) then has to
-implement the following methods (see grids.jl)
+implement the following methods (as an example, see octahedral.jl)
     
 Fundamental grid properties
     get_npoints         # total number of grid points
@@ -71,6 +71,7 @@ Base.zero(grid::Grid) where {Grid<:AbstractGrid} = Grid(zero(grid.data))
 
 # truncation is the spectral truncation corresponding to size of grid and lin/quad/cubic truncation
 get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,grid.nlat_half)
+get_resolution(grid::AbstractGrid) = grid.nlat_half
 
 # does the grid have an odd number of latitudes?
 nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))

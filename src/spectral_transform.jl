@@ -356,7 +356,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
     @boundscheck mmax+1 <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
     @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
-    @boundscheck get_nresolution(map) == S.nresolution || throw(BoundsError)
+    @boundscheck get_resolution(map) == S.nresolution || throw(BoundsError)
 
     # preallocate work arrays
     gn = zeros(Complex{NF}, nfreq_max)      # phase factors for northern latitudes
@@ -461,7 +461,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     @boundscheck mmax+1 <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
     @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
-    @boundscheck get_nresolution(map) == S.nresolution || throw(BoundsError)
+    @boundscheck get_resolution(map) == S.nresolution || throw(BoundsError)
 
     # preallocate work warrays
     fn = zeros(Complex{NF},nfreq_max)       # Fourier-transformed northern latitude

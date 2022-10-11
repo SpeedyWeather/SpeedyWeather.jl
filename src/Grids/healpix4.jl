@@ -7,32 +7,30 @@ and the longitude of the first point in each ring is shifted as in HEALPixGrid.
 Also, different latitudes can be used."""
 abstract type AbstractHEALPix4Grid{T} <: AbstractGrid{T} end
 
-get_nresolution(G::AbstractHEALPix4Grid) = G.nside
-get_nlat_half(::Type{<:AbstractHEALPix4Grid},nside::Integer) = nside
 nlat_odd(::Type{<:AbstractHEALPix4Grid}) = true
-get_nlon_max(::Type{<:AbstractHEALPix4Grid},nside::Integer) = 4nside
+get_nlon_max(::Type{<:AbstractHEALPix4Grid},nlat_half::Integer) = 4nlat_half
 
-function get_nlon_per_ring(::Type{<:AbstractHEALPix4Grid},nside::Integer,j::Integer)
-    nlat = 2nside-1
-    @assert 0 < j <= nlat "Ring $j is outside J$nside grid."
-    nlat_half = (nlat+1)÷2
+function get_nlon_per_ring(Grid::Type{<:AbstractHEALPix4Grid},nlat_half::Integer,j::Integer)
+    nlat = get_nlat(Grid,nlat_half)
+    @assert 0 < j <= nlat "Ring $j is outside H$nlat_half grid."
     j = j > nlat_half ? nlat - j + 1 : j      # flip north south due to symmetry
-    return nlon_healpix4(nside,j)
+    return nlon_healpix4(nlat_half,j)
 end
 
-get_npoints(::Type{<:AbstractHEALPix4Grid},nside::Integer) = npoints_healpix4(nside)
-get_lon(::Type{<:AbstractHEALPix4Grid},nside::Integer) = Float64[]    # only defined for full grids
+get_npoints(::Type{<:AbstractHEALPix4Grid},nlat_half::Integer) = npoints_healpix4(nlat_half)
+get_lon(::Type{<:AbstractHEALPix4Grid},nlat_half::Integer) = Float64[]    # only defined for full grids
 
-function get_colatlons(Grid::Type{<:AbstractHEALPix4Grid},nside::Integer)
-    npoints = get_npoints(Grid,nside)
-    colat = get_colat(Grid,nside)
+function get_colatlons(Grid::Type{<:AbstractHEALPix4Grid},nlat_half::Integer)
+    nlat = get_nlat(Grid,nlat_half)
+    npoints = get_npoints(Grid,nlat_half)
+    colat = get_colat(Grid,nlat_half)
 
     colats = zeros(npoints)
     lons = zeros(npoints)
 
     ij = 1
-    for j in 1:2nside-1
-        nlon = get_nlon_per_ring(Grid,nside,j)
+    for j in 1:nlat
+        nlon = get_nlon_per_ring(Grid,nlat_half,j)
         lon = collect(π/nlon:2π/nlon:2π)
 
         colats[ij:ij+nlon-1] .= colat[j]
@@ -45,15 +43,15 @@ end
 
 function each_index_in_ring(::Type{<:AbstractHEALPix4Grid}, # function for HEALPix4 grids
                             j::Integer,                     # ring index north to south
-                            nside::Integer)                 # resolution param
+                            nlat_half::Integer)             # resolution param
 
-    @boundscheck 0 < j < 2nside || throw(BoundsError)       # ring index valid?
-    if j <= nside                                           # northern hemisphere incl Equator
+    @boundscheck 0 < j < 2nlat_half || throw(BoundsError)   # ring index valid?
+    if j <= nlat_half                                       # northern hemisphere incl Equator
         index_1st = 2j*(j-1) + 1                            # first in-ring index i
         index_end = 2j*(j+1)                                # last in-ring index i
     else                                                    # southern hemisphere 
-        n = 4nside^2                                        # total number of points
-        j = 2nside - j                                      # count ring index from south pole
+        n = 4nlat_half^2                                    # total number of points
+        j = 2nlat_half - j                                  # count ring index from south pole
         index_1st = n - 2j*(j+1) + 1                        # count backwards
         index_end = n - 2j*(j-1)
     end
@@ -62,42 +60,46 @@ end
 
 
 """
-    J = HEALPix4Grid{T}
+    H = HEALPix4Grid{T}
 
-A HEALPix4 grid with 4 base faces, each `nside`x`nside` grid points, each covering the same area.
-The values of all grid points are stored in a vector field `v` that unravels the data 0 to 360˚,
+A HEALPix4 grid with 4 base faces, each `nlat_half`x`nlat_half` grid points, each covering the same area.
+The values of all grid points are stored in a vector field `data` that unravels the data 0 to 360˚,
 then ring by ring, which are sorted north to south."""
 struct HEALPix4Grid{T} <: AbstractHEALPix4Grid{T}
-    data::Vector{T}    # data vector, ring by ring, north to south
-    nside::Int      # nside^2 is the number of pixel in each of the 12 base pixel
+    data::Vector{T}     # data vector, ring by ring, north to south
+    nlat_half::Int      # number of latitude rings on one hemisphere
 
-    HEALPix4Grid{T}(data,nside) where T = length(data) == npoints_healpix4(nside) ?
-    new(data,nside) : error("$(length(data))-element Vector{$(eltype(data))}"*
-    "cannot be used to create an J$nside HEALPix4Grid{$T}.")
+    HEALPix4Grid{T}(data,nlat_half) where T = length(data) == npoints_healpix4(nlat_half) ?
+    new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))}"*
+    "cannot be used to create an H$nlat_half HEALPix4Grid{$T}.")
 end
 
-npoints_healpix4(nside::Integer) = 4nside^2
-nside_healpix4(npoints::Integer) = round(Int,sqrt(npoints/4))  # inverse of npoints_healpix4
-nlat_healpix4(nside::Integer) = 2nside-1
-nlon_healpix4(nside::Integer,j::Integer) = 4j
+npoints_healpix4(nlat_half::Integer) = 4nlat_half^2
+nlat_half_healpix4(npoints::Integer) = round(Int,sqrt(npoints/4))  # inverse of npoints_healpix4
+nlat_healpix4(nlat_half::Integer) = 2nlat_half-1
+nlon_healpix4(nlat_half::Integer,j::Integer) = min(4j,8nlat_half-4j)
 
-# infer nside from data vector length, infer parametric type from eltype of data
-HEALPix4Grid{T}(data::AbstractVector) where T = HEALPix4Grid{T}(data,nside_healpix4(length(data)))
+# infer nlat_half from data vector length, infer parametric type from eltype of data
+HEALPix4Grid{T}(data::AbstractVector) where T = HEALPix4Grid{T}(data,nlat_half_healpix4(length(data)))
 HEALPix4Grid(data::AbstractVector,n::Integer...) = HEALPix4Grid{eltype(data)}(data,n...)
 
-truncation_order(::Type{<:HEALPix4Grid}) = 3                 # cubic (in longitude)
-get_truncation(::Type{<:HEALPix4Grid},nside::Integer) = nside-1
-get_resolution(::Type{<:HEALPix4Grid},trunc::Integer) = roundup_fft(trunc+1)
-get_colat(G::Type{<:HEALPix4Grid},nside::Integer) =
-    ( colat_half=[acos(1-(j/nside)^2) for j in 1:nside]; vcat(colat_half,π.-colat_half[end-1:-1:1]) )
-# get_lon() is already implemented for AbstractHEALPix4Grid
-# get_colatlons() is already implemented for AbstractHEALPix4Grid
-# each_index_in_ring() is already implemented for AbstractHEALPix4Grid
+truncation_order(::Type{<:HEALPix4Grid}) = 3                 # cubic
+get_truncation(::Type{<:HEALPix4Grid},nlat_half::Integer) = nlat_half-1
+get_resolution(::Type{<:HEALPix4Grid},trunc::Integer) = trunc+1
+function get_colat(::Type{<:HEALPix4Grid},nlat_half::Integer)
+    colat = zeros(nlat_healpix4(nlat_half))
+    for j in 1:nlat_half
+        colat[j] = acos(1-(j/nlat_half)^2)  # northern hemisphere
+        colat[2nlat_half-j] = π - colat[j]  # southern hemisphere
+    end
+    return colat
+end
 full_grid(::Type{<:HEALPix4Grid}) = FullHEALPix4Grid    # the full grid with same latitudes
 
-matrix_size(G::HEALPix4Grid) = (2G.nside,2G.nside)
-matrix_size(::Type{HEALPix4Grid},nside::Integer)=(2nside,2nside)
+matrix_size(grid::HEALPix4Grid) = (2grid.nlat_half,2grid.nlat_half)
+matrix_size(::Type{HEALPix4Grid},nlat_half::Integer) = (2nlat_half,2nlat_half)
 Base.Matrix(G::HEALPix4Grid{T};kwargs...) where T = Matrix!(zeros(T,matrix_size(G)...),G;kwargs...)
+
 """
     Matrix!(M::AbstractMatrix,
             G::HEALPix4Grid;
@@ -130,7 +132,7 @@ function Matrix!(   MGs::Tuple{AbstractMatrix{T},HEALPix4Grid}...;
     M,G = MGs[1]
     m,n = size(M)
     @boundscheck m == n || throw(BoundsError)
-    @boundscheck m == 2*G.nside || throw(BoundsError)
+    @boundscheck m == 2*G.nlat_half || throw(BoundsError)
 
     for MG in MGs   # check that all matrices and all grids are of same size
         Mi,Gi = MG
@@ -144,8 +146,8 @@ function Matrix!(   MGs::Tuple{AbstractMatrix{T},HEALPix4Grid}...;
     end
 
     rings = eachring(G)         # index ranges for all rings
-    nlat_half = G.nside         # number of latitude rings on one hemisphere incl Equator
-    nside = G.nside           # side length of a basepixel matrix (=nside in HEALPix)
+    nlat_half = G.nlat_half     # number of latitude rings on one hemisphere incl Equator
+    nside = nlat_half           # side length of a basepixel matrix
 
     # sort grid indices from G into matrix M
     # 1) loop over each grid point per ring
@@ -159,7 +161,7 @@ function Matrix!(   MGs::Tuple{AbstractMatrix{T},HEALPix4Grid}...;
             i = ij-ring[1]                          # 0-based index in ring
             grid_quadrant = floor(Int,mod(4*i/nlon,4))  # either 0,1,2,3
             iq = i - grid_quadrant*(nlon÷4)             # 0-based index i relative to quadrant
-            r = min(j,nlat_half) - iq             # row in matrix m (1-based)
+            r = min(j,nlat_half) - iq               # row in matrix m (1-based)
             c = (iq+1) + max(0,j-nlat_half)         # column in matrix m (1-based)
 
             # rotate indices in quadrant
