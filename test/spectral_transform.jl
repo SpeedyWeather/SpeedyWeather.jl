@@ -26,6 +26,7 @@ spectral_resolutions_inexact = (127,191)
                             OctahedralClenshawGrid,
                             HEALPixGrid,
                             HEALPix4Grid,
+                            FullHEALPixGrid,
                             FullHEALPix4Grid)
 
                 p,d,m = initialize_speedy(NF;trunc,Grid)
@@ -70,7 +71,7 @@ end
                             FullClenshawGrid,
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid)
-                            # HEALPixGrid)
+
                 P = Parameters(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
@@ -98,6 +99,7 @@ end
         for NF in (Float32,Float64)
             for Grid in (   HEALPixGrid,
                             HEALPix4Grid,
+                            FullHEALPixGrid,
                             FullHEALPix4Grid)
                 P = Parameters(;NF,trunc,Grid)
                 S = SpectralTransform(P)
