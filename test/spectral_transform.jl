@@ -15,7 +15,7 @@ end
 # for the following testsets test some spectral truncations
 # but not too large ones as they take so long
 spectral_resolutions = (31,63,127)
-spectral_resolutions_inexact = (127,191)
+spectral_resolutions_inexact = (127,255)
 
 @testset "Transform: l=0,m=0 is constant > 0" begin
     for trunc in spectral_resolutions
