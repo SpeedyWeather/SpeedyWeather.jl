@@ -6,18 +6,18 @@
         F = FullGaussianGrid(randn(NF,96*48),24)        # F24 grid
         O = OctahedralGaussianGrid(randn(NF,3168),24)   # O24 grid
         C = OctahedralClenshawGrid(randn(NF,3056),24)   # C24 grid
-        H = HEALPixGrid(randn(NF,3072),16)              # H16 grid
-        J = HEALPix4Grid(randn(NF,1024),16)             # J16 grid
-        K = FullHEALPix4Grid(randn(NF,64*31),16)        # K16 grid
+        H = HEALPixGrid(randn(NF,3072),32)              # H32 grid
+        J = HEALPix4Grid(randn(NF,4096),32)             # J32 grid
+        K = FullHEALPix4Grid(randn(NF,128*63),32)       # K32 grid
 
         # without resolution parameter provided (inferred from vector length)
         L2 = FullClenshawGrid(randn(NF,96*47))          # L24 grid
         F2 = FullGaussianGrid(randn(NF,96*48))          # F24 grid
         O2 = OctahedralGaussianGrid(randn(NF,3168))     # O24 grid
         C2 = OctahedralClenshawGrid(randn(NF,3056))     # C24 grid
-        H2 = HEALPixGrid(randn(NF,3072))                # H16 grid
-        J2 = HEALPix4Grid(randn(NF,1024))               # J16 grid
-        K2 = FullHEALPix4Grid(randn(NF,64*31))          # K16 grid
+        H2 = HEALPixGrid(randn(NF,3072))                # H32 grid
+        J2 = HEALPix4Grid(randn(NF,4096))               # J32 grid
+        K2 = FullHEALPix4Grid(randn(NF,128*63))         # K32 grid
 
         for (grid1,grid2) in zip([L,F,O,C,H,J,K],[L2,F2,O2,C2,H2,J2,K2])
             @test size(grid1) == size(grid2)
@@ -59,10 +59,11 @@ end
                     OctahedralClenshawGrid,
                     HEALPixGrid,
                     HEALPix4Grid,
+                    FullHEALPixGrid,
                     FullHEALPix4Grid
                     )
 
-            n = 32      # resolution parameter nlat_half/nside
+            n = 32      # resolution parameter nlat_half
             G1 = zeros(G,n)
             G2 = zero(G1)
             G3 = G(G2)
@@ -88,10 +89,11 @@ end
                 OctahedralClenshawGrid,
                 HEALPixGrid,
                 HEALPix4Grid,
-                FullHEALPix4Grid
+                FullHEALPixGrid,
+                FullHEALPix4Grid,
                 )
 
-        n = 32      # resolution parameter nlat_half/nside
+        n = 32      # resolution parameter nlat_half
         grid = zeros(G,n)
 
         # precompute indices and boundscheck

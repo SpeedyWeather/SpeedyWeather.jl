@@ -20,7 +20,7 @@ orography, land-sea mask and albedo from an netCDF file and stores the in a
 function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
 
     @unpack orography_path, orography_file, gravity = P
-    @unpack Grid, nresolution, lmax, mmax = S
+    @unpack Grid, lmax, mmax = S
 
     # LOAD NETCDF FILE (but not its data yet)
     if orography_path == ""
@@ -43,7 +43,7 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
         orography_highres = ncfile.vars["orog"][:,:]        # height [m]
 
         #TODO also read lat,lon from file and flip array in case it's not as expected
-        recompute_legendre = true                          # triggers Float64 precomputation
+        recompute_legendre = true
         orography_spec = spectral(orography_highres;Grid=FullGaussianGrid,recompute_legendre)
 
         lmax,mmax = P.trunc,P.trunc

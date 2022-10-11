@@ -41,6 +41,7 @@ module SpeedyWeather
             AbstractGrid,
             FullClenshawGrid,
             FullGaussianGrid,
+            FullHEALPixGrid,
             OctahedralGaussianGrid,
             OctahedralClenshawGrid,
             HEALPixGrid,
@@ -64,8 +65,7 @@ module SpeedyWeather
 
     include("utility_functions.jl")
     include("lower_triangular_matrix.jl")   # defines LowerTriangularMatrix
-    include("grids_general.jl")             # defines AbstractGrid and interfaces
-    include("grids.jl")                     # defines concrete Grid types
+    include("Grids/Grids.jl")               # defines AbstractGrid and concrete Grid types
     include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
 
     include("parameter_structs.jl")
