@@ -23,7 +23,7 @@ Then, activate the environment with `conda activate SpeedyWeather`.
 To install SpeedyWeather.jl as a development package and [Revise.jl](https://github.com/timholy/Revise.jl) that automatically updates function definitions in a running Julia session, run:
 
 ```
-julia -e 'import Pkg; Pkg.develop(path="."); Pkg.add("Revise")'
+julia -e 'import Pkg; Pkg.develop(path=pwd()); Pkg.add("Revise")'
 ```
 
 
@@ -36,6 +36,12 @@ using Revise, SpeedyWeather
 run_speedy(n_days=30, trunc=63, Grid=OctahedralGaussianGrid, model=:shallowwater, output=true)
 ```  
 
+## Documentation
+
+```
+julia -e 'import Pkg; Pkg.add("Documenter")'
+julia --project=docs/ docs/make.jl
+```
 
 ## Versioning
 

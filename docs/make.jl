@@ -14,7 +14,8 @@ makedocs(
             "Boundary conditions"=>"boundary_conditions.md",
             "New model setups"=>"new_model_setups.md",
             "Function and type index"=>"functions.md",
-            "Style and convention guide"=>"conventions.md"]
+            "Style and convention guide"=>"conventions.md",
+            "Development"=>"development.md"]
 )
 
 deploydocs(
