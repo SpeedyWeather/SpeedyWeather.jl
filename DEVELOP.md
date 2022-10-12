@@ -34,7 +34,7 @@ Make sure to load Revise before importing anything else. For example:
 ```julia
 using Revise, SpeedyWeather
 run_speedy( output=true)
-run_speedy(n_days=30, trunc=63, Grid=OctahedralGaussianGrid, model=:shallowwater, nlev=8, σ_levels_half=[0.000, 0.050, 0.140, 0.260, 0.420, 0.600, 0.770, 0.900, 1.000], output=true)
+run_speedy(n_days=30, trunc=63, Grid=OctahedralGaussianGrid, nlev=8, σ_levels_half=[0.000, 0.050, 0.140, 0.260, 0.420, 0.600, 0.770, 0.900, 1.000], output=true)
 ```  
 
 
