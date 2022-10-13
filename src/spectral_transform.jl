@@ -107,9 +107,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     _, lons = get_colatlons(Grid,nlat_half)
     lon1s = [lons[each_index_in_ring(Grid,j,nlat_half)[1]] for j in 1:nlat_half]
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
-    # Grid <: AbstractHEALPixGrid && fill!(lon_offsets,1)     # no rotation for HEALPix at the moment
-    # Grid <: AbstractHEALPix4Grid && fill!(lon_offsets,1)    # no rotation for HEALPix4 at the moment
-    
+
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
     Λ = zeros(LowerTriangularMatrix{NF},lmax+2,mmax+1)  # Legendre polynomials for one latitude
 
