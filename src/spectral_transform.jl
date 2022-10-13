@@ -375,7 +375,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
         # inverse Legendre transform by looping over wavenumbers l,m
         lm = 1                              # single index for non-zero l,m indices
-        @simd for m in 1:min(nfreq,mmax+1)  # Σ_{m=0}^{mmax}, but 1-based index
+        for m in 1:min(nfreq,mmax+1)        # Σ_{m=0}^{mmax}, but 1-based index
             acc_odd  = zero(Complex{NF})    # accumulator for isodd(l+m)
             acc_even = zero(Complex{NF})    # accumulator for iseven(l+m)
 
@@ -496,7 +496,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         ΔΩ = solid_angles[j_north]                      # = sinθ Δθ Δϕ, solid angle for a grid point
 
         lm = 1                                          # single index for spherical harmonics
-        @simd for m in 1:min(nfreq,mmax+1)              # Σ_{m=0}^{mmax}, but 1-based index
+        for m in 1:min(nfreq,mmax+1)              # Σ_{m=0}^{mmax}, but 1-based index
 
             an, as = fn[m], fs[m]
 
