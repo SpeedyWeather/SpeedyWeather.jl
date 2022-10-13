@@ -8,7 +8,6 @@ module SpeedyWeather
     import Random
     import FastGaussQuadrature
     import AssociatedLegendrePolynomials as Legendre
-    import Healpix
     import AbstractFFTs
     import FFTW
     import GenericFFT
