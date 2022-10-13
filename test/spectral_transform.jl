@@ -139,7 +139,13 @@ end
 
                 oro_grid = B.orography
                 oro_spec = spectral(oro_grid,S)
-                oro_spec[30:end,:] .= 0     # smooth orography
+
+                # smooth orography
+                for m in 1:trunc+1
+                    for l in m:trunc+2
+                        oro_spec[l,m] = 0
+                    end
+                end 
 
                 oro_grid1 = gridded(oro_spec,S)
                 oro_spec1 = spectral(oro_grid1,S)
