@@ -1,5 +1,0 @@
-name: SpeedyWeather
-channels:
-  - conda-forge
-dependencies:
-  - julia
