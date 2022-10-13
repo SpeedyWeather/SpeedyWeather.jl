@@ -24,11 +24,28 @@ get_npoints(::Type{<:AbstractHEALPixGrid},nlat_half::Integer) = npoints_healpix(
 get_lon(::Type{<:AbstractHEALPixGrid},nlat_half::Integer) = Float64[]    # only defined for full grids
 
 function get_colatlons(Grid::Type{<:AbstractHEALPixGrid},nlat_half::Integer)
+    nlat = get_nlat(Grid,nlat_half)
     npoints = get_npoints(Grid,nlat_half)
     nside = nside_healpix(nlat_half)
-    colats_lons = [Healpix.pix2angRing(Healpix.Resolution(nside),ij) for ij in 1:npoints]
-    colats = [colat_lon[1] for colat_lon in colats_lons]
-    lons = [colat_lon[2] for colat_lon in colats_lons]
+    colat = get_colat(Grid,nlat_half)
+
+    colats = zeros(npoints)
+    lons = zeros(npoints)
+
+    ij = 1
+    for j in 1:nlat
+        nlon = get_nlon_per_ring(Grid,nlat_half,j)
+
+        # s = 1 for polar caps, s=2,1,2,1,... in the equatorial zone
+        s = (j < nside) || (j >= 3nside) ? 1 : ((j - nside) % 2 + 1)
+        lon = [π/(nlon÷2)*(i - s/2) for i in 1:nlon]
+    
+        colats[ij:ij+nlon-1] .= colat[j]
+        lons[ij:ij+nlon-1] .= lon
+
+        ij += nlon
+    end
+
     return colats, lons
 end
 
