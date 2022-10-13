@@ -141,8 +141,9 @@ end
                 oro_spec = spectral(oro_grid,S)
 
                 # smooth orography
+                lmax = 30
                 for m in 1:trunc+1
-                    for l in m:trunc+2
+                    for l in max(lmax,m):trunc+2
                         oro_spec[l,m] = 0
                     end
                 end 
