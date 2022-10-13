@@ -107,7 +107,9 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     _, lons = get_colatlons(Grid,nlat_half)
     lon1s = [lons[each_index_in_ring(Grid,j,nlat_half)[1]] for j in 1:nlat_half]
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
-  
+    # Grid <: AbstractHEALPixGrid && fill!(lon_offsets,1)     # no rotation for HEALPix at the moment
+    # Grid <: AbstractHEALPix4Grid && fill!(lon_offsets,1)    # no rotation for HEALPix4 at the moment
+    
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
     Λ = zeros(LowerTriangularMatrix{NF},lmax+2,mmax+1)  # Legendre polynomials for one latitude
 
@@ -502,11 +504,11 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
 
             # SOLID ANGLE QUADRATURE WEIGHTS and LONGITUDE OFFSET
             o = lon_offsets[m,j_north]                  # longitude offset rotation
-            ΔΩ *= conj(o)                               # complex conjugate for rotation back to prime meridian
+            ΔΩ_rotated = ΔΩ*conj(o)                     # complex conjugate for rotation back to prime meridian
 
             # LEGENDRE TRANSFORM
-            a_even = (an + as)*ΔΩ                       # sign flip due to anti-symmetry with
-            a_odd = (an - as)*ΔΩ                        # odd polynomials 
+            a_even = (an + as)*ΔΩ_rotated               # sign flip due to anti-symmetry with
+            a_odd = (an - as)*ΔΩ_rotated                # odd polynomials 
 
             # integration over l = m:lmax+1
             lm_end = lm + lmax-m+1                      # first index lm plus lmax-m+1 (length of column -1)

@@ -96,11 +96,11 @@ end
 
 @testset "Transform: Individual Legendre polynomials (inexact transforms)" begin
     @testset for trunc in spectral_resolutions_inexact
-        for NF in (Float32,Float64)
-            for Grid in (   HEALPixGrid,
-                            HEALPix4Grid,
-                            FullHEALPixGrid,
-                            FullHEALPix4Grid)
+        @testset for NF in (Float32,Float64)
+            @testset for Grid in (  HEALPixGrid,
+                                    HEALPix4Grid,
+                                    FullHEALPixGrid,
+                                    FullHEALPix4Grid)
                 P = Parameters(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
@@ -114,7 +114,7 @@ end
                         alms2 = spectral(map,S)
 
                         for lm in SpeedyWeather.eachharmonic(alms,alms2)
-                            @test alms[lm] ≈ alms2[lm] atol=1e-3
+                            @test alms[lm] ≈ alms2[lm] atol=1e-3 rtol=1e-3
                         end
                     end
                 end
