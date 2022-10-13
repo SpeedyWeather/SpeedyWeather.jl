@@ -15,7 +15,7 @@ makedocs(
             "New model setups"=>"new_model_setups.md",
             "Function and type index"=>"functions.md",
             "Style and convention guide"=>"conventions.md",
-            "Development"=>"development.md"]
+            "Development notes"=>"develop.md"]
 )
 
 deploydocs(
