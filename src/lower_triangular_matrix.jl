@@ -184,8 +184,8 @@ function Base.copyto!(  L::LowerTriangularMatrix{T},    # copy to L
     L
 end
 
-function Base.copyto!(  M::AbstractMatrix{T},               # copy to L
-                        L::LowerTriangularMatrix) where T   # copy from M
+function Base.copyto!(  M::AbstractMatrix{T},               # copy to M
+                        L::LowerTriangularMatrix) where T   # copy from L
 
     @boundscheck size(L) == size(M) || throw(BoundsError)
     lmax,mmax = size(L)
@@ -201,7 +201,7 @@ function Base.copyto!(  M::AbstractMatrix{T},               # copy to L
             M[l,m] = convert(T,M[lm])
         end
     end
-    L
+    M
 end
 
 function LowerTriangularMatrix{T}(M::LowerTriangularMatrix) where T

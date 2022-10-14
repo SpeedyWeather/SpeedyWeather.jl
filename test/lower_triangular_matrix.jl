@@ -115,5 +115,11 @@ end
 
         L2 ./= NF(5)
         @test L1 ./ NF(5) ≈ L2 
+
+        L1 = randn(LowerTriangularMatrix{NF},10,10)
+        L2 = copy(L1)
+
+        L2 .^= NF(2)
+        @test L1 .^ NF(2) ≈ L2
     end
 end 
