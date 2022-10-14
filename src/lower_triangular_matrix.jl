@@ -264,6 +264,7 @@ function Base.:(-)(L1::LowerTriangularMatrix,L2::LowerTriangularMatrix)
 end
 
 Base.:(-)(L::LowerTriangularMatrix) = LowerTriangularMatrix(-L.data,size(L)...)
+Base.prod(L::LowerTriangularMatrix{NF}) where NF = zero(T)
 
 """
     fill!(L::LowerTriangularMatrix,x)
