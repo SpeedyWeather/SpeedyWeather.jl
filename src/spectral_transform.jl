@@ -103,7 +103,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
         s = (linear=1,quadratic=2,cubic=3)[legendre_shortcut]
         m_truncs = [nlons[j]÷(s+1) + 1 for j in 1:nlat_half]
     elseif legendre_shortcut == :linquad_coslat²
-        m_truncs = [floor(Int,(nlons[j] - 1)/(2 + sin_colat[j]^2)) - 1 for j in 1:nlat_half]
+        m_truncs = [ceil(Int,nlons[j]/(2 + sin_colat[j]^2)) for j in 1:nlat_half]
     elseif legendre_shortcut == :lincub_coslat
         m_truncs = [ceil(Int,nlons[j]/(2 + 2sin_colat[j])) for j in 1:nlat_half]
     else
