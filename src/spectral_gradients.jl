@@ -80,14 +80,18 @@ function _divergence!(  kernel,
     lmax,mmax = size(div) .- (2,1)              # 0-based lmax,mmax 
 
     z = zero(Complex{NF})
-    div[1] = kernel(div[1],z,z,z)               # l=m=0 harmonic is zero
+    lm = 0
+    @inbounds for m in 1:mmax                   # 1-based l,m
+        lm += 1                                 # diagonal first
+        ∂u∂λ  = ((m-1)*im)*u[lm]
+        ∂v∂θ2 = grad_y_vordiv2[lm]*v[lm+1]
+        div[lm] = kernel(div[lm],∂u∂λ,z,∂v∂θ2)
 
-    lm = 1
-    for m in 1:mmax+1                           # 1-based l,m
-        for l in max(2,m):lmax+1                # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+        # everything below the diagonal
+        for l in m+1:lmax+1
             lm += 1
             ∂u∂λ  = ((m-1)*im)*u[lm]
-            ∂v∂θ1 = grad_y_vordiv1[lm]*v[l-1,m]
+            ∂v∂θ1 = grad_y_vordiv1[lm]*v[lm-1]
             ∂v∂θ2 = grad_y_vordiv2[lm]*v[lm+1]
             div[lm] = kernel(div[lm],∂u∂λ,∂v∂θ1,∂v∂θ2)
         end
