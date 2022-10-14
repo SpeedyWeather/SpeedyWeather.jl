@@ -309,9 +309,13 @@ LowerTriangularStyle(::Val{2}) = LowerTriangularStyle()
 function Base.copyto!(dest::LowerTriangularMatrix{T}, bc::Broadcasted{<:LowerTriangularStyle}) where T
     axs = axes(dest)
     axes(bc) == axs || Broadcast.throwdm(axes(bc), axs)
-    for i in axs[1]
-        for j in 1:i
-            dest.data[ij2k(i,j,dest.m)] = Broadcast._broadcast_getindex(bc, CartesianIndex(i, j))
+
+    lmax,mmax = size(dest)
+    lm = 0
+    for m in 1:mmax
+        for l in m:lmax
+            lm += 1
+            dest.data[lm] = Broadcast._broadcast_getindex(bc, CartesianIndex(l, m))
         end
     end
     return dest
@@ -319,3 +323,4 @@ end
 
 # GPU methods
 Adapt.adapt_structure(to, x::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix(Adapt.adapt(to, x.data), x.m, x.n)
+
