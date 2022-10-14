@@ -285,5 +285,37 @@ function scale!(L::LowerTriangularMatrix{T},s::Number) where T
     L
 end
 
+# Broadcast (more or less copied and adjusted from LinearAlgebra.jl)
+import Base: similar, copyto!
+import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
+import LinearAlgebra: isstructurepreserving, fzeropreserving
+
+struct LowerTriangularStyle <: Broadcast.AbstractArrayStyle{2} end
+
+Base.BroadcastStyle(::Type{<:LowerTriangularMatrix}) = LowerTriangularStyle()
+
+function Base.similar(bc::Broadcasted{LowerTriangularStyle}, ::Type{NF}) where NF
+    inds = axes(bc)
+    if isstructurepreserving(bc) || fzeropreserving(bc) 
+        return LowerTriangularMatrix{NF}(undef, inds[1][end], inds[2][end])
+    end
+    return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), NF)
+end
+
+LowerTriangularStyle(::Val{0}) = LowerTriangularStyle()
+LowerTriangularStyle(::Val{1}) = LowerTriangularStyle()
+LowerTriangularStyle(::Val{2}) = LowerTriangularStyle()
+
+function Base.copyto!(dest::LowerTriangularMatrix{T}, bc::Broadcasted{<:LowerTriangularStyle}) where T
+    axs = axes(dest)
+    axes(bc) == axs || Broadcast.throwdm(axes(bc), axs)
+    for i in axs[1]
+        for j in 1:i
+            dest.data[ij2k(i,j,dest.m)] = Broadcast._broadcast_getindex(bc, CartesianIndex(i, j))
+        end
+    end
+    return dest
+end
+
 # GPU methods
 Adapt.adapt_structure(to, x::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix(Adapt.adapt(to, x.data), x.m, x.n)
