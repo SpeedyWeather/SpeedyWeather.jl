@@ -100,7 +100,7 @@ The default values of the keywords define the default model setup.
     # LEGENDRE TRANSFORM AND POLYNOMIALS
     recompute_legendre::Bool = false    # recomputation is slower but requires less memory
     legendre_NF::DataType = Float64     # which format to use to calculate the Legendre polynomials
-    legendre_shortcut::Symbol = :linear
+    legendre_shortcut::Symbol = :linear # :linear, :quadratic, :cubic, :lincub_coslat, :linquad_coslat²
 
     # BOUNDARY FILES
     boundary_path::String = ""          # package location is default
