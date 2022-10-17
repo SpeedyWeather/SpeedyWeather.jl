@@ -80,7 +80,7 @@ Base.@propagate_inbounds Base.setindex!(L::LowerTriangularMatrix,x,k::Integer) =
 Base.@propagate_inbounds function Base.setindex!(L::LowerTriangularMatrix{T},x,i::Integer,j::Integer) where T
     @boundscheck i >= j || throw(BoundsError(L,(i,j)))
     k = ij2k(i,j,L.m)
-    @inbounds setindex!(L.data,x,k)
+    setindex!(L.data,x,k)
 end
 
 @inline Base.setindex!(L::LowerTriangularMatrix,x::AbstractVector,r::AbstractRange) = setindex!(L.data,x,r)
