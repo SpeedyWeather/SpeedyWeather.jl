@@ -81,21 +81,24 @@ function _divergence!(  kernel,
 
     z = zero(Complex{NF})
     lm = 0
-    @inbounds for m in 1:mmax                   # 1-based l,m
-        lm += 1                                 # diagonal first
+    @inbounds for m in 1:mmax+1                 # 1-based l,m
+        
+        # diagonal (separate to avoid access to v[l-1,m])
+        lm += 1                                 
         ∂u∂λ  = ((m-1)*im)*u[lm]
+        ∂v∂θ1 = zero(Complex{NF})               # always above the diagonal
         ∂v∂θ2 = grad_y_vordiv2[lm]*v[lm+1]
-        div[lm] = kernel(div[lm],∂u∂λ,z,∂v∂θ2)
+        div[lm] = kernel(div[lm], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
 
-        # everything below the diagonal
+        # everything below the diagonal (but skip last row)
         for l in m+1:lmax+1
             lm += 1
             ∂u∂λ  = ((m-1)*im)*u[lm]
             ∂v∂θ1 = grad_y_vordiv1[lm]*v[lm-1]
-            ∂v∂θ2 = grad_y_vordiv2[lm]*v[lm+1]
-            div[lm] = kernel(div[lm],∂u∂λ,∂v∂θ1,∂v∂θ2)
+            ∂v∂θ2 = grad_y_vordiv2[lm]*v[lm+1]  # this pulls in data from the last row though
+            div[lm] = kernel(div[lm], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
         end
-        lm += 1         # loop skips last row, add one to keep lm corresponding to l,m accordingly
+        lm += 1 # loop skips last row, add one to keep lm corresponding to l,m accordingly
     end
 
     return nothing
