@@ -241,15 +241,15 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
             V[lm] = muladd(z, vor[lm], ∂Dθ)         # = ∂ζλ + ∂Dθ            
         end
 
-        # SECOND LAST ROW
+        # SECOND LAST ROW (separated to imply that vor,div are zero in last row)
         lm += 1
-        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # meridional gradient again (but only 2nd term from above)
-        V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]       # zonal gradient again (as above)
+        U[lm] = im*vordiv_to_uv_x[lm]*div[lm] - vordiv_to_uv1[lm]*vor[lm-1]
+        V[lm] = im*vordiv_to_uv_x[lm]*vor[lm] + vordiv_to_uv1[lm]*div[lm-1]
 
-        # LAST ROW (separated to avoid out-of-bounds access to l+2,m)
+        # LAST ROW (separated to avoid out-of-bounds access to lmax+3
         lm += 1
-        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # other terms are zero
-        V[lm] =  vordiv_to_uv1[lm]*div[lm-1]        # other terms are zero
+        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # only last term from 2nd last row
+        V[lm] =  vordiv_to_uv1[lm]*div[lm-1]        # only last term from 2nd last row
     end
 
     # LAST COLUMN 
