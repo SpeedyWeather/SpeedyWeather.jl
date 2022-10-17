@@ -36,6 +36,10 @@ end
         # shouldn't throw an error if @inbounds
         f(A,i) = @inbounds A[i]             # wrap into function
         f(A,i,j) = @inbounds A[i,j]
+        
+        f(A,33,32)                          # inside ranges
+        f(A,560)
+
         f(A,34,32)                          # outside ranges
         f(A,561)
     end
