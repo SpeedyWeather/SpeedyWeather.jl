@@ -83,14 +83,14 @@ function _divergence!(  kernel,
     lm = 0
     @inbounds for m in 1:mmax+1                 # 1-based l,m
         
-        # diagonal (separate to avoid access to v[l-1,m])
+        # DIAGONAL (separate to avoid access to v[l-1,m])
         lm += 1                                 
         ∂u∂λ  = ((m-1)*im)*u[lm]
         ∂v∂θ1 = zero(Complex{NF})               # always above the diagonal
         ∂v∂θ2 = grad_y_vordiv2[lm]*v[lm+1]
         div[lm] = kernel(div[lm], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
 
-        # everything below the diagonal (but skip last row)
+        # BELOW DIAGONAL (but skip last row)
         for l in m+1:lmax+1
             lm += 1
             ∂u∂λ  = ((m-1)*im)*u[lm]
@@ -98,7 +98,7 @@ function _divergence!(  kernel,
             ∂v∂θ2 = grad_y_vordiv2[lm]*v[lm+1]  # this pulls in data from the last row though
             div[lm] = kernel(div[lm], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
         end
-        lm += 1 # loop skips last row, add one to keep lm corresponding to l,m accordingly
+        lm += 1                                 # loop skips last row
     end
 
     return nothing
@@ -141,13 +141,19 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
         V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
 
         # BELOW DIAGONAL
-        for l in m+1:lmax+1                         # skip last row
+        for l in m+1:lmax                           # skip last two rows
             lm += 1
 
             # U = -∂/∂lat(Ψ) and V = V = ∂/∂λ(Ψ) combined with Laplace inversion ∇⁻², omit radius R scaling
-            U[lm] = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[lm-1]
+            # U[lm] = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[lm-1]
+            U[lm] = muladd(vordiv_to_uv2[lm], vor[lm+1], -vordiv_to_uv1[lm]*vor[lm-1])
             V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
         end
+
+        # SECOND LAST ROW
+        lm += 1
+        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # meridional gradient again (but only 2nd term from above)
+        V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]       # zonal gradient again (as above)
 
         # LAST ROW (separated to avoid out-of-bounds access to l+2,m)
         lm += 1
@@ -199,7 +205,7 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
     @boundscheck size(vordiv_to_uv1) == size(vor) || throw(BoundsError)
 
     lm = 0
-    @inbounds for m in 1:mmax                                 # 1-based l,m, skip last column
+    @inbounds for m in 1:mmax                       # 1-based l,m, skip last column
 
         # DIAGONAL (separated to avoid access to l-1,m which is above the diagonal)
         lm += 1
@@ -217,9 +223,12 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
         V[lm] = muladd(z, vor[lm], ∂Dθ)             # = ∂ζλ + ∂Dθ
 
         # BELOW DIAGONAL (all terms)
-        for l in m+1:lmax+1                         # skip last row
+        for l in m+1:lmax                               # skip last row (lmax+2)
             lm += 1
+            
             # div,vor contribution to meridional gradient
+            # ∂ζθ = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[lm-1]
+            # ∂Dθ = vordiv_to_uv1[lm]*div[lm-1] - vordiv_to_uv2[lm]*div[lm+1]
             ∂ζθ = muladd(vordiv_to_uv2[lm], vor[lm+1], -vordiv_to_uv1[lm]*vor[lm-1])
             ∂Dθ = muladd(vordiv_to_uv1[lm], div[lm-1], -vordiv_to_uv2[lm]*div[lm+1])
 
@@ -229,8 +238,13 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
 
             z = im*vordiv_to_uv_x[lm]
             U[lm] = muladd(z, div[lm], ∂ζθ)         # = ∂Dλ + ∂ζθ
-            V[lm] = muladd(z, vor[lm], ∂Dθ)         # = ∂ζλ + ∂Dθ
+            V[lm] = muladd(z, vor[lm], ∂Dθ)         # = ∂ζλ + ∂Dθ            
         end
+
+        # SECOND LAST ROW
+        lm += 1
+        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # meridional gradient again (but only 2nd term from above)
+        V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]       # zonal gradient again (as above)
 
         # LAST ROW (separated to avoid out-of-bounds access to l+2,m)
         lm += 1
