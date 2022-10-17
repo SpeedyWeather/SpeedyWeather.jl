@@ -141,7 +141,7 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
         V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
 
         # BELOW DIAGONAL
-        for l in m+1:lmax
+        for l in m+1:lmax+1                         # skip last row
             lm += 1
 
             # U = -∂/∂lat(Ψ) and V = V = ∂/∂λ(Ψ) combined with Laplace inversion ∇⁻², omit radius R scaling
@@ -149,25 +149,22 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
             V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
         end
 
-        # SECOND LAST ROW
-        lm += 1
-        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # meridional gradient again (but only 2nd term from above)
-        V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]       # zonal gradient again (as above)
-
-        # # LAST ROW
+        # LAST ROW (separated to avoid out-of-bounds access to l+2,m)
         lm += 1
         U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # meridional gradient again (but only 2nd term from above)
         V[lm] = zero(Complex{NF})                   # set explicitly to 0 as Ψ does not contribute to last row of V
     end
 
-    # LAST COLUMN 
-    lm += 1                     # second last row
-    @inbounds U[lm] = zero(Complex{NF})
-    @inbounds V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
+    # LAST COLUMN
+    @inbounds begin
+        lm += 1                     # second last row
+        U[lm] = zero(Complex{NF})
+        V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
 
-    lm += 1                     # last row
-    @inbounds U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]
-    @inbounds V[lm] = zero(Complex{NF})
+        lm += 1                     # last row
+        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]
+        V[lm] = zero(Complex{NF})
+    end
 
     return nothing
 end
@@ -192,41 +189,64 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
                             ) where {NF<:AbstractFloat}
 
     @unpack vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 = S
+    lmax,mmax = size(vor) .- (2,1)                  # 0-based lmax,mmax
+    @boundscheck lmax == mmax || throw(BoundsError)
     @boundscheck size(div) == size(vor) || throw(BoundsError)
     @boundscheck size(U) == size(vor) || throw(BoundsError)
     @boundscheck size(V) == size(vor) || throw(BoundsError)
     @boundscheck size(vordiv_to_uv_x) == size(vor) || throw(BoundsError)
     @boundscheck size(vordiv_to_uv1) == size(vor) || throw(BoundsError)
     @boundscheck size(vordiv_to_uv1) == size(vor) || throw(BoundsError)
-    lmax,mmax = size(vor) .- (2,1)                  # 0-based lmax,mmax
 
-    U[1] =  vordiv_to_uv2[1]*vor[2]                 # l=m=0 harmonic has only one contribution
-    V[1] = -vordiv_to_uv2[1]*div[2]
+    lm = 0
+    @inbounds for m in 1:mmax                                 # 1-based l,m, skip last column
 
-    lm = 1
-    @inbounds for m in 1:mmax+1                     # 1-based l,m
-        for l in max(2,m):lmax                      # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+        # DIAGONAL (separated to avoid access to l-1,m which is above the diagonal)
+        lm += 1
+        
+        # div,vor contribution to meridional gradient
+        ∂ζθ =  vordiv_to_uv2[lm]*vor[lm+1]          # lm-1 term is zero
+        ∂Dθ = -vordiv_to_uv2[lm]*div[lm+1]          # lm-1 term is zero
+        
+        # the following is moved into the muladd        
+        # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]       # divergence contribution to zonal gradient
+        # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]       # vorticity contribution to zonal gradient
+
+        z = im*vordiv_to_uv_x[lm]
+        U[lm] = muladd(z, div[lm], ∂ζθ)             # = ∂Dλ + ∂ζθ
+        V[lm] = muladd(z, vor[lm], ∂Dθ)             # = ∂ζλ + ∂Dθ
+
+        # BELOW DIAGONAL (all terms)
+        for l in m+1:lmax+1                         # skip last row
             lm += 1
-            ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]     # divergence contribution to zonal gradient
-            ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]     # vorticity contribution to zonal gradient
-
             # div,vor contribution to meridional gradient
-            ∂ζθ = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[l-1,m]
-            ∂Dθ = vordiv_to_uv1[lm]*div[l-1,m] - vordiv_to_uv2[lm]*div[lm+1]
-            U[lm] = ∂Dλ + ∂ζθ
-            V[lm] = ∂ζλ + ∂Dθ
+            ∂ζθ = muladd(vordiv_to_uv2[lm], vor[lm+1], -vordiv_to_uv1[lm]*vor[lm-1])
+            ∂Dθ = muladd(vordiv_to_uv1[lm], div[lm-1], -vordiv_to_uv2[lm]*div[lm+1])
+
+            # The following is moved into the muladd
+            # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]   # divergence contribution to zonal gradient
+            # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]   # vorticity contribution to zonal gradient
+
+            z = im*vordiv_to_uv_x[lm]
+            U[lm] = muladd(z, div[lm], ∂ζθ)         # = ∂Dλ + ∂ζθ
+            V[lm] = muladd(z, vor[lm], ∂Dθ)         # = ∂ζλ + ∂Dθ
         end
-        lm += 2
+
+        # LAST ROW (separated to avoid out-of-bounds access to l+2,m)
+        lm += 1
+        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # other terms are zero
+        V[lm] =  vordiv_to_uv1[lm]*div[lm-1]        # other terms are zero
     end
 
-    @inbounds for m in 1:mmax+1
-        l = lmax+1                                  # second last row, l+1 index is out of bounds (=0 entry)
-        U[l,m] = im*vordiv_to_uv_x[l,m]*div[l,m] - vordiv_to_uv1[l,m]*vor[l-1,m]
-        V[l,m] = im*vordiv_to_uv_x[l,m]*vor[l,m] + vordiv_to_uv1[l,m]*div[l-1,m]
+    # LAST COLUMN 
+    @inbounds begin
+        lm += 1                                     # second last row
+        U[lm] = im*vordiv_to_uv_x[lm]*div[lm]       # other terms are zero
+        V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]       # other terms are zero
 
-        l = lmax+2                                  # last row, l,l+1 indices are out of bounds (=0 entries)
-        U[l,m] = -vordiv_to_uv1[l,m]*vor[l-1,m]
-        V[l,m] =  vordiv_to_uv1[l,m]*div[l-1,m]
+        lm += 1                                     # last row
+        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # other terms are zero
+        V[lm] =  vordiv_to_uv1[lm]*div[lm-1]        # other terms are zero
     end
 end
 
