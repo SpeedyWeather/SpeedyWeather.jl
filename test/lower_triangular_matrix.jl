@@ -26,6 +26,36 @@
     end
 end
 
+@testset "LowerTriangularMatrix: @inbounds" begin
+    A = randn(LowerTriangularMatrix,33,32)
+    
+    @testset "getindex" begin
+        @test_throws BoundsError A[34,32]   # outside of i,j range
+        @test_throws BoundsError A[561]     # outside of k range
+
+        # # shouldn't throw an error if @inbounds
+        # f(A,i) = @inbounds A[i]             # wrap into function
+        # f(A,i,j) = @inbounds A[i,j]
+        
+        # f(A,33,32)                          # inside ranges
+        # f(A,560)
+
+        # f(A,34,32)                          # outside ranges
+        # f(A,561)
+    end
+
+    @testset "setindex!" begin
+        @test_throws BoundsError A[34,32] = 1
+        @test_throws BoundsError A[561] = 1
+
+        # this can create a segfault so don't test regularly (but it worked ;)
+        # g(A,i) = @inbounds A[i] = 1
+        # g(A,i,j) = @inbounds A[i,j] = 1
+        # g(A,34,32)
+        # g(A,561)
+    end
+end
+
 @testset "LowerTriangularMatrix: fill, copy, randn, convert" begin
     @testset for NF in (Float32,Float64)
         mmax = 32
