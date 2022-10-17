@@ -121,38 +121,55 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
                         ) where {NF<:AbstractFloat}
 
     @unpack vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 = S
+    lmax,mmax = size(vor) .- (2,1)                  # 0-based lmax,mmax
+    
+    @boundscheck lmax == mmax || throw(BoundsError)
     @boundscheck size(U) == size(vor) || throw(BoundsError)
     @boundscheck size(V) == size(vor) || throw(BoundsError)
     @boundscheck size(vordiv_to_uv_x) == size(vor) || throw(BoundsError)
     @boundscheck size(vordiv_to_uv1) == size(vor) || throw(BoundsError)
     @boundscheck size(vordiv_to_uv2) == size(vor) || throw(BoundsError)
-    lmax,mmax = size(vor) .- (2,1)                  # 0-based lmax,mmax
 
-    U[1] = vordiv_to_uv2[1]*vor[2]                  # l=m=0 harmonic has only one contribution
-    V[1] = zero(Complex{NF})                        # obtained via zonal derivative (*i*m) = 0 
+    lm = 0
+    @inbounds for m in 1:mmax                       # 1-based l,m, exclude last column
 
-    lm = 1
-    @inbounds for m in 1:mmax+1                     # 1-based l,m
-        for l in max(2,m):lmax                      # skip l=m=0 harmonic (mean) to avoid access to v[0,1]
+        # DIAGONAL (separated to avoid access to l-1,m which is above the diagonal)
+        lm += 1
+
+        # U = -∂/∂lat(Ψ) and V = V = ∂/∂λ(Ψ) combined with Laplace inversion ∇⁻², omit radius R scaling
+        U[lm] = vordiv_to_uv2[lm]*vor[lm+1]         # - vordiv_to_uv1[lm]*vor[l-1,m] <- is zero
+        V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
+
+        # BELOW DIAGONAL
+        for l in m+1:lmax
             lm += 1
-            # meridional gradient, u = -∂/∂lat(Ψ), omit radius R scaling
-            U[lm] = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[l-1,m]
 
-            # zonal gradient, V = ∂/∂λ(Ψ), omit radius R scaling
+            # U = -∂/∂lat(Ψ) and V = V = ∂/∂λ(Ψ) combined with Laplace inversion ∇⁻², omit radius R scaling
+            U[lm] = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[lm-1]
             V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
         end
-        lm += 2
+
+        # SECOND LAST ROW
+        lm += 1
+        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # meridional gradient again (but only 2nd term from above)
+        V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]       # zonal gradient again (as above)
+
+        # # LAST ROW
+        lm += 1
+        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # meridional gradient again (but only 2nd term from above)
+        V[lm] = zero(Complex{NF})                   # set explicitly to 0 as Ψ does not contribute to last row of V
     end
 
-    @inbounds for m in 1:mmax+1
-        l = lmax+1                                  # second last row, l+1 index is out of bounds (=0 entry)
-        U[l,m] = -vordiv_to_uv1[l,m]*vor[l-1,m]     # meridional gradient again (but only 2nd term from above)
-        V[l,m] = im*vordiv_to_uv_x[l,m]*vor[l,m]    # zonal gradient again (as above)
+    # LAST COLUMN 
+    lm += 1                     # second last row
+    @inbounds U[lm] = zero(Complex{NF})
+    @inbounds V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
 
-        l = lmax+2                                  # last row, l,l+1 indices are out of bounds (=0 entries)
-        U[l,m] = -vordiv_to_uv1[l,m]*vor[l-1,m]     # meridional gradient again (but only 2nd term from above)
-        V[l,m] = zero(Complex{NF})                  # set explicitly to 0 as Ψ does not contribute to last row of V
-    end
+    lm += 1                     # last row
+    @inbounds U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]
+    @inbounds V[lm] = zero(Complex{NF})
+
+    return nothing
 end
 
 """
