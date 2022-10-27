@@ -56,6 +56,34 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
 
     # Large-scale condensation
     precip_large_scale::NF = 0  # Precipitation due to large-scale condensation
+
+    # Shortwave radiation: solar
+    tyear::NF = NaN
+    csol::NF = NaN
+    topsr::NF = NaN
+    # Shortwave radiation: solar_oz
+    fsol::NF = NaN
+    ozupp::NF = NaN
+    ozone::NF = NaN
+    zenit::NF = NaN
+    stratz::NF = NaN
+    # Shortwave radiation: radsw
+    albsfc::NF = NaN
+    ssrd::NF = NaN
+    ssr::NF = NaN
+    tsr::NF = NaN
+    tau2::Matrix{NF} = fill(NaN, nlev, 4)
+    tend_t_rsw::Vector{NF} = fill(NaN, nlev)
+    norm_pres::NF = NaN # Normalized pressure (p/1000 hPa)
+    # Shortwave radiation: cloud
+    icltop::Int = typemax(Int)
+    cloudc::NF = NaN
+    clstr::NF = NaN
+    qcloud::NF = NaN
+    fmask::NF = NaN
+    # Shortwave radiation: shortwave_radiation
+    rel_hum::Vector{NF} = fill(NaN, nlev)
+    grad_dry_static_energy::NF = NaN
 end
 
 # use Float64 if not provided

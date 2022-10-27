@@ -35,6 +35,7 @@ The default values of the keywords define the default model setup.
                                         # specific humidity [g/Kg]
     alhs::Real=2801                     # latent heat of sublimation [?]
     sbc::Real=5.67e-8                   # stefan-Boltzmann constant [W/m^2/K^4]
+    p0::Real=1.e+5                      # Reference pressure (Pa)
 
     # STANDARD ATMOSPHERE
     lapse_rate::Real=6                  # reference temperature lapse rate -dT/dz [K/km]
@@ -86,6 +87,42 @@ The default values of the keywords define the default model setup.
     humid_relax_time_cnv::Real = 6.0        # Relaxation time for PBL humidity (hours)
     max_entrainment::Real = 0.5             # Maximum entrainment as a fraction of cloud-base mass flux
     ratio_secondary_mass_flux::Real = 0.8   # Ratio between secondary and primary mass flux at cloud-base
+
+    # Shortwave radiation: sol_oz
+    solc::Real = 342.0 ## Solar constant (area averaged) in W / m^2
+    epssw::Real = 0.020 ## Fraction of incoming solar radiation absorbed by ozone
+
+    # Shortwave radiation: cloud
+    rhcl1::Real = 0.30 # Relative humidity threshold corresponding to cloud cover = 0
+    rhcl2::Real = 1.00 # Relative humidity correponding to cloud cover = 1
+    rrcl::Real = 1.0 / (rhcl2 - rhcl1)
+    qcl::Real = 0.20 # Specific humidity threshold for cloud cover
+    pmaxcl::Real = 10.0 # Maximum value of precipitation (mm/day) contributing to cloud cover
+    wpcl::Real = 0.2  # Cloud cover weight for the square-root of precipitation (for p = 1 mm/day)
+    gse_s1::Real = 0.40 # Gradient of dry static energy corresponding to stratiform cloud cover = 1
+    gse_s0::Real = 0.25 # Gradient of dry static energy corresponding to stratiform cloud cover = 0
+    clsmax::Real = 0.60 # Maximum stratiform cloud cover
+    clsminl::Real = 0.15 # Minimum stratiform cloud cover over land (for RH = 1)
+
+    # Shortwave radiation: radsw
+    albcl::Real = 0.43  # Cloud albedo (for cloud cover = 1)
+    albcls::Real = 0.50  # Stratiform cloud albedo (for st. cloud cover = 1)
+    abscl1::Real = 0.015 # Absorptivity of clouds (visible band, maximum value)
+    abscl2::Real = 0.15  # Absorptivity of clouds (visible band, for dq_base = 1 g/kg)
+
+    absdry::Real = 0.033 # Absorptivity of dry air (visible band)
+    absaer::Real = 0.033 # Absorptivity of aerosols (visible band)
+    abswv1::Real = 0.022 # Absorptivity of water vapour (visible band, for dq = 1 g/kg)
+    abswv2::Real = 15.0  # Absorptivity of water vapour (near IR band, for dq = 1 g/kg)
+
+    ablwin::Real = 0.3   # Absorptivity of air in "window" band
+    ablco2::Real = 6.0   # Absorptivity of air in CO2 band
+    ablwv1::Real = 0.7   # Absorptivity of water vapour in H2O band 1 (weak), (for dq = 1 g/kg)
+    ablwv2::Real = 50.0   # Absorptivity of water vapour in H2O band 2 (strong), (for dq = 1 g/kg)
+    ablcl2::Real = 0.6   # Absorptivity of "thin" upper clouds in window and H2O bands
+    ablcl1::Real = 12.0   # Absorptivity of "thick" clouds in window band (below cloud top)
+    epslw::Real = 0.05    # Fraction of blackbody spectrum absorbed/emitted by PBL only
+
 
     # TIME STEPPING
     startdate::DateTime = DateTime(2000,1,1)# time at which the integration starts
