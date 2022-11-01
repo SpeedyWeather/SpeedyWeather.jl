@@ -143,3 +143,39 @@ end
 
 # iterator for convenience
 eachlayer(column::ColumnVariables) = Base.OneTo(column.nlev)
+
+
+# GPU methods
+
+function Adapt.adapt_structure(to, cv::ColumnVariables)
+    ColumnVariables(cv.lat, cv.lon, cv.nlev,                    # COORDINATES
+                    Adapt.adapt(to, cv.u),                      # PROGNOSTIC VARIABLES
+                    Adapt.adapt(to, cv.v),
+                    Adapt.adapt(to, cv.temp),
+                    Adapt.adapt(to, cv.humid),
+                    cv.log_pres, cv.pres,                       # surface layer prognostic variables
+                    Adapt.adapt(to, cv.u_tend),
+                    Adapt.adapt(to, cv.v_tend),
+                    Adapt.adapt(to, cv.temp_tend),
+                    Adapt.adapt(to, cv.humid_tend),
+                    Adapt.adapt(to, cv.geopot),                 # DIAGNOSTIC VARIABLES
+                    Adapt.adapt(to, cv.humid_half),             # PARAMETERIZATIONS Thermodynamics
+                    Adapt.adapt(to, cv.sat_humid),
+                    Adapt.adapt(to, cv.sat_humid_half),
+                    Adapt.adapt(to, cv.sat_vap_pres),
+                    Adapt.adapt(to, cv.dry_static_energy),
+                    Adapt.adapt(to, cv.dry_static_energy_half),
+                    Adapt.adapt(to, cv.moist_static_energy),
+                    Adapt.adapt(to, cv.sat_moist_static_energy),
+                    Adapt.adapt(to, cv.sat_moist_static_energy_half),
+                    cv.conditional_instability,                 # PARAMETERIZATIONS Convection 
+                    cv.activate_convection,
+                    cv.cloud_top,
+                    cv.excess_humidity,
+                    cv.cloud_base_mass_flux,
+                    cv.precip_convection,
+                    Adapt.adapt(to, cv.net_flux_humid),
+                    Adapt.adapt(to, cv.net_flux_dry_static_energy),
+                    Adapt.adapt(to, cv.entrainment_profile),
+                    cv.precip_large_scale)                      # PARAMETERIZATIONS Large-scale condensation
+end
