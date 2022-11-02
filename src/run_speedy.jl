@@ -54,3 +54,23 @@ function initialize_speedy(::Type{NF}=Float64;      # default number format
 
     return prognostic_vars, diagnostic_vars, M
 end
+
+"""
+    progn = run_speedy!(progn::PrognosticVariables,
+                        diagn::DiagnosticVariables,
+                        M::ModelSetup)
+
+Convenience function that can be used in combination with `initialize_speedy(kwargs...)` as
+
+    P,D,M = initialize_speedy(kwargs...)
+    # possibly change P, D, M manually
+    run_speedy!(P,D,M)
+
+to allow for access to the prognostic/diagnostic variables before the time integration is started."""
+function run_speedy!(   progn::PrognosticVariables, # all prognostic variables
+                        diagn::DiagnosticVariables, # all pre-allocated diagnostic variables
+                        M::ModelSetup,              # all precalculated structs
+                        )
+    time_stepping!(progn,diagn,M)
+    return progn
+end
