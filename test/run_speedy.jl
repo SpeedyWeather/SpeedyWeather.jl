@@ -13,4 +13,8 @@
     
     p = run_speedy(Float64,Grid=OctahedralGaussianGrid)
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
+
+    p,d,m = initialize_speedy(Float32)
+    run_speedy!(p,d,m)
+    @test all(isfinite.(p.layers[1].leapfrog[1].vor)) 
 end

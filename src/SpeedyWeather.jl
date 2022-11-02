@@ -33,6 +33,7 @@ module SpeedyWeather
 
     # EXPORT MAIN INTERFACE TO SPEEDY
     export  run_speedy,
+            run_speedy!,
             initialize_speedy
 
     # EXPORT GRIDS
