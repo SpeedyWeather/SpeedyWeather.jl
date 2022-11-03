@@ -133,7 +133,7 @@ end
                                      OctahedralGaussianGrid,
                                      OctahedralClenshawGrid)
                             
-                P = Parameters(;NF,Grid,trunc,model=:shallowwater)
+                P = Parameters(;NF,Grid,trunc,model=ShallowWater)
                 S = SpectralTransform(P)
                 B = Boundaries(P,S)
 
