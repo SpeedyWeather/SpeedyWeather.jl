@@ -1,5 +1,3 @@
-abstract type ModelSetup{D} end
-
 """
     M = BarotropicModel(::Parameters,
                         ::Constants,
@@ -11,7 +9,7 @@ The BarotropicModel struct holds all other structs that contain precalculated co
 whether scalars or arrays that do not change throughout model integration. In contrast to
 `ShallowWaterModel` or `PrimitiveEquationModel` it does not contain a `Boundaries` struct
 as not needed."""
-struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: ModelSetup{D}
+struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
     parameters::Parameters
     constants::Constants{NF}
     geometry::Geometry{NF}
@@ -32,7 +30,7 @@ has(::Type{BarotropicModel{NF,D}}, var_name::Symbol) where {NF,D} = var_name in 
 
 The ShallowWaterModel struct holds all other structs that contain precalculated constants, whether scalars or
 arrays that do not change throughout model integration."""
-struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ModelSetup{D}
+struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
     parameters::Parameters
     constants::Constants{NF}
     geometry::Geometry{NF}
@@ -57,7 +55,7 @@ has(::Type{ShallowWaterModel{NF,D}}, var_name::Symbol) where {NF,D} = var_name i
 
 The PrimitiveEquationModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration."""
-struct PrimitiveEquationModel{NF<:AbstractFloat,D<:AbstractDevice} <: ModelSetup{D}
+struct PrimitiveEquationModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveEquation
     parameters::Parameters
     constants::Constants{NF}
     geometry::Geometry{NF}
@@ -75,5 +73,5 @@ has(::Type{PrimitiveEquationModel{NF,D}}, var_name::Symbol) where {NF,D} = var_n
 
 Returns true if the model `M` has a prognostic variable `var_name`, false otherwise. The default fallback is that all variables are included. 
 """
-has(::Type{ModelSetup{D}}, var_name::Symbol) where D = var_name in [:vor, :div, :temp, :humid, :pres] 
+has(::Type{ModelSetup}, var_name::Symbol) = var_name in [:vor, :div, :temp, :humid, :pres] 
 has(M::ModelSetup, var_name) = has(typeof(M), var_name)

@@ -11,7 +11,7 @@ The default values of the keywords define the default model setup.
     NF::DataType                        # number format (default defined in run_speedy)
 
     # MODEL (BarotropicModel, ShallowWaterModel, or PrimitiveEquationModel)
-    model::Type{<:ModelSetup} = BarotropicModel
+    model::Type{<:ModelSetup} = Barotropic
 
     # RESOLUTION AND GRID
     trunc::Int = 31                                     # spectral truncation
@@ -142,11 +142,11 @@ end
 Number of vertical levels chosen either automatically based on `model`,
 or from the length of `σ_levels_half` if not a 0-length vector
 (default if not specified parameter)."""
-function nlev_default(model::Type{ModelSetup}, σ_levels_half::AbstractVector)
+function nlev_default(model::Type{<:ModelSetup}, σ_levels_half::AbstractVector)
     if length(σ_levels_half) == 0   # choose nlev automatically 
-        model <: BarotropicModel && return 1
-        model <: ShallowWaterModel && return 1
-        model <: PrimitiveEquationModel && return 8
+        model <: Barotropic && return 1
+        model <: ShallowWater && return 1
+        model <: PrimitiveEquation && return 8
     else                            # use manually set levels 
         return length(σ_levels_half) - 1
     end
