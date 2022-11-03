@@ -113,7 +113,7 @@ end
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
-                                    model=:barotropic)
+                                    model=BarotropicModel)
 
         S = m.spectral_transform
         lmax,mmax = p.lmax,p.mmax
@@ -136,7 +136,7 @@ end
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
-                                    model=:barotropic)
+                                    model=BarotropicModel)
 
         S = m.spectral_transform
         lmax,mmax = p.lmax,p.mmax

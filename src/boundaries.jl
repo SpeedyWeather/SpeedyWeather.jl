@@ -31,14 +31,14 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
     ncfile = NetCDF.open(path)
 
 
-    if P.model == :barotropic   # no boundary data needed with the barotropic model
+    if P.model <: BarotropicModel   # no boundary data needed with the barotropic model
         
         orography           = zeros(Grid{NF},0)               # create dummy arrays
         # η⁰                  = zeros(LowerTriangularMatrix{NF},0,0)
         # geopot_surf         = zeros(complex(P.NF),1,1)  
         # geopot_surf_grid    = zeros(P.NF,1,1)
 
-    elseif P.model == :shallowwater || P.model == :primitive
+    elseif P.model <: ShallowWaterModel || P.model <: PrimitiveEquationModel
 
         orography_highres = ncfile.vars["orog"][:,:]        # height [m]
 

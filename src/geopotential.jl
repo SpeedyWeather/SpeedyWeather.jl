@@ -1,4 +1,6 @@
 """
+    geopotential!(geopot,geopot_surf,temp,G)
+
 Compute spectral geopotential `geopot` from spectral temperature `temp`
 and spectral surface geopotential `geopot_surf` (orography*gravity).
 """

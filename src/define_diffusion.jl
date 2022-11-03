@@ -86,14 +86,14 @@ function HorizontalDiffusion(   P::Parameters,          # Parameter struct
         end
     end
 
-    if P.model == :barotropic || P.model == :shallowwater               # orographic correction not needed
+    if P.model <: BarotropicModel || P.model <: ShallowWaterModel       # orographic correction not needed
         
         temp_correction_vert        = zeros(0)                          # create dummy arrays
         humid_correction_vert       = zeros(0)
         temp_correction_horizontal  = zeros(LowerTriangularMatrix{Complex{P.NF}},0,0) 
         humid_correction_horizontal = zeros(LowerTriangularMatrix{Complex{P.NF}},0,0) 
 
-    else    # P.model == :primitive, orographic correction only needed then
+    else    # P.model <: PrimitiveEquationModel, orographic correction only needed then
 
         temp_correction_vert        = zeros(0)                          # create dummy arrays
         humid_correction_vert       = zeros(0)

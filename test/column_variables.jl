@@ -34,7 +34,7 @@ end
     @testset for NF in (Float32,Float64)
 
         nlev = 8
-        _,diagn,model = initialize_speedy(NF,nlev=nlev,model=:primitive)
+        _,diagn,model = initialize_speedy(NF,nlev=nlev,model=PrimitiveEquationModel)
         column = ColumnVariables{NF}(;nlev)
 
         SpeedyWeather.reset_column!(column)

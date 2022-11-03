@@ -36,6 +36,11 @@ module SpeedyWeather
             run_speedy!,
             initialize_speedy
 
+    # EXPORT MODELS
+    export  BarotropicModel,
+            ShallowWaterModel,
+            PrimitiveEquationModel
+
     # EXPORT GRIDS
     export  LowerTriangularMatrix,
             AbstractGrid,

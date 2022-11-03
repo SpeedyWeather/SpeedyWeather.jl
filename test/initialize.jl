@@ -12,7 +12,7 @@ end
 @testset "Initialize from rest" begin
 
     # BAROTROPIC MODEL
-    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:barotropic)
+    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=BarotropicModel)
     for layers in progn.layers
         for leapfrog in layers.leapfrog
             @test all(leapfrog.vor .== 0)
@@ -20,7 +20,7 @@ end
     end
 
     # SHALLOW WATER MODEL
-    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:shallowwater)
+    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=ShallowWaterModel)
     for layers in progn.layers
         for leapfrog in layers.leapfrog
             @test all(leapfrog.vor .== 0)
@@ -60,9 +60,9 @@ end
 end
 
 @testset "Initialize speedy with different models" begin
-    _,_,m_barotrop = initialize_speedy(model=:barotropic)
-    _,_,m_shalloww = initialize_speedy(model=:shallowwater)
-    _,_,m_primitive = initialize_speedy(model=:primitive)
+    _,_,m_barotrop = initialize_speedy(model=BarotropicModel)
+    _,_,m_shalloww = initialize_speedy(model=ShallowWaterModel)
+    _,_,m_primitive = initialize_speedy(model=PrimitiveEquationModel)
 
     # @test m_barotrop < m_shalloww
     # @test m_shalloww < m_primitive
