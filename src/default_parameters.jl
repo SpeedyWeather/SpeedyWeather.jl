@@ -89,13 +89,13 @@ The default values of the keywords define the default model setup.
     ratio_secondary_mass_flux::Real = 0.8   # Ratio between secondary and primary mass flux at cloud-base
 
     # Shortwave radiation: sol_oz
-    solc::Real = 342.0 ## Solar constant (area averaged) in W / m^2
-    epssw::Real = 0.020 ## Fraction of incoming solar radiation absorbed by ozone
+    solc::Real = 342.0 # Solar constant (area averaged) in W / m^2
+    epssw::Real = 0.020 # Fraction of incoming solar radiation absorbed by ozone
 
     # Shortwave radiation: cloud
     rhcl1::Real = 0.30 # Relative humidity threshold corresponding to cloud cover = 0
     rhcl2::Real = 1.00 # Relative humidity correponding to cloud cover = 1
-    rrcl::Real = 1.0 / (rhcl2 - rhcl1)
+    rrcl::Real = 1 / (rhcl2 - rhcl1)
     qcl::Real = 0.20 # Specific humidity threshold for cloud cover
     pmaxcl::Real = 10.0 # Maximum value of precipitation (mm/day) contributing to cloud cover
     wpcl::Real = 0.2  # Cloud cover weight for the square-root of precipitation (for p = 1 mm/day)

@@ -58,32 +58,32 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     precip_large_scale::NF = 0  # Precipitation due to large-scale condensation
 
     # Shortwave radiation: solar
-    tyear::NF = NaN
-    csol::NF = NaN
-    topsr::NF = NaN
+    tyear::NF = NF(NaN) # time as fraction of year (0-1, 0 = 1jan.h00)
+    csol::NF = NF(NaN)  # FIXME
+    topsr::NF = NF(NaN) # FIXME
     # Shortwave radiation: solar_oz
-    fsol::NF = NaN
-    ozupp::NF = NaN
-    ozone::NF = NaN
-    zenit::NF = NaN
-    stratz::NF = NaN
+    fsol::NF = NF(NaN)   # Flux of incoming solar radiation
+    ozupp::NF = NF(NaN)  # Flux absorbed by ozone (upper stratos.)
+    ozone::NF = NF(NaN)  # Flux absorbed by ozone (lower stratos.)
+    zenit::NF = NF(NaN)  # Optical depth ratio (function of solar zenith angle)
+    stratz::NF = NF(NaN) # Stratospheric correction for polar night
     # Shortwave radiation: radsw
-    albsfc::NF = NaN
-    ssrd::NF = NaN
-    ssr::NF = NaN
-    tsr::NF = NaN
-    tau2::Matrix{NF} = fill(NaN, nlev, 4)
-    tend_t_rsw::Vector{NF} = fill(NaN, nlev)
-    norm_pres::NF = NaN # Normalized pressure (p/1000 hPa)
+    albsfc::NF = NF(NaN) # Combined surface albedo (land + sea)
+    ssrd::NF = NF(NaN)   # Surface shortwave radiation (downward-only)
+    ssr::NF = NF(NaN)    # Surface shortwave radiation (net downward)
+    tsr::NF = NF(NaN)    # Top-of-atm. shortwave radiation (downward)
+    tau2::Matrix{NF} = fill(NF(NaN), nlev, 4) # Transmissivity of atmospheric layers
+    tend_t_rsw::Vector{NF} = fill(NF(NaN), nlev) # Tempterature tendency
+    norm_pres::NF = NF(NaN) # Normalized pressure (p/1000 hPa)
     # Shortwave radiation: cloud
-    icltop::Int = typemax(Int)
-    cloudc::NF = NaN
-    clstr::NF = NaN
-    qcloud::NF = NaN
-    fmask::NF = NaN
+    icltop::Int = typemax(Int) # Cloud top level (all clouds)
+    cloudc::NF = NF(NaN)       # Total cloud cover (fraction)
+    clstr::NF = NF(NaN)        # Stratiform cloud cover (fraction)
+    qcloud::NF = NF(NaN)       # Equivalent specific humidity of clouds
+    fmask::NF = NF(NaN)        # Fraction of land
     # Shortwave radiation: shortwave_radiation
-    rel_hum::Vector{NF} = fill(NaN, nlev)
-    grad_dry_static_energy::NF = NaN
+    rel_hum::Vector{NF} = fill(NF(NaN), nlev) # Relative humidity
+    grad_dry_static_energy::NF = NF(NaN)      # gradient of dry static energy
 end
 
 # use Float64 if not provided
