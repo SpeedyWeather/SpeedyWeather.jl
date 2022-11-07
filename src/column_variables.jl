@@ -56,6 +56,26 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
 
     # Large-scale condensation
     precip_large_scale::NF = 0  # Precipitation due to large-scale condensation
+
+    # Longwave radiation
+    nband::Int = 4 # FIXME
+    n_stratosphere_levels::Int = 2  # FIXME
+    ## New vars in radlw_down!
+    wvi::Matrix{NF} = fill(NF(NaN), nlev, 2)  # Weights for vertical interpolation
+    tau2::Matrix{NF} = fill(NF(NaN), nlev, nband) # Transmissivity of atmospheric layers
+    dfabs::Vector{NF} = fill(NF(NaN), nlev)   # Flux of sw rad. absorbed by each atm. layer
+    fsfcd::NF = NF(NaN)                       # Downward-only flux of sw rad. at the surface
+    st4a::Matrix{NF} = fill(NF(NaN), nlev, 2) # Blackbody emission from full and half atmospheric levels
+    flux::Vector{NF} = fill(NF(NaN), nband)       # Radiative flux in different spectral bands
+
+    ## New vars in compute_bbe!
+    fsfcu::NF = NF(NaN) # surface blackbody emission (upward)
+    ts::NF = NF(NaN)    # surface temperature
+
+    ## New vars in radlw_up!
+    fsfc::NF = NF(NaN) # Net (downw.) flux of sw rad. at the surface
+    ftop::NF = NF(NaN) # Net (downw.) flux of sw rad. at the atm. top
+    stratc::Vector{NF} = fill(NF(NaN), n_stratosphere_levels) # Stratospheric correction term 
 end
 
 # use Float64 if not provided
