@@ -30,3 +30,6 @@ Manifest.toml
 
 # no model output folders
 run????/
+
+# input data folder
+input_data/
