@@ -7,6 +7,10 @@ function run_speedy(::Type{NF}=Float64;             # default number format
                     kwargs...                       # all additional non-default parameters
                     ) where {NF<:AbstractFloat}
 
+    # DOWNLOAD INPUT DATA
+    input_data_path = normpath(joinpath(@__FILE__, "..", "..", "input_data"))
+    isdir(input_data_path) || download_input_data(input_data_path);
+
     # INITALIZE MODEL
     progn_vars,diagn_vars,model_setup = initialize_speedy(NF;kwargs...)
 

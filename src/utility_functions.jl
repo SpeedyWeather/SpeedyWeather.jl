@@ -151,3 +151,28 @@ end
     r == 2 && return rotate_matrix_indices_180(i,j,s)
     r == 3 && return rotate_matrix_indices_270(i,j,s)
 end
+
+"""
+Downloads input files as required by SpeedyWeather.jl
+"""
+function download_input_data(input_data_path)
+    input_data_url = "https://github.com/dmey/speedy-weather-input-data/archive/refs/heads/main.zip"
+    input_data_tmp_fpath = Downloads.download(input_data_url)
+    r = ZipFile.Reader(input_data_tmp_fpath);
+    input_data_tmp_dir = mktempdir()
+    dir_names = Vector{String}()
+    for f in r.files
+        fname = joinpath(input_data_tmp_dir, f.name)
+        if f.uncompressedsize == 0
+            # Folder
+            dir_name = dirname(fname)
+            push!(dir_names, dir_name)
+            mkpath(dir_name)
+        elseif f.uncompressedsize > 0
+            # Files
+            write(fname, read(f));
+        end
+    end
+    close(r)
+    mv(dir_names[1], input_data_path, force=true);
+end
