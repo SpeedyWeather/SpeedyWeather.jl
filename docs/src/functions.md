@@ -73,3 +73,11 @@ SpeedyWeather.timestep!
 SpeedyWeather.first_timesteps!
 SpeedyWeather.leapfrog!
 ```
+
+## Longwave radiation
+```@docs
+SpeedyWeather.radset!
+SpeedyWeather.radlw_down!
+SpeedyWeather.compute_bbe!
+SpeedyWeather.radlw_up!
+```
