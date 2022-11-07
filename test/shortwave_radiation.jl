@@ -4,7 +4,7 @@
             topsr = [0., 283.06, 352.56537, 378.8209880964894]
             lat = [-89., 0., 45., 89.]
             @testset for i in 1:4
-                _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive, nlev = 4)
+                _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
                 nlev = diagn.nlev
 
                 column = ColumnVariables{NF}(nlev = nlev)
@@ -20,7 +20,7 @@
     end
     @testset "sol_oz!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive, nlev = 4)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
             nlev = diagn.nlev
 
             column = ColumnVariables{NF}(nlev = nlev)
@@ -39,7 +39,7 @@
     end
     @testset "cloud!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive, nlev = 4)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
             nlev = diagn.nlev
 
             column = ColumnVariables{NF}(nlev = nlev)
@@ -61,7 +61,7 @@
     end
     @testset "radsw!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive, nlev = 4)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
             nlev = diagn.nlev
 
             column = ColumnVariables{NF}(nlev = nlev)
@@ -93,7 +93,7 @@
     end
     @testset "shortwave_radiation!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive, nlev = 4)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
             nlev = diagn.nlev
 
             column = ColumnVariables{NF}(nlev = nlev)
