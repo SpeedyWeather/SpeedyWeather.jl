@@ -82,7 +82,7 @@ function Constants(P::Parameters)
 
     # SCALING
     Δt_unscaled = Δt        # [s] not scaled
-    Δt /= radius_earth      # scale with Earth's radius
+    Δt /= radius_earth      # [s/m] scale with Earth's radius
 
     # This implies conversion to NF
     return Constants{P.NF}( radius_earth,rotation_earth,gravity,akap,R_gas,H₀,

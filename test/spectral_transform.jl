@@ -96,11 +96,11 @@ end
 
 @testset "Transform: Individual Legendre polynomials (inexact transforms)" begin
     @testset for trunc in spectral_resolutions_inexact
-        for NF in (Float32,Float64)
-            for Grid in (   HEALPixGrid,
-                            HEALPix4Grid,
-                            FullHEALPixGrid,
-                            FullHEALPix4Grid)
+        @testset for NF in (Float32,Float64)
+            @testset for Grid in (  HEALPixGrid,
+                                    HEALPix4Grid,
+                                    FullHEALPixGrid,
+                                    FullHEALPix4Grid)
                 P = Parameters(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
@@ -114,7 +114,7 @@ end
                         alms2 = spectral(map,S)
 
                         for lm in SpeedyWeather.eachharmonic(alms,alms2)
-                            @test alms[lm] ≈ alms2[lm] atol=1e-3
+                            @test alms[lm] ≈ alms2[lm] atol=1e-3 rtol=1e-3
                         end
                     end
                 end
@@ -123,33 +123,43 @@ end
     end
 end
 
-@testset "Transform: Geopotential" begin
+@testset "Transform: Orography (exact grids)" begin
 
     # Test for variable resolution
     @testset for trunc in [31,42]
-        for NF in (Float64,Float32)
-            for Grid in (   FullGaussianGrid,
-                            FullClenshawGrid,
-                            OctahedralGaussianGrid,
-                            OctahedralClenshawGrid)
-                            # HEALPixGrid)
+        @testset for NF in (Float64,Float32)
+            @testset for Grid in (   FullGaussianGrid,
+                                     FullClenshawGrid,
+                                     OctahedralGaussianGrid,
+                                     OctahedralClenshawGrid)
                             
-                P = Parameters(;NF,trunc,model=:shallowwater)
+                P = Parameters(;NF,Grid,trunc,model=ShallowWater)
                 S = SpectralTransform(P)
                 B = Boundaries(P,S)
 
                 oro_grid = B.orography
                 oro_spec = spectral(oro_grid,S)
+
+                # smooth orography
+                lmax = 30
+                for m in 1:trunc+1
+                    for l in max(lmax,m):trunc+2
+                        oro_spec[l,m] = 0
+                    end
+                end 
+
                 oro_grid1 = gridded(oro_spec,S)
                 oro_spec1 = spectral(oro_grid1,S)
                 oro_grid2 = gridded(oro_spec1,S)
                 oro_spec2 = spectral(oro_grid2,S)
 
+                tol = 1e-1
+
                 for lm in SpeedyWeather.eachharmonic(oro_spec1,oro_spec2)
-                    @test oro_grid1[lm] ≈ oro_grid2[lm] rtol=200*sqrt(eps(NF))
+                    @test oro_spec1[lm] ≈ oro_spec2[lm] atol=tol rtol=tol
                 end
                 for ij in eachindex(oro_grid1,oro_grid2)
-                    @test oro_grid1[ij] ≈ oro_grid2[ij] rtol=200*sqrt(eps(NF))
+                    @test oro_grid1[ij] ≈ oro_grid2[ij] atol=tol rtol=tol
                 end
             end
         end

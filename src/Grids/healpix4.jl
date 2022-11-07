@@ -86,6 +86,7 @@ HEALPix4Grid(data::AbstractVector,n::Integer...) = HEALPix4Grid{eltype(data)}(da
 truncation_order(::Type{<:HEALPix4Grid}) = 3                 # cubic
 get_truncation(::Type{<:HEALPix4Grid},nlat_half::Integer) = nlat_half-1
 get_resolution(::Type{<:HEALPix4Grid},trunc::Integer) = trunc+1
+
 function get_colat(::Type{<:HEALPix4Grid},nlat_half::Integer)
     colat = zeros(nlat_healpix4(nlat_half))
     for j in 1:nlat_half
@@ -94,6 +95,7 @@ function get_colat(::Type{<:HEALPix4Grid},nlat_half::Integer)
     end
     return colat
 end
+
 full_grid(::Type{<:HEALPix4Grid}) = FullHEALPix4Grid    # the full grid with same latitudes
 
 matrix_size(grid::HEALPix4Grid) = (2grid.nlat_half,2grid.nlat_half)

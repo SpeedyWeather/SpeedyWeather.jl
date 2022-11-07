@@ -127,7 +127,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
         end
     end
 
-    if P.model == :primitive
+    if P.model == PrimitiveEquation
         # LAPSE RATE correction (TODO reference)
         lapserate_correction = zeros(nlev-2)
         for k in 2:nlev-1
