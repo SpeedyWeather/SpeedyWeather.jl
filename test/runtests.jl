@@ -2,6 +2,7 @@ using SpeedyWeather
 using Test
 
 # GENERAL
+include("input_data.jl")
 include("utility_functions.jl")
 include("lower_triangular_matrix.jl")
 include("grids.jl")

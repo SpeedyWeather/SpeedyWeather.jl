@@ -15,7 +15,7 @@ struct Boundaries{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}        # number form
 end
 
 """ Generator function for a Boundaries struct. Loads the boundary conditions,
-orography, land-sea mask and albedo from an netCDF file and stores the in a
+orography, land-sea mask and albedo from an netCDF file and stores them in a
 `Boundaries` struct."""
 function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
 
