@@ -1,7 +1,7 @@
 @testset "Parametrization: longwave radiation" begin
     @testset "radset!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation)
 
             SpeedyWeather.radset!(model)
 
@@ -15,7 +15,7 @@
     end
     @testset "radlw_down!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive, nlev = 8)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev=8)
 
             nlev = model.parameters.nlev
             column = ColumnVariables{NF}(nlev = nlev)
@@ -33,7 +33,7 @@
     end
     @testset "compute_bbe!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive, nlev = 8)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev=8)
 
             nlev = model.parameters.nlev
             column = ColumnVariables{NF}(nlev = nlev)
@@ -46,7 +46,7 @@
     end
     @testset "radlw_up!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive, nlev=8)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev=8)
 
             nlev = model.parameters.nlev
             column = ColumnVariables{NF}(nlev = nlev)
