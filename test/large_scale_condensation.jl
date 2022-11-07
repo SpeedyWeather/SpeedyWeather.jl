@@ -1,6 +1,6 @@
 @testset "Parametrization: large scale condensation" begin
     @testset for NF in (Float32,Float64)
-        _, diagn, model = SpeedyWeather.initialize_speedy(NF,model=:primitive)
+        _, diagn, model = SpeedyWeather.initialize_speedy(NF,model=PrimitiveEquation)
 
         column = ColumnVariables{NF}(nlev=diagn.nlev)
 

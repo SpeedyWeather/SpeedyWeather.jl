@@ -33,7 +33,16 @@ module SpeedyWeather
 
     # EXPORT MAIN INTERFACE TO SPEEDY
     export  run_speedy,
+            run_speedy!,
             initialize_speedy
+
+    # EXPORT MODELS
+    export  Barotropic,
+            BarotropicModel,
+            ShallowWater,
+            ShallowWaterModel,
+            PrimitiveEquation,
+            PrimitiveEquationModel
 
     # EXPORT GRIDS
     export  LowerTriangularMatrix,
@@ -67,8 +76,10 @@ module SpeedyWeather
     include("Grids/Grids.jl")               # defines AbstractGrid and concrete Grid types
     include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
 
-    include("parameter_structs.jl")
+    include("parameter_structs.jl")         # defines 
     include("spectral_truncation.jl")
+    include("abstract_models.jl")           # defines ModelSetup, Barotropic, ShallowWater,
+                                            # PrimitiveEquation
 
     include("default_parameters.jl")        # defines Parameters
     include("constants.jl")                 # defines Constants
