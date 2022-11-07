@@ -75,3 +75,15 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
     # convert to number format NF here
     return Boundaries(orography)#,η⁰,geopot_surf_grid,geopot_surf,landsea_mask,albedo)
 end
+
+
+# GPU methods
+function Adapt.adapt_structure(to, b::Boundaries)
+    Boundaries(Adapt.adapt(to, b.orography), 
+               # Adapt.adapt(to, b.η⁰),
+               # Adapt.adapt(to, b.geopot_surf_grid),
+               # Adapt.adapt(to, b.geopot_surf),
+               # Adapt.adapt(to, b.landsea_mask),
+               # Adapt.adapt(to, b.albedo)
+              )
+end
