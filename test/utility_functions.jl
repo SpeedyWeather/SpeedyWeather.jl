@@ -46,3 +46,20 @@ end
     @test SpeedyWeather.readable_secs(1.23) == CompoundPeriod(Second(1), Millisecond(230))
     @test SpeedyWeather.readable_secs(0.123) == CompoundPeriod(Second(0), Millisecond(120))
 end
+
+@testset "nans" begin
+    for s in ((3,),(3,4),(3,4,5))
+        for T in (Float16,Float32,Float64)
+            A = SpeedyWeather.nans(T,s...)
+            for a in A
+                @test isnan(a)
+            end
+            @test size(A) == s
+        end
+
+        A = SpeedyWeather.nans(s...)
+        for a in A
+            @test isnan(a)
+        end
+    end
+end
