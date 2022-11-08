@@ -200,7 +200,7 @@ Compute shortwave radiation fluxes for an atmospheric column.
 function radsw!(
     column::ColumnVariables{NF}, model::PrimitiveEquationModel
 ) where {NF<:AbstractFloat}
-    @unpack norm_pres, humid, icltop, cloudc, clstr, ozupp, ozone
+    @unpack norm_pres, humid, icltop, cloudc, clstr, ozupp, ozone = column
     @unpack zenit, stratz, fsol, qcloud, albsfc, nlev = column
     @unpack σ_levels_full, σ_levels_thick, n_stratosphere_levels = model.geometry
     @unpack albcl, albcls, abscl1, abscl2, absdry, absaer = model.parameters.radiation_coefs
