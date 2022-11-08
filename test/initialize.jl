@@ -31,7 +31,7 @@ end
     @test all(progn.pres.leapfrog[2] .== 0)
 
     # # PRIMITIVE EQUATION MODEL
-    # progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=:primitive)
+    # progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=PrimitiveEquation)
     # @test all(progn.vor .== 0)
 
     """
