@@ -176,3 +176,18 @@ function download_input_data(input_data_path)
     close(r)
     mv(dir_names[1], input_data_path, force=true);
 end
+
+# NAN initialisation
+"""
+    A = nans(T,dims...)
+
+Allocate array A with NaNs of type T. Similar to zeros(T,dims...)."""
+function nans(::Type{T},dims...) where T
+    return fill(convert(T,NaN),dims...)
+end
+
+"""
+    A = nans(dims...)
+
+Allocate A::Array{Float64} with NaNs."""
+nans(dims...) = nans(Float64,dims...)
