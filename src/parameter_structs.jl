@@ -38,6 +38,9 @@ end
 Parameters for radiation parameterizations.
 """
 @with_kw struct RadiationCoefs{NF<:Real} <: Coefficients
+
+        p0::Real = 1e5      # Reference pressure (Pa)
+
         # Shortwave radiation: sol_oz
         solc::NF = 342.0    # Solar constant (area averaged) [W/m^2]
         epssw::NF = 0.020   # Fraction of incoming solar radiation absorbed by ozone

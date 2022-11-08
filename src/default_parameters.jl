@@ -35,7 +35,6 @@ The default values of the keywords define the default model setup.
                                         # specific humidity [g/Kg]
     alhs::Real=2801                     # latent heat of sublimation [?]
     sbc::Real=5.67e-8                   # stefan-Boltzmann constant [W/m^2/K^4]
-    p0::Real=1.e+5                      # Reference pressure (Pa)
 
     # STANDARD ATMOSPHERE
     lapse_rate::Real=6                  # reference temperature lapse rate -dT/dz [K/km]
