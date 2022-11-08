@@ -10,7 +10,7 @@ function shortwave_radiation!(
     column::ColumnVariables{NF}, model::PrimitiveEquationModel
 ) where {NF<:AbstractFloat}
     @unpack humid, sat_vap_pres, dry_static_energy, geopot, norm_pres = column
-    @unpack cp, p0, = model.parameters
+    @unpack cp, p0 = model.parameters.radiation_coefs
     @unpack σ_levels_thick = model.geometry
     @unpack gravity = model.constants
 
@@ -87,7 +87,8 @@ function sol_oz!(
     column::ColumnVariables{NF}, model::PrimitiveEquationModel
 ) where {NF<:AbstractFloat}
     @unpack tyear, lat = column
-    @unpack solc, epssw, tropic_cancer = model.parameters
+    @unpack tropic_cancer = model.parameters
+    @unpack solc, epssw = model.parameters.radiation_coefs
 
     # Compute cosine and sine of latitude
     clat = cos(lat * π / 180)
@@ -140,10 +141,10 @@ Compute shortwave radiation cloud contibutions for an atmospheric column.
 function cloud!(
     column::ColumnVariables{NF}, model::PrimitiveEquationModel
 ) where {NF<:AbstractFloat}
-    @unpack rhcl1, rhcl2, rrcl, qcl, pmaxcl, wpcl, gse_s1, gse_s0, clsmax, clsminl =
-        model.parameters
-    @unpack humid, rel_hum, grad_dry_static_energy, precip_convection, precip_large_scale,
-        cloud_top, nlev, fmask = column
+    @unpack rhcl1, rhcl2, rrcl, qcl, pmaxcl = model.parameters.radiation_coefs
+    @unpack wpcl, gse_s1, gse_s0, clsmax, clsminl = model.parameters.radiation_coefs
+    @unpack humid, rel_hum, grad_dry_static_energy, precip_convection = column
+    @unpack precip_large_scale, cloud_top, nlev, fmask = column
 
     # 1.0 Cloud cover, defined as the sum of:
     # - a term proportional to the square - root of precip. rate
@@ -157,11 +158,11 @@ function cloud!(
         column.cloudc = rel_hum[nlev - 1] - rhcl1
         column.icltop = nlev - 1
     else
-        column.cloudc = NF(0.)
+        column.cloudc = NF(0)
         column.icltop = nlev + 1
     end
 
-    for k in 3:(nlev - 2)
+    for k in 3:(nlev - 2)   # TODO use n_stratospheric_levels
         drh = rel_hum[k] - rhcl1
         if (drh > column.cloudc) & (humid[k] > qcl)
             column.cloudc = drh
@@ -199,13 +200,12 @@ Compute shortwave radiation fluxes for an atmospheric column.
 function radsw!(
     column::ColumnVariables{NF}, model::PrimitiveEquationModel
 ) where {NF<:AbstractFloat}
-    @unpack norm_pres,
-    humid, icltop, cloudc, clstr, ozupp, ozone, zenit, stratz, fsol, qcloud, albsfc,
-        nlev = column
+    @unpack norm_pres, humid, icltop, cloudc, clstr, ozupp, ozone
+    @unpack zenit, stratz, fsol, qcloud, albsfc, nlev = column
     @unpack σ_levels_full, σ_levels_thick, n_stratosphere_levels = model.geometry
-
-    @unpack albcl, albcls, abscl1, abscl2, absdry, absaer, abswv1, abswv2, ablwin, ablco2, ablwv1,
-        ablwv2, ablcl2, ablcl1, epslw = model.parameters
+    @unpack albcl, albcls, abscl1, abscl2, absdry, absaer = model.parameters.radiation_coefs
+    @unpack abswv1, abswv2, ablwin, ablco2, ablwv1 = model.parameters.radiation_coefs
+    @unpack ablwv2, ablcl2, ablcl1, epslw = model.parameters.radiation_coefs
 
     # Locals variables
     sbands_flux = 2

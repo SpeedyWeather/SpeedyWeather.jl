@@ -27,8 +27,8 @@ function parametrization_tendencies!(
         convection!(column, M)
         large_scale_condensation!(column, M)
         # clouds!(column, M)
-        # shortwave_radiation!(column, M)
-        # longwave_radiation!(column, M)
+        shortwave_radiation!(column, M)
+        longwave_radiation!(column, M)
         # surface_fluxes!(column,M)
         # vertical_diffusion!(column,M)
 
