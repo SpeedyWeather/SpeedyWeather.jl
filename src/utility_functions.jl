@@ -151,3 +151,18 @@ end
     r == 2 && return rotate_matrix_indices_180(i,j,s)
     r == 3 && return rotate_matrix_indices_270(i,j,s)
 end
+
+# NAN initialisation
+"""
+    A = nans(T,dims...)
+
+Allocate array A with NaNs of type T. Similar to zeros(T,dims...)."""
+function nans(::Type{T},dims...) where T
+    return fill(convert(T,NaN),dims...)
+end
+
+"""
+    A = nans(dims...)
+
+Allocate A::Array{Float64} with NaNs."""
+nans(dims...) = nans(Float64,dims...)
