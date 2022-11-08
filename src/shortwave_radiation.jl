@@ -10,7 +10,8 @@ function shortwave_radiation!(
     column::ColumnVariables{NF}, model::PrimitiveEquationModel
 ) where {NF<:AbstractFloat}
     @unpack humid, sat_vap_pres, dry_static_energy, geopot, norm_pres = column
-    @unpack cp, p0 = model.parameters.radiation_coefs
+    @unpack cp = model.parameters
+    @unpack p0 = model.parameters.radiation_coefs
     @unpack σ_levels_thick = model.geometry
     @unpack gravity = model.constants
 
