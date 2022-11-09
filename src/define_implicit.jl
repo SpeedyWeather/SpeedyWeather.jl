@@ -274,3 +274,13 @@ end
 #         end
 #     end
 # end
+
+
+# GPU methods
+
+function Adapt.adapt_structure(to, im::Implicit)
+    Implicit(Adapt.adapt(to, im.ξH₀),
+             Adapt.adapt(to, im.g∇²),
+             Adapt.adapt(to, im.ξg∇²),
+             Adapt.adapt(to, im.div_impl))
+end

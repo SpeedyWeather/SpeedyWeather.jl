@@ -202,3 +202,44 @@ function generalised_logistic(x,coefs::GenLogisticCoefs)
     @unpack A,K,C,Q,B,M,ν = coefs
     return @. A + (K-A)/(C+Q*exp(-B*(x-M)))^(1/ν)
 end
+
+
+# GPU methods
+
+function Adapt.adapt_structure(to, ge::Geometry)
+    Geometry(Adapt.adapt(to, ge.Grid),              # GRID TYPE AND RESOLUTION
+             ge.nresolution,
+             ge.nlon_max,                           # GRID-POINT SPACE
+             ge.nlon,
+             ge.nlat,
+             ge.nlev,
+             ge.nlat_half,
+             ge.nside,
+             ge.npoints,
+             ge.radius_earth,
+             Adapt.adapt(to, ge.lat),                   # LATITUDES
+             Adapt.adapt(to, ge.latd),
+             Adapt.adapt(to, ge.colat),
+             Adapt.adapt(to, ge.colatd),
+             Adapt.adapt(to, ge.lon),                   # LONGITUDES
+             Adapt.adapt(to, ge.lond),
+             Adapt.adapt(to, ge.lons),                  # COORDINATES
+             Adapt.adapt(to, ge.lats),
+             ge.n_stratosphere_levels,                  # VERTICAL SIGMA COORDINATE
+             Adapt.adapt(to, ge.σ_levels_half),
+             Adapt.adapt(to, ge.σ_levels_full),
+             Adapt.adapt(to, ge.σ_levels_thick),
+             Adapt.adapt(to, ge.σ_levels_half⁻¹_2),
+             Adapt.adapt(to, ge.σ_f),
+             Adapt.adapt(to, ge.sinlat),                # SINES AND COSINES OF LATITUDE
+             Adapt.adapt(to, ge.coslat),
+             Adapt.adapt(to, ge.coslat⁻¹),
+             Adapt.adapt(to, ge.coslat²),
+             Adapt.adapt(to, ge.coslat⁻²),
+             Adapt.adapt(to, ge.f_coriolis),            # CORIOLIS FREQUENCY
+             Adapt.adapt(to, ge.xgeop1),                # GEOPOTENTIAL CALCULATION WORK ARRAYS
+             Adapt.adapt(to, ge.xgeop2),
+             Adapt.adapt(to, ge.lapserate_correction),
+             Adapt.adapt(to, ge.entrainment_profile))   # PARAMETERIZATIONS
+
+end
