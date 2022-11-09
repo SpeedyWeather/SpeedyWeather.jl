@@ -84,9 +84,9 @@ function initialize_netcdf_output(  progn::PrognosticVariables,
 
     # DEFINE NETCDF DIMENSIONS TIME
     @unpack startdate = M.parameters
-    time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
+    time_string = "seconds since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     dim_time = NcDim("time",0,unlimited=true)
-    var_time = NcVar("time",dim_time,t=Int32,atts=Dict("units"=>time_string,"long_name"=>"time"))
+    var_time = NcVar("time",dim_time,t=Int64,atts=Dict("units"=>time_string,"long_name"=>"time"))
 
     # DEFINE NETCDF DIMENSIONS SPACE
     @unpack output_grid, nlev = M.parameters
@@ -212,8 +212,8 @@ function write_netcdf_time!(outputter::Output,
     @unpack netcdf_file, startdate = outputter
     i = outputter.output_counter
 
-    time_hrs = [round(Int32,Dates.Second(time-startdate).value/3600)]
-    NetCDF.putvar(netcdf_file,"time",time_hrs,start=[i])    # write time [hrs] of next output step
+    time_sec = [round(Int64,Dates.value(Dates.Second(time-startdate)))]
+    NetCDF.putvar(netcdf_file,"time",time_sec,start=[i])    # write time [hrs] of next output step
     NetCDF.sync(netcdf_file)                                # sync to flush variables to disc
 
     return nothing
