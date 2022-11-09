@@ -52,8 +52,8 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     σ_f::Vector{NF}                 # akap/(2σ_levels_thick)   #TODO rename?
 
     # GEOPOTENTIAL INTEGRATION (on half/full levels)
-    Δp_geopot_half::Vector{NF}      # = R*(ln(p_k+1/2) - ln(p_k-1/2)), on half levels (Φ_k-1/2)
-    Δp_geopot_full::Vector{NF}      # = R*(ln(p_k+1/2) - ln(p_k)), for full levels (Φ_k)
+    Δp_geopot_half::Vector{NF}      # = R*(ln(p_k+1) - ln(p_k+1/2)), for half level geopotential
+    Δp_geopot_full::Vector{NF}      # = R*(ln(p_k+1/2) - ln(p_k)), for full level geopotential
     lapserate_correction::Vector{NF}    # ?
 
     # PARAMETERIZATIONS
@@ -118,14 +118,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     σ_f = akap ./ (2σ_levels_full)
 
     # GEOPOTENTIAL coefficients to calculate geopotential
-    Δp_geopot_half = zeros(nlev)
-    Δp_geopot_full = zeros(nlev)
-    for k in 1:nlev
-        # used for: Φ_{k-1/2} = Φ_{k+1/2} + R*T*(ln(p_{k+1/2}) - ln(p_{k-1/2}))
-        Δp_geopot_half[k] = R_gas*log(σ_levels_half[k+1]/σ_levels_half[k])
-        # used for: Φ_k = Φ_{k+1/2} + R*T*(ln(p_{k+1/2}) - ln(p_k))
-        Δp_geopot_full[k] = R_gas*log(σ_levels_half[k+1]/σ_levels_full[k])
-    end
+    Δp_geopot_half, Δp_geopot_full = initialise_geopotential(σ_levels_full,σ_levels_half,R_gas)
 
     if P.model == PrimitiveEquation
         # LAPSE RATE correction (TODO reference)
@@ -161,7 +154,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
                     n_stratosphere_levels,
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
-                    Δp_geopot_half,Δp_geopot_full,lapserate_correction, entrainment_profile)
+                    Δp_geopot_half1,Δp_geopot_half2,lapserate_correction, entrainment_profile)
                     # tref,rgas,fsgr,tref3)
 end
 
