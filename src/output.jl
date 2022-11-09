@@ -213,7 +213,7 @@ function write_netcdf_time!(outputter::Output,
     i = outputter.output_counter
 
     time_sec = [round(Int64,Dates.value(Dates.Second(time-startdate)))]
-    NetCDF.putvar(netcdf_file,"time",time_sec,start=[i])    # write time [hrs] of next output step
+    NetCDF.putvar(netcdf_file,"time",time_sec,start=[i])    # write time [sec] of next output step
     NetCDF.sync(netcdf_file)                                # sync to flush variables to disc
 
     return nothing
