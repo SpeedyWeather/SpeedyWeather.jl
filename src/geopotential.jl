@@ -29,6 +29,24 @@ function initialise_geopotential(   σ_levels_full::Vector,
     return Δp_geopot_half, Δp_geopot_full
 end
 
+function lapserate_correction(  σ_levels_full::Vector,
+                                σ_levels_half::Vector,
+                                Δp_geopot_full::Vector)
+
+    nlev = length(σ_levels_full)
+    @assert nlev+1 == length(σ_levels_half) "σ half levels must have length nlev+1"
+    @assert nlev == length(Δp_geopot_full) "σ half levels must have length nlev"
+
+    lapserate_corr = zeros(nlev)
+    for k in 2:nlev-1   # only in the free troposphere
+        # TODO reference
+        lapserate_corr[k] = 0.5*Δp_geopot_full[k]*
+                    log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
+    end
+
+    return lapserate_corr
+end
+
 """
     geopotential!(diagn,progn,B,G)
 
@@ -44,7 +62,7 @@ function geopotential!( diagn::DiagnosticVariables{NF},
 
     @unpack geopot_surf = B                     # = orography*gravity
     @unpack Δp_geopot_half, Δp_geopot_full = G  # = R*Δlnp either on half or full levels
-    @unpack lapserate_correction = G
+    @unpack lapserate_corr = G
     @unpack nlev = G                            # number of vertical levels
 
     # BOTTOM FULL LAYER
@@ -68,12 +86,16 @@ function geopotential!( diagn::DiagnosticVariables{NF},
         end      
     end
 
-    # # LAPSERATE CORRECTION IN THE FREE TROPOSPHERE (>nlev)
-    # # TODO only for spectral coefficients 1,: ?
-    # for k in 2:nlev-1
-    #     for j in 1:nx
-    #         geopot[1,j,k] = geopot[1,j,k] +
-    #                 lapserate_correction[k-1]*(temp[1,j,k+1] - temp[1,j,k-1])
-    #     end
-    # end
+    # LAPSERATE CORRECTION IN THE FREE TROPOSPHERE (>nlev)
+    # TODO only for spectral coefficients 1,: ?
+    lmax,mmax = size(geopot)
+    for k in 2:nlev-1
+        temp_k_above = progn.layers[k-1].leapfrog[lf].temp
+        temp_k_below = progn.layers[k+1].leapfrog[lf].temp
+        geopot  = diagn.layers[k].dynamics_variables.geopot
+
+        for l in 1:lmax-1
+            geopot[l,l] += lapserate_corr[k]*(temp_k_below[l,l] - temp_k_above[l,l])
+        end
+    end
 end
