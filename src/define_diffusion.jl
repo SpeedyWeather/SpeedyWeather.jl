@@ -144,3 +144,19 @@ function HorizontalDiffusion(   P::Parameters,          # Parameter struct
                                         temp_correction_vert,humid_correction_vert,
                                         temp_correction_horizontal,humid_correction_horizontal)
 end
+
+
+# GPU methods
+
+function Adapt.adapt_structure(to, hd::HorizontalDiffusion)
+    HorizontalDiffusion(Adapt.adapt(to, hd.damping),                        # Explicit part of the diffusion
+                        Adapt.adapt(to, hd.damping_div),
+                        Adapt.adapt(to, hd.damping_strat),
+                        Adapt.adapt(to, hd.damping_impl),                   # Implicit part of LowerTriangular diffusion
+                        Adapt.adapt(to, hd.damping_div_impl),
+                        Adapt.adapt(to, hd.damping_strat_impl),
+                        Adapt.adapt(to, hd.temp_correction_vert),           # Vertical component of orographic correction
+                        Adapt.adapt(to, hd.humid_correction_vert),
+                        Adapt.adapt(to, hd.temp_correction_horizontal),     # Horizontal component of orographic correction
+                        Adapt.adapt(to, hd.humid_correction_horizontal))
+end
