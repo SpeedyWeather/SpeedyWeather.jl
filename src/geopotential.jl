@@ -65,16 +65,20 @@ function geopotential!( diagn::DiagnosticVariables{NF},
     @unpack lapserate_corr = G
     @unpack nlev = G                            # number of vertical levels
 
+    @boundscheck progn.nlev == diagn.nlev || throw(BoundsError)
+    @boundscheck progn.nlev == length(Δp_geopot_full) || throw(BoundsError)
+    @boundscheck progn.nlev == length(Δp_geopot_half) || throw(BoundsError)
+
     # BOTTOM FULL LAYER
     temp = progn.layers[end].leapfrog[lf].temp
     geopot = diagn.layers[end].dynamics_variables.geopot
     
-    for lm in eachharmonic(geopot,geopot_surf,temp)
+    @inbounds for lm in eachharmonic(geopot,geopot_surf,temp)
         geopot[lm] = geopot_surf[lm] + Δp_geopot_full[end]*temp[lm]
     end
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
-    for k in nlev-1:-1:1
+    @inbounds for k in nlev-1:-1:1
         temp_k    = progn.layers[k].leapfrog[lf].temp
         temp_k1   = progn.layers[k+1].leapfrog[lf].temp
         geopot_k  = diagn.layers[k].dynamics_variables.geopot
