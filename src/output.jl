@@ -37,10 +37,9 @@ end
 Output() = Output{Float32}()
 
 """
-    run_id = get_run_id_path(output, output_path, run_id)
+    run_id = get_run_id(output, output_path)
 
-Checks existing `run-????` folders in output path to determine a 4-digit `run_id` number
-incase `run_id` is a nonempty string.
+Checks existing `run-????` folders in output path to determine a 4-digit `run_id` number. 
 """
 function get_run_id(output, output_path)
 
