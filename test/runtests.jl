@@ -20,6 +20,7 @@ include("time_stepping.jl")
 
 # VERTICAL LEVELS
 include("vertical_levels.jl")
+include("geopotential.jl")
 
 # PHYSICS
 include("column_variables.jl")

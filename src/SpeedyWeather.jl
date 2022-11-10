@@ -97,6 +97,7 @@ module SpeedyWeather
     include("diagnostic_variables.jl")      # defines DiagnosticVariables
     include("initial_conditions.jl")
     include("scaling.jl")
+    include("geopotential.jl")
 
     include("run_speedy.jl")
     include("tendencies_dynamics.jl")

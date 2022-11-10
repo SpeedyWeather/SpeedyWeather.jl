@@ -33,14 +33,6 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     lons::Vector{NF}        # longitude (0...2π) for each grid point in ring order
     lats::Vector{NF}        # latitude (π/2...-π/2) for each grid point in ring order
 
-    # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
-    n_stratosphere_levels::Int      # number of upper levels for stratosphere
-    σ_levels_half::Vector{NF}       # σ at half levels
-    σ_levels_full::Vector{NF}       # σ at full levels
-    σ_levels_thick::Vector{NF}      # σ level thicknesses
-    σ_levels_half⁻¹_2::Vector{NF}   # 1/(2σ_levels_full)       #TODO rename?
-    σ_f::Vector{NF}                 # akap/(2σ_levels_thick)   #TODO rename?
-
     # SINES AND COSINES OF LATITUDE
     sinlat::Vector{NF}              # sin of latitudes
     coslat::Vector{NF}              # cos of latitudes
@@ -51,10 +43,18 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
     f_coriolis::Vector{NF}          # = 2Ω*sin(lat)*radius_earth
 
-    # GEOPOTENTIAL CALCULATION WORK ARRAYS
-    xgeop1::Vector{NF}                  # ?
-    xgeop2::Vector{NF}                  # ?
-    lapserate_correction::Vector{NF}    # ?
+    # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
+    n_stratosphere_levels::Int      # number of upper levels for stratosphere
+    σ_levels_half::Vector{NF}       # σ at half levels
+    σ_levels_full::Vector{NF}       # σ at full levels
+    σ_levels_thick::Vector{NF}      # σ level thicknesses
+    σ_levels_half⁻¹_2::Vector{NF}   # 1/(2σ_levels_full)       #TODO rename?
+    σ_f::Vector{NF}                 # akap/(2σ_levels_thick)   #TODO rename?
+
+    # GEOPOTENTIAL INTEGRATION (on half/full levels)
+    Δp_geopot_half::Vector{NF}      # = R*(ln(p_k+1) - ln(p_k+1/2)), for half level geopotential
+    Δp_geopot_full::Vector{NF}      # = R*(ln(p_k+1/2) - ln(p_k)), for full level geopotential
+    lapserate_corr::Vector{NF}      # ?
 
     # PARAMETERIZATIONS
     entrainment_profile::Vector{NF}
@@ -74,7 +74,8 @@ Generator function to create the Geometry struct from parameters in `P`.
 function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
     @unpack trunc, nlev = P                         # grid type, spectral truncation, # of vertical levels
-    @unpack radius_earth, rotation_earth, akap = P  # radius of earth, angular frequency, ratio of gas consts
+    @unpack radius_earth, rotation_earth = P        # radius of earth, angular frequency
+    @unpack R_gas, akap = P                         # gas constant for dry air, ratio of gas consts
     @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
 
     # RESOLUTION PARAMETERS
@@ -98,15 +99,6 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     # COORDINATES for every grid point in ring order
     lats,lons = get_colatlons(Grid,nlat_half)       # in radians
 
-    # VERTICAL SIGMA COORDINATE
-    # σ = p/p0 (fraction of surface pressure)
-    # sorted such that σ_levels_half[end] is at the planetary boundary
-    σ_levels_half = vertical_coordinates(P)
-    σ_levels_full = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])
-    σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
-    σ_levels_half⁻¹_2 = 1 ./ (2σ_levels_thick)
-    σ_f = akap ./ (2σ_levels_full)
-
     # SINES AND COSINES OF LATITUDE
     sinlat = sin.(lat)
     coslat = cos.(lat)
@@ -117,26 +109,20 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
     f_coriolis = 2rotation_earth*sinlat*radius_earth
 
-    # GEOPOTENTIAL coefficients to calculate geopotential (TODO reference)
-    xgeop1 = zeros(nlev)
-    xgeop2 = zeros(nlev)
-    for k in 1:nlev
-        xgeop1[k] = radius_earth*log(σ_levels_half[k+1]/σ_levels_half[k])
-        if k != nlev
-            xgeop2[k+1] = radius_earth*log(σ_levels_full[k+1]/σ_levels_half[k+1])
-        end
-    end
+    # VERTICAL SIGMA COORDINATE
+    # σ = p/p0 (fraction of surface pressure)
+    # sorted such that σ_levels_half[end] is at the planetary boundary
+    σ_levels_half = vertical_coordinates(P)
+    σ_levels_full = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])
+    σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
+    σ_levels_half⁻¹_2 = 1 ./ (2σ_levels_thick)
+    σ_f = akap ./ (2σ_levels_full)
 
-    if P.model == PrimitiveEquation
-        # LAPSE RATE correction (TODO reference)
-        lapserate_correction = zeros(nlev-2)
-        for k in 2:nlev-1
-            lapserate_correction[k-1] = 0.5*xgeop1[k]*
-                        log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
-        end
-    else
-        lapserate_correction = zeros(1)
-    end
+    # GEOPOTENTIAL coefficients to calculate geopotential
+    Δp_geopot_half, Δp_geopot_full = initialise_geopotential(σ_levels_full,σ_levels_half,R_gas)
+
+    # LAPSE RATE correction
+    lapserate_corr = lapserate_correction(σ_levels_full,σ_levels_half,Δp_geopot_full)
 
     # Compute the entrainment coefficients for the convection parameterization.
     @unpack max_entrainment = P
@@ -158,11 +144,10 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     Geometry{P.NF}( Grid,nresolution,
                     nlon_max,nlon,nlat,nlev,nlat_half,npoints,radius_earth,
                     lat,latd,colat,colatd,lon,lond,lons,lats,
+                    sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
-                    sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,
-                    f_coriolis,
-                    xgeop1,xgeop2,lapserate_correction, entrainment_profile)
+                    Δp_geopot_half,Δp_geopot_full,lapserate_corr,entrainment_profile)
                     # tref,rgas,fsgr,tref3)
 end
 

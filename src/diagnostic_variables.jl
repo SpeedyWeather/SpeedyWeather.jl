@@ -43,7 +43,7 @@ struct GridVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     div_grid            ::Grid    # divergence
     temp_grid           ::Grid    # absolute temperature [K]
     humid_grid          ::Grid    # specific_humidity
-    geopot_grid         ::Grid    # geopotential
+    geopot_grid         ::Grid    # geopotential (is that needed?)
     U_grid              ::Grid    # zonal velocity *coslat [m/s]
     V_grid              ::Grid    # meridional velocity *coslat [m/s]
     temp_grid_anomaly   ::Grid    # absolute temperature anomaly [K]
@@ -71,7 +71,7 @@ end
 Struct holding intermediate quantities for the dynamics of a given layer."""
 struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 
-    ### VORTICITY INVERSION
+    # VORTICITY INVERSION
     u_coslat        ::LowerTriangularMatrix{Complex{NF}}    # = U = cosθ*u, zonal velocity *cos(latitude)
     v_coslat        ::LowerTriangularMatrix{Complex{NF}}    # = V = cosθ*v, meridional velocity *cos(latitude)
 
@@ -88,6 +88,10 @@ struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     vh_coslat⁻¹_grid::Grid                                  # volume flux vh/coslat on grid
     uh_coslat⁻¹     ::LowerTriangularMatrix{Complex{NF}}    # uh/coslat in spectral
     vh_coslat⁻¹     ::LowerTriangularMatrix{Complex{NF}}    # vh/coslat in spectral
+
+    # VERTICAL INTEGRATION
+    geopot          ::LowerTriangularMatrix{Complex{NF}}    # geopotential on full layers
+
 
     # ###------Defined in surface_pressure_tendency!()
     # u_mean             ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
@@ -144,6 +148,9 @@ function Base.zeros(::Type{DynamicsVariables},
     uh_coslat⁻¹      = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     vh_coslat⁻¹      = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
+    # VERTICAL INTEGRATION
+    geopot           = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+
     # u_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint zonal velocity over all levels
     # v_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint meridional velocity over all levels
     # div_mean    = zeros(NF,nlon,nlat)           # Mean gridpoint divergence over all levels
@@ -174,6 +181,7 @@ function Base.zeros(::Type{DynamicsVariables},
                                 uω_coslat⁻¹,vω_coslat⁻¹,
                                 bernoulli_grid,bernoulli,
                                 uh_coslat⁻¹_grid,vh_coslat⁻¹_grid,uh_coslat⁻¹,vh_coslat⁻¹,
+                                geopot
                                 )
                                 # u_mean,v_mean,div_mean,
                                 # pres_gradient_spectral_x,pres_gradient_spectral_y,
