@@ -66,9 +66,8 @@ end
 """
     run_id, run_path = get_run_id_path(P::Parameters)
 
-Checks existing `run-????` folders in output path to determine a 4-digit `run_id` number
-and creates a new folder `run-????` with that `run_id`. Also returns the full path
-`run_path` of that folder. Returns `0,"no runpath"` in the case of no output.
+Creates a new folder `run-*` with the `run_id`. Also returns the full path
+`run_path` of that folder. Returns `-1, "no runpath"` in the case of no output.
 """
 function get_run_id_path(P::Parameters)
 
