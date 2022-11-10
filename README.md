@@ -1,6 +1,6 @@
 # SpeedyWeather.jl
-[![CI](https://github.com/milankl/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/milankl/SpeedyWeather.jl/actions/workflows/CI.yml)
-[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://milankl.github.io/SpeedyWeather.jl/dev)
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml)
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/dev/)
 
 SpeedyWeather.jl is a global atmospheric model with simple physics which is developed as a computational playground
 with an everything-flexible attitude as long as it is speedy. With minimal code redundancies it supports
