@@ -20,8 +20,8 @@ function initialise_geopotential(   σ_levels_full::Vector,
         Δp_geopot_half[k+1] = R_gas*log(σ_levels_full[k+1]/σ_levels_half[k+1])
     end
 
+    # 2. integration onto full levels (same formula but k -> k-1/2)
     for k in 1:nlev
-        # 2. integration onto full levels (same formula but k -> k-1/2)
         # used for: Φ_k = Φ_{k+1/2} + R*T_k*(ln(p_{k+1/2}) - ln(p_k))
         Δp_geopot_full[k] = R_gas*log(σ_levels_half[k+1]/σ_levels_full[k])
     end
