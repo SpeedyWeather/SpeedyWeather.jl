@@ -31,3 +31,6 @@ include("convection.jl")
 include("initialize.jl")
 include("run_speedy.jl")
 include("run_speedy_with_output.jl")
+
+# OUTPUT 
+include("netcdf_output.jl")

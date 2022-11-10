@@ -116,8 +116,9 @@ The default values of the keywords define the default model setup.
     output::Bool = false            # Store data in netCDF?
     output_dt::Real = 6             # output time step [hours]
     output_path::String = pwd()     # path to output folder
-    output_filename::String="output.nc"     # name of the output netcdf file
-    output_vars::Vector{Symbol}=[:vor]      # variables to output: :u, :v, :vor, :div, :
+    run_id::String = get_run_id(output, output_path)    # name of the output folder, defaults to 4-digit number counting up from 0001
+    output_filename::String="output.nc"                 # name of the output netcdf file
+    output_vars::Vector{Symbol}=[:vor]                  # variables to output: :u, :v, :vor, :div, :
     compression_level::Integer = 3  # 1=low but fast, 9=high but slow
     keepbits::Integer = 7           # mantissa bits to keep for every variable
     version::VersionNumber=pkgversion(SpeedyWeather)
@@ -133,7 +134,7 @@ The default values of the keywords define the default model setup.
     # RESTART
     write_restart::Bool = output        # also write restart file if output==true?
     restart_path::String = output_path  # path for restart file
-    restart_id::Integer = 1             # run_id of restart file in run????/restart.jld2
+    restart_id::String = "0001"         # run_id of restart file in run????/restart.jld2
 end
 
 """
@@ -141,7 +142,8 @@ end
 
 Number of vertical levels chosen either automatically based on `model`,
 or from the length of `σ_levels_half` if not a 0-length vector
-(default if not specified parameter)."""
+(default if not specified parameter).
+"""
 function nlev_default(model::Symbol, σ_levels_half::AbstractVector)
     if length(σ_levels_half) == 0   # choose nlev automatically 
         model == :barotropic && return 1
