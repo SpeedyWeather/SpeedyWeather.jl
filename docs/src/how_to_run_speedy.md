@@ -38,7 +38,7 @@ developed this is by no means complete.
 
 | parameter keyword | default value | meaning   |
 | ----------------- | ------------- | --------- |
-| `model::Symbol`   | `:barotropic` | Equations to be solved: `:barotropic`, `:shallowwater`, or `:primitive` |
+| `model::Type{<:ModelSetup}`   | `BarotropicModel` | Equations to be solved: `BarotropicModel`, `ShallowWaterModel`, or `PrimitiveEquationModel` |
 | `radius_earth::Real`  | `6.371e6` | Radius of Earth [``m``] |
 | `rotation_earth::Real`| `7.292e-5`| Angular frequency of Earth's rotation [``s^{-1}``] |
 | `gravity::Real`   | `9.81`        | Gravitational acceleration [``m/s^2``] |

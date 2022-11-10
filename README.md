@@ -31,7 +31,7 @@ The main interface to SpeedyWeather.jl is
 
 ```julia
 julia> using SpeedyWeather
-julia> run_speedy(n_days=30, trunc=63, Grid=OctahedralGaussianGrid, model=:shallowwater, output=true)
+julia> run_speedy(n_days=30, trunc=63, Grid=OctahedralGaussianGrid, model=ShallowWater, output=true)
 Weather is speedy run 1: 100%|███████████████████████████████████| Time: 0:00:04 (1498.70 years/day)
 ```
 

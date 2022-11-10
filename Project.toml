@@ -1,7 +1,7 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
-authors = ["milankl"]
-version = "0.3.0"
+authors = ["Milan Klöwer and others"]
+version = "0.4.0"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -37,7 +37,7 @@ CUDA = "3"
 CUDAKernels = "0.3, 0.4"
 CodecZlib = "0.7"
 FFTW = "1"
-FastGaussQuadrature = "0.4"
+FastGaussQuadrature = "0.4, 0.5"
 GenericFFT = "0.1"
 JLD2 = "0.4"
 KernelAbstractions = "0.7, 0.8"

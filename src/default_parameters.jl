@@ -10,8 +10,8 @@ The default values of the keywords define the default model setup.
     # NUMBER FORMATS
     NF::DataType                        # number format (default defined in run_speedy)
 
-    # MODEL
-    model::Symbol = :barotropic         # :barotropic, :shallowwater, or :primitive
+    # MODEL (BarotropicModel, ShallowWaterModel, or PrimitiveEquationModel)
+    model::Type{<:ModelSetup} = Barotropic
 
     # RESOLUTION AND GRID
     trunc::Int = 31                                     # spectral truncation
@@ -100,7 +100,7 @@ The default values of the keywords define the default model setup.
     # LEGENDRE TRANSFORM AND POLYNOMIALS
     recompute_legendre::Bool = false    # recomputation is slower but requires less memory
     legendre_NF::DataType = Float64     # which format to use to calculate the Legendre polynomials
-    legendre_shortcut::Symbol = :linear
+    legendre_shortcut::Symbol = :linear # :linear, :quadratic, :cubic, :lincub_coslat, :linquad_coslat²
 
     # BOUNDARY FILES
     boundary_path::String = ""          # package location is default
@@ -108,8 +108,8 @@ The default values of the keywords define the default model setup.
     orography_file::String = "orography_F512.nc"
 
     # INITIAL CONDITIONS
-    seed::Int = abs(rand(Int))          # a random seed that's used in initialize_speedy for the global RNG
-    initial_conditions::Symbol=:barotropic_vorticity    # :rest, :barotropic_vorticity or :restart
+    seed::Int = abs(rand(Int))          # random seed for the global random number generator
+    initial_conditions::Symbol = :barotropic_vorticity    # :rest, :barotropic_vorticity or :restart
 
     # OUTPUT
     verbose::Bool = true            # print dialog for feedback
@@ -126,10 +126,10 @@ The default values of the keywords define the default model setup.
     # OUTPUT GRID
     output_NF::DataType = NF        # number format used for output
     missing_value::Real = NaN       # missing value to be used in netcdf output
-    output_grid::Symbol=:full       # :full, pick the corresponding full grid for reduced grids
+    output_grid::Symbol = :full     # :full, pick the corresponding full grid for reduced grids
                                     # or :matrix, sort gridpoints into a matrix
-    output_quadrant_rotation::NTuple{4,Integer}=(0,1,2,3)
-    output_matrix_quadrant::NTuple{4,Tuple{Integer,Integer}}=((2,2),(1,2),(1,1),(2,1))
+    output_quadrant_rotation::NTuple{4,Integer} = (0,1,2,3)
+    output_matrix_quadrant::NTuple{4,Tuple{Integer,Integer}} = ((2,2),(1,2),(1,1),(2,1))
 
     # RESTART
     write_restart::Bool = output        # also write restart file if output==true?
@@ -144,11 +144,11 @@ Number of vertical levels chosen either automatically based on `model`,
 or from the length of `σ_levels_half` if not a 0-length vector
 (default if not specified parameter).
 """
-function nlev_default(model::Symbol, σ_levels_half::AbstractVector)
+function nlev_default(model::Type{<:ModelSetup}, σ_levels_half::AbstractVector)
     if length(σ_levels_half) == 0   # choose nlev automatically 
-        model == :barotropic && return 1
-        model == :shallowwater && return 1
-        model == :primitive && return 8
+        model <: Barotropic && return 1
+        model <: ShallowWater && return 1
+        model <: PrimitiveEquation && return 8
     else                            # use manually set levels 
         return length(σ_levels_half) - 1
     end
