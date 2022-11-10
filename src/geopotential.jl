@@ -86,16 +86,16 @@ function geopotential!( diagn::DiagnosticVariables{NF},
         end      
     end
 
-    # LAPSERATE CORRECTION IN THE FREE TROPOSPHERE (>nlev)
-    # TODO only for spectral coefficients 1,: ?
-    lmax,mmax = size(geopot)
-    for k in 2:nlev-1
-        temp_k_above = progn.layers[k-1].leapfrog[lf].temp
-        temp_k_below = progn.layers[k+1].leapfrog[lf].temp
-        geopot  = diagn.layers[k].dynamics_variables.geopot
+    # # LAPSERATE CORRECTION IN THE FREE TROPOSPHERE (>nlev)
+    # # TODO only for spectral coefficients 1,: ?
+    # lmax,mmax = size(geopot)
+    # for k in 2:nlev-1
+    #     temp_k_above = progn.layers[k-1].leapfrog[lf].temp
+    #     temp_k_below = progn.layers[k+1].leapfrog[lf].temp
+    #     geopot  = diagn.layers[k].dynamics_variables.geopot
 
-        for l in 1:lmax-1
-            geopot[l,l] += lapserate_corr[k]*(temp_k_below[l,l] - temp_k_above[l,l])
-        end
-    end
+    #     for l in 1:lmax-1
+    #         geopot[l,l] += lapserate_corr[k]*(temp_k_below[l,l] - temp_k_above[l,l])
+    #     end
+    # end
 end

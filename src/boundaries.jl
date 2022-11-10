@@ -41,29 +41,28 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
         #TODO also read lat,lon from file and flip array in case it's not as expected
         recompute_legendre = true
         orography_spec = spectral(orography_highres;Grid=FullGaussianGrid,recompute_legendre)
-
+        
         lmax,mmax = P.trunc,P.trunc
-        orography_spec = spectral_truncation(orography_spec,lmax+1,mmax)
-        orography = gridded(orography_spec,S)
+        orography_spec = spectral_truncation(Complex{NF},orography_spec,lmax+1,mmax)
+        
+        if P.model <: ShallowWater
 
-        # SURFACE GEOPOTENTIAL
-        geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},0,0)
+            # OROGRAPHY ON GRID
+            orography = gridded(orography_spec,S)
 
-    else # primitive equation model only
+            # SURFACE GEOPOTENTIAL
+            geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},0,0)
 
-        # READ, TODO check which latitude ordering is required, it's North to South in file
-        # orography = ncfile.vars["orog"][:,:]        # height [m]
-        # landsea_mask = ncfile.vars["lsm"][:,:]    # fraction of land [0-1]
-        # albedo = ncfile.vars["alb"][:,:]          # annual-mean albedo [0-1]
+        elseif P.model <: PrimitiveEquation
 
-        # GEOPOTENTIAL, transform to spectral space and truncate accordingly   
-        # geopot_surf_highres = spectral(gravity*orography)
-        # geopot_surf = spectral_truncation(geopot_surf_highres,  # truncate to
-        #                                     P.trunc+1,P.trunc)  # lmax+1,mmax matrix
-        # spectral_truncation!(geopot_surf,P.trunc)               # but set l=lmax+1 row to zero
-        # geopot_surf_grid = gridded(geopot_surf)
+            # gridded orography not needed for primitive equation model
+            orography = zeros(Grid{NF},0)
+
+            # GEOPOTENTIAL, use spectral orography from above times gravity
+            geopot_surf = convert(NF,gravity)*orography_spec
+        end
     end
 
     # convert to number format NF here
-    return Boundaries(orography,geopot_surf)#,landsea_mask,albedo)
+    return Boundaries(orography,geopot_surf) #,landsea_mask,albedo)
 end

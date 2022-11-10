@@ -120,12 +120,9 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
     # GEOPOTENTIAL coefficients to calculate geopotential
     Δp_geopot_half, Δp_geopot_full = initialise_geopotential(σ_levels_full,σ_levels_half,R_gas)
-    println(Δp_geopot_full)
-    println(Δp_geopot_half)
 
     # LAPSE RATE correction
     lapserate_corr = lapserate_correction(σ_levels_full,σ_levels_half,Δp_geopot_full)
-    println(lapserate_corr)
 
     # Compute the entrainment coefficients for the convection parameterization.
     @unpack max_entrainment = P
