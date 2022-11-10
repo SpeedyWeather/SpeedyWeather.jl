@@ -25,7 +25,7 @@ end
     p, d, m = initialize_speedy(Float32, model=ShallowWaterModel, output=true, run_id="restart-test")
     SpeedyWeather.time_stepping!(p, d, m)
  
-    progn, diagn, model = initialize_speedy(Float32, initial_conditions=:restart, model=:shallowwater, restart_id="restart-test")
+    progn, diagn, model = initialize_speedy(Float32, initial_conditions=:restart, model=ShallowWaterModel, restart_id="restart-test")
 
     for varname in propertynames(progn.layers[1].leapfrog[1])
         if SpeedyWeather.has(progn, varname)
