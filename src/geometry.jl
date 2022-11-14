@@ -48,7 +48,7 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     σ_levels_half::Vector{NF}       # σ at half levels
     σ_levels_full::Vector{NF}       # σ at full levels
     σ_levels_thick::Vector{NF}      # σ level thicknesses
-    σ_levels_half⁻¹_2::Vector{NF}   # 1/(2σ_levels_full)       #TODO rename?
+    σ_levels_thick⁻¹_half::Vector{NF}   # = 1/(2σ_levels_thick)
     σ_f::Vector{NF}                 # akap/(2σ_levels_thick)   #TODO rename?
 
     # GEOPOTENTIAL INTEGRATION (on half/full levels)
@@ -115,10 +115,10 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     σ_levels_half = vertical_coordinates(P)
     σ_levels_full = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])
     σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
-    σ_levels_half⁻¹_2 = 1 ./ (2σ_levels_thick)
+    σ_levels_thick⁻¹_half = 1 ./ (2σ_levels_thick)
     σ_f = akap ./ (2σ_levels_full)
 
-    # GEOPOTENTIAL coefficients to calculate geopotential
+    # GEOPOTENTIAL, coefficients to calculate geopotential
     Δp_geopot_half, Δp_geopot_full = initialise_geopotential(σ_levels_full,σ_levels_half,R_gas)
 
     # LAPSE RATE correction
@@ -146,7 +146,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
                     lat,latd,colat,colatd,lon,lond,lons,lats,
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,
-                    σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
+                    σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_thick⁻¹_half,σ_f,
                     Δp_geopot_half,Δp_geopot_full,lapserate_corr,entrainment_profile)
                     # tref,rgas,fsgr,tref3)
 end

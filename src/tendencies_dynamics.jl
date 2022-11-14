@@ -38,6 +38,41 @@ function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic 
 end
 
 """
+    vertical_averages!(Diag::DiagnosticVariables,G::Geometry)
+
+Calculates the vertically averaged (weighted by the thickness of the σ level)
+velocities (*coslat) and divergence. E.g.
+
+    U_mean = ∑_k=1^nlev Δσ_k * U_k
+"""
+function vertical_averages!(Diag::DiagnosticVariables{NF},
+                            G::Geometry{NF}) where NF
+    
+    @unpack σ_levels_thick, coslat⁻¹, nlev = G
+    @unpack U_mean, V_mean, div_mean = Diag.surface
+
+    @boundscheck nlev == Diag.nlev || throw(BoundsError)
+
+    fill!(U_mean,0)     # reset accumulators from previous vertical average
+    fill!(V_mean,0)
+    fill!(div_mean,0)
+
+    for k in 1:nlev
+        Δσ_k = σ_levels_thick[k]
+        U = Diag.layers[k].grid_variables.U_grid
+        V = Diag.layers[k].grid_variables.V_grid
+        div = Diag.layers[k].grid_variables.div_grid
+
+        @inbounds for ij in eachgridpoint(Diag.surface)
+            U_mean[ij] += U[ij]*Δσ_k
+            V_mean[ij] += V[ij]*Δσ_k
+            div_mean[ij] += div[ij]*Δσ_k
+        end
+    end
+end
+        
+
+"""
 Compute the spectral tendency of the "vertical" velocity
 """
 function vertical_velocity_tendency!(Diag::DiagnosticVariables{NF}, # Diagnostic variables
@@ -452,16 +487,6 @@ function interface_relaxation!( η::LowerTriangularMatrix{Complex{NF}},
     pres_tend[3] += τ⁻¹*(η3-η[3])
 end
 
-"""
-    gridded!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
-                progn::PrognosticVariables{NF}, # all prognostic variables
-                M::BarotropicModel,             # everything that's constant
-                lf::Int=1                       # leapfrog index
-                ) where NF
-
-Propagate the spectral state of the prognostic variables `progn` to the
-diagnostic variables in `diagn` for the barotropic vorticity model.
-Updates grid vorticity, spectral stream function and spectral and grid velocities u,v."""
 function gridded!(  diagn::DiagnosticVariables,     # all diagnostic variables
                     progn::PrognosticVariables,     # all prognostic variables
                     lf::Int,                        # leapfrog index
@@ -480,6 +505,16 @@ function gridded!(  diagn::DiagnosticVariables,     # all diagnostic variables
     return nothing
 end
 
+"""
+    gridded!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
+                progn::PrognosticVariables{NF}, # all prognostic variables
+                M::BarotropicModel,             # everything that's constant
+                lf::Int=1                       # leapfrog index
+                ) where NF
+
+Propagate the spectral state of the prognostic variables `progn` to the
+diagnostic variables in `diagn` for the barotropic vorticity model.
+Updates grid vorticity, spectral stream function and spectral and grid velocities u,v."""
 function gridded!(  diagn::DiagnosticVariablesLayer,   
                     progn::PrognosticVariablesLeapfrog,
                     lf::Int,                            # leapfrog index
@@ -508,8 +543,8 @@ end
 """
     gridded!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
                 progn::PrognosticVariables{NF}, # all prognostic variables
-                M::ShallowWaterModel,           # everything that's constant
                 lf::Int=1                       # leapfrog index
+                M::ShallowWaterModel,           # everything that's constant
                 ) where NF
 
 Propagate the spectral state of the prognostic variables `progn` to the
