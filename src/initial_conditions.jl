@@ -70,7 +70,7 @@ end
 
 function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup) where NF
     @unpack restart_path, restart_id = M.parameters
-    restart_file = jldopen(joinpath(restart_path,@sprintf("run%04d",restart_id),"restart.jld2"))
+    restart_file = jldopen(joinpath(restart_path,string("run-",run_id_string(restart_id)),"restart.jld2"))
     progn_old = restart_file["prognostic_variables"]
     version = restart_file["version"]   # currently unused, TODO check for compat with version
     time = restart_file["time"]         # currently unused
