@@ -21,7 +21,10 @@
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
 end
 
-@testset "Restart from output file" begin 
+@testset "Restart from output file" begin
+    
+    p = run_speedy(Float32, initial_conditions=:restart, restart_id=1)
+
     p, d, m = initialize_speedy(Float32, model=ShallowWaterModel, output=true, run_id="restart-test")
     SpeedyWeather.time_stepping!(p, d, m)
  

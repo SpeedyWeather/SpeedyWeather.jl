@@ -116,7 +116,7 @@ The default values of the keywords define the default model setup.
     output::Bool = false            # Store data in netCDF?
     output_dt::Real = 6             # output time step [hours]
     output_path::String = pwd()     # path to output folder
-    run_id::String = get_run_id(output, output_path)    # name of the output folder, defaults to 4-digit number counting up from 0001
+    run_id::Union{String,Integer} = get_run_id(output, output_path)    # name of the output folder, defaults to 4-digit number counting up from 0001
     output_filename::String="output.nc"                 # name of the output netcdf file
     output_vars::Vector{Symbol}=[:vor]                  # variables to output: :u, :v, :vor, :div, :
     compression_level::Integer = 3  # 1=low but fast, 9=high but slow
@@ -134,7 +134,7 @@ The default values of the keywords define the default model setup.
     # RESTART
     write_restart::Bool = output        # also write restart file if output==true?
     restart_path::String = output_path  # path for restart file
-    restart_id::String = "0001"         # run_id of restart file in run????/restart.jld2
+    restart_id::Union{String,Integer} = 1         # run_id of restart file in run????/restart.jld2
 end
 
 """

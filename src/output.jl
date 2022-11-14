@@ -74,7 +74,7 @@ function get_run_id_path(P::Parameters)
     @unpack output, output_path, run_id = P
 
     if output
-        run_path = joinpath(output_path,string("run-",run_id))
+        run_path = joinpath(output_path,string("run-",run_id_string(run_id)))
         @assert !(string("run-",run_id) in readdir(output_path)) "Run folder already exists, choose another run_id."
 
         mkdir(run_path)             # actually create the folder
@@ -83,6 +83,9 @@ function get_run_id_path(P::Parameters)
         return run_id, "no runpath"
     end
 end
+
+run_id_string(run_id::Integer) = @sprintf("%04d",run_id)
+run_id_string(run_id::String) = run_id
 
 """
     outputter = initialize_netcdf_output(   progn::PrognosticVariables,
