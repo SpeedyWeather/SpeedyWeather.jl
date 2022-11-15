@@ -98,7 +98,9 @@ function _divergence!(  kernel,
             ∂v∂θ2 = grad_y_vordiv2[lm]*v[lm+1]  # this pulls in data from the last row though
             div[lm] = kernel(div[lm], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
         end
-        lm += 1                                 # loop skips last row
+
+        # Last row
+        lm += 1
     end
 
     return nothing
@@ -328,4 +330,53 @@ function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}},# Output: 
 
     inverse = true
     return ∇²!(∇⁻²alms,alms,S;add,flipsign,inverse)
+end
+
+function ∇!(dpdx::LowerTriangularMatrix{Complex{NF}},       # Output: zonal gradient
+            dpdy::LowerTriangularMatrix{Complex{NF}},       # Output: meridional gradient
+            p::LowerTriangularMatrix{Complex{NF}},          # Input: spectral coefficients
+            S::SpectralTransform{NF}                        # includes precomputed arrays
+            ) where {NF<:AbstractFloat}
+
+    lmax,mmax = size(p) .- (1,1)                            # 0-based, include last row
+    @boundscheck size(p) == size(dpdx) || throw(BoundsError)
+    @boundscheck size(p) == size(dpdy) || throw(BoundsError)
+
+    @unpack grad_y1, grad_y2 = S
+
+    lm = 0
+    @inbounds for m in 1:mmax           # 1-based l,m, skip last column
+
+        # DIAGONAL (separated to avoid access to l-1,m which is above the diagonal)
+        lm += 1
+
+        dpdx[lm] = (m-1)*im*p[lm]       # zonal gradient: d/dlon = *i*m
+        dpdy[lm] = grad_y2[lm]*p[lm+1]  # meridional gradient: p[lm-1]=0 on diagonal
+       
+        # BELOW DIAGONAL (all terms)
+        for l in m+1:lmax               # skip last row
+            lm += 1
+            
+            dpdx[lm] = (m-1)*im*p[lm]
+            dpdy[lm] = grad_y1[lm]*p[lm-1] + grad_y2[lm]*p[lm+1]
+        end
+
+        # LAST ROW (separated to avoid out-of-bounds access to lmax+2
+        lm += 1
+        dpdx[lm] = (m-1)*im*p[lm]
+        dpdy[lm] = grad_y1[lm]*p[lm-1]  # only first term from 2nd last row
+    end
+
+    # LAST COLUMN
+    @inbounds begin
+        lm += 1 
+        dpdx[lm] = mmax*im*p[lm]
+        dpdy[lm] = grad_y2[lm]*p[lm+1]  # only 2nd term
+
+        lm += 1
+        dpdx[lm] = mmax*im*p[lm]
+        dpdy[lm] = grad_y1[lm]*p[lm-1]  # only 1st term
+    end
+
+    return dpdx,dpdy
 end
