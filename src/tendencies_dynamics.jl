@@ -9,22 +9,32 @@ function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic 
 
     vertical_averages!(Diag,M.geometry)
 
+    pres = Prog.pres.leapfrog[lf]
     @unpack dpres_dlon, dpres_dlat = Diag.surface
-    @unpack pres = Prog.pres.leapfrog[lf]
+    @unpack dpres_dlon_grid, dpres_dlat_grid = Diag.surface
     ∇!(dpres_dlon,dpres_dlat,pres,M.spectral_transform)
 
     gridded!(dpres_dlon_grid,dpres_dlon,M.spectral_transform)
     gridded!(dpres_dlat_grid,dpres_dlat,M.spectral_transform)
 
     @unpack pres_tend, pres_tend_grid = Diag.surface
-    @unpack u_mean, v_mean = Diag.surface
+    @unpack U_mean, V_mean = Diag.surface
+    @unpack coslat⁻¹ = M.geometry
 
-    @inbounds for ij in eachgridpoint(pres_tend_grid,dpres_dlon_grid,dpres_dlat_grid,u_mean,v_mean)
-        pres_tend_grid[ij] = -(u_mean[ij]*dpres_dlon_grid[ij] + v_mean[ij]*dpres_dlat_grid[ij])
+    # precompute ring indices
+    rings = eachring(pres_tend_grid,dpres_dlon_grid,dpres_dlat_grid,U_mean,V_mean)
+
+    @inbounds for (j,ring) in enumerate(rings)
+        coslat⁻¹j = coslat⁻¹[j]
+        for ij in ring
+            pres_tend_grid[ij] = -(U_mean[ij]*dpres_dlon_grid[ij] +
+                                    V_mean[ij]*dpres_dlat_grid[ij])*coslat⁻¹j
+        end
     end
 
     spectral!(pres_tend,pres_tend_grid,M.spectral_transform)
-    pres_tend[1] = 0
+    pres_tend[1] = zero(NF)     # for mass conservation
+    return nothing
 end
 
 """

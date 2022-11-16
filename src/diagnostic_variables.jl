@@ -209,6 +209,12 @@ end
 struct SurfaceVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     pres_grid::Grid                                 # log surface pressure
     pres_tend::LowerTriangularMatrix{Complex{NF}}   # tendency of it
+    pres_tend_grid::Grid                            # gridded tendency
+
+    dpres_dlon::LowerTriangularMatrix{Complex{NF}}  # zonal gradient of pressure
+    dpres_dlat::LowerTriangularMatrix{Complex{NF}}  # meridional gradient
+    dpres_dlon_grid::Grid                           # gridded version
+    dpres_dlat_grid::Grid                           # gridded version
 
     U_mean::Grid    # vertical average of: zonal velocity *coslat
     V_mean::Grid    # meridional velocity *coslat
@@ -230,6 +236,13 @@ function Base.zeros(::Type{SurfaceVariables},
     # log of surface pressure and tendency thereof
     pres_grid = zeros(Grid{NF},nresolution)
     pres_tend = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    pres_tend_grid = zeros(Grid{NF},nresolution)
+
+    # gradients of log surface pressure
+    dpres_dlon = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    dpres_dlat = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    dpres_dlon_grid = zeros(Grid{NF},nresolution)
+    dpres_dlat_grid = zeros(Grid{NF},nresolution)
 
     # vertical averaged (weighted by σ level thickness) velocities (*coslat) and divergence
     U_mean = zeros(Grid{NF},nresolution)
@@ -240,7 +253,8 @@ function Base.zeros(::Type{SurfaceVariables},
     precip_large_scale = zeros(Grid{NF},nresolution)
     precip_convection = zeros(Grid{NF},nresolution)
 
-    return SurfaceVariables(pres_grid,pres_tend,
+    return SurfaceVariables(pres_grid,pres_tend,pres_tend_grid,
+                            dpres_dlon,dpres_dlat,dpres_dlon_grid,dpres_dlat_grid,
                             U_mean,V_mean,div_mean,
                             precip_large_scale,precip_convection,
                             npoints)
