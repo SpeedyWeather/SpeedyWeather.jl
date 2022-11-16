@@ -19,16 +19,16 @@ function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic 
 
     @unpack pres_tend, pres_tend_grid = Diag.surface
     @unpack U_mean, V_mean = Diag.surface
-    @unpack coslat⁻¹ = M.geometry
+    @unpack coslat⁻² = M.geometry
 
     # precompute ring indices
     rings = eachring(pres_tend_grid,dpres_dlon_grid,dpres_dlat_grid,U_mean,V_mean)
 
     @inbounds for (j,ring) in enumerate(rings)
-        coslat⁻¹j = coslat⁻¹[j]
+        coslat⁻²j = coslat⁻²[j]
         for ij in ring
             pres_tend_grid[ij] = -(U_mean[ij]*dpres_dlon_grid[ij] +
-                                    V_mean[ij]*dpres_dlat_grid[ij])*coslat⁻¹j
+                                    V_mean[ij]*dpres_dlat_grid[ij])*coslat⁻²j
         end
     end
 
