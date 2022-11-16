@@ -1,6 +1,12 @@
 """
-Compute the spectral tendency of the surface pressure logarithm
-"""
+    surface_pressure_tendency!( Prog::PrognosticVariables,
+                                Diag::DiagnosticVariables,
+                                lf::Int,
+                                M::PrimitiveEquationModel)
+
+Computes the tendency of the logarithm of surface pressure as -(u*px + v*py)
+with u,v being the vertically averaged velocities and px, py the gradients
+of the logarithm of surface pressure."""
 function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic variables
                                     Diag::DiagnosticVariables{NF}, # Diagnostic variables
                                     lf::Int,                       # leapfrog index 2 (time step used for tendencies)
@@ -75,25 +81,48 @@ end
 """
 Compute the spectral tendency of the "vertical" velocity
 """
-function vertical_velocity_tendency!(Diag::DiagnosticVariables{NF}, # Diagnostic variables
-                                     M
-                                     ) where {NF<:AbstractFloat}
-
-    @unpack u_grid,v_grid,div_grid = Diag.grid_variables
-    @unpack u_mean,v_mean,div_mean,pres_surf_gradient_grid_x,pres_surf_gradient_grid_y,sigma_tend,sigma_m, puv = Diag.intermediate_variables
-    @unpack σ_levels_thick = M.GeoSpectral.geometry
-    _,_,nlev = size(u_grid)
+function vertical_velocity!(Diag::DiagnosticVariables{NF},
+                            M::PrimitiveEquationModel
+                            ) where {NF<:AbstractFloat}
 
 
-    for k in 1:nlev
-        puv[:,:,k] = (u_grid[:,:,k] - u_mean) .* pres_surf_gradient_grid_x + (v_grid[:,:,k] - v_mean) .* pres_surf_gradient_grid_y
+    @unpack dpres_dlon_grid, dpres_dlat_grid = Diag.surface
+    @unpack σ_levels_thick = M.geometry
+    @unpack U_mean, V_mean, div_mean = Diag.surface
+
+    # make sure integration starts with 0
+    fill!(Diag.layers[1].grid_variables.σ_tend,0)
+    fill!(Diag.layers[1].grid_variables.σ_m,0)
+
+    for k in 1:nlev-1     # top to bottom, bottom layer separate
+
+        U = Diag.layers[k].grid_variables.U_grid
+        V = Diag.layers[k].grid_variables.V_grid
+        D = Diag.layers[k].grid_variables.div_grid
+
+        σ_tend = Diag.layers[k].grid_variables.σ_tend
+        σ_m =  Diag.layers[k].grid_variables.σ_tend
+        uv∇p = Diag.layers[k].grid_variables.uv∇p
+
+        # next layer below
+        σ_tend_below = Diag.layers[k+1].grid_variables.σ_tend
+        σ_m_below = Diag.layers[k+1].grid_variables.σ_m
+
+        for ij in eachgridpoint(U,V,D)
+            uv∇p_ij = (U[ij]-U_mean[ij])*dpres_dlon_grid[ij] + (V[ij]-V_mean[ij])*dpres_dlat_grid[ij]
+            uh∇p[ij] = uv∇p_ij
+        
+            σ_tend[ij] -= σ_levels_thick[k]*(uv∇p_ij + D[ij] - div_mean[ij])
+            σ_m[ij] -= σ_levels_thick[k]*uv∇p_ij
+
+            # copy into layer below for vertical integration
+            σ_tend_below[ij] = σ_tend[ij]
+            σ_m_below[ij] = σ_m[ij]
+        end
     end
 
-    for k in 1:nlev
-        sigma_tend[:,:,k+1] = sigma_tend[:,:,k] - σ_levels_thick[k]*(puv[:,:,k] + div_grid[:,:,k] - div_mean)
-        sigma_m[:,:,k+1]    = sigma_m[:,:,k]    - σ_levels_thick[k]*puv[:,:,k]
-    end
-
+    # bottom layer
+    # TODO
 end
 
 """
