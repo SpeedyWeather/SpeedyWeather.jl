@@ -3,38 +3,28 @@ Compute the spectral tendency of the surface pressure logarithm
 """
 function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic variables
                                     Diag::DiagnosticVariables{NF}, # Diagnostic variables
-                                    l2::Int,                       # leapfrog index 2 (time step used for tendencies)
-                                    M
+                                    lf::Int,                       # leapfrog index 2 (time step used for tendencies)
+                                    M::PrimitiveEquationModel
                                     ) where {NF<:AbstractFloat}
 
+    vertical_averages!(Diag,M.geometry)
 
-    @unpack pres_surf                            = Prog 
-    @unpack pres_surf_tend                       = Diag.tendencies
-    @unpack u_grid,v_grid,div_grid               = Diag.grid_variables
-    @unpack u_mean,v_mean,div_mean,
-            pres_surf_gradient_spectral_x,
-            pres_surf_gradient_spectral_y,
-            pres_surf_gradient_grid_x,
-            pres_surf_gradient_grid_y            = Diag.intermediate_variables
-    @unpack σ_levels_thick                       = M.GeoSpectral.geometry #I think this is dhs
+    @unpack dpres_dlon, dpres_dlat = Diag.surface
+    @unpack pres = Prog.pres.leapfrog[lf]
+    ∇!(dpres_dlon,dpres_dlat,pres,M.spectral_transform)
 
-    _,_,nlev = size(u_grid)
+    gridded!(dpres_dlon_grid,dpres_dlon,M.spectral_transform)
+    gridded!(dpres_dlat_grid,dpres_dlat,M.spectral_transform)
 
-    #Calculate mean fields
-    for k in 1:nlev
-        u_mean += u_grid[:,:,k]  *σ_levels_thick[k] 
-        v_mean += v_grid[:,:,k]  *σ_levels_thick[k]
-        div_mean += div_grid[:,:,k]*σ_levels_thick[k]
+    @unpack pres_tend, pres_tend_grid = Diag.surface
+    @unpack u_mean, v_mean = Diag.surface
+
+    @inbounds for ij in eachgridpoint(pres_tend_grid,dpres_dlon_grid,dpres_dlat_grid,u_mean,v_mean)
+        pres_tend_grid[ij] = -(u_mean[ij]*dpres_dlon_grid[ij] + v_mean[ij]*dpres_dlat_grid[ij])
     end
 
-    #Now use the mean fields
-    grad!(pres_surf, pres_surf_gradient_spectral_x, pres_surf_gradient_spectral_y, M.GeoSpectral)
-    pres_surf_gradient_grid_x = gridded(pres_surf_gradient_spectral_x*3600)
-    pres_surf_gradient_grid_y = gridded(pres_surf_gradient_spectral_x*3600) #3600 factor from Paxton/Chantry. I think this is to correct for the underflow rescaling earlier
-
-    pres_surf_tend = spectral(-u_mean.*pres_surf_gradient_grid_x - v_mean.*pres_surf_gradient_grid_y)
-    pres_surf_tend[1,1] = pres_surf_tend[1,1]*0.0 
-
+    spectral!(pres_tend,pres_tend_grid,M.spectral_transform)
+    pres_tend[1] = 0
 end
 
 """
