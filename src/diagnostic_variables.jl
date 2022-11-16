@@ -151,10 +151,6 @@ function Base.zeros(::Type{DynamicsVariables},
     # VERTICAL INTEGRATION
     geopot           = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
-    # u_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint zonal velocity over all levels
-    # v_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint meridional velocity over all levels
-    # div_mean    = zeros(NF,nlon,nlat)           # Mean gridpoint divergence over all levels
-
     # # one more l for recursion in meridional gradients
     # # X,Y gradient of the surface pressure in spectral space
     # pres_gradient_spectral_x = zeros(Complex{NF},lmax+2,mmax+1)
@@ -211,13 +207,23 @@ function Base.zeros(::Type{DiagnosticVariablesLayer},
 end
 
 struct SurfaceVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
-    pres_grid::Grid
-    pres_tend::LowerTriangularMatrix{Complex{NF}}
+    pres_grid::Grid                                 # log surface pressure
+    pres_tend::LowerTriangularMatrix{Complex{NF}}   # tendency of it
+    pres_tend_grid::Grid                            # gridded tendency
+
+    dpres_dlon::LowerTriangularMatrix{Complex{NF}}  # zonal gradient of pressure
+    dpres_dlat::LowerTriangularMatrix{Complex{NF}}  # meridional gradient
+    dpres_dlon_grid::Grid                           # gridded version
+    dpres_dlat_grid::Grid                           # gridded version
+
+    U_mean::Grid    # vertical average of: zonal velocity *coslat
+    V_mean::Grid    # meridional velocity *coslat
+    div_mean::Grid  # divergence
 
     precip_large_scale::Grid
     precip_convection::Grid
 
-    npoints::Int        # number of grid points
+    npoints::Int    # number of grid points
 end
 
 function Base.zeros(::Type{SurfaceVariables},
@@ -227,13 +233,29 @@ function Base.zeros(::Type{SurfaceVariables},
     @unpack Grid, nresolution, npoints = G
     @unpack lmax, mmax = S
 
+    # log of surface pressure and tendency thereof
     pres_grid = zeros(Grid{NF},nresolution)
     pres_tend = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    pres_tend_grid = zeros(Grid{NF},nresolution)
 
+    # gradients of log surface pressure
+    dpres_dlon = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    dpres_dlat = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    dpres_dlon_grid = zeros(Grid{NF},nresolution)
+    dpres_dlat_grid = zeros(Grid{NF},nresolution)
+
+    # vertical averaged (weighted by σ level thickness) velocities (*coslat) and divergence
+    U_mean = zeros(Grid{NF},nresolution)
+    V_mean = zeros(Grid{NF},nresolution)
+    div_mean = zeros(Grid{NF},nresolution)
+
+    # precipitation fields
     precip_large_scale = zeros(Grid{NF},nresolution)
     precip_convection = zeros(Grid{NF},nresolution)
 
-    return SurfaceVariables(pres_grid,pres_tend,
+    return SurfaceVariables(pres_grid,pres_tend,pres_tend_grid,
+                            dpres_dlon,dpres_dlat,dpres_dlon_grid,dpres_dlat_grid,
+                            U_mean,V_mean,div_mean,
                             precip_large_scale,precip_convection,
                             npoints)
 end
