@@ -87,42 +87,45 @@ function vertical_velocity!(Diag::DiagnosticVariables{NF},
 
 
     @unpack dpres_dlon_grid, dpres_dlat_grid = Diag.surface
-    @unpack σ_levels_thick = M.geometry
+    @unpack nlev, σ_levels_thick = M.geometry
     @unpack U_mean, V_mean, div_mean = Diag.surface
+    
+    @boundscheck nlev == Diag.nlev || throw(BoundsError)
 
     # make sure integration starts with 0
-    fill!(Diag.layers[1].grid_variables.σ_tend,0)
-    fill!(Diag.layers[1].grid_variables.σ_m,0)
+    fill!(Diag.layers[1].dynamics_variables.σ_tend,0)
+    fill!(Diag.layers[1].dynamics_variables.σ_m,0)
 
-    for k in 1:nlev-1     # top to bottom, bottom layer separate
+    @inbounds for k in 1:nlev     # top to bottom, bottom layer separate
 
         U = Diag.layers[k].grid_variables.U_grid
         V = Diag.layers[k].grid_variables.V_grid
         D = Diag.layers[k].grid_variables.div_grid
 
-        σ_tend = Diag.layers[k].grid_variables.σ_tend
-        σ_m =  Diag.layers[k].grid_variables.σ_tend
-        uv∇p = Diag.layers[k].grid_variables.uv∇p
+        σ_tend = Diag.layers[k].dynamics_variables.σ_tend
+        σ_m =  Diag.layers[k].dynamics_variables.σ_tend
+        uv∇p = Diag.layers[k].dynamics_variables.uv∇p
 
         # next layer below
-        σ_tend_below = Diag.layers[k+1].grid_variables.σ_tend
-        σ_m_below = Diag.layers[k+1].grid_variables.σ_m
+        kmax = min(k+1,nlev)    # to avoid access to k = nlev+1
+        σ_tend_below = Diag.layers[kmax].dynamics_variables.σ_tend
+        σ_m_below = Diag.layers[kmax].dynamics_variables.σ_m
 
-        for ij in eachgridpoint(U,V,D)
+        for ij in eachgridpoint(U,V,D,U_mean,V_mean,div_mean,dpres_dlon_grid,dpres_dlat_grid)
             uv∇p_ij = (U[ij]-U_mean[ij])*dpres_dlon_grid[ij] + (V[ij]-V_mean[ij])*dpres_dlat_grid[ij]
-            uh∇p[ij] = uv∇p_ij
+            uv∇p[ij] = uv∇p_ij
         
+            # integration from the top: σ_tend[k] = σ_tend[k-1] - σ_levels_thick...
+            # here achieved via -= and the copy into the respective array in the layer below
             σ_tend[ij] -= σ_levels_thick[k]*(uv∇p_ij + D[ij] - div_mean[ij])
             σ_m[ij] -= σ_levels_thick[k]*uv∇p_ij
 
             # copy into layer below for vertical integration
+            # for k = nlev, σ_tend_below == σ_tend, so nothing actually happens here
             σ_tend_below[ij] = σ_tend[ij]
             σ_m_below[ij] = σ_m[ij]
         end
     end
-
-    # bottom layer
-    # TODO
 end
 
 """
