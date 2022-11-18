@@ -92,6 +92,10 @@ struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     # VERTICAL INTEGRATION
     geopot          ::LowerTriangularMatrix{Complex{NF}}    # geopotential on full layers
 
+    # VERTICAL VELOCITY (̇̇dσ/dt)
+    σ_tend          ::Grid                              # = dσ/dt, on half levels at k+1/2
+    σ_m             ::Grid                              # TODO what's that, also on half levels at k+1/2
+    uv∇p            ::Grid                              # =(u-u_mean)*dlnp_dlon * (v-v_mean)*dlnp_dlat
 
     # ###------Defined in surface_pressure_tendency!()
     # u_mean             ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
@@ -151,6 +155,11 @@ function Base.zeros(::Type{DynamicsVariables},
     # VERTICAL INTEGRATION
     geopot           = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
+    # VERTICAL VELOCITY (̇̇dσ/dt)
+    σ_tend = zeros(Grid{NF},nresolution)    # = dσ/dt, on half levels at k+1/2
+    σ_m = zeros(Grid{NF},nresolution)       # TODO what's that?
+    uv∇p = zeros(Grid{NF},nresolution)      # =(u-u_mean)*dlnp_dlon * (v-v_mean)*dlnp_dlat
+
     # # one more l for recursion in meridional gradients
     # # X,Y gradient of the surface pressure in spectral space
     # pres_gradient_spectral_x = zeros(Complex{NF},lmax+2,mmax+1)
@@ -177,7 +186,8 @@ function Base.zeros(::Type{DynamicsVariables},
                                 uω_coslat⁻¹,vω_coslat⁻¹,
                                 bernoulli_grid,bernoulli,
                                 uh_coslat⁻¹_grid,vh_coslat⁻¹_grid,uh_coslat⁻¹,vh_coslat⁻¹,
-                                geopot
+                                geopot,
+                                σ_tend,σ_m,uv∇p,
                                 )
                                 # u_mean,v_mean,div_mean,
                                 # pres_gradient_spectral_x,pres_gradient_spectral_y,
