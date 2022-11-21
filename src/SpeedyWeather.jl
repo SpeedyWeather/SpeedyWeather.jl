@@ -8,7 +8,6 @@ module SpeedyWeather
     import Random
     import FastGaussQuadrature
     import AssociatedLegendrePolynomials as Legendre
-    import Healpix
     import AbstractFFTs
     import FFTW
     import GenericFFT
@@ -34,16 +33,28 @@ module SpeedyWeather
 
     # EXPORT MAIN INTERFACE TO SPEEDY
     export  run_speedy,
+            run_speedy!,
             initialize_speedy
+
+    # EXPORT MODELS
+    export  Barotropic,
+            BarotropicModel,
+            ShallowWater,
+            ShallowWaterModel,
+            PrimitiveEquation,
+            PrimitiveEquationModel
 
     # EXPORT GRIDS
     export  LowerTriangularMatrix,
             AbstractGrid,
             FullClenshawGrid,
             FullGaussianGrid,
+            FullHEALPixGrid,
             OctahedralGaussianGrid,
             OctahedralClenshawGrid,
-            HEALPixGrid
+            HEALPixGrid,
+            HEALPix4Grid,
+            FullHEALPix4Grid
 
     # EXPORT STRUCTS
     export  Parameters,
@@ -62,12 +73,13 @@ module SpeedyWeather
 
     include("utility_functions.jl")
     include("lower_triangular_matrix.jl")   # defines LowerTriangularMatrix
-    include("grids_general.jl")             # defines AbstractGrid and interfaces
-    include("grids.jl")                     # defines concrete Grid types
+    include("Grids/Grids.jl")               # defines AbstractGrid and concrete Grid types
     include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
 
-    include("parameter_structs.jl")
+    include("parameter_structs.jl")         # defines 
     include("spectral_truncation.jl")
+    include("abstract_models.jl")           # defines ModelSetup, Barotropic, ShallowWater,
+                                            # PrimitiveEquation
 
     include("default_parameters.jl")        # defines Parameters
     include("constants.jl")                 # defines Constants
@@ -85,6 +97,7 @@ module SpeedyWeather
     include("diagnostic_variables.jl")      # defines DiagnosticVariables
     include("initial_conditions.jl")
     include("scaling.jl")
+    include("geopotential.jl")
 
     include("run_speedy.jl")
     include("tendencies_dynamics.jl")

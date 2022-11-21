@@ -11,7 +11,7 @@
     n_outputsteps::Int = 0                  # number of time steps with output
     output_every_n_steps::Int = 0           # output every n time steps
     
-    run_id::Int = -1                        # run identification number
+    run_id::String = "-1"                   # run identification number
     run_path::String = ""                   # output path plus run????/
 
     # the netcdf file to be written into
@@ -37,21 +37,18 @@ end
 Output() = Output{Float32}()
 
 """
-    run_id, run_path = get_run_id_path(P::Parameters)
+    run_id = get_run_id(output, output_path)
 
-Checks existing `run????` folders in output path to determine a 4-digit `run_id` number
-and creates a new folder `run????` with that `run_id`. Also returns the full path
-`run_path` of that folder. Returns `0,"no runpath"` in the case of no output."""
-function get_run_id_path(P::Parameters)
+Checks existing `run-????` folders in output path to determine a 4-digit `run_id` number. 
+"""
+function get_run_id(output, output_path)
 
-    @unpack output,output_path = P
-
-    if output
+    if output 
         # pull list of existing run???? folders via readdir
-        pattern = r"run\d\d\d\d"                # run???? in regex
+        pattern = r"run-\d\d\d\d"                # run-???? in regex
         runlist = filter(x->startswith(x,pattern),readdir(output_path))
         runlist = filter(x->endswith(  x,pattern),runlist)
-        existing_runs = [parse(Int,id[4:end]) for id in runlist]
+        existing_runs = [parse(Int,id[5:end]) for id in runlist]
 
         # get the run id from existing folders
         if length(existing_runs) == 0           # if no runfolder exists yet
@@ -59,14 +56,36 @@ function get_run_id_path(P::Parameters)
         else
             run_id = maximum(existing_runs)+1   # next run gets id +1
         end
-
-        run_path = joinpath(output_path,@sprintf("run%04d",run_id))
-        mkdir(run_path)             # actually create the folder
-        return run_id,run_path
+        
+        return @sprintf("%04d",run_id)
     else
-        return -1,"no runpath"
+        return "-1"
     end
 end
+
+"""
+    run_id, run_path = get_run_id_path(P::Parameters)
+
+Creates a new folder `run-*` with the `run_id`. Also returns the full path
+`run_path` of that folder. Returns `-1, "no runpath"` in the case of no output.
+"""
+function get_run_id_path(P::Parameters)
+
+    @unpack output, output_path, run_id = P
+
+    if output
+        run_path = joinpath(output_path,string("run-",run_id_string(run_id)))
+        @assert !(string("run-",run_id) in readdir(output_path)) "Run folder already exists, choose another run_id."
+
+        mkdir(run_path)             # actually create the folder
+        return run_id, run_path
+    else
+        return run_id, "no runpath"
+    end
+end
+
+run_id_string(run_id::Integer) = @sprintf("%04d",run_id)
+run_id_string(run_id::String) = run_id
 
 """
     outputter = initialize_netcdf_output(   progn::PrognosticVariables,
@@ -84,9 +103,9 @@ function initialize_netcdf_output(  progn::PrognosticVariables,
 
     # DEFINE NETCDF DIMENSIONS TIME
     @unpack startdate = M.parameters
-    time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
+    time_string = "seconds since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     dim_time = NcDim("time",0,unlimited=true)
-    var_time = NcVar("time",dim_time,t=Int32,atts=Dict("units"=>time_string,"long_name"=>"time"))
+    var_time = NcVar("time",dim_time,t=Int64,atts=Dict("units"=>time_string,"long_name"=>"time"))
 
     # DEFINE NETCDF DIMENSIONS SPACE
     @unpack output_grid, nlev = M.parameters
@@ -212,8 +231,8 @@ function write_netcdf_time!(outputter::Output,
     @unpack netcdf_file, startdate = outputter
     i = outputter.output_counter
 
-    time_hrs = [round(Int32,Dates.Second(time-startdate).value/3600)]
-    NetCDF.putvar(netcdf_file,"time",time_hrs,start=[i])    # write time [hrs] of next output step
+    time_sec = [round(Int64,Dates.value(Dates.Second(time-startdate)))]
+    NetCDF.putvar(netcdf_file,"time",time_sec,start=[i])    # write time [sec] of next output step
     NetCDF.sync(netcdf_file)                                # sync to flush variables to disc
 
     return nothing
@@ -338,9 +357,9 @@ function write_restart_file(time::DateTime,
     write_restart || return nothing                 # exit immediately if no restart file desired
 
     # unscale variables
-    @unpack radius_earth = M.geometry
-    scale!(progn,:vor,1/radius_earth)
-    scale!(progn,:div,1/radius_earth)
+    #@unpack radius_earth = M.geometry
+    #scale!(progn,:vor,1/radius_earth)
+    #scale!(progn,:div,1/radius_earth)
 
     # COMPRESSION OF RESTART FILE
     @unpack keepbits = M.parameters

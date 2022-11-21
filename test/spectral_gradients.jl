@@ -2,7 +2,7 @@
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
-                                    model=:shallowwater)
+                                    model=ShallowWater)
 
         fill!(p.layers[1].leapfrog[1].vor,0)                  # make sure vorticity and divergence are 0
         fill!(p.layers[1].leapfrog[1].div,0)
@@ -46,7 +46,7 @@ end
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
-                                    model=:shallowwater)
+                                    model=ShallowWater)
 
         fill!(p.layers[1].leapfrog[1].vor,0)                  # make sure vorticity and divergence are 0
         fill!(p.layers[1].leapfrog[1].div,0)
@@ -113,7 +113,7 @@ end
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
-                                    model=:barotropic)
+                                    model=BarotropicModel)
 
         S = m.spectral_transform
         lmax,mmax = p.lmax,p.mmax
@@ -136,7 +136,7 @@ end
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
-                                    model=:barotropic)
+                                    model=BarotropicModel)
 
         S = m.spectral_transform
         lmax,mmax = p.lmax,p.mmax
@@ -170,7 +170,7 @@ end
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
-                                    model=:shallowwater)
+                                    model=ShallowWater)
 
         # make sure vorticity and divergence are 0
         fill!(p.layers[1].leapfrog[1].vor,0)
@@ -283,5 +283,28 @@ end
         SpeedyWeather.∇⁻²!(alms2,alms,S);
         SpeedyWeather.∇²!(alms3,alms2,S);
         @test alms ≈ alms3
+    end
+end
+
+@testset "∇ no errors" begin
+    for NF in (Float32,Float64)
+        NF = Float64
+        p,d,m = initialize_speedy(NF)
+
+        a = rand(LowerTriangularMatrix{Complex{NF}},33,32)
+        dadx = zero(a)
+        dady = zero(a)
+        SpeedyWeather.∇!(dadx,dady,a,m.spectral_transform)
+        
+        # coslat unscaling missing in the following
+        # ∇²a_1 = zero(a)
+        # ∇²a_2 = zero(a)
+
+        # SpeedyWeather.divergence!(∇²a_1,dadx,dady,m.spectral_transform)
+        # SpeedyWeather.∇²!(∇²a_2,a,m.spectral_transform)
+
+        # for lm in SpeedyWeather.eachharmonic(∇²a_1,∇²a_2)
+        #     @test ∇²a_1[lm] ≈ ∇²a_2[lm]
+        # end
     end
 end

@@ -15,6 +15,7 @@ end
 # for the following testsets test some spectral truncations
 # but not too large ones as they take so long
 spectral_resolutions = (31,63,127)
+spectral_resolutions_inexact = (127,255)
 
 @testset "Transform: l=0,m=0 is constant > 0" begin
     for trunc in spectral_resolutions
@@ -23,7 +24,10 @@ spectral_resolutions = (31,63,127)
                             FullClenshawGrid,
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid,
-                            HEALPixGrid)
+                            HEALPixGrid,
+                            HEALPix4Grid,
+                            FullHEALPixGrid,
+                            FullHEALPix4Grid)
 
                 p,d,m = initialize_speedy(NF;trunc,Grid)
                 S = m.spectral_transform
@@ -67,7 +71,7 @@ end
                             FullClenshawGrid,
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid)
-                            # HEALPixGrid)
+
                 P = Parameters(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
@@ -90,33 +94,72 @@ end
     end
 end
 
-@testset "Transform: Geopotential" begin
+@testset "Transform: Individual Legendre polynomials (inexact transforms)" begin
+    @testset for trunc in spectral_resolutions_inexact
+        @testset for NF in (Float32,Float64)
+            @testset for Grid in (  HEALPixGrid,
+                                    HEALPix4Grid,
+                                    FullHEALPixGrid,
+                                    FullHEALPix4Grid)
+                P = Parameters(;NF,trunc,Grid)
+                S = SpectralTransform(P)
+
+                lmax = 3
+                for l in 1:lmax
+                    for m in 1:l
+                        alms = zeros(LowerTriangularMatrix{Complex{NF}},S.lmax+2,S.mmax+1)
+                        alms[l,m] = 1
+
+                        map = gridded(alms,S)
+                        alms2 = spectral(map,S)
+
+                        for lm in SpeedyWeather.eachharmonic(alms,alms2)
+                            @test alms[lm] ≈ alms2[lm] atol=1e-3 rtol=1e-3
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+@testset "Transform: Orography (exact grids)" begin
 
     # Test for variable resolution
     @testset for trunc in [31,42]
-        for NF in (Float64,Float32)
-            for Grid in (   FullGaussianGrid,
-                            FullClenshawGrid,
-                            OctahedralGaussianGrid,
-                            OctahedralClenshawGrid,)
-                            # HEALPixGrid)
+        @testset for NF in (Float64,Float32)
+            @testset for Grid in (   FullGaussianGrid,
+                                     FullClenshawGrid,
+                                     OctahedralGaussianGrid,
+                                     OctahedralClenshawGrid)
                             
-                P = Parameters(;NF,trunc,model=:shallowwater)
+                P = Parameters(;NF,Grid,trunc,model=ShallowWater)
                 S = SpectralTransform(P)
                 B = Boundaries(P,S)
 
                 oro_grid = B.orography
                 oro_spec = spectral(oro_grid,S)
+
+                # smooth orography
+                lmax = 30
+                for m in 1:trunc+1
+                    for l in max(lmax,m):trunc+2
+                        oro_spec[l,m] = 0
+                    end
+                end 
+
                 oro_grid1 = gridded(oro_spec,S)
                 oro_spec1 = spectral(oro_grid1,S)
                 oro_grid2 = gridded(oro_spec1,S)
                 oro_spec2 = spectral(oro_grid2,S)
 
+                tol = 1e-1
+
                 for lm in SpeedyWeather.eachharmonic(oro_spec1,oro_spec2)
-                    @test oro_grid1[lm] ≈ oro_grid2[lm] rtol=200*sqrt(eps(NF))
+                    @test oro_spec1[lm] ≈ oro_spec2[lm] atol=tol rtol=tol
                 end
                 for ij in eachindex(oro_grid1,oro_grid2)
-                    @test oro_grid1[ij] ≈ oro_grid2[ij] rtol=200*sqrt(eps(NF))
+                    @test oro_grid1[ij] ≈ oro_grid2[ij] atol=tol rtol=tol
                 end
             end
         end

@@ -76,8 +76,8 @@ end
 
 @inline Base.getindex(L::LowerTriangularMatrix,r::AbstractRange) = L.data[r]
 
-@inline Base.setindex!(L::LowerTriangularMatrix,x,k::Integer) = setindex!(L.data,x,k)
-@inline function Base.setindex!(L::LowerTriangularMatrix{T},x,i::Integer,j::Integer) where T
+Base.@propagate_inbounds Base.setindex!(L::LowerTriangularMatrix,x,k::Integer) = setindex!(L.data,x,k)
+Base.@propagate_inbounds function Base.setindex!(L::LowerTriangularMatrix{T},x,i::Integer,j::Integer) where T
     @boundscheck i >= j || throw(BoundsError(L,(i,j)))
     k = ij2k(i,j,L.m)
     setindex!(L.data,x,k)
@@ -184,8 +184,8 @@ function Base.copyto!(  L::LowerTriangularMatrix{T},    # copy to L
     L
 end
 
-function Base.copyto!(  M::AbstractMatrix{T},               # copy to L
-                        L::LowerTriangularMatrix) where T   # copy from M
+function Base.copyto!(  M::AbstractMatrix{T},               # copy to M
+                        L::LowerTriangularMatrix) where T   # copy from L
 
     @boundscheck size(L) == size(M) || throw(BoundsError)
     lmax,mmax = size(L)
@@ -201,7 +201,7 @@ function Base.copyto!(  M::AbstractMatrix{T},               # copy to L
             M[l,m] = convert(T,M[lm])
         end
     end
-    L
+    M
 end
 
 function LowerTriangularMatrix{T}(M::LowerTriangularMatrix) where T
@@ -264,6 +264,7 @@ function Base.:(-)(L1::LowerTriangularMatrix,L2::LowerTriangularMatrix)
 end
 
 Base.:(-)(L::LowerTriangularMatrix) = LowerTriangularMatrix(-L.data,size(L)...)
+Base.prod(L::LowerTriangularMatrix{NF}) where NF = zero(NF)
 
 """
     fill!(L::LowerTriangularMatrix,x)
@@ -285,5 +286,42 @@ function scale!(L::LowerTriangularMatrix{T},s::Number) where T
     L
 end
 
+# Broadcast (more or less copied and adjusted from LinearAlgebra.jl)
+import Base: similar, copyto!
+import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
+import LinearAlgebra: isstructurepreserving, fzeropreserving
+
+struct LowerTriangularStyle <: Broadcast.AbstractArrayStyle{2} end
+
+Base.BroadcastStyle(::Type{<:LowerTriangularMatrix}) = LowerTriangularStyle()
+
+function Base.similar(bc::Broadcasted{LowerTriangularStyle}, ::Type{NF}) where NF
+    inds = axes(bc)
+    if isstructurepreserving(bc) || fzeropreserving(bc) 
+        return LowerTriangularMatrix{NF}(undef, inds[1][end], inds[2][end])
+    end
+    return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), NF)
+end
+
+LowerTriangularStyle(::Val{0}) = LowerTriangularStyle()
+LowerTriangularStyle(::Val{1}) = LowerTriangularStyle()
+LowerTriangularStyle(::Val{2}) = LowerTriangularStyle()
+
+function Base.copyto!(dest::LowerTriangularMatrix{T}, bc::Broadcasted{<:LowerTriangularStyle}) where T
+    axs = axes(dest)
+    axes(bc) == axs || Broadcast.throwdm(axes(bc), axs)
+
+    lmax,mmax = size(dest)
+    lm = 0
+    for m in 1:mmax
+        for l in m:lmax
+            lm += 1
+            dest.data[lm] = Broadcast._broadcast_getindex(bc, CartesianIndex(l, m))
+        end
+    end
+    return dest
+end
+
 # GPU methods
 Adapt.adapt_structure(to, x::LowerTriangularMatrix{T}) where T = LowerTriangularMatrix(Adapt.adapt(to, x.data), x.m, x.n)
+
