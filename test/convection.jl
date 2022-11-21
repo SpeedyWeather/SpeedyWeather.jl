@@ -1,7 +1,7 @@
 @testset "Parametrization: convection" begin
     @testset "diagnose_convection!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation)
             nlev = diagn.nlev
             pres_thresh_cnv = model.constants.pres_thresh_cnv
 
@@ -23,7 +23,7 @@
 
     @testset "convection!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model = :primitive)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation)
             nlev = diagn.nlev
             pres_thresh_cnv = model.constants.pres_thresh_cnv
 

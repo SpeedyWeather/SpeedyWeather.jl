@@ -26,16 +26,16 @@ function initial_conditions(M::ModelSetup)
             end
         end
 
+        # SCALING
+        @unpack radius_earth = M.geometry
+        scale!(progn,:vor,radius_earth)
+        scale!(progn,:div,radius_earth)
+
     elseif initial_conditions == :restart
         initialize_from_file!(progn,M)
     else
         throw(error("Incorrect initialization option, $initial_conditions given."))
     end
-
-    # SCALING
-    @unpack radius_earth = M.geometry
-    scale!(progn,:vor,radius_earth)
-    scale!(progn,:div,radius_earth)
 
     return progn
 end
@@ -70,32 +70,21 @@ end
 
 function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup) where NF
     @unpack restart_path, restart_id = M.parameters
-    restart_file = jldopen(joinpath(restart_path,@sprintf("run%04d",restart_id),"restart.jld2"))
+    restart_file = jldopen(joinpath(restart_path,string("run-",run_id_string(restart_id)),"restart.jld2"))
     progn_old = restart_file["prognostic_variables"]
     version = restart_file["version"]   # currently unused, TODO check for compat with version
     time = restart_file["time"]         # currently unused
 
-    # SPECTRAL TRUNCATION/INTERPOLATION to new resolution and conversion to NF
-    for (layer_old,layer_new) in zip(progn_old.layers,progn_new.layers)
+    var_names = propertynames(progn_old.layers[1].leapfrog[1])
 
-        layer_old_lf1 = layer_old.leapfrog[1]
-        layer_new_lf1 = layer_new.leapfrog[1]
-
-        vars_old = (getproperty(layer_old_lf1,prop) for prop in propertynames(layer_old_lf1))
-        vars_new = (getproperty(layer_new_lf1,prop) for prop in propertynames(layer_new_lf1))
-    
-        for (var_old,var_new) in zip(vars_old,vars_new)
-            lmax,mmax = size(var_new) .- (2,1)
-            var_old_trunc = spectral_truncation(var_old,lmax+1,mmax)
-            var_new .= convert(LowerTriangularMatrix{Complex{NF}},var_old_trunc)
+    for var_name in var_names
+        if has(progn_new, var_name) 
+            var = get_var(progn_old, var_name) 
+            set_var!(progn_new, var_name, var)
         end
-    end
-
-    # same for surface pressure
-    pres = progn_new.pres.leapfrog[1]
-    lmax,mmax = size(pres) .- (2,1)
-    pres .= convert(LowerTriangularMatrix{Complex{NF}},
-                                    spectral_truncation(progn_old.pres.leapfrog[1],lmax+1,mmax))
+    end 
+    pres = get_pressure(progn_old)
+    set_pressure!(progn_new, pres)
 
     return progn_new
 end

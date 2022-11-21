@@ -14,6 +14,7 @@ struct SpectralTransform{NF<:AbstractFloat}
     lmax::Int               # Maximum degree l=[0,lmax] of spherical harmonics
     mmax::Int               # Maximum order m=[0,l] of spherical harmonics
     nfreq_max::Int          # Maximum (at Equator) number of Fourier frequencies (real FFT)
+    m_truncs::Vector{Int}   # Maximum order m to retain per latitude ring
 
     # CORRESPONDING GRID SIZE
     nlon_max::Int           # Maximum number of longitude points (at Equator)
@@ -74,7 +75,9 @@ and preallocates the Legendre polynomials (if recompute_legendre == false) and q
 function SpectralTransform( ::Type{NF},                     # Number format NF
                             Grid::Type{<:AbstractGrid},     # type of spatial grid used
                             trunc::Int,                     # Spectral truncation
-                            recompute_legendre::Bool) where NF
+                            recompute_legendre::Bool;       # re or precompute legendre polynomials?
+                            legendre_shortcut::Symbol=:linear   # shorten Legendre loop over order m
+                            ) where NF
 
     # SPECTRAL RESOLUTION
     lmax = trunc                # Maximum degree l=[0,lmax] of spherical harmonics
@@ -82,18 +85,31 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     order = truncation_order(Grid)
 
     # RESOLUTION PARAMETERS
-    nresolution = get_resolution(Grid,trunc)        # resolution parameter, nlat_half/nside for HEALPixGrid
-    nlat_half = get_nlat_half(Grid,nresolution)     # contains equator for HEALPix
-    nlat = 2nlat_half - nlat_odd(Grid)              # one less if grids have odd # of latitude rings
-    nlon_max = get_nlon_max(Grid,nresolution)       # number of longitudes around the equator
+    nresolution = get_resolution(Grid,trunc)        # resolution parameter nlat_half
+    nlat_half = nresolution                         # number of latitude rings on one hemisphere incl equator
+    nlat = get_nlat(Grid,nlat_half)                 # 2nlat_half but one less if grids have odd # of lat rings
+    nlon_max = get_nlon_max(Grid,nlat_half)         # number of longitudes around the equator
                                                     # number of longitudes per latitude ring (one hemisphere only)
-    nlons = [get_nlon_per_ring(Grid,nresolution,j) for j in 1:nlat_half]
+    nlons = [get_nlon_per_ring(Grid,nlat_half,j) for j in 1:nlat_half]
     nfreq_max = nlon_max÷2 + 1                      # maximum number of fourier frequencies (real FFTs)
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
-    colat = get_colat(Grid,nresolution)             # colatitude in radians                             
+    colat = get_colat(Grid,nlat_half)               # colatitude in radians                             
     cos_colat = cos.(colat)                         # cos(colat)
     sin_colat = sin.(colat)                         # sin(colat)
+
+    # LEGENDRE SHORTCUT OVER ORDER M (to have linear/quad/cubic truncation per latitude ring)
+    if legendre_shortcut in (:linear,:quadratic,:cubic)
+        s = (linear=1,quadratic=2,cubic=3)[legendre_shortcut]
+        m_truncs = [nlons[j]÷(s+1) + 1 for j in 1:nlat_half]
+    elseif legendre_shortcut == :linquad_coslat²
+        m_truncs = [ceil(Int,nlons[j]/(2 + sin_colat[j]^2)) for j in 1:nlat_half]
+    elseif legendre_shortcut == :lincub_coslat
+        m_truncs = [ceil(Int,nlons[j]/(2 + 2sin_colat[j])) for j in 1:nlat_half]
+    else
+        throw(error("legendre_shortcut=$legendre_shortcut not defined."))
+    end
+    m_truncs = min.(m_truncs,mmax+1)    # only to mmax in any case (otherwise BoundsError)
 
     # PLAN THE FFTs
     FFT_package = NF <: Union{Float32,Float64} ? FFTW : GenericFFT
@@ -104,11 +120,10 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     norm_sphere = 2sqrt(π)  # norm_sphere at l=0,m=0 translates to 1s everywhere in grid space
 
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
-    _, lons = get_colatlons(Grid,nresolution)
-    lon1s = [lons[each_index_in_ring(Grid,j,nresolution)[1]] for j in 1:nlat_half]
+    _, lons = get_colatlons(Grid,nlat_half)
+    lon1s = [lons[each_index_in_ring(Grid,j,nlat_half)[1]] for j in 1:nlat_half]
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
-    Grid <: AbstractHEALPixGrid && fill!(lon_offsets,1)     # no rotation for HEALPix at the moment
-    
+
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
     Λ = zeros(LowerTriangularMatrix{NF},lmax+2,mmax+1)  # Legendre polynomials for one latitude
 
@@ -132,7 +147,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
     # and sum up to 2 over all latitudes as ∫sin(θ)dθ = 2 over 0...π.
     # Δϕ = 2π/nlon is the azimuth every grid point covers
-    solid_angles = get_solid_angles(Grid,nresolution)
+    solid_angles = get_solid_angles(Grid,nlat_half)
 
     # RECURSION FACTORS
     ϵlms = get_recursion_factors(lmax+1,mmax)
@@ -186,7 +201,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
 
     # conversion to NF happens here
     SpectralTransform{NF}(  Grid,nresolution,order,
-                            lmax,mmax,nfreq_max,
+                            lmax,mmax,nfreq_max,m_truncs,
                             nlon_max,nlons,nlat,nlat_half,
                             colat,cos_colat,sin_colat,lon_offsets,
                             norm_sphere,
@@ -216,7 +231,9 @@ function spectral_transform_for_full_grid(S::SpectralTransform{NF}) where NF
     @unpack vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2, eigenvalues, eigenvalues⁻¹ = S
 
     # recalculate what changes on the full grid: FFT and offsets (always 1)
-    nlons = [get_nlon_per_ring(FullGrid,nresolution,j) for j in 1:nlat_half]
+    nlons = [get_nlon_per_ring(FullGrid,nlat_half,j) for j in 1:nlat_half]
+    m_truncs = [mmax+1 for _ in 1:nlat_half]    # no Legendre shortcut for full grids
+
     FFT_package = NF <: Union{Float32,Float64} ? FFTW : GenericFFT
     rfft_plans = [FFT_package.plan_rfft(zeros(NF,nlon)) for nlon in nlons]
     brfft_plans = [FFT_package.plan_brfft(zeros(Complex{NF},nlon÷2 + 1),nlon) for nlon in nlons]
@@ -224,10 +241,10 @@ function spectral_transform_for_full_grid(S::SpectralTransform{NF}) where NF
     lon_offsets = copy(S.lon_offsets)
     fill!(lon_offsets,1)            # =*1, i.e. no longitude offset rotation on full grid
 
-    solid_angles = get_solid_angles(FullGrid,nresolution)
+    solid_angles = get_solid_angles(FullGrid,nlat_half)
 
     return SpectralTransform{NF}(   FullGrid,nresolution,order,
-                                    lmax,mmax,nfreq_max,
+                                    lmax,mmax,nfreq_max,m_truncs,
                                     nlon_max,nlons,nlat,nlat_half,
                                     colat,cos_colat,sin_colat,lon_offsets,
                                     norm_sphere,
@@ -244,8 +261,8 @@ end
 
 Generator function for a SpectralTransform struct pulling in parameters from a Parameters struct."""
 function SpectralTransform(P::Parameters)
-    @unpack NF, Grid, trunc, recompute_legendre = P
-    return SpectralTransform(NF,Grid,trunc,recompute_legendre)
+    @unpack NF, Grid, trunc, recompute_legendre, legendre_shortcut = P
+    return SpectralTransform(NF,Grid,trunc,recompute_legendre;legendre_shortcut)
 end
 
 """
@@ -345,7 +362,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
     @unpack nlat, nlons, nlat_half, nfreq_max, order = S
     @unpack cos_colat, sin_colat, lon_offsets = S
-    @unpack recompute_legendre, Λ, Λs = S
+    @unpack recompute_legendre, Λ, Λs, m_truncs = S
     @unpack brfft_plans = S
 
     recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
@@ -355,7 +372,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
     @boundscheck mmax+1 <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
     @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
-    @boundscheck get_nresolution(map) == S.nresolution || throw(BoundsError)
+    @boundscheck get_resolution(map) == S.nresolution || throw(BoundsError)
 
     # preallocate work arrays
     gn = zeros(Complex{NF}, nfreq_max)      # phase factors for northern latitudes
@@ -367,7 +384,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
         j_south = nlat - j_north + 1        # southern latitude index
         nlon = nlons[j_north]               # number of longitudes on this ring
         nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
-        nfreqm = nlon÷(order+1) + 1         # (lin/quad/cub) max frequency to shorten loop over m
+        m_trunc = m_truncs[j_north]         # (lin/quad/cub) max frequency to shorten loop over m
         not_equator = j_north != j_south    # is the latitude ring not on equator?
 
         # Recalculate or use precomputed Legendre polynomials Λ
@@ -376,7 +393,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
         # inverse Legendre transform by looping over wavenumbers l,m
         lm = 1                              # single index for non-zero l,m indices
-        @simd for m in 1:min(nfreq,mmax+1)  # Σ_{m=0}^{mmax}, but 1-based index
+        for m in 1:m_trunc                  # Σ_{m=0}^{mmax}, but 1-based index, shortened to m_trunc
             acc_odd  = zero(Complex{NF})    # accumulator for isodd(l+m)
             acc_even = zero(Complex{NF})    # accumulator for iseven(l+m)
 
@@ -451,7 +468,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     
     @unpack nlat, nlat_half, nlons, nfreq_max, order, cos_colat = S
     @unpack recompute_legendre, Λ, Λs, solid_angles = S
-    @unpack rfft_plans, lon_offsets = S
+    @unpack rfft_plans, lon_offsets, m_truncs = S
     
     recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
@@ -460,7 +477,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     @boundscheck mmax+1 <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
     @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
-    @boundscheck get_nresolution(map) == S.nresolution || throw(BoundsError)
+    @boundscheck get_resolution(map) == S.nresolution || throw(BoundsError)
 
     # preallocate work warrays
     fn = zeros(Complex{NF},nfreq_max)       # Fourier-transformed northern latitude
@@ -475,7 +492,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         j_south = nlat - j_north + 1        # corresponding southern latitude index
         nlon = nlons[j_north]               # number of longitudes on this ring
         nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
-        nfreqm = nlon÷(order+1) + 1         # (lin/quad/cub) max frequency to shorten loop over m
+        m_trunc = m_truncs[j_north]         # (lin/quad/cub) max frequency to shorten loop over m
         not_equator = j_north != j_south    # is the latitude ring not on equator?
 
         # FOURIER TRANSFORM in zonal direction
@@ -497,17 +514,17 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         ΔΩ = solid_angles[j_north]                      # = sinθ Δθ Δϕ, solid angle for a grid point
 
         lm = 1                                          # single index for spherical harmonics
-        @simd for m in 1:min(nfreq,mmax+1)              # Σ_{m=0}^{mmax}, but 1-based index
+        for m in 1:m_trunc                              # Σ_{m=0}^{mmax}, but 1-based index
 
             an, as = fn[m], fs[m]
 
             # SOLID ANGLE QUADRATURE WEIGHTS and LONGITUDE OFFSET
             o = lon_offsets[m,j_north]                  # longitude offset rotation
-            ΔΩ *= conj(o)                               # complex conjugate for rotation back to prime meridian
+            ΔΩ_rotated = ΔΩ*conj(o)                     # complex conjugate for rotation back to prime meridian
 
             # LEGENDRE TRANSFORM
-            a_even = (an + as)*ΔΩ                       # sign flip due to anti-symmetry with
-            a_odd = (an - as)*ΔΩ                        # odd polynomials 
+            a_even = (an + as)*ΔΩ_rotated               # sign flip due to anti-symmetry with
+            a_odd = (an - as)*ΔΩ_rotated                # odd polynomials 
 
             # integration over l = m:lmax+1
             lm_end = lm + lmax-m+1                      # first index lm plus lmax-m+1 (length of column -1)

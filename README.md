@@ -1,6 +1,6 @@
 # SpeedyWeather.jl
-[![CI](https://github.com/milankl/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/milankl/SpeedyWeather.jl/actions/workflows/CI.yml)
-[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://milankl.github.io/SpeedyWeather.jl/dev)
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml)
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/dev/)
 
 SpeedyWeather.jl is a global atmospheric model with simple physics which is developed as a computational playground
 with an everything-flexible attitude as long as it is speedy. With minimal code redundancies it supports
@@ -31,7 +31,7 @@ The main interface to SpeedyWeather.jl is
 
 ```julia
 julia> using SpeedyWeather
-julia> run_speedy(n_days=30, trunc=63, Grid=OctahedralGaussianGrid, model=:shallowwater, output=true)
+julia> run_speedy(n_days=30, trunc=63, Grid=OctahedralGaussianGrid, model=ShallowWater, output=true)
 Weather is speedy run 1: 100%|███████████████████████████████████| Time: 0:00:04 (1498.70 years/day)
 ```
 

@@ -8,7 +8,7 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
 
     # GRID TYPE AND RESOLUTION
     Grid::Type{<:AbstractGrid}
-    nresolution::Int    # resolution parameter nlat_half or nside for HEALPix
+    nresolution::Int    # resolution parameter nlat_half
 
     # GRID-POINT SPACE
     nlon_max::Int       # Maximum number of longitudes (at/around Equator)
@@ -16,11 +16,10 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     nlat::Int           # Number of latitudes
     nlev::Int           # Number of vertical levels
     nlat_half::Int      # Number of latitudes in one hemisphere (incl Equator)
-    nside::Int          # HEALPix only, nside^2 are the # of grid points in each of the 12 base pixels
     npoints::Int        # total number of grid points
     radius_earth::Real  # Earth's radius [m]
 
-    # LATITUDES (either Gaussian, equi-angle or HEALPix lats, depending on grid)
+    # LATITUDES (either Gaussian, equi-angle, HEALPix or HEALPix4 lats, depending on grid)
     lat::Vector{NF}         # array of latitudes (π/2...-π/2)
     latd::Vector{Float64}   # array of latitudes in degrees (90˚...-90˚)
     colat::Vector{NF}       # array of colatitudes (0...π)
@@ -34,14 +33,6 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     lons::Vector{NF}        # longitude (0...2π) for each grid point in ring order
     lats::Vector{NF}        # latitude (π/2...-π/2) for each grid point in ring order
 
-    # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
-    n_stratosphere_levels::Int      # number of upper levels for stratosphere
-    σ_levels_half::Vector{NF}       # σ at half levels
-    σ_levels_full::Vector{NF}       # σ at full levels
-    σ_levels_thick::Vector{NF}      # σ level thicknesses
-    σ_levels_half⁻¹_2::Vector{NF}   # 1/(2σ_levels_full)       #TODO rename?
-    σ_f::Vector{NF}                 # akap/(2σ_levels_thick)   #TODO rename?
-
     # SINES AND COSINES OF LATITUDE
     sinlat::Vector{NF}              # sin of latitudes
     coslat::Vector{NF}              # cos of latitudes
@@ -52,10 +43,18 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
     f_coriolis::Vector{NF}          # = 2Ω*sin(lat)*radius_earth
 
-    # GEOPOTENTIAL CALCULATION WORK ARRAYS
-    xgeop1::Vector{NF}                  # ?
-    xgeop2::Vector{NF}                  # ?
-    lapserate_correction::Vector{NF}    # ?
+    # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
+    n_stratosphere_levels::Int      # number of upper levels for stratosphere
+    σ_levels_half::Vector{NF}       # σ at half levels
+    σ_levels_full::Vector{NF}       # σ at full levels
+    σ_levels_thick::Vector{NF}      # σ level thicknesses
+    σ_levels_thick⁻¹_half::Vector{NF}   # = 1/(2σ_levels_thick)
+    σ_f::Vector{NF}                 # akap/(2σ_levels_thick)   #TODO rename?
+
+    # GEOPOTENTIAL INTEGRATION (on half/full levels)
+    Δp_geopot_half::Vector{NF}      # = R*(ln(p_k+1) - ln(p_k+1/2)), for half level geopotential
+    Δp_geopot_full::Vector{NF}      # = R*(ln(p_k+1/2) - ln(p_k)), for full level geopotential
+    lapserate_corr::Vector{NF}      # ?
 
     # PARAMETERIZATIONS
     entrainment_profile::Vector{NF}
@@ -75,39 +74,30 @@ Generator function to create the Geometry struct from parameters in `P`.
 function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
     @unpack trunc, nlev = P                         # grid type, spectral truncation, # of vertical levels
-    @unpack radius_earth, rotation_earth, akap = P  # radius of earth, angular frequency, ratio of gas consts
+    @unpack radius_earth, rotation_earth = P        # radius of earth, angular frequency
+    @unpack R_gas, akap = P                         # gas constant for dry air, ratio of gas consts
     @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
 
     # RESOLUTION PARAMETERS
-    nresolution = get_resolution(Grid,trunc)        # resolution parameter, nlat_half or nside for HEALPixGrid
-    nlat_half = get_nlat_half(Grid,nresolution)     # contains equator for HEALPix
-    nlat = 2nlat_half - nlat_odd(Grid)              # one less if grids have odd # of latitude rings
-    nlon_max = get_nlon_max(Grid,nresolution)       # number of longitudes around the equator
+    nresolution = get_resolution(Grid,trunc)        # resolution parameter nlat_half
+    nlat_half = nresolution                         # number of latitude rings on one hemisphere (Equator incl)
+    nlat = get_nlat(Grid,nlat_half)                 # 2nlat_half but one less if grids have odd # of lat rings
+    nlon_max = get_nlon_max(Grid,nlat_half)         # number of longitudes around the equator
     nlon = nlon_max                                 # same (used for compatibility)
-    nside = Grid isa HEALPixGrid ? nresolution : 0  # nside is only defined for HEALPixGrid (npoints)
-    npoints = get_npoints(Grid,nresolution)         # total number of grid points
+    npoints = get_npoints(Grid,nlat_half)           # total number of grid points
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
-    colat = get_colat(Grid,nresolution)             # colatitude in radians
+    colat = get_colat(Grid,nlat_half)               # colatitude in radians
     lat = π/2 .- colat                              # latitude in radians
     colatd = colat*360/2π                           # and the same in degree 0...180˚
     latd = lat*360/2π                               # 90˚...-90˚
 
     # LONGITUDE VECTORS (empty for reduced grids)
-    lon = get_lon(Grid,nresolution)                 # array of longitudes 0...2π (full grids only)
+    lon = get_lon(Grid,nlat_half)                   # array of longitudes 0...2π (full grids only)
     lond = lon*360/2π                               # array of longitudes in degrees 0...360˚
 
     # COORDINATES for every grid point in ring order
-    lats,lons = get_colatlons(Grid,nresolution)     # in radians
-
-    # VERTICAL SIGMA COORDINATE
-    # σ = p/p0 (fraction of surface pressure)
-    # sorted such that σ_levels_half[end] is at the planetary boundary
-    σ_levels_half = vertical_coordinates(P)
-    σ_levels_full = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])
-    σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
-    σ_levels_half⁻¹_2 = 1 ./ (2σ_levels_thick)
-    σ_f = akap ./ (2σ_levels_full)
+    lats,lons = get_colatlons(Grid,nlat_half)       # in radians
 
     # SINES AND COSINES OF LATITUDE
     sinlat = sin.(lat)
@@ -119,26 +109,20 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
     f_coriolis = 2rotation_earth*sinlat*radius_earth
 
-    # GEOPOTENTIAL coefficients to calculate geopotential (TODO reference)
-    xgeop1 = zeros(nlev)
-    xgeop2 = zeros(nlev)
-    for k in 1:nlev
-        xgeop1[k] = radius_earth*log(σ_levels_half[k+1]/σ_levels_half[k])
-        if k != nlev
-            xgeop2[k+1] = radius_earth*log(σ_levels_full[k+1]/σ_levels_half[k+1])
-        end
-    end
+    # VERTICAL SIGMA COORDINATE
+    # σ = p/p0 (fraction of surface pressure)
+    # sorted such that σ_levels_half[end] is at the planetary boundary
+    σ_levels_half = vertical_coordinates(P)
+    σ_levels_full = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])
+    σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
+    σ_levels_thick⁻¹_half = 1 ./ (2σ_levels_thick)
+    σ_f = akap ./ (2σ_levels_full)
 
-    if P.model == :primitive
-        # LAPSE RATE correction (TODO reference)
-        lapserate_correction = zeros(nlev-2)
-        for k in 2:nlev-1
-            lapserate_correction[k-1] = 0.5*xgeop1[k]*
-                        log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
-        end
-    else
-        lapserate_correction = zeros(1)
-    end
+    # GEOPOTENTIAL, coefficients to calculate geopotential
+    Δp_geopot_half, Δp_geopot_full = initialise_geopotential(σ_levels_full,σ_levels_half,R_gas)
+
+    # LAPSE RATE correction
+    lapserate_corr = lapserate_correction(σ_levels_full,σ_levels_half,Δp_geopot_full)
 
     # Compute the entrainment coefficients for the convection parameterization.
     @unpack max_entrainment = P
@@ -158,13 +142,12 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
     # conversion to number format NF happens here
     Geometry{P.NF}( Grid,nresolution,
-                    nlon_max,nlon,nlat,nlev,nlat_half,nside,npoints,radius_earth,
+                    nlon_max,nlon,nlat,nlev,nlat_half,npoints,radius_earth,
                     lat,latd,colat,colatd,lon,lond,lons,lats,
+                    sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,
-                    σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_half⁻¹_2,σ_f,
-                    sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,
-                    f_coriolis,
-                    xgeop1,xgeop2,lapserate_correction, entrainment_profile)
+                    σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_thick⁻¹_half,σ_f,
+                    Δp_geopot_half,Δp_geopot_full,lapserate_corr,entrainment_profile)
                     # tref,rgas,fsgr,tref3)
 end
 

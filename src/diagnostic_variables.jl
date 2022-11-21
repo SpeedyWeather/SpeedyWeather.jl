@@ -56,7 +56,7 @@ struct GridVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     div_grid            ::Grid    # divergence
     temp_grid           ::Grid    # absolute temperature [K]
     humid_grid          ::Grid    # specific_humidity
-    geopot_grid         ::Grid    # geopotential
+    geopot_grid         ::Grid    # geopotential (is that needed?)
     U_grid              ::Grid    # zonal velocity *coslat [m/s]
     V_grid              ::Grid    # meridional velocity *coslat [m/s]
     temp_grid_anomaly   ::Grid    # absolute temperature anomaly [K]
@@ -96,7 +96,7 @@ end
 Struct holding intermediate quantities for the dynamics of a given layer."""
 struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 
-    ### VORTICITY INVERSION
+    # VORTICITY INVERSION
     u_coslat        ::LowerTriangularMatrix{Complex{NF}}    # = U = cosθ*u, zonal velocity *cos(latitude)
     v_coslat        ::LowerTriangularMatrix{Complex{NF}}    # = V = cosθ*v, meridional velocity *cos(latitude)
 
@@ -113,6 +113,14 @@ struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     vh_coslat⁻¹_grid::Grid                                  # volume flux vh/coslat on grid
     uh_coslat⁻¹     ::LowerTriangularMatrix{Complex{NF}}    # uh/coslat in spectral
     vh_coslat⁻¹     ::LowerTriangularMatrix{Complex{NF}}    # vh/coslat in spectral
+
+    # VERTICAL INTEGRATION
+    geopot          ::LowerTriangularMatrix{Complex{NF}}    # geopotential on full layers
+
+    # VERTICAL VELOCITY (̇̇dσ/dt)
+    σ_tend          ::Grid                              # = dσ/dt, on half levels at k+1/2
+    σ_m             ::Grid                              # TODO what's that, also on half levels at k+1/2
+    uv∇p            ::Grid                              # =(u-u_mean)*dlnp_dlon * (v-v_mean)*dlnp_dlat
 
     # ###------Defined in surface_pressure_tendency!()
     # u_mean             ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
@@ -169,9 +177,13 @@ function Base.zeros(::Type{DynamicsVariables},
     uh_coslat⁻¹      = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     vh_coslat⁻¹      = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
-    # u_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint zonal velocity over all levels
-    # v_mean      = zeros(NF,nlon,nlat)           # Mean gridpoint meridional velocity over all levels
-    # div_mean    = zeros(NF,nlon,nlat)           # Mean gridpoint divergence over all levels
+    # VERTICAL INTEGRATION
+    geopot           = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+
+    # VERTICAL VELOCITY (̇̇dσ/dt)
+    σ_tend = zeros(Grid{NF},nresolution)    # = dσ/dt, on half levels at k+1/2
+    σ_m = zeros(Grid{NF},nresolution)       # TODO what's that?
+    uv∇p = zeros(Grid{NF},nresolution)      # =(u-u_mean)*dlnp_dlon * (v-v_mean)*dlnp_dlat
 
     # # one more l for recursion in meridional gradients
     # # X,Y gradient of the surface pressure in spectral space
@@ -199,6 +211,8 @@ function Base.zeros(::Type{DynamicsVariables},
                                 uω_coslat⁻¹,vω_coslat⁻¹,
                                 bernoulli_grid,bernoulli,
                                 uh_coslat⁻¹_grid,vh_coslat⁻¹_grid,uh_coslat⁻¹,vh_coslat⁻¹,
+                                geopot,
+                                σ_tend,σ_m,uv∇p,
                                 )
                                 # u_mean,v_mean,div_mean,
                                 # pres_gradient_spectral_x,pres_gradient_spectral_y,
@@ -252,12 +266,23 @@ function Adapt.adapt_structure(to, dvl::DiagnosticVariablesLayer)
 end
 
 struct SurfaceVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
-    pres_grid::Grid
-    pres_tend::LowerTriangularMatrix{Complex{NF}}
+    pres_grid::Grid                                 # log surface pressure
+    pres_tend::LowerTriangularMatrix{Complex{NF}}   # tendency of it
+    pres_tend_grid::Grid                            # gridded tendency
+
+    dpres_dlon::LowerTriangularMatrix{Complex{NF}}  # zonal gradient of pressure
+    dpres_dlat::LowerTriangularMatrix{Complex{NF}}  # meridional gradient
+    dpres_dlon_grid::Grid                           # gridded version
+    dpres_dlat_grid::Grid                           # gridded version
+
+    U_mean::Grid    # vertical average of: zonal velocity *coslat
+    V_mean::Grid    # meridional velocity *coslat
+    div_mean::Grid  # divergence
 
     precip_large_scale::Grid
     precip_convection::Grid
-    npoints::Int        # number of grid points
+
+    npoints::Int    # number of grid points
 end
 
 function Base.zeros(::Type{SurfaceVariables},
@@ -267,13 +292,29 @@ function Base.zeros(::Type{SurfaceVariables},
     @unpack Grid, nresolution, npoints = G
     @unpack lmax, mmax = S
 
+    # log of surface pressure and tendency thereof
     pres_grid = zeros(Grid{NF},nresolution)
     pres_tend = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    pres_tend_grid = zeros(Grid{NF},nresolution)
 
+    # gradients of log surface pressure
+    dpres_dlon = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    dpres_dlat = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    dpres_dlon_grid = zeros(Grid{NF},nresolution)
+    dpres_dlat_grid = zeros(Grid{NF},nresolution)
+
+    # vertical averaged (weighted by σ level thickness) velocities (*coslat) and divergence
+    U_mean = zeros(Grid{NF},nresolution)
+    V_mean = zeros(Grid{NF},nresolution)
+    div_mean = zeros(Grid{NF},nresolution)
+
+    # precipitation fields
     precip_large_scale = zeros(Grid{NF},nresolution)
     precip_convection = zeros(Grid{NF},nresolution)
 
-    return SurfaceVariables(pres_grid,pres_tend,
+    return SurfaceVariables(pres_grid,pres_tend,pres_tend_grid,
+                            dpres_dlon,dpres_dlat,dpres_dlon_grid,dpres_dlat_grid,
+                            U_mean,V_mean,div_mean,
                             precip_large_scale,precip_convection,
                             npoints)
 end

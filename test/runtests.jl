@@ -5,6 +5,7 @@ using Test
 include("utility_functions.jl")
 include("lower_triangular_matrix.jl")
 include("grids.jl")
+include("set_vars.jl")
 
 # GPU/KERNELABSTRACTIONS
 include("kernelabstractions.jl")
@@ -22,6 +23,7 @@ include("time_stepping.jl")
 
 # VERTICAL LEVELS
 include("vertical_levels.jl")
+include("geopotential.jl")
 
 # PHYSICS
 include("column_variables.jl")
@@ -33,3 +35,6 @@ include("convection.jl")
 include("initialize.jl")
 include("run_speedy.jl")
 include("run_speedy_with_output.jl")
+
+# OUTPUT 
+include("netcdf_output.jl")

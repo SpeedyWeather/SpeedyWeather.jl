@@ -1,7 +1,7 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
-authors = ["milankl"]
-version = "0.3.0"
+authors = ["Milan Klöwer and others"]
+version = "0.4.0"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -16,7 +16,6 @@ Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 GenericFFT = "a8297547-1b15-4a5a-a998-a2ac5f1cef28"
-Healpix = "9f4e344d-96bc-545a-84a3-ae6b9e1b672b"
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
@@ -41,9 +40,8 @@ CUDAKernels = "0.3, 0.4"
 CodecZlib = "0.7"
 Enzyme = ">= 0.10.4"
 FFTW = "1"
-FastGaussQuadrature = "0.4"
+FastGaussQuadrature = "0.4, 0.5"
 GenericFFT = "0.1"
-Healpix = "4"
 JLD2 = "0.4"
 KernelAbstractions = "0.7, 0.8"
 KernelGradients = ">= 0.1.2"
