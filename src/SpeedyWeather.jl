@@ -30,6 +30,8 @@ module SpeedyWeather
     import BitInformation: round, round!
     import UnicodePlots
     import ProgressMeter
+    import Downloads
+    import ZipFile
 
     # EXPORT MAIN INTERFACE TO SPEEDY
     export  run_speedy,
