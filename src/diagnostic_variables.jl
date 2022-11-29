@@ -39,14 +39,15 @@ end
 
 Struct holding the prognostic spectral variables of a given layer in grid point space."""
 struct GridVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
-    vor_grid            ::Grid    # vorticity
-    div_grid            ::Grid    # divergence
-    temp_grid           ::Grid    # absolute temperature [K]
-    humid_grid          ::Grid    # specific_humidity
-    geopot_grid         ::Grid    # geopotential (is that needed?)
-    U_grid              ::Grid    # zonal velocity *coslat [m/s]
-    V_grid              ::Grid    # meridional velocity *coslat [m/s]
-    temp_grid_anomaly   ::Grid    # absolute temperature anomaly [K]
+    vor_grid            ::Grid  # vorticity
+    div_grid            ::Grid  # divergence
+    temp_grid           ::Grid  # absolute temperature [K]
+    temp_virt_grid      ::Grid  # virtual tempereature [K]  
+    humid_grid          ::Grid  # specific_humidity
+    geopot_grid         ::Grid  # geopotential (is that needed?)
+    U_grid              ::Grid  # zonal velocity *coslat [m/s]
+    V_grid              ::Grid  # meridional velocity *coslat [m/s]
+    temp_grid_anomaly   ::Grid  # absolute temperature anomaly [K]
 end
 
 function Base.zeros(::Type{GridVariables},G::Geometry{NF}) where NF
@@ -54,14 +55,15 @@ function Base.zeros(::Type{GridVariables},G::Geometry{NF}) where NF
     @unpack Grid, nresolution = G
     vor_grid            = zeros(Grid{NF},nresolution)   # vorticity
     div_grid            = zeros(Grid{NF},nresolution)   # divergence
-    temp_grid           = zeros(Grid{NF},nresolution)   # absolute Temperature
+    temp_grid           = zeros(Grid{NF},nresolution)   # absolute temperature
+    temp_virt_grid      = zeros(Grid{NF},nresolution)   # virtual temperature
     humid_grid          = zeros(Grid{NF},nresolution)   # specific humidity
     geopot_grid         = zeros(Grid{NF},nresolution)   # geopotential
     U_grid              = zeros(Grid{NF},nresolution)   # zonal velocity *coslat
     V_grid              = zeros(Grid{NF},nresolution)   # meridonal velocity *coslat
     temp_grid_anomaly   = zeros(Grid{NF},nresolution)   # absolute temperature anolamy
 
-    return GridVariables(   vor_grid,div_grid,temp_grid,humid_grid,geopot_grid,
+    return GridVariables(   vor_grid,div_grid,temp_grid,temp_virt_grid,humid_grid,geopot_grid,
                             U_grid,V_grid,temp_grid_anomaly)
 end
 
@@ -90,6 +92,7 @@ struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     vh_coslat⁻¹     ::LowerTriangularMatrix{Complex{NF}}    # vh/coslat in spectral
 
     # VERTICAL INTEGRATION
+    temp_virt       ::LowerTriangularMatrix{Complex{NF}}    # virtual temperature
     geopot          ::LowerTriangularMatrix{Complex{NF}}    # geopotential on full layers
 
     # VERTICAL VELOCITY (̇̇dσ/dt)
@@ -153,6 +156,7 @@ function Base.zeros(::Type{DynamicsVariables},
     vh_coslat⁻¹      = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
     # VERTICAL INTEGRATION
+    temp_virt        = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     geopot           = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
     # VERTICAL VELOCITY (̇̇dσ/dt)
@@ -186,7 +190,7 @@ function Base.zeros(::Type{DynamicsVariables},
                                 uω_coslat⁻¹,vω_coslat⁻¹,
                                 bernoulli_grid,bernoulli,
                                 uh_coslat⁻¹_grid,vh_coslat⁻¹_grid,uh_coslat⁻¹,vh_coslat⁻¹,
-                                geopot,
+                                temp_virt,geopot,
                                 σ_tend,σ_m,uv∇p,
                                 )
                                 # u_mean,v_mean,div_mean,

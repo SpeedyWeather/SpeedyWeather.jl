@@ -102,12 +102,12 @@ function HorizontalDiffusion(   P::Parameters,          # Parameter struct
 
         # # OROGRAPHIC CORRECTION
         # @unpack nlon, nlat, nlev, σ_levels_full = G
-        # @unpack gravity, R_gas, lapse_rate, scale_height, scale_height_humid, relhumid_ref = P
+        # @unpack gravity, R_dry, lapse_rate, scale_height, scale_height_humid, relhumid_ref = P
         # @unpack geopot_surf_grid = B    #TODO is currently not contained in the Boundaries struct B
 
         # # Orographic correction terms for temperature and humidity (vertical component)
         # lapse_rate_gravity = lapse_rate/(1000gravity)       # lapse rate in [K/km] convert to [K/m] with /1000
-        # R_lapse_rate_gravity = R_gas*lapse_rate_gravity     
+        # R_lapse_rate_gravity = R_dry*lapse_rate_gravity     
         # scale_height_ratio = scale_height/scale_height_humid
 
         # # preallocate (high precision, conversion to NF later)
