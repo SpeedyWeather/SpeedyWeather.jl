@@ -1,12 +1,12 @@
 """
     Δp_geopot_half, Δp_geopot_full = initialise_geopotential(   σ_levels_full::Vector,
                                                                 σ_levels_half::Vector,
-                                                                R_gas::Real)
+                                                                R_dry::Real)
 
 Precomputes """
 function initialise_geopotential(   σ_levels_full::Vector,
                                     σ_levels_half::Vector,
-                                    R_gas::Real)
+                                    R_dry::Real)
 
     nlev = length(σ_levels_full)    # number of vertical levels
     @assert nlev+1 == length(σ_levels_half) "σ half levels must have length nlev+1"
@@ -17,13 +17,13 @@ function initialise_geopotential(   σ_levels_full::Vector,
     # 1. integration onto half levels
     for k in 1:nlev-1               # k is full level index, 1=top, nlev=bottom
         # used for: Φ_{k+1/2} = Φ_{k+1} + R*T_{k+1}*(ln(p_{k+1}) - ln(p_{k+1/2}))
-        Δp_geopot_half[k+1] = R_gas*log(σ_levels_full[k+1]/σ_levels_half[k+1])
+        Δp_geopot_half[k+1] = R_dry*log(σ_levels_full[k+1]/σ_levels_half[k+1])
     end
 
     # 2. integration onto full levels (same formula but k -> k-1/2)
     for k in 1:nlev
         # used for: Φ_k = Φ_{k+1/2} + R*T_k*(ln(p_{k+1/2}) - ln(p_k))
-        Δp_geopot_full[k] = R_gas*log(σ_levels_half[k+1]/σ_levels_full[k])
+        Δp_geopot_full[k] = R_dry*log(σ_levels_half[k+1]/σ_levels_full[k])
     end
 
     return Δp_geopot_half, Δp_geopot_full
@@ -48,14 +48,12 @@ function lapserate_correction(  σ_levels_full::Vector,
 end
 
 """
-    geopotential!(diagn,progn,B,G)
+    geopotential!(diagn,B,G)
 
 Compute spectral geopotential `geopot` from spectral temperature `temp`
 and spectral surface geopotential `geopot_surf` (orography*gravity).
 """
 function geopotential!( diagn::DiagnosticVariables{NF},
-                        progn::PrognosticVariables{NF},
-                        lf::Int,                # leapfrog step
                         B::Boundaries{NF},      # contains surface geopotential
                         G::Geometry{NF}         # contains precomputed layer-thickness arrays
                         ) where NF              # number format NF
@@ -65,12 +63,10 @@ function geopotential!( diagn::DiagnosticVariables{NF},
     @unpack lapserate_corr = G
     @unpack nlev = G                            # number of vertical levels
 
-    @boundscheck progn.nlev == diagn.nlev || throw(BoundsError)
-    @boundscheck progn.nlev == length(Δp_geopot_full) || throw(BoundsError)
-    @boundscheck progn.nlev == length(Δp_geopot_half) || throw(BoundsError)
+    @boundscheck diagn.nlev == length(Δp_geopot_full) || throw(BoundsError)
 
     # BOTTOM FULL LAYER
-    temp = progn.layers[end].leapfrog[lf].temp
+    temp = diagn.layers[end].dynamics_variables.temp_virt
     geopot = diagn.layers[end].dynamics_variables.geopot
     
     @inbounds for lm in eachharmonic(geopot,geopot_surf,temp)
@@ -79,8 +75,8 @@ function geopotential!( diagn::DiagnosticVariables{NF},
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
     @inbounds for k in nlev-1:-1:1
-        temp_k    = progn.layers[k].leapfrog[lf].temp
-        temp_k1   = progn.layers[k+1].leapfrog[lf].temp
+        temp_k    = diagn.layers[k].dynamics_variables.temp_virt
+        temp_k1   = diagn.layers[k+1].dynamics_variables.temp_virt
         geopot_k  = diagn.layers[k].dynamics_variables.geopot
         geopot_k1 = diagn.layers[k+1].dynamics_variables.geopot
 
@@ -102,4 +98,33 @@ function geopotential!( diagn::DiagnosticVariables{NF},
     #         geopot[l,l] += lapserate_corr[k]*(temp_k_below[l,l] - temp_k_above[l,l])
     #     end
     # end
+end
+
+"""
+    virtual_temperatuer!( ::DiagnosticVariablesLayer,
+                          ::PrimitiveEquationModel)
+                
+Calculates the virtual temperature Tv as
+
+    Tv = T(1+μq)
+
+With absolute temperature T, specific humidity q and
+
+    μ = (1-ξ)/ξ, ξ = R_dry/R_vapour.
+    
+In grid-point space and then transforms Tv back into spectral space
+for the geopotential calculation."""
+function virtual_temperature!(  diagn_layer::DiagnosticVariablesLayer,
+                                M::PrimitiveEquationModel)
+    
+    @unpack temp_grid, humid_grid, temp_virt_grid = diagn_layer.grid_variables
+    @unpack temp_virt = diagn_layer.dynamics_variables
+    μ = M.constants.μ_virt_temp
+
+    for ij in eachgridpoint(temp_virt_grid, temp_grid, humid_grid)
+        @inbounds temp_virt_grid[ij] = temp_grid[ij]*(1 + μ*humid_grid[ij])
+    end
+
+    S = M.spectral_transform
+    spectral!(temp_virt,temp_virt_grid,S)
 end
