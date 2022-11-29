@@ -12,6 +12,7 @@ The default values of the keywords define the default model setup.
 
     # MODEL (BarotropicModel, ShallowWaterModel, or PrimitiveEquationModel)
     model::Type{<:ModelSetup} = Barotropic
+    dry_core::Bool = true               # true = switches off humidity calculations
 
     # RESOLUTION AND GRID
     trunc::Int = 31                                     # spectral truncation
