@@ -77,7 +77,6 @@ function vertical_averages!(Diag::DiagnosticVariables{NF},
     end
 end
         
-
 """
 Compute the spectral tendency of the "vertical" velocity
 """
@@ -102,9 +101,11 @@ function vertical_velocity!(Diag::DiagnosticVariables{NF},
         V = Diag.layers[k].grid_variables.V_grid
         D = Diag.layers[k].grid_variables.div_grid
 
-        σ_tend = Diag.layers[k].dynamics_variables.σ_tend
-        σ_m =  Diag.layers[k].dynamics_variables.σ_tend
-        uv∇p = Diag.layers[k].dynamics_variables.uv∇p
+        # σ_tend/σ_m sits on half layers below (k+1/2), but its 0 at
+        # k=1/2 and nlev+1/2, don't explicitly store k=1/2
+        σ_tend = Diag.layers[k].dynamics_variables.σ_tend   # actually on half levels  
+        σ_m =  Diag.layers[k].dynamics_variables.σ_tend     # actually on half levels
+        uv∇p = Diag.layers[k].dynamics_variables.uv∇p       # on full levels
 
         # next layer below
         kmax = min(k+1,nlev)    # to avoid access to k = nlev+1
@@ -405,13 +406,14 @@ end
 
 """
     bernoulli_potential!(   B::AbstractGrid,    # Output: Bernoulli potential B = 1/2*(u^2+v^2)+g*η
-                            u::AbstractGrid,    # zonal velocity
-                            v::AbstractGrid,    # meridional velocity
+                            U::AbstractGrid,    # zonal velocity *coslat
+                            V::AbstractGrid,    # meridional velocity *coslat
                             η::AbstractGrid,    # interface displacement
                             g::Real,            # gravity
                             G::Geometry)
 
-Computes the Bernoulli potential 1/2*(u^2 + v^2) + g*η in grid-point space."""
+Computes the Bernoulli potential 1/2*(u^2 + v^2) + g*η in grid-point space. This is the
+ShallowWater variant that adds the interface displacement η."""
 function bernoulli_potential!(  B::AbstractGrid{NF},    # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
                                 U::AbstractGrid{NF},    # zonal velocity *coslat
                                 V::AbstractGrid{NF},    # meridional velocity *coslat
@@ -432,6 +434,63 @@ function bernoulli_potential!(  B::AbstractGrid{NF},    # Output: Bernoulli pote
         one_half_coslat⁻² = one_half*coslat⁻²[j]
         for ij in ring
             B[ij] = one_half_coslat⁻²*(U[ij]^2 + V[ij]^2) + gravity*η[ij]
+        end
+    end
+end
+
+"""
+    bernoulli_potential!(   diagn::DiagnosticVariables, 
+                            G::Geometry,
+                            S::SpectralTransform)
+
+Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral space.
+    (1) computes the kinetic energy KE=1/2(u^2+v^2) on the grid
+    (2) transforms KE to spectral space
+    (3) adds geopotential for the bernoulli potential in spectral space
+    (4) takes the Laplace operator.
+    
+This version is used for the PrimitiveEquation model"""
+function bernoulli_potential!(  diagn::DiagnosticVariablesLayer,
+                                G::Geometry,            
+                                S::SpectralTransform,
+                                )
+    
+    @unpack U_grid,V_grid = diagn.grid_variables
+    @unpack bernoulli, bernoulli_grid, geopot = diagn.dynamics_variables
+    @unpack div_tend = diagn.tendencies
+
+    bernoulli_potential!(bernoulli_grid,U_grid,V_grid,G)    # = 1/2(u^2 + v^2) on grid
+    spectral!(bernoulli,bernoulli_grid,S)                   # to spectral space
+    add_tendencies!(bernoulli,geopot)                       # add geopotential Φ
+    ∇²!(div_tend,bernoulli,S,add=true,flipsign=true)        # add -∇²(1/2(u^2 + v^2) + ϕ)
+end
+
+"""
+    bernoulli_potential!(   B::AbstractGrid,    # Output: Bernoulli potential B = 1/2*(u^2+v^2)+g*η
+                            u::AbstractGrid,    # zonal velocity
+                            v::AbstractGrid,    # meridional velocity
+                            η::AbstractGrid,    # interface displacement
+                            g::Real,            # gravity
+                            G::Geometry)
+
+Computes the Bernoulli potential 1/2*(u^2 + v^2), excluding the geopotential, in grid-point space.
+This is the PrimitiveEquation-variant where the geopotential is added later in spectral space."""
+function bernoulli_potential!(  B::AbstractGrid{NF},    # Output: Bernoulli potential B = 1/2*(u^2+v^2)
+                                U::AbstractGrid{NF},    # zonal velocity *coslat
+                                V::AbstractGrid{NF},    # meridional velocity *coslat
+                                G::Geometry{NF}         # used for precomputed cos²(lat)
+                                ) where {NF<:AbstractFloat}
+    
+    @unpack coslat⁻² = G
+    @boundscheck length(coslat⁻²) == get_nlat(U) || throw(BoundsError)
+
+    one_half = convert(NF,0.5)                      # convert to number format NF
+    rings = eachring(B,U,V)
+
+    @inbounds for (j,ring) in enumerate(rings)
+        one_half_coslat⁻² = one_half*coslat⁻²[j]
+        for ij in ring
+            B[ij] = one_half_coslat⁻²*(U[ij]^2 + V[ij]^2)
         end
     end
 end
