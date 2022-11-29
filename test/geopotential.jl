@@ -17,8 +17,30 @@
 
         for k in 1:8
             geopot_grid = Matrix(gridded(d.layers[k].dynamics_variables.geopot))
-            height_over_ocean = geopot_grid[48,24]/m.parameters.gravity      # middle of pacific
+            height_over_ocean = geopot_grid[48,24]/m.parameters.gravity     # middle of pacific
             @test heights[k] ≈ height_over_ocean rtol=0.5                   # very large error allowed
+        end
+    end
+end
+
+@testset "Add geopotential and kinetic energy, compute -∇²B term, no errors" begin
+    for NF in (Float32,Float64)
+        nlev = 8
+        p,d,m = initialize_speedy(NF,nlev=nlev,model=PrimitiveEquation,
+                                        Grid=FullGaussianGrid)
+
+        # give every layer some constant temperature
+        temp = 280      # in Kelvin
+        for k in 1:nlev
+            p.layers[k].leapfrog[1].temp[1] = temp*m.spectral_transform.norm_sphere
+        end
+
+        SpeedyWeather.geopotential!(d,p,1,m.boundaries,m.geometry)
+
+        lf = 1
+        for (progn_layer,diagn_layer) in zip(p.layers,d.layers)
+            SpeedyWeather.gridded!(diagn_layer,progn_layer,lf,m)             # propagate spectral state to grid
+            SpeedyWeather.bernoulli_potential!(diagn_layer,m.geometry,m.spectral_transform)
         end
     end
 end
