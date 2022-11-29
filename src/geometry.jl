@@ -75,7 +75,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
     @unpack trunc, nlev = P                         # grid type, spectral truncation, # of vertical levels
     @unpack radius_earth, rotation_earth = P        # radius of earth, angular frequency
-    @unpack R_gas, akap = P                         # gas constant for dry air, ratio of gas consts
+    @unpack R_dry, akap = P                         # gas constant for dry air, ratio of gas consts
     @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
 
     # RESOLUTION PARAMETERS
@@ -119,7 +119,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     σ_f = akap ./ (2σ_levels_full)
 
     # GEOPOTENTIAL, coefficients to calculate geopotential
-    Δp_geopot_half, Δp_geopot_full = initialise_geopotential(σ_levels_full,σ_levels_half,R_gas)
+    Δp_geopot_half, Δp_geopot_full = initialise_geopotential(σ_levels_full,σ_levels_half,R_dry)
 
     # LAPSE RATE correction
     lapserate_corr = lapserate_correction(σ_levels_full,σ_levels_half,Δp_geopot_full)
