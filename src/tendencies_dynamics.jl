@@ -101,7 +101,7 @@ function vertical_velocity!(Diag::DiagnosticVariables{NF},
         V = Diag.layers[k].grid_variables.V_grid
         D = Diag.layers[k].grid_variables.div_grid
 
-        # σ_tend/σ_m sits on half layers below (k+1/2), but its 0 at
+        # σ_tend & σ_m sit on half layers below (k+1/2), but its 0 at
         # k=1/2 and nlev+1/2, don't explicitly store k=1/2
         σ_tend = Diag.layers[k].dynamics_variables.σ_tend   # actually on half levels  
         σ_m =  Diag.layers[k].dynamics_variables.σ_tend     # actually on half levels
@@ -112,6 +112,7 @@ function vertical_velocity!(Diag::DiagnosticVariables{NF},
         σ_tend_below = Diag.layers[kmax].dynamics_variables.σ_tend
         σ_m_below = Diag.layers[kmax].dynamics_variables.σ_m
 
+        # todo check whether coslat unscaling is needed
         for ij in eachgridpoint(U,V,D,U_mean,V_mean,div_mean,dpres_dlon_grid,dpres_dlat_grid)
             uv∇p_ij = (U[ij]-U_mean[ij])*dpres_dlon_grid[ij] + (V[ij]-V_mean[ij])*dpres_dlat_grid[ij]
             uv∇p[ij] = uv∇p_ij
@@ -125,6 +126,47 @@ function vertical_velocity!(Diag::DiagnosticVariables{NF},
             # for k = nlev, σ_tend_below == σ_tend, so nothing actually happens here
             σ_tend_below[ij] = σ_tend[ij]
             σ_m_below[ij] = σ_m[ij]
+        end
+    end
+end
+
+function vertical_advection!(   diagn::DiagnosticVariables,
+                                model::ModelSetup)
+    
+    @unpack σ_levels_thick⁻¹_half, nlev = model.geometry
+    @boundscheck nlev == diagn.nlev || throw(BoundsError)
+
+    # ALL LAYERS (but use indexing tricks to avoid out of bounds access)
+    @inbounds for k in 1:nlev       
+        # for k==1 "above" term is 0, for k==nlev "below" term is zero
+        # avoid out-of-bounds indexing with k_above, k_below as follows
+        k_above = k == 1 ? nlev : k-1   # wrap around to access M_nlev+1/2 = 0 (which zeros that term)
+        k_below = min(k+1,nlev)         # just saturate, because M_nlev+1/2 = 0 (which zeros that term)
+        
+        # mass fluxes, M_1/2 = M_nlev+1/2 = 0, but k=1/2 isn't explicitly stored
+        σ_tend_above = diagn.layers[k_above].dynamics_variables.σ_tend
+        σ_tend_below = diagn.layers[k].dynamics_variables.σ_tend
+
+        # zonal wind
+        @unpack u_tend = diagn.layers[k].tendencies
+        U_above = diagn.layers[k_above].grid_variables.U_grid
+        U = diagn.layers[k].grid_variables.U_grid
+        U_below = diagn.layers[k_below].grid_variables.U_grid
+
+        # meridional wind
+        @unpack v_tend = diagn.layers[k].tendencies
+        V_above = diagn.layers[k_above].grid_variables.V_grid
+        V = diagn.layers[k].grid_variables.V_grid
+        V_below = diagn.layers[k_below].grid_variables.V_grid
+
+        Δσk = σ_levels_thick⁻¹_half[k]      # = 1/(2Δp_k), for convenience
+
+        # TODO check whether coslat unscaling is needed
+        @inbounds for ij in eachgridpoint(u_tend)
+            u_tend[ij] = (σ_tend_above[ij]*(U_above[ij] - U[ij]) +
+                            σ_tend_below[ij]*(U[ij] - U_below[ij]))*Δσk
+            v_tend[ij] = (σ_tend_above[ij]*(V_above[ij] - V[ij]) +
+                            σ_tend_below[ij]*(V[ij] - V_below[ij]))*Δσk
         end
     end
 end
@@ -187,8 +229,6 @@ function zonal_wind_tendency!(Diag::DiagnosticVariables{NF}, # Diagnostic variab
   
 
 end
-
-
 
 """
 Compute the spectral tendency of the meridional wind 
