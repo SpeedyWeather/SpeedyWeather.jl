@@ -7,8 +7,10 @@ struct Tendencies{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     div_tend  ::LowerTriangularMatrix{Complex{NF}}      # Divergence of horizontal wind field [1/s]
     temp_tend ::LowerTriangularMatrix{Complex{NF}}      # Absolute temperature [K]
     humid_tend::LowerTriangularMatrix{Complex{NF}}      # Specific humidity [g/kg]
-    u_tend          ::Grid                              # zonal velocity
-    v_tend          ::Grid                              # meridional velocity
+    u_tend    ::LowerTriangularMatrix{Complex{NF}}      # zonal velocity (spectral)
+    v_tend    ::LowerTriangularMatrix{Complex{NF}}      # meridional velocity (spectral)
+    u_tend_grid     ::Grid                              # zonal velocity (grid)
+    v_tend_grid     ::Grid                              # meridinoal velocity (grid)
     humid_grid_tend ::Grid                              # specific humidity
     temp_grid_tend  ::Grid                              # temperature
 end
@@ -25,13 +27,16 @@ function Base.zeros(::Type{Tendencies},
     div_tend        = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # divergence
     temp_tend       = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # absolute Temperature
     humid_tend      = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # specific humidity
-    u_tend          = zeros(Grid{NF},nresolution)                               # zonal velocity
-    v_tend          = zeros(Grid{NF},nresolution)                               # meridional velocity
+    u_tend          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # zonal velocity
+    v_tend          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # meridional velocity
+    u_tend_grid     = zeros(Grid{NF},nresolution)                               # zonal velocity
+    v_tend_grid     = zeros(Grid{NF},nresolution)                               # meridional velocity
     humid_grid_tend = zeros(Grid{NF},nresolution)                               # specific humidity
     temp_grid_tend  = zeros(Grid{NF},nresolution)                               # temperature
 
     return Tendencies(  vor_tend,div_tend,temp_tend,humid_tend,
-                        u_tend,v_tend,humid_grid_tend,temp_grid_tend)
+                        u_tend,v_tend,u_tend_grid,v_tend_grid,
+                        humid_grid_tend,temp_grid_tend)
 end
 
 """
