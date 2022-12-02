@@ -393,6 +393,15 @@ function get_spectral_tendencies!(Prog::PrognosticVariables{NF},
 
 end
 
+"""
+    add_tendencies!(tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
+                    term1::LowerTriangularMatrix{NF},   # with term1
+                    term2::LowerTriangularMatrix{NF}    # and term2
+                    ) where NF                          # number format real or complex
+
+Accumulates three `LowerTriangularMatrix`s element-wise into the first.
+
+    tend += term1 + term2."""
 function add_tendencies!(   tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
                             term1::LowerTriangularMatrix{NF},   # with term1
                             term2::LowerTriangularMatrix{NF}    # and term2
@@ -403,6 +412,14 @@ function add_tendencies!(   tend::LowerTriangularMatrix{NF},    # tendency to ac
     end
 end
 
+"""
+    add_tendencies!(tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
+                    term::LowerTriangularMatrix{NF},    # with term
+                    ) where NF                          # number format real or complex
+
+Accumulates two `LowerTriangularMatrix`s element-wise into the first.
+
+    tend += term."""
 function add_tendencies!(   tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
                             term::LowerTriangularMatrix{NF}     # with term
                             ) where NF                          # number format real or complex

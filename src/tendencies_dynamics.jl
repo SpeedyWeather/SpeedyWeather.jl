@@ -101,7 +101,7 @@ function vertical_velocity!(Diag::DiagnosticVariables{NF},
         V = Diag.layers[k].grid_variables.V_grid
         D = Diag.layers[k].grid_variables.div_grid
 
-        # σ_tend/σ_m sits on half layers below (k+1/2), but its 0 at
+        # σ_tend & σ_m sit on half layers below (k+1/2), but its 0 at
         # k=1/2 and nlev+1/2, don't explicitly store k=1/2
         σ_tend = Diag.layers[k].dynamics_variables.σ_tend   # actually on half levels  
         σ_m =  Diag.layers[k].dynamics_variables.σ_tend     # actually on half levels
@@ -112,6 +112,7 @@ function vertical_velocity!(Diag::DiagnosticVariables{NF},
         σ_tend_below = Diag.layers[kmax].dynamics_variables.σ_tend
         σ_m_below = Diag.layers[kmax].dynamics_variables.σ_m
 
+        # TODO check whether coslat unscaling is needed
         for ij in eachgridpoint(U,V,D,U_mean,V_mean,div_mean,dpres_dlon_grid,dpres_dlat_grid)
             uv∇p_ij = (U[ij]-U_mean[ij])*dpres_dlon_grid[ij] + (V[ij]-V_mean[ij])*dpres_dlat_grid[ij]
             uv∇p[ij] = uv∇p_ij
@@ -125,6 +126,47 @@ function vertical_velocity!(Diag::DiagnosticVariables{NF},
             # for k = nlev, σ_tend_below == σ_tend, so nothing actually happens here
             σ_tend_below[ij] = σ_tend[ij]
             σ_m_below[ij] = σ_m[ij]
+        end
+    end
+end
+
+function vertical_advection!(   diagn::DiagnosticVariables,
+                                model::PrimitiveEquationModel)
+    
+    @unpack σ_levels_thick⁻¹_half, nlev = model.geometry
+    @boundscheck nlev == diagn.nlev || throw(BoundsError)
+
+    # ALL LAYERS (but use indexing tricks to avoid out of bounds access for top/bottom)
+    @inbounds for k in 1:nlev       
+        # for k==1 "above" term is 0, for k==nlev "below" term is zero
+        # avoid out-of-bounds indexing with k_above, k_below as follows
+        k_above = k == 1 ? nlev : k-1   # wrap around to access M_nlev+1/2 = 0 (which zeros that term)
+        k_below = min(k+1,nlev)         # just saturate, because M_nlev+1/2 = 0 (which zeros that term)
+        
+        # mass fluxes, M_1/2 = M_nlev+1/2 = 0, but k=1/2 isn't explicitly stored
+        σ_tend_above = diagn.layers[k_above].dynamics_variables.σ_tend
+        σ_tend_below = diagn.layers[k].dynamics_variables.σ_tend
+
+        # zonal wind
+        u_tend = diagn.layers[k].tendencies.u_tend_grid
+        U_above = diagn.layers[k_above].grid_variables.U_grid
+        U = diagn.layers[k].grid_variables.U_grid
+        U_below = diagn.layers[k_below].grid_variables.U_grid
+
+        # meridional wind
+        v_tend = diagn.layers[k].tendencies.v_tend_grid
+        V_above = diagn.layers[k_above].grid_variables.V_grid
+        V = diagn.layers[k].grid_variables.V_grid
+        V_below = diagn.layers[k_below].grid_variables.V_grid
+
+        Δσk = σ_levels_thick⁻¹_half[k]      # = 1/(2Δp_k), for convenience
+
+        # TODO check whether coslat unscaling is needed
+        @inbounds for ij in eachgridpoint(u_tend,v_tend)
+            u_tend[ij] = (σ_tend_above[ij]*(U_above[ij] - U[ij]) +
+                            σ_tend_below[ij]*(U[ij] - U_below[ij]))*Δσk
+            v_tend[ij] = (σ_tend_above[ij]*(V_above[ij] - V[ij]) +
+                            σ_tend_below[ij]*(V[ij] - V_below[ij]))*Δσk
         end
     end
 end
@@ -148,81 +190,43 @@ function temperature_grid_anomaly!(Diag::DiagnosticVariables{NF}, # Diagnostic v
 
 end
 
-"""
-Compute the spectral tendency of the zonal wind
-"""
-function zonal_wind_tendency!(Diag::DiagnosticVariables{NF}, # Diagnostic variables
-                              M
-                              )where {NF<:AbstractFloat}
+function uv_tendencies!(diagn::DiagnosticVariablesLayer,
+                        surf::SurfaceVariables,
+                        model::PrimitiveEquationModel)
     
-    @unpack u_tend = Diag.tendencies
-    @unpack u_grid,v_grid,vor_grid,temp_grid_anomaly= Diag.grid_variables
-    @unpack sigma_tend,pres_surf_gradient_grid_x,pres_surf_gradient_grid_y,sigma_u = Diag.intermediate_variables
-    
-    
-    @unpack rgas,σ_levels_half⁻¹_2 = M.GeoSpectral.geometry #I think this is dhsr 
+    @unpack f_coriolis, coslat⁻² = model.geometry
+    @unpack R_dry = model.constants
 
-    _,_,nlev = size(u_grid)
+    @unpack u_tend_grid, v_tend_grid = diagn.tendencies   # already contains vertical advection
+    U = diagn.grid_variables.U_grid             # U = u*coslat
+    V = diagn.grid_variables.V_grid             # V = v*coslat
+    vor = diagn.grid_variables.vor_grid         # relative vorticity
+    dpres_dx = surf.dpres_dlon_grid             # zonal gradient of logarithm of surface pressure
+    dpres_dy = surf.dpres_dlat_grid             # meridional gradient thereof
+    Tᵥ = diagn.grid_variables.temp_virt_grid    # virtual temperature
 
+    # precompute ring indices and boundscheck
+    rings = eachring(u_tend_grid,v_tend_grid,U,V,vor,dpres_dx,dpres_dy,Tᵥ)
 
-    #Update px,py
-
-    pres_surf_gradient_grid_x = rgas*pres_surf_gradient_grid_x
-    pres_surf_gradient_grid_y = rgas*pres_surf_gradient_grid_y
-
-   
-
-    for k in 2:nlev
-        sigma_u[:,:,k] = sigma_tend[:,:,k].*(u_grid[:,:,k] - u_grid[:,:,k-1])
+    @inbounds for (j,ring) in enumerate(rings)
+        coslat⁻²j = coslat⁻²[j]
+        f = f_coriolis[j]
+        for ij in ring
+            ω = vor[ij] + f         # absolute vorticity
+            RTᵥ = R_dry*Tᵥ[ij]      # gas constant (dry air) times virtual temperature
+            u_tend_grid[ij] = (u_tend_grid[ij] + V[ij]*ω - RTᵥ*dpres_dx[ij])*coslat⁻²j
+            v_tend_grid[ij] = (v_tend_grid[ij] - U[ij]*ω - RTᵥ*dpres_dy[ij])*coslat⁻²j
+        end
     end
 
+    # convert to spectral space
+    @unpack u_tend, v_tend = diagn.tendencies   # spectral fields
+    S = model.spectral_transform
 
-    for k in 1:nlev
-        u_tend[:,:,k] = u_tend[:,:,k] + v_grid[:,:,k].*vor_grid[:,:,k] 
-                        - temp_grid_anomaly[:,:,k].*pres_surf_gradient_grid_x
-                        - (sigma_u[:,:,k+1] + sigma_u[:,:,k])*σ_levels_half⁻¹_2[k]
-    end
+    spectral!(u_tend,u_tend_grid,S)
+    spectral!(v_tend,v_tend_grid,S)
 
-
-  
-
-end
-
-
-
-"""
-Compute the spectral tendency of the meridional wind 
-"""
-function meridional_wind_tendency!(Diag::DiagnosticVariables{NF}, # Diagnostic variables
-                                   M
-                                  )where {NF<:AbstractFloat}
-
-    @unpack v_tend = Diag.tendencies
-    @unpack vor_grid,u_grid,v_grid,temp_grid_anomaly =Diag.grid_variables
-    @unpack sigma_tend,sigma_u,pres_surf_gradient_grid_x,pres_surf_gradient_grid_y = Diag.intermediate_variables
-    
-    
-    @unpack rgas,σ_levels_half⁻¹_2 = M.GeoSpectral.geometry #I think this is dhsr 
-
-
-    _,_,nlev = size(u_grid)
-
-
-    for k in 2:nlev
-        sigma_u[:,:,k] = sigma_tend[:,:,k].*(v_grid[:,:,k] - v_grid[:,:,k-1])
-    end
-          
- 
-
-    for k in 1:nlev
-        v_tend[:,:,k] = v_tend[:,:,k] + u_grid[:,:,k].*vor_grid[:,:,k] 
-                        - temp_grid_anomaly[:,:,k].*pres_surf_gradient_grid_y
-                       - (sigma_u[:,:,k+1] + sigma_u[:,:,k])*σ_levels_half⁻¹_2[k]
-    end
-
-
-
-
+    return nothing
 end
 
 """
