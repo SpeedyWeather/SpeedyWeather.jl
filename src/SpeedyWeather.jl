@@ -113,6 +113,7 @@ module SpeedyWeather
     include("tendencies_parametrizations.jl")
     include("convection.jl")
     include("large_scale_condensation.jl")
+    include("shortwave_radiation.jl")
 
     include("time_integration.jl")
     include("pretty_printing.jl")
