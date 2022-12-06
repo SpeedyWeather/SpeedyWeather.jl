@@ -81,3 +81,12 @@ SpeedyWeather.radlw_down!
 SpeedyWeather.compute_bbe!
 SpeedyWeather.radlw_up!
 ```
+
+## Shortwave radiation
+```@docs
+SpeedyWeather.shortwave_radiation!
+SpeedyWeather.solar!
+SpeedyWeather.sol_oz!
+SpeedyWeather.cloud!
+SpeedyWeather.radsw!
+```
