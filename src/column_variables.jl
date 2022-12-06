@@ -8,9 +8,9 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
 @with_kw mutable struct ColumnVariables{NF<:AbstractFloat}
 
     # COORDINATES
-    lat::NF = 0                         # latitude [˚N], needed for radiation?
-    lon::NF = 0                         # longitude [˚E], needed for radiation?
     nlev::Int = 0                       # number of vertical levels
+    nband::Int = 0                       # number of radiation bands, needed for radiation
+    n_stratosphere_levels::Int = 0       # number of stratospheric levels, needed for radiation
 
     # PROGNOSTIC VARIABLES
     u::Vector{NF} = zeros(NF,nlev)      # zonal velocity
@@ -58,8 +58,6 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     precip_large_scale::NF = 0  # Precipitation due to large-scale condensation
 
     # Longwave radiation
-    nband::Int = 4 # FIXME
-    n_stratosphere_levels::Int = 2  # FIXME
     ## New vars in radlw_down!
     wvi::Matrix{NF} = fill(NF(NaN), nlev, 2)  # Weights for vertical interpolation
     tau2::Matrix{NF} = fill(NF(NaN), nlev, nband) # Transmissivity of atmospheric layers
