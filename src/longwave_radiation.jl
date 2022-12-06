@@ -64,11 +64,13 @@ function radlw_down!(
     end
 
     # Temperature gradient in tropospheric layers
-    anish  = NF(0.5 * 1.)
+    anis = NF(1.)
+    anish = NF(0.5) # 0.5 * anis
+
     for k = n_stratosphere_levels+1:nlev-1
         column.st4a[k, 2] = anish * max(column.st4a[k, 1] - column.st4a[k - 1, 1], NF(0.))
     end
-    column.st4a[nlev, 2] = anish * max(temp[nlev] - column.st4a[nlev-1, 1], NF(0.))
+    column.st4a[nlev, 2] = anis * max(temp[nlev] - column.st4a[nlev-1, 1], NF(0.))
 
     # Blackbody emission in the stratosphere
     for k = 1:n_stratosphere_levels
