@@ -9,6 +9,7 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
 
     # COORDINATES
     nlev::Int = 0                        # number of vertical levels
+    lon::NF = NaN                        # longitude
     lat::NF = NaN                        # latitude, needed for shortwave radiation
     nband::Int = 0                       # number of radiation bands, needed for radiation
     n_stratosphere_levels::Int = 0       # number of stratospheric levels, needed for radiation
