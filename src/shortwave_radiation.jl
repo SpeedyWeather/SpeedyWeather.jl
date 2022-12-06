@@ -146,6 +146,7 @@ function cloud!(
     @unpack wpcl, gse_s1, gse_s0, clsmax, clsminl = model.parameters.radiation_coefs
     @unpack humid, rel_hum, grad_dry_static_energy, precip_convection = column
     @unpack precip_large_scale, cloud_top, nlev, fmask = column
+    @unpack n_stratosphere_levels = model.geometry
 
     # 1.0 Cloud cover, defined as the sum of:
     # - a term proportional to the square - root of precip. rate
@@ -163,7 +164,7 @@ function cloud!(
         column.icltop = nlev + 1
     end
 
-    for k in 3:(nlev - 2)   # TODO use n_stratospheric_levels
+    for k in n_stratosphere_levels+1:(nlev - n_stratosphere_levels)
         drh = rel_hum[k] - rhcl1
         if (drh > column.cloudc) & (humid[k] > qcl)
             column.cloudc = drh
