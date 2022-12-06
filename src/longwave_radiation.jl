@@ -5,7 +5,8 @@ Compute energy fractions in four longwave bands as a function of temperature.
 
 """
 function radset!(model::PrimitiveEquationModel{NF}) where {NF<:AbstractFloat}
-    @unpack epslw, fband = model.parameters
+    @unpack fband = model.parameters
+    @unpack epslw = model.parameters.radiation_coefs
 
     nband = size(fband)[2]
     @assert nband == 4 "Only four bands are supported, given $nband"
@@ -42,7 +43,8 @@ function radlw_down!(
 ) where {NF<:AbstractFloat}
 
     @unpack nlev, temp, wvi, tau2 = column
-    @unpack nband, epslw, emisfc, sbc, fband, n_stratosphere_levels = model.parameters
+    @unpack nband, sbc, fband, n_stratosphere_levels = model.parameters
+    @unpack epslw, emisfc = model.parameters.radiation_coefs
     
     # 1. Blackbody emission from atmospheric levels.
     #    The linearized gradient of the blakbody emission is computed
@@ -135,7 +137,8 @@ function compute_bbe!(
     column::ColumnVariables{NF}, model::PrimitiveEquationModel
 ) where {NF<:AbstractFloat}
 
-@unpack emisfc, sbc = model.parameters
+@unpack sbc = model.parameters
+@unpack emisfc = model.parameters.radiation_coefs
 @unpack ts = column
 
     column.fsfcu = emisfc * sbc * ts^4
@@ -153,7 +156,8 @@ function radlw_up!(
     column::ColumnVariables{NF}, model::PrimitiveEquationModel
 ) where {NF<:AbstractFloat}
 
-@unpack nband, emisfc, fband, epslw, n_stratosphere_levels = model.parameters
+@unpack nband, fband, n_stratosphere_levels = model.parameters
+@unpack epslw, emisfc = model.parameters.radiation_coefs
 @unpack nlev, temp, fsfcu, fsfcd, flux, ts, tau2, st4a, dfabs, stratc = column
 @unpack σ_levels_thick = model.geometry
 

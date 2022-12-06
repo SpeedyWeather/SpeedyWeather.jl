@@ -33,3 +33,11 @@ Parameters for computing saturation vapour pressure using the August-Roche-Magnu
     C₁::NF = 17.269
     C₂::NF = 21.875
 end
+
+"""
+Parameters for radiation parameterizations.
+"""
+@with_kw struct RadiationCoefs{NF<:Real} <: Coefficients
+    epslw::NF = 0.05                            # Fraction of blackbody spectrum absorbed/emitted by PBL only
+    emisfc::NF = 0.98                           # Longwave surface emissivity
+end

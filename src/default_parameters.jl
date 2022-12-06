@@ -90,8 +90,9 @@ The default values of the keywords define the default model setup.
     # Longwave radiation
     nband::Int = 4                                    # Number of bands used to compute fband
     fband::Matrix{Real} = fill(NF(NaN), 400, nband)   # Energy fraction emitted in each longwave band = f(T)
-    epslw::Real = NF(0.05)                            # Fraction of blackbody spectrum absorbed/emitted by PBL only
-    emisfc::Real = NF(0.98)                           # Longwave surface emissivity
+
+    # Radiation
+    radiation_coefs::RadiationCoefs = RadiationCoefs{NF}()
 
     # TIME STEPPING
     startdate::DateTime = DateTime(2000,1,1)# time at which the integration starts
