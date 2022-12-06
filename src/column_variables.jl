@@ -62,17 +62,17 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     wvi::Matrix{NF} = fill(NF(NaN), nlev, 2)  # Weights for vertical interpolation
     tau2::Matrix{NF} = fill(NF(NaN), nlev, nband) # Transmissivity of atmospheric layers
     dfabs::Vector{NF} = fill(NF(NaN), nlev)   # Flux of sw rad. absorbed by each atm. layer
-    fsfcd::NF = NF(NaN)                       # Downward-only flux of sw rad. at the surface
+    fsfcd::NF = NaN                       # Downward-only flux of sw rad. at the surface
     st4a::Matrix{NF} = fill(NF(NaN), nlev, 2) # Blackbody emission from full and half atmospheric levels
     flux::Vector{NF} = fill(NF(NaN), nband)       # Radiative flux in different spectral bands
 
     ## New vars in compute_bbe!
-    fsfcu::NF = NF(NaN) # surface blackbody emission (upward)
-    ts::NF = NF(NaN)    # surface temperature
+    fsfcu::NF = NaN # surface blackbody emission (upward)
+    ts::NF = NaN    # surface temperature
 
     ## New vars in radlw_up!
-    fsfc::NF = NF(NaN) # Net (downw.) flux of sw rad. at the surface
-    ftop::NF = NF(NaN) # Net (downw.) flux of sw rad. at the atm. top
+    fsfc::NF = NaN # Net (downw.) flux of sw rad. at the surface
+    ftop::NF = NaN # Net (downw.) flux of sw rad. at the atm. top
     stratc::Vector{NF} = fill(NF(NaN), n_stratosphere_levels) # Stratospheric correction term 
 end
 
