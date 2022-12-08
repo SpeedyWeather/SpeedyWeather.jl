@@ -73,3 +73,12 @@ SpeedyWeather.timestep!
 SpeedyWeather.first_timesteps!
 SpeedyWeather.leapfrog!
 ```
+
+## Shortwave radiation
+```@docs
+SpeedyWeather.shortwave_radiation!
+SpeedyWeather.solar!
+SpeedyWeather.sol_oz!
+SpeedyWeather.cloud!
+SpeedyWeather.radsw!
+```

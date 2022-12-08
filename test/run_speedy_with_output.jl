@@ -21,12 +21,15 @@
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
 end
 
-@testset "Restart from output file" begin 
-    p, d, m = initialize_speedy(Float32, model=ShallowWaterModel, output=true)
+@testset "Restart from output file" begin
+    
+    p = run_speedy(Float32, initial_conditions=:restart, restart_id=1)
+
+    p, d, m = initialize_speedy(Float32, model=ShallowWaterModel, output=true, run_id="restart-test")
     SpeedyWeather.time_stepping!(p, d, m)
  
-    # 8 is hard coded as we currently have no other way to determine the run id
-    progn, diagn, model = initialize_speedy(Float32, initial_conditions=:restart, model=ShallowWaterModel, restart_id=8)
+    progn, diagn, model = initialize_speedy(Float32, initial_conditions=:restart, model=ShallowWaterModel, restart_id="restart-test")
+
     for varname in propertynames(progn.layers[1].leapfrog[1])
         if SpeedyWeather.has(progn, varname)
             for (var_new, var_old) in zip(SpeedyWeather.get_var(p, varname), SpeedyWeather.get_var(progn, varname))

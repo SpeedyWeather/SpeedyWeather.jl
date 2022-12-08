@@ -70,7 +70,7 @@ end
 
 function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup) where NF
     @unpack restart_path, restart_id = M.parameters
-    restart_file = jldopen(joinpath(restart_path,@sprintf("run%04d",restart_id),"restart.jld2"))
+    restart_file = jldopen(joinpath(restart_path,string("run-",run_id_string(restart_id)),"restart.jld2"))
     progn_old = restart_file["prognostic_variables"]
     version = restart_file["version"]   # currently unused, TODO check for compat with version
     time = restart_file["time"]         # currently unused
@@ -106,8 +106,8 @@ end
 #     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
 #     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
 #     # gravity:      Gravitational acceleration [m/s^2]
-#     # R_gas:        Specific gas constant for dry air [J/kg/K]
-#     @unpack temp_ref, temp_top, lapse_rate, gravity, R_gas = P
+#     # R_dry:        Specific gas constant for dry air [J/kg/K]
+#     @unpack temp_ref, temp_top, lapse_rate, gravity, R_dry = P
 #     @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
 #     @unpack norm_sphere = G.spectral_transform      # normalization of the l=m=0 spherical harmonic
 
@@ -127,7 +127,7 @@ end
 #     for k in n_stratosphere_levels+1:nlev
 #         for m in 1:mmax+1
 #             for l in m:lmax+1
-#                 temp[l,m,k] = temp_surf[l,m]*σ_levels_full[k]^(R_gas*lapse_rate_scaled)
+#                 temp[l,m,k] = temp_surf[l,m]*σ_levels_full[k]^(R_dry*lapse_rate_scaled)
 #             end
 #         end
 #     end
@@ -150,7 +150,7 @@ end
 #     # gravity:      Gravitational acceleration [m/s^2]
 #     # R:            Specific gas constant for dry air [J/kg/K]
 #     # pres_ref:     Reference surface pressure [hPa]
-#     @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R_gas = P
+#     @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R_dry = P
 #     @unpack geopot_surf = B                     # spectral surface geopotential
 #     geopot_surf_grid = gridded(geopot_surf,S)   # convert to grid-point space
 
@@ -161,7 +161,7 @@ end
 #     for j in 1:nlat
 #         for i in 1:nlon
 #             pres_grid[i,j] = log_pres_ref + 
-#                 log(1 - lapse_rate_scaled*geopot_surf_grid[i,j]/temp_ref)/(R_gas*lapse_rate_scaled)
+#                 log(1 - lapse_rate_scaled*geopot_surf_grid[i,j]/temp_ref)/(R_dry*lapse_rate_scaled)
 #         end
 #     end
 

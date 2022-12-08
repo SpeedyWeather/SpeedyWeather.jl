@@ -393,38 +393,38 @@ function get_spectral_tendencies!(Prog::PrognosticVariables{NF},
 
 end
 
-function add_tendencies!(   tend::AbstractMatrix{NF},   # tendency to accumulate into
-                            term1::AbstractMatrix{NF},  # with term1
-                            term2::AbstractMatrix{NF}   # and term2
-                            ) where NF                  # number format real or complex
+"""
+    add_tendencies!(tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
+                    term1::LowerTriangularMatrix{NF},   # with term1
+                    term2::LowerTriangularMatrix{NF}    # and term2
+                    ) where NF                          # number format real or complex
 
-    # term1, term2 can have one more degree l which will be ignored in the loop though
-    size_compat1 = size(tend) == size(term1) || (size(term1) .- (1,0)) == size(tend)
-    size_compat2 = size(tend) == size(term2) || (size(term2) .- (1,0)) == size(tend)
-    @boundscheck size_compat1 || throw(BoundsError)
-    @boundscheck size_compat2 || throw(BoundsError)
+Accumulates three `LowerTriangularMatrix`s element-wise into the first.
 
-    lmax,mmax = size(tend) .- 1
+    tend += term1 + term2."""
+function add_tendencies!(   tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
+                            term1::LowerTriangularMatrix{NF},   # with term1
+                            term2::LowerTriangularMatrix{NF}    # and term2
+                            ) where NF                          # number format real or complex
 
-    @inbounds for m in 1:mmax+1
-        for l in m:lmax+1
-            tend[l,m] += (term1[l,m] + term2[l,m])
-        end
+    @inbounds for lm in eachharmonic(tend,term1,term2)
+        tend[lm] += (term1[lm] + term2[lm])
     end
 end
 
-function add_tendencies!(   tend::AbstractMatrix{Complex{NF}},  # tendency to accumulate into
-                            term::AbstractMatrix{Complex{NF}}   # with term
+"""
+    add_tendencies!(tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
+                    term::LowerTriangularMatrix{NF},    # with term
+                    ) where NF                          # number format real or complex
+
+Accumulates two `LowerTriangularMatrix`s element-wise into the first.
+
+    tend += term."""
+function add_tendencies!(   tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
+                            term::LowerTriangularMatrix{NF}     # with term
                             ) where NF                          # number format real or complex
 
-    # term can have one more degree l which will be ignored in the loop though
-    size_compat = size(tend) == size(term) || (size(term) .- (1,0)) == size(tend)
-    @boundscheck size_compat || throw(BoundsError)
-    lmax,mmax = size(tend) .- 1
-
-    @inbounds for m in 1:mmax+1
-        for l in m:lmax+1
-            tend[l,m] += term[l,m]
-        end
+    @inbounds for lm in eachharmonic(tend,term)
+        tend[lm] += term[lm]
     end
 end

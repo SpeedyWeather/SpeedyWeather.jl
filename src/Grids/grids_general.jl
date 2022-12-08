@@ -96,6 +96,12 @@ end
 
 UnitRange `ijs` to access each grid point on grid `grid`."""
 eachgridpoint(grid::AbstractGrid) = Base.OneTo(get_npoints(grid))
+function eachgridpoint(grids::AbstractGrid...) 
+    for grid in grids
+        @boundscheck length(grid.data) == length(grids[1].data) || throw(BoundsError)
+    end
+    return eachgridpoint(grids[1])
+end
 
 """
     rings = eachring(grid)
