@@ -1,5 +1,4 @@
-Copyright (c) 2021 Milan Kloewer
-
+Copyright (c) 2022 SpeedyWeather contributors
 Copyright (c) 2022 Fred Kucharski and Franco Molteni
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
