@@ -631,3 +631,38 @@ function spectral(  map::AbstractGrid{NF},      # gridded field
     alms = LowerTriangularMatrix{Complex{NF}}(undef,S.lmax+2,S.mmax+1)
     return spectral!(alms,map,S)                # in-place version
 end
+
+
+# GPU methods
+
+function Adapt.adapt_structure(to, st::SpectralTransform)
+    SpectralTransform(Adapt.adapt(to, st.Grid),             # GRID
+                      st.nresolution, st.order,
+                      st.lmax, st.mmax, st.nfreq_max,       # SPECTRAL RESOLUTION
+                      Adapt.adapt(to, st.m_truncs),
+                      st.nlon_max,                          # CORRESPONDING GRID SIZE
+                      Adapt.adapt(to, st.nlons),
+                      st.nlat, st.nlat_half,
+                      Adapt.adapt(to, st.colat),            # CORRESPONDING GRID VECTORS
+                      Adapt.adapt(to, st.cos_colat),
+                      Adapt.adapt(to, st.sin_colat),
+                      Adapt.adapt(to, st.lon_offsets),
+                      st.norm_sphere,                       # NORMALIZATION
+                      Adapt.adapt(to, st.rfft_plans),       # FFT plans, one plan for each latitude ring
+                      Adapt.adapt(to, st.brfft_plans),
+                      st.recompute_legendre,                # LEGENDRE POLYNOMIALS
+                      Adapt.adapt(to, st.Λ),
+                      Adapt.adapt(to, st.Λs),
+                      Adapt.adapt(to, st.solid_angles),     # SOLID ANGLES ΔΩ FOR QUADRATURE
+                      Adapt.adapt(to, st.ϵlms),             # RECURSION FACTORS
+                      Adapt.adapt(to, st.grad_x),           # GRADIENT MATRICES
+                      Adapt.adapt(to, st.grad_y1),
+                      Adapt.adapt(to, st.grad_y2),
+                      Adapt.adapt(to, st.grad_y_vordiv1),   # GRADIENT MATRICES FOR U,V
+                      Adapt.adapt(to, st.grad_y_vordiv2),
+                      Adapt.adapt(to, st.vordiv_to_uv_x),   # GRADIENT MATRICES FOR Vorticity,Divergence
+                      Adapt.adapt(to, st.vordiv_to_uv1),
+                      Adapt.adapt(to, st.vordiv_to_uv2),
+                      Adapt.adapt(to, st.eigenvalues),      # EIGENVALUES
+                      Adapt.adapt(to, st.eigenvalues⁻¹))
+end

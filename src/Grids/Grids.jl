@@ -8,3 +8,8 @@ include("healpix.jl")       # def AbstractHEALPixGrid, HEALPixGrid
 include("healpix4.jl")      # def AbstractHEALPix4Grid, HEALPix4Grid
 
 include("quadrature_weights.jl")    # quadrature weights and solid angles for grids
+
+#GPU methods
+function Adapt.adapt_structure(to, grid::Grid) where {Grid<:AbstractGrid}
+    Grid(Adapt.adapt(to, grid.data), grid.nlat_half)
+end
