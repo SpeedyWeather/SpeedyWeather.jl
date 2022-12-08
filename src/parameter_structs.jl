@@ -33,3 +33,13 @@ Parameters for computing saturation vapour pressure using the August-Roche-Magnu
     C₁::NF = 17.269
     C₂::NF = 21.875
 end
+
+# GPU methods
+
+function Adapt.adapt_structure(to, glc::GenLogisticCoefs)
+    GenLogisticCoefs(glc.A, glc.K, glc.C, glc.Q, glc.B, glc.M, glc.ν)
+end
+
+function Adapt.adapt_structure(to, mc::MagnusCoefs)
+    MagnusCoefs(mc.e₀, mc.T₀, mc.T₁, mc.T₂, mc.C₁, mc.C₂)
+end
