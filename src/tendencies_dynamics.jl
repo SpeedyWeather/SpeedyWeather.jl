@@ -4,9 +4,16 @@
                                 lf::Int,
                                 M::PrimitiveEquationModel)
 
-Computes the tendency of the logarithm of surface pressure as -(u*px + v*py)
-with u,v being the vertically averaged velocities and px, py the gradients
-of the logarithm of surface pressure."""
+Computes the tendency of the logarithm of surface pressure as
+
+    -(ū*px + v̄*py) - D̄
+
+with ū,v̄ being the vertically averaged velocities; px, py the gradients
+of the logarithm of surface pressure ln(p_s) and D̄ the vertically averaged divergence.
+1. Calculate ∇ln(p_s) in spectral space, convert to grid.
+2. Multiply ū,v̄ with ∇ln(p_s) in grid-point space, convert to spectral.
+3. D̄ is subtracted in spectral space.
+4. Set tendency of the l=m=0 mode to 0 for better mass conservation."""
 function surface_pressure_tendency!(progn::PrognosticVariables{NF},
                                     diagn::DiagnosticVariables{NF},
                                     lf::Int,                      # leapfrog index
@@ -17,6 +24,7 @@ function surface_pressure_tendency!(progn::PrognosticVariables{NF},
     pres = progn.pres.leapfrog[lf]
     @unpack dpres_dlon, dpres_dlat = diagn.surface
     @unpack dpres_dlon_grid, dpres_dlat_grid = diagn.surface
+    
     ∇!(dpres_dlon,dpres_dlat,pres,model.spectral_transform)
     gridded!(dpres_dlon_grid,dpres_dlon,model.spectral_transform)
     gridded!(dpres_dlat_grid,dpres_dlat,model.spectral_transform)
@@ -54,16 +62,18 @@ end
     vertical_averages!(Diag::DiagnosticVariables,G::Geometry)
 
 Calculates the vertically averaged (weighted by the thickness of the σ level)
-velocities (*coslat). E.g.
+velocities (*coslat) and divergence. E.g.
 
     U_mean = ∑_k=1^nlev Δσ_k * U_k
+
+U,V are averaged in grid-point space, divergence in spectral space.
 """
 function vertical_averages!(progn::PrognosticVariables{NF},
                             diagn::DiagnosticVariables{NF},
                             lf::Int,            # leapfrog index
                             G::Geometry{NF}) where NF
     
-    @unpack σ_levels_thick, coslat⁻¹, nlev = G
+    @unpack σ_levels_thick, nlev = G
     @unpack U_mean, V_mean, div_mean = diagn.surface
 
     @boundscheck nlev == diagn.nlev || throw(BoundsError)
