@@ -11,8 +11,8 @@ struct Tendencies{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     v_tend    ::LowerTriangularMatrix{Complex{NF}}      # meridional velocity (spectral)
     u_tend_grid     ::Grid                              # zonal velocity (grid)
     v_tend_grid     ::Grid                              # meridinoal velocity (grid)
-    humid_grid_tend ::Grid                              # specific humidity
-    temp_grid_tend  ::Grid                              # temperature
+    temp_tend_grid  ::Grid                              # temperature
+    humid_tend_grid ::Grid                              # specific humidity
 end
 
 function Base.zeros(::Type{Tendencies},
@@ -31,12 +31,12 @@ function Base.zeros(::Type{Tendencies},
     v_tend          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # meridional velocity
     u_tend_grid     = zeros(Grid{NF},nresolution)                               # zonal velocity
     v_tend_grid     = zeros(Grid{NF},nresolution)                               # meridional velocity
-    humid_grid_tend = zeros(Grid{NF},nresolution)                               # specific humidity
-    temp_grid_tend  = zeros(Grid{NF},nresolution)                               # temperature
+    temp_tend_grid  = zeros(Grid{NF},nresolution)                               # temperature
+    humid_tend_grid = zeros(Grid{NF},nresolution)                               # specific humidity
 
     return Tendencies(  vor_tend,div_tend,temp_tend,humid_tend,
                         u_tend,v_tend,u_tend_grid,v_tend_grid,
-                        humid_grid_tend,temp_grid_tend)
+                        temp_tend_grid,humid_tend_grid)
 end
 
 """
@@ -237,7 +237,7 @@ struct SurfaceVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 
     U_mean::Grid    # vertical average of: zonal velocity *coslat
     V_mean::Grid    # meridional velocity *coslat
-    div_mean::Grid  # divergence
+    div_mean::LowerTriangularMatrix{Complex{NF}}    # divergence (in spectral though)
 
     precip_large_scale::Grid
     precip_convection::Grid
@@ -266,7 +266,7 @@ function Base.zeros(::Type{SurfaceVariables},
     # vertical averaged (weighted by σ level thickness) velocities (*coslat) and divergence
     U_mean = zeros(Grid{NF},nresolution)
     V_mean = zeros(Grid{NF},nresolution)
-    div_mean = zeros(Grid{NF},nresolution)
+    div_mean = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
     # precipitation fields
     precip_large_scale = zeros(Grid{NF},nresolution)

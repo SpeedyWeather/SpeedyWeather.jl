@@ -7,25 +7,25 @@
 Computes the tendency of the logarithm of surface pressure as -(u*px + v*py)
 with u,v being the vertically averaged velocities and px, py the gradients
 of the logarithm of surface pressure."""
-function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic variables
-                                    Diag::DiagnosticVariables{NF}, # Diagnostic variables
-                                    lf::Int,                       # leapfrog index 2 (time step used for tendencies)
-                                    M::PrimitiveEquationModel
+function surface_pressure_tendency!(progn::PrognosticVariables{NF},
+                                    diagn::DiagnosticVariables{NF},
+                                    lf::Int,                      # leapfrog index
+                                    model::PrimitiveEquationModel
                                     ) where {NF<:AbstractFloat}
 
-    vertical_averages!(Diag,M.geometry)
+    # CALCULATE ∇lnp_s
+    pres = progn.pres.leapfrog[lf]
+    @unpack dpres_dlon, dpres_dlat = diagn.surface
+    @unpack dpres_dlon_grid, dpres_dlat_grid = diagn.surface
+    ∇!(dpres_dlon,dpres_dlat,pres,model.spectral_transform)
+    gridded!(dpres_dlon_grid,dpres_dlon,model.spectral_transform)
+    gridded!(dpres_dlat_grid,dpres_dlat,model.spectral_transform)
 
-    pres = Prog.pres.leapfrog[lf]
-    @unpack dpres_dlon, dpres_dlat = Diag.surface
-    @unpack dpres_dlon_grid, dpres_dlat_grid = Diag.surface
-    ∇!(dpres_dlon,dpres_dlat,pres,M.spectral_transform)
-
-    gridded!(dpres_dlon_grid,dpres_dlon,M.spectral_transform)
-    gridded!(dpres_dlat_grid,dpres_dlat,M.spectral_transform)
-
-    @unpack pres_tend, pres_tend_grid = Diag.surface
-    @unpack U_mean, V_mean = Diag.surface
-    @unpack coslat⁻² = M.geometry
+    # TENDENCY: -(ū,v̄)⋅∇lnp_s
+    # vertical averages need to be computed first!
+    @unpack pres_tend, pres_tend_grid = diagn.surface
+    @unpack U_mean, V_mean, div_mean = diagn.surface
+    @unpack coslat⁻² = model.geometry
 
     # precompute ring indices
     rings = eachring(pres_tend_grid,dpres_dlon_grid,dpres_dlat_grid,U_mean,V_mean)
@@ -33,12 +33,19 @@ function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic 
     @inbounds for (j,ring) in enumerate(rings)
         coslat⁻²j = coslat⁻²[j]
         for ij in ring
+            # -(ū,v̄)⋅∇lnp_s only, do -D̄ in spectral space
             pres_tend_grid[ij] = -(U_mean[ij]*dpres_dlon_grid[ij] +
                                     V_mean[ij]*dpres_dlat_grid[ij])*coslat⁻²j
         end
     end
 
-    spectral!(pres_tend,pres_tend_grid,M.spectral_transform)
+    spectral!(pres_tend,pres_tend_grid,model.spectral_transform)
+
+    # now do the -D̄ term
+    @inbounds for lm in eachharmonic(pres_tend,div_mean)
+        pres_tend[lm] -= div_mean[lm]
+    end
+
     pres_tend[1] = zero(NF)     # for mass conservation
     return nothing
 end
@@ -47,17 +54,19 @@ end
     vertical_averages!(Diag::DiagnosticVariables,G::Geometry)
 
 Calculates the vertically averaged (weighted by the thickness of the σ level)
-velocities (*coslat) and divergence. E.g.
+velocities (*coslat). E.g.
 
     U_mean = ∑_k=1^nlev Δσ_k * U_k
 """
-function vertical_averages!(Diag::DiagnosticVariables{NF},
+function vertical_averages!(progn::PrognosticVariables{NF},
+                            diagn::DiagnosticVariables{NF},
+                            lf::Int,            # leapfrog index
                             G::Geometry{NF}) where NF
     
     @unpack σ_levels_thick, coslat⁻¹, nlev = G
-    @unpack U_mean, V_mean, div_mean = Diag.surface
+    @unpack U_mean, V_mean, div_mean = diagn.surface
 
-    @boundscheck nlev == Diag.nlev || throw(BoundsError)
+    @boundscheck nlev == diagn.nlev || throw(BoundsError)
 
     fill!(U_mean,0)     # reset accumulators from previous vertical average
     fill!(V_mean,0)
@@ -65,14 +74,19 @@ function vertical_averages!(Diag::DiagnosticVariables{NF},
 
     for k in 1:nlev
         Δσ_k = σ_levels_thick[k]
-        U = Diag.layers[k].grid_variables.U_grid
-        V = Diag.layers[k].grid_variables.V_grid
-        div = Diag.layers[k].grid_variables.div_grid
+        U = diagn.layers[k].grid_variables.U_grid
+        V = diagn.layers[k].grid_variables.V_grid
+        div = progn.layers[k].leapfrog[lf].div
 
-        @inbounds for ij in eachgridpoint(Diag.surface)
+        # UV in grid-point space
+        @inbounds for ij in eachgridpoint(diagn.surface)
             U_mean[ij] += U[ij]*Δσ_k
             V_mean[ij] += V[ij]*Δσ_k
-            div_mean[ij] += div[ij]*Δσ_k
+        end
+
+        # divergence in spectral space
+        @inbounds for lm in eachharmonic(div,div_mean)
+            div_mean[lm] += div[lm]*Δσ_k
         end
     end
 end
@@ -159,7 +173,19 @@ function vertical_advection!(   diagn::DiagnosticVariables,
         V = diagn.layers[k].grid_variables.V_grid
         V_below = diagn.layers[k_below].grid_variables.V_grid
 
-        Δσk = σ_levels_thick⁻¹_half[k]      # = 1/(2Δp_k), for convenience
+        # temperature
+        T_tend = diagn.layers[k].tendencies.temp_tend_grid
+        T_above = diagn.layers[k_above].grid_variables.temp_grid
+        T = diagn.layers[k].grid_variables.temp_grid
+        T_below = diagn.layers[k_below].grid_variables.temp_grid
+
+        # humidity
+        q_tend = diagn.layers[k].tendencies.humid_tend_grid
+        q_above = diagn.layers[k_above].grid_variables.humid_grid
+        q = diagn.layers[k].grid_variables.humid_grid
+        q_below = diagn.layers[k_below].grid_variables.humid_grid
+
+        Δσk = σ_levels_thick⁻¹_half[k]      # = 1/(2Δσ_k), for convenience
 
         # TODO check whether coslat unscaling is needed
         @inbounds for ij in eachgridpoint(u_tend,v_tend)
@@ -167,6 +193,15 @@ function vertical_advection!(   diagn::DiagnosticVariables,
                             σ_tend_below[ij]*(U[ij] - U_below[ij]))*Δσk
             v_tend[ij] = (σ_tend_above[ij]*(V_above[ij] - V[ij]) +
                             σ_tend_below[ij]*(V[ij] - V_below[ij]))*Δσk
+            T_tend[ij] = (σ_tend_above[ij]*(T_above[ij] - T[ij]) +
+                            σ_tend_below[ij]*(T[ij] - T_below[ij]))*Δσk
+        end
+
+        if model.parameters.dry_core != true    # then also compute vertical advection of humidity
+            @inbounds for ij in eachgridpoint(q_tend)
+                q_tend[ij] = (σ_tend_above[ij]*(q_above[ij] - q[ij]) +
+                                σ_tend_below[ij]*(q[ij] - q_below[ij]))*Δσk
+            end
         end
     end
 end
