@@ -51,6 +51,10 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     σ_levels_thick⁻¹_half::Vector{NF}   # = 1/(2σ_levels_thick)
     σ_f::Vector{NF}                 # akap/(2σ_levels_thick)   #TODO rename?
 
+    # VERTICAL REFERENCE TEMPERATURE PROFILE
+    temp_ref_profile::Vector{NF}
+    # temp_ref_profile_σ::Vector{NF}
+
     # GEOPOTENTIAL INTEGRATION (on half/full levels)
     Δp_geopot_half::Vector{NF}      # = R*(ln(p_k+1) - ln(p_k+1/2)), for half level geopotential
     Δp_geopot_full::Vector{NF}      # = R*(ln(p_k+1/2) - ln(p_k)), for full level geopotential
@@ -58,12 +62,6 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
 
     # PARAMETERIZATIONS
     entrainment_profile::Vector{NF}
-
-    # TEMPORARY, development area. All these variables need to be checked for consistency and potentially defined somewhere else
-    # tref ::Array{NF,1}   #temporarily defined here. Also defined in the Implict struct which is incomplete at the time of writing
-    # rgas ::NF
-    # fsgr ::Array{NF,1}
-    # tref3 ::Array{NF,1}
 end
 
 """
@@ -77,6 +75,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     @unpack radius_earth, rotation_earth = P        # radius of earth, angular frequency
     @unpack R_dry, akap = P                         # gas constant for dry air, ratio of gas consts
     @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
+    @unpack temp_ref, temp_top, lapse_rate, gravity = P # for reference atmosphere
 
     # RESOLUTION PARAMETERS
     nresolution = get_resolution(Grid,trunc)        # resolution parameter nlat_half
@@ -118,6 +117,11 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     σ_levels_thick⁻¹_half = 1 ./ (2σ_levels_thick)
     σ_f = akap ./ (2σ_levels_full)
 
+    # VERTICAL REFERENCE TEMPERATURE PROFILE
+    RΓ = R_dry*lapse_rate/(1000*gravity)                    # origin unclear but profile okay
+    temp_ref_profile = [max(temp_top,temp_ref*σ^RΓ) for σ in σ_levels_full]
+    # temp_ref_profile_σ = temp_ref_profile .* σ_f
+
     # GEOPOTENTIAL, coefficients to calculate geopotential
     Δp_geopot_half, Δp_geopot_full = initialise_geopotential(σ_levels_full,σ_levels_half,R_dry)
 
@@ -130,15 +134,10 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     for k = 2:nlev-1
         entrainment_profile[k] = max(0, (σ_levels_full[k] - 0.5)^2)
     end
-    entrainment_profile /= sum(entrainment_profile)  # Normalise
-    entrainment_profile *= max_entrainment           # Scale by maximum entrainment (as a fraction of cloud-base mass flux)
 
-    # Extra definitions. These will need to be defined consistently either here or somewhere else
-    # Just defined here to proivide basic structure to allow for testing of other components of code
-    # tref = 288.0max.(0.2, σ_levels_full) #more corrections needed here
-    # rgas = (2.0/7.0) / 1004.0
-    # fsgr = (tref * 0.0) #arbitrary definition. Must be defined elsewhere
-    # tref3=fsgr.*tref #this actually is the correct definition. Needs better naming convention
+    # profile as fraction of cloud-base mass flux
+    entrainment_profile /= sum(entrainment_profile)  # Normalise
+    entrainment_profile *= max_entrainment           # fraction of max entrainment
 
     # conversion to number format NF happens here
     Geometry{P.NF}( Grid,nresolution,
@@ -147,6 +146,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_thick⁻¹_half,σ_f,
+                    temp_ref_profile,
                     Δp_geopot_half,Δp_geopot_full,lapserate_corr,entrainment_profile)
                     # tref,rgas,fsgr,tref3)
 end
@@ -183,5 +183,5 @@ end
 """Generalised logistic function based on the coefficients in `coefs`."""
 function generalised_logistic(x,coefs::GenLogisticCoefs)
     @unpack A,K,C,Q,B,M,ν = coefs
-    return @. A + (K-A)/(C+Q*exp(-B*(x-M)))^(1/ν)
+    return @. A + (K-A)/(C+Q*exp(-B*(x-M)))^inv(ν)
 end
