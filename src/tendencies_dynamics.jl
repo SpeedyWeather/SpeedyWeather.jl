@@ -721,13 +721,16 @@ end
 function gridded!(  diagn::DiagnosticVariablesLayer,
                     progn::PrognosticVariablesLeapfrog,
                     lf::Int,                            # leapfrog index
-                    M::PrimitiveEquationModel,          # everything that's constant
+                    model::PrimitiveEquationModel,      # everything that's constant
                     )
     
     @unpack vor_grid, div_grid, U_grid, V_grid = diagn.grid_variables
     @unpack temp_grid, humid_grid = diagn.grid_variables
-    @unpack u_coslat, v_coslat = diagn.dynamics_variables
-    S = M.spectral_transform
+    u_coslat = diagn.dynamics_variables.a       # reuse work arrays a,b
+    v_coslat = diagn.dynamics_variables.b
+
+    @unpack dry_core = model.parameters
+    S = model.spectral_transform
 
     vor_lf = progn.leapfrog[lf].vor     # pick leapfrog index without memory allocation
     div_lf = progn.leapfrog[lf].div
@@ -742,7 +745,7 @@ function gridded!(  diagn::DiagnosticVariablesLayer,
     gridded!(vor_grid,vor_lf,S)         # get vorticity on grid from spectral vor
     gridded!(div_grid,div_lf,S)         # get divergence on grid from spectral div
     gridded!(temp_grid,temp_lf,S)       # (absolute) temperature
-    gridded!(humid_grid,humid_lf,S)     # specific humidity
+    dry_core || gridded!(humid_grid,humid_lf,S)     # specific humidity (wet core only)
 
     # transform to U,V on grid (U,V = u,v*coslat)
     gridded!(U_grid,u_coslat,S)
