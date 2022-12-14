@@ -637,7 +637,7 @@ function gridded!(  diagn::DiagnosticVariables,     # all diagnostic variables
 
     # surface only for ShallowWaterModel or PrimitiveEquationModel
     S = M.spectral_transform
-    M isa BarotropicModel ? nothing : gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf],S)
+    M isa BarotropicModel || gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf],S)
 
     return nothing
 end
@@ -659,8 +659,7 @@ function gridded!(  diagn::DiagnosticVariablesLayer,
                     )
     
     @unpack vor_grid, U_grid, V_grid = diagn.grid_variables
-    u_coslat = diagn.dynamics_variables.a   # use work array a,b for u,v*coslat
-    v_coslat = diagn.dynamics_variables.b
+    @unpack u_coslat, v_coslat = diagn.dynamics_variables
     S = M.spectral_transform
 
     vor_lf = progn.leapfrog[lf].vor     # relative vorticity at leapfrog step lf
@@ -696,8 +695,7 @@ function gridded!(  diagn::DiagnosticVariablesLayer,
                     )
     
     @unpack vor_grid, div_grid, U_grid, V_grid = diagn.grid_variables
-    u_coslat = diagn.dynamics_variables.a   # use work array a,b for u,v*coslat
-    v_coslat = diagn.dynamics_variables.b
+    @unpack u_coslat, v_coslat = diagn.dynamics_variables
     S = M.spectral_transform
 
     vor_lf = progn.leapfrog[lf].vor     # pick leapfrog index without memory allocation
@@ -726,8 +724,7 @@ function gridded!(  diagn::DiagnosticVariablesLayer,
     
     @unpack vor_grid, div_grid, U_grid, V_grid = diagn.grid_variables
     @unpack temp_grid, humid_grid = diagn.grid_variables
-    u_coslat = diagn.dynamics_variables.a       # reuse work arrays a,b
-    v_coslat = diagn.dynamics_variables.b
+    @unpack u_coslat, v_coslat = diagn.dynamics_variables
 
     @unpack dry_core = model.parameters
     S = model.spectral_transform

@@ -78,6 +78,10 @@ end
 Struct holding intermediate quantities for the dynamics of a given layer."""
 struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 
+    # VELOCITY VECTOR (U,V) in spectral with *coslat scaling included
+    u_coslat::LowerTriangularMatrix{Complex{NF}}
+    v_coslat::LowerTriangularMatrix{Complex{NF}}
+
     # GENERAL VECTOR (a,b), work array to be reused in various places
     # u_coslat, v_coslat = a,b                              (all models)
     # uω_coslat⁻¹, vω_coslat⁻¹ = a,b                        (all models)
@@ -138,6 +142,10 @@ function Base.zeros(::Type{DynamicsVariables},
     @unpack lmax, mmax = S
     @unpack Grid, nresolution = G
 
+    # VELOCITY VECTOR (U,V) in spectral with *coslat scaling included
+    u_coslat = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    v_coslat = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+
     # GENERAL VECTOR (a,b), work array to be reused in various places
     a = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     b = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
@@ -178,7 +186,8 @@ function Base.zeros(::Type{DynamicsVariables},
     # dumk                        = zeros(Complex{NF},lmax+2,mmax+1,nlev+1)
     # spectral_geopotential       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
 
-    return DynamicsVariables(   a,b,a_grid,b_grid,
+    return DynamicsVariables(   u_coslat,v_coslat,
+                                a,b,a_grid,b_grid,
                                 bernoulli_grid,bernoulli,
                                 temp_virt,geopot,
                                 σ_tend,σ_m,uv∇p,
