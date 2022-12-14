@@ -30,3 +30,4 @@ Manifest.toml
 
 # no model output folders
 run????/
+run-*/

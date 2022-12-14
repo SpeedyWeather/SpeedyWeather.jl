@@ -53,7 +53,7 @@ end
     for NF in (Float32,Float64)
         nlev = 8
         p,d,m = initialize_speedy(NF,nlev=nlev,model=PrimitiveEquation,
-                                        Grid=FullGaussianGrid)
+                                        Grid=FullGaussianGrid,dry_core=false)
 
         # give every layer some constant temperature
         temp = 280      # in Kelvin

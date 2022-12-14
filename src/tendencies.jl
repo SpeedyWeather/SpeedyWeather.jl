@@ -29,7 +29,7 @@ function get_tendencies!(   diagn::DiagnosticVariablesLayer,
     
     # only (planetary) vorticity advection for the barotropic model
     G,S = M.geometry, M.spectral_transform
-    vorticity_flux_divergence!(diagn,G,S)         # = -∇⋅(u(ζ+f),v(ζ+f))
+    vorticity_flux_divcurl!(diagn,G,S,curl=false)           # = -∇⋅(u(ζ+f),v(ζ+f))
 end
 
 function get_tendencies!(   pres::LowerTriangularMatrix,
@@ -43,8 +43,8 @@ function get_tendencies!(   pres::LowerTriangularMatrix,
     g,H₀  = M.constants.gravity, M.constants.layer_thickness
 
     # for compatibility with other ModelSetups pressure pres = interface displacement η here
-    vorticity_flux_divergence!(diagn,G,S)           # = -∇⋅(u(ζ+f),v(ζ+f)), tendency for vorticity
-    vorticity_flux_curl!(diagn,S)                   # =  ∇×(u(ζ+f),v(ζ+f)), tendency for divergence
+    vorticity_flux_divcurl!(diagn,G,S)              # = -∇⋅(u(ζ+f),v(ζ+f)), tendency for vorticity
+                                                    # and ∇×(u(ζ+f),v(ζ+f)), tendency for divergence
     bernoulli_potential!(diagn,surface,G,S,g)       # = -∇²(E+gη), tendency for divergence
     volume_flux_divergence!(diagn,surface,G,S,B,H₀) # = -∇⋅(uh,vh), tendency pressure
 

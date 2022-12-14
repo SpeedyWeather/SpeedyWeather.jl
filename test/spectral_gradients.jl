@@ -27,8 +27,8 @@
         SpeedyWeather.scale_coslat⁻²!(U_grid,G)
         SpeedyWeather.scale_coslat⁻²!(V_grid,G)
 
-        uω_coslat⁻¹ = d.layers[1].dynamics_variables.uω_coslat⁻¹
-        vω_coslat⁻¹ = d.layers[1].dynamics_variables.vω_coslat⁻¹
+        uω_coslat⁻¹ = d.layers[1].dynamics_variables.a
+        vω_coslat⁻¹ = d.layers[1].dynamics_variables.b
 
         SpeedyWeather.spectral!(uω_coslat⁻¹,U_grid,S)
         SpeedyWeather.spectral!(vω_coslat⁻¹,V_grid,S)
@@ -74,8 +74,7 @@ end
         fill!(G.f_coriolis,0)
 
         # calculate uω,vω in spectral space
-        SpeedyWeather.vorticity_flux_divergence!(d.layers[1],G,S)
-        SpeedyWeather.vorticity_flux_curl!(d.layers[1],S)
+        SpeedyWeather.vorticity_flux_divcurl!(d.layers[1],G,S)
 
         for div_lm in d.layers[1].tendencies.div_tend
             @test abs(div_lm) < sqrt(eps(NF))
