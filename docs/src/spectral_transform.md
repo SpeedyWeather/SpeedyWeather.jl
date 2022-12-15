@@ -29,7 +29,7 @@ For an interactive visualisation of the spherical harmonics, see
     The implementations of the spherical transforms in SpeedyWeather.jl use colatitudes ``\theta = (0,\pi)``
     (0 at the north pole) but the dynamical core uses latitudes ``\theta = (-\pi/2,\pi/2)`` (``\pi/2`` at the north pole).
     However, all arrays are always sorted north to south such that `[i,1]` will access the northern-most grid points.
-    Note: We may also use latitudes in the spherical harmonic transfom in the future for consistency. 
+    Note: We may also use latitudes in the spherical harmonic transform in the future for consistency. 
 
 ## Synthesis (spectral to grid)
 

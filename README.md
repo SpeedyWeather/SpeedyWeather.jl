@@ -16,7 +16,7 @@ towards efficiency within a compute node and at rather low resolutions: The dyna
 and the physical parameterizations gridpoint-by-gridpoint in the horizontal.
 
 For an overview of the functionality and explanation see the (always somehow incomplete)
-[documentation](https://milankl.github.io/SpeedyWeather.jl/dev).
+[documentation](https://speedyweather.github.io/SpeedyWeather.jl/dev).
 
 ## Example use
 

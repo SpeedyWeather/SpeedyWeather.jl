@@ -152,8 +152,8 @@ function write_column_tendencies!(  D::DiagnosticVariables,
     @inbounds for (k,layer) =  enumerate(D.layers)
         layer.tendencies.u_tend[ij] = C.u_tend[k]
         layer.tendencies.v_tend[ij] = C.v_tend[k]
-        layer.tendencies.temp_grid_tend[ij] = C.temp_tend[k]
-        layer.tendencies.humid_grid_tend[ij] = C.humid_tend[k]
+        layer.tendencies.temp_tend_grid[ij] = C.temp_tend[k]
+        layer.tendencies.humid_tend_grid[ij] = C.humid_tend[k]
     end
 
     D.surface.precip_large_scale[ij] = C.precip_large_scale

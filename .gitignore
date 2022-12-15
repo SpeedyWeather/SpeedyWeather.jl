@@ -29,4 +29,5 @@ Manifest.toml
 .ipynb_*
 
 # no model output folders
-test/run*/
+run????/
+run-*/

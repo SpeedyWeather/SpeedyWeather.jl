@@ -49,7 +49,7 @@ end
 
         # and check that that worked
         for (k,layer) in enumerate(diagn.layers)
-            @test humid_tend[k] == layer.tendencies.humid_grid_tend[1]
+            @test humid_tend[k] == layer.tendencies.humid_tend_grid[1]
         end
     end
 end

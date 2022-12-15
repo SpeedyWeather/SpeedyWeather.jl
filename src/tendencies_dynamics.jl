@@ -4,28 +4,36 @@
                                 lf::Int,
                                 M::PrimitiveEquationModel)
 
-Computes the tendency of the logarithm of surface pressure as -(u*px + v*py)
-with u,v being the vertically averaged velocities and px, py the gradients
-of the logarithm of surface pressure."""
-function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic variables
-                                    Diag::DiagnosticVariables{NF}, # Diagnostic variables
-                                    lf::Int,                       # leapfrog index 2 (time step used for tendencies)
-                                    M::PrimitiveEquationModel
+Computes the tendency of the logarithm of surface pressure as
+
+    -(ū*px + v̄*py) - D̄
+
+with ū,v̄ being the vertically averaged velocities; px, py the gradients
+of the logarithm of surface pressure ln(p_s) and D̄ the vertically averaged divergence.
+1. Calculate ∇ln(p_s) in spectral space, convert to grid.
+2. Multiply ū,v̄ with ∇ln(p_s) in grid-point space, convert to spectral.
+3. D̄ is subtracted in spectral space.
+4. Set tendency of the l=m=0 mode to 0 for better mass conservation."""
+function surface_pressure_tendency!(progn::PrognosticVariables{NF},
+                                    diagn::DiagnosticVariables{NF},
+                                    lf::Int,                      # leapfrog index
+                                    model::PrimitiveEquationModel
                                     ) where {NF<:AbstractFloat}
 
-    vertical_averages!(Diag,M.geometry)
+    # CALCULATE ∇lnp_s
+    pres = progn.pres.leapfrog[lf]
+    @unpack dpres_dlon, dpres_dlat = diagn.surface
+    @unpack dpres_dlon_grid, dpres_dlat_grid = diagn.surface
+    
+    ∇!(dpres_dlon,dpres_dlat,pres,model.spectral_transform)
+    gridded!(dpres_dlon_grid,dpres_dlon,model.spectral_transform)
+    gridded!(dpres_dlat_grid,dpres_dlat,model.spectral_transform)
 
-    pres = Prog.pres.leapfrog[lf]
-    @unpack dpres_dlon, dpres_dlat = Diag.surface
-    @unpack dpres_dlon_grid, dpres_dlat_grid = Diag.surface
-    ∇!(dpres_dlon,dpres_dlat,pres,M.spectral_transform)
-
-    gridded!(dpres_dlon_grid,dpres_dlon,M.spectral_transform)
-    gridded!(dpres_dlat_grid,dpres_dlat,M.spectral_transform)
-
-    @unpack pres_tend, pres_tend_grid = Diag.surface
-    @unpack U_mean, V_mean = Diag.surface
-    @unpack coslat⁻² = M.geometry
+    # TENDENCY: -(ū,v̄)⋅∇lnp_s
+    # vertical averages need to be computed first!
+    @unpack pres_tend, pres_tend_grid = diagn.surface
+    @unpack U_mean, V_mean, div_mean = diagn.surface
+    @unpack coslat⁻² = model.geometry
 
     # precompute ring indices
     rings = eachring(pres_tend_grid,dpres_dlon_grid,dpres_dlat_grid,U_mean,V_mean)
@@ -33,12 +41,19 @@ function surface_pressure_tendency!(Prog::PrognosticVariables{NF}, # Prognostic 
     @inbounds for (j,ring) in enumerate(rings)
         coslat⁻²j = coslat⁻²[j]
         for ij in ring
+            # -(ū,v̄)⋅∇lnp_s only, do -D̄ in spectral space
             pres_tend_grid[ij] = -(U_mean[ij]*dpres_dlon_grid[ij] +
                                     V_mean[ij]*dpres_dlat_grid[ij])*coslat⁻²j
         end
     end
 
-    spectral!(pres_tend,pres_tend_grid,M.spectral_transform)
+    spectral!(pres_tend,pres_tend_grid,model.spectral_transform)
+
+    # now do the -D̄ term
+    @inbounds for lm in eachharmonic(pres_tend,div_mean)
+        pres_tend[lm] -= div_mean[lm]
+    end
+
     pres_tend[1] = zero(NF)     # for mass conservation
     return nothing
 end
@@ -50,14 +65,18 @@ Calculates the vertically averaged (weighted by the thickness of the σ level)
 velocities (*coslat) and divergence. E.g.
 
     U_mean = ∑_k=1^nlev Δσ_k * U_k
+
+U,V are averaged in grid-point space, divergence in spectral space.
 """
-function vertical_averages!(Diag::DiagnosticVariables{NF},
+function vertical_averages!(progn::PrognosticVariables{NF},
+                            diagn::DiagnosticVariables{NF},
+                            lf::Int,            # leapfrog index
                             G::Geometry{NF}) where NF
     
-    @unpack σ_levels_thick, coslat⁻¹, nlev = G
-    @unpack U_mean, V_mean, div_mean = Diag.surface
+    @unpack σ_levels_thick, nlev = G
+    @unpack U_mean, V_mean, div_mean = diagn.surface
 
-    @boundscheck nlev == Diag.nlev || throw(BoundsError)
+    @boundscheck nlev == diagn.nlev || throw(BoundsError)
 
     fill!(U_mean,0)     # reset accumulators from previous vertical average
     fill!(V_mean,0)
@@ -65,14 +84,19 @@ function vertical_averages!(Diag::DiagnosticVariables{NF},
 
     for k in 1:nlev
         Δσ_k = σ_levels_thick[k]
-        U = Diag.layers[k].grid_variables.U_grid
-        V = Diag.layers[k].grid_variables.V_grid
-        div = Diag.layers[k].grid_variables.div_grid
+        U = diagn.layers[k].grid_variables.U_grid
+        V = diagn.layers[k].grid_variables.V_grid
+        div = progn.layers[k].leapfrog[lf].div
 
-        @inbounds for ij in eachgridpoint(Diag.surface)
+        # UV in grid-point space
+        @inbounds for ij in eachgridpoint(diagn.surface)
             U_mean[ij] += U[ij]*Δσ_k
             V_mean[ij] += V[ij]*Δσ_k
-            div_mean[ij] += div[ij]*Δσ_k
+        end
+
+        # divergence in spectral space
+        @inbounds for lm in eachharmonic(div,div_mean)
+            div_mean[lm] += div[lm]*Δσ_k
         end
     end
 end
@@ -159,7 +183,19 @@ function vertical_advection!(   diagn::DiagnosticVariables,
         V = diagn.layers[k].grid_variables.V_grid
         V_below = diagn.layers[k_below].grid_variables.V_grid
 
-        Δσk = σ_levels_thick⁻¹_half[k]      # = 1/(2Δp_k), for convenience
+        # temperature
+        T_tend = diagn.layers[k].tendencies.temp_tend_grid
+        T_above = diagn.layers[k_above].grid_variables.temp_grid
+        T = diagn.layers[k].grid_variables.temp_grid
+        T_below = diagn.layers[k_below].grid_variables.temp_grid
+
+        # humidity
+        q_tend = diagn.layers[k].tendencies.humid_tend_grid
+        q_above = diagn.layers[k_above].grid_variables.humid_grid
+        q = diagn.layers[k].grid_variables.humid_grid
+        q_below = diagn.layers[k_below].grid_variables.humid_grid
+
+        Δσk = σ_levels_thick⁻¹_half[k]      # = 1/(2Δσ_k), for convenience
 
         # TODO check whether coslat unscaling is needed
         @inbounds for ij in eachgridpoint(u_tend,v_tend)
@@ -167,6 +203,15 @@ function vertical_advection!(   diagn::DiagnosticVariables,
                             σ_tend_below[ij]*(U[ij] - U_below[ij]))*Δσk
             v_tend[ij] = (σ_tend_above[ij]*(V_above[ij] - V[ij]) +
                             σ_tend_below[ij]*(V[ij] - V_below[ij]))*Δσk
+            T_tend[ij] = (σ_tend_above[ij]*(T_above[ij] - T[ij]) +
+                            σ_tend_below[ij]*(T[ij] - T_below[ij]))*Δσk
+        end
+
+        if model.parameters.dry_core != true    # then also compute vertical advection of humidity
+            @inbounds for ij in eachgridpoint(q_tend)
+                q_tend[ij] = (σ_tend_above[ij]*(q_above[ij] - q[ij]) +
+                                σ_tend_below[ij]*(q[ij] - q_below[ij]))*Δσk
+            end
         end
     end
 end
@@ -267,58 +312,63 @@ end
 """
 Compute the humidity tendency
 """
-function humidity_tendency!(Diag::DiagnosticVariables{NF}, # Diagnostic variables
-                            M
-                            )where {NF<:AbstractFloat}
+function humidity_tendency!(diagn::DiagnosticVariablesLayer,
+                            model::PrimitiveEquationModel)
+
+    model.parameters.dry_core && return nothing     # escape immediately for no humidity
     
-    @unpack humid_tend = Diag.tendencies
-    @unpack div_grid,humid_grid = Diag.grid_variables
-    @unpack sigma_u,sigma_tend,= Diag.intermediate_variables
-
-    @unpack σ_levels_half⁻¹_2 = M.GeoSpectral.geometry 
-
-    _,_,nlev = size(div_grid)
-
-
-    for k in 2:nlev
-        sigma_u[:,:,k] = sigma_tend[:,:,k].*(humid_grid[:,:,k] - humid_grid[:,:,k-1])
+    @unpack humid_tend, humid_tend_grid = diagn.tendencies
+    @unpack div_grid, humid_grid = diagn.grid_variables
+    
+    # +q*div term of the advection operator
+    @inbounds for ij in eachgridpoint(humid_tend_grid,humid_grid,div_grid)
+        # add as tend already contains parameterizations + vertical advection
+        humid_tend_grid[ij] += humid_grid[ij]*div_grid[ij]
     end
-    
 
-    # From Paxton/Chantry: dyngrtend.f90. Unsure if we need this here since we are dealing solely with humidity,
-        # !spj for moisture, vertical advection is not possible between top
-        # !spj two layers
-        # !kuch three layers
-        # !if(iinewtrace==1)then
-        # do k=2,3
-        #     temp(:,:,k)=0.0_dp # temp is equivalent to sigma_u. i.e a temporary array that is reused for calculations 
-        # enddo
-        # !endif
+    spectral!(humid_tend,humid_tend_grid,model.spectral_transform)
 
+    # -∇⋅((u,v)*humid)
+    @unpack U_grid, V_grid = diagn.grid_variables
+    # reuse general work arrays a,b,a_grid,b_grid
+    uq = diagn.dynamics_variables.a             # = u*humid in spectral
+    vq = diagn.dynamics_variables.b             # = v*humid in spectral
+    uq_grid = diagn.dynamics_variables.a_grid   # = u*humid on grid
+    vq_grid = diagn.dynamics_variables.b_grid   # = v*humid on grid
 
-    for k in 1:nlev
-        humid_tend[:,:,k] = humid_tend[:,:,k]
-                            + humid_grid[:,:,k].*div_grid[:,:,k]
-                            - (sigma_u[:,:,k+1] + sigma_u[:,:,k])*σ_levels_half⁻¹_2[k]
-        end 
+    @inbounds for ij in eachgridpoint(humid_tend_grid,humid_grid,U_grid,V_grid)
+        uq_grid[ij] = U_grid[ij]*humid_grid[ij]
+        vq_grid[ij] = V_grid[ij]*humid_grid[ij]
+    end
 
+    spectral!(uq,uq_grid,model.spectral_transform)
+    spectral!(vq,vq_grid,model.spectral_transform)
+
+    divergence!(humid_tend,uq,vq,model.spectral_transform,add=true,flipsign=true)
 end
 
 """
-    vorticity_flux_divergence!( D::DiagnosticVariables{NF}, # all diagnostic variables   
+    vorticity_flux_divcurl!(    D::DiagnosticVariables{NF}, # all diagnostic variables   
                                 G::GeoSpectral{NF}          # struct with geometry and spectral transform
                                 ) where {NF<:AbstractFloat}
 
-Compute the vorticity advection as the (negative) divergence of the vorticity fluxes -∇⋅(uv*(ζ+f)).
-First, compute the uv*(ζ+f), then transform to spectral space and take the divergence and flip the sign."""
-function vorticity_flux_divergence!(diagn::DiagnosticVariablesLayer,
+1) Compute the vorticity advection as the (negative) divergence of the vorticity fluxes -∇⋅(uv*(ζ+f)).
+First, compute the uv*(ζ+f), then transform to spectral space and take the divergence and flip the sign.
+2) Compute the curl of the vorticity fluxes ∇×(uω,vω) and store in divergence tendency."""
+function vorticity_flux_divcurl!(   diagn::DiagnosticVariablesLayer,
                                     G::Geometry,
-                                    S::SpectralTransform,
+                                    S::SpectralTransform;
+                                    div::Bool=true,         # calculate divergence of vor flux?
+                                    curl::Bool=true         # calculate curl of vor flux?
                                     )
 
     @unpack U_grid, V_grid, vor_grid = diagn.grid_variables
-    @unpack uω_coslat⁻¹, vω_coslat⁻¹, uω_coslat⁻¹_grid, vω_coslat⁻¹_grid = diagn.dynamics_variables
-    @unpack vor_tend = diagn.tendencies
+    @unpack vor_tend, div_tend = diagn.tendencies
+
+    uω_coslat⁻¹ = diagn.dynamics_variables.a            # reuse work arrays a,b
+    vω_coslat⁻¹ = diagn.dynamics_variables.b
+    uω_coslat⁻¹_grid = diagn.dynamics_variables.a_grid
+    vω_coslat⁻¹_grid = diagn.dynamics_variables.b_grid
 
     # STEP 1-3: Abs vorticity, velocity times abs vort
     vorticity_fluxes!(uω_coslat⁻¹_grid,vω_coslat⁻¹_grid,U_grid,V_grid,vor_grid,G)
@@ -327,23 +377,11 @@ function vorticity_flux_divergence!(diagn::DiagnosticVariablesLayer,
     spectral!(vω_coslat⁻¹,vω_coslat⁻¹_grid,S)
 
     # flipsign as RHS is negative ∂ζ/∂t = -∇⋅(uv*(ζ+f)), write directly into tendency
-    divergence!(vor_tend,uω_coslat⁻¹,vω_coslat⁻¹,S,flipsign=true)
-end
+    div && divergence!(vor_tend,uω_coslat⁻¹,vω_coslat⁻¹,S,flipsign=true)
 
-"""
-    vorticity_flux_curl!(   D::DiagnosticVariablesLayer,
-                            S::SpectralTransform,
-                            )
-
-Compute the curl of the vorticity fluxes ∇×(uω,vω) and store in divergence tendency.
-Requires vorticity_fluxes! to have been calculated already."""
-function vorticity_flux_curl!(  diagn::DiagnosticVariablesLayer,
-                                S::SpectralTransform,
-                                )                                
-
-    @unpack uω_coslat⁻¹, vω_coslat⁻¹ = diagn.dynamics_variables
-    @unpack div_tend = diagn.tendencies
-    curl!(div_tend,uω_coslat⁻¹,vω_coslat⁻¹,S)               # =∇×(uω,vω)
+    # = ∇×(uω,vω) = ∇×(uv*(ζ+f)), write directly into tendency
+    # curl not needed for BarotropicModel
+    curl && curl!(div_tend,uω_coslat⁻¹,vω_coslat⁻¹,S)               
 end
 
 """
@@ -550,12 +588,16 @@ function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
 
     @unpack pres_grid, pres_tend = surface
     @unpack U_grid, V_grid = diagn.grid_variables
-    @unpack uh_coslat⁻¹, vh_coslat⁻¹, uh_coslat⁻¹_grid, vh_coslat⁻¹_grid = diagn.dynamics_variables
     @unpack orography = B
+
+    uh_coslat⁻¹ = diagn.dynamics_variables.a            # reuse work arrays a,b
+    vh_coslat⁻¹ = diagn.dynamics_variables.b
+    uh_coslat⁻¹_grid = diagn.dynamics_variables.a_grid
+    vh_coslat⁻¹_grid = diagn.dynamics_variables.b_grid
 
     volume_fluxes!(uh_coslat⁻¹_grid,vh_coslat⁻¹_grid,U_grid,V_grid,pres_grid,orography,H₀,G)
     
-    spectral!(uh_coslat⁻¹,uh_coslat⁻¹_grid,S)       # to spectral space
+    spectral!(uh_coslat⁻¹,uh_coslat⁻¹_grid,S)
     spectral!(vh_coslat⁻¹,vh_coslat⁻¹_grid,S)
 
     # compute divergence of volume fluxes and flip sign as ∂η/∂ = -∇⋅(uh,vh)
@@ -595,7 +637,7 @@ function gridded!(  diagn::DiagnosticVariables,     # all diagnostic variables
 
     # surface only for ShallowWaterModel or PrimitiveEquationModel
     S = M.spectral_transform
-    M isa BarotropicModel ? nothing : gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf],S)
+    M isa BarotropicModel || gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf],S)
 
     return nothing
 end
@@ -677,13 +719,15 @@ end
 function gridded!(  diagn::DiagnosticVariablesLayer,
                     progn::PrognosticVariablesLeapfrog,
                     lf::Int,                            # leapfrog index
-                    M::PrimitiveEquationModel,          # everything that's constant
+                    model::PrimitiveEquationModel,      # everything that's constant
                     )
     
     @unpack vor_grid, div_grid, U_grid, V_grid = diagn.grid_variables
     @unpack temp_grid, humid_grid = diagn.grid_variables
     @unpack u_coslat, v_coslat = diagn.dynamics_variables
-    S = M.spectral_transform
+
+    @unpack dry_core = model.parameters
+    S = model.spectral_transform
 
     vor_lf = progn.leapfrog[lf].vor     # pick leapfrog index without memory allocation
     div_lf = progn.leapfrog[lf].div
@@ -698,7 +742,7 @@ function gridded!(  diagn::DiagnosticVariablesLayer,
     gridded!(vor_grid,vor_lf,S)         # get vorticity on grid from spectral vor
     gridded!(div_grid,div_lf,S)         # get divergence on grid from spectral div
     gridded!(temp_grid,temp_lf,S)       # (absolute) temperature
-    gridded!(humid_grid,humid_lf,S)     # specific humidity
+    dry_core || gridded!(humid_grid,humid_lf,S)     # specific humidity (wet core only)
 
     # transform to U,V on grid (U,V = u,v*coslat)
     gridded!(U_grid,u_coslat,S)
