@@ -29,23 +29,23 @@ function initialise_geopotential(   σ_levels_full::Vector,
     return Δp_geopot_half, Δp_geopot_full
 end
 
-function lapserate_correction(  σ_levels_full::Vector,
-                                σ_levels_half::Vector,
-                                Δp_geopot_full::Vector)
+# function lapserate_correction(  σ_levels_full::Vector,
+#                                 σ_levels_half::Vector,
+#                                 Δp_geopot_full::Vector)
 
-    nlev = length(σ_levels_full)
-    @assert nlev+1 == length(σ_levels_half) "σ half levels must have length nlev+1"
-    @assert nlev == length(Δp_geopot_full) "σ half levels must have length nlev"
+#     nlev = length(σ_levels_full)
+#     @assert nlev+1 == length(σ_levels_half) "σ half levels must have length nlev+1"
+#     @assert nlev == length(Δp_geopot_full) "σ half levels must have length nlev"
 
-    lapserate_corr = zeros(nlev)
-    for k in 2:nlev-1   # only in the free troposphere
-        # TODO reference
-        lapserate_corr[k] = 0.5*Δp_geopot_full[k]*
-                    log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
-    end
+#     lapserate_corr = zeros(nlev)
+#     for k in 2:nlev-1   # only in the free troposphere
+#         # TODO reference
+#         lapserate_corr[k] = 0.5*Δp_geopot_full[k]*
+#                     log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
+#     end
 
-    return lapserate_corr
-end
+#     return lapserate_corr
+# end
 
 """
     geopotential!(diagn,B,G)
@@ -101,30 +101,38 @@ function geopotential!( diagn::DiagnosticVariables{NF},
 end
 
 """
-    virtual_temperatuer!( ::DiagnosticVariablesLayer,
-                          ::PrimitiveEquationModel)
+    virtual_temperature!(   diagn::DiagnosticVariablesLayer,
+                            temp::LowerTriangularMatrix,
+                            M::PrimitiveEquationModel,
+                            dry_core::Bool=false)
                 
-Calculates the virtual temperature Tv as
+Calculates the virtual temperature Tᵥ as
 
-    Tv = T(1+μq)
+    Tᵥ = T(1+μq)
 
 With absolute temperature T, specific humidity q and
 
     μ = (1-ξ)/ξ, ξ = R_dry/R_vapour.
     
-In grid-point space and then transforms Tv back into spectral space
+In grid-point space and then transforms Tᵥ back into spectral space
 for the geopotential calculation."""
-function virtual_temperature!(  diagn_layer::DiagnosticVariablesLayer,
-                                M::PrimitiveEquationModel)
+function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
+                                temp::LowerTriangularMatrix,
+                                M::PrimitiveEquationModel,
+                                dry_core::Bool=false)
     
-    @unpack temp_grid, humid_grid, temp_virt_grid = diagn_layer.grid_variables
-    @unpack temp_virt = diagn_layer.dynamics_variables
+    @unpack temp_grid, humid_grid, temp_virt_grid = diagn.grid_variables
+    @unpack temp_virt = diagn.dynamics_variables
     μ = M.constants.μ_virt_temp
-
-    for ij in eachgridpoint(temp_virt_grid, temp_grid, humid_grid)
-        @inbounds temp_virt_grid[ij] = temp_grid[ij]*(1 + μ*humid_grid[ij])
-    end
-
     S = M.spectral_transform
-    spectral!(temp_virt,temp_virt_grid,S)
+
+    if dry_core     # just copy fields over
+        copyto!(temp_virt_grid,temp_grid)
+        copyto!(temp_virt,temp)
+    else            # wet core, actually calculate the virtual temperature
+        for ij in eachgridpoint(temp_virt_grid, temp_grid, humid_grid)
+            @inbounds temp_virt_grid[ij] = temp_grid[ij]*(1 + μ*humid_grid[ij])
+        end
+        spectral!(temp_virt,temp_virt_grid,S)
+    end
 end
