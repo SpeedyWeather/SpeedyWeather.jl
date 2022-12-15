@@ -94,7 +94,6 @@ The default values of the keywords define the default model setup.
 
     # Longwave radiation
     nband::Int = 4                                    # Number of bands used to compute fband
-    fband::Matrix{Real} = fill(NF(NaN), 400, nband)   # Energy fraction emitted in each longwave band = f(T)
 
     # Radiation
     radiation_coefs::RadiationCoefs = RadiationCoefs{NF}()

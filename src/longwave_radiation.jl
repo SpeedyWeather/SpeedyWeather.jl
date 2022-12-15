@@ -1,14 +1,44 @@
 """
+    function initialise_longwave_radiation!(
+        P::Parameters
+    )
+
+Initialise variables and parameters used by the longwave radiation parametrization 
+"""
+function initialise_longwave_radiation!(
+    P::Parameters, K::ParameterizationConstants
+)
+    radset!(P, K)
+end
+
+"""
+    function longwave_radiation!(
+        column::ColumnVariables{NF}, model::PrimitiveEquationModel
+    )
+
+Compute air temperature tendencies from longwave radiation for an atmospheric column.
+For more details see http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf
+"""
+function longwave_radiation!(
+    column::ColumnVariables{NF}, model::PrimitiveEquationModel
+) where {NF<:AbstractFloat}
+
+    radlw_down!(column, model)
+    compute_bbe!(column, model)
+    radlw_up!(column, model)
+end
+
+"""
     function radset!(model::PrimitiveEquationModel) where {NF<:AbstractFloat}
         
 Compute energy fractions in four longwave bands as a function of temperature.
 
 """
-function radset!(model::PrimitiveEquationModel{NF}) where {NF<:AbstractFloat}
-    @unpack fband = model.parameters
-    @unpack epslw = model.parameters.radiation_coefs
+function radset!(P::Parameters, K::ParameterizationConstants)
+    @unpack NF, nband = P
+    @unpack epslw = P.radiation_coefs
+    @unpack fband = K
 
-    nband = size(fband)[2]
     @assert nband == 4 "Only four bands are supported, given $nband"
 
     eps1 = 1 - epslw
@@ -43,7 +73,8 @@ function radlw_down!(
 ) where {NF<:AbstractFloat}
 
     @unpack nlev, temp, wvi, tau2 = column
-    @unpack nband, sbc, fband, n_stratosphere_levels = model.parameters
+    @unpack nband, sbc, n_stratosphere_levels = model.parameters
+    @unpack fband = model.parameterization_constants
     @unpack epslw, emisfc = model.parameters.radiation_coefs
     
     # 1. Blackbody emission from atmospheric levels.
@@ -158,8 +189,9 @@ function radlw_up!(
     column::ColumnVariables{NF}, model::PrimitiveEquationModel
 ) where {NF<:AbstractFloat}
 
-@unpack nband, fband, n_stratosphere_levels = model.parameters
+@unpack nband, n_stratosphere_levels = model.parameters
 @unpack epslw, emisfc = model.parameters.radiation_coefs
+@unpack fband = model.parameterization_constants
 @unpack nlev, temp, fsfcu, fsfcd, flux, ts, tau2, st4a, dfabs, stratc = column
 @unpack σ_levels_thick = model.geometry
 

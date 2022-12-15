@@ -3,11 +3,9 @@
         @testset for NF in (Float32, Float64)
             _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation)
 
-            SpeedyWeather.radset!(model)
-
             # Just check the last band
             @test isapprox(
-                model.parameters.fband[end, :],
+                model.parameterization_constants.fband[end, :],
                 [0.19498351, 0.12541235, 0.33106664, 0.2985375],
                 rtol=0.1
             )
@@ -25,7 +23,6 @@
             column.wvi = fill(0.5, nlev, 2)
             column.tau2 = fill(0.5, nlev, 4)
             
-            SpeedyWeather.radset!(model)
             SpeedyWeather.radlw_down!(column, model)
 
             # Just check fsfcd and dfabs as used by radlw_up! 
@@ -62,10 +59,30 @@
             column.ts = 320.
             column.stratc = fill(0.5, 2)
             
-            SpeedyWeather.radset!(model)
             SpeedyWeather.radlw_down!(column, model)
             SpeedyWeather.compute_bbe!(column, model)
             SpeedyWeather.radlw_up!(column, model)
+
+            # Just check what's needed
+            @test column.fsfc ≈ 135.357378
+            @test column.ftop ≈ 474.76064406
+        end
+    end
+    @testset "longwave_radiation!" begin
+        @testset for NF in (Float32, Float64)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev=8)
+
+            nlev = model.parameters.nlev
+            nband = model.parameters.nband
+            n_stratosphere_levels = model.parameters.n_stratosphere_levels
+            column = ColumnVariables{NF}(nlev=nlev, nband=nband, n_stratosphere_levels=n_stratosphere_levels)
+            column.temp = fill(300., nlev)
+            column.wvi = fill(0.5, nlev, 2)
+            column.tau2 = fill(0.5, nlev, 4)
+            column.ts = 320.
+            column.stratc = fill(0.5, 2)
+            
+            SpeedyWeather.longwave_radiation!(column, model)
 
             # Just check what's needed
             @test column.fsfc ≈ 135.357378
