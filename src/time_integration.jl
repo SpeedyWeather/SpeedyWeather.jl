@@ -42,33 +42,23 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
     end
 end
 
-function leapfrog!( progn::PrognosticVariablesLeapfrog,
-                    diagn::DiagnosticVariablesLayer,
-                    dt::Real,               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
-                    lf::Int,                # leapfrog index to dis/enable William's filter
-                    M::BarotropicModel)
-                    
-    vor_old  = progn.leapfrog[1].vor        # unpack vorticity and call leapfrog!
-    vor_new  = progn.leapfrog[2].vor
-    @unpack vor_tend = diagn.tendencies
-    leapfrog!(vor_old,vor_new,vor_tend,dt,lf,M.constants)
-end
+# variables that are leapfrogged in the respective models that are on layers (so excl surface pressure)
+leapfrog_layer_vars(::BarotropicModel) = (:vor)
+leapfrog_layer_vars(::ShallowWaterModel) = (:vor,:div)
+leapfrog_layer_vars(::PrimitiveEquationModel) = (:vor,:div,:temp)
 
 function leapfrog!( progn::PrognosticVariablesLeapfrog,
                     diagn::DiagnosticVariablesLayer,
                     dt::Real,               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
                     lf::Int,                # leapfrog index to dis/enable William's filter
-                    M::ShallowWaterModel)
+                    M::ModelSetup)
                     
-    vor_old  = progn.leapfrog[1].vor        # vorticity
-    vor_new  = progn.leapfrog[2].vor
-    @unpack vor_tend = diagn.tendencies
-    leapfrog!(vor_old,vor_new,vor_tend,dt,lf,M.constants)
-
-    div_old  = progn.leapfrog[1].div        # divergence
-    div_new  = progn.leapfrog[2].div
-    @unpack div_tend = diagn.tendencies
-    leapfrog!(div_old,div_new,div_tend,dt,lf,M.constants)
+    for var in leapfrog_layer_vars(M)
+        var_old = getfield(progn.leapfrog[1],var)
+        var_new = getfield(progn.leapfrog[2],var)
+        var_tend = getfield(diagn.tendencies,Symbol(var,:_tend))
+        leapfrog!(var_old,var_new,var_tend,dt,lf,M.constants)
+    end
 end
 
 """
@@ -130,63 +120,23 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
-    
-    @unpack vor = progn
-    @unpack vor_tend = diagn.tendencies
-    @unpack damping, damping_impl = M.horizontal_diffusion
 
-    # set all tendencies to zero
-    fill!(vor_tend,zero(Complex{NF}))
+    get_tendencies!(diagn,progn,model,time,lf2)
+    # implicit_correction!(diagn,progn,model)
 
-    # @unpack tcorh,tcorv,qcorh,qcorv = HD
-    # @unpack sdrag = C
+    # LOOP OVER ALL LAYERS for diffusion, leapfrog time integration
+    # and progn state from spectral to grid for next time step
+    for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
+        horizontal_diffusion!(progn_layer,diagn_layer,M)    # implicit diffusion of vor, div, temp
+        leapfrog!(progn_layer,diagn_layer,dt,lf1,M)         # time step forward for vor, div, temp
+        gridded!(diagn_layer,progn_layer,lf2,M)             # propagate spectral state to grid
+    end
 
-    # PROPAGATE THE SPECTRAL STATE INTO THE DIAGNOSTIC VARIABLES
-    gridded!(diagn,progn,M,lf2)
-
-    # COMPUTE TENDENCIES OF PROGNOSTIC VARIABLES
-    get_tendencies!(diagn,progn,M,lf2)                   
-
-    # DIFFUSION FOR WIND
-    # always use first leapfrog index for diffusion (otherwise unstable)
-    vor_lf = view(vor,:,:,1,:)                                      # array view for leapfrog index
-    # div_l1 = view(div,:,:,1,:)                                    # TODO l1/l2 dependent?
-    horizontal_diffusion!(vor_tend,vor_lf,damping,damping_impl)     # diffusion of vorticity
-    # horizontal_diffusion!(div_l1,div_tend,dmpd,dmp1d)             # diffusion of divergence
-
-    # # DIFFUSION FOR TEMPERATURE
-    # orographic_correction!(temp_corrected,temp,1,tcorh,tcorv)   # orographic correction for temperature
-    # horizontal_diffusion!(temp_corrected,temp_tend,dmp,dmp1)    # diffusion for corrected abs temperature
-
-    # # DISSIPATION IN THE STRATOSPHERE
-    # stratospheric_zonal_drag!(vor,vor_tend,sdrag)               # zonal drag for wind
-    # stratospheric_zonal_drag!(div,div_tend,sdrag)
-
-    # horizontal_diffusion!(vor_l1,vor_tend,dmps,dmp1s)           # stratospheric diffusion for wind
-    # horizontal_diffusion!(div_l1,div_tend,dmps,dmp1s)           
-    # horizontal_diffusion!(temp_corrected,temp_tend,dmps,dmp1s)  # stratospheric diffusion for temperature
-
-    # # DIFFUSION OF HUMIDITY
-    # orographic_correction!(humid_corrected,humid,1,qcorh,qcorv) # orographic correction for humidity
-    # horizontal_diffusion!(humid_corrected,humid_tend,dmp,dmp1)  # diffusion for corrected humidity
-
-    # if ntracers > 1
-    #     for i in 2:ntracers
-    #         tracer          = view(tracers,:,:,:,1,i)                   # the i-th tracer, leapfrog index 1
-    #         tracer_tendency = view(tracers_tendencies,:,:,:,i)          # its tendency
-    #         horizontal_diffusion!(tracer,tracer_tendency,dmp,dmp1)
-    #         leapfrog!(tracer,tracer_tendency,j1,C)
-    #     end
-    # end
-
-    # # SPECTRAL TRUNCATION of all tendencies to the spectral resolution
-    # for tendency in (logp0_tend,vor_tend,div_tend,temp_tend,humid_tend)
-    #     spectral_truncation!(tendency,G)
-    # end
-
-    # time integration via leapfrog step forward (filtered with Robert+William's depending on l1)
-    # leapfrog!(progn,diagn,dt,C,lf1)
-    leapfrog!(vor,vor_tend,dt,M.constants,lf1)
+    # SURFACE LAYER (log of surface pressure)
+    @unpack pres_tend = diagn_surface
+    pres_old,pres_new = pres.leapfrog
+    leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,M.constants)
+    gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf2],M.spectral_transform)
 end
 
 """
