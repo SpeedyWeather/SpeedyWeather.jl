@@ -43,7 +43,7 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
 end
 
 # variables that are leapfrogged in the respective models that are on layers (so excl surface pressure)
-leapfrog_layer_vars(::BarotropicModel) = (:vor)
+leapfrog_layer_vars(::BarotropicModel) = (:vor,)
 leapfrog_layer_vars(::ShallowWaterModel) = (:vor,:div)
 leapfrog_layer_vars(::PrimitiveEquationModel) = (:vor,:div,:temp)
 
@@ -121,8 +121,8 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
 
-    get_tendencies!(diagn,progn,model,time,lf2)
-    # implicit_correction!(diagn,progn,model)
+    get_tendencies!(diagn,progn,time,M,lf2)
+    # implicit_correction!(diagn,progn,M)
 
     # LOOP OVER ALL LAYERS for diffusion, leapfrog time integration
     # and progn state from spectral to grid for next time step
@@ -133,8 +133,8 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     end
 
     # SURFACE LAYER (log of surface pressure)
-    @unpack pres_tend = diagn_surface
-    pres_old,pres_new = pres.leapfrog
+    @unpack pres_tend = diagn.surface
+    pres_old,pres_new = progn.pres.leapfrog
     leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,M.constants)
     gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf2],M.spectral_transform)
 end

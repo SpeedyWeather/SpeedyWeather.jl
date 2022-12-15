@@ -29,23 +29,23 @@ function initialise_geopotential(   σ_levels_full::Vector,
     return Δp_geopot_half, Δp_geopot_full
 end
 
-# function lapserate_correction(  σ_levels_full::Vector,
-#                                 σ_levels_half::Vector,
-#                                 Δp_geopot_full::Vector)
+function lapserate_correction(  σ_levels_full::Vector,
+                                σ_levels_half::Vector,
+                                Δp_geopot_full::Vector)
 
-#     nlev = length(σ_levels_full)
-#     @assert nlev+1 == length(σ_levels_half) "σ half levels must have length nlev+1"
-#     @assert nlev == length(Δp_geopot_full) "σ half levels must have length nlev"
+    nlev = length(σ_levels_full)
+    @assert nlev+1 == length(σ_levels_half) "σ half levels must have length nlev+1"
+    @assert nlev == length(Δp_geopot_full) "σ half levels must have length nlev"
 
-#     lapserate_corr = zeros(nlev)
-#     for k in 2:nlev-1   # only in the free troposphere
-#         # TODO reference
-#         lapserate_corr[k] = 0.5*Δp_geopot_full[k]*
-#                     log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
-#     end
+    lapserate_corr = zeros(nlev)
+    for k in 2:nlev-1   # only in the free troposphere
+        # TODO reference
+        lapserate_corr[k] = 0.5*Δp_geopot_full[k]*
+                    log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
+    end
 
-#     return lapserate_corr
-# end
+    return lapserate_corr
+end
 
 """
     geopotential!(diagn,B,G)

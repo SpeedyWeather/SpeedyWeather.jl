@@ -84,7 +84,7 @@ struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     u_coslat::LowerTriangularMatrix{Complex{NF}}
     v_coslat::LowerTriangularMatrix{Complex{NF}}
 
-    # GENERAL VECTOR (a,b), work array to be reused in various places
+    # MULTI-PURPOSE VECTOR (a,b), work array to be reused in various places
     # u_coslat, v_coslat = a,b                              (all models)
     # uω_coslat⁻¹, vω_coslat⁻¹ = a,b                        (all models)
     # uω_coslat⁻¹_grid, vω_coslat⁻¹_grid = a_grid,b_grid    (all models)
@@ -106,7 +106,7 @@ struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     # VERTICAL VELOCITY (̇̇dσ/dt)
     σ_tend          ::Grid                              # = dσ/dt, on half levels at k+1/2
     σ_m             ::Grid                              # TODO what's that, also on half levels at k+1/2
-    uv∇lnp            ::Grid                            # =(u-u_mean)*dlnp_dlon * (v-v_mean)*dlnp_dlat
+    uv∇lnp          ::Grid                              # =(u-u_mean)*dlnp_dlon + (v-v_mean)*dlnp_dlat
 
     # ###------Defined in surface_pressure_tendency!()
     # u_mean             ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
@@ -148,7 +148,7 @@ function Base.zeros(::Type{DynamicsVariables},
     u_coslat = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     v_coslat = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
-    # GENERAL VECTOR (a,b), work array to be reused in various places
+    # MULTI-PURPOSE VECTOR (a,b), work array to be reused in various places
     a = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     b = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     a_grid = zeros(Grid{NF},nresolution)

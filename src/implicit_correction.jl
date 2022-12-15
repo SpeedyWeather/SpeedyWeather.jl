@@ -28,6 +28,8 @@ function initialize_implicit!(  dt::Real,                   # time step to updat
     end
 end
 
+initialize_implicit!(::Real,::PrimitiveEquationModel) = nothing
+
 """
     implicit_correction!(   diagn::DiagnosticVariablesLayer,
                             progn::PrognosticVariablesLeapfrog,

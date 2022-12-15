@@ -36,7 +36,7 @@ function surface_pressure_tendency!(progn::PrognosticVariables{NF},
     V̄ = diagn.surface.V_mean_grid
     # D̄ = diagn.surface.div_mean_grid
     D̄_spec = diagn.surface.div_mean
-    @unpack coslat⁻² = model.geometry
+    @unpack coslat⁻¹ = model.geometry
 
     # precompute ring indices
     rings = eachring(pres_tend_grid,dpres_dlon_grid,dpres_dlat_grid,Ū,V̄)
@@ -169,6 +169,7 @@ function vertical_advection!(   diagn::DiagnosticVariables,
                                 model::PrimitiveEquationModel)
     
     @unpack σ_levels_thick⁻¹_half, nlev, radius_earth = model.geometry
+    @unpack σ_lnp_A, σ_lnp_B = model.geometry
     @boundscheck nlev == diagn.nlev || throw(BoundsError)
 
     # ALL LAYERS (but use indexing tricks to avoid out of bounds access for top/bottom)
@@ -264,8 +265,9 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
     end
 
     # divergence and curl of that u,v_tend vector for vor,div tendencies
-    u_tend = diagn.tendencies.a
-    v_tend = diagn.tendencies.b
+    @unpack vor_tend, div_tend = diagn.tendencies
+    u_tend = diagn.dynamics_variables.a
+    v_tend = diagn.dynamics_variables.b
     S = model.spectral_transform
 
     spectral!(u_tend,u_tend_grid,S)
@@ -285,7 +287,7 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
     @unpack temp_tend, temp_tend_grid, lnp_vert_adv_grid = diagn.tendencies
     @unpack div_grid, temp_grid = diagn.grid_variables
     @unpack κ = model.constants
-    Tᵥ = diagn.dynamics_variables.temp_virt_grid
+    Tᵥ = diagn.grid_variables.temp_virt_grid
     @unpack uv∇lnp = diagn.dynamics_variables
     D̄ = surf.div_mean_grid
     

@@ -30,6 +30,7 @@ end
 
 function get_tendencies!(   diagn::DiagnosticVariables,
                             progn::PrognosticVariables,
+                            time::DateTime,
                             model::PrimitiveEquationModel,
                             lf::Int=2                   # leapfrog index to evaluate tendencies on
                             )
@@ -39,7 +40,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     G = model.geometry
     S = model.spectral_transform
  
-    # parametrization_tendencies!(diagn,model)
+    # parametrization_tendencies!(diagn,time,model)
 
     geopotential!(diagn,B,G)
     vertical_averages!(progn,diagn,lf,G)
@@ -49,13 +50,11 @@ function get_tendencies!(   diagn::DiagnosticVariables,
 
     for layer in diagn.layers
         vordiv_tendencies!(layer,diagn.surface,model)
-        temperature_tendency!(layer,diagn.surf,model)
+        temperature_tendency!(layer,diagn.surface,model)
         dry_core || humidity_tendency!(layer,model)
         bernoulli_potential!(layer,G,S)
     end
 end
-
-
 
 """
     add_tendencies!(tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
