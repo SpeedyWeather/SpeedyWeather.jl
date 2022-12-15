@@ -29,10 +29,7 @@ The default values of the keywords define the default model setup.
     # ATMOSPHERE
     mol_mass_dry_air = 28.964917        # molar mass of dry air [g/mol]
     mol_mass_vapour = 18.01528          # molar mass of water vapour [g/mol]
-    akap::Real = 2/7                    # ratio of gas constant to specific heat of dry air
-                                        # at constant pressure = 1 - 1/γ where γ is the
-                                        # heat capacity ratio of a perfect diatomic gas (7/5)
-    cp::Real = 1004                       # specific heat at constant pressure [J/K/kg]
+    cₚ::Real = 1004.0                   # specific heat at constant pressure [J/K/kg]
     R_gas::Real = 8.31446261815324      # universal gas constant [J/K/mol]
     R_dry::Real = 1000*R_gas/mol_mass_dry_air   # specific gas constant for dry air [J/kg/K]
     R_vapour::Real = 1000*R_gas/mol_mass_vapour # specific gas constant for water vapour [J/kg/K]

@@ -7,10 +7,10 @@ Struct holding the parameters needed at runtime in number format NF.
     radius_earth::NF        # Radius of Earth
     rotation_earth::NF      # Angular frequency of Earth's rotation
     gravity::NF             # Gravitational acceleration
-    akap::NF                # Ratio of gas constant to specific heat of dry air at constant pressure
     R_dry::NF               # specific gas constant for dry air [J/kg/K]
     layer_thickness::NF     # shallow water layer thickness [m]
     μ_virt_temp::NF         # used for virt temp calculation
+    κ::NF                   # = R_dry/cₚ, gas const for air over heat capacity
 
     # TIME STEPPING
     Δt::NF                  # time step [s/m], use 2Δt for leapfrog, scaled by Earth's radius
@@ -53,12 +53,13 @@ Generator function for a Constants struct.
 function Constants(P::Parameters)
 
     # PHYSICAL CONSTANTS
-    @unpack radius_earth, rotation_earth, gravity, akap, R_dry, R_vapour = P
+    @unpack radius_earth, rotation_earth, gravity, R_dry, R_vapour, cₚ = P
     @unpack layer_thickness = P
     H₀ = layer_thickness*1000       # ShallowWater: convert from [km]s to [m]
     ξ = R_dry/R_vapour              # Ratio of gas constants: dry air / water vapour [1]
     μ_virt_temp = (1-ξ)/ξ           # used in Tv = T(1+μq), for conversion from humidity q
                                     # and temperature T to virtual temperature Tv
+    κ = R_dry/cₚ                    # = 2/7ish for diatomic gas
 
     # TIME INTEGRATION CONSTANTS
     @unpack robert_filter, williams_filter = P
@@ -89,7 +90,7 @@ function Constants(P::Parameters)
     Δt /= radius_earth      # [s/m] scale with Earth's radius
 
     # This implies conversion to NF
-    return Constants{P.NF}( radius_earth,rotation_earth,gravity,akap,R_dry,H₀,μ_virt_temp,
+    return Constants{P.NF}( radius_earth,rotation_earth,gravity,R_dry,H₀,μ_virt_temp,κ,
                             Δt,Δt_unscaled,Δt_sec,Δt_hrs,
                             robert_filter,williams_filter,n_timesteps,
                             output_every_n_steps, n_outputsteps,
