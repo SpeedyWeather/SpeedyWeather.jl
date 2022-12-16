@@ -136,3 +136,9 @@ function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
         spectral!(temp_virt,temp_virt_grid,S)
     end
 end
+
+function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
+                                model::PrimitiveEquationModel)
+    
+    virtual_temperature!(diagn,zeros(LowerTriangularMatrix,0,0),model)
+end
