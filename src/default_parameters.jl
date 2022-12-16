@@ -164,6 +164,6 @@ function nlev_default(model::Type{<:ModelSetup}, σ_levels_half::AbstractVector)
 end
 
 # default variables to output by model
-output_vars_default(::Type{Barotropic}) = [:vor,:u]
-output_vars_default(::Type{ShallowWater}) = [:vor,:u]
-output_vars_default(::Type{PrimitiveEquation}) = [:vor,:u,:temp]
+output_vars_default(::Type{<:Barotropic}) = [:vor,:u]
+output_vars_default(::Type{<:ShallowWater}) = [:vor,:u]
+output_vars_default(::Type{<:PrimitiveEquation}) = [:vor,:u,:temp]
