@@ -245,12 +245,12 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
     U = diagn.grid_variables.U_grid             # U = u*coslat
     V = diagn.grid_variables.V_grid             # V = v*coslat
     vor = diagn.grid_variables.vor_grid         # relative vorticity
-    dpres_dx = surf.dpres_dlon_grid             # zonal gradient of logarithm of surface pressure
-    dpres_dy = surf.dpres_dlat_grid             # meridional gradient thereof
+    ∇lnp_x = surf.dpres_dlon_grid               # zonal gradient of logarithm of surface pressure
+    ∇lnp_y = surf.dpres_dlat_grid               # meridional gradient thereof
     Tᵥ = diagn.grid_variables.temp_virt_grid    # virtual temperature
 
     # precompute ring indices and boundscheck
-    rings = eachring(u_tend_grid,v_tend_grid,U,V,vor,dpres_dx,dpres_dy,Tᵥ)
+    rings = eachring(u_tend_grid,v_tend_grid,U,V,vor,∇lnp_x,∇lnp_y,Tᵥ)
 
     @inbounds for (j,ring) in enumerate(rings)
         coslat⁻²j = coslat⁻²[j]
@@ -259,8 +259,10 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
             ω = vor[ij] + f         # absolute vorticity
             RTᵥ = R_dry*Tᵥ[ij]      # gas constant (dry air) times virtual temperature
             # TODO check whether u,v_tend should be included in coslat unscaling
-            u_tend_grid[ij] = (u_tend_grid[ij] + V[ij]*ω - RTᵥ*dpres_dx[ij])*coslat⁻²j
-            v_tend_grid[ij] = (v_tend_grid[ij] - U[ij]*ω - RTᵥ*dpres_dy[ij])*coslat⁻²j
+            # u_tend_grid[ij] = (u_tend_grid[ij] + V[ij]*ω - RTᵥ*dpres_dx[ij])*coslat⁻²j
+            # v_tend_grid[ij] = (v_tend_grid[ij] - U[ij]*ω - RTᵥ*dpres_dy[ij])*coslat⁻²j
+            u_tend_grid[ij] = (V[ij]*ω - RTᵥ*∇lnp_x[ij])*coslat⁻²j
+            v_tend_grid[ij] = (U[ij]*ω - RTᵥ*∇lnp_y[ij])*coslat⁻²j
         end
     end
 
@@ -294,7 +296,7 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
     # +T*div term of the advection operator
     @inbounds for ij in eachgridpoint(temp_tend_grid,temp_grid,div_grid)
         # add as tend already contains parameterizations + vertical advection
-        temp_tend_grid[ij] += temp_grid[ij]*div_grid[ij] +              # +TD term of hori advection
+        temp_tend_grid[ij] = temp_grid[ij]*div_grid[ij] +               # +TD term of hori advection
                 κ*Tᵥ[ij]*(uv∇lnp[ij] - D̄[ij] + lnp_vert_adv_grid[ij])   # +κTᵥ*Dlnp/Dt, adiabatic term
     end
 
@@ -349,14 +351,17 @@ function horizontal_advection!( A_tend::LowerTriangularMatrix{Complex{NF}}, # Ou
                                 A_tend_grid::AbstractGrid{NF},              # Input: tendency including vert advection + parameterization
                                 A_grid::AbstractGrid{NF},                   # Input: grid field to be advected
                                 diagn::DiagnosticVariablesLayer{NF},        
-                                model::ModelSetup) where NF
+                                model::ModelSetup;
+                                add::Bool=true) where NF
 
     @unpack div_grid = diagn.grid_variables
     
+    @inline kernel(a,b,c) = add ? a+b*c : b*c
+
     # +A*div term of the advection operator
     @inbounds for ij in eachgridpoint(A_tend_grid,A_grid,div_grid)
         # add as tend already contains parameterizations + vertical advection
-        A_tend_grid[ij] += A_grid[ij]*div_grid[ij]
+        A_tend_grid[ij] = kernel(A_tend_grid[ij],A_grid[ij],div_grid[ij])
     end
 
     spectral!(A_tend,A_tend_grid,model.spectral_transform)  # for +A*div in spectral space

@@ -13,6 +13,12 @@ function initial_conditions(M::ModelSetup)
         nothing 
 
     elseif initial_conditions == :barotropic_vorticity              # zonal wind with perturbation
+
+        mmax = min(15,progn.mmax+1)     # perturb only larger modes
+        lmax = min(15,progn.lmax+1)
+
+        ξ = randn(Complex{M.parameters.NF},mmax,lmax)
+
         for progn_layer in progn.layers
             progn_layer.leapfrog[1].vor[4,1]  =  80/radius_earth    # zonal wind
             progn_layer.leapfrog[1].vor[6,1]  = -160/radius_earth
@@ -21,7 +27,7 @@ function initial_conditions(M::ModelSetup)
             # perturbation
             for m in 2:min(15,progn.mmax+1)
                 for l in m:min(15,progn.lmax+1)
-                    progn_layer.leapfrog[1].vor[l,m] = 10/radius_earth*randn(ComplexF64)
+                    progn_layer.leapfrog[1].vor[l,m] = 10/radius_earth*ξ[l,m]
                 end
             end
         end
@@ -40,29 +46,34 @@ function initial_conditions(M::ModelSetup)
     return progn
 end
 
-function initialize_from_rest(M::ModelSetup) 
+function initialize_from_rest(model::ModelSetup) 
 
-    @unpack NF = M.parameters
-    @unpack nlev = M.geometry
-    @unpack lmax, mmax = M.spectral_transform
+    @unpack NF = model.parameters
+    @unpack nlev = model.geometry
+    @unpack lmax, mmax = model.spectral_transform
 
-    return zeros(PrognosticVariables{NF},M,lmax,mmax,nlev)
+    return zeros(PrognosticVariables{NF},model,lmax,mmax,nlev)
 end
 
 """Initialize a PrognosticVariables struct for an atmosphere at rest. No winds,
 hence zero vorticity and divergence, but temperature, pressure and humidity are
 initialised """
-function initialize_from_rest(M::PrimitiveEquationModel)
+function initialize_from_rest(model::PrimitiveEquationModel)
 
-    @unpack NF = M.parameters
-    @unpack nlev = M.geometry
-    @unpack lmax, mmax = M.spectral_transform
+    P = model.parameters
+    B = model.boundaries
+    G = model.geometry
+    S = model.spectral_transform
 
-    progn = zeros(PrognosticVariables{NF},M,lmax,mmax,nlev)
+    @unpack NF = model.parameters
+    @unpack nlev = model.geometry
+    @unpack lmax, mmax = model.spectral_transform
 
-    # TODO adjust temp and pres to rest
-    # initialize_temperature!(temp_lf1,P,B,G)                    # temperature from lapse rates    
-    # pres_grid = initialize_pressure!(pres_lf1,P,B,G)  # pressure from temperature profile
+    progn = zeros(PrognosticVariables{NF},model,lmax,mmax,nlev)
+
+    # temperature, pressure from lapse rate and mountains
+    initialize_temperature!(progn,P,B,G,S)
+    pres_grid = initialize_pressure!(progn,P,B,G,S)
     # initialize_humidity!(humid_lf1,pres_grid,P,G)          # specific humidity from pressure
 
     return progn
@@ -89,87 +100,84 @@ function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup)
     return progn_new
 end
 
-# """Initialize spectral temperature from surface absolute temperature and constant
-# lapse rate (troposphere) and zero lapse rate (stratosphere)."""
-# function initialize_temperature!(   temp::AbstractArray{Complex{NF},3},    # spectral temperature in 3D
-#                                     P::Parameters,                         # Parameters struct
-#                                     B::Boundaries,                         # Boundaries struct
-#                                     G::Geometry                            # Geospectral struct
-#                                     S::SpectralTransform
-#                                     ) where NF
+function initialize_temperature!(   progn::PrognosticVariables,
+                                    P::Parameters,
+                                    B::Boundaries,
+                                    G::Geometry,
+                                    S::SpectralTransform)
 
-#     lmax,mmax,nlev = size(temp)     # number of vertical levels nlev
-#     lmax, mmax = lmax-1, mmax-1     # get 0-based max degree l, order m of spherical harmonics
-#     @unpack geopot_surf = B         # spectral surface geopotential [m²/s²]
+    @unpack geopot_surf = B         # spectral surface geopotential [m²/s²] (orography*gravity)
 
-#     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
-#     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
-#     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
-#     # gravity:      Gravitational acceleration [m/s^2]
-#     # R_dry:        Specific gas constant for dry air [J/kg/K]
-#     @unpack temp_ref, temp_top, lapse_rate, gravity, R_dry = P
-#     @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
-#     @unpack norm_sphere = G.spectral_transform      # normalization of the l=m=0 spherical harmonic
+    # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
+    # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
+    # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
+    # gravity:      Gravitational acceleration [m/s^2]
+    # R_dry:        Specific gas constant for dry air [J/kg/K]
+    @unpack temp_ref, temp_top, lapse_rate, gravity, R_dry = P
+    @unpack n_stratosphere_levels, nlev = P     # number of vertical levels used for stratosphere
+    @unpack norm_sphere = S                     # normalization of the l=m=0 spherical harmonic
 
-#     lapse_rate_scaled = lapse_rate/gravity/1000     # Lapse rate scaled by gravity [K/m / (m²/s²)]
-#     temp_surf = -lapse_rate_scaled*geopot_surf      # spectral surface air temperature from orography and lapse rate
-#     temp_surf[1,1] += norm_sphere*temp_ref          # adjust mean value (spectral coefficient 1,1) with temp_ref
+    Γg⁻¹ = lapse_rate/gravity/1000              # Lapse rate scaled by gravity [K/m / (m²/s²)]
 
-#     # Stratosphere, set the first spectral coefficient (=mean value)
-#     # in uppermost levels (default: k=1,2) for lapse rate = 0
-#     for k in 1:n_stratosphere_levels
-#         temp[1,1,k] = norm_sphere*temp_top
-#     end
+    # SURFACE TEMPERATURE
+    temp_surf = progn.layers[end].leapfrog[1].temp  # spectral temperature at k=nlev=surface
+    temp_surf[1] = norm_sphere*temp_ref             # set global mean surface temperature
+    for lm in eachharmonic(geopot_surf,temp_surf)
+        temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]       # lower temperature for higher mountains
+    end
 
-#     # Temperature at tropospheric levels
-#     @unpack σ_levels_full = G.geometry
+    # STRATOSPHERE set the l=m=0 spectral coefficient (=mean value) only
+    # in uppermost levels (default: k=1,2) for lapse rate = 0
+    for k in 1:n_stratosphere_levels
+        temp = progn.layers[k].leapfrog[1].temp
+        temp[1] = norm_sphere*temp_top
+    end
 
-#     for k in n_stratosphere_levels+1:nlev
-#         for m in 1:mmax+1
-#             for l in m:lmax+1
-#                 temp[l,m,k] = temp_surf[l,m]*σ_levels_full[k]^(R_dry*lapse_rate_scaled)
-#             end
-#         end
-#     end
-# end
+    # TROPOSPHERE use lapserate and vertical coordinate σ for profile
+    for k in n_stratosphere_levels+1:nlev
+        temp = progn.layers[k].leapfrog[1].temp
+        σₖᴿ = G.σ_levels_full[k]^(R_dry*Γg⁻¹)   # TODO reference
 
-# """Initialize the logarithm of surface pressure `logp0` consistent with temperature profile."""
-# function initialize_pressure!(  pres::AbstractMatrix{Complex{NF}},      # logarithm of surface pressure
-#                                 P::Parameters,                          # Parameters struct
-#                                 B::Boundaries,                          # Boundaries struct
-#                                 G::Geomtry,
-#                                 S::SpectralTransform
-#                                 ) where NF                # Geospectral struct
+        for lm in eachharmonic(temp,temp_surf)
+            temp[lm] = temp_surf[lm]*σₖᴿ
+        end
+    end
+end
+
+function initialize_pressure!(  progn::PrognosticVariables,
+                                P::Parameters,
+                                B::Boundaries,
+                                G::Geometry,
+                                S::SpectralTransform)
     
-#     @unpack nlon, nlat = P
-#     S = G.spectral_transform
+    @unpack Grid,nlat_half = G
+    @unpack lmax,mmax = S
+    
+    # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
+    # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
+    # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
+    # gravity:      Gravitational acceleration [m/s^2]
+    # R:            Specific gas constant for dry air [J/kg/K]
+    # pres_ref:     Reference surface pressure [hPa]
+    @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R_dry = P
+    @unpack orography = B           # orography on the grid
 
-#     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
-#     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
-#     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
-#     # gravity:      Gravitational acceleration [m/s^2]
-#     # R:            Specific gas constant for dry air [J/kg/K]
-#     # pres_ref:     Reference surface pressure [hPa]
-#     @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R_dry = P
-#     @unpack geopot_surf = B                     # spectral surface geopotential
-#     geopot_surf_grid = gridded(geopot_surf,S)   # convert to grid-point space
+    Γ = lapse_rate/1000             # Lapse rate [K/km] -> [K/m]
+    lnp₀ = log(pres_ref)            # logarithm of reference surface pressure
+    lnp_grid = zero(orography)      # allocate log surface pressure on grid
 
-#     lapse_rate_scaled = lapse_rate/gravity/1000 # Lapse rate scaled by gravity [K/m / (m²/s²)]
-#     log_pres_ref = log(pres_ref)                # logarithm of reference surface pressure
-#     pres_grid = zeros(nlon, nlat)               # logarithm of surface pressure by grid point
+    RΓg⁻¹ = R_dry*Γ/gravity         # for convenience
+    ΓT⁻¹ = Γ/temp_ref           
 
-#     for j in 1:nlat
-#         for i in 1:nlon
-#             pres_grid[i,j] = log_pres_ref + 
-#                 log(1 - lapse_rate_scaled*geopot_surf_grid[i,j]/temp_ref)/(R_dry*lapse_rate_scaled)
-#         end
-#     end
+    for ij in eachgridpoint(lnp_grid,orography)
+        lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹
+    end
 
-#     # convert to spectral space
-#     spectral!(pres,pres_grid,SpectralTransform(NF,nlon,nlat,P.trunc,P.radius_earth,true))
-#     # spectral_truncation!(pres,P.trunc)      # set lmax+1 row to zero
-#     return pres_grid                       # return grid for use in initialize_humidity!
-# end
+    lnp = progn.pres.leapfrog[1]
+    spectral!(lnp,lnp_grid,S)
+    spectral_truncation!(lnp,lmax)  # set lmax+1 row to zero
+    return lnp_grid                 # return grid for use in initialize_humidity!
+end
 
 # """Initialize specific humidity in spectral space."""
 # function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},# spectral specific humidity

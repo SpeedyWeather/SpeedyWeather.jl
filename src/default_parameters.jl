@@ -38,15 +38,15 @@ The default values of the keywords define the default model setup.
     alhs::Real = 2801                   # latent heat of sublimation [?]
     sbc::Real = 5.67e-8                 # stefan-Boltzmann constant [W/m^2/K^4]
 
-    # STANDARD ATMOSPHERE
-    lapse_rate::Real = 6                # reference temperature lapse rate -dT/dz [K/km]
-    temp_ref::Real = 288                # reference absolute temperature at surface z=0 [K]
-    temp_top::Real = 216                # reference absolute temperature in stratosphere [K]
-    scale_height::Real = 7.5            # reference scale height for pressure [km]
-    pres_ref::Real = 1013               # reference surface pressure [hPa]
-    scale_height_humid::Real = 2.5      # reference scale height for specific humidity [km]
-    relhumid_ref::Real = 0.7            # reference relative humidity of near-surface air [1]
-    water_pres_ref::Real = 17           # reference saturation water vapour pressure [Pa]
+    # STANDARD ATMOSPHERE (reference values)
+    lapse_rate::Real = 6                # moist adiabatic temperature lapse rate -dT/dz [K/km]
+    temp_ref::Real = 288                # absolute temperature at surface z=0 [K]
+    temp_top::Real = 216                # absolute temperature in stratosphere [K]
+    scale_height::Real = 7.5            # scale height for pressure [km]
+    pres_ref::Real = 1013               # surface pressure [hPa]
+    scale_height_humid::Real = 2.5      # scale height for specific humidity [km]
+    relhumid_ref::Real = 0.7            # relative humidity of near-surface air [1]
+    water_pres_ref::Real = 17           # saturation water vapour pressure [Pa]
     layer_thickness::Real = 8.5         # layer thickness for the shallow water model [km]
 
     # VERTICAL COORDINATES
@@ -121,12 +121,16 @@ The default values of the keywords define the default model setup.
     output::Bool = false            # Store data in netCDF?
     output_dt::Real = 6             # output time step [hours]
     output_path::String = pwd()     # path to output folder
-    run_id::Union{String,Integer} = get_run_id(output, output_path)    # name of the output folder, defaults to 4-digit number counting up from 0001
-    output_filename::String="output.nc"                 # name of the output netcdf file
-    output_vars::Vector{Symbol}=[:vor]                  # variables to output: :u, :v, :vor, :div, :
-    compression_level::Integer = 3  # 1=low but fast, 9=high but slow
-    keepbits::Integer = 7           # mantissa bits to keep for every variable
-    version::VersionNumber=pkgversion(SpeedyWeather)
+
+    # name of the output folder, defaults to 4-digit number counting up from run-0001
+    run_id::Union{String,Integer} = get_run_id(output, output_path)    
+    output_filename::String="output.nc"     # name of the output netcdf file
+    
+    # variables to output: :u, :v, :vor, :div, :temp, :humid
+    output_vars::Vector{Symbol} = output_vars_default(model)
+    compression_level::Integer = 3          # 1=low but fast, 9=high but slow
+    keepbits::Integer = 7                   # mantissa bits to keep for every variable
+    version::VersionNumber = pkgversion(SpeedyWeather)
 
     # OUTPUT GRID
     output_NF::DataType = NF        # number format used for output
@@ -137,9 +141,9 @@ The default values of the keywords define the default model setup.
     output_matrix_quadrant::NTuple{4,Tuple{Integer,Integer}} = ((2,2),(1,2),(1,1),(2,1))
 
     # RESTART
-    write_restart::Bool = output        # also write restart file if output==true?
-    restart_path::String = output_path  # path for restart file
-    restart_id::Union{String,Integer} = 1         # run_id of restart file in run????/restart.jld2
+    write_restart::Bool = output            # also write restart file if output==true?
+    restart_path::String = output_path      # path for restart file
+    restart_id::Union{String,Integer} = 1   # run_id of restart file in run-????/restart.jld2
 end
 
 """
@@ -158,3 +162,8 @@ function nlev_default(model::Type{<:ModelSetup}, σ_levels_half::AbstractVector)
         return length(σ_levels_half) - 1
     end
 end
+
+# default variables to output by model
+output_vars_default(::Type{<:Barotropic}) = [:vor,:u]
+output_vars_default(::Type{<:ShallowWater}) = [:vor,:u]
+output_vars_default(::Type{<:PrimitiveEquation}) = [:vor,:u,:temp]
