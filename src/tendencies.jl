@@ -40,13 +40,19 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     G = model.geometry
     S = model.spectral_transform
  
-    # parametrization_tendencies!(diagn,time,model)
+    # # parametrization_tendencies!(diagn,time,model)
+    # for layer in diagn.layers
+    #     for fieldname in fieldnames(typeof(layer.tendencies))
+    #         field = getfield(layer.tendencies,fieldname)
+    #         fill!(field,0)
+    #     end
+    # end
 
     geopotential!(diagn,B,G)
     vertical_averages!(progn,diagn,lf,G)
     surface_pressure_tendency!(progn,diagn,lf,model)
-    vertical_velocity!(diagn,model)
-    vertical_advection!(diagn,model)
+    # vertical_velocity!(diagn,model)
+    # vertical_advection!(diagn,model)
 
     for layer in diagn.layers
         vordiv_tendencies!(layer,diagn.surface,model)

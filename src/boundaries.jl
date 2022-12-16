@@ -34,7 +34,7 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
 
     elseif P.model <: ShallowWater || P.model <: PrimitiveEquation
 
-        # OROGRAPHY
+        # OROGRAPHY (on grid)
         orography_highres = ncfile.vars["orog"][:,:]        # height [m]
 
         # Interpolate/coarsen to desired resolution
@@ -44,23 +44,16 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
         
         lmax,mmax = P.trunc,P.trunc
         orography_spec = spectral_truncation(Complex{NF},orography_spec,lmax+1,mmax)
-        
-        if P.model <: ShallowWater
+        orography = gridded(orography_spec,S)
 
-            # OROGRAPHY ON GRID
-            orography = gridded(orography_spec,S)
-
-            # SURFACE GEOPOTENTIAL
+        # SURFACE GEOPOTENTIAL (orography*gravity, in spectral space)
+        if P.model <: ShallowWater      # not needed
             geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},0,0)
-
         elseif P.model <: PrimitiveEquation
-
-            # gridded orography not needed for primitive equation model
-            orography = zeros(Grid{NF},0)
-
-            # GEOPOTENTIAL, use spectral orography from above times gravity
             geopot_surf = convert(NF,gravity)*orography_spec
         end
+
+        spectral_truncation!(geopot_surf,lmax,mmax)
     end
 
     # convert to number format NF here
