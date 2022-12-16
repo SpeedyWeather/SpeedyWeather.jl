@@ -50,6 +50,8 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     σ_levels_thick::Vector{NF}      # σ level thicknesses
     σ_levels_thick⁻¹_half::Vector{NF}   # = 1/(2σ_levels_thick)
     σ_f::Vector{NF}                 # akap/(2σ_levels_thick)   #TODO rename?
+    σ_lnp_A::Vector{NF}
+    σ_lnp_B::Vector{NF}
 
     # VERTICAL REFERENCE TEMPERATURE PROFILE
     temp_ref_profile::Vector{NF}
@@ -73,7 +75,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
     @unpack trunc, nlev = P                         # grid type, spectral truncation, # of vertical levels
     @unpack radius_earth, rotation_earth = P        # radius of earth, angular frequency
-    @unpack R_dry, akap = P                         # gas constant for dry air, ratio of gas consts
+    @unpack R_dry, cₚ = P                           # gas constant for dry air, heat capacity
     @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
     @unpack temp_ref, temp_top, lapse_rate, gravity = P # for reference atmosphere
 
@@ -111,11 +113,15 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     # VERTICAL SIGMA COORDINATE
     # σ = p/p0 (fraction of surface pressure)
     # sorted such that σ_levels_half[end] is at the planetary boundary
+    κ = R_dry/cₚ
     σ_levels_half = vertical_coordinates(P)
     σ_levels_full = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])
     σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
     σ_levels_thick⁻¹_half = 1 ./ (2σ_levels_thick)
-    σ_f = akap ./ (2σ_levels_full)
+    σ_f = κ ./ (2σ_levels_full)
+
+    σ_lnp_A = [log(σ_levels_full[k]/σ_levels_half[k])/σ_levels_thick[k] for k in 1:nlev]
+    σ_lnp_B = [log(σ_levels_half[k+1]/σ_levels_full[k])/σ_levels_thick[k] for k in 1:nlev]
 
     # VERTICAL REFERENCE TEMPERATURE PROFILE
     RΓ = R_dry*lapse_rate/(1000*gravity)                    # origin unclear but profile okay
@@ -146,6 +152,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_thick⁻¹_half,σ_f,
+                    σ_lnp_A,σ_lnp_B,
                     temp_ref_profile,
                     Δp_geopot_half,Δp_geopot_full,lapserate_corr,entrainment_profile)
                     # tref,rgas,fsgr,tref3)

@@ -162,11 +162,11 @@ function dry_static_energy!(
     column::ColumnVariables{NF},
     model::PrimitiveEquationModel{NF},
 ) where {NF<:AbstractFloat}
-    @unpack cp = model.parameters
+    @unpack cₚ = model.parameters
     @unpack dry_static_energy, geopot, temp = column
 
     for k in eachlayer(column)
-        dry_static_energy[k] = cp * temp[k] + geopot[k]
+        dry_static_energy[k] = cₚ * temp[k] + geopot[k]
     end
 
     return nothing

@@ -10,6 +10,7 @@ then write the tendencies back into a horizontal field of tendencies.
 """
 function parametrization_tendencies!(
     diagn::DiagnosticVariables{NF},
+    time::DateTime,
     M::PrimitiveEquationModel,
 ) where {NF}
     G = M.geometry
