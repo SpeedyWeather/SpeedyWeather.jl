@@ -10,7 +10,7 @@ function shortwave_radiation!(
     column::ColumnVariables{NF}, model::PrimitiveEquationModel
 ) where {NF<:AbstractFloat}
     @unpack humid, sat_vap_pres, dry_static_energy, geopot, norm_pres = column
-    @unpack cp = model.parameters
+    @unpack cₚ = model.parameters
     @unpack p0 = model.parameters.radiation_coefs
     @unpack σ_levels_thick = model.geometry
     @unpack gravity = model.constants
@@ -28,8 +28,7 @@ function shortwave_radiation!(
     for k in eachlayer(column)
         column.temp_tend[k] += 
             column.tend_t_rsw[k] * inv(norm_pres) *
-            (gravity / (σ_levels_thick[k] * p0)) /
-            cp
+            (gravity / (σ_levels_thick[k] * p0)) /cₚ
     end
 end
 

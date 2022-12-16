@@ -3,7 +3,7 @@ function large_scale_condensation!( column::ColumnVariables{NF},
                                     ) where {NF<:AbstractFloat}
 
     @unpack gravity, RH_thresh_max_lsc, RH_thresh_range_lsc, RH_thresh_pbl_lsc, humid_relax_time_lsc = model.constants
-    @unpack cp, alhc, n_stratosphere_levels = model.parameters
+    @unpack cₚ, alhc, n_stratosphere_levels = model.parameters
     @unpack σ_levels_full, σ_levels_thick = model.geometry
 
     @unpack humid, pres = column            # prognostic variables: specific humidity, surface pressure
@@ -29,7 +29,7 @@ function large_scale_condensation!( column::ColumnVariables{NF},
         if humid[k] > humid_threshold
             # accumulate in tendencies (nothing is added if humidity not above threshold)
             humid_tend[k] += -(humid[k] - humid_threshold) / humid_relax_time_lsc   # Formula 22
-            temp_tend[k] += -alhc / cp * min(humid_tend[k], humid_tend_max*pres)    # Formula 23
+            temp_tend[k] += -alhc / cₚ * min(humid_tend[k], humid_tend_max*pres)    # Formula 23
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the
