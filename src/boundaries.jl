@@ -56,6 +56,10 @@ function Boundaries(P::Parameters,S::SpectralTransform{NF}) where NF
         spectral_truncation!(geopot_surf,lmax,mmax)
     end
 
+    # SCALE OROGRAPHY (or disable)
+    orography .*= P.orography       # P.orography::Union{Bool,Real}
+    geopot_surf .*= P.orography
+
     # convert to number format NF here
     return Boundaries(orography,geopot_surf) #,landsea_mask,albedo)
 end

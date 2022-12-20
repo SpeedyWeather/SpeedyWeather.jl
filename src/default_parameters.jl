@@ -109,8 +109,10 @@ The default values of the keywords define the default model setup.
 
     # BOUNDARY FILES
     boundary_path::String = ""          # package location is default
+    orography::Union{Bool,Real} = true  # switch on/off orography or scale it by a factor
     orography_path::String = boundary_path
     orography_file::String = "orography_F512.nc"
+    
 
     # INITIAL CONDITIONS
     seed::Int = abs(rand(Int))          # random seed for the global random number generator
