@@ -285,25 +285,45 @@ end
     end
 end
 
-@testset "∇ no errors" begin
+@testset "∇×∇=0 and ∇⋅∇=∇²" begin
     for NF in (Float32,Float64)
-        NF = Float64
         p,d,m = initialize_speedy(NF)
 
         a = rand(LowerTriangularMatrix{Complex{NF}},33,32)
+        SpeedyWeather.spectral_truncation!(a,31)
+        a[:,1] .= real.(a[:,1])
+
+        println(rand(NF))
+
         dadx = zero(a)
         dady = zero(a)
         SpeedyWeather.∇!(dadx,dady,a,m.spectral_transform)
+
+        dadx_grid = gridded(dadx,m.spectral_transform)
+        dady_grid = gridded(dady,m.spectral_transform)
         
-        # coslat unscaling missing in the following
-        # ∇²a_1 = zero(a)
-        # ∇²a_2 = zero(a)
+        SpeedyWeather.scale_coslat⁻²!(dadx_grid,m.geometry)
+        SpeedyWeather.scale_coslat⁻²!(dady_grid,m.geometry)
 
-        # SpeedyWeather.divergence!(∇²a_1,dadx,dady,m.spectral_transform)
-        # SpeedyWeather.∇²!(∇²a_2,a,m.spectral_transform)
+        SpeedyWeather.spectral!(dadx,dadx_grid,m.spectral_transform)
+        SpeedyWeather.spectral!(dady,dady_grid,m.spectral_transform)
 
-        # for lm in SpeedyWeather.eachharmonic(∇²a_1,∇²a_2)
-        #     @test ∇²a_1[lm] ≈ ∇²a_2[lm]
-        # end
+        # CURL(GRAD(A)) = 0
+        ∇x∇a = zero(a)
+        SpeedyWeather.curl!(∇x∇a,dadx,dady,m.spectral_transform)
+
+        for lm in SpeedyWeather.eachharmonic(∇x∇a)
+            @test ∇x∇a[lm] ≈ 0 atol=3*sqrt(eps(NF))
+        end
+        
+        # DIV(GRAD(A)) = LAPLACE(A)
+        div_∇a = zero(a)
+        SpeedyWeather.divergence!(div_∇a,dadx,dady,m.spectral_transform)
+        ∇²a = zero(a)
+        SpeedyWeather.∇²!(∇²a,a,m.spectral_transform)
+
+        for lm in SpeedyWeather.eachharmonic(div_∇a,∇²a)
+            @test div_∇a[lm] ≈ ∇²a[lm] atol=sqrt(eps(NF)) rtol=sqrt(eps(NF))
+        end
     end
 end
