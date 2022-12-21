@@ -19,46 +19,24 @@ function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   
     end
 end
 
-function horizontal_diffusion!( progn::PrognosticVariablesLeapfrog,
-                                diagn::DiagnosticVariablesLayer,
-                                M::BarotropicModel,
-                                lf::Int=1,                          # leapfrog index used (2 is unstable)
-                                )
-
-    @unpack damping, damping_impl = M.horizontal_diffusion
-    @unpack vor = progn.leapfrog[lf]
-    @unpack vor_tend = diagn.tendencies
-
-    horizontal_diffusion!(vor_tend,vor,damping,damping_impl)    # diffusion of vorticity
-end
+# which variables to apply horizontal diffusion to
+diffusion_vars(::BarotropicModel) = (:vor,)
+diffusion_vars(::ShallowWaterModel) = (:vor,:div)
+diffusion_vars(::PrimitiveEquationModel) = (:vor,:div,:temp)
 
 function horizontal_diffusion!( progn::PrognosticVariablesLeapfrog,
                                 diagn::DiagnosticVariablesLayer,
-                                M::ShallowWaterModel,
+                                model::ModelSetup,
                                 lf::Int=1,                          # leapfrog index used (2 is unstable)
                                 )
 
-    @unpack damping, damping_impl = M.horizontal_diffusion
-    @unpack vor, div = progn.leapfrog[lf]
-    @unpack vor_tend,div_tend = diagn.tendencies
+    @unpack damping, damping_impl = model.horizontal_diffusion
 
-    horizontal_diffusion!(vor_tend,vor,damping,damping_impl)        # diffusion of vorticity
-    horizontal_diffusion!(div_tend,div,damping,damping_impl)        # diffusion of divergence
-end
-
-function horizontal_diffusion!( progn::PrognosticVariablesLeapfrog,
-                                diagn::DiagnosticVariablesLayer,
-                                M::PrimitiveEquationModel,
-                                lf::Int=1,                          # leapfrog index used (2 is unstable)
-                                )
-
-    @unpack damping, damping_impl = M.horizontal_diffusion
-    @unpack vor,div,temp = progn.leapfrog[lf]
-    @unpack vor_tend,div_tend,temp_tend = diagn.tendencies
-
-    horizontal_diffusion!(vor_tend, vor, damping,damping_impl)      # diffusion of vorticity
-    horizontal_diffusion!(div_tend, div, damping,damping_impl)      # diffusion of divergence
-    horizontal_diffusion!(temp_tend,temp,damping,damping_impl)      # diffusion of temperature
+    for varname in diffusion_vars(model)
+        var = getfield(progn.leapfrog[lf],varname)
+        var_tend = getfield(diagn.tendencies,Symbol(varname,:_tend))
+        horizontal_diffusion!(var_tend,var,damping,damping_impl)
+    end
 end
 
 
