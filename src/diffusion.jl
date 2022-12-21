@@ -30,11 +30,11 @@ function horizontal_diffusion!( progn::PrognosticVariablesLeapfrog,
                                 lf::Int=1,                          # leapfrog index used (2 is unstable)
                                 )
 
-    @unpack damping, damping_impl = M.horizontal_diffusion
+    @unpack damping, damping_impl = model.horizontal_diffusion
 
     for varname in diffusion_vars(model)
         var = getfield(progn.leapfrog[lf],varname)
-        var_tend = getfield(diagn.tendencies,Symbol(var,:_tend))
+        var_tend = getfield(diagn.tendencies,Symbol(varname,:_tend))
         horizontal_diffusion!(var_tend,var,damping,damping_impl)
     end
 end
