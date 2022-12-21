@@ -39,28 +39,41 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     B = model.boundaries
     G = model.geometry
     S = model.spectral_transform
+    surf = diagn.surface
  
-    # # parametrization_tendencies!(diagn,time,model)
-    # for layer in diagn.layers
-    #     for fieldname in fieldnames(typeof(layer.tendencies))
-    #         field = getfield(layer.tendencies,fieldname)
-    #         fill!(field,0)
-    #     end
-    # end
+    pressure_gradients!(diagn,progn,lf,S)               # calculate ∇ln(pₛ)
 
-    geopotential!(diagn,B,G)
+    for layer in diagn.layers
+        thickness_weighted_divergence!(layer,surf,G)    # calculate Δσₖ[(uₖ,vₖ)⋅∇ln(pₛ) + ∇⋅(uₖ,vₖ)]
+    end
+
+    geopotential!(diagn,B,G)                            # from ∂Φ/∂ln(pₛ) = -RTᵥ
     vertical_averages!(progn,diagn,lf,G)
-    surface_pressure_tendency!(progn,diagn,lf,model)
-    # vertical_velocity!(diagn,model)
+    surface_pressure_tendency!(surf,model)              # 
+    vertical_velocity!(diagn,model)
     # vertical_advection!(diagn,model)
 
     for layer in diagn.layers
         vordiv_tendencies!(layer,diagn.surface,model)
         temperature_tendency!(layer,diagn.surface,model)
-        dry_core || humidity_tendency!(layer,model)
+        # dry_core || humidity_tendency!(layer,model)
         bernoulli_potential!(layer,G,S)
     end
 end
+
+function tendencies_not_zero(diagn::DiagnosticVariables)
+    
+    for k in 1:diagn.nlev
+        any(diagn.layers[k].tendencies.vor_tend .!= 0) && println("ζ tendency not zero in layer $k")
+        any(diagn.layers[k].tendencies.div_tend .!= 0) && println("D tendency not zero in layer $k")
+        any(diagn.layers[k].tendencies.temp_tend .!= 0) && println("T tendency not zero in layer $k")
+    end
+
+    any(diagn.surface.pres_tend .!= 0) && println("ln(pₛ) tendency not zero")
+
+    return nothing
+end
+
 
 """
     add_tendencies!(tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
