@@ -111,7 +111,7 @@ of the logarithm of surface pressure ln(p_s) and D̄ the vertically averaged div
 2. Multiply ū,v̄ with ∇ln(p_s) in grid-point space, convert to spectral.
 3. D̄ is subtracted in spectral space.
 4. Set tendency of the l=m=0 mode to 0 for better mass conservation."""
-function surface_pressure_tendency!(surf::SurfaceVariables,
+function surface_pressure_tendency!(surf::SurfaceVariables{NF},
                                     model::PrimitiveEquationModel
                                     ) where {NF<:AbstractFloat}
 
@@ -287,8 +287,8 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
     U = diagn.grid_variables.U_grid             # U = u*coslat
     V = diagn.grid_variables.V_grid             # V = v*coslat
     vor = diagn.grid_variables.vor_grid         # relative vorticity
-    ∇lnp_x = surf.dpres_dlon_grid               # zonal gradient of logarithm of surface pressure
-    ∇lnp_y = surf.dpres_dlat_grid               # meridional gradient thereof
+    ∇lnp_x = surf.∇lnp_x                        # zonal gradient of logarithm of surface pressure
+    ∇lnp_y = surf.∇lnp_y                        # meridional gradient thereof
     Tᵥ = diagn.grid_variables.temp_virt_grid    # virtual temperature
 
     # precompute ring indices and boundscheck
@@ -300,13 +300,9 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
         for ij in ring
             ω = vor[ij] + f         # absolute vorticity
             RTᵥ = R_dry*Tᵥ[ij]      # gas constant (dry air) times virtual temperature
-            # TODO check whether u,v_tend should be included in coslat unscaling
-            # u_tend_grid[ij] = (u_tend_grid[ij] + V[ij]*ω - RTᵥ*dpres_dx[ij])*coslat⁻²j
-            # v_tend_grid[ij] = (v_tend_grid[ij] - U[ij]*ω - RTᵥ*dpres_dy[ij])*coslat⁻²j
+
             u_tend_grid[ij] =  (V[ij]*ω - RTᵥ*∇lnp_x[ij])*coslat⁻²j
             v_tend_grid[ij] = (-U[ij]*ω - RTᵥ*∇lnp_y[ij])*coslat⁻²j
-            # u_tend_grid[ij] = (V[ij]*ω)*coslat⁻²j
-            # v_tend_grid[ij] = (-U[ij]*ω)*coslat⁻²j
         end
     end
 
@@ -327,12 +323,11 @@ end
 Compute the temperature tendency
 """
 function temperature_tendency!( diagn::DiagnosticVariablesLayer,
-                                surf::SurfaceVariables,
                                 model::PrimitiveEquationModel)
 
     @unpack temp_tend, temp_tend_grid, lnp_vert_adv_grid = diagn.tendencies
     @unpack div_grid, temp_grid = diagn.grid_variables
-    @unpack div_sum_above, div_weighted = diagn.dynamics_variables
+    @unpack div_sum_above, div_weighted, uv∇lnp = diagn.dynamics_variables
     @unpack κ = model.constants
     Tᵥ = diagn.grid_variables.temp_virt_grid
     
@@ -367,6 +362,29 @@ function humidity_tendency!(diagn::DiagnosticVariablesLayer,
     horizontal_advection!(humid_tend,humid_tend_grid,humid_grid,diagn,model)
 end
 
+function horizontal_advection!( A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput: tendency to write into
+                                A_tend_grid::AbstractGrid{NF},              # Input: tendency incl prev terms
+                                A_grid::AbstractGrid{NF},                   # Input: grid field to be advected
+                                diagn::DiagnosticVariablesLayer{NF},        
+                                model::ModelSetup;
+                                add::Bool=true) where NF                    # add/overwrite A_tend_grid?
+
+    @unpack div_grid = diagn.grid_variables
+    
+    @inline kernel(a,b,c) = add ? a+b*c : b*c
+
+    # +A*div term of the advection operator
+    @inbounds for ij in eachgridpoint(A_tend_grid,A_grid,div_grid)
+        # add as tend already contains parameterizations + vertical advection
+        A_tend_grid[ij] = kernel(A_tend_grid[ij],A_grid[ij],div_grid[ij])
+    end
+
+    spectral!(A_tend,A_tend_grid,model.spectral_transform)  # for +A*div in spectral space
+    
+    # now add the -∇⋅((u,v)*A) term
+    flux_divergence!(A_tend,A_grid,diagn,model,add=true,flipsign=true)
+end
+
 """Computes -∇⋅((u,v)*A)"""
 function flux_divergence!(  A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput: tendency to write into
                             A_grid::AbstractGrid{NF},                   # Input: grid field to be advected
@@ -399,29 +417,6 @@ function flux_divergence!(  A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput:
     spectral!(vA,vA_grid,model.spectral_transform)
 
     divergence!(A_tend,uA,vA,model.spectral_transform;add,flipsign)
-end
-
-function horizontal_advection!( A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput: tendency to write into
-                                A_tend_grid::AbstractGrid{NF},              # Input: tendency incl prev terms
-                                A_grid::AbstractGrid{NF},                   # Input: grid field to be advected
-                                diagn::DiagnosticVariablesLayer{NF},        
-                                model::ModelSetup;
-                                add::Bool=true) where NF                    # add/overwrite A_tend_grid?
-
-    @unpack div_grid = diagn.grid_variables
-    
-    @inline kernel(a,b,c) = add ? a+b*c : b*c
-
-    # +A*div term of the advection operator
-    @inbounds for ij in eachgridpoint(A_tend_grid,A_grid,div_grid)
-        # add as tend already contains parameterizations + vertical advection
-        A_tend_grid[ij] = kernel(A_tend_grid[ij],A_grid[ij],div_grid[ij])
-    end
-
-    spectral!(A_tend,A_tend_grid,model.spectral_transform)  # for +A*div in spectral space
-    
-    # now add the -∇⋅((u,v)*A) term
-    flux_divergence!(A_tend,A_grid,diagn,model,add=true,flipsign=true)
 end
 
 """
