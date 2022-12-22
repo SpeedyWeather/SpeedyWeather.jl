@@ -50,13 +50,13 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     geopotential!(diagn,B,G)                            # from ∂Φ/∂ln(pₛ) = -RTᵥ
     vertical_averages!(progn,diagn,lf,G)
     surface_pressure_tendency!(surf,model)              # 
-    vertical_velocity!(diagn,model)
+    # vertical_velocity!(diagn,model)
     # vertical_advection!(diagn,model)
 
     for layer in diagn.layers
         vordiv_tendencies!(layer,diagn.surface,model)
         temperature_tendency!(layer,diagn.surface,model)
-        # dry_core || humidity_tendency!(layer,model)
+        dry_core || humidity_tendency!(layer,model)
         bernoulli_potential!(layer,G,S)
     end
 end
@@ -72,41 +72,4 @@ function tendencies_not_zero(diagn::DiagnosticVariables)
     any(diagn.surface.pres_tend .!= 0) && println("ln(pₛ) tendency not zero")
 
     return nothing
-end
-
-
-"""
-    add_tendencies!(tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
-                    term1::LowerTriangularMatrix{NF},   # with term1
-                    term2::LowerTriangularMatrix{NF}    # and term2
-                    ) where NF                          # number format real or complex
-
-Accumulates three `LowerTriangularMatrix`s element-wise into the first.
-
-    tend += term1 + term2."""
-function add_tendencies!(   tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
-                            term1::LowerTriangularMatrix{NF},   # with term1
-                            term2::LowerTriangularMatrix{NF}    # and term2
-                            ) where NF                          # number format real or complex
-
-    @inbounds for lm in eachharmonic(tend,term1,term2)
-        tend[lm] += (term1[lm] + term2[lm])
-    end
-end
-
-"""
-    add_tendencies!(tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
-                    term::LowerTriangularMatrix{NF},    # with term
-                    ) where NF                          # number format real or complex
-
-Accumulates two `LowerTriangularMatrix`s element-wise into the first.
-
-    tend += term."""
-function add_tendencies!(   tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
-                            term::LowerTriangularMatrix{NF}     # with term
-                            ) where NF                          # number format real or complex
-
-    @inbounds for lm in eachharmonic(tend,term)
-        tend[lm] += term[lm]
-    end
 end

@@ -580,7 +580,7 @@ function bernoulli_potential!(  diagn::DiagnosticVariablesLayer,
 
     bernoulli_potential!(bernoulli_grid,U_grid,V_grid,G)    # = 1/2(u^2 + v^2) on grid
     spectral!(bernoulli,bernoulli_grid,S)                   # to spectral space
-    add_tendencies!(bernoulli,geopot)                       # add geopotential Φ
+    bernoulli .+= geopot                                    # add geopotential Φ
     ∇²!(div_tend,bernoulli,S,add=true,flipsign=true)        # add -∇²(1/2(u^2 + v^2) + ϕ)
 end
 
