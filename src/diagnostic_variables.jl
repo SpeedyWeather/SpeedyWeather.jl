@@ -100,7 +100,7 @@ struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 
     # VERTICAL INTEGRATION
     uv∇lnp          ::Grid                          # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
-    div_sum_above   ::Grid                          # sum of (thickness-weighted) div from top to k 
+    div_sum_above   ::Grid                          # sum of (thickness-weighted) div from top to k
     div_weighted    ::Grid                          # = ∇⋅((uₖ,vₖ)Δpₖ), weighted by pres thick
     temp_virt       ::LowerTriangularMatrix{Complex{NF}}    # virtual temperature spectral for geopot
     geopot          ::LowerTriangularMatrix{Complex{NF}}    # geopotential on full layers
@@ -161,7 +161,7 @@ function Base.zeros(::Type{DynamicsVariables},
     
     # VERTICAL INTEGRATION
     uv∇lnp          = zeros(Grid{NF},nresolution)   # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
-    div_sum_above   = zeros(Grid{NF},nresolution)   # sum of thickness-weighted divs above
+    div_sum_above   = zeros(Grid{NF},nresolution)   # sum of div_weighted from level 1:k
     div_weighted    = zeros(Grid{NF},nresolution)   # = ∇⋅((uₖ,vₖ)Δpₖ), weighted by pres thick
     temp_virt       = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     geopot          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
@@ -223,7 +223,7 @@ struct SurfaceVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     U_mean_grid::Grid                               # vertical average of: zonal velocity *coslat
     V_mean_grid::Grid                               # meridional velocity *coslat
     div_mean_grid::Grid                             # divergence
-    div_mean::LowerTriangularMatrix{Complex{NF}}    # divergence (in spectral though)
+    # div_mean::LowerTriangularMatrix{Complex{NF}}    # divergence (in spectral though)
     
     precip_large_scale::Grid
     precip_convection::Grid
@@ -251,7 +251,7 @@ function Base.zeros(::Type{SurfaceVariables},
     U_mean_grid = zeros(Grid{NF},nresolution)
     V_mean_grid = zeros(Grid{NF},nresolution)
     div_mean_grid = zeros(Grid{NF},nresolution)
-    div_mean = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    # div_mean = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
     # precipitation fields
     precip_large_scale = zeros(Grid{NF},nresolution)
@@ -259,7 +259,7 @@ function Base.zeros(::Type{SurfaceVariables},
 
     return SurfaceVariables(pres_grid,pres_tend,pres_tend_grid,
                             ∇lnp_x,∇lnp_y,
-                            U_mean_grid,V_mean_grid,div_mean_grid,div_mean,
+                            U_mean_grid,V_mean_grid,div_mean_grid,#div_mean,
                             precip_large_scale,precip_convection,
                             npoints)
 end

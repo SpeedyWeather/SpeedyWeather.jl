@@ -51,13 +51,15 @@ function leapfrog!( progn::PrognosticVariablesLeapfrog,
                     diagn::DiagnosticVariablesLayer,
                     dt::Real,               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
                     lf::Int,                # leapfrog index to dis/enable William's filter
-                    M::ModelSetup)
+                    model::ModelSetup)
+    
+    @unpack dry_core = model.parameters     # TODO also leapfrog humid
                     
-    for var in leapfrog_layer_vars(M)
-        var_old = getfield(progn.leapfrog[1],var)
-        var_new = getfield(progn.leapfrog[2],var)
-        var_tend = getfield(diagn.tendencies,Symbol(var,:_tend))
-        leapfrog!(var_old,var_new,var_tend,dt,lf,M.constants)
+    for var in leapfrog_layer_vars(model)
+        var_old = getproperty(progn.leapfrog[1],var)
+        var_new = getproperty(progn.leapfrog[2],var)
+        var_tend = getproperty(diagn.tendencies,Symbol(var,:_tend))
+        leapfrog!(var_old,var_new,var_tend,dt,lf,model.constants)
     end
 end
 
