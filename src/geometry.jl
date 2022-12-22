@@ -120,9 +120,16 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     σ_levels_thick⁻¹_half = 1 ./ (2σ_levels_thick)
     σ_f = κ ./ (2σ_levels_full)
 
-    σ_lnp_A = [log(σ_levels_full[k]/σ_levels_half[k])/σ_levels_thick[k] for k in 1:nlev]
-    σ_lnp_B = [log(σ_levels_half[k+1]/σ_levels_full[k])/σ_levels_thick[k] for k in 1:nlev]
-
+    # version for Vk, the vertical advection in Dlnp/Dt
+    # σ_lnp_A = [log(σ_levels_full[k]/σ_levels_half[k])/σ_levels_thick[k] for k in 1:nlev]
+    # σ_lnp_B = [log(σ_levels_half[k+1]/σ_levels_full[k])/σ_levels_thick[k] for k in 1:nlev]
+    
+    # version to be used with div_sum_above (A) and div (B) for Dlnp/Dt
+    σ_lnp_A = [log(σ_levels_half[k]/σ_levels_half[k+1])/σ_levels_thick[k] for k in 1:nlev]
+    σ_lnp_B = [log(σ_levels_half[k]/σ_levels_full[k])/σ_levels_thick[k] for k in 1:nlev]
+    σ_lnp_A[1] = log(σ_levels_half[2])/σ_levels_thick[1]
+    σ_lnp_B[1] = log(σ_levels_full[1])/σ_levels_thick[1]
+    
     # VERTICAL REFERENCE TEMPERATURE PROFILE
     RΓ = R_dry*lapse_rate/(1000*gravity)                    # origin unclear but profile okay
     temp_ref_profile = [max(temp_top,temp_ref*σ^RΓ) for σ in σ_levels_full]

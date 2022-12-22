@@ -176,6 +176,9 @@ function initialize_pressure!(  progn::PrognosticVariables,
     lnp = progn.pres.leapfrog[1]
     spectral!(lnp,lnp_grid,S)
     spectral_truncation!(lnp,lmax)  # set lmax+1 row to zero
+
+    # lnp[2:end,1] .= 0
+
     return lnp_grid                 # return grid for use in initialize_humidity!
 end
 

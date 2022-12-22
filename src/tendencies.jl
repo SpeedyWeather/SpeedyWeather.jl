@@ -39,61 +39,41 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     B = model.boundaries
     G = model.geometry
     S = model.spectral_transform
- 
-    # # parametrization_tendencies!(diagn,time,model)
-    # for layer in diagn.layers
-    #     for fieldname in fieldnames(typeof(layer.tendencies))
-    #         field = getfield(layer.tendencies,fieldname)
-    #         fill!(field,0)
-    #     end
-    # end
+    surf = diagn.surface
 
-    geopotential!(diagn,B,G)
-    vertical_averages!(progn,diagn,lf,G)
-    surface_pressure_tendency!(progn,diagn,lf,model)
-    # vertical_velocity!(diagn,model)
-    # vertical_advection!(diagn,model)
+    # PARAMETERIZATIONS
+    # parameterization_tendencies!(diagn,time,model)
+ 
+    # DYNAMICS
+    pressure_gradients!(diagn,progn,lf,S)               # calculate ∇ln(pₛ)
+
+    for layer in diagn.layers
+        thickness_weighted_divergence!(layer,surf,G)    # calculate Δσₖ[(uₖ,vₖ)⋅∇ln(pₛ) + ∇⋅(uₖ,vₖ)]
+    end
+
+    geopotential!(diagn,B,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ
+    vertical_averages!(progn,diagn,lf,G)            # get ū,v̄,D̄ and others
+    surface_pressure_tendency!(surf,model)          # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - ∇⋅(ū,v̄)
+    # vertical_velocity!(diagn,model)               # calculate σ̇ for the vertical mass flux M = pₛσ̇
+    # vertical_advection!(diagn,model)              # use σ̇ for the vertical advection of u,v,T,q
 
     for layer in diagn.layers
         vordiv_tendencies!(layer,diagn.surface,model)
-        temperature_tendency!(layer,diagn.surface,model)
+        temperature_tendency!(layer,model)
         dry_core || humidity_tendency!(layer,model)
         bernoulli_potential!(layer,G,S)
     end
 end
 
-"""
-    add_tendencies!(tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
-                    term1::LowerTriangularMatrix{NF},   # with term1
-                    term2::LowerTriangularMatrix{NF}    # and term2
-                    ) where NF                          # number format real or complex
-
-Accumulates three `LowerTriangularMatrix`s element-wise into the first.
-
-    tend += term1 + term2."""
-function add_tendencies!(   tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
-                            term1::LowerTriangularMatrix{NF},   # with term1
-                            term2::LowerTriangularMatrix{NF}    # and term2
-                            ) where NF                          # number format real or complex
-
-    @inbounds for lm in eachharmonic(tend,term1,term2)
-        tend[lm] += (term1[lm] + term2[lm])
+function tendencies_not_zero(diagn::DiagnosticVariables)
+    
+    for k in 1:diagn.nlev
+        any(diagn.layers[k].tendencies.vor_tend .!= 0) && println("ζ tendency not zero in layer $k")
+        any(diagn.layers[k].tendencies.div_tend .!= 0) && println("D tendency not zero in layer $k")
+        any(diagn.layers[k].tendencies.temp_tend .!= 0) && println("T tendency not zero in layer $k")
     end
-end
 
-"""
-    add_tendencies!(tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
-                    term::LowerTriangularMatrix{NF},    # with term
-                    ) where NF                          # number format real or complex
+    any(diagn.surface.pres_tend .!= 0) && println("ln(pₛ) tendency not zero")
 
-Accumulates two `LowerTriangularMatrix`s element-wise into the first.
-
-    tend += term."""
-function add_tendencies!(   tend::LowerTriangularMatrix{NF},    # tendency to accumulate into
-                            term::LowerTriangularMatrix{NF}     # with term
-                            ) where NF                          # number format real or complex
-
-    @inbounds for lm in eachharmonic(tend,term)
-        tend[lm] += term[lm]
-    end
+    return nothing
 end

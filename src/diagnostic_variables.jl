@@ -85,7 +85,6 @@ struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     v_coslat::LowerTriangularMatrix{Complex{NF}}
 
     # MULTI-PURPOSE VECTOR (a,b), work array to be reused in various places
-    # u_coslat, v_coslat = a,b                              (all models)
     # uω_coslat⁻¹, vω_coslat⁻¹ = a,b                        (all models)
     # uω_coslat⁻¹_grid, vω_coslat⁻¹_grid = a_grid,b_grid    (all models)
     # uh_coslat⁻¹, vh_coslat⁻¹ = a,b                        (ShallowWaterModel)
@@ -100,13 +99,15 @@ struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     bernoulli       ::LowerTriangularMatrix{Complex{NF}}    # spectral bernoulli potential
 
     # VERTICAL INTEGRATION
-    temp_virt       ::LowerTriangularMatrix{Complex{NF}}    # virtual temperature
+    uv∇lnp          ::Grid                          # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
+    div_sum_above   ::Grid                          # sum of (thickness-weighted) div from top to k 
+    div_weighted    ::Grid                          # = ∇⋅((uₖ,vₖ)Δpₖ), weighted by pres thick
+    temp_virt       ::LowerTriangularMatrix{Complex{NF}}    # virtual temperature spectral for geopot
     geopot          ::LowerTriangularMatrix{Complex{NF}}    # geopotential on full layers
 
     # VERTICAL VELOCITY (̇̇dσ/dt)
-    σ_tend          ::Grid                              # = dσ/dt, on half levels at k+1/2
-    σ_m             ::Grid                              # TODO what's that, also on half levels at k+1/2
-    uv∇lnp          ::Grid                              # =(u-u_mean)*dlnp_dlon + (v-v_mean)*dlnp_dlat
+    σ_tend          ::Grid                          # = dσ/dt, on half levels at k+1/2
+    # σ_m             ::Grid                              # TODO what's that, also on half levels at k+1/2
 
     # ###------Defined in surface_pressure_tendency!()
     # u_mean             ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
@@ -155,26 +156,19 @@ function Base.zeros(::Type{DynamicsVariables},
     b_grid = zeros(Grid{NF},nresolution)
 
     # SHALLOW WATER and PRIMITIVE EQUATION MODEL, bernoulli = 1/2*(u^2 + v^2) + Φ
-    bernoulli_grid   = zeros(Grid{NF},nresolution)
-    bernoulli        = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-
+    bernoulli_grid  = zeros(Grid{NF},nresolution)
+    bernoulli       = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    
     # VERTICAL INTEGRATION
-    temp_virt        = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    geopot           = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    uv∇lnp          = zeros(Grid{NF},nresolution)   # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
+    div_sum_above   = zeros(Grid{NF},nresolution)   # sum of thickness-weighted divs above
+    div_weighted    = zeros(Grid{NF},nresolution)   # = ∇⋅((uₖ,vₖ)Δpₖ), weighted by pres thick
+    temp_virt       = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    geopot          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
     # VERTICAL VELOCITY (̇̇dσ/dt)
     σ_tend = zeros(Grid{NF},nresolution)    # = dσ/dt, on half levels at k+1/2
-    σ_m = zeros(Grid{NF},nresolution)       # TODO what's that?
-    uv∇lnp = zeros(Grid{NF},nresolution)    # =(u-u_mean)*dlnp_dlon * (v-v_mean)*dlnp_dlat
-
-    # # one more l for recursion in meridional gradients
-    # # X,Y gradient of the surface pressure in spectral space
-    # pres_gradient_spectral_x = zeros(Complex{NF},lmax+2,mmax+1)
-    # pres_gradient_spectral_y = zeros(Complex{NF},lmax+2,mmax+1)
-
-    # # X,Y gradient of the surface pressure in grid space
-    # pres_gradient_grid_x = zeros(NF,nlon,nlat)
-    # pres_gradient_grid_y = zeros(NF,nlon,nlat)
+    # σ_m = zeros(Grid{NF},nresolution)       # TODO what's that?
 
     # sigma_tend  = zeros(NF,nlon,nlat,nlev+1)
     # sigma_m     = zeros(NF,nlon,nlat,nlev+1)
@@ -191,14 +185,9 @@ function Base.zeros(::Type{DynamicsVariables},
     return DynamicsVariables(   u_coslat,v_coslat,
                                 a,b,a_grid,b_grid,
                                 bernoulli_grid,bernoulli,
-                                temp_virt,geopot,
-                                σ_tend,σ_m,uv∇lnp,
+                                uv∇lnp,div_sum_above,div_weighted,temp_virt,geopot,
+                                σ_tend,
                                 )
-                                # u_mean,v_mean,div_mean,
-                                # pres_gradient_spectral_x,pres_gradient_spectral_y,
-                                # pres_gradient_grid_x,pres_gradient_grid_y,
-                                # sigma_tend,sigma_m,puv,sigma_u,L2_velocity_complex,
-                                # vertical_mean_divergence,sigdtc,dumk,spectral_geopotential)
 end
 
 struct DiagnosticVariablesLayer{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
@@ -206,11 +195,13 @@ struct DiagnosticVariablesLayer{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     grid_variables      ::GridVariables{NF,Grid}
     dynamics_variables  ::DynamicsVariables{NF,Grid}
     npoints             ::Int       # number of grid points
+    k                   ::Int       # which vertical model level?
 end
 
 function Base.zeros(::Type{DiagnosticVariablesLayer},
                     G::Geometry{NF},
-                    S::SpectralTransform{NF}) where NF
+                    S::SpectralTransform{NF};
+                    k::Integer=0) where NF      # use k=0 (i.e. unspecified) as default
 
     @unpack npoints = G
 
@@ -218,7 +209,7 @@ function Base.zeros(::Type{DiagnosticVariablesLayer},
     grid_variables = zeros(GridVariables,G)
     dynamics_variables = zeros(DynamicsVariables,G,S)
 
-    return DiagnosticVariablesLayer(tendencies,grid_variables,dynamics_variables,npoints)
+    return DiagnosticVariablesLayer(tendencies,grid_variables,dynamics_variables,npoints,k)
 end
 
 struct SurfaceVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
@@ -226,10 +217,8 @@ struct SurfaceVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     pres_tend::LowerTriangularMatrix{Complex{NF}}   # tendency of it
     pres_tend_grid::Grid                            # gridded tendency
 
-    dpres_dlon::LowerTriangularMatrix{Complex{NF}}  # zonal gradient of pressure
-    dpres_dlat::LowerTriangularMatrix{Complex{NF}}  # meridional gradient
-    dpres_dlon_grid::Grid                           # gridded version
-    dpres_dlat_grid::Grid                           # gridded version
+    ∇lnp_x::Grid                                    # zonal gradient of log surf pressure
+    ∇lnp_y::Grid                                    # meridional gradient of log surf pres
 
     U_mean_grid::Grid                               # vertical average of: zonal velocity *coslat
     V_mean_grid::Grid                               # meridional velocity *coslat
@@ -255,10 +244,8 @@ function Base.zeros(::Type{SurfaceVariables},
     pres_tend_grid = zeros(Grid{NF},nresolution)
 
     # gradients of log surface pressure
-    dpres_dlon = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    dpres_dlat = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    dpres_dlon_grid = zeros(Grid{NF},nresolution)
-    dpres_dlat_grid = zeros(Grid{NF},nresolution)
+    ∇lnp_x = zeros(Grid{NF},nresolution)    # zonal gradient of log surf pressure
+    ∇lnp_y = zeros(Grid{NF},nresolution)    # meridional gradient of log surf pres
 
     # vertical averaged (weighted by σ level thickness) velocities (*coslat) and divergence
     U_mean_grid = zeros(Grid{NF},nresolution)
@@ -271,7 +258,7 @@ function Base.zeros(::Type{SurfaceVariables},
     precip_convection = zeros(Grid{NF},nresolution)
 
     return SurfaceVariables(pres_grid,pres_tend,pres_tend_grid,
-                            dpres_dlon,dpres_dlat,dpres_dlon_grid,dpres_dlat_grid,
+                            ∇lnp_x,∇lnp_y,
                             U_mean_grid,V_mean_grid,div_mean_grid,div_mean,
                             precip_large_scale,precip_convection,
                             npoints)
@@ -294,7 +281,7 @@ function Base.zeros(::Type{DiagnosticVariables},
 
     @unpack nlev,npoints = G
 
-    layers = [zeros(DiagnosticVariablesLayer,G,S) for _ in 1:nlev]
+    layers = [zeros(DiagnosticVariablesLayer,G,S;k) for k in 1:nlev]
     surface = zeros(SurfaceVariables,G,S)
 
     return DiagnosticVariables(layers,surface,nlev,npoints)
