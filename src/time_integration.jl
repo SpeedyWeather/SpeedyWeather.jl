@@ -43,9 +43,9 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
 end
 
 # variables that are leapfrogged in the respective models that are on layers (so excl surface pressure)
-leapfrog_layer_vars(::BarotropicModel) = (:vor,)
-leapfrog_layer_vars(::ShallowWaterModel) = (:vor,:div)
-leapfrog_layer_vars(::PrimitiveEquationModel) = (:vor,:div,:temp)
+leapfrog_layer_vars(::BarotropicModel,dry_core) = (:vor,)
+leapfrog_layer_vars(::ShallowWaterModel,dry_core) = (:vor,:div)
+leapfrog_layer_vars(::PrimitiveEquationModel,dry_core) = dry_core ? (:vor,:div,:temp) : (:vor,:div,:temp,:humid)
 
 function leapfrog!( progn::PrognosticVariablesLeapfrog,
                     diagn::DiagnosticVariablesLayer,
@@ -55,7 +55,7 @@ function leapfrog!( progn::PrognosticVariablesLeapfrog,
     
     @unpack dry_core = model.parameters     # TODO also leapfrog humid
                     
-    for var in leapfrog_layer_vars(model)
+    for var in leapfrog_layer_vars(model,dry_core)
         var_old = getproperty(progn.leapfrog[1],var)
         var_new = getproperty(progn.leapfrog[2],var)
         var_tend = getproperty(diagn.tendencies,Symbol(var,:_tend))
