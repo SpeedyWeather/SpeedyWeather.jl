@@ -12,7 +12,6 @@ struct Tendencies{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     u_tend_grid         ::Grid                          # zonal velocity (grid)
     v_tend_grid         ::Grid                          # meridinoal velocity (grid)
     temp_tend_grid      ::Grid                          # temperature
-    lnp_vert_adv_grid   ::Grid                          # vertical advection of log surf pressure
     humid_tend_grid     ::Grid                          # specific humidity
 end
 
@@ -33,12 +32,11 @@ function Base.zeros(::Type{Tendencies},
     u_tend_grid     = zeros(Grid{NF},nresolution)                               # zonal velocity
     v_tend_grid     = zeros(Grid{NF},nresolution)                               # meridional velocity
     temp_tend_grid  = zeros(Grid{NF},nresolution)                               # temperature
-    lnp_vert_adv_grid   = zeros(Grid{NF},nresolution)                           # vert adv of log surf pres
     humid_tend_grid = zeros(Grid{NF},nresolution)                               # specific humidity
 
     return Tendencies(  vor_tend,div_tend,temp_tend,humid_tend,
                         u_tend,v_tend,u_tend_grid,v_tend_grid,
-                        temp_tend_grid,lnp_vert_adv_grid,humid_tend_grid)
+                        temp_tend_grid,humid_tend_grid)
 end
 
 """
@@ -54,7 +52,6 @@ struct GridVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     geopot_grid         ::Grid  # geopotential (is that needed?)
     U_grid              ::Grid  # zonal velocity *coslat [m/s]
     V_grid              ::Grid  # meridional velocity *coslat [m/s]
-    temp_grid_anomaly   ::Grid  # absolute temperature anomaly [K]
 end
 
 function Base.zeros(::Type{GridVariables},G::Geometry{NF}) where NF
@@ -68,10 +65,9 @@ function Base.zeros(::Type{GridVariables},G::Geometry{NF}) where NF
     geopot_grid         = zeros(Grid{NF},nresolution)   # geopotential
     U_grid              = zeros(Grid{NF},nresolution)   # zonal velocity *coslat
     V_grid              = zeros(Grid{NF},nresolution)   # meridonal velocity *coslat
-    temp_grid_anomaly   = zeros(Grid{NF},nresolution)   # absolute temperature anolamy
 
     return GridVariables(   vor_grid,div_grid,temp_grid,temp_virt_grid,humid_grid,geopot_grid,
-                            U_grid,V_grid,temp_grid_anomaly)
+                            U_grid,V_grid)
 end
 
 """
@@ -100,42 +96,13 @@ struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 
     # VERTICAL INTEGRATION
     uv∇lnp          ::Grid                          # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
-    div_sum_above   ::Grid                          # sum of (thickness-weighted) div from top to k 
     div_weighted    ::Grid                          # = ∇⋅((uₖ,vₖ)Δpₖ), weighted by pres thick
+    div_sum_above   ::Grid                          # sum of div_weighted from top to k
     temp_virt       ::LowerTriangularMatrix{Complex{NF}}    # virtual temperature spectral for geopot
     geopot          ::LowerTriangularMatrix{Complex{NF}}    # geopotential on full layers
 
     # VERTICAL VELOCITY (̇̇dσ/dt)
-    σ_tend          ::Grid                          # = dσ/dt, on half levels at k+1/2
-    # σ_m             ::Grid                              # TODO what's that, also on half levels at k+1/2
-
-    # ###------Defined in surface_pressure_tendency!()
-    # u_mean             ::Array{NF,2}  # Mean gridpoint zonal velocity over all levels
-    # v_mean             ::Array{NF,2}  # Mean gridpoint meridional velocity over all levels
-    # div_mean           ::Array{NF,2}  # Mean gridpoint divergence over all levels
-
-    # pres_gradient_spectral_x ::Array{Complex{NF},2} #X Gradient of the surface pressure, spectral space
-    # pres_gradient_spectral_y ::Array{Complex{NF},2} #Y Gradient of the surface pressure, spectral space
-
-    # pres_gradient_grid_x ::Array{NF,2} #X Gradient of the surface pressure, grid point space
-    # pres_gradient_grid_y ::Array{NF,2} #X Gradient of the surface pressure, grid point space
-
-    # ###------Defined in vertical_velocity_tendency!()
-    # sigma_tend ::Array{NF,3} #vertical velocity in sigma coords
-    # sigma_m    ::Array{NF,3} #some related quantity. What is this physically?
-    # puv        ::Array{NF,3} #(ug -umean)*px + (vg -vmean)*py
-
-    # ###------Defined in zonal_wind_tendency!()
-    # sigma_u ::Array{NF,3}  #some quantity used for later calculations
-
-    # ###------Defined in vor_div_tendency_and_corrections!()
-    # L2_velocity_complex ::Array{Complex{NF},2} # -laplacian(0.5*(u**2+v**2))
-
-    # ###-----Defined in tendencies.jl/get_spectral_tendencies!()
-    # vertical_mean_divergence ::Array{Complex{NF},2}
-    # sigdtc ::Array{Complex{NF},3} # what is this quantity, physically?
-    # dumk ::Array{Complex{NF},3} #ditto
-    # spectral_geopotential ::Array{Complex{NF},3} #This should probably go elsewhere
+    σ_tend          ::Grid                          # = dσ/dt, on half levels below, at k+1/2
 end
 
 function Base.zeros(::Type{DynamicsVariables},
@@ -161,31 +128,18 @@ function Base.zeros(::Type{DynamicsVariables},
     
     # VERTICAL INTEGRATION
     uv∇lnp          = zeros(Grid{NF},nresolution)   # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
-    div_sum_above   = zeros(Grid{NF},nresolution)   # sum of thickness-weighted divs above
     div_weighted    = zeros(Grid{NF},nresolution)   # = ∇⋅((uₖ,vₖ)Δpₖ), weighted by pres thick
+    div_sum_above   = zeros(Grid{NF},nresolution)   # sum of div_weighted from level 1:k
     temp_virt       = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     geopot          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
     # VERTICAL VELOCITY (̇̇dσ/dt)
-    σ_tend = zeros(Grid{NF},nresolution)    # = dσ/dt, on half levels at k+1/2
-    # σ_m = zeros(Grid{NF},nresolution)       # TODO what's that?
-
-    # sigma_tend  = zeros(NF,nlon,nlat,nlev+1)
-    # sigma_m     = zeros(NF,nlon,nlat,nlev+1)
-    # puv         = zeros(NF,nlon,nlat,nlev)
-    # sigma_u     = zeros(NF,nlon,nlat,nlev+1)
-
-    # L2_velocity_complex         = zeros(Complex{NF},lmax+2,mmax+1)
-
-    # vertical_mean_divergence    = zeros(Complex{NF},lmax+2,mmax+1)
-    # sigdtc                      = zeros(Complex{NF},lmax+2,mmax+1,nlev+1)
-    # dumk                        = zeros(Complex{NF},lmax+2,mmax+1,nlev+1)
-    # spectral_geopotential       = zeros(Complex{NF},lmax+2,mmax+1,nlev)
+    σ_tend = zeros(Grid{NF},nresolution)    # = dσ/dt, on half levels below, at k+1/2
 
     return DynamicsVariables(   u_coslat,v_coslat,
                                 a,b,a_grid,b_grid,
                                 bernoulli_grid,bernoulli,
-                                uv∇lnp,div_sum_above,div_weighted,temp_virt,geopot,
+                                uv∇lnp,div_weighted,div_sum_above,temp_virt,geopot,
                                 σ_tend,
                                 )
 end

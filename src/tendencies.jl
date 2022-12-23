@@ -39,7 +39,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     B = model.boundaries
     G = model.geometry
     S = model.spectral_transform
-    surf = diagn.surface
+    @unpack surface = diagn
 
     # PARAMETERIZATIONS
     # parameterization_tendencies!(diagn,time,model)
@@ -48,32 +48,23 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     pressure_gradients!(diagn,progn,lf,S)               # calculate ∇ln(pₛ)
 
     for layer in diagn.layers
-        thickness_weighted_divergence!(layer,surf,G)    # calculate Δσₖ[(uₖ,vₖ)⋅∇ln(pₛ) + ∇⋅(uₖ,vₖ)]
+        thickness_weighted_divergence!(layer,surface,G)    # calculate Δσₖ[(uₖ,vₖ)⋅∇ln(pₛ) + ∇⋅(uₖ,vₖ)]
     end
 
     geopotential!(diagn,B,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ
-    vertical_averages!(progn,diagn,lf,G)            # get ū,v̄,D̄ and others
-    surface_pressure_tendency!(surf,model)          # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - ∇⋅(ū,v̄)
-    # vertical_velocity!(diagn,model)               # calculate σ̇ for the vertical mass flux M = pₛσ̇
-    # vertical_advection!(diagn,model)              # use σ̇ for the vertical advection of u,v,T,q
+    vertical_averages!(diagn,progn,lf,G)            # get ū,v̄,D̄ and others
+    surface_pressure_tendency!(surface,model)       # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - ∇⋅(ū,v̄)
 
     for layer in diagn.layers
-        vordiv_tendencies!(layer,diagn.surface,model)
+        vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
+    end
+
+    vertical_advection!(diagn,model)                # use σ̇ for the vertical advection of u,v,T,q
+
+    for layer in diagn.layers
+        vordiv_tendencies!(layer,surface,model)
         temperature_tendency!(layer,model)
-        dry_core || humidity_tendency!(layer,model)
-        bernoulli_potential!(layer,G,S)
+        humidity_tendency!(layer,model)
+        bernoulli_potential!(layer,G,S)             # add -∇²(E+ϕ) term to div tendency
     end
-end
-
-function tendencies_not_zero(diagn::DiagnosticVariables)
-    
-    for k in 1:diagn.nlev
-        any(diagn.layers[k].tendencies.vor_tend .!= 0) && println("ζ tendency not zero in layer $k")
-        any(diagn.layers[k].tendencies.div_tend .!= 0) && println("D tendency not zero in layer $k")
-        any(diagn.layers[k].tendencies.temp_tend .!= 0) && println("T tendency not zero in layer $k")
-    end
-
-    any(diagn.surface.pres_tend .!= 0) && println("ln(pₛ) tendency not zero")
-
-    return nothing
 end

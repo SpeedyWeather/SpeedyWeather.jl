@@ -43,21 +43,23 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
 end
 
 # variables that are leapfrogged in the respective models that are on layers (so excl surface pressure)
-leapfrog_layer_vars(::BarotropicModel) = (:vor,)
-leapfrog_layer_vars(::ShallowWaterModel) = (:vor,:div)
-leapfrog_layer_vars(::PrimitiveEquationModel) = (:vor,:div,:temp)
+leapfrog_layer_vars(::BarotropicModel,dry_core) = (:vor,)
+leapfrog_layer_vars(::ShallowWaterModel,dry_core) = (:vor,:div)
+leapfrog_layer_vars(::PrimitiveEquationModel,dry_core) = dry_core ? (:vor,:div,:temp) : (:vor,:div,:temp,:humid)
 
 function leapfrog!( progn::PrognosticVariablesLeapfrog,
                     diagn::DiagnosticVariablesLayer,
                     dt::Real,               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
                     lf::Int,                # leapfrog index to dis/enable William's filter
-                    M::ModelSetup)
+                    model::ModelSetup)
+    
+    @unpack dry_core = model.parameters     # TODO also leapfrog humid
                     
-    for var in leapfrog_layer_vars(M)
-        var_old = getfield(progn.leapfrog[1],var)
-        var_new = getfield(progn.leapfrog[2],var)
-        var_tend = getfield(diagn.tendencies,Symbol(var,:_tend))
-        leapfrog!(var_old,var_new,var_tend,dt,lf,M.constants)
+    for var in leapfrog_layer_vars(model,dry_core)
+        var_old = getproperty(progn.leapfrog[1],var)
+        var_new = getproperty(progn.leapfrog[2],var)
+        var_tend = getproperty(diagn.tendencies,Symbol(var,:_tend))
+        leapfrog!(var_old,var_new,var_tend,dt,lf,model.constants)
     end
 end
 
