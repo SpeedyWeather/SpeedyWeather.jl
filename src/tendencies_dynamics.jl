@@ -46,8 +46,8 @@ velocities (*coslat) and divergence. E.g.
 
 U,V are averaged in grid-point space, divergence in spectral space.
 """
-function vertical_averages!(progn::PrognosticVariables{NF},
-                            diagn::DiagnosticVariables{NF},
+function vertical_averages!(diagn::DiagnosticVariables{NF},
+                            progn::PrognosticVariables{NF},
                             lf::Int,            # leapfrog index
                             G::Geometry{NF}) where NF
     
@@ -73,7 +73,7 @@ function vertical_averages!(progn::PrognosticVariables{NF},
         V = diagn.layers[k].grid_variables.V_grid
         D = diagn.layers[k].grid_variables.div_grid
         D_weighted = diagn.layers[k].dynamics_variables.div_weighted
-        D_spec = progn.layers[k].leapfrog[lf].div
+        # D_spec = progn.layers[k].leapfrog[lf].div
         
         # arrays for sum of divergences from level r=1 to k
         k_above = max(1,k-1)
@@ -122,6 +122,7 @@ function surface_pressure_tendency!(surf::SurfaceVariables{NF},
     Ū = surf.U_mean_grid       # rename for convenience
     V̄ = surf.V_mean_grid
     D̄ = surf.div_mean_grid
+    D̄_spec = surf.div_mean
 
     # precompute ring indices
     rings = eachring(pres_tend_grid,∇lnp_x,∇lnp_y,Ū,V̄,D̄)
@@ -129,7 +130,7 @@ function surface_pressure_tendency!(surf::SurfaceVariables{NF},
     @inbounds for (j,ring) in enumerate(rings)
         coslat⁻²j = coslat⁻²[j]
         for ij in ring
-            # -(ū,v̄)⋅∇lnp_s only, do -D̄ in spectral space
+            # -(ū,v̄)⋅∇lnp_s - D̄ all in grid-point space
             pres_tend_grid[ij] = -coslat⁻²j*(Ū[ij]*∇lnp_x[ij] +
                                     V̄[ij]*∇lnp_y[ij]) - D̄[ij]
         end
@@ -137,75 +138,14 @@ function surface_pressure_tendency!(surf::SurfaceVariables{NF},
 
     spectral!(pres_tend,pres_tend_grid,model.spectral_transform)
 
-    # # now do the -D̄ term in spectral
-    # @inbounds for lm in eachharmonic(pres_tend,D̄)
-    #     pres_tend[lm] -= D̄[lm]
+    # # Alternative: do the -D̄ term in spectral
+    # @inbounds for lm in eachharmonic(pres_tend,D̄_spec)
+    #     pres_tend[lm] -= D̄_spec[lm]
     # end
 
     pres_tend[1] = zero(NF)     # for mass conservation
     return nothing
 end
-
-# """
-# Compute the spectral tendency of the "vertical" velocity
-# """
-# function vertical_velocity!(diagn::DiagnosticVariables{NF},
-#                             M::PrimitiveEquationModel
-#                             ) where {NF<:AbstractFloat}
-
-
-#     @unpack dpres_dlon_grid, dpres_dlat_grid = diagn.surface
-#     @unpack nlev, σ_levels_thick, coslat⁻² = M.geometry
-#     Ū = diagn.surface.U_mean_grid       # rename for convenience
-#     V̄ = diagn.surface.V_mean_grid
-#     D̄ = diagn.surface.div_mean_grid
-    
-#     @boundscheck nlev == diagn.nlev || throw(BoundsError)
-
-#     # make sure integration starts with 0
-#     fill!(diagn.layers[1].dynamics_variables.σ_tend,0)
-#     fill!(diagn.layers[1].dynamics_variables.σ_m,0)
-
-#     @inbounds for k in 1:nlev     # top to bottom, bottom layer separate
-
-#         U = diagn.layers[k].grid_variables.U_grid
-#         V = diagn.layers[k].grid_variables.V_grid
-#         D = diagn.layers[k].grid_variables.div_grid
-
-#         # σ_tend & σ_m sit on half layers below (k+1/2), but its 0 at
-#         # k=1/2 and nlev+1/2, don't explicitly store k=1/2
-#         σ_tend = diagn.layers[k].dynamics_variables.σ_tend   # actually on half levels  
-#         σ_m =  diagn.layers[k].dynamics_variables.σ_tend     # actually on half levels
-#         uv∇lnp = diagn.layers[k].dynamics_variables.uv∇lnp   # on full levels
-
-#         # next layer below
-#         kmax = min(k+1,nlev)    # to avoid access to k = nlev+1
-#         σ_tend_below = diagn.layers[kmax].dynamics_variables.σ_tend
-#         σ_m_below = diagn.layers[kmax].dynamics_variables.σ_m
-
-#         # precompute ring indices
-#         rings = eachring(U,V,D,Ū,V̄,D̄,dpres_dlon_grid,dpres_dlat_grid)
-
-#         @inbounds for (j,ring) in enumerate(rings)
-#             coslat⁻²j = coslat⁻²[j]
-#             for ij in ring
-#                 uv∇lnp_ij = ((U[ij]-Ū[ij])*dpres_dlon_grid[ij] +
-#                                 (V[ij]-V̄[ij])*dpres_dlat_grid[ij])*coslat⁻²j
-#                 uv∇lnp[ij] = uv∇lnp_ij
-                
-#                 # integration from the top: σ_tend[k] = σ_tend[k-1] - σ_levels_thick...
-#                 # here achieved via -= and the copy into the respective array in the layer below
-#                 σ_tend[ij] -= σ_levels_thick[k]*(uv∇lnp_ij + D[ij] - D̄[ij])
-#                 σ_m[ij] -= σ_levels_thick[k]*uv∇lnp_ij
-
-#                 # copy into layer below for vertical integration
-#                 # for k = nlev, σ_tend_below == σ_tend, so nothing actually happens here
-#                 σ_tend_below[ij] = σ_tend[ij]
-#                 σ_m_below[ij] = σ_m[ij]
-#             end
-#         end
-#     end
-# end
 
 function vertical_velocity!(diagn::DiagnosticVariablesLayer,
                             surf::SurfaceVariables,
@@ -246,6 +186,10 @@ function vertical_advection!(   var::Symbol,
     varname = Symbol(var,:_grid)    # concatentate symbols for getproperty()
     varname_tend = Symbol(lowercase(string(var)),:_tend_grid)
 
+    # TODO, set the k=1 level to zero in the beginning
+    ξ_tend_top = getproperty(diagn.layers[1].tendencies, varname_tend)
+    fill!(ξ_tend_top,0)
+
     # ALL LAYERS (but use indexing tricks to avoid out of bounds access for top/bottom)
     @inbounds for k in 1:nlev       
         # for k==1 "above" term is 0, for k==nlev "below" term is zero
@@ -269,7 +213,6 @@ function vertical_advection!(   var::Symbol,
         end
     end
 end
-
 
 function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
                             surf::SurfaceVariables,
@@ -319,7 +262,7 @@ Compute the temperature tendency
 function temperature_tendency!( diagn::DiagnosticVariablesLayer,
                                 model::PrimitiveEquationModel)
 
-    @unpack temp_tend, temp_tend_grid, lnp_vert_adv_grid = diagn.tendencies
+    @unpack temp_tend, temp_tend_grid = diagn.tendencies
     @unpack div_grid, temp_grid = diagn.grid_variables
     @unpack div_sum_above, div_weighted, uv∇lnp = diagn.dynamics_variables
     @unpack κ = model.constants
