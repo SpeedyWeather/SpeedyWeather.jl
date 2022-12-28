@@ -8,3 +8,5 @@ include("healpix.jl")       # def AbstractHEALPixGrid, HEALPixGrid
 include("healpix4.jl")      # def AbstractHEALPix4Grid, HEALPix4Grid
 
 include("quadrature_weights.jl")    # quadrature weights and solid angles for grids
+
+include("interpolation.jl")

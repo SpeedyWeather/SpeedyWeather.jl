@@ -1,13 +1,37 @@
 """
     true/false = isincreasing(v::Vector)
 
-Check whether elements of a vector `v` are increasing."""
+Check whether elements of a vector `v` are strictly increasing."""
 function isincreasing(x::Vector)
     is_increasing = true
     for i in 2:length(x)
-        is_increasing &= x[i] > x[i-1] ? true : false
+        is_increasing &= x[i-1] < x[i] ? true : false
     end
     return is_increasing
+end
+
+"""
+    true/false = isdecreasing(v::Vector)
+
+Check whether elements of a vector `v` are strictly decreasing."""
+function isdecreasing(x::Vector)
+    is_decreasing = true
+    for i in 2:length(x)
+        is_decreasing &= x[i-1] > x[i] ? true : false
+    end
+    return is_decreasing
+end
+
+"""
+    true/false = extrema_in(v::Vector,a::Real,b::Real)
+
+For every element vᵢ in v does a<=vi<=b hold?"""
+function extrema_in(v::Vector,
+                    a::Real,
+                    b::Real)
+    
+    vmin,vmax = extrema(v)
+    return (vmin >= a) && (vmax <= b)
 end
 
 """
