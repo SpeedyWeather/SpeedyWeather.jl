@@ -1,5 +1,6 @@
 using SpeedyWeather
 using Test
+import Random
 
 # GENERAL
 include("utility_functions.jl")

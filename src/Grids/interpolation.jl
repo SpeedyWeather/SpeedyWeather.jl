@@ -68,7 +68,7 @@ abstract type AbstractLocator{NF} end
 Contains arrays that locates grid points of a given field to be uses in an interpolation
 and their weights. This Locator is a 4-point average in an anvil-shaped grid-point arrangement
 between two latitude rings."""
-struct AnvilLocator{NF<:AbstractFloat} <: AbstractLocator
+struct AnvilLocator{NF<:AbstractFloat} <: AbstractLocator{NF}
     npoints::Int            # number of points to interpolate onto (length of following vectors)
 
     # to the coordinates respective indices
@@ -127,7 +127,7 @@ NF is the number format used to calculate the interpolation, which can be
 different from the input data and/or the interpolated data on the new grid."""
 abstract type AbstractInterpolator{NF,G} end
 
-struct AnvilInterpolator{NF<:AbstractFloat,G<:AbstractGrid} <: AbstractInterpolator
+struct AnvilInterpolator{NF<:AbstractFloat,G<:AbstractGrid} <: AbstractInterpolator{NF,G}
     geometry::GridGeometry{G}
     locator::AnvilLocator{NF}
 end
@@ -272,8 +272,8 @@ function find_rings(θs::Vector,latd::Vector{NF}) where NF
     return js,Δys
 end
 
-function find_grid_indices!(I::Interpolator,
-                            λs::Vector)
+function find_grid_indices!(I::AnvilInterpolator,   # update indices arrays
+                            λs::Vector)             # based on new longitudes λ
 
     @unpack js, ij_as, ij_bs, ij_cs, ij_ds = I.locator
     @unpack Δabs, Δcds = I.locator
