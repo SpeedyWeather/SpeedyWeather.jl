@@ -90,32 +90,32 @@ Interpolator(grid::AbstractGrid,n::Integer) = Interpolator(Float64,grid,n)
 ## FUNCTIONS
 interpolate(θ::Real,λ::Real,A::AbstractGrid) = interpolate([θ],[λ],A)
 
-function interpolate(θs::Vector{NF},λs::Vector{NF},A::AbstractGrid{NF2}) where {NF,NF2}
+function interpolate(θs::Vector{NF},λs::Vector{NF},A::AbstractGrid) where NF
     n = length(θs)
     @assert n == length(λs) "New interpolation coordinates θs::Vector, λs::Vector have to be of same length.
                                 $n and $(length(λs)) provided."
     
-    I = Interpolator(A,n)                   # generate Interpolator, containing geometry and work arrays
-    update_locator!(θs,λs,I,unsafe=false)   # update location work arrays in I
+    I = Interpolator(NF,A,n)                # generate Interpolator, containing geometry and work arrays
+    update_locator!(I,θs,λs,unsafe=false)   # update location work arrays in I
     interpolate(A,I)
 end
 
-function interpolate(A::AbstractGrid,I::Interpolator{NF}) where NF
+function interpolate(A::AbstractGrid{NF},I::Interpolator) where NF
     @unpack npoints = I.locator             # number of points to interpolate onto
     As = zeros(NF,npoints)                  # preallocate: onto θs,λs interpolated values of A
     interpolate!(As,A,I)
 end
 
-function interpolate!(  As::Vector{NF},                 # Out: interpolated values
+function interpolate!(  As::Vector,                # Out: interpolated values
                         A::Grid,                        # gridded values to interpolate from
-                        I::Interpolator{NF,Grid},       # geometry info and work arrays       
+                        I::Interpolator{NF,Grid},      # geometry info and work arrays       
                         ) where {NF<:AbstractFloat,Grid<:AbstractGrid}
 
     @unpack ij_as,ij_bs,ij_cs,ij_ds,Δabs,Δcds,Δys = I.locator
     @unpack npoints = I.geometry
     @boundscheck length(As) == length(ij_as) || throw(BoundsError)
 
-    A_northpole, A_southpole = average_on_poles(NF,A,I.geometry.rings)
+    A_northpole, A_southpole = average_on_poles(A,I.geometry.rings)
 
     @boundscheck extrema_in(ij_as,-1,npoints) || throw(BoundsError)
     @boundscheck extrema_in(ij_bs,-1,npoints) || throw(BoundsError)
@@ -246,10 +246,10 @@ function find_lon_indices(  λ::NF,
                             λ₀::NF,
                             nlon::Int) where {NF<:AbstractFloat}
 
-    Δλ = 360/nlon           # longitude spacing
-    ix = (λ-λ₀)/Δλ          # grid index i but with fractional part
-    i = floor(Int,ix)       # 0-based grid index to the left
-    Δ = ix-i                # distance fraction from i to i+1
+    Δλ = convert(NF,360)/nlon       # longitude spacing
+    ix = (λ-λ₀)/Δλ                  # grid index i but with fractional part
+    i = floor(Int,ix)               # 0-based grid index to the left
+    Δ = ix-i                        # distance fraction from i to i+1
 
     # [a,b] so that λ ∈ [λa,λb), i.e. a is the next grid point to the left, b to the right
     i_a = mod(i,nlon) + 1           # convert to 1-based index
@@ -298,13 +298,15 @@ function anvil_average( a::NF,      # top left value
                         b::NF,      # top right value
                         c::NF,      # bottom left value
                         d::NF,      # bottom right value
-                        Δab::NF2,   # fraction of distance between a,b ∈ [0,1)
-                        Δcd::NF2,   # fraction of distance between c,d ∈ [0,1)
-                        Δy::NF2,    # fraction of distance between ab,cd ∈ [0,1)
-                        ) where {NF,NF2}
+                        Δab::Real,  # fraction of distance between a,b ∈ [0,1)
+                        Δcd::Real,  # fraction of distance between c,d ∈ [0,1)
+                        Δy::Real,   # fraction of distance between ab,cd ∈ [0,1)
+                        ) where NF
 
-    ab_average = a + (b-a)*convert(NF,Δab)      # a for Δab=1, b for Δab=1
-    cd_average = c + (d-c)*convert(NF,Δcd)      # c for Δab=1, b for Δab=1
+    # the type of the weights is ::Real, but the following is written such that
+    # always NF (the type of the data values a,b,c,d) is returned
+    ab_average = a + (b-a)*convert(NF,Δab)      # a for Δab=0, b for Δab=1
+    cd_average = c + (d-c)*convert(NF,Δcd)      # c for Δab=0, b for Δab=1
     abcd_average = ab_average + (cd_average-ab_average)*convert(NF,Δy)
     return abcd_average
 end
