@@ -7,7 +7,7 @@ struct GridGeometry{G<:AbstractGrid}
     nlat::Int                       # total number of latitude rings
     npoints::Int                    # total number of grid points
     latd::Vector{Float64}           # latitude of each ring, incl north pole 90˚N, ..., south pole -90˚N
-    lons::Vector{Float64}           # longitudes of every grid point
+    londs::Vector{Float64}          # longitudes of every grid point 0˚ to 360˚E
 
     rings::Vector{UnitRange{Int}}   # for every ring a i:j unit range for ring-based indices
     nlons::Vector{Int}              # number of longitudinal points per ring
