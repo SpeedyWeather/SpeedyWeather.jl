@@ -13,6 +13,7 @@ module SpeedyWeather
     import GenericFFT
     import Primes
     import LinearAlgebra
+    import Statistics: mean
 
     # GPU
     import KernelAbstractions
@@ -55,6 +56,11 @@ module SpeedyWeather
             HEALPixGrid,
             HEALPix4Grid,
             FullHEALPix4Grid
+
+    # EXPORT INTERPOLATION FOR GRIDS
+    export  Interpolator,
+            GridGeometry,
+            InterpolationLocator
 
     # EXPORT STRUCTS
     export  Parameters,

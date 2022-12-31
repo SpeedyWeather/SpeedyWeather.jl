@@ -323,7 +323,7 @@ end
         SpeedyWeather.∇²!(∇²a,a,m.spectral_transform)
 
         for lm in SpeedyWeather.eachharmonic(div_∇a,∇²a)
-            @test div_∇a[lm] ≈ ∇²a[lm] atol=sqrt(eps(NF)) rtol=sqrt(eps(NF))
+            @test div_∇a[lm] ≈ ∇²a[lm] atol=3*sqrt(eps(NF)) rtol=3*sqrt(eps(NF))
         end
     end
 end

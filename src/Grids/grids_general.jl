@@ -114,8 +114,10 @@ and then each grid point per ring. To be used like
         for ij in ring
             grid[ij]
 """
-function eachring(grid::AbstractGrid)
-    rings = [each_index_in_ring(grid,j) for j in 1:get_nlat(grid)]
+eachring(grid::AbstractGrid) = eachring(typeof(grid),grid.nlat_half)
+
+function eachring(Grid::Type{<:AbstractGrid},nlat_half::Integer)
+    rings = [each_index_in_ring(Grid,j,nlat_half) for j in 1:get_nlat(Grid,nlat_half)]
     return rings    # returns Vector{UnitRange}
 end
 
