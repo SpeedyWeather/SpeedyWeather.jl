@@ -61,6 +61,22 @@ function each_index_in_ring(Grid::Type{<:AbstractFullGrid},     # function for f
     return index_1st:index_end      # range of js in ring
 end
 
+function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
+                                Grid::Type{<:AbstractFullGrid},
+                                nlat_half::Integer)
+    nlat = length(rings)                # number of latitude rings
+    @boundscheck nlat == get_nlat(Grid,nlat_half) || throw(BoundsError)
+
+    nlon = get_nlon(Grid,nlat_half)     # number of longitudes
+    index_end = 0                       
+    @inbounds for j in 1:nlat
+        index_1st = index_end + 1       # 1st index is +1 from prev ring's last index
+        index_end = j*nlon              # only calculate last index per ring
+        rings[j] = index_1st:index_end  # write UnitRange to rings vector
+    end
+end
+
+
 """
     G = FullClenshawGrid{T}
 

@@ -58,6 +58,29 @@ function each_index_in_ring(Grid::Type{<:AbstractOctahedralGrid},
     return index_1st:index_end                              # range of i's in ring
 end
 
+function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
+                                Grid::Type{<:AbstractOctahedralGrid},
+                                nlat_half::Integer) # resolution param
+
+    nlat = length(rings)
+    @boundscheck nlat == get_nlat(Grid,nlat_half) || throw(BoundsError)
+
+    index_end = 0
+    @inbounds for j in 1:nlat_half                  # North incl Eq only
+        index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
+        index_end += 16 + 4j                        # add number of grid points per ring
+        rings[j] = index_1st:index_end              # turn into UnitRange
+    end
+    @inbounds for (j,j_rev) in zip(   nlat_half+1:nlat, # South only
+                            nlat-nlat_half:-1:1)        # reverse index
+
+        index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
+        index_end += 16 + 4j_rev                    # add number of grid points per ring
+        rings[j] = index_1st:index_end              # turn into UnitRange
+    end
+end
+
+
 """
     G = OctahedralGaussianGrid{T}
 
