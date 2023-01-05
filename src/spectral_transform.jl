@@ -121,7 +121,8 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
 
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
     _, lons = get_colatlons(Grid,nlat_half)
-    lon1s = [lons[each_index_in_ring(Grid,j,nlat_half)[1]] for j in 1:nlat_half]
+    rings = eachring(Grid,nlat_half)                        # compute ring indices
+    lon1s = [lons[rings[j].start] for j in 1:nlat_half]     # pick lons at first index for each ring
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
 
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
