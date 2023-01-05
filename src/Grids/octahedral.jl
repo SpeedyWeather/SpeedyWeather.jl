@@ -45,13 +45,14 @@ function each_index_in_ring(Grid::Type{<:AbstractOctahedralGrid},
                             j::Integer,                     # ring index north to south
                             nlat_half::Integer)             # resolution param
 
-    @boundscheck 0 < j <= (2nlat_half-nlat_odd(Grid)) || throw(BoundsError)  # ring index valid?
+    nlat = get_nlat(Grid,nlat_half)
+    @boundscheck 0 < j <= nlat || throw(BoundsError)        # ring index valid?
     if j <= nlat_half                                       # northern hemisphere incl Equator
         index_1st = 2j*(j+7) - 15                           # first in-ring index i
         index_end = 2j*(j+9)                                # last in-ring index i
     else                                                    # southern hemisphere excl Equator
-        j = 2nlat_half-nlat_odd(Grid) - j + 1               # mirror ring index around Equator
-        n = npoints_octahedral(nlat_half,nlat_odd(Grid))+1  # number of grid points + 1
+        j = nlat - j + 1                                    # mirror ring index around Equator
+        n = get_npoints(Grid,nlat_half) + 1                 # number of grid points + 1
         index_1st = n - 2j*(j+9)                            # count backwards
         index_end = n - (2j*(j+7) - 15)
     end
@@ -71,11 +72,11 @@ function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
         index_end += 16 + 4j                        # add number of grid points per ring
         rings[j] = index_1st:index_end              # turn into UnitRange
     end
-    @inbounds for (j,j_rev) in zip(   nlat_half+1:nlat, # South only
-                            nlat-nlat_half:-1:1)        # reverse index
+    @inbounds for (j,j_mir) in zip( nlat_half+1:nlat,       # South only
+                                    nlat-nlat_half:-1:1)    # reverse index
 
         index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
-        index_end += 16 + 4j_rev                    # add number of grid points per ring
+        index_end += 16 + 4j_mir                    # add number of grid points per ring
         rings[j] = index_1st:index_end              # turn into UnitRange
     end
 end

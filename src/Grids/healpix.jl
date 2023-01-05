@@ -84,7 +84,7 @@ function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
     nside = nside_healpix(nlat_half)                # side length of a basepixel
 
     # North polar cap
-    for j in 1:nside-1
+    @inbounds for j in 1:nside-1
         index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
         index_end += 4j                             # add number of grid points per ring
         rings[j] = index_1st:index_end              # turn into UnitRange
@@ -92,14 +92,14 @@ function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
 
     # Equatorial belt
     nlon_max = get_nlon_max(Grid,nlat_half)         # number of grid points on belt
-    for j in nside:3nside
+    @inbounds for j in nside:3nside
         index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
         index_end += nlon_max                       # nlon constant in belt
         rings[j] = index_1st:index_end              # turn into UnitRange
     end
 
     # South polar cap
-    for (j,j_mir) in zip( 3nside+1:nlat,  # South only
+    @inbounds for (j,j_mir) in zip( 3nside+1:nlat,  # South only
                                     nside-1:-1:1)   # mirror index
 
         index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index

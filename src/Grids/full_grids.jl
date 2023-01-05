@@ -71,7 +71,7 @@ function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
     index_end = 0                       
     @inbounds for j in 1:nlat
         index_1st = index_end + 1       # 1st index is +1 from prev ring's last index
-        index_end = j*nlon              # only calculate last index per ring
+        index_end += nlon               # only calculate last index per ring
         rings[j] = index_1st:index_end  # write UnitRange to rings vector
     end
 end
