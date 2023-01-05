@@ -121,7 +121,8 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
 
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
     _, lons = get_colatlons(Grid,nlat_half)
-    lon1s = [lons[each_index_in_ring(Grid,j,nlat_half)[1]] for j in 1:nlat_half]
+    rings = eachring(Grid,nlat_half)                        # compute ring indices
+    lon1s = [lons[rings[j].start] for j in 1:nlat_half]     # pick lons at first index for each ring
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
 
     # PREALLOCATE LEGENDRE POLYNOMIALS, lmax+2 for one more degree l for meridional gradient recursion
@@ -378,6 +379,8 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
     gn = zeros(Complex{NF}, nfreq_max)      # phase factors for northern latitudes
     gs = zeros(Complex{NF}, nfreq_max)      # phase factors for southern latitudes
 
+    rings = eachring(map)                   # precompute ring indices
+
     Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
 
     @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
@@ -436,11 +439,11 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
         # INVERSE FOURIER TRANSFORM in zonal direction
         brfft_plan = brfft_plans[j_north]       # FFT planned wrt nlon on ring
-        ilons = each_index_in_ring(map,j_north) # in-ring indices northern ring
+        ilons = rings[j_north]                  # in-ring indices northern ring
         LinearAlgebra.mul!(view(map.data,ilons),brfft_plan,view(gn,1:nfreq))  # perform FFT
 
         # southern latitude, don't call redundant 2nd fft if ring is on equator 
-        ilons = each_index_in_ring(map,j_south) # in-ring indices southern ring
+        ilons = rings[j_south]                  # in-ring indices southern ring
         not_equator && LinearAlgebra.mul!(view(map.data,ilons),brfft_plan,view(gs,1:nfreq))  # perform FFT
 
         fill!(gn, zero(Complex{NF}))            # set phase factors back to zero
@@ -483,6 +486,8 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     fn = zeros(Complex{NF},nfreq_max)       # Fourier-transformed northern latitude
     fs = zeros(Complex{NF},nfreq_max)       # Fourier-transformed southern latitude
 
+    rings = eachring(map)                   # precompute ring indices
+
     # partial sums are accumulated in alms, force zeros initially.
     fill!(alms,0)
 
@@ -497,10 +502,10 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
 
         # FOURIER TRANSFORM in zonal direction
         rfft_plan = rfft_plans[j_north]         # FFT planned wrt nlon on ring
-        ilons = each_index_in_ring(map,j_north) # in-ring indices northern ring
+        ilons = rings[j_north]                  # in-ring indices northern ring
         LinearAlgebra.mul!(view(fn,1:nfreq),rfft_plan,view(map.data,ilons))   # Northern latitude
 
-        ilons = each_index_in_ring(map,j_south) # in-ring indices southern ring
+        ilons = rings[j_south]                  # in-ring indices southern ring
                                                 # Southern latitude (don't call FFT on Equator)
                                                 # then fill fs with zeros and no changes needed further down
         not_equator ? LinearAlgebra.mul!(view(fs,1:nfreq),rfft_plan,view(map.data,ilons)) : fill!(fs,0)

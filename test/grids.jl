@@ -112,3 +112,26 @@ end
         @test sum(grid) == SpeedyWeather.get_npoints(G,n)
     end
 end
+
+@testset "Ring indices" begin
+    @testset for G in (  FullClenshawGrid,
+                FullGaussianGrid,
+                OctahedralGaussianGrid,
+                OctahedralClenshawGrid,
+                HEALPixGrid,
+                HEALPix4Grid,
+                FullHEALPixGrid,
+                FullHEALPix4Grid,
+                )
+
+        @testset for n in [8,16,24,32]      # resolution parameter nlat_half
+            grid = zeros(G,n)
+
+            # precompute indices and boundscheck
+            rings = SpeedyWeather.eachring(grid)   
+            rings2 = [SpeedyWeather.each_index_in_ring(grid,j) for j in 1:SpeedyWeather.get_nlat(grid)]
+
+            @test rings == rings2
+        end
+    end
+end

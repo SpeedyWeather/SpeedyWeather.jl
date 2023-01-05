@@ -62,9 +62,9 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     vertical_advection!(diagn,model)                # use σ̇ for the vertical advection of u,v,T,q
 
     for layer in diagn.layers
-        vordiv_tendencies!(layer,surface,model)
-        temperature_tendency!(layer,model)
-        humidity_tendency!(layer,model)
+        vordiv_tendencies!(layer,surface,model)     # vorticity advection
+        temperature_tendency!(layer,model)          # hor. advection + adiabatic term
+        humidity_tendency!(layer,model)             # horizontal advection of humid
         bernoulli_potential!(layer,G,S)             # add -∇²(E+ϕ) term to div tendency
     end
 end

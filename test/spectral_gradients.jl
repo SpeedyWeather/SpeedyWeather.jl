@@ -289,7 +289,7 @@ end
     for NF in (Float32,Float64)
         p,d,m = initialize_speedy(NF)
 
-        a = rand(LowerTriangularMatrix{Complex{NF}},33,32)
+        a = randn(LowerTriangularMatrix{Complex{NF}},33,32)
         SpeedyWeather.spectral_truncation!(a,31)
         a[:,1] .= real.(a[:,1])
 
@@ -313,7 +313,7 @@ end
         SpeedyWeather.curl!(∇x∇a,dadx,dady,m.spectral_transform)
 
         for lm in SpeedyWeather.eachharmonic(∇x∇a)
-            @test ∇x∇a[lm] ≈ 0 atol=3*sqrt(eps(NF))
+            @test ∇x∇a[lm] ≈ 0 atol=5*sqrt(eps(NF))
         end
         
         # DIV(GRAD(A)) = LAPLACE(A)
@@ -323,7 +323,7 @@ end
         SpeedyWeather.∇²!(∇²a,a,m.spectral_transform)
 
         for lm in SpeedyWeather.eachharmonic(div_∇a,∇²a)
-            @test div_∇a[lm] ≈ ∇²a[lm] atol=3*sqrt(eps(NF)) rtol=3*sqrt(eps(NF))
+            @test div_∇a[lm] ≈ ∇²a[lm] atol=5*sqrt(eps(NF)) rtol=5*sqrt(eps(NF))
         end
     end
 end

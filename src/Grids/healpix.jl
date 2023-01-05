@@ -73,6 +73,41 @@ function each_index_in_ring(::Type{<:AbstractHEALPixGrid},  # function for HEALP
     return index_1st:index_end                              # range of i's in ring
 end
 
+function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
+                                Grid::Type{<:AbstractHEALPixGrid},
+                                nlat_half::Integer) # resolution param
+
+    nlat = length(rings)
+    @boundscheck nlat == get_nlat(Grid,nlat_half) || throw(BoundsError)
+
+    index_end = 0
+    nside = nside_healpix(nlat_half)                # side length of a basepixel
+
+    # North polar cap
+    @inbounds for j in 1:nside-1
+        index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
+        index_end += 4j                             # add number of grid points per ring
+        rings[j] = index_1st:index_end              # turn into UnitRange
+    end
+
+    # Equatorial belt
+    nlon_max = get_nlon_max(Grid,nlat_half)         # number of grid points on belt
+    @inbounds for j in nside:3nside
+        index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
+        index_end += nlon_max                       # nlon constant in belt
+        rings[j] = index_1st:index_end              # turn into UnitRange
+    end
+
+    # South polar cap
+    @inbounds for (j,j_mir) in zip( 3nside+1:nlat,  # South only
+                                    nside-1:-1:1)   # mirror index
+
+        index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
+        index_end += 4j_mir                         # add number of grid points per ring
+        rings[j] = index_1st:index_end              # turn into UnitRange
+    end
+end
+
 """
     H = HEALPixGrid{T}
 
