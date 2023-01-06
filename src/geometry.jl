@@ -17,8 +17,7 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     nlev::Int           # Number of vertical levels
     nlat_half::Int      # Number of latitudes in one hemisphere (incl Equator)
     npoints::Int        # total number of grid points
-    rings::Vector{UnitRange}    # indices range on ring
-    radius_earth::Real          # Earth's radius [m]
+    radius_earth::Real  # Earth's radius [m]
 
     # LATITUDES (either Gaussian, equi-angle, HEALPix or HEALPix4 lats, depending on grid)
     lat::Vector{NF}         # array of latitudes (π/2...-π/2)
@@ -87,7 +86,6 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     nlon_max = get_nlon_max(Grid,nlat_half)         # number of longitudes around the equator
     nlon = nlon_max                                 # same (used for compatibility)
     npoints = get_npoints(Grid,nlat_half)           # total number of grid points
-    rings = eachring(Grid,nlat_half)                # indices range on ring
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
     colat = get_colat(Grid,nlat_half)               # colatitude in radians
@@ -156,7 +154,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
     # conversion to number format NF happens here
     Geometry{P.NF}( Grid,nresolution,
-                    nlon_max,nlon,nlat,nlev,nlat_half,npoints,rings,radius_earth,
+                    nlon_max,nlon,nlat,nlev,nlat_half,npoints,radius_earth,
                     lat,latd,colat,colatd,lon,lond,lons,lats,
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,
