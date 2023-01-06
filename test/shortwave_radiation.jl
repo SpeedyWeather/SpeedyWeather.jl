@@ -6,8 +6,9 @@
             @testset for i in 1:4
                 _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
                 nlev = diagn.nlev
+                nband = model.parameters.nband
 
-                column = ColumnVariables{NF}(nlev = nlev)
+                column = ColumnVariables{NF}(nlev=nlev, nband=nband)
                 column.tyear = 0.5
                 column.csol = 1000.
                 column.lat = lat[i]
@@ -22,8 +23,9 @@
         @testset for NF in (Float32, Float64)
             _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
             nlev = diagn.nlev
+            nband = model.parameters.nband
 
-            column = ColumnVariables{NF}(nlev = nlev)
+            column = ColumnVariables{NF}(nlev=nlev, nband=nband)
             column.tyear = 0.5
             column.lat = 89.
 
@@ -41,8 +43,9 @@
         @testset for NF in (Float32, Float64)
             _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
             nlev = diagn.nlev
+            nband = model.parameters.nband
 
-            column = ColumnVariables{NF}(nlev = nlev)
+            column = ColumnVariables{NF}(nlev=nlev, nband=nband)
             column.humid .= [0., 0.03124937, 0.9748285, 6.7846994] # g/kg
             column.rel_hum = [0.0, 1., 1., 0.8964701087948754]
             column.grad_dry_static_energy = 0.4255393541723314
@@ -63,8 +66,9 @@
         @testset for NF in (Float32, Float64)
             _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
             nlev = diagn.nlev
+            nband = model.parameters.nband
 
-            column = ColumnVariables{NF}(nlev = nlev)
+            column = ColumnVariables{NF}(nlev=nlev, nband=nband)
             column.norm_pres = 1.
             column.humid .= [0., 0.03124937, 0.9748285, 6.7846994] # g/kg
             column.albsfc = 0.5
@@ -95,8 +99,9 @@
         @testset for NF in (Float32, Float64)
             _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
             nlev = diagn.nlev
+            nband = model.parameters.nband
 
-            column = ColumnVariables{NF}(nlev = nlev)
+            column = ColumnVariables{NF}(nlev=nlev, nband=nband)
 
             # 1. Set variables for sol_oz
             column.tyear = 0.5

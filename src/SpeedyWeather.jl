@@ -65,6 +65,7 @@ module SpeedyWeather
     # EXPORT STRUCTS
     export  Parameters,
             Constants,
+            ParameterizationConstants,
             Geometry,
             SpectralTransform,
             Boundaries,
@@ -89,6 +90,7 @@ module SpeedyWeather
 
     include("default_parameters.jl")        # defines Parameters
     include("constants.jl")                 # defines Constants
+    include("parameterization_constants.jl")# defines Parameterization Constants
     include("geometry.jl")                  # defines Geometry
 
     include("spectral_transform.jl")        # defines SpectralTransform
@@ -119,6 +121,7 @@ module SpeedyWeather
     include("tendencies_parametrizations.jl")
     include("convection.jl")
     include("large_scale_condensation.jl")
+    include("longwave_radiation.jl")
     include("shortwave_radiation.jl")
 
     include("time_integration.jl")

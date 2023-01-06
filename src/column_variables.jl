@@ -8,9 +8,11 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
 @with_kw mutable struct ColumnVariables{NF<:AbstractFloat}
 
     # COORDINATES
-    lat::NF = 0                         # latitude [˚N], needed for radiation?
-    lon::NF = 0                         # longitude [˚E], needed for radiation?
-    nlev::Int = 0                       # number of vertical levels
+    nlev::Int = 0                        # number of vertical levels
+    lon::NF = NaN                        # longitude
+    lat::NF = NaN                        # latitude, needed for shortwave radiation
+    nband::Int = 0                       # number of radiation bands, needed for radiation
+    n_stratosphere_levels::Int = 0       # number of stratospheric levels, needed for radiation
 
     # PROGNOSTIC VARIABLES
     u::Vector{NF} = zeros(NF,nlev)      # zonal velocity
@@ -57,6 +59,23 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     # Large-scale condensation
     precip_large_scale::NF = 0  # Precipitation due to large-scale condensation
 
+    # Longwave radiation
+    ## New vars in radlw_down!
+    wvi::Matrix{NF} = fill(NF(NaN), nlev, 2)  # Weights for vertical interpolation
+    tau2::Matrix{NF} = fill(NF(NaN), nlev, nband) # Transmissivity of atmospheric layers
+    dfabs::Vector{NF} = fill(NF(NaN), nlev)   # Flux of sw rad. absorbed by each atm. layer
+    fsfcd::NF = NaN                       # Downward-only flux of sw rad. at the surface
+    st4a::Matrix{NF} = fill(NF(NaN), nlev, 2) # Blackbody emission from full and half atmospheric levels
+    flux::Vector{NF} = fill(NF(NaN), nband)       # Radiative flux in different spectral bands
+
+    ## New vars in compute_bbe!
+    fsfcu::NF = NaN # surface blackbody emission (upward)
+    ts::NF = NaN    # surface temperature
+
+    ## New vars in radlw_up!
+    fsfc::NF = NaN # Net (downw.) flux of sw rad. at the surface
+    ftop::NF = NaN # Net (downw.) flux of sw rad. at the atm. top
+    stratc::Vector{NF} = fill(NF(NaN), n_stratosphere_levels) # Stratospheric correction term 
     # Shortwave radiation: solar
     tyear::NF = NF(NaN) # time as fraction of year (0-1, 0 = 1jan.h00)
     csol::NF = NF(NaN)  # FIXME
@@ -72,7 +91,6 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     ssrd::NF = NF(NaN)   # Surface shortwave radiation (downward-only)
     ssr::NF = NF(NaN)    # Surface shortwave radiation (net downward)
     tsr::NF = NF(NaN)    # Top-of-atm. shortwave radiation (downward)
-    tau2::Matrix{NF} = fill(NF(NaN), nlev, 4) # Transmissivity of atmospheric layers
     tend_t_rsw::Vector{NF} = fill(NF(NaN), nlev) # Tempterature tendency
     norm_pres::NF = NF(NaN) # Normalized pressure (p/1000 hPa)
     # Shortwave radiation: cloud

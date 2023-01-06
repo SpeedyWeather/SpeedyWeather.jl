@@ -58,6 +58,7 @@ whether scalars or arrays that do not change throughout model integration."""
 struct PrimitiveEquationModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveEquation
     parameters::Parameters
     constants::Constants{NF}
+    parameterization_constants::ParameterizationConstants{NF}
     geometry::Geometry{NF}
     spectral_transform::SpectralTransform{NF}
     boundaries::Boundaries{NF}
