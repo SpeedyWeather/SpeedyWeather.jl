@@ -1,3 +1,5 @@
+abstract type AbstractParameters{M} end
+
 """
     P = Parameters(kwargs...)
 
@@ -5,13 +7,13 @@ A struct to hold all model parameters that may be changed by the user.
 The struct uses keywords such that default values can be changed at creation.
 The default values of the keywords define the default model setup.
 """
-@with_kw struct Parameters
+@with_kw struct Parameters{M<:ModelSetup} <: AbstractParameters{M}
 
     # NUMBER FORMATS
     NF::DataType                        # number format (default defined in run_speedy)
 
     # MODEL (BarotropicModel, ShallowWaterModel, or PrimitiveEquationModel)
-    model::Type{<:ModelSetup} = Barotropic
+    model::Type{<:ModelSetup} = M
     dry_core::Bool = true               # true = switches off humidity calculations
 
     # RESOLUTION AND GRID
@@ -112,7 +114,8 @@ The default values of the keywords define the default model setup.
 
     # BOUNDARY FILES
     boundary_path::String = ""          # package location is default
-    orography::Union{Bool,Real} = true  # switch on/off orography or scale it by a factor
+    orography::Type{<:AbstractOrography} = EarthOrography
+    orography_scale::Real = 1           # scale orography by a factor
     orography_path::String = boundary_path
     orography_file::String = "orography_F512.nc"
 
@@ -149,6 +152,8 @@ The default values of the keywords define the default model setup.
     restart_path::String = output_path      # path for restart file
     restart_id::Union{String,Integer} = 1   # run_id of restart file in run-????/restart.jld2
 end
+
+Parameters(kwargs...) = Parameters{Barotropic}(kwargs...)
 
 """
     nlev = nlev_default(model::Symbol, σ_levels_half::AbstractVector)
