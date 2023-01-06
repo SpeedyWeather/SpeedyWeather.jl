@@ -89,6 +89,9 @@ The default values of the keywords define the default model setup.
     max_entrainment::Real = 0.5             # Maximum entrainment as a fraction of cloud-base mass flux
     ratio_secondary_mass_flux::Real = 0.8   # Ratio between secondary and primary mass flux at cloud-base
 
+    # Longwave radiation
+    nband::Int = 4                                    # Number of bands used to compute fband
+
     # Radiation
     radiation_coefs::RadiationCoefs = RadiationCoefs{NF}()
 
