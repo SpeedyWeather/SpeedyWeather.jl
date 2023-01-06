@@ -65,7 +65,7 @@ function vertical_averages!(diagn::DiagnosticVariables{NF},
     # fill!(D̄_spec,0)
     fill!(diagn.layers[1].dynamics_variables.div_sum_above,0)
 
-    for k in 1:nlev
+    @inbounds for k in 1:nlev
 
         # arrays for layer-thickness weighted column averages
         Δσ_k = σ_levels_thick[k]
@@ -122,7 +122,7 @@ function surface_pressure_tendency!(surf::SurfaceVariables{NF},
     Ū = surf.U_mean_grid       # rename for convenience
     V̄ = surf.V_mean_grid
     D̄ = surf.div_mean_grid
-    D̄_spec = surf.div_mean
+    # D̄_spec = surf.div_mean
 
     # precompute ring indices
     rings = eachring(pres_tend_grid,∇lnp_x,∇lnp_y,Ū,V̄,D̄)
@@ -168,27 +168,20 @@ end
 
 function vertical_advection!(   diagn::DiagnosticVariables,
                                 model::PrimitiveEquationModel)
-    @unpack dry_core = model.parameters
-
-    vertical_advection!(:U,diagn,model)
-    vertical_advection!(:V,diagn,model)
-    vertical_advection!(:temp,diagn,model)
-    dry_core || vertical_advection!(:humid,diagn,model)
-end
-
-function vertical_advection!(   var::Symbol,
-                                diagn::DiagnosticVariables,
-                                model::PrimitiveEquationModel)
     
+    @unpack dry_core = model.parameters
     @unpack σ_levels_thick⁻¹_half, nlev = model.geometry
     @boundscheck nlev == diagn.nlev || throw(BoundsError)
 
-    varname = Symbol(var,:_grid)    # concatentate symbols for getproperty()
-    varname_tend = Symbol(lowercase(string(var)),:_tend_grid)
-
-    # TODO, set the k=1 level to zero in the beginning
-    ξ_tend_top = getproperty(diagn.layers[1].tendencies, varname_tend)
-    fill!(ξ_tend_top,0)
+    # set the k=1 level to zero in the beginning
+    u_tend_top = diagn.layers[1].tendencies.u_tend_grid
+    v_tend_top = diagn.layers[1].tendencies.v_tend_grid
+    temp_tend_top = diagn.layers[1].tendencies.temp_tend_grid
+    humid_tend_top = diagn.layers[1].tendencies.humid_tend_grid
+    fill!(u_tend_top,0)
+    fill!(v_tend_top,0)
+    fill!(temp_tend_top,0)
+    dry_core || fill!(humid_tend_top,0)
 
     # ALL LAYERS (but use indexing tricks to avoid out of bounds access for top/bottom)
     @inbounds for k in 1:nlev       
@@ -198,21 +191,56 @@ function vertical_advection!(   var::Symbol,
         
         # mass fluxes, M_1/2 = M_nlev+1/2 = 0, but k=1/2 isn't explicitly stored
         σ_tend = diagn.layers[k].dynamics_variables.σ_tend
-
-        # ξ = (u,v,temp,humid)
-        ξ_tend_k = getproperty(diagn.layers[k].tendencies, varname_tend)
-        ξ_tend_below = getproperty(diagn.layers[k_below].tendencies, varname_tend)
-        ξ = getproperty(diagn.layers[k].grid_variables, varname)
-        ξ_below = getproperty(diagn.layers[k_below].grid_variables, varname)
-
+        
+        # layer thickness Δσ on level k
         Δσₖ2⁻¹ = σ_levels_thick⁻¹_half[k]      # = 1/(2Δσ_k), for convenience
+        
+        u_tend_k = diagn.layers[k].tendencies.u_tend_grid
+        u_tend_below = diagn.layers[k_below].tendencies.u_tend_grid
+        u = diagn.layers[k].grid_variables.U_grid
+        u_below = diagn.layers[k_below].grid_variables.U_grid
 
-        @inbounds for ij in eachgridpoint(ξ,ξ_tend_k,σ_tend)
-            ξ_tend_below[ij] = σ_tend[ij] * (ξ_below[ij]-ξ[ij])         # coslat⁻² scaling not here
-            ξ_tend_k[ij] = (ξ_tend_k[ij] - ξ_tend_below[ij])*Δσₖ2⁻¹     # but in vordiv_tendencies!
+        vertical_advection!(u_tend_below,u_tend_k,σ_tend,u_below,u,Δσₖ2⁻¹)
+
+        v_tend_k = diagn.layers[k].tendencies.v_tend_grid
+        v_tend_below = diagn.layers[k_below].tendencies.v_tend_grid
+        v = diagn.layers[k].grid_variables.V_grid
+        v_below = diagn.layers[k_below].grid_variables.V_grid
+
+        vertical_advection!(v_tend_below,v_tend_k,σ_tend,v_below,v,Δσₖ2⁻¹)
+
+        T_tend_k = diagn.layers[k].tendencies.temp_tend_grid
+        T_tend_below = diagn.layers[k_below].tendencies.temp_tend_grid
+        T = diagn.layers[k].grid_variables.temp_grid
+        T_below = diagn.layers[k_below].grid_variables.temp_grid
+
+        vertical_advection!(T_tend_below,T_tend_k,σ_tend,T_below,T,Δσₖ2⁻¹)
+
+        if ~dry_core
+            q_tend_k = diagn.layers[k].tendencies.temp_tend_grid
+            q_tend_below = diagn.layers[k_below].tendencies.temp_tend_grid
+            q = diagn.layers[k].grid_variables.temp_grid
+            q_below = diagn.layers[k_below].grid_variables.temp_grid
+
+            vertical_advection!(q_tend_below,q_tend_k,σ_tend,q_below,q,Δσₖ2⁻¹)
         end
     end
 end
+
+function vertical_advection!(   ξ_tend_below::Grid,
+                                ξ_tend_k::Grid,
+                                σ_tend::Grid,
+                                ξ_below::Grid,
+                                ξ::Grid,
+                                Δσₖ2⁻¹::NF
+                                ) where {NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
+
+    @inbounds for ij in eachgridpoint(ξ,ξ_tend_k,σ_tend)
+        ξ_tend_below[ij] = σ_tend[ij] * (ξ_below[ij] - ξ[ij])         # coslat⁻² scaling not here
+        ξ_tend_k[ij] = Δσₖ2⁻¹ + (ξ_tend_k[ij] - ξ_tend_below[ij])     # but in vordiv_tendencies!
+    end
+end
+
 
 function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
                             surf::SurfaceVariables,
