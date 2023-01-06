@@ -217,10 +217,10 @@ function vertical_advection!(   diagn::DiagnosticVariables,
         vertical_advection!(T_tend_below,T_tend_k,σ_tend,T_below,T,Δσₖ2⁻¹)
 
         if ~dry_core
-            q_tend_k = diagn.layers[k].tendencies.temp_tend_grid
-            q_tend_below = diagn.layers[k_below].tendencies.temp_tend_grid
-            q = diagn.layers[k].grid_variables.temp_grid
-            q_below = diagn.layers[k_below].grid_variables.temp_grid
+            q_tend_k = diagn.layers[k].tendencies.humid_tend_grid
+            q_tend_below = diagn.layers[k_below].tendencies.humid_tend_grid
+            q = diagn.layers[k].grid_variables.humid_grid
+            q_below = diagn.layers[k_below].grid_variables.humid_grid
 
             vertical_advection!(q_tend_below,q_tend_k,σ_tend,q_below,q,Δσₖ2⁻¹)
         end
