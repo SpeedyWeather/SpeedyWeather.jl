@@ -9,8 +9,7 @@ function ParameterizationConstants(P::Parameters)
     @unpack NF, nband = P
     fband = nans(NF,400,nband)   # Energy fraction emitted in each longwave band = f(T)
 
-    # conversion to number format NF happens here
-    K = ParameterizationConstants{NF}(fband)
-    initialise_longwave_radiation!(P, K)
+    K = ParameterizationConstants(fband)
+    initialise_longwave_radiation!(K,P)
     return K
 end

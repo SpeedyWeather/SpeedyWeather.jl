@@ -5,10 +5,9 @@
 
 Initialise variables and parameters used by the longwave radiation parametrization 
 """
-function initialise_longwave_radiation!(
-    P::Parameters, K::ParameterizationConstants
-)
-    radset!(P, K)
+function initialise_longwave_radiation!(K::ParameterizationConstants,
+                                        P::Parameters) 
+    radset!(K,P)
 end
 
 """
@@ -19,9 +18,8 @@ end
 Compute air temperature tendencies from longwave radiation for an atmospheric column.
 For more details see http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf
 """
-function longwave_radiation!(
-    column::ColumnVariables{NF}, model::PrimitiveEquationModel
-) where {NF<:AbstractFloat}
+function longwave_radiation!(   column::ColumnVariables,
+                                model::PrimitiveEquationModel)
 
     radlw_down!(column, model)
     compute_bbe!(column, model)
@@ -34,7 +32,9 @@ end
 Compute energy fractions in four longwave bands as a function of temperature.
 
 """
-function radset!(P::Parameters, K::ParameterizationConstants)
+function radset!(   K::ParameterizationConstants,
+                    P::Parameters)
+
     @unpack NF, nband = P
     @unpack epslw = P.radiation_coefs
     @unpack fband = K
@@ -56,7 +56,6 @@ function radset!(P::Parameters, K::ParameterizationConstants)
             fband[jtemp, jb] = fband[320, jb]
         end
     end
-    return fband
 end
 
 
