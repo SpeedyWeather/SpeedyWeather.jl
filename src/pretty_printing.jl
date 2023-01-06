@@ -14,7 +14,7 @@ function Base.show(io::IO, P::PrognosticVariables)
                             title="Surface relative vorticity",
                             colormap=:viridis,
                             compact=true,
-                            colorbar=false,
+                            colorbar=true,
                             width=60,
                             height=30))
 
