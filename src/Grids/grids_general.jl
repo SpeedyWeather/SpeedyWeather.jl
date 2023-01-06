@@ -96,11 +96,11 @@ end
 
 UnitRange `ijs` to access each grid point on grid `grid`."""
 eachgridpoint(grid::AbstractGrid) = Base.OneTo(get_npoints(grid))
-function eachgridpoint(grids::AbstractGrid...) 
-    for grid in grids
-        @boundscheck length(grid.data) == length(grids[1].data) || throw(BoundsError)
-    end
-    return eachgridpoint(grids[1])
+function eachgridpoint(grid1::Grid,grids::Grid...) where {Grid<:AbstractGrid}
+    @inline 
+    n = length(grid1)
+    Base._all_match_first(X->length(X),n,grid1,grids...) || throw(BoundsError)
+    return eachgridpoint(grid1)
 end
 
 """
@@ -127,11 +127,11 @@ end
 
 Same as `eachring(grid)` but performs a bounds check to assess that all grids
 in `grids` are of same size."""
-function eachring(grids::Grid...) where {Grid<:AbstractGrid}
-    for grid in grids
-        @boundscheck length(grid) == length(grids[1]) || throw(BoundsError)
-    end
-    return eachring(grids[1])
+function eachring(grid1::Grid,grids::Grid...) where {Grid<:AbstractGrid}
+    @inline 
+    n = length(grid1)
+    Base._all_match_first(X->length(X),n,grid1,grids...) || throw(BoundsError)
+    return eachring(grid1)
 end
 
 """
