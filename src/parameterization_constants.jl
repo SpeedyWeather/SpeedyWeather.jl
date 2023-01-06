@@ -1,8 +1,8 @@
 """
 Parameters for radiation parameterizations.
 """
-@with_kw struct ParameterizationConstants{NF<:AbstractFloat}
-    fband::Matrix{Real}
+struct ParameterizationConstants{NF<:AbstractFloat}
+    fband::Matrix{NF}
 end    
 
 function ParameterizationConstants(P::Parameters)
