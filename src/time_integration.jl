@@ -18,7 +18,7 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
                     C::Constants{NF},                               # struct with constants used at runtime
                     ) where {NF<:AbstractFloat}                     # number format NF
 
-    @boundscheck lf in [1,2] || throw(BoundsError())    # index lf picks leapfrog dim
+    @boundscheck lf == 1 || lf == 2 || throw(BoundsError())         # index lf picks leapfrog dim
     
     A_lf = lf == 1 ? A_old : A_new                      # view on either t or t+dt to dis/enable William's filter
     @unpack robert_filter, williams_filter = C          # coefficients for the Robert and William's filter
