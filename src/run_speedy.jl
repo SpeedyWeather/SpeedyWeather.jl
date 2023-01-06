@@ -35,7 +35,7 @@ function initialize_speedy(::Type{NF}=Float64;      # default number format
     C = Constants(P)                                # constants used in model integration
     G = Geometry(P)                                 # everything grid
     S = SpectralTransform(P)                        # everything spectral transform
-    B = Boundaries(P,S)                             # arrays for boundary conditions
+    B = Boundaries(P,S,G)                           # arrays for boundary conditions
     H = HorizontalDiffusion(P,C,G,S,B)              # precomputed arrays for horizontal diffusion
     D = DeviceSetup(CPUDevice())                    # device the model is running on, so far only CPU
     
@@ -66,6 +66,7 @@ Convenience function that can be used in combination with `initialize_speedy(kwa
     P,D,M = initialize_speedy(kwargs...)
     # possibly change P, D, M manually
     run_speedy!(P,D,M)
+    # or investigate D, M afterwards
 
 to allow for access to the prognostic/diagnostic variables before the time integration is started."""
 function run_speedy!(   progn::PrognosticVariables, # all prognostic variables
