@@ -115,14 +115,14 @@ module SpeedyWeather
     include("output.jl")                    # defines Output
     include("feedback.jl")                  # defines Feedback
     
-    # PHYSICS
-    include("column_variables.jl")          # defines ColumnVariables
-    include("thermodynamics.jl")
     include("tendencies_parametrizations.jl")
-    include("convection.jl")
-    include("large_scale_condensation.jl")
-    include("longwave_radiation.jl")
-    include("shortwave_radiation.jl")
+    # PHYSICS
+    include("Parameterizations/column_variables.jl")
+    include("Parameterizations/thermodynamics.jl")
+    include("Parameterizations/convection.jl")
+    include("Parameterizations/large_scale_condensation.jl")
+    include("Parameterizations/longwave_radiation.jl")
+    include("Parameterizations/shortwave_radiation.jl")
 
     include("time_integration.jl")
     include("pretty_printing.jl")
