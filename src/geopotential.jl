@@ -1,10 +1,10 @@
 """
-    Δp_geopot_half, Δp_geopot_full = initialise_geopotential(   σ_levels_full::Vector,
+    Δp_geopot_half, Δp_geopot_full = initialize_geopotential(   σ_levels_full::Vector,
                                                                 σ_levels_half::Vector,
                                                                 R_dry::Real)
 
 Precomputes """
-function initialise_geopotential(   σ_levels_full::Vector,
+function initialize_geopotential(   σ_levels_full::Vector,
                                     σ_levels_half::Vector,
                                     R_dry::Real)
 

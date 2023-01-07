@@ -136,7 +136,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     # temp_ref_profile_σ = temp_ref_profile .* σ_f
 
     # GEOPOTENTIAL, coefficients to calculate geopotential
-    Δp_geopot_half, Δp_geopot_full = initialise_geopotential(σ_levels_full,σ_levels_half,R_dry)
+    Δp_geopot_half, Δp_geopot_full = initialize_geopotential(σ_levels_full,σ_levels_half,R_dry)
 
     # LAPSE RATE correction
     lapserate_corr = lapserate_correction(σ_levels_full,σ_levels_half,Δp_geopot_full)
