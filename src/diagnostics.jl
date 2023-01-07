@@ -2,20 +2,18 @@
 Check global mean temperature at every vertical level from the m=n=1 coefficient
 of the associated Legendre polynomials.
 """
-function check_global_mean_temperature( Tabs::Array{Complex{T},3},
-                                        P::Parameters) where T
+function check_global_mean_temperature(Tabs::Array{Complex{T}, 3},
+                                       P::Parameters) where {T}
     @unpack print_dialog = P
 
     # The m=n=1 coefficent in spectral space is the mean value
     # √2 is due to the normalization of the associated Legendre polynomials
-    gmt = sqrt(0.5)*Float64.(real.(Tabs[1,1,:]))
+    gmt = sqrt(0.5) * Float64.(real.(Tabs[1, 1, :]))
 
     if print_dialog
         println(gmt)
     end
 end
-
-
 
 # # Prints global means of eddy kinetic energy and temperature.
 # # Also stops the integration if the computed diagnostics are outside of

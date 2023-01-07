@@ -6,7 +6,7 @@
 
 Struct that holds various precomputed arrays for the implicit correction to
 prevent gravity waves from amplifying. See generator function for details."""
-struct Implicit{NF<:AbstractFloat}
+struct Implicit{NF <: AbstractFloat}
     ξH₀::Vector{NF}
     g∇²::Vector{NF}
     ξg∇²::Vector{NF}
@@ -20,12 +20,10 @@ end
 
 Generator function for an `Implicit` struct, which holds precomputed arrays for
 the implicit correction that """
-function Implicit(  P::Parameters,
-                    C::Constants{NF},
-                    S::SpectralTransform{NF}
-                    ) where NF
-    
-    @unpack Δt,gravity,radius_earth = C             # time step Δt (scaled), gravity g [m/s²], radius [m]
+function Implicit(P::Parameters,
+                  C::Constants{NF},
+                  S::SpectralTransform{NF}) where {NF}
+    @unpack Δt, gravity, radius_earth = C             # time step Δt (scaled), gravity g [m/s²], radius [m]
     @unpack implicit_α = P                          # implicit time step fraction between i-1 and i+1
     @unpack eigenvalues = S                         # = -(l(l+1)), degree l of harmonics (0-based)
     @unpack layer_thickness = C                     # = H₀, layer thickness at rest without mountains
@@ -38,15 +36,15 @@ function Implicit(  P::Parameters,
     # α = 0.5 only prevents the waves from amplifying
     # α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
 
-    ξ = 2implicit_α*Δt              # = [0,2Δt], time step within [forward,backward] range for implicit terms
-    g∇² = gravity*eigenvalues       # = -gl(l+1), gravity g, degree l of harmonics
-    ξg∇² = ξ*g∇²                    # = -ξgl(l+1)
-    ξH₀ = ξ*layer_thickness         # = ξ*H₀
+    ξ = 2implicit_α * Δt              # = [0,2Δt], time step within [forward,backward] range for implicit terms
+    g∇² = gravity * eigenvalues       # = -gl(l+1), gravity g, degree l of harmonics
+    ξg∇² = ξ * g∇²                    # = -ξgl(l+1)
+    ξH₀ = ξ * layer_thickness         # = ξ*H₀
 
     # (inverse of) implicit denominator for divergence tendency correction (inverse)
-    div_impl = 1 ./ (1 .- ξH₀*ξg∇²) # = 1/(1+l(l+1)*ξ²gH₀)
+    div_impl = 1 ./ (1 .- ξH₀ * ξg∇²) # = 1/(1+l(l+1)*ξ²gH₀)
 
-    return Implicit{NF}([ξH₀],g∇²,ξg∇²,div_impl)
+    return Implicit{NF}([ξH₀], g∇², ξg∇², div_impl)
 end
 
 # struct Implicit{M1<:AbstractMatrix, M2<:AbstractMatrix, A<:AbstractArray, V<:AbstractVector}
@@ -81,7 +79,6 @@ end
 # terms anyway to reduce roundoff error; also the constants needed for
 # the biharmonic diffusion, which is assumed always to be backwards
 # implicit, are defined in initialize_implicit)
-
 
 # function Implicit(T, geometry::Geometry, constants::Constants, params::Parameters,
 #                   horizontal_diffusion::HorizontalDiffusion, Δt)

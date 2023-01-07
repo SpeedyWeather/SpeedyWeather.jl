@@ -6,9 +6,8 @@
 Compute air temperature tendencies from shortwave radiation for an atmospheric column.
 For more details see http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf
 """
-function shortwave_radiation!(
-    column::ColumnVariables{NF}, model::PrimitiveEquationModel
-) where {NF<:AbstractFloat}
+function shortwave_radiation!(column::ColumnVariables{NF},
+                              model::PrimitiveEquationModel) where {NF <: AbstractFloat}
     @unpack humid, sat_vap_pres, dry_static_energy, geopot, norm_pres = column
     @unpack cₚ = model.parameters
     @unpack p0 = model.parameters.radiation_coefs
@@ -18,17 +17,15 @@ function shortwave_radiation!(
     sol_oz!(column, model)
 
     column.rel_hum .= humid ./ sat_vap_pres
-    column.grad_dry_static_energy = 
-        (dry_static_energy[end - 1] - dry_static_energy[end]) /
-        (geopot[end - 1] - geopot[end])
+    column.grad_dry_static_energy = (dry_static_energy[end - 1] - dry_static_energy[end]) /
+                                    (geopot[end - 1] - geopot[end])
     cloud!(column, model)
 
     radsw!(column, model)
 
     for k in eachlayer(column)
-        column.temp_tend[k] += 
-            column.tend_t_rsw[k] * inv(norm_pres) *
-            (gravity / (σ_levels_thick[k] * p0)) /cₚ
+        column.temp_tend[k] += column.tend_t_rsw[k] * inv(norm_pres) *
+                               (gravity / (σ_levels_thick[k] * p0)) / cₚ
     end
 end
 
@@ -38,7 +35,7 @@ end
 Compute average daily flux of solar radiation for an atmospheric column,
 from Hartmann (1994).
 """
-function solar!(column::ColumnVariables{NF}) where {NF<:AbstractFloat}
+function solar!(column::ColumnVariables{NF}) where {NF <: AbstractFloat}
     @unpack tyear, csol, lat = column
 
     # Compute cosine and sine of latitude
@@ -56,11 +53,12 @@ function solar!(column::ColumnVariables{NF}) where {NF<:AbstractFloat}
     ca3 = ca1 * ca2 - sa1 * sa2
     sa3 = sa1 * ca2 + sa2 * ca1
 
-    decl =
-        NF(0.006918) - NF(0.399912) * ca1 + NF(0.070257) * sa1 - NF(0.006758) * ca2 + NF(0.000907) * sa2 -
-        NF(0.002697) * ca3 + NF(0.001480) * sa3
+    decl = NF(0.006918) - NF(0.399912) * ca1 + NF(0.070257) * sa1 - NF(0.006758) * ca2 +
+           NF(0.000907) * sa2 -
+           NF(0.002697) * ca3 + NF(0.001480) * sa3
 
-    fdis = NF(1.000110) + NF(0.034221) * ca1 + NF(0.001280) * sa1 + NF(0.000719) * ca2 + NF(0.000077) * sa2
+    fdis = NF(1.000110) + NF(0.034221) * ca1 + NF(0.001280) * sa1 + NF(0.000719) * ca2 +
+           NF(0.000077) * sa2
 
     cdecl = cos(decl)
     sdecl = sin(decl)
@@ -83,9 +81,8 @@ end
 
 Compute solar radiation parametres for an atmospheric column.
 """
-function sol_oz!(
-    column::ColumnVariables{NF}, model::PrimitiveEquationModel
-) where {NF<:AbstractFloat}
+function sol_oz!(column::ColumnVariables{NF},
+                 model::PrimitiveEquationModel) where {NF <: AbstractFloat}
     @unpack tyear, lat = column
     @unpack tropic_cancer = model.parameters
     @unpack solc, epssw = model.parameters.radiation_coefs
@@ -96,7 +93,7 @@ function sol_oz!(
 
     # α = year phase ( 0 - 2pi, 0 = winter solstice = 22dec.h00 )
     α = 4 * asin(1) * (tyear + 10 / 365)
-    dα = NF(0.)
+    dα = NF(0.0)
 
     coz1 = 1 * max(0, cos(α - dα))
     coz2 = NF(1.8)
@@ -138,9 +135,8 @@ end
 
 Compute shortwave radiation cloud contibutions for an atmospheric column.
 """
-function cloud!(
-    column::ColumnVariables{NF}, model::PrimitiveEquationModel
-) where {NF<:AbstractFloat}
+function cloud!(column::ColumnVariables{NF},
+                model::PrimitiveEquationModel) where {NF <: AbstractFloat}
     @unpack rhcl1, rhcl2, rrcl, qcl, pmaxcl = model.parameters.radiation_coefs
     @unpack wpcl, gse_s1, gse_s0, clsmax, clsminl = model.parameters.radiation_coefs
     @unpack humid, rel_hum, grad_dry_static_energy, precip_convection = column
@@ -163,7 +159,7 @@ function cloud!(
         column.icltop = nlev + 1
     end
 
-    for k in n_stratosphere_levels+1:(nlev - n_stratosphere_levels)
+    for k in (n_stratosphere_levels + 1):(nlev - n_stratosphere_levels)
         drh = rel_hum[k] - rhcl1
         if (drh > column.cloudc) & (humid[k] > qcl)
             column.cloudc = drh
@@ -198,9 +194,8 @@ end
 
 Compute shortwave radiation fluxes for an atmospheric column.
 """
-function radsw!(
-    column::ColumnVariables{NF}, model::PrimitiveEquationModel
-) where {NF<:AbstractFloat}
+function radsw!(column::ColumnVariables{NF},
+                model::PrimitiveEquationModel) where {NF <: AbstractFloat}
     @unpack norm_pres, humid, icltop, cloudc, clstr, ozupp, ozone = column
     @unpack zenit, stratz, fsol, qcloud, albsfc, nlev = column
     @unpack σ_levels_full, σ_levels_thick, n_stratosphere_levels = model.geometry
@@ -263,14 +258,18 @@ function radsw!(
 
     # 3.2 Ozone and dry - air absorption in the stratosphere
     for k in 1:n_stratosphere_levels
-        if k == 1 ozone_tmp = ozupp else ozone_tmp = ozone end
+        if k == 1
+            ozone_tmp = ozupp
+        else
+            ozone_tmp = ozone
+        end
         column.tend_t_rsw[k] = flux[1]
         flux[1] = column.tau2[k, 1] * (flux[1] - ozone_tmp * norm_pres)
         column.tend_t_rsw[k] = column.tend_t_rsw[k] - flux[1]
     end
-    
+
     # 3.3  Absorption and reflection in the troposphere
-    for k in n_stratosphere_levels+1:nlev
+    for k in (n_stratosphere_levels + 1):nlev
         column.tau2[k, 3] = flux[1] * column.tau2[k, 3]
         flux[1] = flux[1] - column.tau2[k, 3]
         column.tend_t_rsw[k] = flux[1]
@@ -310,8 +309,8 @@ function radsw!(
     deltap = norm_pres * σ_levels_thick[k]
     column.tau2[k, 1] = exp(-deltap * ablwin)
     column.tau2[k, 2] = exp(-deltap * ablco2)
-    column.tau2[k, 3] = 1.
-    column.tau2[k, 4] = 1.
+    column.tau2[k, 3] = 1.0
+    column.tau2[k, 4] = 1.0
 
     for k in n_stratosphere_levels:(nlev - n_stratosphere_levels):nlev
         deltap = norm_pres * σ_levels_thick[k]
@@ -324,7 +323,7 @@ function radsw!(
     # Cloudy layers (free troposphere)
     acloud = cloudc * ablcl2
 
-    for k in n_stratosphere_levels+1:nl1
+    for k in (n_stratosphere_levels + 1):nl1
         deltap = norm_pres * σ_levels_thick[k]
         if (k < icltop)
             acloud1 = acloud
@@ -340,7 +339,7 @@ function radsw!(
     # 5.2  Stratospheric correction terms
     stratc[1] = stratz * norm_pres
     for k in 2:n_stratosphere_levels
-        eps1 = epslw / (σ_levels_thick[k-1] + σ_levels_thick[k])
+        eps1 = epslw / (σ_levels_thick[k - 1] + σ_levels_thick[k])
         stratc[k] = eps1 * norm_pres
     end
 end

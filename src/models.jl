@@ -9,7 +9,7 @@ The BarotropicModel struct holds all other structs that contain precalculated co
 whether scalars or arrays that do not change throughout model integration. In contrast to
 `ShallowWaterModel` or `PrimitiveEquationModel` it does not contain a `Boundaries` struct
 as not needed."""
-struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
+struct BarotropicModel{NF <: AbstractFloat, D <: AbstractDevice} <: Barotropic
     parameters::Parameters
     constants::Constants{NF}
     geometry::Geometry{NF}
@@ -18,7 +18,7 @@ struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
     device_setup::DeviceSetup{D}
 end
 
-has(::Type{BarotropicModel{NF,D}}, var_name::Symbol) where {NF,D} = var_name in [:vor]
+has(::Type{BarotropicModel{NF, D}}, var_name::Symbol) where {NF, D} = var_name in [:vor]
 
 """
     M = ShallowWaterModel(  ::Parameters,
@@ -30,7 +30,7 @@ has(::Type{BarotropicModel{NF,D}}, var_name::Symbol) where {NF,D} = var_name in 
 
 The ShallowWaterModel struct holds all other structs that contain precalculated constants, whether scalars or
 arrays that do not change throughout model integration."""
-struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
+struct ShallowWaterModel{NF <: AbstractFloat, D <: AbstractDevice} <: ShallowWater
     parameters::Parameters
     constants::Constants{NF}
     geometry::Geometry{NF}
@@ -41,8 +41,9 @@ struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
     device_setup::DeviceSetup{D}
 end
 
-has(::Type{ShallowWaterModel{NF,D}}, var_name::Symbol) where {NF,D} = var_name in [:vor, :div, :pres]
-
+function has(::Type{ShallowWaterModel{NF, D}}, var_name::Symbol) where {NF, D}
+    var_name in [:vor, :div, :pres]
+end
 
 """
     M = PrimitiveEquationModel( ::Parameters,
@@ -55,7 +56,7 @@ has(::Type{ShallowWaterModel{NF,D}}, var_name::Symbol) where {NF,D} = var_name i
 
 The PrimitiveEquationModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration."""
-struct PrimitiveEquationModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveEquation
+struct PrimitiveEquationModel{NF <: AbstractFloat, D <: AbstractDevice} <: PrimitiveEquation
     parameters::Parameters
     constants::Constants{NF}
     parameterization_constants::ParameterizationConstants{NF}
@@ -67,12 +68,14 @@ struct PrimitiveEquationModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveE
     device_setup::DeviceSetup{D}
 end
 
-has(::Type{PrimitiveEquationModel{NF,D}}, var_name::Symbol) where {NF,D} = var_name in [:vor, :div, :temp, :humid, :pres]
+function has(::Type{PrimitiveEquationModel{NF, D}}, var_name::Symbol) where {NF, D}
+    var_name in [:vor, :div, :temp, :humid, :pres]
+end
 
 """
     has(::ModelSetup, var_name::Symbol)
 
 Returns true if the model `M` has a prognostic variable `var_name`, false otherwise. The default fallback is that all variables are included. 
 """
-has(::Type{ModelSetup}, var_name::Symbol) = var_name in [:vor, :div, :temp, :humid, :pres] 
+has(::Type{ModelSetup}, var_name::Symbol) = var_name in [:vor, :div, :temp, :humid, :pres]
 has(M::ModelSetup, var_name) = has(typeof(M), var_name)

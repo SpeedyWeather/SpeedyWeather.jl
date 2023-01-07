@@ -1,18 +1,17 @@
-@testset "Zero generators" begin
-    @testset for NF in (Float32,Float64)
-        P = Parameters(;NF)
-        G = Geometry(P)
-        S = SpectralTransform(P)
-        
-        P = zeros(PrognosticVariables{NF},5,5,3)
-        P = zeros(DiagnosticVariables,G,S)
-    end
-end
+@testset "Zero generators" begin @testset for NF in (Float32, Float64)
+    P = Parameters(; NF)
+    G = Geometry(P)
+    S = SpectralTransform(P)
+
+    P = zeros(PrognosticVariables{NF}, 5, 5, 3)
+    P = zeros(DiagnosticVariables, G, S)
+end end
 
 @testset "Initialize from rest" begin
 
     # BAROTROPIC MODEL
-    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=BarotropicModel)
+    progn, diagn, model = initialize_speedy(initial_conditions = :rest,
+                                            model = BarotropicModel)
     for layers in progn.layers
         for leapfrog in layers.leapfrog
             @test all(leapfrog.vor .== 0)
@@ -20,7 +19,8 @@ end
     end
 
     # SHALLOW WATER MODEL
-    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=ShallowWaterModel)
+    progn, diagn, model = initialize_speedy(initial_conditions = :rest,
+                                            model = ShallowWaterModel)
     for layers in progn.layers
         for leapfrog in layers.leapfrog
             @test all(leapfrog.vor .== 0)
@@ -60,13 +60,13 @@ end
 end
 
 @testset "Initialize speedy with different models" begin
-    _,_,m_barotrop = initialize_speedy(model=BarotropicModel)
-    _,_,m_shalloww = initialize_speedy(model=ShallowWaterModel)
-    _,_,m_primitive = initialize_speedy(model=PrimitiveEquationModel)
+    _, _, m_barotrop = initialize_speedy(model = BarotropicModel)
+    _, _, m_shalloww = initialize_speedy(model = ShallowWaterModel)
+    _, _, m_primitive = initialize_speedy(model = PrimitiveEquationModel)
 
     # @test m_barotrop < m_shalloww
     # @test m_shalloww < m_primitive
-    
+
     # @test (m_barotrop < m_barotrop) == false
     # @test (m_shalloww < m_shalloww) == false
     # @test (m_primitive < m_primitive) == false

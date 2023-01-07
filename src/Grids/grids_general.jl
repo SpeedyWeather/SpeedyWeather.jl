@@ -4,17 +4,19 @@ abstract type AbstractGrid{T} <: AbstractVector{T} end
 # propagate length, size, getindex, setindex! for that
 Base.length(G::AbstractGrid) = length(G.data)
 Base.size(G::AbstractGrid) = size(G.data)
-@inline function Base.getindex(G::AbstractGrid,k::Integer)
-    @boundscheck 0 < k <= length(G.data) || throw(BoundsError(G,k))
+@inline function Base.getindex(G::AbstractGrid, k::Integer)
+    @boundscheck 0 < k <= length(G.data) || throw(BoundsError(G, k))
     @inbounds r = G.data[k]
     return r
 end
 
-@inline Base.setindex!(G::AbstractGrid,x,k::Integer) = setindex!(G.data,x,k)
+@inline Base.setindex!(G::AbstractGrid, x, k::Integer) = setindex!(G.data, x, k)
 
 # with ranges
-@inline Base.getindex(G::AbstractGrid,r::AbstractRange) = G.data[r]
-@inline Base.setindex!(G::AbstractGrid,x::AbstractVector,r::AbstractRange) = setindex!(G.data,x,r)
+@inline Base.getindex(G::AbstractGrid, r::AbstractRange) = G.data[r]
+@inline function Base.setindex!(G::AbstractGrid, x::AbstractVector, r::AbstractRange)
+    setindex!(G.data, x, r)
+end
 
 """
     abstract type AbstractGrid{T} <: AbstractVector{T} end
@@ -62,33 +64,39 @@ AbstractGrid
 
 # Define methods that are universally applicable to any G<:AbstractGrid here
 # generator functions for grid
-Base.zeros(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid{T}} where T =
-    Grid(zeros(T,get_npoints(Grid,nlat_half)),nlat_half)
+function Base.zeros(::Type{Grid},
+                    nlat_half::Integer) where {Grid <: AbstractGrid{T}} where {T}
+    Grid(zeros(T, get_npoints(Grid, nlat_half)), nlat_half)
+end
 # use Float64 if not provided
-Base.zeros(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid} = zeros(Grid{Float64},nlat_half)
+function Base.zeros(::Type{Grid}, nlat_half::Integer) where {Grid <: AbstractGrid}
+    zeros(Grid{Float64}, nlat_half)
+end
 # zero element of an AbstractGrid instance grid by packing a zero(::Vector) into grid
-Base.zero(grid::Grid) where {Grid<:AbstractGrid} = Grid(zero(grid.data))
+Base.zero(grid::Grid) where {Grid <: AbstractGrid} = Grid(zero(grid.data))
 
 # truncation is the spectral truncation corresponding to size of grid and lin/quad/cubic truncation
-get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,grid.nlat_half)
+function get_truncation(grid::Grid) where {Grid <: AbstractGrid}
+    get_truncation(Grid, grid.nlat_half)
+end
 get_resolution(grid::AbstractGrid) = grid.nlat_half
 
 # does the grid have an odd number of latitudes?
 nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))
 
 # get total number of latitude rings
-get_nlat(Grid::Type{<:AbstractGrid},nlat_half::Integer) = 2nlat_half - nlat_odd(Grid)
-get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,grid.nlat_half)
+get_nlat(Grid::Type{<:AbstractGrid}, nlat_half::Integer) = 2nlat_half - nlat_odd(Grid)
+get_nlat(grid::Grid) where {Grid <: AbstractGrid} = get_nlat(Grid, grid.nlat_half)
 
 # get total number of grid points
-get_npoints(grid::Grid) where {Grid<:AbstractGrid} = get_npoints(Grid,grid.nlat_half)
+get_npoints(grid::Grid) where {Grid <: AbstractGrid} = get_npoints(Grid, grid.nlat_half)
 
 """
     i = each_index_in_ring(grid,j)
 
 UnitRange `i` to access data on grid `grid` on ring `j`."""
-function each_index_in_ring(grid::Grid,j::Integer) where {Grid<:AbstractGrid}
-    return each_index_in_ring(Grid,j,grid.nlat_half)
+function each_index_in_ring(grid::Grid, j::Integer) where {Grid <: AbstractGrid}
+    return each_index_in_ring(Grid, j, grid.nlat_half)
 end
 
 """
@@ -96,10 +104,10 @@ end
 
 UnitRange `ijs` to access each grid point on grid `grid`."""
 eachgridpoint(grid::AbstractGrid) = Base.OneTo(get_npoints(grid))
-function eachgridpoint(grid1::Grid,grids::Grid...) where {Grid<:AbstractGrid}
-    @inline 
+function eachgridpoint(grid1::Grid, grids::Grid...) where {Grid <: AbstractGrid}
+    @inline
     n = length(grid1)
-    Base._all_match_first(X->length(X),n,grid1,grids...) || throw(BoundsError)
+    Base._all_match_first(X -> length(X), n, grid1, grids...) || throw(BoundsError)
     return eachgridpoint(grid1)
 end
 
@@ -114,11 +122,11 @@ and then each grid point per ring. To be used like
         for ij in ring
             grid[ij]
 """
-eachring(grid::AbstractGrid) = eachring(typeof(grid),grid.nlat_half)
+eachring(grid::AbstractGrid) = eachring(typeof(grid), grid.nlat_half)
 
-function eachring(Grid::Type{<:AbstractGrid},nlat_half::Integer)
-    rings = Vector{UnitRange{Int}}(undef,get_nlat(Grid,nlat_half))
-    each_index_in_ring!(rings,Grid,nlat_half)
+function eachring(Grid::Type{<:AbstractGrid}, nlat_half::Integer)
+    rings = Vector{UnitRange{Int}}(undef, get_nlat(Grid, nlat_half))
+    each_index_in_ring!(rings, Grid, nlat_half)
     return rings
 end
 
@@ -127,10 +135,10 @@ end
 
 Same as `eachring(grid)` but performs a bounds check to assess that all grids
 in `grids` are of same size."""
-function eachring(grid1::Grid,grids::Grid...) where {Grid<:AbstractGrid}
-    @inline 
+function eachring(grid1::Grid, grids::Grid...) where {Grid <: AbstractGrid}
+    @inline
     n = length(grid1)
-    Base._all_match_first(X->length(X),n,grid1,grids...) || throw(BoundsError)
+    Base._all_match_first(X -> length(X), n, grid1, grids...) || throw(BoundsError)
     return eachring(grid1)
 end
 
@@ -142,9 +150,10 @@ end
 Returns a vector `nlons` for the number of longitude points per latitude ring, north to south.
 Provide grid `Grid` and its resolution parameter `nlat_half`. For both_hemisphere==false only
 the northern hemisphere (incl Equator) is returned."""
-function get_nlons(Grid::Type{<:AbstractGrid},nlat_half::Integer;both_hemispheres::Bool=false)
-    n = both_hemispheres ? get_nlat(Grid,nlat_half) : nlat_half
-    return [get_nlon_per_ring(Grid,nlat_half,j) for j in 1:n]
+function get_nlons(Grid::Type{<:AbstractGrid}, nlat_half::Integer;
+                   both_hemispheres::Bool = false)
+    n = both_hemispheres ? get_nlat(Grid, nlat_half) : nlat_half
+    return [get_nlon_per_ring(Grid, nlat_half, j) for j in 1:n]
 end
 
-get_nlon_max(grid::Grid) where {Grid<:AbstractGrid} = get_nlon_max(Grid,grid.nlat_half)
+get_nlon_max(grid::Grid) where {Grid <: AbstractGrid} = get_nlon_max(Grid, grid.nlat_half)

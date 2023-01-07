@@ -1,7 +1,6 @@
-function large_scale_condensation!( column::ColumnVariables{NF},
-                                    model::PrimitiveEquationModel,
-                                    ) where {NF<:AbstractFloat}
-
+function large_scale_condensation!(column::ColumnVariables{NF},
+                                   model::PrimitiveEquationModel) where {NF <:
+                                                                         AbstractFloat}
     @unpack gravity, RH_thresh_max_lsc, RH_thresh_range_lsc, RH_thresh_pbl_lsc, humid_relax_time_lsc = model.constants
     @unpack cₚ, alhc, n_stratosphere_levels = model.parameters
     @unpack σ_levels_full, σ_levels_thick = model.geometry
@@ -29,7 +28,7 @@ function large_scale_condensation!( column::ColumnVariables{NF},
         if humid[k] > humid_threshold
             # accumulate in tendencies (nothing is added if humidity not above threshold)
             humid_tend[k] += -(humid[k] - humid_threshold) / humid_relax_time_lsc   # Formula 22
-            temp_tend[k] += -alhc / cₚ * min(humid_tend[k], humid_tend_max*pres)    # Formula 23
+            temp_tend[k] += -alhc / cₚ * min(humid_tend[k], humid_tend_max * pres)    # Formula 23
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the
@@ -40,7 +39,7 @@ function large_scale_condensation!( column::ColumnVariables{NF},
 
     # 2. Precipitation due to large-scale condensation
     for k in eachlayer(column)[n_stratosphere_levels:end]                   # top to bottom, skip stratosphere
-        Δpₖ = pres*σ_levels_thick[k]                                        # Formula 4  # Correct index?
+        Δpₖ = pres * σ_levels_thick[k]                                        # Formula 4  # Correct index?
         column.precip_large_scale += -1 / gravity * Δpₖ * humid_tend[k]     # Formula 25
     end
 end

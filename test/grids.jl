@@ -1,137 +1,152 @@
-@testset "Grid indexing" begin
-    for NF in (Float32,Float64)
+@testset "Grid indexing" begin for NF in (Float32, Float64)
 
-        # with vector and resolution parameter provided
-        L = FullClenshawGrid(randn(NF,96*47),24)        # L24 grid
-        F = FullGaussianGrid(randn(NF,96*48),24)        # F24 grid
-        O = OctahedralGaussianGrid(randn(NF,3168),24)   # O24 grid
-        C = OctahedralClenshawGrid(randn(NF,3056),24)   # C24 grid
-        H = HEALPixGrid(randn(NF,3072),32)              # H32 grid
-        J = HEALPix4Grid(randn(NF,4096),32)             # J32 grid
-        K = FullHEALPix4Grid(randn(NF,128*63),32)       # K32 grid
+    # with vector and resolution parameter provided
+    L = FullClenshawGrid(randn(NF, 96 * 47), 24)        # L24 grid
+    F = FullGaussianGrid(randn(NF, 96 * 48), 24)        # F24 grid
+    O = OctahedralGaussianGrid(randn(NF, 3168), 24)   # O24 grid
+    C = OctahedralClenshawGrid(randn(NF, 3056), 24)   # C24 grid
+    H = HEALPixGrid(randn(NF, 3072), 32)              # H32 grid
+    J = HEALPix4Grid(randn(NF, 4096), 32)             # J32 grid
+    K = FullHEALPix4Grid(randn(NF, 128 * 63), 32)       # K32 grid
 
-        # without resolution parameter provided (inferred from vector length)
-        L2 = FullClenshawGrid(randn(NF,96*47))          # L24 grid
-        F2 = FullGaussianGrid(randn(NF,96*48))          # F24 grid
-        O2 = OctahedralGaussianGrid(randn(NF,3168))     # O24 grid
-        C2 = OctahedralClenshawGrid(randn(NF,3056))     # C24 grid
-        H2 = HEALPixGrid(randn(NF,3072))                # H32 grid
-        J2 = HEALPix4Grid(randn(NF,4096))               # J32 grid
-        K2 = FullHEALPix4Grid(randn(NF,128*63))         # K32 grid
+    # without resolution parameter provided (inferred from vector length)
+    L2 = FullClenshawGrid(randn(NF, 96 * 47))          # L24 grid
+    F2 = FullGaussianGrid(randn(NF, 96 * 48))          # F24 grid
+    O2 = OctahedralGaussianGrid(randn(NF, 3168))     # O24 grid
+    C2 = OctahedralClenshawGrid(randn(NF, 3056))     # C24 grid
+    H2 = HEALPixGrid(randn(NF, 3072))                # H32 grid
+    J2 = HEALPix4Grid(randn(NF, 4096))               # J32 grid
+    K2 = FullHEALPix4Grid(randn(NF, 128 * 63))         # K32 grid
 
-        for (grid1,grid2) in zip([L,F,O,C,H,J,K],[L2,F2,O2,C2,H2,J2,K2])
-            @test size(grid1) == size(grid2)
-        end
-
-        # getindex
-        for ij in eachindex(L) L[ij] end
-        for ij in eachindex(F) F[ij] end
-        for ij in eachindex(O) O[ij] end
-        for ij in eachindex(C) C[ij] end
-        for ij in eachindex(H) H[ij] end
-        for ij in eachindex(J) J[ij] end
-        for ij in eachindex(K) K[ij] end
-
-        # set index
-        for ij in eachindex(L) L[ij] = 0 end
-        for ij in eachindex(F) F[ij] = 0 end
-        for ij in eachindex(O) O[ij] = 0 end
-        for ij in eachindex(C) C[ij] = 0 end
-        for ij in eachindex(H) H[ij] = 0 end
-        for ij in eachindex(J) J[ij] = 0 end
-        for ij in eachindex(K) K[ij] = 0 end
-
-        @test all(L .== 0)
-        @test all(F .== 0)
-        @test all(O .== 0)
-        @test all(C .== 0)
-        @test all(H .== 0)
-        @test all(J .== 0)
-        @test all(K .== 0)
+    for (grid1, grid2) in zip([L, F, O, C, H, J, K], [L2, F2, O2, C2, H2, J2, K2])
+        @test size(grid1) == size(grid2)
     end
-end
 
-@testset "Grid generators" begin
-    for NF in (Float32,Float64)
-        for G in (  FullClenshawGrid,
-                    FullGaussianGrid,
-                    OctahedralGaussianGrid,
-                    OctahedralClenshawGrid,
-                    HEALPixGrid,
-                    HEALPix4Grid,
-                    FullHEALPixGrid,
-                    FullHEALPix4Grid
-                    )
-
-            n = 32      # resolution parameter nlat_half
-            G1 = zeros(G,n)
-            G2 = zero(G1)
-            G3 = G(G2)
-
-            @test G1 == G2
-            @test G1 == G3
-            @test all(G1 .== G2)
-            @test all(G1 .== G3)
-
-            # check that G2, G3 are deep copies
-            G1[1] = 1
-            @test G1[1] == 1
-            @test G2[1] == 0
-            @test G3[1] == 0
-        end
+    # getindex
+    for ij in eachindex(L)
+        L[ij]
     end
-end
+    for ij in eachindex(F)
+        F[ij]
+    end
+    for ij in eachindex(O)
+        O[ij]
+    end
+    for ij in eachindex(C)
+        C[ij]
+    end
+    for ij in eachindex(H)
+        H[ij]
+    end
+    for ij in eachindex(J)
+        J[ij]
+    end
+    for ij in eachindex(K)
+        K[ij]
+    end
 
-@testset "Grid indices" begin
-    for G in (  FullClenshawGrid,
-                FullGaussianGrid,
-                OctahedralGaussianGrid,
-                OctahedralClenshawGrid,
-                HEALPixGrid,
-                HEALPix4Grid,
-                FullHEALPixGrid,
-                FullHEALPix4Grid,
-                )
+    # set index
+    for ij in eachindex(L)
+        L[ij] = 0
+    end
+    for ij in eachindex(F)
+        F[ij] = 0
+    end
+    for ij in eachindex(O)
+        O[ij] = 0
+    end
+    for ij in eachindex(C)
+        C[ij] = 0
+    end
+    for ij in eachindex(H)
+        H[ij] = 0
+    end
+    for ij in eachindex(J)
+        J[ij] = 0
+    end
+    for ij in eachindex(K)
+        K[ij] = 0
+    end
 
+    @test all(L .== 0)
+    @test all(F .== 0)
+    @test all(O .== 0)
+    @test all(C .== 0)
+    @test all(H .== 0)
+    @test all(J .== 0)
+    @test all(K .== 0)
+end end
+
+@testset "Grid generators" begin for NF in (Float32, Float64)
+    for G in (FullClenshawGrid,
+              FullGaussianGrid,
+              OctahedralGaussianGrid,
+              OctahedralClenshawGrid,
+              HEALPixGrid,
+              HEALPix4Grid,
+              FullHEALPixGrid,
+              FullHEALPix4Grid)
         n = 32      # resolution parameter nlat_half
-        grid = zeros(G,n)
+        G1 = zeros(G, n)
+        G2 = zero(G1)
+        G3 = G(G2)
+
+        @test G1 == G2
+        @test G1 == G3
+        @test all(G1 .== G2)
+        @test all(G1 .== G3)
+
+        # check that G2, G3 are deep copies
+        G1[1] = 1
+        @test G1[1] == 1
+        @test G2[1] == 0
+        @test G3[1] == 0
+    end
+end end
+
+@testset "Grid indices" begin for G in (FullClenshawGrid,
+                                        FullGaussianGrid,
+                                        OctahedralGaussianGrid,
+                                        OctahedralClenshawGrid,
+                                        HEALPixGrid,
+                                        HEALPix4Grid,
+                                        FullHEALPixGrid,
+                                        FullHEALPix4Grid)
+    n = 32      # resolution parameter nlat_half
+    grid = zeros(G, n)
+
+    # precompute indices and boundscheck
+    rings = SpeedyWeather.eachring(grid, grid)
+
+    for (j, ring) in enumerate(rings)
+        for ij in ring
+            grid[ij] += 1
+        end
+    end
+
+    for ij in SpeedyWeather.eachgridpoint(grid)
+        @test grid[ij] == 1
+    end
+
+    @test sum(grid) == SpeedyWeather.get_npoints(G, n)
+end end
+
+@testset "Ring indices" begin @testset for G in (FullClenshawGrid,
+                                                 FullGaussianGrid,
+                                                 OctahedralGaussianGrid,
+                                                 OctahedralClenshawGrid,
+                                                 HEALPixGrid,
+                                                 HEALPix4Grid,
+                                                 FullHEALPixGrid,
+                                                 FullHEALPix4Grid)
+    @testset for n in [8, 16, 24, 32]      # resolution parameter nlat_half
+        grid = zeros(G, n)
 
         # precompute indices and boundscheck
-        rings = SpeedyWeather.eachring(grid,grid)   
+        rings = SpeedyWeather.eachring(grid)
+        rings2 = [SpeedyWeather.each_index_in_ring(grid, j)
+                  for j in 1:SpeedyWeather.get_nlat(grid)]
 
-        for (j,ring) in enumerate(rings)
-            for ij in ring
-                grid[ij] += 1
-            end
-        end
-
-        for ij in SpeedyWeather.eachgridpoint(grid)
-            @test grid[ij] == 1
-        end
-
-        @test sum(grid) == SpeedyWeather.get_npoints(G,n)
+        @test rings == rings2
     end
-end
-
-@testset "Ring indices" begin
-    @testset for G in (  FullClenshawGrid,
-                FullGaussianGrid,
-                OctahedralGaussianGrid,
-                OctahedralClenshawGrid,
-                HEALPixGrid,
-                HEALPix4Grid,
-                FullHEALPixGrid,
-                FullHEALPix4Grid,
-                )
-
-        @testset for n in [8,16,24,32]      # resolution parameter nlat_half
-            grid = zeros(G,n)
-
-            # precompute indices and boundscheck
-            rings = SpeedyWeather.eachring(grid)   
-            rings2 = [SpeedyWeather.each_index_in_ring(grid,j) for j in 1:SpeedyWeather.get_nlat(grid)]
-
-            @test rings == rings2
-        end
-    end
-end
+end end

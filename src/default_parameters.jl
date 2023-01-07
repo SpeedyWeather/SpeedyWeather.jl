@@ -17,24 +17,24 @@ The default values of the keywords define the default model setup.
     # RESOLUTION AND GRID
     trunc::Int = 31                                     # spectral truncation
     Grid::Type{<:AbstractGrid} = FullGaussianGrid       # grid used
-    
+
     # EARTH'S PROPERTIES
     radius_earth::Real = 6.371e6            # radius of Earth [m]
     rotation_earth::Real = 7.29e-5          # angular frequency of Earth's rotation [rad/s]
     gravity::Real = 9.81                    # gravitational acceleration [m/s^2]
     seasonal_cycle::Bool = true             # Seasonal cycle?
-    equinox::DateTime = DateTime(2000,3,20) # Spring equinox (year irrelevant)
+    equinox::DateTime = DateTime(2000, 3, 20) # Spring equinox (year irrelevant)
     tropic_cancer::Real = 23.5              # latitude [˚N] of the tropic of cancer
-    
+
     # ATMOSPHERE
     mol_mass_dry_air = 28.964917        # molar mass of dry air [g/mol]
     mol_mass_vapour = 18.01528          # molar mass of water vapour [g/mol]
     cₚ::Real = 1004.0                   # specific heat at constant pressure [J/K/kg]
     R_gas::Real = 8.31446261815324      # universal gas constant [J/K/mol]
-    R_dry::Real = 1000*R_gas/mol_mass_dry_air   # specific gas constant for dry air [J/kg/K]
-    R_vapour::Real = 1000*R_gas/mol_mass_vapour # specific gas constant for water vapour [J/kg/K]
+    R_dry::Real = 1000 * R_gas / mol_mass_dry_air   # specific gas constant for dry air [J/kg/K]
+    R_vapour::Real = 1000 * R_gas / mol_mass_vapour # specific gas constant for water vapour [J/kg/K]
     alhc::Real = 2501                   # latent heat of condensation [J/g] for consistency with
-                                        # specific humidity [g/Kg]
+    # specific humidity [g/Kg]
     alhs::Real = 2801                   # latent heat of sublimation [?]
     sbc::Real = 5.67e-8                 # stefan-Boltzmann constant [W/m^2/K^4]
 
@@ -58,11 +58,11 @@ The default values of the keywords define the default model setup.
     nlev::Integer = nlev_default(model, σ_levels_half)  # number of vertical levels 
 
     # DIFFUSION AND DRAG
-    diffusion_power::Real=4                 # Power n of Laplacian in horizontal diffusion ∇²ⁿ
-    diffusion_time::Real=2.4                # Diffusion time scale [hrs] for temperature and vorticity
-    diffusion_time_div::Real=diffusion_time # Diffusion time scale [hrs] for divergence
-    diffusion_time_strat::Real=12           # Diffusion time scale [hrs] for extra ∇² in the stratosphere
-    damping_time_strat::Real=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
+    diffusion_power::Real = 4                 # Power n of Laplacian in horizontal diffusion ∇²ⁿ
+    diffusion_time::Real = 2.4                # Diffusion time scale [hrs] for temperature and vorticity
+    diffusion_time_div::Real = diffusion_time # Diffusion time scale [hrs] for divergence
+    diffusion_time_strat::Real = 12           # Diffusion time scale [hrs] for extra ∇² in the stratosphere
+    damping_time_strat::Real = 24 * 30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
 
     # FORCING
     interface_relaxation::Bool = false      # turn on interface relaxation for shallow water?
@@ -96,7 +96,7 @@ The default values of the keywords define the default model setup.
     radiation_coefs::RadiationCoefs = RadiationCoefs{NF}()
 
     # TIME STEPPING
-    startdate::DateTime = DateTime(2000,1,1)# time at which the integration starts
+    startdate::DateTime = DateTime(2000, 1, 1)# time at which the integration starts
     n_days::Real = 10                       # number of days to integrate for
     Δt_at_T31::Real = 60                    # time step in minutes for T31, scale linearly to trunc
 
@@ -104,7 +104,7 @@ The default values of the keywords define the default model setup.
     robert_filter::Real = 0.05          # Robert (1966) time filter coefficeint to suppress comput. mode
     williams_filter::Real = 0.53        # William's time filter (Amezcua 2011) coefficient for 3rd order acc
     implicit_α::Real = 0.5              # coefficient for semi-implicit computations to filter gravity waves
-    
+
     # LEGENDRE TRANSFORM AND POLYNOMIALS
     recompute_legendre::Bool = false    # recomputation is slower but requires less memory
     legendre_NF::DataType = Float64     # which format to use to calculate the Legendre polynomials
@@ -112,7 +112,7 @@ The default values of the keywords define the default model setup.
 
     # BOUNDARY FILES
     boundary_path::String = ""          # package location is default
-    orography::Union{Bool,Real} = true  # switch on/off orography or scale it by a factor
+    orography::Union{Bool, Real} = true  # switch on/off orography or scale it by a factor
     orography_path::String = boundary_path
     orography_file::String = "orography_F512.nc"
 
@@ -127,9 +127,9 @@ The default values of the keywords define the default model setup.
     output_path::String = pwd()     # path to output folder
 
     # name of the output folder, defaults to 4-digit number counting up from run-0001
-    run_id::Union{String,Integer} = get_run_id(output, output_path)    
-    output_filename::String="output.nc"     # name of the output netcdf file
-    
+    run_id::Union{String, Integer} = get_run_id(output, output_path)
+    output_filename::String = "output.nc"     # name of the output netcdf file
+
     # variables to output: :u, :v, :vor, :div, :temp, :humid
     output_vars::Vector{Symbol} = output_vars_default(model)
     compression_level::Integer = 3          # 1=low but fast, 9=high but slow
@@ -140,14 +140,15 @@ The default values of the keywords define the default model setup.
     output_NF::DataType = NF        # number format used for output
     missing_value::Real = NaN       # missing value to be used in netcdf output
     output_grid::Symbol = :full     # :full, pick the corresponding full grid for reduced grids
-                                    # or :matrix, sort gridpoints into a matrix
-    output_quadrant_rotation::NTuple{4,Integer} = (0,1,2,3)
-    output_matrix_quadrant::NTuple{4,Tuple{Integer,Integer}} = ((2,2),(1,2),(1,1),(2,1))
+    # or :matrix, sort gridpoints into a matrix
+    output_quadrant_rotation::NTuple{4, Integer} = (0, 1, 2, 3)
+    output_matrix_quadrant::NTuple{4, Tuple{Integer, Integer}} = ((2, 2), (1, 2), (1, 1),
+                                                                  (2, 1))
 
     # RESTART
     write_restart::Bool = output            # also write restart file if output==true?
     restart_path::String = output_path      # path for restart file
-    restart_id::Union{String,Integer} = 1   # run_id of restart file in run-????/restart.jld2
+    restart_id::Union{String, Integer} = 1   # run_id of restart file in run-????/restart.jld2
 end
 
 """
@@ -168,6 +169,6 @@ function nlev_default(model::Type{<:ModelSetup}, σ_levels_half::AbstractVector)
 end
 
 # default variables to output by model
-output_vars_default(::Type{<:Barotropic}) = [:vor,:u]
-output_vars_default(::Type{<:ShallowWater}) = [:vor,:u]
-output_vars_default(::Type{<:PrimitiveEquation}) = [:vor,:u,:temp]
+output_vars_default(::Type{<:Barotropic}) = [:vor, :u]
+output_vars_default(::Type{<:ShallowWater}) = [:vor, :u]
+output_vars_default(::Type{<:PrimitiveEquation}) = [:vor, :u, :temp]

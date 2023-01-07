@@ -1,7 +1,7 @@
 """
 Struct holding the parameters needed at runtime in number format NF.
 """
-@with_kw struct Constants{NF<:AbstractFloat}
+@with_kw struct Constants{NF <: AbstractFloat}
 
     # PHYSICAL CONSTANTS
     radius_earth::NF        # Radius of Earth
@@ -35,7 +35,7 @@ Struct holding the parameters needed at runtime in number format NF.
     # Large-scale condensation (occurs when relative humidity exceeds a given threshold)
     RH_thresh_pbl_lsc::NF    # Relative humidity threshold for LSC in PBL
     RH_thresh_range_lsc::NF  # Vertical range of relative humidity threshold
-    RH_thresh_max_lsc ::NF   # Maximum relative humidity threshold
+    RH_thresh_max_lsc::NF   # Maximum relative humidity threshold
     humid_relax_time_lsc::NF # Relaxation time for humidity (hours)
 
     # Convection
@@ -55,11 +55,11 @@ function Constants(P::Parameters)
     # PHYSICAL CONSTANTS
     @unpack radius_earth, rotation_earth, gravity, R_dry, R_vapour, cₚ = P
     @unpack layer_thickness = P
-    H₀ = layer_thickness*1000       # ShallowWater: convert from [km]s to [m]
-    ξ = R_dry/R_vapour              # Ratio of gas constants: dry air / water vapour [1]
-    μ_virt_temp = (1-ξ)/ξ           # used in Tv = T(1+μq), for conversion from humidity q
-                                    # and temperature T to virtual temperature Tv
-    κ = R_dry/cₚ                    # = 2/7ish for diatomic gas
+    H₀ = layer_thickness * 1000       # ShallowWater: convert from [km]s to [m]
+    ξ = R_dry / R_vapour              # Ratio of gas constants: dry air / water vapour [1]
+    μ_virt_temp = (1 - ξ) / ξ           # used in Tv = T(1+μq), for conversion from humidity q
+    # and temperature T to virtual temperature Tv
+    κ = R_dry / cₚ                    # = 2/7ish for diatomic gas
 
     # TIME INTEGRATION CONSTANTS
     @unpack robert_filter, williams_filter = P
@@ -69,35 +69,34 @@ function Constants(P::Parameters)
     @unpack RH_thresh_pbl_lsc, RH_thresh_range_lsc, RH_thresh_max_lsc, humid_relax_time_lsc = P  # Large-scale condensation
     @unpack pres_thresh_cnv, RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv, max_entrainment, ratio_secondary_mass_flux = P  # Convection
 
-    Δt_min_at_trunc = Δt_at_T31*(31/trunc)      # scale time step Δt to specified resolution
-    Δt      = round(Δt_min_at_trunc*60)         # convert time step Δt from minutes to whole seconds
-    Δt_sec  = convert(Int,Δt)                   # encode time step Δt [s] as integer
-    Δt_hrs  = Δt/3600                           # convert time step Δt from minutes to hours
-    n_timesteps = ceil(Int,24*n_days/Δt_hrs)    # number of time steps to integrate for
-    output_every_n_steps = max(1,floor(Int,output_dt/Δt_hrs))   # output every n time steps
-    n_outputsteps = (n_timesteps ÷ output_every_n_steps)+1      # total number of output time steps
+    Δt_min_at_trunc = Δt_at_T31 * (31 / trunc)      # scale time step Δt to specified resolution
+    Δt = round(Δt_min_at_trunc * 60)         # convert time step Δt from minutes to whole seconds
+    Δt_sec = convert(Int, Δt)                   # encode time step Δt [s] as integer
+    Δt_hrs = Δt / 3600                           # convert time step Δt from minutes to hours
+    n_timesteps = ceil(Int, 24 * n_days / Δt_hrs)    # number of time steps to integrate for
+    output_every_n_steps = max(1, floor(Int, output_dt / Δt_hrs))   # output every n time steps
+    n_outputsteps = (n_timesteps ÷ output_every_n_steps) + 1      # total number of output time steps
 
     # stratospheric drag [1/s] from damping_time_strat [hrs]
     @unpack damping_time_strat = P
-    drag_strat = 1/(damping_time_strat*3600)
+    drag_strat = 1 / (damping_time_strat * 3600)
 
     # interface relaxation forcing
     @unpack interface_relax_time = P
-    interface_relax_time *= 3600/radius_earth   # convert from hours to seconds
+    interface_relax_time *= 3600 / radius_earth   # convert from hours to seconds
 
     # SCALING
     Δt_unscaled = Δt        # [s] not scaled
     Δt /= radius_earth      # [s/m] scale with Earth's radius
 
     # This implies conversion to NF
-    return Constants{P.NF}( radius_earth,rotation_earth,gravity,R_dry,H₀,μ_virt_temp,κ,
-                            Δt,Δt_unscaled,Δt_sec,Δt_hrs,
-                            robert_filter,williams_filter,n_timesteps,
-                            output_every_n_steps, n_outputsteps,
-                            drag_strat, interface_relax_time,
-                            RH_thresh_pbl_lsc, RH_thresh_range_lsc,
-                            RH_thresh_max_lsc, humid_relax_time_lsc, pres_thresh_cnv,
-                            RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv,
-                            max_entrainment, ratio_secondary_mass_flux,
-                            )
+    return Constants{P.NF}(radius_earth, rotation_earth, gravity, R_dry, H₀, μ_virt_temp, κ,
+                           Δt, Δt_unscaled, Δt_sec, Δt_hrs,
+                           robert_filter, williams_filter, n_timesteps,
+                           output_every_n_steps, n_outputsteps,
+                           drag_strat, interface_relax_time,
+                           RH_thresh_pbl_lsc, RH_thresh_range_lsc,
+                           RH_thresh_max_lsc, humid_relax_time_lsc, pres_thresh_cnv,
+                           RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv,
+                           max_entrainment, ratio_secondary_mass_flux)
 end
