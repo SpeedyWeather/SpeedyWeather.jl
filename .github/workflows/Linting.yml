@@ -1,0 +1,32 @@
+name: linting
+on:
+  pull_request:
+    branches:
+      - main
+      - gpu
+  push:
+    branches:
+      - main
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: 1
+      
+      - name: Run formatter
+        run: julia --project=development --color=yes ./development/format.jl
+      
+      - name: Check for diff
+        shell: julia --color=yes {0}
+        run: |
+          out = String(read(Cmd(`git diff`)))
+          if isempty(out)
+              exit(0)
+          end
+          @error "One or more files need formatting."
+          write(stdout, out)
+          exit(1)
