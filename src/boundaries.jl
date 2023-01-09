@@ -32,6 +32,10 @@ function Boundaries(P::Parameters,
     return Boundaries{NF,S.Grid{NF}}(orography)
 end
 
+# recalculate spectral transform or geometry if not provided
+Boundaries(P::Parameters,S::SpectralTransform) = Boundaries(P,S,Geometry(P))
+Boundaries(P::Parameters) = Boundaries(P,SpectralTransform(P))
+
 function initialize_orography!( ::AbstractOrography,
                                 ::Type{<:NoOrography},
                                 ::Parameters{<:ModelSetup},
