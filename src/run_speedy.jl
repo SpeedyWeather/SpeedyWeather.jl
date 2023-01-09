@@ -1,22 +1,31 @@
 """
-    progn_vars = run_speedy(NF,kwargs...)
+    progn_vars = run_speedy(NF,Model;kwargs...)     or
+    progn_vars = run_speedy(NF;kwargs...)           or
+    progn_vars = run_speedy(Model;kwargs...)
 
-Runs SpeedyWeather.jl with number format `NF` and any additional parameters in the keyword arguments
-`kwargs...`. Any unspecified parameters will use the default values as defined in `src/parameters.jl`."""
-function run_speedy(::Type{NF}=Float64;             # default number format
+Runs SpeedyWeather.jl with number format `NF` and the model `Model` and any additional parameters
+in the keyword arguments `kwargs...`. Any unspecified parameters will use the default values as
+defined in `src/default_parameters.jl`."""
+function run_speedy(::Type{NF}=DEFAULT_NF,          # default number format
+                    ::Type{Model}=DEFAULT_MODEL;    # default model
                     kwargs...                       # all additional non-default parameters
-                    ) where {NF<:AbstractFloat}
+                    ) where {NF<:AbstractFloat,Model<:ModelSetup}
 
     # INITALIZE MODEL
-    progn_vars,diagn_vars,model_setup = initialize_speedy(NF;kwargs...)
+    progn_vars,diagn_vars,model_setup = initialize_speedy(NF,Model;kwargs...)
 
     # START MODEL INTEGRATION
     time_stepping!(progn_vars,diagn_vars,model_setup)
     return progn_vars                               # return prognostic variables when finished
 end
 
+# if only Model M provided, use default number format NF
+run_speedy(::Type{Model};kwargs...) where {Model<:ModelSetup} = run_speedy(DEFAULT_NF,Model;kwargs...)
+
 """
-    progn_vars, diagn_vars, model_setup = initialize_speedy(NF,kwargs...)
+    progn_vars, diagn_vars, model_setup = initialize_speedy(NF,Model;kwargs...) or
+    progn_vars, diagn_vars, model_setup = initialize_speedy(NF,kwargs...)       or
+    progn_vars, diagn_vars, model_setup = initialize_speedy(Model,kwargs...)
 
 Initialize the model by returning
 - `progn_vars`, the initial conditions of the prognostic variables
@@ -25,11 +34,13 @@ Initialize the model by returning
 
 The keyword arguments `kwargs` are the same as for `run_speedy`. The `model_setup` contains
 fields that hold the parameters, constants, geometry, spectral transform, boundaries and diffusion."""
-function initialize_speedy(::Type{NF}=Float64;      # default number format
-                          kwargs...                 # all additional non-default parameters
-                          ) where {NF<:AbstractFloat}
+function initialize_speedy( ::Type{NF}=DEFAULT_NF,          # default number format
+                            ::Type{Model}=DEFAULT_MODEL;    # default model
+                            kwargs...                       # all additional non-default parameters
+                            ) where {NF<:AbstractFloat,Model<:ModelSetup}
 
-    P = Parameters(NF=NF;kwargs...)                 # all model parameters chosen through kwargs
+    ConcreteModel = default_model(Model)            # pick default concrete type for abstract Model
+    P = Parameters{ConcreteModel}(NF=NF;kwargs...)  # all model parameters chosen through kwargs
     Random.seed!(P.seed)                            # seed Julia's default RNG for reproducibility
     
     C = Constants(P)                                # constants used in model integration
@@ -39,15 +50,19 @@ function initialize_speedy(::Type{NF}=Float64;      # default number format
     H = HorizontalDiffusion(P,C,G,S,B)              # precomputed arrays for horizontal diffusion
     D = DeviceSetup(CPUDevice())                    # device the model is running on, so far only CPU
     
-    if P.model <: Barotropic                        # pack all of the above into a *Model struct
+    if ConcreteModel <: Barotropic                  # pack all of the above into a *Model struct
         M = BarotropicModel(P,C,G,S,H,D)            # typeof(M) is used to dispatch dynamically
-    elseif P.model <: ShallowWater                  # to the supported model types
-        I = Implicit(P,C,S)
+    elseif ConcreteModel <: ShallowWater            # to the supported model types
+        I = Implicit(P,C,S)                         # precompute arrays for semi-implicit corrections
         M = ShallowWaterModel(P,C,G,S,B,H,I,D)
-    elseif P.model <: PrimitiveEquation
+    elseif ConcreteModel <: PrimitiveDryCore        # no humidity 
         I = Implicit(P,C,S)
         K = ParameterizationConstants(P)
-        M = PrimitiveEquationModel(P,C,K,G,S,B,H,I,D)
+        M = PrimitiveDryCoreModel(P,C,K,G,S,B,H,I,D)
+    elseif ConcreteModel <: PrimitiveWetCore        # with humidity
+        I = Implicit(P,C,S)
+        K = ParameterizationConstants(P)
+        M = PrimitiveWetCoreModel(P,C,K,G,S,B,H,I,D)
     end
 
     prognostic_vars = initial_conditions(M)         # initialize prognostic variables
@@ -56,12 +71,15 @@ function initialize_speedy(::Type{NF}=Float64;      # default number format
     return prognostic_vars, diagnostic_vars, M
 end
 
+# if only Model M provided, use default number format NF
+initialize_speedy(::Type{Model};kwargs...) where {Model<:ModelSetup} = initialize_speedy(DEFAULT_NF,Model;kwargs...)
+
 """
     progn = run_speedy!(progn::PrognosticVariables,
                         diagn::DiagnosticVariables,
                         M::ModelSetup)
 
-Convenience function that can be used in combination with `initialize_speedy(kwargs...)` as
+Convenience function that can be used in combination with `initialize_speedy(args...;kwargs...)` as
 
     P,D,M = initialize_speedy(kwargs...)
     # possibly change P, D, M manually
