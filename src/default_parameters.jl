@@ -150,7 +150,7 @@ The default values of the keywords define the default model setup.
     restart_id::Union{String,Integer} = 1   # run_id of restart file in run-????/restart.jld2
 end
 
-Parameters(kwargs...) = Parameters{DEFAULT_MODEL}(kwargs...)
+Parameters(;kwargs...) = Parameters{default_model(DEFAULT_MODEL)}(;kwargs...)
 
 """
     nlev = nlev_default(model::Symbol, σ_levels_half::AbstractVector)
