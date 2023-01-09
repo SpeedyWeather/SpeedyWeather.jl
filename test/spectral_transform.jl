@@ -135,9 +135,10 @@ end
                             
                 P = Parameters{ShallowWaterModel}(;NF,Grid,trunc)
                 S = SpectralTransform(P)
-                B = Boundaries(P,S)
+                G = Geometry(P)
+                B = Boundaries(P,S,G)
 
-                oro_grid = B.orography
+                oro_grid = B.orography.orography
                 oro_spec = spectral(oro_grid,S)
 
                 # smooth orography

@@ -142,7 +142,8 @@ function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
 end
 
 function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
-                                model::PrimitiveEquation)
+                                model::PrimitiveWetCore)
     
+    # for wet core 2nd argument temp isn't actually needed
     virtual_temperature!(diagn,zeros(LowerTriangularMatrix,0,0),model)
 end

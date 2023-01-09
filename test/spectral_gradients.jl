@@ -169,7 +169,7 @@ end
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
-                                    model=ShallowWater)
+                                    ShallowWater)
 
         # make sure vorticity and divergence are 0
         fill!(p.layers[1].leapfrog[1].vor,0)

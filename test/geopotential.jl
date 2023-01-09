@@ -1,7 +1,7 @@
 @testset "Geopotential reasonable" begin
     for NF in (Float32,Float64)
         nlev = 8
-        p,d,m = initialize_speedy(NF,PrimitiveEquation,nlev=nlev,
+        p,d,m = initialize_speedy(NF,PrimitiveWetCore,nlev=nlev,
                                         Grid=FullGaussianGrid)
 
         # give every layer some constant temperature
@@ -30,7 +30,7 @@ end
 @testset "Add geopotential and kinetic energy, compute -∇²B term, no errors" begin
     for NF in (Float32,Float64)
         nlev = 8
-        p,d,m = initialize_speedy(NF,PrimitiveEquation,nlev=nlev,
+        p,d,m = initialize_speedy(NF,PrimitiveWetCore,nlev=nlev,
                                         Grid=FullGaussianGrid)
 
         # give every layer some constant temperature
@@ -52,8 +52,8 @@ end
 @testset "Virtual temperature calculation" begin
     for NF in (Float32,Float64)
         nlev = 8
-        p,d,m = initialize_speedy(NF,PrimitiveEquation,nlev=nlev,
-                                        Grid=FullGaussianGrid,dry_core=false)
+        p,d,m = initialize_speedy(NF,PrimitiveWetCore,nlev=nlev,
+                                        Grid=FullGaussianGrid)
 
         # give every layer some constant temperature
         temp = 280      # in Kelvin
