@@ -115,7 +115,7 @@ function set_var!(progn::PrognosticVariables{NF},
                   lf::Integer=1) where NF
 
     @assert length(var) == length(progn.layers)
-    @assert has(progn, varname) "PrognosticVariables has no variable $var_name"
+    @assert has(progn, varname) "PrognosticVariables has no variable $varname"
 
     for (progn_layer, var_layer) in zip(progn.layers, var)
         _set_var_core!(getfield(progn_layer.leapfrog[lf], varname), var_layer)
