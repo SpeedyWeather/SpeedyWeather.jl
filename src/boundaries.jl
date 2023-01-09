@@ -1,5 +1,3 @@
-abstract type AbstractOrography{NF} end
-
 # gridded field (orography) and spectral field (surface geopotential) for Earth's orography
 struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF}
     orography::Grid                                 # height [m]
@@ -12,14 +10,12 @@ ZonalRidge(orography,geopot_surf) = EarthOrography(orography,geopot_surf)
 abstract type NoOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF} end
 NoOrography(orography,geopot_surf) = EarthOrography(orography,geopot_surf)
 
-function zero(O::Type{<:AbstractOrography},S::SpectralTransform{NF}) where NF
+function Base.zeros(O::Type{<:AbstractOrography},S::SpectralTransform{NF}) where NF
     @unpack Grid, nlat_half, lmax, mmax = S
     orography   = zeros(Grid{NF},nlat_half)
-    geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax)
+    geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     return O(orography,geopot_surf)
 end
-
-abstract type AbstractBoundaries{NF} end
 
 struct Boundaries{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractBoundaries{NF}
     orography::AbstractOrography{NF}
@@ -28,13 +24,12 @@ struct Boundaries{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractBoundarie
 end
 
 function Boundaries(P::Parameters,
-                    S::SpectralTransform,
-                    G::Geometry)
+                    S::SpectralTransform{NF},
+                    G::Geometry{NF}) where NF
 
-    orography = zero(P.orography,S)
+    orography = zeros(P.orography,S)
     initialize_orography!(orography,P.orography,P,S,G)
-
-    return Boundaries(orography)
+    return Boundaries{NF,S.Grid{NF}}(orography)
 end
 
 function initialize_orography!( ::AbstractOrography,
@@ -58,7 +53,7 @@ function initialize_orography!( orog::AbstractOrography,
                                 G::Geometry) where {M<:Union{ShallowWater,PrimitiveEquation}}
 
     @unpack orography_path, orography_file, gravity = P
-    @unpack Grid, lmax, mmax = S
+    @unpack lmax, mmax = S
 
     # LOAD NETCDF FILE (but not its data yet)
     if orography_path == ""
@@ -72,8 +67,9 @@ function initialize_orography!( orog::AbstractOrography,
 
     # Interpolate/coarsen to desired resolution
     #TODO also read lat,lon from file and flip array in case it's not as expected
-    recompute_legendre = true
-    orography_spec = spectral(orography_highres;Grid=FullGaussianGrid,recompute_legendre)
+    recompute_legendre = true   # don't allocate large arrays as spectral transform is not reused
+    Grid = FullGaussianGrid     # grid the orography file comes with
+    orography_spec = spectral(orography_highres;Grid,recompute_legendre)
     
     @unpack orography, geopot_surf = orog
     copyto!(geopot_surf,orography_spec)     # truncates to the size of geopot_surf, no *gravity yet
