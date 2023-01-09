@@ -20,9 +20,9 @@ function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   
 end
 
 # which variables to apply horizontal diffusion to
-diffusion_vars(::BarotropicModel) = (:vor,)
-diffusion_vars(::ShallowWaterModel) = (:vor,:div)
-diffusion_vars(::PrimitiveEquationModel) = (:vor,:div,:temp)
+diffusion_vars(::Barotropic) = (:vor,)
+diffusion_vars(::ShallowWater) = (:vor,:div)
+diffusion_vars(::PrimitiveEquation) = (:vor,:div,:temp)
 
 function horizontal_diffusion!( progn::PrognosticVariablesLeapfrog,
                                 diagn::DiagnosticVariablesLayer,

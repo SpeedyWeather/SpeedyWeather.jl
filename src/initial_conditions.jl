@@ -58,7 +58,7 @@ end
 """Initialize a PrognosticVariables struct for an atmosphere at rest. No winds,
 hence zero vorticity and divergence, but temperature, pressure and humidity are
 initialised """
-function initialize_from_rest(model::PrimitiveEquationModel)
+function initialize_from_rest(model::PrimitiveEquation)
 
     P = model.parameters
     B = model.boundaries
@@ -106,7 +106,7 @@ function initialize_temperature!(   progn::PrognosticVariables,
                                     G::Geometry,
                                     S::SpectralTransform)
 
-    @unpack geopot_surf = B         # spectral surface geopotential [m²/s²] (orography*gravity)
+    @unpack geopot_surf = B.orography       # spectral surface geopotential [m²/s²] (orography*gravity)
 
     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
@@ -160,7 +160,7 @@ function initialize_pressure!(  progn::PrognosticVariables,
     # R:            Specific gas constant for dry air [J/kg/K]
     # pres_ref:     Reference surface pressure [hPa]
     @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R_dry = P
-    @unpack orography = B           # orography on the grid
+    @unpack orography = B.orography # orography on the grid
 
     Γ = lapse_rate/1000             # Lapse rate [K/km] -> [K/m]
     lnp₀ = log(pres_ref)            # logarithm of reference surface pressure

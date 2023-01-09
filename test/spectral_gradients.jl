@@ -2,7 +2,7 @@
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
-                                    model=ShallowWater)
+                                    ShallowWater)
 
         fill!(p.layers[1].leapfrog[1].vor,0)                  # make sure vorticity and divergence are 0
         fill!(p.layers[1].leapfrog[1].div,0)
@@ -46,7 +46,7 @@ end
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
-                                    model=ShallowWater)
+                                    ShallowWater)
 
         fill!(p.layers[1].leapfrog[1].vor,0)                  # make sure vorticity and divergence are 0
         fill!(p.layers[1].leapfrog[1].div,0)
@@ -112,7 +112,7 @@ end
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
-                                    model=BarotropicModel)
+                                    Barotropic)
 
         S = m.spectral_transform
         lmax,mmax = p.lmax,p.mmax
@@ -135,7 +135,7 @@ end
     @testset for NF in (Float32,Float64)
 
         p,d,m = initialize_speedy(  NF,
-                                    model=BarotropicModel)
+                                    Barotropic)
 
         S = m.spectral_transform
         lmax,mmax = p.lmax,p.mmax

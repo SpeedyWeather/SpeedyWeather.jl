@@ -12,14 +12,14 @@ end
 
 """
     function longwave_radiation!(
-        column::ColumnVariables{NF}, model::PrimitiveEquationModel
+        column::ColumnVariables{NF}, model::PrimitiveEquation
     )
 
 Compute air temperature tendencies from longwave radiation for an atmospheric column.
 For more details see http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf
 """
 function longwave_radiation!(   column::ColumnVariables,
-                                model::PrimitiveEquationModel)
+                                model::PrimitiveEquation)
 
     radlw_down!(column, model)
     compute_bbe!(column, model)
@@ -27,7 +27,7 @@ function longwave_radiation!(   column::ColumnVariables,
 end
 
 """
-    function radset!(model::PrimitiveEquationModel) where {NF<:AbstractFloat}
+    function radset!(model::PrimitiveEquation) where {NF<:AbstractFloat}
         
 Compute energy fractions in four longwave bands as a function of temperature.
 
@@ -61,14 +61,14 @@ end
 
 """
     function radlw_down!(
-        column::ColumnVariables{NF}, model::PrimitiveEquationModel
+        column::ColumnVariables{NF}, model::PrimitiveEquation
     ) where {NF<:AbstractFloat}
 
 Compute the downward flux of longwave radiation. Inputs variables are `temp``, `wvi`, `tau2`.
 Output column varables are `fsfcd`, `dfabs`, `flux`, `st4a`.
 """
 function radlw_down!(
-    column::ColumnVariables{NF}, model::PrimitiveEquationModel
+    column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
 
     @unpack nlev, temp, wvi, tau2 = column
@@ -159,14 +159,14 @@ end
 
 """
     function compute_bbe!(
-        column::ColumnVariables{NF}, model::PrimitiveEquationModel
+        column::ColumnVariables{NF}, model::PrimitiveEquation
     ) where {NF<:AbstractFloat}
 
 # Computes black-body (or grey-body) emissions.
 Input and output variables are `ts` and `fsfcu`, respectively.
 """
 function compute_bbe!(
-    column::ColumnVariables{NF}, model::PrimitiveEquationModel
+    column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
 
 @unpack sbc = model.parameters
@@ -178,14 +178,14 @@ end
 
 """
     function radlw_up!(
-        column::ColumnVariables{NF}, model::PrimitiveEquationModel
+        column::ColumnVariables{NF}, model::PrimitiveEquation
     ) where {NF<:AbstractFloat}
 
 # Computes the upward flux of longwave radiation.
 Input variables are  `nlev`, `temp`, `fsfcu`, `fsfcd`, `flux`, `ts`, `tau2`, `st4a`, `dfabs`, `stratc`, `σ_levels_thick`, `n_stratosphere_levels`. Output column variables are `fsfc` and `ftop`.
 """
 function radlw_up!(
-    column::ColumnVariables{NF}, model::PrimitiveEquationModel
+    column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
 
 @unpack nband, n_stratosphere_levels = model.parameters

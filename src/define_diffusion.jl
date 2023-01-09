@@ -32,11 +32,12 @@ horizontal hyperdiffusion for temperature, vorticity and divergence, with an imp
 and an explicit term. Also precalculates correction terms (horizontal and vertical) for
 temperature and humidity.
 """
-function HorizontalDiffusion(   P::Parameters,          # Parameter struct
-                                C::Constants,           # Constants struct
-                                G::Geometry,            # Geometry struct
-                                S::SpectralTransform,   # SpectralTransform struct 
-                                B::Boundaries)          # Boundaries struct
+function HorizontalDiffusion(   P::Parameters{Model},
+                                C::Constants,        
+                                G::Geometry,
+                                S::SpectralTransform{NF},
+                                B::Boundaries
+                                ) where {Model,NF}
 
     # DIFFUSION
     @unpack lmax,mmax = S
@@ -55,7 +56,7 @@ function HorizontalDiffusion(   P::Parameters,          # Parameter struct
     # conversion to number format NF later, one more degree l for meridional gradient recursion
     # Damping coefficients for explicit part of the diffusion (=ν∇²ⁿ)
     # while precalculated for spectral space, store only the real part as entries are real
-    LTM = LowerTriangularMatrix
+    LTM = LowerTriangularMatrix{NF}
     damping = zeros(LTM,lmax+2,mmax+1)              # for temperature and vorticity (explicit)
     damping_div = zeros(LTM,lmax+2,mmax+1)          # for divergence (explicit)
     damping_strat = zeros(LTM,lmax+2,mmax+1)        # for extra diffusion in the stratosphere (explicit)
@@ -86,7 +87,7 @@ function HorizontalDiffusion(   P::Parameters,          # Parameter struct
         end
     end
 
-    if P.model <: Barotropic || P.model <: ShallowWater                 # orographic correction not needed
+    if Model <: Barotropic || Model <: ShallowWater                 # orographic correction not needed
         
         temp_correction_vert        = zeros(0)                          # create dummy arrays
         humid_correction_vert       = zeros(0)
@@ -138,9 +139,8 @@ function HorizontalDiffusion(   P::Parameters,          # Parameter struct
         # humid_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
     end
 
-    # convert to number format NF here
-    return HorizontalDiffusion{P.NF}(   damping,damping_div,damping_strat,
-                                        damping_impl,damping_div_impl,damping_strat_impl,
-                                        temp_correction_vert,humid_correction_vert,
-                                        temp_correction_horizontal,humid_correction_horizontal)
+    return HorizontalDiffusion{NF}( damping,damping_div,damping_strat,
+                                    damping_impl,damping_div_impl,damping_strat_impl,
+                                    temp_correction_vert,humid_correction_vert,
+                                    temp_correction_horizontal,humid_correction_horizontal)
 end

@@ -43,7 +43,10 @@ module SpeedyWeather
             ShallowWater,
             ShallowWaterModel,
             PrimitiveEquation,
-            PrimitiveEquationModel
+            PrimitiveDryCore,
+            PrimitiveWetCore,
+            PrimitiveDryCoreModel,
+            PrimitiveWetCoreModel
 
     # EXPORT GRIDS
     export  LowerTriangularMatrix,
@@ -85,8 +88,8 @@ module SpeedyWeather
 
     include("parameter_structs.jl")         # defines 
     include("spectral_truncation.jl")
-    include("abstract_models.jl")           # defines ModelSetup, Barotropic, ShallowWater,
-                                            # PrimitiveEquation
+    include("abstract_types.jl")            # defines ModelSetup, Barotropic, ShallowWater,
+                                            # PrimitiveEquation and others
 
     include("default_parameters.jl")        # defines Parameters
     include("constants.jl")                 # defines Constants

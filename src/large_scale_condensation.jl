@@ -1,5 +1,5 @@
 function large_scale_condensation!( column::ColumnVariables{NF},
-                                    model::PrimitiveEquationModel,
+                                    model::PrimitiveEquation,
                                     ) where {NF<:AbstractFloat}
 
     @unpack gravity, RH_thresh_max_lsc, RH_thresh_range_lsc, RH_thresh_pbl_lsc, humid_relax_time_lsc = model.constants

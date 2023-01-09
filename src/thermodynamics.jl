@@ -1,12 +1,12 @@
 """
     get_thermodynamics!(
         column::ColumnVariables{NF},
-        model::PrimitiveEquationModel{NF},
+        model::PrimitiveEquation,
     )
 """
 function get_thermodynamics!(
     column::ColumnVariables{NF},
-    model::PrimitiveEquationModel{NF},
+    model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
     # Calculate thermodynamic quantities at full levels
     saturation_vapour_pressure!(column, model)
@@ -24,12 +24,12 @@ end
 """
     interpolate!(
         column::ColumnVariables{NF},
-        model::PrimitiveEquationModel,
+        model::PrimitiveEquation,
     )
 """
 function interpolate!(
     column::ColumnVariables{NF},
-    model::PrimitiveEquationModel,
+    model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
     @unpack humid, humid_half = column
     @unpack sat_humid, sat_humid_half = column
@@ -53,7 +53,7 @@ end
         A_full_level::Vector{NF},
         A_half_level::Vector{NF},
         column::ColumnVariables{NF},
-        model::PrimitiveEquationModel,
+        model::PrimitiveEquation,
     )
 
 Given some generic column variable A defined at full levels, do a linear interpolation in
@@ -63,7 +63,7 @@ function interpolate!(
     A_full_level::Vector{NF},
     A_half_level::Vector{NF},
     column::ColumnVariables{NF},
-    model::PrimitiveEquationModel,
+    model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
     @unpack nlev = column
     @unpack σ_levels_full, σ_levels_half = model.geometry
@@ -92,7 +92,7 @@ end
 """
     saturation_vapour_pressure!(
         column::ColumnVariables{NF},
-        model::PrimitiveEquationModel{NF},
+        model::PrimitiveEquation,
     )
 
 Compute the saturation vapour pressure as a function of temperature using the
@@ -105,7 +105,7 @@ respectively.
 """
 function saturation_vapour_pressure!(
     column::ColumnVariables{NF},
-    model::PrimitiveEquationModel{NF},
+    model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
 
     @unpack sat_vap_pres, temp = column
@@ -122,8 +122,7 @@ end
 
 """
     saturation_specific_humidity!(  column::ColumnVariables{NF},
-                                    model::PrimitiveEquationModel{NF}
-                                    ) where {NF<:AbstractFloat}
+                                    model::PrimitiveEquation                                    ) where {NF<:AbstractFloat}
 
 Compute the saturation specific humidity according to the formula,
 
@@ -134,7 +133,7 @@ the molecular weight of water to dry air.
 """
 function saturation_specific_humidity!(
     column::ColumnVariables{NF},
-    model::PrimitiveEquationModel{NF},
+    model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
 
     @unpack σ_levels_full = model.geometry
@@ -155,12 +154,12 @@ end
 """
     dry_static_energy!(
         column::ColumnVariables{NF},
-        model::PrimitiveEquationModel{NF},
+        model::PrimitiveEquation,
     )
 """
 function dry_static_energy!(
     column::ColumnVariables{NF},
-    model::PrimitiveEquationModel{NF},
+    model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
     @unpack cₚ = model.parameters
     @unpack dry_static_energy, geopot, temp = column
@@ -175,12 +174,12 @@ end
 """
     moist_static_energy!(
         column::ColumnVariables{NF},
-        model::PrimitiveEquationModel{NF},
+        model::PrimitiveEquation,
     )
 """
 function moist_static_energy!(
     column::ColumnVariables{NF},
-    model::PrimitiveEquationModel{NF},
+    model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
     @unpack alhc = model.parameters
     @unpack moist_static_energy, dry_static_energy, humid = column
@@ -195,12 +194,12 @@ end
 """
     saturation_moist_static_energy!(
         column::ColumnVariables{NF},
-        model::PrimitiveEquationModel{NF},
+        model::PrimitiveEquation,
     )
 """
 function saturation_moist_static_energy!(
     column::ColumnVariables{NF},
-    model::PrimitiveEquationModel{NF},
+    model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
     @unpack alhc = model.parameters
     @unpack sat_moist_static_energy,

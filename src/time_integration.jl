@@ -43,19 +43,18 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
 end
 
 # variables that are leapfrogged in the respective models that are on layers (so excl surface pressure)
-leapfrog_layer_vars(::BarotropicModel,dry_core) = (:vor,)
-leapfrog_layer_vars(::ShallowWaterModel,dry_core) = (:vor,:div)
-leapfrog_layer_vars(::PrimitiveEquationModel,dry_core) = dry_core ? (:vor,:div,:temp) : (:vor,:div,:temp,:humid)
+leapfrog_layer_vars(model::Barotropic) = (:vor,)
+leapfrog_layer_vars(model::ShallowWater) = (:vor, :div)
+leapfrog_layer_vars(model::PrimitiveDryCore) = (:vor, :div, :temp)
+leapfrog_layer_vars(model::PrimitiveWetCore) = (:vor, :div, :temp, :humid)
 
 function leapfrog!( progn::PrognosticVariablesLeapfrog,
                     diagn::DiagnosticVariablesLayer,
                     dt::Real,               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
                     lf::Int,                # leapfrog index to dis/enable William's filter
                     model::ModelSetup)
-    
-    @unpack dry_core = model.parameters     # TODO also leapfrog humid
-                    
-    for var in leapfrog_layer_vars(model,dry_core)
+               
+    for var in leapfrog_layer_vars(model)
         var_old = getproperty(progn.leapfrog[1],var)
         var_new = getproperty(progn.leapfrog[2],var)
         var_tend = getproperty(diagn.tendencies,Symbol(var,:_tend))
@@ -108,7 +107,7 @@ end
                 diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                 time::DateTime,                 # time at timestep
                 dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
-                M::PrimitiveEquationModel,      # everything that's constant at runtime
+                M::PrimitiveEquation,      # everything that's constant at runtime
                 lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                 lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                 ) where {NF<:AbstractFloat}
@@ -118,7 +117,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                     time::DateTime,                 # time at timestep
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
-                    M::PrimitiveEquationModel,      # everything that's constant at runtime
+                    M::PrimitiveEquation,      # everything that's constant at runtime
                     lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}

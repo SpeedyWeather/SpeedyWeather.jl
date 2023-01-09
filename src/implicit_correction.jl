@@ -2,7 +2,7 @@
     nothing = initialize_implicit!(::Real,::BarotropicModel)
 
 Just passes, as implicit terms are not used in the barotropic model."""
-initialize_implicit!(::Real,::BarotropicModel) = nothing
+initialize_implicit!(::Real,::Barotropic) = nothing
 
 """
     initialize_implicit!(dt::Real,M::BarotropicModel)
@@ -28,7 +28,7 @@ function initialize_implicit!(  dt::Real,                   # time step to updat
     end
 end
 
-initialize_implicit!(::Real,::PrimitiveEquationModel) = nothing
+initialize_implicit!(::Real,::PrimitiveEquation) = nothing
 
 """
     implicit_correction!(   diagn::DiagnosticVariablesLayer,
@@ -44,7 +44,7 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
                                 progn::PrognosticVariablesLeapfrog{NF},
                                 surface::SurfaceVariables{NF},
                                 pres::SurfaceLeapfrog{NF},
-                                M::ShallowWaterModel{NF},
+                                M::ShallowWater,
                                 ) where NF
 
     @unpack div_tend = diagn.tendencies     # divergence tendency

@@ -1,6 +1,6 @@
 """
     parametrization_tendencies!(diagn::DiagnosticVariables,
-                                M::PrimitiveEquationModel)
+                                M::PrimitiveEquation)
 
 Compute tendencies for u,v,temp,humid from physical parametrizations.
 Extract for each vertical atmospheric column the prognostic variables
@@ -10,7 +10,7 @@ then write the tendencies back into a horizontal field of tendencies.
 """
 function parametrization_tendencies!(   diagn::DiagnosticVariables{NF},
                                         time::DateTime,
-                                        model::PrimitiveEquationModel
+                                        model::PrimitiveEquation
                                         ) where {NF}
     G = model.geometry
     column = ColumnVariables{NF}(nlev = diagn.nlev)
