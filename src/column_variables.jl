@@ -120,9 +120,9 @@ function get_column!(   C::ColumnVariables,
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
-    C.latd = G.latds[ij]        # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
-    C.lond = G.londs[ij]
-    coslat⁻¹ = 1/cosd(C.latd)
+    C.lat = G.lats[ij]        # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
+    C.lon = G.lons[ij]
+    coslat⁻¹ = 1/cosd(C.lat)
 
     # surface pressure (logarithm used in dynamics, convert back here)
     C.log_pres = D.surface.pres_grid[ij]
