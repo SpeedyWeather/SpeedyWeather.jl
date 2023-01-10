@@ -85,7 +85,7 @@ end
         @test M_RAW < 1
 
         # CHECK THAT NO WILLIAM'S FILTER IS WORSE
-        P = Parameters(NF=NF,williams_filter=1)     # Robert's filter only
+        P = Parameters{BarotropicModel}(NF=NF,williams_filter=1)     # Robert's filter only
         C = Constants(P)
 
         # INITIAL CONDITIONS
