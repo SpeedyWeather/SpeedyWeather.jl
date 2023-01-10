@@ -39,7 +39,7 @@ function initialize_speedy( ::Type{NF}=DEFAULT_NF,          # default number for
                             kwargs...                       # all additional non-default parameters
                             ) where {NF<:AbstractFloat,Model<:ModelSetup}
 
-    ConcreteModel = default_model(Model)            # pick default concrete type for abstract Model
+    ConcreteModel = default_concrete_model(Model)   # pick default concrete type if Model abstract
     P = Parameters{ConcreteModel}(NF=NF;kwargs...)  # all model parameters chosen through kwargs
     Random.seed!(P.seed)                            # seed Julia's default RNG for reproducibility
     
