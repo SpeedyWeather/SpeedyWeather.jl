@@ -18,7 +18,7 @@ end
 
     # loop over different precisions
     @testset for NF in (Float16,Float32,Float64)
-        P = Parameters(NF=NF)
+        P = Parameters{BarotropicModel}(NF=NF)
         C = Constants(P)
 
         # INITIAL CONDITIONS
@@ -57,7 +57,7 @@ end
 
     # loop over different precisions
     @testset for NF in (Float16,Float32,Float64)
-        P = Parameters(NF=NF)
+        P = Parameters{BarotropicModel}(NF=NF)
         C = Constants(P)
 
         # INITIAL CONDITIONS
