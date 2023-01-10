@@ -1,6 +1,6 @@
 @testset "Zero generators" begin
     @testset for NF in (Float32,Float64)
-        P = Parameters(;NF)
+        P = Parameters{BarotropicModel}(;NF)
         G = Geometry(P)
         S = SpectralTransform(P)
         
