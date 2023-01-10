@@ -13,25 +13,25 @@
         p.layers[1].leapfrog[1].vor .= vor0
 
         lf = 1
-        SpeedyWeather.gridded!(d,p,lf,m)   # get corresponding non-divergent U_grid, V_grid
+        SpeedyWeather.gridded!(d,p,lf,m)   # get corresponding non-divergent u_grid, v_grid
 
-        U_grid = d.layers[1].grid_variables.U_grid
-        V_grid = d.layers[1].grid_variables.V_grid
+        u_grid = d.layers[1].grid_variables.u_grid
+        v_grid = d.layers[1].grid_variables.v_grid
 
         # check we've actually created non-zero U=u*coslat,V=v*coslat
-        @test all(U_grid .!= 0)
-        @test all(V_grid .!= 0)
+        @test all(u_grid .!= 0)
+        @test all(v_grid .!= 0)
 
         G = m.geometry
         S = m.spectral_transform
-        SpeedyWeather.scale_coslat⁻²!(U_grid,G)
-        SpeedyWeather.scale_coslat⁻²!(V_grid,G)
+        SpeedyWeather.scale_coslat⁻¹!(u_grid,G)
+        SpeedyWeather.scale_coslat⁻¹!(v_grid,G)
 
         uω_coslat⁻¹ = d.layers[1].dynamics_variables.a
         vω_coslat⁻¹ = d.layers[1].dynamics_variables.b
 
-        SpeedyWeather.spectral!(uω_coslat⁻¹,U_grid,S)
-        SpeedyWeather.spectral!(vω_coslat⁻¹,V_grid,S)
+        SpeedyWeather.spectral!(uω_coslat⁻¹,u_grid,S)
+        SpeedyWeather.spectral!(vω_coslat⁻¹,v_grid,S)
     
         div = zero(vor0)
         SpeedyWeather.divergence!(div,uω_coslat⁻¹,vω_coslat⁻¹,S)
@@ -57,14 +57,14 @@ end
         p.layers[1].leapfrog[1].div .= div0
 
         lf = 1
-        SpeedyWeather.gridded!(d,p,lf,m)   # get corresponding non-divergent U_grid, V_grid
+        SpeedyWeather.gridded!(d,p,lf,m)   # get corresponding non-divergent u_grid, v_grid
 
-        U_grid = d.layers[1].grid_variables.U_grid
-        V_grid = d.layers[1].grid_variables.V_grid
+        u_grid = d.layers[1].grid_variables.u_grid
+        v_grid = d.layers[1].grid_variables.v_grid
 
         # check we've actually created non-zero U=u*coslat,V=v*coslat
-        @test all(U_grid .!= 0)
-        @test all(V_grid .!= 0)
+        @test all(u_grid .!= 0)
+        @test all(v_grid .!= 0)
 
         G = m.geometry
         S = m.spectral_transform
@@ -203,27 +203,23 @@ end
         SpeedyWeather.gridded!(d,p,lf,m)   
 
         # check we've actually created non-zero u,v
-        @test all(d.layers[1].grid_variables.U_grid .!= 0)
-        @test all(d.layers[1].grid_variables.V_grid .!= 0)
+        @test all(d.layers[1].grid_variables.u_grid .!= 0)
+        @test all(d.layers[1].grid_variables.v_grid .!= 0)
 
-        U = d.layers[1].grid_variables.U_grid
-        V = d.layers[1].grid_variables.V_grid
-
-        # # create coslat²*(div,vor) in spectral space
-        # div_grid = d.grid_variables.div_grid[:,:,1]
-        # vor_grid = d.grid_variables.vor_grid[:,:,1]
+        u = d.layers[1].grid_variables.u_grid
+        v = d.layers[1].grid_variables.v_grid
 
         # times coslat² in grid space
         G = m.geometry
-        SpeedyWeather.scale_coslat⁻²!(U,G)
-        SpeedyWeather.scale_coslat⁻²!(V,G)
+        SpeedyWeather.scale_coslat⁻¹!(u,G)
+        SpeedyWeather.scale_coslat⁻¹!(v,G)
 
         # transform back
         S = m.spectral_transform
         u_coslat⁻¹ = zero(vor0)
         v_coslat⁻¹ = zero(vor0)
-        SpeedyWeather.spectral!(u_coslat⁻¹,U,S)
-        SpeedyWeather.spectral!(v_coslat⁻¹,V,S)
+        SpeedyWeather.spectral!(u_coslat⁻¹,u,S)
+        SpeedyWeather.spectral!(v_coslat⁻¹,v,S)
 
         # curl and div in spectral space
         SpeedyWeather.curl!(vor1,u_coslat⁻¹,v_coslat⁻¹,S)

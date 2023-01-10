@@ -50,8 +50,8 @@ struct GridVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     temp_virt_grid      ::Grid  # virtual tempereature [K]  
     humid_grid          ::Grid  # specific_humidity
     geopot_grid         ::Grid  # geopotential (is that needed?)
-    U_grid              ::Grid  # zonal velocity *coslat [m/s]
-    V_grid              ::Grid  # meridional velocity *coslat [m/s]
+    u_grid              ::Grid  # zonal velocity *coslat [m/s]
+    v_grid              ::Grid  # meridional velocity *coslat [m/s]
 end
 
 function Base.zeros(::Type{GridVariables},G::Geometry{NF}) where NF
@@ -63,11 +63,11 @@ function Base.zeros(::Type{GridVariables},G::Geometry{NF}) where NF
     temp_virt_grid      = zeros(Grid{NF},nresolution)   # virtual temperature
     humid_grid          = zeros(Grid{NF},nresolution)   # specific humidity
     geopot_grid         = zeros(Grid{NF},nresolution)   # geopotential
-    U_grid              = zeros(Grid{NF},nresolution)   # zonal velocity *coslat
-    V_grid              = zeros(Grid{NF},nresolution)   # meridonal velocity *coslat
+    u_grid              = zeros(Grid{NF},nresolution)   # zonal velocity *coslat
+    v_grid              = zeros(Grid{NF},nresolution)   # meridonal velocity *coslat
 
     return GridVariables(   vor_grid,div_grid,temp_grid,temp_virt_grid,humid_grid,geopot_grid,
-                            U_grid,V_grid)
+                            u_grid,v_grid)
 end
 
 """
@@ -77,8 +77,8 @@ Struct holding intermediate quantities for the dynamics of a given layer."""
 struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 
     # VELOCITY VECTOR (U,V) in spectral with *coslat scaling included
-    u_coslat::LowerTriangularMatrix{Complex{NF}}
-    v_coslat::LowerTriangularMatrix{Complex{NF}}
+    U::LowerTriangularMatrix{Complex{NF}}
+    V::LowerTriangularMatrix{Complex{NF}}
 
     # MULTI-PURPOSE VECTOR (a,b), work array to be reused in various places
     # uω_coslat⁻¹, vω_coslat⁻¹ = a,b                        (all models)
@@ -113,8 +113,8 @@ function Base.zeros(::Type{DynamicsVariables},
     @unpack Grid, nresolution = G
 
     # VELOCITY VECTOR (U,V) in spectral with *coslat scaling included
-    u_coslat = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    v_coslat = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    U = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    V = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
     # MULTI-PURPOSE VECTOR (a,b), work array to be reused in various places
     a = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
@@ -136,7 +136,7 @@ function Base.zeros(::Type{DynamicsVariables},
     # VERTICAL VELOCITY (̇̇dσ/dt)
     σ_tend = zeros(Grid{NF},nresolution)    # = dσ/dt, on half levels below, at k+1/2
 
-    return DynamicsVariables(   u_coslat,v_coslat,
+    return DynamicsVariables(   U,V,
                                 a,b,a_grid,b_grid,
                                 bernoulli_grid,bernoulli,
                                 uv∇lnp,div_weighted,div_sum_above,temp_virt,geopot,
