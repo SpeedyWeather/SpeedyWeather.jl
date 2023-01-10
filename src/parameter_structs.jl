@@ -7,7 +7,7 @@ See geometry.jl and function vertical_coordinate for more informaiton.
 Following the notation of https://en.wikipedia.org/wiki/Generalised_logistic_function (Dec 15 2021).
 
 Change default parameters for more/fewer levels in the stratosphere vs troposphere vs boundary layer."""
-@with_kw struct GenLogisticCoefs <: Coefficients
+Base.@kwdef struct GenLogisticCoefs <: Coefficients
     A::Float64 = -0.283     # obtained from a fit in /input_date/vertical_coordinate/vertical_resolution.ipynb
     K::Float64 = 0.871
     C::Float64 = 0.414
@@ -25,7 +25,7 @@ Parameters for computing saturation vapour pressure using the August-Roche-Magnu
     where T is in Kelvin and i = 1,2 for saturation with respect to water and ice,
     respectively.
 """
-@with_kw struct MagnusCoefs{NF<:Real} <: Coefficients
+Base.@kwdef struct MagnusCoefs{NF<:Real} <: Coefficients
     e₀::NF = 6.108   # Saturation vapour pressure at 0°C
     T₀::NF = 273.16  # 0°C in Kelvin
     T₁::NF = 35.86
@@ -37,7 +37,7 @@ end
 """
 Parameters for radiation parameterizations.
 """
-@with_kw struct RadiationCoefs{NF<:Real} <: Coefficients
+Base.@kwdef struct RadiationCoefs{NF<:Real} <: Coefficients
     epslw::NF = 0.05    # Fraction of blackbody spectrum absorbed/emitted by PBL only
     emisfc::NF = 0.98   # Longwave surface emissivity
 

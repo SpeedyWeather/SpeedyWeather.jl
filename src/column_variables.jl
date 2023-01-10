@@ -5,7 +5,7 @@ Mutable struct that contains all prognostic (copies thereof) and diagnostic vari
 needed to evaluate the physical parametrizations. For now the struct is mutable as we will reuse the struct
 to iterate over horizontal grid points. Every column vector has `nlev` entries, from [1] at the top to
 [end] at the lowermost model level at the planetary boundary layer."""
-@with_kw mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnVariables{NF}
+Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnVariables{NF}
 
     # COORDINATES
     nlev::Int = 0                        # number of vertical levels
@@ -120,9 +120,9 @@ function get_column!(   C::ColumnVariables,
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
-    C.lat = G.lats[ij]      # pull latitude, longitude for gridpoint ij from Geometry
-    C.lon = G.lons[ij]
-    coslat⁻¹ = 1/cos(C.lat)
+    C.latd = G.latds[ij]        # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
+    C.lond = G.londs[ij]
+    coslat⁻¹ = 1/cosd(C.latd)
 
     # surface pressure (logarithm used in dynamics, convert back here)
     C.log_pres = D.surface.pres_grid[ij]

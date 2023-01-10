@@ -1,7 +1,7 @@
 module SpeedyWeather
 
     # STRUCTURE
-    import Parameters: @with_kw, @unpack
+    import Parameters: @unpack
     import InteractiveUtils: subtypes
 
     # NUMERICS

@@ -1,4 +1,4 @@
-@with_kw mutable struct Output{NF<:Union{Float32,Float64}}
+Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}}
     
     output::Bool = false                    # output to netCDF?
     output_vars::Vector{Symbol}=[:none]     # vector of output variables as Symbols
