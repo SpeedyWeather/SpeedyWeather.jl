@@ -81,7 +81,47 @@ function initialize_orography!( orog::AbstractOrography,
     geopot_surf .*= gravity                 # turn orography into surface geopotential
     spectral_truncation!(geopot_surf,lmax,mmax) # set the lmax+1 harmonics to zero
 
-    # SCALE OROGRAPHY (or disable)
+    scale_orography!(orog,P)                # make whatever mountains bigger/smaller
+end
+
+function initialize_orography!( orog::AbstractOrography,
+                                ::Type{<:ZonalRidge},
+                                P::Parameters{M},
+                                S::SpectralTransform,
+                                G::Geometry) where {M<:Union{ShallowWater,PrimitiveEquation}}
+
+    @unpack gravity, rotation_earth, radius_earth = P
+    @unpack lmax, mmax = S
+
+    @unpack orography, geopot_surf = orog
+
+    ηₛ = 1
+    η₀ = 0.252
+    ηᵥ = (ηₛ-η₀)*π/2
+    u₀ = 35
+    s = u₀*cos(ηᵥ)^(3/2)
+    aΩ = radius_earth*rotation_earth
+    g⁻¹ = inv(gravity)
+    ϕ = G.latds
+
+    for ij in eachindex(ϕ,orography.data)
+        sinϕ = sind(ϕ[ij])
+        cosϕ = cosd(ϕ[ij])
+        orography[ij] = g⁻¹*s*(s*(-2*sinϕ^6*(cosϕ^2 + 1/3) + 10/63) + (8/5*cosϕ^3*(sinϕ^2 + 2/3) - π/4)*aΩ)
+    end
+
+    spectral!(geopot_surf,orography,S)      # to grid-point space
+    geopot_surf .*= gravity                 # turn orography into surface geopotential
+    spectral_truncation!(geopot_surf,lmax,mmax) # set the lmax+1 harmonics to zero
+
+    scale_orography!(orog,P)                # make whatever mountains bigger/smaller
+end
+
+function scale_orography!(  orog::AbstractOrography,
+                            P::Parameters)
+
+    @unpack orography, geopot_surf = orog
     orography .*= P.orography_scale
     geopot_surf .*= P.orography_scale
+    return nothing
 end
