@@ -8,7 +8,7 @@ A struct to hold all model parameters that may be changed by the user.
 The struct uses keywords such that default values can be changed at creation.
 The default values of the keywords define the default model setup.
 """
-@with_kw struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
+Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # NUMBER FORMATS
     NF::DataType = DEFAULT_NF               # number format
