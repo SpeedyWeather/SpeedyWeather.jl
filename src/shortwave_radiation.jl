@@ -39,11 +39,11 @@ Compute average daily flux of solar radiation for an atmospheric column,
 from Hartmann (1994).
 """
 function solar!(column::ColumnVariables{NF}) where {NF<:AbstractFloat}
-    @unpack tyear, csol, lat = column
+    @unpack tyear, csol, latd = column
 
     # Compute cosine and sine of latitude
-    clat = cos(lat * π / 180)
-    slat = sin(lat * π / 180)
+    clat = cos(latd)
+    slat = sin(latd)
 
     # 1.0 Compute declination angle and Earth - Sun distance factor
     pigr = 2 * asin(1)
@@ -86,13 +86,13 @@ Compute solar radiation parametres for an atmospheric column.
 function sol_oz!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
-    @unpack tyear, lat = column
+    @unpack tyear, latd = column
     @unpack tropic_cancer = model.parameters
     @unpack solc, epssw = model.parameters.radiation_coefs
 
     # Compute cosine and sine of latitude
-    clat = cos(lat * π / 180)
-    slat = sin(lat * π / 180)
+    clat = cos(latd)
+    slat = sin(latd)
 
     # α = year phase ( 0 - 2pi, 0 = winter solstice = 22dec.h00 )
     α = 4 * asin(1) * (tyear + 10 / 365)

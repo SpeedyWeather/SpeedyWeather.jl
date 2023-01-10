@@ -2,7 +2,7 @@
     @testset "solar!" begin
         @testset for NF in (Float32, Float64)
             topsr = [0., 283.06, 352.56537, 378.8209880964894]
-            lat = [-89., 0., 45., 89.]
+            latd = [-89., 0., 45., 89.]
             @testset for i in 1:4
                 _, diagn, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation, nlev = 4)
                 nlev = diagn.nlev
@@ -11,7 +11,7 @@
                 column = ColumnVariables{NF}(nlev=nlev, nband=nband)
                 column.tyear = 0.5
                 column.csol = 1000.
-                column.lat = lat[i]
+                column.latd = latd[i]
 
                 SpeedyWeather.solar!(column)
 
@@ -27,7 +27,7 @@
 
             column = ColumnVariables{NF}(nlev=nlev, nband=nband)
             column.tyear = 0.5
-            column.lat = 89.
+            column.latd = 89.
 
             SpeedyWeather.sol_oz!(column, model)
 
@@ -105,7 +105,7 @@
 
             # 1. Set variables for sol_oz
             column.tyear = 0.5
-            column.lat = 89.
+            column.latd = 89.
 
             # 2. Compute sat_vap_pres and dry_static_energy
             # and set remainig varables for cloud

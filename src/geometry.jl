@@ -30,8 +30,8 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     lond::Vector{Float64}   # array of longitudes in degrees (0...360˚)
 
     # COORDINATES
-    lons::Vector{NF}        # longitude (0...2π) for each grid point in ring order
-    lats::Vector{NF}        # latitude (π/2...-π/2) for each grid point in ring order
+    londs::Vector{NF}       # longitude (-180˚...180˚) for each grid point in ring order
+    latds::Vector{NF}       # latitude (-90˚...˚90) for each grid point in ring order
 
     # SINES AND COSINES OF LATITUDE
     sinlat::Vector{NF}              # sin of latitudes
@@ -98,7 +98,11 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     lond = lon*360/2π                               # array of longitudes in degrees 0...360˚
 
     # COORDINATES for every grid point in ring order
-    lats,lons = get_colatlons(Grid,nlat_half)       # in radians
+    latds,londs = get_colatlons(Grid,nlat_half)     # in radians
+    latds .*= (360/2π)                              # in degrees
+    latds .= 90 .- latds                            # in -90˚...90˚N
+    londs .*= (360/2π)                              # in degrees
+    londs .-= 180                                   # -180˚...180˚
 
     # SINES AND COSINES OF LATITUDE
     sinlat = sin.(lat)
@@ -155,7 +159,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     # conversion to number format NF happens here
     Geometry{P.NF}( Grid,nresolution,
                     nlon_max,nlon,nlat,nlev,nlat_half,npoints,radius_earth,
-                    lat,latd,colat,colatd,lon,lond,lons,lats,
+                    lat,latd,colat,colatd,lon,lond,londs,latds,
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_thick⁻¹_half,σ_f,

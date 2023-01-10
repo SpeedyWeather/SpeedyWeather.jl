@@ -293,8 +293,6 @@ end
         SpeedyWeather.spectral_truncation!(a,31)
         a[:,1] .= real.(a[:,1])
 
-        println(rand(NF))
-
         dadx = zero(a)
         dady = zero(a)
         SpeedyWeather.∇!(dadx,dady,a,m.spectral_transform)

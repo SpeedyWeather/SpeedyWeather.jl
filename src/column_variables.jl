@@ -9,8 +9,8 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
 
     # COORDINATES
     nlev::Int = 0                        # number of vertical levels
-    lon::NF = NaN                        # longitude
-    lat::NF = NaN                        # latitude, needed for shortwave radiation
+    lond::NF = NaN                       # longitude
+    latd::NF = NaN                       # latitude, needed for shortwave radiation
     nband::Int = 0                       # number of radiation bands, needed for radiation
     n_stratosphere_levels::Int = 0       # number of stratospheric levels, needed for radiation
 
@@ -120,9 +120,9 @@ function get_column!(   C::ColumnVariables,
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
-    C.lat = G.lats[ij]        # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
-    C.lon = G.lons[ij]
-    coslat⁻¹ = 1/cosd(C.lat)
+    C.latd = G.latds[ij]        # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
+    C.lond = G.londs[ij]
+    coslat⁻¹ = 1/cosd(C.latd)
 
     # surface pressure (logarithm used in dynamics, convert back here)
     C.log_pres = D.surface.pres_grid[ij]
