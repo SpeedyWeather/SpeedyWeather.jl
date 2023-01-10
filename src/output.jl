@@ -261,40 +261,36 @@ function write_netcdf_variables!(   outputter::Output,
         # for full grids always just copy the data over and unscale
         if M.geometry.Grid <: AbstractFullGrid
 
-            @unpack U_grid, V_grid, vor_grid, div_grid, temp_grid, humid_grid = diagn_layer.grid_variables
+            @unpack u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid = diagn_layer.grid_variables
             @unpack nlon, nlat = outputter
 
-            :u in output_vars   && copyto!(u,  reshape(U_grid.data,nlon,nlat))
-            :v in output_vars   && copyto!(v,  reshape(V_grid.data,nlon,nlat))
+            :u in output_vars   && copyto!(u,  reshape(u_grid.data,nlon,nlat))
+            :v in output_vars   && copyto!(v,  reshape(v_grid.data,nlon,nlat))
             :vor in output_vars && copyto!(vor,reshape(vor_grid.data,nlon,nlat))
             :div in output_vars && copyto!(div,reshape(div_grid.data,nlon,nlat))
             temp = :temp in output_vars ? reshape(temp_grid.data,nlon,nlat) : temp
             humid = :humid in output_vars ? reshape(humid_grid.data,nlon,nlat) : humid
 
-            :u in output_vars && scale_coslat⁻¹!(u,M.geometry)
-            :v in output_vars && scale_coslat⁻¹!(v,M.geometry)
-
         # if not a full grid, either resort into a matrix
         elseif output_grid == :matrix
 
-            @unpack U_grid, V_grid, vor_grid, div_grid, temp_grid, humid_grid = diagn_layer.grid_variables
+            @unpack u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid = diagn_layer.grid_variables
 
             # create (matrix,grid) tuples for simultaneous grid -> matrix conversion  
             MGs = ((M,G) for (M,G) in zip((u,v,vor,div,temp,humid),
-                                          (U_grid,V_grid,vor_grid,div_grid,temp_grid,humid_grid))
+                                          (u_grid,v_grid,vor_grid,div_grid,temp_grid,humid_grid))
                                            if length(M) > 0)
                                                     
-            # TODO somehow unscale coslat in U,V on the fly
             Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
 
         # or perform a spectral transform onto a full grid
         elseif output_grid == :full
 
-            @unpack u_coslat, v_coslat = diagn_layer.dynamics_variables
+            @unpack U, V = diagn_layer.dynamics_variables
 
             # convert to grid without allocation
-            :u in output_vars       && gridded!(Grid(u),    u_coslat, S, unscale_coslat=true)
-            :v in output_vars       && gridded!(Grid(v),    v_coslat, S, unscale_coslat=true)
+            :u in output_vars       && gridded!(Grid(u),    U, S, unscale_coslat=true)
+            :v in output_vars       && gridded!(Grid(v),    V, S, unscale_coslat=true)
             :vor in output_vars     && gridded!(Grid(vor),  progn_layer.leapfrog[lf].vor,  S)
             :div in output_vars     && gridded!(Grid(div),  progn_layer.leapfrog[lf].div,  S)
             :temp in output_vars    && gridded!(Grid(temp), progn_layer.leapfrog[lf].temp, S)
