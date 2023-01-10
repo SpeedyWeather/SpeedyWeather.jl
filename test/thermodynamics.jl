@@ -1,7 +1,7 @@
 @testset "Thermodynamics" begin
     @testset "get_thermodynamics!" begin
         @testset for NF in (Float32, Float64)
-            _, _, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation)
+            _, _, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation)
             (; nlev) = model.geometry
 
             column = ColumnVariables{NF}(; nlev)
@@ -17,7 +17,7 @@
 
     @testset "interpolate!" begin
         @testset for NF in (Float32, Float64)
-            _, _, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation)
+            _, _, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation)
             (; nlev) = model.geometry
 
             column = ColumnVariables{NF}(; nlev)
@@ -38,7 +38,7 @@
 
     @testset "Saturation vapour pressure" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation)
             (; nlev) = model.geometry
 
             column = ColumnVariables{NF}(; nlev)
@@ -53,7 +53,7 @@
 
     @testset "Saturation specific humidity" begin
         @testset for NF in (Float32, Float64)
-            _, diag, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation)
+            _, diag, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation)
             (; nlev) = model.geometry
 
             column = ColumnVariables{NF}(; nlev)
@@ -71,7 +71,7 @@
 
     @testset "Dry static energy" begin
         @testset for NF in (Float32, Float64)
-            _, _, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation)
+            _, _, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation)
             (; nlev) = model.geometry
 
             column = ColumnVariables{NF}(; nlev)
@@ -87,7 +87,7 @@
 
     @testset "Moist static energy" begin
         @testset for NF in (Float32, Float64)
-            _, _, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation)
+            _, _, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation)
             (; nlev) = model.geometry
 
             column = ColumnVariables{NF}(; nlev)
@@ -103,7 +103,7 @@
 
     @testset "Saturation moist static energy" begin
         @testset for NF in (Float32, Float64)
-            _, _, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation)
+            _, _, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation)
             (; nlev) = model.geometry
 
             column = ColumnVariables{NF}(; nlev)

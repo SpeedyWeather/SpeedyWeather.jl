@@ -1,7 +1,7 @@
 @testset "Parametrization: longwave radiation" begin
     @testset "radset!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation)
 
             # Just check the last band
             @test isapprox(
@@ -13,7 +13,7 @@
     end
     @testset "radlw_down!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev=8)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation, nlev=8)
 
             nlev = model.parameters.nlev
             nband = model.parameters.nband
@@ -32,7 +32,7 @@
     end
     @testset "compute_bbe!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev=8)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation, nlev=8)
 
             nlev = model.parameters.nlev
             nband = model.parameters.nband
@@ -47,7 +47,7 @@
     end
     @testset "radlw_up!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev=8)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation, nlev=8)
 
             nlev = model.parameters.nlev
             nband = model.parameters.nband
@@ -70,7 +70,7 @@
     end
     @testset "longwave_radiation!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev=8)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation, nlev=8)
 
             nlev = model.parameters.nlev
             nband = model.parameters.nband

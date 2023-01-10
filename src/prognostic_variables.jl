@@ -44,10 +44,11 @@ end
 # reduce size of unneeded variables if ModelSetup is provided
 function Base.zeros(::Type{PrognosticVariablesLayer{NF}},model::ModelSetup,lmax::Integer,mmax::Integer) where NF
     # use one more l for size compat with vector quantities
-    vor = has(model, :vor) ? zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1) : LowerTriangularMatrix{Complex{NF}}(undef, 0, 0)
-    div = has(model, :div) ? zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1) : LowerTriangularMatrix{Complex{NF}}(undef, 0, 0)
-    temp = has(model, :temp) ? zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1) : LowerTriangularMatrix{Complex{NF}}(undef, 0, 0)
-    humid = has(model, :humid) ? zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1) : LowerTriangularMatrix{Complex{NF}}(undef, 0, 0)
+    LTM = LowerTriangularMatrix{Complex{NF}}
+    vor = has(model, :vor) ? zeros(LTM,lmax+2,mmax+1) : LTM(undef, 0, 0)
+    div = has(model, :div) ? zeros(LTM,lmax+2,mmax+1) : LTM(undef, 0, 0)
+    temp = has(model, :temp) ? zeros(LTM,lmax+2,mmax+1) : LTM(undef, 0, 0)
+    humid = has(model, :humid) ? zeros(LTM,lmax+2,mmax+1) : LTM(undef, 0, 0)
 
     return PrognosticVariablesLayer(vor,div,temp,humid)
 end
@@ -114,7 +115,7 @@ function set_var!(progn::PrognosticVariables{NF},
                   lf::Integer=1) where NF
 
     @assert length(var) == length(progn.layers)
-    @assert has(progn, varname) "PrognosticVariables has no variable $var_name"
+    @assert has(progn, varname) "PrognosticVariables has no variable $varname"
 
     for (progn_layer, var_layer) in zip(progn.layers, var)
         _set_var_core!(getfield(progn_layer.leapfrog[lf], varname), var_layer)

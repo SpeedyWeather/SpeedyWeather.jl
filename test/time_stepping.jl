@@ -18,7 +18,7 @@ end
 
     # loop over different precisions
     @testset for NF in (Float16,Float32,Float64)
-        P = Parameters(NF=NF)
+        P = Parameters{BarotropicModel}(NF=NF)
         C = Constants(P)
 
         # INITIAL CONDITIONS
@@ -57,7 +57,7 @@ end
 
     # loop over different precisions
     @testset for NF in (Float16,Float32,Float64)
-        P = Parameters(NF=NF)
+        P = Parameters{BarotropicModel}(NF=NF)
         C = Constants(P)
 
         # INITIAL CONDITIONS
@@ -85,7 +85,7 @@ end
         @test M_RAW < 1
 
         # CHECK THAT NO WILLIAM'S FILTER IS WORSE
-        P = Parameters(NF=NF,williams_filter=1)     # Robert's filter only
+        P = Parameters{BarotropicModel}(NF=NF,williams_filter=1)     # Robert's filter only
         C = Constants(P)
 
         # INITIAL CONDITIONS

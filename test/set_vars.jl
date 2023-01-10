@@ -1,7 +1,7 @@
 @testset "Test PrognosticVariables set_vars! and get_var" begin 
 
     # test setting LowerTriangularMatrices
-    P, D, M = initialize_speedy(initial_conditions=:rest,model=PrimitiveEquation)
+    P, D, M = initialize_speedy(PrimitiveWetCore, initial_conditions=:rest)
 
     nlev = M.geometry.nlev
     lmax = M.spectral_transform.lmax
@@ -36,7 +36,7 @@
     end
 
     # test setting grids 
-    P, D, M = initialize_speedy(initial_conditions=:rest,model=PrimitiveEquation)
+    P, D, M = initialize_speedy(PrimitiveWetCore, initial_conditions=:rest)
 
     grid_data = [gridded(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
 
@@ -54,7 +54,7 @@
     end 
     @test all(isapprox(P.pres.leapfrog[lf],sph_data[1]))
 
-    P, D, M = initialize_speedy(initial_conditions=:rest,model=PrimitiveEquation)
+    P, D, M = initialize_speedy(PrimitiveWetCore, initial_conditions=:rest)
 
     grid_data = [gridded(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
 
@@ -73,7 +73,7 @@
     @test all(isapprox(P.pres.leapfrog[lf],sph_data[1]))
 
     # test setting matrices 
-    P, D, M = initialize_speedy(initial_conditions=:rest,model=PrimitiveEquation)
+    P, D, M = initialize_speedy(PrimitiveWetCore, initial_conditions=:rest)
 
     matrix_data = [Matrix(grid_data[i]) for i in eachindex(grid_data)]
 

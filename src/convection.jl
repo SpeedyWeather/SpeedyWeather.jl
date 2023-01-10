@@ -1,7 +1,7 @@
 """
     diagnose_convection!(
         column::ColumnVariables{NF},
-        model::PrimitiveEquationModel,
+        model::PrimitiveEquation,
     )
 
 Check whether the convection scheme should be activated in the given atmospheric column.
@@ -32,7 +32,7 @@ large-scale condensation parameterization, which is executed after this one.
 """
 function diagnose_convection!(
     column::ColumnVariables{NF},
-    model::PrimitiveEquationModel,
+    model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
     @unpack alhc = model.parameters
     @unpack pres_thresh_cnv, RH_thresh_pbl_cnv = model.constants
@@ -92,7 +92,7 @@ end
 """
     convection!(
         column::ColumnVariables{NF},
-        model::PrimitiveEquationModel,
+        model::PrimitiveEquation,
     )
 
 Compute fluxes and precipitation due to convection in the given atmospheric column.
@@ -105,7 +105,7 @@ For full details of the scheme see: http://users.ictp.it/~kucharsk/speedy_descri
 """
 function convection!(
     column::ColumnVariables{NF},
-    model::PrimitiveEquationModel,
+    model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
     diagnose_convection!(column, model)  # Diagnose convection
 

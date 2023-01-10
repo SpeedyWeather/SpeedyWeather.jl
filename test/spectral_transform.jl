@@ -72,7 +72,7 @@ end
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid)
 
-                P = Parameters(;NF,trunc,Grid)
+                P = Parameters{BarotropicModel}(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
                 lmax = 3
@@ -101,7 +101,7 @@ end
                                     HEALPix4Grid,
                                     FullHEALPixGrid,
                                     FullHEALPix4Grid)
-                P = Parameters(;NF,trunc,Grid)
+                P = Parameters{BarotropicModel}(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
                 lmax = 3
@@ -133,11 +133,12 @@ end
                                      OctahedralGaussianGrid,
                                      OctahedralClenshawGrid)
                             
-                P = Parameters(;NF,Grid,trunc,model=ShallowWater)
+                P = Parameters{ShallowWaterModel}(;NF,Grid,trunc)
                 S = SpectralTransform(P)
-                B = Boundaries(P,S)
+                G = Geometry(P)
+                B = Boundaries(P,S,G)
 
-                oro_grid = B.orography
+                oro_grid = B.orography.orography
                 oro_spec = spectral(oro_grid,S)
 
                 # smooth orography

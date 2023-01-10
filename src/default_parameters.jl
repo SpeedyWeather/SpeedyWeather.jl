@@ -1,18 +1,17 @@
+const DEFAULT_NF = Float64          # number format
+const DEFAULT_MODEL = Barotropic    # abstract model type
+
 """
-    P = Parameters(kwargs...)
+    P = Parameters{M<:ModelSetup}(kwargs...) <: AbstractParameters{M}
 
 A struct to hold all model parameters that may be changed by the user.
 The struct uses keywords such that default values can be changed at creation.
 The default values of the keywords define the default model setup.
 """
-@with_kw struct Parameters
+Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # NUMBER FORMATS
-    NF::DataType                        # number format (default defined in run_speedy)
-
-    # MODEL (BarotropicModel, ShallowWaterModel, or PrimitiveEquationModel)
-    model::Type{<:ModelSetup} = Barotropic
-    dry_core::Bool = true               # true = switches off humidity calculations
+    NF::DataType = DEFAULT_NF               # number format
 
     # RESOLUTION AND GRID
     trunc::Int = 31                                     # spectral truncation
@@ -55,7 +54,7 @@ The default values of the keywords define the default model setup.
     GLcoefs::GenLogisticCoefs = GenLogisticCoefs()
     n_stratosphere_levels::Integer = 2                  # number of vertical levels used for the stratosphere
     σ_levels_half::Vector{Real} = []                    # vector of σ half levels, only if set manually, otherwise an empty vector
-    nlev::Integer = nlev_default(model, σ_levels_half)  # number of vertical levels 
+    nlev::Integer = nlev_default(Model, σ_levels_half)  # number of vertical levels 
 
     # DIFFUSION AND DRAG
     diffusion_power::Real=4                 # Power n of Laplacian in horizontal diffusion ∇²ⁿ
@@ -90,7 +89,7 @@ The default values of the keywords define the default model setup.
     ratio_secondary_mass_flux::Real = 0.8   # Ratio between secondary and primary mass flux at cloud-base
 
     # Longwave radiation
-    nband::Int = 4                                    # Number of bands used to compute fband
+    nband::Int = 4                          # Number of bands used to compute fband
 
     # Radiation
     radiation_coefs::RadiationCoefs = RadiationCoefs{NF}()
@@ -112,7 +111,8 @@ The default values of the keywords define the default model setup.
 
     # BOUNDARY FILES
     boundary_path::String = ""          # package location is default
-    orography::Union{Bool,Real} = true  # switch on/off orography or scale it by a factor
+    orography::Type{<:AbstractOrography} = EarthOrography
+    orography_scale::Real = 1           # scale orography by a factor
     orography_path::String = boundary_path
     orography_file::String = "orography_F512.nc"
 
@@ -131,7 +131,7 @@ The default values of the keywords define the default model setup.
     output_filename::String="output.nc"     # name of the output netcdf file
     
     # variables to output: :u, :v, :vor, :div, :temp, :humid
-    output_vars::Vector{Symbol} = output_vars_default(model)
+    output_vars::Vector{Symbol} = output_vars_default(Model)
     compression_level::Integer = 3          # 1=low but fast, 9=high but slow
     keepbits::Integer = 7                   # mantissa bits to keep for every variable
     version::VersionNumber = pkgversion(SpeedyWeather)
@@ -150,18 +150,20 @@ The default values of the keywords define the default model setup.
     restart_id::Union{String,Integer} = 1   # run_id of restart file in run-????/restart.jld2
 end
 
-"""
-    nlev = nlev_default(model::Symbol, σ_levels_half::AbstractVector)
+Parameters(;kwargs...) = Parameters{default_concrete_model(DEFAULT_MODEL)}(;kwargs...)
 
-Number of vertical levels chosen either automatically based on `model`,
+"""
+    nlev = nlev_default(Model::Type{<:ModelSetup}, σ_levels_half::AbstractVector)
+
+Number of vertical levels chosen either automatically based on `Model`,
 or from the length of `σ_levels_half` if not a 0-length vector
 (default if not specified parameter).
 """
-function nlev_default(model::Type{<:ModelSetup}, σ_levels_half::AbstractVector)
+function nlev_default(Model::Type{<:ModelSetup}, σ_levels_half::AbstractVector)
     if length(σ_levels_half) == 0   # choose nlev automatically 
-        model <: Barotropic && return 1
-        model <: ShallowWater && return 1
-        model <: PrimitiveEquation && return 8
+        Model <: Barotropic && return 1
+        Model <: ShallowWater && return 1
+        Model <: PrimitiveEquation && return 8
     else                            # use manually set levels 
         return length(σ_levels_half) - 1
     end
@@ -170,4 +172,5 @@ end
 # default variables to output by model
 output_vars_default(::Type{<:Barotropic}) = [:vor,:u]
 output_vars_default(::Type{<:ShallowWater}) = [:vor,:u]
-output_vars_default(::Type{<:PrimitiveEquation}) = [:vor,:u,:temp]
+output_vars_default(::Type{<:PrimitiveDryCore}) = [:vor,:u,:temp]
+output_vars_default(::Type{<:PrimitiveWetCore}) = [:vor,:u,:temp,:humid]

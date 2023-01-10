@@ -1,10 +1,10 @@
 """
-    Δp_geopot_half, Δp_geopot_full = initialise_geopotential(   σ_levels_full::Vector,
+    Δp_geopot_half, Δp_geopot_full = initialize_geopotential(   σ_levels_full::Vector,
                                                                 σ_levels_half::Vector,
                                                                 R_dry::Real)
 
 Precomputes """
-function initialise_geopotential(   σ_levels_full::Vector,
+function initialize_geopotential(   σ_levels_full::Vector,
                                     σ_levels_half::Vector,
                                     R_dry::Real)
 
@@ -58,7 +58,7 @@ function geopotential!( diagn::DiagnosticVariables{NF},
                         G::Geometry{NF}         # contains precomputed layer-thickness arrays
                         ) where NF              # number format NF
 
-    @unpack geopot_surf = B                     # = orography*gravity
+    @unpack geopot_surf = B.orography           # = orography*gravity
     @unpack Δp_geopot_half, Δp_geopot_full = G  # = R*Δlnp either on half or full levels
     @unpack lapserate_corr = G
     @unpack nlev = G                            # number of vertical levels
@@ -103,8 +103,7 @@ end
 """
     virtual_temperature!(   diagn::DiagnosticVariablesLayer,
                             temp::LowerTriangularMatrix,
-                            M::PrimitiveEquationModel,
-                            dry_core::Bool=false)
+                            M::PrimitiveWetCore)
                 
 Calculates the virtual temperature Tᵥ as
 
@@ -118,27 +117,33 @@ In grid-point space and then transforms Tᵥ back into spectral space
 for the geopotential calculation."""
 function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
                                 temp::LowerTriangularMatrix,
-                                M::PrimitiveEquationModel,
-                                dry_core::Bool=false)
+                                model::PrimitiveWetCore)
     
     @unpack temp_grid, humid_grid, temp_virt_grid = diagn.grid_variables
     @unpack temp_virt = diagn.dynamics_variables
-    μ = M.constants.μ_virt_temp
-    S = M.spectral_transform
+    μ = model.constants.μ_virt_temp
+    S = model.spectral_transform
 
-    if dry_core     # just copy fields over
-        copyto!(temp_virt_grid,temp_grid)
-        copyto!(temp_virt,temp)
-    else            # wet core, actually calculate the virtual temperature
-        for ij in eachgridpoint(temp_virt_grid, temp_grid, humid_grid)
-            @inbounds temp_virt_grid[ij] = temp_grid[ij]*(1 + μ*humid_grid[ij])
-        end
-        spectral!(temp_virt,temp_virt_grid,S)
+    @inbounds for ij in eachgridpoint(temp_virt_grid, temp_grid, humid_grid)
+        temp_virt_grid[ij] = temp_grid[ij]*(1 + μ*humid_grid[ij])
     end
+    spectral!(temp_virt,temp_virt_grid,S)
 end
 
 function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
-                                model::PrimitiveEquationModel)
+                                temp::LowerTriangularMatrix,
+                                model::PrimitiveDryCore)
     
+    @unpack temp_grid, temp_virt_grid = diagn.grid_variables
+    @unpack temp_virt = diagn.dynamics_variables
+
+    copyto!(temp_virt_grid,temp_grid)
+    copyto!(temp_virt,temp)
+end
+
+function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
+                                model::PrimitiveWetCore)
+    
+    # for wet core 2nd argument temp isn't actually needed
     virtual_temperature!(diagn,zeros(LowerTriangularMatrix,0,0),model)
 end

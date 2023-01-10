@@ -4,7 +4,7 @@
             topsr = [0., 283.06, 352.56537, 378.8209880964894]
             lat = [-89., 0., 45., 89.]
             @testset for i in 1:4
-                _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
+                _, diagn, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation, nlev = 4)
                 nlev = diagn.nlev
                 nband = model.parameters.nband
 
@@ -21,7 +21,7 @@
     end
     @testset "sol_oz!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation, nlev = 4)
             nlev = diagn.nlev
             nband = model.parameters.nband
 
@@ -41,7 +41,7 @@
     end
     @testset "cloud!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation, nlev = 4)
             nlev = diagn.nlev
             nband = model.parameters.nband
 
@@ -64,7 +64,7 @@
     end
     @testset "radsw!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation, nlev = 4)
             nlev = diagn.nlev
             nband = model.parameters.nband
 
@@ -97,7 +97,7 @@
     end
     @testset "shortwave_radiation!" begin
         @testset for NF in (Float32, Float64)
-            _, diagn, model = SpeedyWeather.initialize_speedy(NF, model=PrimitiveEquation, nlev = 4)
+            _, diagn, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation, nlev = 4)
             nlev = diagn.nlev
             nband = model.parameters.nband
 

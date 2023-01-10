@@ -1,13 +1,13 @@
 """
     function shortwave_radiation!(
-        column::ColumnVariables{NF}, model::PrimitiveEquationModel
+        column::ColumnVariables{NF}, model::PrimitiveEquation
     )
 
 Compute air temperature tendencies from shortwave radiation for an atmospheric column.
 For more details see http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf
 """
 function shortwave_radiation!(
-    column::ColumnVariables{NF}, model::PrimitiveEquationModel
+    column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
     @unpack humid, sat_vap_pres, dry_static_energy, geopot, norm_pres = column
     @unpack cₚ = model.parameters
@@ -78,13 +78,13 @@ end
 
 """
     function sol_oz!(
-        column::ColumnVariables{NF}, model::PrimitiveEquationModel
+        column::ColumnVariables{NF}, model::PrimitiveEquation
     )
 
 Compute solar radiation parametres for an atmospheric column.
 """
 function sol_oz!(
-    column::ColumnVariables{NF}, model::PrimitiveEquationModel
+    column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
     @unpack tyear, lat = column
     @unpack tropic_cancer = model.parameters
@@ -133,13 +133,13 @@ end
 
 """
     function cloud!(
-        column::ColumnVariables{NF}, model::PrimitiveEquationModel
+        column::ColumnVariables{NF}, model::PrimitiveEquation
     )
 
 Compute shortwave radiation cloud contibutions for an atmospheric column.
 """
 function cloud!(
-    column::ColumnVariables{NF}, model::PrimitiveEquationModel
+    column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
     @unpack rhcl1, rhcl2, rrcl, qcl, pmaxcl = model.parameters.radiation_coefs
     @unpack wpcl, gse_s1, gse_s0, clsmax, clsminl = model.parameters.radiation_coefs
@@ -193,13 +193,13 @@ end
 
 """
     function radsw!(
-        column::ColumnVariables{NF}, model::PrimitiveEquationModel
+        column::ColumnVariables{NF}, model::PrimitiveEquation
     )
 
 Compute shortwave radiation fluxes for an atmospheric column.
 """
 function radsw!(
-    column::ColumnVariables{NF}, model::PrimitiveEquationModel
+    column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
     @unpack norm_pres, humid, icltop, cloudc, clstr, ozupp, ozone = column
     @unpack zenit, stratz, fsol, qcloud, albsfc, nlev = column

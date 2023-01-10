@@ -31,11 +31,10 @@ end
 function get_tendencies!(   diagn::DiagnosticVariables,
                             progn::PrognosticVariables,
                             time::DateTime,
-                            model::PrimitiveEquationModel,
+                            model::PrimitiveEquation,
                             lf::Int=2                   # leapfrog index to evaluate tendencies on
                             )
 
-    @unpack dry_core = model.parameters
     B = model.boundaries
     G = model.geometry
     S = model.spectral_transform

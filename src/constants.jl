@@ -1,7 +1,7 @@
 """
 Struct holding the parameters needed at runtime in number format NF.
 """
-@with_kw struct Constants{NF<:AbstractFloat}
+Base.@kwdef struct Constants{NF<:AbstractFloat} <: AbstractConstants{NF}
 
     # PHYSICAL CONSTANTS
     radius_earth::NF        # Radius of Earth

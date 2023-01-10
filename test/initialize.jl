@@ -1,6 +1,6 @@
 @testset "Zero generators" begin
     @testset for NF in (Float32,Float64)
-        P = Parameters(;NF)
+        P = Parameters{BarotropicModel}(;NF)
         G = Geometry(P)
         S = SpectralTransform(P)
         
@@ -12,7 +12,7 @@ end
 @testset "Initialize from rest" begin
 
     # BAROTROPIC MODEL
-    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=BarotropicModel)
+    progn, diagn, model = initialize_speedy(Barotropic,initial_conditions=:rest)
     for layers in progn.layers
         for leapfrog in layers.leapfrog
             @test all(leapfrog.vor .== 0)
@@ -20,7 +20,7 @@ end
     end
 
     # SHALLOW WATER MODEL
-    progn, diagn, model = initialize_speedy(initial_conditions=:rest,model=ShallowWaterModel)
+    progn, diagn, model = initialize_speedy(ShallowWater,initial_conditions=:rest)
     for layers in progn.layers
         for leapfrog in layers.leapfrog
             @test all(leapfrog.vor .== 0)
@@ -57,29 +57,4 @@ end
     # println((sum(humid_grid)/length(humid_grid),minimum(humid_grid),maximum(humid_grid)))
     @test_skip all(humid_grid .>= 0)
     """
-end
-
-@testset "Initialize speedy with different models" begin
-    _,_,m_barotrop = initialize_speedy(model=BarotropicModel)
-    _,_,m_shalloww = initialize_speedy(model=ShallowWaterModel)
-    _,_,m_primitive = initialize_speedy(model=PrimitiveEquationModel)
-
-    # @test m_barotrop < m_shalloww
-    # @test m_shalloww < m_primitive
-    
-    # @test (m_barotrop < m_barotrop) == false
-    # @test (m_shalloww < m_shalloww) == false
-    # @test (m_primitive < m_primitive) == false
-
-    # @test m_barotrop == m_barotrop
-    # @test m_shalloww == m_shalloww
-    # @test m_primitive == m_primitive
-
-    # @test typeof(m_barotrop) <: SpeedyWeather.BarotropicModel
-    # @test typeof(m_shalloww) <: SpeedyWeather.ShallowWaterModel
-    # @test typeof(m_primitive) <: SpeedyWeather.PrimitiveEquationModel
-
-    # @test SpeedyWeather.BarotropicModel < SpeedyWeather.ShallowWaterModel
-    # @test SpeedyWeather.ShallowWaterModel < SpeedyWeather.PrimitiveEquationModel
-    # @test SpeedyWeather.BarotropicModel < SpeedyWeather.PrimitiveEquationModel
 end

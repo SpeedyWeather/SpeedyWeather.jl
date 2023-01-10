@@ -1,7 +1,7 @@
 module SpeedyWeather
 
     # STRUCTURE
-    import Parameters: @with_kw, @unpack
+    import Parameters: @unpack
     import InteractiveUtils: subtypes
 
     # NUMERICS
@@ -43,19 +43,25 @@ module SpeedyWeather
             ShallowWater,
             ShallowWaterModel,
             PrimitiveEquation,
-            PrimitiveEquationModel
+            PrimitiveDryCore,
+            PrimitiveWetCore,
+            PrimitiveDryCoreModel,
+            PrimitiveWetCoreModel
 
     # EXPORT GRIDS
     export  LowerTriangularMatrix,
-            AbstractGrid,
             FullClenshawGrid,
             FullGaussianGrid,
             FullHEALPixGrid,
+            FullHEALPix4Grid,
             OctahedralGaussianGrid,
             OctahedralClenshawGrid,
             HEALPixGrid,
-            HEALPix4Grid,
-            FullHEALPix4Grid
+            HEALPix4Grid
+
+    export  NoOrography,
+            EarthOrography,
+            ZonalRidge
 
     # EXPORT INTERPOLATION FOR GRIDS
     export  Interpolator,
@@ -85,8 +91,8 @@ module SpeedyWeather
 
     include("parameter_structs.jl")         # defines 
     include("spectral_truncation.jl")
-    include("abstract_models.jl")           # defines ModelSetup, Barotropic, ShallowWater,
-                                            # PrimitiveEquation
+    include("abstract_types.jl")            # defines ModelSetup, Barotropic, ShallowWater,
+                                            # PrimitiveEquation and others
 
     include("default_parameters.jl")        # defines Parameters
     include("constants.jl")                 # defines Constants
