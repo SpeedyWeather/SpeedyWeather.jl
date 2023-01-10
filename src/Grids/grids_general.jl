@@ -16,6 +16,16 @@ end
 @inline Base.getindex(G::AbstractGrid,r::AbstractRange) = G.data[r]
 @inline Base.setindex!(G::AbstractGrid,x::AbstractVector,r::AbstractRange) = setindex!(G.data,x,r)
 
+function grids_match(A::AbstractGrid,B::AbstractGrid)
+    length(A) == length(B) && return _grids_match(typeof(A),typeof(B))
+    return false
+end
+
+function _grids_match(A::Type{<:AbstractGrid},B::Type{<:AbstractGrid})
+    # throws an error for non-parametric types...
+    return A.name.wrapper == B.name.wrapper
+end
+
 """
     abstract type AbstractGrid{T} <: AbstractVector{T} end
 

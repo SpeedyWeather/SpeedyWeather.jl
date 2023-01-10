@@ -200,6 +200,12 @@ function interpolate!(  As::Vector,                     # Out: interpolated valu
     return As
 end
 
+function interpolate!(  As::AbstractGrid,
+                        A::AbstractGrid)
+    
+    grids_match(As,A) && copyto!(As.data,A.data)
+end
+
 function update_locator!(   I::AbstractInterpolator{NF,Grid},   # GridGeometry and Locator
                             θs::Vector,                         # latitudes to interpolate onto
                             λs::Vector;                         # longitudes to interpolate onto
