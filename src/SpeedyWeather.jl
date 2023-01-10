@@ -50,15 +50,18 @@ module SpeedyWeather
 
     # EXPORT GRIDS
     export  LowerTriangularMatrix,
-            AbstractGrid,
             FullClenshawGrid,
             FullGaussianGrid,
             FullHEALPixGrid,
+            FullHEALPix4Grid,
             OctahedralGaussianGrid,
             OctahedralClenshawGrid,
             HEALPixGrid,
-            HEALPix4Grid,
-            FullHEALPix4Grid
+            HEALPix4Grid
+
+    export  NoOrography,
+            EarthOrography,
+            ZonalRidge
 
     # EXPORT INTERPOLATION FOR GRIDS
     export  Interpolator,

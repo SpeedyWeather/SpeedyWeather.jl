@@ -19,7 +19,7 @@ struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
 end
 
 has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
-default_model(::Type{Barotropic}) = BarotropicModel
+default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
 """
     M = ShallowWaterModel(  ::Parameters,
@@ -43,7 +43,7 @@ struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
 end
 
 has(::Type{<:ShallowWater}, var_name::Symbol) = var_name in (:vor, :div, :pres)
-default_model(::Type{ShallowWater}) = ShallowWaterModel
+default_concrete_model(::Type{ShallowWater}) = ShallowWaterModel
 
 """
     M = PrimitiveDryCoreModel( ::Parameters,
@@ -93,8 +93,8 @@ end
 
 has(::Type{<:PrimitiveDryCore}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres)
 has(::Type{<:PrimitiveWetCore}, var_name::Symbol) = var_name in (:vor, :div, :temp, :humid, :pres)
-default_model(::Type{PrimitiveEquation}) = PrimitiveDryCoreModel
-default_model(Model::Type{<:ModelSetup}) = Model
+default_concrete_model(::Type{PrimitiveEquation}) = PrimitiveDryCoreModel
+default_concrete_model(Model::Type{<:ModelSetup}) = Model
 
 """
     has(M::ModelSetup, var_name::Symbol)

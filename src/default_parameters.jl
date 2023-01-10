@@ -1,5 +1,5 @@
-const DEFAULT_NF = Float64
-const DEFAULT_MODEL = Barotropic
+const DEFAULT_NF = Float64          # number format
+const DEFAULT_MODEL = Barotropic    # abstract model type
 
 """
     P = Parameters{M<:ModelSetup}(kwargs...) <: AbstractParameters{M}
@@ -150,12 +150,12 @@ The default values of the keywords define the default model setup.
     restart_id::Union{String,Integer} = 1   # run_id of restart file in run-????/restart.jld2
 end
 
-Parameters(;kwargs...) = Parameters{default_model(DEFAULT_MODEL)}(;kwargs...)
+Parameters(;kwargs...) = Parameters{default_concrete_model(DEFAULT_MODEL)}(;kwargs...)
 
 """
-    nlev = nlev_default(model::Symbol, σ_levels_half::AbstractVector)
+    nlev = nlev_default(Model::Type{<:ModelSetup}, σ_levels_half::AbstractVector)
 
-Number of vertical levels chosen either automatically based on `model`,
+Number of vertical levels chosen either automatically based on `Model`,
 or from the length of `σ_levels_half` if not a 0-length vector
 (default if not specified parameter).
 """

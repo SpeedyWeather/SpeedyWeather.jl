@@ -72,7 +72,7 @@ end
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid)
 
-                P = Parameters(;NF,trunc,Grid)
+                P = Parameters{BarotropicModel}(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
                 lmax = 3
@@ -101,7 +101,7 @@ end
                                     HEALPix4Grid,
                                     FullHEALPixGrid,
                                     FullHEALPix4Grid)
-                P = Parameters(;NF,trunc,Grid)
+                P = Parameters{BarotropicModel}(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
                 lmax = 3
