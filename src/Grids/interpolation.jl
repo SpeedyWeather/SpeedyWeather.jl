@@ -186,7 +186,7 @@ function interpolate(   A::AbstractGrid{NF},        # field to interpolate
                         ) where NF                  # use number format from input data also for output
 
     @unpack npoints = I.locator             # number of points to interpolate onto
-    Aout = zeros(NF,npoints)                # preallocate: onto θs,λs interpolated values of A
+    Aout = Vector{NF}(undef,npoints)        # preallocate: onto θs,λs interpolated values of A
     interpolate!(Aout,A,I)                  # perform interpolation, store in As
 end
 
@@ -236,7 +236,7 @@ function interpolate!(  ::Type{NF},
     
     # if grids match just copy data over (eltypes might differ)
     grids_match(Aout,A) && return copyto!(Aout.data,A.data)
-    I = interpolator(NF,Aout,A,Interpolator)    # create interpolator from grid A to Aout
+    I = interpolator(NF,Aout,A,Interpolator)    # create interpolator instance from grid A to Aout
     interpolate!(Aout,A,I)                      # perform interpolation
 end
 
@@ -244,6 +244,17 @@ function interpolate!(  Aout::AbstractGrid,     # Out: grid to interpolate onto
                         A::AbstractGrid,        # In: gridded data to interpolate from
                         I::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR)
     interpolate!(Float64,Aout,A,I)              # use Float64 as default
+end
+
+function interpolate(   ::Type{Grid},
+                        nlat_half::Integer,
+                        A::AbstractGrid,
+                        I::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR
+                        ) where {Grid<:AbstractGrid}
+
+    Aout = Grid(undef,nlat_half)
+    interpolate!(Aout,A,I)  # returns a vector
+    return Aout             # returns the grid wrapped around that vector
 end
 
 function update_locator!(   I::AbstractInterpolator{NF,Grid},   # GridGeometry and Locator
