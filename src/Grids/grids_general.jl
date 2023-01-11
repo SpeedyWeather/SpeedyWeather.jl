@@ -93,6 +93,19 @@ get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,grid.nlat_half)
 # get total number of grid points
 get_npoints(grid::Grid) where {Grid<:AbstractGrid} = get_npoints(Grid,grid.nlat_half)
 
+get_latdlonds(grid::Grid) where {Grid<:AbstractGrid} = get_latdlonds(Grid,grid.nlat_half)
+
+function get_latdlonds(Grid::Type{<:AbstractGrid},nlat_half::Integer)
+    colats,lons = get_colatlons(Grid,nlat_half)     # colatitudes, longitudes in radians
+    latds = colats                                  # flat copy rename before conversion
+    londs = lons
+    latds .= π/2 .- colats                          # colatiudes to latitudes in radians
+    latds .= latds .* (360/2π)                      # now in degrees 90˚...-90˚
+    londs .*= (360/2π)
+
+    return latds, londs
+end
+
 """
     i = each_index_in_ring(grid,j)
 
