@@ -566,10 +566,10 @@ end
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map`. Based on the size of `alms` the grid type `grid`, the spatial resolution is retrieved based
 on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `gridded(alms,S)`."""
-function gridded(   alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
+function gridded(   alms::AbstractMatrix{T};            # spectral coefficients
                     recompute_legendre::Bool=true,      # saves memory
                     Grid::Type{<:AbstractGrid}=FullGaussianGrid,
-                    ) where NF                          # number format NF
+                    ) where {NF,T<:Complex{NF}}         # number format NF
 
     _, mmax = size(alms) .- 1                           # -1 for 0-based degree l, order m
     S = SpectralTransform(NF,Grid,mmax,recompute_legendre)

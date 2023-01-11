@@ -63,8 +63,8 @@ end
                     FullHEALPix4Grid
                     )
 
-            n = 32      # resolution parameter nlat_half
-            G1 = zeros(G,n)
+            n = 4      # resolution parameter nlat_half
+            G1 = zeros(G{NF},n)
             G2 = zero(G1)
             G3 = G(G2)
 
@@ -78,6 +78,82 @@ end
             @test G1[1] == 1
             @test G2[1] == 0
             @test G3[1] == 0
+
+            @test eltype(G1) == eltype(G2) == eltype(G3) == NF
+        end
+    end
+end
+
+@testset "Grid generators: ones" begin
+    for NF in (Float32,Float64)
+        for G in (  FullClenshawGrid,
+                    FullGaussianGrid,
+                    OctahedralGaussianGrid,
+                    OctahedralClenshawGrid,
+                    HEALPixGrid,
+                    HEALPix4Grid,
+                    FullHEALPixGrid,
+                    FullHEALPix4Grid
+                    )
+
+            n = 4      # resolution parameter nlat_half
+            G1 = ones(G,n)
+            @test all(G1 .== 1)
+            @test eltype(G1) == Float64
+
+            G2 = ones(G{NF},n)
+            @test all(G2 .== 1)
+            @test eltype(G2) == NF
+        end
+    end
+end
+
+@testset "Grid generators: rand, randn" begin
+    for NF in (Float32,Float64)
+        for G in (  FullClenshawGrid,
+                    FullGaussianGrid,
+                    OctahedralGaussianGrid,
+                    OctahedralClenshawGrid,
+                    HEALPixGrid,
+                    HEALPix4Grid,
+                    FullHEALPixGrid,
+                    FullHEALPix4Grid
+                    )
+
+            n = 4      # resolution parameter nlat_half
+            G1 = rand(G,n)
+            @test eltype(G1) == Float64
+            
+            G1 = randn(G,n)
+            @test eltype(G1) == Float64
+            
+            G1 = rand(G{NF},n)
+            @test eltype(G1) == NF
+            
+            G1 = randn(G{NF},n)
+            @test eltype(G1) == NF
+        end
+    end
+end
+
+@testset "Grid generators: undef" begin
+    for NF in (Float32,Float64)
+        for G in (  FullClenshawGrid,
+                    FullGaussianGrid,
+                    OctahedralGaussianGrid,
+                    OctahedralClenshawGrid,
+                    HEALPixGrid,
+                    HEALPix4Grid,
+                    FullHEALPixGrid,
+                    FullHEALPix4Grid
+                    )
+
+            n = 4      # resolution parameter nlat_half
+            G1 = G(undef,n)
+            @test eltype(G1) == Float64
+            
+            G1 = G{NF}(undef,n)
+            @test eltype(G1) == NF
         end
     end
 end
