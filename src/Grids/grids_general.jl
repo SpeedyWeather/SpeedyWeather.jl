@@ -79,7 +79,30 @@ Base.zeros(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid} = zeros(G
 # zero element of an AbstractGrid instance grid by packing a zero(::Vector) into grid
 Base.zero(grid::Grid) where {Grid<:AbstractGrid} = Grid(zero(grid.data))
 
+# initialise with ones
+Base.ones(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid{T}} where T =
+    Grid(ones(T,get_npoints(Grid,nlat_half)),nlat_half)
+Base.ones(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid} = ones(Grid{Float64},nlat_half)
 
+# in case type parameter T in Grid{T} is provided
+function (::Type{Grid})(::UndefInitializer,nlat_half::Integer) where {Grid<:AbstractGrid{T}} where T
+    return Grid(Vector{T}(undef,get_npoints(Grid,nlat_half)),nlat_half)
+end
+
+# use Float64 if not
+function (::Type{Grid})(::UndefInitializer,nlat_half::Integer) where {Grid<:AbstractGrid}
+    return Grid(Vector{Float64}(undef,get_npoints(Grid,nlat_half)),nlat_half)
+end
+
+# randn initializer, use Float64 if T in Grid{T} not provided
+Base.randn(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid} = randn(Grid{Float64},nlat_half)
+Base.randn(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid{T}} where T = 
+    Grid(randn(T,get_npoints(Grid,nlat_half)),nlat_half)
+
+# rand initializer, use Float64 if T in Grid{T} not provided
+Base.rand(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid} = rand(Grid{Float64},nlat_half)
+Base.rand(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid{T}} where T = 
+    Grid(rand(T,get_npoints(Grid,nlat_half)),nlat_half)
 
 # truncation is the spectral truncation corresponding to size of grid and lin/quad/cubic truncation
 get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,grid.nlat_half)
