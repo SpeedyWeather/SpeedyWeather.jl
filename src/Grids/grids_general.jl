@@ -79,6 +79,8 @@ Base.zeros(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid} = zeros(G
 # zero element of an AbstractGrid instance grid by packing a zero(::Vector) into grid
 Base.zero(grid::Grid) where {Grid<:AbstractGrid} = Grid(zero(grid.data))
 
+
+
 # truncation is the spectral truncation corresponding to size of grid and lin/quad/cubic truncation
 get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,grid.nlat_half)
 get_resolution(grid::AbstractGrid) = grid.nlat_half
