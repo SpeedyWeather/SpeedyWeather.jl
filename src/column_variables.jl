@@ -122,15 +122,14 @@ function get_column!(   C::ColumnVariables,
 
     C.latd = G.latds[ij]        # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
     C.lond = G.londs[ij]
-    coslat⁻¹ = 1/cosd(C.latd)
 
     # surface pressure (logarithm used in dynamics, convert back here)
     C.log_pres = D.surface.pres_grid[ij]
     C.pres = exp(C.log_pres)
 
     @inbounds for (k,layer) = enumerate(D.layers)
-        C.u[k] = layer.grid_variables.U_grid[ij]*coslat⁻¹
-        C.v[k] = layer.grid_variables.V_grid[ij]*coslat⁻¹
+        C.u[k] = layer.grid_variables.u_grid[ij]
+        C.v[k] = layer.grid_variables.v_grid[ij]
         C.temp[k] = layer.grid_variables.temp_grid[ij]
         C.humid[k] = layer.grid_variables.humid_grid[ij]
         C.geopot[k] = layer.grid_variables.geopot_grid[ij]

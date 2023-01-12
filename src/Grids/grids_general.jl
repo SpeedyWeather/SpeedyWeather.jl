@@ -16,6 +16,16 @@ end
 @inline Base.getindex(G::AbstractGrid,r::AbstractRange) = G.data[r]
 @inline Base.setindex!(G::AbstractGrid,x::AbstractVector,r::AbstractRange) = setindex!(G.data,x,r)
 
+function grids_match(A::AbstractGrid,B::AbstractGrid)
+    length(A) == length(B) && return _grids_match(typeof(A),typeof(B))
+    return false
+end
+
+function _grids_match(A::Type{<:AbstractGrid},B::Type{<:AbstractGrid})
+    # throws an error for non-parametric types...
+    return A.name.wrapper == B.name.wrapper
+end
+
 """
     abstract type AbstractGrid{T} <: AbstractVector{T} end
 
@@ -69,6 +79,31 @@ Base.zeros(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid} = zeros(G
 # zero element of an AbstractGrid instance grid by packing a zero(::Vector) into grid
 Base.zero(grid::Grid) where {Grid<:AbstractGrid} = Grid(zero(grid.data))
 
+# initialise with ones
+Base.ones(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid{T}} where T =
+    Grid(ones(T,get_npoints(Grid,nlat_half)),nlat_half)
+Base.ones(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid} = ones(Grid{Float64},nlat_half)
+
+# in case type parameter T in Grid{T} is provided
+function (::Type{Grid})(::UndefInitializer,nlat_half::Integer) where {Grid<:AbstractGrid{T}} where T
+    return Grid(Vector{T}(undef,get_npoints(Grid,nlat_half)),nlat_half)
+end
+
+# use Float64 if not
+function (::Type{Grid})(::UndefInitializer,nlat_half::Integer) where {Grid<:AbstractGrid}
+    return Grid(Vector{Float64}(undef,get_npoints(Grid,nlat_half)),nlat_half)
+end
+
+# randn initializer, use Float64 if T in Grid{T} not provided
+Base.randn(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid} = randn(Grid{Float64},nlat_half)
+Base.randn(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid{T}} where T = 
+    Grid(randn(T,get_npoints(Grid,nlat_half)),nlat_half)
+
+# rand initializer, use Float64 if T in Grid{T} not provided
+Base.rand(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid} = rand(Grid{Float64},nlat_half)
+Base.rand(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid{T}} where T = 
+    Grid(rand(T,get_npoints(Grid,nlat_half)),nlat_half)
+
 # truncation is the spectral truncation corresponding to size of grid and lin/quad/cubic truncation
 get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,grid.nlat_half)
 get_resolution(grid::AbstractGrid) = grid.nlat_half
@@ -82,6 +117,19 @@ get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,grid.nlat_half)
 
 # get total number of grid points
 get_npoints(grid::Grid) where {Grid<:AbstractGrid} = get_npoints(Grid,grid.nlat_half)
+
+get_latdlonds(grid::Grid) where {Grid<:AbstractGrid} = get_latdlonds(Grid,grid.nlat_half)
+
+function get_latdlonds(Grid::Type{<:AbstractGrid},nlat_half::Integer)
+    colats,lons = get_colatlons(Grid,nlat_half)     # colatitudes, longitudes in radians
+    latds = colats                                  # flat copy rename before conversion
+    londs = lons
+    latds .= π/2 .- colats                          # colatiudes to latitudes in radians
+    latds .= latds .* (360/2π)                      # now in degrees 90˚...-90˚
+    londs .*= (360/2π)
+
+    return latds, londs
+end
 
 """
     i = each_index_in_ring(grid,j)

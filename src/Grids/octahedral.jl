@@ -96,7 +96,7 @@ struct OctahedralGaussianGrid{T} <: AbstractOctahedralGrid{T}
     nlat_half::Int  # number of latitudes on one hemisphere
 
     # check that `nlat_half` match the vector `v` length
-    OctahedralGaussianGrid{T}(data,nlat_half) where T = length(data) == npoints_octahedral(nlat_half,false) ?
+    OctahedralGaussianGrid{T}(data::AbstractVector,nlat_half::Integer) where T = length(data) == npoints_octahedral(nlat_half,false) ?
     new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))}"*
     "cannot be used to create a O$(nlat_half) OctahedralGaussianGrid{$T}.")
 end
@@ -137,7 +137,7 @@ struct OctahedralClenshawGrid{T} <: AbstractOctahedralGrid{T}
     nlat_half::Int  # number of latitudes on one hemisphere (incl Equator)
 
     # check that `nlat_half` match the vector `v` length
-    OctahedralClenshawGrid{T}(data,nlat_half) where T = length(data) == npoints_octahedral(nlat_half,true) ?
+    OctahedralClenshawGrid{T}(data::AbstractVector,nlat_half::Integer) where T = length(data) == npoints_octahedral(nlat_half,true) ?
     new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))}"*
     "cannot be used to create a O$(nlat_half) OctahedralClenshawGrid{$T}.")
 end

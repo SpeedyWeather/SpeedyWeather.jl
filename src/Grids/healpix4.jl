@@ -91,7 +91,7 @@ struct HEALPix4Grid{T} <: AbstractHEALPix4Grid{T}
     data::Vector{T}     # data vector, ring by ring, north to south
     nlat_half::Int      # number of latitude rings on one hemisphere
 
-    HEALPix4Grid{T}(data,nlat_half) where T = length(data) == npoints_healpix4(nlat_half) ?
+    HEALPix4Grid{T}(data::AbstractVector,nlat_half::Integer) where T = length(data) == npoints_healpix4(nlat_half) ?
     new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))}"*
     "cannot be used to create an H$nlat_half HEALPix4Grid{$T}.")
 end

@@ -88,7 +88,7 @@ struct FullClenshawGrid{T} <: AbstractFullGrid{T}
     data::Vector{T}    # data vector, ring by ring, north to south
     nlat_half::Int  # number of latitudes on one hemisphere (incl Equator)
 
-    FullClenshawGrid{T}(data,nlat_half) where T = length(data) == npoints_clenshaw(nlat_half) ?
+    FullClenshawGrid{T}(data::AbstractVector,nlat_half::Integer) where T = length(data) == npoints_clenshaw(nlat_half) ?
     new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))} cannot be used to create a "*
         "L$nlat_half ($(4nlat_half)x$(2nlat_half - 1)) FullClenshawGrid{$T}.")
 end
@@ -121,7 +121,7 @@ struct FullGaussianGrid{T} <: AbstractFullGrid{T}
     data::Vector{T}    # data vector, ring by ring, north to south
     nlat_half::Int  # number of latitudes on one hemisphere
 
-    FullGaussianGrid{T}(data,nlat_half) where T = length(data) == 8nlat_half^2 ?
+    FullGaussianGrid{T}(data::AbstractVector,nlat_half::Integer) where T = length(data) == 8nlat_half^2 ?
     new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))} cannot be used to create a "*
         "F$nlat_half ($(4nlat_half)x$(2nlat_half)) FullGaussianGrid{$T}.")
 end
@@ -154,7 +154,7 @@ struct FullHEALPixGrid{T} <: AbstractFullGrid{T}
     data::Vector{T}     # data vector, ring by ring, north to south
     nlat_half::Int      # number of latitudes on one hemisphere
 
-    FullHEALPixGrid{T}(data,nlat_half) where T = length(data) == npoints_fullhealpix(nlat_half) ?
+    FullHEALPixGrid{T}(data::AbstractVector,nlat_half::Integer) where T = length(data) == npoints_fullhealpix(nlat_half) ?
     new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))} cannot be used to create a "*
         "H$nlat_half ($(4nlat_half)x$(2nlat_half-1)) FullHEALPixGrid{$T}.")
 end
@@ -185,7 +185,7 @@ struct FullHEALPix4Grid{T} <: AbstractFullGrid{T}
     data::Vector{T}    # data vector, ring by ring, north to south
     nlat_half::Int  # number of latitudes on one hemisphere
 
-    FullHEALPix4Grid{T}(data,nlat_half) where T = length(data) == npoints_fullhealpix4(nlat_half) ?
+    FullHEALPix4Grid{T}(data::AbstractVector,nlat_half::Integer) where T = length(data) == npoints_fullhealpix4(nlat_half) ?
     new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))} cannot be used to create a "*
         "F$nlat_half ($(4nlat_half)x$(2nlat_half - 1)) FullHEALPix4Grid{$T}.")
 end

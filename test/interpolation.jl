@@ -151,3 +151,31 @@ end
         end
     end
 end
+
+@testset "Interpolate between grids" begin
+    @testset for NF in (Float32,Float64)
+        @testset for Grid in (  FullGaussianGrid,
+                                FullClenshawGrid,
+                                OctahedralGaussianGrid,
+                                OctahedralClenshawGrid,
+                                HEALPixGrid,
+                                HEALPix4Grid)
+
+            # create some smooth gridded field
+            trunc = 10
+            alms = randn(LowerTriangularMatrix{Complex{NF}},5,5)
+            alms = spectral_truncation(alms,trunc+2,trunc+1)
+            A = gridded(alms;Grid)
+
+            # interpolate to FullGaussianGrid and back and compare
+            nlat_half = 32
+            A_interpolated = SpeedyWeather.interpolate(FullGaussianGrid,nlat_half,A)
+            A2 = zero(A)
+            SpeedyWeather.interpolate!(A2,A_interpolated)
+
+            for ij in SpeedyWeather.eachgridpoint(A,A2)
+                @test A[ij] ≈ A2[ij] rtol=1e-1 atol=1e-1
+            end
+        end
+    end
+end
