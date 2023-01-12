@@ -29,7 +29,7 @@ function Boundaries(P::Parameters,
 
     orography = zeros(P.orography,S)                    # allocate orography arrays
     initialize_orography!(orography,P.orography,P,S,G)  # fill them with data
-    scale_orography!(orog,P)                            # make whatever mountains bigger/smaller
+    scale_orography!(orography,P)                       # make whatever mountains bigger/smaller
     return Boundaries{NF,S.Grid{NF}}(orography)
 end
 
