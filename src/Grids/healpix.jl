@@ -133,6 +133,8 @@ get_truncation(::Type{<:HEALPixGrid},nlat_half::Integer) = nlat_half-1
 get_resolution(::Type{<:HEALPixGrid},trunc::Integer) = trunc+1
 
 function get_colat(::Type{<:HEALPixGrid},nlat_half::Integer)
+    nlat_half == 0 && return Float64[]
+    
     nlat = get_nlat(HEALPixGrid,nlat_half)
     nside = nside_healpix(nlat_half)
     colat = zeros(nlat)

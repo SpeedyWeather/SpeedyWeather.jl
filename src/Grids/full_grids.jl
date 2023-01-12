@@ -12,6 +12,7 @@ get_nlon_per_ring(Grid::Type{<:AbstractFullGrid},nlat_half::Integer,j::Integer) 
     get_nlon_max(Grid,nlat_half)
 
 function get_lon(Grid::Type{<:AbstractFullGrid},nlat_half::Integer)
+    nlat_half == 0 && return Float64[]
     nlon = get_nlon(Grid,nlat_half)
     return collect(range(0,2π-π/nlon,step=2π/nlon))
 end
