@@ -83,9 +83,6 @@ struct AnvilLocator{NF<:AbstractFloat} <: AbstractLocator{NF}
     Δcds::Vector{NF}        # distance fractions between c,d
 end
 
-# use Float64 as default for weights
-AnvilLocator(npoints::Integer) = AnvilLocator(Float64,npoints)
-
 """
     L = AnvilLocator(   ::Type{NF},         # number format used for the interpolation
                         npoints::Integer    # number of points to interpolate onto
@@ -95,8 +92,7 @@ Zero generator function for the 4-point average AnvilLocator. Use update_locator
 update the grid indices used for interpolation and their weights. The number format
 NF is the format used for the calculations within the interpolation, the input data
 and/or output data formats may differ."""
-function AnvilLocator(  ::Type{NF},
-                        npoints::Integer) where {NF<:AbstractFloat}
+function AnvilLocator{NF}(npoints::Integer) where {NF<:AbstractFloat}
 
     # to the coordinates respective indices
     js = zeros(Int,npoints)     # ring indices j such that [j,j+1) contains the point
@@ -112,6 +108,11 @@ function AnvilLocator(  ::Type{NF},
 
     return AnvilLocator{NF}(npoints,js,ij_as,ij_bs,ij_cs,ij_ds,Δabs,Δcds,Δys)
 end
+
+(::Type{L})(::Type{NF},npoints::Integer) where {L<:AbstractLocator,NF<:AbstractFloat} = L{NF}(npoints)
+# use Float64 as default for weights
+(::Type{L})(npoints::Integer) where {L<:AbstractLocator} = L{Float64}(npoints)
+
 
 """
     abstract type AbstractInterpolator{NF,G} end
@@ -131,18 +132,26 @@ struct AnvilInterpolator{NF<:AbstractFloat,G<:AbstractGrid} <: AbstractInterpola
     locator::AnvilLocator{NF}
 end
 
-function AnvilInterpolator( ::Type{NF},             # number format for interpolation calculations
-                            grid::AbstractGrid,     # which grid to interpolate from
-                            npoints::Integer        # number of points to interpolate onto
-                            ) where {NF<:AbstractFloat}
+# define to a <:AbstractInterpolator the corresponding Locator
+Locator(::Type{<:AnvilInterpolator}) = AnvilLocator
 
-    geometry = GridGeometry(grid)                   # general coordinates and indices for grid
-    locator = AnvilLocator(NF,npoints)              # preallocate work arrays for interpolation
-    return AnvilInterpolator{NF,typeof(grid)}(geometry,locator)
+function (::Type{I})(   ::Type{NF},
+                        ::Type{Grid}, 
+                        nlat_half::Integer, # size of input grid
+                        npoints::Integer    # number of points to interpolate onto
+                        ) where {I<:AbstractInterpolator,NF<:AbstractFloat,Grid<:AbstractGrid}
+    Loc = Locator(I)                            # L is the to Interpolator I corresponding locator
+    geometry = GridGeometry(Grid,nlat_half)     # general coordinates and indices for grid
+    locator = Loc(NF,npoints)                   # preallocate work arrays for interpolation
+    return I{NF,Grid}(geometry,locator)         # assemble geometry and locator to interpolator
 end
 
-# use Float64 as default
-AnvilInterpolator(grid::AbstractGrid,n::Integer) = AnvilInterpolator(Float64,grid,n)
+function (::Type{I})(   ::Type{Grid},
+                        nlat_half::Integer,
+                        npoints::Integer,
+                        ) where {I<:AbstractInterpolator,Grid<:AbstractGrid}
+    return I(Float64,Grid,nlat_half,npoints)
+end
 
 const DEFAULT_INTERPOLATOR = AnvilInterpolator
 
@@ -153,7 +162,7 @@ function interpolator(  ::Type{NF},
                         ) where {NF<:AbstractFloat}
     
     latds, londs = get_latdlonds(Aout)      # coordinates of new grid
-    I = Interpolator(NF,A,length(Aout))
+    I = Interpolator(NF,typeof(A),A.nlat_half,length(Aout))
     update_locator!(I,latds,londs,unsafe=false)
     return I
 end
@@ -165,19 +174,19 @@ function interpolator(  Aout::AbstractGrid,
 end
     
 ## FUNCTIONS
-interpolate(θ::Real,λ::Real,A::AbstractGrid) = interpolate([θ],[λ],A)
+interpolate(latd::Real,lond::Real,A::AbstractGrid) = interpolate([latd],[lond],A)
 
-function interpolate(   θs::Vector{NF},     # latitudes to interpolate onto (90˚N...-90˚N)
-                        λs::Vector{NF},     # longitudes to interpolate into (0˚...360˚E)
+function interpolate(   latds::Vector{NF},     # latitudes to interpolate onto (90˚N...-90˚N)
+                        londs::Vector{NF},     # longitudes to interpolate into (0˚...360˚E)
                         A::AbstractGrid,    # gridded field to interpolate from
                         Interpolator::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR,
                         ) where NF          # number format used for interpolation
-    n = length(θs)
-    @assert n == length(λs) "New interpolation coordinates θs::Vector, λs::Vector have to be of same length.
-                                $n and $(length(λs)) provided."
+    n = length(latds)
+    @assert n == length(londs) "New interpolation coordinates latds::Vector, londs::Vector have to be of same length.
+                                $n and $(length(londs)) provided."
     
-    I = Interpolator(float(NF),A,n)         # generate Interpolator, containing geometry and work arrays
-    update_locator!(I,θs,λs,unsafe=false)   # update location work arrays in I
+    I = Interpolator(NF,typeof(A),A.nlat_half,n)    # generate Interpolator, containing geometry and work arrays
+    update_locator!(I,latds,londs,unsafe=false)     # update location work arrays in I
     interpolate(A,I)
 end
 

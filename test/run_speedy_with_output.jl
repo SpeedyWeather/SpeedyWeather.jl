@@ -14,10 +14,10 @@
     p = run_speedy(Float64,Grid=OctahedralClenshawGrid,output=true)
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
 
-    p = run_speedy(Float64,Grid=OctahedralClenshawGrid,output_grid=:matrix,output=true)
+    p = run_speedy(Float64,Grid=OctahedralClenshawGrid,output_matrix=true,output=true)
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
 
-    p = run_speedy(Float64,Grid=OctahedralClenshawGrid,output_grid=:matrix,output_NF=Float32,output=true)
+    p = run_speedy(Float64,Grid=OctahedralClenshawGrid,output_matrix=true,output_NF=Float32,output=true)
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
 end
 

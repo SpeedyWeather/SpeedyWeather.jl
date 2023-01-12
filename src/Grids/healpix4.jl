@@ -110,6 +110,7 @@ get_truncation(::Type{<:HEALPix4Grid},nlat_half::Integer) = nlat_half-1
 get_resolution(::Type{<:HEALPix4Grid},trunc::Integer) = trunc+1
 
 function get_colat(::Type{<:HEALPix4Grid},nlat_half::Integer)
+    nlat_half == 0 && return Float64[]
     colat = zeros(nlat_healpix4(nlat_half))
     for j in 1:nlat_half
         colat[j] = acos(1-(j/nlat_half)^2)  # northern hemisphere

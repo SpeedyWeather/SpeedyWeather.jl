@@ -111,8 +111,8 @@ get_resolution(grid::AbstractGrid) = grid.nlat_half
 # does the grid have an odd number of latitudes?
 nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))
 
-# get total number of latitude rings
-get_nlat(Grid::Type{<:AbstractGrid},nlat_half::Integer) = 2nlat_half - nlat_odd(Grid)
+# get total number of latitude rings, *(nlat_half > 0) to return 0 for nlat_half = 0
+get_nlat(Grid::Type{<:AbstractGrid},nlat_half::Integer) = 2nlat_half - nlat_odd(Grid)*(nlat_half > 0)
 get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,grid.nlat_half)
 
 # get total number of grid points
