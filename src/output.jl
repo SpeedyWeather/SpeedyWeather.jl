@@ -18,12 +18,17 @@ Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}}
     netcdf_file::Union{NcFile,Nothing} = nothing
 
     # grid specifications
-    output_grid::Symbol = :full                     # or :matrix
-    Grid::Type{<:AbstractGrid} = FullGaussianGrid   # full grid for output if output_grid == :full
-    spectral_transform::SpectralTransform = SpectralTransform() # spectral transform for that grid
-    nlon::Int = 0                           # number of longitude points
+    output_matrix::Bool = false             # if true sort grid points into a matrix (interpolation-free)
+                                            # full grid for output if output_matrix == false
+    output_Grid::Type{<:AbstractFullGrid} = FullGaussianGrid   
+    nlat_half::Int = 0                      # size of the input/output grid
+    nlon::Int = 0                           # number of longitude/latitude points
     nlat::Int = 0
-
+    
+    # input grid for interpolation
+    input_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(input_Grid,0,0)
+    
     # fields to output (only one layer, reuse over layers)
     u::Matrix{NF} = zeros(0,0)              # zonal velocity
     v::Matrix{NF} = zeros(0,0)              # meridional velocity
@@ -108,21 +113,20 @@ function initialize_netcdf_output(  progn::PrognosticVariables,
     var_time = NcVar("time",dim_time,t=Int64,atts=Dict("units"=>time_string,"long_name"=>"time"))
 
     # DEFINE NETCDF DIMENSIONS SPACE
-    @unpack output_grid, nlev = M.parameters
+    @unpack output_matrix, output_Grid, nlev = M.parameters
 
     # Option :full, output via spectral transform on a full grid with lon,lat vectors
-    # Option :matrix, output grid directly into a matrix (resort grid points, no interpolation)
-    if M.geometry.Grid <: AbstractFullGrid || output_grid == :full
+    # Option :matrix,
+    if output_matrix == false
         @unpack nlat, latd, nresolution = M.geometry
-        Grid = full_grid(M.geometry.Grid)           # use the full grid with same latitudes for output
-        lond = get_lond(Grid,nresolution)
+        lond = get_lond(output_Grid,nresolution)
         nlon = length(lond)
         lon_name, lon_units, lon_longname = "lon","degrees_east","longitude"
         lat_name, lat_units, lat_longname = "lat","degrees_north","latitude"
 
-    elseif output_grid == :matrix
-        @unpack Grid, nresolution = M.geometry
-        nlon,nlat = matrix_size(Grid,nresolution)   # size of the matrix output
+    else    # output grid directly into a matrix (resort grid points, no interpolation)
+        @unpack nresolution = M.geometry
+        nlon,nlat = matrix_size(M.geometry.Grid,M.geometry.nresolution)   # size of the matrix output
         lond = collect(1:nlon)                      # use lond, latd, but just enumerate grid points
         latd = collect(1:nlat)
         lon_name, lon_units, lon_longname = "i","1","horizontal index i"
@@ -176,7 +180,6 @@ function initialize_netcdf_output(  progn::PrognosticVariables,
     # CREATE OUTPUT STRUCT
     @unpack write_restart, startdate = M.parameters
     @unpack n_timesteps, n_outputsteps, output_every_n_steps = M.constants
-    spectral_transform = spectral_transform_for_full_grid(M.spectral_transform)
 
     u = :u in output_vars ?         fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
     v = :v in output_vars ?         fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
@@ -186,10 +189,23 @@ function initialize_netcdf_output(  progn::PrognosticVariables,
     temp = :temp in output_vars ?   fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
     humid = :humid in output_vars ? fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
 
+    # CREATE OUTPUT INTERPOLATOR
+    input_Grid = M.parameters.Grid
+    Interpolator = M.parameters.output_Interpolator
+    @unpack nlat_half = M.geometry
+    npoints = get_npoints(output_Grid,nlat_half)
+    interpolator = output_matrix ? Interpolator(input_Grid,0,0) : Interpolator(output_NF,input_Grid,nlat_half,npoints)
+    
+    # PRECOMPUTE LOCATION INDICES
+    latds, londs = get_latdlonds(output_Grid,nlat_half)
+    output_matrix || update_locator!(interpolator,latds,londs)
+
     outputter = Output( output=true; output_vars, write_restart, 
                         startdate, n_timesteps, n_outputsteps,
                         output_every_n_steps, run_id, run_path,
-                        netcdf_file, output_grid, Grid, spectral_transform, nlon, nlat,
+                        netcdf_file, 
+                        output_matrix, output_Grid, nlat_half, nlon, nlat,
+                        input_Grid, interpolator,
                         u, v, vor, div, pres, temp, humid)
 
     # WRITE INITIAL CONDITIONS TO FILE
@@ -249,32 +265,18 @@ function write_netcdf_variables!(   outputter::Output,
     i = outputter.output_counter
 
     @unpack u, v, vor, div, pres, temp, humid = outputter
-    @unpack output_grid, Grid = outputter           # output_grid = :matrix or :full, Grid actual grid type
-    S = outputter.spectral_transform                # spectral transform for the (full) output grid
+    @unpack output_matrix, output_Grid = outputter
+    @unpack interpolator = outputter
 
     # output to matrix options
     quadrant_rotation = M.parameters.output_quadrant_rotation
     matrix_quadrant = M.parameters.output_matrix_quadrant
 
-    for (k,(progn_layer,diagn_layer)) in enumerate(zip(progn.layers,diagn.layers))
+    for (k,diagn_layer) in enumerate(diagn.layers)
         
-        # for full grids always just copy the data over and unscale
-        if M.geometry.Grid <: AbstractFullGrid
-
-            @unpack u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid = diagn_layer.grid_variables
-            @unpack nlon, nlat = outputter
-
-            :u in output_vars   && copyto!(u,  reshape(u_grid.data,nlon,nlat))
-            :v in output_vars   && copyto!(v,  reshape(v_grid.data,nlon,nlat))
-            :vor in output_vars && copyto!(vor,reshape(vor_grid.data,nlon,nlat))
-            :div in output_vars && copyto!(div,reshape(div_grid.data,nlon,nlat))
-            temp = :temp in output_vars ? reshape(temp_grid.data,nlon,nlat) : temp
-            humid = :humid in output_vars ? reshape(humid_grid.data,nlon,nlat) : humid
-
-        # if not a full grid, either resort into a matrix
-        elseif output_grid == :matrix
-
-            @unpack u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid = diagn_layer.grid_variables
+        @unpack u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid = diagn_layer.grid_variables
+        
+        if output_matrix    # resort gridded variables interpolation-free into a matrix
 
             # create (matrix,grid) tuples for simultaneous grid -> matrix conversion  
             MGs = ((M,G) for (M,G) in zip((u,v,vor,div,temp,humid),
@@ -283,19 +285,13 @@ function write_netcdf_variables!(   outputter::Output,
                                                     
             Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
 
-        # or perform a spectral transform onto a full grid
-        elseif output_grid == :full
-
-            @unpack U, V = diagn_layer.dynamics_variables
-
-            # convert to grid without allocation
-            :u in output_vars       && gridded!(Grid(u),    U, S, unscale_coslat=true)
-            :v in output_vars       && gridded!(Grid(v),    V, S, unscale_coslat=true)
-            :vor in output_vars     && gridded!(Grid(vor),  progn_layer.leapfrog[lf].vor,  S)
-            :div in output_vars     && gridded!(Grid(div),  progn_layer.leapfrog[lf].div,  S)
-            :temp in output_vars    && gridded!(Grid(temp), progn_layer.leapfrog[lf].temp, S)
-            :humid in output_vars   && gridded!(Grid(humid),progn_layer.leapfrog[lf].humid,S)
-            
+        else                # or interpolate onto a full grid
+            :u in output_vars       && interpolate!(output_Grid(u),    u_grid, interpolator)
+            :v in output_vars       && interpolate!(output_Grid(v),    v_grid, interpolator)
+            :vor in output_vars     && interpolate!(output_Grid(vor),  vor_grid, interpolator)
+            :div in output_vars     && interpolate!(output_Grid(div),  div_grid, interpolator)
+            :temp in output_vars    && interpolate!(output_Grid(temp), temp_grid, interpolator)
+            :humid in output_vars   && interpolate!(output_Grid(humid),humid_grid, interpolator)
         end
 
         # UNSCALE SCALED VARIABLES
@@ -321,11 +317,10 @@ function write_netcdf_variables!(   outputter::Output,
 
     # surface pressure, i.e. interface displacement η
     if :pres in output_vars
-        if M.geometry.Grid <: AbstractFullGrid
-            pres = reshape(diagn.surface.pres_grid.data,size(pres)...)
+        if output_matrix
+            Matrix!(pres,diagn.surface.pres_grid; quadrant_rotation, matrix_quadrant)
         else
-            output_grid == :matrix && Matrix!(pres,diagn.surface.pres_grid; quadrant_rotation, matrix_quadrant)
-            output_grid == :full && gridded!(Grid(pres),progn.pres.leapfrog[lf],S)
+            interpolate!(output_Grid(pres),pres_grid,interpolator)
         end
         round!(pres,M.parameters.keepbits)
         NetCDF.putvar(outputter.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
