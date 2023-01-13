@@ -114,7 +114,7 @@ function initialize_temperature!(   progn::PrognosticVariables,
     # gravity:      Gravitational acceleration [m/s^2]
     # R_dry:        Specific gas constant for dry air [J/kg/K]
     @unpack temp_ref, temp_top, lapse_rate, gravity, R_dry = P
-    @unpack n_stratosphere_levels, nlev = P     # number of vertical levels used for stratosphere
+    @unpack n_stratosphere_levels, nlev = G     # number of vertical levels used for stratosphere
     @unpack norm_sphere = S                     # normalization of the l=m=0 spherical harmonic
 
     Γg⁻¹ = lapse_rate/gravity/1000              # Lapse rate scaled by gravity [K/m / (m²/s²)]

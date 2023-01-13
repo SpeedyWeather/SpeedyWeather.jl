@@ -76,7 +76,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     @unpack trunc, nlev = P                         # grid type, spectral truncation, # of vertical levels
     @unpack radius_earth, rotation_earth = P        # radius of earth, angular frequency
     @unpack R_dry, cₚ = P                           # gas constant for dry air, heat capacity
-    @unpack n_stratosphere_levels = P               # number of vertical levels used for stratosphere
+    @unpack σ_tropopause = P                        # number of vertical levels used for stratosphere
     @unpack temp_ref, temp_top, lapse_rate, gravity = P # for reference atmosphere
 
     # RESOLUTION PARAMETERS
@@ -134,6 +134,9 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     σ_lnp_A[1] = log(σ_levels_half[2])/σ_levels_thick[1]
     σ_lnp_B[1] = log(σ_levels_full[1])/σ_levels_thick[1]
     
+    # TROPOPAUSE/STRATOSPHERIC LEVELS
+    n_stratosphere_levels = sum(σ_levels_full .< σ_tropopause)  # of levels above σ_tropopause
+
     # VERTICAL REFERENCE TEMPERATURE PROFILE
     RΓ = R_dry*lapse_rate/(1000*gravity)                    # origin unclear but profile okay
     temp_ref_profile = [max(temp_top,temp_ref*σ^RΓ) for σ in σ_levels_full]

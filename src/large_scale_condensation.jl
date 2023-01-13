@@ -3,8 +3,8 @@ function large_scale_condensation!( column::ColumnVariables{NF},
                                     ) where {NF<:AbstractFloat}
 
     @unpack gravity, RH_thresh_max_lsc, RH_thresh_range_lsc, RH_thresh_pbl_lsc, humid_relax_time_lsc = model.constants
-    @unpack cₚ, alhc, n_stratosphere_levels = model.parameters
-    @unpack σ_levels_full, σ_levels_thick = model.geometry
+    @unpack σ_levels_full, σ_levels_thick, n_stratosphere_levels = model.geometry
+    @unpack cₚ, alhc = model.parameters
 
     @unpack humid, pres = column            # prognostic variables: specific humidity, surface pressure
     @unpack temp_tend, humid_tend = column  # tendencies to write into

@@ -27,8 +27,9 @@ function Boundaries(P::Parameters,
                     S::SpectralTransform{NF},
                     G::Geometry{NF}) where NF
 
-    orography = zeros(P.orography,S)
-    initialize_orography!(orography,P.orography,P,S,G)
+    orography = zeros(P.orography,S)                    # allocate orography arrays
+    initialize_orography!(orography,P.orography,P,S,G)  # fill them with data
+    scale_orography!(orography,P)                       # make whatever mountains bigger/smaller
     return Boundaries{NF,S.Grid{NF}}(orography)
 end
 
@@ -80,8 +81,6 @@ function initialize_orography!( orog::AbstractOrography,
     gridded!(orography,geopot_surf,S)       # to grid-point space
     geopot_surf .*= gravity                 # turn orography into surface geopotential
     spectral_truncation!(geopot_surf,lmax,mmax) # set the lmax+1 harmonics to zero
-
-    scale_orography!(orog,P)                # make whatever mountains bigger/smaller
 end
 
 function initialize_orography!( orog::AbstractOrography,
@@ -113,8 +112,6 @@ function initialize_orography!( orog::AbstractOrography,
     spectral!(geopot_surf,orography,S)      # to grid-point space
     geopot_surf .*= gravity                 # turn orography into surface geopotential
     spectral_truncation!(geopot_surf,lmax,mmax) # set the lmax+1 harmonics to zero
-
-    scale_orography!(orog,P)                # make whatever mountains bigger/smaller
 end
 
 function scale_orography!(  orog::AbstractOrography,

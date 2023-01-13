@@ -72,7 +72,8 @@ function radlw_down!(
 ) where {NF<:AbstractFloat}
 
     @unpack nlev, temp, wvi, tau2 = column
-    @unpack nband, sbc, n_stratosphere_levels = model.parameters
+    @unpack nband, sbc = model.parameters
+    @unpack n_stratosphere_levels = model.geometry
     @unpack fband = model.parameterization_constants
     @unpack epslw, emisfc = model.parameters.radiation_coefs
     
@@ -188,11 +189,11 @@ function radlw_up!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
 
-@unpack nband, n_stratosphere_levels = model.parameters
+@unpack nband = model.parameters
 @unpack epslw, emisfc = model.parameters.radiation_coefs
 @unpack fband = model.parameterization_constants
 @unpack nlev, temp, fsfcu, fsfcd, flux, ts, tau2, st4a, dfabs, stratc = column
-@unpack σ_levels_thick = model.geometry
+@unpack σ_levels_thick, n_stratosphere_levels = model.geometry
 
     column.fsfc = fsfcu - fsfcd
     

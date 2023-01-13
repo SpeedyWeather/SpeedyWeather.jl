@@ -53,6 +53,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     # interpolating ECMWF's L31 configuration
     GLcoefs::GenLogisticCoefs = GenLogisticCoefs()
     n_stratosphere_levels::Integer = 2                  # number of vertical levels used for the stratosphere
+    σ_tropopause::Real = 0.2                            # σ coordinate where the tropopause starts
     σ_levels_half::Vector{Real} = []                    # vector of σ half levels, only if set manually, otherwise an empty vector
     nlev::Integer = nlev_default(Model, σ_levels_half)  # number of vertical levels 
 
