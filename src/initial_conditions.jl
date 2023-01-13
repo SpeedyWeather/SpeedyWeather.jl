@@ -32,7 +32,7 @@ end
 function initial_conditions!(   ::Type{StartFromRest},
                                 progn::PrognosticVariables,
                                 model::PrimitiveEquation)
-    homogenuous_temperature!(progn,model)
+    homogeneous_temperature!(progn,model)
     pres_grid = pressure_on_orography!(progn,model)
     # TODO initialise humidity
 end
@@ -128,7 +128,7 @@ function initial_conditions!(   ::Type{StartFromFile},
     return progn_new
 end
 
-function homogenous_temperature!(   progn::PrognosticVariables,
+function homogeneous_temperature!(  progn::PrognosticVariables,
                                     model::PrimitiveEquation)
 
     P = model.parameters
@@ -174,7 +174,7 @@ function homogenous_temperature!(   progn::PrognosticVariables,
     end
 end
 
-function initialize_pressure!(  progn::PrognosticVariables,
+function pressure_on_orography!(progn::PrognosticVariables,
                                 model::PrimitiveEquation)
     
     P = model.parameters
