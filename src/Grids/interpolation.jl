@@ -266,6 +266,15 @@ function interpolate(   ::Type{Grid},
     return Aout             # returns the grid wrapped around that vector
 end
 
+# if nlat_half not provided use that from input grid
+function interpolate(   ::Type{Grid},
+                        A::AbstractGrid,
+                        I::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR
+                        ) where {Grid<:AbstractGrid}
+
+    interpolate(Grid,A.nlat_half,A,I)
+end
+
 function update_locator!(   I::AbstractInterpolator{NF,Grid},   # GridGeometry and Locator
                             θs::Vector,                         # latitudes to interpolate onto
                             λs::Vector;                         # longitudes to interpolate onto
