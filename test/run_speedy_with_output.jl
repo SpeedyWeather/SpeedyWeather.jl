@@ -23,12 +23,12 @@ end
 
 @testset "Restart from output file" begin
     
-    p = run_speedy(Float32, initial_conditions=:restart, restart_id=1)
+    p = run_speedy(Float32, initial_conditions=StartFromFile, restart_id=1)
 
     p, d, m = initialize_speedy(Float32, ShallowWater, output=true, run_id="restart-test")
     SpeedyWeather.time_stepping!(p, d, m)
  
-    progn, diagn, model = initialize_speedy(Float32, ShallowWaterModel, initial_conditions=:restart, restart_id="restart-test")
+    progn, diagn, model = initialize_speedy(Float32, ShallowWaterModel, initial_conditions=StartFromFile, restart_id="restart-test")
 
     for varname in propertynames(progn.layers[1].leapfrog[1])
         if SpeedyWeather.has(progn, varname)

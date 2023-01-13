@@ -7,8 +7,12 @@ abstract type PrimitiveWetCore <: PrimitiveEquation end
 
 abstract type AbstractParameters{M} end
 
+abstract type InitialConditions end
+# subtypes defined in initial_conditions.jl
+
 abstract type AbstractOrography{NF} end
 abstract type AbstractBoundaries{NF} end
+# subtypes defined in boundaries.jl
 
 abstract type AbstractColumnVariables{NF} end
 abstract type AbstractConstants{NF} end

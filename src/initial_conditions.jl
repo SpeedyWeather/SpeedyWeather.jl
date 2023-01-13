@@ -1,52 +1,100 @@
+abstract type ZonalWind <: InitialConditions end
+abstract type StartFromRest <: InitialConditions end
+abstract type StartFromFile <: InitialConditions end
+abstract type StartWithVorticity <: InitialConditions end
+
 """
     prognostic_variables = initial_conditions(M::ModelSetup)
 
 Initialize the prognostic variables from rest, with some initial vorticity,
 or restart from file."""
-function initial_conditions(M::ModelSetup)
+function initial_conditions(model::ModelSetup)
 
-    progn = initialize_from_rest(M)             # allocate variables in any case
-    @unpack initial_conditions = M.parameters
-    @unpack radius_earth = M.geometry
+    progn = allocate_prognostic_variables(model)    # allocate variables in any case
+    IC = model.parameters.initial_conditions        # type of initial conditions
 
-    if initial_conditions == :rest
-        nothing 
+    initial_conditions!(IC,progn,model)     # dispatch to the type of initial conditions
 
-    elseif initial_conditions == :barotropic_vorticity              # zonal wind with perturbation
-
-        mmax = min(15,progn.mmax+1)     # perturb only larger modes
-        lmax = min(15,progn.lmax+1)
-
-        ξ = randn(Complex{M.parameters.NF},mmax,lmax)
-
-        for progn_layer in progn.layers
-            progn_layer.leapfrog[1].vor[4,1]  =  80/radius_earth    # zonal wind
-            progn_layer.leapfrog[1].vor[6,1]  = -160/radius_earth
-            progn_layer.leapfrog[1].vor[8,1]  =  80/radius_earth
-
-            # perturbation
-            for m in 2:min(15,progn.mmax+1)
-                for l in m:min(15,progn.lmax+1)
-                    progn_layer.leapfrog[1].vor[l,m] = 10/radius_earth*ξ[l,m]
-                end
-            end
-        end
-
-        # SCALING
-        @unpack radius_earth = M.geometry
-        scale!(progn,:vor,radius_earth)
-        scale!(progn,:div,radius_earth)
-
-    elseif initial_conditions == :restart
-        initialize_from_file!(progn,M)
-    else
-        throw(error("Incorrect initialization option, $initial_conditions given."))
-    end
+    # SCALING: we use vorticity*radius,divergence*radius in the dynamical core
+    @unpack radius_earth = model.geometry
+    scale!(progn,:vor,radius_earth)
+    scale!(progn,:div,radius_earth)
 
     return progn
 end
 
-function initialize_from_rest(model::ModelSetup) 
+function initial_conditions!(   ::Type{StartFromRest},
+                                progn::PrognosticVariables,
+                                model::ModelSetup)
+    return nothing
+end
+
+function initial_conditions!(   ::Type{StartFromRest},
+                                progn::PrognosticVariables,
+                                model::PrimitiveEquation)
+    homogenuous_temperature!(progn,model)
+    pres_grid = pressure_on_orography!(progn,model)
+    # TODO initialise humidity
+end
+    
+function initial_conditions!(   ::Type{StartWithVorticity},
+                                progn::PrognosticVariables,
+                                model::ModelSetup)
+    @unpack radius_earth = model.geometry
+
+    mmax = min(15,progn.mmax+1)     # perturb only larger modes
+    lmax = min(15,progn.lmax+1)
+
+    ξ = randn(Complex{model.parameters.NF},mmax,lmax)
+
+    for progn_layer in progn.layers
+        
+        # zonal wind
+        progn_layer.leapfrog[1].vor[4,1]  =  80/radius_earth    
+        progn_layer.leapfrog[1].vor[6,1]  = -160/radius_earth
+        progn_layer.leapfrog[1].vor[8,1]  =  80/radius_earth
+
+        # perturbation
+        for m in 2:min(15,progn.mmax+1)
+            for l in m:min(15,progn.lmax+1)
+                progn_layer.leapfrog[1].vor[l,m] = 10/radius_earth*ξ[l,m]
+            end
+        end
+    end
+end
+
+function initial_conditions!(   ::Type{ZonalWind},
+                                progn::PrognosticVariables,
+                                model::ModelSetup)
+
+#         φ = M.geometry.latds
+
+#         # the -4u₀R⁻¹ sinφ cosφ (2 - 5sin²φ) factor
+#         A = zero(ϕ)
+
+
+#         for k in layers
+#             η = σ_levels_full[k]
+#             σᵥ = (σ .- 0.252)*π/2
+
+
+#         ηₛ = 1
+#         η₀ = 0.252
+#         ηᵥ = (ηₛ-η₀)*π/2
+#         u₀ = 35
+#         s = u₀*cos(ηᵥ)^(3/2)
+#         aΩ = radius_earth*rotation_earth
+#         g⁻¹ = inv(gravity)
+#         ϕ = G.latds
+    
+#         for ij in eachindex(ϕ,orography.data)
+#             sinϕ = sind(ϕ[ij])
+#             cosϕ = cosd(ϕ[ij])
+#             orography[ij] = g⁻¹*s*(s*(-2*sinϕ^6*(cosϕ^2 + 1/3) + 10/63) + (8/5*cosϕ^3*(sinϕ^2 + 2/3) - π/4)*aΩ)
+#         end
+end
+
+function allocate_prognostic_variables(model::ModelSetup) 
 
     @unpack NF = model.parameters
     @unpack nlev = model.geometry
@@ -55,32 +103,12 @@ function initialize_from_rest(model::ModelSetup)
     return zeros(PrognosticVariables{NF},model,lmax,mmax,nlev)
 end
 
-"""Initialize a PrognosticVariables struct for an atmosphere at rest. No winds,
-hence zero vorticity and divergence, but temperature, pressure and humidity are
-initialised """
-function initialize_from_rest(model::PrimitiveEquation)
+function initial_conditions!(   ::Type{StartFromFile},
+                                progn_new::PrognosticVariables,
+                                model::ModelSetup)
 
-    P = model.parameters
-    B = model.boundaries
-    G = model.geometry
-    S = model.spectral_transform
+    @unpack restart_path, restart_id = model.parameters
 
-    @unpack NF = model.parameters
-    @unpack nlev = model.geometry
-    @unpack lmax, mmax = model.spectral_transform
-
-    progn = zeros(PrognosticVariables{NF},model,lmax,mmax,nlev)
-
-    # temperature, pressure from lapse rate and mountains
-    initialize_temperature!(progn,P,B,G,S)
-    pres_grid = initialize_pressure!(progn,P,B,G,S)
-    # initialize_humidity!(humid_lf1,pres_grid,P,G)          # specific humidity from pressure
-
-    return progn
-end
-
-function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup) where NF
-    @unpack restart_path, restart_id = M.parameters
     restart_file = jldopen(joinpath(restart_path,string("run-",run_id_string(restart_id)),"restart.jld2"))
     progn_old = restart_file["prognostic_variables"]
     version = restart_file["version"]   # currently unused, TODO check for compat with version
@@ -100,11 +128,13 @@ function initialize_from_file!(progn_new::PrognosticVariables{NF},M::ModelSetup)
     return progn_new
 end
 
-function initialize_temperature!(   progn::PrognosticVariables,
-                                    P::Parameters,
-                                    B::Boundaries,
-                                    G::Geometry,
-                                    S::SpectralTransform)
+function homogenous_temperature!(   progn::PrognosticVariables,
+                                    model::PrimitiveEquation)
+
+    P = model.parameters
+    B = model.boundaries
+    G = model.geometry
+    S = model.spectral_transform
 
     @unpack geopot_surf = B.orography       # spectral surface geopotential [m²/s²] (orography*gravity)
 
@@ -126,7 +156,7 @@ function initialize_temperature!(   progn::PrognosticVariables,
         temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]       # lower temperature for higher mountains
     end
 
-    # STRATOSPHERE set the l=m=0 spectral coefficient (=mean value) only
+    # TROPOPAUSE/STRATOSPHERE set the l=m=0 spectral coefficient (=mean value) only
     # in uppermost levels (default: k=1,2) for lapse rate = 0
     for k in 1:n_stratosphere_levels
         temp = progn.layers[k].leapfrog[1].temp
@@ -145,11 +175,13 @@ function initialize_temperature!(   progn::PrognosticVariables,
 end
 
 function initialize_pressure!(  progn::PrognosticVariables,
-                                P::Parameters,
-                                B::Boundaries,
-                                G::Geometry,
-                                S::SpectralTransform)
+                                model::PrimitiveEquation)
     
+    P = model.parameters
+    B = model.boundaries
+    G = model.geometry
+    S = model.spectral_transform
+
     @unpack Grid,nlat_half = G
     @unpack lmax,mmax = S
     
@@ -176,8 +208,6 @@ function initialize_pressure!(  progn::PrognosticVariables,
     lnp = progn.pres.leapfrog[1]
     spectral!(lnp,lnp_grid,S)
     spectral_truncation!(lnp,lmax)  # set lmax+1 row to zero
-
-    # lnp[2:end,1] .= 0
 
     return lnp_grid                 # return grid for use in initialize_humidity!
 end

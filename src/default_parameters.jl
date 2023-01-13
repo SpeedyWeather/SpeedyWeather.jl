@@ -119,7 +119,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # INITIAL CONDITIONS
     seed::Int = abs(rand(Int))          # random seed for the global random number generator
-    initial_conditions::Symbol = :barotropic_vorticity    # :rest, :barotropic_vorticity or :restart
+    initial_conditions::Type{<:InitialConditions} = StartWithVorticity
 
     # OUTPUT
     verbose::Bool = true            # print dialog for feedback
