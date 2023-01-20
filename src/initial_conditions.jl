@@ -3,6 +3,7 @@ abstract type StartFromRest <: InitialConditions end
 abstract type StartFromFile <: InitialConditions end
 abstract type StartWithVorticity <: InitialConditions end
 
+
 """
     prognostic_variables = initial_conditions(M::ModelSetup)
 
@@ -14,11 +15,6 @@ function initial_conditions(model::ModelSetup)
     IC = model.parameters.initial_conditions        # type of initial conditions
 
     initial_conditions!(IC,progn,model)     # dispatch to the type of initial conditions
-
-    # SCALING: we use vorticity*radius,divergence*radius in the dynamical core
-    @unpack radius_earth = model.geometry
-    scale!(progn,:vor,radius_earth)
-    scale!(progn,:div,radius_earth)
 
     return progn
 end
