@@ -348,9 +348,9 @@ function write_restart_file(time::DateTime,
     write_restart || return nothing                 # exit immediately if no restart file desired
 
     # unscale variables
-    #@unpack radius_earth = M.geometry
-    #scale!(progn,:vor,1/radius_earth)
-    #scale!(progn,:div,1/radius_earth)
+    @unpack radius_earth = M.geometry
+    scale!(progn,:vor,inv(radius_earth))
+    scale!(progn,:div,inv(radius_earth))
 
     # COMPRESSION OF RESTART FILE
     @unpack keepbits = M.parameters
@@ -368,7 +368,7 @@ function write_restart_file(time::DateTime,
         round!(layer.leapfrog[1].temp,keepbits)
         round!(layer.leapfrog[1].humid,keepbits)
 
-        # remove 2nd leapfrog step
+        # remove 2nd leapfrog step by filling with zeros
         fill!(layer.leapfrog[2].vor,0)
         fill!(layer.leapfrog[2].div,0)
         fill!(layer.leapfrog[2].temp,0)
