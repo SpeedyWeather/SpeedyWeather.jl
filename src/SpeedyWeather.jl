@@ -53,11 +53,11 @@ module SpeedyWeather
             FullClenshawGrid,
             FullGaussianGrid,
             FullHEALPixGrid,
-            FullHEALPix4Grid,
+            FullOctaHEALPixGrid,
             OctahedralGaussianGrid,
             OctahedralClenshawGrid,
             HEALPixGrid,
-            HEALPix4Grid
+            OctaHEALPixGrid
 
     # EXPORT OROGRAPHIES
     export  NoOrography,

@@ -25,9 +25,9 @@ spectral_resolutions_inexact = (127,255)
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid,
                             HEALPixGrid,
-                            HEALPix4Grid,
+                            OctaHEALPixGrid,
                             FullHEALPixGrid,
-                            FullHEALPix4Grid)
+                            FullOctaHEALPixGrid)
 
                 p,d,m = initialize_speedy(NF;trunc,Grid)
                 S = m.spectral_transform
@@ -98,9 +98,9 @@ end
     @testset for trunc in spectral_resolutions_inexact
         @testset for NF in (Float32,Float64)
             @testset for Grid in (  HEALPixGrid,
-                                    HEALPix4Grid,
+                                    OctaHEALPixGrid,
                                     FullHEALPixGrid,
-                                    FullHEALPix4Grid)
+                                    FullOctaHEALPixGrid)
                 P = Parameters{BarotropicModel}(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
