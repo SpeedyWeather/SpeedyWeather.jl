@@ -93,10 +93,10 @@ module SpeedyWeather
 
     include("utility_functions.jl")
     include("lower_triangular_matrix.jl")   # defines LowerTriangularMatrix
-    include("Grids/Grids.jl")               # defines AbstractGrid and concrete Grid types
+    include("RingGrids/RingGrids.jl")       # defines AbstractGrid and concrete Grid types
     include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
 
-    include("parameter_structs.jl")         # defines 
+    include("parameter_structs.jl")
     include("spectral_truncation.jl")
     include("abstract_types.jl")            # defines ModelSetup, Barotropic, ShallowWater,
                                             # PrimitiveEquation and others
