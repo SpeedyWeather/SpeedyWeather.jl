@@ -174,8 +174,8 @@ struct SurfaceVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     ∇lnp_x::Grid                                    # zonal gradient of log surf pressure
     ∇lnp_y::Grid                                    # meridional gradient of log surf pres
 
-    U_mean_grid::Grid                               # vertical average of: zonal velocity *coslat
-    V_mean_grid::Grid                               # meridional velocity *coslat
+    u_mean_grid::Grid                               # vertical average of: zonal velocity *coslat
+    v_mean_grid::Grid                               # meridional velocity *coslat
     div_mean_grid::Grid                             # divergence
     div_mean::LowerTriangularMatrix{Complex{NF}}    # divergence (in spectral though)
     
@@ -202,8 +202,8 @@ function Base.zeros(::Type{SurfaceVariables},
     ∇lnp_y = zeros(Grid{NF},nresolution)    # meridional gradient of log surf pres
 
     # vertical averaged (weighted by σ level thickness) velocities (*coslat) and divergence
-    U_mean_grid = zeros(Grid{NF},nresolution)
-    V_mean_grid = zeros(Grid{NF},nresolution)
+    u_mean_grid = zeros(Grid{NF},nresolution)
+    v_mean_grid = zeros(Grid{NF},nresolution)
     div_mean_grid = zeros(Grid{NF},nresolution)
     div_mean = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
@@ -213,7 +213,7 @@ function Base.zeros(::Type{SurfaceVariables},
 
     return SurfaceVariables(pres_grid,pres_tend,pres_tend_grid,
                             ∇lnp_x,∇lnp_y,
-                            U_mean_grid,V_mean_grid,div_mean_grid,div_mean,
+                            u_mean_grid,v_mean_grid,div_mean_grid,div_mean,
                             precip_large_scale,precip_convection,
                             npoints)
 end

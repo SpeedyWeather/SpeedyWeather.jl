@@ -23,19 +23,17 @@ end
 
 @testset "Restart from output file" begin
     
-    p = run_speedy(Float32, initial_conditions=:restart, restart_id=1)
-
-    p, d, m = initialize_speedy(Float32, ShallowWater, output=true, run_id="restart-test")
-    SpeedyWeather.time_stepping!(p, d, m)
+    p1, d1, m1 = initialize_speedy(Float32, ShallowWater, output=true, run_id="restart-test")
+    run_speedy!(p1, d1, m1)
  
-    progn, diagn, model = initialize_speedy(Float32, ShallowWaterModel, initial_conditions=:restart, restart_id="restart-test")
+    p2, d2, m2 = initialize_speedy(Float32, ShallowWaterModel, initial_conditions=StartFromFile, restart_id="restart-test")
 
-    for varname in propertynames(progn.layers[1].leapfrog[1])
-        if SpeedyWeather.has(progn, varname)
-            for (var_new, var_old) in zip(SpeedyWeather.get_var(p, varname), SpeedyWeather.get_var(progn, varname))
+    for varname in propertynames(p1.layers[1].leapfrog[1])
+        if SpeedyWeather.has(p1, varname)
+            for (var_new, var_old) in zip(SpeedyWeather.get_var(p1, varname), SpeedyWeather.get_var(p2, varname))
                 @test all(var_new .== var_old)
             end
         end
     end
-    @test all(SpeedyWeather.get_pressure(p) .== SpeedyWeather.get_pressure(progn))
+    @test all(SpeedyWeather.get_pressure(p1) .== SpeedyWeather.get_pressure(p2))
 end 

@@ -59,9 +59,16 @@ module SpeedyWeather
             HEALPixGrid,
             HEALPix4Grid
 
+    # EXPORT OROGRAPHIES
     export  NoOrography,
             EarthOrography,
             ZonalRidge
+
+    # EXPORT INITIAL CONDITIONS
+    export  StartFromFile,
+            StartFromRest,
+            ZonalWind,
+            StartWithVorticity
 
     # EXPORT INTERPOLATION FOR GRIDS
     export  Interpolator,

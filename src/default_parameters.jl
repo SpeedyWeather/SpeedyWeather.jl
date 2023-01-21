@@ -119,7 +119,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # INITIAL CONDITIONS
     seed::Int = abs(rand(Int))          # random seed for the global random number generator
-    initial_conditions::Symbol = :barotropic_vorticity    # :rest, :barotropic_vorticity or :restart
+    initial_conditions::Type{<:InitialConditions} = StartWithVorticity
 
     # OUTPUT
     verbose::Bool = true            # print dialog for feedback
@@ -139,6 +139,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # OUTPUT GRID
     output_NF::DataType = Float32   # number format used for output
+    output_nlat_half::Integer = 0   # 0 = reuse nlat_half from dynamical core
     output_Grid::Type{<:AbstractFullGrid} = full_grid(Grid)
     output_Interpolator::Type{<:AbstractInterpolator} = DEFAULT_INTERPOLATOR
     output_matrix::Bool = false     # if true sort gridpoints into a matrix

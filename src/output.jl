@@ -113,21 +113,23 @@ function initialize_netcdf_output(  progn::PrognosticVariables,
     var_time = NcVar("time",dim_time,t=Int64,atts=Dict("units"=>time_string,"long_name"=>"time"))
 
     # DEFINE NETCDF DIMENSIONS SPACE
-    @unpack output_matrix, output_Grid, nlev = M.parameters
+    @unpack output_matrix, output_Grid, output_nlat_half, nlev = M.parameters
 
-    # Option :full, output via spectral transform on a full grid with lon,lat vectors
-    # Option :matrix,
-    if output_matrix == false
-        @unpack nlat, latd, nresolution = M.geometry
-        lond = get_lond(output_Grid,nresolution)
+    # if specified (>0) use output resolution via output_nlat_half, otherwise nlat_half from dynamical core
+    nlat_half = output_nlat_half > 0 ? output_nlat_half : M.geometry.nlat_half
+
+    if output_matrix == false   # interpolate onto (possibly different) output grid
+        lond = get_lond(output_Grid,nlat_half)
+        latd = get_latd(output_Grid,nlat_half)
         nlon = length(lond)
+        nlat = length(latd)
         lon_name, lon_units, lon_longname = "lon","degrees_east","longitude"
         lat_name, lat_units, lat_longname = "lat","degrees_north","latitude"
 
-    else    # output grid directly into a matrix (resort grid points, no interpolation)
-        @unpack nresolution = M.geometry
-        nlon,nlat = matrix_size(M.geometry.Grid,M.geometry.nresolution)   # size of the matrix output
-        lond = collect(1:nlon)                      # use lond, latd, but just enumerate grid points
+    else                        # output grid directly into a matrix (resort grid points, no interpolation)
+        @unpack nlat_half = M.geometry      # don't use output_nlat_half as not supported for output_matrix
+        nlon,nlat = matrix_size(M.geometry.Grid,nlat_half)  # size of the matrix output
+        lond = collect(1:nlon)                              # just enumerate grid points for lond, latd
         latd = collect(1:nlat)
         lon_name, lon_units, lon_longname = "i","1","horizontal index i"
         lat_name, lat_units, lat_longname = "j","1","horizontal index j"
@@ -338,20 +340,17 @@ end
 A restart file `restart.jld2` with the prognostic variables is written
 to the output folder (or current path) that can be used to restart the model.
 `restart.jld2` will then be used as initial conditions. The prognostic variables
-are bitround and the 2nd leapfrog time step is discarded."""
+are bitround for compression and the 2nd leapfrog time step is discarded.
+While the dynamical core may work with scaled variables, the restart file
+contains these variables unscaled."""
 function write_restart_file(time::DateTime,
                             progn::PrognosticVariables,
                             outputter::Output,
                             M::ModelSetup)
     
     @unpack run_path, write_restart = outputter
-    write_restart || return nothing                 # exit immediately if no restart file desired
-
-    # unscale variables
-    #@unpack radius_earth = M.geometry
-    #scale!(progn,:vor,1/radius_earth)
-    #scale!(progn,:div,1/radius_earth)
-
+    write_restart || return nothing         # exit immediately if no restart file desired
+    
     # COMPRESSION OF RESTART FILE
     @unpack keepbits = M.parameters
     for layer in progn.layers
@@ -368,7 +367,7 @@ function write_restart_file(time::DateTime,
         round!(layer.leapfrog[1].temp,keepbits)
         round!(layer.leapfrog[1].humid,keepbits)
 
-        # remove 2nd leapfrog step
+        # remove 2nd leapfrog step by filling with zeros
         fill!(layer.leapfrog[2].vor,0)
         fill!(layer.leapfrog[2].div,0)
         fill!(layer.leapfrog[2].temp,0)

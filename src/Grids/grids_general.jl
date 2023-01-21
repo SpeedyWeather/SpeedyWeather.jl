@@ -118,6 +118,7 @@ get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,grid.nlat_half)
 # get total number of grid points
 get_npoints(grid::Grid) where {Grid<:AbstractGrid} = get_npoints(Grid,grid.nlat_half)
 
+# coordinates
 get_latdlonds(grid::Grid) where {Grid<:AbstractGrid} = get_latdlonds(Grid,grid.nlat_half)
 
 function get_latdlonds(Grid::Type{<:AbstractGrid},nlat_half::Integer)
@@ -129,6 +130,16 @@ function get_latdlonds(Grid::Type{<:AbstractGrid},nlat_half::Integer)
     londs .*= (360/2π)
 
     return latds, londs
+end
+
+get_latd(grid::Grid) where {Grid<:AbstractGrid} = get_latd(Grid,grid.nlat_half)
+
+function get_latd(Grid::Type{<:AbstractGrid},nlat_half::Integer)
+    colat = get_colat(Grid,nlat_half)
+    latd = colat
+    latd .= π/2 .- colat
+    latd .= latd .* (360/2π)
+    return latd
 end
 
 """
