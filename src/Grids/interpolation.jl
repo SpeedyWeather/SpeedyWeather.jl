@@ -206,7 +206,11 @@ function interpolate!(  Aout::Vector,       # Out: interpolated values
 
     @unpack ij_as,ij_bs,ij_cs,ij_ds,Δabs,Δcds,Δys = interpolator.locator
     @unpack npoints = interpolator.geometry
-    @boundscheck length(Aout) == length(ij_as) || throw(BoundsError)
+    
+    # 1) Aout's length must match the interpolator
+    # 2) input grid A must match the interpolator's geometry (Grids are checked with dispatch)
+    @boundscheck length(Aout) == length(ij_as) || throw(BoundsError)    
+    @boundscheck A.nlat_half == interpolator.geometry.nlat_half || throw(BoundsError)
 
     A_northpole, A_southpole = average_on_poles(A,interpolator.geometry.rings)
 
@@ -415,8 +419,8 @@ function average_on_poles(  ::Type{NF},
                             rings::Vector{<:UnitRange{<:Integer}}
                             ) where {NF<:AbstractFloat}
     
-    A_northpole = mean(view(A,rings[1]))
-    A_southpole = mean(view(A,rings[end]))
+    A_northpole = mean(view(A,rings[1]))    # average of all grid points around the north pole
+    A_southpole = mean(view(A,rings[end]))  # same for south pole
     return convert(NF,A_northpole), convert(NF,A_southpole)
 end
 

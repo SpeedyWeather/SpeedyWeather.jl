@@ -51,3 +51,40 @@ function scale!(progn::PrognosticVariables{NF},
         end
     end
 end
+
+"""
+    scale!( progn::PrognosticVariables,
+            model::ModelSetup)
+
+Scales the prognostic variables vorticity and divergence with
+the Earth's radius which is used in the dynamical core."""
+function scale!(progn::PrognosticVariables,
+                model::ModelSetup)
+
+    @unpack radius_earth = model.geometry
+    scale!(progn,:vor,radius_earth)
+    scale!(progn,:div,radius_earth)
+end
+
+"""
+    unscale!(   progn::PrognosticVariables,
+                model::ModelSetup)
+
+Undo the radius-scaling of vorticity and divergence from scale!(progn,model)."""
+function unscale!(  progn::PrognosticVariables,
+                    model::ModelSetup)
+
+    @unpack radius_earth = model.geometry
+    scale!(progn,:vor,inv(radius_earth))
+    scale!(progn,:div,inv(radius_earth))
+end
+
+"""
+    unscale!(   variable::AbstractArray,
+                model::ModelSetup)
+    
+Undo the radius-scaling for any variable. Method used for netcdf output."""
+function unscale!(  variable::AbstractArray,
+                    model::ModelSetup)
+    variable ./= model.geometry.radius_earth
+end
