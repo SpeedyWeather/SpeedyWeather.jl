@@ -212,29 +212,25 @@ end
 """
     time_stepping!( progn::PrognosticVariables,     # all prognostic variables
                     diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
-                    M::ModelSetup                   # all precalculated structs
-                    )
+                    model::ModelSetup)              # all precalculated structs
 
 Main time loop that that initialises output and feedback, loops over all time steps
 and calls the output and feedback functions."""
 function time_stepping!(progn::PrognosticVariables, # all prognostic variables
                         diagn::DiagnosticVariables, # all pre-allocated diagnostic variables
-                        model::ModelSetup,          # all precalculated structs
-                        )
+                        model::ModelSetup)          # all precalculated structs
     
     @unpack n_timesteps, Δt, Δt_sec = model.constants
     time = model.parameters.startdate
 
     # SCALING: we use vorticity*radius,divergence*radius in the dynamical core
-    @unpack radius_earth = model.geometry
-    scale!(progn,:vor,radius_earth)
-    scale!(progn,:div,radius_earth)
+    scale!(progn,model)
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
     lf = 1                                  # use first leapfrog index
     gridded!(diagn,progn,lf,model)
-    outputter = initialize_netcdf_output(progn,diagn,model)
+    outputter = initialize_netcdf_output(diagn,model)
     feedback = initialize_feedback(outputter,model)
 
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
@@ -246,13 +242,10 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
         timestep!(progn,diagn,time,2Δt,model)   # calculate tendencies and leapfrog forward
         
         progress!(feedback,outputter)       # updates the progress meter bar
-        write_netcdf_output!(outputter,time,progn,diagn,model)
+        write_netcdf_output!(outputter,time,diagn,model)
     end
 
-    # UNSCALE radius-scaling in the dynamical core
-    scale!(progn,:vor,inv(radius_earth))
-    scale!(progn,:div,inv(radius_earth))
-
+    unscale!(progn,model)                   # unscale radius-scaling from the dynamical core
     write_restart_file(time,progn,outputter,model)
     progress_finish!(feedback)              # finishes the progress meter bar
 
