@@ -9,6 +9,7 @@ makedocs(
     pages=["Home"=>"index.md",
             "How to run SpeedyWeather.jl"=>"how_to_run_speedy.md",
             "Spherical harmonic transform"=>"spectral_transform.md",
+            "Grids"=>"grids.md",
             "Dynamical core"=>"dynamical_core.md",
             "Parameterizations"=>"parametrizations.md",
             "Boundary conditions"=>"boundary_conditions.md",
