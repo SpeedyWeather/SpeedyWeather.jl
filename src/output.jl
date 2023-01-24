@@ -100,8 +100,7 @@ run_id_string(run_id::String) = run_id
 Creates a netcdf file on disk and the corresponding `netcdf_file` object preallocated with output variables
 and dimensions. `write_netcdf_output!` then writes consecuitive time steps into this file.
 """
-function initialize_netcdf_output(  progn::PrognosticVariables,
-                                    diagn::DiagnosticVariables,
+function initialize_netcdf_output(  diagn::DiagnosticVariables,
                                     M::ModelSetup)
 
     M.parameters.output || return Output()          # escape directly when no netcdf output
@@ -192,11 +191,12 @@ function initialize_netcdf_output(  progn::PrognosticVariables,
     humid = :humid in output_vars ? fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
 
     # CREATE OUTPUT INTERPOLATOR
-    input_Grid = M.parameters.Grid
-    Interpolator = M.parameters.output_Interpolator
-    @unpack nlat_half = M.geometry
-    npoints = get_npoints(output_Grid,nlat_half)
-    interpolator = output_matrix ? Interpolator(input_Grid,0,0) : Interpolator(output_NF,input_Grid,nlat_half,npoints)
+    input_Grid = M.parameters.Grid                      # grid to interpolate from (the on used in dyn core)
+    Interpolator = M.parameters.output_Interpolator     # type of interpolator
+    npoints = get_npoints(output_Grid,nlat_half)        # number of grid points to interpolate onto
+    input_nlat_half = M.geometry.nlat_half
+    interpolator = output_matrix ? Interpolator(input_Grid,0,0) :
+                    Interpolator(output_NF,input_Grid,input_nlat_half,npoints)
     
     # PRECOMPUTE LOCATION INDICES
     latds, londs = get_latdlonds(output_Grid,nlat_half)
@@ -211,8 +211,7 @@ function initialize_netcdf_output(  progn::PrognosticVariables,
                         u, v, vor, div, pres, temp, humid)
 
     # WRITE INITIAL CONDITIONS TO FILE
-    lf = 1                              # output first leapfrog time step for initial conditions
-    write_netcdf_variables!(outputter,progn,diagn,M,lf)
+    write_netcdf_variables!(outputter,diagn,M)
     write_netcdf_time!(outputter,startdate)
 
     return outputter
@@ -229,17 +228,15 @@ netcdf output of if output shouldn't be written on this time step. Converts vari
 for output, truncates the mantissa for higher compression and applies lossless compression."""
 function write_netcdf_output!(  outputter::Output,              # everything for netcdf output
                                 time::DateTime,                 # model time for output
-                                progn::PrognosticVariables,     # all prognostic variables
                                 diagn::DiagnosticVariables,     # all diagnostic variables
-                                M::ModelSetup,                  # all parameters
-                                lf::Integer=2)                  # leapfrog time step to output
+                                model::ModelSetup)              # all parameters
 
     @unpack output, output_every_n_steps, timestep_counter = outputter
     output || return nothing                                        # escape immediately for no netcdf output
     timestep_counter % output_every_n_steps == 0 || return nothing  # escape if output not written on this step
 
     # WRITE VARIABLES
-    write_netcdf_variables!(outputter,progn,diagn,M,lf)
+    write_netcdf_variables!(outputter,diagn,model)
     write_netcdf_time!(outputter,time)
 end
 
@@ -257,10 +254,8 @@ function write_netcdf_time!(outputter::Output,
 end
 
 function write_netcdf_variables!(   outputter::Output,
-                                    progn::PrognosticVariables,
                                     diagn::DiagnosticVariables,
-                                    M::ModelSetup,
-                                    lf::Integer=2)  # leapfrog time step to output
+                                    model::ModelSetup)
 
     outputter.output_counter += 1                   # increase output step counter
     @unpack output_vars = outputter                 # Vector{Symbol} of variables to output
@@ -271,8 +266,8 @@ function write_netcdf_variables!(   outputter::Output,
     @unpack interpolator = outputter
 
     # output to matrix options
-    quadrant_rotation = M.parameters.output_quadrant_rotation
-    matrix_quadrant = M.parameters.output_matrix_quadrant
+    quadrant_rotation = model.parameters.output_quadrant_rotation
+    matrix_quadrant = model.parameters.output_matrix_quadrant
 
     for (k,diagn_layer) in enumerate(diagn.layers)
         
@@ -296,13 +291,12 @@ function write_netcdf_variables!(   outputter::Output,
             :humid in output_vars   && interpolate!(output_Grid(humid),humid_grid, interpolator)
         end
 
-        # UNSCALE SCALED VARIABLES
-        @unpack radius_earth = M.geometry
-        vor ./= M.geometry.radius_earth
-        div ./= M.geometry.radius_earth
+        # UNSCALE THE SCALED VARIABLES
+        unscale!(vor,model)     # was vor*radius, back to vor
+        unscale!(div,model)     # same
 
         # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
-        @unpack keepbits = M.parameters
+        @unpack keepbits = model.parameters
         for var in (u,v,vor,div,temp,humid)
             round!(var,keepbits)
         end
@@ -324,7 +318,7 @@ function write_netcdf_variables!(   outputter::Output,
         else
             interpolate!(output_Grid(pres),pres_grid,interpolator)
         end
-        round!(pres,M.parameters.keepbits)
+        round!(pres,model.parameters.keepbits)
         NetCDF.putvar(outputter.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
     end
 
@@ -346,13 +340,13 @@ contains these variables unscaled."""
 function write_restart_file(time::DateTime,
                             progn::PrognosticVariables,
                             outputter::Output,
-                            M::ModelSetup)
+                            model::ModelSetup)
     
     @unpack run_path, write_restart = outputter
     write_restart || return nothing         # exit immediately if no restart file desired
     
     # COMPRESSION OF RESTART FILE
-    @unpack keepbits = M.parameters
+    @unpack keepbits = model.parameters
     for layer in progn.layers
 
         # copy over leapfrog 2 to 1
@@ -382,7 +376,7 @@ function write_restart_file(time::DateTime,
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
         f["prognostic_variables"] = progn
         f["time"] = time
-        f["version"] = M.parameters.version
+        f["version"] = model.parameters.version
         f["description"] = "Restart file created for SpeedyWeather.jl"
     end
 end
