@@ -19,7 +19,7 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     npoints::Int        # total number of grid points
     radius_earth::Real  # Earth's radius [m]
 
-    # LATITUDES (either Gaussian, equi-angle, HEALPix or HEALPix4 lats, depending on grid)
+    # LATITUDES (either Gaussian, equi-angle, HEALPix or OctaHEALPix lats, depending on grid)
     lat::Vector{NF}         # array of latitudes (π/2...-π/2)
     latd::Vector{Float64}   # array of latitudes in degrees (90˚...-90˚)
     colat::Vector{NF}       # array of colatitudes (0...π)

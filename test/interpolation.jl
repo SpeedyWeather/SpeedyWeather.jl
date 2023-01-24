@@ -5,7 +5,7 @@
                     OctahedralGaussianGrid,
                     OctahedralClenshawGrid,
                     HEALPixGrid,
-                    HEALPix4Grid)
+                    OctaHEALPixGrid)
         
         @testset for NF in (Float32,Float64)
         
@@ -31,7 +31,7 @@ end
                     OctahedralGaussianGrid,
                     OctahedralClenshawGrid,
                     HEALPixGrid,
-                    HEALPix4Grid)
+                    OctaHEALPixGrid)
         
         @testset for NF in (Float32,Float64)
         
@@ -68,7 +68,7 @@ end
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid,
                             HEALPixGrid,
-                            HEALPix4Grid)
+                            OctaHEALPixGrid)
         
         @testset for NF in (Float32,Float64)
         
@@ -128,7 +128,7 @@ end
                     OctahedralGaussianGrid,
                     OctahedralClenshawGrid,
                     HEALPixGrid,
-                    HEALPix4Grid)
+                    OctaHEALPixGrid)
 
         @testset for nlat_half in [4,8,16] 
             G = SpeedyWeather.GridGeometry(Grid,nlat_half)
@@ -159,7 +159,7 @@ end
                                 OctahedralGaussianGrid,
                                 OctahedralClenshawGrid,
                                 HEALPixGrid,
-                                HEALPix4Grid)
+                                OctaHEALPixGrid)
 
             # create some smooth gridded field
             trunc = 10

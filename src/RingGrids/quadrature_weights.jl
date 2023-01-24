@@ -11,11 +11,11 @@ end
 # QUADRATURE WEIGHTS (INEXACT), for HEALPix full grids
 healpix_weights(nlat_half::Integer) =
     [nlon_healpix(nlat_half,j) for j in 1:nlat_half].*(2/npoints_healpix(nlat_half))
-healpix4_weights(nlat_half::Integer) =
-    [nlon_healpix4(nlat_half,j) for j in 1:nlat_half].*(2/npoints_healpix4(nlat_half))
+octahealpix_weights(nlat_half::Integer) =
+    [nlon_octahealpix(nlat_half,j) for j in 1:nlat_half].*(2/npoints_octahealpix(nlat_half))
 
 # SOLID ANGLES ΔΩ = sinθ Δθ Δϕ
 get_solid_angles(Grid::Type{<:AbstractGrid},nlat_half::Integer) = 
     get_quadrature_weights(Grid,nlat_half) .* (2π./get_nlons(Grid,nlat_half))
-get_solid_angles(Grid::Type{<:Union{HEALPixGrid,HEALPix4Grid}},nlat_half::Integer) =
+get_solid_angles(Grid::Type{<:Union{HEALPixGrid,OctaHEALPixGrid}},nlat_half::Integer) =
     4π/get_npoints(Grid,nlat_half)*ones(nlat_half)
