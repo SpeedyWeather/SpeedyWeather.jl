@@ -69,7 +69,8 @@ Gaussian grids at the same `nlat_half`.
     The original formulation for HEALPix grids use ``N_{side}``, the number of grid
     points along the edges of each basepixel (8 in the figure above),
     SpeedyWeather.jl uses `nlat_half`, the number of rings on one hemisphere, Equator included,
-    for all grids. This is done for consistency across grids.
+    for all grids. This is done for consistency across grids. We may use ``N_{side}``
+    for the documentation or within functions though.
 
 ## Truncation
 
@@ -121,21 +122,74 @@ Following Górski, 2004[^1], the ``z=cos(\theta)`` colatitude of the ``j``-th ri
 ```math
 z = 1 - \frac{j^2}{3N_{side}^2}
 ```
-and on that ring, the longitude ``\phi`` of the ``i``-th point is at
+and on that ring, the longitude ``\phi`` of the ``i``-th point (``i`` is the in-ring-index) is at
 ```math
 \phi = \frac{\pi}{2j}(i-\tfrac{1}{2})
 ```
-In the equatorial belt ``\theta > \theta^*`` for ``\cos(\theta^*) = 2/3`` this changes to
+The in-ring index ``i`` goes from ``i=1,...,4`` for the first (i.e. northern-most) ring,
+``i=1,...,8`` for the second ring and ``i = 1,...,4j`` for the ``j``-th ring in the northern polar cap.
+
+In the north equatorial belt ``j=N_{side},...,2N_{side}`` this changes to
 ```math
 z = \frac{4}{3} - \frac{2j}{3N_{side}}
 ```
+and the longitudes change to (``i`` is always ``i = 1,...,4N_{side}`` in the equatorial belt meaning the
+number of longitude points is constant here)
+```math
+\phi = \frac{\pi}{2N_{side}}(i - \frac{s}{2}), \quad s = (j - N_{side} + 1) \mod 2
+```
+The modulo function comes in as there is an alternating longitudinal offset from the prime meridian (see [Implemented grids](@ref)). For the southern hemisphere the grid point locations can be obtained by mirror symmetry.
 
+### Grid cell boundaries
 
+The cell boundaries are obtained by setting ``i = k + 1/2`` or ``i = k + 1/2 + j`` (half indices) into the
+equations above, such that ``z(\phi,k)``, a function for the cosine of colatitude ``z`` of index ``k`` and
+the longitude ``\phi`` is obtained. These are then (northern polar cap)
+
+```math
+z = 1 - \frac{k^2}{3N_{side}^2}\left(\frac{\pi}{2\phi_t}\right)^2, \quad z = 1 - \frac{k^2}{3N_{side}^2}\left(\frac{\pi}{2\phi_t - \pi}\right)^2
+```
+with ``\phi_t = \phi \mod \tfrac{\pi}{2}`` and in the equatorial belt
+```math
+z = \frac{2}{3}-\frac{4k}{3N_{side}} \pm \frac{8\phi}{3\pi}
+```
 
 
 ## OctaHEALPix grid
 
-The original
+While the classic HEALPix grid is based on a [dodecahedron](https://en.wikipedia.org/wiki/Rhombic_dodecahedron),
+other choices for ``N_\varphi`` and ``N_\theta`` in the class of HEALPix grids will change the number of faces
+there are in zonal/meridional direction. With ``N_\varphi = 4`` and ``N_\theta = 1`` we obtain a HEALPix grid that
+is based on an octahedron, which has the convenient property that there are twice as many longitude points around
+the equator than there are latitude rings between the poles. This is a desirable for truncation as this matches
+the distances too, ``2\pi`` around the Equator versus ``\pi`` between the poles. ``N_\varphi = 6, N_\theta = 2``
+or ``N_\varphi = 8, N_\theta = 3`` are other possible choices for this, but also more complicated. See 
+Górski, 2004[^1] for further examples and visulations of these grids.
+
+We call the ``N_\varphi = 4, N_\theta = 1`` HEALPix grid the OctaHEALPix grid, which combines the equal-area
+property of the HEALPix grids with the octahedron that's also used in the `OctahedralGaussianGrid` or the
+`OctahedralClenshawGrid`. As ``N_\theta = 1`` there is no equatorial belt which simplifies the grid.
+The latitude of the ``j``-th isolatitude ring on the `OctaHEALPixGrid` is defined by
+```math
+z = 1 - \frac{j^2}{N^2},
+```
+with ``j=1,...,N``, and similarly for the southern hemisphere by symmetry. On this grid ``N_{side} = N``
+where ``N``= `nlat_half`, the number of latitude rings on one hemisphere, Equator included,
+because each of the 4 basepixels spans from pole to pole and covers a quarter of the sphere.
+The longitudes with in-ring- index ``i = 1,...,4j`` are
+```math
+\phi = \frac{\pi}{2j}(i - \tfrac{1}{2})
+```
+and again, the southern hemisphere grid points are obtained by symmetry.
+
+### Grid cell boundaries
+
+Similar to the grid cell boundaries for the HEALPix grid, the OctaHEALPix grid's boundaries are
+```math
+z = 1 - \frac{k^2}{N^2}\left(\frac{\pi}{2\phi_t}\right)^2, \quad z = 1 - \frac{k^2}{N^2}\left(\frac{\pi}{2\phi_t - \pi}\right)^2
+```
+The ``3N_{side}^2`` in the denominator of the HEALPix grid came simply ``N^2`` for the OctaHEALPix grid and there's no separate equation for the equatorial belt (which doesn't exist in the OctaHEALPix grid).
+
 
 ### References
 
