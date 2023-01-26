@@ -103,7 +103,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     # NUMERICS
     robert_filter::Real = 0.05          # Robert (1966) time filter coefficeint to suppress comput. mode
     williams_filter::Real = 0.53        # William's time filter (Amezcua 2011) coefficient for 3rd order acc
-    implicit_α::Real = 0.5              # coefficient for semi-implicit computations to filter gravity waves
+    implicit_α::Real = 1                # coefficient for semi-implicit computations to filter gravity waves
     
     # LEGENDRE TRANSFORM AND POLYNOMIALS
     recompute_legendre::Bool = false    # recomputation is slower but requires less memory

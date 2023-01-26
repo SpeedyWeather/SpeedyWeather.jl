@@ -1,4 +1,4 @@
-abstract type ZonalWind <: InitialConditions end
+abstract type NorthMidlatitudeJet <: InitialConditions end
 abstract type StartFromRest <: InitialConditions end
 abstract type StartFromFile <: InitialConditions end
 abstract type StartWithVorticity <: InitialConditions end
@@ -59,9 +59,68 @@ function initial_conditions!(   ::Type{StartWithVorticity},
     end
 end
 
-function initial_conditions!(   ::Type{ZonalWind},
+"""Initial conditions from Galewsky, 2004, Tellus"""
+function initial_conditions!(   ::Type{NorthMidlatitudeJet},
                                 progn::PrognosticVariables,
-                                model::ModelSetup)
+                                model::ShallowWater)
+
+    θ₀ = π/7                # northern boundary of jet (latitude)
+    θ₁ = π/2 - θ₀           # southern boundary of jet
+    eₙ = exp(-4/(θ₁-θ₀)^2)  # normalisation
+    umax = 80               # maximum zonal velocity
+    @unpack radius_earth, rotation_earth, gravity = model.parameters
+
+    # always create on F64 grid then convert to spectral and interpolate there
+    Grid = FullGaussianGrid
+    nlat_half = 64
+    u_grid = zeros(Grid,nlat_half)
+    η_grid = zeros(Grid,nlat_half)
+    colats = get_colat(Grid,nlat_half)
+    weights = FastGaussQuadrature.gausslegendre(2nlat_half)[2]
+    η_sum = 0
+
+    for (j,ring) in enumerate(eachring(u_grid,η_grid))
+        θ = π - colats[j]           # latitude in radians
+        coslat⁻¹j = 1/cos(θ)
+        f = 2rotation_earth*sin(θ)
+        
+        # velocity per latitude
+        if θ₀ < θ < θ₁
+            u_θ = umax/eₙ*exp(1/(θ-θ₀)/(θ-θ₁))  # u as in Galewsky, 2004
+        else
+            u_θ = 0
+        end
+
+        u_θc = u_θ/radius_earth*coslat⁻¹j   # include scaling for curl!
+
+        # integration for layer thickness h / interface height η
+        w = weights[j]
+        η_sum += w*(radius_earth*u_θ/gravity * (f + tan(θ)/radius_earth*u_θ))
+
+        # store in all longitudes
+        for ij in ring
+            u_grid[ij] = u_θc
+            η_grid[ij] = η_sum
+        end
+    end
+
+    u = spectral(u_grid)
+    η = spectral(η_grid)
+
+    # interpolate in spectral space to desired resolution
+    @unpack lmax,mmax = model.spectral_transform
+    @unpack NF = model.parameters
+    u = spectral_truncation(complex(NF),u,lmax+1,mmax)
+    
+    # get vorticity initial conditions from curl of u,v
+    v = zero(u)     # meridional velocity zero for these initial conditions
+    @unpack vor = progn.layers[end].leapfrog[1]
+    curl!(vor,u,v,model.spectral_transform)
+
+    # transform interface height η (use pres as prognostic variable) in spectral
+    pres = progn.pres.leapfrog[1]
+    copyto!(pres,η)
+end
 
 #         φ = M.geometry.latds
 
@@ -88,7 +147,6 @@ function initial_conditions!(   ::Type{ZonalWind},
 #             cosϕ = cosd(ϕ[ij])
 #             orography[ij] = g⁻¹*s*(s*(-2*sinϕ^6*(cosϕ^2 + 1/3) + 10/63) + (8/5*cosϕ^3*(sinϕ^2 + 2/3) - π/4)*aΩ)
 #         end
-end
 
 function allocate_prognostic_variables(model::ModelSetup) 
 

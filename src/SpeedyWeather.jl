@@ -67,7 +67,7 @@ module SpeedyWeather
     # EXPORT INITIAL CONDITIONS
     export  StartFromFile,
             StartFromRest,
-            ZonalWind,
+            NorthMidlatitudeJet,
             StartWithVorticity
 
     # EXPORT INTERPOLATION FOR GRIDS
