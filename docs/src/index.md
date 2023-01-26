@@ -6,11 +6,12 @@ precipitation and radiation.
 
 ## Overview
 
-SpeedyWeather.jl is a global spectral model that uses a Fourier and Legendre transform to calculcate
-tendencies of the prognostic variables vorticity, divergence, absolute temperature, logarithm of surface
+SpeedyWeather.jl is a global spectral model that uses a spherical harmonic transform to perform some calculations
+in spectral space (time integration, gradients, linear terms) and some in grid-point space (advection, non-linear terms).
+The prognostic variables used are vorticity, divergence, absolute temperature, logarithm of surface
 pressure and specific humidity. The time stepping uses a leapfrog scheme with additional filters and a
 semi-implicit formulation for gravity waves. The default resolution is T31 (96x48 grid points on a
-Gaussian grid, about 400km at the Equator) and 8 vertical levels.
+regular Gaussian grid, about 400km at the Equator) and 8 vertical levels.
 
 Simple parameterizations are used to represent the physical processes convection, large-scale condensation,
 clouds, short-wave radiation, long-waves radiation, surface fluxes of momentum and energy, and vertical diffusion.
@@ -21,6 +22,7 @@ See the following pages of the documentation for more details
 
 - [How to run SpeedyWeather.jl](how_to_run_speedy.md)
 - [Spherical harmonic transform](spectral_transform.md)
+- [Grids](grids.md)
 - [Dynamical core](dynamical_core.md)
 - [Parametrizations](parametrizations.md)
 - [New model setups](new_model_setups.md)
@@ -32,10 +34,10 @@ by Molteni and Kucharski.
 ## Scope
 
 The focus of SpeedyWeather.jl is to develop a global atmospheric model of intermediate complexity,
-that can run at various levels of precision (16, 32 and 64-bit) on different architectures (x86 and ARM,
-currently planned, GPUs probably in the future). Additionally, the model is written in an entirely number
-format-flexible way, such that any custom number format can be used and Julia will compile to the format
-automatically.
+that can run at various levels of precision (16, 32 and 64-bit) on different architectures (x86 and ARM, 
+GPUs in the future). Additionally, the model is written in an entirely number format-flexible way,
+such that any custom number format can be used and Julia will compile to the format automatically.
+Similarly, many model components are written in an abstract way to support modularity and extandability.
 
 ## History
 
@@ -51,26 +53,29 @@ that a single line of code survived.
 SpeedyWeather.jl is registered in the Julia Registry. Open Julia's package manager from the REPL with `]`
 and `add` the github repository to install SpeedyWeather.jl and all dependencies
 ```julia
-(@v1.7) pkg> add SpeedyWeather
+(@v1.8) pkg> add SpeedyWeather
 ```
 which will automatically install the latest release. However, you may want to install directly from the
 main branch with
 ```julia
-(@v1.7) pkg> add https://github.com/milankl/SpeedyWeather.jl#main
+(@v1.78) pkg> add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
 ```
 other branches than `#main` can be installed by adding `#branch_name` instead.
 
 ## Developers
 
-SpeedyWeather.jl is currently developed by
+The development of  SpeedyWeather.jl is lead by [Milan Klöwer](https://github.com/milankl) and current and
+past contributors include
 
-- [Milan Klöwer](https://github.com/milankl)
 - [Tom Kimpson](https://github.com/tomkimpson)
 - [Alistair White](https://github.com/white-alistair)
+- [Maximilian Gelbrecht](https://github.com/maximilian-gelbrecht)
+- [David Meyer](https://github.com/dmey)
+- [Daisuke Hotta](https://github.com/hottad)
 
 Any contributions are always welcome!
 
 ## Funding
 
-This project is funded by the European Research Council under Horizon 2020 within the ITHACA project,
-grant agreement number 741112.
+Contributors received funding by the European Research Council under Horizon 2020 within the ITHACA project,
+grant agreement number 741112 from 2021-2022.
