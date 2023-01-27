@@ -98,12 +98,12 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     # TIME STEPPING
     startdate::DateTime = DateTime(2000,1,1)# time at which the integration starts
     n_days::Real = 10                       # number of days to integrate for
-    Δt_at_T31::Real = 60                    # time step in minutes for T31, scale linearly to trunc
+    Δt_at_T31::Real = 30                    # time step in minutes for T31, scale linearly to trunc
 
     # NUMERICS
     robert_filter::Real = 0.05          # Robert (1966) time filter coefficeint to suppress comput. mode
     williams_filter::Real = 0.53        # William's time filter (Amezcua 2011) coefficient for 3rd order acc
-    implicit_α::Real = 0.5              # coefficient for semi-implicit computations to filter gravity waves
+    implicit_α::Real = 1                # coefficient for semi-implicit computations to filter gravity waves
     
     # LEGENDRE TRANSFORM AND POLYNOMIALS
     recompute_legendre::Bool = false    # recomputation is slower but requires less memory
@@ -119,7 +119,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # INITIAL CONDITIONS
     seed::Int = abs(rand(Int))          # random seed for the global random number generator
-    initial_conditions::Type{<:InitialConditions} = StartWithVorticity
+    initial_conditions::Type{<:InitialConditions} = initial_conditions_default(Model)
 
     # OUTPUT
     verbose::Bool = true            # print dialog for feedback
@@ -178,3 +178,8 @@ output_vars_default(::Type{<:Barotropic}) = [:vor,:u]
 output_vars_default(::Type{<:ShallowWater}) = [:vor,:u]
 output_vars_default(::Type{<:PrimitiveDryCore}) = [:vor,:u,:temp]
 output_vars_default(::Type{<:PrimitiveWetCore}) = [:vor,:u,:temp,:humid]
+
+# default initial conditions by model
+initial_conditions_default(::Type{<:Barotropic}) = StartWithVorticity
+initial_conditions_default(::Type{<:ShallowWater}) = NorthMidlatitudeJet
+initial_conditions_default(::Type{<:PrimitiveEquation}) = StartFromRest

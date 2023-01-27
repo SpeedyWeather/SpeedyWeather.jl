@@ -313,6 +313,8 @@ function write_netcdf_variables!(   outputter::Output,
 
     # surface pressure, i.e. interface displacement η
     if :pres in output_vars
+        @unpack pres_grid = diagn.surface
+
         if output_matrix
             Matrix!(pres,diagn.surface.pres_grid; quadrant_rotation, matrix_quadrant)
         else
