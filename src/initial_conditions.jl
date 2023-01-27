@@ -64,10 +64,14 @@ function initial_conditions!(   ::Type{NorthMidlatitudeJet},
                                 progn::PrognosticVariables,
                                 model::ShallowWater)
 
-    θ₀ = π/7                # northern boundary of jet (latitude)
-    θ₁ = π/2 - θ₀           # southern boundary of jet
+    θ₀ = π/7                # southern boundary of jet (latitude)
+    θ₁ = π/2 - θ₀           # northern boundary of jet
+    θ₂ = π/4                # perturbation latitude
     eₙ = exp(-4/(θ₁-θ₀)^2)  # normalisation
-    umax = 80               # maximum zonal velocity
+    umax = 80               # maximum zonal velocity [m/s]
+    ĥ = 120                 # interface perturbation [m]
+    α = 1/3                 # zonal extent of interface perturbation [radians]
+    β = 1/15                # meridional extent of interface perturbation [radians]
     @unpack radius_earth, rotation_earth, gravity = model.parameters
 
     # always create on F64 grid then convert to spectral and interpolate there
@@ -76,11 +80,12 @@ function initial_conditions!(   ::Type{NorthMidlatitudeJet},
     u_grid = zeros(Grid,nlat_half)
     η_grid = zeros(Grid,nlat_half)
     colats = get_colat(Grid,nlat_half)
+    _,lons = get_colatlons(Grid,nlat_half)
     weights = FastGaussQuadrature.gausslegendre(2nlat_half)[2]
     η_sum = 0
 
     for (j,ring) in enumerate(eachring(u_grid,η_grid))
-        θ = π - colats[j]           # latitude in radians
+        θ = π/2 - colats[j]             # latitude in radians
         coslat⁻¹j = 1/cos(θ)
         f = 2rotation_earth*sin(θ)
         
@@ -91,16 +96,20 @@ function initial_conditions!(   ::Type{NorthMidlatitudeJet},
             u_θ = 0
         end
 
-        u_θc = u_θ/radius_earth*coslat⁻¹j   # include scaling for curl!
-
         # integration for layer thickness h / interface height η
         w = weights[j]
-        η_sum += w*(radius_earth*u_θ/gravity * (f + tan(θ)/radius_earth*u_θ))
+        η_sum += 2w*(radius_earth*u_θ/gravity * (f + tan(θ)/radius_earth*u_θ))
+
+        # lon-constant part of perturbation
+        ηθ = ĥ*cos(θ)*exp(-((θ₂-θ)/β)^2)
 
         # store in all longitudes
         for ij in ring
-            u_grid[ij] = u_θc
-            η_grid[ij] = η_sum
+            u_grid[ij] = u_θ/radius_earth*coslat⁻¹j   # include scaling for curl!
+            
+            # calculate perturbation
+            ϕ = ((lons[ij] + π) % 2π) - π
+            η_grid[ij] = η_sum + exp(-(ϕ/α)^2)*ηθ
         end
     end
 
@@ -120,6 +129,8 @@ function initial_conditions!(   ::Type{NorthMidlatitudeJet},
     # transform interface height η (use pres as prognostic variable) in spectral
     pres = progn.pres.leapfrog[1]
     copyto!(pres,η)
+    spectral_truncation!(pres)
+    # println(pres)
 end
 
 #         φ = M.geometry.latds
