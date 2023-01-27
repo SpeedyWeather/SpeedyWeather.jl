@@ -4,7 +4,7 @@ makedocs(
     format = Documenter.HTML(
     prettyurls = get(ENV, "CI", nothing) == "true"),
     sitename="SpeedyWeather.jl",
-    authors="M Klöwer, T Kimpson, A White",
+    authors="M Klöwer and SpeedyWeather contributors",
     modules=[SpeedyWeather],
     pages=["Home"=>"index.md",
             "How to run SpeedyWeather.jl"=>"how_to_run_speedy.md",
@@ -19,7 +19,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/milankl/SpeedyWeather.jl.git",
+    repo = "github.com/SpeedyWeather/SpeedyWeather.jl.git",
     devbranch = "main",
     versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"]
 )
