@@ -35,7 +35,7 @@ v &= \frac{1}{R\cos(\theta)} \frac{\partial \Psi}{\partial \phi} \\
 \end{aligned}
 ```
 
-which is described in [Gradients in spectral space](@ref).
+which is described in [Derivatives in spherical coordinates](@ref).
 
 ### Algorithm
 
