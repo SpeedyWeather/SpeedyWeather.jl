@@ -115,7 +115,7 @@ nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))
 get_nlat(Grid::Type{<:AbstractGrid},nlat_half::Integer) = 2nlat_half - nlat_odd(Grid)*(nlat_half > 0)
 get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,grid.nlat_half)
 
-# get total number of grid points
+# get total number of grid pointst
 get_npoints(grid::Grid) where {Grid<:AbstractGrid} = get_npoints(Grid,grid.nlat_half)
 
 # coordinates

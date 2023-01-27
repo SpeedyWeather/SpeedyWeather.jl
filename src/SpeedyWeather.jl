@@ -2,18 +2,9 @@ module SpeedyWeather
 
     # STRUCTURE
     import Parameters: @unpack
-    import InteractiveUtils: subtypes
 
     # NUMERICS
     import Random
-    import FastGaussQuadrature
-    import AssociatedLegendrePolynomials as Legendre
-    import AbstractFFTs
-    import FFTW
-    import GenericFFT
-    import Primes
-    import LinearAlgebra
-    import Statistics: mean
 
     # GPU
     import KernelAbstractions
@@ -70,11 +61,6 @@ module SpeedyWeather
             NorthMidlatitudeJet,
             StartWithVorticity
 
-    # EXPORT INTERPOLATION FOR GRIDS
-    export  Interpolator,
-            GridGeometry,
-            InterpolationLocator
-
     # EXPORT STRUCTS
     export  Parameters,
             Constants,
@@ -90,53 +76,62 @@ module SpeedyWeather
     export  spectral,
             gridded,
             spectral_truncation
-
+            
     include("utility_functions.jl")
-    include("lower_triangular_matrix.jl")   # defines LowerTriangularMatrix
-    include("RingGrids/RingGrids.jl")       # defines AbstractGrid and concrete Grid types
+    include("abstract_types.jl")
+    
+    # LowerTriangularMatrices for spherical harmonics
+    export LowerTriangularMatrices
+    include("LowerTriangularMatrices/LowerTriangularMatrices.jl")
+    using .LowerTriangularMatrices
+    
+    # RingGrids
+    export RingGrids
+    include("RingGrids/RingGrids.jl")
+    using .RingGrids
+
+    # SpeedyTransforms
+    export SpeedyTransforms
+    include("SpeedyTransforms/SpeedyTransforms.jl")
+    using .SpeedyTransforms
+        
     include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
-
-    include("parameter_structs.jl")
-    include("spectral_truncation.jl")
-    include("abstract_types.jl")            # defines ModelSetup, Barotropic, ShallowWater,
-                                            # PrimitiveEquation and others
-
     include("default_parameters.jl")        # defines Parameters
-    include("constants.jl")                 # defines Constants
-    include("parameterization_constants.jl")# defines Parameterization Constants
-    include("geometry.jl")                  # defines Geometry
-
-    include("spectral_transform.jl")        # defines SpectralTransform
-    include("spectral_gradients.jl")
-
-    include("boundaries.jl")                # defines Boundaries
-    include("define_diffusion.jl")          # defines HorizontalDiffusion
-    include("define_implicit.jl")           # defines Implicit
-    include("models.jl")                    # defines ModelSetups
-
-    include("prognostic_variables.jl")      # defines PrognosticVariables
-    include("diagnostic_variables.jl")      # defines DiagnosticVariables
-    include("initial_conditions.jl")
-    include("scaling.jl")
-    include("geopotential.jl")
-
-    include("run_speedy.jl")
-    include("tendencies_dynamics.jl")
-    include("tendencies.jl")
-    include("implicit_correction.jl")
-    include("diffusion.jl")
-    include("output.jl")                    # defines Output
-    include("feedback.jl")                  # defines Feedback
+    
+    # DYNAMICS
+    include("dynamics/constants.jl")                 # defines Constants
+    include("dynamics/geometry.jl")                  # defines Geometry
+    include("dynamics/boundaries.jl")                # defines Boundaries
+    include("dynamics/define_diffusion.jl")          # defines HorizontalDiffusion
+    include("dynamics/define_implicit.jl")           # defines Implicit
+    include("dynamics/models.jl")                    # defines ModelSetups
+    include("dynamics/prognostic_variables.jl")      # defines PrognosticVariables
+    include("dynamics/diagnostic_variables.jl")      # defines DiagnosticVariables
+    include("dynamics/initial_conditions.jl")
+    include("dynamics/scaling.jl")
+    include("dynamics/geopotential.jl")
+    include("dynamics/tendencies_dynamics.jl")
+    include("dynamics/tendencies.jl")
+    include("dynamics/implicit_correction.jl")
+    include("dynamics/diffusion.jl")
+    include("dynamics/time_integration.jl")
     
     # PHYSICS
-    include("column_variables.jl")          # defines ColumnVariables
-    include("thermodynamics.jl")
-    include("tendencies_parametrizations.jl")
-    include("convection.jl")
-    include("large_scale_condensation.jl")
-    include("longwave_radiation.jl")
-    include("shortwave_radiation.jl")
-
-    include("time_integration.jl")
-    include("pretty_printing.jl")
+    include("physics/parameter_structs.jl")
+    include("physics/parameterization_constants.jl")# defines Parameterization Constants
+    include("physics/column_variables.jl")          # defines ColumnVariables
+    include("physics/thermodynamics.jl")
+    include("physics/tendencies_parametrizations.jl")
+    include("physics/convection.jl")
+    include("physics/large_scale_condensation.jl")
+    include("physics/longwave_radiation.jl")
+    include("physics/shortwave_radiation.jl")
+    
+    # OUTPUT
+    include("output/output.jl")                     # defines Output
+    include("output/feedback.jl")                   # defines Feedback
+    include("output/pretty_printing.jl")
+    
+    # INTERFACE
+    include("run_speedy.jl")
 end

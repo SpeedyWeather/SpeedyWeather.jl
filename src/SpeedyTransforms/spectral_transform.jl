@@ -261,7 +261,7 @@ end
     S = SpectralTransform(P::Parameters)
 
 Generator function for a SpectralTransform struct pulling in parameters from a Parameters struct."""
-function SpectralTransform(P::Parameters)
+function SpectralTransform(P::AbstractParameters)
     @unpack NF, Grid, trunc, recompute_legendre, legendre_shortcut = P
     return SpectralTransform(NF,Grid,trunc,recompute_legendre;legendre_shortcut)
 end
@@ -271,19 +271,19 @@ end
 
 As-empty-as-possible constructor for an instance of SpectralTransform."""
 function SpectralTransform()
-    return SpectralTransform(Float64,FullGaussianGrid,0,true)
+    return SpectralTransform(Float64,DEFAULT_GRID,0,true)
 end
 
 """
     S = SpectralTransform(  alms::AbstractMatrix{Complex{NF}};
                             recompute_legendre::Bool=true,
-                            Grid::Type{<:AbstractGrid}=FullGaussianGrid)
+                            Grid::Type{<:AbstractGrid}=DEFAULT_GRID)
 
 Generator function for a `SpectralTransform` struct based on the size of the spectral
 coefficients `alms` and the grid `Grid`. Recomputes the Legendre polynomials by default."""
 function SpectralTransform( alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
                             recompute_legendre::Bool=true,      # saves memory
-                            Grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                            Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                             ) where NF                          # number format NF
 
     _, mmax = size(alms) .- 1                           # -1 for 0-based degree l, order m
@@ -561,14 +561,14 @@ end
 """
     map = gridded(  alms::AbstractMatrix;
                     recompute_legendre::Bool=true,
-                    grid::Type{<:AbstractGrid}=FullGaussianGrid)
+                    grid::Type{<:AbstractGrid}=DEFAULT_GRID)
 
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map`. Based on the size of `alms` the grid type `grid`, the spatial resolution is retrieved based
 on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `gridded(alms,S)`."""
 function gridded(   alms::AbstractMatrix{T};            # spectral coefficients
                     recompute_legendre::Bool=true,      # saves memory
-                    Grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                    Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                     ) where {NF,T<:Complex{NF}}         # number format NF
 
     _, mmax = size(alms) .- 1                           # -1 for 0-based degree l, order m
@@ -595,12 +595,12 @@ end
 
 """
     alms = spectral(    map::AbstractMatrix;
-                        Grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                        Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                         kwargs...)
 
 Converts `map` to `grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""
 function spectral(  map::AbstractMatrix;            # gridded field
-                    Grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                    Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                     kwargs...)
 
     return spectral(Grid(map);kwargs...)
@@ -608,7 +608,7 @@ end
 
 """
     alms = spectral(    map::AbstractGrid;
-                        Grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                        Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                         kwargs...)
 
 Converts `map` to `Grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""
@@ -624,7 +624,7 @@ end
 
 """
     alms = spectral(    map::AbstractMatrix;
-                        Grid::Type{<:AbstractGrid}=FullGaussianGrid,
+                        Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                         kwargs...)
 
 Spectral transform (grid to spectral) `map` to `grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""

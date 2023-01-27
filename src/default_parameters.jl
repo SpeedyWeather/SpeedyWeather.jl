@@ -51,7 +51,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     # VERTICAL COORDINATES
     # of the nlev vertical levels, defined by a generalised logistic function,
     # interpolating ECMWF's L31 configuration
-    GLcoefs::GenLogisticCoefs = GenLogisticCoefs()
+    GLcoefs::Coefficients = GenLogisticCoefs()
     n_stratosphere_levels::Integer = 2                  # number of vertical levels used for the stratosphere
     σ_tropopause::Real = 0.2                            # σ coordinate where the tropopause starts
     σ_levels_half::Vector{Real} = []                    # vector of σ half levels, only if set manually, otherwise an empty vector
@@ -72,7 +72,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     # PARAMETRIZATIONS
     n_shortwave::Integer = 3                # Compute shortwave radiation every n steps
     sppt_on::Bool = false                   # Turn on SPPT?
-    magnus_coefs::MagnusCoefs = MagnusCoefs{NF}()  # For computing saturation vapour pressure
+    magnus_coefs::Coefficients = MagnusCoefs{NF}()  # For computing saturation vapour pressure
 
     # Large-Scale Condensation (from table B10)
     k_lsc::Int = 2                    # Index of atmospheric level at which large-scale condensation begins
@@ -93,7 +93,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     nband::Int = 4                          # Number of bands used to compute fband
 
     # Radiation
-    radiation_coefs::RadiationCoefs = RadiationCoefs{NF}()
+    radiation_coefs::Coefficients = RadiationCoefs{NF}()
 
     # TIME STEPPING
     startdate::DateTime = DateTime(2000,1,1)# time at which the integration starts

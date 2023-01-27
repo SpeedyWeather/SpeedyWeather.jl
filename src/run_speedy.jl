@@ -89,8 +89,8 @@ Convenience function that can be used in combination with `initialize_speedy(arg
 to allow for access to the prognostic/diagnostic variables before the time integration is started."""
 function run_speedy!(   progn::PrognosticVariables, # all prognostic variables
                         diagn::DiagnosticVariables, # all pre-allocated diagnostic variables
-                        M::ModelSetup,              # all precalculated structs
+                        model::ModelSetup,          # all precalculated structs
                         )
-    time_stepping!(progn,diagn,M)
+    time_stepping!(progn,diagn,model)
     return progn
 end

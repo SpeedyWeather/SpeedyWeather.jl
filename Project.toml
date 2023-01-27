@@ -1,6 +1,6 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
-authors = ["Milan Klöwer and others"]
+authors = ["Milan Klöwer and SpeedyWeather contributors"]
 version = "0.4.0"
 
 [deps]
@@ -15,7 +15,6 @@ Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 GenericFFT = "a8297547-1b15-4a5a-a998-a2ac5f1cef28"
-InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"

@@ -1,5 +1,3 @@
-abstract type Coefficients end
-
 """Coefficients of the generalised logistic function to describe the vertical coordinate.
 Default coefficients A,K,C,Q,B,M,ν are fitted to the old L31 configuration at ECMWF.
 See geometry.jl and function vertical_coordinate for more informaiton.
