@@ -107,8 +107,8 @@ function initial_conditions!(   ::Type{NorthMidlatitudeJet},
         for ij in ring
             u_grid[ij] = u_θ/radius_earth*coslat⁻¹j   # include scaling for curl!
             
-            # calculate perturbation
-            ϕ = ((lons[ij] + π) % 2π) - π
+            # calculate perturbation (shifted in lon compared to Galewsky 2004 though)
+            ϕ = lons[ij] - 3π/2
             η_grid[ij] = η_sum + exp(-(ϕ/α)^2)*ηθ
         end
     end
@@ -130,7 +130,6 @@ function initial_conditions!(   ::Type{NorthMidlatitudeJet},
     pres = progn.pres.leapfrog[1]
     copyto!(pres,η)
     spectral_truncation!(pres)
-    # println(pres)
 end
 
 #         φ = M.geometry.latds
