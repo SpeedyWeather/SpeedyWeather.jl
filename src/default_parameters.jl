@@ -98,7 +98,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     # TIME STEPPING
     startdate::DateTime = DateTime(2000,1,1)# time at which the integration starts
     n_days::Real = 10                       # number of days to integrate for
-    Δt_at_T31::Real = 60                    # time step in minutes for T31, scale linearly to trunc
+    Δt_at_T31::Real = 30                    # time step in minutes for T31, scale linearly to trunc
 
     # NUMERICS
     robert_filter::Real = 0.05          # Robert (1966) time filter coefficeint to suppress comput. mode
