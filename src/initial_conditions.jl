@@ -1,4 +1,5 @@
-abstract type NorthMidlatitudeJet <: InitialConditions end
+abstract type NorthMidlatitudeJet <: InitialConditions end  # Galewsky, Scott, Palvani, 2004
+abstract type ZonalWind <: InitialConditions end            # Jablonowski, Williamson, 2006
 abstract type StartFromRest <: InitialConditions end
 abstract type StartFromFile <: InitialConditions end
 abstract type StartWithVorticity <: InitialConditions end
