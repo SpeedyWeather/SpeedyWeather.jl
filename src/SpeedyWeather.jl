@@ -1,5 +1,7 @@
 module SpeedyWeather
 
+    export abc
+
     # STRUCTURE
     import Parameters: @unpack
     import InteractiveUtils: subtypes
