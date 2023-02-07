@@ -15,13 +15,13 @@ end
 
 """
     I = Implicit(   P::Parameters,
-                    C::Constants,
+                    C::DynamicsConstants,
                     S::SpectralTransform)
 
 Generator function for an `Implicit` struct, which holds precomputed arrays for
 the implicit correction that """
 function Implicit(  P::Parameters,
-                    C::Constants{NF},
+                    C::DynamicsConstants{NF},
                     S::SpectralTransform{NF}
                     ) where NF
     

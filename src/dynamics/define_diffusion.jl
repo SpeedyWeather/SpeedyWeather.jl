@@ -33,7 +33,7 @@ and an explicit term. Also precalculates correction terms (horizontal and vertic
 temperature and humidity.
 """
 function HorizontalDiffusion(   P::Parameters{Model},
-                                C::Constants,        
+                                C::DynamicsConstants,        
                                 G::Geometry,
                                 S::SpectralTransform{NF},
                                 B::Boundaries

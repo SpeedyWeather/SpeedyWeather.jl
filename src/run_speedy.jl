@@ -43,7 +43,7 @@ function initialize_speedy( ::Type{NF}=DEFAULT_NF,          # default number for
     P = Parameters{ConcreteModel}(NF=NF;kwargs...)  # all model parameters chosen through kwargs
     Random.seed!(P.seed)                            # seed Julia's default RNG for reproducibility
     
-    C = Constants(P)                                # constants used in model integration
+    C = DynamicsConstants(P)                        # constants used in the dynamical core
     G = Geometry(P)                                 # everything grid
     S = SpectralTransform(P)                        # everything spectral transform
     B = Boundaries(P,S,G)                           # arrays for boundary conditions

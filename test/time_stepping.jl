@@ -19,7 +19,7 @@ end
     # loop over different precisions
     @testset for NF in (Float16,Float32,Float64)
         P = Parameters{BarotropicModel}(NF=NF)
-        C = Constants(P)
+        C = DynamicsConstants(P)
 
         # INITIAL CONDITIONS
         lmax,mmax = 3,3
@@ -30,7 +30,7 @@ end
         X_out = zeros(Complex{NF},n_timesteps+1)
 
         # exact 2nd leapfrog step
-        SpeedyWeather.scale!(X_new,Complex{NF}(exp(im*ω*Δt)))
+        X_new .*= exp(im*ω*Δt)
         X_out[1] = X_old[1,1]      # store initial conditions
 
         # leapfrog forward
@@ -58,7 +58,7 @@ end
     # loop over different precisions
     @testset for NF in (Float16,Float32,Float64)
         P = Parameters{BarotropicModel}(NF=NF)
-        C = Constants(P)
+        C = DynamicsConstants(P)
 
         # INITIAL CONDITIONS
         lmax,mmax = 3,3
@@ -69,7 +69,7 @@ end
         X_out = zeros(Complex{NF},n_timesteps+1)
 
         # exact 2nd leapfrog step
-        SpeedyWeather.scale!(X_new,Complex{NF}(exp(im*ω*Δt)))
+        X_new .*= exp(im*ω*Δt)
         X_out[1] = X_old[1,1]      # store initial conditions
 
         # leapfrog forward
@@ -86,7 +86,7 @@ end
 
         # CHECK THAT NO WILLIAM'S FILTER IS WORSE
         P = Parameters{BarotropicModel}(NF=NF,williams_filter=1)     # Robert's filter only
-        C = Constants(P)
+        C = DynamicsConstants(P)
 
         # INITIAL CONDITIONS
         lmax,mmax = 3,3
@@ -97,7 +97,7 @@ end
         X_out = zeros(Complex{NF},n_timesteps+1)
 
         # exact 2nd leapfrog step
-        SpeedyWeather.scale!(X_new,Complex{NF}(exp(im*ω*Δt)))
+        X_new .*= exp(im*ω*Δt)
         X_out[1] = X_old[1,1]      # store initial conditions
 
         # leapfrog forward

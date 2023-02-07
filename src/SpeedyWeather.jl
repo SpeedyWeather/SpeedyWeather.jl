@@ -5,6 +5,7 @@ module SpeedyWeather
 
     # NUMERICS
     import Random
+    import FastGaussQuadrature
 
     # GPU
     import KernelAbstractions
@@ -63,7 +64,7 @@ module SpeedyWeather
 
     # EXPORT STRUCTS
     export  Parameters,
-            Constants,
+            DynamicsConstants,
             ParameterizationConstants,
             Geometry,
             SpectralTransform,
@@ -99,14 +100,15 @@ module SpeedyWeather
     include("default_parameters.jl")        # defines Parameters
     
     # DYNAMICS
-    include("dynamics/constants.jl")                 # defines Constants
-    include("dynamics/geometry.jl")                  # defines Geometry
-    include("dynamics/boundaries.jl")                # defines Boundaries
-    include("dynamics/define_diffusion.jl")          # defines HorizontalDiffusion
-    include("dynamics/define_implicit.jl")           # defines Implicit
-    include("dynamics/models.jl")                    # defines ModelSetups
-    include("dynamics/prognostic_variables.jl")      # defines PrognosticVariables
-    include("dynamics/diagnostic_variables.jl")      # defines DiagnosticVariables
+    include("dynamics/constants.jl")                # defines DynamicsConstants
+    include("dynamics/geometry.jl")                 # defines Geometry
+    include("dynamics/boundaries.jl")               # defines Boundaries
+    include("dynamics/define_diffusion.jl")         # defines HorizontalDiffusion
+    include("dynamics/define_implicit.jl")          # defines Implicit
+    include("dynamics/parameter_structs.jl")        # defines GenLogisticCoefs
+    include("dynamics/models.jl")                   # defines ModelSetups
+    include("dynamics/prognostic_variables.jl")     # defines PrognosticVariables
+    include("dynamics/diagnostic_variables.jl")     # defines DiagnosticVariables
     include("dynamics/initial_conditions.jl")
     include("dynamics/scaling.jl")
     include("dynamics/geopotential.jl")
@@ -117,8 +119,8 @@ module SpeedyWeather
     include("dynamics/time_integration.jl")
     
     # PHYSICS
-    include("physics/parameter_structs.jl")
-    include("physics/parameterization_constants.jl")# defines Parameterization Constants
+    include("physics/constants.jl")                 # defines Parameterization Constants
+    include("physics/parameter_structs.jl")         # defines MagnusCoefs, RadiationCoefs
     include("physics/column_variables.jl")          # defines ColumnVariables
     include("physics/thermodynamics.jl")
     include("physics/tendencies_parametrizations.jl")
@@ -135,3 +137,4 @@ module SpeedyWeather
     # INTERFACE
     include("run_speedy.jl")
 end
+

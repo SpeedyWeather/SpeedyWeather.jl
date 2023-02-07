@@ -1,7 +1,7 @@
 """
 Struct holding the parameters needed at runtime in number format NF.
 """
-Base.@kwdef struct Constants{NF<:AbstractFloat} <: AbstractConstants{NF}
+Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConstants{NF}
 
     # PHYSICAL CONSTANTS
     radius_earth::NF        # Radius of Earth
@@ -48,9 +48,9 @@ Base.@kwdef struct Constants{NF<:AbstractFloat} <: AbstractConstants{NF}
 end
 
 """
-Generator function for a Constants struct.
+Generator function for a DynamicsConstants struct.
 """
-function Constants(P::Parameters)
+function DynamicsConstants(P::Parameters)
 
     # PHYSICAL CONSTANTS
     @unpack radius_earth, rotation_earth, gravity, R_dry, R_vapour, cₚ = P
@@ -90,14 +90,14 @@ function Constants(P::Parameters)
     Δt /= radius_earth      # [s/m] scale with Earth's radius
 
     # This implies conversion to NF
-    return Constants{P.NF}( radius_earth,rotation_earth,gravity,R_dry,H₀,μ_virt_temp,κ,
-                            Δt,Δt_unscaled,Δt_sec,Δt_hrs,
-                            robert_filter,williams_filter,n_timesteps,
-                            output_every_n_steps, n_outputsteps,
-                            drag_strat, interface_relax_time,
-                            RH_thresh_pbl_lsc, RH_thresh_range_lsc,
-                            RH_thresh_max_lsc, humid_relax_time_lsc, pres_thresh_cnv,
-                            RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv,
-                            max_entrainment, ratio_secondary_mass_flux,
-                            )
+    return DynamicsConstants{P.NF}( radius_earth,rotation_earth,gravity,R_dry,H₀,μ_virt_temp,κ,
+                                    Δt,Δt_unscaled,Δt_sec,Δt_hrs,
+                                    robert_filter,williams_filter,n_timesteps,
+                                    output_every_n_steps, n_outputsteps,
+                                    drag_strat, interface_relax_time,
+                                    RH_thresh_pbl_lsc, RH_thresh_range_lsc,
+                                    RH_thresh_max_lsc, humid_relax_time_lsc, pres_thresh_cnv,
+                                    RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv,
+                                    max_entrainment, ratio_secondary_mass_flux,
+                                    )
 end

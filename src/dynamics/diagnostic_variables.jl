@@ -19,7 +19,7 @@ function Base.zeros(::Type{Tendencies},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
     
-    @unpack Grid, nresolution = G
+    @unpack Grid, nlat_half = G
     @unpack lmax, mmax = S
     
     # use one more l for size compat with vector quantities
@@ -29,10 +29,10 @@ function Base.zeros(::Type{Tendencies},
     humid_tend      = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # specific humidity
     u_tend          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # zonal velocity
     v_tend          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # meridional velocity
-    u_tend_grid     = zeros(Grid{NF},nresolution)                               # zonal velocity
-    v_tend_grid     = zeros(Grid{NF},nresolution)                               # meridional velocity
-    temp_tend_grid  = zeros(Grid{NF},nresolution)                               # temperature
-    humid_tend_grid = zeros(Grid{NF},nresolution)                               # specific humidity
+    u_tend_grid     = zeros(Grid{NF},nlat_half)                               # zonal velocity
+    v_tend_grid     = zeros(Grid{NF},nlat_half)                               # meridional velocity
+    temp_tend_grid  = zeros(Grid{NF},nlat_half)                               # temperature
+    humid_tend_grid = zeros(Grid{NF},nlat_half)                               # specific humidity
 
     return Tendencies(  vor_tend,div_tend,temp_tend,humid_tend,
                         u_tend,v_tend,u_tend_grid,v_tend_grid,
@@ -56,15 +56,15 @@ end
 
 function Base.zeros(::Type{GridVariables},G::Geometry{NF}) where NF
 
-    @unpack Grid, nresolution = G
-    vor_grid            = zeros(Grid{NF},nresolution)   # vorticity
-    div_grid            = zeros(Grid{NF},nresolution)   # divergence
-    temp_grid           = zeros(Grid{NF},nresolution)   # absolute temperature
-    temp_virt_grid      = zeros(Grid{NF},nresolution)   # virtual temperature
-    humid_grid          = zeros(Grid{NF},nresolution)   # specific humidity
-    geopot_grid         = zeros(Grid{NF},nresolution)   # geopotential
-    u_grid              = zeros(Grid{NF},nresolution)   # zonal velocity *coslat
-    v_grid              = zeros(Grid{NF},nresolution)   # meridonal velocity *coslat
+    @unpack Grid, nlat_half = G
+    vor_grid            = zeros(Grid{NF},nlat_half)   # vorticity
+    div_grid            = zeros(Grid{NF},nlat_half)   # divergence
+    temp_grid           = zeros(Grid{NF},nlat_half)   # absolute temperature
+    temp_virt_grid      = zeros(Grid{NF},nlat_half)   # virtual temperature
+    humid_grid          = zeros(Grid{NF},nlat_half)   # specific humidity
+    geopot_grid         = zeros(Grid{NF},nlat_half)   # geopotential
+    u_grid              = zeros(Grid{NF},nlat_half)   # zonal velocity *coslat
+    v_grid              = zeros(Grid{NF},nlat_half)   # meridonal velocity *coslat
 
     return GridVariables(   vor_grid,div_grid,temp_grid,temp_virt_grid,humid_grid,geopot_grid,
                             u_grid,v_grid)
@@ -110,7 +110,7 @@ function Base.zeros(::Type{DynamicsVariables},
                     S::SpectralTransform{NF}) where NF
     
     @unpack lmax, mmax = S
-    @unpack Grid, nresolution = G
+    @unpack Grid, nlat_half = G
 
     # VELOCITY VECTOR (U,V) in spectral with *coslat scaling included
     U = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
@@ -119,22 +119,22 @@ function Base.zeros(::Type{DynamicsVariables},
     # MULTI-PURPOSE VECTOR (a,b), work array to be reused in various places
     a = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     b = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    a_grid = zeros(Grid{NF},nresolution)
-    b_grid = zeros(Grid{NF},nresolution)
+    a_grid = zeros(Grid{NF},nlat_half)
+    b_grid = zeros(Grid{NF},nlat_half)
 
     # SHALLOW WATER and PRIMITIVE EQUATION MODEL, bernoulli = 1/2*(u^2 + v^2) + Φ
-    bernoulli_grid  = zeros(Grid{NF},nresolution)
+    bernoulli_grid  = zeros(Grid{NF},nlat_half)
     bernoulli       = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     
     # VERTICAL INTEGRATION
-    uv∇lnp          = zeros(Grid{NF},nresolution)   # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
-    div_weighted    = zeros(Grid{NF},nresolution)   # = ∇⋅((uₖ,vₖ)Δpₖ), weighted by pres thick
-    div_sum_above   = zeros(Grid{NF},nresolution)   # sum of div_weighted from level 1:k
+    uv∇lnp          = zeros(Grid{NF},nlat_half)   # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
+    div_weighted    = zeros(Grid{NF},nlat_half)   # = ∇⋅((uₖ,vₖ)Δpₖ), weighted by pres thick
+    div_sum_above   = zeros(Grid{NF},nlat_half)   # sum of div_weighted from level 1:k
     temp_virt       = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     geopot          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
     # VERTICAL VELOCITY (̇̇dσ/dt)
-    σ_tend = zeros(Grid{NF},nresolution)    # = dσ/dt, on half levels below, at k+1/2
+    σ_tend = zeros(Grid{NF},nlat_half)    # = dσ/dt, on half levels below, at k+1/2
 
     return DynamicsVariables(   U,V,
                                 a,b,a_grid,b_grid,
@@ -189,27 +189,27 @@ function Base.zeros(::Type{SurfaceVariables},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
 
-    @unpack Grid, nresolution, npoints = G
+    @unpack Grid, nlat_half, npoints = G
     @unpack lmax, mmax = S
 
     # log of surface pressure and tendency thereof
-    pres_grid = zeros(Grid{NF},nresolution)
+    pres_grid = zeros(Grid{NF},nlat_half)
     pres_tend = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    pres_tend_grid = zeros(Grid{NF},nresolution)
+    pres_tend_grid = zeros(Grid{NF},nlat_half)
 
     # gradients of log surface pressure
-    ∇lnp_x = zeros(Grid{NF},nresolution)    # zonal gradient of log surf pressure
-    ∇lnp_y = zeros(Grid{NF},nresolution)    # meridional gradient of log surf pres
+    ∇lnp_x = zeros(Grid{NF},nlat_half)    # zonal gradient of log surf pressure
+    ∇lnp_y = zeros(Grid{NF},nlat_half)    # meridional gradient of log surf pres
 
     # vertical averaged (weighted by σ level thickness) velocities (*coslat) and divergence
-    u_mean_grid = zeros(Grid{NF},nresolution)
-    v_mean_grid = zeros(Grid{NF},nresolution)
-    div_mean_grid = zeros(Grid{NF},nresolution)
+    u_mean_grid = zeros(Grid{NF},nlat_half)
+    v_mean_grid = zeros(Grid{NF},nlat_half)
+    div_mean_grid = zeros(Grid{NF},nlat_half)
     div_mean = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
     # precipitation fields
-    precip_large_scale = zeros(Grid{NF},nresolution)
-    precip_convection = zeros(Grid{NF},nresolution)
+    precip_large_scale = zeros(Grid{NF},nlat_half)
+    precip_convection = zeros(Grid{NF},nlat_half)
 
     return SurfaceVariables(pres_grid,pres_tend,pres_tend_grid,
                             ∇lnp_x,∇lnp_y,
@@ -243,7 +243,7 @@ end
 
 DiagnosticVariables(G::Geometry{NF},S::SpectralTransform{NF}) where NF = zeros(DiagnosticVariables,G,S)
 
-# LOOP OVER ALL GRID POINTS
-eachgridpoint(diagn::DiagnosticVariables) = Base.OneTo(diagn.npoints)
-eachgridpoint(layer::DiagnosticVariablesLayer) = Base.OneTo(layer.npoints)
-eachgridpoint(surface::SurfaceVariables) = Base.OneTo(surface.npoints)
+# LOOP OVER ALL GRID POINTS (extend from RingGrids module)
+RingGrids.eachgridpoint(diagn::DiagnosticVariables) = Base.OneTo(diagn.npoints)
+RingGrids.eachgridpoint(layer::DiagnosticVariablesLayer) = Base.OneTo(layer.npoints)
+RingGrids.eachgridpoint(surface::SurfaceVariables) = Base.OneTo(surface.npoints)

@@ -1,7 +1,7 @@
 """
 Parameters for radiation parameterizations.
 """
-struct ParameterizationConstants{NF<:AbstractFloat}
+struct ParameterizationConstants{NF<:AbstractFloat} <: AbstractParameterizationConstants{NF}
     fband::Matrix{NF}
 end    
 
