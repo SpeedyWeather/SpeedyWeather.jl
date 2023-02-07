@@ -60,9 +60,9 @@ function initialize_orography!( orog::AbstractOrography,
     @unpack orography_path, orography_file, gravity = P
     @unpack lmax, mmax = S
 
-    # LOAD NETCDF FILE (but not its data yet)
+    # LOAD NETCDF FILE
     if orography_path == ""
-        path = joinpath(@__DIR__,"../input_data",orography_file)
+        path = joinpath(@__DIR__,"../../input_data",orography_file)
     else
         path = joinpath(orography_path,orography_file)
     end

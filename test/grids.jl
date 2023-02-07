@@ -173,7 +173,7 @@ end
         grid = zeros(G,n)
 
         # precompute indices and boundscheck
-        rings = SpeedyWeather.eachring(grid,grid)   
+        rings = RingGrids.eachring(grid,grid)   
 
         for (j,ring) in enumerate(rings)
             for ij in ring
@@ -181,11 +181,11 @@ end
             end
         end
 
-        for ij in SpeedyWeather.eachgridpoint(grid)
+        for ij in RingGrids.eachgridpoint(grid)
             @test grid[ij] == 1
         end
 
-        @test sum(grid) == SpeedyWeather.get_npoints(G,n)
+        @test sum(grid) == RingGrids.get_npoints(G,n)
     end
 end
 

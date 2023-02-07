@@ -15,7 +15,7 @@
 
             θs = 180*rand(npoints) .- 90    # some latitudes in [-90˚,90˚N]
             λs = 360*rand(npoints)          # some longitudes in [0˚,360˚E]
-            As = SpeedyWeather.interpolate(θs,λs,A)
+            As = RingGrids.interpolate(θs,λs,A)
 
             for a in As
                 @test a ≈ c
@@ -36,10 +36,10 @@ end
         @testset for NF in (Float32,Float64)
         
             A = zeros(Grid{NF},32)          # some resolution
-            G = SpeedyWeather.GridGeometry(A)
+            G = RingGrids.GridGeometry(A)
             lat1 = G.latd[2]                # latitude of first ring
             
-            for (j,ring) in enumerate(SpeedyWeather.eachring(A))
+            for (j,ring) in enumerate(RingGrids.eachring(A))
                 θ = G.latd[j+1]     # G.latd also includes 90˚N hence +1
                 for ij in ring
                     A[ij] = θ
@@ -52,7 +52,7 @@ end
             θs = 2lat1*rand(npoints) .- lat1    # some latitudes in [-90˚,90˚N]
             λs = 360*rand(npoints)              # some longitudes in [0˚,360˚E]
             
-            As = SpeedyWeather.interpolate(θs,λs,A)
+            As = RingGrids.interpolate(θs,λs,A)
 
             for (a,θ) in zip(As,θs)
                 @test a ≈ θ
@@ -73,14 +73,14 @@ end
         @testset for NF in (Float32,Float64)
         
             A = zeros(Grid{NF},32)          # some resolution
-            G = SpeedyWeather.GridGeometry(A)
+            G = RingGrids.GridGeometry(A)
             lat1 = G.latd[2]                # latitude of first ring
             
             # TEST FROM 60˚ to 300˚ to not interpolate across 0/360˚E
             # where this test won't work because lon have a sharp jump
             # and aren't linear across the prime meridian
             # but that differently further down
-            for (j,ring) in enumerate(SpeedyWeather.eachring(A))
+            for (j,ring) in enumerate(RingGrids.eachring(A))
                 for ij in ring
                     A[ij] = G.londs[ij]
                 end
@@ -92,7 +92,7 @@ end
             θs = 2lat1*rand(npoints) .- lat1    # some latitudes in (-90˚,90˚N)
             λs = 240*rand(npoints) .+ 60        # some longitudes in [60˚,300˚E]
             
-            As = SpeedyWeather.interpolate(θs,λs,A)
+            As = RingGrids.interpolate(θs,λs,A)
 
             for (a,λ) in zip(As,λs)
                 @test a ≈ λ
@@ -102,7 +102,7 @@ end
 
             # TEST FROM -120˚ to 120˚ to still test the indexing across the
             # prime meridian
-            for (j,ring) in enumerate(SpeedyWeather.eachring(A))
+            for (j,ring) in enumerate(RingGrids.eachring(A))
                 for ij in ring
                     A[ij] = f(G.londs[ij])
                 end
@@ -114,7 +114,7 @@ end
             θs = 2lat1*rand(npoints) .- lat1    # some latitudes in (-90˚,90˚N)
             λs = 240*rand(npoints) .- 120       # some longitudes in [-120˚,120˚E]
             
-            As = SpeedyWeather.interpolate(θs,λs,A)
+            As = RingGrids.interpolate(θs,λs,A)
 
             for (a,λ) in zip(As,λs)
                 @test a ≈ λ
@@ -131,7 +131,7 @@ end
                     OctaHEALPixGrid)
 
         @testset for nlat_half in [4,8,16] 
-            G = SpeedyWeather.GridGeometry(Grid,nlat_half)
+            G = RingGrids.GridGeometry(Grid,nlat_half)
             latd = G.latd
 
             n = length(latd)-1
@@ -142,7 +142,7 @@ end
 
             θs = θs[r]
             Δs = Δs[r]
-            js,Δys = SpeedyWeather.find_rings(θs,latd)
+            js,Δys = RingGrids.find_rings(θs,latd)
 
             for (i,(j,Δref,Δ)) in enumerate(zip(js,Δs,Δys))
                 @test j == r[i]-1
@@ -169,11 +169,11 @@ end
 
             # interpolate to FullGaussianGrid and back and compare
             nlat_half = 32
-            A_interpolated = SpeedyWeather.interpolate(FullGaussianGrid,nlat_half,A)
+            A_interpolated = RingGrids.interpolate(FullGaussianGrid,nlat_half,A)
             A2 = zero(A)
-            SpeedyWeather.interpolate!(A2,A_interpolated)
+            RingGrids.interpolate!(A2,A_interpolated)
 
-            for ij in SpeedyWeather.eachgridpoint(A,A2)
+            for ij in RingGrids.eachgridpoint(A,A2)
                 @test A[ij] ≈ A2[ij] rtol=1e-1 atol=1e-1
             end
         end

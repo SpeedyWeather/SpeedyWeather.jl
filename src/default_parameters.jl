@@ -140,7 +140,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     # OUTPUT GRID
     output_NF::DataType = Float32   # number format used for output
     output_nlat_half::Integer = 0   # 0 = reuse nlat_half from dynamical core
-    output_Grid::Type{<:AbstractFullGrid} = full_grid(Grid)
+    output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid(Grid)
     output_Interpolator::Type{<:AbstractInterpolator} = DEFAULT_INTERPOLATOR
     output_matrix::Bool = false     # if true sort gridpoints into a matrix
     output_quadrant_rotation::NTuple{4,Integer} = (0,1,2,3)

@@ -1,6 +1,9 @@
 module RingGrids
 
+    import Parameters: @unpack
     import Statistics: mean
+    import Primes
+    import FastGaussQuadrature
 
     # GRIDS
     export  AbstractGrid, 
@@ -24,9 +27,11 @@ module RingGrids
             get_truncation,
             get_resolution,
             get_nlat,
+            get_nlat_half,
             get_npoints,
             get_latdlonds,
             get_latd,
+            get_lond,
             each_index_in_ring,
             each_index_in_ring!,
             eachgridpoint,
@@ -46,7 +51,10 @@ module RingGrids
 
     export  interpolate,
             interpolate!,
-            update_locator
+            update_locator,
+            update_locator!
+
+    include("utility_functions.jl")
 
     include("grids_general.jl")
     include("show.jl")
@@ -55,4 +63,5 @@ module RingGrids
     include("healpix.jl")
     include("octahealpix.jl")
     include("quadrature_weights.jl")
+    include("interpolation.jl")
 end

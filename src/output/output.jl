@@ -127,8 +127,8 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,
 
     else                        # output grid directly into a matrix (resort grid points, no interpolation)
         @unpack nlat_half = M.geometry      # don't use output_nlat_half as not supported for output_matrix
-        nlon,nlat = matrix_size(M.geometry.Grid,nlat_half)  # size of the matrix output
-        lond = collect(1:nlon)                              # just enumerate grid points for lond, latd
+        nlon,nlat = RingGrids.matrix_size(M.geometry.Grid,nlat_half)    # size of the matrix output
+        lond = collect(1:nlon)                                          # just enumerate grid points for lond, latd
         latd = collect(1:nlat)
         lon_name, lon_units, lon_longname = "i","1","horizontal index i"
         lat_name, lat_units, lat_longname = "j","1","horizontal index j"
@@ -280,15 +280,15 @@ function write_netcdf_variables!(   outputter::Output,
                                           (u_grid,v_grid,vor_grid,div_grid,temp_grid,humid_grid))
                                            if length(M) > 0)
                                                     
-            Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
+            RingGrids.Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
 
         else                # or interpolate onto a full grid
-            :u in output_vars       && interpolate!(output_Grid(u),    u_grid, interpolator)
-            :v in output_vars       && interpolate!(output_Grid(v),    v_grid, interpolator)
-            :vor in output_vars     && interpolate!(output_Grid(vor),  vor_grid, interpolator)
-            :div in output_vars     && interpolate!(output_Grid(div),  div_grid, interpolator)
-            :temp in output_vars    && interpolate!(output_Grid(temp), temp_grid, interpolator)
-            :humid in output_vars   && interpolate!(output_Grid(humid),humid_grid, interpolator)
+            :u in output_vars       && RingGrids.interpolate!(output_Grid(u),    u_grid, interpolator)
+            :v in output_vars       && RingGrids.interpolate!(output_Grid(v),    v_grid, interpolator)
+            :vor in output_vars     && RingGrids.interpolate!(output_Grid(vor),  vor_grid, interpolator)
+            :div in output_vars     && RingGrids.interpolate!(output_Grid(div),  div_grid, interpolator)
+            :temp in output_vars    && RingGrids.interpolate!(output_Grid(temp), temp_grid, interpolator)
+            :humid in output_vars   && RingGrids.interpolate!(output_Grid(humid),humid_grid, interpolator)
         end
 
         # UNSCALE THE SCALED VARIABLES
