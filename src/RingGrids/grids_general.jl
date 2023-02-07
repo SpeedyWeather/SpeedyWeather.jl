@@ -162,7 +162,6 @@ end
 UnitRange `ijs` to access each grid point on grid `grid`."""
 eachgridpoint(grid::AbstractGrid) = Base.OneTo(get_npoints(grid))
 function eachgridpoint(grid1::Grid,grids::Grid...) where {Grid<:AbstractGrid}
-    @inline 
     n = length(grid1)
     Base._all_match_first(X->length(X),n,grid1,grids...) || throw(BoundsError)
     return eachgridpoint(grid1)
