@@ -15,9 +15,6 @@ function get_nlon_per_ring(Grid::Type{<:AbstractOctahedralGrid},nlat_half::Integ
     return nlon_octahedral(j)
 end
 
-# return the longitude vector for the full grid equivalent
-get_lon(G::Type{<:AbstractOctahedralGrid},nlat_half::Integer) = get_lon(full_grid(G),nlat_half)
-
 function get_colatlons(Grid::Type{<:AbstractOctahedralGrid},nlat_half::Integer)
     
     colat = get_colat(Grid,nlat_half)
@@ -149,7 +146,7 @@ OctahedralClenshawGrid(data::AbstractVector,n::Integer...) = OctahedralClenshawG
 
 truncation_order(::Type{<:OctahedralClenshawGrid}) = 3      # cubic
 get_truncation(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = nlat_half-1
-get_resolution(::Type{<:OctahedralClenshawGrid},trunc::Integer) = roundup_fft(trunc+1)
+get_nlat_half(::Type{<:OctahedralClenshawGrid},trunc::Integer) = roundup_fft(trunc+1)
 nlat_odd(::Type{<:OctahedralClenshawGrid}) = true
 get_npoints(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = npoints_octahedral(nlat_half,true)
 get_colat(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = get_colat(FullClenshawGrid,nlat_half)

@@ -21,7 +21,6 @@ function get_nlon_per_ring(G::Type{<:AbstractHEALPixGrid},nlat_half::Integer,j::
 end
 
 get_npoints(::Type{<:AbstractHEALPixGrid},nlat_half::Integer) = npoints_healpix(nlat_half)
-get_lon(::Type{<:AbstractHEALPixGrid},nlat_half::Integer) = Float64[]    # only defined for full grids
 
 function get_colatlons(Grid::Type{<:AbstractHEALPixGrid},nlat_half::Integer)
     nlat = get_nlat(Grid,nlat_half)
