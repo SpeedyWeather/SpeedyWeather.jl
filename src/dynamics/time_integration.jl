@@ -4,7 +4,7 @@
                 tendency::LowerTriangularMatrix{Complex{NF}},   # tendency (dynamics+physics) of A
                 dt::Real,                                       # time step (=2Δt, but for init steps =Δt,Δt/2)
                 lf::Int=2,                                      # leapfrog index to dis/enable William's filter
-                C::Constants{NF},                               # struct with constants used at runtime
+                C::DynamicsConstants{NF},                               # struct with constants used at runtime
                 ) where {NF<:AbstractFloat}                     # number format NF
 
 Performs one leapfrog time step with (`lf=2`) or without (`lf=1`) Robert+William's filter
@@ -15,7 +15,7 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
                     tendency::LowerTriangularMatrix{Complex{NF}},   # tendency (dynamics+physics) of A
                     dt::Real,                                       # time step (=2Δt, but for init steps =Δt,Δt/2)
                     lf::Int,                                        # leapfrog index to dis/enable William's filter
-                    C::Constants{NF},                               # struct with constants used at runtime
+                    C::DynamicsConstants{NF},                               # struct with constants used at runtime
                     ) where {NF<:AbstractFloat}                     # number format NF
 
     @boundscheck lf == 1 || lf == 2 || throw(BoundsError())         # index lf picks leapfrog dim
@@ -67,7 +67,7 @@ end
                         diagn::DiagnosticVariables, # all pre-allocated diagnostic variables
                         time::DateTime,             # time at timestep
                         M::ModelSetup,              # everything that is constant at runtime
-                        feedback::Feedback          # feedback struct
+                        feedback::AbstractFeedback  # feedback struct
                         )
 
 Performs the first two initial time steps (Euler forward, unfiltered leapfrog) to populate the
@@ -76,7 +76,7 @@ function first_timesteps!(  progn::PrognosticVariables, # all prognostic variabl
                             diagn::DiagnosticVariables, # all pre-allocated diagnostic variables
                             time::DateTime,             # time at timestep
                             M::ModelSetup,              # everything that is constant at runtime
-                            feedback::Feedback          # feedback struct
+                            feedback::AbstractFeedback  # feedback struct
                             )
     
     @unpack Δt,Δt_sec = M.constants

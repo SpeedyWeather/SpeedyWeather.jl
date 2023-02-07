@@ -662,11 +662,11 @@ function interface_relaxation!( η::LowerTriangularMatrix{Complex{NF}},
     pres_tend[3] += τ⁻¹*(η3-η[3])
 end
 
-function gridded!(  diagn::DiagnosticVariables,     # all diagnostic variables
-                    progn::PrognosticVariables,     # all prognostic variables
-                    lf::Int,                        # leapfrog index
-                    model::ModelSetup,
-                    )
+function SpeedyTransforms.gridded!( diagn::DiagnosticVariables,     # all diagnostic variables
+                                    progn::PrognosticVariables,     # all prognostic variables
+                                    lf::Int,                        # leapfrog index
+                                    model::ModelSetup,
+                                    )
 
     # all variables on layers
     for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
@@ -690,11 +690,11 @@ end
 Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the barotropic vorticity model.
 Updates grid vorticity, spectral stream function and spectral and grid velocities u,v."""
-function gridded!(  diagn::DiagnosticVariablesLayer,   
-                    progn::PrognosticVariablesLeapfrog,
-                    lf::Int,                            # leapfrog index
-                    model::Barotropic,
-                    )
+function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,   
+                                    progn::PrognosticVariablesLeapfrog,
+                                    lf::Int,                            # leapfrog index
+                                    model::Barotropic,
+                                    )
     
     @unpack vor_grid, u_grid, v_grid = diagn.grid_variables
     @unpack U, V = diagn.dynamics_variables
@@ -726,11 +726,11 @@ Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the shallow water model. Updates grid vorticity,
 grid divergence, grid interface displacement (`pres_grid`) and the velocities
 U,V (scaled by cos(lat))."""
-function gridded!(  diagn::DiagnosticVariablesLayer,
-                    progn::PrognosticVariablesLeapfrog,
-                    lf::Int,                            # leapfrog index
-                    model::ShallowWater,                # everything that's constant
-                    )
+function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
+                                    progn::PrognosticVariablesLeapfrog,
+                                    lf::Int,                            # leapfrog index
+                                    model::ShallowWater,                # everything that's constant
+                                    )
     
     @unpack vor_grid, div_grid, u_grid, v_grid = diagn.grid_variables
     @unpack U, V = diagn.dynamics_variables
@@ -754,11 +754,11 @@ function gridded!(  diagn::DiagnosticVariablesLayer,
     return nothing
 end
 
-function gridded!(  diagn::DiagnosticVariablesLayer,
-                    progn::PrognosticVariablesLeapfrog,
-                    lf::Int,                            # leapfrog index
-                    model::PrimitiveEquation,           # everything that's constant
-                    )
+function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
+                                    progn::PrognosticVariablesLeapfrog,
+                                    lf::Int,                            # leapfrog index
+                                    model::PrimitiveEquation,           # everything that's constant
+                                    )
     
     @unpack vor_grid, div_grid, u_grid, v_grid = diagn.grid_variables
     @unpack temp_grid, humid_grid = diagn.grid_variables

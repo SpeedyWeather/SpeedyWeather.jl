@@ -106,7 +106,9 @@ Base.rand(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid{T}} where T
 
 # truncation is the spectral truncation corresponding to size of grid and lin/quad/cubic truncation
 get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,grid.nlat_half)
-get_resolution(grid::AbstractGrid) = grid.nlat_half
+get_resolution(grid::AbstractGrid) = get_nlat_half(grid)
+get_nlat_half(grid::AbstractGrid) = grid.nlat_half
+get_nlat_half(G::Type{<:AbstractGrid},trunc::Integer) = get_resolution(G,trunc)
 
 # does the grid have an odd number of latitudes?
 nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))
@@ -115,7 +117,7 @@ nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))
 get_nlat(Grid::Type{<:AbstractGrid},nlat_half::Integer) = 2nlat_half - nlat_odd(Grid)*(nlat_half > 0)
 get_nlat(grid::Grid) where {Grid<:AbstractGrid} = get_nlat(Grid,grid.nlat_half)
 
-# get total number of grid points
+# get total number of grid pointst
 get_npoints(grid::Grid) where {Grid<:AbstractGrid} = get_npoints(Grid,grid.nlat_half)
 
 # coordinates
@@ -141,6 +143,10 @@ function get_latd(Grid::Type{<:AbstractGrid},nlat_half::Integer)
     latd .= latd .* (360/2π)
     return latd
 end
+
+# only defined for full grids, empty vector as fallback
+get_lon(::Type{<:AbstractGrid},nlat_half::Integer) = Float64[]
+get_lond(::Type{<:AbstractGrid},nlat_half::Integer) = Float64[]
 
 """
     i = each_index_in_ring(grid,j)

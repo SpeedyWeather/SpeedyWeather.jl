@@ -1,3 +1,4 @@
+# MODELS
 abstract type ModelSetup end
 abstract type Barotropic <: ModelSetup end
 abstract type ShallowWater <: ModelSetup end
@@ -5,14 +6,24 @@ abstract type PrimitiveEquation <: ModelSetup end
 abstract type PrimitiveDryCore <: PrimitiveEquation end
 abstract type PrimitiveWetCore <: PrimitiveEquation end
 
+# PARAMETERS (to be chosen by user)
 abstract type AbstractParameters{M} end
 
-abstract type InitialConditions end
-# subtypes defined in initial_conditions.jl
+# COEFFICIENTS (bundled parameters)
+abstract type Coefficients end
 
-abstract type AbstractOrography{NF} end
+# CONSTANTS (to be defined from parameters & coefficients,
+# face the dynamical core/parameterizations and not the user)
+abstract type AbstractParameterizationConstants{NF} end
+abstract type AbstractDynamicsConstants{NF} end
+
+# INITIAL CONDITIONS AND OROGRAPHY/BOUNDARIES
+abstract type InitialConditions end         # subtypes defined in initial_conditions.jl
+abstract type AbstractOrography{NF} end     # subtypes defined in boundaries.jl
 abstract type AbstractBoundaries{NF} end
-# subtypes defined in boundaries.jl
 
+# ATMOSPHERIC COLUMN FOR PARAMETERIZATIONS
 abstract type AbstractColumnVariables{NF} end
-abstract type AbstractConstants{NF} end
+
+# INPUT/OUTPUT
+abstract type AbstractFeedback end

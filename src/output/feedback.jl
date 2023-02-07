@@ -1,4 +1,4 @@
-mutable struct Feedback
+mutable struct Feedback <: AbstractFeedback
     verbose::Bool                           # print feedback to REPL?
     output::Bool                            # store output (here: write to parameters and progress.txt?)
 

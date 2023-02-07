@@ -1,13 +1,67 @@
-#TODO turn into module?
+module RingGrids
 
-include("grids_general.jl") # def AbstractGrid
-include("show.jl")
+    import Parameters: @unpack
+    import Statistics: mean
+    import Primes
+    import FastGaussQuadrature
 
-include("full_grids.jl")    # def AbstractFullGrid, Full*Grid, * = Gaussian, Clenshaw, HEALPix, OctaHEALPix
-include("octahedral.jl")    # def AbstractOctahedralGrid, OctahedralGaussianGrid, OctahedralClenshawGrid
-include("healpix.jl")       # def AbstractHEALPixGrid, HEALPixGrid
-include("octahealpix.jl")      # def AbstractOctaHEALPixGrid, OctaHEALPixGrid
+    # GRIDS
+    export  AbstractGrid, 
+            AbstractFullGrid, 
+            AbstractOctahedralGrid, 
+            AbstractHEALPixGrid,
+            AbstractOctaHEALPixGrid
 
-include("quadrature_weights.jl")    # quadrature weights and solid angles for grids
+    export  FullGaussianGrid,
+            FullClenshawGrid,
+            FullHEALPixGrid,
+            FullOctaHEALPixGrid
 
-include("interpolation.jl")
+    export  OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
+            HEALPixGrid,
+            OctaHEALPixGrid
+    
+    # GRID FUNCTIONS
+    export  grids_match,
+            get_truncation,
+            get_resolution,
+            get_nlat,
+            get_nlat_half,
+            get_npoints,
+            get_latdlonds,
+            get_latd,
+            get_lond,
+            each_index_in_ring,
+            each_index_in_ring!,
+            eachgridpoint,
+            eachring,
+            get_nlons,
+            get_nlon_max,
+            get_quadrature_weights,
+            get_solid_angles
+
+    # INTERPOLATION
+    export  AbstractInterpolator,
+            GridGeometry,
+            AbstractLocator,
+            AnvilLocator,
+            AnvilInterpolator,
+            DEFAULT_INTERPOLATOR
+
+    export  interpolate,
+            interpolate!,
+            update_locator,
+            update_locator!
+
+    include("utility_functions.jl")
+
+    include("grids_general.jl")
+    include("show.jl")
+    include("full_grids.jl")
+    include("octahedral.jl")
+    include("healpix.jl")
+    include("octahealpix.jl")
+    include("quadrature_weights.jl")
+    include("interpolation.jl")
+end

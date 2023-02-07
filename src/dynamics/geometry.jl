@@ -8,25 +8,20 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
 
     # GRID TYPE AND RESOLUTION
     Grid::Type{<:AbstractGrid}
-    nresolution::Int    # resolution parameter nlat_half
+    nlat_half::Int      # resolution parameter nlat_half, # of latitudes on one hemisphere (incl Equator)
 
     # GRID-POINT SPACE
     nlon_max::Int       # Maximum number of longitudes (at/around Equator)
     nlon::Int           # Same (used for compatibility)
     nlat::Int           # Number of latitudes
     nlev::Int           # Number of vertical levels
-    nlat_half::Int      # Number of latitudes in one hemisphere (incl Equator)
     npoints::Int        # total number of grid points
     radius_earth::Real  # Earth's radius [m]
 
     # LATITUDES (either Gaussian, equi-angle, HEALPix or OctaHEALPix lats, depending on grid)
-    lat::Vector{NF}         # array of latitudes (π/2...-π/2)
     latd::Vector{Float64}   # array of latitudes in degrees (90˚...-90˚)
-    colat::Vector{NF}       # array of colatitudes (0...π)
-    colatd::Vector{Float64} # array of colatitudes in degrees (0...180˚)
 
     # LONGITUDES
-    lon::Vector{NF}         # full grids only: array of longitudes (0...2π)
     lond::Vector{Float64}   # array of longitudes in degrees (0...360˚)
 
     # COORDINATES
@@ -80,33 +75,25 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     @unpack temp_ref, temp_top, lapse_rate, gravity = P # for reference atmosphere
 
     # RESOLUTION PARAMETERS
-    nresolution = get_resolution(Grid,trunc)        # resolution parameter nlat_half
-    nlat_half = nresolution                         # number of latitude rings on one hemisphere (Equator incl)
+    nlat_half = get_nlat_half(Grid,trunc)           # resolution parameter nlat_half
+                                                    # = number of latitude rings on one hemisphere (Equator incl)
     nlat = get_nlat(Grid,nlat_half)                 # 2nlat_half but one less if grids have odd # of lat rings
     nlon_max = get_nlon_max(Grid,nlat_half)         # number of longitudes around the equator
     nlon = nlon_max                                 # same (used for compatibility)
     npoints = get_npoints(Grid,nlat_half)           # total number of grid points
 
     # LATITUDE VECTORS (based on Gaussian, equi-angle or HEALPix latitudes)
-    colat = get_colat(Grid,nlat_half)               # colatitude in radians
-    lat = π/2 .- colat                              # latitude in radians
-    colatd = colat*360/2π                           # and the same in degree 0...180˚
-    latd = lat*360/2π                               # 90˚...-90˚
+    latd = get_latd(Grid,nlat_half)                 # latitude in 90˚...-90˚
 
     # LONGITUDE VECTORS (empty for reduced grids)
-    lon = get_lon(Grid,nlat_half)                   # array of longitudes 0...2π (full grids only)
-    lond = lon*360/2π                               # array of longitudes in degrees 0...360˚
+    lond = get_lond(Grid,nlat_half)                 # array of longitudes 0...360˚ (full grids only)
 
     # COORDINATES for every grid point in ring order
-    latds,londs = get_colatlons(Grid,nlat_half)     # in radians
-    latds .*= (360/2π)                              # in degrees
-    latds .= 90 .- latds                            # in -90˚...90˚N
-    londs .*= (360/2π)                              # in degrees
-    londs .-= 180                                   # -180˚...180˚
+    latds,londs = get_latdlonds(Grid,nlat_half)     # in -90˚...90˚N, -180˚...180˚
 
     # SINES AND COSINES OF LATITUDE
-    sinlat = sin.(lat)
-    coslat = cos.(lat)
+    sinlat = sind.(latd)
+    coslat = cosd.(latd)
     coslat⁻¹ = 1 ./ coslat
     coslat²  = coslat.^2
     coslat⁻² = 1 ./ coslat²
@@ -160,9 +147,9 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     entrainment_profile *= max_entrainment           # fraction of max entrainment
 
     # conversion to number format NF happens here
-    Geometry{P.NF}( Grid,nresolution,
-                    nlon_max,nlon,nlat,nlev,nlat_half,npoints,radius_earth,
-                    lat,latd,colat,colatd,lon,lond,londs,latds,
+    Geometry{P.NF}( Grid,nlat_half,
+                    nlon_max,nlon,nlat,nlev,npoints,radius_earth,
+                    latd,lond,londs,latds,
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,
                     σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_thick⁻¹_half,σ_f,
@@ -201,8 +188,11 @@ function vertical_coordinates(P::Parameters)
     return σ_levels_half
 end
 
-"""Generalised logistic function based on the coefficients in `coefs`."""
-function generalised_logistic(x,coefs::GenLogisticCoefs)
-    @unpack A,K,C,Q,B,M,ν = coefs
-    return @. A + (K-A)/(C+Q*exp(-B*(x-M)))^inv(ν)
+"""
+    S = SpectralTransform(P::Parameters)
+
+Generator function for a SpectralTransform struct pulling in parameters from a Parameters struct."""
+function SpeedyTransforms.SpectralTransform(P::Parameters)
+    @unpack NF, Grid, trunc, recompute_legendre, legendre_shortcut = P
+    return SpectralTransform(NF,Grid,trunc,recompute_legendre;legendre_shortcut)
 end

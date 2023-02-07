@@ -1,6 +1,6 @@
 """
     M = BarotropicModel(::Parameters,
-                        ::Constants,
+                        ::DynamicsConstants,
                         ::Geometry,
                         ::SpectralTransform,
                         ::HorizontalDiffusion)
@@ -11,7 +11,7 @@ whether scalars or arrays that do not change throughout model integration. In co
 as not needed."""
 struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
     parameters::Parameters
-    constants::Constants{NF}
+    constants::DynamicsConstants{NF}
     geometry::Geometry{NF}
     spectral_transform::SpectralTransform{NF}
     horizontal_diffusion::HorizontalDiffusion{NF}
@@ -23,7 +23,7 @@ default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
 """
     M = ShallowWaterModel(  ::Parameters,
-                            ::Constants,
+                            ::DynamicsConstants,
                             ::Geometry,
                             ::SpectralTransform,
                             ::Boundaries,
@@ -33,7 +33,7 @@ The ShallowWaterModel struct holds all other structs that contain precalculated 
 whether scalars or arrays that do not change throughout model integration."""
 struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
     parameters::Parameters
-    constants::Constants{NF}
+    constants::DynamicsConstants{NF}
     geometry::Geometry{NF}
     spectral_transform::SpectralTransform{NF}
     boundaries::Boundaries{NF}
@@ -47,7 +47,7 @@ default_concrete_model(::Type{ShallowWater}) = ShallowWaterModel
 
 """
     M = PrimitiveDryCoreModel( ::Parameters,
-                                ::Constants,
+                                ::DynamicsConstants,
                                 ::Geometry,
                                 ::SpectralTransform,
                                 ::Boundaries,
@@ -58,8 +58,8 @@ The PrimitiveDryCoreModel struct holds all other structs that contain precalcula
 whether scalars or arrays that do not change throughout model integration."""
 struct PrimitiveDryCoreModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveDryCore
     parameters::Parameters
-    constants::Constants{NF}
-    parameterization_constants::ParameterizationConstants{NF}
+    constants::DynamicsConstants{NF}
+    parameterization_constants::AbstractParameterizationConstants{NF}
     geometry::Geometry{NF}
     spectral_transform::SpectralTransform{NF}
     boundaries::Boundaries{NF}
@@ -70,7 +70,7 @@ end
 
 """
     M = PrimitiveWetCoreModel( ::Parameters,
-                                ::Constants,
+                                ::DynamicsConstants,
                                 ::Geometry,
                                 ::SpectralTransform,
                                 ::Boundaries,
@@ -81,8 +81,8 @@ The PrimitiveWetCoreModel struct holds all other structs that contain precalcula
 whether scalars or arrays that do not change throughout model integration."""
 struct PrimitiveWetCoreModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveWetCore
     parameters::Parameters
-    constants::Constants{NF}
-    parameterization_constants::ParameterizationConstants{NF}
+    constants::DynamicsConstants{NF}
+    parameterization_constants::AbstractParameterizationConstants{NF}
     geometry::Geometry{NF}
     spectral_transform::SpectralTransform{NF}
     boundaries::Boundaries{NF}

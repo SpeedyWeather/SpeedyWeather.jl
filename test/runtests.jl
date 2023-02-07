@@ -6,6 +6,7 @@ import Random
 include("utility_functions.jl")
 include("lower_triangular_matrix.jl")
 include("grids.jl")
+include("interpolation.jl")
 include("set_vars.jl")
 
 # GPU/KERNELABSTRACTIONS

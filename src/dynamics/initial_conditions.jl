@@ -80,8 +80,8 @@ function initial_conditions!(   ::Type{NorthMidlatitudeJet},
     nlat_half = 64
     u_grid = zeros(Grid,nlat_half)
     η_grid = zeros(Grid,nlat_half)
-    colats = get_colat(Grid,nlat_half)
-    _,lons = get_colatlons(Grid,nlat_half)
+    colats = RingGrids.get_colat(Grid,nlat_half)
+    _,lons = RingGrids.get_colatlons(Grid,nlat_half)
     weights = FastGaussQuadrature.gausslegendre(2nlat_half)[2]
     η_sum = 0
 
