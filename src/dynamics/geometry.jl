@@ -22,7 +22,7 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     latd::Vector{Float64}   # array of latitudes in degrees (90˚...-90˚)
 
     # LONGITUDES
-    lond::Vector{Float64}   # array of longitudes in degrees (0...360˚)
+    lond::Vector{Float64}   # array of longitudes in degrees (0...360˚), empty for non-full grids
 
     # COORDINATES
     londs::Vector{NF}       # longitude (-180˚...180˚) for each grid point in ring order
@@ -173,11 +173,11 @@ the L31 configuration historically used at ECMWF."""
 function vertical_coordinates(P::Parameters)
     @unpack nlev,GLcoefs,σ_levels_half = P
 
-    if length(σ_levels_half) == 0       # choose σ levels automatically
-        halflevels_normalised = range(0,1,nlev+1)   # normalised = level/nlev
-        σ_levels_half = generalised_logistic(halflevels_normalised,GLcoefs)
-        σ_levels_half[1] = 0            # topmost half-level is at 0 pressure
-        σ_levels_half[end] = 1          # lowermost half-level is at p=p_surface
+    if length(σ_levels_half) == 0           # choose σ levels automatically
+        z = range(0,1,nlev+1)               # normalised = level/nlev
+        σ_levels_half = generalised_logistic(z,GLcoefs)
+        σ_levels_half .-= σ_levels_half[1]      # topmost half-level is at 0 pressure
+        σ_levels_half ./= σ_levels_half[end]    # lowermost half-level is at p=p_surface      
     else                                # choose σ levels manually
         @assert σ_levels_half[1] == 0 "First manually specified σ_levels_half has to be zero 0"
         @assert σ_levels_half[end] == 1 "Last manually specified σ_levels_half has to be 1."
