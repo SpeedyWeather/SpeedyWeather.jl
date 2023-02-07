@@ -9,7 +9,7 @@ with an everything-flexible attitude as long as it is speedy. With minimal code 
 - different architectures (x86 and arm, GPUs in development)
 - different physical models (barotropic vorticity and shallow water, primitive equations in development)
 - different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix)
-- different horizontal resolutions (T31 to T1023, i.e. 400km to 10km using linear, quadratic or cubic truncation)
+- different horizontal resolutions (T31 to T1023 and higher, i.e. 400km to 10km using linear, quadratic or cubic truncation)
 
 and Julia will compile to these choices just-in-time. Parallelisation is designed (but not fully implemented yet)
 towards efficiency within a compute node and at rather low resolutions: The dynamical core layer-by-layer in the vertical
@@ -50,15 +50,29 @@ at GFDL and the physical parametrizations by Fred Kucharski, Franco Molteni and 
 Speedy was then translated to Fortran90 by Sam Hatfield in [speedy.f90](https://github.com/samhatfield/speedy.f90).
 SpeedyWeather.jl is then adopted from [first translations to Julia](https://github.com/samhatfield/speedy.jl) by Sam Hatfield.
 
+## Submodules
+
+SpeedyWeather.jl defines several submodules that are technically stand-alone (with dependencies) but aren't separated
+out to their own packages for now
+
+- __LowerTriangularMatrices__, a module that defines `LowerTriangularMatrix` (among others) used for the spherical harmonic coefficients
+- __RingGrids__, a module that defines several iso-latitude ring-based spherical grids (like the FullGaussianGrid or the HEALPixGrid) and interpolations between them
+- __SpeedyTransforms__, a module that defines the spherical harmonic transform between spectral space (for which LowerTriangularMatrices is used) and grid-point space (as defined by RingGrids).
+
+These modules can also be used independed of SpeedyWeather like so
+```julia
+julia> import SpeedyWeather: LowerTriangularMatrices, RingGrids, SpeedyTransforms
+```
+
 ## Installation
 
 SpeedyWeather.jl is registered in Julia's registry, so open the package manager with `]` and
 ```julia
-(@v1.7) pkg> add SpeedyWeather
+(@v1.8) pkg> add SpeedyWeather
 ```
 which will install the latest release and all dependencies automatically. The very latest version is installed with
 ```julia
-(@v1.7) pkg> add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
+(@v1.8) pkg> add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
 ```
 which pulls directly from the `#main` branch. Please use the current minor version of Julia,
 compatibilities with older versions are not guaranteed.
