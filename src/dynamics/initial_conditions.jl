@@ -1,5 +1,5 @@
 abstract type ZonalJet <: InitialConditions end             # Galewsky, Scott, Palvani, 2004
-abstract type ZonalWind <: InitialConditions end            # Jablonowski, Williamson, 2006
+abstract type ZonalWind <: InitialConditions end            # Jablonowski & Williamson, 2006
 abstract type StartFromRest <: InitialConditions end
 abstract type StartFromFile <: InitialConditions end
 abstract type StartWithVorticity <: InitialConditions end
@@ -137,31 +137,47 @@ function initial_conditions!(   ::Type{ZonalJet},
     spectral_truncation!(pres)
 end
 
-#         φ = M.geometry.latds
+"""Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
+function initial_conditions!(   ::Type{ZonalWind},
+                                progn::PrognosticVariables,
+                                model::PrimitiveEquation)
 
-#         # the -4u₀R⁻¹ sinφ cosφ (2 - 5sin²φ) factor
-#         A = zero(ϕ)
+    @unpack u₀, η₀ = model.parameters.zonal_wind_coefs
+    @unpack radius_earth = model.parameters
+    @unpack σ_levels_full, Grid, nlat_half = model.geometry
 
+    φ = model.geometry.latds
+    S = model.spectral_transform
 
-#         for k in layers
-#             η = σ_levels_full[k]
-#             σᵥ = (σ .- 0.252)*π/2
+    # precompute the -4u₀R⁻¹ sinφ cosφ (2 - 5sin²φ) factor (independent of height)
+    A = zeros(Grid,nlat_half)
 
+    for (ij,φij) in enumerate(φ)
+        sinφ = sind(φij)
+        cosφ = cosd(φij)
+        A[ij] = -4u₀/radius_earth*sinφ*cosφ*(2 - 5sinφ^2)
+    end
 
-#         ηₛ = 1
-#         η₀ = 0.252
-#         ηᵥ = (ηₛ-η₀)*π/2
-#         u₀ = 35
-#         s = u₀*cos(ηᵥ)^(3/2)
-#         aΩ = radius_earth*rotation_earth
-#         g⁻¹ = inv(gravity)
-#         ϕ = G.latds
-    
-#         for ij in eachindex(ϕ,orography.data)
-#             sinϕ = sind(ϕ[ij])
-#             cosϕ = cosd(ϕ[ij])
-#             orography[ij] = g⁻¹*s*(s*(-2*sinϕ^6*(cosϕ^2 + 1/3) + 10/63) + (8/5*cosϕ^3*(sinϕ^2 + 2/3) - π/4)*aΩ)
-#         end
+    # Relative vorticity ζ
+    ζ = zeros(Grid,nlat_half)
+
+    for (k,layer) in enumerate(progn.layers)
+
+        η = σ_levels_full[k]    # Jablonowski and Williamson use η for σ coordinates
+        ηᵥ = (η - η₀)*π/2       # auxiliary variable for vertical coordinate
+
+        # amplitude with height
+        cos_ηᵥ = cos(ηᵥ)^(3/2)  # wind increases with height: 1 at model top, ~0.4 at surface
+
+        for (ij,Ai) in enumerate(A)
+            ζ[ij] = Ai*cos_ηᵥ   # Jablonowski and Williamson, eq. (3)
+        end
+
+        @unpack vor = layer.leapfrog[1]
+        spectral!(vor,ζ,S)      # to spectral space
+        spectral_truncation!(vor)
+    end
+end
 
 function allocate_prognostic_variables(model::ModelSetup) 
 

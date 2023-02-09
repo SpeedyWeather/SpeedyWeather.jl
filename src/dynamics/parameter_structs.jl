@@ -40,5 +40,20 @@ Base.@kwdef struct ZonalJetCoefs <: Coefficients
     perturb_height = 120            # amplitude [m]
 end
 
+"""
+    Z = ZonalWindCoefs(;kwargs...)
 
+Create a ::Coefficients-struct that contains all parameters for the Galewsky et al, 2004 zonal jet
+intitial conditions for the shallow water model. Default values as in Galewsky."""
+Base.@kwdef struct ZonalWindCoefs <: Coefficients
+    
+    # vertical
+    η₀ = 0.252                  # conversion from σ to Jablonowski's ηᵥ-coordinates
+    u₀ = 35                     # max amplitude of zonal wind [m/s]
+    
+    # perturbation
+    perturb_lat = 40            # Gaussian profile perturbation centred at [˚N]
+    perturb_lon = 20            # and [˚E]
+    perturb_u0 = 1              # strength of perturbation [m/s]
+end
 

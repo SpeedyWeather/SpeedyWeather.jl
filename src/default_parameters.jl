@@ -122,6 +122,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     initial_conditions::Type{<:InitialConditions} = initial_conditions_default(Model)
     
     zonal_jet_coefs::Coefficients = ZonalJetCoefs()
+    zonal_wind_coefs::Coefficients = ZonalWindCoefs()
 
     # OUTPUT
     verbose::Bool = true            # print dialog for feedback
