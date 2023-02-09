@@ -20,3 +20,25 @@ function generalised_logistic(x,coefs::GenLogisticCoefs)
     @unpack A,K,C,Q,B,M,ν = coefs
     return @. A + (K-A)/(C+Q*exp(-B*(x-M)))^inv(ν)
 end
+
+"""
+    Z = ZonalJetCoefs(;kwargs...)
+
+Create a ::Coefficients-struct that contains all parameters for the Galewsky et al, 2004 zonal jet
+intitial conditions for the shallow water model. Default values as in Galewsky."""
+Base.@kwdef struct ZonalJetCoefs <: Coefficients
+    # jet
+    latitude = 45               # degrees north [˚N]
+    width = (1/4-1/7)*180       # ≈ 19.29˚ as in Galewsky et al, 2004 
+    umax = 80                   # [m/s]
+    
+    # perturbation
+    perturb_lat = latitude          # [˚N], position in jet by default
+    perturb_lon = 270               # [˚E]
+    perturb_xwidth = 1/3*360/2π     # ≈ 19.1˚E zonal extent [˚E]
+    perturb_ywidth = 1/15*360/2π    # ≈ 3.8˚N meridional extent [˚N]
+    perturb_height = 120            # amplitude [m]
+end
+
+
+

@@ -59,7 +59,7 @@ module SpeedyWeather
     # EXPORT INITIAL CONDITIONS
     export  StartFromFile,
             StartFromRest,
-            NorthMidlatitudeJet,
+            ZonalJet,
             StartWithVorticity
 
     # EXPORT STRUCTS

@@ -120,6 +120,8 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     # INITIAL CONDITIONS
     seed::Int = abs(rand(Int))          # random seed for the global random number generator
     initial_conditions::Type{<:InitialConditions} = initial_conditions_default(Model)
+    
+    zonal_jet_coefs::Coefficients = ZonalJetCoefs()
 
     # OUTPUT
     verbose::Bool = true            # print dialog for feedback
@@ -181,5 +183,5 @@ output_vars_default(::Type{<:PrimitiveWetCore}) = [:vor,:u,:temp,:humid]
 
 # default initial conditions by model
 initial_conditions_default(::Type{<:Barotropic}) = StartWithVorticity
-initial_conditions_default(::Type{<:ShallowWater}) = NorthMidlatitudeJet
+initial_conditions_default(::Type{<:ShallowWater}) = ZonalJet
 initial_conditions_default(::Type{<:PrimitiveEquation}) = StartFromRest

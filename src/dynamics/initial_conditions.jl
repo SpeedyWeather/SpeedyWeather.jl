@@ -1,9 +1,8 @@
-abstract type NorthMidlatitudeJet <: InitialConditions end  # Galewsky, Scott, Palvani, 2004
+abstract type ZonalJet <: InitialConditions end             # Galewsky, Scott, Palvani, 2004
 abstract type ZonalWind <: InitialConditions end            # Jablonowski, Williamson, 2006
 abstract type StartFromRest <: InitialConditions end
 abstract type StartFromFile <: InitialConditions end
 abstract type StartWithVorticity <: InitialConditions end
-
 
 """
     prognostic_variables = initial_conditions(M::ModelSetup)
@@ -15,7 +14,7 @@ function initial_conditions(model::ModelSetup)
     progn = allocate_prognostic_variables(model)    # allocate variables in any case
     IC = model.parameters.initial_conditions        # type of initial conditions
 
-    initial_conditions!(IC,progn,model)     # dispatch to the type of initial conditions
+    initial_conditions!(IC,progn,model)     # dispatch to the type of initial conditions IC
 
     return progn
 end
@@ -61,18 +60,23 @@ function initial_conditions!(   ::Type{StartWithVorticity},
 end
 
 """Initial conditions from Galewsky, 2004, Tellus"""
-function initial_conditions!(   ::Type{NorthMidlatitudeJet},
+function initial_conditions!(   ::Type{ZonalJet},
                                 progn::PrognosticVariables,
                                 model::ShallowWater)
 
-    θ₀ = π/7                # southern boundary of jet (latitude)
-    θ₁ = π/2 - θ₀           # northern boundary of jet
-    θ₂ = π/4                # perturbation latitude
-    eₙ = exp(-4/(θ₁-θ₀)^2)  # normalisation
-    umax = 80               # maximum zonal velocity [m/s]
-    ĥ = 120                 # interface perturbation [m]
-    α = 1/3                 # zonal extent of interface perturbation [radians]
-    β = 1/15                # meridional extent of interface perturbation [radians]
+    @unpack latitude, width, umax = model.parameters.zonal_jet_coefs    # for jet
+    @unpack perturb_lat, perturb_lon, perturb_xwidth,                   # for perturbation
+        perturb_ywidth, perturb_height = model.parameters.zonal_jet_coefs
+
+    θ₀ = (latitude-width)/360*2π    # southern boundary of jet [radians]
+    θ₁ = (latitude+width)/360*2π    # northern boundary of jet
+    eₙ = exp(-4/(θ₁-θ₀)^2)          # normalisation
+    
+    θ₂ = perturb_lat*2π/360         # perturbation latitude [radians]
+    α = perturb_xwidth*2π/360       # zonal extent of interface perturbation [radians]
+    β = perturb_ywidth*2π/360       # meridional extent of interface perturbation [radians]
+    λ = perturb_lon*2π/360          # perturbation longitude [radians]
+
     @unpack radius_earth, rotation_earth, gravity = model.parameters
 
     # always create on F64 grid then convert to spectral and interpolate there
@@ -102,14 +106,14 @@ function initial_conditions!(   ::Type{NorthMidlatitudeJet},
         η_sum += 2w*(radius_earth*u_θ/gravity * (f + tan(θ)/radius_earth*u_θ))
 
         # lon-constant part of perturbation
-        ηθ = ĥ*cos(θ)*exp(-((θ₂-θ)/β)^2)
+        ηθ = perturb_height*cos(θ)*exp(-((θ₂-θ)/β)^2)
 
         # store in all longitudes
         for ij in ring
             u_grid[ij] = u_θ/radius_earth*coslat⁻¹j   # include scaling for curl!
             
-            # calculate perturbation (shifted in lon compared to Galewsky 2004 though)
-            ϕ = lons[ij] - 3π/2
+            # calculate perturbation (possibly shifted in lon compared to Galewsky 2004)
+            ϕ = lons[ij] - λ
             η_grid[ij] = η_sum + exp(-(ϕ/α)^2)*ηθ
         end
     end
