@@ -770,7 +770,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     vor_lf = progn.leapfrog[lf].vor     # pick leapfrog index without memory allocation
     div_lf = progn.leapfrog[lf].div
     temp_lf = progn.leapfrog[lf].temp
-    wet_core &&  (humid_lf = progn.leapfrog[lf].humid)
+    wet_core && (humid_lf = progn.leapfrog[lf].humid)
 
     # get spectral U,V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon

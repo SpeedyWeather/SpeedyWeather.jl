@@ -142,24 +142,17 @@ function initial_conditions!(   ::Type{ZonalWind},
                                 progn::PrognosticVariables,
                                 model::PrimitiveEquation)
 
-    @unpack u₀, η₀ = model.parameters.zonal_wind_coefs
-    @unpack radius_earth = model.parameters
-    @unpack σ_levels_full, Grid, nlat_half = model.geometry
+    @unpack u₀, η₀, ΔT = model.parameters.zonal_wind_coefs
+    @unpack temp_ref, R_dry, lapse_rate, gravity = model.parameters
+    @unpack radius_earth, rotation_earth = model.parameters
+    @unpack σ_tropopause = model.parameters
+    @unpack σ_levels_full, Grid, nlat_half, nlev = model.geometry
 
     φ = model.geometry.latds
     S = model.spectral_transform
 
-    # precompute the -4u₀R⁻¹ sinφ cosφ (2 - 5sin²φ) factor (independent of height)
-    A = zeros(Grid,nlat_half)
-
-    for (ij,φij) in enumerate(φ)
-        sinφ = sind(φij)
-        cosφ = cosd(φij)
-        A[ij] = -4u₀/radius_earth*sinφ*cosφ*(2 - 5sinφ^2)
-    end
-
-    # Relative vorticity ζ
-    ζ = zeros(Grid,nlat_half)
+    # VORTICITY
+    ζ = zeros(Grid,nlat_half)   # relative vorticity
 
     for (k,layer) in enumerate(progn.layers)
 
@@ -169,13 +162,56 @@ function initial_conditions!(   ::Type{ZonalWind},
         # amplitude with height
         cos_ηᵥ = cos(ηᵥ)^(3/2)  # wind increases with height: 1 at model top, ~0.4 at surface
 
-        for (ij,Ai) in enumerate(A)
-            ζ[ij] = Ai*cos_ηᵥ   # Jablonowski and Williamson, eq. (3)
+        for (ij,φij) in enumerate(φ)
+            sinφ = sind(φij)
+            cosφ = cosd(φij)
+
+             # Jablonowski and Williamson, eq. (3) 
+            ζ[ij] = -4u₀/radius_earth*cos_ηᵥ*sinφ*cosφ*(2 - 5sinφ^2) 
         end
 
         @unpack vor = layer.leapfrog[1]
-        spectral!(vor,ζ,S)      # to spectral space
+        spectral!(vor,ζ,S)
         spectral_truncation!(vor)
+    end
+
+    # TEMPERATURE
+    Tη = zero(σ_levels_full)
+    Γ = lapse_rate/1000                         # from [K/km] to [K/m]
+
+    # vertical profile
+    for k in 1:nlev
+        σ = σ_levels_full[k]
+        Tη[k] = temp_ref*σ^(R_dry*Γ/gravity)    # Jablonowski and Williamson eq. 4
+
+        if σ < σ_tropopause
+            Tη[k] += ΔT*(σ_tropopause-σ)^5      # Jablonowski and Williamson eq. 5
+        end
+    end
+
+    T = zeros(Grid,nlat_half)   # temperature
+    aΩ = radius_earth*rotation_earth
+
+    for (k,layer) in enumerate(progn.layers)
+
+        η = σ_levels_full[k]    # Jablonowski and Williamson use η for σ coordinates
+        ηᵥ = (η - η₀)*π/2       # auxiliary variable for vertical coordinate
+
+        # amplitudes with height
+        A1 = 3/4*η*π*u₀/R_dry*sin(ηᵥ)* sqrt(cos(ηᵥ))
+        A2 = 2u₀*cos(ηᵥ)^(3/2)
+
+        for (ij,φij) in enumerate(φ)
+            sinφ = sind(φij)
+            cosφ = cosd(φij)
+
+             # Jablonowski and Williamson, eq. (6) 
+            T[ij] = Tη[k] + A1*((-2sinφ^6*(cosφ^2 + 1/3) + 10/63)*A2 + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*aΩ)
+        end
+
+        @unpack temp = layer.leapfrog[1]
+        spectral!(temp,T,S)
+        spectral_truncation!(temp)
     end
 end
 
