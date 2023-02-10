@@ -93,20 +93,20 @@ function initialize_orography!( orog::AbstractOrography,
     @unpack lmax, mmax = S
 
     @unpack orography, geopot_surf = orog
+    @unpack η₀, u₀ = P.zonal_wind_coefs
 
-    ηₛ = 1
-    η₀ = 0.252
-    ηᵥ = (ηₛ-η₀)*π/2
-    u₀ = 35
-    s = u₀*cos(ηᵥ)^(3/2)
-    aΩ = radius_earth*rotation_earth
-    g⁻¹ = inv(gravity)
-    ϕ = G.latds
+    ηᵥ = (1-η₀)*π/2                     # ηᵥ-coordinate of the surface [1]
+    A = u₀*cos(ηᵥ)^(3/2)                # amplitude [m/s]
+    RΩ = radius_earth*rotation_earth    # [m/s]
+    g⁻¹ = inv(gravity)                  # inverse gravity [s²/m]
+    φ = G.latds                         # latitude for each grid point [˚N]
 
-    for ij in eachindex(ϕ,orography.data)
-        sinϕ = sind(ϕ[ij])
-        cosϕ = cosd(ϕ[ij])
-        orography[ij] = g⁻¹*s*(s*(-2*sinϕ^6*(cosϕ^2 + 1/3) + 10/63) + (8/5*cosϕ^3*(sinϕ^2 + 2/3) - π/4)*aΩ)
+    for ij in eachindex(φ,orography.data)
+        sinφ = sind(φ[ij])
+        cosφ = cosd(φ[ij])
+
+        # Jablonowski & Williamson, 2006, eq. (7)
+        orography[ij] = g⁻¹*A*(A*(-2*sinφ^6*(cosφ^2 + 1/3) + 10/63) + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*RΩ)
     end
 
     spectral!(geopot_surf,orography,S)      # to grid-point space

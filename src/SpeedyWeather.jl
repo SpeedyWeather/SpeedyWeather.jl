@@ -60,6 +60,7 @@ module SpeedyWeather
     export  StartFromFile,
             StartFromRest,
             ZonalJet,
+            ZonalWind,
             StartWithVorticity
 
     # EXPORT STRUCTS

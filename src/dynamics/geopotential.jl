@@ -116,7 +116,7 @@ With absolute temperature T, specific humidity q and
 In grid-point space and then transforms Tᵥ back into spectral space
 for the geopotential calculation."""
 function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
-                                temp::LowerTriangularMatrix,
+                                ::LowerTriangularMatrix,    # only needed for dispatch compat with DryCore
                                 model::PrimitiveWetCore)
     
     @unpack temp_grid, humid_grid, temp_virt_grid = diagn.grid_variables
@@ -130,20 +130,16 @@ function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
     spectral!(temp_virt,temp_virt_grid,S)
 end
 
+"""
+For the PrimitiveDryCore temperautre and virtual temperature are the same (humidity=0).
+Just copy over the arrays."""
 function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
                                 temp::LowerTriangularMatrix,
-                                model::PrimitiveDryCore)
+                                ::PrimitiveDryCore)
     
     @unpack temp_grid, temp_virt_grid = diagn.grid_variables
     @unpack temp_virt = diagn.dynamics_variables
 
     copyto!(temp_virt_grid,temp_grid)
     copyto!(temp_virt,temp)
-end
-
-function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
-                                model::PrimitiveWetCore)
-    
-    # for wet core 2nd argument temp isn't actually needed
-    virtual_temperature!(diagn,zeros(LowerTriangularMatrix,0,0),model)
 end

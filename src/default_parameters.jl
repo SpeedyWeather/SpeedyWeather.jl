@@ -38,7 +38,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     sbc::Real = 5.67e-8                 # stefan-Boltzmann constant [W/m^2/K^4]
 
     # STANDARD ATMOSPHERE (reference values)
-    lapse_rate::Real = 6                # moist adiabatic temperature lapse rate -dT/dz [K/km]
+    lapse_rate::Real = 5                # moist adiabatic temperature lapse rate -dT/dz [K/km]
     temp_ref::Real = 288                # absolute temperature at surface z=0 [K]
     temp_top::Real = 216                # absolute temperature in stratosphere [K]
     scale_height::Real = 7.5            # scale height for pressure [km]
@@ -122,6 +122,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     initial_conditions::Type{<:InitialConditions} = initial_conditions_default(Model)
     
     zonal_jet_coefs::Coefficients = ZonalJetCoefs()
+    zonal_wind_coefs::Coefficients = ZonalWindCoefs()
 
     # OUTPUT
     verbose::Bool = true            # print dialog for feedback

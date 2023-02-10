@@ -134,9 +134,10 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,
         lat_name, lat_units, lat_longname = "j","1","horizontal index j"
     end
     
+    σ = M.geometry.σ_levels_full
     dim_lon = NcDim(lon_name,nlon,values=lond,atts=Dict("units"=>lon_units,"long_name"=>lon_longname))
     dim_lat = NcDim(lat_name,nlat,values=latd,atts=Dict("units"=>lat_units,"long_name"=>lat_longname))
-    dim_lev = NcDim("lev",nlev,values=collect(Int32,1:nlev),atts=Dict("units"=>"1","long_name"=>"vertical model levels"))
+    dim_lev = NcDim("lev",nlev,values=σ,atts=Dict("units"=>"1","long_name"=>"sigma levels"))
 
     # VARIABLES, define every variable here that could be output
     @unpack output_NF, compression_level = M.parameters
