@@ -11,7 +11,9 @@
             progn_layer.leapfrog[lf].temp[1] = temp*m.spectral_transform.norm_sphere
             fill!(progn_layer.leapfrog[lf].humid,0)                 # dry core
             SpeedyWeather.gridded!(diagn_layer,progn_layer,lf,m)    # propagate spectral state to grid
-            SpeedyWeather.virtual_temperature!(diagn_layer,m)
+            
+            temp_lf = progn_layer.leapfrog[lf].temp     # always passed on for compat with DryCore
+            SpeedyWeather.virtual_temperature!(diagn_layer,temp_lf,m)
         end
 
         SpeedyWeather.geopotential!(d,m.boundaries,m.geometry)
@@ -63,7 +65,9 @@ end
             fill!(progn_layer.leapfrog[lf].humid,0)                 
             progn_layer.leapfrog[lf].humid[1] = rand(NF)
             SpeedyWeather.gridded!(diagn_layer,progn_layer,lf,m)    # propagate spectral state to grid
-            SpeedyWeather.virtual_temperature!(diagn_layer,m)
+            
+            temp_lf = progn_layer.leapfrog[lf].temp     # always passed on for compat with DryCore
+            SpeedyWeather.virtual_temperature!(diagn_layer,temp_lf,m)
 
             T  = diagn_layer.grid_variables.temp_grid
             Tv = diagn_layer.grid_variables.temp_virt_grid
