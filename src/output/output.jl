@@ -1,4 +1,4 @@
-Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}}
+Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}}   # output only in Float32/64
     
     output::Bool = false                    # output to netCDF?
     output_vars::Vector{Symbol}=[:none]     # vector of output variables as Symbols
@@ -143,6 +143,10 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,
     @unpack output_NF, compression_level = M.parameters
     missing_value = convert(output_NF,M.parameters.missing_value)
 
+    # given pres the right name, depending on ShallowWaterModel or PrimitiveEquationModel
+    pres_name = M isa ShallowWaterModel ? "interface displacement" : "surface pressure"
+    pres_unit = M isa ShallowWaterModel ? "m" : "hPa"
+
     all_ncvars = (        # define NamedTuple to identify the NcVars by name
     time = var_time,
     u = NcVar("u",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
@@ -155,7 +159,7 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,
             atts=Dict("long_name"=>"relative vorticity","units"=>"1/s","missing_value"=>missing_value,
             "_FillValue"=>missing_value)),
     pres = NcVar("pres",[dim_lon,dim_lat,dim_time],t=output_NF,compress=compression_level,
-            atts=Dict("long_name"=>"interface displacement","units"=>"m","missing_value"=>missing_value,
+            atts=Dict("long_name"=>pres_name,"units"=>pres_unit,"missing_value"=>missing_value,
             "_FillValue"=>missing_value)),
     div = NcVar("div",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
             atts=Dict("long_name"=>"divergence","units"=>"1/s","missing_value"=>missing_value,
@@ -319,8 +323,11 @@ function write_netcdf_variables!(   outputter::Output,
         if output_matrix
             Matrix!(pres,diagn.surface.pres_grid; quadrant_rotation, matrix_quadrant)
         else
-            interpolate!(output_Grid(pres),pres_grid,interpolator)
+            RingGrids.interpolate!(output_Grid(pres),pres_grid,interpolator)
         end
+
+        # convert from log(pₛ) to surface pressure pₛ [hPa]
+        pres .= exp.(pres) ./ 100
         round!(pres,model.parameters.keepbits)
         NetCDF.putvar(outputter.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
     end

@@ -42,7 +42,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     temp_ref::Real = 288                # absolute temperature at surface z=0 [K]
     temp_top::Real = 216                # absolute temperature in stratosphere [K]
     scale_height::Real = 7.5            # scale height for pressure [km]
-    pres_ref::Real = 1013               # surface pressure [hPa]
+    pres_ref::Real = 1000               # surface pressure [hPa]
     scale_height_humid::Real = 2.5      # scale height for specific humidity [km]
     relhumid_ref::Real = 0.7            # relative humidity of near-surface air [1]
     water_pres_ref::Real = 17           # saturation water vapour pressure [Pa]
@@ -179,8 +179,8 @@ end
 # default variables to output by model
 output_vars_default(::Type{<:Barotropic}) = [:vor,:u]
 output_vars_default(::Type{<:ShallowWater}) = [:vor,:u]
-output_vars_default(::Type{<:PrimitiveDryCore}) = [:vor,:u,:temp]
-output_vars_default(::Type{<:PrimitiveWetCore}) = [:vor,:u,:temp,:humid]
+output_vars_default(::Type{<:PrimitiveDryCore}) = [:vor,:u,:temp,:pres]
+output_vars_default(::Type{<:PrimitiveWetCore}) = [:vor,:u,:temp,:humid,:pres]
 
 # default initial conditions by model
 initial_conditions_default(::Type{<:Barotropic}) = StartWithVorticity
