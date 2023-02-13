@@ -143,10 +143,11 @@ function initial_conditions!(   ::Type{ZonalWind},
                                 model::PrimitiveEquation)
 
     @unpack u₀, η₀, ΔT = model.parameters.zonal_wind_coefs
-    @unpack temp_ref, R_dry, lapse_rate, gravity = model.parameters
+    @unpack temp_ref, R_dry, lapse_rate, gravity, pres_ref = model.parameters
     @unpack radius_earth, rotation_earth = model.parameters
     @unpack σ_tropopause = model.parameters
     @unpack σ_levels_full, Grid, nlat_half, nlev = model.geometry
+    @unpack norm_sphere = model.spectral_transform
 
     φ = model.geometry.latds
     S = model.spectral_transform
@@ -213,6 +214,10 @@ function initial_conditions!(   ::Type{ZonalWind},
         spectral!(temp,T,S)
         spectral_truncation!(temp)
     end
+
+    # PRESSURE (constant everywhere)
+    lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
+    progn.pres.leapfrog[1][1] = norm_sphere*lnp₀
 end
 
 function allocate_prognostic_variables(model::ModelSetup) 
@@ -316,7 +321,7 @@ function pressure_on_orography!(progn::PrognosticVariables,
     @unpack orography = B.orography # orography on the grid
 
     Γ = lapse_rate/1000             # Lapse rate [K/km] -> [K/m]
-    lnp₀ = log(pres_ref)            # logarithm of reference surface pressure
+    lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
     lnp_grid = zero(orography)      # allocate log surface pressure on grid
 
     RΓg⁻¹ = R_dry*Γ/gravity         # for convenience
