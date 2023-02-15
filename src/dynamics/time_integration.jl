@@ -43,10 +43,10 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
 end
 
 # variables that are leapfrogged in the respective models that are on layers (so excl surface pressure)
-leapfrog_layer_vars(model::Barotropic) = (:vor,)
-leapfrog_layer_vars(model::ShallowWater) = (:vor, :div)
-leapfrog_layer_vars(model::PrimitiveDryCore) = (:vor, :div, :temp)
-leapfrog_layer_vars(model::PrimitiveWetCore) = (:vor, :div, :temp, :humid)
+leapfrog_layer_vars(::Barotropic) = (:vor,)
+leapfrog_layer_vars(::ShallowWater) = (:vor, :div)
+leapfrog_layer_vars(::PrimitiveDryCore) = (:vor, :div, :temp)
+leapfrog_layer_vars(::PrimitiveWetCore) = (:vor, :div, :temp, :humid)
 
 function leapfrog!( progn::PrognosticVariablesLeapfrog,
                     diagn::DiagnosticVariablesLayer,

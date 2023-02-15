@@ -38,7 +38,7 @@ struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
     spectral_transform::SpectralTransform{NF}
     boundaries::Boundaries{NF}
     horizontal_diffusion::HorizontalDiffusion{NF}
-    implicit::Implicit{NF}
+    implicit::ImplicitShallowWater{NF}
     device_setup::DeviceSetup{D}
 end
 
@@ -46,7 +46,7 @@ has(::Type{<:ShallowWater}, var_name::Symbol) = var_name in (:vor, :div, :pres)
 default_concrete_model(::Type{ShallowWater}) = ShallowWaterModel
 
 """
-    M = PrimitiveDryCoreModel( ::Parameters,
+    M = PrimitiveDryCoreModel(  ::Parameters,
                                 ::DynamicsConstants,
                                 ::Geometry,
                                 ::SpectralTransform,
@@ -64,12 +64,12 @@ struct PrimitiveDryCoreModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveDr
     spectral_transform::SpectralTransform{NF}
     boundaries::Boundaries{NF}
     horizontal_diffusion::HorizontalDiffusion{NF}
-    implicit::Implicit{NF}
+    implicit::ImplicitPrimitiveEq{NF}
     device_setup::DeviceSetup{D}
 end
 
 """
-    M = PrimitiveWetCoreModel( ::Parameters,
+    M = PrimitiveWetCoreModel(  ::Parameters,
                                 ::DynamicsConstants,
                                 ::Geometry,
                                 ::SpectralTransform,
@@ -87,7 +87,7 @@ struct PrimitiveWetCoreModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveWe
     spectral_transform::SpectralTransform{NF}
     boundaries::Boundaries{NF}
     horizontal_diffusion::HorizontalDiffusion{NF}
-    implicit::Implicit{NF}
+    implicit::ImplicitPrimitiveEq{NF}
     device_setup::DeviceSetup{D}
 end
 

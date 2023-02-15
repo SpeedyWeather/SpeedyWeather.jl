@@ -53,14 +53,14 @@ function initialize_speedy( ::Type{NF}=DEFAULT_NF,          # default number for
     if ConcreteModel <: Barotropic                  # pack all of the above into a *Model struct
         M = BarotropicModel(P,C,G,S,H,D)            # typeof(M) is used to dispatch dynamically
     elseif ConcreteModel <: ShallowWater            # to the supported model types
-        I = Implicit(P,C,S)                         # precompute arrays for semi-implicit corrections
+        I = Implicit(P)                             # precompute arrays for semi-implicit corrections
         M = ShallowWaterModel(P,C,G,S,B,H,I,D)
     elseif ConcreteModel <: PrimitiveDryCore        # no humidity 
-        I = Implicit(P,C,S)
+        I = Implicit(P)
         K = ParameterizationConstants(P)
         M = PrimitiveDryCoreModel(P,C,K,G,S,B,H,I,D)
     elseif ConcreteModel <: PrimitiveWetCore        # with humidity
-        I = Implicit(P,C,S)
+        I = Implicit(P)
         K = ParameterizationConstants(P)
         M = PrimitiveWetCoreModel(P,C,K,G,S,B,H,I,D)
     end

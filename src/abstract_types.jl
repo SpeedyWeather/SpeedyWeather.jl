@@ -27,3 +27,6 @@ abstract type AbstractColumnVariables{NF} end
 
 # INPUT/OUTPUT
 abstract type AbstractFeedback end
+
+# IMPLICIT PRECOMPUTED TERMS
+abstract type AbstractImplicit{NF} end
