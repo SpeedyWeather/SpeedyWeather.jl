@@ -179,7 +179,7 @@ function vertical_coordinates(P::Parameters)
         σ_levels_half .-= σ_levels_half[1]      # topmost half-level is at 0 pressure
         σ_levels_half ./= σ_levels_half[end]    # lowermost half-level is at p=p_surface      
     else                                # choose σ levels manually
-        @assert σ_levels_half[1] == 0 "First manually specified σ_levels_half has to be zero 0"
+        @assert σ_levels_half[1] >= 0 "First manually specified σ_levels_half has to be >0"
         @assert σ_levels_half[end] == 1 "Last manually specified σ_levels_half has to be 1."
         @assert nlev == (length(σ_levels_half) - 1) "nlev has to be length of σ_levels_half - 1"
     end
