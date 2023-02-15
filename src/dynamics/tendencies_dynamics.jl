@@ -55,14 +55,14 @@ function vertical_averages!(diagn::DiagnosticVariables{NF},
     ū = diagn.surface.u_mean_grid       # rename for convenience
     v̄ = diagn.surface.v_mean_grid
     D̄ = diagn.surface.div_mean_grid
-    # D̄_spec = diagn.surface.div_mean
+    D̄_spec = diagn.surface.div_mean
 
     @boundscheck nlev == diagn.nlev || throw(BoundsError)
 
     fill!(ū,0)     # reset accumulators from previous vertical average
     fill!(v̄,0)
     fill!(D̄,0)
-    # fill!(D̄_spec,0)
+    fill!(D̄_spec,0)
     fill!(diagn.layers[1].dynamics_variables.div_sum_above,0)
 
     @inbounds for k in 1:nlev
@@ -73,7 +73,7 @@ function vertical_averages!(diagn::DiagnosticVariables{NF},
         v = diagn.layers[k].grid_variables.v_grid
         D = diagn.layers[k].grid_variables.div_grid
         D_weighted = diagn.layers[k].dynamics_variables.div_weighted
-        # D_spec = progn.layers[k].leapfrog[lf].div
+        D_spec = progn.layers[k].leapfrog[lf].div
         
         # arrays for sum of divergences from level r=1 to k
         k_above = max(1,k-1)
@@ -88,10 +88,10 @@ function vertical_averages!(diagn::DiagnosticVariables{NF},
             D̄ᵣ[ij] = D̄ᵣ_above[ij] + D_weighted[ij]
         end
 
-        # # but also divergence in spectral space
-        # @inbounds for lm in eachharmonic(D̄_spec,D_spec)
-        #     D̄_spec[lm] += D_spec[lm]*Δσ_k
-        # end
+        # but also divergence in spectral space
+        @inbounds for lm in eachharmonic(D̄_spec,D_spec)
+            D̄_spec[lm] += D_spec[lm]*Δσ_k
+        end
     end
 end
         
@@ -122,7 +122,7 @@ function surface_pressure_tendency!(surf::SurfaceVariables{NF},
     ū = surf.u_mean_grid       # rename for convenience
     v̄ = surf.v_mean_grid
     D̄ = surf.div_mean_grid
-    #ss D̄_spec = surf.div_mean
+    D̄_spec = surf.div_mean
 
     # precompute ring indices
     rings = eachring(pres_tend_grid,∇lnp_x,∇lnp_y,ū,v̄,D̄)
@@ -312,7 +312,7 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
 
     spectral!(temp_tend,temp_tend_grid,model.spectral_transform)
 
-    # now add the -∇⋅((u,v)*T) term
+    # now add the -∇⋅((u,v)*T) term,
     flux_divergence!(temp_tend,temp_grid,diagn,model,add=true,flipsign=true)
 end
 
