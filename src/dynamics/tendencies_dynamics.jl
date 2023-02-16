@@ -460,66 +460,7 @@ function vorticity_fluxes!( uω_coslat⁻¹::AbstractGrid{NF},  # Output: u*(ζ
 end
 
 """
-    bernoulli_potential!(   D::DiagnosticVariables{NF}, # all diagnostic variables   
-                            GS::GeoSpectral{NF},        # struct with geometry and spectral transform
-                            g::Real                     # gravity
-                            ) where {NF<:AbstractFloat}
-
-Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral space. First, computes the Bernoulli potential
-on the grid, then transforms to spectral space and takes the Laplace operator."""
-function bernoulli_potential!(  diagn::DiagnosticVariablesLayer,
-                                surf::SurfaceVariables,
-                                G::Geometry,            
-                                S::SpectralTransform,
-                                g::Real,                            # gravity
-                                )
-    
-    @unpack u_grid,v_grid = diagn.grid_variables
-    @unpack pres_grid = surf
-    @unpack bernoulli, bernoulli_grid = diagn.dynamics_variables
-    @unpack div_tend = diagn.tendencies
-
-    bernoulli_potential!(bernoulli_grid,u_grid,v_grid,pres_grid,g,G)# = 1/2(u^2 + v^2) + gη on grid
-    spectral!(bernoulli,bernoulli_grid,S)                           # to spectral space
-    ∇²!(div_tend,bernoulli,S,add=true,flipsign=true)                # add -∇²(1/2(u^2 + v^2) + gη)
-end
-
-"""
-    bernoulli_potential!(   B::AbstractGrid,    # Output: Bernoulli potential B = 1/2*(u^2+v^2)+g*η
-                            u::AbstractGrid,    # zonal velocity *coslat
-                            v::AbstractGrid,    # meridional velocity *coslat
-                            η::AbstractGrid,    # interface displacement
-                            g::Real,            # gravity
-                            G::Geometry)
-
-Computes the Bernoulli potential 1/2*(u^2 + v^2) + g*η in grid-point space. This is the
-ShallowWater variant that adds the interface displacement η."""
-function bernoulli_potential!(  B::AbstractGrid{NF},    # Output: Bernoulli potential B = 1/2*(u^2+v^2)+Φ
-                                u::AbstractGrid{NF},    # zonal velocity *coslat
-                                v::AbstractGrid{NF},    # meridional velocity *coslat
-                                η::AbstractGrid{NF},    # interface displacement
-                                g::Real,                # gravity
-                                G::Geometry{NF}         # used for precomputed cos²(lat)
-                                ) where {NF<:AbstractFloat}
-    
-    @unpack coslat⁻¹ = G
-    @boundscheck length(coslat⁻¹) == get_nlat(u) || throw(BoundsError)
-
-    one_half = convert(NF,0.5)                      # convert to number format NF
-    gravity = convert(NF,g)
-
-    rings = eachring(B,u,v,η)
-
-    @inbounds for (j,ring) in enumerate(rings)
-        one_half_coslat⁻¹ = one_half*coslat⁻¹[j]
-        for ij in ring
-            B[ij] = one_half_coslat⁻¹*(u[ij]^2 + v[ij]^2) + gravity*η[ij]
-        end
-    end
-end
-
-"""
-    bernoulli_potential!(   diagn::DiagnosticVariables, 
+    bernoulli_potential!(   diagn::DiagnosticVariablesLayer, 
                             G::Geometry,
                             S::SpectralTransform)
 
@@ -529,7 +470,8 @@ Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral s
     (3) adds geopotential for the bernoulli potential in spectral space
     (4) takes the Laplace operator.
     
-This version is used for the PrimitiveEquation model"""
+This version is used for both ShallowWater and PrimitiveEquation, only the geopotential
+calculation in geopotential! differs."""
 function bernoulli_potential!(  diagn::DiagnosticVariablesLayer,
                                 G::Geometry,            
                                 S::SpectralTransform,
@@ -575,71 +517,28 @@ function bernoulli_potential!(  B::AbstractGrid{NF},    # Output: Bernoulli pote
     end
 end
 
-function volume_fluxes!(    uh_coslat⁻¹::Grid,  # Output: zonal volume flux uh/coslat
-                            vh_coslat⁻¹::Grid,  # Output: meridional volume flux vh/coslat
-                            u::Grid,            # zonal velocity
-                            v::Grid,            # meridional velocity
-                            η::Grid,            # interface displacement
-                            orography::Grid,    # orography
-                            H₀::Real,           # layer thickness at rest
-                            G::Geometry{NF},
-                            ) where {NF<:AbstractFloat,Grid<:AbstractGrid{NF}}                                   
+"""
+    volume_flux_divergence!(diagn::DiagnosticVariablesLayer,
+                            surface::SurfaceVariables,
+                            model::ShallowWater)   
 
-    @unpack coslat⁻¹ = G
-    @boundscheck length(coslat⁻¹) == get_nlat(η) || throw(BoundsError) 
+Computes the (negative) divergence of the volume fluxes `uh,vh` for the continuity equation, -∇⋅(uh,vh)."""
+function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
+                                    surface::SurfaceVariables,
+                                    model::ShallowWater)                        
 
-    H₀ = convert(NF,H₀)
+    @unpack pres_grid, pres_tend = surface
+    @unpack orography = model.boundaries.orography
+    H₀ = model.constants.layer_thickness
 
-    # compute (uh,vh) on the grid
+    # compute dynamic layer thickness h on the grid
     # pres_grid is η, the interface displacement
     # layer thickness h = η + H, H is the layer thickness at rest
     # H = H₀ - orography, H₀ is the layer thickness without mountains
-
-    rings = eachring(uh_coslat⁻¹,vh_coslat⁻¹,u,v,η,orography)   # precompute ring indices
-
-    @inbounds for (j,ring) in enumerate(rings)
-        coslat⁻¹j = coslat⁻¹[j]
-        for ij in ring
-            h = coslat⁻¹j*(η[ij] + H₀ - orography[ij])
-            uh_coslat⁻¹[ij] = u[ij]*h       # = uh/coslat
-            vh_coslat⁻¹[ij] = v[ij]*h       # = vh/coslat
-        end
-    end
-end
-
-"""
-    volume_fluxes!( D::DiagnosticVariables{NF},
-                    G::Geometry{NF},
-                    S::SpectralTransform{NF},
-                    B::Boundaries,
-                    H₀::Real                    # layer thickness
-                    ) where {NF<:AbstractFloat}   
-
-Computes the (negative) divergence of the volume fluxes `uh,vh` for the continuity equation, -∇⋅(uh,vh)"""
-function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
-                                    surface::SurfaceVariables,
-                                    G::Geometry,
-                                    S::SpectralTransform,
-                                    B::Boundaries,              # contains orography
-                                    H₀::Real                    # layer thickness
-                                    )                           
-
-    @unpack pres_grid, pres_tend = surface
-    @unpack u_grid, v_grid = diagn.grid_variables
-    @unpack orography = B.orography
-
-    uh_coslat⁻¹ = diagn.dynamics_variables.a            # reuse work arrays a,b
-    vh_coslat⁻¹ = diagn.dynamics_variables.b
-    uh_coslat⁻¹_grid = diagn.dynamics_variables.a_grid
-    vh_coslat⁻¹_grid = diagn.dynamics_variables.b_grid
-
-    volume_fluxes!(uh_coslat⁻¹_grid,vh_coslat⁻¹_grid,u_grid,v_grid,pres_grid,orography,H₀,G)
+    pres_grid .+= H₀ .- orography
     
-    spectral!(uh_coslat⁻¹,uh_coslat⁻¹_grid,S)
-    spectral!(vh_coslat⁻¹,vh_coslat⁻¹_grid,S)
-
-    # compute divergence of volume fluxes and flip sign as ∂η/∂ = -∇⋅(uh,vh)
-    divergence!(pres_tend,uh_coslat⁻¹,vh_coslat⁻¹,S,flipsign=true)
+    # now do -∇⋅(uh,vh) and store in pres_tend
+    flux_divergence!(pres_tend,pres_grid,diagn,model,add=false,flipsign=true)
 end
 
 function interface_relaxation!( η::LowerTriangularMatrix{Complex{NF}},

@@ -167,7 +167,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     @unpack pres = progn
     pres_lf = pres.leapfrog[lf2]
 
-    get_tendencies!(pres_lf,diagn_layer,diagn_surface,time,M)               # tendency of vor, div, pres
+    get_tendencies!(diagn_layer,diagn_surface,pres_lf,time,M)               # tendency of vor, div, pres
     implicit_correction!(diagn_layer,progn_layer,diagn_surface,pres,M)      # dampen gravity waves
     horizontal_diffusion!(progn_layer,diagn_layer,M)    # diffusion for vorticity and divergence
     leapfrog!(progn_layer,diagn_layer,dt,lf1,M)         # leapfrog vorticity forward

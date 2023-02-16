@@ -100,6 +100,16 @@ function geopotential!( diagn::DiagnosticVariables{NF},
     # end
 end
 
+function geopotential!( diagn::DiagnosticVariablesLayer,
+                        pres::LowerTriangularMatrix,
+                        C::DynamicsConstants)
+
+    @unpack gravity = C
+    @unpack geopot = diagn.dynamics_variables
+
+    geopot .= pres*gravity
+end 
+
 """
     virtual_temperature!(   diagn::DiagnosticVariablesLayer,
                             temp::LowerTriangularMatrix,
