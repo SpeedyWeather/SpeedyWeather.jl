@@ -33,7 +33,7 @@ Update the implicit terms in `M` for the shallow water model as they depend on t
 function initialize_implicit!(  dt::Real,               # time step
                                 model::ShallowWater)    # update Implicit struct in M
 
-    @unpack NF, implicit_α = model.parameters           # = [0,0.5,1], time step fraction for implicit
+    @unpack implicit_α = model.parameters               # = [0,0.5,1], time step fraction for implicit
     @unpack eigenvalues = model.spectral_transform      # = -l*(l+1), degree l of harmonics
     @unpack ξH₀,ξg∇²,div_impl = model.implicit          # pull precomputed arrays to be updated
     @unpack layer_thickness = model.constants           # shallow water layer thickness [m]
@@ -114,8 +114,6 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
 end
 
 # PRIMITIVE EQUATION MODEL
-initialize_implicit!(::Real,::PrimitiveEquation) = nothing
-
 """
     I = Implicit(P::Parameters{<:PrimitiveEquation})
 
@@ -126,11 +124,52 @@ function Implicit(P::Parameters{<:PrimitiveEquation})    # primitive equation on
     @unpack NF,trunc,nlev = P
 
     # initialize with zeros only, actual initialization depends on time step, done in initialize_implicit!
-    S⁻¹ = zeros(0,0)
-    L = zeros(0,0)
-    R = zeros(0,0)
-    U = zeros(0)
-    W = zeros(0)
+    S⁻¹ = zeros(NF,0,0)
+    L = zeros(NF,0,0)
+    R = zeros(NF,0,0)
+    U = zeros(NF,0)
+    W = zeros(NF,0)
 
     return ImplicitPrimitiveEq(S⁻¹,L,R,U,W)
+end
+
+initialize_implicit!(::Real,::PrimitiveEquation) = nothing
+
+function _initialize_implicit!(  dt::Real,
+                                model::PrimitiveEquation)
+
+    @unpack S⁻¹,L,R,U,W = model.implicit
+    @unpack σ_levels_thick = model.geometry
+    α = model.parameters.implicit_α
+
+    ξ = α*dt    # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
+    @inbounds for k in eachindex(σ_levels_thick,W)
+        W[k] = ξ*σ_levels_thick[k]
+    end
+
+    # S = 1 + ξ²(RL + UW), but R,L,U,W contain ξ already
+    S = LinearAlgebra.I  + R*L + U*W'
+    S⁻¹ .= inv(S)
+end
+
+
+function implicit_correction!(  diagn::DiagnosticVariables{NF},
+                                progn::PrognosticVariables{NF},
+                                model::PrimitiveEquation,
+                                ) where NF
+
+    @unpack S⁻¹,L,R,U,W = model.implicit
+
+    # δlnpₛ = G_lnpₛ + ξWδD, W <- ξW here
+    @unpack pres_tend = diagn.surface
+    for (k1,layer_k1) in enumerate(diagn.layers)
+        @unpack div_tend, temp_tend = layer_k1.tendencies
+        pres_tend .-= div_tend*W[k1]
+
+        # δT = G_T + ξLδD, L <- ξL here
+        for (k2, layer_k2) in enumerate(diagn.layer)
+            @unpack div_tend_k2 = layer_k2.tendencies
+            temp_tend .+= div_tend_k2*L[k2,k1]
+        end
+    end
 end

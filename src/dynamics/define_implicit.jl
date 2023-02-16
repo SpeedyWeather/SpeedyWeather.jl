@@ -16,9 +16,11 @@ end
 
 # PRIMITIVE EQUATION MODEL
 struct ImplicitPrimitiveEq{NF<:AbstractFloat} <: AbstractImplicit{NF}
-    S⁻¹::Matrix{NF}     # used for δD = S⁻¹G, S = 1 + ξ²(RL+ UW)
+    # the following arrays all have ξ = 2αΔt absorbed L <- ξL, etc.
     L::Matrix{NF}       # used for δT = G_T + ξLδD
     R::Matrix{NF}       # used for δD = G_D + ξ(RδT + Uδlnpₛ)
     U::Vector{NF}       # see above
     W::Vector{NF}       # used for δlnpₛ = G_lnpₛ + ξWδD
+
+    S⁻¹::Matrix{NF}     # used for δD = S⁻¹G, S = 1 + ξ²(RL + UW)
 end
