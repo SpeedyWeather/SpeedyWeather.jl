@@ -443,49 +443,20 @@ Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral s
     
 This version is used for both ShallowWater and PrimitiveEquation, only the geopotential
 calculation in geopotential! differs."""
-function bernoulli_potential!(  diagn::DiagnosticVariablesLayer,
+function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},
                                 G::Geometry,            
                                 S::SpectralTransform,
-                                )
+                                ) where NF
     
     @unpack u_grid,v_grid = diagn.grid_variables
     @unpack bernoulli, bernoulli_grid, geopot = diagn.dynamics_variables
     @unpack div_tend = diagn.tendencies
-
-    bernoulli_potential!(bernoulli_grid,u_grid,v_grid,G)    # = 1/2(u^2 + v^2) on grid
+ 
+    one_half = convert(NF,0.5)
+    @. bernoulli_grid = one_half*(u_grid^2 + v_grid^2)      # = 1/2(u^2 + v^2) on grid
     spectral!(bernoulli,bernoulli_grid,S)                   # to spectral space
     bernoulli .+= geopot                                    # add geopotential Φ
     ∇²!(div_tend,bernoulli,S,add=true,flipsign=true)        # add -∇²(1/2(u^2 + v^2) + ϕ)
-end
-
-"""
-    bernoulli_potential!(   B::AbstractGrid,    # Output: Bernoulli potential B = 1/2*(u^2+v^2)+g*η
-                            u::AbstractGrid,    # zonal velocity
-                            v::AbstractGrid,    # meridional velocity
-                            η::AbstractGrid,    # interface displacement
-                            g::Real,            # gravity
-                            G::Geometry)
-
-Computes the Bernoulli potential 1/2*(u^2 + v^2), excluding the geopotential, in grid-point space.
-This is the PrimitiveEquation-variant where the geopotential is added later in spectral space."""
-function bernoulli_potential!(  B::AbstractGrid{NF},    # Output: Bernoulli potential B = 1/2*(u^2+v^2)
-                                u::AbstractGrid{NF},    # zonal velocity *coslat
-                                v::AbstractGrid{NF},    # meridional velocity *coslat
-                                G::Geometry{NF}         # used for precomputed cos²(lat)
-                                ) where {NF<:AbstractFloat}
-    
-    @unpack coslat⁻¹ = G
-    @boundscheck length(coslat⁻¹) == get_nlat(u) || throw(BoundsError)
-
-    one_half = convert(NF,0.5)                      # convert to number format NF
-    rings = eachring(B,u,v)
-
-    @inbounds for (j,ring) in enumerate(rings)
-        one_half_coslat⁻¹ = one_half*coslat⁻¹[j]
-        for ij in ring
-            B[ij] = one_half_coslat⁻¹*(u[ij]^2 + v[ij]^2)
-        end
-    end
 end
 
 """

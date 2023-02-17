@@ -70,7 +70,7 @@ function geopotential!( diagn::DiagnosticVariables{NF},
     geopot = diagn.layers[end].dynamics_variables.geopot
     
     @inbounds for lm in eachharmonic(geopot,geopot_surf,temp)
-        geopot[lm] = geopot_surf[lm] + Δp_geopot_full[end]*temp[lm]
+        geopot[lm] = geopot_surf[lm] + temp[lm]*Δp_geopot_full[end]
     end
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
