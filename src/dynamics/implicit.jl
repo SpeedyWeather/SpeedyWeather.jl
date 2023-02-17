@@ -126,13 +126,14 @@ function Implicit(P::Parameters{<:PrimitiveEquation})    # primitive equation on
     @unpack NF,trunc,nlev = P
 
     # initialize with zeros only, actual initialization depends on time step, done in initialize_implicit!
-    S⁻¹ = zeros(NF,0,0)
     L = zeros(NF,0,0)
     R = zeros(NF,0,0)
     U = zeros(NF,0)
     W = zeros(NF,0)
 
-    return ImplicitPrimitiveEq(S⁻¹,L,R,U,W)
+    S⁻¹ = zeros(NF,0,0)
+
+    return ImplicitPrimitiveEq(L,R,U,W,S⁻¹,)
 end
 
 initialize_implicit!(::Real,::PrimitiveEquation) = nothing
