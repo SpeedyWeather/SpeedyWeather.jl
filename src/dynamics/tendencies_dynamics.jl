@@ -383,7 +383,7 @@ function flux_divergence!(  A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput:
     spectral!(vA,vA_grid,model.spectral_transform)
 
     divergence!(A_tend,uA,vA,model.spectral_transform;add,flipsign)
-    return uA,vA
+    return uA,vA        # return for curl calculation (ShallowWater)
 end
 
 """
@@ -412,7 +412,7 @@ function vorticity_flux_divcurl!(   diagn::DiagnosticVariablesLayer,
 
     # = ∇×(uω,vω) = ∇×(uv*(ζ+f)), write directly into tendency
     # curl not needed for BarotropicModel
-    curl && curl!(div_tend,uω,vω,S,add=true,flipsign=false)               
+    curl && curl!(div_tend,uω,vω,S,add=false,flipsign=false)               
 end
 
 function absolute_vorticity!(   vor::AbstractGrid,
