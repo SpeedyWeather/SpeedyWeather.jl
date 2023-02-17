@@ -359,7 +359,7 @@ function flux_divergence!(  A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput:
                             add::Bool=true,                 # add result to A_tend or overwrite for false
                             flipsign::Bool=true) where NF   # compute -∇⋅((u,v)*A) (true) or ∇⋅((u,v)*A)? 
 
-    @unpack u_grid, v_grid = diagn.grid_variables   # velocity vectors *coslat
+    @unpack u_grid, v_grid = diagn.grid_variables
     @unpack coslat⁻¹ = model.geometry
 
     # reuse general work arrays a,b,a_grid,b_grid
@@ -383,78 +383,49 @@ function flux_divergence!(  A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput:
     spectral!(vA,vA_grid,model.spectral_transform)
 
     divergence!(A_tend,uA,vA,model.spectral_transform;add,flipsign)
+    return uA,vA
 end
 
 """
-    vorticity_flux_divcurl!(    D::DiagnosticVariables{NF}, # all diagnostic variables   
-                                G::GeoSpectral{NF}          # struct with geometry and spectral transform
-                                ) where {NF<:AbstractFloat}
+function vorticity_flux_divcurl!(   diagn::DiagnosticVariablesLayer,
+                                    model::ModelSetup;
+                                    curl::Bool=true)    # calculate curl of vor flux?
 
 1) Compute the vorticity advection as the (negative) divergence of the vorticity fluxes -∇⋅(uv*(ζ+f)).
 First, compute the uv*(ζ+f), then transform to spectral space and take the divergence and flip the sign.
 2) Compute the curl of the vorticity fluxes ∇×(uω,vω) and store in divergence tendency."""
 function vorticity_flux_divcurl!(   diagn::DiagnosticVariablesLayer,
-                                    G::Geometry,
-                                    S::SpectralTransform;
-                                    div::Bool=true,         # calculate divergence of vor flux?
-                                    curl::Bool=true         # calculate curl of vor flux?
-                                    )
+                                    model::ModelSetup;
+                                    curl::Bool=true)    # calculate curl of vor flux?
+
+    G = model.geometry
+    S = model.spectral_transform
 
     @unpack u_grid, v_grid, vor_grid = diagn.grid_variables
     @unpack vor_tend, div_tend = diagn.tendencies
 
-    uω_coslat⁻¹ = diagn.dynamics_variables.a            # reuse work arrays a,b
-    vω_coslat⁻¹ = diagn.dynamics_variables.b
-    uω_coslat⁻¹_grid = diagn.dynamics_variables.a_grid
-    vω_coslat⁻¹_grid = diagn.dynamics_variables.b_grid
+    # add the planetary vorticity f to relative vorticity ζ = absolute vorticity ω
+    absolute_vorticity!(vor_grid,G)
 
-    # STEP 1-3: Abs vorticity, velocity times abs vort
-    vorticity_fluxes!(uω_coslat⁻¹_grid,vω_coslat⁻¹_grid,u_grid,v_grid,vor_grid,G)
-
-    spectral!(uω_coslat⁻¹,uω_coslat⁻¹_grid,S)
-    spectral!(vω_coslat⁻¹,vω_coslat⁻¹_grid,S)
-
-    # flipsign as RHS is negative ∂ζ/∂t = -∇⋅(uv*(ζ+f)), write directly into tendency
-    div && divergence!(vor_tend,uω_coslat⁻¹,vω_coslat⁻¹,S,flipsign=true)
+    # now do -∇⋅(uω,vω) and store in vor_tend
+    uω,vω = flux_divergence!(vor_tend,vor_grid,diagn,model,add=false,flipsign=true)
 
     # = ∇×(uω,vω) = ∇×(uv*(ζ+f)), write directly into tendency
     # curl not needed for BarotropicModel
-    curl && curl!(div_tend,uω_coslat⁻¹,vω_coslat⁻¹,S)               
+    curl && curl!(div_tend,uω,vω,S,add=true,flipsign=false)               
 end
 
-"""
-    vorticity_fluxes!(  uω_coslat⁻¹::AbstractGrid{NF},      # Output: u*(ζ+f)/coslat
-                        vω_coslat⁻¹::AbstractGrid{NF},      # Output: v*(ζ+f)/coslat
-                        u::AbstractGrid{NF},                # Input: u*coslat
-                        v::AbstractGrid{NF},                # Input: v*coslat
-                        vor::AbstractGrid{NF},              # Input: relative vorticity ζ
-                        G::Geometry{NF}                     # struct with precomputed geometry arrays
-                        ) where {NF<:AbstractFloat}         # number format NF
+function absolute_vorticity!(   vor::AbstractGrid,
+                                G::Geometry)
 
-Compute the vorticity fluxes (u,v)*(ζ+f)/coslat in grid-point space from u,v and vorticity ζ."""
-function vorticity_fluxes!( uω_coslat⁻¹::AbstractGrid{NF},  # Output: u*(ζ+f)/coslat
-                            vω_coslat⁻¹::AbstractGrid{NF},  # Output: v*(ζ+f)/coslat
-                            u::AbstractGrid{NF},            # Input: u*coslat
-                            v::AbstractGrid{NF},            # Input: v*coslat
-                            vor::AbstractGrid{NF},          # Input: relative vorticity ζ
-                            G::Geometry{NF}                 # struct with precomputed geometry arrays
-                            ) where {NF<:AbstractFloat}     # number format NF
+    @unpack f_coriolis = G
+    @boundscheck length(f_coriolis) == get_nlat(vor) || throw(BoundsError)
 
-    nlat = get_nlat(u)
-    @unpack f_coriolis, coslat⁻¹ = G
-    @boundscheck length(f_coriolis) == nlat || throw(BoundsError)
-    @boundscheck length(coslat⁻¹) == nlat || throw(BoundsError)
-
-    rings = eachring(uω_coslat⁻¹,vω_coslat⁻¹,u,v,vor)       # precompute ring indices
-
+    rings = eachring(vor)
     @inbounds for (j,ring) in enumerate(rings)
-        coslat⁻¹j = coslat⁻¹[j]
         f = f_coriolis[j]
         for ij in ring
-            # ω = relative vorticity + coriolis and unscale with coslat²
-            ω = coslat⁻¹j*(vor[ij] + f)
-            uω_coslat⁻¹[ij] = ω*u[ij]              # = u(ζ+f)/coslat
-            vω_coslat⁻¹[ij] = ω*v[ij]              # = v(ζ+f)/coslat
+            vor[ij] += f
         end
     end
 end
@@ -532,7 +503,7 @@ function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
     H₀ = model.constants.layer_thickness
 
     # compute dynamic layer thickness h on the grid
-    # pres_grid is η, the interface displacement
+    # pres_grid is η, the interface displacement, update to
     # layer thickness h = η + H, H is the layer thickness at rest
     # H = H₀ - orography, H₀ is the layer thickness without mountains
     pres_grid .+= H₀ .- orography

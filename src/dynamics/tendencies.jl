@@ -2,9 +2,8 @@ function get_tendencies!(   diagn::DiagnosticVariablesLayer,
                             model::BarotropicModel,
                             )
     
-    # only (planetary) vorticity advection for the barotropic model
-    G,S = model.geometry, model.spectral_transform
-    vorticity_flux_divcurl!(diagn,G,S,curl=false)           # = -∇⋅(u(ζ+f),v(ζ+f))
+    # only (absolute) vorticity advection for the barotropic model
+    vorticity_flux_divcurl!(diagn,model,curl=false)         # = -∇⋅(u(ζ+f),v(ζ+f))
 end
 
 function get_tendencies!(   diagn::DiagnosticVariablesLayer,
@@ -17,7 +16,7 @@ function get_tendencies!(   diagn::DiagnosticVariablesLayer,
     G,S,C = model.geometry, model.spectral_transform, model.constants
 
     # for compatibility with other ModelSetups pressure pres = interface displacement η here
-    vorticity_flux_divcurl!(diagn,G,S)              # = -∇⋅(u(ζ+f),v(ζ+f)), tendency for vorticity
+    vorticity_flux_divcurl!(diagn,model,curl=true)  # = -∇⋅(u(ζ+f),v(ζ+f)), tendency for vorticity
                                                     # and ∇×(u(ζ+f),v(ζ+f)), tendency for divergence
     geopotential!(diagn,pres,C)                     # Φ = gη in the shallow water model
     bernoulli_potential!(diagn,G,S)                 # = -∇²(E+Φ), tendency for divergence
