@@ -35,7 +35,7 @@ function initialize_implicit!(  dt::Real,               # time step
 
     @unpack implicit_α = model.parameters               # = [0,0.5,1], time step fraction for implicit
     @unpack eigenvalues = model.spectral_transform      # = -l*(l+1), degree l of harmonics
-    @unpack ξH₀,ξg∇²,div_impl = model.implicit          # pull precomputed arrays to be updated
+    @unpack ξH₀,g∇²,ξg∇²,div_impl = model.implicit      # pull precomputed arrays to be updated
     @unpack layer_thickness = model.constants           # shallow water layer thickness [m]
     @unpack gravity = model.constants                   # gravitational acceleration [m/s²]                  
 
@@ -50,9 +50,11 @@ function initialize_implicit!(  dt::Real,               # time step
     ξ = implicit_α*dt               # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
     ξH₀[1] = ξ*layer_thickness      # update ξ*H₀ with new ξ, in vec for mutability
 
-    @inbounds for i in eachindex(ξg∇²,div_impl,eigenvalues)
-        ξg∇²[i] = gravity*eigenvalues[i]        # update ξ∇² with new ξ
-        div_impl[i] = inv(1 - ξH₀[1]*ξg∇²[i])   # update 1/(1-ξ²gH₀∇²) with new ξ
+    # loop over degree l of the harmonics (implicit terms are independent of order m)
+    @inbounds for l in eachindex(g∇²,ξg∇²,div_impl,eigenvalues)
+        g∇²[l] = gravity*eigenvalues[l]         # doesn't actually change with dt
+        ξg∇²[l] = ξ*g∇²[l]                      # update ξg∇² with new ξ
+        div_impl[l] = inv(1 - ξH₀[1]*ξg∇²[l])   # update 1/(1-ξ²gH₀∇²) with new ξ
     end
 end
 
