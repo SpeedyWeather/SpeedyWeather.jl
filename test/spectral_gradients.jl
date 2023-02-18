@@ -74,7 +74,7 @@ end
         fill!(G.f_coriolis,0)
 
         # calculate uω,vω in spectral space
-        SpeedyWeather.vorticity_flux_divcurl!(d.layers[1],G,S)
+        SpeedyWeather.vorticity_flux_divcurl!(d.layers[1],m,curl=true)
 
         for div_lm in d.layers[1].tendencies.div_tend
             @test abs(div_lm) < sqrt(eps(NF))
