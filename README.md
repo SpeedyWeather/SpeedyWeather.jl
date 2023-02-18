@@ -7,8 +7,8 @@ with an everything-flexible attitude as long as it is speedy. With minimal code 
 
 - any number format and precision (32 and 64 bits, 16 bits in development)
 - different architectures (x86 and arm, GPUs in development)
-- different physical models (barotropic vorticity and shallow water, primitive equations in development)
-- different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix)
+- different physical models (barotropic vorticity, shallow water, primitive equations dry core; wet core in development)
+- different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
 - different horizontal resolutions (T31 to T1023 and higher, i.e. 400km to 10km using linear, quadratic or cubic truncation)
 
 and Julia will compile to these choices just-in-time. Parallelisation is designed (but not fully implemented yet)
@@ -31,7 +31,7 @@ The main interface to SpeedyWeather.jl is
 
 ```julia
 julia> using SpeedyWeather
-julia> run_speedy(n_days=30, trunc=63, Grid=OctahedralGaussianGrid, model=ShallowWater, output=true)
+julia> run_speedy(ShallowWater, n_days=30, trunc=63, Grid=OctahedralGaussianGrid, output=true)
 Weather is speedy run 1: 100%|███████████████████████████████████| Time: 0:00:04 (1498.70 years/day)
 ```
 
