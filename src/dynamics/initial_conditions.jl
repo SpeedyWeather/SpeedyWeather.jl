@@ -143,17 +143,19 @@ function initial_conditions!(   ::Type{ZonalWind},
                                 model::PrimitiveEquation)
 
     @unpack u₀, η₀, ΔT = model.parameters.zonal_wind_coefs
+    @unpack perturb_lat, perturb_lon, perturb_uₚ, perturb_radius = model.parameters.zonal_wind_coefs
     @unpack temp_ref, R_dry, lapse_rate, gravity, pres_ref = model.parameters
     @unpack radius_earth, rotation_earth = model.parameters
     @unpack σ_tropopause = model.parameters
     @unpack σ_levels_full, Grid, nlat_half, nlev = model.geometry
     @unpack norm_sphere = model.spectral_transform
 
-    φ = model.geometry.latds
+    φ, λ = model.geometry.latds, model.geometry.londs
     S = model.spectral_transform
 
     # VORTICITY
     ζ = zeros(Grid,nlat_half)   # relative vorticity
+    D = zeros(Grid,nlat_half)   # divergence (perturbation only)
 
     for (k,layer) in enumerate(progn.layers)
 
@@ -163,12 +165,30 @@ function initial_conditions!(   ::Type{ZonalWind},
         # amplitude with height
         cos_ηᵥ = cos(ηᵥ)^(3/2)  # wind increases with height: 1 at model top, ~0.4 at surface
 
-        for (ij,φij) in enumerate(φ)
+        for (ij,(φij,λij)) in enumerate(zip(φ,λ))
             sinφ = sind(φij)
             cosφ = cosd(φij)
+            tanφ = tand(φij)
 
              # Jablonowski and Williamson, eq. (3) 
             ζ[ij] = -4u₀/radius_earth*cos_ηᵥ*sinφ*cosφ*(2 - 5sinφ^2) 
+
+            # PERTURBATION
+            sinφc = sind(perturb_lat)       # location of centre
+            cosφc = cosd(perturb_lat)
+            λc = perturb_lon
+            R = radius_earth*perturb_radius # spatial extent of perturbation
+
+            # great circle distance to perturbation
+            X = sinφc*sinφ + cosφc*cosφ*cosd(λij-λc)
+            X_norm = 1/sqrt(1-X^2)
+            r = radius_earth*acos(X)
+            exp_decay = exp(-(r/R)^2)
+
+            ζ[ij] += perturb_uₚ/radius_earth*exp_decay*
+                (tanφ - 2*(radius_earth/R)^2*acos(X)*X_norm*(sinφc*cosφ - cosφc*sinφ*cosd(λij-λc)))
+            
+            D[ij] -= 2perturb_uₚ*radius_earth/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
         end
 
         @unpack vor = layer.leapfrog[1]
