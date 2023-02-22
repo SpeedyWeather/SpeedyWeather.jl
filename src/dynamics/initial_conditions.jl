@@ -19,6 +19,15 @@ function initial_conditions(model::ModelSetup)
     return progn
 end
 
+function allocate_prognostic_variables(model::ModelSetup) 
+
+    @unpack NF = model.parameters
+    @unpack nlev = model.geometry
+    @unpack lmax, mmax = model.spectral_transform
+
+    return zeros(PrognosticVariables{NF},model,lmax,mmax,nlev)
+end
+
 function initial_conditions!(   ::Type{StartFromRest},
                                 progn::PrognosticVariables,
                                 model::ModelSetup)
@@ -240,15 +249,6 @@ function initial_conditions!(   ::Type{ZonalWind},
     # PRESSURE (constant everywhere)
     lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
     progn.pres.leapfrog[1][1] = norm_sphere*lnp₀
-end
-
-function allocate_prognostic_variables(model::ModelSetup) 
-
-    @unpack NF = model.parameters
-    @unpack nlev = model.geometry
-    @unpack lmax, mmax = model.spectral_transform
-
-    return zeros(PrognosticVariables{NF},model,lmax,mmax,nlev)
 end
 
 function initial_conditions!(   ::Type{StartFromFile},

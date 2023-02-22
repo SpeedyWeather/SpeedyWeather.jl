@@ -138,4 +138,3 @@ module SpeedyWeather
     # INTERFACE
     include("run_speedy.jl")
 end
-

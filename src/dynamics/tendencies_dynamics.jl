@@ -48,7 +48,7 @@ u,v are averaged in grid-point space, divergence in spectral space.
 """
 function vertical_averages!(diagn::DiagnosticVariables{NF},
                             progn::PrognosticVariables{NF},
-                            lf::Int,            # leapfrog index
+                            lf::Int,    # leapfrog index for D̄_spec
                             G::Geometry{NF}) where NF
     
     @unpack σ_levels_thick, nlev = G
@@ -130,18 +130,21 @@ function surface_pressure_tendency!(surf::SurfaceVariables{NF},
     @inbounds for (j,ring) in enumerate(rings)
         coslat⁻¹j = coslat⁻¹[j]
         for ij in ring
-            # -(ū,v̄)⋅∇lnp_s - D̄ all in grid-point space
+            # -(ū,v̄)⋅∇lnp_s in grid-point space
+            # -D̄ is missing here as it's subtracted in spectral space for pres_tend
+            # and subtracted in grid-point space for vertical velocity therein
             pres_tend_grid[ij] = -coslat⁻¹j*(ū[ij]*∇lnp_x[ij] +
-                                            v̄[ij]*∇lnp_y[ij]) - D̄[ij]
+                                            v̄[ij]*∇lnp_y[ij])
         end
     end
 
     spectral!(pres_tend,pres_tend_grid,model.spectral_transform)
 
-    # # Alternative: do the -D̄ term in spectral
-    # @inbounds for lm in eachharmonic(pres_tend,D̄_spec)
-    #     pres_tend[lm] -= D̄_spec[lm]
-    # end
+    # the -D̄ term in spectral
+    # for semi-implicit D̄ is calc at time step i-1, i.e. leapfrog lf=1 in vertical_averages!
+    @inbounds for lm in eachharmonic(pres_tend,D̄_spec)
+        pres_tend[lm] -= D̄_spec[lm]
+    end
 
     pres_tend[1] = zero(NF)     # for mass conservation
     return nothing
@@ -154,7 +157,8 @@ function vertical_velocity!(diagn::DiagnosticVariablesLayer,
     @unpack k = diagn                                   # vertical level
     σ̇ = diagn.dynamics_variables.σ_tend                 # vertical mass flux M = pₛσ̇ at k+1/2
     D̄_above = diagn.dynamics_variables.div_sum_above    # sum of thickness-weighted div from level 1:k
-    ∂lnpₛ_∂t = surf.pres_tend_grid                       # already calc in surface_pressure_tendency!
+    ∂lnpₛ_∂t = surf.pres_tend_grid                      # calculated in surface_pressure_tendency! (excl -D̄)
+    D̄ = surf.div_mean_grid                              # vertical avrgd div to be subtract from ∂lnpₛ_∂t
     σk_half = model.geometry.σ_levels_half[k+1]         # σ at k+1/2
     
     # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlev+1/2 (stored in layer k)
@@ -162,7 +166,7 @@ function vertical_velocity!(diagn::DiagnosticVariablesLayer,
     k == model.geometry.nlev && (fill!(σ̇,0); return nothing)
 
     @inbounds for ij in eachgridpoint(σ̇,D̄_above,∂lnpₛ_∂t)
-        σ̇[ij] = -D̄_above[ij] - σk_half*∂lnpₛ_∂t[ij]
+        σ̇[ij] = -D̄_above[ij] - σk_half*(∂lnpₛ_∂t[ij] - D̄[ij])
     end
 end
 
