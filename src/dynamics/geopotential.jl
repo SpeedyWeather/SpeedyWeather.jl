@@ -137,8 +137,22 @@ function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
     @inbounds for ij in eachgridpoint(temp_virt_grid, temp_grid, humid_grid)
         temp_virt_grid[ij] = temp_grid[ij]*(1 + μ*humid_grid[ij])
     end
-    spectral!(temp_virt,temp_virt_grid,S)
+    # spectral!(temp_virt,temp_virt_grid,S)
 end
+
+function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
+                                        progn::PrognosticVariablesLeapfrog,
+                                        model::PrimitiveWetCore,
+                                        lf::Int)
+    
+    @unpack temp_virt = diagn.dynamics_variables
+    μ = model.constants.μ_virt_temp
+    Tₖ = model.geometry.temp_ref_profile[diagn.k]   
+    @unpack temp,humid = progn.leapfrog[lf]
+
+    @. temp_virt = temp + Tₖ*μ*humid
+end
+
 
 """
 For the PrimitiveDryCore temperautre and virtual temperature are the same (humidity=0).
@@ -151,5 +165,16 @@ function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
     @unpack temp_virt = diagn.dynamics_variables
 
     copyto!(temp_virt_grid,temp_grid)
+    # copyto!(temp_virt,temp)
+end
+
+function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
+                                        progn::PrognosticVariablesLeapfrog,
+                                        ::PrimitiveDryCore,
+                                        lf::Int)
+    
+    @unpack temp_virt = diagn.dynamics_variables
+    @unpack temp = progn.leapfrog[lf]
+
     copyto!(temp_virt,temp)
 end

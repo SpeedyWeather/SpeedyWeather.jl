@@ -48,14 +48,19 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     # parameterization_tendencies!(diagn,time,model)
  
     # DYNAMICS
-    pressure_gradients!(diagn,progn,lf,S)               # calculate ∇ln(pₛ)
+    pressure_gradients!(diagn,progn,lf,S)           # calculate ∇ln(pₛ)
 
-    for layer in diagn.layers
-        thickness_weighted_divergence!(layer,surface,G)    # calculate Δσₖ[(uₖ,vₖ)⋅∇ln(pₛ) + ∇⋅(uₖ,vₖ)]
+    for (diagn_layer,progn_layer) in zip(diagn.layers,progn.layers)
+        # calculate Δσₖ[(uₖ,vₖ)⋅∇ln(pₛ) + ∇⋅(uₖ,vₖ)]
+        thickness_weighted_divergence!(diagn_layer,surface,G)
+
+        # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
+        linear_virtual_temperature!(diagn_layer,progn_layer,model,lf_linear)
     end
 
-    geopotential!(diagn,B,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ
-    vertical_averages!(diagn,progn,lf,G)            # get ū,v̄,D̄ and others
+    geopotential!(diagn,B,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
+    vertical_averages!(diagn,progn,lf_linear,G)     # get ū,v̄,D̄ on grid; and
+                                                    # and D̄ in spectral at prev time step i-1 via lf_linear
     surface_pressure_tendency!(surface,model)       # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - ∇⋅(ū,v̄)
 
     for layer in diagn.layers
@@ -64,15 +69,16 @@ function get_tendencies!(   diagn::DiagnosticVariables,
 
     vertical_advection!(diagn,model)                # use σ̇ for the vertical advection of u,v,T,q
 
-    for layer in diagn.layers
-        vordiv_tendencies!(layer,surface,model)     # vorticity advection
-        temperature_tendency!(layer,model)          # hor. advection + adiabatic term
-        humidity_tendency!(layer,model)             # horizontal advection of humid
+    for (diagn_layer,progn_layer) in zip(diagn.layers,progn.layers)
+        vordiv_tendencies!(diagn_layer,surface,model)     # vorticity advection
+        temperature_tendency!(diagn_layer,model)          # hor. advection + adiabatic term
+        humidity_tendency!(diagn_layer,model)             # horizontal advection of humid
         
-        # SPECTRAL TENDENCIES
-        spectral_tendencies!(layer,progn,model,lf_linear)
+        # SPECTRAL TENDENCIES FOR SEMI-IMPLICIT
+        # except for pres_tend where -D̄ in spectral is already done in surface_pressure_tendency!
+        spectral_tendencies!(diagn_layer,progn_layer,model,lf_linear)
 
-        bernoulli_potential!(layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
+        bernoulli_potential!(diagn_layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
     end
 end
 

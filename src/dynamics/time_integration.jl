@@ -4,7 +4,7 @@
                 tendency::LowerTriangularMatrix{Complex{NF}},   # tendency (dynamics+physics) of A
                 dt::Real,                                       # time step (=2Δt, but for init steps =Δt,Δt/2)
                 lf::Int=2,                                      # leapfrog index to dis/enable William's filter
-                C::DynamicsConstants{NF},                               # struct with constants used at runtime
+                C::DynamicsConstants{NF},                       # struct with constants used at runtime
                 ) where {NF<:AbstractFloat}                     # number format NF
 
 Performs one leapfrog time step with (`lf=2`) or without (`lf=1`) Robert+William's filter
