@@ -72,7 +72,8 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     @unpack radius_earth, rotation_earth = P        # radius of earth, angular frequency
     @unpack R_dry, cₚ = P                           # gas constant for dry air, heat capacity
     @unpack σ_tropopause = P                        # number of vertical levels used for stratosphere
-    @unpack temp_ref, temp_top, lapse_rate, gravity = P # for reference atmosphere
+    @unpack temp_ref, lapse_rate, gravity = P       # for reference atmosphere
+    @unpack ΔT = P.zonal_wind_coefs                 # used for stratospheric temperature increase
 
     # RESOLUTION PARAMETERS
     nlat_half = get_nlat_half(Grid,trunc)           # resolution parameter nlat_half
@@ -125,9 +126,12 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     n_stratosphere_levels = sum(σ_levels_full .< σ_tropopause)  # of levels above σ_tropopause
 
     # VERTICAL REFERENCE TEMPERATURE PROFILE
-    RΓ = R_dry*lapse_rate/(1000*gravity)                    # origin unclear but profile okay
-    temp_ref_profile = [max(temp_top,temp_ref*σ^RΓ) for σ in σ_levels_full]
-    # temp_ref_profile_σ = temp_ref_profile .* σ_f
+    # integrate hydrostatic equation from pₛ to p, use ideal gas law p = ρRT and linear
+    # temperature decrease with height: T = Tₛ - ΔzΓ with lapse rate Γ
+    # for stratosphere (σ < σ_tropopause) increase temperature (Jablonowski & Williamson. 2006, eq. 5)
+    RΓg⁻¹ = R_dry*lapse_rate/(1000*gravity)     # convert lapse rate from [K/km] to [K/m]
+    temp_ref_profile = [temp_ref*σ^RΓg⁻¹ for σ in σ_levels_full]
+    temp_ref_profile .+= [σ < σ_tropopause ? ΔT*(σ_tropopause-σ)^5 : 0 for σ in σ_levels_full]
 
     # GEOPOTENTIAL, coefficients to calculate geopotential
     Δp_geopot_half, Δp_geopot_full = initialize_geopotential(σ_levels_full,σ_levels_half,R_dry)

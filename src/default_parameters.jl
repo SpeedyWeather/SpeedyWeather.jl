@@ -185,4 +185,4 @@ output_vars_default(::Type{<:PrimitiveWetCore}) = [:vor,:u,:temp,:humid,:pres]
 # default initial conditions by model
 initial_conditions_default(::Type{<:Barotropic}) = StartWithVorticity
 initial_conditions_default(::Type{<:ShallowWater}) = ZonalJet
-initial_conditions_default(::Type{<:PrimitiveEquation}) = StartFromRest
+initial_conditions_default(::Type{<:PrimitiveEquation}) = ZonalWind

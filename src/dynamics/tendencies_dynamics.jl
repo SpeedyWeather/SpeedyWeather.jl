@@ -246,7 +246,7 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
                             surf::SurfaceVariables,
                             model::PrimitiveEquation)
     
-    @unpack f_coriolis, coslat⁻¹ = model.geometry
+    @unpack f_coriolis, coslat⁻¹, temp_ref_profile = model.geometry
     @unpack R_dry = model.constants
 
     @unpack u_tend_grid, v_tend_grid = diagn.tendencies   # already contains vertical advection
@@ -256,6 +256,7 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
     ∇lnp_x = surf.∇lnp_x                        # zonal gradient of logarithm of surface pressure
     ∇lnp_y = surf.∇lnp_y                        # meridional gradient thereof
     Tᵥ = diagn.grid_variables.temp_virt_grid    # virtual temperature
+    temp_ref_k = temp_ref_profile[diagn.k]      # reference temperature at this level k
 
     # precompute ring indices and boundscheck
     rings = eachring(u_tend_grid,v_tend_grid,u,v,vor,∇lnp_x,∇lnp_y,Tᵥ)
@@ -264,8 +265,8 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
         coslat⁻¹j = coslat⁻¹[j]
         f = f_coriolis[j]
         for ij in ring
-            ω = vor[ij] + f         # absolute vorticity
-            RTᵥ = R_dry*Tᵥ[ij]      # gas constant (dry air) times virtual temperature
+            ω = vor[ij] + f                     # absolute vorticity
+            RTᵥ = R_dry*(Tᵥ[ij] - temp_ref_k)   # dry gas constant * virtual temperature anomaly
             u_tend_grid[ij] = (u_tend_grid[ij] + v[ij]*ω - RTᵥ*∇lnp_x[ij])*coslat⁻¹j
             v_tend_grid[ij] = (v_tend_grid[ij] - u[ij]*ω - RTᵥ*∇lnp_y[ij])*coslat⁻¹j
         end
@@ -295,6 +296,7 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
     @unpack div_sum_above, div_weighted, uv∇lnp = diagn.dynamics_variables
     @unpack κ = model.constants
     Tᵥ = diagn.grid_variables.temp_virt_grid
+    Tₖ = model.geometry.temp_ref_profile[diagn.k]
     
     @unpack k = diagn           # model level 
     σ_lnp_A = model.geometry.σ_lnp_A[k]
@@ -303,10 +305,11 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
     # +T*div term of the advection operator
     @inbounds for ij in eachgridpoint(temp_tend_grid,temp_grid,div_grid)
 
+        temp_anomaly = temp_grid[ij]-Tₖ                         # anomaly wrt reference profile
         Dlnp_Dt_ij = σ_lnp_A*div_sum_above[ij] + σ_lnp_B*div_weighted[ij] + uv∇lnp[ij]
 
         # += as tend already contains parameterizations + vertical advection
-        temp_tend_grid[ij] += temp_grid[ij]*div_grid[ij] +      # +TD term of hori advection
+        temp_tend_grid[ij] += temp_anomaly[ij]*div_grid[ij] +   # +TD term of hori advection
             κ*Tᵥ[ij]*Dlnp_Dt_ij                                 # +κTᵥ*Dlnp/Dt, adiabatic term
     end
 
@@ -443,8 +446,7 @@ Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral s
     
 This version is used for both ShallowWater and PrimitiveEquation, only the geopotential
 calculation in geopotential! differs."""
-function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},
-                                G::Geometry,            
+function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},     
                                 S::SpectralTransform,
                                 ) where NF
     

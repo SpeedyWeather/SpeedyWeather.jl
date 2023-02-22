@@ -170,7 +170,7 @@ function initial_conditions!(   ::Type{ZonalWind},
             cosφ = cosd(φij)
             tanφ = tand(φij)
 
-             # Jablonowski and Williamson, eq. (3) 
+            # Jablonowski and Williamson, eq. (3) 
             ζ[ij] = -4u₀/radius_earth*cos_ηᵥ*sinφ*cosφ*(2 - 5sinφ^2) 
 
             # PERTURBATION
@@ -185,9 +185,11 @@ function initial_conditions!(   ::Type{ZonalWind},
             r = radius_earth*acos(X)
             exp_decay = exp(-(r/R)^2)
 
+            # Jablonowski and Williamson, eq. (12) 
             ζ[ij] += perturb_uₚ/radius_earth*exp_decay*
                 (tanφ - 2*(radius_earth/R)^2*acos(X)*X_norm*(sinφc*cosφ - cosφc*sinφ*cosd(λij-λc)))
             
+            # Jablonowski and Williamson, eq. (13) 
             D[ij] -= 2perturb_uₚ*radius_earth/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
         end
 
