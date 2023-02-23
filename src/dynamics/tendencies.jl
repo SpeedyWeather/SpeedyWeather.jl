@@ -69,16 +69,17 @@ function get_tendencies!(   diagn::DiagnosticVariables,
 
     vertical_advection!(diagn,model)                # use σ̇ for the vertical advection of u,v,T,q
 
-    for (diagn_layer,progn_layer) in zip(diagn.layers,progn.layers)
-        vordiv_tendencies!(diagn_layer,surface,model)     # vorticity advection
-        temperature_tendency!(diagn_layer,model)          # hor. advection + adiabatic term
-        humidity_tendency!(diagn_layer,model)             # horizontal advection of humid
+    for layer in diagn.layers
+        vordiv_tendencies!(layer,surface,model)     # vorticity advection
+        temperature_tendency!(layer,model)          # hor. advection + adiabatic term
+        humidity_tendency!(layer,model)             # horizontal advection of humid
         
         # SPECTRAL TENDENCIES FOR SEMI-IMPLICIT
         # except for pres_tend where -D̄ in spectral is already done in surface_pressure_tendency!
-        spectral_tendencies!(diagn_layer,progn_layer,model,lf_linear)
+        # also geopotential via linear virtual temperature at time step i-1 (lf_linear) is calculated above
+        spectral_tendencies!(layer,progn,model,lf_linear)
 
-        bernoulli_potential!(diagn_layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
+        bernoulli_potential!(layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
     end
 end
 
@@ -94,7 +95,7 @@ function spectral_tendencies!(  diagn::DiagnosticVariablesLayer,
     @unpack div = progn.layers[diagn.k].leapfrog[lf]
     @unpack temp_tend = diagn.tendencies
 
-    # -R_dry*Tₖ*∇²lnpₛ, linear part of the RTᵥ∇lnpₛ pressure gradient term
+    # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
     # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
     # -∇² is applied in bernoulli_potential!
@@ -103,5 +104,6 @@ function spectral_tendencies!(  diagn::DiagnosticVariablesLayer,
     
     # add the +DTₖ term to tend tendency, as +DT' is calculated in grid-point space at time step i
     # but for semi-implicit corrections do +DTₖ with D at leapfrog step lf (i-1, i.e. not centred)
+    # note T' = T - Tₖ, so not based on virtual temperature
     @. temp_tend += Tₖ*div
 end

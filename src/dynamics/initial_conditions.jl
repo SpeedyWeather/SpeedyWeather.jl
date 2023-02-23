@@ -148,8 +148,8 @@ end
 
 """Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
 function initial_conditions!(   ::Type{ZonalWind},
-                                progn::PrognosticVariables,
-                                model::PrimitiveEquation)
+                                progn::PrognosticVariables{NF},
+                                model::PrimitiveEquation) where NF
 
     @unpack u₀, η₀, ΔT = model.parameters.zonal_wind_coefs
     @unpack perturb_lat, perturb_lon, perturb_uₚ, perturb_radius = model.parameters.zonal_wind_coefs
@@ -163,8 +163,8 @@ function initial_conditions!(   ::Type{ZonalWind},
     S = model.spectral_transform
 
     # VORTICITY
-    ζ = zeros(Grid,nlat_half)   # relative vorticity
-    D = zeros(Grid,nlat_half)   # divergence (perturbation only)
+    ζ = zeros(Grid{NF},nlat_half)   # relative vorticity
+    D = zeros(Grid{NF},nlat_half)   # divergence (perturbation only)
 
     for (k,layer) in enumerate(progn.layers)
 
@@ -199,12 +199,14 @@ function initial_conditions!(   ::Type{ZonalWind},
                 (tanφ - 2*(radius_earth/R)^2*acos(X)*X_norm*(sinφc*cosφ - cosφc*sinφ*cosd(λij-λc)))
             
             # Jablonowski and Williamson, eq. (13) 
-            D[ij] -= 2perturb_uₚ*radius_earth/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
+            D[ij] = -2perturb_uₚ*radius_earth/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
         end
 
-        @unpack vor = layer.leapfrog[1]
+        @unpack vor,div = layer.leapfrog[1]
         spectral!(vor,ζ,S)
+        spectral!(div,D,S)
         spectral_truncation!(vor)
+        spectral_truncation!(div)
     end
 
     # TEMPERATURE
@@ -221,7 +223,7 @@ function initial_conditions!(   ::Type{ZonalWind},
         end
     end
 
-    T = zeros(Grid,nlat_half)   # temperature
+    T = zeros(Grid{NF},nlat_half)   # temperature
     aΩ = radius_earth*rotation_earth
 
     for (k,layer) in enumerate(progn.layers)
