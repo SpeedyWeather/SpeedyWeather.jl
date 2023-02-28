@@ -311,6 +311,7 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
 
         temp_anomaly = temp_grid[ij]-Tₖ                         # anomaly wrt reference profile
         Dlnp_Dt_ij = σ_lnp_A*div_sum_above[ij] + σ_lnp_B*div_weighted[ij] + uv∇lnp[ij]
+        # Dlnp_Dt_ij = uv∇lnp[ij]
 
         # += as tend already contains parameterizations + vertical advection
         temp_tend_grid[ij] += temp_anomaly[ij]*div_grid[ij] +   # +TD term of hori advection

@@ -126,53 +126,128 @@ function Implicit(P::Parameters{<:PrimitiveEquation})    # primitive equation on
     @unpack NF,trunc,nlev = P
 
     # initialize with zeros only, actual initialization depends on time step, done in initialize_implicit!
-    L = zeros(NF,0,0)
-    R = zeros(NF,0,0)
-    U = zeros(NF,0)
-    W = zeros(NF,0)
-
-    S⁻¹ = zeros(NF,0,0)
-
-    return ImplicitPrimitiveEq(L,R,U,W,S⁻¹,)
+    ξ = zeros(NF,1)             # time step 2α*dt packed in a vector for mutability
+    L = zeros(NF,nlev)          # operator for the +TₖD term (reference temperature profile)
+    R = zeros(NF,nlev,nlev)     # operator for the geopotential calculation
+    U = zeros(NF,nlev)          # the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence
+    W = zeros(NF,nlev)          # vertical averaging of the -D̄ term in the log surface pres equation
+    S⁻¹ = zeros(NF,trunc+1,nlev,nlev)   # combined inverted operator: S = 1 + ξ²(RL + UW)
+    return ImplicitPrimitiveEq(ξ,L,R,U,W,S⁻¹,)
 end
 
-initialize_implicit!(::Real,::PrimitiveEquation) = nothing
-
-function _initialize_implicit!(  dt::Real,
+function initialize_implicit!(  dt::Real,
                                 model::PrimitiveEquation)
 
     @unpack S⁻¹,L,R,U,W = model.implicit
-    @unpack σ_levels_thick = model.geometry
+    @unpack nlev, σ_levels_thick, temp_ref_profile = model.geometry
+    @unpack Δp_geopot_half, Δp_geopot_full = model.geometry     # = R*Δlnp on half or full levels
+    @unpack R_dry = model.constants
+    @unpack eigenvalues, lmax = model.spectral_transform
     α = model.parameters.implicit_α
 
+    # set up W,L,U,R operators from
+    # δD = G_D + ξ(RδT + Uδlnps)        divergence D correction
+    # δT = G_T + ξLδD                   temperature T correction
+    # δlnps = G_lnps + ξWδD             log surface pressure lnps correction
+    # 
+    # G_X is the uncorrected explicit tendency calculated as RHS_expl(Xⁱ) + RHS_impl(Xⁱ⁻¹)
+    # with RHS_expl being the nonlinear terms calculated from the centered time step i
+    # and RHS_impl are the linear terms that are supposed to be calcualted semi-implicitly
+    # however, they have sofar only been evaluated explicitly at time step i-1
+    # and are subject to be corrected to δX following the equations above
+    # R, U, L, W are linear operators that are therefore defined here and inverted
+    # to obtain δD first, and then δT and δlnps through substitution
+    # here we absorb the time step ξ directly into the operators R <- ξR etc
+
     ξ = α*dt    # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
-    @inbounds for k in eachindex(σ_levels_thick,W)
-        W[k] = ξ*σ_levels_thick[k]
+    @. W = -ξ*σ_levels_thick            # the -D̄ term in the log surface pres equation
+    @. L = ξ*temp_ref_profile           # the DTₖ term in the temperature equation
+
+    @. U = ξ*R_dry*temp_ref_profile     # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence
+
+    for k in 1:nlev                     # set up vertical geopotential integration as matrix operator
+        R[1:k,k] .= Δp_geopot_full[k]   # but otherwise equivalent to geopotential! with zero orography
+        R[1:k-1,k] .+= Δp_geopot_half[k]# but excluding the eigenvalues as with U
     end
 
-    # S = 1 + ξ²(RL + UW), but R,L,U,W contain ξ already
-    S = LinearAlgebra.I  + R*L + U*W'
-    S⁻¹ .= inv(S)
+    @. R *= ξ                           # include timestep ξ
+    model.implicit.ξ[1] = ξ             # also store in Implicit struct
+
+    # solving the equations above for δD yields
+    # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
+    # S = 1 + ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
+    S = zero(R)
+    for l in 1:lmax+1
+        # include (neg) eigenvalues for -∇² here
+        S .= LinearAlgebra.I(nlev) .- eigenvalues[l]*(R*LinearAlgebra.Diagonal(L) .+ U*W')
+        S⁻¹[l,:,:] .= inv(S)
+    end
 end
 
-
 function implicit_correction!(  diagn::DiagnosticVariables{NF},
-                                progn::PrognosticVariables{NF},
                                 model::PrimitiveEquation,
                                 ) where NF
 
+    @unpack nlev = model.geometry
+    @unpack eigenvalues, lmax, mmax = model.spectral_transform
+    @unpack Δp_geopot_half, Δp_geopot_full = model.geometry     # = R*Δlnp on half or full levels
     @unpack S⁻¹,L,R,U,W = model.implicit
+    ξ = model.implicit.ξ[1]
 
-    # δlnpₛ = G_lnpₛ + ξWδD, W <- ξW here
+    # SEMI IMPLICIT CORRECTIONS FOR DIVERGENCE
     @unpack pres_tend = diagn.surface
-    for (k1,layer_k1) in enumerate(diagn.layers)
-        @unpack div_tend, temp_tend = layer_k1.tendencies
-        pres_tend .-= div_tend*W[k1]
+    for k in nlev:-1:1      # loop from bottom layer to top for geopotential calculation
+        # calculate the combined tendency G = G_D + ξRG_T + ξUG_lnps to solve for divergence δD
+        G = diagn.layers[k].dynamics_variables.a        # reuse work arrays
+        geopot = diagn.layers[k].dynamics_variables.b
+        @unpack div_tend, temp_tend = diagn.layers[k].tendencies
 
-        # δT = G_T + ξLδD, L <- ξL here
-        for (k2, layer_k2) in enumerate(diagn.layer)
-            @unpack div_tend_k2 = layer_k2.tendencies
-            temp_tend .+= div_tend_k2*L[k2,k1]
+        # 1. the ξRG_T term, vertical integration of geopotential (excl ξ, this is done in 2.)
+        # R is not used here as it's cheaper to reuse the geopotential from k+1 than
+        # to multiply with the entire upper triangular matrix R which recalculates
+        # the geopotential for k from all lower levels k...nlev
+        if k == nlev
+            @. geopot = Δp_geopot_full[k]*temp_tend        # surface geopotential without orography 
+        else
+            temp_tend_k1 = diagn.layers[k+1].tendencies.temp_tend   # temp tendency from layer below
+            geopot_k1 = diagn.layers[k+1].dynamics_variables.b      # geopotential from layer below
+            @. geopot = geopot_k1 + Δp_geopot_half[k+1]*temp_tend_k1 + Δp_geopot_full[k]*temp_tend
         end
+
+        # 2. the G = G_D + ξRG_T + ξUG_lnps terms using geopot from above 
+        lm = 0
+        @inbounds for m in 1:mmax+1     # loops over all columns/order m
+            for l in m:lmax+1           # but skips the lmax+2 degree (1-based)
+                lm += 1     # single index lm corresponding to harmonic l,m within a LowerTriangularMatrix
+                            # -∇² not part of U so -eigenvalues here
+                G[lm] = div_tend[lm] - eigenvalues[l]*(U[k]*pres_tend[lm] + ξ*geopot[lm])    
+            end
+            lm += 1         # skip last row, LowerTriangularMatrices are of size lmax+2 x mmax+1
+        end
+
+        # div_tend is now in G, fill with zeros here so that it can be used as an accumulator
+        # in the δD = S⁻¹G calculation
+        fill!(div_tend,0)
+    end
+
+    # NOW SOLVE THE δD = S⁻¹G to correct divergence tendency
+    for k in 1:nlev
+        @unpack div_tend, temp_tend = diagn.layers[k].tendencies
+        for k2 in 1:nlev
+            G = diagn.layers[k2].dynamics_variables.a        # reuse work arrays
+
+            lm = 0
+            @inbounds for m in 1:mmax+1     # loops over all columns/order m
+                for l in m:lmax+1           # but skips the lmax+2 degree (1-based)
+                    lm += 1     # single index lm corresponding to harmonic l,m within a LowerTriangularMatrix
+                    div_tend[lm] += S⁻¹[l,k,k2]*G[lm]    
+                end
+                lm += 1         # skip last row, LowerTriangularMatrices are of size lmax+2 x mmax+1
+            end
+        end
+
+        # SEMI IMPLICIT CORRECTIONS FOR PRESSURE AND TEMPERATURE
+        @. pres_tend += div_tend*W[k]   # δlnpₛ = G_lnpₛ + ξWδD, W <- ξW here
+        @. temp_tend += div_tend*L[k]   # δT = G_T + ξLδD, L <- ξL here
     end
 end
