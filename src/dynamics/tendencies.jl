@@ -42,7 +42,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     # for semi-implicit corrections (α >= 0.5) linear gravity-wave related tendencies are
     # evaluated at previous timestep i-1 (i.e. lf=1 leapfrog time step) 
     # nonlinear terms and parameterizations are always evaluated at lf
-    lf_linear = model.parameters.implicit_α == 0 ? lf : lf
+    lf_linear = model.parameters.implicit_α == 0 ? lf : 1
 
     # PARAMETERIZATIONS
     # parameterization_tendencies!(diagn,time,model)
@@ -102,7 +102,7 @@ function spectral_tendencies!(  diagn::DiagnosticVariablesLayer,
     @unpack geopot = diagn.dynamics_variables
     @. geopot += R_dry*Tₖ*pres
     
-    # add the +DTₖ term to tend tendency, as +DT' is calculated in grid-point space at time step i
+    # add the +DTₖ term to temp tendency, as +DT' is calculated in grid-point space at time step i
     # but for semi-implicit corrections do +DTₖ with D at leapfrog step lf (i-1, i.e. not centred)
     # note T' = T - Tₖ, so not based on virtual temperature
     @. temp_tend += Tₖ*div
