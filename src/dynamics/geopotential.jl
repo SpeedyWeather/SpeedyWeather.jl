@@ -100,6 +100,23 @@ function geopotential!( diagn::DiagnosticVariables{NF},
     # end
 end
 
+function geopotential!( temp::Vector,
+                        G::Geometry)
+    
+    @unpack Δp_geopot_half, Δp_geopot_full, nlev = G  # = R*Δlnp either on half or full levels
+    geopot = zero(temp)
+
+    # bottom layer
+    geopot[nlev] = temp[nlev]*Δp_geopot_full[end]
+
+    # OTHER FULL LAYERS, integrate two half-layers from bottom to top
+    @inbounds for k in nlev-1:-1:1
+        geopot[k] = geopot[k+1] + temp[k+1]*Δp_geopot_half[k+1] + temp[k]*Δp_geopot_full[k]
+    end
+
+    return geopot
+end
+
 function geopotential!( diagn::DiagnosticVariablesLayer,
                         pres::LowerTriangularMatrix,
                         C::DynamicsConstants)
