@@ -1,13 +1,14 @@
 mutable struct Feedback <: AbstractFeedback
     verbose::Bool                           # print feedback to REPL?
+    debug::Bool                             # run nan_detection code?
     output::Bool                            # store output (here: write to parameters and progress.txt?)
 
     # PROGRESS
     progress_meter::ProgressMeter.Progress  # struct containing everything progress related
     progress_txt::Union{IOStream,Nothing}   # txt is a Nothing in case of no output
 
-    # NANS AND OTHER MODEL STATE FEEDBACK
-    nans_detected::Bool                     # did NaNs occur in the simulation?
+    # NaRS (Not-a-Real) AND OTHER MODEL STATE FEEDBACK
+    nars_detected::Bool                     # did Infs/NaNs occur in the simulation?
 end
 
 """Initialises the progress txt file."""
@@ -40,38 +41,41 @@ function initialize_feedback(outputter::Output,M::ModelSetup)
         progress_txt = nothing      # for no ouput, allocate dummies for Feedback struct
     end
 
-    nans_detected = false           # currently not used
+    nans_detected = false           # don't check again if true
 
     # PROGRESSMETER
-    @unpack verbose = M.parameters
+    @unpack verbose, debug = M.parameters
     @unpack n_timesteps = M.constants
     DT_IN_SEC[1] = M.constants.Δt_sec       # hack: redefine element in global constant dt_in_sec
                                             # used to pass on the time step to ProgressMeter.speedstring
     desc = "Weather is speedy$(output ? " run $run_id: " : ": ")"
-                                            # show progress meter via `enabled` through verbose parameter
-    progress_meter = ProgressMeter.Progress(n_timesteps, enabled=verbose, showspeed=true; desc)
+    
+    # show progress meter via `enabled` through verbose parameter
+    # one more time steps for the first Euler time step in first_timesteps!
+    progress_meter = ProgressMeter.Progress(n_timesteps+1, enabled=verbose, showspeed=true; desc)
 
-    return Feedback(verbose,output,progress_meter,progress_txt,nans_detected)
+    return Feedback(verbose,debug,output,progress_meter,progress_txt,nans_detected)
 end
 
 """Calls the progress meter and writes every 5% progress increase to txt."""
-function progress!(F::Feedback)
-    ProgressMeter.next!(F.progress_meter)           # update progress meter
-    @unpack counter, n = F.progress_meter            # unpack counter after update
+function progress!(feedback::Feedback)
+    ProgressMeter.next!(feedback.progress_meter)    # update progress meter
+    @unpack counter, n = feedback.progress_meter    # unpack counter after update
 
     # write progress to txt file too
     if (counter/n*100 % 1) > ((counter+1)/n*100 % 1)  
         percent = round(Int,(counter+1)/n*100)      # % of time steps completed
-        if F.output && (percent % 5 == 0)           # write every 5% step in txt 
-            write(F.progress_txt,"\n$percent%")
-            flush(F.progress_txt)
+        if feedback.output && (percent % 5 == 0)    # write every 5% step in txt 
+            write(feedback.progress_txt,"\n$percent%")
+            flush(feedback.progress_txt)
         end
     end
 end
 
-function progress!(F::Feedback,O::Output)
-    progress!(F)
-    O.timestep_counter = F.progress_meter.counter   # sync counters
+function progress!(feedback::Feedback,outputter::Output,progn::PrognosticVariables)
+    progress!(feedback)
+    outputter.timestep_counter = feedback.progress_meter.counter   # sync counters
+    feedback.debug && nar_detection!(feedback,progn)
 end
 
 """Finalises the progress meter and the progress txt file."""
@@ -85,3 +89,43 @@ function progress_finish!(F::Feedback)
         flush(F.progress_txt)
     end
 end
+
+"""Detect NaR (Not-a-Real) in the prognostic variables."""
+function nar_detection!(feedback::Feedback,progn::PrognosticVariables)
+
+    feedback.nars_detected && return nothing    # escape immediately if nans already detected
+    i = feedback.progress_meter.counter         # time step
+    nars_detected_here = false
+
+    for (k,layer) in enumerate(progn.layers)
+        for (lf,leapfrog) in enumerate(layer.leapfrog)
+            @unpack vor,div,temp = leapfrog
+            for lm in eachharmonic(vor,div,temp)
+                if ~nars_detected_here
+                    nars_vor = ~isfinite(vor[lm])
+                    nars_div = ~isfinite(div[lm])
+                    nars_temp = ~isfinite(temp[lm])
+
+                    nars_vor  && @warn "NaR detected in vor: i=$i, k=$k, lf=$lf, lm=$lm"
+                    nars_div  && @warn "NaR detected in div: i=$i, k=$k, lf=$lf, lm=$lm"
+                    nars_temp && @warn "NaR detected in temp: i=$i, k=$k, lf=$lf, lm=$lm"
+
+                    nars_detected_here |= (nars_vor | nars_div | nars_temp)
+                end
+            end
+        end
+    end
+
+    for (lf,pres) in enumerate(progn.pres.leapfrog)
+        for lm in eachharmonic(pres)
+            if ~nars_detected_here
+                nars_pres = ~isfinite(pres[lm])
+                nars_pres && @warn "NaR detected in pres: i=$i, lf=$lf, lm=$lm"
+                nars_detected_here |= nars_pres
+            end
+        end
+    end
+
+    feedback.nars_detected |= nars_detected_here
+end
+

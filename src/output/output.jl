@@ -1,5 +1,6 @@
-Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}}   # output only in Float32/64
-    
+Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}} <: AbstractOutput
+    # NF: output only in Float32/64
+
     output::Bool = false                    # output to netCDF?
     output_vars::Vector{Symbol}=[:none]     # vector of output variables as Symbols
     write_restart::Bool = false             # also write restart file if output==true?

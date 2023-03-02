@@ -75,31 +75,32 @@ prognostic variables with two time steps (t=0,Δt) that can then be used in the 
 function first_timesteps!(  progn::PrognosticVariables, # all prognostic variables
                             diagn::DiagnosticVariables, # all pre-allocated diagnostic variables
                             time::DateTime,             # time at timestep
-                            M::ModelSetup,              # everything that is constant at runtime
-                            feedback::AbstractFeedback  # feedback struct
+                            model::ModelSetup,          # everything that is constant at runtime
+                            feedback::AbstractFeedback, # feedback struct
+                            outputter::AbstractOutput
                             )
     
-    @unpack Δt,Δt_sec = M.constants
+    @unpack Δt,Δt_sec = model.constants
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
-    initialize_implicit!(Δt/2,M)        # update precomputed implicit terms with time step Δt/2
+    initialize_implicit!(Δt/2,model)    # update precomputed implicit terms with time step Δt/2
     lf1 = 1                             # without Robert+William's filter
     lf2 = 1                             # evaluates all tendencies at t=0,
                                         # the first leapfrog index (=>Euler forward)
-    timestep!(progn,diagn,time,Δt/2,M,lf1,lf2)
-    progress!(feedback)
+    timestep!(progn,diagn,time,Δt/2,model,lf1,lf2)
+    progress!(feedback,outputter,progn)
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
-    initialize_implicit!(Δt,M)          # update precomputed implicit terms with time step Δt
+    initialize_implicit!(Δt,model)      # update precomputed implicit terms with time step Δt
     lf1 = 1                             # without Robert+William's filter
     lf2 = 2                             # evaluate all tendencies at t=dt/2,
                                         # the 2nd leapfrog index (=>Leapfrog)
     time += Dates.Second(Δt_sec÷2)      # update by half the leapfrog time step Δt used here
-    timestep!(progn,diagn,time,Δt,M,lf1,lf2)
-    progress!(feedback)
+    timestep!(progn,diagn,time,Δt,model,lf1,lf2)
+    progress!(feedback,outputter,progn)
 
     # update precomputed implicit terms with time step 2Δt for further time steps
-    initialize_implicit!(2Δt,M)
+    initialize_implicit!(2Δt,model)
 end
 
 """
@@ -234,14 +235,15 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
     feedback = initialize_feedback(outputter,model)
 
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
-    first_timesteps!(progn,diagn,time,model,feedback)
+    first_timesteps!(progn,diagn,time,model,feedback,outputter)
 
     # MAIN LOOP
+    nans_detected = 
     for i in 2:n_timesteps                  # start at 2 as first Δt in first_timesteps!
         time += Dates.Second(Δt_sec)        # update time
         timestep!(progn,diagn,time,2Δt,model)   # calculate tendencies and leapfrog forward
-        
-        progress!(feedback,outputter)       # updates the progress meter bar
+
+        progress!(feedback,outputter,progn)     # updates the progress meter bar
         write_netcdf_output!(outputter,time,diagn,model)
     end
 
@@ -251,4 +253,3 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
 
     return progn
 end
-    

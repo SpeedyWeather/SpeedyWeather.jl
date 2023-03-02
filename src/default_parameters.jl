@@ -126,6 +126,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # OUTPUT
     verbose::Bool = true            # print dialog for feedback
+    debug::Bool = false             # print debug info
     output::Bool = false            # Store data in netCDF?
     output_dt::Float64 = 6             # output time step [hours]
     output_path::String = pwd()     # path to output folder
