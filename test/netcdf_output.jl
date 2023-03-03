@@ -5,9 +5,9 @@
 
         function manual_time_axis(dt, n_timesteps)
             
-            time_axis = zeros(Float64, n_timesteps)
-            for i=1:n_timesteps
-                time_axis[i] = Float64(dt) * (i-1)
+            time_axis = zeros(Float64, n_timesteps+1)
+            for i=0:n_timesteps
+                time_axis[i+1] = Float64(dt) * i
             end 
             time_axis 
         end 
