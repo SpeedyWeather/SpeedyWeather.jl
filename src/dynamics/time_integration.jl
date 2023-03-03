@@ -88,7 +88,7 @@ function first_timesteps!(  progn::PrognosticVariables, # all prognostic variabl
     lf2 = 1                             # evaluates all tendencies at t=0,
                                         # the first leapfrog index (=>Euler forward)
     timestep!(progn,diagn,time,Δt/2,model,lf1,lf2)
-    progress!(feedback,outputter,progn)
+    progress!(feedback,progn)
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
     initialize_implicit!(Δt,model)      # update precomputed implicit terms with time step Δt
@@ -97,10 +97,12 @@ function first_timesteps!(  progn::PrognosticVariables, # all prognostic variabl
                                         # the 2nd leapfrog index (=>Leapfrog)
     time += Dates.Second(Δt_sec÷2)      # update by half the leapfrog time step Δt used here
     timestep!(progn,diagn,time,Δt,model,lf1,lf2)
-    progress!(feedback,outputter,progn)
+    progress!(feedback,progn)
+    write_netcdf_output!(outputter,time,diagn,model)
 
     # update precomputed implicit terms with time step 2Δt for further time steps
     initialize_implicit!(2Δt,model)
+    # return time, don't return time as the main time loop will jump straight from 0 to Δt
 end
 
 """
@@ -236,14 +238,14 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
 
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
     first_timesteps!(progn,diagn,time,model,feedback,outputter)
+    time += Dates.Second(Δt_sec)            # update time accordingly
 
     # MAIN LOOP
-    nans_detected = 
     for i in 2:n_timesteps                  # start at 2 as first Δt in first_timesteps!
-        time += Dates.Second(Δt_sec)        # update time
         timestep!(progn,diagn,time,2Δt,model)   # calculate tendencies and leapfrog forward
+        time += Dates.Second(Δt_sec)        # time of lf=2 and diagn after timestep!
 
-        progress!(feedback,outputter,progn)     # updates the progress meter bar
+        progress!(feedback,progn)           # updates the progress meter bar
         write_netcdf_output!(outputter,time,diagn,model)
     end
 

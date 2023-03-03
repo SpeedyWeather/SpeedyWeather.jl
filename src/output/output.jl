@@ -237,6 +237,7 @@ function write_netcdf_output!(  outputter::Output,              # everything for
                                 diagn::DiagnosticVariables,     # all diagnostic variables
                                 model::ModelSetup)              # all parameters
 
+    outputter.timestep_counter += 1                                 # increase counter
     @unpack output, output_every_n_steps, timestep_counter = outputter
     output || return nothing                                        # escape immediately for no netcdf output
     timestep_counter % output_every_n_steps == 0 || return nothing  # escape if output not written on this step

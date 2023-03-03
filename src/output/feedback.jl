@@ -72,9 +72,9 @@ function progress!(feedback::Feedback)
     end
 end
 
-function progress!(feedback::Feedback,outputter::Output,progn::PrognosticVariables)
+function progress!( feedback::Feedback,
+                    progn::PrognosticVariables)
     progress!(feedback)
-    outputter.timestep_counter = feedback.progress_meter.counter   # sync counters
     feedback.debug && nar_detection!(feedback,progn)
 end
 
