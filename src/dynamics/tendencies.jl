@@ -71,13 +71,13 @@ function get_tendencies!(   diagn::DiagnosticVariables,
 
     for layer in diagn.layers
         vordiv_tendencies!(layer,surface,model)     # vorticity advection
-        temperature_tendency!(layer,model)          # hor. advection + adiabatic term
+        temperature_tendency!(layer,surface,model)  # hor. advection + adiabatic term
         humidity_tendency!(layer,model)             # horizontal advection of humid
         
         # SPECTRAL TENDENCIES FOR SEMI-IMPLICIT
         # except for pres_tend where -D̄ in spectral is already done in surface_pressure_tendency!
         # also geopotential via linear virtual temperature at time step i-1 (lf_linear) is calculated above
-        spectral_tendencies!(layer,progn,model,lf_linear)
+        spectral_tendencies!(layer,progn,model,lf,lf_linear)
 
         bernoulli_potential!(layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
     end
@@ -86,20 +86,21 @@ end
 function spectral_tendencies!(  diagn::DiagnosticVariablesLayer,
                                 progn::PrognosticVariables,
                                 model::PrimitiveEquation,
-                                lf::Int)            # leapfrog index to evaluate tendencies on
+                                lf::Int,
+                                lf_linear::Int)            # leapfrog index to evaluate tendencies on
     
     @unpack R_dry = model.constants
     @unpack temp_ref_profile = model.geometry
     Tₖ = temp_ref_profile[diagn.k]                  # reference temperature at layer k      
-    pres = progn.pres.leapfrog[lf]
-    @unpack div = progn.layers[diagn.k].leapfrog[lf]
+    pres = progn.pres.leapfrog[lf_linear]
+    @unpack div = progn.layers[diagn.k].leapfrog[lf_linear]
     @unpack temp_tend = diagn.tendencies
+    @unpack geopot = diagn.dynamics_variables
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
     # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
     # -∇² is applied in bernoulli_potential!
-    @unpack geopot = diagn.dynamics_variables
     @. geopot += R_dry*Tₖ*pres
     
     # add the +DTₖ term to temp tendency, as +DT' is calculated in grid-point space at time step i
