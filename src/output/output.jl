@@ -301,6 +301,7 @@ function write_netcdf_variables!(   outputter::Output,
         # UNSCALE THE SCALED VARIABLES
         unscale!(vor,model)     # was vor*radius, back to vor
         unscale!(div,model)     # same
+        temp .-= 273.15         # convert to ˚C
 
         # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
         @unpack keepbits = model.parameters
@@ -330,7 +331,7 @@ function write_netcdf_variables!(   outputter::Output,
 
         # convert from log(pₛ) to surface pressure pₛ [hPa]
         pres .= exp.(pres) ./ 100
-        round!(pres,model.parameters.keepbits)
+        # round!(pres,model.parameters.keepbits+3)
         NetCDF.putvar(outputter.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
     end
 
