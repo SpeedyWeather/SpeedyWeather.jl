@@ -6,7 +6,7 @@ module SpeedyWeather
     # NUMERICS
     import Random
     import FastGaussQuadrature
-    import LinearAlgebra
+    import LinearAlgebra: LinearAlgebra, Diagonal
 
     # GPU
     import KernelAbstractions

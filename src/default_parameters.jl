@@ -18,35 +18,35 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     Grid::Type{<:AbstractGrid} = FullGaussianGrid       # grid used
     
     # EARTH'S PROPERTIES
-    radius_earth::Float64 = 6.371e6            # radius of Earth [m]
-    rotation_earth::Float64 = 7.29e-5          # angular frequency of Earth's rotation [rad/s]
-    gravity::Float64 = 9.81                    # gravitational acceleration [m/s^2]
+    radius_earth::Float64 = 6.371e6         # radius of Earth [m]
+    rotation_earth::Float64 = 7.29e-5       # angular frequency of Earth's rotation [rad/s]
+    gravity::Float64 = 9.81                 # gravitational acceleration [m/s^2]
     seasonal_cycle::Bool = true             # Seasonal cycle?
     equinox::DateTime = DateTime(2000,3,20) # Spring equinox (year irrelevant)
-    tropic_cancer::Float64 = 23.5              # latitude [˚N] of the tropic of cancer
+    tropic_cancer::Float64 = 23.5           # latitude [˚N] of the tropic of cancer
     
     # ATMOSPHERE
-    mol_mass_dry_air = 28.964917        # molar mass of dry air [g/mol]
-    mol_mass_vapour = 18.01528          # molar mass of water vapour [g/mol]
-    cₚ::Float64 = 1004.0                   # specific heat at constant pressure [J/K/kg]
-    R_gas::Float64 = 8.31446261815324      # universal gas constant [J/K/mol]
+    mol_mass_dry_air = 28.9649              # molar mass of dry air [g/mol]
+    mol_mass_vapour = 18.0153               # molar mass of water vapour [g/mol]
+    cₚ::Float64 = 1004                      # specific heat at constant pressure [J/K/kg]
+    R_gas::Float64 = 8.3145                 # universal gas constant [J/K/mol]
     R_dry::Float64 = 1000*R_gas/mol_mass_dry_air   # specific gas constant for dry air [J/kg/K]
     R_vapour::Float64 = 1000*R_gas/mol_mass_vapour # specific gas constant for water vapour [J/kg/K]
-    alhc::Float64 = 2501                   # latent heat of condensation [J/g] for consistency with
-                                        # specific humidity [g/Kg]
-    alhs::Float64 = 2801                   # latent heat of sublimation [?]
-    sbc::Float64 = 5.67e-8                 # stefan-Boltzmann constant [W/m^2/K^4]
+    alhc::Float64 = 2501                    # latent heat of condensation [J/g] for consistency with
+                                            # specific humidity [g/Kg]
+    alhs::Float64 = 2801                    # latent heat of sublimation [?]
+    sbc::Float64 = 5.67e-8                  # stefan-Boltzmann constant [W/m^2/K^4]
 
     # STANDARD ATMOSPHERE (reference values)
-    lapse_rate::Float64 = 5                # moist adiabatic temperature lapse rate -dT/dz [K/km]
-    temp_ref::Float64 = 288                # absolute temperature at surface z=0 [K]
-    temp_top::Float64 = 216                # absolute temperature in stratosphere [K]
-    scale_height::Float64 = 7.5            # scale height for pressure [km]
-    pres_ref::Float64 = 1000               # surface pressure [hPa]
-    scale_height_humid::Float64 = 2.5      # scale height for specific humidity [km]
-    relhumid_ref::Float64 = 0.7            # relative humidity of near-surface air [1]
-    water_pres_ref::Float64 = 17           # saturation water vapour pressure [Pa]
-    layer_thickness::Float64 = 8.5         # layer thickness for the shallow water model [km]
+    lapse_rate::Float64 = 5                 # moist adiabatic temperature lapse rate -dT/dz [K/km]
+    temp_ref::Float64 = 288                 # absolute temperature at surface z=0 [K]
+    temp_top::Float64 = 216                 # absolute temperature in stratosphere [K]
+    scale_height::Float64 = 7.5             # scale height for pressure [km]
+    pres_ref::Float64 = 1000                # surface pressure [hPa]
+    scale_height_humid::Float64 = 2.5       # scale height for specific humidity [km]
+    relhumid_ref::Float64 = 0.7             # relative humidity of near-surface air [1]
+    water_pres_ref::Float64 = 17            # saturation water vapour pressure [Pa]
+    layer_thickness::Float64 = 8.5          # layer thickness for the shallow water model [km]
 
     # VERTICAL COORDINATES
     # of the nlev vertical levels, defined by a generalised logistic function,

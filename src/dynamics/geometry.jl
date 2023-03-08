@@ -43,7 +43,6 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     σ_levels_half::Vector{NF}       # σ at half levels
     σ_levels_full::Vector{NF}       # σ at full levels
     σ_levels_thick::Vector{NF}      # σ level thicknesses
-    σ_levels_thick⁻¹_half::Vector{NF}   # = 1/(2σ_levels_thick)
     σ_f::Vector{NF}                 # akap/(2σ_levels_thick)   #TODO rename?
     σ_lnp_A::Vector{NF}
     σ_lnp_B::Vector{NF}
@@ -72,7 +71,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     @unpack radius_earth, rotation_earth = P        # radius of earth, angular frequency
     @unpack R_dry, cₚ = P                           # gas constant for dry air, heat capacity
     @unpack σ_tropopause = P                        # number of vertical levels used for stratosphere
-    @unpack temp_ref, lapse_rate, gravity = P       # for reference atmosphere
+    @unpack temp_ref, temp_top, lapse_rate, gravity = P       # for reference atmosphere
     @unpack ΔT = P.zonal_wind_coefs                 # used for stratospheric temperature increase
 
     # RESOLUTION PARAMETERS
@@ -109,7 +108,6 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     σ_levels_half = vertical_coordinates(P)
     σ_levels_full = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])
     σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
-    σ_levels_thick⁻¹_half = 1 ./ (2σ_levels_thick)
     σ_f = κ ./ (2σ_levels_full)
 
     # version for Vk, the vertical advection in Dlnp/Dt
@@ -117,11 +115,32 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     # σ_lnp_B = [log(σ_levels_half[k+1]/σ_levels_full[k])/σ_levels_thick[k] for k in 1:nlev]
     
     # version to be used with div_sum_above (A) and div (B) for Dlnp/Dt
-    σ_lnp_A = [log(σ_levels_half[k]/σ_levels_half[k+1])/σ_levels_thick[k] for k in 1:nlev]
-    σ_lnp_B = [log(σ_levels_half[k]/σ_levels_full[k])/σ_levels_thick[k] for k in 1:nlev]
-    σ_lnp_A[1] = log(σ_levels_half[2])/σ_levels_thick[1]
-    σ_lnp_B[1] = log(σ_levels_full[1])/σ_levels_thick[1]
+    # σ_lnp_A = [log(σ_levels_half[k]/σ_levels_half[k+1])/σ_levels_thick[k] for k in 1:nlev]
+    # σ_lnp_B = [log(σ_levels_half[k]/σ_levels_full[k])/σ_levels_thick[k] for k in 1:nlev]
     
+    # if σ_levels_half[1] <= 0    # for p_1/2 = 0 ln(p_1/2) is undefined
+    #     σ_lnp_A[1] = 0
+    #     σ_lnp_B[1] = -1/σ_levels_thick[1]
+    # end
+    
+    # σ_lnp_A = zero(σ_levels_full)
+    # σ_lnp_B = zero(σ_levels_full)
+    # σ_lnp_A[1] = log(σ_levels_full[1]/σ_levels_full[2])/2σ_levels_thick[1]
+    # σ_lnp_A[end] = log(σ_levels_full[end-1])/2σ_levels_thick[end]
+    # σ_lnp_B[end] = log(σ_levels_full[end]/σ_levels_full[end-1])/2σ_levels_thick[end]
+
+    # for k in 2:nlev-1
+    #     σ_lnp_A[k] = log(σ_levels_full[k-1]/σ_levels_full[k+1])/2σ_levels_thick[k]
+    #     σ_lnp_B[k] = log(σ_levels_full[k]/σ_levels_full[k-1])/2σ_levels_thick[k]
+    # end
+
+    σ_lnp_A = log.(σ_levels_half[1:end-1]./σ_levels_half[2:end])
+    σ_lnp_A[1] = 0
+    
+    σ_lnp_B = 1 .- σ_levels_half[1:end-1]./σ_levels_thick .* log.(σ_levels_half[2:end]./σ_levels_half[1:end-1])
+    σ_lnp_B[1] = σ_levels_half[1] <= 0 ? log(2) : σ_lnp_B[1]
+    σ_lnp_B ./= -σ_levels_thick
+
     # TROPOPAUSE/STRATOSPHERIC LEVELS
     n_stratosphere_levels = sum(σ_levels_full .< σ_tropopause)  # of levels above σ_tropopause
 
@@ -131,6 +150,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     # for stratosphere (σ < σ_tropopause) increase temperature (Jablonowski & Williamson. 2006, eq. 5)
     RΓg⁻¹ = R_dry*lapse_rate/(1000*gravity)     # convert lapse rate from [K/km] to [K/m]
     temp_ref_profile = [temp_ref*σ^RΓg⁻¹ for σ in σ_levels_full]
+    # temp_ref_profile[σ_levels_full .< σ_tropopause] .= temp_top
     temp_ref_profile .+= [σ < σ_tropopause ? ΔT*(σ_tropopause-σ)^5 : 0 for σ in σ_levels_full]
 
     # GEOPOTENTIAL, coefficients to calculate geopotential
@@ -156,7 +176,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
                     latd,lond,londs,latds,
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,
-                    σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_thick⁻¹_half,σ_f,
+                    σ_levels_half,σ_levels_full,σ_levels_thick,σ_f,
                     σ_lnp_A,σ_lnp_B,
                     temp_ref_profile,
                     Δp_geopot_half,Δp_geopot_full,lapserate_corr,entrainment_profile)
