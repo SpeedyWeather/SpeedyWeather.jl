@@ -329,9 +329,12 @@ function write_netcdf_variables!(   outputter::Output,
             RingGrids.interpolate!(output_Grid(pres),pres_grid,interpolator)
         end
 
-        # convert from log(pₛ) to surface pressure pₛ [hPa]
-        pres .= exp.(pres) ./ 100
-        # round!(pres,model.parameters.keepbits+3)
+        if model isa PrimitiveEquation
+            @. pres = exp(pres)/100     # convert from log(pₛ) to surface pressure pₛ [hPa]
+        else
+            round!(pres,model.parameters.keepbits)
+        end
+        
         NetCDF.putvar(outputter.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
     end
 
