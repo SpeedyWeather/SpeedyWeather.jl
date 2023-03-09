@@ -125,7 +125,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     ) where {NF<:AbstractFloat}
 
     get_tendencies!(diagn,progn,time,model,lf2)
-    implicit_correction!(diagn,model)
+    implicit_correction!(diagn,progn,model)
 
     # LOOP OVER ALL LAYERS for diffusion, leapfrog time integration
     # and progn state from spectral to grid for next time step

@@ -273,6 +273,7 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
         for ij in ring
             ω = vor[ij] + f                     # absolute vorticity
             RTᵥ = R_dry*(Tᵥ[ij] - temp_ref_k)   # dry gas constant * virtual temperature anomaly
+            # RTᵥ = R_dry*Tᵥ[ij]                  # dry gas constant * virtual temperature
             u_tend_grid[ij] = (u_tend_grid[ij] + v[ij]*ω - RTᵥ*∇lnp_x[ij])*coslat⁻¹j
             v_tend_grid[ij] = (v_tend_grid[ij] - u[ij]*ω - RTᵥ*∇lnp_y[ij])*coslat⁻¹j
         end
@@ -323,7 +324,7 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
         # Dlnp_Dt_ij = uv∇lnp[ij]
 
         # += as tend already contains parameterizations + vertical advection
-        temp_tend_grid[ij] = temp_anomaly[ij]*div_grid[ij] +   # +TD term of hori advection
+        temp_tend_grid[ij] = temp_anomaly[ij]*div_grid[ij] +       # +TD term of hori advection
             κ*Tᵥ[ij]*Dlnp_Dt_ij                                 # +κTᵥ*Dlnp/Dt, adiabatic term
     end
 
