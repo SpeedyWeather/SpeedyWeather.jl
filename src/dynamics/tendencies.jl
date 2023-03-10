@@ -42,7 +42,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     # for semi-implicit corrections (α >= 0.5) linear gravity-wave related tendencies are
     # evaluated at previous timestep i-1 (i.e. lf=1 leapfrog time step) 
     # nonlinear terms and parameterizations are always evaluated at lf
-    # lf_linear = model.parameters.implicit_α == 0 ? lf : 1
+    lf_linear = model.parameters.implicit_α == 0 ? lf : 1
 
     # PARAMETERIZATIONS
     # parameterization_tendencies!(diagn,time,model)
@@ -55,11 +55,12 @@ function get_tendencies!(   diagn::DiagnosticVariables,
         thickness_weighted_divergence!(diagn_layer,surface,G)
 
         # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
-        linear_virtual_temperature!(diagn_layer,progn_layer,model,lf)
+        linear_virtual_temperature!(diagn_layer,progn_layer,model,lf_linear)
+        temperature_anomaly!(diagn_layer,model)
     end
 
     geopotential!(diagn,B,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
-    vertical_averages!(diagn,progn,lf,G)            # get ū,v̄,D̄ on grid; and
+    vertical_averages!(diagn,progn,lf_linear,G)     # get ū,v̄,D̄ on grid; and
                                                     # and D̄ in spectral at prev time step i-1 via lf_linear
     surface_pressure_tendency!(surface,model)       # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - ∇⋅(ū,v̄)
 
@@ -77,7 +78,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
         # SPECTRAL TENDENCIES FOR SEMI-IMPLICIT
         # except for pres_tend where -D̄ in spectral is already done in surface_pressure_tendency!
         # also geopotential via linear virtual temperature at time step i-1 (lf_linear) is calculated above
-        spectral_tendencies!(layer,progn,model,lf)
+        spectral_tendencies!(layer,progn,model,lf_linear)
 
         bernoulli_potential!(layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
     end
@@ -105,5 +106,5 @@ function spectral_tendencies!(  diagn::DiagnosticVariablesLayer,
     # add the +DTₖ term to temp tendency, as +DT' is calculated in grid-point space at time step i
     # but for semi-implicit corrections do +DTₖ with D at leapfrog step lf (i-1, i.e. not centred)
     # note T' = T - Tₖ, so not based on virtual temperature
-    @. temp_tend += Tₖ*div
+    # @. temp_tend += Tₖ*div
 end

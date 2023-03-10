@@ -36,6 +36,17 @@ function thickness_weighted_divergence!(diagn::DiagnosticVariablesLayer,
     end
 end
 
+"""Convert absolute and virtual temperature to anomalies wrt to the reference profile"""
+function temperature_anomaly!(  diagn::DiagnosticVariablesLayer,
+                                model::PrimitiveEquation)
+                    
+    Tₖ = model.geometry.temp_ref_profile[diagn.k]   # reference temperature at this level k
+    @unpack temp_grid, temp_virt_grid = diagn.grid_variables
+
+    @. temp_grid -= Tₖ          # absolute temperature -> anomaly
+    @. temp_virt_grid -= Tₖ     # virtual temperature -> anomaly
+end
+
 """
     vertical_averages!(Diag::DiagnosticVariables,G::Geometry)
 
@@ -261,8 +272,7 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
     vor = diagn.grid_variables.vor_grid         # relative vorticity
     ∇lnp_x = surf.∇lnp_x                        # zonal gradient of logarithm of surface pressure
     ∇lnp_y = surf.∇lnp_y                        # meridional gradient thereof
-    Tᵥ = diagn.grid_variables.temp_virt_grid    # virtual temperature
-    temp_ref_k = temp_ref_profile[diagn.k]      # reference temperature at this level k
+    Tᵥ = diagn.grid_variables.temp_virt_grid    # virtual temperature (anomaly!)
 
     # precompute ring indices and boundscheck
     rings = eachring(u_tend_grid,v_tend_grid,u,v,vor,∇lnp_x,∇lnp_y,Tᵥ)
@@ -272,8 +282,7 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
         f = f_coriolis[j]
         for ij in ring
             ω = vor[ij] + f                     # absolute vorticity
-            RTᵥ = R_dry*(Tᵥ[ij] - temp_ref_k)   # dry gas constant * virtual temperature anomaly
-            # RTᵥ = R_dry*Tᵥ[ij]                  # dry gas constant * virtual temperature
+            RTᵥ = R_dry*Tᵥ[ij]                  # dry gas constant * virtual temperature anomaly
             u_tend_grid[ij] = (u_tend_grid[ij] + v[ij]*ω - RTᵥ*∇lnp_x[ij])*coslat⁻¹j
             v_tend_grid[ij] = (v_tend_grid[ij] - u[ij]*ω - RTᵥ*∇lnp_y[ij])*coslat⁻¹j
         end
@@ -316,21 +325,16 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
     # +T*div term of the advection operator
     @inbounds for ij in eachgridpoint(temp_tend_grid,temp_grid,div_grid)
 
-        temp_anomaly = temp_grid[ij]-Tₖ                         # anomaly wrt reference profile
         Dlnp_Dt_ij = σ_lnp_A*div_sum_above[ij] + σ_lnp_B*div_weighted[ij] + uv∇lnp[ij]
-        # Dlnp_Dt_ij = ∂lnpₛ_∂t[ij] - D̄[ij] + uv∇lnp[ij]
-        # Dlnp_Dt_ij = -D̄[ij] + uv∇lnp[ij]
-        # Dlnp_Dt_ij = -div_weighted[ij]
-        # Dlnp_Dt_ij = uv∇lnp[ij]
 
         # += as tend already contains parameterizations + vertical advection
-        temp_tend_grid[ij] = temp_anomaly[ij]*div_grid[ij] +       # +TD term of hori advection
-            κ*Tᵥ[ij]*Dlnp_Dt_ij                                 # +κTᵥ*Dlnp/Dt, adiabatic term
+        temp_tend_grid[ij] += temp_grid[ij]*div_grid[ij] +      # +TD term of hori advection
+            κ*(Tᵥ[ij]+Tₖ)*Dlnp_Dt_ij                            # +κTᵥ*Dlnp/Dt, adiabatic term
     end
 
     spectral!(temp_tend,temp_tend_grid,model.spectral_transform)
 
-    # now add the -∇⋅((u,v)*T) term
+    # now add the -∇⋅((u,v)*T') term
     flux_divergence!(temp_tend,temp_grid,diagn,model,add=true,flipsign=true)
 end
 

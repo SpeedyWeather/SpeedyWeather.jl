@@ -208,8 +208,8 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
     ξ = model.implicit.ξ[1]
     
     @unpack pres_tend = diagn.surface
-    pres_old = progn.pres.leapfrog[1]
-    pres_new = progn.pres.leapfrog[2]
+    # pres_old = progn.pres.leapfrog[1]
+    # pres_new = progn.pres.leapfrog[2]
 
     # MOVE THE IMPLICIT TERMS DTₖ + κTₖDlnps/Dt OF THE TEMPERATURE EQUATION FROM i to i-1
     for k in 1:nlev
@@ -219,36 +219,36 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
             div_new = progn.layers[r].leapfrog[2].div   # divergence at i
             @. temp_tend += L[k,r]*(div_old - div_new)
 
-            temp_old = progn.layers[r].leapfrog[1].temp
-            temp_new = progn.layers[r].leapfrog[2].temp
+            # temp_old = progn.layers[r].leapfrog[1].temp
+            # temp_new = progn.layers[r].leapfrog[2].temp
 
-            lm = 0
-            for m in 1:mmax+1       # loops over all columns/order m
-                for l in m:lmax+1   # but skips the lmax+2 degree (1-based)
-                    lm += 1         # single index lm corresponding to harmonic l,m within a LowerTriangularMatrix
-                                    # ∇² not part of U so *eigenvalues here
-                    div_tend[lm] += eigenvalues[l]*R[k,r]*(temp_old[lm] - temp_new[lm])
-                    # div_tend[lm] += eigenvalues[l]*R[k,r]*temp_new[lm]
-                end
-                lm += 1
-            end
+            # lm = 0
+            # for m in 1:mmax+1       # loops over all columns/order m
+            #     for l in m:lmax+1   # but skips the lmax+2 degree (1-based)
+            #         lm += 1         # single index lm corresponding to harmonic l,m within a LowerTriangularMatrix
+            #                         # ∇² not part of U so *eigenvalues here
+            #         div_tend[lm] += eigenvalues[l]*R[k,r]*(temp_old[lm] - temp_new[lm])
+            #         # div_tend[lm] += eigenvalues[l]*R[k,r]*temp_new[lm]
+            #     end
+            #     lm += 1
+            # end
         end
 
-        lm = 0
-        for m in 1:mmax+1       # loops over all columns/order m
-            for l in m:lmax+1   # but skips the lmax+2 degree (1-based)
-                lm += 1         # single index lm corresponding to harmonic l,m within a LowerTriangularMatrix
-                                # ∇² not part of U so *eigenvalues here
-                div_tend[lm] += eigenvalues[l]*U[k]*(pres_old[lm] - pres_new[lm])
-                # div_tend[lm] += eigenvalues[l]*U[k]*pres_new[lm]
-            end
-            lm += 1
-        end
+        # lm = 0
+        # for m in 1:mmax+1       # loops over all columns/order m
+        #     for l in m:lmax+1   # but skips the lmax+2 degree (1-based)
+        #         lm += 1         # single index lm corresponding to harmonic l,m within a LowerTriangularMatrix
+        #                         # ∇² not part of U so *eigenvalues here
+        #         div_tend[lm] += eigenvalues[l]*U[k]*(pres_old[lm] - pres_new[lm])
+        #         # div_tend[lm] += eigenvalues[l]*U[k]*pres_new[lm]
+        #     end
+        #     lm += 1
+        # end
 
-        div_old = progn.layers[k].leapfrog[1].div   # divergence at i-1
-        div_new = progn.layers[k].leapfrog[2].div   # divergence at i
+        # div_old = progn.layers[k].leapfrog[1].div   # divergence at i-1
+        # div_new = progn.layers[k].leapfrog[2].div   # divergence at i
 
-        @. pres_tend += W[k]*(div_old - div_new)
+        # @. pres_tend += W[k]*(div_old - div_new)
         # @. pres_tend += W[k]*div_new
     end
 

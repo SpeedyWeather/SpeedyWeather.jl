@@ -65,6 +65,9 @@ function geopotential!( diagn::DiagnosticVariables{NF},
 
     @boundscheck diagn.nlev == length(Δp_geopot_full) || throw(BoundsError)
 
+    # for PrimitiveDryCore virtual temperature = absolute temperature here
+    # note these are not anomalies here as they are only in grid-point fields
+    
     # BOTTOM FULL LAYER
     temp = diagn.layers[end].dynamics_variables.temp_virt
     geopot = diagn.layers[end].dynamics_variables.geopot
