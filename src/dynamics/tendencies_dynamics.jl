@@ -19,19 +19,21 @@ function thickness_weighted_divergence!(diagn::DiagnosticVariablesLayer,
                                         )
 
     @unpack ∇lnp_x, ∇lnp_y = surf   # zonal, meridional gradient of log surface pressure
-    @unpack u_grid, v_grid, div_grid = diagn.grid_variables
-    @unpack uv∇lnp, div_weighted = diagn.dynamics_variables
+    @unpack u_grid, v_grid = diagn.grid_variables
+    @unpack uv∇lnp = diagn.dynamics_variables
+    
+    # @. uv∇lnp = u_grid*∇lnp_x + v_grid*∇lnp_y
+
+    # with coslat scaling
     @unpack coslat⁻¹ = G
     Δσₖ = G.σ_levels_thick[diagn.k]
 
-    rings = eachring(uv∇lnp,u_grid,v_grid,div_grid,∇lnp_x,∇lnp_y)
+    rings = eachring(uv∇lnp,u_grid,v_grid,∇lnp_x,∇lnp_y)
 
     @inbounds for (j,ring) in enumerate(rings)
         coslat⁻¹j = coslat⁻¹[j]
         for ij in ring
-            uv∇lnp_ij = coslat⁻¹j*(u_grid[ij]*∇lnp_x[ij] + v_grid[ij]*∇lnp_y[ij])
-            uv∇lnp[ij] = uv∇lnp_ij
-            div_weighted = Δσₖ*(uv∇lnp_ij + div_grid[ij])
+            uv∇lnp[ij] = coslat⁻¹j*(u_grid[ij]*∇lnp_x[ij] + v_grid[ij]*∇lnp_y[ij])
         end
     end
 end
@@ -63,7 +65,9 @@ function vertical_averages!(diagn::DiagnosticVariables{NF},
                             G::Geometry{NF}) where NF
     
     @unpack σ_levels_thick, nlev = G
-    ū = diagn.surface.u_mean_grid       # rename for convenience
+    @unpack ∇lnp_x, ∇lnp_y = diagn.surface  # zonal, meridional grad of log surface pressure
+    
+    ū = diagn.surface.u_mean_grid           # rename for convenience
     v̄ = diagn.surface.v_mean_grid
     D̄ = diagn.surface.div_mean_grid
     D̄_spec = diagn.surface.div_mean
@@ -74,7 +78,6 @@ function vertical_averages!(diagn::DiagnosticVariables{NF},
     fill!(v̄,0)
     fill!(D̄,0)
     fill!(D̄_spec,0)
-    # fill!(diagn.layers[1].dynamics_variables.div_sum_above,0)
 
     @inbounds for k in 1:nlev
 
@@ -85,23 +88,24 @@ function vertical_averages!(diagn::DiagnosticVariables{NF},
         D = diagn.layers[k].grid_variables.div_grid
         D_spec = progn.layers[k].leapfrog[lf].div
         
-        # arrays for sum of divergences for level k from level r=1 to k-1
-        k_above = max(1,k-1)
-        D_weighted_above = diagn.layers[k_above].dynamics_variables.div_weighted
-        D̄ᵣ_above = diagn.layers[k_above].dynamics_variables.div_sum_above
+        # for the Σ_r=1^k-1 Δσᵣ(Dᵣ +  u̲⋅∇lnpₛ) vertical integration
+        # Simmons and Burridge, 1981 eq 3.12 split into div and u̲⋅∇lnpₛ
         D̄ᵣ = diagn.layers[k].dynamics_variables.div_sum_above
-        
+        ūv̄∇lnpᵣ = diagn.layers[k].dynamics_variables.uv∇lnp_sum_above
+
         # u,v,D in grid-point space, with thickness weighting Δσₖ
         @inbounds for ij in eachgridpoint(diagn.surface)
-            ū[ij] += u[ij]*Δσₖ
+            # before this k's u,v,D are added to ū,v̄,D̄ store in the
+            # sum_above fields for a 1:k-1 integration
+            # which is =0 for k=1 as ū,v̄,D̄ accumulators are 0-initialised
+            D̄ᵣ[ij] = D̄[ij]
+            ūv̄∇lnpᵣ = ū[ij]*∇lnp_x[ij] + v̄[ij]*∇lnp_y[ij]
+
+            ū[ij] += u[ij]*Δσₖ  # now add the k-th element to the sum
             v̄[ij] += v[ij]*Δσₖ
             D̄[ij] += D[ij]*Δσₖ
-            D̄ᵣ[ij] = D̄ᵣ_above[ij] + D_weighted_above[ij]
         end
         
-        # above code will incorrectly start the summation at k=1
-        k == 1 && fill!(D̄ᵣ,0)   # set to 0 to remove D_weighted at k=1
-
         # but also divergence in spectral space
         @inbounds for lm in eachharmonic(D̄_spec,D_spec)
             D̄_spec[lm] += D_spec[lm]*Δσₖ
@@ -166,21 +170,26 @@ function vertical_velocity!(diagn::DiagnosticVariablesLayer,
                             surf::SurfaceVariables,
                             model::PrimitiveEquation)
 
-    @unpack k = diagn                                   # vertical level
-    σ̇ = diagn.dynamics_variables.σ_tend                 # vertical mass flux M = pₛσ̇ at k+1/2
-    D̄_above = diagn.dynamics_variables.div_sum_above    # sum of thickness-weighted div from level 1:k
-    ∂lnpₛ_∂t = surf.pres_tend_grid                      # calculated in surface_pressure_tendency! (excl -D̄)
-    D̄ = surf.div_mean_grid                              # vertical avrgd div to be subtract from ∂lnpₛ_∂t
-    σk_half = model.geometry.σ_levels_half[k+1]         # σ at k+1/2
+    @unpack k = diagn                           # vertical level
+    Δσₖ = model.geometry.σ_levels_thick[k]      # σ at k+1/2
+    σk_half = model.geometry.σ_levels_half[k+1] # σ at k+1/2
+    σ̇ = diagn.dynamics_variables.σ_tend         # vertical mass flux M = pₛσ̇ at k+1/2
     
+                                                # sum of Δσ-weighted div, uv∇lnp from 1:k-1
+    @unpack div_sum_above, uv∇lnp, uv∇lnp_sum_above = diagn.dynamics_variables
+    @unpack div_grid = diagn.grid_variables
+
+    ūv̄∇lnp = surf.pres_tend_grid                # calc'd in surface_pressure_tendency! (excl -D̄)
+    D̄ = surf.div_mean_grid                      # vertical avrgd div to be added to ūv̄∇lnp
+
     # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlev+1/2 (stored in layer k)
     # set to zero for bottom layer then, and exit immediately
     k == model.geometry.nlev && (fill!(σ̇,0); return nothing)
 
-    # Hoskins and Simmons, 1975 between eq (5) and (6)
-    @inbounds for ij in eachgridpoint(σ̇,D̄_above,∂lnpₛ_∂t)
-        σ̇[ij] = -D̄_above[ij] - σk_half*(∂lnpₛ_∂t[ij] - D̄[ij])
-    end
+    # Hoskins and Simmons, 1975 just before eq. (6)
+    σ̇ .= σk_half*(D̄ .- ūv̄∇lnp) .-               # 2nd term precalc with minus so swap sign here
+        (div_sum_above .+ Δσₖ*div_grid) .-      # include level k σₖ-weighted div
+        (uv∇lnp_sum_above .+ Δσₖ*uv∇lnp)        # and level k σₖ-weighted uv∇lnp
 end
 
 function vertical_advection!(   diagn::DiagnosticVariables,
@@ -310,25 +319,23 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
 
     @unpack temp_tend, temp_tend_grid = diagn.tendencies
     @unpack div_grid, temp_grid = diagn.grid_variables
-    @unpack div_sum_above, div_weighted, uv∇lnp = diagn.dynamics_variables
+    @unpack uv∇lnp, uv∇lnp_sum_above, div_sum_above = diagn.dynamics_variables
     @unpack κ = model.constants
     Tᵥ = diagn.grid_variables.temp_virt_grid
     Tₖ = model.geometry.temp_ref_profile[diagn.k]
 
-    ∂lnpₛ_∂t = surf.pres_tend_grid                      # calculated in surface_pressure_tendency! (excl -D̄)
-    D̄ = surf.div_mean_grid                              # vertical avrgd div to be subtract from ∂lnpₛ_∂t
-    
     @unpack k = diagn           # model level 
     σ_lnp_A = model.geometry.σ_lnp_A[k]
     σ_lnp_B = model.geometry.σ_lnp_B[k]
+    Δσₖ = model.geometry.σ_levels_thick[k]
 
-    # +T*div term of the advection operator
     @inbounds for ij in eachgridpoint(temp_tend_grid,temp_grid,div_grid)
 
-        Dlnp_Dt_ij = σ_lnp_A*div_sum_above[ij] + σ_lnp_B*div_weighted[ij] + uv∇lnp[ij]
+        Dlnp_Dt_ij = σ_lnp_A*(div_sum_above[ij] + uv∇lnp_sum_above[ij]) + 
+                     σ_lnp_B*(div_grid[ij] + uv∇lnp[ij]) - uv∇lnp[ij]
 
         # += as tend already contains parameterizations + vertical advection
-        temp_tend_grid[ij] += temp_grid[ij]*div_grid[ij] +      # +TD term of hori advection
+        temp_tend_grid[ij] += temp_grid[ij]*div_grid[ij] +      # +T'D term of hori advection
             κ*(Tᵥ[ij]+Tₖ)*Dlnp_Dt_ij                            # +κTᵥ*Dlnp/Dt, adiabatic term
     end
 

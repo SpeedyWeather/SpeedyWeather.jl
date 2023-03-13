@@ -110,36 +110,15 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
     σ_f = κ ./ (2σ_levels_full)
 
-    # version for Vk, the vertical advection in Dlnp/Dt
-    # σ_lnp_A = [log(σ_levels_full[k]/σ_levels_half[k])/σ_levels_thick[k] for k in 1:nlev]
-    # σ_lnp_B = [log(σ_levels_half[k+1]/σ_levels_full[k])/σ_levels_thick[k] for k in 1:nlev]
+    # ADIABATIC TERM, Simmons and Burridge, 1981, eq. 3.12
+    # precompute ln(σ_k+1/2) - ln(σ_k-1/2) but swap sign, include 1/Δσₖ
+    σ_lnp_A = log.(σ_levels_half[1:end-1]./σ_levels_half[2:end]) ./ σ_levels_thick
+    σ_lnp_A[1] = 0  # the corresponding sum is 1:k-1 so 0 to replace log(0) from above
     
-    # version to be used with div_sum_above (A) and div (B) for Dlnp/Dt
-    # σ_lnp_A = [log(σ_levels_half[k]/σ_levels_half[k+1])/σ_levels_thick[k] for k in 1:nlev]
-    # σ_lnp_B = [log(σ_levels_half[k]/σ_levels_full[k])/σ_levels_thick[k] for k in 1:nlev]
-    
-    # if σ_levels_half[1] <= 0    # for p_1/2 = 0 ln(p_1/2) is undefined
-    #     σ_lnp_A[1] = 0
-    #     σ_lnp_B[1] = -1/σ_levels_thick[1]
-    # end
-    
-    # σ_lnp_A = zero(σ_levels_full)
-    # σ_lnp_B = zero(σ_levels_full)
-    # σ_lnp_A[1] = log(σ_levels_full[1]/σ_levels_full[2])/2σ_levels_thick[1]
-    # σ_lnp_A[end] = log(σ_levels_full[end-1])/2σ_levels_thick[end]
-    # σ_lnp_B[end] = log(σ_levels_full[end]/σ_levels_full[end-1])/2σ_levels_thick[end]
-
-    # for k in 2:nlev-1
-    #     σ_lnp_A[k] = log(σ_levels_full[k-1]/σ_levels_full[k+1])/2σ_levels_thick[k]
-    #     σ_lnp_B[k] = log(σ_levels_full[k]/σ_levels_full[k-1])/2σ_levels_thick[k]
-    # end
-
-    σ_lnp_A = log.(σ_levels_half[1:end-1]./σ_levels_half[2:end])
-    σ_lnp_A[1] = 0
-    
+    # precompute the αₖ = 1 - p_k-1/2/Δpₖ*log(p_k+1/2/p_k-1/2) term in σ coordinates
     σ_lnp_B = 1 .- σ_levels_half[1:end-1]./σ_levels_thick .* log.(σ_levels_half[2:end]./σ_levels_half[1:end-1])
-    σ_lnp_B[1] = σ_levels_half[1] <= 0 ? log(2) : σ_lnp_B[1]
-    σ_lnp_B ./= -σ_levels_thick
+    σ_lnp_B[1] = σ_levels_half[1] <= 0 ? log(2) : σ_lnp_B[1]    # set α₁ = log(2), eq. 3.19
+    σ_lnp_B .*= -1
 
     # TROPOPAUSE/STRATOSPHERIC LEVELS
     n_stratosphere_levels = sum(σ_levels_full .< σ_tropopause)  # of levels above σ_tropopause
