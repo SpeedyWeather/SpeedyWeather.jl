@@ -93,23 +93,19 @@ function vertical_averages!(diagn::DiagnosticVariables{NF},
         D̄ᵣ = diagn.layers[k].dynamics_variables.div_sum_above
         ūv̄∇lnpᵣ = diagn.layers[k].dynamics_variables.uv∇lnp_sum_above
 
-        # u,v,D in grid-point space, with thickness weighting Δσₖ
-        @inbounds for ij in eachgridpoint(diagn.surface)
-            # before this k's u,v,D are added to ū,v̄,D̄ store in the
-            # sum_above fields for a 1:k-1 integration
-            # which is =0 for k=1 as ū,v̄,D̄ accumulators are 0-initialised
-            D̄ᵣ[ij] = D̄[ij]
-            ūv̄∇lnpᵣ = ū[ij]*∇lnp_x[ij] + v̄[ij]*∇lnp_y[ij]
+        # GRID-POINT SPACE: u,v,D with thickness weighting Δσₖ
+        # before this k's u,v,D are added to ū,v̄,D̄ store in the
+        # sum_above fields for a 1:k-1 integration
+        # which is =0 for k=1 as ū,v̄,D̄ accumulators are 0-initialised
+        @. D̄ᵣ = D̄
+        @. ūv̄∇lnpᵣ = ū*∇lnp_x + v̄*∇lnp_y
 
-            ū[ij] += u[ij]*Δσₖ  # now add the k-th element to the sum
-            v̄[ij] += v[ij]*Δσₖ
-            D̄[ij] += D[ij]*Δσₖ
-        end
+        @. ū += u*Δσₖ  # now add the k-th element to the sum
+        @. v̄ += v*Δσₖ
+        @. D̄ += D*Δσₖ
         
-        # but also divergence in spectral space
-        @inbounds for lm in eachharmonic(D̄_spec,D_spec)
-            D̄_spec[lm] += D_spec[lm]*Δσₖ
-        end
+        # SPECTRAL SPACE: divergence
+        @. D̄_spec += D_spec*Δσₖ
     end
 end
         
