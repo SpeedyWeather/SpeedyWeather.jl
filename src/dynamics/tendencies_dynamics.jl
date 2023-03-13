@@ -9,8 +9,8 @@ function pressure_gradients!(   diagn::DiagnosticVariables,
     @unpack ∇lnp_x, ∇lnp_y = diagn.surface              # but store in grid space
 
     ∇!(∇lnp_x_spec,∇lnp_y_spec,pres,S)                  # CALCULATE ∇ln(pₛ)
-    gridded!(∇lnp_x,∇lnp_x_spec,S)                      # transform to grid: zonal gradient
-    gridded!(∇lnp_y,∇lnp_y_spec,S)                      # meridional gradient
+    gridded!(∇lnp_x,∇lnp_x_spec,S,unscale_coslat=true)  # transform to grid: zonal gradient
+    gridded!(∇lnp_y,∇lnp_y_spec,S,unscale_coslat=true)  # meridional gradient
 end
 
 function thickness_weighted_divergence!(diagn::DiagnosticVariablesLayer,
@@ -22,20 +22,20 @@ function thickness_weighted_divergence!(diagn::DiagnosticVariablesLayer,
     @unpack u_grid, v_grid = diagn.grid_variables
     @unpack uv∇lnp = diagn.dynamics_variables
     
-    # @. uv∇lnp = u_grid*∇lnp_x + v_grid*∇lnp_y
+    @. uv∇lnp = u_grid*∇lnp_x + v_grid*∇lnp_y
 
-    # with coslat scaling
-    @unpack coslat⁻¹ = G
-    Δσₖ = G.σ_levels_thick[diagn.k]
+    # # with coslat scaling
+    # @unpack coslat⁻¹ = G
+    # Δσₖ = G.σ_levels_thick[diagn.k]
 
-    rings = eachring(uv∇lnp,u_grid,v_grid,∇lnp_x,∇lnp_y)
+    # rings = eachring(uv∇lnp,u_grid,v_grid,∇lnp_x,∇lnp_y)
 
-    @inbounds for (j,ring) in enumerate(rings)
-        coslat⁻¹j = coslat⁻¹[j]
-        for ij in ring
-            uv∇lnp[ij] = coslat⁻¹j*(u_grid[ij]*∇lnp_x[ij] + v_grid[ij]*∇lnp_y[ij])
-        end
-    end
+    # @inbounds for (j,ring) in enumerate(rings)
+    #     coslat⁻¹j = coslat⁻¹[j]
+    #     for ij in ring
+    #         uv∇lnp[ij] = coslat⁻¹j*(u_grid[ij]*∇lnp_x[ij] + v_grid[ij]*∇lnp_y[ij])
+    #     end
+    # end
 end
 
 """Convert absolute and virtual temperature to anomalies wrt to the reference profile"""
@@ -138,20 +138,21 @@ function surface_pressure_tendency!(surf::SurfaceVariables{NF},
     D̄ = surf.div_mean_grid
     D̄_spec = surf.div_mean
 
-    # precompute ring indices
-    rings = eachring(pres_tend_grid,∇lnp_x,∇lnp_y,ū,v̄,D̄)
+    # # precompute ring indices
+    # rings = eachring(pres_tend_grid,∇lnp_x,∇lnp_y,ū,v̄,D̄)
 
-    @inbounds for (j,ring) in enumerate(rings)
-        coslat⁻¹j = coslat⁻¹[j]
-        for ij in ring
-            # -(ū,v̄)⋅∇lnp_s in grid-point space
-            # -D̄ is missing here as it's subtracted in spectral space for pres_tend
-            # and subtracted in grid-point space for vertical velocity therein
-            pres_tend_grid[ij] = -coslat⁻¹j*(ū[ij]*∇lnp_x[ij] +
-                                            v̄[ij]*∇lnp_y[ij])
-        end
-    end
+    # @inbounds for (j,ring) in enumerate(rings)
+    #     coslat⁻¹j = coslat⁻¹[j]
+    #     for ij in ring
+    #         # -(ū,v̄)⋅∇lnp_s in grid-point space
+    #         # -D̄ is missing here as it's subtracted in spectral space for pres_tend
+    #         # and subtracted in grid-point space for vertical velocity therein
+    #         pres_tend_grid[ij] = -coslat⁻¹j*(ū[ij]*∇lnp_x[ij] +
+    #                                         v̄[ij]*∇lnp_y[ij])
+    #     end
+    # end
 
+    @. pres_tend_grid = ū*∇lnp_x + v̄*∇lnp_y
     spectral!(pres_tend,pres_tend_grid,model.spectral_transform)
 
     # the -D̄ term in spectral
@@ -323,7 +324,6 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
     @unpack k = diagn           # model level 
     σ_lnp_A = model.geometry.σ_lnp_A[k]
     σ_lnp_B = model.geometry.σ_lnp_B[k]
-    Δσₖ = model.geometry.σ_levels_thick[k]
 
     @inbounds for ij in eachgridpoint(temp_tend_grid,temp_grid,div_grid)
 
