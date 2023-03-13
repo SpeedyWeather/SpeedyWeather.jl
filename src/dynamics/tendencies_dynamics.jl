@@ -13,29 +13,14 @@ function pressure_gradients!(   diagn::DiagnosticVariables,
     gridded!(∇lnp_y,∇lnp_y_spec,S,unscale_coslat=true)  # meridional gradient
 end
 
-function thickness_weighted_divergence!(diagn::DiagnosticVariablesLayer,
-                                        surf::SurfaceVariables,
-                                        G::Geometry,
-                                        )
+function pressure_flux!(diagn::DiagnosticVariablesLayer,
+                        surf::SurfaceVariables)
 
     @unpack ∇lnp_x, ∇lnp_y = surf   # zonal, meridional gradient of log surface pressure
     @unpack u_grid, v_grid = diagn.grid_variables
     @unpack uv∇lnp = diagn.dynamics_variables
     
-    @. uv∇lnp = u_grid*∇lnp_x + v_grid*∇lnp_y
-
-    # # with coslat scaling
-    # @unpack coslat⁻¹ = G
-    # Δσₖ = G.σ_levels_thick[diagn.k]
-
-    # rings = eachring(uv∇lnp,u_grid,v_grid,∇lnp_x,∇lnp_y)
-
-    # @inbounds for (j,ring) in enumerate(rings)
-    #     coslat⁻¹j = coslat⁻¹[j]
-    #     for ij in ring
-    #         uv∇lnp[ij] = coslat⁻¹j*(u_grid[ij]*∇lnp_x[ij] + v_grid[ij]*∇lnp_y[ij])
-    #     end
-    # end
+    @. uv∇lnp = u_grid*∇lnp_x + v_grid*∇lnp_y           # the (u,v)⋅∇lnpₛ term
 end
 
 """Convert absolute and virtual temperature to anomalies wrt to the reference profile"""
@@ -133,31 +118,16 @@ function surface_pressure_tendency!(surf::SurfaceVariables{NF},
     @unpack coslat⁻¹ = model.geometry
     
     # vertical averages need to be computed first!
-    ū = surf.u_mean_grid       # rename for convenience
+    ū = surf.u_mean_grid            # rename for convenience
     v̄ = surf.v_mean_grid
-    D̄ = surf.div_mean_grid
-    D̄_spec = surf.div_mean
+    D̄ = surf.div_mean
 
-    # # precompute ring indices
-    # rings = eachring(pres_tend_grid,∇lnp_x,∇lnp_y,ū,v̄,D̄)
-
-    # @inbounds for (j,ring) in enumerate(rings)
-    #     coslat⁻¹j = coslat⁻¹[j]
-    #     for ij in ring
-    #         # -(ū,v̄)⋅∇lnp_s in grid-point space
-    #         # -D̄ is missing here as it's subtracted in spectral space for pres_tend
-    #         # and subtracted in grid-point space for vertical velocity therein
-    #         pres_tend_grid[ij] = -coslat⁻¹j*(ū[ij]*∇lnp_x[ij] +
-    #                                         v̄[ij]*∇lnp_y[ij])
-    #     end
-    # end
-
+    # in grid-point space the the (ū,v̄)⋅∇lnpₛ term (swap sign in spectral)
     @. pres_tend_grid = ū*∇lnp_x + v̄*∇lnp_y
     spectral!(pres_tend,pres_tend_grid,model.spectral_transform)
-
-    # the -D̄ term in spectral
+    
     # for semi-implicit D̄ is calc at time step i-1, i.e. leapfrog lf=1 in vertical_averages!
-    pres_tend .-= D̄_spec
+    @. pres_tend = -pres_tend - D̄   # the -D̄ term in spectral and swap sign
 
     pres_tend[1] = zero(NF)     # for mass conservation
     return nothing
@@ -184,9 +154,9 @@ function vertical_velocity!(diagn::DiagnosticVariablesLayer,
     k == model.geometry.nlev && (fill!(σ̇,0); return nothing)
 
     # Hoskins and Simmons, 1975 just before eq. (6)
-    σ̇ .= σk_half*(D̄ .- ūv̄∇lnp) .-               # 2nd term precalc with minus so swap sign here
-        (div_sum_above .+ Δσₖ*div_grid) .-      # include level k σₖ-weighted div
-        (uv∇lnp_sum_above .+ Δσₖ*uv∇lnp)        # and level k σₖ-weighted uv∇lnp
+    σ̇ .= σk_half*(D̄ .+ ūv̄∇lnp) .-
+        (div_sum_above .+ Δσₖ*div_grid) .-      # for 1:k integral add level k σₖ-weighted div 
+        (uv∇lnp_sum_above .+ Δσₖ*uv∇lnp)        # and level k σₖ-weighted uv∇lnp here
 end
 
 function vertical_advection!(   diagn::DiagnosticVariables,
@@ -311,7 +281,6 @@ end
 Compute the temperature tendency
 """
 function temperature_tendency!( diagn::DiagnosticVariablesLayer,
-                                surf::SurfaceVariables,
                                 model::PrimitiveEquation)
 
     @unpack temp_tend, temp_tend_grid = diagn.tendencies
@@ -483,6 +452,23 @@ function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},
     ∇²!(div_tend,bernoulli,S,add=true,flipsign=true)        # add -∇²(1/2(u^2 + v^2) + ϕ)
 end
 
+function linear_pressure_gradient!( diagn::DiagnosticVariablesLayer,
+                                    progn::PrognosticVariables,
+                                    model::PrimitiveEquation,
+                                    lf::Int)            # leapfrog index to evaluate tendencies on
+    
+    @unpack R_dry = model.constants
+    Tₖ = model.geometry.temp_ref_profile[diagn.k]                  # reference temperature at layer k      
+    pres = progn.pres.leapfrog[lf]
+    @unpack geopot = diagn.dynamics_variables
+
+    # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
+    # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
+    # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
+    # -∇² is applied in bernoulli_potential!
+    @. geopot += R_dry*Tₖ*pres
+end
+
 """
     volume_flux_divergence!(diagn::DiagnosticVariablesLayer,
                             surface::SurfaceVariables,
@@ -576,7 +562,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     # transform from U,V in spectral to u,v on grid (U,V = u,v*coslat)
     gridded!(u_grid,U,S,unscale_coslat=true)
     gridded!(v_grid,V,S,unscale_coslat=true)
-
+ 
     return nothing
 end
 
