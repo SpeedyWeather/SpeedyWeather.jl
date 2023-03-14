@@ -43,7 +43,6 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     σ_levels_half::Vector{NF}       # σ at half levels
     σ_levels_full::Vector{NF}       # σ at full levels
     σ_levels_thick::Vector{NF}      # σ level thicknesses
-    σ_levels_thick⁻¹_half::Vector{NF}   # = 1/(2σ_levels_thick)
     σ_f::Vector{NF}                 # akap/(2σ_levels_thick)   #TODO rename?
     σ_lnp_A::Vector{NF}
     σ_lnp_B::Vector{NF}
@@ -72,7 +71,8 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     @unpack radius_earth, rotation_earth = P        # radius of earth, angular frequency
     @unpack R_dry, cₚ = P                           # gas constant for dry air, heat capacity
     @unpack σ_tropopause = P                        # number of vertical levels used for stratosphere
-    @unpack temp_ref, temp_top, lapse_rate, gravity = P # for reference atmosphere
+    @unpack temp_ref, temp_top, lapse_rate, gravity = P       # for reference atmosphere
+    @unpack ΔT = P.zonal_wind_coefs                 # used for stratospheric temperature increase
 
     # RESOLUTION PARAMETERS
     nlat_half = get_nlat_half(Grid,trunc)           # resolution parameter nlat_half
@@ -108,26 +108,29 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     σ_levels_half = vertical_coordinates(P)
     σ_levels_full = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])
     σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
-    σ_levels_thick⁻¹_half = 1 ./ (2σ_levels_thick)
     σ_f = κ ./ (2σ_levels_full)
 
-    # version for Vk, the vertical advection in Dlnp/Dt
-    # σ_lnp_A = [log(σ_levels_full[k]/σ_levels_half[k])/σ_levels_thick[k] for k in 1:nlev]
-    # σ_lnp_B = [log(σ_levels_half[k+1]/σ_levels_full[k])/σ_levels_thick[k] for k in 1:nlev]
+    # ADIABATIC TERM, Simmons and Burridge, 1981, eq. 3.12
+    # precompute ln(σ_k+1/2) - ln(σ_k-1/2) but swap sign, include 1/Δσₖ
+    σ_lnp_A = log.(σ_levels_half[1:end-1]./σ_levels_half[2:end]) ./ σ_levels_thick
+    σ_lnp_A[1] = 0  # the corresponding sum is 1:k-1 so 0 to replace log(0) from above
     
-    # version to be used with div_sum_above (A) and div (B) for Dlnp/Dt
-    σ_lnp_A = [log(σ_levels_half[k]/σ_levels_half[k+1])/σ_levels_thick[k] for k in 1:nlev]
-    σ_lnp_B = [log(σ_levels_half[k]/σ_levels_full[k])/σ_levels_thick[k] for k in 1:nlev]
-    σ_lnp_A[1] = log(σ_levels_half[2])/σ_levels_thick[1]
-    σ_lnp_B[1] = log(σ_levels_full[1])/σ_levels_thick[1]
-    
+    # precompute the αₖ = 1 - p_k-1/2/Δpₖ*log(p_k+1/2/p_k-1/2) term in σ coordinates
+    σ_lnp_B = 1 .- σ_levels_half[1:end-1]./σ_levels_thick .* log.(σ_levels_half[2:end]./σ_levels_half[1:end-1])
+    σ_lnp_B[1] = σ_levels_half[1] <= 0 ? log(2) : σ_lnp_B[1]    # set α₁ = log(2), eq. 3.19
+    σ_lnp_B .*= -1  # absorb sign from -1/Δσₖ only, eq. 3.12
+
     # TROPOPAUSE/STRATOSPHERIC LEVELS
     n_stratosphere_levels = sum(σ_levels_full .< σ_tropopause)  # of levels above σ_tropopause
 
     # VERTICAL REFERENCE TEMPERATURE PROFILE
-    RΓ = R_dry*lapse_rate/(1000*gravity)                    # origin unclear but profile okay
-    temp_ref_profile = [max(temp_top,temp_ref*σ^RΓ) for σ in σ_levels_full]
-    # temp_ref_profile_σ = temp_ref_profile .* σ_f
+    # integrate hydrostatic equation from pₛ to p, use ideal gas law p = ρRT and linear
+    # temperature decrease with height: T = Tₛ - ΔzΓ with lapse rate Γ
+    # for stratosphere (σ < σ_tropopause) increase temperature (Jablonowski & Williamson. 2006, eq. 5)
+    RΓg⁻¹ = R_dry*lapse_rate/(1000*gravity)     # convert lapse rate from [K/km] to [K/m]
+    temp_ref_profile = [temp_ref*σ^RΓg⁻¹ for σ in σ_levels_full]
+    # temp_ref_profile[σ_levels_full .< σ_tropopause] .= temp_top
+    temp_ref_profile .+= [σ < σ_tropopause ? ΔT*(σ_tropopause-σ)^5 : 0 for σ in σ_levels_full]
 
     # GEOPOTENTIAL, coefficients to calculate geopotential
     Δp_geopot_half, Δp_geopot_full = initialize_geopotential(σ_levels_full,σ_levels_half,R_dry)
@@ -152,7 +155,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
                     latd,lond,londs,latds,
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,
-                    σ_levels_half,σ_levels_full,σ_levels_thick,σ_levels_thick⁻¹_half,σ_f,
+                    σ_levels_half,σ_levels_full,σ_levels_thick,σ_f,
                     σ_lnp_A,σ_lnp_B,
                     temp_ref_profile,
                     Δp_geopot_half,Δp_geopot_full,lapserate_corr,entrainment_profile)
@@ -179,7 +182,7 @@ function vertical_coordinates(P::Parameters)
         σ_levels_half .-= σ_levels_half[1]      # topmost half-level is at 0 pressure
         σ_levels_half ./= σ_levels_half[end]    # lowermost half-level is at p=p_surface      
     else                                # choose σ levels manually
-        @assert σ_levels_half[1] == 0 "First manually specified σ_levels_half has to be zero 0"
+        @assert σ_levels_half[1] >= 0 "First manually specified σ_levels_half has to be >0"
         @assert σ_levels_half[end] == 1 "Last manually specified σ_levels_half has to be 1."
         @assert nlev == (length(σ_levels_half) - 1) "nlev has to be length of σ_levels_half - 1"
     end

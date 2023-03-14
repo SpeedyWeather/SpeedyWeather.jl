@@ -4,7 +4,7 @@
                 tendency::LowerTriangularMatrix{Complex{NF}},   # tendency (dynamics+physics) of A
                 dt::Real,                                       # time step (=2Δt, but for init steps =Δt,Δt/2)
                 lf::Int=2,                                      # leapfrog index to dis/enable William's filter
-                C::DynamicsConstants{NF},                               # struct with constants used at runtime
+                C::DynamicsConstants{NF},                       # struct with constants used at runtime
                 ) where {NF<:AbstractFloat}                     # number format NF
 
 Performs one leapfrog time step with (`lf=2`) or without (`lf=1`) Robert+William's filter
@@ -43,10 +43,10 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
 end
 
 # variables that are leapfrogged in the respective models that are on layers (so excl surface pressure)
-leapfrog_layer_vars(model::Barotropic) = (:vor,)
-leapfrog_layer_vars(model::ShallowWater) = (:vor, :div)
-leapfrog_layer_vars(model::PrimitiveDryCore) = (:vor, :div, :temp)
-leapfrog_layer_vars(model::PrimitiveWetCore) = (:vor, :div, :temp, :humid)
+leapfrog_layer_vars(::Barotropic) = (:vor,)
+leapfrog_layer_vars(::ShallowWater) = (:vor, :div)
+leapfrog_layer_vars(::PrimitiveDryCore) = (:vor, :div, :temp)
+leapfrog_layer_vars(::PrimitiveWetCore) = (:vor, :div, :temp, :humid)
 
 function leapfrog!( progn::PrognosticVariablesLeapfrog,
                     diagn::DiagnosticVariablesLayer,
@@ -75,31 +75,33 @@ prognostic variables with two time steps (t=0,Δt) that can then be used in the 
 function first_timesteps!(  progn::PrognosticVariables, # all prognostic variables
                             diagn::DiagnosticVariables, # all pre-allocated diagnostic variables
                             time::DateTime,             # time at timestep
-                            M::ModelSetup,              # everything that is constant at runtime
-                            feedback::AbstractFeedback  # feedback struct
+                            model::ModelSetup,          # everything that is constant at runtime
+                            feedback::AbstractFeedback, # feedback struct
+                            outputter::AbstractOutput
                             )
     
-    @unpack Δt,Δt_sec = M.constants
+    @unpack Δt,Δt_sec = model.constants
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
-    initialize_implicit!(Δt/2,M)        # update precomputed implicit terms with time step Δt/2
+    initialize_implicit!(Δt/2,model)    # update precomputed implicit terms with time step Δt/2
     lf1 = 1                             # without Robert+William's filter
     lf2 = 1                             # evaluates all tendencies at t=0,
                                         # the first leapfrog index (=>Euler forward)
-    timestep!(progn,diagn,time,Δt/2,M,lf1,lf2)
-    progress!(feedback)
+    timestep!(progn,diagn,time,Δt/2,model,lf1,lf2)
+    time += Dates.Second(Δt_sec÷2)      # update by half the leapfrog time step Δt used here
+    progress!(feedback,progn)
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
-    initialize_implicit!(Δt,M)          # update precomputed implicit terms with time step Δt
+    initialize_implicit!(Δt,model)      # update precomputed implicit terms with time step Δt
     lf1 = 1                             # without Robert+William's filter
     lf2 = 2                             # evaluate all tendencies at t=dt/2,
                                         # the 2nd leapfrog index (=>Leapfrog)
-    time += Dates.Second(Δt_sec÷2)      # update by half the leapfrog time step Δt used here
-    timestep!(progn,diagn,time,Δt,M,lf1,lf2)
-    progress!(feedback)
+    timestep!(progn,diagn,time,Δt,model,lf1,lf2)
+    time += Dates.Second(Δt_sec÷2)      # now 2nd leapfrog step is at t=Δt
+    progress!(feedback,progn)
+    write_netcdf_output!(outputter,time,diagn,model)
 
-    # update precomputed implicit terms with time step 2Δt for further time steps
-    initialize_implicit!(2Δt,M)
+    return time
 end
 
 """
@@ -117,27 +119,27 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                     time::DateTime,                 # time at timestep
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
-                    M::PrimitiveEquation,      # everything that's constant at runtime
+                    model::PrimitiveEquation,       # everything that's constant at runtime
                     lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
 
-    get_tendencies!(diagn,progn,time,M,lf2)
-    # implicit_correction!(diagn,progn,M)
+    get_tendencies!(diagn,progn,time,model,lf2)
+    implicit_correction!(diagn,progn,model)
 
     # LOOP OVER ALL LAYERS for diffusion, leapfrog time integration
     # and progn state from spectral to grid for next time step
     for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
-        horizontal_diffusion!(progn_layer,diagn_layer,M)    # implicit diffusion of vor, div, temp
-        leapfrog!(progn_layer,diagn_layer,dt,lf1,M)         # time step forward for vor, div, temp
-        gridded!(diagn_layer,progn_layer,lf2,M)             # propagate spectral state to grid
+        horizontal_diffusion!(progn_layer,diagn_layer,model)    # implicit diffusion of vor, div, temp
+        leapfrog!(progn_layer,diagn_layer,dt,lf1,model)         # time step forward for vor, div, temp
+        gridded!(diagn_layer,progn_layer,lf2,model)             # propagate spectral state to grid
     end
 
     # SURFACE LAYER (log of surface pressure)
     @unpack pres_tend = diagn.surface
     pres_old,pres_new = progn.pres.leapfrog
-    leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,M.constants)
-    gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf2],M.spectral_transform)
+    leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,model.constants)
+    gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf2],model.spectral_transform)
 end
 
 """
@@ -167,7 +169,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     @unpack pres = progn
     pres_lf = pres.leapfrog[lf2]
 
-    get_tendencies!(pres_lf,diagn_layer,diagn_surface,time,M)               # tendency of vor, div, pres
+    get_tendencies!(diagn_layer,diagn_surface,pres_lf,time,M)               # tendency of vor, div, pres
     implicit_correction!(diagn_layer,progn_layer,diagn_surface,pres,M)      # dampen gravity waves
     horizontal_diffusion!(progn_layer,diagn_layer,M)    # diffusion for vorticity and divergence
     leapfrog!(progn_layer,diagn_layer,dt,lf1,M)         # leapfrog vorticity forward
@@ -234,14 +236,15 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
     feedback = initialize_feedback(outputter,model)
 
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
-    first_timesteps!(progn,diagn,time,model,feedback)
+    time = first_timesteps!(progn,diagn,time,model,feedback,outputter)
+    initialize_implicit!(2Δt,model)         # from now on precomputed implicit terms with 2Δt
 
     # MAIN LOOP
     for i in 2:n_timesteps                  # start at 2 as first Δt in first_timesteps!
-        time += Dates.Second(Δt_sec)        # update time
         timestep!(progn,diagn,time,2Δt,model)   # calculate tendencies and leapfrog forward
-        
-        progress!(feedback,outputter)       # updates the progress meter bar
+        time += Dates.Second(Δt_sec)        # time of lf=2 and diagn after timestep!
+
+        progress!(feedback,progn)           # updates the progress meter bar
         write_netcdf_output!(outputter,time,diagn,model)
     end
 
@@ -251,4 +254,3 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
 
     return progn
 end
-    

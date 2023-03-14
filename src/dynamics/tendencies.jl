@@ -1,38 +1,37 @@
 function get_tendencies!(   diagn::DiagnosticVariablesLayer,
-                            M::BarotropicModel,
+                            model::BarotropicModel,
                             )
     
-    # only (planetary) vorticity advection for the barotropic model
-    G,S = M.geometry, M.spectral_transform
-    vorticity_flux_divcurl!(diagn,G,S,curl=false)           # = -∇⋅(u(ζ+f),v(ζ+f))
+    # only (absolute) vorticity advection for the barotropic model
+    vorticity_flux_divcurl!(diagn,model,curl=false)         # = -∇⋅(u(ζ+f),v(ζ+f))
 end
 
-function get_tendencies!(   pres::LowerTriangularMatrix,
-                            diagn::DiagnosticVariablesLayer,
+function get_tendencies!(   diagn::DiagnosticVariablesLayer,
                             surface::SurfaceVariables,
+                            pres::LowerTriangularMatrix,    # spectral pressure/η for geopotential
                             time::DateTime,                 # time to evaluate the tendencies at
-                            M::ShallowWaterModel,           # struct containing all constants
+                            model::ShallowWaterModel,       # struct containing all constants
                             )
 
-    G,S,B = M.geometry, M.spectral_transform, M.boundaries
-    g,H₀  = M.constants.gravity, M.constants.layer_thickness
+    S,C = model.spectral_transform, model.constants
 
     # for compatibility with other ModelSetups pressure pres = interface displacement η here
-    vorticity_flux_divcurl!(diagn,G,S)              # = -∇⋅(u(ζ+f),v(ζ+f)), tendency for vorticity
+    vorticity_flux_divcurl!(diagn,model,curl=true)  # = -∇⋅(u(ζ+f),v(ζ+f)), tendency for vorticity
                                                     # and ∇×(u(ζ+f),v(ζ+f)), tendency for divergence
-    bernoulli_potential!(diagn,surface,G,S,g)       # = -∇²(E+gη), tendency for divergence
-    volume_flux_divergence!(diagn,surface,G,S,B,H₀) # = -∇⋅(uh,vh), tendency pressure
+    geopotential!(diagn,pres,C)                     # Φ = gη in the shallow water model
+    bernoulli_potential!(diagn,S)                   # = -∇²(E+Φ), tendency for divergence
+    volume_flux_divergence!(diagn,surface,model)    # = -∇⋅(uh,vh), tendency pressure
 
     # interface forcing
-    @unpack interface_relaxation = M.parameters
-    interface_relaxation && interface_relaxation!(pres,surface,time,M)
+    @unpack interface_relaxation = model.parameters
+    interface_relaxation && interface_relaxation!(pres,surface,time,model)
 end
 
 function get_tendencies!(   diagn::DiagnosticVariables,
                             progn::PrognosticVariables,
                             time::DateTime,
                             model::PrimitiveEquation,
-                            lf::Int=2                   # leapfrog index to evaluate tendencies on
+                            lf::Int=2               # leapfrog index to evaluate tendencies on
                             )
 
     B = model.boundaries
@@ -40,30 +39,41 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     S = model.spectral_transform
     @unpack surface = diagn
 
+    # for semi-implicit corrections (α >= 0.5) linear gravity-wave related tendencies are
+    # evaluated at previous timestep i-1 (i.e. lf=1 leapfrog time step) 
+    # nonlinear terms and parameterizations are always evaluated at lf
+    lf_implicit = model.parameters.implicit_α == 0 ? lf : 1
+
     # PARAMETERIZATIONS
     # parameterization_tendencies!(diagn,time,model)
  
     # DYNAMICS
-    pressure_gradients!(diagn,progn,lf,S)               # calculate ∇ln(pₛ)
+    pressure_gradients!(diagn,progn,lf,S)           # calculate ∇ln(pₛ)
 
-    for layer in diagn.layers
-        thickness_weighted_divergence!(layer,surface,G)    # calculate Δσₖ[(uₖ,vₖ)⋅∇ln(pₛ) + ∇⋅(uₖ,vₖ)]
+    for (diagn_layer,progn_layer) in zip(diagn.layers,progn.layers)
+        pressure_flux!(diagn_layer,surface)         # calculate (uₖ,vₖ)⋅∇ln(pₛ)
+
+        # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
+        linear_virtual_temperature!(diagn_layer,progn_layer,model,lf_implicit)
+        temperature_anomaly!(diagn_layer,model)
     end
 
-    geopotential!(diagn,B,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ
-    vertical_averages!(diagn,progn,lf,G)            # get ū,v̄,D̄ and others
+    geopotential!(diagn,B,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
+    vertical_integration!(diagn,progn,lf_implicit,G)   # get ū,v̄,D̄ on grid; and
+                                                    # and D̄ in spectral at prev time step i-1 via lf_linear
     surface_pressure_tendency!(surface,model)       # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - ∇⋅(ū,v̄)
 
     for layer in diagn.layers
         vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
+        linear_pressure_gradient!(layer,progn,model,lf_implicit)
     end
 
     vertical_advection!(diagn,model)                # use σ̇ for the vertical advection of u,v,T,q
 
     for layer in diagn.layers
-        vordiv_tendencies!(layer,surface,model)     # vorticity advection
-        temperature_tendency!(layer,model)          # hor. advection + adiabatic term
+        vordiv_tendencies!(layer,surface,model)     # vorticity advection, pressure gradient term
+        temperature_tendency!(layer,surface,model)  # hor. advection + adiabatic term
         humidity_tendency!(layer,model)             # horizontal advection of humid
-        bernoulli_potential!(layer,G,S)             # add -∇²(E+ϕ) term to div tendency
+        bernoulli_potential!(layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
     end
 end

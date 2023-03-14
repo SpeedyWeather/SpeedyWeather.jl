@@ -18,76 +18,76 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     Grid::Type{<:AbstractGrid} = FullGaussianGrid       # grid used
     
     # EARTH'S PROPERTIES
-    radius_earth::Real = 6.371e6            # radius of Earth [m]
-    rotation_earth::Real = 7.29e-5          # angular frequency of Earth's rotation [rad/s]
-    gravity::Real = 9.81                    # gravitational acceleration [m/s^2]
+    radius_earth::Float64 = 6.371e6         # radius of Earth [m]
+    rotation_earth::Float64 = 7.29e-5       # angular frequency of Earth's rotation [rad/s]
+    gravity::Float64 = 9.81                 # gravitational acceleration [m/s^2]
     seasonal_cycle::Bool = true             # Seasonal cycle?
     equinox::DateTime = DateTime(2000,3,20) # Spring equinox (year irrelevant)
-    tropic_cancer::Real = 23.5              # latitude [˚N] of the tropic of cancer
+    tropic_cancer::Float64 = 23.5           # latitude [˚N] of the tropic of cancer
     
     # ATMOSPHERE
-    mol_mass_dry_air = 28.964917        # molar mass of dry air [g/mol]
-    mol_mass_vapour = 18.01528          # molar mass of water vapour [g/mol]
-    cₚ::Real = 1004.0                   # specific heat at constant pressure [J/K/kg]
-    R_gas::Real = 8.31446261815324      # universal gas constant [J/K/mol]
-    R_dry::Real = 1000*R_gas/mol_mass_dry_air   # specific gas constant for dry air [J/kg/K]
-    R_vapour::Real = 1000*R_gas/mol_mass_vapour # specific gas constant for water vapour [J/kg/K]
-    alhc::Real = 2501                   # latent heat of condensation [J/g] for consistency with
-                                        # specific humidity [g/Kg]
-    alhs::Real = 2801                   # latent heat of sublimation [?]
-    sbc::Real = 5.67e-8                 # stefan-Boltzmann constant [W/m^2/K^4]
+    mol_mass_dry_air = 28.9649              # molar mass of dry air [g/mol]
+    mol_mass_vapour = 18.0153               # molar mass of water vapour [g/mol]
+    cₚ::Float64 = 1004                      # specific heat at constant pressure [J/K/kg]
+    R_gas::Float64 = 8.3145                 # universal gas constant [J/K/mol]
+    R_dry::Float64 = 1000*R_gas/mol_mass_dry_air   # specific gas constant for dry air [J/kg/K]
+    R_vapour::Float64 = 1000*R_gas/mol_mass_vapour # specific gas constant for water vapour [J/kg/K]
+    alhc::Float64 = 2501                    # latent heat of condensation [J/g] for consistency with
+                                            # specific humidity [g/Kg]
+    alhs::Float64 = 2801                    # latent heat of sublimation [?]
+    sbc::Float64 = 5.67e-8                  # stefan-Boltzmann constant [W/m^2/K^4]
 
     # STANDARD ATMOSPHERE (reference values)
-    lapse_rate::Real = 5                # moist adiabatic temperature lapse rate -dT/dz [K/km]
-    temp_ref::Real = 288                # absolute temperature at surface z=0 [K]
-    temp_top::Real = 216                # absolute temperature in stratosphere [K]
-    scale_height::Real = 7.5            # scale height for pressure [km]
-    pres_ref::Real = 1000               # surface pressure [hPa]
-    scale_height_humid::Real = 2.5      # scale height for specific humidity [km]
-    relhumid_ref::Real = 0.7            # relative humidity of near-surface air [1]
-    water_pres_ref::Real = 17           # saturation water vapour pressure [Pa]
-    layer_thickness::Real = 8.5         # layer thickness for the shallow water model [km]
+    lapse_rate::Float64 = 5                 # moist adiabatic temperature lapse rate -dT/dz [K/km]
+    temp_ref::Float64 = 288                 # absolute temperature at surface z=0 [K]
+    temp_top::Float64 = 216                 # absolute temperature in stratosphere [K]
+    scale_height::Float64 = 7.5             # scale height for pressure [km]
+    pres_ref::Float64 = 1000                # surface pressure [hPa]
+    scale_height_humid::Float64 = 2.5       # scale height for specific humidity [km]
+    relhumid_ref::Float64 = 0.7             # relative humidity of near-surface air [1]
+    water_pres_ref::Float64 = 17            # saturation water vapour pressure [Pa]
+    layer_thickness::Float64 = 8.5          # layer thickness for the shallow water model [km]
 
     # VERTICAL COORDINATES
     # of the nlev vertical levels, defined by a generalised logistic function,
     # interpolating ECMWF's L31 configuration
     GLcoefs::Coefficients = GenLogisticCoefs()
-    n_stratosphere_levels::Integer = 2                  # number of vertical levels used for the stratosphere
-    σ_tropopause::Real = 0.2                            # σ coordinate where the tropopause starts
-    σ_levels_half::Vector{Real} = []                    # vector of σ half levels, only if set manually, otherwise an empty vector
-    nlev::Integer = nlev_default(Model, σ_levels_half)  # number of vertical levels 
+    n_stratosphere_levels::Int = 2                  # number of vertical levels used for the stratosphere
+    σ_tropopause::Float64 = 0.2                            # σ coordinate where the tropopause starts
+    σ_levels_half::Vector{Float64} = []                    # vector of σ half levels, only if set manually, otherwise an empty vector
+    nlev::Int = nlev_default(Model, σ_levels_half)  # number of vertical levels 
 
     # DIFFUSION AND DRAG
-    diffusion_power::Real=4                 # Power n of Laplacian in horizontal diffusion ∇²ⁿ
-    diffusion_time::Real=2.4                # Diffusion time scale [hrs] for temperature and vorticity
-    diffusion_time_div::Real=diffusion_time # Diffusion time scale [hrs] for divergence
-    diffusion_time_strat::Real=12           # Diffusion time scale [hrs] for extra ∇² in the stratosphere
-    damping_time_strat::Real=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
+    diffusion_power::Float64=4                 # Power n of Laplacian in horizontal diffusion ∇²ⁿ
+    diffusion_time::Float64=2.4                # Diffusion time scale [hrs] for temperature and vorticity
+    diffusion_time_div::Float64=diffusion_time # Diffusion time scale [hrs] for divergence
+    diffusion_time_strat::Float64=12           # Diffusion time scale [hrs] for extra ∇² in the stratosphere
+    damping_time_strat::Float64=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
 
     # FORCING
     interface_relaxation::Bool = false      # turn on interface relaxation for shallow water?
-    interface_relax_time::Real = 96         # time scale [hrs] of interface relaxation
-    interface_relax_amplitude::Real = 300   # Amplitude [m] of interface relaxation
+    interface_relax_time::Float64 = 96         # time scale [hrs] of interface relaxation
+    interface_relax_amplitude::Float64 = 300   # Amplitude [m] of interface relaxation
 
     # PARAMETRIZATIONS
-    n_shortwave::Integer = 3                # Compute shortwave radiation every n steps
+    n_shortwave::Int = 3                # Compute shortwave radiation every n steps
     sppt_on::Bool = false                   # Turn on SPPT?
     magnus_coefs::Coefficients = MagnusCoefs{NF}()  # For computing saturation vapour pressure
 
     # Large-Scale Condensation (from table B10)
     k_lsc::Int = 2                    # Index of atmospheric level at which large-scale condensation begins
-    RH_thresh_pbl_lsc::Real = 0.95    # Relative humidity threshold for boundary layer
-    RH_thresh_range_lsc::Real = 0.1   # Vertical range of relative humidity threshold
-    RH_thresh_max_lsc::Real = 0.9     # Maximum relative humidity threshold
-    humid_relax_time_lsc::Real = 4.0  # Relaxation time for humidity (hours)
+    RH_thresh_pbl_lsc::Float64 = 0.95    # Relative humidity threshold for boundary layer
+    RH_thresh_range_lsc::Float64 = 0.1   # Vertical range of relative humidity threshold
+    RH_thresh_max_lsc::Float64 = 0.9     # Maximum relative humidity threshold
+    humid_relax_time_lsc::Float64 = 4.0  # Relaxation time for humidity (hours)
 
     # Convection
-    pres_thresh_cnv::Real = 0.8             # Minimum (normalised) surface pressure for the occurrence of convection
-    RH_thresh_pbl_cnv::Real = 0.9           # Relative humidity threshold for convection in PBL
-    RH_thresh_trop_cnv::Real = 0.7          # Relative humidity threshold for convection in the troposphere
-    humid_relax_time_cnv::Real = 6.0        # Relaxation time for PBL humidity (hours)
-    max_entrainment::Real = 0.5             # Maximum entrainment as a fraction of cloud-base mass flux
-    ratio_secondary_mass_flux::Real = 0.8   # Ratio between secondary and primary mass flux at cloud-base
+    pres_thresh_cnv::Float64 = 0.8             # Minimum (normalised) surface pressure for the occurrence of convection
+    RH_thresh_pbl_cnv::Float64 = 0.9           # Relative humidity threshold for convection in PBL
+    RH_thresh_trop_cnv::Float64 = 0.7          # Relative humidity threshold for convection in the troposphere
+    humid_relax_time_cnv::Float64 = 6.0        # Relaxation time for PBL humidity (hours)
+    max_entrainment::Float64 = 0.5             # Maximum entrainment as a fraction of cloud-base mass flux
+    ratio_secondary_mass_flux::Float64 = 0.8   # Ratio between secondary and primary mass flux at cloud-base
 
     # Longwave radiation
     nband::Int = 4                          # Number of bands used to compute fband
@@ -97,13 +97,13 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # TIME STEPPING
     startdate::DateTime = DateTime(2000,1,1)# time at which the integration starts
-    n_days::Real = 10                       # number of days to integrate for
-    Δt_at_T31::Real = 30                    # time step in minutes for T31, scale linearly to trunc
+    n_days::Float64 = 10                       # number of days to integrate for
+    Δt_at_T31::Float64 = 30                    # time step in minutes for T31, scale linearly to trunc
 
     # NUMERICS
-    robert_filter::Real = 0.05          # Robert (1966) time filter coefficeint to suppress comput. mode
-    williams_filter::Real = 0.53        # William's time filter (Amezcua 2011) coefficient for 3rd order acc
-    implicit_α::Real = 1                # coefficient for semi-implicit computations to filter gravity waves
+    robert_filter::Float64 = 0.05          # Robert (1966) time filter coefficeint to suppress comput. mode
+    williams_filter::Float64 = 0.53        # William's time filter (Amezcua 2011) coefficient for 3rd order acc
+    implicit_α::Float64 = 1                # coefficient for semi-implicit computations to filter gravity waves
     
     # LEGENDRE TRANSFORM AND POLYNOMIALS
     recompute_legendre::Bool = false    # recomputation is slower but requires less memory
@@ -113,7 +113,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     # BOUNDARY FILES
     boundary_path::String = ""          # package location is default
     orography::Type{<:AbstractOrography} = EarthOrography
-    orography_scale::Real = 1           # scale orography by a factor
+    orography_scale::Float64 = 1           # scale orography by a factor
     orography_path::String = boundary_path
     orography_file::String = "orography_F512.nc"
 
@@ -126,35 +126,36 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # OUTPUT
     verbose::Bool = true            # print dialog for feedback
+    debug::Bool = false             # print debug info
     output::Bool = false            # Store data in netCDF?
-    output_dt::Real = 6             # output time step [hours]
+    output_dt::Float64 = 6             # output time step [hours]
     output_path::String = pwd()     # path to output folder
 
     # name of the output folder, defaults to 4-digit number counting up from run-0001
-    run_id::Union{String,Integer} = get_run_id(output, output_path)    
+    run_id::Union{String,Int} = get_run_id(output, output_path)    
     output_filename::String="output.nc"     # name of the output netcdf file
     
     # variables to output: :u, :v, :vor, :div, :temp, :humid
     output_vars::Vector{Symbol} = output_vars_default(Model)
-    compression_level::Integer = 3          # 1=low but fast, 9=high but slow
-    keepbits::Integer = 7                   # mantissa bits to keep for every variable
+    compression_level::Int = 3          # 1=low but fast, 9=high but slow
+    keepbits::Int = 7                   # mantissa bits to keep for every variable
     version::VersionNumber = pkgversion(SpeedyWeather)
 
     # OUTPUT GRID
     output_NF::DataType = Float32   # number format used for output
-    output_nlat_half::Integer = 0   # 0 = reuse nlat_half from dynamical core
+    output_nlat_half::Int = 0   # 0 = reuse nlat_half from dynamical core
     output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid(Grid)
     output_Interpolator::Type{<:AbstractInterpolator} = DEFAULT_INTERPOLATOR
     output_matrix::Bool = false     # if true sort gridpoints into a matrix
-    output_quadrant_rotation::NTuple{4,Integer} = (0,1,2,3)
-    output_matrix_quadrant::NTuple{4,Tuple{Integer,Integer}} = ((2,2),(1,2),(1,1),(2,1))
+    output_quadrant_rotation::NTuple{4,Int} = (0,1,2,3)
+    output_matrix_quadrant::NTuple{4,Tuple{Int,Int}} = ((2,2),(1,2),(1,1),(2,1))
     
-    missing_value::Real = NaN       # missing value to be used in netcdf output
+    missing_value::Float64 = NaN       # missing value to be used in netcdf output
     
     # RESTART
     write_restart::Bool = output            # also write restart file if output==true?
     restart_path::String = output_path      # path for restart file
-    restart_id::Union{String,Integer} = 1   # run_id of restart file in run-????/restart.jld2
+    restart_id::Union{String,Int} = 1   # run_id of restart file in run-????/restart.jld2
 end
 
 Parameters(;kwargs...) = Parameters{default_concrete_model(DEFAULT_MODEL)}(;kwargs...)
@@ -185,4 +186,4 @@ output_vars_default(::Type{<:PrimitiveWetCore}) = [:vor,:u,:temp,:humid,:pres]
 # default initial conditions by model
 initial_conditions_default(::Type{<:Barotropic}) = StartWithVorticity
 initial_conditions_default(::Type{<:ShallowWater}) = ZonalJet
-initial_conditions_default(::Type{<:PrimitiveEquation}) = StartFromRest
+initial_conditions_default(::Type{<:PrimitiveEquation}) = ZonalWind

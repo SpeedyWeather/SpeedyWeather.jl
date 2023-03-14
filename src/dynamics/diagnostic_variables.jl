@@ -96,7 +96,7 @@ struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 
     # VERTICAL INTEGRATION
     uv∇lnp          ::Grid                          # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
-    div_weighted    ::Grid                          # = ∇⋅((uₖ,vₖ)Δpₖ), weighted by pres thick
+    uv∇lnp_sum_above::Grid                          # sum of Δσₖ-weighted uv∇lnp above
     div_sum_above   ::Grid                          # sum of div_weighted from top to k
     temp_virt       ::LowerTriangularMatrix{Complex{NF}}    # virtual temperature spectral for geopot
     geopot          ::LowerTriangularMatrix{Complex{NF}}    # geopotential on full layers
@@ -128,8 +128,8 @@ function Base.zeros(::Type{DynamicsVariables},
     
     # VERTICAL INTEGRATION
     uv∇lnp          = zeros(Grid{NF},nlat_half)   # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
-    div_weighted    = zeros(Grid{NF},nlat_half)   # = ∇⋅((uₖ,vₖ)Δpₖ), weighted by pres thick
-    div_sum_above   = zeros(Grid{NF},nlat_half)   # sum of div_weighted from level 1:k
+    uv∇lnp_sum_above= zeros(Grid{NF},nlat_half)   # sum of Δσₖ-weighted uv∇lnp from 1:k-1
+    div_sum_above   = zeros(Grid{NF},nlat_half)   # sum of Δσₖ-weighted div from 1:k-1
     temp_virt       = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     geopot          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
 
@@ -139,7 +139,8 @@ function Base.zeros(::Type{DynamicsVariables},
     return DynamicsVariables(   U,V,
                                 a,b,a_grid,b_grid,
                                 bernoulli_grid,bernoulli,
-                                uv∇lnp,div_weighted,div_sum_above,temp_virt,geopot,
+                                uv∇lnp,uv∇lnp_sum_above,div_sum_above,
+                                temp_virt,geopot,
                                 σ_tend,
                                 )
 end

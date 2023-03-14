@@ -1,5 +1,6 @@
-Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}}   # output only in Float32/64
-    
+Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}} <: AbstractOutput
+    # NF: output only in Float32/64
+
     output::Bool = false                    # output to netCDF?
     output_vars::Vector{Symbol}=[:none]     # vector of output variables as Symbols
     write_restart::Bool = false             # also write restart file if output==true?
@@ -165,7 +166,7 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,
             atts=Dict("long_name"=>"divergence","units"=>"1/s","missing_value"=>missing_value,
             "_FillValue"=>missing_value)),
     temp = NcVar("temp",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-            atts=Dict("long_name"=>"temperature","units"=>"K","missing_value"=>missing_value,
+            atts=Dict("long_name"=>"temperature","units"=>"degC","missing_value"=>missing_value,
             "_FillValue"=>missing_value)),
     humid = NcVar("humid",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
             atts=Dict("long_name"=>"specific humidity","units"=>"1","missing_value"=>missing_value,
@@ -236,6 +237,7 @@ function write_netcdf_output!(  outputter::Output,              # everything for
                                 diagn::DiagnosticVariables,     # all diagnostic variables
                                 model::ModelSetup)              # all parameters
 
+    outputter.timestep_counter += 1                                 # increase counter
     @unpack output, output_every_n_steps, timestep_counter = outputter
     output || return nothing                                        # escape immediately for no netcdf output
     timestep_counter % output_every_n_steps == 0 || return nothing  # escape if output not written on this step
@@ -299,6 +301,7 @@ function write_netcdf_variables!(   outputter::Output,
         # UNSCALE THE SCALED VARIABLES
         unscale!(vor,model)     # was vor*radius, back to vor
         unscale!(div,model)     # same
+        temp .-= 273.15         # convert to ˚C
 
         # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
         @unpack keepbits = model.parameters
@@ -326,9 +329,12 @@ function write_netcdf_variables!(   outputter::Output,
             RingGrids.interpolate!(output_Grid(pres),pres_grid,interpolator)
         end
 
-        # convert from log(pₛ) to surface pressure pₛ [hPa]
-        pres .= exp.(pres) ./ 100
-        round!(pres,model.parameters.keepbits)
+        if model isa PrimitiveEquation
+            @. pres = exp(pres)/100     # convert from log(pₛ) to surface pressure pₛ [hPa]
+        else
+            round!(pres,model.parameters.keepbits)
+        end
+        
         NetCDF.putvar(outputter.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
     end
 

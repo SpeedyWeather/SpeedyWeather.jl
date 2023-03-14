@@ -65,12 +65,15 @@ function geopotential!( diagn::DiagnosticVariables{NF},
 
     @boundscheck diagn.nlev == length(Δp_geopot_full) || throw(BoundsError)
 
+    # for PrimitiveDryCore virtual temperature = absolute temperature here
+    # note these are not anomalies here as they are only in grid-point fields
+    
     # BOTTOM FULL LAYER
     temp = diagn.layers[end].dynamics_variables.temp_virt
     geopot = diagn.layers[end].dynamics_variables.geopot
     
     @inbounds for lm in eachharmonic(geopot,geopot_surf,temp)
-        geopot[lm] = geopot_surf[lm] + Δp_geopot_full[end]*temp[lm]
+        geopot[lm] = geopot_surf[lm] + temp[lm]*Δp_geopot_full[end]
     end
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
@@ -100,6 +103,33 @@ function geopotential!( diagn::DiagnosticVariables{NF},
     # end
 end
 
+function geopotential!( temp::Vector,
+                        G::Geometry)
+    
+    @unpack Δp_geopot_half, Δp_geopot_full, nlev = G  # = R*Δlnp either on half or full levels
+    geopot = zero(temp)
+
+    # bottom layer
+    geopot[nlev] = temp[nlev]*Δp_geopot_full[end]
+
+    # OTHER FULL LAYERS, integrate two half-layers from bottom to top
+    @inbounds for k in nlev-1:-1:1
+        geopot[k] = geopot[k+1] + temp[k+1]*Δp_geopot_half[k+1] + temp[k]*Δp_geopot_full[k]
+    end
+
+    return geopot
+end
+
+function geopotential!( diagn::DiagnosticVariablesLayer,
+                        pres::LowerTriangularMatrix,
+                        C::DynamicsConstants)
+
+    @unpack gravity = C
+    @unpack geopot = diagn.dynamics_variables
+
+    geopot .= pres*gravity
+end 
+
 """
     virtual_temperature!(   diagn::DiagnosticVariablesLayer,
                             temp::LowerTriangularMatrix,
@@ -127,8 +157,22 @@ function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
     @inbounds for ij in eachgridpoint(temp_virt_grid, temp_grid, humid_grid)
         temp_virt_grid[ij] = temp_grid[ij]*(1 + μ*humid_grid[ij])
     end
-    spectral!(temp_virt,temp_virt_grid,S)
+    # spectral!(temp_virt,temp_virt_grid,S)
 end
+
+function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
+                                        progn::PrognosticVariablesLeapfrog,
+                                        model::PrimitiveWetCore,
+                                        lf::Int)
+    
+    @unpack temp_virt = diagn.dynamics_variables
+    μ = model.constants.μ_virt_temp
+    Tₖ = model.geometry.temp_ref_profile[diagn.k]   
+    @unpack temp,humid = progn.leapfrog[lf]
+
+    @. temp_virt = temp + Tₖ*μ*humid
+end
+
 
 """
 For the PrimitiveDryCore temperautre and virtual temperature are the same (humidity=0).
@@ -141,5 +185,16 @@ function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
     @unpack temp_virt = diagn.dynamics_variables
 
     copyto!(temp_virt_grid,temp_grid)
+    # copyto!(temp_virt,temp)
+end
+
+function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
+                                        progn::PrognosticVariablesLeapfrog,
+                                        ::PrimitiveDryCore,
+                                        lf::Int)
+    
+    @unpack temp_virt = diagn.dynamics_variables
+    @unpack temp = progn.leapfrog[lf]
+
     copyto!(temp_virt,temp)
 end

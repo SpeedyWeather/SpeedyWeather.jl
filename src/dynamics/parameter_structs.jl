@@ -54,7 +54,8 @@ Base.@kwdef struct ZonalWindCoefs <: Coefficients
     # perturbation
     perturb_lat = 40            # Gaussian profile perturbation centred at [˚N]
     perturb_lon = 20            # and [˚E]
-    perturb_u0 = 1              # strength of perturbation [m/s]
+    perturb_uₚ = 1              # strength of perturbation [m/s]
+    perturb_radius = 1/10       # radius of Gaussian perturbation in units of Earth's radius [1]
 
     # temperature
     ΔT = 4.8e5                  # temperature difference used for stratospheric lapse rate [K]

@@ -6,6 +6,7 @@ module SpeedyWeather
     # NUMERICS
     import Random
     import FastGaussQuadrature
+    import LinearAlgebra: LinearAlgebra, Diagonal
 
     # GPU
     import KernelAbstractions
@@ -105,7 +106,7 @@ module SpeedyWeather
     include("dynamics/geometry.jl")                 # defines Geometry
     include("dynamics/boundaries.jl")               # defines Boundaries
     include("dynamics/define_diffusion.jl")         # defines HorizontalDiffusion
-    include("dynamics/define_implicit.jl")          # defines Implicit
+    include("dynamics/define_implicit.jl")          # defines ImplicitShallowWater, ImplicitPrimitiveEq
     include("dynamics/parameter_structs.jl")        # defines GenLogisticCoefs
     include("dynamics/models.jl")                   # defines ModelSetups
     include("dynamics/prognostic_variables.jl")     # defines PrognosticVariables
@@ -115,7 +116,7 @@ module SpeedyWeather
     include("dynamics/geopotential.jl")
     include("dynamics/tendencies_dynamics.jl")
     include("dynamics/tendencies.jl")
-    include("dynamics/implicit_correction.jl")
+    include("dynamics/implicit.jl")
     include("dynamics/diffusion.jl")
     include("dynamics/time_integration.jl")
     
@@ -138,4 +139,3 @@ module SpeedyWeather
     # INTERFACE
     include("run_speedy.jl")
 end
-
