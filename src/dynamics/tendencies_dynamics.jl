@@ -312,7 +312,7 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
     Δσₖ2⁻¹ = -1/2model.geometry.σ_levels_thick[k]
 
     # Adiabatic term following Simmons and Burridge 1981 but for σ coordinates
-    if model.parameters.implicit_α == 0     # the explicit model
+    # if model.parameters.implicit_α == 0     # the explicit model
         # += as tend already contains parameterizations + vertical advection
         @. temp_tend_grid += temp_grid*div_grid +       # +T'D term of hori advection
             κ*(Tᵥ+Tₖ)*(                                 # +κTᵥ*Dlnp/Dt, adiabatic term
@@ -320,15 +320,15 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
                 σ_lnp_B * (div_grid+uv∇lnp) +                   # eq. 3.12 2nd term
                 uv∇lnp)                                         # eq. 3.13
     
-    else                                    # with semi-implicit time integration
-        # Hoskins and Simmons 1975, Appendix 1 but the adiabatic term therein as above
-        @. temp_tend_grid += temp_grid*div_grid +
-            Δσₖ2⁻¹*ΔT_below*(      σₖ*ūv̄∇lnp - (uv∇lnp_sum_above + σₖ*uv∇lnp)) +
-            Δσₖ2⁻¹*ΔT_above*(σₖ_above*ūv̄∇lnp -  uv∇lnp_sum_above) + 
-            κ*Tₖ*(σ_lnp_A*uv∇lnp_sum_above + σ_lnp_B*uv∇lnp) + 
-            κ*Tᵥ*(σ_lnp_A * (div_sum_above+uv∇lnp_sum_above) + σ_lnp_B * (div_grid+uv∇lnp)) +
-            κ*(Tᵥ+Tₖ)*uv∇lnp
-    end
+    # else                                    # with semi-implicit time integration
+    #     # Hoskins and Simmons 1975, Appendix 1 but the adiabatic term therein as above
+    #     @. temp_tend_grid += temp_grid*div_grid +
+    #         Δσₖ2⁻¹*ΔT_below*(      σₖ*ūv̄∇lnp - (uv∇lnp_sum_above + σₖ*uv∇lnp)) +
+    #         Δσₖ2⁻¹*ΔT_above*(σₖ_above*ūv̄∇lnp -  uv∇lnp_sum_above) + 
+    #         κ*Tₖ*(σ_lnp_A*uv∇lnp_sum_above + σ_lnp_B*uv∇lnp) + 
+    #         κ*Tᵥ*(σ_lnp_A * (div_sum_above+uv∇lnp_sum_above) + σ_lnp_B * (div_grid+uv∇lnp)) +
+    #         κ*(Tᵥ+Tₖ)*uv∇lnp
+    # end
 
     spectral!(temp_tend,temp_tend_grid,model.spectral_transform)
 
