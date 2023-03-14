@@ -59,7 +59,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     end
 
     geopotential!(diagn,B,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
-    vertical_averages!(diagn,progn,lf_implicit,G)   # get ū,v̄,D̄ on grid; and
+    vertical_integration!(diagn,progn,lf_implicit,G)   # get ū,v̄,D̄ on grid; and
                                                     # and D̄ in spectral at prev time step i-1 via lf_linear
     surface_pressure_tendency!(surface,model)       # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - ∇⋅(ū,v̄)
 
@@ -72,7 +72,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
 
     for layer in diagn.layers
         vordiv_tendencies!(layer,surface,model)     # vorticity advection, pressure gradient term
-        temperature_tendency!(layer,model)          # hor. advection + adiabatic term
+        temperature_tendency!(layer,surface,model)  # hor. advection + adiabatic term
         humidity_tendency!(layer,model)             # horizontal advection of humid
         bernoulli_potential!(layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
     end

@@ -118,7 +118,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     # precompute the αₖ = 1 - p_k-1/2/Δpₖ*log(p_k+1/2/p_k-1/2) term in σ coordinates
     σ_lnp_B = 1 .- σ_levels_half[1:end-1]./σ_levels_thick .* log.(σ_levels_half[2:end]./σ_levels_half[1:end-1])
     σ_lnp_B[1] = σ_levels_half[1] <= 0 ? log(2) : σ_lnp_B[1]    # set α₁ = log(2), eq. 3.19
-    σ_lnp_B .*= -1
+    σ_lnp_B .*= -1  # absorb sign from -1/Δσₖ only, eq. 3.12
 
     # TROPOPAUSE/STRATOSPHERIC LEVELS
     n_stratosphere_levels = sum(σ_levels_full .< σ_tropopause)  # of levels above σ_tropopause
