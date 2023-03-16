@@ -9,8 +9,8 @@ function pressure_gradient!(diagn::DiagnosticVariables,
     @unpack ∇lnp_x, ∇lnp_y = diagn.surface              # but store in grid space
 
     ∇!(∇lnp_x_spec,∇lnp_y_spec,pres,S)                  # CALCULATE ∇ln(pₛ)
-    gridded!(∇lnp_x,∇lnp_x_spec,S,unscale_coslat=true)  # transform to grid: zonal gradient
-    gridded!(∇lnp_y,∇lnp_y_spec,S,unscale_coslat=true)  # meridional gradient
+    gridded!(∇lnp_x,∇lnp_x_spec,S)                      # transform to grid: zonal gradient
+    gridded!(∇lnp_y,∇lnp_y_spec,S)                      # meridional gradient
 end
 
 function pressure_flux!(diagn::DiagnosticVariablesLayer,
