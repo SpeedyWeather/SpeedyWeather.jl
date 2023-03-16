@@ -225,7 +225,7 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
     @unpack S⁻¹,R,U,L,W = model.implicit
     ξ = model.implicit.ξ[1]
     
-    # EVALUATE THE IMPLICIT TERMS VERT ADVECTION + κTₖDlnps/Dt OF THE TEMPERATURE EQUATION AT i-1
+    # MOVE THE IMPLICIT TERMS OF THE TEMPERATURE EQUATION FROM TIME STEP i TO i-1
     # geopotential and linear pressure gradient (divergence equation) are already evaluated at i-1
     # so is the -D̄ term for surface pressure in tendencies!
     for k in 1:nlev
@@ -233,7 +233,10 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
         for r in 1:nlev
             div_old = progn.layers[r].leapfrog[1].div   # divergence at i-1
             div_new = progn.layers[r].leapfrog[2].div   # divergence at i
-            @. temp_tend += L[k,r]*(div_old-div_new)
+
+            # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
+            # for temperature tendency do the latter as its cheaper.
+            @. temp_tend += L[k,r]*(div_old-div_new)    
         end
     end       
     
@@ -276,7 +279,7 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
         end
 
         # div_tend is now in G, fill with zeros here so that it can be used as an accumulator
-        # in the δD = S⁻¹G calculation
+        # in the δD = S⁻¹G calculation below
         fill!(div_tend,0)
     end
 
