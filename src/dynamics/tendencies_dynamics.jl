@@ -227,10 +227,10 @@ function _vertical_advection!(  ξ_tend_below::Grid,     # tendency of quantity 
                                 ξ::Grid,                # quantity ξ at k
                                 Δσₖ::NF                 # layer thickness on σ levels
                                 ) where {NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
-    Δσₖ2⁻¹ = 1/2Δσₖ                                                 # precompute     
+    Δσₖ2⁻¹ = -1/2Δσₖ                                                 # precompute     
     @inbounds for ij in eachgridpoint(ξ,ξ_tend_k,σ_tend)
         ξ_tend_below[ij] = σ_tend[ij] * (ξ_below[ij] - ξ[ij])       # coslat⁻¹ scaling not here
-        ξ_tend_k[ij] = Δσₖ2⁻¹ * (ξ_tend_k[ij] - ξ_tend_below[ij])   # but in vordiv_tendencies!
+        ξ_tend_k[ij] = Δσₖ2⁻¹ * (ξ_tend_k[ij] + ξ_tend_below[ij])   # but in vordiv_tendencies!
     end
 end
 
@@ -476,8 +476,8 @@ function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},
     @unpack bernoulli, bernoulli_grid, geopot = diagn.dynamics_variables
     @unpack div_tend = diagn.tendencies
  
-    one_half = convert(NF,0.5)
-    @. bernoulli_grid = one_half*(u_grid^2 + v_grid^2)      # = 1/2(u^2 + v^2) on grid
+    half = convert(NF,0.5)
+    @. bernoulli_grid = half*(u_grid^2 + v_grid^2)          # = 1/2(u^2 + v^2) on grid
     spectral!(bernoulli,bernoulli_grid,S)                   # to spectral space
     bernoulli .+= geopot                                    # add geopotential Φ
     ∇²!(div_tend,bernoulli,S,add=true,flipsign=true)        # add -∇²(1/2(u^2 + v^2) + ϕ)
