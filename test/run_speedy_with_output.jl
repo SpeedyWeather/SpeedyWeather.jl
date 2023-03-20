@@ -1,5 +1,5 @@
 @testset "Output on various grids" begin
-    tmp_output_path = mktempdir(pwd(), prefix = "tmp_test_output_")  # Cleaned up when the process exits
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
     p = run_speedy(Float64,output=true,output_path=tmp_output_path)
     @test all(isfinite.(p.layers[1].leapfrog[1].vor))
@@ -24,7 +24,7 @@
 end
 
 @testset "Restart from output file" begin
-    tmp_output_path = mktempdir(pwd(), prefix = "tmp_test_output_")  # Cleaned up when the process exits
+    tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
     
     p1, d1, m1 = initialize_speedy(Float32, ShallowWater, output=true, output_path=tmp_output_path, run_id="restart-test")
     run_speedy!(p1, d1, m1)

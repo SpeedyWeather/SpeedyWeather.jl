@@ -12,7 +12,7 @@
             time_axis 
         end 
 
-        tmp_output_path = mktempdir(pwd(), prefix = "tmp_test_output_")  # Cleaned up when the process exits
+        tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
         
         p, d, m = initialize_speedy(Float32, output=true, output_path=tmp_output_path, n_days=1, output_dt=0, run_id="dense-output-test")
         SpeedyWeather.time_stepping!(p, d, m)
