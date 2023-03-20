@@ -43,5 +43,9 @@ include("netcdf_output.jl")
  # CLEAN UP 
  run_folders = filter(x->startswith(x, "run-"), readdir("."))
  for folder in run_folders
-     rm(folder, recursive=true)
+    if isdir(folder)
+        if ["output.nc","parameters.txt","progress.txt","restart.jld2"] == readdir(folder)
+            rm(folder, recursive=true)
+        end
+    end
  end
