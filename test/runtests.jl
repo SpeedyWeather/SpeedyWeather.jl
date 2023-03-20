@@ -44,3 +44,4 @@ include("netcdf_output.jl")
  run_folders = filter(x->startswith(x, "run-"), readdir("."))
  for folder in run_folders
      rm(folder, recursive=true)
+ end
