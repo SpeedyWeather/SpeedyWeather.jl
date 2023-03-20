@@ -396,3 +396,20 @@ function write_restart_file(time::DateTime,
         f["description"] = "Restart file created for SpeedyWeather.jl"
     end
 end
+
+"""
+    get_full_output_file_path(p::Parameters)
+
+Returns the full path of the output file after it was created.
+"""
+get_full_output_file_path(P::Parameters) = joinpath(P.output_path, string("run-",run_id_string(P.run_id),"/"), P.output_filename)
+
+"""
+    load_trajectory(var_name::Union{Symbol, String}, M::ModelSetup) 
+
+Loads a `var_name` trajectory of the model `M` that has been saved in a netCDF file during the time stepping.
+"""
+function load_trajectory(var_name::Union{Symbol, String}, M::ModelSetup) 
+    @assert M.parameters.output "Output is turned off"
+    return NetCDF.ncread(get_full_output_file_path(M.parameters), string(var_name))
+end
