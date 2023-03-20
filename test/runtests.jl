@@ -39,3 +39,9 @@ include("run_speedy_with_output.jl")
 
 # OUTPUT 
 include("netcdf_output.jl")
+
+# CLEAN UP 
+run_folders = filter(x->startswith(x, "run-"), readdir("."))
+for folder in run_folders
+    rm(folder, recursive=true)
+end
