@@ -1,7 +1,7 @@
-function pressure_gradients!(   diagn::DiagnosticVariables,
-                                progn::PrognosticVariables,
-                                lf::Integer,        # leapfrog index
-                                S::SpectralTransform)
+function pressure_gradient!(diagn::DiagnosticVariables,
+                            progn::PrognosticVariables,
+                            lf::Integer,        # leapfrog index
+                            S::SpectralTransform)
     
     pres = progn.pres.leapfrog[lf]                      # log of surface pressure
     ∇lnp_x_spec = diagn.layers[1].dynamics_variables.a  # reuse work arrays for gradients
@@ -115,21 +115,21 @@ function surface_pressure_tendency!(surf::SurfaceVariables{NF},
                                     ) where {NF<:AbstractFloat}
 
     @unpack pres_tend, pres_tend_grid, ∇lnp_x, ∇lnp_y = surf
-    @unpack coslat⁻¹ = model.geometry
     
     # vertical averages need to be computed first!
     ū = surf.u_mean_grid            # rename for convenience
     v̄ = surf.v_mean_grid
-    D̄ = surf.div_mean
+    D̄ = surf.div_mean               # spectral
 
     # in grid-point space the the (ū,v̄)⋅∇lnpₛ term (swap sign in spectral)
     @. pres_tend_grid = ū*∇lnp_x + v̄*∇lnp_y
     spectral!(pres_tend,pres_tend_grid,model.spectral_transform)
     
-    # for semi-implicit D̄ is calc at time step i-1, i.e. leapfrog lf=1 in vertical_integration!
+    # for semi-implicit D̄ is calc at time step i-1 in vertical_integration!
     @. pres_tend = -pres_tend - D̄   # the -D̄ term in spectral and swap sign
-
+    
     pres_tend[1] = zero(NF)         # for mass conservation
+    spectral_truncation!(pres_tend) # remove lmax+1 row, only vectors use it
     return nothing
 end
 
@@ -138,7 +138,7 @@ function vertical_velocity!(diagn::DiagnosticVariablesLayer,
                             model::PrimitiveEquation)
 
     @unpack k = diagn                           # vertical level
-    Δσₖ = model.geometry.σ_levels_thick[k]      # σ at k+1/2
+    Δσₖ = model.geometry.σ_levels_thick[k]      # σ level thickness at k
     σk_half = model.geometry.σ_levels_half[k+1] # σ at k+1/2
     σ̇ = diagn.dynamics_variables.σ_tend         # vertical mass flux M = pₛσ̇ at k+1/2
     
@@ -227,13 +227,10 @@ function _vertical_advection!(  ξ_tend_below::Grid,     # tendency of quantity 
                                 ξ::Grid,                # quantity ξ at k
                                 Δσₖ::NF                 # layer thickness on σ levels
                                 ) where {NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
-    Δσₖ2⁻¹ = 1/2Δσₖ                                                 # precompute     
-    @inbounds for ij in eachgridpoint(ξ,ξ_tend_k,σ_tend)
-        ξ_tend_below[ij] = σ_tend[ij] * (ξ_below[ij] - ξ[ij])       # coslat⁻¹ scaling not here
-        ξ_tend_k[ij] = Δσₖ2⁻¹ * (ξ_tend_k[ij] - ξ_tend_below[ij])   # but in vordiv_tendencies!
-    end
+    Δσₖ2⁻¹ = -1/2Δσₖ                                    # precompute
+    @. ξ_tend_below = σ_tend * (ξ_below - ξ)            # store without Δσ-scaling in layer below
+    @. ξ_tend_k = Δσₖ2⁻¹ * (ξ_tend_k + ξ_tend_below)    # combine with layer above and scale
 end
-
 
 function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
                             surf::SurfaceVariables,
@@ -273,8 +270,12 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
     spectral!(u_tend,u_tend_grid,S)
     spectral!(v_tend,v_tend_grid,S)
 
-    curl!(vor_tend,u_tend,v_tend,S)             # ∂ζ/∂t = ∇×(u_tend,v_tend)
-    divergence!(div_tend,u_tend,v_tend,S)       # ∂D/∂t = ∇⋅(u_tend,v_tend)
+    curl!(vor_tend,u_tend,v_tend,S)         # ∂ζ/∂t = ∇×(u_tend,v_tend)
+    divergence!(div_tend,u_tend,v_tend,S)   # ∂D/∂t = ∇⋅(u_tend,v_tend)
+
+    # only vectors make use of the lmax+1 row, set to zero for scalars
+    spectral_truncation!(vor_tend)           
+    spectral_truncation!(div_tend)
 end
 
 """
@@ -287,7 +288,6 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
     @unpack temp_tend, temp_tend_grid = diagn.tendencies
     @unpack div_grid, temp_grid = diagn.grid_variables
     @unpack uv∇lnp, uv∇lnp_sum_above, div_sum_above = diagn.dynamics_variables
-    ūv̄∇lnp = surf.pres_tend_grid
     @unpack κ = model.constants                 # thermodynamic kappa
     @unpack k = diagn                           # model level
     @unpack nlev = model.geometry
@@ -295,45 +295,54 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
     Tᵥ = diagn.grid_variables.temp_virt_grid    # anomaly wrt to Tₖ
     Tₖs = model.geometry.temp_ref_profile       # reference temperatures
     Tₖ = Tₖs[k]                                 # reference temperature at k
-
-    # for explicit vertical advection get reference temperature differences
-    k_above = max(1,k-1)                        # layer index above
-    k_below = min(k+1,nlev)                     # layer index below
-    ΔT_above = Tₖ - Tₖs[k_above]                # temperature difference to layer above
-    ΔT_below = Tₖs[k_below] - Tₖ                # and to layer below
     
     # coefficients from Simmons and Burridge 1981
     σ_lnp_A = model.geometry.σ_lnp_A[k]         # eq. 3.12, -1/Δσₖ*ln(σ_k+1/2/σ_k-1/2)
     σ_lnp_B = model.geometry.σ_lnp_B[k]         # eq. 3.12 -αₖ
     
-    # for explicit vertical advection terms
-    σₖ = model.geometry.σ_levels_full[k]        # should be Σ_r=1^k Δσᵣ for model top at >0hPa
-    σₖ_above = model.geometry.σ_levels_full[k_above]
-    Δσₖ2⁻¹ = -1/2model.geometry.σ_levels_thick[k]
+    # semi-implicit: terms here are explicit+implicit evaluated at time step i
+    # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
+    # to move the implicit terms to i-1 which is cheaper then the alternative below
 
-    # Adiabatic term following Simmons and Burridge 1981 but for σ coordinates
-    # if model.parameters.implicit_α == 0     # the explicit model
-        # += as tend already contains parameterizations + vertical advection
-        @. temp_tend_grid += temp_grid*div_grid +       # +T'D term of hori advection
-            κ*(Tᵥ+Tₖ)*(                                 # +κTᵥ*Dlnp/Dt, adiabatic term
-                σ_lnp_A * (div_sum_above+uv∇lnp_sum_above) +    # eq. 3.12 1st term
-                σ_lnp_B * (div_grid+uv∇lnp) +                   # eq. 3.12 2nd term
-                uv∇lnp)                                         # eq. 3.13
+    # Adiabatic term following Simmons and Burridge 1981 but for σ coordinates 
+    # += as tend already contains parameterizations + vertical advection
+    @. temp_tend_grid += temp_grid*div_grid +       # +T'D term of hori advection
+        κ*(Tᵥ+Tₖ)*(                                 # +κTᵥ*Dlnp/Dt, adiabatic term
+            σ_lnp_A * (div_sum_above+uv∇lnp_sum_above) +    # eq. 3.12 1st term
+            σ_lnp_B * (div_grid+uv∇lnp) +                   # eq. 3.12 2nd term
+            uv∇lnp)                                         # eq. 3.13
     
-    # else                                    # with semi-implicit time integration
-    #     # Hoskins and Simmons 1975, Appendix 1 but the adiabatic term therein as above
-    #     @. temp_tend_grid += temp_grid*div_grid +
-    #         Δσₖ2⁻¹*ΔT_below*(      σₖ*ūv̄∇lnp - (uv∇lnp_sum_above + σₖ*uv∇lnp)) +
-    #         Δσₖ2⁻¹*ΔT_above*(σₖ_above*ūv̄∇lnp -  uv∇lnp_sum_above) + 
-    #         κ*Tₖ*(σ_lnp_A*uv∇lnp_sum_above + σ_lnp_B*uv∇lnp) + 
-    #         κ*Tᵥ*(σ_lnp_A * (div_sum_above+uv∇lnp_sum_above) + σ_lnp_B * (div_grid+uv∇lnp)) +
-    #         κ*(Tᵥ+Tₖ)*uv∇lnp
-    # end
+    # SEMI-IMPLICIT ALTERNATIVE
+    # evaluate only the explicit terms at time step i and the implicit terms
+    # in implicit_correction! at i-1, however, this is more expensive then above
+
+    # ūv̄∇lnp = surf.pres_tend_grid
+    # # for explicit vertical advection get reference temperature differences
+    # k_above = max(1,k-1)                        # layer index above
+    # k_below = min(k+1,nlev)                     # layer index below
+    # ΔT_above = Tₖ - Tₖs[k_above]                # temperature difference to layer above
+    # ΔT_below = Tₖs[k_below] - Tₖ                # and to layer below
+
+    # # for explicit vertical advection terms
+    # σₖ = model.geometry.σ_levels_full[k]        # should be Σ_r=1^k Δσᵣ for model top at >0hPa
+    # σₖ_above = model.geometry.σ_levels_full[k_above]
+    # Δσₖ2⁻¹ = -1/2model.geometry.σ_levels_thick[k]
+
+    # # Hoskins and Simmons 1975, Appendix 1 but the adiabatic term therein as above
+    # @. temp_tend_grid += temp_grid*div_grid +
+    #     Δσₖ2⁻¹*ΔT_below*(      σₖ*ūv̄∇lnp - (uv∇lnp_sum_above + σₖ*uv∇lnp)) +
+    #     Δσₖ2⁻¹*ΔT_above*(σₖ_above*ūv̄∇lnp -  uv∇lnp_sum_above) + 
+    #     κ*Tₖ*(σ_lnp_A*uv∇lnp_sum_above + σ_lnp_B*uv∇lnp) + 
+    #     κ*Tᵥ*(σ_lnp_A * (div_sum_above+uv∇lnp_sum_above) + σ_lnp_B * (div_grid+uv∇lnp)) +
+    #     κ*(Tᵥ+Tₖ)*uv∇lnp
 
     spectral!(temp_tend,temp_tend_grid,model.spectral_transform)
 
     # now add the -∇⋅((u,v)*T') term
     flux_divergence!(temp_tend,temp_grid,diagn,model,add=true,flipsign=true)
+    
+    # only vectors make use of the lmax+1 row, set to zero for scalars
+    spectral_truncation!(temp_tend) 
 end
 
 function humidity_tendency!(diagn::DiagnosticVariablesLayer,
@@ -343,6 +352,9 @@ function humidity_tendency!(diagn::DiagnosticVariablesLayer,
     @unpack humid_grid = diagn.grid_variables
 
     horizontal_advection!(humid_tend,humid_tend_grid,humid_grid,diagn,model)
+
+    # only vectors make use of the lmax+1 row, set to zero for scalars
+    spectral_truncation!(humid_tend) 
 end
 
 # no humidity tendency for dry core
@@ -471,8 +483,8 @@ function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},
     @unpack bernoulli, bernoulli_grid, geopot = diagn.dynamics_variables
     @unpack div_tend = diagn.tendencies
  
-    one_half = convert(NF,0.5)
-    @. bernoulli_grid = one_half*(u_grid^2 + v_grid^2)      # = 1/2(u^2 + v^2) on grid
+    half = convert(NF,0.5)
+    @. bernoulli_grid = half*(u_grid^2 + v_grid^2)          # = 1/2(u^2 + v^2) on grid
     spectral!(bernoulli,bernoulli_grid,S)                   # to spectral space
     bernoulli .+= geopot                                    # add geopotential Φ
     ∇²!(div_tend,bernoulli,S,add=true,flipsign=true)        # add -∇²(1/2(u^2 + v^2) + ϕ)
@@ -481,10 +493,10 @@ end
 function linear_pressure_gradient!( diagn::DiagnosticVariablesLayer,
                                     progn::PrognosticVariables,
                                     model::PrimitiveEquation,
-                                    lf::Int)            # leapfrog index to evaluate tendencies on
+                                    lf::Int)                # leapfrog index to evaluate tendencies on
     
     @unpack R_dry = model.constants
-    Tₖ = model.geometry.temp_ref_profile[diagn.k]                  # reference temperature at layer k      
+    Tₖ = model.geometry.temp_ref_profile[diagn.k]           # reference temperature at layer k      
     pres = progn.pres.leapfrog[lf]
     @unpack geopot = diagn.dynamics_variables
 
@@ -570,8 +582,7 @@ Updates grid vorticity, spectral stream function and spectral and grid velocitie
 function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,   
                                     progn::PrognosticVariablesLeapfrog,
                                     lf::Int,                            # leapfrog index
-                                    model::Barotropic,
-                                    )
+                                    model::Barotropic)
     
     @unpack vor_grid, u_grid, v_grid = diagn.grid_variables
     @unpack U, V = diagn.dynamics_variables
@@ -668,3 +679,5 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
 
     return nothing
 end
+
+≈

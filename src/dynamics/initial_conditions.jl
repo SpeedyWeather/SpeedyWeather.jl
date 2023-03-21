@@ -251,6 +251,7 @@ function initial_conditions!(   ::Type{ZonalWind},
     # PRESSURE (constant everywhere)
     lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
     progn.pres.leapfrog[1][1] = norm_sphere*lnp₀
+    pressure_on_orography!(progn,model)
 end
 
 function initial_conditions!(   ::Type{StartFromFile},
