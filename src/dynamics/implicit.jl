@@ -11,19 +11,20 @@ initialize_implicit!(::Real,::Barotropic) = nothing
 """
     I = Implicit(P::Parameters{<:ShallowWater})
 
-Zero generator function for an `ImplicitShallowWater` struct, which holds precomputed arrays for
-the implicit correction in the shallow water model. Actual precomputation happens in initialize_implicit!."""
+Zero generator function for an `ImplicitShallowWater` struct, which holds precomputed arrays
+for the implicit correction in the shallow water model. Actual precomputation happens in
+initialize_implicit!."""
 function Implicit(P::Parameters{<:ShallowWater})    # shallow water model only
     
     @unpack NF,trunc = P
 
-    # initialize with zeros only, actual initialization depends on time step, done in initialize_implicit!
-    ξH₀ = [zero(NF)]          # wrap in vec to make mutable 
-    g∇² = zeros(NF,trunc+2)
-    ξg∇² = zero(g∇²)
-    div_impl = zero(g∇²)
+    # 0-initialize, actual initialization depends on time step, done in initialize_implicit!
+    ξH₀ = [zero(NF)]            # time step ξ, layer thickness at rest H₀ (in vec for mutability)
+    g∇² = zeros(NF,trunc+2)     # gravity times Laplace operator
+    ξg∇² = zeros(NF,trunc+2)    # time step ξ times gravity times Laplace operator 
+    S⁻¹ = zeros(NF,trunc+2)     # combined operator to be inverted
 
-    return ImplicitShallowWater(ξH₀,g∇²,ξg∇²,div_impl)
+    return ImplicitShallowWater(ξH₀,g∇²,ξg∇²,S⁻¹)
 end
 
 """
@@ -35,7 +36,7 @@ function initialize_implicit!(  dt::Real,               # time step
 
     @unpack implicit_α = model.parameters               # = [0,0.5,1], time step fraction for implicit
     @unpack eigenvalues = model.spectral_transform      # = -l*(l+1), degree l of harmonics
-    @unpack ξH₀,g∇²,ξg∇²,div_impl = model.implicit      # pull precomputed arrays to be updated
+    @unpack ξH₀,g∇²,ξg∇²,S⁻¹ = model.implicit           # pull precomputed arrays to be updated
     @unpack layer_thickness = model.constants           # shallow water layer thickness [m]
     @unpack gravity = model.constants                   # gravitational acceleration [m/s²]                  
 
@@ -44,7 +45,7 @@ function initialize_implicit!(  dt::Real,               # time step
     # α = 0.5 evaluates at i+1 and i-1 (centered implicit)
     # α = 1   evaluates at i+1 (backward implicit)
     # α ∈ [0.5,1] are also possible which controls the strength of the gravity wave dampening.
-    # α = 0.5 only prevents the waves from amplifying
+    # α = 0.5 slows gravity waves and prevents them from amplifying
     # α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
 
     ξ = implicit_α*dt               # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
@@ -52,9 +53,9 @@ function initialize_implicit!(  dt::Real,               # time step
 
     # loop over degree l of the harmonics (implicit terms are independent of order m)
     @inbounds for l in eachindex(g∇²,ξg∇²,div_impl,eigenvalues)
-        g∇²[l] = gravity*eigenvalues[l]         # doesn't actually change with dt
-        ξg∇²[l] = ξ*g∇²[l]                      # update ξg∇² with new ξ
-        div_impl[l] = inv(1 - ξH₀[1]*ξg∇²[l])   # update 1/(1-ξ²gH₀∇²) with new ξ
+        g∇²[l] = gravity*eigenvalues[l]     # doesn't actually change with dt
+        ξg∇²[l] = ξ*g∇²[l]                  # update ξg∇² with new ξ
+        S⁻¹[l] = inv(1 - ξH₀[1]*ξg∇²[l])   # update 1/(1-ξ²gH₀∇²) with new ξ
     end
 end
 
@@ -81,7 +82,7 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
     pres_old, pres_new = pres.leapfrog      # pressure/η at t,t+dt
     @unpack pres_tend = surface             # tendency of pressure/η
 
-    @unpack g∇²,ξg∇²,div_impl = model.implicit
+    @unpack g∇²,ξg∇²,S⁻¹ = model.implicit
     ξH₀ = model.implicit.ξH₀[1]                 # unpack as it's stored in a vec for mutation
     H₀ = model.constants.layer_thickness
 
@@ -108,7 +109,7 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
             G_η   = pres_tend[lm] - H₀*(div_old[lm] - div_new[lm])
 
             # using the Gs correct the tendencies for semi-implicit time stepping
-            div_tend[lm] = (G_div - ξg∇²[l]*G_η)*div_impl[l]
+            div_tend[lm] = S⁻¹[l]*(G_div - ξg∇²[l]*G_η)
             pres_tend[lm] = G_η - ξH₀*div_tend[lm]
         end
         lm += 1     # loop skips last row
@@ -169,7 +170,7 @@ function initialize_implicit!(  dt::Real,                   # the scaled time st
     U .= -R_dry*temp_ref_profile        # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence
     
     # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
-    L0 = -1 ./ 2σ_levels_thick
+    L0 = 1 ./ 2σ_levels_thick
     L1 = zero(L)                        # vert advection term in the temperature equation (below)
     L2 = zero(L)                        # vert advection term in the temperature equation (above)
     L3 = κ*temp_ref_profile.*σ_lnp_A    # factor in front of the div_sum_above term
@@ -194,7 +195,7 @@ function initialize_implicit!(  dt::Real,                   # the scaled time st
         end
 
         L4[1:k,k] .= 0                  # fill upper triangle + diagonal with zeros
-        L4[k+1:end,k] .= σ_levels_thick[k]
+        L4[k+1:end,k] .= σ_levels_thick[k]                  # vert integration top to k-1
     end
 
     L .= Diagonal(L0)*(L1+L2) + Diagonal(L3)*L4 + Diagonal(L5)  # combine all operators into L
@@ -236,7 +237,8 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
 
             # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
             # for temperature tendency do the latter as its cheaper.
-            @. temp_tend += L[k,r]*(div_old-div_new)    
+            @. temp_tend += L[k,r]*(div_old-div_new)
+            # @. temp_tend += L[k,r]*div_old    # for the former
         end
     end       
     
@@ -296,7 +298,7 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
                     lm += 1         # single index lm corresponding to harmonic l,m
                     div_tend[lm] += S⁻¹[l,k,r]*G[lm]
                 end
-                lm += 1             # skip last row, LowerTriaMatrices are of size lmax+2 x mmax+1
+                lm += 1             # skip last row, LowerTriMatrices are of size lmax+2 x mmax+1
             end
         end
     end
