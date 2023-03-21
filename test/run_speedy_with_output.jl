@@ -37,3 +37,21 @@ end
     end
     @test all(SpeedyWeather.get_pressure(p1) .== SpeedyWeather.get_pressure(p2))
 end 
+
+@testset "Restart from PrognosticVariables" begin 
+
+    p1, d1, m1 = initialize_speedy(Float32, ShallowWater)
+    run_speedy!(p1, d1, m1)
+ 
+    p2, d2, m2 = initialize_speedy(Float32, ShallowWater)
+    copy!(p2, p1)
+
+    for varname in propertynames(p1.layers[1].leapfrog[1])
+        if SpeedyWeather.has(p1, varname)
+            for (var_new, var_old) in zip(SpeedyWeather.get_var(p1, varname), SpeedyWeather.get_var(p2, varname))
+                @test all(var_new .== var_old)
+            end
+        end
+    end
+    @test all(SpeedyWeather.get_pressure(p1) .== SpeedyWeather.get_pressure(p2))
+end

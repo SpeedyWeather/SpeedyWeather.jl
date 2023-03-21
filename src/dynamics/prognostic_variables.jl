@@ -1,3 +1,5 @@
+import Base: copy!
+
 """One vertical layer of prognostic variables represented by their spectral coefficients."""
 struct PrognosticVariablesLayer{NF<:AbstractFloat}
     # all matrices are of size lmax x mmax
@@ -97,6 +99,28 @@ function Base.zeros(::Type{PrognosticVariables{NF}},
 end
 
 has(progn::PrognosticVariables{NF,M}, var_name::Symbol) where {NF,M} = has(M, var_name)
+
+"""
+    copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
+
+Copies entries of `progn_old` into `progn_new`. Only copies those variables that are present 
+in the model of both `progn_new` and `progn_old`.
+"""
+function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
+
+    var_names = propertynames(progn_old.layers[1].leapfrog[1])
+
+    for var_name in var_names
+        if has(progn_new, var_name) 
+            var = get_var(progn_old, var_name) 
+            set_var!(progn_new, var_name, var)
+        end
+    end 
+    pres = get_pressure(progn_old)
+    set_pressure!(progn_new, pres)
+
+    return progn_new
+end
 
 # SET_VAR FUNCTIONS TO ASSIGN NEW VALUES TO PrognosticVariables
 
