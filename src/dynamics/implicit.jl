@@ -52,7 +52,7 @@ function initialize_implicit!(  dt::Real,               # time step
     ξH₀[1] = ξ*layer_thickness      # update ξ*H₀ with new ξ, in vec for mutability
 
     # loop over degree l of the harmonics (implicit terms are independent of order m)
-    @inbounds for l in eachindex(g∇²,ξg∇²,div_impl,eigenvalues)
+    @inbounds for l in eachindex(g∇²,ξg∇²,S⁻¹,eigenvalues)
         g∇²[l] = gravity*eigenvalues[l]     # doesn't actually change with dt
         ξg∇²[l] = ξ*g∇²[l]                  # update ξg∇² with new ξ
         S⁻¹[l] = inv(1 - ξH₀[1]*ξg∇²[l])   # update 1/(1-ξ²gH₀∇²) with new ξ
@@ -92,7 +92,7 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
     @boundscheck size(pres_tend) == size(div_new) || throw(BoundsError)
     lmax,mmax = size(div_tend) .- (2,1)
 
-    @boundscheck length(div_impl) == lmax+2 || throw(BoundsError)
+    @boundscheck length(S⁻¹) == lmax+2 || throw(BoundsError)
     @boundscheck length(ξg∇²) == lmax+2 || throw(BoundsError)
     @boundscheck length(g∇²) == lmax+2 || throw(BoundsError)
 
