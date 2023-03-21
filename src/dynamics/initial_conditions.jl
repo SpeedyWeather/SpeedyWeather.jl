@@ -264,18 +264,7 @@ function initial_conditions!(   ::Type{StartFromFile},
     version = restart_file["version"]   # currently unused, TODO check for compat with version
     time = restart_file["time"]         # currently unused
 
-    var_names = propertynames(progn_old.layers[1].leapfrog[1])
-
-    for var_name in var_names
-        if has(progn_new, var_name) 
-            var = get_var(progn_old, var_name) 
-            set_var!(progn_new, var_name, var)
-        end
-    end 
-    pres = get_pressure(progn_old)
-    set_pressure!(progn_new, pres)
-
-    return progn_new
+    return copy!(progn_new, progn_old)
 end
 
 function homogeneous_temperature!(  progn::PrognosticVariables,
