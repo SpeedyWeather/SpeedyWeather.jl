@@ -79,7 +79,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
 
     for layer in diagn.layers
         vordiv_tendencies!(layer,surface,model)     # vorticity advection, pressure gradient term
-        temperature_tendency!(layer,model)          # hor. advection + adiabatic term
+        temperature_tendency!(layer,surface,model)  # hor. advection + adiabatic term
         humidity_tendency!(layer,model)             # horizontal advection of humidity (nothing for wetcore)
         bernoulli_potential!(layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
     end
