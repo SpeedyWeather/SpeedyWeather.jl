@@ -229,7 +229,7 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
     # MOVE THE IMPLICIT TERMS OF THE TEMPERATURE EQUATION FROM TIME STEP i TO i-1
     # geopotential and linear pressure gradient (divergence equation) are already evaluated at i-1
     # so is the -D̄ term for surface pressure in tendencies!
-    for k in 1:nlev
+    Threads.@threads for k in 1:nlev
         @unpack div_tend, temp_tend = diagn.layers[k].tendencies
         for r in 1:nlev
             div_old = progn.layers[r].leapfrog[1].div   # divergence at i-1
@@ -286,10 +286,10 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
     end
 
     # NOW SOLVE THE δD = S⁻¹G to correct divergence tendency
-    @inbounds for k in 1:nlev
+    Threads.@threads for k in 1:nlev
         @unpack div_tend = diagn.layers[k].tendencies
 
-        for r in 1:nlev
+        @inbounds for r in 1:nlev
             G = diagn.layers[r].dynamics_variables.a        # reuse work arrays
 
             lm = 0
@@ -304,11 +304,11 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
     end
 
     # SEMI IMPLICIT CORRECTIONS FOR PRESSURE AND TEMPERATURE, insert δD to get δT, δlnpₛ
-    @inbounds for k in 1:nlev
+    Threads.@threads for k in 1:nlev
         @unpack div_tend, temp_tend = diagn.layers[k].tendencies
         @. pres_tend += ξ*W[k]*div_tend         # δlnpₛ = G_lnpₛ + ξWδD
 
-        for r in 1:nlev
+        @inbounds for r in 1:nlev
             @unpack div_tend = diagn.layers[r].tendencies
             @. temp_tend += ξ*L[k,r]*div_tend   # δT = G_T + ξLδD
         end

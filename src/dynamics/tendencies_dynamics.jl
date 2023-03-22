@@ -679,5 +679,3 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
 
     return nothing
 end
-
-≈

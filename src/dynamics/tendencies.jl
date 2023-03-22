@@ -57,7 +57,10 @@ function get_tendencies!(   diagn::DiagnosticVariables,
 
     pressure_gradient!(diagn,progn,lf,S)            # calculate ∇ln(pₛ)
 
-    for (diagn_layer,progn_layer) in zip(diagn.layers,progn.layers)
+    Threads.@threads for k in 1:diagn.nlev
+        diagn_layer = diagn.layers[k]
+        progn_layer = progn.layers[k]
+
         pressure_flux!(diagn_layer,surface)         # calculate (uₖ,vₖ)⋅∇ln(pₛ)
 
         # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
@@ -69,7 +72,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     vertical_integration!(diagn,progn,lf_implicit,G)   # get ū,v̄,D̄ on grid; and and D̄ in spectral
     surface_pressure_tendency!(surface,model)       # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - D̄
 
-    for layer in diagn.layers
+    Threads.@threads for layer in diagn.layers
         vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
                                                     # add the RTₖlnpₛ term to geopotential
         linear_pressure_gradient!(layer,progn,model,lf_implicit)
@@ -77,7 +80,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
 
     vertical_advection!(diagn,model)                # use σ̇ for the vertical advection of u,v,T,q
 
-    for layer in diagn.layers
+    Threads.@threads for layer in diagn.layers
         vordiv_tendencies!(layer,surface,model)     # vorticity advection, pressure gradient term
         temperature_tendency!(layer,surface,model)  # hor. advection + adiabatic term
         humidity_tendency!(layer,model)             # horizontal advection of humidity (nothing for wetcore)
