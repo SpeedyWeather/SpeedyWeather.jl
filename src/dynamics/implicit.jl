@@ -305,12 +305,15 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
 
     # SEMI IMPLICIT CORRECTIONS FOR PRESSURE AND TEMPERATURE, insert δD to get δT, δlnpₛ
     @threads for k in 1:nlev
-        @unpack div_tend, temp_tend = diagn.layers[k].tendencies
-        @. pres_tend += ξ*W[k]*div_tend         # δlnpₛ = G_lnpₛ + ξWδD
-
+        @unpack temp_tend = diagn.layers[k].tendencies
         @inbounds for r in 1:nlev
             @unpack div_tend = diagn.layers[r].tendencies
             @. temp_tend += ξ*L[k,r]*div_tend   # δT = G_T + ξLδD
         end
+    end
+
+    for k in 1:nlev     # not thread safe
+        @unpack div_tend = diagn.layers[k].tendencies
+        @. pres_tend += ξ*W[k]*div_tend         # δlnpₛ = G_lnpₛ + ξWδD
     end
 end
