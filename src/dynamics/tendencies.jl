@@ -72,15 +72,29 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     vertical_integration!(diagn,progn,lf_implicit,G)   # get ū,v̄,D̄ on grid; and and D̄ in spectral
     surface_pressure_tendency!(surface,model)       # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - D̄
 
+    # SINGLE THREADED VERSION
+    # @threads for layer in diagn.layers
+    #     vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
+    #                                                 # add the RTₖlnpₛ term to geopotential
+    #     linear_pressure_gradient!(layer,progn,model,lf_implicit)
+    # end
+
+    # vertical_advection!(diagn,model)                # use σ̇ for the vertical advection of u,v,T,q
+
+    # @threads for layer in diagn.layers
+    #     vordiv_tendencies!(layer,surface,model)     # vorticity advection, pressure gradient term
+    #     temperature_tendency!(layer,surface,model)  # hor. advection + adiabatic term
+    #     humidity_tendency!(layer,model)             # horizontal advection of humidity (nothing for wetcore)
+    #     bernoulli_potential!(layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
+    # end
+
+    # MULTI-THREADED VERSION
     @threads for layer in diagn.layers
         vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
                                                     # add the RTₖlnpₛ term to geopotential
         linear_pressure_gradient!(layer,progn,model,lf_implicit)
-    end
+        vertical_advection!(layer,diagn,model)      # use σ̇ for the vertical advection of u,v,T,q
 
-    vertical_advection!(diagn,model)                # use σ̇ for the vertical advection of u,v,T,q
-
-    @threads for layer in diagn.layers
         vordiv_tendencies!(layer,surface,model)     # vorticity advection, pressure gradient term
         temperature_tendency!(layer,surface,model)  # hor. advection + adiabatic term
         humidity_tendency!(layer,model)             # horizontal advection of humidity (nothing for wetcore)
