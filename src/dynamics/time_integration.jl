@@ -199,17 +199,16 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
 
     # LOOP OVER ALL LAYERS for diffusion, leapfrog time integration
     # and progn state from spectral to grid for next time step
-    @threads for k in 1:diagn.nlev+1
-        if k <= diagn.nlev
+    @floop for k in 1:diagn.nlev+1
+        if k <= diagn.nlev                  # model levels
             diagn_layer = diagn.layers[k]
             progn_layer = progn.layers[k]
 
             horizontal_diffusion!(progn_layer,diagn_layer,model)    # implicit diffusion of vor, div, temp
             leapfrog!(progn_layer,diagn_layer,dt,lf1,model)         # time step forward for vor, div, temp
             gridded!(diagn_layer,progn_layer,lf2,model)             # propagate spectral state to grid
-        else
-            # SURFACE LAYER (log of surface pressure)
-            @unpack pres_tend = diagn.surface
+        else                                # surface level
+            pres_tend = diagn.surface.pres_tend
             pres_old,pres_new = progn.pres.leapfrog
             leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,model.constants)
             gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf2],model.spectral_transform)

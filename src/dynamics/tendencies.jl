@@ -57,15 +57,12 @@ function get_tendencies!(   diagn::DiagnosticVariables,
 
     pressure_gradient!(diagn,progn,lf,S)            # calculate ∇ln(pₛ)
 
-    @threads for k in 1:diagn.nlev
-        diagn_layer = diagn.layers[k]
-        progn_layer = progn.layers[k]
-
+    @floop for (diagn_layer, progn_layer) in zip(diagn.layers,progn.layers)
         pressure_flux!(diagn_layer,surface)         # calculate (uₖ,vₖ)⋅∇ln(pₛ)
 
         # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
         linear_virtual_temperature!(diagn_layer,progn_layer,model,lf_implicit)
-        temperature_anomaly!(diagn_layer,model)
+        temperature_anomaly!(diagn_layer,model)     # temperature relative to reference profile
     end
 
     geopotential!(diagn,B,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
@@ -73,7 +70,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     surface_pressure_tendency!(surface,model)       # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - D̄
 
     # SINGLE THREADED VERSION
-    # @threads for layer in diagn.layers
+    # for layer in diagn.layers
     #     vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
     #                                                 # add the RTₖlnpₛ term to geopotential
     #     linear_pressure_gradient!(layer,progn,model,lf_implicit)
@@ -81,7 +78,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
 
     # vertical_advection!(diagn,model)                # use σ̇ for the vertical advection of u,v,T,q
 
-    # @threads for layer in diagn.layers
+    # for layer in diagn.layers
     #     vordiv_tendencies!(layer,surface,model)     # vorticity advection, pressure gradient term
     #     temperature_tendency!(layer,surface,model)  # hor. advection + adiabatic term
     #     humidity_tendency!(layer,model)             # horizontal advection of humidity (nothing for wetcore)
@@ -89,7 +86,7 @@ function get_tendencies!(   diagn::DiagnosticVariables,
     # end
 
     # MULTI-THREADED VERSION
-    @threads for layer in diagn.layers
+    @floop for layer in diagn.layers
         vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
                                                     # add the RTₖlnpₛ term to geopotential
         linear_pressure_gradient!(layer,progn,model,lf_implicit)

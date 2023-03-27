@@ -229,8 +229,8 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
     # MOVE THE IMPLICIT TERMS OF THE TEMPERATURE EQUATION FROM TIME STEP i TO i-1
     # geopotential and linear pressure gradient (divergence equation) are already evaluated at i-1
     # so is the -D̄ term for surface pressure in tendencies!
-    @threads for k in 1:nlev
-        @unpack div_tend, temp_tend = diagn.layers[k].tendencies
+    @floop for k in 1:nlev
+        (;temp_tend) = diagn.layers[k].tendencies       # unpack temp_tend
         for r in 1:nlev
             div_old = progn.layers[r].leapfrog[1].div   # divergence at i-1
             div_new = progn.layers[r].leapfrog[2].div   # divergence at i
@@ -244,17 +244,18 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
     
     # SEMI IMPLICIT CORRECTIONS FOR DIVERGENCE
     @unpack pres_tend = diagn.surface
-    @threads for k in 1:nlev    # loop from bottom layer to top for geopotential calculation
+    @floop for k in 1:nlev    # loop from bottom layer to top for geopotential calculation
         
         # calculate the combined tendency G = G_D + ξRG_T + ξUG_lnps to solve for divergence δD
-        G = diagn.layers[k].dynamics_variables.a        # reuse work arrays
-        geopot = diagn.layers[k].dynamics_variables.b
-        @unpack div_tend, temp_tend = diagn.layers[k].tendencies
+        G = diagn.layers[k].dynamics_variables.a        # reuse work arrays, used for combined tendency G
+        geopot = diagn.layers[k].dynamics_variables.b   # used for geopotential
+        (;div_tend) = diagn.layers[k].tendencies        # unpack div_tend
 
         # 1. the ξRG_T term, vertical integration of geopotential (excl ξ, this is done in 2.)
         # R is not used here as it's cheaper to reuse the geopotential from k+1 than
         # to multiply with the entire upper triangular matrix R which recalculates
         # the geopotential for k from all lower levels k...nlev
+        # TODO swap sign here and not in + geopot[lm] further down
         # if k == nlev
         #     @. geopot = Δp_geopot_full[k]*temp_tend        # surface geopotential without orography 
         # else
@@ -265,7 +266,7 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
 
         # # alternative way to calculate the geopotential
         @inbounds for r in 1:nlev
-            @unpack temp_tend = diagn.layers[r].tendencies
+            (;temp_tend) = diagn.layers[r].tendencies   # unpack temp_tend
             @. geopot += R[k,r]*temp_tend
         end
 
@@ -286,11 +287,11 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
     end
 
     # NOW SOLVE THE δD = S⁻¹G to correct divergence tendency
-    @threads for k in 1:nlev
-        @unpack div_tend = diagn.layers[k].tendencies
+    @floop for k in 1:nlev
+        (;div_tend) = diagn.layers[k].tendencies        # unpack div_tend
 
         @inbounds for r in 1:nlev
-            G = diagn.layers[r].dynamics_variables.a        # reuse work arrays
+            G = diagn.layers[r].dynamics_variables.a    # reuse work arrays
 
             lm = 0
             for m in 1:mmax+1       # loops over all columns/order m
@@ -304,16 +305,16 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
     end
 
     # SEMI IMPLICIT CORRECTIONS FOR PRESSURE AND TEMPERATURE, insert δD to get δT, δlnpₛ
-    @threads for k in 1:nlev
-        @unpack temp_tend = diagn.layers[k].tendencies
+    @floop for k in 1:nlev
+        (;temp_tend) = diagn.layers[k].tendencies       # unpack temp_tend
         @inbounds for r in 1:nlev
-            @unpack div_tend = diagn.layers[r].tendencies
-            @. temp_tend += ξ*L[k,r]*div_tend   # δT = G_T + ξLδD
+            (;div_tend) = diagn.layers[r].tendencies    # unpack div_tend
+            @. temp_tend += ξ*L[k,r]*div_tend           # δT = G_T + ξLδD
         end
     end
 
     for k in 1:nlev     # not thread safe
-        @unpack div_tend = diagn.layers[k].tendencies
-        @. pres_tend += ξ*W[k]*div_tend         # δlnpₛ = G_lnpₛ + ξWδD
+        (;div_tend) = diagn.layers[k].tendencies        # unpack div_tend
+        @. pres_tend += ξ*W[k]*div_tend                 # δlnpₛ = G_lnpₛ + ξWδD
     end
 end

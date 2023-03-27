@@ -10,6 +10,7 @@ module SpeedyWeather
 
     # GPU, PARALLEL
     import Base.Threads: Threads, @threads
+    import FLoops: FLoops, @floop
     import KernelAbstractions
     import CUDA
     import CUDAKernels
