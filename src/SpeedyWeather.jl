@@ -8,7 +8,9 @@ module SpeedyWeather
     import FastGaussQuadrature
     import LinearAlgebra: LinearAlgebra, Diagonal
 
-    # GPU
+    # GPU, PARALLEL
+    import Base.Threads: Threads, @threads
+    import FLoops: FLoops, @floop
     import KernelAbstractions
     import CUDA
     import CUDAKernels

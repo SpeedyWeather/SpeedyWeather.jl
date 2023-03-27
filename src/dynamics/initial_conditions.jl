@@ -155,7 +155,7 @@ function initial_conditions!(   ::Type{ZonalWind},
     @unpack perturb_lat, perturb_lon, perturb_uₚ, perturb_radius = model.parameters.zonal_wind_coefs
     @unpack temp_ref, R_dry, lapse_rate, gravity, pres_ref = model.parameters
     @unpack radius_earth, rotation_earth = model.parameters
-    @unpack σ_tropopause = model.parameters
+    @unpack σ_tropopause, pressure_on_orography = model.parameters
     @unpack σ_levels_full, Grid, nlat_half, nlev = model.geometry
     @unpack norm_sphere = model.spectral_transform
 
@@ -232,7 +232,7 @@ function initial_conditions!(   ::Type{ZonalWind},
         ηᵥ = (η - η₀)*π/2       # auxiliary variable for vertical coordinate
 
         # amplitudes with height
-        A1 = 3/4*η*π*u₀/R_dry*sin(ηᵥ)* sqrt(cos(ηᵥ))
+        A1 = 3/4*η*π*u₀/R_dry*sin(ηᵥ)*sqrt(cos(ηᵥ))
         A2 = 2u₀*cos(ηᵥ)^(3/2)
 
         for (ij,φij) in enumerate(φ)
@@ -251,7 +251,7 @@ function initial_conditions!(   ::Type{ZonalWind},
     # PRESSURE (constant everywhere)
     lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
     progn.pres.leapfrog[1][1] = norm_sphere*lnp₀
-    pressure_on_orography!(progn,model)
+    pressure_on_orography && pressure_on_orography!(progn,model)
 end
 
 function initial_conditions!(   ::Type{StartFromFile},

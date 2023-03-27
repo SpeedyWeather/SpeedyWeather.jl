@@ -96,14 +96,14 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     radiation_coefs::Coefficients = RadiationCoefs{NF}()
 
     # TIME STEPPING
-    startdate::DateTime = DateTime(2000,1,1)# time at which the integration starts
-    n_days::Float64 = 10                       # number of days to integrate for
-    Δt_at_T31::Float64 = 30                    # time step in minutes for T31, scale linearly to trunc
+    startdate::DateTime = DateTime(2000,1,1)    # time at which the integration starts
+    n_days::Float64 = 10                        # number of days to integrate for
+    Δt_at_T31::Float64 = 30                     # time step in minutes for T31, scale linearly to trunc
 
     # NUMERICS
-    robert_filter::Float64 = 0.05          # Robert (1966) time filter coefficeint to suppress comput. mode
-    williams_filter::Float64 = 0.53        # William's time filter (Amezcua 2011) coefficient for 3rd order acc
-    implicit_α::Float64 = 1                # coefficient for semi-implicit computations to filter gravity waves
+    robert_filter::Float64 = 0.05       # Robert (1966) time filter coefficeint to suppress comput. mode
+    williams_filter::Float64 = 0.53     # William's time filter (Amezcua 2011) coefficient for 3rd order acc
+    implicit_α::Float64 = 1             # coefficient for semi-implicit computations to filter gravity waves
     
     # LEGENDRE TRANSFORM AND POLYNOMIALS
     recompute_legendre::Bool = false    # recomputation is slower but requires less memory
@@ -113,13 +113,14 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     # BOUNDARY FILES
     boundary_path::String = ""          # package location is default
     orography::Type{<:AbstractOrography} = EarthOrography
-    orography_scale::Float64 = 1           # scale orography by a factor
+    orography_scale::Float64 = 1        # scale orography by a factor
     orography_path::String = boundary_path
     orography_file::String = "orography_F512.nc"
 
     # INITIAL CONDITIONS
     seed::Int = abs(rand(Int))          # random seed for the global random number generator
     initial_conditions::Type{<:InitialConditions} = initial_conditions_default(Model)
+    pressure_on_orography::Bool = false # calculate the initial surface pressure from orography
     
     zonal_jet_coefs::Coefficients = ZonalJetCoefs()
     zonal_wind_coefs::Coefficients = ZonalWindCoefs()
@@ -128,12 +129,12 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     verbose::Bool = true            # print dialog for feedback
     debug::Bool = false             # print debug info
     output::Bool = false            # Store data in netCDF?
-    output_dt::Float64 = 6             # output time step [hours]
+    output_dt::Float64 = 6          # output time step [hours]
     output_path::String = pwd()     # path to output folder
 
     # name of the output folder, defaults to 4-digit number counting up from run-0001
     run_id::Union{String,Int} = get_run_id(output, output_path)    
-    output_filename::String="output.nc"     # name of the output netcdf file
+    output_filename::String = "output.nc"   # name of the output netcdf file
     
     # variables to output: :u, :v, :vor, :div, :temp, :humid
     output_vars::Vector{Symbol} = output_vars_default(Model)
@@ -142,19 +143,19 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     version::VersionNumber = pkgversion(SpeedyWeather)
 
     # OUTPUT GRID
-    output_NF::DataType = Float32   # number format used for output
-    output_nlat_half::Int = 0   # 0 = reuse nlat_half from dynamical core
+    output_NF::DataType = Float32       # number format used for output
+    output_nlat_half::Int = 0           # 0 = reuse nlat_half from dynamical core
     output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid(Grid)
     output_Interpolator::Type{<:AbstractInterpolator} = DEFAULT_INTERPOLATOR
-    output_matrix::Bool = false     # if true sort gridpoints into a matrix
+    output_matrix::Bool = false         # if true sort gridpoints into a matrix
     output_quadrant_rotation::NTuple{4,Int} = (0,1,2,3)
     output_matrix_quadrant::NTuple{4,Tuple{Int,Int}} = ((2,2),(1,2),(1,1),(2,1))
     
-    missing_value::Float64 = NaN       # missing value to be used in netcdf output
+    missing_value::Float64 = NaN        # missing value to be used in netcdf output
     
     # RESTART
-    write_restart::Bool = output            # also write restart file if output==true?
-    restart_path::String = output_path      # path for restart file
+    write_restart::Bool = output        # also write restart file if output==true?
+    restart_path::String = output_path  # path for restart file
     restart_id::Union{String,Int} = 1   # run_id of restart file in run-????/restart.jld2
 end
 
