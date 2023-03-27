@@ -297,7 +297,9 @@ function _vertical_advection!(  ξ_tend::Grid,           # tendency of quantity 
                                 Δσₖ::NF                 # layer thickness on σ levels
                                 ) where {NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     Δσₖ2⁻¹ = -1/2Δσₖ                                    # precompute
-    @. ξ_tend = Δσₖ2⁻¹ * (σ_tend_below*(ξ_below - ξ) + σ_tend_above*(ξ - ξ_above))
+
+    # += as the tendencies already contain the parameterizations
+    @. ξ_tend += Δσₖ2⁻¹ * (σ_tend_below*(ξ_below - ξ) + σ_tend_above*(ξ - ξ_above))
 end
 
 function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
