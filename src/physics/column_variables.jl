@@ -115,8 +115,7 @@ at gridpoint index `ij`. Provide `G::Geometry` for coordinate information."""
 function get_column!(   C::ColumnVariables,
                         D::DiagnosticVariables,
                         ij::Int,            # grid point index
-                        G::Geometry,
-                        )
+                        G::Geometry)
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
@@ -143,14 +142,13 @@ Write the parametrization tendencies from `C::ColumnVariables` into the horizont
 of tendencies stored in `D::DiagnosticVariables` at gridpoint index `ij`."""
 function write_column_tendencies!(  D::DiagnosticVariables,
                                     C::ColumnVariables,
-                                    ij::Int,            # grid point index
-                                    )
+                                    ij::Int)            # grid point index
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
-    @inbounds for (k,layer) =  enumerate(D.layers)
-        layer.tendencies.u_tend[ij] = C.u_tend[k]
-        layer.tendencies.v_tend[ij] = C.v_tend[k]
+    for (k,layer) =  enumerate(D.layers)
+        layer.tendencies.u_tend_grid[ij] = C.u_tend[k]
+        layer.tendencies.v_tend_grid[ij] = C.v_tend[k]
         layer.tendencies.temp_tend_grid[ij] = C.temp_tend[k]
         layer.tendencies.humid_tend_grid[ij] = C.humid_tend[k]
     end
