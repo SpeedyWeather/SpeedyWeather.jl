@@ -64,8 +64,8 @@ struct NoBoundaryLayer <: BoundaryLayer end
 
 """Following Held and Suarez, 1996 BAMS"""
 Base.@kwdef struct LinearDrag{NF<:Real} <: BoundaryLayer
-    σb::NF = 0.7        # sigma coordinate below which linear drag is applied
-    drag_time::NF = 1.0 # [day] time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
+    σb::NF = 0.7            # sigma coordinate below which linear drag is applied
+    drag_time::NF = 24.0    # [hours] time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
 end
 
 LinearDrag(;kwargs...) = LinearDrag{Float64}(;kwargs...)

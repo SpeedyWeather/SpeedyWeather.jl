@@ -8,9 +8,9 @@ function boundary_layer!(   column::ColumnVariables{NF},
                             scheme::LinearDrag,
                             model::PrimitiveEquation) where NF
 
-    (;σ_levels_full) = model.geometry
+    (;σ_levels_full,radius_earth) = model.geometry
     (;σb,drag_time) = scheme
-    kf = 1/drag_time
+    kf = radius_earth/(drag_time*3600)
     (;u,v,u_tend,v_tend) = column
 
     @inbounds for k in eachlayer(column)
