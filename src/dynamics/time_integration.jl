@@ -127,7 +127,7 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
 
     # LOOP OVER LAYERS FOR DIFFUSION, LEAPFROGGING AND PROPAGATE STATE TO GRID
     for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
-        get_tendencies!(diagn_layer,M)                      # tendency of vorticity
+        dynamics_tendencies!(diagn_layer,M)                 # tendency of vorticity
         horizontal_diffusion!(progn_layer,diagn_layer,M)    # diffusion for vorticity
         leapfrog!(progn_layer,diagn_layer,dt,lf1,M)         # leapfrog vorticity forward
         gridded!(diagn_layer,progn_layer,lf2,M)             # propagate spectral state to grid
@@ -161,8 +161,8 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     @unpack pres = progn
     pres_lf = pres.leapfrog[lf2]
 
-    get_tendencies!(diagn_layer,diagn_surface,pres_lf,time,M)               # tendency of vor, div, pres
-    implicit_correction!(diagn_layer,progn_layer,diagn_surface,pres,M)      # dampen gravity waves
+    dynamics_tendencies!(diagn_layer,diagn_surface,pres_lf,time,M)      # tendency of vor, div, pres
+    implicit_correction!(diagn_layer,progn_layer,diagn_surface,pres,M)  # dampen gravity waves
     horizontal_diffusion!(progn_layer,diagn_layer,M)    # diffusion for vorticity and divergence
     leapfrog!(progn_layer,diagn_layer,dt,lf1,M)         # leapfrog vorticity forward
     gridded!(diagn_layer,progn_layer,lf2,M)             # propagate spectral state to grid
@@ -194,7 +194,8 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
 
-    get_tendencies!(diagn,progn,time,model,lf2)
+    parameterization_tendencies!(diagn,time,model)
+    dynamics_tendencies!(diagn,progn,model,lf2)
     implicit_correction!(diagn,progn,model)
 
     # LOOP OVER ALL LAYERS for diffusion, leapfrog time integration

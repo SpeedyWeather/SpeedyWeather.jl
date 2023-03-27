@@ -1,23 +1,24 @@
 """
-    get_tendencies!(diagn,model)
+    dynamics_tendencies!(diagn,model)
 
 Calculate all tendencies for the BarotropicModel."""
-function get_tendencies!(   diagn::DiagnosticVariablesLayer,
-                            model::BarotropicModel)
+function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
+                                model::BarotropicModel)
     
     # only (absolute) vorticity advection for the barotropic model
     vorticity_flux_divcurl!(diagn,model,curl=false)         # = -∇⋅(u(ζ+f),v(ζ+f))
 end
 
 """
-    get_tendencies!(diagn,surface,pres,time,model)
+    dynamics_tendencies!(diagn,surface,pres,time,model)
 
 Calculate all tendencies for the ShallowWaterModel."""
-function get_tendencies!(   diagn::DiagnosticVariablesLayer,
-                            surface::SurfaceVariables,
-                            pres::LowerTriangularMatrix,    # spectral pressure/η for geopotential
-                            time::DateTime,                 # time to evaluate the tendencies at
-                            model::ShallowWaterModel)       # struct containing all constants
+function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
+                                surface::SurfaceVariables,
+                                pres::LowerTriangularMatrix,    # spectral pressure/η for geopotential
+                                time::DateTime,                 # time to evaluate the tendencies at
+                                model::ShallowWaterModel)       # struct containing all constants
+
     S,C = model.spectral_transform, model.constants
 
     # for compatibility with other ModelSetups pressure pres = interface displacement η here
@@ -33,23 +34,17 @@ function get_tendencies!(   diagn::DiagnosticVariablesLayer,
 end
 
 """
-    get_tendencies!(diagn,surface,pres,time,model)
+    dynamics_tendencies!(diagn,surface,pres,time,model)
 
 Calculate all tendencies for the primitive equation model (wet or dry)."""
-function get_tendencies!(   diagn::DiagnosticVariables,
-                            progn::PrognosticVariables,
-                            time::DateTime,
-                            model::PrimitiveEquation,
-                            lf::Int=2               # leapfrog index for tendencies
-                            )
+function dynamics_tendencies!(  diagn::DiagnosticVariables,
+                                progn::PrognosticVariables,
+                                model::PrimitiveEquation,
+                                lf::Int=2)               # leapfrog index for tendencies
 
     B, G, S = model.boundaries, model.geometry, model.spectral_transform
     @unpack surface = diagn
 
-    # PARAMETERIZATIONS
-    # parameterization_tendencies!(diagn,time,model)
-
-    # DYNAMICS
     # for semi-implicit corrections (α >= 0.5) linear gravity-wave related tendencies are
     # evaluated at previous timestep i-1 (i.e. lf=1 leapfrog time step) 
     # nonlinear terms and parameterizations are always evaluated at lf

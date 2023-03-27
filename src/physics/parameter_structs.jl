@@ -58,3 +58,14 @@ Base.@kwdef struct RadiationCoefs{NF<:Real} <: Coefficients
     ablcl2::NF = 0.6    # Absorptivity of "thin" upper clouds in window and H2O bands
     ablcl1::NF = 12.0   # Absorptivity of "thick" clouds in window band (below cloud top)
 end    
+
+"""Concrete type that disables the boundary layer scheme."""
+struct NoBoundaryLayer <: BoundaryLayer end
+
+"""Following Held and Suarez, 1996 BAMS"""
+Base.@kwdef struct LinearDrag{NF<:Real} <: BoundaryLayer
+    σb::NF = 0.7            # sigma coordinate below which linear drag is applied
+    drag_time::NF = 24.0    # [hours] time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
+end
+
+LinearDrag(;kwargs...) = LinearDrag{Float64}(;kwargs...)

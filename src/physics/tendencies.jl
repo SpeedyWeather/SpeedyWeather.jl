@@ -1,6 +1,7 @@
 """
-    parametrization_tendencies!(diagn::DiagnosticVariables,
-                                M::PrimitiveEquation)
+    parameterization_tendencies!(   diagn::DiagnosticVariables,
+                                    time::DateTime,
+                                    M::PrimitiveEquation)
 
 Compute tendencies for u,v,temp,humid from physical parametrizations.
 Extract for each vertical atmospheric column the prognostic variables
@@ -8,27 +9,39 @@ Extract for each vertical atmospheric column the prognostic variables
 grid-points, compute all parametrizations on a single-column basis,
 then write the tendencies back into a horizontal field of tendencies.
 """
-function parametrization_tendencies!(   diagn::DiagnosticVariables{NF},
+function parameterization_tendencies!(  diagn::DiagnosticVariables{NF},
                                         time::DateTime,
                                         model::PrimitiveEquation
                                         ) where {NF}
     G = model.geometry
-    column = ColumnVariables{NF}(nlev = diagn.nlev)
+    boundary_layer_scheme = model.parameters.boundary_layer
 
-    for ij in eachgridpoint(diagn)      # loop over all horizontal grid points
+    # create one column variable per thread to avoid race conditions
+    nthreads = Threads.nthreads()
+    columns = [ColumnVariables{NF}(nlev = diagn.nlev) for _ in 1:nthreads]
+
+    @floop for ij in eachgridpoint(diagn)      # loop over all horizontal grid points
+
+        thread_id = Threads.threadid()  # not two threads should use the same ColumnVariable
+        column = columns[thread_id]
 
         reset_column!(column)           # set accumulators back to zero for next grid point
         get_column!(column,diagn,ij,G)  # extract an atmospheric column for contiguous memory access
 
+        # HELD-SUAREZ
+        # temperature_relaxation!(column,model)
+
+        boundary_layer!(column,boundary_layer_scheme,model)
+
         # Pre-compute thermodynamic quantities
-        get_thermodynamics!(column,model)
+        # get_thermodynamics!(column,model)
 
         # Calculate parametrizations (order of execution is important!)
-        convection!(column,model)
-        large_scale_condensation!(column,model)
+        # convection!(column,model)
+        # large_scale_condensation!(column,model)
         # clouds!(column, model)
-        shortwave_radiation!(column,model)
-        longwave_radiation!(column,model)
+        # shortwave_radiation!(column,model)
+        # longwave_radiation!(column,model)
         # surface_fluxes!(column,model)
         # vertical_diffusion!(column,M)
 
