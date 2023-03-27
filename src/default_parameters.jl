@@ -95,6 +95,9 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     # Radiation
     radiation_coefs::Coefficients = RadiationCoefs{NF}()
 
+    # BOUNDARY LAYER
+    boundary_layer::BoundaryLayer = LinearDrag{NF}()
+
     # TIME STEPPING
     startdate::DateTime = DateTime(2000,1,1)    # time at which the integration starts
     n_days::Float64 = 10                        # number of days to integrate for

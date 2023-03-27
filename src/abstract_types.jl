@@ -25,6 +25,9 @@ abstract type AbstractBoundaries{NF} end
 # ATMOSPHERIC COLUMN FOR PARAMETERIZATIONS
 abstract type AbstractColumnVariables{NF} end
 
+# PARAMETERIZATIONS
+abstract type BoundaryLayer end
+
 # INPUT/OUTPUT
 abstract type AbstractFeedback end
 abstract type AbstractOutput end
