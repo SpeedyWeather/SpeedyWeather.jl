@@ -109,9 +109,10 @@ using .SpeedyTransforms
 include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
 include("default_parameters.jl")        # defines Parameters
 
-# DEFINE CONSTANTS FIRST
+# SOME DEFINITIONS FIRST
 include("dynamics/constants.jl")                # defines DynamicsConstants
 include("physics/constants.jl")                 # defines ParameterizationConstants
+include("physics/define_column.jl")             # define ColumnVariables
 
 # DYNAMICS
 include("dynamics/geometry.jl")                 # defines Geometry
@@ -133,7 +134,7 @@ include("dynamics/time_integration.jl")
 
 # PHYSICS
 include("physics/parameter_structs.jl")         # defines MagnusCoefs, RadiationCoefs
-include("physics/column_variables.jl")          # defines ColumnVariables
+include("physics/column_variables.jl")
 include("physics/thermodynamics.jl")
 include("physics/tendencies.jl")
 include("physics/convection.jl")

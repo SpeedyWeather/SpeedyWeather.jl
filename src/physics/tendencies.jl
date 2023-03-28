@@ -16,17 +16,13 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables{NF},
     G = model.geometry
     boundary_layer_scheme = model.parameters.boundary_layer
 
-    # create one column variable per thread to avoid race conditions
-    nthreads = Threads.nthreads()
-    columns = [ColumnVariables{NF}(nlev = diagn.nlev) for _ in 1:nthreads]
-
     @floop for ij in eachgridpoint(diagn)      # loop over all horizontal grid points
 
         thread_id = Threads.threadid()  # not two threads should use the same ColumnVariable
-        column = columns[thread_id]
+        column = diagn.columns[thread_id]
 
         reset_column!(column)           # set accumulators back to zero for next grid point
-        get_column!(column,diagn,ij,G)  # extract an atmospheric column for contiguous memory access
+        get_column!(column,diagn,ij,G)  # extract column for contiguous memory access
 
         # HELD-SUAREZ
         # temperature_relaxation!(column,model)
