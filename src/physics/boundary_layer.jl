@@ -22,7 +22,7 @@ function boundary_layer!(   column::ColumnVariables,
     @inbounds for k in eachlayer(column)
         kᵥ = drag_coefs[k]
         if kᵥ > 0
-            u_tend[k] -= kᵥ*u[k]
+            u_tend[k] -= kᵥ*u[k]    # Held and Suarez 1996, equation 1
             v_tend[k] -= kᵥ*v[k]
         end
     end

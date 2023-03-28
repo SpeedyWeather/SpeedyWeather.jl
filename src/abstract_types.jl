@@ -7,7 +7,7 @@ abstract type PrimitiveDryCore <: PrimitiveEquation end
 abstract type PrimitiveWetCore <: PrimitiveEquation end
 
 # GEOMETRY
-abstract type AbstractGeometry end
+abstract type AbstractGeometry{NF} end
 
 # PARAMETERS (to be chosen by user)
 abstract type AbstractParameters{M} end
@@ -30,6 +30,7 @@ abstract type AbstractColumnVariables{NF} end
 
 # PARAMETERIZATIONS
 abstract type BoundaryLayer end
+abstract type TemperatureRelaxation end
 
 # INPUT/OUTPUT
 abstract type AbstractFeedback end

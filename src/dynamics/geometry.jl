@@ -4,7 +4,7 @@
 Geometry struct containing parameters and arrays describing an iso-latitude grid <:AbstractGrid
 and the vertical levels. NF is the number format used for the precomputed constants.
 """
-struct Geometry{NF<:AbstractFloat} <: AbstractGeometry     # NF: Number format
+struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF: Number format
 
     # GRID TYPE AND RESOLUTION
     Grid::Type{<:AbstractGrid}

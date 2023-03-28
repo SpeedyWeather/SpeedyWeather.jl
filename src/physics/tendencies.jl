@@ -15,6 +15,7 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables{NF},
                                         ) where {NF}
     G = model.geometry
     boundary_layer_scheme = model.parameters.boundary_layer
+    temperature_relax_scheme = model.parameters.temperature_relaxation
 
     @floop for ij in eachgridpoint(diagn)      # loop over all horizontal grid points
 
@@ -25,8 +26,7 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables{NF},
         get_column!(column,diagn,ij,G)  # extract column for contiguous memory access
 
         # HELD-SUAREZ
-        # temperature_relaxation!(column,model)
-
+        temperature_relaxation!(column,temperature_relax_scheme,model)
         boundary_layer!(column,boundary_layer_scheme,model)
 
         # Pre-compute thermodynamic quantities

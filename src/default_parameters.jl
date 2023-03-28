@@ -100,6 +100,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # BOUNDARY LAYER
     boundary_layer::BoundaryLayer = LinearDrag{NF}()
+    temperature_relaxation::TemperatureRelaxation = HeldSuarez{NF}()
 
     # TIME STEPPING
     startdate::DateTime = DateTime(2000,1,1)    # time at which the integration starts
