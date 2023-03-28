@@ -93,3 +93,13 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
         bernoulli_potential!(layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
     end
 end
+
+function zero_tendencies!(diagn::DiagnosticVariables)
+    for layer in diagn.layers
+        fill!(layer.tendencies.u_tend_grid,0)
+        fill!(layer.tendencies.v_tend_grid,0)
+        fill!(layer.tendencies.temp_tend_grid,0)
+        fill!(layer.tendencies.humid_tend_grid,0)
+    end
+    fill!(diagn.surface.pres_tend_grid,0)
+end
