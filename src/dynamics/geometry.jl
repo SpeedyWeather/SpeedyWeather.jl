@@ -43,13 +43,11 @@ struct Geometry{NF<:AbstractFloat}      # NF: Number format
     σ_levels_half::Vector{NF}       # σ at half levels
     σ_levels_full::Vector{NF}       # σ at full levels
     σ_levels_thick::Vector{NF}      # σ level thicknesses
-    σ_f::Vector{NF}                 # akap/(2σ_levels_thick)   #TODO rename?
-    σ_lnp_A::Vector{NF}
-    σ_lnp_B::Vector{NF}
+    σ_lnp_A::Vector{NF}             # σ-related factors needed for adiabatic terms 1st
+    σ_lnp_B::Vector{NF}             # and 2nd
 
     # VERTICAL REFERENCE TEMPERATURE PROFILE
     temp_ref_profile::Vector{NF}
-    # temp_ref_profile_σ::Vector{NF}
 
     # GEOPOTENTIAL INTEGRATION (on half/full levels)
     Δp_geopot_half::Vector{NF}      # = R*(ln(p_k+1) - ln(p_k+1/2)), for half level geopotential
@@ -72,7 +70,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     @unpack R_dry, cₚ = P                           # gas constant for dry air, heat capacity
     @unpack σ_tropopause = P                        # number of vertical levels used for stratosphere
     @unpack temp_ref, temp_top, lapse_rate, gravity = P       # for reference atmosphere
-    @unpack ΔT = P.zonal_wind_coefs                 # used for stratospheric temperature increase
+    @unpack ΔT_stratosphere = P                     # used for stratospheric temperature increase
 
     # RESOLUTION PARAMETERS
     nlat_half = get_nlat_half(Grid,trunc)           # resolution parameter nlat_half
@@ -104,11 +102,9 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     # VERTICAL SIGMA COORDINATE
     # σ = p/p0 (fraction of surface pressure)
     # sorted such that σ_levels_half[end] is at the planetary boundary
-    κ = R_dry/cₚ
     σ_levels_half = vertical_coordinates(P)
     σ_levels_full = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])
     σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
-    σ_f = κ ./ (2σ_levels_full)
 
     # ADIABATIC TERM, Simmons and Burridge, 1981, eq. 3.12
     # precompute ln(σ_k+1/2) - ln(σ_k-1/2) but swap sign, include 1/Δσₖ
@@ -129,8 +125,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     # for stratosphere (σ < σ_tropopause) increase temperature (Jablonowski & Williamson. 2006, eq. 5)
     RΓg⁻¹ = R_dry*lapse_rate/(1000*gravity)     # convert lapse rate from [K/km] to [K/m]
     temp_ref_profile = [temp_ref*σ^RΓg⁻¹ for σ in σ_levels_full]
-    # temp_ref_profile[σ_levels_full .< σ_tropopause] .= temp_top
-    temp_ref_profile .+= [σ < σ_tropopause ? ΔT*(σ_tropopause-σ)^5 : 0 for σ in σ_levels_full]
+    temp_ref_profile .+= [σ < σ_tropopause ? ΔT_stratosphere*(σ_tropopause-σ)^5 : 0 for σ in σ_levels_full]
 
     # GEOPOTENTIAL, coefficients to calculate geopotential
     Δp_geopot_half, Δp_geopot_full = initialize_geopotential(σ_levels_full,σ_levels_half,R_dry)
@@ -155,11 +150,10 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
                     latd,lond,londs,latds,
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,
-                    σ_levels_half,σ_levels_full,σ_levels_thick,σ_f,
+                    σ_levels_half,σ_levels_full,σ_levels_thick,
                     σ_lnp_A,σ_lnp_B,
                     temp_ref_profile,
                     Δp_geopot_half,Δp_geopot_full,lapserate_corr,entrainment_profile)
-                    # tref,rgas,fsgr,tref3)
 end
 
 # use Grid in Parameters if not provided

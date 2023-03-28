@@ -55,7 +55,8 @@ export  LowerTriangularMatrix,
         OctaHEALPixGrid
 
 # EXPORT OROGRAPHIES
-export  NoOrography,
+export  Orography,
+        NoOrography,
         EarthOrography,
         ZonalRidge
 
@@ -63,9 +64,7 @@ export  NoOrography,
 export  StartFromFile,
         StartFromRest,
         ZonalJet,
-        ZonalJetCoefs,
         ZonalWind,
-        ZonalWindCoefs,
         StartWithVorticity
 
 # EXPORT BOUNDARY LAYER SCHEMES

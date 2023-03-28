@@ -1,24 +1,29 @@
-# gridded field (orography) and spectral field (surface geopotential) for Earth's orography
-struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF}
+"""Concrete struct that holds orography in grid-point space and surface geopotential in
+spectral space."""
+struct Orography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     orography::Grid                                 # height [m]
     geopot_surf::LowerTriangularMatrix{Complex{NF}} # surface geopotential, height*gravity [m²/s²]
 end
 
-abstract type ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF} end
-ZonalRidge(orography,geopot_surf) = EarthOrography(orography,geopot_surf)
+"""Zonal ridge orography after Jablonowski and Williamson 2006."""
+Base.@kwdef struct ZonalRidge <: AbstractOrography
+    η₀ = 0.252      # conversion from σ to Jablonowski's ηᵥ-coordinates
+    u₀ = 35         # max amplitude of zonal wind [m/s] that scales orography height
+end
 
-abstract type NoOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF} end
-NoOrography(orography,geopot_surf) = EarthOrography(orography,geopot_surf)
+# empty structs (no parameters needed) for other orographies
+struct EarthOrography <: AbstractOrography end
+struct NoOrography <: AbstractOrography end
 
-function Base.zeros(O::Type{<:AbstractOrography},S::SpectralTransform{NF}) where NF
+function Base.zeros(::Type{Orography},S::SpectralTransform{NF}) where NF
     @unpack Grid, nlat_half, lmax, mmax = S
     orography   = zeros(Grid{NF},nlat_half)
     geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    return O(orography,geopot_surf)
+    return Orography(orography,geopot_surf)
 end
 
 struct Boundaries{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractBoundaries{NF}
-    orography::AbstractOrography{NF}
+    orography::Orography{NF,Grid}
     # landsea_mask::AbstractLandSeaMask{NF}
     # albedo::AbstractAlbedo{NF}
 end
@@ -27,7 +32,7 @@ function Boundaries(P::Parameters,
                     S::SpectralTransform{NF},
                     G::Geometry{NF}) where NF
 
-    orography = zeros(P.orography,S)                    # allocate orography arrays
+    orography = zeros(Orography,S)                      # allocate orography arrays
     initialize_orography!(orography,P.orography,P,S,G)  # fill them with data
     scale_orography!(orography,P)                       # make whatever mountains bigger/smaller
     return Boundaries{NF,S.Grid{NF}}(orography)
@@ -37,26 +42,27 @@ end
 Boundaries(P::Parameters,S::SpectralTransform) = Boundaries(P,S,Geometry(P))
 Boundaries(P::Parameters) = Boundaries(P,SpectralTransform(P))
 
-function initialize_orography!( ::AbstractOrography,
-                                ::Type{<:NoOrography},
+function initialize_orography!( ::Orography,
+                                ::NoOrography,
                                 ::Parameters{<:ModelSetup},
                                 args...)
     return nothing
 end
 
-function initialize_orography!( ::AbstractOrography,
-                                ::Type{<:AbstractOrography},
+function initialize_orography!( ::Orography,
+                                ::AbstractOrography,
                                 ::Parameters{<:Barotropic},
                                 args...)
     return nothing
 end
 
-function initialize_orography!( orog::AbstractOrography,
-                                ::Type{<:EarthOrography},
+function initialize_orography!( orog::Orography,
+                                ::EarthOrography,
                                 P::Parameters{M},
                                 S::SpectralTransform,
                                 G::Geometry) where {M<:Union{ShallowWater,PrimitiveEquation}}
 
+    @unpack orography, geopot_surf = orog
     @unpack orography_path, orography_file, gravity = P
     @unpack lmax, mmax = S
 
@@ -76,15 +82,14 @@ function initialize_orography!( orog::AbstractOrography,
     Grid = FullGaussianGrid     # grid the orography file comes with
     orography_spec = spectral(orography_highres;Grid,recompute_legendre)
     
-    @unpack orography, geopot_surf = orog
     copyto!(geopot_surf,orography_spec)     # truncates to the size of geopot_surf, no *gravity yet
     gridded!(orography,geopot_surf,S)       # to grid-point space
     geopot_surf .*= gravity                 # turn orography into surface geopotential
-    spectral_truncation!(geopot_surf,lmax,mmax) # set the lmax+1 harmonics to zero
+    spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
 end
 
-function initialize_orography!( orog::AbstractOrography,
-                                ::Type{<:ZonalRidge},
+function initialize_orography!( orog::Orography,
+                                coefs::ZonalRidge,
                                 P::Parameters{M},
                                 S::SpectralTransform,
                                 G::Geometry) where {M<:Union{ShallowWater,PrimitiveEquation}}
@@ -93,7 +98,7 @@ function initialize_orography!( orog::AbstractOrography,
     @unpack lmax, mmax = S
 
     @unpack orography, geopot_surf = orog
-    @unpack η₀, u₀ = P.zonal_wind_coefs
+    @unpack η₀, u₀ = coefs
 
     ηᵥ = (1-η₀)*π/2                     # ηᵥ-coordinate of the surface [1]
     A = u₀*cos(ηᵥ)^(3/2)                # amplitude [m/s]
@@ -111,10 +116,10 @@ function initialize_orography!( orog::AbstractOrography,
 
     spectral!(geopot_surf,orography,S)      # to grid-point space
     geopot_surf .*= gravity                 # turn orography into surface geopotential
-    spectral_truncation!(geopot_surf,lmax,mmax) # set the lmax+1 harmonics to zero
+    spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
 end
 
-function scale_orography!(  orog::AbstractOrography,
+function scale_orography!(  orog::Orography,
                             P::Parameters)
 
     @unpack orography, geopot_surf = orog

@@ -19,7 +19,7 @@ abstract type AbstractDynamicsConstants{NF} end
 
 # INITIAL CONDITIONS AND OROGRAPHY/BOUNDARIES
 abstract type InitialConditions end         # subtypes defined in initial_conditions.jl
-abstract type AbstractOrography{NF} end     # subtypes defined in boundaries.jl
+abstract type AbstractOrography end         # subtypes defined in boundaries.jl
 abstract type AbstractBoundaries{NF} end
 
 # ATMOSPHERIC COLUMN FOR PARAMETERIZATIONS
