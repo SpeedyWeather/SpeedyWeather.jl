@@ -57,11 +57,11 @@ function initialize_speedy( ::Type{NF}=DEFAULT_NF,          # default number for
         M = ShallowWaterModel(P,C,G,S,B,H,I,D)
     elseif ConcreteModel <: PrimitiveDryCore        # no humidity 
         I = Implicit(P)
-        K = ParameterizationConstants(P)
+        K = ParameterizationConstants(P,G)
         M = PrimitiveDryCoreModel(P,C,K,G,S,B,H,I,D)
     elseif ConcreteModel <: PrimitiveWetCore        # with humidity
         I = Implicit(P)
-        K = ParameterizationConstants(P)
+        K = ParameterizationConstants(P,G)
         M = PrimitiveWetCoreModel(P,C,K,G,S,B,H,I,D)
     end
 
