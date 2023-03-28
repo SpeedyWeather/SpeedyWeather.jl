@@ -6,6 +6,9 @@ abstract type PrimitiveEquation <: ModelSetup end
 abstract type PrimitiveDryCore <: PrimitiveEquation end
 abstract type PrimitiveWetCore <: PrimitiveEquation end
 
+# GEOMETRY
+abstract type AbstractGeometry end
+
 # PARAMETERS (to be chosen by user)
 abstract type AbstractParameters{M} end
 
