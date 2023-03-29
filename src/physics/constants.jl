@@ -3,25 +3,37 @@ struct ParameterizationConstants{NF<:AbstractFloat} <: AbstractParameterizationC
     drag_coefs::Vector{NF}          # (inverse) drag time scale per layer
 
     # TEMPERATURE RELAXATION
-    temp_equilibrium::Matrix{NF}    # equilibrium temperature function of latitude and pressure
+    temp_relax_freq::Matrix{NF}     # (inverse) relaxation time scale per layer and latitude
+    temp_equil_a::Vector{NF}        # two terms to calculate equilibrium temperature as function
+    temp_equil_b::Vector{NF}        # of latitude and pressure
 
     # RADIATION
-    # fband::Matrix{NF}
+    fband::Matrix{NF}
 end
 
 function Base.zeros(::Type{ParameterizationConstants},G::AbstractGeometry{NF}) where NF
     (;nlev,nlat) = G
-    drag_coefs = zeros(NF,nlev)
-    temp_equilibrium = zeros(NF,nlev,nlat)
+    
+    drag_coefs = zeros(NF,nlev)     # coefficient for boundary layer drag
+    
+    temp_relax_freq = zeros(NF,nlev,nlat)   # (inverse) relaxation time scale per layer and latitude
+    temp_equil_a = zeros(NF,nlat)   # terms to calculate equilibrium temperature as function
+    temp_equil_b = zeros(NF,nlat)   # of latitude and pressure
+
+    fband = zeros(NF,400,nlat)
+
     return ParameterizationConstants{NF}(   drag_coefs,
-                                            temp_equilibrium,
+                                            temp_relax_freq,
+                                            temp_equil_a,
+                                            temp_equil_b,
+                                            fband,
                                         )
 end
 
 function ParameterizationConstants(P::Parameters,G::AbstractGeometry)
-    K = zeros(ParameterizationConstants,P,G)
-    initialise_boundary_layer!(K,P.boundary_layer,P,G)
-    initialise_temperature_relaxation!(K,P.temperature_relaxation,P,G)
-    # initialise_longwave_radiation!(K,P)
+    K = zeros(ParameterizationConstants,G)
+    initialize_boundary_layer!(K,P.boundary_layer,P,G)
+    initialize_temperature_relaxation!(K,P.temperature_relaxation,P,G)
+    # initialize_longwave_radiation!(K,P)
     return K
 end
