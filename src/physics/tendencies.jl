@@ -17,13 +17,16 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables{NF},
     boundary_layer_scheme = model.parameters.boundary_layer
     temperature_relax_scheme = model.parameters.temperature_relaxation
 
-    @floop for ij in eachgridpoint(diagn)      # loop over all horizontal grid points
+    rings = eachring(G.Grid,G.nlat_half)
 
-        thread_id = Threads.threadid()  # not two threads should use the same ColumnVariable
+    @floop for ij in eachgridpoint(diagn)   # loop over all horizontal grid points
+
+        thread_id = Threads.threadid()      # not two threads should use the same ColumnVariable
         column = diagn.columns[thread_id]
+        jring = whichring(ij,rings)         # ring index gridpoint ij is on
 
-        reset_column!(column)           # set accumulators back to zero for next grid point
-        get_column!(column,diagn,ij,G)  # extract column for contiguous memory access
+        reset_column!(column)                   # set accumulators back to zero for next grid point
+        get_column!(column,diagn,ij,jring,G)    # extract column for contiguous memory access
 
         # HELD-SUAREZ
         temperature_relaxation!(column,temperature_relax_scheme,model)

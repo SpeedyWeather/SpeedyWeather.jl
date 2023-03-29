@@ -1,11 +1,11 @@
 """
-    function initialise_longwave_radiation!(
+    function initialize_longwave_radiation!(
         P::Parameters
     )
 
 Initialise variables and parameters used by the longwave radiation parametrization 
 """
-function initialise_longwave_radiation!(K::ParameterizationConstants,
+function initialize_longwave_radiation!(K::ParameterizationConstants,
                                         P::Parameters) 
     radset!(K,P)
 end

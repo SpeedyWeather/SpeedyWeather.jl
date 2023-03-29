@@ -8,11 +8,12 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
 Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnVariables{NF}
 
     # COORDINATES
-    nlev::Int = 0                        # number of vertical levels
-    lond::NF = NaN                       # longitude
-    latd::NF = NaN                       # latitude, needed for shortwave radiation
-    nband::Int = 0                       # number of radiation bands, needed for radiation
-    n_stratosphere_levels::Int = 0       # number of stratospheric levels, needed for radiation
+    nlev::Int = 0                       # number of vertical levels
+    jring::Int = 0                      # latitude ring the column is on
+    lond::NF = NaN                      # longitude
+    latd::NF = NaN                      # latitude, needed for shortwave radiation
+    nband::Int = 0                      # number of radiation bands, needed for radiation
+    n_stratosphere_levels::Int = 0      # number of stratospheric levels, needed for radiation
 
     # PROGNOSTIC VARIABLES
     u::Vector{NF} = zeros(NF,nlev)      # zonal velocity
@@ -20,9 +21,9 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     temp::Vector{NF} = zeros(NF,nlev)   # temperature
     humid::Vector{NF} = zeros(NF,nlev)  # specific humidity
 
-    # surface layer prognostic variables
-    log_pres::NF = 0                    # logarithm of surface pressure [log(hPa)]
-    pres::NF = 0                        # surface pressure [hPa]
+    # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
+    ln_pres::Vector{NF} = zeros(NF,nlev+1)  # logarithm of pressure [log(hPa)]
+    pres::Vector{NF} = zeros(NF,nlev+1)     # pressure [hPa]
 
     # TENDENCIES to accumulate the parametrizations into
     u_tend::Vector{NF} = zeros(NF,nlev)
