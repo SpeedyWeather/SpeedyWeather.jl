@@ -33,6 +33,17 @@ function get_column!(   C::ColumnVariables,
     end
 end
 
+"""Recalculate ring index if not provided."""
+function get_column!(   C::ColumnVariables,
+                        D::DiagnosticVariables,
+                        ij::Int,            # grid point index
+                        G::Geometry)
+
+    rings = eachring(G.Grid,G.nlat_half)
+    jring = whichring(ij,rings)
+    get_column!(C,D,ij,jring,G)
+end
+
 """
     write_column_tendencies!(D,C,ij,G)
 
