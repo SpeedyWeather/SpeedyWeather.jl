@@ -6,18 +6,25 @@ at gridpoint index `ij`. Provide `G::Geometry` for coordinate information."""
 function get_column!(   C::ColumnVariables,
                         D::DiagnosticVariables,
                         ij::Int,            # grid point index
+                        jring::Int,         # ring index 1 around North Pole to J around South Pole
                         G::Geometry)
+
+    (;σ_levels_full,ln_σ_levels_full) = G
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
     C.latd = G.latds[ij]        # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
     C.lond = G.londs[ij]
+    C.jring = jring             # ring index j of column, used to index latitude vectors
 
-    # surface pressure (logarithm used in dynamics, convert back here)
-    C.log_pres = D.surface.pres_grid[ij]
-    C.pres = exp(C.log_pres)
+    # pressure 
+    lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics
+    pₛ = exp(lnpₛ)                          # convert back here
+    C.ln_pres .= ln_σ_levels_full .+ lnpₛ   # log pressure on every level ln(p) = ln(σ) + ln(pₛ)
+    C.pres[1:end-1] .= σ_levels_full*pₛ     # pressure on every level p = σ*pₛ
+    C.pres[end] = pₛ                        # last element is surface pressure pₛ
 
-    @inbounds for (k,layer) = enumerate(D.layers)
+    @inbounds for (k,layer) = enumerate(D.layers)   # read out prognostic variables on grid
         C.u[k] = layer.grid_variables.u_grid[ij]
         C.v[k] = layer.grid_variables.v_grid[ij]
         C.temp[k] = layer.grid_variables.temp_grid[ij]
