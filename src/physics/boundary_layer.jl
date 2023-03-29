@@ -6,7 +6,7 @@ function boundary_layer!(   column::ColumnVariables,
 end
 
 """NoBoundaryLayer scheme does not need any initialisation."""
-function initialise_boundary_layer!(K::ParameterizationConstants,
+function initialize_boundary_layer!(K::ParameterizationConstants,
                                     scheme::NoBoundaryLayer,
                                     P::Parameters,
                                     G::Geometry)
@@ -28,12 +28,12 @@ function boundary_layer!(   column::ColumnVariables,
     end
 end
 
-function initialise_boundary_layer!(K::ParameterizationConstants,
+function initialize_boundary_layer!(K::ParameterizationConstants,
                                     scheme::LinearDrag,
                                     P::Parameters,
                                     G::Geometry)
 
-    (;σ_levels_full,radius_earth,nlev) = G
+    (;σ_levels_full,radius_earth) = G
     (;σb,drag_time) = scheme
     (;drag_coefs) = K
 

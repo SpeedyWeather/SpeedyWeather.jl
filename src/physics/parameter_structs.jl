@@ -73,11 +73,10 @@ LinearDrag(;kwargs...) = LinearDrag{Float64}(;kwargs...)
 struct NoTemperatureRelaxation <: TemperatureRelaxation end
 
 Base.@kwdef struct HeldSuarez{NF<:Real} <: TemperatureRelaxation
-
     σb::NF = 0.7                    # sigma coordinate below which linear drag is applied
 
-    relax_time_long::NF = 40*24     # [hours] time scale for slow global relaxation
-    relax_time_short::NF = 4*24     # [hours] time scale for faster tropical surface relaxation
+    relax_time_slow::NF = 40*24     # [hours] time scale for slow global relaxation
+    relax_time_fast::NF = 4*24      # [hours] time scale for faster tropical surface relaxation
 
     Tmin::NF = 200      # minimum temperature [K] in equilibrium temperature
     Tmax::NF = 315      # maximum temperature [K] in equilibrium temperature
