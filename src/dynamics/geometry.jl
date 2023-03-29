@@ -43,6 +43,8 @@ struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF: Number form
     σ_levels_half::Vector{NF}       # σ at half levels
     σ_levels_full::Vector{NF}       # σ at full levels
     σ_levels_thick::Vector{NF}      # σ level thicknesses
+    ln_σ_levels_full::Vector{NF}    # log of σ at full levels
+
     σ_lnp_A::Vector{NF}             # σ-related factors needed for adiabatic terms 1st
     σ_lnp_B::Vector{NF}             # and 2nd
 
@@ -69,13 +71,13 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     @unpack radius_earth, rotation_earth = P        # radius of earth, angular frequency
     @unpack R_dry, cₚ = P                           # gas constant for dry air, heat capacity
     @unpack σ_tropopause = P                        # number of vertical levels used for stratosphere
-    @unpack temp_ref, temp_top, lapse_rate, gravity = P       # for reference atmosphere
+    @unpack temp_ref, temp_top, lapse_rate, gravity = P   # for reference atmosphere
     @unpack ΔT_stratosphere = P                     # used for stratospheric temperature increase
 
     # RESOLUTION PARAMETERS
     nlat_half = get_nlat_half(Grid,trunc)           # resolution parameter nlat_half
-                                                    # = number of latitude rings on one hemisphere (Equator incl)
-    nlat = get_nlat(Grid,nlat_half)                 # 2nlat_half but one less if grids have odd # of lat rings
+                                                    # = number of lat rings on one hemisphere (Equator incl)
+    nlat = get_nlat(Grid,nlat_half)                 # 2nlat_half but -1 if grids have odd # of lat rings
     nlon_max = get_nlon_max(Grid,nlat_half)         # number of longitudes around the equator
     nlon = nlon_max                                 # same (used for compatibility)
     npoints = get_npoints(Grid,nlat_half)           # total number of grid points
@@ -105,6 +107,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     σ_levels_half = vertical_coordinates(P)
     σ_levels_full = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])
     σ_levels_thick = σ_levels_half[2:end] - σ_levels_half[1:end-1]
+    ln_σ_levels_full = log.(vcat(σ_levels_full,1))              # include surface (σ=1) as last element
 
     # ADIABATIC TERM, Simmons and Burridge, 1981, eq. 3.12
     # precompute ln(σ_k+1/2) - ln(σ_k-1/2) but swap sign, include 1/Δσₖ
@@ -112,7 +115,8 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     σ_lnp_A[1] = 0  # the corresponding sum is 1:k-1 so 0 to replace log(0) from above
     
     # precompute the αₖ = 1 - p_k-1/2/Δpₖ*log(p_k+1/2/p_k-1/2) term in σ coordinates
-    σ_lnp_B = 1 .- σ_levels_half[1:end-1]./σ_levels_thick .* log.(σ_levels_half[2:end]./σ_levels_half[1:end-1])
+    σ_lnp_B = 1 .- σ_levels_half[1:end-1]./σ_levels_thick .*
+                    log.(σ_levels_half[2:end]./σ_levels_half[1:end-1])
     σ_lnp_B[1] = σ_levels_half[1] <= 0 ? log(2) : σ_lnp_B[1]    # set α₁ = log(2), eq. 3.19
     σ_lnp_B .*= -1  # absorb sign from -1/Δσₖ only, eq. 3.12
 
@@ -150,7 +154,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
                     latd,lond,londs,latds,
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,
-                    σ_levels_half,σ_levels_full,σ_levels_thick,
+                    σ_levels_half,σ_levels_full,σ_levels_thick,ln_σ_levels_full,
                     σ_lnp_A,σ_lnp_B,
                     temp_ref_profile,
                     Δp_geopot_half,Δp_geopot_full,lapserate_corr,entrainment_profile)
