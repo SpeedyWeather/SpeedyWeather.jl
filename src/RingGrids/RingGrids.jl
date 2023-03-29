@@ -36,6 +36,7 @@ module RingGrids
             each_index_in_ring!,
             eachgridpoint,
             eachring,
+            whichring,
             get_nlons,
             get_nlon_max,
             get_quadrature_weights,
