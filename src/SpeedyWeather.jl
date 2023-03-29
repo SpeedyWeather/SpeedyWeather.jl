@@ -67,6 +67,11 @@ export  StartFromFile,
         ZonalWind,
         StartWithVorticity
 
+# EXPORT TEMPERATURE RELAXATION SCHEMES
+export  TemperatureRelaxation,
+        NoTemperatureRelaxation,
+        HeldSuarez
+
 # EXPORT BOUNDARY LAYER SCHEMES
 export  BoundaryLayer,
         NoBoundaryLayer,
@@ -142,6 +147,7 @@ include("physics/large_scale_condensation.jl")
 include("physics/longwave_radiation.jl")
 include("physics/shortwave_radiation.jl")
 include("physics/boundary_layer.jl")
+include("physics/temperature_relaxation.jl")
 
 # OUTPUT
 include("output/output.jl")                     # defines Output
