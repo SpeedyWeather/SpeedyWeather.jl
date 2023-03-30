@@ -85,6 +85,9 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
         vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
                                                     # add the RTₖlnpₛ term to geopotential
         linear_pressure_gradient!(layer,progn,model,lf_implicit)
+    end                                             # wait all because vertical_velocity! needs to
+                                                    # finish before vertical_advection!
+    @floop for layer in diagn.layers
         vertical_advection!(layer,diagn,model)      # use σ̇ for the vertical advection of u,v,T,q
 
         vordiv_tendencies!(layer,surface,model)     # vorticity advection, pressure gradient term
