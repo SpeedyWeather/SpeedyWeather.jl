@@ -10,10 +10,9 @@ with an everything-flexible attitude as long as it is speedy. With minimal code 
 - different physical models (barotropic vorticity, shallow water, primitive equations dry core; wet core in development)
 - different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
 - different horizontal resolutions (T31 to T1023 and higher, i.e. 400km to 10km using linear, quadratic or cubic truncation)
+- multi-threading, layer-wise for dynamics, grid point-wise for physics (multi-processing in development)
 
-and Julia will compile to these choices just-in-time. Parallelisation is designed (but not fully implemented yet)
-towards efficiency within a compute node and at rather low resolutions: The dynamical core layer-by-layer in the vertical
-and the physical parameterizations gridpoint-by-gridpoint in the horizontal.
+and Julia will compile to these choices just-in-time.
 
 For an overview of the functionality and explanation see the (always somehow incomplete)
 [documentation](https://speedyweather.github.io/SpeedyWeather.jl/dev).
@@ -44,9 +43,10 @@ the shallow water equations. The arguments for `run_speedy` are described in
 
 SpeedyWeather.jl is a reinvention of the atmospheric general circulation model
 [SPEEDY](http://users.ictp.it/~kucharsk/speedy-net.html) in Julia. While conceptually the same model,
-it is entirely restructured, features have been added, changed and removed, such that only the core
-algorithms share similarities. Speedy's dynamical core is originally written by Isaac Held
-at GFDL and the physical parametrizations by Fred Kucharski, Franco Molteni and Martin P. King in Fortran77.
+it is entirely restructured, features have been added, changed and removed, such that only the numerical
+schemes share similarities. Speedy's dynamical core has an obscure history: Large parts were written by Isaac Held
+at GFDL in/before the 90ies with an unknown amount of contributions/modifications from Steve Jewson (Oxford) in the 90ies.
+The physical parametrizations were then added by Franco Molteni, Fred Kucharski, and Martin P. King in Fortran77.
 Speedy was then translated to Fortran90 by Sam Hatfield in [speedy.f90](https://github.com/samhatfield/speedy.f90).
 SpeedyWeather.jl is then adopted from [first translations to Julia](https://github.com/samhatfield/speedy.jl) by Sam Hatfield.
 

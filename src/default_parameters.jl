@@ -125,7 +125,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     orography_file::String = "orography_F512.nc"
 
     # INITIAL CONDITIONS
-    seed::Int = abs(rand(Int))          # random seed for the global random number generator
+    seed::Int = 123456789           # random seed for the global random number generator
     initial_conditions::InitialConditions = initial_conditions_default(Model)
     pressure_on_orography::Bool = false # calculate the initial surface pressure from orography
 
