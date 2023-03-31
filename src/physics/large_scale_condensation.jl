@@ -39,8 +39,9 @@ function large_scale_condensation!( column::ColumnVariables{NF},
     end
 
     # 2. Precipitation due to large-scale condensation
+    pₛ = pres[end]                                                          # surface pressure
     for k in eachlayer(column)[n_stratosphere_levels:end]                   # top to bottom, skip stratosphere
-        Δpₖ = pres*σ_levels_thick[k]                                        # Formula 4  # Correct index?
+        Δpₖ = pₛ*σ_levels_thick[k]                                          # Formula 4  # Correct index?
         column.precip_large_scale += -1 / gravity * Δpₖ * humid_tend[k]     # Formula 25
     end
 end
