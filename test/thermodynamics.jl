@@ -84,36 +84,34 @@ end
     end
 end
 
-@testset "Thermodynamics" begin
-    @testset "Moist static energy" begin
-        @testset for NF in (Float32, Float64)
-            _, _, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation)
-            (; nlev) = model.geometry
-
-            column = ColumnVariables{NF}(; nlev)
-            column.dry_static_energy .= rand(NF, nlev)
-            column.humid .= 0 .+ 50 * rand(NF, nlev)         # Typical values between 0-50 g/kg
-
-            SpeedyWeather.moist_static_energy!(column, model)
-
-            @test all(isfinite.(column.moist_static_energy))
-            @test !any(iszero.(column.moist_static_energy))
-        end
+@testset "Moist static energy" begin
+    @testset for NF in (Float32, Float64)
+        _, _, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation)
+        (; nlev) = model.geometry
+        
+        column = ColumnVariables{NF}(; nlev)
+        column.dry_static_energy .= rand(NF, nlev)
+        column.humid .= 0 .+ 50 * rand(NF, nlev)         # Typical values between 0-50 g/kg
+        
+        SpeedyWeather.moist_static_energy!(column, model)
+        
+        @test all(isfinite.(column.moist_static_energy))
+        @test !any(iszero.(column.moist_static_energy))
     end
+end
 
-    @testset "Saturation moist static energy" begin
-        @testset for NF in (Float32, Float64)
-            _, _, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation)
-            (; nlev) = model.geometry
-
-            column = ColumnVariables{NF}(; nlev)
-            column.dry_static_energy .= rand(NF, nlev)
-            column.sat_humid .= 0 .+ 50 * rand(NF, nlev)         # Typical values between 0-50 g/kg
-
-            SpeedyWeather.saturation_moist_static_energy!(column, model)
-
-            @test all(isfinite.(column.sat_moist_static_energy))
-            @test !any(iszero.(column.sat_moist_static_energy))
-        end
+@testset "Saturation moist static energy" begin
+    @testset for NF in (Float32, Float64)
+        _, _, model = SpeedyWeather.initialize_speedy(NF, PrimitiveEquation)
+        (; nlev) = model.geometry
+        
+        column = ColumnVariables{NF}(; nlev)
+        column.dry_static_energy .= rand(NF, nlev)
+        column.sat_humid .= 0 .+ 50 * rand(NF, nlev)         # Typical values between 0-50 g/kg
+        
+        SpeedyWeather.saturation_moist_static_energy!(column, model)
+        
+        @test all(isfinite.(column.sat_moist_static_energy))
+        @test !any(iszero.(column.sat_moist_static_energy))
     end
 end
