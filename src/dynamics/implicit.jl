@@ -251,7 +251,13 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
         geopot = diagn.layers[k].dynamics_variables.b   # used for geopotential
         (;div_tend) = diagn.layers[k].tendencies        # unpack div_tend
 
-        # 1. the ξRG_T term, vertical integration of geopotential (excl ξ, this is done in 2.)
+        # 1. the ξ*R*G_T term, vertical integration of geopotential (excl ξ, this is done in 2.)
+        @inbounds for r in k:nlev                       # skip 1:k-1 as integration is surface to k
+            (;temp_tend) = diagn.layers[r].tendencies   # unpack temp_tend
+            @. geopot += R[k,r]*temp_tend
+        end
+
+        # alternative way to calculate the geopotential (not thread-safe because geopot from below is reused)
         # R is not used here as it's cheaper to reuse the geopotential from k+1 than
         # to multiply with the entire upper triangular matrix R which recalculates
         # the geopotential for k from all lower levels k...nlev
@@ -263,12 +269,6 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
         #     geopot_k1 = diagn.layers[k+1].dynamics_variables.b      # geopotential from layer below
         #     @. geopot = geopot_k1 + Δp_geopot_half[k+1]*temp_tend_k1 + Δp_geopot_full[k]*temp_tend
         # end
-
-        # # alternative way to calculate the geopotential
-        @inbounds for r in 1:nlev
-            (;temp_tend) = diagn.layers[r].tendencies   # unpack temp_tend
-            @. geopot += R[k,r]*temp_tend
-        end
 
         # 2. the G = G_D + ξRG_T + ξUG_lnps terms using geopot from above 
         lm = 0
