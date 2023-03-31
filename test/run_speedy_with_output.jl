@@ -29,7 +29,7 @@ end
     p1, d1, m1 = initialize_speedy(Float32, ShallowWater, output=true, output_path=tmp_output_path, run_id="restart-test")
     run_speedy!(p1, d1, m1)
  
-    p2, d2, m2 = initialize_speedy(Float32, ShallowWater, initial_conditions=StartFromFile, output_path=tmp_output_path, restart_id="restart-test")
+    p2, d2, m2 = initialize_speedy(Float32, ShallowWater, initial_conditions=StartFromFile(), output_path=tmp_output_path, restart_id="restart-test")
 
     for varname in propertynames(p1.layers[1].leapfrog[1])
         if SpeedyWeather.has(p1, varname)
