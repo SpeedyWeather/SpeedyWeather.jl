@@ -34,13 +34,13 @@ function diagnose_convection!(
     column::ColumnVariables{NF},
     model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
-    @unpack alhc = model.parameters
+    @unpack alhc,pres_ref = model.parameters
     @unpack pres_thresh_cnv, RH_thresh_pbl_cnv = model.constants
     @unpack nlev = column
     @unpack humid, pres, sat_humid, dry_static_energy, moist_static_energy,
     sat_moist_static_energy, sat_moist_static_energy_half = column
 
-    if pres > pres_thresh_cnv
+    if pres[end] > pres_thresh_cnv
         # First we pre-compute some values which we will need inside the loop
         # 1. Saturation (or super-saturated) moist static energy in the PBL
         sat_moist_static_energy_pbl =
@@ -132,10 +132,11 @@ function convection!(
     max_humid_pbl = max(NF(1.01) * humid[nlev], sat_humid[nlev])  # Maximum specific humidity in the PBL
 
     # Cloud-base mass flux
-    Δp = pres_ref * pres * σ_levels_thick[nlev]  # Pressure difference between bottom and top of PBL
+    pₛ = pres[end]                               # surface pressure
+    Δp = pres_ref * pₛ * σ_levels_thick[nlev]  # Pressure difference between bottom and top of PBL
     mass_flux =
         Δp / (gravity * 3600humid_relax_time_cnv) *
-        min(1, 2 * (pres - pres_thresh_cnv) / (1 - pres_thresh_cnv)) *
+        min(1, 2 * (pₛ - pres_thresh_cnv) / (1 - pres_thresh_cnv)) *
         min(5, excess_humidity / (max_humid_pbl - humid_top_of_pbl))
     column.cloud_base_mass_flux = mass_flux
 
@@ -158,7 +159,7 @@ function convection!(
         net_flux_humid[k] = flux_up_humid - flux_down_humid
 
         # Mass entrainment
-        mass_entrainment = entrainment_profile[k] * pres * cloud_base_mass_flux  # Why multiply by pres here?
+        mass_entrainment = entrainment_profile[k] * pₛ * cloud_base_mass_flux  # Why multiply by pres here?
         mass_flux += mass_entrainment
 
         # Upward fluxes at upper boundary

@@ -85,12 +85,12 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     humid_relax_time_lsc::Float64 = 4.0  # Relaxation time for humidity (hours)
 
     # Convection
-    pres_thresh_cnv::Float64 = 0.8             # Minimum (normalised) surface pressure for the occurrence of convection
-    RH_thresh_pbl_cnv::Float64 = 0.9           # Relative humidity threshold for convection in PBL
-    RH_thresh_trop_cnv::Float64 = 0.7          # Relative humidity threshold for convection in the troposphere
-    humid_relax_time_cnv::Float64 = 6.0        # Relaxation time for PBL humidity (hours)
-    max_entrainment::Float64 = 0.5             # Maximum entrainment as a fraction of cloud-base mass flux
-    ratio_secondary_mass_flux::Float64 = 0.8   # Ratio between secondary and primary mass flux at cloud-base
+    pres_thresh_cnv::Float64 = 0.8              # Minimum (normalised) surface pressure for the occurrence of convection
+    RH_thresh_pbl_cnv::Float64 = 0.9            # Relative humidity threshold for convection in PBL
+    RH_thresh_trop_cnv::Float64 = 0.7           # Relative humidity threshold for convection in the troposphere
+    humid_relax_time_cnv::Float64 = 6.0         # Relaxation time for PBL humidity (hours)
+    max_entrainment::Float64 = 0.5              # Maximum entrainment as a fraction of cloud-base mass flux
+    ratio_secondary_mass_flux::Float64 = 0.8    # Ratio between secondary and primary mass flux at cloud-base
 
     # Longwave radiation
     nband::Int = 4                          # Number of bands used to compute fband
