@@ -12,7 +12,7 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     jring::Int = 0                      # latitude ring the column is on
     lond::NF = NaN                      # longitude
     latd::NF = NaN                      # latitude, needed for shortwave radiation
-    nband::Int = 0                      # number of radiation bands, needed for radiation
+    nband::Int = 4                      # number of radiation bands, needed for radiation
     n_stratosphere_levels::Int = 0      # number of stratospheric levels, needed for radiation
 
     # PROGNOSTIC VARIABLES

@@ -112,7 +112,7 @@ end
 
         # 2. Compute sat_vap_pres and dry_static_energy
         # and set remainig varables for cloud
-        column.pres = 1. # nomalised
+        column.pres .= 1. # nomalised
         column.temp .= [208.40541, 219.8126 , 249.25502, 276.14264]
         column.humid .= [0., 0.03124937, 0.9748285, 6.7846994] # g/kg
         column.geopot .= [241932.19, 117422.14, 54618.79, 7626.5884]
@@ -131,7 +131,7 @@ end
         # Set variables for radsw
         # FIXME: pres is overloaded and will need to be
         # fixed in other functions
-        column.norm_pres = column.pres
+        column.norm_pres = column.pres[end]
         column.albsfc = 0.5
 
         SpeedyWeather.shortwave_radiation!(column, model)
