@@ -550,7 +550,9 @@ function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},
                                 ) where NF
     
     @unpack u_grid,v_grid = diagn.grid_variables
-    @unpack bernoulli, bernoulli_grid, geopot = diagn.dynamics_variables
+    @unpack geopot = diagn.dynamics_variables
+    bernoulli = diagn.dynamics_variables.a                  # reuse work arrays for bernoulli potential
+    bernoulli_grid = diagn.dynamics_variables.a_grid
     @unpack div_tend = diagn.tendencies
  
     half = convert(NF,0.5)
@@ -655,7 +657,8 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
                                     model::Barotropic)
     
     @unpack vor_grid, u_grid, v_grid = diagn.grid_variables
-    @unpack U, V = diagn.dynamics_variables
+    U = diagn.dynamics_variables.a      # reuse work arrays for velocities in spectral
+    V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
     vor_lf = progn.leapfrog[lf].vor     # relative vorticity at leapfrog step lf
@@ -691,7 +694,8 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
                                     )
     
     @unpack vor_grid, div_grid, u_grid, v_grid = diagn.grid_variables
-    @unpack U, V = diagn.dynamics_variables
+    U = diagn.dynamics_variables.a      # reuse work arrays for velocities spectral
+    V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
     vor_lf = progn.leapfrog[lf].vor     # pick leapfrog index without memory allocation
@@ -720,7 +724,8 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     
     @unpack vor_grid, div_grid, u_grid, v_grid = diagn.grid_variables
     @unpack temp_grid, humid_grid = diagn.grid_variables
-    @unpack U, V = diagn.dynamics_variables
+    U = diagn.dynamics_variables.a      # reuse work arrays for velocities spectral
+    V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
 
     S = model.spectral_transform
     wet_core = model isa PrimitiveWetCore

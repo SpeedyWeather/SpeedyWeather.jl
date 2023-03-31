@@ -77,24 +77,17 @@ end
 Struct holding intermediate quantities for the dynamics of a given layer."""
 struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 
-    # VELOCITY VECTOR (U,V) in spectral with *coslat scaling included
-    U::LowerTriangularMatrix{Complex{NF}}
-    V::LowerTriangularMatrix{Complex{NF}}
-
-    # MULTI-PURPOSE VECTOR (a,b), work array to be reused in various places
+    # MULTI-PURPOSE VECTOR (a,b), work array to be reused in various places, examples:
     # uω_coslat⁻¹, vω_coslat⁻¹ = a,b                        (all models)
     # uω_coslat⁻¹_grid, vω_coslat⁻¹_grid = a_grid,b_grid    (all models)
     # uh_coslat⁻¹, vh_coslat⁻¹ = a,b                        (ShallowWaterModel)
     # uh_coslat⁻¹_grid, vh_coslat⁻¹_grid = a_grid, b_grid   (ShallowWaterModel)
+    # Bernoulli potential: 1/2*(u^2+v^2) + Φ = a,a_grid     (ShallowWater + PrimitiveEquation)
     a::LowerTriangularMatrix{Complex{NF}}
     b::LowerTriangularMatrix{Complex{NF}}
     a_grid::Grid
     b_grid::Grid
     
-    # SHALLOW WATER and PRIMITIVE EQUATION MODEL
-    bernoulli_grid  ::Grid                                  # bernoulli potential = 1/2(u^2+v^2) + g*η
-    bernoulli       ::LowerTriangularMatrix{Complex{NF}}    # spectral bernoulli potential
-
     # VERTICAL INTEGRATION
     uv∇lnp          ::Grid                          # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
     uv∇lnp_sum_above::Grid                          # sum of Δσₖ-weighted uv∇lnp above
@@ -113,20 +106,12 @@ function Base.zeros(::Type{DynamicsVariables},
     @unpack lmax, mmax = S
     @unpack Grid, nlat_half = G
 
-    # VELOCITY VECTOR (U,V) in spectral with *coslat scaling included
-    U = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    V = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-
     # MULTI-PURPOSE VECTOR (a,b), work array to be reused in various places
     a = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     b = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     a_grid = zeros(Grid{NF},nlat_half)
     b_grid = zeros(Grid{NF},nlat_half)
 
-    # SHALLOW WATER and PRIMITIVE EQUATION MODEL, bernoulli = 1/2*(u^2 + v^2) + Φ
-    bernoulli_grid  = zeros(Grid{NF},nlat_half)
-    bernoulli       = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    
     # VERTICAL INTEGRATION
     uv∇lnp          = zeros(Grid{NF},nlat_half)   # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
     uv∇lnp_sum_above= zeros(Grid{NF},nlat_half)   # sum of Δσₖ-weighted uv∇lnp from 1:k-1
@@ -137,9 +122,7 @@ function Base.zeros(::Type{DynamicsVariables},
     # VERTICAL VELOCITY (̇̇dσ/dt)
     σ_tend = zeros(Grid{NF},nlat_half)    # = dσ/dt, on half levels below, at k+1/2
 
-    return DynamicsVariables(   U,V,
-                                a,b,a_grid,b_grid,
-                                bernoulli_grid,bernoulli,
+    return DynamicsVariables(   a,b,a_grid,b_grid,
                                 uv∇lnp,uv∇lnp_sum_above,div_sum_above,
                                 temp_virt,geopot,
                                 σ_tend)
