@@ -136,16 +136,13 @@ function saturation_specific_humidity!(
     model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
 
-    @unpack σ_levels_full = model.geometry
     @unpack sat_humid, sat_vap_pres, pres = column
+    @unpack mol_mass_vapour, mol_mass_dry_air = model.parameters
 
-    mol_ratio = convert(NF, 0.622)
-    one_minus_mol_ratio = convert(NF, 1 - mol_ratio)
+    mol_ratio = convert(NF, mol_mass_vapour/mol_mass_dry_air)
 
-    for k in eachlayer(column)
-        pₖ = pres * σ_levels_full[k]       # pressure in layer k
-        sat_humid[k] =
-            mol_ratio * sat_vap_pres[k] / (pₖ - one_minus_mol_ratio * sat_vap_pres[k])
+    @inbounds for k in eachlayer(column)
+        sat_humid[k] = mol_ratio*sat_vap_pres[k] / (pres[k] - (1-mol_ratio)*sat_vap_pres[k])
     end
 
     return nothing

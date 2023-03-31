@@ -17,7 +17,7 @@ function get_column!(   C::ColumnVariables,
     C.lond = G.londs[ij]
     C.jring = jring             # ring index j of column, used to index latitude vectors
 
-    # pressure 
+    # pressure [Pa]/[log(Pa)]
     lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics
     pₛ = exp(lnpₛ)                          # convert back here
     C.ln_pres .= ln_σ_levels_full .+ lnpₛ   # log pressure on every level ln(p) = ln(σ) + ln(pₛ)
