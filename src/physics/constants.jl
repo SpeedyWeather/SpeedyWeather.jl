@@ -11,16 +11,19 @@ struct ParameterizationConstants{NF<:AbstractFloat} <: AbstractParameterizationC
     fband::Matrix{NF}
 end
 
-function Base.zeros(::Type{ParameterizationConstants},G::AbstractGeometry{NF}) where NF
+function Base.zeros(::Type{ParameterizationConstants},
+                    P::Parameters,
+                    G::AbstractGeometry{NF}) where NF
     (;nlev,nlat) = G
-    
+    (;nband) = P
+
     drag_coefs = zeros(NF,nlev)     # coefficient for boundary layer drag
     
     temp_relax_freq = zeros(NF,nlev,nlat)   # (inverse) relaxation time scale per layer and latitude
     temp_equil_a = zeros(NF,nlat)   # terms to calculate equilibrium temperature as function
     temp_equil_b = zeros(NF,nlat)   # of latitude and pressure
 
-    fband = zeros(NF,400,nlat)
+    fband = zeros(NF,400,nband)
 
     return ParameterizationConstants{NF}(   drag_coefs,
                                             temp_relax_freq,
@@ -31,9 +34,9 @@ function Base.zeros(::Type{ParameterizationConstants},G::AbstractGeometry{NF}) w
 end
 
 function ParameterizationConstants(P::Parameters,G::AbstractGeometry)
-    K = zeros(ParameterizationConstants,G)
+    K = zeros(ParameterizationConstants,P,G)
     initialize_boundary_layer!(K,P.boundary_layer,P,G)
     initialize_temperature_relaxation!(K,P.temperature_relaxation,P,G)
-    # initialize_longwave_radiation!(K,P)
+    initialize_longwave_radiation!(K,P)
     return K
 end
