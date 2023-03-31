@@ -21,12 +21,16 @@ function generalised_logistic(x,coefs::GenLogisticCoefs)
     return @. A + (K-A)/(C+Q*exp(-B*(x-M)))^inv(ν)
 end
 
-"""
-    Z = ZonalJetCoefs(;kwargs...)
+struct StartFromFile <: InitialConditions end
+struct StartFromRest <: InitialConditions end
+struct StartWithVorticity <: InitialConditions end
 
-Create a ::Coefficients-struct that contains all parameters for the Galewsky et al, 2004 zonal jet
+"""
+    Z = ZonalJet(;kwargs...) <: InitialConditions
+
+Create a struct that contains all parameters for the Galewsky et al, 2004 zonal jet
 intitial conditions for the shallow water model. Default values as in Galewsky."""
-Base.@kwdef struct ZonalJetCoefs <: Coefficients
+Base.@kwdef struct ZonalJet <: InitialConditions
     # jet
     latitude = 45               # degrees north [˚N]
     width = (1/4-1/7)*180       # ≈ 19.29˚ as in Galewsky et al, 2004 
@@ -41,11 +45,11 @@ Base.@kwdef struct ZonalJetCoefs <: Coefficients
 end
 
 """
-    Z = ZonalWindCoefs(;kwargs...)
+    Z = ZonalWind(;kwargs...) <: InitialConditions
 
-Create a ::Coefficients-struct that contains all parameters for the Galewsky et al, 2004 zonal jet
+Create a struct that contains all parameters for the Galewsky et al, 2004 zonal jet
 intitial conditions for the shallow water model. Default values as in Galewsky."""
-Base.@kwdef struct ZonalWindCoefs <: Coefficients
+Base.@kwdef struct ZonalWind <: InitialConditions
     
     # vertical
     η₀ = 0.252                  # conversion from σ to Jablonowski's ηᵥ-coordinates

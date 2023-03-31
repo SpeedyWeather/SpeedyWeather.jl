@@ -41,6 +41,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     lapse_rate::Float64 = 5                 # moist adiabatic temperature lapse rate -dT/dz [K/km]
     temp_ref::Float64 = 288                 # absolute temperature at surface z=0 [K]
     temp_top::Float64 = 216                 # absolute temperature in stratosphere [K]
+    ΔT_stratosphere::Float64 = 4.8e5        # for stratospheric lapse rate [K] after Jablonowski
     scale_height::Float64 = 7.5             # scale height for pressure [km]
     pres_ref::Float64 = 1000                # surface pressure [hPa]
     scale_height_humid::Float64 = 2.5       # scale height for specific humidity [km]
@@ -53,25 +54,27 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     # interpolating ECMWF's L31 configuration
     GLcoefs::Coefficients = GenLogisticCoefs()
     n_stratosphere_levels::Int = 2                  # number of vertical levels used for the stratosphere
-    σ_tropopause::Float64 = 0.2                            # σ coordinate where the tropopause starts
-    σ_levels_half::Vector{Float64} = []                    # vector of σ half levels, only if set manually, otherwise an empty vector
+    σ_tropopause::Float64 = 0.2                     # σ coordinate where the tropopause starts
+    σ_levels_half::Vector{Float64} = []             # only used if set manually, otherwise empty
     nlev::Int = nlev_default(Model, σ_levels_half)  # number of vertical levels 
 
     # DIFFUSION AND DRAG
-    diffusion_power::Float64=4                 # Power n of Laplacian in horizontal diffusion ∇²ⁿ
-    diffusion_time::Float64=2.4                # Diffusion time scale [hrs] for temperature and vorticity
-    diffusion_time_div::Float64=diffusion_time # Diffusion time scale [hrs] for divergence
-    diffusion_time_strat::Float64=12           # Diffusion time scale [hrs] for extra ∇² in the stratosphere
-    damping_time_strat::Float64=24*30          # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
+    diffusion_power::Float64=4                  # Power n of Laplacian in horizontal diffusion ∇²ⁿ
+    diffusion_time::Float64=2.4                 # Diffusion time scale [hrs] for temperature and vorticity
+    diffusion_time_div::Float64=diffusion_time  # Diffusion time scale [hrs] for divergence
+    diffusion_time_strat::Float64=12            # Diffusion time scale [hrs] for extra ∇² in the stratosphere
+    damping_time_strat::Float64=24*30           # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
 
     # FORCING
-    interface_relaxation::Bool = false      # turn on interface relaxation for shallow water?
-    interface_relax_time::Float64 = 96         # time scale [hrs] of interface relaxation
-    interface_relax_amplitude::Float64 = 300   # Amplitude [m] of interface relaxation
+    interface_relaxation::Bool = false          # turn on interface relaxation for shallow water?
+    interface_relax_time::Float64 = 96          # time scale [hrs] of interface relaxation
+    interface_relax_amplitude::Float64 = 300    # Amplitude [m] of interface relaxation
 
     # PARAMETRIZATIONS
-    n_shortwave::Int = 3                # Compute shortwave radiation every n steps
-    sppt_on::Bool = false                   # Turn on SPPT?
+    physics::Bool = true                        # en/disables the physics parameterizations
+
+    n_shortwave::Int = 3                        # Compute shortwave radiation every n steps
+    sppt_on::Bool = false                       # Turn on SPPT?
     magnus_coefs::Coefficients = MagnusCoefs{NF}()  # For computing saturation vapour pressure
 
     # Large-Scale Condensation (from table B10)
@@ -82,12 +85,12 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     humid_relax_time_lsc::Float64 = 4.0  # Relaxation time for humidity (hours)
 
     # Convection
-    pres_thresh_cnv::Float64 = 0.8             # Minimum (normalised) surface pressure for the occurrence of convection
-    RH_thresh_pbl_cnv::Float64 = 0.9           # Relative humidity threshold for convection in PBL
-    RH_thresh_trop_cnv::Float64 = 0.7          # Relative humidity threshold for convection in the troposphere
-    humid_relax_time_cnv::Float64 = 6.0        # Relaxation time for PBL humidity (hours)
-    max_entrainment::Float64 = 0.5             # Maximum entrainment as a fraction of cloud-base mass flux
-    ratio_secondary_mass_flux::Float64 = 0.8   # Ratio between secondary and primary mass flux at cloud-base
+    pres_thresh_cnv::Float64 = 0.8              # Minimum (normalised) surface pressure for the occurrence of convection
+    RH_thresh_pbl_cnv::Float64 = 0.9            # Relative humidity threshold for convection in PBL
+    RH_thresh_trop_cnv::Float64 = 0.7           # Relative humidity threshold for convection in the troposphere
+    humid_relax_time_cnv::Float64 = 6.0         # Relaxation time for PBL humidity (hours)
+    max_entrainment::Float64 = 0.5              # Maximum entrainment as a fraction of cloud-base mass flux
+    ratio_secondary_mass_flux::Float64 = 0.8    # Ratio between secondary and primary mass flux at cloud-base
 
     # Longwave radiation
     nband::Int = 4                          # Number of bands used to compute fband
@@ -97,6 +100,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # BOUNDARY LAYER
     boundary_layer::BoundaryLayer = LinearDrag{NF}()
+    temperature_relaxation::TemperatureRelaxation = HeldSuarez{NF}()
 
     # TIME STEPPING
     startdate::DateTime = DateTime(2000,1,1)    # time at which the integration starts
@@ -115,22 +119,19 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # BOUNDARY FILES
     boundary_path::String = ""          # package location is default
-    orography::Type{<:AbstractOrography} = EarthOrography
+    orography::AbstractOrography = EarthOrography()
     orography_scale::Float64 = 1        # scale orography by a factor
     orography_path::String = boundary_path
     orography_file::String = "orography_F512.nc"
 
     # INITIAL CONDITIONS
-    seed::Int = 1          # random seed for the global random number generator
-    initial_conditions::Type{<:InitialConditions} = initial_conditions_default(Model)
+    seed::Int = 123456789           # random seed for the global random number generator
+    initial_conditions::InitialConditions = initial_conditions_default(Model)
     pressure_on_orography::Bool = false # calculate the initial surface pressure from orography
-    
-    zonal_jet_coefs::Coefficients = ZonalJetCoefs()
-    zonal_wind_coefs::Coefficients = ZonalWindCoefs()
 
     # OUTPUT
     verbose::Bool = true            # print dialog for feedback
-    debug::Bool = false             # print debug info
+    debug::Bool = true              # print debug info, NaR detection
     output::Bool = false            # Store data in netCDF?
     output_dt::Float64 = 6          # output time step [hours]
     output_path::String = pwd()     # path to output folder
@@ -188,6 +189,6 @@ output_vars_default(::Type{<:PrimitiveDryCore}) = [:vor,:u,:temp,:pres]
 output_vars_default(::Type{<:PrimitiveWetCore}) = [:vor,:u,:temp,:humid,:pres]
 
 # default initial conditions by model
-initial_conditions_default(::Type{<:Barotropic}) = StartWithVorticity
-initial_conditions_default(::Type{<:ShallowWater}) = ZonalJet
-initial_conditions_default(::Type{<:PrimitiveEquation}) = ZonalWind
+initial_conditions_default(::Type{<:Barotropic}) = StartWithVorticity()
+initial_conditions_default(::Type{<:ShallowWater}) = ZonalJet()
+initial_conditions_default(::Type{<:PrimitiveEquation}) = ZonalWind()

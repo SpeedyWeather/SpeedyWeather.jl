@@ -55,7 +55,8 @@ export  LowerTriangularMatrix,
         OctaHEALPixGrid
 
 # EXPORT OROGRAPHIES
-export  NoOrography,
+export  Orography,
+        NoOrography,
         EarthOrography,
         ZonalRidge
 
@@ -63,10 +64,13 @@ export  NoOrography,
 export  StartFromFile,
         StartFromRest,
         ZonalJet,
-        ZonalJetCoefs,
         ZonalWind,
-        ZonalWindCoefs,
         StartWithVorticity
+
+# EXPORT TEMPERATURE RELAXATION SCHEMES
+export  TemperatureRelaxation,
+        NoTemperatureRelaxation,
+        HeldSuarez
 
 # EXPORT BOUNDARY LAYER SCHEMES
 export  BoundaryLayer,
@@ -110,8 +114,12 @@ using .SpeedyTransforms
 include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
 include("default_parameters.jl")        # defines Parameters
 
-# DYNAMICS
+# SOME DEFINITIONS FIRST
 include("dynamics/constants.jl")                # defines DynamicsConstants
+include("physics/constants.jl")                 # defines ParameterizationConstants
+include("physics/define_column.jl")             # define ColumnVariables
+
+# DYNAMICS
 include("dynamics/geometry.jl")                 # defines Geometry
 include("dynamics/boundaries.jl")               # defines Boundaries
 include("dynamics/define_diffusion.jl")         # defines HorizontalDiffusion
@@ -130,9 +138,8 @@ include("dynamics/diffusion.jl")
 include("dynamics/time_integration.jl")
 
 # PHYSICS
-include("physics/constants.jl")                 # defines Parameterization Constants
 include("physics/parameter_structs.jl")         # defines MagnusCoefs, RadiationCoefs
-include("physics/column_variables.jl")          # defines ColumnVariables
+include("physics/column_variables.jl")
 include("physics/thermodynamics.jl")
 include("physics/tendencies.jl")
 include("physics/convection.jl")
@@ -140,6 +147,7 @@ include("physics/large_scale_condensation.jl")
 include("physics/longwave_radiation.jl")
 include("physics/shortwave_radiation.jl")
 include("physics/boundary_layer.jl")
+include("physics/temperature_relaxation.jl")
 
 # OUTPUT
 include("output/output.jl")                     # defines Output

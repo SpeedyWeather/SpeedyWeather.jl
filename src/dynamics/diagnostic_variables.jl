@@ -21,18 +21,19 @@ function Base.zeros(::Type{Tendencies},
     
     @unpack Grid, nlat_half = G
     @unpack lmax, mmax = S
+    LTM = LowerTriangularMatrix
     
     # use one more l for size compat with vector quantities
-    vor_tend        = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # vorticity
-    div_tend        = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # divergence
-    temp_tend       = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # absolute Temperature
-    humid_tend      = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # specific humidity
-    u_tend          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # zonal velocity
-    v_tend          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)   # meridional velocity
-    u_tend_grid     = zeros(Grid{NF},nlat_half)                               # zonal velocity
-    v_tend_grid     = zeros(Grid{NF},nlat_half)                               # meridional velocity
-    temp_tend_grid  = zeros(Grid{NF},nlat_half)                               # temperature
-    humid_tend_grid = zeros(Grid{NF},nlat_half)                               # specific humidity
+    vor_tend        = zeros(LTM{Complex{NF}},lmax+2,mmax+1)     # vorticity
+    div_tend        = zeros(LTM{Complex{NF}},lmax+2,mmax+1)     # divergence
+    temp_tend       = zeros(LTM{Complex{NF}},lmax+2,mmax+1)     # absolute Temperature
+    humid_tend      = zeros(LTM{Complex{NF}},lmax+2,mmax+1)     # specific humidity
+    u_tend          = zeros(LTM{Complex{NF}},lmax+2,mmax+1)     # zonal velocity
+    v_tend          = zeros(LTM{Complex{NF}},lmax+2,mmax+1)     # meridional velocity
+    u_tend_grid     = zeros(Grid{NF},nlat_half)                 # zonal velocity
+    v_tend_grid     = zeros(Grid{NF},nlat_half)                 # meridional velocity
+    temp_tend_grid  = zeros(Grid{NF},nlat_half)                 # temperature
+    humid_tend_grid = zeros(Grid{NF},nlat_half)                 # specific humidity
 
     return Tendencies(  vor_tend,div_tend,temp_tend,humid_tend,
                         u_tend,v_tend,u_tend_grid,v_tend_grid,
@@ -141,8 +142,7 @@ function Base.zeros(::Type{DynamicsVariables},
                                 bernoulli_grid,bernoulli,
                                 uv∇lnp,uv∇lnp_sum_above,div_sum_above,
                                 temp_virt,geopot,
-                                σ_tend,
-                                )
+                                σ_tend)
 end
 
 struct DiagnosticVariablesLayer{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
@@ -226,6 +226,7 @@ Struct holding the diagnostic variables."""
 struct DiagnosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     layers  ::Vector{DiagnosticVariablesLayer{NF,Grid}}
     surface ::SurfaceVariables{NF,Grid}
+    columns ::Vector{ColumnVariables{NF}}
     nlev    ::Int       # number of vertical levels
     npoints ::Int       # number of grid points
 end
@@ -235,11 +236,14 @@ function Base.zeros(::Type{DiagnosticVariables},
                     S::SpectralTransform{NF}) where NF
 
     @unpack nlev,npoints = G
-
     layers = [zeros(DiagnosticVariablesLayer,G,S;k) for k in 1:nlev]
     surface = zeros(SurfaceVariables,G,S)
+    
+    # create one column variable per thread to avoid race conditions
+    nthreads = Threads.nthreads()
+    columns = [ColumnVariables{NF}(;nlev) for _ in 1:nthreads]
 
-    return DiagnosticVariables(layers,surface,nlev,npoints)
+    return DiagnosticVariables(layers,surface,columns,nlev,npoints)
 end
 
 DiagnosticVariables(G::Geometry{NF},S::SpectralTransform{NF}) where NF = zeros(DiagnosticVariables,G,S)

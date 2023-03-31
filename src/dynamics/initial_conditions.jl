@@ -1,21 +1,12 @@
-abstract type ZonalJet <: InitialConditions end             # Galewsky, Scott, Palvani, 2004
-abstract type ZonalWind <: InitialConditions end            # Jablonowski & Williamson, 2006
-abstract type StartFromRest <: InitialConditions end
-abstract type StartFromFile <: InitialConditions end
-abstract type StartWithVorticity <: InitialConditions end
-
 """
     prognostic_variables = initial_conditions(M::ModelSetup)
 
-Initialize the prognostic variables from rest, with some initial vorticity,
-or restart from file."""
+Allocate the prognostic variables and then set to initial conditions."""
 function initial_conditions(model::ModelSetup)
 
     progn = allocate_prognostic_variables(model)    # allocate variables in any case
-    IC = model.parameters.initial_conditions        # type of initial conditions
-
-    initial_conditions!(IC,progn,model)     # dispatch to the type of initial conditions IC
-
+    IC = model.parameters.initial_conditions        # initial conditions struct
+    initial_conditions!(IC,progn,model)             # dispatch to initial conditions
     return progn
 end
 
@@ -28,23 +19,24 @@ function allocate_prognostic_variables(model::ModelSetup)
     return zeros(PrognosticVariables{NF},model,lmax,mmax,nlev)
 end
 
-function initial_conditions!(   ::Type{StartFromRest},
+function initial_conditions!(   ::StartFromRest,
                                 progn::PrognosticVariables,
                                 model::ModelSetup)
     return nothing
 end
 
-function initial_conditions!(   ::Type{StartFromRest},
+function initial_conditions!(   ::StartFromRest,
                                 progn::PrognosticVariables,
                                 model::PrimitiveEquation)
     homogeneous_temperature!(progn,model)
-    pres_grid = pressure_on_orography!(progn,model)
+    model.parameters.pressure_on_orography && pressure_on_orography!(progn,model)
     # TODO initialise humidity
 end
     
-function initial_conditions!(   ::Type{StartWithVorticity},
+function initial_conditions!(   ::StartWithVorticity,
                                 progn::PrognosticVariables,
                                 model::ModelSetup)
+
     @unpack radius_earth = model.geometry
 
     mmax = min(15,progn.mmax+1)     # perturb only larger modes
@@ -69,13 +61,13 @@ function initial_conditions!(   ::Type{StartWithVorticity},
 end
 
 """Initial conditions from Galewsky, 2004, Tellus"""
-function initial_conditions!(   ::Type{ZonalJet},
+function initial_conditions!(   coefs::ZonalJet,
                                 progn::PrognosticVariables,
                                 model::ShallowWater)
 
-    @unpack latitude, width, umax = model.parameters.zonal_jet_coefs    # for jet
-    @unpack perturb_lat, perturb_lon, perturb_xwidth,                   # for perturbation
-        perturb_ywidth, perturb_height = model.parameters.zonal_jet_coefs
+    @unpack latitude, width, umax = coefs               # for jet
+    @unpack perturb_lat, perturb_lon, perturb_xwidth,   # for perturbation
+        perturb_ywidth, perturb_height = coefs
 
     θ₀ = (latitude-width)/360*2π    # southern boundary of jet [radians]
     θ₁ = (latitude+width)/360*2π    # northern boundary of jet
@@ -147,12 +139,12 @@ function initial_conditions!(   ::Type{ZonalJet},
 end
 
 """Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
-function initial_conditions!(   ::Type{ZonalWind},
+function initial_conditions!(   coefs::ZonalWind,
                                 progn::PrognosticVariables{NF},
                                 model::PrimitiveEquation) where NF
 
-    @unpack u₀, η₀, ΔT = model.parameters.zonal_wind_coefs
-    @unpack perturb_lat, perturb_lon, perturb_uₚ, perturb_radius = model.parameters.zonal_wind_coefs
+    @unpack u₀, η₀, ΔT = coefs
+    @unpack perturb_lat, perturb_lon, perturb_uₚ, perturb_radius = coefs
     @unpack temp_ref, R_dry, lapse_rate, gravity, pres_ref = model.parameters
     @unpack radius_earth, rotation_earth = model.parameters
     @unpack σ_tropopause, pressure_on_orography = model.parameters
@@ -254,7 +246,7 @@ function initial_conditions!(   ::Type{ZonalWind},
     pressure_on_orography && pressure_on_orography!(progn,model)
 end
 
-function initial_conditions!(   ::Type{StartFromFile},
+function initial_conditions!(   ::StartFromFile,
                                 progn_new::PrognosticVariables,
                                 model::ModelSetup)
 

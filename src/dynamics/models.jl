@@ -59,7 +59,7 @@ whether scalars or arrays that do not change throughout model integration."""
 struct PrimitiveDryCoreModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveDryCore
     parameters::Parameters
     constants::DynamicsConstants{NF}
-    parameterization_constants::AbstractParameterizationConstants{NF}
+    parameterization_constants::ParameterizationConstants{NF}
     geometry::Geometry{NF}
     spectral_transform::SpectralTransform{NF}
     boundaries::Boundaries{NF}
@@ -82,7 +82,7 @@ whether scalars or arrays that do not change throughout model integration."""
 struct PrimitiveWetCoreModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveWetCore
     parameters::Parameters
     constants::DynamicsConstants{NF}
-    parameterization_constants::AbstractParameterizationConstants{NF}
+    parameterization_constants::ParameterizationConstants{NF}
     geometry::Geometry{NF}
     spectral_transform::SpectralTransform{NF}
     boundaries::Boundaries{NF}

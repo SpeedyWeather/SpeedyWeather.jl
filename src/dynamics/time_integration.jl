@@ -194,9 +194,13 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
 
-    parameterization_tendencies!(diagn,time,model)
-    dynamics_tendencies!(diagn,progn,model,lf2)
-    implicit_correction!(diagn,progn,model)
+    # switch on/off all physics
+    (;physics) = model.parameters
+    physics && parameterization_tendencies!(diagn,time,model)
+    physics || zero_tendencies!(diagn)              # set tendencies to zero otherwise
+
+    dynamics_tendencies!(diagn,progn,model,lf2)     # dynamical core
+    implicit_correction!(diagn,progn,model)         # semi-implicit time stepping corrections
 
     # LOOP OVER ALL LAYERS for diffusion, leapfrog time integration
     # and progn state from spectral to grid for next time step

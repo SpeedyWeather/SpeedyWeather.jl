@@ -6,6 +6,9 @@ abstract type PrimitiveEquation <: ModelSetup end
 abstract type PrimitiveDryCore <: PrimitiveEquation end
 abstract type PrimitiveWetCore <: PrimitiveEquation end
 
+# GEOMETRY
+abstract type AbstractGeometry{NF} end
+
 # PARAMETERS (to be chosen by user)
 abstract type AbstractParameters{M} end
 
@@ -19,7 +22,7 @@ abstract type AbstractDynamicsConstants{NF} end
 
 # INITIAL CONDITIONS AND OROGRAPHY/BOUNDARIES
 abstract type InitialConditions end         # subtypes defined in initial_conditions.jl
-abstract type AbstractOrography{NF} end     # subtypes defined in boundaries.jl
+abstract type AbstractOrography end         # subtypes defined in boundaries.jl
 abstract type AbstractBoundaries{NF} end
 
 # ATMOSPHERIC COLUMN FOR PARAMETERIZATIONS
@@ -27,6 +30,7 @@ abstract type AbstractColumnVariables{NF} end
 
 # PARAMETERIZATIONS
 abstract type BoundaryLayer end
+abstract type TemperatureRelaxation end
 
 # INPUT/OUTPUT
 abstract type AbstractFeedback end

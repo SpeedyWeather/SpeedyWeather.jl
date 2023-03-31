@@ -199,6 +199,20 @@ function eachring(grid1::Grid,grids::Grid...) where {Grid<:AbstractGrid}
 end
 
 """
+    j = whichring(ij,rings)
+
+Obtain ring index j from gridpoint ij and Vector{UnitRange} describing rind indices
+as obtained from eachring(::Grid)"""
+function whichring(ij::Integer,rings::Vector{<:UnitRange})
+    @boundscheck 0 < ij <= rings[end][end] || throw(BoundsError)
+    j = 1
+    @inbounds while ij > rings[j][end]
+        j += 1
+    end
+    return j
+end
+
+"""
     nlons = get_nlons(  Grid::Type{<:AbstractGrid},
                         nlat_half::Integer;
                         both_hemispheres::Bool=false)

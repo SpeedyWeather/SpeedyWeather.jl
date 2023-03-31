@@ -96,34 +96,13 @@ function nar_detection!(feedback::Feedback,progn::PrognosticVariables)
     feedback.nars_detected && return nothing    # escape immediately if nans already detected
     i = feedback.progress_meter.counter         # time step
     nars_detected_here = false
+    @unpack vor = progn.layers[end].leapfrog[2] # only check for surface vorticity
 
-    for (k,layer) in enumerate(progn.layers)
-        for (lf,leapfrog) in enumerate(layer.leapfrog)
-            @unpack vor,div,temp = leapfrog
-            for lm in eachharmonic(vor,div,temp)
-                if ~nars_detected_here
-                    nars_vor = ~isfinite(vor[lm])
-                    nars_div = ~isfinite(div[lm])
-                    nars_temp = ~isfinite(temp[lm])
-
-                    nars_vor  && @warn "NaR detected in vor: i=$i, k=$k, lf=$lf, lm=$lm"
-                    nars_div  && @warn "NaR detected in div: i=$i, k=$k, lf=$lf, lm=$lm"
-                    nars_temp && @warn "NaR detected in temp: i=$i, k=$k, lf=$lf, lm=$lm"
-
-                    nars_detected_here |= (nars_vor | nars_div | nars_temp)
-                end
-            end
-        end
-    end
-
-    for (lf,pres) in enumerate(progn.pres.leapfrog)
-        for lm in eachharmonic(pres)
-            if ~nars_detected_here
-                nars_pres = ~isfinite(pres[lm])
-                nars_pres && @warn "NaR detected in pres: i=$i, lf=$lf, lm=$lm"
-                nars_detected_here |= nars_pres
-            end
-        end
+    if ~nars_detected_here
+        nars_vor = ~isfinite(vor[1])    # just check first mode
+                                        # spectral transform propagates NaRs globally anyway
+        nars_vor && @warn "NaR detected at time step $i"
+        nars_detected_here |= nars_vor
     end
 
     feedback.nars_detected |= nars_detected_here
