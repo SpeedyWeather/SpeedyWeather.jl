@@ -33,11 +33,11 @@ function initialize_boundary_layer!(K::ParameterizationConstants,
                                     P::Parameters,
                                     G::Geometry)
 
-    (;σ_levels_full,radius_earth) = G
+    (;σ_levels_full,radius) = G
     (;σb,drag_time) = scheme
     (;drag_coefs) = K
 
-    kf = radius_earth/(drag_time*3600)          # scale with radius as ∂ₜu is; hrs -> sec
+    kf = radius/(drag_time*3600)          # scale with radius as ∂ₜu is; hrs -> sec
 
     for (k,σ) in enumerate(σ_levels_full)
         drag_coefs[k] = kf*max(0,(σ-σb)/(1-σb)) # drag only below σb, lin increasing to kf at σ=1

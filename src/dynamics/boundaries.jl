@@ -63,7 +63,8 @@ function initialize_orography!( orog::Orography,
                                 G::Geometry) where {M<:Union{ShallowWater,PrimitiveEquation}}
 
     @unpack orography, geopot_surf = orog
-    @unpack orography_path, orography_file, gravity = P
+    @unpack orography_path, orography_file = P
+    @unpack gravity = P.planet
     @unpack lmax, mmax = S
 
     # LOAD NETCDF FILE
@@ -94,7 +95,7 @@ function initialize_orography!( orog::Orography,
                                 S::SpectralTransform,
                                 G::Geometry) where {M<:Union{ShallowWater,PrimitiveEquation}}
 
-    @unpack gravity, rotation_earth, radius_earth = P
+    @unpack gravity, rotation, radius = P.planet
     @unpack lmax, mmax = S
 
     @unpack orography, geopot_surf = orog
@@ -102,7 +103,7 @@ function initialize_orography!( orog::Orography,
 
     ηᵥ = (1-η₀)*π/2                     # ηᵥ-coordinate of the surface [1]
     A = u₀*cos(ηᵥ)^(3/2)                # amplitude [m/s]
-    RΩ = radius_earth*rotation_earth    # [m/s]
+    RΩ = radius*rotation                # [m/s]
     g⁻¹ = inv(gravity)                  # inverse gravity [s²/m]
     φ = G.latds                         # latitude for each grid point [˚N]
 

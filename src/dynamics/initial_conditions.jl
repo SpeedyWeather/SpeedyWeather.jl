@@ -37,7 +37,7 @@ function initial_conditions!(   ::StartWithVorticity,
                                 progn::PrognosticVariables,
                                 model::ModelSetup)
 
-    @unpack radius_earth = model.geometry
+    @unpack radius = model.geometry
 
     mmax = min(15,progn.mmax+1)     # perturb only larger modes
     lmax = min(15,progn.lmax+1)
@@ -47,14 +47,14 @@ function initial_conditions!(   ::StartWithVorticity,
     for progn_layer in progn.layers
         
         # zonal wind
-        progn_layer.leapfrog[1].vor[4,1]  =  80/radius_earth    
-        progn_layer.leapfrog[1].vor[6,1]  = -160/radius_earth
-        progn_layer.leapfrog[1].vor[8,1]  =  80/radius_earth
+        progn_layer.leapfrog[1].vor[4,1]  =  80/radius
+        progn_layer.leapfrog[1].vor[6,1]  = -160/radius
+        progn_layer.leapfrog[1].vor[8,1]  =  80/radius
 
         # perturbation
         for m in 2:min(15,progn.mmax+1)
             for l in m:min(15,progn.lmax+1)
-                progn_layer.leapfrog[1].vor[l,m] = 10/radius_earth*ξ[l,m]
+                progn_layer.leapfrog[1].vor[l,m] = 10/radius*ξ[l,m]
             end
         end
     end
@@ -78,7 +78,7 @@ function initial_conditions!(   coefs::ZonalJet,
     β = perturb_ywidth*2π/360       # meridional extent of interface perturbation [radians]
     λ = perturb_lon*2π/360          # perturbation longitude [radians]
 
-    @unpack radius_earth, rotation_earth, gravity = model.parameters
+    @unpack radius, rotation, gravity = model.parameters.planet
 
     # always create on F64 grid then convert to spectral and interpolate there
     Grid = FullGaussianGrid
@@ -93,7 +93,7 @@ function initial_conditions!(   coefs::ZonalJet,
     for (j,ring) in enumerate(eachring(u_grid,η_grid))
         θ = π/2 - colats[j]             # latitude in radians
         coslat⁻¹j = 1/cos(θ)
-        f = 2rotation_earth*sin(θ)
+        f = 2rotation*sin(θ)
         
         # velocity per latitude
         if θ₀ < θ < θ₁
@@ -104,14 +104,14 @@ function initial_conditions!(   coefs::ZonalJet,
 
         # integration for layer thickness h / interface height η
         w = weights[j]
-        η_sum += 2w*(radius_earth*u_θ/gravity * (f + tan(θ)/radius_earth*u_θ))
+        η_sum += 2w*(radius*u_θ/gravity * (f + tan(θ)/radius*u_θ))
 
         # lon-constant part of perturbation
         ηθ = perturb_height*cos(θ)*exp(-((θ₂-θ)/β)^2)
 
         # store in all longitudes
         for ij in ring
-            u_grid[ij] = u_θ/radius_earth*coslat⁻¹j   # include scaling for curl!
+            u_grid[ij] = u_θ/radius*coslat⁻¹j   # include scaling for curl!
             
             # calculate perturbation (possibly shifted in lon compared to Galewsky 2004)
             ϕ = lons[ij] - λ
@@ -145,8 +145,8 @@ function initial_conditions!(   coefs::ZonalWind,
 
     @unpack u₀, η₀, ΔT = coefs
     @unpack perturb_lat, perturb_lon, perturb_uₚ, perturb_radius = coefs
-    @unpack temp_ref, R_dry, lapse_rate, gravity, pres_ref = model.parameters
-    @unpack radius_earth, rotation_earth = model.parameters
+    @unpack temp_ref, R_dry, lapse_rate, pres_ref = model.parameters
+    @unpack radius, rotation, gravity = model.parameters.planet
     @unpack σ_tropopause, pressure_on_orography = model.parameters
     @unpack σ_levels_full, Grid, nlat_half, nlev = model.geometry
     @unpack norm_sphere = model.spectral_transform
@@ -172,26 +172,26 @@ function initial_conditions!(   coefs::ZonalWind,
             tanφ = tand(φij)
 
             # Jablonowski and Williamson, eq. (3) 
-            ζ[ij] = -4u₀/radius_earth*cos_ηᵥ*sinφ*cosφ*(2 - 5sinφ^2) 
+            ζ[ij] = -4u₀/radius*cos_ηᵥ*sinφ*cosφ*(2 - 5sinφ^2) 
 
             # PERTURBATION
             sinφc = sind(perturb_lat)       # location of centre
             cosφc = cosd(perturb_lat)
             λc = perturb_lon
-            R = radius_earth*perturb_radius # spatial extent of perturbation
+            R = radius*perturb_radius # spatial extent of perturbation
 
             # great circle distance to perturbation
             X = sinφc*sinφ + cosφc*cosφ*cosd(λij-λc)
             X_norm = 1/sqrt(1-X^2)
-            r = radius_earth*acos(X)
+            r = radius*acos(X)
             exp_decay = exp(-(r/R)^2)
 
             # Jablonowski and Williamson, eq. (12) 
-            ζ[ij] += perturb_uₚ/radius_earth*exp_decay*
-                (tanφ - 2*(radius_earth/R)^2*acos(X)*X_norm*(sinφc*cosφ - cosφc*sinφ*cosd(λij-λc)))
+            ζ[ij] += perturb_uₚ/radius*exp_decay*
+                (tanφ - 2*(radius/R)^2*acos(X)*X_norm*(sinφc*cosφ - cosφc*sinφ*cosd(λij-λc)))
             
             # Jablonowski and Williamson, eq. (13) 
-            D[ij] = -2perturb_uₚ*radius_earth/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
+            D[ij] = -2perturb_uₚ*radius/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
         end
 
         @unpack vor,div = layer.leapfrog[1]
@@ -216,7 +216,7 @@ function initial_conditions!(   coefs::ZonalWind,
     end
 
     T = zeros(Grid{NF},nlat_half)   # temperature
-    aΩ = radius_earth*rotation_earth
+    aΩ = radius*rotation
 
     for (k,layer) in enumerate(progn.layers)
 
@@ -275,7 +275,8 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
     # gravity:      Gravitational acceleration [m/s^2]
     # R_dry:        Specific gas constant for dry air [J/kg/K]
-    @unpack temp_ref, temp_top, lapse_rate, gravity, R_dry = P
+    @unpack temp_ref, temp_top, lapse_rate, R_dry = P
+    @unpack gravity = P.planet
     @unpack n_stratosphere_levels, nlev = G     # number of vertical levels used for stratosphere
     @unpack norm_sphere = S                     # normalization of the l=m=0 spherical harmonic
 
@@ -323,7 +324,8 @@ function pressure_on_orography!(progn::PrognosticVariables,
     # gravity:      Gravitational acceleration [m/s^2]
     # R:            Specific gas constant for dry air [J/kg/K]
     # pres_ref:     Reference surface pressure [hPa]
-    @unpack temp_ref, temp_top, lapse_rate, gravity, pres_ref, R_dry = P
+    @unpack temp_ref, temp_top, lapse_rate, pres_ref, R_dry = P
+    @unpack gravity = P.planet
     @unpack orography = B.orography # orography on the grid
 
     Γ = lapse_rate/1000             # Lapse rate [K/km] -> [K/m]

@@ -39,14 +39,14 @@ function initialize_temperature_relaxation!(K::ParameterizationConstants,
                                             P::Parameters,
                                             G::Geometry)
 
-    (;σ_levels_full,radius_earth,coslat,sinlat) = G
+    (;σ_levels_full,radius,coslat,sinlat) = G
     (;σb,ΔTy,Δθz,relax_time_slow,relax_time_fast,Tmax) = scheme
     (;temp_relax_freq,temp_equil_a,temp_equil_b) = K
     p₀ = P.pres_ref*100                         # [hPa] → [Pa]
 
     # slow relaxation everywhere, fast in the tropics
-    kₐ = radius_earth/(relax_time_slow*3600)    # scale with radius as ∂ₜT is; hrs -> sec
-    kₛ = radius_earth/(relax_time_fast*3600)
+    kₐ = radius/(relax_time_slow*3600)    # scale with radius as ∂ₜT is; hrs -> sec
+    kₛ = radius/(relax_time_fast*3600)
 
     for (j,(cosϕ,sinϕ)) = enumerate(zip(coslat,sinlat))     # use ϕ for latitude here
         for (k,σ) in enumerate(σ_levels_full)

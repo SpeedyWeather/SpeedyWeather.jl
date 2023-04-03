@@ -38,3 +38,7 @@ abstract type AbstractOutput end
 
 # IMPLICIT PRECOMPUTED TERMS
 abstract type AbstractImplicit{NF} end
+
+# PLANETS
+abstract type Planet end
+

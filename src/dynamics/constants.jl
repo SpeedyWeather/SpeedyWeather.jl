@@ -4,8 +4,8 @@ Struct holding the parameters needed at runtime in number format NF.
 Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConstants{NF}
 
     # PHYSICAL CONSTANTS
-    radius_earth::NF        # Radius of Earth
-    rotation_earth::NF      # Angular frequency of Earth's rotation
+    radius::NF              # Radius of Planet
+    rotation::NF            # Angular frequency of Planet's rotation
     gravity::NF             # Gravitational acceleration
     R_dry::NF               # specific gas constant for dry air [J/kg/K]
     layer_thickness::NF     # shallow water layer thickness [m]
@@ -13,8 +13,8 @@ Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConst
     κ::NF                   # = R_dry/cₚ, gas const for air over heat capacity
 
     # TIME STEPPING
-    Δt::NF                  # time step [s/m], use 2Δt for leapfrog, scaled by Earth's radius
-    Δt_unscaled::NF         # time step [s], as Δt but not scaled with Earth's radius
+    Δt::NF                  # time step [s/m], use 2Δt for leapfrog, scaled by radius
+    Δt_unscaled::NF         # time step [s], as Δt but not scaled with radius
     Δt_sec::Int             # time step [s] but encoded as 64-bit integer for rounding error-free accumulation
     Δt_hrs::Float64         # time step [hrs]
     robert_filter::NF       # Robert (1966) time filter coefficient to suppress comput. mode
@@ -53,7 +53,8 @@ Generator function for a DynamicsConstants struct.
 function DynamicsConstants(P::Parameters)
 
     # PHYSICAL CONSTANTS
-    @unpack radius_earth, rotation_earth, gravity, R_dry, R_vapour, cₚ = P
+    @unpack R_dry, R_vapour, cₚ = P
+    @unpack radius, rotation,gravity = P.planet
     @unpack layer_thickness = P
     H₀ = layer_thickness*1000       # ShallowWater: convert from [km]s to [m]
     ξ = R_dry/R_vapour              # Ratio of gas constants: dry air / water vapour [1]
@@ -83,14 +84,14 @@ function DynamicsConstants(P::Parameters)
 
     # interface relaxation forcing
     @unpack interface_relax_time = P
-    interface_relax_time *= 3600/radius_earth   # convert from hours to seconds
+    interface_relax_time *= 3600/radius         # convert from hours to seconds
 
     # SCALING
     Δt_unscaled = Δt        # [s] not scaled
-    Δt /= radius_earth      # [s/m] scale with Earth's radius
+    Δt /= radius            # [s/m] scale with radius
 
     # This implies conversion to NF
-    return DynamicsConstants{P.NF}( radius_earth,rotation_earth,gravity,R_dry,H₀,μ_virt_temp,κ,
+    return DynamicsConstants{P.NF}( radius,rotation,gravity,R_dry,H₀,μ_virt_temp,κ,
                                     Δt,Δt_unscaled,Δt_sec,Δt_hrs,
                                     robert_filter,williams_filter,n_timesteps,
                                     output_every_n_steps, n_outputsteps,

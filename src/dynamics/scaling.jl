@@ -61,9 +61,9 @@ the Earth's radius which is used in the dynamical core."""
 function scale!(progn::PrognosticVariables,
                 model::ModelSetup)
 
-    @unpack radius_earth = model.geometry
-    scale!(progn,:vor,radius_earth)
-    scale!(progn,:div,radius_earth)
+    @unpack radius = model.geometry
+    scale!(progn,:vor,radius)
+    scale!(progn,:div,radius)
 end
 
 """
@@ -74,9 +74,9 @@ Undo the radius-scaling of vorticity and divergence from scale!(progn,model)."""
 function unscale!(  progn::PrognosticVariables,
                     model::ModelSetup)
 
-    @unpack radius_earth = model.geometry
-    scale!(progn,:vor,inv(radius_earth))
-    scale!(progn,:div,inv(radius_earth))
+    @unpack radius = model.geometry
+    scale!(progn,:vor,inv(radius))
+    scale!(progn,:div,inv(radius))
 end
 
 """
@@ -86,5 +86,5 @@ end
 Undo the radius-scaling for any variable. Method used for netcdf output."""
 function unscale!(  variable::AbstractArray,
                     model::ModelSetup)
-    variable ./= model.geometry.radius_earth
+    variable ./= model.geometry.radius
 end
