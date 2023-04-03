@@ -18,12 +18,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     Grid::Type{<:AbstractGrid} = FullGaussianGrid       # grid used
     
     # EARTH'S PROPERTIES
-    radius_earth::Float64 = 6.371e6         # radius of Earth [m]
-    rotation_earth::Float64 = 7.29e-5       # angular frequency of Earth's rotation [rad/s]
-    gravity::Float64 = 9.81                 # gravitational acceleration [m/s^2]
-    seasonal_cycle::Bool = true             # Seasonal cycle?
-    equinox::DateTime = DateTime(2000,3,20) # Spring equinox (year irrelevant)
-    tropic_cancer::Float64 = 23.5           # latitude [˚N] of the tropic of cancer
+    planet::Planet = Earth()
     
     # ATMOSPHERE
     mol_mass_dry_air = 28.9649              # molar mass of dry air [g/mol]

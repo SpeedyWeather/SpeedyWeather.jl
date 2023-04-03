@@ -16,7 +16,7 @@ struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF: Number form
     nlat::Int           # Number of latitudes
     nlev::Int           # Number of vertical levels
     npoints::Int        # total number of grid points
-    radius_earth::Real  # Earth's radius [m]
+    radius::Float64     # Planet's radius [m]
 
     # LATITUDES (either Gaussian, equi-angle, HEALPix or OctaHEALPix lats, depending on grid)
     latd::Vector{Float64}   # array of latitudes in degrees (90˚...-90˚)
@@ -36,7 +36,7 @@ struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF: Number form
     coslat⁻²::Vector{NF}            # = 1/cos²(lat)
 
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
-    f_coriolis::Vector{NF}          # = 2Ω*sin(lat)*radius_earth
+    f_coriolis::Vector{NF}          # = 2Ω*sin(lat)*radius
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     n_stratosphere_levels::Int      # number of upper levels for stratosphere
@@ -68,10 +68,10 @@ Generator function to create the Geometry struct from parameters in `P`.
 function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
     @unpack trunc, nlev = P                         # grid type, spectral truncation, # of vertical levels
-    @unpack radius_earth, rotation_earth = P        # radius of earth, angular frequency
+    @unpack radius, rotation, gravity = P.planet    # radius of planet, angular frequency, gravity
     @unpack R_dry, cₚ = P                           # gas constant for dry air, heat capacity
     @unpack σ_tropopause = P                        # number of vertical levels used for stratosphere
-    @unpack temp_ref, temp_top, lapse_rate, gravity = P   # for reference atmosphere
+    @unpack temp_ref, temp_top, lapse_rate = P      # for reference atmosphere
     @unpack ΔT_stratosphere = P                     # used for stratospheric temperature increase
 
     # RESOLUTION PARAMETERS
@@ -99,7 +99,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     coslat⁻² = 1 ./ coslat²
 
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
-    f_coriolis = 2rotation_earth*sinlat*radius_earth
+    f_coriolis = 2rotation*sinlat*radius
 
     # VERTICAL SIGMA COORDINATE
     # σ = p/p0 (fraction of surface pressure)
@@ -150,7 +150,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
     # conversion to number format NF happens here
     Geometry{P.NF}( Grid,nlat_half,
-                    nlon_max,nlon,nlat,nlev,npoints,radius_earth,
+                    nlon_max,nlon,nlat,nlev,npoints,radius,
                     latd,lond,londs,latds,
                     sinlat,coslat,coslat⁻¹,coslat²,coslat⁻²,f_coriolis,
                     n_stratosphere_levels,

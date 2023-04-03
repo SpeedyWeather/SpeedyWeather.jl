@@ -41,7 +41,7 @@ function HorizontalDiffusion(   P::Parameters{Model},
 
     # DIFFUSION
     @unpack lmax,mmax = S
-    @unpack radius_earth = G
+    @unpack radius = G
     @unpack diffusion_power, diffusion_time, diffusion_time_div = P
     @unpack diffusion_time_strat, damping_time_strat = P
     @unpack Δt = C
@@ -67,7 +67,6 @@ function HorizontalDiffusion(   P::Parameters{Model},
     damping_strat_impl = zeros(LTM,lmax+2,mmax+1)   # for extra diffusion in the stratosphere (implicit)
 
     # PRECALCULATE the damping coefficients for every spectral mode
-    R = radius_earth                                # convenience
     for m in 1:mmax+1                               # fill only the lower triangle
         for l in m:lmax+1
             # eigenvalue is l*(l+1), but 1-based here l→l-1
@@ -76,9 +75,9 @@ function HorizontalDiffusion(   P::Parameters{Model},
 
             # Explicit part (=ν∇²ⁿ)
             # convert diffusion time scales to damping frequencies [1/s] times norm. eigenvalue
-            damping[l,m] = norm_eigenvalueⁿ/(3600*diffusion_time)*R                # temperature/vorticity
-            damping_div[l,m] = norm_eigenvalueⁿ/(3600*diffusion_time_div)*R        # divergence
-            damping_strat[l,m] = norm_eigenvalue/(3600*diffusion_time_strat)*R     # stratosphere (no hyperdiff)
+            damping[l,m] = norm_eigenvalueⁿ/(3600*diffusion_time)*radius            # temperature/vorticity
+            damping_div[l,m] = norm_eigenvalueⁿ/(3600*diffusion_time_div)*radius    # divergence
+            damping_strat[l,m] = norm_eigenvalue/(3600*diffusion_time_strat)*radius # stratosphere (no hyperdiff)
 
             # and implicit part of the diffusion (= 1/(1+2Δtν∇²ⁿ))
             damping_impl[l,m] = 1/(1+2Δt*damping[l,m])                 # for temperature/vorticity

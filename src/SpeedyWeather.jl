@@ -125,6 +125,7 @@ include("dynamics/boundaries.jl")               # defines Boundaries
 include("dynamics/define_diffusion.jl")         # defines HorizontalDiffusion
 include("dynamics/define_implicit.jl")          # defines ImplicitShallowWater, ImplicitPrimitiveEq
 include("dynamics/parameter_structs.jl")        # defines GenLogisticCoefs
+include("dynamics/planets.jl")                  # defines Earth
 include("dynamics/models.jl")                   # defines ModelSetups
 include("dynamics/prognostic_variables.jl")     # defines PrognosticVariables
 include("dynamics/diagnostic_variables.jl")     # defines DiagnosticVariables
