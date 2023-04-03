@@ -54,11 +54,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     nlev::Int = nlev_default(Model, σ_levels_half)  # number of vertical levels 
 
     # DIFFUSION AND DRAG
-    diffusion_power::Float64=4                  # Power n of Laplacian in horizontal diffusion ∇²ⁿ
-    diffusion_time::Float64=2.4                 # Diffusion time scale [hrs] for temperature and vorticity
-    diffusion_time_div::Float64=diffusion_time  # Diffusion time scale [hrs] for divergence
-    diffusion_time_strat::Float64=12            # Diffusion time scale [hrs] for extra ∇² in the stratosphere
-    damping_time_strat::Float64=24*30           # Damping time [hrs] for drag on zonal-mean wind in the stratosphere
+    diffusion::DiffusionParameters = HyperDiffusion()
 
     # FORCING
     interface_relaxation::Bool = false          # turn on interface relaxation for shallow water?

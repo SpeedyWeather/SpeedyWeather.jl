@@ -1,27 +1,30 @@
-"""
+Base.@kwdef struct HyperDiffusion <: DiffusionParameters
+    # hyperdiffusion for temp, vor, div everywhere
+    power::Int = 4                              # Power n of Laplacian in horizontal diffusion ∇²ⁿ
+    time_scale::Float64 = 2.5                   # Diffusion time scale [hrs] for temp, vor, div
+    
+    # additional diffusion in stratosphere
+    power_stratosphere::Int = 1                 # additional ∇² for stratosphere
+    time_scale_stratosphere::Float64 = 12       # associated time scale
+
+    # reduce time scale of diffusion linearly with increasing model resolution?
+    scale_with_resolution::Bool = true      # e.g. T31 = 2.5hrs diffusion time scale, T63 = 1.25 hrs
+end
+
+""" 
     HD = HorizontalDiffusion(...)
 
-Horizontal Diffusion struct containing all the preallocated arrays for the calculation of horizontal diffusion
-and orographic correction for temperature and humidity.
-"""
-struct HorizontalDiffusion{NF<:AbstractFloat}       # Number format NF
-    # Explicit part of the diffusion, precalculated damping coefficients for each spectral mode
-    damping::LowerTriangularMatrix{NF}              # for temperature and vorticity (explicit)
-    damping_div::LowerTriangularMatrix{NF}          # for divergence (explicit)
-    damping_strat::LowerTriangularMatrix{NF}        # for extra diffusion in the stratosphere (explicit)
+Horizontal Diffusion struct containing all the preallocated arrays for the calculation
+of horizontal diffusion."""
+struct HorizontalDiffusion{NF<:AbstractFloat}   # Number format NF
     
-    # Implicit part of LowerTriangular diffusion, precalculated damping coefficients for each spectral mode
-    damping_impl::LowerTriangularMatrix{NF}         # for temperature and vorticity (implicit)
-    damping_div_impl::LowerTriangularMatrix{NF}     # for divergence (implicit)
-    damping_strat_impl::LowerTriangularMatrix{NF}   # for extra diffusion in the stratosphere (implicit)
+    # Explicit part of the (hyper) diffusion, precalculated for each spherical harm degree
+    ∇²ⁿ::Vector{NF}                             # everywhere
+    ∇²ⁿ_stratosphere::Vector{NF}                # +extra diffusion in the stratosphere
     
-    # Vertical component of orographic correction
-    temp_correction_vert::Vector{NF}                # for temperature
-    humid_correction_vert::Vector{NF}               # for humidity
-    
-    # Horizontal component of orographic correction (in spectral space)
-    temp_correction_horizontal::LowerTriangularMatrix{Complex{NF}}
-    humid_correction_horizontal::LowerTriangularMatrix{Complex{NF}}
+    # Implicit part
+    ∇²ⁿ_implicit::Vector{NF}
+    ∇²ⁿ_implicit_stratosphere::Vector{NF}
 end
 
 """
@@ -32,114 +35,54 @@ horizontal hyperdiffusion for temperature, vorticity and divergence, with an imp
 and an explicit term. Also precalculates correction terms (horizontal and vertical) for
 temperature and humidity.
 """
-function HorizontalDiffusion(   P::Parameters{Model},
-                                C::DynamicsConstants,        
-                                G::Geometry,
-                                S::SpectralTransform{NF},
-                                B::Boundaries
-                                ) where {Model,NF}
-
-    # DIFFUSION
+function HorizontalDiffusion(   scheme::HyperDiffusion,
+                                P::Parameters,
+                                C::DynamicsConstants,
+                                S::SpectralTransform{NF}) where NF
     @unpack lmax,mmax = S
-    @unpack radius = G
-    @unpack diffusion_power, diffusion_time, diffusion_time_div = P
-    @unpack diffusion_time_strat, damping_time_strat = P
+    @unpack radius = P.planet
+    @unpack power, power_stratosphere = scheme
     @unpack Δt = C
+
+    # reuce diffusion time scale (=increase diffusion) with resolution?
+    if scheme.scale_with_resolution
+        # use values in scheme for T31 (=32 here) and decrease linearly with lmax+1
+        time_scale = scheme.time_scale * (32/(lmax+1))
+        time_scale_stratosphere = scheme.time_scale_stratosphere * (32/(lmax+1))
+    else
+        @unpack time_scale, time_scale_stratosphere = scheme
+    end
 
     # Diffusion is applied by multiplication of the (absolute) eigenvalues of the Laplacian l*(l+1)
     # normalise by the largest eigenvalue lmax*(lmax+1) such that the highest wavenumber lmax
-    # is dampened to 0 at the time scale diffusion_time
-    # raise to a power of the Laplacian for hyperdiffusion (=less damping for smaller wavenumbers)
+    # is dampened to 0 at the given time scale raise to a power of the Laplacian for hyperdiffusion
+    # (=more scale-selective for smaller wavenumbers)
     largest_eigenvalue = lmax*(lmax+1)
 
-    # PREALLOCATE
-    # conversion to number format NF later, one more degree l for meridional gradient recursion
+    # PREALLOCATE as vector as only dependend on degree l
     # Damping coefficients for explicit part of the diffusion (=ν∇²ⁿ)
-    # while precalculated for spectral space, store only the real part as entries are real
-    LTM = LowerTriangularMatrix{NF}
-    damping = zeros(LTM,lmax+2,mmax+1)              # for temperature and vorticity (explicit)
-    damping_div = zeros(LTM,lmax+2,mmax+1)          # for divergence (explicit)
-    damping_strat = zeros(LTM,lmax+2,mmax+1)        # for extra diffusion in the stratosphere (explicit)
+    ∇²ⁿ = zeros(NF,lmax+2)                  # for temperature and vorticity (explicit)
+    ∇²ⁿ_stratosphere = zeros(NF,lmax+2)     # for divergence (explicit)
 
-    # Damping coefficients for implicit part of the diffusion (= 1/(1+2Δtν∇²ⁿ))
-    damping_impl = zeros(LTM,lmax+2,mmax+1)         # for temperature and vorticity (implicit)
-    damping_div_impl = zeros(LTM,lmax+2,mmax+1)     # for divergence (implicit)
-    damping_strat_impl = zeros(LTM,lmax+2,mmax+1)   # for extra diffusion in the stratosphere (implicit)
+    # Implicit part (= 1/(1+2Δtν∇²ⁿ))
+    ∇²ⁿ_implicit = zeros(NF,lmax+2)
+    ∇²ⁿ_implicit_stratosphere = zeros(NF,lmax+2)
 
-    # PRECALCULATE the damping coefficients for every spectral mode
-    for m in 1:mmax+1                               # fill only the lower triangle
-        for l in m:lmax+1
-            # eigenvalue is l*(l+1), but 1-based here l→l-1
-            norm_eigenvalue = l*(l-1)/largest_eigenvalue        # normal diffusion ∇²
-            norm_eigenvalueⁿ = norm_eigenvalue^diffusion_power  # hyper diffusion ∇²ⁿ
+    # PRECALCULATE for every degree l
+    for l in 0:lmax+1
+        # eigenvalue is l*(l+1), but 1-based here l→l-1
+        norm_eigenvalue = l*(l+1)/largest_eigenvalue        # normal diffusion ∇²
 
-            # Explicit part (=ν∇²ⁿ)
-            # convert diffusion time scales to damping frequencies [1/s] times norm. eigenvalue
-            damping[l,m] = norm_eigenvalueⁿ/(3600*diffusion_time)*radius            # temperature/vorticity
-            damping_div[l,m] = norm_eigenvalueⁿ/(3600*diffusion_time_div)*radius    # divergence
-            damping_strat[l,m] = norm_eigenvalue/(3600*diffusion_time_strat)*radius # stratosphere (no hyperdiff)
+        # Explicit part (=ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
+        # time scale [hrs] *3600-> [s]
+        ∇²ⁿ[l+1] = norm_eigenvalue^power/(3600*time_scale)*radius
+        ∇²ⁿ_implicit[l+1] = 1/(1+2Δt*∇²ⁿ[l+1])              # and implicit part of the diffusion (= 1/(1+2Δtν∇²ⁿ))
 
-            # and implicit part of the diffusion (= 1/(1+2Δtν∇²ⁿ))
-            damping_impl[l,m] = 1/(1+2Δt*damping[l,m])                 # for temperature/vorticity
-            damping_div_impl[l,m] = 1/(1+2Δt*damping_div[l,m])         # for divergence
-            damping_strat_impl[l,m] = 1/(1+2Δt*damping_strat[l,m])     # for stratosphere (no hyperdiffusion)
-        end
+        # add additional diffusion for stratosphere
+        ∇²ⁿ_stratosphere[l+1] = ∇²ⁿ[l+1] + 
+            norm_eigenvalue^power_stratosphere/(3600*time_scale_stratosphere)*radius
+        ∇²ⁿ_implicit_stratosphere[l+1] = 1/(1+2Δt*∇²ⁿ_stratosphere[l+1])
     end
 
-    if Model <: Barotropic || Model <: ShallowWater                 # orographic correction not needed
-        
-        temp_correction_vert        = zeros(0)                          # create dummy arrays
-        humid_correction_vert       = zeros(0)
-        temp_correction_horizontal  = zeros(LowerTriangularMatrix{Complex{P.NF}},0,0) 
-        humid_correction_horizontal = zeros(LowerTriangularMatrix{Complex{P.NF}},0,0) 
-
-    else    # P.model <: PrimitiveEquation, orographic correction only needed then
-
-        temp_correction_vert        = zeros(0)                          # create dummy arrays
-        humid_correction_vert       = zeros(0)
-        temp_correction_horizontal  = zeros(LowerTriangularMatrix{Complex{P.NF}},0,0) 
-        humid_correction_horizontal = zeros(LowerTriangularMatrix{Complex{P.NF}},0,0) 
-
-        # # OROGRAPHIC CORRECTION
-        # @unpack nlon, nlat, nlev, σ_levels_full = G
-        # @unpack gravity, R_dry, lapse_rate, scale_height, scale_height_humid, relhumid_ref = P
-        # @unpack geopot_surf_grid = B    #TODO is currently not contained in the Boundaries struct B
-
-        # # Orographic correction terms for temperature and humidity (vertical component)
-        # lapse_rate_gravity = lapse_rate/(1000gravity)       # lapse rate in [K/km] convert to [K/m] with /1000
-        # R_lapse_rate_gravity = R_dry*lapse_rate_gravity     
-        # scale_height_ratio = scale_height/scale_height_humid
-
-        # # preallocate (high precision, conversion to NF later)
-        # temp_correction_vert = zeros(nlev)      # Vertical component of orographic correction for temperature
-        # humid_correction_vert = zeros(nlev)     # Vertical component of orographic correction for humidity
-
-        # for k in 2:nlev
-        #     temp_correction_vert[k] = σ_levels_full[k]^R_lapse_rate_gravity
-        #     if k > 2
-        #         humid_correction_vert[k] = σ_levels_full[k]^scale_height_ratio
-        #     end
-        # end
-
-        # # Orographic correction term for temperature (horizontal component)
-        # horizontal_correction = zeros(nlon, nlat)       # in grid-point space
-
-        # for j in 1:nlat
-        #     for i = 1:nlon
-        #         horizontal_correction[i,j] = lapse_rate_gravity*geopot_surf_grid[i,j]
-        #     end
-        # end
-
-        # # transform correction to spectral space
-        # temp_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
-
-        # # Orographic correction terms for humidity (horizontal component)
-        # horizontal_correction .= relhumid_ref           # relative humidity reference value
-        # humid_correction_horizontal = spectral(horizontal_correction,one_more_l=true)
-    end
-
-    return HorizontalDiffusion{NF}( damping,damping_div,damping_strat,
-                                    damping_impl,damping_div_impl,damping_strat_impl,
-                                    temp_correction_vert,humid_correction_vert,
-                                    temp_correction_horizontal,humid_correction_horizontal)
+    return HorizontalDiffusion(∇²ⁿ,∇²ⁿ_stratosphere,∇²ⁿ_implicit,∇²ⁿ_implicit_stratosphere)
 end

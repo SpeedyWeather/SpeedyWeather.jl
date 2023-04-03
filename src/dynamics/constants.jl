@@ -78,9 +78,8 @@ function DynamicsConstants(P::Parameters)
     output_every_n_steps = max(1,floor(Int,output_dt/Δt_hrs))   # output every n time steps
     n_outputsteps = (n_timesteps ÷ output_every_n_steps)+1      # total number of output time steps
 
-    # stratospheric drag [1/s] from damping_time_strat [hrs]
-    @unpack damping_time_strat = P
-    drag_strat = 1/(damping_time_strat*3600)
+    # stratospheric drag [1/s] from time scale [hrs]
+    drag_strat = 1/(P.diffusion.time_scale_stratosphere*3600)
 
     # interface relaxation forcing
     @unpack interface_relax_time = P
