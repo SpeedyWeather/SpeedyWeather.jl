@@ -47,7 +47,7 @@ function initialize_speedy( ::Type{NF}=DEFAULT_NF,          # default number for
     G = Geometry(P)                                 # everything grid
     S = SpectralTransform(P)                        # everything spectral transform
     B = Boundaries(P,S,G)                           # arrays for boundary conditions
-    H = HorizontalDiffusion(P,C,G,S,B)              # precomputed arrays for horizontal diffusion
+    H = HorizontalDiffusion(P.diffusion,P,C,S)      # precomputed arrays for horizontal diffusion
     D = DeviceSetup(CPUDevice())                    # device the model is running on, so far only CPU
     
     if ConcreteModel <: Barotropic                  # pack all of the above into a *Model struct

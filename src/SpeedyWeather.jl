@@ -55,10 +55,11 @@ export  LowerTriangularMatrix,
         OctaHEALPixGrid
 
 # EXPORT OROGRAPHIES
-export  Orography,
-        NoOrography,
+export  NoOrography,
         EarthOrography,
         ZonalRidge
+
+export  HyperDiffusion
 
 # EXPORT INITIAL CONDITIONS
 export  StartFromFile,
@@ -73,8 +74,7 @@ export  TemperatureRelaxation,
         HeldSuarez
 
 # EXPORT BOUNDARY LAYER SCHEMES
-export  BoundaryLayer,
-        NoBoundaryLayer,
+export  NoBoundaryLayer,
         LinearDrag
 
 # EXPORT STRUCTS

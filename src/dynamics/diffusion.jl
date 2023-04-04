@@ -1,8 +1,8 @@
 """
     horizontal_diffusion!(  tendency::LowerTriangularMatrix{Complex},
                             A::LowerTriangularMatrix{Complex},
-                            damp_expl::LowerTriangularMatrix,
-                            damp_impl::LowerTriangularMatrix)
+                            ∇²ⁿ_expl::AbstractVector,
+                            ∇²ⁿ_impl::AbstractVector)
 
 Apply horizontal diffusion to a 2D field `A` in spectral space by updating its tendency `tendency`
 with an implicitly calculated diffusion term. The implicit diffusion of the next time step is split
@@ -10,12 +10,20 @@ into an explicit part `damp_expl` and an implicit part `damp_impl`, such that bo
 in a single forward step by using `A` as well as its tendency `tendency`."""
 function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   # tendency of a 
                                 A::LowerTriangularMatrix{Complex{NF}},          # spectral horizontal field
-                                damp_expl::LowerTriangularMatrix{NF},           # explicit spectral damping
-                                damp_impl::LowerTriangularMatrix{NF}            # implicit spectral damping
+                                ∇²ⁿ_expl::AbstractVector{NF},                   # explicit spectral damping
+                                ∇²ⁿ_impl::AbstractVector{NF}                    # implicit spectral damping
                                 ) where {NF<:AbstractFloat}
-    
-    for lm in eachharmonic(tendency,A,damp_expl,damp_impl)
-        @inbounds tendency[lm] = (tendency[lm] - damp_expl[lm]*A[lm])*damp_impl[lm]
+    lmax,mmax = size(tendency)      # 1-based
+    @boundscheck size(tendency) == size(A) || throw(BoundsError)
+    @boundscheck lmax <= length(∇²ⁿ_expl) == length(∇²ⁿ_impl) || throw(BoundsError)
+
+    lm = 0
+    for m in 1:mmax         # loops over all columns/order m
+        for l in m:lmax-1   # but skips the lmax+2 degree (1-based)
+            lm += 1         # single index lm corresponding to harmonic l,m
+            tendency[lm] = (tendency[lm] - ∇²ⁿ_expl[l]*A[lm])*∇²ⁿ_impl[l]
+        end
+        lm += 1         # skip last row, LowerTriangularMatrices are of size lmax+2 x mmax+1
     end
 end
 
@@ -27,15 +35,22 @@ diffusion_vars(::PrimitiveEquation) = (:vor,:div,:temp)
 function horizontal_diffusion!( progn::PrognosticVariablesLeapfrog,
                                 diagn::DiagnosticVariablesLayer,
                                 model::ModelSetup,
-                                lf::Int=1,                          # leapfrog index used (2 is unstable)
-                                )
+                                lf::Int=1)                          # leapfrog index used (2 is unstable)
 
-    @unpack damping, damping_impl = model.horizontal_diffusion
+    k = diagn.k
+    @unpack n_stratosphere_levels = model.geometry
+
+    if k <= n_stratosphere_levels   # if level in the stratosphere use stratospheric diffusion operators
+        ∇²ⁿ = model.horizontal_diffusion.∇²ⁿ_stratosphere
+        ∇²ⁿ_implicit = model.horizontal_diffusion.∇²ⁿ_implicit_stratosphere
+    else
+        @unpack ∇²ⁿ, ∇²ⁿ_implicit = model.horizontal_diffusion
+    end
 
     for varname in diffusion_vars(model)
         var = getfield(progn.leapfrog[lf],varname)
         var_tend = getfield(diagn.tendencies,Symbol(varname,:_tend))
-        horizontal_diffusion!(var_tend,var,damping,damping_impl)
+        horizontal_diffusion!(var_tend,var,∇²ⁿ,∇²ⁿ_implicit)
     end
 end
 

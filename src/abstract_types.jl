@@ -42,3 +42,5 @@ abstract type AbstractImplicit{NF} end
 # PLANETS
 abstract type Planet end
 
+# NUMERICS
+abstract type DiffusionParameters end

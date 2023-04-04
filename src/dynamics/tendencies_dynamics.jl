@@ -610,11 +610,11 @@ function interface_relaxation!( η::LowerTriangularMatrix{Complex{NF}},
                                 ) where NF    
 
     @unpack pres_tend = surface
-    @unpack seasonal_cycle, equinox, tropic_cancer = M.parameters
+    @unpack seasonal_cycle, equinox, axial_tilt = M.parameters.planet
     A = M.parameters.interface_relax_amplitude
 
     s = 45/23.5     # heuristic conversion to Legendre polynomials
-    θ = seasonal_cycle ? s*tropic_cancer*sin(Dates.days(time - equinox)/365.25*2π) : 0
+    θ = seasonal_cycle ? s*axial_tilt*sin(Dates.days(time - equinox)/365.25*2π) : 0
     η2 = convert(NF,A*(2sind(θ)))           # l=1,m=0 harmonic
     η3 = convert(NF,A*(0.2-1.5cosd(θ)))     # l=2,m=0 harmonic
 

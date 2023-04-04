@@ -5,11 +5,11 @@
 
         (;vor) = p.layers[1].leapfrog[1]
         (;vor_tend) = d.layers[1].tendencies
-        (;damping,damping_impl) = m.horizontal_diffusion
+        (;∇²ⁿ,∇²ⁿ_implicit) = m.horizontal_diffusion
 
         vor = randn(typeof(vor),size(vor)...)
 
-        SpeedyWeather.horizontal_diffusion!(vor_tend,vor,damping,damping_impl)
+        SpeedyWeather.horizontal_diffusion!(vor_tend,vor,∇²ⁿ,∇²ⁿ_implicit)
 
         # diffusion tendency has opposite sign (real/imag respectively)
         # than prognostic variable to act as a dissipation 
