@@ -17,15 +17,23 @@ and Julia will compile to these choices just-in-time.
 For an overview of the functionality and explanation see the (always somehow incomplete)
 [documentation](https://speedyweather.github.io/SpeedyWeather.jl/dev).
 
-## Example use
+## Gallery
 
-SpeedyWeather.jl is currently developed. Some things work, some don't. Stay tuned.
-Here is video of some relative vorticity, simulated at T1023 spectral resolution (about 10km),
-simulated on an [octahedral Clenshaw-Curtis grid](https://github.com/milankl/SpeedyWeather.jl/issues/112#issuecomment-1219644323)
+Here is video of some relative vorticity in the shallow water model, simulated at T1023 spectral resolution (about 10km) on an
+[octahedral Clenshaw-Curtis grid](https://github.com/milankl/SpeedyWeather.jl/issues/112#issuecomment-1219644323)
 with more than 4 million grid points
 
 https://user-images.githubusercontent.com/25530332/190443050-d5b8d093-86c0-46c9-b515-8420059ac8dc.mp4
 
+The primitie equation core (wet or dry) is in development, this is temperature at the surface and at the tropopause
+at T511 (~20km resolution) and 31 vertical levels. The simulation was multi-threaded in Float32 (single precision).
+The orography is visible at the tropopause level because we currently use sigma coordinates
+
+https://user-images.githubusercontent.com/25530332/229872856-bdcab69a-2226-4e9b-9470-9c9f90aa31e7.mp4
+
+## Example use
+
+SpeedyWeather.jl is currently developed. Some things work, some don't. Stay tuned.
 The main interface to SpeedyWeather.jl is 
 
 ```julia
@@ -35,7 +43,7 @@ Weather is speedy run 1: 100%|████████████████�
 ```
 
 Hurray! In 4 seconds we just simulated 30 days of the Earth's atmosphere at a speed of 1500 years per day.
-This simulation used a T63 spectral resolution on an octahedral Gaussian grid (165km resolution) solving
+This simulation used a T63 spectral resolution on an octahedral Gaussian grid (~165km resolution) solving
 the shallow water equations. The arguments for `run_speedy` are described in
 [`src/default_parameters.jl`](https://github.com/milankl/SpeedyWeather.jl/blob/main/src/default_parameters.jl).
 
