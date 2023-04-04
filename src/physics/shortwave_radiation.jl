@@ -87,7 +87,6 @@ function sol_oz!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
     @unpack tyear, latd = column
-    @unpack tropic_cancer = model.parameters
     @unpack solc, epssw = model.parameters.radiation_coefs
 
     # Compute cosine and sine of latitude
