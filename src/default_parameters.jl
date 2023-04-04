@@ -90,8 +90,8 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     radiation_coefs::Coefficients = RadiationCoefs{NF}()
 
     # BOUNDARY LAYER
-    boundary_layer::BoundaryLayer = LinearDrag{NF}()
-    temperature_relaxation::TemperatureRelaxation = HeldSuarez{NF}()
+    boundary_layer::BoundaryLayer{Float64} = LinearDrag()
+    temperature_relaxation::TemperatureRelaxation{Float64} = HeldSuarez()
 
     # TIME STEPPING
     startdate::DateTime = DateTime(2000,1,1)    # time at which the integration starts

@@ -60,19 +60,19 @@ Base.@kwdef struct RadiationCoefs{NF<:Real} <: Coefficients
 end    
 
 """Concrete type that disables the boundary layer scheme."""
-struct NoBoundaryLayer <: BoundaryLayer end
+struct NoBoundaryLayer{NF} <: BoundaryLayer{NF} end
 
 """Following Held and Suarez, 1996 BAMS"""
-Base.@kwdef struct LinearDrag{NF<:Real} <: BoundaryLayer
+Base.@kwdef struct LinearDrag{NF<:Real} <: BoundaryLayer{NF}
     σb::NF = 0.7            # sigma coordinate below which linear drag is applied
     drag_time::NF = 24.0    # [hours] time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
 end
 
 LinearDrag(;kwargs...) = LinearDrag{Float64}(;kwargs...)
 
-struct NoTemperatureRelaxation <: TemperatureRelaxation end
+struct NoTemperatureRelaxation{NF} <: TemperatureRelaxation{NF} end
 
-Base.@kwdef struct HeldSuarez{NF<:Real} <: TemperatureRelaxation
+Base.@kwdef struct HeldSuarez{NF<:Real} <: TemperatureRelaxation{NF}
     σb::NF = 0.7                    # sigma coordinate below which linear drag is applied
 
     relax_time_slow::NF = 40*24     # [hours] time scale for slow global relaxation

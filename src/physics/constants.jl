@@ -2,7 +2,7 @@ struct ParameterizationConstants{NF<:AbstractFloat} <: AbstractParameterizationC
     # BOUNDARY LAYER
     drag_coefs::Vector{NF}          # (inverse) drag time scale per layer
 
-    # TEMPERATURE RELAXATION
+    # TEMPERATURE RELAXATION (Held and Suarez, 1996)
     temp_relax_freq::Matrix{NF}     # (inverse) relaxation time scale per layer and latitude
     temp_equil_a::Vector{NF}        # two terms to calculate equilibrium temperature as function
     temp_equil_b::Vector{NF}        # of latitude and pressure
