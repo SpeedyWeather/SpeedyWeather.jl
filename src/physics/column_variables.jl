@@ -13,9 +13,9 @@ function get_column!(   C::ColumnVariables,
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
-    C.latd[] = G.latds[ij]      # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
-    C.lond[] = G.londs[ij]
-    C.jring[] = jring           # ring index j of column, used to index latitude vectors
+    C.latd = G.latds[ij]      # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
+    C.lond = G.londs[ij]
+    C.jring = jring           # ring index j of column, used to index latitude vectors
 
     # pressure [Pa]/[log(Pa)]
     lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics

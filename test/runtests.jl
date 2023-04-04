@@ -26,11 +26,11 @@ include("geopotential.jl")
 
 # PHYSICS
 include("column_variables.jl")
-include("thermodynamics.jl")
-include("large_scale_condensation.jl")
-include("convection.jl")
-include("longwave_radiation.jl")
-include("shortwave_radiation.jl")
+# include("thermodynamics.jl")
+# include("large_scale_condensation.jl")
+# include("convection.jl")
+# include("longwave_radiation.jl")
+# include("shortwave_radiation.jl")
 
 # INITIALIZATION AND INTEGRATION
 include("initialize.jl")

@@ -218,13 +218,13 @@ function Base.zeros(::Type{DiagnosticVariables},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
 
-    @unpack nlev,npoints = G
+    @unpack nlev, npoints, n_stratosphere_levels = G
     layers = [zeros(DiagnosticVariablesLayer,G,S;k) for k in 1:nlev]
     surface = zeros(SurfaceVariables,G,S)
     
     # create one column variable per thread to avoid race conditions
     nthreads = Threads.nthreads()
-    columns = [ColumnVariables{NF}(;nlev) for _ in 1:nthreads]
+    columns = [ColumnVariables{NF}(;nlev,n_stratosphere_levels) for _ in 1:nthreads]
 
     return DiagnosticVariables(layers,surface,columns,nlev,npoints)
 end
