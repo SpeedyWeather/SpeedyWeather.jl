@@ -25,7 +25,7 @@ with more than 4 million grid points
 
 https://user-images.githubusercontent.com/25530332/190443050-d5b8d093-86c0-46c9-b515-8420059ac8dc.mp4
 
-The primitie equation core (wet or dry) is in development, this is temperature at the surface and at the tropopause
+The primitive equation core (wet or dry) is in development, this is temperature at the surface and at the tropopause
 at T511 (~20km resolution) and 31 vertical levels. The simulation was multi-threaded in Float32 (single precision).
 The orography is visible at the tropopause level because we currently use sigma coordinates
 
@@ -47,6 +47,15 @@ This simulation used a T63 spectral resolution on an octahedral Gaussian grid (~
 the shallow water equations. The arguments for `run_speedy` are described in
 [`src/default_parameters.jl`](https://github.com/milankl/SpeedyWeather.jl/blob/main/src/default_parameters.jl).
 
+To run the primitive equation dry core you can for example do
+
+```julia
+julia> run_speedy(Float32,PrimitiveDryCore,physics=true,diffusion=HyperDiffusion(power=2))
+Weather is speedy: 100%|███████████████████████████████████| Time: 0:00:03 (753.71 years/day)
+```
+
+The arguments here use single precision (Float32), enable physics (Held-Suarez forcing and boundary layer drag) and use biharmonic diffusion (default `power=4`).
+
 ## History
 
 SpeedyWeather.jl is a reinvention of the atmospheric general circulation model
@@ -67,7 +76,7 @@ out to their own packages for now
 - __RingGrids__, a module that defines several iso-latitude ring-based spherical grids (like the FullGaussianGrid or the HEALPixGrid) and interpolations between them
 - __SpeedyTransforms__, a module that defines the spherical harmonic transform between spectral space (for which LowerTriangularMatrices is used) and grid-point space (as defined by RingGrids).
 
-These modules can also be used independed of SpeedyWeather like so
+These modules can also be used independently of SpeedyWeather like so
 ```julia
 julia> import SpeedyWeather: LowerTriangularMatrices, RingGrids, SpeedyTransforms
 ```
