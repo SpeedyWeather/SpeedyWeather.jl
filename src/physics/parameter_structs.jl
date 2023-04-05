@@ -68,22 +68,17 @@ Base.@kwdef struct LinearDrag{NF<:Real} <: BoundaryLayer{NF}
     drag_time::NF = 24.0    # [hours] time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
 end
 
-LinearDrag(;kwargs...) = LinearDrag{Float64}(;kwargs...)
-
 struct NoTemperatureRelaxation{NF} <: TemperatureRelaxation{NF} end
 
 Base.@kwdef struct HeldSuarez{NF<:Real} <: TemperatureRelaxation{NF}
     σb::NF = 0.7                    # sigma coordinate below which linear drag is applied
 
-    relax_time_slow::NF = 40*24     # [hours] time scale for slow global relaxation
-    relax_time_fast::NF = 4*24      # [hours] time scale for faster tropical surface relaxation
+    relax_time_slow::NF = 40.0*24   # [hours] time scale for slow global relaxation
+    relax_time_fast::NF = 4.0*24    # [hours] time scale for faster tropical surface relaxation
 
-    Tmin::NF = 200      # minimum temperature [K] in equilibrium temperature
-    Tmax::NF = 315      # maximum temperature [K] in equilibrium temperature
+    Tmin::NF = 200.0    # minimum temperature [K] in equilibrium temperature
+    Tmax::NF = 315.0    # maximum temperature [K] in equilibrium temperature
 
-    ΔTy::NF = 60        # meridional temperature gradient [K]
-    Δθz::NF = 10        # vertical temperature gradient [K]
+    ΔTy::NF = 60.0      # meridional temperature gradient [K]
+    Δθz::NF = 10.0      # vertical temperature gradient [K]
 end
-
-HeldSuarez(;kwargs...) = HeldSuarez{Float64}(;kwargs...)
-
