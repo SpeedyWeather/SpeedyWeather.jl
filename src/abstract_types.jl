@@ -29,8 +29,8 @@ abstract type AbstractBoundaries{NF} end
 abstract type AbstractColumnVariables{NF} end
 
 # PARAMETERIZATIONS
-abstract type BoundaryLayer end
-abstract type TemperatureRelaxation end
+abstract type BoundaryLayer{NF} end
+abstract type TemperatureRelaxation{NF} end
 
 # INPUT/OUTPUT
 abstract type AbstractFeedback end

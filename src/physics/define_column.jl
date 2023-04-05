@@ -7,32 +7,34 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
 [end] at the lowermost model level at the planetary boundary layer."""
 Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnVariables{NF}
 
+    # DIMENSIONS
+    const nlev::Int = 0                     # number of vertical levels
+    const nband::Int = 0                    # number of radiation bands, needed for radiation
+    const n_stratosphere_levels::Int = 0    # number of stratospheric levels, needed for radiation
+    
     # COORDINATES
-    nlev::Int = 0                       # number of vertical levels
-    jring::Int = 0                      # latitude ring the column is on
-    lond::NF = NaN                      # longitude
-    latd::NF = NaN                      # latitude, needed for shortwave radiation
-    nband::Int = 4                      # number of radiation bands, needed for radiation
-    n_stratosphere_levels::Int = 0      # number of stratospheric levels, needed for radiation
+    jring::Int = 0                          # latitude ring the column is on
+    lond::NF = 0                            # longitude
+    latd::NF = 0                            # latitude, needed for shortwave radiation
 
     # PROGNOSTIC VARIABLES
-    u::Vector{NF} = zeros(NF,nlev)      # zonal velocity
-    v::Vector{NF} = zeros(NF,nlev)      # meridional velocity
-    temp::Vector{NF} = zeros(NF,nlev)   # temperature
-    humid::Vector{NF} = zeros(NF,nlev)  # specific humidity
+    const u::Vector{NF} = zeros(NF,nlev)      # zonal velocity
+    const v::Vector{NF} = zeros(NF,nlev)      # meridional velocity
+    const temp::Vector{NF} = zeros(NF,nlev)   # temperature
+    const humid::Vector{NF} = zeros(NF,nlev)  # specific humidity
 
     # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
-    ln_pres::Vector{NF} = zeros(NF,nlev+1)  # logarithm of pressure [log(hPa)]
-    pres::Vector{NF} = zeros(NF,nlev+1)     # pressure [hPa]
+    const ln_pres::Vector{NF} = zeros(NF,nlev+1)  # logarithm of pressure [log(hPa)]
+    const pres::Vector{NF} = zeros(NF,nlev+1)     # pressure [hPa]
 
     # TENDENCIES to accumulate the parametrizations into
-    u_tend::Vector{NF} = zeros(NF,nlev)
-    v_tend::Vector{NF} = zeros(NF,nlev)
-    temp_tend::Vector{NF} = zeros(NF,nlev)
-    humid_tend::Vector{NF} = zeros(NF,nlev)
+    const u_tend::Vector{NF} = zeros(NF,nlev)
+    const v_tend::Vector{NF} = zeros(NF,nlev)
+    const temp_tend::Vector{NF} = zeros(NF,nlev)
+    const humid_tend::Vector{NF} = zeros(NF,nlev)
 
     # DIAGNOSTIC VARIABLES
-    geopot::Vector{NF} = zeros(NF,nlev)
+    const geopot::Vector{NF} = zeros(NF,nlev)
 
     ## PARAMETERIZATIONS
     # Thermodynamics

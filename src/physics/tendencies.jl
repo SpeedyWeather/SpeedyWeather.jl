@@ -9,21 +9,21 @@ Extract for each vertical atmospheric column the prognostic variables
 grid-points, compute all parametrizations on a single-column basis,
 then write the tendencies back into a horizontal field of tendencies.
 """
-function parameterization_tendencies!(  diagn::DiagnosticVariables{NF},
+function parameterization_tendencies!(  diagn::DiagnosticVariables,
                                         time::DateTime,
-                                        model::PrimitiveEquation
-                                        ) where {NF}
+                                        model::PrimitiveEquation)
+
     G = model.geometry
     boundary_layer_scheme = model.parameters.boundary_layer
     temperature_relax_scheme = model.parameters.temperature_relaxation
 
     rings = eachring(G.Grid,G.nlat_half)
 
-    @floop for ij in eachgridpoint(diagn)   # loop over all horizontal grid points
+    @floop for ij in eachgridpoint(diagn)       # loop over all horizontal grid points
 
-        thread_id = Threads.threadid()      # not two threads should use the same ColumnVariable
+        thread_id = Threads.threadid()          # not two threads should use the same ColumnVariable
         column = diagn.columns[thread_id]
-        jring = whichring(ij,rings)         # ring index gridpoint ij is on
+        jring = whichring(ij,rings)             # ring index gridpoint ij is on
 
         reset_column!(column)                   # set accumulators back to zero for next grid point
         get_column!(column,diagn,ij,jring,G)    # extract column for contiguous memory access

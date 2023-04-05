@@ -203,7 +203,7 @@ end
 
 Obtain ring index j from gridpoint ij and Vector{UnitRange} describing rind indices
 as obtained from eachring(::Grid)"""
-function whichring(ij::Integer,rings::Vector{<:UnitRange})
+function whichring(ij::Integer,rings::Vector{UnitRange{Int}})
     @boundscheck 0 < ij <= rings[end][end] || throw(BoundsError)
     j = 1
     @inbounds while ij > rings[j][end]

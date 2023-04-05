@@ -18,7 +18,7 @@ function temperature_relaxation!(   column::ColumnVariables{NF},
                                     model::PrimitiveEquation) where NF
 
     (;temp,temp_tend,pres,ln_pres) = column
-    j = column.jring                        # latitude ring index j
+    j = column.jring[]                      # latitude ring index j
     (;temp_relax_freq,temp_equil_a,temp_equil_b) = model.parameterization_constants
     Tmin = convert(NF,scheme.Tmin)
     p₀ = convert(NF,model.parameters.pres_ref*100)  # [hPa] → [Pa]
