@@ -68,6 +68,9 @@ Base.@kwdef struct LinearDrag{NF<:Real} <: BoundaryLayer{NF}
     drag_time::NF = 24.0    # [hours] time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
 end
 
+# generator so that LinearDrag(drag_time=1::Int) is still possible → Float64
+LinearDrag(;kwargs...) = LinearDrag{Float64}(;kwargs...)
+
 struct NoTemperatureRelaxation{NF} <: TemperatureRelaxation{NF} end
 
 Base.@kwdef struct HeldSuarez{NF<:Real} <: TemperatureRelaxation{NF}
@@ -82,3 +85,6 @@ Base.@kwdef struct HeldSuarez{NF<:Real} <: TemperatureRelaxation{NF}
     ΔTy::NF = 60.0      # meridional temperature gradient [K]
     Δθz::NF = 10.0      # vertical temperature gradient [K]
 end
+
+# generator so that HeldSuarez(Tmin=200::Int) is still possible → Float64
+HeldSuarez(;kwargs...) = HeldSuarez{Float64}(;kwargs...)
