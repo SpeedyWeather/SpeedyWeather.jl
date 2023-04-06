@@ -59,16 +59,16 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "latent heat of sublimation [?]"
     alhs::Float64 = 2801
 
-    "stefan-Boltzmann constant [W/m^2/K^4]"
+    "stefan-Boltzmann constant [W/m²/K⁴]"
     sbc::Float64 = 5.67e-8
 
 
     # STANDARD ATMOSPHERE (reference values)
 
-    "moist adiabatic temperature lapse rate -dT/dz [K/km]"
+    "moist adiabatic temperature lapse rate ``-dT/dz`` [K/km]"
     lapse_rate::Float64 = 5
 
-    "absolute temperature at surface z=0 [K]"
+    "absolute temperature at surface ``z=0`` [K]"
     temp_ref::Float64 = 288
 
     "absolute temperature in stratosphere [K]"
@@ -138,7 +138,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     physics::Bool = true
 
 
-    "Compute shortwave radiation every n steps"
+    "Compute shortwave radiation every `n` steps"
     n_shortwave::Int = 3
 
     "Turn on SPPT?"
@@ -183,7 +183,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     ratio_secondary_mass_flux::Float64 = 0.8
 
     # Longwave radiation
-    "Number of bands used to compute fband"
+    "Number of bands used to compute `fband`"
     nband::Int = 4
 
     # Radiation
@@ -230,7 +230,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "which format to use to calculate the Legendre polynomials"
     legendre_NF::DataType = Float64
 
-    ":linear, :quadratic, :cubic, :lincub_coslat, :linquad_coslat²"
+    "`:linear`, `:quadratic`, `:cubic`, `:lincub_coslat`, `:linquad_coslat²`"
     legendre_shortcut::Symbol = :linear
 
 
