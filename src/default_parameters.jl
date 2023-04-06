@@ -1,3 +1,5 @@
+using DocStringExtensions
+
 const DEFAULT_NF = Float64          # number format
 const DEFAULT_MODEL = Barotropic    # abstract model type
 
@@ -7,15 +9,19 @@ const DEFAULT_MODEL = Barotropic    # abstract model type
 A struct to hold all model parameters that may be changed by the user.
 The struct uses keywords such that default values can be changed at creation.
 The default values of the keywords define the default model setup.
+
+$(TYPEDFIELDS)
 """
 Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
-    # NUMBER FORMATS
-    NF::DataType = DEFAULT_NF               # number format
+    "number format"
+    NF::DataType = DEFAULT_NF
 
     # RESOLUTION AND GRID
-    trunc::Int = 31                                     # spectral truncation
-    Grid::Type{<:AbstractGrid} = FullGaussianGrid       # grid used
+    "spectral truncation"
+    trunc::Int = 31
+    "grid in use"
+    Grid::Type{<:AbstractGrid} = FullGaussianGrid
     
     # EARTH'S PROPERTIES
     planet::Planet = Earth()
