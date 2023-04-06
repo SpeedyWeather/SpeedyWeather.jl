@@ -320,7 +320,7 @@ end
             add::Bool=false,
             flipsign::Bool=false)
 
-Calls ∇²!(∇⁻²alms,alms,S;add,flipsign,inverse=true)."""
+Calls `∇²!(∇⁻²alms, alms, S; add, flipsign, inverse=true)`."""
 function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}},# Output: inverse Laplacian of alms
                 alms::LowerTriangularMatrix{Complex{NF}},   # Input: spectral coefficients
                 S::SpectralTransform{NF};                   # precomputed eigenvalues
