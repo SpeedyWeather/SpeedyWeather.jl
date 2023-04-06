@@ -34,14 +34,10 @@ export  run_speedy,
 
 # EXPORT MODELS
 export  Barotropic,
-        BarotropicModel,
         ShallowWater,
-        ShallowWaterModel,
         PrimitiveEquation,
         PrimitiveDryCore,
-        PrimitiveWetCore,
-        PrimitiveDryCoreModel,
-        PrimitiveWetCoreModel
+        PrimitiveWetCore
 
 # EXPORT GRIDS
 export  LowerTriangularMatrix,
@@ -69,8 +65,7 @@ export  StartFromFile,
         StartWithVorticity
 
 # EXPORT TEMPERATURE RELAXATION SCHEMES
-export  TemperatureRelaxation,
-        NoTemperatureRelaxation,
+export  NoTemperatureRelaxation,
         HeldSuarez
 
 # EXPORT BOUNDARY LAYER SCHEMES

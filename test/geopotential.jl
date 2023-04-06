@@ -8,8 +8,8 @@
         temp = 280      # in Kelvin
         lf = 1
         for (progn_layer,diagn_layer) in zip(p.layers,d.layers)
-            progn_layer.leapfrog[lf].temp[1] = temp*m.spectral_transform.norm_sphere
-            fill!(progn_layer.leapfrog[lf].humid,0)                 # dry core
+            progn_layer.timesteps[lf].temp[1] = temp*m.spectral_transform.norm_sphere
+            fill!(progn_layer.timesteps[lf].humid,0)                 # dry core
             SpeedyWeather.gridded!(diagn_layer,progn_layer,lf,m)    # propagate spectral state to grid
             SpeedyWeather.linear_virtual_temperature!(diagn_layer,progn_layer,m,lf)
         end
@@ -36,7 +36,7 @@ end
         # give every layer some constant temperature
         temp = 280      # in Kelvin
         for k in 1:nlev
-            p.layers[k].leapfrog[1].temp[1] = temp*m.spectral_transform.norm_sphere
+            p.layers[k].timesteps[1].temp[1] = temp*m.spectral_transform.norm_sphere
         end
 
         SpeedyWeather.geopotential!(d,m.boundaries,m.geometry)
@@ -59,12 +59,12 @@ end
         temp = 280      # in Kelvin
         lf = 1
         for (progn_layer,diagn_layer) in zip(p.layers,d.layers)
-            progn_layer.leapfrog[lf].temp[1] = temp*m.spectral_transform.norm_sphere
-            fill!(progn_layer.leapfrog[lf].humid,0)                 
-            progn_layer.leapfrog[lf].humid[1] = rand(NF)
+            progn_layer.timesteps[lf].temp[1] = temp*m.spectral_transform.norm_sphere
+            fill!(progn_layer.timesteps[lf].humid,0)                 
+            progn_layer.timesteps[lf].humid[1] = rand(NF)
             SpeedyWeather.gridded!(diagn_layer,progn_layer,lf,m)    # propagate spectral state to grid
             
-            temp_lf = progn_layer.leapfrog[lf].temp     # always passed on for compat with DryCore
+            temp_lf = progn_layer.timesteps[lf].temp     # always passed on for compat with DryCore
             SpeedyWeather.virtual_temperature!(diagn_layer,temp_lf,m)
 
             T  = diagn_layer.grid_variables.temp_grid

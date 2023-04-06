@@ -14,7 +14,7 @@ end
     # BAROTROPIC MODEL
     progn, diagn, model = initialize_speedy(Barotropic,initial_conditions=StartFromRest())
     for layers in progn.layers
-        for leapfrog in layers.leapfrog
+        for leapfrog in layers.timesteps
             @test all(leapfrog.vor .== 0)
         end
     end
@@ -22,13 +22,13 @@ end
     # SHALLOW WATER MODEL
     progn, diagn, model = initialize_speedy(ShallowWater,initial_conditions=StartFromRest())
     for layers in progn.layers
-        for leapfrog in layers.leapfrog
+        for leapfrog in layers.timesteps
             @test all(leapfrog.vor .== 0)
             @test all(leapfrog.div .== 0)
         end
     end
-    @test all(progn.pres.leapfrog[1] .== 0)
-    @test all(progn.pres.leapfrog[2] .== 0)
+    @test all(progn.pres.timesteps[1] .== 0)
+    @test all(progn.pres.timesteps[2] .== 0)
 
     # # PRIMITIVE EQUATION MODEL
     # progn, diagn, model = initialize_speedy(initial_conditions=StartFromRest,model=PrimitiveEquation)

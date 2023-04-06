@@ -3,7 +3,7 @@
 
         p,d,m = initialize_speedy(T)
 
-        (;vor) = p.layers[1].leapfrog[1]
+        (;vor) = p.layers[1].timesteps[1]
         (;vor_tend) = d.layers[1].tendencies
         (;∇²ⁿ,∇²ⁿ_implicit) = m.horizontal_diffusion
 

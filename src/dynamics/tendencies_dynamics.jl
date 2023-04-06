@@ -3,7 +3,7 @@ function pressure_gradient!(diagn::DiagnosticVariables,
                             lf::Integer,        # leapfrog index
                             S::SpectralTransform)
     
-    pres = progn.pres.leapfrog[lf]                      # log of surface pressure
+    pres = progn.pres.timesteps[lf]                      # log of surface pressure
     ∇lnp_x_spec = diagn.layers[1].dynamics_variables.a  # reuse work arrays for gradients
     ∇lnp_y_spec = diagn.layers[1].dynamics_variables.b  # in spectral space
     @unpack ∇lnp_x, ∇lnp_y = diagn.surface              # but store in grid space
@@ -71,7 +71,7 @@ function vertical_integration!( diagn::DiagnosticVariables{NF},
         u = diagn.layers[k].grid_variables.u_grid
         v = diagn.layers[k].grid_variables.v_grid
         D = diagn.layers[k].grid_variables.div_grid
-        D_spec = progn.layers[k].leapfrog[lf].div
+        D_spec = progn.layers[k].timesteps[lf].div
         
         # for the Σ_r=1^k-1 Δσᵣ(Dᵣ +  u̲⋅∇lnpₛ) vertical integration
         # Simmons and Burridge, 1981 eq 3.12 split into div and u̲⋅∇lnpₛ
@@ -569,7 +569,7 @@ function linear_pressure_gradient!( diagn::DiagnosticVariablesLayer,
     
     @unpack R_dry = model.constants
     Tₖ = model.geometry.temp_ref_profile[diagn.k]           # reference temperature at layer k      
-    pres = progn.pres.leapfrog[lf]
+    pres = progn.pres.timesteps[lf]
     @unpack geopot = diagn.dynamics_variables
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
@@ -636,7 +636,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariables,     # all diagno
 
     # surface only for ShallowWaterModel or PrimitiveEquation
     S = model.spectral_transform
-    model isa Barotropic || gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf],S)
+    model isa Barotropic || gridded!(diagn.surface.pres_grid,progn.pres.timesteps[lf],S)
 
     return nothing
 end
@@ -652,7 +652,7 @@ Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the barotropic vorticity model.
 Updates grid vorticity, spectral stream function and spectral and grid velocities u,v."""
 function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,   
-                                    progn::PrognosticVariablesLeapfrog,
+                                    progn::PrognosticLayerTimesteps,
                                     lf::Int,                            # leapfrog index
                                     model::Barotropic)
     
@@ -661,7 +661,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
-    vor_lf = progn.leapfrog[lf].vor     # relative vorticity at leapfrog step lf
+    vor_lf = progn.timesteps[lf].vor     # relative vorticity at leapfrog step lf
     gridded!(vor_grid,vor_lf,S)         # get vorticity on grid from spectral vor
     
     # get spectral U,V from spectral vorticity via stream function Ψ
@@ -688,7 +688,7 @@ diagnostic variables in `diagn` for the shallow water model. Updates grid vortic
 grid divergence, grid interface displacement (`pres_grid`) and the velocities
 U,V (scaled by cos(lat))."""
 function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
-                                    progn::PrognosticVariablesLeapfrog,
+                                    progn::PrognosticLayerTimesteps,
                                     lf::Int,                            # leapfrog index
                                     model::ShallowWater,                # everything that's constant
                                     )
@@ -698,8 +698,8 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
-    vor_lf = progn.leapfrog[lf].vor     # pick leapfrog index without memory allocation
-    div_lf = progn.leapfrog[lf].div   
+    vor_lf = progn.timesteps[lf].vor     # pick leapfrog index without memory allocation
+    div_lf = progn.timesteps[lf].div   
 
     # get spectral U,V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
@@ -717,7 +717,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
 end
 
 function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
-                                    progn::PrognosticVariablesLeapfrog,
+                                    progn::PrognosticLayerTimesteps,
                                     lf::Int,                            # leapfrog index
                                     model::PrimitiveEquation,           # everything that's constant
                                     )
@@ -730,10 +730,10 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     S = model.spectral_transform
     wet_core = model isa PrimitiveWetCore
 
-    vor_lf = progn.leapfrog[lf].vor     # pick leapfrog index without memory allocation
-    div_lf = progn.leapfrog[lf].div
-    temp_lf = progn.leapfrog[lf].temp
-    wet_core && (humid_lf = progn.leapfrog[lf].humid)
+    vor_lf = progn.timesteps[lf].vor     # pick leapfrog index without memory allocation
+    div_lf = progn.timesteps[lf].div
+    temp_lf = progn.timesteps[lf].temp
+    wet_core && (humid_lf = progn.timesteps[lf].humid)
 
     # get spectral U,V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon

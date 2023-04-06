@@ -7,7 +7,7 @@ Base.@kwdef struct Earth <: Planet
     length_of_day::Float64 = 24             # time [hrs] of a day
 
     seasonal_cycle::Bool = true             # Seasonal cycle?
-    length_of_year::Float64 = 365.25         # time [days] of a year
+    length_of_year::Float64 = 365.25        # time [days] of a year
     equinox::DateTime = DateTime(2000,3,20) # Spring equinox (year irrelevant)
     axial_tilt::Float64 = 23.4              # angle [˚] rotation axis tilt wrt to orbit
 end

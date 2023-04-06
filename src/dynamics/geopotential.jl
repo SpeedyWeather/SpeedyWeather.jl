@@ -93,8 +93,8 @@ function geopotential!( diagn::DiagnosticVariables{NF},
     # # TODO only for spectral coefficients 1,: ?
     # lmax,mmax = size(geopot)
     # for k in 2:nlev-1
-    #     temp_k_above = progn.layers[k-1].leapfrog[lf].temp
-    #     temp_k_below = progn.layers[k+1].leapfrog[lf].temp
+    #     temp_k_above = progn.layers[k-1].timesteps[lf].temp
+    #     temp_k_below = progn.layers[k+1].timesteps[lf].temp
     #     geopot  = diagn.layers[k].dynamics_variables.geopot
 
     #     for l in 1:lmax-1
@@ -161,14 +161,14 @@ function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
 end
 
 function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
-                                        progn::PrognosticVariablesLeapfrog,
+                                        progn::PrognosticLayerTimesteps,
                                         model::PrimitiveWetCore,
                                         lf::Int)
     
     @unpack temp_virt = diagn.dynamics_variables
     μ = model.constants.μ_virt_temp
     Tₖ = model.geometry.temp_ref_profile[diagn.k]   
-    @unpack temp,humid = progn.leapfrog[lf]
+    @unpack temp,humid = progn.timesteps[lf]
 
     @. temp_virt = temp + Tₖ*μ*humid
 end
@@ -189,12 +189,12 @@ function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
 end
 
 function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
-                                        progn::PrognosticVariablesLeapfrog,
+                                        progn::PrognosticLayerTimesteps,
                                         ::PrimitiveDryCore,
                                         lf::Int)
     
     @unpack temp_virt = diagn.dynamics_variables
-    @unpack temp = progn.leapfrog[lf]
+    @unpack temp = progn.timesteps[lf]
 
     copyto!(temp_virt,temp)
 end

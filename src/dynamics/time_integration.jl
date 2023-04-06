@@ -48,15 +48,15 @@ leapfrog_layer_vars(::ShallowWater) = (:vor, :div)
 leapfrog_layer_vars(::PrimitiveDryCore) = (:vor, :div, :temp)
 leapfrog_layer_vars(::PrimitiveWetCore) = (:vor, :div, :temp, :humid)
 
-function leapfrog!( progn::PrognosticVariablesLeapfrog,
+function leapfrog!( progn::PrognosticLayerTimesteps,
                     diagn::DiagnosticVariablesLayer,
                     dt::Real,               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
                     lf::Int,                # leapfrog index to dis/enable William's filter
                     model::ModelSetup)
                
     for var in leapfrog_layer_vars(model)
-        var_old = getproperty(progn.leapfrog[1],var)
-        var_new = getproperty(progn.leapfrog[2],var)
+        var_old = getproperty(progn.timesteps[1],var)
+        var_new = getproperty(progn.timesteps[2],var)
         var_tend = getproperty(diagn.tendencies,Symbol(var,:_tend))
         leapfrog!(var_old,var_new,var_tend,dt,lf,model.constants)
     end
@@ -159,7 +159,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     diagn_layer = diagn.layers[1]
     diagn_surface = diagn.surface
     @unpack pres = progn
-    pres_lf = pres.leapfrog[lf2]
+    pres_lf = pres.timesteps[lf2]
 
     dynamics_tendencies!(diagn_layer,diagn_surface,pres_lf,time,M)      # tendency of vor, div, pres
     implicit_correction!(diagn_layer,progn_layer,diagn_surface,pres,M)  # dampen gravity waves
@@ -169,9 +169,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
 
     # SURFACE LAYER (pressure)
     @unpack pres_tend = diagn_surface
-    pres_old,pres_new = pres.leapfrog
+    pres_old,pres_new = pres.timesteps
     leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,M.constants)
-    gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf2],M.spectral_transform)
+    gridded!(diagn.surface.pres_grid,progn.pres.timesteps[lf2],M.spectral_transform)
 end
 
 """
@@ -214,9 +214,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
             gridded!(diagn_layer,progn_layer,lf2,model)             # propagate spectral state to grid
         else                                # surface level
             pres_tend = diagn.surface.pres_tend
-            pres_old,pres_new = progn.pres.leapfrog
+            pres_old,pres_new = progn.pres.timesteps
             leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,model.constants)
-            gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf2],model.spectral_transform)
+            gridded!(diagn.surface.pres_grid,progn.pres.timesteps[lf2],model.spectral_transform)
         end
     end
 end

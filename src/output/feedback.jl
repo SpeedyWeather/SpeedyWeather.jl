@@ -96,7 +96,7 @@ function nar_detection!(feedback::Feedback,progn::PrognosticVariables)
     feedback.nars_detected && return nothing    # escape immediately if nans already detected
     i = feedback.progress_meter.counter         # time step
     nars_detected_here = false
-    @unpack vor = progn.layers[end].leapfrog[2] # only check for surface vorticity
+    @unpack vor = progn.layers[end].timesteps[2] # only check for surface vorticity
 
     if ~nars_detected_here
         nars_vor = ~isfinite(vor[1])    # just check first mode

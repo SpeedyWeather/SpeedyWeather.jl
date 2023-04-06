@@ -32,7 +32,7 @@ spectral_resolutions_inexact = (127,255)
                 p,d,m = initialize_speedy(NF;trunc,Grid)
                 S = m.spectral_transform
 
-                alms = copy(p.layers[1].leapfrog[1].vor)
+                alms = copy(p.layers[1].timesteps[1].vor)
                 fill!(alms,0)
                 alms[1,1] = 1
 
@@ -52,7 +52,7 @@ end
             p1,d1,m1 = initialize_speedy(NF;trunc,recompute_legendre=false)
             p2,d2,m2 = initialize_speedy(NF;trunc,recompute_legendre=true)
 
-            (;vor) = p1.layers[1].leapfrog[1]
+            (;vor) = p1.layers[1].timesteps[1]
             alms = randn(typeof(vor),size(vor)...)
 
             map1 = gridded(alms,m1.spectral_transform)
