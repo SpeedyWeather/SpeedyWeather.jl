@@ -24,114 +24,181 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     Grid::Type{<:AbstractGrid} = FullGaussianGrid
     
     # EARTH'S PROPERTIES
+    "planet"
     planet::Planet = Earth()
     
     # ATMOSPHERE
-    mol_mass_dry_air = 28.9649              # molar mass of dry air [g/mol]
-    mol_mass_vapour = 18.0153               # molar mass of water vapour [g/mol]
-    cₚ::Float64 = 1004                      # specific heat at constant pressure [J/K/kg]
-    R_gas::Float64 = 8.3145                 # universal gas constant [J/K/mol]
-    R_dry::Float64 = 1000*R_gas/mol_mass_dry_air   # specific gas constant for dry air [J/kg/K]
-    R_vapour::Float64 = 1000*R_gas/mol_mass_vapour # specific gas constant for water vapour [J/kg/K]
-    alhc::Float64 = 2501                    # latent heat of condensation [J/g] for consistency with
-                                            # specific humidity [g/Kg]
-    alhs::Float64 = 2801                    # latent heat of sublimation [?]
-    sbc::Float64 = 5.67e-8                  # stefan-Boltzmann constant [W/m^2/K^4]
+    "molar mass of dry air [g/mol]"
+    mol_mass_dry_air = 28.9649
+    "molar mass of water vapour [g/mol]"
+    mol_mass_vapour = 18.0153
+    "specific heat at constant pressure [J/K/kg]"
+    cₚ::Float64 = 1004
+    "universal gas constant [J/K/mol]"
+    R_gas::Float64 = 8.3145
+    "specific gas constant for dry air [J/kg/K]"
+    R_dry::Float64 = 1000*R_gas/mol_mass_dry_air
+    "specific gas constant for water vapour [J/kg/K]"
+    R_vapour::Float64 = 1000*R_gas/mol_mass_vapour
+    "latent heat of condensation [J/g] for consistency with specific humidity [g/Kg]"
+    alhc::Float64 = 2501
+    "latent heat of sublimation [?]"
+    alhs::Float64 = 2801
+    "stefan-Boltzmann constant [W/m^2/K^4]"
+    sbc::Float64 = 5.67e-8
 
     # STANDARD ATMOSPHERE (reference values)
-    lapse_rate::Float64 = 5                 # moist adiabatic temperature lapse rate -dT/dz [K/km]
-    temp_ref::Float64 = 288                 # absolute temperature at surface z=0 [K]
-    temp_top::Float64 = 216                 # absolute temperature in stratosphere [K]
-    ΔT_stratosphere::Float64 = 4.8e5        # for stratospheric lapse rate [K] after Jablonowski
-    scale_height::Float64 = 7.5             # scale height for pressure [km]
-    pres_ref::Float64 = 1000                # surface pressure [hPa]
-    scale_height_humid::Float64 = 2.5       # scale height for specific humidity [km]
-    relhumid_ref::Float64 = 0.7             # relative humidity of near-surface air [1]
-    water_pres_ref::Float64 = 17            # saturation water vapour pressure [Pa]
-    layer_thickness::Float64 = 8.5          # layer thickness for the shallow water model [km]
+    "moist adiabatic temperature lapse rate -dT/dz [K/km]"
+    lapse_rate::Float64 = 5
+    "absolute temperature at surface z=0 [K]"
+    temp_ref::Float64 = 288
+    "absolute temperature in stratosphere [K]"
+    temp_top::Float64 = 216
+    "for stratospheric lapse rate [K] after Jablonowski"
+    ΔT_stratosphere::Float64 = 4.8e5
+    "scale height for pressure [km]"
+    scale_height::Float64 = 7.5
+    "surface pressure [hPa]"
+    pres_ref::Float64 = 1000
+    "scale height for specific humidity [km]"
+    scale_height_humid::Float64 = 2.5
+    "relative humidity of near-surface air [1]"
+    relhumid_ref::Float64 = 0.7
+    "saturation water vapour pressure [Pa]"
+    water_pres_ref::Float64 = 17
+    "layer thickness for the shallow water model [km]"
+    layer_thickness::Float64 = 8.5
 
     # VERTICAL COORDINATES
-    # of the nlev vertical levels, defined by a generalised logistic function,
-    # interpolating ECMWF's L31 configuration
+    "vertical coordinates of the nlev vertical levels, defined by a generalised logistic function, interpolating ECMWF's L31 configuration"
     GLcoefs::Coefficients = GenLogisticCoefs()
-    n_stratosphere_levels::Int = 2                  # number of vertical levels used for the stratosphere
-    σ_tropopause::Float64 = 0.2                     # σ coordinate where the tropopause starts
-    σ_levels_half::Vector{Float64} = []             # only used if set manually, otherwise empty
-    nlev::Int = nlev_default(Model, σ_levels_half)  # number of vertical levels 
+    "number of vertical levels used for the stratosphere"
+    n_stratosphere_levels::Int = 2
+    "σ coordinate where the tropopause starts"
+    σ_tropopause::Float64 = 0.2
+    "only used if set manually, otherwise empty"
+    σ_levels_half::Vector{Float64} = []
+    "number of vertical levels "
+    nlev::Int = nlev_default(Model, σ_levels_half)
 
     # DIFFUSION AND DRAG
+    "(hyper)-diffusion"
     diffusion::DiffusionParameters = HyperDiffusion()
 
     # FORCING
-    interface_relaxation::Bool = false          # turn on interface relaxation for shallow water?
-    interface_relax_time::Float64 = 96          # time scale [hrs] of interface relaxation
-    interface_relax_amplitude::Float64 = 300    # Amplitude [m] of interface relaxation
+    "turn on interface relaxation for shallow water?"
+    interface_relaxation::Bool = false
+    "time scale [hrs] of interface relaxation"
+    interface_relax_time::Float64 = 96
+    "Amplitude [m] of interface relaxation"
+    interface_relax_amplitude::Float64 = 300
 
     # PARAMETRIZATIONS
-    physics::Bool = true                        # en/disables the physics parameterizations
+    "en/disables the physics parameterizations"
+    physics::Bool = true
 
-    n_shortwave::Int = 3                        # Compute shortwave radiation every n steps
-    sppt_on::Bool = false                       # Turn on SPPT?
-    magnus_coefs::Coefficients = MagnusCoefs{NF}()  # For computing saturation vapour pressure
+    "Compute shortwave radiation every n steps"
+    n_shortwave::Int = 3
+    "Turn on SPPT?"
+    sppt_on::Bool = false
+    "For computing saturation vapour pressure"
+    magnus_coefs::Coefficients = MagnusCoefs{NF}()
 
     # Large-Scale Condensation (from table B10)
-    k_lsc::Int = 2                    # Index of atmospheric level at which large-scale condensation begins
-    RH_thresh_pbl_lsc::Float64 = 0.95    # Relative humidity threshold for boundary layer
-    RH_thresh_range_lsc::Float64 = 0.1   # Vertical range of relative humidity threshold
-    RH_thresh_max_lsc::Float64 = 0.9     # Maximum relative humidity threshold
-    humid_relax_time_lsc::Float64 = 4.0  # Relaxation time for humidity (hours)
+    "Index of atmospheric level at which large-scale condensation begins"
+    k_lsc::Int = 2
+    "Relative humidity threshold for boundary layer"
+    RH_thresh_pbl_lsc::Float64 = 0.95
+    "Vertical range of relative humidity threshold"
+    RH_thresh_range_lsc::Float64 = 0.1
+    "Maximum relative humidity threshold"
+    RH_thresh_max_lsc::Float64 = 0.9
+    "Relaxation time for humidity (hours)"
+    humid_relax_time_lsc::Float64 = 4.0
 
     # Convection
-    pres_thresh_cnv::Float64 = 0.8              # Minimum (normalised) surface pressure for the occurrence of convection
-    RH_thresh_pbl_cnv::Float64 = 0.9            # Relative humidity threshold for convection in PBL
-    RH_thresh_trop_cnv::Float64 = 0.7           # Relative humidity threshold for convection in the troposphere
-    humid_relax_time_cnv::Float64 = 6.0         # Relaxation time for PBL humidity (hours)
-    max_entrainment::Float64 = 0.5              # Maximum entrainment as a fraction of cloud-base mass flux
-    ratio_secondary_mass_flux::Float64 = 0.8    # Ratio between secondary and primary mass flux at cloud-base
+    "Minimum (normalised) surface pressure for the occurrence of convection"
+    pres_thresh_cnv::Float64 = 0.8
+    "Relative humidity threshold for convection in PBL"
+    RH_thresh_pbl_cnv::Float64 = 0.9
+    "Relative humidity threshold for convection in the troposphere"
+    RH_thresh_trop_cnv::Float64 = 0.7
+    "Relaxation time for PBL humidity (hours)"
+    humid_relax_time_cnv::Float64 = 6.0
+    "Maximum entrainment as a fraction of cloud-base mass flux"
+    max_entrainment::Float64 = 0.5
+    "Ratio between secondary and primary mass flux at cloud-base"
+    ratio_secondary_mass_flux::Float64 = 0.8
 
     # Longwave radiation
-    nband::Int = 4                          # Number of bands used to compute fband
+    "Number of bands used to compute fband"
+    nband::Int = 4
 
     # Radiation
+    "radiation coefficients"
     radiation_coefs::Coefficients = RadiationCoefs{NF}()
 
     # BOUNDARY LAYER
+    "boundary layer drag"
     boundary_layer::BoundaryLayer{Float64} = LinearDrag()
+    "temperature relaxation"
     temperature_relaxation::TemperatureRelaxation{Float64} = HeldSuarez()
 
     # TIME STEPPING
-    startdate::DateTime = DateTime(2000,1,1)    # time at which the integration starts
-    n_days::Float64 = 10                        # number of days to integrate for
-    Δt_at_T31::Float64 = 30                     # time step in minutes for T31, scale linearly to trunc
+    "time at which the integration starts"
+    startdate::DateTime = DateTime(2000,1,1)
+    "number of days to integrate for"
+    n_days::Float64 = 10
+    "time step in minutes for T31, scale linearly to `trunc`"
+    Δt_at_T31::Float64 = 30
 
     # NUMERICS
-    robert_filter::Float64 = 0.05       # Robert (1966) time filter coefficeint to suppress comput. mode
-    williams_filter::Float64 = 0.53     # William's time filter (Amezcua 2011) coefficient for 3rd order acc
-    implicit_α::Float64 = 1             # coefficient for semi-implicit computations to filter gravity waves
+    "Robert (1966) time filter coefficeint to suppress comput. mode"
+    robert_filter::Float64 = 0.05
+    "William's time filter (Amezcua 2011) coefficient for 3rd order acc"
+    williams_filter::Float64 = 0.53
+    "coefficient for semi-implicit computations to filter gravity waves"
+    implicit_α::Float64 = 1
     
     # LEGENDRE TRANSFORM AND POLYNOMIALS
-    recompute_legendre::Bool = false    # recomputation is slower but requires less memory
-    legendre_NF::DataType = Float64     # which format to use to calculate the Legendre polynomials
-    legendre_shortcut::Symbol = :linear # :linear, :quadratic, :cubic, :lincub_coslat, :linquad_coslat²
+    "recomputation is slower but requires less memory"
+    recompute_legendre::Bool = false
+    "which format to use to calculate the Legendre polynomials"
+    legendre_NF::DataType = Float64
+    ":linear, :quadratic, :cubic, :lincub_coslat, :linquad_coslat²"
+    legendre_shortcut::Symbol = :linear
 
     # BOUNDARY FILES
-    boundary_path::String = ""          # package location is default
+    "package location is default"
+    boundary_path::String = ""
+    "orography"
     orography::AbstractOrography = EarthOrography()
-    orography_scale::Float64 = 1        # scale orography by a factor
+    "scale orography by a factor"
+    orography_scale::Float64 = 1
+    "path of orography"
     orography_path::String = boundary_path
+    "filename of orography"
     orography_file::String = "orography_F512.nc"
 
     # INITIAL CONDITIONS
-    seed::Int = 123456789           # random seed for the global random number generator
+    "random seed for the global random number generator"
+    seed::Int = 123456789
+    "initial conditions"
     initial_conditions::InitialConditions = initial_conditions_default(Model)
-    pressure_on_orography::Bool = false # calculate the initial surface pressure from orography
+    "calculate the initial surface pressure from orography"
+    pressure_on_orography::Bool = false
 
     # OUTPUT
-    verbose::Bool = true            # print dialog for feedback
-    debug::Bool = true              # print debug info, NaR detection
-    output::Bool = false            # Store data in netCDF?
-    output_dt::Float64 = 6          # output time step [hours]
-    output_path::String = pwd()     # path to output folder
+    "print dialog for feedback"
+    verbose::Bool = true
+    "print debug info, NaR detection"
+    debug::Bool = true
+    "Store data in netCDF?"
+    output::Bool = false
+    "output time step [hours]"
+    output_dt::Float64 = 6
+    "path to output folder"
+    output_path::String = pwd()
 
     # name of the output folder, defaults to 4-digit number counting up from run-0001
     run_id::Union{String,Int} = get_run_id(output, output_path)    
@@ -144,20 +211,29 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     version::VersionNumber = pkgversion(SpeedyWeather)
 
     # OUTPUT GRID
-    output_NF::DataType = Float32       # number format used for output
-    output_nlat_half::Int = 0           # 0 = reuse nlat_half from dynamical core
+    "number format used for output"
+    output_NF::DataType = Float32
+    "0 = reuse nlat_half from dynamical core"
+    output_nlat_half::Int = 0
     output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid(Grid)
     output_Interpolator::Type{<:AbstractInterpolator} = DEFAULT_INTERPOLATOR
-    output_matrix::Bool = false         # if true sort gridpoints into a matrix
+    "if true sort gridpoints into a matrix"
+    output_matrix::Bool = false
+    "rotation of output quadrant"
     output_quadrant_rotation::NTuple{4,Int} = (0,1,2,3)
+    "matrix of output quadrant"
     output_matrix_quadrant::NTuple{4,Tuple{Int,Int}} = ((2,2),(1,2),(1,1),(2,1))
     
-    missing_value::Float64 = NaN        # missing value to be used in netcdf output
+    "missing value to be used in netcdf output"
+    missing_value::Float64 = NaN
     
     # RESTART
-    write_restart::Bool = output        # also write restart file if output==true?
-    restart_path::String = output_path  # path for restart file
-    restart_id::Union{String,Int} = 1   # run_id of restart file in run-????/restart.jld2
+    "also write restart file if output==true?"
+    write_restart::Bool = output
+    "path for restart file"
+    restart_path::String = output_path
+    "run_id of restart file in run-????/restart.jld2"
+    restart_id::Union{String,Int} = 1
 end
 
 Parameters(;kwargs...) = Parameters{default_concrete_model(DEFAULT_MODEL)}(;kwargs...)
