@@ -67,7 +67,7 @@ Generator function to create the Geometry struct from parameters in `P`.
 """
 function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
-    @unpack trunc, nlev = P                         # grid type, spectral truncation, # of vertical levels
+    @unpack trunc, dealiasing, nlev = P             # grid type, spectral truncation, # of vertical levels
     @unpack radius, rotation, gravity = P.planet    # radius of planet, angular frequency, gravity
     @unpack R_dry, cₚ = P                           # gas constant for dry air, heat capacity
     @unpack σ_tropopause = P                        # number of vertical levels used for stratosphere
@@ -75,8 +75,9 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     @unpack ΔT_stratosphere = P                     # used for stratospheric temperature increase
 
     # RESOLUTION PARAMETERS
-    nlat_half = get_nlat_half(Grid,trunc)           # resolution parameter nlat_half
-                                                    # = number of lat rings on one hemisphere (Equator incl)
+    # resolution parameter nlat_half (= number of lat rings on one hemisphere (Equator incl) 
+    # from spectral resolution and dealiasing parameter (e.g. quadratic grid for T31)
+    nlat_half = SpeedyTransforms.get_nlat_half(trunc,dealiasing)
     nlat = get_nlat(Grid,nlat_half)                 # 2nlat_half but -1 if grids have odd # of lat rings
     nlon_max = get_nlon_max(Grid,nlat_half)         # number of longitudes around the equator
     nlon = nlon_max                                 # same (used for compatibility)
@@ -194,6 +195,42 @@ end
 
 Generator function for a SpectralTransform struct pulling in parameters from a Parameters struct."""
 function SpeedyTransforms.SpectralTransform(P::Parameters)
-    @unpack NF, Grid, trunc, recompute_legendre, legendre_shortcut = P
-    return SpectralTransform(NF,Grid,trunc,recompute_legendre;legendre_shortcut)
+    @unpack NF, Grid, trunc, dealiasing, recompute_legendre, legendre_shortcut = P
+    return SpectralTransform(NF,Grid,trunc,recompute_legendre;legendre_shortcut,dealiasing)
 end
+
+
+# truncation_order(::Type{<:FullClenshawGrid}) = 3            # cubic
+# get_truncation(::Type{<:FullClenshawGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
+# get_resolution(::Type{<:FullClenshawGrid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
+
+# truncation_order(::Type{<:FullGaussianGrid}) = 2            # quadratic
+# get_truncation(::Type{<:FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
+# get_resolution(::Type{<:FullGaussianGrid},trunc::Integer) = roundup_fft(ceil(Int,(3*trunc+1)/4))
+
+# truncation_order(::Type{<:FullGaussianGrid}) = 2            # quadratic
+# get_truncation(::Type{<:FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
+# get_resolution(::Type{<:FullGaussianGrid},trunc::Integer) = roundup_fft(ceil(Int,(3*trunc+1)/4))
+
+# truncation_order(::Type{<:FullOctaHEALPixGrid}) = 3            # cubic
+# get_truncation(::Type{<:FullOctaHEALPixGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
+# get_resolution(::Type{<:FullOctaHEALPixGrid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
+
+# truncation_order(::Type{<:HEALPixGrid}) = 1                 # linear (in longitude)
+# get_truncation(::Type{<:HEALPixGrid},nlat_half::Integer) = nlat_half-1
+# get_resolution(::Type{<:HEALPixGrid},trunc::Integer) = trunc+1
+
+# truncation_order(::Type{<:OctaHEALPixGrid}) = 3                 # cubic
+# get_truncation(::Type{<:OctaHEALPixGrid},nlat_half::Integer) = nlat_half-1
+# get_resolution(::Type{<:OctaHEALPixGrid},trunc::Integer) = trunc+1
+
+# truncation_order(::Type{<:OctahedralGaussianGrid}) = 3      # cubic
+# get_truncation(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = nlat_half-1
+# get_resolution(::Type{<:OctahedralGaussianGrid},trunc::Integer) = trunc+1
+
+# truncation_order(::Type{<:OctahedralClenshawGrid}) = 3      # cubic
+# get_truncation(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = nlat_half-1
+# get_nlat_half(::Type{<:OctahedralClenshawGrid},trunc::Integer) = roundup_fft(trunc+1)
+
+# get_nlat_half(G::Type{<:AbstractGrid},trunc::Integer) = get_resolution(G,trunc)
+# get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,grid.nlat_half)

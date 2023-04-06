@@ -102,9 +102,6 @@ nlat_half_clenshaw(npoints::Integer) = round(Int,1/4 + sqrt(1/16 + npoints/8))  
 FullClenshawGrid{T}(data::AbstractVector) where T = FullClenshawGrid{T}(data,nlat_half_clenshaw(length(data)))
 FullClenshawGrid(data::AbstractVector,n::Integer...) = FullClenshawGrid{eltype(data)}(data,n...)
 
-truncation_order(::Type{<:FullClenshawGrid}) = 3            # cubic
-get_truncation(::Type{<:FullClenshawGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
-get_resolution(::Type{<:FullClenshawGrid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
 nlat_odd(::Type{<:FullClenshawGrid}) = true
 get_npoints(::Type{<:FullClenshawGrid},nlat_half::Integer) = npoints_clenshaw(nlat_half)
 get_colat(::Type{<:FullClenshawGrid},nlat_half::Integer) = [j/(2nlat_half)*π for j in 1:2nlat_half-1]
@@ -134,9 +131,6 @@ nlat_half_gaussian(npoints::Integer) = round(Int,sqrt(npoints/8))
 FullGaussianGrid{T}(data::AbstractVector) where T = FullGaussianGrid{T}(data,nlat_half_gaussian(length(data)))
 FullGaussianGrid(data::AbstractVector,n::Integer...) = FullGaussianGrid{eltype(data)}(data,n...)
 
-truncation_order(::Type{<:FullGaussianGrid}) = 2            # quadratic
-get_truncation(::Type{<:FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
-get_resolution(::Type{<:FullGaussianGrid},trunc::Integer) = roundup_fft(ceil(Int,(3*trunc+1)/4))
 nlat_odd(::Type{<:FullGaussianGrid}) = false
 get_npoints(::Type{<:FullGaussianGrid},nlat_half::Integer) = npoints_gaussian(nlat_half)
 get_colat(::Type{<:FullGaussianGrid},nlat_half::Integer) =
@@ -166,9 +160,6 @@ nlat_half_fullhealpix(npoints::Integer) = round(Int,1/4 + sqrt(1/16 + npoints/8)
 # infer nlat_half from data vector length, infer parametric type from eltype of data
 FullHEALPixGrid{T}(data::AbstractVector) where T = FullHEALPixGrid{T}(data,nlat_half_fullhealpix(length(data)))
 FullHEALPixGrid(data::AbstractVector,n::Integer...) = FullHEALPixGrid{eltype(data)}(data,n...)
-truncation_order(::Type{<:FullHEALPixGrid}) = 2            # quadratic
-get_truncation(::Type{<:FullHEALPixGrid},nlat_half::Integer) = get_truncation(HEALPixGrid,nlat_half)
-get_resolution(::Type{<:FullHEALPixGrid},trunc::Integer) = get_resolution(HEALPixGrid,trunc)
 nlat_odd(::Type{<:FullHEALPixGrid}) = true
 get_npoints(::Type{<:FullHEALPixGrid},nlat_half::Integer) = npoints_fullhealpix(nlat_half)
 get_colat(::Type{<:FullHEALPixGrid},nlat_half::Integer) = get_colat(HEALPixGrid,nlat_half)
@@ -197,9 +188,6 @@ nlat_half_fulloctahealpix(npoints::Integer) = round(Int,1/4 + sqrt(1/16 + npoint
 FullOctaHEALPixGrid{T}(data::AbstractVector) where T = FullOctaHEALPixGrid{T}(data,nlat_half_fulloctahealpix(length(data)))
 FullOctaHEALPixGrid(data::AbstractVector,n::Integer...) = FullOctaHEALPixGrid{eltype(data)}(data,n...)
 
-truncation_order(::Type{<:FullOctaHEALPixGrid}) = 3            # cubic
-get_truncation(::Type{<:FullOctaHEALPixGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
-get_resolution(::Type{<:FullOctaHEALPixGrid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
 nlat_odd(::Type{<:FullOctaHEALPixGrid}) = true
 get_npoints(::Type{<:FullOctaHEALPixGrid},nlat_half::Integer) = npoints_fulloctahealpix(nlat_half)
 get_colat(::Type{<:FullOctaHEALPixGrid},nlat_half::Integer) = get_colat(OctaHEALPixGrid,nlat_half)

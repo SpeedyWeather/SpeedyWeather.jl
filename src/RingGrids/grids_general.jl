@@ -105,10 +105,8 @@ Base.rand(::Type{Grid},nlat_half::Integer) where {Grid<:AbstractGrid{T}} where T
     Grid(rand(T,get_npoints(Grid,nlat_half)),nlat_half)
 
 # truncation is the spectral truncation corresponding to size of grid and lin/quad/cubic truncation
-get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,grid.nlat_half)
 get_resolution(grid::AbstractGrid) = get_nlat_half(grid)
 get_nlat_half(grid::AbstractGrid) = grid.nlat_half
-get_nlat_half(G::Type{<:AbstractGrid},trunc::Integer) = get_resolution(G,trunc)
 
 # does the grid have an odd number of latitudes?
 nlat_odd(grid::AbstractGrid) = nlat_odd(typeof(grid))

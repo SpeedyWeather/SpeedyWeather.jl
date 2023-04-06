@@ -8,6 +8,7 @@ module SpeedyTransforms
     import FFTW
     import GenericFFT
     import LinearAlgebra
+    import Primes
 
     # SPEEDYWEATHER MODULES
     using ..LowerTriangularMatrices
@@ -21,6 +22,9 @@ module SpeedyTransforms
             gridded!,
             spectral,
             spectral!
+
+    # ALIASING
+    export  get_nlat_half
 
     # GRADIENTS
     export  curl!,
@@ -36,6 +40,7 @@ module SpeedyTransforms
             spectral_truncation!,
             spectral_interpolation
 
+    include("aliasing.jl")
     include("spectral_transform.jl")
     include("spectral_gradients.jl")
     include("spectral_truncation.jl")

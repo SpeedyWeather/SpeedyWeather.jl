@@ -127,10 +127,6 @@ end
 HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid{T}(data,nlat_half_healpix(length(data)))
 HEALPixGrid(data::AbstractVector,n::Integer...) = HEALPixGrid{eltype(data)}(data,n...)
 
-truncation_order(::Type{<:HEALPixGrid}) = 1                 # linear (in longitude)
-get_truncation(::Type{<:HEALPixGrid},nlat_half::Integer) = nlat_half-1
-get_resolution(::Type{<:HEALPixGrid},trunc::Integer) = trunc+1
-
 function get_colat(::Type{<:HEALPixGrid},nlat_half::Integer)
     nlat_half == 0 && return Float64[]
     

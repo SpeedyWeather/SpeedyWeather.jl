@@ -14,10 +14,11 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     NF::DataType = DEFAULT_NF               # number format
 
     # RESOLUTION AND GRID
-    trunc::Int = 31                                     # spectral truncation
-    Grid::Type{<:AbstractGrid} = FullGaussianGrid       # grid used
+    trunc::Int = 31                                 # spectral truncation
+    Grid::Type{<:AbstractGrid} = FullGaussianGrid   # grid used
+    dealiasing::Float64 = 2                         # 1=linear, 2=quadratic, 3=cubic grid
     
-    # EARTH'S PROPERTIES
+    # PLANET'S PROPERTIES
     planet::Planet = Earth()
     
     # ATMOSPHERE
