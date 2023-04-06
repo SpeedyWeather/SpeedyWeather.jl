@@ -70,7 +70,7 @@ function HorizontalDiffusion(   scheme::HyperDiffusion,
 
     # PRECALCULATE for every degree l
     for l in 0:lmax+1
-        eigenvalue_norm = -l*(l+1)/largest_eigenvalue       # normal diffusion ∇², power=1
+        eigenvalue_norm = -l*(l+1)/largest_eigenvalue       # normalised diffusion ∇², power=1
 
         # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
         # time scale [hrs] *3600-> [s]
@@ -79,7 +79,7 @@ function HorizontalDiffusion(   scheme::HyperDiffusion,
 
         # add additional diffusion for stratosphere
         ∇²ⁿ_stratosphere[l+1] = ∇²ⁿ[l+1] - 
-            norm_eigenvalue^power_stratosphere/(3600*time_scale_stratosphere)*radius
+            eigenvalue_norm^power_stratosphere/(3600*time_scale_stratosphere)*radius
         ∇²ⁿ_implicit_stratosphere[l+1] = 1/(1-2Δt*∇²ⁿ_stratosphere[l+1])
     end
 
