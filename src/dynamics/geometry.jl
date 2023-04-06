@@ -198,39 +198,3 @@ function SpeedyTransforms.SpectralTransform(P::Parameters)
     @unpack NF, Grid, trunc, dealiasing, recompute_legendre, legendre_shortcut = P
     return SpectralTransform(NF,Grid,trunc,recompute_legendre;legendre_shortcut,dealiasing)
 end
-
-
-# truncation_order(::Type{<:FullClenshawGrid}) = 3            # cubic
-# get_truncation(::Type{<:FullClenshawGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
-# get_resolution(::Type{<:FullClenshawGrid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
-
-# truncation_order(::Type{<:FullGaussianGrid}) = 2            # quadratic
-# get_truncation(::Type{<:FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
-# get_resolution(::Type{<:FullGaussianGrid},trunc::Integer) = roundup_fft(ceil(Int,(3*trunc+1)/4))
-
-# truncation_order(::Type{<:FullGaussianGrid}) = 2            # quadratic
-# get_truncation(::Type{<:FullGaussianGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/3)
-# get_resolution(::Type{<:FullGaussianGrid},trunc::Integer) = roundup_fft(ceil(Int,(3*trunc+1)/4))
-
-# truncation_order(::Type{<:FullOctaHEALPixGrid}) = 3            # cubic
-# get_truncation(::Type{<:FullOctaHEALPixGrid},nlat_half::Integer) = floor(Int,(4nlat_half-1)/4)
-# get_resolution(::Type{<:FullOctaHEALPixGrid},trunc::Integer) = roundup_fft(ceil(Int,(4*trunc+1)/4))
-
-# truncation_order(::Type{<:HEALPixGrid}) = 1                 # linear (in longitude)
-# get_truncation(::Type{<:HEALPixGrid},nlat_half::Integer) = nlat_half-1
-# get_resolution(::Type{<:HEALPixGrid},trunc::Integer) = trunc+1
-
-# truncation_order(::Type{<:OctaHEALPixGrid}) = 3                 # cubic
-# get_truncation(::Type{<:OctaHEALPixGrid},nlat_half::Integer) = nlat_half-1
-# get_resolution(::Type{<:OctaHEALPixGrid},trunc::Integer) = trunc+1
-
-# truncation_order(::Type{<:OctahedralGaussianGrid}) = 3      # cubic
-# get_truncation(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = nlat_half-1
-# get_resolution(::Type{<:OctahedralGaussianGrid},trunc::Integer) = trunc+1
-
-# truncation_order(::Type{<:OctahedralClenshawGrid}) = 3      # cubic
-# get_truncation(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = nlat_half-1
-# get_nlat_half(::Type{<:OctahedralClenshawGrid},trunc::Integer) = roundup_fft(trunc+1)
-
-# get_nlat_half(G::Type{<:AbstractGrid},trunc::Integer) = get_resolution(G,trunc)
-# get_truncation(grid::Grid) where {Grid<:AbstractGrid} = get_truncation(Grid,grid.nlat_half)
