@@ -15,10 +15,10 @@ The barotropic vorticity equation is the prognostic equation that describes the 
 relative vorticity ``\zeta`` with advection, Coriolis force and diffusion in a single global layer.
 
 ```math
-\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) = \nu\nabla^{2n}\zeta
+\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) = (-1)^{n+1}\nu\nabla^{2n}\zeta
 ```
-with time ``t``, velocity vector ``\mathbf{u} = (u,v)``, Coriolis parameter ``f`` and hyperdiffusion
-``\nu\nabla^{2n}\zeta`` (see [Horizontal diffusion](@ref)). Starting with some relative vorticity
+with time ``t``, velocity vector ``\mathbf{u} = (u, v)``, Coriolis parameter ``f`` and hyperdiffusion
+``(-1)^{n+1} \nu \nabla^{2n} \zeta`` (see [Horizontal diffusion](@ref)). Starting with some relative vorticity
 ``\zeta``, the [Laplacian](@ref) is inverted to obtain the stream function ``\Psi``
 
 ```math
