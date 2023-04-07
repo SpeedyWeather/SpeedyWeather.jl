@@ -26,8 +26,11 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "grid in use"
     Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
+    "dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
+    dealiasing::Float64 = 2
 
-    # EARTH'S PROPERTIES
+
+    # PLANET'S PROPERTIES
 
     "planet"
     planet::Planet = Earth()

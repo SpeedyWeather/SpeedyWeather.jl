@@ -109,9 +109,6 @@ nlon_octahedral(j::Integer) = 16+4j
 OctahedralGaussianGrid{T}(data::AbstractVector) where T = OctahedralGaussianGrid{T}(data,nlat_half_octahedral(length(data),false))
 OctahedralGaussianGrid(data::AbstractVector,n::Integer...) = OctahedralGaussianGrid{eltype(data)}(data,n...)
 
-truncation_order(::Type{<:OctahedralGaussianGrid}) = 3      # cubic
-get_truncation(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = nlat_half-1
-get_resolution(::Type{<:OctahedralGaussianGrid},trunc::Integer) = trunc+1
 nlat_odd(::Type{<:OctahedralGaussianGrid}) = false
 get_npoints(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = npoints_octahedral(nlat_half,false)
 get_colat(::Type{<:OctahedralGaussianGrid},nlat_half::Integer) = get_colat(FullGaussianGrid,nlat_half)
@@ -144,9 +141,6 @@ OctahedralClenshawGrid{T}(data::AbstractVector) where T = OctahedralClenshawGrid
                                                         nlat_half_octahedral(length(data),true))
 OctahedralClenshawGrid(data::AbstractVector,n::Integer...) = OctahedralClenshawGrid{eltype(data)}(data,n...)
 
-truncation_order(::Type{<:OctahedralClenshawGrid}) = 3      # cubic
-get_truncation(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = nlat_half-1
-get_nlat_half(::Type{<:OctahedralClenshawGrid},trunc::Integer) = roundup_fft(trunc+1)
 nlat_odd(::Type{<:OctahedralClenshawGrid}) = true
 get_npoints(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = npoints_octahedral(nlat_half,true)
 get_colat(::Type{<:OctahedralClenshawGrid},nlat_half::Integer) = get_colat(FullClenshawGrid,nlat_half)
