@@ -35,17 +35,11 @@ diffusion_vars(::PrimitiveEquation) = (:vor,:div,:temp)
 function horizontal_diffusion!( progn::PrognosticVariablesLeapfrog,
                                 diagn::DiagnosticVariablesLayer,
                                 model::ModelSetup,
-                                lf::Int=1)                          # leapfrog index used (2 is unstable)
+                                lf::Int=1)      # leapfrog index used (2 is unstable)
 
-    k = diagn.k
-    @unpack n_stratosphere_levels = model.geometry
-
-    if k <= n_stratosphere_levels   # if level in the stratosphere use stratospheric diffusion operators
-        ∇²ⁿ = model.horizontal_diffusion.∇²ⁿ_stratosphere
-        ∇²ⁿ_implicit = model.horizontal_diffusion.∇²ⁿ_implicit_stratosphere
-    else
-        @unpack ∇²ⁿ, ∇²ⁿ_implicit = model.horizontal_diffusion
-    end
+    k = diagn.k     # pick precalculated hyperdiffusion operator for layer k
+    ∇²ⁿ = model.horizontal_diffusion.∇²ⁿ[k]
+    ∇²ⁿ_implicit = model.horizontal_diffusion.∇²ⁿ_implicit[k]
 
     for varname in diffusion_vars(model)
         var = getfield(progn.leapfrog[lf],varname)
