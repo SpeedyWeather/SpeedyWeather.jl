@@ -581,7 +581,7 @@ end
                         Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                         kwargs...)
 
-Converts `map` to `grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""
+Converts `map` to `grid(map)` to execute `spectral(map::AbstractGrid;kwargs...)`."""
 function spectral(  map::AbstractMatrix;            # gridded field
                     Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                     kwargs...)
@@ -594,7 +594,7 @@ end
                         Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                         kwargs...)
 
-Converts `map` to `Grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""
+Converts `map` to `Grid(map)` to execute `spectral(map::AbstractGrid;kwargs...)`."""
 function spectral(  map::AbstractGrid{NF};          # gridded field
                     recompute_legendre::Bool=true,  # saves memory
                     ) where NF                      # number format NF
@@ -610,7 +610,7 @@ end
                         Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                         kwargs...)
 
-Spectral transform (grid to spectral) `map` to `grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""
+Spectral transform (grid to spectral) `map` to `grid(map)` to execute `spectral(map::AbstractGrid;kwargs...)`."""
 function spectral(  map::AbstractGrid{NF},      # gridded field
                     S::SpectralTransform{NF},   # spectral transform struct
                     ) where NF                  # number format NF
