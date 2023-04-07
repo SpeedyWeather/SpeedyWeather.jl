@@ -532,16 +532,17 @@ function absolute_vorticity!(   vor::AbstractGrid,
     end
 end
 
+\
 """
     bernoulli_potential!(   diagn::DiagnosticVariablesLayer, 
                             G::Geometry,
                             S::SpectralTransform)
 
 Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral space.
-    (1) computes the kinetic energy KE=1/2(u^2+v^2) on the grid
-    (2) transforms KE to spectral space
-    (3) adds geopotential for the bernoulli potential in spectral space
-    (4) takes the Laplace operator.
+  1. computes the kinetic energy KE = ½(u²+v²) on the grid
+  2. transforms KE to spectral space
+  3. adds geopotential for the bernoulli potential in spectral space
+  4. takes the Laplace operator.
     
 This version is used for both ShallowWater and PrimitiveEquation, only the geopotential
 calculation in geopotential! differs."""
