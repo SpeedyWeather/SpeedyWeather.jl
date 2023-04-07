@@ -352,7 +352,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
     lmax, mmax = size(alms) .- 1            # maximum degree l, order m of spherical harmonics
 
-    @boundscheck mmax+1 <= nfreq_max || throw(BoundsError)
+    @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
     @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
     @boundscheck get_nlat_half(map) == S.nlat_half || throw(BoundsError)
@@ -459,7 +459,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
     lmax, mmax = size(alms) .- 1    # maximum degree l, order m of spherical harmonics
 
-    @boundscheck mmax+1 <= nfreq_max || throw(BoundsError)
+    @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
     @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
     @boundscheck get_nlat_half(map) == S.nlat_half || throw(BoundsError)
