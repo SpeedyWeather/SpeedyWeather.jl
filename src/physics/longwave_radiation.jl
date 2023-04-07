@@ -16,7 +16,7 @@ end
     )
 
 Compute air temperature tendencies from longwave radiation for an atmospheric column.
-For more details see http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf
+For more details see [http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf](http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
 """
 function longwave_radiation!(   column::ColumnVariables,
                                 model::PrimitiveEquation)
