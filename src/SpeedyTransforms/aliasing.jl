@@ -9,18 +9,18 @@ end
 function get_truncation(nlat_half::Integer,
                         dealiasing::Real=DEFAULT_DEALIASING)
 
-    return floor(Int,(4nlat_half-1)/(1+dealiasing))
+    return floor(Int,(4nlat_half-1)/(dealiasing+1))
 end
 
 """
     m = roundup_fft(n::Int;
-                    small_primes::Vector{Int}=[2,3,5])
+                    small_primes::Vector{Int}=[2,3])
 
-Returns an integer `m >= n` with only small prime factors 2, 3, 5 (default, others can be specified
+Returns an integer `m >= n` with only small prime factors 2, 3 (default, others can be specified
 with the keyword argument `small_primes`) to obtain an efficiently fourier-transformable number of
 longitudes, m = 2^i * 3^j * 5^k >= n, with i,j,k >=0.
 """
-function roundup_fft(n::Integer;small_primes::Vector{T}=[2,3,5]) where {T<:Integer}
+function roundup_fft(n::Integer;small_primes::Vector{T}=[2,3]) where {T<:Integer}
     factors_not_in_small_primes = true      # starting condition for while loop
     n += isodd(n) ? 1 : 0                   # start with an even n
     while factors_not_in_small_primes

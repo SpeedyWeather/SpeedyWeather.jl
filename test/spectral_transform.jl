@@ -1,19 +1,40 @@
 @testset "FullGaussianGrid: Test grid and spectral resolution match" begin
-    Ts = (31,42,85,170,341,682)     # spectral resolutions
-    nlons = (96,128,256,512,1024)   # number of longitudes
-    nlats = (48,64,128,256,512)     # number of latitudes
-    for (T,nlon,nlat) in zip(Ts,nlons,nlats)
-        
-        nlat_half = SpeedyWeather.get_resolution(FullGaussianGrid,T)
-        @test (nlon,nlat) == (4nlat_half,2nlat_half)
+    
+    p = 5:10
 
-        trunc = SpeedyWeather.get_truncation(FullGaussianGrid,nlat÷2)
-        @test T == trunc
+    @testset for dealiasing in [2,3]
+        # powers of two minus 1, T31, T63, T127, etc
+        Ts = [2^i - 1 for i in p]                   # spectral resolutions
+        nlons = [(dealiasing+1)*2^i for i in p]     # number of longitudes
+        nlats = nlons/2                             # number of latitudes
+        for (T,nlon,nlat) in zip(Ts,nlons,nlats)
+            nlat_half = SpeedyTransforms.get_nlat_half(T,dealiasing)
+            @test (nlon,nlat) == (4nlat_half,2nlat_half)
+
+            trunc = SpeedyTransforms.get_truncation(nlat_half,dealiasing)
+            @test T == trunc
+        end
+    end
+
+    # for these resolutions just test idempotence as the roundup_fft may
+    # give various other options than just the 3*2^n-matching
+    @testset for dealiasing in [2,3]
+        # T42,T85,T170,T341,T682,T1365 etc
+        Ts = [floor(Int,2^(i+2)/3) for i in p]
+        nlons = [dealiasing*2^(i+1) for i in p]
+        nlats = nlons/2                             # number of latitudes
+        for (T,nlon,nlat) in zip(Ts,nlons,nlats)
+            nlat_half = SpeedyTransforms.get_nlat_half(T,dealiasing)
+            trunc = SpeedyTransforms.get_truncation(nlat_half,dealiasing)
+            nlat_half2 = SpeedyTransforms.get_nlat_half(trunc,dealiasing)
+            @test nlat_half == nlat_half2
+        end
     end
 end
 
 # for the following testsets test some spectral truncations
 # but not too large ones as they take so long
+
 spectral_resolutions = (31,63,127)
 spectral_resolutions_inexact = (127,255)
 
@@ -132,8 +153,11 @@ end
                                      FullClenshawGrid,
                                      OctahedralGaussianGrid,
                                      OctahedralClenshawGrid)
-                            
-                P = Parameters{ShallowWaterModel}(;NF,Grid,trunc)
+                
+                # clenshaw-curtis grids are only exact for cubic truncation
+                dealiasing = Grid in (FullGaussianGrid,OctahedralGaussianGrid) ? 2 : 3
+
+                P = Parameters{ShallowWaterModel}(;NF,Grid,trunc,dealiasing)
                 S = SpectralTransform(P)
                 G = Geometry(P)
                 B = Boundaries(P,S,G)
