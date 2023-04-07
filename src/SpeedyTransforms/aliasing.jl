@@ -20,7 +20,7 @@ Returns an integer `m >= n` with only small prime factors 2, 3 (default, others 
 with the keyword argument `small_primes`) to obtain an efficiently fourier-transformable number of
 longitudes, m = 2^i * 3^j * 5^k >= n, with i,j,k >=0.
 """
-function roundup_fft(n::Integer;small_primes::Vector{T}=[2,3]) where {T<:Integer}
+function roundup_fft(n::Integer;small_primes::Vector{T}=[2,3,5]) where {T<:Integer}
     factors_not_in_small_primes = true      # starting condition for while loop
     n += isodd(n) ? 1 : 0                   # start with an even n
     while factors_not_in_small_primes
