@@ -278,10 +278,12 @@ Laplace operator ∇² applied to the spectral coefficients `alms` in spherical
 coordinates. The radius `R` is omitted in the eigenvalues which are precomputed in `S`.
 ∇²! is the in-place version which directly stores the output in the first argument `∇²alms`.
 
-Options:
-    - `add=true` adds the ∇²(alms) to the output
-    - `flipsign=true` computes -∇²(alms) instead
-    - `inverse=true` computes ∇⁻²(alms) instead
+Keyword arguments
+=================
+
+  - `add=true` adds the ∇²(alms) to the output
+  - `flipsign=true` computes -∇²(alms) instead
+  - `inverse=true` computes ∇⁻²(alms) instead
 
 Default is `add=false`, `flipsign=false`, `inverse=false`. These options can be combined."""
 function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: (inverse) Laplacian of alms
@@ -320,7 +322,7 @@ end
             add::Bool=false,
             flipsign::Bool=false)
 
-Calls ∇²!(∇⁻²alms,alms,S;add,flipsign,inverse=true)."""
+Calls `∇²!(∇⁻²alms, alms, S; add, flipsign, inverse=true)`."""
 function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}},# Output: inverse Laplacian of alms
                 alms::LowerTriangularMatrix{Complex{NF}},   # Input: spectral coefficients
                 S::SpectralTransform{NF};                   # precomputed eigenvalues
