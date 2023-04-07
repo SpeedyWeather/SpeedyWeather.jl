@@ -541,7 +541,7 @@ end
 Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral space.
   1. computes the kinetic energy KE = ½(u²+v²) on the grid
   2. transforms KE to spectral space
-  3. adds geopotential for the bernoulli potential in spectral space
+  3. adds geopotential for the Bernoulli potential in spectral space
   4. takes the Laplace operator.
     
 This version is used for both ShallowWater and PrimitiveEquation, only the geopotential
@@ -552,15 +552,15 @@ function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},
     
     @unpack u_grid,v_grid = diagn.grid_variables
     @unpack geopot = diagn.dynamics_variables
-    bernoulli = diagn.dynamics_variables.a                  # reuse work arrays for bernoulli potential
+    bernoulli = diagn.dynamics_variables.a                  # reuse work arrays for Bernoulli potential
     bernoulli_grid = diagn.dynamics_variables.a_grid
     @unpack div_tend = diagn.tendencies
  
     half = convert(NF,0.5)
-    @. bernoulli_grid = half*(u_grid^2 + v_grid^2)          # = 1/2(u^2 + v^2) on grid
+    @. bernoulli_grid = half*(u_grid^2 + v_grid^2)          # = ½(u² + v²) on grid
     spectral!(bernoulli,bernoulli_grid,S)                   # to spectral space
     bernoulli .+= geopot                                    # add geopotential Φ
-    ∇²!(div_tend,bernoulli,S,add=true,flipsign=true)        # add -∇²(1/2(u^2 + v^2) + ϕ)
+    ∇²!(div_tend,bernoulli,S,add=true,flipsign=true)        # add -∇²(½(u² + v²) + ϕ)
 end
 
 function linear_pressure_gradient!( diagn::DiagnosticVariablesLayer,
