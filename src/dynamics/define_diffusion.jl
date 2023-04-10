@@ -4,8 +4,8 @@ Base.@kwdef struct HyperDiffusion <: DiffusionParameters
     time_scale::Float64 = 2.5                   # Diffusion time scale [hrs] for temp, vor, div
     
     # additional diffusion in stratosphere
-    power_stratosphere::Int = 1                 # additional ∇² for stratosphere
-    time_scale_stratosphere::Float64 = 12       # associated time scale
+    power_stratosphere::Int = 2                 # additional ∇² for stratosphere
+    time_scale_stratosphere::Float64 = 24       # associated time scale
     tapering_σ::Float64 = 0.2                   # increase 1/time scale linearly above this σ
 
     # reduce time scale of diffusion linearly with increasing model resolution?
