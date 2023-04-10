@@ -22,7 +22,7 @@
         @test P.layers[i].timesteps[lf].temp == sph_data[i]
         @test P.layers[i].timesteps[lf].humid == sph_data[i]
     end 
-    @test P.pres.timesteps[lf] == sph_data[1]
+    @test P.surface.timesteps[lf].pres == sph_data[1]
 
     @test SpeedyWeather.get_vorticity(P) == sph_data
     @test SpeedyWeather.get_divergence(P) == sph_data
@@ -52,7 +52,7 @@
         @test all(isapprox(P.layers[i].timesteps[lf].temp, sph_data[i]))
         @test all(isapprox(P.layers[i].timesteps[lf].humid, sph_data[i]))
     end 
-    @test all(isapprox(P.pres.timesteps[lf],sph_data[1]))
+    @test all(isapprox(P.surface.timesteps[lf].pres,sph_data[1]))
 
     P, D, M = initialize_speedy(PrimitiveWetCore, initial_conditions=StartFromRest())
 
@@ -70,7 +70,7 @@
         @test all(isapprox(P.layers[i].timesteps[lf].temp, sph_data[i]))
         @test all(isapprox(P.layers[i].timesteps[lf].humid, sph_data[i]))
     end 
-    @test all(isapprox(P.pres.timesteps[lf],sph_data[1]))
+    @test all(isapprox(P.surface.timesteps[lf].pres,sph_data[1]))
 
     # test setting matrices 
     P, D, M = initialize_speedy(PrimitiveWetCore, initial_conditions=StartFromRest())
@@ -89,6 +89,6 @@
         @test all(isapprox(P.layers[i].timesteps[lf].temp, sph_data[i]))
         @test all(isapprox(P.layers[i].timesteps[lf].humid, sph_data[i]))
     end 
-    @test all(isapprox(P.pres.timesteps[lf],sph_data[1]))
+    @test all(isapprox(P.surface.timesteps[lf].pres,sph_data[1]))
 
 end 

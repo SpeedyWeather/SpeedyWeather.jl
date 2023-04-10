@@ -44,8 +44,8 @@ function scale!(progn::PrognosticVariables{NF},
         end
     else
         for layer in progn.layers
-            for leapfrog_step in layer.timesteps
-                variable = getfield(leapfrog_step,var)
+            for step in layer.timesteps
+                variable = getfield(step,var)
                 variable .*= s  # var*s but in-place
             end
         end

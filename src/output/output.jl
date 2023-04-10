@@ -385,9 +385,9 @@ function write_restart_file(time::DateTime,
     end
 
     # same for surface pressure
-    copyto!(progn.pres.timesteps[1],progn.pres.timesteps[2])
-    round!(progn.pres.timesteps[1],keepbits)
-    fill!(progn.pres.timesteps[2],0)
+    copyto!(progn.surface.timesteps[1].pres,progn.surface.timesteps[2].pres)
+    round!(progn.surface.timesteps[1].pres,keepbits)
+    fill!(progn.surface.timesteps[2].pres,0)
 
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
         f["prognostic_variables"] = progn

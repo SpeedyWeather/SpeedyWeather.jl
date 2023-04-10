@@ -133,7 +133,7 @@ function initial_conditions!(   coefs::ZonalJet,
     curl!(vor,u,v,model.spectral_transform)
 
     # transform interface height η (use pres as prognostic variable) in spectral
-    pres = progn.pres.timesteps[1]
+    (;pres) = progn.surface.timesteps[1]
     copyto!(pres,η)
     spectral_truncation!(pres)
 end
@@ -242,7 +242,7 @@ function initial_conditions!(   coefs::ZonalWind,
 
     # PRESSURE (constant everywhere)
     lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
-    progn.pres.timesteps[1][1] = norm_sphere*lnp₀
+    progn.surface.timesteps[1].pres[1] = norm_sphere*lnp₀
     pressure_on_orography && pressure_on_orography!(progn,model)
 end
 

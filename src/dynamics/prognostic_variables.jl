@@ -1,7 +1,7 @@
 import Base: copy!
 
 # how many time steps have to be stored for the time integration? Leapfrog = 2 
-const N_STORAGE = 2
+const N_STEPS = 2
 
 struct PrognosticVariablesLayer{NF<:AbstractFloat}
     # all matrices are of size lmax x mmax
@@ -16,11 +16,11 @@ struct PrognosticVariablesSurface{NF<:AbstractFloat}
 end
 
 struct PrognosticLayerTimesteps{NF<:AbstractFloat}
-    timesteps::Vector{PrognosticVariablesLayer{NF}}     # N_STORAGE-element vector for time steps
+    timesteps::Vector{PrognosticVariablesLayer{NF}}     # N_STEPS-element vector for time steps
 end
 
 struct PrognosticSurfaceTimesteps{NF<:AbstractFloat}
-    timesteps::Vector{PrognosticVariablesSurface{NF}}   # N_STORAGE-element vector for time steps
+    timesteps::Vector{PrognosticVariablesSurface{NF}}   # N_STEPS-element vector for time steps
 end
 
 struct PrognosticVariables{NF<:AbstractFloat,M<:ModelSetup}
@@ -31,7 +31,7 @@ struct PrognosticVariables{NF<:AbstractFloat,M<:ModelSetup}
     # dimensions
     lmax::Int               # two spectral dimensions: max meridional wavenumber
     mmax::Int               # max zonal wavenumber
-    n_storage::Int          # N_STORAGE time steps that are stored
+    n_steps::Int            # N_STEPS time steps that are stored
     nlev::Int               # number of vertical levels
 end
 
@@ -71,13 +71,13 @@ function Base.zeros(::Type{PrognosticVariablesSurface{NF}},model::ModelSetup,lma
     return PrognosticVariablesSurface(pres)
 end
 
-# create time steps as N_STORAGE-element vector of PrognosticVariablesLayer
+# create time steps as N_STEPS-element vector of PrognosticVariablesLayer
 function Base.zeros(::Type{PrognosticLayerTimesteps{NF}},lmax::Integer,mmax::Integer) where NF
-    return PrognosticLayerTimesteps([zeros(PrognosticVariablesLayer{NF},lmax,mmax) for _ in 1:N_STORAGE])
+    return PrognosticLayerTimesteps([zeros(PrognosticVariablesLayer{NF},lmax,mmax) for _ in 1:N_STEPS])
 end
 
 function Base.zeros(::Type{PrognosticSurfaceTimesteps{NF}},lmax::Integer,mmax::Integer) where NF
-    return PrognosticSurfaceTimesteps([zeros(PrognosticVariablesSurface{NF},lmax,mmax) for _ in 1:N_STORAGE])
+    return PrognosticSurfaceTimesteps([zeros(PrognosticVariablesSurface{NF},lmax,mmax) for _ in 1:N_STEPS])
 end
 
 # also pass on model if available
@@ -85,14 +85,14 @@ function Base.zeros(::Type{PrognosticLayerTimesteps{NF}},
                     model::ModelSetup,
                     lmax::Integer,
                     mmax::Integer) where NF
-    return PrognosticLayerTimesteps([zeros(PrognosticVariablesLayer{NF},model,lmax,mmax) for _ in 1:N_STORAGE])   
+    return PrognosticLayerTimesteps([zeros(PrognosticVariablesLayer{NF},model,lmax,mmax) for _ in 1:N_STEPS])   
 end
 
 function Base.zeros(::Type{PrognosticSurfaceTimesteps{NF}},
                     model::ModelSetup,
                     lmax::Integer,
                     mmax::Integer) where NF
-    return PrognosticSurfaceTimesteps([zeros(PrognosticVariablesSurface{NF},model,lmax,mmax) for _ in 1:N_STORAGE])   
+    return PrognosticSurfaceTimesteps([zeros(PrognosticVariablesSurface{NF},model,lmax,mmax) for _ in 1:N_STEPS])   
 end
 
 # general function to initiate all prognostic variables with zeros
@@ -103,7 +103,7 @@ function Base.zeros(::Type{PrognosticVariables{NF}},
 
     layers = [zeros(PrognosticLayerTimesteps{NF},lmax,mmax) for _ in 1:nlev]     # vector of nlev layers
     surface = zeros(PrognosticSurfaceTimesteps{NF},lmax,mmax)
-    return PrognosticVariables{NF,ModelSetup}(layers,surface,lmax,mmax,N_STORAGE,nlev)
+    return PrognosticVariables{NF,ModelSetup}(layers,surface,lmax,mmax,N_STEPS,nlev)
 end
 
 # pass on model to reduce size
@@ -116,7 +116,7 @@ function Base.zeros(::Type{PrognosticVariables{NF}},
     layers = [zeros(PrognosticLayerTimesteps{NF},lmax,mmax) for _ in 1:nlev]     # vector of nlev layers
     PST = PrognosticSurfaceTimesteps{NF}
     surface = has(model, :pres) ? zeros(PST,lmax,mmax) : zeros(PST,-2,-1)  
-    return PrognosticVariables{NF,typeof(model)}(layers,surface,lmax,mmax,N_STORAGE,nlev)
+    return PrognosticVariables{NF,typeof(model)}(layers,surface,lmax,mmax,N_STEPS,nlev)
 end
 
 has(progn::PrognosticVariables{NF,M}, var_name::Symbol) where {NF,M} = has(M, var_name)
@@ -301,7 +301,7 @@ function set_pressure!(progn::PrognosticVariables{NF},
                        pressure::LowerTriangularMatrix;
                        lf::Integer=1) where NF
 
-    _set_var_core!(progn.pres.timesteps[lf], pressure)
+    _set_var_core!(progn.surface.timesteps[lf].pres, pressure)
 
     return progn
 end
@@ -349,4 +349,4 @@ get_vorticity(progn::PrognosticVariables; kwargs...) = get_var(progn, :vor; kwar
 get_divergence(progn::PrognosticVariables; kwargs...) = get_var(progn, :div; kwargs...)
 get_temperature(progn::PrognosticVariables; kwargs...) = get_var(progn, :temp; kwargs...)
 get_humidity(progn::PrognosticVariables; kwargs...) = get_var(progn, :humid; kwargs...)
-get_pressure(progn::PrognosticVariables; lf::Integer=1) = progn.pres.timesteps[lf]
+get_pressure(progn::PrognosticVariables; lf::Integer=1) = progn.surface.timesteps[lf].pres

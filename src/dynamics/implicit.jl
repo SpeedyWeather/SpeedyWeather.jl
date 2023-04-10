@@ -71,16 +71,16 @@ The correction is implicitly evaluated using the parameter `implicit_α` to swit
 forward, centered implicit or backward evaluation of the gravity wave terms."""
 function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
                                 progn::PrognosticLayerTimesteps{NF},
-                                surface::SurfaceVariables{NF},
-                                pres::PrognosticSurfaceTimesteps{NF},
-                                model::ShallowWater,
-                                ) where NF
+                                diagn_surface::SurfaceVariables{NF},
+                                progn_surface::PrognosticSurfaceTimesteps{NF},
+                                model::ShallowWater) where NF
 
-    @unpack div_tend = diagn.tendencies     # divergence tendency
-    div_old = progn.timesteps[1].div         # divergence at t
-    div_new = progn.timesteps[2].div         # divergence at t+dt
-    pres_old, pres_new = pres.timesteps      # pressure/η at t,t+dt
-    @unpack pres_tend = surface             # tendency of pressure/η
+    (;div_tend) = diagn.tendencies          # divergence tendency
+    div_old = progn.timesteps[1].div        # divergence at t
+    div_new = progn.timesteps[2].div        # divergence at t+dt
+    pres_old = progn_surface.timesteps[1].pres  # pressure/η at t
+    pres_new = progn_surface.timesteps[2].pres  # pressure/η at t+dt
+    (;pres_tend) = diagn_surface            # tendency of pressure/η
 
     @unpack g∇²,ξg∇²,S⁻¹ = model.implicit
     ξH₀ = model.implicit.ξH₀[1]                 # unpack as it's stored in a vec for mutation

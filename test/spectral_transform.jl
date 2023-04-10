@@ -72,7 +72,7 @@ end
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid)
 
-                P = Parameters{BarotropicModel}(;NF,trunc,Grid)
+                P = Parameters{SpeedyWeather.BarotropicModel}(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
                 lmax = 3
@@ -101,7 +101,7 @@ end
                                     OctaHEALPixGrid,
                                     FullHEALPixGrid,
                                     FullOctaHEALPixGrid)
-                P = Parameters{BarotropicModel}(;NF,trunc,Grid)
+                P = Parameters{SpeedyWeather.BarotropicModel}(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
                 lmax = 3
@@ -133,7 +133,7 @@ end
                                      OctahedralGaussianGrid,
                                      OctahedralClenshawGrid)
                             
-                P = Parameters{ShallowWaterModel}(;NF,Grid,trunc)
+                P = Parameters{SpeedyWeather.ShallowWaterModel}(;NF,Grid,trunc)
                 S = SpectralTransform(P)
                 G = Geometry(P)
                 B = Boundaries(P,S,G)
