@@ -50,7 +50,7 @@ the shallow water equations. The arguments for `run_speedy` are described in
 To run the primitive equation dry core you can for example do
 
 ```julia
-julia> run_speedy(Float32,PrimitiveDryCore,physics=true,diffusion=HyperDiffusion(power=2))
+julia> run_speedy(Float32, PrimitiveDryCore, physics=true, diffusion=HyperDiffusion(power=2))
 Weather is speedy: 100%|███████████████████████████████████| Time: 0:00:03 (753.71 years/day)
 ```
 
@@ -59,12 +59,12 @@ The arguments here use single precision (Float32), enable physics (Held-Suarez f
 ## History
 
 SpeedyWeather.jl is a reinvention of the atmospheric general circulation model
-[SPEEDY](http://users.ictp.it/~kucharsk/speedy-net.html) in Julia. While conceptually the same model,
+[SPEEDY](http://users.ictp.it/~kucharsk/speedy-net.html) in Julia. While conceptually a similar model,
 it is entirely restructured, features have been added, changed and removed, such that only the numerical
-schemes share similarities. Speedy's dynamical core has an obscure history: Large parts were written by Isaac Held
+schemes share similarities (but we start to diverge here too). Speedy's dynamical core has an obscure history: Large parts were written by Isaac Held
 at GFDL in/before the 90ies with an unknown amount of contributions/modifications from Steve Jewson (Oxford) in the 90ies.
-The physical parametrizations were then added by Franco Molteni, Fred Kucharski, and Martin P. King in Fortran77.
-Speedy was then translated to Fortran90 by Sam Hatfield in [speedy.f90](https://github.com/samhatfield/speedy.f90).
+The physical parametrizations were then added by Franco Molteni, Fred Kucharski, and Martin P. King afterwards while the model was still written in Fortran77.
+Around 2018-19, SPEEDY was then translated to Fortran90 by Sam Hatfield in [speedy.f90](https://github.com/samhatfield/speedy.f90).
 SpeedyWeather.jl is then adopted from [first translations to Julia](https://github.com/samhatfield/speedy.jl) by Sam Hatfield.
 
 ## Submodules

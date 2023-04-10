@@ -6,7 +6,7 @@
 
 Apply horizontal diffusion to a 2D field `A` in spectral space by updating its tendency `tendency`
 with an implicitly calculated diffusion term. The implicit diffusion of the next time step is split
-into an explicit part `damp_expl` and an implicit part `damp_impl`, such that both can be calculated
+into an explicit part `∇²ⁿ_expl` and an implicit part `∇²ⁿ_impl`, such that both can be calculated
 in a single forward step by using `A` as well as its tendency `tendency`."""
 function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   # tendency of a 
                                 A::LowerTriangularMatrix{Complex{NF}},          # spectral horizontal field
@@ -21,9 +21,9 @@ function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   
     for m in 1:mmax         # loops over all columns/order m
         for l in m:lmax-1   # but skips the lmax+2 degree (1-based)
             lm += 1         # single index lm corresponding to harmonic l,m
-            tendency[lm] = (tendency[lm] - ∇²ⁿ_expl[l]*A[lm])*∇²ⁿ_impl[l]
+            tendency[lm] = (tendency[lm] + ∇²ⁿ_expl[l]*A[lm])*∇²ⁿ_impl[l]
         end
-        lm += 1         # skip last row, LowerTriangularMatrices are of size lmax+2 x mmax+1
+        lm += 1             # skip last row for scalar quantities
     end
 end
 
@@ -35,17 +35,11 @@ diffusion_vars(::PrimitiveEquation) = (:vor,:div,:temp)
 function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
                                 diagn::DiagnosticVariablesLayer,
                                 model::ModelSetup,
-                                lf::Int=1)                          # leapfrog index used (2 is unstable)
+                                lf::Int=1)      # leapfrog index used (2 is unstable)
 
-    k = diagn.k
-    @unpack n_stratosphere_levels = model.geometry
-
-    if k <= n_stratosphere_levels   # if level in the stratosphere use stratospheric diffusion operators
-        ∇²ⁿ = model.horizontal_diffusion.∇²ⁿ_stratosphere
-        ∇²ⁿ_implicit = model.horizontal_diffusion.∇²ⁿ_implicit_stratosphere
-    else
-        @unpack ∇²ⁿ, ∇²ⁿ_implicit = model.horizontal_diffusion
-    end
+    k = diagn.k     # pick precalculated hyperdiffusion operator for layer k
+    ∇²ⁿ = model.horizontal_diffusion.∇²ⁿ[k]
+    ∇²ⁿ_implicit = model.horizontal_diffusion.∇²ⁿ_implicit[k]
 
     for varname in diffusion_vars(model)
         var = getfield(progn.timesteps[lf],varname)

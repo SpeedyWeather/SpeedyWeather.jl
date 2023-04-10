@@ -58,7 +58,7 @@ and `add` the github repository to install SpeedyWeather.jl and all dependencies
 which will automatically install the latest release. However, you may want to install directly from the
 main branch with
 ```julia
-(@v1.78) pkg> add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
+(@v1.8) pkg> add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
 ```
 other branches than `#main` can be installed by adding `#branch_name` instead.
 

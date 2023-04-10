@@ -29,8 +29,8 @@ end
 
 Truncate spectral coefficients `alms` in-place by setting all coefficients for which the degree `l`
 is larger than the truncation `ltrunc` or order `m` larger than the truncaction `mtrunc`.
-Similar to `spectral_truncation!(::AbstractMatrix,...) but skips the upper triangle which is
-zero by design for LowerTriangularMatrix."""
+Similar to `spectral_truncation!(::AbstractMatrix, ...)` but skips the upper triangle which is
+zero by design for `LowerTriangularMatrix`."""
 function spectral_truncation!(  alms::LowerTriangularMatrix{NF},    # spectral field to be truncated
                                 ltrunc::Integer,                    # truncate to max degree ltrunc
                                 mtrunc::Integer,                    # truncate to max order mtrunc
@@ -78,8 +78,8 @@ end
 """
     alms_trunc = spectral_truncation(alms,trunc)
 
-Returns a spectral coefficient matrix `alms_trunc` that is truncated from `alms` to the size (`trunc`+1)^2.
-`alms_trunc` only contains those coefficient of `alms` for which m,l <= trunc, and l>=m are zero anyway.
+Returns a spectral coefficient matrix `alms_trunc` that is truncated from `alms` to the size (`trunc`+1)².
+`alms_trunc` only contains those coefficient of `alms` for which `m,l ≤ trunc`, and `l ≥ m` are zero anyway.
 If `trunc` is larger than the implicit truncation in `alms` obtained from its size than `spectral_interpolation`
 is automatically called instead, returning `alms_interp`, a coefficient matrix that is larger than `alms`
 with padded zero coefficients."""

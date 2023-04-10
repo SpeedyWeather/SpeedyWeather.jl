@@ -67,7 +67,7 @@ Generator function to create the Geometry struct from parameters in `P`.
 """
 function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
-    @unpack trunc, nlev = P                         # grid type, spectral truncation, # of vertical levels
+    @unpack trunc, dealiasing, nlev = P             # grid type, spectral truncation, # of vertical levels
     @unpack radius, rotation, gravity = P.planet    # radius of planet, angular frequency, gravity
     @unpack R_dry, cₚ = P                           # gas constant for dry air, heat capacity
     @unpack σ_tropopause = P                        # number of vertical levels used for stratosphere
@@ -75,8 +75,9 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     @unpack ΔT_stratosphere = P                     # used for stratospheric temperature increase
 
     # RESOLUTION PARAMETERS
-    nlat_half = get_nlat_half(Grid,trunc)           # resolution parameter nlat_half
-                                                    # = number of lat rings on one hemisphere (Equator incl)
+    # resolution parameter nlat_half (= number of lat rings on one hemisphere (Equator incl) 
+    # from spectral resolution and dealiasing parameter (e.g. quadratic grid for T31)
+    nlat_half = SpeedyTransforms.get_nlat_half(trunc,dealiasing)
     nlat = get_nlat(Grid,nlat_half)                 # 2nlat_half but -1 if grids have odd # of lat rings
     nlon_max = get_nlon_max(Grid,nlat_half)         # number of longitudes around the equator
     nlon = nlon_max                                 # same (used for compatibility)
@@ -194,6 +195,6 @@ end
 
 Generator function for a SpectralTransform struct pulling in parameters from a Parameters struct."""
 function SpeedyTransforms.SpectralTransform(P::Parameters)
-    @unpack NF, Grid, trunc, recompute_legendre, legendre_shortcut = P
-    return SpectralTransform(NF,Grid,trunc,recompute_legendre;legendre_shortcut)
+    @unpack NF, Grid, trunc, dealiasing, recompute_legendre, legendre_shortcut = P
+    return SpectralTransform(NF,Grid,trunc,recompute_legendre;legendre_shortcut,dealiasing)
 end

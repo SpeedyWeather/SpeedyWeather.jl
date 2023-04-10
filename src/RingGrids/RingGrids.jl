@@ -2,7 +2,6 @@ module RingGrids
 
     import Parameters: @unpack
     import Statistics: mean
-    import Primes
     import FastGaussQuadrature
 
     # GRIDS

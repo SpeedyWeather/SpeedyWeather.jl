@@ -105,10 +105,6 @@ nlon_octahealpix(nlat_half::Integer,j::Integer) = min(4j,8nlat_half-4j)
 OctaHEALPixGrid{T}(data::AbstractVector) where T = OctaHEALPixGrid{T}(data,nlat_half_octahealpix(length(data)))
 OctaHEALPixGrid(data::AbstractVector,n::Integer...) = OctaHEALPixGrid{eltype(data)}(data,n...)
 
-truncation_order(::Type{<:OctaHEALPixGrid}) = 3                 # cubic
-get_truncation(::Type{<:OctaHEALPixGrid},nlat_half::Integer) = nlat_half-1
-get_resolution(::Type{<:OctaHEALPixGrid},trunc::Integer) = trunc+1
-
 function get_colat(::Type{<:OctaHEALPixGrid},nlat_half::Integer)
     nlat_half == 0 && return Float64[]
     colat = zeros(nlat_octahealpix(nlat_half))

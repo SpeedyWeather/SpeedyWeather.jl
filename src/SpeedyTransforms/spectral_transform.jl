@@ -8,7 +8,6 @@ struct SpectralTransform{NF<:AbstractFloat}
     # GRID
     Grid::Type{<:AbstractGrid}  # grid type used
     nlat_half::Int              # resolution parameter of grid (# of latitudes on one hemisphere, Eq incl)
-    order::Int                  # 1,2,3 for linear, quadratic, cubic grid
 
     # SPECTRAL RESOLUTION
     lmax::Int               # Maximum degree l=[0,lmax] of spherical harmonics
@@ -76,16 +75,16 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
                             Grid::Type{<:AbstractGrid},     # type of spatial grid used
                             trunc::Int,                     # Spectral truncation
                             recompute_legendre::Bool;       # re or precompute legendre polynomials?
-                            legendre_shortcut::Symbol=:linear   # shorten Legendre loop over order m
+                            legendre_shortcut::Symbol=:linear,   # shorten Legendre loop over order m
+                            dealiasing::Real=DEFAULT_DEALIASING
                             ) where NF
 
     # SPECTRAL RESOLUTION
     lmax = trunc                # Maximum degree l=[0,lmax] of spherical harmonics
     mmax = trunc                # Maximum order m=[0,l] of spherical harmonics
-    order = RingGrids.truncation_order(Grid)
 
     # RESOLUTION PARAMETERS
-    nlat_half = get_nlat_half(Grid,trunc)       # resolution parameter nlat_half,
+    nlat_half = get_nlat_half(trunc,dealiasing) # resolution parameter nlat_half,
                                                 # number of latitude rings on one hemisphere incl equator
     nlat = get_nlat(Grid,nlat_half)             # 2nlat_half but one less if grids have odd # of lat rings
     nlon_max = get_nlon_max(Grid,nlat_half)     # number of longitudes around the equator
@@ -201,7 +200,7 @@ function SpectralTransform( ::Type{NF},                     # Number format NF
     eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
 
     # conversion to NF happens here
-    SpectralTransform{NF}(  Grid,nlat_half,order,
+    SpectralTransform{NF}(  Grid,nlat_half,
                             lmax,mmax,nfreq_max,m_truncs,
                             nlon_max,nlons,nlat,
                             colat,cos_colat,sin_colat,lon_offsets,
@@ -226,7 +225,7 @@ function spectral_transform_for_full_grid(S::SpectralTransform{NF}) where NF
     FullGrid = full_grid(S.Grid)    # corresponding full grid
     
     # unpack everything that does not have to be recomputed for the full grid
-    @unpack nresolution, order, lmax, mmax, nfreq_max, nlon_max, nlat, nlat_half = S
+    @unpack nresolution, lmax, mmax, nfreq_max, nlon_max, nlat, nlat_half = S
     @unpack colat, cos_colat, sin_colat, norm_sphere, recompute_legendre, Λ, Λs = S
     @unpack ϵlms, grad_x, grad_y1, grad_y2, grad_y_vordiv1, grad_y_vordiv2 = S
     @unpack vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2, eigenvalues, eigenvalues⁻¹ = S
@@ -244,7 +243,7 @@ function spectral_transform_for_full_grid(S::SpectralTransform{NF}) where NF
 
     solid_angles = get_solid_angles(FullGrid,nlat_half)
 
-    return SpectralTransform{NF}(   FullGrid,nresolution,order,
+    return SpectralTransform{NF}(   FullGrid,nresolution,
                                     lmax,mmax,nfreq_max,m_truncs,
                                     nlon_max,nlons,nlat,nlat_half,
                                     colat,cos_colat,sin_colat,lon_offsets,
@@ -344,7 +343,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
                     unscale_coslat::Bool=false                  # unscale with cos(lat) on the fly?
                     ) where {NF<:AbstractFloat}                 # number format NF
 
-    @unpack nlat, nlons, nlat_half, nfreq_max, order = S
+    @unpack nlat, nlons, nlat_half, nfreq_max = S
     @unpack cos_colat, sin_colat, lon_offsets = S
     @unpack recompute_legendre, Λ, Λs, m_truncs = S
     @unpack brfft_plans = S
@@ -353,7 +352,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
     lmax, mmax = size(alms) .- 1            # maximum degree l, order m of spherical harmonics
 
-    @boundscheck mmax+1 <= nfreq_max || throw(BoundsError)
+    @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
     @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
     @boundscheck get_nlat_half(map) == S.nlat_half || throw(BoundsError)
@@ -452,7 +451,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
                     S::SpectralTransform{NF}
                     ) where {NF<:AbstractFloat}
     
-    @unpack nlat, nlat_half, nlons, nfreq_max, order, cos_colat = S
+    @unpack nlat, nlat_half, nlons, nfreq_max, cos_colat = S
     @unpack recompute_legendre, Λ, Λs, solid_angles = S
     @unpack rfft_plans, lon_offsets, m_truncs = S
     
@@ -460,7 +459,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
     lmax, mmax = size(alms) .- 1    # maximum degree l, order m of spherical harmonics
 
-    @boundscheck mmax+1 <= nfreq_max || throw(BoundsError)
+    @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
     @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
     @boundscheck get_nlat_half(map) == S.nlat_half || throw(BoundsError)
@@ -581,7 +580,7 @@ end
                         Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                         kwargs...)
 
-Converts `map` to `grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""
+Converts `map` to `grid(map)` to execute `spectral(map::AbstractGrid;kwargs...)`."""
 function spectral(  map::AbstractMatrix;            # gridded field
                     Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                     kwargs...)
@@ -594,13 +593,13 @@ end
                         Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                         kwargs...)
 
-Converts `map` to `Grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""
+Converts `map` to `Grid(map)` to execute `spectral(map::AbstractGrid;kwargs...)`."""
 function spectral(  map::AbstractGrid{NF};          # gridded field
                     recompute_legendre::Bool=true,  # saves memory
                     ) where NF                      # number format NF
 
     Grid = typeof(map)
-    trunc = get_truncation(map)
+    trunc = get_truncation(map.nlat_half)
     S = SpectralTransform(NF,Grid,trunc,recompute_legendre)
     return spectral(map,S)
 end
@@ -610,7 +609,7 @@ end
                         Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
                         kwargs...)
 
-Spectral transform (grid to spectral) `map` to `grid(map)` to execute spectral(map::AbstractGrid;kwargs...)."""
+Spectral transform (grid to spectral) `map` to `grid(map)` to execute `spectral(map::AbstractGrid;kwargs...)`."""
 function spectral(  map::AbstractGrid{NF},      # gridded field
                     S::SpectralTransform{NF},   # spectral transform struct
                     ) where NF                  # number format NF
