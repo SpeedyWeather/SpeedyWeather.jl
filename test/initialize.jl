@@ -1,6 +1,6 @@
 @testset "Zero generators" begin
     @testset for NF in (Float32,Float64)
-        P = Parameters{BarotropicModel}(;NF)
+        P = Parameters{SpeedyWeather.BarotropicModel}(;NF)
         G = Geometry(P)
         S = SpectralTransform(P)
         
@@ -13,26 +13,31 @@ end
 
     # BAROTROPIC MODEL
     progn, diagn, model = initialize_speedy(Barotropic,initial_conditions=StartFromRest())
-    for layers in progn.layers
-        for leapfrog in layers.leapfrog
-            @test all(leapfrog.vor .== 0)
+    for layer in progn.layers
+        for step in layer.timesteps
+            @test all(step.vor .== 0)
         end
     end
 
     # SHALLOW WATER MODEL
     progn, diagn, model = initialize_speedy(ShallowWater,initial_conditions=StartFromRest())
-    for layers in progn.layers
-        for leapfrog in layers.leapfrog
-            @test all(leapfrog.vor .== 0)
-            @test all(leapfrog.div .== 0)
+    for layer in progn.layers
+        for step in layer.timesteps
+            @test all(step.vor .== 0)
+            @test all(step.div .== 0)
         end
     end
-    @test all(progn.pres.leapfrog[1] .== 0)
-    @test all(progn.pres.leapfrog[2] .== 0)
+    @test all(progn.surface.timesteps[1].pres .== 0)
+    @test all(progn.surface.timesteps[2].pres .== 0)
 
-    # # PRIMITIVE EQUATION MODEL
-    # progn, diagn, model = initialize_speedy(initial_conditions=StartFromRest,model=PrimitiveEquation)
-    # @test all(progn.vor .== 0)
+    # PRIMITIVE EQUATION MODEL
+    progn, diagn, model = initialize_speedy(PrimitiveDryCore,initial_conditions=StartFromRest())
+    for layer in progn.layers
+        for step in layer.timesteps
+            @test all(step.vor .== 0)
+            @test all(step.div .== 0)
+        end
+    end
 
     """
     S = model.geospectral.spectral_transform

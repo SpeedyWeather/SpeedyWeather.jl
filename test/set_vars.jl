@@ -17,12 +17,12 @@
     SpeedyWeather.set_pressure!(P, sph_data[1])
 
     for i=1:nlev 
-        @test P.layers[i].leapfrog[lf].vor == sph_data[i]
-        @test P.layers[i].leapfrog[lf].div == sph_data[i]
-        @test P.layers[i].leapfrog[lf].temp == sph_data[i]
-        @test P.layers[i].leapfrog[lf].humid == sph_data[i]
+        @test P.layers[i].timesteps[lf].vor == sph_data[i]
+        @test P.layers[i].timesteps[lf].div == sph_data[i]
+        @test P.layers[i].timesteps[lf].temp == sph_data[i]
+        @test P.layers[i].timesteps[lf].humid == sph_data[i]
     end 
-    @test P.pres.leapfrog[lf] == sph_data[1]
+    @test P.surface.timesteps[lf].pres == sph_data[1]
 
     @test SpeedyWeather.get_vorticity(P) == sph_data
     @test SpeedyWeather.get_divergence(P) == sph_data
@@ -32,7 +32,7 @@
 
     SpeedyWeather.set_vorticity!(P, 0)
     for i=1:nlev 
-        @test all(P.layers[i].leapfrog[lf].vor .== 0)
+        @test all(P.layers[i].timesteps[lf].vor .== 0)
     end
 
     # test setting grids 
@@ -47,12 +47,12 @@
     SpeedyWeather.set_pressure!(P, grid_data[1])
 
     for i=1:nlev 
-        @test all(isapprox(P.layers[i].leapfrog[lf].vor, sph_data[i]))
-        @test all(isapprox(P.layers[i].leapfrog[lf].div, sph_data[i]))
-        @test all(isapprox(P.layers[i].leapfrog[lf].temp, sph_data[i]))
-        @test all(isapprox(P.layers[i].leapfrog[lf].humid, sph_data[i]))
+        @test all(isapprox(P.layers[i].timesteps[lf].vor, sph_data[i]))
+        @test all(isapprox(P.layers[i].timesteps[lf].div, sph_data[i]))
+        @test all(isapprox(P.layers[i].timesteps[lf].temp, sph_data[i]))
+        @test all(isapprox(P.layers[i].timesteps[lf].humid, sph_data[i]))
     end 
-    @test all(isapprox(P.pres.leapfrog[lf],sph_data[1]))
+    @test all(isapprox(P.surface.timesteps[lf].pres,sph_data[1]))
 
     P, D, M = initialize_speedy(PrimitiveWetCore, initial_conditions=StartFromRest())
 
@@ -65,12 +65,12 @@
     SpeedyWeather.set_pressure!(P, grid_data[1], M)
 
     for i=1:nlev 
-        @test all(isapprox(P.layers[i].leapfrog[lf].vor, sph_data[i]))
-        @test all(isapprox(P.layers[i].leapfrog[lf].div, sph_data[i]))
-        @test all(isapprox(P.layers[i].leapfrog[lf].temp, sph_data[i]))
-        @test all(isapprox(P.layers[i].leapfrog[lf].humid, sph_data[i]))
+        @test all(isapprox(P.layers[i].timesteps[lf].vor, sph_data[i]))
+        @test all(isapprox(P.layers[i].timesteps[lf].div, sph_data[i]))
+        @test all(isapprox(P.layers[i].timesteps[lf].temp, sph_data[i]))
+        @test all(isapprox(P.layers[i].timesteps[lf].humid, sph_data[i]))
     end 
-    @test all(isapprox(P.pres.leapfrog[lf],sph_data[1]))
+    @test all(isapprox(P.surface.timesteps[lf].pres,sph_data[1]))
 
     # test setting matrices 
     P, D, M = initialize_speedy(PrimitiveWetCore, initial_conditions=StartFromRest())
@@ -84,11 +84,11 @@
     SpeedyWeather.set_pressure!(P, grid_data[1])
 
     for i=1:nlev 
-        @test all(isapprox(P.layers[i].leapfrog[lf].vor, sph_data[i]))
-        @test all(isapprox(P.layers[i].leapfrog[lf].div, sph_data[i]))
-        @test all(isapprox(P.layers[i].leapfrog[lf].temp, sph_data[i]))
-        @test all(isapprox(P.layers[i].leapfrog[lf].humid, sph_data[i]))
+        @test all(isapprox(P.layers[i].timesteps[lf].vor, sph_data[i]))
+        @test all(isapprox(P.layers[i].timesteps[lf].div, sph_data[i]))
+        @test all(isapprox(P.layers[i].timesteps[lf].temp, sph_data[i]))
+        @test all(isapprox(P.layers[i].timesteps[lf].humid, sph_data[i]))
     end 
-    @test all(isapprox(P.pres.leapfrog[lf],sph_data[1]))
+    @test all(isapprox(P.surface.timesteps[lf].pres,sph_data[1]))
 
 end 

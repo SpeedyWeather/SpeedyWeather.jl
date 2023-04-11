@@ -47,14 +47,14 @@ function initial_conditions!(   ::StartWithVorticity,
     for progn_layer in progn.layers
         
         # zonal wind
-        progn_layer.leapfrog[1].vor[4,1]  =  80/radius
-        progn_layer.leapfrog[1].vor[6,1]  = -160/radius
-        progn_layer.leapfrog[1].vor[8,1]  =  80/radius
+        progn_layer.timesteps[1].vor[4,1]  =  80/radius
+        progn_layer.timesteps[1].vor[6,1]  = -160/radius
+        progn_layer.timesteps[1].vor[8,1]  =  80/radius
 
         # perturbation
         for m in 2:min(15,progn.mmax+1)
             for l in m:min(15,progn.lmax+1)
-                progn_layer.leapfrog[1].vor[l,m] = 10/radius*ξ[l,m]
+                progn_layer.timesteps[1].vor[l,m] = 10/radius*ξ[l,m]
             end
         end
     end
@@ -129,11 +129,11 @@ function initial_conditions!(   coefs::ZonalJet,
     
     # get vorticity initial conditions from curl of u,v
     v = zero(u)     # meridional velocity zero for these initial conditions
-    @unpack vor = progn.layers[end].leapfrog[1]
+    @unpack vor = progn.layers[end].timesteps[1]
     curl!(vor,u,v,model.spectral_transform)
 
     # transform interface height η (use pres as prognostic variable) in spectral
-    pres = progn.pres.leapfrog[1]
+    (;pres) = progn.surface.timesteps[1]
     copyto!(pres,η)
     spectral_truncation!(pres)
 end
@@ -194,7 +194,7 @@ function initial_conditions!(   coefs::ZonalWind,
             D[ij] = -2perturb_uₚ*radius/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
         end
 
-        @unpack vor,div = layer.leapfrog[1]
+        @unpack vor,div = layer.timesteps[1]
         spectral!(vor,ζ,S)
         spectral!(div,D,S)
         spectral_truncation!(vor)
@@ -235,14 +235,14 @@ function initial_conditions!(   coefs::ZonalWind,
             T[ij] = Tη[k] + A1*((-2sinφ^6*(cosφ^2 + 1/3) + 10/63)*A2 + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*aΩ)
         end
 
-        @unpack temp = layer.leapfrog[1]
+        @unpack temp = layer.timesteps[1]
         spectral!(temp,T,S)
         spectral_truncation!(temp)
     end
 
     # PRESSURE (constant everywhere)
     lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
-    progn.pres.leapfrog[1][1] = norm_sphere*lnp₀
+    progn.surface.timesteps[1].pres[1] = norm_sphere*lnp₀
     pressure_on_orography && pressure_on_orography!(progn,model)
 end
 
@@ -283,7 +283,7 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     Γg⁻¹ = lapse_rate/gravity/1000              # Lapse rate scaled by gravity [K/m / (m²/s²)]
 
     # SURFACE TEMPERATURE
-    temp_surf = progn.layers[end].leapfrog[1].temp  # spectral temperature at k=nlev=surface
+    temp_surf = progn.layers[end].timesteps[1].temp  # spectral temperature at k=nlev=surface
     temp_surf[1] = norm_sphere*temp_ref             # set global mean surface temperature
     for lm in eachharmonic(geopot_surf,temp_surf)
         temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]       # lower temperature for higher mountains
@@ -292,13 +292,13 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     # TROPOPAUSE/STRATOSPHERE set the l=m=0 spectral coefficient (=mean value) only
     # in uppermost levels (default: k=1,2) for lapse rate = 0
     for k in 1:n_stratosphere_levels
-        temp = progn.layers[k].leapfrog[1].temp
+        temp = progn.layers[k].timesteps[1].temp
         temp[1] = norm_sphere*temp_top
     end
 
     # TROPOSPHERE use lapserate and vertical coordinate σ for profile
     for k in n_stratosphere_levels+1:nlev
-        temp = progn.layers[k].leapfrog[1].temp
+        temp = progn.layers[k].timesteps[1].temp
         σₖᴿ = G.σ_levels_full[k]^(R_dry*Γg⁻¹)   # TODO reference
 
         for lm in eachharmonic(temp,temp_surf)
@@ -339,7 +339,7 @@ function pressure_on_orography!(progn::PrognosticVariables,
         lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹
     end
 
-    lnp = progn.pres.leapfrog[1]
+    lnp = progn.pres.timesteps[1]
     spectral!(lnp,lnp_grid,S)
     spectral_truncation!(lnp,lmax)  # set lmax+1 row to zero
 

@@ -15,7 +15,7 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
                     tendency::LowerTriangularMatrix{Complex{NF}},   # tendency (dynamics+physics) of A
                     dt::Real,                                       # time step (=2Δt, but for init steps =Δt,Δt/2)
                     lf::Int,                                        # leapfrog index to dis/enable William's filter
-                    C::DynamicsConstants{NF},                               # struct with constants used at runtime
+                    C::DynamicsConstants{NF},                       # struct with constants used at runtime
                     ) where {NF<:AbstractFloat}                     # number format NF
 
     @boundscheck lf == 1 || lf == 2 || throw(BoundsError())         # index lf picks leapfrog dim
@@ -48,15 +48,15 @@ leapfrog_layer_vars(::ShallowWater) = (:vor, :div)
 leapfrog_layer_vars(::PrimitiveDryCore) = (:vor, :div, :temp)
 leapfrog_layer_vars(::PrimitiveWetCore) = (:vor, :div, :temp, :humid)
 
-function leapfrog!( progn::PrognosticVariablesLeapfrog,
+function leapfrog!( progn::PrognosticLayerTimesteps,
                     diagn::DiagnosticVariablesLayer,
                     dt::Real,               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
                     lf::Int,                # leapfrog index to dis/enable William's filter
                     model::ModelSetup)
                
     for var in leapfrog_layer_vars(model)
-        var_old = getproperty(progn.leapfrog[1],var)
-        var_new = getproperty(progn.leapfrog[2],var)
+        var_old = getproperty(progn.timesteps[1],var)
+        var_new = getproperty(progn.timesteps[2],var)
         var_tend = getproperty(diagn.tendencies,Symbol(var,:_tend))
         leapfrog!(var_old,var_new,var_tend,dt,lf,model.constants)
     end
@@ -158,20 +158,24 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     progn_layer = progn.layers[1]                       # only calculate tendencies for the first layer
     diagn_layer = diagn.layers[1]
     diagn_surface = diagn.surface
-    @unpack pres = progn
-    pres_lf = pres.leapfrog[lf2]
-
-    dynamics_tendencies!(diagn_layer,diagn_surface,pres_lf,time,M)      # tendency of vor, div, pres
-    implicit_correction!(diagn_layer,progn_layer,diagn_surface,pres,M)  # dampen gravity waves
+    progn_surface = progn.surface
+    (;pres) = progn.surface.timesteps[lf2]
+    
+    # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
+    dynamics_tendencies!(diagn_layer,diagn_surface,pres,time,M)
+    implicit_correction!(diagn_layer,progn_layer,diagn_surface,progn_surface,M)
+    
+    # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
     horizontal_diffusion!(progn_layer,diagn_layer,M)    # diffusion for vorticity and divergence
     leapfrog!(progn_layer,diagn_layer,dt,lf1,M)         # leapfrog vorticity forward
     gridded!(diagn_layer,progn_layer,lf2,M)             # propagate spectral state to grid
 
-    # SURFACE LAYER (pressure)
-    @unpack pres_tend = diagn_surface
-    pres_old,pres_new = pres.leapfrog
+    # SURFACE LAYER (pressure), no diffusion though
+    (;pres_grid,pres_tend) = diagn.surface
+    pres_old = progn.surface.timesteps[1].pres
+    pres_new = progn.surface.timesteps[2].pres
     leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,M.constants)
-    gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf2],M.spectral_transform)
+    gridded!(pres_grid,pres,M.spectral_transform)
 end
 
 """
@@ -213,10 +217,12 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
             leapfrog!(progn_layer,diagn_layer,dt,lf1,model)         # time step forward for vor, div, temp
             gridded!(diagn_layer,progn_layer,lf2,model)             # propagate spectral state to grid
         else                                # surface level
-            pres_tend = diagn.surface.pres_tend
-            pres_old,pres_new = progn.pres.leapfrog
+            (;pres_grid,pres_tend) = diagn.surface
+            pres_old = progn.surface.timesteps[1].pres
+            pres_new = progn.surface.timesteps[2].pres
+            pres_lf = progn.surface.timesteps[lf2].pres
             leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,model.constants)
-            gridded!(diagn.surface.pres_grid,progn.pres.leapfrog[lf2],model.spectral_transform)
+            gridded!(pres_grid,pres_lf,model.spectral_transform)
         end
     end
 end

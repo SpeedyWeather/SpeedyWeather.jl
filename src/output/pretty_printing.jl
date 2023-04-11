@@ -1,6 +1,6 @@
 function Base.show(io::IO, P::PrognosticVariables)
 
-    ζ = P.layers[end].leapfrog[1].vor   # create a view on vorticity
+    ζ = P.layers[end].timesteps[1].vor   # create a view on vorticity
     ζ_grid = Matrix(gridded(ζ))         # to grid space
     ζ_grid = ζ_grid[:,end:-1:1]         # flip latitudes
 

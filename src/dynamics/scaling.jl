@@ -39,13 +39,13 @@ function scale!(progn::PrognosticVariables{NF},
                 s::Number) where NF
     
     if var == :pres     # surface pressure is not stored in layers
-        for pres in progn.pres.leapfrog
+        for pres in progn.pres.timesteps
             pres .*= s  # pres*s but in-place
         end
     else
         for layer in progn.layers
-            for leapfrog_step in layer.leapfrog
-                variable = getfield(leapfrog_step,var)
+            for step in layer.timesteps
+                variable = getfield(step,var)
                 variable .*= s  # var*s but in-place
             end
         end

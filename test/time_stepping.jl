@@ -18,7 +18,7 @@ end
 
     # loop over different precisions
     @testset for NF in (Float16,Float32,Float64)
-        P = Parameters{BarotropicModel}(NF=NF)
+        P = Parameters{SpeedyWeather.BarotropicModel}(NF=NF)
         C = DynamicsConstants(P)
 
         # INITIAL CONDITIONS
@@ -57,7 +57,7 @@ end
 
     # loop over different precisions
     @testset for NF in (Float16,Float32,Float64)
-        P = Parameters{BarotropicModel}(NF=NF)
+        P = Parameters{SpeedyWeather.BarotropicModel}(NF=NF)
         C = DynamicsConstants(P)
 
         # INITIAL CONDITIONS
@@ -85,7 +85,7 @@ end
         @test M_RAW < 1
 
         # CHECK THAT NO WILLIAM'S FILTER IS WORSE
-        P = Parameters{BarotropicModel}(NF=NF,williams_filter=1)     # Robert's filter only
+        P = Parameters{SpeedyWeather.BarotropicModel}(NF=NF,williams_filter=1)     # Robert's filter only
         C = DynamicsConstants(P)
 
         # INITIAL CONDITIONS

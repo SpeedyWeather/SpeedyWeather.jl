@@ -53,7 +53,7 @@ spectral_resolutions_inexact = (127,255)
                 p,d,m = initialize_speedy(NF;trunc,Grid)
                 S = m.spectral_transform
 
-                alms = copy(p.layers[1].leapfrog[1].vor)
+                alms = copy(p.layers[1].timesteps[1].vor)
                 fill!(alms,0)
                 alms[1,1] = 1
 
@@ -73,7 +73,7 @@ end
             p1,d1,m1 = initialize_speedy(NF;trunc,recompute_legendre=false)
             p2,d2,m2 = initialize_speedy(NF;trunc,recompute_legendre=true)
 
-            (;vor) = p1.layers[1].leapfrog[1]
+            (;vor) = p1.layers[1].timesteps[1]
             alms = randn(typeof(vor),size(vor)...)
 
             map1 = gridded(alms,m1.spectral_transform)
@@ -93,7 +93,7 @@ end
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid)
 
-                P = Parameters{BarotropicModel}(;NF,trunc,Grid)
+                P = Parameters{SpeedyWeather.BarotropicModel}(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
                 lmax = 3
@@ -122,7 +122,7 @@ end
                                     OctaHEALPixGrid,
                                     FullHEALPixGrid,
                                     FullOctaHEALPixGrid)
-                P = Parameters{BarotropicModel}(;NF,trunc,Grid)
+                P = Parameters{SpeedyWeather.BarotropicModel}(;NF,trunc,Grid)
                 S = SpectralTransform(P)
 
                 lmax = 3
@@ -153,11 +153,11 @@ end
                                      FullClenshawGrid,
                                      OctahedralGaussianGrid,
                                      OctahedralClenshawGrid)
-                
+
                 # clenshaw-curtis grids are only exact for cubic truncation
                 dealiasing = Grid in (FullGaussianGrid,OctahedralGaussianGrid) ? 2 : 3
 
-                P = Parameters{ShallowWaterModel}(;NF,Grid,trunc,dealiasing)
+                P = Parameters{SpeedyWeather.ShallowWaterModel}(;NF,Grid,trunc,dealiasing)
                 S = SpectralTransform(P)
                 G = Geometry(P)
                 B = Boundaries(P,S,G)

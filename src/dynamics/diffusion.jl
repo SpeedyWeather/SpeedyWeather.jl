@@ -32,7 +32,7 @@ diffusion_vars(::Barotropic) = (:vor,)
 diffusion_vars(::ShallowWater) = (:vor,:div)
 diffusion_vars(::PrimitiveEquation) = (:vor,:div,:temp)
 
-function horizontal_diffusion!( progn::PrognosticVariablesLeapfrog,
+function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
                                 diagn::DiagnosticVariablesLayer,
                                 model::ModelSetup,
                                 lf::Int=1)      # leapfrog index used (2 is unstable)
@@ -42,7 +42,7 @@ function horizontal_diffusion!( progn::PrognosticVariablesLeapfrog,
     ∇²ⁿ_implicit = model.horizontal_diffusion.∇²ⁿ_implicit[k]
 
     for varname in diffusion_vars(model)
-        var = getfield(progn.leapfrog[lf],varname)
+        var = getfield(progn.timesteps[lf],varname)
         var_tend = getfield(diagn.tendencies,Symbol(varname,:_tend))
         horizontal_diffusion!(var_tend,var,∇²ⁿ,∇²ⁿ_implicit)
     end

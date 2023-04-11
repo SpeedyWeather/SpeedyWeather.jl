@@ -366,28 +366,28 @@ function write_restart_file(time::DateTime,
     for layer in progn.layers
 
         # copy over leapfrog 2 to 1
-        copyto!(layer.leapfrog[1].vor,layer.leapfrog[2].vor)
-        copyto!(layer.leapfrog[1].div,layer.leapfrog[2].div)
-        copyto!(layer.leapfrog[1].temp,layer.leapfrog[2].temp)
-        copyto!(layer.leapfrog[1].humid,layer.leapfrog[2].humid)
+        copyto!(layer.timesteps[1].vor,layer.timesteps[2].vor)
+        copyto!(layer.timesteps[1].div,layer.timesteps[2].div)
+        copyto!(layer.timesteps[1].temp,layer.timesteps[2].temp)
+        copyto!(layer.timesteps[1].humid,layer.timesteps[2].humid)
 
         # bitround 1st leapfrog step to output precision
-        round!(layer.leapfrog[1].vor,keepbits)
-        round!(layer.leapfrog[1].div,keepbits)
-        round!(layer.leapfrog[1].temp,keepbits)
-        round!(layer.leapfrog[1].humid,keepbits)
+        round!(layer.timesteps[1].vor,keepbits)
+        round!(layer.timesteps[1].div,keepbits)
+        round!(layer.timesteps[1].temp,keepbits)
+        round!(layer.timesteps[1].humid,keepbits)
 
         # remove 2nd leapfrog step by filling with zeros
-        fill!(layer.leapfrog[2].vor,0)
-        fill!(layer.leapfrog[2].div,0)
-        fill!(layer.leapfrog[2].temp,0)
-        fill!(layer.leapfrog[2].humid,0)
+        fill!(layer.timesteps[2].vor,0)
+        fill!(layer.timesteps[2].div,0)
+        fill!(layer.timesteps[2].temp,0)
+        fill!(layer.timesteps[2].humid,0)
     end
 
     # same for surface pressure
-    copyto!(progn.pres.leapfrog[1],progn.pres.leapfrog[2])
-    round!(progn.pres.leapfrog[1],keepbits)
-    fill!(progn.pres.leapfrog[2],0)
+    copyto!(progn.surface.timesteps[1].pres,progn.surface.timesteps[2].pres)
+    round!(progn.surface.timesteps[1].pres,keepbits)
+    fill!(progn.surface.timesteps[2].pres,0)
 
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
         f["prognostic_variables"] = progn

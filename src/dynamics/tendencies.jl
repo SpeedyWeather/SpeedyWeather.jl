@@ -40,7 +40,7 @@ Calculate all tendencies for the primitive equation model (wet or dry)."""
 function dynamics_tendencies!(  diagn::DiagnosticVariables,
                                 progn::PrognosticVariables,
                                 model::PrimitiveEquation,
-                                lf::Int=2)               # leapfrog index for tendencies
+                                lf::Int=2)          # leapfrog index for tendencies
 
     B, G, S = model.boundaries, model.geometry, model.spectral_transform
     @unpack surface = diagn

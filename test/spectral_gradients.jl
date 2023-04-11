@@ -4,13 +4,13 @@
         p,d,m = initialize_speedy(  NF,
                                     ShallowWater)
 
-        fill!(p.layers[1].leapfrog[1].vor,0)                  # make sure vorticity and divergence are 0
-        fill!(p.layers[1].leapfrog[1].div,0)
+        fill!(p.layers[1].timesteps[1].vor,0)                  # make sure vorticity and divergence are 0
+        fill!(p.layers[1].timesteps[1].div,0)
         fill!(d.layers[1].tendencies.vor_tend,0)
 
         # start with some vorticity only
         vor0 = randn(LowerTriangularMatrix{Complex{NF}},p.lmax+2,p.mmax+1)
-        p.layers[1].leapfrog[1].vor .= vor0
+        p.layers[1].timesteps[1].vor .= vor0
 
         lf = 1
         SpeedyWeather.gridded!(d,p,lf,m)   # get corresponding non-divergent u_grid, v_grid
@@ -48,13 +48,13 @@ end
         p,d,m = initialize_speedy(  NF,
                                     ShallowWater)
 
-        fill!(p.layers[1].leapfrog[1].vor,0)                  # make sure vorticity and divergence are 0
-        fill!(p.layers[1].leapfrog[1].div,0)
+        fill!(p.layers[1].timesteps[1].vor,0)                  # make sure vorticity and divergence are 0
+        fill!(p.layers[1].timesteps[1].div,0)
         fill!(d.layers[1].tendencies.div_tend,0)
 
         # start with some vorticity only
         div0 = randn(LowerTriangularMatrix{Complex{NF}},p.lmax+2,p.mmax+1)
-        p.layers[1].leapfrog[1].div .= div0
+        p.layers[1].timesteps[1].div .= div0
 
         lf = 1
         SpeedyWeather.gridded!(d,p,lf,m)   # get corresponding non-divergent u_grid, v_grid
@@ -172,8 +172,8 @@ end
                                     ShallowWater)
 
         # make sure vorticity and divergence are 0
-        fill!(p.layers[1].leapfrog[1].vor,0)
-        fill!(p.layers[1].leapfrog[1].div,0)
+        fill!(p.layers[1].timesteps[1].vor,0)
+        fill!(p.layers[1].timesteps[1].div,0)
 
         # make sure vorticity and divergence are 0
         fill!(d.layers[1].tendencies.vor_tend,0)                  
@@ -192,8 +192,8 @@ end
         div0[end,:] .= 0
 
         # copy into prognostic variables
-        p.layers[1].leapfrog[1].vor .= vor0
-        p.layers[1].leapfrog[1].div .= div0
+        p.layers[1].timesteps[1].vor .= vor0
+        p.layers[1].timesteps[1].div .= div0
 
         vor1 = zero(vor0)
         div1 = zero(div0)
