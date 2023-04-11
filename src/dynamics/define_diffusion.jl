@@ -4,9 +4,8 @@ Base.@kwdef struct HyperDiffusion <: DiffusionParameters
     time_scale::Float64 = 2.5                   # Diffusion time scale [hrs] for temp, vor, div
     
     # additional diffusion in stratosphere
-    power_stratosphere::Int = 1                 # additional ∇² for stratosphere
-    time_scale_stratosphere::Float64 = 12       # associated time scale
-    tapering_σ::Float64 = 0.2                   # increase 1/time scale linearly above this σ
+    power_stratosphere::Int = 2                 # different power for stratosphere
+    tapering_σ::Float64 = 0.2                   # scale towards that power linearly above this σ
 
     # reduce time scale of diffusion linearly with increasing model resolution?
     scale_with_resolution::Bool = true          # e.g. 2.5hrs for T31, 1.25 hrs for T63 etc
@@ -48,9 +47,9 @@ function HorizontalDiffusion(   scheme::HyperDiffusion,
     if scheme.scale_with_resolution
         # use values in scheme for T31 (=32 here) and decrease linearly with lmax+1
         time_scale = scheme.time_scale * (32/(lmax+1))
-        time_scale_stratosphere = scheme.time_scale_stratosphere * (32/(lmax+1))
     else
-        @unpack time_scale, time_scale_stratosphere = scheme
+        # @unpack time_scale, time_scale_stratosphere = scheme
+        @unpack time_scale = scheme
     end
 
     # Diffusion is applied by multiplication of the eigenvalues of the Laplacian -l*(l+1)
@@ -66,17 +65,17 @@ function HorizontalDiffusion(   scheme::HyperDiffusion,
 
     for k in 1:nlev         # every layer is a combination of two Laplacians of different orders
 
-        # tapering: go from 1 to 0 between σ=0 and tapering_σ and no additional diffusion below
+        # tapering: go from 1 to 0 between σ=0 and tapering_σ
         σ = σ_levels_full[k]
         tapering = max(0,(tapering_σ-σ)/tapering_σ)         # ∈ [0,1]
+        p = power + tapering*(power_stratosphere - power)     
         
         for l in 0:lmax+1   # PRECALCULATE for every degree l, but indendent of order m
             eigenvalue_norm = -l*(l+1)/largest_eigenvalue   # normalised diffusion ∇², power=1
 
             # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
             # time scale [hrs] *3600-> [s] and add additional diffusion for stratosphere
-            ∇²ⁿ[k][l+1] = -eigenvalue_norm^power/(3600*time_scale)*radius +
-                -tapering*eigenvalue_norm^power_stratosphere/(3600*time_scale_stratosphere)*radius
+            ∇²ⁿ[k][l+1] = -eigenvalue_norm^p/(3600*time_scale)*radius
             
             # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
             ∇²ⁿ_implicit[k][l+1] = 1/(1-2Δt*∇²ⁿ[k][l+1])           
