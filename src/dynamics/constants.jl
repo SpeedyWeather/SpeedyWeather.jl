@@ -26,7 +26,7 @@ Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConst
     n_outputsteps::Int          # total number of output time steps
 
     # DIFFUSION AND DRAG
-    drag_strat::NF              # drag [1/s] for zonal wind in the stratosphere
+    # drag_strat::NF              # drag [1/s] for zonal wind in the stratosphere
 
     # INTERFACE FORCING
     interface_relax_time::NF    # time scale [1/s] for interface relaxation 
@@ -79,7 +79,7 @@ function DynamicsConstants(P::Parameters)
     n_outputsteps = (n_timesteps ÷ output_every_n_steps)+1      # total number of output time steps
 
     # stratospheric drag [1/s] from time scale [hrs]
-    drag_strat = 1/(P.diffusion.time_scale_stratosphere*3600)
+    # drag_strat = 1/(P.diffusion.time_scale_stratosphere*3600)
 
     # interface relaxation forcing
     @unpack interface_relax_time = P
@@ -94,7 +94,8 @@ function DynamicsConstants(P::Parameters)
                                     Δt,Δt_unscaled,Δt_sec,Δt_hrs,
                                     robert_filter,williams_filter,n_timesteps,
                                     output_every_n_steps, n_outputsteps,
-                                    drag_strat, interface_relax_time,
+                                    # drag_strat,
+                                    interface_relax_time,
                                     RH_thresh_pbl_lsc, RH_thresh_range_lsc,
                                     RH_thresh_max_lsc, humid_relax_time_lsc, pres_thresh_cnv,
                                     RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv,
