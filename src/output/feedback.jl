@@ -18,7 +18,7 @@ function initialize_feedback(outputter::Output,M::ModelSetup)
 
     if output   # with netcdf output write parameters.txt and progress.txt
         @unpack NF, n_days, trunc = M.parameters
-        @unpack Grid, npoints = M.geometry
+        @unpack Grid, npoints, nlat_half = M.geometry
 
         # create progress.txt file in run????/
         progress_txt = open(joinpath(run_path,"progress.txt"),"w")
@@ -28,7 +28,7 @@ function initialize_feedback(outputter::Output,M::ModelSetup)
 
         # add some information on resolution and number format
         write(progress_txt,"Integrating $(n_days) days at a spectral resolution of "*
-                            "T$trunc on a $Grid with $npoints grid points.\n")
+            "T$trunc on a $(get_nlat(Grid,nlat_half))-ring $Grid with $npoints grid points.\n")
         write(progress_txt,"Number format is "*string(NF)*".\n")
         write(progress_txt,"All data will be stored in $run_path.\n")
 
@@ -46,7 +46,7 @@ function initialize_feedback(outputter::Output,M::ModelSetup)
     # PROGRESSMETER
     @unpack verbose, debug = M.parameters
     @unpack n_timesteps = M.constants
-    DT_IN_SEC[] = M.constants.Δt_sec        # hack: redefine element in global constant dt_in_sec
+    DT_IN_SEC[] = M.constants.Δt_sec       # hack: redefine element in global constant dt_in_sec
                                             # used to pass on the time step to ProgressMeter.speedstring
     desc = "Weather is speedy$(output ? " run $run_id: " : ": ")"
     
@@ -60,21 +60,13 @@ end
 """Calls the progress meter and writes every 5% progress increase to txt."""
 function progress!(feedback::Feedback)
     ProgressMeter.next!(feedback.progress_meter)    # update progress meter
-    (;counter, n) = feedback.progress_meter         # unpack counter after update
+    @unpack counter, n = feedback.progress_meter    # unpack counter after update
 
     # write progress to txt file too
     if (counter/n*100 % 1) > ((counter+1)/n*100 % 1)  
         percent = round(Int,(counter+1)/n*100)      # % of time steps completed
         if feedback.output && (percent % 5 == 0)    # write every 5% step in txt 
-            write(feedback.progress_txt,@sprintf("\n%3d%%",percent))
-            r = remaining_time(feedback.progress_meter)
-            write(feedback.progress_txt,", ETA: $r")
-
-            time_elapsed = feedback.progress_meter.tlast - feedback.progress_meter.tinit
-            s = speedstring(time_elapsed/counter,DT_IN_SEC[])
-            write(feedback.progress_txt,", $s")
-
-            feedback.nars_detected && write(feedback.progress_txt,", NaRs detected.")
+            write(feedback.progress_txt,"\n$percent%")
             flush(feedback.progress_txt)
         end
     end
@@ -92,7 +84,7 @@ function progress_finish!(F::Feedback)
     
     if F.output     # write final progress to txt file
         time_elapsed = F.progress_meter.tlast - F.progress_meter.tinit
-        s = "\nIntegration done in $(readable_secs(time_elapsed))."
+        s = "Integration done in $(readable_secs(time_elapsed))."
         write(F.progress_txt,"\n$s\n")
         flush(F.progress_txt)
     end
@@ -104,7 +96,7 @@ function nar_detection!(feedback::Feedback,progn::PrognosticVariables)
     feedback.nars_detected && return nothing    # escape immediately if nans already detected
     i = feedback.progress_meter.counter         # time step
     nars_detected_here = false
-    (;vor) = progn.layers[end].timesteps[2]     # only check for surface vorticity
+    @unpack vor = progn.layers[end].timesteps[2] # only check for surface vorticity
 
     if ~nars_detected_here
         nars_vor = ~isfinite(vor[1])    # just check first mode
