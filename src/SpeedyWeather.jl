@@ -66,7 +66,8 @@ export  StartFromFile,
 
 # EXPORT TEMPERATURE RELAXATION SCHEMES
 export  NoTemperatureRelaxation,
-        HeldSuarez
+        HeldSuarez,
+        JablonowskiRelaxation
 
 # EXPORT BOUNDARY LAYER SCHEMES
 export  NoBoundaryLayer,

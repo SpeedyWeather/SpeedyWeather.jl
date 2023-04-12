@@ -7,6 +7,9 @@ struct ParameterizationConstants{NF<:AbstractFloat} <: AbstractParameterizationC
     temp_equil_a::Vector{NF}        # two terms to calculate equilibrium temperature as function
     temp_equil_b::Vector{NF}        # of latitude and pressure
 
+    # TEMPERATURE RELAXATION (Jablonowski and Williamson, 2006)
+    temp_equil::Matrix{NF}
+
     # RADIATION
     fband::Matrix{NF}
 end
@@ -23,12 +26,15 @@ function Base.zeros(::Type{ParameterizationConstants},
     temp_equil_a = zeros(NF,nlat)   # terms to calculate equilibrium temperature as function
     temp_equil_b = zeros(NF,nlat)   # of latitude and pressure
 
+    temp_equil = zeros(NF,nlev,nlat)
+
     fband = zeros(NF,400,nband)
 
     return ParameterizationConstants{NF}(   drag_coefs,
                                             temp_relax_freq,
                                             temp_equil_a,
                                             temp_equil_b,
+                                            temp_equil,
                                             fband,
                                         )
 end
