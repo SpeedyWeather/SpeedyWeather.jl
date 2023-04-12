@@ -18,7 +18,7 @@ function initialize_feedback(outputter::Output,M::ModelSetup)
 
     if output   # with netcdf output write parameters.txt and progress.txt
         @unpack NF, n_days, trunc = M.parameters
-        @unpack Grid, npoints = M.geometry
+        @unpack Grid, npoints, nlat_half = M.geometry
 
         # create progress.txt file in run????/
         progress_txt = open(joinpath(run_path,"progress.txt"),"w")
@@ -28,7 +28,7 @@ function initialize_feedback(outputter::Output,M::ModelSetup)
 
         # add some information on resolution and number format
         write(progress_txt,"Integrating $(n_days) days at a spectral resolution of "*
-                            "T$trunc on a $Grid with $npoints grid points.\n")
+            "T$trunc on a $(get_nlat(Grid,nlat_half))-ring $Grid with $npoints grid points.\n")
         write(progress_txt,"Number format is "*string(NF)*".\n")
         write(progress_txt,"All data will be stored in $run_path.\n")
 
@@ -46,7 +46,7 @@ function initialize_feedback(outputter::Output,M::ModelSetup)
     # PROGRESSMETER
     @unpack verbose, debug = M.parameters
     @unpack n_timesteps = M.constants
-    DT_IN_SEC[1] = M.constants.Δt_sec       # hack: redefine element in global constant dt_in_sec
+    DT_IN_SEC[] = M.constants.Δt_sec       # hack: redefine element in global constant dt_in_sec
                                             # used to pass on the time step to ProgressMeter.speedstring
     desc = "Weather is speedy$(output ? " run $run_id: " : ": ")"
     

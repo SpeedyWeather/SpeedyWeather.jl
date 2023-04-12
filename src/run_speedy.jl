@@ -11,12 +11,12 @@ function run_speedy(::Type{NF}=DEFAULT_NF,          # default number format
                     kwargs...                       # all additional non-default parameters
                     ) where {NF<:AbstractFloat,Model<:ModelSetup}
 
-    # INITALIZE MODEL
+    # INITIALIZE MODEL
     progn_vars,diagn_vars,model_setup = initialize_speedy(NF,Model;kwargs...)
 
     # START MODEL INTEGRATION
     time_stepping!(progn_vars,diagn_vars,model_setup)
-    return progn_vars                               # return prognostic variables when finished
+    return progn_vars                              # return prognostic variables when finished
 end
 
 # if only Model M provided, use default number format NF
