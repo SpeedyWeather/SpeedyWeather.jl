@@ -1,4 +1,25 @@
-using Documenter, SpeedyWeather
+using Documenter,
+      Literate,
+      CairoMakie,   # to avoid capturing precompilation output by Literate
+      SpeedyWeather
+
+CairoMakie.activate!(type = "svg")
+
+const EXAMPLES_DIR = joinpath(@__DIR__, "..", "examples")
+const OUTPUT_DIR   = joinpath(@__DIR__, "src/literated")
+
+examples = [
+    "basic_example.jl"
+]
+
+for example in examples
+    example_filepath = joinpath(EXAMPLES_DIR, example)
+    Literate.markdown(example_filepath, OUTPUT_DIR; flavor = Literate.DocumenterFlavor())
+end
+
+example_pages = [
+    "Basic example" => "literated/basic_example.md"
+]
 
 makedocs(
     format = Documenter.HTML(
@@ -8,6 +29,7 @@ makedocs(
     modules=[SpeedyWeather],
     pages=["Home"=>"index.md",
             "How to run SpeedyWeather.jl"=>"how_to_run_speedy.md",
+            "Examples" => example_pages,
             "Spherical harmonic transform"=>"spectral_transform.md",
             "Grids"=>"grids.md",
             "Dynamical core"=>"dynamical_core.md",
