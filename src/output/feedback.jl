@@ -46,7 +46,7 @@ function initialize_feedback(outputter::Output,M::ModelSetup)
     # PROGRESSMETER
     @unpack verbose, debug = M.parameters
     @unpack n_timesteps = M.constants
-    DT_IN_SEC[1] = M.constants.Δt_sec       # hack: redefine element in global constant dt_in_sec
+    DT_IN_SEC[] = M.constants.Δt_sec        # hack: redefine element in global constant dt_in_sec
                                             # used to pass on the time step to ProgressMeter.speedstring
     desc = "Weather is speedy$(output ? " run $run_id: " : ": ")"
     
@@ -60,13 +60,21 @@ end
 """Calls the progress meter and writes every 5% progress increase to txt."""
 function progress!(feedback::Feedback)
     ProgressMeter.next!(feedback.progress_meter)    # update progress meter
-    @unpack counter, n = feedback.progress_meter    # unpack counter after update
+    (;counter, n) = feedback.progress_meter         # unpack counter after update
 
     # write progress to txt file too
     if (counter/n*100 % 1) > ((counter+1)/n*100 % 1)  
         percent = round(Int,(counter+1)/n*100)      # % of time steps completed
         if feedback.output && (percent % 5 == 0)    # write every 5% step in txt 
-            write(feedback.progress_txt,"\n$percent%")
+            write(feedback.progress_txt,@sprintf("\n%3d%%",percent))
+            r = remaining_time(feedback.progress_meter)
+            write(feedback.progress_txt,", ETA: $r")
+
+            time_elapsed = feedback.progress_meter.tlast - feedback.progress_meter.tinit
+            s = speedstring(time_elapsed/counter,DT_IN_SEC[])
+            write(feedback.progress_txt,", $s")
+
+            feedback.nars_detected && write(feedback.progress_txt,", NaRs detected.")
             flush(feedback.progress_txt)
         end
     end
@@ -84,7 +92,7 @@ function progress_finish!(F::Feedback)
     
     if F.output     # write final progress to txt file
         time_elapsed = F.progress_meter.tlast - F.progress_meter.tinit
-        s = "Integration done in $(readable_secs(time_elapsed))."
+        s = "\nIntegration done in $(readable_secs(time_elapsed))."
         write(F.progress_txt,"\n$s\n")
         flush(F.progress_txt)
     end
@@ -96,7 +104,7 @@ function nar_detection!(feedback::Feedback,progn::PrognosticVariables)
     feedback.nars_detected && return nothing    # escape immediately if nans already detected
     i = feedback.progress_meter.counter         # time step
     nars_detected_here = false
-    @unpack vor = progn.layers[end].timesteps[2] # only check for surface vorticity
+    (;vor) = progn.layers[end].timesteps[2]     # only check for surface vorticity
 
     if ~nars_detected_here
         nars_vor = ~isfinite(vor[1])    # just check first mode
