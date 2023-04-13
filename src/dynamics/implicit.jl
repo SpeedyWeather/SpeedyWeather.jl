@@ -132,18 +132,27 @@ function Implicit(P::Parameters{<:PrimitiveEquation})    # primitive equation on
     U = zeros(NF,nlev)          # divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence
     L = zeros(NF,nlev,nlev)     # temperature: operator for the TₖD + κTₖDlnps/Dt term
     W = zeros(NF,nlev)          # pressure: vertical averaging of the -D̄ term in the log surface pres equation
+    
+    L0 = zeros(NF,nlev)         # components to construct L
+    L1 = zeros(NF,nlev,nlev)
+    L2 = zeros(NF,nlev,nlev)
+    L3 = zeros(NF,nlev)
+    L4 = zeros(NF,nlev,nlev)
+    L5 = zeros(NF,nlev)
+
+    S = zeros(NF,nlev,nlev)     # for every l the matrix to be inverted 
     S⁻¹ = zeros(NF,trunc+1,nlev,nlev)   # combined inverted operator: S = 1 - ξ²(RL + UW)
-    return ImplicitPrimitiveEq(ξ,R,U,L,W,S⁻¹)
+    return ImplicitPrimitiveEq(ξ,R,U,L,W,L0,L1,L2,L3,L4,L5,S,S⁻¹)
 end
 
 function initialize_implicit!(  dt::Real,                   # the scaled time step radius*dt
                                 model::PrimitiveEquation)
 
-    @unpack S⁻¹,L,R,U,W = model.implicit
-    @unpack nlev, σ_levels_full, σ_levels_thick, temp_ref_profile = model.geometry
-    @unpack Δp_geopot_half, Δp_geopot_full, σ_lnp_A, σ_lnp_B = model.geometry
-    @unpack R_dry, κ = model.constants
-    @unpack eigenvalues, lmax = model.spectral_transform
+    (;S,S⁻¹,L,R,U,W,L0,L1,L2,L3,L4,L5)= model.implicit
+    (;nlev, σ_levels_full, σ_levels_thick, temp_ref_profile) = model.geometry
+    (;Δp_geopot_half, Δp_geopot_full, σ_lnp_A, σ_lnp_B) = model.geometry
+    (;R_dry, κ) = model.constants
+    (;eigenvalues, lmax) = model.spectral_transform
     α = model.parameters.implicit_α
 
     # set up R, U, L, W operators from
@@ -160,24 +169,24 @@ function initialize_implicit!(  dt::Real,                   # the scaled time st
     # to obtain δD first, and then δT and δlnps through substitution
 
     ξ = α*dt                            # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
-    model.implicit.ξ[1] = ξ             # also store in Implicit struct
+    model.implicit.ξ[] = ξ              # also store in Implicit struct
     
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
-    for k in 1:nlev                         # vertical geopotential integration as matrix operator
+    @inbounds for k in 1:nlev               # vertical geopotential integration as matrix operator
         R[1:k,k] .= -Δp_geopot_full[k]      # otherwise equivalent to geopotential! with zero orography
         R[1:k-1,k] .+= -Δp_geopot_half[k]   # incl the minus but excluding the eigenvalues as with U 
     end
     U .= -R_dry*temp_ref_profile        # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence
     
     # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
-    L0 = 1 ./ 2σ_levels_thick
-    L1 = zero(L)                        # vert advection term in the temperature equation (below)
-    L2 = zero(L)                        # vert advection term in the temperature equation (above)
-    L3 = κ*temp_ref_profile.*σ_lnp_A    # factor in front of the div_sum_above term
-    L4 = zero(L)                        # _sum_above operator itself
-    L5 = κ*temp_ref_profile.*σ_lnp_B    # factor in front of div term in Dlnps/Dt
+    L0 .= 1 ./ 2σ_levels_thick
+    # L1 = zero(L)                        # vert advection term in the temperature equation (below)
+    # L2 = zero(L)                        # vert advection term in the temperature equation (above)
+    L3 .= κ*temp_ref_profile.*σ_lnp_A    # factor in front of the div_sum_above term
+    # L4 = zero(L)                        # _sum_above operator itself
+    L5 .= κ*temp_ref_profile.*σ_lnp_B    # factor in front of div term in Dlnps/Dt
 
-    for k in 1:nlev
+    @inbounds for k in 1:nlev
         Tₖ = temp_ref_profile[k]                    # reference temperature at k
         k_above = max(1,k-1)                        # layer index above
         k_below = min(k+1,nlev)                     # layer index below
@@ -194,11 +203,11 @@ function initialize_implicit!(  dt::Real,                   # the scaled time st
             L2[k,r] -= (k-1)>=r ? σ_levels_thick[r] : 0
         end
 
-        L4[1:k,k] .= 0                  # fill upper triangle + diagonal with zeros
-        L4[k+1:end,k] .= σ_levels_thick[k]                  # vert integration top to k-1
+        L4[1:k,k] .= 0                              # fill upper triangle + diagonal with zeros
+        L4[k+1:end,k] .= σ_levels_thick[k]          # vert integration top to k-1
     end
 
-    L .= Diagonal(L0)*(L1+L2) + Diagonal(L3)*L4 + Diagonal(L5)  # combine all operators into L
+    L .= Diagonal(L0)*(L1.+L2) .+ Diagonal(L3)*L4 .+ Diagonal(L5)  # combine all operators into L
 
     # PRESSURE OPERATOR (called πᵣ in Hoskins and Simmons, 1975 Appendix 1)
     W .= -σ_levels_thick                # the -D̄ term in the log surface pres equation
@@ -206,9 +215,16 @@ function initialize_implicit!(  dt::Real,                   # the scaled time st
     # solving the equations above for δD yields
     # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
     # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
-    for l in 1:lmax+1
-        S = LinearAlgebra.I(nlev) - ξ^2*eigenvalues[l]*(R*L + U*W')
-        S⁻¹[l,:,:] .= inv(S)
+    I = LinearAlgebra.I(nlev)
+    @inbounds for l in 1:lmax+1
+        S .= I .- ξ^2*eigenvalues[l]*(R*L .+ U*W')
+
+        # inv(S) but saving memory:
+        luS = LinearAlgebra.lu!(S)      # in-place LU decomposition (overwriting S)
+        Sinv = L1                       # reuse L1 matrix to store inv(S)
+        Sinv .= I                       # use ldiv! so last arg needs to be unity matrix
+        LinearAlgebra.ldiv!(luS,Sinv)   # now do S\I = S⁻¹ via LU decomposition
+        S⁻¹[l,:,:] .= Sinv              # store in array
     end
 end
 
