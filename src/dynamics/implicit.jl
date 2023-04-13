@@ -3,7 +3,7 @@
     nothing = initialize_implicit!(::Real,::Barotropic)
 
 Just passes, as implicit terms are not used in the barotropic model."""
-initialize_implicit!(::Real,::Barotropic) = nothing
+initialize_implicit!(::Barotropic,::DiagnosticVariables,::Real) = nothing
 
 # !!! structs are defined in define_implicit.jl !!!
 
@@ -31,8 +31,9 @@ end
     initialize_implicit!(dt::Real,M::BarotropicModel)
 
 Update the implicit terms in `M` for the shallow water model as they depend on the time step `dt`."""
-function initialize_implicit!(  dt::Real,               # time step
-                                model::ShallowWater)    # update Implicit struct in M
+function initialize_implicit!(  model::ShallowWater,    # update Implicit struct in model
+                                ::DiagnosticVariables,
+                                dt::Real)               # time step
 
     @unpack implicit_α = model.parameters               # = [0,0.5,1], time step fraction for implicit
     @unpack eigenvalues = model.spectral_transform      # = -l*(l+1), degree l of harmonics
