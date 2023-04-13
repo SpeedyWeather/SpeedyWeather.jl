@@ -57,7 +57,7 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
 
         # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
         linear_virtual_temperature!(diagn_layer,progn_layer,model,lf_implicit)
-        temperature_anomaly!(diagn_layer,model)     # temperature relative to reference profile
+        temperature_anomaly!(diagn_layer,diagn)     # temperature relative to profile
     end
 
     geopotential!(diagn,B,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
@@ -84,7 +84,7 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
     @floop for layer in diagn.layers
         vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
                                                     # add the RTₖlnpₛ term to geopotential
-        linear_pressure_gradient!(layer,progn,model,lf_implicit)
+        linear_pressure_gradient!(layer,diagn,progn,model,lf_implicit)
     end                                             # wait all because vertical_velocity! needs to
                                                     # finish before vertical_advection!
     @floop for layer in diagn.layers

@@ -210,6 +210,7 @@ struct DiagnosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     layers  ::Vector{DiagnosticVariablesLayer{NF,Grid}}
     surface ::SurfaceVariables{NF,Grid}
     columns ::Vector{ColumnVariables{NF}}
+    temp_profile::Vector{NF}
     nlev    ::Int       # number of vertical levels
     npoints ::Int       # number of grid points
 end
@@ -226,7 +227,10 @@ function Base.zeros(::Type{DiagnosticVariables},
     nthreads = Threads.nthreads()
     columns = [ColumnVariables{NF}(;nlev,n_stratosphere_levels) for _ in 1:nthreads]
 
-    return DiagnosticVariables(layers,surface,columns,nlev,npoints)
+    # global temperature profile, recalculated occasionally for the implicit solver
+    temp_profile = zeros(NF,nlev)
+
+    return DiagnosticVariables(layers,surface,columns,temp_profile,nlev,npoints)
 end
 
 DiagnosticVariables(G::Geometry{NF},S::SpectralTransform{NF}) where NF = zeros(DiagnosticVariables,G,S)

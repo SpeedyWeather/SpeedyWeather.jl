@@ -24,11 +24,11 @@ function pressure_flux!(diagn::DiagnosticVariablesLayer,
 end
 
 """Convert absolute and virtual temperature to anomalies wrt to the reference profile"""
-function temperature_anomaly!(  diagn::DiagnosticVariablesLayer,
-                                model::PrimitiveEquation)
+function temperature_anomaly!(  diagn_layer::DiagnosticVariablesLayer,
+                                diagn::DiagnosticVariables)
                     
-    Tₖ = model.geometry.temp_ref_profile[diagn.k]   # reference temperature at this level k
-    @unpack temp_grid, temp_virt_grid = diagn.grid_variables
+    Tₖ = diagn.temp_profile[diagn_layer.k]    # mean temperature at this level k
+    @unpack temp_grid, temp_virt_grid = diagn_layer.grid_variables
 
     @. temp_grid -= Tₖ          # absolute temperature -> anomaly
     @. temp_virt_grid -= Tₖ     # virtual temperature -> anomaly
@@ -306,10 +306,10 @@ function vordiv_tendencies!(diagn::DiagnosticVariablesLayer,
                             surf::SurfaceVariables,
                             model::PrimitiveEquation)
     
-    @unpack f_coriolis, coslat⁻¹, temp_ref_profile = model.geometry
-    @unpack R_dry = model.constants
+    (;f_coriolis, coslat⁻¹) = model.geometry
+    (;R_dry) = model.constants
 
-    @unpack u_tend_grid, v_tend_grid = diagn.tendencies   # already contains vertical advection
+    (;u_tend_grid, v_tend_grid) = diagn.tendencies  # already contains vertical advection
     u = diagn.grid_variables.u_grid             # velocity
     v = diagn.grid_variables.v_grid             # velocity
     vor = diagn.grid_variables.vor_grid         # relative vorticity
@@ -532,7 +532,6 @@ function absolute_vorticity!(   vor::AbstractGrid,
     end
 end
 
-\
 """
     bernoulli_potential!(   diagn::DiagnosticVariablesLayer, 
                             G::Geometry,
@@ -563,15 +562,16 @@ function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},
     ∇²!(div_tend,bernoulli,S,add=true,flipsign=true)        # add -∇²(½(u² + v²) + ϕ)
 end
 
-function linear_pressure_gradient!( diagn::DiagnosticVariablesLayer,
+function linear_pressure_gradient!( diagn_layer::DiagnosticVariablesLayer,
+                                    diagn::DiagnosticVariables,
                                     progn::PrognosticVariables,
                                     model::PrimitiveEquation,
-                                    lf::Int)                # leapfrog index to evaluate tendencies on
+                                    lf::Int)    # leapfrog index to evaluate tendencies on
     
     @unpack R_dry = model.constants
-    Tₖ = model.geometry.temp_ref_profile[diagn.k]           # reference temperature at layer k      
+    Tₖ = diagn.temp_profile[diagn_layer.k]            # mean temperature at layer k      
     (;pres) = progn.surface.timesteps[lf]
-    @unpack geopot = diagn.dynamics_variables
+    @unpack geopot = diagn_layer.dynamics_variables
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated

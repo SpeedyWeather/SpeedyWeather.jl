@@ -225,7 +225,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     implicit_α::Float64 = 1
 
     "recalculate implicit operators on temperature profile every n time steps"
-    recalculate_implicit::Int = 10
+    recalculate_implicit::Int = 100
 
     # LEGENDRE TRANSFORM AND POLYNOMIALS
 

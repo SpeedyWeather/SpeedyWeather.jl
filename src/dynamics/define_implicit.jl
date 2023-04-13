@@ -26,7 +26,7 @@ end
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the primitive equation model."""
 struct ImplicitPrimitiveEq{NF<:AbstractFloat} <: AbstractImplicit{NF}
-    ξ::RefValue{NF}       # = 2α*Δt, packed in a vector for mutability
+    ξ::Base.RefValue{NF}# = 2α*Δt, packed in a RefValue for mutability
 
     # the following arrays all have ξ = 2αΔt absorbed L <- ξL, etc.
     R::Matrix{NF}       # divergence: used for δD = G_D + ξ(RδT + Uδlnpₛ)
@@ -37,10 +37,9 @@ struct ImplicitPrimitiveEq{NF<:AbstractFloat} <: AbstractImplicit{NF}
     # components of L
     L0::Vector{NF}
     L1::Matrix{NF}
-    L2::Matrix{NF}
-    L3::Vector{NF}
-    L4::Matrix{NF}
-    L5::Vector{NF}
+    L2::Vector{NF}
+    L3::Matrix{NF}
+    L4::Vector{NF}
 
     # combined implicit operator S
     S::Matrix{NF}
