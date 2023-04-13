@@ -84,20 +84,22 @@ function first_timesteps!(  progn::PrognosticVariables, # all prognostic variabl
     n_timesteps == 0 && return time     # exit immediately for no time steps
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
-    initialize_implicit!(Δt/2,model)    # update precomputed implicit terms with time step Δt/2
+    i = 1                               # time step index
     lf1 = 1                             # without Robert+William's filter
     lf2 = 1                             # evaluates all tendencies at t=0,
                                         # the first leapfrog index (=>Euler forward)
-    timestep!(progn,diagn,time,Δt/2,model,lf1,lf2)
+    temperature_profile!(diagn,progn,model,lf2) # used for implicit solver, update occasionally
+    initialize_implicit!(model,diagn,Δt/2)      # update precomputed implicit terms with time step Δt/2
+    timestep!(progn,diagn,time,Δt/2,i,model,lf1,lf2)
     time += Dates.Second(Δt_sec÷2)      # update by half the leapfrog time step Δt used here
     progress!(feedback,progn)
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
-    initialize_implicit!(Δt,model)      # update precomputed implicit terms with time step Δt
+    initialize_implicit!(model,diagn,Δt)    # update precomputed implicit terms with time step Δt
     lf1 = 1                             # without Robert+William's filter
     lf2 = 2                             # evaluate all tendencies at t=dt/2,
                                         # the 2nd leapfrog index (=>Leapfrog)
-    timestep!(progn,diagn,time,Δt,model,lf1,lf2)
+    timestep!(progn,diagn,time,Δt,i,model,lf1,lf2)
     time += Dates.Second(Δt_sec÷2)      # now 2nd leapfrog step is at t=Δt
     progress!(feedback,progn)
     write_netcdf_output!(outputter,time,diagn,model)
@@ -120,6 +122,7 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
                     diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
                     time::DateTime,                 # time at time step 
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                    i::Integer,                     # time step index
                     M::BarotropicModel,             # everything that's constant at runtime
                     lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                     lf2::Int=2,                     # leapfrog index 2 (time step used for tendencies)
@@ -149,6 +152,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                     time::DateTime,                 # time at timestep
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                    i::Integer,                     # time step index
                     M::ShallowWaterModel,           # everything that's constant at runtime
                     lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
@@ -193,6 +197,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                     time::DateTime,                 # time at timestep
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                    i::Integer,                     # time step index
                     model::PrimitiveEquation,       # everything that's constant at runtime
                     lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
@@ -202,6 +207,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     (;physics) = model.parameters
     physics && parameterization_tendencies!(diagn,time,model)
     physics || zero_tendencies!(diagn)              # set tendencies to zero otherwise
+
+    # occasionally reinitialize the implicit solver with new temperature profile
+    initialize_implicit!(model,diagn,progn,dt,i,lf2)
 
     dynamics_tendencies!(diagn,progn,model,lf2)     # dynamical core
     implicit_correction!(diagn,progn,model)         # semi-implicit time stepping corrections
@@ -253,11 +261,11 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
 
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
     time = first_timesteps!(progn,diagn,time,model,feedback,outputter)
-    initialize_implicit!(2Δt,model)         # from now on precomputed implicit terms with 2Δt
+    initialize_implicit!(model,diagn,2Δt)   # from now on precomputed implicit terms with 2Δt
 
     # MAIN LOOP
     for i in 2:n_timesteps                  # start at 2 as first Δt in first_timesteps!
-        timestep!(progn,diagn,time,2Δt,model)   # calculate tendencies and leapfrog forward
+        timestep!(progn,diagn,time,2Δt,i,model)   # calculate tendencies and leapfrog forward
         time += Dates.Second(Δt_sec)        # time of lf=2 and diagn after timestep!
 
         progress!(feedback,progn)           # updates the progress meter bar

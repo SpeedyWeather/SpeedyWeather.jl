@@ -47,8 +47,8 @@ end
 """
     Z = ZonalWind(;kwargs...) <: InitialConditions
 
-Create a struct that contains all parameters for the Galewsky et al, 2004 zonal jet
-intitial conditions for the shallow water model. Default values as in Galewsky."""
+Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
+intitial conditions for the primitive equation model. Default values as in Jablonowski."""
 Base.@kwdef struct ZonalWind <: InitialConditions
     
     # vertical
