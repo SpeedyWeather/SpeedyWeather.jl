@@ -241,7 +241,8 @@ function initialize_implicit!(  model::PrimitiveEquation,
     initialize_implicit!(model,diagn,dt)
 end
 
-temperature_profile!(::DiagnosticVariables,::PrognosticVariables,::ModelSetup) = nothing
+# just pass for Barotropic and ShallowWater
+temperature_profile!(::DiagnosticVariables,::PrognosticVariables,::ModelSetup,lf::Integer=1) = nothing
 
 function temperature_profile!(  diagn::DiagnosticVariables,
                                 progn::PrognosticVariables,
