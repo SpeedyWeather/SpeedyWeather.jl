@@ -23,7 +23,7 @@
         
         # this is a nonsense simulation with way too large timesteps, but it's here to test the time axis output
         # 1kyrs simulation
-        p, d, m = initialize_speedy(Float32, output=true, output_path=tmp_output_path, n_days=365000, Δt_at_T31=60*24*365*10, output_dt=24*365*10, run_id="long-output-test")
+        p, d, m = initialize_speedy(Float32, trunc=21, output=true, output_path=tmp_output_path, n_days=365000, Δt_at_T21=3600*24*365*10, output_dt=24*365*10, run_id="long-output-test")
         SpeedyWeather.time_stepping!(p, d, m)
 
         tmp_read_path = joinpath(tmp_output_path, "run-long-output-test", "output.nc")
