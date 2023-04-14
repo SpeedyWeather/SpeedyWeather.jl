@@ -40,19 +40,6 @@ function speedstring(sec_per_iter,dt_in_sec)
     return " <2 hours/days"
 end
 
-# adapted from ProgressMeter.jl
-function remaining_time(p::ProgressMeter.Progress)
-    elapsed_time = time() - p.tinit
-    est_total_time = elapsed_time * (p.n - p.start) / (p.counter - p.start)
-    if 0 <= est_total_time <= typemax(Int)
-        eta_sec = round(Int, est_total_time - elapsed_time )
-        eta = ProgressMeter.durationstring(eta_sec)
-    else
-        eta = "N/A"
-    end
-    return eta
-end
-
 # hack: define global constant whose element will be changed in initialize_feedback
 # used to pass on the time step to ProgressMeter.speedstring via calling this
 # constant from the ProgressMeter module

@@ -66,7 +66,15 @@ function progress!(feedback::Feedback)
     if (counter/n*100 % 1) > ((counter+1)/n*100 % 1)  
         percent = round(Int,(counter+1)/n*100)      # % of time steps completed
         if feedback.output && (percent % 5 == 0)    # write every 5% step in txt 
-            write(feedback.progress_txt,"\n$percent%")
+            write(feedback.progress_txt,@sprintf("\n%3d%%",percent))
+            r = remaining_time(feedback.progress_meter)
+            write(feedback.progress_txt,", ETA: $r")
+
+            time_elapsed = feedback.progress_meter.tlast - feedback.progress_meter.tinit
+            s = speedstring(time_elapsed/counter,DT_IN_SEC[])
+            write(feedback.progress_txt,", $s")
+
+            feedback.nars_detected && write(feedback.progress_txt,", NaRs detected.")
             flush(feedback.progress_txt)
         end
     end
@@ -84,7 +92,7 @@ function progress_finish!(F::Feedback)
     
     if F.output     # write final progress to txt file
         time_elapsed = F.progress_meter.tlast - F.progress_meter.tinit
-        s = "Integration done in $(readable_secs(time_elapsed))."
+        s = "\nIntegration done in $(readable_secs(time_elapsed))."
         write(F.progress_txt,"\n$s\n")
         flush(F.progress_txt)
     end
@@ -108,3 +116,15 @@ function nar_detection!(feedback::Feedback,progn::PrognosticVariables)
     feedback.nars_detected |= nars_detected_here
 end
 
+# adapted from ProgressMeter.jl
+function remaining_time(p::ProgressMeter.Progress)
+    elapsed_time = time() - p.tinit
+    est_total_time = elapsed_time * (p.n - p.start) / (p.counter - p.start)
+    if 0 <= est_total_time <= typemax(Int)
+        eta_sec = round(Int, est_total_time - elapsed_time )
+        eta = ProgressMeter.durationstring(eta_sec)
+    else
+        eta = "N/A"
+    end
+    return eta
+end
