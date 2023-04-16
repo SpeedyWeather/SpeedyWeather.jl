@@ -7,12 +7,12 @@ function power_spectrum(alms::LowerTriangularMatrix{Complex{NF}};
     spectrum = zeros(NF,trunc)   
 
     # zonal modes m = 0, *1 as not mirrored at -m
-    for l in 1:trunc
+    @inbounds for l in 1:trunc
         spectrum[l] = abs(alms[l,1])^2
     end
 
     # other modes m > 0 *2 as complex conj at -m
-    for m in 2:trunc
+    @inbounds for m in 2:trunc
         for l in m:trunc
             spectrum[l] += 2*abs(alms[l,m])^2
         end
@@ -20,7 +20,7 @@ function power_spectrum(alms::LowerTriangularMatrix{Complex{NF}};
 
     # divide by number of orders m at l for normalization, "average power at l"
     if normalize
-        for l in 1:trunc            # 1-based degree, hence:
+        @inbounds for l in 1:trunc  # 1-based degree, hence:
             spectrum[l] /= 2l-1     # 1/(2l + 1) but l → l-1
         end
     end
