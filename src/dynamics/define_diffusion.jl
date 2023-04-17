@@ -44,7 +44,8 @@ function HorizontalDiffusion(   scheme::HyperDiffusion,
     time_scales = zero(scheme.time_scales)
     for i in eachindex(time_scales,resolution_scalings)
         # use values in scheme for T31 (=32 here) and decrease with lmax+1
-        time_scales[i] = scheme.time_scales[i] * (32/lmax+1)^resolution_scalings[i]
+        # time scale [hrs] *3600-> [s]
+        time_scales[i] = 3600*scheme.time_scales[i] * (32/(lmax+1))^resolution_scalings[i]
     end
 
     # Diffusion is applied by multiplication of the eigenvalues of the Laplacian -l*(l+1)
@@ -63,12 +64,11 @@ function HorizontalDiffusion(   scheme::HyperDiffusion,
             eigenvalue_norm = -l*(l+1)/largest_eigenvalue   # normalised diffusion ∇², power=1
 
             # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
-            # time scale [hrs] *3600-> [s]
             ∇²ⁿ[k][l+1] = 0
             for i in eachindex(powers,time_scales)
                 power = powers[i]
                 time_scale = time_scales[i]
-                ∇²ⁿ[k][l+1] += -eigenvalue_norm^power/(3600*time_scale)*radius
+                ∇²ⁿ[k][l+1] += -eigenvalue_norm^power/time_scale*radius
             end
             
             # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
