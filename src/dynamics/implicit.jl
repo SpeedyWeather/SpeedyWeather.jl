@@ -253,7 +253,7 @@ function temperature_profile!(  diagn::DiagnosticVariables,
     (;norm_sphere) = model.spectral_transform
 
     @inbounds for k in 1:diagn.nlev
-        temp_profile[k] = progn.layers[k].timesteps[lf].temp[1]/norm_sphere
+        temp_profile[k] = real(progn.layers[k].timesteps[lf].temp[1])/norm_sphere
     end
 end 
 
