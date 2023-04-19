@@ -16,6 +16,7 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables,
     G = model.geometry
     boundary_layer_scheme = model.parameters.boundary_layer
     temperature_relax_scheme = model.parameters.temperature_relaxation
+    vertical_diffusion_scheme = model.parameters.vertical_diffusion
 
     rings = eachring(G.Grid,G.nlat_half)
 
@@ -27,10 +28,14 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables,
 
         reset_column!(column)                   # set accumulators back to zero for next grid point
         get_column!(column,diagn,ij,jring,G)    # extract column for contiguous memory access
+        
+        # VERTICAL DIFFUSION
+        vertical_diffusion!(column,vertical_diffusion_scheme,model)
 
         # HELD-SUAREZ
         temperature_relaxation!(column,temperature_relax_scheme,model)
         boundary_layer!(column,boundary_layer_scheme,model)
+
 
         # Pre-compute thermodynamic quantities
         # get_thermodynamics!(column,model)

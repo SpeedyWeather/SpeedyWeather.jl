@@ -119,8 +119,11 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # DIFFUSION AND DRAG
 
-    "(hyper)-diffusion"
+    "horizontal (hyper)-diffusion"
     diffusion::DiffusionParameters = HyperDiffusion()
+
+    "vertical diffusion"
+    vertical_diffusion::VerticalDiffusion = VerticalLaplacian()
 
 
     # FORCING

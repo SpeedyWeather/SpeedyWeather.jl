@@ -1,3 +1,5 @@
+struct NoTemperatureRelaxation{NF} <: TemperatureRelaxation{NF} end
+
 """NoBoundaryLayer scheme just passes."""
 function temperature_relaxation!(   column::ColumnVariables,
                                     scheme::NoTemperatureRelaxation,
@@ -11,7 +13,23 @@ function initialize_temperature_relaxation!(K::ParameterizationConstants,
                                             P::Parameters,
                                             G::Geometry)
     return nothing
-end 
+end
+
+Base.@kwdef struct HeldSuarez{NF<:Real} <: TemperatureRelaxation{NF}
+    σb::NF = 0.7                    # sigma coordinate below which linear drag is applied
+
+    relax_time_slow::NF = 40.0*24   # [hours] time scale for slow global relaxation
+    relax_time_fast::NF = 4.0*24    # [hours] time scale for faster tropical surface relaxation
+
+    Tmin::NF = 200.0    # minimum temperature [K] in equilibrium temperature
+    Tmax::NF = 315.0    # maximum temperature [K] in equilibrium temperature
+
+    ΔTy::NF = 60.0      # meridional temperature gradient [K]
+    Δθz::NF = 10.0      # vertical temperature gradient [K]
+end
+
+# generator so that HeldSuarez(Tmin=200::Int) is still possible → Float64
+HeldSuarez(;kwargs...) = HeldSuarez{Float64}(;kwargs...)
 
 function temperature_relaxation!(   column::ColumnVariables{NF},
                                     scheme::HeldSuarez,
@@ -60,6 +78,25 @@ function initialize_temperature_relaxation!(K::ParameterizationConstants,
         temp_equil_b[j] = -Δθz*cosϕ^2
     end
 end
+
+"""
+    J = JablonowskiRelaxation{NF}()
+
+HeldSuarez-like temperature relaxation, but towards the Jablonowski temperature
+profile with increasing temperatures in the stratosphere."""
+Base.@kwdef struct JablonowskiRelaxation{NF<:Real} <: TemperatureRelaxation{NF}
+    σb::NF = 0.7        # sigma coordinate below which relax_time_fast is applied
+
+    η₀::NF = 0.252      # conversion from σ to Jablonowski's ηᵥ-coordinates
+    u₀::NF = 35.0       # max amplitude of zonal wind [m/s]
+    ΔT::NF = 4.8e5      # temperature difference used for stratospheric lapse rate [K]
+
+    relax_time_slow::NF = 40.0*24   # [hours] time scale for slow global relaxation
+    relax_time_fast::NF = 4.0*24    # [hours] time scale for faster tropical surface relaxation
+end
+
+# generator so that arguments are converted to Float64
+JablonowskiRelaxation(;kwargs...) = JablonowskiRelaxation{Float64}(;kwargs...)
 
 function temperature_relaxation!(   column::ColumnVariables{NF},
                                     scheme::JablonowskiRelaxation,

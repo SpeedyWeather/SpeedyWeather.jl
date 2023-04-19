@@ -1,3 +1,6 @@
+"""Concrete type that disables the boundary layer scheme."""
+struct NoBoundaryLayer{NF} <: BoundaryLayer{NF} end
+
 """NoBoundaryLayer scheme just passes."""
 function boundary_layer!(   column::ColumnVariables,
                             scheme::NoBoundaryLayer,
@@ -12,6 +15,15 @@ function initialize_boundary_layer!(K::ParameterizationConstants,
                                     G::Geometry)
     return nothing
 end 
+
+"""Following Held and Suarez, 1996 BAMS"""
+Base.@kwdef struct LinearDrag{NF<:Real} <: BoundaryLayer{NF}
+    σb::NF = 0.7            # sigma coordinate below which linear drag is applied
+    drag_time::NF = 24.0    # [hours] time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
+end
+
+# generator so that LinearDrag(drag_time=1::Int) is still possible → Float64
+LinearDrag(;kwargs...) = LinearDrag{Float64}(;kwargs...)
 
 function boundary_layer!(   column::ColumnVariables,
                             scheme::LinearDrag,
