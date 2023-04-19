@@ -2,10 +2,10 @@ Base.@kwdef struct HyperDiffusion <: DiffusionParameters
     # hyperdiffusion for temp, vor, div everywhere
     # several powers of Laplacians, default 4 and 2, are added
     # with respective time scales and scalings with resolution
-    powers::Vector{Float64} = [4.0,2.0]                 # Powers of Laplacians
-    time_scales::Vector{Float64} = [2.4,24.0]           # Diffusion time scales [hrs]
-    resolution_scalings::Vector{Float64} = [2.2,2.2]    # 1: (inverse) linear with T
-                                                        # 2: (inverse) quadratic, etc
+    powers::Vector{Float64} = [4.0,2.0]             # Powers of Laplacians
+    time_scales::Vector{Float64} = [2.4,Inf]        # Diffusion time scales [hrs]
+    resolution_scalings::Vector{Float64} = [2,2]    # 1: (inverse) linear with T
+                                                    # 2: (inverse) quadratic, etc
 end
 
 """ 
