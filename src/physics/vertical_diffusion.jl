@@ -82,7 +82,7 @@ function initialize_vertical_diffusion!(K::ParameterizationConstants,
     (;vert_diff_∇²_above, vert_diff_∇²_below, vert_diff_∂σ) = K
     Δσ = G.σ_levels_thick
     
-    @. vert_diff_∂σ = 2(Δσ[2:end] + Δσ[1:end-1])
+    @. vert_diff_∂σ = 1/2*(Δσ[2:end] + Δσ[1:end-1])
     @. vert_diff_∇²_above = Δσ[2:end]*vert_diff_∂σ
     @. vert_diff_∇²_below = Δσ[1:end-1]*vert_diff_∂σ
 
