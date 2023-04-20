@@ -35,15 +35,18 @@ function vertical_diffusion!(   column::ColumnVariables,
     ∇²_below = model.parameterization_constants.vert_diff_∇²_below
     ∇²_above = model.parameterization_constants.vert_diff_∇²_above
     ν = model.parameterization_constants.vert_diff_ν
-    ∂σ = model.parameterization_constants.vert_diff_∂σ
+    Δσ = model.parameterization_constants.vert_diff_∂σ
 
     # GET DIFFUSION COEFFICIENT as a function of u,v,temp and surface pressure
     ν .= model.geometry.radius*inv(scheme.time_scale*3600)    # *3600 for [hrs] → [s]
+    
+    # scale with surface pressure, on mountains pₛ can be 500hPa, which would increase ν by *2
     scheme.pressure_coordinates && ν .*= (model.parameters.pres_ref*100/column.pres[end])^2
+    
     if scheme.scale_with_temperature_gradient
         @inbounds for k in 1:nlev-1
-            ΔT = (temp[k+1] - temp[k])/∂σ[k]
-            ν[k] *= max(ΔT/scheme.ΔTmax + 1,0)/2
+            ΔT = (temp[k+1] - temp[k])/Δσ[k]        # vertical temperature gradient ∂T/∂σ
+            ν[k] *= max(ΔT/scheme.ΔTmax + 1,0)/2    # map < -ΔTmax to 0, 0 to 1/2 and ΔTmax to 1 
         end
     end
 
@@ -57,9 +60,13 @@ function vertical_diffusion!(   column::ColumnVariables,
 
         # full Laplacian in other layers
         for k in 2:nlev-1
+
+            # diffusion coefficient ν times 1/Δσ²-like operator
             ν∇²_above = ν[k-1]*∇²_above[k]
             ν∇²_below = ν[k]*∇²_below[k]
             ν∇²_at_k = ν∇²_above + ν∇²_below
+
+            # discrete Laplacian, like the (1, -2, 1)-stencil but for variable Δσ
             u_tend[k] += ν∇²_below*u[k+1] - ν∇²_at_k*u[k] + ν∇²_above*u[k-1]
             v_tend[k] += ν∇²_below*v[k+1] - ν∇²_at_k*v[k] + ν∇²_above*v[k-1]
             temp_tend[k] += ν∇²_below*temp[k+1] - ν∇²_at_k*temp[k] + ν∇²_above*temp[k-1]
@@ -79,12 +86,19 @@ function initialize_vertical_diffusion!(K::ParameterizationConstants,
                                         scheme::VerticalLaplacian,
                                         P::Parameters,
                                         G::Geometry)
+
     (;vert_diff_∇²_above, vert_diff_∇²_below, vert_diff_∂σ) = K
     Δσ = G.σ_levels_thick
     
-    @. vert_diff_∂σ = 1/2*(Δσ[2:end] + Δσ[1:end-1])
-    @. vert_diff_∇²_above = Δσ[2:end]*vert_diff_∂σ
-    @. vert_diff_∇²_below = Δσ[1:end-1]*vert_diff_∂σ
+    # thickness Δσ of half levels
+    @. vert_diff_Δσ = 1/2*(Δσ[2:end] + Δσ[1:end-1])
+
+    # 1/Δσ² but for variable Δσ on half levels
+    # = 1/(1/2*Δσₖ(Δσ_k-1 + Δσₖ))
+    @. vert_diff_∇²_above = inv(Δσ[2:end]*vert_diff_∂σ)
+    
+    # = 1/(1/2*Δσₖ(Δσ_k+1 + Δσₖ))
+    @. vert_diff_∇²_below = inv(Δσ[1:end-1]*vert_diff_∂σ)
 
     return nothing
 end 
