@@ -41,16 +41,17 @@ function vertical_diffusion!(   column::ColumnVariables,
 
     # GET DIFFUSION COEFFICIENT as a function of u,v,temp and surface pressure
     # *3600 for [hrs] → [s], *1e3 for [km] → [m]
-    ν .= model.geometry.radius*inv(scheme.time_scale*3600)
+    ν0 = model.geometry.radius*inv(scheme.time_scale*3600)
 
     # include a height scale, technically not needed, but so that the dimensionless
     # 1/Δσ² gets a resonable scale in meters such that the time scale is not
     # counterintuitively in seconds or years
-    ν ./= scheme.height_scale^2
+    ν0 /= scheme.height_scale^2
     
     # scale with surface pressure, on mountains pₛ can be 500hPa, which would increase ν by *2
-    scheme.pressure_coordinates && ν .*= (model.parameters.pres_ref*100/column.pres[end])^2
+    scheme.pressure_coordinates && (ν0 *= (model.parameters.pres_ref*100/column.pres[end])^2)
     
+    ν .= ν0                                         # store scalar diffusion ν0
     if scheme.scale_with_temperature_gradient
         @inbounds for k in 1:nlev-1                 # all half levels in between full levels
             ΔT = (temp[k+1] - temp[k])/Δσ[k]        # vertical temperature gradient ∂T/∂σ
