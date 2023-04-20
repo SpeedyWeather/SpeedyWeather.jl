@@ -1,4 +1,5 @@
 struct NoVerticalDiffusion{NF} <: VerticalDiffusion{NF} end
+NoVerticalDiffusion() = NoVerticalDiffusion{DEFAULT_NF}()
 
 function vertical_diffusion!(   column::ColumnVariables,
                                 scheme::NoVerticalDiffusion,
@@ -14,7 +15,8 @@ function initialize_vertical_diffusion!(K::ParameterizationConstants,
 end 
 
 Base.@kwdef struct VerticalLaplacian{NF<:Real} <: VerticalDiffusion{NF}
-    time_scale::NF = 1.0    # [hours] time scale for slow global relaxation
+    time_scale::NF = 2.4    # [hours] time scale to control the strength of vertical diffusion
+    height_scale::NF = 10   # [km] scales σ coordinates so that time_scale is sensible 
     umax::NF = 80.0         # velocity scale [m/s] to scale the diffusion with |u|/umax
     ΔTmax::NF = 50.0        # temperature gradient scale [K] (divided by Δσ)
 
@@ -35,16 +37,18 @@ function vertical_diffusion!(   column::ColumnVariables,
     ∇²_below = model.parameterization_constants.vert_diff_∇²_below
     ∇²_above = model.parameterization_constants.vert_diff_∇²_above
     ν = model.parameterization_constants.vert_diff_ν
-    Δσ = model.parameterization_constants.vert_diff_∂σ
+    Δσ = model.parameterization_constants.vert_diff_Δσ
 
     # GET DIFFUSION COEFFICIENT as a function of u,v,temp and surface pressure
-    ν .= model.geometry.radius*inv(scheme.time_scale*3600)    # *3600 for [hrs] → [s]
+    # *3600 for [hrs] → [s], *1e3 for [km] → [m]
+    ν .= model.geometry.radius*inv(scheme.time_scale*3600)
+    ν ./= scheme.height_scale*1000
     
     # scale with surface pressure, on mountains pₛ can be 500hPa, which would increase ν by *2
     scheme.pressure_coordinates && ν .*= (model.parameters.pres_ref*100/column.pres[end])^2
     
     if scheme.scale_with_temperature_gradient
-        @inbounds for k in 1:nlev-1
+        @inbounds for k in 1:nlev-1                 # all half levels in between full levels
             ΔT = (temp[k+1] - temp[k])/Δσ[k]        # vertical temperature gradient ∂T/∂σ
             ν[k] *= max(ΔT/scheme.ΔTmax + 1,0)/2    # map < -ΔTmax to 0, 0 to 1/2 and ΔTmax to 1 
         end
@@ -87,7 +91,7 @@ function initialize_vertical_diffusion!(K::ParameterizationConstants,
                                         P::Parameters,
                                         G::Geometry)
 
-    (;vert_diff_∇²_above, vert_diff_∇²_below, vert_diff_∂σ) = K
+    (;vert_diff_∇²_above, vert_diff_∇²_below, vert_diff_Δσ) = K
     Δσ = G.σ_levels_thick
     
     # thickness Δσ of half levels
@@ -95,10 +99,10 @@ function initialize_vertical_diffusion!(K::ParameterizationConstants,
 
     # 1/Δσ² but for variable Δσ on half levels
     # = 1/(1/2*Δσₖ(Δσ_k-1 + Δσₖ))
-    @. vert_diff_∇²_above = inv(Δσ[2:end]*vert_diff_∂σ)
+    @. vert_diff_∇²_above = inv(Δσ[2:end]*vert_diff_Δσ)
     
     # = 1/(1/2*Δσₖ(Δσ_k+1 + Δσₖ))
-    @. vert_diff_∇²_below = inv(Δσ[1:end-1]*vert_diff_∂σ)
+    @. vert_diff_∇²_below = inv(Δσ[1:end-1]*vert_diff_Δσ)
 
     return nothing
 end 
