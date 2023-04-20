@@ -2,10 +2,14 @@ Base.@kwdef struct HyperDiffusion <: DiffusionParameters
     # hyperdiffusion for temp, vor, div everywhere
     # several powers of Laplacians, default 4 and 2, are added
     # with respective time scales and scalings with resolution
-    powers::Vector{Float64} = [4.0,2.0]             # Powers of Laplacians
-    time_scales::Vector{Float64} = [2.4,Inf]        # Diffusion time scales [hrs]
-    resolution_scalings::Vector{Float64} = [2,2]    # 1: (inverse) linear with T
-                                                    # 2: (inverse) quadratic, etc
+    power::Float64 = 4.0                # Powers of Laplacians
+    time_scale::Float64 = 2.4           # Diffusion time scales [hrs]
+    resolution_scaling::Float64 = 2     # 1: (inverse) linear with T
+                                        # 2: (inverse) quadratic, etc
+
+    # additional diffusion in stratosphere
+    power_stratosphere::Int = 2         # different power for stratosphere
+    tapering_σ::Float64 = 0.2           # scale towards that power linearly above this σ
 end
 
 """ 
@@ -36,17 +40,14 @@ function HorizontalDiffusion(   scheme::HyperDiffusion,
                                 S::SpectralTransform{NF}) where NF
     @unpack lmax,mmax = S
     @unpack radius = P.planet
-    @unpack powers, resolution_scalings = scheme
+    @unpack power, time_scale, resolution_scaling = scheme
+    @unpack power_stratosphere, tapering_σ = scheme
     @unpack Δt = C
-    @unpack nlev = G
+    @unpack nlev, σ_levels_full = G
 
     # Reduce diffusion time scale (=increase diffusion) with resolution
-    time_scales = zero(scheme.time_scales)
-    for i in eachindex(time_scales,resolution_scalings)
-        # use values in scheme for T31 (=32 here) and decrease with lmax+1
-        # time scale [hrs] *3600-> [s]
-        time_scales[i] = 3600*scheme.time_scales[i] * (32/(lmax+1))^resolution_scalings[i]
-    end
+    # times 1/radius because time step Δt is scaled with 1/radius
+    time_scale = 1/radius*3600*scheme.time_scale * (32/(lmax+1))^resolution_scaling
 
     # Diffusion is applied by multiplication of the eigenvalues of the Laplacian -l*(l+1)
     # normalise by the largest eigenvalue -lmax*(lmax+1) such that the highest wavenumber lmax
@@ -60,16 +61,17 @@ function HorizontalDiffusion(   scheme::HyperDiffusion,
     ∇²ⁿ_implicit = [zeros(NF,lmax+2) for _ in 1:nlev]       # Implicit part (= 1/(1+2Δtν∇²ⁿ))
 
     for k in 1:nlev         # every layer is a combination of Laplacians of different orders
+        
+        # tapering: go from 1 to 0 between σ=0 and tapering_σ
+        σ = σ_levels_full[k]
+        tapering = max(0,(tapering_σ-σ)/tapering_σ)         # ∈ [0,1]
+        p = power + tapering*(power_stratosphere - power) 
+        
         for l in 0:lmax+1   # PRECALCULATE for every degree l, but indendent of order m
             eigenvalue_norm = -l*(l+1)/largest_eigenvalue   # normalised diffusion ∇², power=1
 
             # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
-            ∇²ⁿ[k][l+1] = 0
-            for i in eachindex(powers,time_scales)
-                power = powers[i]
-                time_scale = time_scales[i]
-                ∇²ⁿ[k][l+1] += -eigenvalue_norm^power/time_scale*radius
-            end
+            ∇²ⁿ[k][l+1] = -eigenvalue_norm^p/time_scale
             
             # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
             ∇²ⁿ_implicit[k][l+1] = 1/(1-2Δt*∇²ⁿ[k][l+1])           
