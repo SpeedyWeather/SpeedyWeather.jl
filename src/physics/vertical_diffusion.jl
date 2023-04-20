@@ -16,7 +16,7 @@ end
 
 Base.@kwdef struct VerticalLaplacian{NF<:Real} <: VerticalDiffusion{NF}
     time_scale::NF = 2.4    # [hours] time scale to control the strength of vertical diffusion
-    height_scale::NF = 10   # [km] scales σ coordinates so that time_scale is sensible 
+    height_scale::NF = 100  # [m] scales for Δσ so that time_scale is sensible 
     umax::NF = 80.0         # velocity scale [m/s] to scale the diffusion with |u|/umax
     ΔTmax::NF = 50.0        # temperature gradient scale [K] (divided by Δσ)
 
@@ -42,7 +42,11 @@ function vertical_diffusion!(   column::ColumnVariables,
     # GET DIFFUSION COEFFICIENT as a function of u,v,temp and surface pressure
     # *3600 for [hrs] → [s], *1e3 for [km] → [m]
     ν .= model.geometry.radius*inv(scheme.time_scale*3600)
-    ν ./= scheme.height_scale*1000
+
+    # include a height scale, technically not needed, but so that the dimensionless
+    # 1/Δσ² gets a resonable scale in meters such that the time scale is not
+    # counterintuitively in seconds or years
+    ν ./= scheme.height_scale^2
     
     # scale with surface pressure, on mountains pₛ can be 500hPa, which would increase ν by *2
     scheme.pressure_coordinates && ν .*= (model.parameters.pres_ref*100/column.pres[end])^2
