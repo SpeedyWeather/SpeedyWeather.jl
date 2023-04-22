@@ -28,16 +28,16 @@ end
 # generator so that arguments are converted to Float64
 VerticalLaplacian(;kwargs...) = VerticalLaplacian{Float64}(;kwargs...)
 
-function vertical_diffusion!(   column::ColumnVariables,
+function vertical_diffusion!(   column::ColumnVariables{NF},
                                 scheme::VerticalLaplacian,
-                                model::PrimitiveEquation)
+                                model::PrimitiveEquation) where NF
 
     (;nlev,u_tend,v_tend,temp_tend) = column
     (;u,v,temp) = column
     ∇²_below = model.parameterization_constants.vert_diff_∇²_below
     ∇²_above = model.parameterization_constants.vert_diff_∇²_above
-    ν = model.parameterization_constants.vert_diff_ν
     Δσ = model.parameterization_constants.vert_diff_Δσ
+    ΔTmax = convert(NF,scheme.ΔTmax)
 
     # GET DIFFUSION COEFFICIENT as a function of u,v,temp and surface pressure
     # *3600 for [hrs] → [s], *1e3 for [km] → [m]
@@ -50,39 +50,45 @@ function vertical_diffusion!(   column::ColumnVariables,
     
     # scale with surface pressure, on mountains pₛ can be 500hPa, which would increase ν by *2
     scheme.pressure_coordinates && (ν0 *= (model.parameters.pres_ref*100/column.pres[end])^2)
-    
-    ν .= ν0                                         # store scalar diffusion ν0
-    if scheme.scale_with_temperature_gradient
-        @inbounds for k in 1:nlev-1                 # all half levels in between full levels
-            ΔT = (temp[k+1] - temp[k])/Δσ[k]        # vertical temperature gradient ∂T/∂σ
-            ν[k] *= max(ΔT/scheme.ΔTmax + 1,0)/2    # map < -ΔTmax to 0, 0 to 1/2 and ΔTmax to 1 
-        end
-    end
+    ν0 = convert(NF,ν0)
+
+    # temperature gradient-based scaling ∈ [0,1] or just pass ν = ν0
+    get_ν(ν0,ΔT,ΔTmax,Δσ) = scheme.scale_with_temperature_gradient ? ν0*max(ΔT/Δσ/ΔTmax + 1,0)/2 : ν0
 
     # DO DIFFUSION
-    # top layer with no flux boundary conditions at k=1/2
     @inbounds begin
-        ν∇²_below = ν[1]*∇²_below[1]
-        u_tend[1] += ν∇²_below*(u[2] - u[1])
-        v_tend[1] += ν∇²_below*(v[2] - v[1])
-        temp_tend[1] += ν∇²_below*(temp[2] - temp[1])
+        
+        # top layer with no flux boundary conditions at k=1/2
+        ΔT = temp[2] - temp[1]          # top temperature gradient
+        ν = get_ν(ν0,ΔT,ΔTmax,Δσ[1])    # calculate diffusion coefficient ν
+
+        ν∇²_below = ν*∇²_below[1]       # diffusion operator
+        u_tend[1] += ν∇²_below*(u[2] - u[1])    # diffusion of u
+        v_tend[1] += ν∇²_below*(v[2] - v[1])    # diffusion of v
+        temp_tend[1] += ν∇²_below*ΔT            # diffusion of temperature
 
         # full Laplacian in other layers
+        ν_above = ν                             # reuse diffusion from above (i.e. k-1/2)
         for k in 2:nlev-1
 
+            ΔT = temp[k+1] - temp[k]            # based on temperature gradient
+            ν = get_ν(ν0,ΔT,ΔTmax,Δσ[k])        # get diffusion coefficient at
+
             # diffusion coefficient ν times 1/Δσ²-like operator
-            ν∇²_above = ν[k-1]*∇²_above[k]
-            ν∇²_below = ν[k]*∇²_below[k]
+            ν∇²_above = ν_above*∇²_above[k]
+            ν∇²_below = ν*∇²_below[k]
             ν∇²_at_k = ν∇²_above + ν∇²_below
 
             # discrete Laplacian, like the (1, -2, 1)-stencil but for variable Δσ
             u_tend[k] += ν∇²_below*u[k+1] - ν∇²_at_k*u[k] + ν∇²_above*u[k-1]
             v_tend[k] += ν∇²_below*v[k+1] - ν∇²_at_k*v[k] + ν∇²_above*v[k-1]
             temp_tend[k] += ν∇²_below*temp[k+1] - ν∇²_at_k*temp[k] + ν∇²_above*temp[k-1]
+
+            ν_above = ν     # reuse diffusion from k+1/2 for next layer's k-1/2
         end
 
         # bottom layer with no flux boundary conditions at k=nlev+1/2
-        ν∇²_above = ν[end]*∇²_above[end]
+        ν∇²_above = ν_above*∇²_above[end]
         u_tend[end] += ν∇²_above*(u[end-1] - u[end])
         v_tend[end] += ν∇²_above*(v[end-1] - v[end])
         temp_tend[end] += ν∇²_above*(temp[end-1] - temp[end])

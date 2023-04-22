@@ -13,7 +13,6 @@ struct ParameterizationConstants{NF<:AbstractFloat} <: AbstractParameterizationC
     # VERTICAL DIFFUSION
     vert_diff_∇²_above::Vector{NF}
     vert_diff_∇²_below::Vector{NF}  # 
-    vert_diff_ν::Vector{NF}         # diffusion coefficient to be updated for every column
     vert_diff_Δσ::Vector{NF}
 
     # RADIATION
@@ -36,7 +35,6 @@ function Base.zeros(::Type{ParameterizationConstants},
 
     vert_diff_∇²_above = zeros(NF,nlev-1)   # defined on half levels, top, and bottom are =0 though
     vert_diff_∇²_below = zeros(NF,nlev-1)   # defined on half levels, top, and bottom are =0 though
-    vert_diff_ν = zeros(NF,nlev-1)          # diffusion coefficient, to be reused
     vert_diff_Δσ = zeros(NF,nlev-1)         # vertical gradient operator wrt σ coordinates
 
     fband = zeros(NF,400,nband)
@@ -48,7 +46,6 @@ function Base.zeros(::Type{ParameterizationConstants},
                                             temp_equil,
                                             vert_diff_∇²_above,
                                             vert_diff_∇²_below,
-                                            vert_diff_ν,
                                             vert_diff_Δσ,
                                             fband,
                                         )
