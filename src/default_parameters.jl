@@ -212,8 +212,8 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "number of days to integrate for"
     n_days::Float64 = 10
 
-    "time step in seconds for T21, scale linearly to `trunc`"
-    Δt_at_T21::Float64 = 2400
+    "time step in minutes for T31, scale linearly to `trunc`"
+    Δt_at_T31::Float64 = 30
 
 
     # NUMERICS
