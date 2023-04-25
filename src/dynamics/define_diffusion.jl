@@ -2,13 +2,13 @@ Base.@kwdef struct HyperDiffusion <: DiffusionParameters
     # hyperdiffusion for temp, vor, div everywhere
     # several powers of Laplacians, default 4 and 2, are added
     # with respective time scales and scalings with resolution
-    power::Float64 = 4.0                # Powers of Laplacians
-    time_scale::Float64 = 2.4           # Diffusion time scales [hrs]
+    power::Float64 = 2.0                # Powers of Laplacians
+    time_scale::Float64 = 12.0          # Diffusion time scales [hrs]
     resolution_scaling::Float64 = 2     # 1: (inverse) linear with T
                                         # 2: (inverse) quadratic, etc
 
     # additional diffusion in stratosphere
-    power_stratosphere::Int = 2         # different power for stratosphere
+    power_stratosphere::Int = 1         # different power for stratosphere
     tapering_σ::Float64 = 0.2           # scale towards that power linearly above this σ
 end
 
