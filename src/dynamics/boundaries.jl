@@ -12,7 +12,12 @@ Base.@kwdef struct ZonalRidge <: AbstractOrography
 end
 
 # empty structs (no parameters needed) for other orographies
-struct EarthOrography <: AbstractOrography end
+Base.@kwdef struct EarthOrography <: AbstractOrography
+    smoothing::Bool = true              # smooth the orography field?
+    smoothing_power::Float64 = 1.0      # power of Laplacian for smoothing
+    smoothing_strength::Float64 = 0.5   # highest degree l is multiplied by
+end
+
 struct NoOrography <: AbstractOrography end
 
 function Base.zeros(::Type{Orography},S::SpectralTransform{NF}) where NF
@@ -57,7 +62,7 @@ function initialize_orography!( ::Orography,
 end
 
 function initialize_orography!( orog::Orography,
-                                ::EarthOrography,
+                                EO::EarthOrography,
                                 P::Parameters{M},
                                 S::SpectralTransform,
                                 G::Geometry) where {M<:Union{ShallowWater,PrimitiveEquation}}
@@ -84,6 +89,10 @@ function initialize_orography!( orog::Orography,
     orography_spec = spectral(orography_highres;Grid,recompute_legendre)
     
     copyto!(geopot_surf,orography_spec)     # truncates to the size of geopot_surf, no *gravity yet
+    if EO.smoothing                         # smooth orography in spectral space?
+        SpeedyTransforms.spectral_smoothing!(geopot_surf,EO.smoothing_strength,power=EO.smoothing_power)
+    end
+
     gridded!(orography,geopot_surf,S)       # to grid-point space
     geopot_surf .*= gravity                 # turn orography into surface geopotential
     spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
