@@ -18,9 +18,9 @@ function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   
     @boundscheck lmax <= length(∇²ⁿ_expl) == length(∇²ⁿ_impl) || throw(BoundsError)
 
     lm = 0
-    for m in 1:mmax         # loops over all columns/order m
-        for l in m:lmax-1   # but skips the lmax+2 degree (1-based)
-            lm += 1         # single index lm corresponding to harmonic l,m
+    @inbounds for m in 1:mmax   # loops over all columns/order m
+        for l in m:lmax-1       # but skips the lmax+2 degree (1-based)
+            lm += 1             # single index lm corresponding to harmonic l,m
             tendency[lm] = (tendency[lm] + ∇²ⁿ_expl[l]*A[lm])*∇²ⁿ_impl[l]
         end
         lm += 1             # skip last row for scalar quantities
@@ -36,10 +36,13 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
                                 diagn::DiagnosticVariablesLayer,
                                 model::ModelSetup,
                                 lf::Int=1)      # leapfrog index used (2 is unstable)
+    HD = model.horizontal_diffusion
+    diffusion_scheme = model.parameters.diffusion
+    adapt_diffusion!(HD,diffusion_scheme,diagn,model.geometry,model.constants)
 
     k = diagn.k     # pick precalculated hyperdiffusion operator for layer k
-    ∇²ⁿ = model.horizontal_diffusion.∇²ⁿ[k]
-    ∇²ⁿ_implicit = model.horizontal_diffusion.∇²ⁿ_implicit[k]
+    ∇²ⁿ = HD.∇²ⁿ[k]
+    ∇²ⁿ_implicit = HD.∇²ⁿ_implicit[k]
 
     for varname in diffusion_vars(model)
         var = getfield(progn.timesteps[lf],varname)
@@ -48,6 +51,15 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
     end
 end
 
+function adapt_diffusion!(  HD::HorizontalDiffusion,
+                            scheme::HyperDiffusion,
+                            diagn::DiagnosticVariablesLayer,
+                            G::Geometry,
+                            C::DynamicsConstants)
+    scheme.adaptive || return nothing
+    vor_max = maximum(diagn.grid_variables.vor_grid)/G.radius
+    adapt_diffusion!(HD,scheme,vor_max,diagn.k,G,C)
+end
 
 """
     stratospheric_zonal_drag!(  tendency::AbstractArray{Complex{NF},3}, # tendency of
