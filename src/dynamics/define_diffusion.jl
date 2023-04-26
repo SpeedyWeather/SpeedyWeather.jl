@@ -14,7 +14,7 @@ Base.@kwdef struct HyperDiffusion <: DiffusionParameters
     # increase diffusion based on high vorticity levels
     adaptive::Bool = true               # swith on/off
     vor_max::Float64 = 3e-4             # above this diffusion is increased
-    adaptive_strength::Float64 = 1.0    # for 
+    adaptive_strength::Float64 = 1.0    # increase strength above vor_max by this factor
 end
 
 """ 
@@ -78,12 +78,12 @@ function adapt_diffusion!(  HD::HorizontalDiffusion{NF},
     end
 end
 
-function adapt_diffusion!(  HD::HorizontalDiffusion{NF},
+function adapt_diffusion!(  HD::HorizontalDiffusion,
                             scheme::HyperDiffusion,
-                            vor_max::NF,
+                            vor_max::Real,
                             k::Int,
                             G::Geometry,
-                            C::DynamicsConstants) where NF
+                            C::DynamicsConstants)
 
     (;lmax,time_scale,∇²ⁿ,∇²ⁿ_implicit) = HD
     (;power, power_stratosphere, tapering_σ) = scheme
