@@ -13,8 +13,8 @@ Base.@kwdef struct HyperDiffusion <: DiffusionParameters
 
     # increase diffusion based on high vorticity levels
     adaptive::Bool = true               # swith on/off
-    vor_max::Float64 = 3e-4             # above this diffusion is increased
-    adaptive_strength::Float64 = 1.0    # increase strength above vor_max by this factor
+    vor_max::Float64 = 1e-4             # [1/s] above this, diffusion is increased
+    adaptive_strength::Float64 = 2.0    # increase strength above vor_max by this factor
 end
 
 """ 
@@ -61,9 +61,11 @@ function HorizontalDiffusion(   scheme::HyperDiffusion,
     # Damping coefficients for explicit part of the diffusion (=ν∇²ⁿ)
     ∇²ⁿ = [zeros(NF,lmax+2) for _ in 1:nlev]                # for temp, vor, div (explicit)
     ∇²ⁿ_implicit = [zeros(NF,lmax+2) for _ in 1:nlev]       # Implicit part (= 1/(1+2Δtν∇²ⁿ))
+    HD = HorizontalDiffusion{NF}(lmax,time_scale,∇²ⁿ,∇²ⁿ_implicit)  # initialize struct
 
-    HD = HorizontalDiffusion{NF}(lmax,time_scale,∇²ⁿ,∇²ⁿ_implicit)
-    adapt_diffusion!(HD,scheme,scheme.vor_max,G,C)
+    # PRECOMPUTE diffusion operators based on non-adaptive diffusion
+    vor_max = 0                                 # not increased diffusion initially
+    adapt_diffusion!(HD,scheme,vor_max,G,C)     # fill diffusion arrays
     return HD
 end
 
