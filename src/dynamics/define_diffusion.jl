@@ -8,7 +8,7 @@ Base.@kwdef struct HyperDiffusion <: DiffusionParameters
                                         # 2: (inverse) quadratic, etc
 
     # additional diffusion in stratosphere
-    power_stratosphere::Float64 = 1.0   # different power for stratosphere
+    power_stratosphere::Float64 = 2.0   # different power for stratosphere
     tapering_σ::Float64 = 0.2           # scale towards that power linearly above this σ
 
     # increase diffusion based on high vorticity levels
