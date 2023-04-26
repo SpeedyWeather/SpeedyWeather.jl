@@ -154,8 +154,8 @@ end
 """
     spectral_smoothing!(A::LowerTriangularMatrix,c;power=1)
 
-Smooth the spectral field `A` following A *= (1-c*∇²ⁿ) with power n of a normalised Laplacian
-so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c<0."""
+Smooth the spectral field `A` following A *= (1-(1-c)*∇²ⁿ) with power n of a normalised Laplacian
+so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c>1."""
 function spectral_smoothing!(   A::LowerTriangularMatrix,
                                 c::Real;
                                 power::Real=1)
@@ -167,7 +167,7 @@ function spectral_smoothing!(   A::LowerTriangularMatrix,
     for m in 1:mmax
         for l in m:lmax
             eigenvalue_normalised = -l*(l-1)/largest_eigenvalue
-            A[lm] *= 1 - c*eigenvalue_normalised^power
+            A[lm] *= 1 - (1-c)*eigenvalue_normalised^power
             lm += 1
         end
     end
