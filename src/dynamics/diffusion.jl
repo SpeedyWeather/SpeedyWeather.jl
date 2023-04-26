@@ -57,8 +57,9 @@ function adapt_diffusion!(  HD::HorizontalDiffusion,
                             G::Geometry,
                             C::DynamicsConstants)
     scheme.adaptive || return nothing
-    vor_max = maximum(diagn.grid_variables.vor_grid)/G.radius
-    adapt_diffusion!(HD,scheme,vor_max,diagn.k,G,C)
+    vor_min, vor_max = extrema(diagn.grid_variables.vor_grid)
+    vor_abs_max = max(abs(vor_min), abs(vor_max))/G.radius
+    adapt_diffusion!(HD,scheme,vor_abs_max,diagn.k,G,C)
 end
 
 """
