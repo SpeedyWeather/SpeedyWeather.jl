@@ -67,11 +67,11 @@ function HorizontalDiffusion(   scheme::HyperDiffusion,
     return HD
 end
 
-function adapt_diffusion!(  HD::HorizontalDiffusion{NF},
+function adapt_diffusion!(  HD::HorizontalDiffusion,
                             scheme::HyperDiffusion,
-                            vor_max::NF,
+                            vor_max::Real,
                             G::Geometry,
-                            C::DynamicsConstants) where NF
+                            C::DynamicsConstants)
     nlev = length(HD.∇²ⁿ)
     for k in 1:nlev
         adapt_diffusion!(HD,scheme,vor_max,k,G,C)
