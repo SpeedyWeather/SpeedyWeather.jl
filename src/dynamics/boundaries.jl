@@ -15,7 +15,7 @@ end
 Base.@kwdef struct EarthOrography <: AbstractOrography
     smoothing::Bool = true              # smooth the orography field?
     smoothing_power::Float64 = 1.0      # power of Laplacian for smoothing
-    smoothing_strength::Float64 = 0.25  # highest degree l is multiplied by
+    smoothing_strength::Float64 = 0.2   # highest degree l is multiplied by
 end
 
 struct NoOrography <: AbstractOrography end
