@@ -15,7 +15,7 @@ function initialize_vertical_diffusion!(K::ParameterizationConstants,
 end 
 
 Base.@kwdef struct VerticalLaplacian{NF<:Real} <: VerticalDiffusion{NF}
-    time_scale::NF = 6.0        # [hours] time scale to control the strength of vertical diffusion
+    time_scale::NF = 36.0       # [hours] time scale to control the strength of vertical diffusion
     height_scale::NF = 100.0    # [m] scales for Δσ so that time_scale is sensible 
     umax::NF = 80.0             # velocity scale [m/s] to scale the diffusion with |u|/umax
     ΔTmax::NF = 50.0            # temperature gradient scale [K] (divided by Δσ)
@@ -53,7 +53,7 @@ function vertical_diffusion!(   column::ColumnVariables{NF},
     ν0 = convert(NF,ν0)
 
     # temperature gradient-based scaling ∈ [0,1] or just pass ν = ν0
-    get_ν(ν0,ΔT,ΔTmax,Δσ) = scheme.scale_with_temperature_gradient ? ν0*max(ΔT/Δσ/ΔTmax + 1,0)/2 : ν0
+    get_ν(ν0,ΔT,ΔTmax,Δσ) = scheme.scale_with_temperature_gradient ? ν0*(1+2*max(ΔT/Δσ/ΔTmax + 1,0)) : 3ν0
 
     # DO DIFFUSION
     @inbounds begin
