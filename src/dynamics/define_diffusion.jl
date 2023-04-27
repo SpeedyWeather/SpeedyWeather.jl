@@ -2,7 +2,7 @@ Base.@kwdef struct HyperDiffusion <: DiffusionParameters
     # hyperdiffusion for temp, vor, div everywhere
     # several powers of Laplacians, default 4 and 2, are added
     # with respective time scales and scalings with resolution
-    power::Float64 = 2.0                # Powers of Laplacians
+    power::Float64 = 2.0                # Power of Laplacian
     time_scale::Float64 = 12.0          # Diffusion time scales [hrs]
     resolution_scaling::Float64 = 1.0   # 1: (inverse) linear with T
                                         # 2: (inverse) quadratic, etc
@@ -14,7 +14,7 @@ Base.@kwdef struct HyperDiffusion <: DiffusionParameters
     # increase diffusion based on high vorticity levels
     adaptive::Bool = true               # swith on/off
     vor_max::Float64 = 5e-5             # [1/s] above this, diffusion is increased
-    adaptive_strength::Float64 = 2.0    # increase strength above vor_max by this factor
+    adaptive_strength::Float64 = 2.5    # increase strength above vor_max by this factor
                                         # times max(abs(vor))/vor_max
 end
 
