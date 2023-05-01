@@ -40,7 +40,8 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
     diffusion_scheme = model.parameters.diffusion
     adapt_diffusion!(HD,diffusion_scheme,diagn,model.geometry,model.constants)
 
-    k = diagn.k     # pick precalculated hyperdiffusion operator for layer k
+    # pick precalculated hyperdiffusion operator for layer k
+    k = diagn.k     
     ∇²ⁿ = HD.∇²ⁿ[k]
     ∇²ⁿ_implicit = HD.∇²ⁿ_implicit[k]
 

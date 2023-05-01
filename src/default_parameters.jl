@@ -201,7 +201,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     boundary_layer::BoundaryLayer{Float64} = LinearDrag()
 
     "temperature relaxation"
-    temperature_relaxation::TemperatureRelaxation{Float64} = JablonowskiRelaxation()
+    temperature_relaxation::TemperatureRelaxation{Float64} = HeldSuarez()
 
 
     # TIME STEPPING
