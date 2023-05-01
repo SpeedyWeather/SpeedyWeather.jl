@@ -15,11 +15,11 @@ function initialize_vertical_diffusion!(K::ParameterizationConstants,
 end 
 
 Base.@kwdef struct VerticalLaplacian{NF<:Real} <: VerticalDiffusion{NF}
-    time_scale::NF = 4.0        # [hours] time scale to control the strength of vertical diffusion
+    time_scale::NF = 16.0       # [hours] time scale to control the strength of vertical diffusion
     height_scale::NF = 100.0    # [m] scales for Δσ so that time_scale is sensible
 
     resolution_scaling::NF = 1.0    # (inverse) scaling with resolution T
-    nlev_scaling::NF = -2.0         # (inverse) scaling with n vertical levels
+    nlev_scaling::NF = 0.0         # (inverse) scaling with n vertical levels
 end
 
 # generator so that arguments are converted to Float64
