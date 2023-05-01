@@ -19,7 +19,7 @@ Base.@kwdef struct VerticalLaplacian{NF<:Real} <: VerticalDiffusion{NF}
     height_scale::NF = 100.0    # [m] scales for Δσ so that time_scale is sensible
 
     resolution_scaling::NF = 1.0    # (inverse) scaling with resolution T
-    nlev_scaling::NF = 0.0         # (inverse) scaling with n vertical levels
+    nlev_scaling::NF = -2.0         # (inverse) scaling with n vertical levels
 end
 
 # generator so that arguments are converted to Float64
