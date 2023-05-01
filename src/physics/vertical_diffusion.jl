@@ -15,8 +15,11 @@ function initialize_vertical_diffusion!(K::ParameterizationConstants,
 end 
 
 Base.@kwdef struct VerticalLaplacian{NF<:Real} <: VerticalDiffusion{NF}
-    time_scale::NF = 16.0       # [hours] time scale to control the strength of vertical diffusion
-    height_scale::NF = 100.0    # [m] scales for Δσ so that time_scale is sensible 
+    time_scale::NF = 4.0        # [hours] time scale to control the strength of vertical diffusion
+    height_scale::NF = 100.0    # [m] scales for Δσ so that time_scale is sensible
+
+    resolution_scaling::NF = 1.0    # (inverse) scaling with resolution T
+    nlev_scaling::NF = -2.0         # (inverse) scaling with n vertical levels
 end
 
 # generator so that arguments are converted to Float64
@@ -28,6 +31,8 @@ function vertical_diffusion!(   column::ColumnVariables{NF},
 
     (;nlev,u_tend,v_tend,temp_tend) = column
     (;u,v,temp) = column
+    (;time_scale, height_scale, resolution_scaling, nlev_scaling) = scheme
+    (;trunc) = model.parameters
     ∇²_below = model.parameterization_constants.vert_diff_∇²_below
     ∇²_above = model.parameterization_constants.vert_diff_∇²_above
 
@@ -36,7 +41,8 @@ function vertical_diffusion!(   column::ColumnVariables{NF},
     # include a height scale, technically not needed, but so that the dimensionless
     # 1/Δσ² gets a resonable scale in meters such that the time scale is not
     # counterintuitively in seconds or years
-    ν0 = model.geometry.radius*inv(scheme.time_scale*3600) / scheme.height_scale^2
+    ν0 = model.geometry.radius*inv(time_scale*3600) / height_scale^2
+    ν0 *= (32/(trunc+1))^resolution_scaling*(8/nlev)^nlev_scaling
     ν0 = convert(NF,ν0)
 
     # DO DIFFUSION
