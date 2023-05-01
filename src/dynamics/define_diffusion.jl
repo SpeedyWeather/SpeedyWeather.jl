@@ -4,7 +4,7 @@ Base.@kwdef struct HyperDiffusion <: DiffusionParameters
     # with respective time scales and scalings with resolution
     power::Float64 = 4.0                # Power of Laplacian
     time_scale::Float64 = 2.4           # Diffusion time scales [hrs]
-    resolution_scaling::Float64 = 0.0   # 0: constant with T
+    resolution_scaling::Float64 = 0.5   # 0: constant with T
                                         # 1: (inverse) linear with T
                                         # 2: (inverse) quadratic, etc
 
