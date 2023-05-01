@@ -62,6 +62,8 @@ Base.@kwdef struct ZonalWind <: InitialConditions
     perturb_radius = 1/10       # radius of Gaussian perturbation in units of Earth's radius [1]
 
     # temperature
-    ΔT = 4.8e5                  # temperature difference used for stratospheric lapse rate [K]
+    ΔT = 0                      # temperature difference used for stratospheric lapse rate [K]
+                                # Jablonowski uses ΔT = 4.8e5 [K]
+    Tmin = 200                  # minimum temperature [K] of profile
 end
 
