@@ -42,7 +42,7 @@ function vertical_diffusion!(   column::ColumnVariables{NF},
     # 1/Δσ² gets a resonable scale in meters such that the time scale is not
     # counterintuitively in seconds or years
     ν0 = model.geometry.radius*inv(time_scale*3600) / height_scale^2
-    ν0 *= (32/(trunc+1))^resolution_scaling*(8/nlev)^nlev_scaling
+    ν0 /= (32/(trunc+1))^resolution_scaling*(8/nlev)^nlev_scaling
     ν0 = convert(NF,ν0)
 
     # DO DIFFUSION
