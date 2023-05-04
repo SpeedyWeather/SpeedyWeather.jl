@@ -57,7 +57,7 @@ function vertical_diffusion!(   column::ColumnVariables{NF},
         # full Laplacian in other layers
         for k in 2:nlev-1
             # diffusion coefficient ν times 1/Δσ²-like operator
-            ν∇²_above = ν0*∇²_above[k]
+            ν∇²_above = ν0*∇²_above[k-1]
             ν∇²_below = ν0*∇²_below[k]
             ν∇²_at_k = ν∇²_above + ν∇²_below
 
