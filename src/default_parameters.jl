@@ -123,7 +123,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     diffusion::DiffusionParameters = HyperDiffusion()
 
     "vertical diffusion"
-    vertical_diffusion::VerticalDiffusion = VerticalLaplacian()
+    vertical_diffusion::VerticalDiffusion = NoVerticalDiffusion()
 
 
     # FORCING
@@ -248,7 +248,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     boundary_path::String = ""
 
     "orography"
-    orography::AbstractOrography = EarthOrography()
+    orography::AbstractOrography = EarthOrography(smoothing_strength=1e-2,smoothing_power=0.1)
 
     "scale orography by a factor"
     orography_scale::Float64 = 1
