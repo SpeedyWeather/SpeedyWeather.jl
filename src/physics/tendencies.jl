@@ -29,16 +29,15 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables,
         reset_column!(column)                   # set accumulators back to zero for next grid point
         get_column!(column,diagn,ij,jring,G)    # extract column for contiguous memory access
         
+        # Pre-compute thermodynamic quantities
+        get_thermodynamics!(column,model)
+
         # VERTICAL DIFFUSION
         vertical_diffusion!(column,vertical_diffusion_scheme,model)
 
         # HELD-SUAREZ
         temperature_relaxation!(column,temperature_relax_scheme,model)
         boundary_layer!(column,boundary_layer_scheme,model)
-
-
-        # Pre-compute thermodynamic quantities
-        # get_thermodynamics!(column,model)
 
         # Calculate parametrizations (order of execution is important!)
         # convection!(column,model)
