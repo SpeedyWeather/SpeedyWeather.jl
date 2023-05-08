@@ -48,6 +48,9 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables,
         # surface_fluxes!(column,model)
         # vertical_diffusion!(column,M)
 
+        # sum fluxes on half levels up and down for every layer
+        # fluxes_to_tendencies!(column,model)
+
         # write tendencies from parametrizations back into horizontal fields
         write_column_tendencies!(diagn,column,ij)
     end

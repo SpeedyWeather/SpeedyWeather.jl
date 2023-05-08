@@ -125,6 +125,9 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "vertical diffusion"
     vertical_diffusion::VerticalDiffusion = NoVerticalDiffusion()
 
+    # "static energy diffusion"
+    # static_energy_diffusion::VerticalDiffusion = StaticEnergyDiffusion()
+
 
     # FORCING
 
