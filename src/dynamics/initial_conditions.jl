@@ -143,7 +143,7 @@ function initial_conditions!(   coefs::ZonalWind,
                                 progn::PrognosticVariables{NF},
                                 model::PrimitiveEquation) where NF
 
-    @unpack u₀, η₀, ΔT = coefs
+    @unpack u₀, η₀, ΔT, Tmin = coefs
     @unpack perturb_lat, perturb_lon, perturb_uₚ, perturb_radius = coefs
     @unpack temp_ref, R_dry, lapse_rate, pres_ref = model.parameters
     @unpack radius, rotation, gravity = model.parameters.planet
@@ -214,6 +214,8 @@ function initial_conditions!(   coefs::ZonalWind,
             Tη[k] += ΔT*(σ_tropopause-σ)^5      # Jablonowski and Williamson eq. 5
         end
     end
+
+    Tη .= max.(Tη,Tmin)
 
     T = zeros(Grid{NF},nlat_half)   # temperature
     aΩ = radius*rotation

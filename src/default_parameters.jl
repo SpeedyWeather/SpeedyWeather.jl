@@ -119,8 +119,14 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # DIFFUSION AND DRAG
 
-    "(hyper)-diffusion"
+    "horizontal (hyper)-diffusion"
     diffusion::DiffusionParameters = HyperDiffusion()
+
+    "vertical diffusion"
+    vertical_diffusion::VerticalDiffusion = NoVerticalDiffusion()
+
+    # "static energy diffusion"
+    # static_energy_diffusion::VerticalDiffusion = StaticEnergyDiffusion()
 
 
     # FORCING
@@ -198,7 +204,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     boundary_layer::BoundaryLayer{Float64} = LinearDrag()
 
     "temperature relaxation"
-    temperature_relaxation::TemperatureRelaxation{Float64} = JablonowskiRelaxation()
+    temperature_relaxation::TemperatureRelaxation{Float64} = HeldSuarez()
 
 
     # TIME STEPPING
@@ -209,8 +215,8 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "number of days to integrate for"
     n_days::Float64 = 10
 
-    "time step in seconds for T21, scale linearly to `trunc`"
-    Δt_at_T21::Float64 = 2400
+    "time step in minutes for T31, scale linearly to `trunc`"
+    Δt_at_T31::Float64 = 30
 
 
     # NUMERICS
@@ -245,7 +251,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     boundary_path::String = ""
 
     "orography"
-    orography::AbstractOrography = EarthOrography()
+    orography::AbstractOrography = EarthOrography(smoothing_strength=1e-2,smoothing_power=0.1)
 
     "scale orography by a factor"
     orography_scale::Float64 = 1

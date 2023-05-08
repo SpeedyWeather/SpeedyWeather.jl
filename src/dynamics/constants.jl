@@ -64,13 +64,14 @@ function DynamicsConstants(P::Parameters)
 
     # TIME INTEGRATION CONSTANTS
     @unpack robert_filter, williams_filter = P
-    @unpack trunc, Δt_at_T21, n_days, output_dt = P
+    @unpack trunc, Δt_at_T31, n_days, output_dt = P
 
     # PARAMETRIZATION CONSTANTS
     @unpack RH_thresh_pbl_lsc, RH_thresh_range_lsc, RH_thresh_max_lsc, humid_relax_time_lsc = P  # Large-scale condensation
-    @unpack pres_thresh_cnv, RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv, max_entrainment, ratio_secondary_mass_flux = P  # Convection
+    @unpack pres_thresh_cnv, RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv,
+        max_entrainment, ratio_secondary_mass_flux = P  # Convection
         
-    Δt      = round(Δt_at_T21*(21/trunc))       # scale time step Δt to specified resolution
+    Δt      = round(60*Δt_at_T31*(32/(trunc+1)))# scale time step Δt to specified resolution, [min] → [s]
     Δt_sec  = convert(Int,Δt)                   # encode time step Δt [s] as integer
     Δt_hrs  = Δt/3600                           # convert time step Δt from minutes to hours
     n_timesteps = ceil(Int,24*n_days/Δt_hrs)    # number of time steps to integrate for

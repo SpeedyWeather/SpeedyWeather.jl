@@ -1,22 +1,24 @@
 """
-    get_thermodynamics!(
-        column::ColumnVariables{NF},
-        model::PrimitiveEquation,
-    )
-"""
-function get_thermodynamics!(
-    column::ColumnVariables{NF},
-    model::PrimitiveEquation,
-) where {NF<:AbstractFloat}
+    get_thermodynamics!(column::ColumnVariables,model::PrimitiveWetCore)
+
+Calculate thermodynamic quantities like saturation vapour pressure,
+saturation specific humidity, dry static energy, moist static energy
+and saturation moist static energy from the prognostic column variables."""
+function get_thermodynamics!(   column::ColumnVariables,
+                                model::PrimitiveEquation)
+
     # Calculate thermodynamic quantities at full levels
-    saturation_vapour_pressure!(column, model)
-    saturation_specific_humidity!(column, model)
     dry_static_energy!(column, model)
-    moist_static_energy!(column, model)
-    saturation_moist_static_energy!(column, model)
+
+    if model isa PrimitiveWetCore
+        saturation_vapour_pressure!(column, model)
+        saturation_specific_humidity!(column, model)
+        moist_static_energy!(column, model)
+        saturation_moist_static_energy!(column, model)
+    end
 
     # Interpolate certain variables to half-levels
-    interpolate!(column, model)
+    # interpolate!(column, model)
 
     return nothing
 end
@@ -149,19 +151,17 @@ function saturation_specific_humidity!(
 end
 
 """
-    dry_static_energy!(
-        column::ColumnVariables{NF},
-        model::PrimitiveEquation,
-    )
-"""
-function dry_static_energy!(
-    column::ColumnVariables{NF},
-    model::PrimitiveEquation,
-) where {NF<:AbstractFloat}
-    @unpack cₚ = model.parameters
-    @unpack dry_static_energy, geopot, temp = column
+    dry_static_energy!(column::ColumnVariables,model::PrimitiveEquation)
 
-    for k in eachlayer(column)
+Compute the dry static energy SE = cₚT + Φ (latent heat times temperature plus geopotential)
+for the column."""
+function dry_static_energy!(column::ColumnVariables{NF},
+                            model::PrimitiveEquation) where NF
+
+    cₚ = convert(NF,model.parameters.cₚ)
+    (;dry_static_energy, geopot, temp) = column
+
+    @inbounds for k in eachlayer(column)
         dry_static_energy[k] = cₚ * temp[k] + geopot[k]
     end
 

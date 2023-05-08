@@ -73,6 +73,10 @@ export  NoTemperatureRelaxation,
 export  NoBoundaryLayer,
         LinearDrag
 
+# EXPORT VERTICAL DIFFUSION
+export  NoVerticalDiffusion,
+        VerticalLaplacian
+
 # EXPORT STRUCTS
 export  Parameters,
         DynamicsConstants,
@@ -145,6 +149,7 @@ include("physics/longwave_radiation.jl")
 include("physics/shortwave_radiation.jl")
 include("physics/boundary_layer.jl")
 include("physics/temperature_relaxation.jl")
+include("physics/vertical_diffusion.jl")
 
 # OUTPUT
 include("output/output.jl")                     # defines Output
