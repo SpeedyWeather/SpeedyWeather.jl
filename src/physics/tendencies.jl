@@ -49,9 +49,51 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables,
         # vertical_diffusion!(column,M)
 
         # sum fluxes on half levels up and down for every layer
-        # fluxes_to_tendencies!(column,model)
+        fluxes_to_tendencies!(column,model)
 
         # write tendencies from parametrizations back into horizontal fields
         write_column_tendencies!(diagn,column,ij)
     end
+end
+
+function fluxes_to_tendencies!( column::ColumnVariables{NF},
+                                model::PrimitiveEquation) where NF
+    
+    (;nlev,u_tend,flux_u_upward,flux_u_downward) = column
+    (;v_tend,flux_v_upward,flux_v_downward) = column
+    (;humid_tend,flux_humid_upward,flux_humid_downward) = column
+    (;temp_tend,flux_temp_upward,flux_temp_downward) = column
+
+    Δσ = model.geometry.σ_levels_thick
+    pₛ = column.pres[end]               # surface pressure
+
+    # g/pₛ and g/(pₛ*cₚ), see Fortran SPEEDY documentation eq. (3,5)
+    g_pₛ = convert(NF,model.parameters.planet.gravity/pₛ)
+    g_pₛ_cₚ = g_pₛ/convert(NF,model.parameters.cₚ)
+
+    # fluxes are defined on half levels including top k=1/2 and surface k=nlev+1/2
+    @inbounds for k in 1:nlev
+
+        # Absorbed flux in a given layer, i.e. flux in minus flux out from above and below
+        # Fortran SPEEDY documentation eq. (2)
+        ΔF_u = (flux_u_upward[k+1] - flux_u_upward[k]) +
+            (flux_u_downward[k] - flux_u_downward[k+1])
+        
+        ΔF_v = (flux_v_upward[k+1] - flux_v_upward[k]) +
+            (flux_v_downward[k] - flux_v_downward[k+1])
+
+        ΔF_humid = (flux_humid_upward[k+1] - flux_humid_upward[k]) +
+            (flux_humid_downward[k] - flux_humid_downward[k+1])
+
+        ΔF_temp = (flux_temp_upward[k+1] - flux_temp_upward[k]) +
+            (flux_temp_downward[k] - flux_temp_downward[k+1])
+
+        # convert absorbed flux to tendency
+        u_tend[k] += g_pₛ/Δσ[k]*ΔF_u
+        v_tend[k] += g_pₛ/Δσ[k]*ΔF_v
+        humid_tend[k] += g_pₛ/Δσ[k]*ΔF_humid
+        temp_tend[k] += g_pₛ_cₚ/Δσ[k]*ΔF_temp
+    end
+
+    return nothing
 end

@@ -1,5 +1,3 @@
-using DocStringExtensions
-
 const DEFAULT_NF = Float64          # number format
 const DEFAULT_MODEL = Barotropic    # abstract model type
 
