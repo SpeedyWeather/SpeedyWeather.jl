@@ -194,7 +194,7 @@ function interpolate(   A::AbstractGrid{NF},        # field to interpolate
                         I::AbstractInterpolator     # indices in I are assumed to be calculated already!
                         ) where NF                  # use number format from input data also for output
 
-    @unpack npoints = I.locator             # number of points to interpolate onto
+    (; npoints ) = I.locator             # number of points to interpolate onto
     Aout = Vector{NF}(undef,npoints)        # preallocate: onto θs,λs interpolated values of A
     interpolate!(Aout,A,I)                  # perform interpolation, store in As
 end
@@ -204,8 +204,8 @@ function interpolate!(  Aout::Vector,       # Out: interpolated values
                         interpolator::AnvilInterpolator{NF,Grid},   # geometry info and work arrays       
                         ) where {NF<:AbstractFloat,Grid<:AbstractGrid}
 
-    @unpack ij_as,ij_bs,ij_cs,ij_ds,Δabs,Δcds,Δys = interpolator.locator
-    @unpack npoints = interpolator.geometry
+    (; ij_as,ij_bs,ij_cs,ij_ds,Δabs,Δcds,Δys ) = interpolator.locator
+    (; npoints ) = interpolator.geometry
     
     # 1) Aout's length must match the interpolator
     # 2) input grid A must match the interpolator's geometry (Grids are checked with dispatch)
@@ -286,8 +286,8 @@ function update_locator!(   I::AbstractInterpolator{NF,Grid},   # GridGeometry a
                             ) where {NF<:AbstractFloat,Grid<:AbstractGrid}
 
     # find latitude ring indices corresponding to interpolation points
-    @unpack latd = I.geometry           # latitudes of rings including north and south pole
-    @unpack js,Δys = I.locator          # to be updated: ring indices js, and meridional weights Δys
+    (; latd ) = I.geometry           # latitudes of rings including north and south pole
+    (; js,Δys ) = I.locator          # to be updated: ring indices js, and meridional weights Δys
     find_rings!(js,Δys,θs,latd;unsafe)  # next ring at or north of θ
 
     # find grid incides ij for top, bottom and left, right grid points around (θ,λ)
@@ -354,9 +354,9 @@ end
 function find_grid_indices!(I::AnvilInterpolator,   # update indices arrays
                             λs::Vector)             # based on new longitudes λ
 
-    @unpack js, ij_as, ij_bs, ij_cs, ij_ds = I.locator
-    @unpack Δabs, Δcds = I.locator
-    @unpack nlons, rings, lon_offsets, nlat = I.geometry
+    (; js, ij_as, ij_bs, ij_cs, ij_ds ) = I.locator
+    (; Δabs, Δcds ) = I.locator
+    (; nlons, rings, lon_offsets, nlat ) = I.geometry
 
     @inbounds for (k,(λf,j)) in enumerate(zip(λs,js))
 

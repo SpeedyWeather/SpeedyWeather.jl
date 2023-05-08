@@ -34,11 +34,11 @@ function diagnose_convection!(
     column::ColumnVariables{NF},
     model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
-    @unpack alhc,pres_ref = model.parameters
-    @unpack pres_thresh_cnv, RH_thresh_pbl_cnv = model.constants
-    @unpack nlev = column
-    @unpack humid, pres, sat_humid, dry_static_energy, moist_static_energy,
-    sat_moist_static_energy, sat_moist_static_energy_half = column
+    (; alhc,pres_ref ) = model.parameters
+    (; pres_thresh_cnv, RH_thresh_pbl_cnv ) = model.constants
+    (; nlev ) = column
+    (; humid, pres, sat_humid, dry_static_energy, moist_static_energy,
+    sat_moist_static_energy, sat_moist_static_energy_half) = column
 
     if pres[end] > pres_thresh_cnv
         # First we pre-compute some values which we will need inside the loop
@@ -113,19 +113,19 @@ function convection!(
         return nothing  # No convection
     end
 
-    @unpack gravity = model.constants
-    @unpack alhc, pres_ref = model.parameters
-    @unpack σ_levels_full, σ_levels_thick = model.geometry
+    (; gravity ) = model.constants
+    (; alhc, pres_ref ) = model.parameters
+    (; σ_levels_full, σ_levels_thick ) = model.geometry
     # Constants for convection
-    @unpack RH_thresh_pbl_cnv, RH_thresh_trop_cnv, pres_thresh_cnv, humid_relax_time_cnv,
-    max_entrainment, ratio_secondary_mass_flux = model.constants
+    (;RH_thresh_pbl_cnv, RH_thresh_trop_cnv, pres_thresh_cnv, humid_relax_time_cnv,
+    max_entrainment, ratio_secondary_mass_flux) = model.constants
     # Column variables for calculating fluxes due to convection
-    @unpack pres, humid, humid_half, sat_humid, sat_humid_half, dry_static_energy,
+    (;pres, humid, humid_half, sat_humid, sat_humid_half, dry_static_energy,
     dry_static_energy_half, entrainment_profile, cloud_top, excess_humidity,
-    nlev = column
+    nlev) = column
     # Quantities calculated by this parameterization
-    @unpack cloud_base_mass_flux, net_flux_humid, net_flux_dry_static_energy,
-    precip_convection = column
+    (;cloud_base_mass_flux, net_flux_humid, net_flux_dry_static_energy,
+    precip_convection) = column
 
     # 1. Fluxes in the PBL
     humid_top_of_pbl = min(humid_half[nlev-1], humid[nlev])   # Humidity at the upper boundary of the PBL

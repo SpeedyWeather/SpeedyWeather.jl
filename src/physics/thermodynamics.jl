@@ -33,10 +33,10 @@ function interpolate!(
     column::ColumnVariables{NF},
     model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
-    @unpack humid, humid_half = column
-    @unpack sat_humid, sat_humid_half = column
-    @unpack dry_static_energy, dry_static_energy_half = column
-    @unpack sat_moist_static_energy, sat_moist_static_energy_half = column
+    (; humid, humid_half ) = column
+    (; sat_humid, sat_humid_half ) = column
+    (; dry_static_energy, dry_static_energy_half ) = column
+    (; sat_moist_static_energy, sat_moist_static_energy_half ) = column
 
     for (full, half) in (
         (humid, humid_half),
@@ -67,8 +67,8 @@ function interpolate!(
     column::ColumnVariables{NF},
     model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
-    @unpack nlev = column
-    @unpack σ_levels_full, σ_levels_half = model.geometry
+    (; nlev ) = column
+    (; σ_levels_full, σ_levels_half ) = model.geometry
 
     # For A at each full level k, compute A at the half-level below, i.e. at the boundary
     # between the full levels k and k+1.
@@ -110,8 +110,8 @@ function saturation_vapour_pressure!(
     model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
 
-    @unpack sat_vap_pres, temp = column
-    @unpack e₀, T₀, C₁, C₂, T₁, T₂ = model.parameters.magnus_coefs
+    (; sat_vap_pres, temp ) = column
+    (; e₀, T₀, C₁, C₂, T₁, T₂ ) = model.parameters.magnus_coefs
 
     for k in eachlayer(column)
         # change coefficients for water (temp > T₀) or ice (else)
@@ -138,8 +138,8 @@ function saturation_specific_humidity!(
     model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
 
-    @unpack sat_humid, sat_vap_pres, pres = column
-    @unpack mol_mass_vapour, mol_mass_dry_air = model.parameters
+    (; sat_humid, sat_vap_pres, pres ) = column
+    (; mol_mass_vapour, mol_mass_dry_air ) = model.parameters
 
     mol_ratio = convert(NF, mol_mass_vapour/mol_mass_dry_air)
 
@@ -178,8 +178,8 @@ function moist_static_energy!(
     column::ColumnVariables{NF},
     model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
-    @unpack alhc = model.parameters
-    @unpack moist_static_energy, dry_static_energy, humid = column
+    (; alhc ) = model.parameters
+    (; moist_static_energy, dry_static_energy, humid ) = column
 
     for k in eachlayer(column)
         moist_static_energy[k] = dry_static_energy[k] + alhc * humid[k]
@@ -198,11 +198,11 @@ function saturation_moist_static_energy!(
     column::ColumnVariables{NF},
     model::PrimitiveEquation,
 ) where {NF<:AbstractFloat}
-    @unpack alhc = model.parameters
-    @unpack sat_moist_static_energy,
+    (; alhc ) = model.parameters
+    (; sat_moist_static_energy,
     sat_moist_static_energy_half,
     dry_static_energy,
-    sat_humid = column
+    sat_humid) = column
 
     for k in eachlayer(column)
         sat_moist_static_energy[k] = dry_static_energy[k] + alhc * sat_humid[k]

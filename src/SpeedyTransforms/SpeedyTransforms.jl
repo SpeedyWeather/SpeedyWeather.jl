@@ -1,7 +1,5 @@
 module SpeedyTransforms
 
-import Parameters: @unpack
-
 # NUMERICS
 import AssociatedLegendrePolynomials as Legendre
 import AbstractFFTs

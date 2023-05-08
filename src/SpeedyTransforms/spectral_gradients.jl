@@ -74,7 +74,7 @@ function _divergence!(  kernel,
     @boundscheck size(u) == size(div) || throw(BoundsError)
     @boundscheck size(v) == size(div) || throw(BoundsError)
 
-    @unpack grad_y_vordiv1,grad_y_vordiv2 = S
+    (; grad_y_vordiv1,grad_y_vordiv2 ) = S
     @boundscheck size(grad_y_vordiv1) == size(div) || throw(BoundsError)
     @boundscheck size(grad_y_vordiv2) == size(div) || throw(BoundsError)
     lmax,mmax = size(div) .- (2,1)              # 0-based lmax,mmax 
@@ -122,7 +122,7 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
                         S::SpectralTransform{NF}
                         ) where {NF<:AbstractFloat}
 
-    @unpack vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 = S
+    (; vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 ) = S
     lmax,mmax = size(vor) .- (2,1)                  # 0-based lmax,mmax
     
     @boundscheck lmax == mmax || throw(BoundsError)
@@ -196,7 +196,7 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
                             S::SpectralTransform{NF}
                             ) where {NF<:AbstractFloat}
 
-    @unpack vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 = S
+    (; vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 ) = S
     lmax,mmax = size(vor) .- (2,1)                  # 0-based lmax,mmax
     @boundscheck lmax == mmax || throw(BoundsError)
     @boundscheck size(div) == size(vor) || throw(BoundsError)
@@ -344,7 +344,7 @@ function ∇!(dpdx::LowerTriangularMatrix{Complex{NF}},       # Output: zonal gr
     @boundscheck size(p) == size(dpdx) || throw(BoundsError)
     @boundscheck size(p) == size(dpdy) || throw(BoundsError)
 
-    @unpack grad_y1, grad_y2 = S
+    (; grad_y1, grad_y2 ) = S
 
     lm = 0
     @inbounds for m in 1:mmax           # 1-based l,m, skip last column
