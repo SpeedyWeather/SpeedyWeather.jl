@@ -22,7 +22,7 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables,
 
     @floop for ij in eachgridpoint(diagn)       # loop over all horizontal grid points
 
-        thread_id = Threads.threadid()          # not two threads should use the same ColumnVariable
+        thread_id = Threads.threadid()          # not two threads should use the same ColumnVariables
         column = diagn.columns[thread_id]
         jring = whichring(ij,rings)             # ring index gridpoint ij is on
 
@@ -34,6 +34,7 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables,
 
         # VERTICAL DIFFUSION
         vertical_diffusion!(column,vertical_diffusion_scheme,model)
+        static_energy_diffusion!(column,static_energy_diffusion_scheme,model)
 
         # HELD-SUAREZ
         temperature_relaxation!(column,temperature_relax_scheme,model)
