@@ -17,7 +17,7 @@ end
 
 """Generalised logistic function based on the coefficients in `coefs`."""
 function generalised_logistic(x,coefs::GenLogisticCoefs)
-    @unpack A,K,C,Q,B,M,ν = coefs
+    (; A,K,C,Q,B,M,ν ) = coefs
     return @. A + (K-A)/(C+Q*exp(-B*(x-M)))^inv(ν)
 end
 

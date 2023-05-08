@@ -29,7 +29,7 @@ function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
     volume_flux_divergence!(diagn,surface,model)    # = -∇⋅(uh,vh), tendency pressure
 
     # interface forcing
-    @unpack interface_relaxation = model.parameters
+    (; interface_relaxation ) = model.parameters
     interface_relaxation && interface_relaxation!(pres,surface,time,model)
 end
 
@@ -43,7 +43,7 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
                                 lf::Int=2)          # leapfrog index for tendencies
 
     B, G, S = model.boundaries, model.geometry, model.spectral_transform
-    @unpack surface = diagn
+    (; surface ) = diagn
 
     # for semi-implicit corrections (α >= 0.5) linear gravity-wave related tendencies are
     # evaluated at previous timestep i-1 (i.e. lf=1 leapfrog time step) 

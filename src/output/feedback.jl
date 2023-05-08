@@ -13,12 +13,12 @@ end
 
 """Initialises the progress txt file."""
 function initialize_feedback(outputter::Output,M::ModelSetup)
-    @unpack output, write_restart = outputter
-    @unpack run_id, run_path = outputter
+    (; output, write_restart ) = outputter
+    (; run_id, run_path ) = outputter
 
     if output   # with netcdf output write parameters.txt and progress.txt
-        @unpack NF, n_days, trunc = M.parameters
-        @unpack Grid, npoints, nlat_half = M.geometry
+        (; NF, n_days, trunc ) = M.parameters
+        (; Grid, npoints, nlat_half ) = M.geometry
 
         # create progress.txt file in run????/
         progress_txt = open(joinpath(run_path,"progress.txt"),"w")
@@ -44,8 +44,8 @@ function initialize_feedback(outputter::Output,M::ModelSetup)
     nans_detected = false           # don't check again if true
 
     # PROGRESSMETER
-    @unpack verbose, debug = M.parameters
-    @unpack n_timesteps = M.constants
+    (; verbose, debug ) = M.parameters
+    (; n_timesteps ) = M.constants
     DT_IN_SEC[] = M.constants.Δt_sec       # hack: redefine element in global constant dt_in_sec
                                             # used to pass on the time step to ProgressMeter.speedstring
     desc = "Weather is speedy$(output ? " run $run_id: " : ": ")"
@@ -60,7 +60,7 @@ end
 """Calls the progress meter and writes every 5% progress increase to txt."""
 function progress!(feedback::Feedback)
     ProgressMeter.next!(feedback.progress_meter)    # update progress meter
-    @unpack counter, n = feedback.progress_meter    # unpack counter after update
+    (; counter, n ) = feedback.progress_meter    # unpack counter after update
 
     # write progress to txt file too
     if (counter/n*100 % 1) > ((counter+1)/n*100 % 1)  
@@ -104,7 +104,7 @@ function nar_detection!(feedback::Feedback,progn::PrognosticVariables)
     feedback.nars_detected && return nothing    # escape immediately if nans already detected
     i = feedback.progress_meter.counter         # time step
     nars_detected_here = false
-    @unpack vor = progn.layers[end].timesteps[2] # only check for surface vorticity
+    (; vor ) = progn.layers[end].timesteps[2] # only check for surface vorticity
 
     if ~nars_detected_here
         nars_vor = ~isfinite(vor[1])    # just check first mode

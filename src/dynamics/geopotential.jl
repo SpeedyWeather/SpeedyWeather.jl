@@ -58,10 +58,10 @@ function geopotential!( diagn::DiagnosticVariables{NF},
                         G::Geometry{NF}         # contains precomputed layer-thickness arrays
                         ) where NF              # number format NF
 
-    @unpack geopot_surf = B.orography           # = orography*gravity
-    @unpack Δp_geopot_half, Δp_geopot_full = G  # = R*Δlnp either on half or full levels
-    @unpack lapserate_corr = G
-    @unpack nlev = G                            # number of vertical levels
+    (;geopot_surf) = B.orography           # = orography*gravity
+    (;Δp_geopot_half, Δp_geopot_full) = G  # = R*Δlnp either on half or full levels
+    (;lapserate_corr) = G
+    (;nlev) = G                            # number of vertical levels
 
     @boundscheck diagn.nlev == length(Δp_geopot_full) || throw(BoundsError)
 
@@ -106,7 +106,7 @@ end
 function geopotential!( temp::Vector,
                         G::Geometry)
     
-    @unpack Δp_geopot_half, Δp_geopot_full, nlev = G  # = R*Δlnp either on half or full levels
+    (;Δp_geopot_half, Δp_geopot_full, nlev) = G  # = R*Δlnp either on half or full levels
     geopot = zero(temp)
 
     # bottom layer
@@ -124,8 +124,8 @@ function geopotential!( diagn::DiagnosticVariablesLayer,
                         pres::LowerTriangularMatrix,
                         C::DynamicsConstants)
 
-    @unpack gravity = C
-    @unpack geopot = diagn.dynamics_variables
+    (;gravity) = C
+    (;geopot) = diagn.dynamics_variables
 
     geopot .= pres*gravity
 end 
@@ -149,8 +149,8 @@ function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
                                 ::LowerTriangularMatrix,    # only needed for dispatch compat with DryCore
                                 model::PrimitiveWetCore)
     
-    @unpack temp_grid, humid_grid, temp_virt_grid = diagn.grid_variables
-    @unpack temp_virt = diagn.dynamics_variables
+    (;temp_grid, humid_grid, temp_virt_grid) = diagn.grid_variables
+    (;temp_virt) = diagn.dynamics_variables
     μ = model.constants.μ_virt_temp
     S = model.spectral_transform
 
@@ -165,10 +165,10 @@ function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
                                         model::PrimitiveWetCore,
                                         lf::Int)
     
-    @unpack temp_virt = diagn.dynamics_variables
+    (;temp_virt) = diagn.dynamics_variables
     μ = model.constants.μ_virt_temp
     Tₖ = model.geometry.temp_ref_profile[diagn.k]   
-    @unpack temp,humid = progn.timesteps[lf]
+    (;temp,humid) = progn.timesteps[lf]
 
     @. temp_virt = temp + Tₖ*μ*humid
 end
@@ -181,8 +181,8 @@ function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
                                 temp::LowerTriangularMatrix,
                                 ::PrimitiveDryCore)
     
-    @unpack temp_grid, temp_virt_grid = diagn.grid_variables
-    @unpack temp_virt = diagn.dynamics_variables
+    (;temp_grid, temp_virt_grid) = diagn.grid_variables
+    (;temp_virt) = diagn.dynamics_variables
 
     copyto!(temp_virt_grid,temp_grid)
     # copyto!(temp_virt,temp)
@@ -193,8 +193,8 @@ function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
                                         ::PrimitiveDryCore,
                                         lf::Int)
     
-    @unpack temp_virt = diagn.dynamics_variables
-    @unpack temp = progn.timesteps[lf]
+    (;temp_virt) = diagn.dynamics_variables
+    (;temp) = progn.timesteps[lf]
 
     copyto!(temp_virt,temp)
 end

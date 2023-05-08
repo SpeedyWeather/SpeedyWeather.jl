@@ -9,11 +9,11 @@ For more details see http://users.ictp.it/~kucharsk/speedy_description/km_ver41_
 function shortwave_radiation!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
-    @unpack humid, sat_vap_pres, dry_static_energy, geopot, norm_pres = column
-    @unpack cₚ = model.parameters
-    @unpack p0 = model.parameters.radiation_coefs
-    @unpack σ_levels_thick = model.geometry
-    @unpack gravity = model.constants
+    (; humid, sat_vap_pres, dry_static_energy, geopot, norm_pres ) = column
+    (; cₚ ) = model.parameters
+    (; p0 ) = model.parameters.radiation_coefs
+    (; σ_levels_thick ) = model.geometry
+    (; gravity ) = model.constants
 
     sol_oz!(column, model)
 
@@ -39,7 +39,7 @@ Compute average daily flux of solar radiation for an atmospheric column,
 from Hartmann (1994).
 """
 function solar!(column::ColumnVariables{NF}) where {NF<:AbstractFloat}
-    @unpack tyear, csol, latd = column
+    (; tyear, csol, latd ) = column
 
     # Compute cosine and sine of latitude
     clat = cos(latd)
@@ -86,8 +86,8 @@ Compute solar radiation parametres for an atmospheric column.
 function sol_oz!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
-    @unpack tyear, latd = column
-    @unpack solc, epssw = model.parameters.radiation_coefs
+    (; tyear, latd ) = column
+    (; solc, epssw ) = model.parameters.radiation_coefs
 
     # Compute cosine and sine of latitude
     clat = cos(latd)
@@ -140,11 +140,11 @@ Compute shortwave radiation cloud contibutions for an atmospheric column.
 function cloud!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
-    @unpack rhcl1, rhcl2, rrcl, qcl, pmaxcl = model.parameters.radiation_coefs
-    @unpack wpcl, gse_s1, gse_s0, clsmax, clsminl = model.parameters.radiation_coefs
-    @unpack humid, rel_hum, grad_dry_static_energy, precip_convection = column
-    @unpack precip_large_scale, cloud_top, nlev, fmask = column
-    @unpack n_stratosphere_levels = model.geometry
+    (; rhcl1, rhcl2, rrcl, qcl, pmaxcl ) = model.parameters.radiation_coefs
+    (; wpcl, gse_s1, gse_s0, clsmax, clsminl ) = model.parameters.radiation_coefs
+    (; humid, rel_hum, grad_dry_static_energy, precip_convection ) = column
+    (; precip_large_scale, cloud_top, nlev, fmask ) = column
+    (; n_stratosphere_levels ) = model.geometry
 
     # 1.0 Cloud cover, defined as the sum of:
     # - a term proportional to the square - root of precip. rate
@@ -200,12 +200,12 @@ Compute shortwave radiation fluxes for an atmospheric column.
 function radsw!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
-    @unpack norm_pres, humid, icltop, cloudc, clstr, ozupp, ozone = column
-    @unpack zenit, stratz, fsol, qcloud, albsfc, nlev = column
-    @unpack σ_levels_full, σ_levels_thick, n_stratosphere_levels = model.geometry
-    @unpack albcl, albcls, abscl1, abscl2, absdry, absaer = model.parameters.radiation_coefs
-    @unpack abswv1, abswv2, ablwin, ablco2, ablwv1 = model.parameters.radiation_coefs
-    @unpack ablwv2, ablcl2, ablcl1, epslw = model.parameters.radiation_coefs
+    (; norm_pres, humid, icltop, cloudc, clstr, ozupp, ozone ) = column
+    (; zenit, stratz, fsol, qcloud, albsfc, nlev ) = column
+    (; σ_levels_full, σ_levels_thick, n_stratosphere_levels ) = model.geometry
+    (; albcl, albcls, abscl1, abscl2, absdry, absaer ) = model.parameters.radiation_coefs
+    (; abswv1, abswv2, ablwin, ablco2, ablwv1 ) = model.parameters.radiation_coefs
+    (; ablwv2, ablcl2, ablcl1, epslw ) = model.parameters.radiation_coefs
 
     # Locals variables
     sbands_flux = 2

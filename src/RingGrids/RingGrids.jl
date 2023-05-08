@@ -1,6 +1,5 @@
 module RingGrids
 
-    import Parameters: @unpack
     import Statistics: mean
     import FastGaussQuadrature
 

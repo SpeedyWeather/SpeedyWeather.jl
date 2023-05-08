@@ -61,7 +61,7 @@ the Earth's radius which is used in the dynamical core."""
 function scale!(progn::PrognosticVariables,
                 model::ModelSetup)
 
-    @unpack radius = model.geometry
+    (; radius ) = model.geometry
     scale!(progn,:vor,radius)
     scale!(progn,:div,radius)
 end
@@ -74,7 +74,7 @@ Undo the radius-scaling of vorticity and divergence from scale!(progn,model)."""
 function unscale!(  progn::PrognosticVariables,
                     model::ModelSetup)
 
-    @unpack radius = model.geometry
+    (; radius ) = model.geometry
     scale!(progn,:vor,inv(radius))
     scale!(progn,:div,inv(radius))
 end

@@ -1,7 +1,7 @@
 module SpeedyWeather
 
 # STRUCTURE
-import Parameters: @unpack
+using DocStringExtensions
 
 # NUMERICS
 import Random

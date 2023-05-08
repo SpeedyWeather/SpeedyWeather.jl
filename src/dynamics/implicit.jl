@@ -16,7 +16,7 @@ for the implicit correction in the shallow water model. Actual precomputation ha
 initialize_implicit!."""
 function Implicit(P::Parameters{<:ShallowWater})    # shallow water model only
     
-    @unpack NF,trunc = P
+    (;NF,trunc) = P
 
     # 0-initialize, actual initialization depends on time step, done in initialize_implicit!
     ξH₀ = [zero(NF)]            # time step ξ, layer thickness at rest H₀ (in vec for mutability)
@@ -35,11 +35,11 @@ function initialize_implicit!(  model::ShallowWater,    # update Implicit struct
                                 ::DiagnosticVariables,
                                 dt::Real)               # time step
 
-    @unpack implicit_α = model.parameters               # = [0,0.5,1], time step fraction for implicit
-    @unpack eigenvalues = model.spectral_transform      # = -l*(l+1), degree l of harmonics
-    @unpack ξH₀,g∇²,ξg∇²,S⁻¹ = model.implicit           # pull precomputed arrays to be updated
-    @unpack layer_thickness = model.constants           # shallow water layer thickness [m]
-    @unpack gravity = model.constants                   # gravitational acceleration [m/s²]                  
+    (;implicit_α) = model.parameters               # = [0,0.5,1], time step fraction for implicit
+    (;eigenvalues) = model.spectral_transform      # = -l*(l+1), degree l of harmonics
+    (;ξH₀,g∇²,ξg∇²,S⁻¹) = model.implicit           # pull precomputed arrays to be updated
+    (;layer_thickness) = model.constants           # shallow water layer thickness [m]
+    (;gravity) = model.constants                   # gravitational acceleration [m/s²]                  
 
     # implicit time step between i-1 and i+1
     # α = 0   means the gravity wave terms are evaluated at i-1 (forward)
@@ -83,7 +83,7 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
     pres_new = progn_surface.timesteps[2].pres  # pressure/η at t+dt
     (;pres_tend) = diagn_surface            # tendency of pressure/η
 
-    @unpack g∇²,ξg∇²,S⁻¹ = model.implicit
+    (;g∇²,ξg∇²,S⁻¹) = model.implicit
     ξH₀ = model.implicit.ξH₀[1]                 # unpack as it's stored in a vec for mutation
     H₀ = model.constants.layer_thickness
 
@@ -125,7 +125,7 @@ Zero generator function for an `ImplicitPrimitiveEq` struct, which holds precomp
 the implicit correction in the primitive equation model. Actual precomputation happens in initialize_implicit!."""
 function Implicit(P::Parameters{<:PrimitiveEquation})    # primitive equation only
     
-    @unpack NF,trunc,nlev = P
+    (;NF,trunc,nlev) = P
 
     # initialize with zeros only, actual initialization depends on time step, done in initialize_implicit!
     ξ = Ref{NF}(0)              # time step 2α*Δt packed in RefValue for mutability
@@ -265,10 +265,10 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
     # escape immediately if explicit
     model.parameters.implicit_α == 0 && return nothing   
 
-    @unpack nlev = model.geometry
-    @unpack eigenvalues, lmax, mmax = model.spectral_transform
-    @unpack Δp_geopot_half, Δp_geopot_full = model.geometry     # = R*Δlnp on half or full levels
-    @unpack S⁻¹,R,U,L,W = model.implicit
+    (;nlev) = model.geometry
+    (;eigenvalues, lmax, mmax) = model.spectral_transform
+    (;Δp_geopot_half, Δp_geopot_full) = model.geometry     # = R*Δlnp on half or full levels
+    (;S⁻¹,R,U,L,W) = model.implicit
     ξ = model.implicit.ξ[]
     
     # MOVE THE IMPLICIT TERMS OF THE TEMPERATURE EQUATION FROM TIME STEP i TO i-1
@@ -288,7 +288,7 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
     end       
     
     # SEMI IMPLICIT CORRECTIONS FOR DIVERGENCE
-    @unpack pres_tend = diagn.surface
+    (;pres_tend) = diagn.surface
     @floop for k in 1:nlev    # loop from bottom layer to top for geopotential calculation
         
         # calculate the combined tendency G = G_D + ξRG_T + ξUG_lnps to solve for divergence δD

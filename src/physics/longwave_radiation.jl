@@ -35,9 +35,9 @@ Compute energy fractions in four longwave bands as a function of temperature.
 function radset!(   K::ParameterizationConstants,
                     P::Parameters)
 
-    @unpack NF, nband = P
-    @unpack epslw = P.radiation_coefs
-    @unpack fband = K
+    (; NF, nband ) = P
+    (; epslw ) = P.radiation_coefs
+    (; fband ) = K
 
     @assert nband == 4 "Only four bands are supported, given $nband"
 
@@ -71,11 +71,11 @@ function radlw_down!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
 
-    @unpack nlev, temp, wvi, tau2 = column
-    @unpack nband, sbc = model.parameters
-    @unpack n_stratosphere_levels = model.geometry
-    @unpack fband = model.parameterization_constants
-    @unpack epslw, emisfc = model.parameters.radiation_coefs
+    (; nlev, temp, wvi, tau2 ) = column
+    (; nband, sbc ) = model.parameters
+    (; n_stratosphere_levels ) = model.geometry
+    (; fband ) = model.parameterization_constants
+    (; epslw, emisfc ) = model.parameters.radiation_coefs
     
     # 1. Blackbody emission from atmospheric levels.
     #    The linearized gradient of the blakbody emission is computed
@@ -170,9 +170,9 @@ function compute_bbe!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
 
-@unpack sbc = model.parameters
-@unpack emisfc = model.parameters.radiation_coefs
-@unpack ts = column
+(; sbc ) = model.parameters
+(; emisfc ) = model.parameters.radiation_coefs
+(; ts ) = column
 
     column.fsfcu = emisfc * sbc * ts^4
 end
@@ -189,11 +189,11 @@ function radlw_up!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
 
-@unpack nband = model.parameters
-@unpack epslw, emisfc = model.parameters.radiation_coefs
-@unpack fband = model.parameterization_constants
-@unpack nlev, temp, fsfcu, fsfcd, flux, ts, tau2, st4a, dfabs, stratc = column
-@unpack σ_levels_thick, n_stratosphere_levels = model.geometry
+(; nband ) = model.parameters
+(; epslw, emisfc ) = model.parameters.radiation_coefs
+(; fband ) = model.parameterization_constants
+(; nlev, temp, fsfcu, fsfcd, flux, ts, tau2, st4a, dfabs, stratc ) = column
+(; σ_levels_thick, n_stratosphere_levels ) = model.geometry
 
     column.fsfc = fsfcu - fsfcd
     

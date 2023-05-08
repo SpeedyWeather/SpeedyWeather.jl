@@ -67,12 +67,12 @@ Generator function to create the Geometry struct from parameters in `P`.
 """
 function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
 
-    @unpack trunc, dealiasing, nlev = P             # grid type, spectral truncation, # of vertical levels
-    @unpack radius, rotation, gravity = P.planet    # radius of planet, angular frequency, gravity
-    @unpack R_dry, cₚ = P                           # gas constant for dry air, heat capacity
-    @unpack σ_tropopause = P                        # number of vertical levels used for stratosphere
-    @unpack temp_ref, temp_top, lapse_rate = P      # for reference atmosphere
-    @unpack ΔT_stratosphere = P                     # used for stratospheric temperature increase
+    (;trunc, dealiasing, nlev) = P             # grid type, spectral truncation, # of vertical levels
+    (;radius, rotation, gravity) = P.planet    # radius of planet, angular frequency, gravity
+    (;R_dry, cₚ) = P                           # gas constant for dry air, heat capacity
+    (;σ_tropopause) = P                        # number of vertical levels used for stratosphere
+    (;temp_ref, temp_top, lapse_rate) = P      # for reference atmosphere
+    (;ΔT_stratosphere) = P                     # used for stratospheric temperature increase
 
     # RESOLUTION PARAMETERS
     # resolution parameter nlat_half (= number of lat rings on one hemisphere (Equator incl) 
@@ -139,7 +139,7 @@ function Geometry(P::Parameters,Grid::Type{<:AbstractGrid})
     lapserate_corr = lapserate_correction(σ_levels_full,σ_levels_half,Δp_geopot_full)
 
     # Compute the entrainment coefficients for the convection parameterization.
-    @unpack max_entrainment = P
+    (;max_entrainment) = P
     entrainment_profile = zeros(nlev)
     for k = 2:nlev-1
         entrainment_profile[k] = max(0, (σ_levels_full[k] - 0.5)^2)
@@ -173,7 +173,7 @@ The first half level is at 0 the last at 1. Evaluate a generalised logistic func
 coefficients in `P` for the distribution of values in between. Default coefficients follow
 the L31 configuration historically used at ECMWF."""
 function vertical_coordinates(P::Parameters)
-    @unpack nlev,GLcoefs,σ_levels_half = P
+    (;nlev,GLcoefs,σ_levels_half) = P
 
     if length(σ_levels_half) == 0           # choose σ levels automatically
         z = range(0,1,nlev+1)               # normalised = level/nlev
@@ -195,6 +195,6 @@ end
 
 Generator function for a SpectralTransform struct pulling in parameters from a Parameters struct."""
 function SpeedyTransforms.SpectralTransform(P::Parameters)
-    @unpack NF, Grid, trunc, dealiasing, recompute_legendre, legendre_shortcut = P
+    (;NF, Grid, trunc, dealiasing, recompute_legendre, legendre_shortcut) = P
     return SpectralTransform(NF,Grid,trunc,recompute_legendre;legendre_shortcut,dealiasing)
 end

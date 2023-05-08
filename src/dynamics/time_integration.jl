@@ -21,7 +21,7 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
     @boundscheck lf == 1 || lf == 2 || throw(BoundsError())         # index lf picks leapfrog dim
     
     A_lf = lf == 1 ? A_old : A_new                      # view on either t or t+dt to dis/enable William's filter
-    @unpack robert_filter, williams_filter = C          # coefficients for the Robert and William's filter
+    (; robert_filter, williams_filter ) = C          # coefficients for the Robert and William's filter
     two = convert(NF,2)                                 # 2 in number format NF
     dt_NF = convert(NF,dt)                              # time step dt in number format NF
 
@@ -80,7 +80,7 @@ function first_timesteps!(  progn::PrognosticVariables, # all prognostic variabl
                             outputter::AbstractOutput
                             )
     
-    @unpack n_timesteps, Δt, Δt_sec = model.constants
+    (; n_timesteps, Δt, Δt_sec ) = model.constants
     n_timesteps == 0 && return time     # exit immediately for no time steps
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
@@ -246,7 +246,7 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
                         diagn::DiagnosticVariables, # all pre-allocated diagnostic variables
                         model::ModelSetup)          # all precalculated structs
     
-    @unpack n_timesteps, Δt, Δt_sec = model.constants
+    (; n_timesteps, Δt, Δt_sec ) = model.constants
     time = model.parameters.startdate
 
     # SCALING: we use vorticity*radius,divergence*radius in the dynamical core

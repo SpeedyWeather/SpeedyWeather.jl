@@ -21,7 +21,7 @@ end
 struct NoOrography <: AbstractOrography end
 
 function Base.zeros(::Type{Orography},S::SpectralTransform{NF}) where NF
-    @unpack Grid, nlat_half, lmax, mmax = S
+    (;Grid, nlat_half, lmax, mmax) = S
     orography   = zeros(Grid{NF},nlat_half)
     geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
     return Orography(orography,geopot_surf)
@@ -67,10 +67,10 @@ function initialize_orography!( orog::Orography,
                                 S::SpectralTransform,
                                 G::Geometry) where {M<:Union{ShallowWater,PrimitiveEquation}}
 
-    @unpack orography, geopot_surf = orog
-    @unpack orography_path, orography_file = P
-    @unpack gravity = P.planet
-    @unpack lmax, mmax = S
+    (;orography, geopot_surf) = orog
+    (;orography_path, orography_file) = P
+    (;gravity) = P.planet
+    (;lmax, mmax) = S
 
     # LOAD NETCDF FILE
     if orography_path == ""
@@ -104,11 +104,11 @@ function initialize_orography!( orog::Orography,
                                 S::SpectralTransform,
                                 G::Geometry) where {M<:Union{ShallowWater,PrimitiveEquation}}
 
-    @unpack gravity, rotation, radius = P.planet
-    @unpack lmax, mmax = S
+    (;gravity, rotation, radius) = P.planet
+    (;lmax, mmax) = S
 
-    @unpack orography, geopot_surf = orog
-    @unpack η₀, u₀ = coefs
+    (;orography, geopot_surf) = orog
+    (;η₀, u₀) = coefs
 
     ηᵥ = (1-η₀)*π/2                     # ηᵥ-coordinate of the surface [1]
     A = u₀*cos(ηᵥ)^(3/2)                # amplitude [m/s]
@@ -132,7 +132,7 @@ end
 function scale_orography!(  orog::Orography,
                             P::Parameters)
 
-    @unpack orography, geopot_surf = orog
+    (;orography, geopot_surf) = orog
     orography .*= P.orography_scale
     geopot_surf .*= P.orography_scale
     return nothing
