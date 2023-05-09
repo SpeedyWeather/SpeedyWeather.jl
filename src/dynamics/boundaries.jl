@@ -15,7 +15,8 @@ end
 Base.@kwdef struct EarthOrography <: AbstractOrography
     smoothing::Bool = true              # smooth the orography field?
     smoothing_power::Float64 = 1.0      # power of Laplacian for smoothing
-    smoothing_strength::Float64 = 0.2   # highest degree l is multiplied by
+    smoothing_strength::Float64 = 0.1   # highest degree l is multiplied by
+    smoothing_truncation::Int = 85      # resolution of orography
 end
 
 struct NoOrography <: AbstractOrography end
@@ -90,7 +91,9 @@ function initialize_orography!( orog::Orography,
     
     copyto!(geopot_surf,orography_spec)     # truncates to the size of geopot_surf, no *gravity yet
     if EO.smoothing                         # smooth orography in spectral space?
-        SpeedyTransforms.spectral_smoothing!(geopot_surf,EO.smoothing_strength,power=EO.smoothing_power)
+        SpeedyTransforms.spectral_smoothing!(geopot_surf,EO.smoothing_strength,
+                                                            power=EO.smoothing_power,
+                                                            truncation=EO.smoothing_truncation)
     end
 
     gridded!(orography,geopot_surf,S)       # to grid-point space

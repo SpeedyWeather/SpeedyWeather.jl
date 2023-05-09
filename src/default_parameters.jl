@@ -249,7 +249,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     boundary_path::String = ""
 
     "orography"
-    orography::AbstractOrography = EarthOrography(smoothing_strength=1e-2,smoothing_power=0.1)
+    orography::AbstractOrography = EarthOrography()
 
     "scale orography by a factor"
     orography_scale::Float64 = 1
