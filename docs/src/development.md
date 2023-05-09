@@ -1,6 +1,6 @@
 # Development notes
 
-To run tests:
+To run tests, from the path of your local clone of the repository do:
 ```
 julia --project=. -e 'import Pkg; Pkg.test()'
 ```
