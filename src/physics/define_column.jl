@@ -36,6 +36,19 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     # DIAGNOSTIC VARIABLES
     const geopot::Vector{NF} = zeros(NF,nlev)                   # gepotential height [m]
 
+    # FLUXES, arrays to be used for various parameterizations, on half levels incl top and bottom
+    const flux_u_upward::Vector{NF} = zeros(NF,nlev+1)
+    const flux_u_downward::Vector{NF} = zeros(NF,nlev+1)
+
+    const flux_v_upward::Vector{NF} = zeros(NF,nlev+1)
+    const flux_v_downward::Vector{NF} = zeros(NF,nlev+1)
+
+    const flux_temp_upward::Vector{NF} = zeros(NF,nlev+1)
+    const flux_temp_downward::Vector{NF} = zeros(NF,nlev+1)
+    
+    const flux_humid_upward::Vector{NF} = zeros(NF,nlev+1)
+    const flux_humid_downward::Vector{NF} = zeros(NF,nlev+1)
+
     # THERMODYNAMICS
     const sat_humid::Vector{NF} = zeros(NF,nlev)                # Saturation specific humidity
     const sat_vap_pres::Vector{NF} = zeros(NF,nlev)             # Saturation vapour pressure

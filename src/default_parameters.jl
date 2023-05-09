@@ -1,5 +1,3 @@
-using DocStringExtensions
-
 const DEFAULT_NF = Float64          # number format
 const DEFAULT_MODEL = Barotropic    # abstract model type
 
@@ -125,8 +123,8 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "vertical diffusion"
     vertical_diffusion::VerticalDiffusion = NoVerticalDiffusion()
 
-    # "static energy diffusion"
-    # static_energy_diffusion::VerticalDiffusion = StaticEnergyDiffusion()
+    "static energy diffusion"
+    static_energy_diffusion::VerticalDiffusion = StaticEnergyDiffusion()
 
 
     # FORCING

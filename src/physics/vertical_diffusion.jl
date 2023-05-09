@@ -97,3 +97,39 @@ function initialize_vertical_diffusion!(K::ParameterizationConstants,
 
     return nothing
 end 
+
+Base.@kwdef struct StaticEnergyDiffusion{NF<:Real} <: VerticalDiffusion{NF}
+    time_scale::NF = 6.0                # [hours] time scale for strength
+    static_energy_lapse_rate::NF = 0.1  # [1] ∂SE/∂Φ, vertical gradient of
+                                        # static energy SE with geopotential Φ
+end
+
+function static_energy_diffusion!(  column::ColumnVariables{NF},
+                                    scheme::StaticEnergyDiffusion,
+                                    model::PrimitiveEquation) where NF
+
+    (;nlev,dry_static_energy,flux_temp_upward,geopot) = column
+    pₛ = column.pres[end]               # surface pressure
+    
+    (;time_scale, static_energy_lapse_rate) = scheme
+    (;gravity) = model.parameters.planet
+
+    # Fortran SPEEDY documentation equation (70)
+    C₀ = 1/nlev                                         # average Δσ
+    Fstar = convert(NF,C₀*pₛ/gravity/(time_scale*3600)) # [hrs] → [s]
+    Γˢᵉ = convert(NF,static_energy_lapse_rate)
+
+    # relax static energy profile back to a reference gradient Γˢᵉ
+    @inbounds for k in 1:nlev-1
+        # Fortran SPEEDY doc eq (74)
+        SEstar = dry_static_energy[k+1] + Γˢᵉ*(geopot[k] - geopot[k+1])
+        SE = max(dry_static_energy[k],SEstar)           # equivalent to if SE < SEstar
+        flux_temp_upward[k+1] += Fstar*(SEstar - SE)    # then Fstar*(SEstar - SE) else 0
+    end
+end
+
+function static_energy_diffusion!(  column::ColumnVariables,
+                                    scheme::NoVerticalDiffusion,
+                                    model::PrimitiveEquation)
+    return nothing
+end

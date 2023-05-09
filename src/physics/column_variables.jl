@@ -84,14 +84,14 @@ function reset_column!(column::ColumnVariables)
     fill!(column.humid_tend,0)
 
     # set fluxes to 0 for += accumulation
-    # fill!(column.flux_u_upward,0)
-    # fill!(column.flux_u_downward,0)
-    # fill!(column.flux_v_upward,0)
-    # fill!(column.flux_v_downward,0)
-    # fill!(column.flux_humid_upward,0)
-    # fill!(column.flux_humid_downward,0)
-    # fill!(column.flux_temp_upward,0)
-    # fill!(column.flux_temp_downward,0)
+    fill!(column.flux_u_upward,0)
+    fill!(column.flux_u_downward,0)
+    fill!(column.flux_v_upward,0)
+    fill!(column.flux_v_downward,0)
+    fill!(column.flux_humid_upward,0)
+    fill!(column.flux_humid_downward,0)
+    fill!(column.flux_temp_upward,0)
+    fill!(column.flux_temp_downward,0)
 
     # # Convection
     # column.cloud_top = column.nlev+1
