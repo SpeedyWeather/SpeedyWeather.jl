@@ -1,3 +1,5 @@
+import Random
+
 @testset "Interpolate constant field" begin
     npoints = 100
     
