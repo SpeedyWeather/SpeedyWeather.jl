@@ -283,7 +283,7 @@ end
 
 @testset "∇×∇=0 and ∇⋅∇=∇²" begin
     for NF in (Float32,Float64)
-        p,d,m = initialize_speedy(NF)
+        p,d,m = initialize_speedy(NF,Grid=FullGaussianGrid)
 
         a = randn(LowerTriangularMatrix{Complex{NF}},33,32)
         SpeedyWeather.spectral_truncation!(a,31)
