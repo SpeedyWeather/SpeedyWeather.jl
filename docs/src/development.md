@@ -8,7 +8,7 @@ julia --project=. -e 'import Pkg; Pkg.test()'
 To install dependencies:
 
 ```
-julia --project=. -e 'import Pkg; Pkg.instantiate()`
+julia --project -e 'import Pkg; Pkg.instantiate()`
 ```
 
 then:
