@@ -305,9 +305,12 @@ function write_netcdf_variables!(   outputter::Output,
 
         # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
         (; keepbits ) = model.parameters
-        for var in (u,v,vor,div,temp,humid)
-            round!(var,keepbits)
-        end
+        :u in output_vars     && round!(u,    keepbits.u)
+        :v in output_vars     && round!(v,    keepbits.v)
+        :vor in output_vars   && round!(vor,  keepbits.vor)
+        :div in output_vars   && round!(div,  keepbits.div)
+        :temp in output_vars  && round!(temp, keepbits.temp)
+        :humid in output_vars && round!(humid,keepbits.humid)
 
         # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
         (; netcdf_file ) = outputter
@@ -331,9 +334,8 @@ function write_netcdf_variables!(   outputter::Output,
 
         if model isa PrimitiveEquation
             @. pres = exp(pres)/100     # convert from log(pₛ) to surface pressure pₛ [hPa]
-        else
-            round!(pres,model.parameters.keepbits)
         end
+        round!(pres,model.parameters.keepbits.pres)
         
         NetCDF.putvar(outputter.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
     end
@@ -372,10 +374,10 @@ function write_restart_file(time::DateTime,
         copyto!(layer.timesteps[1].humid,layer.timesteps[2].humid)
 
         # bitround 1st leapfrog step to output precision
-        round!(layer.timesteps[1].vor,keepbits)
-        round!(layer.timesteps[1].div,keepbits)
-        round!(layer.timesteps[1].temp,keepbits)
-        round!(layer.timesteps[1].humid,keepbits)
+        round!(layer.timesteps[1].vor,keepbits.vor)
+        round!(layer.timesteps[1].div,keepbits.div)
+        round!(layer.timesteps[1].temp,keepbits.temp)
+        round!(layer.timesteps[1].humid,keepbits.humid)
 
         # remove 2nd leapfrog step by filling with zeros
         fill!(layer.timesteps[2].vor,0)
@@ -386,7 +388,7 @@ function write_restart_file(time::DateTime,
 
     # same for surface pressure
     copyto!(progn.surface.timesteps[1].pres,progn.surface.timesteps[2].pres)
-    round!(progn.surface.timesteps[1].pres,keepbits)
+    round!(progn.surface.timesteps[1].pres,keepbits.pres)
     fill!(progn.surface.timesteps[2].pres,0)
 
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
