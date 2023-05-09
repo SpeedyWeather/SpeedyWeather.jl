@@ -303,7 +303,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     compression_level::Int = 3
 
     "mantissa bits to keep for every variable"
-    keepbits::Int = 7
+    keepbits::NamedTuple = default_keepbits()
 
     "SpeedyWeather.jl version number"
     version::VersionNumber = pkgversion(SpeedyWeather)
@@ -372,6 +372,8 @@ output_vars_default(::Type{<:Barotropic}) = [:vor,:u]
 output_vars_default(::Type{<:ShallowWater}) = [:vor,:u]
 output_vars_default(::Type{<:PrimitiveDryCore}) = [:vor,:u,:temp,:pres]
 output_vars_default(::Type{<:PrimitiveWetCore}) = [:vor,:u,:temp,:humid,:pres]
+
+default_keepbits() = (u=7,v=7,vor=5,div=5,temp=10,pres=12,humid=7)
 
 # default initial conditions by model
 initial_conditions_default(::Type{<:Barotropic}) = StartWithVorticity()

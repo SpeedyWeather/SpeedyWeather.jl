@@ -17,6 +17,7 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables,
     boundary_layer_scheme = model.parameters.boundary_layer
     temperature_relax_scheme = model.parameters.temperature_relaxation
     vertical_diffusion_scheme = model.parameters.vertical_diffusion
+    static_energy_diffusion_scheme = model.parameters.static_energy_diffusion
 
     rings = eachring(G.Grid,G.nlat_half)
 
