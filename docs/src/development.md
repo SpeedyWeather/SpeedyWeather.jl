@@ -13,7 +13,7 @@ julia --project -e 'import Pkg; Pkg.instantiate()`
 
 then:
 ```
-julia --project=.
+julia --project
 ```
 
 To generate docs:
