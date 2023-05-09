@@ -327,7 +327,7 @@ function write_netcdf_variables!(   outputter::Output,
         (; pres_grid ) = diagn.surface
 
         if output_matrix
-            Matrix!(pres,diagn.surface.pres_grid; quadrant_rotation, matrix_quadrant)
+            RingGrids.Matrix!(pres,diagn.surface.pres_grid; quadrant_rotation, matrix_quadrant)
         else
             RingGrids.interpolate!(output_Grid(pres),pres_grid,interpolator)
         end

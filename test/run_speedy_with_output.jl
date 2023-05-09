@@ -1,25 +1,26 @@
 @testset "Output on various grids" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
+    n_days = 1
 
-    p = run_speedy(Float64,output=true,output_path=tmp_output_path)
+    p = run_speedy(Float64,output=true,output_path=tmp_output_path;n_days)
     @test all(isfinite.(p.layers[1].timesteps[1].vor))
 
-    p = run_speedy(Float32,output=true,output_path=tmp_output_path)
+    p = run_speedy(Float32,output=true,output_path=tmp_output_path;n_days)
     @test all(isfinite.(p.layers[1].timesteps[1].vor))
 
-    p = run_speedy(Float64,Grid=FullClenshawGrid,output=true,output_path=tmp_output_path)
+    p = run_speedy(Float64,Grid=FullClenshawGrid,output=true,output_path=tmp_output_path;n_days)
     @test all(isfinite.(p.layers[1].timesteps[1].vor))
 
-    p = run_speedy(Float64,Grid=OctahedralGaussianGrid,output=true,output_path=tmp_output_path)
+    p = run_speedy(Float64,Grid=OctahedralGaussianGrid,output=true,output_path=tmp_output_path;n_days)
     @test all(isfinite.(p.layers[1].timesteps[1].vor))
 
-    p = run_speedy(Float64,Grid=OctahedralClenshawGrid,output=true,output_path=tmp_output_path)
+    p = run_speedy(Float64,Grid=OctahedralClenshawGrid,output=true,output_path=tmp_output_path;n_days)
     @test all(isfinite.(p.layers[1].timesteps[1].vor))
 
-    p = run_speedy(Float64,Grid=OctahedralClenshawGrid,output_matrix=true,output=true,output_path=tmp_output_path)
+    p = run_speedy(Float64,Grid=OctahedralClenshawGrid,output_matrix=true,output=true,output_path=tmp_output_path;n_days)
     @test all(isfinite.(p.layers[1].timesteps[1].vor))
 
-    p = run_speedy(Float64,Grid=OctahedralClenshawGrid,output_matrix=true,output_NF=Float32,output=true,output_path=tmp_output_path)
+    p = run_speedy(Float64,Grid=OctahedralClenshawGrid,output_matrix=true,output_NF=Float32,output=true,output_path=tmp_output_path;n_days)
     @test all(isfinite.(p.layers[1].timesteps[1].vor))
 end
 

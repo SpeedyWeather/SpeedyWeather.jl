@@ -1,5 +1,5 @@
-const DEFAULT_NF = Float64          # number format
-const DEFAULT_MODEL = Barotropic    # abstract model type
+const DEFAULT_NF = Float32              # number format
+const DEFAULT_MODEL = PrimitiveDryCore  # abstract model type
 
 """
     P = Parameters{M<:ModelSetup}(kwargs...) <: AbstractParameters{M}
@@ -22,7 +22,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     trunc::Int = 31
 
     "grid in use"
-    Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    Grid::Type{<:AbstractGrid} = OctahedralGaussianGrid
 
     "dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
     dealiasing::Float64 = 2
