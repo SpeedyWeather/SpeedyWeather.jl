@@ -69,8 +69,8 @@ function fluxes_to_tendencies!( column::ColumnVariables{NF},
     Δσ = model.geometry.σ_levels_thick
     pₛ = column.pres[end]               # surface pressure
 
-    # g/pₛ and g/(pₛ*cₚ), see Fortran SPEEDY documentation eq. (3,5)
-    g_pₛ = convert(NF,model.parameters.planet.gravity/pₛ)
+    # # g/pₛ and g/(pₛ*cₚ), see Fortran SPEEDY documentation eq. (3,5)
+    g_pₛ = convert(NF,model.constants.gravity/pₛ)
     g_pₛ_cₚ = g_pₛ/convert(NF,model.parameters.cₚ)
 
     # fluxes are defined on half levels including top k=1/2 and surface k=nlev+1/2
@@ -90,7 +90,7 @@ function fluxes_to_tendencies!( column::ColumnVariables{NF},
         ΔF_temp = (flux_temp_upward[k+1] - flux_temp_upward[k]) +
             (flux_temp_downward[k] - flux_temp_downward[k+1])
 
-        # convert absorbed flux to tendency
+        # # convert absorbed flux to tendency
         u_tend[k] += g_pₛ/Δσ[k]*ΔF_u
         v_tend[k] += g_pₛ/Δσ[k]*ΔF_v
         humid_tend[k] += g_pₛ/Δσ[k]*ΔF_humid
