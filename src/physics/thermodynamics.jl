@@ -1,4 +1,21 @@
 """
+Parameters for computing saturation vapour pressure using the August-Roche-Magnus formula,
+
+    eᵢ(T) = e₀ * exp(Cᵢ * (T - T₀) / (T - Tᵢ)),
+
+where T is in Kelvin and i = 1,2 for saturation with respect to water and ice,
+respectively.
+"""
+Base.@kwdef struct MagnusCoefs{NF<:Real} <: Coefficients
+    e₀::NF = 6.108   # Saturation vapour pressure at 0°C
+    T₀::NF = 273.16  # 0°C in Kelvin
+    T₁::NF = 35.86
+    T₂::NF = 7.66
+    C₁::NF = 17.269
+    C₂::NF = 21.875
+end
+
+"""
     get_thermodynamics!(column::ColumnVariables,model::PrimitiveWetCore)
 
 Calculate thermodynamic quantities like saturation vapour pressure,

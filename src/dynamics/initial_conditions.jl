@@ -19,6 +19,8 @@ function allocate_prognostic_variables(model::ModelSetup)
     return zeros(PrognosticVariables{NF},model,lmax,mmax,nlev)
 end
 
+struct StartFromRest <: InitialConditions end
+
 function initial_conditions!(   ::StartFromRest,
                                 progn::PrognosticVariables,
                                 model::ModelSetup)
@@ -32,7 +34,9 @@ function initial_conditions!(   ::StartFromRest,
     model.parameters.pressure_on_orography && pressure_on_orography!(progn,model)
     # TODO initialise humidity
 end
-    
+
+struct StartWithVorticity <: InitialConditions end
+
 function initial_conditions!(   ::StartWithVorticity,
                                 progn::PrognosticVariables,
                                 model::ModelSetup)
@@ -58,6 +62,25 @@ function initial_conditions!(   ::StartWithVorticity,
             end
         end
     end
+end
+
+"""
+    Z = ZonalJet(;kwargs...) <: InitialConditions
+
+Create a struct that contains all parameters for the Galewsky et al, 2004 zonal jet
+intitial conditions for the shallow water model. Default values as in Galewsky."""
+Base.@kwdef struct ZonalJet <: InitialConditions
+    # jet
+    latitude = 45               # degrees north [˚N]
+    width = (1/4-1/7)*180       # ≈ 19.29˚ as in Galewsky et al, 2004 
+    umax = 80                   # [m/s]
+    
+    # perturbation
+    perturb_lat = latitude          # [˚N], position in jet by default
+    perturb_lon = 270               # [˚E]
+    perturb_xwidth = 1/3*360/2π     # ≈ 19.1˚E zonal extent [˚E]
+    perturb_ywidth = 1/15*360/2π    # ≈ 3.8˚N meridional extent [˚N]
+    perturb_height = 120            # amplitude [m]
 end
 
 """Initial conditions from Galewsky, 2004, Tellus"""
@@ -136,6 +159,29 @@ function initial_conditions!(   coefs::ZonalJet,
     (;pres) = progn.surface.timesteps[1]
     copyto!(pres,η)
     spectral_truncation!(pres)
+end
+
+"""
+    Z = ZonalWind(;kwargs...) <: InitialConditions
+
+Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
+intitial conditions for the primitive equation model. Default values as in Jablonowski."""
+Base.@kwdef struct ZonalWind <: InitialConditions
+    
+    # vertical
+    η₀ = 0.252                  # conversion from σ to Jablonowski's ηᵥ-coordinates
+    u₀ = 35                     # max amplitude of zonal wind [m/s]
+    
+    # perturbation
+    perturb_lat = 40            # Gaussian profile perturbation centred at [˚N]
+    perturb_lon = 20            # and [˚E]
+    perturb_uₚ = 1              # strength of perturbation [m/s]
+    perturb_radius = 1/10       # radius of Gaussian perturbation in units of Earth's radius [1]
+
+    # temperature
+    ΔT = 0                      # temperature difference used for stratospheric lapse rate [K]
+                                # Jablonowski uses ΔT = 4.8e5 [K]
+    Tmin = 200                  # minimum temperature [K] of profile
 end
 
 """Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
@@ -247,6 +293,8 @@ function initial_conditions!(   coefs::ZonalWind,
     progn.surface.timesteps[1].pres[1] = norm_sphere*lnp₀
     pressure_on_orography && pressure_on_orography!(progn,model)
 end
+
+struct StartFromFile <: InitialConditions end
 
 function initial_conditions!(   ::StartFromFile,
                                 progn_new::PrognosticVariables,
