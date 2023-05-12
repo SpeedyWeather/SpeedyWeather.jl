@@ -102,16 +102,13 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "vertical coordinates of the nlev vertical levels, defined by a generalised logistic function, interpolating ECMWF's L31 configuration"
     GLcoefs::Coefficients = GenLogisticCoefs()
 
-    "number of vertical levels used for the stratosphere"
-    n_stratosphere_levels::Int = 2
-
     "σ coordinate where the tropopause starts"
     σ_tropopause::Float64 = 0.2
 
     "only used if set manually, otherwise empty"
     σ_levels_half::Vector{Float64} = []
 
-    "number of vertical levels "
+    "number of vertical levels"
     nlev::Int = nlev_default(Model, σ_levels_half)
 
 
