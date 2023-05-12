@@ -48,12 +48,10 @@ function HorizontalDiffusion(   scheme::HyperDiffusion,
                                 C::DynamicsConstants,
                                 G::Geometry,
                                 S::SpectralTransform{NF}) where NF
-    (;lmax,mmax) = S
+    (;lmax) = S
     (;radius) = P.planet
-    (;power, time_scale, resolution_scaling )= scheme
-    (;power_stratosphere, tapering_σ) = scheme
-    (;Δt) = C
-    (;nlev, σ_levels_full) = G
+    (;time_scale, resolution_scaling) = scheme
+    (;nlev) = G
 
     # Reduce diffusion time scale (=increase diffusion) with resolution
     # times 1/radius because time step Δt is scaled with 1/radius

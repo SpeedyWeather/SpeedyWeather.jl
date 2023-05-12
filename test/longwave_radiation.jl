@@ -17,7 +17,7 @@ end
 
         nlev = model.parameters.nlev
         nband = model.parameters.nband
-        n_stratosphere_levels = model.parameters.n_stratosphere_levels
+        n_stratosphere_levels = model.geometry.n_stratosphere_levels
         column = ColumnVariables{NF}(nlev=nlev, nband=nband, n_stratosphere_levels=n_stratosphere_levels)
         column.temp = fill(300., nlev)
         column.wvi = fill(0.5, nlev, 2)
@@ -37,7 +37,7 @@ end
 
         nlev = model.parameters.nlev
         nband = model.parameters.nband
-        n_stratosphere_levels = model.parameters.n_stratosphere_levels
+        n_stratosphere_levels = model.geometry.n_stratosphere_levels
         column = ColumnVariables{NF}(nlev=nlev, nband=nband, n_stratosphere_levels=n_stratosphere_levels)
         column.ts = 320.
         
@@ -53,7 +53,7 @@ end
 
         nlev = model.parameters.nlev
         nband = model.parameters.nband
-        n_stratosphere_levels = model.parameters.n_stratosphere_levels
+        n_stratosphere_levels = model.geometry.n_stratosphere_levels
         column = ColumnVariables{NF}(nlev=nlev, nband=nband, n_stratosphere_levels=n_stratosphere_levels)
         column.temp = fill(300., nlev)
         column.wvi = fill(0.5, nlev, 2)
@@ -77,7 +77,7 @@ end
 
         nlev = model.parameters.nlev
         nband = model.parameters.nband
-        n_stratosphere_levels = model.parameters.n_stratosphere_levels
+        n_stratosphere_levels = model.geometry.n_stratosphere_levels
         column = ColumnVariables{NF}(nlev=nlev, nband=nband, n_stratosphere_levels=n_stratosphere_levels)
         column.temp = fill(300., nlev)
         column.wvi = fill(0.5, nlev, 2)

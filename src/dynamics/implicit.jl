@@ -158,6 +158,9 @@ function initialize_implicit!(  model::PrimitiveEquation,
 
     # use an occasionally updated vertical temperature profile
     (;temp_profile) = diagn
+    for t in temp_profile                       # return immediately if temp_profile contains
+        if !isfinite(t) return nothing end      # NaRs, model blew up in that case
+    end
 
     # set up R, U, L, W operators from
     # δD = G_D + ξ(RδT + Uδlnps)        divergence D correction

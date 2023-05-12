@@ -7,8 +7,8 @@ end
 
 """Zonal ridge orography after Jablonowski and Williamson 2006."""
 Base.@kwdef struct ZonalRidge <: AbstractOrography
-    η₀ = 0.252      # conversion from σ to Jablonowski's ηᵥ-coordinates
-    u₀ = 35         # max amplitude of zonal wind [m/s] that scales orography height
+    η₀::Float32 = 0.252     # conversion from σ to Jablonowski's ηᵥ-coordinates
+    u₀::Float32 = 35        # max amplitude of zonal wind [m/s] that scales orography height
 end
 
 # empty structs (no parameters needed) for other orographies
