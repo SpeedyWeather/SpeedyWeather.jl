@@ -5,7 +5,7 @@
 
 Runs SpeedyWeather.jl with number format `NF` and the model `Model` and any additional parameters
 in the keyword arguments `kwargs...`. Any unspecified parameters will use the default values as
-defined in `src/default_parameters.jl`."""
+defined in [`Parameters`](@ref)."""
 function run_speedy(::Type{NF}=DEFAULT_NF,          # default number format
                     ::Type{Model}=DEFAULT_MODEL;    # default model
                     kwargs...                       # all additional non-default parameters
