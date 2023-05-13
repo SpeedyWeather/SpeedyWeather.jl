@@ -65,7 +65,8 @@ compatibilities with older versions are not guaranteed.
 
 ## Copyright and license
 
-Copyright (c) 2022 Milan Kloewer and contributors for SpeedyWeather.jl.
-Copyright (c) 2022 Fred Kucharski and Franco Molteni for parametrization schemes.
+Copyright (c) 2020 Milan Kloewer for SpeedyWeather.jl
+Copyright (c) 2021 The SpeedyWeather.jl Contributors for SpeedyWeather.jl
+Copyright (c) 2022 Fred Kucharski and Franco Molteni for SPEEDY parametrization schemes
 
 Software licensed under the [MIT License](LICENSE.txt).
