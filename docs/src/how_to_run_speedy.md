@@ -11,7 +11,7 @@ Hooray, you have just simulated the Earth's atmosphere. Parameters, their meanin
 defaults are documented in [`Parameters`](@ref). For example, if you want to run
 the primitive equation dry core (no humidity) simulation in double precision (`Float64`),
 at higher resolution (`trunc`, the triangular spectral truncation), slow down the rotation
-of the Earth (`rotation in ``s^{-1}``), and create some netCDF ouput, do
+of the Earth (`rotation` in ``s^{-1}``), and create some netCDF ouput, do
 
 ```julia
 run_speedy(Float64,PrimitiveDryCore,trunc=42,planet=Earth(rotation=1e-5),output=true)
