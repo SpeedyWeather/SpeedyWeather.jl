@@ -17,12 +17,6 @@ Base.@kwdef struct LeapfrogSemiImplicit <: TimeIntegrator
 
     "William's time filter (Amezcua 2011) coefficient for 3rd order acc"
     william_filter::Float64 = 0.53
-
-    "coefficient for semi-implicit computations to filter gravity waves"
-    implicit_α::Float64 = 1
-
-    "recalculate implicit operators on temperature profile every n time steps"
-    recalculate_implicit::Int = 100
 end
 
 """

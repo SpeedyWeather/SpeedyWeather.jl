@@ -1,45 +1,48 @@
-# BAROTROPIC MODEL
-"""
-    nothing = initialize_implicit!(::Real,::Barotropic)
-
-Just passes, as implicit terms are not used in the barotropic model."""
-initialize_implicit!(::Barotropic,::DiagnosticVariables,::Real) = nothing
-
-# !!! structs are defined in define_implicit.jl !!!
+# BAROTROPIC MODEL (no implicit needed)
+struct NoImplicit <: AbstractImplicit end
+initialize!(I::NoImplicit,dt::Real,C::DynamicsConstants) = nothing
 
 # SHALLOW WATER MODEL
 """
-    I = Implicit(P::Parameters{<:ShallowWater})
+    I = ImplicitShallowWater(   ξH₀::Vector,
+                                g∇²::Vector,
+                                ξg∇²::Vector,
+                                S⁻¹::Vector)
 
-Zero generator function for an `ImplicitShallowWater` struct, which holds precomputed arrays
-for the implicit correction in the shallow water model. Actual precomputation happens in
-initialize_implicit!."""
-function Implicit(P::Parameters{<:ShallowWater})    # shallow water model only
-    
-    (;NF,trunc) = P
+Struct that holds various precomputed arrays for the semi-implicit correction to
+prevent gravity waves from amplifying in the shallow water model."""
+Base.@kwdef struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit{NF}
 
-    # 0-initialize, actual initialization depends on time step, done in initialize_implicit!
-    ξH₀ = [zero(NF)]            # time step ξ, layer thickness at rest H₀ (in vec for mutability)
-    g∇² = zeros(NF,trunc+2)     # gravity times Laplace operator
-    ξg∇² = zeros(NF,trunc+2)    # time step ξ times gravity times Laplace operator 
-    S⁻¹ = zeros(NF,trunc+2)     # combined operator to be inverted
+    # DIMENSIONS
+    trunc::Int
 
-    return ImplicitShallowWater(ξH₀,g∇²,ξg∇²,S⁻¹)
+    "coefficient for semi-implicit computations to filter gravity waves"
+    α::Float64 = 1
+
+    # PRECOMPUTED ARRAYS, to be initiliased with initialize!
+    ξH₀::Base.RefValue{NF} = Ref(zero(NF))  # = 2αΔt*layer_thickness, store in RefValue for mutability
+    g∇²::Vector{NF} = zeros(NF,trunc+2)     # = gravity*eigenvalues
+    ξg∇²::Vector{NF} = zeros(NF,trunc+2)    # = 2αΔt*gravity*eigenvalues
+    S⁻¹::Vector{NF} = zeros(NF,trunc+2)     # = 1 / (1-ξH₀*ξg∇²), implicit operator
+end
+
+# Generator using the resolution from SpectralGrid
+function ImplicitShallowWater(spectral_grid::SpectralGrid,kwargs...) 
+    (;trunc) = spectral_grid
+    return ImplicitShallowWater{NF}(;trunc,kwargs...)
 end
 
 """
     initialize_implicit!(dt::Real,M::BarotropicModel)
 
 Update the implicit terms in `M` for the shallow water model as they depend on the time step `dt`."""
-function initialize_implicit!(  model::ShallowWater,    # update Implicit struct in model
-                                ::DiagnosticVariables,
-                                dt::Real)               # time step
+function initialize!(   implicit::ImplicitShallowWater,
+                        dt::Real,                   # time step used [s]
+                        constants::DynamicsConstants)
 
-    (;implicit_α) = model.parameters               # = [0,0.5,1], time step fraction for implicit
-    (;eigenvalues) = model.spectral_transform      # = -l*(l+1), degree l of harmonics
-    (;ξH₀,g∇²,ξg∇²,S⁻¹) = model.implicit           # pull precomputed arrays to be updated
-    (;layer_thickness) = model.constants           # shallow water layer thickness [m]
-    (;gravity) = model.constants                   # gravitational acceleration [m/s²]                  
+    (;α,ξH₀,g∇²,ξg∇²,S⁻¹) = implicit                # precomputed arrays to be updated
+    (;gravity,layer_thickness) = constants          # shallow water layer thickness [m]
+                                                    # gravitational acceleration [m/s²]                  
 
     # implicit time step between i-1 and i+1
     # α = 0   means the gravity wave terms are evaluated at i-1 (forward)
@@ -49,14 +52,15 @@ function initialize_implicit!(  model::ShallowWater,    # update Implicit struct
     # α = 0.5 slows gravity waves and prevents them from amplifying
     # α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
 
-    ξ = implicit_α*dt               # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
-    ξH₀[1] = ξ*layer_thickness      # update ξ*H₀ with new ξ, in vec for mutability
+    ξ = α*dt                    # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
+    ξH₀[] = ξ*layer_thickness   # update ξ*H₀ with new ξ, in RefValue for mutability
 
     # loop over degree l of the harmonics (implicit terms are independent of order m)
-    @inbounds for l in eachindex(g∇²,ξg∇²,S⁻¹,eigenvalues)
-        g∇²[l] = gravity*eigenvalues[l]     # doesn't actually change with dt
+    @inbounds for l in eachindex(g∇²,ξg∇²,S⁻¹)
+        eigenvalue = -l*(l-1)               # =∇², with without 1/radius², 1-based -l*l(l+1) → -l*(l-1)
+        g∇²[l] = gravity*eigenvalue         # doesn't actually change with dt
         ξg∇²[l] = ξ*g∇²[l]                  # update ξg∇² with new ξ
-        S⁻¹[l] = inv(1 - ξH₀[1]*ξg∇²[l])   # update 1/(1-ξ²gH₀∇²) with new ξ
+        S⁻¹[l] = inv(1 - ξH₀[1]*ξg∇²[l])    # update 1/(1-ξ²gH₀∇²) with new ξ
     end
 end
 
@@ -74,7 +78,8 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
                                 progn::PrognosticLayerTimesteps{NF},
                                 diagn_surface::SurfaceVariables{NF},
                                 progn_surface::PrognosticSurfaceTimesteps{NF},
-                                model::ShallowWater) where NF
+                                implicit::ImplicitShallowWater,
+                                constants::DynamicsConstants) where NF
 
     (;div_tend) = diagn.tendencies          # divergence tendency
     div_old = progn.timesteps[1].div        # divergence at t
@@ -83,16 +88,11 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
     pres_new = progn_surface.timesteps[2].pres  # pressure/η at t+dt
     (;pres_tend) = diagn_surface            # tendency of pressure/η
 
-    (;g∇²,ξg∇²,S⁻¹) = model.implicit
-    ξH₀ = model.implicit.ξH₀[1]                 # unpack as it's stored in a vec for mutation
-    H₀ = model.constants.layer_thickness
+    (;g∇²,ξg∇²,S⁻¹) = implicit
+    ξH₀ = implicit.ξH₀[]            # unpack as it's stored in a RefValue for mutation
+    H₀ = constants.layer_thickness
 
-    @boundscheck size(div_old) == size(div_new) || throw(BoundsError)
-    @boundscheck size(pres_old) == size(pres_new) || throw(BoundsError)
-    @boundscheck size(div_tend) == size(pres_new) || throw(BoundsError)
-    @boundscheck size(pres_tend) == size(div_new) || throw(BoundsError)
     lmax,mmax = size(div_tend) .- (2,1)
-
     @boundscheck length(S⁻¹) == lmax+2 || throw(BoundsError)
     @boundscheck length(ξg∇²) == lmax+2 || throw(BoundsError)
     @boundscheck length(g∇²) == lmax+2 || throw(BoundsError)
@@ -119,42 +119,58 @@ end
 
 # PRIMITIVE EQUATION MODEL
 """
-    I = Implicit(P::Parameters{<:PrimitiveEquation})
+    I = ImplicitPrimitiveEq(ξ::Vector,
+                            R::Matrix,
+                            U::Vector,
+                            L::Matrix,
+                            W::Vector,
+                            S⁻¹::Matrix)
 
-Zero generator function for an `ImplicitPrimitiveEq` struct, which holds precomputed arrays for
-the implicit correction in the primitive equation model. Actual precomputation happens in initialize_implicit!."""
-function Implicit(P::Parameters{<:PrimitiveEquation})    # primitive equation only
+Struct that holds various precomputed arrays for the semi-implicit correction to
+prevent gravity waves from amplifying in the primitive equation model."""
+Base.@kwdef struct ImplicitPrimitiveEq{NF<:AbstractFloat} <: AbstractImplicit{NF}
     
-    (;NF,trunc,nlev) = P
+    # DIMENSIONS
+    trunc::Int
+    nlev::Int
 
-    # initialize with zeros only, actual initialization depends on time step, done in initialize_implicit!
-    ξ = Ref{NF}(0)              # time step 2α*Δt packed in RefValue for mutability
-    R = zeros(NF,nlev,nlev)     # divergence: operator for the geopotential calculation
-    U = zeros(NF,nlev)          # divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence
-    L = zeros(NF,nlev,nlev)     # temperature: operator for the TₖD + κTₖDlnps/Dt term
-    W = zeros(NF,nlev)          # pressure: vertical averaging of the -D̄ term in the log surface pres equation
+    # PARAMETERS
+    "coefficient for semi-implicit computations to filter gravity waves"
+    α::Float64 = 1
+
+    # PRECOMPUTED ARRAYS, to be initiliased with initialize!
+    ξ::Base.RefValue{NF} = Ref{NF}(0)       # time step 2α*Δt packed in RefValue for mutability
+    R::Matrix{NF} = zeros(NF,nlev,nlev)     # divergence: operator for the geopotential calculation
+    U::Vector{NF} = zeros(NF,nlev)          # divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence
+    L::Matrix{NF} = zeros(NF,nlev,nlev)     # temperature: operator for the TₖD + κTₖDlnps/Dt term
+    W::Vector{NF} = zeros(NF,nlev)          # pressure: vertical averaging of the -D̄ term in the log surface pres equation
     
-    L0 = zeros(NF,nlev)         # components to construct L, 1/ 2Δσ
-    L1 = zeros(NF,nlev,nlev)    # vert advection term in the temperature equation (below+above)
-    L2 = zeros(NF,nlev)         # factor in front of the div_sum_above term
-    L3 = zeros(NF,nlev,nlev)    # _sum_above operator itself
-    L4 = zeros(NF,nlev)         # factor in front of div term in Dlnps/Dt
+    L0::Vector{NF} = zeros(NF,nlev)         # components to construct L, 1/ 2Δσ
+    L1::Matrix{NF} = zeros(NF,nlev,nlev)    # vert advection term in the temperature equation (below+above)
+    L2::Vector{NF} = zeros(NF,nlev)         # factor in front of the div_sum_above term
+    L3::Matrix{NF} = zeros(NF,nlev,nlev)    # _sum_above operator itself
+    L4::Vector{NF} = zeros(NF,nlev)         # factor in front of div term in Dlnps/Dt
 
-    S = zeros(NF,nlev,nlev)     # for every l the matrix to be inverted 
-    S⁻¹ = zeros(NF,trunc+1,nlev,nlev)   # combined inverted operator: S = 1 - ξ²(RL + UW)
-    return ImplicitPrimitiveEq(ξ,R,U,L,W,L0,L1,L2,L3,L4,S,S⁻¹)
+    S::Matrix{NF} = zeros(NF,nlev,nlev)     # for every l the matrix to be inverted 
+    S⁻¹::Array{NF,3} = zeros(NF,trunc+1,nlev,nlev)   # combined inverted operator: S = 1 - ξ²(RL + UW)
 end
 
-function initialize_implicit!(  model::PrimitiveEquation,
-                                diagn::DiagnosticVariables,
-                                dt::Real)                   # the scaled time step radius*dt
+# Generator using the resolution from SpectralGrid
+function ImplicitShallowWater(spectral_grid::SpectralGrid,kwargs...) 
+    (;trunc,nlev) = spectral_grid
+    return ImplicitShallowWater{NF}(;trunc,nlev,kwargs...)
+end
 
-    (;S,S⁻¹,L,R,U,W,L0,L1,L2,L3,L4)= model.implicit
-    (;nlev, σ_levels_full, σ_levels_thick) = model.geometry
-    (;Δp_geopot_half, Δp_geopot_full, σ_lnp_A, σ_lnp_B) = model.geometry
-    (;R_dry, κ) = model.constants
-    (;eigenvalues, lmax) = model.spectral_transform
-    α = model.parameters.implicit_α
+function initialize!(   implicit::ImplicitPrimitiveEq,
+                        dt::Real,                   # the scaled time step radius*dt
+                        diagn::DiagnosticVariables,
+                        geometry::Geometry,
+                        constants::DynamicsConstants)
+
+    (;α,S,S⁻¹,L,R,U,W,L0,L1,L2,L3,L4) = implicit
+    (;nlev, σ_levels_full, σ_levels_thick) = geometry
+    (;Δp_geopot_half, Δp_geopot_full, σ_lnp_A, σ_lnp_B) = geometry
+    (;R_dry, κ) = constants
 
     # use an occasionally updated vertical temperature profile
     (;temp_profile) = diagn
@@ -175,8 +191,8 @@ function initialize_implicit!(  model::PrimitiveEquation,
     # R, U, L, W are linear operators that are therefore defined here and inverted
     # to obtain δD first, and then δT and δlnps through substitution
 
-    ξ = α*dt                            # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
-    model.implicit.ξ[] = ξ              # also store in Implicit struct
+    ξ = α*dt                        # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
+    implicit.ξ[] = ξ                # also store in Implicit struct
     
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
     @inbounds for k in 1:nlev               # vertical geopotential integration as matrix operator
@@ -222,7 +238,8 @@ function initialize_implicit!(  model::PrimitiveEquation,
     # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
     I = LinearAlgebra.I(nlev)
     @inbounds for l in 1:lmax+1
-        S .= I .- ξ^2*eigenvalues[l]*(R*L .+ U*W')
+        eigenvalue = -l*(l-1)           # 1-based, -l*(l+1) → -l*(l-1)
+        S .= I .- ξ^2*eigenvalue*(R*L .+ U*W')
 
         # inv(S) but saving memory:
         luS = LinearAlgebra.lu!(S)      # in-place LU decomposition (overwriting S)

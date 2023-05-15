@@ -17,11 +17,13 @@ Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Baro
     # PHYSICS 
     planet::Planet = Earth()
     atmosphere::Atmosphere = EarthAthmosphere()
+    forcing::AbstractForcing = NoForcing(spectral_grid)
 
     # NUMERICS
     time_stepping::TimeIntegrator = LeapfrogSemiImplicit()
     spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
     horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
+    implicit::AbstractImplicit{NF} = NoImplicit()
 
     # INTERNALS
     geometry::Geometry{NF} = Geometry(spectral_grid)
