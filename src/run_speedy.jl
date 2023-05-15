@@ -11,6 +11,21 @@ function run_speedy(::Type{NF}=DEFAULT_NF,          # default number format
                     kwargs...                       # all additional non-default parameters
                     ) where {NF<:AbstractFloat,Model<:ModelSetup}
 
+    geospectral_kwargs = pop!(kwargs,(:trunc,:Grid,:dealiasing,:nlev))
+    parameter_kwargs = pop!(kwargs,(:))
+    other_kwargs =
+    
+    geospectral = Geospectral(NF,geospectral_kwargs...)
+    ConcreteModel = default_concrete_model(Model)
+    parameters = Parameters{ConcreteModel}(parameter_kwargs...)
+    model = ConcreteModel(;geospectral,parameters,other_kwargs...)
+
+    prognostic_vars = initial_conditions(M)         # initialize prognostic variables
+    diagnostic_vars = DiagnosticVariables(M)        # preallocate all diagnostic variables with zeros
+
+
+
+
     # INITIALIZE MODEL
     progn_vars,diagn_vars,model_setup = initialize_speedy(NF,Model;kwargs...)
 

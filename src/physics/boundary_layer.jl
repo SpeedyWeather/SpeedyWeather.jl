@@ -9,27 +9,43 @@ function boundary_layer!(   column::ColumnVariables,
 end
 
 """NoBoundaryLayer scheme does not need any initialisation."""
-function initialize_boundary_layer!(K::ParameterizationConstants,
-                                    scheme::NoBoundaryLayer,
-                                    P::Parameters,
-                                    G::Geometry)
+function initialize!(   scheme::NoBoundaryLayer,
+                        model::PrimitiveEquation)
     return nothing
 end 
 
 """Following Held and Suarez, 1996 BAMS"""
 Base.@kwdef struct LinearDrag{NF<:Real} <: BoundaryLayer{NF}
-    σb::NF = 0.7            # sigma coordinate below which linear drag is applied
-    drag_time::NF = 24.0    # [hours] time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
+    # PARAMETERS
+    σb::Float64 = 0.7           # sigma coordinate below which linear drag is applied
+    time_scale::Float64 = 24    # [hours] time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
+
+    # PRECOMPUTED CONSTANTS
+    nlev::Int = 0
+    drag_coefs::Vector{NF} = zeros(NF,nlev)
 end
 
-# generator so that LinearDrag(drag_time=1::Int) is still possible → Float64
-LinearDrag(;kwargs...) = LinearDrag{Float64}(;kwargs...)
+LinearDrag(geospectral::Geospectral{NF},kwargs...) where NF = LinearDrag{NF}(nlev=geospectral.nlev;kwargs...)
 
+function initialize!(   scheme::LinearDrag,
+                        model::PrimitiveEquation)
+
+    (;σ_levels_full,radius) = model.geometry
+    (;σb,time_scale,drag_coefs) = scheme
+
+    kf = radius/(time_scale*3600)               # scale with radius as ∂ₜu is; hrs -> sec
+
+    for (k,σ) in enumerate(σ_levels_full)
+        drag_coefs[k] = kf*max(0,(σ-σb)/(1-σb)) # drag only below σb, lin increasing to kf at σ=1
+    end
+end 
+        
 function boundary_layer!(   column::ColumnVariables,
                             scheme::LinearDrag,
                             model::PrimitiveEquation)
+
     (;u,v,u_tend,v_tend) = column
-    (;drag_coefs) = model.parameterization_constants
+    (;drag_coefs) = scheme
 
     @inbounds for k in eachlayer(column)
         kᵥ = drag_coefs[k]
@@ -39,20 +55,3 @@ function boundary_layer!(   column::ColumnVariables,
         end
     end
 end
-
-function initialize_boundary_layer!(K::ParameterizationConstants,
-                                    scheme::LinearDrag,
-                                    P::Parameters,
-                                    G::Geometry)
-
-    (;σ_levels_full,radius) = G
-    (;σb,drag_time) = scheme
-    (;drag_coefs) = K
-
-    kf = radius/(drag_time*3600)          # scale with radius as ∂ₜu is; hrs -> sec
-
-    for (k,σ) in enumerate(σ_levels_full)
-        drag_coefs[k] = kf*max(0,(σ-σb)/(1-σb)) # drag only below σb, lin increasing to kf at σ=1
-    end
-end 
-        

@@ -347,23 +347,6 @@ end
 
 Parameters(;kwargs...) = Parameters{default_concrete_model(DEFAULT_MODEL)}(;kwargs...)
 
-"""
-    nlev = nlev_default(Model::Type{<:ModelSetup}, σ_levels_half::AbstractVector)
-
-Number of vertical levels chosen either automatically based on `Model`,
-or from the length of `σ_levels_half` if not a 0-length vector
-(default if not specified parameter).
-"""
-function nlev_default(Model::Type{<:ModelSetup}, σ_levels_half::AbstractVector)
-    if length(σ_levels_half) == 0   # choose nlev automatically 
-        Model <: Barotropic && return 1
-        Model <: ShallowWater && return 1
-        Model <: PrimitiveEquation && return 8
-    else                            # use manually set levels 
-        return length(σ_levels_half) - 1
-    end
-end
-
 # default variables to output by model
 output_vars_default(::Type{<:Barotropic}) = [:vor,:u]
 output_vars_default(::Type{<:ShallowWater}) = [:vor,:u]

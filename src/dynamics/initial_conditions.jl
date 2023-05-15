@@ -19,26 +19,28 @@ function allocate_prognostic_variables(model::ModelSetup)
     return zeros(PrognosticVariables{NF},model,lmax,mmax,nlev)
 end
 
-struct StartFromRest <: InitialConditions end
-
-function initial_conditions!(   ::StartFromRest,
-                                progn::PrognosticVariables,
-                                model::ModelSetup)
-    return nothing
+Base.@kwdef struct StartFromRest <: InitialConditions 
+    pressure_on_orography::Bool = false
 end
 
-function initial_conditions!(   ::StartFromRest,
-                                progn::PrognosticVariables,
+function initial_conditions!(   progn::PrognosticVariables,
+                                initial_conditions::StartFromRest,
+                                model::ModelSetup)
+    return nothing          # everything remains zero 
+end
+
+function initial_conditions!(   progn::PrognosticVariables,
+                                initial_conditions::StartFromRest,
                                 model::PrimitiveEquation)
     homogeneous_temperature!(progn,model)
-    model.parameters.pressure_on_orography && pressure_on_orography!(progn,model)
+    initial_conditions.pressure_on_orography && pressure_on_orography!(progn,model)
     # TODO initialise humidity
 end
 
 struct StartWithVorticity <: InitialConditions end
 
-function initial_conditions!(   ::StartWithVorticity,
-                                progn::PrognosticVariables,
+function initial_conditions!(   progn::PrognosticVariables,
+                                initial_conditions::StartWithVorticity,
                                 model::ModelSetup)
 
     (;radius) = model.geometry
@@ -71,26 +73,26 @@ Create a struct that contains all parameters for the Galewsky et al, 2004 zonal 
 intitial conditions for the shallow water model. Default values as in Galewsky."""
 Base.@kwdef struct ZonalJet <: InitialConditions
     # jet
-    latitude = 45               # degrees north [˚N]
-    width = (1/4-1/7)*180       # ≈ 19.29˚ as in Galewsky et al, 2004 
-    umax = 80                   # [m/s]
+    latitude::Float64 = 45                  # degrees north [˚N]
+    width::Float64 = (1/4-1/7)*180          # ≈ 19.29˚ as in Galewsky et al, 2004 
+    umax::Float64 = 80                      # [m/s]
     
     # perturbation
-    perturb_lat = latitude          # [˚N], position in jet by default
-    perturb_lon = 270               # [˚E]
-    perturb_xwidth = 1/3*360/2π     # ≈ 19.1˚E zonal extent [˚E]
-    perturb_ywidth = 1/15*360/2π    # ≈ 3.8˚N meridional extent [˚N]
-    perturb_height = 120            # amplitude [m]
+    perturb_lat::Float64 = latitude         # [˚N], position in jet by default
+    perturb_lon::Float64 = 270              # [˚E]
+    perturb_xwidth::Float64 = 1/3*360/2π    # ≈ 19.1˚E zonal extent [˚E]
+    perturb_ywidth::Float64 = 1/15*360/2π   # ≈ 3.8˚N meridional extent [˚N]
+    perturb_height::Float64 = 120           # amplitude [m]
 end
 
 """Initial conditions from Galewsky, 2004, Tellus"""
-function initial_conditions!(   coefs::ZonalJet,
-                                progn::PrognosticVariables,
+function initial_conditions!(   progn::PrognosticVariables,
+                                initial_conditions::ZonalJet,
                                 model::ShallowWater)
 
-    (;latitude, width, umax) = coefs               # for jet
-    (;perturb_lat, perturb_lon, perturb_xwidth,   # for perturbation
-        perturb_ywidth, perturb_height) = coefs
+    (;latitude, width, umax) = initial_conditions               # for jet
+    (;perturb_lat, perturb_lon, perturb_xwidth,                 # for perturbation
+        perturb_ywidth, perturb_height) = initial_conditions
 
     θ₀ = (latitude-width)/360*2π    # southern boundary of jet [radians]
     θ₁ = (latitude+width)/360*2π    # northern boundary of jet
@@ -169,28 +171,28 @@ intitial conditions for the primitive equation model. Default values as in Jablo
 Base.@kwdef struct ZonalWind <: InitialConditions
     
     # vertical
-    η₀ = 0.252                  # conversion from σ to Jablonowski's ηᵥ-coordinates
-    u₀ = 35                     # max amplitude of zonal wind [m/s]
+    η₀::Float64 = 0.252             # conversion from σ to Jablonowski's ηᵥ-coordinates
+    u₀::Float64 = 35                # max amplitude of zonal wind [m/s]
     
     # perturbation
-    perturb_lat = 40            # Gaussian profile perturbation centred at [˚N]
-    perturb_lon = 20            # and [˚E]
-    perturb_uₚ = 1              # strength of perturbation [m/s]
-    perturb_radius = 1/10       # radius of Gaussian perturbation in units of Earth's radius [1]
+    perturb_lat::Float64 = 40       # Gaussian profile perturbation centred at [˚N]
+    perturb_lon::Float64 = 20       # and [˚E]
+    perturb_uₚ::Float64 = 1         # strength of perturbation [m/s]
+    perturb_radius::Float64 = 1/10  # radius of Gaussian perturbation in units of Earth's radius [1]
 
     # temperature
-    ΔT = 0                      # temperature difference used for stratospheric lapse rate [K]
-                                # Jablonowski uses ΔT = 4.8e5 [K]
-    Tmin = 200                  # minimum temperature [K] of profile
+    ΔT::Float64 = 0                 # temperature difference used for stratospheric lapse rate [K]
+                                    # Jablonowski uses ΔT = 4.8e5 [K]
+    Tmin::Float64 = 200             # minimum temperature [K] of profile
 end
 
 """Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
-function initial_conditions!(   coefs::ZonalWind,
-                                progn::PrognosticVariables{NF},
+function initial_conditions!(   progn::PrognosticVariables{NF},
+                                initial_conditions::ZonalWind,
                                 model::PrimitiveEquation) where NF
 
-    (;u₀, η₀, ΔT, Tmin) = coefs
-    (;perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = coefs
+    (;u₀, η₀, ΔT, Tmin) = initial_conditions
+    (;perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = initial_conditions
     (;temp_ref, R_dry, lapse_rate, pres_ref) = model.parameters
     (;radius, rotation, gravity) = model.parameters.planet
     (;σ_tropopause, pressure_on_orography) = model.parameters
@@ -294,15 +296,21 @@ function initial_conditions!(   coefs::ZonalWind,
     pressure_on_orography && pressure_on_orography!(progn,model)
 end
 
-struct StartFromFile <: InitialConditions end
+Base.@kwdef struct StartFromFile <: InitialConditions
+    "path for restart file"
+    path::String = output_path
 
-function initial_conditions!(   ::StartFromFile,
-                                progn_new::PrognosticVariables,
+    "`run_id` of restart file in `run-????/restart.jld2`"
+    id::Union{String,Int} = 1
+end
+
+function initial_conditions!(   progn_new::PrognosticVariables,
+                                initial_conditions::StartFromFile,
                                 model::ModelSetup)
 
-    (; restart_path, restart_id ) = model.parameters
+    (; path, id ) = initial_conditions
 
-    restart_file = jldopen(joinpath(restart_path,string("run-",run_id_string(restart_id)),"restart.jld2"))
+    restart_file = jldopen(joinpath(path,string("run-",run_id_string(id)),"restart.jld2"))
     progn_old = restart_file["prognostic_variables"]
     version = restart_file["version"]   # currently unused, TODO check for compat with version
     time = restart_file["time"]         # currently unused

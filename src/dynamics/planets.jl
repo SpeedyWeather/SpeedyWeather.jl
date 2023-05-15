@@ -1,4 +1,4 @@
-Base.@kwdef struct Earth <: Planet
+Base.@kwdef struct Earth <: AbstractPlanet
     radius::Float64 = 6.371e6               # radius of Earth [m]
     rotation::Float64 = 7.29e-5             # angular frequency of Earth's rotation [rad/s]
     gravity::Float64 = 9.81                 # gravitational acceleration [m/s^2]

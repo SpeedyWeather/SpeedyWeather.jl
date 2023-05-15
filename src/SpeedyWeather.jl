@@ -94,7 +94,6 @@ export  spectral,
         spectral_truncation
         
 include("utility_functions.jl")
-include("abstract_types.jl")
 
 # LowerTriangularMatrices for spherical harmonics
 export LowerTriangularMatrices
@@ -112,7 +111,11 @@ include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
     
 include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
-include("default_parameters.jl")        # defines Parameters
+
+include("abstract_types.jl")
+include("dynamics/vertical_coordinates.jl")
+include("dynamics/spectral_grid.jl")
+include("dynamics/models.jl")
 
 # SOME DEFINITIONS FIRST
 include("dynamics/constants.jl")                # defines DynamicsConstants
@@ -121,7 +124,7 @@ include("physics/define_column.jl")             # define ColumnVariables
 
 # DYNAMICS
 include("dynamics/geometry.jl")                 # defines Geometry
-include("dynamics/boundaries.jl")               # defines Boundaries
+include("dynamics/orography.jl")                # defines Orography
 include("dynamics/define_diffusion.jl")         # defines HorizontalDiffusion
 include("dynamics/define_implicit.jl")          # defines ImplicitShallowWater, ImplicitPrimitiveEq     # defines GenLogisticCoefs
 include("dynamics/planets.jl")                  # defines Earth

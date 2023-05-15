@@ -1,5 +1,5 @@
 """
-    M = BarotropicModel(::Parameters,
+    model = BarotropicModel(::Parameters,
                         ::DynamicsConstants,
                         ::Geometry,
                         ::SpectralTransform,
@@ -9,13 +9,16 @@ The BarotropicModel struct holds all other structs that contain precalculated co
 whether scalars or arrays that do not change throughout model integration. In contrast to
 `ShallowWaterModel` or `PrimitiveEquation` it does not contain a `Boundaries` struct
 as not needed."""
-struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
-    parameters::Parameters
-    constants::DynamicsConstants{NF}
-    geometry::Geometry{NF}
-    spectral_transform::SpectralTransform{NF}
-    horizontal_diffusion::HorizontalDiffusion{NF}
-    device_setup::DeviceSetup{D}
+Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
+    spectral_grid::SpectralGrid = SpectralGrid()
+    planet::Planet = Earth()
+    atmosphere::Atmosphere = EarthAthmosphere()
+    time_stepping::TimeIntegrator = LeapfrogSemiImplicit()
+    geometry::Geometry{NF} = Geometry(spectral_grid)
+    spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
+    constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,time_stepping,geometry)
+    horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
+    device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 end
 
 has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)

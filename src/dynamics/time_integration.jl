@@ -1,3 +1,30 @@
+Base.@kwdef struct LeapfrogSemiImplicit <: TimeIntegrator
+
+    "time at which the integration starts"
+    startdate::DateTime = DateTime(2000,1,1)
+    
+    "number of days to integrate for"
+    n_days::Float64 = 10
+    
+    "time step in minutes for T31, scale linearly to `trunc`"
+    Δt_at_T31::Float64 = 30
+
+
+    # NUMERICS
+
+    "Robert (1966) time filter coefficeint to suppress comput. mode"
+    robert_filter::Float64 = 0.05
+
+    "William's time filter (Amezcua 2011) coefficient for 3rd order acc"
+    william_filter::Float64 = 0.53
+
+    "coefficient for semi-implicit computations to filter gravity waves"
+    implicit_α::Float64 = 1
+
+    "recalculate implicit operators on temperature profile every n time steps"
+    recalculate_implicit::Int = 100
+end
+
 """
     leapfrog!(  A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic variable at t
                 A_new::LowerTriangularMatrix{Complex{NF}},      # prognostic variable at t+dt
@@ -15,13 +42,14 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
                     tendency::LowerTriangularMatrix{Complex{NF}},   # tendency (dynamics+physics) of A
                     dt::Real,                                       # time step (=2Δt, but for init steps =Δt,Δt/2)
                     lf::Int,                                        # leapfrog index to dis/enable William's filter
-                    C::DynamicsConstants{NF},                       # struct with constants used at runtime
+                    L::LeapfrogSemiImplicit{NF},                    # struct with constants
                     ) where {NF<:AbstractFloat}                     # number format NF
 
     @boundscheck lf == 1 || lf == 2 || throw(BoundsError())         # index lf picks leapfrog dim
     
-    A_lf = lf == 1 ? A_old : A_new                      # view on either t or t+dt to dis/enable William's filter
-    (; robert_filter, williams_filter ) = C          # coefficients for the Robert and William's filter
+    A_lf = lf == 1 ? A_old : A_new                      # view on either t or t+dt to dis/enable William's filter        
+    robert_filter = convert(NF,L.robert_filter)         # coefficients for the Robert and William's filter
+    william_filter = convert(NF,L.william_filter)
     two = convert(NF,2)                                 # 2 in number format NF
     dt_NF = convert(NF,dt)                              # time step dt in number format NF
 
@@ -30,8 +58,8 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
     # see William (2009), Eq. 7-9
     # for lf == 1 (initial time step) no filter applied (w1=w2=0)
     # for lf == 2 (later steps) Robert+William's filter is applied
-    w1 = lf == 1 ? zero(NF) : robert_filter*williams_filter/two         # = ν*α/2 in William (2009, Eq. 8)
-    w2 = lf == 1 ? zero(NF) : robert_filter*(1-williams_filter)/two     # = ν(1-α)/2 in William (2009, Eq. 9)
+    w1 = lf == 1 ? zero(NF) : robert_filter*william_filter/two         # = ν*α/2 in William (2009, Eq. 8)
+    w2 = lf == 1 ? zero(NF) : robert_filter*(1-william_filter)/two     # = ν(1-α)/2 in William (2009, Eq. 9)
 
     @inbounds for lm in eachharmonic(A_old,A_new,A_lf,tendency)
         a_old = A_old[lm]                       # double filtered value from previous time step (t-Δt)
@@ -58,7 +86,7 @@ function leapfrog!( progn::PrognosticLayerTimesteps,
         var_old = getproperty(progn.timesteps[1],var)
         var_new = getproperty(progn.timesteps[2],var)
         var_tend = getproperty(diagn.tendencies,Symbol(var,:_tend))
-        leapfrog!(var_old,var_new,var_tend,dt,lf,model.constants)
+        leapfrog!(var_old,var_new,var_tend,dt,lf,model.time_stepping)
     end
 end
 
@@ -153,7 +181,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     time::DateTime,                 # time at timestep
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
                     i::Integer,                     # time step index
-                    M::ShallowWaterModel,           # everything that's constant at runtime
+                    model::ShallowWaterModel,       # everything that's constant at runtime
                     lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
@@ -166,20 +194,20 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     (;pres) = progn.surface.timesteps[lf2]
     
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
-    dynamics_tendencies!(diagn_layer,diagn_surface,pres,time,M)
-    implicit_correction!(diagn_layer,progn_layer,diagn_surface,progn_surface,M)
+    dynamics_tendencies!(diagn_layer,diagn_surface,pres,time,model)
+    implicit_correction!(diagn_layer,progn_layer,diagn_surface,progn_surface,model)
     
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
-    horizontal_diffusion!(progn_layer,diagn_layer,M)    # diffusion for vorticity and divergence
-    leapfrog!(progn_layer,diagn_layer,dt,lf1,M)         # leapfrog vorticity forward
-    gridded!(diagn_layer,progn_layer,lf2,M)             # propagate spectral state to grid
+    horizontal_diffusion!(progn_layer,diagn_layer,model)    # diffusion for vorticity and divergence
+    leapfrog!(progn_layer,diagn_layer,dt,lf1,model)         # leapfrog vorticity forward
+    gridded!(diagn_layer,progn_layer,lf2,model)             # propagate spectral state to grid
 
     # SURFACE LAYER (pressure), no diffusion though
     (;pres_grid,pres_tend) = diagn.surface
     pres_old = progn.surface.timesteps[1].pres
     pres_new = progn.surface.timesteps[2].pres
-    leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,M.constants)
-    gridded!(pres_grid,pres,M.spectral_transform)
+    leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,model.time_stepping)
+    gridded!(pres_grid,pres,model.spectral_transform)
 end
 
 """
@@ -187,7 +215,7 @@ end
                 diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
                 time::DateTime,                 # time at timestep
                 dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
-                M::PrimitiveEquation,      # everything that's constant at runtime
+                M::PrimitiveEquation,           # everything that's constant at runtime
                 lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                 lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                 ) where {NF<:AbstractFloat}
@@ -229,7 +257,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
             pres_old = progn.surface.timesteps[1].pres
             pres_new = progn.surface.timesteps[2].pres
             pres_lf = progn.surface.timesteps[lf2].pres
-            leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,model.constants)
+            leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,model.time_stepping)
             gridded!(pres_grid,pres_lf,model.spectral_transform)
         end
     end
