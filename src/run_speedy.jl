@@ -4,33 +4,38 @@
     progn_vars = run_speedy(Model;kwargs...)
 
 Runs SpeedyWeather.jl with number format `NF` and the model `Model` and any additional parameters
-in the keyword arguments `kwargs...`. Any unspecified parameters will use the default values as
-defined in `src/default_parameters.jl`."""
-function run_speedy(::Type{NF}=DEFAULT_NF,          # default number format
-                    ::Type{Model}=DEFAULT_MODEL;    # default model
-                    kwargs...                       # all additional non-default parameters
+in the keyword arguments `kwargs...`. Unspecified parameters use the default values."""
+function run_speedy(::Type{NF}=Float32,                 # default number format
+                    ::Type{Model}=PrimitiveDryCore;     # default model
+                    spectral_grid::NamedTuple = NamedTuple(),   # some keyword arguments to be
+                    planet::NamedTuple = NamedTuple(),          # passed on
+                    atmosphere::NamedTuple = NamedTuple(),
+                    time_stepping::NamedTuple = NamedTuple(),
+                    feedback::NamedTuple = NamedTuple(),
+                    output::NamedTuple = NamedTuple(),
+                    kwargs...
                     ) where {NF<:AbstractFloat,Model<:ModelSetup}
 
-    geospectral_kwargs = pop!(kwargs,(:trunc,:Grid,:dealiasing,:nlev))
-    parameter_kwargs = pop!(kwargs,(:))
-    other_kwargs =
-    
-    geospectral = Geospectral(NF,geospectral_kwargs...)
+    # pass on some keyword arguments to the default structs for convenience
+    spectral_grid = SpectralGrid(NF,spectral_grid...)
+    planet = Earth(planet...)
+    atmosphere = EarthAtmosphere(atmosphere...)
+    time_stepping = LeapfrogSemiImplicit(time_stepping...)
+    feedback = Feedback(feedback...)
+    output = Output(spectral_grid,output...)
+
+    # create model with mostly defaults and initalize
     ConcreteModel = default_concrete_model(Model)
-    parameters = Parameters{ConcreteModel}(parameter_kwargs...)
-    model = ConcreteModel(;geospectral,parameters,other_kwargs...)
+    model = ConcreteModel(;spectral_grid,planet,atmosphere,time_stepping,
+                            feedback,output,kwargs...)
+    initialize!(model)
 
-    prognostic_vars = initial_conditions(M)         # initialize prognostic variables
-    diagnostic_vars = DiagnosticVariables(M)        # preallocate all diagnostic variables with zeros
+    # allocate prognostic and diagnostic variables
+    progn_vars = initial_conditions(model)
+    diagn_vars = DiagnosticVariables(model)
 
-
-
-
-    # INITIALIZE MODEL
-    progn_vars,diagn_vars,model_setup = initialize_speedy(NF,Model;kwargs...)
-
-    # START MODEL INTEGRATION
-    time_stepping!(progn_vars,diagn_vars,model_setup)
+    # start model integration
+    time_stepping!(progn_vars,diagn_vars,model)
     return progn_vars                              # return prognostic variables when finished
 end
 
@@ -92,7 +97,7 @@ initialize_speedy(::Type{Model};kwargs...) where {Model<:ModelSetup} = initializ
 """
     progn = run_speedy!(progn::PrognosticVariables,
                         diagn::DiagnosticVariables,
-                        M::ModelSetup)
+                        model::ModelSetup)
 
 Convenience function that can be used in combination with `initialize_speedy(args...;kwargs...)` as
 
@@ -104,8 +109,9 @@ Convenience function that can be used in combination with `initialize_speedy(arg
 to allow for access to the prognostic/diagnostic variables before the time integration is started."""
 function run_speedy!(   progn::PrognosticVariables, # all prognostic variables
                         diagn::DiagnosticVariables, # all pre-allocated diagnostic variables
-                        model::ModelSetup,          # all precalculated structs
-                        )
+                        model::ModelSetup;          # all precalculated structs
+                        initialize::Bool=true)
+    initialize && initalize!(model)
     time_stepping!(progn,diagn,model)
     return progn
 end

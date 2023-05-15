@@ -1,5 +1,4 @@
-struct NoVerticalDiffusion{NF} <: VerticalDiffusion{NF} end
-NoVerticalDiffusion() = NoVerticalDiffusion{DEFAULT_NF}()
+struct NoVerticalDiffusion <: VerticalDiffusion end
 
 function vertical_diffusion!(   column::ColumnVariables,
                                 scheme::NoVerticalDiffusion,

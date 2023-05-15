@@ -1,6 +1,3 @@
-const DEFAULT_NF = Float32              # number format
-const DEFAULT_MODEL = PrimitiveDryCore  # abstract model type
-
 """
     P = Parameters{M<:ModelSetup}(kwargs...) <: AbstractParameters{M}
 
@@ -344,18 +341,3 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "`run_id` of restart file in `run-????/restart.jld2`"
     restart_id::Union{String,Int} = 1
 end
-
-Parameters(;kwargs...) = Parameters{default_concrete_model(DEFAULT_MODEL)}(;kwargs...)
-
-# default variables to output by model
-output_vars_default(::Type{<:Barotropic}) = [:vor,:u]
-output_vars_default(::Type{<:ShallowWater}) = [:vor,:u]
-output_vars_default(::Type{<:PrimitiveDryCore}) = [:vor,:u,:temp,:pres]
-output_vars_default(::Type{<:PrimitiveWetCore}) = [:vor,:u,:temp,:humid,:pres]
-
-default_keepbits() = (u=7,v=7,vor=5,div=5,temp=10,pres=12,humid=7)
-
-# default initial conditions by model
-initial_conditions_default(::Type{<:Barotropic}) = StartWithVorticity()
-initial_conditions_default(::Type{<:ShallowWater}) = ZonalJet()
-initial_conditions_default(::Type{<:PrimitiveEquation}) = ZonalWind()

@@ -2,9 +2,14 @@ Base.@kwdef struct SpectralGrid
     NF::Type{<:AbstractFloat} = Float32
     
     # HORIZONTAL
-    trunc::Int = 31
-    Grid::Type{<:AbstractGrid} = OctahedralGaussianGrid
-    dealiasing::Float64 = 2
+    trunc::Int = 31             # max degree of spherical harmonics
+    Grid::Type{<:AbstractGrid} = OctahedralGaussianGrid # horizontal grid
+    dealiasing::Float64 = 2     # dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid
+
+    # SIZE OF GRID from trunc, Grid, dealiasing:
+    # nlat_half is the number of latitude rings on one hemisphere (Equator incl)
+    nlat_half = SpeedyTransforms.get_nlat_half(trunc,dealiasing)
+    npoints = RingGrids.get_npoints(Grid,nlat_half)           # total number of grid points
 
     # VERTICAL
     nlev::Int = 8

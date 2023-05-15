@@ -29,10 +29,21 @@ Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Baro
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,time_stepping,geometry)
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
+
+    # OUTPUT
+    feedback::Feedback = Feedback()
+    output::Output = Output()
 end
 
 has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
+
+function initialize!(model::BarotropicModel)
+    initialize!(model.forcing)
+    initialize!(model.horizontal_diffusion,model.geometry,model.constants)
+end
+
+
 
 """
     M = ShallowWaterModel(  ::Parameters,

@@ -1,46 +1,82 @@
-Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}} <: AbstractOutput
-    # NF: output only in Float32/64
+# number of mantissa bits to keep by default per variable
+struct Keepbits
+    u::Int = 7
+    v::Int = 7
+    vor::Int = 5
+    div::Int = 5
+    temp::Int = 10
+    pres::Int = 12
+    humid::Int = 7
+end
 
+Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}} <: AbstractOutput
+
+    # FILE OPTIONS
     output::Bool = false                    # output to netCDF?
-    output_vars::Vector{Symbol}=[:none]     # vector of output variables as Symbols
-    write_restart::Bool = false             # also write restart file if output==true?
-    
+    path::String = pwd()                    # path to output folder
+    filename::String = "output.nc"          # name of the output netcdf file
+    id::Union{String,Int} = get_run_id(output, path)    # run identification number/string
+    write_restart::Bool = output            # also write restart file if output==true?
+    version::VersionNumber = pkgversion(SpeedyWeather)
+
+    # WHAT/WHEN OPTIONS
     startdate::DateTime = DateTime(2000,1,1)
+    dt::Float64 = 6                         # output time step [hours]
+    output_vars::Vector{Symbol}=[:u,:vor]   # vector of output variables as Symbols
+    missing_value::Float64 = NaN            # missing value to be used in netcdf output
+
+    # COMPRESSION OPTIONS
+    compression_level::Int = 3              # compression level; 1=low but fast, 9=high but slow
+    keepbits::Keepbits = Keepbits()         # mantissa bits to keep for every variable
+
+    # TIME STEPS and COUNTERS
     timestep_counter::Int = 0               # time step counter
     output_counter::Int = 0                 # output step counter
     n_timesteps::Int = 0                    # number of time steps
     n_outputsteps::Int = 0                  # number of time steps with output
     output_every_n_steps::Int = 0           # output every n time steps
     
-    run_id::String = "-1"                   # run identification number
-    run_path::String = ""                   # output path plus run????/
-
     # the netcdf file to be written into
     netcdf_file::Union{NcFile,Nothing} = nothing
 
+    # input grid for interpolation
+    input_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(input_Grid,0,0)
+    
     # grid specifications
-    output_matrix::Bool = false             # if true sort grid points into a matrix (interpolation-free)
-                                            # full grid for output if output_matrix == false
     output_Grid::Type{<:AbstractFullGrid} = FullGaussianGrid   
     nlat_half::Int = 0                      # size of the input/output grid
     nlon::Int = 0                           # number of longitude/latitude points
     nlat::Int = 0
     
-    # input grid for interpolation
-    input_Grid::Type{<:AbstractGrid} = FullGaussianGrid
-    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(input_Grid,0,0)
-    
+    # Output as matrix (particularly for reduced grids)
+    as_matrix::Bool = false                 # if true sort grid points into a matrix (interpolation-free)
+                                            # full grid for output if output_matrix == false
+    quadrant_rotation::NTuple{4,Int} = (0,1,2,3)    # rotation of output quadrant
+                                                    # matrix of output quadrant
+    matrix_quadrant::NTuple{4,Tuple{Int,Int}} = ((2,2),(1,2),(1,1),(2,1))
+
     # fields to output (only one layer, reuse over layers)
-    u::Matrix{NF} = zeros(0,0)              # zonal velocity
-    v::Matrix{NF} = zeros(0,0)              # meridional velocity
-    vor::Matrix{NF} = zeros(0,0)            # relative vorticity
-    div::Matrix{NF} = zeros(0,0)            # divergence
-    pres::Matrix{NF} = zeros(0,0)           # pressure
-    temp::Matrix{NF} = zeros(0,0)           # temperature
-    humid::Matrix{NF} = zeros(0,0)          # humidity
+    u::Matrix{NF} = zeros(NF,0,0)           # zonal velocity
+    v::Matrix{NF} = zeros(NF,0,0)           # meridional velocity
+    vor::Matrix{NF} = zeros(NF,0,0)         # relative vorticity
+    div::Matrix{NF} = zeros(NF,0,0)         # divergence
+    pres::Matrix{NF} = zeros(NF,0,0)        # pressure
+    temp::Matrix{NF} = zeros(NF,0,0)        # temperature
+    humid::Matrix{NF} = zeros(NF,0,0)       # humidity
 end
 
-Output() = Output{Float32}()
+Output(;kwargs...) = Output{Float32}(;kwargs...)
+function Output(spectral_grid::SpectralGrid;kwargs...)
+    (;Grid,nlat_half,npoints) = spectral_grid
+    
+
+# default variables to output by model
+output_vars_default(::Type{<:Barotropic}) = [:vor,:u]
+output_vars_default(::Type{<:ShallowWater}) = [:vor,:u]
+output_vars_default(::Type{<:PrimitiveDryCore}) = [:vor,:u,:temp,:pres]
+output_vars_default(::Type{<:PrimitiveWetCore}) = [:vor,:u,:temp,:humid,:pres]
+
 
 """
     run_id = get_run_id(output, output_path)

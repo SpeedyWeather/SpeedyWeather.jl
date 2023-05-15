@@ -1,3 +1,8 @@
+# default initial conditions by model
+initial_conditions_default(::Type{<:Barotropic}) = StartWithVorticity()
+initial_conditions_default(::Type{<:ShallowWater}) = ZonalJet()
+initial_conditions_default(::Type{<:PrimitiveEquation}) = ZonalWind()
+
 """
     prognostic_variables = initial_conditions(M::ModelSetup)
 
