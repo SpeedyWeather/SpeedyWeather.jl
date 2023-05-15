@@ -11,7 +11,6 @@ abstract type AbstractGeometry{NF} end
 abstract type VerticalCoordinates end
 
 # CONSTANTS (face the dynamical core and not the user)
-abstract type AbstractParameterizationConstants{NF} end
 abstract type AbstractDynamicsConstants{NF} end
 
 # INITIAL CONDITIONS AND OROGRAPHY/BOUNDARIES
@@ -20,6 +19,9 @@ abstract type AbstractOrography end
 
 # ATMOSPHERIC COLUMN FOR PARAMETERIZATIONS
 abstract type AbstractColumnVariables{NF} end
+
+# FORCING (Barotropic and ShallowWaterModel)
+abstract type AbstractForcing{NF} end
 
 # PARAMETERIZATIONS
 abstract type AbstractParameterization{NF} end
