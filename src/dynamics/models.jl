@@ -10,14 +10,22 @@ whether scalars or arrays that do not change throughout model integration. In co
 `ShallowWaterModel` or `PrimitiveEquation` it does not contain a `Boundaries` struct
 as not needed."""
 Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
+    
+    # SpectralGrid object dictates resolution for many other components
     spectral_grid::SpectralGrid = SpectralGrid()
+
+    # PHYSICS 
     planet::Planet = Earth()
     atmosphere::Atmosphere = EarthAthmosphere()
+
+    # NUMERICS
     time_stepping::TimeIntegrator = LeapfrogSemiImplicit()
-    geometry::Geometry{NF} = Geometry(spectral_grid)
     spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
-    constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,time_stepping,geometry)
     horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
+
+    # INTERNALS
+    geometry::Geometry{NF} = Geometry(spectral_grid)
+    constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,time_stepping,geometry)
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 end
 

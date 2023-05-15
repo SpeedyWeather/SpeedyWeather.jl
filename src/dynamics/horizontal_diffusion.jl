@@ -21,7 +21,7 @@ Base.@kwdef struct HyperDiffusion{NF} <: HorizontalDiffusion{NF}
                                         # times max(abs(vor))/vor_max
 
     # constant arrays to be initalised later
-    # (Hyper) diffusion, precalculated for each spherical harm degree
+    # (Hyper) diffusion, precalculated for each spherical harmonics degree
     # and for each layer (to allow for varying orders/strength in the vertical)
     ∇²ⁿ::Vector{Vector{NF}} = [zeros(NF,trunc+2) for _ in 1:nlev]           # explicit part
     ∇²ⁿ_implicit::Vector{Vector{NF}} = [zeros(NF,trunc+2) for _ in 1:nlev]  # implicit part
@@ -33,58 +33,34 @@ function HyperDiffusion(spectral_grid::SpectralGrid,kwargs...)
 end
 
 function initialize!(   scheme::HyperDiffusion,
-                                P::Parameters,
-                                C::DynamicsConstants,
-                                G::Geometry,
-                                S::SpectralTransform{NF}) where NF
-    (;lmax) = S
-    (;radius) = P.planet
-    (;time_scale, resolution_scaling) = scheme
-    (;nlev) = G
-
-    # Reduce diffusion time scale (=increase diffusion) with resolution
-    # times 1/radius because time step Δt is scaled with 1/radius
-    time_scale = 1/radius*3600*scheme.time_scale * (32/(lmax+1))^resolution_scaling
-
-    # PREALLOCATE as vector as only dependend on degree l
-    # Damping coefficients for explicit part of the diffusion (=ν∇²ⁿ)
-    ∇²ⁿ = [zeros(NF,lmax+2) for _ in 1:nlev]                # for temp, vor, div (explicit)
-    ∇²ⁿ_implicit = [zeros(NF,lmax+2) for _ in 1:nlev]       # Implicit part (= 1/(1+2Δtν∇²ⁿ))
-    HD = HorizontalDiffusion{NF}(lmax,time_scale,∇²ⁿ,∇²ⁿ_implicit)  # initialize struct
-
-    # PRECOMPUTE diffusion operators based on non-adaptive diffusion
-    vor_max = 0                                 # not increased diffusion initially
-    adapt_diffusion!(HD,scheme,vor_max,G,C)     # fill diffusion arrays
-    return HD
-end
-
-function adapt_diffusion!(  HD::HorizontalDiffusion,
-                            scheme::HyperDiffusion,
-                            vor_max::Real,
-                            G::Geometry,
-                            C::DynamicsConstants)
-    nlev = length(HD.∇²ⁿ)
-    for k in 1:nlev
-        adapt_diffusion!(HD,scheme,vor_max,k,G,C)
+                        G::Geometry,
+                        C::DynamicsConstants)
+    (;nlev) = scheme
+    for k in 1:nlev 
+        initialize!(scheme,k,G,C)
     end
 end
 
-function adapt_diffusion!(  HD::HorizontalDiffusion,
-                            scheme::HyperDiffusion,
-                            vor_max::Real,
-                            k::Int,
-                            G::Geometry,
-                            C::DynamicsConstants)
+function initialize!(   scheme::HyperDiffusion,
+                        k::Int,
+                        G::Geometry,
+                        C::DynamicsConstants,
+                        vor_max::Real = 0)
 
-    (;lmax,time_scale,∇²ⁿ,∇²ⁿ_implicit) = HD
+    (;trunc,time_scale,resolution_scaling,∇²ⁿ,∇²ⁿ_implicit) = scheme
     (;power, power_stratosphere, tapering_σ) = scheme
-    (;Δt) = C
+    (;Δt, radius) = C
     σ = G.σ_levels_full[k]
+
+    # Reduce diffusion time scale (=increase diffusion) with resolution
+    # times 1/radius because time step Δt is scaled with 1/radius
+    # time scale*3600 for [hrs] → [s]
+    time_scale = 1/radius*(3600*time_scale) * (32/(trunc+1))^resolution_scaling
 
     # ADAPTIVE/FLOW AWARE
     # increase diffusion if maximum vorticity per layer is larger than scheme.vor_max
     if scheme.adaptive
-        # /= as 1/time_scale*∇²ʰ below
+        # /= as 1/time_scale*∇²ⁿ below
         time_scale /= 1 + (scheme.adaptive_strength-1)*max(0,vor_max/scheme.vor_max - 1)
     end
 
@@ -93,7 +69,7 @@ function adapt_diffusion!(  HD::HorizontalDiffusion,
     # normalise by the largest eigenvalue -lmax*(lmax+1) such that the highest wavenumber lmax
     # is dampened to 0 at the given time scale raise to a power of the Laplacian for hyperdiffusion
     # (=more scale-selective for smaller wavenumbers)
-    largest_eigenvalue = -lmax*(lmax+1)
+    largest_eigenvalue = -trunc*(trunc+1)
     
     # VERTICAL TAPERING for the stratosphere
     # go from 1 to 0 between σ=0 and tapering_σ
@@ -109,6 +85,17 @@ function adapt_diffusion!(  HD::HorizontalDiffusion,
         # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
         ∇²ⁿ_implicit[k][l+1] = 1/(1-2Δt*∇²ⁿ[k][l+1])           
     end
+end
+
+function initialize!(   scheme::HyperDiffusion,
+                        diagn::DiagnosticVariablesLayer,
+                        G::Geometry,
+                        C::DynamicsConstants)
+
+    scheme.adaptive || return nothing
+    vor_min, vor_max = extrema(diagn.grid_variables.vor_grid)
+    vor_abs_max = max(abs(vor_min), abs(vor_max))/G.radius
+    initialize!(scheme,diagn.k,G,C,vor_abs_max)
 end
 
 """
@@ -161,13 +148,4 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
         var_tend = getfield(diagn.tendencies,Symbol(varname,:_tend))
         horizontal_diffusion!(var_tend,var,∇²ⁿ,∇²ⁿ_implicit)
     end
-end
-
-function initialize!(   scheme::HyperDiffusion,
-                        diagn::DiagnosticVariablesLayer,
-                        model::ModelSetup)
-    scheme.adaptive || return nothing
-    vor_min, vor_max = extrema(diagn.grid_variables.vor_grid)
-    vor_abs_max = max(abs(vor_min), abs(vor_max))/model.geometry.radius
-    initialize!(scheme,vor_abs_max,diagn.k,model)
 end
