@@ -92,7 +92,7 @@ function spectral_truncation(   ::Type{NF},                     # number format 
     lmax,mmax = size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics
     
     # interpolate to higher resolution if output larger than input
-    (ltrunc > lmax || mtrunc > mmax) && return spectral_interpolation(alms,ltrunc,mtrunc)
+    (ltrunc > lmax || mtrunc > mmax) && return spectral_interpolation(NF,alms,ltrunc,mtrunc)
 
     # preallocate new (smaller) array
     alms_trunc = zeros(LowerTriangularMatrix{NF},ltrunc+1,mtrunc+1)  
@@ -126,7 +126,7 @@ function spectral_interpolation(::Type{NF},                     # number format 
     lmax,mmax = size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics 
     
     # truncate to lower resolution if output smaller than input
-    (ltrunc <= lmax && mtrunc <= mmax) && return spectral_truncation(alms,ltrunc,mtrunc)
+    (ltrunc <= lmax && mtrunc <= mmax) && return spectral_truncation(NF,alms,ltrunc,mtrunc)
 
     # allocate new (larger) array
     alms_trunc = zeros(LowerTriangularMatrix{NF},ltrunc+1,mtrunc+1)  
