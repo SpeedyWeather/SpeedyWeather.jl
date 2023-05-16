@@ -57,7 +57,8 @@ function sigma_okay(nlev::Integer,σ_half::AbstractVector)
     return true
 end
 
-Base.@kwdef struct HybridCoordinates <: VerticalCoordinates
+#TODO
+Base.@kwdef struct SigmaPressureCoordinates <: VerticalCoordinates
     nlev::Int = 8
     A::Vector{Float64} = default_hybrid_coordinates(:A,nlev)
     B::Vector{Float64} = default_hybrid_coordinates(:B,nlev)

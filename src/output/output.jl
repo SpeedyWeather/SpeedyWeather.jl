@@ -29,7 +29,7 @@ Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}} <: AbstractOutput
     compression_level::Int = 3              # compression level; 1=low but fast, 9=high but slow
     keepbits::Keepbits = Keepbits()         # mantissa bits to keep for every variable
 
-    # TIME STEPS and COUNTERS
+    # TIME STEPS and COUNTERS (will be changed in initialize!)
     timestep_counter::Int = 0               # time step counter
     output_counter::Int = 0                 # output step counter
     n_timesteps::Int = 0                    # number of time steps
@@ -67,9 +67,16 @@ Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}} <: AbstractOutput
 end
 
 Output(;kwargs...) = Output{Float32}(;kwargs...)
-function Output(spectral_grid::SpectralGrid;kwargs...)
-    (;Grid,nlat_half,npoints) = spectral_grid
+function Output(spectral_grid::SpectralGrid;
+                Model::Type{<:ModelSetup}=DEFAULT_MODEL,
+                kwargs...)
     
+    (;Grid,nlat_half,npoints) = spectral_grid
+    output_vars = :output_vars in keys(kwargs) ? values(kwargs).output_vars : default_output_var(Model)
+    
+
+    output_every_n_steps = max(1,floor(Int,output_dt/Δt_hrs))   # output every n time steps
+    n_outputsteps = (n_timesteps ÷ output_every_n_steps)+1      # total number of output time steps
 
 # default variables to output by model
 output_vars_default(::Type{<:Barotropic}) = [:vor,:u]

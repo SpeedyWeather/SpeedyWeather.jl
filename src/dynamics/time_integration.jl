@@ -1,5 +1,13 @@
 Base.@kwdef struct LeapfrogSemiImplicit <: TimeIntegrator
 
+    # DIMENSIONS
+    "spectral resolution (max degree of spherical harmonics)"
+    trunc::Int                      
+    
+    "radius of the sphere, used for scaling"
+    radius::Float64
+
+    # OPTIONS
     "time at which the integration starts"
     startdate::DateTime = DateTime(2000,1,1)
     
@@ -11,13 +19,35 @@ Base.@kwdef struct LeapfrogSemiImplicit <: TimeIntegrator
 
 
     # NUMERICS
-
     "Robert (1966) time filter coefficeint to suppress comput. mode"
     robert_filter::Float64 = 0.05
 
     "William's time filter (Amezcua 2011) coefficient for 3rd order acc"
     william_filter::Float64 = 0.53
+
+
+    # DERIVED FROM OPTIONS
+    "time step Δt at specified resolution, [min] → [s], scaled with radius"
+    Δt_unscaled::Float64 = round(60*Δt_at_T31*(32/(trunc+1)))
+
+    "Δt in [s/m], scaled with radius"
+    Δt::Float64 = Δt/radius
+    
+    "time step Δt [s] as integer for rounding error free accumulation"
+    Δt_sec::Int = convert(Int,Δt_unscaled)
+    
+    "convert time step Δt from minutes to hours"
+    Δt_hrs::Floa64 = Δt_unscaled/3600
+
+    "number of time steps to integrate for"
+    n_timesteps::Int = ceil(Int,24*n_days/Δt_hrs)        
 end
+
+function LeapfrogSemiImplicit(spectral_grid::SpectralGrid;kwargs...)
+    (;trunc,radius) = spectral_grid
+    return LeapfrogSemiImplicit(;trunc,radius,kwargs...)
+end
+
 
 """
     leapfrog!(  A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic variable at t
@@ -99,8 +129,7 @@ function first_timesteps!(  progn::PrognosticVariables, # all prognostic variabl
                             time::DateTime,             # time at timestep
                             model::ModelSetup,          # everything that is constant at runtime
                             feedback::AbstractFeedback, # feedback struct
-                            outputter::AbstractOutput
-                            )
+                            outputter::AbstractOutput)
     
     (; n_timesteps, Δt, Δt_sec ) = model.constants
     n_timesteps == 0 && return time     # exit immediately for no time steps
@@ -180,14 +209,16 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
 
-    # IMPLICIT, DIFFUSION, LEAPFROGGING AND PROPAGATE STATE TO GRID
-    progn_layer = progn.layers[1]                       # only calculate tendencies for the first layer
+    progn_layer = progn.layers[1]                   # only calculate tendencies for the first layer
     diagn_layer = diagn.layers[1]
     diagn_surface = diagn.surface
     progn_surface = progn.surface
     (;pres) = progn.surface.timesteps[lf2]
+
+    # zero_tendencies!(diagn)
     
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
+    # forcing!(diagn_layer,diagn_surface,time,model.forcing)
     dynamics_tendencies!(diagn_layer,diagn_surface,pres,time,model)
     implicit_correction!(diagn_layer,progn_layer,diagn_surface,progn_surface,model)
     
@@ -246,7 +277,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
             horizontal_diffusion!(progn_layer,diagn_layer,model)    # implicit diffusion of vor, div, temp
             leapfrog!(progn_layer,diagn_layer,dt,lf1,model)         # time step forward for vor, div, temp
             gridded!(diagn_layer,progn_layer,lf2,model)             # propagate spectral state to grid
-        else                                # surface level
+        else                                                        # surface level
             (;pres_grid,pres_tend) = diagn.surface
             pres_old = progn.surface.timesteps[1].pres
             pres_new = progn.surface.timesteps[2].pres

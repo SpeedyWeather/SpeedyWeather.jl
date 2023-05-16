@@ -15,31 +15,30 @@ Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Baro
     spectral_grid::SpectralGrid = SpectralGrid()
 
     # PHYSICS 
-    planet::Planet = Earth()
+    planet::Planet = Earth(spectral_grid)
     atmosphere::Atmosphere = EarthAthmosphere()
     forcing::AbstractForcing = NoForcing(spectral_grid)
 
     # NUMERICS
-    time_stepping::TimeIntegrator = LeapfrogSemiImplicit()
+    time_stepping::TimeIntegrator = LeapfrogSemiImplicit(spectral_grid)
     spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
     horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
-    implicit::AbstractImplicit{NF} = NoImplicit()
 
     # INTERNALS
     geometry::Geometry{NF} = Geometry(spectral_grid)
-    constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,time_stepping,geometry)
+    constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
     feedback::Feedback = Feedback()
-    output::Output = Output()
+    output::Output = Output(spectral_grid)
 end
 
 has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
 function initialize!(model::BarotropicModel)
-    initialize!(model.forcing)
+    initialize!(model.forcing,model)
     initialize!(model.horizontal_diffusion,model.geometry,model.constants)
 end
 

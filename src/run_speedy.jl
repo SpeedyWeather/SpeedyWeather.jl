@@ -22,7 +22,7 @@ function run_speedy(::Type{NF}=Float32,                 # default number format
     atmosphere = EarthAtmosphere(atmosphere...)
     time_stepping = LeapfrogSemiImplicit(time_stepping...)
     feedback = Feedback(feedback...)
-    output = Output(spectral_grid,output...)
+    output = Output(spectral_grid,Model,output...)
 
     # create model with mostly defaults and initalize
     ConcreteModel = default_concrete_model(Model)

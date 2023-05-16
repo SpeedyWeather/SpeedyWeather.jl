@@ -195,3 +195,30 @@ function convection!(
 
     return nothing
 end
+
+
+    # # Compute the entrainment coefficients for the convection parameterization.
+    # (;max_entrainment) = P
+    # entrainment_profile = zeros(nlev)
+    # for k = 2:nlev-1
+    #     entrainment_profile[k] = max(0, (σ_levels_full[k] - 0.5)^2)
+    # end
+
+    # # profile as fraction of cloud-base mass flux
+    # entrainment_profile /= sum(entrainment_profile)  # Normalise
+    # entrainment_profile *= max_entrainment           # fraction of max entrainment
+
+    # # PARAMETRIZATIONS
+    # # Large-scale condensation (occurs when relative humidity exceeds a given threshold)
+    # RH_thresh_pbl_lsc::NF    # Relative humidity threshold for LSC in PBL
+    # RH_thresh_range_lsc::NF  # Vertical range of relative humidity threshold
+    # RH_thresh_max_lsc ::NF   # Maximum relative humidity threshold
+    # humid_relax_time_lsc::NF # Relaxation time for humidity (hours)
+
+    # # Convection
+    # pres_thresh_cnv::NF            # Minimum (normalised) surface pressure for the occurrence of convection
+    # RH_thresh_pbl_cnv::NF          # Relative humidity threshold for convection in PBL
+    # RH_thresh_trop_cnv::NF         # Relative humidity threshold for convection in the troposphere
+    # humid_relax_time_cnv::NF       # Relaxation time for PBL humidity (hours)
+    # max_entrainment::NF            # Maximum entrainment as a fraction of cloud-base mass flux
+    # ratio_secondary_mass_flux::NF  # Ratio between secondary and primary mass flux at cloud-base

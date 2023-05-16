@@ -9,104 +9,104 @@ $(TYPEDFIELDS)
 """
 Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
-    "number format"
-    NF::DataType = DEFAULT_NF
+    # "number format"
+    # NF::DataType = DEFAULT_NF
 
 
-    # RESOLUTION AND GRID
+    # # RESOLUTION AND GRID
 
-    "spectral truncation"
-    trunc::Int = 31
+    # "spectral truncation"
+    # trunc::Int = 31
 
-    "grid in use"
-    Grid::Type{<:AbstractGrid} = OctahedralGaussianGrid
+    # "grid in use"
+    # Grid::Type{<:AbstractGrid} = OctahedralGaussianGrid
 
-    "dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
-    dealiasing::Float64 = 2
-
-
-    # PLANET'S PROPERTIES
-
-    "planet"
-    planet::Planet = Earth()
+    # "dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
+    # dealiasing::Float64 = 2
 
 
-    # ATMOSPHERE
+    # # PLANET'S PROPERTIES
 
-    "molar mass of dry air [g/mol]"
-    mol_mass_dry_air = 28.9649
-
-    "molar mass of water vapour [g/mol]"
-    mol_mass_vapour = 18.0153
-
-    "specific heat at constant pressure [J/K/kg]"
-    cₚ::Float64 = 1004
-
-    "universal gas constant [J/K/mol]"
-    R_gas::Float64 = 8.3145
-
-    "specific gas constant for dry air [J/kg/K]"
-    R_dry::Float64 = 1000*R_gas/mol_mass_dry_air
-
-    "specific gas constant for water vapour [J/kg/K]"
-    R_vapour::Float64 = 1000*R_gas/mol_mass_vapour
-
-    "latent heat of condensation [J/g] for consistency with specific humidity [g/Kg]"
-    alhc::Float64 = 2501
-
-    "latent heat of sublimation [?]"
-    alhs::Float64 = 2801
-
-    "stefan-Boltzmann constant [W/m²/K⁴]"
-    sbc::Float64 = 5.67e-8
+    # "planet"
+    # planet::Planet = Earth()
 
 
-    # STANDARD ATMOSPHERE (reference values)
+    # # ATMOSPHERE
 
-    "moist adiabatic temperature lapse rate ``-dT/dz`` [K/km]"
-    lapse_rate::Float64 = 5
+    # "molar mass of dry air [g/mol]"
+    # mol_mass_dry_air = 28.9649
 
-    "absolute temperature at surface ``z=0`` [K]"
-    temp_ref::Float64 = 288
+    # "molar mass of water vapour [g/mol]"
+    # mol_mass_vapour = 18.0153
 
-    "absolute temperature in stratosphere [K]"
-    temp_top::Float64 = 216
+    # "specific heat at constant pressure [J/K/kg]"
+    # cₚ::Float64 = 1004
 
-    "for stratospheric lapse rate [K] after Jablonowski"
-    ΔT_stratosphere::Float64 = 4.8e5
+    # "universal gas constant [J/K/mol]"
+    # R_gas::Float64 = 8.3145
 
-    "scale height for pressure [km]"
-    scale_height::Float64 = 7.5
+    # "specific gas constant for dry air [J/kg/K]"
+    # R_dry::Float64 = 1000*R_gas/mol_mass_dry_air
 
-    "surface pressure [hPa]"
-    pres_ref::Float64 = 1000
+    # "specific gas constant for water vapour [J/kg/K]"
+    # R_vapour::Float64 = 1000*R_gas/mol_mass_vapour
 
-    "scale height for specific humidity [km]"
-    scale_height_humid::Float64 = 2.5
+    # "latent heat of condensation [J/g] for consistency with specific humidity [g/Kg]"
+    # alhc::Float64 = 2501
 
-    "relative humidity of near-surface air [1]"
-    relhumid_ref::Float64 = 0.7
+    # "latent heat of sublimation [?]"
+    # alhs::Float64 = 2801
 
-    "saturation water vapour pressure [Pa]"
-    water_pres_ref::Float64 = 17
+    # "stefan-Boltzmann constant [W/m²/K⁴]"
+    # sbc::Float64 = 5.67e-8
 
-    "layer thickness for the shallow water model [km]"
-    layer_thickness::Float64 = 8.5
+
+    # # STANDARD ATMOSPHERE (reference values)
+
+    # "moist adiabatic temperature lapse rate ``-dT/dz`` [K/km]"
+    # lapse_rate::Float64 = 5
+
+    # "absolute temperature at surface ``z=0`` [K]"
+    # temp_ref::Float64 = 288
+
+    # "absolute temperature in stratosphere [K]"
+    # temp_top::Float64 = 216
+
+    # "for stratospheric lapse rate [K] after Jablonowski"
+    # ΔT_stratosphere::Float64 = 4.8e5
+
+    # "scale height for pressure [km]"
+    # scale_height::Float64 = 7.5
+
+    # "surface pressure [hPa]"
+    # pres_ref::Float64 = 1000
+
+    # "scale height for specific humidity [km]"
+    # scale_height_humid::Float64 = 2.5
+
+    # "relative humidity of near-surface air [1]"
+    # relhumid_ref::Float64 = 0.7
+
+    # "saturation water vapour pressure [Pa]"
+    # water_pres_ref::Float64 = 17
+
+    # "layer thickness for the shallow water model [km]"
+    # layer_thickness::Float64 = 8.5
 
 
     # VERTICAL COORDINATES
 
-    "vertical coordinates of the nlev vertical levels, defined by a generalised logistic function, interpolating ECMWF's L31 configuration"
-    GLcoefs::Coefficients = GenLogisticCoefs()
+    # "vertical coordinates of the nlev vertical levels, defined by a generalised logistic function, interpolating ECMWF's L31 configuration"
+    # GLcoefs::Coefficients = GenLogisticCoefs()
 
     "σ coordinate where the tropopause starts"
     σ_tropopause::Float64 = 0.2
 
-    "only used if set manually, otherwise empty"
-    σ_levels_half::Vector{Float64} = []
+    # "only used if set manually, otherwise empty"
+    # σ_levels_half::Vector{Float64} = []
 
-    "number of vertical levels"
-    nlev::Int = nlev_default(Model, σ_levels_half)
+    # "number of vertical levels"
+    # nlev::Int = nlev_default(Model, σ_levels_half)
 
 
     # DIFFUSION AND DRAG
