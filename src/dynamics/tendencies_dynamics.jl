@@ -296,14 +296,14 @@ function _vertical_advection!(  ξ_tend::Grid,           # tendency of quantity 
                                 ξ_below::Grid,          # quantity ξ at k+1
                                 Δσₖ::NF                 # layer thickness on σ levels
                                 ) where {NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
-    Δσₖ⁻¹ = -1/Δσₖ                                      # precompute
+    Δσₖ⁻¹ = 1/Δσₖ                                      # precompute
 
     # += as the tendencies already contain the parameterizations
     for ij in eachgridpoint(ξ_tend,σ_tend_above,σ_tend_below,ξ_above,ξ,ξ_below)
         # 1st order upwind scheme
-        ξ_face_below = signbit(σ_tend_below[ij]) ? ξ_below[ij] : ξ[ij]  # upwind: if velocity < 0, pick ξ from k+1
-        ξ_face_above = signbit(σ_tend_above[ij]) ? ξ[ij] : ξ_above[ij]
-        ξ_tend[ij] += Δσₖ⁻¹ * (σ_tend_below[ij]*(ξ_face_below - ξ[ij]) + σ_tend_above[ij]*(ξ[ij] - ξ_face_above))
+        σ̇⁺ = max(σ_tend_above[ij],0)        # velocity into layer k from above
+        σ̇⁻ = min(σ_tend_below[ij],0)        # velocity into layer k from below
+        ξ_tend[ij] -= Δσₖ⁻¹ * (σ̇⁺*(ξ[ij] - ξ_above[ij]) + σ̇⁻*(ξ_below[ij] - ξ[ij]))
     end
 
     # # centred scheme
