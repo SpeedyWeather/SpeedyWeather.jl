@@ -1,11 +1,8 @@
-Base.@kwdef struct LeapfrogSemiImplicit <: TimeIntegrator
+Base.@kwdef mutable struct LeapfrogSemiImplicit{NF} <: TimeIntegrator{NF}
 
     # DIMENSIONS
     "spectral resolution (max degree of spherical harmonics)"
     trunc::Int                      
-    
-    "radius of the sphere, used for scaling"
-    radius::Float64
 
     # OPTIONS
     "time at which the integration starts"
@@ -27,25 +24,22 @@ Base.@kwdef struct LeapfrogSemiImplicit <: TimeIntegrator
 
 
     # DERIVED FROM OPTIONS
-    "time step Δt at specified resolution, [min] → [s], scaled with radius"
-    Δt_unscaled::Float64 = round(60*Δt_at_T31*(32/(trunc+1)))
-
-    "Δt in [s/m], scaled with radius"
-    Δt::Float64 = Δt/radius
+    "time step Δt at specified resolution, [min] → [s]"
+    Δt::Float64 = round(60*Δt_at_T31*(32/(trunc+1)))
     
     "time step Δt [s] as integer for rounding error free accumulation"
-    Δt_sec::Int = convert(Int,Δt_unscaled)
+    Δt_sec::Int = convert(Int,Δt)
     
     "convert time step Δt from minutes to hours"
-    Δt_hrs::Floa64 = Δt_unscaled/3600
+    Δt_hrs::Float64 = Δt_unscaled/3600
 
     "number of time steps to integrate for"
     n_timesteps::Int = ceil(Int,24*n_days/Δt_hrs)        
 end
 
 function LeapfrogSemiImplicit(spectral_grid::SpectralGrid;kwargs...)
-    (;trunc,radius) = spectral_grid
-    return LeapfrogSemiImplicit(;trunc,radius,kwargs...)
+    (;trunc) = spectral_grid
+    return LeapfrogSemiImplicit(;trunc,kwargs...)
 end
 
 
@@ -134,19 +128,21 @@ function first_timesteps!(  progn::PrognosticVariables, # all prognostic variabl
     (; n_timesteps, Δt, Δt_sec ) = model.constants
     n_timesteps == 0 && return time     # exit immediately for no time steps
 
+    (;implicit) = model
+
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
     i = 1                               # time step index
     lf1 = 1                             # without Robert+William's filter
     lf2 = 1                             # evaluates all tendencies at t=0,
                                         # the first leapfrog index (=>Euler forward)
     temperature_profile!(diagn,progn,model,lf2) # used for implicit solver, update occasionally
-    initialize_implicit!(model,diagn,Δt/2)      # update precomputed implicit terms with time step Δt/2
+    initialize!(model,diagn,Δt/2)      # update precomputed implicit terms with time step Δt/2
     timestep!(progn,diagn,time,Δt/2,i,model,lf1,lf2)
     time += Dates.Second(Δt_sec÷2)      # update by half the leapfrog time step Δt used here
     progress!(feedback,progn)
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
-    initialize_implicit!(model,diagn,Δt)    # update precomputed implicit terms with time step Δt
+    initialize!(model,diagn,Δt)    # update precomputed implicit terms with time step Δt
     lf1 = 1                             # without Robert+William's filter
     lf2 = 2                             # evaluate all tendencies at t=dt/2,
                                         # the 2nd leapfrog index (=>Leapfrog)
@@ -174,17 +170,19 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
                     time::DateTime,                 # time at time step 
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
                     i::Integer,                     # time step index
-                    M::BarotropicModel,             # everything that's constant at runtime
+                    model::Barotropic,              # everything that's constant at runtime
                     lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                     lf2::Int=2,                     # leapfrog index 2 (time step used for tendencies)
                     )
 
-    # LOOP OVER LAYERS FOR DIFFUSION, LEAPFROGGING AND PROPAGATE STATE TO GRID
+    (;horizontal_diffusion, time_stepping) = model
+
+    # LOOP OVER LAYERS FOR TENDENCIES, DIFFUSION, LEAPFROGGING AND PROPAGATE STATE TO GRID
     for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
-        dynamics_tendencies!(diagn_layer,M)                 # tendency of vorticity
-        horizontal_diffusion!(progn_layer,diagn_layer,M)    # diffusion for vorticity
-        leapfrog!(progn_layer,diagn_layer,dt,lf1,M)         # leapfrog vorticity forward
-        gridded!(diagn_layer,progn_layer,lf2,M)             # propagate spectral state to grid
+        dynamics_tendencies!(diagn_layer,model)
+        horizontal_diffusion!(progn_layer,diagn_layer,horizontal_diffusion)
+        leapfrog!(progn_layer,diagn_layer,dt,lf1,time_stepping)
+        gridded!(diagn_layer,progn_layer,lf2,model)
     end
 end
 
@@ -204,7 +202,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     time::DateTime,                 # time at timestep
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
                     i::Integer,                     # time step index
-                    model::ShallowWaterModel,       # everything that's constant at runtime
+                    model::ShallowWater,            # everything that's constant at runtime
                     lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
@@ -214,25 +212,26 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     diagn_surface = diagn.surface
     progn_surface = progn.surface
     (;pres) = progn.surface.timesteps[lf2]
+    (;implicit, horizontal_diffusion, time_stepping, spectral_transform) = model
 
     # zero_tendencies!(diagn)
     
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
     # forcing!(diagn_layer,diagn_surface,time,model.forcing)
     dynamics_tendencies!(diagn_layer,diagn_surface,pres,time,model)
-    implicit_correction!(diagn_layer,progn_layer,diagn_surface,progn_surface,model)
+    implicit_correction!(diagn_layer,progn_layer,diagn_surface,progn_surface,implicit)
     
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
-    horizontal_diffusion!(progn_layer,diagn_layer,model)    # diffusion for vorticity and divergence
-    leapfrog!(progn_layer,diagn_layer,dt,lf1,model)         # leapfrog vorticity forward
-    gridded!(diagn_layer,progn_layer,lf2,model)             # propagate spectral state to grid
+    horizontal_diffusion!(progn_layer,diagn_layer,horizontal_diffusion)
+    leapfrog!(progn_layer,diagn_layer,dt,lf1,time_stepping)
+    gridded!(diagn_layer,progn_layer,lf2,model)
 
     # SURFACE LAYER (pressure), no diffusion though
     (;pres_grid,pres_tend) = diagn.surface
     pres_old = progn.surface.timesteps[1].pres
     pres_new = progn.surface.timesteps[2].pres
-    leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,model.time_stepping)
-    gridded!(pres_grid,pres,model.spectral_transform)
+    leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,time_stepping)
+    gridded!(pres_grid,pres,spectral_transform)
 end
 
 """

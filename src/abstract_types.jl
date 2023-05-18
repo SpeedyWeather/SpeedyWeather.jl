@@ -6,6 +6,9 @@ abstract type PrimitiveEquation <: ModelSetup end
 abstract type PrimitiveDryCore <: PrimitiveEquation end
 abstract type PrimitiveWetCore <: PrimitiveEquation end
 
+abstract type AbstractPlanet end
+abstract type AbstractAtmosphere end
+
 # GEOMETRY, GRID
 abstract type AbstractGeometry{NF} end
 abstract type VerticalCoordinates end
@@ -32,9 +35,6 @@ abstract type VerticalDiffusion{NF} <: AbstractParameterization{NF} end
 # INPUT/OUTPUT
 abstract type AbstractFeedback end
 abstract type AbstractOutput end
-
-# PLANETS
-abstract type Planet end
 
 # NUMERICS
 abstract type HorizontalDiffusion{NF} end

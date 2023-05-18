@@ -20,6 +20,7 @@ Base.@kwdef struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit{N
     α::Float64 = 1
 
     # PRECOMPUTED ARRAYS, to be initiliased with initialize!
+    H₀::Base.RefValue{NF} = Ref(zero(NF))   # layer_thicknes
     ξH₀::Base.RefValue{NF} = Ref(zero(NF))  # = 2αΔt*layer_thickness, store in RefValue for mutability
     g∇²::Vector{NF} = zeros(NF,trunc+2)     # = gravity*eigenvalues
     ξg∇²::Vector{NF} = zeros(NF,trunc+2)    # = 2αΔt*gravity*eigenvalues
@@ -40,7 +41,7 @@ function initialize!(   implicit::ImplicitShallowWater,
                         dt::Real,                   # time step used [s]
                         constants::DynamicsConstants)
 
-    (;α,ξH₀,g∇²,ξg∇²,S⁻¹) = implicit                # precomputed arrays to be updated
+    (;α,H₀,ξH₀,g∇²,ξg∇²,S⁻¹) = implicit                # precomputed arrays to be updated
     (;gravity,layer_thickness) = constants          # shallow water layer thickness [m]
                                                     # gravitational acceleration [m/s²]                  
 
@@ -53,6 +54,7 @@ function initialize!(   implicit::ImplicitShallowWater,
     # α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
 
     ξ = α*dt                    # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
+    H₀[] = layer_thickness      # update H₀ the undisturbed layer thickness without mountains
     ξH₀[] = ξ*layer_thickness   # update ξ*H₀ with new ξ, in RefValue for mutability
 
     # loop over degree l of the harmonics (implicit terms are independent of order m)
@@ -78,8 +80,7 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
                                 progn::PrognosticLayerTimesteps{NF},
                                 diagn_surface::SurfaceVariables{NF},
                                 progn_surface::PrognosticSurfaceTimesteps{NF},
-                                implicit::ImplicitShallowWater,
-                                constants::DynamicsConstants) where NF
+                                implicit::ImplicitShallowWater) where NF
 
     (;div_tend) = diagn.tendencies          # divergence tendency
     div_old = progn.timesteps[1].div        # divergence at t
@@ -89,8 +90,8 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
     (;pres_tend) = diagn_surface            # tendency of pressure/η
 
     (;g∇²,ξg∇²,S⁻¹) = implicit
+    H₀ = implicit.H₀[]              # unpack as it's stored in a RefValue for mutation
     ξH₀ = implicit.ξH₀[]            # unpack as it's stored in a RefValue for mutation
-    H₀ = constants.layer_thickness
 
     lmax,mmax = size(div_tend) .- (2,1)
     @boundscheck length(S⁻¹) == lmax+2 || throw(BoundsError)

@@ -14,20 +14,29 @@ Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConst
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity) = 2Ω*sin(lat)*radius
     f_coriolis::Vector{NF}
 
-    
+    # ADIABATIC TERM
+    σ_lnp_A::Vector{NF}             # σ-related factors needed for adiabatic terms 1st
+    σ_lnp_B::Vector{NF}             # and 2nd
+
+    # GEOPOTENTIAL INTEGRATION (on half/full levels)
+    Δp_geopot_half::Vector{NF}      # = R*(ln(p_k+1) - ln(p_k+1/2)), for half level geopotential
+    Δp_geopot_full::Vector{NF}      # = R*(ln(p_k+1/2) - ln(p_k)), for full level geopotential
+
+    # REFERENCE TEMPERATURE PROFILE for implicit
+    temp_ref_profile::Vector{NF}    # reference temperature profile
 end
 
 """
 Generator function for a DynamicsConstants struct.
 """
-function DynamicsConstants( spectral_grid::SpectralGrid{NF},
-                            planet::Planet,
+function DynamicsConstants( spectral_grid::SpectralGrid,
+                            planet::AbstractPlanet,
                             atmosphere::AbstractAtmosphere,
-                            geometry::Geometry) where NF
+                            geometry::Geometry)
 
     # PHYSICAL CONSTANTS
-    (;R_dry, R_vapour, cₚ) = atmosphere
-    (;radius) = spectral_grid
+    (;R_dry, R_vapour, lapse_rate, cₚ, temp_ref, σ_tropopause) = atmosphere
+    (;NF, radius) = spectral_grid
     (;rotation, gravity) = planet
     layer_thickness = planet.layer_thickness*1000   # ShallowWater: convert from [km]s to [m]
     ξ = R_dry/R_vapour              # Ratio of gas constants: dry air / water vapour [1]
@@ -36,31 +45,11 @@ function DynamicsConstants( spectral_grid::SpectralGrid{NF},
     κ = R_dry/cₚ                    # = 2/7ish for diatomic gas
 
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
-    f_coriolis = 2rotation*geometry.sinlat*radius
+    (;sinlat) = geometry
+    f_coriolis = 2rotation*sinlat*radius
 
-    # This implies conversion to NF
-    return DynamicsConstants{NF}(   radius,rotation,gravity,R_dry,
-                                    layer_thickness,μ_virt_temp,κ,
-                                    f_coriolis)
-end
-
-    # # VERTICAL REFERENCE TEMPERATURE PROFILE
-    # # integrate hydrostatic equation from pₛ to p, use ideal gas law p = ρRT and linear
-    # # temperature decrease with height: T = Tₛ - ΔzΓ with lapse rate Γ
-    # # for stratosphere (σ < σ_tropopause) increase temperature (Jablonowski & Williamson. 2006, eq. 5)
-    # RΓg⁻¹ = R_dry*lapse_rate/(1000*gravity)     # convert lapse rate from [K/km] to [K/m]
-    # temp_ref_profile = [temp_ref*σ^RΓg⁻¹ for σ in σ_levels_full]
-    # temp_ref_profile .+= [σ < σ_tropopause ? ΔT_stratosphere*(σ_tropopause-σ)^5 : 0 for σ in σ_levels_full]
-
-        # # GEOPOTENTIAL, coefficients to calculate geopotential
-        # Δp_geopot_half, Δp_geopot_full = initialize_geopotential(σ_levels_full,σ_levels_half,R_dry)
-
-        # # LAPSE RATE correction
-        # lapserate_corr = lapserate_correction(σ_levels_full,σ_levels_half,Δp_geopot_full)
-        # TROPOPAUSE/STRATOSPHERIC LEVELS
-        n_stratosphere_levels = sum(σ_levels_full .< σ_tropopause)  # of levels above σ_tropopause
-
-        # ADIABATIC TERM, Simmons and Burridge, 1981, eq. 3.12
+    # ADIABATIC TERM, Simmons and Burridge, 1981, eq. 3.12
+    (;σ_levels_half,σ_levels_full,σ_levels_thick) = geometry
     # precompute ln(σ_k+1/2) - ln(σ_k-1/2) but swap sign, include 1/Δσₖ
     σ_lnp_A = log.(σ_levels_half[1:end-1]./σ_levels_half[2:end]) ./ σ_levels_thick
     σ_lnp_A[1] = 0  # the corresponding sum is 1:k-1 so 0 to replace log(0) from above
@@ -70,3 +59,23 @@ end
                     log.(σ_levels_half[2:end]./σ_levels_half[1:end-1])
     σ_lnp_B[1] = σ_levels_half[1] <= 0 ? log(2) : σ_lnp_B[1]    # set α₁ = log(2), eq. 3.19
     σ_lnp_B .*= -1  # absorb sign from -1/Δσₖ only, eq. 3.12
+
+    # GEOPOTENTIAL
+    Δp_geopot_half, Δp_geopot_full = initialize_geopotential(σ_levels_full,σ_levels_half,R_dry)
+
+    # VERTICAL REFERENCE TEMPERATURE PROFILE
+    # integrate hydrostatic equation from pₛ to p, use ideal gas law p = ρRT and linear
+    # temperature decrease with height: T = Tₛ - ΔzΓ with lapse rate Γ
+    # for stratosphere (σ < σ_tropopause) increase temperature (Jablonowski & Williamson. 2006, eq. 5)
+    RΓg⁻¹ = R_dry*lapse_rate/(1000*gravity)     # convert lapse rate from [K/km] to [K/m]
+    temp_ref_profile = [temp_ref*σ^RΓg⁻¹ for σ in σ_levels_full]
+    temp_ref_profile .+= [σ < σ_tropopause ? ΔT_stratosphere*(σ_tropopause-σ)^5 : 0 for σ in σ_levels_full]
+
+    # This implies conversion to NF
+    return DynamicsConstants{NF}(   radius,rotation,gravity,R_dry,
+                                    layer_thickness,μ_virt_temp,κ,
+                                    f_coriolis,
+                                    σ_lnp_A,σ_lnp_B,
+                                    Δp_geopot_half, Δp_geopot_full,
+                                    temp_ref_profile)
+end

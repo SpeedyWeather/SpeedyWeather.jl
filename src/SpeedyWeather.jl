@@ -27,10 +27,13 @@ import BitInformation: round, round!
 import UnicodePlots
 import ProgressMeter
 
-# EXPORT MAIN INTERFACE TO SPEEDY
+# EXPORT MONOLITHIC INTERFACE TO SPEEDY
 export  run_speedy,
         run_speedy!,
         initialize_speedy
+
+export  SigmaCoordinates,
+        SigmaPressureCoordinates
 
 # EXPORT MODELS
 export  Barotropic,
@@ -40,6 +43,9 @@ export  Barotropic,
         PrimitiveWetCore
 
 # EXPORT GRIDS
+export  SpectralGrid,
+        Geometry
+
 export  LowerTriangularMatrix,
         FullClenshawGrid,
         FullGaussianGrid,
@@ -49,6 +55,8 @@ export  LowerTriangularMatrix,
         OctahedralClenshawGrid,
         HEALPixGrid,
         OctaHEALPixGrid
+
+export  LeapfrogSemiImplicit
 
 # EXPORT OROGRAPHIES
 export  NoOrography,
@@ -78,10 +86,7 @@ export  NoVerticalDiffusion,
         VerticalLaplacian
 
 # EXPORT STRUCTS
-export  Parameters,
-        DynamicsConstants,
-        ParameterizationConstants,
-        Geometry,
+export  DynamicsConstants,
         SpectralTransform,
         Boundaries,
         PrognosticVariables,
@@ -89,7 +94,8 @@ export  Parameters,
         ColumnVariables
 
 # EXPORT SPECTRAL FUNCTIONS
-export  spectral,
+export  SpectralTransform,
+        spectral,
         gridded,
         spectral_truncation
         
@@ -110,53 +116,54 @@ export SpeedyTransforms
 include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
     
-include("gpu.jl")                       # defines utility for GPU / KernelAbstractions
+include("gpu.jl")                               # defines utility for GPU / KernelAbstractions
 
 include("abstract_types.jl")
 include("dynamics/vertical_coordinates.jl")
 include("dynamics/spectral_grid.jl")
+include("dynamics/planets.jl")
+include("dynamics/atmospheres.jl")
+include("dynamics/constants.jl")
+include("dynamics/prognostic_variables.jl")
+include("physics/define_column.jl")             # define ColumnVariables
+include("dynamics/diagnostic_variables.jl")
+include("dynamics/time_integration.jl")
 include("dynamics/models.jl")
 
-# SOME DEFINITIONS FIRST
-include("dynamics/constants.jl")                # defines DynamicsConstants
-include("physics/constants.jl")                 # defines ParameterizationConstants
-include("physics/define_column.jl")             # define ColumnVariables
+# # SOME DEFINITIONS FIRST
+# include("physics/constants.jl")                 # defines ParameterizationConstants
 
-# DYNAMICS
-include("dynamics/geometry.jl")                 # defines Geometry
-include("dynamics/orography.jl")                # defines Orography
-include("dynamics/define_diffusion.jl")         # defines HorizontalDiffusion
-include("dynamics/define_implicit.jl")          # defines ImplicitShallowWater, ImplicitPrimitiveEq     # defines GenLogisticCoefs
-include("dynamics/planets.jl")                  # defines Earth
-include("dynamics/models.jl")                   # defines ModelSetups
-include("dynamics/prognostic_variables.jl")     # defines PrognosticVariables
-include("dynamics/diagnostic_variables.jl")     # defines DiagnosticVariables
-include("dynamics/initial_conditions.jl")
-include("dynamics/scaling.jl")
-include("dynamics/geopotential.jl")
-include("dynamics/tendencies_dynamics.jl")
-include("dynamics/tendencies.jl")
-include("dynamics/implicit.jl")
-include("dynamics/diffusion.jl")
-include("dynamics/time_integration.jl")
+# # DYNAMICS
+# include("dynamics/orography.jl")                # defines Orography
+# include("dynamics/define_diffusion.jl")         # defines HorizontalDiffusion
+# include("dynamics/define_implicit.jl")          # defines ImplicitShallowWater, ImplicitPrimitiveEq     # defines GenLogisticCoefs
+# include("dynamics/planets.jl")                  # defines Earth
+# include("dynamics/models.jl")                   # defines ModelSetups
+# include("dynamics/initial_conditions.jl")
+# include("dynamics/scaling.jl")
+# include("dynamics/geopotential.jl")
+# include("dynamics/tendencies_dynamics.jl")
+# include("dynamics/tendencies.jl")
+# include("dynamics/implicit.jl")
+# include("dynamics/diffusion.jl")
 
-# PHYSICS
-include("physics/column_variables.jl")
-include("physics/thermodynamics.jl")
-include("physics/tendencies.jl")
-include("physics/convection.jl")
-include("physics/large_scale_condensation.jl")
-include("physics/longwave_radiation.jl")
-include("physics/shortwave_radiation.jl")
-include("physics/boundary_layer.jl")
-include("physics/temperature_relaxation.jl")
-include("physics/vertical_diffusion.jl")
+# # PHYSICS
+# include("physics/column_variables.jl")
+# include("physics/thermodynamics.jl")
+# include("physics/tendencies.jl")
+# include("physics/convection.jl")
+# include("physics/large_scale_condensation.jl")
+# include("physics/longwave_radiation.jl")
+# include("physics/shortwave_radiation.jl")
+# include("physics/boundary_layer.jl")
+# include("physics/temperature_relaxation.jl")
+# include("physics/vertical_diffusion.jl")
 
-# OUTPUT
-include("output/output.jl")                     # defines Output
-include("output/feedback.jl")                   # defines Feedback
-include("output/pretty_printing.jl")
+# # OUTPUT
+# include("output/output.jl")                     # defines Output
+# include("output/feedback.jl")                   # defines Feedback
+# include("output/pretty_printing.jl")
 
-# INTERFACE
-include("run_speedy.jl")
+# # INTERFACE
+# include("run_speedy.jl")
 end
