@@ -1,5 +1,5 @@
 """
-    EA = Earth(kwargs...)
+    E = Earth(kwargs...)
 
 Create a struct `Earth<:AbstractPlanet`, with the following physical/orbital
 characteristics. Note that `radius` is not part of it as this should be chosen
@@ -32,4 +32,16 @@ Base.@kwdef struct Earth <: AbstractPlanet
 
     "angle [˚] rotation axis tilt wrt to orbit"
     axial_tilt::Float64 = 23.4              
+end
+
+function Base.show(io::IO,planet::AbstractPlanet)
+    println(io,"$(typeof(planet))(")
+    fields = propertynames(planet)
+    nfields = length(fields)
+    for i in 1:nfields
+        key = fields[i]
+        val = getfield(planet,key)
+        s = "  $key::$(typeof(val)) = $val"
+        if i < nfields println(io,s) else print(io,s*")") end
+    end
 end

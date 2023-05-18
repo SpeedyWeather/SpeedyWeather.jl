@@ -1,11 +1,19 @@
-Base.@kwdef EarthAtmosphere <: AbstractAtmosphere
+"""
+    EA = EarthAtmosphere(kwargs...)
+
+Create a struct `EarthAtmosphere<:AbstractPlanet`, with the following physical/chemical
+characteristics. Note that `radius` is not part of it as this should be chosen
+in `SpectralGrid`. Default keyword arguments are
+
+$(TYPEDFIELDS)"""
+Base.@kwdef struct EarthAtmosphere <: AbstractAtmosphere
     # ATMOSPHERE
 
     "molar mass of dry air [g/mol]"
-    mol_mass_dry_air = 28.9649
+    mol_mass_dry_air::Float64 = 28.9649
 
     "molar mass of water vapour [g/mol]"
-    mol_mass_vapour = 18.0153
+    mol_mass_vapour::Float64 = 18.0153
 
     "specific heat at constant pressure [J/K/kg]"
     cₚ::Float64 = 1004
@@ -43,6 +51,9 @@ Base.@kwdef EarthAtmosphere <: AbstractAtmosphere
     "for stratospheric lapse rate [K] after Jablonowski"
     ΔT_stratosphere::Float64 = 4.8e5
 
+    "start of the stratosphere in sigma coordinates"
+    σ_tropopause::Float64 = 0.2
+
     "scale height for pressure [km]"
     scale_height::Float64 = 7.5
 
@@ -60,4 +71,16 @@ Base.@kwdef EarthAtmosphere <: AbstractAtmosphere
 
     "layer thickness for the shallow water model [km]"
     layer_thickness::Float64 = 8.5
+end
+
+function Base.show(io::IO,atm::AbstractAtmosphere)
+    println(io,"$(typeof(atm))(")
+    fields = propertynames(atm)
+    nfields = length(fields)
+    for i in 1:nfields
+        key = fields[i]
+        val = getfield(atm,key)
+        s = "  $key::$(typeof(val)) = $val"
+        if i < nfields println(io,s) else print(io,s*")") end
+    end
 end

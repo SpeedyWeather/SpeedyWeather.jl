@@ -16,14 +16,24 @@ Base.@kwdef struct SpectralGrid
     nlev::Int = 8
     vertical_coordinates::VerticalCoordinates = SigmaCoordinates(;nlev)
 
-    SpectralGrid(NF,trunc,Grid,dealiasing,nlev,vertical_coordinates) = nlev == vertical_coordinates.nlev ?
-        new(NF,trunc,Grid,dealiasing,nlev,vertical_coordinates) :
+    SpectralGrid(NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates) = nlev == vertical_coordinates.nlev ?
+        new(NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates) :
         error("nlev does not match. $nlev vs $(vertical_coordinates.nlev)")
 end
 
 SpectralGrid(NF::Type{<:AbstractFloat};kwargs...) = SpectralGrid(NF=NF;kwargs...)
 SpectralGrid(Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(Grid=Grid;kwargs...)
 SpectralGrid(NF::Type{<:AbstractFloat},Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(Grid=Grid;kwargs...)
+
+function Base.show(io::IO,SG::SpectralGrid)
+    (;NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates) = SG
+    truncation = if dealiasing < 2 "linear" elseif dealiasing < 3 "quadratic" else "cubic" end
+    res = sqrt(4π*radius^2/npoints)/1000  # in [km]
+    println(io,"Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
+    println(io,"Grid:       $npoints-element, $(get_nlat(Grid,nlat_half))-ring $Grid{$NF} ($truncation)")
+    println(io,"Resolution: $(@sprintf("%.3g",res))km (average)")
+      print(io,"Vertical:   $nlev-level $(typeof(vertical_coordinates))")
+end
 
 # TODO adjust nlev when vertical_coordinates is provided
 # SpectralGrid(vertical_coordinates::VerticalCoordinates;kwargs...) = SpectralGrid(nlev=vertical_coordinates.nlev;vertical_coordinates,kwargs...)
@@ -115,13 +125,20 @@ function Geometry(spectral_grid::SpectralGrid)
     return Geometry{spectral_grid.NF}(;spectral_grid)
 end
 
+function Base.show(io::IO,G::Geometry)
+    println(io,"$(typeof(G))(")
+    print(io,"$(G.spectral_grid))")
+    # Base.show(io,G.σ_levels_half)
+end
+
 """
     S = SpectralTransform(::SpectralGrid)
 
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""
-function SpeedyTransforms.SpectralTransform(spectral_grid::Spectralgrid;
+function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
                                             recompute_legendre::Bool = false,
                                             kwargs...)
     (;NF, Grid, trunc, dealiasing) = spectral_grid
     return SpectralTransform(NF,Grid,trunc;recompute_legendre,dealiasing,kwargs...)
 end
+
