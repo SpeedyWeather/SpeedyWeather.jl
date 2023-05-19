@@ -7,7 +7,7 @@ in `SpectralGrid`. Keyword arguments are
 
 $(TYPEDFIELDS)
 """
-Base.@kwdef struct Earth <: AbstractPlanet
+@kwdef struct Earth <: AbstractPlanet
 
     "angular frequency of Earth's rotation [rad/s]"
     rotation::Float64 = 7.29e-5

@@ -29,94 +29,96 @@ struct PrognosticVariables{NF<:AbstractFloat,M<:ModelSetup}
     surface::PrognosticSurfaceTimesteps{NF}
 
     # dimensions
-    lmax::Int               # two spectral dimensions: max meridional wavenumber
-    mmax::Int               # max zonal wavenumber
+    trunc::Int              # max degree of spherical harmonics
     n_steps::Int            # N_STEPS time steps that are stored
     nlev::Int               # number of vertical levels
+
+    # scaling
+    scale::Base.RefValue{NF}
+
+    # # scaling TODO think about including more flexible scaling factors here
+    # scaling_vor::Base.RefValue{NF}
+    # scaling_div::Base.RefValue{NF}
+    # scaling_temp::Base.RefValue{NF}
+    # scaling_humid::Base.RefValue{NF}
+    # scaling_pres::Base.RefValue{NF}
 end
 
 # ZERO GENERATOR FUNCTIONS
 # general version
-function Base.zeros(::Type{PrognosticVariablesLayer{NF}},lmax::Integer,mmax::Integer) where NF
+function Base.zeros(::Type{PrognosticVariablesLayer{NF}},trunc::Integer) where NF
     # use one more l for size compatibility with vector quantities
-    vor   = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    div   = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    temp  = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    humid = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    # size trunc+2 x trunc+1 corresponds to lmax+1 x mmax
+    vor   = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
+    div   = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
+    temp  = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
+    humid = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
     return PrognosticVariablesLayer(vor,div,temp,humid)
 end
 
 # reduce size of unneeded variables if ModelSetup is provided
-function Base.zeros(::Type{PrognosticVariablesLayer{NF}},model::ModelSetup,lmax::Integer,mmax::Integer) where NF
+function Base.zeros(::Type{PrognosticVariablesLayer{NF}},Model::Type{<:ModelSetup},trunc::Integer) where NF
     # use one more l for size compatibility with vector quantities
     LTM = LowerTriangularMatrix{Complex{NF}}
-    vor = has(model, :vor) ? zeros(LTM,lmax+2,mmax+1) : LTM(undef, 0, 0)
-    div = has(model, :div) ? zeros(LTM,lmax+2,mmax+1) : LTM(undef, 0, 0)
-    temp = has(model, :temp) ? zeros(LTM,lmax+2,mmax+1) : LTM(undef, 0, 0)
-    humid = has(model, :humid) ? zeros(LTM,lmax+2,mmax+1) : LTM(undef, 0, 0)
+    vor = has(Model, :vor) ? zeros(LTM,trunc+2,trunc+1) : LTM(undef, 0, 0)
+    div = has(Model, :div) ? zeros(LTM,trunc+2,trunc+1) : LTM(undef, 0, 0)
+    temp = has(Model, :temp) ? zeros(LTM,trunc+2,trunc+1) : LTM(undef, 0, 0)
+    humid = has(Model, :humid) ? zeros(LTM,trunc+2,trunc+1) : LTM(undef, 0, 0)
 
     return PrognosticVariablesLayer(vor,div,temp,humid)
 end
 
-function Base.zeros(::Type{PrognosticVariablesSurface{NF}},lmax::Integer,mmax::Integer) where NF
+function Base.zeros(::Type{PrognosticVariablesSurface{NF}},trunc::Integer) where NF
     # use one more l for size compatibility with vector quantities
-    pres = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    pres = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
     return PrognosticVariablesSurface(pres)
 end
 
-function Base.zeros(::Type{PrognosticVariablesSurface{NF}},model::ModelSetup,lmax::Integer,mmax::Integer) where NF
+function Base.zeros(::Type{PrognosticVariablesSurface{NF}},Model::Type{<:ModelSetup},trunc::Integer) where NF
     # use one more l for size compatibility with vector quantities
     LTM = LowerTriangularMatrix{Complex{NF}}
-    pres = has(model, :pres) ? zeros(LTM,lmax+2,mmax+1) : LTM(undef, 0, 0)
+    pres = has(Model, :pres) ? zeros(LTM,trunc+2,trunc+1) : LTM(undef, 0, 0)
     return PrognosticVariablesSurface(pres)
 end
 
 # create time steps as N_STEPS-element vector of PrognosticVariablesLayer
-function Base.zeros(::Type{PrognosticLayerTimesteps{NF}},lmax::Integer,mmax::Integer) where NF
-    return PrognosticLayerTimesteps([zeros(PrognosticVariablesLayer{NF},lmax,mmax) for _ in 1:N_STEPS])
+function Base.zeros(::Type{PrognosticLayerTimesteps{NF}},trunc::Integer) where NF
+    return PrognosticLayerTimesteps([zeros(PrognosticVariablesLayer{NF},trunc) for _ in 1:N_STEPS])
 end
 
-function Base.zeros(::Type{PrognosticSurfaceTimesteps{NF}},lmax::Integer,mmax::Integer) where NF
-    return PrognosticSurfaceTimesteps([zeros(PrognosticVariablesSurface{NF},lmax,mmax) for _ in 1:N_STEPS])
+function Base.zeros(::Type{PrognosticSurfaceTimesteps{NF}},trunc::Integer) where NF
+    return PrognosticSurfaceTimesteps([zeros(PrognosticVariablesSurface{NF},trunc) for _ in 1:N_STEPS])
 end
 
 # also pass on model if available
-function Base.zeros(::Type{PrognosticLayerTimesteps{NF}},
-                    model::ModelSetup,
-                    lmax::Integer,
-                    mmax::Integer) where NF
-    return PrognosticLayerTimesteps([zeros(PrognosticVariablesLayer{NF},model,lmax,mmax) for _ in 1:N_STEPS])   
+function Base.zeros(::Type{PrognosticLayerTimesteps{NF}},Model::Type{<:ModelSetup},trunc::Integer) where NF
+    return PrognosticLayerTimesteps([zeros(PrognosticVariablesLayer{NF},Model,trunc) for _ in 1:N_STEPS])   
 end
 
-function Base.zeros(::Type{PrognosticSurfaceTimesteps{NF}},
-                    model::ModelSetup,
-                    lmax::Integer,
-                    mmax::Integer) where NF
-    return PrognosticSurfaceTimesteps([zeros(PrognosticVariablesSurface{NF},model,lmax,mmax) for _ in 1:N_STEPS])   
+function Base.zeros(::Type{PrognosticSurfaceTimesteps{NF}},Model::Type{<:ModelSetup},trunc::Integer) where NF
+    return PrognosticSurfaceTimesteps([zeros(PrognosticVariablesSurface{NF},Model,trunc) for _ in 1:N_STEPS])   
 end
 
 # general function to initiate all prognostic variables with zeros
-function Base.zeros(::Type{PrognosticVariables{NF}},
-                    lmax::Integer,
-                    mmax::Integer,
-                    nlev::Integer) where NF
-
-    layers = [zeros(PrognosticLayerTimesteps{NF},lmax,mmax) for _ in 1:nlev]     # vector of nlev layers
-    surface = zeros(PrognosticSurfaceTimesteps{NF},lmax,mmax)
-    return PrognosticVariables{NF,ModelSetup}(layers,surface,lmax,mmax,N_STEPS,nlev)
+function Base.zeros(::Type{PrognosticVariables{NF}},trunc::Integer,nlev::Integer) where NF
+    layers = [zeros(PrognosticLayerTimesteps{NF},trunc) for _ in 1:nlev]    # vector of nlev layers
+    surface = zeros(PrognosticSurfaceTimesteps{NF},trunc)
+    
+    # initialize with scale=1, wrapped in RefValue for mutability
+    scale = Ref(one(NF)) 
+    return PrognosticVariables{NF,ModelSetup}(layers,surface,trunc,N_STEPS,nlev,scale)
 end
 
 # pass on model to reduce size
-function Base.zeros(::Type{PrognosticVariables{NF}},
-                    model::ModelSetup,
-                    lmax::Integer,
-                    mmax::Integer,
-                    nlev::Integer) where NF
-
-    layers = [zeros(PrognosticLayerTimesteps{NF},lmax,mmax) for _ in 1:nlev]     # vector of nlev layers
+function Base.zeros(::Type{PrognosticVariables{NF}},Model::Type{<:ModelSetup},trunc::Integer,nlev::Integer) where NF
+    
+    layers = [zeros(PrognosticLayerTimesteps{NF},Model,trunc) for _ in 1:nlev]      # vector of nlev layers
     PST = PrognosticSurfaceTimesteps{NF}
-    surface = has(model, :pres) ? zeros(PST,lmax,mmax) : zeros(PST,-2,-1)  
-    return PrognosticVariables{NF,typeof(model)}(layers,surface,lmax,mmax,N_STEPS,nlev)
+    surface = has(Model, :pres) ? zeros(PST,trunc) : zeros(PST,-1)
+    
+    # initialize with scale=1, wrapped in RefValue for mutability
+    scale = Ref(one(NF))                                                    
+    return PrognosticVariables{NF,Model}(layers,surface,trunc,N_STEPS,nlev,scale)
 end
 
 has(progn::PrognosticVariables{NF,M}, var_name::Symbol) where {NF,M} = has(M, var_name)
@@ -350,3 +352,26 @@ get_divergence(progn::PrognosticVariables; kwargs...) = get_var(progn, :div; kwa
 get_temperature(progn::PrognosticVariables; kwargs...) = get_var(progn, :temp; kwargs...)
 get_humidity(progn::PrognosticVariables; kwargs...) = get_var(progn, :humid; kwargs...)
 get_pressure(progn::PrognosticVariables; lf::Integer=1) = progn.surface.timesteps[lf].pres
+
+function Base.show(io::IO, P::PrognosticVariables)
+
+    ζ = P.layers[end].timesteps[1].vor   # create a view on vorticity
+    ζ_grid = Matrix(gridded(ζ))         # to grid space
+    ζ_grid = ζ_grid[:,end:-1:1]         # flip latitudes
+
+    nlon,nlat = size(ζ_grid)
+
+    plot_kwargs = pairs((   xlabel="˚E",
+                            xfact=360/(nlon-1),
+                            ylabel="˚N",
+                            yfact=180/(nlat-1),
+                            yoffset=-90,
+                            title="Surface relative vorticity",
+                            colormap=:viridis,
+                            compact=true,
+                            colorbar=true,
+                            width=60,
+                            height=30))
+
+    print(io,UnicodePlots.heatmap(ζ_grid';plot_kwargs...))
+end

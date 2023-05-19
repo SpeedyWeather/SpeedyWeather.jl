@@ -13,7 +13,7 @@ function initialize_vertical_diffusion!(K::ParameterizationConstants,
     return nothing
 end 
 
-Base.@kwdef struct VerticalLaplacian{NF<:Real} <: VerticalDiffusion{NF}
+@kwdef struct VerticalLaplacian{NF<:Real} <: VerticalDiffusion{NF}
     time_scale::NF = 10.0       # [hours] time scale to control the strength of vertical diffusion
     height_scale::NF = 100.0    # [m] scales for Δσ so that time_scale is sensible
 
@@ -97,7 +97,7 @@ function initialize_vertical_diffusion!(K::ParameterizationConstants,
     return nothing
 end 
 
-Base.@kwdef struct StaticEnergyDiffusion{NF<:Real} <: VerticalDiffusion{NF}
+@kwdef struct StaticEnergyDiffusion{NF<:Real} <: VerticalDiffusion{NF}
     time_scale::NF = 6.0                # [hours] time scale for strength
     static_energy_lapse_rate::NF = 0.1  # [1] ∂SE/∂Φ, vertical gradient of
                                         # static energy SE with geopotential Φ

@@ -1,7 +1,7 @@
 """
 Struct holding the parameters needed at runtime in number format NF.
 """
-Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConstants{NF}
+@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConstants{NF}
     # PHYSICAL CONSTANTS
     radius::NF              # Radius of Planet
     rotation::NF            # Angular frequency of Planet's rotation
@@ -35,10 +35,11 @@ function DynamicsConstants( spectral_grid::SpectralGrid,
                             geometry::Geometry)
 
     # PHYSICAL CONSTANTS
-    (;R_dry, R_vapour, lapse_rate, cₚ, temp_ref, σ_tropopause) = atmosphere
+    (;R_dry, R_vapour, lapse_rate, cₚ) = atmosphere
+    (;ΔT_stratosphere, σ_tropopause, temp_ref) = atmosphere
     (;NF, radius) = spectral_grid
     (;rotation, gravity) = planet
-    layer_thickness = planet.layer_thickness*1000   # ShallowWater: convert from [km]s to [m]
+    layer_thickness = atmosphere.layer_thickness*1000   # ShallowWater: convert from [km]s to [m]
     ξ = R_dry/R_vapour              # Ratio of gas constants: dry air / water vapour [1]
     μ_virt_temp = (1-ξ)/ξ           # used in Tv = T(1+μq), for conversion from humidity q
                                     # and temperature T to virtual temperature Tv
@@ -63,7 +64,7 @@ function DynamicsConstants( spectral_grid::SpectralGrid,
     # GEOPOTENTIAL
     Δp_geopot_half, Δp_geopot_full = initialize_geopotential(σ_levels_full,σ_levels_half,R_dry)
 
-    # VERTICAL REFERENCE TEMPERATURE PROFILE
+    # VERTICAL REFERENCE TEMPERATURE PROFILE (TODO: don't initialize here but in initalize! ?)
     # integrate hydrostatic equation from pₛ to p, use ideal gas law p = ρRT and linear
     # temperature decrease with height: T = Tₛ - ΔzΓ with lapse rate Γ
     # for stratosphere (σ < σ_tropopause) increase temperature (Jablonowski & Williamson. 2006, eq. 5)

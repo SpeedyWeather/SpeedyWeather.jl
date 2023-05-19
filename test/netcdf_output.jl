@@ -17,7 +17,7 @@
         p, d, m = initialize_speedy(Float32, output=true, recalculate_implicit=1000000, output_path=tmp_output_path, n_days=1, output_dt=0, run_id="dense-output-test")
         SpeedyWeather.time_stepping!(p, d, m)
 
-        tmp_read_path = joinpath(tmp_output_path, "run-dense-output-test", "output.nc")
+        tmp_read_path = joinpath(tmp_output_path, "run_dense-output-test", "output.nc")
         t = NetCDF.ncread(tmp_read_path, "time")
         @test t ≈ Int64.(manual_time_axis(m.constants.Δt_sec, m.constants.n_timesteps))
         
@@ -26,7 +26,7 @@
         p, d, m = initialize_speedy(Float32, trunc=31, output=true, recalculate_implicit=1000000, output_path=tmp_output_path, n_days=365000, Δt_at_T31=60*24*365*10, output_dt=24*365*10, run_id="long-output-test")
         SpeedyWeather.time_stepping!(p, d, m)
 
-        tmp_read_path = joinpath(tmp_output_path, "run-long-output-test", "output.nc")
+        tmp_read_path = joinpath(tmp_output_path, "run_long-output-test", "output.nc")
         t = NetCDF.ncread(tmp_read_path, "time")
         @test t ≈ Int64.(manual_time_axis(m.constants.Δt_sec, m.constants.n_timesteps))
 

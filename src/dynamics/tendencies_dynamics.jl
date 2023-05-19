@@ -163,7 +163,7 @@ end
 function vertical_advection!(   diagn::DiagnosticVariables,
                                 model::PrimitiveEquation)
     
-    wet_core = model isa PrimitiveWetCore
+    wet_core = model isa PrimitiveWet
     (; σ_levels_thick, nlev ) = model.geometry
     @boundscheck nlev == diagn.nlev || throw(BoundsError)
 
@@ -228,7 +228,7 @@ function vertical_advection!(   layer::DiagnosticVariablesLayer,
             
     (; k ) = layer       # which layer are we on?
     
-    wet_core = model isa PrimitiveWetCore
+    wet_core = model isa PrimitiveWet
     (; σ_levels_thick, nlev ) = model.geometry
      
     # for k==1 "above" term is 0, for k==nlev "below" term is zero
@@ -416,7 +416,7 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
 end
 
 function humidity_tendency!(diagn::DiagnosticVariablesLayer,
-                            model::PrimitiveWetCore)
+                            model::PrimitiveWet)
 
     (; humid_tend, humid_tend_grid ) = diagn.tendencies
     (; humid_grid ) = diagn.grid_variables
@@ -428,7 +428,7 @@ function humidity_tendency!(diagn::DiagnosticVariablesLayer,
 end
 
 # no humidity tendency for dry core
-humidity_tendency!(::DiagnosticVariablesLayer,::PrimitiveDryCore) = nothing
+humidity_tendency!(::DiagnosticVariablesLayer,::PrimitiveDry) = nothing
 
 function horizontal_advection!( A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput: tendency to write into
                                 A_tend_grid::AbstractGrid{NF},              # Input: tendency incl prev terms
@@ -731,7 +731,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
 
     S = model.spectral_transform
-    wet_core = model isa PrimitiveWetCore
+    wet_core = model isa PrimitiveWet
 
     vor_lf = progn.timesteps[lf].vor     # pick leapfrog index without memory allocation
     div_lf = progn.timesteps[lf].div

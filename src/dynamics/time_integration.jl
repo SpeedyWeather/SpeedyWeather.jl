@@ -1,8 +1,12 @@
-Base.@kwdef mutable struct LeapfrogSemiImplicit{NF} <: TimeIntegrator{NF}
+"""
+$(TYPEDFIELDS)
+"""
+@kwdef struct Leapfrog{NF} <: TimeStepper{NF}
 
     # DIMENSIONS
     "spectral resolution (max degree of spherical harmonics)"
     trunc::Int                      
+
 
     # OPTIONS
     "time at which the integration starts"
@@ -14,34 +18,47 @@ Base.@kwdef mutable struct LeapfrogSemiImplicit{NF} <: TimeIntegrator{NF}
     "time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::Float64 = 30
 
+    "radius of sphere [m], used for scaling"
+    radius::Float64 = 6.371e6
 
     # NUMERICS
     "Robert (1966) time filter coefficeint to suppress comput. mode"
-    robert_filter::Float64 = 0.05
+    robert_filter::NF = 0.05
 
     "William's time filter (Amezcua 2011) coefficient for 3rd order acc"
-    william_filter::Float64 = 0.53
+    william_filter::NF = 0.53
 
 
-    # DERIVED FROM OPTIONS
-    "time step Δt at specified resolution, [min] → [s]"
-    Δt::Float64 = round(60*Δt_at_T31*(32/(trunc+1)))
-    
-    "time step Δt [s] as integer for rounding error free accumulation"
-    Δt_sec::Int = convert(Int,Δt)
+    # DERIVED FROM OPTIONS    
+    "time step Δt [s] at specified resolution"
+    Δt_sec::Int = round(Int,60*Δt_at_T31*(32/(trunc+1)))
+
+    "time step Δt [s/m] at specified resolution, scaled by 1/radius"
+    Δt::NF = Δt_sec/radius
     
     "convert time step Δt from minutes to hours"
-    Δt_hrs::Float64 = Δt_unscaled/3600
+    Δt_hrs::Float64 = Δt_sec/3600
 
     "number of time steps to integrate for"
     n_timesteps::Int = ceil(Int,24*n_days/Δt_hrs)        
 end
 
-function LeapfrogSemiImplicit(spectral_grid::SpectralGrid;kwargs...)
-    (;trunc) = spectral_grid
-    return LeapfrogSemiImplicit(;trunc,kwargs...)
+function Leapfrog(spectral_grid::SpectralGrid;kwargs...)
+    (;NF,trunc,radius) = spectral_grid
+    return Leapfrog{NF}(;trunc,radius,kwargs...)
 end
 
+function Base.show(io::IO,L::Leapfrog)
+    println(io,"$(typeof(L))(")
+    fields = propertynames(L)
+    nfields = length(fields)
+    for i in 1:nfields
+        key = fields[i]
+        val = getfield(L,key)
+        s = "  $key::$(typeof(val)) = $val"
+        if i < nfields println(io,s) else print(io,s*")") end
+    end
+end
 
 """
     leapfrog!(  A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic variable at t
@@ -60,14 +77,13 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
                     tendency::LowerTriangularMatrix{Complex{NF}},   # tendency (dynamics+physics) of A
                     dt::Real,                                       # time step (=2Δt, but for init steps =Δt,Δt/2)
                     lf::Int,                                        # leapfrog index to dis/enable William's filter
-                    L::LeapfrogSemiImplicit{NF},                    # struct with constants
+                    L::Leapfrog{NF},                                # struct with constants
                     ) where {NF<:AbstractFloat}                     # number format NF
 
     @boundscheck lf == 1 || lf == 2 || throw(BoundsError())         # index lf picks leapfrog dim
     
     A_lf = lf == 1 ? A_old : A_new                      # view on either t or t+dt to dis/enable William's filter        
-    robert_filter = convert(NF,L.robert_filter)         # coefficients for the Robert and William's filter
-    william_filter = convert(NF,L.william_filter)
+    (;robert_filter, william_filter) = L                # coefficients for the Robert and William's filter
     two = convert(NF,2)                                 # 2 in number format NF
     dt_NF = convert(NF,dt)                              # time step dt in number format NF
 
@@ -91,8 +107,8 @@ end
 # variables that are leapfrogged in the respective models that are on layers (so excl surface pressure)
 leapfrog_layer_vars(::Barotropic) = (:vor,)
 leapfrog_layer_vars(::ShallowWater) = (:vor, :div)
-leapfrog_layer_vars(::PrimitiveDryCore) = (:vor, :div, :temp)
-leapfrog_layer_vars(::PrimitiveWetCore) = (:vor, :div, :temp, :humid)
+leapfrog_layer_vars(::PrimitiveDry) = (:vor, :div, :temp)
+leapfrog_layer_vars(::PrimitiveWet) = (:vor, :div, :temp, :humid)
 
 function leapfrog!( progn::PrognosticLayerTimesteps,
                     diagn::DiagnosticVariablesLayer,
@@ -298,18 +314,19 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
                         diagn::DiagnosticVariables, # all pre-allocated diagnostic variables
                         model::ModelSetup)          # all precalculated structs
     
-    (; n_timesteps, Δt, Δt_sec ) = model.constants
-    time = model.parameters.startdate
+    (; n_timesteps, Δt, Δt_sec ) = model.time_stepping
+    time = model.time_stepping.startdate
 
     # SCALING: we use vorticity*radius,divergence*radius in the dynamical core
-    scale!(progn,model)
+    scale!(progn,model.spectral_grid.radius)
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
+    (;output,feedback) = model
     lf = 1                                  # use first leapfrog index
     gridded!(diagn,progn,lf,model)
-    outputter = initialize_netcdf_output(diagn,model)
-    feedback = initialize_feedback(outputter,model)
+    initialize!(output,diagn,model.geometry)
+    initialize!(feedback,model.spectral_grid,model.time_stepping)
 
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
     time = first_timesteps!(progn,diagn,time,model,feedback,outputter)
@@ -321,11 +338,11 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
         time += Dates.Second(Δt_sec)        # time of lf=2 and diagn after timestep!
 
         progress!(feedback,progn)           # updates the progress meter bar
-        write_netcdf_output!(outputter,time,diagn,model)
+        write_output!(outputter,time,diagn,model)
     end
 
-    unscale!(progn,model)                   # unscale radius-scaling from the dynamical core
-    write_restart_file(time,progn,outputter,model)
+    unscale!(progn)                         # undo radius-scaling for vor,div from the dynamical core
+    write_restart_file(time,progn,outputter)
     progress_finish!(feedback)              # finishes the progress meter bar
 
     return progn

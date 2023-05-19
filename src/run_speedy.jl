@@ -5,8 +5,8 @@
 
 Runs SpeedyWeather.jl with number format `NF` and the model `Model` and any additional parameters
 in the keyword arguments `kwargs...`. Unspecified parameters use the default values."""
-function run_speedy(::Type{NF}=Float32,                 # default number format
-                    ::Type{Model}=PrimitiveDryCore;     # default model
+function run_speedy(::Type{NF}=DEFAULT_NF,                      # default number format
+                    ::Type{Model}=DEFAULT_MODEL;                # default model
                     spectral_grid::NamedTuple = NamedTuple(),   # some keyword arguments to be
                     planet::NamedTuple = NamedTuple(),          # passed on
                     atmosphere::NamedTuple = NamedTuple(),
@@ -28,15 +28,11 @@ function run_speedy(::Type{NF}=Float32,                 # default number format
     ConcreteModel = default_concrete_model(Model)
     model = ConcreteModel(;spectral_grid,planet,atmosphere,time_stepping,
                             feedback,output,kwargs...)
-    initialize!(model)
+    simulation = initialize!(model)
 
-    # allocate prognostic and diagnostic variables
-    progn_vars = initial_conditions(model)
-    diagn_vars = DiagnosticVariables(model)
-
-    # start model integration
-    time_stepping!(progn_vars,diagn_vars,model)
-    return progn_vars                              # return prognostic variables when finished
+    # run it, yeah!
+    run!(simulation)
+    return simulation.prognostic_variables  # return prognostic variables when finished
 end
 
 # if only Model M provided, use default number format NF
@@ -75,14 +71,14 @@ function initialize_speedy( ::Type{NF}=DEFAULT_NF,          # default number for
     elseif ConcreteModel <: ShallowWater            # to the supported model types
         I = Implicit(P)                             # precompute arrays for semi-implicit corrections
         M = ShallowWaterModel(P,C,G,S,B,H,I,D)
-    elseif ConcreteModel <: PrimitiveDryCore        # no humidity 
+    elseif ConcreteModel <: PrimitiveDry        # no humidity 
         I = Implicit(P)
         K = ParameterizationConstants(P,G)
-        M = PrimitiveDryCoreModel(P,C,K,G,S,B,H,I,D)
-    elseif ConcreteModel <: PrimitiveWetCore        # with humidity
+        M = PrimitiveDryModel(P,C,K,G,S,B,H,I,D)
+    elseif ConcreteModel <: PrimitiveWet        # with humidity
         I = Implicit(P)
         K = ParameterizationConstants(P,G)
-        M = PrimitiveWetCoreModel(P,C,K,G,S,B,H,I,D)
+        M = PrimitiveWetModel(P,C,K,G,S,B,H,I,D)
     end
 
     prognostic_vars = initial_conditions(M)         # initialize prognostic variables
@@ -95,10 +91,7 @@ end
 initialize_speedy(::Type{Model};kwargs...) where {Model<:ModelSetup} = initialize_speedy(DEFAULT_NF,Model;kwargs...)
 
 """
-    progn = run_speedy!(progn::PrognosticVariables,
-                        diagn::DiagnosticVariables,
-                        model::ModelSetup)
-
+$(TYPEDSIGNATURES)
 Convenience function that can be used in combination with `initialize_speedy(args...;kwargs...)` as
 
     P,D,M = initialize_speedy(kwargs...)
@@ -114,4 +107,12 @@ function run_speedy!(   progn::PrognosticVariables, # all prognostic variables
     initialize && initalize!(model)
     time_stepping!(progn,diagn,model)
     return progn
+end
+
+"""
+$(TYPEDSIGNATURES)
+"""
+function run!(simulation::Simulation)
+    (;prognostic_variables, diagnostic_variables, model) = simulation
+    run_speedy!(prognostic_variables,diagnostic_variables,model)
 end

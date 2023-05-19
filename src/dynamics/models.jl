@@ -1,26 +1,29 @@
+struct Simulation{Model<:ModelSetup}
+    prognostic_variables::PrognosticVariables
+    diagnostic_variables::DiagnosticVariables
+    model::Model
+end
+
 """
-    model = BarotropicModel(::Parameters,
-                        ::DynamicsConstants,
-                        ::Geometry,
-                        ::SpectralTransform,
-                        ::HorizontalDiffusion)
+$(SIGNATURES)
 
 The BarotropicModel struct holds all other structs that contain precalculated constants,
-whether scalars or arrays that do not change throughout model integration. In contrast to
-`ShallowWaterModel` or `PrimitiveEquation` it does not contain a `Boundaries` struct
-as not needed."""
-Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
-    
-    # SpectralGrid object dictates resolution for many other components
+whether scalars or arrays that do not change throughout model integration.
+
+$(TYPEDFIELDS)"""
+@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
+    "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
     # PHYSICS 
-    planet::Planet = Earth(spectral_grid)
-    atmosphere::Atmosphere = EarthAthmosphere()
-    forcing::AbstractForcing = NoForcing()
+    "contains physical and orbital characteristics"
+    planet::AbstractPlanet = Earth()
+    atmosphere::AbstractAtmosphere = EarthAtmosphere()
+    forcing::AbstractForcing{NF} = NoForcing(spectral_grid)
+    initial_conditions::InitialConditions = StartWithVorticity()
 
     # NUMERICS
-    time_stepping::TimeIntegrator{NF} = LeapfrogSemiImplicit(spectral_grid)
+    time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
     spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
     horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
 
@@ -30,19 +33,21 @@ Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Baro
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
-    feedback::AbstractFeedback = Feedback()
-    output::AbstractOutput = Output(spectral_grid)
+    output::AbstractOutput = Output(spectral_grid,time_stepping)
+    feedback::AbstractFeedback = Feedback(output,time_stepping)
 end
 
 has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
-# function initialize!(model::BarotropicModel)
-#     initialize!(model.forcing,model)
-#     initialize!(model.horizontal_diffusion,model.geometry,model.constants)
-# end
+function initialize!(model::BarotropicModel)
+    initialize!(model.forcing,model)
+    initialize!(model.horizontal_diffusion,model.constants)
 
-
+    prognostic_variables = initial_conditions(model)
+    diagnostic_variables = DiagnosticVariables(model)
+    return Simulation(prognostic_variables,diagnostic_variables,model)
+end
 
 # """
 #     M = ShallowWaterModel(  ::Parameters,
@@ -69,7 +74,7 @@ default_concrete_model(::Type{Barotropic}) = BarotropicModel
 # default_concrete_model(::Type{ShallowWater}) = ShallowWaterModel
 
 # """
-#     M = PrimitiveDryCoreModel(  ::Parameters,
+#     M = PrimitiveDryModel(  ::Parameters,
 #                                 ::DynamicsConstants,
 #                                 ::Geometry,
 #                                 ::SpectralTransform,
@@ -77,9 +82,9 @@ default_concrete_model(::Type{Barotropic}) = BarotropicModel
 #                                 ::HorizontalDiffusion
 #                                 ::Implicit)
 
-# The PrimitiveDryCoreModel struct holds all other structs that contain precalculated constants,
+# The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 # whether scalars or arrays that do not change throughout model integration."""
-# struct PrimitiveDryCoreModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveDryCore
+# struct PrimitiveDryModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveDry
 #     parameters::Parameters
 #     constants::DynamicsConstants{NF}
 #     parameterization_constants::ParameterizationConstants{NF}
@@ -92,7 +97,7 @@ default_concrete_model(::Type{Barotropic}) = BarotropicModel
 # end
 
 # """
-#     M = PrimitiveWetCoreModel(  ::Parameters,
+#     M = PrimitiveWetModel(  ::Parameters,
 #                                 ::DynamicsConstants,
 #                                 ::Geometry,
 #                                 ::SpectralTransform,
@@ -100,9 +105,9 @@ default_concrete_model(::Type{Barotropic}) = BarotropicModel
 #                                 ::HorizontalDiffusion
 #                                 ::Implicit)
 
-# The PrimitiveWetCoreModel struct holds all other structs that contain precalculated constants,
+# The PrimitiveWetModel struct holds all other structs that contain precalculated constants,
 # whether scalars or arrays that do not change throughout model integration."""
-# struct PrimitiveWetCoreModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveWetCore
+# struct PrimitiveWetModel{NF<:AbstractFloat,D<:AbstractDevice} <: PrimitiveWet
 #     parameters::Parameters
 #     constants::DynamicsConstants{NF}
 #     parameterization_constants::ParameterizationConstants{NF}
@@ -114,9 +119,9 @@ default_concrete_model(::Type{Barotropic}) = BarotropicModel
 #     device_setup::DeviceSetup{D}
 # end
 
-# has(::Type{<:PrimitiveDryCore}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres)
-# has(::Type{<:PrimitiveWetCore}, var_name::Symbol) = var_name in (:vor, :div, :temp, :humid, :pres)
-# default_concrete_model(::Type{PrimitiveEquation}) = PrimitiveDryCoreModel
+# has(::Type{<:PrimitiveDry}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres)
+# has(::Type{<:PrimitiveWet}, var_name::Symbol) = var_name in (:vor, :div, :temp, :humid, :pres)
+# default_concrete_model(::Type{PrimitiveEquation}) = PrimitiveDryModel
 # default_concrete_model(Model::Type{<:ModelSetup}) = Model
 
 # """
@@ -127,3 +132,7 @@ default_concrete_model(::Type{Barotropic}) = BarotropicModel
 # """
 # has(::Type{<:ModelSetup}, var_name::Symbol) = var_name in (:vor, :div, :temp, :humid, :pres)
 # has(M::ModelSetup, var_name) = has(typeof(M), var_name)
+
+function Model(spectral_grid::SpectralGrid{WhichModel};kwargs...) where WhichModel
+    return default_concrete_model(WhichModel)(;kwargs...)
+end

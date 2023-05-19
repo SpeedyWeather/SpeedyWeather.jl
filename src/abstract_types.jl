@@ -3,8 +3,8 @@ abstract type ModelSetup end
 abstract type Barotropic <: ModelSetup end
 abstract type ShallowWater <: ModelSetup end
 abstract type PrimitiveEquation <: ModelSetup end
-abstract type PrimitiveDryCore <: PrimitiveEquation end
-abstract type PrimitiveWetCore <: PrimitiveEquation end
+abstract type PrimitiveDry <: PrimitiveEquation end
+abstract type PrimitiveWet <: PrimitiveEquation end
 
 abstract type AbstractPlanet end
 abstract type AbstractAtmosphere end
@@ -39,4 +39,4 @@ abstract type AbstractOutput end
 # NUMERICS
 abstract type HorizontalDiffusion{NF} end
 abstract type AbstractImplicit{NF} end
-abstract type TimeIntegrator{NF} end
+abstract type TimeStepper{NF} end

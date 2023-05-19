@@ -6,7 +6,7 @@ characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Default keyword arguments are
 
 $(TYPEDFIELDS)"""
-Base.@kwdef struct EarthAtmosphere <: AbstractAtmosphere
+@kwdef struct EarthAtmosphere <: AbstractAtmosphere
     # ATMOSPHERE
 
     "molar mass of dry air [g/mol]"

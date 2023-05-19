@@ -15,7 +15,7 @@ function initialize_temperature_relaxation!(K::ParameterizationConstants,
     return nothing
 end
 
-Base.@kwdef struct HeldSuarez{NF<:Real} <: TemperatureRelaxation{NF}
+@kwdef struct HeldSuarez{NF<:Real} <: TemperatureRelaxation{NF}
     σb::NF = 0.7                    # sigma coordinate below which linear drag is applied
 
     relax_time_slow::NF = 40.0*24   # [hours] time scale for slow global relaxation
@@ -84,7 +84,7 @@ end
 
 HeldSuarez-like temperature relaxation, but towards the Jablonowski temperature
 profile with increasing temperatures in the stratosphere."""
-Base.@kwdef struct JablonowskiRelaxation{NF<:Real} <: TemperatureRelaxation{NF}
+@kwdef struct JablonowskiRelaxation{NF<:Real} <: TemperatureRelaxation{NF}
     σb::NF = 0.7        # sigma coordinate below which relax_time_fast is applied
 
     η₀::NF = 0.252      # conversion from σ to Jablonowski's ηᵥ-coordinates

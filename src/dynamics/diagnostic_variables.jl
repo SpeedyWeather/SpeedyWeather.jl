@@ -16,20 +16,18 @@ struct Tendencies{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 end
 
 function Base.zeros(::Type{Tendencies},
-                    G::Geometry{NF},
-                    S::SpectralTransform{NF}) where NF
+                    SG::SpectralGrid)
     
-    (;Grid, nlat_half) = G
-    (;lmax, mmax) = S
+    (;NF, trunc,Grid, nlat_half) = G
     LTM = LowerTriangularMatrix
     
     # use one more l for size compat with vector quantities
-    vor_tend        = zeros(LTM{Complex{NF}},lmax+2,mmax+1)     # vorticity
-    div_tend        = zeros(LTM{Complex{NF}},lmax+2,mmax+1)     # divergence
-    temp_tend       = zeros(LTM{Complex{NF}},lmax+2,mmax+1)     # absolute Temperature
-    humid_tend      = zeros(LTM{Complex{NF}},lmax+2,mmax+1)     # specific humidity
-    u_tend          = zeros(LTM{Complex{NF}},lmax+2,mmax+1)     # zonal velocity
-    v_tend          = zeros(LTM{Complex{NF}},lmax+2,mmax+1)     # meridional velocity
+    vor_tend        = zeros(LTM{Complex{NF}},trunc+2,trunc+1)   # vorticity
+    div_tend        = zeros(LTM{Complex{NF}},trunc+2,trunc+1)   # divergence
+    temp_tend       = zeros(LTM{Complex{NF}},trunc+2,trunc+1)   # absolute Temperature
+    humid_tend      = zeros(LTM{Complex{NF}},trunc+2,trunc+1)   # specific humidity
+    u_tend          = zeros(LTM{Complex{NF}},trunc+2,trunc+1)   # zonal velocity
+    v_tend          = zeros(LTM{Complex{NF}},trunc+2,trunc+1)   # meridional velocity
     u_tend_grid     = zeros(Grid{NF},nlat_half)                 # zonal velocity
     v_tend_grid     = zeros(Grid{NF},nlat_half)                 # meridional velocity
     temp_tend_grid  = zeros(Grid{NF},nlat_half)                 # temperature
@@ -55,9 +53,9 @@ struct GridVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     v_grid              ::Grid  # meridional velocity *coslat [m/s]
 end
 
-function Base.zeros(::Type{GridVariables},G::Geometry{NF}) where NF
+function Base.zeros(::Type{GridVariables},SG::SpectralGrid)
 
-    (;Grid, nlat_half) = G
+    (;NF, Grid, nlat_half) = G
     vor_grid            = zeros(Grid{NF},nlat_half)   # vorticity
     div_grid            = zeros(Grid{NF},nlat_half)   # divergence
     temp_grid           = zeros(Grid{NF},nlat_half)   # absolute temperature
@@ -100,15 +98,13 @@ struct DynamicsVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 end
 
 function Base.zeros(::Type{DynamicsVariables},
-                    G::Geometry{NF},
-                    S::SpectralTransform{NF}) where NF
+                    SG::SpectralGrid)
     
-    (;lmax, mmax) = S
-    (;Grid, nlat_half) = G
+    (;NF, trunc, Grid, nlat_half) = SG
 
     # MULTI-PURPOSE VECTOR (a,b), work array to be reused in various places
-    a = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    b = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    a = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
+    b = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
     a_grid = zeros(Grid{NF},nlat_half)
     b_grid = zeros(Grid{NF},nlat_half)
 
@@ -116,8 +112,8 @@ function Base.zeros(::Type{DynamicsVariables},
     uv∇lnp          = zeros(Grid{NF},nlat_half)   # = (uₖ,vₖ)⋅∇ln(pₛ), pressure flux
     uv∇lnp_sum_above= zeros(Grid{NF},nlat_half)   # sum of Δσₖ-weighted uv∇lnp from 1:k-1
     div_sum_above   = zeros(Grid{NF},nlat_half)   # sum of Δσₖ-weighted div from 1:k-1
-    temp_virt       = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-    geopot          = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    temp_virt       = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
+    geopot          = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
 
     # VERTICAL VELOCITY (̇̇dσ/dt)
     σ_tend = zeros(Grid{NF},nlat_half)    # = dσ/dt, on half levels below, at k+1/2
@@ -137,16 +133,12 @@ struct DiagnosticVariablesLayer{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 end
 
 function Base.zeros(::Type{DiagnosticVariablesLayer},
-                    G::Geometry{NF},
-                    S::SpectralTransform{NF};
-                    k::Integer=0) where NF      # use k=0 (i.e. unspecified) as default
-
+                    SG::SpectralGrid,
+                    k::Integer=0)                   # use k=0 (i.e. unspecified) as default
     (;npoints) = G
-
-    tendencies = zeros(Tendencies,G,S)
-    grid_variables = zeros(GridVariables,G)
-    dynamics_variables = zeros(DynamicsVariables,G,S)
-
+    tendencies = zeros(Tendencies,SG)
+    grid_variables = zeros(GridVariables,SG)
+    dynamics_variables = zeros(DynamicsVariables,SG)
     return DiagnosticVariablesLayer(tendencies,grid_variables,dynamics_variables,npoints,k)
 end
 
@@ -170,15 +162,13 @@ struct SurfaceVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 end
 
 function Base.zeros(::Type{SurfaceVariables},
-                    G::Geometry{NF},
-                    S::SpectralTransform{NF}) where NF
+                    SG::SpectralGrid)
 
-    (;Grid, nlat_half, npoints) = G
-    (;lmax, mmax) = S
+    (;NF, trunc, Grid, nlat_half, npoints) = G
 
     # log of surface pressure and tendency thereof
     pres_grid = zeros(Grid{NF},nlat_half)
-    pres_tend = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    pres_tend = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
     pres_tend_grid = zeros(Grid{NF},nlat_half)
 
     # gradients of log surface pressure
@@ -189,7 +179,7 @@ function Base.zeros(::Type{SurfaceVariables},
     u_mean_grid = zeros(Grid{NF},nlat_half)
     v_mean_grid = zeros(Grid{NF},nlat_half)
     div_mean_grid = zeros(Grid{NF},nlat_half)
-    div_mean = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+    div_mean = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
 
     # precipitation fields
     precip_large_scale = zeros(Grid{NF},nlat_half)
@@ -206,34 +196,40 @@ end
     DiagnosticVariables{Grid<:AbstractGrid,NF<:AbstractFloat}
 
 Struct holding the diagnostic variables."""
-struct DiagnosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
+struct DiagnosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF},Model<:ModelSetup}
     layers  ::Vector{DiagnosticVariablesLayer{NF,Grid}}
     surface ::SurfaceVariables{NF,Grid}
     columns ::Vector{ColumnVariables{NF}}
     temp_profile::Vector{NF}
+
+    nlat_half::Int      # resolution parameter of any Grid
     nlev    ::Int       # number of vertical levels
     npoints ::Int       # number of grid points
+
+    scale::Base.RefValue{NF}   # vorticity and divergence are scaled by radius
 end
 
 function Base.zeros(::Type{DiagnosticVariables},
-                    G::Geometry{NF},
-                    S::SpectralTransform{NF}) where NF
+                    SG::SpectralGrid{Model}) where {Model<:ModelSetup}
 
-    (;nlev, npoints, n_stratosphere_levels) = G
-    layers = [zeros(DiagnosticVariablesLayer,G,S;k) for k in 1:nlev]
-    surface = zeros(SurfaceVariables,G,S)
+    (;NF,Grid,nlat_half, nlev, npoints) = SG
+    layers = [zeros(DiagnosticVariablesLayer,SG;k) for k in 1:nlev]
+    surface = zeros(SurfaceVariables,SG)
     
     # create one column variable per thread to avoid race conditions
     nthreads = Threads.nthreads()
-    columns = [ColumnVariables{NF}(;nlev,n_stratosphere_levels) for _ in 1:nthreads]
+    columns = [ColumnVariables{NF}(;nlev) for _ in 1:nthreads]
 
     # global temperature profile, recalculated occasionally for the implicit solver
     temp_profile = zeros(NF,nlev)
 
-    return DiagnosticVariables(layers,surface,columns,temp_profile,nlev,npoints)
+    scale = Ref(convert(SG.NF,SG.radius))
+
+    return DiagnosticVariables{NF,Grid{NF},Model}(
+        layers,surface,columns,temp_profile,nlat_half,nlev,npoints,scale)
 end
 
-DiagnosticVariables(G::Geometry{NF},S::SpectralTransform{NF}) where NF = zeros(DiagnosticVariables,G,S)
+DiagnosticVariables(SG::SpectralGrid) = zeros(DiagnosticVariables,SG)
 
 # LOOP OVER ALL GRID POINTS (extend from RingGrids module)
 RingGrids.eachgridpoint(diagn::DiagnosticVariables) = Base.OneTo(diagn.npoints)

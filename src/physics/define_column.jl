@@ -5,7 +5,7 @@ Mutable struct that contains all prognostic (copies thereof) and diagnostic vari
 needed to evaluate the physical parametrizations. For now the struct is mutable as we will reuse the struct
 to iterate over horizontal grid points. Every column vector has `nlev` entries, from [1] at the top to
 [end] at the lowermost model level at the planetary boundary layer."""
-Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnVariables{NF}
+@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnVariables{NF}
 
     # DIMENSIONS
     const nlev::Int = 0                     # number of vertical levels

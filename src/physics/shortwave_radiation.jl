@@ -1,7 +1,7 @@
 """
 Parameters for radiation parameterizations.
 """
-Base.@kwdef struct RadiationCoefs{NF<:Real} <: Coefficients
+@kwdef struct RadiationCoefs{NF<:Real} <: Coefficients
     epslw::NF = 0.05    # Fraction of blackbody spectrum absorbed/emitted by PBL only
     emisfc::NF = 0.98   # Longwave surface emissivity
 

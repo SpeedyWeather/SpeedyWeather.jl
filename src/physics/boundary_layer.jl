@@ -15,7 +15,7 @@ function initialize!(   scheme::NoBoundaryLayer,
 end 
 
 """Following Held and Suarez, 1996 BAMS"""
-Base.@kwdef struct LinearDrag{NF<:Real} <: BoundaryLayer{NF}
+@kwdef struct LinearDrag{NF<:Real} <: BoundaryLayer{NF}
     # PARAMETERS
     σb::Float64 = 0.7           # sigma coordinate below which linear drag is applied
     time_scale::Float64 = 24    # [hours] time scale for linear drag coefficient at σ=1 (=1/kf in HS96)

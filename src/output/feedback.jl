@@ -1,7 +1,10 @@
 mutable struct Feedback <: AbstractFeedback
     verbose::Bool                           # print feedback to REPL?
     debug::Bool                             # run nan_detection code?
-    output::Bool                            # store output (here: write to parameters and progress.txt?)
+    
+    output::Bool                            # write a progress.txt?
+    id::Union{String,Int}                   # identification of run, taken from ::Output
+    run_path::String                        # path to run folder, taken from ::Output
 
     # PROGRESS
     progress_meter::ProgressMeter.Progress  # struct containing everything progress related
@@ -11,50 +14,49 @@ mutable struct Feedback <: AbstractFeedback
     nars_detected::Bool                     # did Infs/NaNs occur in the simulation?
 end
 
-"""Initialises the progress txt file."""
-function initialize_feedback(outputter::Output,M::ModelSetup)
-    (; output, write_restart ) = outputter
-    (; run_id, run_path ) = outputter
-
-    if output   # with netcdf output write parameters.txt and progress.txt
-        (; NF, n_days, trunc ) = M.parameters
-        (; Grid, npoints, nlat_half ) = M.geometry
-
-        # create progress.txt file in run????/
-        progress_txt = open(joinpath(run_path,"progress.txt"),"w")
-        s = "Starting SpeedyWeather.jl run $run_id on "*
-                Dates.format(Dates.now(),Dates.RFC1123Format)
-        write(progress_txt,s*"\n")      # and in file
-
-        # add some information on resolution and number format
-        write(progress_txt,"Integrating $(n_days) days at a spectral resolution of "*
-            "T$trunc on a $(get_nlat(Grid,nlat_half))-ring $Grid with $npoints grid points.\n")
-        write(progress_txt,"Number format is "*string(NF)*".\n")
-        write(progress_txt,"All data will be stored in $run_path.\n")
-
-        # also export parameters into run????/parameters.txt
-        parameters_txt = open(joinpath(run_path,"parameters.txt"),"w")
-        print(parameters_txt,M.parameters)
-        close(parameters_txt)
-
-    else        # no netcdf output
-        progress_txt = nothing      # for no ouput, allocate dummies for Feedback struct
-    end
-
-    nans_detected = false           # don't check again if true
+function Feedback(  outputter::Output,
+                    time_stepping::TimeStepper,
+                    verbose::Bool=true,
+                    debug::Bool=true)
+    
+    (;output) = outputter
+    id = ""             # do this in initialize!(::Output, ...) to avoid folder-race conditions
+    run_path = ""
 
     # PROGRESSMETER
-    (; verbose, debug ) = M.parameters
-    (; n_timesteps ) = M.constants
-    DT_IN_SEC[] = M.constants.Δt_sec       # hack: redefine element in global constant dt_in_sec
-                                            # used to pass on the time step to ProgressMeter.speedstring
-    desc = "Weather is speedy$(output ? " run $run_id: " : ": ")"
+    (;Δt_sec, n_timesteps) = time_stepping
+    DT_IN_SEC[] = Δt_sec        # hack: redefine element in global constant dt_in_sec
+                                # used to pass on the time step to ProgressMeter.speedstring
+    desc = "Weather is speedy: "
     
     # show progress meter via `enabled` through verbose parameter
-    # one more time steps for the first Euler time step in first_timesteps!
-    progress_meter = ProgressMeter.Progress(n_timesteps+1, enabled=verbose, showspeed=true; desc)
+    # minus one to exclude first_timesteps! which contain compilation
+    progress_meter = ProgressMeter.Progress(n_timesteps-1, enabled=verbose, showspeed=true; desc)
+    progress_txt = nothing          # initialize with nothing, initialize in initialize!(::Feedback,...)
 
-    return Feedback(verbose,debug,output,progress_meter,progress_txt,nans_detected)
+    nars_detected = false
+    return Feedback(verbose,debug,
+                    output,id,run_path,
+                    progress_meter,progress_txt,
+                    nars_detected)
+end
+
+"""Initialises the progress txt file."""
+function initialize!(feedback::Feedback,SG::SpectralGrid,L::TimeStepper)
+    if feedback.output   # with netcdf output write progress.txt
+        (; path, id) = feedback
+
+        # create progress.txt file in run_????/
+        progress_txt = open(joinpath(path,"progress.txt"),"w")
+        s = "Starting SpeedyWeather.jl run $id on "*
+                Dates.format(Dates.now(),Dates.RFC1123Format)
+        write(progress_txt,s*"\n")
+        write(progress_txt,"Integrating:\n")
+        write(progress_txt,"$SG\n")
+        write(progress_txt,"Time: $(L.n_days) days at Δt = $(L.Δt_sec)s\n")
+        write(progress_txt,"\nAll data stored in $path")
+        feedback.progress_txt = progress_txt
+    end
 end
 
 """Calls the progress meter and writes every 5% progress increase to txt."""
@@ -127,4 +129,57 @@ function remaining_time(p::ProgressMeter.Progress)
         eta = "N/A"
     end
     return eta
+end
+
+# adapted from ProgressMeter.jl
+function speedstring(sec_per_iter,dt_in_sec)
+    if sec_per_iter == Inf
+        return "  N/A  days/day"
+    end
+
+    sim_time_per_time = dt_in_sec/sec_per_iter
+
+    for (divideby, unit) in (   (365*1_000, "millenia"),
+                                (365, "years"),
+                                (1, "days"),
+                                (1/24, "hours"))    
+        if (sim_time_per_time / divideby) > 2
+            return @sprintf "%5.2f %2s/day" (sim_time_per_time / divideby) unit
+        end
+    end
+    return " <2 hours/days"
+end
+
+# hack: define global constant whose element will be changed in initialize_feedback
+# used to pass on the time step to ProgressMeter.speedstring via calling this
+# constant from the ProgressMeter module
+const DT_IN_SEC = Ref(1800)
+
+function ProgressMeter.speedstring(sec_per_iter,dt_in_sec=SpeedyWeather.DT_IN_SEC)
+    speedstring(sec_per_iter,dt_in_sec[])
+end
+
+"""
+    readable_secs(secs::Real) -> Dates.CompoundPeriod
+
+Returns `Dates.CompoundPeriod` rounding to either (days, hours), (hours, minutes), (minutes,
+seconds), or seconds with 1 decimal place accuracy for >10s and two for less.
+E.g.
+```julia
+julia> readable_secs(12345)
+3 hours, 26 minutes
+```
+"""
+function readable_secs(secs::Real)
+    millisecs = Dates.Millisecond(round(secs * 10 ^ 3))
+    if millisecs >= Dates.Day(1)
+        return Dates.canonicalize(round(millisecs, Dates.Hour))
+    elseif millisecs >= Dates.Hour(1)
+        return Dates.canonicalize(round(millisecs, Dates.Minute))
+    elseif millisecs >= Dates.Minute(1)
+        return Dates.canonicalize(round(millisecs, Dates.Second))
+    elseif millisecs >= Dates.Second(10)
+        return Dates.canonicalize(round(millisecs, Dates.Millisecond(100)))
+    end
+    return Dates.canonicalize(round(millisecs, Dates.Millisecond(10)))
 end

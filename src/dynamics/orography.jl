@@ -6,13 +6,13 @@ struct Orography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
 end
 
 """Zonal ridge orography after Jablonowski and Williamson 2006."""
-Base.@kwdef struct ZonalRidge <: AbstractOrography
+@kwdef struct ZonalRidge <: AbstractOrography
     η₀::Float64 = 0.252     # conversion from σ to Jablonowski's ηᵥ-coordinates
     u₀::Float64 = 35        # max amplitude of zonal wind [m/s] that scales orography height
 end
 
 # empty structs (no parameters needed) for other orographies
-Base.@kwdef struct EarthOrography <: AbstractOrography
+@kwdef struct EarthOrography <: AbstractOrography
     smoothing::Bool = true              # smooth the orography field?
     smoothing_power::Float64 = 1.0      # power of Laplacian for smoothing
     smoothing_strength::Float64 = 0.1   # highest degree l is multiplied by

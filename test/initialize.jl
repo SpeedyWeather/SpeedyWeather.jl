@@ -31,7 +31,7 @@ end
     @test all(progn.surface.timesteps[2].pres .== 0)
 
     # PRIMITIVE EQUATION MODEL
-    progn, diagn, model = initialize_speedy(PrimitiveDryCore,initial_conditions=StartFromRest())
+    progn, diagn, model = initialize_speedy(PrimitiveDry,initial_conditions=StartFromRest())
     for layer in progn.layers
         for step in layer.timesteps
             @test all(step.vor .== 0)

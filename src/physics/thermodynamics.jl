@@ -6,7 +6,7 @@ Parameters for computing saturation vapour pressure using the August-Roche-Magnu
 where T is in Kelvin and i = 1,2 for saturation with respect to water and ice,
 respectively.
 """
-Base.@kwdef struct MagnusCoefs{NF<:Real} <: Coefficients
+@kwdef struct MagnusCoefs{NF<:Real} <: Coefficients
     e₀::NF = 6.108   # Saturation vapour pressure at 0°C
     T₀::NF = 273.16  # 0°C in Kelvin
     T₁::NF = 35.86
@@ -16,7 +16,7 @@ Base.@kwdef struct MagnusCoefs{NF<:Real} <: Coefficients
 end
 
 """
-    get_thermodynamics!(column::ColumnVariables,model::PrimitiveWetCore)
+    get_thermodynamics!(column::ColumnVariables,model::PrimitiveWet)
 
 Calculate thermodynamic quantities like saturation vapour pressure,
 saturation specific humidity, dry static energy, moist static energy
@@ -27,7 +27,7 @@ function get_thermodynamics!(   column::ColumnVariables,
     # Calculate thermodynamic quantities at full levels
     dry_static_energy!(column, model)
 
-    if model isa PrimitiveWetCore
+    if model isa PrimitiveWet
         saturation_vapour_pressure!(column, model)
         saturation_specific_humidity!(column, model)
         moist_static_energy!(column, model)

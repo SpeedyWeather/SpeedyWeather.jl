@@ -1,4 +1,4 @@
-Base.@kwdef struct HyperDiffusion{NF} <: HorizontalDiffusion{NF}
+@kwdef struct HyperDiffusion{NF} <: HorizontalDiffusion{NF}
     # DIMENSIONS
     trunc::Int                          # spectral resolution
     nlev::Int                           # number of vertical levels
@@ -20,8 +20,12 @@ Base.@kwdef struct HyperDiffusion{NF} <: HorizontalDiffusion{NF}
     adaptive_strength::Float64 = 2.0    # increase strength above vor_max by this factor
                                         # times max(abs(vor))/vor_max
 
-    # constant arrays to be initalised later
-    # (Hyper) diffusion, precalculated for each spherical harmonics degree
+    # ARRAYS, precalculated for each spherical harmonics degree
+    # Barotropic and ShallowWater are fine with a constant time scale 
+    ∇²ⁿ_2D::Vector{NF} = zeros(NF,trunc+2)
+    ∇²ⁿ_2D_implicit::Vector{NF} = zeros(NF,trunc+2)
+
+    # PrimitiveEquation models need something more adaptive
     # and for each layer (to allow for varying orders/strength in the vertical)
     ∇²ⁿ::Vector{Vector{NF}} = [zeros(NF,trunc+2) for _ in 1:nlev]           # explicit part
     ∇²ⁿ_implicit::Vector{Vector{NF}} = [zeros(NF,trunc+2) for _ in 1:nlev]  # implicit part
@@ -38,6 +42,34 @@ function initialize!(   scheme::HyperDiffusion,
     (;nlev) = scheme
     for k in 1:nlev 
         initialize!(scheme,k,G,C)
+    end
+end
+
+function initialize!(   scheme::HyperDiffusion,
+                        C::DynamicsConstants)
+
+    (;trunc,time_scale,∇²ⁿ_2D,∇²ⁿ_2D_implicit,power) = scheme
+    (;Δt, radius) = C
+
+    # time scale times 1/radius because time step Δt is scaled with 1/radius
+    # time scale*3600 for [hrs] → [s]
+    time_scale = 1/radius*(3600*time_scale)
+
+    # NORMALISATION
+    # Diffusion is applied by multiplication of the eigenvalues of the Laplacian -l*(l+1)
+    # normalise by the largest eigenvalue -lmax*(lmax+1) such that the highest wavenumber lmax
+    # is dampened to 0 at the given time scale raise to a power of the Laplacian for hyperdiffusion
+    # (=more scale-selective for smaller wavenumbers)
+    largest_eigenvalue = -trunc*(trunc+1)
+    
+    @inbounds for l in 0:lmax+1   # diffusion for every degree l, but indendent of order m
+        eigenvalue_norm = -l*(l+1)/largest_eigenvalue   # normalised diffusion ∇², power=1
+
+        # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
+        ∇²ⁿ_2D[l+1] = -eigenvalue_norm^power/time_scale
+        
+        # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
+        ∇²ⁿ_2D_implicit[l+1] = 1/(1-2Δt*∇²ⁿ[l+1])           
     end
 end
 
@@ -127,14 +159,40 @@ function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   
     end
 end
 
-# which variables to apply horizontal diffusion to
-diffusion_vars(::Barotropic) = (:vor,)
-diffusion_vars(::ShallowWater) = (:vor,:div)
-diffusion_vars(::PrimitiveEquation) = (:vor,:div,:temp)
+function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
+                                diagn::DiagnosticVariablesLayer,
+                                model::Barotropic,
+                                lf::Int=1)      # leapfrog index used (2 is unstable)
+    
+    HD = model.horizontal_diffusion
+    ∇²ⁿ = HD.∇²ⁿ_2D
+    ∇²ⁿ_implicit = HD.∇²ⁿ_2D_implicit
+
+    # Barotropic model diffuses vorticity (only variable)
+    (;vor) = progn.timesteps[lf]
+    (;vor_tend) = diagn.tendencies
+    horizontal_diffusion!(vor_tend,vor,∇²ⁿ,∇²ⁿ_implicit)
+end
 
 function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
                                 diagn::DiagnosticVariablesLayer,
-                                model::ModelSetup,
+                                model::ShallowWater,
+                                lf::Int=1)      # leapfrog index used (2 is unstable)
+    
+    HD = model.horizontal_diffusion
+    ∇²ⁿ = HD.∇²ⁿ_2D
+    ∇²ⁿ_implicit = HD.∇²ⁿ_2D_implicit
+
+    # ShallowWater model diffuses vorticity and divergence
+    (;vor,div) = progn.timesteps[lf]
+    (;vor_tend,div_tend) = diagn.tendencies
+    horizontal_diffusion!(vor_tend,vor,∇²ⁿ,∇²ⁿ_implicit)
+    horizontal_diffusion!(div_tend,div,∇²ⁿ,∇²ⁿ_implicit)
+end
+
+function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
+                                diagn::DiagnosticVariablesLayer,
+                                model::PrimitiveEquation,
                                 lf::Int=1)      # leapfrog index used (2 is unstable)
     
     HD = model.horizontal_diffusion
@@ -143,9 +201,14 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
     ∇²ⁿ = HD.∇²ⁿ[k]                             # now pick operators at k
     ∇²ⁿ_implicit = HD.∇²ⁿ_implicit[k]
 
-    for varname in diffusion_vars(model)
-        var = getfield(progn.timesteps[lf],varname)
-        var_tend = getfield(diagn.tendencies,Symbol(varname,:_tend))
-        horizontal_diffusion!(var_tend,var,∇²ⁿ,∇²ⁿ_implicit)
-    end
+    # Primitive equation models diffuse vor and divergence more selective/adaptive
+    (;vor,div,temp) = progn.timesteps[lf]
+    (;vor_tend,div_tend,temp_tend) = diagn.tendencies
+    horizontal_diffusion!(vor_tend,vor,∇²ⁿ,∇²ⁿ_implicit)
+    horizontal_diffusion!(div_tend,div,∇²ⁿ,∇²ⁿ_implicit)
+
+    # but use the weaker diffusion for temperature
+    ∇²ⁿ = HD.∇²ⁿ_2D
+    ∇²ⁿ_implicit = HD.∇²ⁿ_2D_implicit
+    horizontal_diffusion!(temp_tend,temp,∇²ⁿ,∇²ⁿ_implicit)
 end

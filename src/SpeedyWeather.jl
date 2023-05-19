@@ -32,15 +32,21 @@ export  run_speedy,
         run_speedy!,
         initialize_speedy
 
-export  SigmaCoordinates,
+export  NoVerticalCoordinates,
+        SigmaCoordinates,
         SigmaPressureCoordinates
 
 # EXPORT MODELS
-export  Barotropic,
+export  Barotropic,             # abstract
         ShallowWater,
         PrimitiveEquation,
-        PrimitiveDryCore,
-        PrimitiveWetCore
+        PrimitiveDry,
+        PrimitiveWet
+
+export  BarotropicModel,        # concrete
+        ShallowWaterModel,
+        PrimitiveDryModel,
+        PrimitiveWetModel
 
 # EXPORT GRIDS
 export  SpectralGrid,
@@ -56,7 +62,7 @@ export  LowerTriangularMatrix,
         HEALPixGrid,
         OctaHEALPixGrid
 
-export  LeapfrogSemiImplicit
+export  Leapfrog
 
 # EXPORT OROGRAPHIES
 export  NoOrography,
@@ -115,19 +121,31 @@ using .RingGrids
 export SpeedyTransforms
 include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
-    
-include("gpu.jl")                               # defines utility for GPU / KernelAbstractions
 
+# Utility for GPU / KernelAbstractions
+include("gpu.jl")                               
+
+# GEOMETRY CONSTANTS ETC
 include("abstract_types.jl")
 include("dynamics/vertical_coordinates.jl")
 include("dynamics/spectral_grid.jl")
 include("dynamics/planets.jl")
 include("dynamics/atmospheres.jl")
 include("dynamics/constants.jl")
+
+# VARIABLES
 include("dynamics/prognostic_variables.jl")
-include("physics/define_column.jl")             # define ColumnVariables
+include("physics/define_column.jl")
 include("dynamics/diagnostic_variables.jl")
+
+# MODEL COMPONENTS
 include("dynamics/time_integration.jl")
+include("dynamics/forcing.jl")
+include("dynamics/geopotential.jl")
+include("dynamics/initial_conditions.jl")
+include("dynamics/horizontal_diffusion.jl")
+
+# MODELS
 include("dynamics/models.jl")
 
 # # SOME DEFINITIONS FIRST
@@ -135,13 +153,10 @@ include("dynamics/models.jl")
 
 # # DYNAMICS
 # include("dynamics/orography.jl")                # defines Orography
-# include("dynamics/define_diffusion.jl")         # defines HorizontalDiffusion
 # include("dynamics/define_implicit.jl")          # defines ImplicitShallowWater, ImplicitPrimitiveEq     # defines GenLogisticCoefs
 # include("dynamics/planets.jl")                  # defines Earth
 # include("dynamics/models.jl")                   # defines ModelSetups
-# include("dynamics/initial_conditions.jl")
 # include("dynamics/scaling.jl")
-# include("dynamics/geopotential.jl")
 # include("dynamics/tendencies_dynamics.jl")
 # include("dynamics/tendencies.jl")
 # include("dynamics/implicit.jl")
@@ -159,10 +174,10 @@ include("dynamics/models.jl")
 # include("physics/temperature_relaxation.jl")
 # include("physics/vertical_diffusion.jl")
 
-# # OUTPUT
-# include("output/output.jl")                     # defines Output
-# include("output/feedback.jl")                   # defines Feedback
-# include("output/pretty_printing.jl")
+# OUTPUT
+include("output/output.jl")                     # defines Output
+include("output/feedback.jl")                   # defines Feedback
+include("output/pretty_printing.jl")
 
 # # INTERFACE
 # include("run_speedy.jl")

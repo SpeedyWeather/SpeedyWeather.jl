@@ -14,11 +14,11 @@ at higher resolution (`trunc`, the triangular spectral truncation), slow down th
 of the Earth (`rotation_` in ``s^{-1}``) and create some netCDF ouput, do
 
 ```julia
-run_speedy(Float64,PrimitiveDryCore,trunc=42,planet=Earth(rotation=1e-5),output=true)
+run_speedy(Float64,PrimitiveDry,trunc=42,planet=Earth(rotation=1e-5),output=true)
 ```
 
 If provided, the number format has to be the first argument, the model (`Barotropic`, `ShallowWater`,
-`PrimitiveDryCore`, `PrimitiveWetCore` are available) the second, and all other arguments are keyword
+`PrimitiveDry`, `PrimitiveWet` are available) the second, and all other arguments are keyword
 arguments.
 
 ## The `run_speedy` interface

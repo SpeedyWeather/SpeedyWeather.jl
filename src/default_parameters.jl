@@ -7,7 +7,7 @@ The default values of the keywords define the default model setup.
 
 $(TYPEDFIELDS)
 """
-Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
+@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
 
     # "number format"
     # NF::DataType = DEFAULT_NF
@@ -284,7 +284,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "path to output folder"
     output_path::String = pwd()
 
-    "name of the output folder, defaults to 4-digit number counting up from `run-0001`"
+    "name of the output folder, defaults to 4-digit number counting up from `run_0001`"
     run_id::Union{String,Int} = get_run_id(output, output_path)
 
     "name of the output netcdf file"
@@ -338,6 +338,6 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "path for restart file"
     restart_path::String = output_path
 
-    "`run_id` of restart file in `run-????/restart.jld2`"
+    "`run_id` of restart file in `run_????/restart.jld2`"
     restart_id::Union{String,Int} = 1
 end

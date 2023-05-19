@@ -1,9 +1,13 @@
-Base.@kwdef struct SpectralGrid
-    NF::Type{<:AbstractFloat} = Float32
-    
+const DEFAULT_NF = Float32
+const DEFAULT_MODEL = Barotropic
+const DEFAULT_GRID = OctahedralGaussianGrid
+
+@kwdef struct SpectralGrid{Model<:ModelSetup}
+    NF::Type{<:AbstractFloat} = DEFAULT_NF
+
     # HORIZONTAL
     trunc::Int = 31             # max degree of spherical harmonics
-    Grid::Type{<:AbstractGrid} = OctahedralGaussianGrid # horizontal grid
+    Grid::Type{<:AbstractGrid} = DEFAULT_GRID # horizontal grid
     dealiasing::Float64 = 2     # dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid
     radius::Float64 = 6.371e6   # radius of the sphere [m]
 
@@ -13,40 +17,44 @@ Base.@kwdef struct SpectralGrid
     npoints::Int = RingGrids.get_npoints(Grid,nlat_half)           # total number of grid points
 
     # VERTICAL
-    nlev::Int = 8
-    vertical_coordinates::VerticalCoordinates = SigmaCoordinates(;nlev)
+    nlev::Int = default_nlev(Model)
+    vertical_coordinates::VerticalCoordinates = default_vertical_coordinates(Model)(;nlev)
 
-    SpectralGrid(NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates) = nlev == vertical_coordinates.nlev ?
-        new(NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates) :
-        error("nlev does not match. $nlev vs $(vertical_coordinates.nlev)")
+    function SpectralGrid{Model}(NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates) where Model
+        if nlev == vertical_coordinates.nlev
+            return new(NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,
+                    nlev,vertical_coordinates)
+        else    # use nlev from vert_coords:
+            return new(NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,
+                    vertical_coordinates.nlev,vertical_coordinates)
+        end
+    end
 end
 
-SpectralGrid(NF::Type{<:AbstractFloat};kwargs...) = SpectralGrid(NF=NF;kwargs...)
-SpectralGrid(Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(Grid=Grid;kwargs...)
-SpectralGrid(NF::Type{<:AbstractFloat},Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(Grid=Grid;kwargs...)
+SpectralGrid(NF::Type{<:AbstractFloat};kwargs...) = SpectralGrid(;NF,kwargs...)
+SpectralGrid(Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(;Grid,kwargs...)
+SpectralGrid(NF::Type{<:AbstractFloat},Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(;NF,Grid,kwargs...)
+SpectralGrid(Model::Type{<:ModelSetup};kwargs...) = SpectralGrid{Model}(;kwargs...)
+SpectralGrid(;kwargs...) = SpectralGrid{DEFAULT_MODEL}(;kwargs...)
 
 function Base.show(io::IO,SG::SpectralGrid)
     (;NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates) = SG
     truncation = if dealiasing < 2 "linear" elseif dealiasing < 3 "quadratic" else "cubic" end
     res = sqrt(4π*radius^2/npoints)/1000  # in [km]
-    println(io,"Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
-    println(io,"Grid:       $npoints-element, $(get_nlat(Grid,nlat_half))-ring $Grid{$NF} ($truncation)")
-    println(io,"Resolution: $(@sprintf("%.3g",res))km (average)")
-      print(io,"Vertical:   $nlev-level $(typeof(vertical_coordinates))")
+    println(io,"$(typeof(SG))(")
+    println(io,"  Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
+    println(io,"  Grid:       $npoints-element, $(get_nlat(Grid,nlat_half))-ring $Grid{$NF} ($truncation)")
+    println(io,"  Resolution: $(@sprintf("%.3g",res))km (average)")
+      print(io,"  Vertical:   $nlev-level $(typeof(vertical_coordinates)))")
 end
 
-# TODO adjust nlev when vertical_coordinates is provided
-# SpectralGrid(vertical_coordinates::VerticalCoordinates;kwargs...) = SpectralGrid(nlev=vertical_coordinates.nlev;vertical_coordinates,kwargs...)
-
 """
-    G = Geometry(::SpectralGrid)
-
+$(TYPEDSIGNATURES)
 Construct Geometry struct containing parameters and arrays describing an iso-latitude grid <:AbstractGrid
 and the vertical levels. Pass on `SpectralGrid` to calculate the following fields
-
 $(TYPEDFIELDS)
 """
-Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF: Number format
+@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF: Number format
 
     "SpectralGrid that defines spectral and grid resolution"
     spectral_grid::SpectralGrid
@@ -125,15 +133,16 @@ function Geometry(spectral_grid::SpectralGrid)
     return Geometry{spectral_grid.NF}(;spectral_grid)
 end
 
+function Geometry(spectral_grid::SpectralGrid{Model}) where {Model<:Union{Barotropic,ShallowWater}}
+    return Geometry{spectral_grid.NF}(;spectral_grid,σ_levels_half=[0,1])
+end
+
 function Base.show(io::IO,G::Geometry)
-    println(io,"$(typeof(G))(")
-    print(io,"$(G.spectral_grid))")
-    # Base.show(io,G.σ_levels_half)
+    println(io,"$(typeof(G))($(G.spectral_grid))")
 end
 
 """
-    S = SpectralTransform(::SpectralGrid)
-
+$(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""
 function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
                                             recompute_legendre::Bool = false,
