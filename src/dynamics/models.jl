@@ -44,7 +44,7 @@ $(TYPEDFIELDS)"""
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
-    output::AbstractOutput = Output(spectral_grid,time_stepping)
+    output::AbstractOutputWriter = OutputWriter(spectral_grid,time_stepping)
     feedback::AbstractFeedback = Feedback(output,time_stepping)
 end
 

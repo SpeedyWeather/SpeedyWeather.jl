@@ -1,4 +1,7 @@
-# number of mantissa bits to keep by default per variable
+"""
+Number of mantissa bits to keep for each prognostic variable when compressed for
+netCDF and .jld2 data output.
+$(TYPEDFIELDS)"""
 @kwdef struct Keepbits
     u::Int = 7
     v::Int = 7
@@ -9,9 +12,16 @@
     humid::Int = 7
 end
 
+# default number format for output
 const DEFAULT_OUTPUT_NF = Float32
 
-@kwdef mutable struct Output{NF<:Union{Float32,Float64},Model<:ModelSetup} <: AbstractOutput
+"""
+$(TYPEDSIGNATURES)
+NetCDF output writer. Contains all output options and auxiliary fields for output interpolation.
+To be initialised with `OutputWriter(::SpectralGrid,::TimeStepper,kwargs...)` to pass on the
+resolution/time stepping information from those structs. Options include
+$(TYPEDFIELDS)"""
+@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelSetup} <: AbstractOutputWriter
 
     spectral_grid::SpectralGrid{Model}
     time_stepping::TimeStepper
@@ -75,11 +85,12 @@ const DEFAULT_OUTPUT_NF = Float32
     const humid::Matrix{NF} = :humid in output_vars ? fill(missing_value,output*nlon,output*nlat) : zeros(NF,0,0)
 end
 
-function Output(spectral_grid::SpectralGrid{Model},
+# generator function pulling grid resolution and time stepping from ::SpectralGrid and ::TimeStepper
+function OutputWriter(spectral_grid::SpectralGrid{Model},
                 time_stepping::TimeStepper;
                 NF::Type{<:Union{Float32,Float64}} = DEFAULT_OUTPUT_NF,
                 kwargs...) where Model
-    return Output{NF,Model}(;spectral_grid,time_stepping,kwargs...)
+    return OutputWriter{NF,Model}(;spectral_grid,time_stepping,kwargs...)
 end
 
 # default variables to output by model
@@ -94,7 +105,7 @@ Creates a netcdf file on disk and the corresponding `netcdf_file` object preallo
 and dimensions. `write_output!` then writes consecuitive time steps into this file.
 """
 function initialize!(   
-    output::Output{output_NF,Model},
+    output::OutputWriter{output_NF,Model},
     feedback::AbstractFeedback,
     diagn::DiagnosticVariables,
     model::Model
@@ -246,10 +257,11 @@ run_id_to_string(run_id::String) = run_id
 
 """
 $(TYPEDSIGNATURES)
-Writes the variables from `diagn` of time step `i` at time `time_sec` into `netcdf_file`. Simply escapes for no
-netcdf output of if output shouldn't be written on this time step. Converts variables from `diagn` to float32
-for output, truncates the mantissa for higher compression and applies lossless compression."""
-function write_output!( outputter::Output,              # everything for netcdf output
+Writes the variables from `diagn` of time step `i` at time `time` into `outputter.netcdf_file`.
+Simply escapes for no netcdf output of if output shouldn't be written on this time step.
+Interpolates onto output grid and resolution as specified in `outputter`, converts to output
+number format, truncates the mantissa for higher compression and applies lossless compression."""
+function write_output!( outputter::OutputWriter,        # everything for netcdf output
                         time::DateTime,                 # model time for output
                         diagn::DiagnosticVariables)     # all diagnostic variables
 
@@ -263,7 +275,10 @@ function write_output!( outputter::Output,              # everything for netcdf 
     write_netcdf_time!(outputter,time)
 end
 
-function write_netcdf_time!(output::Output,
+"""
+$(TYPEDSIGNATURES)
+Write the current time `time::DateTime` to the netCDF file in `output::OutputWriter`."""
+function write_netcdf_time!(output::OutputWriter,
                             time::DateTime)
     
     (; netcdf_file, startdate ) = output
@@ -276,7 +291,10 @@ function write_netcdf_time!(output::Output,
     return nothing
 end
 
-function write_netcdf_variables!(   output::Output,
+"""
+$(TYPEDSIGNATURES)
+Write diagnostic variables from `diagn` to the netCDF file in `output::OutputWriter`."""
+function write_netcdf_variables!(   output::OutputWriter,
                                     diagn::DiagnosticVariables{NF,Grid,Model}) where {NF,Grid,Model}
 
     output.output_counter += 1                  # increase output step counter
@@ -364,7 +382,7 @@ are bitrounded for compression and the 2nd leapfrog time step is discarded.
 Variables in restart file are unscaled."""
 function write_restart_file(time::DateTime,
                             progn::PrognosticVariables,
-                            output::Output)
+                            output::OutputWriter)
     
     (; run_path, write_restart, keepbits ) = output
     write_restart || return nothing         # exit immediately if no restart file desired
@@ -408,7 +426,7 @@ end
 $(TYPEDSIGNATURES)
 Returns the full path of the output file after it was created.
 """
-get_full_output_file_path(output::Output) = joinpath(output.path, string("run_",run_id_string(output.id),"/"), output.filename)
+get_full_output_file_path(output::OutputWriter) = joinpath(output.path, string("run_",run_id_string(output.id),"/"), output.filename)
 
 """
 $(TYPEDSIGNATURES)

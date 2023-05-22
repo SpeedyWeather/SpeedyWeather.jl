@@ -34,7 +34,7 @@ abstract type VerticalDiffusion{NF} <: AbstractParameterization{NF} end
 
 # INPUT/OUTPUT
 abstract type AbstractFeedback end
-abstract type AbstractOutput end
+abstract type AbstractOutputWriter end
 
 # NUMERICS
 abstract type HorizontalDiffusion{NF} end

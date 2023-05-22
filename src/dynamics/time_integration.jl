@@ -139,7 +139,7 @@ function first_timesteps!(  progn::PrognosticVariables, # all prognostic variabl
                             time::DateTime,             # time at timestep
                             model::ModelSetup,          # everything that is constant at runtime
                             feedback::AbstractFeedback, # feedback struct
-                            output::AbstractOutput)
+                            output::AbstractOutputWriter)
     
     (;implicit) = model
     (; n_timesteps, Δt, Δt_sec ) = model.time_stepping

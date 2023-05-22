@@ -3,8 +3,8 @@ mutable struct Feedback <: AbstractFeedback
     debug::Bool                             # run nan_detection code?
     
     output::Bool                            # write a progress.txt?
-    id::Union{String,Int}                   # identification of run, taken from ::Output
-    run_path::String                        # path to run folder, taken from ::Output
+    id::Union{String,Int}                   # identification of run, taken from ::OutputWriter
+    run_path::String                        # path to run folder, taken from ::OutputWriter
 
     # PROGRESS
     progress_meter::ProgressMeter.Progress  # struct containing everything progress related
@@ -14,13 +14,13 @@ mutable struct Feedback <: AbstractFeedback
     nars_detected::Bool                     # did Infs/NaNs occur in the simulation?
 end
 
-function Feedback(  outputter::Output,
+function Feedback(  outputter::OutputWriter,
                     time_stepping::TimeStepper,
                     verbose::Bool=true,
                     debug::Bool=true)
     
     (;output) = outputter
-    id = ""             # do this in initialize!(::Output, ...) to avoid folder-race conditions
+    id = ""             # do this in initialize!(::OutputWriter, ...) to avoid folder-race conditions
     run_path = ""
 
     # PROGRESSMETER
