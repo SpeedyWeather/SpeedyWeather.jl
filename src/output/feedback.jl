@@ -1,19 +1,38 @@
+"""
+Feedback struct that contains options and object for command-line feedback
+like the progress meter.
+$(TYPEDFIELDS)"""
 mutable struct Feedback <: AbstractFeedback
-    verbose::Bool                           # print feedback to REPL?
-    debug::Bool                             # run nan_detection code?
+    "print feedback to REPL?"
+    verbose::Bool            
+
+    "check for NaRs in the prognostic variables"
+    debug::Bool
     
-    output::Bool                            # write a progress.txt?
-    id::Union{String,Int}                   # identification of run, taken from ::OutputWriter
-    run_path::String                        # path to run folder, taken from ::OutputWriter
+    "write a progress.txt file?"
+    output::Bool
+
+    "identification of run, taken from ::OutputWriter"
+    id::Union{String,Int}
+
+    "path to run folder, taken from ::OutputWriter"
+    run_path::String
 
     # PROGRESS
-    progress_meter::ProgressMeter.Progress  # struct containing everything progress related
-    progress_txt::Union{IOStream,Nothing}   # txt is a Nothing in case of no output
+    "struct containing everything progress related"
+    progress_meter::ProgressMeter.Progress  # 
 
-    # NaRS (Not-a-Real) AND OTHER MODEL STATE FEEDBACK
-    nars_detected::Bool                     # did Infs/NaNs occur in the simulation?
+    "txt is a Nothing in case of no output"
+    progress_txt::Union{IOStream,Nothing}   
+
+    "did Infs/NaNs occur in the simulation?"
+    nars_detected::Bool                     
 end
 
+"""
+$(TYPEDSIGNATURES)
+Generator function for a Feedback struct based on a ::TimeStepper
+struct."""
 function Feedback(  outputter::OutputWriter,
                     time_stepping::TimeStepper,
                     verbose::Bool=true,
@@ -41,7 +60,9 @@ function Feedback(  outputter::OutputWriter,
                     nars_detected)
 end
 
-"""Initialises the progress txt file."""
+"""
+$(TYPEDSIGNATURES)
+Initializes the a `Feedback` struct."""
 function initialize!(feedback::Feedback,model::ModelSetup)
 
     # reinitalize progress meter
@@ -66,13 +87,9 @@ function initialize!(feedback::Feedback,model::ModelSetup)
     end
 end
 
-function initialize!(pm::ProgressMeter.Progress)
-    pm.counter = 0
-    pm.tinit = time()
-    pm.tlast = pm.tinit
-end
-
-"""Calls the progress meter and writes every 5% progress increase to txt."""
+"""
+$(TYPEDSIGNATURES)
+Calls the progress meter and writes every 5% progress increase to txt."""
 function progress!(feedback::Feedback)
 
     # update progress meter and unpack counter after update
@@ -103,7 +120,9 @@ function progress!( feedback::Feedback,
     feedback.debug && nar_detection!(feedback,progn)
 end
 
-"""Finalises the progress meter and the progress txt file."""
+"""
+$(TYPEDSIGNATURES)
+Finalises the progress meter and the progress txt file."""
 function progress_finish!(F::Feedback)
     ProgressMeter.finish!(F.progress_meter)
     
@@ -115,7 +134,9 @@ function progress_finish!(F::Feedback)
     end
 end
 
-"""Detect NaR (Not-a-Real) in the prognostic variables."""
+"""
+$(TYPEDSIGNATURES)
+Detect NaR (Not-a-Real) in the prognostic variables."""
 function nar_detection!(feedback::Feedback,progn::PrognosticVariables)
 
     feedback.nars_detected && return nothing    # escape immediately if nans already detected
@@ -133,7 +154,10 @@ function nar_detection!(feedback::Feedback,progn::PrognosticVariables)
     feedback.nars_detected |= nars_detected_here
 end
 
-# adapted from ProgressMeter.jl
+"""
+$(TYPEDSIGNATURES)
+Estimates the remaining time from a `ProgresssMeter.Progress`.
+Adapted from ProgressMeter.jl"""
 function remaining_time(p::ProgressMeter.Progress)
     elapsed_time = time() - p.tinit
     est_total_time = elapsed_time * (p.n - p.start) / (p.counter - p.start)
@@ -146,7 +170,10 @@ function remaining_time(p::ProgressMeter.Progress)
     return eta
 end
 
-# adapted from ProgressMeter.jl
+"""
+$(TYPEDSIGNATURES)
+define a ProgressMeter.speedstring method that also takes a time step
+`dt_in_sec` to translate sec/iteration to days/days-like speeds."""
 function speedstring(sec_per_iter,dt_in_sec)
     if sec_per_iter == Inf
         return "  N/A  days/day"
@@ -170,13 +197,13 @@ end
 # constant from the ProgressMeter module
 const DT_IN_SEC = Ref(1800)
 
+# overwrite the speedstring function from ProgressMeter
 function ProgressMeter.speedstring(sec_per_iter,dt_in_sec=SpeedyWeather.DT_IN_SEC)
     speedstring(sec_per_iter,dt_in_sec[])
 end
 
 """
-    readable_secs(secs::Real) -> Dates.CompoundPeriod
-
+$(TYPEDSIGNATURES)
 Returns `Dates.CompoundPeriod` rounding to either (days, hours), (hours, minutes), (minutes,
 seconds), or seconds with 1 decimal place accuracy for >10s and two for less.
 E.g.
