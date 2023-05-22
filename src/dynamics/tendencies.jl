@@ -1,17 +1,14 @@
 """
-    dynamics_tendencies!(diagn,model)
-
+$(TYPEDSIGNATURES)
 Calculate all tendencies for the BarotropicModel."""
 function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
                                 model::Barotropic)
-    
-    # only (absolute) vorticity advection for the barotropic model
-    vorticity_flux_divcurl!(diagn,model,curl=false)         # = -∇⋅(u(ζ+f),v(ζ+f))
+    forcing!(diagn,model.forcing)   # = (Fᵤ, Fᵥ) forcing for u,v
+    vorticity_flux!(diagn,model)    # = ∇×(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ)
 end
 
 """
-    dynamics_tendencies!(diagn,surface,pres,time,model)
-
+$(TYPEDSIGNATURES)
 Calculate all tendencies for the ShallowWaterModel."""
 function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
                                 surface::SurfaceVariables,
@@ -22,15 +19,13 @@ function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
     S,C = model.spectral_transform, model.constants
 
     # for compatibility with other ModelSetups pressure pres = interface displacement η here
-    vorticity_flux_divcurl!(diagn,model,curl=true)  # = -∇⋅(u(ζ+f),v(ζ+f)), tendency for vorticity
-                                                    # and ∇×(u(ζ+f),v(ζ+f)), tendency for divergence
+    forcing!(diagn,model.forcing)   # = (Fᵤ, Fᵥ, Fₙ) forcing for u,v,η
+    vorticity_flux!(diagn,model)    # = ∇×(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ), tendency for vorticity
+                                    # = ∇⋅(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ), tendency for divergence
+    
     geopotential!(diagn,pres,C)                     # geopotential Φ = gη in the shallow water model
     bernoulli_potential!(diagn,S)                   # = -∇²(E+Φ), tendency for divergence
     volume_flux_divergence!(diagn,surface,model)    # = -∇⋅(uh,vh), tendency pressure
-
-    # interface forcing
-    (; interface_relaxation ) = model.parameters
-    interface_relaxation && interface_relaxation!(pres,surface,time,model)
 end
 
 """
@@ -97,6 +92,9 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
     end
 end
 
+"""
+$(TYPEDSIGNATURES)
+Set the tendencies in `diagn` to zero."""
 function zero_tendencies!(diagn::DiagnosticVariables)
     for layer in diagn.layers
         fill!(layer.tendencies.u_tend_grid,0)
@@ -105,4 +103,5 @@ function zero_tendencies!(diagn::DiagnosticVariables)
         fill!(layer.tendencies.humid_tend_grid,0)
     end
     fill!(diagn.surface.pres_tend_grid,0)
+    return nothing
 end

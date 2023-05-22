@@ -107,7 +107,7 @@ export  SpectralTransform,
         gridded,
         spectral_truncation
 
-export  Output, Feedback
+export  OutputWriter, Feedback
         
 include("utility_functions.jl")
 

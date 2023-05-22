@@ -453,7 +453,16 @@ function horizontal_advection!( A_tend::LowerTriangularMatrix{Complex{NF}}, # Ou
     flux_divergence!(A_tend,A_grid,diagn,model,add=true,flipsign=true)
 end
 
-"""Computes -∇⋅((u,v)*A)"""
+"""
+$(TYPEDSIGNATURES)
+Computes ∇⋅((u,v)*A) with the option to add/overwrite `A_tend` and to
+`flip_sign` of the flux divergence by doing so.
+
+- `A_tend =  ∇⋅((u,v)*A)` for `add=false`, `flip_sign=false`
+- `A_tend = -∇⋅((u,v)*A)` for `add=false`, `flip_sign=true`
+- `A_tend += ∇⋅((u,v)*A)` for `add=true`, `flip_sign=false`
+- `A_tend -= ∇⋅((u,v)*A)` for `add=true`, `flip_sign=true`
+"""
 function flux_divergence!(  A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput: tendency to write into
                             A_grid::AbstractGrid{NF},                   # Input: grid field to be advected
                             diagn::DiagnosticVariablesLayer{NF},        
@@ -485,58 +494,111 @@ function flux_divergence!(  A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput:
     spectral!(vA,vA_grid,model.spectral_transform)
 
     divergence!(A_tend,uA,vA,model.spectral_transform;add,flipsign)
-    return uA,vA        # return for curl calculation (ShallowWater)
+    return nothing
 end
 
 """
-function vorticity_flux_divcurl!(   diagn::DiagnosticVariablesLayer,
-                                    model::ModelSetup;
-                                    curl::Bool=true)    # calculate curl of vor flux?
+$(TYPEDSIGNATURES)
+Compute the vorticity advection as the curl/div of the vorticity fluxes
 
-1) Compute the vorticity advection as the (negative) divergence of the vorticity fluxes -∇⋅(uv*(ζ+f)).
-First, compute the uv*(ζ+f), then transform to spectral space and take the divergence and flip the sign.
-2) Compute the curl of the vorticity fluxes ∇×(uω,vω) and store in divergence tendency."""
-function vorticity_flux_divcurl!(   diagn::DiagnosticVariablesLayer,
-                                    model::ModelSetup;
-                                    curl::Bool=true)    # calculate curl of vor flux?
+`∂ζ/∂t = ∇×(u_tend,v_tend)`
+`∂D/∂t = ∇⋅(u_tend,v_tend)`
 
-    C = model.constants
-    S = model.spectral_transform
+with
 
-    (; u_grid, v_grid, vor_grid ) = diagn.grid_variables
-    (; vor_tend, div_tend ) = diagn.tendencies
+`u_tend = Fᵤ + v*(ζ+f)`
+`v_tend = Fᵥ - u*(ζ+f)`
 
-    # add the planetary vorticity f to relative vorticity ζ = absolute vorticity ω
-    absolute_vorticity!(vor_grid,C)
+with `Fᵤ,Fᵥ` from `u_tend_grid`/`v_tend_grid` that are assumed to be alread
+set in `forcing!`. Set `div=false` for the BarotropicModel which doesn't
+require the divergence tendency."""
+function vorticity_flux_curldiv!(   diagn::DiagnosticVariablesLayer,
+                                    C::DynamicsConstants,
+                                    G::Geometry,
+                                    S::SpectralTransform;
+                                    div::Bool=true)    # also calculate div of vor flux?
+    
+    (;f_coriolis) = C
+    (;coslat⁻¹) = G
 
-    # now do -∇⋅(uω,vω) and store in vor_tend
-    uω,vω = flux_divergence!(vor_tend,vor_grid,diagn,model,add=false,flipsign=true)
+    (;u_tend_grid, v_tend_grid) = diagn.tendencies  # already contains forcing
+    u = diagn.grid_variables.u_grid             # velocity
+    v = diagn.grid_variables.v_grid             # velocity
+    vor = diagn.grid_variables.vor_grid         # relative vorticity
 
-    # = ∇×(uω,vω) = ∇×(uv*(ζ+f)), write directly into tendency
-    # curl not needed for BarotropicModel
-    curl && curl!(div_tend,uω,vω,S,add=false,flipsign=false)               
-end
+    # precompute ring indices and boundscheck
+    rings = eachring(u_tend_grid,v_tend_grid,u,v,vor)
 
-function absolute_vorticity!(   vor::AbstractGrid,
-                                C::DynamicsConstants)
-
-    (; f_coriolis ) = C
-    @boundscheck length(f_coriolis) == get_nlat(vor) || throw(BoundsError)
-
-    rings = eachring(vor)
     @inbounds for (j,ring) in enumerate(rings)
+        coslat⁻¹j = coslat⁻¹[j]
         f = f_coriolis[j]
         for ij in ring
-            vor[ij] += f
+            ω = vor[ij] + f                     # absolute vorticity
+            u_tend_grid[ij] = (u_tend_grid[ij] + v[ij]*ω)*coslat⁻¹j
+            v_tend_grid[ij] = (v_tend_grid[ij] - u[ij]*ω)*coslat⁻¹j
         end
     end
+
+    # divergence and curl of that u,v_tend vector for vor,div tendencies
+    (; vor_tend, div_tend ) = diagn.tendencies
+    u_tend = diagn.dynamics_variables.a
+    v_tend = diagn.dynamics_variables.b
+
+    spectral!(u_tend,u_tend_grid,S)
+    spectral!(v_tend,v_tend_grid,S)
+
+    curl!(vor_tend,u_tend,v_tend,S)                 # ∂ζ/∂t = ∇×(u_tend,v_tend)
+    div && divergence!(div_tend,u_tend,v_tend,S)    # ∂D/∂t = ∇⋅(u_tend,v_tend)
+
+    # only vectors make use of the lmax+1 row, set to zero for scalars
+    spectral_truncation!(vor_tend)           
+    div && spectral_truncation!(div_tend)     
+    return nothing       
 end
 
 """
-    bernoulli_potential!(   diagn::DiagnosticVariablesLayer, 
-                            G::Geometry,
-                            S::SpectralTransform)
+$(TYPEDSIGNATURES)
+Vorticity flux tendency in the shallow water equations
 
+`∂ζ/∂t = ∇×(u_tend,v_tend)`
+`∂D/∂t = ∇⋅(u_tend,v_tend)`
+
+with
+
+`u_tend = Fᵤ + v*(ζ+f)`
+`v_tend = Fᵥ - u*(ζ+f)`
+
+with Fᵤ,Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
+vorticity ζ, coriolis f."""
+function vorticity_flux!(diagn::DiagnosticVariablesLayer,model::ShallowWater)
+    C = model.constants
+    G = model.geometry
+    S = model.spectral_transform
+    vorticity_flux_curldiv!(diagn,C,G,S,div=true)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Vorticity flux tendency in the barotropic vorticity equation
+
+`∂ζ/∂t = ∇×(u_tend,v_tend)`
+
+with
+
+`u_tend = Fᵤ + v*(ζ+f)`
+`v_tend = Fᵥ - u*(ζ+f)`
+
+with Fᵤ,Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
+vorticity ζ, coriolis f."""
+function vorticity_flux!(diagn::DiagnosticVariablesLayer,model::Barotropic)
+    C = model.constants
+    G = model.geometry
+    S = model.spectral_transform
+    vorticity_flux_curldiv!(diagn,C,G,S,div=false)
+end
+
+"""
+$(TYPEDSIGNATURES)
 Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral space.
   1. computes the kinetic energy KE = ½(u²+v²) on the grid
   2. transforms KE to spectral space

@@ -2,24 +2,45 @@ const DEFAULT_NF = Float32
 const DEFAULT_MODEL = Barotropic
 const DEFAULT_GRID = OctahedralGaussianGrid
 
+"""
+Defines the horizontal spectral resolution and corresponding grid and the
+vertical coordinate for SpeedyWeather.jl. Options are
+$(TYPEDFIELDS)
+
+`nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
+`Grid` and `dealiasing`."""
 @kwdef struct SpectralGrid{Model<:ModelSetup}
+    "number format used throughout the model"
     NF::Type{<:AbstractFloat} = DEFAULT_NF
 
     # HORIZONTAL
-    trunc::Int = 31             # max degree of spherical harmonics
-    Grid::Type{<:AbstractGrid} = DEFAULT_GRID # horizontal grid
-    dealiasing::Float64 = 2     # dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid
-    radius::Float64 = 6.371e6   # radius of the sphere [m]
+    "horizontal resolution as the maximum degree of spherical harmonics"
+    trunc::Int = 31
+
+    "horizontal grid used for calculations in grid-point space"
+    Grid::Type{<:AbstractGrid} = DEFAULT_GRID
+
+    "how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
+    dealiasing::Float64 = 2
+
+    "radius of the sphere [m]"
+    radius::Float64 = 6.371e6
 
     # SIZE OF GRID from trunc, Grid, dealiasing:
-    # nlat_half is the number of latitude rings on one hemisphere (Equator incl)
+    "number of latitude rings on one hemisphere (Equator incl)"
     nlat_half::Int = SpeedyTransforms.get_nlat_half(trunc,dealiasing)
-    npoints::Int = RingGrids.get_npoints(Grid,nlat_half)           # total number of grid points
+
+    "total number of grid points in the horizontal"
+    npoints::Int = RingGrids.get_npoints(Grid,nlat_half)
 
     # VERTICAL
+    "number of vertical levels"
     nlev::Int = default_nlev(Model)
+
+    "coordinates used to discretize the vertical"
     vertical_coordinates::VerticalCoordinates = default_vertical_coordinates(Model)(;nlev)
 
+    # make sure nlev and vertical_coordinates.nlev match
     function SpectralGrid{Model}(NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates) where Model
         if nlev == vertical_coordinates.nlev
             return new(NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,
@@ -31,6 +52,7 @@ const DEFAULT_GRID = OctahedralGaussianGrid
     end
 end
 
+# generator functions
 SpectralGrid(NF::Type{<:AbstractFloat};kwargs...) = SpectralGrid(;NF,kwargs...)
 SpectralGrid(Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(;Grid,kwargs...)
 SpectralGrid(NF::Type{<:AbstractFloat},Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(;NF,Grid,kwargs...)
@@ -129,10 +151,14 @@ $(TYPEDFIELDS)
     ln_σ_levels_full::Vector{NF} = log.(vcat(σ_levels_full,1))
 end
 
+"""
+$(TYPEDSIGNATURES)
+Generator function for `Geometry` struct based on `spectral_grid`."""
 function Geometry(spectral_grid::SpectralGrid)
     return Geometry{spectral_grid.NF}(;spectral_grid)
 end
 
+# for barotropic/shallowwater always set the σ level to be defined between 0 and 1
 function Geometry(spectral_grid::SpectralGrid{Model}) where {Model<:Union{Barotropic,ShallowWater}}
     return Geometry{spectral_grid.NF}(;spectral_grid,σ_levels_half=[0,1])
 end

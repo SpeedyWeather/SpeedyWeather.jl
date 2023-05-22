@@ -5,13 +5,9 @@ initialize!(I::NoImplicit,dt::Real,::DiagnosticVariables,::ModelSetup) = nothing
 
 # SHALLOW WATER MODEL
 """
-    I = ImplicitShallowWater(   ξH₀::Vector,
-                                g∇²::Vector,
-                                ξg∇²::Vector,
-                                S⁻¹::Vector)
-
 Struct that holds various precomputed arrays for the semi-implicit correction to
-prevent gravity waves from amplifying in the shallow water model."""
+prevent gravity waves from amplifying in the shallow water model.
+$(TYPEDFIELDS)"""
 @kwdef struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit{NF}
 
     # DIMENSIONS
@@ -28,7 +24,9 @@ prevent gravity waves from amplifying in the shallow water model."""
     S⁻¹::Vector{NF} = zeros(NF,trunc+2)     # = 1 / (1-ξH₀*ξg∇²), implicit operator
 end
 
-# Generator using the resolution from SpectralGrid
+"""
+$(TYPEDSIGNATURES)
+Generator using the resolution from `spectral_grid`."""
 function ImplicitShallowWater(spectral_grid::SpectralGrid,kwargs...) 
     (;trunc) = spectral_grid
     return ImplicitShallowWater{NF}(;trunc,kwargs...)
@@ -40,9 +38,8 @@ function initialize!(I::ImplicitShallowWater,dt::Real,::DiagnosticVariables,mode
 end
 
 """
-    initialize_implicit!(dt::Real,M::BarotropicModel)
-
-Update the implicit terms in `M` for the shallow water model as they depend on the time step `dt`."""
+$(TYPEDSIGNATURES)
+Update the implicit terms in `implicit` for the shallow water model as they depend on the time step `dt`."""
 function initialize!(   implicit::ImplicitShallowWater,
                         dt::Real,                   # time step used [s]
                         constants::DynamicsConstants)
@@ -73,14 +70,9 @@ function initialize!(   implicit::ImplicitShallowWater,
 end
 
 """
-    implicit_correction!(   diagn::DiagnosticVariablesLayer,
-                            progn::PrognosticLayerTimesteps,
-                            surface::SurfaceVariables,
-                            pres::PrognosticSurfaceTimesteps,
-                            M::ShallowWaterModel)
-
-Apply correction to the tendencies in `diag` to prevent the gravity waves from amplifying.
-The correction is implicitly evaluated using the parameter `implicit_α` to switch between
+$(TYPEDSIGNATURES)
+Apply correction to the tendencies in `diagn` to prevent the gravity waves from amplifying.
+The correction is implicitly evaluated using the parameter `implicit.α` to switch between
 forward, centered implicit or backward evaluation of the gravity wave terms."""
 function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
                                 progn::PrognosticLayerTimesteps{NF},

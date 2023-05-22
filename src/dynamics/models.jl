@@ -16,10 +16,8 @@ end
 
 """
 $(SIGNATURES)
-
 The BarotropicModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
-
 $(TYPEDFIELDS)"""
 @kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
     "dictates resolution for many other components"
@@ -51,7 +49,12 @@ end
 has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
-function initialize!(model::BarotropicModel)
+"""
+$(TYPEDSIGNATURES)
+Calls all `initialize!` functions for components of `model::Barotropic`,
+except for `model.output` and `model.feedback` which are always called
+at in `time_stepping!`."""
+function initialize!(model::Barotropic)
     initialize!(model.forcing,model)
     initialize!(model.horizontal_diffusion,model.time_stepping)
 
@@ -60,29 +63,56 @@ function initialize!(model::BarotropicModel)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
 
-# """
-#     M = ShallowWaterModel(  ::Parameters,
-#                             ::DynamicsConstants,
-#                             ::Geometry,
-#                             ::SpectralTransform,
-#                             ::Boundaries,
-#                             ::HorizontalDiffusion)
+"""
+$(SIGNATURES)
+The ShallowWaterModel struct holds all other structs that contain precalculated constants,
+whether scalars or arrays that do not change throughout model integration.
+$(TYPEDFIELDS)"""
+@kwdef struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
+    "dictates resolution for many other components"
+    spectral_grid::SpectralGrid = SpectralGrid()
 
-# The ShallowWaterModel struct holds all other structs that contain precalculated constants,
-# whether scalars or arrays that do not change throughout model integration."""
-# struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
-#     parameters::Parameters
-#     constants::DynamicsConstants{NF}
-#     geometry::Geometry{NF}
-#     spectral_transform::SpectralTransform{NF}
-#     boundaries::Boundaries{NF}
-#     horizontal_diffusion::HorizontalDiffusion{NF}
-#     implicit::ImplicitShallowWater{NF}
-#     device_setup::DeviceSetup{D}
-# end
+    # PHYSICS 
+    "contains physical and orbital characteristics"
+    planet::AbstractPlanet = Earth()
+    atmosphere::AbstractAtmosphere = EarthAtmosphere()
+    forcing::AbstractForcing{NF} = NoForcing(spectral_grid)
+    initial_conditions::InitialConditions = ZonalJet()
+    orography::AbstractOrography{NF} = EarthOrography(spectral_grid)
 
-# has(::Type{<:ShallowWater}, var_name::Symbol) = var_name in (:vor, :div, :pres)
-# default_concrete_model(::Type{ShallowWater}) = ShallowWaterModel
+    # NUMERICS
+    time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
+    spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
+    horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
+    implicit::AbstractImplicit{NF} = ImplicitShallowWater(spectral_grid)
+
+    # INTERNALS
+    geometry::Geometry{NF} = Geometry(spectral_grid)
+    constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
+    device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
+
+    # OUTPUT
+    output::AbstractOutputWriter = OutputWriter(spectral_grid,time_stepping)
+    feedback::AbstractFeedback = Feedback(output,time_stepping)
+end
+
+has(::Type{<:ShallowWater}, var_name::Symbol) = var_name in (:vor, :div, :pres)
+default_concrete_model(::Type{ShallowWater}) = ShallowWaterModel
+
+"""
+$(TYPEDSIGNATURES)
+Calls all `initialize!` functions for components of `model::Barotropic`,
+except for `model.output` and `model.feedback` which are always called
+at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
+function initialize!(model::ShallowWater)
+    initialize!(model.forcing,model)
+    initialize!(model.horizontal_diffusion,model.time_stepping)
+    initialize!(model.orography)
+
+    prognostic_variables = initial_conditions(model)
+    diagnostic_variables = DiagnosticVariables(model.spectral_grid)
+    return Simulation(prognostic_variables,diagnostic_variables,model)
+end
 
 # """
 #     M = PrimitiveDryModel(  ::Parameters,
