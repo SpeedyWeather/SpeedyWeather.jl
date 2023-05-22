@@ -139,12 +139,11 @@ function first_timesteps!(  progn::PrognosticVariables, # all prognostic variabl
                             time::DateTime,             # time at timestep
                             model::ModelSetup,          # everything that is constant at runtime
                             feedback::AbstractFeedback, # feedback struct
-                            outputter::AbstractOutput)
+                            output::AbstractOutput)
     
-    (; n_timesteps, Δt, Δt_sec ) = model.constants
-    n_timesteps == 0 && return time     # exit immediately for no time steps
-
     (;implicit) = model
+    (; n_timesteps, Δt, Δt_sec ) = model.time_stepping
+    n_timesteps == 0 && return time     # exit immediately for no time steps
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
     i = 1                               # time step index
@@ -152,20 +151,20 @@ function first_timesteps!(  progn::PrognosticVariables, # all prognostic variabl
     lf2 = 1                             # evaluates all tendencies at t=0,
                                         # the first leapfrog index (=>Euler forward)
     temperature_profile!(diagn,progn,model,lf2) # used for implicit solver, update occasionally
-    initialize!(model,diagn,Δt/2)      # update precomputed implicit terms with time step Δt/2
+    initialize!(implicit,Δt/2,diagn,model)  # update precomputed implicit terms with time step Δt/2
     timestep!(progn,diagn,time,Δt/2,i,model,lf1,lf2)
     time += Dates.Second(Δt_sec÷2)      # update by half the leapfrog time step Δt used here
-    progress!(feedback,progn)
+    # progress!(feedback,progn)
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
-    initialize!(model,diagn,Δt)    # update precomputed implicit terms with time step Δt
+    initialize!(implicit,Δt,diagn,model)    # update precomputed implicit terms with time step Δt
     lf1 = 1                             # without Robert+William's filter
     lf2 = 2                             # evaluate all tendencies at t=dt/2,
                                         # the 2nd leapfrog index (=>Leapfrog)
     timestep!(progn,diagn,time,Δt,i,model,lf1,lf2)
     time += Dates.Second(Δt_sec÷2)      # now 2nd leapfrog step is at t=Δt
-    progress!(feedback,progn)
-    write_netcdf_output!(outputter,time,diagn,model)
+    # progress!(feedback,progn)
+    write_output!(output,time,diagn)
 
     return time
 end
@@ -191,13 +190,11 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
                     lf2::Int=2,                     # leapfrog index 2 (time step used for tendencies)
                     )
 
-    (;horizontal_diffusion, time_stepping) = model
-
     # LOOP OVER LAYERS FOR TENDENCIES, DIFFUSION, LEAPFROGGING AND PROPAGATE STATE TO GRID
     for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
         dynamics_tendencies!(diagn_layer,model)
-        horizontal_diffusion!(progn_layer,diagn_layer,horizontal_diffusion)
-        leapfrog!(progn_layer,diagn_layer,dt,lf1,time_stepping)
+        horizontal_diffusion!(diagn_layer,progn_layer,model)
+        leapfrog!(progn_layer,diagn_layer,dt,lf1,model)
         gridded!(diagn_layer,progn_layer,lf2,model)
     end
 end
@@ -304,11 +301,8 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
 end
 
 """
-    time_stepping!( progn::PrognosticVariables,     # all prognostic variables
-                    diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
-                    model::ModelSetup)              # all precalculated structs
-
-Main time loop that that initialises output and feedback, loops over all time steps
+$(TYPEDSIGNATURES)
+Main time loop that that initializes output and feedback, loops over all time steps
 and calls the output and feedback functions."""
 function time_stepping!(progn::PrognosticVariables, # all prognostic variables
                         diagn::DiagnosticVariables, # all pre-allocated diagnostic variables
@@ -325,12 +319,13 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
     (;output,feedback) = model
     lf = 1                                  # use first leapfrog index
     gridded!(diagn,progn,lf,model)
-    initialize!(output,diagn,model.geometry)
-    initialize!(feedback,model.spectral_grid,model.time_stepping)
+    initialize!(output,feedback,diagn,model)
+    initialize!(feedback,model)
 
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
-    time = first_timesteps!(progn,diagn,time,model,feedback,outputter)
-    initialize_implicit!(model,diagn,2Δt)   # from now on precomputed implicit terms with 2Δt
+    time = first_timesteps!(progn,diagn,time,model,feedback,output)
+    initialize!(model.implicit,2Δt,diagn,model) # from now on precomputed implicit terms with 2Δt
+    initialize!(feedback.progress_meter)
 
     # MAIN LOOP
     for i in 2:n_timesteps                  # start at 2 as first Δt in first_timesteps!
@@ -338,11 +333,11 @@ function time_stepping!(progn::PrognosticVariables, # all prognostic variables
         time += Dates.Second(Δt_sec)        # time of lf=2 and diagn after timestep!
 
         progress!(feedback,progn)           # updates the progress meter bar
-        write_output!(outputter,time,diagn,model)
+        write_output!(output,time,diagn)
     end
 
     unscale!(progn)                         # undo radius-scaling for vor,div from the dynamical core
-    write_restart_file(time,progn,outputter)
+    write_restart_file(time,progn,output)
     progress_finish!(feedback)              # finishes the progress meter bar
 
     return progn

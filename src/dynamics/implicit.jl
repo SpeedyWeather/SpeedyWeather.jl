@@ -1,6 +1,7 @@
 # BAROTROPIC MODEL (no implicit needed)
-struct NoImplicit <: AbstractImplicit end
-initialize!(I::NoImplicit,dt::Real,C::DynamicsConstants) = nothing
+struct NoImplicit{NF} <: AbstractImplicit{NF} end
+NoImplicit(SG::SpectralGrid) = NoImplicit{SG.NF}()
+initialize!(I::NoImplicit,dt::Real,::DiagnosticVariables,::ModelSetup) = nothing
 
 # SHALLOW WATER MODEL
 """
@@ -31,6 +32,11 @@ end
 function ImplicitShallowWater(spectral_grid::SpectralGrid,kwargs...) 
     (;trunc) = spectral_grid
     return ImplicitShallowWater{NF}(;trunc,kwargs...)
+end
+
+# function barrier to unpack the constants struct for shallow water
+function initialize!(I::ImplicitShallowWater,dt::Real,::DiagnosticVariables,model::ShallowWater)
+    initialize!(I,dt,model.constants)
 end
 
 """

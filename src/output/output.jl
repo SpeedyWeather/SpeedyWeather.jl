@@ -77,8 +77,8 @@ end
 
 function Output(spectral_grid::SpectralGrid{Model},
                 time_stepping::TimeStepper;
+                NF::Type{<:Union{Float32,Float64}} = DEFAULT_OUTPUT_NF,
                 kwargs...) where Model
-    NF = :NF in keys(kwargs) ? values(kwargs).NF : DEFAULT_OUTPUT_NF
     return Output{NF,Model}(;spectral_grid,time_stepping,kwargs...)
 end
 
@@ -97,7 +97,7 @@ function initialize!(
     output::Output{output_NF,Model},
     feedback::AbstractFeedback,
     diagn::DiagnosticVariables,
-    geometry::Geometry
+    model::Model
 ) where {output_NF,Model}
     
     output.output || return nothing     # exit immediately for no output
@@ -109,7 +109,7 @@ function initialize!(
     var_time = NcVar("time",dim_time,t=Int64,atts=Dict("units"=>time_string,"long_name"=>"time"))
     
     # DEFINE NETCDF DIMENSIONS SPACE
-    (;input_grid, output_Grid, nlat_half, nlev) = output
+    (;input_Grid, output_Grid, nlat_half, nlev) = output
     
     if output.as_matrix == false        # interpolate onto (possibly different) output grid
         lond = get_lond(output_Grid,nlat_half)
@@ -128,7 +128,7 @@ function initialize!(
         lat_name, lat_units, lat_longname = "j","1","horizontal index j"
     end
     
-    σ = geometry.σ_levels_full
+    σ = model.geometry.σ_levels_full
     dim_lon = NcDim(lon_name,nlon,values=lond,atts=Dict("units"=>lon_units,"long_name"=>lon_longname))
     dim_lat = NcDim(lat_name,nlat,values=latd,atts=Dict("units"=>lat_units,"long_name"=>lat_longname))
     dim_lev = NcDim("lev",nlev,values=σ,atts=Dict("units"=>"1","long_name"=>"sigma levels"))
@@ -138,8 +138,8 @@ function initialize!(
     missing_value = convert(output_NF,output.missing_value)
     
     # given pres the right name, depending on ShallowWaterModel or PrimitiveEquationModel
-    pres_name = Model <: ShallowWaterModel ? "interface displacement" : "surface pressure"
-    pres_unit = Model <: ShallowWaterModel ? "m" : "hPa"
+    pres_name = Model <: ShallowWater ? "interface displacement" : "surface pressure"
+    pres_unit = Model <: ShallowWater ? "m" : "hPa"
     
     all_ncvars = (        # define NamedTuple to identify the NcVars by name
     time = var_time,
@@ -170,26 +170,34 @@ function initialize!(
     )
     
     # GET RUN ID, CREATE FOLDER
-    output.id = output.id == "" : get_run_id(output.path) : output.id
+    # TODO allow to specify id through Ouput(id="something")
+    output.id = get_run_id(output.path)
     output.run_path = create_output_folder(output.path,output.id) 
     
     feedback.id = output.id         # synchronize with feedback struct
-    feedback.run_path = run_path
-    feedback.progress_meter.desc *= "(run $(output.id)) "
+    feedback.run_path = output.run_path
+    feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
     
     # also export parameters into run????/parameters.txt
     parameters_txt = open(joinpath(output.run_path,"parameters.txt"),"w")
-    print(parameters_txt,M.parameters)
+    println(parameters_txt,model.spectral_grid)
+    println(parameters_txt,model.planet)
+    println(parameters_txt,model.atmosphere)
+    println(parameters_txt,model.time_stepping)
     close(parameters_txt)
     
     # CREATE NETCDF FILE, vector of NcVars for output
-    (; run_path, filename, output_vars) = M.parameters
+    (; run_path, filename, output_vars) = output
     vars_out = [all_ncvars[key] for key in keys(all_ncvars) if key in vcat(:time,output_vars)]
     output.netcdf_file = NetCDF.create(joinpath(run_path,filename),vars_out,mode=NetCDF.NC_NETCDF4)
     
     # INTERPOLATION: PRECOMPUTE LOCATION INDICES
     latds, londs = RingGrids.get_latdlonds(output_Grid,output.nlat_half)
-    output.as_matrix || RingGrids.update_locator!(interpolator,latds,londs)
+    output.as_matrix || RingGrids.update_locator!(output.interpolator,latds,londs)
+
+    # RESET COUNTERS
+    output.timestep_counter = 0         # time step counter
+    output.output_counter = 0           # output step counter
 
     # WRITE INITIAL CONDITIONS TO FILE
     write_netcdf_variables!(output,diagn)
@@ -204,14 +212,14 @@ Does not create a folder for the returned run id.
 """
 function get_run_id(path::String)
     # pull list of existing run_???? folders via readdir
-    pattern = r"run_\d\d\d\d"                # run_???? in regex
+    pattern = r"run_\d\d\d\d"               # run_???? in regex
     runlist = filter(x->startswith(x,pattern),readdir(path))
     runlist = filter(x->endswith(  x,pattern),runlist)
     existing_runs = [parse(Int,id[5:end]) for id in runlist]
 
     # get the run id from existing folders
     if length(existing_runs) == 0           # if no runfolder exists yet
-        run_id = 1                          # start with run0001
+        run_id = 1                          # start with run_0001
     else
         run_id = maximum(existing_runs)+1   # next run gets id +1
     end
@@ -225,7 +233,7 @@ Creates a new folder `run_*` with the identification `id`. Also returns the full
 `run_path` of that folder.
 """
 function create_output_folder(path::String,id::Union{String,Int})
-    run_id = string("run_",run_id_string(id))
+    run_id = string("run_",run_id_to_string(id))
     run_path = joinpath(path,run_id)
     @assert !(run_id in readdir(path)) "Run folder $run_path already exists."
     mkdir(run_path)             # actually create the folder
@@ -282,7 +290,7 @@ function write_netcdf_variables!(   output::Output,
     for (k,diagn_layer) in enumerate(diagn.layers)
         
         (; u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid ) = diagn_layer.grid_variables
-        
+
         if output.as_matrix     # resort gridded variables interpolation-free into a matrix
 
             # create (matrix,grid) tuples for simultaneous grid -> matrix conversion  
@@ -302,9 +310,9 @@ function write_netcdf_variables!(   output::Output,
         end
 
         # UNSCALE THE SCALED VARIABLES
-        unscale!(vor,diagn.scale)       # was vor*radius, back to vor
-        unscale!(div,diagn.scale)       # same
-        temp .-= 273.15                 # convert to ˚C
+        unscale!(vor,diagn.scale[]) # was vor*radius, back to vor
+        unscale!(div,diagn.scale[]) # same
+        temp .-= 273.15             # convert to ˚C
 
         # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
         (; keepbits ) = output
@@ -358,7 +366,7 @@ function write_restart_file(time::DateTime,
                             progn::PrognosticVariables,
                             output::Output)
     
-    (; path, write_restart, keepbits ) = output
+    (; run_path, write_restart, keepbits ) = output
     write_restart || return nothing         # exit immediately if no restart file desired
     
     # COMPRESSION OF RESTART FILE
@@ -388,7 +396,7 @@ function write_restart_file(time::DateTime,
     round!(progn.surface.timesteps[1].pres,keepbits.pres)
     fill!(progn.surface.timesteps[2].pres,0)
 
-    jldopen(joinpath(path,"restart.jld2"),"w"; compress=true) do f
+    jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
         f["prognostic_variables"] = progn
         f["time"] = time
         f["version"] = output.pkg_version

@@ -20,7 +20,7 @@ function run_speedy(::Type{NF}=DEFAULT_NF,                      # default number
     spectral_grid = SpectralGrid(NF,spectral_grid...)
     planet = Earth(planet...)
     atmosphere = EarthAtmosphere(atmosphere...)
-    time_stepping = LeapfrogSemiImplicit(time_stepping...)
+    time_stepping = Leapfrog(time_stepping...)
     feedback = Feedback(feedback...)
     output = Output(spectral_grid,Model,output...)
 
@@ -104,15 +104,16 @@ function run_speedy!(   progn::PrognosticVariables, # all prognostic variables
                         diagn::DiagnosticVariables, # all pre-allocated diagnostic variables
                         model::ModelSetup;          # all precalculated structs
                         initialize::Bool=true)
-    initialize && initalize!(model)
+    initialize && initialize!(model)
     time_stepping!(progn,diagn,model)
     return progn
 end
 
 """
 $(TYPEDSIGNATURES)
-"""
-function run!(simulation::Simulation)
+Run a `sim::Simulation`. The `sim.model` Model is assumed to be initialized,
+otherwise use `initialize=true` as keyword argument."""
+function run!(simulation::Simulation;initialize=false)
     (;prognostic_variables, diagnostic_variables, model) = simulation
-    run_speedy!(prognostic_variables,diagnostic_variables,model)
+    run_speedy!(prognostic_variables,diagnostic_variables,model;initialize)
 end

@@ -500,14 +500,14 @@ function vorticity_flux_divcurl!(   diagn::DiagnosticVariablesLayer,
                                     model::ModelSetup;
                                     curl::Bool=true)    # calculate curl of vor flux?
 
-    G = model.geometry
+    C = model.constants
     S = model.spectral_transform
 
     (; u_grid, v_grid, vor_grid ) = diagn.grid_variables
     (; vor_tend, div_tend ) = diagn.tendencies
 
     # add the planetary vorticity f to relative vorticity ζ = absolute vorticity ω
-    absolute_vorticity!(vor_grid,G)
+    absolute_vorticity!(vor_grid,C)
 
     # now do -∇⋅(uω,vω) and store in vor_tend
     uω,vω = flux_divergence!(vor_tend,vor_grid,diagn,model,add=false,flipsign=true)
@@ -518,9 +518,9 @@ function vorticity_flux_divcurl!(   diagn::DiagnosticVariablesLayer,
 end
 
 function absolute_vorticity!(   vor::AbstractGrid,
-                                G::Geometry)
+                                C::DynamicsConstants)
 
-    (; f_coriolis ) = G
+    (; f_coriolis ) = C
     @boundscheck length(f_coriolis) == get_nlat(vor) || throw(BoundsError)
 
     rings = eachring(vor)
@@ -607,7 +607,7 @@ end
 function interface_relaxation!( η::LowerTriangularMatrix{Complex{NF}},
                                 surface::SurfaceVariables{NF},
                                 time::DateTime,         # time of relaxation
-                                M::ShallowWaterModel,   # contains η⁰, which η is relaxed to
+                                M::ShallowWater,   # contains η⁰, which η is relaxed to
                                 ) where NF    
 
     (; pres_tend ) = surface

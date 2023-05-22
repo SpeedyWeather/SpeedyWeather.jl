@@ -3,7 +3,7 @@
 
 Calculate all tendencies for the BarotropicModel."""
 function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
-                                model::BarotropicModel)
+                                model::Barotropic)
     
     # only (absolute) vorticity advection for the barotropic model
     vorticity_flux_divcurl!(diagn,model,curl=false)         # = -∇⋅(u(ζ+f),v(ζ+f))
@@ -17,7 +17,7 @@ function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
                                 surface::SurfaceVariables,
                                 pres::LowerTriangularMatrix,    # spectral pressure/η for geopotential
                                 time::DateTime,                 # time to evaluate the tendencies at
-                                model::ShallowWaterModel)       # struct containing all constants
+                                model::ShallowWater)            # struct containing all constants
 
     S,C = model.spectral_transform, model.constants
 

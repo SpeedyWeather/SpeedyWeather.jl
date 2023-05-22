@@ -33,7 +33,6 @@ Scale the variable `var` inside `progn` with scalar `scale`.
 function scale!(progn::PrognosticVariables{NF},
                 var::Symbol,
                 scale::Real) where NF
-    
     if var == :pres
         for pres in progn.pres.timesteps
             pres .*= scale
@@ -56,6 +55,7 @@ function scale!(progn::PrognosticVariables,
                 scale::Real)
     scale!(progn,:vor,scale)
     scale!(progn,:div,scale)
+    progn.scale[] = scale   # store scaling information
 end
 
 """
@@ -65,6 +65,7 @@ function unscale!(progn::PrognosticVariables)
     scale = progn.scale[]
     scale!(progn,:vor,inv(scale))
     scale!(progn,:div,inv(scale))
+    progn.scale[] = 1       # set scale back to 1=unscaled
 end
 
 """

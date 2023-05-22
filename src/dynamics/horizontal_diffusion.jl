@@ -46,10 +46,10 @@ function initialize!(   scheme::HyperDiffusion,
 end
 
 function initialize!(   scheme::HyperDiffusion,
-                        C::DynamicsConstants)
+                        L::TimeStepper)
 
     (;trunc,time_scale,∇²ⁿ_2D,∇²ⁿ_2D_implicit,power) = scheme
-    (;Δt, radius) = C
+    (;Δt, radius) = L
 
     # time scale times 1/radius because time step Δt is scaled with 1/radius
     # time scale*3600 for [hrs] → [s]
@@ -62,14 +62,14 @@ function initialize!(   scheme::HyperDiffusion,
     # (=more scale-selective for smaller wavenumbers)
     largest_eigenvalue = -trunc*(trunc+1)
     
-    @inbounds for l in 0:lmax+1   # diffusion for every degree l, but indendent of order m
+    @inbounds for l in 0:trunc+1   # diffusion for every degree l, but indendent of order m
         eigenvalue_norm = -l*(l+1)/largest_eigenvalue   # normalised diffusion ∇², power=1
 
         # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
         ∇²ⁿ_2D[l+1] = -eigenvalue_norm^power/time_scale
         
         # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
-        ∇²ⁿ_2D_implicit[l+1] = 1/(1-2Δt*∇²ⁿ[l+1])           
+        ∇²ⁿ_2D_implicit[l+1] = 1/(1-2Δt*∇²ⁿ_2D[l+1])           
     end
 end
 
@@ -159,8 +159,8 @@ function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   
     end
 end
 
-function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
-                                diagn::DiagnosticVariablesLayer,
+function horizontal_diffusion!( diagn::DiagnosticVariablesLayer,
+                                progn::PrognosticLayerTimesteps,
                                 model::Barotropic,
                                 lf::Int=1)      # leapfrog index used (2 is unstable)
     

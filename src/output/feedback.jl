@@ -42,27 +42,42 @@ function Feedback(  outputter::Output,
 end
 
 """Initialises the progress txt file."""
-function initialize!(feedback::Feedback,SG::SpectralGrid,L::TimeStepper)
+function initialize!(feedback::Feedback,model::ModelSetup)
+
+    # reinitalize progress meter
+    (;n, enabled, showspeed, desc) = feedback.progress_meter
+    feedback.progress_meter = ProgressMeter.Progress(n;enabled,showspeed, desc)
+
     if feedback.output   # with netcdf output write progress.txt
-        (; path, id) = feedback
+        (; run_path, id) = feedback
+        SG = model.spectral_grid
+        L = model.time_stepping
 
         # create progress.txt file in run_????/
-        progress_txt = open(joinpath(path,"progress.txt"),"w")
+        progress_txt = open(joinpath(run_path,"progress.txt"),"w")
         s = "Starting SpeedyWeather.jl run $id on "*
                 Dates.format(Dates.now(),Dates.RFC1123Format)
         write(progress_txt,s*"\n")
         write(progress_txt,"Integrating:\n")
         write(progress_txt,"$SG\n")
         write(progress_txt,"Time: $(L.n_days) days at Δt = $(L.Δt_sec)s\n")
-        write(progress_txt,"\nAll data stored in $path")
+        write(progress_txt,"\nAll data will be stored in $run_path\n")
         feedback.progress_txt = progress_txt
     end
 end
 
+function initialize!(pm::ProgressMeter.Progress)
+    pm.counter = 0
+    pm.tinit = time()
+    pm.tlast = pm.tinit
+end
+
 """Calls the progress meter and writes every 5% progress increase to txt."""
 function progress!(feedback::Feedback)
-    ProgressMeter.next!(feedback.progress_meter)    # update progress meter
-    (; counter, n ) = feedback.progress_meter    # unpack counter after update
+
+    # update progress meter and unpack counter after update
+    ProgressMeter.next!(feedback.progress_meter)    
+    (; counter, n ) = feedback.progress_meter
 
     # write progress to txt file too
     if (counter/n*100 % 1) > ((counter+1)/n*100 % 1)  

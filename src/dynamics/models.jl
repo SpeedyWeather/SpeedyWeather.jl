@@ -1,6 +1,16 @@
+"""
+$(TYPEDSIGNATURES)
+Simulation is a container struct to be used with `run!(::Simulation)`.
+It contains
+$(TYPEDFIELDS)"""
 struct Simulation{Model<:ModelSetup}
+    "define the current state of the model"
     prognostic_variables::PrognosticVariables
+
+    "contain the tendencies and auxiliary arrays to compute them"
     diagnostic_variables::DiagnosticVariables
+
+    "all parameters, constant at runtime"
     model::Model
 end
 
@@ -26,6 +36,7 @@ $(TYPEDFIELDS)"""
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
     spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
     horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
+    implicit::AbstractImplicit{NF} = NoImplicit(spectral_grid)
 
     # INTERNALS
     geometry::Geometry{NF} = Geometry(spectral_grid)
@@ -42,10 +53,10 @@ default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
 function initialize!(model::BarotropicModel)
     initialize!(model.forcing,model)
-    initialize!(model.horizontal_diffusion,model.constants)
+    initialize!(model.horizontal_diffusion,model.time_stepping)
 
     prognostic_variables = initial_conditions(model)
-    diagnostic_variables = DiagnosticVariables(model)
+    diagnostic_variables = DiagnosticVariables(model.spectral_grid)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
 

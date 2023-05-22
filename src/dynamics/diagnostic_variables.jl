@@ -18,7 +18,7 @@ end
 function Base.zeros(::Type{Tendencies},
                     SG::SpectralGrid)
     
-    (;NF, trunc,Grid, nlat_half) = G
+    (;NF, trunc,Grid, nlat_half) = SG
     LTM = LowerTriangularMatrix
     
     # use one more l for size compat with vector quantities
@@ -55,7 +55,7 @@ end
 
 function Base.zeros(::Type{GridVariables},SG::SpectralGrid)
 
-    (;NF, Grid, nlat_half) = G
+    (;NF, Grid, nlat_half) = SG
     vor_grid            = zeros(Grid{NF},nlat_half)   # vorticity
     div_grid            = zeros(Grid{NF},nlat_half)   # divergence
     temp_grid           = zeros(Grid{NF},nlat_half)   # absolute temperature
@@ -135,7 +135,7 @@ end
 function Base.zeros(::Type{DiagnosticVariablesLayer},
                     SG::SpectralGrid,
                     k::Integer=0)                   # use k=0 (i.e. unspecified) as default
-    (;npoints) = G
+    (;npoints) = SG
     tendencies = zeros(Tendencies,SG)
     grid_variables = zeros(GridVariables,SG)
     dynamics_variables = zeros(DynamicsVariables,SG)
@@ -164,7 +164,7 @@ end
 function Base.zeros(::Type{SurfaceVariables},
                     SG::SpectralGrid)
 
-    (;NF, trunc, Grid, nlat_half, npoints) = G
+    (;NF, trunc, Grid, nlat_half, npoints) = SG
 
     # log of surface pressure and tendency thereof
     pres_grid = zeros(Grid{NF},nlat_half)
@@ -213,7 +213,7 @@ function Base.zeros(::Type{DiagnosticVariables},
                     SG::SpectralGrid{Model}) where {Model<:ModelSetup}
 
     (;NF,Grid,nlat_half, nlev, npoints) = SG
-    layers = [zeros(DiagnosticVariablesLayer,SG;k) for k in 1:nlev]
+    layers = [zeros(DiagnosticVariablesLayer,SG,k) for k in 1:nlev]
     surface = zeros(SurfaceVariables,SG)
     
     # create one column variable per thread to avoid race conditions

@@ -30,7 +30,9 @@ import ProgressMeter
 # EXPORT MONOLITHIC INTERFACE TO SPEEDY
 export  run_speedy,
         run_speedy!,
-        initialize_speedy
+        initialize_speedy,
+        initialize!,
+        run!
 
 export  NoVerticalCoordinates,
         SigmaCoordinates,
@@ -104,6 +106,8 @@ export  SpectralTransform,
         spectral,
         gridded,
         spectral_truncation
+
+export  Output, Feedback
         
 include("utility_functions.jl")
 
@@ -144,6 +148,10 @@ include("dynamics/forcing.jl")
 include("dynamics/geopotential.jl")
 include("dynamics/initial_conditions.jl")
 include("dynamics/horizontal_diffusion.jl")
+include("dynamics/implicit.jl")
+include("dynamics/scaling.jl")
+include("dynamics/tendencies.jl")
+include("dynamics/tendencies_dynamics.jl")
 
 # MODELS
 include("dynamics/models.jl")
@@ -156,10 +164,6 @@ include("dynamics/models.jl")
 # include("dynamics/define_implicit.jl")          # defines ImplicitShallowWater, ImplicitPrimitiveEq     # defines GenLogisticCoefs
 # include("dynamics/planets.jl")                  # defines Earth
 # include("dynamics/models.jl")                   # defines ModelSetups
-# include("dynamics/scaling.jl")
-# include("dynamics/tendencies_dynamics.jl")
-# include("dynamics/tendencies.jl")
-# include("dynamics/implicit.jl")
 # include("dynamics/diffusion.jl")
 
 # # PHYSICS
@@ -177,8 +181,7 @@ include("dynamics/models.jl")
 # OUTPUT
 include("output/output.jl")                     # defines Output
 include("output/feedback.jl")                   # defines Feedback
-include("output/pretty_printing.jl")
 
-# # INTERFACE
-# include("run_speedy.jl")
+# INTERFACE
+include("run_speedy.jl")
 end

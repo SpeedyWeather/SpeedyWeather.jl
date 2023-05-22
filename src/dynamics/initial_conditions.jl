@@ -10,7 +10,7 @@ Allocate the prognostic variables and then set to initial conditions."""
 function initial_conditions(model::ModelSetup)
     progn = allocate(PrognosticVariables,model.spectral_grid)   # allocate variables in any case
     IC = model.initial_conditions                               # initial conditions struct
-    initial_conditions!(IC,progn,model)                         # dispatch to initial conditions
+    initial_conditions!(progn,IC,model)                         # dispatch to initial conditions
     return progn
 end
 
@@ -37,32 +37,27 @@ function initial_conditions!(   progn::PrognosticVariables,
     # TODO initialise humidity
 end
 
-struct StartWithVorticity <: InitialConditions end
+@kwdef struct StartWithVorticity <: InitialConditions
+    power_law::Float64 = -3
+    amplitude::Float64 = 1e-5
+end
 
-function initial_conditions!(   progn::PrognosticVariables,
+function initial_conditions!(   progn::PrognosticVariables{NF},
                                 initial_conditions::StartWithVorticity,
-                                model::ModelSetup)
+                                model::ModelSetup) where NF
 
-    (;radius) = model.geometry
-
-    mmax = min(15,progn.mmax+1)     # perturb only larger modes
-    lmax = min(15,progn.lmax+1)
-
-    ξ = randn(Complex{model.parameters.NF},mmax,lmax)
+    lmax = progn.trunc+1
+    power = initial_conditions.power_law + 1    # +1 as power is summed of orders m
+    ξ = randn(Complex{NF},lmax,lmax)*convert(NF,initial_conditions.amplitude)
 
     for progn_layer in progn.layers
-        
-        # zonal wind
-        progn_layer.timesteps[1].vor[4,1]  =  80/radius
-        progn_layer.timesteps[1].vor[6,1]  = -160/radius
-        progn_layer.timesteps[1].vor[8,1]  =  80/radius
-
-        # perturbation
-        for m in 2:min(15,progn.mmax+1)
-            for l in m:min(15,progn.lmax+1)
-                progn_layer.timesteps[1].vor[l,m] = 10/radius*ξ[l,m]
+        for m in 1:lmax
+            for l in m:lmax
+                progn_layer.timesteps[1].vor[l,m] = ξ[l,m]*l^power
             end
         end
+        # don't perturb l=m=0 mode to have zero mean
+        progn_layer.timesteps[1].vor[1] = 0
     end
 end
 
