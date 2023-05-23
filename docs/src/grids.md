@@ -90,9 +90,9 @@ and in general ``\frac{m+1}{2}T \approx J`` for _m-th_ order truncation. So the 
 order the more grid points are used in combination with the same spectral
 resolution. A higher truncation order therefore makes all grid-point calculations more expensive,
 but can represent products of terms on the grid (which will have higher wavenumber components) to
-a higher accuracy as more grid points are available within a given wavelength.
-
-
+a higher accuracy as more grid points are available within a given wavelength. Using a sufficiently
+high truncation is therefore one way to avoid aliasing. In SpeedyWeather.jl the parameter
+`dealiasing` controls this option, `= 1` would be linear, `= 2` quadratic, `= 3` cubic etc.
 
 ## Full Gaussian grid
 
