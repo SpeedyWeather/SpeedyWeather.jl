@@ -567,11 +567,15 @@ function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
     flux_divergence!(pres_tend,pres_grid,diagn,G,S,add=true,flipsign=true)
 end
 
-function SpeedyTransforms.gridded!( diagn::DiagnosticVariables,     # all diagnostic variables
-                                    progn::PrognosticVariables,     # all prognostic variables
-                                    lf::Int,                        # leapfrog index
-                                    model::ModelSetup,
-                                    )
+"""
+$(TYPEDSIGNATURES)
+Propagate the spectral state of `progn` to `diagn` using time step/leapfrog index `lf`.
+Function barrier that calls gridded! for the respective `model`."""
+function SpeedyTransforms.gridded!( 
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    lf::Int,
+    model::ModelSetup)
 
     # all variables on layers
     for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
@@ -588,12 +592,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariables,     # all diagno
 end
 
 """
-    gridded!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
-                progn::PrognosticVariables{NF}, # all prognostic variables
-                M::BarotropicModel,             # everything that's constant
-                lf::Int=1                       # leapfrog index
-                ) where NF
-
+$(TYPEDSIGNATURES)
 Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the barotropic vorticity model.
 Updates grid vorticity, spectral stream function and spectral and grid velocities u,v."""
@@ -623,16 +622,11 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
 end
 
 """
-    gridded!(   diagn::DiagnosticVariables{NF}, # all diagnostic variables
-                progn::PrognosticVariables{NF}, # all prognostic variables
-                lf::Int=1                       # leapfrog index
-                M::ShallowWaterModel,           # everything that's constant
-                ) where NF
-
+$(TYPEDSIGNATURES)
 Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the shallow water model. Updates grid vorticity,
 grid divergence, grid interface displacement (`pres_grid`) and the velocities
-U,V (scaled by cos(lat))."""
+u,v."""
 function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
                                     progn::PrognosticLayerTimesteps,
                                     lf::Int,                            # leapfrog index
@@ -662,6 +656,12 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     return nothing
 end
 
+"""
+$(TYPEDSIGNATURES)
+Propagate the spectral state of the prognostic variables `progn` to the
+diagnostic variables in `diagn` for primitive equation models. Updates grid vorticity,
+grid divergence, grid temperature, pressure (`pres_grid`) and the velocities
+u,v."""
 function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
                                     progn::PrognosticLayerTimesteps,
                                     lf::Int,                            # leapfrog index
@@ -692,7 +692,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
 
     # include humidity effect into temp for everything stability-related
     virtual_temperature!(diagn,temp_lf,model)   # temp = virt temp for dry core
-    # TODO analyse the temperature profile here
+    temperature_average!(diagn,progn,S)
 
     # transform from U,V in spectral to u,v on grid (U,V = u,v*coslat)
     gridded!(u_grid,U,S,unscale_coslat=true)
@@ -700,3 +700,18 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
 
     return nothing
 end
+
+"""
+$(TYPEDSIGNATURES)
+Calculates the average temperature of a layer from the l=m=0 harmonic
+and stores the result in `diagn.temp_average`"""
+function temperature_average!(
+    diagn::DiagnosticVariablesLayer,
+    progn::PrognosticVariablesLayer,
+    S::SpectralTransform,
+    lf::Integer=2)
+    
+    # average from l=m=0 harmonic divided by norm of the sphere
+    diagn.temp_average[] = real(progn.timesteps[lf].temp[1])/S.norm_sphere
+    end
+end 

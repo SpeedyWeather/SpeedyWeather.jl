@@ -207,7 +207,7 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
     horizontal_diffusion!(vor_tend,vor,∇²ⁿ,∇²ⁿ_implicit)
     horizontal_diffusion!(div_tend,div,∇²ⁿ,∇²ⁿ_implicit)
 
-    # but use the weaker diffusion for temperature
+    # but use the weaker normal diffusion for temperature
     ∇²ⁿ = HD.∇²ⁿ_2D
     ∇²ⁿ_implicit = HD.∇²ⁿ_2D_implicit
     horizontal_diffusion!(temp_tend,temp,∇²ⁿ,∇²ⁿ_implicit)

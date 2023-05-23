@@ -1,10 +1,8 @@
 """
-    EA = EarthAtmosphere(kwargs...)
-
+$(TYPEDSIGNATURES)
 Create a struct `EarthAtmosphere<:AbstractPlanet`, with the following physical/chemical
 characteristics. Note that `radius` is not part of it as this should be chosen
-in `SpectralGrid`. Default keyword arguments are
-
+in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)"""
 @kwdef struct EarthAtmosphere <: AbstractAtmosphere
     # ATMOSPHERE

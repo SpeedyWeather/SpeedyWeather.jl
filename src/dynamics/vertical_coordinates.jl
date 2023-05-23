@@ -36,8 +36,7 @@ function generalised_logistic(x,coefs::GenLogisticCoefs)
 end
 
 """
-    σ_levels_half = vertical_coordinates(P::Parameters)
-
+$(TYPEDSIGNATURES)
 Vertical sigma coordinates defined by their nlev+1 half levels `σ_levels_half`. Sigma coordinates are
 fraction of surface pressure (p/p0) and are sorted from top (stratosphere) to bottom (surface).
 The first half level is at 0 the last at 1. Evaluate a generalised logistic function with
@@ -52,7 +51,9 @@ function default_sigma_coordinates(nlev::Integer)
     return σ_half
 end
 
-"""check that nlev and σ_half match."""    
+"""
+$(TYPEDSIGNATURES)
+Check that nlev and σ_half match."""    
 function sigma_okay(nlev::Integer,σ_half::AbstractVector)
     @assert σ_half[1] >= 0 "First manually specified σ_half has to be >0"
     @assert σ_half[end] == 1 "Last manually specified σ_half has to be 1."

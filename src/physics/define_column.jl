@@ -120,6 +120,3 @@ to iterate over horizontal grid points. Every column vector has `nlev` entries, 
     rel_hum::Vector{NF} = fill(NF(NaN), nlev) # Relative humidity
     grad_dry_static_energy::NF = NF(NaN)      # gradient of dry static energy
 end
-
-# use Float64 if not provided
-ColumnVariables(;kwargs...) = ColumnVariables{Float64}(;kwargs...)

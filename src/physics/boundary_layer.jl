@@ -1,12 +1,5 @@
-"""Concrete type that disables the boundary layer scheme."""
-struct NoBoundaryLayer{NF} <: BoundaryLayer{NF} end
-
-"""NoBoundaryLayer scheme just passes."""
-function boundary_layer!(   column::ColumnVariables,
-                            scheme::NoBoundaryLayer,
-                            model::PrimitiveEquation)
-    return nothing
-end
+"""Concrete type that disables the boundary layer drag scheme."""
+struct NoBoundaryLayerDrag{NF} <: BoundaryLayerDrag{NF} end
 
 """NoBoundaryLayer scheme does not need any initialisation."""
 function initialize!(   scheme::NoBoundaryLayer,
@@ -14,8 +7,16 @@ function initialize!(   scheme::NoBoundaryLayer,
     return nothing
 end 
 
-"""Following Held and Suarez, 1996 BAMS"""
-@kwdef struct LinearDrag{NF<:Real} <: BoundaryLayer{NF}
+"""NoBoundaryLayer scheme just passes."""
+function boundary_layer_drag!(  column::ColumnVariables,
+                                scheme::NoBoundaryLayerDrag,
+                                model::PrimitiveEquation)
+    return nothing
+end
+
+"""Linear boundary layer drag Following Held and Suarez, 1996 BAMS
+$(TYPEDFIELDS)"""
+@kwdef struct LinearDrag{NF<:AbstractFloat} <: BoundaryLayerDrag{NF}
     # PARAMETERS
     σb::Float64 = 0.7           # sigma coordinate below which linear drag is applied
     time_scale::Float64 = 24    # [hours] time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
@@ -25,24 +26,33 @@ end
     drag_coefs::Vector{NF} = zeros(NF,nlev)
 end
 
-LinearDrag(geospectral::Geospectral{NF},kwargs...) where NF = LinearDrag{NF}(nlev=geospectral.nlev;kwargs...)
+"""
+$(TYPEDSIGNATURES)
+Generator function using `nlev` from `SG::SpectralGrid`"""
+LinearDrag(SG::SpectralGrid;kwargs...) = LinearDrag{SG.NF}(nlev=SG.nlev;kwargs...)
 
+"""
+$(TYPEDSIGNATURES)
+Precomputes the drag coefficients for this `BoundaryLayerDrag` scheme."""
 function initialize!(   scheme::LinearDrag,
                         model::PrimitiveEquation)
 
     (;σ_levels_full,radius) = model.geometry
     (;σb,time_scale,drag_coefs) = scheme
 
-    kf = radius/(time_scale*3600)               # scale with radius as ∂ₜu is; hrs -> sec
+    kf = radius/(time_scale*3600)                   # scale with radius as ∂ₜu is; hrs -> sec
 
     for (k,σ) in enumerate(σ_levels_full)
-        drag_coefs[k] = kf*max(0,(σ-σb)/(1-σb)) # drag only below σb, lin increasing to kf at σ=1
+        drag_coefs[k] = -kf*max(0,(σ-σb)/(1-σb))    # drag only below σb, lin increasing to kf at σ=1
     end
 end 
-        
-function boundary_layer!(   column::ColumnVariables,
-                            scheme::LinearDrag,
-                            model::PrimitiveEquation)
+
+"""
+$(TYPEDSIGNATURES)
+Compute tendency for boundary layer drag of a `column` and add to its tendencies fields"""
+function boundary_layer_drag!(  column::ColumnVariables,
+                                scheme::LinearDrag,
+                                model::PrimitiveEquation)
 
     (;u,v,u_tend,v_tend) = column
     (;drag_coefs) = scheme
@@ -50,8 +60,8 @@ function boundary_layer!(   column::ColumnVariables,
     @inbounds for k in eachlayer(column)
         kᵥ = drag_coefs[k]
         if kᵥ > 0
-            u_tend[k] -= kᵥ*u[k]    # Held and Suarez 1996, equation 1
-            v_tend[k] -= kᵥ*v[k]
+            u_tend[k] += kᵥ*u[k]    # Held and Suarez 1996, equation 1
+            v_tend[k] += kᵥ*v[k]
         end
     end
 end

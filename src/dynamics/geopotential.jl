@@ -1,9 +1,11 @@
 """
-    Δp_geopot_half, Δp_geopot_full = initialize_geopotential(   σ_levels_full::Vector,
-                                                                σ_levels_half::Vector,
-                                                                R_dry::Real)
+$(TYPEDSIGNATURES)
+Precomputes constants for the vertical integration of the geopotential, defined as
 
-Precomputes """
+`Φ_{k+1/2} = Φ_{k+1} + R*T_{k+1}*(ln(p_{k+1}) - ln(p_{k+1/2}))` (half levels)
+`Φ_k = Φ_{k+1/2} + R*T_k*(ln(p_{k+1/2}) - ln(p_k))` (full levels)
+
+Same formula by `k → k-1/2`."""
 function initialize_geopotential(   σ_levels_full::Vector,
                                     σ_levels_half::Vector,
                                     R_dry::Real)

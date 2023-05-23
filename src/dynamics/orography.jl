@@ -52,6 +52,8 @@ end
 
 """
 $(TYPEDSIGNATURES)
+Initialize the arrays `orography`,`geopot_surf` in `orog` following 
+Jablonowski and Williamson, 2006.
 """
 function initialize!(   orog::ZonalRidge,
                         P::AbstractPlanet,
@@ -133,6 +135,8 @@ end
 
 """
 $(TYPEDSIGNATURES)
+Initialize the arrays `orography`,`geopot_surf` in `orog` by reading the
+orography field from file.
 """
 function initialize!(   orog::EarthOrography,
                         P::AbstractPlanet,

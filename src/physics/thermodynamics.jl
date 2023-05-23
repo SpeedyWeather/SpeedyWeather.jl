@@ -5,10 +5,13 @@ Parameters for computing saturation vapour pressure using the August-Roche-Magnu
 
 where T is in Kelvin and i = 1,2 for saturation with respect to water and ice,
 respectively.
-"""
-@kwdef struct MagnusCoefs{NF<:Real} <: Coefficients
-    e₀::NF = 6.108   # Saturation vapour pressure at 0°C
-    T₀::NF = 273.16  # 0°C in Kelvin
+$(TYPEDFIELDS)"""
+@kwdef struct MagnusCoefs{NF<:AbstractFloat}
+    "Saturation vapour pressure at 0°C"
+    e₀::NF = 6.108
+
+    "0°C in Kelvin"
+    T₀::NF = 273.16
     T₁::NF = 35.86
     T₂::NF = 7.66
     C₁::NF = 17.269
@@ -16,16 +19,17 @@ respectively.
 end
 
 """
-    get_thermodynamics!(column::ColumnVariables,model::PrimitiveWet)
-
+$(TYPEDSIGNATURES)
 Calculate thermodynamic quantities like saturation vapour pressure,
 saturation specific humidity, dry static energy, moist static energy
 and saturation moist static energy from the prognostic column variables."""
-function get_thermodynamics!(   column::ColumnVariables,
-                                model::PrimitiveEquation)
+function get_thermodynamics!(
+    column::ColumnVariables,
+    model::PrimitiveEquation,
+)
 
     # Calculate thermodynamic quantities at full levels
-    dry_static_energy!(column, model)
+    dry_static_energy!(column, model.constants)
 
     if model isa PrimitiveWet
         saturation_vapour_pressure!(column, model)
@@ -168,14 +172,12 @@ function saturation_specific_humidity!(
 end
 
 """
-    dry_static_energy!(column::ColumnVariables,model::PrimitiveEquation)
-
+$(TYPEDSIGNATURES)
 Compute the dry static energy SE = cₚT + Φ (latent heat times temperature plus geopotential)
 for the column."""
-function dry_static_energy!(column::ColumnVariables{NF},
-                            model::PrimitiveEquation) where NF
+function dry_static_energy!(column::ColumnVariables,constants::DynamicsConstants)
 
-    cₚ = convert(NF,model.parameters.cₚ)
+    (;cₚ) = constants
     (;dry_static_energy, geopot, temp) = column
 
     @inbounds for k in eachlayer(column)

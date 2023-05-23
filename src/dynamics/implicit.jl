@@ -116,65 +116,101 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
     end
 end
 
-# PRIMITIVE EQUATION MODEL
 """
-    I = ImplicitPrimitiveEq(ξ::Vector,
-                            R::Matrix,
-                            U::Vector,
-                            L::Matrix,
-                            W::Vector,
-                            S⁻¹::Matrix)
-
 Struct that holds various precomputed arrays for the semi-implicit correction to
-prevent gravity waves from amplifying in the primitive equation model."""
+prevent gravity waves from amplifying in the primitive equation model.
+$(TYPEDFIELDS)"""
 @kwdef struct ImplicitPrimitiveEq{NF<:AbstractFloat} <: AbstractImplicit{NF}
     
     # DIMENSIONS
+    "spectral resolution"
     trunc::Int
+
+    "number of vertical levels"
     nlev::Int
 
     # PARAMETERS
-    "coefficient for semi-implicit computations to filter gravity waves"
+    "time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
     α::Float64 = 1
 
-    # PRECOMPUTED ARRAYS, to be initiliased with initialize!
-    ξ::Base.RefValue{NF} = Ref{NF}(0)       # time step 2α*Δt packed in RefValue for mutability
-    R::Matrix{NF} = zeros(NF,nlev,nlev)     # divergence: operator for the geopotential calculation
-    U::Vector{NF} = zeros(NF,nlev)          # divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence
-    L::Matrix{NF} = zeros(NF,nlev,nlev)     # temperature: operator for the TₖD + κTₖDlnps/Dt term
-    W::Vector{NF} = zeros(NF,nlev)          # pressure: vertical averaging of the -D̄ term in the log surface pres equation
-    
-    L0::Vector{NF} = zeros(NF,nlev)         # components to construct L, 1/ 2Δσ
-    L1::Matrix{NF} = zeros(NF,nlev,nlev)    # vert advection term in the temperature equation (below+above)
-    L2::Vector{NF} = zeros(NF,nlev)         # factor in front of the div_sum_above term
-    L3::Matrix{NF} = zeros(NF,nlev,nlev)    # _sum_above operator itself
-    L4::Vector{NF} = zeros(NF,nlev)         # factor in front of div term in Dlnps/Dt
+    "recalculate the implicit terms occasionally based on the current temperature profile?"
+    adaptive::Bool = true
 
-    S::Matrix{NF} = zeros(NF,nlev,nlev)     # for every l the matrix to be inverted 
-    S⁻¹::Array{NF,3} = zeros(NF,trunc+1,nlev,nlev)   # combined inverted operator: S = 1 - ξ²(RL + UW)
+    "recalculate operators based on new temperature profile every `recalculate` time steps"
+    recalculate::Int = adaptive ? 100 : typemax(Int)
+
+    # PRECOMPUTED ARRAYS, to be initiliased with initialize!
+    "vertical temperature profile"
+    temp_profile::Vector{NF} = zeros(NF,nlev)
+
+    "time step 2α*Δt packed in RefValue for mutability"
+    ξ::Base.RefValue{NF} = Ref{NF}(0)       
+    
+    "divergence: operator for the geopotential calculation"
+    R::Matrix{NF} = zeros(NF,nlev,nlev)     
+    
+    "divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"
+    U::Vector{NF} = zeros(NF,nlev)
+    
+    "temperature: operator for the TₖD + κTₖDlnps/Dt term"
+    L::Matrix{NF} = zeros(NF,nlev,nlev)
+
+    "pressure: vertical averaging of the -D̄ term in the log surface pres equation"
+    W::Vector{NF} = zeros(NF,nlev)
+    
+    "components to construct L, 1/ 2Δσ"
+    L0::Vector{NF} = zeros(NF,nlev)
+
+    "vert advection term in the temperature equation (below+above)"
+    L1::Matrix{NF} = zeros(NF,nlev,nlev)
+
+    "factor in front of the div_sum_above term"
+    L2::Vector{NF} = zeros(NF,nlev)
+
+    "_sum_above operator itself"
+    L3::Matrix{NF} = zeros(NF,nlev,nlev)
+
+    "factor in front of div term in Dlnps/Dt"
+    L4::Vector{NF} = zeros(NF,nlev)
+
+    "for every l the matrix to be inverted"
+    S::Matrix{NF} = zeros(NF,nlev,nlev)
+
+    "combined inverted operator: S = 1 - ξ²(RL + UW)"
+    S⁻¹::Array{NF,3} = zeros(NF,trunc+1,nlev,nlev)   
 end
 
-# Generator using the resolution from SpectralGrid
+"""$(TYPEDSIGNATURES)
+Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEq(spectral_grid::SpectralGrid,kwargs...) 
     (;NF,trunc,nlev) = spectral_grid
     return ImplicitPrimitiveEq{NF}(;trunc,nlev,kwargs...)
 end
 
+# function barrier to unpack the constants struct for primitive eq models
+function initialize!(I::ImplicitShallowWater,dt::Real,diagn::DiagnosticVariables,model::PrimitiveEquation)
+    initialize!(I,dt,diagn,model.geometry,model.constants)
+end
+
+"""$(TYPEDSIGNATURES)
+Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(   implicit::ImplicitPrimitiveEq,
                         dt::Real,                   # the scaled time step radius*dt
                         diagn::DiagnosticVariables,
                         geometry::Geometry,
                         constants::DynamicsConstants)
 
-    (;α,S,S⁻¹,L,R,U,W,L0,L1,L2,L3,L4) = implicit
+    (;α,temp_profile,S,S⁻¹,L,R,U,W,L0,L1,L2,L3,L4) = implicit
     (;nlev, σ_levels_full, σ_levels_thick) = geometry
-    (;Δp_geopot_half, Δp_geopot_full, σ_lnp_A, σ_lnp_B) = geometry
-    (;R_dry, κ) = constants
+    (;R_dry, κ, Δp_geopot_half, Δp_geopot_full, σ_lnp_A, σ_lnp_B) = constants
 
-    # use an occasionally updated vertical temperature profile
-    (;temp_profile) = diagn
-    for t in temp_profile                       # return immediately if temp_profile contains
-        if !isfinite(t) return nothing end      # NaRs, model blew up in that case
+    if implicit.adaptive    # use current vertical temperature profile
+        for k in 1:nlev                                         
+            temp_profile[k] = diagn.layers[k].temp_average[]    # return immediately if temp_profile contains
+            if !isfinite(temp_profile[k]) return nothing end    # NaRs, model blew up in that case
+        end
+    else                    # or use reference profile
+        temp_profile .= constants.temp_ref_profile
     end
 
     # set up R, U, L, W operators from
@@ -249,45 +285,34 @@ function initialize!(   implicit::ImplicitPrimitiveEq,
     end
 end
 
-function initialize_implicit!(  model::PrimitiveEquation,
-                                diagn::DiagnosticVariables,
-                                progn::PrognosticVariables,
-                                dt::Real,
-                                i::Integer,
-                                lf::Integer)
+"""$(TYPEDSIGNATURES)
+Reinitialize implicit occasionally based on time step `i` and `implicit.recalculate`."""
+function initialize!(  
+    implicit::ImplicitPrimitiveEq,
+    i::Integer,
+    dt::Real,                   # the scaled time step radius*dt
+    diagn::DiagnosticVariables,
+    geometry::Geometry,
+    constants::DynamicsConstants
+)
     # only reinitialize occasionally, otherwise exit immediately
-    i % model.parameters.recalculate_implicit == 0 || return nothing
-    temperature_profile!(diagn,progn,model,lf)
-    initialize_implicit!(model,diagn,dt)
+    i % implicit.recalculate == 0 || return nothing
+    initialize!(implicit,dt,diagn,geometry,constants)
 end
 
-# just pass for Barotropic and ShallowWater
-temperature_profile!(::DiagnosticVariables,::PrognosticVariables,::ModelSetup,lf::Integer=1) = nothing
-
-function temperature_profile!(  diagn::DiagnosticVariables,
-                                progn::PrognosticVariables,
-                                model::PrimitiveEquation,
-                                lf::Integer=1)
-    (;temp_profile) = diagn
-    (;norm_sphere) = model.spectral_transform
-
-    @inbounds for k in 1:diagn.nlev
-        temp_profile[k] = real(progn.layers[k].timesteps[lf].temp[1])/norm_sphere
-    end
-end 
-
-function implicit_correction!(  diagn::DiagnosticVariables{NF},
-                                progn::PrognosticVariables,
-                                model::PrimitiveEquation,
-                                ) where NF
+"""$(TYPEDSIGNATURES)
+Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
+function implicit_correction!(  
+    diagn::DiagnosticVariables,
+    implicit::ImplicitPrimitiveEq,
+    progn::PrognosticVariables,
+)
 
     # escape immediately if explicit
-    model.parameters.implicit_α == 0 && return nothing   
+    implicit.α == 0 && return nothing   
 
-    (;nlev) = model.geometry
-    (;eigenvalues, lmax, mmax) = model.spectral_transform
-    (;Δp_geopot_half, Δp_geopot_full) = model.geometry     # = R*Δlnp on half or full levels
-    (;S⁻¹,R,U,L,W) = model.implicit
+    # (;Δp_geopot_half, Δp_geopot_full) = model.geometry     # = R*Δlnp on half or full levels
+    (;nlev, trunc, S⁻¹, R, U, L, W) = implicit
     ξ = model.implicit.ξ[]
     
     # MOVE THE IMPLICIT TERMS OF THE TEMPERATURE EQUATION FROM TIME STEP i TO i-1
@@ -336,11 +361,12 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
 
         # 2. the G = G_D + ξRG_T + ξUG_lnps terms using geopot from above 
         lm = 0
-        @inbounds for m in 1:mmax+1     # loops over all columns/order m
-            for l in m:lmax+1           # but skips the lmax+2 degree (1-based)
+        @inbounds for m in 1:trunc+1    # loops over all columns/order m
+            for l in m:trunc+1          # but skips the lmax+2 degree (1-based)
                 lm += 1                 # single index lm corresponding to harmonic l,m
                                         # ∇² not part of U so *eigenvalues here
-                G[lm] = div_tend[lm] + ξ*eigenvalues[l]*(U[k]*pres_tend[lm] + geopot[lm])      
+                eigenvalue = -l*(l+1)
+                G[lm] = div_tend[lm] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopot[lm])      
             end
             lm += 1         # skip last row, LowerTriangularMatrices are of size lmax+2 x mmax+1
         end
@@ -358,8 +384,8 @@ function implicit_correction!(  diagn::DiagnosticVariables{NF},
             G = diagn.layers[r].dynamics_variables.a    # reuse work arrays
 
             lm = 0
-            for m in 1:mmax+1       # loops over all columns/order m
-                for l in m:lmax+1   # but skips the lmax+2 degree (1-based)
+            for m in 1:trunc+1       # loops over all columns/order m
+                for l in m:trunc+1   # but skips the lmax+2 degree (1-based)
                     lm += 1         # single index lm corresponding to harmonic l,m
                     div_tend[lm] += S⁻¹[l,k,r]*G[lm]
                 end

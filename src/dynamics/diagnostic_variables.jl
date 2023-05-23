@@ -128,8 +128,9 @@ struct DiagnosticVariablesLayer{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     tendencies          ::Tendencies{NF,Grid}
     grid_variables      ::GridVariables{NF,Grid}
     dynamics_variables  ::DynamicsVariables{NF,Grid}
-    npoints             ::Int       # number of grid points
-    k                   ::Int       # which vertical model level?
+    npoints             ::Int                   # number of grid points
+    k                   ::Int                   # which vertical model level?
+    temp_average        ::Base.RefValue{NF}     # average temperature for this level
 end
 
 function Base.zeros(::Type{DiagnosticVariablesLayer},
@@ -139,7 +140,8 @@ function Base.zeros(::Type{DiagnosticVariablesLayer},
     tendencies = zeros(Tendencies,SG)
     grid_variables = zeros(GridVariables,SG)
     dynamics_variables = zeros(DynamicsVariables,SG)
-    return DiagnosticVariablesLayer(tendencies,grid_variables,dynamics_variables,npoints,k)
+    temp_average = Ref(zero(SG.NF))
+    return DiagnosticVariablesLayer(tendencies,grid_variables,dynamics_variables,npoints,k,temp_average)
 end
 
 struct SurfaceVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
@@ -200,7 +202,6 @@ struct DiagnosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF},Model<:Model
     layers  ::Vector{DiagnosticVariablesLayer{NF,Grid}}
     surface ::SurfaceVariables{NF,Grid}
     columns ::Vector{ColumnVariables{NF}}
-    temp_profile::Vector{NF}
 
     nlat_half::Int      # resolution parameter of any Grid
     nlev    ::Int       # number of vertical levels
@@ -220,13 +221,10 @@ function Base.zeros(::Type{DiagnosticVariables},
     nthreads = Threads.nthreads()
     columns = [ColumnVariables{NF}(;nlev) for _ in 1:nthreads]
 
-    # global temperature profile, recalculated occasionally for the implicit solver
-    temp_profile = zeros(NF,nlev)
-
     scale = Ref(convert(SG.NF,SG.radius))
 
     return DiagnosticVariables{NF,Grid{NF},Model}(
-        layers,surface,columns,temp_profile,nlat_half,nlev,npoints,scale)
+        layers,surface,columns,nlat_half,nlev,npoints,scale)
 end
 
 DiagnosticVariables(SG::SpectralGrid) = zeros(DiagnosticVariables,SG)

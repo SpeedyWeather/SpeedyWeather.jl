@@ -209,7 +209,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     diagn_surface = diagn.surface
     progn_surface = progn.surface
     (;pres) = progn.surface.timesteps[lf2]
-    (;implicit, horizontal_diffusion, time_stepping, spectral_transform) = model
+    (;implicit, time_stepping, spectral_transform) = model
 
     zero_tendencies!(diagn)
     
@@ -244,12 +244,11 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     ) where {NF<:AbstractFloat}
 
     # switch on/off all physics
-    (;physics) = model.parameters
-    physics && parameterization_tendencies!(diagn,time,model)
-    physics || zero_tendencies!(diagn)              # set tendencies to zero otherwise
+    model.physics && parameterization_tendencies!(diagn,time,model)
+    model.physics || zero_tendencies!(diagn)        # set tendencies to zero otherwise
 
     # occasionally reinitialize the implicit solver with new temperature profile
-    initialize_implicit!(model,diagn,progn,dt,i,lf2)
+    initialize!(model.implicit,i,dt,diagn,model.geometry,model.constants)
 
     dynamics_tendencies!(diagn,progn,model,lf2)     # dynamical core
     implicit_correction!(diagn,progn,model)         # semi-implicit time stepping corrections

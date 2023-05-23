@@ -28,7 +28,7 @@ abstract type AbstractForcing{NF} end
 
 # PARAMETERIZATIONS
 abstract type AbstractParameterization{NF} end
-abstract type BoundaryLayer{NF} <: AbstractParameterization{NF} end
+abstract type BoundaryLayerDrag{NF} <: AbstractParameterization{NF} end
 abstract type TemperatureRelaxation{NF} <: AbstractParameterization{NF} end
 abstract type VerticalDiffusion{NF} <: AbstractParameterization{NF} end
 

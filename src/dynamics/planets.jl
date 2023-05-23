@@ -1,10 +1,8 @@
 """
-    E = Earth(kwargs...)
-
+$(TYPEDSIGNATURES)
 Create a struct `Earth<:AbstractPlanet`, with the following physical/orbital
 characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Keyword arguments are
-
 $(TYPEDFIELDS)
 """
 @kwdef struct Earth <: AbstractPlanet

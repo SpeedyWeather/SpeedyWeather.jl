@@ -1,14 +1,18 @@
 """
-Struct holding the parameters needed at runtime in number format NF.
-"""
+Struct holding constants needed at runtime for the dynamical core in number format NF.
+$(TYPEDFIELDS)"""
 @kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConstants{NF}
     # PHYSICAL CONSTANTS
     radius::NF              # Radius of Planet
     rotation::NF            # Angular frequency of Planet's rotation
     gravity::NF             # Gravitational acceleration
-    R_dry::NF               # specific gas constant for dry air [J/kg/K]
     layer_thickness::NF     # shallow water layer thickness [m]
+    
+    # THERMODYNAMICS
+    R_dry::NF               # specific gas constant for dry air [J/kg/K]
+    R_vapour::NF            # specific gas constant for water vapour [J/kg/K]
     μ_virt_temp::NF         # used for virt temp calculation
+    cₚ::NF                  # specific heat at constant pressure [J/K/kg]
     κ::NF                   # = R_dry/cₚ, gas const for air over heat capacity
 
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity) = 2Ω*sin(lat)*radius
@@ -27,6 +31,7 @@ Struct holding the parameters needed at runtime in number format NF.
 end
 
 """
+$(TYPEDSIGNATURES)
 Generator function for a DynamicsConstants struct.
 """
 function DynamicsConstants( spectral_grid::SpectralGrid,
@@ -73,8 +78,8 @@ function DynamicsConstants( spectral_grid::SpectralGrid,
     temp_ref_profile .+= [σ < σ_tropopause ? ΔT_stratosphere*(σ_tropopause-σ)^5 : 0 for σ in σ_levels_full]
 
     # This implies conversion to NF
-    return DynamicsConstants{NF}(   radius,rotation,gravity,R_dry,
-                                    layer_thickness,μ_virt_temp,κ,
+    return DynamicsConstants{NF}(;  radius,rotation,gravity,layer_thickness,
+                                    R_dry,R_vapour,μ_virt_temp,cₚ,κ,
                                     f_coriolis,
                                     σ_lnp_A,σ_lnp_B,
                                     Δp_geopot_half, Δp_geopot_full,

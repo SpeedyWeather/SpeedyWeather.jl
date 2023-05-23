@@ -37,7 +37,7 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
                                 model::PrimitiveEquation,
                                 lf::Int=2)          # leapfrog index for tendencies
 
-    B, G, S = model.boundaries, model.geometry, model.spectral_transform
+    O, G, S = model.orography, model.geometry, model.spectral_transform
     (; surface ) = diagn
 
     # for semi-implicit corrections (α >= 0.5) linear gravity-wave related tendencies are
@@ -55,11 +55,10 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
         temperature_anomaly!(diagn_layer,diagn)     # temperature relative to profile
     end
 
-    geopotential!(diagn,B,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
+    geopotential!(diagn,O,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
     vertical_integration!(diagn,progn,lf_implicit,G)   # get ū,v̄,D̄ on grid; and and D̄ in spectral
     surface_pressure_tendency!(surface,model)       # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - D̄
 
-    # MULTI-THREADED VERSION
     @floop for layer in diagn.layers
         vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
                                                     # add the RTₖlnpₛ term to geopotential

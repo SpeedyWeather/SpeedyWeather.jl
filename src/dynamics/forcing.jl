@@ -31,3 +31,12 @@ end
 #     pres_tend[2] += τ⁻¹*(η2-η[2])
 #     pres_tend[3] += τ⁻¹*(η3-η[3])
 # end
+
+# "turn on interface relaxation for shallow water?"
+# interface_relaxation::Bool = false
+
+# "time scale [hrs] of interface relaxation"
+# interface_relax_time::Float64 = 96
+
+# "Amplitude [m] of interface relaxation"
+# interface_relax_amplitude::Float64 = 300

@@ -199,16 +199,6 @@ $(TYPEDFIELDS)
     temperature_relaxation::TemperatureRelaxation{Float64} = HeldSuarez()
 
 
-    # TIME STEPPING
-
-    "time at which the integration starts"
-    startdate::DateTime = DateTime(2000,1,1)
-
-    "number of days to integrate for"
-    n_days::Float64 = 10
-
-    "time step in minutes for T31, scale linearly to `trunc`"
-    Δt_at_T31::Float64 = 30
 
 
     # NUMERICS
@@ -236,25 +226,6 @@ $(TYPEDFIELDS)
     "`:linear`, `:quadratic`, `:cubic`, `:lincub_coslat`, `:linquad_coslat²`"
     legendre_shortcut::Symbol = :linear
 
-
-    # BOUNDARY FILES
-
-    "package location is default"
-    boundary_path::String = ""
-
-    "orography"
-    orography::AbstractOrography = EarthOrography()
-
-    "scale orography by a factor"
-    orography_scale::Float64 = 1
-
-    "path of orography"
-    orography_path::String = boundary_path
-
-    "filename of orography"
-    orography_file::String = "orography_F512.nc"
-
-
     # INITIAL CONDITIONS
 
     "random seed for the global random number generator"
@@ -267,73 +238,73 @@ $(TYPEDFIELDS)
     pressure_on_orography::Bool = false
 
 
-    # OUTPUT
+    # # OUTPUT
 
-    "print dialog for feedback"
-    verbose::Bool = true
+    # "print dialog for feedback"
+    # verbose::Bool = true
 
-    "print debug info, NaR detection"
-    debug::Bool = true
+    # "print debug info, NaR detection"
+    # debug::Bool = true
 
-    "Store data in netCDF?"
-    output::Bool = false
+    # "Store data in netCDF?"
+    # output::Bool = false
 
-    "output time step [hours]"
-    output_dt::Float64 = 6
+    # "output time step [hours]"
+    # output_dt::Float64 = 6
 
-    "path to output folder"
-    output_path::String = pwd()
+    # "path to output folder"
+    # output_path::String = pwd()
 
-    "name of the output folder, defaults to 4-digit number counting up from `run_0001`"
-    run_id::Union{String,Int} = get_run_id(output, output_path)
+    # "name of the output folder, defaults to 4-digit number counting up from `run_0001`"
+    # run_id::Union{String,Int} = get_run_id(output, output_path)
 
-    "name of the output netcdf file"
-    output_filename::String = "output.nc"
+    # "name of the output netcdf file"
+    # output_filename::String = "output.nc"
     
-    "variables to output: `:u`, `:v`, `:vor`, `:div`, `:temp`, `:humid`"
-    output_vars::Vector{Symbol} = output_vars_default(Model)
+    # "variables to output: `:u`, `:v`, `:vor`, `:div`, `:temp`, `:humid`"
+    # output_vars::Vector{Symbol} = output_vars_default(Model)
 
-    "compression level; 1=low but fast, 9=high but slow"
-    compression_level::Int = 3
+    # "compression level; 1=low but fast, 9=high but slow"
+    # compression_level::Int = 3
 
-    "mantissa bits to keep for every variable"
-    keepbits::NamedTuple = default_keepbits()
+    # "mantissa bits to keep for every variable"
+    # keepbits::NamedTuple = default_keepbits()
 
-    "SpeedyWeather.jl version number"
-    version::VersionNumber = pkgversion(SpeedyWeather)
+    # "SpeedyWeather.jl version number"
+    # version::VersionNumber = pkgversion(SpeedyWeather)
 
 
-    # OUTPUT GRID
+    # # OUTPUT GRID
 
-    "number format used for output"
-    output_NF::DataType = Float32
+    # "number format used for output"
+    # output_NF::DataType = Float32
 
-    "0 = reuse nlat_half from dynamical core"
-    output_nlat_half::Int = 0
+    # "0 = reuse nlat_half from dynamical core"
+    # output_nlat_half::Int = 0
 
-    "output grid"
-    output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid(Grid)
+    # "output grid"
+    # output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid(Grid)
 
-    "output interpolator"
-    output_Interpolator::Type{<:AbstractInterpolator} = DEFAULT_INTERPOLATOR
+    # "output interpolator"
+    # output_Interpolator::Type{<:AbstractInterpolator} = DEFAULT_INTERPOLATOR
 
-    "if true sort gridpoints into a matrix"
-    output_matrix::Bool = false
+    # "if true sort gridpoints into a matrix"
+    # output_matrix::Bool = false
 
-    "rotation of output quadrant"
-    output_quadrant_rotation::NTuple{4,Int} = (0,1,2,3)
+    # "rotation of output quadrant"
+    # output_quadrant_rotation::NTuple{4,Int} = (0,1,2,3)
 
-    "matrix of output quadrant"
-    output_matrix_quadrant::NTuple{4,Tuple{Int,Int}} = ((2,2),(1,2),(1,1),(2,1))
+    # "matrix of output quadrant"
+    # output_matrix_quadrant::NTuple{4,Tuple{Int,Int}} = ((2,2),(1,2),(1,1),(2,1))
     
-    "missing value to be used in netcdf output"
-    missing_value::Float64 = NaN
+    # "missing value to be used in netcdf output"
+    # missing_value::Float64 = NaN
 
 
-    # RESTART
+    # # RESTART
 
-    "also write restart file if output==true?"
-    write_restart::Bool = output
+    # "also write restart file if output==true?"
+    # write_restart::Bool = output
 
     "path for restart file"
     restart_path::String = output_path
