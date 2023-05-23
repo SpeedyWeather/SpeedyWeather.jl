@@ -4,8 +4,8 @@ Calculate all tendencies for the BarotropicModel."""
 function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
                                 time::DateTime,
                                 model::Barotropic)
-    forcing!(diagn,model.forcing,time)   # = (Fᵤ, Fᵥ) forcing for u,v
-    vorticity_flux!(diagn,model)    # = ∇×(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ)
+    forcing!(diagn,model.forcing,time)      # = (Fᵤ, Fᵥ) forcing for u,v
+    vorticity_flux!(diagn,model)            # = ∇×(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ)
 end
 
 """

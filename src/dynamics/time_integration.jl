@@ -3,10 +3,20 @@
     time::DateTime = DateTime(2000,1,1)
     
     "number of days to integrate for"
-    n_days::Float64 = 0
+    n_days::Float64 = 10
 
     "number of time steps to integrate for"
     n_timesteps::Int = 0  
+end
+
+function initialize!(clock::Clock,time_stepping::TimeStepper)
+    clock.n_timesteps = ceil(Int,24*clock.n_days/time_stepping.Δt_hrs)
+    return clock
+end
+
+function Clock(time_stepping::TimeStepper;kwargs...)
+    clock = Clock(;kwargs...)
+    initialize!(clock,time_stepping)
 end
 
 """
@@ -52,10 +62,6 @@ for the resolution information."""
 function Leapfrog(spectral_grid::SpectralGrid;kwargs...)
     (;NF,trunc,radius) = spectral_grid
     return Leapfrog{NF}(;trunc,radius,kwargs...)
-end
-
-function initialize!(clock::Clock,time_stepping::TimeStepper)
-    clock.n_timesteps = ceil(Int,24*clock.n_days/time_stepping.Δt_hrs)
 end
 
 function Base.show(io::IO,L::Leapfrog)
@@ -178,7 +184,7 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
 
     # LOOP OVER LAYERS FOR TENDENCIES, DIFFUSION, LEAPFROGGING AND PROPAGATE STATE TO GRID
     for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
-        dynamics_tendencies!(diagn_layer,model,time)
+        dynamics_tendencies!(diagn_layer,time,model)
         horizontal_diffusion!(diagn_layer,progn_layer,model)
         leapfrog!(progn_layer,diagn_layer,dt,lf1,model)
         gridded!(diagn_layer,progn_layer,lf2,model)
