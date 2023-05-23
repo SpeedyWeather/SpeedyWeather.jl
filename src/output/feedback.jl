@@ -34,7 +34,6 @@ $(TYPEDSIGNATURES)
 Generator function for a Feedback struct based on a ::TimeStepper
 struct."""
 function Feedback(  outputter::OutputWriter,
-                    time_stepping::TimeStepper,
                     verbose::Bool=true,
                     debug::Bool=true)
     
@@ -42,15 +41,10 @@ function Feedback(  outputter::OutputWriter,
     id = ""             # do this in initialize!(::OutputWriter, ...) to avoid folder-race conditions
     run_path = ""
 
-    # PROGRESSMETER
-    (;Δt_sec, n_timesteps) = time_stepping
-    DT_IN_SEC[] = Δt_sec        # hack: redefine element in global constant dt_in_sec
-                                # used to pass on the time step to ProgressMeter.speedstring
+    # PROGRESSMETER     
+    # show progress meter via `enabled` through verbose parameter, initialize only for 1 time step
     desc = "Weather is speedy: "
-    
-    # show progress meter via `enabled` through verbose parameter
-    # minus one to exclude first_timesteps! which contain compilation
-    progress_meter = ProgressMeter.Progress(n_timesteps-1, enabled=verbose, showspeed=true; desc)
+    progress_meter = ProgressMeter.Progress(1, enabled=verbose, showspeed=true; desc)
     progress_txt = nothing          # initialize with nothing, initialize in initialize!(::Feedback,...)
 
     nars_detected = false
@@ -63,11 +57,15 @@ end
 """
 $(TYPEDSIGNATURES)
 Initializes the a `Feedback` struct."""
-function initialize!(feedback::Feedback,model::ModelSetup)
+function initialize!(feedback::Feedback,clock::Clock,model::ModelSetup)
 
-    # reinitalize progress meter
-    (;n, enabled, showspeed, desc) = feedback.progress_meter
-    feedback.progress_meter = ProgressMeter.Progress(n;enabled,showspeed, desc)
+    # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
+    (;enabled, showspeed, desc) = feedback.progress_meter
+    feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps-1;enabled,showspeed, desc)
+    
+    # hack: redefine element in global constant dt_in_sec
+    # used to pass on the time step to ProgressMeter.speedstring
+    DT_IN_SEC[] = model.time_stepping.Δt_sec        
 
     if feedback.output   # with netcdf output write progress.txt
         (; run_path, id) = feedback
@@ -81,7 +79,7 @@ function initialize!(feedback::Feedback,model::ModelSetup)
         write(progress_txt,s*"\n")
         write(progress_txt,"Integrating:\n")
         write(progress_txt,"$SG\n")
-        write(progress_txt,"Time: $(L.n_days) days at Δt = $(L.Δt_sec)s\n")
+        write(progress_txt,"Time: $(clock.n_days) days at Δt = $(L.Δt_sec)s\n")
         write(progress_txt,"\nAll data will be stored in $run_path\n")
         feedback.progress_txt = progress_txt
     end

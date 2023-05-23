@@ -37,13 +37,14 @@ $(TYPEDFIELDS)"""
     implicit::AbstractImplicit{NF} = NoImplicit(spectral_grid)
 
     # INTERNALS
+    clock::Clock = Clock()
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
-    output::AbstractOutputWriter = OutputWriter(spectral_grid,time_stepping)
-    feedback::AbstractFeedback = Feedback(output,time_stepping)
+    output::AbstractOutputWriter = OutputWriter(spectral_grid)
+    feedback::AbstractFeedback = Feedback(output)
 end
 
 has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
@@ -88,13 +89,14 @@ $(TYPEDFIELDS)"""
     implicit::AbstractImplicit{NF} = ImplicitShallowWater(spectral_grid)
 
     # INTERNALS
+    clock::Clock = Clock()
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
-    output::AbstractOutputWriter = OutputWriter(spectral_grid,time_stepping)
-    feedback::AbstractFeedback = Feedback(output,time_stepping)
+    output::AbstractOutputWriter = OutputWriter(spectral_grid)
+    feedback::AbstractFeedback = Feedback(output)
 end
 
 has(::Type{<:ShallowWater}, var_name::Symbol) = var_name in (:vor, :div, :pres)

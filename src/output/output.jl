@@ -24,7 +24,6 @@ $(TYPEDFIELDS)"""
 @kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelSetup} <: AbstractOutputWriter
 
     spectral_grid::SpectralGrid{Model}
-    time_stepping::TimeStepper
 
     # FILE OPTIONS
     output::Bool = false                    # output to netCDF?
@@ -37,19 +36,16 @@ $(TYPEDFIELDS)"""
 
     # WHAT/WHEN OPTIONS
     startdate::DateTime = DateTime(2000,1,1)
-    output_dt::Float64 = 6                         # output time step [hours]
+    output_dt::Float64 = 6                  # output time step [hours]
     output_vars::Vector{Symbol} = default_output_vars(Model)   # vector of output variables as Symbols
-    missing_value::NF = NaN            # missing value to be used in netcdf output
+    missing_value::NF = NaN                 # missing value to be used in netcdf output
 
     # COMPRESSION OPTIONS
     compression_level::Int = 3              # compression level; 1=low but fast, 9=high but slow
     keepbits::Keepbits = Keepbits()         # mantissa bits to keep for every variable
 
-    # TIME STEPS
-    output_every_n_steps::Int = max(1,floor(Int,output_dt/time_stepping.Δt_hrs))
-    n_outputsteps::Int = (time_stepping.n_timesteps ÷ output_every_n_steps)+1
-    
-    # COUNTERS
+    # TIME STEPS AND COUNTERS (initialize later)
+    output_every_n_steps::Int = 0           # output frequency
     timestep_counter::Int = 0               # time step counter
     output_counter::Int = 0                 # output step counter
     
@@ -59,38 +55,41 @@ $(TYPEDFIELDS)"""
     # INPUT GRID (the one used in the dynamical core)
     input_Grid::Type{<:AbstractGrid} = spectral_grid.Grid
     
-    # OUTPUT GRID
-    output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid(input_Grid)
-    nlat_half::Int = spectral_grid.nlat_half                # default: same nlat_half for in/output
-    nlon::Int = RingGrids.get_nlon(output_Grid,nlat_half)   
-    nlat::Int = RingGrids.get_nlat(output_Grid,nlat_half)
-    npoints::Int = nlon*nlat
-    nlev::Int = spectral_grid.nlev
-    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(input_Grid,spectral_grid.nlat_half,npoints)
-
     # Output as matrix (particularly for reduced grids)
     as_matrix::Bool = false                 # if true sort grid points into a matrix (interpolation-free)
                                             # full grid for output if output_matrix == false
     quadrant_rotation::NTuple{4,Int} = (0,1,2,3)    # rotation of output quadrant
                                                     # matrix of output quadrant
     matrix_quadrant::NTuple{4,Tuple{Int,Int}} = ((2,2),(1,2),(1,1),(2,1))
+    
+    # OUTPUT GRID
+    output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid(input_Grid)
+    nlat_half::Int = spectral_grid.nlat_half                # default: same nlat_half for in/output
+    nlon::Int = as_matrix ? RingGrids.matrix_size(input_Grid,spectral_grid.nlat_half)[1] :
+                                                    RingGrids.get_nlon(output_Grid,nlat_half)
+    nlat::Int =  as_matrix ? RingGrids.matrix_size(input_Grid,spectral_grid.nlat_half)[2] :
+                                                    RingGrids.get_nlat(output_Grid,nlat_half)
+    npoints::Int = nlon*nlat
+    nlev::Int = spectral_grid.nlev
+    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(input_Grid,spectral_grid.nlat_half,npoints)
 
     # fields to output (only one layer, reuse over layers)
-    const u::Matrix{NF} = :u in output_vars ?         fill(missing_value,output*nlon,output*nlat) : zeros(NF,0,0)
-    const v::Matrix{NF} = :v in output_vars ?         fill(missing_value,output*nlon,output*nlat) : zeros(NF,0,0)
-    const vor::Matrix{NF} = :vor in output_vars ?     fill(missing_value,output*nlon,output*nlat) : zeros(NF,0,0)
-    const div::Matrix{NF} = :div in output_vars ?     fill(missing_value,output*nlon,output*nlat) : zeros(NF,0,0)
-    const pres::Matrix{NF} = :pres in output_vars ?   fill(missing_value,output*nlon,output*nlat) : zeros(NF,0,0)
-    const temp::Matrix{NF} = :temp in output_vars ?   fill(missing_value,output*nlon,output*nlat) : zeros(NF,0,0)
-    const humid::Matrix{NF} = :humid in output_vars ? fill(missing_value,output*nlon,output*nlat) : zeros(NF,0,0)
+    const u::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const v::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const vor::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const div::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const temp::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const pres::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const humid::Matrix{NF} = fill(missing_value,nlon,nlat)
 end
 
 # generator function pulling grid resolution and time stepping from ::SpectralGrid and ::TimeStepper
-function OutputWriter(spectral_grid::SpectralGrid{Model},
-                time_stepping::TimeStepper;
-                NF::Type{<:Union{Float32,Float64}} = DEFAULT_OUTPUT_NF,
-                kwargs...) where Model
-    return OutputWriter{NF,Model}(;spectral_grid,time_stepping,kwargs...)
+function OutputWriter(
+    spectral_grid::SpectralGrid{Model};
+    NF::Type{<:Union{Float32,Float64}} = DEFAULT_OUTPUT_NF,
+    kwargs...
+) where Model
+    return OutputWriter{NF,Model}(;spectral_grid,kwargs...)
 end
 
 # default variables to output by model
@@ -107,6 +106,7 @@ and dimensions. `write_output!` then writes consecuitive time steps into this fi
 function initialize!(   
     output::OutputWriter{output_NF,Model},
     feedback::AbstractFeedback,
+    time_stepping::TimeStepper,
     diagn::DiagnosticVariables,
     model::Model
 ) where {output_NF,Model}
@@ -206,6 +206,9 @@ function initialize!(
     latds, londs = RingGrids.get_latdlonds(output_Grid,output.nlat_half)
     output.as_matrix || RingGrids.update_locator!(output.interpolator,latds,londs)
 
+    # OUTPUT FREQUENCY
+    output.output_every_n_steps = max(1,floor(Int,output.output_dt/time_stepping.Δt_hrs))
+    
     # RESET COUNTERS
     output.timestep_counter = 0         # time step counter
     output.output_counter = 0           # output step counter
