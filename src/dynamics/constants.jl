@@ -39,7 +39,7 @@ function DynamicsConstants( spectral_grid::SpectralGrid,
     (;ΔT_stratosphere, σ_tropopause, temp_ref) = atmosphere
     (;NF, radius) = spectral_grid
     (;rotation, gravity) = planet
-    layer_thickness = atmosphere.layer_thickness*1000   # ShallowWater: convert from [km]s to [m]
+    layer_thickness = atmosphere.layer_thickness*1000   # ShallowWater: convert from [km] to [m]
     ξ = R_dry/R_vapour              # Ratio of gas constants: dry air / water vapour [1]
     μ_virt_temp = (1-ξ)/ξ           # used in Tv = T(1+μq), for conversion from humidity q
                                     # and temperature T to virtual temperature Tv

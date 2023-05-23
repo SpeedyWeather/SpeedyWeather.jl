@@ -120,15 +120,17 @@ end
 #     return geopot
 # end
 
-# function geopotential!( diagn::DiagnosticVariablesLayer,
-#                         pres::LowerTriangularMatrix,
-#                         C::DynamicsConstants)
-
-#     (;gravity) = C
-#     (;geopot) = diagn.dynamics_variables
-
-#     geopot .= pres*gravity
-# end 
+"""
+$(TYPEDSIGNATURES)
+calculates the geopotential in the ShallowWaterModel as g*η,
+i.e. gravity times the interface displacement (field `pres`)"""
+function geopotential!( diagn::DiagnosticVariablesLayer,
+                        pres::LowerTriangularMatrix,
+                        C::DynamicsConstants)
+    (;gravity) = C
+    (;geopot) = diagn.dynamics_variables
+    geopot .= pres*gravity
+end 
 
 # """
 #     virtual_temperature!(   diagn::DiagnosticVariablesLayer,

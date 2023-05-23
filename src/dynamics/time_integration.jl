@@ -174,7 +174,7 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
 
     # LOOP OVER LAYERS FOR TENDENCIES, DIFFUSION, LEAPFROGGING AND PROPAGATE STATE TO GRID
     for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
-        dynamics_tendencies!(diagn_layer,model)
+        dynamics_tendencies!(diagn_layer,model,time)
         horizontal_diffusion!(diagn_layer,progn_layer,model)
         leapfrog!(progn_layer,diagn_layer,dt,lf1,model)
         gridded!(diagn_layer,progn_layer,lf2,model)
@@ -201,16 +201,15 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     (;pres) = progn.surface.timesteps[lf2]
     (;implicit, horizontal_diffusion, time_stepping, spectral_transform) = model
 
-    # zero_tendencies!(diagn)
+    zero_tendencies!(diagn)
     
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
-    # forcing!(diagn_layer,diagn_surface,time,model.forcing)
     dynamics_tendencies!(diagn_layer,diagn_surface,pres,time,model)
     implicit_correction!(diagn_layer,progn_layer,diagn_surface,progn_surface,implicit)
     
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
-    horizontal_diffusion!(progn_layer,diagn_layer,horizontal_diffusion)
-    leapfrog!(progn_layer,diagn_layer,dt,lf1,time_stepping)
+    horizontal_diffusion!(progn_layer,diagn_layer,model)
+    leapfrog!(progn_layer,diagn_layer,dt,lf1,model)
     gridded!(diagn_layer,progn_layer,lf2,model)
 
     # SURFACE LAYER (pressure), no diffusion though

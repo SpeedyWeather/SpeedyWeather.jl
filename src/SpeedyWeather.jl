@@ -136,6 +136,7 @@ include("dynamics/spectral_grid.jl")
 include("dynamics/planets.jl")
 include("dynamics/atmospheres.jl")
 include("dynamics/constants.jl")
+include("dynamics/orography.jl")                # defines Orography
 
 # VARIABLES
 include("dynamics/prognostic_variables.jl")
@@ -160,7 +161,6 @@ include("dynamics/models.jl")
 # include("physics/constants.jl")                 # defines ParameterizationConstants
 
 # # DYNAMICS
-# include("dynamics/orography.jl")                # defines Orography
 # include("dynamics/define_implicit.jl")          # defines ImplicitShallowWater, ImplicitPrimitiveEq     # defines GenLogisticCoefs
 # include("dynamics/planets.jl")                  # defines Earth
 # include("dynamics/models.jl")                   # defines ModelSetups

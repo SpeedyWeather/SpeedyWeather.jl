@@ -2,8 +2,9 @@
 $(TYPEDSIGNATURES)
 Calculate all tendencies for the BarotropicModel."""
 function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
+                                time::DateTime,
                                 model::Barotropic)
-    forcing!(diagn,model.forcing)   # = (Fᵤ, Fᵥ) forcing for u,v
+    forcing!(diagn,model.forcing,time)   # = (Fᵤ, Fᵥ) forcing for u,v
     vorticity_flux!(diagn,model)    # = ∇×(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ)
 end
 
@@ -16,22 +17,21 @@ function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
                                 time::DateTime,                 # time to evaluate the tendencies at
                                 model::ShallowWater)            # struct containing all constants
 
-    S,C = model.spectral_transform, model.constants
+    S,C,G,O,F = model.spectral_transform, model.constants, model.geometry, model.orography, model.forcing
 
     # for compatibility with other ModelSetups pressure pres = interface displacement η here
-    forcing!(diagn,model.forcing)   # = (Fᵤ, Fᵥ, Fₙ) forcing for u,v,η
-    vorticity_flux!(diagn,model)    # = ∇×(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ), tendency for vorticity
-                                    # = ∇⋅(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ), tendency for divergence
+    forcing!(diagn,F,time)                  # = (Fᵤ, Fᵥ, Fₙ) forcing for u,v,η
+    vorticity_flux!(diagn,model)            # = ∇×(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ), tendency for vorticity
+                                            # = ∇⋅(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ), tendency for divergence
     
     geopotential!(diagn,pres,C)                     # geopotential Φ = gη in the shallow water model
     bernoulli_potential!(diagn,S)                   # = -∇²(E+Φ), tendency for divergence
-    volume_flux_divergence!(diagn,surface,model)    # = -∇⋅(uh,vh), tendency pressure
+    volume_flux_divergence!(diagn,surface,O,C,G,S)  # = -∇⋅(uh,vh), tendency pressure
 end
 
 """
-    dynamics_tendencies!(diagn,surface,pres,time,model)
-
-Calculate all tendencies for the primitive equation model (wet or dry)."""
+$(TYPEDSIGNATURES)
+Calculate all tendencies for the PrimitiveEquation model (wet or dry)."""
 function dynamics_tendencies!(  diagn::DiagnosticVariables,
                                 progn::PrognosticVariables,
                                 model::PrimitiveEquation,
@@ -58,22 +58,6 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
     geopotential!(diagn,B,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
     vertical_integration!(diagn,progn,lf_implicit,G)   # get ū,v̄,D̄ on grid; and and D̄ in spectral
     surface_pressure_tendency!(surface,model)       # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - D̄
-
-    # SINGLE THREADED VERSION
-    # for layer in diagn.layers
-    #     vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
-    #                                                 # add the RTₖlnpₛ term to geopotential
-    #     linear_pressure_gradient!(layer,progn,model,lf_implicit)
-    # end
-
-    # vertical_advection!(diagn,model)                # use σ̇ for the vertical advection of u,v,T,q
-
-    # for layer in diagn.layers
-    #     vordiv_tendencies!(layer,surface,model)     # vorticity advection, pressure gradient term
-    #     temperature_tendency!(layer,surface,model)  # hor. advection + adiabatic term
-    #     humidity_tendency!(layer,model)             # horizontal advection of humidity (nothing for wetcore)
-    #     bernoulli_potential!(layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
-    # end
 
     # MULTI-THREADED VERSION
     @floop for layer in diagn.layers
@@ -103,5 +87,6 @@ function zero_tendencies!(diagn::DiagnosticVariables)
         fill!(layer.tendencies.humid_tend_grid,0)
     end
     fill!(diagn.surface.pres_tend_grid,0)
+    fill!(diagn.surface.pres_tend,0)
     return nothing
 end

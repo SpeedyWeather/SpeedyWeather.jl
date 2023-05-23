@@ -28,7 +28,7 @@ end
 $(TYPEDSIGNATURES)
 Generator using the resolution from `spectral_grid`."""
 function ImplicitShallowWater(spectral_grid::SpectralGrid,kwargs...) 
-    (;trunc) = spectral_grid
+    (;NF,trunc) = spectral_grid
     return ImplicitShallowWater{NF}(;trunc,kwargs...)
 end
 
@@ -44,7 +44,7 @@ function initialize!(   implicit::ImplicitShallowWater,
                         dt::Real,                   # time step used [s]
                         constants::DynamicsConstants)
 
-    (;α,H₀,ξH₀,g∇²,ξg∇²,S⁻¹) = implicit                # precomputed arrays to be updated
+    (;α,H₀,ξH₀,g∇²,ξg∇²,S⁻¹) = implicit             # precomputed arrays to be updated
     (;gravity,layer_thickness) = constants          # shallow water layer thickness [m]
                                                     # gravitational acceleration [m/s²]                  
 
@@ -65,7 +65,7 @@ function initialize!(   implicit::ImplicitShallowWater,
         eigenvalue = -l*(l-1)               # =∇², with without 1/radius², 1-based -l*l(l+1) → -l*(l-1)
         g∇²[l] = gravity*eigenvalue         # doesn't actually change with dt
         ξg∇²[l] = ξ*g∇²[l]                  # update ξg∇² with new ξ
-        S⁻¹[l] = inv(1 - ξH₀[1]*ξg∇²[l])    # update 1/(1-ξ²gH₀∇²) with new ξ
+        S⁻¹[l] = inv(1 - ξH₀[]*ξg∇²[l])    # update 1/(1-ξ²gH₀∇²) with new ξ
     end
 end
 
@@ -155,9 +155,9 @@ prevent gravity waves from amplifying in the primitive equation model."""
 end
 
 # Generator using the resolution from SpectralGrid
-function ImplicitShallowWater(spectral_grid::SpectralGrid,kwargs...) 
-    (;trunc,nlev) = spectral_grid
-    return ImplicitShallowWater{NF}(;trunc,nlev,kwargs...)
+function ImplicitPrimitiveEq(spectral_grid::SpectralGrid,kwargs...) 
+    (;NF,trunc,nlev) = spectral_grid
+    return ImplicitPrimitiveEq{NF}(;trunc,nlev,kwargs...)
 end
 
 function initialize!(   implicit::ImplicitPrimitiveEq,

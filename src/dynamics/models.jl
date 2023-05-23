@@ -55,11 +55,12 @@ Calls all `initialize!` functions for components of `model::Barotropic`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!`."""
 function initialize!(model::Barotropic)
-    initialize!(model.forcing,model)
-    initialize!(model.horizontal_diffusion,model.time_stepping)
+    (;spectral_grid,forcing,horizontal_diffusion,time_stepping) = model
+    initialize!(forcing,model)
+    initialize!(horizontal_diffusion,time_stepping)
 
     prognostic_variables = initial_conditions(model)
-    diagnostic_variables = DiagnosticVariables(model.spectral_grid)
+    diagnostic_variables = DiagnosticVariables(spectral_grid)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
 
@@ -105,12 +106,15 @@ Calls all `initialize!` functions for components of `model::Barotropic`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::ShallowWater)
-    initialize!(model.forcing,model)
-    initialize!(model.horizontal_diffusion,model.time_stepping)
-    initialize!(model.orography)
+    (;spectral_grid,forcing,horizontal_diffusion,time_stepping,
+        orography,planet,spectral_transform,geometry) = model
+
+    initialize!(forcing,model)
+    initialize!(horizontal_diffusion,time_stepping)
+    initialize!(orography,planet,spectral_transform,geometry)
 
     prognostic_variables = initial_conditions(model)
-    diagnostic_variables = DiagnosticVariables(model.spectral_grid)
+    diagnostic_variables = DiagnosticVariables(spectral_grid)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
 

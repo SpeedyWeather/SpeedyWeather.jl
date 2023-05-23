@@ -159,69 +159,6 @@ function vertical_velocity!(diagn::DiagnosticVariablesLayer,
         (uv∇lnp_sum_above .+ Δσₖ*uv∇lnp)        # and level k σₖ-weighted uv∇lnp here
 end
 
-# MULTI LAYER VERSION
-function vertical_advection!(   diagn::DiagnosticVariables,
-                                model::PrimitiveEquation)
-    
-    wet_core = model isa PrimitiveWet
-    (; σ_levels_thick, nlev ) = model.geometry
-    @boundscheck nlev == diagn.nlev || throw(BoundsError)
-
-    # set the k=1 level to zero in the beginning
-    u_tend_top = diagn.layers[1].tendencies.u_tend_grid
-    v_tend_top = diagn.layers[1].tendencies.v_tend_grid
-    temp_tend_top = diagn.layers[1].tendencies.temp_tend_grid
-    humid_tend_top = diagn.layers[1].tendencies.humid_tend_grid
-    fill!(u_tend_top,0)
-    fill!(v_tend_top,0)
-    fill!(temp_tend_top,0)
-    wet_core && fill!(humid_tend_top,0)
-
-    # ALL LAYERS (but use indexing tricks to avoid out of bounds access for top/bottom)
-    @inbounds for k in 1:nlev       
-        # for k==1 "above" term is 0, for k==nlev "below" term is zero
-        # avoid out-of-bounds indexing with k_above, k_below as follows
-        k_below = min(k+1,nlev)         # just saturate, because M_nlev+1/2 = 0 (which zeros that term)
-        
-        # mass fluxes, M_1/2 = M_nlev+1/2 = 0, but k=1/2 isn't explicitly stored
-        σ_tend = diagn.layers[k].dynamics_variables.σ_tend
-        
-        # layer thickness Δσ on level k
-        Δσₖ = σ_levels_thick[k]
-        
-        u_tend_k = diagn.layers[k].tendencies.u_tend_grid
-        u_tend_below = diagn.layers[k_below].tendencies.u_tend_grid
-        u = diagn.layers[k].grid_variables.u_grid
-        u_below = diagn.layers[k_below].grid_variables.u_grid
-
-        _vertical_advection!(u_tend_below,u_tend_k,σ_tend,u_below,u,Δσₖ)
-
-        v_tend_k = diagn.layers[k].tendencies.v_tend_grid
-        v_tend_below = diagn.layers[k_below].tendencies.v_tend_grid
-        v = diagn.layers[k].grid_variables.v_grid
-        v_below = diagn.layers[k_below].grid_variables.v_grid
-
-        _vertical_advection!(v_tend_below,v_tend_k,σ_tend,v_below,v,Δσₖ)
-
-        T_tend_k = diagn.layers[k].tendencies.temp_tend_grid
-        T_tend_below = diagn.layers[k_below].tendencies.temp_tend_grid
-        T = diagn.layers[k].grid_variables.temp_grid
-        T_below = diagn.layers[k_below].grid_variables.temp_grid
-
-        _vertical_advection!(T_tend_below,T_tend_k,σ_tend,T_below,T,Δσₖ)
-
-        if wet_core
-            q_tend_k = diagn.layers[k].tendencies.humid_tend_grid
-            q_tend_below = diagn.layers[k_below].tendencies.humid_tend_grid
-            q = diagn.layers[k].grid_variables.humid_grid
-            q_below = diagn.layers[k_below].grid_variables.humid_grid
-
-            _vertical_advection!(q_tend_below,q_tend_k,σ_tend,q_below,q,Δσₖ)
-        end
-    end
-end
-
-# SINGLE LAYER VERSION
 function vertical_advection!(   layer::DiagnosticVariablesLayer,
                                 diagn::DiagnosticVariables,
                                 model::PrimitiveEquation)
@@ -272,19 +209,6 @@ function vertical_advection!(   layer::DiagnosticVariablesLayer,
     
         _vertical_advection!(q_tend,σ_tend_above,σ_tend_below,q_above,q,q_below,Δσₖ)
     end
-end
-
-# SINGLE THREADED VERSION uses the layer below to store intermediate result
-function _vertical_advection!(  ξ_tend_below::Grid,     # tendency of quantity ξ at k+1
-                                ξ_tend_k::Grid,         # tendency of quantity ξ at k
-                                σ_tend::Grid,           # vertical velocity at k+1/2
-                                ξ_below::Grid,          # quantity ξ at k+1
-                                ξ::Grid,                # quantity ξ at k
-                                Δσₖ::NF                 # layer thickness on σ levels
-                                ) where {NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
-    Δσₖ2⁻¹ = -1/2Δσₖ                                    # precompute
-    @. ξ_tend_below = σ_tend * (ξ_below - ξ)            # store without Δσ-scaling in layer below
-    @. ξ_tend_k = Δσₖ2⁻¹ * (ξ_tend_k + ξ_tend_below)    # combine with layer above and scale
 end
 
 # MULTI THREADED VERSION only writes into layer k
@@ -381,30 +305,6 @@ function temperature_tendency!( diagn::DiagnosticVariablesLayer,
             σ_lnp_A * (div_sum_above+uv∇lnp_sum_above) +    # eq. 3.12 1st term
             σ_lnp_B * (div_grid+uv∇lnp) +                   # eq. 3.12 2nd term
             uv∇lnp)                                         # eq. 3.13
-    
-    # SEMI-IMPLICIT ALTERNATIVE
-    # evaluate only the explicit terms at time step i and the implicit terms
-    # in implicit_correction! at i-1, however, this is more expensive then above
-
-    # ūv̄∇lnp = surf.pres_tend_grid
-    # # for explicit vertical advection get reference temperature differences
-    # k_above = max(1,k-1)                        # layer index above
-    # k_below = min(k+1,nlev)                     # layer index below
-    # ΔT_above = Tₖ - Tₖs[k_above]                # temperature difference to layer above
-    # ΔT_below = Tₖs[k_below] - Tₖ                # and to layer below
-
-    # # for explicit vertical advection terms
-    # σₖ = model.geometry.σ_levels_full[k]        # should be Σ_r=1^k Δσᵣ for model top at >0hPa
-    # σₖ_above = model.geometry.σ_levels_full[k_above]
-    # Δσₖ2⁻¹ = -1/2model.geometry.σ_levels_thick[k]
-
-    # # Hoskins and Simmons 1975, Appendix 1 but the adiabatic term therein as above
-    # @. temp_tend_grid += temp_grid*div_grid +
-    #     Δσₖ2⁻¹*ΔT_below*(      σₖ*ūv̄∇lnp - (uv∇lnp_sum_above + σₖ*uv∇lnp)) +
-    #     Δσₖ2⁻¹*ΔT_above*(σₖ_above*ūv̄∇lnp -  uv∇lnp_sum_above) + 
-    #     κ*Tₖ*(σ_lnp_A*uv∇lnp_sum_above + σ_lnp_B*uv∇lnp) + 
-    #     κ*Tᵥ*(σ_lnp_A * (div_sum_above+uv∇lnp_sum_above) + σ_lnp_B * (div_grid+uv∇lnp)) +
-    #     κ*(Tᵥ+Tₖ)*uv∇lnp
 
     spectral!(temp_tend,temp_tend_grid,model.spectral_transform)
 
@@ -466,12 +366,13 @@ Computes ∇⋅((u,v)*A) with the option to add/overwrite `A_tend` and to
 function flux_divergence!(  A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput: tendency to write into
                             A_grid::AbstractGrid{NF},                   # Input: grid field to be advected
                             diagn::DiagnosticVariablesLayer{NF},        
-                            model::ModelSetup;
+                            G::Geometry,
+                            S::SpectralTransform;
                             add::Bool=true,                 # add result to A_tend or overwrite for false
                             flipsign::Bool=true) where NF   # compute -∇⋅((u,v)*A) (true) or ∇⋅((u,v)*A)? 
 
     (; u_grid, v_grid ) = diagn.grid_variables
-    (; coslat⁻¹ ) = model.geometry
+    (; coslat⁻¹ ) = G
 
     # reuse general work arrays a,b,a_grid,b_grid
     uA = diagn.dynamics_variables.a             # = u*A in spectral
@@ -490,10 +391,10 @@ function flux_divergence!(  A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput:
         end
     end
 
-    spectral!(uA,uA_grid,model.spectral_transform)
-    spectral!(vA,vA_grid,model.spectral_transform)
+    spectral!(uA,uA_grid,S)
+    spectral!(vA,vA_grid,S)
 
-    divergence!(A_tend,uA,vA,model.spectral_transform;add,flipsign)
+    divergence!(A_tend,uA,vA,S;add,flipsign)
     return nothing
 end
 
@@ -643,47 +544,27 @@ function linear_pressure_gradient!( diagn_layer::DiagnosticVariablesLayer,
 end
 
 """
-    volume_flux_divergence!(diagn::DiagnosticVariablesLayer,
-                            surface::SurfaceVariables,
-                            model::ShallowWater)   
-
+$(TYPEDSIGNATURES)
 Computes the (negative) divergence of the volume fluxes `uh,vh` for the continuity equation, -∇⋅(uh,vh)."""
 function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
                                     surface::SurfaceVariables,
-                                    model::ShallowWater)                        
+                                    orog::AbstractOrography,
+                                    constants::DynamicsConstants,
+                                    G::Geometry,
+                                    S::SpectralTransform)                        
 
     (; pres_grid, pres_tend ) = surface
-    (; orography ) = model.boundaries.orography
-    H₀ = model.constants.layer_thickness
+    (; orography ) = orog
+    H₀ = constants.layer_thickness
 
     # compute dynamic layer thickness h on the grid
     # pres_grid is η, the interface displacement, update to
     # layer thickness h = η + H, H is the layer thickness at rest
-    # H = H₀ - orography, H₀ is the layer thickness without mountains
+    # H = H₀ - orography, H₀ is the layer thickness at rest without mountains
     pres_grid .+= H₀ .- orography
     
     # now do -∇⋅(uh,vh) and store in pres_tend
-    flux_divergence!(pres_tend,pres_grid,diagn,model,add=false,flipsign=true)
-end
-
-function interface_relaxation!( η::LowerTriangularMatrix{Complex{NF}},
-                                surface::SurfaceVariables{NF},
-                                time::DateTime,         # time of relaxation
-                                M::ShallowWater,   # contains η⁰, which η is relaxed to
-                                ) where NF    
-
-    (; pres_tend ) = surface
-    (; seasonal_cycle, equinox, axial_tilt ) = M.parameters.planet
-    A = M.parameters.interface_relax_amplitude
-
-    s = 45/23.5     # heuristic conversion to Legendre polynomials
-    θ = seasonal_cycle ? s*axial_tilt*sin(Dates.days(time - equinox)/365.25*2π) : 0
-    η2 = convert(NF,A*(2sind(θ)))           # l=1,m=0 harmonic
-    η3 = convert(NF,A*(0.2-1.5cosd(θ)))     # l=2,m=0 harmonic
-
-    τ⁻¹ = inv(M.constants.interface_relax_time)
-    pres_tend[2] += τ⁻¹*(η2-η[2])
-    pres_tend[3] += τ⁻¹*(η3-η[3])
+    flux_divergence!(pres_tend,pres_grid,diagn,G,S,add=true,flipsign=true)
 end
 
 function SpeedyTransforms.gridded!( diagn::DiagnosticVariables,     # all diagnostic variables
@@ -784,8 +665,7 @@ end
 function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
                                     progn::PrognosticLayerTimesteps,
                                     lf::Int,                            # leapfrog index
-                                    model::PrimitiveEquation,           # everything that's constant
-                                    )
+                                    model::PrimitiveEquation)           # everything that's constant
     
     (; vor_grid, div_grid, u_grid, v_grid ) = diagn.grid_variables
     (; temp_grid, humid_grid ) = diagn.grid_variables
@@ -812,6 +692,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
 
     # include humidity effect into temp for everything stability-related
     virtual_temperature!(diagn,temp_lf,model)   # temp = virt temp for dry core
+    # TODO analyse the temperature profile here
 
     # transform from U,V in spectral to u,v on grid (U,V = u,v*coslat)
     gridded!(u_grid,U,S,unscale_coslat=true)

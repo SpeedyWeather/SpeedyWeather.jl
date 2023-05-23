@@ -4,8 +4,7 @@ initial_conditions_default(::Type{<:ShallowWater}) = ZonalJet()
 initial_conditions_default(::Type{<:PrimitiveEquation}) = ZonalWind()
 
 """
-    prognostic_variables = initial_conditions(M::ModelSetup)
-
+$(TYPEDSIGNATURES)
 Allocate the prognostic variables and then set to initial conditions."""
 function initial_conditions(model::ModelSetup)
     progn = allocate(PrognosticVariables,model.spectral_grid)   # allocate variables in any case
@@ -14,6 +13,8 @@ function initial_conditions(model::ModelSetup)
     return progn
 end
 
+"""
+$(TYPEDSIGNATURES)"""
 function allocate(::Type{PrognosticVariables},spectral_grid::SpectralGrid{Model}) where Model 
     (;NF,trunc,nlev) = spectral_grid
     return zeros(PrognosticVariables{NF},Model,trunc,nlev)
@@ -37,8 +38,14 @@ function initial_conditions!(   progn::PrognosticVariables,
     # TODO initialise humidity
 end
 
+"""Start with random vorticity as initial conditions
+$(TYPEDFIELDS)"""
 @kwdef struct StartWithVorticity <: InitialConditions
+
+    "Power law the vorticity should be spectrally distributed by"
     power_law::Float64 = -3
+
+    "(approximate) amplitude in [1/s], used as standard deviation of spherical harmonic coefficients"
     amplitude::Float64 = 1e-5
 end
 
@@ -61,102 +68,104 @@ function initial_conditions!(   progn::PrognosticVariables{NF},
     end
 end
 
-# """
-#     Z = ZonalJet(;kwargs...) <: InitialConditions
-
-# Create a struct that contains all parameters for the Galewsky et al, 2004 zonal jet
-# intitial conditions for the shallow water model. Default values as in Galewsky."""
-# @kwdef struct ZonalJet <: InitialConditions
-#     # jet
-#     latitude::Float64 = 45                  # degrees north [˚N]
-#     width::Float64 = (1/4-1/7)*180          # ≈ 19.29˚ as in Galewsky et al, 2004 
-#     umax::Float64 = 80                      # [m/s]
+"""
+Create a struct that contains all parameters for the Galewsky et al, 2004 zonal jet
+intitial conditions for the shallow water model. Default values as in Galewsky.
+$(TYPEDFIELDS)"""
+@kwdef struct ZonalJet <: InitialConditions
+    # jet
+    latitude::Float64 = 45                  # degrees north [˚N]
+    width::Float64 = (1/4-1/7)*180          # ≈ 19.29˚ as in Galewsky et al, 2004 
+    umax::Float64 = 80                      # [m/s]
     
-#     # perturbation
-#     perturb_lat::Float64 = latitude         # [˚N], position in jet by default
-#     perturb_lon::Float64 = 270              # [˚E]
-#     perturb_xwidth::Float64 = 1/3*360/2π    # ≈ 19.1˚E zonal extent [˚E]
-#     perturb_ywidth::Float64 = 1/15*360/2π   # ≈ 3.8˚N meridional extent [˚N]
-#     perturb_height::Float64 = 120           # amplitude [m]
-# end
+    # perturbation
+    perturb_lat::Float64 = latitude         # [˚N], position in jet by default
+    perturb_lon::Float64 = 270              # [˚E]
+    perturb_xwidth::Float64 = 1/3*360/2π    # ≈ 19.1˚E zonal extent [˚E]
+    perturb_ywidth::Float64 = 1/15*360/2π   # ≈ 3.8˚N meridional extent [˚N]
+    perturb_height::Float64 = 120           # amplitude [m]
+end
 
-# """Initial conditions from Galewsky, 2004, Tellus"""
-# function initial_conditions!(   progn::PrognosticVariables,
-#                                 initial_conditions::ZonalJet,
-#                                 model::ShallowWater)
+"""
+$(TYPEDSIGNATURES)
+Initial conditions from Galewsky, 2004, Tellus"""
+function initial_conditions!(   progn::PrognosticVariables,
+                                initial_conditions::ZonalJet,
+                                model::ShallowWater)
 
-#     (;latitude, width, umax) = initial_conditions               # for jet
-#     (;perturb_lat, perturb_lon, perturb_xwidth,                 # for perturbation
-#         perturb_ywidth, perturb_height) = initial_conditions
+    (;latitude, width, umax) = initial_conditions               # for jet
+    (;perturb_lat, perturb_lon, perturb_xwidth,                 # for perturbation
+        perturb_ywidth, perturb_height) = initial_conditions
 
-#     θ₀ = (latitude-width)/360*2π    # southern boundary of jet [radians]
-#     θ₁ = (latitude+width)/360*2π    # northern boundary of jet
-#     eₙ = exp(-4/(θ₁-θ₀)^2)          # normalisation
+    θ₀ = (latitude-width)/360*2π    # southern boundary of jet [radians]
+    θ₁ = (latitude+width)/360*2π    # northern boundary of jet
+    eₙ = exp(-4/(θ₁-θ₀)^2)          # normalisation
     
-#     θ₂ = perturb_lat*2π/360         # perturbation latitude [radians]
-#     α = perturb_xwidth*2π/360       # zonal extent of interface perturbation [radians]
-#     β = perturb_ywidth*2π/360       # meridional extent of interface perturbation [radians]
-#     λ = perturb_lon*2π/360          # perturbation longitude [radians]
+    θ₂ = perturb_lat*2π/360         # perturbation latitude [radians]
+    α = perturb_xwidth*2π/360       # zonal extent of interface perturbation [radians]
+    β = perturb_ywidth*2π/360       # meridional extent of interface perturbation [radians]
+    λ = perturb_lon*2π/360          # perturbation longitude [radians]
 
-#     (;radius, rotation, gravity) = model.parameters.planet
+    (;rotation, gravity) = model.planet
+    (;radius) = model.spectral_grid
 
-#     # always create on F64 grid then convert to spectral and interpolate there
-#     Grid = FullGaussianGrid
-#     nlat_half = 64
-#     u_grid = zeros(Grid,nlat_half)
-#     η_grid = zeros(Grid,nlat_half)
-#     colats = RingGrids.get_colat(Grid,nlat_half)
-#     _,lons = RingGrids.get_colatlons(Grid,nlat_half)
-#     weights = FastGaussQuadrature.gausslegendre(2nlat_half)[2]
-#     η_sum = 0
+    # always create on F64 grid then convert to spectral and interpolate there
+    Grid = FullGaussianGrid
+    nlat_half = 64
+    u_grid = zeros(Grid,nlat_half)
+    η_grid = zeros(Grid,nlat_half)
+    colats = RingGrids.get_colat(Grid,nlat_half)
+    _,lons = RingGrids.get_colatlons(Grid,nlat_half)
+    weights = FastGaussQuadrature.gausslegendre(2nlat_half)[2]
+    η_sum = 0
 
-#     for (j,ring) in enumerate(eachring(u_grid,η_grid))
-#         θ = π/2 - colats[j]             # latitude in radians
-#         coslat⁻¹j = 1/cos(θ)
-#         f = 2rotation*sin(θ)
+    for (j,ring) in enumerate(eachring(u_grid,η_grid))
+        θ = π/2 - colats[j]             # latitude in radians
+        coslat⁻¹j = 1/cos(θ)
+        f = 2rotation*sin(θ)
         
-#         # velocity per latitude
-#         if θ₀ < θ < θ₁
-#             u_θ = umax/eₙ*exp(1/(θ-θ₀)/(θ-θ₁))  # u as in Galewsky, 2004
-#         else
-#             u_θ = 0
-#         end
+        # velocity per latitude
+        if θ₀ < θ < θ₁
+            u_θ = umax/eₙ*exp(1/(θ-θ₀)/(θ-θ₁))  # u as in Galewsky, 2004
+        else
+            u_θ = 0
+        end
 
-#         # integration for layer thickness h / interface height η
-#         w = weights[j]
-#         η_sum += 2w*(radius*u_θ/gravity * (f + tan(θ)/radius*u_θ))
+        # integration for layer thickness h / interface height η
+        w = weights[j]
+        η_sum += 2w*(radius*u_θ/gravity * (f + tan(θ)/radius*u_θ))
 
-#         # lon-constant part of perturbation
-#         ηθ = perturb_height*cos(θ)*exp(-((θ₂-θ)/β)^2)
+        # lon-constant part of perturbation
+        ηθ = perturb_height*cos(θ)*exp(-((θ₂-θ)/β)^2)
 
-#         # store in all longitudes
-#         for ij in ring
-#             u_grid[ij] = u_θ/radius*coslat⁻¹j   # include scaling for curl!
+        # store in all longitudes
+        for ij in ring
+            u_grid[ij] = u_θ/radius*coslat⁻¹j   # include scaling for curl!
             
-#             # calculate perturbation (possibly shifted in lon compared to Galewsky 2004)
-#             ϕ = lons[ij] - λ
-#             η_grid[ij] = η_sum + exp(-(ϕ/α)^2)*ηθ
-#         end
-#     end
+            # calculate perturbation (possibly shifted in lon compared to Galewsky 2004)
+            ϕ = lons[ij] - λ
+            η_grid[ij] = η_sum + exp(-(ϕ/α)^2)*ηθ
+        end
+    end
 
-#     u = spectral(u_grid)
-#     η = spectral(η_grid)
+    u = spectral(u_grid)
+    η = spectral(η_grid)
 
-#     # interpolate in spectral space to desired resolution
-#     (;lmax,mmax) = model.spectral_transform
-#     (;NF) = model.parameters
-#     u = spectral_truncation(complex(NF),u,lmax+1,mmax)
+    # interpolate in spectral space to desired resolution
+    (;lmax,mmax) = model.spectral_transform
+    (;NF) = model.spectral_grid
+    u = spectral_truncation(complex(NF),u,lmax+1,mmax)
     
-#     # get vorticity initial conditions from curl of u,v
-#     v = zero(u)     # meridional velocity zero for these initial conditions
-#     (;vor) = progn.layers[end].timesteps[1]
-#     curl!(vor,u,v,model.spectral_transform)
+    # get vorticity initial conditions from curl of u,v
+    v = zero(u)     # meridional velocity zero for these initial conditions
+    (;vor) = progn.layers[end].timesteps[1]
+    curl!(vor,u,v,model.spectral_transform)
 
-#     # transform interface height η (use pres as prognostic variable) in spectral
-#     (;pres) = progn.surface.timesteps[1]
-#     copyto!(pres,η)
-#     spectral_truncation!(pres)
-# end
+    # transform interface height η (use pres as prognostic variable) in spectral
+    (;pres) = progn.surface.timesteps[1]
+    copyto!(pres,η)
+    spectral_truncation!(pres)
+end
 
 # """
 #     Z = ZonalWind(;kwargs...) <: InitialConditions
