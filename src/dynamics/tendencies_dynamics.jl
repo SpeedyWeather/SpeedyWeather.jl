@@ -6,7 +6,7 @@ function pressure_gradient!(diagn::DiagnosticVariables,
     (;pres) = progn.surface.timesteps[lf]               # log of surface pressure
     ∇lnp_x_spec = diagn.layers[1].dynamics_variables.a  # reuse work arrays for gradients
     ∇lnp_y_spec = diagn.layers[1].dynamics_variables.b  # in spectral space
-    (;∇lnp_x, ∇lnp_y) = diagn.surface              # but store in grid space
+    (;∇lnp_x, ∇lnp_y) = diagn.surface                   # but store in grid space
 
     ∇!(∇lnp_x_spec,∇lnp_y_spec,pres,S)                  # CALCULATE ∇ln(pₛ)
     gridded!(∇lnp_x,∇lnp_x_spec,S,unscale_coslat=true)  # transform to grid: zonal gradient
@@ -109,10 +109,10 @@ of the logarithm of surface pressure ln(p_s) and D̄ the vertically averaged div
 2. Multiply ū,v̄ with ∇ln(p_s) in grid-point space, convert to spectral.
 3. D̄ is subtracted in spectral space.
 4. Set tendency of the l=m=0 mode to 0 for better mass conservation."""
-function surface_pressure_tendency!(surf::SurfaceVariables{NF},
-                                    model::PrimitiveEquation
-                                    ) where {NF<:AbstractFloat}
-
+function surface_pressure_tendency!(
+    surf::SurfaceVariables,
+    S::SpectralTransform,
+)
     (; pres_tend, pres_tend_grid, ∇lnp_x, ∇lnp_y ) = surf
     
     # vertical averages need to be computed first!
@@ -122,35 +122,36 @@ function surface_pressure_tendency!(surf::SurfaceVariables{NF},
 
     # in grid-point space the the (ū,v̄)⋅∇lnpₛ term (swap sign in spectral)
     @. pres_tend_grid = ū*∇lnp_x + v̄*∇lnp_y
-    spectral!(pres_tend,pres_tend_grid,model.spectral_transform)
+    spectral!(pres_tend,pres_tend_grid,S)
     
     # for semi-implicit D̄ is calc at time step i-1 in vertical_integration!
     @. pres_tend = -pres_tend - D̄   # the -D̄ term in spectral and swap sign
     
-    pres_tend[1] = zero(NF)         # for mass conservation
+    pres_tend[1] = 0                # for mass conservation
     spectral_truncation!(pres_tend) # remove lmax+1 row, only vectors use it
     return nothing
 end
 
-function vertical_velocity!(diagn::DiagnosticVariablesLayer,
-                            surf::SurfaceVariables,
-                            model::PrimitiveEquation)
-
-    (; k ) = diagn                           # vertical level
-    Δσₖ = model.geometry.σ_levels_thick[k]      # σ level thickness at k
-    σk_half = model.geometry.σ_levels_half[k+1] # σ at k+1/2
+function vertical_velocity!(
+    diagn::DiagnosticVariablesLayer,
+    surf::SurfaceVariables,
+    G::Geometry,
+)
+    (;k) = diagn                                # vertical level
+    Δσₖ = G.σ_levels_thick[k]                   # σ level thickness at k
+    σk_half = G.σ_levels_half[k+1]              # σ at k+1/2
     σ̇ = diagn.dynamics_variables.σ_tend         # vertical mass flux M = pₛσ̇ at k+1/2
     
                                                 # sum of Δσ-weighted div, uv∇lnp from 1:k-1
-    (; div_sum_above, uv∇lnp, uv∇lnp_sum_above ) = diagn.dynamics_variables
-    (; div_grid ) = diagn.grid_variables
+    (;div_sum_above, uv∇lnp, uv∇lnp_sum_above) = diagn.dynamics_variables
+    (;div_grid) = diagn.grid_variables
 
     ūv̄∇lnp = surf.pres_tend_grid                # calc'd in surface_pressure_tendency! (excl -D̄)
     D̄ = surf.div_mean_grid                      # vertical avrgd div to be added to ūv̄∇lnp
 
     # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlev+1/2 (stored in layer k)
     # set to zero for bottom layer then, and exit immediately
-    k == model.geometry.nlev && (fill!(σ̇,0); return nothing)
+    k == G.nlev && (fill!(σ̇,0); return nothing)
 
     # Hoskins and Simmons, 1975 just before eq. (6)
     σ̇ .= σk_half*(D̄ .+ ūv̄∇lnp) .-
@@ -374,12 +375,15 @@ end
 
 function humidity_tendency!(diagn::DiagnosticVariablesLayer,
                             model::PrimitiveWet)
+    G = model.geometry
+    S = model.spectral_transform
 
     (; humid_tend, humid_tend_grid ) = diagn.tendencies
     (; humid_grid ) = diagn.grid_variables
 
-    horizontal_advection!(humid_tend,humid_tend_grid,humid_grid,diagn,model)
-
+    # add horizontal advection to parameterization + vertical advection tendencies
+    horizontal_advection!(humid_tend,humid_tend_grid,humid_grid,diagn,G,S,add=true)
+    
     # only vectors make use of the lmax+1 row, set to zero for scalars
     spectral_truncation!(humid_tend) 
 end
@@ -387,14 +391,16 @@ end
 # no humidity tendency for dry core
 humidity_tendency!(::DiagnosticVariablesLayer,::PrimitiveDry) = nothing
 
-function horizontal_advection!( A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput: tendency to write into
-                                A_tend_grid::AbstractGrid{NF},              # Input: tendency incl prev terms
-                                A_grid::AbstractGrid{NF},                   # Input: grid field to be advected
-                                diagn::DiagnosticVariablesLayer{NF},        
-                                model::ModelSetup;
-                                add::Bool=true) where NF                    # add/overwrite A_tend_grid?
-    S = model.spectral_transform
-    G = model.geometry
+function horizontal_advection!( 
+    A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput: tendency to write into
+    A_tend_grid::AbstractGrid{NF},              # Input: tendency incl prev terms
+    A_grid::AbstractGrid{NF},                   # Input: grid field to be advected
+    diagn::DiagnosticVariablesLayer{NF},        
+    G::Geometry,
+    S::SpectralTransform;
+    add::Bool=true                              # add/overwrite A_tend_grid?
+) where NF                    
+
     (;div_grid) = diagn.grid_variables
     
     @inline kernel(a,b,c) = add ? a+b*c : b*c
@@ -759,7 +765,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     wet_core && gridded!(humid_grid,humid_lf,S) # specific humidity (wet core only)
 
     # include humidity effect into temp for everything stability-related
-    temperature_average!(diagn,temp_lf,S)
+    temperature_average!(diagn,temp_lf,S)       # TODO: do at frequency of reinitialize implicit?
     virtual_temperature!(diagn,temp_lf,model)   # temp = virt temp for dry core
 
     # transform from U,V in spectral to u,v on grid (U,V = u,v*coslat)

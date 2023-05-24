@@ -60,10 +60,10 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
 
     geopotential!(diagn,O,C)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
     vertical_integration!(diagn,progn,lf_implicit,G)   # get ū,v̄,D̄ on grid; and and D̄ in spectral
-    surface_pressure_tendency!(surface,model)       # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - D̄
+    surface_pressure_tendency!(surface,S)           # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - D̄
 
     @floop for layer in diagn.layers
-        vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
+        vertical_velocity!(layer,surface,G)         # calculate σ̇ for the vertical mass flux M = pₛσ̇
                                                     # add the RTₖlnpₛ term to geopotential
         linear_pressure_gradient!(layer,progn.surface,lf_implicit,C)
     end                                             # wait all because vertical_velocity! needs to
