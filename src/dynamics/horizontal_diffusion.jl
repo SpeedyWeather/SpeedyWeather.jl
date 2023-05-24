@@ -1,50 +1,85 @@
+"""
+Struct for horizontal hyper diffusion of vor, div, temp; implicitly in spectral space
+with a `power` of the Laplacian (default=4) and the strength controlled by
+`time_scale`. Options exist to scale the diffusion by resolution, and adaptive
+depending on the current vorticity maximum to increase diffusion in active
+layers. Furthermore the power can be decreased above the `tapering_σ` to
+`power_stratosphere` (default 2). For Barotropic, ShallowWater,
+the default non-adaptive constant-time scale hyper diffusion is used. Options are
+$(TYPEDFIELDS)"""
 @kwdef struct HyperDiffusion{NF} <: HorizontalDiffusion{NF}
     # DIMENSIONS
-    trunc::Int                          # spectral resolution
-    nlev::Int                           # number of vertical levels
+    "spectral resolution"
+    trunc::Int
+
+    "number of vertical levels"
+    nlev::Int
     
     # PARAMETERS
-    power::Float64 = 4.0                # Power of Laplacian
-    time_scale::Float64 = 2.4           # Diffusion time scales [hrs]
-    resolution_scaling::Float64 = 0.5   # 0: constant with trunc
-                                        # 1: (inverse) linear with trunc
-                                        # 2: (inverse) quadratic, etc
+    "power of Laplacian"
+    power::Float64 = 4.0
+    
+    "diffusion time scales [hrs]"
+    time_scale::Float64 = 2.4
+    
+    "stronger diffusion with resolution? 0: constant with trunc, 1: (inverse) linear with trunc, etc"
+    resolution_scaling::Float64 = 0.5
 
     # incrased diffusion in stratosphere
-    power_stratosphere::Float64 = 2.0   # different power for stratosphere
-    tapering_σ::Float64 = 0.2           # scale towards that power linearly above this σ
+    "different power for tropopause/stratosphere"
+    power_stratosphere::Float64 = 2.0
+    
+    "linearly scale towards power_stratosphere above this σ"
+    tapering_σ::Float64 = 0.2
 
     # increase diffusion based on high vorticity levels
+    "adaptive = higher diffusion for layers with higher vorticity levels."
     adaptive::Bool = true               # swith on/off
-    vor_max::Float64 = 1e-4             # [1/s] above this, diffusion is increased
-    adaptive_strength::Float64 = 2.0    # increase strength above vor_max by this factor
-                                        # times max(abs(vor))/vor_max
+    
+    "above this (absolute) vorticity level [1/s], diffusion is increased"
+    vor_max::Float64 = 1e-4
+    
+    "increase strength above `vor_max` by this factor times `max(abs(vor))/vor_max`"
+    adaptive_strength::Float64 = 2.0
 
     # ARRAYS, precalculated for each spherical harmonics degree
     # Barotropic and ShallowWater are fine with a constant time scale 
-    ∇²ⁿ_2D::Vector{NF} = zeros(NF,trunc+2)
-    ∇²ⁿ_2D_implicit::Vector{NF} = zeros(NF,trunc+2)
+    ∇²ⁿ_2D::Vector{NF} = zeros(NF,trunc+2)              # initialized with zeros, ones
+    ∇²ⁿ_2D_implicit::Vector{NF} = ones(NF,trunc+2)      # as this corresponds to no diffusion
 
     # PrimitiveEquation models need something more adaptive
     # and for each layer (to allow for varying orders/strength in the vertical)
     ∇²ⁿ::Vector{Vector{NF}} = [zeros(NF,trunc+2) for _ in 1:nlev]           # explicit part
-    ∇²ⁿ_implicit::Vector{Vector{NF}} = [zeros(NF,trunc+2) for _ in 1:nlev]  # implicit part
+    ∇²ⁿ_implicit::Vector{Vector{NF}} = [ones(NF,trunc+2) for _ in 1:nlev]   # implicit part
 end
 
+"""$(TYPEDSIGNATURES)
+Generator function based on the resolutin in `spectral_grid`.
+Passes on keyword arguments."""
 function HyperDiffusion(spectral_grid::SpectralGrid,kwargs...)
     (;NF,trunc,nlev) = spectral_grid        # take resolution parameters from spectral_grid
     return HyperDiffusion{NF}(;trunc,nlev,kwargs...)
 end
 
+"""$(TYPEDSIGNATURES)
+Precomputes the hyper diffusion terms in `scheme` based on the
+model time step, and possibly with a changing strength/power in
+the vertical.
+"""
 function initialize!(   scheme::HyperDiffusion,
-                        G::Geometry,
-                        C::DynamicsConstants)
-    (;nlev) = scheme
-    for k in 1:nlev 
-        initialize!(scheme,k,G,C)
+                        model::ModelSetup)
+    # always initialize the 2D arrays
+    initialize!(scheme,model.time_stepping)
+    
+    # and the 3D arrays (different diffusion per layer) for primitive eq
+    for k in 1:scheme.nlev 
+        initialize!(scheme,k,model.geometry,model.time_stepping)
     end
 end
 
+"""$(TYPEDSIGNATURES)
+Precomputes the 2D hyper diffusion terms in `scheme` based on the
+model time step."""
 function initialize!(   scheme::HyperDiffusion,
                         L::TimeStepper)
 
@@ -73,6 +108,10 @@ function initialize!(   scheme::HyperDiffusion,
     end
 end
 
+"""$(TYPEDSIGNATURES)
+Precomputes the hyper diffusion terms in `scheme` for layer `k` based on the
+model time step in `L`, the vertical level sigma level in `G`, and
+the current (absolute) vorticity maximum level `vor_max`"""
 function initialize!(   
     scheme::HyperDiffusion,
     k::Int,
@@ -120,25 +159,22 @@ function initialize!(
     end
 end
 
+"""$(TYPEDSIGNATURES)
+Pre-function to other `initialize!(::HyperDiffusion)` initialisors that
+calculates the (absolute) vorticity maximum for the layer of `diagn`."""
 function initialize!(   
     scheme::HyperDiffusion,
     diagn::DiagnosticVariablesLayer,
     G::Geometry,
     L::TimeStepper,
 )
-
     scheme.adaptive || return nothing
     vor_min, vor_max = extrema(diagn.grid_variables.vor_grid)
     vor_abs_max = max(abs(vor_min), abs(vor_max))/G.radius
     initialize!(scheme,diagn.k,G,L,vor_abs_max)
 end
 
-"""
-    horizontal_diffusion!(  tendency::LowerTriangularMatrix{Complex},
-                            A::LowerTriangularMatrix{Complex},
-                            ∇²ⁿ_expl::AbstractVector,
-                            ∇²ⁿ_impl::AbstractVector)
-
+"""$(TYPEDSIGNATURES)
 Apply horizontal diffusion to a 2D field `A` in spectral space by updating its tendency `tendency`
 with an implicitly calculated diffusion term. The implicit diffusion of the next time step is split
 into an explicit part `∇²ⁿ_expl` and an implicit part `∇²ⁿ_impl`, such that both can be calculated
@@ -162,6 +198,8 @@ function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   
     end
 end
 
+"""$(TYPEDSIGNATURES)
+Apply horizontal diffusion to vorticity in the Barotropic models."""
 function horizontal_diffusion!( diagn::DiagnosticVariablesLayer,
                                 progn::PrognosticLayerTimesteps,
                                 model::Barotropic,
@@ -177,6 +215,8 @@ function horizontal_diffusion!( diagn::DiagnosticVariablesLayer,
     horizontal_diffusion!(vor_tend,vor,∇²ⁿ,∇²ⁿ_implicit)
 end
 
+"""$(TYPEDSIGNATURES)
+Apply horizontal diffusion to vorticity and diffusion in the ShallowWater models."""
 function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
                                 diagn::DiagnosticVariablesLayer,
                                 model::ShallowWater,
@@ -193,6 +233,10 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
     horizontal_diffusion!(div_tend,div,∇²ⁿ,∇²ⁿ_implicit)
 end
 
+"""$(TYPEDSIGNATURES)
+Apply horizontal diffusion applied to vorticity, diffusion and temperature
+in the PrimitiveEquation models. Uses the constant diffusion for temperature
+but possibly adaptive diffusion for vorticity and divergence."""
 function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
                                 diagn::DiagnosticVariablesLayer,
                                 model::PrimitiveEquation,
