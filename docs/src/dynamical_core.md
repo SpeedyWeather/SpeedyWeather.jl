@@ -60,13 +60,17 @@ We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrat
 
 ```math
 \begin{aligned}
-\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) &= (-1)^{n+1}\nu\nabla^{2n}\zeta \\
-\frac{\partial \mathcal{D}}{\partial t} - \nabla \times (\mathbf{u}(\zeta + f)) &= -\nabla^2(\tfrac{1}{2}(u^2 + v^2) + g\eta) + (-1)^{n+1}\nu\nabla^{2n}\mathcal{D} \\
-\frac{\partial \eta}{\partial t} + \nabla \cdot (\mathbf{u}h) &= 0.
+\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) &= (-1)^{n+1}\nu\nabla^{2n}\zeta, \\
+\frac{\partial \mathcal{D}}{\partial t} - \nabla \times (\mathbf{u}(\zeta + f)) &= -\nabla^2(\tfrac{1}{2}(u^2 + v^2) + g\eta) + (-1)^{n+1}\nu\nabla^{2n}\mathcal{D}, \\
+\frac{\partial \eta}{\partial t} + \nabla \cdot (\mathbf{u}h) &= 0,
 \end{aligned}
 ```
 
-more to come
+where ``\zeta = \hat{\mathbf{z}} \cdot (\nabla \times \mathbf{u})`` is the relative vorticity,
+``\mathcal{D} = \nabla \cdot \mathbf{u}`` the divergence, and ``\eta`` the deviation from the
+fluids rest height.
+
+**Note**: more to come...
 
 ## Primitive equations
 
