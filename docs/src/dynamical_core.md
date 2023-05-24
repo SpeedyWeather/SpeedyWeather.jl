@@ -68,7 +68,7 @@ We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrat
 
 where ``\zeta = \hat{\mathbf{z}} \cdot (\nabla \times \mathbf{u})`` is the relative vorticity,
 ``\mathcal{D} = \nabla \cdot \mathbf{u}`` the divergence, and ``\eta`` the deviation from the
-fluids rest height.
+fluid's rest height.
 
 **Note**: more to come...
 
@@ -78,14 +78,14 @@ The [primitive equations](https://en.wikipedia.org/wiki/Primitive_equations) sol
 
 ```math
 \begin{aligned}
-\partial_t u = ... \\
-\partial_t v = ... \\
-\partial_t T = ... \\ 
-\partial_t Q = ...
+\partial_t u &= ... \\
+\partial_t v &= ... \\
+\partial_t T &= ... \\ 
+\partial_t Q &= ...
 \end{aligned}
 ```
 
-more to come
+**Note**: more to come...
 
 ## Horizontal diffusion
 
