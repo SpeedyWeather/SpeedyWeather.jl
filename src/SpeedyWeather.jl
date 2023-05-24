@@ -45,7 +45,8 @@ export  Barotropic,             # abstract
         PrimitiveDry,
         PrimitiveWet
 
-export  BarotropicModel,        # concrete
+export  Model,
+        BarotropicModel,        # concrete
         ShallowWaterModel,
         PrimitiveDryModel,
         PrimitiveWetModel
@@ -136,7 +137,7 @@ include("dynamics/spectral_grid.jl")
 include("dynamics/planets.jl")
 include("dynamics/atmospheres.jl")
 include("dynamics/constants.jl")
-include("dynamics/orography.jl")                # defines Orography
+include("dynamics/orography.jl")
 
 # VARIABLES
 include("dynamics/prognostic_variables.jl")
@@ -154,27 +155,20 @@ include("dynamics/scaling.jl")
 include("dynamics/tendencies.jl")
 include("dynamics/tendencies_dynamics.jl")
 
+# PARAMETERIZATIONS
+include("physics/tendencies.jl")
+include("physics/column_variables.jl")
+include("physics/thermodynamics.jl")
+include("physics/boundary_layer.jl")
+
 # MODELS
 include("dynamics/models.jl")
 
-# # SOME DEFINITIONS FIRST
-# include("physics/constants.jl")                 # defines ParameterizationConstants
-
-# # DYNAMICS
-# include("dynamics/define_implicit.jl")          # defines ImplicitShallowWater, ImplicitPrimitiveEq     # defines GenLogisticCoefs
-# include("dynamics/planets.jl")                  # defines Earth
-# include("dynamics/models.jl")                   # defines ModelSetups
-# include("dynamics/diffusion.jl")
-
 # # PHYSICS
-# include("physics/column_variables.jl")
-# include("physics/thermodynamics.jl")
-# include("physics/tendencies.jl")
 # include("physics/convection.jl")
 # include("physics/large_scale_condensation.jl")
 # include("physics/longwave_radiation.jl")
 # include("physics/shortwave_radiation.jl")
-# include("physics/boundary_layer.jl")
 # include("physics/temperature_relaxation.jl")
 # include("physics/vertical_diffusion.jl")
 

@@ -34,7 +34,7 @@ $(TYPEDFIELDS)
     Δt_at_T31::Float64 = 30
 
     "radius of sphere [m], used for scaling"
-    radius::Float64 = 6.371e6
+    radius::NF = 6.371e6
 
     # NUMERICS
     "Robert (1966) time filter coefficeint to suppress comput. mode"
@@ -250,8 +250,8 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     # occasionally reinitialize the implicit solver with new temperature profile
     initialize!(model.implicit,i,dt,diagn,model.geometry,model.constants)
 
-    dynamics_tendencies!(diagn,progn,model,lf2)     # dynamical core
-    implicit_correction!(diagn,progn,model)         # semi-implicit time stepping corrections
+    dynamics_tendencies!(diagn,progn,model,lf2)         # dynamical core
+    implicit_correction!(diagn,model.implicit,progn)    # semi-implicit time stepping corrections
 
     # LOOP OVER ALL LAYERS for diffusion, leapfrog time integration
     # and progn state from spectral to grid for next time step

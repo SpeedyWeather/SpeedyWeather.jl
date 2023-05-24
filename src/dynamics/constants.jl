@@ -3,31 +3,54 @@ Struct holding constants needed at runtime for the dynamical core in number form
 $(TYPEDFIELDS)"""
 @kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConstants{NF}
     # PHYSICAL CONSTANTS
-    radius::NF              # Radius of Planet
-    rotation::NF            # Angular frequency of Planet's rotation
-    gravity::NF             # Gravitational acceleration
-    layer_thickness::NF     # shallow water layer thickness [m]
+    "Radius of Planet [m]"
+    radius::NF
+
+    "Angular frequency of Planet's rotation [1/s]"
+    rotation::NF
+    
+    "Gravitational acceleration [m/s^2]"
+    gravity::NF
+    
+    "shallow water layer thickness [m]"
+    layer_thickness::NF
     
     # THERMODYNAMICS
-    R_dry::NF               # specific gas constant for dry air [J/kg/K]
-    R_vapour::NF            # specific gas constant for water vapour [J/kg/K]
-    μ_virt_temp::NF         # used for virt temp calculation
-    cₚ::NF                  # specific heat at constant pressure [J/K/kg]
-    κ::NF                   # = R_dry/cₚ, gas const for air over heat capacity
+    "specific gas constant for dry air [J/kg/K]"
+    R_dry::NF
 
-    # CORIOLIS FREQUENCY (scaled by radius as is vorticity) = 2Ω*sin(lat)*radius
+    "specific gas constant for water vapour [J/kg/K]"
+    R_vapour::NF
+
+    "used in Tv = T(1+μq) for virt temp Tv(T,q) calculation"
+    μ_virt_temp::NF
+
+    "specific heat at constant pressure [J/K/kg]"
+    cₚ::NF
+
+    "= R_dry/cₚ, gas const for air over heat capacity"
+    κ::NF
+
+    "coriolis frequency [1/s] (scaled by radius as is vorticity) = 2Ω*sin(lat)*radius"
     f_coriolis::Vector{NF}
 
     # ADIABATIC TERM
-    σ_lnp_A::Vector{NF}             # σ-related factors needed for adiabatic terms 1st
-    σ_lnp_B::Vector{NF}             # and 2nd
+    "σ-related factor A needed for adiabatic terms"
+    σ_lnp_A::Vector{NF}
+    
+    "σ-related factor B needed for adiabatic terms"
+    σ_lnp_B::Vector{NF}
 
     # GEOPOTENTIAL INTEGRATION (on half/full levels)
-    Δp_geopot_half::Vector{NF}      # = R*(ln(p_k+1) - ln(p_k+1/2)), for half level geopotential
-    Δp_geopot_full::Vector{NF}      # = R*(ln(p_k+1/2) - ln(p_k)), for full level geopotential
+    "= R*(ln(p_k+1) - ln(p_k+1/2)), for half level geopotential"
+    Δp_geopot_half::Vector{NF}
+    
+    "= R*(ln(p_k+1/2) - ln(p_k)), for full level geopotential"
+    Δp_geopot_full::Vector{NF}
 
     # REFERENCE TEMPERATURE PROFILE for implicit
-    temp_ref_profile::Vector{NF}    # reference temperature profile
+    "reference temperature profile"
+    temp_ref_profile::Vector{NF}
 end
 
 """

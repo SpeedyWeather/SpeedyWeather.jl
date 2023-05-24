@@ -38,7 +38,7 @@ function parameterization_tendencies!(
 
         # HELD-SUAREZ
         # temperature_relaxation!(column,temperature_relax,model)
-        boundary_layer!(column,boundary_layer_drag,model)
+        boundary_layer_drag!(column,boundary_layer_drag,model)
 
         # Calculate parametrizations (order of execution is important!)
         # convection!(column,model)

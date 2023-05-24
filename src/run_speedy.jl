@@ -1,6 +1,6 @@
 """
 $(TYPEDSIGNATURES)
-Run a `sim::Simulation`. The `sim.model` Model is assumed to be initialized,
+Run a SpeedyWeather.jl `simulation`. The `simulation.model` is assumed to be initialized,
 otherwise use `initialize=true` as keyword argument."""
 function run!(  simulation::Simulation;
                 initialize::Bool = false,
@@ -29,8 +29,8 @@ end
 
 Runs SpeedyWeather.jl with number format `NF` and the model `Model` and any additional parameters
 in the keyword arguments `kwargs...`. Unspecified parameters use the default values."""
-function run_speedy(::Type{NF}=DEFAULT_NF,                      # default number format
-                    ::Type{Model}=DEFAULT_MODEL;                # default model
+function run_speedy(::Type{NF} = DEFAULT_NF,                    # default number format
+                    ::Type{Model} = DEFAULT_MODEL;              # default model
                     spectral_grid::NamedTuple = NamedTuple(),   # some keyword arguments to be
                     planet::NamedTuple = NamedTuple(),          # passed on
                     atmosphere::NamedTuple = NamedTuple(),

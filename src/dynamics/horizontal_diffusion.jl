@@ -73,15 +73,16 @@ function initialize!(   scheme::HyperDiffusion,
     end
 end
 
-function initialize!(   scheme::HyperDiffusion,
-                        k::Int,
-                        G::Geometry,
-                        C::DynamicsConstants,
-                        vor_max::Real = 0)
-
+function initialize!(   
+    scheme::HyperDiffusion,
+    k::Int,
+    G::Geometry,
+    L::TimeStepper,
+    vor_max::Real = 0,
+)
     (;trunc,time_scale,resolution_scaling,∇²ⁿ,∇²ⁿ_implicit) = scheme
     (;power, power_stratosphere, tapering_σ) = scheme
-    (;Δt, radius) = C
+    (;Δt, radius) = L
     σ = G.σ_levels_full[k]
 
     # Reduce diffusion time scale (=increase diffusion) with resolution
@@ -108,7 +109,7 @@ function initialize!(   scheme::HyperDiffusion,
     tapering = max(0,(tapering_σ-σ)/tapering_σ)         # ∈ [0,1]
     p = power + tapering*(power_stratosphere - power) 
         
-    @inbounds for l in 0:lmax+1   # diffusion for every degree l, but indendent of order m
+    @inbounds for l in 0:trunc+1   # diffusion for every degree l, but indendent of order m
         eigenvalue_norm = -l*(l+1)/largest_eigenvalue   # normalised diffusion ∇², power=1
 
         # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
@@ -119,15 +120,17 @@ function initialize!(   scheme::HyperDiffusion,
     end
 end
 
-function initialize!(   scheme::HyperDiffusion,
-                        diagn::DiagnosticVariablesLayer,
-                        G::Geometry,
-                        C::DynamicsConstants)
+function initialize!(   
+    scheme::HyperDiffusion,
+    diagn::DiagnosticVariablesLayer,
+    G::Geometry,
+    L::TimeStepper,
+)
 
     scheme.adaptive || return nothing
     vor_min, vor_max = extrema(diagn.grid_variables.vor_grid)
     vor_abs_max = max(abs(vor_min), abs(vor_max))/G.radius
-    initialize!(scheme,diagn.k,G,C,vor_abs_max)
+    initialize!(scheme,diagn.k,G,L,vor_abs_max)
 end
 
 """
@@ -196,7 +199,7 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
                                 lf::Int=1)      # leapfrog index used (2 is unstable)
     
     HD = model.horizontal_diffusion
-    initialize!(HD,diagn,model)
+    initialize!(HD,diagn,model.geometry,model.time_stepping)
     k = diagn.k                                 # current layer k
     ∇²ⁿ = HD.∇²ⁿ[k]                             # now pick operators at k
     ∇²ⁿ_implicit = HD.∇²ⁿ_implicit[k]

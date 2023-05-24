@@ -125,7 +125,7 @@ $(SIGNATURES)
 The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveEquation
+@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveDry
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
@@ -194,6 +194,6 @@ The default fallback is that all variables are included. """
 has(::Type{<:ModelSetup}, var_name::Symbol) = var_name in (:vor, :div, :temp, :humid, :pres)
 has(M::ModelSetup, var_name) = has(typeof(M), var_name)
 
-function Model(spectral_grid::SpectralGrid{WhichModel};kwargs...) where WhichModel
-    return default_concrete_model(WhichModel)(;kwargs...)
+function Model(;spectral_grid::SpectralGrid{WhichModel},kwargs...) where WhichModel
+    return default_concrete_model(WhichModel)(;spectral_grid,kwargs...)
 end

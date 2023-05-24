@@ -6,7 +6,6 @@ in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)"""
 @kwdef struct EarthAtmosphere <: AbstractAtmosphere
     # ATMOSPHERE
-
     "molar mass of dry air [g/mol]"
     mol_mass_dry_air::Float64 = 28.9649
 
@@ -36,7 +35,6 @@ $(TYPEDFIELDS)"""
 
 
     # STANDARD ATMOSPHERE (reference values)
-
     "moist adiabatic temperature lapse rate ``-dT/dz`` [K/km]"
     lapse_rate::Float64 = 5
 

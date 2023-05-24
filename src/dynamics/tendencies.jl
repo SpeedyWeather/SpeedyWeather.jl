@@ -37,13 +37,16 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
                                 model::PrimitiveEquation,
                                 lf::Int=2)          # leapfrog index for tendencies
 
-    O, G, S = model.orography, model.geometry, model.spectral_transform
+    O = model.orography
+    G = model.geometry
+    S = model.spectral_transform
+    C = model.constants
     (; surface ) = diagn
 
     # for semi-implicit corrections (α >= 0.5) linear gravity-wave related tendencies are
     # evaluated at previous timestep i-1 (i.e. lf=1 leapfrog time step) 
     # nonlinear terms and parameterizations are always evaluated at lf
-    lf_implicit = model.parameters.implicit_α == 0 ? lf : 1
+    lf_implicit = model.implicit.α == 0 ? lf : 1
 
     pressure_gradient!(diagn,progn,lf,S)            # calculate ∇ln(pₛ)
 
@@ -52,24 +55,24 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
 
         # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
         linear_virtual_temperature!(diagn_layer,progn_layer,model,lf_implicit)
-        temperature_anomaly!(diagn_layer,diagn)     # temperature relative to profile
+        temperature_anomaly!(diagn_layer)           # temperature relative to profile
     end
 
-    geopotential!(diagn,O,G)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
+    geopotential!(diagn,O,C)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
     vertical_integration!(diagn,progn,lf_implicit,G)   # get ū,v̄,D̄ on grid; and and D̄ in spectral
     surface_pressure_tendency!(surface,model)       # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - D̄
 
     @floop for layer in diagn.layers
         vertical_velocity!(layer,surface,model)     # calculate σ̇ for the vertical mass flux M = pₛσ̇
                                                     # add the RTₖlnpₛ term to geopotential
-        linear_pressure_gradient!(layer,diagn,progn,model,lf_implicit)
+        linear_pressure_gradient!(layer,progn.surface,lf_implicit,C)
     end                                             # wait all because vertical_velocity! needs to
                                                     # finish before vertical_advection!
     @floop for layer in diagn.layers
         vertical_advection!(layer,diagn,model)      # use σ̇ for the vertical advection of u,v,T,q
 
         vordiv_tendencies!(layer,surface,model)     # vorticity advection, pressure gradient term
-        temperature_tendency!(layer,surface,model)  # hor. advection + adiabatic term
+        temperature_tendency!(layer,model)          # hor. advection + adiabatic term
         humidity_tendency!(layer,model)             # horizontal advection of humidity (nothing for wetcore)
         bernoulli_potential!(layer,S)               # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
     end

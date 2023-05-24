@@ -105,7 +105,7 @@ $(TYPEDFIELDS)
     npoints::Int = spectral_grid.npoints
 
     "Planet's radius [m]"
-    radius::Float64 = spectral_grid.radius    
+    radius::NF = spectral_grid.radius    
 
 
     # ARRAYS OF LANGITUDES/LONGITUDES

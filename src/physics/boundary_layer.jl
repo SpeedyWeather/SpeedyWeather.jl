@@ -2,7 +2,7 @@
 struct NoBoundaryLayerDrag{NF} <: BoundaryLayerDrag{NF} end
 
 """NoBoundaryLayer scheme does not need any initialisation."""
-function initialize!(   scheme::NoBoundaryLayer,
+function initialize!(   scheme::NoBoundaryLayerDrag,
                         model::PrimitiveEquation)
     return nothing
 end 

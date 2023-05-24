@@ -188,7 +188,7 @@ function ImplicitPrimitiveEq(spectral_grid::SpectralGrid,kwargs...)
 end
 
 # function barrier to unpack the constants struct for primitive eq models
-function initialize!(I::ImplicitShallowWater,dt::Real,diagn::DiagnosticVariables,model::PrimitiveEquation)
+function initialize!(I::ImplicitPrimitiveEq,dt::Real,diagn::DiagnosticVariables,model::PrimitiveEquation)
     initialize!(I,dt,diagn,model.geometry,model.constants)
 end
 
@@ -200,8 +200,8 @@ function initialize!(   implicit::ImplicitPrimitiveEq,
                         geometry::Geometry,
                         constants::DynamicsConstants)
 
-    (;α,temp_profile,S,S⁻¹,L,R,U,W,L0,L1,L2,L3,L4) = implicit
-    (;nlev, σ_levels_full, σ_levels_thick) = geometry
+    (;trunc, nlev, α,temp_profile,S,S⁻¹,L,R,U,W,L0,L1,L2,L3,L4) = implicit
+    (;σ_levels_full, σ_levels_thick) = geometry
     (;R_dry, κ, Δp_geopot_half, Δp_geopot_full, σ_lnp_A, σ_lnp_B) = constants
 
     if implicit.adaptive    # use current vertical temperature profile
@@ -272,7 +272,7 @@ function initialize!(   implicit::ImplicitPrimitiveEq,
     # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
     # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
     I = LinearAlgebra.I(nlev)
-    @inbounds for l in 1:lmax+1
+    @inbounds for l in 1:trunc+1
         eigenvalue = -l*(l-1)           # 1-based, -l*(l+1) → -l*(l-1)
         S .= I .- ξ^2*eigenvalue*(R*L .+ U*W')
 
@@ -313,7 +313,7 @@ function implicit_correction!(
 
     # (;Δp_geopot_half, Δp_geopot_full) = model.geometry     # = R*Δlnp on half or full levels
     (;nlev, trunc, S⁻¹, R, U, L, W) = implicit
-    ξ = model.implicit.ξ[]
+    ξ = implicit.ξ[]
     
     # MOVE THE IMPLICIT TERMS OF THE TEMPERATURE EQUATION FROM TIME STEP i TO i-1
     # geopotential and linear pressure gradient (divergence equation) are already evaluated at i-1
@@ -365,7 +365,7 @@ function implicit_correction!(
             for l in m:trunc+1          # but skips the lmax+2 degree (1-based)
                 lm += 1                 # single index lm corresponding to harmonic l,m
                                         # ∇² not part of U so *eigenvalues here
-                eigenvalue = -l*(l+1)
+                eigenvalue = -l*(l-1)   # 1-based, -l*(l+1) → -l*(l-1)
                 G[lm] = div_tend[lm] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopot[lm])      
             end
             lm += 1         # skip last row, LowerTriangularMatrices are of size lmax+2 x mmax+1

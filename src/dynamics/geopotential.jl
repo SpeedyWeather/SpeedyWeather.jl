@@ -5,7 +5,7 @@ Precomputes constants for the vertical integration of the geopotential, defined 
 `Φ_{k+1/2} = Φ_{k+1} + R*T_{k+1}*(ln(p_{k+1}) - ln(p_{k+1/2}))` (half levels)
 `Φ_k = Φ_{k+1/2} + R*T_k*(ln(p_{k+1/2}) - ln(p_k))` (full levels)
 
-Same formula by `k → k-1/2`."""
+Same formula but `k → k-1/2`."""
 function initialize_geopotential(   σ_levels_full::Vector,
                                     σ_levels_half::Vector,
                                     R_dry::Real)
@@ -49,78 +49,84 @@ end
 #     return lapserate_corr
 # end
 
-# """
-#     geopotential!(diagn,B,G)
+"""
+$(TYPEDSIGNATURES)
+Compute spectral geopotential `geopot` from spectral temperature `temp`
+and spectral surface geopotential `geopot_surf` (orography*gravity).
+"""
+function geopotential!( 
+    diagn::DiagnosticVariables,
+    O::AbstractOrography,       # contains surface geopotential
+    C::DynamicsConstants,       # contains precomputed layer-thickness arrays
+)
 
-# Compute spectral geopotential `geopot` from spectral temperature `temp`
-# and spectral surface geopotential `geopot_surf` (orography*gravity).
-# """
-# function geopotential!( diagn::DiagnosticVariables{NF},
-#                         B::Boundaries{NF},      # contains surface geopotential
-#                         G::Geometry{NF}         # contains precomputed layer-thickness arrays
-#                         ) where NF              # number format NF
+    (;geopot_surf) = O                      # = orography*gravity
+    (;Δp_geopot_half, Δp_geopot_full) = C   # = R*Δlnp either on half or full levels
+    (;nlev) = diagn                         # number of vertical levels
 
-#     (;geopot_surf) = B.orography           # = orography*gravity
-#     (;Δp_geopot_half, Δp_geopot_full) = G  # = R*Δlnp either on half or full levels
-#     (;lapserate_corr) = G
-#     (;nlev) = G                            # number of vertical levels
+    @boundscheck nlev == length(Δp_geopot_full) || throw(BoundsError)
 
-#     @boundscheck diagn.nlev == length(Δp_geopot_full) || throw(BoundsError)
-
-#     # for PrimitiveDry virtual temperature = absolute temperature here
-#     # note these are not anomalies here as they are only in grid-point fields
+    # for PrimitiveDry virtual temperature = absolute temperature here
+    # note these are not anomalies here as they are only in grid-point fields
     
-#     # BOTTOM FULL LAYER
-#     temp = diagn.layers[end].dynamics_variables.temp_virt
-#     geopot = diagn.layers[end].dynamics_variables.geopot
+    # BOTTOM FULL LAYER
+    temp = diagn.layers[end].dynamics_variables.temp_virt
+    geopot = diagn.layers[end].dynamics_variables.geopot
     
-#     @inbounds for lm in eachharmonic(geopot,geopot_surf,temp)
-#         geopot[lm] = geopot_surf[lm] + temp[lm]*Δp_geopot_full[end]
-#     end
+    @inbounds for lm in eachharmonic(geopot,geopot_surf,temp)
+        geopot[lm] = geopot_surf[lm] + temp[lm]*Δp_geopot_full[end]
+    end
 
-#     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
-#     @inbounds for k in nlev-1:-1:1
-#         temp_k    = diagn.layers[k].dynamics_variables.temp_virt
-#         temp_k1   = diagn.layers[k+1].dynamics_variables.temp_virt
-#         geopot_k  = diagn.layers[k].dynamics_variables.geopot
-#         geopot_k1 = diagn.layers[k+1].dynamics_variables.geopot
+    # OTHER FULL LAYERS, integrate two half-layers from bottom to top
+    @inbounds for k in nlev-1:-1:1
+        temp_k    = diagn.layers[k].dynamics_variables.temp_virt
+        temp_k1   = diagn.layers[k+1].dynamics_variables.temp_virt
+        geopot_k  = diagn.layers[k].dynamics_variables.geopot
+        geopot_k1 = diagn.layers[k+1].dynamics_variables.geopot
 
-#         for lm in eachharmonic(temp_k,temp_k1,geopot_k,geopot_k1)
-#             geopot_k½ = geopot_k1[lm] + temp_k1[lm]*Δp_geopot_half[k+1] # 1st half layer integration
-#             geopot_k[lm] = geopot_k½  + temp_k[lm]*Δp_geopot_full[k]    # 2nd onto full layer
-#         end      
-#     end
+        for lm in eachharmonic(temp_k,temp_k1,geopot_k,geopot_k1)
+            geopot_k½ = geopot_k1[lm] + temp_k1[lm]*Δp_geopot_half[k+1] # 1st half layer integration
+            geopot_k[lm] = geopot_k½  + temp_k[lm]*Δp_geopot_full[k]    # 2nd onto full layer
+        end      
+    end
 
-#     # # LAPSERATE CORRECTION IN THE FREE TROPOSPHERE (>nlev)
-#     # # TODO only for spectral coefficients 1,: ?
-#     # lmax,mmax = size(geopot)
-#     # for k in 2:nlev-1
-#     #     temp_k_above = progn.layers[k-1].timesteps[lf].temp
-#     #     temp_k_below = progn.layers[k+1].timesteps[lf].temp
-#     #     geopot  = diagn.layers[k].dynamics_variables.geopot
+    # # LAPSERATE CORRECTION IN THE FREE TROPOSPHERE (>nlev)
+    # # TODO only for spectral coefficients 1,: ?
+    # lmax,mmax = size(geopot)
+    # for k in 2:nlev-1
+    #     temp_k_above = progn.layers[k-1].timesteps[lf].temp
+    #     temp_k_below = progn.layers[k+1].timesteps[lf].temp
+    #     geopot  = diagn.layers[k].dynamics_variables.geopot
 
-#     #     for l in 1:lmax-1
-#     #         geopot[l,l] += lapserate_corr[k]*(temp_k_below[l,l] - temp_k_above[l,l])
-#     #     end
-#     # end
-# end
+    #     for l in 1:lmax-1
+    #         geopot[l,l] += lapserate_corr[k]*(temp_k_below[l,l] - temp_k_above[l,l])
+    #     end
+    # end
+end
 
-# function geopotential!( temp::Vector,
-#                         G::Geometry)
-    
-#     (;Δp_geopot_half, Δp_geopot_full, nlev) = G  # = R*Δlnp either on half or full levels
-#     geopot = zero(temp)
+"""
+$(TYPEDSIGNATURES)
+Calculate the geopotential based on `temp` in a single column.
+This exclues the surface geopotential that would need to be added to the returned vector.
+Function not used in the dynamical core but for post-processing and analysis."""
+function geopotential!( temp::Vector,
+                        C::DynamicsConstants)
+    nlev = length(temp)
+    (;Δp_geopot_half, Δp_geopot_full) = C  # = R*Δlnp either on half or full levels
+    geopot = zero(temp)
 
-#     # bottom layer
-#     geopot[nlev] = temp[nlev]*Δp_geopot_full[end]
+    @boundscheck length(temp) == length(Δp_geopot_full) || throw(BoundsError)
 
-#     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
-#     @inbounds for k in nlev-1:-1:1
-#         geopot[k] = geopot[k+1] + temp[k+1]*Δp_geopot_half[k+1] + temp[k]*Δp_geopot_full[k]
-#     end
+    # bottom layer
+    geopot[nlev] = temp[nlev]*Δp_geopot_full[end]
 
-#     return geopot
-# end
+    # OTHER FULL LAYERS, integrate two half-layers from bottom to top
+    @inbounds for k in nlev-1:-1:1
+        geopot[k] = geopot[k+1] + temp[k+1]*Δp_geopot_half[k+1] + temp[k]*Δp_geopot_full[k]
+    end
+
+    return geopot
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -134,71 +140,105 @@ function geopotential!( diagn::DiagnosticVariablesLayer,
     geopot .= pres*gravity
 end 
 
-# """
-#     virtual_temperature!(   diagn::DiagnosticVariablesLayer,
-#                             temp::LowerTriangularMatrix,
-#                             M::PrimitiveWet)
-                
-# Calculates the virtual temperature Tᵥ as
+# function barrier
+function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
+                                temp::LowerTriangularMatrix,    # only needed for dispatch compat with DryCore
+                                model::PrimitiveWet)
+    virtual_temperature!(diagn,temp,model.constants)
+end
 
-#     Tᵥ = T(1+μq)
+"""
+$(TYPEDSIGNATURES)
+Calculates the virtual temperature Tᵥ as
 
-# With absolute temperature T, specific humidity q and
+    Tᵥ = T(1+μq)
 
-#     μ = (1-ξ)/ξ, ξ = R_dry/R_vapour.
+With absolute temperature T, specific humidity q and
+
+    μ = (1-ξ)/ξ, ξ = R_dry/R_vapour.
     
-# In grid-point space and then transforms Tᵥ back into spectral space
-# for the geopotential calculation."""
-# function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
-#                                 ::LowerTriangularMatrix,    # only needed for dispatch compat with DryCore
-#                                 model::PrimitiveWet)
+in grid-point space."""
+function virtual_temperature!(
+    diagn::DiagnosticVariablesLayer,
+    temp::LowerTriangularMatrix,    # only needed for dispatch compat with DryCore
+    constants::DynamicsConstants,
+    )
     
-#     (;temp_grid, humid_grid, temp_virt_grid) = diagn.grid_variables
-#     (;temp_virt) = diagn.dynamics_variables
-#     μ = model.constants.μ_virt_temp
-#     S = model.spectral_transform
+    (;temp_grid, humid_grid, temp_virt_grid) = diagn.grid_variables
+    (;temp_virt) = diagn.dynamics_variables
+    μ = constants.μ_virt_temp
 
-#     @inbounds for ij in eachgridpoint(temp_virt_grid, temp_grid, humid_grid)
-#         temp_virt_grid[ij] = temp_grid[ij]*(1 + μ*humid_grid[ij])
-#     end
-#     # spectral!(temp_virt,temp_virt_grid,S)
-# end
+    @inbounds for ij in eachgridpoint(temp_virt_grid, temp_grid, humid_grid)
+        temp_virt_grid[ij] = temp_grid[ij]*(1 + μ*humid_grid[ij])
+    end
+    # TODO check that doing a non-linear virtual temperature in grid-point space
+    # but a linear virtual temperature in spectral space to avoid another transform
+    # does not cause any problems. Alternative do the transform or have a linear
+    # virtual temperature in both grid and spectral space
+    # spectral!(temp_virt,temp_virt_grid,S)
+end
 
-# function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
-#                                         progn::PrognosticLayerTimesteps,
-#                                         model::PrimitiveWet,
-#                                         lf::Int)
+"""
+$(TYPEDSIGNATURES)
+Virtual temperature in grid-point space: For the PrimitiveDry temperature
+and virtual temperature are the same (humidity=0). Just copy over the arrays."""
+function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
+                                temp::LowerTriangularMatrix,
+                                model::PrimitiveDry)
     
-#     (;temp_virt) = diagn.dynamics_variables
-#     μ = model.constants.μ_virt_temp
-#     Tₖ = model.geometry.temp_ref_profile[diagn.k]   
-#     (;temp,humid) = progn.timesteps[lf]
+    (;temp_grid, temp_virt_grid) = diagn.grid_variables
+    (;temp_virt) = diagn.dynamics_variables
 
-#     @. temp_virt = temp + Tₖ*μ*humid
-# end
+    copyto!(temp_virt_grid,temp_grid)
+end
 
+"""
+$(TYPEDSIGNATURES)
+Linear virtual temperature for `model::PrimitiveDry`: Just copy over
+arrays from `temp` to `temp_virt` at timestep `lf` in spectral space
+as humidity is zero in this `model`."""
+function linear_virtual_temperature!(   
+    diagn::DiagnosticVariablesLayer,
+    progn::PrognosticLayerTimesteps,
+    model::PrimitiveDry,
+    lf::Integer,
+)
+    (;temp_virt) = diagn.dynamics_variables
+    (;temp) = progn.timesteps[lf]
+    copyto!(temp_virt,temp)
+end
 
-# """
-# For the PrimitiveDry temperautre and virtual temperature are the same (humidity=0).
-# Just copy over the arrays."""
-# function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
-#                                 temp::LowerTriangularMatrix,
-#                                 ::PrimitiveDry)
+# function barrier
+function linear_virtual_temperature!(  
+    diagn::DiagnosticVariablesLayer,
+    progn::PrognosticLayerTimesteps,
+    model::PrimitiveWet,
+    lf::Integer,
+)
+    linear_virtual_temperature!(diagn,progn,model.constants,lf)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Calculates a linearised virtual temperature Tᵥ as
+
+    Tᵥ = T + Tₖμq
+
+With absolute temperature T, layer-average temperarture Tₖ (computed in temperature_average!),
+specific humidity q and
+
+    μ = (1-ξ)/ξ, ξ = R_dry/R_vapour.
     
-#     (;temp_grid, temp_virt_grid) = diagn.grid_variables
-#     (;temp_virt) = diagn.dynamics_variables
-
-#     copyto!(temp_virt_grid,temp_grid)
-#     # copyto!(temp_virt,temp)
-# end
-
-# function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
-#                                         progn::PrognosticLayerTimesteps,
-#                                         ::PrimitiveDry,
-#                                         lf::Int)
+in spectral space."""
+function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
+                                        progn::PrognosticLayerTimesteps,
+                                        constants::DynamicsConstants,
+                                        lf::Int)
     
-#     (;temp_virt) = diagn.dynamics_variables
-#     (;temp) = progn.timesteps[lf]
+    (;temp_virt) = diagn.dynamics_variables
+    μ = constants.μ_virt_temp
+    Tₖ = diagn.temp_average[]   
+    (;temp,humid) = progn.timesteps[lf]
 
-#     copyto!(temp_virt,temp)
-# end
+    @. temp_virt = temp + (Tₖ*μ)*humid
+end
