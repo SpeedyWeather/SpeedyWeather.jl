@@ -225,10 +225,10 @@ function spectral_transform_for_full_grid(S::SpectralTransform{NF}) where NF
     FullGrid = full_grid(S.Grid)    # corresponding full grid
     
     # unpack everything that does not have to be recomputed for the full grid
-    @unpack nresolution, lmax, mmax, nfreq_max, nlon_max, nlat, nlat_half = S
-    @unpack colat, cos_colat, sin_colat, norm_sphere, recompute_legendre, Λ, Λs = S
-    @unpack ϵlms, grad_x, grad_y1, grad_y2, grad_y_vordiv1, grad_y_vordiv2 = S
-    @unpack vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2, eigenvalues, eigenvalues⁻¹ = S
+    (; nresolution, lmax, mmax, nfreq_max, nlon_max, nlat, nlat_half ) = S
+    (; colat, cos_colat, sin_colat, norm_sphere, recompute_legendre, Λ, Λs ) = S
+    (; ϵlms, grad_x, grad_y1, grad_y2, grad_y_vordiv1, grad_y_vordiv2 ) = S
+    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2, eigenvalues, eigenvalues⁻¹ ) = S
 
     # recalculate what changes on the full grid: FFT and offsets (always 1)
     nlons = [get_nlon_per_ring(FullGrid,nlat_half,j) for j in 1:nlat_half]
@@ -343,10 +343,10 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
                     unscale_coslat::Bool=false                  # unscale with cos(lat) on the fly?
                     ) where {NF<:AbstractFloat}                 # number format NF
 
-    @unpack nlat, nlons, nlat_half, nfreq_max = S
-    @unpack cos_colat, sin_colat, lon_offsets = S
-    @unpack recompute_legendre, Λ, Λs, m_truncs = S
-    @unpack brfft_plans = S
+    (; nlat, nlons, nlat_half, nfreq_max ) = S
+    (; cos_colat, sin_colat, lon_offsets ) = S
+    (; recompute_legendre, Λ, Λs, m_truncs ) = S
+    (; brfft_plans ) = S
 
     recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
@@ -451,9 +451,9 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
                     S::SpectralTransform{NF}
                     ) where {NF<:AbstractFloat}
     
-    @unpack nlat, nlat_half, nlons, nfreq_max, cos_colat = S
-    @unpack recompute_legendre, Λ, Λs, solid_angles = S
-    @unpack rfft_plans, lon_offsets, m_truncs = S
+    (; nlat, nlat_half, nlons, nfreq_max, cos_colat ) = S
+    (; recompute_legendre, Λ, Λs, solid_angles ) = S
+    (; rfft_plans, lon_offsets, m_truncs ) = S
     
     recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)

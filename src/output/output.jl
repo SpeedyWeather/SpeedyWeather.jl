@@ -77,7 +77,7 @@ Creates a new folder `run-*` with the `run_id`. Also returns the full path
 """
 function get_run_id_path(P::Parameters)
 
-    @unpack output, output_path, run_id = P
+    (; output, output_path, run_id ) = P
 
     if output
         run_path = joinpath(output_path,string("run-",run_id_string(run_id)))
@@ -107,13 +107,13 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,
     M.parameters.output || return Output()          # escape directly when no netcdf output
 
     # DEFINE NETCDF DIMENSIONS TIME
-    @unpack startdate = M.parameters
+    (; startdate ) = M.parameters
     time_string = "seconds since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     dim_time = NcDim("time",0,unlimited=true)
     var_time = NcVar("time",dim_time,t=Int64,atts=Dict("units"=>time_string,"long_name"=>"time"))
 
     # DEFINE NETCDF DIMENSIONS SPACE
-    @unpack output_matrix, output_Grid, output_nlat_half, nlev = M.parameters
+    (; output_matrix, output_Grid, output_nlat_half, nlev ) = M.parameters
 
     # if specified (>0) use output resolution via output_nlat_half, otherwise nlat_half from dynamical core
     nlat_half = output_nlat_half > 0 ? output_nlat_half : M.geometry.nlat_half
@@ -127,7 +127,7 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,
         lat_name, lat_units, lat_longname = "lat","degrees_north","latitude"
 
     else                        # output grid directly into a matrix (resort grid points, no interpolation)
-        @unpack nlat_half = M.geometry      # don't use output_nlat_half as not supported for output_matrix
+        (; nlat_half ) = M.geometry      # don't use output_nlat_half as not supported for output_matrix
         nlon,nlat = RingGrids.matrix_size(M.geometry.Grid,nlat_half)    # size of the matrix output
         lond = collect(1:nlon)                                          # just enumerate grid points for lond, latd
         latd = collect(1:nlat)
@@ -141,7 +141,7 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,
     dim_lev = NcDim("lev",nlev,values=σ,atts=Dict("units"=>"1","long_name"=>"sigma levels"))
 
     # VARIABLES, define every variable here that could be output
-    @unpack output_NF, compression_level = M.parameters
+    (; output_NF, compression_level ) = M.parameters
     missing_value = convert(output_NF,M.parameters.missing_value)
 
     # given pres the right name, depending on ShallowWaterModel or PrimitiveEquationModel
@@ -177,7 +177,7 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,
     )
 
     # CREATE NETCDF FILE
-    @unpack output_filename, output_vars, output_NF = M.parameters
+    (; output_filename, output_vars, output_NF ) = M.parameters
     run_id,run_path = get_run_id_path(M.parameters)     # create output folder and get its id and path
 
     # vector of NcVars for output
@@ -185,8 +185,8 @@ function initialize_netcdf_output(  diagn::DiagnosticVariables,
     netcdf_file = NetCDF.create(joinpath(run_path,output_filename),vars_out,mode=NetCDF.NC_NETCDF4)
     
     # CREATE OUTPUT STRUCT
-    @unpack write_restart, startdate = M.parameters
-    @unpack n_timesteps, n_outputsteps, output_every_n_steps = M.constants
+    (; write_restart, startdate ) = M.parameters
+    (; n_timesteps, n_outputsteps, output_every_n_steps ) = M.constants
 
     u = :u in output_vars ?         fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
     v = :v in output_vars ?         fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
@@ -238,7 +238,7 @@ function write_netcdf_output!(  outputter::Output,              # everything for
                                 model::ModelSetup)              # all parameters
 
     outputter.timestep_counter += 1                                 # increase counter
-    @unpack output, output_every_n_steps, timestep_counter = outputter
+    (; output, output_every_n_steps, timestep_counter ) = outputter
     output || return nothing                                        # escape immediately for no netcdf output
     timestep_counter % output_every_n_steps == 0 || return nothing  # escape if output not written on this step
 
@@ -250,7 +250,7 @@ end
 function write_netcdf_time!(outputter::Output,
                             time::DateTime)
     
-    @unpack netcdf_file, startdate = outputter
+    (; netcdf_file, startdate ) = outputter
     i = outputter.output_counter
 
     time_sec = [round(Int64,Dates.value(Dates.Second(time-startdate)))]
@@ -265,12 +265,12 @@ function write_netcdf_variables!(   outputter::Output,
                                     model::ModelSetup)
 
     outputter.output_counter += 1                   # increase output step counter
-    @unpack output_vars = outputter                 # Vector{Symbol} of variables to output
+    (; output_vars ) = outputter                 # Vector{Symbol} of variables to output
     i = outputter.output_counter
 
-    @unpack u, v, vor, div, pres, temp, humid = outputter
-    @unpack output_matrix, output_Grid = outputter
-    @unpack interpolator = outputter
+    (; u, v, vor, div, pres, temp, humid ) = outputter
+    (; output_matrix, output_Grid ) = outputter
+    (; interpolator ) = outputter
 
     # output to matrix options
     quadrant_rotation = model.parameters.output_quadrant_rotation
@@ -278,7 +278,7 @@ function write_netcdf_variables!(   outputter::Output,
 
     for (k,diagn_layer) in enumerate(diagn.layers)
         
-        @unpack u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid = diagn_layer.grid_variables
+        (; u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid ) = diagn_layer.grid_variables
         
         if output_matrix    # resort gridded variables interpolation-free into a matrix
 
@@ -304,13 +304,16 @@ function write_netcdf_variables!(   outputter::Output,
         temp .-= 273.15         # convert to ˚C
 
         # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
-        @unpack keepbits = model.parameters
-        for var in (u,v,vor,div,temp,humid)
-            round!(var,keepbits)
-        end
+        (; keepbits ) = model.parameters
+        :u in output_vars     && round!(u,    keepbits.u)
+        :v in output_vars     && round!(v,    keepbits.v)
+        :vor in output_vars   && round!(vor,  keepbits.vor)
+        :div in output_vars   && round!(div,  keepbits.div)
+        :temp in output_vars  && round!(temp, keepbits.temp)
+        :humid in output_vars && round!(humid,keepbits.humid)
 
         # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
-        @unpack netcdf_file = outputter
+        (; netcdf_file ) = outputter
         :u in output_vars     && NetCDF.putvar(netcdf_file,"u",    u,    start=[1,1,k,i],count=[-1,-1,1,1])
         :v in output_vars     && NetCDF.putvar(netcdf_file,"v",    v,    start=[1,1,k,i],count=[-1,-1,1,1])
         :vor in output_vars   && NetCDF.putvar(netcdf_file,"vor",  vor,  start=[1,1,k,i],count=[-1,-1,1,1])
@@ -321,19 +324,18 @@ function write_netcdf_variables!(   outputter::Output,
 
     # surface pressure, i.e. interface displacement η
     if :pres in output_vars
-        @unpack pres_grid = diagn.surface
+        (; pres_grid ) = diagn.surface
 
         if output_matrix
-            Matrix!(pres,diagn.surface.pres_grid; quadrant_rotation, matrix_quadrant)
+            RingGrids.Matrix!(pres,diagn.surface.pres_grid; quadrant_rotation, matrix_quadrant)
         else
             RingGrids.interpolate!(output_Grid(pres),pres_grid,interpolator)
         end
 
         if model isa PrimitiveEquation
             @. pres = exp(pres)/100     # convert from log(pₛ) to surface pressure pₛ [hPa]
-        else
-            round!(pres,model.parameters.keepbits)
         end
+        round!(pres,model.parameters.keepbits.pres)
         
         NetCDF.putvar(outputter.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
     end
@@ -358,11 +360,11 @@ function write_restart_file(time::DateTime,
                             outputter::Output,
                             model::ModelSetup)
     
-    @unpack run_path, write_restart = outputter
+    (; run_path, write_restart ) = outputter
     write_restart || return nothing         # exit immediately if no restart file desired
     
     # COMPRESSION OF RESTART FILE
-    @unpack keepbits = model.parameters
+    (; keepbits ) = model.parameters
     for layer in progn.layers
 
         # copy over leapfrog 2 to 1
@@ -372,10 +374,10 @@ function write_restart_file(time::DateTime,
         copyto!(layer.timesteps[1].humid,layer.timesteps[2].humid)
 
         # bitround 1st leapfrog step to output precision
-        round!(layer.timesteps[1].vor,keepbits)
-        round!(layer.timesteps[1].div,keepbits)
-        round!(layer.timesteps[1].temp,keepbits)
-        round!(layer.timesteps[1].humid,keepbits)
+        round!(layer.timesteps[1].vor,keepbits.vor)
+        round!(layer.timesteps[1].div,keepbits.div)
+        round!(layer.timesteps[1].temp,keepbits.temp)
+        round!(layer.timesteps[1].humid,keepbits.humid)
 
         # remove 2nd leapfrog step by filling with zeros
         fill!(layer.timesteps[2].vor,0)
@@ -386,7 +388,7 @@ function write_restart_file(time::DateTime,
 
     # same for surface pressure
     copyto!(progn.surface.timesteps[1].pres,progn.surface.timesteps[2].pres)
-    round!(progn.surface.timesteps[1].pres,keepbits)
+    round!(progn.surface.timesteps[1].pres,keepbits.pres)
     fill!(progn.surface.timesteps[2].pres,0)
 
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f

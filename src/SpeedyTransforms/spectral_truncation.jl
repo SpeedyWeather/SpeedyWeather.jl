@@ -92,7 +92,7 @@ function spectral_truncation(   ::Type{NF},                     # number format 
     lmax,mmax = size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics
     
     # interpolate to higher resolution if output larger than input
-    (ltrunc > lmax || mtrunc > mmax) && return spectral_interpolation(alms,ltrunc,mtrunc)
+    (ltrunc > lmax || mtrunc > mmax) && return spectral_interpolation(NF,alms,ltrunc,mtrunc)
 
     # preallocate new (smaller) array
     alms_trunc = zeros(LowerTriangularMatrix{NF},ltrunc+1,mtrunc+1)  
@@ -126,7 +126,7 @@ function spectral_interpolation(::Type{NF},                     # number format 
     lmax,mmax = size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics 
     
     # truncate to lower resolution if output smaller than input
-    (ltrunc <= lmax && mtrunc <= mmax) && return spectral_truncation(alms,ltrunc,mtrunc)
+    (ltrunc <= lmax && mtrunc <= mmax) && return spectral_truncation(NF,alms,ltrunc,mtrunc)
 
     # allocate new (larger) array
     alms_trunc = zeros(LowerTriangularMatrix{NF},ltrunc+1,mtrunc+1)  
@@ -139,3 +139,40 @@ end
 spectral_interpolation(alms::AbstractMatrix{NF},ltrunc::Integer,mtrunc::Integer) where NF =
     spectral_interpolation(NF,alms,ltrunc,mtrunc)
 spectral_interpolation(alms::AbstractMatrix,trunc::Int) = spectral_interpolation(alms,trunc,trunc)
+
+"""
+    A_smooth = spectral_smoothing(A::LowerTriangularMatrix,c;power=1)
+
+Smooth the spectral field `A` following A_smooth = (1-c*∇²ⁿ)A with power n of a normalised Laplacian
+so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c<0."""
+function spectral_smoothing(A::LowerTriangularMatrix,c::Real;power::Real=1)
+    A_smooth = copy(A)
+    spectral_smoothing!(A_smooth,c;power)
+    return A_smooth
+end
+
+"""
+    spectral_smoothing!(A::LowerTriangularMatrix,c;power=1)
+
+Smooth the spectral field `A` following A *= (1-(1-c)*∇²ⁿ) with power n of a normalised Laplacian
+so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c>1."""
+function spectral_smoothing!(   A::LowerTriangularMatrix,
+                                c::Real;
+                                power::Real=1,          # power of Laplacian used for smoothing
+                                truncation::Int=-1)     # smoothing wrt wavenumber (0 = largest)
+                        
+    lmax,mmax = size(A)
+    # normalize by largest eigenvalue by default, or wrt to given truncation
+    eigenvalue_norm = truncation == -1 ? -mmax*(mmax+1) : -truncation*(truncation+1)
+
+    lm = 1
+    for m in 1:mmax
+        for l in m:lmax
+            eigenvalue_normalised = -l*(l-1)/eigenvalue_norm
+            # for eigenvalue_norm < largest eigenvalue the factor becomes negative
+            # set to zero in that case
+            A[lm] *= max(1 - (1-c)*eigenvalue_normalised^power,0)
+            lm += 1
+        end
+    end
+end

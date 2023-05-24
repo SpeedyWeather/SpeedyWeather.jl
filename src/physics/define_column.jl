@@ -18,34 +18,48 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     latd::NF = 0                            # latitude, needed for shortwave radiation
 
     # PROGNOSTIC VARIABLES
-    const u::Vector{NF} = zeros(NF,nlev)      # zonal velocity
-    const v::Vector{NF} = zeros(NF,nlev)      # meridional velocity
-    const temp::Vector{NF} = zeros(NF,nlev)   # temperature
-    const humid::Vector{NF} = zeros(NF,nlev)  # specific humidity
+    const u::Vector{NF} = zeros(NF,nlev)            # zonal velocity
+    const v::Vector{NF} = zeros(NF,nlev)            # meridional velocity
+    const temp::Vector{NF} = zeros(NF,nlev)         # temperature
+    const humid::Vector{NF} = zeros(NF,nlev)        # specific humidity
 
     # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
-    const ln_pres::Vector{NF} = zeros(NF,nlev+1)  # logarithm of pressure [log(hPa)]
-    const pres::Vector{NF} = zeros(NF,nlev+1)     # pressure [hPa]
+    const ln_pres::Vector{NF} = zeros(NF,nlev+1)    # logarithm of pressure [log(hPa)]
+    const pres::Vector{NF} = zeros(NF,nlev+1)       # pressure [hPa]
 
     # TENDENCIES to accumulate the parametrizations into
-    const u_tend::Vector{NF} = zeros(NF,nlev)
-    const v_tend::Vector{NF} = zeros(NF,nlev)
-    const temp_tend::Vector{NF} = zeros(NF,nlev)
-    const humid_tend::Vector{NF} = zeros(NF,nlev)
+    const u_tend::Vector{NF} = zeros(NF,nlev)                   # zonal velocity [m]
+    const v_tend::Vector{NF} = zeros(NF,nlev)                   # meridional velocity [m]
+    const temp_tend::Vector{NF} = zeros(NF,nlev)                # absolute temperature [K]
+    const humid_tend::Vector{NF} = zeros(NF,nlev)               # specific humidity
 
     # DIAGNOSTIC VARIABLES
-    const geopot::Vector{NF} = zeros(NF,nlev)
+    const geopot::Vector{NF} = zeros(NF,nlev)                   # gepotential height [m]
 
-    ## PARAMETERIZATIONS
-    # Thermodynamics
+    # FLUXES, arrays to be used for various parameterizations, on half levels incl top and bottom
+    const flux_u_upward::Vector{NF} = zeros(NF,nlev+1)
+    const flux_u_downward::Vector{NF} = zeros(NF,nlev+1)
+
+    const flux_v_upward::Vector{NF} = zeros(NF,nlev+1)
+    const flux_v_downward::Vector{NF} = zeros(NF,nlev+1)
+
+    const flux_temp_upward::Vector{NF} = zeros(NF,nlev+1)
+    const flux_temp_downward::Vector{NF} = zeros(NF,nlev+1)
+    
+    const flux_humid_upward::Vector{NF} = zeros(NF,nlev+1)
+    const flux_humid_downward::Vector{NF} = zeros(NF,nlev+1)
+
+    # THERMODYNAMICS
+    const sat_humid::Vector{NF} = zeros(NF,nlev)                # Saturation specific humidity
+    const sat_vap_pres::Vector{NF} = zeros(NF,nlev)             # Saturation vapour pressure
+    const dry_static_energy::Vector{NF} = zeros(NF,nlev)        # Dry static energy
+    const moist_static_energy::Vector{NF} = zeros(NF,nlev)      # Moist static energy
+    
+    # an interpolated to half levels
     humid_half::Vector{NF} = zeros(NF,nlev)                    # Specific humidity interpolated to half-levels
-    sat_humid::Vector{NF} = zeros(NF,nlev)                     # Saturation specific humidity
     sat_humid_half::Vector{NF} = zeros(NF,nlev)                # Saturation specific humidity interpolated to half-levels
-    sat_vap_pres::Vector{NF} = zeros(NF,nlev)                  # Saturation vapour pressure
-    dry_static_energy::Vector{NF} = zeros(NF,nlev)             # Dry static energy
-    dry_static_energy_half::Vector{NF} = zeros(NF,nlev)        # Dry static energy interpolated to half-levels
-    moist_static_energy::Vector{NF} = zeros(NF,nlev)           # Moist static energy
     sat_moist_static_energy::Vector{NF} = zeros(NF,nlev)       # Saturation moist static energy
+    dry_static_energy_half::Vector{NF} = zeros(NF,nlev)        # Dry static energy interpolated to half-levels
     sat_moist_static_energy_half::Vector{NF} = zeros(NF,nlev)  # Saturation moist static energy interpolated to half-levels
 
     # Convection

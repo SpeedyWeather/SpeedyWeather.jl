@@ -29,6 +29,8 @@ function get_column!(   C::ColumnVariables,
         C.v[k] = layer.grid_variables.v_grid[ij]
         C.temp[k] = layer.grid_variables.temp_grid[ij]
         C.humid[k] = layer.grid_variables.humid_grid[ij]
+
+        # as well as geopotential (not actually prognostic though)
         C.geopot[k] = layer.grid_variables.geopot_grid[ij]
     end
 end
@@ -73,12 +75,23 @@ end
 
 Set the accumulators (tendencies but also vertical sums and similar) back to zero
 for `column` to be reused at other grid points."""
-function reset_column!(column::ColumnVariables{NF}) where NF
+function reset_column!(column::ColumnVariables)
 
-    fill!(column.u_tend,0)      # set tendencies to 0 for += accumulation
+    # set tendencies to 0 for += accumulation
+    fill!(column.u_tend,0)
     fill!(column.v_tend,0)
     fill!(column.temp_tend,0)
     fill!(column.humid_tend,0)
+
+    # set fluxes to 0 for += accumulation
+    fill!(column.flux_u_upward,0)
+    fill!(column.flux_u_downward,0)
+    fill!(column.flux_v_upward,0)
+    fill!(column.flux_v_downward,0)
+    fill!(column.flux_humid_upward,0)
+    fill!(column.flux_humid_downward,0)
+    fill!(column.flux_temp_upward,0)
+    fill!(column.flux_temp_downward,0)
 
     # # Convection
     # column.cloud_top = column.nlev+1

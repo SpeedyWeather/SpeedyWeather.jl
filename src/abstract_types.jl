@@ -31,6 +31,7 @@ abstract type AbstractColumnVariables{NF} end
 # PARAMETERIZATIONS
 abstract type BoundaryLayer{NF} end
 abstract type TemperatureRelaxation{NF} end
+abstract type VerticalDiffusion{NF} end
 
 # INPUT/OUTPUT
 abstract type AbstractFeedback end

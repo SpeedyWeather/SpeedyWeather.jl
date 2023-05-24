@@ -1,11 +1,21 @@
-Copyright (c) 2021 Milan Kloewer
+SpeedyWeather.jl (https://github.com/milankl/SpeedyWeather.jl).
 
-Copyright (c) 2022 Fred Kucharski and Franco Molteni
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION.
+Do Not Translate or Localize.
+
+This project incorporates components from the projects listed below.
+The original copyright notices and the licenses are included below:
+
+1. SPEEDY fortran routines for physical parametrizations v41 (https://github.com/samhatfield/speedy_physics.f90)
+
+%% SPEEDY fortran routines for physical parametrizations v41 NOTICES AND INFORMATION BEGIN HERE
+=========================================
+Copyright (c) 2022 <Fred Kucharski, Franco Molteni>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+to use, copy, modify, merge, publish, distribute, and/or sublicense
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
@@ -19,3 +29,5 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+=========================================
+END OF SPEEDY fortran routines for physical parametrizations v41 NOTICES AND INFORMATION

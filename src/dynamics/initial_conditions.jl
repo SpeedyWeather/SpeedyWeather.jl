@@ -12,12 +12,14 @@ end
 
 function allocate_prognostic_variables(model::ModelSetup) 
 
-    @unpack NF = model.parameters
-    @unpack nlev = model.geometry
-    @unpack lmax, mmax = model.spectral_transform
+    (;NF) = model.parameters
+    (;nlev) = model.geometry
+    (;lmax, mmax) = model.spectral_transform
 
     return zeros(PrognosticVariables{NF},model,lmax,mmax,nlev)
 end
+
+struct StartFromRest <: InitialConditions end
 
 function initial_conditions!(   ::StartFromRest,
                                 progn::PrognosticVariables,
@@ -32,12 +34,14 @@ function initial_conditions!(   ::StartFromRest,
     model.parameters.pressure_on_orography && pressure_on_orography!(progn,model)
     # TODO initialise humidity
 end
-    
+
+struct StartWithVorticity <: InitialConditions end
+
 function initial_conditions!(   ::StartWithVorticity,
                                 progn::PrognosticVariables,
                                 model::ModelSetup)
 
-    @unpack radius = model.geometry
+    (;radius) = model.geometry
 
     mmax = min(15,progn.mmax+1)     # perturb only larger modes
     lmax = min(15,progn.lmax+1)
@@ -60,14 +64,33 @@ function initial_conditions!(   ::StartWithVorticity,
     end
 end
 
+"""
+    Z = ZonalJet(;kwargs...) <: InitialConditions
+
+Create a struct that contains all parameters for the Galewsky et al, 2004 zonal jet
+intitial conditions for the shallow water model. Default values as in Galewsky."""
+Base.@kwdef struct ZonalJet <: InitialConditions
+    # jet
+    latitude = 45               # degrees north [˚N]
+    width = (1/4-1/7)*180       # ≈ 19.29˚ as in Galewsky et al, 2004 
+    umax = 80                   # [m/s]
+    
+    # perturbation
+    perturb_lat = latitude          # [˚N], position in jet by default
+    perturb_lon = 270               # [˚E]
+    perturb_xwidth = 1/3*360/2π     # ≈ 19.1˚E zonal extent [˚E]
+    perturb_ywidth = 1/15*360/2π    # ≈ 3.8˚N meridional extent [˚N]
+    perturb_height = 120            # amplitude [m]
+end
+
 """Initial conditions from Galewsky, 2004, Tellus"""
 function initial_conditions!(   coefs::ZonalJet,
                                 progn::PrognosticVariables,
                                 model::ShallowWater)
 
-    @unpack latitude, width, umax = coefs               # for jet
-    @unpack perturb_lat, perturb_lon, perturb_xwidth,   # for perturbation
-        perturb_ywidth, perturb_height = coefs
+    (;latitude, width, umax) = coefs               # for jet
+    (;perturb_lat, perturb_lon, perturb_xwidth,   # for perturbation
+        perturb_ywidth, perturb_height) = coefs
 
     θ₀ = (latitude-width)/360*2π    # southern boundary of jet [radians]
     θ₁ = (latitude+width)/360*2π    # northern boundary of jet
@@ -78,7 +101,7 @@ function initial_conditions!(   coefs::ZonalJet,
     β = perturb_ywidth*2π/360       # meridional extent of interface perturbation [radians]
     λ = perturb_lon*2π/360          # perturbation longitude [radians]
 
-    @unpack radius, rotation, gravity = model.parameters.planet
+    (;radius, rotation, gravity) = model.parameters.planet
 
     # always create on F64 grid then convert to spectral and interpolate there
     Grid = FullGaussianGrid
@@ -123,13 +146,13 @@ function initial_conditions!(   coefs::ZonalJet,
     η = spectral(η_grid)
 
     # interpolate in spectral space to desired resolution
-    @unpack lmax,mmax = model.spectral_transform
-    @unpack NF = model.parameters
+    (;lmax,mmax) = model.spectral_transform
+    (;NF) = model.parameters
     u = spectral_truncation(complex(NF),u,lmax+1,mmax)
     
     # get vorticity initial conditions from curl of u,v
     v = zero(u)     # meridional velocity zero for these initial conditions
-    @unpack vor = progn.layers[end].timesteps[1]
+    (;vor) = progn.layers[end].timesteps[1]
     curl!(vor,u,v,model.spectral_transform)
 
     # transform interface height η (use pres as prognostic variable) in spectral
@@ -138,18 +161,41 @@ function initial_conditions!(   coefs::ZonalJet,
     spectral_truncation!(pres)
 end
 
+"""
+    Z = ZonalWind(;kwargs...) <: InitialConditions
+
+Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
+intitial conditions for the primitive equation model. Default values as in Jablonowski."""
+Base.@kwdef struct ZonalWind <: InitialConditions
+    
+    # vertical
+    η₀ = 0.252                  # conversion from σ to Jablonowski's ηᵥ-coordinates
+    u₀ = 35                     # max amplitude of zonal wind [m/s]
+    
+    # perturbation
+    perturb_lat = 40            # Gaussian profile perturbation centred at [˚N]
+    perturb_lon = 20            # and [˚E]
+    perturb_uₚ = 1              # strength of perturbation [m/s]
+    perturb_radius = 1/10       # radius of Gaussian perturbation in units of Earth's radius [1]
+
+    # temperature
+    ΔT = 0                      # temperature difference used for stratospheric lapse rate [K]
+                                # Jablonowski uses ΔT = 4.8e5 [K]
+    Tmin = 200                  # minimum temperature [K] of profile
+end
+
 """Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
 function initial_conditions!(   coefs::ZonalWind,
                                 progn::PrognosticVariables{NF},
                                 model::PrimitiveEquation) where NF
 
-    @unpack u₀, η₀, ΔT = coefs
-    @unpack perturb_lat, perturb_lon, perturb_uₚ, perturb_radius = coefs
-    @unpack temp_ref, R_dry, lapse_rate, pres_ref = model.parameters
-    @unpack radius, rotation, gravity = model.parameters.planet
-    @unpack σ_tropopause, pressure_on_orography = model.parameters
-    @unpack σ_levels_full, Grid, nlat_half, nlev = model.geometry
-    @unpack norm_sphere = model.spectral_transform
+    (;u₀, η₀, ΔT, Tmin) = coefs
+    (;perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = coefs
+    (;temp_ref, R_dry, lapse_rate, pres_ref) = model.parameters
+    (;radius, rotation, gravity) = model.parameters.planet
+    (;σ_tropopause, pressure_on_orography) = model.parameters
+    (;σ_levels_full, Grid, nlat_half, nlev) = model.geometry
+    (;norm_sphere) = model.spectral_transform
 
     φ, λ = model.geometry.latds, model.geometry.londs
     S = model.spectral_transform
@@ -194,7 +240,7 @@ function initial_conditions!(   coefs::ZonalWind,
             D[ij] = -2perturb_uₚ*radius/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
         end
 
-        @unpack vor,div = layer.timesteps[1]
+        (;vor,div) = layer.timesteps[1]
         spectral!(vor,ζ,S)
         spectral!(div,D,S)
         spectral_truncation!(vor)
@@ -214,6 +260,8 @@ function initial_conditions!(   coefs::ZonalWind,
             Tη[k] += ΔT*(σ_tropopause-σ)^5      # Jablonowski and Williamson eq. 5
         end
     end
+
+    Tη .= max.(Tη,Tmin)
 
     T = zeros(Grid{NF},nlat_half)   # temperature
     aΩ = radius*rotation
@@ -235,7 +283,7 @@ function initial_conditions!(   coefs::ZonalWind,
             T[ij] = Tη[k] + A1*((-2sinφ^6*(cosφ^2 + 1/3) + 10/63)*A2 + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*aΩ)
         end
 
-        @unpack temp = layer.timesteps[1]
+        (;temp) = layer.timesteps[1]
         spectral!(temp,T,S)
         spectral_truncation!(temp)
     end
@@ -246,11 +294,13 @@ function initial_conditions!(   coefs::ZonalWind,
     pressure_on_orography && pressure_on_orography!(progn,model)
 end
 
+struct StartFromFile <: InitialConditions end
+
 function initial_conditions!(   ::StartFromFile,
                                 progn_new::PrognosticVariables,
                                 model::ModelSetup)
 
-    @unpack restart_path, restart_id = model.parameters
+    (; restart_path, restart_id ) = model.parameters
 
     restart_file = jldopen(joinpath(restart_path,string("run-",run_id_string(restart_id)),"restart.jld2"))
     progn_old = restart_file["prognostic_variables"]
@@ -268,17 +318,17 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     G = model.geometry
     S = model.spectral_transform
 
-    @unpack geopot_surf = B.orography       # spectral surface geopotential [m²/s²] (orography*gravity)
+    (; geopot_surf ) = B.orography       # spectral surface geopotential [m²/s²] (orography*gravity)
 
     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
     # gravity:      Gravitational acceleration [m/s^2]
     # R_dry:        Specific gas constant for dry air [J/kg/K]
-    @unpack temp_ref, temp_top, lapse_rate, R_dry = P
-    @unpack gravity = P.planet
-    @unpack n_stratosphere_levels, nlev = G     # number of vertical levels used for stratosphere
-    @unpack norm_sphere = S                     # normalization of the l=m=0 spherical harmonic
+    (; temp_ref, temp_top, lapse_rate, R_dry ) = P
+    (; gravity ) = P.planet
+    (; n_stratosphere_levels, nlev ) = G     # number of vertical levels used for stratosphere
+    (; norm_sphere ) = S                     # normalization of the l=m=0 spherical harmonic
 
     Γg⁻¹ = lapse_rate/gravity/1000              # Lapse rate scaled by gravity [K/m / (m²/s²)]
 
@@ -315,8 +365,8 @@ function pressure_on_orography!(progn::PrognosticVariables,
     G = model.geometry
     S = model.spectral_transform
 
-    @unpack Grid,nlat_half = G
-    @unpack lmax,mmax = S
+    (; Grid,nlat_half ) = G
+    (; lmax,mmax ) = S
     
     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
@@ -324,9 +374,9 @@ function pressure_on_orography!(progn::PrognosticVariables,
     # gravity:      Gravitational acceleration [m/s^2]
     # R:            Specific gas constant for dry air [J/kg/K]
     # pres_ref:     Reference surface pressure [hPa]
-    @unpack temp_ref, temp_top, lapse_rate, pres_ref, R_dry = P
-    @unpack gravity = P.planet
-    @unpack orography = B.orography # orography on the grid
+    (; temp_ref, temp_top, lapse_rate, pres_ref, R_dry ) = P
+    (; gravity ) = P.planet
+    (; orography ) = B.orography # orography on the grid
 
     Γ = lapse_rate/1000             # Lapse rate [K/km] -> [K/m]
     lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
@@ -354,16 +404,16 @@ end
 
 #     lmax,mmax,nlev = size(humid)    # of size lmax+1, mmax+1, nlev
 #     lmax, mmax = lmax-1, mmax-1     # hence correct with -1 for 0-based l,m
-#     @unpack nlon, nlat, n_stratosphere_levels = P
-#     @unpack σ_levels_full = G.geometry
+#     (; nlon, nlat, n_stratosphere_levels ) = P
+#     (; σ_levels_full ) = G.geometry
 
 #     # reference saturation water vapour pressure [Pa]
 #     # relative humidity reference [1]
-#     @unpack water_pres_ref, relhumid_ref = P
+#     (; water_pres_ref, relhumid_ref ) = P
 #     humid_ref = relhumid_ref*0.622*water_pres_ref   # reference specific humidity [Pa]
 
 #     # scale height [km], scale height for spec humidity [km]
-#     @unpack scale_height, scale_height_humid = P            
+#     (; scale_height, scale_height_humid ) = P            
 #     scale_height_ratio = scale_height/scale_height_humid    # ratio of scale heights [1]
 
 #     # Specific humidity at the surface (grid space)

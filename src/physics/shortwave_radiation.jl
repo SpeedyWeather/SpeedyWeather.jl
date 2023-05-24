@@ -1,4 +1,48 @@
 """
+Parameters for radiation parameterizations.
+"""
+Base.@kwdef struct RadiationCoefs{NF<:Real} <: Coefficients
+    epslw::NF = 0.05    # Fraction of blackbody spectrum absorbed/emitted by PBL only
+    emisfc::NF = 0.98   # Longwave surface emissivity
+
+    p0::Real = 1e5      # Reference pressure (Pa)
+
+    # Shortwave radiation: sol_oz
+    solc::NF = 342.0    # Solar constant (area averaged) [W/m^2]
+    epssw::NF = 0.020   # Fraction of incoming solar radiation absorbed by ozone
+
+    # Shortwave radiation: cloud
+    rhcl1::NF = 0.30    # Relative humidity threshold corresponding to cloud cover = 0
+    rhcl2::NF = 1.00    # Relative humidity correponding to cloud cover = 1
+    rrcl::NF = 1 / (rhcl2 - rhcl1)
+    qcl::NF = 0.20      # Specific humidity threshold for cloud cover
+    pmaxcl::NF = 10.0   # Maximum value of precipitation (mm/day) contributing to cloud cover
+    wpcl::NF = 0.2      # Cloud cover weight for the square-root of precipitation (for p = 1 mm/day)
+    gse_s1::NF = 0.40   # Gradient of dry static energy corresponding to stratiform cloud cover = 1
+    gse_s0::NF = 0.25   # Gradient of dry static energy corresponding to stratiform cloud cover = 0
+    clsmax::NF = 0.60   # Maximum stratiform cloud cover
+    clsminl::NF = 0.15  # Minimum stratiform cloud cover over land (for RH = 1)
+
+    # Shortwave radiation: radsw
+    albcl::NF = 0.43    # Cloud albedo (for cloud cover = 1)
+    albcls::NF = 0.50   # Stratiform cloud albedo (for st. cloud cover = 1)
+    abscl1::NF = 0.015  # Absorptivity of clouds (visible band, maximum value)
+    abscl2::NF = 0.15   # Absorptivity of clouds (visible band, for dq_base = 1 g/kg)
+
+    absdry::NF = 0.033  # Absorptivity of dry air (visible band)
+    absaer::NF = 0.033  # Absorptivity of aerosols (visible band)
+    abswv1::NF = 0.022  # Absorptivity of water vapour (visible band, for dq = 1 g/kg)
+    abswv2::NF = 15.0   # Absorptivity of water vapour (near IR band, for dq = 1 g/kg)
+
+    ablwin::NF = 0.3    # Absorptivity of air in "window" band
+    ablco2::NF = 6.0    # Absorptivity of air in CO2 band
+    ablwv1::NF = 0.7    # Absorptivity of water vapour in H2O band 1 (weak), (for dq = 1 g/kg)
+    ablwv2::NF = 50.0   # Absorptivity of water vapour in H2O band 2 (strong), (for dq = 1 g/kg)
+    ablcl2::NF = 0.6    # Absorptivity of "thin" upper clouds in window and H2O bands
+    ablcl1::NF = 12.0   # Absorptivity of "thick" clouds in window band (below cloud top)
+end 
+
+"""
     function shortwave_radiation!(
         column::ColumnVariables{NF}, model::PrimitiveEquation
     )
@@ -9,11 +53,11 @@ For more details see http://users.ictp.it/~kucharsk/speedy_description/km_ver41_
 function shortwave_radiation!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
-    @unpack humid, sat_vap_pres, dry_static_energy, geopot, norm_pres = column
-    @unpack cₚ = model.parameters
-    @unpack p0 = model.parameters.radiation_coefs
-    @unpack σ_levels_thick = model.geometry
-    @unpack gravity = model.constants
+    (; humid, sat_vap_pres, dry_static_energy, geopot, norm_pres ) = column
+    (; cₚ ) = model.parameters
+    (; p0 ) = model.parameters.radiation_coefs
+    (; σ_levels_thick ) = model.geometry
+    (; gravity ) = model.constants
 
     sol_oz!(column, model)
 
@@ -39,7 +83,7 @@ Compute average daily flux of solar radiation for an atmospheric column,
 from Hartmann (1994).
 """
 function solar!(column::ColumnVariables{NF}) where {NF<:AbstractFloat}
-    @unpack tyear, csol, latd = column
+    (; tyear, csol, latd ) = column
 
     # Compute cosine and sine of latitude
     clat = cos(latd)
@@ -86,8 +130,8 @@ Compute solar radiation parametres for an atmospheric column.
 function sol_oz!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
-    @unpack tyear, latd = column
-    @unpack solc, epssw = model.parameters.radiation_coefs
+    (; tyear, latd ) = column
+    (; solc, epssw ) = model.parameters.radiation_coefs
 
     # Compute cosine and sine of latitude
     clat = cos(latd)
@@ -140,11 +184,11 @@ Compute shortwave radiation cloud contibutions for an atmospheric column.
 function cloud!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
-    @unpack rhcl1, rhcl2, rrcl, qcl, pmaxcl = model.parameters.radiation_coefs
-    @unpack wpcl, gse_s1, gse_s0, clsmax, clsminl = model.parameters.radiation_coefs
-    @unpack humid, rel_hum, grad_dry_static_energy, precip_convection = column
-    @unpack precip_large_scale, cloud_top, nlev, fmask = column
-    @unpack n_stratosphere_levels = model.geometry
+    (; rhcl1, rhcl2, rrcl, qcl, pmaxcl ) = model.parameters.radiation_coefs
+    (; wpcl, gse_s1, gse_s0, clsmax, clsminl ) = model.parameters.radiation_coefs
+    (; humid, rel_hum, grad_dry_static_energy, precip_convection ) = column
+    (; precip_large_scale, cloud_top, nlev, fmask ) = column
+    (; n_stratosphere_levels ) = model.geometry
 
     # 1.0 Cloud cover, defined as the sum of:
     # - a term proportional to the square - root of precip. rate
@@ -200,12 +244,12 @@ Compute shortwave radiation fluxes for an atmospheric column.
 function radsw!(
     column::ColumnVariables{NF}, model::PrimitiveEquation
 ) where {NF<:AbstractFloat}
-    @unpack norm_pres, humid, icltop, cloudc, clstr, ozupp, ozone = column
-    @unpack zenit, stratz, fsol, qcloud, albsfc, nlev = column
-    @unpack σ_levels_full, σ_levels_thick, n_stratosphere_levels = model.geometry
-    @unpack albcl, albcls, abscl1, abscl2, absdry, absaer = model.parameters.radiation_coefs
-    @unpack abswv1, abswv2, ablwin, ablco2, ablwv1 = model.parameters.radiation_coefs
-    @unpack ablwv2, ablcl2, ablcl1, epslw = model.parameters.radiation_coefs
+    (; norm_pres, humid, icltop, cloudc, clstr, ozupp, ozone ) = column
+    (; zenit, stratz, fsol, qcloud, albsfc, nlev ) = column
+    (; σ_levels_full, σ_levels_thick, n_stratosphere_levels ) = model.geometry
+    (; albcl, albcls, abscl1, abscl2, absdry, absaer ) = model.parameters.radiation_coefs
+    (; abswv1, abswv2, ablwin, ablco2, ablwv1 ) = model.parameters.radiation_coefs
+    (; ablwv2, ablcl2, ablcl1, epslw ) = model.parameters.radiation_coefs
 
     # Locals variables
     sbands_flux = 2

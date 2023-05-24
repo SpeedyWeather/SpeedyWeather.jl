@@ -1,20 +1,17 @@
 @testset "run_speedy no errors, no blowup" begin
-    p = run_speedy(Float32)
+    p = run_speedy(Barotropic)
     @test all(isfinite.(p.layers[1].timesteps[1].vor))
     
-    p = run_speedy(Float64)
+    p = run_speedy(ShallowWater)
     @test all(isfinite.(p.layers[1].timesteps[1].vor))
     
-    p = run_speedy(Float32,Grid=OctahedralClenshawGrid)
+    p = run_speedy(PrimitiveDryCore)
     @test all(isfinite.(p.layers[1].timesteps[1].vor))
     
-    p = run_speedy(Float64,Grid=HEALPixGrid)
+    p = run_speedy(PrimitiveWetCore)
     @test all(isfinite.(p.layers[1].timesteps[1].vor))
     
-    p = run_speedy(Float64,Grid=OctahedralGaussianGrid)
-    @test all(isfinite.(p.layers[1].timesteps[1].vor))
-
-    p,d,m = initialize_speedy(Float32)
+    p,d,m = initialize_speedy()
     run_speedy!(p,d,m)
     @test all(isfinite.(p.layers[1].timesteps[1].vor)) 
 end

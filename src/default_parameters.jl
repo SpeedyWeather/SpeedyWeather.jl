@@ -1,7 +1,5 @@
-using DocStringExtensions
-
-const DEFAULT_NF = Float64          # number format
-const DEFAULT_MODEL = Barotropic    # abstract model type
+const DEFAULT_NF = Float32              # number format
+const DEFAULT_MODEL = PrimitiveDryCore  # abstract model type
 
 """
     P = Parameters{M<:ModelSetup}(kwargs...) <: AbstractParameters{M}
@@ -24,7 +22,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     trunc::Int = 31
 
     "grid in use"
-    Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    Grid::Type{<:AbstractGrid} = OctahedralGaussianGrid
 
     "dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
     dealiasing::Float64 = 2
@@ -104,23 +102,26 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "vertical coordinates of the nlev vertical levels, defined by a generalised logistic function, interpolating ECMWF's L31 configuration"
     GLcoefs::Coefficients = GenLogisticCoefs()
 
-    "number of vertical levels used for the stratosphere"
-    n_stratosphere_levels::Int = 2
-
     "σ coordinate where the tropopause starts"
     σ_tropopause::Float64 = 0.2
 
     "only used if set manually, otherwise empty"
     σ_levels_half::Vector{Float64} = []
 
-    "number of vertical levels "
+    "number of vertical levels"
     nlev::Int = nlev_default(Model, σ_levels_half)
 
 
     # DIFFUSION AND DRAG
 
-    "(hyper)-diffusion"
+    "horizontal (hyper)-diffusion"
     diffusion::DiffusionParameters = HyperDiffusion()
+
+    "vertical diffusion"
+    vertical_diffusion::VerticalDiffusion = NoVerticalDiffusion()
+
+    "static energy diffusion"
+    static_energy_diffusion::VerticalDiffusion = StaticEnergyDiffusion()
 
 
     # FORCING
@@ -224,6 +225,8 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     "coefficient for semi-implicit computations to filter gravity waves"
     implicit_α::Float64 = 1
 
+    "recalculate implicit operators on temperature profile every n time steps"
+    recalculate_implicit::Int = 100
 
     # LEGENDRE TRANSFORM AND POLYNOMIALS
 
@@ -297,7 +300,7 @@ Base.@kwdef struct Parameters{Model<:ModelSetup} <: AbstractParameters{Model}
     compression_level::Int = 3
 
     "mantissa bits to keep for every variable"
-    keepbits::Int = 7
+    keepbits::NamedTuple = default_keepbits()
 
     "SpeedyWeather.jl version number"
     version::VersionNumber = pkgversion(SpeedyWeather)
@@ -366,6 +369,8 @@ output_vars_default(::Type{<:Barotropic}) = [:vor,:u]
 output_vars_default(::Type{<:ShallowWater}) = [:vor,:u]
 output_vars_default(::Type{<:PrimitiveDryCore}) = [:vor,:u,:temp,:pres]
 output_vars_default(::Type{<:PrimitiveWetCore}) = [:vor,:u,:temp,:humid,:pres]
+
+default_keepbits() = (u=7,v=7,vor=5,div=5,temp=10,pres=12,humid=7)
 
 # default initial conditions by model
 initial_conditions_default(::Type{<:Barotropic}) = StartWithVorticity()

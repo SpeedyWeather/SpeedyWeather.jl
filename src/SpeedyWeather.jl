@@ -1,7 +1,7 @@
 module SpeedyWeather
 
 # STRUCTURE
-import Parameters: @unpack
+using DocStringExtensions
 
 # NUMERICS
 import Random
@@ -66,11 +66,16 @@ export  StartFromFile,
 
 # EXPORT TEMPERATURE RELAXATION SCHEMES
 export  NoTemperatureRelaxation,
-        HeldSuarez
+        HeldSuarez,
+        JablonowskiRelaxation
 
 # EXPORT BOUNDARY LAYER SCHEMES
 export  NoBoundaryLayer,
         LinearDrag
+
+# EXPORT VERTICAL DIFFUSION
+export  NoVerticalDiffusion,
+        VerticalLaplacian
 
 # EXPORT STRUCTS
 export  Parameters,
@@ -118,8 +123,7 @@ include("physics/define_column.jl")             # define ColumnVariables
 include("dynamics/geometry.jl")                 # defines Geometry
 include("dynamics/boundaries.jl")               # defines Boundaries
 include("dynamics/define_diffusion.jl")         # defines HorizontalDiffusion
-include("dynamics/define_implicit.jl")          # defines ImplicitShallowWater, ImplicitPrimitiveEq
-include("dynamics/parameter_structs.jl")        # defines GenLogisticCoefs
+include("dynamics/define_implicit.jl")          # defines ImplicitShallowWater, ImplicitPrimitiveEq     # defines GenLogisticCoefs
 include("dynamics/planets.jl")                  # defines Earth
 include("dynamics/models.jl")                   # defines ModelSetups
 include("dynamics/prognostic_variables.jl")     # defines PrognosticVariables
@@ -134,7 +138,6 @@ include("dynamics/diffusion.jl")
 include("dynamics/time_integration.jl")
 
 # PHYSICS
-include("physics/parameter_structs.jl")         # defines MagnusCoefs, RadiationCoefs
 include("physics/column_variables.jl")
 include("physics/thermodynamics.jl")
 include("physics/tendencies.jl")
@@ -144,6 +147,7 @@ include("physics/longwave_radiation.jl")
 include("physics/shortwave_radiation.jl")
 include("physics/boundary_layer.jl")
 include("physics/temperature_relaxation.jl")
+include("physics/vertical_diffusion.jl")
 
 # OUTPUT
 include("output/output.jl")                     # defines Output

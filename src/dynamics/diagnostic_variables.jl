@@ -19,8 +19,8 @@ function Base.zeros(::Type{Tendencies},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
     
-    @unpack Grid, nlat_half = G
-    @unpack lmax, mmax = S
+    (;Grid, nlat_half) = G
+    (;lmax, mmax) = S
     LTM = LowerTriangularMatrix
     
     # use one more l for size compat with vector quantities
@@ -57,7 +57,7 @@ end
 
 function Base.zeros(::Type{GridVariables},G::Geometry{NF}) where NF
 
-    @unpack Grid, nlat_half = G
+    (;Grid, nlat_half) = G
     vor_grid            = zeros(Grid{NF},nlat_half)   # vorticity
     div_grid            = zeros(Grid{NF},nlat_half)   # divergence
     temp_grid           = zeros(Grid{NF},nlat_half)   # absolute temperature
@@ -103,8 +103,8 @@ function Base.zeros(::Type{DynamicsVariables},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
     
-    @unpack lmax, mmax = S
-    @unpack Grid, nlat_half = G
+    (;lmax, mmax) = S
+    (;Grid, nlat_half) = G
 
     # MULTI-PURPOSE VECTOR (a,b), work array to be reused in various places
     a = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
@@ -141,7 +141,7 @@ function Base.zeros(::Type{DiagnosticVariablesLayer},
                     S::SpectralTransform{NF};
                     k::Integer=0) where NF      # use k=0 (i.e. unspecified) as default
 
-    @unpack npoints = G
+    (;npoints) = G
 
     tendencies = zeros(Tendencies,G,S)
     grid_variables = zeros(GridVariables,G)
@@ -173,8 +173,8 @@ function Base.zeros(::Type{SurfaceVariables},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
 
-    @unpack Grid, nlat_half, npoints = G
-    @unpack lmax, mmax = S
+    (;Grid, nlat_half, npoints) = G
+    (;lmax, mmax) = S
 
     # log of surface pressure and tendency thereof
     pres_grid = zeros(Grid{NF},nlat_half)
@@ -210,6 +210,7 @@ struct DiagnosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     layers  ::Vector{DiagnosticVariablesLayer{NF,Grid}}
     surface ::SurfaceVariables{NF,Grid}
     columns ::Vector{ColumnVariables{NF}}
+    temp_profile::Vector{NF}
     nlev    ::Int       # number of vertical levels
     npoints ::Int       # number of grid points
 end
@@ -218,7 +219,7 @@ function Base.zeros(::Type{DiagnosticVariables},
                     G::Geometry{NF},
                     S::SpectralTransform{NF}) where NF
 
-    @unpack nlev, npoints, n_stratosphere_levels = G
+    (;nlev, npoints, n_stratosphere_levels) = G
     layers = [zeros(DiagnosticVariablesLayer,G,S;k) for k in 1:nlev]
     surface = zeros(SurfaceVariables,G,S)
     
@@ -226,7 +227,10 @@ function Base.zeros(::Type{DiagnosticVariables},
     nthreads = Threads.nthreads()
     columns = [ColumnVariables{NF}(;nlev,n_stratosphere_levels) for _ in 1:nthreads]
 
-    return DiagnosticVariables(layers,surface,columns,nlev,npoints)
+    # global temperature profile, recalculated occasionally for the implicit solver
+    temp_profile = zeros(NF,nlev)
+
+    return DiagnosticVariables(layers,surface,columns,temp_profile,nlev,npoints)
 end
 
 DiagnosticVariables(G::Geometry{NF},S::SpectralTransform{NF}) where NF = zeros(DiagnosticVariables,G,S)

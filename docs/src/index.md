@@ -7,7 +7,8 @@ precipitation and radiation.
 ## Overview
 
 SpeedyWeather.jl is a global spectral model that uses a spherical harmonic transform to perform some calculations
-in spectral space (time integration, gradients, linear terms) and some in grid-point space (advection, non-linear terms).
+in spectral space (time integration, gradients, linear terms) and some in grid-point space (advection, non-linear terms,
+parameterizations).
 The prognostic variables used are vorticity, divergence, absolute temperature, logarithm of surface
 pressure and specific humidity. The time stepping uses a leapfrog scheme with additional filters and a
 semi-implicit formulation for gravity waves. The default resolution is T31 (96x48 grid points on a

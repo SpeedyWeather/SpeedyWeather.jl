@@ -21,17 +21,13 @@ function Base.show(io::IO, P::PrognosticVariables)
     print(io,UnicodePlots.heatmap(ζ_grid';plot_kwargs...))
 end
 
-# hack: define global constant whose element will be changed in initialize_feedback
-# used to pass on the time step to ProgressMeter.speedstring via calling this
-# constant from the ProgressMeter module
-const DT_IN_SEC = [1800]
-
-function ProgressMeter.speedstring(sec_per_iter,dt_in_sec=SpeedyWeather.DT_IN_SEC)
+# adapted from ProgressMeter.jl
+function speedstring(sec_per_iter,dt_in_sec)
     if sec_per_iter == Inf
         return "  N/A  days/day"
     end
 
-    sim_time_per_time = dt_in_sec[1]/sec_per_iter
+    sim_time_per_time = dt_in_sec/sec_per_iter
 
     for (divideby, unit) in (   (365*1_000, "millenia"),
                                 (365, "years"),
@@ -42,4 +38,38 @@ function ProgressMeter.speedstring(sec_per_iter,dt_in_sec=SpeedyWeather.DT_IN_SE
         end
     end
     return " <2 hours/days"
+end
+
+# hack: define global constant whose element will be changed in initialize_feedback
+# used to pass on the time step to ProgressMeter.speedstring via calling this
+# constant from the ProgressMeter module
+const DT_IN_SEC = Ref(1800)
+
+function ProgressMeter.speedstring(sec_per_iter,dt_in_sec=SpeedyWeather.DT_IN_SEC)
+    speedstring(sec_per_iter,dt_in_sec[])
+end
+
+"""
+    readable_secs(secs::Real) -> Dates.CompoundPeriod
+
+Returns `Dates.CompoundPeriod` rounding to either (days, hours), (hours, minutes), (minutes,
+seconds), or seconds with 1 decimal place accuracy for >10s and two for less.
+E.g.
+```julia
+julia> readable_secs(12345)
+3 hours, 26 minutes
+```
+"""
+function readable_secs(secs::Real)
+    millisecs = Dates.Millisecond(round(secs * 10 ^ 3))
+    if millisecs >= Dates.Day(1)
+        return Dates.canonicalize(round(millisecs, Dates.Hour))
+    elseif millisecs >= Dates.Hour(1)
+        return Dates.canonicalize(round(millisecs, Dates.Minute))
+    elseif millisecs >= Dates.Minute(1)
+        return Dates.canonicalize(round(millisecs, Dates.Second))
+    elseif millisecs >= Dates.Second(10)
+        return Dates.canonicalize(round(millisecs, Dates.Millisecond(100)))
+    end
+    return Dates.canonicalize(round(millisecs, Dates.Millisecond(10)))
 end

@@ -53,9 +53,9 @@ Generator function for a DynamicsConstants struct.
 function DynamicsConstants(P::Parameters)
 
     # PHYSICAL CONSTANTS
-    @unpack R_dry, R_vapour, cₚ = P
-    @unpack radius, rotation,gravity = P.planet
-    @unpack layer_thickness = P
+    (;R_dry, R_vapour, cₚ) = P
+    (;radius, rotation,gravity) = P.planet
+    (;layer_thickness) = P
     H₀ = layer_thickness*1000       # ShallowWater: convert from [km]s to [m]
     ξ = R_dry/R_vapour              # Ratio of gas constants: dry air / water vapour [1]
     μ_virt_temp = (1-ξ)/ξ           # used in Tv = T(1+μq), for conversion from humidity q
@@ -63,15 +63,15 @@ function DynamicsConstants(P::Parameters)
     κ = R_dry/cₚ                    # = 2/7ish for diatomic gas
 
     # TIME INTEGRATION CONSTANTS
-    @unpack robert_filter, williams_filter = P
-    @unpack trunc, Δt_at_T31, n_days, output_dt = P
+    (;robert_filter, williams_filter) = P
+    (;trunc, Δt_at_T31, n_days, output_dt) = P
 
     # PARAMETRIZATION CONSTANTS
-    @unpack RH_thresh_pbl_lsc, RH_thresh_range_lsc, RH_thresh_max_lsc, humid_relax_time_lsc = P  # Large-scale condensation
-    @unpack pres_thresh_cnv, RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv, max_entrainment, ratio_secondary_mass_flux = P  # Convection
-
-    Δt_min_at_trunc = Δt_at_T31*(31/trunc)      # scale time step Δt to specified resolution
-    Δt      = round(Δt_min_at_trunc*60)         # convert time step Δt from minutes to whole seconds
+    (;RH_thresh_pbl_lsc, RH_thresh_range_lsc, RH_thresh_max_lsc, humid_relax_time_lsc) = P  # Large-scale condensation
+    (;pres_thresh_cnv, RH_thresh_pbl_cnv, RH_thresh_trop_cnv, humid_relax_time_cnv,
+        max_entrainment, ratio_secondary_mass_flux) = P  # Convection
+        
+    Δt      = round(60*Δt_at_T31*(32/(trunc+1)))# scale time step Δt to specified resolution, [min] → [s]
     Δt_sec  = convert(Int,Δt)                   # encode time step Δt [s] as integer
     Δt_hrs  = Δt/3600                           # convert time step Δt from minutes to hours
     n_timesteps = ceil(Int,24*n_days/Δt_hrs)    # number of time steps to integrate for
@@ -82,7 +82,7 @@ function DynamicsConstants(P::Parameters)
     # drag_strat = 1/(P.diffusion.time_scale_stratosphere*3600)
 
     # interface relaxation forcing
-    @unpack interface_relax_time = P
+    (;interface_relax_time) = P
     interface_relax_time *= 3600/radius         # convert from hours to seconds
 
     # SCALING
