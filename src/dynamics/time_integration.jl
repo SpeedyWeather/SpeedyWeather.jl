@@ -1,11 +1,15 @@
+"""
+Clock struct keeps track of the model time, how many days to integrate for
+and how many time steps this takes
+$(TYPEDFIELDS)."""
 @kwdef mutable struct Clock
     "current model time"
     time::DateTime = DateTime(2000,1,1)
     
-    "number of days to integrate for"
-    n_days::Float64 = 10
+    "number of days to integrate for, set in run!(::Simulation)"
+    n_days::Float64 = 0
 
-    "number of time steps to integrate for"
+    "number of time steps to integrate for, set initialize!(::Clock,::TimeStepper)"
     n_timesteps::Int = 0  
 end
 
@@ -65,22 +69,17 @@ function Leapfrog(spectral_grid::SpectralGrid;kwargs...)
 end
 
 function Base.show(io::IO,L::Leapfrog)
-    println(io,"$(typeof(L))(")
-    fields = propertynames(L)
-    nfields = length(fields)
-    for i in 1:nfields
-        key = fields[i]
+    print(io,"$(typeof(L)):")
+    for key = propertynames(L)
         val = getfield(L,key)
-        s = "  $key::$(typeof(val)) = $val"
-        if i < nfields println(io,s) else print(io,s*")") end
+        print(io,"\n $key::$(typeof(val)) = $val")
     end
 end
 
 """
 $(TYPEDSIGNATURES)
 Performs one leapfrog time step with (`lf=2`) or without (`lf=1`) Robert+William's filter
-(see William (2009), Montly Weather Review, Eq. 7-9).
-"""
+(see William (2009), Montly Weather Review, Eq. 7-9)."""
 function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic variable at t
                     A_new::LowerTriangularMatrix{Complex{NF}},      # prognostic variable at t+dt
                     tendency::LowerTriangularMatrix{Complex{NF}},   # tendency (dynamics+physics) of A

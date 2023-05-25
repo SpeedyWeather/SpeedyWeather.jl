@@ -33,13 +33,9 @@ $(TYPEDFIELDS)
 end
 
 function Base.show(io::IO,planet::AbstractPlanet)
-    println(io,"$(typeof(planet))(")
-    fields = propertynames(planet)
-    nfields = length(fields)
-    for i in 1:nfields
-        key = fields[i]
+    print(io,"$(typeof(planet)):")
+    for key in propertynames(planet)
         val = getfield(planet,key)
-        s = "  $key::$(typeof(val)) = $val"
-        if i < nfields println(io,s) else print(io,s*")") end
+        print(io,"\n $key::$(typeof(val)) = $val")
     end
 end

@@ -32,6 +32,16 @@ function ImplicitShallowWater(spectral_grid::SpectralGrid,kwargs...)
     return ImplicitShallowWater{NF}(;trunc,kwargs...)
 end
 
+function Base.show(io::IO,I::ImplicitShallowWater)
+    print(io,"$(typeof(I)):")
+    keys = (:trunc,:α)
+    for key in keys
+        val = getfield(I,key)
+        s = "\n $key::$(typeof(val)) = $val"
+        print(io,s)
+    end
+end
+
 # function barrier to unpack the constants struct for shallow water
 function initialize!(I::ImplicitShallowWater,dt::Real,::DiagnosticVariables,model::ShallowWater)
     initialize!(I,dt,model.constants)
@@ -185,6 +195,16 @@ Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEq(spectral_grid::SpectralGrid,kwargs...) 
     (;NF,trunc,nlev) = spectral_grid
     return ImplicitPrimitiveEq{NF}(;trunc,nlev,kwargs...)
+end
+
+function Base.show(io::IO,I::ImplicitPrimitiveEq)
+    print(io,"$(typeof(I)):")
+    keys = (:trunc,:nlev,:α,:adaptive,:recalculate)
+    for key in keys
+        val = getfield(I,key)
+        s = "\n $key::$(typeof(val)) = $val"
+        print(io,s)
+    end
 end
 
 # function barrier to unpack the constants struct for primitive eq models

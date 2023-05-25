@@ -44,7 +44,7 @@ $(TYPEDFIELDS)"""
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid)
-    feedback::AbstractFeedback = Feedback(output)
+    feedback::AbstractFeedback = Feedback()
 end
 
 has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
@@ -96,7 +96,7 @@ $(TYPEDFIELDS)"""
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid)
-    feedback::AbstractFeedback = Feedback(output)
+    feedback::AbstractFeedback = Feedback()
 end
 
 has(::Type{<:ShallowWater}, var_name::Symbol) = var_name in (:vor, :div, :pres)
@@ -157,7 +157,7 @@ $(TYPEDFIELDS)"""
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid)
-    feedback::AbstractFeedback = Feedback(output)
+    feedback::AbstractFeedback = Feedback()
 end
 
 has(::Type{<:PrimitiveDry}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres)
@@ -224,7 +224,7 @@ $(TYPEDFIELDS)"""
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid)
-    feedback::AbstractFeedback = Feedback(output)
+    feedback::AbstractFeedback = Feedback()
 end
  
 has(::Type{<:PrimitiveWet}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres, :humid)

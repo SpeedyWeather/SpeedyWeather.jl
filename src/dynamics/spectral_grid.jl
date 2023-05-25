@@ -63,11 +63,11 @@ function Base.show(io::IO,SG::SpectralGrid)
     (;NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates) = SG
     truncation = if dealiasing < 2 "linear" elseif dealiasing < 3 "quadratic" else "cubic" end
     res = sqrt(4π*radius^2/npoints)/1000  # in [km]
-    println(io,"$(typeof(SG))(")
-    println(io,"  Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
-    println(io,"  Grid:       $npoints-element, $(get_nlat(Grid,nlat_half))-ring $Grid{$NF} ($truncation)")
-    println(io,"  Resolution: $(@sprintf("%.3g",res))km (average)")
-      print(io,"  Vertical:   $nlev-level $(typeof(vertical_coordinates)))")
+    println(io,"$(typeof(SG)):")
+    println(io," Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
+    println(io," Grid:       $npoints-element, $(get_nlat(Grid,nlat_half))-ring $Grid{$NF} ($truncation)")
+    println(io," Resolution: $(@sprintf("%.3g",res))km (average)")
+      print(io," Vertical:   $nlev-level $(typeof(vertical_coordinates))")
 end
 
 """
@@ -164,7 +164,7 @@ function Geometry(spectral_grid::SpectralGrid{Model}) where {Model<:Union{Barotr
 end
 
 function Base.show(io::IO,G::Geometry)
-    println(io,"$(typeof(G))($(G.spectral_grid))")
+    print(io,"$(typeof(G)) for $(G.spectral_grid)")
 end
 
 """

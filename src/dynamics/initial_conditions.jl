@@ -102,6 +102,14 @@ $(TYPEDFIELDS)"""
     perturb_height::Float64 = 120
 end
 
+function Base.show(io::IO,IC::InitialConditions)
+    print(io,"$(typeof(IC)) <: InitialConditions:")
+    for key in propertynames(IC)
+        val = getfield(IC,key)
+        print(io,"\n $key::$(typeof(val)) = $val")
+    end
+end
+
 """
 $(TYPEDSIGNATURES)
 Initial conditions from Galewsky, 2004, Tellus"""
@@ -357,8 +365,8 @@ function initial_conditions!(   progn_new::PrognosticVariables,
 
     restart_file = jldopen(joinpath(path,string("run_",run_id_string(id)),"restart.jld2"))
     progn_old = restart_file["prognostic_variables"]
-    # version = restart_file["version"]           # currently unused
-    model.clock.time = restart_file["time"]
+    # version = restart_file["version"]             # currently unused
+    model.clock.time = restart_file["time"]         # synchronize clocks
     return copy!(progn_new, progn_old)
 end
 

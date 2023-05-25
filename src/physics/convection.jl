@@ -222,3 +222,42 @@ end
     # humid_relax_time_cnv::NF       # Relaxation time for PBL humidity (hours)
     # max_entrainment::NF            # Maximum entrainment as a fraction of cloud-base mass flux
     # ratio_secondary_mass_flux::NF  # Ratio between secondary and primary mass flux at cloud-base
+
+
+    # "For computing saturation vapour pressure"
+    # magnus_coefs::Coefficients = MagnusCoefs{NF}()
+
+    # # Large-Scale Condensation (from table B10)
+    # "Index of atmospheric level at which large-scale condensation begins"
+    # k_lsc::Int = 2
+
+    # "Relative humidity threshold for boundary layer"
+    # RH_thresh_pbl_lsc::Float64 = 0.95
+
+    # "Vertical range of relative humidity threshold"
+    # RH_thresh_range_lsc::Float64 = 0.1
+
+    # "Maximum relative humidity threshold"
+    # RH_thresh_max_lsc::Float64 = 0.9
+
+    # "Relaxation time for humidity (hours)"
+    # humid_relax_time_lsc::Float64 = 4.0
+
+    # # Convection
+    # "Minimum (normalised) surface pressure for the occurrence of convection"
+    # pres_thresh_cnv::Float64 = 0.8
+
+    # "Relative humidity threshold for convection in PBL"
+    # RH_thresh_pbl_cnv::Float64 = 0.9
+
+    # "Relative humidity threshold for convection in the troposphere"
+    # RH_thresh_trop_cnv::Float64 = 0.7
+
+    # "Relaxation time for PBL humidity (hours)"
+    # humid_relax_time_cnv::Float64 = 6.0
+
+    # "Maximum entrainment as a fraction of cloud-base mass flux"
+    # max_entrainment::Float64 = 0.5
+
+    # "Ratio between secondary and primary mass flux at cloud-base"
+    # ratio_secondary_mass_flux::Float64 = 0.8

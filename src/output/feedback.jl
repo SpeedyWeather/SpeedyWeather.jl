@@ -9,7 +9,7 @@ mutable struct Feedback <: AbstractFeedback
     "check for NaRs in the prognostic variables"
     debug::Bool
     
-    "write a progress.txt file?"
+    "write a progress.txt file? State synced with OutputWriter.output"
     output::Bool
 
     "identification of run, taken from ::OutputWriter"
@@ -20,7 +20,7 @@ mutable struct Feedback <: AbstractFeedback
 
     # PROGRESS
     "struct containing everything progress related"
-    progress_meter::ProgressMeter.Progress  # 
+    progress_meter::ProgressMeter.Progress
 
     "txt is a Nothing in case of no output"
     progress_txt::Union{IOStream,Nothing}   
@@ -31,14 +31,13 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Generator function for a Feedback struct based on a ::TimeStepper
-struct."""
-function Feedback(  outputter::OutputWriter,
-                    verbose::Bool=true,
-                    debug::Bool=true)
+Generator function for a Feedback struct."""
+function Feedback(verbose::Bool=true,debug::Bool=true)
     
-    (;output) = outputter
-    id = ""             # do this in initialize!(::OutputWriter, ...) to avoid folder-race conditions
+    # the following are synced with OutputWriter in
+    # initialize!(::OutputWriter, ...) to avoid folder-race conditions
+    output = false
+    id = ""             
     run_path = ""
 
     # PROGRESSMETER     

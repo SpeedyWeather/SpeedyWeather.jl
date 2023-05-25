@@ -18,6 +18,10 @@ function NoOrography(spectral_grid::SpectralGrid)
     return NoOrography{NF,Grid{NF}}(orography,geopot_surf)
 end
 
+function Base.show(io::IO,orog::NoOrography)
+    print(io,"$(typeof(orog))")
+end
+
 # no further initialization needed
 initialize!(::NoOrography,::AbstractPlanet,::SpectralTransform,::Geometry) = nothing
 
@@ -38,6 +42,15 @@ $(TYPEDFIELDS)"""
     
     "surface geopotential, height*gravity [m²/s²]"
     geopot_surf::LowerTriangularMatrix{Complex{NF}} 
+end
+
+function Base.show(io::IO,orog::ZonalRidge)
+    print(io,"$(typeof(orog)):")
+    keys = (:η₀,:u₀)
+    for key in keys
+        val = getfield(orog,key)
+        print(io,"\n $key::$(typeof(val)) = $val")
+    end
 end
 
 """
@@ -90,8 +103,8 @@ $(TYPEDFIELDS)"""
 @kwdef struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
 
     # OPTIONS
-    "path to the folder containing the orography file, empty string = pkg path"
-    path::String = ""
+    "path to the folder containing the orography file, pkg path default"
+    path::String = "SpeedyWeather.jl/input_data"
 
     "filename of orography"
     file::String = "orography_F512.nc"
@@ -133,6 +146,16 @@ function EarthOrography(spectral_grid::SpectralGrid;kwargs...)
     return EarthOrography{NF,Grid{NF}}(;orography,geopot_surf,kwargs...)
 end
 
+function Base.show(io::IO,orog::EarthOrography)
+    print(io,"$(typeof(orog)):")
+    keys = (:path,:file,:scale,:smoothing,:smoothing_power,
+            :smoothing_strength,:smoothing_truncation)
+    for key in keys
+        val = getfield(orog,key)
+        print(io,"\n $key::$(typeof(val)) = $val")
+    end
+end
+
 """
 $(TYPEDSIGNATURES)
 Initialize the arrays `orography`,`geopot_surf` in `orog` by reading the
@@ -147,7 +170,7 @@ function initialize!(   orog::EarthOrography,
     (;gravity) = P
 
     # LOAD NETCDF FILE
-    if orog.path == ""
+    if orog.path == "SpeedyWeather.jl/input_data"
         path = joinpath(@__DIR__,"../../input_data",orog.file)
     else
         path = joinpath(orog.path,orog.file)

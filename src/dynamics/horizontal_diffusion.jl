@@ -61,6 +61,17 @@ function HyperDiffusion(spectral_grid::SpectralGrid,kwargs...)
     return HyperDiffusion{NF}(;trunc,nlev,kwargs...)
 end
 
+function Base.show(io::IO,HD::HyperDiffusion)
+    print(io,"$(typeof(HD)):")
+    keys = (:trunc,:nlev,:power,:time_scale,:resolution_scaling,:power_stratosphere,
+                :tapering_σ,:adaptive,:vor_max,:adaptive_strength)
+    for key in keys
+        val = getfield(HD,key)
+        s = "\n $key::$(typeof(val)) = $val"
+        print(io,s)
+    end
+end
+
 """$(TYPEDSIGNATURES)
 Precomputes the hyper diffusion terms in `scheme` based on the
 model time step, and possibly with a changing strength/power in

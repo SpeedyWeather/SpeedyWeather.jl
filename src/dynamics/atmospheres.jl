@@ -70,13 +70,9 @@ $(TYPEDFIELDS)"""
 end
 
 function Base.show(io::IO,atm::AbstractAtmosphere)
-    println(io,"$(typeof(atm))(")
-    fields = propertynames(atm)
-    nfields = length(fields)
-    for i in 1:nfields
-        key = fields[i]
+    print(io,"$(typeof(atm)):")
+    for key in propertynames(atm)
         val = getfield(atm,key)
-        s = "  $key::$(typeof(val)) = $val"
-        if i < nfields println(io,s) else print(io,s*")") end
+        print(io,"\n $key::$(typeof(val)) = $val")
     end
 end

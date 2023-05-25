@@ -31,7 +31,7 @@ $(TYPEDFIELDS)"""
     id::Union{String,Int} = ""              # run identification number/string
     run_path::String = ""                   # will be determined in initalize!
     filename::String = "output.nc"          # name of the output netcdf file
-    write_restart::Bool = output            # also write restart file if output==true?
+    write_restart::Bool = true              # also write restart file if output==true?
     pkg_version::VersionNumber = pkgversion(SpeedyWeather)
 
     # WHAT/WHEN OPTIONS
@@ -188,13 +188,19 @@ function initialize!(
     feedback.id = output.id         # synchronize with feedback struct
     feedback.run_path = output.run_path
     feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
-    
+    feedback.output = true          # if output=true set feedback.output=true too!
+
     # also export parameters into run????/parameters.txt
     parameters_txt = open(joinpath(output.run_path,"parameters.txt"),"w")
     println(parameters_txt,model.spectral_grid)
     println(parameters_txt,model.planet)
     println(parameters_txt,model.atmosphere)
     println(parameters_txt,model.time_stepping)
+    println(parameters_txt,model.initial_conditions)
+    println(parameters_txt,model.horizontal_diffusion)
+    model isa Union{ShallowWater,PrimitiveEquation} && println(parameters_txt,model.implicit)
+    model isa Union{ShallowWater,PrimitiveEquation} && println(parameters_txt,model.orography)
+
     close(parameters_txt)
     
     # CREATE NETCDF FILE, vector of NcVars for output
@@ -388,6 +394,7 @@ function write_restart_file(time::DateTime,
                             output::OutputWriter)
     
     (; run_path, write_restart, keepbits ) = output
+    output.output || return nothing         # exit immediately if no output and
     write_restart || return nothing         # exit immediately if no restart file desired
     
     # COMPRESSION OF RESTART FILE
