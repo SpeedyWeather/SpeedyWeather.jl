@@ -24,14 +24,14 @@ $(TYPEDFIELDS)"""
     "specific gas constant for water vapour [J/kg/K]"
     R_vapour::Float64 = 1000*R_gas/mol_mass_vapour
 
-    "latent heat of condensation [J/g] for consistency with specific humidity [g/Kg]"
-    alhc::Float64 = 2501
+    "latent heat of condensation [J/g] for consistency with specific humidity [g/Kg], also called alhc"
+    latent_heat_condensation::Float64 = 2501
 
-    "latent heat of sublimation [?]"
-    alhs::Float64 = 2801
+    "latent heat of sublimation [J/g], also called alhs"
+    latent_heat_sublimation::Float64 = 2801
 
     "stefan-Boltzmann constant [W/m²/K⁴]"
-    sbc::Float64 = 5.67e-8
+    stefan_boltzmann::Float64 = 5.67e-8
 
 
     # STANDARD ATMOSPHERE (reference values)

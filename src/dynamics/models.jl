@@ -179,8 +179,8 @@ function initialize!(model::PrimitiveDry)
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
     initialize!(model.temperature_relaxation,model)
+    initialize!(model.static_energy_diffusion,model)
     # initialize!(model.vertical_diffusion,model)
-    # initialize!(model.static_energy_diffusion,model)
 
     prognostic_variables = initial_conditions(model)
     diagnostic_variables = DiagnosticVariables(spectral_grid)
@@ -205,10 +205,11 @@ $(TYPEDFIELDS)"""
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
+    thermodynamics::Thermodynamics{NF} = Thermodynamics(spectral_grid,atmosphere)
     boundary_layer_drag::BoundaryLayerDrag{NF} = LinearDrag(spectral_grid)
     temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
+    static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
     # vertical_diffusion::VerticalDiffusion{NF} = VerticalLaplacian(spectral_grid)
-    # static_energy_diffuson::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
 
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
@@ -246,8 +247,8 @@ function initialize!(model::PrimitiveWet)
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
     initialize!(model.temperature_relaxation,model)
+    initialize!(model.static_energy_diffusion,model)
     # initialize!(model.vertical_diffusion,model)
-    # initialize!(model.static_energy_diffusion,model)
 
     prognostic_variables = initial_conditions(model)
     diagnostic_variables = DiagnosticVariables(spectral_grid)

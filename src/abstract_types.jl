@@ -31,6 +31,7 @@ abstract type AbstractParameterization{NF} end
 abstract type BoundaryLayerDrag{NF} <: AbstractParameterization{NF} end
 abstract type TemperatureRelaxation{NF} <: AbstractParameterization{NF} end
 abstract type VerticalDiffusion{NF} <: AbstractParameterization{NF} end
+abstract type AbstractThermodynamics{NF} <: AbstractParameterization{NF} end
 
 # INPUT/OUTPUT
 abstract type AbstractFeedback end

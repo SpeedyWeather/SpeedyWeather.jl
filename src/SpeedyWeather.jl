@@ -162,6 +162,7 @@ include("physics/thermodynamics.jl")
 include("physics/boundary_layer.jl")
 include("physics/temperature_relaxation.jl")
 include("physics/vertical_diffusion.jl")
+include("physics/pretty_printing.jl")
 
 # MODELS
 include("dynamics/models.jl")

@@ -37,7 +37,7 @@ function initialize!(   scheme::StaticEnergyDiffusion{NF},
     (;gravity) = model.planet
     C₀ = 1/nlev                     # average Δσ
     
-    # Fortran SPEEDY documentation equation (70)
+    # Fortran SPEEDY documentation equation (70), excluding the surface pressure pₛ
     scheme.Fstar[] = convert(NF,C₀/gravity/(scheme.time_scale*3600))
 end
 
