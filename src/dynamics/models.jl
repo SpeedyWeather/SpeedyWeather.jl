@@ -139,7 +139,7 @@ $(TYPEDFIELDS)"""
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     boundary_layer_drag::BoundaryLayerDrag{NF} = LinearDrag(spectral_grid)
-    # temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
+    temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
     # vertical_diffusion::VerticalDiffusion{NF} = VerticalLaplacian(spectral_grid)
     # static_energy_diffuson::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
 
@@ -178,7 +178,7 @@ function initialize!(model::PrimitiveDry)
     
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
-    # initialize!(model.temperature_relaxation,model)
+    initialize!(model.temperature_relaxation,model)
     # initialize!(model.vertical_diffusion,model)
     # initialize!(model.static_energy_diffusion,model)
 
@@ -206,7 +206,7 @@ $(TYPEDFIELDS)"""
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     boundary_layer_drag::BoundaryLayerDrag{NF} = LinearDrag(spectral_grid)
-    # temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
+    temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
     # vertical_diffusion::VerticalDiffusion{NF} = VerticalLaplacian(spectral_grid)
     # static_energy_diffuson::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
 
@@ -245,7 +245,7 @@ function initialize!(model::PrimitiveWet)
     
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
-    # initialize!(model.temperature_relaxation,model)
+    initialize!(model.temperature_relaxation,model)
     # initialize!(model.vertical_diffusion,model)
     # initialize!(model.static_energy_diffusion,model)
 

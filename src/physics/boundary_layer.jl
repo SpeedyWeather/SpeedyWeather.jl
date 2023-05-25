@@ -51,8 +51,7 @@ end
 $(TYPEDSIGNATURES)
 Compute tendency for boundary layer drag of a `column` and add to its tendencies fields"""
 function boundary_layer_drag!(  column::ColumnVariables,
-                                scheme::LinearDrag,
-                                model::PrimitiveEquation)
+                                scheme::LinearDrag)
 
     (;u,v,u_tend,v_tend) = column
     (;drag_coefs) = scheme

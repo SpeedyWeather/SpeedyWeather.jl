@@ -1,5 +1,5 @@
 const DEFAULT_NF = Float32
-const DEFAULT_MODEL = Barotropic
+const DEFAULT_MODEL = PrimitiveDry
 const DEFAULT_GRID = OctahedralGaussianGrid
 
 """

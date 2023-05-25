@@ -13,7 +13,7 @@ function parameterization_tendencies!(
 )
 
     (;boundary_layer_drag) = model
-    # (;temperature_relax) = model
+    (;temperature_relaxation) = model
     # (;vertical_diffusion) = model
     # (;static_energy_diffusion) = model
     
@@ -37,8 +37,8 @@ function parameterization_tendencies!(
         # static_energy_diffusion!(column,static_energy_diffusion,model)
 
         # HELD-SUAREZ
-        # temperature_relaxation!(column,temperature_relax,model)
-        boundary_layer_drag!(column,boundary_layer_drag,model)
+        temperature_relaxation!(column,temperature_relaxation)
+        boundary_layer_drag!(column,boundary_layer_drag)
 
         # Calculate parametrizations (order of execution is important!)
         # convection!(column,model)
