@@ -140,8 +140,8 @@ $(TYPEDFIELDS)"""
     physics::Bool = true
     boundary_layer_drag::BoundaryLayerDrag{NF} = LinearDrag(spectral_grid)
     temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
+    static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
     # vertical_diffusion::VerticalDiffusion{NF} = VerticalLaplacian(spectral_grid)
-    # static_energy_diffuson::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
 
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)

@@ -3,8 +3,7 @@ NoTemperatureRelaxation(SG::SpectralGrid) = NoTemperatureRelaxation{SG.NF}()
 
 """$(TYPEDSIGNATURES) just passes."""
 function temperature_relaxation!(   column::ColumnVariables,
-                                    scheme::NoTemperatureRelaxation,
-                                    model::PrimitiveEquation)
+                                    scheme::NoTemperatureRelaxation)
     return nothing
 end
 

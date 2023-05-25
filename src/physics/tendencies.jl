@@ -15,7 +15,7 @@ function parameterization_tendencies!(
     (;boundary_layer_drag) = model
     (;temperature_relaxation) = model
     # (;vertical_diffusion) = model
-    # (;static_energy_diffusion) = model
+    (;static_energy_diffusion) = model
     
     G = model.geometry
     rings = eachring(G.Grid,G.nlat_half)
@@ -34,7 +34,7 @@ function parameterization_tendencies!(
 
         # VERTICAL DIFFUSION
         # vertical_diffusion!(column,vertical_diffusion,model)
-        # static_energy_diffusion!(column,static_energy_diffusion,model)
+        static_energy_diffusion!(column,static_energy_diffusion)
 
         # HELD-SUAREZ
         temperature_relaxation!(column,temperature_relaxation)

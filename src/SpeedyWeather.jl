@@ -161,6 +161,7 @@ include("physics/column_variables.jl")
 include("physics/thermodynamics.jl")
 include("physics/boundary_layer.jl")
 include("physics/temperature_relaxation.jl")
+include("physics/vertical_diffusion.jl")
 
 # MODELS
 include("dynamics/models.jl")
@@ -170,7 +171,6 @@ include("dynamics/models.jl")
 # include("physics/large_scale_condensation.jl")
 # include("physics/longwave_radiation.jl")
 # include("physics/shortwave_radiation.jl")
-# include("physics/vertical_diffusion.jl")
 
 # OUTPUT
 include("output/output.jl")                     # defines Output
