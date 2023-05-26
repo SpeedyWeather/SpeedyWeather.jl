@@ -370,52 +370,50 @@ function initial_conditions!(   progn_new::PrognosticVariables,
     return copy!(progn_new, progn_old)
 end
 
-# function homogeneous_temperature!(  progn::PrognosticVariables,
-#                                     model::PrimitiveEquation)
+function homogeneous_temperature!(  progn::PrognosticVariables,
+                                    model::PrimitiveEquation)
+    (; geopot_surf ) = model.orography       # spectral surface geopotential [m²/s²] (orography*gravity)
 
-#     P = model.parameters
-#     B = model.boundaries
-#     G = model.geometry
-#     S = model.spectral_transform
+    # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
+    # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
+    # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
+    # gravity:      Gravitational acceleration [m/s^2]
+    # R_dry:        Specific gas constant for dry air [J/kg/K]
+    (;temp_ref, temp_top, lapse_rate, R_dry, σ_tropopause) = model.atmosphere
+    (;gravity) = model.planet
+    (;nlev, σ_levels_full) = model.geometry         
+    (; norm_sphere ) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
+    n_stratosphere_levels = findfirst(σ->σ>=σ_tropopause,σ_levels_full)
 
-#     (; geopot_surf ) = B.orography       # spectral surface geopotential [m²/s²] (orography*gravity)
+    # Lapse rate scaled by gravity [K/m / (m²/s²)]
+    Γg⁻¹ = lapse_rate/gravity/1000                      # /1000 for lapse rate [K/km] → [K/m]
 
-#     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
-#     # temp_top:     Reference absolute T in the stratosphere [K], lapse rate = 0
-#     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
-#     # gravity:      Gravitational acceleration [m/s^2]
-#     # R_dry:        Specific gas constant for dry air [J/kg/K]
-#     (; temp_ref, temp_top, lapse_rate, R_dry ) = P
-#     (; gravity ) = P.planet
-#     (; n_stratosphere_levels, nlev ) = G     # number of vertical levels used for stratosphere
-#     (; norm_sphere ) = S                     # normalization of the l=m=0 spherical harmonic
+    # SURFACE TEMPERATURE (store in k = nlev, but it's actually surface, i.e. k=nlev+1/2)
+    # overwrite with lowermost layer further down
+    temp_surf = progn.layers[end].timesteps[1].temp     # spectral temperature at k=nlev+1/2
+    temp_surf[1] = norm_sphere*temp_ref                 # set global mean surface temperature
+    for lm in eachharmonic(geopot_surf,temp_surf)
+        temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]           # lower temperature for higher mountains
+    end
 
-#     Γg⁻¹ = lapse_rate/gravity/1000              # Lapse rate scaled by gravity [K/m / (m²/s²)]
+    # TROPOPAUSE/STRATOSPHERE set the l=m=0 spectral coefficient (=mean value) only
+    # in uppermost levels (default: k=1,2) for lapse rate = 0
+    for k in 1:n_stratosphere_levels
+        temp = progn.layers[k].timesteps[1].temp
+        temp[1] = norm_sphere*temp_top
+    end
 
-#     # SURFACE TEMPERATURE
-#     temp_surf = progn.layers[end].timesteps[1].temp  # spectral temperature at k=nlev=surface
-#     temp_surf[1] = norm_sphere*temp_ref             # set global mean surface temperature
-#     for lm in eachharmonic(geopot_surf,temp_surf)
-#         temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]       # lower temperature for higher mountains
-#     end
+    # TROPOSPHERE use lapserate and vertical coordinate σ for profile
+    for k in n_stratosphere_levels+1:nlev               # k=nlev overwrites the surface temperature
+                                                        # with lowermost layer temperature
+        temp = progn.layers[k].timesteps[1].temp
+        σₖᴿ = σ_levels_full[k]^(R_dry*Γg⁻¹)             # from hydrostatic equation
 
-#     # TROPOPAUSE/STRATOSPHERE set the l=m=0 spectral coefficient (=mean value) only
-#     # in uppermost levels (default: k=1,2) for lapse rate = 0
-#     for k in 1:n_stratosphere_levels
-#         temp = progn.layers[k].timesteps[1].temp
-#         temp[1] = norm_sphere*temp_top
-#     end
-
-#     # TROPOSPHERE use lapserate and vertical coordinate σ for profile
-#     for k in n_stratosphere_levels+1:nlev
-#         temp = progn.layers[k].timesteps[1].temp
-#         σₖᴿ = G.σ_levels_full[k]^(R_dry*Γg⁻¹)   # TODO reference
-
-#         for lm in eachharmonic(temp,temp_surf)
-#             temp[lm] = temp_surf[lm]*σₖᴿ
-#         end
-#     end
-# end
+        for lm in eachharmonic(temp,temp_surf)
+            temp[lm] = temp_surf[lm]*σₖᴿ
+        end
+    end
+end
 
 """
 $(TYPEDSIGNATURES)
