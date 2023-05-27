@@ -1,7 +1,11 @@
 @testset "Horizontal diffusion of random" begin
-    for T in (Float32,Float64)
+    for NF in (Float32,Float64)
 
-        p,d,m = initialize_speedy(T)
+        spectral_grid = SpectralGrid(NF)
+        m = Model(;spectral_grid)
+        simulation = initialize!(m)
+        p = simulation.prognostic_variables
+        d = simulation.diagnostic_variables
 
         (;vor) = p.layers[1].timesteps[1]
         (;vor_tend) = d.layers[1].tendencies
@@ -24,7 +28,7 @@
 
         vor0 = copy(vor)
         vor1 = copy(vor)
-        SpeedyWeather.leapfrog!(vor0,vor1,vor_tend,m.constants.Δt,1,m.constants)
+        SpeedyWeather.leapfrog!(vor0,vor1,vor_tend,m.time_stepping.Δt,1,m.time_stepping)
 
         @test any(vor0 .!= vor1)    # check that at least some coefficients are different
         @test any(vor0 .== vor1)    # check that at least some coefficients are identical

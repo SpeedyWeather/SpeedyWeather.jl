@@ -1,15 +1,18 @@
 @testset "Divergence of a non-divergent flow zero?" begin
     @testset for NF in (Float32,Float64)
 
-        p,d,m = initialize_speedy(  NF,
-                                    ShallowWater)
+        spectral_grid = SpectralGrid(ShallowWater;NF)
+        m = Model(;spectral_grid)
+        simulation = initialize!(m)
+        p = simulation.prognostic_variables
+        d = simulation.diagnostic_variables
 
         fill!(p.layers[1].timesteps[1].vor,0)                  # make sure vorticity and divergence are 0
         fill!(p.layers[1].timesteps[1].div,0)
         fill!(d.layers[1].tendencies.vor_tend,0)
 
         # start with some vorticity only
-        vor0 = randn(LowerTriangularMatrix{Complex{NF}},p.lmax+2,p.mmax+1)
+        vor0 = randn(LowerTriangularMatrix{Complex{NF}},p.trunc+2,p.trunc+1)
         p.layers[1].timesteps[1].vor .= vor0
 
         lf = 1
@@ -45,15 +48,18 @@ end
 @testset "Curl of an irrotational flow zero?" begin
     @testset for NF in (Float32,Float64)
 
-        p,d,m = initialize_speedy(  NF,
-                                    ShallowWater)
+        spectral_grid = SpectralGrid(ShallowWater;NF)
+        m = Model(;spectral_grid)
+        simulation = initialize!(m)
+        p = simulation.prognostic_variables
+        d = simulation.diagnostic_variables
 
         fill!(p.layers[1].timesteps[1].vor,0)                  # make sure vorticity and divergence are 0
         fill!(p.layers[1].timesteps[1].div,0)
         fill!(d.layers[1].tendencies.div_tend,0)
 
         # start with some vorticity only
-        div0 = randn(LowerTriangularMatrix{Complex{NF}},p.lmax+2,p.mmax+1)
+        div0 = randn(LowerTriangularMatrix{Complex{NF}},p.trunc+2,p.trunc+1)
         p.layers[1].timesteps[1].div .= div0
 
         lf = 1
@@ -68,13 +74,14 @@ end
 
         G = m.geometry
         S = m.spectral_transform
+        C = m.constants
 
         # to evaluate ∇×(uv) use curl of vorticity fluxes (=∇×(uv(ζ+f))) with ζ=1,f=0
         fill!(d.layers[1].grid_variables.vor_grid,1)
-        fill!(G.f_coriolis,0)
+        fill!(C.f_coriolis,0)
 
         # calculate uω,vω in spectral space
-        SpeedyWeather.vorticity_flux_divcurl!(d.layers[1],m,curl=true)
+        SpeedyWeather.vorticity_flux_curldiv!(d.layers[1],C,G,S,div=true)
 
         for div_lm in d.layers[1].tendencies.div_tend
             @test abs(div_lm) < sqrt(eps(NF))
@@ -90,10 +97,10 @@ end
                         OctahedralClenshawGrid,
                         HEALPixGrid)
 
-            p,d,m = initialize_speedy(NF;Grid)
-            G = m.geometry
+            SG = SpectralGrid(NF;Grid)
+            G = Geometry(SG)
 
-            A = Grid(randn(NF,G.npoints))
+            A = Grid(randn(NF,SG.npoints))
             B = copy(A)
             SpeedyWeather.scale_coslat⁻¹!(A,G)
             SpeedyWeather.scale_coslat!(A,G)
@@ -111,11 +118,10 @@ end
 @testset "Flipsign in divergence!, curl!" begin
     @testset for NF in (Float32,Float64)
 
-        p,d,m = initialize_speedy(  NF,
-                                    Barotropic)
+        SG = SpectralGrid(NF)
+        S = SpectralTransform(SG)
 
-        S = m.spectral_transform
-        lmax,mmax = p.lmax,p.mmax
+        lmax,mmax = S.lmax,S.mmax
         A1 = randn(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
         A2 = randn(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
         B = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
@@ -134,11 +140,10 @@ end
 @testset "Add in divergence!, curl!" begin
     @testset for NF in (Float32,Float64)
 
-        p,d,m = initialize_speedy(  NF,
-                                    Barotropic)
+        SG = SpectralGrid(NF)
+        S = SpectralTransform(SG)
 
-        S = m.spectral_transform
-        lmax,mmax = p.lmax,p.mmax
+        lmax,mmax = S.lmax,S.mmax
         A1 = randn(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
         A2 = randn(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
         B = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
@@ -168,8 +173,11 @@ end
 @testset "D,ζ -> u,v -> D,ζ" begin
     @testset for NF in (Float32,Float64)
 
-        p,d,m = initialize_speedy(  NF,
-                                    ShallowWater)
+        spectral_grid = SpectralGrid(ShallowWater;NF)
+        m = Model(;spectral_grid)
+        simulation = initialize!(m)
+        p = simulation.prognostic_variables
+        d = simulation.diagnostic_variables
 
         # make sure vorticity and divergence are 0
         fill!(p.layers[1].timesteps[1].vor,0)
@@ -180,7 +188,7 @@ end
         fill!(d.layers[1].tendencies.div_tend,0)
 
         # create initial conditions
-        lmax,mmax = p.lmax,p.mmax
+        lmax,mmax = p.trunc,p.trunc
         vor0 = randn(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
         div0 = randn(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
         
@@ -283,10 +291,16 @@ end
 
 @testset "∇×∇=0 and ∇⋅∇=∇²" begin
     for NF in (Float32,Float64)
-        p,d,m = initialize_speedy(NF,Grid=FullGaussianGrid)
 
-        a = randn(LowerTriangularMatrix{Complex{NF}},33,32)
-        SpeedyWeather.spectral_truncation!(a,31)
+        trunc = 31
+        spectral_grid = SpectralGrid(ShallowWater;NF,trunc,Grid=FullGaussianGrid)
+        m = Model(;spectral_grid)
+        simulation = initialize!(m)
+        p = simulation.prognostic_variables
+        d = simulation.diagnostic_variables
+
+        a = randn(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
+        SpeedyWeather.spectral_truncation!(a)
         a[:,1] .= real.(a[:,1])
 
         dadx = zero(a)

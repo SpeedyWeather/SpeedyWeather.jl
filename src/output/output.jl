@@ -12,6 +12,15 @@ $(TYPEDFIELDS)"""
     humid::Int = 7
 end
 
+function Base.show(io::IO,K::Keepbits)
+    print(io,"$(typeof(K))(")
+    for key in propertynames(K)
+        val = getfield(K,key)
+        print(io,"$key=$val, ")
+    end
+    print(")")
+end
+
 # default number format for output
 const DEFAULT_OUTPUT_NF = Float32
 
@@ -98,6 +107,16 @@ default_output_vars(::Type{<:ShallowWater}) = [:vor,:u]
 default_output_vars(::Type{<:PrimitiveDry}) = [:vor,:u,:temp,:pres]
 default_output_vars(::Type{<:PrimitiveWet}) = [:vor,:u,:temp,:humid,:pres]
 
+# print all fields with type <: Number
+function Base.show(io::IO,O::AbstractOutputWriter)
+    print(io,"$(typeof(O)):")
+    for key in propertynames(O)
+        val = getfield(O,key)
+        val isa Union{Number,String,DataType,NTuple,Vector{Symbol},UnionAll,Keepbits} &&
+            print(io,"\n $key::$(typeof(val)) = $val")
+    end
+end
+
 """
 $(TYPEDSIGNATURES)
 Creates a netcdf file on disk and the corresponding `netcdf_file` object preallocated with output variables
@@ -181,8 +200,8 @@ function initialize!(
     )
     
     # GET RUN ID, CREATE FOLDER
-    # TODO allow to specify id through Ouput(id="something")
-    output.id = get_run_id(output.path)
+    # get new id only if not already specified
+    output.id = output.id == "" ? get_run_id(output.path) : output.id
     output.run_path = create_output_folder(output.path,output.id) 
     
     feedback.id = output.id         # synchronize with feedback struct
@@ -190,18 +209,6 @@ function initialize!(
     feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
     feedback.output = true          # if output=true set feedback.output=true too!
 
-    # also export parameters into run????/parameters.txt
-    parameters_txt = open(joinpath(output.run_path,"parameters.txt"),"w")
-    println(parameters_txt,model.spectral_grid)
-    println(parameters_txt,model.planet)
-    println(parameters_txt,model.atmosphere)
-    println(parameters_txt,model.time_stepping)
-    println(parameters_txt,model.initial_conditions)
-    println(parameters_txt,model.horizontal_diffusion)
-    model isa Union{ShallowWater,PrimitiveEquation} && println(parameters_txt,model.implicit)
-    model isa Union{ShallowWater,PrimitiveEquation} && println(parameters_txt,model.orography)
-
-    close(parameters_txt)
     
     # CREATE NETCDF FILE, vector of NcVars for output
     (; run_path, filename, output_vars) = output
@@ -211,17 +218,30 @@ function initialize!(
     # INTERPOLATION: PRECOMPUTE LOCATION INDICES
     latds, londs = RingGrids.get_latdlonds(output_Grid,output.nlat_half)
     output.as_matrix || RingGrids.update_locator!(output.interpolator,latds,londs)
-
+    
     # OUTPUT FREQUENCY
     output.output_every_n_steps = max(1,floor(Int,output.output_dt/time_stepping.Δt_hrs))
     
     # RESET COUNTERS
     output.timestep_counter = 0         # time step counter
     output.output_counter = 0           # output step counter
-
+    
     # WRITE INITIAL CONDITIONS TO FILE
     write_netcdf_variables!(output,diagn)
     write_netcdf_time!(output,startdate)
+
+    # also export parameters into run????/parameters.txt
+    parameters_txt = open(joinpath(output.run_path,"parameters.txt"),"w")
+    println(parameters_txt,model.spectral_grid)
+    println(parameters_txt,model.planet)
+    println(parameters_txt,model.atmosphere)
+    println(parameters_txt,model.time_stepping)
+    println(parameters_txt,model.output)
+    println(parameters_txt,model.initial_conditions)
+    println(parameters_txt,model.horizontal_diffusion)
+    model isa Union{ShallowWater,PrimitiveEquation} && println(parameters_txt,model.implicit)
+    model isa Union{ShallowWater,PrimitiveEquation} && println(parameters_txt,model.orography)
+    close(parameters_txt)
 end
 
 """
@@ -436,7 +456,7 @@ end
 $(TYPEDSIGNATURES)
 Returns the full path of the output file after it was created.
 """
-get_full_output_file_path(output::OutputWriter) = joinpath(output.path, string("run_",run_id_string(output.id),"/"), output.filename)
+get_full_output_file_path(output::OutputWriter) = joinpath(output.run_path, output.filename)
 
 """
 $(TYPEDSIGNATURES)

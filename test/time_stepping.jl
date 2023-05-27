@@ -18,8 +18,9 @@ end
 
     # loop over different precisions
     @testset for NF in (Float16,Float32,Float64)
-        P = Parameters{SpeedyWeather.BarotropicModel}(NF=NF)
-        C = DynamicsConstants(P)
+
+        spectral_grid = SpectralGrid(NF)
+        L = Leapfrog(spectral_grid)
 
         # INITIAL CONDITIONS
         lmax,mmax = 3,3
@@ -37,7 +38,7 @@ end
         for i in 2:n_timesteps+1
             # always evaluate F with lf = 2
             lf = 2
-            SpeedyWeather.leapfrog!(X_old,X_new,F(X_new,NF(ω)),NF(2Δt),lf,C)
+            SpeedyWeather.leapfrog!(X_old,X_new,F(X_new,NF(ω)),NF(2Δt),lf,L)
             X_out[i] = X_old[1,1]
         end
 
@@ -57,8 +58,9 @@ end
 
     # loop over different precisions
     @testset for NF in (Float16,Float32,Float64)
-        P = Parameters{SpeedyWeather.BarotropicModel}(NF=NF)
-        C = DynamicsConstants(P)
+
+        spectral_grid = SpectralGrid(NF)
+        L = Leapfrog(spectral_grid)
 
         # INITIAL CONDITIONS
         lmax,mmax = 3,3
@@ -76,7 +78,7 @@ end
         for i in 2:n_timesteps+1
             # always evaluate F with lf = 2
             lf = 2
-            SpeedyWeather.leapfrog!(X_old,X_new,F(X_new,NF(ω)),NF(2Δt),lf,C)
+            SpeedyWeather.leapfrog!(X_old,X_new,F(X_new,NF(ω)),NF(2Δt),lf,L)
             X_out[i] = X_old[1,1]
         end
 
@@ -85,8 +87,8 @@ end
         @test M_RAW < 1
 
         # CHECK THAT NO WILLIAM'S FILTER IS WORSE
-        P = Parameters{SpeedyWeather.BarotropicModel}(NF=NF,williams_filter=1)     # Robert's filter only
-        C = DynamicsConstants(P)
+        spectral_grid = SpectralGrid(NF)
+        L = Leapfrog(spectral_grid,william_filter=1)
 
         # INITIAL CONDITIONS
         lmax,mmax = 3,3
@@ -104,7 +106,7 @@ end
         for i in 2:n_timesteps+1
             # always evaluate F with lf = 2
             lf = 2
-            SpeedyWeather.leapfrog!(X_old,X_new,F(X_new,NF(ω)),NF(2Δt),lf,C)
+            SpeedyWeather.leapfrog!(X_old,X_new,F(X_new,NF(ω)),NF(2Δt),lf,L)
             X_out[i] = X_old[1,1]
         end
 

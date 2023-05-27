@@ -1,9 +1,5 @@
 """
-    diagnose_convection!(
-        column::ColumnVariables{NF},
-        model::PrimitiveEquation,
-    )
-
+$(TYPEDSIGNATURES)
 Check whether the convection scheme should be activated in the given atmospheric column.
 
 1. A conditional instability exists when the saturation moist energy (MSS) decreases with
@@ -28,16 +24,13 @@ boundary of the full level k.
 
 The top-of-convection (TCN) layer, or cloud-top, is the largest value of k for which
 condition 1 is satisfied. The cloud-top layer may be subsequently adjusted upwards by the
-large-scale condensation parameterization, which is executed after this one.
-"""
-function diagnose_convection!(
-    column::ColumnVariables{NF},
-    model::PrimitiveEquation,
-) where {NF<:AbstractFloat}
+large-scale condensation parameterization, which is executed after this one."""
+function diagnose_convection!(column::ColumnVariables,convection::SpeedyConvection)
+
     (; alhc,pres_ref ) = model.parameters
     (; pres_thresh_cnv, RH_thresh_pbl_cnv ) = model.constants
     (; nlev ) = column
-    (; humid, pres, sat_humid, dry_static_energy, moist_static_energy,
+    (; humid, pres, sat_humid, moist_static_energy,
     sat_moist_static_energy, sat_moist_static_energy_half) = column
 
     if pres[end] > pres_thresh_cnv
@@ -88,6 +81,9 @@ function diagnose_convection!(
     end
     return nothing
 end
+
+convection!(column::ColumnVariables,model::PrimitiveDry) = nothing
+convection!(column::ColumnVariables,model::PrimitiveWet) = convection!(column,model.convection)
 
 """
     convection!(

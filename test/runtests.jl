@@ -32,9 +32,7 @@ include("column_variables.jl")
 # include("shortwave_radiation.jl")
 
 # INITIALIZATION AND INTEGRATION
-include("initialize.jl")
 include("run_speedy.jl")
-include("run_speedy_with_output.jl")
 
 # OUTPUT 
 include("netcdf_output.jl")
