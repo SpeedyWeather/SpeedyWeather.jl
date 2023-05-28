@@ -4,7 +4,7 @@ Create a struct `EarthAtmosphere<:AbstractPlanet`, with the following physical/c
 characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)"""
-@kwdef struct EarthAtmosphere <: AbstractAtmosphere
+@with_kw struct EarthAtmosphere <: AbstractAtmosphere
     # ATMOSPHERE
     "molar mass of dry air [g/mol]"
     mol_mass_dry_air::Float64 = 28.9649

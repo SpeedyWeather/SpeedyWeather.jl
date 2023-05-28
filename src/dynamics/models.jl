@@ -19,7 +19,7 @@ $(SIGNATURES)
 The BarotropicModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
+@with_kw struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
@@ -70,7 +70,7 @@ $(SIGNATURES)
 The ShallowWaterModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@kwdef struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
+@with_kw struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
@@ -125,7 +125,7 @@ $(SIGNATURES)
 The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveDry
+@with_kw struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveDry
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
@@ -192,7 +192,7 @@ $(SIGNATURES)
 The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveWet
+@with_kw struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveWet
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 

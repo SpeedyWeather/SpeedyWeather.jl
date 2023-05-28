@@ -1,7 +1,7 @@
 """
 Struct holding constants needed at runtime for the dynamical core in number format NF.
 $(TYPEDFIELDS)"""
-@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConstants{NF}
+@with_kw struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConstants{NF}
     # PHYSICAL CONSTANTS
     "Radius of Planet [m]"
     radius::NF

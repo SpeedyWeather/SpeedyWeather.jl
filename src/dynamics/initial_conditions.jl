@@ -20,7 +20,7 @@ function allocate(::Type{PrognosticVariables},spectral_grid::SpectralGrid{Model}
     return zeros(PrognosticVariables{NF},Model,trunc,nlev)
 end
 
-@kwdef struct StartFromRest <: InitialConditions 
+@with_kw struct StartFromRest <: InitialConditions 
     pressure_on_orography::Bool = false
 end
 
@@ -40,7 +40,7 @@ end
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef struct StartWithVorticity <: InitialConditions
+@with_kw struct StartWithVorticity <: InitialConditions
 
     "Power law the vorticity should be spectrally distributed by"
     power_law::Float64 = -3
@@ -76,7 +76,7 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Galewsky et al, 2004 zonal jet
 intitial conditions for the shallow water model. Default values as in Galewsky.
 $(TYPEDFIELDS)"""
-@kwdef struct ZonalJet <: InitialConditions
+@with_kw struct ZonalJet <: InitialConditions
     "jet latitude [˚N]"
     latitude::Float64 = 45
     
@@ -196,7 +196,7 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
 intitial conditions for the primitive equation model. Default values as in Jablonowski.
 $(TYPEDFIELDS)"""
-@kwdef struct ZonalWind <: InitialConditions
+@with_kw struct ZonalWind <: InitialConditions
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
     
@@ -345,7 +345,7 @@ Restart from a previous SpeedyWeather.jl simulation via the restart file restart
 Applies interpolation in the horizontal but not in the vertical. restart.jld2 is
 identified by
 $(TYPEDFIELDS)"""
-@kwdef struct StartFromFile <: InitialConditions
+@with_kw struct StartFromFile <: InitialConditions
     "path for restart file"
     path::String = pwd()
 

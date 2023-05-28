@@ -7,7 +7,7 @@ layers. Furthermore the power can be decreased above the `tapering_σ` to
 `power_stratosphere` (default 2). For Barotropic, ShallowWater,
 the default non-adaptive constant-time scale hyper diffusion is used. Options are
 $(TYPEDFIELDS)"""
-@kwdef struct HyperDiffusion{NF} <: HorizontalDiffusion{NF}
+@with_kw struct HyperDiffusion{NF} <: HorizontalDiffusion{NF}
     # DIMENSIONS
     "spectral resolution"
     trunc::Int

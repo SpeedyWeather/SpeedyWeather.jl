@@ -2,7 +2,7 @@
 Number of mantissa bits to keep for each prognostic variable when compressed for
 netCDF and .jld2 data output.
 $(TYPEDFIELDS)"""
-@kwdef struct Keepbits
+@with_kw struct Keepbits
     u::Int = 7
     v::Int = 7
     vor::Int = 5
@@ -30,7 +30,7 @@ NetCDF output writer. Contains all output options and auxiliary fields for outpu
 To be initialised with `OutputWriter(::SpectralGrid,::TimeStepper,kwargs...)` to pass on the
 resolution/time stepping information from those structs. Options include
 $(TYPEDFIELDS)"""
-@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelSetup} <: AbstractOutputWriter
+Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelSetup} <: AbstractOutputWriter
 
     spectral_grid::SpectralGrid{Model}
 

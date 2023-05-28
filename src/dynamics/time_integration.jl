@@ -2,7 +2,7 @@
 Clock struct keeps track of the model time, how many days to integrate for
 and how many time steps this takes
 $(TYPEDFIELDS)."""
-@kwdef mutable struct Clock
+@with_kw mutable struct Clock
     "current model time"
     time::DateTime = DateTime(2000,1,1)
     
@@ -27,7 +27,7 @@ end
 Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)
 """
-@kwdef struct Leapfrog{NF} <: TimeStepper{NF}
+@with_kw struct Leapfrog{NF} <: TimeStepper{NF}
 
     # DIMENSIONS
     "spectral resolution (max degree of spherical harmonics)"

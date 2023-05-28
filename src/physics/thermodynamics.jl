@@ -6,7 +6,7 @@ Parameters for computing saturation vapour pressure using the August-Roche-Magnu
 where T is in Kelvin and i = 1,2 for saturation with respect to water and ice,
 respectively.
 $(TYPEDFIELDS)"""
-@kwdef struct MagnusCoefs{NF<:AbstractFloat}
+@with_kw struct MagnusCoefs{NF<:AbstractFloat}
     "Saturation vapour pressure at 0°C"
     e₀::NF = 6.108
 
@@ -18,7 +18,7 @@ $(TYPEDFIELDS)"""
     C₂::NF = 21.875
 end
 
-@kwdef struct Thermodynamics{NF} <: AbstractThermodynamics{NF}
+@with_kw struct Thermodynamics{NF} <: AbstractThermodynamics{NF}
     magnus_coefs::MagnusCoefs{NF} = MagnusCoefs{NF}()
     mol_ratio::NF 
     latent_heat_condensation::NF

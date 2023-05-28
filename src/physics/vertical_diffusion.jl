@@ -15,7 +15,7 @@ end
 Diffusion of dry static energy: A relaxation towards a reference
 gradient of static energy wrt to geopotential, see Fortran SPEEDY documentation.
 $(TYPEDFIELDS)"""
-@kwdef struct StaticEnergyDiffusion{NF<:AbstractFloat} <: VerticalDiffusion{NF}
+@with_kw struct StaticEnergyDiffusion{NF<:AbstractFloat} <: VerticalDiffusion{NF}
     "time scale [hrs] for strength"
     time_scale::Float64 = 6
     
@@ -60,7 +60,7 @@ function static_energy_diffusion!(  column::ColumnVariables{NF},
     end
 end
 
-# @kwdef struct VerticalLaplacian{NF<:Real} <: VerticalDiffusion{NF}
+# @with_kw struct VerticalLaplacian{NF<:Real} <: VerticalDiffusion{NF}
 #     time_scale::NF = 10.0       # [hours] time scale to control the strength of vertical diffusion
 #     height_scale::NF = 100.0    # [m] scales for Δσ so that time_scale is sensible
 

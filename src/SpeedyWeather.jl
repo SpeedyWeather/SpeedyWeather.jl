@@ -1,6 +1,7 @@
 module SpeedyWeather
 
 # STRUCTURE
+import Parameters: @with_kw
 using DocStringExtensions
 
 # NUMERICS

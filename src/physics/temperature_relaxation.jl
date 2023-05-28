@@ -16,7 +16,7 @@ end
 """
 Struct that defines the temperature relaxation from Held and Suarez, 1996 BAMS
 $(TYPEDFIELDS)"""
-@kwdef struct HeldSuarez{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
+@with_kw struct HeldSuarez{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
     # DIMENSIONS
     "number of latitude rings"
     nlat::Int
@@ -123,7 +123,7 @@ end
 """$(TYPEDSIGNATURES)
 HeldSuarez-like temperature relaxation, but towards the Jablonowski temperature
 profile with increasing temperatures in the stratosphere."""
-@kwdef struct JablonowskiRelaxation{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
+@with_kw struct JablonowskiRelaxation{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
     # DIMENSIONS
     nlat::Int
     nlev::Int

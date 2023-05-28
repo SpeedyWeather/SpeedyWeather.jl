@@ -28,7 +28,7 @@ initialize!(::NoOrography,::AbstractPlanet,::SpectralTransform,::Geometry) = not
 
 """Zonal ridge orography after Jablonowski and Williamson, 2006.
 $(TYPEDFIELDS)"""
-@kwdef struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
+@with_kw struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
     
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
@@ -100,7 +100,7 @@ end
 
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
-@kwdef struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
+@with_kw struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
 
     # OPTIONS
     "path to the folder containing the orography file, pkg path default"
