@@ -58,7 +58,7 @@ function parameterization_tendencies!(
 end
 
 """
-$(TYPEDFIELDS)
+$(TYPEDSIGNATURES)
 Convert the fluxes on half levels to tendencies on full levels."""
 function fluxes_to_tendencies!(
     column::ColumnVariables,
