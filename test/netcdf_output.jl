@@ -6,7 +6,7 @@ import NetCDF
 
     # default grid, Float64, ShallowWater
     spectral_grid = SpectralGrid(;NF=Float64)
-    output = OutputWriter(spectral_grid,path=tmp_output_path)
+    output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
     run!(simulation,output=true;n_days)
@@ -14,7 +14,7 @@ import NetCDF
 
     # default grid, Float32, ShallowWater
     spectral_grid = SpectralGrid(;NF=Float32)
-    output = OutputWriter(spectral_grid,path=tmp_output_path)
+    output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
     run!(simulation,output=true;n_days)
@@ -22,7 +22,7 @@ import NetCDF
 
     # FullClenshawGrid, Float32, ShallowWater
     spectral_grid = SpectralGrid(;NF=Float32,Grid=FullClenshawGrid)
-    output = OutputWriter(spectral_grid,path=tmp_output_path)
+    output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
     run!(simulation,output=true;n_days)
@@ -30,7 +30,7 @@ import NetCDF
 
     # OctahedralClenshawGrid, Float32, ShallowWater
     spectral_grid = SpectralGrid(;NF=Float32,Grid=OctahedralClenshawGrid)
-    output = OutputWriter(spectral_grid,path=tmp_output_path)
+    output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
     run!(simulation,output=true;n_days)
@@ -38,7 +38,7 @@ import NetCDF
 
     # HEALPixGrid, Float32, ShallowWater
     spectral_grid = SpectralGrid(;NF=Float32,Grid=HEALPixGrid)
-    output = OutputWriter(spectral_grid,path=tmp_output_path)
+    output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
     run!(simulation,output=true;n_days)
@@ -46,7 +46,7 @@ import NetCDF
 
     # OctaHEALPixGrid, Float32, ShallowWater
     spectral_grid = SpectralGrid(;NF=Float32,Grid=OctaHEALPixGrid)
-    output = OutputWriter(spectral_grid,path=tmp_output_path)
+    output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
     run!(simulation,output=true;n_days)
@@ -54,7 +54,7 @@ import NetCDF
 
     # OctahedralClenshawGrid, as matrix, Float32, ShallowWater
     spectral_grid = SpectralGrid(;NF=Float32,Grid=OctahedralClenshawGrid)
-    output = OutputWriter(spectral_grid,path=tmp_output_path,as_matrix=true)
+    output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path,as_matrix=true)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
     run!(simulation,output=true;n_days)
@@ -62,7 +62,7 @@ import NetCDF
 
     # OctaHEALPixGrid, as matrix, Float32, PrimitiveDry
     spectral_grid = SpectralGrid(;NF=Float32,Grid=OctaHEALPixGrid)
-    output = OutputWriter(spectral_grid,path=tmp_output_path,as_matrix=true)
+    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,as_matrix=true)
     model = PrimitiveDryModel(;spectral_grid,output)
     simulation = initialize!(model)
     run!(simulation,output=true;n_days)
@@ -70,7 +70,7 @@ import NetCDF
 
     # OctaHEALPixGrid, as matrix, Float32, but output Float64 PrimitiveDry
     spectral_grid = SpectralGrid(;NF=Float32,Grid=OctaHEALPixGrid)
-    output = OutputWriter(spectral_grid,path=tmp_output_path,as_matrix=true,NF=Float64)
+    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,as_matrix=true,NF=Float64)
     model = PrimitiveDryModel(;spectral_grid,output)
     simulation = initialize!(model)
     run!(simulation,output=true;n_days)
@@ -81,7 +81,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
     
     spectral_grid = SpectralGrid()
-    output = OutputWriter(spectral_grid,path=tmp_output_path,id="restart-test")
+    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="restart-test")
     model = PrimitiveDryModel(;spectral_grid,output)
     simulation = initialize!(model)
     run!(simulation,output=true,n_days=1)
@@ -117,7 +117,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
     
     spectral_grid = SpectralGrid()
-    output = OutputWriter(spectral_grid,path=tmp_output_path,id="dense-output-test",output_dt=0)
+    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="dense-output-test",output_dt=0)
     model = PrimitiveDryModel(;spectral_grid,output)
     simulation = initialize!(model)
     run!(simulation,output=true,n_days=1)
@@ -132,7 +132,7 @@ end
     # 1kyrs simulation
     spectral_grid = SpectralGrid()
     time_stepping = Leapfrog(spectral_grid,Δt_at_T31=60*24*365*10)
-    output = OutputWriter(spectral_grid,path=tmp_output_path,id="long-output-test",output_dt=24*365*10)
+    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="long-output-test",output_dt=24*365*10)
     model = PrimitiveDryModel(;spectral_grid,output,time_stepping)
     simulation = initialize!(model)
     run!(simulation,output=true,n_days=365000)
