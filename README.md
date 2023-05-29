@@ -41,10 +41,10 @@ All contributions always welcome.
 With v0.6 the interface to SpeedyWeather.jl is split in 4 steps
 
 ```julia
-spectral_grid = SpectralGrid(PrimitiveDry, trunc=31, Grid=OctahedralGaussianGrid, nlev=8) # 1, define grid 
-model = Model(;spectral_grid, orography = EarthOrography(spectral_grid))                  # 2, create model
-simulation = initialize!(model)                                                           # 3, initialize
-run!(simulation,n_days=10,output=true)                                                    # 4, run
+spectral_grid = SpectralGrid(trunc=31, Grid=OctahedralGaussianGrid, nlev=8)             # 1, define grid 
+model = PrimitiveDryModel(;spectral_grid, orography = EarthOrography(spectral_grid))    # 2, create model
+simulation = initialize!(model)                                                         # 3, initialize
+run!(simulation,n_days=10,output=true)                                                  # 4, run
 Weather is speedy: run 0001 100%|█████████| Time: 0:00:04 (531.88 years/day)
 ```
 

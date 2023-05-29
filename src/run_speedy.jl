@@ -42,7 +42,7 @@ function run_speedy(::Type{NF} = DEFAULT_NF,                    # default number
                     ) where {NF<:AbstractFloat,Model<:ModelSetup}
 
     # pass on some keyword arguments to the default structs for convenience
-    spectral_grid = SpectralGrid{Model}(;NF,spectral_grid...)
+    spectral_grid = SpectralGrid(;NF,spectral_grid...)
     planet = Earth(;planet...)
     atmosphere = EarthAtmosphere(;atmosphere...)
     time_stepping = Leapfrog(spectral_grid;time_stepping...)
