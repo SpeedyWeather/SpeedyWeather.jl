@@ -19,11 +19,13 @@ makedocs(
             "Submodule: LowerTriangularMatrices"=>"lowertriangularmatrices.md",
             "Submodule: SpeedyTransforms"=>"speedytransforms.md",
             "Function and type index"=>"functions.md",
-            "Style and convention guide"=>"conventions.md"]
+            "Style and convention guide"=>"conventions.md",
+            "Development notes"=>"development.md"]
 )
 
 deploydocs(
     repo = "github.com/SpeedyWeather/SpeedyWeather.jl.git",
     devbranch = "main",
+    push_preview = true,
     versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"]
 )

@@ -34,7 +34,11 @@ end
     @testset for NF in (Float32,Float64)
 
         nlev = 8
-        _,diagn,model = initialize_speedy(NF,PrimitiveEquation,nlev=nlev)
+        spectral_grid = SpectralGrid(NF;nlev)
+        model = Model(;spectral_grid)
+        simulation = initialize!(model)
+        diagn = simulation.diagnostic_variables
+
         column = ColumnVariables{NF}(;nlev)
 
         SpeedyWeather.reset_column!(column)
