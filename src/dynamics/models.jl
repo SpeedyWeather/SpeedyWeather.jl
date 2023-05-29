@@ -19,7 +19,7 @@ $(SIGNATURES)
 The BarotropicModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@with_kw struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
+@with_kw struct BarotropicModel{NF<:AbstractFloat} <: Barotropic
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
@@ -40,7 +40,7 @@ $(TYPEDFIELDS)"""
     clock::Clock = Clock()
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
-    device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
+    # device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid)
@@ -70,7 +70,7 @@ $(SIGNATURES)
 The ShallowWaterModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@with_kw struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
+@with_kw struct ShallowWaterModel{NF<:AbstractFloat} <: ShallowWater
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
@@ -92,7 +92,7 @@ $(TYPEDFIELDS)"""
     clock::Clock = Clock()
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
-    device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
+    # device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid)
@@ -125,7 +125,7 @@ $(SIGNATURES)
 The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@with_kw struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveDry
+@with_kw struct PrimitiveDryModel{NF<:AbstractFloat} <: PrimitiveDry
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
@@ -153,7 +153,7 @@ $(TYPEDFIELDS)"""
     clock::Clock = Clock()
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
-    device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
+    # device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid)
@@ -192,7 +192,7 @@ $(SIGNATURES)
 The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@with_kw struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveWet
+@with_kw struct PrimitiveWetModel{NF<:AbstractFloat} <: PrimitiveWet
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
@@ -221,7 +221,7 @@ $(TYPEDFIELDS)"""
     clock::Clock = Clock()
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
-    device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
+    # device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid)
