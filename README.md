@@ -68,14 +68,17 @@ SpeedyWeather.jl is then adopted from [first translations to Julia](https://gith
 SpeedyWeather.jl defines several submodules that are technically stand-alone (with dependencies) but aren't separated
 out to their own packages for now
 
-- __LowerTriangularMatrices__, a module that defines `LowerTriangularMatrix` (among others) used for the spherical harmonic coefficients
-- __RingGrids__, a module that defines several iso-latitude ring-based spherical grids (like the FullGaussianGrid or the HEALPixGrid) and interpolations between them
-- __SpeedyTransforms__, a module that defines the spherical harmonic transform between spectral space (for which LowerTriangularMatrices is used) and grid-point space (as defined by RingGrids).
+- [__RingGrids__](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/), a module that defines several iso-latitude ring-based spherical grids (like the FullGaussianGrid or the HEALPixGrid) and interpolations between them
+- [__LowerTriangularMatrices__](https://speedyweather.github.io/SpeedyWeather.jl/dev/lowertriangularmatrices/), a module that defines `LowerTriangularMatrix` used for the spherical harmonic coefficients
+- [__SpeedyTransforms__](https://speedyweather.github.io/SpeedyWeather.jl/dev/speedytransforms/), a module that defines the spherical harmonic transform between spectral space (for which LowerTriangularMatrices is used) and grid-point space (as defined by RingGrids).
 
 These modules can also be used independently of SpeedyWeather like so
 ```julia
-julia> import SpeedyWeather: LowerTriangularMatrices, RingGrids, SpeedyTransforms
+julia> using SpeedyWeather: LowerTriangularMatrices, RingGrids, SpeedyTransforms
 ```
+check out their documentation: [RingGrids](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/), 
+[LowerTriangularMatrices](https://speedyweather.github.io/SpeedyWeather.jl/dev/lowertriangularmatrices/), 
+[SpeedyTransforms](https://speedyweather.github.io/SpeedyWeather.jl/dev/speedytransforms/).
 
 ## Installation
 
@@ -83,11 +86,8 @@ SpeedyWeather.jl is registered in Julia's registry, so open the package manager 
 ```julia
 (@v1.8) pkg> add SpeedyWeather
 ```
-which will install the [latest release]([url](https://github.com/SpeedyWeather/SpeedyWeather.jl/releases)) and all dependencies automatically. The very latest version is installed with
-```julia
-(@v1.8) pkg> add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
-```
-which pulls directly from the `#main` branch. Please use the current minor version of Julia,
+which will install the [latest release]([url](https://github.com/SpeedyWeather/SpeedyWeather.jl/releases)) and all dependencies automatically. For more information see the [Installation](https://speedyweather.github.io/SpeedyWeather.jl/dev/installation/) in the documentation.
+Please use the current minor version of Julia,
 compatibilities with older versions are not guaranteed.
 
 ## Copyright and license
