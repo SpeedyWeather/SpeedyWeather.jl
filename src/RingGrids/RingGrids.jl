@@ -1,66 +1,68 @@
 module RingGrids
 
-    import Statistics: mean
-    import FastGaussQuadrature
+using DocStringExtensions
 
-    # GRIDS
-    export  AbstractGrid, 
-            AbstractFullGrid, 
-            AbstractOctahedralGrid, 
-            AbstractHEALPixGrid,
-            AbstractOctaHEALPixGrid
+import Statistics: mean
+import FastGaussQuadrature
 
-    export  FullGaussianGrid,
-            FullClenshawGrid,
-            FullHEALPixGrid,
-            FullOctaHEALPixGrid
+# GRIDS
+export  AbstractGrid, 
+        AbstractFullGrid, 
+        AbstractOctahedralGrid, 
+        AbstractHEALPixGrid,
+        AbstractOctaHEALPixGrid
 
-    export  OctahedralGaussianGrid,
-            OctahedralClenshawGrid,
-            HEALPixGrid,
-            OctaHEALPixGrid
-    
-    # GRID FUNCTIONS
-    export  grids_match,
-            get_truncation,
-            get_resolution,
-            get_nlat,
-            get_nlat_half,
-            get_npoints,
-            get_latdlonds,
-            get_latd,
-            get_lond,
-            each_index_in_ring,
-            each_index_in_ring!,
-            eachgridpoint,
-            eachring,
-            whichring,
-            get_nlons,
-            get_nlon_max,
-            get_quadrature_weights,
-            get_solid_angles
+export  FullGaussianGrid,
+        FullClenshawGrid,
+        FullHEALPixGrid,
+        FullOctaHEALPixGrid
 
-    # INTERPOLATION
-    export  AbstractInterpolator,
-            GridGeometry,
-            AbstractLocator,
-            AnvilLocator,
-            AnvilInterpolator,
-            DEFAULT_INTERPOLATOR
+export  OctahedralGaussianGrid,
+        OctahedralClenshawGrid,
+        HEALPixGrid,
+        OctaHEALPixGrid
 
-    export  interpolate,
-            interpolate!,
-            update_locator,
-            update_locator!
+# GRID FUNCTIONS
+export  grids_match,
+        get_truncation,
+        get_resolution,
+        get_nlat,
+        get_nlat_half,
+        get_npoints,
+        get_latdlonds,
+        get_latd,
+        get_lond,
+        each_index_in_ring,
+        each_index_in_ring!,
+        eachgridpoint,
+        eachring,
+        whichring,
+        get_nlons,
+        get_nlon_max,
+        get_quadrature_weights,
+        get_solid_angles
 
-    include("utility_functions.jl")
+# INTERPOLATION
+export  AbstractInterpolator,
+        GridGeometry,
+        AbstractLocator,
+        AnvilLocator,
+        AnvilInterpolator,
+        DEFAULT_INTERPOLATOR
 
-    include("grids_general.jl")
-    include("show.jl")
-    include("full_grids.jl")
-    include("octahedral.jl")
-    include("healpix.jl")
-    include("octahealpix.jl")
-    include("quadrature_weights.jl")
-    include("interpolation.jl")
+export  interpolate,
+        interpolate!,
+        update_locator,
+        update_locator!
+
+include("utility_functions.jl")
+
+include("grids_general.jl")
+include("show.jl")
+include("full_grids.jl")
+include("octahedral.jl")
+include("healpix.jl")
+include("octahealpix.jl")
+include("quadrature_weights.jl")
+include("interpolation.jl")
 end

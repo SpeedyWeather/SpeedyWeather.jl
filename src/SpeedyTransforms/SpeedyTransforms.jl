@@ -1,5 +1,8 @@
 module SpeedyTransforms
 
+using DocStringExtensions
+
+
 # NUMERICS
 import AssociatedLegendrePolynomials as Legendre
 import AbstractFFTs
