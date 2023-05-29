@@ -1,20 +1,22 @@
 # SpeedyWeather.jl
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml)
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/stable/)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/dev/)
 
-SpeedyWeather.jl is a global atmospheric model with simple physics which is developed as a computational playground
+SpeedyWeather.jl is a global spectral atmospheric model with simple physics which is developed as a research playground
 with an everything-flexible attitude as long as it is speedy. With minimal code redundancies it supports
 
-- any number format and precision (32 and 64 bits, 16 bits in development)
-- different architectures (x86 and arm, GPUs in development)
-- different physical models (barotropic vorticity, shallow water, primitive equations dry core; wet core in development)
+- different physical models (barotropic vorticity, shallow water, primitive equations dry and wet core)
+- physics parameterizations for precipitation, boundary layer, etc; new ones are passed as argument to the model constructor
 - different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
 - different horizontal resolutions (T31 to T1023 and higher, i.e. 400km to 10km using linear, quadratic or cubic truncation)
+- 32-bit single and 64-bit double precision (16 bits in development)
 - multi-threading, layer-wise for dynamics, grid point-wise for physics (multi-processing in development)
+- different architectures (x86 and arm, GPUs in development)
 
 and Julia will compile to these choices just-in-time.
 
-For an overview of the functionality and explanation see the (always somehow incomplete)
+For an overview of the functionality and explanation see the
 [documentation](https://speedyweather.github.io/SpeedyWeather.jl/dev).
 
 ## Gallery
@@ -33,28 +35,22 @@ https://user-images.githubusercontent.com/25530332/229872856-bdcab69a-2226-4e9b-
 
 ## Example use
 
-SpeedyWeather.jl is currently developed. Some things work, some don't. Stay tuned.
-The main interface to SpeedyWeather.jl is 
+SpeedyWeather.jl is currently developed. Some things work, some don't. Stay tuned or talk to us by raising an [issue]([url](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues)) to express interest as a user or developer.
+All contributions always welcome.
+
+With v0.6 the interface to SpeedyWeather.jl is split in 4 steps
 
 ```julia
-julia> using SpeedyWeather
-julia> run_speedy(ShallowWater, n_days=30, trunc=63, Grid=OctahedralGaussianGrid, output=true)
-Weather is speedy run 1: 100%|███████████████████████████████████| Time: 0:00:04 (1498.70 years/day)
+spectral_grid = SpectralGrid(PrimitiveDry, trunc=31, Grid=OctahedralGaussianGrid, nlev=8) # 1, define grid 
+model = Model(;spectral_grid, orography = EarthOrography(spectral_grid))                  # 2, create model
+simulation = initialize!(model)                                                           # 3, initialize
+run!(simulation,n_days=10,output=true)                                                    # 4, run
+Weather is speedy: run 0001 100%|█████████| Time: 0:00:04 (531.88 years/day)
 ```
 
-Hurray! In 4 seconds we just simulated 30 days of the Earth's atmosphere at a speed of 1500 years per day.
-This simulation used a T63 spectral resolution on an octahedral Gaussian grid (~165km resolution) solving
-the shallow water equations. The arguments for `run_speedy` are described in
-[`src/default_parameters.jl`](https://github.com/milankl/SpeedyWeather.jl/blob/main/src/default_parameters.jl).
-
-To run the primitive equation dry core you can for example do
-
-```julia
-julia> run_speedy(Float32, PrimitiveDry, physics=true, diffusion=HyperDiffusion(power=2))
-Weather is speedy: 100%|███████████████████████████████████| Time: 0:00:03 (753.71 years/day)
-```
-
-The arguments here use single precision (Float32), enable physics (Held-Suarez forcing and boundary layer drag) and use biharmonic diffusion (default `power=4`).
+Hurray! In 4 seconds we just simulated 10 days of the Earth's atmosphere at a speed of 500 years per day.
+This simulation used a T31 spectral resolution on an octahedral Gaussian grid (~400km resolution) solving
+the dry primitive equations.
 
 ## History
 
@@ -72,14 +68,17 @@ SpeedyWeather.jl is then adopted from [first translations to Julia](https://gith
 SpeedyWeather.jl defines several submodules that are technically stand-alone (with dependencies) but aren't separated
 out to their own packages for now
 
-- __LowerTriangularMatrices__, a module that defines `LowerTriangularMatrix` (among others) used for the spherical harmonic coefficients
-- __RingGrids__, a module that defines several iso-latitude ring-based spherical grids (like the FullGaussianGrid or the HEALPixGrid) and interpolations between them
-- __SpeedyTransforms__, a module that defines the spherical harmonic transform between spectral space (for which LowerTriangularMatrices is used) and grid-point space (as defined by RingGrids).
+- [__RingGrids__](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/), a module that defines several iso-latitude ring-based spherical grids (like the FullGaussianGrid or the HEALPixGrid) and interpolations between them
+- [__LowerTriangularMatrices__](https://speedyweather.github.io/SpeedyWeather.jl/dev/lowertriangularmatrices/), a module that defines `LowerTriangularMatrix` used for the spherical harmonic coefficients
+- [__SpeedyTransforms__](https://speedyweather.github.io/SpeedyWeather.jl/dev/speedytransforms/), a module that defines the spherical harmonic transform between spectral space (for which LowerTriangularMatrices is used) and grid-point space (as defined by RingGrids).
 
 These modules can also be used independently of SpeedyWeather like so
 ```julia
-julia> import SpeedyWeather: LowerTriangularMatrices, RingGrids, SpeedyTransforms
+julia> using SpeedyWeather: LowerTriangularMatrices, RingGrids, SpeedyTransforms
 ```
+check out their documentation: [RingGrids](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/), 
+[LowerTriangularMatrices](https://speedyweather.github.io/SpeedyWeather.jl/dev/lowertriangularmatrices/), 
+[SpeedyTransforms](https://speedyweather.github.io/SpeedyWeather.jl/dev/speedytransforms/).
 
 ## Installation
 
@@ -87,17 +86,14 @@ SpeedyWeather.jl is registered in Julia's registry, so open the package manager 
 ```julia
 (@v1.8) pkg> add SpeedyWeather
 ```
-which will install the latest release and all dependencies automatically. The very latest version is installed with
-```julia
-(@v1.8) pkg> add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
-```
-which pulls directly from the `#main` branch. Please use the current minor version of Julia,
+which will install the [latest release]([url](https://github.com/SpeedyWeather/SpeedyWeather.jl/releases)) and all dependencies automatically. For more information see the [Installation](https://speedyweather.github.io/SpeedyWeather.jl/dev/installation/) in the documentation.
+Please use the current minor version of Julia,
 compatibilities with older versions are not guaranteed.
 
 ## Copyright and license
 
-Copyright (c) 2020 Milan Kloewer for SpeedyWeather.jl
-Copyright (c) 2021 The SpeedyWeather.jl Contributors for SpeedyWeather.jl
-Copyright (c) 2022 Fred Kucharski and Franco Molteni for SPEEDY parametrization schemes
+Copyright (c) 2020 Milan Kloewer for SpeedyWeather.jl  
+Copyright (c) 2021 The SpeedyWeather.jl Contributors for SpeedyWeather.jl  
+Copyright (c) 2022 Fred Kucharski and Franco Molteni for SPEEDY parametrization schemes  
 
 Software licensed under the [MIT License](LICENSE.txt).
