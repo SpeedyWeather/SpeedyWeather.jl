@@ -65,7 +65,7 @@ struct SpectralTransform{NF<:AbstractFloat}
 end
 
 """
-    S = SpectralTransform(NF,Grid,trunc,recompute_legendre)
+    S = SpectralTransform(NF,Grid,trunc)
 
 Generator function for a SpectralTransform struct. With `NF` the number format,
 `Grid` the grid type `<:AbstractGrid` and spectral truncation `trunc` this function sets up
@@ -73,9 +73,9 @@ necessary constants for the spetral transform. Also plans the Fourier transforms
 and preallocates the Legendre polynomials (if recompute_legendre == false) and quadrature weights."""
 function SpectralTransform( ::Type{NF},                     # Number format NF
                             Grid::Type{<:AbstractGrid},     # type of spatial grid used
-                            trunc::Int,                     # Spectral truncation
-                            recompute_legendre::Bool;       # re or precompute legendre polynomials?
-                            legendre_shortcut::Symbol=:linear,   # shorten Legendre loop over order m
+                            trunc::Int;                     # Spectral truncation
+                            recompute_legendre::Bool = true,        # re or precompute legendre polynomials?
+                            legendre_shortcut::Symbol = :linear,    # shorten Legendre loop over order m
                             dealiasing::Real=DEFAULT_DEALIASING
                             ) where NF
 
@@ -264,12 +264,12 @@ end
 Generator function for a `SpectralTransform` struct based on the size of the spectral
 coefficients `alms` and the grid `Grid`. Recomputes the Legendre polynomials by default."""
 function SpectralTransform( alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
-                            recompute_legendre::Bool=true,      # saves memory
-                            Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
+                            recompute_legendre::Bool = true,    # saves memory
+                            Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
                             ) where NF                          # number format NF
 
     _, mmax = size(alms) .- 1                           # -1 for 0-based degree l, order m
-    return SpectralTransform(NF,Grid,mmax,recompute_legendre)
+    return SpectralTransform(NF,Grid,mmax;recompute_legendre)
 end
 
 """
@@ -284,7 +284,7 @@ function SpectralTransform( map::AbstractGrid{NF};          # gridded field
 
     Grid = typeof(map)
     trunc = get_truncation(map)
-    return SpectralTransform(NF,Grid,trunc,recompute_legendre)
+    return SpectralTransform(NF,Grid,trunc;recompute_legendre)
 end
 
 """
@@ -549,12 +549,12 @@ Spectral transform (spectral to grid space) from spherical coefficients `alms` t
 field `map`. Based on the size of `alms` the grid type `grid`, the spatial resolution is retrieved based
 on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `gridded(alms,S)`."""
 function gridded(   alms::AbstractMatrix{T};            # spectral coefficients
-                    recompute_legendre::Bool=true,      # saves memory
-                    Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
+                    recompute_legendre::Bool = true,    # saves memory
+                    Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
                     ) where {NF,T<:Complex{NF}}         # number format NF
 
     _, mmax = size(alms) .- 1                           # -1 for 0-based degree l, order m
-    S = SpectralTransform(NF,Grid,mmax,recompute_legendre)
+    S = SpectralTransform(NF,Grid,mmax;recompute_legendre)
     return gridded(alms,S)
 end
 
@@ -595,12 +595,12 @@ end
 
 Converts `map` to `Grid(map)` to execute `spectral(map::AbstractGrid;kwargs...)`."""
 function spectral(  map::AbstractGrid{NF};          # gridded field
-                    recompute_legendre::Bool=true,  # saves memory
+                    recompute_legendre::Bool = true,# saves memory
                     ) where NF                      # number format NF
 
     Grid = typeof(map)
     trunc = get_truncation(map.nlat_half)
-    S = SpectralTransform(NF,Grid,trunc,recompute_legendre)
+    S = SpectralTransform(NF,Grid,trunc;recompute_legendre)
     return spectral(map,S)
 end
 

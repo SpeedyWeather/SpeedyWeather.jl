@@ -1,24 +1,23 @@
 """
-    parameterization_tendencies!(   diagn::DiagnosticVariables,
-                                    time::DateTime,
-                                    M::PrimitiveEquation)
-
+$(TYPEDSIGNATURES)
 Compute tendencies for u,v,temp,humid from physical parametrizations.
 Extract for each vertical atmospheric column the prognostic variables
 (stored in `diagn` as they are grid-point transformed), loop over all
 grid-points, compute all parametrizations on a single-column basis,
 then write the tendencies back into a horizontal field of tendencies.
 """
-function parameterization_tendencies!(  diagn::DiagnosticVariables,
-                                        time::DateTime,
-                                        model::PrimitiveEquation)
+function parameterization_tendencies!(
+    diagn::DiagnosticVariables,
+    time::DateTime,
+    model::PrimitiveEquation,
+)
 
+    (;boundary_layer_drag) = model
+    (;temperature_relaxation) = model
+    # (;vertical_diffusion) = model
+    (;static_energy_diffusion) = model
+    
     G = model.geometry
-    boundary_layer_scheme = model.parameters.boundary_layer
-    temperature_relax_scheme = model.parameters.temperature_relaxation
-    vertical_diffusion_scheme = model.parameters.vertical_diffusion
-    static_energy_diffusion_scheme = model.parameters.static_energy_diffusion
-
     rings = eachring(G.Grid,G.nlat_half)
 
     @floop for ij in eachgridpoint(diagn)       # loop over all horizontal grid points
@@ -34,12 +33,12 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables,
         get_thermodynamics!(column,model)
 
         # VERTICAL DIFFUSION
-        vertical_diffusion!(column,vertical_diffusion_scheme,model)
-        static_energy_diffusion!(column,static_energy_diffusion_scheme,model)
+        # vertical_diffusion!(column,vertical_diffusion,model)
+        static_energy_diffusion!(column,static_energy_diffusion)
 
         # HELD-SUAREZ
-        temperature_relaxation!(column,temperature_relax_scheme,model)
-        boundary_layer!(column,boundary_layer_scheme,model)
+        temperature_relaxation!(column,temperature_relaxation)
+        boundary_layer_drag!(column,boundary_layer_drag)
 
         # Calculate parametrizations (order of execution is important!)
         # convection!(column,model)
@@ -51,27 +50,33 @@ function parameterization_tendencies!(  diagn::DiagnosticVariables,
         # vertical_diffusion!(column,M)
 
         # sum fluxes on half levels up and down for every layer
-        fluxes_to_tendencies!(column,model)
+        fluxes_to_tendencies!(column,model.geometry,model.constants)
 
         # write tendencies from parametrizations back into horizontal fields
         write_column_tendencies!(diagn,column,ij)
     end
 end
 
-function fluxes_to_tendencies!( column::ColumnVariables{NF},
-                                model::PrimitiveEquation) where NF
+"""
+$(TYPEDSIGNATURES)
+Convert the fluxes on half levels to tendencies on full levels."""
+function fluxes_to_tendencies!(
+    column::ColumnVariables,
+    geometry::Geometry,
+    constants::DynamicsConstants,
+)
     
     (;nlev,u_tend,flux_u_upward,flux_u_downward) = column
     (;v_tend,flux_v_upward,flux_v_downward) = column
     (;humid_tend,flux_humid_upward,flux_humid_downward) = column
     (;temp_tend,flux_temp_upward,flux_temp_downward) = column
 
-    Δσ = model.geometry.σ_levels_thick
+    Δσ = geometry.σ_levels_thick
     pₛ = column.pres[end]               # surface pressure
 
     # # g/pₛ and g/(pₛ*cₚ), see Fortran SPEEDY documentation eq. (3,5)
-    g_pₛ = convert(NF,model.constants.gravity/pₛ)
-    g_pₛ_cₚ = g_pₛ/convert(NF,model.parameters.cₚ)
+    g_pₛ = constants.gravity/pₛ
+    g_pₛ_cₚ = g_pₛ/constants.cₚ
 
     # fluxes are defined on half levels including top k=1/2 and surface k=nlev+1/2
     @inbounds for k in 1:nlev

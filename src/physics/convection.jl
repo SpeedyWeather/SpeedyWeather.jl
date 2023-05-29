@@ -1,9 +1,5 @@
 """
-    diagnose_convection!(
-        column::ColumnVariables{NF},
-        model::PrimitiveEquation,
-    )
-
+$(TYPEDSIGNATURES)
 Check whether the convection scheme should be activated in the given atmospheric column.
 
 1. A conditional instability exists when the saturation moist energy (MSS) decreases with
@@ -28,16 +24,13 @@ boundary of the full level k.
 
 The top-of-convection (TCN) layer, or cloud-top, is the largest value of k for which
 condition 1 is satisfied. The cloud-top layer may be subsequently adjusted upwards by the
-large-scale condensation parameterization, which is executed after this one.
-"""
-function diagnose_convection!(
-    column::ColumnVariables{NF},
-    model::PrimitiveEquation,
-) where {NF<:AbstractFloat}
+large-scale condensation parameterization, which is executed after this one."""
+function diagnose_convection!(column::ColumnVariables,convection::SpeedyConvection)
+
     (; alhc,pres_ref ) = model.parameters
     (; pres_thresh_cnv, RH_thresh_pbl_cnv ) = model.constants
     (; nlev ) = column
-    (; humid, pres, sat_humid, dry_static_energy, moist_static_energy,
+    (; humid, pres, sat_humid, moist_static_energy,
     sat_moist_static_energy, sat_moist_static_energy_half) = column
 
     if pres[end] > pres_thresh_cnv
@@ -88,6 +81,9 @@ function diagnose_convection!(
     end
     return nothing
 end
+
+convection!(column::ColumnVariables,model::PrimitiveDry) = nothing
+convection!(column::ColumnVariables,model::PrimitiveWet) = convection!(column,model.convection)
 
 """
     convection!(
@@ -195,3 +191,69 @@ function convection!(
 
     return nothing
 end
+
+
+    # # Compute the entrainment coefficients for the convection parameterization.
+    # (;max_entrainment) = P
+    # entrainment_profile = zeros(nlev)
+    # for k = 2:nlev-1
+    #     entrainment_profile[k] = max(0, (σ_levels_full[k] - 0.5)^2)
+    # end
+
+    # # profile as fraction of cloud-base mass flux
+    # entrainment_profile /= sum(entrainment_profile)  # Normalise
+    # entrainment_profile *= max_entrainment           # fraction of max entrainment
+
+    # # PARAMETRIZATIONS
+    # # Large-scale condensation (occurs when relative humidity exceeds a given threshold)
+    # RH_thresh_pbl_lsc::NF    # Relative humidity threshold for LSC in PBL
+    # RH_thresh_range_lsc::NF  # Vertical range of relative humidity threshold
+    # RH_thresh_max_lsc ::NF   # Maximum relative humidity threshold
+    # humid_relax_time_lsc::NF # Relaxation time for humidity (hours)
+
+    # # Convection
+    # pres_thresh_cnv::NF            # Minimum (normalised) surface pressure for the occurrence of convection
+    # RH_thresh_pbl_cnv::NF          # Relative humidity threshold for convection in PBL
+    # RH_thresh_trop_cnv::NF         # Relative humidity threshold for convection in the troposphere
+    # humid_relax_time_cnv::NF       # Relaxation time for PBL humidity (hours)
+    # max_entrainment::NF            # Maximum entrainment as a fraction of cloud-base mass flux
+    # ratio_secondary_mass_flux::NF  # Ratio between secondary and primary mass flux at cloud-base
+
+
+    # "For computing saturation vapour pressure"
+    # magnus_coefs::Coefficients = MagnusCoefs{NF}()
+
+    # # Large-Scale Condensation (from table B10)
+    # "Index of atmospheric level at which large-scale condensation begins"
+    # k_lsc::Int = 2
+
+    # "Relative humidity threshold for boundary layer"
+    # RH_thresh_pbl_lsc::Float64 = 0.95
+
+    # "Vertical range of relative humidity threshold"
+    # RH_thresh_range_lsc::Float64 = 0.1
+
+    # "Maximum relative humidity threshold"
+    # RH_thresh_max_lsc::Float64 = 0.9
+
+    # "Relaxation time for humidity (hours)"
+    # humid_relax_time_lsc::Float64 = 4.0
+
+    # # Convection
+    # "Minimum (normalised) surface pressure for the occurrence of convection"
+    # pres_thresh_cnv::Float64 = 0.8
+
+    # "Relative humidity threshold for convection in PBL"
+    # RH_thresh_pbl_cnv::Float64 = 0.9
+
+    # "Relative humidity threshold for convection in the troposphere"
+    # RH_thresh_trop_cnv::Float64 = 0.7
+
+    # "Relaxation time for PBL humidity (hours)"
+    # humid_relax_time_cnv::Float64 = 6.0
+
+    # "Maximum entrainment as a fraction of cloud-base mass flux"
+    # max_entrainment::Float64 = 0.5
+
+    # "Ratio between secondary and primary mass flux at cloud-base"
+    # ratio_secondary_mass_flux::Float64 = 0.8

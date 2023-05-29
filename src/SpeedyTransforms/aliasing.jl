@@ -14,7 +14,7 @@ end
 
 """
     m = roundup_fft(n::Int;
-                    small_primes::Vector{Int}=[2,3])
+                    small_primes::Vector{Int}=[2,3,5])
 
 Returns an integer `m >= n` with only small prime factors 2, 3 (default, others can be specified
 with the keyword argument `small_primes`) to obtain an efficiently fourier-transformable number of

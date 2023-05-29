@@ -50,10 +50,10 @@ spectral_resolutions_inexact = (127,255)
                             FullHEALPixGrid,
                             FullOctaHEALPixGrid)
 
-                p,d,m = initialize_speedy(NF;trunc,Grid)
-                S = m.spectral_transform
+                SG = SpectralGrid(NF;trunc,Grid)
+                S = SpectralTransform(SG)
 
-                alms = copy(p.layers[1].timesteps[1].vor)
+                alms = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
                 fill!(alms,0)
                 alms[1,1] = 1
 
@@ -70,14 +70,15 @@ end
 @testset "Transform: Recompute, precompute identical results" begin
     for trunc in spectral_resolutions
         for NF in (Float32,Float64)
-            p1,d1,m1 = initialize_speedy(NF;trunc,recompute_legendre=false)
-            p2,d2,m2 = initialize_speedy(NF;trunc,recompute_legendre=true)
 
-            (;vor) = p1.layers[1].timesteps[1]
-            alms = randn(typeof(vor),size(vor)...)
+            SG = SpectralGrid(NF;trunc)
+            S1 = SpectralTransform(SG,recompute_legendre=true)
+            S2 = SpectralTransform(SG,recompute_legendre=false)
 
-            map1 = gridded(alms,m1.spectral_transform)
-            map2 = gridded(alms,m2.spectral_transform)
+            alms = randn(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
+
+            map1 = gridded(alms,S1)
+            map2 = gridded(alms,S2)
         
             # is only approx as recompute_legendre may use a different precision
             @test map1 ≈ map2
@@ -93,13 +94,13 @@ end
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid)
 
-                P = Parameters{SpeedyWeather.BarotropicModel}(;NF,trunc,Grid)
-                S = SpectralTransform(P)
+                SG = SpectralGrid(NF;trunc,Grid)
+                S = SpectralTransform(SG,recompute_legendre=true)
 
                 lmax = 3
                 for l in 1:lmax
                     for m in 1:l
-                        alms = zeros(LowerTriangularMatrix{Complex{NF}},S.lmax+2,S.mmax+1)
+                        alms = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
                         alms[l,m] = 1
 
                         map = gridded(alms,S)
@@ -122,13 +123,14 @@ end
                                     OctaHEALPixGrid,
                                     FullHEALPixGrid,
                                     FullOctaHEALPixGrid)
-                P = Parameters{SpeedyWeather.BarotropicModel}(;NF,trunc,Grid)
-                S = SpectralTransform(P)
+                
+                SG = SpectralGrid(NF;trunc,Grid)
+                S = SpectralTransform(SG,recompute_legendre=true)
 
                 lmax = 3
                 for l in 1:lmax
                     for m in 1:l
-                        alms = zeros(LowerTriangularMatrix{Complex{NF}},S.lmax+2,S.mmax+1)
+                        alms = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
                         alms[l,m] = 1
 
                         map = gridded(alms,S)
@@ -157,21 +159,13 @@ end
                 # clenshaw-curtis grids are only exact for cubic truncation
                 dealiasing = Grid in (FullGaussianGrid,OctahedralGaussianGrid) ? 2 : 3
 
-                P = Parameters{SpeedyWeather.ShallowWaterModel}(;NF,Grid,trunc,dealiasing)
-                S = SpectralTransform(P)
-                G = Geometry(P)
-                B = Boundaries(P,S,G)
+                SG = SpectralGrid(NF;trunc,Grid,dealiasing)
+                S = SpectralTransform(SG,recompute_legendre=false)
+                O = EarthOrography(SG,smoothing=true,smoothing_truncation=31)
+                initialize!(O,SpeedyWeather.Earth(),S,Geometry(SG))
 
-                oro_grid = B.orography.orography
+                oro_grid = O.orography
                 oro_spec = spectral(oro_grid,S)
-
-                # smooth orography
-                lmax = 30
-                for m in 1:trunc+1
-                    for l in max(lmax,m):trunc+2
-                        oro_spec[l,m] = 0
-                    end
-                end 
 
                 oro_grid1 = gridded(oro_spec,S)
                 oro_spec1 = spectral(oro_grid1,S)

@@ -50,7 +50,7 @@ the shallow water equations. The arguments for `run_speedy` are described in
 To run the primitive equation dry core you can for example do
 
 ```julia
-julia> run_speedy(Float32, PrimitiveDryCore, physics=true, diffusion=HyperDiffusion(power=2))
+julia> run_speedy(Float32, PrimitiveDry, physics=true, diffusion=HyperDiffusion(power=2))
 Weather is speedy: 100%|███████████████████████████████████| Time: 0:00:03 (753.71 years/day)
 ```
 

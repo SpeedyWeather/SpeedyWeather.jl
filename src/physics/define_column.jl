@@ -1,10 +1,9 @@
 """
-    column = ColumnVariables{NF<:AbstractFloat}
-
 Mutable struct that contains all prognostic (copies thereof) and diagnostic variables in a single column
 needed to evaluate the physical parametrizations. For now the struct is mutable as we will reuse the struct
 to iterate over horizontal grid points. Every column vector has `nlev` entries, from [1] at the top to
-[end] at the lowermost model level at the planetary boundary layer."""
+[end] at the lowermost model level at the planetary boundary layer.
+$(TYPEDFIELDS)"""
 Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnVariables{NF}
 
     # DIMENSIONS
@@ -120,6 +119,3 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     rel_hum::Vector{NF} = fill(NF(NaN), nlev) # Relative humidity
     grad_dry_static_energy::NF = NF(NaN)      # gradient of dry static energy
 end
-
-# use Float64 if not provided
-ColumnVariables(;kwargs...) = ColumnVariables{Float64}(;kwargs...)

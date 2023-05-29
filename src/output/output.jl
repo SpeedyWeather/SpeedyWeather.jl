@@ -1,241 +1,298 @@
-Base.@kwdef mutable struct Output{NF<:Union{Float32,Float64}} <: AbstractOutput
-    # NF: output only in Float32/64
+"""
+Number of mantissa bits to keep for each prognostic variable when compressed for
+netCDF and .jld2 data output.
+$(TYPEDFIELDS)"""
+@with_kw struct Keepbits
+    u::Int = 7
+    v::Int = 7
+    vor::Int = 5
+    div::Int = 5
+    temp::Int = 10
+    pres::Int = 12
+    humid::Int = 7
+end
 
+function Base.show(io::IO,K::Keepbits)
+    print(io,"$(typeof(K))(")
+    for key in propertynames(K)
+        val = getfield(K,key)
+        print(io,"$key=$val, ")
+    end
+    print(")")
+end
+
+# default number format for output
+const DEFAULT_OUTPUT_NF = Float32
+
+"""
+$(TYPEDSIGNATURES)
+NetCDF output writer. Contains all output options and auxiliary fields for output interpolation.
+To be initialised with `OutputWriter(::SpectralGrid,::TimeStepper,kwargs...)` to pass on the
+resolution/time stepping information from those structs. Options include
+$(TYPEDFIELDS)"""
+Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelSetup} <: AbstractOutputWriter
+
+    spectral_grid::SpectralGrid{Model}
+
+    # FILE OPTIONS
     output::Bool = false                    # output to netCDF?
-    output_vars::Vector{Symbol}=[:none]     # vector of output variables as Symbols
-    write_restart::Bool = false             # also write restart file if output==true?
-    
+    path::String = pwd()                    # path to output folder
+    id::Union{String,Int} = ""              # run identification number/string
+    run_path::String = ""                   # will be determined in initalize!
+    filename::String = "output.nc"          # name of the output netcdf file
+    write_restart::Bool = true              # also write restart file if output==true?
+    pkg_version::VersionNumber = pkgversion(SpeedyWeather)
+
+    # WHAT/WHEN OPTIONS
     startdate::DateTime = DateTime(2000,1,1)
+    output_dt::Float64 = 6                  # output time step [hours]
+    output_vars::Vector{Symbol} = default_output_vars(Model)   # vector of output variables as Symbols
+    missing_value::NF = NaN                 # missing value to be used in netcdf output
+
+    # COMPRESSION OPTIONS
+    compression_level::Int = 3              # compression level; 1=low but fast, 9=high but slow
+    keepbits::Keepbits = Keepbits()         # mantissa bits to keep for every variable
+
+    # TIME STEPS AND COUNTERS (initialize later)
+    output_every_n_steps::Int = 0           # output frequency
     timestep_counter::Int = 0               # time step counter
     output_counter::Int = 0                 # output step counter
-    n_timesteps::Int = 0                    # number of time steps
-    n_outputsteps::Int = 0                  # number of time steps with output
-    output_every_n_steps::Int = 0           # output every n time steps
     
-    run_id::String = "-1"                   # run identification number
-    run_path::String = ""                   # output path plus run????/
-
-    # the netcdf file to be written into
+    # the netcdf file to be written into, will be create
     netcdf_file::Union{NcFile,Nothing} = nothing
 
-    # grid specifications
-    output_matrix::Bool = false             # if true sort grid points into a matrix (interpolation-free)
+    # INPUT GRID (the one used in the dynamical core)
+    input_Grid::Type{<:AbstractGrid} = spectral_grid.Grid
+    
+    # Output as matrix (particularly for reduced grids)
+    as_matrix::Bool = false                 # if true sort grid points into a matrix (interpolation-free)
                                             # full grid for output if output_matrix == false
-    output_Grid::Type{<:AbstractFullGrid} = FullGaussianGrid   
-    nlat_half::Int = 0                      # size of the input/output grid
-    nlon::Int = 0                           # number of longitude/latitude points
-    nlat::Int = 0
+    quadrant_rotation::NTuple{4,Int} = (0,1,2,3)    # rotation of output quadrant
+                                                    # matrix of output quadrant
+    matrix_quadrant::NTuple{4,Tuple{Int,Int}} = ((2,2),(1,2),(1,1),(2,1))
     
-    # input grid for interpolation
-    input_Grid::Type{<:AbstractGrid} = FullGaussianGrid
-    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(input_Grid,0,0)
-    
+    # OUTPUT GRID
+    output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid(input_Grid)
+    nlat_half::Int = spectral_grid.nlat_half                # default: same nlat_half for in/output
+    nlon::Int = as_matrix ? RingGrids.matrix_size(input_Grid,spectral_grid.nlat_half)[1] :
+                                                    RingGrids.get_nlon(output_Grid,nlat_half)
+    nlat::Int =  as_matrix ? RingGrids.matrix_size(input_Grid,spectral_grid.nlat_half)[2] :
+                                                    RingGrids.get_nlat(output_Grid,nlat_half)
+    npoints::Int = nlon*nlat
+    nlev::Int = spectral_grid.nlev
+    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(input_Grid,spectral_grid.nlat_half,npoints)
+
     # fields to output (only one layer, reuse over layers)
-    u::Matrix{NF} = zeros(0,0)              # zonal velocity
-    v::Matrix{NF} = zeros(0,0)              # meridional velocity
-    vor::Matrix{NF} = zeros(0,0)            # relative vorticity
-    div::Matrix{NF} = zeros(0,0)            # divergence
-    pres::Matrix{NF} = zeros(0,0)           # pressure
-    temp::Matrix{NF} = zeros(0,0)           # temperature
-    humid::Matrix{NF} = zeros(0,0)          # humidity
+    const u::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const v::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const vor::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const div::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const temp::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const pres::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const humid::Matrix{NF} = fill(missing_value,nlon,nlat)
 end
 
-Output() = Output{Float32}()
+# generator function pulling grid resolution and time stepping from ::SpectralGrid and ::TimeStepper
+function OutputWriter(
+    spectral_grid::SpectralGrid{Model};
+    NF::Type{<:Union{Float32,Float64}} = DEFAULT_OUTPUT_NF,
+    kwargs...
+) where Model
+    return OutputWriter{NF,Model}(;spectral_grid,kwargs...)
+end
 
-"""
-    run_id = get_run_id(output, output_path)
+# default variables to output by model
+default_output_vars(::Type{<:Barotropic}) = [:vor,:u]
+default_output_vars(::Type{<:ShallowWater}) = [:vor,:u]
+default_output_vars(::Type{<:PrimitiveDry}) = [:vor,:u,:temp,:pres]
+default_output_vars(::Type{<:PrimitiveWet}) = [:vor,:u,:temp,:humid,:pres]
 
-Checks existing `run-????` folders in output path to determine a 4-digit `run_id` number. 
-"""
-function get_run_id(output, output_path)
-
-    if output 
-        # pull list of existing run???? folders via readdir
-        pattern = r"run-\d\d\d\d"                # run-???? in regex
-        runlist = filter(x->startswith(x,pattern),readdir(output_path))
-        runlist = filter(x->endswith(  x,pattern),runlist)
-        existing_runs = [parse(Int,id[5:end]) for id in runlist]
-
-        # get the run id from existing folders
-        if length(existing_runs) == 0           # if no runfolder exists yet
-            run_id = 1                          # start with run0001
-        else
-            run_id = maximum(existing_runs)+1   # next run gets id +1
-        end
-        
-        return @sprintf("%04d",run_id)
-    else
-        return "-1"
+# print all fields with type <: Number
+function Base.show(io::IO,O::AbstractOutputWriter)
+    print(io,"$(typeof(O)):")
+    for key in propertynames(O)
+        val = getfield(O,key)
+        val isa Union{Number,String,DataType,NTuple,Vector{Symbol},UnionAll,Keepbits} &&
+            print(io,"\n $key::$(typeof(val)) = $val")
     end
 end
 
 """
-    run_id, run_path = get_run_id_path(P::Parameters)
-
-Creates a new folder `run-*` with the `run_id`. Also returns the full path
-`run_path` of that folder. Returns `-1, "no runpath"` in the case of no output.
-"""
-function get_run_id_path(P::Parameters)
-
-    (; output, output_path, run_id ) = P
-
-    if output
-        run_path = joinpath(output_path,string("run-",run_id_string(run_id)))
-        @assert !(string("run-",run_id) in readdir(output_path)) "Run folder already exists, choose another run_id."
-
-        mkdir(run_path)             # actually create the folder
-        return run_id, run_path
-    else
-        return run_id, "no runpath"
-    end
-end
-
-run_id_string(run_id::Integer) = @sprintf("%04d",run_id)
-run_id_string(run_id::String) = run_id
-
-"""
-    outputter = initialize_netcdf_output(   progn::PrognosticVariables,
-                                            diagn::DiagnosticVariables,
-                                            M::ModelSetup)
-
+$(TYPEDSIGNATURES)
 Creates a netcdf file on disk and the corresponding `netcdf_file` object preallocated with output variables
-and dimensions. `write_netcdf_output!` then writes consecuitive time steps into this file.
+and dimensions. `write_output!` then writes consecuitive time steps into this file.
 """
-function initialize_netcdf_output(  diagn::DiagnosticVariables,
-                                    M::ModelSetup)
-
-    M.parameters.output || return Output()          # escape directly when no netcdf output
-
+function initialize!(   
+    output::OutputWriter{output_NF,Model},
+    feedback::AbstractFeedback,
+    time_stepping::TimeStepper,
+    diagn::DiagnosticVariables,
+    model::Model
+) where {output_NF,Model}
+    
+    output.output || return nothing     # exit immediately for no output
+    
     # DEFINE NETCDF DIMENSIONS TIME
-    (; startdate ) = M.parameters
+    (;startdate) = output
     time_string = "seconds since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     dim_time = NcDim("time",0,unlimited=true)
     var_time = NcVar("time",dim_time,t=Int64,atts=Dict("units"=>time_string,"long_name"=>"time"))
-
+    
     # DEFINE NETCDF DIMENSIONS SPACE
-    (; output_matrix, output_Grid, output_nlat_half, nlev ) = M.parameters
-
-    # if specified (>0) use output resolution via output_nlat_half, otherwise nlat_half from dynamical core
-    nlat_half = output_nlat_half > 0 ? output_nlat_half : M.geometry.nlat_half
-
-    if output_matrix == false   # interpolate onto (possibly different) output grid
+    (;input_Grid, output_Grid, nlat_half, nlev) = output
+    
+    if output.as_matrix == false        # interpolate onto (possibly different) output grid
         lond = get_lond(output_Grid,nlat_half)
         latd = get_latd(output_Grid,nlat_half)
         nlon = length(lond)
         nlat = length(latd)
         lon_name, lon_units, lon_longname = "lon","degrees_east","longitude"
         lat_name, lat_units, lat_longname = "lat","degrees_north","latitude"
-
-    else                        # output grid directly into a matrix (resort grid points, no interpolation)
-        (; nlat_half ) = M.geometry      # don't use output_nlat_half as not supported for output_matrix
-        nlon,nlat = RingGrids.matrix_size(M.geometry.Grid,nlat_half)    # size of the matrix output
-        lond = collect(1:nlon)                                          # just enumerate grid points for lond, latd
+        
+    else                                # output grid directly into a matrix (resort grid points, no interpolation)
+        (;nlat_half) = diagn            # don't use output.nlat_half as not supported for output_matrix
+        nlon,nlat = RingGrids.matrix_size(input_Grid,nlat_half)     # size of the matrix output
+        lond = collect(1:nlon)                                      # just enumerate grid points for lond, latd
         latd = collect(1:nlat)
         lon_name, lon_units, lon_longname = "i","1","horizontal index i"
         lat_name, lat_units, lat_longname = "j","1","horizontal index j"
     end
     
-    σ = M.geometry.σ_levels_full
+    σ = model.geometry.σ_levels_full
     dim_lon = NcDim(lon_name,nlon,values=lond,atts=Dict("units"=>lon_units,"long_name"=>lon_longname))
     dim_lat = NcDim(lat_name,nlat,values=latd,atts=Dict("units"=>lat_units,"long_name"=>lat_longname))
     dim_lev = NcDim("lev",nlev,values=σ,atts=Dict("units"=>"1","long_name"=>"sigma levels"))
-
+    
     # VARIABLES, define every variable here that could be output
-    (; output_NF, compression_level ) = M.parameters
-    missing_value = convert(output_NF,M.parameters.missing_value)
-
+    (;compression_level) = output
+    missing_value = convert(output_NF,output.missing_value)
+    
     # given pres the right name, depending on ShallowWaterModel or PrimitiveEquationModel
-    pres_name = M isa ShallowWaterModel ? "interface displacement" : "surface pressure"
-    pres_unit = M isa ShallowWaterModel ? "m" : "hPa"
-
+    pres_name = Model <: ShallowWater ? "interface displacement" : "surface pressure"
+    pres_unit = Model <: ShallowWater ? "m" : "hPa"
+    
     all_ncvars = (        # define NamedTuple to identify the NcVars by name
     time = var_time,
     u = NcVar("u",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-            atts=Dict("long_name"=>"zonal wind","units"=>"m/s","missing_value"=>missing_value,
-            "_FillValue"=>missing_value)),
+    atts=Dict("long_name"=>"zonal wind","units"=>"m/s","missing_value"=>missing_value,
+    "_FillValue"=>missing_value)),
     v = NcVar("v",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-            atts=Dict("long_name"=>"meridional wind","units"=>"m/s","missing_value"=>missing_value,
-            "_FillValue"=>missing_value)),
+    atts=Dict("long_name"=>"meridional wind","units"=>"m/s","missing_value"=>missing_value,
+    "_FillValue"=>missing_value)),
     vor = NcVar("vor",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-            atts=Dict("long_name"=>"relative vorticity","units"=>"1/s","missing_value"=>missing_value,
-            "_FillValue"=>missing_value)),
+    atts=Dict("long_name"=>"relative vorticity","units"=>"1/s","missing_value"=>missing_value,
+    "_FillValue"=>missing_value)),
     pres = NcVar("pres",[dim_lon,dim_lat,dim_time],t=output_NF,compress=compression_level,
-            atts=Dict("long_name"=>pres_name,"units"=>pres_unit,"missing_value"=>missing_value,
-            "_FillValue"=>missing_value)),
+    atts=Dict("long_name"=>pres_name,"units"=>pres_unit,"missing_value"=>missing_value,
+    "_FillValue"=>missing_value)),
     div = NcVar("div",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-            atts=Dict("long_name"=>"divergence","units"=>"1/s","missing_value"=>missing_value,
-            "_FillValue"=>missing_value)),
+    atts=Dict("long_name"=>"divergence","units"=>"1/s","missing_value"=>missing_value,
+    "_FillValue"=>missing_value)),
     temp = NcVar("temp",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-            atts=Dict("long_name"=>"temperature","units"=>"degC","missing_value"=>missing_value,
-            "_FillValue"=>missing_value)),
+    atts=Dict("long_name"=>"temperature","units"=>"degC","missing_value"=>missing_value,
+    "_FillValue"=>missing_value)),
     humid = NcVar("humid",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-            atts=Dict("long_name"=>"specific humidity","units"=>"1","missing_value"=>missing_value,
-            "_FillValue"=>missing_value)),
+    atts=Dict("long_name"=>"specific humidity","units"=>"1","missing_value"=>missing_value,
+    "_FillValue"=>missing_value)),
     orog = NcVar("orog",[dim_lon,dim_lat],t=output_NF,compress=compression_level,
-            atts=Dict("long_name"=>"orography","units"=>"m","missing_value"=>missing_value,
-            "_FillValue"=>missing_value))
+    atts=Dict("long_name"=>"orography","units"=>"m","missing_value"=>missing_value,
+    "_FillValue"=>missing_value))
     )
+    
+    # GET RUN ID, CREATE FOLDER
+    # get new id only if not already specified
+    output.id = output.id == "" ? get_run_id(output.path) : output.id
+    output.run_path = create_output_folder(output.path,output.id) 
+    
+    feedback.id = output.id         # synchronize with feedback struct
+    feedback.run_path = output.run_path
+    feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
+    feedback.output = true          # if output=true set feedback.output=true too!
 
-    # CREATE NETCDF FILE
-    (; output_filename, output_vars, output_NF ) = M.parameters
-    run_id,run_path = get_run_id_path(M.parameters)     # create output folder and get its id and path
-
-    # vector of NcVars for output
+    
+    # CREATE NETCDF FILE, vector of NcVars for output
+    (; run_path, filename, output_vars) = output
     vars_out = [all_ncvars[key] for key in keys(all_ncvars) if key in vcat(:time,output_vars)]
-    netcdf_file = NetCDF.create(joinpath(run_path,output_filename),vars_out,mode=NetCDF.NC_NETCDF4)
+    output.netcdf_file = NetCDF.create(joinpath(run_path,filename),vars_out,mode=NetCDF.NC_NETCDF4)
     
-    # CREATE OUTPUT STRUCT
-    (; write_restart, startdate ) = M.parameters
-    (; n_timesteps, n_outputsteps, output_every_n_steps ) = M.constants
-
-    u = :u in output_vars ?         fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
-    v = :v in output_vars ?         fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
-    vor = :vor in output_vars ?     fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
-    div = :div in output_vars ?     fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
-    pres = :pres in output_vars ?   fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
-    temp = :temp in output_vars ?   fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
-    humid = :humid in output_vars ? fill(missing_value,nlon,nlat) : zeros(output_NF,0,0)
-
-    # CREATE OUTPUT INTERPOLATOR
-    input_Grid = M.parameters.Grid                      # grid to interpolate from (the on used in dyn core)
-    Interpolator = M.parameters.output_Interpolator     # type of interpolator
-    npoints = get_npoints(output_Grid,nlat_half)        # number of grid points to interpolate onto
-    input_nlat_half = M.geometry.nlat_half
-    interpolator = output_matrix ? Interpolator(input_Grid,0,0) :
-                    Interpolator(output_NF,input_Grid,input_nlat_half,npoints)
+    # INTERPOLATION: PRECOMPUTE LOCATION INDICES
+    latds, londs = RingGrids.get_latdlonds(output_Grid,output.nlat_half)
+    output.as_matrix || RingGrids.update_locator!(output.interpolator,latds,londs)
     
-    # PRECOMPUTE LOCATION INDICES
-    latds, londs = get_latdlonds(output_Grid,nlat_half)
-    output_matrix || update_locator!(interpolator,latds,londs)
-
-    outputter = Output( output=true; output_vars, write_restart, 
-                        startdate, n_timesteps, n_outputsteps,
-                        output_every_n_steps, run_id, run_path,
-                        netcdf_file, 
-                        output_matrix, output_Grid, nlat_half, nlon, nlat,
-                        input_Grid, interpolator,
-                        u, v, vor, div, pres, temp, humid)
-
+    # OUTPUT FREQUENCY
+    output.output_every_n_steps = max(1,floor(Int,output.output_dt/time_stepping.Δt_hrs))
+    
+    # RESET COUNTERS
+    output.timestep_counter = 0         # time step counter
+    output.output_counter = 0           # output step counter
+    
     # WRITE INITIAL CONDITIONS TO FILE
-    write_netcdf_variables!(outputter,diagn,M)
-    write_netcdf_time!(outputter,startdate)
+    write_netcdf_variables!(output,diagn)
+    write_netcdf_time!(output,startdate)
 
-    return outputter
+    # also export parameters into run????/parameters.txt
+    parameters_txt = open(joinpath(output.run_path,"parameters.txt"),"w")
+    println(parameters_txt,model.spectral_grid)
+    println(parameters_txt,model.planet)
+    println(parameters_txt,model.atmosphere)
+    println(parameters_txt,model.time_stepping)
+    println(parameters_txt,model.output)
+    println(parameters_txt,model.initial_conditions)
+    println(parameters_txt,model.horizontal_diffusion)
+    model isa Union{ShallowWater,PrimitiveEquation} && println(parameters_txt,model.implicit)
+    model isa Union{ShallowWater,PrimitiveEquation} && println(parameters_txt,model.orography)
+    close(parameters_txt)
 end
 
-"""write_netcdf_output!(outputter::Output,                      # contains everything for netcdf_file output
-                        time_sec::Int,                          # model time [s] for output
-                        progn::PrognosticVariables,             # all prognostic variables
-                        diagn::DiagnosticVariables,             # all diagnostic variables
-                        M::ModelSetup)                          # all parameters
+"""
+$(TYPEDSIGNATURES)
+Checks existing `run_????` folders in `path` to determine a 4-digit `id` number
+by counting up. E.g. if folder run_0001 exists it will return the string "0002".
+Does not create a folder for the returned run id.
+"""
+function get_run_id(path::String)
+    # pull list of existing run_???? folders via readdir
+    pattern = r"run_\d\d\d\d"               # run_???? in regex
+    runlist = filter(x->startswith(x,pattern),readdir(path))
+    runlist = filter(x->endswith(  x,pattern),runlist)
+    existing_runs = [parse(Int,id[5:end]) for id in runlist]
 
-Writes the variables from `diagn` of time step `i` at time `time_sec` into `netcdf_file`. Simply escapes for no
-netcdf output of if output shouldn't be written on this time step. Converts variables from `diagn` to float32
-for output, truncates the mantissa for higher compression and applies lossless compression."""
-function write_netcdf_output!(  outputter::Output,              # everything for netcdf output
-                                time::DateTime,                 # model time for output
-                                diagn::DiagnosticVariables,     # all diagnostic variables
-                                model::ModelSetup)              # all parameters
+    # get the run id from existing folders
+    if length(existing_runs) == 0           # if no runfolder exists yet
+        run_id = 1                          # start with run_0001
+    else
+        run_id = maximum(existing_runs)+1   # next run gets id +1
+    end
+    
+    return @sprintf("%04d",run_id)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Creates a new folder `run_*` with the identification `id`. Also returns the full path
+`run_path` of that folder.
+"""
+function create_output_folder(path::String,id::Union{String,Int})
+    run_id = string("run_",run_id_to_string(id))
+    run_path = joinpath(path,run_id)
+    @assert !(run_id in readdir(path)) "Run folder $run_path already exists."
+    mkdir(run_path)             # actually create the folder
+    return run_path
+end
+
+run_id_to_string(run_id::Integer) = @sprintf("%04d",run_id)
+run_id_to_string(run_id::String) = run_id
+
+
+"""
+$(TYPEDSIGNATURES)
+Writes the variables from `diagn` of time step `i` at time `time` into `outputter.netcdf_file`.
+Simply escapes for no netcdf output of if output shouldn't be written on this time step.
+Interpolates onto output grid and resolution as specified in `outputter`, converts to output
+number format, truncates the mantissa for higher compression and applies lossless compression."""
+function write_output!( outputter::OutputWriter,        # everything for netcdf output
+                        time::DateTime,                 # model time for output
+                        diagn::DiagnosticVariables)     # all diagnostic variables
 
     outputter.timestep_counter += 1                                 # increase counter
     (; output, output_every_n_steps, timestep_counter ) = outputter
@@ -243,15 +300,18 @@ function write_netcdf_output!(  outputter::Output,              # everything for
     timestep_counter % output_every_n_steps == 0 || return nothing  # escape if output not written on this step
 
     # WRITE VARIABLES
-    write_netcdf_variables!(outputter,diagn,model)
+    write_netcdf_variables!(outputter,diagn)
     write_netcdf_time!(outputter,time)
 end
 
-function write_netcdf_time!(outputter::Output,
+"""
+$(TYPEDSIGNATURES)
+Write the current time `time::DateTime` to the netCDF file in `output::OutputWriter`."""
+function write_netcdf_time!(output::OutputWriter,
                             time::DateTime)
     
-    (; netcdf_file, startdate ) = outputter
-    i = outputter.output_counter
+    (; netcdf_file, startdate ) = output
+    i = output.output_counter
 
     time_sec = [round(Int64,Dates.value(Dates.Second(time-startdate)))]
     NetCDF.putvar(netcdf_file,"time",time_sec,start=[i])    # write time [sec] of next output step
@@ -260,27 +320,25 @@ function write_netcdf_time!(outputter::Output,
     return nothing
 end
 
-function write_netcdf_variables!(   outputter::Output,
-                                    diagn::DiagnosticVariables,
-                                    model::ModelSetup)
+"""
+$(TYPEDSIGNATURES)
+Write diagnostic variables from `diagn` to the netCDF file in `output::OutputWriter`."""
+function write_netcdf_variables!(   output::OutputWriter,
+                                    diagn::DiagnosticVariables{NF,Grid,Model}) where {NF,Grid,Model}
 
-    outputter.output_counter += 1                   # increase output step counter
-    (; output_vars ) = outputter                 # Vector{Symbol} of variables to output
-    i = outputter.output_counter
+    output.output_counter += 1                  # increase output step counter
+    (;output_vars) = output                     # Vector{Symbol} of variables to output
+    i = output.output_counter
 
-    (; u, v, vor, div, pres, temp, humid ) = outputter
-    (; output_matrix, output_Grid ) = outputter
-    (; interpolator ) = outputter
-
-    # output to matrix options
-    quadrant_rotation = model.parameters.output_quadrant_rotation
-    matrix_quadrant = model.parameters.output_matrix_quadrant
+    (;u, v, vor, div, pres, temp, humid) = output
+    (;output_Grid, interpolator) = output
+    (;quadrant_rotation, matrix_quadrant) = output
 
     for (k,diagn_layer) in enumerate(diagn.layers)
         
         (; u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid ) = diagn_layer.grid_variables
-        
-        if output_matrix    # resort gridded variables interpolation-free into a matrix
+
+        if output.as_matrix     # resort gridded variables interpolation-free into a matrix
 
             # create (matrix,grid) tuples for simultaneous grid -> matrix conversion  
             MGs = ((M,G) for (M,G) in zip((u,v,vor,div,temp,humid),
@@ -289,7 +347,7 @@ function write_netcdf_variables!(   outputter::Output,
                                                     
             RingGrids.Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
 
-        else                # or interpolate onto a full grid
+        else                    # or interpolate onto a full grid
             :u in output_vars       && RingGrids.interpolate!(output_Grid(u),    u_grid, interpolator)
             :v in output_vars       && RingGrids.interpolate!(output_Grid(v),    v_grid, interpolator)
             :vor in output_vars     && RingGrids.interpolate!(output_Grid(vor),  vor_grid, interpolator)
@@ -299,12 +357,12 @@ function write_netcdf_variables!(   outputter::Output,
         end
 
         # UNSCALE THE SCALED VARIABLES
-        unscale!(vor,model)     # was vor*radius, back to vor
-        unscale!(div,model)     # same
-        temp .-= 273.15         # convert to ˚C
+        unscale!(vor,diagn.scale[]) # was vor*radius, back to vor
+        unscale!(div,diagn.scale[]) # same
+        temp .-= 273.15             # convert to ˚C
 
         # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
-        (; keepbits ) = model.parameters
+        (; keepbits ) = output
         :u in output_vars     && round!(u,    keepbits.u)
         :v in output_vars     && round!(v,    keepbits.v)
         :vor in output_vars   && round!(vor,  keepbits.vor)
@@ -313,7 +371,7 @@ function write_netcdf_variables!(   outputter::Output,
         :humid in output_vars && round!(humid,keepbits.humid)
 
         # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
-        (; netcdf_file ) = outputter
+        (; netcdf_file ) = output
         :u in output_vars     && NetCDF.putvar(netcdf_file,"u",    u,    start=[1,1,k,i],count=[-1,-1,1,1])
         :v in output_vars     && NetCDF.putvar(netcdf_file,"v",    v,    start=[1,1,k,i],count=[-1,-1,1,1])
         :vor in output_vars   && NetCDF.putvar(netcdf_file,"vor",  vor,  start=[1,1,k,i],count=[-1,-1,1,1])
@@ -326,45 +384,40 @@ function write_netcdf_variables!(   outputter::Output,
     if :pres in output_vars
         (; pres_grid ) = diagn.surface
 
-        if output_matrix
+        if output.as_matrix
             RingGrids.Matrix!(pres,diagn.surface.pres_grid; quadrant_rotation, matrix_quadrant)
         else
             RingGrids.interpolate!(output_Grid(pres),pres_grid,interpolator)
         end
 
-        if model isa PrimitiveEquation
+        if Model <: PrimitiveEquation
             @. pres = exp(pres)/100     # convert from log(pₛ) to surface pressure pₛ [hPa]
         end
-        round!(pres,model.parameters.keepbits.pres)
+
+        round!(pres,output.keepbits.pres)
         
-        NetCDF.putvar(outputter.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
+        NetCDF.putvar(output.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
     end
 
     return nothing
 end
 
 """
-    write_restart_file( time::DateTime,
-                        progn::PrognosticVariables,
-                        outputter::Output,
-                        M::ModelSetup)
-
+$(TYPEDSIGNATURES)
 A restart file `restart.jld2` with the prognostic variables is written
 to the output folder (or current path) that can be used to restart the model.
 `restart.jld2` will then be used as initial conditions. The prognostic variables
-are bitround for compression and the 2nd leapfrog time step is discarded.
-While the dynamical core may work with scaled variables, the restart file
-contains these variables unscaled."""
+are bitrounded for compression and the 2nd leapfrog time step is discarded.
+Variables in restart file are unscaled."""
 function write_restart_file(time::DateTime,
                             progn::PrognosticVariables,
-                            outputter::Output,
-                            model::ModelSetup)
+                            output::OutputWriter)
     
-    (; run_path, write_restart ) = outputter
+    (; run_path, write_restart, keepbits ) = output
+    output.output || return nothing         # exit immediately if no output and
     write_restart || return nothing         # exit immediately if no restart file desired
     
     # COMPRESSION OF RESTART FILE
-    (; keepbits ) = model.parameters
     for layer in progn.layers
 
         # copy over leapfrog 2 to 1
@@ -394,24 +447,22 @@ function write_restart_file(time::DateTime,
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
         f["prognostic_variables"] = progn
         f["time"] = time
-        f["version"] = model.parameters.version
+        f["version"] = output.pkg_version
         f["description"] = "Restart file created for SpeedyWeather.jl"
     end
 end
 
 """
-    get_full_output_file_path(p::Parameters)
-
+$(TYPEDSIGNATURES)
 Returns the full path of the output file after it was created.
 """
-get_full_output_file_path(P::Parameters) = joinpath(P.output_path, string("run-",run_id_string(P.run_id),"/"), P.output_filename)
+get_full_output_file_path(output::OutputWriter) = joinpath(output.run_path, output.filename)
 
 """
-    load_trajectory(var_name::Union{Symbol, String}, M::ModelSetup) 
-
+$(TYPEDSIGNATURES)
 Loads a `var_name` trajectory of the model `M` that has been saved in a netCDF file during the time stepping.
 """
-function load_trajectory(var_name::Union{Symbol, String}, M::ModelSetup) 
-    @assert M.parameters.output "Output is turned off"
-    return NetCDF.ncread(get_full_output_file_path(M.parameters), string(var_name))
+function load_trajectory(var_name::Union{Symbol, String}, model::ModelSetup) 
+    @assert model.output.output "Output is turned off"
+    return NetCDF.ncread(get_full_output_file_path(model.output), string(var_name))
 end
