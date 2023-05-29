@@ -12,10 +12,10 @@ import LinearAlgebra: LinearAlgebra, Diagonal
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
 import FLoops: FLoops, @floop
-import KernelAbstractions
-import CUDA
-import CUDAKernels
-import Adapt: Adapt, adapt, adapt_structure
+# import KernelAbstractions
+# import CUDA
+# import CUDAKernels
+# import Adapt: Adapt, adapt, adapt_structure
 
 # INPUT OUTPUT
 import TOML
@@ -129,7 +129,7 @@ include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
 
 # Utility for GPU / KernelAbstractions
-include("gpu.jl")                               
+# include("gpu.jl")                               
 
 # GEOMETRY CONSTANTS ETC
 include("abstract_types.jl")

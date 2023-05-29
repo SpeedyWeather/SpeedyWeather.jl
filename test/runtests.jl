@@ -9,7 +9,7 @@ include("interpolation.jl")
 include("set_vars.jl")
 
 # GPU/KERNELABSTRACTIONS
-include("kernelabstractions.jl")
+# include("kernelabstractions.jl")
 
 # SPECTRAL TRANSFORM
 include("spectral_transform.jl")
