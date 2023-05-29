@@ -50,7 +50,7 @@ the shallow water equations. The arguments for `run_speedy` are described in
 To run the primitive equation dry core you can for example do
 
 ```julia
-julia> run_speedy(Float32, PrimitiveDryCore, physics=true, diffusion=HyperDiffusion(power=2))
+julia> run_speedy(Float32, PrimitiveDry, physics=true, diffusion=HyperDiffusion(power=2))
 Weather is speedy: 100%|███████████████████████████████████| Time: 0:00:03 (753.71 years/day)
 ```
 
@@ -93,3 +93,11 @@ which will install the latest release and all dependencies automatically. The ve
 ```
 which pulls directly from the `#main` branch. Please use the current minor version of Julia,
 compatibilities with older versions are not guaranteed.
+
+## Copyright and license
+
+Copyright (c) 2020 Milan Kloewer for SpeedyWeather.jl
+Copyright (c) 2021 The SpeedyWeather.jl Contributors for SpeedyWeather.jl
+Copyright (c) 2022 Fred Kucharski and Franco Molteni for SPEEDY parametrization schemes
+
+Software licensed under the [MIT License](LICENSE.txt).

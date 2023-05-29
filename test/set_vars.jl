@@ -1,14 +1,18 @@
 @testset "Test PrognosticVariables set_vars! and get_var" begin 
 
     # test setting LowerTriangularMatrices
-    P, D, M = initialize_speedy(PrimitiveWetCore, initial_conditions=StartFromRest())
-
+    spectral_grid = SpectralGrid(PrimitiveWet)
+    initial_conditions = StartFromRest()
+    M = Model(;spectral_grid,initial_conditions)
+    simulation = initialize!(M)
+    P = simulation.prognostic_variables
+ 
     nlev = M.geometry.nlev
     lmax = M.spectral_transform.lmax
     mmax = M.spectral_transform.mmax
     lf = 1
 
-    sph_data = [rand(LowerTriangularMatrix, lmax+2, mmax+1) for i=1:nlev]
+    sph_data = [rand(LowerTriangularMatrix{spectral_grid.NF}, lmax+2, mmax+1) for i=1:nlev]
 
     SpeedyWeather.set_vorticity!(P, sph_data)
     SpeedyWeather.set_divergence!(P, sph_data)
@@ -35,9 +39,6 @@
         @test all(P.layers[i].timesteps[lf].vor .== 0)
     end
 
-    # test setting grids 
-    P, D, M = initialize_speedy(PrimitiveWetCore, initial_conditions=StartFromRest())
-
     grid_data = [gridded(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
 
     SpeedyWeather.set_vorticity!(P, grid_data)
@@ -53,8 +54,6 @@
         @test all(isapprox(P.layers[i].timesteps[lf].humid, sph_data[i]))
     end 
     @test all(isapprox(P.surface.timesteps[lf].pres,sph_data[1]))
-
-    P, D, M = initialize_speedy(PrimitiveWetCore, initial_conditions=StartFromRest())
 
     grid_data = [gridded(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
 
@@ -73,8 +72,18 @@
     @test all(isapprox(P.surface.timesteps[lf].pres,sph_data[1]))
 
     # test setting matrices 
-    P, D, M = initialize_speedy(PrimitiveWetCore, initial_conditions=StartFromRest())
+    spectral_grid = SpectralGrid(PrimitiveWet,Grid=FullGaussianGrid)
+    initial_conditions = StartFromRest()
+    M = Model(;spectral_grid,initial_conditions)
+    simulation = initialize!(M)
+    P = simulation.prognostic_variables
+ 
+    nlev = M.geometry.nlev
+    lmax = M.spectral_transform.lmax
+    mmax = M.spectral_transform.mmax
+    lf = 1
 
+    grid_data = [gridded(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
     matrix_data = [Matrix(grid_data[i]) for i in eachindex(grid_data)]
 
     SpeedyWeather.set_vorticity!(P, grid_data)

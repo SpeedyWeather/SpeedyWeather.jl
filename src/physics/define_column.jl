@@ -1,10 +1,9 @@
 """
-    column = ColumnVariables{NF<:AbstractFloat}
-
 Mutable struct that contains all prognostic (copies thereof) and diagnostic variables in a single column
 needed to evaluate the physical parametrizations. For now the struct is mutable as we will reuse the struct
 to iterate over horizontal grid points. Every column vector has `nlev` entries, from [1] at the top to
-[end] at the lowermost model level at the planetary boundary layer."""
+[end] at the lowermost model level at the planetary boundary layer.
+$(TYPEDFIELDS)"""
 Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnVariables{NF}
 
     # DIMENSIONS
@@ -35,6 +34,19 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
 
     # DIAGNOSTIC VARIABLES
     const geopot::Vector{NF} = zeros(NF,nlev)                   # gepotential height [m]
+
+    # FLUXES, arrays to be used for various parameterizations, on half levels incl top and bottom
+    const flux_u_upward::Vector{NF} = zeros(NF,nlev+1)
+    const flux_u_downward::Vector{NF} = zeros(NF,nlev+1)
+
+    const flux_v_upward::Vector{NF} = zeros(NF,nlev+1)
+    const flux_v_downward::Vector{NF} = zeros(NF,nlev+1)
+
+    const flux_temp_upward::Vector{NF} = zeros(NF,nlev+1)
+    const flux_temp_downward::Vector{NF} = zeros(NF,nlev+1)
+    
+    const flux_humid_upward::Vector{NF} = zeros(NF,nlev+1)
+    const flux_humid_downward::Vector{NF} = zeros(NF,nlev+1)
 
     # THERMODYNAMICS
     const sat_humid::Vector{NF} = zeros(NF,nlev)                # Saturation specific humidity
@@ -107,6 +119,3 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     rel_hum::Vector{NF} = fill(NF(NaN), nlev) # Relative humidity
     grad_dry_static_energy::NF = NF(NaN)      # gradient of dry static energy
 end
-
-# use Float64 if not provided
-ColumnVariables(;kwargs...) = ColumnVariables{Float64}(;kwargs...)

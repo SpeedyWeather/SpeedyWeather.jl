@@ -11,8 +11,7 @@ scale_coslat⁻¹!(A::AbstractMatrix,G::Geometry) = A.*G.coslat⁻¹'
 scale_coslat⁻²!(A::AbstractMatrix,G::Geometry) = A.*G.coslat⁻²'
 
 """
-    _scale_lat!(A::AbstractGrid,v::AbstractVector)
-
+$(TYPEDSIGNATURES)
 Generic latitude scaling applied to `A` in-place with latitude-like vector `v`."""
 function _scale_lat!(A::AbstractGrid{NF},v::AbstractVector) where {NF<:AbstractFloat}
     @boundscheck get_nlat(A) == length(v) || throw(BoundsError)
@@ -28,63 +27,51 @@ function _scale_lat!(A::AbstractGrid{NF},v::AbstractVector) where {NF<:AbstractF
 end 
 
 """
-    scale!( progn::PrognosticVariables{NF},
-            var::Symbol,
-            s::Number) where NF
-
-Scale the variable `var` inside `progn` with scalar `s`.
+$(TYPEDSIGNATURES)
+Scale the variable `var` inside `progn` with scalar `scale`.
 """
 function scale!(progn::PrognosticVariables{NF},
                 var::Symbol,
-                s::Number) where NF
-    
-    if var == :pres     # surface pressure is not stored in layers
+                scale::Real) where NF
+    if var == :pres
         for pres in progn.pres.timesteps
-            pres .*= s  # pres*s but in-place
+            pres .*= scale
         end
     else
         for layer in progn.layers
             for step in layer.timesteps
                 variable = getfield(step,var)
-                variable .*= s  # var*s but in-place
+                variable .*= scale
             end
         end
     end
 end
 
 """
-    scale!( progn::PrognosticVariables,
-            model::ModelSetup)
-
+$(TYPEDSIGNATURES)
 Scales the prognostic variables vorticity and divergence with
 the Earth's radius which is used in the dynamical core."""
 function scale!(progn::PrognosticVariables,
-                model::ModelSetup)
-
-    (; radius ) = model.geometry
-    scale!(progn,:vor,radius)
-    scale!(progn,:div,radius)
+                scale::Real)
+    scale!(progn,:vor,scale)
+    scale!(progn,:div,scale)
+    progn.scale[] = scale   # store scaling information
 end
 
 """
-    unscale!(   progn::PrognosticVariables,
-                model::ModelSetup)
-
-Undo the radius-scaling of vorticity and divergence from scale!(progn,model)."""
-function unscale!(  progn::PrognosticVariables,
-                    model::ModelSetup)
-
-    (; radius ) = model.geometry
-    scale!(progn,:vor,inv(radius))
-    scale!(progn,:div,inv(radius))
+$(TYPEDSIGNATURES)
+Undo the radius-scaling of vorticity and divergence from scale!(progn,scale::Real)."""
+function unscale!(progn::PrognosticVariables)
+    scale = progn.scale[]
+    scale!(progn,:vor,inv(scale))
+    scale!(progn,:div,inv(scale))
+    progn.scale[] = 1       # set scale back to 1=unscaled
 end
 
 """
-    unscale!(   variable::AbstractArray,
-                model::ModelSetup)
-    
+$(TYPEDSIGNATURES)
 Undo the radius-scaling for any variable. Method used for netcdf output."""
 function unscale!(  variable::AbstractArray,
-                    model::ModelSetup)
-    variable ./= model.geometry.radius
+                    scale::Real)
+    variable ./= scale
 end
