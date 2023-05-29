@@ -425,30 +425,27 @@ function average_on_poles(  ::Type{NF},
 end
 
 """
-    r = anvil_average(a,b,c,d,Δab,Δcd,Δy)
-
+$(TYPEDSIGNATURES)
 The bilinear average of a,b,c,d which are values at grid points
 in an anvil-shaped configuration at location x, which is denoted
 by Δab,Δcd,Δy, the fraction of distances between a-b,c-d, and ab-cd,
 respectively. Note that a,c and b,d do not necessarily share the same
 longitude/x-coordinate. See schematic:
+```
+            0..............1    # fraction of distance Δab between a,b
+            |<  Δab   >|
 
-        0..............1    # fraction of distance Δab between a,b
-        |<  Δab   >|
+    0^      a -------- o - b    # anvil-shaped average of a,b,c,d at location x
+    .Δy                |
+    .                  |
+    .v                 x 
+    .                  |
+    1         c ------ o ---- d
 
-0^      a -------- o - b    # anvil-shaped average of a,b,c,d at location x
-.Δy                |
-.                  |
-.v                 x 
-.                  |
-1         c ------ o ---- d
-
-          |<  Δcd >|
-          0...............1 # fraction of distance Δcd between c,d
-
-
-^ fraction of distance Δy between a-b and c-d.
-"""
+              |<  Δcd >|
+              0...............1 # fraction of distance Δcd between c,d
+```
+^ fraction of distance Δy between a-b and c-d."""
 function anvil_average( a::NF,      # top left value
                         b::NF,      # top right value
                         c::NF,      # bottom left value

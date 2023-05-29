@@ -166,16 +166,14 @@ function eachgridpoint(grid1::Grid,grids::Grid...) where {Grid<:AbstractGrid}
 end
 
 """
-    rings = eachring(grid)
-
+$(TYPEDSIGNATURES)
 Vector{UnitRange} `rings` to loop over every ring of grid `grid`
 and then each grid point per ring. To be used like
 
     rings = eachring(grid)
     for ring in rings
         for ij in ring
-            grid[ij]
-"""
+            grid[ij]"""
 eachring(grid::AbstractGrid) = eachring(typeof(grid),grid.nlat_half)
 
 function eachring(Grid::Type{<:AbstractGrid},nlat_half::Integer)
@@ -185,8 +183,7 @@ function eachring(Grid::Type{<:AbstractGrid},nlat_half::Integer)
 end
 
 """
-    rings = eachring(grids...)
-
+$(TYPEDSIGNATURES)
 Same as `eachring(grid)` but performs a bounds check to assess that all grids
 in `grids` are of same size."""
 function eachring(grid1::Grid,grids::Grid...) where {Grid<:AbstractGrid}
@@ -197,8 +194,7 @@ function eachring(grid1::Grid,grids::Grid...) where {Grid<:AbstractGrid}
 end
 
 """
-    j = whichring(ij,rings)
-
+$(TYPEDSIGNATURES)
 Obtain ring index j from gridpoint ij and Vector{UnitRange} describing rind indices
 as obtained from eachring(::Grid)"""
 function whichring(ij::Integer,rings::Vector{UnitRange{Int}})
@@ -211,10 +207,7 @@ function whichring(ij::Integer,rings::Vector{UnitRange{Int}})
 end
 
 """
-    nlons = get_nlons(  Grid::Type{<:AbstractGrid},
-                        nlat_half::Integer;
-                        both_hemispheres::Bool=false)
-
+$(TYPEDSIGNATURES)
 Returns a vector `nlons` for the number of longitude points per latitude ring, north to south.
 Provide grid `Grid` and its resolution parameter `nlat_half`. For both_hemisphere==false only
 the northern hemisphere (incl Equator) is returned."""

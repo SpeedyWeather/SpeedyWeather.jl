@@ -1,8 +1,9 @@
 module LowerTriangularMatrices
 
-    import Adapt
+using DocStringExtensions
+import Adapt
 
-    export LowerTriangularMatrix, eachharmonic
+export LowerTriangularMatrix, eachharmonic
 
-    include("lower_triangular_matrix.jl")
+include("lower_triangular_matrix.jl")
 end

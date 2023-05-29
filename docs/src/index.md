@@ -21,62 +21,39 @@ clouds, short-wave radiation, long-waves radiation, surface fluxes of momentum a
 
 See the following pages of the documentation for more details
 
+- [Installation](installation.md)
 - [How to run SpeedyWeather.jl](how_to_run_speedy.md)
 - [Spherical harmonic transform](spectral_transform.md)
 - [Grids](grids.md)
 - [Dynamical core](dynamical_core.md)
 - [Parametrizations](parametrizations.md)
-- [New model setups](new_model_setups.md)
-- [Function and type index](functions.md)
+- [Extending SpeedyWeather](extending.md)
+
+and the submodules
+
+- [RingGrids](@ref) and their interpolation   
+- [LowerTriangularMatrices](@ref)   
+- [SpeedyTransforms](@ref)
 
 and the [original documentation](http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
 by Molteni and Kucharski.
 
-## Scope
-
-The focus of SpeedyWeather.jl is to develop a global atmospheric model of intermediate complexity,
-that can run at various levels of precision (16, 32 and 64-bit) on different architectures (x86 and ARM, 
-GPUs in the future). Additionally, the model is written in an entirely number format-flexible way,
-such that any custom number format can be used and Julia will compile to the format automatically.
-Similarly, many model components are written in an abstract way to support modularity and extandability.
-
-## History
-
-SpeedyWeather.jl is a Julia implementation of [SPEEDY](http://users.ictp.it/~kucharsk/speedy-net.html),
-which is written in Fortran 77. Sam Hatfield
-[translated SPEEDY to Fortran 90](https://github.com/samhatfield/speedy.f90) and started the project to
-[port it to Julia](https://github.com/samhatfield/speedy.jl). However, we are making an effort to
-overhaul the implementation of the mathematical model behind speedy completely and it is unlikely
-that a single line of code survived.
-
-## Installation
-
-SpeedyWeather.jl is registered in the Julia Registry. Open Julia's package manager from the REPL with `]`
-and `add` the github repository to install SpeedyWeather.jl and all dependencies
-```julia
-(@v1.8) pkg> add SpeedyWeather
-```
-which will automatically install the latest release. However, you may want to install directly from the
-main branch with
-```julia
-(@v1.8) pkg> add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
-```
-other branches than `#main` can be installed by adding `#branch_name` instead.
-
 ## Developers
 
-The development of  SpeedyWeather.jl is lead by [Milan Klöwer](https://github.com/milankl) and current and
-past contributors include
+The development of  SpeedyWeather.jl is lead by [Milan Klöwer](https://github.com/milankl) and
+[current and past contributors](https://github.com/SpeedyWeather/SpeedyWeather.jl/graphs/contributors) include
 
 - [Tom Kimpson](https://github.com/tomkimpson)
 - [Alistair White](https://github.com/white-alistair)
 - [Maximilian Gelbrecht](https://github.com/maximilian-gelbrecht)
 - [David Meyer](https://github.com/dmey)
 - [Daisuke Hotta](https://github.com/hottad)
+- [Navid Constantinou](https://github.com/navidcy)
 
 Any contributions are always welcome!
 
 ## Funding
 
-Contributors received funding by the European Research Council under Horizon 2020 within the ITHACA project,
-grant agreement number 741112 from 2021-2022.
+MK received funding by the European Research Council under Horizon 2020 within the ITHACA project,
+grant agreement number 741112 from 2021-2022. Since 2023 this project is also funded by the
+National Science Foundation NSF.
