@@ -2,12 +2,30 @@
 
 The spectral transform (the [Spherical Harmonic Transform](@ref)) in SpeedyWeather.jl supports any ring-based
 equi-longitude grid. Several grids are already implemented but other can be added. The following pages will
-describe an overview of these grids and how they can be used.
+describe an overview of these grids and but let's start but how they can be used
+```julia
+julia> spectral_grid = SpectralGrid(Grid = FullGaussianGrid)
+SpectralGrid:
+ Spectral:   T31 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
+ Grid:       4608-element, 48-ring FullGaussianGrid{Float32} (quadratic)
+ Resolution: 333km (average)
+ Vertical:   8-level SigmaCoordinates
+```
+The life of every SpeedyWeather.jl simulation starts with a `SpectralGrid` object which defines the
+resolution in spectral and in grid-point space. The generator `SpectralGrid()` can take as a keyword
+argument `Grid` which can be any of the grids described below. The resolution of the grid, however,
+is not directly chosen, but determined from the spectral resolution `trunc` and the `dealiasing`
+factor. More in [Matching spectral and grid resolution](@ref).
+
+!!! info "RingGrids is a module too!"
+    While RingGrids is the underlying module that SpeedyWeather.jl uses for data structs
+    on the sphere, the module can also be used independently of SpeedyWeather, for example
+    to interpolate between data on different grids. See [RingGrids](@ref)
 
 #### Ring-based equi-longitude grids
 
-SpeedyWeather.jl's spectral transform currently only supports ring-based equi-longitude grids.
-These grids have their grid points located on rings with constant latitude and on rings the
+SpeedyWeather.jl's spectral transform supports all ring-based equi-longitude grids.
+These grids have their grid points located on rings with constant latitude and on these rings the
 points are equi-spaced in longitude. There is technically no constrain on the spacing of the
 latitude rings, but the Legendre transform requires a quadrature to map those to spectral space
 and back. Common choices for latitudes are the
@@ -56,7 +74,7 @@ hemispheres in **a** and **b**, the 8 octahedral faces **c**,
 **d**,**f** and the 12 dodecahedral faces (or base pixels) in **e**.
 Coastlines are added for orientation.
 
-## Resolution
+## Grid resolution
 
 All grids use the same resolution parameter `nlat_half`, i.e. the number of rings on
 one hemisphere, Equator included. The Gaussian grids (full and reduced) do not have
@@ -72,7 +90,7 @@ Gaussian grids at the same `nlat_half`.
     for all grids. This is done for consistency across grids. We may use ``N_{side}``
     for the documentation or within functions though.
 
-## Truncation
+## Matching spectral and grid resolution
 
 A given spectral resolution can be matched to a variety of grid resolutions. A _cubic_ grid, for example,
 combines a spectral truncation T with a grid resolution N (=`nlat_half`) such that `T + 1 = N`.
@@ -93,6 +111,21 @@ but can represent products of terms on the grid (which will have higher wavenumb
 a higher accuracy as more grid points are available within a given wavelength. Using a sufficiently
 high truncation is therefore one way to avoid aliasing. In SpeedyWeather.jl the parameter
 `dealiasing` controls this option, `= 1` would be linear, `= 2` quadratic, `= 3` cubic etc.
+
+For now just a quick overview of how the grid resolution changes when `dealiasing` is passed onto
+`SpectralGrid` on the `FullGaussianGrid`
+
+| trunc | dealiasing | FullGaussianGrid size |
+| ----- | ---------- | --------------------- |
+| 31    | 1          | 64x32                 |
+| 31    | 2          | 96x48                 |
+| 31    | 3          | 128x64                |
+| 42    | 1          | 96x48                 |
+| 42    | 2          | 128x64                |
+| 42    | 3          | 192x96                |
+| ...   | ...        | ...                   |
+
+You will obtain this information every time you create a `SpectralGrid(;Grid,trunc,dealiasing)`.
 
 ## Full Gaussian grid
 
