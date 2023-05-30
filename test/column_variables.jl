@@ -35,7 +35,7 @@ end
 
         nlev = 8
         spectral_grid = SpectralGrid(NF;nlev)
-        model = Model(;spectral_grid)
+        model = PrimitiveDryModel(;spectral_grid)
         simulation = initialize!(model)
         diagn = simulation.diagnostic_variables
 

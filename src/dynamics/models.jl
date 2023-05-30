@@ -43,7 +43,7 @@ $(TYPEDFIELDS)"""
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
-    output::AbstractOutputWriter = OutputWriter(spectral_grid)
+    output::AbstractOutputWriter = OutputWriter(spectral_grid,Barotropic)
     feedback::AbstractFeedback = Feedback()
 end
 
@@ -95,7 +95,7 @@ $(TYPEDFIELDS)"""
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
-    output::AbstractOutputWriter = OutputWriter(spectral_grid)
+    output::AbstractOutputWriter = OutputWriter(spectral_grid,ShallowWater)
     feedback::AbstractFeedback = Feedback()
 end
 
@@ -156,7 +156,7 @@ $(TYPEDFIELDS)"""
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
-    output::AbstractOutputWriter = OutputWriter(spectral_grid)
+    output::AbstractOutputWriter = OutputWriter(spectral_grid,PrimitiveDry)
     feedback::AbstractFeedback = Feedback()
 end
 
@@ -224,7 +224,7 @@ $(TYPEDFIELDS)"""
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
 
     # OUTPUT
-    output::AbstractOutputWriter = OutputWriter(spectral_grid)
+    output::AbstractOutputWriter = OutputWriter(spectral_grid,PrimitiveWet)
     feedback::AbstractFeedback = Feedback()
 end
  
@@ -260,9 +260,3 @@ Returns true if the model `M` has a prognostic variable `var_name`, false otherw
 The default fallback is that all variables are included. """
 has(M::Type{<:ModelSetup}, var_name::Symbol) = var_name in (:vor, :div, :temp, :humid, :pres)
 has(M::ModelSetup, var_name) = has(typeof(M), var_name)
-
-"""$(TYPEDSIGNATURES)
-Creates a concrete model depending on the abstract model type of `spectral_grid`."""
-function Model(;spectral_grid::SpectralGrid{WhichModel},kwargs...) where WhichModel
-    return default_concrete_model(WhichModel)(;spectral_grid,kwargs...)
-end
