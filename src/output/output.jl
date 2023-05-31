@@ -2,7 +2,7 @@
 Number of mantissa bits to keep for each prognostic variable when compressed for
 netCDF and .jld2 data output.
 $(TYPEDFIELDS)"""
-@with_kw struct Keepbits
+Base.@kwdef struct Keepbits
     u::Int = 7
     v::Int = 7
     vor::Int = 5
@@ -37,7 +37,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
     # FILE OPTIONS
     output::Bool = false                    # output to netCDF?
     path::String = pwd()                    # path to output folder
-    id::Union{String,Int} = ""              # run identification number/string
+    id::String = "0001"                     # run identification string "????"
     run_path::String = ""                   # will be determined in initalize!
     filename::String = "output.nc"          # name of the output netcdf file
     write_restart::Bool = true              # also write restart file if output==true?
@@ -201,7 +201,7 @@ function initialize!(
     
     # GET RUN ID, CREATE FOLDER
     # get new id only if not already specified
-    output.id = output.id == "" ? get_run_id(output.path) : output.id
+    output.id = get_run_id(output.path,output.id)
     output.run_path = create_output_folder(output.path,output.id) 
     
     feedback.id = output.id         # synchronize with feedback struct
@@ -250,8 +250,12 @@ Checks existing `run_????` folders in `path` to determine a 4-digit `id` number
 by counting up. E.g. if folder run_0001 exists it will return the string "0002".
 Does not create a folder for the returned run id.
 """
-function get_run_id(path::String)
-    # pull list of existing run_???? folders via readdir
+function get_run_id(path::String,id::String)
+    # if run_???? folder doesn't exist yet don't change the id
+    run_id = string("run_",run_id_to_string(id))
+    !(run_id in readdir(path)) && return id
+
+    # otherwise pull list of existing run_???? folders via readdir
     pattern = r"run_\d\d\d\d"               # run_???? in regex
     runlist = filter(x->startswith(x,pattern),readdir(path))
     runlist = filter(x->endswith(  x,pattern),runlist)

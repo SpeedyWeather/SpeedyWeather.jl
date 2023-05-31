@@ -64,7 +64,7 @@ function write_column_tendencies!(  D::DiagnosticVariables,
         layer.tendencies.humid_tend_grid[ij] = C.humid_tend[k]
     end
 
-    # D.surface.precip_large_scale[ij] = C.precip_large_scale
+    D.surface.precip_large_scale[ij] = C.precip_large_scale
     # D.surface.precip_convection[ij] = C.precip_convection
 
     return nothing
@@ -75,7 +75,7 @@ end
 
 Set the accumulators (tendencies but also vertical sums and similar) back to zero
 for `column` to be reused at other grid points."""
-function reset_column!(column::ColumnVariables)
+function reset_column!(column::ColumnVariables{NF}) where NF
 
     # set tendencies to 0 for += accumulation
     fill!(column.u_tend,0)
@@ -101,8 +101,8 @@ function reset_column!(column::ColumnVariables)
     # fill!(column.net_flux_humid, 0)
     # fill!(column.net_flux_dry_static_energy, 0)
 
-    # # Large-scale condensation
-    # column.precip_large_scale = zero(NF)
+    # Large-scale condensation
+    column.precip_large_scale = zero(NF)
     return nothing
 end
 

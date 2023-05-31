@@ -1,7 +1,6 @@
 module SpeedyWeather
 
 # STRUCTURE
-import Parameters: @with_kw
 using DocStringExtensions
 
 # NUMERICS
@@ -95,6 +94,9 @@ export  NoBoundaryLayer,
 export  NoVerticalDiffusion,
         VerticalLaplacian
 
+# Large scale condensation
+export  SpeedyCondensation
+
 # EXPORT STRUCTS
 export  DynamicsConstants,
         SpectralTransform,
@@ -170,7 +172,7 @@ include("dynamics/models.jl")
 
 # # PHYSICS
 # include("physics/convection.jl")
-# include("physics/large_scale_condensation.jl")
+include("physics/large_scale_condensation.jl")
 # include("physics/longwave_radiation.jl")
 # include("physics/shortwave_radiation.jl")
 

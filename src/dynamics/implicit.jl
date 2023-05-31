@@ -8,7 +8,7 @@ initialize!(I::NoImplicit,dt::Real,::DiagnosticVariables,::ModelSetup) = nothing
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the shallow water model.
 $(TYPEDFIELDS)"""
-@with_kw struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit{NF}
+Base.@kwdef struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit{NF}
 
     # DIMENSIONS
     trunc::Int
@@ -130,7 +130,7 @@ end
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the primitive equation model.
 $(TYPEDFIELDS)"""
-@with_kw struct ImplicitPrimitiveEq{NF<:AbstractFloat} <: AbstractImplicit{NF}
+Base.@kwdef struct ImplicitPrimitiveEq{NF<:AbstractFloat} <: AbstractImplicit{NF}
     
     # DIMENSIONS
     "spectral resolution"

@@ -19,7 +19,7 @@ $(SIGNATURES)
 The BarotropicModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@with_kw struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
+Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
@@ -70,7 +70,7 @@ $(SIGNATURES)
 The ShallowWaterModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@with_kw struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
+Base.@kwdef struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
@@ -125,7 +125,7 @@ $(SIGNATURES)
 The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@with_kw struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveDry
+Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveDry
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
@@ -192,7 +192,7 @@ $(SIGNATURES)
 The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-@with_kw struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveWet
+Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveWet
     "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
@@ -209,6 +209,7 @@ $(TYPEDFIELDS)"""
     boundary_layer_drag::BoundaryLayerDrag{NF} = LinearDrag(spectral_grid)
     temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
+    large_scale_condensation::AbstractCondensation{NF} = SpeedyCondensation(spectral_grid)
     # vertical_diffusion::VerticalDiffusion{NF} = VerticalLaplacian(spectral_grid)
 
     # NUMERICS
@@ -248,6 +249,7 @@ function initialize!(model::PrimitiveWet)
     initialize!(model.boundary_layer_drag,model)
     initialize!(model.temperature_relaxation,model)
     initialize!(model.static_energy_diffusion,model)
+    initialize!(model.large_scale_condensation,model)
     # initialize!(model.vertical_diffusion,model)
 
     prognostic_variables = initial_conditions(model)
