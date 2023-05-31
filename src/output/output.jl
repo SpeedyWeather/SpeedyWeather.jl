@@ -27,31 +27,48 @@ const DEFAULT_OUTPUT_NF = Float32
 """
 $(TYPEDSIGNATURES)
 NetCDF output writer. Contains all output options and auxiliary fields for output interpolation.
-To be initialised with `OutputWriter(::SpectralGrid,::TimeStepper,kwargs...)` to pass on the
-resolution/time stepping information from those structs. Options include
+To be initialised with `OutputWriter(::SpectralGrid,::Type{<:ModelSetup},kwargs...)` to pass on the
+resolution information and the model type which chooses which variables to output. Options include
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelSetup} <: AbstractOutputWriter
 
     spectral_grid::SpectralGrid
 
     # FILE OPTIONS
-    output::Bool = false                    # output to netCDF?
-    path::String = pwd()                    # path to output folder
-    id::String = "0001"                     # run identification string "????"
+    output::Bool = false                    
+    
+    "[OPTION] path to output folder, run_???? will be created within"
+    path::String = pwd()
+    
+    "[OPTION] run identification number/string"
+    id::String = "0001"
     run_path::String = ""                   # will be determined in initalize!
-    filename::String = "output.nc"          # name of the output netcdf file
-    write_restart::Bool = true              # also write restart file if output==true?
+    
+    "[OPTION] name of the output netcdf file"
+    filename::String = "output.nc"
+    
+    "[OPTION] also write restart file if output==true?"
+    write_restart::Bool = true
     pkg_version::VersionNumber = pkgversion(SpeedyWeather)
 
     # WHAT/WHEN OPTIONS
     startdate::DateTime = DateTime(2000,1,1)
-    output_dt::Float64 = 6                  # output time step [hours]
-    output_vars::Vector{Symbol} = default_output_vars(Model)   # vector of output variables as Symbols
-    missing_value::NF = NaN                 # missing value to be used in netcdf output
+
+    "[OPTION] output frequency, time step [hrs]"
+    output_dt::Float64 = 6
+
+    "[OPTION] which variables to output, u, v, vor, div, pres, temp, humid"
+    output_vars::Vector{Symbol} = default_output_vars(Model)
+
+    "[OPTION] missing value to be used in netcdf output"
+    missing_value::NF = NaN
 
     # COMPRESSION OPTIONS
-    compression_level::Int = 3              # compression level; 1=low but fast, 9=high but slow
-    keepbits::Keepbits = Keepbits()         # mantissa bits to keep for every variable
+    "[OPTION] lossless compression level; 1=low but fast, 9=high but slow"
+    compression_level::Int = 3
+    
+    "[OPTION] mantissa bits to keep for every variable"
+    keepbits::Keepbits = Keepbits()
 
     # TIME STEPS AND COUNTERS (initialize later)
     output_every_n_steps::Int = 0           # output frequency
@@ -65,15 +82,19 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
     input_Grid::Type{<:AbstractGrid} = spectral_grid.Grid
     
     # Output as matrix (particularly for reduced grids)
-    as_matrix::Bool = false                 # if true sort grid points into a matrix (interpolation-free)
-                                            # full grid for output if output_matrix == false
+    "[OPTION] sort grid points into a matrix (interpolation-free), for OctahedralClenshawGrid, OctaHEALPixGrid only"
+    as_matrix::Bool = false
+
     quadrant_rotation::NTuple{4,Int} = (0,1,2,3)    # rotation of output quadrant
                                                     # matrix of output quadrant
     matrix_quadrant::NTuple{4,Tuple{Int,Int}} = ((2,2),(1,2),(1,1),(2,1))
     
     # OUTPUT GRID
+    "[OPTION] the grid used for output, full grids only"
     output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid(input_Grid)
-    nlat_half::Int = spectral_grid.nlat_half                # default: same nlat_half for in/output
+    
+    "[OPTION] the resolution of the output grid, default: same nlat_half as in the dynamical core"
+    nlat_half::Int = spectral_grid.nlat_half
     nlon::Int = as_matrix ? RingGrids.matrix_size(input_Grid,spectral_grid.nlat_half)[1] :
                                                     RingGrids.get_nlon(output_Grid,nlat_half)
     nlat::Int =  as_matrix ? RingGrids.matrix_size(input_Grid,spectral_grid.nlat_half)[2] :
