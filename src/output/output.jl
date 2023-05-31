@@ -136,7 +136,8 @@ function initialize!(
     (;startdate) = output
     time_string = "seconds since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     dim_time = NcDim("time",0,unlimited=true)
-    var_time = NcVar("time",dim_time,t=Int64,atts=Dict("units"=>time_string,"long_name"=>"time"))
+    var_time = NcVar("time",dim_time,t=Int64,atts=Dict("units"=>time_string,"long_name"=>"time",
+                                        "standard_name"=>"time","calendar"=>"proleptic_gregorian"))
     
     # DEFINE NETCDF DIMENSIONS SPACE
     (;input_Grid, output_Grid, nlat_half, nlev) = output
@@ -192,7 +193,7 @@ function initialize!(
     atts=Dict("long_name"=>"temperature","units"=>"degC","missing_value"=>missing_value,
     "_FillValue"=>missing_value)),
     humid = NcVar("humid",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-    atts=Dict("long_name"=>"specific humidity","units"=>"1","missing_value"=>missing_value,
+    atts=Dict("long_name"=>"specific humidity","units"=>"kg/kg","missing_value"=>missing_value,
     "_FillValue"=>missing_value)),
     orog = NcVar("orog",[dim_lon,dim_lat],t=output_NF,compress=compression_level,
     atts=Dict("long_name"=>"orography","units"=>"m","missing_value"=>missing_value,

@@ -1,7 +1,7 @@
 """
 Large scale condensation as in Fortran SPEEDY with default values from therein.
 $(TYPEDFIELDS)"""
-@kwdef struct SpeedyCondensation{NF<:AbstractFloat} <: AbstractCondensation{NF}
+Base.@kwdef struct SpeedyCondensation{NF<:AbstractFloat} <: AbstractCondensation{NF}
 
     "number of vertical levels"
     nlev::Int

@@ -162,7 +162,6 @@ end
 
 has(::Type{<:PrimitiveDry}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres)
 default_concrete_model(::Type{PrimitiveDry}) = PrimitiveDryModel
-default_concrete_model(::Type{PrimitiveEquation}) = PrimitiveDryModel
 
 """
 $(TYPEDSIGNATURES)
@@ -231,7 +230,6 @@ end
  
 has(::Type{<:PrimitiveWet}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres, :humid)
 default_concrete_model(::Type{PrimitiveWet}) = PrimitiveWetModel
-default_concrete_model(::Type{PrimitiveEquation}) = PrimitiveDryModel
  
 """
 $(TYPEDSIGNATURES)

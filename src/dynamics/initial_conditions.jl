@@ -464,7 +464,7 @@ function initialize_humidity!(  progn::PrognosticVariables,
 
     # reference saturation water vapour pressure [Pa]
     # relative humidity reference [1]
-    (;water_pres_ref, relhumid_ref, R_dry, R_vapour) = model.atmosphere
+    (;water_pres_ref, relhumid_ref, R_dry, R_vapour, pres_ref) = model.atmosphere
     gas_ratio = R_dry/R_vapour
     humid_ref = relhumid_ref*gas_ratio*water_pres_ref   # reference specific humidity [Pa]
 
@@ -477,20 +477,19 @@ function initialize_humidity!(  progn::PrognosticVariables,
 
     # Specific humidity at the surface (grid space)
     humid_surf_grid = zero(pres_surf_grid)
-    @. humid_surf_grid = humid_ref*exp(scale_height_ratio*pres_surf_grid)
-    
+    # @. humid_surf_grid = humid_ref*(exp(pres_surf_grid)/(pres_ref*100))^scale_height_ratio
+    q_ref = 20e-3       # kg/kg at the surface
+    @. humid_surf_grid .= q_ref
+    scale_coslat²!(humid_surf_grid,model.geometry)
+
     humid_surf = spectral(humid_surf_grid,model.spectral_transform)
     spectral_truncation!(humid_surf)
 
-    q0 = 3e-3
-    q1 = -1e-3
-
     # Specific humidity at tropospheric levels (stratospheric humidity remains zero)
+    a = model.spectral_transform.norm_sphere
     for k in n_stratosphere_levels+1:nlev
-        # for lm in eachharmonic(humid_surf,progn.layers[1].timesteps[1].humid)
-        #     progn.layers[k].timesteps[1].humid[lm] = humid_surf[lm]*σ_levels_full[k]^scale_height_ratio
-        # end
-        progn.layers[k].timesteps[1].humid[1] = model.spectral_transform.norm_sphere*q0*σ_levels_full[k]^scale_height_ratio
-        progn.layers[k].timesteps[1].humid[3] = model.spectral_transform.norm_sphere*q1*σ_levels_full[k]^scale_height_ratio
+        for lm in eachharmonic(humid_surf,progn.layers[1].timesteps[1].humid)
+            progn.layers[k].timesteps[1].humid[lm] = humid_surf[lm]*σ_levels_full[k]^scale_height_ratio
+        end
     end
 end
