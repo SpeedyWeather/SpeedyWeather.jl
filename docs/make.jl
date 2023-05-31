@@ -15,6 +15,7 @@ makedocs(
             "Parameterizations"=>"parametrizations.md",
             "Boundary conditions"=>"boundary_conditions.md",
             "Extending SpeedyWeather"=>"extending.md",
+            "NetCDF output"=>"output.md",
             "Submodule: RingGrids"=>"ringgrids.md",
             "Submodule: LowerTriangularMatrices"=>"lowertriangularmatrices.md",
             "Submodule: SpeedyTransforms"=>"speedytransforms.md",
