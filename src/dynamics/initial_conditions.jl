@@ -6,8 +6,9 @@ initial_conditions_default(::Type{<:PrimitiveEquation}) = ZonalWind()
 """
 $(TYPEDSIGNATURES)
 Allocate the prognostic variables and then set to initial conditions."""
-function initial_conditions(model::ModelSetup)
-    progn = allocate(PrognosticVariables,model.spectral_grid)   # allocate variables in any case
+function initial_conditions(model::Model) where Model
+    (;spectral_grid) = model
+    progn = allocate(PrognosticVariables,spectral_grid,Model)   # allocate variables in any case
     IC = model.initial_conditions                               # initial conditions struct
     initial_conditions!(progn,IC,model)                         # dispatch to initial conditions
     return progn
@@ -15,7 +16,12 @@ end
 
 """
 $(TYPEDSIGNATURES)"""
-function allocate(::Type{PrognosticVariables},spectral_grid::SpectralGrid{Model}) where Model 
+function allocate(
+    ::Type{PrognosticVariables},
+    spectral_grid::SpectralGrid,
+    ::Type{Model},
+) where {Model<:ModelSetup}
+
     (;NF,trunc,nlev) = spectral_grid
     return zeros(PrognosticVariables{NF},Model,trunc,nlev)
 end

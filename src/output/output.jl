@@ -32,7 +32,7 @@ resolution/time stepping information from those structs. Options include
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelSetup} <: AbstractOutputWriter
 
-    spectral_grid::SpectralGrid{Model}
+    spectral_grid::SpectralGrid
 
     # FILE OPTIONS
     output::Bool = false                    # output to netCDF?
@@ -94,10 +94,11 @@ end
 
 # generator function pulling grid resolution and time stepping from ::SpectralGrid and ::TimeStepper
 function OutputWriter(
-    spectral_grid::SpectralGrid{Model};
+    spectral_grid::SpectralGrid,
+    ::Type{Model};
     NF::Type{<:Union{Float32,Float64}} = DEFAULT_OUTPUT_NF,
     kwargs...
-) where Model
+) where {Model<:ModelSetup}
     return OutputWriter{NF,Model}(;spectral_grid,kwargs...)
 end
 

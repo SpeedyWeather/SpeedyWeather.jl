@@ -210,8 +210,11 @@ struct DiagnosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF},Model<:Model
     scale::Base.RefValue{NF}   # vorticity and divergence are scaled by radius
 end
 
-function Base.zeros(::Type{DiagnosticVariables},
-                    SG::SpectralGrid{Model}) where {Model<:ModelSetup}
+function Base.zeros(
+    ::Type{DiagnosticVariables},
+    SG::SpectralGrid,
+    model::Type{Model}
+) where {Model<:ModelSetup}
 
     (;NF,Grid,nlat_half, nlev, npoints) = SG
     layers = [zeros(DiagnosticVariablesLayer,SG,k) for k in 1:nlev]
@@ -227,7 +230,7 @@ function Base.zeros(::Type{DiagnosticVariables},
         layers,surface,columns,nlat_half,nlev,npoints,scale)
 end
 
-DiagnosticVariables(SG::SpectralGrid) = zeros(DiagnosticVariables,SG)
+DiagnosticVariables(SG::SpectralGrid) = zeros(DiagnosticVariables,SG,DEFAULT_MODEL)
 
 # LOOP OVER ALL GRID POINTS (extend from RingGrids module)
 RingGrids.eachgridpoint(diagn::DiagnosticVariables) = Base.OneTo(diagn.npoints)

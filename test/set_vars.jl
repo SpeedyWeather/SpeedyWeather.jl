@@ -1,9 +1,9 @@
 @testset "Test PrognosticVariables set_vars! and get_var" begin 
 
     # test setting LowerTriangularMatrices
-    spectral_grid = SpectralGrid(PrimitiveWet)
+    spectral_grid = SpectralGrid()
     initial_conditions = StartFromRest()
-    M = Model(;spectral_grid,initial_conditions)
+    M = PrimitiveWetModel(;spectral_grid,initial_conditions)
     simulation = initialize!(M)
     P = simulation.prognostic_variables
  
@@ -72,9 +72,9 @@
     @test all(isapprox(P.surface.timesteps[lf].pres,sph_data[1]))
 
     # test setting matrices 
-    spectral_grid = SpectralGrid(PrimitiveWet,Grid=FullGaussianGrid)
+    spectral_grid = SpectralGrid(Grid=FullGaussianGrid)
     initial_conditions = StartFromRest()
-    M = Model(;spectral_grid,initial_conditions)
+    M = PrimitiveWetModel(;spectral_grid,initial_conditions)
     simulation = initialize!(M)
     P = simulation.prognostic_variables
  

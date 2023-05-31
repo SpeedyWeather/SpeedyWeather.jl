@@ -9,7 +9,7 @@ $(TYPEDFIELDS)
 
 `nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
 `Grid` and `dealiasing`."""
-Base.@kwdef struct SpectralGrid{Model<:ModelSetup}
+Base.@kwdef struct SpectralGrid
     "number format used throughout the model"
     NF::Type{<:AbstractFloat} = DEFAULT_NF
 
@@ -35,13 +35,13 @@ Base.@kwdef struct SpectralGrid{Model<:ModelSetup}
 
     # VERTICAL
     "number of vertical levels"
-    nlev::Int = default_nlev(Model)
+    nlev::Int = 8
 
     "coordinates used to discretize the vertical"
-    vertical_coordinates::VerticalCoordinates = default_vertical_coordinates(Model)(;nlev)
+    vertical_coordinates::VerticalCoordinates = SigmaCoordinates(;nlev)
 
     # make sure nlev and vertical_coordinates.nlev match
-    function SpectralGrid{Model}(NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates) where Model
+    function SpectralGrid(NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates)
         if nlev == vertical_coordinates.nlev
             return new(NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,
                     nlev,vertical_coordinates)
@@ -56,8 +56,6 @@ end
 SpectralGrid(NF::Type{<:AbstractFloat};kwargs...) = SpectralGrid(;NF,kwargs...)
 SpectralGrid(Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(;Grid,kwargs...)
 SpectralGrid(NF::Type{<:AbstractFloat},Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(;NF,Grid,kwargs...)
-SpectralGrid(Model::Type{<:ModelSetup};kwargs...) = SpectralGrid{Model}(;kwargs...)
-SpectralGrid(;kwargs...) = SpectralGrid{DEFAULT_MODEL}(;kwargs...)
 
 function Base.show(io::IO,SG::SpectralGrid)
     (;NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates) = SG
@@ -156,11 +154,6 @@ $(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
 function Geometry(spectral_grid::SpectralGrid)
     return Geometry{spectral_grid.NF}(;spectral_grid)
-end
-
-# for barotropic/shallowwater always set the σ level to be defined between 0 and 1
-function Geometry(spectral_grid::SpectralGrid{Model}) where {Model<:Union{Barotropic,ShallowWater}}
-    return Geometry{spectral_grid.NF}(;spectral_grid,σ_levels_half=[0,1])
 end
 
 function Base.show(io::IO,G::Geometry)
