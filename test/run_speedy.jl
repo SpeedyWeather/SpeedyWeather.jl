@@ -1,28 +1,28 @@
 @testset "run_speedy no errors, no blowup" begin
     # Barotropic
-    spectral_grid = SpectralGrid(Barotropic)
-    model = Model(;spectral_grid)
+    spectral_grid = SpectralGrid()
+    model = BarotropicModel(;spectral_grid)
     simulation = initialize!(model)
     run!(simulation,n_days=10)
     @test simulation.model.feedback.nars_detected == false
     
     # ShallowWater
-    spectral_grid = SpectralGrid(ShallowWater)
-    model = Model(;spectral_grid)
+    spectral_grid = SpectralGrid()
+    model = ShallowWaterModel(;spectral_grid)
     simulation = initialize!(model)
     run!(simulation,n_days=10)
     @test simulation.model.feedback.nars_detected == false
 
     # PrimitiveDry
-    spectral_grid = SpectralGrid(PrimitiveDry)
-    model = Model(;spectral_grid)
+    spectral_grid = SpectralGrid()
+    model = PrimitiveDryModel(;spectral_grid)
     simulation = initialize!(model)
     run!(simulation,n_days=10)
     @test simulation.model.feedback.nars_detected == false
 
     # PrimitiveWet
-    spectral_grid = SpectralGrid(PrimitiveWet)
-    model = Model(;spectral_grid)
+    spectral_grid = SpectralGrid()
+    model = PrimitiveWetModel(;spectral_grid)
     simulation = initialize!(model)
     run!(simulation,n_days=10)
     @test simulation.model.feedback.nars_detected == false
