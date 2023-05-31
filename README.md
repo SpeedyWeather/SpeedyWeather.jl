@@ -33,12 +33,14 @@ simulation = initialize!(model)
 run!(simulation,n_days=10,output=true)
 ```
 and you will see
-```
-Weather is speedy: run 0001 100%|█████████| Time: 0:00:04 (531.88 years/day)
-```
-Hurray🥳 In 4 seconds we just simulated 10 days of the Earth's atmosphere at a speed of 500 years per day.
-This simulation used a T31 spectral resolution on an octahedral Gaussian grid (~400km resolution) solving
-the dry primitive equations.
+
+<img src="https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a04fbb10-1cc1-4f77-93f2-7bdf047f277d" width="450"><br>
+
+Hurray🥳 In 5 seconds we just simulated 10 days of the Earth's atmosphere at a speed of 440 years per day.
+This simulation used a T31 spectral resolution on an [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids) (~400km resolution) solving
+the dry primitive equations. The [UnicodePlot](https://github.com/JuliaPlots/UnicodePlots.jl) will give
+you a snapshot of surface vorticity at the last time step. The plots resolution is not representative,
+but allows a quick check of what has been simulated. The [NetCDF output](https://speedyweather.github.io/SpeedyWeather.jl/dev/output/) is independent of the UnicodePlot.
 
 More examples in the [How to run SpeedyWeather](https://speedyweather.github.io/SpeedyWeather.jl/dev/how_to_run_speedy/)
 section of the [documentation](https://speedyweather.github.io/SpeedyWeather.jl/dev).
@@ -61,7 +63,7 @@ https://user-images.githubusercontent.com/25530332/229872856-bdcab69a-2226-4e9b-
 
 SpeedyWeather.jl can also solve the 2D barotropic vorticity equations on the sphere.
 Here, we use single-threaded Float32 (single precision) at a resolution of T340 (40km) on
-an [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids) (quadratic truncation). 
+an [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids). 
 Initial conditions are randomly distributed relative vorticity on a slowly rotating Earth ($\Omega = 10^{-6}\text{ s}^{-1}$) and no forcing is applied
 
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/8a7c6758-950f-424d-8ece-0480295386b3
