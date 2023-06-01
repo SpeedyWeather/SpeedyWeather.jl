@@ -51,6 +51,9 @@ export  Model,
         PrimitiveDryModel,
         PrimitiveWetModel
 
+export  Earth,
+        EarthAtmosphere
+
 # EXPORT GRIDS
 export  SpectralGrid,
         Geometry
@@ -79,7 +82,7 @@ export  StartFromFile,
         StartFromRest,
         ZonalJet,
         ZonalWind,
-        StartWithVorticity
+        StartWithRandomVorticity
 
 # EXPORT TEMPERATURE RELAXATION SCHEMES
 export  NoTemperatureRelaxation,

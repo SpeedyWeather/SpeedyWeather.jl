@@ -28,7 +28,7 @@ Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Baro
     planet::AbstractPlanet = Earth()
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     forcing::AbstractForcing{NF} = NoForcing(spectral_grid)
-    initial_conditions::InitialConditions = StartWithVorticity()
+    initial_conditions::InitialConditions = StartWithRandomVorticity()
 
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
