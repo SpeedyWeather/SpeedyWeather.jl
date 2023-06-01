@@ -21,8 +21,9 @@ For an overview of the functionality and explanation see the
 
 ## Example use
 
-SpeedyWeather.jl is currently developed. Some things work, some don't. Stay tuned or talk to us by raising an [issue]([url](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues)) to express interest as a user or developer.
-All contributions are always welcome.
+SpeedyWeather.jl is currently developed. Some things work, some don't. Stay tuned or talk to us by raising an
+[issue]([url](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues))
+to express interest as a user or developer. All contributions are always welcome.
 
 With v0.6 the interface to SpeedyWeather.jl consist of 4 steps: define the grid, create the model, initialize, run
 
@@ -37,17 +38,20 @@ and you will see
 <img src="https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a04fbb10-1cc1-4f77-93f2-7bdf047f277d" width="450"><br>
 
 Hurray🥳 In 5 seconds we just simulated 10 days of the Earth's atmosphere at a speed of 440 years per day.
-This simulation used a T31 spectral resolution on an [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids) (~400km resolution) solving
-the dry primitive equations. The [UnicodePlot](https://github.com/JuliaPlots/UnicodePlots.jl) will give
-you a snapshot of surface vorticity at the last time step. The plots resolution is not representative,
-but allows a quick check of what has been simulated. The [NetCDF output](https://speedyweather.github.io/SpeedyWeather.jl/dev/output/) is independent of the UnicodePlot.
+This simulation used a T31 spectral resolution on an
+[octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids)
+(~400km resolution) solving the dry primitive equations on 8 vertical levels.
+The [UnicodePlot](https://github.com/JuliaPlots/UnicodePlots.jl) will give
+you a snapshot of surface vorticity at the last time step. The plotted resolution is not representative,
+but allows a quick check of what has been simulated. The [NetCDF output](https://speedyweather.github.io/SpeedyWeather.jl/dev/output/) is independent of the unicode plot.
 
 More examples in the [How to run SpeedyWeather](https://speedyweather.github.io/SpeedyWeather.jl/dev/how_to_run_speedy/)
 section of the [documentation](https://speedyweather.github.io/SpeedyWeather.jl/dev).
 
 ## Gallery
 
-Here is video of some relative vorticity in the shallow water model, simulated at T1023 spectral resolution (about 10km) on an
+Here is video of some relative vorticity in the shallow water model, simulated at T1023 spectral resolution
+(about 10km) on an
 [octahedral Clenshaw-Curtis grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids)
 with more than 4 million grid points
 
