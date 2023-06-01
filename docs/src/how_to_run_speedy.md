@@ -66,7 +66,7 @@ The `run!` command will always return the prognostic variables, which, by defaul
 plotted for surface relative vorticity with a unicode plot. The resolution of the plot
 is not necessarily representative but it lets us have a quick look at the result
 
-![Barotropic vorticity unicode plot](../img/barotropic_vorticity.jpg)
+![Barotropic vorticity unicode plot](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/barotropic_vorticity.jpg)
 
 Woohoo! I can see turbulence! You could pick up where this simulation stopped by simply
 doing `run!(simulation,n_days=50)` again. We didn't store any output, which
@@ -108,7 +108,7 @@ Now we construct a model, but this time a `ShallowWaterModel`
 julia> model = ShallowWaterModel(;spectral_grid, orography, initial_conditions);
 julia> simulation = initialize!(model);
 ```
-![Galewsky jet unicode plot](../img/galewsky.jpg)
+![Galewsky jet unicode plot](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/galewsky.jpg)
 
 Oh yeah. That looks like the wobbly jet in their paper. Let's run it again for another 6 days
 but this time also store [NetCDF output](@ref).
@@ -141,7 +141,7 @@ julia> pcolormesh(lon,lat,vor')
 ```
 Which looks like
 
-![Galewsky jet pyplot](../img/galewsky_nc_6days.png)
+![Galewsky jet pyplot](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/galewsky_nc_6days.png)
 
 You see that the unicode plot heavily coarse-grains the simulation, well it's unicode after all!
 And now the last time step, that means time=12days is
@@ -150,7 +150,7 @@ julia> vor = ds["vor"][:,:,1,25];
 julia> pcolormesh(lon,lat,vor')
 ```
 
-![Galewsky jet pyplot](../img/galewsky_nc_12days.png)
+![Galewsky jet pyplot](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/galewsky_nc_12days.png)
 
 The jet broke up into many small eddies, but the turbulence is still confined to the northern hemisphere, cool!
 How this may change when we add mountains (we had `NoOrography` above!), say Earth's orography, you may ask?
@@ -179,7 +179,7 @@ Weather is speedy: run 0003 100%|███████████████�
 ```
 This time the run got the id "0003", but otherwise we do as before.
 
-![Galewsky jet pyplot](../img/galewsky_nc_12days_mountains.png)
+![Galewsky jet pyplot](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/galewsky_nc_12days_mountains.png)
 
 Interesting! The initial conditions have zero velocity in the southern hemisphere, but still, one can see
 some imprint of the orography on vorticity. You can spot the coastline of Antarctica; the Andes and
