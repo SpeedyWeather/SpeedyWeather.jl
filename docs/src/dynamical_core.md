@@ -74,13 +74,17 @@ Now loop over
 
 ```math
 \begin{aligned}
-\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) &= (-1)^{n+1}\nu\nabla^{2n}\zeta \\
-\frac{\partial \mathcal{D}}{\partial t} - \nabla \times (\mathbf{u}(\zeta + f)) &= -\nabla^2(\tfrac{1}{2}(u^2 + v^2) + g\eta) + (-1)^{n+1}\nu\nabla^{2n}\mathcal{D} \\
-\frac{\partial \eta}{\partial t} + \nabla \cdot (\mathbf{u}h) &= 0.
+\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) &= (-1)^{n+1}\nu\nabla^{2n}\zeta, \\
+\frac{\partial \mathcal{D}}{\partial t} - \nabla \times (\mathbf{u}(\zeta + f)) &= -\nabla^2(\tfrac{1}{2}(u^2 + v^2) + g\eta) + (-1)^{n+1}\nu\nabla^{2n}\mathcal{D}, \\
+\frac{\partial \eta}{\partial t} + \nabla \cdot (\mathbf{u}h) &= 0,
 \end{aligned}
 ```
 
-more to come
+where ``\zeta = \hat{\mathbf{z}} \cdot (\nabla \times \mathbf{u})`` is the relative vorticity,
+``\mathcal{D} = \nabla \cdot \mathbf{u}`` the divergence, and ``\eta`` the deviation from the
+fluid's rest height.
+
+**Note**: more to come...
 
 ## Primitive equations
 
@@ -88,14 +92,14 @@ The [primitive equations](https://en.wikipedia.org/wiki/Primitive_equations) sol
 
 ```math
 \begin{aligned}
-\partial_t u = ... \\
-\partial_t v = ... \\
-\partial_t T = ... \\ 
-\partial_t Q = ...
+\partial_t u &= ... \\
+\partial_t v &= ... \\
+\partial_t T &= ... \\ 
+\partial_t Q &= ...
 \end{aligned}
 ```
 
-more to come
+**Note**: more to come...
 
 ## Horizontal diffusion
 
