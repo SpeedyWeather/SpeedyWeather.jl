@@ -7,8 +7,8 @@ where T is in Kelvin and i = 1,2 for saturation with respect to water and ice,
 respectively.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct MagnusCoefs{NF<:AbstractFloat}
-    "Saturation vapour pressure at 0°C"
-    e₀::NF = 6.108
+    "Saturation vapour pressure at 0°C [Pa]"
+    e₀::NF = 610.8
 
     "0°C in Kelvin"
     T₀::NF = 273.16
