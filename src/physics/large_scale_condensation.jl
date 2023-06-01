@@ -93,7 +93,7 @@ function large_scale_condensation!(
     (;nlev) = column
     pₛ = pres[end]                         # surface pressure
 
-    (;gravity) = constants
+    (;gravity, water_density) = constants
     (;σ_levels_thick) = geometry
     latent_heat = convert(NF, atmosphere.latent_heat_condensation/atmosphere.cₚ)
     
@@ -112,9 +112,10 @@ function large_scale_condensation!(
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
             column.cloud_top = min(column.cloud_top, k)             # Page 7 (last sentence)
     
-            # 2. Precipitation due to large-scale condensation
-            Δpₖ_g = pₛ*σ_levels_thick[k]/gravity                    # Formula 4
-            column.precip_large_scale -= Δpₖ_g * humid_tend_k       # Formula 25
+            # 2. Precipitation due to large-scale condensation [kg/m²/s] /ρ for [m/s]
+            # += for vertical integral
+            Δpₖ_g = pₛ*σ_levels_thick[k]/gravity/water_density      # Formula 4
+            column.precip_large_scale += -Δpₖ_g * humid_tend_k       # Formula 25
 
             # only write into humid_tend now to allow humid_tend != 0 before this scheme is called
             humid_tend[k] += humid_tend_k                           

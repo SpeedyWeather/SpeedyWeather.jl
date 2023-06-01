@@ -260,13 +260,14 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
     ∇²ⁿ_implicit = HD.∇²ⁿ_implicit[k]
 
     # Primitive equation models diffuse vor and divergence more selective/adaptive
-    (;vor,div,temp) = progn.timesteps[lf]
-    (;vor_tend,div_tend,temp_tend) = diagn.tendencies
+    (;vor,div,temp,humid) = progn.timesteps[lf]
+    (;vor_tend,div_tend,temp_tend,humid_tend) = diagn.tendencies
     horizontal_diffusion!(vor_tend,vor,∇²ⁿ,∇²ⁿ_implicit)
     horizontal_diffusion!(div_tend,div,∇²ⁿ,∇²ⁿ_implicit)
 
-    # but use the weaker normal diffusion for temperature
+    # but use the weaker normal diffusion for temperature, humidity
     ∇²ⁿ = HD.∇²ⁿ_2D
     ∇²ⁿ_implicit = HD.∇²ⁿ_2D_implicit
     horizontal_diffusion!(temp_tend,temp,∇²ⁿ,∇²ⁿ_implicit)
+    model isa PrimitiveWet && horizontal_diffusion!(humid_tend,humid,∇²ⁿ,∇²ⁿ_implicit)
 end

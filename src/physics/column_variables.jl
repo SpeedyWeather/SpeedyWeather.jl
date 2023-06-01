@@ -64,8 +64,9 @@ function write_column_tendencies!(  D::DiagnosticVariables,
         layer.tendencies.humid_tend_grid[ij] = C.humid_tend[k]
     end
 
-    D.surface.precip_large_scale[ij] = C.precip_large_scale
-    # D.surface.precip_convection[ij] = C.precip_convection
+    # accumulate (set back to zero when netcdf output)
+    D.surface.precip_large_scale[ij] += C.precip_large_scale
+    D.surface.precip_convection[ij] += C.precip_convection
 
     return nothing
 end
@@ -97,7 +98,7 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     # column.cloud_top = column.nlev+1
     # column.conditional_instability = false
     # column.activate_convection = false
-    # column.precip_convection = zero(NF)
+    column.precip_convection = zero(NF)
     # fill!(column.net_flux_humid, 0)
     # fill!(column.net_flux_dry_static_energy, 0)
 

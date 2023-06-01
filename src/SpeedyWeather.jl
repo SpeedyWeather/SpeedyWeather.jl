@@ -79,7 +79,7 @@ export  StartFromFile,
         StartFromRest,
         ZonalJet,
         ZonalWind,
-        StartWithVorticity
+        StartWithRandomVorticity
 
 # EXPORT TEMPERATURE RELAXATION SCHEMES
 export  NoTemperatureRelaxation,

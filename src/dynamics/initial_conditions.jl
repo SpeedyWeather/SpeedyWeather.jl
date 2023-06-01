@@ -1,5 +1,5 @@
 # default initial conditions by model
-initial_conditions_default(::Type{<:Barotropic}) = StartWithVorticity()
+initial_conditions_default(::Type{<:Barotropic}) = StartWithRandomVorticity()
 initial_conditions_default(::Type{<:ShallowWater}) = ZonalJet()
 initial_conditions_default(::Type{<:PrimitiveEquation}) = ZonalWind()
 
@@ -46,7 +46,7 @@ end
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-Base.@kwdef struct StartWithVorticity <: InitialConditions
+Base.@kwdef struct StartWithRandomVorticity <: InitialConditions
 
     "Power law the vorticity should be spectrally distributed by"
     power_law::Float64 = -3
@@ -59,7 +59,7 @@ end
 $(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
 function initial_conditions!(   progn::PrognosticVariables{NF},
-                                initial_conditions::StartWithVorticity,
+                                initial_conditions::StartWithRandomVorticity,
                                 model::ModelSetup) where NF
 
     lmax = progn.trunc+1

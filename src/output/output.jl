@@ -10,6 +10,8 @@ Base.@kwdef struct Keepbits
     temp::Int = 10
     pres::Int = 12
     humid::Int = 7
+    precip_cond::Int = 7
+    precip_conv::Int = 7
 end
 
 function Base.show(io::IO,K::Keepbits)
@@ -56,6 +58,9 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
 
     "[OPTION] output frequency, time step [hrs]"
     output_dt::Float64 = 6
+
+    "actual output time step [sec]"
+    output_dt_sec::Int = 0
 
     "[OPTION] which variables to output, u, v, vor, div, pres, temp, humid"
     output_vars::Vector{Symbol} = default_output_vars(Model)
@@ -111,6 +116,8 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
     const temp::Matrix{NF} = fill(missing_value,nlon,nlat)
     const pres::Matrix{NF} = fill(missing_value,nlon,nlat)
     const humid::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const precip_cond::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const precip_conv::Matrix{NF} = fill(missing_value,nlon,nlat)
 end
 
 # generator function pulling grid resolution and time stepping from ::SpectralGrid and ::TimeStepper
@@ -127,7 +134,7 @@ end
 default_output_vars(::Type{<:Barotropic}) = [:vor,:u]
 default_output_vars(::Type{<:ShallowWater}) = [:vor,:u]
 default_output_vars(::Type{<:PrimitiveDry}) = [:vor,:u,:temp,:pres]
-default_output_vars(::Type{<:PrimitiveWet}) = [:vor,:u,:temp,:humid,:pres]
+default_output_vars(::Type{<:PrimitiveWet}) = [:vor,:u,:temp,:humid,:pres,:precip_cond,:precip_conv]
 
 # print all fields with type <: Number
 function Base.show(io::IO,O::AbstractOutputWriter)
@@ -219,7 +226,13 @@ function initialize!(
     "_FillValue"=>missing_value)),
     orog = NcVar("orog",[dim_lon,dim_lat],t=output_NF,compress=compression_level,
     atts=Dict("long_name"=>"orography","units"=>"m","missing_value"=>missing_value,
-    "_FillValue"=>missing_value))
+    "_FillValue"=>missing_value)),
+    precip_cond = NcVar("precip_cond",[dim_lon,dim_lat,dim_time],t=output_NF,compress=compression_level,
+    atts=Dict("long_name"=>"Large-scale precipitation","units"=>"mm/dt","missing_value"=>missing_value,
+    "_FillValue"=>missing_value)),
+    precip_conv = NcVar("precip_conv",[dim_lon,dim_lat,dim_time],t=output_NF,compress=compression_level,
+    atts=Dict("long_name"=>"Convective precipitation","units"=>"mm/dt","missing_value"=>missing_value,
+    "_FillValue"=>missing_value)),
     )
     
     # GET RUN ID, CREATE FOLDER
@@ -232,7 +245,6 @@ function initialize!(
     feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
     feedback.output = true          # if output=true set feedback.output=true too!
 
-    
     # CREATE NETCDF FILE, vector of NcVars for output
     (; run_path, filename, output_vars) = output
     vars_out = [all_ncvars[key] for key in keys(all_ncvars) if key in vcat(:time,output_vars)]
@@ -244,7 +256,8 @@ function initialize!(
     
     # OUTPUT FREQUENCY
     output.output_every_n_steps = max(1,floor(Int,output.output_dt/time_stepping.Δt_hrs))
-    
+    output.output_dt_sec = output.output_every_n_steps*time_stepping.Δt_sec
+
     # RESET COUNTERS
     output.timestep_counter = 0         # time step counter
     output.output_counter = 0           # output step counter
@@ -357,7 +370,7 @@ function write_netcdf_variables!(   output::OutputWriter,
     (;output_vars) = output                     # Vector{Symbol} of variables to output
     i = output.output_counter
 
-    (;u, v, vor, div, pres, temp, humid) = output
+    (;u, v, vor, div, pres, temp, humid, precip_cond, precip_conv) = output
     (;output_Grid, interpolator) = output
     (;quadrant_rotation, matrix_quadrant) = output
 
@@ -367,7 +380,9 @@ function write_netcdf_variables!(   output::OutputWriter,
 
         if output.as_matrix     # resort gridded variables interpolation-free into a matrix
 
-            # create (matrix,grid) tuples for simultaneous grid -> matrix conversion  
+            # create (matrix,grid) tuples for simultaneous grid -> matrix conversion
+            # TODO this currently does the Matrix! conversion to all variables, not just output_vars
+            # as arrays are always initialised  
             MGs = ((M,G) for (M,G) in zip((u,v,vor,div,temp,humid),
                                           (u_grid,v_grid,vor_grid,div_grid,temp_grid,humid_grid))
                                            if length(M) > 0)
@@ -408,23 +423,40 @@ function write_netcdf_variables!(   output::OutputWriter,
     end
 
     # surface pressure, i.e. interface displacement η
-    if :pres in output_vars
-        (; pres_grid ) = diagn.surface
+    (; pres_grid, precip_large_scale, precip_convection ) = diagn.surface
 
-        if output.as_matrix
-            RingGrids.Matrix!(pres,diagn.surface.pres_grid; quadrant_rotation, matrix_quadrant)
-        else
-            RingGrids.interpolate!(output_Grid(pres),pres_grid,interpolator)
+    if output.as_matrix
+        if :pres in output_vars || :precip_cond in output_vars || :precip_conv in output_vars
+            MGs = ((M,G) for (M,G) in zip((pres,precip_cond,precip_conv),
+                                            (pres_grid, precip_large_scale, precip_convection)))
+
+            RingGrids.Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
         end
-
-        if Model <: PrimitiveEquation
-            @. pres = exp(pres)/100     # convert from log(pₛ) to surface pressure pₛ [hPa]
-        end
-
-        round!(pres,output.keepbits.pres)
-        
-        NetCDF.putvar(output.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
+    else
+        :pres in output_vars && RingGrids.interpolate!(output_Grid(pres),pres_grid,interpolator)
+        :precip_cond in output_vars && RingGrids.interpolate!(output_Grid(precip_cond),precip_large_scale,interpolator)
+        :precip_conv in output_vars && RingGrids.interpolate!(output_Grid(precip_conv),precip_convection,interpolator)
     end
+
+    # after output set precip accumulators back to zero
+    precip_large_scale .= 0
+    precip_convection .= 0
+
+    # convert from [m/s] to [mm/Δt], where Δt is the output time step
+    precip_cond *= 1000*output.output_dt_sec
+    precip_conv *= 1000*output.output_dt_sec
+
+    if Model <: PrimitiveEquation
+        @. pres = exp(pres)/100     # convert from log(pₛ) to surface pressure pₛ [hPa]
+    end
+
+    :pres in output_vars && round!(pres,output.keepbits.pres)
+    :precip_cond in output_vars && round!(precip_cond,output.keepbits.precip_cond)
+    :precip_conv in output_vars && round!(precip_conv,output.keepbits.precip_conv)
+    
+    :pres in output_vars && NetCDF.putvar(output.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
+    :precip_cond in output_vars && NetCDF.putvar(output.netcdf_file,"precip_cond",precip_cond,start=[1,1,i],count=[-1,-1,1])
+    :precip_conv in output_vars && NetCDF.putvar(output.netcdf_file,"precip_conv",precip_conv,start=[1,1,i],count=[-1,-1,1])
 
     return nothing
 end

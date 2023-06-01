@@ -24,6 +24,9 @@ Base.@kwdef struct EarthAtmosphere <: AbstractAtmosphere
     "specific gas constant for water vapour [J/kg/K]"
     R_vapour::Float64 = 1000*R_gas/mol_mass_vapour
 
+    "water density [kg/m³]"
+    water_density::Float64 = 1000
+
     "latent heat of condensation [J/g] for consistency with specific humidity [g/Kg], also called alhc"
     latent_heat_condensation::Float64 = 2501
 
