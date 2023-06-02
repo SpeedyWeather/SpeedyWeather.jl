@@ -47,9 +47,8 @@ end
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
 Base.@kwdef struct StartWithRandomVorticity <: InitialConditions
-
-    "Power law the vorticity should be spectrally distributed by"
-    power_law::Float64 = -3
+    "Power of the spectral distribution k^power"
+    power::Float64 = -3
 
     "(approximate) amplitude in [1/s], used as standard deviation of spherical harmonic coefficients"
     amplitude::Float64 = 1e-5
@@ -63,7 +62,7 @@ function initial_conditions!(   progn::PrognosticVariables{NF},
                                 model::ModelSetup) where NF
 
     lmax = progn.trunc+1
-    power = initial_conditions.power_law + 1    # +1 as power is summed of orders m
+    power = initial_conditions.power + 1    # +1 as power is summed of orders m
     ξ = randn(Complex{NF},lmax,lmax)*convert(NF,initial_conditions.amplitude)
 
     for progn_layer in progn.layers

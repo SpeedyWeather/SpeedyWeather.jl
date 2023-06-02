@@ -12,14 +12,21 @@ model [^3] and a primitive equation model[^4].
 ## Barotropic vorticity equation
 
 The barotropic vorticity equation is the prognostic equation that describes the time evolution of
-relative vorticity ``\zeta`` with advection, Coriolis force and diffusion in a single global layer.
+relative vorticity ``\zeta`` with advection, Coriolis force and diffusion in a single global layer
+on the sphere.
 
 ```math
-\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) = (-1)^{n+1}\nu\nabla^{2n}\zeta
+\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) =
+\nabla \times \mathbf{F} + (-1)^{n+1}\nu\nabla^{2n}\zeta
 ```
 with time ``t``, velocity vector ``\mathbf{u} = (u, v)``, Coriolis parameter ``f``, and hyperdiffusion
-``(-1)^{n+1} \nu \nabla^{2n} \zeta`` (``n`` is the hyperdiffusion order; see [Horizontal diffusion](@ref)). Starting with some relative vorticity
-``\zeta``, the [Laplacian](@ref) is inverted to obtain the stream function ``\Psi``
+``(-1)^{n+1} \nu \nabla^{2n} \zeta`` (``n`` is the hyperdiffusion order; see [Horizontal diffusion](@ref)).
+We also include a forcing vector ``\mathbf{F} = (F_u,F_v)`` which acts on the
+zonal velocity ``u`` and the meridional velocity ``v`` and hence its curl ``\nabla \times \mathbf{F}``
+is a tendency for relative vorticity ``\zeta``.
+
+Starting with some relative vorticity ``\zeta``, the [Laplacian](@ref) is
+inverted to obtain the stream function ``\Psi``
 
 ```math
 \Psi = \nabla^{-2}\zeta
@@ -39,34 +46,45 @@ which is described in [Derivatives in spherical coordinates](@ref).
 
 ### Algorithm
 
-We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrate the barotropic vorticity equation
+We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrate the barotropic vorticity equation.
+As an intial step
 
-1. Start with initial conditions of ``\zeta_{lm}`` in spectral space
-2. Use ``\zeta_{lm}`` to
-    - Invert the [Laplacian](@ref) to obtain the stream function ``\Psi_{lm}`` in spectral space
-    - Transform ``\zeta_{lm}`` to ``\zeta`` in grid-point space
-3. Use ``\Psi_lm`` to
-    - obtain zonal velocity ``(\cos(\theta)u)_{lm}`` through a [Meridional derivative](@ref)
-    - obtain meridional velocity ``(\cos(\theta)v)_{lm}`` through a [Zonal derivative](@ref)
-4. Transform zonal and meridional velocity ``(\cos(\theta)u)_{lm}``, ``(\cos(\theta)v)_{lm}`` to grid-point space and unscale the ``\cos(\theta)`` factor to obtain ``u,v``.
-5. Multiply ``u,v`` with ``\zeta+f`` in grid-point space
-6. Transform ``u(\zeta + f)`` and ``v(\zeta+f)`` to spectral space
-7. Compute the divergence of ``(\mathbf{u}(\zeta + f))_{lm}`` in spectral space through a [Meridional derivative](@ref) and [Zonal derivative](@ref) which will be the tendency of ``\zeta_{lm}``
-8. Compute the [Horizontal diffusion](@ref) based on that tendency
-9. Compute a leapfrog time step as described in [Time integration](@ref)
+0\. Start with initial conditions of ``\zeta_{lm}`` in spectral space and transform this model state to grid-point space:
+- Invert the [Laplacian](@ref) to obtain the stream function ``\Psi_{lm}`` in spectral space
+- obtain zonal velocity ``(\cos(\theta)u)_{lm}`` through a [Meridional derivative](@ref)
+- obtain meridional velocity ``(\cos(\theta)v)_{lm}`` through a [Zonal derivative](@ref)
+- Transform zonal and meridional velocity ``(\cos(\theta)u)_{lm}``, ``(\cos(\theta)v)_{lm}`` to grid-point space
+- Unscale the ``\cos(\theta)`` factor to obtain ``u,v``
+- Transform ``\zeta_{lm}`` to ``\zeta`` in grid-point space
+
+Now loop over
+
+1. Compute the forcing vector ``\mathbf{F} = (F_u,F_v)`` for ``u`` and ``v``
+2. Multiply ``u,v`` with ``\zeta+f`` in grid-point space
+3. Add ``A = F_u + v(\zeta + f)`` and ``B = F_v - u(\zeta + f)``
+4. Transform these vector components to spectral space ``A_{lm}``, ``B_{lm}``
+5. Compute the curl of ``(A,B)_{lm}`` in spectral space which is the tendency of ``\zeta_{lm}``
+6. Compute the [Horizontal diffusion](@ref) based on that tendency
+7. Compute a leapfrog time step as described in [Time integration](@ref)
+8. Transform the spectral state of ``\zeta_{lm}`` to grid-point ``u,v,\zeta`` as described in 0.
+9. Possibly do some output
 10. Repeat from 1.
 
 ## Shallow water equations
 
 ```math
 \begin{aligned}
-\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) &= (-1)^{n+1}\nu\nabla^{2n}\zeta \\
-\frac{\partial \mathcal{D}}{\partial t} - \nabla \times (\mathbf{u}(\zeta + f)) &= -\nabla^2(\tfrac{1}{2}(u^2 + v^2) + g\eta) + (-1)^{n+1}\nu\nabla^{2n}\mathcal{D} \\
-\frac{\partial \eta}{\partial t} + \nabla \cdot (\mathbf{u}h) &= 0.
+\frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) &= (-1)^{n+1}\nu\nabla^{2n}\zeta, \\
+\frac{\partial \mathcal{D}}{\partial t} - \nabla \times (\mathbf{u}(\zeta + f)) &= -\nabla^2(\tfrac{1}{2}(u^2 + v^2) + g\eta) + (-1)^{n+1}\nu\nabla^{2n}\mathcal{D}, \\
+\frac{\partial \eta}{\partial t} + \nabla \cdot (\mathbf{u}h) &= 0,
 \end{aligned}
 ```
 
-more to come
+where ``\zeta = \hat{\mathbf{z}} \cdot (\nabla \times \mathbf{u})`` is the relative vorticity,
+``\mathcal{D} = \nabla \cdot \mathbf{u}`` the divergence, and ``\eta`` the deviation from the
+fluid's rest height.
+
+**Note**: more to come...
 
 ## Primitive equations
 
@@ -74,14 +92,14 @@ The [primitive equations](https://en.wikipedia.org/wiki/Primitive_equations) sol
 
 ```math
 \begin{aligned}
-\partial_t u = ... \\
-\partial_t v = ... \\
-\partial_t T = ... \\ 
-\partial_t Q = ...
+\partial_t u &= ... \\
+\partial_t v &= ... \\
+\partial_t T &= ... \\ 
+\partial_t Q &= ...
 \end{aligned}
 ```
 
-more to come
+**Note**: more to come...
 
 ## Horizontal diffusion
 

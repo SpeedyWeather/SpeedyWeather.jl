@@ -51,6 +51,9 @@ export  Model,
         PrimitiveDryModel,
         PrimitiveWetModel
 
+export  Earth,
+        EarthAtmosphere
+
 # EXPORT GRIDS
 export  SpectralGrid,
         Geometry
