@@ -1,8 +1,8 @@
 using Documenter, SpeedyWeather
 
 makedocs(
-    format = Documenter.HTML(
-    prettyurls = get(ENV, "CI", nothing) == "true"),
+     format=Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",
+                            ansicolor=true),
     sitename="SpeedyWeather.jl",
     authors="M Klöwer and SpeedyWeather contributors",
     modules=[SpeedyWeather],
