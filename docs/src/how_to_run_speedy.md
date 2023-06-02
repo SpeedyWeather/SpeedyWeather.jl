@@ -17,56 +17,39 @@ on the sphere without rotation. We start by defining the `SpectralGrid` object.
 To have a resolution of about 100km, we choose a spectral resolution of
 T127 (see [Available resolutions](@ref)) and `nlev=1` vertical levels.
 The `SpectralGrid` object will provide us with some more information
-```julia
-julia> spectral_grid = SpectralGrid(trunc=127,nlev=1)
-SpectralGrid:
- Spectral:   T127 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
- Grid:       40320-element, 192-ring OctahedralGaussianGrid{Float32} (quadratic)
- Resolution: 112km (average)
- Vertical:   1-level SigmaCoordinates
+```@example howtorun
+using SpeedyWeather
+
+spectral_grid = SpectralGrid(trunc=127,nlev=1)
 ```
 We could have specified further options, but let's ignore that for now.
 Next step we create a planet that's like Earth but not rotating
-```julia
-julia> still_earth = Earth(rotation=0)
-Main.SpeedyWeather.Earth
-  rotation: Float64 0.0
-  gravity: Float64 9.81
-  daily_cycle: Bool true
-  length_of_day: Float64 24.0
-  seasonal_cycle: Bool true
-  length_of_year: Float64 365.25
-  equinox: Dates.DateTime
-  axial_tilt: Float64 23.4
+```@example howtorun
+still_earth = Earth(rotation=0)
 ```
-There are other options to create a planet but they are irreleveant for the
+There are other options to create a planet but they are irrelevant for the
 barotropic vorticity equations. We also want to specify the initial conditions,
 randomly distributed vorticity is already defined
-```julia
-julia> initial_conditions = StartWithRandomVorticity()
-StartWithRandomVorticity
-  power_law: Float64 -3.0
-  amplitude: Float64 1.0e-5
+```@example howtorun
+initial_conditions = StartWithRandomVorticity()
 ```
 By default, the power of vorticity is spectrally distributed with ``k^{-3}``, ``k`` being the
-horizontal wavenumber, and the amplitude is ``10^{-5}\text{ s}^{-1}``.
+horizontal wavenumber, and the amplitude is ``10^{-5}\text{s}^{-1}``.
 
 Now we want to construct a `BarotropicModel`
 with these
-```julia
-julia> model = BarotropicModel(;spectral_grid, initial_conditions, planet=still_earth);
+```@example howtorun
+model = BarotropicModel(;spectral_grid, initial_conditions, planet=still_earth)
 ```
 The `model` contains all the parameters, but isn't initialized yet, which we can do
-with and then run it.
-```julia
-julia> simulation = initialize!(model);
-julia> run!(simulation,n_days=30)
-```
-The `run!` command will always return the prognostic variables, which, by default, are 
+with and then run it. The `run!` command will always return the prognostic variables, which, by default, are 
 plotted for surface relative vorticity with a unicode plot. The resolution of the plot
 is not necessarily representative but it lets us have a quick look at the result
+```@example howtorun
+simulation = initialize!(model);
 
-![Barotropic vorticity unicode plot](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/barotropic_vorticity.jpg)
+run!(simulation,n_days=30)
+```
 
 Woohoo! I can see turbulence! You could pick up where this simulation stopped by simply
 doing `run!(simulation,n_days=50)` again. We didn't store any output, which
@@ -78,43 +61,32 @@ with default settings. More options on output in [NetCDF output](@ref).
 As a second example, let's investigate the Galewsky et al.[^1] test case for the shallow
 water equations with and without mountains. As the shallow water system has also only
 one level, we can reuse the `SpectralGrid` from Example 1.
-```julia
-julia> spectral_grid = SpectralGrid(trunc=127,nlev=1)
+```@example howtorun
+spectral_grid = SpectralGrid(trunc=127,nlev=1)
 ```
 Now as a first simulation, we want to disable any orography, so we create a `NoOrography`
-```julia
-julia> orography = NoOrography(spectral_grid)
-NoOrography{Float32, OctahedralGaussianGrid{Float32}}
+```@example howtorun
+orography = NoOrography(spectral_grid)
 ```
 Although the orography is zero, you have to pass on `spectral_grid` so that it can
 still initialize zero-arrays of the right size and element type. Awesome.
 This time the initial conditions should be set the the Galewsky et al.[^1] zonal
 jet, which is already defined as
-```julia
-julia> initial_conditions = ZonalJet()
-ZonalJet
-  latitude: Float64 45.0
-  width: Float64 19.28571428571429
-  umax: Float64 80.0
-  perturb_lat: Float64 45.0
-  perturb_lon: Float64 270.0
-  perturb_xwidth: Float64 19.098593171027442
-  perturb_ywidth: Float64 3.819718634205488
-  perturb_height: Float64 120.0
+```@example howtorun
+initial_conditions = ZonalJet()
 ```
 The jet sits at 45˚N with a maximum velocity of 80m/s and a perturbation as described in their paper.
 Now we construct a model, but this time a `ShallowWaterModel`
+```@example howtorun
+model = ShallowWaterModel(;spectral_grid, orography, initial_conditions);
+
+simulation = initialize!(model);
 ```
-julia> model = ShallowWaterModel(;spectral_grid, orography, initial_conditions);
-julia> simulation = initialize!(model);
-```
-![Galewsky jet unicode plot](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/galewsky.jpg)
 
 Oh yeah. That looks like the wobbly jet in their paper. Let's run it again for another 6 days
 but this time also store [NetCDF output](@ref).
-```
-julia> run!(simulation,n_days=6,output=true)
-Weather is speedy: run 0002 100%|███████████████████████| Time: 0:00:12 (115.37 years/day)
+```@example howtorun
+run!(simulation,n_days=6,output=true)
 ```
 The progress bar tells us that the simulation run got the identification "0002", meaning that
 data is stored in the folder `/run_0002`, so let's plot that data properly (and not just using UnicodePlots).
