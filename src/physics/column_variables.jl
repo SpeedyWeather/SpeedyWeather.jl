@@ -1,6 +1,5 @@
 """
-    get_column!(C,D,ij,G)
-
+$(TYPEDSIGNATURES)
 Update `C::ColumnVariables` by copying the prognostic variables from `D::DiagnosticVariables`
 at gridpoint index `ij`. Provide `G::Geometry` for coordinate information."""
 function get_column!(   C::ColumnVariables,
@@ -31,6 +30,7 @@ function get_column!(   C::ColumnVariables,
         C.humid[k] = layer.grid_variables.humid_grid[ij]
 
         # as well as geopotential (not actually prognostic though)
+        # TODO geopot on the grid is currently not computed in dynamics
         C.geopot[k] = layer.grid_variables.geopot_grid[ij]
     end
 end
@@ -47,8 +47,7 @@ function get_column!(   C::ColumnVariables,
 end
 
 """
-    write_column_tendencies!(D,C,ij,G)
-
+$(TYPEDSIGNATURES)
 Write the parametrization tendencies from `C::ColumnVariables` into the horizontal fields
 of tendencies stored in `D::DiagnosticVariables` at gridpoint index `ij`."""
 function write_column_tendencies!(  D::DiagnosticVariables,
@@ -72,27 +71,26 @@ function write_column_tendencies!(  D::DiagnosticVariables,
 end
 
 """
-    reset_column!(column::ColumnVariables)
-
+$(TYPEDSIGNATURES)
 Set the accumulators (tendencies but also vertical sums and similar) back to zero
 for `column` to be reused at other grid points."""
 function reset_column!(column::ColumnVariables{NF}) where NF
 
     # set tendencies to 0 for += accumulation
-    fill!(column.u_tend,0)
-    fill!(column.v_tend,0)
-    fill!(column.temp_tend,0)
-    fill!(column.humid_tend,0)
+    column.u_tend .= 0
+    column.v_tend .= 0
+    column.temp_tend .= 0
+    column.humid_tend .= 0
 
     # set fluxes to 0 for += accumulation
-    fill!(column.flux_u_upward,0)
-    fill!(column.flux_u_downward,0)
-    fill!(column.flux_v_upward,0)
-    fill!(column.flux_v_downward,0)
-    fill!(column.flux_humid_upward,0)
-    fill!(column.flux_humid_downward,0)
-    fill!(column.flux_temp_upward,0)
-    fill!(column.flux_temp_downward,0)
+    column.flux_u_upward .= 0
+    column.flux_u_downward .= 0
+    column.flux_v_upward .= 0
+    column.flux_v_downward .= 0
+    column.flux_humid_upward .= 0
+    column.flux_humid_downward .= 0
+    column.flux_temp_upward .= 0
+    column.flux_temp_downward .= 0
 
     # # Convection
     # column.cloud_top = column.nlev+1

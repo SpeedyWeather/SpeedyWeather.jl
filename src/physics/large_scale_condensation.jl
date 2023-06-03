@@ -71,7 +71,7 @@ function large_scale_condensation!(
     model::PrimitiveWet,
 )
     large_scale_condensation!(column,model.large_scale_condensation,
-        model.geometry,model.constants,model.atmosphere)
+        model.geometry,model.constants,model.atmosphere,model.time_stepping)
 end
 
 
@@ -81,6 +81,7 @@ function large_scale_condensation!(
     geometry::Geometry,
     constants::DynamicsConstants,
     atmosphere::AbstractAtmosphere,
+    time_stepping::TimeStepper,
     ) where NF
 
     (;relative_threshold,humid_tend_max) = scheme
@@ -94,6 +95,9 @@ function large_scale_condensation!(
     pₛ = pres[end]                         # surface pressure
 
     (;gravity, water_density) = constants
+    (;Δt_sec) = time_stepping
+    Δt_gρ = Δt_sec/gravity/water_density
+
     (;σ_levels_thick) = geometry
     latent_heat = convert(NF, atmosphere.latent_heat_condensation/atmosphere.cₚ)
     
@@ -106,16 +110,16 @@ function large_scale_condensation!(
         if humid[k] > humid_threshold
             # accumulate in tendencies (nothing is added if humidity not above threshold)
             humid_tend_k = -(humid[k] - humid_threshold) / time_scale                   # Formula 22
-            temp_tend[k] += -latent_heat * min(humid_tend_k, humid_tend_max[k]*pres[k])   # Formula 23
+            temp_tend[k] += -latent_heat * min(humid_tend_k, humid_tend_max[k]*pres[k]) # Formula 23
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
-            column.cloud_top = min(column.cloud_top, k)             # Page 7 (last sentence)
+            column.cloud_top = min(column.cloud_top, k)         # Page 7 (last sentence)
     
             # 2. Precipitation due to large-scale condensation [kg/m²/s] /ρ for [m/s]
             # += for vertical integral
-            Δpₖ_g = pₛ*σ_levels_thick[k]/gravity/water_density      # Formula 4
-            column.precip_large_scale += -Δpₖ_g * humid_tend_k       # Formula 25
+            Δpₖ_g = pₛ*σ_levels_thick[k]*Δt_gρ                  # Formula 4 *Δt for [m] of rain during Δt
+            column.precip_large_scale += -Δpₖ_g * humid_tend_k  # Formula 25, unit [m]
 
             # only write into humid_tend now to allow humid_tend != 0 before this scheme is called
             humid_tend[k] += humid_tend_k                           

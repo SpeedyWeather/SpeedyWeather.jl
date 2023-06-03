@@ -442,9 +442,9 @@ function write_netcdf_variables!(   output::OutputWriter,
     precip_large_scale .= 0
     precip_convection .= 0
 
-    # convert from [m/s] to [mm/Δt], where Δt is the output time step
-    precip_cond *= 1000*output.output_dt_sec
-    precip_conv *= 1000*output.output_dt_sec
+    # convert from [m] to [mm] within output time step (e.g. 6hours)
+    precip_cond *= 1000
+    precip_conv *= 1000
 
     if Model <: PrimitiveEquation
         @. pres = exp(pres)/100     # convert from log(pₛ) to surface pressure pₛ [hPa]

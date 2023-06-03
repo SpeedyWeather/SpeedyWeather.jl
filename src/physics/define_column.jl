@@ -17,14 +17,14 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     latd::NF = 0                            # latitude, needed for shortwave radiation
 
     # PROGNOSTIC VARIABLES
-    const u::Vector{NF} = zeros(NF,nlev)            # zonal velocity
-    const v::Vector{NF} = zeros(NF,nlev)            # meridional velocity
-    const temp::Vector{NF} = zeros(NF,nlev)         # temperature
-    const humid::Vector{NF} = zeros(NF,nlev)        # specific humidity
+    const u::Vector{NF} = zeros(NF,nlev)            # zonal velocity [m/s]
+    const v::Vector{NF} = zeros(NF,nlev)            # meridional velocity [m/s]
+    const temp::Vector{NF} = zeros(NF,nlev)         # temperature [K]
+    const humid::Vector{NF} = zeros(NF,nlev)        # specific humidity [kg/kg]
 
     # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
-    const ln_pres::Vector{NF} = zeros(NF,nlev+1)    # logarithm of pressure [log(hPa)]
-    const pres::Vector{NF} = zeros(NF,nlev+1)       # pressure [hPa]
+    const ln_pres::Vector{NF} = zeros(NF,nlev+1)    # logarithm of pressure [log(Pa)]
+    const pres::Vector{NF} = zeros(NF,nlev+1)       # pressure [Pa]
 
     # TENDENCIES to accumulate the parametrizations into
     const u_tend::Vector{NF} = zeros(NF,nlev)                   # zonal velocity [m]
@@ -49,8 +49,8 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const flux_humid_downward::Vector{NF} = zeros(NF,nlev+1)
 
     # THERMODYNAMICS
-    const sat_humid::Vector{NF} = zeros(NF,nlev)                # Saturation specific humidity
-    const sat_vap_pres::Vector{NF} = zeros(NF,nlev)             # Saturation vapour pressure
+    const sat_humid::Vector{NF} = zeros(NF,nlev)                # Saturation specific humidity [kg/kg]
+    const sat_vap_pres::Vector{NF} = zeros(NF,nlev)             # Saturation vapour pressure [Pa]
     const dry_static_energy::Vector{NF} = zeros(NF,nlev)        # Dry static energy
     const moist_static_energy::Vector{NF} = zeros(NF,nlev)      # Moist static energy
     
@@ -62,18 +62,18 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     sat_moist_static_energy_half::Vector{NF} = zeros(NF,nlev)  # Saturation moist static energy interpolated to half-levels
 
     # Convection
-    conditional_instability::Bool = false                    # Whether a conditional instability exists in this column (condition 1)
-    activate_convection::Bool = false                        # Whether convection should be activated in this column (condition 2)
-    cloud_top::Int = nlev+1                                  # Top-of-convection layer
-    excess_humidity::NF = 0                                  # Excess humidity due to convection
-    cloud_base_mass_flux::NF = 0                             # Mass flux at the top of the PBL
-    precip_convection::NF = 0                                # Precipitation due to convection
+    conditional_instability::Bool = false                       # in this column? (condition 1)
+    activate_convection::Bool = false                           # in this column? (condition 2)
+    cloud_top::Int = nlev+1                                     # Top-of-convection layer
+    excess_humidity::NF = 0                                     # due to convection
+    cloud_base_mass_flux::NF = 0                                # Mass flux at the top of the PBL
+    precip_convection::NF = 0                                   # Precipitation due to convection [m]
     net_flux_humid::Vector{NF} = zeros(NF,nlev)              # Net fluxes of moisture in this column
     net_flux_dry_static_energy::Vector{NF} = zeros(NF,nlev)  # Net fluxes of dry static energy in this column
     entrainment_profile::Vector{NF} = zeros(NF,nlev)         # Entrainment coefficients
 
     # Large-scale condensation
-    precip_large_scale::NF = 0  # Precipitation due to large-scale condensation
+    precip_large_scale::NF = 0                                  # precipitation [m]
 
     # Longwave radiation
     ## New vars in radlw_down!
