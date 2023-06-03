@@ -6,9 +6,6 @@ Base.@kwdef struct SpeedyCondensation{NF<:AbstractFloat} <: AbstractCondensation
     "number of vertical levels"
     nlev::Int
 
-    # "Index of atmospheric level at which large-scale condensation begins"
-    # k_lsc::Int = 2
-
     "Relative humidity threshold for boundary layer"
     threshold_boundary_layer::Float64 = 0.95
 
@@ -74,7 +71,12 @@ function large_scale_condensation!(
         model.geometry,model.constants,model.atmosphere,model.time_stepping)
 end
 
-
+"""
+$(TYPEDSIGNATURES)
+Large-scale condensation for a `column` by relaxation back to a reference
+relative humidity if larger than that. Calculates the tendencies for
+specific humidity and temperature and integrates the large-scale
+precipitation vertically for output."""
 function large_scale_condensation!(
     column::ColumnVariables{NF},
     scheme::SpeedyCondensation,
@@ -96,13 +98,13 @@ function large_scale_condensation!(
 
     (;gravity, water_density) = constants
     (;Δt_sec) = time_stepping
-    Δt_gρ = Δt_sec/gravity/water_density
+    pₛΔt_gρ = pₛ*Δt_sec/gravity/water_density   # precompute constant
 
     (;σ_levels_thick) = geometry
     latent_heat = convert(NF, atmosphere.latent_heat_condensation/atmosphere.cₚ)
     
     # 1. Tendencies of humidity and temperature due to large-scale condensation
-    for k in n_stratosphere_levels+1:nlev   # top to bottom, skip stratospheric levels
+    @inbounds for k in n_stratosphere_levels+1:nlev   # top to bottom, skip stratospheric levels
 
         # Specific humidity threshold for condensation
         humid_threshold = relative_threshold[k] * sat_humid[k]               
@@ -114,12 +116,12 @@ function large_scale_condensation!(
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
-            column.cloud_top = min(column.cloud_top, k)         # Page 7 (last sentence)
+            column.cloud_top = min(column.cloud_top, k)             # Page 7 (last sentence)
     
             # 2. Precipitation due to large-scale condensation [kg/m²/s] /ρ for [m/s]
             # += for vertical integral
-            Δpₖ_g = pₛ*σ_levels_thick[k]*Δt_gρ                  # Formula 4 *Δt for [m] of rain during Δt
-            column.precip_large_scale += -Δpₖ_g * humid_tend_k  # Formula 25, unit [m]
+            ΔpₖΔt_gρ = σ_levels_thick[k]*pₛΔt_gρ                    # Formula 4 *Δt for [m] of rain during Δt
+            column.precip_large_scale += -ΔpₖΔt_gρ * humid_tend_k   # Formula 25, unit [m]
 
             # only write into humid_tend now to allow humid_tend != 0 before this scheme is called
             humid_tend[k] += humid_tend_k                           
