@@ -66,7 +66,8 @@ export  LowerTriangularMatrix,
         OctahedralGaussianGrid,
         OctahedralClenshawGrid,
         HEALPixGrid,
-        OctaHEALPixGrid
+        OctaHEALPixGrid,
+        plot
 
 export  Leapfrog
 

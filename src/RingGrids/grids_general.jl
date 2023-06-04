@@ -133,6 +133,7 @@ function get_latdlonds(Grid::Type{<:AbstractGrid},nlat_half::Integer)
 end
 
 get_latd(grid::Grid) where {Grid<:AbstractGrid} = get_latd(Grid,grid.nlat_half)
+get_lond(grid::Grid) where {Grid<:AbstractGrid} = get_lond(Grid,grid.nlat_half)
 
 function get_latd(Grid::Type{<:AbstractGrid},nlat_half::Integer)
     colat = get_colat(Grid,nlat_half)

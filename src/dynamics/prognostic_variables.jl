@@ -354,24 +354,7 @@ get_humidity(progn::PrognosticVariables; kwargs...) = get_var(progn, :humid; kwa
 get_pressure(progn::PrognosticVariables; lf::Integer=1) = progn.surface.timesteps[lf].pres
 
 function Base.show(io::IO, P::PrognosticVariables)
-
-    ζ = P.layers[end].timesteps[1].vor  # create a view on vorticity
-    ζ_grid = Matrix(gridded(ζ))         # to grid space
-    ζ_grid = ζ_grid[:,end:-1:1]         # flip latitudes
-
-    nlon,nlat = size(ζ_grid)
-
-    plot_kwargs = pairs((   xlabel="˚E",
-                            xfact=360/(nlon-1),
-                            ylabel="˚N",
-                            yfact=180/(nlat-1),
-                            yoffset=-90,
-                            title="Surface relative vorticity",
-                            colormap=:viridis,
-                            compact=true,
-                            colorbar=true,
-                            width=60,
-                            height=30))
-
-    print(io,UnicodePlots.heatmap(ζ_grid';plot_kwargs...))
+    ζ = P.layers[end].timesteps[1].vor          # create a view on surface relative vorticity
+    ζ_grid = gridded(ζ)                         # to grid space
+    print(io,plot(ζ_grid,title="Surface relative vorticity"))
 end
