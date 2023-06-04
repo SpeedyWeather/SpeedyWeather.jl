@@ -16,7 +16,7 @@ end
 
 """Linear boundary layer drag Following Held and Suarez, 1996 BAMS
 $(TYPEDFIELDS)"""
-@with_kw struct LinearDrag{NF<:AbstractFloat} <: BoundaryLayerDrag{NF}
+Base.@kwdef struct LinearDrag{NF<:AbstractFloat} <: BoundaryLayerDrag{NF}
     # PARAMETERS
     σb::Float64 = 0.7           # sigma coordinate below which linear drag is applied
     time_scale::Float64 = 24    # [hours] time scale for linear drag coefficient at σ=1 (=1/kf in HS96)

@@ -1,7 +1,7 @@
 """
 Struct holding constants needed at runtime for the dynamical core in number format NF.
 $(TYPEDFIELDS)"""
-@with_kw struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConstants{NF}
+Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConstants{NF}
     # PHYSICAL CONSTANTS
     "Radius of Planet [m]"
     radius::NF
@@ -30,6 +30,9 @@ $(TYPEDFIELDS)"""
 
     "= R_dry/cₚ, gas const for air over heat capacity"
     κ::NF
+
+    "water density [kg/m³]"
+    water_density::NF
 
     "coriolis frequency [1/s] (scaled by radius as is vorticity) = 2Ω*sin(lat)*radius"
     f_coriolis::Vector{NF}
@@ -63,7 +66,7 @@ function DynamicsConstants( spectral_grid::SpectralGrid,
                             geometry::Geometry)
 
     # PHYSICAL CONSTANTS
-    (;R_dry, R_vapour, lapse_rate, cₚ) = atmosphere
+    (;R_dry, R_vapour, lapse_rate, cₚ, water_density) = atmosphere
     (;ΔT_stratosphere, σ_tropopause, temp_ref) = atmosphere
     (;NF, radius) = spectral_grid
     (;rotation, gravity) = planet
@@ -102,7 +105,7 @@ function DynamicsConstants( spectral_grid::SpectralGrid,
 
     # This implies conversion to NF
     return DynamicsConstants{NF}(;  radius,rotation,gravity,layer_thickness,
-                                    R_dry,R_vapour,μ_virt_temp,cₚ,κ,
+                                    R_dry,R_vapour,μ_virt_temp,cₚ,κ,water_density,
                                     f_coriolis,
                                     σ_lnp_A,σ_lnp_B,
                                     Δp_geopot_half, Δp_geopot_full,

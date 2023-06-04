@@ -26,7 +26,7 @@ function allocate(
     return zeros(PrognosticVariables{NF},Model,trunc,nlev)
 end
 
-@with_kw struct StartFromRest <: InitialConditions 
+Base.@kwdef struct StartFromRest <: InitialConditions 
     pressure_on_orography::Bool = false
 end
 
@@ -46,10 +46,9 @@ end
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-@with_kw struct StartWithRandomVorticity <: InitialConditions
-
-    "Power law the vorticity should be spectrally distributed by"
-    power_law::Float64 = -3
+Base.@kwdef struct StartWithRandomVorticity <: InitialConditions
+    "Power of the spectral distribution k^power"
+    power::Float64 = -3
 
     "(approximate) amplitude in [1/s], used as standard deviation of spherical harmonic coefficients"
     amplitude::Float64 = 1e-5
@@ -63,7 +62,7 @@ function initial_conditions!(   progn::PrognosticVariables{NF},
                                 model::ModelSetup) where NF
 
     lmax = progn.trunc+1
-    power = initial_conditions.power_law + 1    # +1 as power is summed of orders m
+    power = initial_conditions.power + 1    # +1 as power is summed of orders m
     ξ = randn(Complex{NF},lmax,lmax)*convert(NF,initial_conditions.amplitude)
 
     for progn_layer in progn.layers
@@ -82,7 +81,7 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Galewsky et al, 2004 zonal jet
 intitial conditions for the shallow water model. Default values as in Galewsky.
 $(TYPEDFIELDS)"""
-@with_kw struct ZonalJet <: InitialConditions
+Base.@kwdef struct ZonalJet <: InitialConditions
     "jet latitude [˚N]"
     latitude::Float64 = 45
     
@@ -202,7 +201,7 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
 intitial conditions for the primitive equation model. Default values as in Jablonowski.
 $(TYPEDFIELDS)"""
-@with_kw struct ZonalWind <: InitialConditions
+Base.@kwdef struct ZonalWind <: InitialConditions
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
     
@@ -343,7 +342,12 @@ function initial_conditions!(   progn::PrognosticVariables{NF},
     # PRESSURE (constant everywhere)
     lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
     progn.surface.timesteps[1].pres[1] = norm_sphere*lnp₀
-    pressure_on_orography && pressure_on_orography!(progn,model)
+
+    lnpₛ = ones(Grid{NF},nlat_half)
+    lnpₛ .= pressure_on_orography ? pressure_on_orography!(progn,model) : lnp₀
+    
+    # HUMIDITY
+    initialize_humidity!(progn,lnpₛ,model)
 end
 
 """
@@ -351,7 +355,7 @@ Restart from a previous SpeedyWeather.jl simulation via the restart file restart
 Applies interpolation in the horizontal but not in the vertical. restart.jld2 is
 identified by
 $(TYPEDFIELDS)"""
-@with_kw struct StartFromFile <: InitialConditions
+Base.@kwdef struct StartFromFile <: InitialConditions
     "path for restart file"
     path::String = pwd()
 
@@ -453,40 +457,44 @@ function pressure_on_orography!(progn::PrognosticVariables,
     return lnp_grid                 # return grid for use in initialize_humidity!
 end
 
-# """Initialize specific humidity in spectral space."""
-# function initialize_humidity!(  humid::AbstractArray{Complex{NF},3},# spectral specific humidity
-#                                 pres_surf_grid::AbstractMatrix,     # log of surf pressure (grid space)
-#                                 P::Parameters,                      # Parameters struct
-#                                 G::GeoSpectral) where NF            # Geospectral struct
+function initialize_humidity!(  progn::PrognosticVariables,
+                                pres_surf_grid::AbstractGrid,
+                                model::PrimitiveDry)
+    return nothing
+end
 
-#     lmax,mmax,nlev = size(humid)    # of size lmax+1, mmax+1, nlev
-#     lmax, mmax = lmax-1, mmax-1     # hence correct with -1 for 0-based l,m
-#     (; nlon, nlat, n_stratosphere_levels ) = P
-#     (; σ_levels_full ) = G.geometry
+function initialize_humidity!(  progn::PrognosticVariables,
+                                pres_surf_grid::AbstractGrid,
+                                model::PrimitiveWet)
 
-#     # reference saturation water vapour pressure [Pa]
-#     # relative humidity reference [1]
-#     (; water_pres_ref, relhumid_ref ) = P
-#     humid_ref = relhumid_ref*0.622*water_pres_ref   # reference specific humidity [Pa]
+    # reference saturation water vapour pressure [Pa]
+    # relative humidity reference [1]
+    (;water_pres_ref, relhumid_ref, R_dry, R_vapour, pres_ref) = model.atmosphere
+    gas_ratio = R_dry/R_vapour
+    humid_ref = relhumid_ref*gas_ratio*water_pres_ref   # reference specific humidity [Pa]
 
-#     # scale height [km], scale height for spec humidity [km]
-#     (; scale_height, scale_height_humid ) = P            
-#     scale_height_ratio = scale_height/scale_height_humid    # ratio of scale heights [1]
+    # ratio of scale heights [1], scale height [km], scale height for spec humidity [km]     
+    (;scale_height, scale_height_humid, σ_tropopause) = model.atmosphere
+    scale_height_ratio = scale_height/scale_height_humid
 
-#     # Specific humidity at the surface (grid space)
-#     humid_surf_grid = humid_ref*exp.(scale_height_ratio*pres_surf_grid)
-#     humid_surf = spectral(humid_surf_grid,one_more_l=true)
-#     # spectral_truncation!(humid_surf,P.trunc)                # set the lmax+1 row to zero
+    (;nlev, σ_levels_full) = model.geometry
+    n_stratosphere_levels = findfirst(σ->σ>=σ_tropopause,σ_levels_full)
 
-#     # stratospheric humidity zero
-#     fill!(view(humid,:,:,1:n_stratosphere_levels),0)
+    # Specific humidity at the surface (grid space)
+    humid_surf_grid = zero(pres_surf_grid)
+    # @. humid_surf_grid = humid_ref*(exp(pres_surf_grid)/(pres_ref*100))^scale_height_ratio
+    q_ref = 20e-3       # kg/kg at the surface
+    @. humid_surf_grid .= q_ref
+    scale_coslat²!(humid_surf_grid,model.geometry)
 
-#     # Specific humidity at tropospheric levels
-#     for k in n_stratosphere_levels+1:nlev
-#         for m in 1:mmax+1
-#             for l in m:lmax+1
-#                 humid[l,m,k] = humid_surf[l,m]*σ_levels_full[k]^scale_height_ratio
-#             end
-#         end
-#     end
-# end
+    humid_surf = spectral(humid_surf_grid,model.spectral_transform)
+    spectral_truncation!(humid_surf)
+
+    # Specific humidity at tropospheric levels (stratospheric humidity remains zero)
+    a = model.spectral_transform.norm_sphere
+    for k in n_stratosphere_levels+1:nlev
+        for lm in eachharmonic(humid_surf,progn.layers[1].timesteps[1].humid)
+            progn.layers[k].timesteps[1].humid[lm] = humid_surf[lm]*σ_levels_full[k]^scale_height_ratio
+        end
+    end
+end
