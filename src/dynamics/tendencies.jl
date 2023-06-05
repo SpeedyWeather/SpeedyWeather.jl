@@ -5,7 +5,7 @@ function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
                                 time::DateTime,
                                 model::Barotropic)
     forcing!(diagn,model.forcing,time)      # = (Fᵤ, Fᵥ) forcing for u,v
-    vorticity_flux!(diagn,model)            # = ∇×(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ)
+    vorticity_flux!(diagn,model)            # = ∇×(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ)
 end
 
 """
@@ -21,8 +21,8 @@ function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
 
     # for compatibility with other ModelSetups pressure pres = interface displacement η here
     forcing!(diagn,F,time)                  # = (Fᵤ, Fᵥ, Fₙ) forcing for u,v,η
-    vorticity_flux!(diagn,model)            # = ∇×(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ), tendency for vorticity
-                                            # = ∇⋅(v(ζ+f) + Fᵤ,v(ζ+f) + Fᵥ), tendency for divergence
+    vorticity_flux!(diagn,model)            # = ∇×(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ), tendency for vorticity
+                                            # = ∇⋅(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ), tendency for divergence
     
     geopotential!(diagn,pres,C)                     # geopotential Φ = gη in the shallow water model
     bernoulli_potential!(diagn,S)                   # = -∇²(E+Φ), tendency for divergence
