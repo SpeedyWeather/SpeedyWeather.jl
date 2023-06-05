@@ -174,7 +174,10 @@ function interpolator(  Aout::AbstractGrid,
 end
     
 ## FUNCTIONS
-interpolate(latd::Real,lond::Real,A::AbstractGrid) = interpolate([latd],[lond],A)
+function interpolate(latd::Real,lond::Real,A::AbstractGrid)
+    Ai = interpolate([latd],[lond],A)
+    return Ai[1]
+end
 
 function interpolate(   latds::Vector{NF},     # latitudes to interpolate onto (90˚N...-90˚N)
                         londs::Vector{NF},     # longitudes to interpolate into (0˚...360˚E)
