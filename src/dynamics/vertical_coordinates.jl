@@ -1,8 +1,8 @@
-@with_kw struct NoVerticalCoordinates <: VerticalCoordinates
+Base.@kwdef struct NoVerticalCoordinates <: VerticalCoordinates
     nlev::Int = 1
 end
 
-@with_kw struct SigmaCoordinates <: VerticalCoordinates
+Base.@kwdef struct SigmaCoordinates <: VerticalCoordinates
     nlev::Int = 8
     σ_half::Vector{Float64} = default_sigma_coordinates(nlev)
 
@@ -19,7 +19,7 @@ Default coefficients A,K,C,Q,B,M,ν are fitted to the old L31 configuration at E
 Following the notation of [https://en.wikipedia.org/wiki/Generalised_logistic_function](https://en.wikipedia.org/wiki/Generalised_logistic_function) (Dec 15 2021).
 
 Change default parameters for more/fewer levels in the stratosphere vs troposphere vs boundary layer."""
-@with_kw struct GenLogisticCoefs
+Base.@kwdef struct GenLogisticCoefs
     A::Float64 = -0.283     # obtained from a fit in /input_data/vertical_coordinate/vertical_resolution.ipynb
     K::Float64 = 0.871
     C::Float64 = 0.414
@@ -63,7 +63,7 @@ function sigma_okay(nlev::Integer,σ_half::AbstractVector)
 end
 
 #TODO
-@with_kw struct SigmaPressureCoordinates <: VerticalCoordinates
+Base.@kwdef struct SigmaPressureCoordinates <: VerticalCoordinates
     nlev::Int = 8
     A::Vector{Float64} = default_hybrid_coordinates(:A,nlev)
     B::Vector{Float64} = default_hybrid_coordinates(:B,nlev)

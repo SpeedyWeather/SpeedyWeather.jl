@@ -1,7 +1,6 @@
 module SpeedyWeather
 
 # STRUCTURE
-import Parameters: @with_kw
 using DocStringExtensions
 
 # NUMERICS
@@ -67,7 +66,8 @@ export  LowerTriangularMatrix,
         OctahedralGaussianGrid,
         OctahedralClenshawGrid,
         HEALPixGrid,
-        OctaHEALPixGrid
+        OctaHEALPixGrid,
+        plot
 
 export  Leapfrog
 
@@ -97,6 +97,9 @@ export  NoBoundaryLayer,
 # EXPORT VERTICAL DIFFUSION
 export  NoVerticalDiffusion,
         VerticalLaplacian
+
+# Large scale condensation
+export  SpeedyCondensation
 
 # EXPORT STRUCTS
 export  DynamicsConstants,
@@ -166,6 +169,7 @@ include("physics/thermodynamics.jl")
 include("physics/boundary_layer.jl")
 include("physics/temperature_relaxation.jl")
 include("physics/vertical_diffusion.jl")
+include("physics/large_scale_condensation.jl")
 include("physics/pretty_printing.jl")
 
 # MODELS
@@ -173,7 +177,6 @@ include("dynamics/models.jl")
 
 # # PHYSICS
 # include("physics/convection.jl")
-# include("physics/large_scale_condensation.jl")
 # include("physics/longwave_radiation.jl")
 # include("physics/shortwave_radiation.jl")
 

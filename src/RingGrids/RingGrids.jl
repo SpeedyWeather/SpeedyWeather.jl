@@ -1,7 +1,10 @@
 module RingGrids
 
-using DocStringExtensions
+# DOCUMENTATION AND VISUALISATION
+using  DocStringExtensions
+import UnicodePlots
 
+# NUMERICS
 import Statistics: mean
 import FastGaussQuadrature
 
@@ -55,14 +58,16 @@ export  interpolate,
         update_locator,
         update_locator!
 
+export  plot
+
 include("utility_functions.jl")
 
 include("grids_general.jl")
-include("show.jl")
 include("full_grids.jl")
 include("octahedral.jl")
 include("healpix.jl")
 include("octahealpix.jl")
 include("quadrature_weights.jl")
 include("interpolation.jl")
+include("show.jl")
 end

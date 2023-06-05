@@ -5,7 +5,7 @@ characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)
 """
-@with_kw struct Earth <: AbstractPlanet
+Base.@kwdef struct Earth <: AbstractPlanet
 
     "angular frequency of Earth's rotation [rad/s]"
     rotation::Float64 = 7.29e-5

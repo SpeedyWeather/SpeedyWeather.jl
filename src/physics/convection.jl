@@ -204,12 +204,6 @@ end
     # entrainment_profile /= sum(entrainment_profile)  # Normalise
     # entrainment_profile *= max_entrainment           # fraction of max entrainment
 
-    # # PARAMETRIZATIONS
-    # # Large-scale condensation (occurs when relative humidity exceeds a given threshold)
-    # RH_thresh_pbl_lsc::NF    # Relative humidity threshold for LSC in PBL
-    # RH_thresh_range_lsc::NF  # Vertical range of relative humidity threshold
-    # RH_thresh_max_lsc ::NF   # Maximum relative humidity threshold
-    # humid_relax_time_lsc::NF # Relaxation time for humidity (hours)
 
     # # Convection
     # pres_thresh_cnv::NF            # Minimum (normalised) surface pressure for the occurrence of convection
@@ -222,22 +216,6 @@ end
 
     # "For computing saturation vapour pressure"
     # magnus_coefs::Coefficients = MagnusCoefs{NF}()
-
-    # # Large-Scale Condensation (from table B10)
-    # "Index of atmospheric level at which large-scale condensation begins"
-    # k_lsc::Int = 2
-
-    # "Relative humidity threshold for boundary layer"
-    # RH_thresh_pbl_lsc::Float64 = 0.95
-
-    # "Vertical range of relative humidity threshold"
-    # RH_thresh_range_lsc::Float64 = 0.1
-
-    # "Maximum relative humidity threshold"
-    # RH_thresh_max_lsc::Float64 = 0.9
-
-    # "Relaxation time for humidity (hours)"
-    # humid_relax_time_lsc::Float64 = 4.0
 
     # # Convection
     # "Minimum (normalised) surface pressure for the occurrence of convection"

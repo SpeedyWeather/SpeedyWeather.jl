@@ -4,7 +4,7 @@ Create a struct `EarthAtmosphere<:AbstractPlanet`, with the following physical/c
 characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)"""
-@with_kw struct EarthAtmosphere <: AbstractAtmosphere
+Base.@kwdef struct EarthAtmosphere <: AbstractAtmosphere
     # ATMOSPHERE
     "molar mass of dry air [g/mol]"
     mol_mass_dry_air::Float64 = 28.9649
@@ -23,6 +23,9 @@ $(TYPEDFIELDS)"""
 
     "specific gas constant for water vapour [J/kg/K]"
     R_vapour::Float64 = 1000*R_gas/mol_mass_vapour
+
+    "water density [kg/m³]"
+    water_density::Float64 = 1000
 
     "latent heat of condensation [J/g] for consistency with specific humidity [g/Kg], also called alhc"
     latent_heat_condensation::Float64 = 2501
@@ -49,6 +52,9 @@ $(TYPEDFIELDS)"""
 
     "start of the stratosphere in sigma coordinates"
     σ_tropopause::Float64 = 0.2
+
+    "top of the planetary boundary layer in sigma coordinates"
+    σ_boundary_layer::Float64 = 0.95
 
     "scale height for pressure [km]"
     scale_height::Float64 = 7.5

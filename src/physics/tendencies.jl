@@ -42,7 +42,7 @@ function parameterization_tendencies!(
 
         # Calculate parametrizations (order of execution is important!)
         # convection!(column,model)
-        # large_scale_condensation!(column,model)
+        large_scale_condensation!(column,model)
         # clouds!(column, model)
         # shortwave_radiation!(column,model)
         # longwave_radiation!(column,model)

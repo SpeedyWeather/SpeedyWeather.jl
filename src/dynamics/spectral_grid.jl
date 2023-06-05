@@ -9,7 +9,7 @@ $(TYPEDFIELDS)
 
 `nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
 `Grid` and `dealiasing`."""
-@with_kw struct SpectralGrid
+Base.@kwdef struct SpectralGrid
     "number format used throughout the model"
     NF::Type{<:AbstractFloat} = DEFAULT_NF
 
@@ -74,7 +74,7 @@ Construct Geometry struct containing parameters and arrays describing an iso-lat
 and the vertical levels. Pass on `SpectralGrid` to calculate the following fields
 $(TYPEDFIELDS)
 """
-@with_kw struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF: Number format
+Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF: Number format
 
     "SpectralGrid that defines spectral and grid resolution"
     spectral_grid::SpectralGrid

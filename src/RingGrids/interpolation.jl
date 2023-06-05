@@ -174,7 +174,10 @@ function interpolator(  Aout::AbstractGrid,
 end
     
 ## FUNCTIONS
-interpolate(latd::Real,lond::Real,A::AbstractGrid) = interpolate([latd],[lond],A)
+function interpolate(latd::Real,lond::Real,A::AbstractGrid)
+    Ai = interpolate([latd],[lond],A)
+    return Ai[1]
+end
 
 function interpolate(   latds::Vector{NF},     # latitudes to interpolate onto (90˚N...-90˚N)
                         londs::Vector{NF},     # longitudes to interpolate into (0˚...360˚E)
@@ -407,21 +410,30 @@ function find_lon_indices(  λ::NF,      # longitude to find incides for (0˚...
 end
 
 """
-    N,S = average_on_poles( A::AbstractGrid,
-                            rings::Vector{<:UnitRange})
-
-N,S are the interpolated values of A onto the north/south pole, by averaging all values on the
-northern/southern-most rings respectively."""
-average_on_poles(A::AbstractGrid{NF},rings::Vector{<:UnitRange}) where NF = average_on_poles(NF,A,rings)
-
-function average_on_poles(  ::Type{NF},
-                            A::AbstractGrid,
+$(TYPEDSIGNATURES)
+Computes the average at the North and South pole from a given grid `A` and it's precomputed
+ring indices `rings`. The North pole average is an equally weighted average of all grid points
+on the northern-most ring. Similar for the South pole."""
+function average_on_poles(  A::AbstractGrid{NF},
                             rings::Vector{<:UnitRange{<:Integer}}
                             ) where {NF<:AbstractFloat}
     
     A_northpole = mean(view(A,rings[1]))    # average of all grid points around the north pole
     A_southpole = mean(view(A,rings[end]))  # same for south pole
     return convert(NF,A_northpole), convert(NF,A_southpole)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Method for `A::Abstract{T<:Integer}` which rounds the averaged values
+to return the same number format `NF`."""
+function average_on_poles(  A::AbstractGrid{NF},
+                            rings::Vector{<:UnitRange{<:Integer}}
+                            ) where {NF<:Integer}
+    
+    A_northpole = mean(view(A,rings[1]))    # average of all grid points around the north pole
+    A_southpole = mean(view(A,rings[end]))  # same for south pole
+    return round(NF,A_northpole), round(NF,A_southpole)
 end
 
 """
@@ -446,19 +458,20 @@ longitude/x-coordinate. See schematic:
               0...............1 # fraction of distance Δcd between c,d
 ```
 ^ fraction of distance Δy between a-b and c-d."""
-function anvil_average( a::NF,      # top left value
-                        b::NF,      # top right value
-                        c::NF,      # bottom left value
-                        d::NF,      # bottom right value
-                        Δab::Real,  # fraction of distance between a,b ∈ [0,1)
-                        Δcd::Real,  # fraction of distance between c,d ∈ [0,1)
-                        Δy::Real,   # fraction of distance between ab,cd ∈ [0,1)
-                        ) where NF
+function anvil_average(
+    a,      # top left value
+    b,      # top right value
+    c,      # bottom left value
+    d,      # bottom right value
+    Δab,    # fraction of distance between a,b ∈ [0,1)
+    Δcd,    # fraction of distance between c,d ∈ [0,1)
+    Δy,     # fraction of distance between ab,cd ∈ [0,1)
+    )
 
     # the type of the weights is ::Real, but the following is written such that
     # always NF (the type of the data values a,b,c,d) is returned
-    ab_average = a + (b-a)*convert(NF,Δab)      # a for Δab=0, b for Δab=1
-    cd_average = c + (d-c)*convert(NF,Δcd)      # c for Δab=0, b for Δab=1
-    abcd_average = ab_average + (cd_average-ab_average)*convert(NF,Δy)
+    ab_average = a + (b-a)*Δab      # a for Δab=0, b for Δab=1
+    cd_average = c + (d-c)*Δcd      # c for Δab=0, b for Δab=1
+    abcd_average = ab_average + (cd_average-ab_average)*Δy
     return abcd_average
 end
