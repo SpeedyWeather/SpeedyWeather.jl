@@ -220,7 +220,7 @@ available so that 3. can start the leapfrogging without any offset from the inui
 | Initial conditions | ``t = 0``            |                    |                      |
 | 1: Euler           | (T) ``\quad t = 0``  |  ``t=\Delta t/2``  |                      |
 | 2: Leapfrog with ``\Delta t``|``t = 0``|(T) ``\quad t = \Delta t/2``| ``t = \Delta t``|
-| 3 to ``n``: Leapfrog with ``2\Delta t``|``t-\Delta t``|(T) ``\qquad \quad \quad t``|     ``t+\Delta t``  |
+| 3 to ``n``: Leapfrog with ``2\Delta t``|``t-\Delta t``|(T) ``\qquad \quad \quad t``| ``t+\Delta t`` |
 
 The time step that is used to evaluate the tendencies is denoted with (T).
 It is always the time step furthest in time that is available.
@@ -228,9 +228,12 @@ It is always the time step furthest in time that is available.
 
 ### Robert and William filter
 
-*more to come*
+The standard leapfrog time integration is often combined with a Robert filter to dampen a well-known computational mode.
 
 ## References
 
 [^1]: Geophysical Fluid Dynamics Laboratory, [Idealized models with spectral dynamics](https://www.gfdl.noaa.gov/idealized-models-with-spectral-dynamics/)
 [^2]: Geophysical Fluid Dynamics Laboratory, [The barotropic vorticity equation](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/barotropic.pdf).
+[^3]: Williams, P. D., 2009: A Proposed Modification to the Robert–Asselin Time Filter. Mon. Wea. Rev., 137, 2538–2546, [10.1175/2009MWR2724.1](https://doi.org/10.1175/2009MWR2724.1).
+[^4]: Amezcua, J., E. Kalnay, and P. D. Williams, 2011: The Effects of the RAW Filter on the Climatology and Forecast Skill of the SPEEDY Model. Mon. Wea. Rev., 139, 608–619, doi:[10.1175/2010MWR3530.1](https://doi.org/10.1175/2010MWR3530.1). 
+[^5]: Williams, P. D., 2011: The RAW Filter: An Improvement to the Robert–Asselin Filter in Semi-Implicit Integrations. Mon. Wea. Rev., 139, 1996–2007, doi:[10.1175/2010MWR3601.1](https://doi.org/10.1175/2010MWR3601.1). 

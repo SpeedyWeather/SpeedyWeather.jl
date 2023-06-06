@@ -17,7 +17,7 @@ RingGrids defines and exports the following grids:
 
 The following explanation of how to use these can be mostly applied to any of them, however,
 there are certain functions that are not defined, e.g. the full grids can be trivially converted
-to a `Matrix` but not the `OctahedralGaussianGrid`.
+to a `Matrix` (i.e. they are *rectangular* grids) but not the `OctahedralGaussianGrid`.
 
 !!! note "What is a ring?"
     We use the term *ring*, short for *iso-latitude ring*, to refer to a sequence of grid points
@@ -268,10 +268,6 @@ but the longitudes can be different for all four, a,b,c,d.
 
 ## Function index
 
-```@docs
-RingGrids.each_index_in_ring
-RingGrids.eachgridpoint
-RingGrids.eachring
-RingGrids.whichring
-RingGrids.get_nlons
+```@autodocs
+Modules = [SpeedyWeather.RingGrids]
 ```

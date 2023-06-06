@@ -15,7 +15,7 @@ but let's start with some examples first.
 We want to use the barotropic model to simulate some free-decaying 2D turbulence
 on the sphere without rotation. We start by defining the `SpectralGrid` object.
 To have a resolution of about 100km, we choose a spectral resolution of
-T127 (see [Available resolutions](@ref)) and `nlev=1` vertical levels.
+T127 (see [Available horizontal resolutions](@ref)) and `nlev=1` vertical levels.
 The `SpectralGrid` object will provide us with some more information
 ```julia
 julia> spectral_grid = SpectralGrid(trunc=127,nlev=1)

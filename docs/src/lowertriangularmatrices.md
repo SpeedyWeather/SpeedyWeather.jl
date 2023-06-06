@@ -128,11 +128,8 @@ operations, including `inv` or `\`. Hence when trying to do more sophisticated l
 algebra with `LowerTriangularMatrix` we quickly leave lower triangular-land and go
 back to normal matrix-land.
 
-## Function index
+## Function and type index
 
-```@docs
-LowerTriangularMatrix
-LowerTriangularMatrices.ij2k
-Base.fill!(L::LowerTriangularMatrix{T}, x) where T
-LowerTriangularMatrices.eachharmonic
+```@autodocs
+Modules = [SpeedyWeather.LowerTriangularMatrices]
 ```

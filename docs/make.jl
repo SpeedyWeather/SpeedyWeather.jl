@@ -21,7 +21,8 @@ makedocs(
             "Submodule: LowerTriangularMatrices"=>"lowertriangularmatrices.md",
             "Submodule: SpeedyTransforms"=>"speedytransforms.md",
             "Style and convention guide"=>"conventions.md",
-            "Development notes"=>"development.md"]
+            "Development notes"=>"development.md",
+            "Function and type index"=>"functions.md"]
 )
 
 deploydocs(
