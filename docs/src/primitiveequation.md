@@ -12,3 +12,5 @@ The [primitive equations](https://en.wikipedia.org/wiki/Primitive_equations) sol
 ```
 
 **Note**: more to come...
+
+[^3]: Geophysical Fluid Dynamics Laboratory, [The Spectral Dynamical Core](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/spectral_core.pdf)

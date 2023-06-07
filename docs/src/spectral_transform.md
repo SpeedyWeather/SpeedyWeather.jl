@@ -66,10 +66,13 @@ a_{l,-m} = (-1)^m a^*_{l,+m},
 meaning that the coefficients at ``-m`` and ``m`` are the same, but the sign of the real and imaginary component
 can be flipped, as denoted with the ``(-1)^m`` and the complex conjugate ``a_{l,m}^*``. As we are only dealing with
 real-valued fields anyway, we therefore never have to store the negative orders ``-m`` and end up with a lower
-triangular matrix of size ``l_{max} \times m_{max}`` or technically ``T^2`` where ``T`` is the truncation `trunc`.
+triangular matrix of size ``(l_{max}+1) \times (m_{max}+1)`` or technically ``(T+1)^2`` where ``T`` is
+the truncation `trunc`. One is added here because the degree ``l`` and order ``m`` use 0-based indexing
+but sizes (and so is Julia's indexing) are 1-based.
+
 For correctness we want to mention here that vector quantities require one more degree ``l`` due to the recurrence
 relation in the [Meridional derivative](@ref). Hence for practical reasons *all* spectral fields are represented
-as a lower triangular matrix of size ``(m_{max} + 1) \times m_{max}``. And the scalar quantities would just
+as a lower triangular matrix of size ``(m_{max} + 2) \times (m_{max} +1)``. And the scalar quantities would just
 not make use of that last degree, and its entries would be simply zero. We will, however, for the following
 sections ignore this and only discuss it again in [Meridional derivative](@ref).
 
@@ -126,16 +129,16 @@ implementation for ring grids, but there is no need to hardcode a specific grid.
 
 ## Spectral packing
 
-Spectral packing is the way how the coefficients ``a_{lm}`` of the spherical harmonics of a given spectral field are
-stored in an array. SpeedyWeather.jl uses the conventional spectral packing of degree ``l`` and order ``m`` as
-illustrated in the following image
+Spectral packing is the way how the coefficients ``a_{lm}`` of the spherical harmonics of a given spectral
+field are stored in an array. SpeedyWeather.jl uses the conventional spectral packing of degree ``l``
+and order ``m`` as illustrated in the following image
 [(Cyp, CC BY-SA 3.0, via Wikimedia Commons)](https://commons.wikimedia.org/wiki/File:Rotating_spherical_harmonics.gif)
 ```@raw html
 <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Rotating_spherical_harmonics.gif">
 ```
-Every row represents an order ``l \geq 0``, starting from ``l=0`` at the top. Every column represents an order
-``m \geq 0``, starting from ``m=0`` on the left. The coefficients of these spherical harmonics are directly
-mapped into a matrix ``a_{lm}`` as 
+Every row represents an order ``l \geq 0``, starting from ``l=0`` at the top.
+Every column represents an order ``m \geq 0``, starting from ``m=0`` on the left. The coefficients of these
+spherical harmonics are directly mapped into a matrix ``a_{lm}`` as 
 
 |     |``m``     |          |          |          |
 | :-: | :------: | :------: | :------: | :------: | 
@@ -152,8 +155,8 @@ The harmonics with ``a_{ll}`` (the main diagonal) are also called _sectoral_ har
 into ``2l`` sectors in longitude ``\phi`` without a zero-crossing in latitude.
 
 !!! info "Array indices"
-    For a spectral field `alms` note that due to Julia's 1-based indexing the coefficient ``a_{lm}`` is obtained via
-    `a[l+1,m+1]`.
+    For a spectral field `a` note that due to Julia's 1-based indexing the coefficient ``a_{lm}`` is obtained via
+    `a[l+1,m+1]`. Alternatively, we may index over 1-based `l`,`m` but a comment is usually added for clarification.
 
 [Fortran SPEEDY](https://users.ictp.it/~kucharsk/speedy-net.html) does not use the same spectral packing as
 SpeedyWeather.jl. The alternative packing ``l',m'`` therein uses ``l'=m`` and ``m'=l-m`` as summarized in the
@@ -170,7 +173,6 @@ following table.
 |3             |0            |0          |3            |
 |...           |...          |...        |...          |
 
-
 This alternative packing uses the top-left triangle of a coefficient matrix, and the degrees and orders from above are
 stored at the following indices
 
@@ -182,7 +184,7 @@ stored at the following indices
 |      |``a_{33}``|          |          |          |
 
 This spectral packing is not used in SpeedyWeather.jl but illustrated here for completeness and comparison with
-Fortran-speedy.
+Fortran SPEEDY.
 
 SpeedyWeather.jl uses triangular truncation such that only spherical harmonics with ``l \leq l_{max}`` and ``|m| \leq m_{max}``
 are explicitly represented. This is usually described as ``Tm_{max}``, with ``l_{max} = m_{max}`` (although in vector quantities
@@ -389,19 +391,23 @@ How to translate this to spectral coefficients has to be derived separately[^10]
 
 The spectral transform of vorticity ``\zeta`` is
 ```math
-\zeta_{l,m} = \frac{1}{2\pi}\int_{-\tfrac{\pi}{2}}^\tfrac{\pi}{2}\int_0^{2\pi} \zeta(\lambda,\theta) P_{l,m}(\sin\theta) e^{im\lambda} d\lambda \cos\theta d\theta
+\zeta_{l,m} = \frac{1}{2\pi}\int_{-\tfrac{\pi}{2}}^\tfrac{\pi}{2}\int_0^{2\pi} \zeta(\lambda,\theta)
+P_{l,m}(\sin\theta) e^{im\lambda} d\lambda \cos\theta d\theta
 ```
-Given that ``R\zeta = \cos^{-1}\partial_\lambda v - \cos^{-1}\partial_\theta (u \cos\theta)``, we therefore have to evaluate a meridional integral of the form
+Given that ``R\zeta = \cos^{-1}\partial_\lambda v - \cos^{-1}\partial_\theta (u \cos\theta)``,
+we therefore have to evaluate a meridional integral of the form
 ```math
 \int P_{l,m} \frac{1}{\cos \theta} \partial_\theta(u \cos\theta)) \cos \theta d\theta
 ```
 which can be solved through integration by parts. As ``u\cos\theta = 0`` at ``\theta = \pm \tfrac{\pi}{2}`` only the integral
 ```math
-= -\int \partial_\theta P_{l,m} (u \cos\theta) d\theta = -\int \cos\theta \partial_\theta P_{l,m} (\frac{u}{\cos\theta}) \cos\theta d\theta
+= -\int \partial_\theta P_{l,m} (u \cos\theta) d\theta = -\int \cos\theta \partial_\theta P_{l,m}
+(\frac{u}{\cos\theta}) \cos\theta d\theta
 ```
 remains. Inserting the recurrence relation from the [Meridional derivative](@ref) turns this into
 ```math
-= -\int \left(-l \epsilon_{l+1,m}P_{l+1,m} + (l+1)\epsilon_{l,m} P_{l-1,m} \right) (\frac{u}{\cos\theta}) \cos \theta d\theta
+= -\int \left(-l \epsilon_{l+1,m}P_{l+1,m} + (l+1)\epsilon_{l,m} P_{l-1,m} \right) (\frac{u}{\cos\theta})
+\cos \theta d\theta
 ```
 Now we expand ``(\tfrac{u}{\cos\theta})`` but only the ``l,m`` harmonic will project onto``P_{l,m}``. Let
 ``u^* = u\cos^{-1}\theta, v^* = v\cos^{-1}\theta`` we then have in total
@@ -411,16 +417,18 @@ R\zeta_{l,m} &= imv^*_{l,m} + (l+1)\epsilon_{l,m}u^*_{l-1,m} - l\epsilon_{l+1,m}
 RD_{l,m} &= imu^*_{l,m} - (l+1)\epsilon_{l,m}v^*_{l-1,m} + l\epsilon_{l+1,m}v^*_{l+1,m} \\
 \end{aligned}
 ```
-And the divergence ``D`` is similar, but ``(u,v) \to (-v,u)``. We have moved the scaling with the radius ``R`` directly into ``\zeta,D`` as further described in [Radius scaling](@ref scaling).
+And the divergence ``D`` is similar, but ``(u,v) \to (-v,u)``. We have moved the scaling with the
+radius ``R`` directly into ``\zeta,D`` as further described in [Radius scaling](@ref scaling).
 
 ### Laplacian
 
 The spectral Laplacian is easily applied to the coefficients ``\Psi_{lm}`` of a spectral field
-as the spherical harmonics are eigenfunctions of the Laplace operator ``\nabla^2`` in spherical coordinates with
-eigenvalues ``-l(l+1)`` divided by the radius squared ``R^2``, i.e. ``\nabla^2 \Psi`` becomes ``\tfrac{-l(l+1)}{R^2}\Psi_{lm}``
-in spectral space. For example, vorticity ``\zeta`` and streamfunction ``\Psi`` are related by ``\zeta = \nabla^2\Psi``
-in the barotropic vorticity model. Hence, in spectral space this is equivalent for every spectral mode of
-degree ``l`` and order ``m`` to
+as the spherical harmonics are eigenfunctions of the Laplace operator ``\nabla^2`` in spherical
+coordinates with eigenvalues ``-l(l+1)`` divided by the radius squared ``R^2``, i.e.
+``\nabla^2 \Psi`` becomes ``\tfrac{-l(l+1)}{R^2}\Psi_{lm}`` in spectral space. For example,
+vorticity ``\zeta`` and streamfunction ``\Psi`` are related by ``\zeta = \nabla^2\Psi``
+in the barotropic vorticity model. Hence, in spectral space this is equivalent for every
+spectral mode of degree ``l`` and order ``m`` to
 
 ```math
 \zeta_{l,m} = \frac{-l(l+1)}{R^2}\Psi_{l,m}
@@ -448,12 +456,15 @@ instead of calculating stream function and velocity potential first. In total we
 
 ```math
 \begin{aligned}
-U_{l,m} &= -\frac{im}{l(l+1)}(RD)_{l,m} + \frac{\epsilon_{l+1,m}}{l+1}(R\zeta)_{l+1,m} - \frac{\epsilon_{l,m}}{l}(R\zeta)_{l-1,m} \\
-V_{l,m} &= -\frac{im}{l(l+1)}(R\zeta)_{l,m} - \frac{\epsilon_{l+1,m}}{l+1}(RD)_{l+1,m} + \frac{\epsilon_{l,m}}{l}(RD)_{l-1,m} \\
+U_{l,m} &= -\frac{im}{l(l+1)}(RD)_{l,m} + \frac{\epsilon_{l+1,m}}{l+1}(R\zeta)_{l+1,m} -
+\frac{\epsilon_{l,m}}{l}(R\zeta)_{l-1,m} \\
+V_{l,m} &= -\frac{im}{l(l+1)}(R\zeta)_{l,m} - \frac{\epsilon_{l+1,m}}{l+1}(RD)_{l+1,m} +
+\frac{\epsilon_{l,m}}{l}(RD)_{l-1,m} \\
 \end{aligned}
 ```
 
-We have moved the scaling with the radius ``R`` directly into ``\zeta,D`` as further described in [Radius scaling](@ref scaling).
+We have moved the scaling with the radius ``R`` directly into ``\zeta,D``
+as further described in [Radius scaling](@ref scaling).
 
 ## References
 

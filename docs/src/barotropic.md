@@ -1,5 +1,10 @@
 # Barotropic vorticity model
 
+The barotropic vorticity model describes the evolution of a 2D non-divergent flow with
+velocity components ``\mathbf{u} = (u,v)`` through self-advection, forces and dissipation.
+Due to the non-divergent nature of the flow, it can be described by (the vertical component)
+of the relative vorticity ``\zeta = \nabla \times \mathbf{u}``.
+
 The dynamical core presented here to solve the barotropic vorticity equations largely follows
 the idealized models with spectral dynamics developed at the
 Geophysical Fluid Dynamics Laboratory[^1]: A barotropic vorticity model[^2].
@@ -43,8 +48,8 @@ v &= \frac{1}{R\cos(\theta)} \frac{\partial \Psi}{\partial \phi} \\
 ```
 
 which is described in [Derivatives in spherical coordinates](@ref). Using ``u`` and ``v`` we can then
-advect the absolute vorticity ``\zeta + f``. In order to avoid to calculate both the curl and a flux
-we rewrite the barotropic vorticity equation as
+advect the absolute vorticity ``\zeta + f``. In order to avoid to calculate both the curl and the
+divergence of a flux we rewrite the barotropic vorticity equation as
 ```math
 \frac{\partial \zeta}{\partial t} =
 \nabla \times (\mathbf{F} + \mathbf{u}_\perp(\zeta + f)) + (-1)^{n+1}\nu\nabla^{2n}\zeta
@@ -60,7 +65,7 @@ As an intial step
 
 0\. Start with initial conditions of ``\zeta_{lm}`` in spectral space and
 transform this model state to grid-point space:
-- Invert the [Laplacian](@ref) to obtain the stream function ``\Psi_{lm}`` in spectral space
+- Invert the [Laplacian](@ref) of vorticity ``\zeta_{lm}`` to obtain the stream function ``\Psi_{lm}`` in spectral space
 - obtain zonal velocity ``(\cos(\theta)u)_{lm}`` through a [Meridional derivative](@ref)
 - obtain meridional velocity ``(\cos(\theta)v)_{lm}`` through a [Zonal derivative](@ref)
 - Transform zonal and meridional velocity ``(\cos(\theta)u)_{lm}``, ``(\cos(\theta)v)_{lm}`` to grid-point space
@@ -79,6 +84,8 @@ Now loop over
 8. Transform the new spectral state of ``\zeta_{lm}`` to grid-point ``u,v,\zeta`` as described in 0.
 9. Possibly do some output
 10. Repeat from 1.
+
+
 
 ## [Horizontal diffusion](@id diffusion)
 
@@ -143,6 +150,7 @@ and the hyper-Laplacian of power ``n`` follows as
 D^\text{explicit,n}_{l,m} = -\nu^* \left(\frac{l(l+1)}{l_\text{max}(l_\text{max}+1)}\right)^n
 ```
 and the implicit part is accordingly ``D^\text{implicit,n}_{l,m} = 1 - 2\Delta t D^\text{explicit,n}_{l,m}``.
+Note that the diffusion time scale ``\nu^*`` is then also scaled by the radius, see next section.
 
 ## [Radius scaling](@id scaling)
 
