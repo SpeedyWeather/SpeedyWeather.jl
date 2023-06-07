@@ -193,7 +193,7 @@ and similar for the curl
 ```
 
 The radius of the sphere (i.e. Earth) is ``R``. The zonal gradient scales with ``1/\cos(\theta)`` as the 
-longitudes converge towards the poles (note that ``\theta`` describes latitudes here, defintions using colatitudes
+longitudes converge towards the poles (note that ``\theta`` describes latitudes here, definitions using colatitudes
 replace the ``\cos`` with a ``\sin``.)
 
 Starting with a spectral field of vorticity ``\zeta`` and divergence ``\mathcal{D}`` one can obtain stream function ``\Psi``
@@ -203,7 +203,7 @@ and velocity potential ``\Phi`` by inverting the Laplace operator ``\nabla^2``:
 \Psi = \nabla^{-2}\zeta, \quad \Phi = \nabla^{-2}\mathcal{D}.
 ```
 
-The velocities ``u,v`` are then obtained from ``(u,v) = \nabla^\bot\Psi + \nabla\Phi`` following the defintion from above
+The velocities ``u,v`` are then obtained from ``(u,v) = \nabla^\bot\Psi + \nabla\Phi`` following the definition from above
 and ``\nabla^\bot = (-R^{-1}\partial_\theta, (R\cos\theta)^{-1}\partial_\lambda)``
 
 ```math
@@ -268,7 +268,7 @@ in zonal direction and the derivative a multiplication with the respective wave 
 
 ### Meridional derivative
 
-The meridioinal derivative of the spherical harmonics is a derivative of the Legendre polynomials for which the following
+The meridional derivative of the spherical harmonics is a derivative of the Legendre polynomials for which the following
 recursion relation applies[^10],[^11]
 
 ```math
@@ -302,7 +302,7 @@ coefficients at ``l-1,m`` and ``l+1,m`` have to be combined. This means that the
 ``((\cos\theta) u)_{lm}`` is a linear combination of the coefficients of one higher and one lower degree
 ``\Psi_{l+1,m},\Psi_{l-1,m}``. As the coefficient ``\Psi_{lm}`` with ``m<l`` are zero, the sectoral harmonics
 (``l=m``) of the gradients are obtained from the first off-diagonal only. However, the ``l=l_{max}`` harmonics of
-the gradients require the ``l_{max}-1`` as well as the ``l_{max}+1`` harmonics. In SpeedyWeather.jl vector quantitie
+the gradients require the ``l_{max}-1`` as well as the ``l_{max}+1`` harmonics. In SpeedyWeather.jl vector quantities
 like ``u,v`` use therefore one more meridional mode than scalar quantities such as vorticity ``\zeta`` or stream
 function ``\Psi``. The meridional derivative in SpeedyWeather.jl also omits the ``1/R``-scaling as explained for
 the [Zonal derivative](@ref) and in [Radius scaling](@ref).
