@@ -197,7 +197,7 @@ is based on an octahedron, which has the convenient property that there are twic
 the equator than there are latitude rings between the poles. This is a desirable for truncation as this matches
 the distances too, ``2\pi`` around the Equator versus ``\pi`` between the poles. ``N_\varphi = 6, N_\theta = 2``
 or ``N_\varphi = 8, N_\theta = 3`` are other possible choices for this, but also more complicated. See 
-Górski, 2004[^1] for further examples and visulations of these grids.
+Górski, 2004[^1] for further examples and visualisations of these grids.
 
 We call the ``N_\varphi = 4, N_\theta = 1`` HEALPix grid the OctaHEALPix grid, which combines the equal-area
 property of the HEALPix grids with the octahedron that's also used in the `OctahedralGaussianGrid` or the
