@@ -246,7 +246,7 @@ with ``N`` number of grid points over a sphere with radius ``R``. However, we ha
 to acknowledge that this usually gives higher resolution compared to other methods
 of estimating the effective resolution, see [^Randall2021] for a discussion. You may therefore
 need to be careful to make claims that, e.g. `trunc=85` can resolve the
-atmopsheric dynamics at a scale of 165km.
+atmospheric dynamics at a scale of 165km.
 
 ## Derivatives in spherical coordinates
 
@@ -272,7 +272,7 @@ and similar for the curl
 ```
 
 The radius of the sphere (i.e. Earth) is ``R``. The zonal gradient scales with ``1/\cos(\theta)`` as the 
-longitudes converge towards the poles (note that ``\theta`` describes latitudes here, defintions using colatitudes
+longitudes converge towards the poles (note that ``\theta`` describes latitudes here, definitions using colatitudes
 replace the ``\cos`` with a ``\sin``.)
 
 Starting with a spectral field of vorticity ``\zeta`` and divergence ``\mathcal{D}`` one can obtain stream function ``\Psi``
@@ -282,7 +282,7 @@ and velocity potential ``\Phi`` by inverting the Laplace operator ``\nabla^2``:
 \Psi = \nabla^{-2}\zeta, \quad \Phi = \nabla^{-2}\mathcal{D}.
 ```
 
-The velocities ``u,v`` are then obtained from ``(u,v) = \nabla^\bot\Psi + \nabla\Phi`` following the defintion from above
+The velocities ``u,v`` are then obtained from ``(u,v) = \nabla^\bot\Psi + \nabla\Phi`` following the definition from above
 and ``\nabla^\bot = (-R^{-1}\partial_\theta, (R\cos\theta)^{-1}\partial_\lambda)``
 
 ```math
@@ -353,7 +353,7 @@ number ``m`` times imaginary ``i``.
 
 ### Meridional derivative
 
-The meridioinal derivative of the spherical harmonics is a derivative of the Legendre polynomials for which the following
+The meridional derivative of the spherical harmonics is a derivative of the Legendre polynomials for which the following
 recursion relation applies[^10],[^11]
 
 ```math
@@ -394,7 +394,7 @@ degree ``l``, but scalar quantities should not make use of it. Equivalently, the
 set to zero before the time integration, which only advances scalar quantities.
 
 
-In SpeedyWeather.jl vector quantitie
+In SpeedyWeather.jl vector quantities
 like ``u,v`` use therefore one more meridional mode than scalar quantities such as vorticity ``\zeta`` or stream
 function ``\Psi``. The meridional derivative in SpeedyWeather.jl also omits the ``1/R``-scaling as explained for
 the [Zonal derivative](@ref) and in [Radius scaling](@ref scaling).
