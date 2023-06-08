@@ -148,11 +148,16 @@ spherical harmonics are directly mapped into a matrix ``a_{lm}`` as
 |     |``a_{30}``|``a_{13}``|``a_{23}``|``a_{33}``|
 
 which is consistently extended for higher degrees and orders. Consequently, all spectral fields are lower-triangular matrices
-with complex entries. The upper triangle excluding the diagonal explicitly stores zeros. Note that internally vector fields
+with complex entries. The upper triangle excluding the diagonal are zero. Note that internally vector fields
 include an additional degree, such that ``l_{max} = m_{max} + 1`` (see [Derivatives in spherical coordinates](@ref) for more information).
 The harmonics with ``a_{l0}`` (the first column) are also called _zonal_ harmonics as they are constant with longitude ``\phi``.
 The harmonics with ``a_{ll}`` (the main diagonal) are also called _sectoral_ harmonics as they essentially split the sphere
 into ``2l`` sectors in longitude ``\phi`` without a zero-crossing in latitude.
+
+For correctness it is mentioned here that SpeedyWeather.jl uses a `LowerTriangularMatrix` type to store
+the spherical harmonic coefficients. By doing so, the upper triangle is actually *not* explicitly stored
+and the data technically unravelled into a vector, but this is hidden as much as possible from the user.
+For more details see [`LowerTriangularMatrices`](@ref).
 
 !!! info "Array indices"
     For a spectral field `a` note that due to Julia's 1-based indexing the coefficient ``a_{lm}`` is obtained via
@@ -312,14 +317,19 @@ V &= +\frac{\cos\theta}{R}\partial_\theta\Phi + \frac{1}{R}\partial_\lambda\Psi 
 \end{aligned}
 ```
 
-which is a more convenient formulation as required ``\cos\theta`` scalings are reduced to a minimum.
-The remaining ``(U,V)*\cos^{-2}\theta`` are done in grid-point space and usually in combination with
-other operations like the computation of the vorticity flux. But also note that SpeedyWeather.jl scales
-the equations with the radius `R` (see [Radius scaling](@ref scaling)) such that the divisions by `R` drop out too.
-As described in [Meridional derivative](@ref), it is more convenient to implement ``\cos\theta \partial_\theta``
-via a recursion relation for the Legendre polynomials than ``\partial_\theta`` directly.
-How the operators ``\nabla, \nabla \times, \nabla \cdot`` can be implemented with spherical harmonics is
-presented in the following sections.
+which is a more convenient formulation because of the way how the [Meridional derivative](@ref)
+is implemented with a recursion relation, actually computing ``\cos\theta \partial_\theta``
+rather than ``\partial_\theta`` directly. The remaining cosine scalings in
+``(U,V)*\cos^{-2}\theta`` are done in grid-point space.
+If one wanted to get back to ``\zeta, \mathcal{D}`` this is how it would be done, but
+it is often more convenient to unscale ``U,V`` on the fly in the spectral transform
+to obtain ``u,v`` and then divide again by ``\cos\theta`` when any gradient (or divergence or
+curl) is taken. This is because other terms would need that single ``\cos\theta`` unscaling
+too before a gradient is taken. How the operators ``\nabla, \nabla \times, \nabla \cdot`` can
+be implemented with spherical harmonics is presented in the following sections.
+
+Also note that SpeedyWeather.jl scales the equations with the radius `R` (see [Radius scaling](@ref scaling))
+such that the divisions by `R` drop out in this last formulation too.
 
 ### Zonal derivative
 
@@ -377,7 +387,14 @@ coefficients at ``l-1,m`` and ``l+1,m`` have to be combined. This means that the
 ``((\cos\theta) u)_{lm}`` is a linear combination of the coefficients of one higher and one lower degree
 ``\Psi_{l+1,m},\Psi_{l-1,m}``. As the coefficient ``\Psi_{lm}`` with ``m<l`` are zero, the sectoral harmonics
 (``l=m``) of the gradients are obtained from the first off-diagonal only. However, the ``l=l_{max}`` harmonics of
-the gradients require the ``l_{max}-1`` as well as the ``l_{max}+1`` harmonics. In SpeedyWeather.jl vector quantitie
+the gradients require the ``l_{max}-1`` as well as the ``l_{max}+1`` harmonics. As a consequence
+vector quantities like velocity components ``u,v`` require one more degree ``l`` than scalar quantities like
+vorticity[^Bourke72]. However, for easier compatibility all spectral fields in SpeedyWeather.jl use one more
+degree ``l``, but scalar quantities should not make use of it. Equivalently, the last degree ``l`` is 
+set to zero before the time integration, which only advances scalar quantities.
+
+
+In SpeedyWeather.jl vector quantitie
 like ``u,v`` use therefore one more meridional mode than scalar quantities such as vorticity ``\zeta`` or stream
 function ``\Psi``. The meridional derivative in SpeedyWeather.jl also omits the ``1/R``-scaling as explained for
 the [Zonal derivative](@ref) and in [Radius scaling](@ref scaling).
@@ -484,3 +501,4 @@ as further described in [Radius scaling](@ref scaling).
 [^Durran2010]: Dale Durran, 2010. [Numerical Methods for Fluid Dynamics](https://link.springer.com/book/10.1007/978-1-4419-6412-0), Springer. In particular section 6.2, 6.4.
 [^GFDL]: Geophysical Fluid Dynamics Laboratory, [The barotropic vorticity equation](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/barotropic.pdf).
 [^FFT]: Depending on the implementation of the Fast Fourier Transform ([Cooley-Tukey algorithm](https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm), or or the [Bluestein algorithm](https://en.wikipedia.org/wiki/Chirp_Z-transform#Bluestein.27s_algorithm)) *easily Fourier-transformable* can mean different things: Vectors of the length ``n`` that is a power of two, i.e. ``n = 2^i`` is certainly easily Fourier-transformable, but for most FFT implementations so are ``n = 2^i3^j5^k`` with ``i,j,k`` some positive integers. In fact, [FFTW](http://fftw.org/) uses ``O(n \log n)`` algorithms even for prime sizes.
+[^Bourke72]: Bourke, W. An Efficient, One-Level, Primitive-Equation Spectral Model. Mon. Wea. Rev. 100, 683–689 (1972). doi:[10.1175/1520-0493(1972)100<0683:AEOPSM>2.3.CO;2](https://doi.org/10.1175/1520-0493(1972)100<0683:AEOPSM>2.3.CO;2)
