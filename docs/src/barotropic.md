@@ -61,7 +61,6 @@ in the `BarotropicModel`, as outlined in the following section.
 ## Algorithm
 
 We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrate the barotropic vorticity equation.
-
 As an initial step
 
 0\. Start with initial conditions of ``\zeta_{lm}`` in spectral space and
