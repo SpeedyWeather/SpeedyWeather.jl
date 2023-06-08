@@ -101,7 +101,6 @@ obtain from time steps ``i-1`` and ``i``, the next time step ``i+1``
 \zeta_{i+1} = \zeta_{i-1} + 2\Delta t d\zeta,
 ```
 with ``d\zeta`` being some tendency evaluated from ``\zeta_i``. Now we want to add a diffusion term ``(-1)^{n+1}\nu \nabla^{2n}\zeta``
-
 with coefficient ``\nu``, which however, is implicitly calculated from ``\zeta_{i+1}``, then
 
 ```math
