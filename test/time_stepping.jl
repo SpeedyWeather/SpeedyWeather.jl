@@ -1,4 +1,4 @@
-# William (2009), MWR oscillation test case
+# Williams (2009), MWR oscillation test case
 # dF/dt = iωF 
 F(x::Complex{T},ω::T) where T = im*ω*x
 function F(L::LowerTriangularMatrix{Complex{T}},ω::T) where T
@@ -86,9 +86,9 @@ end
         M_RAW = abs(X_out[end])
         @test M_RAW < 1
 
-        # CHECK THAT NO WILLIAM'S FILTER IS WORSE
+        # CHECK THAT NO WILLIAMS FILTER IS WORSE
         spectral_grid = SpectralGrid(NF)
-        L = Leapfrog(spectral_grid,william_filter=1)
+        L = Leapfrog(spectral_grid,williams_filter=1)
 
         # INITIAL CONDITIONS
         lmax,mmax = 3,3

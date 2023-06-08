@@ -80,7 +80,7 @@ Now loop over
 4. Transform these vector components to spectral space ``A_{lm}``, ``B_{lm}``
 5. Compute the curl of ``(A,B)_{lm}`` in spectral space which is the tendency of ``\zeta_{lm}``
 6. Compute the [horizontal diffusion](@ref diffusion) based on that tendency
-7. Compute a leapfrog time step as described in [Time integration](@ref leapfrog)
+7. Compute a leapfrog time step as described in [Time integration](@ref leapfrog) with a [Robert-Asselin and Williams filter](@ref)
 8. Transform the new spectral state of ``\zeta_{lm}`` to grid-point ``u,v,\zeta`` as described in 0.
 9. Possibly do some output
 10. Repeat from 1.
@@ -234,14 +234,63 @@ The time step that is used to evaluate the tendencies is denoted with (T).
 It is always the time step furthest in time that is available.
 
 
-### Robert and William filter
+## Robert-Asselin and Williams filter
 
-The standard leapfrog time integration is often combined with a Robert filter to dampen a well-known computational mode.
+The standard leapfrog time integration is often combined with a Robert-Asselin filter[^Robert66][^Asselin72]
+to dampen a computational mode. The idea is to start with a standard leapfrog step to obtain
+the next time step ``i+1`` but then to correct the current time step ``i`` by applying a filter
+which dampens the computational mode. The filter looks like a discrete Laplacian in time
+with a ``(1, -2, 1)`` stencil, and so, maybe unsurprisingly, is efficient to filter out
+a "grid-scale oscillation" in time, aka the computational mode. Let ``v`` be the unfiltered
+variable and ``u`` be the filtered variable, ``F`` the right-hand side tendency,
+then the standard leapfrog step is
+```math
+v_{i+1} = u_{i-1} + 2\Delta tF(v_i)
+```
+Meaning we start with a filtered variable ``u`` at the previous time step ``i-1``, evaluate
+the tendency ``F(v_i)`` based on the current time step ``i`` to obtain an
+unfiltered next time step ``v_{i+1}``. We then filter the current time step ``i``
+(which will become ``i-1`` on the next iteration)
+```math
+u_i = v_i + \frac{\nu}{2}(v_{i+1} - 2v_i + u_{i-1})
+```
+by adding a discrete Laplacian with coefficient ``\tfrac{\nu}{2}`` to it, evaluated
+from the available filtered and unfiltered time steps centred around ``i``:
+``v_{i-1}`` is not available anymore because it was overwritten by the filtering
+at the previous iteration, ``u_i, u_{i+1}`` are not filtered yet when applying
+the Laplacian. The filter parameter ``\nu`` is typically chosen between 0.01-0.2,
+with stronger filtering for higher values.
+
+Williams[^Williams2009] then proposed an additional filter step to regain accuracy
+that is otherwise lost with a strong Robert-Asselin filter[^Amezcua2011][^Williams2011].
+Now let ``w`` be unfiltered, ``v`` be once filtered, and ``u`` twice filtered, then
+```math
+\begin{aligned}
+w_{i+1} &= u_{i-1} + 2\Delta tF(v_i) \\
+u_i &= v_i + \frac{\nu\alpha}{2}(w_{i+1} - 2v_i + u_{i-1}) \\
+v_{i+1} &= w_{i+1} - \frac{\nu(1-\alpha)}{2}(w_{i+1} - 2v_i + u_{i-1})
+\end{aligned}
+```
+with the Williams filter parameter ``\alpha \in [0.5,1]``. For ``\alpha=1``
+we're back with the Robert-Asselin filter (the first two lines).
+The Laplacian in the parantheses is often called a *displacement*,
+meaning that the filtered value is displaced (or corrected) in the direction
+of the two surrounding time steps. The Williams filter now also applies
+the same displacement, but in the opposite direction to the next time
+step ``i+1`` as a correction step (line 3 above) for a once-filtered
+value ``v_{i+1}`` which will then be twice-filtered by the Robert-Asselin
+filter on the next interation. For more details see the referenced publications.
+
+The initial Euler step (see [Time integration](@ref leapfrog), Table) is not filtered.
+Both the the Robert-Asselin and Williams filter are then switched on for all
+following leapfrog time steps.
 
 ## References
 
 [^1]: Geophysical Fluid Dynamics Laboratory, [Idealized models with spectral dynamics](https://www.gfdl.noaa.gov/idealized-models-with-spectral-dynamics/)
 [^2]: Geophysical Fluid Dynamics Laboratory, [The barotropic vorticity equation](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/barotropic.pdf).
-[^3]: Williams, P. D., 2009: A Proposed Modification to the Robert–Asselin Time Filter. Mon. Wea. Rev., 137, 2538–2546, [10.1175/2009MWR2724.1](https://doi.org/10.1175/2009MWR2724.1).
-[^4]: Amezcua, J., E. Kalnay, and P. D. Williams, 2011: The Effects of the RAW Filter on the Climatology and Forecast Skill of the SPEEDY Model. Mon. Wea. Rev., 139, 608–619, doi:[10.1175/2010MWR3530.1](https://doi.org/10.1175/2010MWR3530.1). 
-[^5]: Williams, P. D., 2011: The RAW Filter: An Improvement to the Robert–Asselin Filter in Semi-Implicit Integrations. Mon. Wea. Rev., 139, 1996–2007, doi:[10.1175/2010MWR3601.1](https://doi.org/10.1175/2010MWR3601.1). 
+[^Robert66]: Robert, André. “The Integration of a Low Order Spectral Form of the Primitive Meteorological Equations.” Journal of the Meteorological Society of Japan 44 (1966): 237-245.
+[^Asselin72]: ASSELIN, R., 1972: Frequency Filter for Time Integrations. Mon. Wea. Rev., 100, 487–490, doi:[10.1175/1520-0493(1972)100<0487:FFFTI>2.3.CO;2](https://doi.org/10.1175/1520-0493(1972)100<0487:FFFTI>2.3.CO;2.)
+[^Williams2009]: Williams, P. D., 2009: A Proposed Modification to the Robert–Asselin Time Filter. Mon. Wea. Rev., 137, 2538–2546, [10.1175/2009MWR2724.1](https://doi.org/10.1175/2009MWR2724.1).
+[^Amezcua2011]: Amezcua, J., E. Kalnay, and P. D. Williams, 2011: The Effects of the RAW Filter on the Climatology and Forecast Skill of the SPEEDY Model. Mon. Wea. Rev., 139, 608–619, doi:[10.1175/2010MWR3530.1](https://doi.org/10.1175/2010MWR3530.1). 
+[^Williams2011]: Williams, P. D., 2011: The RAW Filter: An Improvement to the Robert–Asselin Filter in Semi-Implicit Integrations. Mon. Wea. Rev., 139, 1996–2007, doi:[10.1175/2010MWR3601.1](https://doi.org/10.1175/2010MWR3601.1). 
