@@ -17,7 +17,7 @@ RingGrids defines and exports the following grids:
 
 The following explanation of how to use these can be mostly applied to any of them, however,
 there are certain functions that are not defined, e.g. the full grids can be trivially converted
-to a `Matrix` but not the `OctahedralGaussianGrid`.
+to a `Matrix` (i.e. they are *rectangular* grids) but not the `OctahedralGaussianGrid`.
 
 !!! note "What is a ring?"
     We use the term *ring*, short for *iso-latitude ring*, to refer to a sequence of grid points
@@ -64,7 +64,7 @@ and any element type `T` can be used for `OctahedralGaussianGrid{T}` and similar
 
 ## Visualising RingGrid data
 
-As only the full grids can be reshaped into a matrix, the underlying data structure of any `AbstractGrid`
+As only the full grids can be reshaped into a matrix, the underyling data structure of any `AbstractGrid`
 is a vector. As shown in the examples above, one can therefore inspect the data as if it was a vector.
 But as that data has, through its `<:AbstractGrid` type, all the geometric information available to plot
 it on a map, RingGrids also exports `plot` function,
@@ -163,7 +163,7 @@ The input grid contains the data which is subject to interpolation, it must come
 its coordinate information is actually already in the interpolator. The interpolator knows about the
 geometry of the grid the data is coming on and the coordinates it is supposed to interpolate onto.
 It has therefore precalculated the indices that are needed to access the right data on the input grid
-and the weights it needs to apply in the actual interpolation operation. The only thing it does not
+and the weights it needs to apply in the actual interplation operation. The only thing it does not
 know is the actual data values of that grid. So in the case you want to interpolate from grid A
 to grid B many times, you can just reuse the same interpolator. If you want to change the coordinates
 of the output grid but its total number of points remain constants then you can update the locator
@@ -204,7 +204,7 @@ interp = RingGrids.interpolator(Float32,grid_out,grid_in)
 interpolate!(grid_out,grid_in,interp)
 grid_out
 ```
-As a last example we want to illustrate a situation where we would always want to interpolate onto
+As a last example we want to illustrate a situation where we would always want to interplate onto
 10 coordinates, but their locations may change. In order to avoid recreating an interpolator object
 we would do (`AnvilInterpolator` is described in [Anvil interpolator](@ref))
 ```@example ringgrids
@@ -239,7 +239,7 @@ which is the approximately the same as doing it directly without creating an int
 interpolate(latds,londs,grid_input)
 ```
 but allows for a reuse of the interpolator. Note that the two output arrays are not exactly identical because we manually
-set our interpolator `interp` to use `Float32` for the interpolation whereas the default is `Float64`.
+set our interpolator `interp` to use `Float32` for the interplation whereas the default is `Float64`.
 
 ## Anvil interpolator
 
@@ -263,15 +263,11 @@ Note that a,c and b,d do not necessarily share the same longitude/x-coordinate.
 
 ^ fraction of distance Δy between a-b and c-d.
 ```
-This interpolation is chosen as by definition of the ring grids, a and b share the same latitude, so do c and d,
+This interpolation is chosen as by definiton of the ring grids, a and b share the same latitude, so do c and d,
 but the longitudes can be different for all four, a,b,c,d.
 
 ## Function index
 
-```@docs
-RingGrids.each_index_in_ring
-RingGrids.eachgridpoint
-RingGrids.eachring
-RingGrids.whichring
-RingGrids.get_nlons
+```@autodocs
+Modules = [SpeedyWeather.RingGrids]
 ```

@@ -15,7 +15,7 @@ but let's start with some examples first.
 We want to use the barotropic model to simulate some free-decaying 2D turbulence
 on the sphere without rotation. We start by defining the `SpectralGrid` object.
 To have a resolution of about 100km, we choose a spectral resolution of
-T127 (see [Available resolutions](@ref)) and `nlev=1` vertical levels.
+T127 (see [Available horizontal resolutions](@ref)) and `nlev=1` vertical levels.
 The `SpectralGrid` object will provide us with some more information
 ```julia
 julia> spectral_grid = SpectralGrid(trunc=127,nlev=1)
@@ -39,7 +39,7 @@ Main.SpeedyWeather.Earth
   equinox: Dates.DateTime
   axial_tilt: Float64 23.4
 ```
-There are other options to create a planet but they are irrelevant for the
+There are other options to create a planet but they are irreleveant for the
 barotropic vorticity equations. We also want to specify the initial conditions,
 randomly distributed vorticity is already defined
 ```julia
@@ -169,7 +169,7 @@ EarthOrography{Float32, OctahedralGaussianGrid{Float32}}:
 ```
 
 It will read the orography from file as shown, and there are some smoothing options too, but let's not change them.
-Same as before, create a model, initialize into a simulation, run. This time directly for 12 days so that we can
+Same as before, create a model, intialize into a simulation, run. This time directly for 12 days so that we can
 compare with the last plot
 ```julia
 julia> model = ShallowWaterModel(;spectral_grid, orography, initial_conditions);

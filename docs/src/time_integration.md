@@ -1,6 +1,6 @@
 # Time integration
 
-SpeedyWeather.jl uses a leapfrog time scheme with a Robert's and William's filter
+SpeedyWeather.jl uses a leapfrog time scheme with a Robert's and Williams filter
 to dampen the computational mode and achieve 3rd order accuracy.
 
 ## Oscillation equation
