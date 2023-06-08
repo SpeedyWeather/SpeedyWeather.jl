@@ -51,6 +51,18 @@ for further details. Especially because the inversion of the [Laplacian](@ref) a
 gradients of ``\Psi, \Phi`` can be computed in a single pass, see
 [U,V from vorticity and divergence](@ref).
 
+The divergence/curl of the vorticity flux ``\mathbf{u}(\zeta + f)`` are combined with the
+divergence/curl of the forcing vector ``\mathbf{F}``, as
+```math
+\begin{aligned}
+- \nabla \cdot (\mathbf{u}(\zeta + f)) + \nabla \times \mathbf{F} &=
+\nabla \times (\mathbf{F} + \mathbf{u}_\perp(\zeta + f)) \\
+\nabla \times (\mathbf{u}(\zeta + f)) + \nabla \cdot \mathbf{F} &=
+\nabla \cdot (\mathbf{F} + \mathbf{u}_\perp(\zeta + f))
+\end{aligned}
+```
+equivalently to how this is done in the [Barotropic vorticity equation](@ref)
+with ``\mathbf{u}_\perp = (v,-u)``.
 
 ## Algorithm
 
@@ -71,14 +83,15 @@ Now loop over
 4. Transform these vector components to spectral space ``A_{lm}``, ``B_{lm}``
 5. Compute the curl of ``(A,B)_{lm}`` in spectral space which is the tendency of ``\zeta_{lm}``
 5. Compute the divergence of ``(A,B)_{lm}`` in spectral space which is the tendency of ``\mathcal{D}_{lm}``
-6. Compute the Bernoulli potential ``P`` by adding the kinetic energy ``\frac{1}{2}(u^2 + v^2)`` and the "geopotential" ``g\eta`` in grid-point space
-7. Transform the Bernoulli potential to spectral space ``P_{lm}``, take the Laplacian and subtract from the divergence tendency
+6. Compute the kinetic energy ``\frac{1}{2}(u^2 + v^2)`` and transform to spectral space
+6. Add to the kinetic energy the "geopotential" ``g\eta_{lm}`` in spectral space to obtain the Bernoulli potential
+7. Take the Laplacian of the Bernoulli potential and subtract from the divergence tendency
 7. Compute the volume fluxes ``uh,vh`` in grid-point space via ``h = \eta + H - H_b``
 7. Transform to spectral space and take the divergence for ``-\nabla \cdot (\mathbf{u}h)`` which is the tendency for ``\eta``
 7. Add possibly forcing ``F_\eta`` for ``\eta`` in spectral space
 7. Correct the tendencies following the [Semi implicit time integration](@ref) to prevent fast gravity waves from causing numerical instabilities
 6. Compute the [horizontal diffusion](@ref diffusion) based on the ``\zeta,\mathcal{D}`` tendencies
-7. Compute a leapfrog time step as described in [Time integration](@ref leapfrog)
+7. Compute a leapfrog time step as described in [Time integration](@ref leapfrog) with a [Robert-Asselin and Williams filter](@ref)
 8. Transform the new spectral state of ``\zeta_{lm}``, ``\mathcal{D}_{lm}``, ``\eta_{lm}`` to grid-point ``u,v,\zeta,\mathcal{D},\eta`` as described in 0.
 9. Possibly do some output
 10. Repeat from 1.
@@ -104,24 +117,38 @@ resolve the advective motion of the atmosphere, which is usually one or two orde
 longer than gravity waves.
 
 In the following we will describe how the semi implicit time integration can be combined
-with the [Leapfrog time stepping](@ref leapfrog) for a large increase in numerical
-stability with gravity waves.
+with the [Leapfrog time stepping](@ref leapfrog) and the [Robert-Asselin and Williams filter](@ref)
+for a large increase in numerical stability with gravity waves.
 
 
 
 ## Scaled shallow water equations
 
-Similar to the scaled barotropic vorticity equations, the scaled shallow water equations scale the vorticity and the divergence equation with ``R^2``, but the continuity equation with ``R``
+Similar to the [scaled barotropic vorticity equations](@ref scaling),
+SpeedyWeather.jl scales in the shallow water equations.
+The vorticity and the divergence equation are scaled with ``R^2``, but the continuity equation is
+scaled with ``R``. We also combine the vorticity flux and forcing into a single
+divergence/curl operation as mentioned in [Shallow water equations](@ref) above
 
 ```math
 \begin{aligned}
-\frac{\partial \tilde{\zeta}}{\partial \tilde{t}} + \tilde{\nabla} \cdot (\mathbf{u}(\tilde{\zeta} + \tilde{f})) &=
-\tilde{\nu}\tilde{\nabla}^{2n}\tilde{\zeta} \\
-\frac{\partial \tilde{\mathcal{D}}}{\partial \tilde{t}} - \tilde{\nabla} \times (\mathbf{u}(\tilde{\zeta} + \tilde{f})) &=
--\tilde{\nabla}^2\left(\tfrac{1}{2}(u^2 + v^2) + g\eta \right) + \tilde{\nu}\tilde{\nabla}^{2n}\tilde{\mathcal{D}} \\
-\frac{\partial \eta}{\partial \tilde{t}} + \tilde{\nabla} \cdot (\mathbf{u}h) &= 0.
+\frac{\partial \tilde{\zeta}}{\partial \tilde{t}} &=
+\tilde{\nabla} \times (\tilde{\mathbf{F}} + \mathbf{u}_\perp(\tilde{\zeta} + \tilde{f})) +
+(-1)^{n+1}\tilde{\nu}\tilde{\nabla}^{2n}\tilde{\zeta} \\
+\frac{\partial \tilde{\mathcal{D}}}{\partial \tilde{t}} &=
+\tilde{\nabla} \cdot (\tilde{\mathbf{F}} + \mathbf{u}_\perp(\tilde{\zeta} + \tilde{f})) -
+\tilde{\nabla}^2\left(\tfrac{1}{2}(u^2 + v^2) + g\eta \right) +
+(-1)^{n+1}\tilde{\nu}\tilde{\nabla}^{2n}\tilde{\mathcal{D}} \\
+\frac{\partial \eta}{\partial \tilde{t}} &=
+- \tilde{\nabla} \cdot (\mathbf{u}h) + \tilde{F}_\eta.
 \end{aligned}
 ```
+
+As in the [scaled barotropic vorticity equations](@ref scaling), one needs to scale
+the time step, the Coriolis force, the forcing and the diffusion coefficient, but then
+enjoys the luxury of working with dimensionless gradient operators. As before,
+SpeedyWeather.jl will scale vorticity and divergence just before the model integration
+starts and unscale them upon completion and for output.
 
 ## References
 
