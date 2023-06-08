@@ -61,6 +61,7 @@ in the `BarotropicModel`, as outlined in the following section.
 ## Algorithm
 
 We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrate the barotropic vorticity equation.
+
 As an initial step
 
 0\. Start with initial conditions of ``\zeta_{lm}`` in spectral space and
@@ -101,7 +102,9 @@ obtain from time steps ``i-1`` and ``i``, the next time step ``i+1``
 \zeta_{i+1} = \zeta_{i-1} + 2\Delta t d\zeta,
 ```
 with ``d\zeta`` being some tendency evaluated from ``\zeta_i``. Now we want to add a diffusion term ``(-1)^{n+1}\nu \nabla^{2n}\zeta``
+
 with coefficient ``\nu``, which however, is implicitly calculated from ``\zeta_{i+1}``, then
+
 ```math
 \zeta_{i+1} = \zeta_{i-1} + 2\Delta t (d\zeta + (-1)^{n+1} \nu\nabla^{2n}\zeta_{i+1})
 ```
@@ -273,6 +276,7 @@ v_{i+1} &= w_{i+1} - \frac{\nu(1-\alpha)}{2}(w_{i+1} - 2v_i + u_{i-1})
 ```
 with the Williams filter parameter ``\alpha \in [0.5,1]``. For ``\alpha=1``
 we're back with the Robert-Asselin filter (the first two lines).
+
 The Laplacian in the parentheses is often called a *displacement*,
 meaning that the filtered value is displaced (or corrected) in the direction
 of the two surrounding time steps. The Williams filter now also applies
