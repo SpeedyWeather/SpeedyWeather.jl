@@ -116,7 +116,7 @@ Let `J` be the total number of rings. Then we have
 - ``\frac{3}{2}T \approx J`` for _quadratic_ truncation, i.e. `dealiasing = 2`
 - ``2T \approx J`` for _cubic_ truncation, , i.e. `dealiasing = 3`
 
-and in general ``\frac{m+1}{2}T \approx J`` for _m-th_ order truncation. So the higher the truncaction
+and in general ``\frac{m+1}{2}T \approx J`` for _m-th_ order truncation. So the higher the truncation
 order the more grid points are used in combination with the same spectral
 resolution. A higher truncation order therefore makes all grid-point calculations more expensive,
 but can represent products of terms on the grid (which will have higher wavenumber components) to
@@ -206,7 +206,7 @@ is based on an octahedron, which has the convenient property that there are twic
 the equator than there are latitude rings between the poles. This is a desirable for truncation as this matches
 the distances too, ``2\pi`` around the Equator versus ``\pi`` between the poles. ``N_\varphi = 6, N_\theta = 2``
 or ``N_\varphi = 8, N_\theta = 3`` are other possible choices for this, but also more complicated. See 
-Górski, 2004[^1] for further examples and visulations of these grids.
+Górski, 2004[^1] for further examples and visualizations of these grids.
 
 We call the ``N_\varphi = 4, N_\theta = 1`` HEALPix grid the OctaHEALPix grid, which combines the equal-area
 property of the HEALPix grids with the octahedron that's also used in the `OctahedralGaussianGrid` or the
