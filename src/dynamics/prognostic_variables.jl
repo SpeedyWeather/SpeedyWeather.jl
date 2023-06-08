@@ -1,3 +1,31 @@
+"""
+Clock struct keeps track of the model time, how many days to integrate for
+and how many time steps this takes
+$(TYPEDFIELDS)."""
+Base.@kwdef mutable struct Clock
+    "current model time"
+    time::DateTime = DateTime(2000,1,1)
+    
+    "number of days to integrate for, set in run!(::Simulation)"
+    n_days::Float64 = 0
+
+    "number of time steps to integrate for, set in initialize!(::Clock,::TimeStepper)"
+    n_timesteps::Int = 0  
+end
+
+"""
+$(TYPEDSIGNATURES)
+Initialize the clock with the time step `Δt` in the `time_stepping`."""
+function initialize!(clock::Clock,time_stepping::TimeStepper)
+    clock.n_timesteps = ceil(Int,24*clock.n_days/time_stepping.Δt_hrs)
+    return clock
+end
+
+function Clock(time_stepping::TimeStepper;kwargs...)
+    clock = Clock(;kwargs...)
+    initialize!(clock,time_stepping)
+end
+
 import Base: copy!
 
 # how many time steps have to be stored for the time integration? Leapfrog = 2 
@@ -42,6 +70,8 @@ struct PrognosticVariables{NF<:AbstractFloat,M<:ModelSetup}
     # scaling_temp::Base.RefValue{NF}
     # scaling_humid::Base.RefValue{NF}
     # scaling_pres::Base.RefValue{NF}
+
+    clock::Clock
 end
 
 # ZERO GENERATOR FUNCTIONS
@@ -117,8 +147,11 @@ function Base.zeros(::Type{PrognosticVariables{NF}},Model::Type{<:ModelSetup},tr
     surface = has(Model, :pres) ? zeros(PST,trunc) : zeros(PST,-1)
     
     # initialize with scale=1, wrapped in RefValue for mutability
-    scale = Ref(one(NF))                                                    
-    return PrognosticVariables{NF,Model}(layers,surface,trunc,N_STEPS,nlev,scale)
+    scale = Ref(one(NF))  
+    
+    # clock
+    clock::Clock = Clock()
+    return PrognosticVariables{NF,Model}(layers,surface,trunc,N_STEPS,nlev,scale,clock)
 end
 
 has(progn::PrognosticVariables{NF,M}, var_name::Symbol) where {NF,M} = has(M, var_name)
@@ -141,6 +174,9 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     end 
     pres = get_pressure(progn_old)
     set_pressure!(progn_new, pres)
+    
+    # synchronize the clock
+    progn_new.clock.time = progn_old.clock.time
 
     return progn_new
 end

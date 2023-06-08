@@ -15,12 +15,11 @@ Base.@kwdef struct Keepbits
 end
 
 function Base.show(io::IO,K::Keepbits)
-    print(io,"$(typeof(K))(")
+    print(io,"$(typeof(K)):")
     for key in propertynames(K)
         val = getfield(K,key)
-        print(io,"$key=$val, ")
+        print(io,"\n $key::$(typeof(val)) = $val")
     end
-    print(")")
 end
 
 # default number format for output
@@ -468,8 +467,7 @@ to the output folder (or current path) that can be used to restart the model.
 `restart.jld2` will then be used as initial conditions. The prognostic variables
 are bitrounded for compression and the 2nd leapfrog time step is discarded.
 Variables in restart file are unscaled."""
-function write_restart_file(time::DateTime,
-                            progn::PrognosticVariables,
+function write_restart_file(progn::PrognosticVariables,
                             output::OutputWriter)
     
     (; run_path, write_restart, keepbits ) = output
@@ -505,7 +503,6 @@ function write_restart_file(time::DateTime,
 
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
         f["prognostic_variables"] = progn
-        f["time"] = time
         f["version"] = output.pkg_version
         f["description"] = "Restart file created for SpeedyWeather.jl"
     end
