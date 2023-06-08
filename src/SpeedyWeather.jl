@@ -45,8 +45,7 @@ export  Barotropic,             # abstract
         PrimitiveDry,
         PrimitiveWet
 
-export  Model,
-        BarotropicModel,        # concrete
+export  BarotropicModel,        # concrete
         ShallowWaterModel,
         PrimitiveDryModel,
         PrimitiveWetModel

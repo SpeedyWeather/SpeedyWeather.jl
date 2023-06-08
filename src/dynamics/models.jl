@@ -37,7 +37,6 @@ Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Baro
     implicit::AbstractImplicit{NF} = NoImplicit(spectral_grid)
 
     # INTERNALS
-    clock::Clock = Clock()
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
@@ -89,7 +88,6 @@ Base.@kwdef struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: Sh
     implicit::AbstractImplicit{NF} = ImplicitShallowWater(spectral_grid)
 
     # INTERNALS
-    clock::Clock = Clock()
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
@@ -150,7 +148,6 @@ Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     implicit::AbstractImplicit{NF} = ImplicitPrimitiveEq(spectral_grid)
 
     # INTERNALS
-    clock::Clock = Clock()
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
@@ -218,7 +215,6 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     implicit::AbstractImplicit{NF} = ImplicitPrimitiveEq(spectral_grid)
 
     # INTERNALS
-    clock::Clock = Clock()
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
     device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())

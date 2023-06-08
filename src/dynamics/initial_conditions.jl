@@ -376,7 +376,6 @@ function initial_conditions!(   progn_new::PrognosticVariables,
     restart_file = jldopen(joinpath(path,string("run_",run_id_to_string(id)),"restart.jld2"))
     progn_old = restart_file["prognostic_variables"]
     # version = restart_file["version"]             # currently unused
-    model.clock.time = restart_file["time"]         # synchronize clocks
     return copy!(progn_new, progn_old)
 end
 
