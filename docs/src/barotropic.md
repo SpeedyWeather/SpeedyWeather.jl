@@ -61,7 +61,7 @@ in the `BarotropicModel`, as outlined in the following section.
 ## Algorithm
 
 We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrate the barotropic vorticity equation.
-As an intial step
+As an initial step
 
 0\. Start with initial conditions of ``\zeta_{lm}`` in spectral space and
 transform this model state to grid-point space:
@@ -101,7 +101,7 @@ obtain from time steps ``i-1`` and ``i``, the next time step ``i+1``
 \zeta_{i+1} = \zeta_{i-1} + 2\Delta t d\zeta,
 ```
 with ``d\zeta`` being some tendency evaluated from ``\zeta_i``. Now we want to add a diffusion term ``(-1)^{n+1}\nu \nabla^{2n}\zeta``
-with coefficient ``\nu``, wich however, is implicitly calculated from ``\zeta_{i+1}``, then
+with coefficient ``\nu``, which however, is implicitly calculated from ``\zeta_{i+1}``, then
 ```math
 \zeta_{i+1} = \zeta_{i-1} + 2\Delta t (d\zeta + (-1)^{n+1} \nu\nabla^{2n}\zeta_{i+1})
 ```
@@ -220,7 +220,7 @@ the leapfrog time steps that follow and that have been described above.
 3) leapfrog with ``2 \Delta t`` till the end
 
 This is particularly done in a way that after 2. we have ``t=0`` at ``i-1`` and ``t=\Delta t`` at ``i``
-available so that 3. can start the leapfrogging without any offset from the inuitive spacing
+available so that 3. can start the leapfrogging without any offset from the intuitive spacing
 ``0,\Delta  t, 2\Delta t, 3\Delta t,...``. The following schematic can be useful
 
 |                    | time at step ``i-1`` | time at step ``i`` | time step at ``i+1`` |
@@ -273,13 +273,13 @@ v_{i+1} &= w_{i+1} - \frac{\nu(1-\alpha)}{2}(w_{i+1} - 2v_i + u_{i-1})
 ```
 with the Williams filter parameter ``\alpha \in [0.5,1]``. For ``\alpha=1``
 we're back with the Robert-Asselin filter (the first two lines).
-The Laplacian in the parantheses is often called a *displacement*,
+The Laplacian in the parentheses is often called a *displacement*,
 meaning that the filtered value is displaced (or corrected) in the direction
 of the two surrounding time steps. The Williams filter now also applies
 the same displacement, but in the opposite direction to the next time
 step ``i+1`` as a correction step (line 3 above) for a once-filtered
 value ``v_{i+1}`` which will then be twice-filtered by the Robert-Asselin
-filter on the next interation. For more details see the referenced publications.
+filter on the next iteration. For more details see the referenced publications.
 
 The initial Euler step (see [Time integration](@ref leapfrog), Table) is not filtered.
 Both the the Robert-Asselin and Williams filter are then switched on for all
