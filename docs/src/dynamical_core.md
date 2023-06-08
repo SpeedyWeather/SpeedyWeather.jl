@@ -47,7 +47,7 @@ which is described in [Derivatives in spherical coordinates](@ref).
 ### Algorithm
 
 We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrate the barotropic vorticity equation.
-As an intial step
+As an initial step
 
 0\. Start with initial conditions of ``\zeta_{lm}`` in spectral space and transform this model state to grid-point space:
 - Invert the [Laplacian](@ref) to obtain the stream function ``\Psi_{lm}`` in spectral space
@@ -167,7 +167,7 @@ SpeedyWeather.jl uses a scaling for vorticity ``\zeta`` and stream function ``\P
 ```math
 \tilde{\zeta} = \zeta R, \tilde{\Psi} = \Psi R^{-1}.
 ```
-In the barotropic voriticity equation model the inversion of the Laplcians in order to obtain
+In the barotropic vorticity equation model the inversion of the Laplacians in order to obtain
 ``\Psi`` from ``\zeta`` therefore becomes
 ```math
 \tilde{\zeta} = \tilde{\nabla}^2 \tilde{\Psi}

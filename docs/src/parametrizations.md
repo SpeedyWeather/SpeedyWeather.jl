@@ -1,6 +1,6 @@
 # Parameterizations
 
-This page describes the mathematical formulation of the parameterizations used in SpeedyWeather.jl to represent physical processes in the atmopshere. Every section is followed by a brief description of implementation details.
+This page describes the mathematical formulation of the parameterizations used in SpeedyWeather.jl to represent physical processes in the atmosphere. Every section is followed by a brief description of implementation details.
 
 ## Convection
 
