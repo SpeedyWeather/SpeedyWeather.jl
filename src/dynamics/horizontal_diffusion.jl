@@ -56,7 +56,7 @@ end
 """$(TYPEDSIGNATURES)
 Generator function based on the resolutin in `spectral_grid`.
 Passes on keyword arguments."""
-function HyperDiffusion(spectral_grid::SpectralGrid,kwargs...)
+function HyperDiffusion(spectral_grid::SpectralGrid;kwargs...)
     (;NF,trunc,nlev) = spectral_grid        # take resolution parameters from spectral_grid
     return HyperDiffusion{NF}(;trunc,nlev,kwargs...)
 end

@@ -17,6 +17,11 @@ function plot(A::AbstractFullGrid;title::String="$(get_nlat(A))-ring $(typeof(A)
     nlon,nlat = size(A_matrix)
     A_view = view(A_matrix,:,nlat:-1:1)
 
+    # use at most 30 points in height, but fewer for smaller grids
+    # small grids are then displayed as 1 character per grid point
+    height = min(nlat,30)
+    width = 2height
+
     plot_kwargs = pairs((   xlabel="˚E",
                             xfact=360/(nlon-1),
                             ylabel="˚N",
@@ -26,8 +31,7 @@ function plot(A::AbstractFullGrid;title::String="$(get_nlat(A))-ring $(typeof(A)
                             colormap=:viridis,
                             compact=true,
                             colorbar=true,
-                            width=60,
-                            height=30))
-
-    UnicodePlots.heatmap(A_view';plot_kwargs...)
+                            width=width,
+                            height=height))
+    return UnicodePlots.heatmap(A_view';plot_kwargs...)
 end
