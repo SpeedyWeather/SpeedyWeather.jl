@@ -143,12 +143,6 @@ Base.@kwdef struct ImplicitPrimitiveEq{NF<:AbstractFloat} <: AbstractImplicit{NF
     "time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
     α::Float64 = 1
 
-    "recalculate the implicit terms occasionally based on the current temperature profile?"
-    adaptive::Bool = true
-
-    "recalculate operators based on new temperature profile every `recalculate` time steps"
-    recalculate::Int = adaptive ? 100 : typemax(Int)
-
     # PRECOMPUTED ARRAYS, to be initiliased with initialize!
     "vertical temperature profile"
     temp_profile::Vector{NF} = zeros(NF,nlev)
@@ -224,13 +218,12 @@ function initialize!(   implicit::ImplicitPrimitiveEq,
     (;σ_levels_full, σ_levels_thick) = geometry
     (;R_dry, κ, Δp_geopot_half, Δp_geopot_full, σ_lnp_A, σ_lnp_B) = constants
 
-    if implicit.adaptive    # use current vertical temperature profile
-        for k in 1:nlev                                         
-            temp_profile[k] = diagn.layers[k].temp_average[]    # return immediately if temp_profile contains
-            if !isfinite(temp_profile[k]) return nothing end    # NaRs, model blew up in that case
-        end
-    else                    # or use reference profile
-        temp_profile .= constants.temp_ref_profile
+    for k in 1:nlev    
+        # use current vertical temperature profile                                     
+        temp_profile[k] = diagn.layers[k].temp_average[]   
+        
+        # return immediately if temp_profile contains NaRs, model blew up in that case
+        if !isfinite(temp_profile[k]) return nothing end
     end
 
     # set up R, U, L, W operators from

@@ -24,13 +24,16 @@ function pressure_flux!(diagn::DiagnosticVariablesLayer,
 end
 
 """Convert absolute and virtual temperature to anomalies wrt to the reference profile"""
-function temperature_anomaly!(diagn_layer::DiagnosticVariablesLayer)
+function temperature_anomaly!(
+    diagn::DiagnosticVariablesLayer,
+    I::ImplicitPrimitiveEq,
+    )
                     
-    Tₖ = diagn_layer.temp_average[]   # mean temperature on this layer
-    (; temp_grid, temp_virt_grid ) = diagn_layer.grid_variables
+    Tₖ = I.temp_profile[diagn.k]    # reference temperature on this layer
+    (; temp_grid, temp_virt_grid ) = diagn.grid_variables
 
-    @. temp_grid -= Tₖ          # absolute temperature -> anomaly
-    @. temp_virt_grid -= Tₖ     # virtual temperature -> anomaly
+    @. temp_grid -= Tₖ              # absolute temperature -> anomaly
+    @. temp_virt_grid -= Tₖ         # virtual temperature -> anomaly
 end
 
 """
@@ -220,20 +223,20 @@ function _vertical_advection!(  ξ_tend::Grid,           # tendency of quantity 
                                 ξ_below::Grid,          # quantity ξ at k+1
                                 Δσₖ::NF                 # layer thickness on σ levels
                                 ) where {NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
-    Δσₖ⁻¹ = 1/Δσₖ                                      # precompute
+    # Δσₖ⁻¹ = 1/Δσₖ                                      # precompute
 
-    # += as the tendencies already contain the parameterizations
-    for ij in eachgridpoint(ξ_tend,σ_tend_above,σ_tend_below,ξ_above,ξ,ξ_below)
-        # 1st order upwind scheme
-        σ̇⁺ = max(σ_tend_above[ij],0)        # velocity into layer k from above
-        σ̇⁻ = min(σ_tend_below[ij],0)        # velocity into layer k from below
-        ξ_tend[ij] -= Δσₖ⁻¹ * (σ̇⁺*(ξ[ij] - ξ_above[ij]) + σ̇⁻*(ξ_below[ij] - ξ[ij]))
-    end
-
-    # # centred scheme
-    # Δσₖ2⁻¹ = -1/2Δσₖ                                    # precompute
     # # += as the tendencies already contain the parameterizations
-    # @. ξ_tend += Δσₖ2⁻¹ * (σ_tend_below*(ξ_below - ξ) + σ_tend_above*(ξ - ξ_above))
+    # for ij in eachgridpoint(ξ_tend,σ_tend_above,σ_tend_below,ξ_above,ξ,ξ_below)
+    #     # 1st order upwind scheme
+    #     σ̇⁺ = max(σ_tend_above[ij],0)        # velocity into layer k from above
+    #     σ̇⁻ = min(σ_tend_below[ij],0)        # velocity into layer k from below
+    #     ξ_tend[ij] -= Δσₖ⁻¹ * (σ̇⁺*(ξ[ij] - ξ_above[ij]) + σ̇⁻*(ξ_below[ij] - ξ[ij]))
+    # end
+
+    # centred scheme
+    Δσₖ2⁻¹ = -1/2Δσₖ                                    # precompute
+    # += as the tendencies already contain the parameterizations
+    @. ξ_tend += Δσₖ2⁻¹ * (σ_tend_below*(ξ_below - ξ) + σ_tend_above*(ξ - ξ_above))
 end
 
 """
@@ -321,7 +324,8 @@ function temperature_tendency!(
     diagn::DiagnosticVariablesLayer,
     model::PrimitiveEquation,
 )
-    temperature_tendency!(diagn,model.constants,model.geometry,model.spectral_transform)
+    temperature_tendency!(diagn,model.constants,model.geometry,
+                            model.spectral_transform,model.implicit)
 end
 
 """
@@ -338,6 +342,7 @@ function temperature_tendency!(
     C::DynamicsConstants,
     G::Geometry,
     S::SpectralTransform,
+    I::ImplicitPrimitiveEq,
 )
     (;temp_tend, temp_tend_grid)  = diagn.tendencies
     (;div_grid, temp_grid) = diagn.grid_variables
@@ -345,7 +350,7 @@ function temperature_tendency!(
     
     (;κ) = C                                    # thermodynamic kappa
     Tᵥ = diagn.grid_variables.temp_virt_grid    # anomaly wrt to Tₖ
-    Tₖ = diagn.temp_average[]                   # average temperatures
+    Tₖ = I.temp_profile[diagn.k]                # average layer temperature from reference profile
     
     # coefficients from Simmons and Burridge 1981
     σ_lnp_A = C.σ_lnp_A[diagn.k]         # eq. 3.12, -1/Δσₖ*ln(σ_k+1/2/σ_k-1/2)
@@ -604,9 +609,10 @@ function linear_pressure_gradient!(
     surface::PrognosticSurfaceTimesteps,
     lf::Int,                # leapfrog index to evaluate tendencies on
     C::DynamicsConstants,
+    I::ImplicitPrimitiveEq,
 )                          
     (; R_dry ) = C
-    Tₖ = diagn.temp_average[]   # mean temperature at layer k      
+    Tₖ = I.temp_profile[diagn.k]            # reference profile at layer k      
     (;pres) = surface.timesteps[lf]
     (;geopot) = diagn.dynamics_variables
 
