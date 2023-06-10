@@ -158,6 +158,7 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
                     lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                     lf2::Int=2)                     # leapfrog index 2 (time step used for tendencies)
 
+    model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
     zero_tendencies!(diagn)                         # start with zero for accumulation 
 
@@ -182,6 +183,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
 
+    model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
 
     progn_layer = progn.layers[1]                   # only calculate tendencies for the first layer
@@ -222,6 +224,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
 
+    model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
 
     # switch on/off all physics
