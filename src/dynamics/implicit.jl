@@ -144,7 +144,7 @@ Base.@kwdef struct ImplicitPrimitiveEq{NF<:AbstractFloat} <: AbstractImplicit{NF
     α::Float64 = 1
 
     # PRECOMPUTED ARRAYS, to be initiliased with initialize!
-    "vertical temperature profile"
+    "vertical temperature profile, obtained from diagn"
     temp_profile::Vector{NF} = zeros(NF,nlev)
 
     "time step 2α*Δt packed in RefValue for mutability"
@@ -193,7 +193,7 @@ end
 
 function Base.show(io::IO,I::ImplicitPrimitiveEq)
     print(io,"$(typeof(I)):")
-    keys = (:trunc,:nlev,:α,:adaptive,:recalculate)
+    keys = (:trunc,:nlev,:α)
     for key in keys
         val = getfield(I,key)
         s = "\n $key::$(typeof(val)) = $val"

@@ -62,6 +62,9 @@ function initialize!(feedback::Feedback,clock::Clock,model::ModelSetup)
     (;enabled, showspeed, desc) = feedback.progress_meter
     feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps-1;enabled,showspeed, desc)
     
+    # set to false to recheck for NaRs
+    feedback.nars_detected = false
+
     # hack: redefine element in global constant dt_in_sec
     # used to pass on the time step to ProgressMeter.speedstring
     DT_IN_SEC[] = model.time_stepping.Δt_sec        
