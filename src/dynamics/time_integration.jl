@@ -141,6 +141,9 @@ function first_timesteps!(
     clock.time += Dates.Second(Δt_sec÷2)      # now 2nd leapfrog step is at t=Δt
     write_output!(output,clock.time,diagn)
 
+    # from now on precomputed implicit terms with 2Δt
+    initialize!(implicit,2Δt,diagn,model) 
+
     return time
 end
 
@@ -155,6 +158,7 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
                     lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
                     lf2::Int=2)                     # leapfrog index 2 (time step used for tendencies)
 
+    model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
     zero_tendencies!(diagn)                         # start with zero for accumulation 
 
@@ -179,6 +183,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
 
+    model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
 
     progn_layer = progn.layers[1]                   # only calculate tendencies for the first layer
@@ -219,6 +224,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
 
+    model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
 
     # switch on/off all physics
@@ -226,7 +232,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     model.physics || zero_tendencies!(diagn)        # set tendencies to zero otherwise
 
     # occasionally reinitialize the implicit solver with new temperature profile
-    initialize!(model.implicit,i,dt,diagn,model.geometry,model.constants)
+    # initialize!(model.implicit,i,dt,diagn,model.geometry,model.constants)
 
     dynamics_tendencies!(diagn,progn,model,lf2)         # dynamical core
     implicit_correction!(diagn,model.implicit,progn)    # semi-implicit time stepping corrections
@@ -279,7 +285,6 @@ function time_stepping!(
 
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
     first_timesteps!(progn,diagn,model,output)
-    initialize!(model.implicit,2Δt,diagn,model) # from now on precomputed implicit terms with 2Δt
 
     # MAIN LOOP
     for i in 2:clock.n_timesteps            # start at 2 as first Δt in first_timesteps!
