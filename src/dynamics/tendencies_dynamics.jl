@@ -629,13 +629,14 @@ function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
 
     (; pres_grid, pres_tend ) = surface
     (; orography ) = orog
-    H₀ = constants.layer_thickness
+    H = constants.layer_thickness
 
     # compute dynamic layer thickness h on the grid
     # pres_grid is η, the interface displacement, update to
-    # layer thickness h = η + H, H is the layer thickness at rest
-    # H = H₀ - orography, H₀ is the layer thickness at rest without mountains
-    pres_grid .+= H₀ .- orography
+    # layer thickness h = η + H - Hb
+    # H is the layer thickness at rest without mountains
+    # Hb the orography
+    pres_grid .+= H .- orography
     
     # now do -∇⋅(uh,vh) and store in pres_tend
     flux_divergence!(pres_tend,pres_grid,diagn,G,S,add=true,flipsign=true)

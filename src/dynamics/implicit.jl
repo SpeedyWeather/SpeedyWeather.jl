@@ -17,11 +17,11 @@ Base.@kwdef struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit{N
     α::Float64 = 1
 
     # PRECOMPUTED ARRAYS, to be initiliased with initialize!
-    H₀::Base.RefValue{NF} = Ref(zero(NF))   # layer_thicknes
-    ξH₀::Base.RefValue{NF} = Ref(zero(NF))  # = 2αΔt*layer_thickness, store in RefValue for mutability
+    H::Base.RefValue{NF} = Ref(zero(NF))   # layer_thicknes
+    ξH::Base.RefValue{NF} = Ref(zero(NF))  # = 2αΔt*layer_thickness, store in RefValue for mutability
     g∇²::Vector{NF} = zeros(NF,trunc+2)     # = gravity*eigenvalues
     ξg∇²::Vector{NF} = zeros(NF,trunc+2)    # = 2αΔt*gravity*eigenvalues
-    S⁻¹::Vector{NF} = zeros(NF,trunc+2)     # = 1 / (1-ξH₀*ξg∇²), implicit operator
+    S⁻¹::Vector{NF} = zeros(NF,trunc+2)     # = 1 / (1-ξH*ξg∇²), implicit operator
 end
 
 """
@@ -54,7 +54,7 @@ function initialize!(   implicit::ImplicitShallowWater,
                         dt::Real,                   # time step used [s]
                         constants::DynamicsConstants)
 
-    (;α,H₀,ξH₀,g∇²,ξg∇²,S⁻¹) = implicit             # precomputed arrays to be updated
+    (;α,H,ξH,g∇²,ξg∇²,S⁻¹) = implicit             # precomputed arrays to be updated
     (;gravity,layer_thickness) = constants          # shallow water layer thickness [m]
                                                     # gravitational acceleration [m/s²]                  
 
@@ -67,15 +67,15 @@ function initialize!(   implicit::ImplicitShallowWater,
     # α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
 
     ξ = α*dt                    # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
-    H₀[] = layer_thickness      # update H₀ the undisturbed layer thickness without mountains
-    ξH₀[] = ξ*layer_thickness   # update ξ*H₀ with new ξ, in RefValue for mutability
+    H[] = layer_thickness      # update H the undisturbed layer thickness without mountains
+    ξH[] = ξ*layer_thickness   # update ξ*H with new ξ, in RefValue for mutability
 
     # loop over degree l of the harmonics (implicit terms are independent of order m)
     @inbounds for l in eachindex(g∇²,ξg∇²,S⁻¹)
         eigenvalue = -l*(l-1)               # =∇², with without 1/radius², 1-based -l*l(l+1) → -l*(l-1)
         g∇²[l] = gravity*eigenvalue         # doesn't actually change with dt
         ξg∇²[l] = ξ*g∇²[l]                  # update ξg∇² with new ξ
-        S⁻¹[l] = inv(1 - ξH₀[]*ξg∇²[l])    # update 1/(1-ξ²gH₀∇²) with new ξ
+        S⁻¹[l] = inv(1 - ξH[]*ξg∇²[l])    # update 1/(1-ξ²gH∇²) with new ξ
     end
 end
 
@@ -98,8 +98,8 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
     (;pres_tend) = diagn_surface            # tendency of pressure/η
 
     (;g∇²,ξg∇²,S⁻¹) = implicit
-    H₀ = implicit.H₀[]              # unpack as it's stored in a RefValue for mutation
-    ξH₀ = implicit.ξH₀[]            # unpack as it's stored in a RefValue for mutation
+    H = implicit.H[]              # unpack as it's stored in a RefValue for mutation
+    ξH = implicit.ξH[]            # unpack as it's stored in a RefValue for mutation
 
     lmax,mmax = size(div_tend) .- (2,1)
     @boundscheck length(S⁻¹) == lmax+2 || throw(BoundsError)
@@ -116,11 +116,11 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
             # N is the right hand side of ∂V\∂t = N(V)
             # NI is the part of N that's calculated semi-implicitily: N = NE + NI
             G_div = div_tend[lm] - g∇²[l]*(pres_old[lm] - pres_new[lm])
-            G_η   = pres_tend[lm] - H₀*(div_old[lm] - div_new[lm])
+            G_η   = pres_tend[lm] - H*(div_old[lm] - div_new[lm])
 
             # using the Gs correct the tendencies for semi-implicit time stepping
             div_tend[lm] = S⁻¹[l]*(G_div - ξg∇²[l]*G_η)
-            pres_tend[lm] = G_η - ξH₀*div_tend[lm]
+            pres_tend[lm] = G_η - ξH*div_tend[lm]
         end
         lm += 1     # loop skips last row
     end

@@ -96,7 +96,7 @@ Now loop over
 9. Possibly do some output
 10. Repeat from 1.
 
-## Semi implicit time integration 
+## [Semi-implicit time integration](@ref implicit_swm)
 
 Probably the biggest advantage of a spectral model is its ability to solve (parts of) the equations implicitly
 a low computational cost. The reason is that a linear operator can be easily inverted in spectral space,
@@ -193,7 +193,8 @@ G_\mathcal{\eta} &= N_\eta - \xi H (\mathcal{D}_{i-1} - \mathcal{D}_i)
 Inserting the second equation into the first, we can first solve for ``\delta \mathcal{D}``,
 and then for ``\delta \eta``. Reminder that we do this in spectral space to every harmonic
 independently, so the Laplace operator ``\nabla^2 = -l(l+1)`` takes the form of its eigenvalue
-``-l(l+1)`` and its inversion is therefore just the inversion of this scalar.
+``-l(l+1)`` (normalized to unit sphere, as are the [scaled shallow water equations](@ref scaled_swm))
+and its inversion is therefore just the inversion of this scalar.
 ```math
 \delta D = \frac{G_\mathcal{D} - \xi g\nabla^2 G_\eta}{1 - \xi^2 H \nabla^2} =: S^{-1}(G_\mathcal{D} - \xi g\nabla^2 G_\eta) 
 ```
@@ -218,7 +219,7 @@ Some notes on the semi-implicit time stepping
 - The inversion of the semi-implicit time stepping depends on ``\delta t``, that means every time the time step changes, the inversion has to be recalculated.
 - You may choose ``\alpha = 1/2`` to dampen gravity waves but initialisation shocks still usually kick off many gravity waves that propagate around the sphere for many days.
 - With increasing ``\alpha > 1/2`` these waves are also slowed down, such that for ``\alpha = 1`` they quickly disappear in several hours.
-- When using the [scaled shallow water equations](@ref scaled_swm) the time step ``\delta t`` has to be the scaled time step ``\tilde{\Delta t} = \delta t/R`` which is divided by the radius ``R``. No further scaling required.
+- Using the [scaled shallow water equations](@ref scaled_swm) the time step ``\delta t`` has to be the scaled time step ``\tilde{\Delta t} = \delta t/R`` which is divided by the radius ``R``. Then we use the normalized eigenvalues ``-l(l+1)`` which also omit the ``1/R^2`` scaling, see [scaled shallow water equations](@ref scaled_swm) for more details.
 
 ## [Scaled shallow water equations](@id scaled_swm)
 
@@ -246,7 +247,24 @@ As in the [scaled barotropic vorticity equations](@ref scaling), one needs to sc
 the time step, the Coriolis force, the forcing and the diffusion coefficient, but then
 enjoys the luxury of working with dimensionless gradient operators. As before,
 SpeedyWeather.jl will scale vorticity and divergence just before the model integration
-starts and unscale them upon completion and for output.
+starts and unscale them upon completion and for output. In the 
+[semi-implicit time integration](@ref implicit_swm) we solve an equation that also
+has to be scaled. It is with radius squared scaling (because it is the tendency for
+the divergence equation which is also scaled with ``R^2``)
+
+```math
+R^2 \delta D = R^2\frac{G_\mathcal{D} - \xi g\nabla^2 G_\eta}{1 - \xi^2 H \nabla^2}
+```
+As ``G_\eta`` is only scaled with ``R`` we have
+```math
+\tilde{\delta D} = \frac{\tilde{G_\mathcal{D}} - \tilde{\xi} g\tilde{\nabla}^2 \tilde{G_\eta}}{1 - \tilde{\xi}^2 H \tilde{\nabla}^2}
+```
+The ``R^2`` normalizes the Laplace operator in the numerator, but using the scaled ``G_\eta`` we also scale ``\xi``
+(which is convenient, because the time step within is the one we use anyway). The denominator ``S``
+does not actually change because ``\xi^2\nabla^2 = \tilde{\xi}^2\tilde{\nabla}^2`` as ``\xi^2`` is scaled with
+``1/R^2``, but the Laplace operator with ``R^2``. So overall we just have to use the scaled time step ``\tilde{\Delta t}``
+and normalized eigenvalues for ``\tilde{\nabla}^2``.
+
 
 ## References
 
