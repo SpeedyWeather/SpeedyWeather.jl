@@ -105,7 +105,7 @@ in grid-point space is costly because it requires a global communication, coupli
 In spectral space ``\nabla^2`` is a diagonal operator, meaning that there is no communication between
 harmonics and its inversion is therefore easily done on a mode-by-mode basis of the harmonics.
 
-This can be made use of when facing time stepping constraints with explicit schemes, such that
+This can be made use of when facing time stepping constraints with explicit schemes, where
 ridiculuously small time steps to resolve fast waves would otherwise result in a horribly slow simulation. 
 In the shallow water system there are gravity waves that propagate at a wave speed of ``\sqrt{gH}``
 (typically 300m/s), which, in order to not violate the
@@ -118,17 +118,115 @@ longer than gravity waves.
 
 In the following we will describe how the semi implicit time integration can be combined
 with the [Leapfrog time stepping](@ref leapfrog) and the [Robert-Asselin and Williams filter](@ref)
-for a large increase in numerical stability with gravity waves.
+for a large increase in numerical stability with gravity waves. Let ``V_i`` be the model
+state of all prognostic variables at time step ``i``, the [leapfrog time stepping](@ref leapfrog)
+is then
 
+```math
+\frac{V_{i+1} - V_{i-1}}{2\Delta t} = N(V_{i})
+```
+with the right-hand side operator ``N`` evaluated at the current time step ``i``. Now the
+idea is to split the terms in ``N`` into non-linear terms that are evaluated explicitly
+in ``N_E`` and into the linear terms ``N_I``, solved implicitly, that are responsible for
+the gravity waves. We could already assume to evaluate ``N_I`` at ``i+1``, but in fact,
+we can introduce ``\alpha \in [0,1]`` so that for ``\alpha=0`` we use ``i-1`` (i.e. explicit),
+for ``\alpha=1/2`` it is centred implicit ``\tfrac{1}{2}N_I(V_{i-1}) + \tfrac{1}{2}N_I(V_{i+1})``,
+and for ``\alpha=1`` a fully backwards scheme ``N_I(V_{i+1})`` evaluated at ``i+1``.
 
+```math
+\frac{V_{i+1} - V_{i-1}}{2\Delta t} = N_E(V_{i}) + \alpha N_I(V_{i+1}) + (1-\alpha)N_I(V_{i-1})
+```
+Let ``\delta V = \tfrac{V_{i+1} - V_{i-1}}{2\Delta t}`` be the tendency we need for the Leapfrog
+time stepping. Introducing ``\xi = 2\alpha\Delta t`` we have
 
-## Scaled shallow water equations
+```math
+\delta V = N_E(V_i) + N_I(V_{i-1}) + \xi N_I(\delta V)
+```
+because ``N_I`` is a linear operator. This is done so that we can solve for ``\delta V``
+by inverting ``N_I``, but let us gather the other terms as ``G`` first.
+```math
+G = N_E(V_i) + N_I(V_{i-1}) = N(V_i) + N_I(V_{i-1} - V_i)
+```
+For the shallow water equations we will only make use of the last formulation, meaning 
+we first evaluate the whole right-hand side ``N(V_i)`` at the current time step
+as we would do with fully explicit time stepping but then add the implicit terms
+``N_I(V_{i-1} - V_i)`` afterwards to move those terms from ``i`` to ``i-1``.
+Note that we could also directly evaluate the implicit terms at ``i-1``
+as it is suggested in the previous formulation ``N_E(V_i) + N_I(V_{i-1})``, the result would be the same.
+But in general it can be more efficient to do it one or the other way, and in fact
+it is also possible to combine both ways. This will be discussed in the
+[semi-implicit time stepping for the primitive equations](@ref implicit_primitive).
+
+We can now implicitly solve for ``\delta V`` by
+```math
+\delta V = (1-\xi N_I)^{-1}G
+```
+So what is ``N_I``? In the shallow water system the gravity waves are caused by
+```math
+\begin{aligned}
+\frac{\partial \mathcal{D}}{\partial t} &= -g\nabla^2\eta \\
+\frac{\partial \eta}{\partial t} &= -H\mathcal{D},
+\end{aligned}
+```
+which is a linearization of the equations around a state of rest with uniform constant layer
+thickness ``h = H``. The continuity equation with the ``-\nabla(\mathbf{u}h)``
+term, for example, is linearized to ``-\nabla(\mathbf{u}H) = -H\mathcal{D}``.
+The divergence and continuity equations can now be written following the
+``\delta V = G + \xi N_I(\delta V)`` formulation from above as
+a coupled system (The vorticity equation is zero for the linear gravity wave equation in the shallow water equations,
+hence no semi-implicit correction has to be made to the vorticity tendency).
+
+```math
+\begin{aligned}
+\delta \mathcal{D} &= G_\mathcal{D} - \xi g \nabla^2 \delta \eta \\
+\delta \eta &= G_\mathcal{\eta} - \xi H \delta\mathcal{D}
+\end{aligned}
+```
+with
+
+```math
+\begin{aligned}
+G_\mathcal{D} &= N_\mathcal{D} - \xi g \nabla^2 (\eta_{i-1} - \eta_i) \\
+G_\mathcal{\eta} &= N_\eta - \xi H (\mathcal{D}_{i-1} - \mathcal{D}_i)
+\end{aligned}
+```
+Inserting the second equation into the first, we can first solve for ``\delta \mathcal{D}``,
+and then for ``\delta \eta``. Reminder that we do this in spectral space to every harmonic
+independently, so the Laplace operator ``\nabla^2 = -l(l+1)`` takes the form of its eigenvalue
+``-l(l+1)`` and its inversion is therefore just the inversion of this scalar.
+```math
+\delta D = \frac{G_\mathcal{D} - \xi g\nabla^2 G_\eta}{1 - \xi^2 H \nabla^2} =: S^{-1}(G_\mathcal{D} - \xi g\nabla^2 G_\eta) 
+```
+Where the last formulation just makes it clear that ``S = 1 - \xi^2 H \nabla^2`` is the
+operator to be inverted. ``\delta \eta`` is then obtained via insertion as written above.
+Equivalently, by adding a superscript ``l`` for every degree of the spherical harmonics,
+we have
+```math
+\delta \mathcal{D}^l = \frac{G_\mathcal{D}^l + \xi g l(l+1) G_\eta^l}{1 + \xi^2 H l(l+1)}
+```
+
+The idea of the semi-implicit time stepping is now as follows:
+1) Evaluate the right-hand side explicitly at time step ``i`` to obtain the explicit, preliminary tendencies ``N_\mathcal{D},N_\eta`` (and ``N_\zeta`` without a need for semi-implicit correction)
+2) Move the implicit terms from ``i`` to ``i-1`` when calculating ``G_\mathcal{D}, G_\eta``
+3) Solve for ``\delta \mathcal{D}``, the new, corrected tendency for divergence.
+4) With ``\delta \mathcal{D}`` obtain ``\delta \eta``, the new, corrected tendency for ``\eta``.
+5) Apply horizontal diffusion as a correction to ``N_\zeta, \delta \mathcal{D}`` as outlined in [Horizontal diffusion](@ref diffusion).
+6) Leapfrog with tendencies that have been corrected for both semi-implicit and diffusion.
+
+Some notes on the semi-implicit time stepping
+
+- The inversion of the semi-implicit time stepping depends on ``\delta t``, that means every time the time step changes, the inversion has to be recalculated.
+- You may choose ``\alpha = 1/2`` to dampen gravity waves but initialisation shocks still usually kick off many gravity waves that propagate around the sphere for many days.
+- With increasing ``\alpha > 1/2`` these waves are also slowed down, such that for ``\alpha = 1`` they quickly disappear in several hours.
+- When using the [scaled shallow water equations](@ref scaled_swm) the time step ``\delta t`` has to be the scaled time step ``\tilde{\Delta t} = \delta t/R`` which is divided by the radius ``R``. No further scaling required.
+
+## [Scaled shallow water equations](@id scaled_swm)
 
 Similar to the [scaled barotropic vorticity equations](@ref scaling),
 SpeedyWeather.jl scales in the shallow water equations.
-The vorticity and the divergence equation are scaled with ``R^2``, but the continuity equation is
-scaled with ``R``. We also combine the vorticity flux and forcing into a single
-divergence/curl operation as mentioned in [Shallow water equations](@ref) above
+The vorticity and the divergence equation are scaled with ``R^2``, the radius of the sphere squared,
+but the continuity equation is scaled with ``R``. We also combine the vorticity flux and forcing into
+a single divergence/curl operation as mentioned in [Shallow water equations](@ref) above
 
 ```math
 \begin{aligned}

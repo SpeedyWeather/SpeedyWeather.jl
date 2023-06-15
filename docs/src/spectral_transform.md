@@ -157,7 +157,7 @@ into ``2l`` sectors in longitude ``\phi`` without a zero-crossing in latitude.
 For correctness it is mentioned here that SpeedyWeather.jl uses a `LowerTriangularMatrix` type to store
 the spherical harmonic coefficients. By doing so, the upper triangle is actually *not* explicitly stored
 and the data technically unravelled into a vector, but this is hidden as much as possible from the user.
-For more details see [`LowerTriangularMatrices`](@ref).
+For more details see [`LowerTriangularMatrices`](@ref lowertriangularmatrices).
 
 !!! info "Array indices"
     For a spectral field `a` note that due to Julia's 1-based indexing the coefficient ``a_{lm}`` is obtained via
@@ -235,7 +235,7 @@ There are many ways to estimate the effective grid resolution of spectral models
 Some of them are based on the wavelength a given spectral resolution allows to
 represent, others on the total number of real variables per area.
 However, as many atmospheric models do represent a considerable amount of physics
-on the grid (see [Parameterizations](@ref)) there is also a good argument to
+on the grid (see [Parameterizations](@ref parameterizations)) there is also a good argument to
 include the actual grid resolution into this estimate and not just the spectral
 resolution. We therefore use the average grid cell area to estimate the
 resolution

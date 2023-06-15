@@ -38,7 +38,7 @@ See the following pages of the documentation for more details
 and the submodules
 
 - [RingGrids](@ref)
-- [LowerTriangularMatrices](@ref)   
+- [LowerTriangularMatrices](@ref lowertriangularmatrices)   
 - [SpeedyTransforms](@ref)
 
 and the [original documentation](http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)

@@ -1,4 +1,4 @@
-# Parameterizations
+# [Parameterizations](@id parameterizations)
 
 This page describes the mathematical formulation of the parameterizations used in SpeedyWeather.jl to represent physical processes in the atmopshere. Every section is followed by a brief description of implementation details.
 

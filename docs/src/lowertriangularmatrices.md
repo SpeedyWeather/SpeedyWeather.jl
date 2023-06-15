@@ -1,4 +1,4 @@
-# LowerTriangularMatrices
+# [LowerTriangularMatrices](@id lowertriangularmatrices)
 
 LowerTriangularMatrices is a submodule that has been developed for SpeedyWeather.jl which is
 technically independent (SpeedyWeather.jl however imports it and so does SpeedyTransforms)
@@ -102,7 +102,7 @@ ERROR: BoundsError: attempt to access 3×3 LowerTriangularMatrix{Float32} at ind
 
 ## Linear algebra with `LowerTriangularMatrix`
 
-The [LowerTriangularMatrices](@ref) module's main purpose is not linear algebra, and it's
+The [LowerTriangularMatrices](@ref lowertriangularmatrices) module's main purpose is not linear algebra, and it's
 implementation may not be efficient, however, many operations work as expected
 ```julia
 julia> L = rand(LowerTriangularMatrix{Float32},3,3)
