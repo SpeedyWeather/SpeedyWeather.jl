@@ -89,14 +89,14 @@ Now loop over
 7. Compute the volume fluxes ``uh,vh`` in grid-point space via ``h = \eta + H - H_b``
 7. Transform to spectral space and take the divergence for ``-\nabla \cdot (\mathbf{u}h)`` which is the tendency for ``\eta``
 7. Add possibly forcing ``F_\eta`` for ``\eta`` in spectral space
-7. Correct the tendencies following the [Semi implicit time integration](@ref) to prevent fast gravity waves from causing numerical instabilities
+7. Correct the tendencies following the [semi-implicit time integration](@ref implicit_swm) to prevent fast gravity waves from causing numerical instabilities
 6. Compute the [horizontal diffusion](@ref diffusion) based on the ``\zeta,\mathcal{D}`` tendencies
 7. Compute a leapfrog time step as described in [Time integration](@ref leapfrog) with a [Robert-Asselin and Williams filter](@ref)
 8. Transform the new spectral state of ``\zeta_{lm}``, ``\mathcal{D}_{lm}``, ``\eta_{lm}`` to grid-point ``u,v,\zeta,\mathcal{D},\eta`` as described in 0.
 9. Possibly do some output
 10. Repeat from 1.
 
-## [Semi-implicit time integration](@ref implicit_swm)
+## [Semi-implicit time integration](@id implicit_swm)
 
 Probably the biggest advantage of a spectral model is its ability to solve (parts of) the equations implicitly
 a low computational cost. The reason is that a linear operator can be easily inverted in spectral space,
