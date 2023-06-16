@@ -12,8 +12,7 @@ import LinearAlgebra: LinearAlgebra, Diagonal
 import Base.Threads: Threads, @threads
 import FLoops: FLoops, @floop
 import KernelAbstractions
-import CUDA
-import CUDAKernels
+import CUDA: CUDA, CUDAKernels
 import Adapt: Adapt, adapt, adapt_structure
 
 # INPUT OUTPUT
