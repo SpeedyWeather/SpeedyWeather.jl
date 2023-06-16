@@ -1,4 +1,4 @@
-# SpeedyWeather.jl 
+# SpeedyWeather.jl
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml)
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/stable/)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/dev/)
@@ -122,12 +122,8 @@ compatibilities with older versions are not guaranteed.
 
 ## Copyright and license
 
-Copyright (c) 2020 Milan Klöwer for SpeedyWeather.jl  
+Copyright (c) 2020 Milan Kloewer for SpeedyWeather.jl  
 Copyright (c) 2021 The SpeedyWeather.jl Contributors for SpeedyWeather.jl  
 Copyright (c) 2022 Fred Kucharski and Franco Molteni for SPEEDY parametrization schemes  
 
 Software licensed under the [MIT License](LICENSE.txt).
-
-<p align="center">
-<img src="https://github.com/SpeedyWeather/.github/assets/25530332/9afefdb1-0360-4ffa-9b9e-a3ccb006d18f" width="500">
-</p>

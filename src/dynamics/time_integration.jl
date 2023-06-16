@@ -19,8 +19,8 @@ Base.@kwdef struct Leapfrog{NF} <: TimeStepper{NF}
     "Robert (1966) time filter coefficeint to suppress comput. mode"
     robert_filter::NF = 0.05
 
-    "William's time filter (Amezcua 2011) coefficient for 3rd order acc"
-    william_filter::NF = 0.53
+    "Williams time filter (Amezcua 2011) coefficient for 3rd order acc"
+    williams_filter::NF = 0.53
 
 
     # DERIVED FROM OPTIONS    
@@ -53,37 +53,37 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Performs one leapfrog time step with (`lf=2`) or without (`lf=1`) Robert+William's filter
-(see William (2009), Montly Weather Review, Eq. 7-9)."""
+Performs one leapfrog time step with (`lf=2`) or without (`lf=1`) Robert+Williams filter
+(see Williams (2009), Montly Weather Review, Eq. 7-9)."""
 function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic variable at t
                     A_new::LowerTriangularMatrix{Complex{NF}},      # prognostic variable at t+dt
                     tendency::LowerTriangularMatrix{Complex{NF}},   # tendency (dynamics+physics) of A
                     dt::Real,                                       # time step (=2Δt, but for init steps =Δt,Δt/2)
-                    lf::Int,                                        # leapfrog index to dis/enable William's filter
+                    lf::Int,                                        # leapfrog index to dis/enable Williams filter
                     L::Leapfrog{NF},                                # struct with constants
                     ) where {NF<:AbstractFloat}                     # number format NF
 
     @boundscheck lf == 1 || lf == 2 || throw(BoundsError())         # index lf picks leapfrog dim
     
-    A_lf = lf == 1 ? A_old : A_new                      # view on either t or t+dt to dis/enable William's filter        
-    (;robert_filter, william_filter) = L                # coefficients for the Robert and William's filter
+    A_lf = lf == 1 ? A_old : A_new                      # view on either t or t+dt to dis/enable Williams filter        
+    (;robert_filter, williams_filter) = L               # coefficients for the Robert and Williams filter
     two = convert(NF,2)                                 # 2 in number format NF
     dt_NF = convert(NF,dt)                              # time step dt in number format NF
 
-    # LEAP FROG time step with or without Robert+William's filter
-    # Robert time filter to compress computational mode, Williams' filter for 3rd order accuracy
-    # see William (2009), Eq. 7-9
+    # LEAP FROG time step with or without Robert+Williams filter
+    # Robert time filter to compress computational mode, Williams filter for 3rd order accuracy
+    # see Williams (2009), Eq. 7-9
     # for lf == 1 (initial time step) no filter applied (w1=w2=0)
-    # for lf == 2 (later steps) Robert+William's filter is applied
-    w1 = lf == 1 ? zero(NF) : robert_filter*william_filter/two         # = ν*α/2 in William (2009, Eq. 8)
-    w2 = lf == 1 ? zero(NF) : robert_filter*(1-william_filter)/two     # = ν(1-α)/2 in William (2009, Eq. 9)
+    # for lf == 2 (later steps) Robert+Williams filter is applied
+    w1 = lf == 1 ? zero(NF) : robert_filter*williams_filter/two         # = ν*α/2 in Williams (2009, Eq. 8)
+    w2 = lf == 1 ? zero(NF) : robert_filter*(1-williams_filter)/two     # = ν(1-α)/2 in Williams (2009, Eq. 9)
 
     @inbounds for lm in eachharmonic(A_old,A_new,A_lf,tendency)
         a_old = A_old[lm]                       # double filtered value from previous time step (t-Δt)
         a_new = a_old + dt_NF*tendency[lm]      # Leapfrog/Euler step depending on dt=Δt,2Δt (unfiltered at t+Δt)
-        a_update = a_old - two*A_lf[lm] + a_new # Eq. 8&9 in William (2009), calculate only once
+        a_update = a_old - two*A_lf[lm] + a_new # Eq. 8&9 in Williams (2009), calculate only once
         A_old[lm] = A_lf[lm] + w1*a_update      # Robert's filter: A_old[lm] becomes 2xfiltered value at t
-        A_new[lm] = a_new - w2*a_update         # Williams' filter: A_new[lm] becomes 1xfiltred value at t+Δt
+        A_new[lm] = a_new - w2*a_update         # Williams filter: A_new[lm] becomes 1xfiltered value at t+Δt
     end
 end
 
@@ -96,7 +96,7 @@ leapfrog_layer_vars(::PrimitiveWet) = (:vor, :div, :temp, :humid)
 function leapfrog!( progn::PrognosticLayerTimesteps,
                     diagn::DiagnosticVariablesLayer,
                     dt::Real,               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
-                    lf::Int,                # leapfrog index to dis/enable William's filter
+                    lf::Int,                # leapfrog index to dis/enable Williams filter
                     model::ModelSetup)
                
     for var in leapfrog_layer_vars(model)
@@ -125,7 +125,7 @@ function first_timesteps!(
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
     i = 1                               # time step index
-    lf1 = 1                             # without Robert+William's filter
+    lf1 = 1                             # without Robert+Williams filter
     lf2 = 1                             # evaluates all tendencies at t=0,
                                         # the first leapfrog index (=>Euler forward)
     initialize!(implicit,Δt/2,diagn,model)  # update precomputed implicit terms with time step Δt/2
@@ -134,7 +134,7 @@ function first_timesteps!(
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
     initialize!(implicit,Δt,diagn,model)    # update precomputed implicit terms with time step Δt
-    lf1 = 1                             # without Robert+William's filter
+    lf1 = 1                             # without Robert+Williams filter
     lf2 = 2                             # evaluate all tendencies at t=dt/2,
                                         # the 2nd leapfrog index (=>Leapfrog)
     timestep!(progn,diagn,Δt,i,model,lf1,lf2)
@@ -155,7 +155,7 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
                     i::Integer,                     # time step index
                     model::Barotropic,              # everything that's constant at runtime
-                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
+                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
                     lf2::Int=2)                     # leapfrog index 2 (time step used for tendencies)
 
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
@@ -179,7 +179,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
                     i::Integer,                     # time step index
                     model::ShallowWater,            # everything that's constant at runtime
-                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
+                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
 
@@ -220,7 +220,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
                     i::Integer,                     # time step index
                     model::PrimitiveEquation,       # everything that's constant at runtime
-                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+William's filter)
+                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
                     lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
                     ) where {NF<:AbstractFloat}
 

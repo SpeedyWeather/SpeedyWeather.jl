@@ -6,16 +6,19 @@ precipitation and radiation.
 
 ## Overview
 
-SpeedyWeather.jl is a global spectral model that uses a spherical harmonic transform to perform some calculations
-in spectral space (time integration, gradients, linear terms) and some in grid-point space (advection, non-linear terms,
-parameterizations).
-The prognostic variables used are vorticity, divergence, absolute temperature, logarithm of surface
-pressure and specific humidity. The time stepping uses a leapfrog scheme with additional filters and a
-semi-implicit formulation for gravity waves. The default resolution is T31 (96x48 grid points on a
-regular Gaussian grid, about 400km at the Equator) and 8 vertical levels.
+SpeedyWeather.jl is a global spectral model that uses a spherical harmonic transform to simulate
+the general circulation of the atmosphere.
+The prognostic variables used are vorticity, divergence, temperature, surface pressure
+and specific humidity. Simple parameterizations represent various climate processes: Radiation,
+clouds, precipitation, surface fluxes, among others.
 
-Simple parameterizations are used to represent the physical processes convection, large-scale condensation,
-clouds, short-wave radiation, long-waves radiation, surface fluxes of momentum and energy, and vertical diffusion.
+SpeedyWeather.jl defines 
+- `BarotropicModel` for the 2D barotropic vorticity equation
+- `ShallowWaterModel` for the 2D shallow water equations
+- `PrimitiveDryModel` for the 3D primitive equations without humidity
+- `PrimitiveWetModel` for the 3D primitive equations with humidity
+
+and solves these equations in spherical coordinates as described in this documentation.
 
 ## Manual outline
 
@@ -25,14 +28,17 @@ See the following pages of the documentation for more details
 - [How to run SpeedyWeather.jl](how_to_run_speedy.md)
 - [Spherical harmonic transform](spectral_transform.md)
 - [Grids](grids.md)
-- [Dynamical core](dynamical_core.md)
-- [Parametrizations](parametrizations.md)
+- [Barotropic model](barotropic.md)
+- [Shallow water model](shallowwater.md)
+- [Primitive equation model](primitiveequation.md)
+- [Parameterizations](parameterizations.md)
 - [Extending SpeedyWeather](extending.md)
+- [NetCDF output](output.md)
 
 and the submodules
 
-- [RingGrids](@ref) and their interpolation   
-- [LowerTriangularMatrices](@ref)   
+- [RingGrids](@ref)
+- [LowerTriangularMatrices](@ref lowertriangularmatrices)   
 - [SpeedyTransforms](@ref)
 
 and the [original documentation](http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)

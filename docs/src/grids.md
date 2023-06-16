@@ -39,6 +39,15 @@ In SpeedyWeather.jl the first grid point on any ring can have a longitudinal off
 by spacing 4 points around the globe at 45˚E, 135˚E, 225˚E, and 315˚E. In this case the offset is 45˚E
 as the first point is not at 0˚E.
 
+!!! info "Is the FullClenshawGrid a longitude-latitude grid?"
+    Short answer: Yes. The `FullClenshawGrid` is *a* specific longitude-latitude grid with equi-angle spacing.
+    The most common grids for geoscientific data use regular spacings for 0-360˚E in longitude and
+    90˚N-90˚S. The `FullClenshawGrid` does that too, but it does not have a point on the North or South
+    pole, and the central latitude ring sits exactly on the Equator. We name it *Clenshaw* following
+    the [Clenshaw-Curtis quadrature](https://en.wikipedia.org/wiki/Clenshaw%E2%80%93Curtis_quadrature)
+    that is used in the Legendre transfrom in the same way as *Gaussian*
+    refers to the [Gaussian quadrature](https://en.wikipedia.org/wiki/Gaussian_quadrature).
+
 ## Implemented grids
 
 All grids in SpeedyWeather.jl are a subtype of `AbstractGrid`, i.e. `<: AbstractGrid`. We further distinguish
@@ -90,30 +99,30 @@ Gaussian grids at the same `nlat_half`.
     for all grids. This is done for consistency across grids. We may use ``N_{side}``
     for the documentation or within functions though.
 
+Related: [Effective grid resolution](@ref) and [Available horizontal resolutions](@ref).
+
 ## Matching spectral and grid resolution
 
 A given spectral resolution can be matched to a variety of grid resolutions. A _cubic_ grid, for example,
-combines a spectral truncation T with a grid resolution N (=`nlat_half`) such that `T + 1 = N`.
+combines a spectral truncation ``T`` with a grid resolution ``N`` (=`nlat_half`) such that ``T + 1 = N``.
 Using T31 and an O32 is therefore often abbreviated as Tco31 meaning that the spherical harmonics are
 truncated at ``l_{max}=31`` in combination with `N=32`, i.e. 64 latitude rings in total on an octahedral
-Gaussian grid.
+Gaussian grid. In SpeedyWeather.jl the choice of the order of truncation is controlled with the
+`dealiasing` parameter in the [SpectralGrid](@ref) construction.
 
 Let `J` be the total number of rings. Then we have
 
-- ``T \approx J`` for _linear_ truncation
-- ``\frac{3}{2}T \approx J`` for _quadratic_ truncation
-- ``2T \approx J`` for _cubic_ truncation
+- ``T \approx J`` for _linear_ truncation, i.e. `dealiasing = 1`
+- ``\frac{3}{2}T \approx J`` for _quadratic_ truncation, i.e. `dealiasing = 2`
+- ``2T \approx J`` for _cubic_ truncation, , i.e. `dealiasing = 3`
 
-and in general ``\frac{m+1}{2}T \approx J`` for _m-th_ order truncation. So the higher the truncaction
+and in general ``\frac{m+1}{2}T \approx J`` for _m-th_ order truncation. So the higher the truncation
 order the more grid points are used in combination with the same spectral
 resolution. A higher truncation order therefore makes all grid-point calculations more expensive,
 but can represent products of terms on the grid (which will have higher wavenumber components) to
 a higher accuracy as more grid points are available within a given wavelength. Using a sufficiently
-high truncation is therefore one way to avoid aliasing. In SpeedyWeather.jl the parameter
-`dealiasing` controls this option, `= 1` would be linear, `= 2` quadratic, `= 3` cubic etc.
-
-For now just a quick overview of how the grid resolution changes when `dealiasing` is passed onto
-`SpectralGrid` on the `FullGaussianGrid`
+high truncation is therefore one way to avoid aliasing. A quick overview of how the grid resolution
+changes when `dealiasing` is passed onto `SpectralGrid` on the `FullGaussianGrid`
 
 | trunc | dealiasing | FullGaussianGrid size |
 | ----- | ---------- | --------------------- |
@@ -127,11 +136,11 @@ For now just a quick overview of how the grid resolution changes when `dealiasin
 
 You will obtain this information every time you create a `SpectralGrid(;Grid,trunc,dealiasing)`.
 
-## Full Gaussian grid
+## [Full Gaussian grid](@id FullGaussianGrid)
 
 ...
 
-## Full Clenshaw-Curtis grid
+## [Full Clenshaw-Curtis grid](@id FullClenshawGrid)
 
 ...
 
@@ -139,12 +148,12 @@ You will obtain this information every time you create a `SpectralGrid(;Grid,tru
 
 ...
 
-## The HEALPix grid
+## HEALPix grid
 
 Technically, HEALPix grids are a class of grids that tessalate the sphere into faces that are often
 called basepixels. For each member of this class there are ``N_\varphi`` basepixels in zonal direction
 and ``N_\theta`` basepixels in meridional direction. For ``N_\varphi = 4`` and ``N_\theta = 3`` we obtain
-the classical HEALPix grid with ``N_\varphi N_\theta = 12`` basepixels shown above in [Implemented Grids](@ref).
+the classical HEALPix grid with ``N_\varphi N_\theta = 12`` basepixels shown above in [Implemented grids](@ref).
 Each basepixel has a quadratic number of grid points in them. There's an equatorial zone where the number
 of zonal grid points is constant (always ``2N``, so 32 at ``N=16``) and there are polar caps above and below
 the equatorial zone with the border at  ``\cos(\theta) = 2/3`` (``\theta`` in colatitudes).
@@ -197,7 +206,7 @@ is based on an octahedron, which has the convenient property that there are twic
 the equator than there are latitude rings between the poles. This is a desirable for truncation as this matches
 the distances too, ``2\pi`` around the Equator versus ``\pi`` between the poles. ``N_\varphi = 6, N_\theta = 2``
 or ``N_\varphi = 8, N_\theta = 3`` are other possible choices for this, but also more complicated. See 
-Górski, 2004[^1] for further examples and visualisations of these grids.
+Górski, 2004[^1] for further examples and visualizations of these grids.
 
 We call the ``N_\varphi = 4, N_\theta = 1`` HEALPix grid the OctaHEALPix grid, which combines the equal-area
 property of the HEALPix grids with the octahedron that's also used in the `OctahedralGaussianGrid` or the
@@ -221,10 +230,11 @@ Similar to the grid cell boundaries for the HEALPix grid, the OctaHEALPix grid's
 ```math
 z = 1 - \frac{k^2}{N^2}\left(\frac{\pi}{2\phi_t}\right)^2, \quad z = 1 - \frac{k^2}{N^2}\left(\frac{\pi}{2\phi_t - \pi}\right)^2
 ```
-The ``3N_{side}^2`` in the denominator of the HEALPix grid came simply ``N^2`` for the OctaHEALPix grid and there's no separate equation for the equatorial belt (which doesn't exist in the OctaHEALPix grid).
+The ``3N_{side}^2`` in the denominator of the HEALPix grid came simply ``N^2`` for the OctaHEALPix
+grid and there's no separate equation for the equatorial belt (which doesn't exist in the OctaHEALPix grid).
 
 
 ### References
 
-[^1] Górski, Hivon, Banday, Wandelt, Hansen, Reinecke, Bartelmann, 2004. _HEALPix: A FRAMEWORK FOR HIGH-RESOLUTION DISCRETIZATION AND FAST ANALYSIS OF DATA DISTRIBUTED ON THE SPHERE_, The Astrophysical Journal. doi:[10.1086/427976](https://doi.org/10.1086/427976)
+[^1]: Górski, Hivon, Banday, Wandelt, Hansen, Reinecke, Bartelmann, 2004. _HEALPix: A FRAMEWORK FOR HIGH-RESOLUTION DISCRETIZATION AND FAST ANALYSIS OF DATA DISTRIBUTED ON THE SPHERE_, The Astrophysical Journal. doi:[10.1086/427976](https://doi.org/10.1086/427976)
 

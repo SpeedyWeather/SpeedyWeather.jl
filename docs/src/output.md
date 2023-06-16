@@ -9,6 +9,7 @@ There are many options to this available.
 The output writer is a component of every Model, i.e. `BarotropicModel`, `ShallowWaterModel`, `PrimitiveDryModel` and `PrimitiveWetModel`, hence a non-default output writer can be passed on as a keyword argument to the model constructor
 
 ```julia
+julia> using SpeedyWeather
 julia> spectral_grid = SpectralGrid()
 julia> my_output_writer = OutputWriter(spectral_grid, PrimitiveDry)
 julia> model = PrimitiveDryModel(;spectral_grid, output=my_output_writer)
