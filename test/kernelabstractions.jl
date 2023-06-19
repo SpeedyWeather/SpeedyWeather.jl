@@ -14,8 +14,7 @@ using KernelAbstractions
     C = SpeedyWeather.DeviceArray(device_setup, rand(10,10))
     A = zero(B)
 
-    ev = SpeedyWeather.launch_kernel!(device_setup, mul_test!, size(B), A, B, C)
-    wait(ev)
+    SpeedyWeather.launch_kernel!(device_setup, mul_test!, size(B), A, B, C)
 
     @test A ≈ B .* C 
 end 

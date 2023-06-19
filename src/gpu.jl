@@ -91,14 +91,14 @@ DeviceArrayNotAdapt(dev::DeviceSetup, x) = DeviceArrayNotAdapt(dev.device, x)
 """
     launch_kernel!(device_setup::DeviceSetup, kernel!, ndrange, kernel_args...)
 
-Launches the `kernel!` on the `device_setup` with `ndrange` computations over the kernel and arguments `kernel_args`. Returns an event.
+Launches the `kernel!` on the `device_setup` with `ndrange` computations over the kernel and arguments `kernel_args`
 """
 function launch_kernel!(device_setup::DeviceSetup, kernel!, ndrange, kernel_args...)
     device = device_setup.device_KA()
     n = device_setup.n 
 
     k! = kernel!(device, n)
-    event = k!(kernel_args...; ndrange=ndrange)
+    k!(kernel_args...; ndrange=ndrange)
 
-    return event 
+    return nothing
 end
