@@ -15,9 +15,9 @@ jobs:
       - uses: julia-actions/setup-julia@v1
         with:
           version:
-            - '1.8'
-            - '1.9'
-            - 'nightly'
+            - 1.8
+            - 1.9
+            - nightly
       - uses: actions/cache@v1
         env:
           cache-name: cache-artifacts
