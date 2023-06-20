@@ -57,13 +57,10 @@ with more than 4 million grid points
 
 https://user-images.githubusercontent.com/25530332/190443050-d5b8d093-86c0-46c9-b515-8420059ac8dc.mp4
 
-
-The primitive equation core (wet or dry) is in development, this is temperature at the surface and at the tropopause
+The primitive equation core (wet or dry) is in development, this is temperature at the surface
 at T511 (~20km resolution) and 31 vertical levels. The simulation was multi-threaded in Float32 (single precision).
-The orography is visible at the tropopause level because we currently use sigma coordinates
 
-https://user-images.githubusercontent.com/25530332/229872856-bdcab69a-2226-4e9b-9470-9c9f90aa31e7.mp4
-
+https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/95897b82-9b81-4980-934b-cfdcf4d5a4b0
 
 SpeedyWeather.jl can also solve the 2D barotropic vorticity equations on the sphere.
 Here, we use single-threaded Float32 (single precision) at a resolution of T340 (40km) on
@@ -71,7 +68,6 @@ an [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/d
 Initial conditions are randomly distributed relative vorticity on a slowly rotating Earth ($\Omega = 10^{-6}\text{ s}^{-1}$) and no forcing is applied
 
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/8a7c6758-950f-424d-8ece-0480295386b3
-
 
 ## History
 
@@ -122,7 +118,7 @@ compatibilities with older versions are not guaranteed.
 
 ## Copyright and license
 
-Copyright (c) 2020 Milan Kloewer for SpeedyWeather.jl  
+Copyright (c) 2020 Milan Klöwer for SpeedyWeather.jl  
 Copyright (c) 2021 The SpeedyWeather.jl Contributors for SpeedyWeather.jl  
 Copyright (c) 2022 Fred Kucharski and Franco Molteni for SPEEDY parametrization schemes  
 
