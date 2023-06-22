@@ -1,28 +1,27 @@
-name: CI
+name: Nightly CI
+
 on:
   pull_request:
     branches:
       - main
-      - gpu
   push:
     branches:
       - main
+    tags: '*'
+
 jobs:
   test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        version:
-          - '1.8'
-          - '1.9'
-        os:
-          - ubuntu-latest
-        arch:
-          - x64
+        version: [nightly]
+        os: [ubuntu-latest]
+        arch: [x64]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: julia-actions/setup-julia@v1
-        continue-on-error: ${{ matrix.version == 'nightly' }}
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
@@ -37,6 +36,7 @@ jobs:
             ${{ runner.os }}-test-
             ${{ runner.os }}-
       - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
-        env:
-          GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}
+      - name: "Run test without coverage report"
+        uses: julia-actions/julia-runtest@v1
+        with:
+          coverage: false
