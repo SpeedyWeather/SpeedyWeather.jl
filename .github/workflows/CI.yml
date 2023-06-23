@@ -10,7 +10,7 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.bleadingedge }}
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: true
       matrix:
@@ -21,10 +21,10 @@ jobs:
           - ubuntu-latest
         arch:
           - x64
-        bleadingedge: [false]
+        experimental: [false]
         include:
           - version: 'nightly'
-            bleadingedge: true
+            experimental: true
           
     steps:
       - uses: actions/checkout@v2
