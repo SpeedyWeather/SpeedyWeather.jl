@@ -10,7 +10,9 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.bleadingedge }}
     strategy:
+      fail-fast: true
       matrix:
         version:
           - '1.8'
@@ -19,10 +21,14 @@ jobs:
           - ubuntu-latest
         arch:
           - x64
+        bleadingedge: [false]
+        include:
+          - version: 'nightly'
+            bleadingedge: true
+          
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
-        continue-on-error: ${{ matrix.version == 'nightly' }}
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
