@@ -46,11 +46,14 @@ struct GridVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     vor_grid            ::Grid  # vorticity
     div_grid            ::Grid  # divergence
     temp_grid           ::Grid  # absolute temperature [K]
+    temp_grid_prev      ::Grid
     temp_virt_grid      ::Grid  # virtual tempereature [K]  
     humid_grid          ::Grid  # specific_humidity
     geopot_grid         ::Grid  # geopotential (is that needed?)
     u_grid              ::Grid  # zonal velocity *coslat [m/s]
     v_grid              ::Grid  # meridional velocity *coslat [m/s]
+    u_grid_prev         ::Grid  # zonal velocity *coslat [m/s]
+    v_grid_prev         ::Grid  # meridional velocity *coslat [m/s]
 end
 
 function Base.zeros(::Type{GridVariables},SG::SpectralGrid)
@@ -59,14 +62,17 @@ function Base.zeros(::Type{GridVariables},SG::SpectralGrid)
     vor_grid            = zeros(Grid{NF},nlat_half)   # vorticity
     div_grid            = zeros(Grid{NF},nlat_half)   # divergence
     temp_grid           = zeros(Grid{NF},nlat_half)   # absolute temperature
+    temp_grid_prev      = zeros(Grid{NF},nlat_half)   # absolute temperature
     temp_virt_grid      = zeros(Grid{NF},nlat_half)   # virtual temperature
     humid_grid          = zeros(Grid{NF},nlat_half)   # specific humidity
     geopot_grid         = zeros(Grid{NF},nlat_half)   # geopotential
     u_grid              = zeros(Grid{NF},nlat_half)   # zonal velocity *coslat
     v_grid              = zeros(Grid{NF},nlat_half)   # meridonal velocity *coslat
+    u_grid_prev         = zeros(Grid{NF},nlat_half)   # zonal velocity *coslat
+    v_grid_prev         = zeros(Grid{NF},nlat_half)   # meridonal velocity *coslat
 
-    return GridVariables(   vor_grid,div_grid,temp_grid,temp_virt_grid,humid_grid,geopot_grid,
-                            u_grid,v_grid)
+    return GridVariables(   vor_grid,div_grid,temp_grid,temp_grid_prev,temp_virt_grid,humid_grid,geopot_grid,
+                            u_grid,v_grid,u_grid_prev,v_grid_prev)
 end
 
 """

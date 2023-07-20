@@ -162,83 +162,6 @@ function vertical_velocity!(
         (uv∇lnp_sum_above .+ Δσₖ*uv∇lnp)        # and level k σₖ-weighted uv∇lnp here
 end
 
-function vertical_advection!(   layer::DiagnosticVariablesLayer,
-                                diagn::DiagnosticVariables,
-                                model::PrimitiveEquation)
-            
-    (; k ) = layer       # which layer are we on?
-    
-    wet_core = model isa PrimitiveWet
-    (; σ_levels_thick, nlev ) = model.geometry
-     
-    # for k==1 "above" term is 0, for k==nlev "below" term is zero
-    # avoid out-of-bounds indexing with k_above, k_below as follows
-    k_above = max(1,k-1)        # just saturate, because M_1/2 = 0 (which zeros that term)
-    k_below = min(k+1,nlev)     # just saturate, because M_nlev+1/2 = 0 (which zeros that term)
-        
-    # mass fluxes, M_1/2 = M_nlev+1/2 = 0, but k=1/2 isn't explicitly stored
-    σ_tend_above = diagn.layers[k_above].dynamics_variables.σ_tend
-    σ_tend_below = layer.dynamics_variables.σ_tend
-    
-    # layer thickness Δσ on level k
-    Δσₖ = σ_levels_thick[k]
-    
-    u_tend = layer.tendencies.u_tend_grid                   # zonal velocity
-    u_above = diagn.layers[k_above].grid_variables.u_grid
-    u = layer.grid_variables.u_grid
-    u_below = diagn.layers[k_below].grid_variables.u_grid
-
-    _vertical_advection!(u_tend,σ_tend_above,σ_tend_below,u_above,u,u_below,Δσₖ)
-
-    v_tend = layer.tendencies.v_tend_grid                   # meridional velocity
-    v_above = diagn.layers[k_above].grid_variables.v_grid
-    v = layer.grid_variables.v_grid
-    v_below = diagn.layers[k_below].grid_variables.v_grid
-
-    _vertical_advection!(v_tend,σ_tend_above,σ_tend_below,v_above,v,v_below,Δσₖ)
-
-    T_tend = layer.tendencies.temp_tend_grid                   # temperature
-    T_above = diagn.layers[k_above].grid_variables.temp_grid
-    T = layer.grid_variables.temp_grid
-    T_below = diagn.layers[k_below].grid_variables.temp_grid
-
-    _vertical_advection!(T_tend,σ_tend_above,σ_tend_below,T_above,T,T_below,Δσₖ)
-
-    if wet_core
-        q_tend = layer.tendencies.humid_tend_grid               # humidity
-        q_above = diagn.layers[k_above].grid_variables.humid_grid
-        q = layer.grid_variables.humid_grid
-        q_below = diagn.layers[k_below].grid_variables.humid_grid
-    
-        _vertical_advection!(q_tend,σ_tend_above,σ_tend_below,q_above,q,q_below,Δσₖ)
-    end
-end
-
-# MULTI THREADED VERSION only writes into layer k
-function _vertical_advection!(  ξ_tend::Grid,           # tendency of quantity ξ at k
-                                σ_tend_above::Grid,     # vertical velocity at k-1/2
-                                σ_tend_below::Grid,     # vertical velocity at k+1/2
-                                ξ_above::Grid,          # quantity ξ at k-1
-                                ξ::Grid,                # quantity ξ at k
-                                ξ_below::Grid,          # quantity ξ at k+1
-                                Δσₖ::NF                 # layer thickness on σ levels
-                                ) where {NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
-    # Δσₖ⁻¹ = 1/Δσₖ                                      # precompute
-
-    # # += as the tendencies already contain the parameterizations
-    # for ij in eachgridpoint(ξ_tend,σ_tend_above,σ_tend_below,ξ_above,ξ,ξ_below)
-    #     # 1st order upwind scheme
-    #     σ̇⁺ = max(σ_tend_above[ij],0)        # velocity into layer k from above
-    #     σ̇⁻ = min(σ_tend_below[ij],0)        # velocity into layer k from below
-    #     ξ_tend[ij] -= Δσₖ⁻¹ * (σ̇⁺*(ξ[ij] - ξ_above[ij]) + σ̇⁻*(ξ_below[ij] - ξ[ij]))
-    # end
-
-    # centred scheme
-    Δσₖ2⁻¹ = -1/2Δσₖ                                    # precompute
-    # += as the tendencies already contain the parameterizations
-    @. ξ_tend += Δσₖ2⁻¹ * (σ_tend_below*(ξ_below - ξ) + σ_tend_above*(ξ - ξ_above))
-end
-
 """
 $(TYPEDSIGNATURES)
 Function barrier to unpack `model`."""
@@ -750,8 +673,13 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     
     (; vor_grid, div_grid, u_grid, v_grid ) = diagn.grid_variables
     (; temp_grid, humid_grid ) = diagn.grid_variables
+    (; temp_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid_variables
     U = diagn.dynamics_variables.a      # reuse work arrays for velocities spectral
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
+
+    @. temp_grid_prev = temp_grid
+    @. u_grid_prev = u_grid
+    @. v_grid_prev = v_grid
 
     S = model.spectral_transform
     wet_core = model isa PrimitiveWet
