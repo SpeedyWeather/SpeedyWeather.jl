@@ -27,7 +27,7 @@ abstract type AbstractColumnVariables{NF} end
 abstract type AbstractForcing{NF} end
 
 # VERTICAL ADVECTION (PrimitiveEquation)
-abstract type VerticalAdvection{NF} end
+abstract type VerticalAdvection{NF,B} end
 
 # PARAMETERIZATIONS
 abstract type AbstractParameterization{NF} end
