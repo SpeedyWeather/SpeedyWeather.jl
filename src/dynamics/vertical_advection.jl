@@ -2,21 +2,18 @@
 abstract type DiffusiveVerticalAdvection{NF, B}  <: VerticalAdvection{NF, B} end
 abstract type DispersiveVerticalAdvection{NF, B} <: VerticalAdvection{NF, B} end
 
-struct FirstOrderUpwind{NF}    <: DiffusiveVerticalAdvection{NF, 1} end
-struct ThirdOrderUpwind{NF}    <: DiffusiveVerticalAdvection{NF, 2} end
-struct WENO3{NF}               <: DiffusiveVerticalAdvection{NF, 2} end
+struct UpwindVerticalAdvection{NF, B}   <: DiffusiveVerticalAdvection{NF, B} end
+struct WENOVerticalAdvection{NF, B}     <: DiffusiveVerticalAdvection{NF, B} end
+struct CenteredVerticalAdvection{NF, B} <: DispersiveVerticalAdvection{NF, B} end
 
-struct SecondOrderCentered{NF} <: DispersiveVerticalAdvection{NF, 1} end
-struct FourthOrderCentered{NF} <: DispersiveVerticalAdvection{NF, 2} end
-
-for T in (:FirstOrderUpwind, :ThirdOrderUpwind, :WENO3, :SecondOrderCentered, :FourthOrderCentered)
-    @eval $T(spectral_grid::SpectralGrid) = $T{spectral_grid.NF}()
-end
+CenteredVerticalAdvection(spectral_grid; order = 2) = CenteredVerticalAdvection{spectral_grid.NF, order}()
+UpwindVerticalAdvection(spectral_grid; order = 3)   =   UpwindVerticalAdvection{spectral_grid.NF, order}()
+WENOVerticalAdvection(spectral_grid; order = 3)     =     WENOVerticalAdvection{spectral_grid.NF, order}()
 
 @inline retrieve_time_step(::DiffusiveVerticalAdvection,  variables, var) = getproperty(variables, Symbol(var, :_grid_prev))
 @inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) = getproperty(variables, Symbol(var, :_grid))
 
-@inline boundary_buffer(::VerticalAdvection{NF, B}) where {NF, B} = B 
+@inline order(::VerticalAdvection{NF, B}) where {NF, B} = B 
 
 function vertical_advection!(   layer::DiagnosticVariablesLayer,
                                 diagn::DiagnosticVariables,
@@ -73,12 +70,12 @@ function vertical_advection!(   layer::DiagnosticVariablesLayer,
     end
 end
 
-@inline reconstructed_at_face(::FirstOrderUpwind, u, c⁻⁻, c⁻, c⁺, c⁺⁺) = ifelse(u > 0, c⁻, c⁺)
-@inline reconstructed_at_face(::ThirdOrderUpwind, u, c⁻⁻, c⁻, c⁺, c⁺⁺) = ifelse(u > 0, (2c⁻⁻ + 5c⁻ - c⁺  ) / 6,
-                                                                                       (-c⁻  + 5c⁺ + 2c⁺⁺) / 6)
+@inline reconstructed_at_face(::UpwindVerticalAdvection{NF, 1}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = ifelse(u > 0, c⁻, c⁺)
+@inline reconstructed_at_face(::UpwindVerticalAdvection{NF, 3}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = ifelse(u > 0, (2c⁻⁻ + 5c⁻ - c⁺  ) / 6,
+                                                                                                              (-c⁻  + 5c⁺ + 2c⁺⁺) / 6)
 
-@inline reconstructed_at_face(::SecondOrderCentered, u, c⁻⁻, c⁻, c⁺, c⁺⁺) = (c⁻ + c⁺) / 2
-@inline reconstructed_at_face(::FourthOrderCentered, u, c⁻⁻, c⁻, c⁺, c⁺⁺) = (- c⁻⁻ + 7c⁻ + 7c⁺ - c⁺⁺) / 12
+@inline reconstructed_at_face(::CenteredVerticalAdvection{NF, 2}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) = (c⁻ + c⁺) / 2
+@inline reconstructed_at_face(::CenteredVerticalAdvection{NF, 3}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) = (- c⁻⁻ + 7c⁻ + 7c⁺ - c⁺⁺) / 12
 
 # MULTI THREADED VERSION only writes into layer k
 function _vertical_advection!(  ξ_tend::Grid,           # tendency of quantity ξ at k
