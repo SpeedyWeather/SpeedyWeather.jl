@@ -3,12 +3,10 @@ abstract type DiffusiveVerticalAdvection{NF, B}  <: VerticalAdvection{NF, B} end
 abstract type DispersiveVerticalAdvection{NF, B} <: VerticalAdvection{NF, B} end
 
 struct UpwindVerticalAdvection{NF, B}   <: DiffusiveVerticalAdvection{NF, B} end
-struct WENOVerticalAdvection{NF, B}     <: DiffusiveVerticalAdvection{NF, B} end
 struct CenteredVerticalAdvection{NF, B} <: DispersiveVerticalAdvection{NF, B} end
 
 CenteredVerticalAdvection(spectral_grid; order = 2) = CenteredVerticalAdvection{spectral_grid.NF, order}()
 UpwindVerticalAdvection(spectral_grid; order = 3)   =   UpwindVerticalAdvection{spectral_grid.NF, order}()
-WENOVerticalAdvection(spectral_grid; order = 3)     =     WENOVerticalAdvection{spectral_grid.NF, order}()
 
 @inline retrieve_time_step(::DiffusiveVerticalAdvection,  variables, var) = getproperty(variables, Symbol(var, :_grid_prev))
 @inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) = getproperty(variables, Symbol(var, :_grid))
@@ -70,13 +68,6 @@ function vertical_advection!(   layer::DiagnosticVariablesLayer,
     end
 end
 
-@inline reconstructed_at_face(::UpwindVerticalAdvection{NF, 1}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = ifelse(u > 0, c⁻, c⁺)
-@inline reconstructed_at_face(::UpwindVerticalAdvection{NF, 3}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = ifelse(u > 0, (2c⁻⁻ + 5c⁻ - c⁺  ) / 6,
-                                                                                                              (-c⁻  + 5c⁺ + 2c⁺⁺) / 6)
-
-@inline reconstructed_at_face(::CenteredVerticalAdvection{NF, 2}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = (c⁻ + c⁺) / 2
-@inline reconstructed_at_face(::CenteredVerticalAdvection{NF, 3}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = (- c⁻⁻ + 7c⁻ + 7c⁺ - c⁺⁺) / 12
-
 # MULTI THREADED VERSION only writes into layer k
 function _vertical_advection!(  ξ_tend::Grid,           # tendency of quantity ξ at k
                                 σ_tend_above::Grid,     # vertical velocity at k-1/2
@@ -109,3 +100,9 @@ function _vertical_advection!(  ξ_tend::Grid,           # tendency of quantity 
     end
 end
 
+@inline reconstructed_at_face(::UpwindVerticalAdvection{NF, 1}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = ifelse(u > 0, c⁻, c⁺)
+@inline reconstructed_at_face(::UpwindVerticalAdvection{NF, 3}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = ifelse(u > 0, (2c⁻⁻ + 5c⁻ - c⁺  ) / 6,
+                                                                                                              (-c⁻  + 5c⁺ + 2c⁺⁺) / 6)
+
+@inline reconstructed_at_face(::CenteredVerticalAdvection{NF, 2}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = (c⁻ + c⁺) / 2
+@inline reconstructed_at_face(::CenteredVerticalAdvection{NF, 3}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = (- c⁻⁻ + 7c⁻ + 7c⁺ - c⁺⁺) / 12
