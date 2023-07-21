@@ -74,8 +74,8 @@ end
 @inline reconstructed_at_face(::UpwindVerticalAdvection{NF, 3}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = ifelse(u > 0, (2c⁻⁻ + 5c⁻ - c⁺  ) / 6,
                                                                                                               (-c⁻  + 5c⁺ + 2c⁺⁺) / 6)
 
-@inline reconstructed_at_face(::CenteredVerticalAdvection{NF, 2}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) = (c⁻ + c⁺) / 2
-@inline reconstructed_at_face(::CenteredVerticalAdvection{NF, 3}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) = (- c⁻⁻ + 7c⁻ + 7c⁺ - c⁺⁺) / 12
+@inline reconstructed_at_face(::CenteredVerticalAdvection{NF, 2}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = (c⁻ + c⁺) / 2
+@inline reconstructed_at_face(::CenteredVerticalAdvection{NF, 3}, u, c⁻⁻, c⁻, c⁺, c⁺⁺) where NF = (- c⁻⁻ + 7c⁻ + 7c⁺ - c⁺⁺) / 12
 
 # MULTI THREADED VERSION only writes into layer k
 function _vertical_advection!(  ξ_tend::Grid,           # tendency of quantity ξ at k
