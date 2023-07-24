@@ -207,7 +207,7 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
     large_scale_condensation::AbstractCondensation{NF} = SpeedyCondensation(spectral_grid)
-    vertical_advection::VerticalAdvection{NF} = FirstOrderUpwind(spectral_grid)
+    vertical_advection::VerticalAdvection{NF} = UpwindVerticalAdvection(spectral_grid)
 
     # vertical_diffusion::VerticalDiffusion{NF} = VerticalLaplacian(spectral_grid)
 

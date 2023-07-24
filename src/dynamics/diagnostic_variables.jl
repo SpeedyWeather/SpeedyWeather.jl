@@ -46,14 +46,14 @@ struct GridVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     vor_grid            ::Grid  # vorticity
     div_grid            ::Grid  # divergence
     temp_grid           ::Grid  # absolute temperature [K]
-    temp_grid_prev      ::Grid
+    temp_grid_prev      ::Grid  # absolute temperature of previous time step [K]
     temp_virt_grid      ::Grid  # virtual tempereature [K]  
     humid_grid          ::Grid  # specific_humidity
     geopot_grid         ::Grid  # geopotential (is that needed?)
     u_grid              ::Grid  # zonal velocity *coslat [m/s]
     v_grid              ::Grid  # meridional velocity *coslat [m/s]
-    u_grid_prev         ::Grid  # zonal velocity *coslat [m/s]
-    v_grid_prev         ::Grid  # meridional velocity *coslat [m/s]
+    u_grid_prev         ::Grid  # zonal velocity *coslat of previous time step [m/s]
+    v_grid_prev         ::Grid  # meridional velocity *coslat of previous time step [m/s]
 end
 
 function Base.zeros(::Type{GridVariables},SG::SpectralGrid)
