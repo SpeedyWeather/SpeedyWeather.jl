@@ -3,10 +3,12 @@ abstract type DiffusiveVerticalAdvection{NF, B}  <: VerticalAdvection{NF, B} end
 abstract type DispersiveVerticalAdvection{NF, B} <: VerticalAdvection{NF, B} end
 
 struct UpwindVerticalAdvection{NF, B}   <: DiffusiveVerticalAdvection{NF, B} end
+struct WENOVerticalAdvection{NF}        <: DiffusiveVerticalAdvection{NF, 3} end
 struct CenteredVerticalAdvection{NF, B} <: DispersiveVerticalAdvection{NF, B} end
 
 CenteredVerticalAdvection(spectral_grid; order = 2) = CenteredVerticalAdvection{spectral_grid.NF, order       ÷ 2}()
 UpwindVerticalAdvection(spectral_grid; order = 5)   =   UpwindVerticalAdvection{spectral_grid.NF, (order + 1) ÷ 2}()
+WENOVerticalAdvection(spectral_grid)                    = WENOVerticalAdvection{spectral_grid.NF}()
 
 @inline retrieve_time_step(::DiffusiveVerticalAdvection,  variables, var) = getproperty(variables, Symbol(var, :_grid_prev))
 @inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) = getproperty(variables, Symbol(var, :_grid))
@@ -89,3 +91,43 @@ end
 
 @inline reconstructed_at_face(ij, ::CenteredVerticalAdvection{NF, 1}, u, ξ) where NF = ( ξ[1][ij] +  ξ[2][ij]) / 2
 @inline reconstructed_at_face(ij, ::CenteredVerticalAdvection{NF, 2}, u, ξ) where NF = (-ξ[1][ij] + 7ξ[2][ij] + 7ξ[3][ij] - ξ[4][ij]) / 12
+
+const ε  = 1e-6
+const d₀ = 3/10
+const d₁ = 3/5
+const d₂ = 1/10
+
+@inline weight_β₀(S, NF) = NF(13/12) * (S[1] - 2S[2] + S[3])^2 + NF(1/4) * (3S[1] - 4S[2] +  S[3])^2
+@inline weight_β₁(S, NF) = NF(13/12) * (S[1] - 2S[2] + S[3])^2 + NF(1/4) * ( S[1]         -  S[3])^2
+@inline weight_β₂(S, NF) = NF(13/12) * (S[1] - 2S[2] + S[3])^2 + NF(1/4) * ( S[1] - 4S[2] + 3S[3])^2
+
+@inline p₀(S) = (2S[1] + 5S[2] -   S[3]) / 6
+@inline p₁(S) = (-S[1] + 5S[2] +  2S[3]) / 6
+@inline p₂(S) = (2S[1] - 7S[2] + 11S[3]) / 6
+
+@inline function weno_reconstruction(S₀, S₁, S₂)
+    β₀ = weight_β₀(S₀, NF)
+    β₁ = weight_β₁(S₁, NF)
+    β₂ = weight_β₂(S₂, NF)
+
+    w₀ = NF(d₀) / (β₀ + NF(ε))^2
+    w₁ = NF(d₁) / (β₁ + NF(ε))^2
+    w₂ = NF(d₂) / (β₂ + NF(ε))^2
+
+    w₀, w₁, w₂ = (w₀, w₁, w₂) ./ (w₀ + w₁ + w₂) 
+
+    return p₀(S₀) * w₀ + p₁(S₁) * w₁ + p₂(S₂) * w₂
+end
+
+@inline function reconstructed_at_face(ij, ::WENOVerticalAdvection{NF}, u, ξ) where NF
+    if u > 0
+        S₀ = (ξ[1][ij], ξ[2][ij], ξ[3][ij])
+        S₁ = (ξ[2][ij], ξ[3][ij], ξ[4][ij])
+        S₂ = (ξ[3][ij], ξ[4][ij], ξ[5][ij])
+    else
+        S₀ = (ξ[6][ij], ξ[5][ij], ξ[4][ij])
+        S₁ = (ξ[5][ij], ξ[4][ij], ξ[3][ij])
+        S₂ = (ξ[4][ij], ξ[3][ij], ξ[2][ij])
+    end
+    return weno_reconstruction(S₀, S₁, S₂)
+end
