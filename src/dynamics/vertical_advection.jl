@@ -8,7 +8,7 @@ struct CenteredVerticalAdvection{NF, B} <: DispersiveVerticalAdvection{NF, B} en
 
 CenteredVerticalAdvection(spectral_grid; order = 2) = CenteredVerticalAdvection{spectral_grid.NF, order       ÷ 2}()
 UpwindVerticalAdvection(spectral_grid; order = 5)   =   UpwindVerticalAdvection{spectral_grid.NF, (order + 1) ÷ 2}()
-WENOVerticalAdvection(spectral_grid)                    = WENOVerticalAdvection{spectral_grid.NF}()
+WENOVerticalAdvection(spectral_grid)                =     WENOVerticalAdvection{spectral_grid.NF}()
 
 @inline retrieve_time_step(::DiffusiveVerticalAdvection,  variables, var) = getproperty(variables, Symbol(var, :_grid_prev))
 @inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) = getproperty(variables, Symbol(var, :_grid))
@@ -76,18 +76,18 @@ function _vertical_advection!(  ξ_tend::Grid,                  # tendency of qu
         σ̇⁻ = σ_tend_above[ij]       # velocity into layer k from above
         σ̇⁺ = σ_tend_below[ij]       # velocity out of layer k to below
 
-        ξ⁺ = reconstructed_at_face(ij, adv, σ̇⁺, ξ_sten[2:end])
-        ξ⁻ = reconstructed_at_face(ij, adv, σ̇⁻, ξ_sten[1:end-1])
+        ξᶠ⁺ = reconstructed_at_face(ij, adv, σ̇⁺, ξ_sten[2:end])
+        ξᶠ⁻ = reconstructed_at_face(ij, adv, σ̇⁻, ξ_sten[1:end-1])
 
-        ξ_tend[ij] -=  Δσₖ⁻¹ * (σ̇⁺ * ξ⁺ - σ̇⁻ * ξ⁻ - ξ[ij] * (σ̇⁺ - σ̇⁻))
+        ξ_tend[ij] -=  Δσₖ⁻¹ * (σ̇⁺ * ξᶠ⁺ - σ̇⁻ * ξᶠ⁻ - ξ[ij] * (σ̇⁺ - σ̇⁻))
     end
 end
 
 @inline reconstructed_at_face(ij, ::UpwindVerticalAdvection{NF, 1}, u, ξ) where NF = ifelse(u > 0, ξ[1][ij], ξ[2][ij])
-@inline reconstructed_at_face(ij, ::UpwindVerticalAdvection{NF, 2}, u, ξ) where NF = ifelse(u > 0, (2ξ[1][ij] + 5ξ[2][ij] -  ξ[3][ij]) / 6,
-                                                                                                   (-ξ[2][ij] + 5ξ[3][ij] + 2ξ[4][ij]) / 6)
-@inline reconstructed_at_face(ij, ::UpwindVerticalAdvection{NF, 3}, u, ξ) where NF = ifelse(u > 0, ( 2ξ[1][ij] - 13ξ[2][ij] + 47ξ[3][ij] + 27ξ[4][ij] - 3ξ[5][ij]) / 60,
-                                                                                                   (-3ξ[2][ij] + 27ξ[3][ij] + 47ξ[4][ij] - 13ξ[5][ij] + 2ξ[6][ij]) / 60)
+@inline reconstructed_at_face(ij, ::UpwindVerticalAdvection{NF, 2}, u, ξ) where NF = ifelse(u > 0, (2ξ[1][ij] + 5ξ[2][ij] - ξ[3][ij]) / 6,
+                                                                                                   (2ξ[4][ij] + 5ξ[3][ij] - ξ[2][ij]) / 6)
+@inline reconstructed_at_face(ij, ::UpwindVerticalAdvection{NF, 3}, u, ξ) where NF = ifelse(u > 0, (2ξ[1][ij] - 13ξ[2][ij] + 47ξ[3][ij] + 27ξ[4][ij] - 3ξ[5][ij]) / 60,
+                                                                                                   (2ξ[6][ij] - 13ξ[5][ij] + 47ξ[4][ij] + 27ξ[3][ij] - 3ξ[2][ij]) / 60)
 
 @inline reconstructed_at_face(ij, ::CenteredVerticalAdvection{NF, 1}, u, ξ) where NF = ( ξ[1][ij] +  ξ[2][ij]) / 2
 @inline reconstructed_at_face(ij, ::CenteredVerticalAdvection{NF, 2}, u, ξ) where NF = (-ξ[1][ij] + 7ξ[2][ij] + 7ξ[3][ij] - ξ[4][ij]) / 12
