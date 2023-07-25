@@ -105,7 +105,7 @@ const d₂ = 1/10
 @inline p₁(S) = (-S[1] + 5S[2] +  2S[3]) / 6
 @inline p₂(S) = (2S[1] - 7S[2] + 11S[3]) / 6
 
-@inline function weno_reconstruction(S₀, S₁, S₂)
+@inline function weno_reconstruction(S₀, S₁, S₂, NF)
     β₀ = weight_β₀(S₀, NF)
     β₁ = weight_β₁(S₁, NF)
     β₂ = weight_β₂(S₂, NF)
@@ -129,5 +129,5 @@ end
         S₁ = (ξ[5][ij], ξ[4][ij], ξ[3][ij])
         S₂ = (ξ[4][ij], ξ[3][ij], ξ[2][ij])
     end
-    return weno_reconstruction(S₀, S₁, S₂)
+    return weno_reconstruction(S₀, S₁, S₂, NF)
 end
