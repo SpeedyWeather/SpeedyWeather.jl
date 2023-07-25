@@ -121,13 +121,13 @@ end
 
 @inline function reconstructed_at_face(ij, ::WENOVerticalAdvection{NF}, u, ξ) where NF
     if u > 0
-        S₀ = (ξ[1][ij], ξ[2][ij], ξ[3][ij])
+        S₀ = (ξ[3][ij], ξ[4][ij], ξ[5][ij])
         S₁ = (ξ[2][ij], ξ[3][ij], ξ[4][ij])
-        S₂ = (ξ[3][ij], ξ[4][ij], ξ[5][ij])
+        S₂ = (ξ[1][ij], ξ[2][ij], ξ[3][ij])
     else
-        S₀ = (ξ[6][ij], ξ[5][ij], ξ[4][ij])
+        S₀ = (ξ[4][ij], ξ[3][ij], ξ[2][ij])
         S₁ = (ξ[5][ij], ξ[4][ij], ξ[3][ij])
-        S₂ = (ξ[4][ij], ξ[3][ij], ξ[2][ij])
+        S₂ = (ξ[6][ij], ξ[5][ij], ξ[4][ij])
     end
     return weno_reconstruction(S₀, S₁, S₂, NF)
 end
