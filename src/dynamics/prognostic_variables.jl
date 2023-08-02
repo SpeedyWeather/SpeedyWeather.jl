@@ -208,8 +208,8 @@ function set_var!(progn::PrognosticVariables{NF},
 end 
 
 function _set_var_core!(var_old::LowerTriangularMatrix{T}, var_new::LowerTriangularMatrix{R}) where {T,R}
-    lmax,mmax = size(var_old) .- (2,1)
-    var_new_trunc = spectral_truncation!(var_new, lmax+1, mmax)
+    lmax,mmax = size(var_old) .- (1,1)
+    var_new_trunc = spectral_truncation!(var_new, mmax+1, mmax)
     copyto!(var_old, var_new_trunc)
 end 
 
@@ -228,9 +228,7 @@ function set_var!(progn::PrognosticVariables{NF},
                   lf::Integer=1) where NF
 
     @assert length(var) == length(progn.layers)
-
-    var_sph = [spectral(var_layer) for var_layer in var]
-
+    var_sph = [spectral(var_layer,one_more_degree=true) for var_layer in var]
     return set_var!(progn, varname, var_sph; lf=lf)
 end 
 
@@ -251,7 +249,7 @@ function set_var!(progn::PrognosticVariables{NF},
                   lf::Integer=1) where NF
 
     @assert length(var) == length(progn.layers)
-
+    
     var_sph = [spectral(var_layer, M.spectral_transform) for var_layer in var]
 
     return set_var!(progn, varname, var_sph; lf=lf)
@@ -275,7 +273,7 @@ function set_var!(progn::PrognosticVariables{NF},
 
     @assert length(var) == length(progn.layers)
 
-    var_grid = [spectral(var_layer, Grid) for var_layer in var]
+    var_grid = [spectral(var_layer; Grid, one_more_degree=true) for var_layer in var]
 
     return set_var!(progn, varname, var_grid; lf=lf)
 end 
@@ -335,9 +333,9 @@ set_humidity!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(prog
 
 Sets the prognostic variable with the surface pressure in spectral space at leapfrog index `lf`.
 """
-function set_pressure!(progn::PrognosticVariables{NF}, 
+function set_pressure!(progn::PrognosticVariables,
                        pressure::LowerTriangularMatrix;
-                       lf::Integer=1) where NF
+                       lf::Integer=1)
 
     _set_var_core!(progn.surface.timesteps[lf].pres, pressure)
 
@@ -352,7 +350,8 @@ end
 
 Sets the prognostic variable with the surface pressure in grid space at leapfrog index `lf`.
 """
-set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid, M::ModelSetup; lf::Integer=1) = set_pressure!(progn, spectral(pressure, M.spectral_transform); lf=lf)
+set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid, M::ModelSetup; lf::Integer=1) =
+    set_pressure!(progn, spectral(pressure, M.spectral_transform); lf)
 
 """
     set_pressure!(progn::PrognosticVariables{NF}, 
@@ -361,7 +360,8 @@ set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid, M::ModelSetup;
 
 Sets the prognostic variable with the surface pressure in grid space at leapfrog index `lf`.
 """
-set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid, lf::Integer=1) = set_pressure!(progn, spectral(pressure); lf=lf)
+set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid; lf::Integer=1) =
+    set_pressure!(progn, spectral(pressure, one_more_degree=true); lf)
 
 """
     set_pressure!(progn::PrognosticVariables{NF}, 
@@ -371,7 +371,8 @@ set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid, lf::Integer=1)
 
 Sets the prognostic variable with the surface pressure in grid space at leapfrog index `lf`.
 """
-set_pressure!(progn::PrognosticVariables, pressure::AbstractMatrix, Grid::Type{<:AbstractGrid}, lf::Integer=1) = set_pressure!(progn, spectral(pressure, Grid); lf=lf)
+set_pressure!(progn::PrognosticVariables, pressure::AbstractMatrix; lf::Integer=1,
+    Grid::Type{<:AbstractGrid}=FullGaussianGrid) = set_pressure!(progn, spectral(pressure; Grid, one_more_degree=true); lf)
   
 """
     get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1)

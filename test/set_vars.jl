@@ -12,7 +12,7 @@
     mmax = M.spectral_transform.mmax
     lf = 1
 
-    sph_data = [rand(LowerTriangularMatrix{spectral_grid.NF}, lmax+2, mmax+1) for i=1:nlev]
+    sph_data = [rand(LowerTriangularMatrix{spectral_grid.NF}, lmax+1, mmax+1) for i=1:nlev]
 
     SpeedyWeather.set_vorticity!(P, sph_data)
     SpeedyWeather.set_divergence!(P, sph_data)
@@ -20,7 +20,7 @@
     SpeedyWeather.set_humidity!(P, sph_data)
     SpeedyWeather.set_pressure!(P, sph_data[1])
 
-    for i=1:nlev 
+    for i=1:nlev
         @test P.layers[i].timesteps[lf].vor == sph_data[i]
         @test P.layers[i].timesteps[lf].div == sph_data[i]
         @test P.layers[i].timesteps[lf].temp == sph_data[i]
@@ -48,12 +48,12 @@
     SpeedyWeather.set_pressure!(P, grid_data[1])
 
     for i=1:nlev 
-        @test all(isapprox(P.layers[i].timesteps[lf].vor, sph_data[i]))
-        @test all(isapprox(P.layers[i].timesteps[lf].div, sph_data[i]))
-        @test all(isapprox(P.layers[i].timesteps[lf].temp, sph_data[i]))
-        @test all(isapprox(P.layers[i].timesteps[lf].humid, sph_data[i]))
+        @test P.layers[i].timesteps[lf].vor ≈   sph_data[i]
+        @test P.layers[i].timesteps[lf].div ≈   sph_data[i]
+        @test P.layers[i].timesteps[lf].temp ≈  sph_data[i]
+        @test P.layers[i].timesteps[lf].humid ≈ sph_data[i]
     end 
-    @test all(isapprox(P.surface.timesteps[lf].pres,sph_data[1]))
+    @test P.surface.timesteps[lf].pres ≈ sph_data[1]
 
     grid_data = [gridded(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
 
@@ -64,12 +64,12 @@
     SpeedyWeather.set_pressure!(P, grid_data[1], M)
 
     for i=1:nlev 
-        @test all(isapprox(P.layers[i].timesteps[lf].vor, sph_data[i]))
-        @test all(isapprox(P.layers[i].timesteps[lf].div, sph_data[i]))
-        @test all(isapprox(P.layers[i].timesteps[lf].temp, sph_data[i]))
-        @test all(isapprox(P.layers[i].timesteps[lf].humid, sph_data[i]))
+        @test P.layers[i].timesteps[lf].vor   ≈ sph_data[i]
+        @test P.layers[i].timesteps[lf].div   ≈ sph_data[i]
+        @test P.layers[i].timesteps[lf].temp  ≈ sph_data[i]
+        @test P.layers[i].timesteps[lf].humid ≈ sph_data[i]
     end 
-    @test all(isapprox(P.surface.timesteps[lf].pres,sph_data[1]))
+    @test P.surface.timesteps[lf].pres ≈ sph_data[1]
 
     # test setting matrices 
     spectral_grid = SpectralGrid(Grid=FullGaussianGrid)
@@ -86,18 +86,18 @@
     grid_data = [gridded(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
     matrix_data = [Matrix(grid_data[i]) for i in eachindex(grid_data)]
 
-    SpeedyWeather.set_vorticity!(P, grid_data)
-    SpeedyWeather.set_divergence!(P, grid_data)
-    SpeedyWeather.set_temperature!(P, grid_data)
-    SpeedyWeather.set_humidity!(P, grid_data)
-    SpeedyWeather.set_pressure!(P, grid_data[1])
+    SpeedyWeather.set_vorticity!(P, matrix_data)
+    SpeedyWeather.set_divergence!(P, matrix_data)
+    SpeedyWeather.set_temperature!(P, matrix_data)
+    SpeedyWeather.set_humidity!(P, matrix_data)
+    SpeedyWeather.set_pressure!(P, matrix_data[1])
 
     for i=1:nlev 
-        @test all(isapprox(P.layers[i].timesteps[lf].vor, sph_data[i]))
-        @test all(isapprox(P.layers[i].timesteps[lf].div, sph_data[i]))
-        @test all(isapprox(P.layers[i].timesteps[lf].temp, sph_data[i]))
-        @test all(isapprox(P.layers[i].timesteps[lf].humid, sph_data[i]))
+        @test P.layers[i].timesteps[lf].vor   ≈ sph_data[i]
+        @test P.layers[i].timesteps[lf].div   ≈ sph_data[i]
+        @test P.layers[i].timesteps[lf].temp  ≈ sph_data[i]
+        @test P.layers[i].timesteps[lf].humid ≈ sph_data[i]
     end 
-    @test all(isapprox(P.surface.timesteps[lf].pres,sph_data[1]))
+    @test P.surface.timesteps[lf].pres ≈ sph_data[1]
 
-end 
+end
