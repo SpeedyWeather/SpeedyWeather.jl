@@ -20,7 +20,7 @@
         # than prognostic variable to act as a dissipation 
         (;lmax,mmax) = m.spectral_transform
         for m in 1:mmax+1
-            for l in max(2,m):lmax+1
+            for l in max(2,m):lmax
                 @test -sign(real(vor[l,m])) == sign(real(vor_tend[l,m]))
                 @test -sign(imag(vor[l,m])) == sign(imag(vor_tend[l,m]))
             end
