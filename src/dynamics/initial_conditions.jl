@@ -183,7 +183,7 @@ function initial_conditions!(   progn::PrognosticVariables,
     # interpolate in spectral space to desired resolution
     (;lmax,mmax) = model.spectral_transform
     (;NF) = model.spectral_grid
-    u = spectral_truncation(complex(NF),u,lmax+1,mmax)
+    u = spectral_truncation(complex(NF),u,lmax,mmax)
     
     # get vorticity initial conditions from curl of u,v
     v = zero(u)     # meridional velocity zero for these initial conditions

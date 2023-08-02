@@ -167,6 +167,6 @@ function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
                                             recompute_legendre::Bool = false,
                                             kwargs...)
     (;NF, Grid, trunc, dealiasing) = spectral_grid
-    return SpectralTransform(NF,Grid,trunc;recompute_legendre,dealiasing,kwargs...)
+    return SpectralTransform(NF,Grid,trunc+1,trunc;recompute_legendre,dealiasing,kwargs...)
 end
 

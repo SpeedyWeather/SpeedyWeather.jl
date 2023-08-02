@@ -122,10 +122,10 @@ end
         S = SpectralTransform(SG)
 
         lmax,mmax = S.lmax,S.mmax
-        A1 = randn(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-        A2 = randn(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-        B = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-        C = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+        A1 = randn(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+        A2 = randn(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+        B = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+        C = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
 
         SpeedyWeather.divergence!(B,A1,A2,S,flipsign=true)
         SpeedyWeather.divergence!(C,A1,A2,S,flipsign=false)
@@ -144,10 +144,10 @@ end
         S = SpectralTransform(SG)
 
         lmax,mmax = S.lmax,S.mmax
-        A1 = randn(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-        A2 = randn(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-        B = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-        C = zeros(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+        A1 = randn(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+        A2 = randn(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+        B = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+        C = zeros(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
 
         SpeedyWeather.divergence!(B,A1,A2,S,add=true)
         SpeedyWeather.divergence!(B,A1,A2,S,add=true)
@@ -188,9 +188,9 @@ end
         fill!(d.layers[1].tendencies.div_tend,0)
 
         # create initial conditions
-        lmax,mmax = p.trunc,p.trunc
-        vor0 = randn(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
-        div0 = randn(LowerTriangularMatrix{Complex{NF}},lmax+2,mmax+1)
+        (;lmax,mmax) = m.spectral_transform
+        vor0 = randn(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+        div0 = randn(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
         
         vor0[1,1] = 0                   # zero mean
         div0[1,1] = 0
