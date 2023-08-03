@@ -518,7 +518,7 @@ function gridded(   alms::AbstractMatrix,       # spectral coefficients
                     ) where NF                  # number format NF
  
     map = zeros(S.Grid{NF},S.nlat_half)         # preallocate output
-    almsᴸ = LowerTriangularMatrix{Complex{NF}}(undef,S.lmax+1,S.mmax+1)
+    almsᴸ = zeros(LowerTriangularMatrix{Complex{NF}},S.lmax+1,S.mmax+1)
     copyto!(almsᴸ,alms)                         # drop the upper triangle and convert to NF  
     gridded!(map,almsᴸ,S)                       # now execute the in-place version
     return map
