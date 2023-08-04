@@ -10,16 +10,26 @@ CenteredVerticalAdvection(spectral_grid; order = 2) = CenteredVerticalAdvection{
 UpwindVerticalAdvection(spectral_grid; order = 5)   =   UpwindVerticalAdvection{spectral_grid.NF, (order + 1) ÷ 2}()
 WENOVerticalAdvection(spectral_grid)                =     WENOVerticalAdvection{spectral_grid.NF}()
 
-@inline retrieve_time_step(::DiffusiveVerticalAdvection,  variables, var) = getproperty(variables, Symbol(var, :_grid_prev))
-@inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) = getproperty(variables, Symbol(var, :_grid))
+@inline retrieve_previous_time_step(variables, var) = getproperty(variables, Symbol(var, :_grid_prev))
+@inline  retrieve_current_time_step(variables, var) = getproperty(variables, Symbol(var, :_grid))
 
-@inline order(::VerticalAdvection{NF, B}) where {NF, B} = B 
+@inline retrieve_time_step(::DiffusiveVerticalAdvection,  variables, var) = retrieve_previous_time_step(variables, var)
+@inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) =  retrieve_current_time_step(variables, var)
 
-@inline function retrieve_stencil(k, layers, var, nlev, vertical_advection::VerticalAdvection{NF, B}) where {NF, B}
+@inline function retrieve_current_stencil(k, layers, var, nlev, ::VerticalAdvection{NF, B}) where {NF, B}
     k_stencil = max.(min.(nlev, k-B:k+B), 1)
-    ξ_stencil = Tuple(retrieve_time_step(vertical_advection, layers[k].grid_variables, var) for k in k_stencil)
+    ξ_stencil = Tuple(retrieve_current_time_step(layers[k].grid_variables, var) for k in k_stencil)
     return ξ_stencil
 end
+
+@inline function retrieve_previous_stencil(k, layers, var, nlev, ::VerticalAdvection{NF, B}) where {NF, B}
+    k_stencil = max.(min.(nlev, k-B:k+B), 1)
+    ξ_stencil = Tuple(retrieve_current_time_step(layers[k].grid_variables, var) for k in k_stencil)
+    return ξ_stencil
+end
+
+@inline retrieve_stencil(k, layers, var, nlev, scheme::DiffusiveVerticalAdvection)  = retrieve_previous_stencil(k, layers, var, nlev, scheme)
+@inline retrieve_stencil(k, layers, var, nlev, scheme::DispersiveVerticalAdvection) =  retrieve_current_stencil(k, layers, var, nlev, scheme)
 
 function vertical_advection!(   layer::DiagnosticVariablesLayer,
                                 diagn::DiagnosticVariables,
@@ -30,7 +40,7 @@ function vertical_advection!(   layer::DiagnosticVariablesLayer,
     wet_core = model isa PrimitiveWet
     (; σ_levels_thick, nlev ) = model.geometry
      
-    vertical_advection = model.vertical_advection
+    scheme = model.vertical_advection
 
     # for k==1 "above" term is 0, for k==nlev "below" term is zero
     # avoid out-of-bounds indexing with k_above, k_below as follows
@@ -45,18 +55,18 @@ function vertical_advection!(   layer::DiagnosticVariablesLayer,
     
     for var in (:u, :v, :temp)
         ξ_tend = getproperty(layer.tendencies, Symbol(var, :_tend_grid))
-        ξ_sten = retrieve_stencil(k, diagn.layers, var, nlev, vertical_advection)
-        ξ      = retrieve_time_step(vertical_advection, layer.grid_variables, var)
+        ξ_sten = retrieve_stencil(k, diagn.layers, var, nlev, scheme)
+        ξ      = retrieve_time_step(scheme, layer.grid_variables, var)
 
-        _vertical_advection!(ξ_tend,σ_tend_above,σ_tend_below,ξ_sten,ξ,Δσₖ,vertical_advection)
+        _vertical_advection!(ξ_tend,σ_tend_above,σ_tend_below,ξ_sten,ξ,Δσₖ,scheme)
     end
 
     if wet_core
-        ξ_tend  = getproperty(layer.tendencies, :humid_tend_grid)
-        ξ_sten = retrieve_stencil(k, diagn.layers, :humid, nlev, vertical_advection)
-        ξ      = retrieve_time_step(vertical_advection, layer.grid_variables, :humid)
+        ξ_tend = getproperty(layer.tendencies, :humid_tend_grid)
+        ξ_sten = retrieve_current_stencil(k, diagn.layers, :humid, nlev, scheme)
+        ξ      = retrieve_current_time_step(layer.grid_variables, :humid)
 
-        _vertical_advection!(ξ_tend,σ_tend_above,σ_tend_below,ξ_sten,ξ,Δσₖ,vertical_advection)
+        _vertical_advection!(ξ_tend,σ_tend_above,σ_tend_below,ξ_sten,ξ,Δσₖ,scheme)
     end
 end
 
