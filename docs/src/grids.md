@@ -144,11 +144,11 @@ You will obtain this information every time you create a `SpectralGrid(;Grid,tru
 
 ...
 
-## Octahedral Gaussian grid
+## [Octahedral Gaussian grid](@id OctahedralGaussianGrid)
 
 ...
 
-## HEALPix grid
+## [HEALPix grid](@id HEALPixGrid)
 
 Technically, HEALPix grids are a class of grids that tessalate the sphere into faces that are often
 called basepixels. For each member of this class there are ``N_\varphi`` basepixels in zonal direction
@@ -197,7 +197,7 @@ z = \frac{2}{3}-\frac{4k}{3N_{side}} \pm \frac{8\phi}{3\pi}
 ```
 
 
-## OctaHEALPix grid
+## [OctaHEALPix grid](@id OctaHEALPixGrid)
 
 While the classic HEALPix grid is based on a [dodecahedron](https://en.wikipedia.org/wiki/Rhombic_dodecahedron),
 other choices for ``N_\varphi`` and ``N_\theta`` in the class of HEALPix grids will change the number of faces
