@@ -551,13 +551,13 @@ end
 """
 $(TYPEDSIGNATURES)
 Spectral transform (grid to spectral) `map` to `grid(map)` to execute `spectral(map::AbstractGrid;kwargs...)`."""
-function spectral(  map::Grid,                      # gridded field
-                    S::SpectralTransform{NF},       # spectral transform struct
-                    ) where {Grid<:AbstractGrid,NF} # number format NF
+function spectral(  map::AbstractGrid,          # gridded field
+                    S::SpectralTransform{NF},   # spectral transform struct
+                    ) where NF                  # number format NF
 
-    map_NF = Grid{NF}(map)                          # convert map to NF
+    map_NF = similar(map,NF)                    # convert map to NF
+    copyto!(map_NF,map)
     
-    # always use one more l for consistency with vector quantities
     alms = LowerTriangularMatrix{Complex{NF}}(undef,S.lmax+1,S.mmax+1)
-    return spectral!(alms,map_NF,S)                # in-place version
+    return spectral!(alms,map_NF,S)             # in-place version
 end
