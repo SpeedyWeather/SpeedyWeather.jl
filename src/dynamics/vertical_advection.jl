@@ -111,18 +111,20 @@ const d₂ = 1/10
 @inline weight_β₁(S, NF) = NF(13/12) * (S[1] - 2S[2] + S[3])^2 + NF(1/4) * ( S[1]         -  S[3])^2
 @inline weight_β₂(S, NF) = NF(13/12) * (S[1] - 2S[2] + S[3])^2 + NF(1/4) * ( S[1] - 4S[2] + 3S[3])^2
 
-@inline p₀(S) = (2S[1] + 5S[2] -   S[3]) / 6
-@inline p₁(S) = (-S[1] + 5S[2] +  2S[3]) / 6
-@inline p₂(S) = (2S[1] - 7S[2] + 11S[3]) / 6
+@inline p₀(S) = (2S[1] + 5S[2] -   S[3]) / 6 # downind stencil
+@inline p₁(S) = (-S[1] + 5S[2] +  2S[3]) / 6 # upwind stencil
+@inline p₂(S) = (2S[1] - 7S[2] + 11S[3]) / 6 # extrapolating stencil
+
+@inline τ₅(β₀, β₁, β₂) = abs(β₂ - β₀)
 
 @inline function weno_reconstruction(S₀, S₁, S₂, NF)
     β₀ = weight_β₀(S₀, NF)
     β₁ = weight_β₁(S₁, NF)
     β₂ = weight_β₂(S₂, NF)
 
-    w₀ = NF(d₀) / (β₀ + NF(ε))^2
-    w₁ = NF(d₁) / (β₁ + NF(ε))^2
-    w₂ = NF(d₂) / (β₂ + NF(ε))^2
+    w₀ = NF(d₀) * (1 + (τ₅(β₀, β₁, β₂) / (β₀ + NF(ε)))^2)
+    w₁ = NF(d₁) * (1 + (τ₅(β₀, β₁, β₂) / (β₁ + NF(ε)))^2)
+    w₂ = NF(d₂) * (1 + (τ₅(β₀, β₁, β₂) / (β₂ + NF(ε)))^2)
 
     w₀, w₁, w₂ = (w₀, w₁, w₂) ./ (w₀ + w₁ + w₂) 
 
