@@ -34,7 +34,7 @@ Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConst
     "water density [kg/m³]"
     water_density::NF
 
-    "coriolis frequency [s^-1] (scaled by radius as is vorticity) = 2Ω*sin(lat)*radius"
+    "coriolis frequency [s^-1], scaled by radius as is vorticity = 2Ω*sin(lat)*radius"
     f_coriolis::Vector{NF}
 
     # ADIABATIC TERM
