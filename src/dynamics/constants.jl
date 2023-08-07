@@ -6,7 +6,7 @@ Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConst
     "Radius of Planet [m]"
     radius::NF
 
-    "Angular frequency of Planet's rotation [1/s]"
+    "Angular frequency of Planet's rotation [s^-1]"
     rotation::NF
     
     "Gravitational acceleration [m/s^2]"
@@ -34,7 +34,7 @@ Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConst
     "water density [kg/m³]"
     water_density::NF
 
-    "coriolis frequency [1/s] (scaled by radius as is vorticity) = 2Ω*sin(lat)*radius"
+    "coriolis frequency [s^-1] (scaled by radius as is vorticity) = 2Ω*sin(lat)*radius"
     f_coriolis::Vector{NF}
 
     # ADIABATIC TERM

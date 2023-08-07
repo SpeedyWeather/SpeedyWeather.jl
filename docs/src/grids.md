@@ -62,7 +62,7 @@ Currently the following full grids `<: AbstractFullGrid` are implemented
 - `FullClenshawGrid`, a full grid with equi-angle latitudes
 
 and additionally we have `FullHEALPixGrid` and `FullOctaHEALPixGrid` which are the full grid equivalents to the
-[HEALPix grid](@ref) and the [OctaHEALPix grid](@ref) discussed below. Full grid equivalent means that they have
+[HEALPix grid](@ref HEALPixGrid) and the [OctaHEALPix grid](@ref OctaHEALPixGrid) discussed below. Full grid equivalent means that they have
 the same latitude rings, but no reduction in the number of points per ring towards the poles and no longitude offset.
 Other implemented reduced grids are
 
