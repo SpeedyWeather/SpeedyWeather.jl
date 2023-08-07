@@ -127,15 +127,17 @@ alms2 = spectral(map,S)
 As you can see the rounding error is now more like ``10^{-8}`` as we are using Float32
 (the [OctahedralGaussianGrid](@ref OctahedralGaussianGrid) is another _exact_ grid).
 Note, however, that the returned `LowerTriangularMatrix` is of size 7x6, not 6x6
-what we started from. We may change this in the future, but the underlying reason is
-that internally SpeedyWeather uses `LowerTriangularMatrix`s of size ``l_{max} + 2 \times m_{max} + 1``.
+what we started from. The underlying reason is that internally SpeedyWeather uses
+`LowerTriangularMatrix`s of size ``l_{max} + 2 \times m_{max} + 1``.
 One ``+1`` on both degree and order for 0-based harmonics versus 1-based matrix sizes,
 but an additional ``+1`` for the degrees which is required by the meridional derivative.
 For consistency, all `LowerTriangularMatrix`s in SpeedyWeather.jl carry this additional degree
-but only the vector quantities explicitly make use of it.
+but only the vector quantities explicitly make use of it. 
 See [Meridional derivative](@ref) for details.
 
-You can, however, always truncate this additional degree, say to T5 (hence matrix size is 6x6)
+For this interface to SpeedyTransforms this means that on a grid-to-spectral transform you will get
+one more degree than orders of the spherical harmonics by default. You can, however, always truncate
+this additional degree, say to T5 (hence matrix size is 6x6)
 ```@example speedytransforms
 spectral_truncation(alms2,5,5)
 ```
@@ -162,7 +164,11 @@ m = Matrix(map) # hide
 m
 ```
 You hopefully know which grid this data comes on, let us assume it is a regular
-latitde-longitude grid, which we call the `FullClenshawGrid`. We now wrap this matrix
+latitde-longitude grid, which we call the `FullClenshawGrid`. Note that for the spectral
+transform this should not include the poles, so the 96x47 matrix size here corresponds
+to 
+
+We now wrap this matrix
 therefore to associate it with the necessary grid information
 ```@example speedytransforms
 map = FullClenshawGrid(m)
@@ -171,7 +177,7 @@ plot(map)
 Now we transform into spectral space and call `power_spectrum(::LowerTriangularMatrix)`
 ```@example speedytransforms
 alms = spectral(map)
-p = SpeedyTransforms.power_spectrum(alms)
+power = SpeedyTransforms.power_spectrum(alms)
 nothing # hide
 ```
 
@@ -179,16 +185,11 @@ Which returns a vector of power at every wavenumber. By default this is normaliz
 as average power per degree, you can change that with the keyword argument `normalize=false`.
 Plotting this yields
 ```@example speedytransforms
-import PyPlot: PyPlot, savefig, tight_layout # hide
-PyPlot.ioff() # hide
-import PyPlot: semilogy, xlabel, ylabel
-semilogy(p)
-xlabel("wavenumber")
-ylabel("power")
-tight_layout() # hide
-savefig("spectrum.svg"); close() # hide
+using UnicodePlots
+k = 0:length(power)-1
+lineplot(k,power,yscale=:log10,ylim=(1e-15,10),xlim=extrema(k),
+    ylabel="power",xlabel="wavenumber",height=10,width=60)
 ```
-![](spectrum.svg)
 
 The power spectrum of our data is about 1 up to wavenumber 10 and then close to zero for
 higher wavenumbers (which is in fact how we constructed this fake data). Let us
@@ -198,7 +199,7 @@ to be used in grid-point space!
 ## Example: Creating k^n-distributed noise
 
 
-How would be construct random noise in spectral space that follows a certain
+How would we construct random noise in spectral space that follows a certain
 power law and transform it back into grid-point space? Define the wavenumber ``k``
 for T31, the spectral resolution we are interested in.
 (We start from 1 instead of 0 to avoid zero to the power of something negative).
@@ -216,7 +217,6 @@ to grid-point space and let us visualize the result
 map = gridded(alms)
 plot(map)
 ```
-![](power_noise.svg)
 
 You can always access the underlying data in `map` via `map.data` in case you
 need to get rid of the wrapping into a grid again!
