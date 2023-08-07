@@ -70,4 +70,5 @@ include("octahealpix.jl")
 include("quadrature_weights.jl")
 include("interpolation.jl")
 include("show.jl")
+include("similar.jl")
 end

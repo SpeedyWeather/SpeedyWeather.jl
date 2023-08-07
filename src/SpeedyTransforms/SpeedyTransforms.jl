@@ -1,7 +1,6 @@
 module SpeedyTransforms
 
-using DocStringExtensions
-
+using DocStringExtensions, Printf
 
 # NUMERICS
 import AssociatedLegendrePolynomials as Legendre
@@ -39,7 +38,8 @@ export  curl!,
 # TRUNCATION
 export  spectral_truncation,
         spectral_truncation!,
-        spectral_interpolation
+        spectral_interpolation,
+        power_spectrum
 
 include("aliasing.jl")
 include("spectral_transform.jl")

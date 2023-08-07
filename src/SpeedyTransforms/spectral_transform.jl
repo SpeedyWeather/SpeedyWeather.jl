@@ -494,10 +494,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
 end
 
 """
-    map = gridded(  alms::AbstractMatrix;
-                    recompute_legendre::Bool=true,
-                    grid::Type{<:AbstractGrid}=DEFAULT_GRID)
-
+$(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map`. Based on the size of `alms` the grid type `grid`, the spatial resolution is retrieved based
 on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `gridded(alms,S)`."""
@@ -512,9 +509,7 @@ function gridded(   alms::AbstractMatrix{T};            # spectral coefficients
 end
 
 """
-    map = gridded(  alms::AbstractMatrix,
-                    S::SpectralTransform)
-
+$(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map` with precalculated properties based on the SpectralTransform struct `S`. `alms` is converted to
 a `LowerTriangularMatrix` to execute the in-place `gridded!`."""
@@ -522,17 +517,15 @@ function gridded(   alms::AbstractMatrix,       # spectral coefficients
                     S::SpectralTransform{NF},   # struct for spectral transform parameters
                     ) where NF                  # number format NF
  
-    map = zeros(S.Grid{NF},S.nlat_half)               # preallocate output
-    almsᴸ = LowerTriangularMatrix{Complex{NF}}(alms)    # drop the upper triangle and convert to NF
-    gridded!(map,almsᴸ,S)                               # now execute the in-place version
+    map = zeros(S.Grid{NF},S.nlat_half)         # preallocate output
+    almsᴸ = zeros(LowerTriangularMatrix{Complex{NF}},S.lmax+1,S.mmax+1)
+    copyto!(almsᴸ,alms)                         # drop the upper triangle and convert to NF  
+    gridded!(map,almsᴸ,S)                       # now execute the in-place version
     return map
 end
 
 """
-    alms = spectral(    map::AbstractMatrix;
-                        Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
-                        kwargs...)
-
+$(TYPEDSIGNATURES)
 Converts `map` to `grid(map)` to execute `spectral(map::AbstractGrid;kwargs...)`."""
 function spectral(  map::AbstractMatrix;            # gridded field
                     Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
@@ -542,10 +535,7 @@ function spectral(  map::AbstractMatrix;            # gridded field
 end
 
 """
-    alms = spectral(    map::AbstractGrid;
-                        Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
-                        kwargs...)
-
+$(TYPEDSIGNATURES)
 Converts `map` to `Grid(map)` to execute `spectral(map::AbstractGrid;kwargs...)`."""
 function spectral(  map::AbstractGrid{NF};          # gridded field
                     recompute_legendre::Bool = true,# saves memory
@@ -559,16 +549,15 @@ function spectral(  map::AbstractGrid{NF};          # gridded field
 end
 
 """
-    alms = spectral(    map::AbstractMatrix;
-                        Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
-                        kwargs...)
-
+$(TYPEDSIGNATURES)
 Spectral transform (grid to spectral) `map` to `grid(map)` to execute `spectral(map::AbstractGrid;kwargs...)`."""
-function spectral(  map::AbstractGrid{NF},      # gridded field
+function spectral(  map::AbstractGrid,          # gridded field
                     S::SpectralTransform{NF},   # spectral transform struct
                     ) where NF                  # number format NF
 
-    # always use one more l for consistency with vector quantities
+    map_NF = similar(map,NF)                    # convert map to NF
+    copyto!(map_NF,map)
+    
     alms = LowerTriangularMatrix{Complex{NF}}(undef,S.lmax+1,S.mmax+1)
-    return spectral!(alms,map,S)                # in-place version
+    return spectral!(alms,map_NF,S)             # in-place version
 end

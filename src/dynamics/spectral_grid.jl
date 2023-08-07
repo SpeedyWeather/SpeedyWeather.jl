@@ -165,8 +165,9 @@ $(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""
 function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
                                             recompute_legendre::Bool = false,
+                                            one_more_degree::Bool = true,
                                             kwargs...)
     (;NF, Grid, trunc, dealiasing) = spectral_grid
-    return SpectralTransform(NF,Grid,trunc+1,trunc;recompute_legendre,dealiasing,kwargs...)
+    return SpectralTransform(NF,Grid,trunc+one_more_degree,trunc;recompute_legendre,dealiasing,kwargs...)
 end
 
