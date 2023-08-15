@@ -100,15 +100,18 @@ T_v = (1 + \mu q)T
 ```
 
 For completeness we want to mention here that the above product, because it is a 
-product of two variables ``q,T`` has to be computed in grid-point space, see [Spectral Transform].
+product of two variables ``q,T`` has to be computed in grid-point space,
+see [Spherical Harmonic Transform](@ref).
 To obtain an approximation to the virtual temperature in spectral space without
 expensive transforms one can linearize
 ```math
-T_v = T + \mu q\bar{T}
+T_v \approx T + \mu q\bar{T}
 ```
-With a global constant temperature ``\bar{T}``, for example obtained from the
+with a global constant temperature ``\bar{T}``, for example obtained from the
 ``l=m=0`` mode, ``\bar{T} = T_{0,0}\frac{1}{\sqrt{4\pi}}`` but depending on the
 normalization of the spherical harmonics that factor needs adjustment.
+We call this the _linear virtual temperature_ which is used for the geopotential
+calculation, see [#254](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/254).
 
 ## Vertical coordinates
 
@@ -160,11 +163,37 @@ with ``N`` vertical levels. We can integrate the geopotential onto half levels a
 \Phi_{k-\tfrac{1}{2}} = \Phi_{k+\tfrac{1}{2}} + R_dT^v_k(\ln p_{k+1/2} - \ln p_{k-1/2})
 ```
 
+## Vorticity advection
+
+Vorticity advection in the primitive equation takes the form
+```math
+\begin{aligned}
+\frac{\partial u}{\partial t} &= (f+\zeta)v \\
+\frac{\partial v}{\partial t} &= -(f+\zeta)u \\
+\end{aligned}
+```
+Meaning that we add the Coriolis parameter ``f`` and the relative vorticity ``\zeta``
+and multiply by the respective velocity component. While the primitive equations here
+are written with vorticity and divergence, we use ``u,v`` here as other tendencies
+will be added and the curl and divergence are only taken once after transform into
+spectral space. To obtain a tendency for vorticity and divergence, we rewrite this as
+```math
+\begin{aligned}
+\frac{\partial \zeta}{\partial t} &= \nabla \times (f+\zeta)\mathbf{u}_\perp \\
+\frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot (f+\zeta)\mathbf{u}_\perp \\
+\end{aligned}
+```
+with ``\mathbf{u}_\perp = (v,-u)`` the rotated velocity vector, see [Barotropic vorticity equation](@ref).
+
 ## Surface pressure tendency
 
 ## Vertical advection
 
-## Pressure gradient force
+### Vertical velocity
+
+
+
+## Pressure gradient
 
 ## Temperature equation
 
@@ -172,7 +201,58 @@ with ``N`` vertical levels. We can integrate the geopotential onto half levels a
 
 ## Horizontal diffusion
 
+Horizontal diffusion in the primitive equations is applied to vorticity ``\zeta``, divergence ``\mathcal{D}``,
+temperature ``T`` and humidity ``q``. In short, all variables that are advected.
+For the dry equations, ``q=0`` and no diffusion has to be applied.
+
+The horizontal diffusion is applied implicitly in spectral space, as already described in
+[Horizontal diffusion](@ref) for the barotropic vorticity equation.
+
 ## Algorithm
+
+The following algorithm describes a time step of the `PrimitiveWetModel`, for
+the `PrimitiveDryModel` humidity can be set to zero and respective steps skipped.
+
+0\. Start with initial conditions of relative vorticity ``\zeta_{lm}``, divergence ``D_{lm}``,
+temperature ``T_{lm}``, humidity ``q_{lm}`` and the logarithm of surface pressure ``(\ln p_s)_{lm}``
+in spectral space. Variables ``\zeta, D, T, q`` are defined on all vertical levels, the logarithm
+of surface pressure only at the surface. Transform this model state to grid-point space,
+obtaining velocities is done as in the shallow water model
+
+- Invert the [Laplacian](@ref) of ``\zeta_{lm}`` to obtain the stream function ``\Psi_{lm}`` in spectral space
+- Invert the [Laplacian](@ref) of ``D_{lm}`` to obtain the velocity potential ``\Phi_{lm}`` in spectral space
+- obtain velocities ``U_{lm} = (\cos(\theta)u)_{lm}, V_{lm} = (\cos(\theta)v)_{lm}`` from ``\nabla^\perp\Psi_{lm} + \nabla\Phi_{lm}``
+- Transform velocities ``U_{lm}``, ``V_{lm}`` to grid-point space ``U,V``
+- Unscale the ``\cos(\theta)`` factor to obtain ``u,v``
+
+Additionally we
+
+- Transform ``\zeta_{lm}``, ``D_{lm}``, ``T_{lm}, (\ln p_s)_{lm}`` to ``\zeta, D, \eta, T, \ln p_s`` in grid-point space
+- Compute the (non-linearized) [Virtual temperature](@ref) in grid-point space.
+
+Now loop over
+
+1. Compute all tendencies of ``u, v, T, q`` due to physical parameterizations in grid-point space.
+2. Compute the gradient of the logarithm of surface pressure ``\nabla (\ln p_s)_{lm}`` in spectral space and convert the two fields to grid-point space. Unscale the ``\cos(\theta)`` on the fly.
+3. For every layer ``k`` compute the pressure flux ``\mathbf{u}_k \cdot \nabla \ln p_s`` in grid-point space. 
+4. For every layer ``k`` compute a linearized [Virtual temperature](@ref) in spectral space.
+5. For every layer ``k`` compute a temperature anomaly (virtual and absolute) relative to a vertical reference profile ``T_k`` in grid-point space.
+6. Compute the [Geopotential](@ref) ``\Phi`` by integrating the virtual temperature vertically in spectral space from surface to top.
+7. Integrate ``u,v,D`` vertically to obtain ``\bar{u},\bar{v},\bar{D}`` in grid-point space and also ``\bar{D}_{lm}`` in spectral space. Store on the fly also for every layer ``k`` the partial integration from 1 to ``k-1`` (top to layer above). These will be used in the adiabatic term of the [Temperature equation](@ref).
+8. Compute the [Surface pressure tendency](@ref).
+9. For every layer ``k`` compute the [Vertical velocity](@ref).
+10. For every layer ``k`` add the linear contribution of the [Pressure gradient](@ref) ``RT_k (\ln p_s)_{lm}`` to the geopotential ``\Phi`` in spectral space.
+11. For every layer ``k`` compute the [Vertical advection](@ref) for ``u,v,T,q`` and add it to the respective tendency.
+12. For every layer ``k`` compute the tendency of ``u,v`` due to [Vorticity advection](@ref) and the [Pressure gradient](@ref) ``RT_v \nabla \ln p_s`` and add to the respective existing tendency. Unscale ``\cos(\theta)``, transform to spectral space, take curl and divergence to obtain tendencies for ``\zeta_{lm},\mathcal{D}_{lm}``.
+13. For every layer ``k`` compute the adiabatic term and the horizontal advection in the [Temperature equation](@ref) in grid-point space, add to existing tendency and transform to spectral.
+14. For every layer ``k`` compute the horizontal advection of humidity ``q`` in grid-point space, add to existing tendency and transform to spectral.
+15. For every layer ``k`` compute the kinetic energy ``\tfrac{1}{2}(u^2 + v^2)``, transform to spectral and add to the geopotential and the linear pressure gradient. Now apply the Laplace operator and subtract from the divergence tendency.
+16. Correct the tendencies following the [semi-implicit time integration](@ref implicit_swm) to prevent fast gravity waves from causing numerical instabilities.
+17. Compute the [horizontal diffusion](@ref diffusion) for the advected variables ``\zeta,\mathcal{D},T,q``
+18. Compute a leapfrog time step as described in [Time integration](@ref leapfrog) with a [Robert-Asselin and Williams filter](@ref)
+19. Transform the new spectral state of ``\zeta_{lm}``, ``\mathcal{D}_{lm}``, ``T_{lm}``, ``q_{lm}`` and ``(\ln p_s)_{lm}`` to grid-point ``u,v,\zeta,\mathcal{D},T,q,\ln p_s`` as described in 0.
+20. Possibly do some output
+21. Repeat from 1.
 
 ## Scaled primitive equations
 

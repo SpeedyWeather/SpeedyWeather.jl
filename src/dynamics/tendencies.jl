@@ -56,7 +56,7 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
 
         # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
         linear_virtual_temperature!(diagn_layer,progn_layer,model,lf_implicit)
-        temperature_anomaly!(diagn_layer,I)           # temperature relative to profile
+        temperature_anomaly!(diagn_layer,I)         # temperature relative to profile
     end
 
     geopotential!(diagn,O,C)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
