@@ -13,7 +13,7 @@ logarithm of surface pressure ``\ln p_s``, temperature ``T`` and specific humidi
 + (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s) \\
 \frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot (\mathcal{P}_\mathbf{u}
 + (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s) - \nabla^2(\frac{1}{2}(u^2 + v^2) + \Phi) \\
-\frac{\partial \ln p_s}{\partial t} &= -\frac{1}{p_s} \nabla \cdot \int_0^{p_s} \mathbf{u}~dp \\
+\frac{\partial \ln p_s}{\partial t} &= -\frac{1}{p_s} \int_{p_s}^0 \nabla \cdot \mathbf{u}~dp \\
 \frac{\partial T}{\partial t} &= \mathcal{P}_T -\nabla\cdot(\mathbf{u}T) + T\mathcal{D} - W(T) + \kappa T_v \frac{D \ln p}{Dt} \\
 \frac{\partial q}{\partial t} &= \mathcal{P}_q -\nabla\cdot(\mathbf{u}q) + q\mathcal{D} - W(q)\\
 \end{aligned}
@@ -159,9 +159,19 @@ is the orography, we can integrate this equation from the surface to the top
 to obtain ``\Phi_k`` on every layer ``k``.
 The surface is at ``k = N+\tfrac{1}{2}`` (see [Vertical coordinates](@ref)) 
 with ``N`` vertical levels. We can integrate the geopotential onto half levels as
+(``T_k^v`` is the virtual temperature at layer ``k``, the subscript ``v`` has been
+moved to be a superscript)
 ```math
 \Phi_{k-\tfrac{1}{2}} = \Phi_{k+\tfrac{1}{2}} + R_dT^v_k(\ln p_{k+1/2} - \ln p_{k-1/2})
 ```
+or onto full levels with
+```math
+\Phi_{k} = \Phi_{k+\tfrac{1}{2}} + R_dT^v_k(\ln p_{k+1/2} - \ln p_k).
+```
+We use this last formula first to get from ``\Phi_s`` to ``\Phi_N``, and then for
+every ``k`` twice to get from ``\Phi_k`` to ``\Phi_{k-1}`` via ``\Phi_{k-\tfrac{1}{2}}``.
+For the first half-level integration we use ``T_k`` for the second ``T_{k-1}``.
+
 
 ## Vorticity advection
 
@@ -186,6 +196,56 @@ spectral space. To obtain a tendency for vorticity and divergence, we rewrite th
 with ``\mathbf{u}_\perp = (v,-u)`` the rotated velocity vector, see [Barotropic vorticity equation](@ref).
 
 ## Surface pressure tendency
+
+The surface pressure increases with a convergence of the flow above. For ``k`` discrete layers from 1
+at the top to ``N`` at the surface layer this can be written as
+```math
+\frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \nabla \cdot (\mathbf{u}_k \Delta p_k)
+```
+which can be thought of as a vertical integration of the pressure thickness-weighted divergence.
+In ``\sigma``-coordinates with ``\Delta p_k = \Delta \sigma_k p_s`` (see [Vertical coordinates](@ref))
+this becomes
+```math
+\frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \sigma_k \nabla \cdot (\mathbf{u}_k p_s)
+= -\sum_{k=1}^N \sigma_k (\mathbf{u}_k \cdot \nabla p_s + p_s \nabla \cdot \mathbf{u}_k)
+```
+Using the logarithm of pressure ``\ln p`` as the vertical coordinate this becomes
+```math
+\frac{\partial \ln p_s}{\partial t} = 
+-\sum_{k=1}^N \sigma_k (\mathbf{u}_k \cdot \nabla \ln p_s + \nabla \cdot \mathbf{u}_k)
+```
+The second term is the divergence ``\mathcal{D}_k`` at layer ``k``.
+We introduce ``\bar{a} = \sum_k \Delta \sigma_k a_k``, the ``\sigma``-weighted vertical integration operator
+applied to some variable ``a``. This is essentially an average as ``\sum_k \Delta \sigma_k = 1``.
+The surface pressure tendency can then be written as
+```math
+\frac{\partial \ln p_s}{\partial t} = 
+-\mathbf{\bar{u}} \cdot \nabla \ln p_s - \bar{\mathcal{D}}
+```
+which is form used by SpeedyWeather.jl to calculate the tendency of (the logarithm of) surface pressure.
+
+As we will have ``\ln p_s`` available in spectral space at the beginning of a time step, the
+gradient can be easily computed (see [Derivatives in spherical coordinates](@ref)). However,
+we then need to transform both gradients to grid-point space for the scalar product with 
+the (vertically ``\sigma``-averaged) velocity vector ``\mathbf{\bar{u}}`` before transforming it
+back to spectral space where the tendency is needed. In general, we can do the ``\sigma``-weighted
+average in spectral or in grid-point space, although it is computationally cheaper in spectral space.
+We therefore compute ``- \bar{\mathcal{D}}`` entirely in spectral space. With ``()`` denoting
+spectral space and ``[]`` grid-point space (hence, ``([])`` and ``[()]`` are the transforms in the
+respective directions) we therefore do
+```math
+\left(\frac{\partial \ln p_s}{\partial t}\right) = 
+\left(-\mathbf{\overline{[u]}} \cdot [\nabla (\ln p_s)]\right) - \overline{(\mathcal{D})}
+```
+But note that it would also be possible to do
+```math
+\left(\frac{\partial \ln p_s}{\partial t}\right) = 
+\left(-\mathbf{\overline{[u]}} \cdot [\nabla (\ln p_s)] - \overline{[\mathcal{D}]}\right)
+```
+Meaning that we would compute the vertical average in grid-point space, subtract from the
+pressure gradient flux before transforming to spectral space. The same amount of transforms
+are performed but in the latter, the vertical averaging is done in grid-point space.
+
 
 ## Vertical advection
 
@@ -239,7 +299,7 @@ Now loop over
 5. For every layer ``k`` compute a temperature anomaly (virtual and absolute) relative to a vertical reference profile ``T_k`` in grid-point space.
 6. Compute the [Geopotential](@ref) ``\Phi`` by integrating the virtual temperature vertically in spectral space from surface to top.
 7. Integrate ``u,v,D`` vertically to obtain ``\bar{u},\bar{v},\bar{D}`` in grid-point space and also ``\bar{D}_{lm}`` in spectral space. Store on the fly also for every layer ``k`` the partial integration from 1 to ``k-1`` (top to layer above). These will be used in the adiabatic term of the [Temperature equation](@ref).
-8. Compute the [Surface pressure tendency](@ref).
+8. Compute the [Surface pressure tendency](@ref) with the vertical averages from the previous step.
 9. For every layer ``k`` compute the [Vertical velocity](@ref).
 10. For every layer ``k`` add the linear contribution of the [Pressure gradient](@ref) ``RT_k (\ln p_s)_{lm}`` to the geopotential ``\Phi`` in spectral space.
 11. For every layer ``k`` compute the [Vertical advection](@ref) for ``u,v,T,q`` and add it to the respective tendency.
