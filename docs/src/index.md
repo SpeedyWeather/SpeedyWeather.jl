@@ -55,6 +55,7 @@ The development of  SpeedyWeather.jl is lead by [Milan Klöwer](https://github.c
 - [David Meyer](https://github.com/dmey)
 - [Daisuke Hotta](https://github.com/hottad)
 - [Navid Constantinou](https://github.com/navidcy)
+- [Simone Silvestri](https://github.com/simone-silvestri)
 
 Any contributions are always welcome!
 
