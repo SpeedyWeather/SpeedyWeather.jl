@@ -18,11 +18,11 @@ function Base.show(io::IO,σ::SigmaCoordinates)
     nchars = length(string(σ.nlev))
     format = Printf.Format("%$(nchars)d")
     for k=1:σ.nlev
-        println(" k=",Printf.format(format,k-1),".5  -- $(Float16(σ.σ_half[k]))")
+        println(" k=",Printf.format(format,k-1),".5  -- ",@sprintf("%1.4f",σ.σ_half[k]))
         σk = (σ.σ_half[k] + σ.σ_half[k+1])/2
-        println(" k=",Printf.format(format,k),"    ×  $(Float16(σk))")
+        println(" k=",Printf.format(format,k),"    ×  ",@sprintf("%1.4f",σk))
     end
-    print(" k=",Printf.format(format,σ.nlev),".5  -- $(Float16(σ.σ_half[end]))")
+    print(" k=",Printf.format(format,σ.nlev),".5  -- ",@sprintf("%1.4f",σ.σ_half[end]))
 end
 
 """Coefficients of the generalised logistic function to describe the vertical coordinate.

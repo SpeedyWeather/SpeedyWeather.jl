@@ -119,19 +119,40 @@ calculation, see [#254](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues
 
 Let ``\Psi(x,y,z,t)`` 
 
-SpeedyWeather.jl currently uses sigma coordinates for the vertical. 
+### Sigma coordinates
 
-
+SpeedyWeather.jl currently uses so-called sigma coordinates for the vertical. This coordinate
+system uses fraction of surface pressure in the vertical, i.e.
 ```math
 \sigma = \frac{p}{p_s}
 ```
+with ``\sigma = [0,1]`` and ``\sigma = 0`` being the top (zero pressure) and ``\sigma = 1``
+the surface (at surface pressure). As a consequence the vertical dimension is also
+indexed from top to surface.
 
+!!! info "Vertical indexing"
+    Pressure, sigma, or hybrid coordinates in the vertical range from lowest values at the top
+    to highest values at the surface. Consistently, we also index the vertical dimension top to
+    surface. This means that ``k=1`` is the top-most layer, and ``k=N_{lev}`` (or similar)
+    is the layer that sits directly above the surface.
+
+One therefore chooses ``\sigma`` levels associated with the ``k``-th layer and the pressure
+can be reobtained from the surface pressure ``p_s``
 ```math
 p_k = \sigma_kp_s
 ```
+
+The layer thickness in terms of pressure is
 ```math
-\Delta p_k = p_{k+1} - p_k = \Delta \sigma_k p_s
+\Delta p_k = p_{k+\tfrac{1}{2}} - p_{k-\tfrac{1}{2}} =
+(\sigma_{k+\tfrac{1}{2}} - \sigma_{k-\tfrac{1}{2}}) p_s = \Delta \sigma_k p_s
 ``` 
+which can also be expressed with the layer thickness in sigma coordinates ``\Delta \sigma_k``
+times the surface pressure. In SpeedyWeather.jl one chooses the half levels
+``\sigma_{k+\tfrac{1}{2}}`` first and then obtains the full levels through averaging
+```math
+\sigma_k = \frac{\sigma_{k+\tfrac{1}{2}} + \sigma_{k-\tfrac{1}{2}}}{2}
+```
 
 ## Geopotential
 
