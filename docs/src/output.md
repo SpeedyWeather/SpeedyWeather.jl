@@ -135,6 +135,40 @@ Note that some fields are actual options, but others are derived from the option
 arrays/objects the output writer needs, but shouldn't be passed on by the user.
 The actual options are declared as `[OPTION]` in the following
 
-```@docs
-OutputWriter
+```julia
+help?> OutputWriter
+search: OutputWriter
+
+  NetCDF output writer. Contains all output options and auxiliary fields for
+  output interpolation. To be initialised with
+  OutputWriter(::SpectralGrid,::Type{<:ModelSetup},kwargs...) to pass on the
+  resolution information and the model type which chooses which variables to
+  output. Options include
+
+    •  spectral_grid::SpectralGrid
+
+    •  output::Bool
+
+    •  path::String: [OPTION] path to output folder, run_???? will be
+       created within
+
+    •  id::String: [OPTION] run identification number/string
+
+    •  run_path::String
+
+    •  filename::String: [OPTION] name of the output netcdf file
+
+    •  write_restart::Bool: [OPTION] also write restart file if
+       output==true?
+
+    •  pkg_version::VersionNumber
+
+    •  startdate::Dates.DateTime
+
+    •  output_dt::Float64: [OPTION] output frequency, time step [hrs]
+
+    •  output_dt_sec::Int64: actual output time step [sec]
+
+    •  output_vars::Vector{Symbol}: [OPTION] which variables to output,
+       u, v, vor, div, pres, temp, humid
 ```

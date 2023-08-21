@@ -13,7 +13,7 @@ logarithm of surface pressure ``\ln p_s``, temperature ``T`` and specific humidi
 + (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s) \\
 \frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot (\mathcal{P}_\mathbf{u}
 + (f+\zeta)\mathbf{u}_\perp - W(\mathbf{u}) - R_dT_v\nabla \ln p_s) - \nabla^2(\frac{1}{2}(u^2 + v^2) + \Phi) \\
-\frac{\partial \ln p_s}{\partial t} &= -\frac{1}{p_s} \int_{p_s}^0 \nabla \cdot \mathbf{u}~dp \\
+\frac{\partial \ln p_s}{\partial t} &= -\frac{1}{p_s} \nabla \cdot \int_0^{p_s} \mathbf{u}~dp \\
 \frac{\partial T}{\partial t} &= \mathcal{P}_T -\nabla\cdot(\mathbf{u}T) + T\mathcal{D} - W(T) + \kappa T_v \frac{D \ln p}{Dt} \\
 \frac{\partial q}{\partial t} &= \mathcal{P}_q -\nabla\cdot(\mathbf{u}q) + q\mathcal{D} - W(q)\\
 \end{aligned}
@@ -115,14 +115,47 @@ calculation, see [#254](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues
 
 ## Vertical coordinates
 
-### General
+We start with some general considerations that apply when changing the vertical
+coordinate from height ``z`` to something else. Let ``\Psi(x,y,z,t)``
+be some variable that depends on space and time. Now we want to express
+``\Psi`` using some other coordinate ``\eta`` in the vertical. Regardless of
+the coordinate system the value of ``\Psi`` at the to ``z`` corresponding ``\eta``
+(and vice versa) has to be the same as we only want to change the coordinate,
+not ``\Psi`` itself.
 
-Let ``\Psi(x,y,z,t)`` 
+```math
+\Psi(x,y,\eta,t) = \Psi(x,y,z(x,y,\eta,t),t)
+```
+So you can think of ``z`` as a function of ``\eta`` and ``\eta`` as a function of ``z``.
+The chain rule lets us differentiate ``\Psi`` with respect to ``z`` or ``\eta``
+```math
+\frac{\partial \Psi}{\partial z} = \frac{\partial \Psi}{\partial \eta}\frac{\partial \eta}{\partial z},
+\qquad \frac{\partial \Psi}{\partial \eta} = \frac{\partial \Psi}{\partial z}\frac{\partial z}{\partial \eta}
+```
+But for derivatives with respect to ``x,y,t`` we have to apply the multivariable
+chain-rule as both ``\Psi`` and ``\eta`` depend on it. So a derivative with respect to
+``x`` on ``\eta`` levels (where ``\eta`` constant) becomes
+```math
+\left. \frac{\partial \Psi}{\partial x}\right\vert_\eta = 
+\left. \frac{\partial \Psi}{\partial x}\right\vert_z +
+\frac{\partial \Psi}{\partial z}
+\left. \frac{\partial z}{\partial x}\right\vert_\eta
+```
+So we first take the derivative of ``\Psi`` with respect to ``x``, but then also have to
+account for the fact that, at a given ``\eta``, ``z`` depends on ``x`` which is again
+dealt with using the univariate chain rule from above. We will make use of that
+for the [Pressure gradient](@ref).
 
 ### Sigma coordinates
 
-SpeedyWeather.jl currently uses so-called sigma coordinates for the vertical. This coordinate
-system uses fraction of surface pressure in the vertical, i.e.
+The problem with pure pressure coordinates is that they are not terrain-following.
+For example, the 1000 hPa level in the Earth's atmosphere cuts through mountains.
+A flow field on such a level is therefore not continuous and one would need to deal with
+boundaries. Especially with spherical harmonics we need a terrain-following vertical
+coordinate to transform between continuous fields in grid-point space and spectral space.
+
+SpeedyWeather.jl currently uses so-called sigma coordinates for the vertical. 
+This coordinate system uses fraction of surface pressure in the vertical, i.e.
 ```math
 \sigma = \frac{p}{p_s}
 ```
@@ -136,12 +169,15 @@ indexed from top to surface.
     surface. This means that ``k=1`` is the top-most layer, and ``k=N_{lev}`` (or similar)
     is the layer that sits directly above the surface.
 
-One therefore chooses ``\sigma`` levels associated with the ``k``-th layer and the pressure
+Sigma coordinates are therefore terrain-following, as ``\sigma = 1`` is always at surface pressure
+and so this level bends itself around every mountain, although the actual pressure on this
+level can vary.
+
+One chooses ``\sigma`` levels associated with the ``k``-th layer and the pressure
 can be reobtained from the surface pressure ``p_s``
 ```math
 p_k = \sigma_kp_s
 ```
-
 The layer thickness in terms of pressure is
 ```math
 \Delta p_k = p_{k+\tfrac{1}{2}} - p_{k-\tfrac{1}{2}} =
@@ -193,7 +229,6 @@ We use this last formula first to get from ``\Phi_s`` to ``\Phi_N``, and then fo
 every ``k`` twice to get from ``\Phi_k`` to ``\Phi_{k-1}`` via ``\Phi_{k-\tfrac{1}{2}}``.
 For the first half-level integration we use ``T_k`` for the second ``T_{k-1}``.
 
-
 ## Vorticity advection
 
 Vorticity advection in the primitive equation takes the form
@@ -218,7 +253,12 @@ with ``\mathbf{u}_\perp = (v,-u)`` the rotated velocity vector, see [Barotropic 
 
 ## Surface pressure tendency
 
-The surface pressure increases with a convergence of the flow above. For ``k`` discrete layers from 1
+The surface pressure increases with a convergence of the flow above. Written in terms
+of the surface pressure directly, and not its logarithm
+```math
+\frac{\partial p_s}{\partial t} = -\nabla \cdot \int_0^{p_s} \mathbf{u}~dp
+```
+For ``k`` discrete layers from 1
 at the top to ``N`` at the surface layer this can be written as
 ```math
 \frac{\partial p_s}{\partial t} = - \sum_{k=1}^N \nabla \cdot (\mathbf{u}_k \Delta p_k)
@@ -275,6 +315,71 @@ are performed but in the latter, the vertical averaging is done in grid-point sp
 
 
 ## Pressure gradient
+
+The pressure gradient term in the primitive equations is
+```math
+-\frac{1}{\rho}\nabla_z p
+```
+with density ``\rho`` and pressure ``p``. The gradient here is taken at constant ``z`` hence the
+subscript. If we move to a pressure-based vertical coordinate system we will need to evaluate
+gradients on constant levels of pressure though, i.e. ``\nabla_p``. There is, by definition,
+no gradient of pressure on constant levels of pressure, but we can use the chain rule (see 
+[Vertical coordinates](@ref)) to rewrite this as (use only ``x`` but ``y`` is identical)
+```math
+0 = \left. \frac{\partial p}{\partial x} \right\vert_p =
+\left. \frac{\partial p}{\partial x} \right\vert_z +
+\frac{\partial p}{\partial z}\left. \frac{\partial z}{\partial x} \right\vert_p
+```
+Using the hydrostatic equation ``\partial_z p = -\rho g`` this becomes
+```math
+\left. \frac{\partial p}{\partial x} \right\vert_z = \rho g \left. \frac{\partial z}{\partial x} \right\vert_p
+```
+Or, in terms of the geopotential ``\Phi = gz``
+```math
+\frac{1}{\rho}\nabla_z p = \nabla_p \Phi
+```
+which is the actual reason why we use pressure coordinates: As density ``\rho`` also depends on
+the pressure ``p`` the left-hand side means an implicit system when solving for pressure ``p``.
+To go from pressure to sigma coordinates we apply the chain rule from section
+[Vertical coordinates](@ref) again and obtain
+```math
+\nabla_p \Phi = \nabla_\sigma \Phi - \frac{\partial \Phi}{\partial p}\nabla_\sigma p
+= \nabla_\sigma \Phi + \frac{1}{\rho}\nabla_\sigma p
+```
+where the last step inserts the hydrostatic equation again. With the ideal gas law, and note
+that we use [Virtual temperature](@ref) ``T_v`` everywhere where the ideal gas law is used,
+but in combination with the dry gas constant ``R_d``
+```math
+\nabla_p \Phi = \nabla_\sigma \Phi + \frac{R_dT_v}{p} \nabla_\sigma p
+```
+Combining the pressure in denominator and gradient to the logarithm and with
+``\nabla \ln p = \nabla \ln p_s`` in [Sigma coordinates](@ref) (the logarithm of
+``\sigma_k`` adds a constant that drops out in the gradient) we therefore
+have
+```math
+- \frac{1}{\rho}\nabla_z p = -\nabla_p \Phi = -\nabla_\sigma \Phi - R_dT_v \nabla_\sigma \ln p_s
+```
+From left to right: The pressure gradient force in ``z``-coordinates; in pressure coordinates;
+and in sigma coordinates. Each denoted with the respective subscript on gradients. 
+SpeedyWeather.jl uses the latter.
+In sigma coordinates we may drop the ``\sigma`` subscript on gradients, but still meaning
+that the gradient is evaluted on a surface of our vertical coordinate.
+In vorticity-divergence formulation of the momentum equations the ``\nabla_\sigma \Phi``
+drops out in the vorticity equation (``\nabla \times \nabla \Phi = 0``),
+but becomes a ``-\nabla^2 \Phi`` in the divergence equation,
+which is therefore combined with the kinetic energy term
+``-\nabla^2(\tfrac{1}{2}(u^2 + v^2))`` similar as it is done in the [Shallow water equations](@ref).
+You can think of ``\tfrac{1}{2}(u^2 + v^2) + \Phi`` as the Bernoulli potential in
+the primitive equations. However, due to the change into sigma coordinates the surface pressure
+gradient also has to be accounted for. Now highlighting only the pressure gradient force, we
+have in total
+```math
+\begin{aligned}
+\frac{\partial \zeta}{\partial t} &= \nabla \times (... - R_dT_v\nabla \ln p_s) + ... \\
+\frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot (... - R_dT_v\nabla \ln p_s) - \nabla^2\Phi + ...
+\end{aligned}
+```
+In our vorticity-divergence formulation and with sigma coordinates.
 
 ## Temperature equation
 
