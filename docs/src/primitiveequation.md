@@ -229,28 +229,6 @@ We use this last formula first to get from ``\Phi_s`` to ``\Phi_N``, and then fo
 every ``k`` twice to get from ``\Phi_k`` to ``\Phi_{k-1}`` via ``\Phi_{k-\tfrac{1}{2}}``.
 For the first half-level integration we use ``T_k`` for the second ``T_{k-1}``.
 
-## Vorticity advection
-
-Vorticity advection in the primitive equation takes the form
-```math
-\begin{aligned}
-\frac{\partial u}{\partial t} &= (f+\zeta)v \\
-\frac{\partial v}{\partial t} &= -(f+\zeta)u \\
-\end{aligned}
-```
-Meaning that we add the Coriolis parameter ``f`` and the relative vorticity ``\zeta``
-and multiply by the respective velocity component. While the primitive equations here
-are written with vorticity and divergence, we use ``u,v`` here as other tendencies
-will be added and the curl and divergence are only taken once after transform into
-spectral space. To obtain a tendency for vorticity and divergence, we rewrite this as
-```math
-\begin{aligned}
-\frac{\partial \zeta}{\partial t} &= \nabla \times (f+\zeta)\mathbf{u}_\perp \\
-\frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot (f+\zeta)\mathbf{u}_\perp \\
-\end{aligned}
-```
-with ``\mathbf{u}_\perp = (v,-u)`` the rotated velocity vector, see [Barotropic vorticity equation](@ref).
-
 ## Surface pressure tendency
 
 The surface pressure increases with a convergence of the flow above. Written in terms
@@ -307,12 +285,14 @@ Meaning that we would compute the vertical average in grid-point space, subtract
 pressure gradient flux before transforming to spectral space. The same amount of transforms
 are performed but in the latter, the vertical averaging is done in grid-point space.
 
-
 ## Vertical advection
+
+
 
 ### Vertical velocity
 
-
+In the section [Surface pressure tendency](@ref) we used that the surface pressure changes
+with the convergence of the flow above, which derives from the conservation of mass.
 
 ## Pressure gradient
 
@@ -381,7 +361,115 @@ have in total
 ```
 In our vorticity-divergence formulation and with sigma coordinates.
 
+## Vorticity advection
+
+Vorticity advection in the primitive equation takes the form
+```math
+\begin{aligned}
+\frac{\partial u}{\partial t} &= (f+\zeta)v \\
+\frac{\partial v}{\partial t} &= -(f+\zeta)u \\
+\end{aligned}
+```
+Meaning that we add the Coriolis parameter ``f`` and the relative vorticity ``\zeta``
+and multiply by the respective velocity component. While the primitive equations here
+are written with vorticity and divergence, we use ``u,v`` here as other tendencies
+will be added and the curl and divergence are only taken once after transform into
+spectral space. To obtain a tendency for vorticity and divergence, we rewrite this as
+```math
+\begin{aligned}
+\frac{\partial \zeta}{\partial t} &= \nabla \times (f+\zeta)\mathbf{u}_\perp \\
+\frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot (f+\zeta)\mathbf{u}_\perp \\
+\end{aligned}
+```
+with ``\mathbf{u}_\perp = (v,-u)`` the rotated velocity vector, see [Barotropic vorticity equation](@ref).
+
+## Humidity equation
+
+The dynamical core treats humidity as an (active) tracer, meaning that after the physical
+parameterizations for humidity ``\matchal{P}`` are calculated in grid-point space,
+humidity is only advected with the flow. The only exception is the [Virtual temperature](@ref)
+as high levels of humidity will lower the effective density, which is why we use the
+virtual instead of the absolute temperature. The equation to be solved for humidity
+is therefore,
+```math
+\left( \frac{\partial q}{\partial t} \right) = \left(\left[\mathcal{P}_q - W_q +
+q\mathcal{D} \right]\right) -\nabla\cdot([\mathbf{u}q])
+```
+With ``()`` denoting spectral space and ``[]`` grid-point space, so that
+``([])`` and ``[()]`` are the transforms in the respective directions.
+To avoid confusion with that notation, we write the tendency of humidity due
+to [Vertical advectio](@ref) as ``W_q``. This equation is identical to a tracer equation,
+with ``\mathcal{P}_q`` denoting sources and sinks. Note that [Horizontal diffusion](@ref)
+should be applied to every advected variable.
+
+A very similar equation is solved for (absolute) temperature
+as described in the following.
+
 ## Temperature equation
+
+The first law of thermodynamic states that the internal energy ``I`` is increased by
+the heat ``Q`` applied minus the work ``W`` done by the system. We neglect changes
+in chemical composition ([^Vallis], chapter 1.5). For an ideal gas, the internal 
+energy is ``c_vT`` with ``c_v`` the heat capacity at constant volume and temperature
+``T``. The work done is ``pV``, with pressure ``p`` and the specific volume ``V``
+```math
+dI = Q - p dV.
+```
+For fluids we replace the differential ``d`` here with the material derivative ``\tfrac{D}{Dt}``.
+With ``V = \tfrac{1}{\rho}`` and density ``\rho`` we then have
+```math
+c_v \frac{DT}{Dt} = -p \frac{D (1/\rho)}{Dt} + Q
+```
+Using the ideal gas law to replace ``\tfrac{1}{\rho}`` with ``\tfrac{RT_v}{p}`` (we are
+using the [Virtual temperature](@ref) again), and using
+```math
+p\frac{D (1/p)}{Dt} = -\frac{1}{p} \frac{Dp}{Dt}
+```
+we have
+```math
+(c_v + R)\frac{DT}{Dt} = \frac{RT_v}{p}\frac{Dp}{Dt} + Q
+```
+And further, with ``c_p = c_v + R`` the heat capacity at constant pressure,
+``\kappa = \tfrac{R}{c_p}``, and using the logarithm of pressure
+```math
+\frac{DT}{Dt} = \kappa T_v\frac{D \ln p}{Dt} + \frac{Q}{c_p}
+```
+This is the form of the temperature equation that SpeedyWeather.jl uses. Temperature
+is advected through the material derivative and first term on the right-hand side
+represents a diabatic conversion term describing how the temperature changes with
+changes in pressure. Recall that this term originated from the work term in
+the first law of thermodynamics. The forcing term ``\tfrac{Q}{c_p}`` is here
+identified as the physical parameterizations changing the temperature, for example
+radiation, and hence we will call it ``P_T``.
+
+Similar to the [Humidity equation](@ref) we write the equation for (absolute) temperature ``T`` as
+
+```math
+\left( \frac{\partial T}{\partial t} \right) = \left(\left[\mathcal{P}_T - W_T +
+T\mathcal{D} + \kappa T_v \frac{D \ln p}{Dt} \right]\right) -\nabla\cdot([\mathbf{u}T])
+```
+``W_T`` is the [Vertical advection](@ref) of temperature. We evaluate the diabatic conversion
+term follwing Simmons and Burridge, 1981[^SB81] Equation 3.12 and 3.13.
+Leaving out the ``\kappa T_v`` for clarity, the term at level ``k`` is
+```math
+\left(\frac{D \ln p}{D t}\right)_k = \mathbf{u}_k \cdot \nabla \ln p_k
+- \frac{1}{\Delta p_k} \left[\left( \ln \frac{p_{k+\tfrac{1}{2}}}{p_{k-\tfrac{1}{2}}}\right)
+\sum_{r=1}^{k-1}\nabla \cdot (\mathbf{u}_k \Delta p_k) + \alpha_k \nabla \cdot (\mathbf{u}_k \Delta p_k) \right]
+```
+with
+```math
+\alpha_k = 1 - \frac{p_{k-\tfrac{1}{2}}}{\Delta p_k} \ln \frac{p_{k+\tfrac{1}{2}}}{p_{k-\tfrac{1}{2}}}
+```
+In sigma coordinates this simplifies to following similar steps as in [Surface pressure tendency](@ref)
+```math
+\begin{aligned}
+\left(\frac{D \ln p}{D t}\right)_k &= \mathbf{u}_k \cdot \nabla \ln p_s \\
+&- \frac{1}{\Delta \sigma_k} \left( \ln \frac{\sigma_{k+\tfrac{1}{2}}}{\sigma_{k-\tfrac{1}{2}}}\right)
+\sum_{r=1}^{k-1}\Delta \sigma_r (\mathcal{D}_r + \mathbf{u}_r \cdot \nabla \ln p_s) +
+\alpha_k (\mathcal{D}_k + \mathbf{u}_k \cdot \nabla \ln p_s)
+\end{aligned}
+```
+
 
 ## [Semi-implicit time stepping](@id implicit_primitive)
 
@@ -446,3 +534,5 @@ Now loop over
 
 [^1]: Geophysical Fluid Dynamics Laboratory, [Idealized models with spectral dynamics](https://www.gfdl.noaa.gov/idealized-models-with-spectral-dynamics/)
 [^2]: Geophysical Fluid Dynamics Laboratory, [The Spectral Dynamical Core](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/spectral_core.pdf)
+[^Vallis]: GK Vallis, 2006. [Atmopsheric and Ocean Fluid Dynamics](http://vallisbook.org/), Cambridge University Press.
+[^SB81]: Simmons and Burridge, 1981. *An Energy and Angular-Momentum Conserving Vertical Finite-Difference Scheme and Hybrid Vertical Coordinates*, Monthly Weather Review. DOI: [10.1175/1520-0493(1981)109<0758:AEAAMC>2.0.CO;2](https://doi.org/10.1175/1520-0493(1981)109<0758:AEAAMC>2.0.CO;2).

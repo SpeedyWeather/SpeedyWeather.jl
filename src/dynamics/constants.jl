@@ -80,7 +80,7 @@ function DynamicsConstants( spectral_grid::SpectralGrid,
     (;sinlat) = geometry
     f_coriolis = 2rotation*sinlat*radius
 
-    # ADIABATIC TERM, Simmons and Burridge, 1981, eq. 3.12
+    # DIABATIC TERM, Simmons and Burridge, 1981, eq. 3.12
     (;σ_levels_half,σ_levels_full,σ_levels_thick) = geometry
     # precompute ln(σ_k+1/2) - ln(σ_k-1/2) but swap sign, include 1/Δσₖ
     σ_lnp_A = log.(σ_levels_half[1:end-1]./σ_levels_half[2:end]) ./ σ_levels_thick

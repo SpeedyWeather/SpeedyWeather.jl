@@ -360,7 +360,7 @@ function temperature_tendency!(
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
     # to move the implicit terms to i-1 which is cheaper then the alternative below
 
-    # Adiabatic term following Simmons and Burridge 1981 but for σ coordinates 
+    # Diabatic term following Simmons and Burridge 1981 but for σ coordinates 
     # += as tend already contains parameterizations + vertical advection
     @. temp_tend_grid += temp_grid*div_grid +       # +T'D term of hori advection
         κ*(Tᵥ+Tₖ)*(                                 # +κTᵥ*Dlnp/Dt, adiabatic term
