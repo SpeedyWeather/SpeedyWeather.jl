@@ -20,8 +20,9 @@ logarithm of surface pressure ``\ln p_s``, temperature ``T`` and specific humidi
 ```
 
 with velocity ``\mathbf{u} = (u,v)``, rotated velocity ``\mathbf{u}_\perp = (v,-u)``,
-Coriolis parameter ``f``, ``W`` the vertical advection operator, dry air gas constant ``R_d``,
-virtual temperature ``T_v``, geopotential ``\Phi``, pressure ``p``, thermodynamic ``\kappa = R\_d/c_p``
+Coriolis parameter ``f``, ``W`` the [Vertical advection](@ref) operator, dry air gas constant ``R_d``,
+[Virtual temperature](@ref) ``T_v``, [Geopotential](@ref) ``\Phi``, pressure ``p``
+and surface pressure ``p_s``, thermodynamic ``\kappa = R\_d/c_p``
 with ``c_p`` the heat capacity at constant pressure. Horizontal hyper diffusion of the
 form ``(-1)^{n+1}\nu\nabla^{2n}`` with coefficient ``\nu`` and power ``n``  is added for
 every variable that is advected, meaning ``\zeta, \mathcal{D}, T, q``, but left out
@@ -171,7 +172,7 @@ indexed from top to surface.
 
 Sigma coordinates are therefore terrain-following, as ``\sigma = 1`` is always at surface pressure
 and so this level bends itself around every mountain, although the actual pressure on this
-level can vary.
+level can vary. For a visualisation see [#329](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/329).
 
 One chooses ``\sigma`` levels associated with the ``k``-th layer and the pressure
 can be reobtained from the surface pressure ``p_s``
@@ -287,12 +288,72 @@ are performed but in the latter, the vertical averaging is done in grid-point sp
 
 ## Vertical advection
 
-
+The advection equation ``\tfrac{DT}{Dt} = 0`` for a tracer ``T`` is, in flux form,
+for layer ``k``
+```math
+\frac{\partial (T_k \Delta p_k)}{\partial t} = - \nabla \cdot (\mathbf{u}_k T_k \Delta p_k)
+- (M_{k+\tfrac{1}{2}}T_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}}T_{k-\tfrac{1}{2}})
+```
+which can be through the gradient product rule, and using the conservation of mass
+(see [Vertical velocity](@ref)) transformed into an advective form. In sigma coordinates this simpifies to
+```math
+\frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
+- \frac{1}{\Delta \sigma_k}\left(\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+\tfrac{1}{2}} - T_k) - \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-\tfrac{1}{2}})\right)
+```
+With the reconstruction at the faces, ``T_{k+\tfrac{1}{2}}``, and ``T_{k-\tfrac{1}{2}}`` depending on one's choice
+of the advection scheme. For a second order centered scheme, we choose ``T_{k+\tfrac{1}{2}} = \tfrac{1}{2}(T_k + T_{k+1})``
+and obtain
+```math
+\frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
+- \frac{1}{2\Delta \sigma_k}\left(\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+1} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-1})\right)
+```
+However, note that this scheme is dispersive and easily leads to instabilities at higher resolution, where a
+more advanced vertical advection scheme becomes necessary. For convenience, we may write ``W(T)``
+to denote the vertical advection term ``\dot{\sigma}\partial_\sigma T``, without specifying which schemes is used.
+The vertical velocity ``\dot{\sigma}`` is calculated as described in the following.
 
 ### Vertical velocity
 
 In the section [Surface pressure tendency](@ref) we used that the surface pressure changes
 with the convergence of the flow above, which derives from the conservation of mass.
+Similarly, the conservation of mass for layer ``k`` can be expressed as
+(setting ``T=1`` in the advection equation in section [Vertical advection](@ref))
+```math
+\frac{\partial \Delta p_k}{\partial t} = -\nabla \cdot (\mathbf{u}_k \Delta p_k)
+- (M_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}})
+```
+Meaning that the pressure thickness ``\Delta p_k`` of layer ``k`` changes with
+a horizontal divergence ``-\nabla \cdot (\mathbf{u}_k \Delta p_k)`` if not
+balanced by a net vertical mass flux ``M`` into of the layer through the
+bottom and top boundaries of ``k`` at ``k\pm\tfrac{1}{2}``. ``M`` is defined positive
+downward as this is the direction in which both pressure and sigma coordinates increase.
+The boundary conditions are ``M_\tfrac{1}{2} = M_{N+\tfrac{1}{2}} = 0``, such that there
+is no mass flux into the top layer from above or out of the surface layer ``N`` and into the ground
+or ocean.
+
+When integrating from the top down to layer ``k`` we obtain the mass flux downwards out of layer ``k``
+```math
+M_{k+\tfrac{1}{2}} = - \sum_{r=1}^k \nabla \cdot (\mathbf{u}_k \Delta p_k) - \frac{\partial p_{k+\tfrac{1}{2}}}{\partial t}
+```
+In sigma coordinates we have ``M_{k+\tfrac{1}{2}} = p_s \dot{\sigma}_{k+\tfrac{1}{2}}`` with
+``\dot{\sigma}`` being the vertical velocity in sigma coordinates, also defined at interfaces
+between layers. To calculate ``\dot{\sigma}`` we therefore compute
+```math
+\dot{\sigma}_{k+\tfrac{1}{2}} = \frac{M_{k+\tfrac{1}{2}}}{p_s} = 
+- \sum_{r=1}^k \Delta \sigma_r (\mathbf{u}_k \cdot \nabla \ln p_s + \mathcal{D}_r) 
++ \sigma_{k+\tfrac{1}{2}}(-\mathbf{\bar{u}} \cdot \nabla \ln p_s - \bar{\mathcal{D}})
+```
+With ``\bar{A}`` denoting a sigma thickness-weighted vertical average as in section [Surface pressure tendency](@ref).
+Now let ``\bar{A_k}`` be that average from ``r=1`` to ``r=k`` only and not necessarily down to the surface, as required in the
+equation above, then we can also write
+```math
+\dot{\sigma}_{k+\tfrac{1}{2}} = 
+- \overline{\mathbf{u}_k \cdot \nabla \ln p_s} - \bar{\mathcal{D}}_k
++ \sigma_{k+\tfrac{1}{2}}(-\mathbf{\bar{u}} \cdot \nabla \ln p_s - \bar{\mathcal{D}})
+```
+See also Hoskins and Simmons, 1975[^HS75]. These vertical averages are the same as required by the 
+[Surface pressure tendency](@ref) and in the [Temperature equaiton](@ref), they are therefore all calculated
+at once, storing the partial averages ``\overline{\mathbf{u}_k \cdot \nabla \ln p_s}`` and ``\bar{\mathcal{D}}_k`` on the fly.
 
 ## Pressure gradient
 
@@ -304,7 +365,7 @@ with density ``\rho`` and pressure ``p``. The gradient here is taken at constant
 subscript. If we move to a pressure-based vertical coordinate system we will need to evaluate
 gradients on constant levels of pressure though, i.e. ``\nabla_p``. There is, by definition,
 no gradient of pressure on constant levels of pressure, but we can use the chain rule (see 
-[Vertical coordinates](@ref)) to rewrite this as (use only ``x`` but ``y`` is identical)
+[Vertical coordinates](@ref)) to rewrite this as (use only ``x`` but ``y`` is equivalent)
 ```math
 0 = \left. \frac{\partial p}{\partial x} \right\vert_p =
 \left. \frac{\partial p}{\partial x} \right\vert_z +
@@ -398,7 +459,7 @@ q\mathcal{D} \right]\right) -\nabla\cdot([\mathbf{u}q])
 With ``()`` denoting spectral space and ``[]`` grid-point space, so that
 ``([])`` and ``[()]`` are the transforms in the respective directions.
 To avoid confusion with that notation, we write the tendency of humidity due
-to [Vertical advectio](@ref) as ``W_q``. This equation is identical to a tracer equation,
+to [Vertical advection](@ref) as ``W_q``. This equation is identical to a tracer equation,
 with ``\mathcal{P}_q`` denoting sources and sinks. Note that [Horizontal diffusion](@ref)
 should be applied to every advected variable.
 
@@ -436,7 +497,7 @@ And further, with ``c_p = c_v + R`` the heat capacity at constant pressure,
 ```
 This is the form of the temperature equation that SpeedyWeather.jl uses. Temperature
 is advected through the material derivative and first term on the right-hand side
-represents a diabatic conversion term describing how the temperature changes with
+represents an adiabatic conversion term describing how the temperature changes with
 changes in pressure. Recall that this term originated from the work term in
 the first law of thermodynamics. The forcing term ``\tfrac{Q}{c_p}`` is here
 identified as the physical parameterizations changing the temperature, for example
@@ -448,8 +509,8 @@ Similar to the [Humidity equation](@ref) we write the equation for (absolute) te
 \left( \frac{\partial T}{\partial t} \right) = \left(\left[\mathcal{P}_T - W_T +
 T\mathcal{D} + \kappa T_v \frac{D \ln p}{Dt} \right]\right) -\nabla\cdot([\mathbf{u}T])
 ```
-``W_T`` is the [Vertical advection](@ref) of temperature. We evaluate the diabatic conversion
-term follwing Simmons and Burridge, 1981[^SB81] Equation 3.12 and 3.13.
+``W_T`` is the [Vertical advection](@ref) of temperature. We evaluate the adiabatic conversion
+term completely in grid-point space following Simmons and Burridge, 1981[^SB81] Equation 3.12 and 3.13.
 Leaving out the ``\kappa T_v`` for clarity, the term at level ``k`` is
 ```math
 \left(\frac{D \ln p}{D t}\right)_k = \mathbf{u}_k \cdot \nabla \ln p_k
@@ -460,16 +521,26 @@ with
 ```math
 \alpha_k = 1 - \frac{p_{k-\tfrac{1}{2}}}{\Delta p_k} \ln \frac{p_{k+\tfrac{1}{2}}}{p_{k-\tfrac{1}{2}}}
 ```
-In sigma coordinates this simplifies to following similar steps as in [Surface pressure tendency](@ref)
+In sigma coordinates this simplifies to, following similar steps as in [Surface pressure tendency](@ref)
 ```math
 \begin{aligned}
 \left(\frac{D \ln p}{D t}\right)_k &= \mathbf{u}_k \cdot \nabla \ln p_s \\
 &- \frac{1}{\Delta \sigma_k} \left( \ln \frac{\sigma_{k+\tfrac{1}{2}}}{\sigma_{k-\tfrac{1}{2}}}\right)
-\sum_{r=1}^{k-1}\Delta \sigma_r (\mathcal{D}_r + \mathbf{u}_r \cdot \nabla \ln p_s) +
+\sum_{r=1}^{k-1}\Delta \sigma_r (\mathcal{D}_r + \mathbf{u}_r \cdot \nabla \ln p_s) -
 \alpha_k (\mathcal{D}_k + \mathbf{u}_k \cdot \nabla \ln p_s)
 \end{aligned}
 ```
-
+Let ``A_k = \mathcal{D}_k + \mathbf{u}_k \cdot \nabla \ln p_s`` and
+``\beta_k = \tfrac{1}{\Delta \sigma_k} \left( \ln \tfrac{\sigma_{k+\tfrac{1}{2}}}{\sigma_{k-\tfrac{1}{2}}}\right)``,
+then this can also be summarised as
+```math
+\left(\frac{D \ln p}{D t}\right)_k = \mathbf{u}_k \cdot \nabla \ln p_s
+- \beta_k \sum_{r=1}^{k-1}\Delta \sigma_r A_r - \alpha_k A_k
+```
+The ``\alpha_k, \beta_k`` are constants and can be precomputed. The surface pressure flux
+``\mathbf{u}_k \cdot \nabla \ln p_s`` has to be computed, so does the vertical sigma-weighted
+average from top to ``k-1``, which is done when computing other vertical averages for the
+[Surface pressure tendency](@ref).
 
 ## [Semi-implicit time stepping](@id implicit_primitive)
 
@@ -513,14 +584,14 @@ Now loop over
 5. For every layer ``k`` compute a temperature anomaly (virtual and absolute) relative to a vertical reference profile ``T_k`` in grid-point space.
 6. Compute the [Geopotential](@ref) ``\Phi`` by integrating the virtual temperature vertically in spectral space from surface to top.
 7. Integrate ``u,v,D`` vertically to obtain ``\bar{u},\bar{v},\bar{D}`` in grid-point space and also ``\bar{D}_{lm}`` in spectral space. Store on the fly also for every layer ``k`` the partial integration from 1 to ``k-1`` (top to layer above). These will be used in the adiabatic term of the [Temperature equation](@ref).
-8. Compute the [Surface pressure tendency](@ref) with the vertical averages from the previous step.
+8. Compute the [Surface pressure tendency](@ref) with the vertical averages from the previous step. For the [semi-implicit time stepping](@ref implicit_primitive)
 9. For every layer ``k`` compute the [Vertical velocity](@ref).
 10. For every layer ``k`` add the linear contribution of the [Pressure gradient](@ref) ``RT_k (\ln p_s)_{lm}`` to the geopotential ``\Phi`` in spectral space.
 11. For every layer ``k`` compute the [Vertical advection](@ref) for ``u,v,T,q`` and add it to the respective tendency.
 12. For every layer ``k`` compute the tendency of ``u,v`` due to [Vorticity advection](@ref) and the [Pressure gradient](@ref) ``RT_v \nabla \ln p_s`` and add to the respective existing tendency. Unscale ``\cos(\theta)``, transform to spectral space, take curl and divergence to obtain tendencies for ``\zeta_{lm},\mathcal{D}_{lm}``.
 13. For every layer ``k`` compute the adiabatic term and the horizontal advection in the [Temperature equation](@ref) in grid-point space, add to existing tendency and transform to spectral.
-14. For every layer ``k`` compute the horizontal advection of humidity ``q`` in grid-point space, add to existing tendency and transform to spectral.
-15. For every layer ``k`` compute the kinetic energy ``\tfrac{1}{2}(u^2 + v^2)``, transform to spectral and add to the geopotential and the linear pressure gradient. Now apply the Laplace operator and subtract from the divergence tendency.
+14. For every layer ``k`` compute the horizontal advection of humidity ``q`` in the [Humidity equation](@ref) in grid-point space, add to existing tendency and transform to spectral.
+15. For every layer ``k`` compute the kinetic energy ``\tfrac{1}{2}(u^2 + v^2)``, transform to spectral and add to the [Geopotential](@ref). For the [semi-implicit time stepping](@ref implicit_primitive) also add the linear pressure gradient calculated from the previous time step. Now apply the Laplace operator and subtract from the divergence tendency.
 16. Correct the tendencies following the [semi-implicit time integration](@ref implicit_swm) to prevent fast gravity waves from causing numerical instabilities.
 17. Compute the [horizontal diffusion](@ref diffusion) for the advected variables ``\zeta,\mathcal{D},T,q``
 18. Compute a leapfrog time step as described in [Time integration](@ref leapfrog) with a [Robert-Asselin and Williams filter](@ref)
@@ -536,3 +607,4 @@ Now loop over
 [^2]: Geophysical Fluid Dynamics Laboratory, [The Spectral Dynamical Core](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/spectral_core.pdf)
 [^Vallis]: GK Vallis, 2006. [Atmopsheric and Ocean Fluid Dynamics](http://vallisbook.org/), Cambridge University Press.
 [^SB81]: Simmons and Burridge, 1981. *An Energy and Angular-Momentum Conserving Vertical Finite-Difference Scheme and Hybrid Vertical Coordinates*, Monthly Weather Review. DOI: [10.1175/1520-0493(1981)109<0758:AEAAMC>2.0.CO;2](https://doi.org/10.1175/1520-0493(1981)109<0758:AEAAMC>2.0.CO;2).
+[^HS75]: Hoskins and Simmons, 1975. *A multi-layer spectral model and the semi-implicit method*, Quart. J. R. Met. Soc. DOI: [10.1002/qj.49710142918](https://doi.org/10.1002/qj.49710142918)

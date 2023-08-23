@@ -611,9 +611,9 @@ function linear_pressure_gradient!(
     C::DynamicsConstants,
     I::ImplicitPrimitiveEq,
 )                          
-    (; R_dry ) = C
+    (;R_dry) = C                            # dry gas constant 
     Tₖ = I.temp_profile[diagn.k]            # reference profile at layer k      
-    (;pres) = surface.timesteps[lf]
+    (;pres) = surface.timesteps[lf]         # logarithm of surface pressure
     (;geopot) = diagn.dynamics_variables
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
