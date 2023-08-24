@@ -230,6 +230,14 @@ We use this last formula first to get from ``\Phi_s`` to ``\Phi_N``, and then fo
 every ``k`` twice to get from ``\Phi_k`` to ``\Phi_{k-1}`` via ``\Phi_{k-\tfrac{1}{2}}``.
 For the first half-level integration we use ``T_k`` for the second ``T_{k-1}``.
 
+!!! warning "Semi-implicit time integration: Geopotential"
+    With the semi-implicit time integration in SpeedyWeather the
+    Geopotential is not calculated from the spectral temperature 
+    at the current, but at the previous time step.
+    This is because this is a linear term that we solve implicitly
+    to avoid instabilities from gravity waves.
+    For details see section [Semi-implicit time stepping](@ref implicit_primitive).
+
 ## Surface pressure tendency
 
 The surface pressure increases with a convergence of the flow above. Written in terms
@@ -285,6 +293,14 @@ But note that it would also be possible to do
 Meaning that we would compute the vertical average in grid-point space, subtract from the
 pressure gradient flux before transforming to spectral space. The same amount of transforms
 are performed but in the latter, the vertical averaging is done in grid-point space.
+
+!!! warning "Semi-implicit time integration: Surface pressure tendency"
+    With the semi-implicit time integration in SpeedyWeather the
+    ``- \overline{(\mathcal{D})}`` term is not evaluated from the spectral divergence
+    ``\mathcal{D}`` at the current, but at the previous time step.
+    This is because this is a linear term that we solve implicitly
+    to avoid instabilities from gravity waves.
+    For details see section [Semi-implicit time stepping](@ref implicit_primitive).
 
 ## Vertical advection
 
@@ -422,6 +438,31 @@ have in total
 ```
 In our vorticity-divergence formulation and with sigma coordinates.
 
+### Semi-implicit pressure gradient
+
+With the [semi-implicit time integration](@ref implicit_primitive) in SpeedyWeather.jl
+the pressure gradient terms are further modified as follows. See that section for details
+why, but here is just to mention that we need to split the terms into linear and non-linear
+terms. The linear terms are then evaluated at the previous time step for the implicit
+scheme such that we can avoid instabilities from gravity waves.
+
+We split the (virtual) temperature into a reference vertical profile ``T_k`` and its anomaly,
+``T_v = T_k + T_v'``. The reference profile ``T_k`` has to be a global
+constant for the spectral transform but can depend on the vertical.
+With this, the previous equation becomes
+```math
+\begin{aligned}
+\frac{\partial \zeta}{\partial t} &= \nabla \times (... - R_dT_v'\nabla \ln p_s) + ... \\
+\frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot (... - R_dT_v'\nabla \ln p_s) - \nabla^2(\Phi + R_d T_k \ln p_s) + ...
+\end{aligned}
+```
+In the vorticity equation the term with the reference profile drops out as ``\nabla \times \nabla = 0``,
+and in the divergence equation we move it into the Laplace operator. Now the linear terms
+are gathered with the Laplace operator and for the semi-implicit scheme we calculate both the
+[Geopotential](@ref) ``\Phi`` and the contribution to the "linear pressure gradient"
+``R_dT_k \ln p_s`` at the previous time step for the
+[semi-implicit time integration](@ref implicit_primitive) for details see therein.
+
 ## Vorticity advection
 
 Vorticity advection in the primitive equation takes the form
@@ -541,6 +582,24 @@ The ``\alpha_k, \beta_k`` are constants and can be precomputed. The surface pres
 ``\mathbf{u}_k \cdot \nabla \ln p_s`` has to be computed, so does the vertical sigma-weighted
 average from top to ``k-1``, which is done when computing other vertical averages for the
 [Surface pressure tendency](@ref).
+
+### Semi-implicit temperature equation
+
+For the [semi-implicit scheme](@ref implicit_primitive) we need to split the temperature
+equation into linear and non-linear terms, as the linear terms need to be evaluated
+at the previous time step. Decomposing temperature ``T`` into ``T = T_k + T'``
+with the reference profile ``T_k`` and its anomaly ``T'``, the temperature equation
+becomes
+```math
+\left( \frac{\partial T}{\partial t} \right) = \mathcal{P}_T - W_T +
+T'\mathcal{D} + \kappa T_v \frac{D \ln p}{Dt} -\nabla\cdot(\mathbf{u}T')
+```
+Note that we do not change the adiabatic conversion term. While its linear
+component ``\kappa T_k^v \tfrac{D \ln p_s}{D t}`` (the subscript ``v`` for
+[Virtual temperature](@ref) as been raised)
+would need to be evaluated at the previous time step, we still evaluate this
+term at the current time step and move it within the semi-implicit corrections
+to the previous time step afterwards.
 
 ## [Semi-implicit time stepping](@id implicit_primitive)
 
