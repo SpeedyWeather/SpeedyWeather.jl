@@ -3,7 +3,7 @@ using SpeedyWeather: vertical_advection!
 
 @testset "Vertical advection runs" begin
     spectral_grid = SpectralGrid()
-    model_types = (PrimitiveDry, PrimitiveWet)
+    model_types = (PrimitiveDryModel, PrimitiveWetModel)
     advection_schems = (WENOVerticalAdvection, CenteredVerticalAdvection, UpwindVerticalAdvection)
 
     for Model in model_types, VerticalAdvection in advection_schems
