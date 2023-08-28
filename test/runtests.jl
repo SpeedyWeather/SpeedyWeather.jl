@@ -18,6 +18,7 @@ include("spectral_gradients.jl")
 # DYNAMICS
 include("diffusion.jl")
 include("time_stepping.jl")
+include("vertical_advection.jl")
 
 # VERTICAL LEVELS
 include("vertical_levels.jl")
