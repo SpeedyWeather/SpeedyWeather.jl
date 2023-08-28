@@ -26,6 +26,9 @@ abstract type AbstractColumnVariables{NF} end
 # FORCING (Barotropic and ShallowWaterModel)
 abstract type AbstractForcing{NF} end
 
+# VERTICAL ADVECTION (PrimitiveEquation)
+abstract type VerticalAdvection{NF,B} end
+
 # PARAMETERIZATIONS
 abstract type AbstractParameterization{NF} end
 abstract type BoundaryLayerDrag{NF} <: AbstractParameterization{NF} end
