@@ -24,7 +24,7 @@ end
 
 @inline function retrieve_previous_stencil(k, layers, var, nlev, ::VerticalAdvection{NF, B}) where {NF, B}
     k_stencil = max.(min.(nlev, k-B:k+B), 1)
-    ξ_stencil = Tuple(retrieve_current_time_step(layers[k].grid_variables, var) for k in k_stencil)
+    ξ_stencil = Tuple(retrieve_previous_time_step(layers[k].grid_variables, var) for k in k_stencil)
     return ξ_stencil
 end
 
