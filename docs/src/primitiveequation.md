@@ -603,6 +603,148 @@ to the previous time step afterwards.
 
 ## [Semi-implicit time stepping](@id implicit_primitive)
 
+Conceptually, the semi-implicit time stepping in the [Primitive equation model](@ref) is
+the same as in the [Shallow water model](@ref implicit_swm),
+but
+
+- tendencies for divergence ``\mathcal{D}``, logarithm of surface pressure ``\ln p_s`` but also temperature ``T`` are computed semi-implicitly,
+- the vertical layers are coupled, creating a linear equation system that is solved via matrix inversion.
+
+The linear terms of the primitive equations follow a linearization around a state of rest without
+orography and a reference vertical temperature profile. The scheme described here largely follows
+Hoskins and Simmons [^HS75], which has also been used in Simmons and Burridge [^SB81].
+
+As before, let ``\delta V = \tfrac{V_{i+1} - V_{i-1}}{2\Delta t}`` be the tendency we need for the Leapfrog
+time stepping. With the implicit time step ``\xi = 2\alpha\Delta t``, ``\alpha \in [\tfrac{1}{2},1]`` we have
+
+```math
+\delta V = N_E(V_i) + N_I(V_{i-1}) + \xi N_I(\delta V)
+```
+with ``N_E`` being the explicitly-treated non-linear terms and ``N_I`` the implicitly-treated linear terms, such that
+``N_I`` is a linear operator. We can therefore solve for ``\delta V``
+by inverting ``N_I``, 
+```math
+\delta V = (1-\xi N_I)^{-1}G
+```
+where we gathered the uncorrected right-hand side as ``G``
+```math
+G = N_E(V_i) + N_I(V_{i-1}) = N(V_i) + N_I(V_{i-1} - V_i).
+```
+So for every linear term in ``N_I`` we have two options corresponding to two sides of this equation
+
+1. Evaluate it at the previous time step ``i-1``
+2. Or, evaluate it at the current time step ``i`` as ``N(V_i)``, but then move it back to the previous time step ``i-1`` by adding (in spectral space) the linear operator ``N_I`` evaluated with the difference between the two time steps.
+
+If there is a tendency that is easily evaluated in spectral space it is easier to follow 1. However,
+a term that is costly to evalute in grid-point space should usually follow the latter. The reason is that
+the previous time step is generally not available in grid-point space (unless recalculated through a costly transform
+or stored with additional memory requirements) so it is easier to follow 2 where the ``N_I`` is
+available in spectral space. For the adiabatic conversion term in the [Temperature equation](@ref)
+we follow 2 as one would otherwise need to split this term into a non-linear and linear term,
+evaluating it essentially twice in grid-point space. 
+
+So what is ``G`` in the [Primitive equation model](@ref)? 
+
+```math
+\begin{aligned}
+G_\mathcal{D} &= N^E_\mathcal{D} - \nabla^2(\Phi^{i-1} + R_dT_k^v (\ln p_s)^{i-1})
+= N^E_\mathcal{D} - \nabla^2( \mathbf{R}T^{i-1} + \mathbf{U}\ln p_s^{i-1}) \\
+G_{\ln p_s} &= N_{\ln p_s}^E - \overline{\mathcal{D}^{i-1}}
+= N_{\ln p_s}^E + \mathbf{W}\mathcal{D}^{i-1} \\
+G_T &= N_T + \mathbf{L}(\mathcal{D}^{i-1} - \mathcal{D}^i) \\
+\end{aligned}
+```
+``G`` is for the divergence, pressure and temperature equation the "uncorrected" tendency.
+Moving time step ``i - 1 \to i`` we would be back with a fully explicit scheme. In the divergence equation
+the [Geopotential](@ref) ``\Phi`` is calculated from temperature ``T`` at the previous time step
+``i-1`` (denoted as superscript) and the "linear" [Pressure gradient](@ref) from the logarithm of
+surface pressure at the previous time step.
+One can think of these two calculations as linear operators, ``\mathbf{R}`` and ``\mathbf{U}``.
+We will shortly discuss their properties. While we could combine them with the Laplace operator
+``\nabla^2`` (which is also linear) we do not do this as ``\mathbf{R, U}`` do not depend on
+the degree and order of the spherical harmonics (their *wavenumber*) but on the vertical,
+but ``\nabla^2`` does not depend on the vertical, only on the wavenumber.
+All other terms are gathered in ``N_\mathcal{D}^E`` (subscript ``E`` has been raised)
+and calculated as described in the respective section at the current time step ``i``.
+
+For the pressure tendency, the subtraction with the thickness-weighted vertical average ``\bar{\mathcal{D}}``
+is the linear term that is treated implicitly. We call this operator ``\mathbf{W}``.
+For the temperature tendency, we evaluate all terms explicitly at the current time step in ``N_T``
+but then move the linear term in the adiabatic conversion term with the operator ``\mathbf{L}``
+back to the previous time step. For details see [Semi-implicit temperature equation](@ref).
+
+The operators ``\mathbf{R, U, L, W}`` are all linear, meaning that we can apply them 
+in spectral space to each spherical harmonic independently -- the vertical is coupled however.
+With ``N`` being the number of vertical levels and the prognostic variables like
+temperature for a given degree ``l`` and order ``m`` being a column vector in the vertical,
+``T_{l,m} \in \mathbb{R}^N``, these operators have the following shapes
+
+```math
+\begin{aligned}
+\mathbf{R} &\in \mathbb{R}^{N\times N} \\
+\mathbf{U} &\in \mathbb{R}^{N\times 1} \\
+\mathbf{L} &\in \mathbb{R}^{N\times N} \\
+\mathbf{W} &\in \mathbb{R}^{1\times N} \\
+\end{aligned}
+```
+
+``\mathbf{R}`` is an integration in the vertical hence it is an upper triangular matrix such that
+the first (an top-most) ``k=1`` element of the resulting vector depends on all vertical levels
+of the temperature mode ``T_{l,m}``, but the surface ``k=N`` only on the temperature mode at the surface.
+``\mathbf{U}`` takes the surface value of the ``l,m`` mode of the logarithm of surface pressure
+``(\ln p_s)_{l,m}`` and multiplies it element-wise with the reference temperature profile and
+the dry gas constant. So the result is a column vector.
+``\mathbf{L}`` is an ``N \times N`` matrix as the adiabatic conversion term couples all layers.
+``\mathbf{W}`` is a row vector as it represents the vertical averaging of the spherical harmonics
+of a divergence profile. So, ``\mathbf{W}\mathcal{D}`` is a scalar product for every ``l,m``
+giving a contribution of all vertical layers in divergence to the (single-layer!) logarithm of
+surface pressure tendency.
+
+With the ``G``s defined we can now write the semi-implicit tendencies ``\delta \mathcal{D}``,
+``\delta T``, ``\delta \ln p_s`` as (first equation in this section)
+```math
+\begin{aligned}
+\delta \mathcal{D} &= G_D - \xi \nabla^2(\mathbf{R}\delta T + \mathbf{U} \delta \ln p_s)\\
+\delta T &= G_T + \xi \mathbf{L}\delta \mathcal{D} \\
+\delta \ln p_s &= G_{\ln p_s} + \xi \mathbf{W}\delta \mathcal{D}
+\end{aligned}
+```
+Solving for ``\delta \mathcal{D}`` with the "combined" tendency
+```math
+G = G_D - \xi \nabla^2(\mathbf{R}G_T + \mathbf{U}G_{\ln p_s})
+```
+via
+```math
+\delta \mathcal{D} = G - \xi^2\nabla^2(\mathbf{RL + UW})\delta \mathcal{D}
+```
+(``\mathbf{UW}`` is a matrix of size ``N \times N``) yields
+```math
+\delta D = \left( 1 + \xi^2\nabla^2(\mathbf{RL + UW})  \right)^{-1}G = \mathbf{S}^{-1}G
+```
+The other tendencies ``\delta T`` and ``\delta \ln p_s`` are then obtained
+through insertion above. We may call the operator to be inverted ``\mathbf{S}``
+which is of size ``l_{max} \times N \times N``, hence for every degree ``l`` of
+the spherical harmonics (which the Laplace operator depends on) a
+``N \times N`` matrix coupling the ``N`` vertical levels. Furthermore, ``S`` depends
+- through ``\xi`` on the time step ``\Delta t``,
+- through ``\mathbf{R,W,L}`` on the vertical level spacing ``\Delta \sigma_k``
+- through ``\mathbf{U}`` on the reference temperature profile ``T_k``
+
+so for any changes of these the matrix inversion of ``\mathbf{S}`` has to
+be recomputed. Otherwise the algorithm for the semi-implicit scheme is as follows
+
+0\. Precompute the linear operators ``\mathbf{R,U,L,W}`` and with them the matrix inversion ``\mathbf{S}^{-1}``.
+
+Then for every time step
+
+1. Compute the uncorrected tendencies evaluated at the current time step for the explicit terms and the previous time step for the implicit terms.
+2. Excpetion in SpeedyWeather.jl is the adiabatic conversion term, which is, using ``\mathbf{L}`` moved afterwards from the current ``i`` to the previous time step ``i-1``.
+3. Compute the combined tendency ``G`` from the uncorrected tendencies ``G_\mathcal{D}``, ``G_T``, ``G_{\ln p_s}``.
+4. With the inverted operator get the corrected tendency for divergence, ``\delta \mathcal{D} = \mathbf{S}^{-1}G``.
+5. Obtain the corrected tendencies for temperature ``\delta T`` and surface pressure ``\delta \ln p_s`` from ``\delta \mathcal{D}``.
+6. Apply [Horizontal diffusion](@ref) (which is only mentioned here as it further updates the tendencies).
+7. Use ``\delta \mathcal{D}``, ``\delta T`` and ``\delta \ln p_s`` in the [Leapfrog time integration](@ref leapfrog).
+
 ## Horizontal diffusion
 
 Horizontal diffusion in the primitive equations is applied to vorticity ``\zeta``, divergence ``\mathcal{D}``,
