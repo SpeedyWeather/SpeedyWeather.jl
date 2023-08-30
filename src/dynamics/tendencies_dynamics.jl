@@ -283,7 +283,7 @@ function temperature_tendency!(
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
     # to move the implicit terms to i-1 which is cheaper then the alternative below
 
-    # Adiabatic term following Simmons and Burridge 1981 but for σ coordinates 
+    # Diabatic term following Simmons and Burridge 1981 but for σ coordinates 
     # += as tend already contains parameterizations + vertical advection
     @. temp_tend_grid += temp_grid*div_grid +       # +T'D term of hori advection
         κ*(Tᵥ+Tₖ)*(                                 # +κTᵥ*Dlnp/Dt, adiabatic term
@@ -534,9 +534,9 @@ function linear_pressure_gradient!(
     C::DynamicsConstants,
     I::ImplicitPrimitiveEq,
 )                          
-    (; R_dry ) = C
+    (;R_dry) = C                            # dry gas constant 
     Tₖ = I.temp_profile[diagn.k]            # reference profile at layer k      
-    (;pres) = surface.timesteps[lf]
+    (;pres) = surface.timesteps[lf]         # logarithm of surface pressure
     (;geopot) = diagn.dynamics_variables
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term

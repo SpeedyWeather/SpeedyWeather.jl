@@ -38,10 +38,10 @@ Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConst
     f_coriolis::Vector{NF}
 
     # ADIABATIC TERM
-    "σ-related factor A needed for adiabatic terms"
+    "σ-related factor A needed for adiabatic conversion term"
     σ_lnp_A::Vector{NF}
     
-    "σ-related factor B needed for adiabatic terms"
+    "σ-related factor B needed for adiabatic conversion term"
     σ_lnp_B::Vector{NF}
 
     # GEOPOTENTIAL INTEGRATION (on half/full levels)

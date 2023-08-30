@@ -128,7 +128,9 @@ is then
 with the right-hand side operator ``N`` evaluated at the current time step ``i``. Now the
 idea is to split the terms in ``N`` into non-linear terms that are evaluated explicitly
 in ``N_E`` and into the linear terms ``N_I``, solved implicitly, that are responsible for
-the gravity waves. We could already assume to evaluate ``N_I`` at ``i+1``, but in fact,
+the gravity waves. Linearization happens around a state of rest without orography.
+
+We could already assume to evaluate ``N_I`` at ``i+1``, but in fact,
 we can introduce ``\alpha \in [0,1]`` so that for ``\alpha=0`` we use ``i-1`` (i.e. explicit),
 for ``\alpha=1/2`` it is centred implicit ``\tfrac{1}{2}N_I(V_{i-1}) + \tfrac{1}{2}N_I(V_{i+1})``,
 and for ``\alpha=1`` a fully backwards scheme ``N_I(V_{i+1})`` evaluated at ``i+1``.
