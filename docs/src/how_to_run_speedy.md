@@ -171,9 +171,70 @@ probably not surprising!
 The life of every SpeedyWeather.jl simulation starts with a `SpectralGrid` object.
 We have seen some examples above, now let's look into the details
 
-```@example howtorun
-SpectralGrid
+```julia
+help?> SpectralGrid
+search: SpectralGrid
+
+  Defines the horizontal spectral resolution and corresponding grid and the
+  vertical coordinate for SpeedyWeather.jl. Options are
+
+    •  NF::Type{<:AbstractFloat}: number format used throughout the model
+
+    •  trunc::Int64: horizontal resolution as the maximum degree of
+       spherical harmonics
+
+    •  Grid::Type{<:SpeedyWeather.RingGrids.AbstractGrid}: horizontal
+       grid used for calculations in grid-point space
+
+    •  dealiasing::Float64: how to match spectral with grid resolution:
+       dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid
+
+    •  radius::Float64: radius of the sphere [m]
+
+    •  nlat_half::Int64: number of latitude rings on one hemisphere
+       (Equator incl)
+
+    •  npoints::Int64: total number of grid points in the horizontal
+
+    •  nlev::Int64: number of vertical levels
+
+    •  vertical_coordinates::SpeedyWeather.VerticalCoordinates:
+       coordinates used to discretize the vertical
+
+  nlat_half and npoints should not be chosen but are derived from trunc, Grid
+  and dealiasing.
 ```
+
+Say we wanted double precision (`Float64`), a spectral resolution of T42 on
+a regular longitude-latitude grid (`FullClenshawGrid`) with cubic truncation
+(`dealiasing=3`) and 4 vertical levels, we would do this by
+
+```@example howtorun
+spectral_grid = SpectralGrid(NF=Float64, trunc=42, Grid=FullClenshawGrid, dealiasing=3, nlev=4)
+```
+
+We don't specify the resolution of the grid (its `nlat_half` parameter) directly,
+instead we chose a spectral truncation `trunc`
+and through the `dealiasing` factor a grid resolution will be automatically chosen. 
+Here T42 will be a matched with a 192x95 regular longitude-latitude grid
+that has 18240 grid points in total. For details see [Matching spectral and grid resolution](@ref).
+
+We could have also defined `SpectralGrid` on a smaller sphere than Earth,
+or with a different vertical spacing
+```@example howtorun
+vertical_coordinates = SigmaCoordinates(0:0.2:1)
+```
+These are regularly spaced [Sigma coordinates](@ref), defined through their half levels.
+```@example howtorun
+spectral_grid = SpectralGrid(;vertical_coordinates,radius=1e6)
+```
+
+In the end, a `SpectralGrid` defines the physical domain of the simulation and its discretization.
+This domain has to be a sphere because of the spherical harmonics, but it can have a different radius.
+The discretization is for spectral, grid-point space and the vertical as this determines the size of many
+arrays for preallocation, for which als the number format is essential to know.
+That's why `SpectralGrid` is the beginning of every SpeedyWeather.jl simulation and that is why
+it has to be passed on to (most) model components.
 
 ## References
 

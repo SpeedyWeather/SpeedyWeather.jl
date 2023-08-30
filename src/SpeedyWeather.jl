@@ -18,7 +18,7 @@ import Adapt: Adapt, adapt, adapt_structure
 # INPUT OUTPUT
 import TOML
 import Dates: Dates, DateTime
-import Printf: @sprintf
+import Printf: Printf, @sprintf
 import NetCDF: NetCDF, NcFile, NcDim, NcVar
 import JLD2: jldopen
 import CodecZlib
