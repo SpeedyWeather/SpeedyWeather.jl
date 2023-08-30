@@ -61,7 +61,7 @@ As a second example, let's investigate the Galewsky et al.[^1] test case for the
 water equations with and without mountains. As the shallow water system has also only
 one level, we can reuse the `SpectralGrid` from Example 1.
 ```@example howtorun
-spectral_grid = SpectralGrid(trunc=85,nlev=1)
+spectral_grid = SpectralGrid(trunc=63,nlev=1)
 ```
 Now as a first simulation, we want to disable any orography, so we create a `NoOrography`
 ```@example howtorun
