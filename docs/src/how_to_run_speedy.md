@@ -39,15 +39,15 @@ horizontal wavenumber, and the amplitude is ``10^{-5}\text{s}^{-1}``.
 Now we want to construct a `BarotropicModel`
 with these
 ```@example howtorun
-model = BarotropicModel(;spectral_grid, initial_conditions, planet=still_earth)
+model = BarotropicModel(;spectral_grid, initial_conditions, planet=still_earth);
+nothing # hide
 ```
 The `model` contains all the parameters, but isn't initialized yet, which we can do
 with and then run it. The `run!` command will always return the prognostic variables, which, by default, are 
 plotted for surface relative vorticity with a unicode plot. The resolution of the plot
 is not necessarily representative but it lets us have a quick look at the result
 ```@example howtorun
-simulation = initialize!(model);
-
+simulation = initialize!(model)
 run!(simulation,n_days=30)
 ```
 
@@ -78,48 +78,41 @@ initial_conditions = ZonalJet()
 The jet sits at 45˚N with a maximum velocity of 80m/s and a perturbation as described in their paper.
 Now we construct a model, but this time a `ShallowWaterModel`
 ```@example howtorun
-model = ShallowWaterModel(;spectral_grid, orography, initial_conditions);
-
+model = ShallowWaterModel(;spectral_grid, orography, initial_conditions)
 simulation = initialize!(model);
+run!(simulation,n_days=6)
 ```
-
 Oh yeah. That looks like the wobbly jet in their paper. Let's run it again for another 6 days
 but this time also store [NetCDF output](@ref).
 ```@example howtorun
 run!(simulation,n_days=6,output=true)
 ```
-The progress bar tells us that the simulation run got the identification "0002", meaning that
-data is stored in the folder `/run_0002`, so let's plot that data properly (and not just using UnicodePlots).
-```julia
-julia> using PyPlot, NCDatasets
-julia> ds = NCDataset("run_0002/output.nc");
-julia> ds["vor"]
-vor (384 × 192 × 1 × 25)
-  Datatype:    Float32
-  Dimensions:  lon × lat × lev × time
-  Attributes:
-   units                = 1/s
-   missing_value        = NaN
-   long_name            = relative vorticity
-   _FillValue           = NaN
+The progress bar tells us that the simulation run got the identification "0001"
+(which just counts up, so yours might be higher), meaning that
+data is stored in the folder `/run_0001`, so let's plot that data properly (and not just using UnicodePlots).
+```@example howtorun
+using PyPlot, NCDatasets
+ds = NCDataset("run_0001/output.nc");
+ds["vor"]
 ```
 Vorticity `vor` is stored as a 384x192x1x25 array, we may want to look at the first time step,
 which is the end of the previous simulation (time=6days) which we didn't store output for.
-```julia
-julia> vor = ds["vor"][:,:,1,1];
-julia> lat = ds["lat"][:];
-julia> lon = ds["lon"][:];
-julia> pcolormesh(lon,lat,vor')
+```@example howtorun
+vor = ds["vor"][:,:,1,1];
+lat = ds["lat"][:];
+lon = ds["lon"][:];
+pcolormesh(lon,lat,vor')
+nothing # hide
 ```
 Which looks like
 
 ![Galewsky jet pyplot](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/galewsky_nc_6days.png)
 
 You see that the unicode plot heavily coarse-grains the simulation, well it's unicode after all!
-And now the last time step, that means time=12days is
-```julia
-julia> vor = ds["vor"][:,:,1,25];
-julia> pcolormesh(lon,lat,vor')
+And now the last time step, that means time = 12days is
+```@example howtorun
+vor = ds["vor"][:,:,1,25];
+pcolormesh(lon,lat,vor')
 ```
 
 ![Galewsky jet pyplot](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/galewsky_nc_12days.png)
@@ -128,28 +121,19 @@ The jet broke up into many small eddies, but the turbulence is still confined to
 How this may change when we add mountains (we had `NoOrography` above!), say Earth's orography, you may ask?
 Let's try it out! We create an `EarthOrography` struct like so
 
-```julia
-julia> orography = EarthOrography(spectral_grid)
-EarthOrography{Float32, OctahedralGaussianGrid{Float32}}:
- path::String = SpeedyWeather.jl/input_data
- file::String = orography_F512.nc
- scale::Float64 = 1.0
- smoothing::Bool = true
- smoothing_power::Float64 = 1.0
- smoothing_strength::Float64 = 0.1
- smoothing_truncation::Int64 = 85
+```@example howtorun
+orography = EarthOrography(spectral_grid)
 ```
 
 It will read the orography from file as shown, and there are some smoothing options too, but let's not change them.
 Same as before, create a model, intialize into a simulation, run. This time directly for 12 days so that we can
 compare with the last plot
-```julia
-julia> model = ShallowWaterModel(;spectral_grid, orography, initial_conditions);
-julia> simulation = initialize!(model);
-julia> run!(simulation,n_days=12,output=true)
-Weather is speedy: run 0003 100%|███████████████████████| Time: 0:00:35 (79.16 years/day)
+```@example howtorun
+model = ShallowWaterModel(;spectral_grid, orography, initial_conditions);
+simulation = initialize!(model);
+run!(simulation,n_days=12,output=true)
 ```
-This time the run got the id "0003", but otherwise we do as before.
+This time the run got a new run id, `0002` in our case, but otherwise we do as before.
 
 ![Galewsky jet pyplot](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/galewsky_nc_12days_mountains.png)
 
@@ -163,8 +147,8 @@ probably not surprising!
 The life of every SpeedyWeather.jl simulation starts with a `SpectralGrid` object.
 We have seen some examples above, now let's look into the details
 
-```@docs
-SpectralGrid
+```@example howtorun
+?SpectralGrid
 ```
 
 ## References
