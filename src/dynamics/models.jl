@@ -56,6 +56,10 @@ except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!`."""
 function initialize!(model::Barotropic)
     (;spectral_grid,forcing,horizontal_diffusion) = model
+
+    spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for BarotropicModel, \
+        SpectralGrid with nlev=$(spectral_grid.nlev) provided."
+
     initialize!(forcing,model)
     initialize!(horizontal_diffusion,model)
 
@@ -108,6 +112,9 @@ at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`.
 function initialize!(model::ShallowWater)
     (;spectral_grid,forcing,horizontal_diffusion,
         orography,planet,spectral_transform,geometry) = model
+
+    spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for ShallowWaterModel, \
+                                SpectralGrid with nlev=$(spectral_grid.nlev) provided."
 
     initialize!(forcing,model)
     initialize!(horizontal_diffusion,model)
