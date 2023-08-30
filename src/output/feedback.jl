@@ -197,9 +197,11 @@ end
 # constant from the ProgressMeter module
 const DT_IN_SEC = Ref(1800)
 
-# overwrite the speedstring function from ProgressMeter
-function ProgressMeter.speedstring(sec_per_iter,dt_in_sec=SpeedyWeather.DT_IN_SEC)
-    speedstring(sec_per_iter,dt_in_sec[])
+# "extend" the speedstring function from ProgressMeter by defining it for ::AbstractFloat
+# not just ::Any to effectively overwrite it
+function ProgressMeter.speedstring(sec_per_iter::AbstractFloat)
+    dt_in_sec = SpeedyWeather.DT_IN_SEC[]   # pull global "constant"
+    speedstring(sec_per_iter,dt_in_sec)
 end
 
 """
