@@ -58,20 +58,20 @@ equal-area, meaning that every grid cell covers exactly the same area (although 
 
 Currently the following full grids `<: AbstractFullGrid` are implemented
 
-- `FullGaussianGrid`, a full grid with Gaussian latitudes
-- `FullClenshawGrid`, a full grid with equi-angle latitudes
+- [`FullGaussianGrid`](@ref FullGaussianGrid), a full grid with Gaussian latitudes
+- [`FullClenshawGrid`](@ref FullClenshawGrid), a full grid with equi-angle latitudes
 
 and additionally we have `FullHEALPixGrid` and `FullOctaHEALPixGrid` which are the full grid equivalents to the
 [HEALPix grid](@ref HEALPixGrid) and the [OctaHEALPix grid](@ref OctaHEALPixGrid) discussed below. Full grid equivalent means that they have
 the same latitude rings, but no reduction in the number of points per ring towards the poles and no longitude offset.
 Other implemented reduced grids are
 
-- `OctahedralGaussianGrid`, a reduced grid with Gaussian latitudes based on an [octahedron](https://en.wikipedia.org/wiki/Octahedron)
-- `OctahedralClenshawGrid`, similar but based on equi-angle latitudes
-- `HEALPixGrid`, an equal-area grid based on a [dodecahedron](https://en.wikipedia.org/wiki/Rhombic_dodecahedron) with 12 faces
-- `OctaHEALPixGrid`, an equal-area grid from the class of HEALPix grids but based on an octahedron.
+- [`OctahedralGaussianGrid`](@ref OctahedralGaussianGrid), a reduced grid with Gaussian latitudes based on an [octahedron](https://en.wikipedia.org/wiki/Octahedron)
+- [`OctahedralClenshawGrid`](@ref OctahedralClenshawGrid), similar but based on equi-angle latitudes
+- [`HEALPixGrid`](@ref HEALPixGrid), an equal-area grid based on a [dodecahedron](https://en.wikipedia.org/wiki/Rhombic_dodecahedron) with 12 faces
+- [`OctaHEALPixGrid`](@ref OctaHEALPixGrid), an equal-area grid from the class of HEALPix grids but based on an octahedron.
 
-An overview of these grids is visualised here
+An overview of these grids is visualised here, and a more detailed description follows below.
 
 ![Overview of implemented grids in SpeedyWeather.jl](https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/grids_comparison.png)
 
@@ -138,17 +138,131 @@ You will obtain this information every time you create a `SpectralGrid(;Grid,tru
 
 ## [Full Gaussian grid](@id FullGaussianGrid)
 
-...
+(called `FullGaussianGrid`)
 
-## [Full Clenshaw-Curtis grid](@id FullClenshawGrid)
+The full Gaussian grid is a grid that uses regularly spaced longitudes
+which points that do not reduce in number towards the poles. That means for every latitude
+``\theta`` the longitudes
+``\phi`` are
 
-...
+```math
+\phi_i = \frac{2\pi (i-1)}{N_\phi}
+```
+
+with ``i = 1,...,N_\phi`` the in-ring index (1-based, counting from 0˚ eastward) and
+``N_\phi`` the number of longitudinal points on the grid.
+The first longitude is therefore 0˚, meaning that there is no longitudinal offset on this grid.
+There are always twice as many points in zonal direction as there are in meridional,
+i.e. ``N_\phi = 2N_\theta``. The latitudes, however, are not regular, but chosen from the
+``j``-th zero crossing ``z_j(l)`` of the ``l``-th
+[Legendre polynomial](https://en.wikipedia.org/wiki/Legendre_polynomials).
+For ``\theta`` in latitudes
+```math
+\sin(\theta_j) = z_j(l) 
+```
+As it can be easy to mix up latitudes, colatitudes and as the Legendre polynomials are defined in ``[0,1]``
+an overview of the first Gaussian latitudes (approximated for ``l>2`` for brevity)
+
+| ``l`` | Zero crossings ``z_j``      | Latitudes [˚N] |
+| ----- | --------------------------- | -------------- |
+| 2     | ``\pm \tfrac{1}{\sqrt{3}}`` | ``\pm 35.3...`` |
+| 4     | ``\pm 0.34..., \pm 0.86...``| ``\pm 19.9..., \pm 59.44...`` |
+| 6     | ``\pm 0.24..., \pm 0.66..., \pm 0.93...`` | ``\pm 13.8..., \pm 41.4..., \pm 68.8...``  |
+
+Only even Legendre polynomials are used, such that there is always an even number of latitudes,
+with no latitude on the Equator. As you can already see from this short table, the Gaussian
+latitudes do not nest, i.e. different resolutions through different ``l`` do not share
+latitudes. The latitudes are also only approximately evenly spaced. 
+Due to the Gaussian latitudes, a spectral transform with a full Gaussian grid is *exact*
+as long as the truncation is at least quadratic, see [Matching spectral and grid resolution](@ref).
+Exactness here means that only rounding errors occur in the transform, meaning that the
+transform error is very small compared to other errors in a simulation.
+This property arises from that property of the
+[Gauss-Legendre quadrature](https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_quadrature),
+which is used in the [Spherical harmonic transform](@ref) with a full Gaussian grid.
+
+On the full Gaussian grid there are in total ``N_\phi N_\theta`` grid points, which are squeezed
+towards the poles, making the grid area smaller and smaller following a cosine.
+But no points are on the poles as ``z=-1`` or ``1`` is never a zero crossing of the Legendre polynomials.
 
 ## [Octahedral Gaussian grid](@id OctahedralGaussianGrid)
 
-...
+(called `OctahedralGaussianGrid`)
+
+The octahedral Gaussian grid is a reduced grid, i.e. the number of longitudinal points reduces
+towards the poles. It still uses the Gaussian latitudes from the [full Gaussian grid](@ref FullGaussianGrid)
+so the exactness property of the spherical harmonic transform also holds for this grid.
+However, the longitudes ``\phi_i`` with ``i = 1,...,16+4j`` on the ``j``-th latitude ring
+(starting with 1 around the north pole), ``j=1,...,\tfrac{N_\theta}{2}``,
+are now, on the northern hemisphere,
+
+```math
+\phi_i = \frac{2\pi (i-1)}{16 + 4j}.
+```
+
+We start with 20 points, evenly spaced, starting at 0˚E, around the first latitude ring below the north pole.
+The next ring has 24 points, then 28, and so on till reaching the Equator (which is not a ring).
+For the southern hemisphere all points are mirrored around the Equator.
+For more details see Malardel, 2016[^M16].
+
+Note that starting with 20 grid points on the first ring is a choice that ECMWF made with their grid
+for accuracy reasons. An octahedral Gaussian grid can also be defined starting with fewer grid points
+on the first ring. However, in SpeedyWeather.jl we follow ECMWF's definition. 
+
+The grid cells of an octahedral Gaussian grid are not exactly equal area, but are usually within
+a factor of two. This largely solves the efficiency problem of having too many grid points near
+the poles for computational, memory and data storage reasons.
+
+## [Full Clenshaw-Curtis grid](@id FullClenshawGrid)
+
+(called `FullClenshawGrid`)
+
+The full Clenshaw-Curtis grid is a regular longitude-latitude grid, but a specific one:
+The colatitudes ``\theta_j``, and the longitudes ``\phi_i`` are
+```math
+\theta_j = \frac{j}{N_\theta + 1}\pi, \quad \phi_i = \frac{2\pi (i-1)}{N_\phi}
+```
+with ``i`` the in-ring zonal index ``i = 1,...,N_\phi`` and ``j = 1, ... ,N_\theta`` the
+ring index starting with 1 around the north pole. There is no grid point on the poles,
+but in contrast to the Gaussian grids there is a ring on the Equator.
+The longitudes are shared with the full Gaussian grid.
+Being a full grid, also the full Clenshaw-Curtis grid suffers from too many grid points
+around the poles, this is addressed with the [octahedral Clenshaw-Curtis grid](@ref OctahedralClenshawGrid).
+
+The full Clenshaw-Curtis grid gets its name from the
+[Clenshaw-Curtis quadrature](https://en.wikipedia.org/wiki/Clenshaw%E2%80%93Curtis_quadrature)
+that is used in the Legendre transform (see [Spherical Harmonic Transform](@ref)).
+This quadrature relies on evenly spaced latitudes, which also means that this grid
+nests, see Hotta and Ujiie[^HU18]. More importantly for our application,
+the Clenshaw-Curtis grids (including the octahedral described below) allow for an exact
+transform with cubic truncation (see [Matching spectral and grid resolution](@ref)).
+Recall that the Gaussian latitudes allow for an exact transform with quadratic truncation,
+so the Clenshaw-Curtis grids require more grid points for the same spectral resolution
+to be exact. But compared to other errors during a simulation this error may be
+masked anyway.
+
+## [Octahedral Clenshaw-Curtis grid](@id OctahedralClenshawGrid)
+
+(called `OctahedralClenshawGrid`)
+
+In the same as we constructed the octahedral Gaussian grid from the full Gaussian grid,
+the octahedral Clenshaw-Curtis grid can be constructed from the full Clenshaw-Curtis grid.
+It therefore shares the latitudes with the full grid, but the longitudes with the
+octahedral Gaussian grid.
+
+```math
+\theta_j = \frac{j}{N_\theta + 1}\pi, \quad \phi_i = \frac{2\pi (i-1)}{16 + 4j}.
+```
+
+Notation as before, but note that the definition for ``\phi_i`` only holds for the
+northern hemisphere, Equator included. The southern hemisphere is mirrored.
+The octahedral Clenshaw-Curtis grid inherits the exactness properties from the full Clenshaw-Curtis grid,
+but as it is a reduced grid, it is more efficient in terms of computational aspects
+and memory than the full grid. Hotta and Ujiie[^HU18] describe this grid in more detail.
 
 ## [HEALPix grid](@id HEALPixGrid)
+
+(called `HEALPixGrid`)
 
 Technically, HEALPix grids are a class of grids that tessalate the sphere into faces that are often
 called basepixels. For each member of this class there are ``N_\varphi`` basepixels in zonal direction
@@ -158,7 +272,7 @@ Each basepixel has a quadratic number of grid points in them. There's an equator
 of zonal grid points is constant (always ``2N``, so 32 at ``N=16``) and there are polar caps above and below
 the equatorial zone with the border at  ``\cos(\theta) = 2/3`` (``\theta`` in colatitudes).
 
-Following Górski, 2004[^1], the ``z=cos(\theta)`` colatitude of the ``j``-th ring in the north polar cap,
+Following Górski, 2004[^G04], the ``z=cos(\theta)`` colatitude of the ``j``-th ring in the north polar cap,
 ``j=1,...,N_{side}`` with ``2N_{side} = N`` is 
 
 ```math
@@ -196,8 +310,9 @@ with ``\phi_t = \phi \mod \tfrac{\pi}{2}`` and in the equatorial belt
 z = \frac{2}{3}-\frac{4k}{3N_{side}} \pm \frac{8\phi}{3\pi}
 ```
 
-
 ## [OctaHEALPix grid](@id OctaHEALPixGrid)
+
+(called `OctaHEALPixGrid`)
 
 While the classic HEALPix grid is based on a [dodecahedron](https://en.wikipedia.org/wiki/Rhombic_dodecahedron),
 other choices for ``N_\varphi`` and ``N_\theta`` in the class of HEALPix grids will change the number of faces
@@ -206,7 +321,7 @@ is based on an octahedron, which has the convenient property that there are twic
 the equator than there are latitude rings between the poles. This is a desirable for truncation as this matches
 the distances too, ``2\pi`` around the Equator versus ``\pi`` between the poles. ``N_\varphi = 6, N_\theta = 2``
 or ``N_\varphi = 8, N_\theta = 3`` are other possible choices for this, but also more complicated. See 
-Górski, 2004[^1] for further examples and visualizations of these grids.
+Górski, 2004[^G04] for further examples and visualizations of these grids.
 
 We call the ``N_\varphi = 4, N_\theta = 1`` HEALPix grid the OctaHEALPix grid, which combines the equal-area
 property of the HEALPix grids with the octahedron that's also used in the `OctahedralGaussianGrid` or the
@@ -236,5 +351,8 @@ grid and there's no separate equation for the equatorial belt (which doesn't exi
 
 ### References
 
-[^1]: Górski, Hivon, Banday, Wandelt, Hansen, Reinecke, Bartelmann, 2004. _HEALPix: A FRAMEWORK FOR HIGH-RESOLUTION DISCRETIZATION AND FAST ANALYSIS OF DATA DISTRIBUTED ON THE SPHERE_, The Astrophysical Journal. doi:[10.1086/427976](https://doi.org/10.1086/427976)
+[^G04]: Górski, Hivon, Banday, Wandelt, Hansen, Reinecke, Bartelmann, 2004. _HEALPix: A FRAMEWORK FOR HIGH-RESOLUTION DISCRETIZATION AND FAST ANALYSIS OF DATA DISTRIBUTED ON THE SPHERE_, The Astrophysical Journal. doi:[10.1086/427976](https://doi.org/10.1086/427976)
 
+[^M16]: S Malardel, et al., 2016: _A new grid for the IFS_, ECMWF Newsletter 146. [https://www.ecmwf.int/sites/default/files/elibrary/2016/17262-new-grid-ifs.pdf](https://www.ecmwf.int/sites/default/files/elibrary/2016/17262-new-grid-ifs.pdf)
+
+[^HU18]: Daisuke Hotta and Masashi Ujiie, 2018: _A nestable, multigrid-friendly grid on a sphere for global spectralmodels based on Clenshaw–Curtis quadrature_, Quarterly Journal of the Royal Meteorological Society, DOI: [10.1002/qj.3282](https://doi.org/10.1002/qj.3282)
