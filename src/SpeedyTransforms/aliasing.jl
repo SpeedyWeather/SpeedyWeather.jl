@@ -1,16 +1,31 @@
 const DEFAULT_DEALIASING = 2.0
 
+"""
+$(TYPEDSIGNATURES)
+For the spectral truncation `trunc` (e.g. 31 for T31) return the
+grid resolution parameter `nlat_half` (number of latitude rings on one hemisphere
+including the Equator) following a dealiasing parameter (default 2)
+to match spectral and grid resolution."""
 function RingGrids.get_nlat_half(   trunc::Integer,
                                     dealiasing::Real=DEFAULT_DEALIASING)
                     
     return roundup_fft(ceil(Int,((1+dealiasing)*trunc+1)/4))
 end
 
+"""
+$(TYPEDSIGNATURES)
+For the grid resolution parameter `nlat_half` (e.g. 24 for a 48-ring FullGaussianGrid)
+return the spectral truncation `trunc` (max degree of spherical harmonics)
+following a dealiasing parameter (default 2) to match spectral and grid resolution."""
 function get_truncation(nlat_half::Integer,
                         dealiasing::Real=DEFAULT_DEALIASING)
 
     return floor(Int,(4nlat_half-1)/(dealiasing+1))
 end
+
+# unpack nlat_half from provided map
+get_truncation(map::AbstractGrid,dealiasing::Real=DEFAULT_DEALIASING) =
+    get_truncation(map.nlat_half,dealiasing)
 
 """
     m = roundup_fft(n::Int;
