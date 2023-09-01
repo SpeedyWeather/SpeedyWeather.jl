@@ -12,6 +12,7 @@ end
 
 # obtain nlev from length of predefined σ_half levels
 SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(nlev=length(σ_half)-1;σ_half) 
+SigmaCoordinates(σ_half::AbstractRange) = SigmaCoordinates(collect(σ_half))
 
 function Base.show(io::IO,σ::SigmaCoordinates)
     println("$(σ.nlev)-level SigmaCoordinates:")

@@ -1,8 +1,8 @@
 using Documenter, SpeedyWeather
 
 makedocs(
-    format=Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",
-    ansicolor=true),
+     format=Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",
+                            ansicolor=true),
     sitename="SpeedyWeather.jl",
     authors="M Klöwer and SpeedyWeather contributors",
     modules=[SpeedyWeather],
@@ -20,8 +20,6 @@ makedocs(
             "Submodule: RingGrids"=>"ringgrids.md",
             "Submodule: LowerTriangularMatrices"=>"lowertriangularmatrices.md",
             "Submodule: SpeedyTransforms"=>"speedytransforms.md",
-            "Style and convention guide"=>"conventions.md",
-            "Development notes"=>"development.md",
             "Function and type index"=>"functions.md"]
 )
 
