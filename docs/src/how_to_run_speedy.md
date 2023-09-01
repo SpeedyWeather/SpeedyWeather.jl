@@ -21,6 +21,7 @@ The `SpectralGrid` object will provide us with some more information
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=63,nlev=1)
 ```
+
 We could have specified further options, but let's ignore that for now.
 Next step we create a planet that's like Earth but not rotating
 ```@example howtorun
@@ -30,6 +31,8 @@ There are other options to create a planet but they are irrelevant for the
 barotropic vorticity equations. We also want to specify the initial conditions,
 randomly distributed vorticity is already defined
 ```@example howtorun
+using Random # hide
+Random.seed!(1234) # hide
 initial_conditions = StartWithRandomVorticity()
 ```
 By default, the power of vorticity is spectrally distributed with ``k^{-3}``, ``k`` being the
@@ -38,7 +41,7 @@ horizontal wavenumber, and the amplitude is ``10^{-5}\text{s}^{-1}``.
 Now we want to construct a `BarotropicModel`
 with these
 ```@example howtorun
-model = BarotropicModel(;spectral_grid, initial_conditions, planet=still_earth);
+model = BarotropicModel(;spectral_grid, initial_conditions, planet=still_earth)
 nothing # hide
 ```
 The `model` contains all the parameters, but isn't initialized yet, which we can do
@@ -78,7 +81,7 @@ The jet sits at 45˚N with a maximum velocity of 80m/s and a perturbation as des
 Now we construct a model, but this time a `ShallowWaterModel`
 ```@example howtorun
 model = ShallowWaterModel(;spectral_grid, orography, initial_conditions)
-simulation = initialize!(model);
+simulation = initialize!(model)
 run!(simulation,n_days=6)
 ```
 Oh yeah. That looks like the wobbly jet in their paper. Let's run it again for another 6 days
@@ -90,40 +93,40 @@ The progress bar tells us that the simulation run got the identification "0001"
 (which just counts up, so yours might be higher), meaning that
 data is stored in the folder `/run_0001`, so let's plot that data properly (and not just using UnicodePlots).
 ```@example howtorun
-using PyPlot, NCDatasets
-ioff() # hide
-ds = NCDataset("run_0001/output.nc");
+using PythonPlot, NCDatasets
+ioff() # hide
+ds = NCDataset("run_0001/output.nc")
 ds["vor"]
 ```
 Vorticity `vor` is stored as a lon x lat x vert x time array, we may want to look at the first time step,
 which is the end of the previous simulation (time=6days) which we didn't store output for.
 ```@example howtorun
-vor = ds["vor"][:,:,1,1];
-lat = ds["lat"][:];
-lon = ds["lon"][:];
+time = 1
+vor = Matrix{Float32}(ds["vor"][:,:,1,time]) # convert from Matrix{Union{Missing,Float32}} to Matrix{Float32}
+lat = ds["lat"][:]
+lon = ds["lon"][:]
 pcolormesh(lon,lat,vor')
 xlabel("longitude")
 ylabel("latitude")
-tight_layout() # hide
-nothing # hide
+tight_layout() # hide
 savefig("galewsky1.png") # hide
+nothing # hide
 ```
-Which looks like
-
 ![Galewsky jet pyplot](galewsky1.png)
 
-You see that the unicode plot heavily coarse-grains the simulation, well it's unicode after all!
+You see that in comparison the unicode plot heavily coarse-grains the simulation, well it's unicode after all!
 And now the last time step, that means time = 12days is
+
 ```@example howtorun
-vor = ds["vor"][:,:,1,25];
+time = 25
+vor = Matrix{Float32}(ds["vor"][:,:,1,time])
 pcolormesh(lon,lat,vor')
 xlabel("longitude")
 ylabel("latitude")
 tight_layout() # hide
-nothing # hide
 savefig("galewsky2.png") # hide
+nothing # hide
 ```
-
 ![Galewsky jet pyplot](galewsky2.png)
 
 The jet broke up into many small eddies, but the turbulence is still confined to the northern hemisphere, cool!
@@ -137,28 +140,28 @@ orography = EarthOrography(spectral_grid)
 It will read the orography from file as shown, and there are some smoothing options too, but let's not change them.
 Same as before, create a model, initialize into a simulation, run. This time directly for 12 days so that we can
 compare with the last plot
+
 ```@example howtorun
 model = ShallowWaterModel(;spectral_grid, orography, initial_conditions)
 simulation = initialize!(model)
 run!(simulation,n_days=12,output=true)
 ```
-This time the run got a new run id, `0002` in our case, but otherwise we do as before.
+
+This time the run got a new run id, `0002` in our case, which you can always check
+after the `run!` call (the automatic run id is only determined just before the main time loop starts)
+with `model.output.id`, but otherwise we do as before.
 
 ```@example howtorun
-dsvor = NCDataset("run_0002/output.nc")["vor"]
-```
-
-```@example howtorun
-vor = dsvor[:,:,1,49]
+ds = NCDataset("run_0002/output.nc")
+time = 49
+vor = Matrix{Float32}(ds["vor"][:,:,1,time])
 pcolormesh(lon,lat,vor')
 xlabel("longitude")
 ylabel("latitude")
 tight_layout() # hide
-nothing # hide
 savefig("galewsky3.png") # hide
+nothing # hide
 ```
-Which looks like
-
 ![Galewsky jet pyplot](galewsky3.png)
 
 Interesting! The initial conditions have zero velocity in the southern hemisphere, but still, one can see

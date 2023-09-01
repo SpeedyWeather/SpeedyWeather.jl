@@ -368,7 +368,7 @@ equation above, then we can also write
 + \sigma_{k+\tfrac{1}{2}}(-\mathbf{\bar{u}} \cdot \nabla \ln p_s - \bar{\mathcal{D}})
 ```
 See also Hoskins and Simmons, 1975[^HS75]. These vertical averages are the same as required by the 
-[Surface pressure tendency](@ref) and in the [Temperature equaiton](@ref), they are therefore all calculated
+[Surface pressure tendency](@ref) and in the [Temperature equation](@ref), they are therefore all calculated
 at once, storing the partial averages ``\overline{\mathbf{u}_k \cdot \nabla \ln p_s}`` and ``\bar{\mathcal{D}}_k`` on the fly.
 
 ## Pressure gradient

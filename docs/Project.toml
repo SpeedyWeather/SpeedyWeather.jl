@@ -1,11 +1,11 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
-PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
+PythonPlot = "274fc56d-3b97-40fa-a1cd-1b4a50311bf9"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [compat]
 Documenter = "0.26, 0.27"
-UnicodePlots = "^3.3"
 NCDatasets = "0.12"
-PyPlot = "^2.11"
+UnicodePlots = "^3.3"
+PythonPlot = "1"
