@@ -152,6 +152,7 @@ include("dynamics/diagnostic_variables.jl")
 # MODEL COMPONENTS
 include("dynamics/time_integration.jl")
 include("dynamics/forcing.jl")
+include("dynamics/drag.jl")
 include("dynamics/geopotential.jl")
 include("dynamics/initial_conditions.jl")
 include("dynamics/horizontal_diffusion.jl")
