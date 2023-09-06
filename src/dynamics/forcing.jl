@@ -1,3 +1,12 @@
+function Base.show(io::IO,F::AbstractForcing)
+    print(io,"$(typeof(F)) <: AbstractForcing:")
+    for key in propertynames(F)
+        val = getfield(F,key)
+        val isa AbstractArray || print(io,"\n $key::$(typeof(val)) = $val")
+    end
+end
+
+## NO FORCING
 struct NoForcing{NF} <: AbstractForcing{NF} end
 NoForcing(SG::SpectralGrid) = NoForcing{SG.NF}()
 
@@ -8,35 +17,95 @@ end
 
 function forcing!(  diagn::DiagnosticVariablesLayer,
                     forcing::NoForcing,
-                    time::DateTime)
+                    time::DateTime,
+                    model::ModelSetup)
     return nothing
 end
 
-# function interface_relaxation!( η::LowerTriangularMatrix{Complex{NF}},
-#                                 surface::SurfaceVariables{NF},
-#                                 time::DateTime,         # time of relaxation
-#                                 M::ShallowWater,   # contains η⁰, which η is relaxed to
-#                                 ) where NF    
+# JET STREAM FORCING FOR SHALLOW WATER
 
-#     (; pres_tend ) = surface
-#     (; seasonal_cycle, equinox, axial_tilt ) = M.parameters.planet
-#     A = M.parameters.interface_relax_amplitude
+"""
+Forcing term for the Barotropic or ShallowWaterModel with an
+idealised jet stream similar to the initial conditions from
+Galewsky, 2004, but mirrored for both hemispheres.
 
-#     s = 45/23.5     # heuristic conversion to Legendre polynomials
-#     θ = seasonal_cycle ? s*axial_tilt*sin(Dates.days(time - equinox)/365.25*2π) : 0
-#     η2 = convert(NF,A*(2sind(θ)))           # l=1,m=0 harmonic
-#     η3 = convert(NF,A*(0.2-1.5cosd(θ)))     # l=2,m=0 harmonic
+$(TYPEDFIELDS)
+"""
+Base.@kwdef struct JetStreamForcing{NF} <: AbstractForcing{NF}
+    "Number of latitude rings"
+    nlat::Int = 0
 
-#     τ⁻¹ = inv(M.constants.interface_relax_time)
-#     pres_tend[2] += τ⁻¹*(η2-η[2])
-#     pres_tend[3] += τ⁻¹*(η3-η[3])
-# end
+    "jet latitude [˚N]"
+    latitude::Float64 = 45
+    
+    "jet width [˚], default ≈ 19.29˚"
+    width::Float64 = (1/4-1/7)*180
 
-# "turn on interface relaxation for shallow water?"
-# interface_relaxation::Bool = false
+    "jet speed scale [m/s]"
+    speed::Float64 = 85
 
-# "time scale [hrs] of interface relaxation"
-# interface_relax_time::Float64 = 96
+    "time scale [days]"
+    time_scale::Float64 = 30
 
-# "Amplitude [m] of interface relaxation"
-# interface_relax_amplitude::Float64 = 300
+    "precomputed amplitude vector [m/s²]"
+    amplitude::Vector{NF} = zeros(NF,nlat)
+end
+
+JetStreamForcing(SG::SpectralGrid;kwargs...) = JetStreamForcing{SG.NF}(
+    ;nlat=RingGrids.get_nlat(SG.Grid,SG.nlat_half),kwargs...)
+
+function initialize!(   forcing::JetStreamForcing,
+                        model::ModelSetup)
+
+    (;latitude,width,speed,time_scale,amplitude) = forcing
+    (;radius) = model.spectral_grid
+    
+    # Some constants similar to Galewsky 2004
+    θ₀ = (latitude-width)/360*2π        # southern boundary of jet [radians]
+    θ₁ = (latitude+width)/360*2π        # northern boundary of jet
+    eₙ = exp(-4/(θ₁-θ₀)^2)              # normalisation, so that speed is at max
+    A₀ = speed/eₙ/(time_scale*24*3600)  # amplitude [m/s²] without lat dependency
+    A₀ *= radius                        # scale by radius as are the momentum equations
+
+    (;nlat,colat) = model.geometry
+
+    for j in 1:nlat
+        # latitude in radians, abs for north/south symmetry
+        θ = abs(π/2 - colat[j])
+        if θ₀ < θ < θ₁
+            # Similar to u as in Galewsky, 2004 but with north/south symmetry
+            amplitude[j] = A₀*exp(1/(θ-θ₀)/(θ-θ₁))  
+        else
+            amplitude[j] = 0
+        end
+    end
+
+    return nothing
+end
+
+# function barrier
+function forcing!(  diagn::DiagnosticVariablesLayer,
+                    forcing::JetStreamForcing,
+                    time::DateTime,
+                    model::ModelSetup)
+    forcing!(diagn,forcing)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Set for every latitude ring the tendency to the precomputed forcing
+in the momentum equations following the JetStreamForcing.
+The forcing is precomputed in `initialize!(::JetStreamForcing,::ModelSetup)`."""
+function forcing!(  diagn::DiagnosticVariablesLayer,
+                    forcing::JetStreamForcing)
+    Fu = diagn.tendencies.u_tend_grid
+    (;amplitude) = forcing
+
+    @inbounds for (j,ring) in enumerate(eachring(Fu))
+        F = amplitude[j]
+        for ij in ring
+            Fu[ij] = F
+        end
+    end
+end

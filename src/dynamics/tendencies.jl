@@ -4,8 +4,9 @@ Calculate all tendencies for the BarotropicModel."""
 function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
                                 time::DateTime,
                                 model::Barotropic)
-    forcing!(diagn,model.forcing,time)      # = (Fᵤ, Fᵥ) forcing for u,v
-    vorticity_flux!(diagn,model)            # = ∇×(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ)
+    forcing!(diagn,model.forcing,time,model)    # = (Fᵤ, Fᵥ) forcing for u,v
+    drag!(diagn,model.drag,time,model)          # drag term for u,v
+    vorticity_flux!(diagn,model)                # = ∇×(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ)
 end
 
 """
@@ -17,10 +18,12 @@ function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
                                 time::DateTime,                 # time to evaluate the tendencies at
                                 model::ShallowWater)            # struct containing all constants
 
-    S,C,G,O,F = model.spectral_transform, model.constants, model.geometry, model.orography, model.forcing
+    S,C,G,O = model.spectral_transform, model.constants, model.geometry, model.orography
+    F,D = model.forcing, model.drag
 
     # for compatibility with other ModelSetups pressure pres = interface displacement η here
-    forcing!(diagn,F,time)                  # = (Fᵤ, Fᵥ, Fₙ) forcing for u,v,η
+    forcing!(diagn,F,time,model)            # = (Fᵤ, Fᵥ, Fₙ) forcing for u,v,η
+    drag!(diagn,D,time,model)               # drag term for momentum u,v
     vorticity_flux!(diagn,model)            # = ∇×(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ), tendency for vorticity
                                             # = ∇⋅(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ), tendency for divergence
     

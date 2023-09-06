@@ -23,8 +23,9 @@ abstract type AbstractOrography{NF,Grid} end
 # ATMOSPHERIC COLUMN FOR PARAMETERIZATIONS
 abstract type AbstractColumnVariables{NF} end
 
-# FORCING (Barotropic and ShallowWaterModel)
+# FORCING and DRAG (Barotropic and ShallowWaterModel)
 abstract type AbstractForcing{NF} end
+abstract type AbstractDrag{NF} end
 
 # VERTICAL ADVECTION (PrimitiveEquation)
 abstract type VerticalAdvection{NF,B} end

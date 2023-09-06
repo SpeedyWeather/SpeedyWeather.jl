@@ -90,7 +90,11 @@ export  NoTemperatureRelaxation,
 
 # EXPORT BOUNDARY LAYER SCHEMES
 export  NoBoundaryLayer,
-        LinearDrag
+        LinearDrag,
+        QuadraticDrag
+
+# EXPORT FORCING
+export  JetStreamForcing
 
 # EXPORT VERTICAL DIFFUSION
 export  NoVerticalDiffusion,
@@ -152,6 +156,7 @@ include("dynamics/diagnostic_variables.jl")
 # MODEL COMPONENTS
 include("dynamics/time_integration.jl")
 include("dynamics/forcing.jl")
+include("dynamics/drag.jl")
 include("dynamics/geopotential.jl")
 include("dynamics/initial_conditions.jl")
 include("dynamics/horizontal_diffusion.jl")
