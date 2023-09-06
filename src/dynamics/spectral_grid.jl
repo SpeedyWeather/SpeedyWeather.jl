@@ -107,6 +107,9 @@ Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF:
 
 
     # ARRAYS OF LANGITUDES/LONGITUDES
+    "array of colatitudes in radians (0...π)"
+    colat::Vector{Float64} = get_colat(Grid,nlat_half)
+
     "array of latitudes in degrees (90˚...-90˚)"
     latd::Vector{Float64} = get_latd(Grid,nlat_half)
 
