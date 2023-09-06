@@ -45,7 +45,7 @@ Base.@kwdef struct JetStreamForcing{NF} <: AbstractForcing{NF}
     speed::Float64 = 85
 
     "time scale [days]"
-    time_scale::Float64 = 20
+    time_scale::Float64 = 30
 
     "precomputed amplitude vector [m/s²]"
     amplitude::Vector{NF} = zeros(NF,nlat)

@@ -90,7 +90,11 @@ export  NoTemperatureRelaxation,
 
 # EXPORT BOUNDARY LAYER SCHEMES
 export  NoBoundaryLayer,
-        LinearDrag
+        LinearDrag,
+        QuadraticDrag
+
+# EXPORT FORCING
+export  JetStreamForcing
 
 # EXPORT VERTICAL DIFFUSION
 export  NoVerticalDiffusion,
