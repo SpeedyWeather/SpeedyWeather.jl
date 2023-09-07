@@ -508,10 +508,11 @@ Base.@kwdef struct RandomWaves <: InitialConditions
     lmax::Int64 = 20        # maximum wavenumber
 end
 
-"""Random initial conditions for the interface displacement η
+"""
+$(TYPEDSIGNATURES)
+Random initial conditions for the interface displacement η
 in the shallow water equations. The flow (u,v) is zero initially.
-This kicks off gravity waves that will interact with orography.
-$(TYPEDFIELDS)"""
+This kicks off gravity waves that will interact with orography."""
 function initial_conditions!(   progn::PrognosticVariables{NF},
                                 initial_conditions::RandomWaves,
                                 model::ShallowWater) where NF
