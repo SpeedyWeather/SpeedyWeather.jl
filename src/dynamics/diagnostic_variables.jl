@@ -237,6 +237,7 @@ function Base.zeros(
 end
 
 DiagnosticVariables(SG::SpectralGrid) = zeros(DiagnosticVariables,SG,DEFAULT_MODEL)
+DiagnosticVariables(SG::SpectralGrid,Model::Type{<:ModelSetup}) = zeros(DiagnosticVariables,SG,Model)
 
 # LOOP OVER ALL GRID POINTS (extend from RingGrids module)
 RingGrids.eachgridpoint(diagn::DiagnosticVariables) = Base.OneTo(diagn.npoints)

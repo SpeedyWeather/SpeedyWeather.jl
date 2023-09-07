@@ -17,8 +17,8 @@ Base.@kwdef struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit{N
     α::Float64 = 1
 
     # PRECOMPUTED ARRAYS, to be initiliased with initialize!
-    H::Base.RefValue{NF} = Ref(zero(NF))   # layer_thicknes
-    ξH::Base.RefValue{NF} = Ref(zero(NF))  # = 2αΔt*layer_thickness, store in RefValue for mutability
+    H::Base.RefValue{NF} = Ref(zero(NF))    # layer_thickness
+    ξH::Base.RefValue{NF} = Ref(zero(NF))   # = 2αΔt*layer_thickness, store in RefValue for mutability
     g∇²::Vector{NF} = zeros(NF,trunc+2)     # = gravity*eigenvalues
     ξg∇²::Vector{NF} = zeros(NF,trunc+2)    # = 2αΔt*gravity*eigenvalues
     S⁻¹::Vector{NF} = zeros(NF,trunc+2)     # = 1 / (1-ξH*ξg∇²), implicit operator
@@ -27,7 +27,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Generator using the resolution from `spectral_grid`."""
-function ImplicitShallowWater(spectral_grid::SpectralGrid,kwargs...) 
+function ImplicitShallowWater(spectral_grid::SpectralGrid;kwargs...) 
     (;NF,trunc) = spectral_grid
     return ImplicitShallowWater{NF}(;trunc,kwargs...)
 end
@@ -75,7 +75,7 @@ function initialize!(   implicit::ImplicitShallowWater,
         eigenvalue = -l*(l-1)               # =∇², with without 1/radius², 1-based -l*l(l+1) → -l*(l-1)
         g∇²[l] = gravity*eigenvalue         # doesn't actually change with dt
         ξg∇²[l] = ξ*g∇²[l]                  # update ξg∇² with new ξ
-        S⁻¹[l] = inv(1 - ξH[]*ξg∇²[l])    # update 1/(1-ξ²gH∇²) with new ξ
+        S⁻¹[l] = inv(1 - ξH[]*ξg∇²[l])      # update 1/(1-ξ²gH∇²) with new ξ
     end
 end
 
