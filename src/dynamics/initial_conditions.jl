@@ -497,3 +497,39 @@ function initialize_humidity!(  progn::PrognosticVariables,
         end
     end
 end
+
+"""Parameters for random initial conditions for the interface displacement η
+in the shallow water equations.
+$(TYPEDFIELDS)"""
+Base.@kwdef struct RandomWaves <: InitialConditions  
+    # random interface displacement field
+    A::Float64 = 2000       # amplitude [m]
+    lmin::Int64 = 10        # minimum wavenumber
+    lmax::Int64 = 20        # maximum wavenumber
+end
+
+"""Random initial conditions for the interface displacement η
+in the shallow water equations. The flow (u,v) is zero initially.
+This kicks off gravity waves that will interact with orography.
+$(TYPEDFIELDS)"""
+function initial_conditions!(   progn::PrognosticVariables{NF},
+                                initial_conditions::RandomWaves,
+                                model::ShallowWater) where NF
+        
+    (;A, lmin, lmax) = initial_conditions
+    (;trunc) = progn
+
+    η = progn.surface.timesteps[1].pres
+    η .= randn(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
+
+    # zero out other wavenumbers
+    η[1:min(lmin,trunc+2),:] .= 0
+    η[min(lmax,trunc+2):trunc+2,:] .= 0
+
+    # scale to amplitude
+    η_grid = gridded(η,model.spectral_transform)
+    η_min,η_max = extrema(η_grid)
+    η .*= (A/max(abs(η_min),abs(η_max)))
+
+    return nothing
+end
