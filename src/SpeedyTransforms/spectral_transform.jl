@@ -501,11 +501,12 @@ on the truncation defined for `grid`. SpectralTransform struct `S` is allocated 
 function gridded(   alms::AbstractMatrix{T};            # spectral coefficients
                     recompute_legendre::Bool = true,    # saves memory
                     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
+                    kwargs...
                     ) where {NF,T<:Complex{NF}}         # number format NF
 
     lmax, mmax = size(alms) .- 1                        # -1 for 0-based degree l, order m
     S = SpectralTransform(NF,Grid,lmax,mmax;recompute_legendre)
-    return gridded(alms,S)
+    return gridded(alms,S;kwargs...)
 end
 
 """
@@ -514,13 +515,14 @@ Spectral transform (spectral to grid space) from spherical coefficients `alms` t
 field `map` with precalculated properties based on the SpectralTransform struct `S`. `alms` is converted to
 a `LowerTriangularMatrix` to execute the in-place `gridded!`."""
 function gridded(   alms::AbstractMatrix,       # spectral coefficients
-                    S::SpectralTransform{NF},   # struct for spectral transform parameters
+                    S::SpectralTransform{NF};   # struct for spectral transform parameters
+                    kwargs...
                     ) where NF                  # number format NF
  
     map = zeros(S.Grid{NF},S.nlat_half)         # preallocate output
     almsᴸ = zeros(LowerTriangularMatrix{Complex{NF}},S.lmax+1,S.mmax+1)
     copyto!(almsᴸ,alms)                         # drop the upper triangle and convert to NF  
-    gridded!(map,almsᴸ,S)                       # now execute the in-place version
+    gridded!(map,almsᴸ,S;kwargs...)             # now execute the in-place version
     return map
 end
 

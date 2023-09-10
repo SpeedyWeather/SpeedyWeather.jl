@@ -1,31 +1,3 @@
-# alias functions to scale the latitude of any gridded map A
-scale_coslat!(  A::AbstractGrid,G::Geometry) = _scale_lat!(A,G.coslat)
-scale_coslat²!( A::AbstractGrid,G::Geometry) = _scale_lat!(A,G.coslat²)
-scale_coslat⁻¹!(A::AbstractGrid,G::Geometry) = _scale_lat!(A,G.coslat⁻¹)
-scale_coslat⁻²!(A::AbstractGrid,G::Geometry) = _scale_lat!(A,G.coslat⁻²)
-
-# matrix versions used for output
-scale_coslat!(  A::AbstractMatrix,G::Geometry) = A.*G.coslat'
-scale_coslat²!( A::AbstractMatrix,G::Geometry) = A.*G.coslat²'
-scale_coslat⁻¹!(A::AbstractMatrix,G::Geometry) = A.*G.coslat⁻¹'
-scale_coslat⁻²!(A::AbstractMatrix,G::Geometry) = A.*G.coslat⁻²'
-
-"""
-$(TYPEDSIGNATURES)
-Generic latitude scaling applied to `A` in-place with latitude-like vector `v`."""
-function _scale_lat!(A::AbstractGrid{NF},v::AbstractVector) where {NF<:AbstractFloat}
-    @boundscheck get_nlat(A) == length(v) || throw(BoundsError)
-    
-    rings = eachring(A)
-    
-    @inbounds for (j,ring) in enumerate(rings)
-        vj = convert(NF,v[j])
-        for ij in ring
-            A[ij] *= vj
-        end
-    end
-end 
-
 """
 $(TYPEDSIGNATURES)
 Scale the variable `var` inside `progn` with scalar `scale`.
