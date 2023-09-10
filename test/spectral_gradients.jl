@@ -27,8 +27,8 @@
 
         G = m.geometry
         S = m.spectral_transform
-        SpeedyWeather.scale_coslat⁻¹!(u_grid,G)
-        SpeedyWeather.scale_coslat⁻¹!(v_grid,G)
+        RingGrids.scale_coslat⁻¹!(u_grid)
+        RingGrids.scale_coslat⁻¹!(v_grid)
 
         uω_coslat⁻¹ = d.layers[1].dynamics_variables.a
         vω_coslat⁻¹ = d.layers[1].dynamics_variables.b
@@ -102,13 +102,13 @@ end
 
             A = Grid(randn(NF,SG.npoints))
             B = copy(A)
-            SpeedyWeather.scale_coslat⁻¹!(A,G)
-            SpeedyWeather.scale_coslat!(A,G)
+            RingGrids.scale_coslat⁻¹!(A)
+            RingGrids.scale_coslat!(A)
 
             @test all(isapprox.(A,B,rtol=10*eps(NF)))
 
-            SpeedyWeather.scale_coslat²!(A,G)
-            SpeedyWeather.scale_coslat⁻²!(A,G)
+            RingGrids.scale_coslat²!(A)
+            RingGrids.scale_coslat⁻²!(A)
 
             @test all(isapprox.(A,B,rtol=10*eps(NF)))
         end
@@ -219,8 +219,8 @@ end
 
         # times coslat² in grid space
         G = m.geometry
-        SpeedyWeather.scale_coslat⁻¹!(u,G)
-        SpeedyWeather.scale_coslat⁻¹!(v,G)
+        RingGrids.scale_coslat⁻¹!(u)
+        RingGrids.scale_coslat⁻¹!(v)
 
         # transform back
         S = m.spectral_transform
@@ -310,8 +310,8 @@ end
         dadx_grid = gridded(dadx,m.spectral_transform)
         dady_grid = gridded(dady,m.spectral_transform)
         
-        SpeedyWeather.scale_coslat⁻²!(dadx_grid,m.geometry)
-        SpeedyWeather.scale_coslat⁻²!(dady_grid,m.geometry)
+        RingGrids.scale_coslat⁻²!(dadx_grid)
+        RingGrids.scale_coslat⁻²!(dady_grid)
 
         SpeedyWeather.spectral!(dadx,dadx_grid,m.spectral_transform)
         SpeedyWeather.spectral!(dady,dady_grid,m.spectral_transform)

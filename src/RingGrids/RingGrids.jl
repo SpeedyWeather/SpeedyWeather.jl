@@ -33,6 +33,7 @@ export  grids_match,
         get_nlat_half,
         get_npoints,
         get_latdlonds,
+        get_lat,
         get_colat,
         get_latd,
         get_lond,
@@ -45,6 +46,12 @@ export  grids_match,
         get_nlon_max,
         get_quadrature_weights,
         get_solid_angles
+
+# SCALING
+export  scale_coslat!,
+        scale_coslat²!,
+        scale_coslat⁻¹!,
+        scale_coslat⁻²!
 
 # INTERPOLATION
 export  AbstractInterpolator,
@@ -72,4 +79,6 @@ include("quadrature_weights.jl")
 include("interpolation.jl")
 include("show.jl")
 include("similar.jl")
+include("scaling.jl")
+
 end
