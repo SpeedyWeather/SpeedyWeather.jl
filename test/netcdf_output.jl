@@ -5,7 +5,7 @@ import NetCDF
     n_days = 1
 
     # default grid, Float64, ShallowWater
-    spectral_grid = SpectralGrid(;NF=Float64)
+    spectral_grid = SpectralGrid(;NF=Float64,nlev=1)
     output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
@@ -13,7 +13,7 @@ import NetCDF
     @test simulation.model.feedback.nars_detected == false
 
     # default grid, Float32, ShallowWater
-    spectral_grid = SpectralGrid(;NF=Float32)
+    spectral_grid = SpectralGrid(;NF=Float32,nlev=1)
     output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
@@ -21,7 +21,7 @@ import NetCDF
     @test simulation.model.feedback.nars_detected == false
 
     # FullClenshawGrid, Float32, ShallowWater
-    spectral_grid = SpectralGrid(;NF=Float32,Grid=FullClenshawGrid)
+    spectral_grid = SpectralGrid(;NF=Float32,Grid=FullClenshawGrid,nlev=1)
     output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
@@ -29,7 +29,7 @@ import NetCDF
     @test simulation.model.feedback.nars_detected == false
 
     # OctahedralClenshawGrid, Float32, ShallowWater
-    spectral_grid = SpectralGrid(;NF=Float32,Grid=OctahedralClenshawGrid)
+    spectral_grid = SpectralGrid(;NF=Float32,Grid=OctahedralClenshawGrid,nlev=1)
     output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
@@ -37,7 +37,7 @@ import NetCDF
     @test simulation.model.feedback.nars_detected == false
 
     # HEALPixGrid, Float32, ShallowWater
-    spectral_grid = SpectralGrid(;NF=Float32,Grid=HEALPixGrid)
+    spectral_grid = SpectralGrid(;NF=Float32,Grid=HEALPixGrid,nlev=1)
     output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
@@ -45,7 +45,7 @@ import NetCDF
     @test simulation.model.feedback.nars_detected == false
 
     # OctaHEALPixGrid, Float32, ShallowWater
-    spectral_grid = SpectralGrid(;NF=Float32,Grid=OctaHEALPixGrid)
+    spectral_grid = SpectralGrid(;NF=Float32,Grid=OctaHEALPixGrid,nlev=1)
     output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
@@ -53,7 +53,7 @@ import NetCDF
     @test simulation.model.feedback.nars_detected == false
 
     # OctahedralClenshawGrid, as matrix, Float32, ShallowWater
-    spectral_grid = SpectralGrid(;NF=Float32,Grid=OctahedralClenshawGrid)
+    spectral_grid = SpectralGrid(;NF=Float32,Grid=OctahedralClenshawGrid,nlev=1)
     output = OutputWriter(spectral_grid,ShallowWater,path=tmp_output_path,as_matrix=true)
     model = ShallowWaterModel(;spectral_grid,output)
     simulation = initialize!(model)
