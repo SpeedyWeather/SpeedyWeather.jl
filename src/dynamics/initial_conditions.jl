@@ -484,7 +484,7 @@ function initialize_humidity!(  progn::PrognosticVariables,
     # @. humid_surf_grid = humid_ref*(exp(pres_surf_grid)/(pres_ref*100))^scale_height_ratio
     q_ref = 20e-3       # kg/kg at the surface
     @. humid_surf_grid .= q_ref
-    scale_coslat²!(humid_surf_grid,model.geometry)
+    RingGrids.scale_coslat²!(humid_surf_grid)
 
     humid_surf = spectral(humid_surf_grid,model.spectral_transform)
     spectral_truncation!(humid_surf)
