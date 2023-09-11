@@ -1,12 +1,5 @@
 """
-    curl!(  curl::LowerTriangularMatrix,
-            u::LowerTriangularMatrix,
-            v::LowerTriangularMatrix,
-            S::SpectralTransform;
-            flipsign::Bool=false,
-            add::Bool=false,
-            )
-
+$(TYPEDSIGNATURES)
 Curl of a vector `u,v` written into `curl`, `curl = ∇×(u,v)`.
 `u,v` are expected to have a 1/coslat-scaling included, then `curl` is not scaled.
 `flipsign` option calculates -∇×(u,v) instead. `add` option calculates `curl += ∇×(u,v)` instead.
@@ -27,14 +20,7 @@ function curl!( curl::LowerTriangularMatrix,
 end
 
 """
-    divergence!(div::LowerTriangularMatrix,
-                u::LowerTriangularMatrix,
-                v::LowerTriangularMatrix,
-                S::SpectralTransform{NF};
-                flipsign::Bool=false,
-                add::Bool=false,
-                )
-
+$(TYPEDSIGNATURES)
 Divergence of a vector `u,v` written into `div`, `div = ∇⋅(u,v)`. 
 `u,v` are expected to have a 1/coslat-scaling included, then `div` is not scaled.
 `flipsign` option calculates -∇⋅(u,v) instead. `add` option calculates `div += ∇⋅(u,v)` instead.
@@ -55,12 +41,7 @@ function divergence!(   div::LowerTriangularMatrix,
 end
 
 """
-    _divergence!(   kernel,
-                    div::LowerTriangularMatrix,
-                    u::LowerTriangularMatrix,
-                    v::LowerTriangularMatrix,
-                    S::SpectralTransform)
-
+$(TYPEDSIGNATURES)
 Generic divergence function of vector `u`,`v` that writes into the output into `div`.
 Generic as it uses the kernel `kernel` such that curl, div, add or flipsign
 options are provided through `kernel`, but otherwise a single function is used."""
@@ -79,7 +60,6 @@ function _divergence!(  kernel,
     @boundscheck size(grad_y_vordiv2) == size(div) || throw(BoundsError)
     lmax,mmax = size(div) .- (2,1)              # 0-based lmax,mmax 
 
-    z = zero(Complex{NF})
     lm = 0
     @inbounds for m in 1:mmax+1                 # 1-based l,m
         
@@ -99,19 +79,66 @@ function _divergence!(  kernel,
             div[lm] = kernel(div[lm], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
         end
 
-        # Last row
+        # Last row, only vectors make use of the lmax+1 row, set to zero for scalars div, curl
         lm += 1
+        div[lm] = zero(Complex{NF})
     end
 
     return nothing
 end
 
 """
-    UV_from_vor!(   U::LowerTriangularMatrix,
-                    V::LowerTriangularMatrix,
-                    vor::LowerTriangularMatrix,
-                    S::SpectralTransform)
+$(TYPEDSIGNATURES)
+Divergence (∇⋅) of two vector components `u,v` which need to have size (n+1)xn,
+the last row will be set to zero in the returned `LowerTriangularMatrix`.
+This function requires both `u,v` to be transforms of fields that are scaled with
+`1/cos(lat)`. An example usage is therefore
 
+    RingGrids.scale_coslat⁻¹!(u_grid)
+    RingGrids.scale_coslat⁻¹!(v_grid)
+    u = spectral(u_grid)
+    v = spectral(v_grid)
+    div = divergence(u,v)
+    div_grid = gridded(div)
+"""
+function divergence(u::LowerTriangularMatrix,
+                    v::LowerTriangularMatrix)
+
+    @assert size(u) == size(v) "Size $(size(u)) and $(size(v)) incompatible."
+
+    S = SpectralTransform(u)
+    div = similar(u)
+    divergence!(div,u,v,S,add=false,flipsign=false)
+    return div
+end
+
+"""
+$(TYPEDSIGNATURES)
+Curl (∇×) of two vector components `u,v` of size (n+1)xn, the last row
+will be set to zero in the returned `LowerTriangularMatrix`. This function
+requires both `u,v` to be transforms of fields that are scaled with
+`1/cos(lat)`. An example usage is therefore
+
+    RingGrids.scale_coslat⁻¹!(u_grid)
+    RingGrids.scale_coslat⁻¹!(v_grid)
+    u = spectral(u_grid)
+    v = spectral(v_grid)
+    vor = curl(u,v)
+    vor_grid = gridded(div)
+"""
+function curl(  u::LowerTriangularMatrix,
+                v::LowerTriangularMatrix)
+
+    @assert size(u) == size(v) "Size $(size(u)) and $(size(v)) incompatible."
+
+    S = SpectralTransform(u)
+    vor = similar(u)
+    curl!(vor,u,v,S,add=false,flipsign=false)
+    return vor
+end
+
+"""
+$(TYPEDSIGNATURES)
 Get U,V (=(u,v)*coslat) from vorticity ζ spectral space (divergence D=0)
 Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity. Then
@@ -178,12 +205,7 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
 end
 
 """
-    UV_from_vordiv!(U::LowerTriangularMatrix,
-                    V::LowerTriangularMatrix,
-                    vor::LowerTriangularMatrix,
-                    div::LowerTriangularMatrix,
-                    S::SpectralTransform)
-
+$(TYPEDSIGNATURES)
 Get U,V (=(u,v)*coslat) from vorticity ζ and divergence D in spectral space.
 Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity and

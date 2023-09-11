@@ -27,7 +27,9 @@ export  SpectralTransform,
 export  get_nlat_half
 
 # GRADIENTS
-export  curl!,
+export  curl,
+        divergence,
+        curl!,
         divergence!,
         UV_from_vor!,
         UV_from_vordiv!,
