@@ -175,9 +175,8 @@ function initialize!(   orog::EarthOrography,
     else
         path = joinpath(orog.path,orog.file)
     end
-    ncfile = NetCDF.open(path)
-
-    orography_highres = ncfile.vars["orog"][:,:]        # height [m]
+    ncfile = NCDataset(path)
+    orography_highres = ncfile["orog"][:,:]        # height [m]
 
     # Interpolate/coarsen to desired resolution
     # TODO also read lat,lon from file and flip array in case it's not as expected

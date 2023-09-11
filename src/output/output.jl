@@ -80,7 +80,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
     output_counter::Int = 0                 # output step counter
     
     # the netcdf file to be written into, will be create
-    netcdf_file::Union{NcFile,Nothing} = nothing
+    netcdf_file::Union{NCDataset,Nothing} = nothing
 
     # INPUT GRID (the one used in the dynamical core)
     input_Grid::Type{<:AbstractGrid} = spectral_grid.Grid
@@ -160,15 +160,38 @@ function initialize!(
     
     output.output || return nothing     # exit immediately for no output
     
+    # GET RUN ID, CREATE FOLDER
+    # get new id only if not already specified
+    output.id = get_run_id(output.path,output.id)
+    output.run_path = create_output_folder(output.path,output.id) 
+    
+    feedback.id = output.id         # synchronize with feedback struct
+    feedback.run_path = output.run_path
+    feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
+    feedback.output = true          # if output=true set feedback.output=true too!
+
+    # OUTPUT FREQUENCY
+    output.output_every_n_steps = max(1,floor(Int,output.output_dt/time_stepping.Δt_hrs))
+    output.output_dt_sec = output.output_every_n_steps*time_stepping.Δt_sec
+
+    # RESET COUNTERS
+    output.timestep_counter = 0         # time step counter
+    output.output_counter = 0           # output step counter
+
+    # CREATE NETCDF FILE, vector of NcVars for output
+    (; run_path, filename, output_vars) = output
+    dataset = NCDataset(joinpath(run_path,filename),"c")
+    output.netcdf_file = dataset
+    
     # DEFINE NETCDF DIMENSIONS TIME
     (;startdate) = output
     time_string = "seconds since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
-    dim_time = NcDim("time",0,unlimited=true)
-    var_time = NcVar("time",dim_time,t=Int64,atts=Dict("units"=>time_string,"long_name"=>"time",
-                                        "standard_name"=>"time","calendar"=>"proleptic_gregorian"))
+    defDim(dataset,"time",Inf)       # unlimited time dimension
+    defVar(dataset,"time",Int64,("time",),attrib=Dict("units"=>time_string,"long_name"=>"time",
+            "standard_name"=>"time","calendar"=>"proleptic_gregorian"))
     
     # DEFINE NETCDF DIMENSIONS SPACE
-    (;input_Grid, output_Grid, nlat_half, nlev) = output
+    (;input_Grid, output_Grid, nlat_half) = output
     
     if output.as_matrix == false        # interpolate onto (possibly different) output grid
         lond = get_lond(output_Grid,nlat_half)
@@ -187,10 +210,14 @@ function initialize!(
         lat_name, lat_units, lat_longname = "j","1","horizontal index j"
     end
     
+    # INTERPOLATION: PRECOMPUTE LOCATION INDICES
+    latds, londs = RingGrids.get_latdlonds(output_Grid,output.nlat_half)
+    output.as_matrix || RingGrids.update_locator!(output.interpolator,latds,londs)
+        
     σ = model.geometry.σ_levels_full
-    dim_lon = NcDim(lon_name,nlon,values=lond,atts=Dict("units"=>lon_units,"long_name"=>lon_longname))
-    dim_lat = NcDim(lat_name,nlat,values=latd,atts=Dict("units"=>lat_units,"long_name"=>lat_longname))
-    dim_lev = NcDim("lev",nlev,values=σ,atts=Dict("units"=>"1","long_name"=>"sigma levels"))
+    defVar(dataset,lon_name,lond,(lon_name,),attrib=Dict("units"=>lon_units,"long_name"=>lon_longname))
+    defVar(dataset,lat_name,latd,(lat_name,),attrib=Dict("units"=>lat_units,"long_name"=>lat_longname))
+    defVar(dataset,"lev",σ,("lev",),attrib=Dict("units"=>"1","long_name"=>"sigma levels"))
     
     # VARIABLES, define every variable here that could be output
     (;compression_level) = output
@@ -200,66 +227,51 @@ function initialize!(
     pres_name = Model <: ShallowWater ? "interface displacement" : "surface pressure"
     pres_unit = Model <: ShallowWater ? "m" : "hPa"
     
-    all_ncvars = (        # define NamedTuple to identify the NcVars by name
-    time = var_time,
-    u = NcVar("u",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-    atts=Dict("long_name"=>"zonal wind","units"=>"m/s","missing_value"=>missing_value,
-    "_FillValue"=>missing_value)),
-    v = NcVar("v",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-    atts=Dict("long_name"=>"meridional wind","units"=>"m/s","missing_value"=>missing_value,
-    "_FillValue"=>missing_value)),
-    vor = NcVar("vor",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-    atts=Dict("long_name"=>"relative vorticity","units"=>"1/s","missing_value"=>missing_value,
-    "_FillValue"=>missing_value)),
-    pres = NcVar("pres",[dim_lon,dim_lat,dim_time],t=output_NF,compress=compression_level,
-    atts=Dict("long_name"=>pres_name,"units"=>pres_unit,"missing_value"=>missing_value,
-    "_FillValue"=>missing_value)),
-    div = NcVar("div",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-    atts=Dict("long_name"=>"divergence","units"=>"1/s","missing_value"=>missing_value,
-    "_FillValue"=>missing_value)),
-    temp = NcVar("temp",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-    atts=Dict("long_name"=>"temperature","units"=>"degC","missing_value"=>missing_value,
-    "_FillValue"=>missing_value)),
-    humid = NcVar("humid",[dim_lon,dim_lat,dim_lev,dim_time],t=output_NF,compress=compression_level,
-    atts=Dict("long_name"=>"specific humidity","units"=>"kg/kg","missing_value"=>missing_value,
-    "_FillValue"=>missing_value)),
-    orog = NcVar("orog",[dim_lon,dim_lat],t=output_NF,compress=compression_level,
-    atts=Dict("long_name"=>"orography","units"=>"m","missing_value"=>missing_value,
-    "_FillValue"=>missing_value)),
-    precip_cond = NcVar("precip_cond",[dim_lon,dim_lat,dim_time],t=output_NF,compress=compression_level,
-    atts=Dict("long_name"=>"Large-scale precipitation","units"=>"mm/dt","missing_value"=>missing_value,
-    "_FillValue"=>missing_value)),
-    precip_conv = NcVar("precip_conv",[dim_lon,dim_lat,dim_time],t=output_NF,compress=compression_level,
-    atts=Dict("long_name"=>"Convective precipitation","units"=>"mm/dt","missing_value"=>missing_value,
-    "_FillValue"=>missing_value)),
-    )
-    
-    # GET RUN ID, CREATE FOLDER
-    # get new id only if not already specified
-    output.id = get_run_id(output.path,output.id)
-    output.run_path = create_output_folder(output.path,output.id) 
-    
-    feedback.id = output.id         # synchronize with feedback struct
-    feedback.run_path = output.run_path
-    feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
-    feedback.output = true          # if output=true set feedback.output=true too!
+    # zonal wind
+    u_attribs = Dict("long_name"=>"zonal wind","units"=>"m/s","_FillValue"=>missing_value)
+    :u in output_vars && defVar(dataset,"u",output_NF,("lon","lat","lev","time"),attrib=u_attribs)
 
-    # CREATE NETCDF FILE, vector of NcVars for output
-    (; run_path, filename, output_vars) = output
-    vars_out = [all_ncvars[key] for key in keys(all_ncvars) if key in vcat(:time,output_vars)]
-    output.netcdf_file = NetCDF.create(joinpath(run_path,filename),vars_out,mode=NetCDF.NC_NETCDF4)
-    
-    # INTERPOLATION: PRECOMPUTE LOCATION INDICES
-    latds, londs = RingGrids.get_latdlonds(output_Grid,output.nlat_half)
-    output.as_matrix || RingGrids.update_locator!(output.interpolator,latds,londs)
-    
-    # OUTPUT FREQUENCY
-    output.output_every_n_steps = max(1,floor(Int,output.output_dt/time_stepping.Δt_hrs))
-    output.output_dt_sec = output.output_every_n_steps*time_stepping.Δt_sec
+    # meridional wind
+    v_attribs = Dict("long_name"=>"meridional wind","units"=>"m/s","_FillValue"=>missing_value)
+    :v in output_vars && defVar(dataset,"v",output_NF,("lon","lat","lev","time"),attrib=v_attribs)
 
-    # RESET COUNTERS
-    output.timestep_counter = 0         # time step counter
-    output.output_counter = 0           # output step counter
+    # vorticity
+    vor_attribs = Dict("long_name"=>"relative vorticity","units"=>"1/s","_FillValue"=>missing_value)
+    :vor in output_vars && defVar(dataset,"vor",output_NF,("lon","lat","lev","time"),attrib=vor_attribs)
+
+    # divergence
+    div_attribs = Dict("long_name"=>"divergence","units"=>"1/s","_FillValue"=>missing_value)
+    :div in output_vars && defVar(dataset,"div",output_NF,("lon","lat","lev","time"),attrib=div_attribs)
+
+    # pressure / interface displacement
+    pres_attribs = Dict("long_name"=>pres_name,"units"=>pres_unit,"_FillValue"=>missing_value)
+    :pres in output_vars && defVar(dataset,"pres",output_NF,("lon","lat","time"),attrib=pres_attribs)
+
+    # temperature
+    temp_attribs = Dict("long_name"=>"temperature","units"=>"degC","_FillValue"=>missing_value)
+    :temp in output_vars && defVar(dataset,"temp",output_NF,("lon","lat","lev","time"),attrib=temp_attribs)
+    
+    # humidity
+    humid_attribs = Dict("long_name"=>"specific humidity","units"=>"kg/kg","_FillValue"=>missing_value)
+    :humid in output_vars && defVar(dataset,"humid",output_NF,("lon","lat","lev","time"),attrib=humid_attribs)
+
+    # orography
+    if :orography in output_vars    # write orography directly to file
+        orog_attribs = Dict("long_name"=>"orography","units"=>"m","_FillValue"=>missing_value)
+        orog_grid = model.orography.orography
+        orog_matrix = output.u
+        output.as_matrix && (orog_matrix = Matrix(orog_grid))
+        output.as_matrix || RingGrids.interpolate!(output_Grid(output.u),orog_grid,output.interpolator)
+        defVar(dataset,"orography",orog_matrix,("lon","lat"),attrib=orog_attribs)
+    end
+
+    # large-scale condensation
+    precip_cond_attribs = Dict("long_name"=>"large-scale precipitation","units"=>"mm/dt","_FillValue"=>missing_value)
+    :precip in output_vars && defVar(dataset,"precip_cond",output_NF,("lon","lat","time"),attrib=precip_cond_attribs)
+
+    # convective precipitation
+    precip_conv_attribs = Dict("long_name"=>"convective precipitation","units"=>"mm/dt","_FillValue"=>missing_value)
+    :precip in output_vars && defVar(dataset,"precip_conv",output_NF,("lon","lat","time"),attrib=precip_conv_attribs)
     
     # WRITE INITIAL CONDITIONS TO FILE
     write_netcdf_variables!(output,diagn)
@@ -352,9 +364,9 @@ function write_netcdf_time!(output::OutputWriter,
     (; netcdf_file, startdate ) = output
     i = output.output_counter
 
-    time_sec = [round(Int64,Dates.value(Dates.Second(time-startdate)))]
-    NetCDF.putvar(netcdf_file,"time",time_sec,start=[i])    # write time [sec] of next output step
-    NetCDF.sync(netcdf_file)                                # sync to flush variables to disc
+    time_sec = round(Int64,Dates.value(Dates.Second(time-startdate)))
+    netcdf_file["time"][i] = time_sec
+    # sync(netcdf_file)
 
     return nothing
 end
@@ -372,6 +384,7 @@ function write_netcdf_variables!(   output::OutputWriter,
     (;u, v, vor, div, pres, temp, humid, precip_cond, precip_conv) = output
     (;output_Grid, interpolator) = output
     (;quadrant_rotation, matrix_quadrant) = output
+    (;netcdf_file, keepbits) = output
 
     for (k,diagn_layer) in enumerate(diagn.layers)
         
@@ -403,7 +416,6 @@ function write_netcdf_variables!(   output::OutputWriter,
         temp .-= 273.15             # convert to ˚C
 
         # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
-        (; keepbits ) = output
         :u in output_vars     && round!(u,    keepbits.u)
         :v in output_vars     && round!(v,    keepbits.v)
         :vor in output_vars   && round!(vor,  keepbits.vor)
@@ -412,13 +424,12 @@ function write_netcdf_variables!(   output::OutputWriter,
         :humid in output_vars && round!(humid,keepbits.humid)
 
         # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
-        (; netcdf_file ) = output
-        :u in output_vars     && NetCDF.putvar(netcdf_file,"u",    u,    start=[1,1,k,i],count=[-1,-1,1,1])
-        :v in output_vars     && NetCDF.putvar(netcdf_file,"v",    v,    start=[1,1,k,i],count=[-1,-1,1,1])
-        :vor in output_vars   && NetCDF.putvar(netcdf_file,"vor",  vor,  start=[1,1,k,i],count=[-1,-1,1,1])
-        :div in output_vars   && NetCDF.putvar(netcdf_file,"div",  div,  start=[1,1,k,i],count=[-1,-1,1,1])
-        :temp in output_vars  && NetCDF.putvar(netcdf_file,"temp", temp, start=[1,1,k,i],count=[-1,-1,1,1])
-        :humid in output_vars && NetCDF.putvar(netcdf_file,"humid",humid,start=[1,1,k,i],count=[-1,-1,1,1])
+        :u in output_vars     && (netcdf_file["u"][:,:,k,i] = u)
+        :v in output_vars     && (netcdf_file["v"][:,:,k,i] = v)
+        :vor in output_vars   && (netcdf_file["vor"][:,:,k,i] = vor)
+        :div in output_vars   && (netcdf_file["div"][:,:,k,i] = div)
+        :temp in output_vars  && (netcdf_file["temp"][:,:,k,i] = temp)
+        :humid in output_vars && (netcdf_file["humid"][:,:,k,i] = humid)
     end
 
     # surface pressure, i.e. interface displacement η
@@ -433,8 +444,8 @@ function write_netcdf_variables!(   output::OutputWriter,
         end
     else
         :pres in output_vars && RingGrids.interpolate!(output_Grid(pres),pres_grid,interpolator)
-        :precip_cond in output_vars && RingGrids.interpolate!(output_Grid(precip_cond),precip_large_scale,interpolator)
-        :precip_conv in output_vars && RingGrids.interpolate!(output_Grid(precip_conv),precip_convection,interpolator)
+        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_cond),precip_large_scale,interpolator)
+        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_conv),precip_convection,interpolator)
     end
 
     # after output set precip accumulators back to zero
@@ -449,13 +460,13 @@ function write_netcdf_variables!(   output::OutputWriter,
         @. pres = exp(pres)/100     # convert from log(pₛ) to surface pressure pₛ [hPa]
     end
 
-    :pres in output_vars && round!(pres,output.keepbits.pres)
-    :precip_cond in output_vars && round!(precip_cond,output.keepbits.precip_cond)
-    :precip_conv in output_vars && round!(precip_conv,output.keepbits.precip_conv)
+    :pres in output_vars && round!(pres,keepbits.pres)
+    :precip in output_vars && round!(precip_cond,keepbits.precip_cond)
+    :precip in output_vars && round!(precip_conv,keepbits.precip_conv)
     
-    :pres in output_vars && NetCDF.putvar(output.netcdf_file,"pres",pres,start=[1,1,i],count=[-1,-1,1])
-    :precip_cond in output_vars && NetCDF.putvar(output.netcdf_file,"precip_cond",precip_cond,start=[1,1,i],count=[-1,-1,1])
-    :precip_conv in output_vars && NetCDF.putvar(output.netcdf_file,"precip_conv",precip_conv,start=[1,1,i],count=[-1,-1,1])
+    :pres in output_vars && (netcdf_file["pres"][:,:,i] = pres)
+    :precip in output_vars && (netcdf_file["precip_cond"][:,:,i] = precip_cond)
+    :precip in output_vars && (netcdf_file["precip_conv"][:,:,i] = precip_conv)
 
     return nothing
 end
@@ -520,5 +531,5 @@ Loads a `var_name` trajectory of the model `M` that has been saved in a netCDF f
 """
 function load_trajectory(var_name::Union{Symbol, String}, model::ModelSetup) 
     @assert model.output.output "Output is turned off"
-    return NetCDF.ncread(get_full_output_file_path(model.output), string(var_name))
+    return NCDataset(get_full_output_file_path(model.output), string(var_name))
 end
