@@ -70,6 +70,9 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
     # COMPRESSION OPTIONS
     "[OPTION] lossless compression level; 1=low but fast, 9=high but slow"
     compression_level::Int = 3
+
+    "[OPTION] shuffle/bittranspose filter for compression"
+    shuffle::Bool = true
     
     "[OPTION] mantissa bits to keep for every variable"
     keepbits::Keepbits = Keepbits()
@@ -229,31 +232,38 @@ function initialize!(
     
     # zonal wind
     u_attribs = Dict("long_name"=>"zonal wind","units"=>"m/s","_FillValue"=>missing_value)
-    :u in output_vars && defVar(dataset,"u",output_NF,(lon_name,lat_name,"lev","time"),attrib=u_attribs)
+    :u in output_vars && defVar(dataset,"u",output_NF,(lon_name,lat_name,"lev","time"),attrib=u_attribs,
+                                deflatelevel=compression_level,shuffle=output.shuffle)
 
     # meridional wind
     v_attribs = Dict("long_name"=>"meridional wind","units"=>"m/s","_FillValue"=>missing_value)
-    :v in output_vars && defVar(dataset,"v",output_NF,(lon_name,lat_name,"lev","time"),attrib=v_attribs)
+    :v in output_vars && defVar(dataset,"v",output_NF,(lon_name,lat_name,"lev","time"),attrib=v_attribs,
+                                deflatelevel=compression_level,shuffle=output.shuffle)
 
     # vorticity
     vor_attribs = Dict("long_name"=>"relative vorticity","units"=>"1/s","_FillValue"=>missing_value)
-    :vor in output_vars && defVar(dataset,"vor",output_NF,(lon_name,lat_name,"lev","time"),attrib=vor_attribs)
+    :vor in output_vars && defVar(dataset,"vor",output_NF,(lon_name,lat_name,"lev","time"),attrib=vor_attribs,
+                                    deflatelevel=compression_level,shuffle=output.shuffle)
 
     # divergence
     div_attribs = Dict("long_name"=>"divergence","units"=>"1/s","_FillValue"=>missing_value)
-    :div in output_vars && defVar(dataset,"div",output_NF,(lon_name,lat_name,"lev","time"),attrib=div_attribs)
+    :div in output_vars && defVar(dataset,"div",output_NF,(lon_name,lat_name,"lev","time"),attrib=div_attribs,
+                                    deflatelevel=compression_level,shuffle=output.shuffle)
 
     # pressure / interface displacement
     pres_attribs = Dict("long_name"=>pres_name,"units"=>pres_unit,"_FillValue"=>missing_value)
-    :pres in output_vars && defVar(dataset,"pres",output_NF,(lon_name,lat_name,"time"),attrib=pres_attribs)
+    :pres in output_vars && defVar(dataset,"pres",output_NF,(lon_name,lat_name,"time"),attrib=pres_attribs,
+                                    deflatelevel=compression_level,shuffle=output.shuffle)
 
     # temperature
     temp_attribs = Dict("long_name"=>"temperature","units"=>"degC","_FillValue"=>missing_value)
-    :temp in output_vars && defVar(dataset,"temp",output_NF,(lon_name,lat_name,"lev","time"),attrib=temp_attribs)
-    
+    :temp in output_vars && defVar(dataset,"temp",output_NF,(lon_name,lat_name,"lev","time"),attrib=temp_attribs,
+                                    deflatelevel=compression_level,shuffle=output.shuffle)
+                                    
     # humidity
     humid_attribs = Dict("long_name"=>"specific humidity","units"=>"kg/kg","_FillValue"=>missing_value)
-    :humid in output_vars && defVar(dataset,"humid",output_NF,(lon_name,lat_name,"lev","time"),attrib=humid_attribs)
+    :humid in output_vars && defVar(dataset,"humid",output_NF,(lon_name,lat_name,"lev","time"),attrib=humid_attribs,
+                                    deflatelevel=compression_level,shuffle=output.shuffle)
 
     # orography
     if :orography in output_vars    # write orography directly to file
@@ -267,11 +277,13 @@ function initialize!(
 
     # large-scale condensation
     precip_cond_attribs = Dict("long_name"=>"large-scale precipitation","units"=>"mm/dt","_FillValue"=>missing_value)
-    :precip in output_vars && defVar(dataset,"precip_cond",output_NF,(lon_name,lat_name,"time"),attrib=precip_cond_attribs)
+    :precip in output_vars && defVar(dataset,"precip_cond",output_NF,(lon_name,lat_name,"time"),attrib=precip_cond_attribs,
+                                        deflatelevel=compression_level,shuffle=output.shuffle)
 
     # convective precipitation
     precip_conv_attribs = Dict("long_name"=>"convective precipitation","units"=>"mm/dt","_FillValue"=>missing_value)
-    :precip in output_vars && defVar(dataset,"precip_conv",output_NF,(lon_name,lat_name,"time"),attrib=precip_conv_attribs)
+    :precip in output_vars && defVar(dataset,"precip_conv",output_NF,(lon_name,lat_name,"time"),attrib=precip_conv_attribs,
+                                        deflatelevel=compression_level,shuffle=output.shuffle)
     
     # WRITE INITIAL CONDITIONS TO FILE
     write_netcdf_variables!(output,diagn)
