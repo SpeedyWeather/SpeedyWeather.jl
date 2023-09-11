@@ -79,7 +79,6 @@ function _divergence!(  kernel,
     @boundscheck size(grad_y_vordiv2) == size(div) || throw(BoundsError)
     lmax,mmax = size(div) .- (2,1)              # 0-based lmax,mmax 
 
-    z = zero(Complex{NF})
     lm = 0
     @inbounds for m in 1:mmax+1                 # 1-based l,m
         
@@ -99,8 +98,9 @@ function _divergence!(  kernel,
             div[lm] = kernel(div[lm], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
         end
 
-        # Last row
+        # Last row, only vectors make use of the lmax+1 row, set to zero for scalars div, curl
         lm += 1
+        div[lm] = zero(Complex{NF})
     end
 
     return nothing
