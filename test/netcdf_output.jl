@@ -141,5 +141,5 @@ end
     tmp_read_path = joinpath(model.output.run_path,model.output.filename)
     t = NCDataset(tmp_read_path)["time"][:]
     @test t == manual_time_axis(model.output.startdate,model.time_stepping.Δt_sec,progn.clock.n_timesteps)
-    @test t ≈ SpeedyWeather.load_trajectory("time", model)
+    @test t == SpeedyWeather.load_trajectory("time", model)
 end
