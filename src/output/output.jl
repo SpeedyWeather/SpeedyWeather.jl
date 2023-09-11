@@ -366,7 +366,7 @@ function write_netcdf_time!(output::OutputWriter,
 
     time_sec = round(Int64,Dates.value(Dates.Second(time-startdate)))
     netcdf_file["time"][i] = time_sec
-    # sync(netcdf_file)
+    NCDatasets.sync(netcdf_file)
 
     return nothing
 end
@@ -470,6 +470,9 @@ function write_netcdf_variables!(   output::OutputWriter,
 
     return nothing
 end
+
+Base.close(output::OutputWriter) = NCDatasets.close(output.netcdf_file)
+Base.close(::Nothing) = nothing
 
 """
 $(TYPEDSIGNATURES)

@@ -19,7 +19,7 @@ import Adapt: Adapt, adapt, adapt_structure
 import TOML
 import Dates: Dates, DateTime
 import Printf: Printf, @sprintf
-import NCDatasets: NCDataset, defDim, defVar
+import NCDatasets: NCDatasets, NCDataset, defDim, defVar
 import JLD2: jldopen
 import CodecZlib
 import BitInformation: round, round!
