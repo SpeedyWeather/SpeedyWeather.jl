@@ -233,10 +233,6 @@ function vordiv_tendencies!(
 
     curl!(vor_tend,u_tend,v_tend,S)         # ∂ζ/∂t = ∇×(u_tend,v_tend)
     divergence!(div_tend,u_tend,v_tend,S)   # ∂D/∂t = ∇⋅(u_tend,v_tend)
-
-    # only vectors make use of the lmax+1 row, set to zero for scalars
-    spectral_truncation!(vor_tend)           
-    spectral_truncation!(div_tend)
     return nothing
 end
 
@@ -311,9 +307,6 @@ function humidity_tendency!(diagn::DiagnosticVariablesLayer,
 
     # add horizontal advection to parameterization + vertical advection tendencies
     horizontal_advection!(humid_tend,humid_tend_grid,humid_grid,diagn,G,S,add=true)
-    
-    # only vectors make use of the lmax+1 row, set to zero for scalars
-    spectral_truncation!(humid_tend) 
 end
 
 # no humidity tendency for dry core
@@ -441,11 +434,7 @@ function vorticity_flux_curldiv!(   diagn::DiagnosticVariablesLayer,
     spectral!(v_tend,v_tend_grid,S)
 
     curl!(vor_tend,u_tend,v_tend,S)                 # ∂ζ/∂t = ∇×(u_tend,v_tend)
-    div && divergence!(div_tend,u_tend,v_tend,S)    # ∂D/∂t = ∇⋅(u_tend,v_tend)
-
-    # only vectors make use of the lmax+1 row, set to zero for scalars
-    spectral_truncation!(vor_tend)           
-    div && spectral_truncation!(div_tend)     
+    div && divergence!(div_tend,u_tend,v_tend,S)    # ∂D/∂t = ∇⋅(u_tend,v_tend)   
     return nothing       
 end
 
@@ -515,6 +504,7 @@ function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},
     spectral!(bernoulli,bernoulli_grid,S)                   # to spectral space
     bernoulli .+= geopot                                    # add geopotential Φ
     ∇²!(div_tend,bernoulli,S,add=true,flipsign=true)        # add -∇²(½(u² + v²) + ϕ)
+    spectral_truncation!(div_tend)                          # set lmax+1 row to zero
 end
 
 """
