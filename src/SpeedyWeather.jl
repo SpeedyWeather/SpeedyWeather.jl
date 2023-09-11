@@ -19,7 +19,7 @@ import Adapt: Adapt, adapt, adapt_structure
 import TOML
 import Dates: Dates, DateTime
 import Printf: Printf, @sprintf
-import NetCDF: NetCDF, NcFile, NcDim, NcVar
+import NCDatasets: NCDatasets, NCDataset, defDim, defVar
 import JLD2: jldopen
 import CodecZlib
 import BitInformation: round, round!
@@ -74,7 +74,10 @@ export  NoOrography,
         EarthOrography,
         ZonalRidge
 
-export  HyperDiffusion
+# NUMERICS
+export  HyperDiffusion,
+        ImplicitShallowWater,
+        ImplicitPrimitiveEq
 
 # EXPORT INITIAL CONDITIONS
 export  StartFromFile,

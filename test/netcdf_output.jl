@@ -1,4 +1,4 @@
-import NetCDF
+using NCDatasets, Dates
 
 @testset "Output on various grids" begin
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
@@ -105,11 +105,10 @@ end
 
 @testset "Time axis" begin 
 
-    function manual_time_axis(dt, n_timesteps)
-        
-        time_axis = zeros(Float64, n_timesteps+1)
+    function manual_time_axis(startdate, dt, n_timesteps)
+        time_axis = zeros(typeof(startdate), n_timesteps+1)
         for i=0:n_timesteps
-            time_axis[i+1] = Float64(dt) * i
+            time_axis[i+1] = startdate + Dates.Second(dt*i)
         end 
         time_axis 
     end 
@@ -124,8 +123,8 @@ end
     
     progn = simulation.prognostic_variables
     tmp_read_path = joinpath(model.output.run_path,model.output.filename)
-    t = NetCDF.ncread(tmp_read_path, "time")
-    @test t ≈ Int64.(manual_time_axis(model.time_stepping.Δt_sec, progn.clock.n_timesteps))
+    t = NCDataset(tmp_read_path)["time"][:]
+    @test t == manual_time_axis(model.output.startdate,model.time_stepping.Δt_sec,progn.clock.n_timesteps)
     
     # this is a nonsense simulation with way too large timesteps, but it's here to test the time axis output
     # for future tests: This simulation blows up because of too large time steps but only a warning is thrown
@@ -140,7 +139,7 @@ end
 
     progn = simulation.prognostic_variables
     tmp_read_path = joinpath(model.output.run_path,model.output.filename)
-    t = NetCDF.ncread(tmp_read_path, "time")
-    @test t ≈ Int64.(manual_time_axis(model.time_stepping.Δt_sec, progn.clock.n_timesteps))
-    @test t ≈ SpeedyWeather.load_trajectory("time", model)
+    t = NCDataset(tmp_read_path)["time"][:]
+    @test t == manual_time_axis(model.output.startdate,model.time_stepping.Δt_sec,progn.clock.n_timesteps)
+    @test t == SpeedyWeather.load_trajectory("time", model)
 end

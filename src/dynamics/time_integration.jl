@@ -297,8 +297,10 @@ function time_stepping!(
         write_output!(output,clock.time,diagn)
     end
 
+    # UNSCALE, CLOSE, FINISH
     unscale!(progn)                         # undo radius-scaling for vor,div from the dynamical core
-    write_restart_file(progn,output)
+    close(output)                           # close netCDF file
+    write_restart_file(progn,output)        # as JLD2 
     progress_finish!(feedback)              # finishes the progress meter bar
 
     return progn
