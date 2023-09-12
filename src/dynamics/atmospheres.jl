@@ -76,9 +76,7 @@ Base.@kwdef struct EarthAtmosphere <: AbstractAtmosphere
 end
 
 function Base.show(io::IO,atm::AbstractAtmosphere)
-    print(io,"$(typeof(atm)):")
-    for key in propertynames(atm)
-        val = getfield(atm,key)
-        print(io,"\n $key::$(typeof(val)) = $val")
-    end
+    println(io,"$(typeof(atm))")
+    keys = propertynames(atm)
+    print_fields(io,atm,keys)
 end

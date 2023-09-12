@@ -12,6 +12,9 @@ function RingGrids.get_nlat_half(   trunc::Integer,
     return roundup_fft(ceil(Int,((1+dealiasing)*trunc+1)/4))
 end
 
+# inverse of get_nlat_half to reobtain dealiasing
+get_dealiasing(trunc,nlat_half) = (4nlat_half)/(trunc+1) - 1
+
 """
 $(TYPEDSIGNATURES)
 For the grid resolution parameter `nlat_half` (e.g. 24 for a 48-ring FullGaussianGrid)

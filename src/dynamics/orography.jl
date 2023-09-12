@@ -18,8 +18,10 @@ function NoOrography(spectral_grid::SpectralGrid)
     return NoOrography{NF,Grid{NF}}(orography,geopot_surf)
 end
 
-function Base.show(io::IO,orog::NoOrography)
-    print(io,"$(typeof(orog))")
+function Base.show(io::IO,orog::AbstractOrography)
+    println(io,"$(typeof(IC)) <: AbstractOrography")
+    keys = propertynames(IC)
+    print_fields(io,IC,keys)
 end
 
 # no further initialization needed
@@ -42,15 +44,6 @@ Base.@kwdef struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: Abstr
     
     "surface geopotential, height*gravity [m²/s²]"
     geopot_surf::LowerTriangularMatrix{Complex{NF}} 
-end
-
-function Base.show(io::IO,orog::ZonalRidge)
-    print(io,"$(typeof(orog)):")
-    keys = (:η₀,:u₀)
-    for key in keys
-        val = getfield(orog,key)
-        print(io,"\n $key::$(typeof(val)) = $val")
-    end
 end
 
 """
@@ -144,16 +137,6 @@ function EarthOrography(spectral_grid::SpectralGrid;kwargs...)
     orography   = zeros(Grid{NF},nlat_half)
     geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
     return EarthOrography{NF,Grid{NF}}(;orography,geopot_surf,kwargs...)
-end
-
-function Base.show(io::IO,orog::EarthOrography)
-    print(io,"$(typeof(orog)):")
-    keys = (:path,:file,:scale,:smoothing,:smoothing_power,
-            :smoothing_strength,:smoothing_truncation)
-    for key in keys
-        val = getfield(orog,key)
-        print(io,"\n $key::$(typeof(val)) = $val")
-    end
 end
 
 """

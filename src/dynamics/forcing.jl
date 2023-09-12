@@ -1,9 +1,7 @@
 function Base.show(io::IO,F::AbstractForcing)
-    print(io,"$(typeof(F)) <: AbstractForcing:")
-    for key in propertynames(F)
-        val = getfield(F,key)
-        val isa AbstractArray || print(io,"\n $key::$(typeof(val)) = $val")
-    end
+    println(io,"$(typeof(F)) <: AbstractForcing")
+    keys = propertynames(F)
+    print_fields(io,F,keys)
 end
 
 ## NO FORCING

@@ -44,11 +44,9 @@ function Leapfrog(spectral_grid::SpectralGrid;kwargs...)
 end
 
 function Base.show(io::IO,L::Leapfrog)
-    print(io,"$(typeof(L)):")
-    for key = propertynames(L)
-        val = getfield(L,key)
-        print(io,"\n $key::$(typeof(val)) = $val")
-    end
+    println(io,"$(typeof(L)) <: TimeStepper")
+    keys = propertynames(L)
+    print_fields(io,L,keys)
 end
 
 """

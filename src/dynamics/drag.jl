@@ -1,9 +1,7 @@
 function Base.show(io::IO,F::AbstractDrag)
-    print(io,"$(typeof(F)) <: AbstractDrag:")
-    for key in propertynames(F)
-        val = getfield(F,key)
-        val isa AbstractArray || print(io,"\n $key::$(typeof(val)) = $val")
-    end
+    println(io,"$(typeof(F)) <: AbstractDrag")
+    keys = propertynames(F)
+    print_fields(io,F,keys)
 end
 
 ## NO DRAG

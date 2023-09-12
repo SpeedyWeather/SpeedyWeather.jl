@@ -33,13 +33,9 @@ function ImplicitShallowWater(spectral_grid::SpectralGrid;kwargs...)
 end
 
 function Base.show(io::IO,I::ImplicitShallowWater)
-    print(io,"$(typeof(I)):")
-    keys = (:trunc,:α)
-    for key in keys
-        val = getfield(I,key)
-        s = "\n $key::$(typeof(val)) = $val"
-        print(io,s)
-    end
+    println(io,"$(typeof(I)) <: AbstractImplicit")
+    keys = propertynames(I)
+    print_fields(io,I,keys)
 end
 
 # function barrier to unpack the constants struct for shallow water
@@ -192,13 +188,9 @@ function ImplicitPrimitiveEq(spectral_grid::SpectralGrid,kwargs...)
 end
 
 function Base.show(io::IO,I::ImplicitPrimitiveEq)
-    print(io,"$(typeof(I)):")
-    keys = (:trunc,:nlev,:α)
-    for key in keys
-        val = getfield(I,key)
-        s = "\n $key::$(typeof(val)) = $val"
-        print(io,s)
-    end
+    println(io,"$(typeof(I)) <: AbstractImplicit")
+    keys = propertynames(I)
+    print_fields(io,I,keys)
 end
 
 # function barrier to unpack the constants struct for primitive eq models

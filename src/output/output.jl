@@ -15,11 +15,9 @@ Base.@kwdef struct Keepbits
 end
 
 function Base.show(io::IO,K::Keepbits)
-    print(io,"$(typeof(K)):")
-    for key in propertynames(K)
-        val = getfield(K,key)
-        print(io,"\n $key::$(typeof(val)) = $val")
-    end
+    println(io,"$(typeof(K))")
+    keys = propertynames(K)
+    print_fields(io,K,keys)
 end
 
 # default number format for output

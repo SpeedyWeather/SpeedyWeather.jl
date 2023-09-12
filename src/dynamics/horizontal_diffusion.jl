@@ -61,15 +61,10 @@ function HyperDiffusion(spectral_grid::SpectralGrid;kwargs...)
     return HyperDiffusion{NF}(;trunc,nlev,kwargs...)
 end
 
-function Base.show(io::IO,HD::HyperDiffusion)
-    print(io,"$(typeof(HD)):")
-    keys = (:trunc,:nlev,:power,:time_scale,:resolution_scaling,:power_stratosphere,
-                :tapering_σ,:adaptive,:vor_max,:adaptive_strength)
-    for key in keys
-        val = getfield(HD,key)
-        s = "\n $key::$(typeof(val)) = $val"
-        print(io,s)
-    end
+function Base.show(io::IO,HD::HorizontalDiffusion)
+    println(io,"$(typeof(HD))")
+    keys = propertynames(HD)
+    print_fields(io,HD,keys,arrays=false)
 end
 
 """$(TYPEDSIGNATURES)

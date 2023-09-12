@@ -58,14 +58,22 @@ SpectralGrid(Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(;Grid,kwargs..
 SpectralGrid(NF::Type{<:AbstractFloat},Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(;NF,Grid,kwargs...)
 
 function Base.show(io::IO,SG::SpectralGrid)
-    (;NF,trunc,Grid,dealiasing,radius,nlat_half,npoints,nlev,vertical_coordinates) = SG
-    truncation = if dealiasing < 2 "linear" elseif dealiasing < 3 "quadratic" else "cubic" end
-    res = sqrt(4π*radius^2/npoints)/1000  # in [km]
+    (;NF,trunc,Grid,radius,nlat_half,npoints,nlev,vertical_coordinates) = SG
+    # truncation = if dealiasing < 2 "linear" elseif dealiasing < 3 "quadratic" else "cubic" end
+    
+    # resolution information
+    res_ave = sqrt(4π*radius^2/npoints)/1000  # in [km]
+    res_eq_x = 2π*radius/RingGrids.get_nlon_max(Grid,nlat_half)/1000
+    lat = get_lat(Grid,nlat_half)
+    res_eq_y = (lat[nlat_half] - lat[nlat_half+1])*radius/1000
+
+    s(x) = @sprintf("%.3g",x)
+
     println(io,"$(typeof(SG)):")
-    println(io," Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
-    println(io," Grid:       $npoints-element, $(get_nlat(Grid,nlat_half))-ring $Grid{$NF} ($truncation)")
-    println(io," Resolution: $(@sprintf("%.3g",res))km (average)")
-      print(io," Vertical:   $nlev-level $(typeof(vertical_coordinates))")
+    println(io,"├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
+    println(io,"├ Grid:       $(get_nlat(Grid,nlat_half))-ring $Grid{$NF}, $npoints grid points")
+    println(io,"├ Resolution: $(s(res_ave))km (average), $(s(res_eq_x))km × $(s(res_eq_y))km (Equator)")
+      print(io,"└ Vertical:   $nlev-level $(typeof(vertical_coordinates))")
 end
 
 """

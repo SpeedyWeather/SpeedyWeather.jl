@@ -270,3 +270,19 @@ Returns true if the model `M` has a prognostic variable `var_name`, false otherw
 The default fallback is that all variables are included. """
 has(M::Type{<:ModelSetup}, var_name::Symbol) = var_name in (:vor, :div, :temp, :humid, :pres)
 has(M::ModelSetup, var_name) = has(typeof(M), var_name)
+
+function Base.show(io::IO,M::ModelSetup)
+    println(io,"$(typeof(M))")
+    for key in propertynames(M)[1:end-1]
+        val = getfield(M,key)
+        println(io,"├ $key: $(typeof(val))")
+    end
+    println(io,"└ feedback: $(typeof(M.feedback))")
+end
+
+function Base.show(io::IO,S::Simulation)
+    println(io,"$(typeof(S))")
+    println(io,"├ $(typeof(S.model))")
+    println(io,"├ $(typeof(S.prognostic_variables))")
+    print(io,  "└ $(typeof(S.diagnostic_variables))")
+end

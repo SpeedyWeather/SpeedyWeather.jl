@@ -33,9 +33,7 @@ Base.@kwdef struct Earth <: AbstractPlanet
 end
 
 function Base.show(io::IO,planet::AbstractPlanet)
-    print(io,"$(typeof(planet)):")
-    for key in propertynames(planet)
-        val = getfield(planet,key)
-        print(io,"\n $key::$(typeof(val)) = $val")
-    end
+    println(io,"$(typeof(planet)) <: AbstractPlanet")
+    keys = propertynames(planet)
+    print_fields(io,planet,keys)
 end
