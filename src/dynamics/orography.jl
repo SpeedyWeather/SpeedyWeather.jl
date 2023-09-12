@@ -19,9 +19,9 @@ function NoOrography(spectral_grid::SpectralGrid)
 end
 
 function Base.show(io::IO,orog::AbstractOrography)
-    println(io,"$(typeof(IC)) <: AbstractOrography")
-    keys = propertynames(IC)
-    print_fields(io,IC,keys)
+    println(io,"$(typeof(orog)) <: AbstractOrography")
+    keys = propertynames(orog)
+    print_fields(io,orog,keys)
 end
 
 # no further initialization needed
