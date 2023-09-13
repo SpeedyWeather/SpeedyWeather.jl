@@ -71,3 +71,32 @@ end
 
 Allocate A::Array{Float64} with NaNs."""
 nans(dims...) = nans(Float64,dims...)
+
+"""
+$(TYPEDSIGNATURES)
+Prints to `io` all fields of a struct `A` identified by their
+`keys`."""
+function print_fields(io::IO,A,keys;arrays::Bool=false)
+    keys_filtered = arrays ? keys : filter(key -> ~(getfield(A,key) isa AbstractArray),keys)
+    n = length(keys_filtered)
+    filtered = n < length(keys)
+    for (i,key) in enumerate(keys_filtered)
+        last = (i == n) & ~filtered
+        key = keys[i]
+        val = getfield(A,key)
+        ~last ? println(io,"├ $key::$(typeof(val)) = $val") :
+                print(io,  "└ $key::$(typeof(val)) = $val")
+    end
+    if filtered                 # add the names of arrays
+        s = "└── arrays: "
+        for key in keys
+            if ~(key in keys_filtered)
+                s *= "$key, "
+            end
+        end
+
+        # remove last ", "
+        s_without_comma = s[1:prevind(s,findlast(==(','), s))]
+        print(io,s_without_comma)    
+    end
+end

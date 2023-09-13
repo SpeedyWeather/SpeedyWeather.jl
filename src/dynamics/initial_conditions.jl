@@ -108,11 +108,9 @@ Base.@kwdef struct ZonalJet <: InitialConditions
 end
 
 function Base.show(io::IO,IC::InitialConditions)
-    print(io,"$(typeof(IC)) <: InitialConditions:")
-    for key in propertynames(IC)
-        val = getfield(IC,key)
-        print(io,"\n $key::$(typeof(val)) = $val")
-    end
+    println(io,"$(typeof(IC)) <: InitialConditions")
+    keys = propertynames(IC)
+    print_fields(io,IC,keys)
 end
 
 """

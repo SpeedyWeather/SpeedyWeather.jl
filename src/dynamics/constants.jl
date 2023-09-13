@@ -56,6 +56,12 @@ Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConst
     temp_ref_profile::Vector{NF}
 end
 
+function Base.show(io::IO,C::DynamicsConstants)
+    println(io,"$(typeof(C)) <: AbstractDynamicsConstants")
+    keys = propertynames(C)
+    print_fields(io,C,keys)
+end
+
 """
 $(TYPEDSIGNATURES)
 Generator function for a DynamicsConstants struct.
