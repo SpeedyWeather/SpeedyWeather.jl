@@ -94,6 +94,9 @@ function print_fields(io::IO,A,keys;arrays::Bool=false)
                 s *= "$key, "
             end
         end
-        print(io,s[1:end-2])    # remove last ", "
+
+        # remove last ", "
+        s_without_comma = s[1:prevind(s,findlast(==(','), s))]
+        print(io,s_without_comma)    
     end
 end
