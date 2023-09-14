@@ -36,3 +36,6 @@ run_*/
 
 # no video outputs
 *.mp4
+
+# JOSS paper
+docs/joss/media
