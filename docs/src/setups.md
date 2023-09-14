@@ -1,7 +1,7 @@
 # Model setups
 
 The following is a collection of model setups, starting with an easy setup
-of the [Barotropic vorticity equation](@ref) and continuiing with more
+of the [Barotropic vorticity equation](@ref) and continuing with more
 complicated setups.
 
 ## 2D turbulence on a non-rotating sphere
@@ -56,7 +56,7 @@ simulation = initialize!(model)
 run!(simulation,n_days=20)
 ```
 
-Woohoo! I can see turbulence! You could pick up where this simulation stopped by simply
+Woohoo! Something is moving! You could pick up where this simulation stopped by simply
 doing `run!(simulation,n_days=50)` again. We didn't store any output, which
 you can do by `run!(simulation,output=true)`, which will switch on NetCDF output
 with default settings. More options on output in [NetCDF output](@ref).
@@ -277,9 +277,9 @@ model.atmosphere.layer_thickness
 8.5km so those waves are with an amplitude of 2000m quite strong.
 But the semi-implicit time integration can handle that even with fairly large time steps of
 ```@example gravity_wave_setup
-model.time_stepping
+model.time_stepping.Δt_sec
 ```
-670s or about 11min. Note that the gravity wave speed here is ``\sqrt{gH}`` so almost 300m/s.
+seconds. Note that the gravity wave speed here is ``\sqrt{gH}`` so almost 300m/s.
 Let us also output divergence, as gravity waves are quite pronounced in that variable.
 But given the speed of gravity waves we don't have to integrate for long.
 Visualise with
@@ -323,11 +323,11 @@ run!(simulation,n_days=9,output=true)
 nothing # hide
 ```
 
-The Jablonowski-Williamson baroclinic wave test case using the [Primitive equation model](@ref)
+The Jablonowski-Williamson baroclinic wave test case[^JW06] using the [Primitive equation model](@ref)
 particularly the dry model, as we switch off all physics with `physics=false`.
-We want to use 8 vertical levels, and a lower resolution of T31 on a [full Gaussian grid](@ref FullGaussianGrid)
+We want to use 8 vertical levels, and a lower resolution of T31 on a [full Gaussian grid](@ref FullGaussianGrid).
 The Jablonowski-Williamson initial conditions are in `ZonalWind`, the orography
-is just a `ZonalRidge`. There is no forcing and the initial conditions are just
+is just a `ZonalRidge`. There is no forcing and the initial conditions are
 baroclinically unstable which kicks off a wave propagating eastward.
 This wave becomes obvious when visualised with
 
@@ -358,3 +358,4 @@ nothing # hide
 ## References
 
 [^G04]: Galewsky, Scott, Polvani, 2004. *An initial-value problem for testing numerical models of the global shallow-water equations*, Tellus A. DOI: [10.3402/tellusa.v56i5.14436](https://doi.org/10.3402/tellusa.v56i5.14436)
+[^JW06]: Jablonowski, C. and Williamson, D.L. (2006), A baroclinic instability test case for atmospheric model dynamical cores. Q.J.R. Meteorol. Soc., 132: 2943-2975. [10.1256/qj.06.12](https://doi.org/10.1256/qj.06.12)
