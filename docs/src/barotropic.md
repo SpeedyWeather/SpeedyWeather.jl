@@ -89,7 +89,7 @@ Now loop over
 
 ## [Horizontal diffusion](@id diffusion)
 
-In SpeedyWeather.jl we use hyerdiffusion through an ``n``-th power Laplacian ``(-1)^{n+1}\nabla^{2n}`` (hyper when ``n>1``) which
+In SpeedyWeather.jl we use hyperdiffusion through an ``n``-th power Laplacian ``(-1)^{n+1}\nabla^{2n}`` (hyper when ``n>1``) which
 can be implemented as a multiplication of the spectral coefficients ``\Psi_{lm}`` with ``(-l(l+1))^nR^{-2n}`` (see
 spectral [Laplacian](@ref)) It is therefore computationally not more expensive to apply hyperdiffusion over diffusion
 as the ``(-l(l+1))^nR^{-2n}`` can be precomputed. Note the sign change ``(-1)^{n+1}`` here is such that the dissipative nature of the diffusion operator is retained for ``n`` odd and even.
@@ -162,7 +162,7 @@ A scaling for vorticity ``\zeta`` and stream function ``\Psi`` is used that is
 \tilde{\zeta} = \zeta R, \tilde{\Psi} = \Psi R^{-1}.
 ```
 This is also convenient as vorticity is often ``10^{-5}\text{ s}^{-1}`` in the atmosphere,
-but the streamfunction more like ``10^5\text{ m}^2\text{ s}^{-1}`` and so this scaling
+but the stream function more like ``10^5\text{ m}^2\text{ s}^{-1}`` and so this scaling
 brings both closer to 1 with a typical radius of the Earth of 6371km.
 The inversion of the Laplacians in order to obtain ``\Psi`` from ``\zeta`` therefore becomes
 ```math
@@ -184,7 +184,7 @@ with
 So scaling with the radius squared means we can use dimensionless operators, however, this comes at the
 cost of needing to deal with both a time step in seconds as well as a scaled time step in seconds per
 meter, which can be confusing. Furthermore, some constants like Coriolis or the diffusion coefficient
-need to be scaled too during initialisation, which may be confusing too because values are not
+need to be scaled too during initialization, which may be confusing too because values are not
 what users expect them to be. SpeedyWeather.jl follows the logic that the scaling to the prognostic
 variables is only applied just before the time integration and variables are unscaled for output
 and after the time integration finished. That way, the scaling is hidden as much as possible from
@@ -211,7 +211,7 @@ For the Leapfrog time integration two time steps of the prognostic variables hav
 to ``i-1`` in a step that also swaps the indices for the next time step ``i \to i-1`` and ``i+1 \to i``,
 so that no additional memory than two time steps have to be stored at the same time.
 
-The Leapfrog time integration has to be initialised with an Euler forward step in order
+The Leapfrog time integration has to be initialized with an Euler forward step in order
 to have a second time step ``i+1`` available when starting from ``i`` to actually leapfrog over.
 SpeedyWeather.jl therefore does two initial time steps that are different from
 the leapfrog time steps that follow and that have been described above.
