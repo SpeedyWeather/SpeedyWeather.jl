@@ -21,7 +21,7 @@ whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
     "dictates resolution for many other components"
-    spectral_grid::SpectralGrid = SpectralGrid()
+    spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
 
     # DYNAMICS
     "contains physical and orbital characteristics"
@@ -77,7 +77,7 @@ whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
     "dictates resolution for many other components"
-    spectral_grid::SpectralGrid = SpectralGrid()
+    spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
 
     # DYNAMICS
     "contains physical and orbital characteristics"
