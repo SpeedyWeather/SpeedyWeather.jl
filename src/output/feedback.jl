@@ -29,6 +29,18 @@ mutable struct Feedback <: AbstractFeedback
     nars_detected::Bool                     
 end
 
+function Base.show(io::IO,F::AbstractFeedback)
+    println(io,"$(typeof(F)) <: AbstractFeedback")
+    keys = propertynames(F)
+    print_fields(io,F,keys)
+end
+
+function Base.show(io::IO,P::ProgressMeter.Progress)
+    println(io,"$(typeof(P)) <: ProgressMeter.AbstractProgress")
+    keys = propertynames(P)
+    print_fields(io,P,keys)
+end
+
 """
 $(TYPEDSIGNATURES)
 Generator function for a Feedback struct."""
@@ -59,8 +71,9 @@ Initializes the a `Feedback` struct."""
 function initialize!(feedback::Feedback,clock::Clock,model::ModelSetup)
 
     # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
-    (;enabled, showspeed, desc) = feedback.progress_meter
-    feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps-1;enabled,showspeed, desc)
+    (;showspeed, desc) = feedback.progress_meter
+    (;verbose) = feedback
+    feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps-1;enabled=verbose, showspeed, desc)
     
     # set to false to recheck for NaRs
     feedback.nars_detected = false
