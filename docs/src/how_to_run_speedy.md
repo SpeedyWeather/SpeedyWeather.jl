@@ -1,6 +1,9 @@
 # How to run SpeedyWeather.jl
 
-Creating a SpeedyWeather.jl simulation and running it consists conceptually of 4 steps
+Creating a SpeedyWeather.jl simulation and running it consists conceptually of 4 steps.
+In contrast to many other models, these steps are bottom-up rather then top-down.
+There is no monolithic interface to SpeedyWeather.jl, instead all options that a
+user may want to adjust are chosen and live in their respective model components.
 
 1. Create a [SpectralGrid](@ref) which defines the grid and spectral resolution.
 2. [Create model components](@ref create_model_components) and combine to a [model](@ref create_model).

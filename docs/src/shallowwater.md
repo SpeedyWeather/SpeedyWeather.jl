@@ -106,7 +106,7 @@ In spectral space ``\nabla^2`` is a diagonal operator, meaning that there is no 
 harmonics and its inversion is therefore easily done on a mode-by-mode basis of the harmonics.
 
 This can be made use of when facing time stepping constraints with explicit schemes, where
-ridiculuously small time steps to resolve fast waves would otherwise result in a horribly slow simulation. 
+ridiculously small time steps to resolve fast waves would otherwise result in a horribly slow simulation. 
 In the shallow water system there are gravity waves that propagate at a wave speed of ``\sqrt{gH}``
 (typically 300m/s), which, in order to not violate the
 [CFL criterion](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition)
@@ -219,7 +219,7 @@ The idea of the semi-implicit time stepping is now as follows:
 Some notes on the semi-implicit time stepping
 
 - The inversion of the semi-implicit time stepping depends on ``\delta t``, that means every time the time step changes, the inversion has to be recalculated.
-- You may choose ``\alpha = 1/2`` to dampen gravity waves but initialisation shocks still usually kick off many gravity waves that propagate around the sphere for many days.
+- You may choose ``\alpha = 1/2`` to dampen gravity waves but initialization shocks still usually kick off many gravity waves that propagate around the sphere for many days.
 - With increasing ``\alpha > 1/2`` these waves are also slowed down, such that for ``\alpha = 1`` they quickly disappear in several hours.
 - Using the [scaled shallow water equations](@ref scaled_swm) the time step ``\delta t`` has to be the scaled time step ``\tilde{\Delta t} = \delta t/R`` which is divided by the radius ``R``. Then we use the normalized eigenvalues ``-l(l+1)`` which also omit the ``1/R^2`` scaling, see [scaled shallow water equations](@ref scaled_swm) for more details.
 

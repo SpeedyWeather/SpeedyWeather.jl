@@ -38,7 +38,7 @@ map = gridded(alms)
 ```
 By default, the `gridded` transforms onto a [`FullGaussianGrid`](@ref FullGaussianGrid) unravelled here
 into a vector west to east, starting at the prime meridian, then north to south, see [RingGrids](@ref).
-We can visualize `map` quickly with a unicodeplot via `plot` (see [Visualising RingGrid data](@ref))
+We can visualize `map` quickly with a UnicodePlot via `plot` (see [Visualising RingGrid data](@ref))
 ```@example speedytransforms
 plot(map)
 ```
@@ -108,7 +108,7 @@ Note that because we chose `dealiasing=3` (cubic truncation) we now match a T5 s
 with a 12-ring octahedral Gaussian grid, instead of the 8 rings as above. So going from
 `dealiasing=2` (default) to `dealiasing=3` increased our resolution on the grid while the
 spectral resolution remains the same. The `SpectralTransform` also has options for the
-recomputation or precomputation of the Legendre polynomials, fore more information see
+recomputation or pre-computation of the Legendre polynomials, fore more information see
 [(P)recompute Legendre polynomials](@ref).
 
 Passing on `S` the `SpectralTransform` now allows us to transform directly on the grid
@@ -164,7 +164,7 @@ m = Matrix(map) # hide
 m
 ```
 You hopefully know which grid this data comes on, let us assume it is a regular
-latitde-longitude grid, which we call the `FullClenshawGrid`. Note that for the spectral
+latitude-longitude grid, which we call the `FullClenshawGrid`. Note that for the spectral
 transform this should not include the poles, so the 96x47 matrix size here corresponds
 to 
 
