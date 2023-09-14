@@ -227,11 +227,11 @@ Some remarks on this table
 - This assumes the default quadratic truncation, you can always adapt the grid resolution via the `dealiasing` option, see [Matching spectral and grid resolution](@ref)
 - `nlat` refers to the total number of latitude rings, see [Grids](@ref). With non-Gaussian grids, `nlat` will be one one less, e.g. 47 instead of 48 rings.
 - `nlon` is the number of longitude points on the [Full Gaussian Grid](@ref FullGaussianGrid), for other grids there will be at most these number of points around the Equator.
-- ``\Delta x`` is the horizontal resolution. For a spectral model there are many ways of estimating this[^9]. We use here the square root of the average area a grid cell covers, see [Effective grid resolution](@ref)
+- ``\Delta x`` is the horizontal resolution. For a spectral model there are many ways of estimating this[^Randall2021]. We use here the square root of the average area a grid cell covers, see [Effective grid resolution](@ref)
 
 ## Effective grid resolution
 
-There are many ways to estimate the effective grid resolution of spectral models[^9].
+There are many ways to estimate the effective grid resolution of spectral models[^Randall2021].
 Some of them are based on the wavelength a given spectral resolution allows to
 represent, others on the total number of real variables per area.
 However, as many atmospheric models do represent a considerable amount of physics
@@ -354,7 +354,7 @@ number ``m`` times imaginary ``i``.
 ### Meridional derivative
 
 The meridional derivative of the spherical harmonics is a derivative of the Legendre polynomials for which the following
-recursion relation applies[^10],[^11]
+recursion relation applies[^Randall2021],[^Durran2010],[^GFDL],[^Orszag70]
 
 ```math
 \cos\theta \frac{dP_{l,m}}{d\theta} = -l\epsilon_{l+1,m}P_{l+1,m} + (l+1)\epsilon_{l,m}P_{l-1,m}.
@@ -394,7 +394,7 @@ degree ``l``, but scalar quantities should not make use of it. Equivalently, the
 set to zero before the time integration, which only advances scalar quantities.
 
 
-In SpeedyWeather.jl vector quantities
+In SpeedyWeather.jl, vector quantities
 like ``u,v`` use therefore one more meridional mode than scalar quantities such as vorticity ``\zeta`` or stream
 function ``\Psi``. The meridional derivative in SpeedyWeather.jl also omits the ``1/R``-scaling as explained for
 the [Zonal derivative](@ref) and in [Radius scaling](@ref scaling).
@@ -404,7 +404,7 @@ the [Zonal derivative](@ref) and in [Radius scaling](@ref scaling).
 The meridional gradient as described above can be applied to scalars, such as ``\Psi`` and ``\Phi`` in the conversion
 to velocities ``(u,v) = \nabla^\bot\Psi + \nabla\Phi``, however, the operators curl ``\nabla \times`` and divergence
 ``\nabla \cdot`` in spherical coordinates involve a ``\cos\theta`` scaling _before_ the meridional gradient is applied.
-How to translate this to spectral coefficients has to be derived separately[^10],[^11].
+How to translate this to spectral coefficients has to be derived separately[^Randall2021],[^Durran2010].
 
 The spectral transform of vorticity ``\zeta`` is
 ```math
@@ -414,7 +414,7 @@ P_{l,m}(\sin\theta) e^{im\lambda} d\lambda \cos\theta d\theta
 Given that ``R\zeta = \cos^{-1}\partial_\lambda v - \cos^{-1}\partial_\theta (u \cos\theta)``,
 we therefore have to evaluate a meridional integral of the form
 ```math
-\int P_{l,m} \frac{1}{\cos \theta} \partial_\theta(u \cos\theta)) \cos \theta d\theta
+\int P_{l,m} \frac{1}{\cos \theta} \partial_\theta(u \cos\theta) \cos \theta d\theta
 ```
 which can be solved through integration by parts. As ``u\cos\theta = 0`` at ``\theta = \pm \tfrac{\pi}{2}`` only the integral
 ```math
@@ -443,7 +443,7 @@ The spectral Laplacian is easily applied to the coefficients ``\Psi_{lm}`` of a 
 as the spherical harmonics are eigenfunctions of the Laplace operator ``\nabla^2`` in spherical
 coordinates with eigenvalues ``-l(l+1)`` divided by the radius squared ``R^2``, i.e.
 ``\nabla^2 \Psi`` becomes ``\tfrac{-l(l+1)}{R^2}\Psi_{lm}`` in spectral space. For example,
-vorticity ``\zeta`` and streamfunction ``\Psi`` are related by ``\zeta = \nabla^2\Psi``
+vorticity ``\zeta`` and stream function ``\Psi`` are related by ``\zeta = \nabla^2\Psi``
 in the barotropic vorticity model. Hence, in spectral space this is equivalent for every
 spectral mode of degree ``l`` and order ``m`` to
 
@@ -502,3 +502,4 @@ as further described in [Radius scaling](@ref scaling).
 [^GFDL]: Geophysical Fluid Dynamics Laboratory, [The barotropic vorticity equation](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/barotropic.pdf).
 [^FFT]: Depending on the implementation of the Fast Fourier Transform ([Cooley-Tukey algorithm](https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm), or or the [Bluestein algorithm](https://en.wikipedia.org/wiki/Chirp_Z-transform#Bluestein.27s_algorithm)) *easily Fourier-transformable* can mean different things: Vectors of the length ``n`` that is a power of two, i.e. ``n = 2^i`` is certainly easily Fourier-transformable, but for most FFT implementations so are ``n = 2^i3^j5^k`` with ``i,j,k`` some positive integers. In fact, [FFTW](http://fftw.org/) uses ``O(n \log n)`` algorithms even for prime sizes.
 [^Bourke72]: Bourke, W. An Efficient, One-Level, Primitive-Equation Spectral Model. Mon. Wea. Rev. 100, 683–689 (1972). doi:[10.1175/1520-0493(1972)100<0683:AEOPSM>2.3.CO;2](https://doi.org/10.1175/1520-0493(1972)100<0683:AEOPSM>2.3.CO;2)
+[^Orszag70]: Orszag, S. A., 1970: Transform Method for the Calculation of Vector-Coupled Sums: Application to the Spectral Form of the Vorticity Equation. J. Atmos. Sci., 27, 890–895, [10.1175/1520-0469(1970)027<0890:TMFTCO>2.0.CO;2](https://doi.org/10.1175/1520-0469(1970)027<0890:TMFTCO>2.0.CO;2). 

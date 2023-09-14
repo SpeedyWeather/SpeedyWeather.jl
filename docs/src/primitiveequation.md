@@ -2,7 +2,7 @@
 
 The [primitive equations](https://en.wikipedia.org/wiki/Primitive_equations) are a hydrostatic approximation
 of the compressible Navier-Stokes equations for an ideal gas on a rotating sphere. We largely follow
-the idealised spectral dynamical core developed by GFDL[^1] and documented therein[^2].
+the idealised spectral dynamical core developed by GFDL[^GFDL1] and documented therein[^GFDL2].
 
 The primitive equations solved by SpeedyWeather.jl for relative vorticity ``\zeta``, divergence ``\mathcal{D}``,
 logarithm of surface pressure ``\ln p_s``, temperature ``T`` and specific humidity ``q`` are
@@ -57,7 +57,7 @@ p_w &= \rho_w R_w T \\
 \end{aligned}
 ```
 with the respective specific gas constants ``R_d = R/m_d`` and ``R_w = R/m_w``
-obtained from the univeral gas constant ``R`` divided by the molecular masses
+obtained from the universal gas constant ``R`` divided by the molecular masses
 of the gas. The total pressure ``p`` in the air parcel is
 ```math
 p = p_d + p_w = (\rho_d R_d + \rho_w R_w)T
@@ -67,7 +67,7 @@ using the ideal gas law, with the temperature ``T``, so that we never have
 to calculate the density explicitly. However, in order to not deal with
 two densities (dry air and water vapour) we would like to replace
 temperature with a virtual temperature that includes the effect of
-humidity on the density. So, whereever we use the ideal gas law
+humidity on the density. So, wherever we use the ideal gas law
 to replace density with temperature, we would use the virtual temperature,
 which is a function of the absolute temperature and specific humidity,
 instead. A higher specific humidity in an air parcel lowers 
@@ -78,7 +78,7 @@ think of the virtual temperature as the temperature dry air would need to have
 to be as light as moist air.
 
 Starting with the last equation, with some manipulation we can write
-the ideal gas law as total density ``rho`` times a gas constant
+the ideal gas law as total density ``\rho`` times a gas constant
 times the virtual temperature that is supposed to be a function
 of absolute temperature, humidity and some constants
 ```math
@@ -133,7 +133,7 @@ The chain rule lets us differentiate ``\Psi`` with respect to ``z`` or ``\eta``
 \frac{\partial \Psi}{\partial z} = \frac{\partial \Psi}{\partial \eta}\frac{\partial \eta}{\partial z},
 \qquad \frac{\partial \Psi}{\partial \eta} = \frac{\partial \Psi}{\partial z}\frac{\partial z}{\partial \eta}
 ```
-But for derivatives with respect to ``x,y,t`` we have to apply the multivariable
+But for derivatives with respect to ``x,y,t`` we have to apply the multi-variable
 chain-rule as both ``\Psi`` and ``\eta`` depend on it. So a derivative with respect to
 ``x`` on ``\eta`` levels (where ``\eta`` constant) becomes
 ```math
@@ -311,7 +311,7 @@ for layer ``k``
 - (M_{k+\tfrac{1}{2}}T_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}}T_{k-\tfrac{1}{2}})
 ```
 which can be through the gradient product rule, and using the conservation of mass
-(see [Vertical velocity](@ref)) transformed into an advective form. In sigma coordinates this simpifies to
+(see [Vertical velocity](@ref)) transformed into an advective form. In sigma coordinates this simplifies to
 ```math
 \frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
 - \frac{1}{\Delta \sigma_k}\left(\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+\tfrac{1}{2}} - T_k) - \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-\tfrac{1}{2}})\right)
@@ -420,7 +420,7 @@ From left to right: The pressure gradient force in ``z``-coordinates; in pressur
 and in sigma coordinates. Each denoted with the respective subscript on gradients. 
 SpeedyWeather.jl uses the latter.
 In sigma coordinates we may drop the ``\sigma`` subscript on gradients, but still meaning
-that the gradient is evaluted on a surface of our vertical coordinate.
+that the gradient is evaluated on a surface of our vertical coordinate.
 In vorticity-divergence formulation of the momentum equations the ``\nabla_\sigma \Phi``
 drops out in the vorticity equation (``\nabla \times \nabla \Phi = 0``),
 but becomes a ``-\nabla^2 \Phi`` in the divergence equation,
@@ -488,7 +488,7 @@ with ``\mathbf{u}_\perp = (v,-u)`` the rotated velocity vector, see [Barotropic 
 ## Humidity equation
 
 The dynamical core treats humidity as an (active) tracer, meaning that after the physical
-parameterizations for humidity ``\matchal{P}`` are calculated in grid-point space,
+parameterizations for humidity ``\mathcal{P}`` are calculated in grid-point space,
 humidity is only advected with the flow. The only exception is the [Virtual temperature](@ref)
 as high levels of humidity will lower the effective density, which is why we use the
 virtual instead of the absolute temperature. The equation to be solved for humidity
@@ -636,7 +636,7 @@ So for every linear term in ``N_I`` we have two options corresponding to two sid
 2. Or, evaluate it at the current time step ``i`` as ``N(V_i)``, but then move it back to the previous time step ``i-1`` by adding (in spectral space) the linear operator ``N_I`` evaluated with the difference between the two time steps.
 
 If there is a tendency that is easily evaluated in spectral space it is easier to follow 1. However,
-a term that is costly to evalute in grid-point space should usually follow the latter. The reason is that
+a term that is costly to evaluate in grid-point space should usually follow the latter. The reason is that
 the previous time step is generally not available in grid-point space (unless recalculated through a costly transform
 or stored with additional memory requirements) so it is easier to follow 2 where the ``N_I`` is
 available in spectral space. For the adiabatic conversion term in the [Temperature equation](@ref)
@@ -738,7 +738,7 @@ be recomputed. Otherwise the algorithm for the semi-implicit scheme is as follow
 Then for every time step
 
 1. Compute the uncorrected tendencies evaluated at the current time step for the explicit terms and the previous time step for the implicit terms.
-2. Excpetion in SpeedyWeather.jl is the adiabatic conversion term, which is, using ``\mathbf{L}`` moved afterwards from the current ``i`` to the previous time step ``i-1``.
+2. Exception in SpeedyWeather.jl is the adiabatic conversion term, which is, using ``\mathbf{L}`` moved afterwards from the current ``i`` to the previous time step ``i-1``.
 3. Compute the combined tendency ``G`` from the uncorrected tendencies ``G_\mathcal{D}``, ``G_T``, ``G_{\ln p_s}``.
 4. With the inverted operator get the corrected tendency for divergence, ``\delta \mathcal{D} = \mathbf{S}^{-1}G``.
 5. Obtain the corrected tendencies for temperature ``\delta T`` and surface pressure ``\delta \ln p_s`` from ``\delta \mathcal{D}``.
@@ -804,8 +804,8 @@ Now loop over
 
 ## References
 
-[^1]: Geophysical Fluid Dynamics Laboratory, [Idealized models with spectral dynamics](https://www.gfdl.noaa.gov/idealized-models-with-spectral-dynamics/)
-[^2]: Geophysical Fluid Dynamics Laboratory, [The Spectral Dynamical Core](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/spectral_core.pdf)
+[^GFDL1]: Geophysical Fluid Dynamics Laboratory, [Idealized models with spectral dynamics](https://www.gfdl.noaa.gov/idealized-models-with-spectral-dynamics/)
+[^GFDL2]: Geophysical Fluid Dynamics Laboratory, [The Spectral Dynamical Core](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/spectral_core.pdf)
 [^Vallis]: GK Vallis, 2006. [Atmopsheric and Ocean Fluid Dynamics](http://vallisbook.org/), Cambridge University Press.
 [^SB81]: Simmons and Burridge, 1981. *An Energy and Angular-Momentum Conserving Vertical Finite-Difference Scheme and Hybrid Vertical Coordinates*, Monthly Weather Review. DOI: [10.1175/1520-0493(1981)109<0758:AEAAMC>2.0.CO;2](https://doi.org/10.1175/1520-0493(1981)109<0758:AEAAMC>2.0.CO;2).
 [^HS75]: Hoskins and Simmons, 1975. *A multi-layer spectral model and the semi-implicit method*, Quart. J. R. Met. Soc. DOI: [10.1002/qj.49710142918](https://doi.org/10.1002/qj.49710142918)
