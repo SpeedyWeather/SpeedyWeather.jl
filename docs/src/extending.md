@@ -1,3 +1,3 @@
-# New model setups
+# Extending SpeedyWeather
 
 more to come...

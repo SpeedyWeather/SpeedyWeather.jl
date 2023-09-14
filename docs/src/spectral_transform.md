@@ -227,11 +227,11 @@ Some remarks on this table
 - This assumes the default quadratic truncation, you can always adapt the grid resolution via the `dealiasing` option, see [Matching spectral and grid resolution](@ref)
 - `nlat` refers to the total number of latitude rings, see [Grids](@ref). With non-Gaussian grids, `nlat` will be one one less, e.g. 47 instead of 48 rings.
 - `nlon` is the number of longitude points on the [Full Gaussian Grid](@ref FullGaussianGrid), for other grids there will be at most these number of points around the Equator.
-- ``\Delta x`` is the horizontal resolution. For a spectral model there are many ways of estimating this[^9]. We use here the square root of the average area a grid cell covers, see [Effective grid resolution](@ref)
+- ``\Delta x`` is the horizontal resolution. For a spectral model there are many ways of estimating this[^Randall2021]. We use here the square root of the average area a grid cell covers, see [Effective grid resolution](@ref)
 
 ## Effective grid resolution
 
-There are many ways to estimate the effective grid resolution of spectral models[^9].
+There are many ways to estimate the effective grid resolution of spectral models[^Randall2021].
 Some of them are based on the wavelength a given spectral resolution allows to
 represent, others on the total number of real variables per area.
 However, as many atmospheric models do represent a considerable amount of physics
@@ -354,7 +354,7 @@ number ``m`` times imaginary ``i``.
 ### Meridional derivative
 
 The meridional derivative of the spherical harmonics is a derivative of the Legendre polynomials for which the following
-recursion relation applies[^10],[^11]
+recursion relation applies[^Randall2021],[^Durran2010],[^GFDL]
 
 ```math
 \cos\theta \frac{dP_{l,m}}{d\theta} = -l\epsilon_{l+1,m}P_{l+1,m} + (l+1)\epsilon_{l,m}P_{l-1,m}.
@@ -404,7 +404,7 @@ the [Zonal derivative](@ref) and in [Radius scaling](@ref scaling).
 The meridional gradient as described above can be applied to scalars, such as ``\Psi`` and ``\Phi`` in the conversion
 to velocities ``(u,v) = \nabla^\bot\Psi + \nabla\Phi``, however, the operators curl ``\nabla \times`` and divergence
 ``\nabla \cdot`` in spherical coordinates involve a ``\cos\theta`` scaling _before_ the meridional gradient is applied.
-How to translate this to spectral coefficients has to be derived separately[^10],[^11].
+How to translate this to spectral coefficients has to be derived separately[^Randall2021],[^Durran2010].
 
 The spectral transform of vorticity ``\zeta`` is
 ```math
@@ -414,7 +414,7 @@ P_{l,m}(\sin\theta) e^{im\lambda} d\lambda \cos\theta d\theta
 Given that ``R\zeta = \cos^{-1}\partial_\lambda v - \cos^{-1}\partial_\theta (u \cos\theta)``,
 we therefore have to evaluate a meridional integral of the form
 ```math
-\int P_{l,m} \frac{1}{\cos \theta} \partial_\theta(u \cos\theta)) \cos \theta d\theta
+\int P_{l,m} \frac{1}{\cos \theta} \partial_\theta(u \cos\theta) \cos \theta d\theta
 ```
 which can be solved through integration by parts. As ``u\cos\theta = 0`` at ``\theta = \pm \tfrac{\pi}{2}`` only the integral
 ```math
