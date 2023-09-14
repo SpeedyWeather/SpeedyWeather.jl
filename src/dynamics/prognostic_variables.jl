@@ -13,6 +13,12 @@ Base.@kwdef mutable struct Clock
     n_timesteps::Int = 0  
 end
 
+function Base.show(io::IO,C::Clock)
+    println(io,"$(typeof(C))")
+    keys = propertynames(C)
+    print_fields(io,C,keys)
+end
+
 """
 $(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` in the `time_stepping`."""
