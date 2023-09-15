@@ -66,7 +66,7 @@ affiliations:
    index: 7
  - name: European Centre for Medium-Range Weather Forecasts, Reading, UK
    index: 8
- - name: University of Melbourne, Melbourne, Australia
+ - name: University of Melbourne, Australia
    index: 9
  - name: Australian National University, Canberra, Australia
    index: 10
@@ -76,23 +76,60 @@ bibliography: paper.bib
 
 ---
 
+
 # Summary
 
 SpeedyWeather.jl is a library to simulate and analyse the global atmospheric
 circulation on the sphere. It implements several 2D and 3D
-models to solve the primitive equations with and without humidity,
+models to solve the primitive equations with and without humidity (\autoref{fig:primitive}),
 the shallow water equations (\autoref{fig:swm}), or the barotropic vorticity equations
-with spherical harmonics.
+with spherical harmonics. Several simple parameterizations for unresolved physical processes
+such as precipitation or the boundary layer are implemented, and new ones can
+be externally defined and passed as an argument to the model constructor.
+SpeedyWeather.jl is an intermediate-complexity general circulation model [@Kucharski2013]
+and research playground with an (almost) everything-flexible attitude.
+It can be thought of as a conceptual reinvention of the Fortran SPEEDY model [@Molteni2003]
+in the Julia programming language [@Bezanson2017].
+
+SpeedyWeather.jl internally uses three sub-modules `SpeedyTransforms`, `RingGrids`, and
+`LowerTriangularMatrices` to perform spherical harmonic transforms and interpolations
+between various grids and the spectral space. `RingGrids` discretize the sphere
+on iso-latitude rings and the spectral space is defined by the `LowerTriangularMatrices`
+of the spherical harmonic coefficients. These three modules are independently usable
+and therefore make SpeedyWeather.jl, beyond its main purpose of simulating the weather,
+also a library for the analysis of gridded data on the sphere.
+Running and analysing simulations can interactively combined, enhancing user
+experience and productivity.
 
 The user interface of SpeedyWeather.jl is heavily influenced by
-Oceananigans.jl [@Ramadhan2020]. A monolithic interface is deliberately avoided
+the Julia ocean model Oceananigans.jl [@Ramadhan2020].
+A monolithic interface is deliberately avoided,
+instead, a model is created bottom-up by first defining the discretization
+and any non-default model components with its respective parameters.
+All components are then collected into a single model object, which, once
+initialized, returns a simulation object that contains the entire model state,
+work arrays and parameters, that can be run, analysed or changed.
+While these steps can be written into a script for reproducibility,
+the same steps can be executed and interacted with one-by-one in
+Julia's read-evaluate-print loop (REPL). We thereby reach an interactivity
+far beyond a monolithic interface that is limited to the options provided.
 
-To be extendible and composable, SpeedyWeather.jl relies on multiple dispatch
-from the Julia programming language [@Bezanson2017]. Every model component
-is defined as a new type `SomeComponent <: AbstractComponent`, i.e. subtype of
-an abstract super type `AbstractComponent`.
-Extending SpeedyWeather.jl can therefore easily achieved by defining a new
-`OtherComponent <: AbstractComponent` 
+To be extendible and composable with new
+model components, SpeedyWeather.jl relies on Julia's multiple dispatch
+programming paradigm [@Bezanson2017]. Every model component
+is defined as a new type. For example, to define a new way how to calculate
+the precipitation due to the physical process of large-scale condensation,
+one would define `MyCondensation` as a new subtype of `AbstractCondensation`.
+One then only needs to extend the `initialize!` and `condensation!`
+functions for this new type. Passing on `condensation = MyCondensation()`
+to the model constructor then implements this new model component without
+the need to branch off or overwrite existing model components.
+Conceptually similar scientific modelling paradigms have been very successful
+in the Python-based generic partial differential equation solver Dedalus [@Burns2020]
+and the Julia ocean model Oceananigans.jl [@Ramadhan2020].
+
+![Surface temperature simulated with the primitive equation model in SpeedyWeather.jl.
+(Figure will be updated) \label{fig:primitive}](primitive.jpg)
 
 The dynamical core of SpeedyWeather.jl uses established numerics
 [@Bourke1972; @Hoskins1975; @Simmons1978; @Simmons1981],
@@ -107,22 +144,39 @@ the octahedral Gaussian grid [@Malardel2016], the octahedral
 Clenshaw-Curtis grid [@Hotta2018], and the HEALPix grid [@Gorski2005].
 Both SpeedyWeather.jl and its spherical harmonic transform are also
 number format-flexible. 32-bit single-precision floating-point numbers
-(Float32) are the default as adapted by other modelling efforts [@Vana2017],
+(Float32) are the default as adapted by other modelling efforts [@Vana2017, @Nakano2018],
 but Float64 and other custom number formats can be used with a single
-code basis. Julia will compile to the choice of the number format
-and grid (and other model components) just-in-time.
+code basis. Julia will compile to the choice of the number format, the grid,
+and and other model components just-in-time. A simple parallelisation
+across vertical layers is supported with Julia's multi threading.
 
 # Statement of need
 
-Most weather and climate models are written in Fortran and have been developed over
-decades. From this tradition follows a specific programming style and
-associated user interface. SpeedyWeather.jl is a fresh approach to atmospheric
+SpeedyWeather.jl is a fresh approach to atmospheric
 models that have been very influential in many areas of scientific 
 and high-performance computing as well as climate change mitigation and adaptation.
+Most weather, ocean and climate models are written in Fortran and have been developed over
+decades. From this tradition follows a specific programming style and
+associated user interface. Running a simulation in Fortran and analysing the
+data in Python makes it virtually impossible to interact with various model
+components interactively. Furthermore, data-driven climate modelling
+[@Rasp2018,Schneider2023], which replaces existing model components with machine learning
+is difficult due to the lack of established deep learning frameworks in Fortran [@Innes2019].
+Let alone online learning, which trains a neural network-based component together
+with the rest of the model, accounting for interactions between components.
+Gradients, necessary to optimize training, can be computed 
+with automatic differentiation [@Moses2020], but only if differentiable functions
+in a coherent language framework are provided.
 
-![Shallow water simulation with SpeedyWeather.jl.
-Relative vorticity with a spectral resolution of T1023 (about 20km) simulated
-in Float32 on an octahedral Clenshaw-Curtis grid [@Hotta2018]. Relative vorticity
+We hope to provide with SpeedyWeather.jl a first test platform for data-driven
+atmospheric modelling and in general an interactive model that makes difficult
+problems easy to simulate. Climate models that are user-friendly, trainable,
+but also easily extensible will suddenly make many complex
+research ideas possible.
+
+![Relative vorticity simulated with the shallow water model in SpeedyWeather.jl.
+The simulation used a spectral resolution of T1023 (about 20km) and Float32
+arithmetic on an octahedral Clenshaw-Curtis grid [@Hotta2018]. Relative vorticity
 is visualised with Matplotlib [@Hunter2007] and Cartopy [@Cartopy] using a
 transparent-to-white colormap to mimic the appearance of clouds. Underlain is
 NASA's blue marble from June 2004. \label{fig:swm}](swm.png)
@@ -131,8 +185,8 @@ NASA's blue marble from June 2004. \label{fig:swm}](swm.png)
 
 We acknowledge contributions from Mosè Giordano, Valentin Churavy and Pietro Monticone
 who have also committed to the SpeedyWeather.jl repository, and the wider Julia community
-help and support. We gratefully acknowledge funding from the 
-National Science Foundation (...) and the European Research Council
+for help and support. We gratefully acknowledge funding from the 
+National Science Foundation (Chris please add) and the European Research Council
 under the European Union’s Horizon 2020 research and innovation programme
 for the ITHACA grant (no. 741112).
 

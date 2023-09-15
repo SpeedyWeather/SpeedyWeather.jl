@@ -312,24 +312,6 @@ url = {https://scitools.org.uk/cartopy}
   file = {/Users/milan/Zotero/storage/4FW52IRQ/9684.html}
 }
 
-@article{Schneider2017,
-  title = {Earth {{System Modeling}} 2.0: {{A Blueprint}} for {{Models That Learn From Observations}} and {{Targeted High-Resolution Simulations}}},
-  shorttitle = {Earth {{System Modeling}} 2.0},
-  author = {Schneider, Tapio and Lan, Shiwei and Stuart, Andrew and Teixeira, Jo{\~a}o},
-  year = {2017},
-  journal = {Geophysical Research Letters},
-  volume = {44},
-  number = {24},
-  pages = {12,396--12,417},
-  issn = {1944-8007},
-  doi = {10.1002/2017GL076101},
-  urldate = {2022-10-21},
-  abstract = {Climate projections continue to be marred by large uncertainties, which originate in processes that need to be parameterized, such as clouds, convection, and ecosystems. But rapid progress is now within reach. New computational tools and methods from data assimilation and machine learning make it possible to integrate global observations and local high-resolution simulations in an Earth system model (ESM) that systematically learns from both and quantifies uncertainties. Here we propose a blueprint for such an ESM. We outline how parameterization schemes can learn from global observations and targeted high-resolution simulations, for example, of clouds and convection, through matching low-order statistics between ESMs, observations, and high-resolution simulations. We illustrate learning algorithms for ESMs with a simple dynamical system that shares characteristics of the climate system; and we discuss the opportunities the proposed framework presents and the challenges that remain to realize it.},
-  langid = {english},
-  keywords = {data assimilation,Earth system models,Kalman inversion,machine learning,Markov chain Monte Carlo,parameterizations},
-  file = {/Users/milan/Zotero/storage/79YWM78D/Schneider et al. - 2017 - Earth System Modeling 2.0 A Blueprint for Models .pdf;/Users/milan/Zotero/storage/SL4Z8NTA/2017GL076101.html}
-}
-
 @article{Schneider2023,
   title = {Harnessing {{AI}} and Computing to Advance Climate Modelling and Prediction},
   author = {Schneider, Tapio and Behera, Swadhin and Boccaletti, Giulio and Deser, Clara and Emanuel, Kerry and Ferrari, Raffaele and Leung, L. Ruby and Lin, Ning and M{\"u}ller, Thomas and Navarra, Antonio and Ndiaye, Ousmane and Stuart, Andrew and Tribbia, Joseph and Yamagata, Toshio},
@@ -421,4 +403,34 @@ url = {https://scitools.org.uk/cartopy}
   abstract = {Errors caused by discrete time stepping may be an important component of total model error in contemporary atmospheric and oceanic simulations. To reduce time-stepping errors in leapfrog integrations, the Robert\textendash Asselin\textendash Williams (RAW) filter was proposed by the author as a simple improvement to the widely used Robert\textendash Asselin (RA) filter. The present paper examines the behavior of the RAW filter in semi-implicit integrations. First, in a linear theoretical analysis, the stability and accuracy are interrogated by deriving analytic expressions for the amplitude errors and phase errors. Then, power-series expansions are used to interpret the leading-order errors for small time steps and hence to identify optimal values of the filter parameters. Finally, the RAW filter is tested in a realistic nonlinear setting, by applying it to semi-implicit integrations of the elastic pendulum equations. The results suggest that replacing the RA filter with the RAW filter could reduce time-stepping errors in semi-implicit integrations.},
   langid = {english},
   file = {/Users/milan/Zotero/storage/YS2LGST8/Williams - 2011 - The RAW Filter An Improvement to the Robert–Assel.pdf}
+}
+
+@misc{Innes2019,
+  title = {A {{Differentiable Programming System}} to {{Bridge Machine Learning}} and {{Scientific Computing}}},
+  author = {Innes, Mike and Edelman, Alan and Fischer, Keno and Rackauckas, Chris and Saba, Elliot and Shah, Viral B. and Tebbutt, Will},
+  year = {2019},
+  month = jul,
+  number = {arXiv:1907.07587},
+  eprint = {1907.07587},
+  primaryclass = {cs},
+  publisher = {{arXiv}},
+  doi = {10.48550/arXiv.1907.07587},
+  urldate = {2023-09-15},
+  abstract = {Scientific computing is increasingly incorporating the advancements in machine learning and the ability to work with large amounts of data. At the same time, machine learning models are becoming increasingly sophisticated and exhibit many features often seen in scientific computing, stressing the capabilities of machine learning frameworks. Just as the disciplines of scientific computing and machine learning have shared common underlying infrastructure in the form of numerical linear algebra, we now have the opportunity to further share new computational infrastructure, and thus ideas, in the form of Differentiable Programming. We describe Zygote, a Differentiable Programming system that is able to take gradients of general program structures. We implement this system in the Julia programming language. Our system supports almost all language constructs (control flow, recursion, mutation, etc.) and compiles high-performance code without requiring any user intervention or refactoring to stage computations. This enables an expressive programming model for deep learning, but more importantly, it enables us to incorporate a large ecosystem of libraries in our models in a straightforward way. We discuss our approach to automatic differentiation, including its support for advanced techniques such as mixed-mode, complex and checkpointed differentiation, and present several examples of differentiating programs.},
+  archiveprefix = {arxiv},
+  keywords = {Computer Science - Machine Learning,Computer Science - Programming Languages},
+  file = {/Users/milan/Zotero/storage/VY5339JF/Innes et al. - 2019 - A Differentiable Programming System to Bridge Mach.pdf;/Users/milan/Zotero/storage/CZ4BXQCY/1907.html}
+}
+
+@inproceedings{Moses2020,
+  title = {Instead of {{Rewriting Foreign Code}} for {{Machine Learning}}, {{Automatically Synthesize Fast Gradients}}},
+  booktitle = {Advances in {{Neural Information Processing Systems}}},
+  author = {Moses, William and Churavy, Valentin},
+  year = {2020},
+  volume = {33},
+  pages = {12472--12485},
+  publisher = {{Curran Associates, Inc.}},
+  urldate = {2023-09-15},
+  abstract = {Applying differentiable programming techniques and machine learning algorithms to foreign programs requires developers to either rewrite their code in a machine learning framework, or otherwise provide derivatives of the foreign code. This paper presents Enzyme, a high-performance automatic differentiation (AD) compiler plugin for the LLVM compiler framework capable of synthesizing gradients of statically analyzable programs expressed in the LLVM intermediate representation (IR). Enzyme synthesizes gradients for programs written in any language whose compiler targets LLVM IR including C, C++, Fortran, Julia, Rust, Swift, MLIR, etc., thereby providing native AD capabilities in these languages. Unlike traditional source-to-source and operator-overloading tools, Enzyme performs AD on optimized IR. On a machine-learning focused benchmark suite including Microsoft's ADBench, AD on optimized IR achieves a geometric mean speedup of 4.2 times over AD on IR before optimization allowing Enzyme to achieve state-of-the-art performance. Packaging Enzyme for PyTorch and TensorFlow provides convenient access to gradients of foreign code with state-of-the-art performance, enabling foreign code to be directly incorporated into existing machine learning workflows.},
+  file = {/Users/milan/Zotero/storage/Y9ZTEWXC/Moses and Churavy - 2020 - Instead of Rewriting Foreign Code for Machine Lear.pdf}
 }
