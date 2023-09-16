@@ -99,7 +99,7 @@ on iso-latitude rings and the spectral space is defined by the `LowerTriangularM
 of the spherical harmonic coefficients. These three modules are independently usable
 and therefore make SpeedyWeather.jl, beyond its main purpose of simulating the weather,
 also a library for the analysis of gridded data on the sphere.
-Running and analysing simulations can interactively combined, enhancing user
+Running and analysing simulations can be interactively combined, enhancing user
 experience and productivity.
 
 The user interface of SpeedyWeather.jl is heavily influenced by
@@ -115,7 +115,7 @@ the same steps can be executed and interacted with one-by-one in
 Julia's read-evaluate-print loop (REPL). We thereby reach an interactivity
 far beyond a monolithic interface that is limited to the options provided.
 
-To be extendible and composable with new
+To be extensible and composable with new
 model components, SpeedyWeather.jl relies on Julia's multiple dispatch
 programming paradigm [@Bezanson2017]. Every model component
 is defined as a new type. For example, to define a new way how to calculate
@@ -139,7 +139,7 @@ harmonic transform with a leapfrog-based semi-implicit time integration [@Hoskin
 and a Robert-Asselin-Williams filter [@Williams2011; @Amezcua2011].
 The spherical harmonic transform is grid-flexible. Any iso-latitude ring-based
 grid can be used and new grids can be externally defined and passed on
-as argument. Many grids are already implemented: The conventional
+as argument. Many grids are already implemented: the conventional
 Gaussian grid, a regular longitude-latitude grid, 
 the octahedral Gaussian grid [@Malardel2016], the octahedral
 Clenshaw-Curtis grid [@Hotta2018], and the HEALPix grid [@Gorski2005].
@@ -184,7 +184,7 @@ NASA's blue marble from June 2004. \label{fig:swm}](swm.png)
 
 # Acknowledgements
 
-We acknowledge contributions from Mosè Giordano, Valentin Churavy and Pietro Monticone
+We acknowledge contributions from Mosè Giordano, Valentin Churavy, and Pietro Monticone
 who have also committed to the SpeedyWeather.jl repository, and the wider Julia community
 for help and support. We gratefully acknowledge funding from the 
 National Science Foundation (Chris please add) and the European Research Council
