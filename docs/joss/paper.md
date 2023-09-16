@@ -21,10 +21,10 @@ authors:
 
   - name: Daisuke Hotta
     orcid: 0000-0003-2287-0608
-    affiliation: "5,7"
+    affiliation: "5,6"
 
   - name: Justin Willmert
-    affiliation: 6
+    affiliation: 7
 
   - name: Simone Silvestri
     affiliation: 1
@@ -37,10 +37,10 @@ authors:
     affiliation: "3,4"
 
   - name: Sam Hatfield
-    affiliation: 7
+    affiliation: 6
 
   - name: David Meyer
-    affiliation: 7
+    affiliation: 6
 
   - name: Tom Kimpson
     affiliation: "2,8"
@@ -63,9 +63,9 @@ affiliations:
    index: 4
  - name: Japan Meteorological Agency, Tsukuba, Japan
    index: 5
- - name: University of Minnesota, Minneapolis, MN, USA
-   index: 6
  - name: European Centre for Medium-Range Weather Forecasts, Reading, UK
+   index: 6
+ - name: University of Minnesota, Minneapolis, MN, USA
    index: 7
  - name: University of Melbourne, Australia
    index: 8
@@ -104,8 +104,10 @@ experience and productivity.
 
 The user interface of SpeedyWeather.jl is heavily influenced by
 the Julia ocean model Oceananigans.jl [@Ramadhan2020].
-A monolithic interface is deliberately avoided,
-instead, a model is created bottom-up by first defining the discretization
+A monolithic interface based on parameter files is avoided in favor of a
+library-style interface in which users write code to run models rather than
+merely supplying parameters and input arrays.
+A model is created bottom-up by first defining the discretization
 and any non-default model components with its respective parameters.
 All components are then collected into a single model object, which, once
 initialized, returns a simulation object that contains the entire model state,
@@ -143,7 +145,7 @@ as argument. Many grids are already implemented: the conventional
 Gaussian grid, a regular longitude-latitude grid, 
 the octahedral Gaussian grid [@Malardel2016], the octahedral
 Clenshaw-Curtis grid [@Hotta2018], and the HEALPix grid [@Gorski2005].
-Both SpeedyWeather.jl and its spherical harmonic transform are also
+Both SpeedyWeather.jl and its spherical harmonic transform SpeedyTransforms are also
 number format-flexible. 32-bit single-precision floating-point numbers
 (Float32) are the default as adapted by other modelling efforts [@Vana2017, @Nakano2018],
 but Float64 and other custom number formats can be used with a single
