@@ -20,31 +20,34 @@ authors:
     affiliation: "3,4"
 
   - name: Daisuke Hotta
-    affiliation: "5,6"
+    orcid: 0000-0003-2287-0608
+    affiliation: "5,7"
 
   - name: Justin Willmert
-    affiliation: 7
+    affiliation: 6
 
   - name: Simone Silvestri
     affiliation: 1
 
   - name: Gregory L Wagner
+    orcid: 0000-0001-5317-2445
     affiliation: 1
 
   - name: Alistair White
     affiliation: "3,4"
 
   - name: Sam Hatfield
-    affiliation: 8
+    affiliation: 7
 
   - name: David Meyer
-    affiliation: 8
+    affiliation: 7
 
   - name: Tom Kimpson
-    affiliation: "2,9"
+    affiliation: "2,8"
 
   - name: Navid C Constantinou
-    affiliation: 10
+    orcid: 0000-0002-8149-4094
+    affiliation: 9
 
   - name: Chris Hill
     affiliation: 1
@@ -60,16 +63,14 @@ affiliations:
    index: 4
  - name: Japan Meteorological Agency, Tsukuba, Japan
    index: 5
- - name: University of Reading, UK
-   index: 6
  - name: University of Minnesota, Minneapolis, MN, USA
-   index: 7
+   index: 6
  - name: European Centre for Medium-Range Weather Forecasts, Reading, UK
-   index: 8
+   index: 7
  - name: University of Melbourne, Australia
-   index: 9
+   index: 8
  - name: Australian National University, Canberra, Australia
-   index: 10
+   index: 9
    
 date: 14 September 2023
 bibliography: paper.bib
