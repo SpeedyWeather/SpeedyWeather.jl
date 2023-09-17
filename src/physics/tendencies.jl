@@ -18,6 +18,7 @@ function parameterization_tendencies!(
     (;static_energy_diffusion) = model
     
     G = model.geometry
+    L = model.land_sea_mask
     rings = eachring(G.Grid,G.nlat_half)
 
     @floop for ij in eachgridpoint(diagn)       # loop over all horizontal grid points
@@ -27,7 +28,7 @@ function parameterization_tendencies!(
         jring = whichring(ij,rings)             # ring index gridpoint ij is on
 
         reset_column!(column)                   # set accumulators back to zero for next grid point
-        get_column!(column,diagn,ij,jring,G)    # extract column for contiguous memory access
+        get_column!(column,diagn,ij,jring,G,L)  # extract column for contiguous memory access
         
         # Pre-compute thermodynamic quantities
         get_thermodynamics!(column,model)

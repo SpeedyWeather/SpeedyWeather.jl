@@ -6,7 +6,8 @@ function get_column!(   C::ColumnVariables,
                         D::DiagnosticVariables,
                         ij::Integer,        # grid point index
                         jring::Integer,     # ring index 1 around North Pole to J around South Pole
-                        G::Geometry)
+                        G::Geometry,
+                        L::AbstractLandSeaMask)
 
     (;σ_levels_full,ln_σ_levels_full) = G
 
@@ -15,6 +16,7 @@ function get_column!(   C::ColumnVariables,
     C.latd = G.latds[ij]      # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
     C.lond = G.londs[ij]
     C.jring = jring           # ring index j of column, used to index latitude vectors
+    C.land_fraction = L.land_sea_mask[ij]
 
     # pressure [Pa]/[log(Pa)]
     lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics
@@ -39,11 +41,12 @@ end
 function get_column!(   C::ColumnVariables,
                         D::DiagnosticVariables,
                         ij::Int,            # grid point index
-                        G::Geometry)
+                        G::Geometry,
+                        L::LandSeaMask)
 
     rings = eachring(G.Grid,G.nlat_half)
     jring = whichring(ij,rings)
-    get_column!(C,D,ij,jring,G)
+    get_column!(C,D,ij,jring,G,L)
 end
 
 """

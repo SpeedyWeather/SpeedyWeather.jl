@@ -72,6 +72,7 @@ export  Leapfrog
 # EXPORT OROGRAPHIES
 export  NoOrography,
         EarthOrography,
+        LandSeaMask,
         ZonalRidge
 
 # NUMERICS
