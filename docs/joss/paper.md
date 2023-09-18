@@ -136,18 +136,18 @@ and the Julia ocean model Oceananigans.jl [@Ramadhan2020].
 
 The dynamical core of SpeedyWeather.jl uses established numerics
 [@Bourke1972; @Hoskins1975; @Simmons1978; @Simmons1981],
-widely adapted in numerical weather prediction. It is based on the spherical
+widely adopted in numerical weather prediction. It is based on the spherical
 harmonic transform with a leapfrog-based semi-implicit time integration [@Hoskins1975]
 and a Robert-Asselin-Williams filter [@Williams2011; @Amezcua2011].
 The spherical harmonic transform is grid-flexible. Any iso-latitude ring-based
-grid can be used and new grids can be externally defined and passed on
-as argument. Many grids are already implemented: the conventional
+grid can be used and new grids can be externally defined and passed in
+as an argument. Many grids are already implemented: the conventional
 Gaussian grid, a regular longitude-latitude grid, 
 the octahedral Gaussian grid [@Malardel2016], the octahedral
 Clenshaw-Curtis grid [@Hotta2018], and the HEALPix grid [@Gorski2005].
 Both SpeedyWeather.jl and its spherical harmonic transform SpeedyTransforms are also
 number format-flexible. 32-bit single-precision floating-point numbers
-(Float32) are the default as adapted by other modelling efforts [@Vana2017, @Nakano2018],
+(Float32) are the default as adopted by other modelling efforts [@Vana2017, @Nakano2018],
 but Float64 and other custom number formats can be used with a single
 code basis. Julia will compile to the choice of the number format, the grid,
 and and other model components just-in-time. A simple parallelisation
