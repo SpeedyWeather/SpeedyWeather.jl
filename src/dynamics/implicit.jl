@@ -291,21 +291,6 @@ function initialize!(   implicit::ImplicitPrimitiveEq,
 end
 
 """$(TYPEDSIGNATURES)
-Reinitialize implicit occasionally based on time step `i` and `implicit.recalculate`."""
-function initialize!(  
-    implicit::ImplicitPrimitiveEq,
-    i::Integer,
-    dt::Real,                   # the scaled time step radius*dt
-    diagn::DiagnosticVariables,
-    geometry::Geometry,
-    constants::DynamicsConstants
-)
-    # only reinitialize occasionally, otherwise exit immediately
-    i % implicit.recalculate == 0 || return nothing
-    initialize!(implicit,dt,diagn,geometry,constants)
-end
-
-"""$(TYPEDSIGNATURES)
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
 function implicit_correction!(  
     diagn::DiagnosticVariables,
