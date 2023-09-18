@@ -155,6 +155,7 @@ function initialize!(
     output::OutputWriter{output_NF,Model},
     feedback::AbstractFeedback,
     time_stepping::TimeStepper,
+    clock::Clock,
     diagn::DiagnosticVariables,
     model::Model
 ) where {output_NF,Model}
@@ -285,7 +286,7 @@ function initialize!(
     
     # WRITE INITIAL CONDITIONS TO FILE
     write_netcdf_variables!(output,diagn)
-    write_netcdf_time!(output,startdate)
+    write_netcdf_time!(output,clock.time)
 
     # also export parameters into run????/parameters.txt
     parameters_txt = open(joinpath(output.run_path,"parameters.txt"),"w")
