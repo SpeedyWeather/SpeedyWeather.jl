@@ -9,11 +9,14 @@ function run!(  simulation::Simulation;
                 output::Bool = false)
     
     (;prognostic_variables, diagnostic_variables, model) = simulation
+    (;clock) = prognostic_variables
 
     # set the clock
-    if typeof(startdate) == DateTime prognostic_variables.clock.time = startdate end
-    prognostic_variables.clock.n_days = n_days
-    initialize!(prognostic_variables.clock,model.time_stepping)
+    if typeof(startdate) == DateTime
+        clock.time = startdate
+    end
+    clock.n_days = n_days
+    initialize!(clock,model.time_stepping)
 
     model.output.output = output            # enable/disable output
     initialize && initialize!(model)        # initialize again?
