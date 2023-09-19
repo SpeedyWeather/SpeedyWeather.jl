@@ -17,6 +17,7 @@ authors:
     affiliation: "1, 2" # (Multiple affiliations must be quoted)
 
   - name: Maximilian Gelbrecht
+    orcid: 0000-0002-0729-6671
     affiliation: "3,4"
 
   - name: Daisuke Hotta
@@ -56,8 +57,7 @@ affiliations:
  - name: Massachusetts Institute of Technology, Cambridge, MA, USA
    index: 1
  - name: University of Oxford, UK
-   index: 2
- - name: Technical University Munich, Germany
+ - name: Technical University of Munich, Germany
    index: 3
  - name: Potsdam Institute for Climate Impact Research, Germany
    index: 4
@@ -188,9 +188,9 @@ NASA's blue marble from June 2004. \label{fig:swm}](swm.png)
 
 We acknowledge contributions from Mosè Giordano, Valentin Churavy, and Pietro Monticone
 who have also committed to the SpeedyWeather.jl repository, and the wider Julia community
-for help and support. We gratefully acknowledge funding from the 
-National Science Foundation (Chris please add) and the European Research Council
-under the European Union’s Horizon 2020 research and innovation programme
-for the ITHACA grant (no. 741112).
+for help and support. MK acknowledges funding from the 
+National Science Foundation (Chris please add). MK and TK acknowledge funding from the European Research Council
+under the European Union’s Horizon 2020 research and innovation programme for the ITHACA grant (no. 741112).
+NCC acknowledges support by the Australian Research Council DECRA Fellowship DE210100749.
 
 # References
