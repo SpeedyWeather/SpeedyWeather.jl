@@ -196,6 +196,22 @@ url = {https://scitools.org.uk/cartopy}
   file = {/Users/milan/Zotero/storage/VH7SAZC2/Jablonowski and Williamson - 2006 - A baroclinic instability test case for atmospheric.pdf}
 }
 
+@article{Klower2020,
+author = {Klöwer, M. and Düben, P. D. and Palmer, T. N.},
+title = {Number Formats, Error Mitigation, and Scope for 16-Bit Arithmetics in Weather and Climate Modeling Analyzed With a Shallow Water Model},
+journal = {Journal of Advances in Modeling Earth Systems},
+volume = {12},
+number = {10},
+pages = {e2020MS002246},
+keywords = {Reduced precision, 16-bit arithmetic, climate models, rounding error, floating-point numbers, posit numbers},
+doi = {https://doi.org/10.1029/2020MS002246},
+url = {https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/2020MS002246},
+eprint = {https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/2020MS002246},
+note = {e2020MS002246 10.1029/2020MS002246},
+abstract = {Abstract The need for high-precision calculations with 64-bit or 32-bit floating-point arithmetic for weather and climate models is questioned. Lower-precision numbers can accelerate simulations and are increasingly supported by modern computing hardware. This paper investigates the potential of 16-bit arithmetic when applied within a shallow water model that serves as a medium complexity weather or climate application. There are several 16-bit number formats that can potentially be used (IEEE half precision, BFloat16, posits, integer, and fixed-point). It is evident that a simple change to 16-bit arithmetic will not be possible for complex weather and climate applications as it will degrade model results by intolerable rounding errors that cause a stalling of model dynamics or model instabilities. However, if the posit number format is used as an alternative to the standard floating-point numbers, the model degradation can be significantly reduced. Furthermore, mitigation methods, such as rescaling, reordering, and mixed precision, are available to make model simulations resilient against a precision reduction. If mitigation methods are applied, 16-bit floating-point arithmetic can be used successfully within the shallow water model. The results show the potential of 16-bit formats for at least parts of complex weather and climate models where rounding errors would be entirely masked by initial condition, model, or discretization error.},
+year = {2020}
+}
+
 @article{Klower2022,
   title = {Fluid {{Simulations Accelerated With}} 16 {{Bits}}: {{Approaching}} 4x {{Speedup}} on {{A64FX}} by {{Squeezing ShallowWaters}}.Jl {{Into Float16}}},
   shorttitle = {Fluid {{Simulations Accelerated With}} 16 {{Bits}}},

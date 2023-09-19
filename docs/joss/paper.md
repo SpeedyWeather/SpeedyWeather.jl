@@ -115,7 +115,9 @@ work arrays and parameters, that can be run, analysed or changed.
 While these steps can be written into a script for reproducibility,
 the same steps can be executed and interacted with one-by-one in
 Julia's read-evaluate-print loop (REPL). We thereby reach an interactivity
-far beyond a monolithic interface that is limited to the options provided. At the same time, sensible default arguments enable even inexperienced users, to run simulations in just a few lines of code. 
+far beyond a monolithic interface that is limited to the options provided.
+At the same time, sensible default arguments enable even inexperienced users
+to run simulations in just a few lines of code. 
 
 To be extensible and composable with new
 model components, SpeedyWeather.jl relies on Julia's multiple dispatch
@@ -147,11 +149,14 @@ the octahedral Gaussian grid [@Malardel2016], the octahedral
 Clenshaw-Curtis grid [@Hotta2018], and the HEALPix grid [@Gorski2005].
 Both SpeedyWeather.jl and its spherical harmonic transform SpeedyTransforms are also
 number format-flexible. 32-bit single-precision floating-point numbers
-(Float32) are the default as adopted by other modelling efforts [@Vana2017, @Nakano2018],
+(Float32) are the default as adopted by other modelling efforts [@Vana2017; @Nakano2018],
 but Float64 and other custom number formats can be used with a single
-code basis. Julia will compile to the choice of the number format, the grid,
+code basis [@Klower2022; @Klower2020].
+Julia will compile to the choice of the number format, the grid,
 and and other model components just-in-time. A simple parallelisation
 across vertical layers is supported with Julia's multi threading.
+Output is stored as NetCDF files using
+[NCDatasets.jl](https://github.com/Alexander-Barth/NCDatasets.jl).
 
 # Statement of need
 
@@ -163,7 +168,7 @@ decades. From this tradition follows a specific programming style and
 associated user interface. Running a simulation in Fortran and analysing the
 data in Python makes it virtually impossible to interact with various model
 components interactively. Furthermore, data-driven climate modelling
-[@Rasp2018,Schneider2023], which replaces existing model components with machine learning
+[@Rasp2018; @Schneider2023], which replaces existing model components with machine learning
 is difficult due to the lack of established deep learning frameworks in Fortran [@Innes2019].
 Let alone online learning, which trains a neural network-based component together
 with the rest of the model, accounting for interactions between components.
