@@ -115,7 +115,7 @@ work arrays and parameters, that can be run, analysed or changed.
 While these steps can be written into a script for reproducibility,
 the same steps can be executed and interacted with one-by-one in
 Julia's read-evaluate-print loop (REPL). We thereby reach an interactivity
-far beyond a monolithic interface that is limited to the options provided.
+far beyond a monolithic interface that is limited to the options provided. At the same time, sensible default arguments enable even inexperienced users, to run simulations in just a few lines of code. 
 
 To be extensible and composable with new
 model components, SpeedyWeather.jl relies on Julia's multiple dispatch
