@@ -42,7 +42,7 @@ end
         column = ColumnVariables{NF}(;nlev)
 
         SpeedyWeather.reset_column!(column)
-        SpeedyWeather.get_column!(column,diagn,1,model.geometry)
+        SpeedyWeather.get_column!(column,diagn,1,model.geometry,model.land_sea_mask)
 
         # set a tendency to something
         humid_tend = rand(NF,nlev)

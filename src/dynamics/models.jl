@@ -144,6 +144,7 @@ Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     initial_conditions::InitialConditions = ZonalWind()
     orography::AbstractOrography{NF} = EarthOrography(spectral_grid)
+    land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -180,10 +181,12 @@ at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`.
 function initialize!(model::PrimitiveDry)
     (;spectral_grid,horizontal_diffusion,
         orography,planet,spectral_transform,geometry) = model
+    (;land_sea_mask) = model
 
     initialize!(horizontal_diffusion,model)
     initialize!(orography,planet,spectral_transform,geometry)
-    
+    initialize!(land_sea_mask)
+
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
     initialize!(model.temperature_relaxation,model)
@@ -210,6 +213,7 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     initial_conditions::InitialConditions = ZonalWind()
     orography::AbstractOrography{NF} = EarthOrography(spectral_grid)
+    land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -249,9 +253,11 @@ at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`.
 function initialize!(model::PrimitiveWet)
     (;spectral_grid,horizontal_diffusion,
         orography,planet,spectral_transform,geometry) = model
+    (;land_sea_mask) = model
 
     initialize!(horizontal_diffusion,model)
     initialize!(orography,planet,spectral_transform,geometry)
+    initialize!(land_sea_mask)
     
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
@@ -277,7 +283,7 @@ function Base.show(io::IO,M::ModelSetup)
         val = getfield(M,key)
         println(io,"├ $key: $(typeof(val))")
     end
-    println(io,"└ feedback: $(typeof(M.feedback))")
+    print(io,"└ feedback: $(typeof(M.feedback))")
 end
 
 function Base.show(io::IO,S::Simulation)

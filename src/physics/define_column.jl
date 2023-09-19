@@ -15,6 +15,7 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     jring::Int = 0                          # latitude ring the column is on
     lond::NF = 0                            # longitude
     latd::NF = 0                            # latitude, needed for shortwave radiation
+    land_fraction::NF = 0                   # fraction of the column that is over land
 
     # PROGNOSTIC VARIABLES
     const u::Vector{NF} = zeros(NF,nlev)            # zonal velocity [m/s]

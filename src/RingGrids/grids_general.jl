@@ -135,6 +135,9 @@ end
 get_lat(grid::Grid) where {Grid<:AbstractGrid} = get_lat(Grid,grid.nlat_half)
 get_latd(grid::Grid) where {Grid<:AbstractGrid} = get_latd(Grid,grid.nlat_half)
 get_lond(grid::Grid) where {Grid<:AbstractGrid} = get_lond(Grid,grid.nlat_half)
+get_lon(grid::Grid) where {Grid<:AbstractGrid} = get_lon(Grid,grid.nlat_half)
+get_colat(grid::Grid) where {Grid<:AbstractGrid} = get_colat(Grid,grid.nlat_half)
+get_colatlons(grid::Grid) where {Grid<:AbstractGrid} = get_colatlons(Grid,grid.nlat_half)
 
 function get_lat(Grid::Type{<:AbstractGrid},nlat_half::Integer)
     return π/2 .- get_colat(Grid,nlat_half)
