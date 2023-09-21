@@ -57,6 +57,7 @@ affiliations:
  - name: Massachusetts Institute of Technology, Cambridge, MA, USA
    index: 1
  - name: University of Oxford, UK
+   index: 2
  - name: Technical University of Munich, Germany
    index: 3
  - name: Potsdam Institute for Climate Impact Research, Germany
