@@ -117,3 +117,39 @@ function DynamicsConstants( spectral_grid::SpectralGrid,
                                     Δp_geopot_half, Δp_geopot_full,
                                     temp_ref_profile)
 end
+
+# default angular frequency of Earth's rotation [1/s]
+const DEFAULT_ROTATION = 7.29e-5
+
+"""
+$(TYPEDSIGNATURES)
+Return the Coriolis parameter `f` on the grid `Grid` of resolution `nlat_half`
+on a planet of `ratation` [1/s]. Default rotation of Earth."""
+function coriolis(
+    ::Type{Grid},
+    nlat_half::Integer;
+    rotation=DEFAULT_ROTATION
+) where {Grid<:AbstractGrid}
+    
+    f = zeros(Grid,nlat_half)
+    lat = get_lat(Grid,nlat_half)
+
+    for (j,ring) in enumerate(eachring(f))
+        fⱼ = 2rotation*sin(lat[j])
+        for ij in ring
+            f[ij] = fⱼ
+        end
+    end
+    return f
+end
+
+"""
+$(TYPEDSIGNATURES)
+Return the Coriolis parameter `f` on a grid like `grid`
+on a planet of `ratation` [1/s]. Default rotation of Earth."""
+function coriolis(
+    grid::Grid;
+    rotation=DEFAULT_ROTATION
+) where {Grid<:AbstractGrid}
+    return coriolis(Grid,grid.nlat_half;rotation)
+end
