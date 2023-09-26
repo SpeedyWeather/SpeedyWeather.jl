@@ -36,13 +36,15 @@ authors:
     affiliation: 1
 
   - name: Alistair White
+  - orcid: 0000-0003-3377-6852
     affiliation: "3,4"
 
   - name: Sam Hatfield
     affiliation: 6
 
   - name: David Meyer
-    affiliation: 6
+    orcid: 0000-0002-7071-7547
+    affiliation: "8,9"
 
   - name: Tom Kimpson
     affiliation: "2,8"
@@ -82,7 +84,7 @@ bibliography: paper.bib
 
 # Summary
 
-SpeedyWeather.jl is a library to simulate and analyse the global atmospheric
+SpeedyWeather.jl is a library to simulate and analyze the global atmospheric
 circulation on the sphere. It implements several 2D and 3D
 models to solve the primitive equations with and without humidity (\autoref{fig:primitive}),
 the shallow water equations (\autoref{fig:swm}), or the barotropic vorticity equations
@@ -110,8 +112,8 @@ A monolithic interface based on parameter files is avoided in favor of a
 library-style interface in which users write code to run models rather than
 merely supplying parameters and input arrays.
 A model is created bottom-up by first defining the discretization
-and any non-default model components with its respective parameters.
-All components are then collected into a single model object, which, once
+and any non-default model components with their respective parameters.
+All components are then collected into a single model object which, once
 initialized, returns a simulation object that contains the entire model state,
 work arrays and parameters, that can be run, analysed or changed.
 While these steps can be written into a script for reproducibility,
@@ -185,7 +187,7 @@ but also easily extensible will suddenly make many complex
 research ideas possible.
 
 ![Relative vorticity simulated with the shallow water model in SpeedyWeather.jl.
-The simulation used a spectral resolution of T1023 (about 20km) and Float32
+The simulation used a spectral resolution of T1023 (about 20 km) and Float32
 arithmetic on an octahedral Clenshaw-Curtis grid [@Hotta2018]. Relative vorticity
 is visualised with Matplotlib [@Hunter2007] and Cartopy [@Cartopy] using a
 transparent-to-white colormap to mimic the appearance of clouds. Underlain is
