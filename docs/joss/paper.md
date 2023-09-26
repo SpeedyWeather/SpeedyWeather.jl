@@ -40,6 +40,7 @@ authors:
     affiliation: "3,4"
 
   - name: Sam Hatfield
+    orcid: 0000-0001-7235-6450
     affiliation: 6
 
   - name: David Meyer
@@ -47,11 +48,12 @@ authors:
     affiliation: "8,9"
 
   - name: Tom Kimpson
-    affiliation: "2,8"
+    orcid: 0000-0002-6542-6032
+    affiliation: "2,10"
 
   - name: Navid C Constantinou
     orcid: 0000-0002-8149-4094
-    affiliation: 9
+    affiliation: 11
 
   - name: Chris Hill
     affiliation: 1
@@ -71,10 +73,14 @@ affiliations:
    index: 6
  - name: University of Minnesota, Minneapolis, MN, USA
    index: 7
- - name: University of Melbourne, Australia
+ - name: Imperial College London, UK
    index: 8
- - name: Australian National University, Canberra, Australia
+ - name: European Centre for Medium-Range Weather Forecasts, Bonn, Germany
    index: 9
+ - name: University of Melbourne, Australia
+   index: 10
+ - name: Australian National University, Canberra, Australia
+   index: 11
    
 date: 14 September 2023
 bibliography: paper.bib
