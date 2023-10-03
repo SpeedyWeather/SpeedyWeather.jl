@@ -85,14 +85,55 @@ end
 """
 $(TYPEDSIGNATURES)
 Set the tendencies in `diagn` to zero."""
-function zero_tendencies!(diagn::DiagnosticVariables)
+function zero_tendencies!(diagn::DiagnosticVariables{NF,Grid,Model}) where {NF,Grid,Model<:Barotropic}
     for layer in diagn.layers
         fill!(layer.tendencies.u_tend_grid,0)
         fill!(layer.tendencies.v_tend_grid,0)
+        fill!(layer.tendencies.vor_tend,0)
+    end
+end
+
+"""
+$(TYPEDSIGNATURES)
+Set the tendencies in `diagn` to zero."""
+function zero_tendencies!(diagn::DiagnosticVariables{NF,Grid,Model}) where {NF,Grid,Model<:ShallowWater}
+    for layer in diagn.layers
+        fill!(layer.tendencies.u_tend_grid,0)
+        fill!(layer.tendencies.v_tend_grid,0)
+        fill!(layer.tendencies.vor_tend,0)
+        fill!(layer.tendencies.div_tend,0)
+    end
+    fill!(diagn.surface.pres_tend_grid,0)
+    fill!(diagn.surface.pres_tend,0)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Set the tendencies in `diagn` to zero."""
+function zero_tendencies!(diagn::DiagnosticVariables{NF,Grid,Model}) where {NF,Grid,Model<:PrimitiveDry}
+    for layer in diagn.layers
+        fill!(layer.tendencies.u_tend_grid,0)
+        fill!(layer.tendencies.v_tend_grid,0)
+        fill!(layer.tendencies.vor_tend,0)
+        fill!(layer.tendencies.div_tend,0)
+        fill!(layer.tendencies.temp_tend_grid,0)
+    end
+    fill!(diagn.surface.pres_tend_grid,0)
+    fill!(diagn.surface.pres_tend,0)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Set the tendencies in `diagn` to zero."""
+function zero_tendencies!(diagn::DiagnosticVariables{NF,Grid,Model}) where {NF,Grid,Model<:PrimitiveWet}
+    for layer in diagn.layers
+        fill!(layer.tendencies.u_tend_grid,0)
+        fill!(layer.tendencies.v_tend_grid,0)
+        fill!(layer.tendencies.vor_tend,0)
+        fill!(layer.tendencies.div_tend,0)
         fill!(layer.tendencies.temp_tend_grid,0)
         fill!(layer.tendencies.humid_tend_grid,0)
     end
     fill!(diagn.surface.pres_tend_grid,0)
     fill!(diagn.surface.pres_tend,0)
-    return nothing
 end

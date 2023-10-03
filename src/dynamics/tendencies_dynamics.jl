@@ -402,7 +402,8 @@ function vorticity_flux_curldiv!(   diagn::DiagnosticVariablesLayer,
                                     C::DynamicsConstants,
                                     G::Geometry,
                                     S::SpectralTransform;
-                                    div::Bool=true)    # also calculate div of vor flux?
+                                    div::Bool=true,     # also calculate div of vor flux?
+                                    add::Bool=false)    # accumulate in vor/div tendencies?
     
     (;f_coriolis) = C
     (;coslat⁻¹) = G
@@ -433,8 +434,8 @@ function vorticity_flux_curldiv!(   diagn::DiagnosticVariablesLayer,
     spectral!(u_tend,u_tend_grid,S)
     spectral!(v_tend,v_tend_grid,S)
 
-    curl!(vor_tend,u_tend,v_tend,S)                 # ∂ζ/∂t = ∇×(u_tend,v_tend)
-    div && divergence!(div_tend,u_tend,v_tend,S)    # ∂D/∂t = ∇⋅(u_tend,v_tend)   
+    curl!(vor_tend,u_tend,v_tend,S;add)                 # ∂ζ/∂t = ∇×(u_tend,v_tend)
+    div && divergence!(div_tend,u_tend,v_tend,S;add)    # ∂D/∂t = ∇⋅(u_tend,v_tend)   
     return nothing       
 end
 
@@ -456,7 +457,7 @@ function vorticity_flux!(diagn::DiagnosticVariablesLayer,model::ShallowWater)
     C = model.constants
     G = model.geometry
     S = model.spectral_transform
-    vorticity_flux_curldiv!(diagn,C,G,S,div=true)
+    vorticity_flux_curldiv!(diagn,C,G,S,div=true,add=true)
 end
 
 """
@@ -476,7 +477,7 @@ function vorticity_flux!(diagn::DiagnosticVariablesLayer,model::Barotropic)
     C = model.constants
     G = model.geometry
     S = model.spectral_transform
-    vorticity_flux_curldiv!(diagn,C,G,S,div=false)
+    vorticity_flux_curldiv!(diagn,C,G,S,div=false,add=true)
 end
 
 """

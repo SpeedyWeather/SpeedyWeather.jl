@@ -131,10 +131,10 @@ function OutputWriter(
 end
 
 # default variables to output by model
-default_output_vars(::Type{<:Barotropic}) = [:vor,:u]
-default_output_vars(::Type{<:ShallowWater}) = [:vor,:u]
-default_output_vars(::Type{<:PrimitiveDry}) = [:vor,:u,:temp,:pres]
-default_output_vars(::Type{<:PrimitiveWet}) = [:vor,:u,:temp,:humid,:pres,:precip_cond,:precip_conv]
+default_output_vars(::Type{<:Barotropic}) = [:vor,:u,:v]
+default_output_vars(::Type{<:ShallowWater}) = [:vor,:u,:v]
+default_output_vars(::Type{<:PrimitiveDry}) = [:vor,:u,:v,:temp,:pres]
+default_output_vars(::Type{<:PrimitiveWet}) = [:vor,:u,:v,:temp,:humid,:pres,:precip_cond,:precip_conv]
 
 # print all fields with type <: Number
 function Base.show(io::IO,O::AbstractOutputWriter)
