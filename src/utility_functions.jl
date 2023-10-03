@@ -82,7 +82,7 @@ function print_fields(io::IO,A,keys;arrays::Bool=false)
     filtered = n < length(keys)
     for (i,key) in enumerate(keys_filtered)
         last = (i == n) & ~filtered
-        key = keys[i]
+        key = keys_filtered[i]
         val = getfield(A,key)
         ~last ? println(io,"├ $key::$(typeof(val)) = $val") :
                 print(io,  "└ $key::$(typeof(val)) = $val")
