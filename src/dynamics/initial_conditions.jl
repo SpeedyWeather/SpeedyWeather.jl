@@ -3,42 +3,19 @@ initial_conditions_default(::Type{<:Barotropic}) = StartWithRandomVorticity()
 initial_conditions_default(::Type{<:ShallowWater}) = ZonalJet()
 initial_conditions_default(::Type{<:PrimitiveEquation}) = ZonalWind()
 
-"""
-$(TYPEDSIGNATURES)
-Allocate the prognostic variables and then set to initial conditions."""
-function initial_conditions(model::Model) where Model
-    (;spectral_grid) = model
-    progn = allocate(PrognosticVariables,spectral_grid,Model)   # allocate variables in any case
-    IC = model.initial_conditions                               # initial conditions struct
-    initial_conditions!(progn,IC,model)                         # dispatch to initial conditions
-    return progn
-end
-
-"""
-$(TYPEDSIGNATURES)"""
-function allocate(
-    ::Type{PrognosticVariables},
-    spectral_grid::SpectralGrid,
-    ::Type{Model},
-) where {Model<:ModelSetup}
-
-    (;NF,trunc,nlev) = spectral_grid
-    return zeros(PrognosticVariables{NF},Model,trunc,nlev)
-end
-
 Base.@kwdef struct StartFromRest <: InitialConditions 
     pressure_on_orography::Bool = false
 end
 
-function initial_conditions!(   progn::PrognosticVariables,
-                                initial_conditions::StartFromRest,
-                                model::ModelSetup)
+function initialize!(   progn::PrognosticVariables,
+                        initial_conditions::StartFromRest,
+                        model::ModelSetup)
     return nothing          # everything remains zero 
 end
 
-function initial_conditions!(   progn::PrognosticVariables,
-                                initial_conditions::StartFromRest,
-                                model::PrimitiveEquation)
+function initialize!(   progn::PrognosticVariables,
+                        initial_conditions::StartFromRest,
+                        model::PrimitiveEquation)
     homogeneous_temperature!(progn,model)
     initial_conditions.pressure_on_orography && pressure_on_orography!(progn,model)
     # TODO initialise humidity
@@ -57,9 +34,9 @@ end
 """
 $(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
-function initial_conditions!(   progn::PrognosticVariables{NF},
-                                initial_conditions::StartWithRandomVorticity,
-                                model::ModelSetup) where NF
+function initialize!(   progn::PrognosticVariables{NF},
+                        initial_conditions::StartWithRandomVorticity,
+                        model::ModelSetup) where NF
 
     lmax = progn.trunc+1
     power = initial_conditions.power + 1    # +1 as power is summed of orders m
@@ -116,9 +93,9 @@ end
 """
 $(TYPEDSIGNATURES)
 Initial conditions from Galewsky, 2004, Tellus"""
-function initial_conditions!(   progn::PrognosticVariables,
-                                initial_conditions::ZonalJet,
-                                model::ShallowWater)
+function initialize!(   progn::PrognosticVariables,
+                        initial_conditions::ZonalJet,
+                        model::ShallowWater)
 
     (;latitude, width, umax) = initial_conditions               # for jet
     (;perturb_lat, perturb_lon, perturb_xwidth,                 # for perturbation
@@ -234,9 +211,9 @@ end
 """
 $(TYPEDSIGNATURES)
 Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
-function initial_conditions!(   progn::PrognosticVariables{NF},
-                                initial_conditions::ZonalWind,
-                                model::PrimitiveEquation) where NF
+function initialize!(   progn::PrognosticVariables{NF},
+                        initial_conditions::ZonalWind,
+                        model::PrimitiveEquation) where NF
 
     (;u₀, η₀, ΔT, Tmin, pressure_on_orography) = initial_conditions
     (;perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = initial_conditions
@@ -365,9 +342,9 @@ end
 $(TYPEDSIGNATURES)
 Restart from a previous SpeedyWeather.jl simulation via the restart file restart.jld2
 Applies interpolation in the horizontal but not in the vertical."""
-function initial_conditions!(   progn_new::PrognosticVariables,
-                                initial_conditions::StartFromFile,
-                                model::ModelSetup)
+function initialize!(   progn_new::PrognosticVariables,
+                        initial_conditions::StartFromFile,
+                        model::ModelSetup)
 
     (; path, id ) = initial_conditions
 
@@ -511,9 +488,9 @@ $(TYPEDSIGNATURES)
 Random initial conditions for the interface displacement η
 in the shallow water equations. The flow (u,v) is zero initially.
 This kicks off gravity waves that will interact with orography."""
-function initial_conditions!(   progn::PrognosticVariables{NF},
-                                initial_conditions::RandomWaves,
-                                model::ShallowWater) where NF
+function initialize!(   progn::PrognosticVariables{NF},
+                        initial_conditions::RandomWaves,
+                        model::ShallowWater) where NF
         
     (;A, lmin, lmax) = initial_conditions
     (;trunc) = progn
@@ -523,7 +500,7 @@ function initial_conditions!(   progn::PrognosticVariables{NF},
 
     # zero out other wavenumbers
     η[1:min(lmin,trunc+2),:] .= 0
-    η[min(lmax,trunc+2):trunc+2,:] .= 0
+    η[min(lmax+2,trunc+2):trunc+2,:] .= 0
 
     # scale to amplitude
     η_grid = gridded(η,model.spectral_transform)

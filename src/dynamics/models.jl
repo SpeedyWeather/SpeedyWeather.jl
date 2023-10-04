@@ -65,7 +65,10 @@ function initialize!(model::Barotropic)
     initialize!(drag,model)
     initialize!(horizontal_diffusion,model)
 
+    # initial conditions
     prognostic_variables = initial_conditions(model)
+    initialize!(prognostic_variables,model.initial_conditions,model)
+    
     diagnostic_variables = DiagnosticVariables(spectral_grid,Barotropic)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
@@ -124,7 +127,10 @@ function initialize!(model::ShallowWater)
     initialize!(horizontal_diffusion,model)
     initialize!(orography,planet,spectral_transform,geometry)
 
+    # initial conditions
     prognostic_variables = initial_conditions(model)
+    initialize!(prognostic_variables,model.initial_conditions,model)
+
     diagnostic_variables = DiagnosticVariables(spectral_grid,ShallowWater)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
@@ -193,7 +199,10 @@ function initialize!(model::PrimitiveDry)
     initialize!(model.static_energy_diffusion,model)
     # initialize!(model.vertical_diffusion,model)
 
+    # initial conditions
     prognostic_variables = initial_conditions(model)
+    initialize!(prognostic_variables,model.initial_conditions,model)
+
     diagnostic_variables = DiagnosticVariables(spectral_grid,PrimitiveDry)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
@@ -266,7 +275,10 @@ function initialize!(model::PrimitiveWet)
     initialize!(model.large_scale_condensation,model)
     # initialize!(model.vertical_diffusion,model)
 
+    # initial conditions
     prognostic_variables = initial_conditions(model)
+    initialize!(prognostic_variables,model.initial_conditions,model)
+
     diagnostic_variables = DiagnosticVariables(spectral_grid,PrimitiveWet)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
