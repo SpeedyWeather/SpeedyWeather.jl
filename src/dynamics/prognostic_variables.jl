@@ -1,3 +1,5 @@
+abstract type AbstractVariables end
+
 const DEFAULT_DATE = DateTime(2000,1,1)
 
 """
@@ -44,7 +46,7 @@ const LTM = LowerTriangularMatrix       # just because it's shorter here
 
 """A layer of the prognostic variables in spectral space.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct PrognosticVariablesLayer{NF<:AbstractFloat}
+Base.@kwdef struct PrognosticVariablesLayer{NF<:AbstractFloat} <: AbstractVariables
 
     "Spectral resolution as max degree of spherical harmonics"
     trunc::Int
@@ -65,10 +67,16 @@ end
 # generator function based on spectral grid
 PrognosticVariablesLayer(SG::SpectralGrid) = PrognosticVariablesLayer{SG.NF}(trunc=SG.trunc)
 
+function Base.show(io::IO,A::AbstractVariables)
+    println(io,"$(typeof(A))")
+    keys = propertynames(A)
+    print_fields(io,A,keys)
+end
+
 """Collect the n time steps of PrognosticVariablesLayer
 of an n-step time integration (leapfrog=2) into a single struct.
 $(TYPEDFIELDS).""" 
-struct PrognosticLayerTimesteps{NF<:AbstractFloat}
+struct PrognosticLayerTimesteps{NF<:AbstractFloat} <: AbstractVariables
     timesteps::Vector{PrognosticVariablesLayer{NF}}     # N_STEPS-element vector for time steps
 end
 
@@ -79,7 +87,7 @@ end
 
 """The spectral and gridded prognostic variables at the surface.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct PrognosticVariablesSurface{NF<:AbstractFloat}
+Base.@kwdef struct PrognosticVariablesSurface{NF<:AbstractFloat} <: AbstractVariables
 
     "Spectral resolution as max degree of spherical harmonics"
     trunc::Int
@@ -92,9 +100,9 @@ Base.@kwdef struct PrognosticVariablesSurface{NF<:AbstractFloat}
 end
 
 # generator function based on a SpectralGrid
-PrognosticVariablesSurface(SG::SpectralGrid) = PrognosticVariablesSurface{NF}(trunc=SG.trunc)
+PrognosticVariablesSurface(SG::SpectralGrid) = PrognosticVariablesSurface{SG.NF}(trunc=SG.trunc)
 
-Base.@kwdef mutable struct PrognosticVariablesOcean{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
+Base.@kwdef mutable struct PrognosticVariablesOcean{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractVariables
 
     "Resolution parameter of grid"
     const nlat_half::Int
@@ -104,10 +112,10 @@ Base.@kwdef mutable struct PrognosticVariablesOcean{NF<:AbstractFloat,Grid<:Abst
 
     # SEA
     "Sea surface temperature [K]"
-    const sea_surface_temperature::Grid = zeros(Grid{NF},nlat_half)
+    const sea_surface_temperature::Grid = zeros(Grid,nlat_half)
 
     "Sea ice concentration [1]"
-    const sea_ice_concentration::Grid = zeros(Grid{NF},nlat_half)
+    const sea_ice_concentration::Grid = zeros(Grid,nlat_half)
 end
 
 # generator function based on a SpectralGrid
@@ -116,7 +124,7 @@ function PrognosticVariablesOcean(SG::SpectralGrid)
     return PrognosticVariablesOcean{NF,Grid{NF}}(;nlat_half)
 end
 
-Base.@kwdef mutable struct PrognosticLand{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
+Base.@kwdef mutable struct PrognosticVariablesLand{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractVariables
 
     "Resolution parameter of grid"
     const nlat_half::Int
@@ -126,16 +134,16 @@ Base.@kwdef mutable struct PrognosticLand{NF<:AbstractFloat,Grid<:AbstractGrid{N
 
     # LAND
     "Land surface temperature [K]"
-    const land_surface_temperature::Grid = zeros(Grid{NF},nlat_half)
+    const land_surface_temperature::Grid = zeros(Grid,nlat_half)
 
     "Snow depth [m]"
-    const snow_depth::Grid = zeros(Grid{NF},nlat_half)
+    const snow_depth::Grid = zeros(Grid,nlat_half)
 
     "Soil wetness layer 1, volume fraction [1]"
-    const soil_wetness_layer1::Grid = zeros(Grid{NF},nlat_half)
+    const soil_wetness_layer1::Grid = zeros(Grid,nlat_half)
 
     "Soil wetness layer 2, volume fraction [1]"
-    const soil_wetness_layer2::Grid = zeros(Grid{NF},nlat_half)
+    const soil_wetness_layer2::Grid = zeros(Grid,nlat_half)
 end
 
 # generator function based on a SpectralGrid
@@ -147,16 +155,16 @@ end
 """Collect the n time steps of PrognosticVariablesSurface
 of an n-step time integration (leapfrog=2) into a single struct.
 $(TYPEDFIELDS).""" 
-struct PrognosticSurfaceTimesteps{NF<:AbstractFloat}
+struct PrognosticSurfaceTimesteps{NF<:AbstractFloat} <: AbstractVariables
     timesteps::Vector{PrognosticVariablesSurface{NF}}   # N_STEPS-element vector for time steps
 end
 
 # generator function based on spectral grid
 function PrognosticSurfaceTimesteps(SG::SpectralGrid)
-    return PrognosticSurfaceTimesteps([PrognosticVariablesLayer(SG) for _ in 1:N_STEPS])
+    return PrognosticSurfaceTimesteps([PrognosticVariablesSurface(SG) for _ in 1:N_STEPS])
 end
 
-struct PrognosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF},M<:ModelSetup}
+struct PrognosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF},M<:ModelSetup} <: AbstractVariables
 
     # dimensions
     trunc::Int              # max degree of spherical harmonics
