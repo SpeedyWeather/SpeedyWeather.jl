@@ -1,10 +1,14 @@
+abstract type AbstractVariables end
+
+const DEFAULT_DATE = DateTime(2000,1,1)
+
 """
 Clock struct keeps track of the model time, how many days to integrate for
 and how many time steps this takes
 $(TYPEDFIELDS)."""
 Base.@kwdef mutable struct Clock
     "current model time"
-    time::DateTime = DateTime(2000,1,1)
+    time::DateTime = DEFAULT_DATE
     
     "number of days to integrate for, set in run!(::Simulation)"
     n_days::Float64 = 0
@@ -13,6 +17,7 @@ Base.@kwdef mutable struct Clock
     n_timesteps::Int = 0  
 end
 
+# pretty printing
 function Base.show(io::IO,C::Clock)
     println(io,"$(typeof(C))")
     keys = propertynames(C)
@@ -27,140 +32,172 @@ function initialize!(clock::Clock,time_stepping::TimeStepper)
     return clock
 end
 
+"""
+$(TYPEDSIGNATURES)
+Create and initialize a clock from `time_stepping`"""
 function Clock(time_stepping::TimeStepper;kwargs...)
     clock = Clock(;kwargs...)
     initialize!(clock,time_stepping)
 end
 
-import Base: copy!
-
 # how many time steps have to be stored for the time integration? Leapfrog = 2 
 const N_STEPS = 2
+const LTM = LowerTriangularMatrix       # just because it's shorter here
 
-struct PrognosticVariablesLayer{NF<:AbstractFloat}
-    # all matrices are of size lmax x mmax
-    vor  ::LowerTriangularMatrix{Complex{NF}}   # Vorticity of horizontal wind field [1/s]
-    div  ::LowerTriangularMatrix{Complex{NF}}   # Divergence of horizontal wind field [1/s]
-    temp ::LowerTriangularMatrix{Complex{NF}}   # Absolute temperature [K]
-    humid::LowerTriangularMatrix{Complex{NF}}   # Specific humidity [g/kg]
+"""A layer of the prognostic variables in spectral space.
+$(TYPEDFIELDS)"""
+Base.@kwdef struct PrognosticVariablesLayer{NF<:AbstractFloat} <: AbstractVariables
+
+    "Spectral resolution as max degree of spherical harmonics"
+    trunc::Int
+
+    "Vorticity of horizontal wind field [1/s]"
+    vor  ::LTM{Complex{NF}} = zeros(LTM{Complex{NF}},trunc+2,trunc+1)   
+
+    "Divergence of horizontal wind field [1/s]"
+    div  ::LTM{Complex{NF}} = zeros(LTM{Complex{NF}},trunc+2,trunc+1)
+
+    "Absolute temperature [K]"
+    temp ::LTM{Complex{NF}} = zeros(LTM{Complex{NF}},trunc+2,trunc+1)
+
+    "Specific humidity [kg/kg]"
+    humid::LTM{Complex{NF}} = zeros(LTM{Complex{NF}},trunc+2,trunc+1)
 end
 
-struct PrognosticVariablesSurface{NF<:AbstractFloat}
-    pres::LowerTriangularMatrix{Complex{NF}}    # log of surface pressure [log(Pa)]
+# generator function based on spectral grid
+PrognosticVariablesLayer(SG::SpectralGrid) = PrognosticVariablesLayer{SG.NF}(trunc=SG.trunc)
+
+function Base.show(io::IO,A::AbstractVariables)
+    println(io,"$(typeof(A))")
+    keys = propertynames(A)
+    print_fields(io,A,keys)
 end
 
-struct PrognosticLayerTimesteps{NF<:AbstractFloat}
+"""Collect the n time steps of PrognosticVariablesLayer
+of an n-step time integration (leapfrog=2) into a single struct.
+$(TYPEDFIELDS).""" 
+struct PrognosticLayerTimesteps{NF<:AbstractFloat} <: AbstractVariables
     timesteps::Vector{PrognosticVariablesLayer{NF}}     # N_STEPS-element vector for time steps
 end
 
-struct PrognosticSurfaceTimesteps{NF<:AbstractFloat}
+# generator function based on spectral grid
+function PrognosticLayerTimesteps(SG::SpectralGrid)
+    return PrognosticLayerTimesteps([PrognosticVariablesLayer(SG) for _ in 1:N_STEPS])
+end
+
+"""The spectral and gridded prognostic variables at the surface.
+$(TYPEDFIELDS)"""
+Base.@kwdef struct PrognosticVariablesSurface{NF<:AbstractFloat} <: AbstractVariables
+
+    "Spectral resolution as max degree of spherical harmonics"
+    trunc::Int
+
+    "log of surface pressure [log(Pa)] for PrimitiveEquation, interface displacement [m] for ShallowWaterModel"
+    pres::LTM{Complex{NF}} = zeros(LTM{Complex{NF}},trunc+2,trunc+1)
+end
+
+# generator function based on a SpectralGrid
+PrognosticVariablesSurface(SG::SpectralGrid) = PrognosticVariablesSurface{SG.NF}(trunc=SG.trunc)
+
+Base.@kwdef mutable struct PrognosticVariablesOcean{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractVariables
+
+    "Resolution parameter of grid"
+    const nlat_half::Int
+
+    "Current time of the ocean variables"
+    time::DateTime = DEFAULT_DATE
+
+    # SEA
+    "Sea surface temperature [K]"
+    const sea_surface_temperature::Grid = zeros(Grid,nlat_half)
+
+    "Sea ice concentration [1]"
+    const sea_ice_concentration::Grid = zeros(Grid,nlat_half)
+end
+
+# generator function based on a SpectralGrid
+function PrognosticVariablesOcean(SG::SpectralGrid)
+    (;nlat_half,Grid,NF) = SG
+    return PrognosticVariablesOcean{NF,Grid{NF}}(;nlat_half)
+end
+
+Base.@kwdef mutable struct PrognosticVariablesLand{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractVariables
+
+    "Resolution parameter of grid"
+    const nlat_half::Int
+
+    "Current time of the land variables"
+    time::DateTime = DEFAULT_DATE
+
+    # LAND
+    "Land surface temperature [K]"
+    const land_surface_temperature::Grid = zeros(Grid,nlat_half)
+
+    "Snow depth [m]"
+    const snow_depth::Grid = zeros(Grid,nlat_half)
+
+    "Soil wetness layer 1, volume fraction [1]"
+    const soil_wetness_layer1::Grid = zeros(Grid,nlat_half)
+
+    "Soil wetness layer 2, volume fraction [1]"
+    const soil_wetness_layer2::Grid = zeros(Grid,nlat_half)
+end
+
+# generator function based on a SpectralGrid
+function PrognosticVariablesLand(SG::SpectralGrid)
+    (;nlat_half,Grid,NF) = SG
+    return PrognosticVariablesLand{NF,Grid{NF}}(;nlat_half)
+end
+
+"""Collect the n time steps of PrognosticVariablesSurface
+of an n-step time integration (leapfrog=2) into a single struct.
+$(TYPEDFIELDS).""" 
+struct PrognosticSurfaceTimesteps{NF<:AbstractFloat} <: AbstractVariables
     timesteps::Vector{PrognosticVariablesSurface{NF}}   # N_STEPS-element vector for time steps
 end
 
-struct PrognosticVariables{NF<:AbstractFloat,M<:ModelSetup}
-    # data
-    layers::Vector{PrognosticLayerTimesteps{NF}}     # vector of vertical layers  
-    surface::PrognosticSurfaceTimesteps{NF}
+# generator function based on spectral grid
+function PrognosticSurfaceTimesteps(SG::SpectralGrid)
+    return PrognosticSurfaceTimesteps([PrognosticVariablesSurface(SG) for _ in 1:N_STEPS])
+end
+
+struct PrognosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF},M<:ModelSetup} <: AbstractVariables
 
     # dimensions
     trunc::Int              # max degree of spherical harmonics
-    n_steps::Int            # N_STEPS time steps that are stored
+    nlat_half::Int          # resolution parameter of grids
     nlev::Int               # number of vertical levels
+    n_steps::Int            # N_STEPS time steps that are stored
+
+    layers::Vector{PrognosticLayerTimesteps{NF}}     # vector of vertical layers  
+    surface::PrognosticSurfaceTimesteps{NF}
+    ocean::PrognosticVariablesOcean{NF,Grid}
+    land::PrognosticVariablesLand{NF,Grid}
 
     # scaling
     scale::Base.RefValue{NF}
 
-    # # scaling TODO think about including more flexible scaling factors here
-    # scaling_vor::Base.RefValue{NF}
-    # scaling_div::Base.RefValue{NF}
-    # scaling_temp::Base.RefValue{NF}
-    # scaling_humid::Base.RefValue{NF}
-    # scaling_pres::Base.RefValue{NF}
-
     clock::Clock
 end
 
-# ZERO GENERATOR FUNCTIONS
-# general version
-function Base.zeros(::Type{PrognosticVariablesLayer{NF}},trunc::Integer) where NF
-    # use one more l for size compatibility with vector quantities
-    # size trunc+2 x trunc+1 corresponds to lmax+1 x mmax
-    vor   = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
-    div   = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
-    temp  = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
-    humid = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
-    return PrognosticVariablesLayer(vor,div,temp,humid)
-end
-
-# reduce size of unneeded variables if ModelSetup is provided
-function Base.zeros(::Type{PrognosticVariablesLayer{NF}},Model::Type{<:ModelSetup},trunc::Integer) where NF
-    # use one more l for size compatibility with vector quantities
-    LTM = LowerTriangularMatrix{Complex{NF}}
-    vor = has(Model, :vor) ? zeros(LTM,trunc+2,trunc+1) : LTM(undef, 0, 0)
-    div = has(Model, :div) ? zeros(LTM,trunc+2,trunc+1) : LTM(undef, 0, 0)
-    temp = has(Model, :temp) ? zeros(LTM,trunc+2,trunc+1) : LTM(undef, 0, 0)
-    humid = has(Model, :humid) ? zeros(LTM,trunc+2,trunc+1) : LTM(undef, 0, 0)
-
-    return PrognosticVariablesLayer(vor,div,temp,humid)
-end
-
-function Base.zeros(::Type{PrognosticVariablesSurface{NF}},trunc::Integer) where NF
-    # use one more l for size compatibility with vector quantities
-    pres = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
-    return PrognosticVariablesSurface(pres)
-end
-
-function Base.zeros(::Type{PrognosticVariablesSurface{NF}},Model::Type{<:ModelSetup},trunc::Integer) where NF
-    # use one more l for size compatibility with vector quantities
-    LTM = LowerTriangularMatrix{Complex{NF}}
-    pres = has(Model, :pres) ? zeros(LTM,trunc+2,trunc+1) : LTM(undef, 0, 0)
-    return PrognosticVariablesSurface(pres)
-end
-
-# create time steps as N_STEPS-element vector of PrognosticVariablesLayer
-function Base.zeros(::Type{PrognosticLayerTimesteps{NF}},trunc::Integer) where NF
-    return PrognosticLayerTimesteps([zeros(PrognosticVariablesLayer{NF},trunc) for _ in 1:N_STEPS])
-end
-
-function Base.zeros(::Type{PrognosticSurfaceTimesteps{NF}},trunc::Integer) where NF
-    return PrognosticSurfaceTimesteps([zeros(PrognosticVariablesSurface{NF},trunc) for _ in 1:N_STEPS])
-end
-
-# also pass on model if available
-function Base.zeros(::Type{PrognosticLayerTimesteps{NF}},Model::Type{<:ModelSetup},trunc::Integer) where NF
-    return PrognosticLayerTimesteps([zeros(PrognosticVariablesLayer{NF},Model,trunc) for _ in 1:N_STEPS])   
-end
-
-function Base.zeros(::Type{PrognosticSurfaceTimesteps{NF}},Model::Type{<:ModelSetup},trunc::Integer) where NF
-    return PrognosticSurfaceTimesteps([zeros(PrognosticVariablesSurface{NF},Model,trunc) for _ in 1:N_STEPS])   
-end
-
-# general function to initiate all prognostic variables with zeros
-function Base.zeros(::Type{PrognosticVariables{NF}},trunc::Integer,nlev::Integer) where NF
-    layers = [zeros(PrognosticLayerTimesteps{NF},trunc) for _ in 1:nlev]    # vector of nlev layers
-    surface = zeros(PrognosticSurfaceTimesteps{NF},trunc)
+function PrognosticVariables(SG::SpectralGrid,::Model) where Model<:ModelSetup
     
-    # initialize with scale=1, wrapped in RefValue for mutability
-    scale = Ref(one(NF)) 
-    return PrognosticVariables{NF,ModelSetup}(layers,surface,trunc,N_STEPS,nlev,scale)
+    (;trunc,nlat_half,nlev,Grid,NF) = SG
+
+    # data structs
+    layers = [PrognosticLayerTimesteps(SG) for _ in 1:nlev]      # vector of nlev layers
+    surface = PrognosticSurfaceTimesteps(SG)
+    ocean = PrognosticVariablesOcean(SG)
+    land = PrognosticVariablesLand(SG)
+
+    scale = Ref(one(NF))        # initialize with scale=1, wrapped in RefValue for mutability
+    clock = Clock()
+
+    return PrognosticVariables{NF,Grid{NF},Model}(  trunc,nlat_half,nlev,N_STEPS,
+                                                    layers,surface,ocean,land,scale,clock)
 end
 
-# pass on model to reduce size
-function Base.zeros(::Type{PrognosticVariables{NF}},Model::Type{<:ModelSetup},trunc::Integer,nlev::Integer) where NF
-    
-    layers = [zeros(PrognosticLayerTimesteps{NF},Model,trunc) for _ in 1:nlev]      # vector of nlev layers
-    PST = PrognosticSurfaceTimesteps{NF}
-    surface = has(Model, :pres) ? zeros(PST,trunc) : zeros(PST,-1)
-    
-    # initialize with scale=1, wrapped in RefValue for mutability
-    scale = Ref(one(NF))  
-    
-    # clock
-    clock::Clock = Clock()
-    return PrognosticVariables{NF,Model}(layers,surface,trunc,N_STEPS,nlev,scale,clock)
-end
-
-has(progn::PrognosticVariables{NF,M}, var_name::Symbol) where {NF,M} = has(M, var_name)
+has(::PrognosticVariables{NF,Grid,M}, var_name::Symbol) where {NF,Grid,M} = has(M, var_name)
 
 """
     copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
