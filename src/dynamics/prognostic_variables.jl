@@ -92,11 +92,8 @@ Base.@kwdef struct PrognosticVariablesSurface{NF<:AbstractFloat} <: AbstractVari
     "Spectral resolution as max degree of spherical harmonics"
     trunc::Int
 
-    "log of surface pressure [log(Pa)]"
+    "log of surface pressure [log(Pa)] for PrimitiveEquation, interface displacement [m] for ShallowWaterModel"
     pres::LTM{Complex{NF}} = zeros(LTM{Complex{NF}},trunc+2,trunc+1)
-
-    "Interface displacement in the ShallowWaterModel [m]"
-    eta::LTM{Complex{NF}} = zeros(LTM{Complex{NF}},trunc+2,trunc+1)
 end
 
 # generator function based on a SpectralGrid
@@ -183,7 +180,7 @@ struct PrognosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF},M<:ModelSetu
     clock::Clock
 end
 
-function Base.zeros(::Type{PrognosticVariables},SG::SpectralGrid,Model::Type{<:ModelSetup})
+function PrognosticVariables(SG::SpectralGrid,::Model) where Model<:ModelSetup
     
     (;trunc,nlat_half,nlev,Grid,NF) = SG
 
