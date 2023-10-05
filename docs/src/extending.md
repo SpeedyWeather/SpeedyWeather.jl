@@ -117,6 +117,8 @@ Defining a new type for example as a subtype of AbstractForcing, you will actual
 want to do
 ```julia
 struct MyForcing <: SpeedyWeather.AbstractForcing
+    # fields
+end
 ```
 Because `AbstractForcing` is defined inside SpeedyWeather, but we do not export
 all functions/types in order to not flood your global scope to avoid
@@ -128,6 +130,8 @@ as we want to define a new method for it *outside* that can be called *inside*
 we actually need to write
 ```julia
 function SpeedyWeather.initialize!(forcing::MyForcing,model::SpeedyWeather.ModelSetup)
+    # how to initialize it
+end
 ```
 And similar for `SpeedyWeather.forcing!`.
 
@@ -161,6 +165,7 @@ of the stochastic process. `Q` is for every spherical harmonic a complex random 
 number in `[-1,1]` in both its real and imaginary components. 
 So we actually define our `StochasticStirring` forcing as follows and
 will explain the details in second
+
 ```julia
 Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing{NF}
     
@@ -201,5 +206,59 @@ Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing{NF}
 end
 ```
 
+So, first the scalar parameters, are added as fields of type `Float64` with some default values
+as suggested in the [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2)
+paper. In order to be able to define the default values, we add the `Base.@kwdef` macro
+before the `struct` definition. Then we need the term `S` as coefficients of the spherical harmonics, which
+is a `LowerTriangularMatrix`, however we want its elements to be of number format `NF`,
+which is also the parametric type of `StochasticStirring{NF}`, this is done because it will
+allow us to use multiple dispatch not just based on `StochasticStirring` but also based on the
+number format. Neat. In order to allocate `S` with some default though we need to
+know the size of the matrix, which is given by the spectral resolution `trunc`.
+So in order to automatically allocate `S` based on the right size we add `trunc` as another
+field, which does not have a default but will be initialised with the help of a `SpectralGrid`,
+as explained later. So once we call `StochasticStirring{NF}(trunc=31)` then `S` will automatically
+have the right size.
+
+Then we also see in the definition of `S` that there are prefactors ``A(1-\exp(-2\tfrac{\Delta t}{\tau}))``
+which depend on the forcing's parameters but also on the time step, which, at the time of the creation
+of `StochasticStirring` we might not know about! And definitely do not want to hardcode in.
+So to illustrate what you can do in this case we define two additional parameters `a,b` that
+are just initialized as zero, but that will be precalculated in the `initialize!` function.
+However, we decided to define our `struct` as _immutable_ (meaning you cannot change it after
+creation unless its elements have mutable fields, like the elements in vectors). In order
+to make it mutable, we could write `mutable struct` instead, or as outlined here use `RefValue`s.
+Another option would be to just recalculate `a,b` in `forcing!` on every time step.
+Depending on exactly what you would like to do, you can choose your way.
+Anyway, we decide to include `a,b` as `RefValue`s so that we can always access the scalar 
+underneath with `a[]` and `b[]` and also change it with `a[] = 1` etc.
+
+Lastly, the [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2)
+paper also describes how the forcing is not supposed to applied everywhere on the global but only
+over a range of latitudes, meaning we want to scale down certain latitudes with a factor approaching
+zero. For this we want to define a latitudinal mask `lat_mask` that is a vector of length `nlat`,
+the number of latitude rings. Similar to `S`, we want to allocate it with zeros (or any other
+value for that matter), but then precompute this mask in the `initialize!` step. For this
+we need to know `nlat` at creation time meaning we add this similar as to how we added
+`trunc`. This mask requires a central `latitude` and a `width` which are therefore added to
+the
+
+Cool. Now you could create our new `StochasticStirring` forcing with `StochasticStirring{NF}(trunc=31,nlat=48)`,
+but in SpeedyWeather we typically use the `SpectralGrid` object to pass on the information of
+the resolution so we want a generator function like
+```julia
+function StochasticStirring(SG::SpectralGrid;kwargs...)
+    (;trunc,Grid,nlat_half) = SG
+    nlat = RingGrids.get_nlat(Grid,nlat_half)
+    return StochasticStirring{SG.NF}(;trunc,nlat,kwargs...)
+end
+```
+Which allows us to do
+```julia
+julia> spectral_grid = SpectralGrid(trunc=42,nlev=1)
+julia> stochastic_stirring = StochasticStirring(spectral_grid,latitude=30,decorrelation_time=5)
+```
+So the respective resolution parameters are just pulled from the `SpectralGrid` as a first argument
+and the remaining parameters are just keyword arguments that one can change at creation.
 
 ## Add custom drag
