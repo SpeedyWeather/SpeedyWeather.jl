@@ -180,6 +180,9 @@ include("physics/vertical_diffusion.jl")
 include("physics/large_scale_condensation.jl")
 include("physics/pretty_printing.jl")
 
+# OCEAN AND LAND
+include("dynamics/ocean.jl")
+
 # MODELS
 include("dynamics/models.jl")
 

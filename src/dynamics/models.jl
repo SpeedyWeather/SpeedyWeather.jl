@@ -150,22 +150,25 @@ Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     initial_conditions::InitialConditions = ZonalWind()
     orography::AbstractOrography{NF} = EarthOrography(spectral_grid)
-    land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
 
+    # BOUNDARY CONDITIONS
+    land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
+    ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
+    
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     boundary_layer_drag::BoundaryLayerDrag{NF} = LinearDrag(spectral_grid)
     temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
-    vertical_advection::VerticalAdvection{NF} = CenteredVerticalAdvection(spectral_grid)
     # vertical_diffusion::VerticalDiffusion{NF} = VerticalLaplacian(spectral_grid)
-
+    
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
     spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
     horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
     implicit::AbstractImplicit{NF} = ImplicitPrimitiveEq(spectral_grid)
-
+    vertical_advection::VerticalAdvection{NF} = CenteredVerticalAdvection(spectral_grid)
+    
     # INTERNALS
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
@@ -187,11 +190,14 @@ at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`.
 function initialize!(model::PrimitiveDry)
     (;spectral_grid,horizontal_diffusion,
         orography,planet,spectral_transform,geometry) = model
-    (;land_sea_mask) = model
 
+    # numerics
     initialize!(horizontal_diffusion,model)
+
+    # boundary conditionss
     initialize!(orography,planet,spectral_transform,geometry)
-    initialize!(land_sea_mask)
+    initialize!(model.land_sea_mask)
+    initialize!(model.ocean)
 
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
@@ -222,7 +228,10 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     initial_conditions::InitialConditions = ZonalWind()
     orography::AbstractOrography{NF} = EarthOrography(spectral_grid)
+
+    # BOUNDARY CONDITIONS
     land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
+    ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -231,16 +240,15 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
     large_scale_condensation::AbstractCondensation{NF} = SpeedyCondensation(spectral_grid)
-    vertical_advection::VerticalAdvection{NF} = CenteredVerticalAdvection(spectral_grid)
-
     # vertical_diffusion::VerticalDiffusion{NF} = VerticalLaplacian(spectral_grid)
-
+    
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
     spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
     horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
     implicit::AbstractImplicit{NF} = ImplicitPrimitiveEq(spectral_grid)
-
+    vertical_advection::VerticalAdvection{NF} = CenteredVerticalAdvection(spectral_grid)
+    
     # INTERNALS
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
@@ -262,11 +270,13 @@ at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`.
 function initialize!(model::PrimitiveWet)
     (;spectral_grid,horizontal_diffusion,
         orography,planet,spectral_transform,geometry) = model
-    (;land_sea_mask) = model
 
     initialize!(horizontal_diffusion,model)
+
+    # boundary conditionss
     initialize!(orography,planet,spectral_transform,geometry)
-    initialize!(land_sea_mask)
+    initialize!(model.land_sea_mask)
+    initialize!(model.ocean)
     
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
