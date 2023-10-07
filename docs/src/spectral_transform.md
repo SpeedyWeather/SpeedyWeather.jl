@@ -292,44 +292,14 @@ v &= +\frac{1}{R}\partial_\theta\Phi + \frac{1}{R\cos\theta}\partial_\lambda\Psi
 \end{aligned}
 ```
 
-Alternatively, we can use the velocities ``U = u\cos\theta, V = v\cos\theta``, which we do as the meridional gradient
-for spherical harmonics is easier implemented with a ``\cos\theta``-scaling included, and because the divergence and 
-curl in spherical coordinates evaluates the meridional gradient with ``U,V`` and not ``u,v``. From ``u,v`` we can
-return to ``\zeta, \mathcal{D}`` via
-
-```math
-\begin{aligned}
-\zeta &= \frac{1}{R\cos\theta}\partial_\lambda v - \frac{1}{R\cos\theta}\partial_\theta (u \cos\theta) \\
-\mathcal{D} &= \frac{1}{R\cos\theta}\partial_\lambda u + \frac{1}{R\cos\theta}\partial_\theta (v \cos\theta).
-\end{aligned}
-```
-
-Equivalently, we have
-
-```math
-\begin{aligned}
-U &= -\frac{\cos\theta}{R}\partial_\theta\Psi + \frac{1}{R}\partial_\lambda\Phi \\
-V &= +\frac{\cos\theta}{R}\partial_\theta\Phi + \frac{1}{R}\partial_\lambda\Psi \\
-\zeta &= \frac{1}{R}\partial_\lambda \left( \frac{V}{\cos^2\theta} \right) -
-\frac{\cos\theta}{R}\partial_\theta \left( \frac{U}{\cos^2\theta} \right) \\
-\mathcal{D} &= \frac{1}{R}\partial_\lambda \left( \frac{U}{\cos^2\theta} \right) +
-\frac{\cos\theta}{R}\partial_\theta \left( \frac{V}{\cos^2\theta} \right).
-\end{aligned}
-```
-
-which is a more convenient formulation because of the way how the [Meridional derivative](@ref)
-is implemented with a recursion relation, actually computing ``\cos\theta \partial_\theta``
-rather than ``\partial_\theta`` directly. The remaining cosine scalings in
-``(U,V)*\cos^{-2}\theta`` are done in grid-point space.
-If one wanted to get back to ``\zeta, \mathcal{D}`` this is how it would be done, but
-it is often more convenient to unscale ``U,V`` on the fly in the spectral transform
-to obtain ``u,v`` and then divide again by ``\cos\theta`` when any gradient (or divergence or
-curl) is taken. This is because other terms would need that single ``\cos\theta`` unscaling
-too before a gradient is taken. How the operators ``\nabla, \nabla \times, \nabla \cdot`` can
+How the operators ``\nabla, \nabla \times, \nabla \cdot`` can
 be implemented with spherical harmonics is presented in the following sections.
-
-Also note that SpeedyWeather.jl scales the equations with the radius `R` (see [Radius scaling](@ref scaling))
-such that the divisions by `R` drop out in this last formulation too.
+However, note that the actually implemented operators differ slightly in their
+scaling with respect to the radius ``R`` and the cosine of latitude ``\cos(\theta)``.
+For further details see [Gradient operators](@ref) which describes those as implemented
+in the [SpeedyTransforms](@ref) module. Also note that the equations in SpeedyWeather.jl
+are scaled with the radius ``R^2`` (see [Radius scaling](@ref scaling))
+which turns most operators into non-dimensional operators on the unit sphere anyway.
 
 ### Zonal derivative
 
