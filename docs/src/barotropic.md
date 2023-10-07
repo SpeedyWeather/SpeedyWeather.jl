@@ -21,14 +21,16 @@ single global layer on the sphere.
 
 ```math
 \frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) =
-\nabla \times \mathbf{F} + (-1)^{n+1}\nu\nabla^{2n}\zeta
+F_\zeta + \nabla \times \mathbf{F}_\mathbf{u} + (-1)^{n+1}\nu\nabla^{2n}\zeta
 ```
 We denote time``t``, velocity vector ``\mathbf{u} = (u, v)``, Coriolis parameter ``f``,
 and hyperdiffusion ``(-1)^{n+1} \nu \nabla^{2n} \zeta``
 (``n`` is the hyperdiffusion order,  see [Horizontal diffusion](@ref diffusion)).
-We also include a forcing vector ``\mathbf{F} = (F_u,F_v)`` which acts on the
-zonal velocity ``u`` and the meridional velocity ``v`` and hence its curl ``\nabla \times \mathbf{F}``
-is a tendency for relative vorticity ``\zeta``.
+We also include possible forcing terms
+``F_\zeta, \mathbf{F}_\mathbf{u} = (F_u,F_v)`` which act on the vorticity and/or on the
+zonal velocity ``u`` and the meridional velocity ``v`` and hence the curl
+``\nabla \times \mathbf{F}_\mathbf{u}`` is a tendency for relative vorticity ``\zeta``.
+See [Extending SpeedyWeather](@ref) how to define these.
 
 Starting with some relative vorticity ``\zeta``, the [Laplacian](@ref) is
 inverted to obtain the stream function ``\Psi``
@@ -51,7 +53,7 @@ which is described in [Derivatives in spherical coordinates](@ref). Using ``u`` 
 advect the absolute vorticity ``\zeta + f``. In order to avoid to calculate both the curl and the
 divergence of a flux we rewrite the barotropic vorticity equation as
 ```math
-\frac{\partial \zeta}{\partial t} =
+\frac{\partial \zeta}{\partial t} = F_\zeta +
 \nabla \times (\mathbf{F} + \mathbf{u}_\perp(\zeta + f)) + (-1)^{n+1}\nu\nabla^{2n}\zeta
 ```
 with ``\mathbf{u}_\perp = (v,-u)`` the rotated velocity vector, because
@@ -74,11 +76,11 @@ transform this model state to grid-point space:
 
 Now loop over
 
-1. Compute the forcing vector ``\mathbf{F} = (F_u,F_v)`` for ``u`` and ``v``
+1. Compute the forcing (or drag) terms ``F_\zeta, \mathbf{F}_\mathbf{u}``
 2. Multiply ``u,v`` with ``\zeta+f`` in grid-point space
 3. Add ``A = F_u + v(\zeta + f)`` and ``B = F_v - u(\zeta + f)``
 4. Transform these vector components to spectral space ``A_{lm}``, ``B_{lm}``
-5. Compute the curl of ``(A,B)_{lm}`` in spectral space which is the tendency of ``\zeta_{lm}``
+5. Compute the curl of ``(A,B)_{lm}`` in spectral space, add to ``F_\zeta`` to accumulate the tendency of ``\zeta_{lm}``
 6. Compute the [horizontal diffusion](@ref diffusion) based on that tendency
 7. Compute a leapfrog time step as described in [Time integration](@ref leapfrog) with a [Robert-Asselin and Williams filter](@ref)
 8. Transform the new spectral state of ``\zeta_{lm}`` to grid-point ``u,v,\zeta`` as described in 0.
