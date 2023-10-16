@@ -1,5 +1,5 @@
 ---
-title: 'SpeedyWeather.jl: Reinventing atmospheric general circulation models towards interactivity, extensibility and composability'
+title: 'SpeedyWeather.jl: Reinventing atmospheric general circulation models towards interactivity and extensibility'
 
 tags:
   - Julia
@@ -139,11 +139,10 @@ far beyond the options provided in a monolithic interface.
 At the same time, defaults, set to well-established test cases, 
 enable even inexperienced users to run simulations in just a few lines of code. 
 
-To be extensible and composable with new
-model components, SpeedyWeather.jl relies on Julia's multiple dispatch
-programming paradigm [@Bezanson2017]. Every model component
-is defined as a new type. For example, to define precipitation due to the
-physical process of large-scale condensation,
+To be extensible with new model components, SpeedyWeather.jl relies on Julia's
+multiple dispatch programming paradigm [@Bezanson2017].
+Every model component is defined as a new type.
+For example, to define precipitation due to the physical process of large-scale condensation,
 one would define `MyCondensation` as a new subtype of `AbstractCondensation`.
 One then only needs to extend the `initialize!` and `condensation!`
 functions for this new type. Passing on `condensation = MyCondensation()`
@@ -160,9 +159,9 @@ and the Julia ocean model Oceananigans.jl [@Ramadhan2020].
 The dynamical core of SpeedyWeather.jl uses established numerics
 [@Bourke1972; @Hoskins1975; @Simmons1978; @Simmons1981],
 widely adopted in numerical weather prediction. It is based on the spherical
-harmonic transform with a leapfrog-based semi-implicit time integration [@Hoskins1975]
-and a Robert-Asselin-Williams filter [@Williams2011; @Amezcua2011].
-The spherical harmonic transform is grid-flexible. Any iso-latitude ring-based
+harmonic transform [@reinecke2013; @stompor2011] with a leapfrog-based semi-implicit
+time integration [@Hoskins1975] and a Robert-Asselin-Williams filter [@Williams2011; @Amezcua2011].
+The spherical harmonic transform is grid-flexible [@Willmert2020]. Any iso-latitude ring-based
 grid can be used and new grids can be externally defined and passed in
 as an argument. Many grids are already implemented: the conventional
 Gaussian grid, a regular longitude-latitude grid, 
