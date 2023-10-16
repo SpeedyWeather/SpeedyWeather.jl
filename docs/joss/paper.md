@@ -93,9 +93,11 @@ bibliography: paper.bib
 SpeedyWeather.jl is a library to simulate and analyze the global atmospheric
 circulation on the sphere. It implements several 2D and 3D
 models solved with spherical harmonics:
+
 - the primitive equations with and without humidity (\autoref{fig:primitive}),
 - the shallow water equations (\autoref{fig:swm}), and
 - the barotropic vorticity equations.
+
 Several simple parameterizations for unresolved physical processes
 such as precipitation or the boundary layer are implemented, and new ones can
 be externally defined and passed as an argument to the model constructor.
@@ -172,15 +174,9 @@ number format-flexible. Single precision floating-point numbers
 (Float32) are the default as adopted by other modelling efforts [@Vana2017; @Nakano2018],
 but Float64 and other custom number formats can be used with a single
 code basis [@Klower2022; @Klower2020].
-<<<<<<< HEAD
 Julia will compile to the choice of the number format, the grid,
 and and other model components just-in-time. A simple parallelization
 across vertical layers is supported by Julia's multithreading.
-=======
-Julia will compile to the choice of number format, the grid,
-and and other model components just-in-time. A simple parallelisation
-across vertical layers is supported with Julia's multi threading.
->>>>>>> 8c99caf7620a833b1c3563a0cc77e59466da2fd4
 Output is stored as NetCDF files using
 [NCDatasets.jl](https://github.com/Alexander-Barth/NCDatasets.jl).
 
@@ -202,7 +198,6 @@ is difficult due to the lack of established machine learning frameworks in Fortr
 In Julia, Flux.jl is available for machine learning [@Innes2019] as well as automatic
 differentiation with Enzyme [@Moses2020], which calculates gradients,
 necessary to optimize network weights or parameters during training.
-
 
 With SpeedyWeather.jl we hope to provide a first test platform for data-driven
 atmospheric modelling and in general an interactive model that makes difficult
