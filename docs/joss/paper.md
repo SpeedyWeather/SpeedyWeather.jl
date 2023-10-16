@@ -162,7 +162,7 @@ number format-flexible. 32-bit single-precision floating-point numbers
 (Float32) are the default as adopted by other modelling efforts [@Vana2017; @Nakano2018],
 but Float64 and other custom number formats can be used with a single
 code basis [@Klower2022; @Klower2020].
-Julia will compile to the choice of the number format, the grid,
+Julia will compile to the choice of number format, the grid,
 and and other model components just-in-time. A simple parallelisation
 across vertical layers is supported with Julia's multi threading.
 Output is stored as NetCDF files using
