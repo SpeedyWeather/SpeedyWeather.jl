@@ -188,12 +188,13 @@ Most weather, ocean and climate models are written in Fortran and have been
 developed over decades. From this tradition follows a specific programming
 style and associated user interface.
 SpeedyWeather.jl aims to overcome the constraints of traditional Fortran-based models.
-Running a simulation in Fortran and analyzing the data in Python makes it
-virtually impossible to interact with various model components directly.
+The modern trend sees simulations in Fortran and data analysis in Python,
+making virtually impossible to interact with various model components directly.
 In SpeedyWeather.jl, interfaces to the model components are exposed to the user.
 Furthermore, data-driven climate modelling [@Rasp2018; @Schneider2023],
 which replaces existing model components with machine learning,
-is difficult due to the lack of established machine learning frameworks in Fortran.
+is more difficult in Fortran due to the lack of
+established machine learning frameworks [@Meyer2022].
 In Julia, Flux.jl is available for machine learning [@Innes2019] as well as automatic
 differentiation with Enzyme [@Moses2020], which calculates gradients,
 necessary to optimize network weights or parameters during training.
