@@ -108,7 +108,7 @@ in the Julia programming language [@Bezanson2017].
 
 SpeedyWeather.jl internally uses three sub-modules `RingGrids`,
 `LowerTriangularMatrices`, and `SpeedyTransforms`. `RingGrids` is a module that discretizes
-the sphere on iso-latitude rings and implements interpolations between various grids.
+the sphere on iso-latitude rings and implements interpolations between various such grids.
 `LowerTriangularMatrices` is a module used to define the spectral space of the spherical
 harmonic coefficients. `SpeedyTransforms` implements the spectral transform between
 the grid-point space as defined by `RingGrids` and the spectral space defined in
@@ -128,15 +128,14 @@ and any non-default model components with their respective parameters.
 All components are then collected into a single model object which, once
 initialized, returns a simulation object. A simulation contains everything,
 the model with all parameters as created before but also all prognostic and diagnostic variables.
-Such a simulation can then be run, but also accessed to analyze the current variables,
-or individual terms of the equations. One can also adjust parameters before resuming the
-simulation.
-
+Such a simulation can then be run, but also accessed before and after to analyze or
+visualize the current variables, or individual terms of the equations.
+One can also adjust parameters or define new model components before resuming the simulation.
 While these steps can be written into a script for reproducibility,
 the same steps can be executed and interacted with one-by-one in
-Julia's read-evaluate-print loop (REPL). We thereby achieve an interactivity
-of a simulation and its various model components far beyond
-the options provided in a monolithic interface.
+Julia's read-evaluate-print loop (REPL) or in a single Jupyter or Pluto notebook.
+We thereby achieve an interactivity of a simulation and its various model components
+far beyond the options provided in a monolithic interface.
 At the same time, defaults, set to well-established test cases, 
 enable even inexperienced users to run simulations in just a few lines of code. 
 
@@ -169,8 +168,8 @@ as an argument. Many grids are already implemented: the conventional
 Gaussian grid, a regular longitude-latitude grid, 
 the octahedral Gaussian grid [@Malardel2016], the octahedral
 Clenshaw-Curtis grid [@Hotta2018], and the HEALPix grid [@Gorski2005].
-Both SpeedyWeather.jl and its spherical harmonic transform SpeedyTransforms are also
-number format-flexible. Single precision floating-point numbers
+Both SpeedyWeather.jl and its spherical harmonic transform `SpeedyTransforms` are also
+number format-flexible. Single-precision floating-point numbers
 (Float32) are the default as adopted by other modelling efforts [@Vana2017; @Nakano2018],
 but Float64 and other custom number formats can be used with a single
 code basis [@Klower2022; @Klower2020].
@@ -182,24 +181,24 @@ Output is stored as NetCDF files using
 
 # Statement of need
 
-SpeedyWeather.jl is a fresh approach to atmospheric
-models that have been very influential in many areas of scientific 
-and high-performance computing as well as climate change mitigation and adaptation.
-Most weather, ocean and climate models are written in Fortran and have been developed over
-decades. From this tradition follows a specific programming style and
-associated user interface.
+SpeedyWeather.jl is a fresh approach to atmospheric models that have been
+very influential in many areas of scientific  and high-performance computing
+as well as climate change mitigation and adaptation.
+Most weather, ocean and climate models are written in Fortran and have been
+developed over decades. From this tradition follows a specific programming
+style and associated user interface.
 SpeedyWeather.jl aims to overcome the constraints of traditional Fortran-based models.
-Running a simulation in Fortran and analyzing the
-data in Python makes it virtually impossible to interact with various model
-components directly. In SpeedyWeather.jl, interfaces to the model components are
-exposed to the user. Furthermore, data-driven climate modelling
-[@Rasp2018; @Schneider2023], which replaces existing model components with machine learning,
+Running a simulation in Fortran and analyzing the data in Python makes it
+virtually impossible to interact with various model components directly.
+In SpeedyWeather.jl, interfaces to the model components are exposed to the user.
+Furthermore, data-driven climate modelling [@Rasp2018; @Schneider2023],
+which replaces existing model components with machine learning,
 is difficult due to the lack of established machine learning frameworks in Fortran.
 In Julia, Flux.jl is available for machine learning [@Innes2019] as well as automatic
 differentiation with Enzyme [@Moses2020], which calculates gradients,
 necessary to optimize network weights or parameters during training.
 
-With SpeedyWeather.jl we hope to provide a first test platform for data-driven
+With SpeedyWeather.jl we hope to provide a platform for data-driven
 atmospheric modelling and in general an interactive model that makes difficult
 problems easy to simulate. Climate models that are user-friendly, trainable,
 but also easily extensible will suddenly make many complex
