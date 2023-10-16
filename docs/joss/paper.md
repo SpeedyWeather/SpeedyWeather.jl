@@ -194,7 +194,7 @@ In SpeedyWeather.jl, interfaces to the model components are exposed to the user.
 Furthermore, data-driven climate modelling [@Rasp2018; @Schneider2023],
 which replaces existing model components with machine learning,
 is more difficult in Fortran due to the lack of
-established machine learning frameworks [@Meyer2022].
+established machine learning frameworks [@Meyer_2022].
 In Julia, Flux.jl is available for machine learning [@Innes2019] as well as automatic
 differentiation with Enzyme [@Moses2020], which calculates gradients,
 necessary to optimize network weights or parameters during training.
