@@ -8,6 +8,7 @@ then write the tendencies back into a horizontal field of tendencies.
 """
 function parameterization_tendencies!(
     diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     time::DateTime,
     model::PrimitiveEquation,
 )
@@ -27,8 +28,9 @@ function parameterization_tendencies!(
         column = diagn.columns[thread_id]
         jring = whichring(ij,rings)             # ring index gridpoint ij is on
 
+        # extract current column for contiguous memory access
         reset_column!(column)                   # set accumulators back to zero for next grid point
-        get_column!(column,diagn,ij,jring,G,L)  # extract column for contiguous memory access
+        get_column!(column,diagn,progn,ij,jring,G,L)  
         
         # Pre-compute thermodynamic quantities
         get_thermodynamics!(column,model)
@@ -47,7 +49,7 @@ function parameterization_tendencies!(
         # clouds!(column, model)
         # shortwave_radiation!(column,model)
         # longwave_radiation!(column,model)
-        # surface_fluxes!(column,model)
+        surface_fluxes!(column,model)
         # vertical_diffusion!(column,M)
 
         # sum fluxes on half levels up and down for every layer
@@ -96,7 +98,7 @@ function fluxes_to_tendencies!(
         ΔF_temp = (flux_temp_upward[k+1] - flux_temp_upward[k]) +
             (flux_temp_downward[k] - flux_temp_downward[k+1])
 
-        # # convert absorbed flux to tendency
+        # convert absorbed flux to tendency
         u_tend[k] += g_pₛ/Δσ[k]*ΔF_u
         v_tend[k] += g_pₛ/Δσ[k]*ΔF_v
         humid_tend[k] += g_pₛ/Δσ[k]*ΔF_humid

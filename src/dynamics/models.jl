@@ -160,7 +160,9 @@ Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     boundary_layer_drag::BoundaryLayerDrag{NF} = LinearDrag(spectral_grid)
     temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
-    # vertical_diffusion::VerticalDiffusion{NF} = VerticalLaplacian(spectral_grid)
+    surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
+    surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
+    surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
     
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
@@ -203,7 +205,6 @@ function initialize!(model::PrimitiveDry)
     initialize!(model.boundary_layer_drag,model)
     initialize!(model.temperature_relaxation,model)
     initialize!(model.static_energy_diffusion,model)
-    # initialize!(model.vertical_diffusion,model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
@@ -240,7 +241,9 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
     large_scale_condensation::AbstractCondensation{NF} = SpeedyCondensation(spectral_grid)
-    # vertical_diffusion::VerticalDiffusion{NF} = VerticalLaplacian(spectral_grid)
+    surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
+    surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
+    surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
     
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
@@ -283,7 +286,6 @@ function initialize!(model::PrimitiveWet)
     initialize!(model.temperature_relaxation,model)
     initialize!(model.static_energy_diffusion,model)
     initialize!(model.large_scale_condensation,model)
-    # initialize!(model.vertical_diffusion,model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)

@@ -20,6 +20,8 @@ abstract type AbstractDynamicsConstants{NF} end
 abstract type InitialConditions end
 abstract type AbstractOrography{NF,Grid} end
 abstract type AbstractLandSeaMask{NF,Grid} end
+abstract type AbstractAlbedo{NF,Grid} end
+abstract type AbstractVegetation{NF,Grid} end
 
 # ATMOSPHERIC COLUMN FOR PARAMETERIZATIONS
 abstract type AbstractColumnVariables{NF} end
@@ -38,6 +40,10 @@ abstract type TemperatureRelaxation{NF} <: AbstractParameterization{NF} end
 abstract type VerticalDiffusion{NF} <: AbstractParameterization{NF} end
 abstract type AbstractThermodynamics{NF} <: AbstractParameterization{NF} end
 abstract type AbstractCondensation{NF} <: AbstractParameterization{NF} end
+abstract type AbstractSurfaceWind{NF} <: AbstractParameterization{NF} end
+abstract type AbstractSurfaceThermodynamics{NF} <: AbstractParameterization{NF} end
+abstract type AbstractSurfaceHeat{NF} <: AbstractParameterization{NF} end
+abstract type AbstractEvaporation{NF} <: AbstractParameterization{NF} end
 
 # INPUT/OUTPUT
 abstract type AbstractFeedback end

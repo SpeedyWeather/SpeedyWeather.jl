@@ -12,16 +12,17 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const n_stratosphere_levels::Int = 0    # number of stratospheric levels, needed for radiation
     
     # COORDINATES
+    ij::Int = 0                             # grid-point index
     jring::Int = 0                          # latitude ring the column is on
     lond::NF = 0                            # longitude
     latd::NF = 0                            # latitude, needed for shortwave radiation
     land_fraction::NF = 0                   # fraction of the column that is over land
 
-    # PROGNOSTIC VARIABLES
-    const u::Vector{NF} = zeros(NF,nlev)            # zonal velocity [m/s]
-    const v::Vector{NF} = zeros(NF,nlev)            # meridional velocity [m/s]
-    const temp::Vector{NF} = zeros(NF,nlev)         # temperature [K]
-    const humid::Vector{NF} = zeros(NF,nlev)        # specific humidity [kg/kg]
+    # PROGNOSTIC VARIABLES, last element is surface
+    const u::Vector{NF} = zeros(NF,nlev+1)          # zonal velocity [m/s]
+    const v::Vector{NF} = zeros(NF,nlev+1)          # meridional velocity [m/s]
+    const temp::Vector{NF} = zeros(NF,nlev+1)       # temperature [K]
+    const humid::Vector{NF} = zeros(NF,nlev+1)      # specific humidity [kg/kg]
 
     # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
     const ln_pres::Vector{NF} = zeros(NF,nlev+1)    # logarithm of pressure [log(Pa)]
@@ -49,7 +50,12 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const flux_humid_upward::Vector{NF} = zeros(NF,nlev+1)
     const flux_humid_downward::Vector{NF} = zeros(NF,nlev+1)
 
+    surface_wind_speed::NF = 0
+    skin_temperature_sea::NF = 0
+    skin_temperature_land::NF = 0
+
     # THERMODYNAMICS
+    surface_air_density::NF = 0
     const sat_humid::Vector{NF} = zeros(NF,nlev)                # Saturation specific humidity [kg/kg]
     const sat_vap_pres::Vector{NF} = zeros(NF,nlev)             # Saturation vapour pressure [Pa]
     const dry_static_energy::Vector{NF} = zeros(NF,nlev)        # Dry static energy
