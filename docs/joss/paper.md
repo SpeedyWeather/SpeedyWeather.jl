@@ -114,8 +114,8 @@ harmonic coefficients. `SpeedyTransforms` implements the spectral transform betw
 the grid-point space as defined by `RingGrids` and the spectral space defined in
 `LowerTriangularMatrices`. These three modules are independently usable
 and therefore make SpeedyWeather.jl, beyond its main purpose of simulating 
-atmospheric motion also a library for the analysis of gridded data on the sphere.
-Running and analysing simulations can be interactively combined, enhancing user
+atmospheric motion, also a library for the analysis of gridded data on the sphere.
+Running and analyzing simulations can be interactively combined, enhancing user
 experience and productivity.
 
 The user interface of SpeedyWeather.jl is heavily influenced by
@@ -172,7 +172,7 @@ number format-flexible. Single-precision floating-point numbers
 (Float32) are the default as adopted by other modelling efforts [@Vana2017; @Nakano2018],
 but Float64 and other custom number formats can be used with a single
 code basis [@Klower2022; @Klower2020].
-Julia will compile to the choice of the number format, the grid,
+Julia will compile to the choice of number format, the grid,
 and and other model components just-in-time. A simple parallelization
 across vertical layers is supported by Julia's multithreading.
 Output is stored as NetCDF files using
