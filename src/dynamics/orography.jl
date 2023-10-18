@@ -100,7 +100,7 @@ Base.@kwdef struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: A
     path::String = "SpeedyWeather.jl/input_data"
 
     "filename of orography"
-    file::String = "orography_F512.nc"
+    file::String = "orography.nc"
 
     "Grid the orography file comes on"
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
@@ -119,7 +119,6 @@ Base.@kwdef struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: A
 
     "resolution of orography in spectral trunc"
     smoothing_truncation::Int = 85
-
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
