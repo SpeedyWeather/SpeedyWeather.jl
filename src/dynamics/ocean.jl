@@ -68,19 +68,28 @@ function initialize!(ocean::SeasonalOceanClimatology{NF,Grid}) where {NF,Grid}
     return nothing
 end
 
+function initialize!(   ocean::PrognosticVariablesOcean,
+                        time::DateTime,
+                        model::PrimitiveEquation)
+    ocean_timestep!(ocean,time,model,initialize=true)
+end
+
 # function barrier
 function ocean_timestep!(   ocean::PrognosticVariablesOcean,
                             time::DateTime,
-                            model::PrimitiveEquation)
-    ocean_timestep!(ocean,time,model.ocean)
+                            model::PrimitiveEquation;
+                            initialize::Bool = false)
+    ocean_timestep!(ocean,time,model.ocean;initialize)
 end
 
 function ocean_timestep!(   ocean::PrognosticVariablesOcean{NF},
                             time::DateTime,
-                            ocean_model::SeasonalOceanClimatology) where NF
+                            ocean_model::SeasonalOceanClimatology;
+                            initialize::Bool = false) where NF
 
     # escape immediately if Δt of ocean model hasn't passed yet
-    (time - ocean.time) < ocean_model.Δt && return nothing
+    # unless the ocean hasn't been initialized yet
+    initialize || (time - ocean.time) < ocean_model.Δt && return nothing
 
     # otherwise update ocean prognostic variables:
     ocean.time = time
@@ -88,6 +97,7 @@ function ocean_timestep!(   ocean::PrognosticVariablesOcean{NF},
     next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
 
     # linear interpolation weight between the two months
+    # TODO check whether this shifts the climatology by 1/2 a month
     weight = convert(NF,Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
     (;monthly_temperature) = ocean_model
