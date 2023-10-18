@@ -314,6 +314,13 @@ The default fallback is that all variables are included. """
 has(M::Type{<:ModelSetup}, var_name::Symbol) = var_name in (:vor, :div, :temp, :humid, :pres)
 has(M::ModelSetup, var_name) = has(typeof(M), var_name)
 
+# strip away the parameters of the model type
+model_class(::Type{<:Barotropic}) = Barotropic
+model_class(::Type{<:ShallowWater}) = ShallowWater
+model_class(::Type{<:PrimitiveDry}) = PrimitiveDry
+model_class(::Type{<:PrimitiveWet}) = PrimitiveWet
+model_class(model::ModelSetup) = model_class(typeof(model))
+
 function Base.show(io::IO,M::ModelSetup)
     println(io,"$(typeof(M))")
     for key in propertynames(M)[1:end-1]
