@@ -154,7 +154,8 @@ Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     # BOUNDARY CONDITIONS
     land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
     ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
-    
+    land::AbstractLand{NF} = SeasonalLandClimatology(spectral_grid)
+
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     boundary_layer_drag::BoundaryLayerDrag{NF} = LinearDrag(spectral_grid)
@@ -200,6 +201,7 @@ function initialize!(model::PrimitiveDry)
     initialize!(orography,planet,spectral_transform,geometry)
     initialize!(model.land_sea_mask)
     initialize!(model.ocean)
+    initialize!(model.land)
 
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
@@ -209,6 +211,10 @@ function initialize!(model::PrimitiveDry)
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
+    
+    (;time) = prognostic_variables.clock
+    initialize!(prognostic_variables.ocean,time,model)
+    initialize!(prognostic_variables.land,time,model)
 
     diagnostic_variables = DiagnosticVariables(spectral_grid,PrimitiveDry)
     return Simulation(prognostic_variables,diagnostic_variables,model)
@@ -233,6 +239,7 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     # BOUNDARY CONDITIONS
     land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
     ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
+    land::AbstractLand{NF} = SeasonalLandClimatology(spectral_grid)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -244,6 +251,7 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
     surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
+    evaporation::AbstractEvaporation{NF} = SurfaceEvaporation(spectral_grid)
     
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
@@ -280,7 +288,8 @@ function initialize!(model::PrimitiveWet)
     initialize!(orography,planet,spectral_transform,geometry)
     initialize!(model.land_sea_mask)
     initialize!(model.ocean)
-    
+    initialize!(model.land)
+
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
     initialize!(model.temperature_relaxation,model)
@@ -290,6 +299,10 @@ function initialize!(model::PrimitiveWet)
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
+
+    (;time) = prognostic_variables.clock
+    initialize!(prognostic_variables.ocean,time,model)
+    initialize!(prognostic_variables.land,time,model)
 
     diagnostic_variables = DiagnosticVariables(spectral_grid,PrimitiveWet)
     return Simulation(prognostic_variables,diagnostic_variables,model)
