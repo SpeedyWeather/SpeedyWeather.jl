@@ -88,15 +88,33 @@ function saturation_humidity!(
     thermodynamics::Thermodynamics,
 )
     (;sat_humid, sat_vap_pres, pres, temp) = column
-    (;e₀, T₀, C₁, C₂, T₁, T₂) = thermodynamics.magnus_coefs
+    # (;e₀, T₀, C₁, C₂, T₁, T₂) = thermodynamics.magnus_coefs
     (;mol_ratio) = thermodynamics      # = mol_mass_vapour/mol_mass_dry_air = 0.622
 
     for k in eachlayer(column)
         # change coefficients for water (temp > T₀) or ice (else)
-        C, T = temp[k] > T₀ ? (C₁, T₁) : (C₂, T₂)
-        sat_vap_pres[k] = e₀ * exp(C * (temp[k] - T₀) / (temp[k] - T))
-        sat_humid[k] = mol_ratio*sat_vap_pres[k] / (pres[k] - (1-mol_ratio)*sat_vap_pres[k])
+        # C, T = temp[k] > T₀ ? (C₁, T₁) : (C₂, T₂)
+        # sat_vap_pres[k] = e₀ * exp(C * (temp[k] - T₀) / (temp[k] - T))
+        sat_vap_pres[k] = saturation_vapour_pressure(temp[k],thermodynamics.magnus_coefs)
+        # sat_humid[k] = mol_ratio*sat_vap_pres[k] / (pres[k] - (1-mol_ratio)*sat_vap_pres[k])
+        sat_humid[k] = saturation_humidity(sat_vap_pres[k],pres[k];mol_ratio)
     end
+end
+
+function saturation_vapour_pressure(temp::NF,magnus_coefs::MagnusCoefs{NF}) where NF
+    (;e₀, T₀, C₁, C₂, T₁, T₂) = magnus_coefs
+    C, T = temp > T₀ ? (C₁, T₁) : (C₂, T₂)
+    return e₀ * exp(C * (temp - T₀) / (temp - T))
+end
+
+function saturation_humidity(sat_vap_pres::NF,pres::NF;mol_ratio::NF = NF(0.622)) where NF
+    return mol_ratio*sat_vap_pres / (pres - (1-mol_ratio)*sat_vap_pres)
+end
+
+function saturation_humidity(temp::NF,pres::NF,thermodynamics::Thermodynamics{NF}) where NF
+    (;mol_ratio) = thermodynamics
+    sat_vap_pres = saturation_vapour_pressure(temp,thermodynamics.magnus_coefs)
+    return saturation_humidity(sat_vap_pres,pres;mol_ratio)
 end
 
 """$(TYPEDSIGNATURES)
