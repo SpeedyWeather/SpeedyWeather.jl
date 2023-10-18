@@ -37,6 +37,7 @@ function get_column!(   C::ColumnVariables,
         C.geopot[k] = layer.grid_variables.geopot_grid[ij]
     end
 
+    # TODO skin = surface approximation for now
     C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
     C.skin_temperature_land = P.land.land_surface_temperature[ij]
 end
