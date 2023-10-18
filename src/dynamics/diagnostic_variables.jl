@@ -219,8 +219,8 @@ end
 function Base.zeros(
     ::Type{DiagnosticVariables},
     SG::SpectralGrid,
-    model::Type{Model}
-) where {Model<:ModelSetup}
+    model::ModelSetup
+)
 
     (;NF,Grid,nlat_half, nlev, npoints) = SG
     layers = [zeros(DiagnosticVariablesLayer,SG,k) for k in 1:nlev]
@@ -232,6 +232,7 @@ function Base.zeros(
 
     scale = Ref(convert(SG.NF,SG.radius))
 
+    Model = model_class(model)
     return DiagnosticVariables{NF,Grid{NF},Model}(
         layers,surface,columns,nlat_half,nlev,npoints,scale)
 end

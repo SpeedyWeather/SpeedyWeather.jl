@@ -69,7 +69,7 @@ function initialize!(model::Barotropic)
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid,Barotropic)
+    diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
 
@@ -131,7 +131,7 @@ function initialize!(model::ShallowWater)
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid,ShallowWater)
+    diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
 
@@ -216,7 +216,7 @@ function initialize!(model::PrimitiveDry)
     initialize!(prognostic_variables.ocean,time,model)
     initialize!(prognostic_variables.land,time,model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid,PrimitiveDry)
+    diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
 
@@ -304,7 +304,7 @@ function initialize!(model::PrimitiveWet)
     initialize!(prognostic_variables.ocean,time,model)
     initialize!(prognostic_variables.land,time,model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid,PrimitiveWet)
+    diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
    
