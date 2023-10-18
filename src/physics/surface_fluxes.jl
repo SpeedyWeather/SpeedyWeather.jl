@@ -9,7 +9,7 @@ function surface_fluxes!(column::ColumnVariables,model::PrimitiveEquation)
     # now call other heat and humidity fluxes
     # soil_moisture!(column,model.vegetation)
     sensible_heat_flux!(column,model.surface_heat_flux,model.constants)
-    # evaporation!(column,model.surface_evaporation,model)
+    evaporation!(column,model)
 end
 
 struct SurfaceThermodynamicsConstant{NF<:AbstractFloat} <: AbstractSurfaceThermodynamics{NF} end
@@ -112,9 +112,8 @@ function sensible_heat_flux!(   column::ColumnVariables{NF},
     land_fraction = column.land_fraction
 
     # SPEEDY documentation Eq. 54 and 56
-    # flux_land = ρ*heat_exchange_land*V₀*cₚ*(T_skin_land - T)
-    flux_land = 0
-    flux_sea  = ρ*heat_exchange_sea *V₀*cₚ*(T_skin_sea  - T)
+    flux_land = ρ*heat_exchange_land*V₀*cₚ*(T_skin_land - T)
+    flux_sea  = ρ*heat_exchange_sea*V₀*cₚ*(T_skin_sea  - T)
 
     # mix fluxes for fractional land-sea mask
     land_available = ~isnan(T_skin_land)
@@ -171,6 +170,8 @@ Base.@kwdef struct SurfaceEvaporation{NF<:AbstractFloat} <: AbstractEvaporation{
     # soil_moisture_availability::Grid = zeros(Grid{NF},nlat_half)
 end
 
+SurfaceEvaporation(SG::SpectralGrid;kwargs...) = SurfaceEvaporation{SG.NF}(nlat_half=SG.nlat_half;kwargs...)
+
 function initialize!(evaporation::SurfaceEvaporation)
 
     # LOAD NETCDF FILE
@@ -186,25 +187,20 @@ function initialize!(evaporation::SurfaceEvaporation)
 
     # average onto grid cells of the model
     RingGrids.grid_cell_average!(land_sea_mask.land_sea_mask,lsm_highres)
-    end
-
-
-function SurfaceEvaporation(SG::SpectralGrid;kwargs...)
-    return SurfaceEvaporation(nlat_half=SG.nlat_half;kwargs...)
 end
+
+SurfaceEvaporation(SG::SpectralGrid;kwargs...) = SurfaceEvaporation{SG.NF}(nlat_half=SG.nlat_half;kwargs...)
 
 # don't do anything for dry core
 function evaporation!(  column::ColumnVariables,
-                        moisture_flux::AbstractEvaporation,
                         model::PrimitiveDry)
     return nothing
 end
 
 # function barrier
-function evaporation!(  column::ColumnVariables{NF},
-                        moisture_flux::SurfaceEvaporation,
-                        model::PrimitiveWet) where NF
-    evaporation!(column,moisture_flux,model.soil_moisture,model.thermodynamics)
+function evaporation!(  column::ColumnVariables,
+                        model::PrimitiveWet)
+    evaporation!(column,model.evaporation,model.thermodynamics)
 end
 
 function evaporation!(  column::ColumnVariables{NF},
@@ -212,19 +208,39 @@ function evaporation!(  column::ColumnVariables{NF},
                         thermodynamics::Thermodynamics) where NF
 
     (;skin_temperature_sea, skin_temperature_land, pres, humid) = column
-    (;e₀, T₀, C₁, C₂, T₁, T₂) = thermodynamics.magnus_coefs
-    (;mol_ratio) = thermodynamics      # = mol_mass_vapour/mol_mass_dry_air = 0.622
-    α = soil_moisture.availability[column.ij]
+    moisture_exchange_land = convert(NF,evaporation.moisture_exchange_land)
+    moisture_exchange_sea  = convert(NF,evaporation.moisture_exchange_sea)
 
-    # LAND SKIN TEMPERATURE
-    # change coefficients for water (temp > T₀) or ice (else)
-    C, T = skin_temperature_land > T₀ ? (C₁, T₁) : (C₂, T₂)
-    sat_vap_pres = e₀ * exp(C * (skin_temperature_land - T₀) / (skin_temperature_land - T))
-    sat_humid_land = mol_ratio*sat_vap_pres / (pres[end] - (1-mol_ratio)*sat_vap_pres)
+    # α = soil_moisture.availability[column.ij]
+    α = convert(NF,0.2)
 
-    # SEA SKIN TEMPERATURE
-    C, T = skin_temperature_sea > T₀ ? (C₁, T₁) : (C₂, T₂)
-    sat_vap_pres = e₀ * exp(C * (skin_temperature_sea - T₀) / (skin_temperature_sea - T))
-    sat_humid_sea = mol_ratio*sat_vap_pres / (pres[end] - (1-mol_ratio)*sat_vap_pres)
+    # SATURATION HUMIDITY OVER LAND AND OCEAN
+    surface_pressure = pres[end]
+    sat_humid_land = saturation_humidity(skin_temperature_land,surface_pressure,thermodynamics)
+    sat_humid_sea = saturation_humidity(skin_temperature_sea,surface_pressure,thermodynamics)
 
+    ρ = column.surface_air_density
+    V₀ = column.surface_wind_speed
+    land_fraction = column.land_fraction
+    flux_sea = ρ*moisture_exchange_sea*V₀*max(sat_humid_sea  - humid[end],0)
+    flux_land = ρ*moisture_exchange_land*V₀*α*max(sat_humid_land  - humid[end],0)
+
+    # mix fluxes for fractional land-sea mask
+    land_available = ~isnan(skin_temperature_land)
+    sea_available = ~isnan(skin_temperature_sea)
+
+    if land_available && sea_available
+        column.flux_humid_upward[end] += land_fraction*flux_land + (1-land_fraction)*flux_sea
+
+    # but in case only land or sea are available use those ones only
+    elseif land_available
+        column.flux_humid_upward[end] += flux_land
+
+    elseif sea_available
+        column.flux_humid_upward[end] += flux_sea
+
+    # or no flux in case none is defined (shouldn't happen with default surface data)
+    # else   # doesn't have to be executed because fluxes are accumulated
+    #   column.flux_temp_upward[end] += 0
+    end
 end
