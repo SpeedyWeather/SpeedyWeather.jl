@@ -38,11 +38,12 @@ end
         model = PrimitiveDryModel(;spectral_grid)
         simulation = initialize!(model)
         diagn = simulation.diagnostic_variables
+        progn = simulation.prognostic_variables
 
         column = ColumnVariables{NF}(;nlev)
 
         SpeedyWeather.reset_column!(column)
-        SpeedyWeather.get_column!(column,diagn,1,model.geometry,model.land_sea_mask)
+        SpeedyWeather.get_column!(column,diagn,progn,1,model.geometry,model.land_sea_mask)
 
         # set a tendency to something
         humid_tend = rand(NF,nlev)
