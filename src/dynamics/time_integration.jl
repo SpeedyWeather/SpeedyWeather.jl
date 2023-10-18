@@ -222,7 +222,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     (;time) = progn.clock                           # current time
 
     ocean_timestep!(progn.ocean,time,model)
-    # land_timestep!(progn.land,time,model)
+    land_timestep!(progn.land,time,model)
 
     # switch on/off all physics
     model.physics && parameterization_tendencies!(diagn,progn,time,model)

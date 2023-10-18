@@ -38,7 +38,7 @@ function get_column!(   C::ColumnVariables,
     end
 
     C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
-    # C.skin_temperature_land = P.land.land_surface_temperature[ij]
+    C.skin_temperature_land = P.land.land_surface_temperature[ij]
 end
 
 """Recalculate ring index if not provided."""
