@@ -48,18 +48,20 @@ function initialize!(ocean::SeasonalOceanClimatology{NF,Grid}) where {NF,Grid}
     ncfile = NCDataset(path)
 
     # create interpolator from grid in file to grid used in model
-    npoints = ncfile.dim["lat"]*ncfile.dim["lon"]
+    nx, ny = ncfile.dim["lon"], ncfile.dim["lat"]
+    npoints = nx*ny
     NF_file = typeof(ncfile["sst"].attrib["_FillValue"])
     sst = ocean.file_Grid(zeros(NF_file,npoints))
     interp = RingGrids.interpolator(NF,ocean.monthly_temperature[1],sst)
 
     # interpolate and store in ocean
     for month in 1:12
+        sst_this_month = ncfile["sst"][:,:,month]
         ij = 0
-        for j in 1:ncfile.dim["lat"]
-            for i in 1:ncfile.dim["lon"]
+        for j in 1:ny
+            for i in 1:nx
                 ij += 1
-                x = ncfile["sst"][i,j,month]
+                x = sst_this_month[i,j]
                 sst[ij] = ismissing(x) ? ocean.missing_value : x
             end
         end

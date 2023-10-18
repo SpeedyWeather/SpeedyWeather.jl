@@ -219,7 +219,7 @@ end
 function Base.zeros(
     ::Type{DiagnosticVariables},
     SG::SpectralGrid,
-    model::ModelSetup
+    Model::Type{<:ModelSetup}
 )
 
     (;NF,Grid,nlat_half, nlev, npoints) = SG
@@ -232,13 +232,13 @@ function Base.zeros(
 
     scale = Ref(convert(SG.NF,SG.radius))
 
-    Model = model_class(model)
     return DiagnosticVariables{NF,Grid{NF},Model}(
         layers,surface,columns,nlat_half,nlev,npoints,scale)
 end
 
 DiagnosticVariables(SG::SpectralGrid) = zeros(DiagnosticVariables,SG,DEFAULT_MODEL)
 DiagnosticVariables(SG::SpectralGrid,Model::Type{<:ModelSetup}) = zeros(DiagnosticVariables,SG,Model)
+DiagnosticVariables(SG::SpectralGrid,model::ModelSetup) = zeros(DiagnosticVariables,SG,model_class(model))
 
 # LOOP OVER ALL GRID POINTS (extend from RingGrids module)
 RingGrids.eachgridpoint(diagn::DiagnosticVariables) = Base.OneTo(diagn.npoints)

@@ -191,14 +191,13 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::PrimitiveDry)
-    (;spectral_grid,horizontal_diffusion,
-        orography,planet,spectral_transform,geometry) = model
+    (;spectral_grid) = model
 
-    # numerics
-    initialize!(horizontal_diffusion,model)
+    # numerics (implicit is initialized later)
+    initialize!(model.horizontal_diffusion,model)
 
     # boundary conditionss
-    initialize!(orography,planet,spectral_transform,geometry)
+    initialize!(model.orography,model)
     initialize!(model.land_sea_mask)
     initialize!(model.ocean)
     initialize!(model.land)
@@ -279,13 +278,13 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::PrimitiveWet)
-    (;spectral_grid,horizontal_diffusion,
-        orography,planet,spectral_transform,geometry) = model
+    (;spectral_grid) = model
 
-    initialize!(horizontal_diffusion,model)
+    # numerics (implicit is initialized later)
+    initialize!(model.horizontal_diffusion,model)
 
     # boundary conditionss
-    initialize!(orography,planet,spectral_transform,geometry)
+    initialize!(model.orography,model)
     initialize!(model.land_sea_mask)
     initialize!(model.ocean)
     initialize!(model.land)

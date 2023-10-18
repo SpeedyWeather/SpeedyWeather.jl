@@ -48,18 +48,20 @@ function initialize!(land::SeasonalLandClimatology{NF,Grid}) where {NF,Grid}
     ncfile = NCDataset(path)
 
     # create interpolator from grid in file to grid used in model
-    npoints = ncfile.dim["lat"]*ncfile.dim["lon"]
+    nx, ny = ncfile.dim["lon"], ncfile.dim["lat"]
+    npoints = nx*ny
     NF_file = typeof(ncfile["lst"].attrib["_FillValue"])
     lst = land.file_Grid(zeros(NF_file,npoints))
     interp = RingGrids.interpolator(NF,land.monthly_temperature[1],lst)
 
     # interpolate and store in land
     for month in 1:12
+        lst_this_month = ncfile["lst"][:,:,month]
         ij = 0
-        for j in 1:ncfile.dim["lat"]
-            for i in 1:ncfile.dim["lon"]
+        for j in 1:ny
+            for i in 1:nx
                 ij += 1
-                x = ncfile["lst"][i,j,month]
+                x = lst_this_month[i,j]
                 lst[ij] = ismissing(x) ? land.missing_value : x
             end
         end

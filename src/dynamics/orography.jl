@@ -25,8 +25,7 @@ function Base.show(io::IO,orog::AbstractOrography)
 end
 
 # no further initialization needed
-initialize!(::NoOrography,::AbstractPlanet,::SpectralTransform,::Geometry) = nothing
-
+initialize!(::NoOrography,::ModelSetup) = nothing
 
 """Zonal ridge orography after Jablonowski and Williamson, 2006.
 $(TYPEDFIELDS)"""
@@ -54,6 +53,12 @@ function ZonalRidge(spectral_grid::SpectralGrid;kwargs...)
     orography   = zeros(Grid{NF},nlat_half)
     geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
     return ZonalRidge{NF,Grid{NF}}(;orography,geopot_surf,kwargs...)
+end
+
+# function barrier
+function initialize!(   orog::ZonalRidge,
+                        model::ModelSetup)
+    initialize!(orog,model.planet,model.spectral_transform,model.geometry)
 end
 
 """
@@ -138,6 +143,12 @@ function EarthOrography(spectral_grid::SpectralGrid;kwargs...)
     return EarthOrography{NF,Grid{NF}}(;orography,geopot_surf,kwargs...)
 end
 
+# function barrier
+function initialize!(   orog::EarthOrography,
+                        model::ModelSetup)
+    initialize!(orog,model.planet,model.spectral_transform)
+end
+
 """
 $(TYPEDSIGNATURES)
 Initialize the arrays `orography`,`geopot_surf` in `orog` by reading the
@@ -145,8 +156,7 @@ orography field from file.
 """
 function initialize!(   orog::EarthOrography,
                         P::AbstractPlanet,
-                        S::SpectralTransform,
-                        G::Geometry)
+                        S::SpectralTransform)
 
     (;orography, geopot_surf) = orog
     (;gravity) = P
@@ -158,14 +168,15 @@ function initialize!(   orog::EarthOrography,
         path = joinpath(orog.path,orog.file)
     end
     ncfile = NCDataset(path)
-    orography_highres = ncfile["orog"][:,:]        # height [m]
+
+    # height [m], wrap matrix into a grid
+    # TODO also read lat,lon from file and flip array in case it's not as expected
+    orography_highres = orog.file_Grid(ncfile["orog"][:,:])
 
     # Interpolate/coarsen to desired resolution
-    # TODO also read lat,lon from file and flip array in case it's not as expected
-    recompute_legendre = true   # don't allocate large arrays as spectral transform is not reused
-    orography_spec = spectral(orography_highres;Grid=orog.file_Grid,recompute_legendre)
-    
-    copyto!(geopot_surf,orography_spec)     # truncates to the size of geopot_surf, no *gravity yet
+    interpolate!(orography,orography_highres)
+    spectral!(geopot_surf,orography,S)      # no *gravity yet
+  
     if orog.smoothing                       # smooth orography in spectral space?
         SpeedyTransforms.spectral_smoothing!(geopot_surf,orog.smoothing_strength,
                                                             power=orog.smoothing_power,
