@@ -221,8 +221,11 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
 
+    ocean_timestep!(progn.ocean,time,model)
+    land_timestep!(progn.land,time,model)
+
     # switch on/off all physics
-    model.physics && parameterization_tendencies!(diagn,time,model)
+    model.physics && parameterization_tendencies!(diagn,progn,time,model)
     model.physics || zero_tendencies!(diagn)        # set tendencies to zero otherwise
 
     dynamics_tendencies!(diagn,progn,model,lf2)         # dynamical core

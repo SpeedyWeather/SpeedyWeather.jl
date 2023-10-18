@@ -178,7 +178,12 @@ include("physics/boundary_layer.jl")
 include("physics/temperature_relaxation.jl")
 include("physics/vertical_diffusion.jl")
 include("physics/large_scale_condensation.jl")
+include("physics/surface_fluxes.jl")
 include("physics/pretty_printing.jl")
+
+# OCEAN AND LAND
+include("dynamics/ocean.jl")
+include("dynamics/land.jl")
 
 # MODELS
 include("dynamics/models.jl")

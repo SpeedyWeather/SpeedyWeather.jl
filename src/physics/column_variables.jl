@@ -4,6 +4,7 @@ Update `C::ColumnVariables` by copying the prognostic variables from `D::Diagnos
 at gridpoint index `ij`. Provide `G::Geometry` for coordinate information."""
 function get_column!(   C::ColumnVariables,
                         D::DiagnosticVariables,
+                        P::PrognosticVariables,
                         ij::Integer,        # grid point index
                         jring::Integer,     # ring index 1 around North Pole to J around South Pole
                         G::Geometry,
@@ -35,18 +36,23 @@ function get_column!(   C::ColumnVariables,
         # TODO geopot on the grid is currently not computed in dynamics
         C.geopot[k] = layer.grid_variables.geopot_grid[ij]
     end
+
+    # TODO skin = surface approximation for now
+    C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
+    C.skin_temperature_land = P.land.land_surface_temperature[ij]
 end
 
 """Recalculate ring index if not provided."""
 function get_column!(   C::ColumnVariables,
                         D::DiagnosticVariables,
+                        P::PrognosticVariables,
                         ij::Int,            # grid point index
                         G::Geometry,
                         L::LandSeaMask)
 
     rings = eachring(G.Grid,G.nlat_half)
     jring = whichring(ij,rings)
-    get_column!(C,D,ij,jring,G,L)
+    get_column!(C,D,P,ij,jring,G,L)
 end
 
 """

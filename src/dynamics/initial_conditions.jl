@@ -457,7 +457,7 @@ function initialize_humidity!(  progn::PrognosticVariables,
     # Specific humidity at the surface (grid space)
     humid_surf_grid = zero(pres_surf_grid)
     # @. humid_surf_grid = humid_ref*(exp(pres_surf_grid)/(pres_ref*100))^scale_height_ratio
-    q_ref = 20e-3       # kg/kg at the surface
+    q_ref = 1e-3       # kg/kg at the surface
     @. humid_surf_grid .= q_ref
     RingGrids.scale_coslat²!(humid_surf_grid)
 

@@ -56,20 +56,20 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!`."""
 function initialize!(model::Barotropic)
-    (;spectral_grid,forcing,drag,horizontal_diffusion) = model
+    (;spectral_grid) = model
 
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for BarotropicModel, \
         SpectralGrid with nlev=$(spectral_grid.nlev) provided."
 
-    initialize!(forcing,model)
-    initialize!(drag,model)
-    initialize!(horizontal_diffusion,model)
+    initialize!(model.forcing,model)
+    initialize!(model.drag,model)
+    initialize!(model.horizontal_diffusion,model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid,Barotropic)
+    diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
 
@@ -116,22 +116,21 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::ShallowWater)
-    (;spectral_grid,forcing,horizontal_diffusion,drag,
-        orography,planet,spectral_transform,geometry) = model
+    (;spectral_grid) = model
 
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for ShallowWaterModel, \
                                 SpectralGrid with nlev=$(spectral_grid.nlev) provided."
 
-    initialize!(forcing,model)
-    initialize!(drag,model)
-    initialize!(horizontal_diffusion,model)
-    initialize!(orography,planet,spectral_transform,geometry)
+    initialize!(model.forcing,model)
+    initialize!(model.drag,model)
+    initialize!(model.horizontal_diffusion,model)
+    initialize!(model.orography,model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid,ShallowWater)
+    diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
 
@@ -150,22 +149,28 @@ Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     initial_conditions::InitialConditions = ZonalWind()
     orography::AbstractOrography{NF} = EarthOrography(spectral_grid)
+
+    # BOUNDARY CONDITIONS
     land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
+    ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
+    land::AbstractLand{NF} = SeasonalLandClimatology(spectral_grid)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     boundary_layer_drag::BoundaryLayerDrag{NF} = LinearDrag(spectral_grid)
     temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
-    vertical_advection::VerticalAdvection{NF} = CenteredVerticalAdvection(spectral_grid)
-    # vertical_diffusion::VerticalDiffusion{NF} = VerticalLaplacian(spectral_grid)
-
+    surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
+    surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
+    surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
+    
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
     spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
     horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
     implicit::AbstractImplicit{NF} = ImplicitPrimitiveEq(spectral_grid)
-
+    vertical_advection::VerticalAdvection{NF} = CenteredVerticalAdvection(spectral_grid)
+    
     # INTERNALS
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
@@ -185,25 +190,31 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::PrimitiveDry)
-    (;spectral_grid,horizontal_diffusion,
-        orography,planet,spectral_transform,geometry) = model
-    (;land_sea_mask) = model
+    (;spectral_grid) = model
 
-    initialize!(horizontal_diffusion,model)
-    initialize!(orography,planet,spectral_transform,geometry)
-    initialize!(land_sea_mask)
+    # numerics (implicit is initialized later)
+    initialize!(model.horizontal_diffusion,model)
+
+    # boundary conditionss
+    initialize!(model.orography,model)
+    initialize!(model.land_sea_mask)
+    initialize!(model.ocean)
+    initialize!(model.land)
 
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
     initialize!(model.temperature_relaxation,model)
     initialize!(model.static_energy_diffusion,model)
-    # initialize!(model.vertical_diffusion,model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
+    
+    (;time) = prognostic_variables.clock
+    initialize!(prognostic_variables.ocean,time,model)
+    initialize!(prognostic_variables.land,time,model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid,PrimitiveDry)
+    diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
 
@@ -222,7 +233,11 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     initial_conditions::InitialConditions = ZonalWind()
     orography::AbstractOrography{NF} = EarthOrography(spectral_grid)
+
+    # BOUNDARY CONDITIONS
     land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
+    ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
+    land::AbstractLand{NF} = SeasonalLandClimatology(spectral_grid)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -231,16 +246,18 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
     large_scale_condensation::AbstractCondensation{NF} = SpeedyCondensation(spectral_grid)
-    vertical_advection::VerticalAdvection{NF} = CenteredVerticalAdvection(spectral_grid)
-
-    # vertical_diffusion::VerticalDiffusion{NF} = VerticalLaplacian(spectral_grid)
-
+    surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
+    surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
+    surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
+    evaporation::AbstractEvaporation{NF} = SurfaceEvaporation(spectral_grid)
+    
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
     spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
     horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
     implicit::AbstractImplicit{NF} = ImplicitPrimitiveEq(spectral_grid)
-
+    vertical_advection::VerticalAdvection{NF} = CenteredVerticalAdvection(spectral_grid)
+    
     # INTERNALS
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
@@ -260,26 +277,32 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::PrimitiveWet)
-    (;spectral_grid,horizontal_diffusion,
-        orography,planet,spectral_transform,geometry) = model
-    (;land_sea_mask) = model
+    (;spectral_grid) = model
 
-    initialize!(horizontal_diffusion,model)
-    initialize!(orography,planet,spectral_transform,geometry)
-    initialize!(land_sea_mask)
-    
+    # numerics (implicit is initialized later)
+    initialize!(model.horizontal_diffusion,model)
+
+    # boundary conditionss
+    initialize!(model.orography,model)
+    initialize!(model.land_sea_mask)
+    initialize!(model.ocean)
+    initialize!(model.land)
+
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
     initialize!(model.temperature_relaxation,model)
     initialize!(model.static_energy_diffusion,model)
     initialize!(model.large_scale_condensation,model)
-    # initialize!(model.vertical_diffusion,model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid,PrimitiveWet)
+    (;time) = prognostic_variables.clock
+    initialize!(prognostic_variables.ocean,time,model)
+    initialize!(prognostic_variables.land,time,model)
+
+    diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)
 end
    
@@ -288,6 +311,13 @@ Returns true if the model `M` has a prognostic variable `var_name`, false otherw
 The default fallback is that all variables are included. """
 has(M::Type{<:ModelSetup}, var_name::Symbol) = var_name in (:vor, :div, :temp, :humid, :pres)
 has(M::ModelSetup, var_name) = has(typeof(M), var_name)
+
+# strip away the parameters of the model type
+model_class(::Type{<:Barotropic}) = Barotropic
+model_class(::Type{<:ShallowWater}) = ShallowWater
+model_class(::Type{<:PrimitiveDry}) = PrimitiveDry
+model_class(::Type{<:PrimitiveWet}) = PrimitiveWet
+model_class(model::ModelSetup) = model_class(typeof(model))
 
 function Base.show(io::IO,M::ModelSetup)
     println(io,"$(typeof(M))")

@@ -180,7 +180,7 @@ struct PrognosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF},M<:ModelSetu
     clock::Clock
 end
 
-function PrognosticVariables(SG::SpectralGrid,::Model) where Model<:ModelSetup
+function PrognosticVariables(SG::SpectralGrid,model::ModelSetup)
     
     (;trunc,nlat_half,nlev,Grid,NF) = SG
 
@@ -193,6 +193,7 @@ function PrognosticVariables(SG::SpectralGrid,::Model) where Model<:ModelSetup
     scale = Ref(one(NF))        # initialize with scale=1, wrapped in RefValue for mutability
     clock = Clock()
 
+    Model = model_class(model)  # strip away the parameters
     return PrognosticVariables{NF,Grid{NF},Model}(  trunc,nlat_half,nlev,N_STEPS,
                                                     layers,surface,ocean,land,scale,clock)
 end
