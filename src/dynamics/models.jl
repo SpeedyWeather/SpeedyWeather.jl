@@ -56,14 +56,14 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!`."""
 function initialize!(model::Barotropic)
-    (;spectral_grid,forcing,drag,horizontal_diffusion) = model
+    (;spectral_grid) = model
 
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for BarotropicModel, \
         SpectralGrid with nlev=$(spectral_grid.nlev) provided."
 
-    initialize!(forcing,model)
-    initialize!(drag,model)
-    initialize!(horizontal_diffusion,model)
+    initialize!(model.forcing,model)
+    initialize!(model.drag,model)
+    initialize!(model.horizontal_diffusion,model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
@@ -116,16 +116,15 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::ShallowWater)
-    (;spectral_grid,forcing,horizontal_diffusion,drag,
-        orography,planet,spectral_transform,geometry) = model
+    (;spectral_grid) = model
 
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for ShallowWaterModel, \
                                 SpectralGrid with nlev=$(spectral_grid.nlev) provided."
 
-    initialize!(forcing,model)
-    initialize!(drag,model)
-    initialize!(horizontal_diffusion,model)
-    initialize!(orography,planet,spectral_transform,geometry)
+    initialize!(model.forcing,model)
+    initialize!(model.drag,model)
+    initialize!(model.horizontal_diffusion,model)
+    initialize!(model.orography,model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
