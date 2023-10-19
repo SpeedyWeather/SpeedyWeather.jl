@@ -1,6 +1,8 @@
 """Concrete type that disables the boundary layer drag scheme."""
 struct NoBoundaryLayerDrag{NF} <: BoundaryLayerDrag{NF} end
 
+NoBoundaryLayerDrag(SG::SpectralGrid) = NoBoundaryLayerDrag{SG.NF}()
+
 """NoBoundaryLayer scheme does not need any initialisation."""
 function initialize!(   scheme::NoBoundaryLayerDrag,
                         model::PrimitiveEquation)
@@ -9,8 +11,7 @@ end
 
 """NoBoundaryLayer scheme just passes."""
 function boundary_layer_drag!(  column::ColumnVariables,
-                                scheme::NoBoundaryLayerDrag,
-                                model::PrimitiveEquation)
+                                scheme::NoBoundaryLayerDrag)
     return nothing
 end
 

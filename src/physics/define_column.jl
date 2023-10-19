@@ -53,6 +53,7 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     surface_wind_speed::NF = 0
     skin_temperature_sea::NF = 0
     skin_temperature_land::NF = 0
+    soil_moisture_availability::NF = 0
 
     # THERMODYNAMICS
     surface_air_density::NF = 0

@@ -136,11 +136,11 @@ Base.@kwdef mutable struct PrognosticVariablesLand{NF<:AbstractFloat,Grid<:Abstr
     "Snow depth [m]"
     const snow_depth::Grid = zeros(Grid,nlat_half)
 
-    "Soil wetness layer 1, volume fraction [1]"
-    const soil_wetness_layer1::Grid = zeros(Grid,nlat_half)
+    "Soil moisture layer 1, volume fraction [1]"
+    const soil_moisture_layer1::Grid = zeros(Grid,nlat_half)
 
-    "Soil wetness layer 2, volume fraction [1]"
-    const soil_wetness_layer2::Grid = zeros(Grid,nlat_half)
+    "Soil moisture layer 2, volume fraction [1]"
+    const soil_moisture_layer2::Grid = zeros(Grid,nlat_half)
 end
 
 # generator function based on a SpectralGrid
