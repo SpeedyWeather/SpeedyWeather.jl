@@ -153,7 +153,7 @@ Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     # BOUNDARY CONDITIONS
     land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
     ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
-    land::AbstractLand{NF} = SeasonalLandClimatology(spectral_grid)
+    land::AbstractLand{NF} = SeasonalLandTemperature(spectral_grid)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -237,7 +237,9 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     # BOUNDARY CONDITIONS
     land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
     ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
-    land::AbstractLand{NF} = SeasonalLandClimatology(spectral_grid)
+    land::AbstractLand{NF} = SeasonalLandTemperature(spectral_grid)
+    soil::AbstractSoil{NF} = SeasonalSoilMoisture(spectral_grid)
+    vegetation::AbstractVegetation{NF} = VegetationClimatology(spectral_grid)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -287,6 +289,8 @@ function initialize!(model::PrimitiveWet)
     initialize!(model.land_sea_mask)
     initialize!(model.ocean)
     initialize!(model.land)
+    initialize!(model.soil)
+    initialize!(model.vegetation)
 
     # parameterizations
     initialize!(model.boundary_layer_drag,model)

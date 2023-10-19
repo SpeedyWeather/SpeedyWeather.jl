@@ -40,6 +40,7 @@ function get_column!(   C::ColumnVariables,
     # TODO skin = surface approximation for now
     C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
     C.skin_temperature_land = P.land.land_surface_temperature[ij]
+    C.soil_moisture_availability = D.surface.soil_moisture_availability[ij]
 end
 
 """Recalculate ring index if not provided."""

@@ -21,6 +21,9 @@ Base.@kwdef struct SeasonalOceanClimatology{NF,Grid<:AbstractGrid{NF}} <: Abstra
     "filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
 
+    "Variable name in netcdf file"
+    varname::String = "sst"
+
     "Grid the sea surface temperature file comes on"
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
@@ -39,33 +42,42 @@ function SeasonalOceanClimatology(SG::SpectralGrid;kwargs...)
 end
 
 function initialize!(ocean::SeasonalOceanClimatology{NF,Grid}) where {NF,Grid}
+    load_monthly_climatology!(ocean.monthly_temperature,ocean)
+end
+
+function load_monthly_climatology!( 
+    monthly::Vector{Grid},
+    scheme;
+    varname::String = scheme.varname
+) where {Grid<:AbstractGrid}
+
     # LOAD NETCDF FILE
-    if ocean.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__,"../../input_data",ocean.file)
+    if scheme.path == "SpeedyWeather.jl/input_data"
+        path = joinpath(@__DIR__,"../../input_data",scheme.file)
     else
-        path = joinpath(ocean.path,ocean.file)
+        path = joinpath(scheme.path,scheme.file)
     end
     ncfile = NCDataset(path)
 
     # create interpolator from grid in file to grid used in model
     nx, ny = ncfile.dim["lon"], ncfile.dim["lat"]
     npoints = nx*ny
-    NF_file = typeof(ncfile["sst"].attrib["_FillValue"])
-    sst = ocean.file_Grid(zeros(NF_file,npoints))
-    interp = RingGrids.interpolator(NF,ocean.monthly_temperature[1],sst)
+    NF_file = typeof(ncfile[varname].attrib["_FillValue"])
+    grid = scheme.file_Grid(zeros(NF_file,npoints))
+    interp = RingGrids.interpolator(Float32,monthly[1],grid)
 
-    # interpolate and store in ocean
+    # interpolate and store in monthly
     for month in 1:12
-        sst_this_month = ncfile["sst"][:,:,month]
+        this_month = ncfile[varname][:,:,month]
         ij = 0
         for j in 1:ny
             for i in 1:nx
                 ij += 1
-                x = sst_this_month[i,j]
-                sst[ij] = ismissing(x) ? ocean.missing_value : x
+                x = this_month[i,j]
+                grid[ij] = ismissing(x) ? scheme.missing_value : x
             end
         end
-        interpolate!(ocean.monthly_temperature[month],sst,interp)
+        interpolate!(monthly[month],grid,interp)
     end
     return nothing
 end

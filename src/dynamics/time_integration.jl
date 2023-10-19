@@ -221,12 +221,17 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
 
-    ocean_timestep!(progn.ocean,time,model)
-    land_timestep!(progn.land,time,model)
+    if model.physics                                # switch on/off all physics parameterizations
+        # time step ocean (temperature and TODO sea ice) and land (temperature and soil moisture)
+        ocean_timestep!(progn.ocean,time,model)
+        land_timestep!(progn.land,time,model)
+        soil_moisture_availability!(diagn.surface,progn.land,model)
 
-    # switch on/off all physics
-    model.physics && parameterization_tendencies!(diagn,progn,time,model)
-    model.physics || zero_tendencies!(diagn)        # set tendencies to zero otherwise
+        # calculate all parameterizations
+        parameterization_tendencies!(diagn,progn,time,model)
+    else                                            # set tendencies to zero otherwise for accumulators
+        zero_tendencies!(diagn)
+    end       
 
     dynamics_tendencies!(diagn,progn,model,lf2)         # dynamical core
     implicit_correction!(diagn,model.implicit,progn)    # semi-implicit time stepping corrections
