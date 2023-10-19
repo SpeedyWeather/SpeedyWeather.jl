@@ -26,6 +26,9 @@ import BitInformation: round, round!
 import UnicodePlots
 import ProgressMeter
 
+# to avoid a `using Dates` to pass on DateTime arguments
+export DateTime
+
 # EXPORT MONOLITHIC INTERFACE TO SPEEDY
 export  run_speedy,
         run_speedy!,

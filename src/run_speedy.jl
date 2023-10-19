@@ -1,19 +1,14 @@
 """
 $(TYPEDSIGNATURES)
-Run a SpeedyWeather.jl `simulation`. The `simulation.model` is assumed to be initialized,
-otherwise use `initialize=true` as keyword argument."""
+Run a SpeedyWeather.jl `simulation`. The `simulation.model` is assumed to be initialized."""
 function run!(  simulation::Simulation;
                 n_days::Real = 10,
-                startdate::Union{Nothing,DateTime} = nothing,
                 output::Bool = false)
     
     (;prognostic_variables, diagnostic_variables, model) = simulation
     (;clock) = prognostic_variables
 
-    # set the clock
-    if typeof(startdate) == DateTime
-        clock.time = startdate
-    end
+    # set the clock's enddate
     clock.n_days = n_days
     initialize!(clock,model.time_stepping)
 

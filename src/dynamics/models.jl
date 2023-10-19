@@ -55,7 +55,7 @@ $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!`."""
-function initialize!(model::Barotropic)
+function initialize!(model::Barotropic;time::DateTime = DEFAULT_DATE)
     (;spectral_grid) = model
 
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for BarotropicModel, \
@@ -68,6 +68,7 @@ function initialize!(model::Barotropic)
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
+    prognostic_variables.clock.time = time       # set the time
 
     diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)
@@ -115,7 +116,7 @@ $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
-function initialize!(model::ShallowWater)
+function initialize!(model::ShallowWater;time::DateTime = DEFAULT_DATE)
     (;spectral_grid) = model
 
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for ShallowWaterModel, \
@@ -129,6 +130,7 @@ function initialize!(model::ShallowWater)
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
+    prognostic_variables.clock.time = time       # set the time
 
     diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)
@@ -189,7 +191,7 @@ $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
-function initialize!(model::PrimitiveDry)
+function initialize!(model::PrimitiveDry;time::DateTime = DEFAULT_DATE)
     (;spectral_grid) = model
 
     # numerics (implicit is initialized later)
@@ -209,10 +211,12 @@ function initialize!(model::PrimitiveDry)
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
-    
-    (;time) = prognostic_variables.clock
-    initialize!(prognostic_variables.ocean,time,model)
-    initialize!(prognostic_variables.land,time,model)
+    (;clock) = prognostic_variables
+    clock.time = time       # set the time
+
+    # initialize ocean and land and synchronize clocks
+    initialize!(prognostic_variables.ocean,clock.time,model)
+    initialize!(prognostic_variables.land,clock.time,model)
 
     diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)
@@ -278,7 +282,7 @@ $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
-function initialize!(model::PrimitiveWet)
+function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     (;spectral_grid) = model
 
     # numerics (implicit is initialized later)
@@ -301,10 +305,12 @@ function initialize!(model::PrimitiveWet)
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
+    (;clock) = prognostic_variables
+    clock.time = time       # set the time
 
-    (;time) = prognostic_variables.clock
-    initialize!(prognostic_variables.ocean,time,model)
-    initialize!(prognostic_variables.land,time,model)
+    # initialize ocean and land and synchronize clocks
+    initialize!(prognostic_variables.ocean,clock.time,model)
+    initialize!(prognostic_variables.land,clock.time,model)
 
     diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)
