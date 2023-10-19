@@ -183,7 +183,7 @@ include("physics/pretty_printing.jl")
 
 # OCEAN AND LAND
 include("dynamics/ocean.jl")
-include("dynamics/land.jl")
+include("physics/land.jl")
 
 # MODELS
 include("dynamics/models.jl")

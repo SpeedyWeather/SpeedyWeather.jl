@@ -21,7 +21,6 @@ abstract type InitialConditions end
 abstract type AbstractOrography{NF,Grid} end
 abstract type AbstractLandSeaMask{NF,Grid} end
 abstract type AbstractAlbedo{NF,Grid} end
-abstract type AbstractVegetation{NF,Grid} end
 
 # ATMOSPHERIC COLUMN FOR PARAMETERIZATIONS
 abstract type AbstractColumnVariables{NF} end
