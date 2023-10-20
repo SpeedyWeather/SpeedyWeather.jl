@@ -43,17 +43,13 @@ authors:
     orcid: 0000-0001-7235-6450
     affiliation: 6
 
-  - name: David Meyer
-    orcid: 0000-0002-7071-7547
-    affiliation: "8,9"
-
   - name: Tom Kimpson
     orcid: 0000-0002-6542-6032
-    affiliation: "2,10"
+    affiliation: "2,8"
 
   - name: Navid C Constantinou
     orcid: 0000-0002-8149-4094
-    affiliation: 11
+    affiliation: 9
 
   - name: Chris Hill
     affiliation: 1
@@ -73,14 +69,10 @@ affiliations:
    index: 6
  - name: University of Minnesota, Minneapolis, MN, USA
    index: 7
- - name: Imperial College London, UK
-   index: 8
- - name: European Centre for Medium-Range Weather Forecasts, Bonn, Germany
-   index: 9
  - name: University of Melbourne, Australia
-   index: 10
+   index: 8
  - name: Australian National University, Canberra, Australia
-   index: 11
+   index: 9
    
 date: 14 September 2023
 bibliography: paper.bib
@@ -121,7 +113,8 @@ experience and productivity.
 The user interface of SpeedyWeather.jl is heavily influenced by
 the Julia ocean model Oceananigans.jl [@Ramadhan2020].
 A monolithic interface based on parameter files is avoided in favor of a
-library-style interface in which users write short scripts to run models
+library-style interface. Users write notebooks, directly into
+Julia's read-evaluate-print loop (REPL) or short scripts to run models
 rather than merely supplying parameters and input arrays.
 A model is created bottom-up by first defining the discretization
 and any non-default model components with their respective parameters.
@@ -133,7 +126,7 @@ visualize the current variables, or individual terms of the equations.
 One can also adjust parameters or define new model components before resuming the simulation.
 While these steps can be written into a script for reproducibility,
 the same steps can be executed and interacted with one-by-one in
-Julia's read-evaluate-print loop (REPL) or in a single Jupyter or Pluto notebook.
+the REPL or in a single Jupyter or Pluto notebook.
 We thereby achieve an interactivity of a simulation and its various model components
 far beyond the options provided in a monolithic interface.
 At the same time, defaults, set to well-established test cases, 
@@ -188,7 +181,7 @@ developed over decades. From this tradition follows a specific programming
 style and associated user interface.
 SpeedyWeather.jl aims to overcome the constraints of traditional Fortran-based models.
 The modern trend sees simulations in Fortran and data analysis in Python,
-making virtually impossible to interact with various model components directly.
+making it virtually impossible to interact with various model components directly.
 In SpeedyWeather.jl, interfaces to the model components are exposed to the user.
 Furthermore, data-driven climate modelling [@Rasp2018; @Schneider2023],
 which replaces existing model components with machine learning,
@@ -213,7 +206,7 @@ NASA's blue marble from June 2004. \label{fig:swm}](swm.png)
 
 # Acknowledgements
 
-We acknowledge contributions from Mosè Giordano, Valentin Churavy, and Pietro Monticone
+We acknowledge contributions from David Meyer, Mosè Giordano, Valentin Churavy, and Pietro Monticone
 who have also committed to the SpeedyWeather.jl repository, and the wider Julia community
 for help and support. MK acknowledges funding from the 
 National Science Foundation (Chris please add).
