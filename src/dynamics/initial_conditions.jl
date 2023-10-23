@@ -441,25 +441,22 @@ function initialize_humidity!(  progn::PrognosticVariables,
                                 pres_surf_grid::AbstractGrid,
                                 model::PrimitiveWet)
 
-    # reference saturation water vapour pressure [Pa]
-    # relative humidity reference [1]
-    (;water_pres_ref, relhumid_ref, R_dry, R_vapour, pres_ref) = model.atmosphere
-    gas_ratio = R_dry/R_vapour
-    humid_ref = relhumid_ref*gas_ratio*water_pres_ref   # reference specific humidity [Pa]
+    (;relhumid_ref) = model.atmosphere      # relative humidity reference [1]
 
     # ratio of scale heights [1], scale height [km], scale height for spec humidity [km]     
     (;scale_height, scale_height_humid, σ_tropopause) = model.atmosphere
     scale_height_ratio = scale_height/scale_height_humid
 
     (;nlev, σ_levels_full) = model.geometry
-    n_stratosphere_levels = findfirst(σ->σ>=σ_tropopause,σ_levels_full)
+    n_stratosphere_levels = findlast(σ->σ<=σ_tropopause,σ_levels_full)
 
     # Specific humidity at the surface (grid space)
+    temp_grid = gridded(progn.layers[end].timesteps[1].temp,model.spectral_transform)
     humid_surf_grid = zero(pres_surf_grid)
-    # @. humid_surf_grid = humid_ref*(exp(pres_surf_grid)/(pres_ref*100))^scale_height_ratio
-    q_ref = 1e-3       # kg/kg at the surface
-    @. humid_surf_grid .= q_ref
-    RingGrids.scale_coslat²!(humid_surf_grid)
+    for ij in eachgridpoint(humid_surf_grid)
+        q_sat = saturation_humidity(temp_grid[ij],exp(pres_surf_grid[ij]),model.thermodynamics)
+        humid_surf_grid[ij] = relhumid_ref*q_sat
+    end
 
     humid_surf = spectral(humid_surf_grid,model.spectral_transform)
     spectral_truncation!(humid_surf)
@@ -467,7 +464,7 @@ function initialize_humidity!(  progn::PrognosticVariables,
     # Specific humidity at tropospheric levels (stratospheric humidity remains zero)
     a = model.spectral_transform.norm_sphere
     for k in n_stratosphere_levels+1:nlev
-        for lm in eachharmonic(humid_surf,progn.layers[1].timesteps[1].humid)
+        for lm in eachharmonic(humid_surf)
             progn.layers[k].timesteps[1].humid[lm] = humid_surf[lm]*σ_levels_full[k]^scale_height_ratio
         end
     end

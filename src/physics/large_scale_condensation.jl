@@ -42,7 +42,7 @@ function initialize!(scheme::SpeedyCondensation,model::PrimitiveEquation)
         # the relative humidity threshold above which condensation occurs per layer
         σₖ² = σ_levels_full[k]^2
         relative_threshold[k] = threshold_max + threshold_range * (σₖ² - 1)
-        if k >= σ_boundary_layer
+        if σ_levels_full[k] >= σ_boundary_layer
             relative_threshold[k] = max(relative_threshold[k], threshold_boundary_layer)
         end
 
@@ -87,7 +87,7 @@ function large_scale_condensation!(
     ) where NF
 
     (;relative_threshold,humid_tend_max) = scheme
-    time_scale = convert(NF,3600*scheme.time_scale)
+    time_scale = convert(NF,3600*scheme.time_scale)     # [hrs] -> [s]
     n_stratosphere_levels = scheme.n_stratosphere_levels[]
 
     (;humid, pres) = column               # prognostic variables: specific humidity, surface pressure
@@ -101,7 +101,7 @@ function large_scale_condensation!(
     pₛΔt_gρ = pₛ*Δt_sec/gravity/water_density   # precompute constant
 
     (;σ_levels_thick) = geometry
-    latent_heat = convert(NF, atmosphere.latent_heat_condensation/atmosphere.cₚ)
+    latent_heat = convert(NF, atmosphere.latent_heat_condensation)
     
     # 1. Tendencies of humidity and temperature due to large-scale condensation
     @inbounds for k in n_stratosphere_levels+1:nlev   # top to bottom, skip stratospheric levels
@@ -112,7 +112,8 @@ function large_scale_condensation!(
         if humid[k] > humid_threshold
             # accumulate in tendencies (nothing is added if humidity not above threshold)
             humid_tend_k = -(humid[k] - humid_threshold) / time_scale                   # Formula 22
-            temp_tend[k] += -latent_heat * min(humid_tend_k, humid_tend_max[k]*pres[k]) # Formula 23
+            # temp_tend[k] += -latent_heat * min(humid_tend_k, humid_tend_max[k]*pres[k]) # Formula 23
+            temp_tend[k] += -latent_heat * humid_tend_k             # Formula 23, without limiter
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
@@ -124,7 +125,7 @@ function large_scale_condensation!(
             column.precip_large_scale += -ΔpₖΔt_gρ * humid_tend_k   # Formula 25, unit [m]
 
             # only write into humid_tend now to allow humid_tend != 0 before this scheme is called
-            humid_tend[k] += humid_tend_k                           
+            humid_tend[k] += humid_tend_k
         end
     end
 end
