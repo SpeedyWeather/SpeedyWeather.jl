@@ -96,7 +96,7 @@ export  NoTemperatureRelaxation,
         JablonowskiRelaxation
 
 # EXPORT BOUNDARY LAYER SCHEMES
-export  NoBoundaryLayer,
+export  NoBoundaryLayerDrag,
         LinearDrag,
         QuadraticDrag
 
