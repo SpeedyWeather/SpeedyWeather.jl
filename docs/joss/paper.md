@@ -90,16 +90,16 @@ models which solve different sets of equations:
 - the shallow water equations (\autoref{fig:swm}), and
 - the barotropic vorticity equation.
 
-Several simple parameterizations for unresolved physical processes
-including precipitation or boundary layer mixing are implemented, and new ones can
+The primitive equation model in SpeedyWeather.jl is an
+atmospheric general circulation model [@Kucharski2013] with simple parameterizations
+for unresolved physical processes including precipitation or boundary layer mixing.
+It can be thought of as a conceptual reinvention of the Fortran SPEEDY model [@Molteni2003]
+in the Julia programming language [@Bezanson2017]. However, all models here are written in a modular
+way to make its components easily extensible. For example, a new parameterization can
 be externally defined and passed as an argument to the model constructor.
-The primitive equation model in SpeedyWeather.jl is an intermediate-complexity
-atmospheric general circulation model [@Kucharski2013] and can be thought of as a
-conceptual reinvention of the Fortran SPEEDY model [@Molteni2003] in the Julia
-programming language [@Bezanson2017]. However, all models are written in a modular
-way to make its components easily extensible. Furthermore, operators used inside
-SpeedyWeather.jl are exposed to the user, facilitating analysis of the simulation
-data. SpeedyWeather.jl is therefore, beyond its main purpose of simulating 
+Operators used inside SpeedyWeather.jl are exposed to the user,
+facilitating analysis of the simulation data.
+SpeedyWeather.jl is therefore, beyond its main purpose of simulating 
 atmospheric motion, also a library for the analysis of gridded data on the sphere.
 Running and analyzing simulations can be interactively combined, enhancing user
 experience and productivity.
@@ -154,7 +154,7 @@ as an argument. Many grids are already implemented: the conventional
 Gaussian grid, a regular longitude-latitude grid, 
 the octahedral Gaussian grid [@Malardel2016], the octahedral
 Clenshaw-Curtis grid [@Hotta2018], and the HEALPix grid [@Gorski2005].
-Both SpeedyWeather.jl and its spherical harmonic transform `SpeedyTransforms` are also
+Both SpeedyWeather.jl and its spherical harmonic transform are also
 number format-flexible. Single-precision floating-point numbers
 (Float32) are the default as adopted by other modelling efforts [@Vana2017; @Nakano2018],
 but Float64 and other custom number formats can be used with a single
