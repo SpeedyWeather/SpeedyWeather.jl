@@ -84,14 +84,14 @@ bibliography: paper.bib
 
 SpeedyWeather.jl is a library to simulate and analyze the global atmospheric
 circulation on the sphere. It implements several 2D and 3D
-models solved with spherical harmonics:
+models solving different sets of equations:
 
 - the primitive equations with and without humidity (\autoref{fig:primitive}),
 - the shallow water equations (\autoref{fig:swm}), and
-- the barotropic vorticity equations.
+- the barotropic vorticity equation.
 
 Several simple parameterizations for unresolved physical processes
-such as precipitation or the boundary layer are implemented, and new ones can
+including precipitation or boundary layer mixing are implemented, and new ones can
 be externally defined and passed as an argument to the model constructor.
 SpeedyWeather.jl is an intermediate-complexity general circulation model [@Kucharski2013]
 and research playground with an (almost) everything-flexible attitude.
@@ -116,14 +116,14 @@ A monolithic interface based on parameter files is avoided in favor of a
 library-style interface. Users write notebooks, directly into
 Julia's read-evaluate-print loop (REPL) or short scripts to run models
 rather than merely supplying parameters and input arrays.
-A model is created bottom-up by first defining the discretization
+A model is constructed bottom-up by first defining the discretization
 and any non-default model components with their respective parameters.
 All components are then collected into a single model object which, once
 initialized, returns a simulation object. A simulation contains everything,
 the model with all parameters as created before but also all prognostic and diagnostic variables.
 Such a simulation can then be run, but also accessed before and after to analyze or
 visualize the current variables, or individual terms of the equations.
-One can also adjust parameters or define new model components before resuming the simulation.
+One can also adjust some parameters before resuming the simulation.
 While these steps can be written into a script for reproducibility,
 the same steps can be executed and interacted with one-by-one in
 the REPL or in a single Jupyter or Pluto notebook.
@@ -132,10 +132,12 @@ far beyond the options provided in a monolithic interface.
 At the same time, defaults, set to well-established test cases, 
 enable even inexperienced users to run simulations in just a few lines of code. 
 
-To be extensible with new model components, SpeedyWeather.jl relies on Julia's
-multiple dispatch programming paradigm [@Bezanson2017].
-Every model component is defined as a new type.
-For example, to define precipitation due to the physical process of large-scale condensation,
+SpeedyWeather.jl relies on Julia's multiple dispatch programming paradigm [@Bezanson2017]
+to be extensible with new components including parameterizations, forcings, drag,
+or even the grid.
+All such supported model components define an abstract type that can be
+subtyped to introduce, for example, a new parameterization.
+To define precipitation due to the physical process of large-scale condensation,
 one would define `MyCondensation` as a new subtype of `AbstractCondensation`.
 One then only needs to extend the `initialize!` and `condensation!`
 functions for this new type. Passing on `condensation = MyCondensation()`
