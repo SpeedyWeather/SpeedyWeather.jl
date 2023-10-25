@@ -84,7 +84,7 @@ bibliography: paper.bib
 
 SpeedyWeather.jl is a library to simulate and analyze the global atmospheric
 circulation on the sphere. It implements several 2D and 3D
-models solving different sets of equations:
+models which solve different sets of equations:
 
 - the primitive equations with and without humidity (\autoref{fig:primitive}),
 - the shallow water equations (\autoref{fig:swm}), and
@@ -93,19 +93,13 @@ models solving different sets of equations:
 Several simple parameterizations for unresolved physical processes
 including precipitation or boundary layer mixing are implemented, and new ones can
 be externally defined and passed as an argument to the model constructor.
-SpeedyWeather.jl is an intermediate-complexity general circulation model [@Kucharski2013]
-and research playground with an (almost) everything-flexible attitude.
-It can be thought of as a conceptual reinvention of the Fortran SPEEDY model [@Molteni2003]
-in the Julia programming language [@Bezanson2017].
-
-SpeedyWeather.jl internally uses three sub-modules `RingGrids`,
-`LowerTriangularMatrices`, and `SpeedyTransforms`. `RingGrids` is a module that discretizes
-the sphere on iso-latitude rings and implements interpolations between various such grids.
-`LowerTriangularMatrices` is a module used to define the spectral space of the spherical
-harmonic coefficients. `SpeedyTransforms` implements the spectral transform between
-the grid-point space as defined by `RingGrids` and the spectral space defined in
-`LowerTriangularMatrices`. These three modules are independently usable
-and therefore make SpeedyWeather.jl, beyond its main purpose of simulating 
+The primitive equation model in SpeedyWeather.jl is an intermediate-complexity
+atmospheric general circulation model [@Kucharski2013] and can be thought of as a
+conceptual reinvention of the Fortran SPEEDY model [@Molteni2003] in the Julia
+programming language [@Bezanson2017]. However, all models are written in a modular
+way to make its components easily extensible. Furthermore, operators used inside
+SpeedyWeather.jl are exposed to the user, facilitating analysis of the simulation
+data. SpeedyWeather.jl is therefore, beyond its main purpose of simulating 
 atmospheric motion, also a library for the analysis of gridded data on the sphere.
 Running and analyzing simulations can be interactively combined, enhancing user
 experience and productivity.
@@ -113,20 +107,18 @@ experience and productivity.
 The user interface of SpeedyWeather.jl is heavily influenced by
 the Julia ocean model Oceananigans.jl [@Ramadhan2020].
 A monolithic interface based on parameter files is avoided in favor of a
-library-style interface. Users write notebooks, directly into
-Julia's read-evaluate-print loop (REPL) or short scripts to run models
-rather than merely supplying parameters and input arrays.
+library-style interface.
 A model is constructed bottom-up by first defining the discretization
 and any non-default model components with their respective parameters.
 All components are then collected into a single model object which, once
 initialized, returns a simulation object. A simulation contains everything,
-the model with all parameters as created before but also all prognostic and diagnostic variables.
+the model with all parameters as constructed before but also all prognostic and diagnostic variables.
 Such a simulation can then be run, but also accessed before and after to analyze or
 visualize the current variables, or individual terms of the equations.
 One can also adjust some parameters before resuming the simulation.
 While these steps can be written into a script for reproducibility,
 the same steps can be executed and interacted with one-by-one in
-the REPL or in a single Jupyter or Pluto notebook.
+Julia's read-evaluate-print loop (REPL) or in a Jupyter or Pluto notebook.
 We thereby achieve an interactivity of a simulation and its various model components
 far beyond the options provided in a monolithic interface.
 At the same time, defaults, set to well-established test cases, 
@@ -170,6 +162,16 @@ code basis [@Klower2022; @Klower2020].
 Julia will compile to the choice of number format, the grid,
 and and other model components just-in-time. A simple parallelization
 across vertical layers is supported by Julia's multithreading.
+
+SpeedyWeather.jl internally uses three sub-modules `RingGrids`,
+`LowerTriangularMatrices`, and `SpeedyTransforms`. `RingGrids` is a module that discretizes
+the sphere on iso-latitude rings and implements interpolations between various such grids.
+`LowerTriangularMatrices` facilitates the implementation of the spherical harmonics by organizing
+their coefficients in a lower triangular matrix representation.
+`SpeedyTransforms` implements the spectral transform between
+the grid-point space as defined by `RingGrids` and the spectral space defined in
+`LowerTriangularMatrices`. These three modules are independently usable
+and therefore support SpeedyWeather's library-like user interface.
 Output is stored as NetCDF files using
 [NCDatasets.jl](https://github.com/Alexander-Barth/NCDatasets.jl).
 
