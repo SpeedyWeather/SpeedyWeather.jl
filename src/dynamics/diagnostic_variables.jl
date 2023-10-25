@@ -138,6 +138,7 @@ Base.@kwdef struct SurfaceVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     
     precip_large_scale::Grid = zeros(Grid,nlat_half)    # large scale precipitation (for output)
     precip_convection::Grid = zeros(Grid,nlat_half)     # convective precipitation (for output)
+    cloud_top::Grid = zeros(Grid,nlat_half)             # cloud top [hPa]
     soil_moisture_availability::Grid = zeros(Grid,nlat_half)
 end
 
