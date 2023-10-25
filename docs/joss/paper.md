@@ -36,7 +36,7 @@ authors:
     affiliation: 1
 
   - name: Alistair White
-  - orcid: 0000-0003-3377-6852
+    orcid: 0000-0003-3377-6852
     affiliation: "3,4"
 
   - name: Sam Hatfield
