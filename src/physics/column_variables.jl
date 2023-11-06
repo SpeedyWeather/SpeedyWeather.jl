@@ -14,9 +14,10 @@ function get_column!(   C::ColumnVariables,
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
-    C.latd = G.latds[ij]      # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
+    C.latd = G.latds[ij]        # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
     C.lond = G.londs[ij]
-    C.jring = jring           # ring index j of column, used to index latitude vectors
+    C.ij = ij                   # grid-point index
+    C.jring = jring             # ring index j of column, used to index latitude vectors
     C.land_fraction = L.land_sea_mask[ij]
 
     # pressure [Pa]/[log(Pa)]
@@ -76,6 +77,7 @@ function write_column_tendencies!(  D::DiagnosticVariables,
     # accumulate (set back to zero when netcdf output)
     D.surface.precip_large_scale[ij] += C.precip_large_scale
     D.surface.precip_convection[ij] += C.precip_convection
+    D.surface.cloud_top[ij] = C.pres[C.cloud_top]
 
     return nothing
 end
@@ -103,7 +105,7 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     column.flux_temp_downward .= 0
 
     # # Convection
-    # column.cloud_top = column.nlev+1
+    column.cloud_top = column.nlev+1
     # column.conditional_instability = false
     # column.activate_convection = false
     column.precip_convection = zero(NF)

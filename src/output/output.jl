@@ -12,6 +12,7 @@ Base.@kwdef struct Keepbits
     humid::Int = 7
     precip_cond::Int = 7
     precip_conv::Int = 7
+    cloud::Int = 7
 end
 
 function Base.show(io::IO,K::Keepbits)
@@ -118,6 +119,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
     const humid::Matrix{NF} = fill(missing_value,nlon,nlat)
     const precip_cond::Matrix{NF} = fill(missing_value,nlon,nlat)
     const precip_conv::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const cloud::Matrix{NF} = fill(missing_value,nlon,nlat)
 end
 
 # generator function pulling grid resolution and time stepping from ::SpectralGrid and ::TimeStepper
@@ -134,7 +136,7 @@ end
 default_output_vars(::Type{<:Barotropic}) = [:vor,:u,:v]
 default_output_vars(::Type{<:ShallowWater}) = [:vor,:u,:v]
 default_output_vars(::Type{<:PrimitiveDry}) = [:vor,:u,:v,:temp,:pres]
-default_output_vars(::Type{<:PrimitiveWet}) = [:vor,:u,:v,:temp,:humid,:pres,:precip]
+default_output_vars(::Type{<:PrimitiveWet}) = [:vor,:u,:v,:temp,:humid,:pres,:precip,:cloud]
 
 # print all fields with type <: Number
 function Base.show(io::IO,O::AbstractOutputWriter)
@@ -284,6 +286,11 @@ function initialize!(
     :precip in output_vars && defVar(dataset,"precip_conv",output_NF,(lon_name,lat_name,"time"),attrib=precip_conv_attribs,
                                         deflatelevel=compression_level,shuffle=output.shuffle)
     
+    # convective precipitation
+    cloud_top_attribs = Dict("long_name"=>"cloud top","units"=>"Pa","_FillValue"=>missing_value)
+    :cloud in output_vars && defVar(dataset,"cloud_top",output_NF,(lon_name,lat_name,"time"),attrib=cloud_top_attribs,
+                                    deflatelevel=compression_level,shuffle=output.shuffle)
+
     # WRITE INITIAL CONDITIONS TO FILE
     write_netcdf_variables!(output,diagn)
     write_netcdf_time!(output,clock.time)
@@ -392,7 +399,7 @@ function write_netcdf_variables!(   output::OutputWriter,
     (;output_vars) = output                     # Vector{Symbol} of variables to output
     i = output.output_counter
 
-    (;u, v, vor, div, pres, temp, humid, precip_cond, precip_conv) = output
+    (;u, v, vor, div, pres, temp, humid, precip_cond, precip_conv, cloud) = output
     (;output_Grid, interpolator) = output
     (;quadrant_rotation, matrix_quadrant) = output
     (;netcdf_file, keepbits) = output
@@ -444,12 +451,12 @@ function write_netcdf_variables!(   output::OutputWriter,
     end
 
     # surface pressure, i.e. interface displacement η
-    (; pres_grid, precip_large_scale, precip_convection ) = diagn.surface
+    (; pres_grid, precip_large_scale, precip_convection, cloud_top ) = diagn.surface
 
     if output.as_matrix
-        if :pres in output_vars || :precip_cond in output_vars || :precip_conv in output_vars
-            MGs = ((M,G) for (M,G) in zip((pres,precip_cond,precip_conv),
-                                            (pres_grid, precip_large_scale, precip_convection)))
+        if :pres in output_vars || :precip_cond in output_vars || :precip_conv in output_vars || :cloud in output_vars
+            MGs = ((M,G) for (M,G) in zip((pres,precip_cond,precip_conv,cloud),
+                                            (pres_grid, precip_large_scale, precip_convection, cloud_top)))
 
             RingGrids.Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
         end
@@ -457,6 +464,8 @@ function write_netcdf_variables!(   output::OutputWriter,
         :pres in output_vars && RingGrids.interpolate!(output_Grid(pres),pres_grid,interpolator)
         :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_cond),precip_large_scale,interpolator)
         :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_conv),precip_convection,interpolator)
+        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_conv),precip_convection,interpolator)
+        :cloud in output_vars && RingGrids.interpolate!(output_Grid(cloud),cloud_top,interpolator)
     end
 
     # after output set precip accumulators back to zero
@@ -474,10 +483,12 @@ function write_netcdf_variables!(   output::OutputWriter,
     :pres in output_vars && round!(pres,keepbits.pres)
     :precip in output_vars && round!(precip_cond,keepbits.precip_cond)
     :precip in output_vars && round!(precip_conv,keepbits.precip_conv)
+    :cloud in output_vars && round!(cloud,keepbits.cloud)
     
     :pres in output_vars && (netcdf_file["pres"][:,:,i] = pres)
     :precip in output_vars && (netcdf_file["precip_cond"][:,:,i] = precip_cond)
     :precip in output_vars && (netcdf_file["precip_conv"][:,:,i] = precip_conv)
+    :cloud in output_vars && (netcdf_file["cloud_top"][:,:,i] = cloud)
 
     return nothing
 end
