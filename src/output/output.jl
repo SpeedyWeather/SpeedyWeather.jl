@@ -107,7 +107,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
                                                     RingGrids.get_nlat(output_Grid,nlat_half)
     npoints::Int = nlon*nlat
     nlev::Int = spectral_grid.nlev
-    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(input_Grid,spectral_grid.nlat_half,npoints)
+    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(NF,input_Grid,spectral_grid.nlat_half,npoints)
 
     # fields to output (only one layer, reuse over layers)
     const u::Matrix{NF} = fill(missing_value,nlon,nlat)
@@ -218,7 +218,7 @@ function initialize!(
     latds, londs = RingGrids.get_latdlonds(output_Grid,output.nlat_half)
     output.as_matrix || RingGrids.update_locator!(output.interpolator,latds,londs)
         
-    σ = model.geometry.σ_levels_full
+    σ = output_NF.(model.geometry.σ_levels_full)
     defVar(dataset,lon_name,lond,(lon_name,),attrib=Dict("units"=>lon_units,"long_name"=>lon_longname))
     defVar(dataset,lat_name,latd,(lat_name,),attrib=Dict("units"=>lat_units,"long_name"=>lat_longname))
     defVar(dataset,"lev",σ,("lev",),attrib=Dict("units"=>"1","long_name"=>"sigma levels"))
