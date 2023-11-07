@@ -199,6 +199,7 @@ include("dynamics/models.jl")
 # OUTPUT
 include("output/output.jl")                     # defines Output
 include("output/feedback.jl")                   # defines Feedback
+include("output/plot.jl")
 
 # INTERFACE
 include("run_speedy.jl")
