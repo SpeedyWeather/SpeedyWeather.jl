@@ -503,8 +503,8 @@ to the output folder (or current path) that can be used to restart the model.
 `restart.jld2` will then be used as initial conditions. The prognostic variables
 are bitrounded for compression and the 2nd leapfrog time step is discarded.
 Variables in restart file are unscaled."""
-function write_restart_file(progn::PrognosticVariables,
-                            output::OutputWriter)
+function write_restart_file(progn::PrognosticVariables{T},
+                            output::OutputWriter) where T
     
     (; run_path, write_restart, keepbits ) = output
     output.output || return nothing         # exit immediately if no output and
@@ -520,10 +520,12 @@ function write_restart_file(progn::PrognosticVariables,
         copyto!(layer.timesteps[1].humid,layer.timesteps[2].humid)
 
         # bitround 1st leapfrog step to output precision
-        round!(layer.timesteps[1].vor,keepbits.vor)
-        round!(layer.timesteps[1].div,keepbits.div)
-        round!(layer.timesteps[1].temp,keepbits.temp)
-        round!(layer.timesteps[1].humid,keepbits.humid)
+        if T <: Base.IEEEFloat  # currently not defined for other formats...
+            round!(layer.timesteps[1].vor,keepbits.vor)
+            round!(layer.timesteps[1].div,keepbits.div)
+            round!(layer.timesteps[1].temp,keepbits.temp)
+            round!(layer.timesteps[1].humid,keepbits.humid)
+        end
 
         # remove 2nd leapfrog step by filling with zeros
         fill!(layer.timesteps[2].vor,0)
@@ -534,7 +536,7 @@ function write_restart_file(progn::PrognosticVariables,
 
     # same for surface pressure
     copyto!(progn.surface.timesteps[1].pres,progn.surface.timesteps[2].pres)
-    round!(progn.surface.timesteps[1].pres,keepbits.pres)
+    T <: Base.IEEEFloat && round!(progn.surface.timesteps[1].pres,keepbits.pres)
     fill!(progn.surface.timesteps[2].pres,0)
 
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
