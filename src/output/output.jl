@@ -107,7 +107,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
                                                     RingGrids.get_nlat(output_Grid,nlat_half)
     npoints::Int = nlon*nlat
     nlev::Int = spectral_grid.nlev
-    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(input_Grid,spectral_grid.nlat_half,npoints)
+    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(NF,input_Grid,spectral_grid.nlat_half,npoints)
 
     # fields to output (only one layer, reuse over layers)
     const u::Matrix{NF} = fill(missing_value,nlon,nlat)
@@ -218,7 +218,7 @@ function initialize!(
     latds, londs = RingGrids.get_latdlonds(output_Grid,output.nlat_half)
     output.as_matrix || RingGrids.update_locator!(output.interpolator,latds,londs)
         
-    σ = model.geometry.σ_levels_full
+    σ = output_NF.(model.geometry.σ_levels_full)
     defVar(dataset,lon_name,lond,(lon_name,),attrib=Dict("units"=>lon_units,"long_name"=>lon_longname))
     defVar(dataset,lat_name,latd,(lat_name,),attrib=Dict("units"=>lat_units,"long_name"=>lat_longname))
     defVar(dataset,"lev",σ,("lev",),attrib=Dict("units"=>"1","long_name"=>"sigma levels"))
@@ -503,8 +503,8 @@ to the output folder (or current path) that can be used to restart the model.
 `restart.jld2` will then be used as initial conditions. The prognostic variables
 are bitrounded for compression and the 2nd leapfrog time step is discarded.
 Variables in restart file are unscaled."""
-function write_restart_file(progn::PrognosticVariables,
-                            output::OutputWriter)
+function write_restart_file(progn::PrognosticVariables{T},
+                            output::OutputWriter) where T
     
     (; run_path, write_restart, keepbits ) = output
     output.output || return nothing         # exit immediately if no output and
@@ -520,10 +520,12 @@ function write_restart_file(progn::PrognosticVariables,
         copyto!(layer.timesteps[1].humid,layer.timesteps[2].humid)
 
         # bitround 1st leapfrog step to output precision
-        round!(layer.timesteps[1].vor,keepbits.vor)
-        round!(layer.timesteps[1].div,keepbits.div)
-        round!(layer.timesteps[1].temp,keepbits.temp)
-        round!(layer.timesteps[1].humid,keepbits.humid)
+        if T <: Base.IEEEFloat  # currently not defined for other formats...
+            round!(layer.timesteps[1].vor,keepbits.vor)
+            round!(layer.timesteps[1].div,keepbits.div)
+            round!(layer.timesteps[1].temp,keepbits.temp)
+            round!(layer.timesteps[1].humid,keepbits.humid)
+        end
 
         # remove 2nd leapfrog step by filling with zeros
         fill!(layer.timesteps[2].vor,0)
@@ -534,7 +536,7 @@ function write_restart_file(progn::PrognosticVariables,
 
     # same for surface pressure
     copyto!(progn.surface.timesteps[1].pres,progn.surface.timesteps[2].pres)
-    round!(progn.surface.timesteps[1].pres,keepbits.pres)
+    T <: Base.IEEEFloat && round!(progn.surface.timesteps[1].pres,keepbits.pres)
     fill!(progn.surface.timesteps[2].pres,0)
 
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
