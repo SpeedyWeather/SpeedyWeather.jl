@@ -66,7 +66,7 @@ export  interpolate,
         update_locator,
         update_locator!
 
-export  plot
+# export  plot
 
 include("utility_functions.jl")
 
