@@ -29,7 +29,8 @@ function initialize!(scheme::SpeedyCondensation,model::PrimitiveEquation)
     (;σ_levels_full) = model.geometry
     (;σ_tropopause) = model.atmosphere
 
-    scheme.n_stratosphere_levels[] = findlast(σ->σ<=σ_tropopause,σ_levels_full)
+    n = findlast(σ->σ<=σ_tropopause,σ_levels_full)
+    scheme.n_stratosphere_levels[] = isnothing(n) ? 0 : n
 end
 
 """
@@ -99,7 +100,7 @@ function large_scale_condensation!(
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
-            column.cloud_top = min(column.cloud_top, k)             # Page 7 (last sentence)
+            # column.cloud_top = min(column.cloud_top, k)             # Page 7 (last sentence)
     
             # 2. Precipitation due to large-scale condensation [kg/m²/s] /ρ for [m/s]
             # += for vertical integral

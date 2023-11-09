@@ -95,6 +95,11 @@ function initialize!(   scheme::HeldSuarez,
     end
 end
 
+# function barrier
+function temperature_relaxation!(column::ColumnVariables,model::PrimitiveEquation)
+    temperature_relaxation!(column,model.temperature_relaxation)
+end
+
 """$(TYPEDSIGNATURES)
 Apply temperature relaxation following Held and Suarez 1996, BAMS."""
 function temperature_relaxation!(   column::ColumnVariables{NF},

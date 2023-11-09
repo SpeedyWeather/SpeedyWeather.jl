@@ -20,11 +20,9 @@ The BarotropicModel struct holds all other structs that contain precalculated co
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
-    "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
 
     # DYNAMICS
-    "contains physical and orbital characteristics"
     planet::AbstractPlanet = Earth()
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     forcing::AbstractForcing{NF} = NoForcing(spectral_grid)
@@ -80,11 +78,9 @@ The ShallowWaterModel struct holds all other structs that contain precalculated 
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
-    "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
 
     # DYNAMICS
-    "contains physical and orbital characteristics"
     planet::AbstractPlanet = Earth()
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     forcing::AbstractForcing{NF} = NoForcing(spectral_grid)
@@ -142,11 +138,9 @@ The PrimitiveDryModel struct holds all other structs that contain precalculated 
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveDry
-    "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
     # DYNAMICS
-    "contains physical and orbital characteristics"
     planet::AbstractPlanet = Earth()
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     initial_conditions::InitialConditions = ZonalWind()
@@ -228,11 +222,9 @@ The PrimitiveDryModel struct holds all other structs that contain precalculated 
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveWet
-    "dictates resolution for many other components"
     spectral_grid::SpectralGrid = SpectralGrid()
 
     # DYNAMICS
-    "contains physical and orbital characteristics"
     planet::AbstractPlanet = Earth()
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     initial_conditions::InitialConditions = ZonalWind()
@@ -256,6 +248,7 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
     surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
     evaporation::AbstractEvaporation{NF} = SurfaceEvaporation(spectral_grid)
+    convection::AbstractConvection{NF} = SpeedyConvection(spectral_grid)
     
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
@@ -301,6 +294,7 @@ function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     initialize!(model.temperature_relaxation,model)
     initialize!(model.static_energy_diffusion,model)
     initialize!(model.large_scale_condensation,model)
+    initialize!(model.convection,model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
