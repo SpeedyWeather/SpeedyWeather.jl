@@ -27,15 +27,14 @@ Base.@kwdef struct EarthAtmosphere <: AbstractAtmosphere
     "water density [kg/m³]"
     water_density::Float64 = 1000
 
-    "latent heat of condensation [J/g] for consistency with specific humidity [g/Kg], also called alhc"
-    latent_heat_condensation::Float64 = 2501
+    "latent heat of condensation [J/kg] for consistency with specific humidity [kg/kg], also called alhc"
+    latent_heat_condensation::Float64 = 2501e3
 
-    "latent heat of sublimation [J/g], also called alhs"
-    latent_heat_sublimation::Float64 = 2801
+    "latent heat of sublimation [J/kg], also called alhs"
+    latent_heat_sublimation::Float64 = 2801e3
 
     "stefan-Boltzmann constant [W/m²/K⁴]"
     stefan_boltzmann::Float64 = 5.67e-8
-
 
     # STANDARD ATMOSPHERE (reference values)
     "moist adiabatic temperature lapse rate ``-dT/dz`` [K/km]"
@@ -54,7 +53,7 @@ Base.@kwdef struct EarthAtmosphere <: AbstractAtmosphere
     σ_tropopause::Float64 = 0.2
 
     "top of the planetary boundary layer in sigma coordinates"
-    σ_boundary_layer::Float64 = 0.95
+    σ_boundary_layer::Float64 = 0.93
 
     "scale height for pressure [km]"
     scale_height::Float64 = 7.5
@@ -71,6 +70,7 @@ Base.@kwdef struct EarthAtmosphere <: AbstractAtmosphere
     "saturation water vapour pressure [Pa]"
     water_pres_ref::Float64 = 17
 
+    # TODO maybe make this actually part of the spectral grid?
     "layer thickness for the shallow water model [km]"
     layer_thickness::Float64 = 8.5
 end

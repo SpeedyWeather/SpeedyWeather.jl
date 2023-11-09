@@ -49,9 +49,29 @@ function get_thermodynamics!(column::ColumnVariables,model::PrimitiveWet)
     moist_static_energy!(column, model.thermodynamics)
 
     # Interpolate certain variables to half-levels
-    # interpolate!(column, model)
+    vertical_interpolate!(column, model)
 
     return nothing
+end
+
+"""
+$(TYPEDSIGNATURES)
+Full to half-level interpolation for humidity, saturation humidity,
+dry static energy and saturation moist static energy.
+"""
+function vertical_interpolate!(
+    column::ColumnVariables,
+    model::PrimitiveEquation,
+)
+
+    for (full, half) in (
+        (column.humid,                      column.humid_half),
+        (column.sat_humid,                  column.sat_humid_half),
+        (column.dry_static_energy,          column.dry_static_energy_half),
+        (column.sat_moist_static_energy,    column.sat_moist_static_energy_half),
+    )
+        vertical_interpolate!(half, full, model.geometry)
+    end
 end
 
 """

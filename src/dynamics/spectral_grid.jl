@@ -158,6 +158,9 @@ Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF:
 
     "log of σ at full levels, include surface (σ=1) as last element"
     ln_σ_levels_full::Vector{NF} = log.(vcat(σ_levels_full,1))
+
+    "Full to half levels interpolation"
+    full_to_half_interpolation::Vector{NF} = σ_interpolation_weights(σ_levels_full,σ_levels_half)
 end
 
 """

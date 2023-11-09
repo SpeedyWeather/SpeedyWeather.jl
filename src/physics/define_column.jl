@@ -61,13 +61,13 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const sat_vap_pres::Vector{NF} = zeros(NF,nlev)             # Saturation vapour pressure [Pa]
     const dry_static_energy::Vector{NF} = zeros(NF,nlev)        # Dry static energy
     const moist_static_energy::Vector{NF} = zeros(NF,nlev)      # Moist static energy
+    const sat_moist_static_energy::Vector{NF} = zeros(NF,nlev)  # Saturation moist static energy
     
     # an interpolated to half levels
-    humid_half::Vector{NF} = zeros(NF,nlev)                    # Specific humidity interpolated to half-levels
-    sat_humid_half::Vector{NF} = zeros(NF,nlev)                # Saturation specific humidity interpolated to half-levels
-    sat_moist_static_energy::Vector{NF} = zeros(NF,nlev)       # Saturation moist static energy
-    dry_static_energy_half::Vector{NF} = zeros(NF,nlev)        # Dry static energy interpolated to half-levels
-    sat_moist_static_energy_half::Vector{NF} = zeros(NF,nlev)  # Saturation moist static energy interpolated to half-levels
+    const humid_half::Vector{NF} = zeros(NF,nlev)                    # Specific humidity interpolated to half-levels
+    const sat_humid_half::Vector{NF} = zeros(NF,nlev)                # Saturation specific humidity interpolated to half-levels
+    const dry_static_energy_half::Vector{NF} = zeros(NF,nlev)        # Dry static energy interpolated to half-levels
+    const sat_moist_static_energy_half::Vector{NF} = zeros(NF,nlev)  # Saturation moist static energy interpolated to half-levels
 
     # Convection
     conditional_instability::Bool = false                       # in this column? (condition 1)

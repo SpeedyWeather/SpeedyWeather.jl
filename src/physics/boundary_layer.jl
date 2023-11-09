@@ -9,6 +9,12 @@ function initialize!(   scheme::NoBoundaryLayerDrag,
     return nothing
 end 
 
+# function barrier
+function boundary_layer_drag!(  column::ColumnVariables,
+                                model::PrimitiveEquation)
+    boundary_layer_drag!(column,model.boundary_layer_drag)
+end
+
 """NoBoundaryLayer scheme just passes."""
 function boundary_layer_drag!(  column::ColumnVariables,
                                 scheme::NoBoundaryLayerDrag)

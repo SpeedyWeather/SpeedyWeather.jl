@@ -448,7 +448,8 @@ function initialize_humidity!(  progn::PrognosticVariables,
     scale_height_ratio = scale_height/scale_height_humid
 
     (;nlev, σ_levels_full) = model.geometry
-    n_stratosphere_levels = findlast(σ->σ<=σ_tropopause,σ_levels_full)
+    n = findlast(σ->σ<=σ_tropopause,σ_levels_full)
+    n_stratosphere_levels = isnothing(n) ? 0 : n
 
     # Specific humidity at the surface (grid space)
     temp_grid = gridded(progn.layers[end].timesteps[1].temp,model.spectral_transform)

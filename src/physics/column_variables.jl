@@ -20,7 +20,7 @@ function get_column!(   C::ColumnVariables,
     C.jring = jring             # ring index j of column, used to index latitude vectors
     C.land_fraction = L.land_sea_mask[ij]
 
-    # pressure [Pa]/[log(Pa)]
+    # pressure [Pa] or [log(Pa)]
     lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics
     pₛ = exp(lnpₛ)                          # convert back here
     C.ln_pres .= ln_σ_levels_full .+ lnpₛ   # log pressure on every level ln(p) = ln(σ) + ln(pₛ)
@@ -105,12 +105,10 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     column.flux_temp_downward .= 0
 
     # # Convection
-    column.cloud_top = column.nlev+1
-    # column.conditional_instability = false
-    # column.activate_convection = false
+    column.cloud_top = column.nlev+1            # also diagnostic from condensation
+    column.conditional_instability = false
+    column.activate_convection = false
     column.precip_convection = zero(NF)
-    # fill!(column.net_flux_humid, 0)
-    # fill!(column.net_flux_dry_static_energy, 0)
 
     # Large-scale condensation
     column.precip_large_scale = zero(NF)

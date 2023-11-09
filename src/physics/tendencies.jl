@@ -13,11 +13,6 @@ function parameterization_tendencies!(
     model::PrimitiveEquation,
 )
 
-    (;boundary_layer_drag) = model
-    (;temperature_relaxation) = model
-    # (;vertical_diffusion) = model
-    (;static_energy_diffusion) = model
-    
     G = model.geometry
     L = model.land_sea_mask
     rings = eachring(G.Grid,G.nlat_half)
@@ -36,21 +31,19 @@ function parameterization_tendencies!(
         get_thermodynamics!(column,model)
 
         # VERTICAL DIFFUSION
-        # vertical_diffusion!(column,vertical_diffusion,model)
-        static_energy_diffusion!(column,static_energy_diffusion)
+        static_energy_diffusion!(column,model)
 
         # HELD-SUAREZ
-        temperature_relaxation!(column,temperature_relaxation)
-        boundary_layer_drag!(column,boundary_layer_drag)
+        temperature_relaxation!(column,model)
+        boundary_layer_drag!(column,model)
 
         # Calculate parametrizations (order of execution is important!)
-        # convection!(column,model)
+        convection!(column,model)
         large_scale_condensation!(column,model)
         # clouds!(column, model)
         # shortwave_radiation!(column,model)
         # longwave_radiation!(column,model)
         surface_fluxes!(column,model)
-        # vertical_diffusion!(column,M)
 
         # sum fluxes on half levels up and down for every layer
         fluxes_to_tendencies!(column,model.geometry,model.constants)

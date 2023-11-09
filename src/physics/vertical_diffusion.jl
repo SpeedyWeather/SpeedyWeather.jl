@@ -6,6 +6,12 @@ function initialize!(   scheme::NoVerticalDiffusion,
     return nothing
 end 
 
+# function barrier
+function static_energy_diffusion!(  column::ColumnVariables,
+                                    model::PrimitiveEquation)
+    static_energy_diffusion!(column,model.static_energy_diffusion)
+end
+
 function static_energy_diffusion!(  column::ColumnVariables,
                                     scheme::NoVerticalDiffusion)
     return nothing
