@@ -35,13 +35,13 @@ Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
     relax_time_fast::Float64 = 4*24
 
     "minimum equilibrium temperature [K]"
-    Tmin::Float64 = 200    
+    Tmin::Float64 = 195    
 
     "maximum equilibrium temperature [K]"
-    Tmax::Float64 = 315    
+    Tmax::Float64 = 330    
 
     "meridional temperature gradient [K]"
-    ΔTy::Float64 = 60
+    ΔTy::Float64 = 35
     
     "vertical temperature gradient [K]"
     Δθz::Float64 = 10
@@ -119,6 +119,59 @@ function temperature_relaxation!(   column::ColumnVariables{NF},
     end
 end
 
+"""
+Struct that defines the temperature relaxation from Held and Suarez, 1996 BAMS
+$(TYPEDFIELDS)"""
+Base.@kwdef struct MyTemperatureRelaxation{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
+    # DIMENSIONS
+    "number of latitude rings"
+    nlat::Int
+
+    "number of vertical levels"
+    nlev::Int
+    
+    relax_time::Float64 = 40*24
+
+    temp_relax_freq::Base.RefValue{NF} = Ref(zero(NF))   # (inverse) relax time scale per layer and lat
+    temp_equil_a::Vector{NF} = zeros(NF,nlat)   # terms to calc equilibrium temper func
+    temp_equil_s::Vector{NF} = zeros(NF,nlat)      # of latitude and pressure
+end
+
+"""
+$(TYPEDSIGNATURES)
+create a HeldSuarez temperature relaxation with arrays allocated given `spectral_grid`"""
+function MyTemperatureRelaxation(SG::SpectralGrid;kwargs...) 
+    (;NF, Grid, nlat_half, nlev) = SG
+    nlat = RingGrids.get_nlat(Grid,nlat_half)
+    return HeldSuarez{NF}(;nlev,nlat,kwargs...)
+end
+
+"""$(TYPEDSIGNATURES)
+initialize the HeldSuarez temperature relaxation by precomputing terms for the
+equilibrium temperature Teq."""
+function initialize!(   scheme::MyTemperatureRelaxation,
+                        model::PrimitiveEquation)
+                        
+    scheme.temp_relax_freq[] = radius/(3600 * scheme.relax_time)
+    
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Apply temperature relaxation following Held and Suarez 1996, BAMS."""
+function temperature_relaxation!(   column::ColumnVariables{NF},
+                                    scheme::MyTemperatureRelaxation) where NF
+
+    (;temp, temp_tend) = column
+    (;temp_relax_freq, temp_equil_a, temp_equil_s) = scheme
+    
+    @inbounds for k in eachlayer(column)
+        kₜ = temp_relax_freq          # (inverse) relaxation time scale
+        temp_tend[k] -= kₜ*(temp[k] - temp_equil_a[j])  # Held and Suarez 1996, equation 2
+    end
+    temp_tend[end] += kₜ*(temp[end] - temp_equil_a[j])  # Held and Suarez 1996, equation 2
+    temp_tend[end] -= kₜ*(temp[end] - temp_equil_s[j])  # Held and Suarez 1996, equation 2
+end
 
 """$(TYPEDSIGNATURES)
 HeldSuarez-like temperature relaxation, but towards the Jablonowski temperature
