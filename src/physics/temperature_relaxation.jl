@@ -35,13 +35,13 @@ Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
     relax_time_fast::Float64 = 4*24
 
     "minimum equilibrium temperature [K]"
-    Tmin::Float64 = 195    
+    Tmin::Float64 = 200    
 
     "maximum equilibrium temperature [K]"
-    Tmax::Float64 = 330    
+    Tmax::Float64 = 315    
 
     "meridional temperature gradient [K]"
-    ΔTy::Float64 = 35
+    ΔTy::Float64 = 60
     
     "vertical temperature gradient [K]"
     Δθz::Float64 = 10
