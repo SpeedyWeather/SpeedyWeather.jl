@@ -133,8 +133,8 @@ Base.@kwdef struct MyTemperatureRelaxation{NF<:AbstractFloat} <: TemperatureRela
     relax_time::Float64 = 40*24
 
     temp_relax_freq::Base.RefValue{NF} = Ref(zero(NF))   # (inverse) relax time scale per layer and lat
-    temp_equil_a::Vector{NF} = zeros(NF,nlat)   # terms to calc equilibrium temper func
-    temp_equil_s::Vector{NF} = zeros(NF,nlat)      # of latitude and pressure
+    temp_equil_a::Vector{NF} = zeros(NF,nlat)            # terms to calc equilibrium temper func
+    temp_equil_s::Vector{NF} = zeros(NF,nlat)            # of latitude and pressure
 end
 
 """
@@ -143,7 +143,7 @@ create a HeldSuarez temperature relaxation with arrays allocated given `spectral
 function MyTemperatureRelaxation(SG::SpectralGrid;kwargs...) 
     (;NF, Grid, nlat_half, nlev) = SG
     nlat = RingGrids.get_nlat(Grid,nlat_half)
-    return HeldSuarez{NF}(;nlev,nlat,kwargs...)
+    return MyTemperatureRelaxation{NF}(;nlev,nlat,kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
