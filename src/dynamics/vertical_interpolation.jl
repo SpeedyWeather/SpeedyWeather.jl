@@ -8,12 +8,13 @@ function σ_interpolation_weights(
 
     weights = zero(σ_levels_full)
     nlev = length(weights)
+    nlev == 1 && return weights     # escape early for 1 layer to avoid out-of-bounds access
 
     for k in 1:nlev-1
         weights[k] = (log(σ_levels_half[k+1]) - log(σ_levels_full[k])) /
                         (log(σ_levels_full[k+1]) - log(σ_levels_full[k]))
     end
-    # was log(0.99) in Fortran SPEEDY but doesn't make sense to me
+    # was log(0.99) in Fortran SPEEDY code but doesn't make sense to me
     weights[end] =  (log(σ_levels_half[nlev+1]) - log(σ_levels_full[nlev])) /
                         (log(σ_levels_full[nlev]) - log(σ_levels_full[nlev-1]))
     
