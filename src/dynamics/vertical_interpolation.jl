@@ -24,8 +24,8 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Given some generic column variable A defined at full levels, do a linear interpolation in
-log(σ) to calculate its values at half-levels.
+Given a vector in column defined at full levels, do a linear interpolation in
+log(σ) to calculate its values at half-levels, skipping top (k=1/2), extrapolating to bottom (k=NLEV+1/2).
 """
 function vertical_interpolate!(
     A_half::Vector,             # quantity A on half levels (excl top)
