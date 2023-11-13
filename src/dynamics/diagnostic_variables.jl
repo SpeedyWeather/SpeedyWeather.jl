@@ -36,7 +36,6 @@ Base.@kwdef struct GridVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF}}
     temp_grid_prev  ::Grid = zeros(Grid,nlat_half)  # absolute temperature of previous time step [K]
     temp_virt_grid  ::Grid = zeros(Grid,nlat_half)  # virtual tempereature [K]  
     humid_grid      ::Grid = zeros(Grid,nlat_half)  # specific_humidity
-    geopot_grid     ::Grid = zeros(Grid,nlat_half)  # geopotential (is that needed?)
     u_grid          ::Grid = zeros(Grid,nlat_half)  # zonal velocity *coslat [m/s]
     v_grid          ::Grid = zeros(Grid,nlat_half)  # meridional velocity *coslat [m/s]
     u_grid_prev     ::Grid = zeros(Grid,nlat_half)  # zonal velocity *coslat of previous time step [m/s]

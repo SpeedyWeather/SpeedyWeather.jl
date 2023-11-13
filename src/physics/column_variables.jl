@@ -32,10 +32,6 @@ function get_column!(   C::ColumnVariables,
         C.v[k] = layer.grid_variables.v_grid[ij]
         C.temp[k] = layer.grid_variables.temp_grid[ij]
         C.humid[k] = layer.grid_variables.humid_grid[ij]
-
-        # as well as geopotential (not actually prognostic though)
-        # TODO geopot on the grid is currently not computed in dynamics
-        C.geopot[k] = layer.grid_variables.geopot_grid[ij]
     end
 
     # TODO skin = surface approximation for now
