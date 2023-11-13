@@ -287,7 +287,7 @@ function initialize!(
                                         deflatelevel=compression_level,shuffle=output.shuffle)
     
     # convective precipitation
-    cloud_top_attribs = Dict("long_name"=>"cloud top","units"=>"Pa","_FillValue"=>missing_value)
+    cloud_top_attribs = Dict("long_name"=>"cloud top height","units"=>"m","_FillValue"=>missing_value)
     :cloud in output_vars && defVar(dataset,"cloud_top",output_NF,(lon_name,lat_name,"time"),attrib=cloud_top_attribs,
                                     deflatelevel=compression_level,shuffle=output.shuffle)
 

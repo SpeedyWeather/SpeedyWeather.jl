@@ -29,10 +29,10 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const pres::Vector{NF} = zeros(NF,nlev+1)       # pressure [Pa]
 
     # TENDENCIES to accumulate the parametrizations into
-    const u_tend::Vector{NF} = zeros(NF,nlev)                   # zonal velocity [m]
-    const v_tend::Vector{NF} = zeros(NF,nlev)                   # meridional velocity [m]
-    const temp_tend::Vector{NF} = zeros(NF,nlev)                # absolute temperature [K]
-    const humid_tend::Vector{NF} = zeros(NF,nlev)               # specific humidity
+    const u_tend::Vector{NF} = zeros(NF,nlev)                   # zonal velocity [m/s²]
+    const v_tend::Vector{NF} = zeros(NF,nlev)                   # meridional velocity [m/s²]
+    const temp_tend::Vector{NF} = zeros(NF,nlev)                # absolute temperature [K/s]
+    const humid_tend::Vector{NF} = zeros(NF,nlev)               # specific humidity [kg/kg/s]
 
     # DIAGNOSTIC VARIABLES
     const geopot::Vector{NF} = zeros(NF,nlev)                   # gepotential height [m]
@@ -63,7 +63,7 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const moist_static_energy::Vector{NF} = zeros(NF,nlev)      # Moist static energy
     const sat_moist_static_energy::Vector{NF} = zeros(NF,nlev)  # Saturation moist static energy
     
-    # an interpolated to half levels
+    # and interpolated to half levels
     const humid_half::Vector{NF} = zeros(NF,nlev)                    # Specific humidity interpolated to half-levels
     const sat_humid_half::Vector{NF} = zeros(NF,nlev)                # Saturation specific humidity interpolated to half-levels
     const dry_static_energy_half::Vector{NF} = zeros(NF,nlev)        # Dry static energy interpolated to half-levels
@@ -73,12 +73,9 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     conditional_instability::Bool = false                       # in this column? (condition 1)
     activate_convection::Bool = false                           # in this column? (condition 2)
     cloud_top::Int = nlev+1                                     # Top-of-convection layer
-    excess_humidity::NF = 0                                     # due to convection
+    excess_humid::NF = 0                                        # due to convection
     cloud_base_mass_flux::NF = 0                                # Mass flux at the top of the PBL
     precip_convection::NF = 0                                   # Precipitation due to convection [m]
-    net_flux_humid::Vector{NF} = zeros(NF,nlev)              # Net fluxes of moisture in this column
-    net_flux_dry_static_energy::Vector{NF} = zeros(NF,nlev)  # Net fluxes of dry static energy in this column
-    entrainment_profile::Vector{NF} = zeros(NF,nlev)         # Entrainment coefficients
 
     # Large-scale condensation
     precip_large_scale::NF = 0                                  # precipitation [m]
