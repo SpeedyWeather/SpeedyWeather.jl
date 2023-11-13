@@ -58,22 +58,28 @@ $(TYPEDSIGNATURES)
 Write the parametrization tendencies from `C::ColumnVariables` into the horizontal fields
 of tendencies stored in `D::DiagnosticVariables` at gridpoint index `ij`."""
 function write_column_tendencies!(  D::DiagnosticVariables,
-                                    C::ColumnVariables,
+                                    column::ColumnVariables,
+                                    C::DynamicsConstants,
                                     ij::Int)            # grid point index
 
-    @boundscheck C.nlev == D.nlev || throw(BoundsError)
+    (; nlev) = column
+    @boundscheck nlev == D.nlev || throw(BoundsError)
 
     @inbounds for (k,layer) = enumerate(D.layers)
-        layer.tendencies.u_tend_grid[ij] = C.u_tend[k]
-        layer.tendencies.v_tend_grid[ij] = C.v_tend[k]
-        layer.tendencies.temp_tend_grid[ij] = C.temp_tend[k]
-        layer.tendencies.humid_tend_grid[ij] = C.humid_tend[k]
+        layer.tendencies.u_tend_grid[ij] = column.u_tend[k]
+        layer.tendencies.v_tend_grid[ij] = column.v_tend[k]
+        layer.tendencies.temp_tend_grid[ij] = column.temp_tend[k]
+        layer.tendencies.humid_tend_grid[ij] = column.humid_tend[k]
     end
 
     # accumulate (set back to zero when netcdf output)
-    D.surface.precip_large_scale[ij] += C.precip_large_scale
-    D.surface.precip_convection[ij] += C.precip_convection
-    D.surface.cloud_top[ij] = C.pres[C.cloud_top]
+    D.surface.precip_large_scale[ij] += column.precip_large_scale
+    D.surface.precip_convection[ij] += column.precip_convection
+
+    # Output cloud top in height [m] from geopotential height divided by gravity,
+    # but NaN for no clouds
+    D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? NaN : column.geopot[column.cloud_top]
+    D.surface.cloud_top[ij] /= C.gravity
 
     return nothing
 end

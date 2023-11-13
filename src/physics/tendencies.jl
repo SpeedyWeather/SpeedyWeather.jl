@@ -49,7 +49,7 @@ function parameterization_tendencies!(
         fluxes_to_tendencies!(column,model.geometry,model.constants)
 
         # write tendencies from parametrizations back into horizontal fields
-        write_column_tendencies!(diagn,column,ij)
+        write_column_tendencies!(diagn,column,model.constants,ij)
     end
 end
 
