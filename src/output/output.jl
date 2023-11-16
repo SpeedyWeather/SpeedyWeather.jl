@@ -558,5 +558,5 @@ Loads a `var_name` trajectory of the model `M` that has been saved in a netCDF f
 """
 function load_trajectory(var_name::Union{Symbol, String}, model::ModelSetup) 
     @assert model.output.output "Output is turned off"
-    return NCDataset(get_full_output_file_path(model.output))[string(var_name)][:]
+    return Array(NCDataset(get_full_output_file_path(model.output))[string(var_name)])
 end
