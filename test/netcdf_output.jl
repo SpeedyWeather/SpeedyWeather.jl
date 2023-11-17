@@ -116,7 +116,7 @@ end
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
     
     spectral_grid = SpectralGrid()
-    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="dense-output-test",output_dt=0)
+    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="dense-output-test",output_dt=Hour(0))
     model = PrimitiveDryModel(;spectral_grid,output)
     simulation = initialize!(model)
     run!(simulation,output=true,n_days=1)
@@ -126,13 +126,23 @@ end
     t = NCDataset(tmp_read_path)["time"][:]
     @test t == manual_time_axis(model.output.startdate,model.time_stepping.Δt_sec,progn.clock.n_timesteps)
     
+    # do a simulation with the adjust_Δt_with_output turned on 
+    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="adjust_dt_with_output-test",output_dt=Minute(70))
+    time_stepping = Leapfrog(spectral_grid, adjust_Δt_with_output=true, output_dt=Minute(70))
+    model = PrimitiveDryModel(;spectral_grid,output,time_stepping)
+    simulation = initialize!(model)
+    run!(simulation,output=true,n_days=1)
+    t = SpeedyWeather.load_trajectory("time", model)
+    @test all(y->y==diff(t)[1], diff(t)) # all elements equal 
+    @test diff(t)[1] == Minute(70)
+
     # this is a nonsense simulation with way too large timesteps, but it's here to test the time axis output
     # for future tests: This simulation blows up because of too large time steps but only a warning is thrown
     # at the moment, no error
     # 1kyrs simulation
     spectral_grid = SpectralGrid()
-    time_stepping = Leapfrog(spectral_grid,Δt_at_T31=60*24*365*10)
-    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="long-output-test",output_dt=24*365*10)
+    time_stepping = Leapfrog(spectral_grid,Δt_at_T31=Minute(60*24*365*10))
+    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="long-output-test",output_dt=Hour(24*365*10))
     model = PrimitiveDryModel(;spectral_grid,output,time_stepping)
     simulation = initialize!(model)
     run!(simulation,output=true,n_days=365000)
@@ -142,4 +152,11 @@ end
     t = NCDataset(tmp_read_path)["time"][:]
     @test t == manual_time_axis(model.output.startdate,model.time_stepping.Δt_sec,progn.clock.n_timesteps)
     @test t == SpeedyWeather.load_trajectory("time", model)
+
+
+    # do a simulation with the adjust_Δt_with_output turned on 
+    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="long-output-test",output_dt=Hour(24*365*10))
+    model = PrimitiveDryModel(;spectral_grid,output,time_stepping)
+
+
 end

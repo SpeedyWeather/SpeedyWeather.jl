@@ -198,7 +198,7 @@ using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=63,nlev=1)
 forcing = JetStreamForcing(spectral_grid,latitude=60)
 drag = QuadraticDrag(spectral_grid)
-output = OutputWriter(spectral_grid,ShallowWater,output_dt=6,output_vars=[:u,:v,:pres,:orography])
+output = OutputWriter(spectral_grid,ShallowWater,output_dt=Hour(6),output_vars=[:u,:v,:pres,:orography])
 model = ShallowWaterModel(;spectral_grid,output,drag,forcing)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
@@ -251,7 +251,7 @@ time_stepping = SpeedyWeather.Leapfrog(spectral_grid,Δt_at_T31=30)
 implicit = SpeedyWeather.ImplicitShallowWater(spectral_grid,α=0.5)
 orography = EarthOrography(spectral_grid,smoothing=false)
 initial_conditions = SpeedyWeather.RandomWaves()
-output = OutputWriter(spectral_grid,ShallowWater,output_dt=12,output_vars=[:u,:pres,:div,:orography])
+output = OutputWriter(spectral_grid,ShallowWater,output_dt=Hour(12),output_vars=[:u,:pres,:div,:orography])
 model = ShallowWaterModel(;spectral_grid,orography,output,initial_conditions,implicit,time_stepping)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide

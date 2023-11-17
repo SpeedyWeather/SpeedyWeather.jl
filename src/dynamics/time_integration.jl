@@ -10,10 +10,17 @@ Base.@kwdef struct Leapfrog{NF} <: TimeStepper{NF}
 
     # OPTIONS
     "time step in minutes for T31, scale linearly to `trunc`"
-    Δt_at_T31::Float64 = 30
+    Δt_at_T31::Second = Minute(30)
 
     "radius of sphere [m], used for scaling"
     radius::NF = 6.371e6
+
+    "adjust Δt_at_T31 to the output_dt, so that it is rounded to closest"
+    "divisor of output_dt, ensures that output_dt is kept exactly in the output"
+    adjust_Δt_with_output::Bool = false 
+
+    "Output time step [hrs], needed if adjust_Δt_with_output is true"
+    output_dt::Second = Hour(6)
 
     # NUMERICS
     "Robert (1966) time filter coefficeint to suppress comput. mode"
@@ -22,17 +29,37 @@ Base.@kwdef struct Leapfrog{NF} <: TimeStepper{NF}
     "Williams time filter (Amezcua 2011) coefficient for 3rd order acc"
     williams_filter::NF = 0.53
 
-
     # DERIVED FROM OPTIONS    
     "time step Δt [s] at specified resolution"
-    Δt_sec::Int = round(Int,60*Δt_at_T31*(32/(trunc+1)))
+    Δt_sec::Second = get_Δt_sec(Second(Δt_at_T31), trunc, adjust_Δt_with_output, Second(output_dt))
 
     "time step Δt [s/m] at specified resolution, scaled by 1/radius"
-    Δt::NF = Δt_sec/radius
-    
-    "convert time step Δt from minutes to hours"
-    Δt_hrs::Float64 = Δt_sec/3600     
+    Δt::NF = value(Δt_sec)/radius  
 end
+
+"""
+$(TYPEDSIGNATURES)
+Computes the time step in [s]. `Δt_at_T31` is always scaled with the resolution `trunc` 
+of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T31` is additionally 
+adjusted to the closest divisor of `output_dt` so that the output time axis is keeping
+`output_dt` exactly.
+"""
+function get_Δt_sec(Δt_at_T31, trunc, adjust_Δt_with_output, output_dt)
+
+    scaling_factor = (32/(trunc+1))
+    scaled_Δt_at_T31 = value(Δt_at_T31)*scaling_factor
+
+    if adjust_Δt_with_output
+        # by using ceil we will always adjust Δt_at_T31 to be smaller than original one
+        k = ceil(value(output_dt) / scaled_Δt_at_T31)
+    
+        Δt_sec = Second(round(Int, (value(output_dt)/k) * inv(scaling_factor)))
+    else 
+        Δt_sec = Second(round(Int, scaled_Δt_at_T31))
+    end 
+
+    return Δt_sec
+end 
 
 """
 $(TYPEDSIGNATURES)

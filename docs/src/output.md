@@ -27,9 +27,9 @@ also pass on further keyword arguments. So let's start with an example.
 
 ## Example 1: NetCDF output every hour
 
-If we want to increase the frequency of the output we can choose `output_dt` (default `=6` in hours) like so
+If we want to increase the frequency of the output we can choose `output_dt` (default `=Hour(6)`) like so
 ```julia
-julia> my_output_writer = OutputWriter(spectral_grid, PrimitiveDry, output_dt=1)
+julia> my_output_writer = OutputWriter(spectral_grid, PrimitiveDry, output_dt=Hour(1))
 julia> model = PrimitiveDryModel(;spectral_grid, output=my_output_writer)
 ```
 which will now output every hour. It is important to pass on the new output writer `my_output_writer` to the
@@ -66,6 +66,12 @@ julia> diff(ds["time"][:])
 ```
 This is so that we don't interpolate in time during output to hit exactly every 6 hours, but at
 the same time have a constant spacing in time between output time steps.
+
+If we want to overwrite this behaviour, we can choose `adjust_Δt_with_output=true` and specifiy an `output_dt` in the `Leapfrog` time stepper like this:
+```Julia
+julia> time_stepper = Leapfrog(spectral_grid, adjust_Δt_with_output=true, output_dt=Hour(1))
+```
+In this case the internal time step will be adjusted to be a divisor of `output_dt`, so that the output will be exactly every `output_dt`
 
 ## Example 2: Output onto a higher/lower resolution grid
 
@@ -165,9 +171,7 @@ search: OutputWriter
 
     •  startdate::Dates.DateTime
 
-    •  output_dt::Float64: [OPTION] output frequency, time step [hrs]
-
-    •  output_dt_sec::Int64: actual output time step [sec]
+    •  output_dt::Second: [OPTION] output frequency, time step
 
     •  output_vars::Vector{Symbol}: [OPTION] which variables to output,
        u, v, vor, div, pres, temp, humid

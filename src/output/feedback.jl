@@ -80,7 +80,7 @@ function initialize!(feedback::Feedback,clock::Clock,model::ModelSetup)
 
     # hack: redefine element in global constant dt_in_sec
     # used to pass on the time step to ProgressMeter.speedstring
-    DT_IN_SEC[] = model.time_stepping.Δt_sec        
+    DT_IN_SEC[] = value(model.time_stepping.Δt_sec)     
 
     if feedback.output   # with netcdf output write progress.txt
         (; run_path, id) = feedback

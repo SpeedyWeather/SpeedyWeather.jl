@@ -54,11 +54,8 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
     # WHAT/WHEN OPTIONS
     startdate::DateTime = DateTime(2000,1,1)
 
-    "[OPTION] output frequency, time step [hrs]"
-    output_dt::Float64 = 6
-
-    "actual output time step [sec]"
-    output_dt_sec::Int = 0
+    "[OPTION] output frequency, time step"
+    output_dt::Second = Hour(6)
 
     "[OPTION] which variables to output, u, v, vor, div, pres, temp, humid"
     output_vars::Vector{Symbol} = default_output_vars(Model)
@@ -175,8 +172,8 @@ function initialize!(
     feedback.output = true          # if output=true set feedback.output=true too!
 
     # OUTPUT FREQUENCY
-    output.output_every_n_steps = max(1,floor(Int,output.output_dt/time_stepping.Δt_hrs))
-    output.output_dt_sec = output.output_every_n_steps*time_stepping.Δt_sec
+    output.output_every_n_steps = max(1,round(Int, output.output_dt/time_stepping.Δt_sec))
+    output.output_dt = output.output_every_n_steps*time_stepping.Δt_sec
 
     # RESET COUNTERS
     output.timestep_counter = 0         # time step counter
