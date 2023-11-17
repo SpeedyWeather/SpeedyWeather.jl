@@ -152,11 +152,4 @@ end
     t = NCDataset(tmp_read_path)["time"][:]
     @test t == manual_time_axis(model.output.startdate,model.time_stepping.Δt_sec,progn.clock.n_timesteps)
     @test t == SpeedyWeather.load_trajectory("time", model)
-
-
-    # do a simulation with the adjust_Δt_with_output turned on 
-    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="long-output-test",output_dt=Hour(24*365*10))
-    model = PrimitiveDryModel(;spectral_grid,output,time_stepping)
-
-
 end
