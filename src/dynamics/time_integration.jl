@@ -34,7 +34,7 @@ Base.@kwdef struct Leapfrog{NF} <: TimeStepper{NF}
     Δt_sec::Second = get_Δt_sec(Second(Δt_at_T31), trunc, adjust_Δt_with_output, Second(output_dt))
 
     "time step Δt [s/m] at specified resolution, scaled by 1/radius"
-    Δt::NF = value(Δt_sec)/radius  
+    Δt::NF = Δt_sec.value/radius  
 end
 
 """
@@ -47,13 +47,13 @@ adjusted to the closest divisor of `output_dt` so that the output time axis is k
 function get_Δt_sec(Δt_at_T31, trunc, adjust_Δt_with_output, output_dt)
 
     scaling_factor = (32/(trunc+1))
-    scaled_Δt_at_T31 = value(Δt_at_T31)*scaling_factor
+    scaled_Δt_at_T31 = Δt_at_T31.value*scaling_factor
 
     if adjust_Δt_with_output
         # by using ceil we will always adjust Δt_at_T31 to be smaller than original one
-        k = ceil(value(output_dt) / scaled_Δt_at_T31)
+        k = ceil(output_dt.value / scaled_Δt_at_T31)
     
-        Δt_sec = Second(round(Int, (value(output_dt)/k) * inv(scaling_factor)))
+        Δt_sec = Second(round(Int, output_dt.value/k/scaling_factor))
     else 
         Δt_sec = Second(round(Int, scaled_Δt_at_T31))
     end 
