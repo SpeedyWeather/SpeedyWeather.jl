@@ -39,6 +39,9 @@ Base.@kwdef struct SpeedyConvection{NF} <: AbstractConvection{NF}
     "latent heat of condensation [J/kg] for consistency with specific humidity [kg/kg], also called alhc"
     latent_heat_condensation::Base.RefValue{NF} = Base.Ref(zero(NF))
 
+    "specific heat [J/kg/K] of air"
+    specific_heat::Base.RefValue{NF} = Base.Ref(zero(NF))
+
     "Number of vertical levels for stratosphere"
     n_stratosphere_levels::Base.RefValue{Int} = Base.Ref(0)
 
@@ -68,6 +71,7 @@ function initialize!(convection::SpeedyConvection,model::PrimitiveWet)
     # reference pressure
     convection.pres_ref[] = model.atmosphere.pres_ref*100     # [hPa] -> [Pa]
     convection.latent_heat_condensation[] = model.atmosphere.latent_heat_condensation
+    convection.specific_heat[] = model.atmosphere.cₚ
 
     # Mass entrainment profile
     entrainment_profile[1] = 0      # no entrainment in top layer
@@ -93,7 +97,7 @@ function convection!(
 
     # but only execute if conditions are met
     if column.conditional_instability && column.activate_convection
-        convection!(column,model.convection,model.constants)
+        # convection!(column,model.convection,model.constants,model.geometry,model.time_stepping)
     end
 end
 
@@ -129,7 +133,7 @@ function diagnose_convection!(column::ColumnVariables,convection::SpeedyConvecti
     (; pres_ref, pres_threshold, humid_threshold_boundary) = convection
     n_stratosphere_levels = convection.n_stratosphere_levels[]
     n_boundary_levels = convection.n_boundary_levels[]
-    latent_heat = convection.latent_heat_condensation[]
+    latent_heat = convection.latent_heat_condensation[]/convection.specific_heat[]
 
     (; nlev ) = column
     (; humid, pres, sat_humid, moist_static_energy,
@@ -200,30 +204,20 @@ function convection!(
     column::ColumnVariables{NF},
     convection::SpeedyConvection,
     C::DynamicsConstants,
-
+    G::Geometry,
+    T::TimeStepper,
 ) where NF
 
     (; gravity ) = C
-    # (; alhc, pres_ref ) = model.parameters
-    # # (; σ_levels_full, σ_levels_thick ) = model.geometry
-    # # Constants for convection
-    # (;RH_thresh_pbl_cnv, RH_thresh_trop_cnv, pres_thresh_cnv, humid_relax_time_cnv,
-    # max_entrainment, ratio_secondary_mass_flux) = model.constants
-    # Column variables for calculating fluxes due to convection
-    # (;pres, humid, humid_half, sat_humid, sat_humid_half, dry_static_energy,
-    # dry_static_energy_half, entrainment_profile, cloud_top, excess_humid,
-    # nlev) = column
     (; nlev, pres, humid, humid_half, sat_humid, sat_humid_half, cloud_top) = column
     (; dry_static_energy, dry_static_energy_half, cloud_top) = column
     (; flux_temp_downward, flux_temp_upward, flux_humid_downward, flux_humid_upward) = column
     (; temp_tend, humid_tend) = column
-    # # Quantities calculated by this parameterization
-    # (;cloud_base_mass_flux, net_flux_humid, net_flux_dry_static_energy,
-    # precip_convection) = column
+    (; σ_levels_thick) = G
 
-    n_stratosphere_levels = convection.n_stratosphere_levels[]
     n_boundary_levels = convection.n_boundary_levels[]
     relaxation_time = convection.relaxation_time*3600               # [hrs] -> [s]
+    latent_heat_cₚ = convection.latent_heat_condensation[]/convection.specific_heat[]
 
     # 1. Fluxes in the planetary boundary layer (PBL)
     # Humidity at the upper boundary of the PBL
@@ -237,17 +231,17 @@ function convection!(
 
     # Cloud-base mass flux
     pₛ = pres[end]                          # surface pressure
-    Δp = pₛ - pres[end-n_boundary_levels]   # Pressure difference between bottom and top of PBL
+    Δp = pₛ - pres[nlev-n_boundary_levels]   # Pressure difference between bottom and top of PBL
     
     # excess humidity relative to humid difference across PBL
     excess_humid = column.excess_humid / (max_humid_pbl - humid_top_of_pbl)
 
     # Fortran SPEEDY documentation eq. (12) and (13)
     mass_flux =
-        Δp / (gravity * relaxation_time) * excess_humid
+        Δp / (gravity * relaxation_time) *
         # Fortran SPEEDY extends this with some flux limiters:
         # min(convection.mass_flux_limiter_pres,  (pₛ - pres_threshold) / (1 - pres_threshold)) *
-        # min(convection.mass_flux_limiter_humid, excess_humid)
+        min(convection.mass_flux_limiter_humid, excess_humid)
     
     column.cloud_base_mass_flux = mass_flux
 
@@ -260,17 +254,14 @@ function convection!(
     flux_down_static_energy = mass_flux * dry_static_energy_half[nlev-n_boundary_levels]    # eq. (11)
 
     # Accumulate in fluxes for all parameterizations
-    flux_temp_upward[nlev-n_boundary_levels+1]   += flux_up_static_energy
-    flux_temp_downward[nlev-n_boundary_levels+1] += flux_down_static_energy
+    # flux_temp_upward[nlev-n_boundary_levels+1]   += flux_up_static_energy
+    # flux_temp_downward[nlev-n_boundary_levels+1] += flux_down_static_energy
     
-    flux_humid_upward[nlev-n_boundary_levels+1]   += flux_up_humid
-    flux_humid_downward[nlev-n_boundary_levels+1] += flux_down_humid
+    # flux_humid_upward[nlev-n_boundary_levels+1]   += flux_up_humid
+    # flux_humid_downward[nlev-n_boundary_levels+1] += flux_down_humid
 
     # 2. Fluxes for intermediate layers
     for k = (nlev-n_boundary_levels):-1:(cloud_top+1)
-        # # Fluxes at lower boundary
-        # net_flux_dry_static_energy[k] = flux_up_dry_static_energy - flux_down_dry_static_energy
-        # net_flux_humid[k] = flux_up_humid - flux_down_humid
 
         # Mass entrainment
         mass_entrainment = convection.entrainment_profile[k] * column.cloud_base_mass_flux
@@ -285,11 +276,11 @@ function convection!(
         flux_down_humid         = mass_flux * humid_half[k-1]
 
         # accumulate in fluxes that are translated to tendencies in tendencies.jl
-        flux_temp_upward[k]   += flux_up_static_energy
-        flux_temp_downward[k] += flux_down_static_energy
+        # flux_temp_upward[k]   += flux_up_static_energy
+        # flux_temp_downward[k] += flux_down_static_energy
         
-        flux_humid_upward[k]   += flux_up_humid
-        flux_humid_downward[k] += flux_down_humid
+        # flux_humid_upward[k]   += flux_up_humid
+        # flux_humid_downward[k] += flux_down_humid
 
         # # Secondary moisture flux representing shallower, non-precipitating convective systems
         # # Occurs when RH in an intermediate layer falls below a threshold
@@ -302,11 +293,14 @@ function convection!(
     end
 
     # 3. Convective precipitation in top-of-convection layer
-    column.precip_convection = max(flux_up_humid - mass_flux * sat_humid_half[cloud_top], 0)
+    precip_convection = max(flux_up_humid - mass_flux * sat_humid_half[cloud_top], 0)   # in [kg/m²/s]
+    column.precip_convection = precip_convection*T.Δt_sec/C.water_density               # convert to [m]
 
-    # Net flux of dry static energy and moisture
-    # temp_tend[cloud_top] += convection.latent_heat_condensation * column.precip_convection
-    # humid_tend[cloud_top] -= column.precip_convection
+    # Condensation of convectice precipiation creates a humidity and temperature (heating)
+    # tendency at the top of convection layer cloud_top
+    humid_tend_k = -precip_convection*gravity/(pₛ*σ_levels_thick[cloud_top])
+    # humid_tend[cloud_top] += humid_tend_k
+    # temp_tend[cloud_top] -= humid_tend_k*latent_heat_cₚ
 
     return nothing
 end
