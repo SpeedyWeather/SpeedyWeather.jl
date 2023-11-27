@@ -44,10 +44,10 @@ Precomputes the drag coefficients for this `BoundaryLayerDrag` scheme."""
 function initialize!(   scheme::LinearDrag,
                         model::PrimitiveEquation)
 
-    (;σ_levels_full,radius) = model.geometry
+    (;σ_levels_full) = model.geometry
     (;σb,time_scale,drag_coefs) = scheme
 
-    kf = radius/(time_scale*3600)                   # scale with radius as ∂ₜu is; hrs -> sec
+    kf = 1/(time_scale*3600)                        # scale with radius as ∂ₜu is; hrs -> sec
 
     for (k,σ) in enumerate(σ_levels_full)
         drag_coefs[k] = -kf*max(0,(σ-σb)/(1-σb))    # drag only below σb, lin increasing to kf at σ=1
