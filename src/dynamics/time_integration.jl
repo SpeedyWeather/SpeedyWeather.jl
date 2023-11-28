@@ -36,8 +36,6 @@ Base.@kwdef mutable struct Leapfrog{NF} <: TimeStepper{NF}
     Δt::NF = Δt_sec/radius  
 end
 
-using Primes
-
 """
 $(TYPEDSIGNATURES)
 Computes the time step in [ms]. `Δt_at_T31` is always scaled with the resolution `trunc` 
@@ -51,22 +49,42 @@ function get_Δt_millisec(
     adjust_with_output::Bool,
     output_dt::Dates.TimePeriod = DEFAULT_OUTPUT_DT,
 )
-    resolution_factor = (32/(trunc+1))      # linearly scale Δt with trunc+1 (which are often powers of two)
+    # linearly scale Δt with trunc+1 (which are often powers of two)
+    resolution_factor = (32/(trunc+1))
     Δt_at_trunc = Second(Δt_at_T31).value*resolution_factor
 
     if adjust_with_output
-        # by using ceil we will always adjust Δt to be <= than original one
         k = round(Int,Second(output_dt).value / Δt_at_trunc)
-        factorization = Primes.factor(Millisecond(output_dt).value)
-        factors = [factor.first for factor in factorization.pe]
-        k = SpeedyTransforms.roundup_fft(k;small_primes=factors)
-        Δt_millisec = Millisecond(round(Int, Millisecond(output_dt).value/k))
+        divisors = Primes.divisors(Millisecond(output_dt).value)
+        sort!(divisors)
+        i = findfirst(x -> x>=k,divisors)
+        k_new = isnothing(i) ? k : divisors[i]
+        Δt_millisec = Millisecond(round(Int, Millisecond(output_dt).value/k_new))
+
+        if k_new/k > 1.05   # provide info on 
+            p = round(Int,(k/k_new - 1)*100)
+            @info "Adjust with output: Time step shortened to $Δt_millisec ($p%)"
+        end
     else 
         Δt_millisec = Millisecond(round(Int, 1000*Δt_at_trunc))
     end 
 
     return Δt_millisec
 end 
+
+function roundup(k::Integer,divisors::Vector{<:Integer};sorted=false)
+    sorted || sort!(divisors)
+    k_new = 0
+    i = 1
+    while k_new < k
+        divisor = divisors[i]
+        if divisor >= k
+            k_new = divisor
+        end
+        i += 1
+    end
+    return k_new
+end
 
 """
 $(TYPEDSIGNATURES)
