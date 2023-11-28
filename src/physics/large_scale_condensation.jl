@@ -78,7 +78,7 @@ function large_scale_condensation!(
 
     (;gravity, water_density) = constants
     (;Δt_sec) = time_stepping
-    pₛΔt_gρ = pₛ*Δt_sec.value/gravity/water_density   # precompute constant
+    pₛΔt_gρ = pₛ*Δt_sec/gravity/water_density   # precompute constant
 
     (;σ_levels_thick) = geometry
     latent_heat = convert(NF, atmosphere.latent_heat_condensation)

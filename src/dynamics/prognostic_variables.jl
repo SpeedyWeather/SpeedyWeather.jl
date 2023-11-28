@@ -28,7 +28,7 @@ end
 $(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` in the `time_stepping`."""
 function initialize!(clock::Clock,time_stepping::TimeStepper)
-    clock.n_timesteps = ceil(Int,3600*24*clock.n_days/time_stepping.Δt_sec.value)
+    clock.n_timesteps = ceil(Int,3600*24*clock.n_days/time_stepping.Δt_sec)
     return clock
 end
 
