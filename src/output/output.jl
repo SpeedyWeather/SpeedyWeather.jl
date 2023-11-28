@@ -23,6 +23,7 @@ end
 
 # default number format for output
 const DEFAULT_OUTPUT_NF = Float32
+const DEFAULT_OUTPUT_DT = Hour(6)
 
 """
 $(TYPEDSIGNATURES)
@@ -55,7 +56,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
     startdate::DateTime = DateTime(2000,1,1)
 
     "[OPTION] output frequency, time step"
-    output_dt::Second = Hour(6)
+    output_dt::Second = DEFAULT_OUTPUT_DT
 
     "[OPTION] which variables to output, u, v, vor, div, pres, temp, humid"
     output_vars::Vector{Symbol} = default_output_vars(Model)
@@ -137,12 +138,12 @@ default_output_vars(::Type{<:PrimitiveWet}) = [:vor,:u,:v,:temp,:humid,:pres,:pr
 
 # print all fields with type <: Number
 function Base.show(io::IO,O::AbstractOutputWriter)
-    print(io,"$(typeof(O)):")
-    for key in propertynames(O)
-        val = getfield(O,key)
-        val isa Union{Number,String,DataType,NTuple,Vector{Symbol},UnionAll,Keepbits} &&
-            print(io,"\n $key::$(typeof(val)) = $val")
-    end
+    println(io,"$(typeof(O))")
+    keys = propertynames(O)
+
+    # remove interpolator from being printed, TODO: implement show for AbstractInterpolator
+    keys_filtered = filter(key -> ~(getfield(O,key) isa AbstractInterpolator),keys)
+    print_fields(io,O,keys_filtered)
 end
 
 """
@@ -172,8 +173,17 @@ function initialize!(
     feedback.output = true          # if output=true set feedback.output=true too!
 
     # OUTPUT FREQUENCY
-    output.output_every_n_steps = max(1,round(Int, output.output_dt/time_stepping.Δt_sec))
-    output.output_dt = output.output_every_n_steps*time_stepping.Δt_sec
+    output.output_every_n_steps = max(1,round(Int,
+            Millisecond(output.output_dt).value/time_stepping.Δt_millisec.value))
+    output.output_dt = Second(round(Int,output.output_every_n_steps*time_stepping.Δt_sec))
+
+    # check how time stepping time step and output time step align
+    n = output.output_every_n_steps
+    Δt = time_stepping.Δt_millisec
+    nΔt = n*Δt
+    if nΔt != output.output_dt
+        @info "$n steps of Δt = $Δt yield output every $(nΔt) (=$(nΔt.value/1000)s), but output_dt = $(output.output_dt)"
+    end
 
     # RESET COUNTERS
     output.timestep_counter = 0         # time step counter
@@ -379,7 +389,8 @@ function write_netcdf_time!(output::OutputWriter,
     (; netcdf_file, startdate ) = output
     i = output.output_counter
 
-    time_sec = round(Int64,Dates.value(Dates.Second(time-startdate)))
+    time_passed = Dates.Millisecond(time-startdate)
+    time_sec = round(Int64,time_passed.value/1000)
     netcdf_file["time"][i] = time_sec
     NCDatasets.sync(netcdf_file)
 
