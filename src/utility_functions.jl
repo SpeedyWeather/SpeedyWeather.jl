@@ -101,10 +101,15 @@ function print_fields(io::IO,A,keys;arrays::Bool=false)
     end
 end
 
-function Base.convert(::Type{Second},x::Real)
+Dates.Second(x::AbstractFloat) = convert(Second,x)
+Dates.Minute(x::AbstractFloat) = Second(60x)
+Dates.Hour(  x::AbstractFloat) = Minute(60x)
+Dates.Day(   x::AbstractFloat) = Hour(24x)
+
+function Base.convert(::Type{Second},x::AbstractFloat)
     xr = round(Int64,x)
     @info "Rounding and converting $x to $xr for integer seconds."
-    return convert(Second,xr)
+    return Second(xr)
 end
 
 function Base.convert(::Type{Second},x::Integer)
