@@ -100,3 +100,14 @@ function print_fields(io::IO,A,keys;arrays::Bool=false)
         print(io,s_without_comma)    
     end
 end
+
+function Base.convert(::Type{Second},x::Real)
+    xr = round(Int64,x)
+    @info "Rounding and converting $x to $xr for integer seconds."
+    return convert(Second,xr)
+end
+
+function Base.convert(::Type{Second},x::Integer)
+    @info "Input '$x' assumed to have units of seconds. Use Minute($x), Hour($x), Day($x) otherwise."
+    return Second(round(Int64,x))
+end
