@@ -67,7 +67,7 @@ function large_scale_condensation!(
     ) where NF
 
     (;relative_threshold,relative_baseline) = scheme
-    time_scale⁻¹ = scheme.time_scale.value
+    time_scale⁻¹ = inv(convert(NF,scheme.time_scale.value))
     n_stratosphere_levels = scheme.n_stratosphere_levels[]
 
     (;humid, pres) = column               # prognostic variables: specific humidity, surface pressure
