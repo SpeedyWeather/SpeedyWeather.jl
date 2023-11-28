@@ -177,14 +177,6 @@ function initialize!(
             Millisecond(output.output_dt).value/time_stepping.Δt_millisec.value))
     output.output_dt = Second(round(Int,output.output_every_n_steps*time_stepping.Δt_sec))
 
-    # check how time stepping time step and output time step align
-    n = output.output_every_n_steps
-    Δt = time_stepping.Δt_millisec
-    nΔt = n*Δt
-    if nΔt != output.output_dt
-        @info "$n steps of Δt = $Δt yield output every $(nΔt) (=$(nΔt.value/1000)s), but output_dt = $(output.output_dt)"
-    end
-
     # RESET COUNTERS
     output.timestep_counter = 0         # time step counter
     output.output_counter = 0           # output step counter
@@ -196,9 +188,9 @@ function initialize!(
     
     # DEFINE NETCDF DIMENSIONS TIME
     (;startdate) = output
-    time_string = "seconds since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
+    time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     defDim(dataset,"time",Inf)       # unlimited time dimension
-    defVar(dataset,"time",Int64,("time",),attrib=Dict("units"=>time_string,"long_name"=>"time",
+    defVar(dataset,"time",Float64,("time",),attrib=Dict("units"=>time_string,"long_name"=>"time",
             "standard_name"=>"time","calendar"=>"proleptic_gregorian"))
     
     # DEFINE NETCDF DIMENSIONS SPACE
@@ -389,9 +381,9 @@ function write_netcdf_time!(output::OutputWriter,
     (; netcdf_file, startdate ) = output
     i = output.output_counter
 
-    time_passed = Dates.Millisecond(time-startdate)
-    time_sec = round(Int64,time_passed.value/1000)
-    netcdf_file["time"][i] = time_sec
+    time_passed = Millisecond(time-startdate)
+    time_hrs = time_passed.value/3600_000       # [ms] -> [hrs]
+    netcdf_file["time"][i] = time_hrs
     NCDatasets.sync(netcdf_file)
 
     return nothing
