@@ -108,7 +108,7 @@ end
     function manual_time_axis(startdate, dt, n_timesteps)
         time_axis = zeros(typeof(startdate), n_timesteps+1)
         for i=0:n_timesteps
-            time_axis[i+1] = startdate + Dates.Second(dt*i)
+            time_axis[i+1] = startdate + dt*i
         end 
         time_axis 
     end 
@@ -124,11 +124,11 @@ end
     progn = simulation.prognostic_variables
     tmp_read_path = joinpath(model.output.run_path,model.output.filename)
     t = NCDataset(tmp_read_path)["time"][:]
-    @test t == manual_time_axis(model.output.startdate,model.time_stepping.Δt_sec,progn.clock.n_timesteps)
+    @test t == manual_time_axis(model.output.startdate,model.time_stepping.Δt_millisec,progn.clock.n_timesteps)
     
     # do a simulation with the adjust_Δt_with_output turned on 
     output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="adjust_dt_with_output-test",output_dt=Minute(70))
-    time_stepping = Leapfrog(spectral_grid, adjust_Δt_with_output=true, output_dt=Minute(70))
+    time_stepping = Leapfrog(spectral_grid, adjust_with_output=true)
     model = PrimitiveDryModel(;spectral_grid,output,time_stepping)
     simulation = initialize!(model)
     run!(simulation,output=true,n_days=1)
@@ -150,6 +150,6 @@ end
     progn = simulation.prognostic_variables
     tmp_read_path = joinpath(model.output.run_path,model.output.filename)
     t = NCDataset(tmp_read_path)["time"][:]
-    @test t == manual_time_axis(model.output.startdate,model.time_stepping.Δt_sec,progn.clock.n_timesteps)
+    @test t == manual_time_axis(model.output.startdate,model.time_stepping.Δt_millisec,progn.clock.n_timesteps)
     @test t == SpeedyWeather.load_trajectory("time", model)
 end
