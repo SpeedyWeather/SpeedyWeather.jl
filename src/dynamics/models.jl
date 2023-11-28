@@ -61,6 +61,10 @@ function initialize!(model::Barotropic;time::DateTime = DEFAULT_DATE)
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for BarotropicModel, \
         SpectralGrid with nlev=$(spectral_grid.nlev) provided."
 
+    # slightly adjust model time step to be a convenient divisor of output timestep
+    initialize!(model.time_stepping,model)
+
+    # initialize components
     initialize!(model.forcing,model)
     initialize!(model.drag,model)
     initialize!(model.horizontal_diffusion,model)
@@ -122,6 +126,10 @@ function initialize!(model::ShallowWater;time::DateTime = DEFAULT_DATE)
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for ShallowWaterModel, \
                                 SpectralGrid with nlev=$(spectral_grid.nlev) provided."
 
+    # slightly adjust model time step to be a convenient divisor of output timestep
+    initialize!(model.time_stepping,model)
+
+    # initialize components
     initialize!(model.forcing,model)
     initialize!(model.drag,model)
     initialize!(model.horizontal_diffusion,model)
@@ -193,6 +201,9 @@ except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::PrimitiveDry;time::DateTime = DEFAULT_DATE)
     (;spectral_grid) = model
+
+    # slightly adjust model time step to be a convenient divisor of output timestep
+    initialize!(model.time_stepping,model)
 
     # numerics (implicit is initialized later)
     initialize!(model.horizontal_diffusion,model)
@@ -284,6 +295,9 @@ except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     (;spectral_grid) = model
+
+    # slightly adjust model time step to be a convenient divisor of output timestep
+    initialize!(model.time_stepping,model)
 
     # numerics (implicit is initialized later)
     initialize!(model.horizontal_diffusion,model)
