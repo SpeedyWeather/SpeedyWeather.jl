@@ -53,7 +53,7 @@ function get_Δt_millisec(
     resolution_factor = (32/(trunc+1))
     Δt_at_trunc = Second(Δt_at_T31).value*resolution_factor
 
-    if adjust_with_output
+    if adjust_with_output && (output_dt > Millisecond(0))
         k = round(Int,Second(output_dt).value / Δt_at_trunc)
         divisors = Primes.divisors(Millisecond(output_dt).value)
         sort!(divisors)
@@ -67,24 +67,10 @@ function get_Δt_millisec(
         end
     else 
         Δt_millisec = Millisecond(round(Int, 1000*Δt_at_trunc))
-    end 
+    end
 
     return Δt_millisec
 end 
-
-function roundup(k::Integer,divisors::Vector{<:Integer};sorted=false)
-    sorted || sort!(divisors)
-    k_new = 0
-    i = 1
-    while k_new < k
-        divisor = divisors[i]
-        if divisor >= k
-            k_new = divisor
-        end
-        i += 1
-    end
-    return k_new
-end
 
 """
 $(TYPEDSIGNATURES)
@@ -108,14 +94,21 @@ Initialize leapfrogging `L` by recalculating the timestep given the output time 
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog,model::ModelSetup)
-    # nothing to initialize if timestep isn't adjusted with output
-    L.adjust_with_output || return nothing
-
-    # otherwise take actual output dt from model.output and recalculate timestep
     (;output_dt) = model.output
-    L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, L.adjust_with_output, output_dt)
-    L.Δt_sec = L.Δt_millisec.value/1000
-    L.Δt = L.Δt_sec/L.radius  
+
+    if L.adjust_with_output
+        # take actual output dt from model.output and recalculate timestep
+        L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, L.adjust_with_output, output_dt)
+        L.Δt_sec = L.Δt_millisec.value/1000
+        L.Δt = L.Δt_sec/L.radius
+    end
+
+    # check how time stepping time step and output time step align
+    n = round(Int,Millisecond(output_dt).value/L.Δt_millisec.value)
+    nΔt = n*L.Δt_millisec
+    if nΔt != output_dt
+        @info "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms (=$(nΔt.value/1000)s), but output_dt = $(output_dt.value)s"
+    end
 end
 
 """
