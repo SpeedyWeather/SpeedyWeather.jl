@@ -19,8 +19,8 @@ Base.@kwdef struct HyperDiffusion{NF} <: HorizontalDiffusion{NF}
     "power of Laplacian"
     power::Float64 = 4.0
     
-    "diffusion time scales [hrs]"
-    time_scale::Float64 = 2.4
+    "diffusion time scale"
+    time_scale::Second = Minute(144)
     
     "stronger diffusion with resolution? 0: constant with trunc, 1: (inverse) linear with trunc, etc"
     resolution_scaling::Float64 = 0.5
@@ -89,12 +89,11 @@ model time step."""
 function initialize!(   scheme::HyperDiffusion,
                         L::TimeStepper)
 
-    (;trunc,time_scale,∇²ⁿ_2D,∇²ⁿ_2D_implicit,power) = scheme
+    (;trunc,∇²ⁿ_2D,∇²ⁿ_2D_implicit,power) = scheme
     (;Δt, radius) = L
 
     # time scale times 1/radius because time step Δt is scaled with 1/radius
-    # time scale*3600 for [hrs] → [s]
-    time_scale = 1/radius*(3600*time_scale)
+    time_scale = scheme.time_scale.value/radius
 
     # NORMALISATION
     # Diffusion is applied by multiplication of the eigenvalues of the Laplacian -l*(l+1)
@@ -125,7 +124,7 @@ function initialize!(
     L::TimeStepper,
     vor_max::Real = 0,
 )
-    (;trunc,time_scale,resolution_scaling,∇²ⁿ,∇²ⁿ_implicit) = scheme
+    (;trunc, resolution_scaling, ∇²ⁿ, ∇²ⁿ_implicit) = scheme
     (;power, power_stratosphere, tapering_σ) = scheme
     (;Δt, radius) = L
     σ = G.σ_levels_full[k]
@@ -133,7 +132,7 @@ function initialize!(
     # Reduce diffusion time scale (=increase diffusion) with resolution
     # times 1/radius because time step Δt is scaled with 1/radius
     # time scale*3600 for [hrs] → [s]
-    time_scale = 1/radius*(3600*time_scale) * (32/(trunc+1))^resolution_scaling
+    time_scale = scheme.time_scale.value/radius * (32/(trunc+1))^resolution_scaling
 
     # ADAPTIVE/FLOW AWARE
     # increase diffusion if maximum vorticity per layer is larger than scheme.vor_max

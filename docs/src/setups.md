@@ -106,11 +106,16 @@ run!(simulation,n_days=6,output=true)
 ```
 The progress bar tells us that the simulation run got the identification "0001"
 (which just counts up, so yours might be higher), meaning that
-data is stored in the folder `/run_0001`, so let's plot that data properly (and not just using UnicodePlots).
+data is stored in the folder `/run_0001`. In general we can check this also via
+```@example galewsky_setup
+id = model.output.id
+```
+So let's plot that data properly (and not just using UnicodePlots). `$id` in the following just means
+that the string is interpolated to `run_0001` if this is the first unnamed run in your folder.
 ```@example galewsky_setup
 using PythonPlot, NCDatasets
 ioff() # hide
-ds = NCDataset("run_0001/output.nc")
+ds = NCDataset("run_$id/output.nc")
 ds["vor"]
 ```
 Vorticity `vor` is stored as a lon x lat x vert x time array, we may want to look at the first time step,
@@ -127,7 +132,7 @@ ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Relative vorticity")
 tight_layout() # hide
-savefig("galewsky1.png") # hide
+savefig("galewsky1.png", dpi=70) # hide
 nothing # hide
 ```
 ![Galewsky jet pyplot1](galewsky1.png)
@@ -139,7 +144,7 @@ And now the last time step, that means time = 12days is
 t = ds.dim["time"]
 vor = Matrix{Float32}(ds["vor"][:,:,1,t])
 ax.pcolormesh(lon,lat,vor')
-savefig("galewsky2.png") # hide
+savefig("galewsky2.png", dpi=70) # hide
 nothing # hide
 ```
 ![Galewsky jet pyplot2](galewsky2.png)
@@ -162,7 +167,7 @@ simulation = initialize!(model)
 run!(simulation,n_days=12,output=true)
 ```
 
-This time the run got a new run id, which you see in the progress bar, but can also always check
+This time the run got a new run id, which you see in the progress bar, but can again always check
 after the `run!` call (the automatic run id is only determined just before the main time loop starts)
 with `model.output.id`, but otherwise we do as before.
 ```@example galewsky_setup
@@ -180,7 +185,7 @@ ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Relative vorticity")
 tight_layout() # hide
-savefig("galewsky3.png") # hide
+savefig("galewsky3.png", dpi=70) # hide
 nothing # hide
 ```
 ![Galewsky jet pyplot3](galewsky3.png)
@@ -198,7 +203,7 @@ using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=63,nlev=1)
 forcing = JetStreamForcing(spectral_grid,latitude=60)
 drag = QuadraticDrag(spectral_grid)
-output = OutputWriter(spectral_grid,ShallowWater,output_dt=6,output_vars=[:u,:v,:pres,:orography])
+output = OutputWriter(spectral_grid,ShallowWater,output_dt=Hour(6),output_vars=[:u,:v,:pres,:orography])
 model = ShallowWaterModel(;spectral_grid,output,drag,forcing)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
@@ -233,7 +238,7 @@ ax.set_ylabel("latitude")
 ax.set_title("Zonal wind [m/s]")
 colorbar(q,ax=ax)
 tight_layout() # hide
-savefig("polar_jets.png") # hide
+savefig("polar_jets.png", dpi=70) # hide
 nothing # hide
 ```
 ![Polar jets pyplot](polar_jets.png)
@@ -247,11 +252,11 @@ using Random # hide
 Random.seed!(1234) # hide
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=127,nlev=1)
-time_stepping = SpeedyWeather.Leapfrog(spectral_grid,Δt_at_T31=30)
+time_stepping = SpeedyWeather.Leapfrog(spectral_grid,Δt_at_T31=Minute(30))
 implicit = SpeedyWeather.ImplicitShallowWater(spectral_grid,α=0.5)
 orography = EarthOrography(spectral_grid,smoothing=false)
 initial_conditions = SpeedyWeather.RandomWaves()
-output = OutputWriter(spectral_grid,ShallowWater,output_dt=12,output_vars=[:u,:pres,:div,:orography])
+output = OutputWriter(spectral_grid,ShallowWater,output_dt=Hour(12),output_vars=[:u,:pres,:div,:orography])
 model = ShallowWaterModel(;spectral_grid,orography,output,initial_conditions,implicit,time_stepping)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
@@ -302,7 +307,7 @@ ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Divergence")
 tight_layout() # hide
-savefig("gravity_waves.png") # hide
+savefig("gravity_waves.png", dpi=70) # hide
 nothing # hide
 ```
 ![Gravity waves pyplot](gravity_waves.png)
@@ -349,7 +354,7 @@ ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Surface relative vorticity")
 tight_layout() # hide
-savefig("jablonowski.png") # hide
+savefig("jablonowski.png", dpi=70) # hide
 nothing # hide
 ```
 ![Jablonowski pyplot](jablonowski.png)

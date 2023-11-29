@@ -53,6 +53,7 @@ By default, the `gridded` transforms onto a [`FullGaussianGrid`](@ref FullGaussi
 into a vector west to east, starting at the prime meridian, then north to south, see [RingGrids](@ref).
 We can visualize `map` quickly with a UnicodePlot via `plot` (see [Visualising RingGrid data](@ref))
 ```@example speedytransforms
+import SpeedyWeather.RingGrids: plot    # not necessary when `using SpeedyWeather`
 plot(map)
 ```
 Yay! This is the what the ``l=m=1`` spherical harmonic is supposed to look like!

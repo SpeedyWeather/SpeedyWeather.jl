@@ -112,7 +112,7 @@ Meaning that if you want to have a shorter or longer time step you can create a 
 `SpectralGrid` as first argument.
 ```@example howto
 spectral_grid = SpectralGrid(trunc=63,nlev=1)
-time_stepping = Leapfrog(spectral_grid,Δt_at_T31=15)
+time_stepping = Leapfrog(spectral_grid,Δt_at_T31=Minute(15))
 ```
 The actual time step at the given resolution (here T63) is then `Δt_sec`, there's
 also `Δt` which is a scaled time step used internally, because SpeedyWeather.jl
@@ -178,9 +178,9 @@ and we have initialized the `ShallowWaterModel` we have defined earlier.
 After this step you can continue to tweak your model setup but note that
 some model components are immutable, or that your changes may not be
 propagated to other model components that rely on it. But you can, for
-example, change the output time step (in hours) like so
+example, change the output time step like so
 ```@example howto
-simulation.model.output.output_dt = 1
+simulation.model.output.output_dt = Second(3600)
 ```
 Now, if there's output, it will be every hour. Furthermore the initial
 conditions can be set with the `initial_conditions` model component

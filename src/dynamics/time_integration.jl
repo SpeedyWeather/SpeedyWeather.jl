@@ -2,7 +2,7 @@
 Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)
 """
-Base.@kwdef struct Leapfrog{NF} <: TimeStepper{NF}
+Base.@kwdef mutable struct Leapfrog{NF} <: TimeStepper{NF}
 
     # DIMENSIONS
     "spectral resolution (max degree of spherical harmonics)"
@@ -10,10 +10,13 @@ Base.@kwdef struct Leapfrog{NF} <: TimeStepper{NF}
 
     # OPTIONS
     "time step in minutes for T31, scale linearly to `trunc`"
-    Δt_at_T31::Float64 = 30
+    Δt_at_T31::Second = Minute(30)
 
     "radius of sphere [m], used for scaling"
     radius::NF = 6.371e6
+
+    "adjust Δt_at_T31 with the output_dt to reach output_dt exactly in integer time steps"
+    adjust_with_output::Bool = true 
 
     # NUMERICS
     "Robert (1966) time filter coefficeint to suppress comput. mode"
@@ -22,17 +25,57 @@ Base.@kwdef struct Leapfrog{NF} <: TimeStepper{NF}
     "Williams time filter (Amezcua 2011) coefficient for 3rd order acc"
     williams_filter::NF = 0.53
 
-
     # DERIVED FROM OPTIONS    
+    "time step Δt [ms] at specified resolution"
+    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, adjust_with_output)
+
     "time step Δt [s] at specified resolution"
-    Δt_sec::Int = round(Int,60*Δt_at_T31*(32/(trunc+1)))
+    Δt_sec::NF = Δt_millisec.value/1000
 
     "time step Δt [s/m] at specified resolution, scaled by 1/radius"
-    Δt::NF = Δt_sec/radius
-    
-    "convert time step Δt from minutes to hours"
-    Δt_hrs::Float64 = Δt_sec/3600     
+    Δt::NF = Δt_sec/radius  
 end
+
+"""
+$(TYPEDSIGNATURES)
+Computes the time step in [ms]. `Δt_at_T31` is always scaled with the resolution `trunc` 
+of the model. In case `adjust_Δt_with_output` is true, the `Δt_at_T31` is additionally 
+adjusted to the closest divisor of `output_dt` so that the output time axis is keeping
+`output_dt` exactly.
+"""
+function get_Δt_millisec(
+    Δt_at_T31::Dates.TimePeriod,
+    trunc,
+    adjust_with_output::Bool,
+    output_dt::Dates.TimePeriod = DEFAULT_OUTPUT_DT,
+)
+    # linearly scale Δt with trunc+1 (which are often powers of two)
+    resolution_factor = (32/(trunc+1))
+    Δt_at_trunc = Second(Δt_at_T31).value*resolution_factor
+
+    if adjust_with_output && (output_dt > Millisecond(0))
+        k = round(Int,Second(output_dt).value / Δt_at_trunc)
+        divisors = Primes.divisors(Millisecond(output_dt).value)
+        sort!(divisors)
+        i = findfirst(x -> x>=k, divisors)
+        k_new = isnothing(i) ? k : divisors[i]
+        Δt_millisec = Millisecond(round(Int, Millisecond(output_dt).value/k_new))
+
+        # provide info when time step is significantly shortened or lengthened
+        Δt_millisec_unadjusted = round(Int,1000*Δt_at_trunc)
+        Δt_ratio = Δt_millisec.value/Δt_millisec_unadjusted
+
+        if abs(Δt_ratio - 1) > 0.05     # only when +-5% changes
+            p = round(Int,(Δt_ratio - 1)*100)
+            ps = p > 0 ? "+" : ""
+            @info "Time step changed from $Δt_millisec_unadjusted to $Δt_millisec ($ps$p%) to match output frequency."
+        end
+    else 
+        Δt_millisec = Millisecond(round(Int, 1000*Δt_at_trunc))
+    end
+
+    return Δt_millisec
+end 
 
 """
 $(TYPEDSIGNATURES)
@@ -47,6 +90,30 @@ function Base.show(io::IO,L::Leapfrog)
     println(io,"$(typeof(L)) <: TimeStepper")
     keys = propertynames(L)
     print_fields(io,L,keys)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Initialize leapfrogging `L` by recalculating the timestep given the output time step
+`output_dt` from `model.output`. Recalculating will slightly adjust the time step to
+be a divisor such that an integer number of time steps matches exactly with the output
+time step."""
+function initialize!(L::Leapfrog,model::ModelSetup)
+    (;output_dt) = model.output
+
+    if L.adjust_with_output
+        # take actual output dt from model.output and recalculate timestep
+        L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, L.adjust_with_output, output_dt)
+        L.Δt_sec = L.Δt_millisec.value/1000
+        L.Δt = L.Δt_sec/L.radius
+    end
+
+    # check how time stepping time step and output time step align
+    n = round(Int,Millisecond(output_dt).value/L.Δt_millisec.value)
+    nΔt = n*L.Δt_millisec
+    if nΔt != output_dt
+        @info "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms (=$(nΔt.value/1000)s), but output_dt = $(output_dt.value)s"
+    end
 end
 
 """
@@ -117,9 +184,11 @@ function first_timesteps!(
 )
     
     (;clock) = progn
-    (;implicit) = model
-    (;Δt, Δt_sec) = model.time_stepping
     clock.n_timesteps == 0 && return time     # exit immediately for no time steps
+    
+    (;implicit) = model
+    (;Δt, Δt_millisec) = model.time_stepping
+    Δt_millisec_half = Dates.Millisecond(Δt_millisec.value÷2)   # this might be 1ms off
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
     lf1 = 1                             # without Robert+Williams filter
@@ -127,7 +196,7 @@ function first_timesteps!(
                                         # the first leapfrog index (=>Euler forward)
     initialize!(implicit,Δt/2,diagn,model)  # update precomputed implicit terms with time step Δt/2
     timestep!(progn,diagn,Δt/2,model,lf1,lf2)
-    clock.time += Dates.Second(Δt_sec÷2)      # update by half the leapfrog time step Δt used here
+    clock.time += Δt_millisec_half      # update by half the leapfrog time step Δt used here
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
     initialize!(implicit,Δt,diagn,model)    # update precomputed implicit terms with time step Δt
@@ -135,7 +204,8 @@ function first_timesteps!(
     lf2 = 2                             # evaluate all tendencies at t=dt/2,
                                         # the 2nd leapfrog index (=>Leapfrog)
     timestep!(progn,diagn,Δt,model,lf1,lf2)
-    clock.time += Dates.Second(Δt_sec÷2)      # now 2nd leapfrog step is at t=Δt
+    clock.time -= Δt_millisec_half      # remove prev Δt/2 in case not even ms
+    clock.time += Δt_millisec           # otherwise time is off by 1ms
     write_output!(output,clock.time,diagn)
 
     # from now on precomputed implicit terms with 2Δt
@@ -268,7 +338,7 @@ function time_stepping!(
 )          
     
     (;clock) = progn
-    (;Δt, Δt_sec) = model.time_stepping
+    (;Δt, Δt_millisec) = model.time_stepping
     (;time_stepping) = model
 
     # SCALING: we use vorticity*radius,divergence*radius in the dynamical core
@@ -290,7 +360,7 @@ function time_stepping!(
         
         # calculate tendencies and leapfrog forward
         timestep!(progn,diagn,2Δt,model)   
-        clock.time += Dates.Second(Δt_sec)  # time of lf=2 and diagn after timestep!
+        clock.time += Δt_millisec           # time of lf=2 and diagn after timestep!
 
         progress!(feedback,progn)           # updates the progress meter bar
         write_output!(output,clock.time,diagn)

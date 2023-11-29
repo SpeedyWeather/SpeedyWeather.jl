@@ -23,6 +23,7 @@ end
 
 # default number format for output
 const DEFAULT_OUTPUT_NF = Float32
+const DEFAULT_OUTPUT_DT = Hour(6)
 
 """
 $(TYPEDSIGNATURES)
@@ -54,11 +55,8 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
     # WHAT/WHEN OPTIONS
     startdate::DateTime = DateTime(2000,1,1)
 
-    "[OPTION] output frequency, time step [hrs]"
-    output_dt::Float64 = 6
-
-    "actual output time step [sec]"
-    output_dt_sec::Int = 0
+    "[OPTION] output frequency, time step"
+    output_dt::Second = DEFAULT_OUTPUT_DT
 
     "[OPTION] which variables to output, u, v, vor, div, pres, temp, humid"
     output_vars::Vector{Symbol} = default_output_vars(Model)
@@ -140,12 +138,12 @@ default_output_vars(::Type{<:PrimitiveWet}) = [:vor,:u,:v,:temp,:humid,:pres,:pr
 
 # print all fields with type <: Number
 function Base.show(io::IO,O::AbstractOutputWriter)
-    print(io,"$(typeof(O)):")
-    for key in propertynames(O)
-        val = getfield(O,key)
-        val isa Union{Number,String,DataType,NTuple,Vector{Symbol},UnionAll,Keepbits} &&
-            print(io,"\n $key::$(typeof(val)) = $val")
-    end
+    println(io,"$(typeof(O))")
+    keys = propertynames(O)
+
+    # remove interpolator from being printed, TODO: implement show for AbstractInterpolator
+    keys_filtered = filter(key -> ~(getfield(O,key) isa AbstractInterpolator),keys)
+    print_fields(io,O,keys_filtered)
 end
 
 """
@@ -175,8 +173,9 @@ function initialize!(
     feedback.output = true          # if output=true set feedback.output=true too!
 
     # OUTPUT FREQUENCY
-    output.output_every_n_steps = max(1,floor(Int,output.output_dt/time_stepping.Δt_hrs))
-    output.output_dt_sec = output.output_every_n_steps*time_stepping.Δt_sec
+    output.output_every_n_steps = max(1,round(Int,
+            Millisecond(output.output_dt).value/time_stepping.Δt_millisec.value))
+    output.output_dt = Second(round(Int,output.output_every_n_steps*time_stepping.Δt_sec))
 
     # RESET COUNTERS
     output.timestep_counter = 0         # time step counter
@@ -189,9 +188,9 @@ function initialize!(
     
     # DEFINE NETCDF DIMENSIONS TIME
     (;startdate) = output
-    time_string = "seconds since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
+    time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     defDim(dataset,"time",Inf)       # unlimited time dimension
-    defVar(dataset,"time",Int64,("time",),attrib=Dict("units"=>time_string,"long_name"=>"time",
+    defVar(dataset,"time",Float64,("time",),attrib=Dict("units"=>time_string,"long_name"=>"time",
             "standard_name"=>"time","calendar"=>"proleptic_gregorian"))
     
     # DEFINE NETCDF DIMENSIONS SPACE
@@ -382,8 +381,9 @@ function write_netcdf_time!(output::OutputWriter,
     (; netcdf_file, startdate ) = output
     i = output.output_counter
 
-    time_sec = round(Int64,Dates.value(Dates.Second(time-startdate)))
-    netcdf_file["time"][i] = time_sec
+    time_passed = Millisecond(time-startdate)
+    time_hrs = time_passed.value/3600_000       # [ms] -> [hrs]
+    netcdf_file["time"][i] = time_hrs
     NCDatasets.sync(netcdf_file)
 
     return nothing

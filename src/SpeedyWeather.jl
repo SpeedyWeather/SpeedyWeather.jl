@@ -4,6 +4,7 @@ module SpeedyWeather
 using DocStringExtensions
 
 # NUMERICS
+import Primes
 import Random
 import FastGaussQuadrature
 import LinearAlgebra: LinearAlgebra, Diagonal
@@ -17,7 +18,7 @@ import Adapt: Adapt, adapt, adapt_structure
 
 # INPUT OUTPUT
 import TOML
-import Dates: Dates, DateTime
+import Dates: Dates, DateTime, Millisecond, Second, Minute, Hour, Day
 import Printf: Printf, @sprintf
 import NCDatasets: NCDatasets, NCDataset, defDim, defVar
 import JLD2: jldopen
@@ -27,7 +28,7 @@ import UnicodePlots
 import ProgressMeter
 
 # to avoid a `using Dates` to pass on DateTime arguments
-export DateTime
+export DateTime, Second, Minute, Hour, Day
 
 # EXPORT MONOLITHIC INTERFACE TO SPEEDY
 export  run_speedy,

@@ -1,12 +1,13 @@
 using Documenter, SpeedyWeather
 
 makedocs(
-     format=Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",
-                            ansicolor=true),
-    sitename="SpeedyWeather.jl",
-    authors="M Klöwer and SpeedyWeather contributors",
-    modules=[SpeedyWeather],
-    pages=["Home"=>"index.md",
+    format = Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",
+                            ansicolor=true,
+                            size_threshold = 600_000),      # in bytes
+    sitename = "SpeedyWeather.jl",
+    authors = "M Klöwer and SpeedyWeather contributors",
+    modules = [SpeedyWeather],
+    pages = ["Home"=>"index.md",
             "Installation"=>"installation.md",
             "How to run SpeedyWeather.jl"=>"how_to_run_speedy.md",
             "Model setups"=>"setups.md",
