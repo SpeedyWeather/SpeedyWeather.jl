@@ -72,7 +72,7 @@ based on [UnicodePlots](https://github.com/JuliaPlots/UnicodePlots.jl)' `heatmap
 ```@example ringgrids
 nlat_half = 24
 grid = randn(OctahedralGaussianGrid,nlat_half)
-RinGrids.plot(grid)
+RingGrids.plot(grid)
 ```
 (Note that to skip the `RingGrids.` in the last line you can do `import SpeedyWeather.RingGrids: plot`,
 `import SpeedyWeather: plot` or simply `using SpeedyWeather`. It's just that `LowerTriangularMatrices`
