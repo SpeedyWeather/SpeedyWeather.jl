@@ -16,7 +16,7 @@ Base.@kwdef struct SpeedyCondensation{NF<:AbstractFloat} <: AbstractCondensation
     threshold_max::NF = 0.9
 
     "Relaxation time for humidity [hrs]"
-    time_scale::NF = 4.0
+    time_scale::Second = Hour(4)
 
     "Flux limiter for humidity tendency"
     max_flux::NF = 5
@@ -97,7 +97,7 @@ function large_scale_condensation!(
     ) where NF
 
     (;relative_threshold, humid_tend_max) = scheme
-    time_scale = 3600*scheme.time_scale     # [hrs] -> [s]
+    time_scale⁻¹ = inv(convert(NF,scheme.time_scale.value))
     n_stratosphere_levels = scheme.n_stratosphere_levels[]
 
     (;humid, pres) = column                 # prognostic vars: specific humidity, pressure
@@ -122,7 +122,7 @@ function large_scale_condensation!(
         if humid[k] > humid_threshold
 
             # accumulate in tendencies (nothing is added if humidity not above threshold)
-            humid_tend_k = -(humid[k] - humid_threshold) / time_scale                   # eq. 22
+            humid_tend_k = -(humid[k] - humid_threshold) * time_scale⁻¹                   # eq. 22
             
             # with flux limiter, use max and - as humid_tend_k is always negative
             humid_tend_k = max(humid_tend_k, -pₛ_norm²*humid_tend_max[k])

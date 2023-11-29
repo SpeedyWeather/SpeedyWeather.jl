@@ -3,6 +3,7 @@ using Test
 
 # GENERAL
 include("utility_functions.jl")
+include("dates.jl")
 include("lower_triangular_matrix.jl")
 include("grids.jl")
 include("interpolation.jl")

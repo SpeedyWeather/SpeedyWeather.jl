@@ -43,7 +43,7 @@ Base.@kwdef struct JetStreamForcing{NF} <: AbstractForcing{NF}
     speed::Float64 = 85
 
     "time scale [days]"
-    time_scale::Float64 = 30
+    time_scale::Second = Day(30)
 
     "precomputed amplitude vector [m/s²]"
     amplitude::Vector{NF} = zeros(NF,nlat)
@@ -62,7 +62,7 @@ function initialize!(   forcing::JetStreamForcing,
     θ₀ = (latitude-width)/360*2π        # southern boundary of jet [radians]
     θ₁ = (latitude+width)/360*2π        # northern boundary of jet
     eₙ = exp(-4/(θ₁-θ₀)^2)              # normalisation, so that speed is at max
-    A₀ = speed/eₙ/(time_scale*24*3600)  # amplitude [m/s²] without lat dependency
+    A₀ = speed/eₙ/time_scale.value      # amplitude [m/s²] without lat dependency
     A₀ *= radius                        # scale by radius as are the momentum equations
 
     (;nlat,colat) = model.geometry

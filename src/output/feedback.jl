@@ -80,7 +80,7 @@ function initialize!(feedback::Feedback,clock::Clock,model::ModelSetup)
 
     # hack: redefine element in global constant dt_in_sec
     # used to pass on the time step to ProgressMeter.speedstring
-    DT_IN_SEC[] = model.time_stepping.Δt_sec        
+    DT_IN_SEC[] = model.time_stepping.Δt_sec
 
     if feedback.output   # with netcdf output write progress.txt
         (; run_path, id) = feedback
@@ -208,7 +208,7 @@ end
 # hack: define global constant whose element will be changed in initialize_feedback
 # used to pass on the time step to ProgressMeter.speedstring via calling this
 # constant from the ProgressMeter module
-const DT_IN_SEC = Ref(1800)
+const DT_IN_SEC = Ref(1800.0)
 
 # "extend" the speedstring function from ProgressMeter by defining it for ::AbstractFloat
 # not just ::Any to effectively overwrite it
@@ -228,7 +228,7 @@ julia> readable_secs(12345)
 ```
 """
 function readable_secs(secs::Real)
-    millisecs = Dates.Millisecond(round(secs * 10 ^ 3))
+    millisecs = Dates.Millisecond(round(secs * 1000))
     if millisecs >= Dates.Day(1)
         return Dates.canonicalize(round(millisecs, Dates.Hour))
     elseif millisecs >= Dates.Hour(1)
