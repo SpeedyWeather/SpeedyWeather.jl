@@ -57,13 +57,18 @@ function get_Δt_millisec(
         k = round(Int,Second(output_dt).value / Δt_at_trunc)
         divisors = Primes.divisors(Millisecond(output_dt).value)
         sort!(divisors)
-        i = findfirst(x -> x>=k,divisors)
+        i = findfirst(x -> x>=k, divisors)
         k_new = isnothing(i) ? k : divisors[i]
         Δt_millisec = Millisecond(round(Int, Millisecond(output_dt).value/k_new))
 
-        if k_new/k > 1.05   # provide info on 
-            p = round(Int,(k/k_new - 1)*100)
-            @info "Adjust with output: Time step shortened to $Δt_millisec ($p%)"
+        # provide info when time step is significantly shortened or lengthened
+        Δt_millisec_unadjusted = round(Int,1000*Δt_at_trunc)
+        Δt_ratio = Δt_millisec.value/Δt_millisec_unadjusted
+
+        if abs(Δt_ratio - 1) > 0.05     # only when +-5% changes
+            p = round(Int,(Δt_ratio - 1)*100)
+            ps = p > 0 ? "+" : ""
+            @info "Time step changed from $Δt_millisec_unadjusted to $Δt_millisec ($ps$p%) to match output frequency."
         end
     else 
         Δt_millisec = Millisecond(round(Int, 1000*Δt_at_trunc))
