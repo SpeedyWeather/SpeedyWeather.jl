@@ -132,7 +132,7 @@ ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Relative vorticity")
 tight_layout() # hide
-savefig("galewsky1.png") # hide
+savefig("galewsky1.png", dpi=70) # hide
 nothing # hide
 ```
 ![Galewsky jet pyplot1](galewsky1.png)
@@ -144,7 +144,7 @@ And now the last time step, that means time = 12days is
 t = ds.dim["time"]
 vor = Matrix{Float32}(ds["vor"][:,:,1,t])
 ax.pcolormesh(lon,lat,vor')
-savefig("galewsky2.png") # hide
+savefig("galewsky2.png", dpi=70) # hide
 nothing # hide
 ```
 ![Galewsky jet pyplot2](galewsky2.png)
@@ -185,7 +185,7 @@ ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Relative vorticity")
 tight_layout() # hide
-savefig("galewsky3.png") # hide
+savefig("galewsky3.png", dpi=70) # hide
 nothing # hide
 ```
 ![Galewsky jet pyplot3](galewsky3.png)
@@ -238,7 +238,7 @@ ax.set_ylabel("latitude")
 ax.set_title("Zonal wind [m/s]")
 colorbar(q,ax=ax)
 tight_layout() # hide
-savefig("polar_jets.png") # hide
+savefig("polar_jets.png", dpi=70) # hide
 nothing # hide
 ```
 ![Polar jets pyplot](polar_jets.png)
@@ -307,7 +307,7 @@ ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Divergence")
 tight_layout() # hide
-savefig("gravity_waves.png") # hide
+savefig("gravity_waves.png", dpi=70) # hide
 nothing # hide
 ```
 ![Gravity waves pyplot](gravity_waves.png)
@@ -354,7 +354,7 @@ ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Surface relative vorticity")
 tight_layout() # hide
-savefig("jablonowski.png") # hide
+savefig("jablonowski.png", dpi=70) # hide
 nothing # hide
 ```
 ![Jablonowski pyplot](jablonowski.png)
