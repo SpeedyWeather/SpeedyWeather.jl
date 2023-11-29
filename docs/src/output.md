@@ -182,10 +182,46 @@ search: OutputWriter
 
     •  pkg_version::VersionNumber
 
-    •  startdate::Dates.DateTime
+    •  startdate::DateTime
 
     •  output_dt::Second: [OPTION] output frequency, time step
 
     •  output_vars::Vector{Symbol}: [OPTION] which variables to output,
        u, v, vor, div, pres, temp, humid
+
+    •  missing_value::Union{Float32, Float64}: [OPTION] missing value to
+       be used in netcdf output
+
+    •  compression_level::Int64: [OPTION] lossless compression level;
+       1=low but fast, 9=high but slow
+
+    •  shuffle::Bool: [OPTION] shuffle/bittranspose filter for
+       compression
+
+    •  keepbits::SpeedyWeather.Keepbits: [OPTION] mantissa bits to keep
+       for every variable
+
+    •  output_every_n_steps::Int64
+
+    •  timestep_counter::Int64
+
+    •  output_counter::Int64
+
+    •  netcdf_file::Union{Nothing, NCDatasets.NCDataset}
+
+    •  input_Grid::Type{<:AbstractGrid}
+
+    •  as_matrix::Bool: [OPTION] sort grid points into a matrix
+       (interpolation-free), for OctahedralClenshawGrid, OctaHEALPixGrid
+       only
+
+    •  quadrant_rotation::NTuple{4, Int64}
+
+    •  matrix_quadrant::NTuple{4, Tuple{Int64, Int64}}
+
+    •  output_Grid::Type{<:AbstractFullGrid}: [OPTION] the grid used for
+       output, full grids only
+
+    •  nlat_half::Int64: [OPTION] the resolution of the output grid,
+       default: same nlat_half as in the dynamical core
 ```

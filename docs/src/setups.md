@@ -106,11 +106,16 @@ run!(simulation,n_days=6,output=true)
 ```
 The progress bar tells us that the simulation run got the identification "0001"
 (which just counts up, so yours might be higher), meaning that
-data is stored in the folder `/run_0001`, so let's plot that data properly (and not just using UnicodePlots).
+data is stored in the folder `/run_0001`. In general we can check this also via
+```@example galewsky_setup
+id = model.output.id
+```
+So let's plot that data properly (and not just using UnicodePlots). `$id` in the following just means
+that the string is interpolated to `run_0001` if this is the first unnamed run in your folder.
 ```@example galewsky_setup
 using PythonPlot, NCDatasets
 ioff() # hide
-ds = NCDataset("run_0001/output.nc")
+ds = NCDataset("run_$id/output.nc")
 ds["vor"]
 ```
 Vorticity `vor` is stored as a lon x lat x vert x time array, we may want to look at the first time step,
@@ -162,7 +167,7 @@ simulation = initialize!(model)
 run!(simulation,n_days=12,output=true)
 ```
 
-This time the run got a new run id, which you see in the progress bar, but can also always check
+This time the run got a new run id, which you see in the progress bar, but can again always check
 after the `run!` call (the automatic run id is only determined just before the main time loop starts)
 with `model.output.id`, but otherwise we do as before.
 ```@example galewsky_setup
