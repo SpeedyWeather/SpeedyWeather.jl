@@ -11,8 +11,8 @@ The output writer is a component of every Model, i.e. `BarotropicModel`, `Shallo
 ```@example netcdf
 using SpeedyWeather
 spectral_grid = SpectralGrid()
-my_output_writer = OutputWriter(spectral_grid, ShallowWater)
-model = ShallowWaterModel(;spectral_grid, output=my_output_writer)
+output = OutputWriter(spectral_grid, ShallowWater)
+model = ShallowWaterModel(;spectral_grid, output=output)
 nothing # hide
 ```
 
@@ -27,11 +27,11 @@ Then we can also pass on further keyword arguments. So let's start with an examp
 
 If we want to increase the frequency of the output we can choose `output_dt` (default `=Hour(6)`) like so
 ```@example netcdf
-my_output_writer = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(1))
-model = ShallowWaterModel(;spectral_grid, output=my_output_writer)
+output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(1))
+model = ShallowWaterModel(;spectral_grid, output=output)
 nothing # hide
 ```
-which will now output every hour. It is important to pass on the new output writer `my_output_writer` to the
+which will now output every hour. It is important to pass on the new output writer `output` to the
 model constructor, otherwise it will not be part of your model and the default is used instead.
 Note that the choice of `output_dt` can affect the actual time step that is used for the model
 integration, which is explained in the following.
@@ -44,11 +44,15 @@ time_stepping.Δt_sec
 seconds. Depending on the output frequency (we chose `output_dt = Hour(1)` above)
 this will be slightly adjusted during model initialization:
 ```@example netcdf
+output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(1))
+model = ShallowWaterModel(;spectral_grid, time_stepping, output)
 simulation = initialize!(model)
 model.time_stepping.Δt_sec
 ```
 The shorter the output time step the more the model time step needs to be adjusted
-to match the desired output time step exactly. This is important so that for daily output at noon this does not slowly shift towards night over years of model integration. One can always disable this adjustment with
+to match the desired output time step exactly. This is important so that for daily output at
+noon this does not slowly shift towards night over years of model integration.
+One can always disable this adjustment with
 ```@example netcdf
 time_stepping = Leapfrog(spectral_grid,adjust_with_output=false)
 time_stepping.Δt_sec
@@ -56,7 +60,7 @@ time_stepping.Δt_sec
 and a little info will be printed to explain that even though you wanted
 `output_dt = Hour(1)` you will not actually get this upon initialization:
 ```@example netcdf
-model = ShallowWaterModel(;spectral_grid, time_stepping, output=my_output_writer)
+model = ShallowWaterModel(;spectral_grid, time_stepping, output)
 simulation = initialize!(model)
 ```
 
