@@ -8,70 +8,79 @@ There are many options to this available.
 
 The output writer is a component of every Model, i.e. `BarotropicModel`, `ShallowWaterModel`, `PrimitiveDryModel` and `PrimitiveWetModel`, hence a non-default output writer can be passed on as a keyword argument to the model constructor
 
-```julia
-julia> using SpeedyWeather
-julia> spectral_grid = SpectralGrid()
-julia> my_output_writer = OutputWriter(spectral_grid, PrimitiveDry)
-julia> model = PrimitiveDryModel(;spectral_grid, output=my_output_writer)
+```@example netcdf
+using SpeedyWeather
+spectral_grid = SpectralGrid()
+my_output_writer = OutputWriter(spectral_grid, ShallowWater)
+model = ShallowWaterModel(;spectral_grid, output=my_output_writer)
+nothing # hide
 ```
 
 So after we have defined the grid through the `SpectralGrid` object we can use and change
-the implemented `OutputWriter` by passing on the following arguments
-```julia
-julia> my_output_writer = OutputWriter(spectral_grid, PrimitiveDry, kwargs...)
-```
-the `spectral_grid` has to be the first argument then the model type
-(`Barotropic`, `ShallowWater`, `PrimitiveDry`, `PrimitiveWet`)
-which helps the output writer to make default choices on which variables to output. However, we can
-also pass on further keyword arguments. So let's start with an example.
+the implemented `OutputWriter` by passing on additional arguments.
+The `spectral_grid` has to be the first argument then the model type
+(`Barotropic`, `ShallowWater`, `PrimitiveDry`, or `PrimitiveWet`)
+which helps the output writer to make default choices on which variables to output.
+Then we can also pass on further keyword arguments. So let's start with an example.
 
 ## Example 1: NetCDF output every hour
 
 If we want to increase the frequency of the output we can choose `output_dt` (default `=Hour(6)`) like so
-```julia
-julia> my_output_writer = OutputWriter(spectral_grid, PrimitiveDry, output_dt=Hour(1))
-julia> model = PrimitiveDryModel(;spectral_grid, output=my_output_writer)
+```@example netcdf
+my_output_writer = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(1))
+model = ShallowWaterModel(;spectral_grid, output=my_output_writer)
+nothing # hide
 ```
 which will now output every hour. It is important to pass on the new output writer `my_output_writer` to the
 model constructor, otherwise it will not be part of your model and the default is used instead.
-Note that `output_dt` has to be understood as the minimum frequency or maximum output time step.
-Example, we run the model at a resolution of T85 and the time step is going to be 670s
-```julia
-julia> spectral_grid = SpectralGrid(trunc=85)
-julia> time_stepper = Leapfrog(spectral_grid)
-Leapfrog{Float32}:
-...
- Δt_sec::Int64 = 670
-...
+Note that the choice of `output_dt` can affect the actual time step that is used for the model
+integration, which is explained in the following.
+Example, we run the model at a resolution of T42 and the time step is going to be
+```@example netcdf
+spectral_grid = SpectralGrid(trunc=42,nlev=1)
+time_stepping = Leapfrog(spectral_grid)
+time_stepping.Δt_sec
 ```
-This means that after 32 time steps 5h 57min and 20s will have passed where output will happen as
-the next time step would be >6h. The time axis of the NetCDF output will look like
-```julia
-julia> using NCDatasets
-julia> ds = NCDataset("run_0001/output.nc");
-julia> ds["time"][:]
-5-element Vector{Dates.DateTime}:
- 2000-01-01T00:00:00
- 2000-01-01T05:57:20
- 2000-01-01T11:54:40
- 2000-01-01T17:52:00
- 2000-01-01T23:49:20
+seconds. Depending on the output frequency (we chose `output_dt = Hour(1)` above)
+this will be slightly adjusted during model initialization:
+```@example netcdf
+simulation = initialize!(model)
+model.time_stepping.Δt_sec
+```
+The shorter the output time step the more the model time step needs to be adjusted
+to match the desired output time step exactly. This is important so that for daily output at noon this does not slowly shift towards night over years of model integration. One can always disable this adjustment with
+```@example netcdf
+time_stepping = Leapfrog(spectral_grid,adjust_with_output=false)
+time_stepping.Δt_sec
+```
+and a little info will be printed to explain that even though you wanted
+`output_dt = Hour(1)` you will not actually get this upon initialization:
+```@example netcdf
+model = ShallowWaterModel(;spectral_grid, time_stepping, output=my_output_writer)
+simulation = initialize!(model)
+```
 
-julia> diff(ds["time"][:])
-4-element Vector{Dates.Millisecond}:
- 21440000 milliseconds
- 21440000 milliseconds
- 21440000 milliseconds
- 21440000 milliseconds
+The time axis of the NetCDF output will now look like
+```@example netcdf
+using NCDatasets
+model.feedback.verbose = false # hide
+run!(simulation,n_days=1,output=true)
+id = model.output.id
+ds = NCDataset("run_$id/output.nc")
+ds["time"][:]
 ```
-This is so that we don't interpolate in time during output to hit exactly every 6 hours, but at
-the same time have a constant spacing in time between output time steps.
-
-If we want to overwrite this behaviour, we can choose `adjust_Δt_with_output=true` and specifiy an `output_dt` in the `Leapfrog` time stepper like this:
-```Julia
-julia> time_stepper = Leapfrog(spectral_grid, adjust_Δt_with_output=true, output_dt=Hour(1))
+which is a bit ugly, that's why `adjust_with_output=true` is the default. In that case we would have
+```@example netcdf
+time_stepping = Leapfrog(spectral_grid,adjust_with_output=true)
+output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(1))
+model = ShallowWaterModel(;spectral_grid, time_stepping, output)
+simulation = initialize!(model)
+run!(simulation,n_days=1,output=true)
+id = model.output.id
+ds = NCDataset("run_$id/output.nc")
+ds["time"][:]
 ```
-In this case the internal time step will be adjusted to be a divisor of `output_dt`, so that the output will be exactly every `output_dt`
+very neatly hourly output in the NetCDF file!
 
 ## Example 2: Output onto a higher/lower resolution grid
 
@@ -81,7 +90,7 @@ So for example `output_Grid=FullClenshawGrid` and `nlat_half=48` will always int
 regular 192x95 longitude-latitude grid of 1.875˚ resolution, regardless the grid and resolution used
 for the model integration.
 ```julia
-julia> my_output_writer = OutputWriter(spectral_grid, PrimitiveDry, output_Grid=FullClenshawGrid, nlat_half=48)
+julia> my_output_writer = OutputWriter(spectral_grid, ShallowWater, output_Grid=FullClenshawGrid, nlat_half=48)
 ```
 Note that by default the output is on the corresponding full of the grid used in the dynamical core
 so that interpolation only happens at most in the zonal direction as they share the location of the
