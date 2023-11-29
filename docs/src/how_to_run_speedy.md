@@ -112,7 +112,7 @@ Meaning that if you want to have a shorter or longer time step you can create a 
 `SpectralGrid` as first argument.
 ```@example howto
 spectral_grid = SpectralGrid(trunc=63,nlev=1)
-time_stepping = Leapfrog(spectral_grid,Δt_at_T31=15)
+time_stepping = Leapfrog(spectral_grid,Δt_at_T31=Minute(15))
 ```
 The actual time step at the given resolution (here T63) is then `Δt_sec`, there's
 also `Δt` which is a scaled time step used internally, because SpeedyWeather.jl
