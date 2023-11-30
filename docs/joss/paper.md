@@ -140,8 +140,12 @@ in the Python-based generic partial differential equation solver Dedalus [@Burns
 the process-oriented climate model CLIMLAB [@Rose2018],
 and the Julia ocean model Oceananigans.jl [@Ramadhan2020].
 
-![Surface temperature simulated with the primitive equation model in SpeedyWeather.jl.
-(Figure will be updated) \label{fig:primitive}](primitive.jpg)
+![Surface humidity, air temperature, wind speed and precipitation simulated
+with the primitive equation model in SpeedyWeather.jl. Spectral resolution is
+T127 (about 100km) on an octahedral Gaussian grid [@Malardel2016] with simple
+physics to represent unresolved processes such as surface fluxes including
+evaporation, and precipitation due to large-scale condensation and convection.
+\label{fig:primitive}](primitive.png)
 
 The dynamical core of SpeedyWeather.jl uses established numerics
 [@Bourke1972; @Hoskins1975; @Simmons1978; @Simmons1981],
@@ -212,8 +216,8 @@ NASA's blue marble from June 2004. \label{fig:swm}](swm.png)
 
 We acknowledge contributions from David Meyer, Mosè Giordano, Valentin Churavy, and Pietro Monticone
 who have also committed to the SpeedyWeather.jl repository, and the wider Julia community
-for help and support. MK acknowledges funding from the 
-National Science Foundation (Chris please add).
+for help and support.
+MK acknowledges funding from the National Science Foundation.
 MK and TK acknowledge funding from the European Research Council
 under the European Union’s Horizon 2020 research and innovation programme for the ITHACA grant (no. 741112).
 NCC acknowledges support by the Australian Research Council DECRA Fellowship DE210100749.
