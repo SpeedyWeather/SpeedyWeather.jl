@@ -276,12 +276,12 @@ function initialize!(
     end
 
     # large-scale condensation
-    precip_cond_attribs = Dict("long_name"=>"large-scale precipitation","units"=>"mm/24h","_FillValue"=>missing_value)
+    precip_cond_attribs = Dict("long_name"=>"large-scale precipitation","units"=>"mm/hr","_FillValue"=>missing_value)
     :precip in output_vars && defVar(dataset,"precip_cond",output_NF,(lon_name,lat_name,"time"),attrib=precip_cond_attribs,
                                         deflatelevel=compression_level,shuffle=output.shuffle)
 
     # convective precipitation
-    precip_conv_attribs = Dict("long_name"=>"convective precipitation","units"=>"mm/24h","_FillValue"=>missing_value)
+    precip_conv_attribs = Dict("long_name"=>"convective precipitation","units"=>"mm/hr","_FillValue"=>missing_value)
     :precip in output_vars && defVar(dataset,"precip_conv",output_NF,(lon_name,lat_name,"time"),attrib=precip_conv_attribs,
                                         deflatelevel=compression_level,shuffle=output.shuffle)
     
@@ -472,8 +472,8 @@ function write_netcdf_variables!(   output::OutputWriter,
     precip_large_scale .= 0
     precip_convection .= 0
 
-    # convert from [m] to [mm/24h] rain rate over output time step (e.g. 6hours)
-    s = (1000*Hour(24)/output.output_dt)
+    # convert from [m] to [mm/hr] rain rate over output time step (e.g. 6hours)
+    s = (1000*Hour(1)/output.output_dt)
     precip_cond *= s
     precip_conv *= s
 
