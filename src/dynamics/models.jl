@@ -162,7 +162,7 @@ Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     boundary_layer_drag::BoundaryLayerDrag{NF} = NoBoundaryLayerDrag(spectral_grid)
-    temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
+    temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
     surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
@@ -252,7 +252,7 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     physics::Bool = true
     thermodynamics::Thermodynamics{NF} = Thermodynamics(spectral_grid,atmosphere)
     boundary_layer_drag::BoundaryLayerDrag{NF} = NoBoundaryLayerDrag(spectral_grid)
-    temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
+    temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
     large_scale_condensation::AbstractCondensation{NF} = SpeedyCondensation(spectral_grid)
     surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
