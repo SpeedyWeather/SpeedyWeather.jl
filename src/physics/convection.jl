@@ -15,7 +15,7 @@ Base.@kwdef struct SpeedyConvection{NF} <: AbstractConvection{NF}
     humid_threshold_troposphere::NF = 0.7
 
     "Relaxation time for PBL humidity"
-    relaxation_time::Second = Hour(6)
+    time_scale::Second = Hour(6)
 
     "Maximum entrainment as a fraction of cloud-base mass flux"
     max_entrainment::NF = 0.5
@@ -26,11 +26,8 @@ Base.@kwdef struct SpeedyConvection{NF} <: AbstractConvection{NF}
     "Super saturation of relative humidity in the planteray boundar layer [1]"
     super_saturation::NF = 1.01
 
-    "Mass flux limiter for pressure"
-    mass_flux_limiter_pres::NF = 1
-
     "Mass flux limiter for humidity [kg/kg]"
-    mass_flux_limiter_humid::NF = 1e-1
+    mass_flux_limiter_humid::NF = 5e-3
 
     # precomputed in initialize!
     "Reference surface pressure [Pa]"
@@ -208,7 +205,7 @@ function convection!(
     T::TimeStepper,
 ) where NF
 
-    (; gravity ) = C
+    (; gravity, pres_ref ) = C
     (; nlev, pres, humid, humid_half, sat_humid, sat_humid_half, cloud_top) = column
     (; dry_static_energy, dry_static_energy_half, cloud_top) = column
     (; flux_temp_downward, flux_temp_upward, flux_humid_downward, flux_humid_upward) = column
@@ -216,8 +213,10 @@ function convection!(
     (; σ_levels_thick) = G
 
     n_boundary_levels = convection.n_boundary_levels[]
-    relaxation_time = convection.relaxation_time.value
+    time_scale = convection.time_scale.value
     latent_heat_cₚ = convection.latent_heat_condensation[]/convection.specific_heat[]
+    (;pres_threshold, humid_threshold_troposphere, ratio_secondary_mass_flux) = convection
+    (;mass_flux_limiter_humid) = convection
 
     # 1. Fluxes in the planetary boundary layer (PBL)
     # Humidity at the upper boundary of the PBL
@@ -231,17 +230,21 @@ function convection!(
 
     # Cloud-base mass flux
     pₛ = pres[end]                          # surface pressure
-    Δp = pₛ - pres[nlev-n_boundary_levels]   # Pressure difference between bottom and top of PBL
+    p_norm = pₛ/pres_ref                    # normalised surface pressure
+    Δp = pres_ref*σ_levels_thick[nlev]      # Pressure difference between bottom and top of PBL
     
     # excess humidity relative to humid difference across PBL
     excess_humid = column.excess_humid / (max_humid_pbl - humid_top_of_pbl)
 
     # Fortran SPEEDY documentation eq. (12) and (13)
     mass_flux =
-        Δp / (gravity * relaxation_time) *
+        Δp / (gravity * time_scale) *
         # Fortran SPEEDY extends this with some flux limiters:
-        # min(convection.mass_flux_limiter_pres,  (pₛ - pres_threshold) / (1 - pres_threshold)) *
-        min(convection.mass_flux_limiter_humid, excess_humid)
+        # (original SPEEDY formulation doesn't make sense to me given it's supposed to be for
+        # "Minimum (normalised) surface pressure for the occurrence of convection")
+        # p_norm*min(1,  2 * (p_norm - pres_threshold) / (1 - pres_threshold)) *
+        max(0,(p_norm - pres_threshold) / (1 - pres_threshold)) *       # new version
+        min(mass_flux_limiter_humid, excess_humid)
     
     column.cloud_base_mass_flux = mass_flux
 
@@ -264,7 +267,7 @@ function convection!(
     for k = (nlev-n_boundary_levels):-1:(cloud_top+1)
 
         # Mass entrainment
-        mass_entrainment = convection.entrainment_profile[k] * column.cloud_base_mass_flux
+        mass_entrainment = p_norm * convection.entrainment_profile[k] * column.cloud_base_mass_flux
         mass_flux += mass_entrainment
 
         # Upward fluxes at upper boundary
@@ -282,14 +285,17 @@ function convection!(
         flux_humid_upward[k]   += flux_up_humid
         flux_humid_downward[k] += flux_down_humid
 
-        # # Secondary moisture flux representing shallower, non-precipitating convective systems
-        # # Occurs when RH in an intermediate layer falls below a threshold
-        # Δhumid = RH_thresh_trop_cnv * sat_humid[k] - humid[k]
-        # if Δhumid > 0
-        #     Δflux_humid = ratio_secondary_mass_flux * cloud_base_mass_flux * Δhumid
-        #     net_flux_humid[k] += Δflux_humid
-        #     net_flux_humid[nlev] -= Δflux_humid
-        # end
+        # Secondary moisture flux representing shallower, non-precipitating convective systems
+        # Occurs when RH in an intermediate layer falls below a threshold
+        Δhumid = humid_threshold_troposphere * sat_humid[k] - humid[k]
+        if Δhumid > 0
+            Δflux_humid = ratio_secondary_mass_flux * mass_flux * Δhumid
+
+            # a flux from bottom nlev to layer k, equivalent to net flux of Δflux_humid into k but out of nlev
+            for kk in k+1:nlev+1
+                flux_humid_upward[kk] += Δflux_humid
+            end
+        end
     end
 
     # 3. Convective precipitation in top-of-convection layer
