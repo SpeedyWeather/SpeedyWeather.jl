@@ -124,6 +124,13 @@ far beyond the options provided in a monolithic interface.
 At the same time, defaults, set to well-established test cases, 
 enable even inexperienced users to run simulations in just a few lines of code. 
 
+![Surface humidity, air temperature, wind speed and precipitation simulated
+with the primitive equation model in SpeedyWeather.jl. Spectral resolution is
+T127 (about 100km) on an octahedral Gaussian grid [@Malardel2016] with simple
+physics to represent unresolved processes such as surface fluxes including
+evaporation, and precipitation due to large-scale condensation and convection.
+\label{fig:primitive}](primitive.png)
+
 SpeedyWeather.jl relies on Julia's multiple dispatch programming paradigm [@Bezanson2017]
 to be extensible with new components including parameterizations, forcings, drag,
 or even the grid.
@@ -139,13 +146,6 @@ Conceptually similar scientific modelling paradigms have been very successful
 in the Python-based generic partial differential equation solver Dedalus [@Burns2020],
 the process-oriented climate model CLIMLAB [@Rose2018],
 and the Julia ocean model Oceananigans.jl [@Ramadhan2020].
-
-![Surface humidity, air temperature, wind speed and precipitation simulated
-with the primitive equation model in SpeedyWeather.jl. Spectral resolution is
-T127 (about 100km) on an octahedral Gaussian grid [@Malardel2016] with simple
-physics to represent unresolved processes such as surface fluxes including
-evaporation, and precipitation due to large-scale condensation and convection.
-\label{fig:primitive}](primitive.png)
 
 The dynamical core of SpeedyWeather.jl uses established numerics
 [@Bourke1972; @Hoskins1975; @Simmons1978; @Simmons1981],
@@ -179,6 +179,13 @@ and therefore support SpeedyWeather's library-like user interface.
 Output is stored as NetCDF files using
 [NCDatasets.jl](https://github.com/Alexander-Barth/NCDatasets.jl).
 
+![Relative vorticity simulated with the shallow water model in SpeedyWeather.jl.
+The simulation used a spectral resolution of T1023 (about 20 km) and Float32
+arithmetic on an octahedral Clenshaw-Curtis grid [@Hotta2018]. Relative vorticity
+is visualized with Matplotlib [@Hunter2007] and Cartopy [@Cartopy] using a
+transparent-to-white colormap to mimic the appearance of clouds. Underlaid is
+NASA's blue marble from June 2004. \label{fig:swm}](swm.png)
+
 # Statement of need
 
 SpeedyWeather.jl is a fresh approach to atmospheric models that have been
@@ -196,21 +203,13 @@ which replaces existing model components with machine learning,
 is more difficult in Fortran due to the lack of
 established machine learning frameworks [@Meyer2022a].
 In Julia, Flux.jl is available for machine learning [@Innes2019] as well as automatic
-differentiation with Enzyme [@Moses2020], which calculates gradients,
-necessary to optimize network weights or parameters during training.
+differentiation with Enzyme [@Moses2020] for gradients-based optimization.
 
 With SpeedyWeather.jl we hope to provide a platform for data-driven
 atmospheric modelling and in general an interactive model that makes difficult
 problems easy to simulate. Climate models that are user-friendly, trainable,
 but also easily extensible will suddenly make many complex
 research ideas possible.
-
-![Relative vorticity simulated with the shallow water model in SpeedyWeather.jl.
-The simulation used a spectral resolution of T1023 (about 20 km) and Float32
-arithmetic on an octahedral Clenshaw-Curtis grid [@Hotta2018]. Relative vorticity
-is visualized with Matplotlib [@Hunter2007] and Cartopy [@Cartopy] using a
-transparent-to-white colormap to mimic the appearance of clouds. Underlaid is
-NASA's blue marble from June 2004. \label{fig:swm}](swm.png)
 
 # Acknowledgements
 
