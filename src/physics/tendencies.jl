@@ -72,7 +72,7 @@ function fluxes_to_tendencies!(
     (;radius) = constants               # used for scaling
     
     # TODO ONLY FOR TESTING TO MAKE PARAMETERIZATIONS WEAKER
-    radius /= 2
+    radius /= 1.5
 
     # for g/Δp and g/(Δp*cₚ), see Fortran SPEEDY documentation eq. (3,5)
     g_pₛ = constants.gravity/pₛ
