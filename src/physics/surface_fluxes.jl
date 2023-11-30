@@ -82,13 +82,13 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
     V₀ = column.surface_wind_speed
     drag = land_fraction*drag_land + (1-land_fraction)*drag_sea
 
-    # SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
     # add flux limiter to avoid heavy drag in initial shock
     # u_flux = sign(u[end])*min(abs(ρdragV₀*u[end]),max_flux)
     # v_flux = sign(v[end])*min(abs(ρdragV₀*v[end]),max_flux)
     # column.flux_u_upward[end] -= u_flux
     # column.flux_v_upward[end] -= v_flux
-
+    
+    # SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
     column.flux_u_upward[end] -= ρ*drag*V₀*u[end]
     column.flux_v_upward[end] -= ρ*drag*V₀*v[end]
     

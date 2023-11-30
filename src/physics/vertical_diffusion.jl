@@ -22,9 +22,9 @@ Diffusion of dry static energy: A relaxation towards a reference
 gradient of static energy wrt to geopotential, see Fortran SPEEDY documentation.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct StaticEnergyDiffusion{NF<:AbstractFloat} <: VerticalDiffusion{NF}
-    "time scale [hrs] for strength"
-    time_scale::NF = 6
-    
+    "time scale for strength"
+    time_scale::Second = Hour(6)
+
     "[1] ∂SE/∂Φ, vertical gradient of static energy SE with geopotential Φ"
     static_energy_lapse_rate::NF = 0.1
     
@@ -44,7 +44,7 @@ function initialize!(   scheme::StaticEnergyDiffusion,
     C₀ = 1/nlev                     # average Δσ
     
     # Fortran SPEEDY documentation equation (70), excluding the surface pressure pₛ
-    scheme.Fstar[] = C₀/gravity/(scheme.time_scale*3600)
+    scheme.Fstar[] = C₀/gravity/scheme.time_scale.value
 end
 
 """$(TYPEDSIGNATURES)

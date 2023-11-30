@@ -62,7 +62,7 @@ Base.@kwdef struct EarthAtmosphere <: AbstractAtmosphere
     pres_ref::Float64 = 1000
 
     "scale height for specific humidity [km]"
-    scale_height_humid::Float64 = 2.0
+    scale_height_humid::Float64 = 2.5
 
     "relative humidity of near-surface air [1]"
     relhumid_ref::Float64 = 0.7

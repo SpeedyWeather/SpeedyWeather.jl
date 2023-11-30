@@ -54,7 +54,7 @@ function initialize!(scheme::SpeedyCondensation,model::PrimitiveEquation)
         # Impose a maximum heating rate to avoid grid-point storm instability
         # This formula does not appear in the original SPEEDY documentation
         # there's a (pres[end]/pres_ref)^2 which we set to 1 for simplicity
-        humid_tend_max[k] = max_flux*σₖ² / 3600time_scale          # [hrs] → [s]
+        humid_tend_max[k] = max_flux*σₖ² / time_scale.value
     end
 
     # to convert humidity tendency to temperature tendency
