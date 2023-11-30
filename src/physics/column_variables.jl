@@ -20,7 +20,7 @@ function get_column!(   C::ColumnVariables,
     C.jring = jring             # ring index j of column, used to index latitude vectors
     C.land_fraction = L.land_sea_mask[ij]
 
-    # pressure [Pa]/[log(Pa)]
+    # pressure [Pa] or [log(Pa)]
     lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics
     pₛ = exp(lnpₛ)                          # convert back here
     C.ln_pres .= ln_σ_levels_full .+ lnpₛ   # log pressure on every level ln(p) = ln(σ) + ln(pₛ)
@@ -32,10 +32,6 @@ function get_column!(   C::ColumnVariables,
         C.v[k] = layer.grid_variables.v_grid[ij]
         C.temp[k] = layer.grid_variables.temp_grid[ij]
         C.humid[k] = layer.grid_variables.humid_grid[ij]
-
-        # as well as geopotential (not actually prognostic though)
-        # TODO geopot on the grid is currently not computed in dynamics
-        C.geopot[k] = layer.grid_variables.geopot_grid[ij]
     end
 
     # TODO skin = surface approximation for now
@@ -62,22 +58,28 @@ $(TYPEDSIGNATURES)
 Write the parametrization tendencies from `C::ColumnVariables` into the horizontal fields
 of tendencies stored in `D::DiagnosticVariables` at gridpoint index `ij`."""
 function write_column_tendencies!(  D::DiagnosticVariables,
-                                    C::ColumnVariables,
+                                    column::ColumnVariables,
+                                    C::DynamicsConstants,
                                     ij::Int)            # grid point index
 
-    @boundscheck C.nlev == D.nlev || throw(BoundsError)
+    (; nlev) = column
+    @boundscheck nlev == D.nlev || throw(BoundsError)
 
     @inbounds for (k,layer) = enumerate(D.layers)
-        layer.tendencies.u_tend_grid[ij] = C.u_tend[k]
-        layer.tendencies.v_tend_grid[ij] = C.v_tend[k]
-        layer.tendencies.temp_tend_grid[ij] = C.temp_tend[k]
-        layer.tendencies.humid_tend_grid[ij] = C.humid_tend[k]
+        layer.tendencies.u_tend_grid[ij] = column.u_tend[k]
+        layer.tendencies.v_tend_grid[ij] = column.v_tend[k]
+        layer.tendencies.temp_tend_grid[ij] = column.temp_tend[k]
+        layer.tendencies.humid_tend_grid[ij] = column.humid_tend[k]
     end
 
     # accumulate (set back to zero when netcdf output)
-    D.surface.precip_large_scale[ij] += C.precip_large_scale
-    D.surface.precip_convection[ij] += C.precip_convection
-    D.surface.cloud_top[ij] = C.pres[C.cloud_top]
+    D.surface.precip_large_scale[ij] += column.precip_large_scale
+    D.surface.precip_convection[ij] += column.precip_convection
+
+    # Output cloud top in height [m] from geopotential height divided by gravity,
+    # but NaN for no clouds
+    D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? NaN : column.geopot[column.cloud_top]
+    D.surface.cloud_top[ij] /= C.gravity
 
     return nothing
 end
@@ -104,16 +106,15 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     column.flux_temp_upward .= 0
     column.flux_temp_downward .= 0
 
-    # # Convection
-    column.cloud_top = column.nlev+1
-    # column.conditional_instability = false
-    # column.activate_convection = false
-    column.precip_convection = zero(NF)
-    # fill!(column.net_flux_humid, 0)
-    # fill!(column.net_flux_dry_static_energy, 0)
+    # Convection
+    column.cloud_top = column.nlev+1            # also diagnostic from condensation
+    column.conditional_instability = false
+    column.activate_convection = false
+    column.excess_humid = 0
+    column.precip_convection = 0
 
     # Large-scale condensation
-    column.precip_large_scale = zero(NF)
+    column.precip_large_scale = 0
     return nothing
 end
 

@@ -205,7 +205,7 @@ Base.@kwdef struct ZonalWind <: InitialConditions
 
     # PRESSURE
     "initialize pressure given the `atmosphere.lapse_rate` on orography?"
-    pressure_on_orography::Bool = false
+    pressure_on_orography::Bool = true
 end
 
 """
@@ -425,8 +425,8 @@ function pressure_on_orography!(progn::PrognosticVariables,
         lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹
     end
 
-    lnp = progn.pres.timesteps[1]
-    spectral!(lnp,lnp_grid,S)
+    lnp = progn.surface.timesteps[1].pres
+    spectral!(lnp,lnp_grid,model.spectral_transform)
     spectral_truncation!(lnp)       # set lmax+1 row to zero
     return lnp_grid                 # return grid for use in initialize_humidity!
 end
@@ -448,7 +448,8 @@ function initialize_humidity!(  progn::PrognosticVariables,
     scale_height_ratio = scale_height/scale_height_humid
 
     (;nlev, σ_levels_full) = model.geometry
-    n_stratosphere_levels = findlast(σ->σ<=σ_tropopause,σ_levels_full)
+    n = findlast(σ->σ<=σ_tropopause,σ_levels_full)
+    n_stratosphere_levels = isnothing(n) ? 0 : n
 
     # Specific humidity at the surface (grid space)
     temp_grid = gridded(progn.layers[end].timesteps[1].temp,model.spectral_transform)

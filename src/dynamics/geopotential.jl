@@ -109,13 +109,15 @@ $(TYPEDSIGNATURES)
 Calculate the geopotential based on `temp` in a single column.
 This exclues the surface geopotential that would need to be added to the returned vector.
 Function not used in the dynamical core but for post-processing and analysis."""
-function geopotential!( temp::Vector,
+function geopotential!( geopot::Vector,
+                        temp::Vector,
                         C::DynamicsConstants)
-    nlev = length(temp)
+    nlev = length(geopot)
     (;Δp_geopot_half, Δp_geopot_full) = C  # = R*Δlnp either on half or full levels
-    geopot = zero(temp)
 
-    @boundscheck length(temp) == length(Δp_geopot_full) || throw(BoundsError)
+    @boundscheck length(temp) >= nlev || throw(BoundsError)
+    @boundscheck length(Δp_geopot_full) >= nlev || throw(BoundsError)
+    @boundscheck length(Δp_geopot_half) >= nlev || throw(BoundsError)
 
     # bottom layer
     geopot[nlev] = temp[nlev]*Δp_geopot_full[end]
@@ -125,6 +127,13 @@ function geopotential!( temp::Vector,
         geopot[k] = geopot[k+1] + temp[k+1]*Δp_geopot_half[k+1] + temp[k]*Δp_geopot_full[k]
     end
 
+    return geopot
+end
+
+function geopotential(  temp::Vector,
+                        C::DynamicsConstants) 
+    geopot = zero(temp)
+    geopotential!(geopot,temp,C)
     return geopot
 end
 

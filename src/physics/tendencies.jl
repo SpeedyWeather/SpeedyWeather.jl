@@ -13,11 +13,6 @@ function parameterization_tendencies!(
     model::PrimitiveEquation,
 )
 
-    (;boundary_layer_drag) = model
-    (;temperature_relaxation) = model
-    # (;vertical_diffusion) = model
-    (;static_energy_diffusion) = model
-    
     G = model.geometry
     L = model.land_sea_mask
     rings = eachring(G.Grid,G.nlat_half)
@@ -36,27 +31,25 @@ function parameterization_tendencies!(
         get_thermodynamics!(column,model)
 
         # VERTICAL DIFFUSION
-        # vertical_diffusion!(column,vertical_diffusion,model)
-        static_energy_diffusion!(column,static_energy_diffusion)
+        static_energy_diffusion!(column,model)
 
         # HELD-SUAREZ
-        temperature_relaxation!(column,temperature_relaxation)
-        boundary_layer_drag!(column,boundary_layer_drag)
+        temperature_relaxation!(column,model)
+        boundary_layer_drag!(column,model)
 
         # Calculate parametrizations (order of execution is important!)
-        # convection!(column,model)
+        convection!(column,model)
         large_scale_condensation!(column,model)
         # clouds!(column, model)
         # shortwave_radiation!(column,model)
         # longwave_radiation!(column,model)
         surface_fluxes!(column,model)
-        # vertical_diffusion!(column,M)
 
         # sum fluxes on half levels up and down for every layer
         fluxes_to_tendencies!(column,model.geometry,model.constants)
 
         # write tendencies from parametrizations back into horizontal fields
-        write_column_tendencies!(diagn,column,ij)
+        write_column_tendencies!(diagn,column,model.constants,ij)
     end
 end
 
@@ -76,10 +69,13 @@ function fluxes_to_tendencies!(
 
     Δσ = geometry.σ_levels_thick
     pₛ = column.pres[end]               # surface pressure
+    (;radius) = constants               # used for scaling
+    
+    # TODO ONLY FOR TESTING TO MAKE PARAMETERIZATIONS WEAKER
+    radius /= 1.5
 
-    # # g/pₛ and g/(pₛ*cₚ), see Fortran SPEEDY documentation eq. (3,5)
+    # for g/Δp and g/(Δp*cₚ), see Fortran SPEEDY documentation eq. (3,5)
     g_pₛ = constants.gravity/pₛ
-    g_pₛ_cₚ = g_pₛ/constants.cₚ
 
     # fluxes are defined on half levels including top k=1/2 and surface k=nlev+1/2
     @inbounds for k in 1:nlev
@@ -98,11 +94,14 @@ function fluxes_to_tendencies!(
         ΔF_temp = (flux_temp_upward[k+1] - flux_temp_upward[k]) +
             (flux_temp_downward[k] - flux_temp_downward[k+1])
 
-        # convert absorbed flux to tendency
-        u_tend[k] += g_pₛ/Δσ[k]*ΔF_u
-        v_tend[k] += g_pₛ/Δσ[k]*ΔF_v
-        humid_tend[k] += g_pₛ/Δσ[k]*ΔF_humid
-        temp_tend[k] += g_pₛ_cₚ/Δσ[k]*ΔF_temp
+        # convert absorbed flux to tendency, accumulate with
+        # non-flux tendencies and scale with radius
+        g_Δp = g_pₛ/Δσ[k]
+        g_Δp_cₚ = g_Δp/constants.cₚ
+        u_tend[k] = radius*(u_tend[k] + g_Δp*ΔF_u)
+        v_tend[k] = radius*(v_tend[k] + g_Δp*ΔF_v)
+        humid_tend[k] = radius*(humid_tend[k] + g_Δp*ΔF_humid)
+        temp_tend[k] = radius*(temp_tend[k] + g_Δp_cₚ*ΔF_temp)
     end
 
     return nothing

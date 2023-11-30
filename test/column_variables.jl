@@ -1,9 +1,4 @@
 @testset "ColumnVariables initialisation" begin
-
-    # no number format provided
-    # column = ColumnVariables(nlev=8)
-    # @test eltype(column.temp) == Float64
-
     @testset for NF in (Float16,Float32,Float64)
         column = ColumnVariables{NF}(nlev=8)
 
@@ -19,11 +14,9 @@
         @test column.cloud_top === column.nlev+1
         @test column.conditional_instability === false
         @test column.activate_convection === false
-        @test column.excess_humidity === zero(NF)
+        @test column.excess_humid === zero(NF)
         @test column.precip_convection === zero(NF)
         @test column.cloud_base_mass_flux === zero(NF)
-        @test all(column.net_flux_humid .=== zero(NF))
-        @test all(column.net_flux_dry_static_energy .=== zero(NF))
 
         # Large-scale condensation
         @test column.precip_large_scale === zero(NF)
@@ -50,7 +43,7 @@ end
         column.humid_tend .= humid_tend
 
         # copy into diagn
-        SpeedyWeather.write_column_tendencies!(diagn,column,1)
+        SpeedyWeather.write_column_tendencies!(diagn,column,model.constants,1)
 
         # and check that that worked
         for (k,layer) in enumerate(diagn.layers)

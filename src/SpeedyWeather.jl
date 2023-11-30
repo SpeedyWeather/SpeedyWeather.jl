@@ -108,8 +108,9 @@ export  JetStreamForcing
 export  NoVerticalDiffusion,
         VerticalLaplacian
 
-# Large scale condensation
-export  SpeedyCondensation
+# PRECIPITATOIN
+export  SpeedyCondensation,
+        SpeedyConvection
 
 # EXPORT STRUCTS
 export  DynamicsConstants,
@@ -151,6 +152,7 @@ include("gpu.jl")
 include("abstract_types.jl")
 include("dynamics/vertical_coordinates.jl")
 include("dynamics/spectral_grid.jl")
+include("dynamics/vertical_interpolation.jl")
 include("dynamics/planets.jl")
 include("dynamics/atmospheres.jl")
 include("dynamics/constants.jl")
@@ -183,6 +185,9 @@ include("physics/temperature_relaxation.jl")
 include("physics/vertical_diffusion.jl")
 include("physics/large_scale_condensation.jl")
 include("physics/surface_fluxes.jl")
+include("physics/convection.jl")
+# include("physics/longwave_radiation.jl")
+# include("physics/shortwave_radiation.jl")
 include("physics/pretty_printing.jl")
 
 # OCEAN AND LAND
@@ -191,11 +196,6 @@ include("physics/land.jl")
 
 # MODELS
 include("dynamics/models.jl")
-
-# # PHYSICS
-# include("physics/convection.jl")
-# include("physics/longwave_radiation.jl")
-# include("physics/shortwave_radiation.jl")
 
 # OUTPUT
 include("output/output.jl")                     # defines Output

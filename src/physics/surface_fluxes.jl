@@ -46,17 +46,20 @@ end
 
 Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind{NF}
     "Ratio of near-surface wind to lowest-level wind [1]"
-    f_wind::Float64 = 0.95
+    f_wind::NF = 0.95
 
     "Wind speed of sub-grid scale gusts [m/s]"
-    V_gust::Float64 = 5
+    V_gust::NF = 5
 
     # TODO make this orography dependent
     "Drag coefficient over land (orography = 0) [1]"
-    drag_land::Float64 = 2.4e-3
+    drag_land::NF = 2.4e-3
 
     "Drag coefficient over sea [1]"
-    drag_sea::Float64 = 1.8e-3
+    drag_sea::NF = 1.8e-3
+
+    "Flux limiter [kg/m/s²]"
+    max_flux::NF = 1.5
 end
 
 SurfaceWind(SG::SpectralGrid;kwargs...) = SurfaceWind{SG.NF}(;kwargs...)
@@ -65,10 +68,7 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
                                 surface_wind::SurfaceWind) where NF
 
     (;u,v,land_fraction) = column
-    f_wind = convert(NF,surface_wind.f_wind)
-    V_gust = convert(NF,surface_wind.V_gust)            
-    drag_land = convert(NF,surface_wind.drag_land)            
-    drag_sea = convert(NF,surface_wind.drag_sea)            
+    (;f_wind, V_gust, drag_land, drag_sea, max_flux) = surface_wind     
 
     # SPEEDY documentation eq. 49
     u[end] = f_wind*u[end-1] 
@@ -82,10 +82,16 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
     V₀ = column.surface_wind_speed
     drag = land_fraction*drag_land + (1-land_fraction)*drag_sea
 
+    # add flux limiter to avoid heavy drag in initial shock
+    # u_flux = sign(u[end])*min(abs(ρdragV₀*u[end]),max_flux)
+    # v_flux = sign(v[end])*min(abs(ρdragV₀*v[end]),max_flux)
+    # column.flux_u_upward[end] -= u_flux
+    # column.flux_v_upward[end] -= v_flux
+    
     # SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
-    column.flux_u_upward[end] += -ρ*drag*V₀*u[end]
-    column.flux_v_upward[end] += -ρ*drag*V₀*v[end]
-
+    column.flux_u_upward[end] -= ρ*drag*V₀*u[end]
+    column.flux_v_upward[end] -= ρ*drag*V₀*v[end]
+    
     return nothing
 end
 

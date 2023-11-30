@@ -35,6 +35,7 @@ end
 $(TYPEDSIGNATURES)
 Calculate the dry static energy for the primitive dry model."""
 function get_thermodynamics!(column::ColumnVariables,model::PrimitiveDry)
+    geopotential!(column.geopot,column.temp,model.constants)
     dry_static_energy!(column, model.constants)
 end
 
@@ -44,14 +45,35 @@ Calculate thermodynamic quantities like saturation vapour pressure,
 saturation specific humidity, dry static energy, moist static energy
 and saturation moist static energy from the prognostic column variables."""
 function get_thermodynamics!(column::ColumnVariables,model::PrimitiveWet)
+    geopotential!(column.geopot,column.temp,model.constants)
     dry_static_energy!(column, model.constants)
     saturation_humidity!(column, model.thermodynamics)
     moist_static_energy!(column, model.thermodynamics)
 
     # Interpolate certain variables to half-levels
-    # interpolate!(column, model)
+    vertical_interpolate!(column, model)
 
     return nothing
+end
+
+"""
+$(TYPEDSIGNATURES)
+Full to half-level interpolation for humidity, saturation humidity,
+dry static energy and saturation moist static energy.
+"""
+function vertical_interpolate!(
+    column::ColumnVariables,
+    model::PrimitiveEquation,
+)
+
+    for (full, half) in (
+        (column.humid,                      column.humid_half),
+        (column.sat_humid,                  column.sat_humid_half),
+        (column.dry_static_energy,          column.dry_static_energy_half),
+        (column.sat_moist_static_energy,    column.sat_moist_static_energy_half),
+    )
+        vertical_interpolate!(half, full, model.geometry)
+    end
 end
 
 """

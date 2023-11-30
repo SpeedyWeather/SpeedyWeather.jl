@@ -1,15 +1,15 @@
-# stolen from BenchmarkTools.jl
+# from BenchmarkTools.jl but using KB instead of KiB etc
 function prettymemory(b)
-  if b < 1024
-      return string(b, " bytes")
-  elseif b < 1024^2
-      value, units = b / 1024, "KiB"
-  elseif b < 1024^3
-      value, units = b / 1024^2, "MiB"
-  else
-      value, units = b / 1024^3, "GiB"
-  end
-  return string(@sprintf("%.2f", value), " ", units)
+    if b < 1e3
+        return string(b, " bytes")
+    elseif b < 1e6
+        value, units = b * 1e-3, "KB"
+    elseif b < 1e9
+        value, units = b * 1e-6, "MB"
+    else
+        value, units = b * 1e-9, "GB"
+    end
+    return string(@sprintf("%.2f", value), " ", units)
 end
 
 function Base.show(io::IO,S::SpectralTransform{NF}) where NF

@@ -34,6 +34,9 @@ Base.@kwdef struct DynamicsConstants{NF<:AbstractFloat} <: AbstractDynamicsConst
     "water density [kg/m³]"
     water_density::NF
 
+    "reference pressure [Pa]"
+    pres_ref::NF
+
     "coriolis frequency [s^-1], scaled by radius as is vorticity = 2Ω*sin(lat)*radius"
     f_coriolis::Vector{NF}
 
@@ -81,6 +84,7 @@ function DynamicsConstants( spectral_grid::SpectralGrid,
     μ_virt_temp = (1-ξ)/ξ           # used in Tv = T(1+μq), for conversion from humidity q
                                     # and temperature T to virtual temperature Tv
     κ = R_dry/cₚ                    # = 2/7ish for diatomic gas
+    pres_ref = atmosphere.pres_ref*100
 
     # CORIOLIS FREQUENCY (scaled by radius as is vorticity)
     (;sinlat) = geometry
@@ -111,7 +115,7 @@ function DynamicsConstants( spectral_grid::SpectralGrid,
 
     # This implies conversion to NF
     return DynamicsConstants{NF}(;  radius,rotation,gravity,layer_thickness,
-                                    R_dry,R_vapour,μ_virt_temp,cₚ,κ,water_density,
+                                    R_dry,R_vapour,μ_virt_temp,cₚ,κ,water_density,pres_ref,
                                     f_coriolis,
                                     σ_lnp_A,σ_lnp_B,
                                     Δp_geopot_half, Δp_geopot_full,

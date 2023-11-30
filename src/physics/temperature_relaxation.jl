@@ -70,7 +70,7 @@ equilibrium temperature Teq."""
 function initialize!(   scheme::HeldSuarez,
                         model::PrimitiveEquation)
 
-    (;σ_levels_full, radius, coslat, sinlat) = model.geometry
+    (;σ_levels_full, coslat, sinlat) = model.geometry
     (;σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = scheme
     (;temp_relax_freq, temp_equil_a, temp_equil_b) = scheme
     
@@ -79,8 +79,8 @@ function initialize!(   scheme::HeldSuarez,
     scheme.κ[] = model.constants.κ                          # thermodynamic kappa
 
     # slow relaxation everywhere, fast in the tropics
-    kₐ = radius/(relax_time_slow*3600)    # scale with radius as ∂ₜT is; hrs -> sec
-    kₛ = radius/(relax_time_fast*3600)
+    kₐ = 1/(relax_time_slow*3600)    # scale with radius as ∂ₜT is; hrs -> sec
+    kₛ = 1/(relax_time_fast*3600)
 
     for (j,(cosϕ,sinϕ)) = enumerate(zip(coslat,sinlat))     # use ϕ for latitude here
         for (k,σ) in enumerate(σ_levels_full)
@@ -93,6 +93,11 @@ function initialize!(   scheme::HeldSuarez,
         temp_equil_a[j] = Tmax - ΔTy*sinϕ^2 + Δθz*log(p₀)*cosϕ^2
         temp_equil_b[j] = -Δθz*cosϕ^2
     end
+end
+
+# function barrier
+function temperature_relaxation!(column::ColumnVariables,model::PrimitiveEquation)
+    temperature_relaxation!(column,model.temperature_relaxation)
 end
 
 """$(TYPEDSIGNATURES)
@@ -173,12 +178,12 @@ function initialize!(   scheme::JablonowskiRelaxation,
     (;gravity, rotation) = model.planet
     (;lapse_rate, R_dry, σ_tropopause, temp_ref) = model.atmosphere
 
-    Γ = lapse_rate/1000                   # from [K/km] to [K/m]
-    aΩ = radius*rotation
+    Γ = lapse_rate/1000                   # from [K/km] to [K1 = radius*rotation
+    Ω = rotation
 
     # slow relaxation everywhere, fast in the tropics
-    kₐ = radius/(relax_time_slow*3600)    # scale with radius as ∂ₜT is; hrs -> sec
-    kₛ = radius/(relax_time_fast*3600)
+    kₐ = 1/(relax_time_slow*3600)    # scale with radius as ∂ₜT is; hrs -> sec
+    kₛ = 1/(relax_time_fast*3600)
 
     for (j,(cosϕ,sinϕ)) = enumerate(zip(coslat,sinlat))     # use ϕ for latitude here
         for (k,σ) in enumerate(σ_levels_full)
@@ -201,7 +206,7 @@ function initialize!(   scheme::JablonowskiRelaxation,
 
             # Jablonowski and Williamson, eq. (6) 
             temp_equil[k,j] = Tη + A1*((-2sinϕ^6*(cosϕ^2 + 1/3) + 10/63)*A2 +
-                                            (8/5*cosϕ^3*(sinϕ^2 + 2/3) - π/4)*aΩ)
+                                            (8/5*cosϕ^3*(sinϕ^2 + 2/3) - π/4)*Ω)
         end
     end
 end 
