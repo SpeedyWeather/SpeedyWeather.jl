@@ -34,6 +34,14 @@
     SpeedyWeather.initialize!(c1, L6)
     @test c1.n_timesteps == 10 
 
+    SpeedyWeather.set_period!(c1, 10)
+    SpeedyWeather.initialize!(c1, L6)
+    @test c1.n_timesteps == 10
+
+    SpeedyWeather.set_period!(c1, 10.0)
+    SpeedyWeather.initialize!(c1, L6)
+    @test c1.n_timesteps == 10 
+
     SpeedyWeather.set_period!(c1, Day(2))
     SpeedyWeather.initialize!(c1, L6)
     @test c1.n_timesteps == 48

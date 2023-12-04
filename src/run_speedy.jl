@@ -2,7 +2,7 @@
 $(TYPEDSIGNATURES)
 Run a SpeedyWeather.jl `simulation`. The `simulation.model` is assumed to be initialized."""
 function run!(  simulation::Simulation;
-                period::Period = Day(10),
+                period = Day(10),
                 output::Bool = false, 
                 n_days::Union{Nothing, Real}=nothing)
     

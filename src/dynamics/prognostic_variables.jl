@@ -41,6 +41,14 @@ end
 
 """
 $(TYPEDSIGNATURES)
+Set the `period` of the clock to a new value. Converts any `::Real` input to `Day`."""
+function set_period!(clock::Clock,period::Real)
+    @info "Input $x assumed to have units of days. Use Week($x), Hour($x), Minute($x) otherwise."
+    clock.period = Day(period)
+end
+
+"""
+$(TYPEDSIGNATURES)
 Create and initialize a clock from `time_stepping`"""
 function Clock(time_stepping::TimeStepper;kwargs...)
     clock = Clock(;kwargs...)
