@@ -131,7 +131,7 @@ end
     time_stepping = Leapfrog(spectral_grid, adjust_with_output=true)
     model = PrimitiveDryModel(;spectral_grid,output,time_stepping)
     simulation = initialize!(model)
-    run!(simulation,output=true;period)
+    run!(simulation,output=true;period=Day(1))
     t = SpeedyWeather.load_trajectory("time", model)
     @test all(y->y==diff(t)[1], diff(t)) # all elements equal 
     @test diff(t)[1] == Minute(70)
@@ -141,11 +141,11 @@ end
     # at the moment, no error
     # 1kyrs simulation
     spectral_grid = SpectralGrid()
-    time_stepping = Leapfrog(spectral_grid,Δt_at_T31=Year(10))
-    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="long-output-test",output_dt=Year(10))
+    time_stepping = Leapfrog(spectral_grid,Δt_at_T31=Day(3650))
+    output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,id="long-output-test",output_dt=Day(3650))
     model = PrimitiveDryModel(;spectral_grid,output,time_stepping)
     simulation = initialize!(model)
-    run!(simulation,output=true,period=Year(1000))
+    run!(simulation,output=true,period=Day(365000))
 
     progn = simulation.prognostic_variables
     tmp_read_path = joinpath(model.output.run_path,model.output.filename)
