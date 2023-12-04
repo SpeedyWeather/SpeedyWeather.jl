@@ -43,7 +43,7 @@ end
 $(TYPEDSIGNATURES)
 Set the `period` of the clock to a new value. Converts any `::Real` input to `Day`."""
 function set_period!(clock::Clock,period::Real)
-    @info "Input $x assumed to have units of days. Use Week($x), Hour($x), Minute($x) otherwise."
+    @info "Input $period assumed to have units of days. Use Week($period), Hour($period), Minute($period) otherwise."
     clock.period = Day(period)
 end
 
