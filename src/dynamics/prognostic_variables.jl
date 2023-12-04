@@ -34,7 +34,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Set the `period` of the clock to a new value. Converts any `Dates.Period` input to `Second`."""
+Set the `period` of the clock to a new value. Converts any `Dates.Period` input `Second`."""
 function set_period!(clock::Clock,period::Period)
     clock.period = Second(period)
 end
