@@ -108,7 +108,7 @@ just ignore those. But the `Leapfrog` time stepper comes with `Δt_at_T31` which
 is the parameter used to scale the time step automatically. This means at a spectral
 resolution of T31 it would use 30min steps, at T63 it would be ~half that, 15min, etc.
 Meaning that if you want to have a shorter or longer time step you can create a new
-`Leapfrog` time stepper. But remember that every model component depends on a
+`Leapfrog` time stepper. All time inputs are supposed to be given with the help of  `Dates` (e.g. `Minute()`, `Hour()`, ...). But remember that every model component depends on a
 `SpectralGrid` as first argument.
 ```@example howto
 spectral_grid = SpectralGrid(trunc=63,nlev=1)
@@ -206,7 +206,7 @@ By default this runs for 10 days without output. These are the options left
 to change, so with
 ```@example howto
 model.output.id = "test" # hide
-run!(simulation,n_days=5,output=true)
+run!(simulation,period=Day(5),output=true)
 ```
 You would continue this simulation (the previous `run!` call already integrated
 10 days!) for another 5 days and storing default [NetCDF output](@ref).

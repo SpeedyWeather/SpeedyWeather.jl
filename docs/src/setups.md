@@ -14,7 +14,7 @@ complicated setups.
     initial_conditions = StartWithRandomVorticity()
     model = BarotropicModel(;spectral_grid, initial_conditions, planet=still_earth)
     simulation = initialize!(model)
-    run!(simulation,n_days=20)
+    run!(simulation,period=Day(20))
     ```
 
 We want to use the barotropic model to simulate some free-decaying 2D turbulence
@@ -53,11 +53,11 @@ plotted for surface relative vorticity with a unicode plot. The resolution of th
 is not necessarily representative but it lets us have a quick look at the result
 ```@example barotropic_setup
 simulation = initialize!(model)
-run!(simulation,n_days=20)
+run!(simulation,period=Day(20))
 ```
 
 Woohoo! Something is moving! You could pick up where this simulation stopped by simply
-doing `run!(simulation,n_days=50)` again. We didn't store any output, which
+doing `run!(simulation,period=Day(50))` again. We didn't store any output, which
 you can do by `run!(simulation,output=true)`, which will switch on NetCDF output
 with default settings. More options on output in [NetCDF output](@ref).
 
@@ -71,7 +71,7 @@ with default settings. More options on output in [NetCDF output](@ref).
     initial_conditions = ZonalJet()
     model = ShallowWaterModel(;spectral_grid, orography, initial_conditions)
     simulation = initialize!(model)
-    run!(simulation,n_days=6)
+    run!(simulation,period=Day(6))
     ```
 
 As a second example, let's investigate the Galewsky et al.[^G04] test case for the shallow
@@ -97,12 +97,12 @@ Now we construct a model, but this time a `ShallowWaterModel`
 ```@example galewsky_setup
 model = ShallowWaterModel(;spectral_grid, orography, initial_conditions)
 simulation = initialize!(model)
-run!(simulation,n_days=6)
+run!(simulation,period=Day(6))
 ```
 Oh yeah. That looks like the wobbly jet in their paper. Let's run it again for another 6 days
 but this time also store [NetCDF output](@ref).
 ```@example galewsky_setup
-run!(simulation,n_days=6,output=true)
+run!(simulation,period=Day(6),output=true)
 ```
 The progress bar tells us that the simulation run got the identification "0001"
 (which just counts up, so yours might be higher), meaning that
@@ -164,7 +164,7 @@ compare with the last plot
 ```@example galewsky_setup
 model = ShallowWaterModel(;spectral_grid, orography, initial_conditions)
 simulation = initialize!(model)
-run!(simulation,n_days=12,output=true)
+run!(simulation,period=Day(12),output=true)
 ```
 
 This time the run got a new run id, which you see in the progress bar, but can again always check
@@ -207,8 +207,8 @@ output = OutputWriter(spectral_grid,ShallowWater,output_dt=Hour(6),output_vars=[
 model = ShallowWaterModel(;spectral_grid,output,drag,forcing)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation,n_days=20)   # discard first 20 days   
-run!(simulation,n_days=20,output=true)
+run!(simulation,period=Day(20))   # discard first 20 days   
+run!(simulation,period=Day(20),output=true)
 nothing # hide
 ```
 
@@ -260,7 +260,7 @@ output = OutputWriter(spectral_grid,ShallowWater,output_dt=Hour(12),output_vars=
 model = ShallowWaterModel(;spectral_grid,orography,output,initial_conditions,implicit,time_stepping)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation,n_days=2,output=true)
+run!(simulation,period=Day(2),output=true)
 nothing # hide
 ```
 
@@ -324,7 +324,7 @@ initial_conditions = ZonalWind()
 model = PrimitiveDryModel(;spectral_grid,orography,initial_conditions,physics=false)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation,n_days=9,output=true)
+run!(simulation,period=Day(9),output=true)
 nothing # hide
 ```
 
