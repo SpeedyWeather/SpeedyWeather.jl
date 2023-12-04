@@ -1,7 +1,9 @@
 # SpeedyWeather.jl
-[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml)
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/stable/)
-[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/dev/)
+
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml) 
+[![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/stable/)
+[![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/dev/)
+[![status](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a/status.svg)](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a)
 
 SpeedyWeather.jl is a global spectral atmospheric model with simple physics which is developed as a research playground
 with an everything-flexible attitude as long as it is speedy. With minimal code redundancies it supports
