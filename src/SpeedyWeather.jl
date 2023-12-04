@@ -18,7 +18,7 @@ import Adapt: Adapt, adapt, adapt_structure
 
 # INPUT OUTPUT
 import TOML
-import Dates: Dates, DateTime, Millisecond, Second, Minute, Hour, Day
+import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day
 import Printf: Printf, @sprintf
 import NCDatasets: NCDatasets, NCDataset, defDim, defVar
 import JLD2: jldopen

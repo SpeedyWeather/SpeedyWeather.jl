@@ -10,7 +10,7 @@
                         vertical_advection = VerticalAdvection(spectral_grid),
                         physics=false)
         simulation = initialize!(model)
-        run!(simulation,n_days=10)
+        run!(simulation,period=Day(10))
         @test simulation.model.feedback.nars_detected == false    
     end
 end
