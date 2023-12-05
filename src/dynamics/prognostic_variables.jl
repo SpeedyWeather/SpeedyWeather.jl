@@ -10,8 +10,8 @@ Base.@kwdef mutable struct Clock
     "current model time"
     time::DateTime = DEFAULT_DATE
     
-    "number of days to integrate for, set in run!(::Simulation)"
-    n_days::Float64 = 0
+    "period to integrate for, set in set_period!(::Clock, ::Dates.Period)"
+    period::Second = Second(0)
 
     "number of time steps to integrate for, set in initialize!(::Clock,::TimeStepper)"
     n_timesteps::Int = 0  
@@ -28,8 +28,23 @@ end
 $(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` in the `time_stepping`."""
 function initialize!(clock::Clock,time_stepping::TimeStepper)
-    clock.n_timesteps = ceil(Int,3600*24*clock.n_days/time_stepping.Δt_sec)
+    clock.n_timesteps = ceil(Int,clock.period.value/time_stepping.Δt_sec)
     return clock
+end
+
+"""
+$(TYPEDSIGNATURES)
+Set the `period` of the clock to a new value. Converts any `Dates.Period` input to `Second`."""
+function set_period!(clock::Clock,period::Period)
+    clock.period = Second(period)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Set the `period` of the clock to a new value. Converts any `::Real` input to `Day`."""
+function set_period!(clock::Clock,period::Real)
+    @info "Input $period assumed to have units of days. Use Week($period), Hour($period), Minute($period) otherwise."
+    clock.period = Day(period)
 end
 
 """

@@ -86,7 +86,8 @@ function initialize!(feedback::Feedback,clock::Clock,model::ModelSetup)
         (; run_path, id) = feedback
         SG = model.spectral_grid
         L = model.time_stepping
-
+        days = clock.period.value/(3600*24)
+        
         # create progress.txt file in run_????/
         progress_txt = open(joinpath(run_path,"progress.txt"),"w")
         s = "Starting SpeedyWeather.jl run $id on "*
@@ -94,7 +95,7 @@ function initialize!(feedback::Feedback,clock::Clock,model::ModelSetup)
         write(progress_txt,s*"\n")
         write(progress_txt,"Integrating:\n")
         write(progress_txt,"$SG\n")
-        write(progress_txt,"Time: $(clock.n_days) days at Δt = $(L.Δt_sec)s\n")
+        write(progress_txt,"Time: $days days at Δt = $(L.Δt_sec)s\n")
         write(progress_txt,"\nAll data will be stored in $run_path\n")
         feedback.progress_txt = progress_txt
     end

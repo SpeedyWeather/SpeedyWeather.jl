@@ -324,7 +324,7 @@ drag = QuadraticDrag(spectral_grid)
 model = ShallowWaterModel(;spectral_grid,forcing,drag)
 model.feedback.verbose = false # hide
 simulation = initialize!(model);
-run!(simulation,n_days=30)
+run!(simulation,period=Day(30))
 nothing # hide
 ```
 
