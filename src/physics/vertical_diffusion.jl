@@ -23,7 +23,7 @@ gradient of static energy wrt to geopotential, see Fortran SPEEDY documentation.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct StaticEnergyDiffusion{NF<:AbstractFloat} <: VerticalDiffusion{NF}
     "time scale for strength"
-    time_scale::Second = Hour(6)
+    time_scale::Second = Hour(24)
 
     "[1] ∂SE/∂Φ, vertical gradient of static energy SE with geopotential Φ"
     static_energy_lapse_rate::NF = 0.1
@@ -54,17 +54,103 @@ function static_energy_diffusion!(  column::ColumnVariables,
     
     (;nlev, dry_static_energy, flux_temp_upward, geopot) = column
     pₛ = column.pres[end]               # surface pressure
-    Fstar = scheme.Fstar[]/pₛ
-    Γˢᵉ = scheme.static_energy_lapse_rate
+    Fstar = scheme.Fstar[]*pₛ
+    Γˢᵉ = scheme.static_energy_lapse_rate 
     
     # relax static energy profile back to a reference gradient Γˢᵉ
     @inbounds for k in 1:nlev-1
         # Fortran SPEEDY doc eq (74)
         SEstar = dry_static_energy[k+1] + Γˢᵉ*(geopot[k] - geopot[k+1])
-        SE = max(dry_static_energy[k],SEstar)           # equivalent to if SE < SEstar
-        flux_temp_upward[k+1] += Fstar*(SEstar - SE)    # then Fstar*(SEstar - SE) else 0
+        SE = dry_static_energy[k]
+        if SE < SEstar
+            flux_temp_upward[k+1] += Fstar*(SEstar - SE)
+        end
     end
 end
+
+"""
+Diffusion of dry static energy: A relaxation towards a reference
+gradient of static energy wrt to geopotential, see Fortran SPEEDY documentation.
+$(TYPEDFIELDS)"""
+Base.@kwdef struct HumidityDiffusion{NF<:AbstractFloat} <: VerticalDiffusion{NF}
+    "time scale for strength"
+    time_scale::Second = Hour(24)
+
+    "[1] ∂RH/∂σ, vertical gradient of relative humidity RH wrt sigma coordinate σ"
+    humidity_gradient::NF = 0.5
+
+    "[1] disable above this σ level"
+    σ_min::NF = 0.5
+    
+    # precomputations
+    Fstar::Base.RefValue{NF} = Ref(zero(NF))    # excluding the surface pressure pₛ
+end
+
+HumidityDiffusion(SG::SpectralGrid;kwargs...) = HumidityDiffusion{SG.NF}(;kwargs...)
+
+"""$(TYPEDSIGNATURES)
+Initialize dry static energy diffusion."""
+function initialize!(   scheme::HumidityDiffusion,
+                        model::PrimitiveEquation)
+
+    (;nlev) = model.spectral_grid
+    (;gravity) = model.planet
+    C₀ = 1/nlev                     # average Δσ
+    
+    # Fortran SPEEDY documentation equation (70), excluding the surface pressure pₛ
+    scheme.Fstar[] = C₀/gravity/scheme.time_scale.value
+end
+
+# function barrier
+function humidity_diffusion!(   column::ColumnVariables,
+                                model::PrimitiveWet)
+    humidity_diffusion!(column,model.humidity_diffusion,model.geometry)
+end
+
+# do nothing for primitive dry
+function humidity_diffusion!(   column::ColumnVariables,
+                                model::PrimitiveDry)
+    return nothing
+end
+
+function humidity_diffusion!(   column::ColumnVariables,
+                                scheme::NoVerticalDiffusion)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Apply humidity diffusion."""
+function humidity_diffusion!(   column::ColumnVariables,
+                                scheme::HumidityDiffusion,
+                                geometry::Geometry)
+    
+    (;nlev, humid, sat_humid, flux_humid_upward) = column
+    pₛ = column.pres[end]               # surface pressure
+    Fstar = scheme.Fstar[]*pₛ
+    Γ = scheme.humidity_gradient        # relative humidity wrt σ
+    σ = geometry.σ_levels_full
+
+    # skip stratosphere
+    ktop = findfirst(σₖ -> σₖ >= scheme.σ_min,σ)
+    ktop = isnothing(ktop) ? 1 : ktop
+
+    # relax humidity profile back to a reference gradient Γ
+    relative_humidity_below = humid[1]/sat_humid[1]
+    @inbounds for k in ktop:nlev-2
+
+        Γσ = Γ*(σ[k+1] - σ[k])
+        relative_humidity_above = relative_humidity_below
+        relative_humidity_below = humid[k+1]/sat_humid[k+1]
+        ΔRH = (relative_humidity_below - relative_humidity_above)
+
+        # Fortran SPEEDY doc eq (71)
+        if ΔRH > Γσ
+            # Fortran SPEEDY doc eq (72)
+            flux_humid_upward[k+1] += Fstar*sat_humid[k]*ΔRH
+        end
+    end
+end
+
 
 # Base.@kwdef struct VerticalLaplacian{NF<:Real} <: VerticalDiffusion{NF}
 #     time_scale::NF = 10.0       # [hours] time scale to control the strength of vertical diffusion

@@ -7,8 +7,8 @@ function surface_fluxes!(column::ColumnVariables,model::PrimitiveEquation)
     surface_wind_stress!(column,model.surface_wind)
 
     # now call other heat and humidity fluxes
-    # sensible_heat_flux!(column,model.surface_heat_flux,model.constants)
-    # evaporation!(column,model)
+    sensible_heat_flux!(column,model.surface_heat_flux,model.constants)
+    evaporation!(column,model)
 end
 
 struct SurfaceThermodynamicsConstant{NF<:AbstractFloat} <: AbstractSurfaceThermodynamics{NF} end
@@ -91,8 +91,8 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
     # column.flux_v_upward[end] -= v_flux
     
     # SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
-    # column.flux_u_upward[end] -= ρ*drag*V₀*surface_u
-    # column.flux_v_upward[end] -= ρ*drag*V₀*surface_v
+    column.flux_u_upward[end] -= ρ*drag*V₀*surface_u
+    column.flux_v_upward[end] -= ρ*drag*V₀*surface_v
     
     return nothing
 end
