@@ -18,11 +18,11 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     latd::NF = 0                            # latitude, needed for shortwave radiation
     land_fraction::NF = 0                   # fraction of the column that is over land
 
-    # PROGNOSTIC VARIABLES, last element is surface
-    const u::Vector{NF} = zeros(NF,nlev+1)          # zonal velocity [m/s]
-    const v::Vector{NF} = zeros(NF,nlev+1)          # meridional velocity [m/s]
-    const temp::Vector{NF} = zeros(NF,nlev+1)       # temperature [K]
-    const humid::Vector{NF} = zeros(NF,nlev+1)      # specific humidity [kg/kg]
+    # PROGNOSTIC VARIABLES
+    const u::Vector{NF} = zeros(NF,nlev)        # zonal velocity [m/s]
+    const v::Vector{NF} = zeros(NF,nlev)        # meridional velocity [m/s]
+    const temp::Vector{NF} = zeros(NF,nlev)     # temperature [K]
+    const humid::Vector{NF} = zeros(NF,nlev)    # specific humidity [kg/kg]
 
     # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
     const ln_pres::Vector{NF} = zeros(NF,nlev+1)    # logarithm of pressure [log(Pa)]
@@ -50,6 +50,10 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const flux_humid_upward::Vector{NF} = zeros(NF,nlev+1)
     const flux_humid_downward::Vector{NF} = zeros(NF,nlev+1)
 
+    surface_u::NF = 0
+    surface_v::NF = 0
+    surface_temp::NF = 0
+    surface_humid::NF = 0
     surface_wind_speed::NF = 0
     skin_temperature_sea::NF = 0
     skin_temperature_land::NF = 0
@@ -123,4 +127,16 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     # Shortwave radiation: shortwave_radiation
     rel_hum::Vector{NF} = fill(NF(NaN), nlev) # Relative humidity
     grad_dry_static_energy::NF = NF(NaN)      # gradient of dry static energy
+end
+
+function plot(column::ColumnVariables,var::Symbol=:temp)
+    v = getfield(column,var)
+    z = 1:length(v)
+
+    x,y = column.lond, column.latd
+    title = "Column at $(y)˚N, $(x)˚E"
+    ylabel = "k"
+    yflip = true
+
+    UnicodePlots.lineplot(v,z;title,xlabel=string(var),ylabel,yflip)
 end
