@@ -184,8 +184,8 @@ function first_timesteps!(
 )
     
     (;clock) = progn
-    clock.n_timesteps == 0 && return time     # exit immediately for no time steps
-    
+    clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
+
     (;implicit) = model
     (;Δt, Δt_millisec) = model.time_stepping
     Δt_millisec_half = Dates.Millisecond(Δt_millisec.value÷2)   # this might be 1ms off
@@ -210,8 +210,6 @@ function first_timesteps!(
 
     # from now on precomputed implicit terms with 2Δt
     initialize!(implicit,2Δt,diagn,model) 
-
-    return time
 end
 
 """

@@ -463,7 +463,6 @@ function initialize_humidity!(  progn::PrognosticVariables,
     spectral_truncation!(humid_surf)
 
     # Specific humidity at tropospheric levels (stratospheric humidity remains zero)
-    a = model.spectral_transform.norm_sphere
     for k in n_stratosphere_levels+1:nlev
         for lm in eachharmonic(humid_surf)
             progn.layers[k].timesteps[1].humid[lm] = humid_surf[lm]*σ_levels_full[k]^scale_height_ratio
