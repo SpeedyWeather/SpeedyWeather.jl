@@ -3,7 +3,7 @@ $(TYPEDSIGNATURES)
 Simulation is a container struct to be used with `run!(::Simulation)`.
 It contains
 $(TYPEDFIELDS)"""
-struct Simulation{Model<:ModelSetup}
+struct Simulation{Model<:ModelSetup} <: AbstractSimulation{Model}
     "define the current state of the model"
     prognostic_variables::PrognosticVariables
 
@@ -162,8 +162,8 @@ Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
-    boundary_layer_drag::BoundaryLayerDrag{NF} = NoBoundaryLayerDrag(spectral_grid)
-    temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
+    boundary_layer_drag::BoundaryLayerDrag{NF} = LinearDrag(spectral_grid)
+    temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
     surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
@@ -253,9 +253,10 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     thermodynamics::Thermodynamics{NF} = Thermodynamics(spectral_grid,atmosphere)
-    boundary_layer_drag::BoundaryLayerDrag{NF} = NoBoundaryLayerDrag(spectral_grid)
-    temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
+    boundary_layer_drag::BoundaryLayerDrag{NF} = LinearDrag(spectral_grid)
+    temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
+    humidity_diffusion::VerticalDiffusion{NF} = HumidityDiffusion(spectral_grid)
     large_scale_condensation::AbstractCondensation{NF} = SpeedyCondensation(spectral_grid)
     surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
@@ -309,6 +310,7 @@ function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     initialize!(model.boundary_layer_drag,model)
     initialize!(model.temperature_relaxation,model)
     initialize!(model.static_energy_diffusion,model)
+    initialize!(model.humidity_diffusion,model)
     initialize!(model.large_scale_condensation,model)
     initialize!(model.convection,model)
 
