@@ -53,6 +53,25 @@ function get_column!(   C::ColumnVariables,
     get_column!(C,D,P,ij,jring,G,L)
 end
 
+function get_column(    S::AbstractSimulation,
+                        ij::Integer)
+    (;prognostic_variables, diagnostic_variables) = S
+    (;geometry, land_sea_mask) = S.model
+
+    column = deepcopy(S.diagnostic_variables.columns[1])
+    reset_column!(column)
+
+    get_column!(column,
+                diagnostic_variables,
+                prognostic_variables,
+                ij,
+                geometry,
+                land_sea_mask)
+
+    @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
+    return column
+end
+
 """
 $(TYPEDSIGNATURES)
 Write the parametrization tendencies from `C::ColumnVariables` into the horizontal fields
