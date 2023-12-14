@@ -131,7 +131,6 @@ function surface_pressure_tendency!(
     @. pres_tend = -pres_tend - D̄   # the -D̄ term in spectral and swap sign
     
     pres_tend[1] = 0                # for mass conservation
-    spectral_truncation!(pres_tend) # remove lmax+1 row, only vectors use it
     return nothing
 end
 
@@ -292,8 +291,6 @@ function temperature_tendency!(
     # now add the -∇⋅((u,v)*T') term
     flux_divergence!(temp_tend,temp_grid,diagn,G,S,add=true,flipsign=true)
     
-    # only vectors make use of the lmax+1 row, set to zero for scalars
-    spectral_truncation!(temp_tend)
     return nothing
 end
 
@@ -505,7 +502,6 @@ function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},
     spectral!(bernoulli,bernoulli_grid,S)                   # to spectral space
     bernoulli .+= geopot                                    # add geopotential Φ
     ∇²!(div_tend,bernoulli,S,add=true,flipsign=true)        # add -∇²(½(u² + v²) + ϕ)
-    spectral_truncation!(div_tend)                          # set lmax+1 row to zero
 end
 
 """
@@ -574,7 +570,8 @@ function SpeedyTransforms.gridded!(
 
     # all variables on layers
     for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
-        gridded!(diagn_layer,progn_layer,lf,model)
+        progn_layer_lf = progn_layer.timesteps[lf]
+        gridded!(diagn_layer,progn_layer_lf,model)
     end
 
     # surface only for ShallowWaterModel or PrimitiveEquation
@@ -592,22 +589,21 @@ Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the barotropic vorticity model.
 Updates grid vorticity, spectral stream function and spectral and grid velocities u,v."""
 function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,   
-                                    progn::PrognosticLayerTimesteps,
-                                    lf::Int,                            # leapfrog index
+                                    progn::PrognosticVariablesLayer,
                                     model::Barotropic)
     
     (; vor_grid, u_grid, v_grid ) = diagn.grid_variables
+    (; vor ) = progn                    # relative vorticity
     U = diagn.dynamics_variables.a      # reuse work arrays for velocities in spectral
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
-    vor_lf = progn.timesteps[lf].vor    # relative vorticity at leapfrog step lf
-    gridded!(vor_grid,vor_lf,S)         # get vorticity on grid from spectral vor
+    gridded!(vor_grid,vor,S)            # get vorticity on grid from spectral vor
     
     # get spectral U,V from spectral vorticity via stream function Ψ
     # U = u*coslat = -coslat*∂Ψ/∂lat
     # V = v*coslat = ∂Ψ/∂lon, radius omitted in both cases
-    UV_from_vor!(U,V,vor_lf,S)
+    UV_from_vor!(U,V,vor,S)
 
     # transform from U,V in spectral to u,v on grid (U,V = u,v*coslat)
     gridded!(u_grid,U,S,unscale_coslat=true)
@@ -623,26 +619,23 @@ diagnostic variables in `diagn` for the shallow water model. Updates grid vortic
 grid divergence, grid interface displacement (`pres_grid`) and the velocities
 u,v."""
 function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
-                                    progn::PrognosticLayerTimesteps,
-                                    lf::Int,                            # leapfrog index
+                                    progn::PrognosticVariablesLayer,
                                     model::ShallowWater,                # everything that's constant
                                     )
     
     (; vor_grid, div_grid, u_grid, v_grid ) = diagn.grid_variables
+    (; vor, div) = progn
     U = diagn.dynamics_variables.a      # reuse work arrays for velocities spectral
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
-    vor_lf = progn.timesteps[lf].vor    # pick leapfrog index without memory allocation
-    div_lf = progn.timesteps[lf].div   
-
     # get spectral U,V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
-    UV_from_vordiv!(U,V,vor_lf,div_lf,S)
+    UV_from_vordiv!(U,V,vor,div,S)
 
-    gridded!(vor_grid,vor_lf,S)         # get vorticity on grid from spectral vor
-    gridded!(div_grid,div_lf,S)         # get divergence on grid from spectral div
+    gridded!(vor_grid,vor,S)            # get vorticity on grid from spectral vor
+    gridded!(div_grid,div,S)            # get divergence on grid from spectral div
 
     # transform from U,V in spectral to u,v on grid (U,V = u,v*coslat)
     gridded!(u_grid,U,S,unscale_coslat=true)
@@ -658,13 +651,13 @@ diagnostic variables in `diagn` for primitive equation models. Updates grid vort
 grid divergence, grid temperature, pressure (`pres_grid`) and the velocities
 u,v."""
 function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
-                                    progn::PrognosticLayerTimesteps,
-                                    lf::Int,                            # leapfrog index
+                                    progn::PrognosticVariablesLayer,
                                     model::PrimitiveEquation)           # everything that's constant
     
     (; vor_grid, div_grid, u_grid, v_grid ) = diagn.grid_variables
     (; temp_grid, humid_grid ) = diagn.grid_variables
     (; temp_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid_variables
+    (; vor, div, temp, humid) = progn
     U = diagn.dynamics_variables.a      # reuse work arrays for velocities spectral
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
 
@@ -675,24 +668,19 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     S = model.spectral_transform
     wet_core = model isa PrimitiveWet
 
-    vor_lf = progn.timesteps[lf].vor     # pick leapfrog index without memory allocation
-    div_lf = progn.timesteps[lf].div
-    temp_lf = progn.timesteps[lf].temp
-    wet_core && (humid_lf = progn.timesteps[lf].humid)
-
     # get spectral U,V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
-    UV_from_vordiv!(U,V,vor_lf,div_lf,S)
+    UV_from_vordiv!(U,V,vor,div,S)
 
-    gridded!(vor_grid,vor_lf,S)         # get vorticity on grid from spectral vor
-    gridded!(div_grid,div_lf,S)         # get divergence on grid from spectral div
-    gridded!(temp_grid,temp_lf,S)       # (absolute) temperature
-    wet_core && gridded!(humid_grid,humid_lf,S) # specific humidity (wet core only)
+    gridded!(vor_grid,vor,S)                # get vorticity on grid from spectral vor
+    gridded!(div_grid,div,S)                # get divergence on grid from spectral div
+    gridded!(temp_grid,temp,S)              # (absolute) temperature
+    wet_core && gridded!(humid_grid,humid,S)# specific humidity (wet core only)
 
     # include humidity effect into temp for everything stability-related
-    temperature_average!(diagn,temp_lf,S)       # TODO: do at frequency of reinitialize implicit?
-    virtual_temperature!(diagn,temp_lf,model)   # temp = virt temp for dry core
+    temperature_average!(diagn,temp,S)      # TODO: do at frequency of reinitialize implicit?
+    virtual_temperature!(diagn,temp,model)  # temp = virt temp for dry core
 
     # transform from U,V in spectral to u,v on grid (U,V = u,v*coslat)
     gridded!(u_grid,U,S,unscale_coslat=true)

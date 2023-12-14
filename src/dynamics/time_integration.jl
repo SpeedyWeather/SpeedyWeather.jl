@@ -132,7 +132,6 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
     
     A_lf = lf == 1 ? A_old : A_new                      # view on either t or t+dt to dis/enable Williams filter        
     (;robert_filter, williams_filter) = L               # coefficients for the Robert and Williams filter
-    two = convert(NF,2)                                 # 2 in number format NF
     dt_NF = convert(NF,dt)                              # time step dt in number format NF
 
     # LEAP FROG time step with or without Robert+Williams filter
@@ -140,13 +139,13 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
     # see Williams (2009), Eq. 7-9
     # for lf == 1 (initial time step) no filter applied (w1=w2=0)
     # for lf == 2 (later steps) Robert+Williams filter is applied
-    w1 = lf == 1 ? zero(NF) : robert_filter*williams_filter/two         # = ν*α/2 in Williams (2009, Eq. 8)
-    w2 = lf == 1 ? zero(NF) : robert_filter*(1-williams_filter)/two     # = ν(1-α)/2 in Williams (2009, Eq. 9)
+    w1 = lf == 1 ? zero(NF) : robert_filter*williams_filter/2       # = ν*α/2 in Williams (2009, Eq. 8)
+    w2 = lf == 1 ? zero(NF) : robert_filter*(1-williams_filter)/2   # = ν(1-α)/2 in Williams (2009, Eq. 9)
 
     @inbounds for lm in eachharmonic(A_old,A_new,A_lf,tendency)
         a_old = A_old[lm]                       # double filtered value from previous time step (t-Δt)
         a_new = a_old + dt_NF*tendency[lm]      # Leapfrog/Euler step depending on dt=Δt,2Δt (unfiltered at t+Δt)
-        a_update = a_old - two*A_lf[lm] + a_new # Eq. 8&9 in Williams (2009), calculate only once
+        a_update = a_old - 2A_lf[lm] + a_new # Eq. 8&9 in Williams (2009), calculate only once
         A_old[lm] = A_lf[lm] + w1*a_update      # Robert's filter: A_old[lm] becomes 2xfiltered value at t
         A_new[lm] = a_new - w2*a_update         # Williams filter: A_new[lm] becomes 1xfiltered value at t+Δt
     end
@@ -168,8 +167,22 @@ function leapfrog!( progn::PrognosticLayerTimesteps,
         var_old = getproperty(progn.timesteps[1],var)
         var_new = getproperty(progn.timesteps[2],var)
         var_tend = getproperty(diagn.tendencies,Symbol(var,:_tend))
+        spectral_truncation!(var_tend)      # set lmax+1 mode to zero
         leapfrog!(var_old,var_new,var_tend,dt,lf,model.time_stepping)
     end
+end
+
+function leapfrog!( progn::PrognosticSurfaceTimesteps,
+                    diagn::SurfaceVariables,
+                    dt::Real,               # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+                    lf::Int,                # leapfrog index to dis/enable Williams filter
+                    model::ModelSetup)
+               
+    (;pres_tend) = diagn
+    pres_old = progn.timesteps[1].pres
+    pres_new = progn.timesteps[2].pres
+    spectral_truncation!(pres_tend)         # set lmax+1 mode to zero
+    leapfrog!(pres_old,pres_new,pres_tend,dt,lf,model.time_stepping)
 end
 
 """
@@ -184,7 +197,7 @@ function first_timesteps!(
 )
     
     (;clock) = progn
-    clock.n_timesteps == 0 && return time     # exit immediately for no time steps
+    clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
     
     (;implicit) = model
     (;Δt, Δt_millisec) = model.time_stepping
@@ -211,7 +224,7 @@ function first_timesteps!(
     # from now on precomputed implicit terms with 2Δt
     initialize!(implicit,2Δt,diagn,model) 
 
-    return time
+    return nothing
 end
 
 """
@@ -230,10 +243,11 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
 
     # LOOP OVER LAYERS FOR TENDENCIES, DIFFUSION, LEAPFROGGING AND PROPAGATE STATE TO GRID
     for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
-        dynamics_tendencies!(diagn_layer,time,model)
+        progn_lf = progn_layer.timesteps[lf2]       # pick the leapfrog time step lf2 for tendencies
+        dynamics_tendencies!(diagn_layer,progn_lf,time,model)
         horizontal_diffusion!(diagn_layer,progn_layer,model)
         leapfrog!(progn_layer,diagn_layer,dt,lf1,model)
-        gridded!(diagn_layer,progn_layer,lf2,model)
+        gridded!(diagn_layer,progn_lf,model)
     end
 end
 
@@ -252,28 +266,26 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     (;time) = progn.clock                           # current time
 
     progn_layer = progn.layers[1]                   # only calculate tendencies for the first layer
-    diagn_layer = diagn.layers[1]
-    diagn_surface = diagn.surface
-    progn_surface = progn.surface
+    diagn_layer = diagn.layers[1]                   # multi-layer shallow water not supported
+
+    progn_lf = progn_layer.timesteps[lf2]           # pick the leapfrog time step lf2 for tendencies
     (;pres) = progn.surface.timesteps[lf2]
-    (;implicit, time_stepping, spectral_transform) = model
+    (;implicit, spectral_transform) = model
 
     zero_tendencies!(diagn)
     
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
-    dynamics_tendencies!(diagn_layer,diagn_surface,pres,time,model)
-    implicit_correction!(diagn_layer,progn_layer,diagn_surface,progn_surface,implicit)
+    dynamics_tendencies!(diagn_layer,progn_lf,diagn.surface,pres,time,model)
+    implicit_correction!(diagn_layer,progn_layer,diagn.surface,progn.surface,implicit)
     
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
     horizontal_diffusion!(progn_layer,diagn_layer,model)
     leapfrog!(progn_layer,diagn_layer,dt,lf1,model)
-    gridded!(diagn_layer,progn_layer,lf2,model)
+    gridded!(diagn_layer,progn_lf,model)
 
     # SURFACE LAYER (pressure), no diffusion though
-    (;pres_grid,pres_tend) = diagn.surface
-    pres_old = progn.surface.timesteps[1].pres
-    pres_new = progn.surface.timesteps[2].pres
-    leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,time_stepping)
+    (;pres_grid) = diagn.surface
+    leapfrog!(progn.surface,diagn.surface,dt,lf1,model)
     gridded!(pres_grid,pres,spectral_transform)
 end
 
@@ -312,16 +324,15 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
         if k <= diagn.nlev                  # model levels
             diagn_layer = diagn.layers[k]
             progn_layer = progn.layers[k]
+            progn_layer_lf = progn_layer.timesteps[lf2]
 
             horizontal_diffusion!(progn_layer,diagn_layer,model)    # implicit diffusion of vor, div, temp
             leapfrog!(progn_layer,diagn_layer,dt,lf1,model)         # time step forward for vor, div, temp
-            gridded!(diagn_layer,progn_layer,lf2,model)             # propagate spectral state to grid
+            gridded!(diagn_layer,progn_layer_lf,model)              # propagate spectral state to grid
         else                                                        # surface level
-            (;pres_grid,pres_tend) = diagn.surface
-            pres_old = progn.surface.timesteps[1].pres
-            pres_new = progn.surface.timesteps[2].pres
+            leapfrog!(progn.surface,diagn.surface,dt,lf1,model)
+            (;pres_grid) = diagn.surface
             pres_lf = progn.surface.timesteps[lf2].pres
-            leapfrog!(pres_old,pres_new,pres_tend,dt,lf1,model.time_stepping)
             gridded!(pres_grid,pres_lf,model.spectral_transform)
         end
     end
