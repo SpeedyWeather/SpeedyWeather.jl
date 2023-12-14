@@ -14,6 +14,7 @@ function initialize!(   drag::NoDrag,
 end
 
 function drag!(     diagn::DiagnosticVariablesLayer,
+                    progn::PrognosticVariablesLayer,
                     drag::NoDrag,
                     time::DateTime,
                     model::ModelSetup)
@@ -23,7 +24,7 @@ end
 # Quadratic drag
 Base.@kwdef struct QuadraticDrag{NF} <: AbstractDrag{NF}
     "drag coefficient [1]"
-    c_D::Float64 = 1e-5
+    c_D::NF = 1e-5
 end
 
 QuadraticDrag(SG::SpectralGrid;kwargs...) = QuadraticDrag{SG.NF}(;kwargs...)
@@ -35,6 +36,7 @@ end
 
 # function barrier
 function drag!(     diagn::DiagnosticVariablesLayer,
+                    progn::PrognosticVariablesLayer,
                     drag::QuadraticDrag,
                     time::DateTime,
                     model::ModelSetup)

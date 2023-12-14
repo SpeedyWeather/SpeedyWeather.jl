@@ -14,6 +14,7 @@ function initialize!(   forcing::NoForcing,
 end
 
 function forcing!(  diagn::DiagnosticVariablesLayer,
+                    progn::PrognosticVariablesLayer,
                     forcing::NoForcing,
                     time::DateTime,
                     model::ModelSetup)
@@ -83,6 +84,7 @@ end
 
 # function barrier
 function forcing!(  diagn::DiagnosticVariablesLayer,
+                    progn::PrognosticVariablesLayer,
                     forcing::JetStreamForcing,
                     time::DateTime,
                     model::ModelSetup)
