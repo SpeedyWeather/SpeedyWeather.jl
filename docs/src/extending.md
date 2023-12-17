@@ -82,6 +82,7 @@ that is called on _every_ step of the time integration. This new method
 for `forcing!` needs to have the following function signature
 ```julia
 function forcing!(  diagn::DiagnosticVariablesLayer,
+                    progn::PrognosticVariablesLayer,
                     forcing::MyForcing,
                     time::DateTime,
                     model::ModelSetup)
@@ -339,6 +340,7 @@ then this will be called automatically with multiple dispatch.
 
 ```@example extend
 function SpeedyWeather.forcing!(diagn::SpeedyWeather.DiagnosticVariablesLayer,
+                                progn::SpeedyWeather.PrognosticVariablesLayer,
                                 forcing::StochasticStirring,
                                 time::DateTime,
                                 model::SpeedyWeather.ModelSetup)
@@ -349,7 +351,9 @@ end
 The function has to be as outlined above. The first argument has to be of type
 ``DiagnosticVariablesLayer`` as it acts on a layer of the diagnostic variables,
 where the current model state in grid-point space and the tendencies (in spectral space)
-are defined. The second argument has to be of the type of our new forcing,
+are defined. The second argument has to be a `PrognosticVariablesLayer` because,
+in general, the forcing may use the prognostic variables in spectral space.
+The third argument has to be of the type of our new forcing,
 the third argument is time which you may use or skip, the last element is a `ModelSetup`,
 but as before you can be more restrictive to define a forcing only for the
 `BarotropicModel` for example, use ``model::Barotropic`` in that case.

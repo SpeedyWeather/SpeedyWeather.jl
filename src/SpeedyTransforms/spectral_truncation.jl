@@ -71,7 +71,8 @@ to enforce that all coefficients for which the degree l is larger than order m a
 spectral_truncation!(alms::AbstractMatrix) = spectral_truncation!(alms,size(alms)...)
 
 function spectral_truncation!(alms::LowerTriangularMatrix{NF}) where NF
-    alms[end,:] .= zero(NF)     # set the lmax+1 mode to zero
+    lmax,mmax = size(alms)
+    alms[mmax+1:lmax,:] .= 0 # set everything to zero below the triangle
     return alms
 end
 

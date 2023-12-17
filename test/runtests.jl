@@ -36,5 +36,8 @@ include("column_variables.jl")
 # INITIALIZATION AND INTEGRATION
 include("run_speedy.jl")
 
+# EXTENSION
+include("extending.jl")
+
 # OUTPUT 
 include("netcdf_output.jl")
