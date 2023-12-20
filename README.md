@@ -72,6 +72,12 @@ Map projection is orthographic centred on the north pole.
 
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/3d7fccd5-b66d-42e3-9f73-64dcf21d00ee
 
+Here, SpeedyWeather.jl simulates atmospheric gravity waves, initialised randomly interacting with orography
+over a period of 2 days. Each frame is one time step, solved with a centred semi-implicit scheme that
+resolves gravity waves with a timestep of CFL=1.2-1.4 despite a single-stage RAW-filtered leapfrog integration.
+
+https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/510c38c7-12cb-42d5-b905-c66b4eaa514d
+
 ## History
 
 SpeedyWeather.jl is a reinvention of the atmospheric general circulation model
