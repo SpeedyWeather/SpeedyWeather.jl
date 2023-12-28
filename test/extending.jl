@@ -61,10 +61,6 @@
         for lm in eachindex(vor,vor_tend,ζ₀)
             vor_tend[lm] -= r*(vor[lm] - ζ₀[lm])
         end
-        
-        SpeedyTransforms.spectral_truncation!(vor_tend)    # set lmax+1 to zero
-        
-        return nothing
     end
     
     Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing{NF}
@@ -90,6 +86,17 @@
         "Stirring width [˚]"
         width::Float64 = 24
     
+        "Minimum degree of spherical harmonics to force"
+        lmin::Int = 8
+
+        "Maximum degree of spherical harmonics to force"
+        lmax::Int = 40
+
+        "Minimum order of spherical harmonics to force"
+        mmin::Int = 4
+
+        "Maximum order of spherical harmonics to force"
+        mmax::Int = lmax
         
         # TO BE INITIALISED
         "Stochastic stirring term S"
@@ -153,10 +160,16 @@
         b = forcing.b[]    # = exp(-dt/τ)
         
         (;S) = forcing
-        @inbounds for lm in eachindex(S)
-            # Barnes and Hartmann, 2011 Eq. 2
-            Qi = 2rand(Complex{NF}) - (1 + im)   # ~ [-1,1] in complex
-            S[lm] = a*Qi + b*S[lm]
+        lmax,mmax = size(S)
+        @inbounds for m in 1:mmax
+            for l in m:lmax
+                if (forcing.mmin <= m <= forcing.mmax) &&
+                    (forcing.lmin <= l <= forcing.lmax)
+                    # Barnes and Hartmann, 2011 Eq. 2
+                    Qi = 2rand(Complex{NF}) - (1 + im)   # ~ [-1,1] in complex
+                    S[l,m] = a*Qi + b*S[l,m]
+                end
+            end
         end
     
         # to grid-point space
