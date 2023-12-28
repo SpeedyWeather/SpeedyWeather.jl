@@ -28,7 +28,7 @@
     end
     
     function SpeedyWeather.initialize!( drag::JetDrag,
-                                        model::SpeedyWeather.ModelSetup)
+                                        model::ModelSetup)
     
         (;spectral_grid, geometry) = model
         (;Grid,NF,nlat_half) = spectral_grid
@@ -46,11 +46,11 @@
         return nothing
     end
     
-    function SpeedyWeather.drag!(   diagn::SpeedyWeather.DiagnosticVariablesLayer,
-                                    progn::SpeedyWeather.PrognosticVariablesLayer,
+    function SpeedyWeather.drag!(   diagn::DiagnosticVariablesLayer,
+                                    progn::PrognosticVariablesLayer,
                                     drag::JetDrag,
                                     time::DateTime,
-                                    model::SpeedyWeather.ModelSetup)
+                                    model::ModelSetup)
     
         (;vor) = progn
         (;vor_tend) = diagn.tendencies
@@ -119,7 +119,7 @@
     end
     
     function SpeedyWeather.initialize!( forcing::StochasticStirring,
-                                        model::SpeedyWeather.ModelSetup)
+                                        model::ModelSetup)
         
         # precompute forcing strength, scale with radius^2 as is the vorticity equation
         (;radius) = model.spectral_grid
@@ -143,15 +143,15 @@
         return nothing
     end
     
-    function SpeedyWeather.forcing!(diagn::SpeedyWeather.DiagnosticVariablesLayer,
-                                    progn::SpeedyWeather.PrognosticVariablesLayer,
+    function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
+                                    progn::PrognosticVariablesLayer,
                                     forcing::StochasticStirring,
                                     time::DateTime,
-                                    model::SpeedyWeather.ModelSetup)
+                                    model::ModelSetup)
         SpeedyWeather.forcing!(diagn,forcing,model.spectral_transform)
     end
     
-    function SpeedyWeather.forcing!(diagn::SpeedyWeather.DiagnosticVariablesLayer,
+    function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
                                     forcing::StochasticStirring{NF},
                                     spectral_transform::SpectralTransform) where NF
         

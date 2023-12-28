@@ -46,7 +46,8 @@ export  Barotropic,             # abstract
         ShallowWater,
         PrimitiveEquation,
         PrimitiveDry,
-        PrimitiveWet
+        PrimitiveWet,
+        ModelSetup
 
 export  BarotropicModel,        # concrete
         ShallowWaterModel,
@@ -102,7 +103,13 @@ export  NoBoundaryLayerDrag,
         QuadraticDrag
 
 # EXPORT FORCING
-export  JetStreamForcing
+export  forcing!,
+        JetStreamForcing,
+        AbstractForcing
+
+# EXPORT DRAG
+export  drag!,
+        AbstractDrag
 
 # EXPORT VERTICAL DIFFUSION
 export  NoVerticalDiffusion,
@@ -117,7 +124,9 @@ export  DynamicsConstants,
         SpectralTransform,
         Boundaries,
         PrognosticVariables,
+        PrognosticVariablesLayer,
         DiagnosticVariables,
+        DiagnosticVariablesLayer,
         ColumnVariables
 
 # EXPORT SPECTRAL FUNCTIONS
