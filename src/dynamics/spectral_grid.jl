@@ -1,6 +1,9 @@
 const DEFAULT_NF = Float32
 const DEFAULT_MODEL = PrimitiveDry
 const DEFAULT_GRID = OctahedralGaussianGrid
+const DEFAULT_RADIUS = 6.371e6
+const DEFAULT_TRUNC = 31
+const DEFAULT_NLEV = 8
 
 """
 Defines the horizontal spectral resolution and corresponding grid and the
@@ -15,7 +18,7 @@ Base.@kwdef struct SpectralGrid
 
     # HORIZONTAL
     "horizontal resolution as the maximum degree of spherical harmonics"
-    trunc::Int = 31
+    trunc::Int = DEFAULT_TRUNC
 
     "horizontal grid used for calculations in grid-point space"
     Grid::Type{<:AbstractGrid} = DEFAULT_GRID
@@ -24,7 +27,7 @@ Base.@kwdef struct SpectralGrid
     dealiasing::Float64 = 2
 
     "radius of the sphere [m]"
-    radius::Float64 = 6.371e6
+    radius::Float64 = DEFAULT_RADIUS
 
     # SIZE OF GRID from trunc, Grid, dealiasing:
     "number of latitude rings on one hemisphere (Equator incl)"
@@ -35,7 +38,7 @@ Base.@kwdef struct SpectralGrid
 
     # VERTICAL
     "number of vertical levels"
-    nlev::Int = 8
+    nlev::Int = DEFAULT_NLEV
 
     "coordinates used to discretize the vertical"
     vertical_coordinates::VerticalCoordinates = SigmaCoordinates(;nlev)
