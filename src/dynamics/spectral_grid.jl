@@ -70,7 +70,7 @@ function Base.show(io::IO,SG::SpectralGrid)
     lat = get_lat(Grid,nlat_half)
     res_eq_y = (lat[nlat_half] - lat[nlat_half+1])*radius/1000
 
-    s(x) = @sprintf("%.3g",x)
+    s(x) = x > 1000 ? @sprintf("%i",x) : @sprintf("%.3g",x)
 
     println(io,"$(typeof(SG)):")
     println(io,"├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")

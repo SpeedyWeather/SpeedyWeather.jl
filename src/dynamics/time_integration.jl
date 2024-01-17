@@ -109,7 +109,7 @@ function initialize!(L::Leapfrog,model::ModelSetup)
 
     if L.adjust_with_output
         # take actual output dt from model.output and recalculate timestep
-        L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, L.adjust_with_output, output_dt)
+        L.Δt_millisec = get_Δt_millisec(L.Δt_at_T31, L.trunc, L.radius, L.adjust_with_output, output_dt)
         L.Δt_sec = L.Δt_millisec.value/1000
         L.Δt = L.Δt_sec/L.radius
     end
