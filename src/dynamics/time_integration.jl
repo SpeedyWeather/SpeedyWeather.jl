@@ -13,10 +13,10 @@ Base.@kwdef mutable struct Leapfrog{NF} <: TimeStepper{NF}
     Δt_at_T31::Second = Minute(30)
 
     "radius of sphere [m], used for scaling"
-    radius::NF = 6.371e6
+    radius::NF = DEFAULT_RADIUS
 
     "adjust Δt_at_T31 with the output_dt to reach output_dt exactly in integer time steps"
-    adjust_with_output::Bool = true 
+    adjust_with_output::Bool = true
 
     # NUMERICS
     "Robert (1966) time filter coefficeint to suppress comput. mode"
@@ -27,7 +27,7 @@ Base.@kwdef mutable struct Leapfrog{NF} <: TimeStepper{NF}
 
     # DERIVED FROM OPTIONS    
     "time step Δt [ms] at specified resolution"
-    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, adjust_with_output)
+    Δt_millisec::Millisecond = get_Δt_millisec(Second(Δt_at_T31), trunc, radius, adjust_with_output)
 
     "time step Δt [s] at specified resolution"
     Δt_sec::NF = Δt_millisec.value/1000
@@ -46,12 +46,18 @@ adjusted to the closest divisor of `output_dt` so that the output time axis is k
 function get_Δt_millisec(
     Δt_at_T31::Dates.TimePeriod,
     trunc,
+    radius,
     adjust_with_output::Bool,
     output_dt::Dates.TimePeriod = DEFAULT_OUTPUT_DT,
 )
     # linearly scale Δt with trunc+1 (which are often powers of two)
-    resolution_factor = (32/(trunc+1))
-    Δt_at_trunc = Second(Δt_at_T31).value*resolution_factor
+    resolution_factor = (DEFAULT_TRUNC+1)/(trunc+1)
+
+    # radius also affects grid spacing, scale proportionally
+    radius_factor = radius/DEFAULT_RADIUS
+
+    # maybe rename to _at_trunc_and_radius?
+    Δt_at_trunc = Second(Δt_at_T31).value * resolution_factor * radius_factor
 
     if adjust_with_output && (output_dt > Millisecond(0))
         k = round(Int,Second(output_dt).value / Δt_at_trunc)
