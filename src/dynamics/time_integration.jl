@@ -319,10 +319,17 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
         parameterization_tendencies!(diagn,progn,time,model)
     else                                            # set tendencies to zero otherwise for accumulators
         zero_tendencies!(diagn)
-    end       
+    end
 
-    dynamics_tendencies!(diagn,progn,model,lf2)         # dynamical core
-    implicit_correction!(diagn,model.implicit,progn)    # semi-implicit time stepping corrections
+    if model.dynamics                               # switch on/off all dynamics
+        dynamics_tendencies!(diagn,progn,model,lf2)         # dynamical core
+        implicit_correction!(diagn,model.implicit,progn)    # semi-implicit time stepping corrections
+    else    # just transform physics tendencies to spectral space
+        for k in 1:diagn.nlev
+            diagn_layer = diagn.layers[k]
+            tendencies_physics_only!(diagn_layer,model)
+        end
+    end
 
     # LOOP OVER ALL LAYERS for diffusion, leapfrog time integration
     # and progn state from spectral to grid for next time step
