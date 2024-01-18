@@ -233,4 +233,7 @@ function initialize!(land_sea_mask::LandSeaMask)
 
     # average onto grid cells of the model
     RingGrids.grid_cell_average!(land_sea_mask.land_sea_mask,lsm_highres)
+
+    # TODO this shoudln't be necessary, but at the moment grid_cell_average! can return values > 1
+    clamp!(land_sea_mask.land_sea_mask,0,1)
 end

@@ -149,6 +149,7 @@ Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     spectral_grid::SpectralGrid = SpectralGrid()
 
     # DYNAMICS
+    dynamics::Bool = true
     planet::AbstractPlanet = Earth()
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     initial_conditions::InitialConditions = ZonalWind()
@@ -236,6 +237,7 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     spectral_grid::SpectralGrid = SpectralGrid()
 
     # DYNAMICS
+    dynamics::Bool = true
     planet::AbstractPlanet = Earth()
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     initial_conditions::InitialConditions = ZonalWind()
