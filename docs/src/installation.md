@@ -25,9 +25,4 @@ julia>] add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
 
 ## Compatibility with Julia versions
 
-SpeedyWeather.jl usually lives on the latest minor release and/or its predecessor.
-At the moment (June 2023) this means 
-- Julia v1.8
-- Julia v1.9
-
-are supported, but we dropped the support of earlier versions.
+SpeedyWeather.jl requires Julia v1.8 or later. The package is tested on Julia v1.8, 1.9, and 1.10.
