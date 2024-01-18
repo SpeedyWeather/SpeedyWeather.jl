@@ -30,7 +30,7 @@ UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [compat]
 AbstractFFTs = "1"
-Adapt = "3"
+Adapt = "3, 4"
 AssociatedLegendrePolynomials = "1"
 BitInformation = "0.6"
 CUDA = "4, 5"
