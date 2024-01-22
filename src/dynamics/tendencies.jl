@@ -847,6 +847,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     U = diagn.dynamics_variables.a      # reuse work arrays for velocities spectral
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
 
+    # retain previous time step for vertical advection
     @. temp_grid_prev = temp_grid
     @. u_grid_prev = u_grid
     @. v_grid_prev = v_grid
@@ -862,10 +863,14 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     gridded!(vor_grid,vor,S)                # get vorticity on grid from spectral vor
     gridded!(div_grid,div,S)                # get divergence on grid from spectral div
     gridded!(temp_grid,temp,S)              # (absolute) temperature
-    wet_core && gridded!(humid_grid,humid,S)# specific humidity (wet core only)
+    
+    if wet_core                             # specific humidity (wet core only)
+        gridded!(humid_grid,humid,S)        
+        hole_filling!(humid_grid,model.hole_filling,model)  # remove negative humidity
+    end
 
     # include humidity effect into temp for everything stability-related
-    temperature_average!(diagn,temp,S)      # TODO: do at frequency of reinitialize implicit?
+    temperature_average!(diagn,temp,S)
     virtual_temperature!(diagn,temp,model)  # temp = virt temp for dry core
 
     # transform from U,V in spectral to u,v on grid (U,V = u,v*coslat)
