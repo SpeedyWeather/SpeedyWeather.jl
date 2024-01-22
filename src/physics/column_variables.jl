@@ -31,7 +31,7 @@ function get_column!(   C::ColumnVariables,
         C.u[k] = layer.grid_variables.u_grid[ij]
         C.v[k] = layer.grid_variables.v_grid[ij]
         C.temp[k] = layer.grid_variables.temp_grid[ij]
-        C.humid[k] = layer.grid_variables.humid_grid[ij]
+        C.humid[k] = layer.grid_variables.humid_grid[ij] 
     end
 
     # TODO skin = surface approximation for now
@@ -67,6 +67,9 @@ function get_column(    S::AbstractSimulation,
                 ij,
                 geometry,
                 land_sea_mask)
+
+    # execute all parameterizations for this column to return a consistent state
+    parameterization_tendencies!(column,S.model)
 
     @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
     return column

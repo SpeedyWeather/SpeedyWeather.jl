@@ -27,31 +27,40 @@ function parameterization_tendencies!(
         reset_column!(column)                   # set accumulators back to zero for next grid point
         get_column!(column,diagn,progn,ij,jring,G,L)  
         
-        # Pre-compute thermodynamic quantities
-        get_thermodynamics!(column,model)
-
-        # VERTICAL DIFFUSION
-        static_energy_diffusion!(column,model)
-        humidity_diffusion!(column,model)
-
-        # HELD-SUAREZ
-        temperature_relaxation!(column,model)
-        boundary_layer_drag!(column,model)
-
-        # Calculate parametrizations (order of execution is important!)
-        convection!(column,model)
-        large_scale_condensation!(column,model)
-        # clouds!(column, model)
-        # shortwave_radiation!(column,model)
-        # longwave_radiation!(column,model)
-        surface_fluxes!(column,model)
-
-        # sum fluxes on half levels up and down for every layer
-        fluxes_to_tendencies!(column,model.geometry,model.constants)
+        # execute all parameterizations
+        parameterization_tendencies!(column,model)
 
         # write tendencies from parametrizations back into horizontal fields
         write_column_tendencies!(diagn,column,model.constants,ij)
     end
+end
+
+function parameterization_tendencies!(
+    column::ColumnVariables,
+    model::PrimitiveEquation
+    )
+
+    # Pre-compute thermodynamic quantities
+    get_thermodynamics!(column,model)
+
+    # VERTICAL DIFFUSION
+    static_energy_diffusion!(column,model)
+    humidity_diffusion!(column,model)
+
+    # HELD-SUAREZ
+    # temperature_relaxation!(column,model)
+    # boundary_layer_drag!(column,model)
+
+    # Calculate parametrizations (order of execution is important!)
+    convection!(column,model)
+    large_scale_condensation!(column,model)
+    # clouds!(column, model)
+    # shortwave_radiation!(column,model)
+    # longwave_radiation!(column,model)
+    surface_fluxes!(column,model)
+
+    # sum fluxes on half levels up and down for every layer
+    fluxes_to_tendencies!(column,model.geometry,model.constants)
 end
 
 """
@@ -71,9 +80,6 @@ function fluxes_to_tendencies!(
     Δσ = geometry.σ_levels_thick
     pₛ = column.pres[end]               # surface pressure
     (;radius) = constants               # used for scaling
-
-    # TODO ONLY FOR TESTING TO MAKE PARAMETERIZATIONS WEAKER
-    radius /= 2
 
     # for g/Δp and g/(Δp*cₚ), see Fortran SPEEDY documentation eq. (3,5)
     g_pₛ = constants.gravity/pₛ
