@@ -19,8 +19,8 @@ $(SIGNATURES)
 The BarotropicModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
-    spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
+Base.@kwdef mutable struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
+    spectral_grid::SpectralGrid
 
     # DYNAMICS
     planet::AbstractPlanet = Earth()
@@ -81,8 +81,8 @@ $(SIGNATURES)
 The ShallowWaterModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
-    spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
+Base.@kwdef mutable struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
+    spectral_grid::SpectralGrid
 
     # DYNAMICS
     planet::AbstractPlanet = Earth()
@@ -145,8 +145,8 @@ $(SIGNATURES)
 The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveDry
-    spectral_grid::SpectralGrid = SpectralGrid()
+Base.@kwdef mutable struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveDry
+    spectral_grid::SpectralGrid
 
     # DYNAMICS
     dynamics::Bool = true
@@ -233,8 +233,8 @@ $(SIGNATURES)
 The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveWet
-    spectral_grid::SpectralGrid = SpectralGrid()
+Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveWet
+    spectral_grid::SpectralGrid
 
     # DYNAMICS
     dynamics::Bool = true
@@ -253,8 +253,8 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     thermodynamics::Thermodynamics{NF} = Thermodynamics(spectral_grid,atmosphere)
-    boundary_layer_drag::BoundaryLayerDrag{NF} = LinearDrag(spectral_grid)
-    temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
+    boundary_layer_drag::BoundaryLayerDrag{NF} = NoBoundaryLayerDrag(spectral_grid)
+    temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = StaticEnergyDiffusion(spectral_grid)
     humidity_diffusion::VerticalDiffusion{NF} = HumidityDiffusion(spectral_grid)
     large_scale_condensation::AbstractCondensation{NF} = SpeedyCondensation(spectral_grid)
@@ -270,7 +270,8 @@ Base.@kwdef struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: Pr
     horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
     implicit::AbstractImplicit{NF} = ImplicitPrimitiveEq(spectral_grid)
     vertical_advection::VerticalAdvection{NF} = CenteredVerticalAdvection(spectral_grid)
-    
+    hole_filling::AbstractHoleFilling{NF} = ClipNegatives(spectral_grid)
+
     # INTERNALS
     geometry::Geometry{NF} = Geometry(spectral_grid)
     constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
