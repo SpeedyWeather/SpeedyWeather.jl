@@ -377,17 +377,23 @@ function vordiv_tendencies!(
     return nothing
 end
 
+# function barrier
 function tendencies_physics_only!(
     diagn::DiagnosticVariablesLayer,
     model::PrimitiveEquation
 )
-    tendencies_physics_only!(diagn,model.geometry,model.spectral_transform)
+    wet_core = model isa PrimitiveWet
+    tendencies_physics_only!(diagn,model.geometry,model.spectral_transform,wet_core)
 end
 
+"""For dynamics=false, after calling parameterization_tendencies! call this function
+to transform the physics tendencies from grid-point to spectral space including the
+necessary coslat⁻¹ scaling."""
 function tendencies_physics_only!(
     diagn::DiagnosticVariablesLayer,
     G::Geometry,
     S::SpectralTransform,
+    wet_core::Bool = true
 )
     (;coslat⁻¹) = G
     (;u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid) = diagn.tendencies  # already contains parameterizations
@@ -411,15 +417,12 @@ function tendencies_physics_only!(
     spectral!(u_tend,u_tend_grid,S)
     spectral!(v_tend,v_tend_grid,S)
     spectral!(temp_tend,temp_tend_grid,S)
-    spectral!(humid_tend,humid_tend_grid,S)
+    wet_core && spectral!(humid_tend,humid_tend_grid,S)
 
     curl!(vor_tend,u_tend,v_tend,S)         # ∂ζ/∂t = ∇×(u_tend,v_tend)
     divergence!(div_tend,u_tend,v_tend,S)   # ∂D/∂t = ∇⋅(u_tend,v_tend)
     return nothing
 end
-
-
-
 
 """
 $(TYPEDSIGNATURES)
