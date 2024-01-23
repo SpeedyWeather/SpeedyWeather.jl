@@ -40,7 +40,7 @@ function surface_thermodynamics!(   column::ColumnVariables,
                                     model::PrimitiveDry)
 
     # surface value is same as lowest model level
-    column.surface_temp = column.temp   # todo use constant POTENTIAL temperature
+    column.surface_temp = column.temp[end]   # todo use constant POTENTIAL temperature
     column.surface_air_density = column.pres[end]/C.R_dry/column.surface_temp
 end
 
