@@ -150,7 +150,7 @@ function humidity_diffusion!(   column::ColumnVariables,
         # Fortran SPEEDY doc eq (71)
         if Δrel_humid > Γσ
             # Fortran SPEEDY doc eq (72)
-            # the σh[k] is not in the documentation, but it makes the diffusion
+            # the σ_half[k] is not in the documentation, but it makes the diffusion
             # weaker higher up, so it's maybe not bad after all
             flux_humid_upward[k+1] += Fstar*σ_half[k]*sat_humid[k]*Δrel_humid
         
