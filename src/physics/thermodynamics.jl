@@ -124,6 +124,7 @@ function saturation_humidity!(
         sat_vap_pres[k] = saturation_vapour_pressure(temp[k],thermodynamics.tetens_coefs)
         sat_humid[k] = saturation_humidity(sat_vap_pres[k],pres[k];mol_ratio)
         rel_humid[k] = humid[k]/sat_humid[k]
+        # rel_humid[k] > 2 && @info "$(column.ij), $k"
     end
 end
 
@@ -133,6 +134,13 @@ saturation_vapour_pressure(temp_kelvin::Integer) = saturation_vapour_pressure(Fl
 # version that pulls default Tetens coefficients
 function saturation_vapour_pressure(temp_kelvin::NF) where NF
     return saturation_vapour_pressure(temp_kelvin,TetensCoefs{NF}())
+end
+
+function relative_humidity(temp_kelvin,humid,pres)
+    sat_vap_pres = saturation_vapour_pressure(temp_kelvin)
+    sat_vap_pres, pres = promote(sat_vap_pres, pres)
+    sat_humid = saturation_humidity(sat_vap_pres,pres)
+    return humid/sat_humid  # = relative humidity [1]
 end
 
 """
