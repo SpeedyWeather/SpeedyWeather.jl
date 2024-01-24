@@ -61,7 +61,8 @@ using NCDatasets, Dates
     @test simulation.model.feedback.nars_detected == false
 
     # OctaHEALPixGrid, as matrix, Float32, PrimitiveDry
-    spectral_grid = SpectralGrid(;NF=Float32,Grid=OctaHEALPixGrid)
+    # using T42 as T31 has stability issues in the first day
+    spectral_grid = SpectralGrid(;NF=Float32,trunc=42,Grid=OctaHEALPixGrid)
     output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,as_matrix=true)
     model = PrimitiveDryModel(;spectral_grid,output)
     simulation = initialize!(model)
@@ -69,7 +70,8 @@ using NCDatasets, Dates
     @test simulation.model.feedback.nars_detected == false
 
     # OctaHEALPixGrid, as matrix, Float32, but output Float64 PrimitiveDry
-    spectral_grid = SpectralGrid(;NF=Float32,Grid=OctaHEALPixGrid)
+    # using T42 as T31 has stability issues in the first day
+    spectral_grid = SpectralGrid(;NF=Float32,trunc=42,Grid=OctaHEALPixGrid)
     output = OutputWriter(spectral_grid,PrimitiveDry,path=tmp_output_path,as_matrix=true,NF=Float64)
     model = PrimitiveDryModel(;spectral_grid,output)
     simulation = initialize!(model)

@@ -183,6 +183,7 @@ include("dynamics/vertical_advection.jl")
 include("dynamics/implicit.jl")
 include("dynamics/scaling.jl")
 include("dynamics/tendencies.jl")
+include("dynamics/hole_filling.jl")
 
 # PARAMETERIZATIONS
 include("physics/tendencies.jl")

@@ -161,7 +161,7 @@ function nar_detection!(feedback::Feedback,progn::PrognosticVariables)
     if ~nars_detected_here
         nars_vor = ~isfinite(vor[1])    # just check first mode
                                         # spectral transform propagates NaRs globally anyway
-        nars_vor && @warn "NaR detected at time step $i"
+        nars_vor && @warn "NaN or Inf detected at time step $i"
         nars_detected_here |= nars_vor
     end
 

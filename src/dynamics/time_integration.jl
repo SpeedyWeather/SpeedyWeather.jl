@@ -339,10 +339,10 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
             progn_layer = progn.layers[k]
             progn_layer_lf = progn_layer.timesteps[lf2]
 
-            horizontal_diffusion!(progn_layer,diagn_layer,model)    # implicit diffusion of vor, div, temp
-            leapfrog!(progn_layer,diagn_layer,dt,lf1,model)         # time step forward for vor, div, temp
+            horizontal_diffusion!(progn_layer,diagn_layer,model)    # for vor, div, temp, humid
+            leapfrog!(progn_layer,diagn_layer,dt,lf1,model)         # time step forward for vor, div, temp, humid
             gridded!(diagn_layer,progn_layer_lf,model)              # propagate spectral state to grid
-        else                                                        # surface level
+        else                                                        # surface level, time step for pressure
             leapfrog!(progn.surface,diagn.surface,dt,lf1,model)
             (;pres_grid) = diagn.surface
             pres_lf = progn.surface.timesteps[lf2].pres

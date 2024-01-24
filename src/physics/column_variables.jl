@@ -31,7 +31,7 @@ function get_column!(   C::ColumnVariables,
         C.u[k] = layer.grid_variables.u_grid[ij]
         C.v[k] = layer.grid_variables.v_grid[ij]
         C.temp[k] = layer.grid_variables.temp_grid[ij]
-        C.humid[k] = layer.grid_variables.humid_grid[ij]
+        C.humid[k] = layer.grid_variables.humid_grid[ij] 
     end
 
     # TODO skin = surface approximation for now
@@ -51,6 +51,28 @@ function get_column!(   C::ColumnVariables,
     rings = eachring(G.Grid,G.nlat_half)
     jring = whichring(ij,rings)
     get_column!(C,D,P,ij,jring,G,L)
+end
+
+function get_column(    S::AbstractSimulation,
+                        ij::Integer)
+    (;prognostic_variables, diagnostic_variables) = S
+    (;geometry, land_sea_mask) = S.model
+
+    column = deepcopy(S.diagnostic_variables.columns[1])
+    reset_column!(column)
+
+    get_column!(column,
+                diagnostic_variables,
+                prognostic_variables,
+                ij,
+                geometry,
+                land_sea_mask)
+
+    # execute all parameterizations for this column to return a consistent state
+    parameterization_tendencies!(column,S.model)
+
+    @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
+    return column
 end
 
 """

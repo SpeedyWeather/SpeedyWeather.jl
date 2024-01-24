@@ -19,7 +19,10 @@ Base.@kwdef struct SpeedyCondensation{NF<:AbstractFloat} <: AbstractCondensation
     time_scale::Second = Hour(4)
 
     "Flux limiter for humidity tendency"
-    max_flux::NF = 5
+    max_flux::NF = 0.1
+
+    "Flux limiter for condensation heating"
+    max_heating::NF = 0.001
 
     # precomputed arrays
     n_stratosphere_levels::Base.RefValue{Int} = Ref(0)
@@ -106,6 +109,7 @@ function large_scale_condensation!(
     (;nlev) = column
     pₛ = pres[end]                          # surface pressure
     pₛ_norm² = (pₛ/constants.pres_ref)^2
+    max_heating = -scheme.max_heating*time_scale⁻¹
 
     # precompute scaling constant, undo radius scaling here as directly used for output
     (;gravity, water_density) = constants
@@ -123,12 +127,12 @@ function large_scale_condensation!(
 
             # accumulate in tendencies (nothing is added if humidity not above threshold)
             humid_tend_k = -(humid[k] - humid_threshold) * time_scale⁻¹                   # eq. 22
-            
+
             # with flux limiter, use max and - as humid_tend_k is always negative
             humid_tend_k = max(humid_tend_k, -pₛ_norm²*humid_tend_max[k])
 
             # condensation heating, eq. 23 
-            temp_tend[k] -= scheme.latent_heat_cₚ[] * humid_tend_k
+            temp_tend[k] -= max(max_heating, scheme.latent_heat_cₚ[] * humid_tend_k)
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top

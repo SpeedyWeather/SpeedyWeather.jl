@@ -377,17 +377,23 @@ function vordiv_tendencies!(
     return nothing
 end
 
+# function barrier
 function tendencies_physics_only!(
     diagn::DiagnosticVariablesLayer,
     model::PrimitiveEquation
 )
-    tendencies_physics_only!(diagn,model.geometry,model.spectral_transform)
+    wet_core = model isa PrimitiveWet
+    tendencies_physics_only!(diagn,model.geometry,model.spectral_transform,wet_core)
 end
 
+"""For dynamics=false, after calling parameterization_tendencies! call this function
+to transform the physics tendencies from grid-point to spectral space including the
+necessary coslat⁻¹ scaling."""
 function tendencies_physics_only!(
     diagn::DiagnosticVariablesLayer,
     G::Geometry,
     S::SpectralTransform,
+    wet_core::Bool = true
 )
     (;coslat⁻¹) = G
     (;u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid) = diagn.tendencies  # already contains parameterizations
@@ -411,15 +417,12 @@ function tendencies_physics_only!(
     spectral!(u_tend,u_tend_grid,S)
     spectral!(v_tend,v_tend_grid,S)
     spectral!(temp_tend,temp_tend_grid,S)
-    spectral!(humid_tend,humid_tend_grid,S)
+    wet_core && spectral!(humid_tend,humid_tend_grid,S)
 
     curl!(vor_tend,u_tend,v_tend,S)         # ∂ζ/∂t = ∇×(u_tend,v_tend)
     divergence!(div_tend,u_tend,v_tend,S)   # ∂D/∂t = ∇⋅(u_tend,v_tend)
     return nothing
 end
-
-
-
 
 """
 $(TYPEDSIGNATURES)
@@ -847,6 +850,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     U = diagn.dynamics_variables.a      # reuse work arrays for velocities spectral
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
 
+    # retain previous time step for vertical advection
     @. temp_grid_prev = temp_grid
     @. u_grid_prev = u_grid
     @. v_grid_prev = v_grid
@@ -862,10 +866,14 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     gridded!(vor_grid,vor,S)                # get vorticity on grid from spectral vor
     gridded!(div_grid,div,S)                # get divergence on grid from spectral div
     gridded!(temp_grid,temp,S)              # (absolute) temperature
-    wet_core && gridded!(humid_grid,humid,S)# specific humidity (wet core only)
+    
+    if wet_core                             # specific humidity (wet core only)
+        gridded!(humid_grid,humid,S)        
+        hole_filling!(humid_grid,model.hole_filling,model)  # remove negative humidity
+    end
 
     # include humidity effect into temp for everything stability-related
-    temperature_average!(diagn,temp,S)      # TODO: do at frequency of reinitialize implicit?
+    temperature_average!(diagn,temp,S)
     virtual_temperature!(diagn,temp,model)  # temp = virt temp for dry core
 
     # transform from U,V in spectral to u,v on grid (U,V = u,v*coslat)
