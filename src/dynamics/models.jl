@@ -20,7 +20,7 @@ The BarotropicModel struct holds all other structs that contain precalculated co
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
-    spectral_grid::SpectralGrid
+    spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
 
     # DYNAMICS
     planet::AbstractPlanet = Earth()
@@ -82,7 +82,7 @@ The ShallowWaterModel struct holds all other structs that contain precalculated 
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
-    spectral_grid::SpectralGrid
+    spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
 
     # DYNAMICS
     planet::AbstractPlanet = Earth()
@@ -146,7 +146,7 @@ The PrimitiveDryModel struct holds all other structs that contain precalculated 
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveDry
-    spectral_grid::SpectralGrid
+    spectral_grid::SpectralGrid = SpectralGrid()
 
     # DYNAMICS
     dynamics::Bool = true
@@ -234,7 +234,7 @@ The PrimitiveDryModel struct holds all other structs that contain precalculated 
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveWet
-    spectral_grid::SpectralGrid
+    spectral_grid::SpectralGrid = SpectralGrid()
 
     # DYNAMICS
     dynamics::Bool = true
