@@ -189,8 +189,8 @@ end
 
         # create initial conditions
         (;lmax,mmax) = m.spectral_transform
-        vor0 = randn(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
-        div0 = randn(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+        vor0 = rand(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+        div0 = rand(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
         
         vor0[1,1] = 0                   # zero mean
         div0[1,1] = 0
@@ -234,8 +234,8 @@ end
         SpeedyWeather.divergence!(div1,u_coslat⁻¹,v_coslat⁻¹,S)
 
         for lm in SpeedyWeather.eachharmonic(vor0,vor1,div0,div1)
-            @test vor0[lm] ≈ vor1[lm] rtol=20*sqrt(eps(NF))
-            @test div0[lm] ≈ div1[lm] rtol=20*sqrt(eps(NF))
+            @test vor0[lm] ≈ vor1[lm] rtol=10*sqrt(eps(NF))
+            @test div0[lm] ≈ div1[lm] rtol=10*sqrt(eps(NF))
         end
     end
 end
