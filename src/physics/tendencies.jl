@@ -48,8 +48,8 @@ function parameterization_tendencies!(
     humidity_diffusion!(column,model)
 
     # HELD-SUAREZ
-    # temperature_relaxation!(column,model)
-    # boundary_layer_drag!(column,model)
+    temperature_relaxation!(column,model)
+    boundary_layer_drag!(column,model)
 
     # Calculate parametrizations (order of execution is important!)
     convection!(column,model)
