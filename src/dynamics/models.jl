@@ -209,6 +209,7 @@ function initialize!(model::PrimitiveDry;time::DateTime = DEFAULT_DATE)
     initialize!(model.land_sea_mask)
     initialize!(model.ocean)
     initialize!(model.land)
+    initialize!(model.solar_zenith,time)
 
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
@@ -308,6 +309,7 @@ function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     initialize!(model.land)
     initialize!(model.soil)
     initialize!(model.vegetation)
+    initialize!(model.solar_zenith,time,model)
 
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
