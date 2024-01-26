@@ -108,7 +108,7 @@ Dates.Day(   x::AbstractFloat) = Hour(24x)
 
 function Base.convert(::Type{Second},x::AbstractFloat)
     xr = round(Int64,x)
-    @info "Rounding and converting $x to $xr for integer seconds."
+    x == xr || @info "Rounding and converting $x to $xr for integer seconds."
     return Second(xr)
 end
 

@@ -132,6 +132,14 @@ function get_latdlonds(Grid::Type{<:AbstractGrid},nlat_half::Integer)
     return latds, londs
 end
 
+function get_latlons(Grid::Type{<:AbstractGrid},nlat_half::Integer)
+    colats,lons = get_colatlons(Grid,nlat_half)     # colatitudes, longitudes in radians
+    lats = colats                                   # flat copy rename before conversion
+    lats .= π/2 .- colats                           # colatiudes to latitudes in radians
+
+    return lats, lons
+end
+
 get_lat(grid::Grid) where {Grid<:AbstractGrid} = get_lat(Grid,grid.nlat_half)
 get_latd(grid::Grid) where {Grid<:AbstractGrid} = get_latd(Grid,grid.nlat_half)
 get_lond(grid::Grid) where {Grid<:AbstractGrid} = get_lond(Grid,grid.nlat_half)

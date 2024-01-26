@@ -16,20 +16,23 @@ Base.@kwdef struct Earth <: AbstractPlanet
     "switch on/off daily cycle"
     daily_cycle::Bool = true
     
-    "[hrs] in a day"
-    length_of_day::Float64 = 24             
+    "Seconds in a daily rotation"
+    length_of_day::Second = Hour(24)             
 
     "switch on/off seasonal cycle"
     seasonal_cycle::Bool = true
 
-    "[days] in a year"
-    length_of_year::Float64 = 365.25     
+    "Seconds in an orbit around the sun"
+    length_of_year::Second = Day(365.25)
     
     "time of spring equinox (year irrelevant)"
     equinox::DateTime = DateTime(2000,3,20) 
 
     "angle [˚] rotation axis tilt wrt to orbit"
-    axial_tilt::Float64 = 23.4              
+    axial_tilt::Float64 = 23.4
+
+    "Total solar irradiance at the distance of 1 AU [W/m²]"
+    solar_constant::Float64 = 1365
 end
 
 function Base.show(io::IO,planet::AbstractPlanet)
