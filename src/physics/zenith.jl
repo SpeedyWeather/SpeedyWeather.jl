@@ -210,10 +210,11 @@ function cos_zenith!(
     rings = eachring(cos_zenith)
 
     @inbounds for (j,ring) in enumerate(rings)                         
-        sinϕ, cosϕ = sinlat[j], coslat[j]
+        sinδsinϕ = sinδ*sinlat[j]
+        cosδcosϕ = cosδ*coslat[j]
         for ij in ring
             h = solar_hour_angle_0E + lons[ij]      # solar hour angle at longitude λ in radians
-            cos_zenith[ij] = max(0,sinδ*sinϕ + cosδ*cosϕ*cos(h))
+            cos_zenith[ij] = max(0,sinδsinϕ + cosδcosϕ*cos(h))
         end
     end
 end
@@ -266,7 +267,7 @@ function cos_zenith!(
         ϕ*δ > 0 ? one_pi : 0                # polar day if signs are equal, otherwise polar night
         
         sinϕ, cosϕ = sinlat[j], coslat[j]            # sin, cos of latitude
-        cos_zenith_j = max(0,(h₀*sinδ*sinϕ + cosδ*cosϕ*sin(h₀))/two_pi)
+        cos_zenith_j = max(0,(h₀*sinδ*sinϕ + cosδ*cosϕ*sin(h₀))/one_pi)
 
         for ij in ring
             cos_zenith[ij] = cos_zenith_j
