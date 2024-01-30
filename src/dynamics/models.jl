@@ -159,7 +159,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevic
     land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
     ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
     land::AbstractLand{NF} = SeasonalLandTemperature(spectral_grid)
-    solar_zenith::AbstractZenith{NF} = SolarZenithAngle(spectral_grid,planet)
+    solar_zenith::AbstractZenith{NF} = WhichZenith(spectral_grid,planet)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -251,7 +251,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevic
     land::AbstractLand{NF} = SeasonalLandTemperature(spectral_grid)
     soil::AbstractSoil{NF} = SeasonalSoilMoisture(spectral_grid)
     vegetation::AbstractVegetation{NF} = VegetationClimatology(spectral_grid)
-    solar_zenith::AbstractZenith{NF} = SolarZenithAngle(spectral_grid,planet)
+    solar_zenith::AbstractZenith{NF} = WhichZenith(spectral_grid,planet)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
