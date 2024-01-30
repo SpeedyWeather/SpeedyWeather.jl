@@ -202,6 +202,7 @@ function cos_zenith!(
 
     (;sinlat, coslat, lons) = geometry
     (;cos_zenith, length_of_day, length_of_year) = S
+    @boundscheck geometry.nlat_half == S.nlat_half || throw(BoundsError)
 
     # g: angular fraction of year [0...2π] for Jan-01 to Dec-31
     time_of_year = S.seasonal_cycle ? time : S.initial_time[]
@@ -263,6 +264,7 @@ function cos_zenith!(
 
     (;sinlat, coslat, lat) = geometry
     (;cos_zenith, length_of_day, length_of_year) = S
+    @boundscheck geometry.nlat_half == S.nlat_half || throw(BoundsError)
 
     # g: angular fraction of year [0...2π] for Jan-01 to Dec-31
     time_of_year = S.seasonal_cycle ? time : S.initial_time[]
@@ -285,7 +287,7 @@ function cos_zenith!(
         ϕ*δ > 0 ? π : 0                     # polar day if signs are equal, otherwise polar night
         
         sinϕ, cosϕ = sinlat[j], coslat[j]
-        cos_zenith_j = max(0,h₀*sinδ*sinϕ + cosδ*cosϕ*sin(h₀))
+        cos_zenith_j = h₀*sinδ*sinϕ + cosδ*cosϕ*sin(h₀)
         cos_zenith_j /= π
 
         for ij in ring
