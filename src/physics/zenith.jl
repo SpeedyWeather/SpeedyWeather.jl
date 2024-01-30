@@ -100,9 +100,10 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Chooses from SolarZenith (daily and seasonal cycle), SolarZenithDay (daily cycle only),
-SolarZenithSeason (seasonal cycle only) and SolarZenithConstant (no daily or seasonal cycle)
-given the parameters in model.planet."""
+Chooses from SolarZenith (daily and seasonal cycle) or SolarZenithSeason
+given the parameters in model.planet. In both cases the seasonal cycle can
+be disabled, calculating the solar declination from the initial time
+instead of current time."""
 function WhichZenith(SG::SpectralGrid,P::AbstractPlanet;kwargs...)
     (;NF, Grid, nlat_half) = SG
     (;daily_cycle, seasonal_cycle, length_of_day, length_of_year) = P
@@ -118,6 +119,7 @@ function WhichZenith(SG::SpectralGrid,P::AbstractPlanet;kwargs...)
     end
 end
 
+# function barrier
 function cos_zenith!(time::DateTime,model::PrimitiveEquation)
     (;solar_zenith,geometry) = model
     cos_zenith!(solar_zenith,time,geometry)
@@ -187,6 +189,11 @@ function solar_hour_angle(
     return (sec_of_day - noon_in_sec)*day2rad + convert(T,λ)
 end
 
+"""
+$(TYPEDSIGNATURES)
+Calculate cos of solar zenith angle with a daily cycle
+at time `time`. Seasonal cycle or time correction may be disabled,
+depending on parameters in SolarZenith."""
 function cos_zenith!(
     S::SolarZenith{NF},
     time::DateTime,
@@ -243,6 +250,11 @@ Base.@kwdef struct SolarZenithSeason{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <
     cos_zenith::Grid = zeros(Grid,nlat_half)
 end
 
+"""
+$(TYPEDSIGNATURES)
+Calculate cos of solar zenith angle as daily average
+at time `time`. Seasonal cycle or time correction may be disabled,
+depending on parameters in SolarZenithSeason."""
 function cos_zenith!(
     S::SolarZenithSeason{NF},
     time::DateTime,
