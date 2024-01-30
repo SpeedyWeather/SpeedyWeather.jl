@@ -118,6 +118,11 @@ function WhichZenith(SG::SpectralGrid,P::AbstractPlanet;kwargs...)
     end
 end
 
+function cos_zenith!(time::DateTime,model::PrimitiveEquation)
+    (;solar_zenith,geometry) = model
+    cos_zenith!(solar_zenith,time,geometry)
+end
+
 function Base.show(io::IO,L::AbstractZenith)
     println(io,"$(typeof(L)) <: AbstractZenith")
     keys = propertynames(L)
@@ -221,7 +226,7 @@ end
 
 """Solar zenith angle varying with seasonal cycle only.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SolarZenithSeason{NF<:AbstractFloat,Grid<:AbstractGrid{NF   }} <: AbstractZenith{NF,Grid}
+Base.@kwdef struct SolarZenithSeason{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractZenith{NF,Grid}
     # DIMENSIONS
     nlat_half::Int
 
@@ -256,18 +261,20 @@ function cos_zenith!(
     δ = S.solar_declination(g)
     sinδ,cosδ = sincos(δ)
 
-    one_pi, pi_half, two_pi = convert.(NF,(π, π/2, 2π))
+    local h₀::NF                # hour angle sunrise to sunset
+    local cos_zenith_j::NF      # at latitude j
 
     rings = eachring(cos_zenith)
     @inbounds for (j,ring) in enumerate(rings)
             
         ϕ = lat[j]
-        h₀ = abs(δ) + abs(ϕ) < pi_half ?    # polar day/night?
+        h₀ = abs(δ) + abs(ϕ) < π/2 ?        # polar day/night?
         acos(-tan(ϕ) * tan(δ)) :            # if not: calculate length of day
-        ϕ*δ > 0 ? one_pi : 0                # polar day if signs are equal, otherwise polar night
+        ϕ*δ > 0 ? π : 0                     # polar day if signs are equal, otherwise polar night
         
-        sinϕ, cosϕ = sinlat[j], coslat[j]            # sin, cos of latitude
-        cos_zenith_j = max(0,(h₀*sinδ*sinϕ + cosδ*cosϕ*sin(h₀))/one_pi)
+        sinϕ, cosϕ = sinlat[j], coslat[j]
+        cos_zenith_j = max(0,h₀*sinδ*sinϕ + cosδ*cosϕ*sin(h₀))
+        cos_zenith_j /= π
 
         for ij in ring
             cos_zenith[ij] = cos_zenith_j
