@@ -209,7 +209,7 @@ function cos_zenith!(
 
     rings = eachring(cos_zenith)
 
-    for (j,ring) in enumerate(rings)                         
+    @inbounds for (j,ring) in enumerate(rings)                         
         sinϕ, cosϕ = sinlat[j], coslat[j]
         for ij in ring
             h = solar_hour_angle_0E + lons[ij]      # solar hour angle at longitude λ in radians
@@ -258,7 +258,7 @@ function cos_zenith!(
     one_pi, pi_half, two_pi = convert.(NF,(π, π/2, 2π))
 
     rings = eachring(cos_zenith)
-    for (j,ring) in enumerate(rings)
+    @inbounds for (j,ring) in enumerate(rings)
             
         ϕ = lat[j]
         h₀ = abs(δ) + abs(ϕ) < pi_half ?    # polar day/night?
