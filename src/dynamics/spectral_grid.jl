@@ -139,7 +139,7 @@ Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF:
     "longitude (0...2π) for each grid point in ring order"
     lons::Vector{NF} = RingGrids.get_latlons(Grid,nlat_half)[2]
     
-    "latitude (-π...π) for each grid point in ring order"
+    "latitude (-π/2...π/2) for each grid point in ring order"
     lats::Vector{NF} = RingGrids.get_latlons(Grid,nlat_half)[1]
 
     "sin of latitudes"
