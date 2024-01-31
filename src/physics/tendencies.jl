@@ -13,6 +13,8 @@ function parameterization_tendencies!(
     model::PrimitiveEquation,
 )
 
+    cos_zenith!(time,model)
+
     G = model.geometry
     L = model.land_sea_mask
     rings = eachring(G.Grid,G.nlat_half)

@@ -121,17 +121,26 @@ Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF:
     "array of colatitudes in radians (0...π)"
     colat::Vector{Float64} = get_colat(Grid,nlat_half)
 
+    "array of latitudes in radians (π...-π)"
+    lat::Vector{NF} = get_lat(Grid,nlat_half)
+
     "array of latitudes in degrees (90˚...-90˚)"
     latd::Vector{Float64} = get_latd(Grid,nlat_half)
 
     "array of longitudes in degrees (0...360˚), empty for non-full grids"
     lond::Vector{Float64} = get_lond(Grid,nlat_half)
 
-    "longitude (-180˚...180˚) for each grid point in ring order"
+    "longitude (0˚...360˚) for each grid point in ring order"
     londs::Vector{NF} = get_latdlonds(Grid,nlat_half)[2]
     
     "latitude (-90˚...˚90) for each grid point in ring order"
     latds::Vector{NF} = get_latdlonds(Grid,nlat_half)[1]
+
+    "longitude (0...2π) for each grid point in ring order"
+    lons::Vector{NF} = RingGrids.get_latlons(Grid,nlat_half)[2]
+    
+    "latitude (-π/2...π/2) for each grid point in ring order"
+    lats::Vector{NF} = RingGrids.get_latlons(Grid,nlat_half)[1]
 
     "sin of latitudes"
     sinlat::Vector{NF} = sind.(latd)

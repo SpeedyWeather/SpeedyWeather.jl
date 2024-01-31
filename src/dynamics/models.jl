@@ -159,6 +159,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevic
     land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
     ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
     land::AbstractLand{NF} = SeasonalLandTemperature(spectral_grid)
+    solar_zenith::AbstractZenith{NF} = WhichZenith(spectral_grid,planet)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -208,6 +209,7 @@ function initialize!(model::PrimitiveDry;time::DateTime = DEFAULT_DATE)
     initialize!(model.land_sea_mask)
     initialize!(model.ocean)
     initialize!(model.land)
+    initialize!(model.solar_zenith,time,model)
 
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
@@ -249,6 +251,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevic
     land::AbstractLand{NF} = SeasonalLandTemperature(spectral_grid)
     soil::AbstractSoil{NF} = SeasonalSoilMoisture(spectral_grid)
     vegetation::AbstractVegetation{NF} = VegetationClimatology(spectral_grid)
+    solar_zenith::AbstractZenith{NF} = WhichZenith(spectral_grid,planet)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -306,6 +309,7 @@ function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     initialize!(model.land)
     initialize!(model.soil)
     initialize!(model.vegetation)
+    initialize!(model.solar_zenith,time,model)
 
     # parameterizations
     initialize!(model.boundary_layer_drag,model)
