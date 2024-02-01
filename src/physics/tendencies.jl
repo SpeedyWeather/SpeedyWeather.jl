@@ -13,6 +13,7 @@ function parameterization_tendencies!(
     model::PrimitiveEquation,
 )
 
+    # TODO move into shortwave radiation code
     cos_zenith!(time,model)
 
     G = model.geometry
@@ -46,12 +47,12 @@ function parameterization_tendencies!(
     get_thermodynamics!(column,model)
 
     # VERTICAL DIFFUSION
-    static_energy_diffusion!(column,model)
-    humidity_diffusion!(column,model)
+    # static_energy_diffusion!(column,model)
+    # humidity_diffusion!(column,model)
 
     # HELD-SUAREZ
-    temperature_relaxation!(column,model)
-    boundary_layer_drag!(column,model)
+    # temperature_relaxation!(column,model)
+    # boundary_layer_drag!(column,model)
 
     # Calculate parametrizations (order of execution is important!)
     convection!(column,model)

@@ -1,3 +1,5 @@
+abstract type VerticalAdvection{NF,B} end
+
 # Dispersive and diffusive advection schemes `NF` is the type, `B` the half-stencil size
 abstract type DiffusiveVerticalAdvection{NF, B}  <: VerticalAdvection{NF, B} end
 abstract type DispersiveVerticalAdvection{NF, B} <: VerticalAdvection{NF, B} end
