@@ -76,12 +76,21 @@ function large_scale_condensation!(
     return nothing
 end
 
-"""Function barrier only."""
+# function barrier for all AbstractCondensation
 function large_scale_condensation!( 
     column::ColumnVariables,
     model::PrimitiveWet,
 )
-    large_scale_condensation!(column,model.large_scale_condensation,
+    large_scale_condensation!(column,model.large_scale_condensation,model)
+end
+
+# function barrier for SpeedyCondensation to unpack model
+function large_scale_condensation!( 
+    column::ColumnVariables,
+    scheme::SpeedyCondensation,
+    model::PrimitiveWet,
+)
+    large_scale_condensation!(column,scheme,
         model.geometry,model.constants,model.time_stepping)
 end
 
@@ -142,6 +151,94 @@ function large_scale_condensation!(
             # += for vertical integral
             ΔpₖΔt_gρ = σ_levels_thick[k]*pₛΔt_gρ                    # Formula 4 *Δt for [m] of rain during Δt
             column.precip_large_scale += -ΔpₖΔt_gρ * humid_tend_k   # Formula 25, unit [m]
+
+            # only accumulate into humid_tend now to allow humid_tend != 0 before this scheme is called
+            humid_tend[k] += humid_tend_k
+        end
+    end
+end
+
+"""
+Large scale condensation as with immediate precipitation.
+$(TYPEDFIELDS)"""
+Base.@kwdef struct ImmediateCondensation{NF<:AbstractFloat} <: AbstractCondensation{NF}
+    "Flux limiter for latent heat release [K] per timestep"
+    max_heating::NF = 0.2
+
+    "Latent heat of evaporation divided by specific heat of dry air "
+    latent_heat_cₚ::Base.RefValue{NF} = Ref(zero(NF))
+end
+
+ImmediateCondensation(SG::SpectralGrid;kwargs...) = ImmediateCondensation{SG.NF}(;kwargs...)
+
+"""
+$(TYPEDSIGNATURES)
+Initialize the SpeedyCondensation scheme."""
+function initialize!(scheme::ImmediateCondensation,model::PrimitiveEquation)
+    # for latent heat release dT/dt = -(Lᵥ/cₚ)*dq/dt
+    scheme.latent_heat_cₚ[] = model.atmosphere.latent_heat_condensation/    # [J/kg]
+                                model.atmosphere.cₚ     # [J/K/kg] specific heat capacity, const pres
+end
+
+# function barrier for ImmediateCondensation to unpack model
+function large_scale_condensation!( 
+    column::ColumnVariables,
+    scheme::ImmediateCondensation,
+    model::PrimitiveWet,
+)
+    large_scale_condensation!(column,scheme,
+        model.clausis_clapeyron,model.geometry,model.constants,model.time_stepping)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Large-scale condensation for a `column` by relaxation back to a reference
+relative humidity if larger than that. Calculates the tendencies for
+specific humidity and temperature and integrates the large-scale
+precipitation vertically for output."""
+function large_scale_condensation!(
+    column::ColumnVariables{NF},
+    scheme::ImmediateCondensation,
+    clausius_clapeyron::AbstractClausiusClapeyron,
+    geometry::Geometry,
+    constants::DynamicsConstants,
+    time_stepping::TimeStepper,
+) where NF
+
+    (;temp, humid, pres) = column           # prognostic vars: specific humidity, pressure
+    (;temp_tend, humid_tend) = column       # tendencies to write into
+    (;sat_humid) = column                   # intermediate variable, calculated in thermodynamics!
+    
+    # precompute scaling constant for precipitation output
+    pₛ = pres[end]                          # surface pressure
+    (;gravity, water_density) = constants
+    (;Δt_sec) = time_stepping
+    (;σ_levels_thick) = geometry
+    pₛΔt_gρ = pₛ*Δt_sec/gravity/water_density 
+
+    max_heating = scheme.max_heating/Δt_sec
+
+    @inbounds for k in eachindex(column)
+        if humid[k] > sat_humid[k]
+
+            # tendency for immediate humid = sat_humid
+            humid_tend_k = (sat_humid[k] - humid[k])/Δt_sec
+
+            # implicit correction, Frierson et al. 2006 eq. (21)
+            dqsat_dT = grad_saturation_humidity(clausius_clapeyron,temp[k],pres[k])
+            humid_tend_k /= 1 + scheme.latent_heat_cₚ[]*dqsat_dT
+
+            # latent heat release 
+            temp_tend[k] += min(max_heating, -scheme.latent_heat_cₚ[] * humid_tend_k)
+
+            # If there is large-scale condensation at a level higher (i.e. smaller k) than
+            # the cloud-top previously diagnosed due to convection, then increase the cloud-top
+            column.cloud_top = min(column.cloud_top, k)             # Page 7 (last sentence)
+    
+            # 2. Precipitation due to large-scale condensation [kg/m²/s] /ρ for [m/s]
+            # += for vertical integral
+            ΔpₖΔt_gρ = σ_levels_thick[k]*pₛΔt_gρ                    # Formula 4 *Δt for [m] of rain during Δt
+            column.precip_large_scale -= ΔpₖΔt_gρ * humid_tend_k    # Formula 25, unit [m]
 
             # only accumulate into humid_tend now to allow humid_tend != 0 before this scheme is called
             humid_tend[k] += humid_tend_k
