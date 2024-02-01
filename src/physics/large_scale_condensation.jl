@@ -228,7 +228,7 @@ function large_scale_condensation!(
             dqsat_dT = grad_saturation_humidity(clausius_clapeyron,temp[k],pres[k])
             humid_tend_k /= 1 + scheme.latent_heat_cₚ[]*dqsat_dT
 
-            # latent heat release 
+            # latent heat release with maximum heating limiter for stability
             temp_tend[k] += min(max_heating, -scheme.latent_heat_cₚ[] * humid_tend_k)
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
