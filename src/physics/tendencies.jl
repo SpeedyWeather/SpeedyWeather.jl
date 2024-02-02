@@ -12,7 +12,6 @@ function parameterization_tendencies!(
     time::DateTime,
     model::PrimitiveEquation,
 )
-
     cos_zenith!(time,model)
 
     G = model.geometry
