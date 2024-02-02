@@ -63,7 +63,6 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     surface_air_density::NF = 0
     const sat_humid::Vector{NF} = zeros(NF,nlev)                # Saturation specific humidity [kg/kg]
     const rel_humid::Vector{NF} = zeros(NF,nlev)                # Relative humidity [1]
-    const sat_vap_pres::Vector{NF} = zeros(NF,nlev)             # Saturation vapour pressure [Pa]
     const dry_static_energy::Vector{NF} = zeros(NF,nlev)        # Dry static energy
     const moist_static_energy::Vector{NF} = zeros(NF,nlev)      # Moist static energy
     const sat_moist_static_energy::Vector{NF} = zeros(NF,nlev)  # Saturation moist static energy

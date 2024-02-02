@@ -1,3 +1,7 @@
+abstract type AbstractSolarDeclination{NF} end
+abstract type AbstractSolarTimeCorrection{NF} end
+abstract type AbstractZenith{NF,Grid} end
+
 """Coefficients to calculate the solar declination angle δ [radians] based on a simple
 sine function, with Earth's axial tilt as amplitude, equinox as phase shift.
 $(TYPEDFIELDS)"""

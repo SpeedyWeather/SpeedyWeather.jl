@@ -163,12 +163,12 @@ end
 # function barrier
 function evaporation!(  column::ColumnVariables,
                         model::PrimitiveWet)
-    evaporation!(column,model.evaporation,model.thermodynamics)
+    evaporation!(column,model.evaporation,model.clausis_clapeyron)
 end
 
 function evaporation!(  column::ColumnVariables{NF},
                         evaporation::SurfaceEvaporation,
-                        thermodynamics::Thermodynamics) where NF
+                        clausius_clapeyron::AbstractClausiusClapeyron) where NF
 
     (;skin_temperature_sea, skin_temperature_land, pres) = column
     (;moisture_exchange_land, moisture_exchange_sea) = evaporation
@@ -176,8 +176,8 @@ function evaporation!(  column::ColumnVariables{NF},
 
     # SATURATION HUMIDITY OVER LAND AND OCEAN
     surface_pressure = pres[end]
-    sat_humid_land = saturation_humidity(skin_temperature_land,surface_pressure,thermodynamics)
-    sat_humid_sea = saturation_humidity(skin_temperature_sea,surface_pressure,thermodynamics)
+    sat_humid_land = saturation_humidity(skin_temperature_land,surface_pressure,clausius_clapeyron)
+    sat_humid_sea = saturation_humidity(skin_temperature_sea,surface_pressure,clausius_clapeyron)
 
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
