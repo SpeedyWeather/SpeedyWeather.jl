@@ -30,20 +30,11 @@ abstract type AbstractColumnVariables{NF} end
 abstract type AbstractForcing{NF} end
 abstract type AbstractDrag{NF} end
 
-# VERTICAL ADVECTION (PrimitiveEquation)
-abstract type VerticalAdvection{NF,B} end
-
-# SOLAR RADIATION
-abstract type AbstractSolarDeclination{NF} end
-abstract type AbstractSolarTimeCorrection{NF} end
-abstract type AbstractZenith{NF,Grid} end
-
 # PARAMETERIZATIONS
 abstract type AbstractParameterization{NF} end
 abstract type BoundaryLayerDrag{NF} <: AbstractParameterization{NF} end
 abstract type TemperatureRelaxation{NF} <: AbstractParameterization{NF} end
 abstract type VerticalDiffusion{NF} <: AbstractParameterization{NF} end
-abstract type AbstractThermodynamics{NF} <: AbstractParameterization{NF} end
 abstract type AbstractCondensation{NF} <: AbstractParameterization{NF} end
 abstract type AbstractSurfaceWind{NF} <: AbstractParameterization{NF} end
 abstract type AbstractSurfaceThermodynamics{NF} <: AbstractParameterization{NF} end

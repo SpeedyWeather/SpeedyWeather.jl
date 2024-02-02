@@ -13,6 +13,7 @@ function parameterization_tendencies!(
     model::PrimitiveEquation,
 )
 
+    # TODO move into shortwave radiation code
     cos_zenith!(time,model)
 
     G = model.geometry
