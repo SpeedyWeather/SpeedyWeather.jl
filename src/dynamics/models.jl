@@ -164,7 +164,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevic
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
     boundary_layer_drag::BoundaryLayerDrag{NF} = NoBoundaryLayerDrag(spectral_grid)
-    temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
+    temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
     surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
@@ -257,7 +257,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevic
     physics::Bool = true
     clausis_clapeyron::AbstractClausiusClapeyron{NF} = ClausiusClapeyron(spectral_grid,atmosphere)
     boundary_layer_drag::BoundaryLayerDrag{NF} = NoBoundaryLayerDrag(spectral_grid)
-    temperature_relaxation::TemperatureRelaxation{NF} = HeldSuarez(spectral_grid)
+    temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
     humidity_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
     large_scale_condensation::AbstractCondensation{NF} = ImmediateCondensation(spectral_grid)

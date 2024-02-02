@@ -54,12 +54,12 @@ Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind{NF}
     # TODO make this orography dependent
     "Drag coefficient over land (orography = 0) [1]"
     drag_land::NF = 2.4e-3
-
+    
     "Drag coefficient over sea [1]"
     drag_sea::NF = 1.8e-3
 
-    # "Flux limiter [kg/m/s²]"
-    # max_flux::NF = 1.5
+    "Flux limiter [kg/m/s²]"
+    max_flux::NF = 0.1
 end
 
 SurfaceWind(SG::SpectralGrid;kwargs...) = SurfaceWind{SG.NF}(;kwargs...)
@@ -69,7 +69,7 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
 
     (;land_fraction) = column
     (;f_wind, V_gust, drag_land, drag_sea) = surface_wind
-    # (;max_flux) = surface_wind
+    (;max_flux) = surface_wind
 
     # SPEEDY documentation eq. 49
     column.surface_u = f_wind*column.u[end] 
@@ -84,22 +84,23 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
     V₀ = column.surface_wind_speed
     drag = land_fraction*drag_land + (1-land_fraction)*drag_sea
 
-    # add flux limiter to avoid heavy drag in initial shock
-    # u_flux = sign(u[end])*min(abs(ρdragV₀*u[end]),max_flux)
-    # v_flux = sign(v[end])*min(abs(ρdragV₀*v[end]),max_flux)
-    # column.flux_u_upward[end] -= u_flux
-    # column.flux_v_upward[end] -= v_flux
-    
+    # add flux limiter to avoid heavy drag in (initial) shock
+    u_flux = ρ*drag*V₀*surface_u
+    v_flux = ρ*drag*V₀*surface_v
+    column.flux_u_upward[end] -= clamp(u_flux,-max_flux,max_flux)
+    column.flux_v_upward[end] -= clamp(v_flux,-max_flux,max_flux)
+
     # SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
-    column.flux_u_upward[end] -= ρ*drag*V₀*surface_u
-    column.flux_v_upward[end] -= ρ*drag*V₀*surface_v
+    # column.flux_u_upward[end] -= ρ*drag*V₀*surface_u
+    # column.flux_v_upward[end] -= ρ*drag*V₀*surface_v
     
     return nothing
 end
 
 Base.@kwdef struct SurfaceSensibleHeat{NF<:AbstractFloat} <: AbstractSurfaceHeat{NF}
-    heat_exchange_land::Float64 = 1.2e-3    # for neutral stability
-    heat_exchange_sea::Float64 = 0.9e-3
+    heat_exchange_land::NF = 1.2e-3    # for neutral stability
+    heat_exchange_sea::NF = 0.9e-3
+    max_flux::NF = 100
 end
 
 SurfaceSensibleHeat(SG::SpectralGrid;kwargs...) = SurfaceSensibleHeat{SG.NF}(;kwargs...)
@@ -108,8 +109,7 @@ function sensible_heat_flux!(   column::ColumnVariables{NF},
                                 heat_flux::SurfaceSensibleHeat,
                                 C::DynamicsConstants) where NF
     (;cₚ) = C
-    heat_exchange_land = convert(NF,heat_flux.heat_exchange_land)
-    heat_exchange_sea  = convert(NF,heat_flux.heat_exchange_sea)
+    (;heat_exchange_land, heat_exchange_sea, max_flux) = heat_flux
 
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
@@ -121,6 +121,10 @@ function sensible_heat_flux!(   column::ColumnVariables{NF},
     # SPEEDY documentation Eq. 54 and 56
     flux_land = ρ*heat_exchange_land*V₀*cₚ*(T_skin_land - T)
     flux_sea  = ρ*heat_exchange_sea*V₀*cₚ*(T_skin_sea  - T)
+
+    # flux limiter
+    flux_land = clamp(flux_land,-max_flux,max_flux)
+    flux_sea = clamp(flux_sea,-max_flux,max_flux)
 
     # mix fluxes for fractional land-sea mask
     land_available = isfinite(T_skin_land)
@@ -144,8 +148,8 @@ function sensible_heat_flux!(   column::ColumnVariables{NF},
 end
 
 Base.@kwdef struct SurfaceEvaporation{NF<:AbstractFloat} <: AbstractEvaporation{NF}
-    moisture_exchange_land::Float64 = 1.2e-3    # for neutral stability
-    moisture_exchange_sea::Float64 = 0.9e-3
+    moisture_exchange_land::NF = 1.2e-3    # for neutral stability
+    moisture_exchange_sea::NF = 0.9e-3
 end
 
 SurfaceEvaporation(SG::SpectralGrid;kwargs...) = SurfaceEvaporation{SG.NF}(;kwargs...)
@@ -167,8 +171,7 @@ function evaporation!(  column::ColumnVariables{NF},
                         clausius_clapeyron::AbstractClausiusClapeyron) where NF
 
     (;skin_temperature_sea, skin_temperature_land, pres) = column
-    moisture_exchange_land = convert(NF,evaporation.moisture_exchange_land)
-    moisture_exchange_sea  = convert(NF,evaporation.moisture_exchange_sea)
+    (;moisture_exchange_land, moisture_exchange_sea) = evaporation
     α = column.soil_moisture_availability
 
     # SATURATION HUMIDITY OVER LAND AND OCEAN
