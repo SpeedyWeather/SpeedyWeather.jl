@@ -108,10 +108,10 @@ function initialize!(   scheme::HumidityDiffusion,
     # scheme.Fstar[] = C₀/scheme.time_scale.value
 end
 
-# function barrier
+# function barrier for all VerticalDiffusion, dispatch by type of humidity diffusion
 function humidity_diffusion!(   column::ColumnVariables,
                                 model::PrimitiveWet)
-    humidity_diffusion!(column,model.humidity_diffusion,model.geometry)
+    humidity_diffusion!(column,model.humidity_diffusion,model)
 end
 
 # do nothing for primitive dry
@@ -120,9 +120,18 @@ function humidity_diffusion!(   column::ColumnVariables,
     return nothing
 end
 
+# do nothing for no vertical diffusion
 function humidity_diffusion!(   column::ColumnVariables,
-                                scheme::NoVerticalDiffusion)
+                                scheme::NoVerticalDiffusion,
+                                model::PrimitiveEquation)
     return nothing
+end
+
+# function barrier to unpack model
+function humidity_diffusion!(   column::ColumnVariables,
+                                scheme::HumidityDiffusion,
+                                model::PrimitiveEquation)
+    humidity_diffusion!(column, scheme, model.geometry)
 end
 
 """$(TYPEDSIGNATURES)

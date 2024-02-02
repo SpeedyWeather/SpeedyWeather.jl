@@ -142,3 +142,4 @@ end
 
 # iterator for convenience
 eachlayer(column::ColumnVariables) = Base.OneTo(column.nlev)
+Base.eachindex(column::ColumnVariables) = Base.OneTo(column.nlev)
