@@ -34,12 +34,12 @@ The first half level is at 0 the last at 1. Default levels are equally spaced fr
 function default_sigma_coordinates(nlev::Integer)
 
     # equi-distant in σ
-    # σ_half = collect(range(0,1,nlev+1))
+    σ_half = collect(range(0,1,nlev+1))
 
     # Frierson 2006 spacing, higher resolution in surface boundary layer and in stratosphere
-    z = collect(range(1,0,nlev+1))
-    σ_half = @. exp(-5*(0.05*z + 0.95*z^3))
-    σ_half[1] = 0
+    # z = collect(range(1,0,nlev+1))
+    # σ_half = @. exp(-5*(0.05*z + 0.95*z^3))
+    # σ_half[1] = 0
     return σ_half
 end
 
