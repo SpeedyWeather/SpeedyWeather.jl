@@ -19,10 +19,10 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     land_fraction::NF = 0                   # fraction of the column that is over land
 
     # PROGNOSTIC VARIABLES
-    const u::Vector{NF} = zeros(NF,nlev)        # zonal velocity [m/s]
-    const v::Vector{NF} = zeros(NF,nlev)        # meridional velocity [m/s]
-    const temp::Vector{NF} = zeros(NF,nlev)     # temperature [K]
-    const humid::Vector{NF} = zeros(NF,nlev)    # specific humidity [kg/kg]
+    const u::Vector{NF} = zeros(NF,nlev)            # zonal velocity [m/s]
+    const v::Vector{NF} = zeros(NF,nlev)            # meridional velocity [m/s]
+    const temp::Vector{NF} = zeros(NF,nlev)         # absolute temperature [K]
+    const humid::Vector{NF} = zeros(NF,nlev)        # specific humidity [kg/kg]
 
     # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
     const ln_pres::Vector{NF} = zeros(NF,nlev+1)    # logarithm of pressure [log(Pa)]
@@ -33,9 +33,6 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const v_tend::Vector{NF} = zeros(NF,nlev)                   # meridional velocity [m/s²]
     const temp_tend::Vector{NF} = zeros(NF,nlev)                # absolute temperature [K/s]
     const humid_tend::Vector{NF} = zeros(NF,nlev)               # specific humidity [kg/kg/s]
-
-    # DIAGNOSTIC VARIABLES
-    const geopot::Vector{NF} = zeros(NF,nlev)                   # gepotential height [m]
 
     # FLUXES, arrays to be used for various parameterizations, on half levels incl top and bottom
     const flux_u_upward::Vector{NF} = zeros(NF,nlev+1)
@@ -66,7 +63,10 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const dry_static_energy::Vector{NF} = zeros(NF,nlev)        # Dry static energy
     const moist_static_energy::Vector{NF} = zeros(NF,nlev)      # Moist static energy
     const sat_moist_static_energy::Vector{NF} = zeros(NF,nlev)  # Saturation moist static energy
-    
+    const temp_virt::Vector{NF} = zeros(NF,nlev)                # virtual temperature [K]
+    const bulk_richardson::Vector{NF} = zeros(NF,nlev)          # bulk richardson number [1]
+    const geopot::Vector{NF} = zeros(NF,nlev)                   # gepotential height [m]
+
     # and interpolated to half levels
     const humid_half::Vector{NF} = zeros(NF,nlev)                    # Specific humidity interpolated to half-levels
     const sat_humid_half::Vector{NF} = zeros(NF,nlev)                # Saturation specific humidity interpolated to half-levels

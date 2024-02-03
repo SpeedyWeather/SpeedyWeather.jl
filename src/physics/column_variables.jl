@@ -31,6 +31,7 @@ function get_column!(   C::ColumnVariables,
         C.u[k] = layer.grid_variables.u_grid[ij]
         C.v[k] = layer.grid_variables.v_grid[ij]
         C.temp[k] = layer.grid_variables.temp_grid[ij]
+        C.temp_virt[k] = layer.grid_variables.temp_virt_grid[ij]    # actually diagnostic
         C.humid[k] = layer.grid_variables.humid_grid[ij] 
     end
 

@@ -127,6 +127,7 @@ function get_thermodynamics!(column::ColumnVariables,model::PrimitiveWet)
     dry_static_energy!(column, model.constants)
     saturation_humidity!(column, model.clausis_clapeyron)
     moist_static_energy!(column, model.clausis_clapeyron)
+    bulk_richardson!(column, model.constants)
 
     # Interpolate certain variables to half-levels
     vertical_interpolate!(column, model)
@@ -165,6 +166,25 @@ function dry_static_energy!(column::ColumnVariables,constants::DynamicsConstants
 
     @inbounds for k in eachlayer(column)
         dry_static_energy[k] = cₚ * temp[k] + geopot[k]
+    end
+
+    return nothing
+end
+
+function bulk_richardson!(column::ColumnVariables,constants::DynamicsConstants)
+
+    (;cₚ) = constants
+    (;u, v, geopot, temp_virt, nlev, bulk_richardson) = column
+
+    V² = u[nlev]^2 + v[nlev]^2
+    Θ₀ = cₚ*temp_virt[nlev]
+    Θ₁ = θ₀ + geopot[nlev]
+    bulk_richardson[nlev] = geopot[nlev]*(Θ₁ - Θ₀)/Θ₀/V²
+
+    @inbounds for k in nlev-1:-1:1
+        V² = u[k]^2 + v[k]^2
+        virtual_dry_static_energy = cₚ * temp_virt[k] + geopot[k]
+        bulk_richardson[k] = geopot[k]*(virtual_dry_static_energy - Θ₁)/Θ₁/V²
     end
 
     return nothing
