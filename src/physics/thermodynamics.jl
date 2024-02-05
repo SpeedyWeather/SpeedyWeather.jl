@@ -178,7 +178,7 @@ function bulk_richardson!(column::ColumnVariables,constants::DynamicsConstants)
 
     V² = u[nlev]^2 + v[nlev]^2
     Θ₀ = cₚ*temp_virt[nlev]
-    Θ₁ = θ₀ + geopot[nlev]
+    Θ₁ = Θ₀ + geopot[nlev]
     bulk_richardson[nlev] = geopot[nlev]*(Θ₁ - Θ₀)/Θ₀/V²
 
     @inbounds for k in nlev-1:-1:1
