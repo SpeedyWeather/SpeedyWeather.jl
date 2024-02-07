@@ -17,6 +17,7 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     lond::NF = 0                            # longitude
     latd::NF = 0                            # latitude, needed for shortwave radiation
     land_fraction::NF = 0                   # fraction of the column that is over land
+    orography::NF = 0                       # orography height [m]
 
     # PROGNOSTIC VARIABLES
     const u::Vector{NF} = zeros(NF,nlev)            # zonal velocity [m/s]
@@ -47,6 +48,10 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const flux_humid_upward::Vector{NF} = zeros(NF,nlev+1)
     const flux_humid_downward::Vector{NF} = zeros(NF,nlev+1)
 
+    # boundary layer
+    boundary_layer_depth::Int = 0
+    boundary_layer_drag::NF = 0
+    surface_geopotential::NF = 0
     surface_u::NF = 0
     surface_v::NF = 0
     surface_temp::NF = 0
