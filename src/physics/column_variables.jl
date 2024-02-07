@@ -62,18 +62,16 @@ function get_column!(   C::ColumnVariables,
                         D::DiagnosticVariables,
                         P::PrognosticVariables,
                         ij::Int,            # grid point index
-                        G::Geometry,
-                        L::LandSeaMask)
+                        model::PrimitiveEquation)
 
     rings = eachring(G.Grid,G.nlat_half)
     jring = whichring(ij,rings)
-    get_column!(C,D,P,ij,jring,G,L)
+    get_column!(C,D,P,ij,jring,model)
 end
 
 function get_column(    S::AbstractSimulation,
                         ij::Integer)
     (;prognostic_variables, diagnostic_variables) = S
-    (;geometry, land_sea_mask) = S.model
 
     column = deepcopy(S.diagnostic_variables.columns[1])
     reset_column!(column)
@@ -82,8 +80,7 @@ function get_column(    S::AbstractSimulation,
                 diagnostic_variables,
                 prognostic_variables,
                 ij,
-                geometry,
-                land_sea_mask)
+                model)
 
     # execute all parameterizations for this column to return a consistent state
     parameterization_tendencies!(column,S.model)
