@@ -1,3 +1,15 @@
+# function barrier
+function get_column!(   
+    C::ColumnVariables,
+    D::DiagnosticVariables,
+    P::PrognosticVariables,
+    ij::Integer,        # grid point index
+    jring::Integer,     # ring index 1 around North Pole to J around South Pole
+    model::PrimitiveEquation,
+)
+    get_column!(C, D, P, ij, jring, model.geometry, model.constants, model.orography, model.land_sea_mask)
+end
+
 """
 $(TYPEDSIGNATURES)
 Update `C::ColumnVariables` by copying the prognostic variables from `D::DiagnosticVariables`
@@ -8,6 +20,8 @@ function get_column!(   C::ColumnVariables,
                         ij::Integer,        # grid point index
                         jring::Integer,     # ring index 1 around North Pole to J around South Pole
                         G::Geometry,
+                        constants::DynamicsConstants,
+                        O::AbstractOrography,
                         L::AbstractLandSeaMask)
 
     (;σ_levels_full,ln_σ_levels_full) = G
@@ -19,6 +33,8 @@ function get_column!(   C::ColumnVariables,
     C.ij = ij                   # grid-point index
     C.jring = jring             # ring index j of column, used to index latitude vectors
     C.land_fraction = L.land_sea_mask[ij]
+    C.orography = O.orography[ij]
+    C.surface_geopotential = C.orography*constants.gravity
 
     # pressure [Pa] or [log(Pa)]
     lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics
