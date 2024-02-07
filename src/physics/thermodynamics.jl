@@ -113,6 +113,7 @@ end
 $(TYPEDSIGNATURES)
 Calculate the dry static energy for the primitive dry model."""
 function get_thermodynamics!(column::ColumnVariables,model::PrimitiveDry)
+    # use temp here as temp = temp_virt
     geopotential!(column.geopot,column.temp,model.constants)
     dry_static_energy!(column, model.constants)
 end
@@ -123,10 +124,11 @@ Calculate thermodynamic quantities like saturation vapour pressure,
 saturation specific humidity, dry static energy, moist static energy
 and saturation moist static energy from the prognostic column variables."""
 function get_thermodynamics!(column::ColumnVariables,model::PrimitiveWet)
-    geopotential!(column.geopot,column.temp,model.constants)
+    geopotential!(column.geopot, column.temp_virt, model.constants, column.surface_geopotential)
     dry_static_energy!(column, model.constants)
     saturation_humidity!(column, model.clausis_clapeyron)
     moist_static_energy!(column, model.clausis_clapeyron)
+    bulk_richardson!(column, model.constants)
 
     # Interpolate certain variables to half-levels
     vertical_interpolate!(column, model)
@@ -165,6 +167,25 @@ function dry_static_energy!(column::ColumnVariables,constants::DynamicsConstants
 
     @inbounds for k in eachlayer(column)
         dry_static_energy[k] = cₚ * temp[k] + geopot[k]
+    end
+
+    return nothing
+end
+
+function bulk_richardson!(column::ColumnVariables,constants::DynamicsConstants)
+
+    (;cₚ) = constants
+    (;u, v, geopot, temp_virt, nlev, bulk_richardson) = column
+
+    V² = u[nlev]^2 + v[nlev]^2
+    Θ₀ = cₚ*temp_virt[nlev]
+    Θ₁ = Θ₀ + geopot[nlev]
+    bulk_richardson[nlev] = geopot[nlev]*(Θ₁ - Θ₀)/Θ₀/V²
+
+    @inbounds for k in nlev-1:-1:1
+        V² = u[k]^2 + v[k]^2
+        virtual_dry_static_energy = cₚ * temp_virt[k] + geopot[k]
+        bulk_richardson[k] = geopot[k]*(virtual_dry_static_energy - Θ₁)/Θ₁/V²
     end
 
     return nothing

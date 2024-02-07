@@ -16,7 +16,6 @@ function parameterization_tendencies!(
     cos_zenith!(time,model)
 
     G = model.geometry
-    L = model.land_sea_mask
     rings = eachring(G.Grid,G.nlat_half)
 
     @floop for ij in eachgridpoint(diagn)       # loop over all horizontal grid points
@@ -27,7 +26,7 @@ function parameterization_tendencies!(
 
         # extract current column for contiguous memory access
         reset_column!(column)                   # set accumulators back to zero for next grid point
-        get_column!(column,diagn,progn,ij,jring,G,L)  
+        get_column!(column,diagn,progn,ij,jring,model)  
         
         # execute all parameterizations
         parameterization_tendencies!(column,model)
@@ -45,13 +44,14 @@ function parameterization_tendencies!(
     # Pre-compute thermodynamic quantities
     get_thermodynamics!(column,model)
 
-    # VERTICAL DIFFUSION
-    static_energy_diffusion!(column,model)
-    humidity_diffusion!(column,model)
-
-    # HELD-SUAREZ
     temperature_relaxation!(column,model)
     boundary_layer_drag!(column,model)
+
+    # VERTICAL DIFFUSION
+    # diffusion_coefficient!(column,model)
+    # momentum_diffusion!(column,model)
+    static_energy_diffusion!(column,model)
+    humidity_diffusion!(column,model)
 
     # Calculate parametrizations (order of execution is important!)
     convection!(column,model)

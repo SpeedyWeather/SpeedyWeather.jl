@@ -51,14 +51,16 @@ Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind{NF}
     "Wind speed of sub-grid scale gusts [m/s]"
     V_gust::NF = 5
 
-    # TODO make this orography dependent
-    "Drag coefficient over land (orography = 0) [1]"
+    "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
+    use_boundary_layer_drag::Bool = true
+
+    "Otherwise, drag coefficient over land (orography = 0) [1]"
     drag_land::NF = 2.4e-3
     
-    "Drag coefficient over sea [1]"
+    "Otherwise, Drag coefficient over sea [1]"
     drag_sea::NF = 1.8e-3
 
-    "Flux limiter [kg/m/s²]"
+    "Flux limiter to cap the max of surface momentum fluxes [kg/m/s²]"
     max_flux::NF = 0.1
 end
 
@@ -79,6 +81,11 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
     # SPEEDY documentation eq. 50
     column.surface_wind_speed = sqrt(surface_u^2 + surface_v^2 + V_gust^2)
 
+    # drag coefficient either from SurfaceEvaporation or from a central drag coefficient
+    drag_sea, drag_land = surface_wind.use_boundary_layer_drag ?
+                                (column.boundary_layer_drag, column.boundary_layer_drag) : 
+                                (drag_sea, drag_land)
+    
     # surface wind stress: quadratic drag, fractional land-sea mask
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
@@ -98,8 +105,17 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
 end
 
 Base.@kwdef struct SurfaceSensibleHeat{NF<:AbstractFloat} <: AbstractSurfaceHeat{NF}
+    
+    "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
+    use_boundary_layer_drag::Bool = true
+    
+    "Otherwise, use the following drag coefficient for heat fluxes over land"
     heat_exchange_land::NF = 1.2e-3    # for neutral stability
+
+    "Otherwise, use the following drag coefficient for heat fluxes over sea"
     heat_exchange_sea::NF = 0.9e-3
+
+    "Flux limiter for surface heat fluxes [W/m²]"
     max_flux::NF = 100
 end
 
@@ -118,9 +134,14 @@ function sensible_heat_flux!(   column::ColumnVariables{NF},
     T = column.surface_temp
     land_fraction = column.land_fraction
 
+    # drag coefficient
+    drag_sea, drag_land = heat_flux.use_boundary_layer_drag ?
+                        (column.boundary_layer_drag, column.boundary_layer_drag) : 
+                        (heat_exchange_sea, heat_exchange_land)
+
     # SPEEDY documentation Eq. 54 and 56
-    flux_land = ρ*heat_exchange_land*V₀*cₚ*(T_skin_land - T)
-    flux_sea  = ρ*heat_exchange_sea*V₀*cₚ*(T_skin_sea  - T)
+    flux_land = ρ*drag_land*V₀*cₚ*(T_skin_land - T)
+    flux_sea  = ρ*drag_sea*V₀*cₚ*(T_skin_sea  - T)
 
     # flux limiter
     flux_land = clamp(flux_land,-max_flux,max_flux)
@@ -147,8 +168,18 @@ function sensible_heat_flux!(   column::ColumnVariables{NF},
     return nothing
 end
 
+"""
+Surface evaporation following a bulk formula with wind from model.surface_wind 
+$(TYPEDFIELDS)"""
 Base.@kwdef struct SurfaceEvaporation{NF<:AbstractFloat} <: AbstractEvaporation{NF}
-    moisture_exchange_land::NF = 1.2e-3    # for neutral stability
+    
+    "Use column.boundary_layer_drag coefficient"
+    use_boundary_layer_drag::Bool = true
+
+    "Otherwise, use the following drag coefficient for evaporation over land"
+    moisture_exchange_land::NF = 1.2e-3
+
+    "Or drag coefficient for evaporation over sea"
     moisture_exchange_sea::NF = 0.9e-3
 end
 
@@ -183,8 +214,14 @@ function evaporation!(  column::ColumnVariables{NF},
     V₀ = column.surface_wind_speed
     land_fraction = column.land_fraction
     (;surface_humid) = column
-    flux_sea = ρ*moisture_exchange_sea*V₀*max(sat_humid_sea  - surface_humid,0)
-    flux_land = ρ*moisture_exchange_land*V₀*α*max(sat_humid_land  - surface_humid,0)
+
+    # drag coefficient either from SurfaceEvaporation or from a central drag coefficient
+    drag_sea, drag_land = evaporation.use_boundary_layer_drag ?
+                        (column.boundary_layer_drag, column.boundary_layer_drag) : 
+                        (moisture_exchange_sea, moisture_exchange_land)
+
+    flux_sea = ρ*drag_sea*V₀*max(sat_humid_sea  - surface_humid,0)
+    flux_land = ρ*drag_land*V₀*α*max(sat_humid_land  - surface_humid,0)
 
     # mix fluxes for fractional land-sea mask
     land_available = isfinite(skin_temperature_land) && isfinite(α)
