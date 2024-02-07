@@ -64,13 +64,15 @@ function get_column!(   C::ColumnVariables,
                         ij::Int,            # grid point index
                         model::PrimitiveEquation)
 
-    rings = eachring(G.Grid,G.nlat_half)
+    SG = model.spectral_grid
+    rings = eachring(SG.Grid,SG.nlat_half)
     jring = whichring(ij,rings)
     get_column!(C,D,P,ij,jring,model)
 end
 
 function get_column(    S::AbstractSimulation,
-                        ij::Integer)
+                        ij::Integer,
+                        verbose::Bool = true)
     (;prognostic_variables, diagnostic_variables) = S
 
     column = deepcopy(S.diagnostic_variables.columns[1])
@@ -85,7 +87,7 @@ function get_column(    S::AbstractSimulation,
     # execute all parameterizations for this column to return a consistent state
     parameterization_tendencies!(column,S.model)
 
-    @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
+    verbose && @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
     return column
 end
 
