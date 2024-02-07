@@ -123,7 +123,7 @@ Calculate thermodynamic quantities like saturation vapour pressure,
 saturation specific humidity, dry static energy, moist static energy
 and saturation moist static energy from the prognostic column variables."""
 function get_thermodynamics!(column::ColumnVariables,model::PrimitiveWet)
-    geopotential!(column.geopot,column.temp,model.constants)
+    geopotential!(column.geopot, column.temp, model.constants, column.surface_geopotential)
     dry_static_energy!(column, model.constants)
     saturation_humidity!(column, model.clausis_clapeyron)
     moist_static_energy!(column, model.clausis_clapeyron)
