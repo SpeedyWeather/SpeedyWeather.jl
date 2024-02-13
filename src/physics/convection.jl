@@ -346,14 +346,16 @@ function convection!(
     scheme::SimplifiedBettsMiller,
     model::PrimitiveEquation,
 )
-    convection!(column,scheme,model.clausis_clapeyron,model.geometry)
+    convection!(column, scheme, model.clausis_clapeyron, model.geometry, model.constants, model.time_stepping)
 end
 
 function convection!(
     column::ColumnVariables{NF},
     SBM::SimplifiedBettsMiller,
     clausius_clapeyron::AbstractClausiusClapeyron,
-    geometry::Geometry
+    geometry::Geometry,
+    constants::DynamicsConstants,
+    time_stepping::TimeStepper,
 ) where NF
 
     σ = geometry.σ_levels_full
@@ -400,6 +402,10 @@ function convection!(
     deep_convection = Pq > 0 && PT > 0
     shallow_convection = Pq <= 0 && PT > 0
 
+    # escape immediately for no convection
+    no_convection = !(deep_convection || shallow_convection)
+    no_convection && return nothing
+
     # height of zero buoyancy level in σ coordinates
     Δσ_lzb = σ_half[nlev+1] - σ_half[level_zero_buoyancy]   
 
@@ -430,14 +436,20 @@ function convection!(
     end
 
     # GET TENDENCIES FROM ADJUSTED PROFILES
-    if shallow_convection || deep_convection    # otherwise don't do anything
-        for k in level_zero_buoyancy:nlev
-            temp_tend[k] -= (temp[k] - temp_ref_profile[k])/SBM.time_scale.value
-            humid_tend[k] -= (humid[k] - humid_ref_profile[k])/SBM.time_scale.value
-        end
+    for k in level_zero_buoyancy:nlev
+        temp_tend[k] -= (temp[k] - temp_ref_profile[k]) / SBM.time_scale.value
+        δq = (humid[k] - humid_ref_profile[k]) / SBM.time_scale.value
+        humid_tend[k] -= δq
 
-        column.cloud_top = level_zero_buoyancy
+        # convective precipiation, integrate dq\dt [(kg/kg)/s] vertically
+        column.precip_convection += δq * Δσ[k]
     end
+
+    (;gravity, water_density) = constants
+    (;Δt_sec) = time_stepping
+    pₛΔt_gρ = pₛ * Δt_sec / gravity / water_density 
+    column.precip_convection *= pₛΔt_gρ         # convert to [m] of rain during Δt
+    column.cloud_top = level_zero_buoyancy      # clouds reach to top of convection
 end
 
 function moist_adiabat!(
