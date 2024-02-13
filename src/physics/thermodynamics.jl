@@ -17,6 +17,9 @@ Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClape
     "Latent heat of condensation/vaporization of water [J/kg]"
     Lᵥ::NF = 2.5e6
 
+    "Specific heat at constant pressure [J/K/kg]"
+    cₚ::NF = 1004.64
+
     "Gas constant of water vapour [J/kg/K]"
     R_vapour::NF = 461.5
 
@@ -30,12 +33,12 @@ Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClape
     T₀⁻¹::NF = inv(T₀)
 
     "Ratio of molecular masses [1] of water vapour over dry air (=R_dry/R_vapour)."
-    mol_ratio::NF = 18.0153/28.9649
+    mol_ratio::NF = R_dry/R_vapour
 end
 
 function ClausiusClapeyron(SG::SpectralGrid,atm::AbstractAtmosphere;kwargs...)
-    (;R_dry, R_vapour, latent_heat_condensation) = atm
-    return ClausiusClapeyron{SG.NF}(;Lᵥ=latent_heat_condensation,R_dry,R_vapour,kwargs...)
+    (;R_dry, R_vapour, latent_heat_condensation, cₚ) = atm
+    return ClausiusClapeyron{SG.NF}(;Lᵥ=latent_heat_condensation,R_dry,R_vapour,cₚ,kwargs...)
 end
 
 """
