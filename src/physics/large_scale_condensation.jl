@@ -164,21 +164,11 @@ $(TYPEDFIELDS)"""
 Base.@kwdef struct ImmediateCondensation{NF<:AbstractFloat} <: AbstractCondensation{NF}
     "Flux limiter for latent heat release [K] per timestep"
     max_heating::NF = 0.2
-
-    "Latent heat of evaporation divided by specific heat of dry air "
-    latent_heat_cₚ::Base.RefValue{NF} = Ref(zero(NF))
 end
 
 ImmediateCondensation(SG::SpectralGrid;kwargs...) = ImmediateCondensation{SG.NF}(;kwargs...)
 
-"""
-$(TYPEDSIGNATURES)
-Initialize the SpeedyCondensation scheme."""
-function initialize!(scheme::ImmediateCondensation,model::PrimitiveEquation)
-    # for latent heat release dT/dt = -(Lᵥ/cₚ)*dq/dt
-    scheme.latent_heat_cₚ[] = model.atmosphere.latent_heat_condensation/    # [J/kg]
-                                model.atmosphere.cₚ     # [J/K/kg] specific heat capacity, const pres
-end
+initialize!(scheme::ImmediateCondensation,model::PrimitiveEquation) = nothing
 
 # function barrier for ImmediateCondensation to unpack model
 function large_scale_condensation!( 
@@ -214,22 +204,25 @@ function large_scale_condensation!(
     (;gravity, water_density) = constants
     (;Δt_sec) = time_stepping
     (;σ_levels_thick) = geometry
-    pₛΔt_gρ = pₛ*Δt_sec/gravity/water_density 
+    pₛΔt_gρ = pₛ*Δt_sec/gravity/water_density
 
+    (;Lᵥ, cₚ, Lᵥ_Rᵥ) = clausius_clapeyron
+    Lᵥ_cₚ = Lᵥ/cₚ                           # latent heat of vaporization over heat capacity
     max_heating = scheme.max_heating/Δt_sec
 
     @inbounds for k in eachindex(column)
         if humid[k] > sat_humid[k]
 
             # tendency for immediate humid = sat_humid
-            humid_tend_k = (sat_humid[k] - humid[k])/Δt_sec
+            humid_tend_k = (sat_humid[k] - humid[k])/(2Δt_sec)
 
             # implicit correction, Frierson et al. 2006 eq. (21)
-            dqsat_dT = grad_saturation_humidity(clausius_clapeyron,temp[k],pres[k])
-            humid_tend_k /= 1 + scheme.latent_heat_cₚ[]*dqsat_dT
+            # dqsat_dT = grad_saturation_humidity(clausius_clapeyron,temp[k],pres[k])
+            dqsat_dT = sat_humid[k] * Lᵥ_Rᵥ/temp[k]^2
+            humid_tend_k /= (1 + Lᵥ_cₚ*dqsat_dT)
 
             # latent heat release with maximum heating limiter for stability
-            temp_tend[k] += min(max_heating, -scheme.latent_heat_cₚ[] * humid_tend_k)
+            temp_tend[k] += min(max_heating, -Lᵥ_cₚ * humid_tend_k)
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
