@@ -265,7 +265,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevic
     surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
     surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
     evaporation::AbstractEvaporation{NF} = SurfaceEvaporation(spectral_grid)
-    convection::AbstractConvection{NF} = SpeedyConvection(spectral_grid)
+    convection::AbstractConvection{NF} = SimplifiedBettsMiller(spectral_grid)
     
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
