@@ -448,8 +448,8 @@ function convection!(
     (;gravity, water_density) = constants
     (;Δt_sec) = time_stepping
     pₛΔt_gρ = pₛ * Δt_sec / gravity / water_density 
-    column.precip_convection *= pₛΔt_gρ         # convert to [m] of rain during Δt
-    column.cloud_top = level_zero_buoyancy      # clouds reach to top of convection
+    column.precip_convection *= pₛΔt_gρ                             # convert to [m] of rain during Δt
+    column.cloud_top = min(column.cloud_top,level_zero_buoyancy)    # clouds reach to top of convection
 end
 
 function moist_adiabat!(
