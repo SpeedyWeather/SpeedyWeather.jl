@@ -31,24 +31,6 @@ function initialize_geopotential(   σ_levels_full::Vector,
     return Δp_geopot_half, Δp_geopot_full
 end
 
-# function lapserate_correction(  σ_levels_full::Vector,
-#                                 σ_levels_half::Vector,
-#                                 Δp_geopot_full::Vector)
-
-#     nlev = length(σ_levels_full)
-#     @assert nlev+1 == length(σ_levels_half) "σ half levels must have length nlev+1"
-#     @assert nlev == length(Δp_geopot_full) "σ half levels must have length nlev"
-
-#     lapserate_corr = zeros(nlev)
-#     for k in 2:nlev-1   # only in the free troposphere
-#         # TODO reference
-#         lapserate_corr[k] = 0.5*Δp_geopot_full[k]*
-#                     log(σ_levels_half[k+1]/σ_levels_full[k]) / log(σ_levels_full[k+1]/σ_levels_full[k-1])
-#     end
-
-#     return lapserate_corr
-# end
-
 """
 $(TYPEDSIGNATURES)
 Compute spectral geopotential `geopot` from spectral temperature `temp`
@@ -89,19 +71,6 @@ function geopotential!(
             geopot_k[lm] = geopot_k½  + temp_k[lm]*Δp_geopot_full[k]    # 2nd onto full layer
         end      
     end
-
-    # # LAPSERATE CORRECTION IN THE FREE TROPOSPHERE (>nlev)
-    # # TODO only for spectral coefficients 1,: ?
-    # lmax,mmax = size(geopot)
-    # for k in 2:nlev-1
-    #     temp_k_above = progn.layers[k-1].timesteps[lf].temp
-    #     temp_k_below = progn.layers[k+1].timesteps[lf].temp
-    #     geopot  = diagn.layers[k].dynamics_variables.geopot
-
-    #     for l in 1:lmax-1
-    #         geopot[l,l] += lapserate_corr[k]*(temp_k_below[l,l] - temp_k_above[l,l])
-    #     end
-    # end
 end
 
 """
@@ -109,9 +78,11 @@ $(TYPEDSIGNATURES)
 Calculate the geopotential based on `temp` in a single column.
 This exclues the surface geopotential that would need to be added to the returned vector.
 Function not used in the dynamical core but for post-processing and analysis."""
-function geopotential!( geopot::Vector,
-                        temp::Vector,
-                        C::DynamicsConstants)
+function geopotential!( geopot::AbstractVector,
+                        temp::AbstractVector,
+                        C::DynamicsConstants,
+                        geopot_surf::Real = 0)
+
     nlev = length(geopot)
     (;Δp_geopot_half, Δp_geopot_full) = C  # = R*Δlnp either on half or full levels
 
@@ -120,7 +91,7 @@ function geopotential!( geopot::Vector,
     @boundscheck length(Δp_geopot_half) >= nlev || throw(BoundsError)
 
     # bottom layer
-    geopot[nlev] = temp[nlev]*Δp_geopot_full[end]
+    geopot[nlev] = geopot_surf + temp[nlev]*Δp_geopot_full[end]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
     @inbounds for k in nlev-1:-1:1

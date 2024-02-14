@@ -1,3 +1,15 @@
+# function barrier
+function get_column!(   
+    C::ColumnVariables,
+    D::DiagnosticVariables,
+    P::PrognosticVariables,
+    ij::Integer,        # grid point index
+    jring::Integer,     # ring index 1 around North Pole to J around South Pole
+    model::PrimitiveEquation,
+)
+    get_column!(C, D, P, ij, jring, model.geometry, model.constants, model.orography, model.land_sea_mask)
+end
+
 """
 $(TYPEDSIGNATURES)
 Update `C::ColumnVariables` by copying the prognostic variables from `D::DiagnosticVariables`
@@ -8,6 +20,8 @@ function get_column!(   C::ColumnVariables,
                         ij::Integer,        # grid point index
                         jring::Integer,     # ring index 1 around North Pole to J around South Pole
                         G::Geometry,
+                        constants::DynamicsConstants,
+                        O::AbstractOrography,
                         L::AbstractLandSeaMask)
 
     (;σ_levels_full,ln_σ_levels_full) = G
@@ -19,6 +33,8 @@ function get_column!(   C::ColumnVariables,
     C.ij = ij                   # grid-point index
     C.jring = jring             # ring index j of column, used to index latitude vectors
     C.land_fraction = L.land_sea_mask[ij]
+    C.orography = O.orography[ij]
+    C.surface_geopotential = C.orography*constants.gravity
 
     # pressure [Pa] or [log(Pa)]
     lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics
@@ -31,8 +47,8 @@ function get_column!(   C::ColumnVariables,
         C.u[k] = layer.grid_variables.u_grid[ij]
         C.v[k] = layer.grid_variables.v_grid[ij]
         C.temp[k] = layer.grid_variables.temp_grid[ij]
-        C.humid[k] = layer.grid_variables.humid_grid[ij]
-        C.temp_virt[k] = layer.grid_variables.temp_virt_grid[ij]
+        C.temp_virt[k] = layer.grid_variables.temp_virt_grid[ij]    # actually diagnostic
+        C.humid[k] = layer.grid_variables.humid_grid[ij] 
     end
 
     # TODO skin = surface approximation for now
@@ -46,18 +62,18 @@ function get_column!(   C::ColumnVariables,
                         D::DiagnosticVariables,
                         P::PrognosticVariables,
                         ij::Int,            # grid point index
-                        G::Geometry,
-                        L::LandSeaMask)
+                        model::PrimitiveEquation)
 
-    rings = eachring(G.Grid,G.nlat_half)
+    SG = model.spectral_grid
+    rings = eachring(SG.Grid,SG.nlat_half)
     jring = whichring(ij,rings)
-    get_column!(C,D,P,ij,jring,G,L)
+    get_column!(C,D,P,ij,jring,model)
 end
 
 function get_column(    S::AbstractSimulation,
-                        ij::Integer)
+                        ij::Integer,
+                        verbose::Bool = true)
     (;prognostic_variables, diagnostic_variables) = S
-    (;geometry, land_sea_mask) = S.model
 
     column = deepcopy(S.diagnostic_variables.columns[1])
     reset_column!(column)
@@ -66,13 +82,12 @@ function get_column(    S::AbstractSimulation,
                 diagnostic_variables,
                 prognostic_variables,
                 ij,
-                geometry,
-                land_sea_mask)
+                model)
 
     # execute all parameterizations for this column to return a consistent state
     parameterization_tendencies!(column,S.model)
 
-    @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
+    verbose && @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
     return column
 end
 

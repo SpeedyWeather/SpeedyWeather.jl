@@ -157,6 +157,25 @@ function dry_static_energy!(column::ColumnVariables,constants::DynamicsConstants
     return nothing
 end
 
+function bulk_richardson!(column::ColumnVariables,constants::DynamicsConstants)
+
+    (;cₚ) = constants
+    (;u, v, geopot, temp_virt, nlev, bulk_richardson) = column
+
+    V² = u[nlev]^2 + v[nlev]^2
+    Θ₀ = cₚ*temp_virt[nlev]
+    Θ₁ = Θ₀ + geopot[nlev]
+    bulk_richardson[nlev] = geopot[nlev]*(Θ₁ - Θ₀)/Θ₀/V²
+
+    @inbounds for k in nlev-1:-1:1
+        V² = u[k]^2 + v[k]^2
+        virtual_dry_static_energy = cₚ * temp_virt[k] + geopot[k]
+        bulk_richardson[k] = geopot[k]*(virtual_dry_static_energy - Θ₁)/Θ₁/V²
+    end
+
+    return nothing
+end
+
 """$(TYPEDSIGNATURES)
 Compute the saturation water vapour pressure [Pa], the saturation humidity [kg/kg]
 and the relative humidity following `clausius_clapeyron`."""
