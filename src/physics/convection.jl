@@ -362,16 +362,16 @@ function convection!(
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
     (;temp_ref_profile, humid_ref_profile) = SBM
-    (;geopot, nlev, temp, humid, temp_tend, humid_tend) = column
+    (;geopot, nlev, temp, temp_virt, humid, temp_tend, humid_tend) = column
     pₛ = column.pres[end]
     (;Lᵥ, cₚ) = clausius_clapeyron
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     temp_parcel = temp[nlev]
     humid_parcel = humid[nlev]
-    level_zero_buoyancy = moist_adiabat!(temp_ref_profile,
+    level_zero_buoyancy = pseudo_adiabat!(temp_ref_profile,
                                             temp_parcel, humid_parcel,
-                                            temp, geopot, pₛ, σ,
+                                            temp_virt, geopot, pₛ, σ,
                                             clausius_clapeyron)
             
     for k in level_zero_buoyancy:nlev
@@ -447,28 +447,31 @@ function convection!(
 
     (;gravity, water_density) = constants
     (;Δt_sec) = time_stepping
-    pₛΔt_gρ = pₛ * Δt_sec / gravity / water_density 
-    column.precip_convection *= pₛΔt_gρ                             # convert to [m] of rain during Δt
-    column.cloud_top = min(column.cloud_top,level_zero_buoyancy)    # clouds reach to top of convection
+    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv 
+    column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
+    
+    # TODO at the moment the cloud top include shallow convection, should that be?
+    column.cloud_top = min(column.cloud_top,level_zero_buoyancy)        # clouds reach to top of convection
 end
 
-function moist_adiabat!(
+function pseudo_adiabat!(
     temp_ref_profile::AbstractVector,
-    temp_parcel::Real,
+    temp_parcel::NF,
     humid_parcel::Real,
-    temp_environment::AbstractVector,
+    temp_virt_environment::AbstractVector,
     geopot::AbstractVector,
     pres::Real,
     σ::AbstractVector,
     clausius_clapeyron::AbstractClausiusClapeyron,
-)
+) where NF
+
     (;Lᵥ, R_dry, R_vapour, cₚ) = clausius_clapeyron
     R_cₚ = R_dry/cₚ
     ε = clausius_clapeyron.mol_ratio
-    μ = (1-ε)/ε
+    μ = (1-ε)/ε                             # for virtual temperature
 
     @boundscheck length(temp_ref_profile) == length(geopot) ==
-        length(σ) == length(temp_environment) || throw(BoundsError)
+        length(σ) == length(temp_virt_environment) || throw(BoundsError)
 
     nlev = length(temp_ref_profile)         # number of vertical levels
     temp_ref_profile .= NaN                 # reset profile from any previous calculation
@@ -477,11 +480,12 @@ function moist_adiabat!(
     local saturated::Bool = false           # did the parcel reach saturation yet?
     local buoyant::Bool = true              # is the parcel still buoyant?
     local k::Int = nlev                     # layer index top to surface
-    
+    local temp_virt_parcel::NF = temp_parcel * (1 + μ*humid_parcel)
+
     while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
         k -= 1                              # one level up
             
-        if !saturated                       # if not saturated yet follow dry adiabt
+        if !saturated                       # if not saturated yet follow dry adiabat
             # dry adiabatic ascent and saturation humidity of that temperature 
             temp_parcel_dry = temp_parcel*(σ[k]/σ[k+1])^R_cₚ
             sat_humid = saturation_humidity(temp_parcel_dry,σ[k]*pres,clausius_clapeyron)
@@ -491,13 +495,11 @@ function moist_adiabat!(
             saturated = humid_parcel >= sat_humid
         end
     
-        if saturated
-            temp_virt_parcel = temp_parcel*(1 + μ*humid_parcel)     # virtual temperature of parcel
-            
+        if saturated            
             # calculate moist/pseudo adiabatic lapse rate, dT/dΦ = -Γ/cp
             T, Tᵥ, q = temp_parcel, temp_virt_parcel, humid_parcel  # for brevity
-            A = q*Lᵥ / (1-q)^2 / R_dry
-            B = q*Lᵥ^2 / (1-q)^2 / cₚ / R_vapour
+            A = q*Lᵥ / ((1-q)^2 * R_dry)
+            B = q*Lᵥ^2 / ((1-q)^2 * cₚ * R_vapour)
             Γ = (1 + A/Tᵥ) / (1 + B/T^2)
                 
             ΔΦ = geopot[k] - geopot[k+1]                            # vertical gradient in geopotential
@@ -513,8 +515,10 @@ function moist_adiabat!(
         # use dry/moist adiabatic ascent for reference profile
         temp_ref_profile[k] = temp_parcel
 
-        # check whether parcel is still buoyant wrt to temp_environment TODO should this be virtual temperature?
-        buoyant = temp_parcel > temp_environment[k] ? true : false      
+        # check whether parcel is still buoyant wrt to environment
+        # use virtual temperature as it's equivalent to density
+        temp_virt_parcel = temp_parcel*(1 + μ*humid_parcel)         # virtual temperature of parcel
+        buoyant = temp_virt_parcel > temp_virt_environment[k] ? true : false      
     end
     
     # if parcel isn't buoyant anymore set last temperature (with negative buoyancy) back to NaN
