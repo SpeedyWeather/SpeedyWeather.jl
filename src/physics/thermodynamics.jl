@@ -36,6 +36,7 @@ Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClape
     mol_ratio::NF = R_dry/R_vapour
 end
 
+# generator function
 function ClausiusClapeyron(SG::SpectralGrid,atm::AbstractAtmosphere;kwargs...)
     (;R_dry, R_vapour, latent_heat_condensation, cₚ) = atm
     return ClausiusClapeyron{SG.NF}(;Lᵥ=latent_heat_condensation,R_dry,R_vapour,cₚ,kwargs...)
@@ -114,27 +115,10 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Calculate the dry static energy for the primitive dry model."""
-function get_thermodynamics!(column::ColumnVariables,model::PrimitiveDry)
+Calculate geopotentiala and dry static energy for the primitive equation model."""
+function get_thermodynamics!(column::ColumnVariables,model::PrimitiveEquation)
     geopotential!(column.geopot,column.temp,model.constants)
     dry_static_energy!(column, model.constants)
-end
-
-"""
-$(TYPEDSIGNATURES)
-Calculate thermodynamic quantities like saturation vapour pressure,
-saturation specific humidity, dry static energy, moist static energy
-and saturation moist static energy from the prognostic column variables."""
-function get_thermodynamics!(column::ColumnVariables,model::PrimitiveWet)
-    geopotential!(column.geopot,column.temp,model.constants)
-    dry_static_energy!(column, model.constants)
-    saturation_humidity!(column, model.clausis_clapeyron)
-    moist_static_energy!(column, model.clausis_clapeyron)
-
-    # Interpolate certain variables to half-levels
-    vertical_interpolate!(column, model)
-
-    return nothing
 end
 
 """
