@@ -97,6 +97,10 @@ function convection!(
     scheme::SpeedyConvection,
     model::PrimitiveEquation,
 )
+
+    moist_static_energy!(column, model.clausis_clapeyron)
+    vertical_interpolate!(column, model)                # Interpolate certain variables to half-levels
+
     # always diagnose convection
     diagnose_convection!(column, model.convection)
 
@@ -327,7 +331,7 @@ Base.@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection{NF}
     time_scale::Second = Hour(4)
 
     "Relative humidity for reference profile"
-    relative_humidity::NF = 0.7
+    relative_humidity::NF = 0.8
 
     "temperature [K] reference profile to adjust to"
     temp_ref_profile::Vector{NF} = zeros(NF,nlev)
