@@ -31,7 +31,8 @@ function get_column!(   C::ColumnVariables,
         C.u[k] = layer.grid_variables.u_grid[ij]
         C.v[k] = layer.grid_variables.v_grid[ij]
         C.temp[k] = layer.grid_variables.temp_grid[ij]
-        C.humid[k] = layer.grid_variables.humid_grid[ij] 
+        C.humid[k] = layer.grid_variables.humid_grid[ij]
+        C.temp_virt[k] = layer.grid_variables.temp_virt_grid[ij]
     end
 
     # TODO skin = surface approximation for now
@@ -100,9 +101,11 @@ function write_column_tendencies!(  D::DiagnosticVariables,
 
     # Output cloud top in height [m] from geopotential height divided by gravity,
     # but NaN for no clouds
-    D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? NaN : column.geopot[column.cloud_top]
-    D.surface.cloud_top[ij] /= C.gravity
-
+    # D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? NaN : column.geopot[column.cloud_top]
+    # D.surface.cloud_top[ij] /= C.gravity
+    
+    # just use layer index 1 (top) to nlev (surface) for analysis, but 0 for no clouds
+    D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.cloud_top
     return nothing
 end
 

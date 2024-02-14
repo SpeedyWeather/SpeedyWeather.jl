@@ -36,6 +36,7 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
 
     # DIAGNOSTIC VARIABLES
     const geopot::Vector{NF} = zeros(NF,nlev)                   # gepotential height [m]
+    const temp_virt::Vector{NF} = zeros(NF,nlev)                # virtual temperature [K]
 
     # FLUXES, arrays to be used for various parameterizations, on half levels incl top and bottom
     const flux_u_upward::Vector{NF} = zeros(NF,nlev+1)
