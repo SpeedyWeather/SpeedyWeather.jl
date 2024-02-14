@@ -81,6 +81,7 @@ function large_scale_condensation!(
     column::ColumnVariables,
     model::PrimitiveWet,
 )
+    saturation_humidity!(column, model.clausis_clapeyron)
     large_scale_condensation!(column,model.large_scale_condensation,model)
 end
 
@@ -222,6 +223,7 @@ function large_scale_condensation!(
             humid_tend_k /= (1 + Lᵥ_cₚ*dqsat_dT)
 
             # latent heat release with maximum heating limiter for stability
+            # note that this violates enthalpy conservation
             temp_tend[k] += min(max_heating, -Lᵥ_cₚ * humid_tend_k)
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
