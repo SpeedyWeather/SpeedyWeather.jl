@@ -146,15 +146,11 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     column.flux_temp_upward .= 0
     column.flux_temp_downward .= 0
 
-    # Convection
+    # Convection and precipitation
     column.cloud_top = column.nlev+1            # also diagnostic from condensation
-    column.conditional_instability = false
-    column.activate_convection = false
-    column.excess_humid = 0
     column.precip_convection = 0
-
-    # Large-scale condensation
     column.precip_large_scale = 0
+
     return nothing
 end
 
