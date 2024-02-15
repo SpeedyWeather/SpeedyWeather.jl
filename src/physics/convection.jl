@@ -28,6 +28,9 @@ function convection!(
     convection!(column,model.convection,model)
 end
 
+# TODO SimplifiedBettsMiller can be trimmed for PrimitiveDry
+convection!(column::ColumnVariables,model::PrimitiveDry) = nothing
+
 # function barrier to unpack model
 function convection!(
     column::ColumnVariables,
