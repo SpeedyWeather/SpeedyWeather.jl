@@ -18,8 +18,15 @@ Base.@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection{NF}
 end
 
 SimplifiedBettsMiller(SG::SpectralGrid;kwargs...) = SimplifiedBettsMiller{SG.NF}(nlev=SG.nlev;kwargs...)
-
 initialize!(::SimplifiedBettsMiller,::PrimitiveWet) = nothing
+
+# function barrier for all AbstractConvection
+function convection!(
+    column::ColumnVariables,
+    model::PrimitiveEquation,
+)
+    convection!(column,model.convection,model)
+end
 
 # function barrier to unpack model
 function convection!(

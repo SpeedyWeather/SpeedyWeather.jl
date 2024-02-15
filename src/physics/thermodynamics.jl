@@ -183,11 +183,10 @@ function saturation_humidity!(
     column::ColumnVariables,
     clausius_clapeyron::AbstractClausiusClapeyron,
 )
-    (;sat_humid, rel_humid, pres, temp, humid) = column
+    (;sat_humid, pres, temp) = column
 
     for k in eachlayer(column)
         sat_humid[k] = saturation_humidity(temp[k],pres[k],clausius_clapeyron)
-        rel_humid[k] = humid[k]/sat_humid[k]
     end
 end
 
