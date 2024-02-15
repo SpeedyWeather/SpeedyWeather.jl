@@ -172,7 +172,7 @@ TODO: Takes length of day/year as argument, but calls to Dates.Time(), Dates.day
 currently have these hardcoded."""
 function year_angle(::Type{T}, time::DateTime, length_of_day::Second, length_of_year::Second) where T
     year2rad = convert(T,2π/length_of_year.value)
-    sec_of_day = Second(Dates.Time(time).instant).value
+    sec_of_day = Dates.second(Dates.Time(time).instant)
     return year2rad*(Dates.dayofyear(time)*length_of_day.value + sec_of_day)
 end
 
@@ -189,7 +189,7 @@ function solar_hour_angle(
 ) where T
     day2rad = convert(T,2π/length_of_day.value)
     noon_in_sec = length_of_day.value ÷ 2
-    sec_of_day = Second(Dates.Time(time).instant).value
+    sec_of_day = Dates.second(Dates.Time(time).instant)
     return (sec_of_day - noon_in_sec)*day2rad + convert(T,λ)
 end
 

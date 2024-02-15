@@ -17,6 +17,9 @@ Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClape
     "Latent heat of condensation/vaporization of water [J/kg]"
     Lᵥ::NF = 2.5e6
 
+    "Specific heat at constant pressure [J/K/kg]"
+    cₚ::NF = 1004.64
+
     "Gas constant of water vapour [J/kg/K]"
     R_vapour::NF = 461.5
 
@@ -30,12 +33,13 @@ Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClape
     T₀⁻¹::NF = inv(T₀)
 
     "Ratio of molecular masses [1] of water vapour over dry air (=R_dry/R_vapour)."
-    mol_ratio::NF = 18.0153/28.9649
+    mol_ratio::NF = R_dry/R_vapour
 end
 
+# generator function
 function ClausiusClapeyron(SG::SpectralGrid,atm::AbstractAtmosphere;kwargs...)
-    (;R_dry, R_vapour, latent_heat_condensation) = atm
-    return ClausiusClapeyron{SG.NF}(;Lᵥ=latent_heat_condensation,R_dry,R_vapour,kwargs...)
+    (;R_dry, R_vapour, latent_heat_condensation, cₚ) = atm
+    return ClausiusClapeyron{SG.NF}(;Lᵥ=latent_heat_condensation,R_dry,R_vapour,cₚ,kwargs...)
 end
 
 """
@@ -111,29 +115,10 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Calculate the dry static energy for the primitive dry model."""
-function get_thermodynamics!(column::ColumnVariables,model::PrimitiveDry)
-    # use temp here as temp = temp_virt
+Calculate geopotentiala and dry static energy for the primitive equation model."""
+function get_thermodynamics!(column::ColumnVariables,model::PrimitiveEquation)
     geopotential!(column.geopot,column.temp,model.constants)
     dry_static_energy!(column, model.constants)
-end
-
-"""
-$(TYPEDSIGNATURES)
-Calculate thermodynamic quantities like saturation vapour pressure,
-saturation specific humidity, dry static energy, moist static energy
-and saturation moist static energy from the prognostic column variables."""
-function get_thermodynamics!(column::ColumnVariables,model::PrimitiveWet)
-    geopotential!(column.geopot, column.temp_virt, model.constants, column.surface_geopotential)
-    dry_static_energy!(column, model.constants)
-    saturation_humidity!(column, model.clausis_clapeyron)
-    moist_static_energy!(column, model.clausis_clapeyron)
-    bulk_richardson!(column, model.constants)
-
-    # Interpolate certain variables to half-levels
-    vertical_interpolate!(column, model)
-
-    return nothing
 end
 
 """

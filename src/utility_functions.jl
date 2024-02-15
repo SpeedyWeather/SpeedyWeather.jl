@@ -106,6 +106,11 @@ Dates.Minute(x::AbstractFloat) = Second(60x)
 Dates.Hour(  x::AbstractFloat) = Minute(60x)
 Dates.Day(   x::AbstractFloat) = Hour(24x)
 
+# use Dates.second to round to integer seconds
+Dates.second(x::Dates.Nanosecond) = round(Int,x.value*1e-9)
+Dates.second(x::Dates.Microsecond) = round(Int,x.value*1e-6)
+Dates.second(x::Dates.Millisecond) = round(Int,x.value*1e-3)
+
 function Base.convert(::Type{Second},x::AbstractFloat)
     xr = round(Int64,x)
     x == xr || @info "Rounding and converting $x to $xr for integer seconds."

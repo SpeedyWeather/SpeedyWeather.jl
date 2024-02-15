@@ -116,9 +116,11 @@ function write_column_tendencies!(  D::DiagnosticVariables,
 
     # Output cloud top in height [m] from geopotential height divided by gravity,
     # but NaN for no clouds
-    D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? NaN : column.geopot[column.cloud_top]
-    D.surface.cloud_top[ij] /= C.gravity
-
+    # D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? NaN : column.geopot[column.cloud_top]
+    # D.surface.cloud_top[ij] /= C.gravity
+    
+    # just use layer index 1 (top) to nlev (surface) for analysis, but 0 for no clouds
+    D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.cloud_top
     return nothing
 end
 
