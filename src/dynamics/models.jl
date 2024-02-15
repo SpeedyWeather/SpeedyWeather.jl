@@ -163,13 +163,15 @@ Base.@kwdef mutable struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevic
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
-    boundary_layer_drag::BoundaryLayerDrag{NF} = NoBoundaryLayerDrag(spectral_grid)
+    boundary_layer_drag::BoundaryLayerDrag{NF} = BulkRichardsonDrag(spectral_grid)
     temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
     surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
     surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
-    
+    shortwave_radiation::AbstractShortwave{NF} = NoShortwave(spectral_grid)
+    longwave_radiation::AbstractLongwave{NF} = UniformCooling(spectral_grid)
+
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
     spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
@@ -215,6 +217,8 @@ function initialize!(model::PrimitiveDry;time::DateTime = DEFAULT_DATE)
     initialize!(model.boundary_layer_drag,model)
     initialize!(model.temperature_relaxation,model)
     initialize!(model.static_energy_diffusion,model)
+    initialize!(model.shortwave_radiation,model)
+    initialize!(model.longwave_radiation,model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
@@ -255,8 +259,8 @@ Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevic
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
-    clausis_clapeyron::AbstractClausiusClapeyron{NF} = ClausiusClapeyron(spectral_grid,atmosphere)
-    boundary_layer_drag::BoundaryLayerDrag{NF} = NoBoundaryLayerDrag(spectral_grid)
+    clausius_clapeyron::AbstractClausiusClapeyron{NF} = ClausiusClapeyron(spectral_grid,atmosphere)
+    boundary_layer_drag::BoundaryLayerDrag{NF} = BulkRichardsonDrag(spectral_grid)
     temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
     humidity_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
@@ -266,7 +270,9 @@ Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevic
     surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
     evaporation::AbstractEvaporation{NF} = SurfaceEvaporation(spectral_grid)
     convection::AbstractConvection{NF} = SimplifiedBettsMiller(spectral_grid)
-    
+    shortwave_radiation::AbstractShortwave{NF} = NoShortwave(spectral_grid)
+    longwave_radiation::AbstractLongwave{NF} = UniformCooling(spectral_grid)
+
     # NUMERICS
     time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
     spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
@@ -318,6 +324,8 @@ function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     initialize!(model.humidity_diffusion,model)
     initialize!(model.large_scale_condensation,model)
     initialize!(model.convection,model)
+    initialize!(model.shortwave_radiation,model)
+    initialize!(model.longwave_radiation,model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)

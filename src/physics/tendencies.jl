@@ -53,12 +53,12 @@ function parameterization_tendencies!(
     static_energy_diffusion!(column,model)
     humidity_diffusion!(column,model)
 
-    # Calculate parametrizations (order of execution is important!)
+    # Calculate parametrizations
     convection!(column,model)
     large_scale_condensation!(column,model)
     # clouds!(column, model)
-    # shortwave_radiation!(column,model)
-    # longwave_radiation!(column,model)
+    shortwave_radiation!(column,model)
+    longwave_radiation!(column,model)
     surface_fluxes!(column,model)
 
     # sum fluxes on half levels up and down for every layer
