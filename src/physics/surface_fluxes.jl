@@ -194,7 +194,7 @@ end
 # function barrier
 function evaporation!(  column::ColumnVariables,
                         model::PrimitiveWet)
-    evaporation!(column,model.evaporation,model.clausis_clapeyron)
+    evaporation!(column,model.evaporation,model.clausius_clapeyron)
 end
 
 function evaporation!(  column::ColumnVariables{NF},

@@ -455,7 +455,7 @@ function initialize_humidity!(  progn::PrognosticVariables,
     temp_grid = gridded(progn.layers[end].timesteps[1].temp,model.spectral_transform)
     humid_surf_grid = zero(pres_surf_grid)
     for ij in eachgridpoint(humid_surf_grid)
-        q_sat = saturation_humidity(temp_grid[ij],exp(pres_surf_grid[ij]),model.clausis_clapeyron)
+        q_sat = saturation_humidity(temp_grid[ij],exp(pres_surf_grid[ij]),model.clausius_clapeyron)
         humid_surf_grid[ij] = relhumid_ref*q_sat
     end
 
