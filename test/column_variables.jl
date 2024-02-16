@@ -12,14 +12,10 @@
 
         # Convection
         @test column.cloud_top === column.nlev+1
-        @test column.conditional_instability === false
-        @test column.activate_convection === false
-        @test column.excess_humid === zero(NF)
-        @test column.precip_convection === zero(NF)
-        @test column.cloud_base_mass_flux === zero(NF)
 
         # Large-scale condensation
         @test column.precip_large_scale === zero(NF)
+        @test column.precip_convection === zero(NF)
     end
 end
 

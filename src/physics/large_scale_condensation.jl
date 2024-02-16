@@ -81,7 +81,7 @@ function large_scale_condensation!(
     column::ColumnVariables,
     model::PrimitiveWet,
 )
-    saturation_humidity!(column, model.clausis_clapeyron)
+    saturation_humidity!(column, model.clausius_clapeyron)
     large_scale_condensation!(column,model.large_scale_condensation,model)
 end
 
@@ -178,7 +178,7 @@ function large_scale_condensation!(
     model::PrimitiveWet,
 )
     large_scale_condensation!(column,scheme,
-        model.clausis_clapeyron,model.geometry,model.constants,model.time_stepping)
+        model.clausius_clapeyron,model.geometry,model.constants,model.time_stepping)
 end
 
 """

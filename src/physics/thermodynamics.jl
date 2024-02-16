@@ -94,15 +94,15 @@ end
 $(TYPEDSIGNATURES)
 Saturation humidity [kg/kg] from temperature [K], pressure [Pa] via
 
-    sat_vap_pres = clausis_clapeyron(temperature)
+    sat_vap_pres = clausius_clapeyron(temperature)
     saturation humidity = mol_ratio * sat_vap_pres / pressure"""
 function saturation_humidity(
     temp_kelvin::NF,
     pres::NF,
-    clausis_clapeyron::AbstractClausiusClapeyron{NF}
+    clausius_clapeyron::AbstractClausiusClapeyron{NF}
 ) where NF
-    sat_vap_pres = clausis_clapeyron(temp_kelvin)
-    return saturation_humidity(sat_vap_pres,pres;mol_ratio=clausis_clapeyron.mol_ratio)
+    sat_vap_pres = clausius_clapeyron(temp_kelvin)
+    return saturation_humidity(sat_vap_pres,pres;mol_ratio=clausius_clapeyron.mol_ratio)
 end
 
 """
@@ -183,11 +183,10 @@ function saturation_humidity!(
     column::ColumnVariables,
     clausius_clapeyron::AbstractClausiusClapeyron,
 )
-    (;sat_humid, rel_humid, pres, temp, humid) = column
+    (;sat_humid, pres, temp) = column
 
     for k in eachlayer(column)
         sat_humid[k] = saturation_humidity(temp[k],pres[k],clausius_clapeyron)
-        rel_humid[k] = humid[k]/sat_humid[k]
     end
 end
 
