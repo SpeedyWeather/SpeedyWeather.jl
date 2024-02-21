@@ -1,11 +1,4 @@
-# function barrier for all AbstractCondensation
-function large_scale_condensation!( 
-    column::ColumnVariables,
-    model::PrimitiveWet,
-)
-    saturation_humidity!(column, model.clausius_clapeyron)
-    large_scale_condensation!(column,model.large_scale_condensation,model)
-end
+abstract type AbstractCondensation{NF} <: AbstractParameterization{NF} end
 
 """
 Large scale condensation as with implicit precipitation.
@@ -15,12 +8,22 @@ Base.@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensati
     max_heating::NF = 0.2
 
     "Time scale in multiples of time step Δt"
-    time_scale::NF = 7
+    time_scale::NF = 9
 end
 
 ImplicitCondensation(SG::SpectralGrid;kwargs...) = ImplicitCondensation{SG.NF}(;kwargs...)
 
+# fall back for PrimitiveDry
 initialize!(scheme::ImplicitCondensation,model::PrimitiveEquation) = nothing
+
+# function barrier for all AbstractCondensation
+function large_scale_condensation!( 
+    column::ColumnVariables,
+    model::PrimitiveWet,
+)
+    saturation_humidity!(column, model.clausius_clapeyron)
+    large_scale_condensation!(column,model.large_scale_condensation,model)
+end
 
 # function barrier for ImplicitCondensation to unpack model
 function large_scale_condensation!( 
