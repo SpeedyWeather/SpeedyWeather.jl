@@ -151,7 +151,7 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
     @inbounds for lm in eachharmonic(A_old,A_new,A_lf,tendency)
         a_old = A_old[lm]                       # double filtered value from previous time step (t-Δt)
         a_new = a_old + dt_NF*tendency[lm]      # Leapfrog/Euler step depending on dt=Δt,2Δt (unfiltered at t+Δt)
-        a_update = a_old - 2A_lf[lm] + a_new # Eq. 8&9 in Williams (2009), calculate only once
+        a_update = a_old - 2A_lf[lm] + a_new    # Eq. 8&9 in Williams (2009), calculate only once
         A_old[lm] = A_lf[lm] + w1*a_update      # Robert's filter: A_old[lm] becomes 2xfiltered value at t
         A_new[lm] = a_new - w2*a_update         # Williams filter: A_new[lm] becomes 1xfiltered value at t+Δt
     end

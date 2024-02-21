@@ -201,7 +201,7 @@ include("physics/longwave_radiation.jl")
 include("physics/pretty_printing.jl")
 
 # OCEAN AND LAND
-include("dynamics/ocean.jl")
+include("physics/ocean.jl")
 include("physics/land.jl")
 
 # MODELS

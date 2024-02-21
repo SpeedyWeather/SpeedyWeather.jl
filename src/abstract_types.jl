@@ -34,7 +34,6 @@ abstract type AbstractDrag{NF} end
 abstract type AbstractParameterization{NF} end
 abstract type TemperatureRelaxation{NF} <: AbstractParameterization{NF} end
 abstract type VerticalDiffusion{NF} <: AbstractParameterization{NF} end
-abstract type AbstractCondensation{NF} <: AbstractParameterization{NF} end
 abstract type AbstractSurfaceWind{NF} <: AbstractParameterization{NF} end
 abstract type AbstractSurfaceThermodynamics{NF} <: AbstractParameterization{NF} end
 abstract type AbstractSurfaceHeat{NF} <: AbstractParameterization{NF} end
