@@ -264,7 +264,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevic
     temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
     static_energy_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
     humidity_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
-    large_scale_condensation::AbstractCondensation{NF} = ImmediateCondensation(spectral_grid)
+    large_scale_condensation::AbstractCondensation{NF} = ImplicitCondensation(spectral_grid)
     surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
     surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
