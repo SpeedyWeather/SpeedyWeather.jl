@@ -13,8 +13,16 @@ end
 
 ImplicitCondensation(SG::SpectralGrid;kwargs...) = ImplicitCondensation{SG.NF}(;kwargs...)
 
-# fall back for PrimitiveDry
+# nothing to initialize with this scheme
 initialize!(scheme::ImplicitCondensation,model::PrimitiveEquation) = nothing
+
+# do nothing fall back for primitive dry 
+function large_scale_condensation!( 
+    column::ColumnVariables,
+    model::PrimitiveEquation,
+)
+    return nothing
+end
 
 # function barrier for all AbstractCondensation
 function large_scale_condensation!( 
