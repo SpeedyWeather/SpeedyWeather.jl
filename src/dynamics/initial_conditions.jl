@@ -444,12 +444,10 @@ function initialize_humidity!(  progn::PrognosticVariables,
     (;relhumid_ref) = model.atmosphere      # relative humidity reference [1]
 
     # ratio of scale heights [1], scale height [km], scale height for spec humidity [km]     
-    (;scale_height, scale_height_humid, σ_tropopause) = model.atmosphere
+    (;scale_height, scale_height_humid) = model.atmosphere
     scale_height_ratio = scale_height/scale_height_humid
 
     (;nlev, σ_levels_full) = model.geometry
-    n = findlast(σ->σ<=σ_tropopause,σ_levels_full)
-    n_stratosphere_levels = isnothing(n) ? 0 : n
 
     # Specific humidity at the surface (grid space)
     temp_grid = gridded(progn.layers[end].timesteps[1].temp,model.spectral_transform)
@@ -462,8 +460,8 @@ function initialize_humidity!(  progn::PrognosticVariables,
     humid_surf = spectral(humid_surf_grid,model.spectral_transform)
     spectral_truncation!(humid_surf)
 
-    # Specific humidity at tropospheric levels (stratospheric humidity remains zero)
-    for k in n_stratosphere_levels+1:nlev
+    # Specific humidity at levels above
+    for k in 1:nlev
         for lm in eachharmonic(humid_surf)
             progn.layers[k].timesteps[1].humid[lm] = humid_surf[lm]*σ_levels_full[k]^scale_height_ratio
         end
