@@ -1,3 +1,23 @@
+"""
+Abstract type for land-sea masks. Custom land-sea masks have to be defined as
+
+    CustomMask{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF,Grid}
+
+and need to have at least a field called `land_sea_mask::Grid` that uses a `Grid` as defined
+by the spectral grid object, so of correct size and with the numberformat NF.
+Then the initialize function has to be extended for that new mask
+
+    initialize!(mask::CustomMask,model::PrimitiveEquation)
+
+which generally is used to tweak the mask.land_sea_mask grid as you like, using
+(preferrably read-only) anything from `model`.
+
+The land-sea mask grid is expected to have values between [0,1] as we use a fractional mask,
+allowing for grid points being, e.g. quarter land and three quarters sea for 0.25
+with 0 (=sea) and 1 (=land). The surface fluxes will weight proportionally the fluxes e.g.
+from sea and land surface temperatures. Note however, that the land-sea mask can declare
+grid points being (at least partially) ocean even though the sea surface temperatures
+aren't defined (=NaN) in that grid point. In that case, not flux is applied."""
 abstract type AbstractLandSeaMask{NF,Grid} end
 
 # make available when using SpeedyWeather
@@ -31,7 +51,11 @@ function LandSeaMask(spectral_grid::SpectralGrid;kwargs...)
     return LandSeaMask{NF,Grid{NF}}(;land_sea_mask,kwargs...)
 end
 
-function initialize!(land_sea_mask::LandSeaMask)
+"""
+$(TYPEDSIGNATURES)
+Reads a high-resolution land-sea mask from file and interpolates (grid-call average)
+onto the model grid for a fractional sea mask."""
+function initialize!(land_sea_mask::LandSeaMask, model::PrimitiveEquation)
 
     (;file_Grid) = land_sea_mask
 
@@ -69,7 +93,10 @@ function AquaPlanetMask(spectral_grid::SpectralGrid;kwargs...)
     return AquaPlanetMask{NF,Grid{NF}}(;land_sea_mask,kwargs...)
 end
 
-function initialize!(land_sea_mask::AquaPlanetMask)
+"""
+$(TYPEDSIGNATURES)
+Sets all grid points to sea."""
+function initialize!(land_sea_mask::AquaPlanetMask, model::PrimitiveEquation)
     land_sea_mask.land_sea_mask .= 0    # set all to sea
     return nothing
 end
