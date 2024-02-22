@@ -201,14 +201,14 @@ function initialize!(model::PrimitiveDry;time::DateTime = DEFAULT_DATE)
     (;spectral_grid) = model
 
     # slightly adjust model time step to be a convenient divisor of output timestep
-    initialize!(model.time_stepping,model)
+    initialize!(model.time_stepping, model)
 
     # numerics (implicit is initialized later)
-    initialize!(model.horizontal_diffusion,model)
+    initialize!(model.horizontal_diffusion, model)
 
     # boundary conditionss
-    initialize!(model.orography,model)
-    initialize!(model.land_sea_mask)
+    initialize!(model.orography, model)
+    initialize!(model.land_sea_mask, model)
     initialize!(model.ocean)
     initialize!(model.land)
     initialize!(model.solar_zenith,time,model)
@@ -303,14 +303,14 @@ function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     (;spectral_grid) = model
 
     # slightly adjust model time step to be a convenient divisor of output timestep
-    initialize!(model.time_stepping,model)
+    initialize!(model.time_stepping, model)
 
     # numerics (implicit is initialized later)
-    initialize!(model.horizontal_diffusion,model)
+    initialize!(model.horizontal_diffusion, model)
 
     # boundary conditionss
-    initialize!(model.orography,model)
-    initialize!(model.land_sea_mask)
+    initialize!(model.orography, model)
+    initialize!(model.land_sea_mask, model)
     initialize!(model.ocean)
     initialize!(model.land)
     initialize!(model.soil)

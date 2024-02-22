@@ -77,7 +77,6 @@ export  Leapfrog
 # EXPORT OROGRAPHIES
 export  NoOrography,
         EarthOrography,
-        LandSeaMask,
         ZonalRidge
 
 # NUMERICS
@@ -166,6 +165,7 @@ include("dynamics/planets.jl")
 include("dynamics/atmospheres.jl")
 include("dynamics/constants.jl")
 include("dynamics/orography.jl")
+include("physics/land_sea_mask.jl")
 
 # VARIABLES
 include("dynamics/prognostic_variables.jl")

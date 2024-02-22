@@ -20,7 +20,6 @@ abstract type AbstractDynamicsConstants{NF} end
 # INITIAL CONDITIONS AND OROGRAPHY/BOUNDARIES
 abstract type InitialConditions end
 abstract type AbstractOrography{NF,Grid} end
-abstract type AbstractLandSeaMask{NF,Grid} end
 abstract type AbstractAlbedo{NF,Grid} end
 
 # ATMOSPHERIC COLUMN FOR PARAMETERIZATIONS

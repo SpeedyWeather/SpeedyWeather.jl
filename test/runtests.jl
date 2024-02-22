@@ -27,6 +27,8 @@ include("geopotential.jl")
 
 # PHYSICS
 include("column_variables.jl")
+include("orography.jl")
+include("land_sea_mask.jl")
 # include("thermodynamics.jl")
 # include("large_scale_condensation.jl")
 # include("convection.jl")
