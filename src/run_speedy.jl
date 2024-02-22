@@ -1,3 +1,5 @@
+export run!
+
 """
 $(TYPEDSIGNATURES)
 Run a SpeedyWeather.jl `simulation`. The `simulation.model` is assumed to be initialized."""
@@ -15,8 +17,8 @@ function run!(  simulation::Simulation;
     (;clock) = prognostic_variables
 
     # set the clock's enddate
-    set_period!(clock,period)
-    initialize!(clock,model.time_stepping)
+    set_period!(clock, period)
+    initialize!(clock, model.time_stepping)
 
     model.output.output = output            # enable/disable output
 

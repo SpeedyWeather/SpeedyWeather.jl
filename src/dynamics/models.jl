@@ -43,6 +43,7 @@ Base.@kwdef mutable struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice}
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid,Barotropic)
     feedback::AbstractFeedback = Feedback()
+    callbacks::AbstractVector{<:AbstractCallback} = [NoCallback()]
 end
 
 has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
@@ -106,6 +107,7 @@ Base.@kwdef mutable struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevic
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid,ShallowWater)
     feedback::AbstractFeedback = Feedback()
+    callbacks::AbstractVector{<:AbstractCallback} = [NoCallback()]
 end
 
 has(::Type{<:ShallowWater}, var_name::Symbol) = var_name in (:vor, :div, :pres)
@@ -187,6 +189,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevic
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid,PrimitiveDry)
     feedback::AbstractFeedback = Feedback()
+    callbacks::AbstractVector{<:AbstractCallback} = [NoCallback()]
 end
 
 has(::Type{<:PrimitiveDry}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres)
@@ -289,6 +292,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevic
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid,PrimitiveWet)
     feedback::AbstractFeedback = Feedback()
+    callbacks::AbstractVector{<:AbstractCallback} = [NoCallback()]
 end
  
 has(::Type{<:PrimitiveWet}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres, :humid)

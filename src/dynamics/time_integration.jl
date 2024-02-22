@@ -225,7 +225,8 @@ function first_timesteps!(
     timestep!(progn,diagn,Δt,model,lf1,lf2)
     clock.time -= Δt_millisec_half      # remove prev Δt/2 in case not even ms
     clock.time += Δt_millisec           # otherwise time is off by 1ms
-    write_output!(output,clock.time,diagn)
+    write_output!(output,clock.time, diagn)
+    callback!(model.callbacks, progn, diagn, model)
 
     # from now on precomputed implicit terms with 2Δt
     initialize!(implicit,2Δt,diagn,model) 
@@ -245,8 +246,7 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
 
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
-    zero_tendencies!(diagn)                         # start with zero for accumulation 
-
+    
     # LOOP OVER LAYERS FOR TENDENCIES, DIFFUSION, LEAPFROGGING AND PROPAGATE STATE TO GRID
     for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
         progn_lf = progn_layer.timesteps[lf2]       # pick the leapfrog time step lf2 for tendencies
@@ -255,6 +255,9 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
         leapfrog!(progn_layer,diagn_layer,dt,lf1,model)
         gridded!(diagn_layer,progn_lf,model)
     end
+
+    # set the tendencies back to zero for accumulation
+    zero_tendencies!(diagn)
 end
 
 """
@@ -278,8 +281,6 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     (;pres) = progn.surface.timesteps[lf2]
     (;implicit, spectral_transform) = model
 
-    zero_tendencies!(diagn)
-    
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
     dynamics_tendencies!(diagn_layer,progn_lf,diagn.surface,pres,time,model)
     implicit_correction!(diagn_layer,progn_layer,diagn.surface,progn.surface,implicit)
@@ -293,6 +294,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     (;pres_grid) = diagn.surface
     leapfrog!(progn.surface,diagn.surface,dt,lf1,model)
     gridded!(pres_grid,pres,spectral_transform)
+
+    # set the tendencies back to zero for accumulation
+    zero_tendencies!(diagn)
 end
 
 """
@@ -317,11 +321,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
 
         # calculate all parameterizations
         parameterization_tendencies!(diagn,progn,time,model)
-    else                                            # set tendencies to zero otherwise for accumulators
-        zero_tendencies!(diagn)
     end
 
-    if model.dynamics                               # switch on/off all dynamics
+    if model.dynamics                                       # switch on/off all dynamics
         dynamics_tendencies!(diagn,progn,model,lf2)         # dynamical core
         implicit_correction!(diagn,model.implicit,progn)    # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space
@@ -349,6 +351,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
             gridded!(pres_grid,pres_lf,model.spectral_transform)
         end
     end
+
+    # set the tendencies back to zero for accumulation
+    zero_tendencies!(diagn)
 end
 
 """
@@ -375,26 +380,29 @@ function time_stepping!(
     gridded!(diagn,progn,lf,model)
     initialize!(output,feedback,time_stepping,clock,diagn,model)
     initialize!(feedback,clock,model)
+    initialize!(model.callbacks, progn, diagn, model)
 
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
-    first_timesteps!(progn,diagn,model,output)
+    first_timesteps!(progn,diagn, model, output)
 
     # MAIN LOOP
     for i in 2:clock.n_timesteps            # start at 2 as first Δt in first_timesteps!
         
         # calculate tendencies and leapfrog forward
-        timestep!(progn,diagn,2Δt,model)   
+        timestep!(progn,diagn, 2Δt, model)   
         clock.time += Δt_millisec           # time of lf=2 and diagn after timestep!
 
         progress!(feedback,progn)           # updates the progress meter bar
-        write_output!(output,clock.time,diagn)
+        write_output!(output, clock.time, diagn)
+        callback!(model.callbacks, progn, diagn, model)
     end
 
     # UNSCALE, CLOSE, FINISH
     unscale!(progn)                         # undo radius-scaling for vor,div from the dynamical core
     close(output)                           # close netCDF file
-    write_restart_file(progn,output)        # as JLD2 
+    write_restart_file(progn, output)       # as JLD2 
     progress_finish!(feedback)              # finishes the progress meter bar
+    finish!(model.callbacks, progn, diagn, model)
 
     return progn
 end
