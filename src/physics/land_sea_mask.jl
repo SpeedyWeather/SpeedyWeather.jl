@@ -98,15 +98,6 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Generator function pulling the resolution information from `spectral_grid`."""
-function AquaPlanetMask(spectral_grid::SpectralGrid;kwargs...)
-    (;NF, Grid, nlat_half) = spectral_grid
-    land_sea_mask = zeros(Grid{NF},nlat_half)
-    return AquaPlanetMask{NF,Grid{NF}}(;land_sea_mask,kwargs...)
-end
-
-"""
-$(TYPEDSIGNATURES)
 Sets all grid points to sea."""
 function initialize!(land_sea_mask::AquaPlanetMask, model::PrimitiveEquation)
     land_sea_mask.land_sea_mask .= 0    # set all to sea
