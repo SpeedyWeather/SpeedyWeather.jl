@@ -22,6 +22,7 @@ for func in (:initialize!, :callback!, :finish!)
     end
 end
 
+export GlobalSurfaceTemperatureCallback
 Base.@kwdef mutable struct GlobalSurfaceTemperatureCallback{NF} <: AbstractCallback
     timestep_counter::Int = 0
     temp::Vector{NF} = [0]
