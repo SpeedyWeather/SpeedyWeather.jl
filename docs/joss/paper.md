@@ -49,7 +49,7 @@ authors:
 
   - name: Navid C Constantinou
     orcid: 0000-0002-8149-4094
-    affiliation: 9
+    affiliation: 8
 
   - name: Chris Hill
     affiliation: 1
@@ -69,10 +69,8 @@ affiliations:
    index: 6
  - name: University of Minnesota, Minneapolis, MN, USA
    index: 7
- - name: University of Melbourne, Australia
-   index: 8
  - name: The University of Melbourne, Parkville, VIC, Australia
-   index: 9
+   index: 8
    
 date: 14 September 2023
 bibliography: paper.bib
