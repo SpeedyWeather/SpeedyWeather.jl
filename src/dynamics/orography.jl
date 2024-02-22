@@ -237,3 +237,24 @@ function initialize!(land_sea_mask::LandSeaMask)
     # TODO this shoudln't be necessary, but at the moment grid_cell_average! can return values > 1
     clamp!(land_sea_mask.land_sea_mask,0,1)
 end
+
+"""Land-sea mask with zero = sea everywhere.
+$(TYPEDFIELDS)"""
+Base.@kwdef struct AquaPlanetMask{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF,Grid}
+    "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
+    land_sea_mask::Grid
+end
+
+"""
+$(TYPEDSIGNATURES)
+Generator function pulling the resolution information from `spectral_grid`."""
+function AquaPlanetMask(spectral_grid::SpectralGrid;kwargs...)
+    (;NF, Grid, nlat_half) = spectral_grid
+    land_sea_mask = zeros(Grid{NF},nlat_half)
+    return AquaPlanetMask{NF,Grid{NF}}(;land_sea_mask,kwargs...)
+end
+
+function initialize!(land_sea_mask::LandSeaMask)
+    land_sea_mask.land_sea_mask .= 0    # set all to sea
+    return nothing
+end
