@@ -57,7 +57,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
-function (L::AbstractLandSeaMask)(spectral_grid::SpectralGrid;kwargs...)
+function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid;kwargs...)
     (;NF, Grid, nlat_half) = spectral_grid
     land_sea_mask   = zeros(Grid{NF},nlat_half)
     return L{NF,Grid{NF}}(;land_sea_mask,kwargs...)
