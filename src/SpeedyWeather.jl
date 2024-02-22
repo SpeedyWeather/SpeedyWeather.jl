@@ -30,12 +30,8 @@ import ProgressMeter
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Second, Minute, Hour, Day
 
-# EXPORT MONOLITHIC INTERFACE TO SPEEDY
-export  run_speedy,
-        run_speedy!,
-        initialize_speedy,
-        initialize!,
-        run!
+
+export  initialize!
 
 export  NoVerticalCoordinates,
         SigmaCoordinates,
@@ -113,10 +109,6 @@ export  drag!,
 # EXPORT VERTICAL DIFFUSION
 export  NoVerticalDiffusion,
         VerticalLaplacian
-
-# PRECIPITATOIN
-export  SpeedyCondensation,
-        SpeedyConvection
 
 # EXPORT STRUCTS
 export  DynamicsConstants,
@@ -211,6 +203,7 @@ include("dynamics/models.jl")
 include("output/output.jl")                     # defines Output
 include("output/feedback.jl")                   # defines Feedback
 include("output/plot.jl")
+include("output/callbacks.jl")
 
 # INTERFACE
 include("run_speedy.jl")
