@@ -2,8 +2,8 @@ using Documenter, SpeedyWeather
 
 makedocs(
     format = Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",
-                            ansicolor=true,
-                            size_threshold = 600_000),      # in bytes
+                             ansicolor=true,
+                             size_threshold = 600_000),      # in bytes
     sitename = "SpeedyWeather.jl",
     authors = "M Klöwer and SpeedyWeather contributors",
     modules = [SpeedyWeather],
