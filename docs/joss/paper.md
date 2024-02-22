@@ -29,6 +29,7 @@ authors:
     affiliation: 7
 
   - name: Simone Silvestri
+    orcid: 0000-0002-7156-946X
     affiliation: 1
 
   - name: Gregory L Wagner
