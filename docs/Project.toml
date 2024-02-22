@@ -2,10 +2,11 @@
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
 PythonPlot = "274fc56d-3b97-40fa-a1cd-1b4a50311bf9"
+SpeedyWeather = "9e226e20-d153-4fed-8a5b-493def4f21a9"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [compat]
 Documenter = "0.26, 0.27, 1"
-NCDatasets = "0.12, 0.13"
-UnicodePlots = "^3.3"
+NCDatasets = "0.12, 0.13, 0.14"
 PythonPlot = "1"
+UnicodePlots = "3.3"
