@@ -94,14 +94,13 @@ So for example `output_Grid=FullClenshawGrid` and `nlat_half=48` will always int
 regular 192x95 longitude-latitude grid of 1.875˚ resolution, regardless the grid and resolution used
 for the model integration.
 ```julia
-julia> my_output_writer = OutputWriter(spectral_grid, ShallowWater, output_Grid=FullClenshawGrid, nlat_half=48)
+my_output_writer = OutputWriter(spectral_grid, ShallowWater, output_Grid=FullClenshawGrid, nlat_half=48)
 ```
 Note that by default the output is on the corresponding full of the grid used in the dynamical core
 so that interpolation only happens at most in the zonal direction as they share the location of the
 latitude rings. You can check this by
-```julia
-julia> RingGrids.full_grid(OctahedralGaussianGrid)
-FullGaussianGrid
+```@example netcdf
+RingGrids.full_grid(OctahedralGaussianGrid)
 ```
 So the corresponding full grid of an `OctahedralGaussianGrid` is the `FullGaussiangrid` and the same resolution
 `nlat_half` is chosen by default in the output writer (which you can change though as shown above).
@@ -131,12 +130,12 @@ julia> path = pwd()
 julia> my_output_writer = OutputWriter(spectral_grid, PrimitiveDry, path=path)
 ```
 This folder must already exist. If you want to give your run a name/identification you can pass on `id`
-```
+```julia
 julia> my_output_writer = OutputWriter(spectral_grid,PrimitiveDry,id="diffusion_test");
 ```
 which will be used instead of a 4 digit number like 0001, 0002 which is automatically determined if
 `id` is not provided. You will see the id of the run in the progress bar
-```
+```julia
 Weather is speedy: run diffusion_test 100%|███████████████████████| Time: 0:00:12 (19.20 years/day)
 ```
 and the run folder, here `run_diffusion_test`, is also named accordingly
