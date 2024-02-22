@@ -7,11 +7,11 @@ and need to have at least a field called `land_sea_mask::Grid` that uses a `Grid
 by the spectral grid object, so of correct size and with the number format `NF``.
 All AbstractLandSeaMask have a convenient generator function to be used like
 `mask = CustomMask(spectral_grid,option=argument)`, but you may add your own or customize by
-defining `CustomMask()` which should return an instance of type `CustomMask{NF,Grid}` with
+defining `CustomMask(args...)` which should return an instance of type `CustomMask{NF,Grid}` with
 parameters matching the spectral grid. Then the initialize function has to be extended for
 that new mask
 
-    initialize!(mask::CustomMask,model::PrimitiveEquation)
+    initialize!(mask::CustomMask, model::PrimitiveEquation)
 
 which generally is used to tweak the mask.land_sea_mask grid as you like, using
 any other options you have included in `CustomMask` as fields or anything else (preferrably read-only,
@@ -98,7 +98,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Sets all grid points to sea."""
+Sets all grid points to 0 = sea."""
 function initialize!(land_sea_mask::AquaPlanetMask, model::PrimitiveEquation)
     land_sea_mask.land_sea_mask .= 0    # set all to sea
     return nothing
