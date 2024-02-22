@@ -154,6 +154,6 @@ Note that some fields are actual options, but others are derived from the option
 arrays/objects the output writer needs, but shouldn't be passed on by the user.
 The actual options are declared as `[OPTION]` in the following
 
-```@docs
-SpeedyWeather.OutputWriter
+```@example netcdf
+@doc OutputWriter
 ```
