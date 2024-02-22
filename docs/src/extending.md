@@ -34,11 +34,13 @@ from the repository and write directly into it. However, note the [Scope of vari
 if you define a component externally.
 
 To define a new forcing type, at the most basic level you would do
-```julia
-struct MyForcing <: AbstractForcing
+```@example extending
+using SpeedyWeather
+
+struct MyForcing{NF} <: AbstractForcing{NF}
     # define some parameters and work arrays here
-    a::Float64
-    v::Vector{Float64}
+    a::NF
+    v::Vector{NF}
 end
 ```
 In Julia this introduces a new (so-called compound) type that is a subtype of `AbstractForcing`,
@@ -57,7 +59,7 @@ For a more concrete example see [Custom forcing: define](@ref).
 
 To define the new type's initialization, at the most basic level you need
 to extend the `initialize!` function for this new type
-```julia
+```@example extending
 function initialize!(forcing::MyForcing,model::ModelSetup)
     # fill in/change any fields of your new forcing here
     forcing.v[1] = 1
@@ -80,7 +82,7 @@ into your forcing.
 As the last step we have to extend the `forcing!` function which is the function
 that is called on _every_ step of the time integration. This new method
 for `forcing!` needs to have the following function signature
-```julia
+```@example extending
 function forcing!(  diagn::DiagnosticVariablesLayer,
                     progn::PrognosticVariablesLayer,
                     forcing::MyForcing,
@@ -114,23 +116,11 @@ In general, you should be familiar with Julia's
 [scope of variables](https://docs.julialang.org/en/v1/manual/variables-and-scoping/)
 logic.
 
-Defining a new type for example as a subtype of AbstractForcing, you will actually
-want to do
-```julia
-struct MyForcing <: SpeedyWeather.AbstractForcing
-    # fields
-end
-```
-Because `AbstractForcing` is defined inside SpeedyWeather, but we do not export
-all functions/types in order to not flood your global scope to avoid
-naming conflicts. Rule of thumb: If you get an error hinting at something is
-not defined, make sure you are in the right scope!
-
-Then the `initialize!` function is a function *inside* the SpeedyWeather module,
+The `initialize!` function is a function *inside* the SpeedyWeather module,
 as we want to define a new method for it *outside* that can be called *inside*
 we actually need to write
-```julia
-function SpeedyWeather.initialize!(forcing::MyForcing,model::SpeedyWeather.ModelSetup)
+```@example extending
+function SpeedyWeather.initialize!(forcing::MyForcing, model::SpeedyWeather.ModelSetup)
     # how to initialize it
 end
 ```
@@ -173,16 +163,16 @@ will explain the details in second
 ```@example extend
 using SpeedyWeather, Dates
 
-Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing{NF}
-    
+Base.@kwdef struct StochasticStirring{NF} <: AbstractForcing{NF}
+
     # DIMENSIONS from SpectralGrid
     "Spectral resolution as max degree of spherical harmonics"
     trunc::Int
-    
+
     "Number of latitude rings, used for latitudinal mask"
     nlat::Int
 
-    
+
     # OPTIONS
     "Decorrelation time scale τ [days]"
     decorrelation_time::Float64 = 2
@@ -196,17 +186,17 @@ Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing{NF}
     "Stirring width [˚]"
     width::Float64 = 24
 
-    
+
     # TO BE INITIALISED
     "Stochastic stirring term S"
     S::LowerTriangularMatrix{Complex{NF}} = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
-    
+
     "a = A*sqrt(1 - exp(-2dt/τ)), the noise factor times the stirring strength [1/s²]"
     a::Base.RefValue{NF} = Ref(zero(NF))
-        
+
     "b = exp(-dt/τ), the auto-regressive factor [1]"
     b::Base.RefValue{NF} = Ref(zero(NF))
-        
+
     "Latitudinal mask, confined to mid-latitude storm track by default [1]"
     lat_mask::Vector{NF} = zeros(NF,nlat)
 end
@@ -267,9 +257,12 @@ end
 nothing # hide
 ```
 Which allows us to do
-```julia
-julia> spectral_grid = SpectralGrid(trunc=42,nlev=1)
-julia> stochastic_stirring = StochasticStirring(spectral_grid,latitude=30,decorrelation_time=5)
+```@example extend
+spectral_grid = SpectralGrid(trunc=42,nlev=1)
+```
+and
+```@example extend
+stochastic_stirring = StochasticStirring(spectral_grid,latitude=30,decorrelation_time=5)
 ```
 So the respective resolution parameters and the number format are just pulled from the `SpectralGrid`
 as a first argument and the remaining parameters are just keyword arguments that one can change at creation.
@@ -397,7 +390,6 @@ function forcing!(  diagn::SpeedyWeather.DiagnosticVariablesLayer,
     
     return nothing
 end
-nothing # hide
 ```
 The function signature can then just match to whatever we need. In our case
 we have a forcing defined in spectral space which, however, is masked in
