@@ -186,7 +186,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-define a ProgressMeter.speedstring method that also takes a time step
+Define a ProgressMeter.speedstring method that also takes a time step
 `dt_in_sec` to translate sec/iteration to days/days-like speeds."""
 function speedstring(sec_per_iter,dt_in_sec)
     if sec_per_iter == Inf
@@ -223,9 +223,10 @@ $(TYPEDSIGNATURES)
 Returns `Dates.CompoundPeriod` rounding to either (days, hours), (hours, minutes), (minutes,
 seconds), or seconds with 1 decimal place accuracy for >10s and two for less.
 E.g.
-```julia
+```@example
+julia> using SpeedyWeather: readable_secs
+
 julia> readable_secs(12345)
-3 hours, 26 minutes
 ```
 """
 function readable_secs(secs::Real)
