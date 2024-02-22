@@ -10,7 +10,7 @@ It is therefore recommended (but not required) to write a generator function as 
     function CustomMask(spectral_grid::SpectralGrid;kwargs...)
         (;NF, Grid, nlat_half) = spectral_grid
         land_sea_mask   = zeros(Grid{NF},nlat_half)
-        return LandSeaMask{NF,Grid{NF}}(;land_sea_mask,kwargs...)
+        return CustomMask{NF,Grid{NF}}(;land_sea_mask,kwargs...)
     end
 
 to allow a convenient construction like `mask = CustomMask(spectral_grid,option=argument)`.
