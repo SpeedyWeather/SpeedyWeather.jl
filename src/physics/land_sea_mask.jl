@@ -4,24 +4,19 @@ Abstract type for land-sea masks. Custom land-sea masks have to be defined as
     CustomMask{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF,Grid}
 
 and need to have at least a field called `land_sea_mask::Grid` that uses a `Grid` as defined
-by the spectral grid object, so of correct size and with the number format NF.
-It is therefore recommended (but not required) to write a generator function as follows
-
-    function CustomMask(spectral_grid::SpectralGrid;kwargs...)
-        (;NF, Grid, nlat_half) = spectral_grid
-        land_sea_mask   = zeros(Grid{NF},nlat_half)
-        return CustomMask{NF,Grid{NF}}(;land_sea_mask,kwargs...)
-    end
-
-to allow a convenient construction like `mask = CustomMask(spectral_grid,option=argument)`.
-Then the initialize function has to be extended for that new mask
+by the spectral grid object, so of correct size and with the number format `NF``.
+All AbstractLandSeaMask have a convenient generator function to be used like
+`mask = CustomMask(spectral_grid,option=argument)`, but you may add your own or customize by
+defining `CustomMask()` which should return an instance of type `CustomMask{NF,Grid}` with
+parameters matching the spectral grid. Then the initialize function has to be extended for
+that new mask
 
     initialize!(mask::CustomMask,model::PrimitiveEquation)
 
 which generally is used to tweak the mask.land_sea_mask grid as you like, using
-any other options you have included in `CustomMask` as fields
-or anything else (preferrably read-only, because this is only to initialize the land-sea mask, nothing else)
-from `model`.
+any other options you have included in `CustomMask` as fields or anything else (preferrably read-only,
+because this is only to initialize the land-sea mask, nothing else) from `model`. You can
+for example read something from file, set some values manually, or use coordinates from `model.geometry`.
 
 The land-sea mask grid is expected to have values between [0,1] as we use a fractional mask,
 allowing for grid points being, e.g. quarter land and three quarters sea for 0.25
@@ -62,10 +57,10 @@ end
 """
 $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
-function LandSeaMask(spectral_grid::SpectralGrid;kwargs...)
+function (L::AbstractLandSeaMask)(spectral_grid::SpectralGrid;kwargs...)
     (;NF, Grid, nlat_half) = spectral_grid
     land_sea_mask   = zeros(Grid{NF},nlat_half)
-    return LandSeaMask{NF,Grid{NF}}(;land_sea_mask,kwargs...)
+    return L{NF,Grid{NF}}(;land_sea_mask,kwargs...)
 end
 
 """
