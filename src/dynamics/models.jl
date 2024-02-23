@@ -42,8 +42,8 @@ Base.@kwdef mutable struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice}
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid,Barotropic)
+    callbacks::AbstractVector{<:AbstractCallback} = Vector{AbstractCallback}()
     feedback::AbstractFeedback = Feedback()
-    callbacks::AbstractVector{<:AbstractCallback} = [NoCallback()]
 end
 
 has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
@@ -106,8 +106,8 @@ Base.@kwdef mutable struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevic
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid,ShallowWater)
+    callbacks::AbstractVector{<:AbstractCallback} = Vector{AbstractCallback}()
     feedback::AbstractFeedback = Feedback()
-    callbacks::AbstractVector{<:AbstractCallback} = [NoCallback()]
 end
 
 has(::Type{<:ShallowWater}, var_name::Symbol) = var_name in (:vor, :div, :pres)
@@ -188,8 +188,8 @@ Base.@kwdef mutable struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevic
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid,PrimitiveDry)
+    callbacks::AbstractVector{<:AbstractCallback} = Vector{AbstractCallback}()
     feedback::AbstractFeedback = Feedback()
-    callbacks::AbstractVector{<:AbstractCallback} = [NoCallback()]
 end
 
 has(::Type{<:PrimitiveDry}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres)
@@ -291,8 +291,8 @@ Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevic
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid,PrimitiveWet)
+    callbacks::AbstractVector{<:AbstractCallback} = Vector{AbstractCallback}()
     feedback::AbstractFeedback = Feedback()
-    callbacks::AbstractVector{<:AbstractCallback} = [NoCallback()]
 end
  
 has(::Type{<:PrimitiveWet}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres, :humid)
@@ -360,11 +360,13 @@ model_class(model::ModelSetup) = model_class(typeof(model))
 
 function Base.show(io::IO,M::ModelSetup)
     println(io,"$(typeof(M))")
-    for key in propertynames(M)[1:end-1]
+    properties = propertynames(M)
+    n = length(properties)
+    for (i,key) in enumerate(properties)
         val = getfield(M,key)
-        println(io,"├ $key: $(typeof(val))")
+        s = i == n ? "└" : "├"  # choose ending └ for last property
+        println(io,"$s $key: $(typeof(val))")
     end
-    print(io,"└ feedback: $(typeof(M.feedback))")
 end
 
 function Base.show(io::IO,S::Simulation)
