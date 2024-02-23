@@ -25,8 +25,8 @@ makedocs(
                 "Spherical Harmonic Transform"=>"spectral_transform.md",
                 "Grids"=>"grids.md",
             ],
-            "Running SpeedyWeather.jl" => [
-                "How to run SpeedyWeather.jl"=>"how_to_run_speedy.md",
+            "Running SpeedyWeather" => [
+                "How to run SpeedyWeather"=>"how_to_run_speedy.md",
                 "Model setups"=>"setups.md",
                 "NetCDF output"=>"output.md",
             ],
