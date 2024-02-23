@@ -1,0 +1,3 @@
+# Vertical Diffusion
+
+More to follow ...
