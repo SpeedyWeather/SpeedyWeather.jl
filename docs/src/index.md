@@ -22,31 +22,6 @@ SpeedyWeather.jl defines
 
 and solves these equations in spherical coordinates as described in this documentation.
 
-## Manual outline
-
-See the following pages of the documentation for more details
-
-- [Installation](installation.md)
-- [How to run SpeedyWeather.jl](how_to_run_speedy.md)
-- [Model setups](setups.md)
-- [Spherical harmonic transform](spectral_transform.md)
-- [Grids](grids.md)
-- [Barotropic model](barotropic.md)
-- [Shallow water model](shallowwater.md)
-- [Primitive equation model](primitiveequation.md)
-- [Parameterizations](parameterizations.md)
-- [Extending SpeedyWeather](extending.md)
-- [NetCDF output](output.md)
-
-and the submodules
-
-- [RingGrids](@ref)
-- [LowerTriangularMatrices](@ref lowertriangularmatrices)   
-- [SpeedyTransforms](@ref)
-
-and the [original documentation](http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
-by Molteni and Kucharski.
-
 ## Developers
 
 The development of  SpeedyWeather.jl is lead by [Milan Klöwer](https://github.com/milankl) and

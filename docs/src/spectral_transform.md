@@ -235,7 +235,7 @@ There are many ways to estimate the effective grid resolution of spectral models
 Some of them are based on the wavelength a given spectral resolution allows to
 represent, others on the total number of real variables per area.
 However, as many atmospheric models do represent a considerable amount of physics
-on the grid (see [Parameterizations](@ref parameterizations)) there is also a good argument to
+on the grid (see [Parameterizations](@ref)) there is also a good argument to
 include the actual grid resolution into this estimate and not just the spectral
 resolution. We therefore use the average grid cell area to estimate the
 resolution

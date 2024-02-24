@@ -30,7 +30,7 @@ here for clarity, see [Horizontal diffusion](@ref diffusion).
 
 The parameterizations for the tendencies of ``u,v,T,q`` from physical processes are denoted as
 ``\mathcal{P}_\mathbf{u} = (\mathcal{P}_u, \mathcal{P}_v), \mathcal{P}_T, \mathcal{P}_q``
-and are further described in the corresponding sections, see [Parameterizations](@ref parameterizations).
+and are further described in the corresponding sections, see [Parameterizations](@ref).
 
 SpeedyWeather.jl implements a `PrimitiveWet` and a `PrimitiveDry` dynamical core.
 For a dry atmosphere, we have ``q = 0`` and the virtual temperature ``T_v = T``
