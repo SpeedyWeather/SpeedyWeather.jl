@@ -1,21 +1,21 @@
-abstract type AbstractHoleFilling{NF} end
+abstract type AbstractHoleFilling end
 
-struct ClipNegatives{NF} <: AbstractHoleFilling{NF} end
-ClipNegatives(SG::SpectralGrid) = ClipNegatives{SG.NF}()
+struct ClipNegatives <: AbstractHoleFilling end
+ClipNegatives(SG::SpectralGrid) = ClipNegatives()
 
 # nothing to initialize
-initialize!(H::ClipNegatives,::PrimitiveWet) = nothing
+initialize!(::ClipNegatives,::PrimitiveWet) = nothing
 
 # function barrier
 function hole_filling!(
     A::AbstractGrid,
     H::ClipNegatives,
-    model::PrimitiveWet)
-
+    model::PrimitiveWet
+)
     hole_filling!(A,H)
 end
 
-function hole_filling!(A::AbstractGrid,H::ClipNegatives)
+function hole_filling!(A::AbstractGrid,::ClipNegatives)
     @inbounds for ij in eachgridpoint(A)
         A[ij] = max(A[ij],0)
     end

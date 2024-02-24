@@ -1,8 +1,12 @@
+abstract type AbstractTimeStepper <: AbstractModelComponent end
+
+export Leapfrog
+
 """
 Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)
 """
-Base.@kwdef mutable struct Leapfrog{NF} <: TimeStepper{NF}
+Base.@kwdef mutable struct Leapfrog{NF<:AbstractFloat} <: AbstractTimeStepper
 
     # DIMENSIONS
     "spectral resolution (max degree of spherical harmonics)"
@@ -90,12 +94,6 @@ for the resolution information."""
 function Leapfrog(spectral_grid::SpectralGrid;kwargs...)
     (;NF,trunc,radius) = spectral_grid
     return Leapfrog{NF}(;trunc,radius,kwargs...)
-end
-
-function Base.show(io::IO,L::Leapfrog)
-    println(io,"$(typeof(L)) <: TimeStepper")
-    keys = propertynames(L)
-    print_fields(io,L,keys)
 end
 
 """

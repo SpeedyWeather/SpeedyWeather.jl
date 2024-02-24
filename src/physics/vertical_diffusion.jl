@@ -1,3 +1,6 @@
+abstract type VerticalDiffusion{NF} <: AbstractParameterization{NF} end
+
+export NoVerticalDiffusion
 struct NoVerticalDiffusion{NF} <: VerticalDiffusion{NF} end
 NoVerticalDiffusion(SG::SpectralGrid) = NoVerticalDiffusion{SG.NF}()
 
@@ -16,6 +19,8 @@ function static_energy_diffusion!(  column::ColumnVariables,
                                     scheme::NoVerticalDiffusion)
     return nothing
 end
+
+export StaticEnergyDiffusion
 
 """
 Diffusion of dry static energy: A relaxation towards a reference
@@ -74,6 +79,8 @@ function static_energy_diffusion!(  column::ColumnVariables,
         end
     end
 end
+
+export HumidityDiffusion
 
 """
 Diffusion of dry static energy: A relaxation towards a reference

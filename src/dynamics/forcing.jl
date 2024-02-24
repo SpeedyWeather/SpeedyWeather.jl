@@ -1,18 +1,11 @@
-function Base.show(io::IO,F::AbstractForcing)
-    println(io,"$(typeof(F)) <: AbstractForcing")
-    keys = propertynames(F)
-    print_fields(io,F,keys)
-end
+abstract type AbstractForcing <: AbstractModelComponent end
 
-## NO FORCING
-struct NoForcing{NF} <: AbstractForcing{NF} end
-NoForcing(SG::SpectralGrid) = NoForcing{SG.NF}()
+## NO FORCING = dummy forcing
+export NoForcing
+struct NoForcing <: AbstractForcing end
+NoForcing(SG::SpectralGrid) = NoForcing()
 
-function initialize!(   forcing::NoForcing,
-                        model::ModelSetup)
-    return nothing
-end
-
+initialize!(::NoForcing,::ModelSetup) = nothing
 function forcing!(  diagn::DiagnosticVariablesLayer,
                     progn::PrognosticVariablesLayer,
                     forcing::NoForcing,
@@ -22,6 +15,7 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
 end
 
 # JET STREAM FORCING FOR SHALLOW WATER
+export JetStreamForcing
 
 """
 Forcing term for the Barotropic or ShallowWaterModel with an
@@ -30,18 +24,18 @@ Galewsky, 2004, but mirrored for both hemispheres.
 
 $(TYPEDFIELDS)
 """
-Base.@kwdef struct JetStreamForcing{NF} <: AbstractForcing{NF}
+Base.@kwdef struct JetStreamForcing{NF} <: AbstractForcing
     "Number of latitude rings"
     nlat::Int = 0
 
     "jet latitude [˚N]"
-    latitude::Float64 = 45
+    latitude::NF = 45
     
     "jet width [˚], default ≈ 19.29˚"
-    width::Float64 = (1/4-1/7)*180
+    width::NF = (1/4-1/7)*180
 
     "jet speed scale [m/s]"
-    speed::Float64 = 85
+    speed::NF = 85
 
     "time scale [days]"
     time_scale::Second = Day(30)
@@ -51,7 +45,7 @@ Base.@kwdef struct JetStreamForcing{NF} <: AbstractForcing{NF}
 end
 
 JetStreamForcing(SG::SpectralGrid;kwargs...) = JetStreamForcing{SG.NF}(
-    ;nlat=RingGrids.get_nlat(SG.Grid,SG.nlat_half),kwargs...)
+    ;nlat=SG.nlat,kwargs...)
 
 function initialize!(   forcing::JetStreamForcing,
                         model::ModelSetup)
@@ -88,7 +82,7 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
                     forcing::JetStreamForcing,
                     time::DateTime,
                     model::ModelSetup)
-    forcing!(diagn,forcing)
+    forcing!(diagn, forcing)
 end
 
 """

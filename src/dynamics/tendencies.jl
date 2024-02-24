@@ -5,9 +5,9 @@ function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
                                 progn::PrognosticVariablesLayer,
                                 time::DateTime,
                                 model::Barotropic)
-    forcing!(diagn,progn,model.forcing,time,model)  # = (Fᵤ, Fᵥ) forcing for u,v
-    drag!(diagn,progn,model.drag,time,model)        # drag term for u,v
-    vorticity_flux!(diagn,model)                    # = ∇×(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ)
+    forcing!(diagn, progn, model.forcing, time, model)  # = (Fᵤ, Fᵥ) forcing for u,v
+    drag!(diagn,progn, model.drag, time, model)         # drag term for u,v
+    vorticity_flux!(diagn,model)                        # = ∇×(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ)
 end
 
 """
@@ -168,7 +168,7 @@ end
 """Convert absolute and virtual temperature to anomalies wrt to the reference profile"""
 function temperature_anomaly!(
     diagn::DiagnosticVariablesLayer,
-    I::ImplicitPrimitiveEq,
+    I::ImplicitPrimitiveEquation,
     )
                     
     Tₖ = I.temp_profile[diagn.k]    # reference temperature on this layer
@@ -335,12 +335,14 @@ spectral space
 function vordiv_tendencies!(
     diagn::DiagnosticVariablesLayer,
     surf::SurfaceVariables,
-    C::DynamicsConstants,
-    G::Geometry,
+    coriolis::AbstractCoriolis,
+    atmosphere::AbstractAtmosphere,
+    geometry::AbstractGeometry,
     S::SpectralTransform,
 )
-    (;R_dry, f_coriolis) = C
-    (;coslat⁻¹) = G
+    (;R_dry) = atmosphere                       # gas constant for dry air
+    (;f) = coriolis                             # coriolis parameter
+    (;coslat⁻¹) = geometry
 
     (;u_tend_grid, v_tend_grid) = diagn.tendencies  # already contains vertical advection
     u = diagn.grid_variables.u_grid             # velocity
@@ -355,9 +357,9 @@ function vordiv_tendencies!(
 
     @inbounds for (j,ring) in enumerate(rings)
         coslat⁻¹j = coslat⁻¹[j]
-        f = f_coriolis[j]
+        f_j = f[j]
         for ij in ring
-            ω = vor[ij] + f                     # absolute vorticity
+            ω = vor[ij] + f_j                   # absolute vorticity
             RTᵥ = R_dry*Tᵥ[ij]                  # dry gas constant * virtual temperature anomaly
             u_tend_grid[ij] = (u_tend_grid[ij] + v[ij]*ω - RTᵥ*∇lnp_x[ij])*coslat⁻¹j
             v_tend_grid[ij] = (v_tend_grid[ij] - u[ij]*ω - RTᵥ*∇lnp_y[ij])*coslat⁻¹j
@@ -431,8 +433,8 @@ function temperature_tendency!(
     diagn::DiagnosticVariablesLayer,
     model::PrimitiveEquation,
 )
-    temperature_tendency!(diagn,model.constants,model.geometry,
-                            model.spectral_transform,model.implicit)
+    temperature_tendency!(diagn, model.atmosphere, model.geometry,
+                            model.spectral_transform, model.implicit)
 end
 
 """
@@ -446,16 +448,16 @@ Compute the temperature tendency
 temperature used in the adiabatic term κTᵥ*Dlnp/Dt."""
 function temperature_tendency!(
     diagn::DiagnosticVariablesLayer,
-    C::DynamicsConstants,
+    atmosphere::AbstractAtmosphere,
     G::Geometry,
     S::SpectralTransform,
-    I::ImplicitPrimitiveEq,
+    I::ImplicitPrimitiveEquation,
 )
     (;temp_tend, temp_tend_grid)  = diagn.tendencies
     (;div_grid, temp_grid) = diagn.grid_variables
     (;uv∇lnp, uv∇lnp_sum_above, div_sum_above) = diagn.dynamics_variables
     
-    (;κ) = C                                    # thermodynamic kappa
+    (;κ) = atmosphere                           # thermodynamic kappa = R_Dry/heat_capacity
     Tᵥ = diagn.grid_variables.temp_virt_grid    # anomaly wrt to Tₖ
     Tₖ = I.temp_profile[diagn.k]                # average layer temperature from reference profile
     
@@ -585,13 +587,13 @@ with `Fᵤ,Fᵥ` from `u_tend_grid`/`v_tend_grid` that are assumed to be alread
 set in `forcing!`. Set `div=false` for the BarotropicModel which doesn't
 require the divergence tendency."""
 function vorticity_flux_curldiv!(   diagn::DiagnosticVariablesLayer,
-                                    C::DynamicsConstants,
+                                    C::AbstractCoriolis,
                                     G::Geometry,
                                     S::SpectralTransform;
                                     div::Bool=true,     # also calculate div of vor flux?
                                     add::Bool=false)    # accumulate in vor/div tendencies?
     
-    (;f_coriolis) = C
+    (;f) = C
     (;coslat⁻¹) = G
 
     (;u_tend_grid, v_tend_grid) = diagn.tendencies  # already contains forcing
@@ -604,9 +606,9 @@ function vorticity_flux_curldiv!(   diagn::DiagnosticVariablesLayer,
 
     @inbounds for (j,ring) in enumerate(rings)
         coslat⁻¹j = coslat⁻¹[j]
-        f = f_coriolis[j]
+        f_j = f[j]
         for ij in ring
-            ω = vor[ij] + f                     # absolute vorticity
+            ω = vor[ij] + f_j                   # absolute vorticity
             u_tend_grid[ij] = (u_tend_grid[ij] + v[ij]*ω)*coslat⁻¹j
             v_tend_grid[ij] = (v_tend_grid[ij] - u[ij]*ω)*coslat⁻¹j
         end
@@ -640,10 +642,10 @@ with
 with Fᵤ,Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
 vorticity ζ, coriolis f."""
 function vorticity_flux!(diagn::DiagnosticVariablesLayer,model::ShallowWater)
-    C = model.constants
+    C = model.coriolis
     G = model.geometry
     S = model.spectral_transform
-    vorticity_flux_curldiv!(diagn,C,G,S,div=true,add=true)
+    vorticity_flux_curldiv!(diagn, C, G, S, div=true, add=true)
 end
 
 """
@@ -660,10 +662,10 @@ with
 with Fᵤ,Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
 vorticity ζ, coriolis f."""
 function vorticity_flux!(diagn::DiagnosticVariablesLayer,model::Barotropic)
-    C = model.constants
+    C = model.coriolis
     G = model.geometry
     S = model.spectral_transform
-    vorticity_flux_curldiv!(diagn,C,G,S,div=false,add=true)
+    vorticity_flux_curldiv!(diagn, C, G, S, div=false, add=true)
 end
 
 """
@@ -707,10 +709,10 @@ function linear_pressure_gradient!(
     diagn::DiagnosticVariablesLayer,
     surface::PrognosticSurfaceTimesteps,
     lf::Int,                # leapfrog index to evaluate tendencies on
-    C::DynamicsConstants,
-    I::ImplicitPrimitiveEq,
+    atmosphere::AbstractAtmosphere,
+    I::ImplicitPrimitiveEquation,
 )                          
-    (;R_dry) = C                            # dry gas constant 
+    (;R_dry) = atmosphere                   # dry gas constant 
     Tₖ = I.temp_profile[diagn.k]            # reference profile at layer k      
     (;pres) = surface.timesteps[lf]         # logarithm of surface pressure
     (;geopot) = diagn.dynamics_variables
@@ -728,13 +730,13 @@ Computes the (negative) divergence of the volume fluxes `uh,vh` for the continui
 function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
                                     surface::SurfaceVariables,
                                     orog::AbstractOrography,
-                                    constants::DynamicsConstants,
-                                    G::Geometry,
+                                    atmosphere::AbstractAtmosphere,
+                                    G::AbstractGeometry,
                                     S::SpectralTransform)                        
 
     (; pres_grid, pres_tend ) = surface
     (; orography ) = orog
-    H = constants.layer_thickness
+    H = atmosphere.layer_thickness
 
     # compute dynamic layer thickness h on the grid
     # pres_grid is η, the interface displacement, update to
@@ -744,7 +746,7 @@ function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
     pres_grid .+= H .- orography
     
     # now do -∇⋅(uh,vh) and store in pres_tend
-    flux_divergence!(pres_tend,pres_grid,diagn,G,S,add=true,flipsign=true)
+    flux_divergence!(pres_tend, pres_grid, diagn, G, S, add=true, flipsign=true)
 end
 
 """
@@ -787,16 +789,16 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
-    gridded!(vor_grid,vor,S)            # get vorticity on grid from spectral vor
+    gridded!(vor_grid, vor, S)          # get vorticity on grid from spectral vor
     
     # get spectral U,V from spectral vorticity via stream function Ψ
     # U = u*coslat = -coslat*∂Ψ/∂lat
     # V = v*coslat = ∂Ψ/∂lon, radius omitted in both cases
-    UV_from_vor!(U,V,vor,S)
+    UV_from_vor!(U, V, vor, S)
 
     # transform from U,V in spectral to u,v on grid (U,V = u,v*coslat)
-    gridded!(u_grid,U,S,unscale_coslat=true)
-    gridded!(v_grid,V,S,unscale_coslat=true)
+    gridded!(u_grid, U, S, unscale_coslat=true)
+    gridded!(v_grid, V, S, unscale_coslat=true)
  
     return nothing
 end

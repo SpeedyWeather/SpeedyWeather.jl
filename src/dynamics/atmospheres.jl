@@ -1,82 +1,88 @@
+abstract type AbstractAtmosphere <: AbstractModelComponent end
+export EarthAtmosphere
+
 """
 $(TYPEDSIGNATURES)
-Create a struct `EarthAtmosphere<:AbstractPlanet`, with the following physical/chemical
-characteristics. Note that `radius` is not part of it as this should be chosen
-in `SpectralGrid`. Keyword arguments are
+Create a struct `EarthAtmosphere <: AbstractAtmosphere`, with the following physical/chemical
+characteristics. Keyword arguments are
 $(TYPEDFIELDS)"""
-Base.@kwdef struct EarthAtmosphere <: AbstractAtmosphere
-    # ATMOSPHERE
+Base.@kwdef struct EarthAtmosphere{NF<:AbstractFloat} <: AbstractAtmosphere
     "molar mass of dry air [g/mol]"
-    mol_mass_dry_air::Float64 = 28.9649
+    mol_mass_dry_air::NF = 28.9649
 
     "molar mass of water vapour [g/mol]"
-    mol_mass_vapour::Float64 = 18.0153
+    mol_mass_vapour::NF = 18.0153
 
-    "specific heat at constant pressure [J/K/kg]"
-    cₚ::Float64 = 1004
+    "specific heat at constant pressure cₚ [J/K/kg]"
+    heat_capacity::NF = 1004
 
     "universal gas constant [J/K/mol]"
-    R_gas::Float64 = 8.3145
+    R_gas::NF = 8.3145
 
     "specific gas constant for dry air [J/kg/K]"
-    R_dry::Float64 = 1000*R_gas/mol_mass_dry_air
+    R_dry::NF = 1000*R_gas/mol_mass_dry_air
 
     "specific gas constant for water vapour [J/kg/K]"
-    R_vapour::Float64 = 1000*R_gas/mol_mass_vapour
+    R_vapour::NF = 1000*R_gas/mol_mass_vapour
+
+    "Ratio of gas constants: dry air / water vapour, often called ε [1]"
+    mol_ratio::NF = R_dry/R_vapour
+
+    "Virtual temperature Tᵥ calculation, Tᵥ = T(1 + μ*q), humidity q, absolute tempereature T"
+    μ_virt_temp::NF = (1-mol_ratio)/mol_ratio
+
+    "= R_dry/cₚ, gas const for air over heat capacity"
+    κ::NF = R_dry/cₚ
 
     "water density [kg/m³]"
-    water_density::Float64 = 1000
+    water_density::NF = 1000
 
-    "latent heat of condensation [J/kg] for consistency with specific humidity [kg/kg], also called alhc"
-    latent_heat_condensation::Float64 = 2501e3
+    "latent heat of condensation [J/kg] for consistency with specific humidity [kg/kg]"
+    latent_heat_condensation::NF = 2501e3
 
-    "latent heat of sublimation [J/kg], also called alhs"
-    latent_heat_sublimation::Float64 = 2801e3
+    "latent heat of sublimation [J/kg]"
+    latent_heat_sublimation::NF = 2801e3
 
     "stefan-Boltzmann constant [W/m²/K⁴]"
-    stefan_boltzmann::Float64 = 5.67e-8
+    stefan_boltzmann::NF = 5.67e-8
 
-    # STANDARD ATMOSPHERE (reference values)
-    "moist adiabatic temperature lapse rate ``-dT/dz`` [K/km]"
-    lapse_rate::Float64 = 5
+    "surface reference pressure [Pa]"
+    pres_ref::NF = 1e5
 
-    "absolute temperature at surface ``z=0`` [K]"
-    temp_ref::Float64 = 288
-
-    "absolute temperature in stratosphere [K]"
-    temp_top::Float64 = 216
-
-    "for stratospheric lapse rate [K] after Jablonowski"
-    ΔT_stratosphere::Float64 = 4.8e5
-
-    "start of the stratosphere in sigma coordinates"
-    σ_tropopause::Float64 = 0.2
-
-    "top of the planetary boundary layer in sigma coordinates"
-    σ_boundary_layer::Float64 = 0.93
-
-    "scale height for pressure [km]"
-    scale_height::Float64 = 7.5
-
-    "surface pressure [hPa]"
-    pres_ref::Float64 = 1000
-
-    "scale height for specific humidity [km]"
-    scale_height_humid::Float64 = 2.5
-
-    "relative humidity of near-surface air [1]"
-    relhumid_ref::Float64 = 0.7
-
-    "saturation water vapour pressure [Pa]"
-    water_pres_ref::Float64 = 17
-
-    # TODO maybe make this actually part of the spectral grid?
-    "layer thickness for the shallow water model [km]"
-    layer_thickness::Float64 = 8.5
+    "layer thickness for the shallow water model [m]"
+    layer_thickness::NF = 8500
 end
 
-function Base.show(io::IO,atm::AbstractAtmosphere)
-    println(io,"$(typeof(atm))")
-    keys = propertynames(atm)
-    print_fields(io,atm,keys)
-end
+EarthAtmosphere(;kwargs...) = EarthAtmosphere{DEFAULT_NF}(;kwargs...)
+EarthAtmosphere(SG::SpectralGrid;kwargs...) = EarthAtmosphere{SG.NF}(;kwargs...)
+
+# "scale height for specific humidity [km]"
+# scale_height_humid::NF = 2.5
+
+# "relative humidity of near-surface air [1]"
+# relhumid_ref::NF = 0.7
+
+# "saturation water vapour pressure [Pa]"
+# water_pres_ref::NF = 17
+
+# # STANDARD ATMOSPHERE (reference values)
+# "moist adiabatic temperature lapse rate ``-dT/dz`` [K/km]"
+# lapse_rate::NF = 5
+
+# "absolute temperature at surface ``z=0`` [K]"
+# temp_ref::NF = 288
+
+# "absolute temperature in stratosphere [K]"
+# temp_top::NF = 216
+
+# "for stratospheric lapse rate [K] after Jablonowski"
+# ΔT_stratosphere::NF = 4.8e5
+
+# "start of the stratosphere in sigma coordinates"
+# σ_tropopause::NF = 0.2
+
+# "top of the planetary boundary layer in sigma coordinates"
+# σ_boundary_layer::NF = 0.93
+
+# "scale height for pressure [km]"
+# scale_height::NF = 7.5

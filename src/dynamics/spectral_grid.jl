@@ -1,9 +1,14 @@
+abstract type AbstractSpectralGrid end
+abstract type AbstractGeometry end
+
 const DEFAULT_NF = Float32
 const DEFAULT_MODEL = PrimitiveDry
 const DEFAULT_GRID = OctahedralGaussianGrid
 const DEFAULT_RADIUS = 6.371e6
 const DEFAULT_TRUNC = 31
 const DEFAULT_NLEV = 8
+
+export SpectralGrid
 
 """
 Defines the horizontal spectral resolution and corresponding grid and the
@@ -12,7 +17,7 @@ $(TYPEDFIELDS)
 
 `nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
 `Grid` and `dealiasing`."""
-Base.@kwdef struct SpectralGrid
+Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
     "number format used throughout the model"
     NF::Type{<:AbstractFloat} = DEFAULT_NF
 
@@ -77,113 +82,6 @@ function Base.show(io::IO,SG::SpectralGrid)
     println(io,"├ Grid:       $(get_nlat(Grid,nlat_half))-ring $Grid{$NF}, $npoints grid points")
     println(io,"├ Resolution: $(s(res_ave))km (average), $(s(res_eq_x))km × $(s(res_eq_y))km (Equator)")
       print(io,"└ Vertical:   $nlev-level $(typeof(vertical_coordinates))")
-end
-
-"""
-$(TYPEDSIGNATURES)
-Construct Geometry struct containing parameters and arrays describing an iso-latitude grid <:AbstractGrid
-and the vertical levels. Pass on `SpectralGrid` to calculate the following fields
-$(TYPEDFIELDS)
-"""
-Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry{NF}     # NF: Number format
-
-    "SpectralGrid that defines spectral and grid resolution"
-    spectral_grid::SpectralGrid
-
-    "grid of the dynamical core"
-    Grid::Type{<:AbstractGrid} = spectral_grid.Grid
-
-    "resolution parameter nlat_half of Grid, # of latitudes on one hemisphere (incl Equator)"
-    nlat_half::Int = spectral_grid.nlat_half      
-
-
-    # GRID-POINT SPACE
-    "maximum number of longitudes (at/around Equator)"
-    nlon_max::Int = get_nlon_max(Grid,nlat_half)
-
-    "=nlon_max, same (used for compatibility), TODO: still needed?"
-    nlon::Int = nlon_max
-
-    "number of latitude rings"
-    nlat::Int = get_nlat(Grid,nlat_half)
-
-    "number of vertical levels"
-    nlev::Int = spectral_grid.nlev
-
-    "total number of grid points"
-    npoints::Int = spectral_grid.npoints
-
-    "Planet's radius [m]"
-    radius::NF = spectral_grid.radius    
-
-
-    # ARRAYS OF LANGITUDES/LONGITUDES
-    "array of colatitudes in radians (0...π)"
-    colat::Vector{Float64} = get_colat(Grid,nlat_half)
-
-    "array of latitudes in radians (π...-π)"
-    lat::Vector{NF} = get_lat(Grid,nlat_half)
-
-    "array of latitudes in degrees (90˚...-90˚)"
-    latd::Vector{Float64} = get_latd(Grid,nlat_half)
-
-    "array of longitudes in degrees (0...360˚), empty for non-full grids"
-    lond::Vector{Float64} = get_lond(Grid,nlat_half)
-
-    "longitude (0˚...360˚) for each grid point in ring order"
-    londs::Vector{NF} = get_latdlonds(Grid,nlat_half)[2]
-    
-    "latitude (-90˚...˚90) for each grid point in ring order"
-    latds::Vector{NF} = get_latdlonds(Grid,nlat_half)[1]
-
-    "longitude (0...2π) for each grid point in ring order"
-    lons::Vector{NF} = RingGrids.get_latlons(Grid,nlat_half)[2]
-    
-    "latitude (-π/2...π/2) for each grid point in ring order"
-    lats::Vector{NF} = RingGrids.get_latlons(Grid,nlat_half)[1]
-
-    "sin of latitudes"
-    sinlat::Vector{NF} = sind.(latd)
-    
-    "cos of latitudes"
-    coslat::Vector{NF} = cosd.(latd)
-    
-    "= 1/cos(lat)"
-    coslat⁻¹::Vector{NF} = 1 ./ coslat
-
-    "= cos²(lat)"
-    coslat²::Vector{NF} = coslat.^2
-
-    "# = 1/cos²(lat)"
-    coslat⁻²::Vector{NF} = 1 ./ coslat²            
-
-
-    # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
-    "σ at half levels, σ_k+1/2"
-    σ_levels_half::Vector{NF} = spectral_grid.vertical_coordinates.σ_half
-
-    "σ at full levels, σₖ"
-    σ_levels_full::Vector{NF} = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])  
-    
-    "σ level thicknesses, σₖ₊₁ - σₖ"
-    σ_levels_thick::Vector{NF} = σ_levels_half[2:end] - σ_levels_half[1:end-1]      
-
-    "log of σ at full levels, include surface (σ=1) as last element"
-    ln_σ_levels_full::Vector{NF} = log.(vcat(σ_levels_full,1))
-
-    "Full to half levels interpolation"
-    full_to_half_interpolation::Vector{NF} = σ_interpolation_weights(σ_levels_full,σ_levels_half)
-end
-
-"""
-$(TYPEDSIGNATURES)
-Generator function for `Geometry` struct based on `spectral_grid`."""
-function Geometry(spectral_grid::SpectralGrid)
-    return Geometry{spectral_grid.NF}(;spectral_grid)
-end
-
-function Base.show(io::IO,G::Geometry)
-    print(io,"$(typeof(G)) for $(G.spectral_grid)")
 end
 
 """

@@ -1,3 +1,6 @@
+abstract type AbstractFeedback end
+export Feedback
+
 """
 Feedback struct that contains options and object for command-line feedback
 like the progress meter.

@@ -1,7 +1,11 @@
-# default initial conditions by model
-initial_conditions_default(::Type{<:Barotropic}) = StartWithRandomVorticity()
-initial_conditions_default(::Type{<:ShallowWater}) = ZonalJet()
-initial_conditions_default(::Type{<:PrimitiveEquation}) = ZonalWind()
+abstract type InitialConditions end
+
+# EXPORT INITIAL CONDITIONS
+export  StartFromFile,
+        StartFromRest,
+        ZonalJet,
+        ZonalWind,
+        StartWithRandomVorticity
 
 Base.@kwdef struct StartFromRest <: InitialConditions 
     pressure_on_orography::Bool = false
@@ -315,7 +319,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     end
 
     # PRESSURE (constant everywhere)
-    lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
+    lnp₀ = log(pres_ref)            # logarithm of reference surface pressure [log(Pa)]
     progn.surface.timesteps[1].pres[1] = norm_sphere*lnp₀
 
     lnpₛ = ones(Grid{NF},nlat_half)
@@ -415,7 +419,7 @@ function pressure_on_orography!(progn::PrognosticVariables,
     (; orography ) = model.orography # orography on the grid
 
     Γ = lapse_rate/1000             # Lapse rate [K/km] -> [K/m]
-    lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
+    lnp₀ = log(pres_ref)            # logarithm of reference surface pressure [log(Pa)]
     lnp_grid = zero(orography)      # allocate log surface pressure on grid
 
     RΓg⁻¹ = R_dry*Γ/gravity         # for convenience

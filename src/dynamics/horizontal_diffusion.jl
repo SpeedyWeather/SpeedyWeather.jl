@@ -1,3 +1,7 @@
+abstract type HorizontalDiffusion <: AbstractModelComponent end
+
+export HyperDiffusion
+
 """
 Struct for horizontal hyper diffusion of vor, div, temp; implicitly in spectral space
 with a `power` of the Laplacian (default=4) and the strength controlled by
@@ -7,7 +11,7 @@ layers. Furthermore the power can be decreased above the `tapering_σ` to
 `power_stratosphere` (default 2). For Barotropic, ShallowWater,
 the default non-adaptive constant-time scale hyper diffusion is used. Options are
 $(TYPEDFIELDS)"""
-Base.@kwdef struct HyperDiffusion{NF} <: HorizontalDiffusion{NF}
+Base.@kwdef struct HyperDiffusion{NF} <: HorizontalDiffusion
     # DIMENSIONS
     "spectral resolution"
     trunc::Int
@@ -61,12 +65,6 @@ function HyperDiffusion(spectral_grid::SpectralGrid;kwargs...)
     return HyperDiffusion{NF}(;trunc,nlev,kwargs...)
 end
 
-function Base.show(io::IO,HD::HorizontalDiffusion)
-    println(io,"$(typeof(HD))")
-    keys = propertynames(HD)
-    print_fields(io,HD,keys,arrays=false)
-end
-
 """$(TYPEDSIGNATURES)
 Precomputes the hyper diffusion terms in `scheme` based on the
 model time step, and possibly with a changing strength/power in
@@ -87,7 +85,7 @@ end
 Precomputes the 2D hyper diffusion terms in `scheme` based on the
 model time step."""
 function initialize!(   scheme::HyperDiffusion,
-                        L::TimeStepper)
+                        L::AbstractTimeStepper)
 
     (;trunc,∇²ⁿ_2D,∇²ⁿ_2D_implicit,power) = scheme
     (;Δt, radius) = L
@@ -120,8 +118,8 @@ the current (absolute) vorticity maximum level `vor_max`"""
 function initialize!(   
     scheme::HyperDiffusion,
     k::Int,
-    G::Geometry,
-    L::TimeStepper,
+    G::AbstractGeometry,
+    L::AbstractTimeStepper,
     vor_max::Real = 0,
 )
     (;trunc, resolution_scaling, ∇²ⁿ, ∇²ⁿ_implicit) = scheme
@@ -170,8 +168,8 @@ calculates the (absolute) vorticity maximum for the layer of `diagn`."""
 function initialize!(   
     scheme::HyperDiffusion,
     diagn::DiagnosticVariablesLayer,
-    G::Geometry,
-    L::TimeStepper,
+    G::AbstractGeometry,
+    L::AbstractTimeStepper,
 )
     scheme.adaptive || return nothing
     vor_min, vor_max = extrema(diagn.grid_variables.vor_grid)

@@ -1,22 +1,21 @@
-struct NoTemperatureRelaxation{NF} <: TemperatureRelaxation{NF} end
-NoTemperatureRelaxation(SG::SpectralGrid) = NoTemperatureRelaxation{SG.NF}()
+abstract type TemperatureRelaxation <: AbstractParameterization end
 
-"""$(TYPEDSIGNATURES) just passes."""
-function temperature_relaxation!(   column::ColumnVariables,
-                                    scheme::NoTemperatureRelaxation)
-    return nothing
+function temperature_relaxation!(::ColumnVariables,::PrimitiveEquation)
+    temperature_relaxation!(column, model.temperature_relaxation, model)
 end
 
-"""$(TYPEDSIGNATURES) just passes, does not need any initialization."""
-function initialize!(   scheme::NoTemperatureRelaxation,
-                        model::PrimitiveEquation)
-    return nothing
-end
+export NoTemperatureRelaxation
+struct NoTemperatureRelaxation <: TemperatureRelaxation end
+NoTemperatureRelaxation(::SpectralGrid) = NoTemperatureRelaxation()
+initialize!(::TemperatureRelaxation,::PrimitiveEquation) = nothing
+temperature_relaxation!(::ColumnVariables,::TemperatureRelaxation,::PrimitiveEquation) = nothing
+
+export HeldSuarez
 
 """
 Struct that defines the temperature relaxation from Held and Suarez, 1996 BAMS
 $(TYPEDFIELDS)"""
-Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
+Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: TemperatureRelaxation
     # DIMENSIONS
     "number of latitude rings"
     nlat::Int
@@ -26,25 +25,25 @@ Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
     
     # OPTIONS
     "sigma coordinate below which faster surface relaxation is applied"
-    σb::Float64 = 0.7
+    σb::NF = 0.7
 
     "time scale [hrs] for slow global relaxation"
-    relax_time_slow::Float64 = 40*24
+    relax_time_slow::NF = 40*24
 
     "time scale [hrs] for faster tropical surface relaxation"
-    relax_time_fast::Float64 = 4*24
+    relax_time_fast::NF = 4*24
 
     "minimum equilibrium temperature [K]"
-    Tmin::Float64 = 200    
+    Tmin::NF = 200    
 
     "maximum equilibrium temperature [K]"
-    Tmax::Float64 = 315    
+    Tmax::NF = 315    
 
     "meridional temperature gradient [K]"
-    ΔTy::Float64 = 60
+    ΔTy::NF = 60
     
     "vertical temperature gradient [K]"
-    Δθz::Float64 = 10
+    Δθz::NF = 10
 
     # precomputed constants, allocate here, fill in initialize!
     κ::Base.RefValue{NF} = Ref(zero(NF))
@@ -74,7 +73,7 @@ function initialize!(   scheme::HeldSuarez,
     (;σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = scheme
     (;temp_relax_freq, temp_equil_a, temp_equil_b) = scheme
     
-    p₀ = model.atmosphere.pres_ref*100                      # [hPa] → [Pa]
+    p₀ = model.atmosphere.pres_ref                          # surface reference pressure [Pa]
     scheme.p₀[] = p₀
     scheme.κ[] = model.constants.κ                          # thermodynamic kappa
 
@@ -93,11 +92,6 @@ function initialize!(   scheme::HeldSuarez,
         temp_equil_a[j] = Tmax - ΔTy*sinϕ^2 + Δθz*log(p₀)*cosϕ^2
         temp_equil_b[j] = -Δθz*cosϕ^2
     end
-end
-
-# function barrier
-function temperature_relaxation!(column::ColumnVariables,model::PrimitiveEquation)
-    temperature_relaxation!(column,model.temperature_relaxation)
 end
 
 """$(TYPEDSIGNATURES)
@@ -124,11 +118,12 @@ function temperature_relaxation!(   column::ColumnVariables{NF},
     end
 end
 
+export JablonowskiRelaxation
 
 """$(TYPEDSIGNATURES)
 HeldSuarez-like temperature relaxation, but towards the Jablonowski temperature
 profile with increasing temperatures in the stratosphere."""
-Base.@kwdef struct JablonowskiRelaxation{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
+Base.@kwdef struct JablonowskiRelaxation{NF<:AbstractFloat} <: TemperatureRelaxation
     # DIMENSIONS
     nlat::Int
     nlev::Int

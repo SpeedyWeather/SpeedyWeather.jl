@@ -1,25 +1,28 @@
+abstract type AbstractSurfaceWind <: AbstractParameterization end
+abstract type AbstractSurfaceThermodynamics <: AbstractParameterization end
+abstract type AbstractSurfaceHeat <: AbstractParameterization end
+abstract type AbstractEvaporation <: AbstractParameterization end
+
 function surface_fluxes!(column::ColumnVariables,model::PrimitiveEquation)
 
     # get temperature, humidity and density at surface
-    surface_thermodynamics!(column,model.surface_thermodynamics,model.constants,model)
+    surface_thermodynamics!(column, model.surface_thermodynamics, model.atmosphere, model)
 
     # also calculates surface wind speed necessary for other fluxes too
-    surface_wind_stress!(column,model.surface_wind)
+    surface_wind_stress!(column, model.surface_wind)
 
     # now call other heat and humidity fluxes
-    sensible_heat_flux!(column,model.surface_heat_flux,model.constants)
+    sensible_heat_flux!(column, model.surface_heat_flux, model.constants)
     evaporation!(column,model)
 end
 
-struct SurfaceThermodynamicsConstant{NF<:AbstractFloat} <: AbstractSurfaceThermodynamics{NF} end
-struct SurfaceThermodynamicsExtrapolate{NF<:AbstractFloat} <: AbstractSurfaceThermodynamics{NF} end
-
+export SurfaceThermodynamicsConstant
+struct SurfaceThermodynamicsConstant{NF<:AbstractFloat} <: AbstractSurfaceThermodynamics end
 SurfaceThermodynamicsConstant(SG::SpectralGrid) = SurfaceThermodynamicsConstant{SG.NF}()
-SurfaceThermodynamicsExtrapolate(SG::SpectralGrid) = SurfaceThermodynamicsExtrapolate{SG.NF}()
 
 function surface_thermodynamics!(   column::ColumnVariables,
                                     ::SurfaceThermodynamicsConstant,
-                                    C::DynamicsConstants,
+                                    atmosphere::AbstractAtmosphere,
                                     model::PrimitiveWet)
 
     # surface value is same as lowest model level
@@ -27,24 +30,23 @@ function surface_thermodynamics!(   column::ColumnVariables,
     column.surface_humid = column.humid[end]    # humidity at surface is the same as 
 
     # surface air density via virtual temperature
-    (;R_dry,μ_virt_temp) = C
-    T = column.surface_temp     # surface air temperature
-    q = column.surface_humid    # surface humidity
-    Tᵥ = T*(1 + μ_virt_temp*q)  # virtual temperature
-    column.surface_air_density = column.pres[end]/R_dry/Tᵥ
+    (;R_dry) = atmosphere
+    Tᵥ = column.temp_virt[column.nlev]
+    column.surface_air_density = column.pres[end]/(R_dry*Tᵥ)
 end
 
 function surface_thermodynamics!(   column::ColumnVariables,
                                     ::SurfaceThermodynamicsConstant,
-                                    C::DynamicsConstants,
+                                    atmosphere::AbstractAtmosphere,
                                     model::PrimitiveDry)
-
+    (;R_dry) = atmosphere
     # surface value is same as lowest model level
     column.surface_temp = column.temp[end]   # todo use constant POTENTIAL temperature
-    column.surface_air_density = column.pres[end]/C.R_dry/column.surface_temp
+    column.surface_air_density = column.pres[end]/(R_dry*column.surface_temp)
 end
 
-Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind{NF}
+export SurfaceWind
+Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind
     "Ratio of near-surface wind to lowest-level wind [1]"
     f_wind::NF = 0.95
 
@@ -104,7 +106,8 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
     return nothing
 end
 
-Base.@kwdef struct SurfaceSensibleHeat{NF<:AbstractFloat} <: AbstractSurfaceHeat{NF}
+export SurfaceSensibleHeat
+Base.@kwdef struct SurfaceSensibleHeat{NF<:AbstractFloat} <: AbstractSurfaceHeat
     
     "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
@@ -123,8 +126,8 @@ SurfaceSensibleHeat(SG::SpectralGrid;kwargs...) = SurfaceSensibleHeat{SG.NF}(;kw
 
 function sensible_heat_flux!(   column::ColumnVariables{NF},
                                 heat_flux::SurfaceSensibleHeat,
-                                C::DynamicsConstants) where NF
-    (;cₚ) = C
+                                atmosphere::AbstractAtmosphere) where NF
+    cₚ = atmosphere.heat_capacity
     (;heat_exchange_land, heat_exchange_sea, max_flux) = heat_flux
 
     ρ = column.surface_air_density
@@ -168,10 +171,12 @@ function sensible_heat_flux!(   column::ColumnVariables{NF},
     return nothing
 end
 
+export SurfaceEvaporation
+
 """
 Surface evaporation following a bulk formula with wind from model.surface_wind 
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SurfaceEvaporation{NF<:AbstractFloat} <: AbstractEvaporation{NF}
+Base.@kwdef struct SurfaceEvaporation{NF<:AbstractFloat} <: AbstractEvaporation
     
     "Use column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
@@ -194,7 +199,7 @@ end
 # function barrier
 function evaporation!(  column::ColumnVariables,
                         model::PrimitiveWet)
-    evaporation!(column,model.evaporation,model.clausius_clapeyron)
+    evaporation!(column, model.evaporation, model.clausius_clapeyron)
 end
 
 function evaporation!(  column::ColumnVariables{NF},

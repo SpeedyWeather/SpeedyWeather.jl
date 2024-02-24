@@ -1,17 +1,10 @@
-function Base.show(io::IO,F::AbstractDrag)
-    println(io,"$(typeof(F)) <: AbstractDrag")
-    keys = propertynames(F)
-    print_fields(io,F,keys)
-end
+abstract type AbstractDrag <: AbstractModelComponent end
 
 ## NO DRAG
-struct NoDrag{NF} <: AbstractDrag{NF} end
-NoDrag(SG::SpectralGrid) = NoDrag{SG.NF}()
-
-function initialize!(   drag::NoDrag,
-                        model::ModelSetup)
-    return nothing
-end
+export NoDrag
+struct NoDrag <: AbstractDrag end
+NoDrag(SG::SpectralGrid) = NoDrag()
+initialize!(::NoDrag,::ModelSetup) = nothing
 
 function drag!(     diagn::DiagnosticVariablesLayer,
                     progn::PrognosticVariablesLayer,
@@ -22,16 +15,21 @@ function drag!(     diagn::DiagnosticVariablesLayer,
 end
 
 # Quadratic drag
-Base.@kwdef struct QuadraticDrag{NF} <: AbstractDrag{NF}
-    "drag coefficient [1]"
+export QuadraticDrag
+Base.@kwdef struct QuadraticDrag{NF} <: AbstractDrag
+    "[OPTION] drag coefficient [1]"
     c_D::NF = 1e-5
+
+    "drag coefficient divided by layer thickness H, scaled with radius R [1]"
+    c::Base.RefValue{NF} = Ref(zero(NF))
 end
 
 QuadraticDrag(SG::SpectralGrid;kwargs...) = QuadraticDrag{SG.NF}(;kwargs...)
 
 function initialize!(   drag::QuadraticDrag,
                         model::ModelSetup)
-    return nothing
+    # c = c_D / H * R
+    drag.c[] = drag.c_D / model.atmosphere.layer_thickness * model.geometry.radius
 end
 
 # function barrier
@@ -40,7 +38,7 @@ function drag!(     diagn::DiagnosticVariablesLayer,
                     drag::QuadraticDrag,
                     time::DateTime,
                     model::ModelSetup)
-    drag!(diagn,drag,model.constants)
+    drag!(diagn, drag)
 end
 
 """
@@ -49,13 +47,13 @@ Quadratic drag for the momentum equations.
 
     F = -c_D/H*|(u,v)|*(u,v)
 
-with c_D the non-dimensional drag coefficient
-as defined in `drag::QuadraticDrag`. Layer thickness `H`
-is taken from the `Atmosphere` via `DynamicsConstants`,
-as defined for the `ShallowWaterModel`."""
-function drag!(     diagn::DiagnosticVariablesLayer,
-                    drag::QuadraticDrag{NF},
-                    C::DynamicsConstants) where NF
+with c_D the non-dimensional drag coefficient as defined in `drag::QuadraticDrag`.
+c_D and layer thickness `H` are precomputed in intialize!(::QuadraticDrag,::ModelSetup)
+and scaled by the radius as are the momentum equations."""
+function drag!(     
+    diagn::DiagnosticVariablesLayer,
+    drag::QuadraticDrag{NF},
+) where NF
     
     u = diagn.grid_variables.u_grid
     v = diagn.grid_variables.v_grid
@@ -64,7 +62,7 @@ function drag!(     diagn::DiagnosticVariablesLayer,
     Fv = diagn.tendencies.v_tend_grid
 
     # total drag coefficient with radius scaling and /layer_thickness
-    c = convert(NF,drag.c_D/C.layer_thickness*C.radius)
+    c = drag.c[]
 
     @inbounds for ij in eachgridpoint(u,v,Fu,Fv)
         speed = sqrt(u[ij]^2 + v[ij]^2)
