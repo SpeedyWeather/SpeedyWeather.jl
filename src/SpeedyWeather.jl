@@ -196,14 +196,14 @@ include("physics/pretty_printing.jl")
 include("physics/ocean.jl")
 include("physics/land.jl")
 
-# MODELS
-include("dynamics/models.jl")
-
 # OUTPUT
 include("output/output.jl")                     # defines Output
 include("output/feedback.jl")                   # defines Feedback
 include("output/plot.jl")
 include("output/callbacks.jl")
+
+# MODELS
+include("dynamics/models.jl")
 
 # INTERFACE
 include("run_speedy.jl")
