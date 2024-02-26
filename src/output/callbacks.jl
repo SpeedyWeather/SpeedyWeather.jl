@@ -1,3 +1,5 @@
+abstract type AbstractCallback end
+
 function Base.show(io::IO,C::AbstractCallback)
     println(io,"$(typeof(C)) <: AbstractCallback")
     keys = propertynames(C)
@@ -9,9 +11,9 @@ export NoCallback
 
 """Dummy callback that doesn't do anything."""
 struct NoCallback <: AbstractCallback end
-initialize!(::AbstractCallback,args...) = nothing   # executed once before the main time loop
-callback!(::AbstractCallback,args...) = nothing     # executed after every time step
-finish!(::AbstractCallback,args...) = nothing       # executed after main time loop finishes
+initialize!(::NoCallback,args...) = nothing     # executed once before the main time loop
+callback!(::NoCallback,args...) = nothing       # executed after every time step
+finish!(::NoCallback,args...) = nothing         # executed after main time loop finishes
 
 # simply loop over vector of callbacks
 for func in (:initialize!, :callback!, :finish!)
