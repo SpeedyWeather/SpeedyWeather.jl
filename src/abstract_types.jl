@@ -41,7 +41,6 @@ abstract type AbstractEvaporation{NF} <: AbstractParameterization{NF} end
 # INPUT/OUTPUT
 abstract type AbstractFeedback end
 abstract type AbstractOutputWriter end
-abstract type AbstractCallback end
 
 # NUMERICS
 abstract type HorizontalDiffusion{NF} end

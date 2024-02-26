@@ -217,6 +217,9 @@ function first_timesteps!(
     timestep!(progn,diagn,Δt/2,model,lf1,lf2)
     clock.time += Δt_millisec_half      # update by half the leapfrog time step Δt used here
 
+    # output, callbacks not called after the first Euler step as it's a half-step (i=0 to i=1/2)
+    # populating the second leapfrog index to perform the second time step
+
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
     initialize!(implicit,Δt,diagn,model)    # update precomputed implicit terms with time step Δt
     lf1 = 1                             # without Robert+Williams filter
@@ -225,6 +228,8 @@ function first_timesteps!(
     timestep!(progn,diagn,Δt,model,lf1,lf2)
     clock.time -= Δt_millisec_half      # remove prev Δt/2 in case not even ms
     clock.time += Δt_millisec           # otherwise time is off by 1ms
+    
+    # do output and callbacks after the first proper (from i=0 to i=1) time step
     write_output!(output,clock.time, diagn)
     callback!(model.callbacks, progn, diagn, model)
 
@@ -247,6 +252,9 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
     
+    # set the tendencies back to zero for accumulation
+    zero_tendencies!(diagn)
+
     # LOOP OVER LAYERS FOR TENDENCIES, DIFFUSION, LEAPFROGGING AND PROPAGATE STATE TO GRID
     for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
         progn_lf = progn_layer.timesteps[lf2]       # pick the leapfrog time step lf2 for tendencies
@@ -255,9 +263,6 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
         leapfrog!(progn_layer,diagn_layer,dt,lf1,model)
         gridded!(diagn_layer,progn_lf,model)
     end
-
-    # set the tendencies back to zero for accumulation
-    zero_tendencies!(diagn)
 end
 
 """
@@ -273,6 +278,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
 
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
+
+    # set the tendencies back to zero for accumulation
+    zero_tendencies!(diagn)
 
     progn_layer = progn.layers[1]                   # only calculate tendencies for the first layer
     diagn_layer = diagn.layers[1]                   # multi-layer shallow water not supported
@@ -294,9 +302,6 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     (;pres_grid) = diagn.surface
     leapfrog!(progn.surface,diagn.surface,dt,lf1,model)
     gridded!(pres_grid,pres,spectral_transform)
-
-    # set the tendencies back to zero for accumulation
-    zero_tendencies!(diagn)
 end
 
 """
@@ -312,6 +317,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
 
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
+
+    # set the tendencies back to zero for accumulation
+    zero_tendencies!(diagn)
 
     if model.physics                                # switch on/off all physics parameterizations
         # time step ocean (temperature and TODO sea ice) and land (temperature and soil moisture)
@@ -351,9 +359,6 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
             gridded!(pres_grid,pres_lf,model.spectral_transform)
         end
     end
-
-    # set the tendencies back to zero for accumulation
-    zero_tendencies!(diagn)
 end
 
 """
