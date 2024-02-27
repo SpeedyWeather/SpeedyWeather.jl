@@ -134,7 +134,7 @@ The function signature for `callback!` is the same as for `initialize!`. You may
 access anything from `progn`, `diagn` or `model`, although for a purely diagnostic
 callback this should be read-only. While you could change other model components like the
 land sea mask in `model.land_sea_mask` or orography etc. then you interfere with the
-simulation which is more advanced and will be discussed in [Intrusive callbacks](@ref)
+simulation which is more advanced and will be discussed in Intrusive callbacks below.
 
 Lastly, we extend the `finish!` function which is called once after the last time step.
 This could be used, for example, to save the `maximum_surface_wind_speed` vector to
