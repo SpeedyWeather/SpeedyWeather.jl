@@ -3,14 +3,15 @@
 SpeedyWeather.jl implements a callback system to let users include a flexible piece of code
 into the time stepping. You can think about the main time loop *calling back* to check whether
 anything else should be done before continuing with the next time step. The callback system
-here is called *after* the time step only (excluding calls at with `initialize!` and `finish!`),
+here is called *after* the time step only (plus one call at `initialize!` and one at `finish!`),
 we currently do not implement other callsites.
 
 Callbacks are mainly introduced for diagnostic purposes, meaning that they do not influence
 the simulation, and access the prognostic variables and the model components in a read-only
-fashion. However, you may define a callback that changes the orography during the simulation.
-In general, one has to keep the general order of executions during a time step in mind
-(valid for all models)
+fashion. However, a callback is not strictly prevented from changing prognostic or diagnostic
+variables or the model. For example, you may define a callback that changes the orography
+during the simulation. In general, one has to keep the general order of executions during a
+time step in mind (valid for all models)
 
 1. set tendencies to zero
 2. compute parameterizations, forcing, or drag terms. Accumulate tendencies.
@@ -94,7 +95,7 @@ every time step. We then also compute that maximum for the initial conditions an
 time step counter to 1. We define the `max_2norm` function as follows
 
 ```@example callbacks
-"""Maximum of the 2-norm for two arrays."""
+"""Maximum of the 2-norm of elements across two arrays."""
 function max_2norm(u::AbstractArray{T},v::AbstractArray{T}) where T
     max_norm = zero(T)      # = u² + v²
     for ij in eachindex(u, v)
@@ -105,6 +106,9 @@ function max_2norm(u::AbstractArray{T},v::AbstractArray{T}) where T
 end
 ```
 
+Note that this function is defined in the scope `Main` and not inside SpeedyWeather, this is absolutely
+possible due to Julia's scope of variables which will use `max_2norm` from `Main` scope if it doesn't
+exist in the global scope inside the `SpeedyWeather` module scope.
 Then we need to extend the `callback!` function as follows
 
 ```@example callbacks
@@ -128,9 +132,9 @@ end
 ```
 The function signature for `callback!` is the same as for `initialize!`. You may
 access anything from `progn`, `diagn` or `model`, although for a purely diagnostic
-callback this  be read-only. While you could change other model components like the
+callback this should be read-only. While you could change other model components like the
 land sea mask in `model.land_sea_mask` or orography etc. then you interfere with the
-simulation which is more advanced and will not be discussed here.
+simulation which is more advanced and will be discussed in [Intrusive callbacks](@ref)
 
 Lastly, we extend the `finish!` function which is called once after the last time step.
 This could be used, for example, to save the `maximum_surface_wind_speed` vector to
@@ -191,3 +195,36 @@ time step while the model ran for 3 days.
 ```@example callbacks
 model.callbacks[3].temp
 ```
+
+## Intrusive callbacks
+
+In the sections above, callbacks were introduced as a tool to define custom
+diagnostics or simulation output. This is the simpler and recommended way of using 
+them but nothing stops you from defining a callback that is *intrusive*, meaning
+that it can alter the prognostic or diagnostic variables or the model.
+
+Changing any components of the model, e.g. boundary conditions like orography
+or the land-sea mask through a callback is possible although one should notice
+that this only comes into effect on the next time step given the execution
+order mentioned above. One could for example run a simulation for a certain
+period and then start moving continents around. Note that for physical consistency
+this should be reflected in the orography, land-sea mask, as well as in the available
+sea and land-surface temperatures, but one is free to do this only partially too.
+Another example would be to switch on/off certain model components over time.
+If these components are implemented as *mutable* struct then one could define
+a callback that weakens their respective strength parameter over time.
+
+Changing the diagnostic variables, however, will not have any effect. All of
+them are treated as work arrays, meaning that their state is completely
+overwritten on every time step. 
+
+Changing the prognostic variables in spectral space directly is not advised
+though possible because this can easily lead to stability issues. It is generally
+easier to implement something like this as a parameterization, forcing or
+drag term (which can also be made time-dependent).
+
+Overall, callbacks give the user a wide range of possibilities to diagnose 
+the simulation while running or to interfere with a simulation. We therefore
+encourage users to use callbacks as widely as possible, but if you run
+into any issues please open an issue in the repository and explain what
+you'd like to achieve and which errors you are facing. We are happy to help.
