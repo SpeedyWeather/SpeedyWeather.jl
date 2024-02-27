@@ -153,7 +153,7 @@ SpeedyWeather.finish!(::StormChaser,args...) = nothing
     on each of these, this may give you the false impression that your callback is already defined
     correctly, although it's not.
 
-## Adding a callback
+## Adding a callback
 
 Every model has a field `callbacks::AbstractVector{<:AbstractCallback}` such that the `callbacks`
 keyword can be used to create a model with a vector of callbacks
@@ -196,7 +196,7 @@ time step while the model ran for 3 days.
 model.callbacks[3].temp
 ```
 
-## Intrusive callbacks
+## Intrusive callbacks
 
 In the sections above, callbacks were introduced as a tool to define custom
 diagnostics or simulation output. This is the simpler and recommended way of using 
