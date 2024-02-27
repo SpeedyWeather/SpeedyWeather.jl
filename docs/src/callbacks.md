@@ -34,7 +34,7 @@ to be defined.
 Every custom callback needs to be defined as a (`mutable`) `struct`, subtype of `AbstractCallback`,
 i.e. `struct` or `mutable struct CustomCallback <: SpeedyWeather.AbstractCallback`. In our case, this is
 
-```@example callback
+```@example callbacks
 using SpeedyWeather
 
 Base.@kwdef mutable struct StormChaser{NF} <: SpeedyWeather.AbstractCallback
