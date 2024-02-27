@@ -37,7 +37,7 @@ Callback that records the global mean surface temperature on every time step
 $(TYPEDFIELDS)."""
 Base.@kwdef mutable struct GlobalSurfaceTemperatureCallback{NF} <: AbstractCallback
     timestep_counter::Int = 0
-    temp::Vector{NF} = [0]
+    temp::Vector{NF} = zeros(DEFAULT_NF,0)
 end
 
 GlobalSurfaceTemperatureCallback(SG::SpectralGrid) = GlobalSurfaceTemperatureCallback{SG.NF}()

@@ -19,30 +19,30 @@ $(SIGNATURES)
 The BarotropicModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct BarotropicModel{NF<:AbstractFloat, D<:AbstractDevice} <: Barotropic
+Base.@kwdef mutable struct BarotropicModel <: Barotropic
     spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
 
     # DYNAMICS
     planet::AbstractPlanet = Earth()
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
-    forcing::AbstractForcing{NF} = NoForcing(spectral_grid)
-    drag::AbstractDrag{NF} = NoDrag(spectral_grid)
+    forcing::AbstractForcing = NoForcing(spectral_grid)
+    drag::AbstractDrag = NoDrag(spectral_grid)
     initial_conditions::InitialConditions = StartWithRandomVorticity()
 
     # NUMERICS
-    time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
-    spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
-    horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
-    implicit::AbstractImplicit{NF} = NoImplicit(spectral_grid)
+    time_stepping::TimeStepper = Leapfrog(spectral_grid)
+    spectral_transform::SpectralTransform = SpectralTransform(spectral_grid)
+    horizontal_diffusion::HorizontalDiffusion = HyperDiffusion(spectral_grid)
+    implicit::AbstractImplicit = NoImplicit(spectral_grid)
 
     # INTERNALS
-    geometry::Geometry{NF} = Geometry(spectral_grid)
-    constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
-    device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
+    geometry::Geometry = Geometry(spectral_grid)
+    constants::DynamicsConstants = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
+    device_setup::DeviceSetup = DeviceSetup(CPUDevice())
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid,Barotropic)
-    callbacks::AbstractVector{<:AbstractCallback} = Vector{AbstractCallback}()
+    callbacks::Vector{AbstractCallback} = AbstractCallback[]
     feedback::AbstractFeedback = Feedback()
 end
 
@@ -82,31 +82,31 @@ $(SIGNATURES)
 The ShallowWaterModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct ShallowWaterModel{NF<:AbstractFloat, D<:AbstractDevice} <: ShallowWater
+Base.@kwdef mutable struct ShallowWaterModel <: ShallowWater
     spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
 
     # DYNAMICS
     planet::AbstractPlanet = Earth()
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
-    forcing::AbstractForcing{NF} = NoForcing(spectral_grid)
-    drag::AbstractDrag{NF} = NoDrag(spectral_grid)
+    forcing::AbstractForcing = NoForcing(spectral_grid)
+    drag::AbstractDrag = NoDrag(spectral_grid)
     initial_conditions::InitialConditions = ZonalJet()
-    orography::AbstractOrography{NF} = EarthOrography(spectral_grid)
+    orography::AbstractOrography = EarthOrography(spectral_grid)
 
     # NUMERICS
-    time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
-    spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
-    horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
-    implicit::AbstractImplicit{NF} = ImplicitShallowWater(spectral_grid)
+    time_stepping::TimeStepper = Leapfrog(spectral_grid)
+    spectral_transform::SpectralTransform = SpectralTransform(spectral_grid)
+    horizontal_diffusion::HorizontalDiffusion = HyperDiffusion(spectral_grid)
+    implicit::AbstractImplicit = ImplicitShallowWater(spectral_grid)
 
     # INTERNALS
-    geometry::Geometry{NF} = Geometry(spectral_grid)
-    constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
-    device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
+    geometry::Geometry = Geometry(spectral_grid)
+    constants::DynamicsConstants = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
+    device_setup::DeviceSetup = DeviceSetup(CPUDevice())
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid,ShallowWater)
-    callbacks::AbstractVector{<:AbstractCallback} = Vector{AbstractCallback}()
+    callbacks::Vector{AbstractCallback} = AbstractCallback[]
     feedback::AbstractFeedback = Feedback()
 end
 
@@ -147,7 +147,7 @@ $(SIGNATURES)
 The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveDry
+Base.@kwdef mutable struct PrimitiveDryModel <: PrimitiveDry
     spectral_grid::SpectralGrid = SpectralGrid()
 
     # DYNAMICS
@@ -155,40 +155,40 @@ Base.@kwdef mutable struct PrimitiveDryModel{NF<:AbstractFloat, D<:AbstractDevic
     planet::AbstractPlanet = Earth()
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     initial_conditions::InitialConditions = ZonalWind()
-    orography::AbstractOrography{NF} = EarthOrography(spectral_grid)
+    orography::AbstractOrography = EarthOrography(spectral_grid)
 
     # BOUNDARY CONDITIONS
-    land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
-    ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
-    land::AbstractLand{NF} = SeasonalLandTemperature(spectral_grid)
-    solar_zenith::AbstractZenith{NF} = WhichZenith(spectral_grid,planet)
+    land_sea_mask::AbstractLandSeaMask = LandSeaMask(spectral_grid)
+    ocean::AbstractOcean = SeasonalOceanClimatology(spectral_grid)
+    land::AbstractLand = SeasonalLandTemperature(spectral_grid)
+    solar_zenith::AbstractZenith = WhichZenith(spectral_grid,planet)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
-    boundary_layer_drag::BoundaryLayerDrag{NF} = BulkRichardsonDrag(spectral_grid)
-    temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
-    static_energy_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
-    surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
-    surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
-    surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
-    shortwave_radiation::AbstractShortwave{NF} = NoShortwave(spectral_grid)
-    longwave_radiation::AbstractLongwave{NF} = UniformCooling(spectral_grid)
+    boundary_layer_drag::BoundaryLayerDrag = BulkRichardsonDrag(spectral_grid)
+    temperature_relaxation::TemperatureRelaxation = NoTemperatureRelaxation(spectral_grid)
+    static_energy_diffusion::VerticalDiffusion = NoVerticalDiffusion(spectral_grid)
+    surface_thermodynamics::AbstractSurfaceThermodynamics = SurfaceThermodynamicsConstant(spectral_grid)
+    surface_wind::AbstractSurfaceWind = SurfaceWind(spectral_grid)
+    surface_heat_flux::AbstractSurfaceHeat = SurfaceSensibleHeat(spectral_grid)
+    shortwave_radiation::AbstractShortwave = NoShortwave(spectral_grid)
+    longwave_radiation::AbstractLongwave = UniformCooling(spectral_grid)
 
     # NUMERICS
-    time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
-    spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
-    horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
-    implicit::AbstractImplicit{NF} = ImplicitPrimitiveEq(spectral_grid)
-    vertical_advection::VerticalAdvection{NF} = CenteredVerticalAdvection(spectral_grid)
+    time_stepping::TimeStepper = Leapfrog(spectral_grid)
+    spectral_transform::SpectralTransform = SpectralTransform(spectral_grid)
+    horizontal_diffusion::HorizontalDiffusion = HyperDiffusion(spectral_grid)
+    implicit::AbstractImplicit = ImplicitPrimitiveEq(spectral_grid)
+    vertical_advection::VerticalAdvection = CenteredVerticalAdvection(spectral_grid)
     
     # INTERNALS
-    geometry::Geometry{NF} = Geometry(spectral_grid)
-    constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
-    device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
+    geometry::Geometry = Geometry(spectral_grid)
+    constants::DynamicsConstants = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
+    device_setup::DeviceSetup = DeviceSetup(CPUDevice())
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid,PrimitiveDry)
-    callbacks::AbstractVector{<:AbstractCallback} = Vector{AbstractCallback}()
+    callbacks::Vector{AbstractCallback} = AbstractCallback[]
     feedback::AbstractFeedback = Feedback()
 end
 
@@ -242,7 +242,7 @@ $(SIGNATURES)
 The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveWet
+Base.@kwdef mutable struct PrimitiveWetModel <: PrimitiveWet
     spectral_grid::SpectralGrid = SpectralGrid()
 
     # DYNAMICS
@@ -250,48 +250,48 @@ Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevic
     planet::AbstractPlanet = Earth()
     atmosphere::AbstractAtmosphere = EarthAtmosphere()
     initial_conditions::InitialConditions = ZonalWind()
-    orography::AbstractOrography{NF} = EarthOrography(spectral_grid)
+    orography::AbstractOrography = EarthOrography(spectral_grid)
 
     # BOUNDARY CONDITIONS
-    land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
-    ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
-    land::AbstractLand{NF} = SeasonalLandTemperature(spectral_grid)
-    soil::AbstractSoil{NF} = SeasonalSoilMoisture(spectral_grid)
-    vegetation::AbstractVegetation{NF} = VegetationClimatology(spectral_grid)
-    solar_zenith::AbstractZenith{NF} = WhichZenith(spectral_grid,planet)
+    land_sea_mask::AbstractLandSeaMask = LandSeaMask(spectral_grid)
+    ocean::AbstractOcean = SeasonalOceanClimatology(spectral_grid)
+    land::AbstractLand = SeasonalLandTemperature(spectral_grid)
+    soil::AbstractSoil = SeasonalSoilMoisture(spectral_grid)
+    vegetation::AbstractVegetation = VegetationClimatology(spectral_grid)
+    solar_zenith::AbstractZenith = WhichZenith(spectral_grid,planet)
 
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
-    clausius_clapeyron::AbstractClausiusClapeyron{NF} = ClausiusClapeyron(spectral_grid,atmosphere)
-    boundary_layer_drag::BoundaryLayerDrag{NF} = BulkRichardsonDrag(spectral_grid)
-    temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
-    static_energy_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
-    humidity_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
-    large_scale_condensation::AbstractCondensation{NF} = ImplicitCondensation(spectral_grid)
-    surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
-    surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
-    surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
-    evaporation::AbstractEvaporation{NF} = SurfaceEvaporation(spectral_grid)
-    convection::AbstractConvection{NF} = SimplifiedBettsMiller(spectral_grid)
-    shortwave_radiation::AbstractShortwave{NF} = NoShortwave(spectral_grid)
-    longwave_radiation::AbstractLongwave{NF} = UniformCooling(spectral_grid)
+    clausius_clapeyron::AbstractClausiusClapeyron = ClausiusClapeyron(spectral_grid,atmosphere)
+    boundary_layer_drag::BoundaryLayerDrag = BulkRichardsonDrag(spectral_grid)
+    temperature_relaxation::TemperatureRelaxation = NoTemperatureRelaxation(spectral_grid)
+    static_energy_diffusion::VerticalDiffusion = NoVerticalDiffusion(spectral_grid)
+    humidity_diffusion::VerticalDiffusion = NoVerticalDiffusion(spectral_grid)
+    large_scale_condensation::AbstractCondensation = ImplicitCondensation(spectral_grid)
+    surface_thermodynamics::AbstractSurfaceThermodynamics = SurfaceThermodynamicsConstant(spectral_grid)
+    surface_wind::AbstractSurfaceWind = SurfaceWind(spectral_grid)
+    surface_heat_flux::AbstractSurfaceHeat = SurfaceSensibleHeat(spectral_grid)
+    evaporation::AbstractEvaporation = SurfaceEvaporation(spectral_grid)
+    convection::AbstractConvection = SimplifiedBettsMiller(spectral_grid)
+    shortwave_radiation::AbstractShortwave = NoShortwave(spectral_grid)
+    longwave_radiation::AbstractLongwave = UniformCooling(spectral_grid)
 
     # NUMERICS
-    time_stepping::TimeStepper{NF} = Leapfrog(spectral_grid)
-    spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
-    horizontal_diffusion::HorizontalDiffusion{NF} = HyperDiffusion(spectral_grid)
-    implicit::AbstractImplicit{NF} = ImplicitPrimitiveEq(spectral_grid)
-    vertical_advection::VerticalAdvection{NF} = CenteredVerticalAdvection(spectral_grid)
-    hole_filling::AbstractHoleFilling{NF} = ClipNegatives(spectral_grid)
+    time_stepping::TimeStepper = Leapfrog(spectral_grid)
+    spectral_transform::SpectralTransform = SpectralTransform(spectral_grid)
+    horizontal_diffusion::HorizontalDiffusion = HyperDiffusion(spectral_grid)
+    implicit::AbstractImplicit = ImplicitPrimitiveEq(spectral_grid)
+    vertical_advection::VerticalAdvection = CenteredVerticalAdvection(spectral_grid)
+    hole_filling::AbstractHoleFilling = ClipNegatives(spectral_grid)
 
     # INTERNALS
-    geometry::Geometry{NF} = Geometry(spectral_grid)
-    constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
-    device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
+    geometry::Geometry = Geometry(spectral_grid)
+    constants::DynamicsConstants = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
+    device_setup::DeviceSetup = DeviceSetup(CPUDevice())
 
     # OUTPUT
     output::AbstractOutputWriter = OutputWriter(spectral_grid,PrimitiveWet)
-    callbacks::AbstractVector{<:AbstractCallback} = Vector{AbstractCallback}()
+    callbacks::Vector{AbstractCallback} = AbstractCallback[]
     feedback::AbstractFeedback = Feedback()
 end
  

@@ -2,7 +2,7 @@
     
     Base.@kwdef mutable struct StormChaser{NF} <: SpeedyWeather.AbstractCallback
         timestep_counter::Int = 0
-        maximum_surface_wind_speed::Vector{NF} = [0]
+        maximum_surface_wind_speed::Vector{NF} = Float64[]
     end
     
     # Generator function
@@ -57,17 +57,19 @@
     SpeedyWeather.finish!(::StormChaser,args...) = nothing
 
     spectral_grid = SpectralGrid()
-    model = PrimitiveWetModel(;spectral_grid)
+    callbacks = [NoCallback()]
+    model = PrimitiveWetModel(;spectral_grid,callbacks)
     
     storm_chaser = StormChaser(spectral_grid)
     append!(model.callbacks, storm_chaser)
+    append!(model.callbacks, NoCallback())  # add dummy too 
 
     simulation = initialize!(model)
     run!(simulation)
 
     # maximum wind speed should always be non-negative
-    @test all(model.callbacks[1].maximum_surface_wind_speed .>= 0)
+    @test all(model.callbacks[2].maximum_surface_wind_speed .>= 0)
 
     # highest wind speed across all time steps should be positive
-    @test maximum(model.callbacks[1].maximum_surface_wind_speed) > 0
+    @test maximum(model.callbacks[2].maximum_surface_wind_speed) > 0
 end
