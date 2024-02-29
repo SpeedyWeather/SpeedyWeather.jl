@@ -160,7 +160,7 @@ function initialize!(
     time_stepping::AbstractTimeStepper,
     clock::Clock,
     diagn::DiagnosticVariables,
-    model::Model
+    model::ModelSetup,
 ) where {output_NF,Model}
     
     output.output || return nothing     # exit immediately for no output

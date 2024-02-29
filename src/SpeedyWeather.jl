@@ -125,12 +125,9 @@ include("output/plot.jl")
 include("output/callbacks.jl")
 
 # MODELS
-include("dynamics/models.jl")
-
-# MODELS
 include("models/simulation.jl")
 include("models/barotropic.jl")
-# include("models/shallow_water.jl")
+include("models/shallow_water.jl")
 # include("models/primitive_dry.jl")
 # include("models/primitive_wet.jl")
 end

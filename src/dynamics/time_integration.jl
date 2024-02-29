@@ -365,7 +365,7 @@ and calls the output and feedback functions."""
 function time_stepping!(
     progn::PrognosticVariables,     # all prognostic variables
     diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
-    model::ModelSetup,              # all precalculated structs
+    model::ModelSetup,              # all model components
 )          
     
     (;clock) = progn

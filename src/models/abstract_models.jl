@@ -10,6 +10,13 @@ abstract type PrimitiveWet <: PrimitiveEquation end
 
 abstract type AbstractModelComponent end
 
+# print all fields with type <: Number
+function Base.show(io::IO,P::AbstractModelComponent)
+    println(io,"$(typeof(P)) <: $(supertype(typeof(P)))")
+    keys = propertynames(P)
+    print_fields(io,P,keys)
+end
+
 """$(TYPEDSIGNATURES)
 Returns true if the model `M` has a prognostic variable `var_name`, false otherwise.
 The default fallback is that all variables are included. """

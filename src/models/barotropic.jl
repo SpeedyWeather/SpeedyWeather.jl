@@ -1,9 +1,14 @@
 export BarotropicModel, initialize!
 
 """
-$(SIGNATURES)
-The BarotropicModel struct holds all other structs that contain precalculated constants,
-whether scalars or arrays that do not change throughout model integration.
+The BarotropicModel contains all model components needed for the simulation of the
+barotropic vorticity equations. To be constructed like
+
+    model = BarotropicModel(;spectral_grid, kwargs...)
+
+with `spectral_grid::SpectralGrid` used to initalize all non-default components
+passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
+model components, are
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct BarotropicModel{
     NF<:AbstractFloat,
@@ -20,7 +25,7 @@ Base.@kwdef mutable struct BarotropicModel{
     HD<:AbstractHorizontalDiffusion,
     GE<:AbstractGeometry,
     OW<:AbstractOutputWriter,
-    FB<:AbstractFeedback
+    FB<:AbstractFeedback,
 } <: Barotropic
     
     spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
@@ -43,6 +48,7 @@ Base.@kwdef mutable struct BarotropicModel{
 
     # OUTPUT
     output::OW = OutputWriter(spectral_grid,Barotropic)
+    callbacks::Vector{AbstractCallback} = AbstractCallback[]
     feedback::FB = Feedback()
 end
 
@@ -51,7 +57,7 @@ default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
 """
 $(TYPEDSIGNATURES)
-Calls all `initialize!` functions for components of `model`,
+Calls all `initialize!` functions for most fields, representing components, of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!`."""
 function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
@@ -60,10 +66,8 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for BarotropicModel, \
         SpectralGrid with nlev=$(spectral_grid.nlev) provided."
 
-    # slightly adjust model time step to be a convenient divisor of output timestep
-    initialize!(model.time_stepping, model)
-
     # initialize components
+    initialize!(model.time_stepping, model)
     initialize!(model.coriolis, model)
     initialize!(model.forcing, model)
     initialize!(model.drag, model)

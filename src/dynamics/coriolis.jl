@@ -17,6 +17,7 @@ function initialize!(coriolis::Coriolis, model::ModelSetup)
 
     # =2Ωsin(lat) but scaled with radius as are the equations
     coriolis.f .= 2rotation * sinlat * radius
+    return nothing
 end
 
 """

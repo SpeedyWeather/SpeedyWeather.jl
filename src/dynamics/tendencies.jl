@@ -13,25 +13,30 @@ end
 """
 $(TYPEDSIGNATURES)
 Calculate all tendencies for the ShallowWaterModel."""
-function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
-                                progn::PrognosticVariablesLayer,
-                                surface::SurfaceVariables,
-                                pres::LowerTriangularMatrix,    # spectral pressure/η for geopotential
-                                time::DateTime,                 # time to evaluate the tendencies at
-                                model::ShallowWater)            # struct containing all constants
-
-    S,C,G,O = model.spectral_transform, model.constants, model.geometry, model.orography
-    F,D = model.forcing, model.drag
+function dynamics_tendencies!(  
+    diagn::DiagnosticVariablesLayer,
+    progn::PrognosticVariablesLayer,
+    surface::SurfaceVariables,
+    pres::LowerTriangularMatrix,    # spectral pressure/η for geopotential
+    time::DateTime,                 # time to evaluate the tendencies at
+    model::ShallowWater,
+)
+    (;forcing, drag, planet, atmosphere, orography) = model
+    (;spectral_transform, geometry) = model
 
     # for compatibility with other ModelSetups pressure pres = interface displacement η here
-    forcing!(diagn,progn,F,time,model)      # = (Fᵤ, Fᵥ, Fₙ) forcing for u,v,η
-    drag!(diagn,progn,D,time,model)         # drag term for momentum u,v
-    vorticity_flux!(diagn,model)            # = ∇×(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ), tendency for vorticity
-                                            # = ∇⋅(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ), tendency for divergence
+    forcing!(diagn, progn, forcing, time, model)    # = (Fᵤ, Fᵥ, Fₙ) forcing for u,v,η
+    drag!(diagn, progn, drag, time, model)          # drag term for momentum u,v
     
-    geopotential!(diagn,pres,C)                     # geopotential Φ = gη in the shallow water model
-    bernoulli_potential!(diagn,S)                   # = -∇²(E+Φ), tendency for divergence
-    volume_flux_divergence!(diagn,surface,O,C,G,S)  # = -∇⋅(uh,vh), tendency pressure
+    # = ∇×(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ), tendency for vorticity
+    # = ∇⋅(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ), tendency for divergence
+    vorticity_flux!(diagn, model)
+                                           
+    geopotential!(diagn, pres, planet)              # geopotential Φ = gη in shallow water
+    bernoulli_potential!(diagn, spectral_transform) # = -∇²(E+Φ), tendency for divergence
+    
+    # = -∇⋅(uh,vh), tendency for "pressure" η
+    volume_flux_divergence!(diagn, surface, orography, atmosphere, geometry, spectral_transform)
 end
 
 """
