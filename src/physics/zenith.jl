@@ -1,11 +1,11 @@
-abstract type AbstractSolarDeclination{NF} end
-abstract type AbstractSolarTimeCorrection{NF} end
+abstract type AbstractSolarDeclination end
+abstract type AbstractSolarTimeCorrection end
 abstract type AbstractZenith{NF,Grid} end
 
 """Coefficients to calculate the solar declination angle δ [radians] based on a simple
 sine function, with Earth's axial tilt as amplitude, equinox as phase shift.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SinSolarDeclination{NF} <: AbstractSolarDeclination{NF}
+Base.@kwdef struct SinSolarDeclination{NF} <: AbstractSolarDeclination
     axial_tilt::NF = 23.44
     equinox::DateTime = DateTime(2000,3,20)
     length_of_year::Second = Day(365.25)
@@ -42,7 +42,7 @@ end
 with g the angular fraction of the year in radians. Following Spencer 1971,
 Fourier series representation of the position of the sun. Search 2(5):172.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SolarDeclination{NF} <: AbstractSolarDeclination{NF}
+Base.@kwdef struct SolarDeclination{NF<:AbstractFloat} <: AbstractSolarDeclination
     a::NF =   0.006918      # the offset +
     s1::NF =  0.070257      # s1*sin(g) +
     c1::NF = -0.399912      # c1*cos(g) +
@@ -77,7 +77,7 @@ end
 """Coefficients for the solar time correction (also called
 Equation of time) which adjusts the solar hour to an oscillation
 of sunrise/set by about +-16min throughout the year."""
-Base.@kwdef struct SolarTimeCorrection{NF} <: AbstractSolarTimeCorrection{NF}
+Base.@kwdef struct SolarTimeCorrection{NF<:AbstractFloat} <: AbstractSolarTimeCorrection
     a::NF =   0.004297      # the offset +
     s1::NF = -1.837877      # s1*sin(g) +
     c1::NF =  0.107029      # c1*cos(g) +
@@ -201,7 +201,7 @@ depending on parameters in SolarZenith."""
 function cos_zenith!(
     S::SolarZenith{NF},
     time::DateTime,
-    geometry::Geometry
+    geometry::AbstractGeometry,
 ) where NF
 
     (;sinlat, coslat, lons) = geometry
@@ -263,7 +263,7 @@ depending on parameters in SolarZenithSeason."""
 function cos_zenith!(
     S::SolarZenithSeason{NF},
     time::DateTime,
-    geometry::Geometry
+    geometry::AbstractGeometry,
 ) where NF
 
     (;sinlat, coslat, lat) = geometry

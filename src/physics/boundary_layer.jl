@@ -1,4 +1,4 @@
-abstract type AbstractBoundaryLayerDrag <: AbstractParameterization end
+abstract type AbstractBoundaryLayer <: AbstractParameterization end
 
 # function barrier for all boundary layer drags
 function boundary_layer_drag!(  column::ColumnVariables,
@@ -8,7 +8,7 @@ end
 
 # dummy boundary layer
 export NoBoundaryLayerDrag
-struct NoBoundaryLayerDrag <: AbstractBoundaryLayerDrag end
+struct NoBoundaryLayerDrag <: AbstractBoundaryLayer end
 NoBoundaryLayerDrag(::SpectralGrid) = NoBoundaryLayerDrag()
 initialize!(::NoBoundaryLayerDrag,::PrimitiveEquation) = nothing
 boundary_layer_drag!(::ColumnVariables,::NoBoundaryLayerDrag,::PrimitiveEquation) = nothing
@@ -77,7 +77,7 @@ function boundary_layer_drag!(  column::ColumnVariables,
 end
 
 export ConstantDrag
-Base.@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayerDrag
+Base.@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
     drag::NF = 1e-3
 end
 
@@ -94,7 +94,7 @@ export BulkRichardsonDrag
 """Boundary layer drag coefficient from the bulk Richardson number,
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct BulkRichardsonDrag{NF} <: BoundaryLayerDrag{NF}
+Base.@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     "von Kármán constant [1]"
     κ::NF = 0.4
 

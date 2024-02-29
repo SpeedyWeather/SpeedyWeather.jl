@@ -32,7 +32,7 @@ Base.@kwdef struct EarthAtmosphere{NF<:AbstractFloat} <: AbstractAtmosphere
     μ_virt_temp::NF = (1-mol_ratio)/mol_ratio
 
     "= R_dry/cₚ, gas const for air over heat capacity"
-    κ::NF = R_dry/cₚ
+    κ::NF = R_dry/heat_capacity
 
     "water density [kg/m³]"
     water_density::NF = 1000

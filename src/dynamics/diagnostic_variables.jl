@@ -149,6 +149,8 @@ function Base.zeros(::Type{SurfaceVariables},
     return SurfaceVariables{NF,Grid{NF}}(;nlat_half,trunc,npoints)
 end
 
+export DiagnosticVariables
+
 """
 All diagnostic variables.
 $(TYPEDFIELDS)"""

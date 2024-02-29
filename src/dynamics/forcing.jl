@@ -4,8 +4,8 @@ abstract type AbstractForcing <: AbstractModelComponent end
 export NoForcing
 struct NoForcing <: AbstractForcing end
 NoForcing(SG::SpectralGrid) = NoForcing()
-
 initialize!(::NoForcing,::ModelSetup) = nothing
+
 function forcing!(  diagn::DiagnosticVariablesLayer,
                     progn::PrognosticVariablesLayer,
                     forcing::NoForcing,
@@ -14,7 +14,7 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
     return nothing
 end
 
-# JET STREAM FORCING FOR SHALLOW WATER
+# JET STREAM FORCING
 export JetStreamForcing
 
 """
@@ -45,7 +45,7 @@ Base.@kwdef struct JetStreamForcing{NF} <: AbstractForcing
 end
 
 JetStreamForcing(SG::SpectralGrid;kwargs...) = JetStreamForcing{SG.NF}(
-    ;nlat=SG.nlat,kwargs...)
+    ;nlat=SG.nlat, kwargs...)
 
 function initialize!(   forcing::JetStreamForcing,
                         model::ModelSetup)

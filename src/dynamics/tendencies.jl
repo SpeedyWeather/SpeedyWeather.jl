@@ -7,7 +7,7 @@ function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
                                 model::Barotropic)
     forcing!(diagn, progn, model.forcing, time, model)  # = (Fᵤ, Fᵥ) forcing for u,v
     drag!(diagn,progn, model.drag, time, model)         # drag term for u,v
-    vorticity_flux!(diagn,model)                        # = ∇×(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ)
+    vorticity_flux!(diagn, model)                       # = ∇×(v(ζ+f) + Fᵤ,-u(ζ+f) + Fᵥ)
 end
 
 """
@@ -587,14 +587,14 @@ with `Fᵤ,Fᵥ` from `u_tend_grid`/`v_tend_grid` that are assumed to be alread
 set in `forcing!`. Set `div=false` for the BarotropicModel which doesn't
 require the divergence tendency."""
 function vorticity_flux_curldiv!(   diagn::DiagnosticVariablesLayer,
-                                    C::AbstractCoriolis,
-                                    G::Geometry,
+                                    coriolis::AbstractCoriolis,
+                                    geometry::Geometry,
                                     S::SpectralTransform;
                                     div::Bool=true,     # also calculate div of vor flux?
                                     add::Bool=false)    # accumulate in vor/div tendencies?
     
-    (;f) = C
-    (;coslat⁻¹) = G
+    (;f) = coriolis
+    (;coslat⁻¹) = geometry
 
     (;u_tend_grid, v_tend_grid) = diagn.tendencies  # already contains forcing
     u = diagn.grid_variables.u_grid             # velocity
@@ -641,7 +641,7 @@ with
 
 with Fᵤ,Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
 vorticity ζ, coriolis f."""
-function vorticity_flux!(diagn::DiagnosticVariablesLayer,model::ShallowWater)
+function vorticity_flux!(diagn::DiagnosticVariablesLayer, model::ShallowWater)
     C = model.coriolis
     G = model.geometry
     S = model.spectral_transform

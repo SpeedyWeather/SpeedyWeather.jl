@@ -1,5 +1,6 @@
 abstract type AbstractCoriolis <: AbstractModelComponent end
 
+export Coriolis
 Base.@kwdef struct Coriolis{NF} <: AbstractCoriolis
     "number of latitude rings"
     nlat::Int

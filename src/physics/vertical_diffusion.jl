@@ -1,8 +1,8 @@
-abstract type VerticalDiffusion{NF} <: AbstractParameterization{NF} end
+abstract type AbstractVerticalDiffusion <: AbstractParameterization end
 
 export NoVerticalDiffusion
-struct NoVerticalDiffusion{NF} <: VerticalDiffusion{NF} end
-NoVerticalDiffusion(SG::SpectralGrid) = NoVerticalDiffusion{SG.NF}()
+struct NoVerticalDiffusion <: AbstractVerticalDiffusion end
+NoVerticalDiffusion(SG::SpectralGrid) = NoVerticalDiffusion()
 
 function initialize!(   scheme::NoVerticalDiffusion,
                         model::PrimitiveEquation)
@@ -26,7 +26,7 @@ export StaticEnergyDiffusion
 Diffusion of dry static energy: A relaxation towards a reference
 gradient of static energy wrt to geopotential, see Fortran SPEEDY documentation.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct StaticEnergyDiffusion{NF<:AbstractFloat} <: VerticalDiffusion{NF}
+Base.@kwdef struct StaticEnergyDiffusion{NF<:AbstractFloat} <: AbstractVerticalDiffusion
     "time scale for strength"
     time_scale::Second = Hour(6)
 
@@ -86,7 +86,7 @@ export HumidityDiffusion
 Diffusion of dry static energy: A relaxation towards a reference
 gradient of static energy wrt to geopotential, see Fortran SPEEDY documentation.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct HumidityDiffusion{NF<:AbstractFloat} <: VerticalDiffusion{NF}
+Base.@kwdef struct HumidityDiffusion{NF<:AbstractFloat} <: AbstractVerticalDiffusion
     "time scale for strength"
     time_scale::Second = Hour(24)
 

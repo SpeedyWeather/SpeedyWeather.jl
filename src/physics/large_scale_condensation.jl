@@ -10,7 +10,7 @@ export ImplicitCondensation
 """
 Large scale condensation as with implicit precipitation.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation{NF}
+Base.@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
     "Flux limiter for latent heat release [K] per timestep"
     max_heating::NF = 0.2
 

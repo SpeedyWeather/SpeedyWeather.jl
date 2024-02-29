@@ -59,7 +59,7 @@ function (CC::ClausiusClapeyron{NF})(temp_kelvin::NF) where NF
 end
 
 # convert to number format of struct
-function (CC::AbstractClausiusClapeyron{NF})(temp_kelvin) where NF
+function (CC::ClausiusClapeyron{NF})(temp_kelvin) where NF
     CC(convert(NF,temp_kelvin))
 end
 
@@ -72,7 +72,7 @@ function grad(CC::ClausiusClapeyron{NF},temp_kelvin::NF) where NF
 end
 
 # convert to input argument to number format from struct
-grad(CC::AbstractClausiusClapeyron{NF},temp_kelvin) where NF = grad(CC,convert(NF,temp_kelvin))
+grad(CC::ClausiusClapeyron{NF},temp_kelvin) where NF = grad(CC,convert(NF,temp_kelvin))
 
 """
 $(TYPEDSIGNATURES)
@@ -101,7 +101,7 @@ Saturation humidity [kg/kg] from temperature [K], pressure [Pa] via
 function saturation_humidity(
     temp_kelvin::NF,
     pres::NF,
-    clausius_clapeyron::AbstractClausiusClapeyron{NF}
+    clausius_clapeyron::AbstractClausiusClapeyron,
 ) where NF
     sat_vap_pres = clausius_clapeyron(temp_kelvin)
     return saturation_humidity(sat_vap_pres,pres;mol_ratio=clausius_clapeyron.mol_ratio)

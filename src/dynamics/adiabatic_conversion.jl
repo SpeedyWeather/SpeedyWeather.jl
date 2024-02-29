@@ -10,7 +10,7 @@ Base.@kwdef struct AdiabaticConversion{NF} <: AbstractAdiabaticConversion
     σ_lnp_B::Vector{NF} = zeros(NF,nlev)
 end
 
-AdiabaticConversion(SG::SpectralGrid;kwargs...) = AdiabaticConversion{SG.NF}(;nlev=SG.nlev;kwargs...)
+AdiabaticConversion(SG::SpectralGrid;kwargs...) = AdiabaticConversion{SG.NF}(;nlev=SG.nlev,kwargs...)
 
 function initialize!(
     adiabatic::AdiabaticConversion,

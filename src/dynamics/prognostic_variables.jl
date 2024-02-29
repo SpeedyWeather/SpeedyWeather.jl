@@ -50,7 +50,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Create and initialize a clock from `time_stepping`"""
-function Clock(time_stepping::TimeStepper;kwargs...)
+function Clock(time_stepping::AbstractTimeStepper;kwargs...)
     clock = Clock(;kwargs...)
     initialize!(clock,time_stepping)
 end

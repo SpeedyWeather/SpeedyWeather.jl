@@ -16,18 +16,29 @@ The default fallback is that all variables are included. """
 has(M::Type{<:ModelSetup}, var_name::Symbol) = var_name in (:vor, :div, :temp, :humid, :pres)
 has(M::ModelSetup, var_name) = has(typeof(M), var_name)
 
-# strip away the parameters of the model type
+# model class is the abstract supertype
 model_class(::Type{<:Barotropic}) = Barotropic
 model_class(::Type{<:ShallowWater}) = ShallowWater
 model_class(::Type{<:PrimitiveDry}) = PrimitiveDry
 model_class(::Type{<:PrimitiveWet}) = PrimitiveWet
 model_class(model::ModelSetup) = model_class(typeof(model))
 
+# model type is the parameter-free type of a model
+# TODO what happens if we have several concrete types under each abstract type?
+model_type(::Type{<:Barotropic}) = BarotropicModel
+model_type(::Type{<:ShallowWater}) = ShallowWaterModel
+model_type(::Type{<:PrimitiveDry}) = PrimitiveDryModel
+model_type(::Type{<:PrimitiveWet}) = PrimitiveWetModel
+model_type(model::ModelSetup) = model_type(typeof(model))
+
 function Base.show(io::IO,M::ModelSetup)
-    println(io,"$(typeof(M))")
-    for key in propertynames(M)[1:end-1]
+    println(io,"$(model_type(M)) <: $(model_class(M))")
+    properties = propertynames(M)
+    n = length(properties)
+    for (i,key) in enumerate(properties)
         val = getfield(M,key)
-        println(io,"├ $key: $(typeof(val))")
+        s = i == n ? "└" : "├"  # choose ending └ for last property
+        p = i == n ? print : println
+        p(io,"$s $key: $(typeof(val))")
     end
-    print(io,"└ feedback: $(typeof(M.feedback))")
 end

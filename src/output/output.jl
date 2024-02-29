@@ -1,5 +1,26 @@
-abstract type AbstractOutputWriter end
 abstract type AbstractKeepbits end
+
+"""Number of mantissa bits to keep for each prognostic variable when compressed for
+netCDF and .jld2 data output.
+$(TYPEDFIELDS)"""
+Base.@kwdef struct Keepbits
+    u::Int = 7
+    v::Int = 7
+    vor::Int = 5
+    div::Int = 5
+    temp::Int = 10
+    pres::Int = 12
+    humid::Int = 7
+    precip_cond::Int = 7
+    precip_conv::Int = 7
+    cloud::Int = 7
+end
+
+function Base.show(io::IO,K::Keepbits)
+    println(io,"$(typeof(K))")
+    keys = propertynames(K)
+    print_fields(io,K,keys)
+end
 
 # default number format for output
 const DEFAULT_OUTPUT_NF = Float32
@@ -290,28 +311,6 @@ function initialize!(
     close(parameters_txt)
 end
 
-"""
-Number of mantissa bits to keep for each prognostic variable when compressed for
-netCDF and .jld2 data output.
-$(TYPEDFIELDS)"""
-Base.@kwdef struct Keepbits
-    u::Int = 7
-    v::Int = 7
-    vor::Int = 5
-    div::Int = 5
-    temp::Int = 10
-    pres::Int = 12
-    humid::Int = 7
-    precip_cond::Int = 7
-    precip_conv::Int = 7
-    cloud::Int = 7
-end
-
-function Base.show(io::IO,K::Keepbits)
-    println(io,"$(typeof(K))")
-    keys = propertynames(K)
-    print_fields(io,K,keys)
-end
 
 """
 $(TYPEDSIGNATURES)

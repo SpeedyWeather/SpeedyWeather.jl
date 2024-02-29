@@ -30,6 +30,9 @@ import ProgressMeter
 # to avoid a `using Dates` to pass on DateTime arguments
 export DateTime, Second, Minute, Hour, Day
 
+# export functions that have many cross-component methods
+export initialize!, finish!
+
 include("utility_functions.jl")
 
 # LowerTriangularMatrices for spherical harmonics
@@ -61,11 +64,17 @@ using .SpeedyTransforms
 # Utility for GPU / KernelAbstractions
 include("gpu.jl")                               
 
-# GEOMETRY CONSTANTS ETC
+# abstract types
 include("models/abstract_models.jl")
+include("dynamics/abstract_types.jl")
+include("output/abstract_types.jl")
+include("physics/abstract_types.jl")
+
+# GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")
 include("dynamics/spectral_grid.jl")
 include("dynamics/geometry.jl")
+include("dynamics/coriolis.jl")
 include("dynamics/planets.jl")
 include("dynamics/atmospheres.jl")
 include("dynamics/adiabatic_conversion.jl")
@@ -91,7 +100,6 @@ include("dynamics/tendencies.jl")
 include("dynamics/hole_filling.jl")
 
 # PARAMETERIZATIONS
-include("physics/abstract_types.jl")
 include("physics/albedo.jl")
 include("physics/tendencies.jl")
 include("physics/column_variables.jl")
@@ -118,7 +126,7 @@ include("output/plot.jl")
 # MODELS
 include("models/simulation.jl")
 include("models/barotropic.jl")
-include("models/shallow_water.jl")
-include("models/primitive_dry.jl")
-include("models/primitive_wet.jl")
+# include("models/shallow_water.jl")
+# include("models/primitive_dry.jl")
+# include("models/primitive_wet.jl")
 end

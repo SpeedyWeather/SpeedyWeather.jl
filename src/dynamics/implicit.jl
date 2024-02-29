@@ -4,11 +4,12 @@ abstract type AbstractImplicit <: AbstractModelComponent end
 export NoImplicit
 struct NoImplicit <: AbstractImplicit end
 NoImplicit(SG::SpectralGrid) = NoImplicit()
-initialize!(::AbstractImplicit,args...) = nothing
-
-export ImplicitShallowWater
+initialize!(::NoImplicit,args...) = nothing
+implicit_correction!(::DiagnosticVariables,::PrognosticVariables,::NoImplicit) = nothing
 
 # SHALLOW WATER MODEL
+export ImplicitShallowWater
+
 """
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the shallow water model.
@@ -193,20 +194,25 @@ end
 
 # function barrier to unpack the constants struct for primitive eq models
 function initialize!(I::ImplicitPrimitiveEquation,dt::Real,diagn::DiagnosticVariables,model::PrimitiveEquation)
-    initialize!(I,dt,diagn,model.geometry,model.constants)
+    initialize!(I, dt, diagn, model.geometry, model.geopotential, model.adiabatic_conversion)
 end
 
 """$(TYPEDSIGNATURES)
 Initialize the implicit terms for the PrimitiveEquation models."""
-function initialize!(   implicit::ImplicitPrimitiveEquation,
-                        dt::Real,                   # the scaled time step radius*dt
-                        diagn::DiagnosticVariables,
-                        geometry::Geometry,
-                        constants::DynamicsConstants)
+function initialize!(   
+    implicit::ImplicitPrimitiveEquation,
+    dt::Real,                                           # the scaled time step radius*dt
+    diagn::DiagnosticVariables,
+    geometry::AbstractGeometry,
+    geopotential::AbstractGeopotential,
+    adiabatic_conversion::AbstractAdiabaticConversion
+)
 
     (;trunc, nlev, α,temp_profile,S,S⁻¹,L,R,U,W,L0,L1,L2,L3,L4) = implicit
     (;σ_levels_full, σ_levels_thick) = geometry
-    (;R_dry, κ, Δp_geopot_half, Δp_geopot_full, σ_lnp_A, σ_lnp_B) = constants
+    (;R_dry, κ) = atmosphere
+    (;Δp_geopot_half, Δp_geopot_full) = geopotential
+    (;σ_lnp_A, σ_lnp_B) = adiabatic_conversion
 
     for k in 1:nlev    
         # use current vertical temperature profile                                     

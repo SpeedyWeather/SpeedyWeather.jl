@@ -1,6 +1,6 @@
-abstract type AbstractConvection{NF} <: AbstractParameterization{NF} end
+abstract type AbstractConvection <: AbstractParameterization end
 
-Base.@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection{NF}
+Base.@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection
     "number of vertical layers/levels"
     nlev::Int
 

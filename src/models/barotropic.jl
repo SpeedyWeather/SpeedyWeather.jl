@@ -7,6 +7,7 @@ whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct BarotropicModel{
     NF<:AbstractFloat,
+    DS<:DeviceSetup,
     PL<:AbstractPlanet,
     AT<:AbstractAtmosphere,
     CO<:AbstractCoriolis,
@@ -15,14 +16,15 @@ Base.@kwdef mutable struct BarotropicModel{
     IC<:InitialConditions,
     TS<:AbstractTimeStepper,
     ST<:SpectralTransform{NF},
+    IM<:AbstractImplicit,
     HD<:AbstractHorizontalDiffusion,
     GE<:AbstractGeometry,
-    DS<:AbstractDevice,
     OW<:AbstractOutputWriter,
     FB<:AbstractFeedback
 } <: Barotropic
     
     spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
+    device_setup::DS = DeviceSetup(CPUDevice())
 
     # DYNAMICS
     planet::PL = Earth(spectral_grid)
@@ -35,11 +37,9 @@ Base.@kwdef mutable struct BarotropicModel{
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
     spectral_transform::ST = SpectralTransform(spectral_grid)
+    implicit::IM = NoImplicit(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     geometry::GE = Geometry(spectral_grid)
-
-    # INTERNALS
-    device_setup::DS = DeviceSetup(CPUDevice())
 
     # OUTPUT
     output::OW = OutputWriter(spectral_grid,Barotropic)

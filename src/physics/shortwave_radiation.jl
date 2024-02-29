@@ -1,18 +1,18 @@
-abstract type AbstractRadiation{NF} <: AbstractParameterization{NF} end
-abstract type AbstractShortwave{NF} <: AbstractRadiation{NF} end
+abstract type AbstractRadiation <: AbstractParameterization end
+abstract type AbstractShortwave <: AbstractRadiation end
 
-struct NoShortwave{NF} <: AbstractShortwave{NF} end
-NoShortwave(SG::SpectralGrid) = NoShortwave{SG.NF}()
+struct NoShortwave <: AbstractShortwave end
+NoShortwave(SG::SpectralGrid) = NoShortwave()
 initialize!(::NoShortwave,::PrimitiveEquation) = nothing
 
 # function barrier for all AbstractShortwave
-function shortwave_radiation!(column::ColumnVariables,model::PrimitiveEquation)
-    shortwave_radiation!(column,model.shortwave_radiation,model)
+function shortwave_radiation!(column::ColumnVariables, model::PrimitiveEquation)
+    shortwave_radiation!(column, model.shortwave_radiation, model)
 end
 
 shortwave_radiation!(::ColumnVariables,::NoShortwave,::PrimitiveEquation) = nothing
 
-Base.@kwdef struct TransparentShortwave{NF} <: AbstractShortwave{NF}
+Base.@kwdef struct TransparentShortwave{NF} <: AbstractShortwave
     albedo::NF = 0.3
     S::Base.RefValue{NF} = Ref(zero(NF))
 end

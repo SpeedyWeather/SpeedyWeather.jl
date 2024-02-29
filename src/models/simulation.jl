@@ -17,10 +17,10 @@ struct Simulation{Model<:ModelSetup} <: AbstractSimulation{Model}
 end
 
 function Base.show(io::IO,S::AbstractSimulation)
-    println(io,"$(typeof(S))")
-    println(io,"├ $(typeof(S.model))")
+    println(io,"Simulation{$(model_type(S.model))}")
     println(io,"├ $(typeof(S.prognostic_variables))")
-    print(io,  "└ $(typeof(S.diagnostic_variables))")
+    println(io,"├ $(typeof(S.diagnostic_variables))")
+    print(io,"└ model::$(model_type(S.model))")
 end
 
 export run!
@@ -31,7 +31,7 @@ Run a SpeedyWeather.jl `simulation`. The `simulation.model` is assumed to be ini
 function run!(  simulation::AbstractSimulation;
                 period = Day(10),
                 output::Bool = false, 
-                n_days::Union{Nothing, Real}=nothing)
+                n_days::Union{Nothing, Real} = nothing)
     
     if !isnothing(n_days)
         @warn "run!: n_days keyword is deprecated, use period = Day(n_days) instead."
