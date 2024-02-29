@@ -87,10 +87,14 @@ function initialize!(land_sea_mask::LandSeaMask, model::PrimitiveEquation)
 
     # TODO this shoudln't be necessary, but at the moment grid_cell_average! can return values > 1
     clamp!(land_sea_mask.land_sea_mask,0,1)
+
+    return nothing
 end
 
-"""Land-sea mask with zero = sea everywhere.
-$(TYPEDFIELDS)"""
+"""
+$(TYPEDFIELDS)
+Land-sea mask with zero = sea everywhere.
+"""
 Base.@kwdef struct AquaPlanetMask{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF,Grid}
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
     land_sea_mask::Grid
