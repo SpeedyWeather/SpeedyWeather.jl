@@ -24,7 +24,7 @@ Galewsky, 2004, but mirrored for both hemispheres.
 
 $(TYPEDFIELDS)
 """
-Base.@kwdef struct JetStreamForcing{NF} <: AbstractForcing
+Base.@kwdef mutable struct JetStreamForcing{NF} <: AbstractForcing
     "Number of latitude rings"
     nlat::Int = 0
 

@@ -28,7 +28,7 @@ export ZonalRidge
 
 """Zonal ridge orography after Jablonowski and Williamson, 2006.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
+Base.@kwdef mutable struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
     
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
@@ -38,10 +38,10 @@ Base.@kwdef struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: Abstr
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
-    orography::Grid
+    const orography::Grid
     
     "surface geopotential, height*gravity [m²/s²]"
-    geopot_surf::LowerTriangularMatrix{Complex{NF}} 
+    const geopot_surf::LowerTriangularMatrix{Complex{NF}} 
 end
 
 """
@@ -98,7 +98,7 @@ export EarthOrography
 
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
+Base.@kwdef mutable struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
 
     # OPTIONS
     "path to the folder containing the orography file, pkg path default"
@@ -127,10 +127,10 @@ Base.@kwdef struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: A
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
-    orography::Grid
+    const orography::Grid
     
     "surface geopotential, height*gravity [m²/s²]"
-    geopot_surf::LowerTriangularMatrix{Complex{NF}} 
+    const geopot_surf::LowerTriangularMatrix{Complex{NF}} 
 end
 
 """

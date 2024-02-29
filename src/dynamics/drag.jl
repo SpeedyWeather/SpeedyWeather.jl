@@ -16,7 +16,7 @@ end
 
 # Quadratic drag
 export QuadraticDrag
-Base.@kwdef struct QuadraticDrag{NF} <: AbstractDrag
+Base.@kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
     c_D::NF = 1e-5
 

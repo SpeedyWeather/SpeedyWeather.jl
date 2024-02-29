@@ -27,7 +27,7 @@ end
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-Base.@kwdef struct StartWithRandomVorticity <: InitialConditions
+Base.@kwdef mutable struct StartWithRandomVorticity <: InitialConditions
     "Power of the spectral distribution k^power"
     power::Float64 = -3
 
@@ -62,7 +62,7 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Galewsky et al, 2004 zonal jet
 intitial conditions for the shallow water model. Default values as in Galewsky.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ZonalJet <: InitialConditions
+Base.@kwdef mutable struct ZonalJet <: InitialConditions
     "jet latitude [˚N]"
     latitude::Float64 = 45
     
