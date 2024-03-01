@@ -40,8 +40,8 @@ end
 
 # generator function
 function ClausiusClapeyron(SG::SpectralGrid, atm::AbstractAtmosphere; kwargs...)
-    (;R_dry, R_vapour, latent_heat_condensation, cₚ) = atm
-    return ClausiusClapeyron{SG.NF}(;Lᵥ=latent_heat_condensation,R_dry,R_vapour,cₚ,kwargs...)
+    (;R_dry, R_vapour, latent_heat_condensation, heat_capacity) = atm
+    return ClausiusClapeyron{SG.NF}(;Lᵥ=latent_heat_condensation,R_dry,R_vapour,cₚ=heat_capacity,kwargs...)
 end
 
 """

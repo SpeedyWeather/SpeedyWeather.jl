@@ -174,14 +174,9 @@ function soil_timestep!(land::PrognosticVariablesLand{NF},
 end
 
 ## SOIL MOISTURE
-abstract type AbstractVegetation{NF,Grid} end
+abstract type AbstractVegetation{NF,Grid} <: AbstractParameterization end
 
-function Base.show(io::IO,A::AbstractVegetation)
-    println(io,"$(typeof(A)) <: AbstractVegetation")
-    keys = propertynames(A)
-    print_fields(io,A,keys)
-end
-
+export VegetationClimatology
 Base.@kwdef struct VegetationClimatology{NF,Grid<:AbstractGrid{NF}} <: AbstractVegetation{NF,Grid}
 
     "number of latitudes on one hemisphere, Equator included"
@@ -221,7 +216,7 @@ function VegetationClimatology(SG::SpectralGrid;kwargs...)
     return VegetationClimatology{NF,Grid{NF}}(;nlat_half,kwargs...)
 end
 
-function initialize!(vegetation::VegetationClimatology)
+function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
     if vegetation.path == "SpeedyWeather.jl/input_data"

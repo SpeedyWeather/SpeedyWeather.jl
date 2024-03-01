@@ -1,5 +1,6 @@
 abstract type AbstractHoleFilling end
 
+export ClipNegatives
 struct ClipNegatives <: AbstractHoleFilling end
 ClipNegatives(SG::SpectralGrid) = ClipNegatives()
 

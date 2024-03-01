@@ -446,14 +446,16 @@ function initialize_humidity!(  progn::PrognosticVariables,
     return nothing
 end
 
-function initialize_humidity!(  progn::PrognosticVariables,
-                                pres_surf_grid::AbstractGrid,
-                                model::PrimitiveWet)
+function initialize_humidity!(  
+    progn::PrognosticVariables{NF},
+    pres_surf_grid::AbstractGrid,
+    model::PrimitiveWet
+) where NF
 
-    (;relhumid_ref) = model.atmosphere      # relative humidity reference [1]
-
-    # ratio of scale heights [1], scale height [km], scale height for spec humidity [km]     
-    (;scale_height, scale_height_humid) = model.atmosphere
+    # TODO create a InitialHumidity <: InitialConditions to hold these parameters
+    relhumid_ref::NF = 0.7
+    scale_height_humid::NF = 2.5        # scale height for specific humidity [km]
+    scale_height::NF = 7.5              # scale height for pressure [km]
     scale_height_ratio = scale_height/scale_height_humid
 
     (;nlev, σ_levels_full) = model.geometry

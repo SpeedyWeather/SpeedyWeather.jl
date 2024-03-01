@@ -5,59 +5,96 @@ $(SIGNATURES)
 The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
 whether scalars or arrays that do not change throughout model integration.
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct PrimitiveWetModel{NF<:AbstractFloat, D<:AbstractDevice} <: PrimitiveWet
-    spectral_grid::SpectralGrid = SpectralGrid()
+Base.@kwdef mutable struct PrimitiveWetModel{
+    NF<:AbstractFloat,
+    DS<:DeviceSetup,
+    PL<:AbstractPlanet,
+    AT<:AbstractAtmosphere,
+    CO<:AbstractCoriolis,
+    GO<:AbstractGeopotential,
+    OR<:AbstractOrography,
+    AC<:AbstractAdiabaticConversion,
+    IC<:InitialConditions,
+    LS<:AbstractLandSeaMask,
+    OC<:AbstractOcean,
+    LA<:AbstractLand,
+    ZE<:AbstractZenith,
+    SO<:AbstractSoil,
+    VG<:AbstractVegetation,
+    CC<:AbstractClausiusClapeyron,
+    BL<:AbstractBoundaryLayer,
+    TR<:AbstractTemperatureRelaxation,
+    SE<:AbstractVerticalDiffusion,
+    HU<:AbstractVerticalDiffusion,
+    SUT<:AbstractSurfaceThermodynamics,
+    SUW<:AbstractSurfaceWind,
+    SH<:AbstractSurfaceHeat,
+    EV<:AbstractEvaporation,
+    LSC<:AbstractCondensation,
+    CV<:AbstractConvection,
+    SW<:AbstractShortwave,
+    LW<:AbstractLongwave,
+    TS<:AbstractTimeStepper,
+    ST<:SpectralTransform{NF},
+    IM<:AbstractImplicit,
+    HD<:AbstractHorizontalDiffusion,
+    VA<:AbstractVerticalAdvection,
+    HF<:AbstractHoleFilling,
+    GE<:AbstractGeometry,
+    OW<:AbstractOutputWriter,
+    FB<:AbstractFeedback,
+} <: PrimitiveWet
 
+    spectral_grid::SpectralGrid = SpectralGrid()
+    geometry::GE = Geometry(spectral_grid)
+    
     # DYNAMICS
     dynamics::Bool = true
-    planet::AbstractPlanet = Earth()
-    atmosphere::AbstractAtmosphere = EarthAtmosphere()
-    coriolis::AbstractCoriolis = Coriolis(spectral_grid)
-    initial_conditions::InitialConditions = ZonalWind()
-    orography::AbstractOrography{NF} = EarthOrography(spectral_grid)
-    geopotential::AbstractGeopotential = Geopotential(spectral_grid)
-    adiabatic_conversion::AbstractAdiabaticConversion = AdiabaticConversion(spectral_grid)
-
+    planet::PL = Earth(spectral_grid)
+    atmosphere::AT = EarthAtmosphere(spectral_grid)
+    coriolis::CO = Coriolis(spectral_grid)
+    geopotential::GO = Geopotential(spectral_grid)
+    adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
+    initial_conditions::IC = ZonalWind()
+    
     # BOUNDARY CONDITIONS
-    land_sea_mask::AbstractLandSeaMask{NF} = LandSeaMask(spectral_grid)
-    ocean::AbstractOcean{NF} = SeasonalOceanClimatology(spectral_grid)
-    land::AbstractLand{NF} = SeasonalLandTemperature(spectral_grid)
-    soil::AbstractSoil{NF} = SeasonalSoilMoisture(spectral_grid)
-    vegetation::AbstractVegetation{NF} = VegetationClimatology(spectral_grid)
-    solar_zenith::AbstractZenith{NF} = WhichZenith(spectral_grid,planet)
-
+    orography::OR = EarthOrography(spectral_grid)
+    land_sea_mask::LS = LandSeaMask(spectral_grid)
+    ocean::OC = SeasonalOceanClimatology(spectral_grid)
+    land::LA = SeasonalLandTemperature(spectral_grid)
+    solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    soil::SO = SeasonalSoilMoisture(spectral_grid)
+    vegetation::VG = VegetationClimatology(spectral_grid)
+    
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
-    clausius_clapeyron::AbstractClausiusClapeyron{NF} = ClausiusClapeyron(spectral_grid,atmosphere)
-    boundary_layer_drag::BoundaryLayerDrag{NF} = BulkRichardsonDrag(spectral_grid)
-    temperature_relaxation::TemperatureRelaxation{NF} = NoTemperatureRelaxation(spectral_grid)
-    static_energy_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
-    humidity_diffusion::VerticalDiffusion{NF} = NoVerticalDiffusion(spectral_grid)
-    large_scale_condensation::AbstractCondensation{NF} = ImplicitCondensation(spectral_grid)
-    surface_thermodynamics::AbstractSurfaceThermodynamics{NF} = SurfaceThermodynamicsConstant(spectral_grid)
-    surface_wind::AbstractSurfaceWind{NF} = SurfaceWind(spectral_grid)
-    surface_heat_flux::AbstractSurfaceHeat{NF} = SurfaceSensibleHeat(spectral_grid)
-    evaporation::AbstractEvaporation{NF} = SurfaceEvaporation(spectral_grid)
-    convection::AbstractConvection{NF} = SimplifiedBettsMiller(spectral_grid)
-    shortwave_radiation::AbstractShortwave{NF} = NoShortwave(spectral_grid)
-    longwave_radiation::AbstractLongwave{NF} = UniformCooling(spectral_grid)
-
+    clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
+    boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
+    temperature_relaxation::TR = NoTemperatureRelaxation(spectral_grid)
+    static_energy_diffusion::SE = NoVerticalDiffusion(spectral_grid)
+    humidity_diffusion::HU = NoVerticalDiffusion(spectral_grid)
+    surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
+    surface_wind::SUW = SurfaceWind(spectral_grid)
+    surface_heat_flux::SH = SurfaceSensibleHeat(spectral_grid)
+    evaporation::EV = SurfaceEvaporation(spectral_grid)
+    large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
+    convection::CV = SimplifiedBettsMiller(spectral_grid)
+    shortwave_radiation::SW = NoShortwave(spectral_grid)
+    longwave_radiation::LW = UniformCooling(spectral_grid)
+    
     # NUMERICS
-    time_stepping::TimeStepper = Leapfrog(spectral_grid)
-    spectral_transform::SpectralTransform{NF} = SpectralTransform(spectral_grid)
-    horizontal_diffusion::HorizontalDiffusion = HyperDiffusion(spectral_grid)
-    implicit::AbstractImplicit = ImplicitPrimitiveEquation(spectral_grid)
-    vertical_advection::VerticalAdvection{NF} = CenteredVerticalAdvection(spectral_grid)
-    hole_filling::AbstractHoleFilling = ClipNegatives()
-
-    # INTERNALS
-    geometry::AbstractGeometry = Geometry(spectral_grid)
-    constants::DynamicsConstants{NF} = DynamicsConstants(spectral_grid,planet,atmosphere,geometry)
-    device_setup::DeviceSetup{D} = DeviceSetup(CPUDevice())
-
+    device_setup::DS = DeviceSetup(CPUDevice())
+    time_stepping::TS = Leapfrog(spectral_grid)
+    spectral_transform::ST = SpectralTransform(spectral_grid)
+    implicit::IM = ImplicitPrimitiveEquation(spectral_grid)
+    horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
+    vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
+    hole_filling::HF = ClipNegatives()
+    
     # OUTPUT
-    output::AbstractOutputWriter = OutputWriter(spectral_grid,PrimitiveWet)
-    feedback::AbstractFeedback = Feedback()
+    output::OW = OutputWriter(spectral_grid, PrimitiveDry)
+    callbacks::Vector{AbstractCallback} = AbstractCallback[]
+    feedback::FB = Feedback()
 end
  
 has(::Type{<:PrimitiveWet}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres, :humid)
@@ -72,13 +109,12 @@ function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     (;spectral_grid) = model
 
     # NUMERICS (implicit is initialized later)
-    # slightly adjust model time step to be a convenient divisor of output timestep
     initialize!(model.time_stepping, model)
     initialize!(model.horizontal_diffusion, model)
 
     # DYNAMICS
     initialize!(model.coriolis, model)
-    initialize!(model.gepotential, model)
+    initialize!(model.geopotential, model)
     initialize!(model.adiabatic_conversion, model)
 
     # boundary conditionss

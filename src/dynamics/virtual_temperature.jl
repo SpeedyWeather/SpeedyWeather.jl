@@ -73,7 +73,7 @@ function linear_virtual_temperature!(
     model::PrimitiveWet,
     lf::Integer,
 )
-    linear_virtual_temperature!(diagn,progn,model.constants,lf)
+    linear_virtual_temperature!(diagn,progn,model.atmosphere,lf)
 end
 
 """
