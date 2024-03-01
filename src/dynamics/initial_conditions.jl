@@ -373,14 +373,13 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
     # gravity:      Gravitational acceleration [m/s^2]
     # R_dry:        Specific gas constant for dry air [J/kg/K]
-    (;temp_ref, temp_top, lapse_rate, R_dry, σ_tropopause) = model.atmosphere
+    (;temp_ref, lapse_rate, R_dry) = model.atmosphere
     (;gravity) = model.planet
     (;nlev, σ_levels_full) = model.geometry         
-    (; norm_sphere ) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
-    n_stratosphere_levels = findfirst(σ->σ>=σ_tropopause,σ_levels_full)
+    (;norm_sphere) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
 
     # Lapse rate scaled by gravity [K/m / (m²/s²)]
-    Γg⁻¹ = lapse_rate/gravity/1000                      # /1000 for lapse rate [K/km] → [K/m]
+    Γg⁻¹ = lapse_rate/gravity
 
     # SURFACE TEMPERATURE (store in k = nlev, but it's actually surface, i.e. k=nlev+1/2)
     # overwrite with lowermost layer further down
@@ -390,15 +389,8 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
         temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]           # lower temperature for higher mountains
     end
 
-    # TROPOPAUSE/STRATOSPHERE set the l=m=0 spectral coefficient (=mean value) only
-    # in uppermost levels (default: k=1,2) for lapse rate = 0
-    for k in 1:n_stratosphere_levels
-        temp = progn.layers[k].timesteps[1].temp
-        temp[1] = norm_sphere*temp_top
-    end
-
-    # TROPOSPHERE use lapserate and vertical coordinate σ for profile
-    for k in n_stratosphere_levels+1:nlev               # k=nlev overwrites the surface temperature
+    # Use lapserate and vertical coordinate σ for profile
+    for k in 1:nlev                                     # k=nlev overwrites the surface temperature
                                                         # with lowermost layer temperature
         temp = progn.layers[k].timesteps[1].temp
         σₖᴿ = σ_levels_full[k]^(R_dry*Γg⁻¹)             # from hydrostatic equation

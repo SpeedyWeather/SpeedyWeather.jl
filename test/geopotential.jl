@@ -18,7 +18,7 @@
             SpeedyWeather.linear_virtual_temperature!(diagn_layer,progn_layer,model,lf)
         end
 
-        SpeedyWeather.geopotential!(d,model.orography,model.constants)
+        SpeedyWeather.geopotential!(d,model.geopotential,model.orography)
 
         # approximate heights [m] for this setup
         heights = [27000,18000,13000,9000,6000,3700,1800,700] 
@@ -46,7 +46,7 @@ end
             p.layers[k].timesteps[1].temp[1] = temp*m.spectral_transform.norm_sphere
         end
 
-        SpeedyWeather.geopotential!(d,m.orography,m.constants)
+        SpeedyWeather.geopotential!(d,m.geopotential,m.orography)
 
         lf = 1
         for (progn_layer,diagn_layer) in zip(p.layers,d.layers)

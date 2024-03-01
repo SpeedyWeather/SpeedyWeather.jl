@@ -46,8 +46,8 @@
         return nothing
     end
     
-    function SpeedyWeather.drag!(   diagn::DiagnosticVariablesLayer,
-                                    progn::PrognosticVariablesLayer,
+    function SpeedyWeather.drag!(   diagn::SpeedyWeather.DiagnosticVariablesLayer,
+                                    progn::SpeedyWeather.PrognosticVariablesLayer,
                                     drag::JetDrag,
                                     time::DateTime,
                                     model::ModelSetup)
@@ -113,8 +113,7 @@
     end
     
     function StochasticStirring(SG::SpectralGrid;kwargs...)
-        (;trunc,Grid,nlat_half) = SG
-        nlat = RingGrids.get_nlat(Grid,nlat_half)
+        (;trunc,nlat) = SG
         return StochasticStirring{SG.NF}(;trunc,nlat,kwargs...)
     end
     
@@ -143,15 +142,15 @@
         return nothing
     end
     
-    function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
-                                    progn::PrognosticVariablesLayer,
+    function SpeedyWeather.forcing!(diagn::SpeedyWeather.DiagnosticVariablesLayer,
+                                    progn::SpeedyWeather.PrognosticVariablesLayer,
                                     forcing::StochasticStirring,
                                     time::DateTime,
                                     model::ModelSetup)
         SpeedyWeather.forcing!(diagn,forcing,model.spectral_transform)
     end
     
-    function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
+    function SpeedyWeather.forcing!(diagn::SpeedyWeather.DiagnosticVariablesLayer,
                                     forcing::StochasticStirring{NF},
                                     spectral_transform::SpectralTransform) where NF
         

@@ -74,11 +74,11 @@ end
 
         G = m.geometry
         S = m.spectral_transform
-        C = m.constants
+        C = m.coriolis
 
         # to evaluate ∇×(uv) use curl of vorticity fluxes (=∇×(uv(ζ+f))) with ζ=1,f=0
         fill!(d.layers[1].grid_variables.vor_grid,1)
-        fill!(C.f_coriolis,0)
+        fill!(m.coriolis.f,0)
 
         # calculate uω,vω in spectral space
         SpeedyWeather.vorticity_flux_curldiv!(d.layers[1],C,G,S,div=true)

@@ -39,7 +39,7 @@ end
         column.humid_tend .= humid_tend
 
         # copy into diagn
-        SpeedyWeather.write_column_tendencies!(diagn,column,model.constants,1)
+        SpeedyWeather.write_column_tendencies!(diagn,column,model.planet,1)
 
         # and check that that worked
         for (k,layer) in enumerate(diagn.layers)
