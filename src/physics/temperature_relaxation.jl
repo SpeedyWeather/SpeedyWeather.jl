@@ -1,7 +1,7 @@
 abstract type AbstractTemperatureRelaxation <: AbstractParameterization end
 
 # function barrier to unpack model.temperature_relaxation
-function temperature_relaxation!(::ColumnVariables,::PrimitiveEquation)
+function temperature_relaxation!(column::ColumnVariables,model::PrimitiveEquation)
     temperature_relaxation!(column, model.temperature_relaxation, model)
 end
 

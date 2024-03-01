@@ -441,8 +441,8 @@ function temperature_tendency!(
     model::PrimitiveEquation,
 )
     (;adiabatic_conversion, atmosphere, geometry, spectral_transform, implicit) = model
-    temperature_tendency!(diagn, model.atmosphere, model.geometry,
-                            model.spectral_transform, model.implicit)
+    temperature_tendency!(diagn, adiabatic_conversion, atmosphere, geometry,
+                            spectral_transform, implicit)
 end
 
 """
