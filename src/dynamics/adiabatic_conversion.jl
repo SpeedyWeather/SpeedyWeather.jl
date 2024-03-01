@@ -1,5 +1,6 @@
 abstract type AbstractAdiabaticConversion <: AbstractModelComponent end
 
+export AdiabaticConversion
 Base.@kwdef struct AdiabaticConversion{NF} <: AbstractAdiabaticConversion
     nlev::Int
 

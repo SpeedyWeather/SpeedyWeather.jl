@@ -183,6 +183,9 @@ $(TYPEDFIELDS)"""
 Base.@kwdef struct ZonalWind <: InitialConditions
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
+
+    "Sigma coordinates of the tropopause [1]"
+    σ_tropopause::Float64 = 0.2
     
     "max amplitude of zonal wind [m/s]"
     u₀::Float64 = 35
@@ -201,6 +204,9 @@ Base.@kwdef struct ZonalWind <: InitialConditions
     perturb_radius::Float64 = 1/10
 
     # TERMPERATURE
+    "reference dry-adiabtic lapse rate [K/m]"
+    lapse_rate::Float64 = 5/1000
+
     "temperature difference used for stratospheric lapse rate [K], Jablonowski uses ΔT = 4.8e5 [K]"
     ΔT::Float64 = 0                 
 
@@ -221,7 +227,8 @@ function initialize!(   progn::PrognosticVariables{NF},
 
     (;u₀, η₀, ΔT, Tmin, pressure_on_orography) = initial_conditions
     (;perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = initial_conditions
-    (;temp_ref, R_dry, lapse_rate, pres_ref, σ_tropopause) = model.atmosphere
+    (;lapse_rate, σ_tropopause) = initial_conditions
+    (;temp_ref, R_dry, pres_ref) = model.atmosphere
     (;radius, Grid, nlat_half, nlev) = model.spectral_grid
     (;rotation, gravity) = model.planet
     (;σ_levels_full) = model.geometry
@@ -279,15 +286,14 @@ function initialize!(   progn::PrognosticVariables{NF},
 
     # TEMPERATURE
     Tη = zero(σ_levels_full)
-    Γ = lapse_rate/1000                         # from [K/km] to [K/m]
 
     # vertical profile
     for k in 1:nlev
         σ = σ_levels_full[k]
-        Tη[k] = temp_ref*σ^(R_dry*Γ/gravity)    # Jablonowski and Williamson eq. 4
+        Tη[k] = temp_ref*σ^(R_dry*lapse_rate/gravity)   # Jablonowski and Williamson eq. 4
 
         if σ < σ_tropopause
-            Tη[k] += ΔT*(σ_tropopause-σ)^5      # Jablonowski and Williamson eq. 5
+            Tη[k] += ΔT*(σ_tropopause-σ)^5              # Jablonowski and Williamson eq. 5
         end
     end
 
@@ -410,7 +416,7 @@ hydrostatic equation with the reference temperature lapse rate."""
 function pressure_on_orography!(progn::PrognosticVariables,
                                 model::PrimitiveEquation)
     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
-    # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
+    # lapse_rate:   Reference temperature lapse rate -dT/dz [K/m]
     # gravity:      Gravitational acceleration [m/s^2]
     # R:            Specific gas constant for dry air [J/kg/K]
     # pres_ref:     Reference surface pressure [hPa]
@@ -418,12 +424,11 @@ function pressure_on_orography!(progn::PrognosticVariables,
     (; gravity ) = model.planet
     (; orography ) = model.orography # orography on the grid
 
-    Γ = lapse_rate/1000             # Lapse rate [K/km] -> [K/m]
     lnp₀ = log(pres_ref)            # logarithm of reference surface pressure [log(Pa)]
     lnp_grid = zero(orography)      # allocate log surface pressure on grid
 
-    RΓg⁻¹ = R_dry*Γ/gravity         # for convenience
-    ΓT⁻¹ = Γ/temp_ref           
+    RΓg⁻¹ = R_dry*lapse_rate/gravity         # for convenience
+    ΓT⁻¹ = lapse_rate/temp_ref           
 
     for ij in eachgridpoint(lnp_grid,orography)
         lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹

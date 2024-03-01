@@ -50,7 +50,8 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
     O = model.orography
     G = model.geometry
     S = model.spectral_transform
-    C = model.constants
+    GP = model.geopotential
+    A = model.atmosphere
     I = model.implicit
     (; surface ) = diagn
 
@@ -69,14 +70,14 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
         temperature_anomaly!(diagn_layer,I)         # temperature relative to profile
     end
 
-    geopotential!(diagn,O,C)                        # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
-    vertical_integration!(diagn,progn,lf_implicit,G)   # get ū,v̄,D̄ on grid; and and D̄ in spectral
+    geopotential!(diagn,GP,O)                       # from ∂Φ/∂ln(pₛ) = -RTᵥ, used in bernoulli_potential!
+    vertical_integration!(diagn,progn,lf_implicit,G)# get ū,v̄,D̄ on grid; and and D̄ in spectral
     surface_pressure_tendency!(surface,S)           # ∂ln(pₛ)/∂t = -(ū,v̄)⋅∇ln(pₛ) - D̄
 
     @floop for layer in diagn.layers
         vertical_velocity!(layer,surface,G)         # calculate σ̇ for the vertical mass flux M = pₛσ̇
                                                     # add the RTₖlnpₛ term to geopotential
-        linear_pressure_gradient!(layer,progn.surface,lf_implicit,C,I)
+        linear_pressure_gradient!(layer,progn.surface,lf_implicit,A,I)
     end                                             # wait all because vertical_velocity! needs to
                                                     # finish before vertical_advection!
     @floop for layer in diagn.layers
@@ -316,7 +317,8 @@ function vordiv_tendencies!(
     surf::SurfaceVariables,
     model::PrimitiveEquation,
 )
-    vordiv_tendencies!(diagn,surf,model.constants,model.geometry,model.spectral_transform)
+    (;coriolis, atmosphere, geometry, spectral_transform) = model
+    vordiv_tendencies!(diagn, surf, coriolis, atmosphere, geometry, spectral_transform)
 end
 
 """$(TYPEDSIGNATURES)
@@ -398,12 +400,14 @@ to transform the physics tendencies from grid-point to spectral space including 
 necessary coslat⁻¹ scaling."""
 function tendencies_physics_only!(
     diagn::DiagnosticVariablesLayer,
-    G::Geometry,
+    G::AbstractGeometry,
     S::SpectralTransform,
     wet_core::Bool = true
 )
     (;coslat⁻¹) = G
-    (;u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid) = diagn.tendencies  # already contains parameterizations
+
+    # already contain parameterizations
+    (;u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid) = diagn.tendencies
 
     # precompute ring indices and boundscheck
     rings = eachring(u_tend_grid,v_tend_grid)
@@ -431,13 +435,12 @@ function tendencies_physics_only!(
     return nothing
 end
 
-"""
-$(TYPEDSIGNATURES)
-Function barrier to unpack `model`."""
+# function barrier
 function temperature_tendency!(
     diagn::DiagnosticVariablesLayer,
     model::PrimitiveEquation,
 )
+    (;adiabatic_conversion, atmosphere, geometry, spectral_transform, implicit) = model
     temperature_tendency!(diagn, model.atmosphere, model.geometry,
                             model.spectral_transform, model.implicit)
 end
@@ -453,6 +456,7 @@ Compute the temperature tendency
 temperature used in the adiabatic term κTᵥ*Dlnp/Dt."""
 function temperature_tendency!(
     diagn::DiagnosticVariablesLayer,
+    adiabatic_conversion::AbstractAdiabaticConversion,
     atmosphere::AbstractAtmosphere,
     G::Geometry,
     S::SpectralTransform,
@@ -467,14 +471,14 @@ function temperature_tendency!(
     Tₖ = I.temp_profile[diagn.k]                # average layer temperature from reference profile
     
     # coefficients from Simmons and Burridge 1981
-    σ_lnp_A = C.σ_lnp_A[diagn.k]         # eq. 3.12, -1/Δσₖ*ln(σ_k+1/2/σ_k-1/2)
-    σ_lnp_B = C.σ_lnp_B[diagn.k]         # eq. 3.12 -αₖ
+    σ_lnp_A = adiabatic_conversion.σ_lnp_A[diagn.k]         # eq. 3.12, -1/Δσₖ*ln(σ_k+1/2/σ_k-1/2)
+    σ_lnp_B = adiabatic_conversion.σ_lnp_B[diagn.k]         # eq. 3.12 -αₖ
     
     # semi-implicit: terms here are explicit+implicit evaluated at time step i
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
     # to move the implicit terms to i-1 which is cheaper then the alternative below
 
-    # Diabatic term following Simmons and Burridge 1981 but for σ coordinates 
+    # Adiabatic conversion term following Simmons and Burridge 1981 but for σ coordinates 
     # += as tend already contains parameterizations + vertical advection
     @. temp_tend_grid += temp_grid*div_grid +       # +T'D term of hori advection
         κ*(Tᵥ+Tₖ)*(                                 # +κTᵥ*Dlnp/Dt, adiabatic term
@@ -485,7 +489,7 @@ function temperature_tendency!(
     spectral!(temp_tend,temp_tend_grid,S)
 
     # now add the -∇⋅((u,v)*T') term
-    flux_divergence!(temp_tend,temp_grid,diagn,G,S,add=true,flipsign=true)
+    flux_divergence!(temp_tend, temp_grid, diagn, G, S, add=true,flipsign=true)
     
     return nothing
 end

@@ -135,6 +135,8 @@ function Base.show(io::IO,L::AbstractZenith)
     print_fields(io,L,keys)
 end
 
+export SolarZenith
+
 """Solar zenith angle varying with daily and seasonal cycle.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct SolarZenith{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractZenith{NF,Grid}
@@ -235,6 +237,8 @@ function cos_zenith!(
         end
     end
 end
+
+export SolarZenithSeason
 
 """Solar zenith angle varying with seasonal cycle only.
 $(TYPEDFIELDS)"""

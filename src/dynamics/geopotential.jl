@@ -1,10 +1,13 @@
 abstract type AbstractGeopotential <: AbstractModelComponent end
 
+export Geopotential
 Base.@kwdef struct Geopotential{NF} <: AbstractGeopotential
     nlev::Int
     Δp_geopot_half::Vector{NF} = zeros(NF,nlev)
     Δp_geopot_full::Vector{NF} = zeros(NF,nlev)
 end
+
+Geopotential(SG::SpectralGrid) = Geopotential{SG.NF}(;nlev=SG.nlev)
 
 """
 $(TYPEDSIGNATURES)

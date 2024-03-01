@@ -2,7 +2,7 @@
 function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
                                 temp::LowerTriangularMatrix,    # only needed for dispatch compat with DryCore
                                 model::PrimitiveWet)
-    virtual_temperature!(diagn,temp,model.constants)
+    virtual_temperature!(diagn, temp, model.atmosphere)
 end
 
 """
@@ -19,12 +19,12 @@ in grid-point space."""
 function virtual_temperature!(
     diagn::DiagnosticVariablesLayer,
     temp::LowerTriangularMatrix,    # only needed for dispatch compat with DryCore
-    constants::DynamicsConstants,
+    atmosphere::AbstractAtmosphere,
     )
     
     (;temp_grid, humid_grid, temp_virt_grid) = diagn.grid_variables
     (;temp_virt) = diagn.dynamics_variables
-    μ = constants.μ_virt_temp
+    μ = atmosphere.μ_virt_temp
 
     @inbounds for ij in eachgridpoint(temp_virt_grid, temp_grid, humid_grid)
         temp_virt_grid[ij] = temp_grid[ij]*(1 + μ*humid_grid[ij])
@@ -90,11 +90,11 @@ specific humidity q and
 in spectral space."""
 function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
                                         progn::PrognosticLayerTimesteps,
-                                        constants::DynamicsConstants,
+                                        atmosphere::AbstractAtmosphere,
                                         lf::Int)
     
     (;temp_virt) = diagn.dynamics_variables
-    μ = constants.μ_virt_temp
+    μ = atmosphere.μ_virt_temp
     Tₖ = diagn.temp_average[]   
     (;temp,humid) = progn.timesteps[lf]
 

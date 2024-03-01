@@ -115,8 +115,9 @@ function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
     # Typical height Z of lowermost layer from geopotential of reference surface temperature
     # minus surface geopotential (orography * gravity)
     (;temp_ref) = model.atmosphere
-    (;Δp_geopot_full, gravity) = model.constants
-    Z = temp_ref*Δp_geopot_full[end] / gravity
+    (;gravity) = model.planet
+    (;Δp_geopot_full) = model.geopotential
+    Z = temp_ref * Δp_geopot_full[end] / gravity
     
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)

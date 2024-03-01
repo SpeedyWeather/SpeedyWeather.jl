@@ -12,7 +12,7 @@ function surface_fluxes!(column::ColumnVariables,model::PrimitiveEquation)
     surface_wind_stress!(column, model.surface_wind)
 
     # now call other heat and humidity fluxes
-    sensible_heat_flux!(column, model.surface_heat_flux, model.constants)
+    sensible_heat_flux!(column, model.surface_heat_flux, model.atmosphere)
     evaporation!(column,model)
 end
 
@@ -124,9 +124,11 @@ end
 
 SurfaceSensibleHeat(SG::SpectralGrid;kwargs...) = SurfaceSensibleHeat{SG.NF}(;kwargs...)
 
-function sensible_heat_flux!(   column::ColumnVariables{NF},
-                                heat_flux::SurfaceSensibleHeat,
-                                atmosphere::AbstractAtmosphere) where NF
+function sensible_heat_flux!(   
+    column::ColumnVariables,
+    heat_flux::SurfaceSensibleHeat,
+    atmosphere::AbstractAtmosphere
+)   
     cₚ = atmosphere.heat_capacity
     (;heat_exchange_land, heat_exchange_sea, max_flux) = heat_flux
 

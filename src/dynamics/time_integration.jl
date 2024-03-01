@@ -381,8 +381,8 @@ function time_stepping!(
     lf = 1                                  # use first leapfrog index
     gridded!(diagn,progn,lf,model)
     initialize!(output, feedback, time_stepping, clock, diagn, model)
-    initialize!(feedback, clock, model)
     initialize!(model.callbacks, progn, diagn, model)
+    initialize!(feedback, clock, model)
 
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
     first_timesteps!(progn,diagn, model, output)

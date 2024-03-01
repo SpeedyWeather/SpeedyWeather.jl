@@ -119,8 +119,8 @@ end
 $(TYPEDSIGNATURES)
 Calculate geopotentiala and dry static energy for the primitive equation model."""
 function get_thermodynamics!(column::ColumnVariables,model::PrimitiveEquation)
-    geopotential!(column.geopot, column.temp, model.constants)
-    dry_static_energy!(column, model.constants)
+    geopotential!(column.geopot, column.temp, model.geopotential, column.surface_geopotential)
+    dry_static_energy!(column, model.atmosphere)
 end
 
 """

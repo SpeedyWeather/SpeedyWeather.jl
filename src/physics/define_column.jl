@@ -11,8 +11,6 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
 
     # DIMENSIONS
     const nlev::Int = 0                     # number of vertical levels
-    const nband::Int = 0                    # number of radiation bands, needed for radiation
-    const n_stratosphere_levels::Int = 0    # number of stratospheric levels, needed for radiation
     
     # COORDINATES
     ij::Int = 0                             # grid-point index

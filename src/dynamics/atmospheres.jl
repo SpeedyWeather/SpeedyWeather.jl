@@ -49,6 +49,12 @@ Base.@kwdef mutable struct EarthAtmosphere{NF<:AbstractFloat} <: AbstractAtmosph
     "surface reference pressure [Pa]"
     pres_ref::NF = 1e5
 
+    "surface reference temperature [K]"
+    temp_ref::NF = 288
+
+    "reference moist-adiabatic temperature lapse rate [K/m]"
+    lapse_rate::NF = 5/1000
+
     "layer thickness for the shallow water model [m]"
     layer_thickness::NF = 8500
 end

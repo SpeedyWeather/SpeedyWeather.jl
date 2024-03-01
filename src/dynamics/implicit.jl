@@ -193,8 +193,14 @@ function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid,kwargs...)
 end
 
 # function barrier to unpack the constants struct for primitive eq models
-function initialize!(I::ImplicitPrimitiveEquation,dt::Real,diagn::DiagnosticVariables,model::PrimitiveEquation)
-    initialize!(I, dt, diagn, model.geometry, model.geopotential, model.adiabatic_conversion)
+function initialize!(
+    I::ImplicitPrimitiveEquation,
+    dt::Real,
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation,
+)
+    (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
+    initialize!(I, dt, diagn, geometry, geopotential, atmosphere, adiabatic_conversion)
 end
 
 """$(TYPEDSIGNATURES)
@@ -205,7 +211,8 @@ function initialize!(
     diagn::DiagnosticVariables,
     geometry::AbstractGeometry,
     geopotential::AbstractGeopotential,
-    adiabatic_conversion::AbstractAdiabaticConversion
+    atmosphere::AbstractAtmosphere,
+    adiabatic_conversion::AbstractAdiabaticConversion,
 )
 
     (;trunc, nlev, α,temp_profile,S,S⁻¹,L,R,U,W,L0,L1,L2,L3,L4) = implicit

@@ -1,6 +1,7 @@
 abstract type AbstractRadiation <: AbstractParameterization end
 abstract type AbstractShortwave <: AbstractRadiation end
 
+export NoShortwave
 struct NoShortwave <: AbstractShortwave end
 NoShortwave(SG::SpectralGrid) = NoShortwave()
 initialize!(::NoShortwave,::PrimitiveEquation) = nothing
@@ -12,6 +13,7 @@ end
 
 shortwave_radiation!(::ColumnVariables,::NoShortwave,::PrimitiveEquation) = nothing
 
+export TransparentShortwave
 Base.@kwdef struct TransparentShortwave{NF} <: AbstractShortwave
     albedo::NF = 0.3
     S::Base.RefValue{NF} = Ref(zero(NF))
