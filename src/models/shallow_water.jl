@@ -50,7 +50,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
 
     # OUTPUT
     output::OW = OutputWriter(spectral_grid,Barotropic)
-    callbacks::Vector{AbstractCallback} = AbstractCallback[]
+    callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
     feedback::FB = Feedback()
 end
 

@@ -1,3 +1,20 @@
+@testset "CallbackDict generator" begin
+    @test CallbackDict() isa SpeedyWeather.CALLBACK_DICT
+    @test CallbackDict(NoCallback()) isa SpeedyWeather.CALLBACK_DICT
+    @test CallbackDict(GlobalSurfaceTemperatureCallback()) isa SpeedyWeather.CALLBACK_DICT
+    @test CallbackDict(NoCallback(),NoCallback()) isa SpeedyWeather.CALLBACK_DICT
+    @test CallbackDict(NoCallback(),GlobalSurfaceTemperatureCallback()) isa SpeedyWeather.CALLBACK_DICT
+    @test CallbackDict(:a => NoCallback()) isa SpeedyWeather.CALLBACK_DICT
+
+    d = CallbackDict()
+    add!(d,NoCallback())
+    add!(d,:my_callback,NoCallback())
+    add!(d,"my_callback",NoCallback())
+    @test d isa SpeedyWeather.CALLBACK_DICT
+    delete!(d,:my_callback)
+    @test d isa SpeedyWeather.CALLBACK_DICT
+end
+
 @testset "Callbacks interface" begin
     
     Base.@kwdef mutable struct StormChaser{NF} <: SpeedyWeather.AbstractCallback
@@ -57,19 +74,20 @@
     SpeedyWeather.finish!(::StormChaser,args...) = nothing
 
     spectral_grid = SpectralGrid()
-    # callbacks = [NoCallback()]    # doesn't work at the moment
-    model = PrimitiveWetModel(;spectral_grid)
+    callbacks = CallbackDict(NoCallback())
+    model = PrimitiveWetModel(;spectral_grid,callbacks)
     
     storm_chaser = StormChaser(spectral_grid)
-    append!(model.callbacks, storm_chaser)
-    append!(model.callbacks, NoCallback())  # add dummy too 
+    key = :storm_chaser
+    add!(model.callbacks, key, storm_chaser)  # with :storm_chaser key
+    add!(model.callbacks, NoCallback())                 # add dummy too 
 
     simulation = initialize!(model)
-    run!(simulation)
+    run!(simulation,period=Day(3))
 
     # maximum wind speed should always be non-negative
-    @test all(model.callbacks[1].maximum_surface_wind_speed .>= 0)
+    @test all(model.callbacks[key].maximum_surface_wind_speed .>= 0)
 
     # highest wind speed across all time steps should be positive
-    @test maximum(model.callbacks[1].maximum_surface_wind_speed) > 0
+    @test maximum(model.callbacks[key].maximum_surface_wind_speed) > 0
 end

@@ -49,7 +49,7 @@ Base.@kwdef mutable struct BarotropicModel{
 
     # OUTPUT
     output::OW = OutputWriter(spectral_grid,Barotropic)
-    callbacks::Vector{AbstractCallback} = AbstractCallback[]
+    callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
     feedback::FB = Feedback()
 end
 

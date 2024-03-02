@@ -155,26 +155,46 @@ SpeedyWeather.finish!(::StormChaser,args...) = nothing
 
 ## Adding a callback
 
-Every model has a field `callbacks::AbstractVector{<:AbstractCallback}` such that the `callbacks`
-keyword can be used to create a model with a vector of callbacks
+Every model has a field `callbacks::Dict{Symbol,AbstractCallback}` such that the `callbacks`
+keyword can be used to create a model with a dictionary of callbacks. Callbacks are identified
+with a `Symbol` key inside such a dictionary. We have a convenient `CallbackDict` generator function
+which can be used like `Dict` but the key-value pairs have to be of type `Symbol`-`AbstractCallback`.
+Let us illustrate this with the dummy callback `NoCallback` (which is a callback that returns `nothing`
+on `initialize!`, `callback!` and `finish!`)
+
+```@example callbacks
+callbacks = CallbackDict()                                  # empty dictionary
+callbacks = CallbackDict(:my_callback => NoCallback())      # key => callback
+```
+If you don't provide a key a random key will be assigned
+```@example callbacks
+callbacks = CallbackDict(NoCallback())
+```
+and you can add (or delete) additional callbacks
+```@example callbacks
+add!(callbacks,NoCallback())                # this will also pick a random key
+add!(callbacks,:my_callback,NoCallback())   # use key :my_callback
+delete!(callbacks,:my_callback)             # remove by key
+callbacks
+```
+Meaning that callbacks can be added before and after model construction
 
 ```@example callbacks
 spectral_grid = SpectralGrid()
-dummy_callback = [NoCallback()]    # 1-element vector with dummy NoCallback only
-model = PrimitiveWetModel(;spectral_grid, callbacks=dummy_callback)
-model.callbacks
+callbacks = CallbackDict(:callback_added_before, NoCallback())
+model = PrimitiveWetModel(;spectral_grid, callbacks)
+add!(model.callbacks,:callback_added_afterwards, NoCallback())
 ```
-
-but, maybe more conveniently, a callback can be added after model construction too
+Let us add two more meaningful callbacks
 
 ```@example callbacks
 storm_chaser = StormChaser(spectral_grid)
 record_surface_temperature = GlobalSurfaceTemperatureCallback(spectral_grid)
-append!(model.callbacks, storm_chaser)
-append!(model.callbacks, record_surface_temperature)
+add!(model.callbacks, :storm_chaser, storm_chaser)
+add!(model.callbacks, :temperature, record_surface_temperature)
 ```
 
-which means that now in the calls to `callback!` first the dummy `NoCallback` is called
+which means that now in the calls to `callback!` first the two dummy `NoCallback`s are called
 and then our storm chaser callback and then the `GlobalSurfaceTemperatureCallback` which
 records the global mean surface temperature on every time step. From normal [NetCDF output](@ref)
 the information these callbacks analyse would not be available,
@@ -183,17 +203,16 @@ and considerably slow down the simulation. Let's run the simulation and check th
 
 ```@example callbacks
 simulation = initialize!(model)
-run!(simulation,period=Day(3))
-v = model.callbacks[2].maximum_surface_wind_speed
+run!(simulation, period=Day(3))
+v = model.callbacks[:storm_chaser].maximum_surface_wind_speed
 maximum(v)      # highest surface wind speeds in simulation [m/s]
 ```
-The second callback is our `storm_chaser::StormChaser` (remember the first callback was a
-dummy `NoCallback`), the third is the `GlobalSurfaceTemperatureCallback` with
-the field `temp` is a vector of the global mean surface temperature on every
-time step while the model ran for 3 days.
+Cool, our `StormChaser` callback with the key `:storm_chaser` has been recording maximum
+surface wind speeds in [m/s]. And the `:temperature` callback a time series of
+global mean surface temperatures in Kelvin on every time step while the model ran for 3 days.
 
 ```@example callbacks
-model.callbacks[3].temp
+model.callbacks[:temperature].temp
 ```
 
 ## Intrusive callbacks
@@ -216,11 +235,9 @@ a callback that weakens their respective strength parameter over time.
 
 Changing the diagnostic variables, however, will not have any effect. All of
 them are treated as work arrays, meaning that their state is completely
-overwritten on every time step. 
-
-Changing the prognostic variables in spectral space directly is not advised
-though possible because this can easily lead to stability issues. It is generally
-easier to implement something like this as a parameterization, forcing or
+overwritten on every time step.  Changing the prognostic variables in spectral space
+directly is not advised though possible because this can easily lead to stability issues.
+It is generally easier to implement something like this as a parameterization, forcing or
 drag term (which can also be made time-dependent).
 
 Overall, callbacks give the user a wide range of possibilities to diagnose 
