@@ -9,7 +9,12 @@ function CallbackDict(callbacks::AbstractCallback...)
     CALLBACK_DICT(callback_pairs...)
 end
 
+"""$(TYPEDSIGNATURES)
+Empty Callback dictionary generator."""
 CallbackDict() = CALLBACK_DICT()
+
+"""$(TYPEDSIGNATURES)
+Create Callback dictionary like normal dictionaries."""
 CallbackDict(pairs::Pair{Symbol,<:AbstractCallback}...) = CALLBACK_DICT(pairs...)
 
 function Base.show(io::IO,C::AbstractCallback)
@@ -39,38 +44,43 @@ for func in (:initialize!, :callback!, :finish!)
 end
 
 export add!
-
 """
 $(TYPEDSIGNATURES)
-Add a callback to a Dict{String,AbstractCallback} dictionary. To be used like
+Add a or several callbacks to a Dict{String,AbstractCallback} dictionary. To be used like
 
-    add!(model.callbacks,"mycallback",callback)
-
+add!(model.callbacks,:my_callback => callback)
+add!(model.callbacks,:my_callback1 => callback, :my_callback2 => other_callback)
 """
-function add!(D::CALLBACK_DICT,key::Symbol,callback::AbstractCallback)
-    D[key] = callback
-    return nothing
+function add!(D::CALLBACK_DICT, key_callbacks::Pair{Symbol, <:AbstractCallback}...)
+    for key_callback in key_callbacks
+        key = key_callback.first
+        callback = key_callback.second
+        D[key] = callback
+    end
 end
 
-function add!(D::CALLBACK_DICT,key::String,callback::AbstractCallback)
+add!(D::CALLBACK_DICT, key::Symbol, callback::AbstractCallback) = add!(D,Pair(key,callback))
+
+# also with string but flag conversion
+function add!(D::CALLBACK_DICT, key::String, callback::AbstractCallback)
     key_symbol = Symbol(key)
     @info "Callback keys are Symbols. String \"$key\" converted to Symbol :$key_symbol."
-    add!(D,key_symbol,callback)
+    add!(D, key_symbol, callback)
 end
 
 """
 $(TYPEDSIGNATURES)
-Add a callback to a Dict{Symbol,AbstractCallback} dictionary without specifying the
+Add a or several callbacks to a Dict{Symbol,AbstractCallback} dictionary without specifying the
 key which is randomly created like callback_????. To be used like
 
-    add!(model.callbacks,callback)
-
-"""
-function add!(D::CALLBACK_DICT,callback::AbstractCallback)
-    key = Symbol("callback_"*Random.randstring(4))
-    @info "$(typeof(callback)) callback added with key $key"
-    D[key] = callback
-    return nothing
+    add!(model.callbacks, callback)
+    add!(model.callbacks, callback1, callback2)."""
+function add!(D::CALLBACK_DICT,callbacks::AbstractCallback...)
+    for callback in callbacks
+        key = Symbol("callback_"*Random.randstring(4))
+        @info "$(typeof(callback)) callback added with key $key"
+        add!(D, key => callback)
+    end
 end
 
 # delete!(dict,key) already defined in Base

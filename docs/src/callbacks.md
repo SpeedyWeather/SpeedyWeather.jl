@@ -172,26 +172,32 @@ callbacks = CallbackDict(NoCallback())
 ```
 and you can add (or delete) additional callbacks
 ```@example callbacks
-add!(callbacks,NoCallback())                    # this will also pick a random key
-add!(callbacks,:my_callback => NoCallback())    # use key :my_callback
-delete!(callbacks,:my_callback)                 # remove by key
+add!(callbacks, NoCallback())                   # this will also pick a random key
+add!(callbacks, :my_callback => NoCallback())   # use key :my_callback
+delete!(callbacks, :my_callback)                # remove by key
 callbacks
+```
+And you can chain them too
+```@example callbacks
+add!(callbacks, NoCallback(), NoCallback())                     # random keys
+add!(callbacks, :key1 => NoCallback(), :key2 => NoCallback())   # keys provided
 ```
 Meaning that callbacks can be added before and after model construction
 
+
 ```@example callbacks
 spectral_grid = SpectralGrid()
-callbacks = CallbackDict(:callback_added_before, NoCallback())
+callbacks = CallbackDict(:callback_added_before => NoCallback())
 model = PrimitiveWetModel(;spectral_grid, callbacks)
-add!(model.callbacks,:callback_added_afterwards, NoCallback())
+add!(model.callbacks,:callback_added_afterwards => NoCallback())
 ```
 Let us add two more meaningful callbacks
 
 ```@example callbacks
 storm_chaser = StormChaser(spectral_grid)
 record_surface_temperature = GlobalSurfaceTemperatureCallback(spectral_grid)
-add!(model.callbacks, :storm_chaser, storm_chaser)
-add!(model.callbacks, :temperature, record_surface_temperature)
+add!(model.callbacks, :storm_chaser => storm_chaser)
+add!(model.callbacks, :temperature => record_surface_temperature)
 ```
 
 which means that now in the calls to `callback!` first the two dummy `NoCallback`s are called
