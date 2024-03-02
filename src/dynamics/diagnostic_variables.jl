@@ -87,6 +87,8 @@ function Base.zeros(::Type{DynamicsVariables},
     return DynamicsVariables{NF,Grid{NF}}(;nlat_half,trunc)
 end
 
+export DiagnosticVariablesLayer
+
 """
 All diagnostic variables for a given layer: tendencies, prognostic varibles on the grid,
 and intermediate dynamics variables.
