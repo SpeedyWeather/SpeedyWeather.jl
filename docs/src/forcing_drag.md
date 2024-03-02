@@ -280,7 +280,7 @@ function SpeedyWeather.initialize!( forcing::StochasticStirring,
     
     # precompute noise and auto-regressive factor, packed in RefValue for mutability
     dt = model.time_stepping.Δt_sec
-    τ = forcing.decorrelation_time*24*3600   # convert to seconds
+    τ = forcing.decorrelation_time.value        # in seconds
     forcing.a[] = A*sqrt(1 - exp(-2dt/τ))
     forcing.b[] = exp(-dt/τ)
     
@@ -335,7 +335,7 @@ function SpeedyWeather.forcing!(diagn::SpeedyWeather.DiagnosticVariablesLayer,
                                 time::DateTime,
                                 model::SpeedyWeather.ModelSetup)
     # function barrier only
-    forcing!(diagn,forcing,model.spectral_transform)
+    forcing!(diagn, forcing, model.spectral_transform)
 end
 ```
 The function has to be as outlined above. The first argument has to be of type
