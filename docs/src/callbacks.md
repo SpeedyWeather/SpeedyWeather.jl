@@ -172,9 +172,9 @@ callbacks = CallbackDict(NoCallback())
 ```
 and you can add (or delete) additional callbacks
 ```@example callbacks
-add!(callbacks,NoCallback())                # this will also pick a random key
-add!(callbacks,:my_callback,NoCallback())   # use key :my_callback
-delete!(callbacks,:my_callback)             # remove by key
+add!(callbacks,NoCallback())                    # this will also pick a random key
+add!(callbacks,:my_callback => NoCallback())    # use key :my_callback
+delete!(callbacks,:my_callback)                 # remove by key
 callbacks
 ```
 Meaning that callbacks can be added before and after model construction
