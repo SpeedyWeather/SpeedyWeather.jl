@@ -272,7 +272,7 @@ Now let us have a closer look at the details of the `initialize!` function, in o
 actually do
 ```@example extend
 function SpeedyWeather.initialize!( forcing::StochasticStirring,
-                                    model::SpeedyWeather.ModelSetup)
+                                    model::ModelSetup)
     
     # precompute forcing strength, scale with radius^2 as is the vorticity equation
     (;radius) = model.spectral_grid
@@ -329,11 +329,11 @@ defined for our new `StochasticStirring` forcing. But if you define it as follow
 then this will be called automatically with multiple dispatch.
 
 ```@example extend
-function SpeedyWeather.forcing!(diagn::SpeedyWeather.DiagnosticVariablesLayer,
-                                progn::SpeedyWeather.PrognosticVariablesLayer,
+function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
+                                progn::PrognosticVariablesLayer,
                                 forcing::StochasticStirring,
                                 time::DateTime,
-                                model::SpeedyWeather.ModelSetup)
+                                model::ModelSetup)
     # function barrier only
     forcing!(diagn, forcing, model.spectral_transform)
 end
@@ -358,7 +358,7 @@ makes that possible. And it also tells you more clearly what a function depends 
 So we define the actual `forcing!` function that's then called as follows
 
 ```@example extend
-function forcing!(  diagn::SpeedyWeather.DiagnosticVariablesLayer,
+function forcing!(  diagn::DiagnosticVariablesLayer,
                     forcing::StochasticStirring{NF},
                     spectral_transform::SpectralTransform) where NF
     
@@ -443,7 +443,7 @@ and just put them together as you like, and as long as you follow some rules.
 spectral_grid = SpectralGrid(trunc=42,nlev=1)
 stochastic_stirring = StochasticStirring(spectral_grid,latitude=-45)
 initial_conditions = StartFromRest()
-model = BarotropicModel(;spectral_grid,initial_conditions,forcing=stochastic_stirring)
+model = BarotropicModel(;spectral_grid, initial_conditions, forcing=stochastic_stirring)
 simulation = initialize!(model)
 run!(simulation)
 ```
