@@ -46,8 +46,8 @@
         return nothing
     end
     
-    function SpeedyWeather.drag!(   diagn::SpeedyWeather.DiagnosticVariablesLayer,
-                                    progn::SpeedyWeather.PrognosticVariablesLayer,
+    function SpeedyWeather.drag!(   diagn::DiagnosticVariablesLayer,
+                                    progn::PrognosticVariablesLayer,
                                     drag::JetDrag,
                                     time::DateTime,
                                     model::ModelSetup)
@@ -142,15 +142,15 @@
         return nothing
     end
     
-    function SpeedyWeather.forcing!(diagn::SpeedyWeather.DiagnosticVariablesLayer,
-                                    progn::SpeedyWeather.PrognosticVariablesLayer,
+    function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
+                                    progn::PrognosticVariablesLayer,
                                     forcing::StochasticStirring,
                                     time::DateTime,
                                     model::ModelSetup)
         SpeedyWeather.forcing!(diagn,forcing,model.spectral_transform)
     end
     
-    function SpeedyWeather.forcing!(diagn::SpeedyWeather.DiagnosticVariablesLayer,
+    function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
                                     forcing::StochasticStirring{NF},
                                     spectral_transform::SpectralTransform) where NF
         
