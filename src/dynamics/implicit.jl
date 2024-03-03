@@ -1,14 +1,20 @@
+abstract type AbstractImplicit <: AbstractModelComponent end
+
 # BAROTROPIC MODEL (no implicit needed)
-struct NoImplicit{NF} <: AbstractImplicit{NF} end
-NoImplicit(SG::SpectralGrid) = NoImplicit{SG.NF}()
-initialize!(I::NoImplicit,dt::Real,::DiagnosticVariables,::ModelSetup) = nothing
+export NoImplicit
+struct NoImplicit <: AbstractImplicit end
+NoImplicit(SG::SpectralGrid) = NoImplicit()
+initialize!(::NoImplicit,args...) = nothing
+implicit_correction!(::DiagnosticVariables,::PrognosticVariables,::NoImplicit) = nothing
 
 # SHALLOW WATER MODEL
+export ImplicitShallowWater
+
 """
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the shallow water model.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit{NF}
+Base.@kwdef struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit
 
     # DIMENSIONS
     trunc::Int
@@ -32,27 +38,24 @@ function ImplicitShallowWater(spectral_grid::SpectralGrid;kwargs...)
     return ImplicitShallowWater{NF}(;trunc,kwargs...)
 end
 
-function Base.show(io::IO,I::ImplicitShallowWater)
-    println(io,"$(typeof(I)) <: AbstractImplicit")
-    keys = propertynames(I)
-    print_fields(io,I,keys)
-end
-
 # function barrier to unpack the constants struct for shallow water
 function initialize!(I::ImplicitShallowWater,dt::Real,::DiagnosticVariables,model::ShallowWater)
-    initialize!(I,dt,model.constants)
+    initialize!(I, dt, model.planet, model.atmosphere)
 end
 
 """
 $(TYPEDSIGNATURES)
 Update the implicit terms in `implicit` for the shallow water model as they depend on the time step `dt`."""
-function initialize!(   implicit::ImplicitShallowWater,
-                        dt::Real,                   # time step used [s]
-                        constants::DynamicsConstants)
+function initialize!(   
+    implicit::ImplicitShallowWater,
+    dt::Real,                   # time step used [s]
+    planet::AbstractPlanet,
+    atmosphere::AbstractAtmosphere,
+)
 
-    (;α,H,ξH,g∇²,ξg∇²,S⁻¹) = implicit             # precomputed arrays to be updated
-    (;gravity,layer_thickness) = constants          # shallow water layer thickness [m]
-                                                    # gravitational acceleration [m/s²]                  
+    (;α, H, ξH, g∇², ξg∇², S⁻¹) = implicit          # precomputed arrays to be updated                
+    (;gravity) = planet                             # gravitational acceleration [m/s²]
+    (;layer_thickness) = atmosphere                 # shallow water layer thickness [m]
 
     # implicit time step between i-1 and i+1
     # α = 0   means the gravity wave terms are evaluated at i-1 (forward)
@@ -122,11 +125,13 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
     end
 end
 
+export ImplicitPrimitiveEquation
+
 """
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the primitive equation model.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ImplicitPrimitiveEq{NF<:AbstractFloat} <: AbstractImplicit{NF}
+Base.@kwdef struct ImplicitPrimitiveEquation{NF<:AbstractFloat} <: AbstractImplicit
     
     # DIMENSIONS
     "spectral resolution"
@@ -182,33 +187,39 @@ end
 
 """$(TYPEDSIGNATURES)
 Generator using the resolution from SpectralGrid."""
-function ImplicitPrimitiveEq(spectral_grid::SpectralGrid,kwargs...) 
+function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid,kwargs...) 
     (;NF,trunc,nlev) = spectral_grid
-    return ImplicitPrimitiveEq{NF}(;trunc,nlev,kwargs...)
-end
-
-function Base.show(io::IO,I::ImplicitPrimitiveEq)
-    println(io,"$(typeof(I)) <: AbstractImplicit")
-    keys = propertynames(I)
-    print_fields(io,I,keys)
+    return ImplicitPrimitiveEquation{NF}(;trunc,nlev,kwargs...)
 end
 
 # function barrier to unpack the constants struct for primitive eq models
-function initialize!(I::ImplicitPrimitiveEq,dt::Real,diagn::DiagnosticVariables,model::PrimitiveEquation)
-    initialize!(I,dt,diagn,model.geometry,model.constants)
+function initialize!(
+    I::ImplicitPrimitiveEquation,
+    dt::Real,
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation,
+)
+    (; geometry, geopotential, atmosphere, adiabatic_conversion) = model
+    initialize!(I, dt, diagn, geometry, geopotential, atmosphere, adiabatic_conversion)
 end
 
 """$(TYPEDSIGNATURES)
 Initialize the implicit terms for the PrimitiveEquation models."""
-function initialize!(   implicit::ImplicitPrimitiveEq,
-                        dt::Real,                   # the scaled time step radius*dt
-                        diagn::DiagnosticVariables,
-                        geometry::Geometry,
-                        constants::DynamicsConstants)
+function initialize!(   
+    implicit::ImplicitPrimitiveEquation,
+    dt::Real,                                           # the scaled time step radius*dt
+    diagn::DiagnosticVariables,
+    geometry::AbstractGeometry,
+    geopotential::AbstractGeopotential,
+    atmosphere::AbstractAtmosphere,
+    adiabatic_conversion::AbstractAdiabaticConversion,
+)
 
     (;trunc, nlev, α,temp_profile,S,S⁻¹,L,R,U,W,L0,L1,L2,L3,L4) = implicit
     (;σ_levels_full, σ_levels_thick) = geometry
-    (;R_dry, κ, Δp_geopot_half, Δp_geopot_full, σ_lnp_A, σ_lnp_B) = constants
+    (;R_dry, κ) = atmosphere
+    (;Δp_geopot_half, Δp_geopot_full) = geopotential
+    (;σ_lnp_A, σ_lnp_B) = adiabatic_conversion
 
     for k in 1:nlev    
         # use current vertical temperature profile                                     
@@ -291,25 +302,10 @@ function initialize!(   implicit::ImplicitPrimitiveEq,
 end
 
 """$(TYPEDSIGNATURES)
-Reinitialize implicit occasionally based on time step `i` and `implicit.recalculate`."""
-function initialize!(  
-    implicit::ImplicitPrimitiveEq,
-    i::Integer,
-    dt::Real,                   # the scaled time step radius*dt
-    diagn::DiagnosticVariables,
-    geometry::Geometry,
-    constants::DynamicsConstants
-)
-    # only reinitialize occasionally, otherwise exit immediately
-    i % implicit.recalculate == 0 || return nothing
-    initialize!(implicit,dt,diagn,geometry,constants)
-end
-
-"""$(TYPEDSIGNATURES)
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
 function implicit_correction!(  
     diagn::DiagnosticVariables,
-    implicit::ImplicitPrimitiveEq,
+    implicit::ImplicitPrimitiveEquation,
     progn::PrognosticVariables,
 )
 

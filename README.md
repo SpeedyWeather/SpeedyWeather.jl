@@ -1,7 +1,9 @@
 # SpeedyWeather.jl
-[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml)
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/stable/)
-[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/dev/)
+
+[![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml) 
+[![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/stable/)
+[![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/dev/)
+[![status](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a/status.svg)](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a)
 
 SpeedyWeather.jl is a global spectral atmospheric model with simple physics which is developed as a research playground
 with an everything-flexible attitude as long as it is speedy. With minimal code redundancies it supports
@@ -31,7 +33,7 @@ With v0.6 the interface to SpeedyWeather.jl consist of 4 steps: define the grid,
 spectral_grid = SpectralGrid(trunc=31, Grid=OctahedralGaussianGrid, nlev=8)
 model = PrimitiveDryModel(;spectral_grid, orography = EarthOrography(spectral_grid))
 simulation = initialize!(model)
-run!(simulation,n_days=10,output=true)
+run!(simulation,period=Day(10),output=true)
 ```
 and you will see
 
@@ -63,11 +65,18 @@ at T511 (~20km resolution) and 31 vertical levels. The simulation was multi-thre
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/95897b82-9b81-4980-934b-cfdcf4d5a4b0
 
 SpeedyWeather.jl can also solve the 2D barotropic vorticity equations on the sphere.
-Here, we use single-threaded Float32 (single precision) at a resolution of T340 (40km) on
-an [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids). 
-Initial conditions are randomly distributed relative vorticity on a slowly rotating Earth ($\Omega = 10^{-6}\text{ s}^{-1}$) and no forcing is applied
+Here, we use Float32 (single precision) at a resolution of T340 (40km) on
+an [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids).
+Forcing is a stochastic stirring on northern hemisphere mid-latitudes following Barnes and Hartmann, 2011.
+Map projection is orthographic centred on the north pole.
 
-https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/8a7c6758-950f-424d-8ece-0480295386b3
+https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/3d7fccd5-b66d-42e3-9f73-64dcf21d00ee
+
+Here, SpeedyWeather.jl simulates atmospheric gravity waves, initialised randomly interacting with orography
+over a period of 2 days. Each frame is one time step, solved with a centred semi-implicit scheme that
+resolves gravity waves with a timestep of CFL=1.2-1.4 despite a single-stage RAW-filtered leapfrog integration.
+
+https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/510c38c7-12cb-42d5-b905-c66b4eaa514d
 
 ## History
 

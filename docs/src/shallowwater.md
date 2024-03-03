@@ -19,21 +19,26 @@ divergence ``\mathcal{D} = \nabla \cdot \mathbf{u}``
 ```math
 \begin{aligned}
 \frac{\partial \zeta}{\partial t} + \nabla \cdot (\mathbf{u}(\zeta + f)) &=
-\nabla \times \mathbf{F} + (-1)^{n+1}\nu\nabla^{2n}\zeta, \\
+F_\zeta + \nabla \times \mathbf{F}_\mathbf{u} + (-1)^{n+1}\nu\nabla^{2n}\zeta, \\
 \frac{\partial \mathcal{D}}{\partial t} - \nabla \times (\mathbf{u}(\zeta + f)) &=
-\nabla \cdot \mathbf{F} -\nabla^2(\tfrac{1}{2}(u^2 + v^2) + g\eta) + (-1)^{n+1}\nu\nabla^{2n}\mathcal{D}, \\
+F_\mathcal{D} + \nabla \cdot \mathbf{F}_\mathbf{u}
+-\nabla^2(\tfrac{1}{2}(u^2 + v^2) + g\eta) + (-1)^{n+1}\nu\nabla^{2n}\mathcal{D}, \\
 \frac{\partial \eta}{\partial t} + \nabla \cdot (\mathbf{u}h) &= F_\eta,
 \end{aligned}
 ```
 
-We denote time``t``, Coriolis parameter ``f``, a forcing vector ``\mathbf{F} = (F_u,F_v)``,
-hyperdiffusion ``(-1)^{n+1} \nu \nabla^{2n}`` (``n`` is the hyperdiffusion order,  see [Horizontal diffusion](@ref diffusion)),
+We denote time ``t``, Coriolis parameter ``f``,
+hyperdiffusion ``(-1)^{n+1} \nu \nabla^{2n}`` (``n`` is the hyperdiffusion order,
+see [Horizontal diffusion](@ref diffusion)),
 gravitational acceleration ``g``, dynamic layer thickness ``h``, and a forcing for
 the interface height ``F_\eta``. In the shallow water model the dynamics layer thickness ``h`` is
 ```math
 h = \eta + H - H_b
 ```
 that is, the layer thickness at rest ``H`` plus the interface height ``\eta`` minus orography ``H_b``.
+We also add various possible forcing terms
+``F_\zeta, F_\mathcal{D}, F_\eta, \mathbf{F}_\mathbf{u} = (F_u,F_v)`` which can be defined 
+to force the respective variables, see [Extending SpeedyWeather](@ref). 
 
 In the shallow water system the flow can be described through ``u,v`` or ``\zeta,\mathcal{D}`` which
 are related through the stream function ``\Psi`` and the velocity potential ``\Phi`` (which is zero
@@ -77,18 +82,17 @@ and interface height ``\eta_{lm}`` in spectral space and transform this model st
 
 Now loop over
 
-1. Compute the forcing vector ``\mathbf{F} = (F_u,F_v)`` for ``u`` and ``v``
+1. Compute the forcing (or drag) terms ``F_\zeta, F_\mathcal{D}, F_\eta, \mathbf{F}_\mathbf{u}``
 2. Multiply ``u,v`` with ``\zeta+f`` in grid-point space
 3. Add ``A = F_u + v(\zeta + f)`` and ``B = F_v - u(\zeta + f)``
 4. Transform these vector components to spectral space ``A_{lm}``, ``B_{lm}``
-5. Compute the curl of ``(A,B)_{lm}`` in spectral space which is the tendency of ``\zeta_{lm}``
-5. Compute the divergence of ``(A,B)_{lm}`` in spectral space which is the tendency of ``\mathcal{D}_{lm}``
+5. Compute the curl of ``(A,B)_{lm}`` in spectral space and add to forcing of ``\zeta_{lm}``
+5. Compute the divergence of ``(A,B)_{lm}`` in spectral space and add to forcing of divergence ``\mathcal{D}_{lm}``
 6. Compute the kinetic energy ``\frac{1}{2}(u^2 + v^2)`` and transform to spectral space
 6. Add to the kinetic energy the "geopotential" ``g\eta_{lm}`` in spectral space to obtain the Bernoulli potential
 7. Take the Laplacian of the Bernoulli potential and subtract from the divergence tendency
 7. Compute the volume fluxes ``uh,vh`` in grid-point space via ``h = \eta + H - H_b``
-7. Transform to spectral space and take the divergence for ``-\nabla \cdot (\mathbf{u}h)`` which is the tendency for ``\eta``
-7. Add possibly forcing ``F_\eta`` for ``\eta`` in spectral space
+7. Transform to spectral space and take the divergence for ``-\nabla \cdot (\mathbf{u}h)``. Add to forcing for ``\eta``.
 7. Correct the tendencies following the [semi-implicit time integration](@ref implicit_swm) to prevent fast gravity waves from causing numerical instabilities
 6. Compute the [horizontal diffusion](@ref diffusion) based on the ``\zeta,\mathcal{D}`` tendencies
 7. Compute a leapfrog time step as described in [Time integration](@ref leapfrog) with a [Robert-Asselin and Williams filter](@ref)
@@ -106,7 +110,7 @@ In spectral space ``\nabla^2`` is a diagonal operator, meaning that there is no 
 harmonics and its inversion is therefore easily done on a mode-by-mode basis of the harmonics.
 
 This can be made use of when facing time stepping constraints with explicit schemes, where
-ridiculuously small time steps to resolve fast waves would otherwise result in a horribly slow simulation. 
+ridiculously small time steps to resolve fast waves would otherwise result in a horribly slow simulation. 
 In the shallow water system there are gravity waves that propagate at a wave speed of ``\sqrt{gH}``
 (typically 300m/s), which, in order to not violate the
 [CFL criterion](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition)
@@ -219,7 +223,7 @@ The idea of the semi-implicit time stepping is now as follows:
 Some notes on the semi-implicit time stepping
 
 - The inversion of the semi-implicit time stepping depends on ``\delta t``, that means every time the time step changes, the inversion has to be recalculated.
-- You may choose ``\alpha = 1/2`` to dampen gravity waves but initialisation shocks still usually kick off many gravity waves that propagate around the sphere for many days.
+- You may choose ``\alpha = 1/2`` to dampen gravity waves but initialization shocks still usually kick off many gravity waves that propagate around the sphere for many days.
 - With increasing ``\alpha > 1/2`` these waves are also slowed down, such that for ``\alpha = 1`` they quickly disappear in several hours.
 - Using the [scaled shallow water equations](@ref scaled_swm) the time step ``\delta t`` has to be the scaled time step ``\tilde{\Delta t} = \delta t/R`` which is divided by the radius ``R``. Then we use the normalized eigenvalues ``-l(l+1)`` which also omit the ``1/R^2`` scaling, see [scaled shallow water equations](@ref scaled_swm) for more details.
 

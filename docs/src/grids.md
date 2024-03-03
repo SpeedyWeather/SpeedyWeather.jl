@@ -3,19 +3,15 @@
 The spectral transform (the [Spherical Harmonic Transform](@ref)) in SpeedyWeather.jl supports any ring-based
 equi-longitude grid. Several grids are already implemented but other can be added. The following pages will
 describe an overview of these grids and but let's start but how they can be used
-```julia
-julia> spectral_grid = SpectralGrid(Grid = FullGaussianGrid)
-SpectralGrid:
- Spectral:   T31 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
- Grid:       4608-element, 48-ring FullGaussianGrid{Float32} (quadratic)
- Resolution: 333km (average)
- Vertical:   8-level SigmaCoordinates
+```@example grids
+using SpeedyWeather
+spectral_grid = SpectralGrid(Grid = FullGaussianGrid)
 ```
 The life of every SpeedyWeather.jl simulation starts with a `SpectralGrid` object which defines the
 resolution in spectral and in grid-point space. The generator `SpectralGrid()` can take as a keyword
 argument `Grid` which can be any of the grids described below. The resolution of the grid, however,
 is not directly chosen, but determined from the spectral resolution `trunc` and the `dealiasing`
-factor. More in [Matching spectral and grid resolution](@ref).
+factor. More in [SpectralGrid](@ref) and [Matching spectral and grid resolution](@ref).
 
 !!! info "RingGrids is a module too!"
     While RingGrids is the underlying module that SpeedyWeather.jl uses for data structs
@@ -179,7 +175,7 @@ Exactness here means that only rounding errors occur in the transform, meaning t
 transform error is very small compared to other errors in a simulation.
 This property arises from that property of the
 [Gauss-Legendre quadrature](https://en.wikipedia.org/wiki/Gauss%E2%80%93Legendre_quadrature),
-which is used in the [Spherical harmonic transform](@ref) with a full Gaussian grid.
+which is used in the [Spherical Harmonic Transform](@ref) with a full Gaussian grid.
 
 On the full Gaussian grid there are in total ``N_\phi N_\theta`` grid points, which are squeezed
 towards the poles, making the grid area smaller and smaller following a cosine.

@@ -1,22 +1,42 @@
+# function barrier
+function get_column!(   
+    C::ColumnVariables,
+    D::DiagnosticVariables,
+    P::PrognosticVariables,
+    ij::Integer,        # grid point index
+    jring::Integer,     # ring index 1 around North Pole to J around South Pole
+    model::PrimitiveEquation,
+)
+    get_column!(C, D, P, ij, jring, model.geometry, model.planet, model.orography, model.land_sea_mask)
+end
+
 """
 $(TYPEDSIGNATURES)
 Update `C::ColumnVariables` by copying the prognostic variables from `D::DiagnosticVariables`
 at gridpoint index `ij`. Provide `G::Geometry` for coordinate information."""
 function get_column!(   C::ColumnVariables,
                         D::DiagnosticVariables,
+                        P::PrognosticVariables,
                         ij::Integer,        # grid point index
                         jring::Integer,     # ring index 1 around North Pole to J around South Pole
-                        G::Geometry)
+                        geometry::Geometry,
+                        planet::AbstractPlanet,
+                        orography::AbstractOrography,
+                        land_sea_mask::AbstractLandSeaMask)
 
-    (;σ_levels_full,ln_σ_levels_full) = G
+    (;σ_levels_full, ln_σ_levels_full) = geometry
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
-    C.latd = G.latds[ij]      # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
-    C.lond = G.londs[ij]
-    C.jring = jring           # ring index j of column, used to index latitude vectors
+    C.latd = geometry.latds[ij]     # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
+    C.lond = geometry.londs[ij]
+    C.ij = ij                       # grid-point index
+    C.jring = jring                 # ring index j of column, used to index latitude vectors
+    C.land_fraction = land_sea_mask.land_sea_mask[ij]
+    C.orography = orography.orography[ij]
+    C.surface_geopotential = C.orography * planet.gravity
 
-    # pressure [Pa]/[log(Pa)]
+    # pressure [Pa] or [log(Pa)]
     lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics
     pₛ = exp(lnpₛ)                          # convert back here
     C.ln_pres .= ln_σ_levels_full .+ lnpₛ   # log pressure on every level ln(p) = ln(σ) + ln(pₛ)
@@ -27,23 +47,48 @@ function get_column!(   C::ColumnVariables,
         C.u[k] = layer.grid_variables.u_grid[ij]
         C.v[k] = layer.grid_variables.v_grid[ij]
         C.temp[k] = layer.grid_variables.temp_grid[ij]
-        C.humid[k] = layer.grid_variables.humid_grid[ij]
-
-        # as well as geopotential (not actually prognostic though)
-        # TODO geopot on the grid is currently not computed in dynamics
-        C.geopot[k] = layer.grid_variables.geopot_grid[ij]
+        C.temp_virt[k] = layer.grid_variables.temp_virt_grid[ij]    # actually diagnostic
+        C.humid[k] = layer.grid_variables.humid_grid[ij] 
     end
+
+    # TODO skin = surface approximation for now
+    C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
+    C.skin_temperature_land = P.land.land_surface_temperature[ij]
+    C.soil_moisture_availability = D.surface.soil_moisture_availability[ij]
 end
 
 """Recalculate ring index if not provided."""
 function get_column!(   C::ColumnVariables,
                         D::DiagnosticVariables,
+                        P::PrognosticVariables,
                         ij::Int,            # grid point index
-                        G::Geometry)
+                        model::PrimitiveEquation)
 
-    rings = eachring(G.Grid,G.nlat_half)
+    SG = model.spectral_grid
+    rings = eachring(SG.Grid,SG.nlat_half)
     jring = whichring(ij,rings)
-    get_column!(C,D,ij,jring,G)
+    get_column!(C,D,P,ij,jring,model)
+end
+
+function get_column(    S::AbstractSimulation,
+                        ij::Integer,
+                        verbose::Bool = true)
+    (;prognostic_variables, diagnostic_variables) = S
+
+    column = deepcopy(S.diagnostic_variables.columns[1])
+    reset_column!(column)
+
+    get_column!(column,
+                diagnostic_variables,
+                prognostic_variables,
+                ij,
+                model)
+
+    # execute all parameterizations for this column to return a consistent state
+    parameterization_tendencies!(column, S.model)
+
+    verbose && @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
+    return column
 end
 
 """
@@ -51,22 +96,31 @@ $(TYPEDSIGNATURES)
 Write the parametrization tendencies from `C::ColumnVariables` into the horizontal fields
 of tendencies stored in `D::DiagnosticVariables` at gridpoint index `ij`."""
 function write_column_tendencies!(  D::DiagnosticVariables,
-                                    C::ColumnVariables,
+                                    column::ColumnVariables,
+                                    planet::AbstractPlanet,
                                     ij::Int)            # grid point index
 
-    @boundscheck C.nlev == D.nlev || throw(BoundsError)
+    (; nlev) = column
+    @boundscheck nlev == D.nlev || throw(BoundsError)
 
     @inbounds for (k,layer) = enumerate(D.layers)
-        layer.tendencies.u_tend_grid[ij] = C.u_tend[k]
-        layer.tendencies.v_tend_grid[ij] = C.v_tend[k]
-        layer.tendencies.temp_tend_grid[ij] = C.temp_tend[k]
-        layer.tendencies.humid_tend_grid[ij] = C.humid_tend[k]
+        layer.tendencies.u_tend_grid[ij] = column.u_tend[k]
+        layer.tendencies.v_tend_grid[ij] = column.v_tend[k]
+        layer.tendencies.temp_tend_grid[ij] = column.temp_tend[k]
+        layer.tendencies.humid_tend_grid[ij] = column.humid_tend[k]
     end
 
     # accumulate (set back to zero when netcdf output)
-    D.surface.precip_large_scale[ij] += C.precip_large_scale
-    D.surface.precip_convection[ij] += C.precip_convection
+    D.surface.precip_large_scale[ij] += column.precip_large_scale
+    D.surface.precip_convection[ij] += column.precip_convection
 
+    # Output cloud top in height [m] from geopotential height divided by gravity,
+    # but NaN for no clouds
+    D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.geopot[column.cloud_top]
+    D.surface.cloud_top[ij] /= planet.gravity
+    
+    # just use layer index 1 (top) to nlev (surface) for analysis, but 0 for no clouds
+    # D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.cloud_top
     return nothing
 end
 
@@ -92,18 +146,14 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     column.flux_temp_upward .= 0
     column.flux_temp_downward .= 0
 
-    # # Convection
-    # column.cloud_top = column.nlev+1
-    # column.conditional_instability = false
-    # column.activate_convection = false
-    column.precip_convection = zero(NF)
-    # fill!(column.net_flux_humid, 0)
-    # fill!(column.net_flux_dry_static_energy, 0)
+    # Convection and precipitation
+    column.cloud_top = column.nlev+1            # also diagnostic from condensation
+    column.precip_convection = 0
+    column.precip_large_scale = 0
 
-    # Large-scale condensation
-    column.precip_large_scale = zero(NF)
     return nothing
 end
 
 # iterator for convenience
 eachlayer(column::ColumnVariables) = Base.OneTo(column.nlev)
+Base.eachindex(column::ColumnVariables) = Base.OneTo(column.nlev)

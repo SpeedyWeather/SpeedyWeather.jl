@@ -1,7 +1,11 @@
+abstract type AbstractVerticalAdvection end
+abstract type VerticalAdvection{NF,B} <: AbstractVerticalAdvection end
+
 # Dispersive and diffusive advection schemes `NF` is the type, `B` the half-stencil size
 abstract type DiffusiveVerticalAdvection{NF, B}  <: VerticalAdvection{NF, B} end
 abstract type DispersiveVerticalAdvection{NF, B} <: VerticalAdvection{NF, B} end
 
+export UpwindVerticalAdvection, WENOVerticalAdvection, CenteredVerticalAdvection
 struct UpwindVerticalAdvection{NF, B}   <: DiffusiveVerticalAdvection{NF, B} end
 struct WENOVerticalAdvection{NF}        <: DiffusiveVerticalAdvection{NF, 3} end
 struct CenteredVerticalAdvection{NF, B} <: DispersiveVerticalAdvection{NF, B} end

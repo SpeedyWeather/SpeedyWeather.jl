@@ -1,245 +1,212 @@
 # How to run SpeedyWeather.jl
 
-Creating a SpeedyWeather.jl simulation and running it consists conceptually of 4 steps
+Creating a SpeedyWeather.jl simulation and running it consists conceptually of 4 steps.
+In contrast to many other models, these steps are bottom-up rather then top-down.
+There is no monolithic interface to SpeedyWeather.jl, instead all options that a
+user may want to adjust are chosen and live in their respective model components.
 
-1. Create a `SpectralGrid` which defines the grid and spectral resolution
-2. Create a model
-3. Initialize a model to obtain a `Simulation`.
-4. Run the simulation.
+1. Create a [SpectralGrid](@ref) which defines the grid and spectral resolution.
+2. [Create model components](@ref create_model_components) and combine to a [model](@ref create_model).
+3. [Initialize the model to create a simulation](@ref initialize).
+4. [Run that simulation](@ref run).
 
-In the following we will describe these steps in more detail,
-but let's start with some examples first.
-
-## Example 1: 2D turbulence on a non-rotating sphere
-
-We want to use the barotropic model to simulate some free-decaying 2D turbulence
-on the sphere without rotation. We start by defining the `SpectralGrid` object.
-To have a resolution of about 200km, we choose a spectral resolution of
-T63 (see [Available horizontal resolutions](@ref)) and `nlev=1` vertical levels.
-The `SpectralGrid` object will provide us with some more information
-```@example howtorun
-using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=63,nlev=1)
-```
-
-We could have specified further options, but let's ignore that for now.
-Next step we create a planet that's like Earth but not rotating
-```@example howtorun
-still_earth = Earth(rotation=0)
-```
-There are other options to create a planet but they are irrelevant for the
-barotropic vorticity equations. We also want to specify the initial conditions,
-randomly distributed vorticity is already defined
-```@example howtorun
-using Random # hide
-Random.seed!(1234) # hide
-initial_conditions = StartWithRandomVorticity()
-```
-By default, the power of vorticity is spectrally distributed with ``k^{-3}``, ``k`` being the
-horizontal wavenumber, and the amplitude is ``10^{-5}\text{s}^{-1}``.
-
-Now we want to construct a `BarotropicModel`
-with these
-```@example howtorun
-model = BarotropicModel(;spectral_grid, initial_conditions, planet=still_earth)
-nothing # hide
-```
-The `model` contains all the parameters, but isn't initialized yet, which we can do
-with and then run it. The `run!` command will always return the prognostic variables, which, by default, are 
-plotted for surface relative vorticity with a unicode plot. The resolution of the plot
-is not necessarily representative but it lets us have a quick look at the result
-```@example howtorun
-simulation = initialize!(model)
-run!(simulation,n_days=20)
-```
-
-Woohoo! I can see turbulence! You could pick up where this simulation stopped by simply
-doing `run!(simulation,n_days=50)` again. We didn't store any output, which
-you can do by `run!(simulation,output=true)`, which will switch on NetCDF output
-with default settings. More options on output in [NetCDF output](@ref).
-
-## Example 2: Shallow water with mountains
-
-As a second example, let's investigate the Galewsky et al.[^1] test case for the shallow
-water equations with and without mountains. As the shallow water system has also only
-one level, we can reuse the `SpectralGrid` from Example 1.
-```@example howtorun
-spectral_grid = SpectralGrid(trunc=63,nlev=1)
-```
-Now as a first simulation, we want to disable any orography, so we create a `NoOrography`
-```@example howtorun
-orography = NoOrography(spectral_grid)
-```
-Although the orography is zero, you have to pass on `spectral_grid` so that it can
-still initialize zero-arrays of the right size and element type. Awesome.
-This time the initial conditions should be set the the Galewsky et al.[^1] zonal
-jet, which is already defined as
-```@example howtorun
-initial_conditions = ZonalJet()
-```
-The jet sits at 45˚N with a maximum velocity of 80m/s and a perturbation as described in their paper.
-Now we construct a model, but this time a `ShallowWaterModel`
-```@example howtorun
-model = ShallowWaterModel(;spectral_grid, orography, initial_conditions)
-simulation = initialize!(model)
-run!(simulation,n_days=6)
-```
-Oh yeah. That looks like the wobbly jet in their paper. Let's run it again for another 6 days
-but this time also store [NetCDF output](@ref).
-```@example howtorun
-run!(simulation,n_days=6,output=true)
-```
-The progress bar tells us that the simulation run got the identification "0001"
-(which just counts up, so yours might be higher), meaning that
-data is stored in the folder `/run_0001`, so let's plot that data properly (and not just using UnicodePlots).
-```@example howtorun
-using PythonPlot, NCDatasets
-ioff() # hide
-ds = NCDataset("run_0001/output.nc")
-ds["vor"]
-```
-Vorticity `vor` is stored as a lon x lat x vert x time array, we may want to look at the first time step,
-which is the end of the previous simulation (time=6days) which we didn't store output for.
-```@example howtorun
-time = 1
-vor = Matrix{Float32}(ds["vor"][:,:,1,time]) # convert from Matrix{Union{Missing,Float32}} to Matrix{Float32}
-lat = ds["lat"][:]
-lon = ds["lon"][:]
-pcolormesh(lon,lat,vor')
-xlabel("longitude")
-ylabel("latitude")
-tight_layout() # hide
-savefig("galewsky1.png") # hide
-nothing # hide
-```
-![Galewsky jet pyplot](galewsky1.png)
-
-You see that in comparison the unicode plot heavily coarse-grains the simulation, well it's unicode after all!
-And now the last time step, that means time = 12days is
-
-```@example howtorun
-time = 25
-vor = Matrix{Float32}(ds["vor"][:,:,1,time])
-pcolormesh(lon,lat,vor')
-xlabel("longitude")
-ylabel("latitude")
-tight_layout() # hide
-savefig("galewsky2.png") # hide
-nothing # hide
-```
-![Galewsky jet pyplot](galewsky2.png)
-
-The jet broke up into many small eddies, but the turbulence is still confined to the northern hemisphere, cool!
-How this may change when we add mountains (we had `NoOrography` above!), say Earth's orography, you may ask?
-Let's try it out! We create an `EarthOrography` struct like so
-
-```@example howtorun
-orography = EarthOrography(spectral_grid)
-```
-
-It will read the orography from file as shown, and there are some smoothing options too, but let's not change them.
-Same as before, create a model, initialize into a simulation, run. This time directly for 12 days so that we can
-compare with the last plot
-
-```@example howtorun
-model = ShallowWaterModel(;spectral_grid, orography, initial_conditions)
-simulation = initialize!(model)
-run!(simulation,n_days=12,output=true)
-```
-
-This time the run got a new run id, `0002` in our case, which you can always check
-after the `run!` call (the automatic run id is only determined just before the main time loop starts)
-with `model.output.id`, but otherwise we do as before.
-
-```@example howtorun
-ds = NCDataset("run_0002/output.nc")
-time = 49
-vor = Matrix{Float32}(ds["vor"][:,:,1,time])
-pcolormesh(lon,lat,vor')
-xlabel("longitude")
-ylabel("latitude")
-tight_layout() # hide
-savefig("galewsky3.png") # hide
-nothing # hide
-```
-![Galewsky jet pyplot](galewsky3.png)
-
-Interesting! The initial conditions have zero velocity in the southern hemisphere, but still, one can see
-some imprint of the orography on vorticity. You can spot the coastline of Antarctica; the Andes and
-Greenland are somewhat visible too. Mountains also completely changed the flow after 12 days,
-probably not surprising!
+In the following we will describe these steps in more detail.
+If you want to start with some examples first, see [Model setups](@ref)
+which has easy and more advanced examples of how to set up
+SpeedyWeather.jl to run the simulation you want.
 
 ## SpectralGrid
 
 The life of every SpeedyWeather.jl simulation starts with a `SpectralGrid` object.
-We have seen some examples above, now let's look into the details
-
-```julia
-help?> SpectralGrid
-search: SpectralGrid
-
-  Defines the horizontal spectral resolution and corresponding grid and the
-  vertical coordinate for SpeedyWeather.jl. Options are
-
-    •  NF::Type{<:AbstractFloat}: number format used throughout the model
-
-    •  trunc::Int64: horizontal resolution as the maximum degree of
-       spherical harmonics
-
-    •  Grid::Type{<:SpeedyWeather.RingGrids.AbstractGrid}: horizontal
-       grid used for calculations in grid-point space
-
-    •  dealiasing::Float64: how to match spectral with grid resolution:
-       dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid
-
-    •  radius::Float64: radius of the sphere [m]
-
-    •  nlat_half::Int64: number of latitude rings on one hemisphere
-       (Equator incl)
-
-    •  npoints::Int64: total number of grid points in the horizontal
-
-    •  nlev::Int64: number of vertical levels
-
-    •  vertical_coordinates::SpeedyWeather.VerticalCoordinates:
-       coordinates used to discretize the vertical
-
-  nlat_half and npoints should not be chosen but are derived from trunc, Grid
-  and dealiasing.
-```
-
-Say we wanted double precision (`Float64`), a spectral resolution of T42 on
-a regular longitude-latitude grid (`FullClenshawGrid`) with cubic truncation
-(`dealiasing=3`) and 4 vertical levels, we would do this by
-
-```@example howtorun
-spectral_grid = SpectralGrid(NF=Float64, trunc=42, Grid=FullClenshawGrid, dealiasing=3, nlev=4)
-```
-
-We don't specify the resolution of the grid (its `nlat_half` parameter) directly,
-instead we chose a spectral truncation `trunc`
-and through the `dealiasing` factor a grid resolution will be automatically chosen. 
-Here T42 will be a matched with a 192x95 regular longitude-latitude grid
-that has 18240 grid points in total. For details see [Matching spectral and grid resolution](@ref).
-
-We could have also defined `SpectralGrid` on a smaller sphere than Earth,
-or with a different vertical spacing
-```@example howtorun
-vertical_coordinates = SigmaCoordinates(0:0.2:1)
-```
-These are regularly spaced [Sigma coordinates](@ref), defined through their half levels.
-```@example howtorun
-spectral_grid = SpectralGrid(;vertical_coordinates,radius=1e6)
-```
-
-In the end, a `SpectralGrid` defines the physical domain of the simulation and its discretization.
+A `SpectralGrid` defines the physical domain of the simulation and its discretization.
 This domain has to be a sphere because of the spherical harmonics, but it can have a different radius.
 The discretization is for spectral, grid-point space and the vertical as this determines the size of many
 arrays for preallocation, for which als the number format is essential to know.
 That's why `SpectralGrid` is the beginning of every SpeedyWeather.jl simulation and that is why
 it has to be passed on to (most) model components.
 
-## References
+The default `SpectralGrid` is
 
-[^1] Galewsky, Scott, Polvani, 2004. *An initial-value problem for testing numerical models of the global shallow-water equations*, Tellus A.
-DOI: [10.3402/tellusa.v56i5.14436](https://doi.org/10.3402/tellusa.v56i5.14436)
+```@example howto
+using SpeedyWeather
+spectral_grid = SpectralGrid()
+```
+You can also get the help prompt by typing `?SpectralGrid`.
+Let's explain the details: The spectral resolution is T31, so the largest
+wavenumber in spectral space is 31, and all the complex spherical harmonic
+coefficients of a given 2D field (see [Spherical Harmonic Transform](@ref))
+are stored in a [`LowerTriangularMatrix`](@ref lowertriangularmatrices)
+in the number format Float32. The radius of the sphere is
+6371km by default, which is the radius of the Earth.
+
+This spectral resolution is combined with an
+[octahedral Gaussian grid](@ref OctahedralGaussianGrid) of 3168 grid points.
+This grid has 48 latitude rings, 20 longitude points around the poles
+and up to 96 longitude points around the Equator. Data on that
+grid is also stored in Float32. The resolution is therefore on average about 400km.
+In the vertical 8 levels are used, using [Sigma coordinates](@ref).
+
+The resolution of a SpeedyWeather.jl simulation is adjusted using the
+`trunc` argument, this defines the spectral resolution and the grid
+resolution is automatically adjusted to keep the aliasing between
+spectral and grid-point space constant (see [Matching spectral and grid resolution](@ref)).
+```@example howto
+spectral_grid = SpectralGrid(trunc=85)
+```
+Typical values are 31,42,63,85,127,170,... although you can technically
+use any integer, see [Available horizontal resolutions](@ref) for details.
+Now with T85 (which is a common notation for `trunc=85`) the grid
+is of higher resolution too. You may play with the `dealiasing` factor,
+a larger factor increases the grid resolution that is matched with a given
+spectral resolution. You don't choose the resolution of the grid directly,
+but using the `Grid` argument you can change its type (see [Grids](@ref))
+```@example howto
+spectral_grid = SpectralGrid(trunc=85,dealiasing=3,Grid=HEALPixGrid)
+```
+
+## Vertical coordinates and resolution
+
+The number of vertical layers or levels (we use both terms often interchangeably)
+is determined through the `nlev` argument. Especially for the
+`BarotropicModel` and the `ShallowWaterModel` you want to set this to
+```@example howto
+spectral_grid = SpectralGrid(nlev=1)
+```
+For a single vertical level the type of the vertical coordinates does not matter,
+but in general you can change the spacing of the sigma coordinates
+which have to be discretized in ``[0,1]``
+```@example howto
+vertical_coordinates = SigmaCoordinates(0:0.2:1)
+```
+These are regularly spaced [Sigma coordinates](@ref), defined through their half levels.
+The cell centers or called full levels are marked with an ×.
+
+## [Creating model components](@id create_model_components)
+
+SpeedyWeather.jl deliberately avoids the namelists that are the main
+user interface to many old school models. Instead, we employ a modular approach
+whereby every non-default model component is created with its respective
+parameters to finally build the whole model from these components.
+
+If you know which components you want to adjust you would create them right away,
+however, a new user might first want to know which components there are,
+so let's flip the logic around and assume you know you want to run a `ShallowWaterModel`.
+You can create a default `ShallowWaterModel` like so and inspect its components
+```@example howto
+model = ShallowWaterModel()
+```
+
+So by default the `ShallowWaterModel` uses a [Leapfrog `time_stepping`](@ref leapfrog),
+which you can inspect like so
+```@example howto
+model.time_stepping
+```
+
+Model components often contain parameters from the `SpectralGrid` as they are needed
+to determine the size of arrays and other internal reasons. You should, in most cases,
+just ignore those. But the `Leapfrog` time stepper comes with `Δt_at_T31` which
+is the parameter used to scale the time step automatically. This means at a spectral
+resolution of T31 it would use 30min steps, at T63 it would be ~half that, 15min, etc.
+Meaning that if you want to have a shorter or longer time step you can create a new
+`Leapfrog` time stepper. All time inputs are supposed to be given with the help of  `Dates` (e.g. `Minute()`, `Hour()`, ...). But remember that every model component depends on a
+`SpectralGrid` as first argument.
+```@example howto
+spectral_grid = SpectralGrid(trunc=63,nlev=1)
+time_stepping = Leapfrog(spectral_grid,Δt_at_T31=Minute(15))
+```
+The actual time step at the given resolution (here T63) is then `Δt_sec`, there's
+also `Δt` which is a scaled time step used internally, because SpeedyWeather.jl
+[scales the equations](@ref scaled_swm) with the radius of the Earth,
+but this is largely hidden (except here) from the user. With this new 
+`Leapfrog` time stepper constructed we can create a model by passing
+on the components (they are keyword arguments so either use `;time_stepping`
+for which the naming must match, or `time_stepping=my_time_stepping` with
+any name)
+```@example howto
+model = ShallowWaterModel(;spectral_grid,time_stepping)
+```
+This logic continues for all model components. See the [Model setups](@ref)
+for examples. All model components are also subtype (i.e. `<:`) of
+some abstract supertype, this feature can be made use of to redefine
+not just constant parameters of existing model components but also
+to define new ones. This is more elaborated in [Extending SpeedyWeather](@ref).
+
+A model in SpeedyWeather.jl is understood as a collection of model components that
+roughly belong into one of three groups. 
+
+1. Components (numerics, dynamics, or physics) that have parameters, possibly contain some data (immutable, precomputed) and some functions associated with them. For example, a forcing term may be defined through some parameters, but also require precomputed arrays, or data to be loaded from file and a function that instructs how to calculate this forcing on every time step.
+2. Components that are merely a collection of parameters that conceptually belong together. For example, `Earth` is an `AbstractPlanet` that contains all the orbital parameters important for weather and climate (rotation, gravity, etc).
+3. Components for output purposes. For example, `OutputWriter` controls the NetCDF output, and `Feedback` controls the information printed to the REPL and to file.
+
+## [Creating a model](@id create_model)
+
+SpeedyWeather.jl implements (currently) 4 different models
+
+1. `BarotropicModel`, see [Barotropic vorticity model](@ref)
+2. `ShallowWaterModel`, see [Shallow water model](@ref)
+3. `PrimitiveDryModel`, see [Primitive equation model](@ref) but with zero humidity.
+4. `PrimitiveWetModel`, see [Primitive equation model](@ref).
+
+Overall they are kept quite similar, but there are still fundamental
+differences arising from the different equations. For example,
+the barotropic and shallow water models do not have any physical
+parameterizations. Conceptually you construct these different models with
+
+```julia
+spectral_grid = SpectralGrid(trunc=...,...)
+component1 = SomeComponent(spectral_grid,parameter1=...,...)
+component2 = SomeOtherComponent(spectral_grid,parameter2=...,...)
+model = BarotropicModel(;spectral_grid,all_other_components...,...)
+```
+or `model = ShallowWaterModel(;spectral_grid,...)`, etc.
+
+## [Model initialization](@id initialize)
+
+In the previous section the model was created, but this is conceptually
+just gathering all its components together. However, many components
+need to be initialized. This step is used to precompute arrays,
+load necessary data from file or to communicate those between components.
+Furthermore, prognostic and diagnostic variables are allocated.
+It is (almost) all that needs to be done before the model can be run
+(exception being the output initialization). Many model components
+have a `initialize!` function associated with them that it executed here.
+However, from a user perspective all that needs to be done here is
+```@example howto
+simulation = initialize!(model)
+```
+and we have initialized the `ShallowWaterModel` we have defined earlier.
+After this step you can continue to tweak your model setup but note that
+some model components are immutable, or that your changes may not be
+propagated to other model components that rely on it. But you can, for
+example, change the output time step like so
+```@example howto
+simulation.model.output.output_dt = Second(3600)
+```
+Now, if there's output, it will be every hour. Furthermore the initial
+conditions can be set with the `initial_conditions` model component
+which are then set during `initialize!(::ModelSetup)`, but you can also
+change them now, before the model runs
+```@example howto
+simulation.prognostic_variables.layers[1].timesteps[1].vor[1] = 0
+```
+So with this we have set the zero mode of vorticity of the first (and only)
+layer in the shallow water to zero. Because the leapfrogging is a 2-step
+time stepping scheme we set here the first. As it is often tricky
+to set the initial conditions in spectral space, it is generally advised
+to do so through the `initial_conditions` model component.
+
+## [Run a simulation](@id run)
+
+After creating a model, initializing it to a simulation, all that is left
+is to run the simulation.
+```@example howto
+run!(simulation)
+```
+By default this runs for 10 days without output. These are the options left
+to change, so with
+```@example howto
+model.output.id = "test" # hide
+run!(simulation,period=Day(5),output=true)
+```
+You would continue this simulation (the previous `run!` call already integrated
+10 days!) for another 5 days and storing default [NetCDF output](@ref).

@@ -2,15 +2,17 @@
 
 Welcome to the documentation for [SpeedyWeather.jl](https://github.com/milankl/SpeedyWeather.jl) a global
 atmospheric circulation model with simple parametrizations to represent physical processes such as clouds,
-precipitation and radiation.
+precipitation and radiation. SpeedyWeather in general is more a library than just a model as it exposes
+most of its internal functions to the user such that simulations and analysis can be interactively
+combined. Its user interface is built in a very modular way such that new components can be easily
+defined and integrated into SpeedyWeather.
 
 ## Overview
 
-SpeedyWeather.jl is a global spectral model that uses a spherical harmonic transform to simulate
-the general circulation of the atmosphere.
-The prognostic variables used are vorticity, divergence, temperature, surface pressure
-and specific humidity. Simple parameterizations represent various climate processes: Radiation,
-clouds, precipitation, surface fluxes, among others.
+SpeedyWeather.jl is uses a spherical harmonic transform to simulate
+the general circulation of the atmosphere using a vorticity-divergence formulation,
+a semi-implicit time integration and simple parameterizations to represent various
+climate processes: Radiation, clouds, precipitation, surface fluxes, among others.
 
 SpeedyWeather.jl defines 
 - `BarotropicModel` for the 2D barotropic vorticity equation
@@ -19,30 +21,6 @@ SpeedyWeather.jl defines
 - `PrimitiveWetModel` for the 3D primitive equations with humidity
 
 and solves these equations in spherical coordinates as described in this documentation.
-
-## Manual outline
-
-See the following pages of the documentation for more details
-
-- [Installation](installation.md)
-- [How to run SpeedyWeather.jl](how_to_run_speedy.md)
-- [Spherical harmonic transform](spectral_transform.md)
-- [Grids](grids.md)
-- [Barotropic model](barotropic.md)
-- [Shallow water model](shallowwater.md)
-- [Primitive equation model](primitiveequation.md)
-- [Parameterizations](parameterizations.md)
-- [Extending SpeedyWeather](extending.md)
-- [NetCDF output](output.md)
-
-and the submodules
-
-- [RingGrids](@ref)
-- [LowerTriangularMatrices](@ref lowertriangularmatrices)   
-- [SpeedyTransforms](@ref)
-
-and the [original documentation](http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf)
-by Molteni and Kucharski.
 
 ## Developers
 

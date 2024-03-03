@@ -1,7 +1,7 @@
 @testset "Divergence of a non-divergent flow zero?" begin
     @testset for NF in (Float32,Float64)
 
-        spectral_grid = SpectralGrid(;NF)
+        spectral_grid = SpectralGrid(;NF,nlev=1)
         m = ShallowWaterModel(;spectral_grid)
         simulation = initialize!(m)
         p = simulation.prognostic_variables
@@ -48,7 +48,7 @@ end
 @testset "Curl of an irrotational flow zero?" begin
     @testset for NF in (Float32,Float64)
 
-        spectral_grid = SpectralGrid(;NF)
+        spectral_grid = SpectralGrid(;NF,nlev=1)
         m = ShallowWaterModel(;spectral_grid)
         simulation = initialize!(m)
         p = simulation.prognostic_variables
@@ -74,11 +74,11 @@ end
 
         G = m.geometry
         S = m.spectral_transform
-        C = m.constants
+        C = m.coriolis
 
         # to evaluate ∇×(uv) use curl of vorticity fluxes (=∇×(uv(ζ+f))) with ζ=1,f=0
         fill!(d.layers[1].grid_variables.vor_grid,1)
-        fill!(C.f_coriolis,0)
+        fill!(m.coriolis.f,0)
 
         # calculate uω,vω in spectral space
         SpeedyWeather.vorticity_flux_curldiv!(d.layers[1],C,G,S,div=true)
@@ -97,7 +97,7 @@ end
                         OctahedralClenshawGrid,
                         HEALPixGrid)
 
-            SG = SpectralGrid(NF;Grid)
+            SG = SpectralGrid(NF;Grid,nlev=1)
             G = Geometry(SG)
 
             A = Grid(randn(NF,SG.npoints))
@@ -173,7 +173,7 @@ end
 @testset "D,ζ -> u,v -> D,ζ" begin
     @testset for NF in (Float32,Float64)
 
-        spectral_grid = SpectralGrid(;NF)
+        spectral_grid = SpectralGrid(;NF,nlev=1)
         m = ShallowWaterModel(;spectral_grid)
         simulation = initialize!(m)
         p = simulation.prognostic_variables
@@ -189,8 +189,8 @@ end
 
         # create initial conditions
         (;lmax,mmax) = m.spectral_transform
-        vor0 = randn(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
-        div0 = randn(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+        vor0 = rand(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
+        div0 = rand(LowerTriangularMatrix{Complex{NF}},lmax+1,mmax+1)
         
         vor0[1,1] = 0                   # zero mean
         div0[1,1] = 0
@@ -234,6 +234,7 @@ end
         SpeedyWeather.divergence!(div1,u_coslat⁻¹,v_coslat⁻¹,S)
 
         for lm in SpeedyWeather.eachharmonic(vor0,vor1,div0,div1)
+            # increased to 20 as 10 caused single fails every now and then
             @test vor0[lm] ≈ vor1[lm] rtol=20*sqrt(eps(NF))
             @test div0[lm] ≈ div1[lm] rtol=20*sqrt(eps(NF))
         end
@@ -293,7 +294,7 @@ end
     for NF in (Float32,Float64)
 
         trunc = 31
-        spectral_grid = SpectralGrid(;NF,trunc,Grid=FullGaussianGrid)
+        spectral_grid = SpectralGrid(;NF,trunc,Grid=FullGaussianGrid,nlev=1)
         m = ShallowWaterModel(;spectral_grid)
         simulation = initialize!(m)
         p = simulation.prognostic_variables

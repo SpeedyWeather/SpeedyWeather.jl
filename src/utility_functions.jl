@@ -82,7 +82,7 @@ function print_fields(io::IO,A,keys;arrays::Bool=false)
     filtered = n < length(keys)
     for (i,key) in enumerate(keys_filtered)
         last = (i == n) & ~filtered
-        key = keys[i]
+        key = keys_filtered[i]
         val = getfield(A,key)
         ~last ? println(io,"├ $key::$(typeof(val)) = $val") :
                 print(io,  "└ $key::$(typeof(val)) = $val")
@@ -99,4 +99,26 @@ function print_fields(io::IO,A,keys;arrays::Bool=false)
         s_without_comma = s[1:prevind(s,findlast(==(','), s))]
         print(io,s_without_comma)    
     end
+end
+
+Dates.Second(x::AbstractFloat) = convert(Second,x)
+Dates.Minute(x::AbstractFloat) = Second(60x)
+Dates.Hour(  x::AbstractFloat) = Minute(60x)
+Dates.Day(   x::AbstractFloat) = Hour(24x)
+
+# use Dates.second to round to integer seconds
+Dates.second(x::Dates.Nanosecond) = round(Int,x.value*1e-9)
+Dates.second(x::Dates.Microsecond) = round(Int,x.value*1e-6)
+Dates.second(x::Dates.Millisecond) = round(Int,x.value*1e-3)
+
+# defined to convert from floats to Dates.Second (which require ints by default) via rounding
+function Base.convert(::Type{Second},x::AbstractFloat)
+    xr = round(Int64,x)
+    x == xr || @info "Rounding and converting $x to $xr for integer seconds."
+    return Second(xr)
+end
+
+function Base.convert(::Type{Second},x::Integer)
+    @info "Input '$x' assumed to have units of seconds. Use Minute($x), Hour($x), Day($x) otherwise."
+    return Second(round(Int64,x))
 end

@@ -1,5 +1,6 @@
-"""
-Number of mantissa bits to keep for each prognostic variable when compressed for
+abstract type AbstractKeepbits end
+
+"""Number of mantissa bits to keep for each prognostic variable when compressed for
 netCDF and .jld2 data output.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct Keepbits
@@ -12,6 +13,7 @@ Base.@kwdef struct Keepbits
     humid::Int = 7
     precip_cond::Int = 7
     precip_conv::Int = 7
+    cloud::Int = 7
 end
 
 function Base.show(io::IO,K::Keepbits)
@@ -22,6 +24,9 @@ end
 
 # default number format for output
 const DEFAULT_OUTPUT_NF = Float32
+const DEFAULT_OUTPUT_DT = Hour(6)
+
+export OutputWriter
 
 """
 $(TYPEDSIGNATURES)
@@ -53,11 +58,8 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
     # WHAT/WHEN OPTIONS
     startdate::DateTime = DateTime(2000,1,1)
 
-    "[OPTION] output frequency, time step [hrs]"
-    output_dt::Float64 = 6
-
-    "actual output time step [sec]"
-    output_dt_sec::Int = 0
+    "[OPTION] output frequency, time step"
+    output_dt::Second = DEFAULT_OUTPUT_DT
 
     "[OPTION] which variables to output, u, v, vor, div, pres, temp, humid"
     output_vars::Vector{Symbol} = default_output_vars(Model)
@@ -106,7 +108,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
                                                     RingGrids.get_nlat(output_Grid,nlat_half)
     npoints::Int = nlon*nlat
     nlev::Int = spectral_grid.nlev
-    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(input_Grid,spectral_grid.nlat_half,npoints)
+    interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(NF,input_Grid,spectral_grid.nlat_half,npoints)
 
     # fields to output (only one layer, reuse over layers)
     const u::Matrix{NF} = fill(missing_value,nlon,nlat)
@@ -118,9 +120,10 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
     const humid::Matrix{NF} = fill(missing_value,nlon,nlat)
     const precip_cond::Matrix{NF} = fill(missing_value,nlon,nlat)
     const precip_conv::Matrix{NF} = fill(missing_value,nlon,nlat)
+    const cloud::Matrix{NF} = fill(missing_value,nlon,nlat)
 end
 
-# generator function pulling grid resolution and time stepping from ::SpectralGrid and ::TimeStepper
+# generator function pulling grid resolution and time stepping from ::SpectralGrid and ::AbstractTimeStepper
 function OutputWriter(
     spectral_grid::SpectralGrid,
     ::Type{Model};
@@ -131,19 +134,19 @@ function OutputWriter(
 end
 
 # default variables to output by model
-default_output_vars(::Type{<:Barotropic}) = [:vor,:u]
-default_output_vars(::Type{<:ShallowWater}) = [:vor,:u]
-default_output_vars(::Type{<:PrimitiveDry}) = [:vor,:u,:temp,:pres]
-default_output_vars(::Type{<:PrimitiveWet}) = [:vor,:u,:temp,:humid,:pres,:precip_cond,:precip_conv]
+default_output_vars(::Type{<:Barotropic}) = [:vor,:u,:v]
+default_output_vars(::Type{<:ShallowWater}) = [:vor,:u,:v]
+default_output_vars(::Type{<:PrimitiveDry}) = [:vor,:u,:v,:temp,:pres]
+default_output_vars(::Type{<:PrimitiveWet}) = [:vor,:u,:v,:temp,:humid,:pres,:precip,:cloud]
 
 # print all fields with type <: Number
 function Base.show(io::IO,O::AbstractOutputWriter)
-    print(io,"$(typeof(O)):")
-    for key in propertynames(O)
-        val = getfield(O,key)
-        val isa Union{Number,String,DataType,NTuple,Vector{Symbol},UnionAll,Keepbits} &&
-            print(io,"\n $key::$(typeof(val)) = $val")
-    end
+    println(io,"$(typeof(O))")
+    keys = propertynames(O)
+
+    # remove interpolator from being printed, TODO: implement show for AbstractInterpolator
+    keys_filtered = filter(key -> ~(getfield(O,key) isa AbstractInterpolator),keys)
+    print_fields(io,O,keys_filtered)
 end
 
 """
@@ -154,9 +157,10 @@ and dimensions. `write_output!` then writes consecuitive time steps into this fi
 function initialize!(   
     output::OutputWriter{output_NF,Model},
     feedback::AbstractFeedback,
-    time_stepping::TimeStepper,
+    time_stepping::AbstractTimeStepper,
+    clock::Clock,
     diagn::DiagnosticVariables,
-    model::Model
+    model::ModelSetup,
 ) where {output_NF,Model}
     
     output.output || return nothing     # exit immediately for no output
@@ -172,8 +176,9 @@ function initialize!(
     feedback.output = true          # if output=true set feedback.output=true too!
 
     # OUTPUT FREQUENCY
-    output.output_every_n_steps = max(1,floor(Int,output.output_dt/time_stepping.Δt_hrs))
-    output.output_dt_sec = output.output_every_n_steps*time_stepping.Δt_sec
+    output.output_every_n_steps = max(1,round(Int,
+            Millisecond(output.output_dt).value/time_stepping.Δt_millisec.value))
+    output.output_dt = Second(round(Int,output.output_every_n_steps*time_stepping.Δt_sec))
 
     # RESET COUNTERS
     output.timestep_counter = 0         # time step counter
@@ -186,9 +191,9 @@ function initialize!(
     
     # DEFINE NETCDF DIMENSIONS TIME
     (;startdate) = output
-    time_string = "seconds since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
+    time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     defDim(dataset,"time",Inf)       # unlimited time dimension
-    defVar(dataset,"time",Int64,("time",),attrib=Dict("units"=>time_string,"long_name"=>"time",
+    defVar(dataset,"time",Float64,("time",),attrib=Dict("units"=>time_string,"long_name"=>"time",
             "standard_name"=>"time","calendar"=>"proleptic_gregorian"))
     
     # DEFINE NETCDF DIMENSIONS SPACE
@@ -215,7 +220,7 @@ function initialize!(
     latds, londs = RingGrids.get_latdlonds(output_Grid,output.nlat_half)
     output.as_matrix || RingGrids.update_locator!(output.interpolator,latds,londs)
         
-    σ = model.geometry.σ_levels_full
+    σ = output_NF.(model.geometry.σ_levels_full)
     defVar(dataset,lon_name,lond,(lon_name,),attrib=Dict("units"=>lon_units,"long_name"=>lon_longname))
     defVar(dataset,lat_name,latd,(lat_name,),attrib=Dict("units"=>lat_units,"long_name"=>lat_longname))
     defVar(dataset,"lev",σ,("lev",),attrib=Dict("units"=>"1","long_name"=>"sigma levels"))
@@ -274,18 +279,23 @@ function initialize!(
     end
 
     # large-scale condensation
-    precip_cond_attribs = Dict("long_name"=>"large-scale precipitation","units"=>"mm/dt","_FillValue"=>missing_value)
+    precip_cond_attribs = Dict("long_name"=>"large-scale precipitation","units"=>"mm/hr","_FillValue"=>missing_value)
     :precip in output_vars && defVar(dataset,"precip_cond",output_NF,(lon_name,lat_name,"time"),attrib=precip_cond_attribs,
                                         deflatelevel=compression_level,shuffle=output.shuffle)
 
     # convective precipitation
-    precip_conv_attribs = Dict("long_name"=>"convective precipitation","units"=>"mm/dt","_FillValue"=>missing_value)
+    precip_conv_attribs = Dict("long_name"=>"convective precipitation","units"=>"mm/hr","_FillValue"=>missing_value)
     :precip in output_vars && defVar(dataset,"precip_conv",output_NF,(lon_name,lat_name,"time"),attrib=precip_conv_attribs,
                                         deflatelevel=compression_level,shuffle=output.shuffle)
     
+    # convective precipitation
+    cloud_top_attribs = Dict("long_name"=>"cloud top height","units"=>"m","_FillValue"=>missing_value)
+    :cloud in output_vars && defVar(dataset,"cloud_top",output_NF,(lon_name,lat_name,"time"),attrib=cloud_top_attribs,
+                                    deflatelevel=compression_level,shuffle=output.shuffle)
+
     # WRITE INITIAL CONDITIONS TO FILE
     write_netcdf_variables!(output,diagn)
-    write_netcdf_time!(output,startdate)
+    write_netcdf_time!(output,clock.time)
 
     # also export parameters into run????/parameters.txt
     parameters_txt = open(joinpath(output.run_path,"parameters.txt"),"w")
@@ -300,6 +310,7 @@ function initialize!(
     model isa Union{ShallowWater,PrimitiveEquation} && println(parameters_txt,model.orography)
     close(parameters_txt)
 end
+
 
 """
 $(TYPEDSIGNATURES)
@@ -374,8 +385,9 @@ function write_netcdf_time!(output::OutputWriter,
     (; netcdf_file, startdate ) = output
     i = output.output_counter
 
-    time_sec = round(Int64,Dates.value(Dates.Second(time-startdate)))
-    netcdf_file["time"][i] = time_sec
+    time_passed = Millisecond(time-startdate)
+    time_hrs = time_passed.value/3600_000       # [ms] -> [hrs]
+    netcdf_file["time"][i] = time_hrs
     NCDatasets.sync(netcdf_file)
 
     return nothing
@@ -391,7 +403,7 @@ function write_netcdf_variables!(   output::OutputWriter,
     (;output_vars) = output                     # Vector{Symbol} of variables to output
     i = output.output_counter
 
-    (;u, v, vor, div, pres, temp, humid, precip_cond, precip_conv) = output
+    (;u, v, vor, div, pres, temp, humid, precip_cond, precip_conv, cloud) = output
     (;output_Grid, interpolator) = output
     (;quadrant_rotation, matrix_quadrant) = output
     (;netcdf_file, keepbits) = output
@@ -443,12 +455,12 @@ function write_netcdf_variables!(   output::OutputWriter,
     end
 
     # surface pressure, i.e. interface displacement η
-    (; pres_grid, precip_large_scale, precip_convection ) = diagn.surface
+    (; pres_grid, precip_large_scale, precip_convection, cloud_top ) = diagn.surface
 
     if output.as_matrix
-        if :pres in output_vars || :precip_cond in output_vars || :precip_conv in output_vars
-            MGs = ((M,G) for (M,G) in zip((pres,precip_cond,precip_conv),
-                                            (pres_grid, precip_large_scale, precip_convection)))
+        if :pres in output_vars || :precip_cond in output_vars || :precip_conv in output_vars || :cloud in output_vars
+            MGs = ((M,G) for (M,G) in zip((pres,precip_cond,precip_conv,cloud),
+                                            (pres_grid, precip_large_scale, precip_convection, cloud_top)))
 
             RingGrids.Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
         end
@@ -456,15 +468,18 @@ function write_netcdf_variables!(   output::OutputWriter,
         :pres in output_vars && RingGrids.interpolate!(output_Grid(pres),pres_grid,interpolator)
         :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_cond),precip_large_scale,interpolator)
         :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_conv),precip_convection,interpolator)
+        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_conv),precip_convection,interpolator)
+        :cloud in output_vars && RingGrids.interpolate!(output_Grid(cloud),cloud_top,interpolator)
     end
 
     # after output set precip accumulators back to zero
     precip_large_scale .= 0
     precip_convection .= 0
 
-    # convert from [m] to [mm] within output time step (e.g. 6hours)
-    precip_cond *= 1000
-    precip_conv *= 1000
+    # convert from [m] to [mm/hr] rain rate over output time step (e.g. 6hours)
+    s = (1000*Hour(1)/output.output_dt)
+    precip_cond *= s
+    precip_conv *= s
 
     if Model <: PrimitiveEquation
         @. pres = exp(pres)/100     # convert from log(pₛ) to surface pressure pₛ [hPa]
@@ -473,10 +488,12 @@ function write_netcdf_variables!(   output::OutputWriter,
     :pres in output_vars && round!(pres,keepbits.pres)
     :precip in output_vars && round!(precip_cond,keepbits.precip_cond)
     :precip in output_vars && round!(precip_conv,keepbits.precip_conv)
+    :cloud in output_vars && round!(cloud,keepbits.cloud)
     
     :pres in output_vars && (netcdf_file["pres"][:,:,i] = pres)
     :precip in output_vars && (netcdf_file["precip_cond"][:,:,i] = precip_cond)
     :precip in output_vars && (netcdf_file["precip_conv"][:,:,i] = precip_conv)
+    :cloud in output_vars && (netcdf_file["cloud_top"][:,:,i] = cloud)
 
     return nothing
 end
@@ -491,8 +508,8 @@ to the output folder (or current path) that can be used to restart the model.
 `restart.jld2` will then be used as initial conditions. The prognostic variables
 are bitrounded for compression and the 2nd leapfrog time step is discarded.
 Variables in restart file are unscaled."""
-function write_restart_file(progn::PrognosticVariables,
-                            output::OutputWriter)
+function write_restart_file(progn::PrognosticVariables{T},
+                            output::OutputWriter) where T
     
     (; run_path, write_restart, keepbits ) = output
     output.output || return nothing         # exit immediately if no output and
@@ -508,10 +525,12 @@ function write_restart_file(progn::PrognosticVariables,
         copyto!(layer.timesteps[1].humid,layer.timesteps[2].humid)
 
         # bitround 1st leapfrog step to output precision
-        round!(layer.timesteps[1].vor,keepbits.vor)
-        round!(layer.timesteps[1].div,keepbits.div)
-        round!(layer.timesteps[1].temp,keepbits.temp)
-        round!(layer.timesteps[1].humid,keepbits.humid)
+        if T <: Base.IEEEFloat  # currently not defined for other formats...
+            round!(layer.timesteps[1].vor,keepbits.vor)
+            round!(layer.timesteps[1].div,keepbits.div)
+            round!(layer.timesteps[1].temp,keepbits.temp)
+            round!(layer.timesteps[1].humid,keepbits.humid)
+        end
 
         # remove 2nd leapfrog step by filling with zeros
         fill!(layer.timesteps[2].vor,0)
@@ -522,7 +541,7 @@ function write_restart_file(progn::PrognosticVariables,
 
     # same for surface pressure
     copyto!(progn.surface.timesteps[1].pres,progn.surface.timesteps[2].pres)
-    round!(progn.surface.timesteps[1].pres,keepbits.pres)
+    T <: Base.IEEEFloat && round!(progn.surface.timesteps[1].pres,keepbits.pres)
     fill!(progn.surface.timesteps[2].pres,0)
 
     jldopen(joinpath(run_path,"restart.jld2"),"w"; compress=true) do f
@@ -544,5 +563,5 @@ Loads a `var_name` trajectory of the model `M` that has been saved in a netCDF f
 """
 function load_trajectory(var_name::Union{Symbol, String}, model::ModelSetup) 
     @assert model.output.output "Output is turned off"
-    return NCDataset(get_full_output_file_path(model.output))[string(var_name)][:]
+    return Array(NCDataset(get_full_output_file_path(model.output))[string(var_name)])
 end

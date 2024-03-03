@@ -475,3 +475,91 @@ function anvil_average(
     abcd_average = ab_average + (cd_average-ab_average)*Δy
     return abcd_average
 end
+
+"""
+$TYPEDSIGNATURES
+Averages all grid points in `input` that are within one grid cell of
+`output` with coslat-weighting. The output grid cell boundaries 
+are assumed to be rectangles spanning half way to adjacent longitude
+and latitude points."""
+function grid_cell_average!(
+    output::AbstractGrid,
+    input::AbstractFullGrid)
+
+    # for i,j indexing
+    input_matrix = reshape(input.data,:,get_nlat(input))
+
+    # input grid coordinates, all in radians 0:π for colat, 0:2π for lon
+    colat_in = get_colat(input)
+    coslat = sin.(colat_in)    # cos(lat) = sin(colat)
+    lon_in = get_lon(input)
+    nlon_in = length(lon_in)
+
+    # output grid coordinates, append -π,2π to have grid points
+    # towards the poles definitely included
+    colat_out = vcat(-π,get_colat(output),2π)
+    _,lons_out = get_colatlons(output)
+
+    rings = eachring(output)
+
+    for (j,ring) in enumerate(rings)
+        Δϕ = 2π/length(ring)        # longitude spacing on this ring
+
+        # indices for lat_out are shifted as north and south pole are included
+        θ0 = (colat_out[j]   + colat_out[j+1])/2    # northern edge
+        θ1 = (colat_out[j+1] + colat_out[j+2])/2    # southern edge
+
+        # matrix indices for input grid that lie in output grid cell
+        j0 = findfirst(θ -> θ >= θ0,colat_in)
+        j1 = findlast( θ -> θ <  θ1,colat_in)
+
+        for ij in ring
+            ϕ0 = mod(lons_out[ij] - Δϕ/2,2π)        # western edge
+            ϕ1 = ϕ0 + Δϕ                            # eastern edge
+            # the last line does not require a mod and in fact throws
+            # an error if, as long as the offset from prime meridian
+            # is at most Δϕ/2 (true for HEALPixGrids, offset 0 for
+            # Gaussian and Clenshaw grids)
+
+            # matrix indices for input grid that lie in output grid cell
+            a = findfirst(ϕ -> ϕ >= ϕ0,lon_in)
+            b = findlast( ϕ -> ϕ <  ϕ1,lon_in)
+            
+            # in most cases we will have 1 <= a < b <=n, then loop i in a:b (b:a isn't looping)
+            # however at the edges we have a < 1 or n < b the mod turns this into
+            # 1 <= b < a <= n, for which we want to loop 1:b AND a:n
+            ab, ba = b < a ? (1:b,a:nlon_in) : (a:b,b:a)
+
+            sum_of_weights = 0
+            @inbounds for j′ in j0:j1
+                    
+                for i in ab
+                    w = coslat[j′]
+                    sum_of_weights += w
+                    output[ij] += w*input_matrix[i,j′]
+                end
+                
+                for i in ba
+                    w = coslat[j′]
+                    sum_of_weights += w
+                    output[ij] += w*input_matrix[i,j′]
+                end
+            end
+            output[ij] /= sum_of_weights
+        end
+    end
+    
+    return output
+end
+
+"""
+$TYPEDSIGNATURES
+Averages all grid points in `input` that are within one grid cell of
+`output` with coslat-weighting. The output grid cell boundaries 
+are assumed to be rectangles spanning half way to adjacent longitude
+and latitude points."""
+function grid_cell_average(Grid::Type{<:AbstractGrid},nlat_half::Integer,input::AbstractFullGrid)
+    output = zeros(Grid,nlat_half)
+    grid_cell_average!(output,input)
+    return output
+end

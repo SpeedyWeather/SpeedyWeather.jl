@@ -96,10 +96,12 @@ This function requires both `u,v` to be transforms of fields that are scaled wit
 
     RingGrids.scale_coslat⁻¹!(u_grid)
     RingGrids.scale_coslat⁻¹!(v_grid)
-    u = spectral(u_grid)
-    v = spectral(v_grid)
+    u = spectral(u_grid,one_more_degree=true)
+    v = spectral(v_grid,one_more_degree=true)
     div = divergence(u,v)
     div_grid = gridded(div)
+
+Both `div` and `div_grid` are scaled with the radius.
 """
 function divergence(u::LowerTriangularMatrix,
                     v::LowerTriangularMatrix)
@@ -111,6 +113,43 @@ function divergence(u::LowerTriangularMatrix,
     divergence!(div,u,v,S,add=false,flipsign=false)
     return div
 end
+
+function _div_or_curl(  kernel!,
+                        u::Grid,
+                        v::Grid) where {Grid<:AbstractGrid}
+
+    @assert size(u) == size(v) "Size $(size(u)) and $(size(v)) incompatible."
+
+    u_grid = copy(u)
+    v_grid = copy(v)
+
+    RingGrids.scale_coslat⁻¹!(u_grid)
+    RingGrids.scale_coslat⁻¹!(v_grid)
+
+    S = SpectralTransform(u_grid,one_more_degree=true)
+    us = spectral(u_grid,S)
+    vs = spectral(v_grid,S)
+
+    div_or_vor = similar(us)
+    kernel!(div_or_vor,us,vs,S,add=false,flipsign=false)
+    return div_or_vor
+end
+
+"""
+$(TYPEDSIGNATURES)
+Divergence (∇⋅) of two vector components `u,v` on a grid.
+Applies 1/coslat scaling, transforms to spectral space and returns
+the spectral divergence, which is scaled with the radius
+of the sphere. Divide by radius for unscaling."""
+divergence(u::Grid,v::Grid) where {Grid<:AbstractGrid} = _div_or_curl(divergence!,u,v)
+
+"""
+$(TYPEDSIGNATURES)
+Curl (∇×) of two vector components `u,v` on a grid.
+Applies 1/coslat scaling, transforms to spectral space and returns
+the spectral curl, which is scaled with the radius
+of the sphere. Divide by radius for unscaling."""
+curl(u::Grid,v::Grid) where {Grid<:AbstractGrid} = _div_or_curl(curl!,u,v)
 
 """
 $(TYPEDSIGNATURES)
@@ -338,6 +377,46 @@ function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: (inv
 end
 
 """
+$(TYPEDSIGNATURES)
+Laplace operator ∇² applied to input `alms`, using precomputed
+eigenvalues from `S`. The Laplace operator acts on the unit
+sphere and therefore omits the 1/radius^2 scaling"""
+function ∇²(alms::LowerTriangularMatrix,    # Input: spectral coefficients
+            S::SpectralTransform)           # precomputed eigenvalues
+
+    ∇²alms = similar(alms)
+    ∇²!(∇²alms,alms,S,add=false,flipsign=false,inverse=false)
+    return ∇²alms
+end
+
+"""
+$(TYPEDSIGNATURES)
+Returns the Laplace operator ∇² applied to input `alms`.
+The Laplace operator acts on the unit
+sphere and therefore omits the 1/radius^2 scaling"""
+∇²(alms::LowerTriangularMatrix) = ∇²(alms,SpectralTransform(alms))
+
+"""
+$(TYPEDSIGNATURES)
+InverseLaplace operator ∇⁻² applied to input `alms`, using precomputed
+eigenvalues from `S`. The Laplace operator acts on the unit
+sphere and therefore omits the radius^2 scaling"""
+function ∇⁻²(   ∇²alms::LowerTriangularMatrix,  # Input: spectral coefficients
+                S::SpectralTransform)           # precomputed eigenvalues
+
+    alms = similar(∇²alms)
+    ∇⁻²!(alms,∇²alms,S,add=false,flipsign=false)
+    return alms
+end
+
+"""
+$(TYPEDSIGNATURES)
+Returns the inverse Laplace operator ∇⁻² applied to input `alms`.
+The Laplace operator acts on the unit
+sphere and therefore omits the radius^2 scaling"""
+∇⁻²(∇²alms::LowerTriangularMatrix) = ∇⁻²(∇²alms,SpectralTransform(∇²alms))
+
+"""
     ∇⁻²!(   ∇⁻²alms::LowerTriangularMatrix,
             alms::LowerTriangularMatrix,
             S::SpectralTransform;
@@ -356,6 +435,11 @@ function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}},# Output: 
     return ∇²!(∇⁻²alms,alms,S;add,flipsign,inverse)
 end
 
+"""
+$(TYPEDSIGNATURES)
+Applies the gradient operator ∇ applied to input `p` and stores the result in
+`dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
+on the unit sphere and therefore omits the radius scaling"""
 function ∇!(dpdx::LowerTriangularMatrix{Complex{NF}},       # Output: zonal gradient
             dpdy::LowerTriangularMatrix{Complex{NF}},       # Output: meridional gradient
             p::LowerTriangularMatrix{Complex{NF}},          # Input: spectral coefficients

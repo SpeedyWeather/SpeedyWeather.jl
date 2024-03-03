@@ -1,3 +1,7 @@
+abstract type AbstractHorizontalDiffusion <: AbstractModelComponent end
+
+export HyperDiffusion
+
 """
 Struct for horizontal hyper diffusion of vor, div, temp; implicitly in spectral space
 with a `power` of the Laplacian (default=4) and the strength controlled by
@@ -7,7 +11,7 @@ layers. Furthermore the power can be decreased above the `tapering_σ` to
 `power_stratosphere` (default 2). For Barotropic, ShallowWater,
 the default non-adaptive constant-time scale hyper diffusion is used. Options are
 $(TYPEDFIELDS)"""
-Base.@kwdef struct HyperDiffusion{NF} <: HorizontalDiffusion{NF}
+Base.@kwdef mutable struct HyperDiffusion{NF} <: AbstractHorizontalDiffusion
     # DIMENSIONS
     "spectral resolution"
     trunc::Int
@@ -19,8 +23,8 @@ Base.@kwdef struct HyperDiffusion{NF} <: HorizontalDiffusion{NF}
     "power of Laplacian"
     power::Float64 = 4.0
     
-    "diffusion time scales [hrs]"
-    time_scale::Float64 = 2.4
+    "diffusion time scale"
+    time_scale::Second = Minute(144)
     
     "stronger diffusion with resolution? 0: constant with trunc, 1: (inverse) linear with trunc, etc"
     resolution_scaling::Float64 = 0.5
@@ -61,12 +65,6 @@ function HyperDiffusion(spectral_grid::SpectralGrid;kwargs...)
     return HyperDiffusion{NF}(;trunc,nlev,kwargs...)
 end
 
-function Base.show(io::IO,HD::HorizontalDiffusion)
-    println(io,"$(typeof(HD))")
-    keys = propertynames(HD)
-    print_fields(io,HD,keys,arrays=false)
-end
-
 """$(TYPEDSIGNATURES)
 Precomputes the hyper diffusion terms in `scheme` based on the
 model time step, and possibly with a changing strength/power in
@@ -87,14 +85,13 @@ end
 Precomputes the 2D hyper diffusion terms in `scheme` based on the
 model time step."""
 function initialize!(   scheme::HyperDiffusion,
-                        L::TimeStepper)
+                        L::AbstractTimeStepper)
 
-    (;trunc,time_scale,∇²ⁿ_2D,∇²ⁿ_2D_implicit,power) = scheme
+    (;trunc,∇²ⁿ_2D,∇²ⁿ_2D_implicit,power) = scheme
     (;Δt, radius) = L
 
     # time scale times 1/radius because time step Δt is scaled with 1/radius
-    # time scale*3600 for [hrs] → [s]
-    time_scale = 1/radius*(3600*time_scale)
+    time_scale = scheme.time_scale.value/radius
 
     # NORMALISATION
     # Diffusion is applied by multiplication of the eigenvalues of the Laplacian -l*(l+1)
@@ -121,11 +118,11 @@ the current (absolute) vorticity maximum level `vor_max`"""
 function initialize!(   
     scheme::HyperDiffusion,
     k::Int,
-    G::Geometry,
-    L::TimeStepper,
+    G::AbstractGeometry,
+    L::AbstractTimeStepper,
     vor_max::Real = 0,
 )
-    (;trunc,time_scale,resolution_scaling,∇²ⁿ,∇²ⁿ_implicit) = scheme
+    (;trunc, resolution_scaling, ∇²ⁿ, ∇²ⁿ_implicit) = scheme
     (;power, power_stratosphere, tapering_σ) = scheme
     (;Δt, radius) = L
     σ = G.σ_levels_full[k]
@@ -133,7 +130,7 @@ function initialize!(
     # Reduce diffusion time scale (=increase diffusion) with resolution
     # times 1/radius because time step Δt is scaled with 1/radius
     # time scale*3600 for [hrs] → [s]
-    time_scale = 1/radius*(3600*time_scale) * (32/(trunc+1))^resolution_scaling
+    time_scale = scheme.time_scale.value/radius * (32/(trunc+1))^resolution_scaling
 
     # ADAPTIVE/FLOW AWARE
     # increase diffusion if maximum vorticity per layer is larger than scheme.vor_max
@@ -171,8 +168,8 @@ calculates the (absolute) vorticity maximum for the layer of `diagn`."""
 function initialize!(   
     scheme::HyperDiffusion,
     diagn::DiagnosticVariablesLayer,
-    G::Geometry,
-    L::TimeStepper,
+    G::AbstractGeometry,
+    L::AbstractTimeStepper,
 )
     scheme.adaptive || return nothing
     vor_min, vor_max = extrema(diagn.grid_variables.vor_grid)

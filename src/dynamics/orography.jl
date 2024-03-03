@@ -1,3 +1,6 @@
+abstract type AbstractOrography{NF,Grid} <: AbstractModelComponent end
+export NoOrography
+
 """Orography with zero height in `orography` and zero surface geopotential `geopot_surf`.
 $(TYPEDFIELDS)"""
 struct NoOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
@@ -18,19 +21,14 @@ function NoOrography(spectral_grid::SpectralGrid)
     return NoOrography{NF,Grid{NF}}(orography,geopot_surf)
 end
 
-function Base.show(io::IO,orog::AbstractOrography)
-    println(io,"$(typeof(orog)) <: AbstractOrography")
-    keys = propertynames(orog)
-    print_fields(io,orog,keys)
-end
-
 # no further initialization needed
-initialize!(::NoOrography,::AbstractPlanet,::SpectralTransform,::Geometry) = nothing
+initialize!(::NoOrography,::ModelSetup) = nothing
 
+export ZonalRidge
 
 """Zonal ridge orography after Jablonowski and Williamson, 2006.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
+Base.@kwdef mutable struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
     
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
@@ -40,10 +38,10 @@ Base.@kwdef struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: Abstr
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
-    orography::Grid
+    const orography::Grid
     
     "surface geopotential, height*gravity [m²/s²]"
-    geopot_surf::LowerTriangularMatrix{Complex{NF}} 
+    const geopot_surf::LowerTriangularMatrix{Complex{NF}} 
 end
 
 """
@@ -54,6 +52,12 @@ function ZonalRidge(spectral_grid::SpectralGrid;kwargs...)
     orography   = zeros(Grid{NF},nlat_half)
     geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
     return ZonalRidge{NF,Grid{NF}}(;orography,geopot_surf,kwargs...)
+end
+
+# function barrier
+function initialize!(   orog::ZonalRidge,
+                        model::ModelSetup)
+    initialize!(orog,model.planet,model.spectral_transform,model.geometry)
 end
 
 """
@@ -90,17 +94,18 @@ function initialize!(   orog::ZonalRidge,
     spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
 end
 
+export EarthOrography
 
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
+Base.@kwdef mutable struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
 
     # OPTIONS
     "path to the folder containing the orography file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
     "filename of orography"
-    file::String = "orography_F512.nc"
+    file::String = "orography.nc"
 
     "Grid the orography file comes on"
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
@@ -120,13 +125,12 @@ Base.@kwdef struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: A
     "resolution of orography in spectral trunc"
     smoothing_truncation::Int = 85
 
-
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
-    orography::Grid
+    const orography::Grid
     
     "surface geopotential, height*gravity [m²/s²]"
-    geopot_surf::LowerTriangularMatrix{Complex{NF}} 
+    const geopot_surf::LowerTriangularMatrix{Complex{NF}} 
 end
 
 """
@@ -139,6 +143,12 @@ function EarthOrography(spectral_grid::SpectralGrid;kwargs...)
     return EarthOrography{NF,Grid{NF}}(;orography,geopot_surf,kwargs...)
 end
 
+# function barrier
+function initialize!(   orog::EarthOrography,
+                        model::ModelSetup)
+    initialize!(orog, model.planet, model.spectral_transform)
+end
+
 """
 $(TYPEDSIGNATURES)
 Initialize the arrays `orography`,`geopot_surf` in `orog` by reading the
@@ -146,8 +156,7 @@ orography field from file.
 """
 function initialize!(   orog::EarthOrography,
                         P::AbstractPlanet,
-                        S::SpectralTransform,
-                        G::Geometry)
+                        S::SpectralTransform)
 
     (;orography, geopot_surf) = orog
     (;gravity) = P
@@ -159,14 +168,15 @@ function initialize!(   orog::EarthOrography,
         path = joinpath(orog.path,orog.file)
     end
     ncfile = NCDataset(path)
-    orography_highres = ncfile["orog"][:,:]        # height [m]
+
+    # height [m], wrap matrix into a grid
+    # TODO also read lat,lon from file and flip array in case it's not as expected
+    orography_highres = orog.file_Grid(ncfile["orog"][:,:])
 
     # Interpolate/coarsen to desired resolution
-    # TODO also read lat,lon from file and flip array in case it's not as expected
-    recompute_legendre = true   # don't allocate large arrays as spectral transform is not reused
-    orography_spec = spectral(orography_highres;Grid=orog.file_Grid,recompute_legendre)
-    
-    copyto!(geopot_surf,orography_spec)     # truncates to the size of geopot_surf, no *gravity yet
+    interpolate!(orography,orography_highres)
+    spectral!(geopot_surf,orography,S)      # no *gravity yet
+  
     if orog.smoothing                       # smooth orography in spectral space?
         SpeedyTransforms.spectral_smoothing!(geopot_surf,orog.smoothing_strength,
                                                             power=orog.smoothing_power,

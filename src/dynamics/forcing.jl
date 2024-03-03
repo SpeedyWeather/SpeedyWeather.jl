@@ -1,26 +1,21 @@
-function Base.show(io::IO,F::AbstractForcing)
-    println(io,"$(typeof(F)) <: AbstractForcing")
-    keys = propertynames(F)
-    print_fields(io,F,keys)
-end
+abstract type AbstractForcing <: AbstractModelComponent end
 
-## NO FORCING
-struct NoForcing{NF} <: AbstractForcing{NF} end
-NoForcing(SG::SpectralGrid) = NoForcing{SG.NF}()
-
-function initialize!(   forcing::NoForcing,
-                        model::ModelSetup)
-    return nothing
-end
+## NO FORCING = dummy forcing
+export NoForcing
+struct NoForcing <: AbstractForcing end
+NoForcing(SG::SpectralGrid) = NoForcing()
+initialize!(::NoForcing,::ModelSetup) = nothing
 
 function forcing!(  diagn::DiagnosticVariablesLayer,
+                    progn::PrognosticVariablesLayer,
                     forcing::NoForcing,
                     time::DateTime,
                     model::ModelSetup)
     return nothing
 end
 
-# JET STREAM FORCING FOR SHALLOW WATER
+# JET STREAM FORCING
+export JetStreamForcing
 
 """
 Forcing term for the Barotropic or ShallowWaterModel with an
@@ -29,28 +24,28 @@ Galewsky, 2004, but mirrored for both hemispheres.
 
 $(TYPEDFIELDS)
 """
-Base.@kwdef struct JetStreamForcing{NF} <: AbstractForcing{NF}
+Base.@kwdef mutable struct JetStreamForcing{NF} <: AbstractForcing
     "Number of latitude rings"
     nlat::Int = 0
 
     "jet latitude [˚N]"
-    latitude::Float64 = 45
+    latitude::NF = 45
     
     "jet width [˚], default ≈ 19.29˚"
-    width::Float64 = (1/4-1/7)*180
+    width::NF = (1/4-1/7)*180
 
     "jet speed scale [m/s]"
-    speed::Float64 = 85
+    speed::NF = 85
 
     "time scale [days]"
-    time_scale::Float64 = 30
+    time_scale::Second = Day(30)
 
     "precomputed amplitude vector [m/s²]"
     amplitude::Vector{NF} = zeros(NF,nlat)
 end
 
 JetStreamForcing(SG::SpectralGrid;kwargs...) = JetStreamForcing{SG.NF}(
-    ;nlat=RingGrids.get_nlat(SG.Grid,SG.nlat_half),kwargs...)
+    ;nlat=SG.nlat, kwargs...)
 
 function initialize!(   forcing::JetStreamForcing,
                         model::ModelSetup)
@@ -62,7 +57,7 @@ function initialize!(   forcing::JetStreamForcing,
     θ₀ = (latitude-width)/360*2π        # southern boundary of jet [radians]
     θ₁ = (latitude+width)/360*2π        # northern boundary of jet
     eₙ = exp(-4/(θ₁-θ₀)^2)              # normalisation, so that speed is at max
-    A₀ = speed/eₙ/(time_scale*24*3600)  # amplitude [m/s²] without lat dependency
+    A₀ = speed/eₙ/time_scale.value      # amplitude [m/s²] without lat dependency
     A₀ *= radius                        # scale by radius as are the momentum equations
 
     (;nlat,colat) = model.geometry
@@ -83,10 +78,11 @@ end
 
 # function barrier
 function forcing!(  diagn::DiagnosticVariablesLayer,
+                    progn::PrognosticVariablesLayer,
                     forcing::JetStreamForcing,
                     time::DateTime,
                     model::ModelSetup)
-    forcing!(diagn,forcing)
+    forcing!(diagn, forcing)
 end
 
 """

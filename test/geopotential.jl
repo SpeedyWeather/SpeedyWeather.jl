@@ -11,13 +11,14 @@
         temp = 280      # in Kelvin
         lf = 1
         for (progn_layer,diagn_layer) in zip(p.layers,d.layers)
-            progn_layer.timesteps[lf].temp[1] = temp*model.spectral_transform.norm_sphere
-            fill!(progn_layer.timesteps[lf].humid,0)                 # dry core
-            SpeedyWeather.gridded!(diagn_layer,progn_layer,lf,model)    # propagate spectral state to grid
+            progn_layer_lf = progn_layer.timesteps[lf]
+            progn_layer_lf.temp[1] = temp*model.spectral_transform.norm_sphere
+            fill!(progn_layer_lf.humid,0)                               # dry core
+            SpeedyWeather.gridded!(diagn_layer,progn_layer_lf,model)    # propagate spectral state to grid
             SpeedyWeather.linear_virtual_temperature!(diagn_layer,progn_layer,model,lf)
         end
 
-        SpeedyWeather.geopotential!(d,model.orography,model.constants)
+        SpeedyWeather.geopotential!(d,model.geopotential,model.orography)
 
         # approximate heights [m] for this setup
         heights = [27000,18000,13000,9000,6000,3700,1800,700] 
@@ -45,11 +46,12 @@ end
             p.layers[k].timesteps[1].temp[1] = temp*m.spectral_transform.norm_sphere
         end
 
-        SpeedyWeather.geopotential!(d,m.orography,m.constants)
+        SpeedyWeather.geopotential!(d,m.geopotential,m.orography)
 
         lf = 1
         for (progn_layer,diagn_layer) in zip(p.layers,d.layers)
-            SpeedyWeather.gridded!(diagn_layer,progn_layer,lf,m)             # propagate spectral state to grid
+            progn_layer_lf = progn_layer.timesteps[lf]
+            SpeedyWeather.gridded!(diagn_layer,progn_layer_lf,m)             # propagate spectral state to grid
             SpeedyWeather.bernoulli_potential!(diagn_layer,m.spectral_transform)
         end
     end
@@ -68,10 +70,11 @@ end
         temp = 280      # in Kelvin
         lf = 1
         for (progn_layer,diagn_layer) in zip(p.layers,d.layers)
-            progn_layer.timesteps[lf].temp[1] = temp*m.spectral_transform.norm_sphere
-            fill!(progn_layer.timesteps[lf].humid,0)                 
-            progn_layer.timesteps[lf].humid[1] = rand(NF)
-            SpeedyWeather.gridded!(diagn_layer,progn_layer,lf,m)    # propagate spectral state to grid
+            progn_layer_lf = progn_layer.timesteps[lf]
+            progn_layer_lf.temp[1] = temp*m.spectral_transform.norm_sphere
+            fill!(progn_layer_lf.humid,0)                 
+            progn_layer_lf.humid[1] = rand(NF)
+            SpeedyWeather.gridded!(diagn_layer,progn_layer_lf,m)    # propagate spectral state to grid
             
             temp_lf = progn_layer.timesteps[lf].temp     # always passed on for compat with DryCore
             SpeedyWeather.virtual_temperature!(diagn_layer,temp_lf,m)

@@ -1,22 +1,22 @@
-struct NoTemperatureRelaxation{NF} <: TemperatureRelaxation{NF} end
-NoTemperatureRelaxation(SG::SpectralGrid) = NoTemperatureRelaxation{SG.NF}()
+abstract type AbstractTemperatureRelaxation <: AbstractParameterization end
 
-"""$(TYPEDSIGNATURES) just passes."""
-function temperature_relaxation!(   column::ColumnVariables,
-                                    scheme::NoTemperatureRelaxation)
-    return nothing
+# function barrier to unpack model.temperature_relaxation
+function temperature_relaxation!(column::ColumnVariables,model::PrimitiveEquation)
+    temperature_relaxation!(column, model.temperature_relaxation, model)
 end
 
-"""$(TYPEDSIGNATURES) just passes, does not need any initialization."""
-function initialize!(   scheme::NoTemperatureRelaxation,
-                        model::PrimitiveEquation)
-    return nothing
-end
+export NoTemperatureRelaxation
+struct NoTemperatureRelaxation <: AbstractTemperatureRelaxation end
+NoTemperatureRelaxation(::SpectralGrid) = NoTemperatureRelaxation()
+initialize!(::NoTemperatureRelaxation,::PrimitiveEquation) = nothing
+temperature_relaxation!(::ColumnVariables,::NoTemperatureRelaxation,::PrimitiveEquation) = nothing
+
+export HeldSuarez
 
 """
 Struct that defines the temperature relaxation from Held and Suarez, 1996 BAMS
 $(TYPEDFIELDS)"""
-Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
+Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: AbstractTemperatureRelaxation
     # DIMENSIONS
     "number of latitude rings"
     nlat::Int
@@ -26,25 +26,25 @@ Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
     
     # OPTIONS
     "sigma coordinate below which faster surface relaxation is applied"
-    σb::Float64 = 0.7
+    σb::NF = 0.7
 
-    "time scale [hrs] for slow global relaxation"
-    relax_time_slow::Float64 = 40*24
+    "time scale for slow global relaxation"
+    relax_time_slow::Second = Day(40)
 
-    "time scale [hrs] for faster tropical surface relaxation"
-    relax_time_fast::Float64 = 4*24
+    "time scale for faster tropical surface relaxation"
+    relax_time_fast::Second = Day(4)
 
     "minimum equilibrium temperature [K]"
-    Tmin::Float64 = 200    
+    Tmin::NF = 200    
 
     "maximum equilibrium temperature [K]"
-    Tmax::Float64 = 315    
+    Tmax::NF = 315    
 
     "meridional temperature gradient [K]"
-    ΔTy::Float64 = 60
+    ΔTy::NF = 60
     
     "vertical temperature gradient [K]"
-    Δθz::Float64 = 10
+    Δθz::NF = 10
 
     # precomputed constants, allocate here, fill in initialize!
     κ::Base.RefValue{NF} = Ref(zero(NF))
@@ -59,8 +59,7 @@ end
 $(TYPEDSIGNATURES)
 create a HeldSuarez temperature relaxation with arrays allocated given `spectral_grid`"""
 function HeldSuarez(SG::SpectralGrid;kwargs...) 
-    (;NF, Grid, nlat_half, nlev) = SG
-    nlat = RingGrids.get_nlat(Grid,nlat_half)
+    (;NF, nlat, nlev) = SG
     return HeldSuarez{NF}(;nlev,nlat,kwargs...)
 end
 
@@ -70,17 +69,17 @@ equilibrium temperature Teq."""
 function initialize!(   scheme::HeldSuarez,
                         model::PrimitiveEquation)
 
-    (;σ_levels_full, radius, coslat, sinlat) = model.geometry
+    (;σ_levels_full, coslat, sinlat) = model.geometry
     (;σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = scheme
     (;temp_relax_freq, temp_equil_a, temp_equil_b) = scheme
-    
-    p₀ = model.atmosphere.pres_ref*100                      # [hPa] → [Pa]
-    scheme.p₀[] = p₀
-    scheme.κ[] = model.constants.κ                          # thermodynamic kappa
+                           
+    (;pres_ref) = model.atmosphere
+    scheme.p₀[] = pres_ref              # surface reference pressure [Pa]
+    scheme.κ[] = model.atmosphere.κ     # thermodynamic kappa R_dry/cₚ
 
     # slow relaxation everywhere, fast in the tropics
-    kₐ = radius/(relax_time_slow*3600)    # scale with radius as ∂ₜT is; hrs -> sec
-    kₛ = radius/(relax_time_fast*3600)
+    kₐ = 1/relax_time_slow.value
+    kₛ = 1/relax_time_fast.value
 
     for (j,(cosϕ,sinϕ)) = enumerate(zip(coslat,sinlat))     # use ϕ for latitude here
         for (k,σ) in enumerate(σ_levels_full)
@@ -90,62 +89,79 @@ function initialize!(   scheme::HeldSuarez,
 
         # Held and Suarez equation 3, split into max(Tmin,(a - b*ln(p))*(p/p₀)^κ)
         # precompute a,b to simplify online calculation
-        temp_equil_a[j] = Tmax - ΔTy*sinϕ^2 + Δθz*log(p₀)*cosϕ^2
+        temp_equil_a[j] = Tmax - ΔTy*sinϕ^2 + Δθz*log(pres_ref)*cosϕ^2
         temp_equil_b[j] = -Δθz*cosϕ^2
     end
 end
 
+# function barrier
+function temperature_relaxation!(
+    column::ColumnVariables,
+    scheme::HeldSuarez,
+    model::PrimitiveEquation
+)
+    temperature_relaxation!(column, scheme, model.atmosphere)
+end
+
 """$(TYPEDSIGNATURES)
 Apply temperature relaxation following Held and Suarez 1996, BAMS."""
-function temperature_relaxation!(   column::ColumnVariables{NF},
-                                    scheme::HeldSuarez) where NF
-
+function temperature_relaxation!(   
+    column::ColumnVariables,
+    scheme::HeldSuarez,
+    atmosphere::AbstractAtmosphere,
+)
     (;temp, temp_tend, pres, ln_pres) = column
     j = column.jring[]                      # latitude ring index j
+    (;Tmin, temp_relax_freq, temp_equil_a, temp_equil_b) = scheme
 
-    (;temp_relax_freq, temp_equil_a, temp_equil_b) = scheme
-    Tmin = convert(NF,scheme.Tmin)
-    
-    p₀ = scheme.p₀[]                        # reference surface pressure
-    κ = scheme.κ[]                          # thermodynamic kappa
+    # surface reference pressure [Pa] and thermodynamic kappa R_dry/cₚ
+    (;pres_ref, κ) = atmosphere             
 
     @inbounds for k in eachlayer(column)
         lnp = ln_pres[k]                    # logarithm of pressure at level k
         kₜ = temp_relax_freq[k,j]           # (inverse) relaxation time scale
 
         # Held and Suarez 1996, equation 3 with precomputed a,b during initilisation
-        Teq = max(Tmin,(temp_equil_a[j] + temp_equil_b[j]*lnp)*(pres[k]/p₀)^κ)
+        Teq = max(Tmin,(temp_equil_a[j] + temp_equil_b[j]*lnp)*(pres[k]/pres_ref)^κ)
         temp_tend[k] -= kₜ*(temp[k] - Teq)  # Held and Suarez 1996, equation 2
     end
 end
 
+export JablonowskiRelaxation
 
 """$(TYPEDSIGNATURES)
 HeldSuarez-like temperature relaxation, but towards the Jablonowski temperature
 profile with increasing temperatures in the stratosphere."""
-Base.@kwdef struct JablonowskiRelaxation{NF<:AbstractFloat} <: TemperatureRelaxation{NF}
+Base.@kwdef mutable struct JablonowskiRelaxation{NF<:AbstractFloat} <: AbstractTemperatureRelaxation
+    
     # DIMENSIONS
     nlat::Int
     nlev::Int
 
     # OPTIONS
-    "sigma coordinate below which relax_time_fast is applied"
-    σb::Float64= 0.7
+    "sigma coordinate below which relax_time_fast is applied [1]"
+    σb::NF = 0.7
+
+    "sigma coordinate for tropopause temperature inversion"
+    σ_tropopause::NF = 0.2
 
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
-    η₀::Float64 = 0.252
+    η₀::NF = 0.252
 
     "max amplitude of zonal wind [m/s]"
-    u₀::Float64 = 35
+    u₀::NF = 35
 
     "temperature difference used for stratospheric lapse rate [K]"
-    ΔT::Float64 = 4.8e5
+    ΔT::NF = 4.8e5
 
-    "[hours] time scale for slow global relaxation"
-    relax_time_slow::NF = 40*24
+    "Dry-adiabatic lapse rate [K/m]"
+    lapse_rate::NF = 5/1000
+
+    "time scale for slow global relaxation"
+    relax_time_slow::Second = Day(40)
     
-    "[hours] time scale for fast aster tropical surface relaxation"
-    relax_time_fast::NF = 4*24
+    "time scale for faster tropical surface relaxation"
+    relax_time_fast::Second = Day(4)
 
     # precomputed constants, allocate here, fill in initialize!
     temp_relax_freq::Matrix{NF} = zeros(NF,nlev,nlat)   # (inverse) relax time scale per layer and lat
@@ -156,8 +172,7 @@ end
 $(TYPEDSIGNATURES)
 create a JablonowskiRelaxation temperature relaxation with arrays allocated given `spectral_grid`"""
 function JablonowskiRelaxation(SG::SpectralGrid;kwargs...) 
-    (;NF, Grid, nlat_half, nlev) = SG
-    nlat = RingGrids.get_nlat(Grid,nlat_half)
+    (;NF, nlat, nlev) = SG
     return JablonowskiRelaxation{NF}(;nlev,nlat,kwargs...)
 end
 
@@ -167,18 +182,16 @@ equilibrium temperature Teq and the frequency (strength of relaxation)."""
 function initialize!(   scheme::JablonowskiRelaxation,
                         model::PrimitiveEquation)
 
-    (;σ_levels_full, radius, coslat, sinlat) = model.geometry
+    (;σ_levels_full, coslat, sinlat) = model.geometry
     (;σb, relax_time_slow, relax_time_fast, η₀, u₀, ΔT) = scheme
-    (;temp_relax_freq, temp_equil) = scheme
-    (;gravity, rotation) = model.planet
-    (;lapse_rate, R_dry, σ_tropopause, temp_ref) = model.atmosphere
+    (;temp_relax_freq, temp_equil, σ_tropopause, lapse_rate) = scheme
+    (;gravity) = model.planet
+    (;R_dry, temp_ref) = model.atmosphere
+    Ω = model.planet.rotation
 
-    Γ = lapse_rate/1000                   # from [K/km] to [K/m]
-    aΩ = radius*rotation
-
-    # slow relaxation everywhere, fast in the tropics
-    kₐ = radius/(relax_time_slow*3600)    # scale with radius as ∂ₜT is; hrs -> sec
-    kₛ = radius/(relax_time_fast*3600)
+    # slow relaxation [1/s] everywhere, fast in the tropics
+    kₐ = 1/relax_time_slow.value
+    kₛ = 1/relax_time_fast.value
 
     for (j,(cosϕ,sinϕ)) = enumerate(zip(coslat,sinlat))     # use ϕ for latitude here
         for (k,σ) in enumerate(σ_levels_full)
@@ -186,7 +199,7 @@ function initialize!(   scheme::JablonowskiRelaxation,
             temp_relax_freq[k,j] =  kₐ + (kₛ - kₐ)*max(0,(σ-σb)/(1-σb))*cosϕ^4
         
             # vertical profile
-            Tη = temp_ref*σ^(R_dry*Γ/gravity)    # Jablonowski and Williamson eq. 4
+            Tη = temp_ref*σ^(R_dry*lapse_rate/gravity)      # Jablonowski and Williamson eq. 4
 
             if σ < σ_tropopause
                 Tη += ΔT*(σ_tropopause-σ)^5      # Jablonowski and Williamson eq. 5
@@ -201,10 +214,20 @@ function initialize!(   scheme::JablonowskiRelaxation,
 
             # Jablonowski and Williamson, eq. (6) 
             temp_equil[k,j] = Tη + A1*((-2sinϕ^6*(cosϕ^2 + 1/3) + 10/63)*A2 +
-                                            (8/5*cosϕ^3*(sinϕ^2 + 2/3) - π/4)*aΩ)
+                                            (8/5*cosϕ^3*(sinϕ^2 + 2/3) - π/4)*Ω)
         end
     end
-end 
+end
+
+# function barrier
+function temperature_relaxation!(
+    column::ColumnVariables,
+    scheme::JablonowskiRelaxation,
+    model::PrimitiveEquation,
+)
+    temperature_relaxation!(column, scheme)
+end
+
 
 """$(TYPEDSIGNATURES)
 Apply HeldSuarez-like temperature relaxation to the Jablonowski and Williamson

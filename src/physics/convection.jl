@@ -1,237 +1,223 @@
-"""
-$(TYPEDSIGNATURES)
-Check whether the convection scheme should be activated in the given atmospheric column.
+abstract type AbstractConvection <: AbstractParameterization end
 
-1. A conditional instability exists when the saturation moist energy (MSS) decreases with
-height, that is, there exists an atmospheric level k such that,
+export SimplifiedBettsMiller
+Base.@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection
+    "number of vertical layers/levels"
+    nlev::Int
 
-    MSS(N) > MSS(k+h)
+    "Relaxation time for profile adjustment"
+    time_scale::Second = Hour(4)
 
-where N is the planetary boundary layer (PBL) and k+h is the half-level at the lower
-boundary of the full level k.
+    "Relative humidity for reference profile"
+    relative_humidity::NF = 0.7
 
-2. When a conditional instability exists, the convection scheme is activated when, either,
+    "temperature [K] reference profile to adjust to"
+    temp_ref_profile::Vector{NF} = zeros(NF,nlev)
 
-    a. the actual moist static energy (MSE) at level N-1 (directly above the PBL) is greater
-       than the saturation moist static energy at some half-level k+h,
-
-            MSE(N-1) > MSS(k+h)
-
-    b. the humidity in both the PBL and one layer above exceeds a prescribed threshold,
-
-            Q(N)   > RH_cnv * Qˢᵃᵗ(N)
-            Q(N-1) > RH_cnv * Qˢᵃᵗ(N-1)
-
-The top-of-convection (TCN) layer, or cloud-top, is the largest value of k for which
-condition 1 is satisfied. The cloud-top layer may be subsequently adjusted upwards by the
-large-scale condensation parameterization, which is executed after this one."""
-function diagnose_convection!(column::ColumnVariables,convection::SpeedyConvection)
-
-    (; alhc,pres_ref ) = model.parameters
-    (; pres_thresh_cnv, RH_thresh_pbl_cnv ) = model.constants
-    (; nlev ) = column
-    (; humid, pres, sat_humid, moist_static_energy,
-    sat_moist_static_energy, sat_moist_static_energy_half) = column
-
-    if pres[end] > pres_thresh_cnv
-        # First we pre-compute some values which we will need inside the loop
-        # 1. Saturation (or super-saturated) moist static energy in the PBL
-        sat_moist_static_energy_pbl =
-            max(moist_static_energy[nlev], sat_moist_static_energy[nlev])
-
-        # 2. Minimum of moist static energy in the lowest two levels
-        moist_static_energy_lower_trop =
-            min(moist_static_energy[nlev], moist_static_energy[nlev-1])
-
-        # 3. Humidity threshold for convection, defined in the PBL and one level above
-        humid_threshold_pbl = RH_thresh_pbl_cnv * sat_humid[nlev]
-        humid_threshold_above_pbl = RH_thresh_pbl_cnv * sat_humid[nlev-1]
-
-        # The range of this loop requires clarification, but in its current form it means
-        # that the top-of-convection level may be any tropospheric level, excluding the two
-        # layers directly above the PBL.
-        for k = (nlev-3):-1:3
-            # Condition 1: Conditional instability (MSS in PBL < MSS at this half-level)
-            if sat_moist_static_energy_pbl > sat_moist_static_energy_half[k]
-                column.conditional_instability = true
-                column.cloud_top = k
-            end
-
-            # Condition 2a: Gradient of actual moist static energy between lower and upper troposphere
-            if moist_static_energy_lower_trop > sat_moist_static_energy_half[k]
-                column.activate_convection = true
-                column.excess_humidity = max(
-                    humid[nlev] - humid_threshold_pbl,
-                    (moist_static_energy[nlev] - sat_moist_static_energy_half[k]) / alhc,
-                )
-            end
-        end
-
-        if column.conditional_instability && column.activate_convection
-            return nothing  # Condition for convection already satisfied
-        end
-
-        # Condition 2b: Humidity exceeds threshold in both PBL and one layer above
-        if column.conditional_instability &&
-           (humid[nlev] > humid_threshold_pbl) &&
-           (humid[nlev-1] > humid_threshold_above_pbl)
-            column.activate_convection = true
-            column.excess_humidity = humid[nlev] - humid_threshold_pbl
-        end
-    end
-    return nothing
+    "specific humidity [kg/kg] profile to adjust to"
+    humid_ref_profile::Vector{NF} = zeros(NF,nlev)
 end
 
+SimplifiedBettsMiller(SG::SpectralGrid;kwargs...) = SimplifiedBettsMiller{SG.NF}(nlev=SG.nlev;kwargs...)
+initialize!(::SimplifiedBettsMiller,::PrimitiveWet) = nothing
+
+# function barrier for all AbstractConvection
+function convection!(
+    column::ColumnVariables,
+    model::PrimitiveEquation,
+)
+    convection!(column,model.convection,model)
+end
+
+# TODO SimplifiedBettsMiller can be trimmed for PrimitiveDry
 convection!(column::ColumnVariables,model::PrimitiveDry) = nothing
-convection!(column::ColumnVariables,model::PrimitiveWet) = convection!(column,model.convection)
 
-"""
-    convection!(
-        column::ColumnVariables{NF},
-        model::PrimitiveEquation,
-    )
+# function barrier to unpack model
+function convection!(
+    column::ColumnVariables,
+    scheme::SimplifiedBettsMiller,
+    model::PrimitiveEquation,
+)
+    convection!(column, scheme, model.clausius_clapeyron, 
+                    model.geometry, model.planet, model.atmosphere, model.time_stepping)
+end
 
-Compute fluxes and precipitation due to convection in the given atmospheric column.
-
-The scheme computes fluxes of mass, humidity and dry static energy. A part of the upward
-moisture flux at the lower boundary of the cloud-top (TCN) layer is converted into
-convective precipitation.
-
-For full details of the scheme see: http://users.ictp.it/~kucharsk/speedy_description/km_ver41_appendixA.pdf
-"""
 function convection!(
     column::ColumnVariables{NF},
-    model::PrimitiveEquation,
-) where {NF<:AbstractFloat}
-    diagnose_convection!(column, model)  # Diagnose convection
+    SBM::SimplifiedBettsMiller,
+    clausius_clapeyron::AbstractClausiusClapeyron,
+    geometry::Geometry,
+    planet::AbstractPlanet,
+    atmosphere::AbstractAtmosphere,
+    time_stepping::AbstractTimeStepper,
+) where NF
 
-    if !(column.conditional_instability && column.activate_convection)
-        return nothing  # No convection
+    σ = geometry.σ_levels_full
+    σ_half = geometry.σ_levels_half
+    Δσ = geometry.σ_levels_thick
+    (;temp_ref_profile, humid_ref_profile) = SBM
+    (;geopot, nlev, temp, temp_virt, humid, temp_tend, humid_tend) = column
+    pₛ = column.pres[end]
+    (;Lᵥ, cₚ) = clausius_clapeyron
+
+    # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
+    temp_parcel = temp[nlev]
+    humid_parcel = humid[nlev]
+    level_zero_buoyancy = pseudo_adiabat!(temp_ref_profile,
+                                            temp_parcel, humid_parcel,
+                                            temp_virt, geopot, pₛ, σ,
+                                            clausius_clapeyron)
+            
+    for k in level_zero_buoyancy:nlev
+        qsat = saturation_humidity(temp_ref_profile[k],pₛ*σ[k],clausius_clapeyron)
+        humid_ref_profile[k] = qsat*SBM.relative_humidity
     end
 
-    (; gravity ) = model.constants
-    (; alhc, pres_ref ) = model.parameters
-    (; σ_levels_full, σ_levels_thick ) = model.geometry
-    # Constants for convection
-    (;RH_thresh_pbl_cnv, RH_thresh_trop_cnv, pres_thresh_cnv, humid_relax_time_cnv,
-    max_entrainment, ratio_secondary_mass_flux) = model.constants
-    # Column variables for calculating fluxes due to convection
-    (;pres, humid, humid_half, sat_humid, sat_humid_half, dry_static_energy,
-    dry_static_energy_half, entrainment_profile, cloud_top, excess_humidity,
-    nlev) = column
-    # Quantities calculated by this parameterization
-    (;cloud_base_mass_flux, net_flux_humid, net_flux_dry_static_energy,
-    precip_convection) = column
+    local Pq::NF = 0        # precipitation due to drying
+    local PT::NF = 0        # precipitation due to cooling
+    local ΔT::NF = 0        # vertically uniform temperature profile adjustment
+    local Qref::NF = 0      # = ∫_pₛ^p_LZB -humid_ref_profile dp
 
-    # 1. Fluxes in the PBL
-    humid_top_of_pbl = min(humid_half[nlev-1], humid[nlev])   # Humidity at the upper boundary of the PBL
-    max_humid_pbl = max(NF(1.01) * humid[nlev], sat_humid[nlev])  # Maximum specific humidity in the PBL
+    # skip constants compared to Frierson 2007, i.e. no /τ, /gravity, *cₚ/Lᵥ
+    for k in level_zero_buoyancy:nlev
+        # Frierson's equation (1)
+        # δq = -(humid[k] - humid_ref_profile[k])/SBM.time_scale.value
+        # Pq -= δq*Δσ[k]/gravity
+        #
+        # δT = -(temp[k] - temp_ref_profile[k])/SBM.time_scale.value
+        # PT += δT*Δσ[k]/gravity*cₚ/Lᵥ
 
-    # Cloud-base mass flux
-    pₛ = pres[end]                               # surface pressure
-    Δp = pres_ref * pₛ * σ_levels_thick[nlev]  # Pressure difference between bottom and top of PBL
-    mass_flux =
-        Δp / (gravity * 3600humid_relax_time_cnv) *
-        min(1, 2 * (pₛ - pres_thresh_cnv) / (1 - pres_thresh_cnv)) *
-        min(5, excess_humidity / (max_humid_pbl - humid_top_of_pbl))
-    column.cloud_base_mass_flux = mass_flux
+        # shorter form with same sign (τ, gravity, cₚ, Lᵥ all positive) to be reused
+        Pq += (humid[k] - humid_ref_profile[k])*Δσ[k]
+        PT -= (temp[k] - temp_ref_profile[k])*Δσ[k]
+    end
 
-    # Upward fluxes at upper boundary
-    flux_up_humid = mass_flux * max_humid_pbl
-    flux_up_dry_static_energy = mass_flux * dry_static_energy[nlev]
+    # ADJUST PROFILES FOLLOWING FRIERSON 2007
+    deep_convection = Pq > 0 && PT > 0
+    shallow_convection = Pq <= 0 && PT > 0
 
-    # Downward fluxes at upper boundary
-    flux_down_humid = mass_flux * humid_top_of_pbl
-    flux_down_dry_static_energy = mass_flux * dry_static_energy_half[nlev-1]
+    # escape immediately for no convection
+    no_convection = !(deep_convection || shallow_convection)
+    no_convection && return nothing
 
-    # Net flux
-    net_flux_dry_static_energy[nlev] = flux_down_dry_static_energy - flux_up_dry_static_energy
-    net_flux_humid[nlev] = flux_down_humid - flux_up_humid
+    # height of zero buoyancy level in σ coordinates
+    Δσ_lzb = σ_half[nlev+1] - σ_half[level_zero_buoyancy]   
 
-    # 2. Fluxes for intermediate layers
-    for k = (nlev-1):-1:(cloud_top+1)
-        # Fluxes at lower boundary
-        net_flux_dry_static_energy[k] = flux_up_dry_static_energy - flux_down_dry_static_energy
-        net_flux_humid[k] = flux_up_humid - flux_down_humid
+    if deep_convection
 
-        # Mass entrainment
-        mass_entrainment = entrainment_profile[k] * pₛ * cloud_base_mass_flux  # Why multiply by pres here?
-        mass_flux += mass_entrainment
+        ΔT = (PT + Pq*Lᵥ/cₚ)/Δσ_lzb         # minus eq (5) but reusing PT, Pq, and /cₚ already included
 
-        # Upward fluxes at upper boundary
-        flux_up_dry_static_energy += mass_entrainment * dry_static_energy[k]
-        flux_up_humid += mass_entrainment * humid[k]
+        for k in level_zero_buoyancy:nlev
+            temp_ref_profile[k] += ΔT       # equation (6)
+        end
+    
+    elseif shallow_convection
+        
+        # FRIERSON'S QREF SCHEME
+        # "changing the reference profiles for both temperature and humidity so the
+        # precipitation is zero.
 
-        # Downward fluxes at upper boundary
-        flux_down_dry_static_energy = mass_flux * dry_static_energy_half[k-1]
-        flux_down_humid = mass_flux * humid_half[k-1]
+        for k in level_zero_buoyancy:nlev
+            Qref -= humid_ref_profile[k]*Δσ[k]  # eq (11) but in σ coordinates
+        end
+        fq = 1 - Pq/Qref                    # = 1 - Δq/Qref in eq (12) but we reuse Pq
 
-        # Net flux of dry static energy and moisture
-        net_flux_dry_static_energy[k] += flux_down_dry_static_energy - flux_up_dry_static_energy
-        net_flux_humid[k] = flux_down_humid - flux_up_humid
-
-        # Secondary moisture flux representing shallower, non-precipitating convective systems
-        # Occurs when RH in an intermediate layer falls below a threshold
-        Δhumid = RH_thresh_trop_cnv * sat_humid[k] - humid[k]
-        if Δhumid > 0
-            Δflux_humid = ratio_secondary_mass_flux * cloud_base_mass_flux * Δhumid
-            net_flux_humid[k] += Δflux_humid
-            net_flux_humid[nlev] -= Δflux_humid
+        ΔT = PT/Δσ_lzb                      # equation (14), reuse PT and in σ coordinates
+        for k in level_zero_buoyancy:nlev
+            humid_ref_profile[k] *= fq      # update humidity profile, eq (13)
+            temp_ref_profile[k] -= ΔT       # update temperature profile, eq (15)
         end
     end
 
-    # 3. Fluxes for top-of-convection layer
-    # Flux of convective precipitation
-    column.precip_convection = max(flux_up_humid - mass_flux * sat_humid_half[cloud_top], 0)
+    # GET TENDENCIES FROM ADJUSTED PROFILES
+    for k in level_zero_buoyancy:nlev
+        temp_tend[k] -= (temp[k] - temp_ref_profile[k]) / SBM.time_scale.value
+        δq = (humid[k] - humid_ref_profile[k]) / SBM.time_scale.value
+        humid_tend[k] -= δq
 
-    # Net flux of dry static energy and moisture
-    net_flux_dry_static_energy[cloud_top] =
-        flux_up_dry_static_energy - flux_down_dry_static_energy + alhc * precip_convection
-    net_flux_humid[cloud_top] = flux_up_humid - flux_down_humid - precip_convection
+        # convective precipiation, integrate dq\dt [(kg/kg)/s] vertically
+        column.precip_convection += δq * Δσ[k]
+    end
 
-    return nothing
+    (;gravity) = planet
+    (;water_density) = atmosphere
+    (;Δt_sec) = time_stepping
+    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv 
+    column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
+    column.cloud_top = min(column.cloud_top,level_zero_buoyancy)        # clouds reach to top of convection
 end
 
+function pseudo_adiabat!(
+    temp_ref_profile::AbstractVector,
+    temp_parcel::NF,
+    humid_parcel::Real,
+    temp_virt_environment::AbstractVector,
+    geopot::AbstractVector,
+    pres::Real,
+    σ::AbstractVector,
+    clausius_clapeyron::AbstractClausiusClapeyron,
+) where NF
 
-    # # Compute the entrainment coefficients for the convection parameterization.
-    # (;max_entrainment) = P
-    # entrainment_profile = zeros(nlev)
-    # for k = 2:nlev-1
-    #     entrainment_profile[k] = max(0, (σ_levels_full[k] - 0.5)^2)
-    # end
+    (;Lᵥ, R_dry, R_vapour, cₚ) = clausius_clapeyron
+    R_cₚ = R_dry/cₚ
+    ε = clausius_clapeyron.mol_ratio
+    μ = (1-ε)/ε                             # for virtual temperature
 
-    # # profile as fraction of cloud-base mass flux
-    # entrainment_profile /= sum(entrainment_profile)  # Normalise
-    # entrainment_profile *= max_entrainment           # fraction of max entrainment
+    @boundscheck length(temp_ref_profile) == length(geopot) ==
+        length(σ) == length(temp_virt_environment) || throw(BoundsError)
 
+    nlev = length(temp_ref_profile)         # number of vertical levels
+    temp_ref_profile .= NaN                 # reset profile from any previous calculation
+    temp_ref_profile[nlev] = temp_parcel    # start profile with parcel temperature
 
-    # # Convection
-    # pres_thresh_cnv::NF            # Minimum (normalised) surface pressure for the occurrence of convection
-    # RH_thresh_pbl_cnv::NF          # Relative humidity threshold for convection in PBL
-    # RH_thresh_trop_cnv::NF         # Relative humidity threshold for convection in the troposphere
-    # humid_relax_time_cnv::NF       # Relaxation time for PBL humidity (hours)
-    # max_entrainment::NF            # Maximum entrainment as a fraction of cloud-base mass flux
-    # ratio_secondary_mass_flux::NF  # Ratio between secondary and primary mass flux at cloud-base
+    local saturated::Bool = false           # did the parcel reach saturation yet?
+    local buoyant::Bool = true              # is the parcel still buoyant?
+    local k::Int = nlev                     # layer index top to surface
+    local temp_virt_parcel::NF = temp_parcel * (1 + μ*humid_parcel)
 
+    while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
+        k -= 1                              # one level up
+            
+        if !saturated                       # if not saturated yet follow dry adiabat
+            # dry adiabatic ascent and saturation humidity of that temperature 
+            temp_parcel_dry = temp_parcel*(σ[k]/σ[k+1])^R_cₚ
+            sat_humid = saturation_humidity(temp_parcel_dry,σ[k]*pres,clausius_clapeyron)
+                    
+            # set to saturated when the dry adiabatic ascent would reach saturation
+            # then follow moist adiabat instead (see below)
+            saturated = humid_parcel >= sat_humid
+        end
+    
+        if saturated            
+            # calculate moist/pseudo adiabatic lapse rate, dT/dΦ = -Γ/cp
+            T, Tᵥ, q = temp_parcel, temp_virt_parcel, humid_parcel  # for brevity
+            A = q*Lᵥ / ((1-q)^2 * R_dry)
+            B = q*Lᵥ^2 / ((1-q)^2 * cₚ * R_vapour)
+            Γ = (1 + A/Tᵥ) / (1 + B/T^2)
+                
+            ΔΦ = geopot[k] - geopot[k+1]                            # vertical gradient in geopotential
+            temp_parcel = temp_parcel - ΔΦ/cₚ*Γ                     # new temperature of parcel at k
+                
+            # at new (lower) temperature condensation occurs immediately
+            # new humidity equals to that saturation humidity
+            humid_parcel = saturation_humidity(temp_parcel,σ[k]*pres,clausius_clapeyron)
+        else
+            temp_parcel = temp_parcel_dry       # else parcel temperature following dry adiabat
+        end
+    
+        # use dry/moist adiabatic ascent for reference profile
+        temp_ref_profile[k] = temp_parcel
 
-    # "For computing saturation vapour pressure"
-    # magnus_coefs::Coefficients = MagnusCoefs{NF}()
-
-    # # Convection
-    # "Minimum (normalised) surface pressure for the occurrence of convection"
-    # pres_thresh_cnv::Float64 = 0.8
-
-    # "Relative humidity threshold for convection in PBL"
-    # RH_thresh_pbl_cnv::Float64 = 0.9
-
-    # "Relative humidity threshold for convection in the troposphere"
-    # RH_thresh_trop_cnv::Float64 = 0.7
-
-    # "Relaxation time for PBL humidity (hours)"
-    # humid_relax_time_cnv::Float64 = 6.0
-
-    # "Maximum entrainment as a fraction of cloud-base mass flux"
-    # max_entrainment::Float64 = 0.5
-
-    # "Ratio between secondary and primary mass flux at cloud-base"
-    # ratio_secondary_mass_flux::Float64 = 0.8
+        # check whether parcel is still buoyant wrt to environment
+        # use virtual temperature as it's equivalent to density
+        temp_virt_parcel = temp_parcel*(1 + μ*humid_parcel)         # virtual temperature of parcel
+        buoyant = temp_virt_parcel > temp_virt_environment[k] ? true : false      
+    end
+    
+    # if parcel isn't buoyant anymore set last temperature (with negative buoyancy) back to NaN
+    temp_ref_profile[k] = !buoyant ? NaN : temp_ref_profile[k]    
+    
+    # level of zero buoyancy is reached when the loop stops, but in case it's at the top it's still buoyant
+    level_zero_buoyancy = k + (1-buoyant)
+    return level_zero_buoyancy
+end
