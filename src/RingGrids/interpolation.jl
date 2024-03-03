@@ -53,6 +53,11 @@ function GridGeometry(  Grid::Type{<:AbstractGrid}, # which grid to calculate th
     return GridGeometry{Grid}(nlat_half,nlat,npoints,latd_poles,londs,rings,nlons,lon_offsets)
 end
 
+function Base.show(io::IO,G::GridGeometry{T}) where T
+    println(io,"$(typeof(G))")
+    print(io,"└ $(G.nlat)-ring $T, $(G.npoints) grid points")
+end
+
 """
     AbstractLocator{NF}
 
@@ -113,6 +118,11 @@ end
 # use Float64 as default for weights
 (::Type{L})(npoints::Integer) where {L<:AbstractLocator} = L{Float64}(npoints)
 
+function Base.show(io::IO,L::AnvilLocator)
+    println(io,"$(typeof(L))")
+    print(io,"└ npoints::Int = $(L.npoints)")
+end
+
 
 """
     abstract type AbstractInterpolator{NF,G} end
@@ -130,6 +140,12 @@ abstract type AbstractInterpolator{NF,G} end
 struct AnvilInterpolator{NF<:AbstractFloat,G<:AbstractGrid} <: AbstractInterpolator{NF,G}
     geometry::GridGeometry{G}
     locator::AnvilLocator{NF}
+end
+
+function Base.show(io::IO,L::AnvilInterpolator{NF,Grid}) where {NF,Grid}
+    println(io,"$(typeof(L))")
+    println(io,"├ from: $(L.geometry.nlat)-ring $Grid, $(L.geometry.npoints) grid points")
+    print(io,"└ onto: $(L.locator.npoints) points")
 end
 
 # define to a <:AbstractInterpolator the corresponding Locator

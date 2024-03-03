@@ -191,6 +191,8 @@ struct PrognosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF},M<:ModelSetu
     ocean::PrognosticVariablesOcean{NF,Grid}
     land::PrognosticVariablesLand{NF,Grid}
 
+    particles::Vector{Particle{NF}}
+
     # scaling
     scale::Base.RefValue{NF}
 
@@ -206,13 +208,15 @@ function PrognosticVariables(SG::SpectralGrid,model::ModelSetup)
     surface = PrognosticSurfaceTimesteps(SG)
     ocean = PrognosticVariablesOcean(SG)
     land = PrognosticVariablesLand(SG)
+    particles = zeros(Particle{NF}, model.particle_advection.n_particles)
 
     scale = Ref(one(NF))        # initialize with scale=1, wrapped in RefValue for mutability
     clock = Clock()
 
     Model = model_class(model)  # strip away the parameters
     return PrognosticVariables{NF,Grid{NF},Model}(  trunc,nlat_half,nlev,N_STEPS,
-                                                    layers,surface,ocean,land,scale,clock)
+                                                    layers,surface,ocean,land,particles,
+                                                    scale,clock)
 end
 
 has(::PrognosticVariables{NF,Grid,M}, var_name::Symbol) where {NF,Grid,M} = has(M, var_name)

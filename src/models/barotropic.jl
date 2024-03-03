@@ -18,6 +18,7 @@ Base.@kwdef mutable struct BarotropicModel{
     CO<:AbstractCoriolis,
     FR<:AbstractForcing,
     DR<:AbstractDrag,
+    PA<:AbstractParticleAdvection,
     IC<:InitialConditions,
     TS<:AbstractTimeStepper,
     ST<:SpectralTransform{NF},
@@ -38,6 +39,7 @@ Base.@kwdef mutable struct BarotropicModel{
     coriolis::CO = Coriolis(spectral_grid)
     forcing::FR = NoForcing()
     drag::DR = NoDrag()
+    particle_advection::PA = ParticleAdvection(spectral_grid)
     initial_conditions::IC = StartWithRandomVorticity()
     
     # NUMERICS
@@ -78,6 +80,9 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     prognostic_variables = PrognosticVariables(spectral_grid, model)
     initialize!(prognostic_variables, model.initial_conditions, model)
     prognostic_variables.clock.time = time       # set the time
+
+    # particle advection
+    initialize!(prognostic_variables.particles, model)
 
     diagnostic_variables = DiagnosticVariables(spectral_grid, model)
     return Simulation(prognostic_variables, diagnostic_variables, model)

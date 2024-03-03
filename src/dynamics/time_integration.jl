@@ -260,6 +260,8 @@ function timestep!(
         leapfrog!(progn_layer, diagn_layer, dt, lf1, model)
         gridded!(diagn_layer, progn_lf, model)
     end
+
+    particle_advection!(progn.particles, diagn, dt, model.particle_advection)
 end
 
 """
