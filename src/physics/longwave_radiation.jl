@@ -1,7 +1,8 @@
-abstract type AbstractLongwave{NF} <: AbstractRadiation{NF} end
+abstract type AbstractLongwave <: AbstractRadiation end
 
-struct NoLongwave{NF} <: AbstractLongwave{NF} end
-NoLongwave(SG::SpectralGrid) = NoLongwave{SG.NF}()
+export NoLongwave
+struct NoLongwave <: AbstractLongwave end
+NoLongwave(SG::SpectralGrid) = NoLongwave()
 initialize!(::NoLongwave,::PrimitiveEquation) = nothing
 
 # function barrier for all AbstractLongwave
@@ -11,7 +12,8 @@ end
 
 longwave_radiation!(::ColumnVariables,::NoLongwave,::PrimitiveEquation) = nothing
 
-Base.@kwdef struct UniformCooling{NF} <: AbstractLongwave{NF}
+export UniformCooling
+Base.@kwdef struct UniformCooling{NF} <: AbstractLongwave
     time_scale::Second = Hour(16)
     temp_min::NF = 207.5
     temp_stratosphere::NF = 200

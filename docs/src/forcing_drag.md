@@ -37,7 +37,7 @@ To define a new forcing type, at the most basic level you would do
 ```@example extending
 using SpeedyWeather
 
-struct MyForcing{NF} <: AbstractForcing{NF}
+struct MyForcing{NF} <: SpeedyWeather.AbstractForcing
     # define some parameters and work arrays here
     a::NF
     v::Vector{NF}
@@ -47,7 +47,7 @@ In Julia this introduces a new (so-called compound) type that is a subtype of `A
 we have a bunch of these abstract super types defined and you want to
 piggy-back on them because of multiple-dispatch. This new type could also be 
 a `mutable struct`, could have keywords defined with `Base.@kwdef` and can
-also be parametric with respect to the number format or grid, but let's skip
+also be parametric with respect to the number format `NF` or grid, but let's skip
 those details for now. Conceptually you include into the type any parameters
 (example the float `a` here) that you may need and especially those that you want to change.
 This type will get a user-facing interface so that one can quickly create a new
@@ -163,7 +163,7 @@ will explain the details in second
 ```@example extend
 using SpeedyWeather, Dates
 
-Base.@kwdef struct StochasticStirring{NF} <: AbstractForcing{NF}
+Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing
 
     # DIMENSIONS from SpectralGrid
     "Spectral resolution as max degree of spherical harmonics"
@@ -175,16 +175,16 @@ Base.@kwdef struct StochasticStirring{NF} <: AbstractForcing{NF}
 
     # OPTIONS
     "Decorrelation time scale τ [days]"
-    decorrelation_time::Float64 = 2
+    decorrelation_time::Second = Day(2)
 
     "Stirring strength A [1/s²]"
-    strength::Float64 = 1e-11
+    strength::NF = 7e-11
 
     "Stirring latitude [˚N]"
-    latitude::Float64 = 45
+    latitude::NF = 45
 
     "Stirring width [˚]"
-    width::Float64 = 24
+    width::NF = 24
 
 
     # TO BE INITIALISED
@@ -202,9 +202,10 @@ Base.@kwdef struct StochasticStirring{NF} <: AbstractForcing{NF}
 end
 ```
 
-So, first the scalar parameters, are added as fields of type `Float64` with some default values
-as suggested in the [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2)
-paper. In order to be able to define the default values, we add the `Base.@kwdef` macro
+So, first the scalar parameters, are added as fields of type `NF` (you could harcode `Float64` too)
+with some default values as suggested in the
+[Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2) paper.
+In order to be able to define the default values, we add the `Base.@kwdef` macro
 before the `struct` definition. Then we need the term `S` as coefficients of the spherical harmonics, which
 is a `LowerTriangularMatrix`, however we want its elements to be of number format `NF`,
 which is also the parametric type of `StochasticStirring{NF}`, this is done because it will
@@ -236,33 +237,29 @@ zero. For this we want to define a latitudinal mask `lat_mask` that is a vector 
 the number of latitude rings. Similar to `S`, we want to allocate it with zeros (or any other
 value for that matter), but then precompute this mask in the `initialize!` step. For this
 we need to know `nlat` at creation time meaning we add this field similar as to how we added
-`trunc`. This mask requires the parameters `latitude` and a `width` which are therefore also
-added to the definition of `StochasticStirring`.
+`trunc`. This mask requires the parameters `latitude` (it's position) and a `width` which
+are therefore also added to the definition of `StochasticStirring`.
 
 ## Custom forcing: generator function
 
-Cool. Now you could create our new `StochasticStirring` forcing with `StochasticStirring{NF}(trunc=31,nlat=48)`,
-and the default values would be chosen as well as the correct size of the arrays `S` and `lat_mask` we need.
-Furthermore, note that because `StochasticStirring{NF}` is parametric on the number format `NF`, these
-arrays are also allocated with the correct number format that will be used throughout model integration.
+Cool. Now you could create our new `StochasticStirring` forcing with `StochasticStirring{Float64}(trunc=31,nlat=48)`,
+and the default values would be chosen as well as the correct size of the arrays `S` and `lat_mask` we need
+and in double precision Float64. Furthermore, note that because `StochasticStirring{NF}` is parametric
+on the number format `NF`, these arrays are also allocated with the correct number format that will
+be used throughout model integration.
 
 But in SpeedyWeather we typically use the [SpectralGrid](@ref) object to pass on the information of
 the resolution (and number format) so we want a generator function like
 ```@example extend
 function StochasticStirring(SG::SpectralGrid;kwargs...)
-    (;trunc,Grid,nlat_half) = SG
-    nlat = RingGrids.get_nlat(Grid,nlat_half)
+    (;trunc,nlat) = SG
     return StochasticStirring{SG.NF}(;trunc,nlat,kwargs...)
 end
-nothing # hide
 ```
 Which allows us to do
 ```@example extend
 spectral_grid = SpectralGrid(trunc=42,nlev=1)
-```
-and
-```@example extend
-stochastic_stirring = StochasticStirring(spectral_grid,latitude=30,decorrelation_time=5)
+stochastic_stirring = StochasticStirring(spectral_grid,latitude=30,decorrelation_time=Day(5))
 ```
 So the respective resolution parameters and the number format are just pulled from the `SpectralGrid`
 as a first argument and the remaining parameters are just keyword arguments that one can change at creation.
@@ -275,7 +272,7 @@ Now let us have a closer look at the details of the `initialize!` function, in o
 actually do
 ```@example extend
 function SpeedyWeather.initialize!( forcing::StochasticStirring,
-                                    model::SpeedyWeather.ModelSetup)
+                                    model::ModelSetup)
     
     # precompute forcing strength, scale with radius^2 as is the vorticity equation
     (;radius) = model.spectral_grid
@@ -283,7 +280,7 @@ function SpeedyWeather.initialize!( forcing::StochasticStirring,
     
     # precompute noise and auto-regressive factor, packed in RefValue for mutability
     dt = model.time_stepping.Δt_sec
-    τ = forcing.decorrelation_time*24*3600   # convert to seconds
+    τ = forcing.decorrelation_time.value        # in seconds
     forcing.a[] = A*sqrt(1 - exp(-2dt/τ))
     forcing.b[] = exp(-dt/τ)
     
@@ -332,13 +329,13 @@ defined for our new `StochasticStirring` forcing. But if you define it as follow
 then this will be called automatically with multiple dispatch.
 
 ```@example extend
-function SpeedyWeather.forcing!(diagn::SpeedyWeather.DiagnosticVariablesLayer,
-                                progn::SpeedyWeather.PrognosticVariablesLayer,
+function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
+                                progn::PrognosticVariablesLayer,
                                 forcing::StochasticStirring,
                                 time::DateTime,
-                                model::SpeedyWeather.ModelSetup)
+                                model::ModelSetup)
     # function barrier only
-    forcing!(diagn,forcing,model.spectral_transform)
+    forcing!(diagn, forcing, model.spectral_transform)
 end
 ```
 The function has to be as outlined above. The first argument has to be of type
@@ -355,13 +352,13 @@ As you can see, for now not much is actually happening inside this function,
 this is what is often called a function barrier, the only thing we do in here
 is to unpack the model to the specific model components we actually need.
 You can omit this function barrier and jump straight to the definition below,
-but often this is done for performance reasons: `model` has several
+but often this is done for performance and clarity reasons: `model` might have
 abstract fields which the compiler cannot optimize for, but unpacking them
-makes that possible. So we define the actual `forcing!` function that's
-then called as follows
+makes that possible. And it also tells you more clearly what a function depends on.
+So we define the actual `forcing!` function that's then called as follows
 
 ```@example extend
-function forcing!(  diagn::SpeedyWeather.DiagnosticVariablesLayer,
+function forcing!(  diagn::DiagnosticVariablesLayer,
                     forcing::StochasticStirring{NF},
                     spectral_transform::SpectralTransform) where NF
     
@@ -378,16 +375,15 @@ function forcing!(  diagn::SpeedyWeather.DiagnosticVariablesLayer,
 
     # to grid-point space
     S_grid = diagn.dynamics_variables.a_grid
-    SpeedyTransforms.gridded!(S_grid,S,spectral_transform)
+    SpeedyTransforms.gridded!(S_grid, S, spectral_transform)
     
     # mask everything but mid-latitudes
-    RingGrids._scale_lat!(S_grid,forcing.lat_mask)
+    RingGrids._scale_lat!(S_grid, forcing.lat_mask)
     
     # back to spectral space
     (;vor_tend) = diagn.tendencies
-    SpeedyTransforms.spectral!(vor_tend,S_grid,spectral_transform)
-    SpeedyTransforms.spectral_truncation!(vor_tend)    # set lmax+1 to zero
-    
+    SpeedyTransforms.spectral!(vor_tend, S_grid, spectral_transform)
+
     return nothing
 end
 ```
@@ -418,7 +414,8 @@ without overwriting other terms which, in fact, will be added to this
 array afterwards. In general, you can also force the momentum equations
 in grid-point space by writing into `u_tend_grid` and `v_tend_grid`.
 
-Then one last detail is the call to `spectral_truncation!`. Despite the
+(Not needed anymore with SpeedyWeather.jl v0.8)
+~~Then one last detail is the call to `spectral_truncation!`. Despite the
 triangular spectral truncation in SpeedyWeather, the lower triangular matrices
 for the spherical harmonics are actually of size ``N+1 \times N``, because
 this additional degree (=row) is needed for vector quantities
@@ -426,7 +423,7 @@ this additional degree (=row) is needed for vector quantities
 this means that the last spectral transform will compute the spherical
 harmonics of this last degree which, however, scalar quantities like
 vorticity should not make use of. We therefore set this degree to zero
-with the call to `spectral_truncation!`, which does exactly that.
+with the call to `spectral_truncation!`, which does exactly that.~~
 
 ## Custom forcing: model construction
 
@@ -446,7 +443,7 @@ and just put them together as you like, and as long as you follow some rules.
 spectral_grid = SpectralGrid(trunc=42,nlev=1)
 stochastic_stirring = StochasticStirring(spectral_grid,latitude=-45)
 initial_conditions = StartFromRest()
-model = BarotropicModel(;spectral_grid,initial_conditions,forcing=stochastic_stirring)
+model = BarotropicModel(;spectral_grid, initial_conditions, forcing=stochastic_stirring)
 simulation = initialize!(model)
 run!(simulation)
 ```
@@ -466,8 +463,8 @@ This section is just to outline some differences.
 SpeedyWeather defines `AbstractForcing` and `AbstractDrag`, both are only conceptual
 supertypes, and in fact you could define a forcing as a subtype of `AbstractDrag`
 and vice versa. So for a drag, most straight-forwardly you would do
-```julia
-struct MyDrag <: AbstractDrag
+```@example extend
+struct MyDrag <: SpeedyWeather.AbstractDrag
     # parameters and arrays
 end
 ```

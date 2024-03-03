@@ -1,8 +1,10 @@
+export Leapfrog
+
 """
 Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)
 """
-Base.@kwdef mutable struct Leapfrog{NF} <: TimeStepper{NF}
+Base.@kwdef mutable struct Leapfrog{NF<:AbstractFloat} <: AbstractTimeStepper
 
     # DIMENSIONS
     "spectral resolution (max degree of spherical harmonics)"
@@ -90,12 +92,6 @@ for the resolution information."""
 function Leapfrog(spectral_grid::SpectralGrid;kwargs...)
     (;NF,trunc,radius) = spectral_grid
     return Leapfrog{NF}(;trunc,radius,kwargs...)
-end
-
-function Base.show(io::IO,L::Leapfrog)
-    println(io,"$(typeof(L)) <: TimeStepper")
-    keys = propertynames(L)
-    print_fields(io,L,keys)
 end
 
 """
@@ -242,13 +238,14 @@ end
 """
 $(TYPEDSIGNATURES)
 Calculate a single time step for the `model <: Barotropic`."""
-function timestep!( progn::PrognosticVariables,     # all prognostic variables
-                    diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
-                    dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
-                    model::Barotropic,              # everything that's constant at runtime
-                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
-                    lf2::Int=2)                     # leapfrog index 2 (time step used for tendencies)
-
+function timestep!( 
+    progn::PrognosticVariables,     # all prognostic variables
+    diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
+    dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt,Δt/2)
+    model::Barotropic,              # everything that's constant at runtime
+    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
+    lf2::Int=2,                     # leapfrog index 2 (time step used for tendencies)
+)
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (;time) = progn.clock                           # current time
     
@@ -256,12 +253,12 @@ function timestep!( progn::PrognosticVariables,     # all prognostic variables
     zero_tendencies!(diagn)
 
     # LOOP OVER LAYERS FOR TENDENCIES, DIFFUSION, LEAPFROGGING AND PROPAGATE STATE TO GRID
-    for (progn_layer,diagn_layer) in zip(progn.layers,diagn.layers)
+    for (progn_layer,diagn_layer) in zip(progn.layers, diagn.layers)
         progn_lf = progn_layer.timesteps[lf2]       # pick the leapfrog time step lf2 for tendencies
-        dynamics_tendencies!(diagn_layer,progn_lf,time,model)
-        horizontal_diffusion!(diagn_layer,progn_layer,model)
-        leapfrog!(progn_layer,diagn_layer,dt,lf1,model)
-        gridded!(diagn_layer,progn_lf,model)
+        dynamics_tendencies!(diagn_layer, progn_lf, time, model)
+        horizontal_diffusion!(diagn_layer, progn_layer, model)
+        leapfrog!(progn_layer, diagn_layer, dt, lf1, model)
+        gridded!(diagn_layer, progn_lf, model)
     end
 end
 
@@ -368,7 +365,7 @@ and calls the output and feedback functions."""
 function time_stepping!(
     progn::PrognosticVariables,     # all prognostic variables
     diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
-    model::ModelSetup,              # all precalculated structs
+    model::ModelSetup,              # all model components
 )          
     
     (;clock) = progn
@@ -376,16 +373,16 @@ function time_stepping!(
     (;time_stepping) = model
 
     # SCALING: we use vorticity*radius,divergence*radius in the dynamical core
-    scale!(progn,model.spectral_grid.radius)
+    scale!(progn, model.spectral_grid.radius)
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
     (;output,feedback) = model
     lf = 1                                  # use first leapfrog index
     gridded!(diagn,progn,lf,model)
-    initialize!(output,feedback,time_stepping,clock,diagn,model)
-    initialize!(feedback,clock,model)
+    initialize!(output, feedback, time_stepping, clock, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)
+    initialize!(feedback, clock, model)
 
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
     first_timesteps!(progn,diagn, model, output)
@@ -406,8 +403,8 @@ function time_stepping!(
     unscale!(progn)                         # undo radius-scaling for vor,div from the dynamical core
     close(output)                           # close netCDF file
     write_restart_file(progn, output)       # as JLD2 
-    progress_finish!(feedback)              # finishes the progress meter bar
+    finish!(feedback)                       # finishes the progress meter bar
     finish!(model.callbacks, progn, diagn, model)
 
-    return progn
-end
+    return progn                            # to trigger UnicodePlot via show(::IO,::PrognosticVariables)
+end 

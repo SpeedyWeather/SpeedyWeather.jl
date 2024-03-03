@@ -1,3 +1,6 @@
+abstract type AbstractOrography{NF,Grid} <: AbstractModelComponent end
+export NoOrography
+
 """Orography with zero height in `orography` and zero surface geopotential `geopot_surf`.
 $(TYPEDFIELDS)"""
 struct NoOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
@@ -18,18 +21,14 @@ function NoOrography(spectral_grid::SpectralGrid)
     return NoOrography{NF,Grid{NF}}(orography,geopot_surf)
 end
 
-function Base.show(io::IO,orog::AbstractOrography)
-    println(io,"$(typeof(orog)) <: AbstractOrography")
-    keys = propertynames(orog)
-    print_fields(io,orog,keys)
-end
-
 # no further initialization needed
 initialize!(::NoOrography,::ModelSetup) = nothing
 
+export ZonalRidge
+
 """Zonal ridge orography after Jablonowski and Williamson, 2006.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
+Base.@kwdef mutable struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
     
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
@@ -39,10 +38,10 @@ Base.@kwdef struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: Abstr
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
-    orography::Grid
+    const orography::Grid
     
     "surface geopotential, height*gravity [m²/s²]"
-    geopot_surf::LowerTriangularMatrix{Complex{NF}} 
+    const geopot_surf::LowerTriangularMatrix{Complex{NF}} 
 end
 
 """
@@ -95,10 +94,11 @@ function initialize!(   orog::ZonalRidge,
     spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
 end
 
+export EarthOrography
 
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
+Base.@kwdef mutable struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
 
     # OPTIONS
     "path to the folder containing the orography file, pkg path default"
@@ -127,10 +127,10 @@ Base.@kwdef struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: A
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
-    orography::Grid
+    const orography::Grid
     
     "surface geopotential, height*gravity [m²/s²]"
-    geopot_surf::LowerTriangularMatrix{Complex{NF}} 
+    const geopot_surf::LowerTriangularMatrix{Complex{NF}} 
 end
 
 """
@@ -146,7 +146,7 @@ end
 # function barrier
 function initialize!(   orog::EarthOrography,
                         model::ModelSetup)
-    initialize!(orog,model.planet,model.spectral_transform)
+    initialize!(orog, model.planet, model.spectral_transform)
 end
 
 """

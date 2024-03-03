@@ -1,3 +1,5 @@
+export Feedback
+
 """
 Feedback struct that contains options and object for command-line feedback
 like the progress meter.
@@ -137,7 +139,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Finalises the progress meter and the progress txt file."""
-function progress_finish!(F::Feedback)
+function finish!(F::Feedback)
     ProgressMeter.finish!(F.progress_meter)
     
     if F.output     # write final progress to txt file

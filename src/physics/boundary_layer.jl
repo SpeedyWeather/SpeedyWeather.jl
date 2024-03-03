@@ -1,32 +1,23 @@
-abstract type BoundaryLayerDrag{NF} <: AbstractParameterization{NF} end
-
-"""Concrete type that disables the boundary layer drag scheme."""
-struct NoBoundaryLayerDrag{NF} <: BoundaryLayerDrag{NF} end
-
-NoBoundaryLayerDrag(SG::SpectralGrid) = NoBoundaryLayerDrag{SG.NF}()
-
-"""NoBoundaryLayer scheme does not need any initialisation."""
-function initialize!(   scheme::NoBoundaryLayerDrag,
-                        model::PrimitiveEquation)
-    return nothing
-end 
+abstract type AbstractBoundaryLayer <: AbstractParameterization end
 
 # function barrier for all boundary layer drags
 function boundary_layer_drag!(  column::ColumnVariables,
                                 model::PrimitiveEquation)
-    boundary_layer_drag!(column,model.boundary_layer_drag,model)
+    boundary_layer_drag!(column, model.boundary_layer_drag, model)
 end
 
-"""NoBoundaryLayer scheme just passes."""
-function boundary_layer_drag!(  column::ColumnVariables,
-                                scheme::NoBoundaryLayerDrag,
-                                model::PrimitiveEquation)
-    return nothing
-end
+# dummy boundary layer
+export NoBoundaryLayerDrag
+struct NoBoundaryLayerDrag <: AbstractBoundaryLayer end
+NoBoundaryLayerDrag(::SpectralGrid) = NoBoundaryLayerDrag()
+initialize!(::NoBoundaryLayerDrag,::PrimitiveEquation) = nothing
+boundary_layer_drag!(::ColumnVariables,::NoBoundaryLayerDrag,::PrimitiveEquation) = nothing
 
-"""Linear boundary layer drag Following Held and Suarez, 1996 BAMS
+export LinearDrag
+
+"""Linear boundary layer drag following Held and Suarez, 1996 BAMS
 $(TYPEDFIELDS)"""
-Base.@kwdef struct LinearDrag{NF<:AbstractFloat} <: BoundaryLayerDrag{NF}
+Base.@kwdef struct LinearDrag{NF<:AbstractFloat} <: AbstractBoundaryLayer
     
     # DIMENSIONS
     nlev::Int
@@ -85,24 +76,25 @@ function boundary_layer_drag!(  column::ColumnVariables,
     end
 end
 
-Base.@kwdef struct ConstantDrag{NF} <: BoundaryLayerDrag{NF}
+export ConstantDrag
+Base.@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
     drag::NF = 1e-3
 end
 
 ConstantDrag(SG::SpectralGrid;kwargs...) = ConstantDrag{SG.NF}(;kwargs...)
-
 initialize!(::ConstantDrag,::PrimitiveEquation) = nothing
-
 function boundary_layer_drag!(  column::ColumnVariables,
                                 scheme::ConstantDrag,
                                 model::PrimitiveEquation)
     column.boundary_layer_drag = scheme.drag
 end
 
+export BulkRichardsonDrag
+
 """Boundary layer drag coefficient from the bulk Richardson number,
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct BulkRichardsonDrag{NF} <: BoundaryLayerDrag{NF}
+Base.@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     "von Kármán constant [1]"
     κ::NF = 0.4
 
@@ -123,8 +115,9 @@ function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
     # Typical height Z of lowermost layer from geopotential of reference surface temperature
     # minus surface geopotential (orography * gravity)
     (;temp_ref) = model.atmosphere
-    (;Δp_geopot_full, gravity) = model.constants
-    Z = temp_ref*Δp_geopot_full[end] / gravity
+    (;gravity) = model.planet
+    (;Δp_geopot_full) = model.geopotential
+    Z = temp_ref * Δp_geopot_full[end] / gravity
     
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)

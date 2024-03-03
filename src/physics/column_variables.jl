@@ -7,7 +7,7 @@ function get_column!(
     jring::Integer,     # ring index 1 around North Pole to J around South Pole
     model::PrimitiveEquation,
 )
-    get_column!(C, D, P, ij, jring, model.geometry, model.constants, model.orography, model.land_sea_mask)
+    get_column!(C, D, P, ij, jring, model.geometry, model.planet, model.orography, model.land_sea_mask)
 end
 
 """
@@ -19,22 +19,22 @@ function get_column!(   C::ColumnVariables,
                         P::PrognosticVariables,
                         ij::Integer,        # grid point index
                         jring::Integer,     # ring index 1 around North Pole to J around South Pole
-                        G::Geometry,
-                        constants::DynamicsConstants,
-                        O::AbstractOrography,
-                        L::AbstractLandSeaMask)
+                        geometry::Geometry,
+                        planet::AbstractPlanet,
+                        orography::AbstractOrography,
+                        land_sea_mask::AbstractLandSeaMask)
 
-    (;σ_levels_full,ln_σ_levels_full) = G
+    (;σ_levels_full, ln_σ_levels_full) = geometry
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
-    C.latd = G.latds[ij]        # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
-    C.lond = G.londs[ij]
-    C.ij = ij                   # grid-point index
-    C.jring = jring             # ring index j of column, used to index latitude vectors
-    C.land_fraction = L.land_sea_mask[ij]
-    C.orography = O.orography[ij]
-    C.surface_geopotential = C.orography*constants.gravity
+    C.latd = geometry.latds[ij]     # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
+    C.lond = geometry.londs[ij]
+    C.ij = ij                       # grid-point index
+    C.jring = jring                 # ring index j of column, used to index latitude vectors
+    C.land_fraction = land_sea_mask.land_sea_mask[ij]
+    C.orography = orography.orography[ij]
+    C.surface_geopotential = C.orography * planet.gravity
 
     # pressure [Pa] or [log(Pa)]
     lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics
@@ -85,7 +85,7 @@ function get_column(    S::AbstractSimulation,
                 model)
 
     # execute all parameterizations for this column to return a consistent state
-    parameterization_tendencies!(column,S.model)
+    parameterization_tendencies!(column, S.model)
 
     verbose && @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
     return column
@@ -97,7 +97,7 @@ Write the parametrization tendencies from `C::ColumnVariables` into the horizont
 of tendencies stored in `D::DiagnosticVariables` at gridpoint index `ij`."""
 function write_column_tendencies!(  D::DiagnosticVariables,
                                     column::ColumnVariables,
-                                    C::DynamicsConstants,
+                                    planet::AbstractPlanet,
                                     ij::Int)            # grid point index
 
     (; nlev) = column
@@ -117,7 +117,7 @@ function write_column_tendencies!(  D::DiagnosticVariables,
     # Output cloud top in height [m] from geopotential height divided by gravity,
     # but NaN for no clouds
     D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.geopot[column.cloud_top]
-    D.surface.cloud_top[ij] /= C.gravity
+    D.surface.cloud_top[ij] /= planet.gravity
     
     # just use layer index 1 (top) to nlev (surface) for analysis, but 0 for no clouds
     # D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.cloud_top

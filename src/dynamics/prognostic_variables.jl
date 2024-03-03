@@ -13,7 +13,7 @@ Base.@kwdef mutable struct Clock
     "period to integrate for, set in set_period!(::Clock, ::Dates.Period)"
     period::Second = Second(0)
 
-    "number of time steps to integrate for, set in initialize!(::Clock,::TimeStepper)"
+    "number of time steps to integrate for, set in initialize!(::Clock,::AbstractTimeStepper)"
     n_timesteps::Int = 0  
 end
 
@@ -27,7 +27,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` in the `time_stepping`."""
-function initialize!(clock::Clock,time_stepping::TimeStepper)
+function initialize!(clock::Clock, time_stepping::AbstractTimeStepper)
     clock.n_timesteps = ceil(Int,clock.period.value/time_stepping.Δt_sec)
     return clock
 end
@@ -50,7 +50,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Create and initialize a clock from `time_stepping`"""
-function Clock(time_stepping::TimeStepper;kwargs...)
+function Clock(time_stepping::AbstractTimeStepper;kwargs...)
     clock = Clock(;kwargs...)
     initialize!(clock,time_stepping)
 end
@@ -58,6 +58,7 @@ end
 # how many time steps have to be stored for the time integration? Leapfrog = 2 
 const N_STEPS = 2
 const LTM = LowerTriangularMatrix       # just because it's shorter here
+export PrognosticVariablesLayer
 
 """A layer of the prognostic variables in spectral space.
 $(TYPEDFIELDS)"""
@@ -176,6 +177,7 @@ function PrognosticSurfaceTimesteps(SG::SpectralGrid)
     return PrognosticSurfaceTimesteps([PrognosticVariablesSurface(SG) for _ in 1:N_STEPS])
 end
 
+export PrognosticVariables
 struct PrognosticVariables{NF<:AbstractFloat,Grid<:AbstractGrid{NF},M<:ModelSetup} <: AbstractVariables
 
     # dimensions

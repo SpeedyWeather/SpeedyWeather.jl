@@ -1,0 +1,2 @@
+abstract type AbstractOutputWriter end
+abstract type AbstractFeedback end

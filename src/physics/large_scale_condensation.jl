@@ -1,9 +1,16 @@
-abstract type AbstractCondensation{NF} <: AbstractParameterization{NF} end
+abstract type AbstractCondensation <: AbstractParameterization end
 
+export NoCondensation
+struct NoCondensation <: AbstractCondensation end
+NoCondesantion(::SpectralGrid) = NoCondensation()
+initialize!(::NoCondensation,::PrimitiveEquation) = nothing
+large_scale_condensation!(::ColumnVariables, ::NoCondensation, ::PrimitiveEquation) = nothing
+
+export ImplicitCondensation
 """
 Large scale condensation as with implicit precipitation.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation{NF}
+Base.@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
     "Flux limiter for latent heat release [K] per timestep"
     max_heating::NF = 0.2
 
@@ -29,8 +36,9 @@ function large_scale_condensation!(
     column::ColumnVariables,
     model::PrimitiveWet,
 )
+    #TODO not needed for NoCondensation
     saturation_humidity!(column, model.clausius_clapeyron)
-    large_scale_condensation!(column,model.large_scale_condensation,model)
+    large_scale_condensation!(column, model.large_scale_condensation, model)
 end
 
 # function barrier for ImplicitCondensation to unpack model
@@ -39,8 +47,8 @@ function large_scale_condensation!(
     scheme::ImplicitCondensation,
     model::PrimitiveWet,
 )
-    large_scale_condensation!(column,scheme,
-        model.clausius_clapeyron,model.geometry,model.constants,model.time_stepping)
+    large_scale_condensation!(column, scheme,
+        model.clausius_clapeyron, model.geometry, model.planet, model.atmosphere, model.time_stepping)
 end
 
 """
@@ -54,8 +62,9 @@ function large_scale_condensation!(
     scheme::ImplicitCondensation,
     clausius_clapeyron::AbstractClausiusClapeyron,
     geometry::Geometry,
-    constants::DynamicsConstants,
-    time_stepping::TimeStepper,
+    planet::AbstractPlanet,
+    atmosphere::AbstractAtmosphere,
+    time_stepping::AbstractTimeStepper,
 ) where NF
 
     (;temp, humid, pres) = column           # prognostic vars: specific humidity, pressure
@@ -64,10 +73,9 @@ function large_scale_condensation!(
     
     # precompute scaling constant for precipitation output
     pₛ = pres[end]                          # surface pressure
-    (;gravity, water_density) = constants
     (;Δt_sec) = time_stepping
     Δσ = geometry.σ_levels_thick
-    pₛΔt_gρ = pₛ*Δt_sec/(gravity*water_density)
+    pₛΔt_gρ = pₛ*Δt_sec/(planet.gravity * atmosphere.water_density)
 
     (;Lᵥ, cₚ, Lᵥ_Rᵥ) = clausius_clapeyron
     Lᵥ_cₚ = Lᵥ/cₚ                           # latent heat of vaporization over heat capacity

@@ -1,3 +1,10 @@
+abstract type AbstractPlanet <: AbstractModelComponent end
+
+const DEFAULT_ROTATION = 7.29e-5    # default angular frequency of Earth's rotation [1/s]
+const DEFAULT_GRAVITY = 9.81        # default gravitational acceleration on Earth [m/s²]
+
+export Earth
+
 """
 $(TYPEDSIGNATURES)
 Create a struct `Earth<:AbstractPlanet`, with the following physical/orbital
@@ -5,13 +12,13 @@ characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)
 """
-Base.@kwdef struct Earth <: AbstractPlanet
+Base.@kwdef mutable struct Earth{NF<:AbstractFloat} <: AbstractPlanet
 
     "angular frequency of Earth's rotation [rad/s]"
-    rotation::Float64 = 7.29e-5
+    rotation::NF = DEFAULT_ROTATION
     
     "gravitational acceleration [m/s^2]"
-    gravity::Float64 = 9.81                 
+    gravity::NF = DEFAULT_GRAVITY              
     
     "switch on/off daily cycle"
     daily_cycle::Bool = true
@@ -29,14 +36,11 @@ Base.@kwdef struct Earth <: AbstractPlanet
     equinox::DateTime = DateTime(2000,3,20) 
 
     "angle [˚] rotation axis tilt wrt to orbit"
-    axial_tilt::Float64 = 23.4
+    axial_tilt::NF = 23.4
 
     "Total solar irradiance at the distance of 1 AU [W/m²]"
-    solar_constant::Float64 = 1365
+    solar_constant::NF = 1365
 end
 
-function Base.show(io::IO,planet::AbstractPlanet)
-    println(io,"$(typeof(planet)) <: AbstractPlanet")
-    keys = propertynames(planet)
-    print_fields(io,planet,keys)
-end
+Earth(;kwargs...) = Earth{DEFAULT_NF}(;kwargs...)
+Earth(SG::SpectralGrid;kwargs...) = Earth{SG.NF}(;kwargs...)

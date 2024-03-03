@@ -1,5 +1,6 @@
-"""
-Number of mantissa bits to keep for each prognostic variable when compressed for
+abstract type AbstractKeepbits end
+
+"""Number of mantissa bits to keep for each prognostic variable when compressed for
 netCDF and .jld2 data output.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct Keepbits
@@ -24,6 +25,8 @@ end
 # default number format for output
 const DEFAULT_OUTPUT_NF = Float32
 const DEFAULT_OUTPUT_DT = Hour(6)
+
+export OutputWriter
 
 """
 $(TYPEDSIGNATURES)
@@ -120,7 +123,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32,Float64},Model<:ModelS
     const cloud::Matrix{NF} = fill(missing_value,nlon,nlat)
 end
 
-# generator function pulling grid resolution and time stepping from ::SpectralGrid and ::TimeStepper
+# generator function pulling grid resolution and time stepping from ::SpectralGrid and ::AbstractTimeStepper
 function OutputWriter(
     spectral_grid::SpectralGrid,
     ::Type{Model};
@@ -154,10 +157,10 @@ and dimensions. `write_output!` then writes consecuitive time steps into this fi
 function initialize!(   
     output::OutputWriter{output_NF,Model},
     feedback::AbstractFeedback,
-    time_stepping::TimeStepper,
+    time_stepping::AbstractTimeStepper,
     clock::Clock,
     diagn::DiagnosticVariables,
-    model::Model
+    model::ModelSetup,
 ) where {output_NF,Model}
     
     output.output || return nothing     # exit immediately for no output
@@ -307,6 +310,7 @@ function initialize!(
     model isa Union{ShallowWater,PrimitiveEquation} && println(parameters_txt,model.orography)
     close(parameters_txt)
 end
+
 
 """
 $(TYPEDSIGNATURES)

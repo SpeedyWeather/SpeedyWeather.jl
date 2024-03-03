@@ -1,4 +1,21 @@
 abstract type AbstractCallback end
+const CALLBACK_DICT = Dict{Symbol,AbstractCallback}
+const RANDSTRING_LENGTH = 4
+
+export CallbackDict
+function CallbackDict(callbacks::AbstractCallback...)
+    callback_pairs = (Pair(Symbol("callback_"*randstring(RANDSTRING_LENGTH)),callback)
+                        for callback in callbacks)
+    CALLBACK_DICT(callback_pairs...)
+end
+
+"""$(TYPEDSIGNATURES)
+Empty Callback dictionary generator."""
+CallbackDict() = CALLBACK_DICT()
+
+"""$(TYPEDSIGNATURES)
+Create Callback dictionary like normal dictionaries."""
+CallbackDict(pairs::Pair{Symbol,<:AbstractCallback}...) = CALLBACK_DICT(pairs...)
 
 function Base.show(io::IO,C::AbstractCallback)
     println(io,"$(typeof(C)) <: AbstractCallback")
@@ -15,20 +32,58 @@ initialize!(::NoCallback,args...) = nothing     # executed once before the main 
 callback!(::NoCallback,args...) = nothing       # executed after every time step
 finish!(::NoCallback,args...) = nothing         # executed after main time loop finishes
 
-# simply loop over vector of callbacks
+# simply loop over dict of callbacks
 for func in (:initialize!, :callback!, :finish!)
     @eval begin
-        function $func(callbacks::Vector{<:AbstractCallback},args...)
-            for callback in callbacks
-                $func(callback,args...)
+        function $func(callbacks::CALLBACK_DICT,args...)
+            for key in keys(callbacks)
+                $func(callbacks[key],args...)
             end
         end
     end
 end
 
-# define to make append!(::AbstractVector{<:AbstractCallback},::AbstractCallback) possible
-Base.length(::SpeedyWeather.AbstractCallback) = 1
-Base.iterate(c::SpeedyWeather.AbstractCallback) = (c,nothing)
+export add!
+"""
+$(TYPEDSIGNATURES)
+Add a or several callbacks to a Dict{String,AbstractCallback} dictionary. To be used like
+
+add!(model.callbacks,:my_callback => callback)
+add!(model.callbacks,:my_callback1 => callback, :my_callback2 => other_callback)
+"""
+function add!(D::CALLBACK_DICT, key_callbacks::Pair{Symbol, <:AbstractCallback}...)
+    for key_callback in key_callbacks
+        key = key_callback.first
+        callback = key_callback.second
+        D[key] = callback
+    end
+end
+
+add!(D::CALLBACK_DICT, key::Symbol, callback::AbstractCallback) = add!(D,Pair(key,callback))
+
+# also with string but flag conversion
+function add!(D::CALLBACK_DICT, key::String, callback::AbstractCallback)
+    key_symbol = Symbol(key)
+    @info "Callback keys are Symbols. String \"$key\" converted to Symbol :$key_symbol."
+    add!(D, key_symbol, callback)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Add a or several callbacks to a Dict{Symbol,AbstractCallback} dictionary without specifying the
+key which is randomly created like callback_????. To be used like
+
+    add!(model.callbacks, callback)
+    add!(model.callbacks, callback1, callback2)."""
+function add!(D::CALLBACK_DICT,callbacks::AbstractCallback...)
+    for callback in callbacks
+        key = Symbol("callback_"*Random.randstring(4))
+        @info "$(typeof(callback)) callback added with key $key"
+        add!(D, key => callback)
+    end
+end
+
+# delete!(dict,key) already defined in Base
 
 export GlobalSurfaceTemperatureCallback
 

@@ -1,7 +1,10 @@
+abstract type VerticalCoordinates end
+
 Base.@kwdef struct NoVerticalCoordinates <: VerticalCoordinates
     nlev::Int = 1
 end
 
+export SigmaCoordinates
 Base.@kwdef struct SigmaCoordinates <: VerticalCoordinates
     nlev::Int = 8
     σ_half::Vector{Float64} = default_sigma_coordinates(nlev)
@@ -52,13 +55,6 @@ function sigma_okay(nlev::Integer,σ_half::AbstractVector)
     @assert nlev == (length(σ_half) - 1) "nlev has to be length of σ_half - 1"
     @assert isincreasing(σ_half) "Vertical sigma coordinates are not increasing."
     return true
-end
-
-#TODO
-Base.@kwdef struct SigmaPressureCoordinates <: VerticalCoordinates
-    nlev::Int = 8
-    A::Vector{Float64} = default_hybrid_coordinates(:A,nlev)
-    B::Vector{Float64} = default_hybrid_coordinates(:B,nlev)
 end
 
 # currently not used as the grid has to be defined first

@@ -1,4 +1,6 @@
-abstract type AbstractClausiusClapeyron{NF} <: AbstractParameterization{NF} end
+abstract type AbstractClausiusClapeyron <: AbstractParameterization end
+
+export ClausiusClapeyron
 
 """
 Parameters for computing saturation vapour pressure of water using the Clausis-Clapeyron equation,
@@ -7,7 +9,7 @@ Parameters for computing saturation vapour pressure of water using the Clausis-C
 
 where T is in Kelvin, Lᵥ the the latent heat of condensation and Rᵥ the gas constant of water vapour
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClapeyron{NF}
+Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClapeyron
     "Saturation water vapour pressure at 0°C [Pa]"
     e₀::NF = 610.78
 
@@ -37,9 +39,9 @@ Base.@kwdef struct ClausiusClapeyron{NF<:AbstractFloat} <: AbstractClausiusClape
 end
 
 # generator function
-function ClausiusClapeyron(SG::SpectralGrid,atm::AbstractAtmosphere;kwargs...)
-    (;R_dry, R_vapour, latent_heat_condensation, cₚ) = atm
-    return ClausiusClapeyron{SG.NF}(;Lᵥ=latent_heat_condensation,R_dry,R_vapour,cₚ,kwargs...)
+function ClausiusClapeyron(SG::SpectralGrid, atm::AbstractAtmosphere; kwargs...)
+    (;R_dry, R_vapour, latent_heat_condensation, heat_capacity) = atm
+    return ClausiusClapeyron{SG.NF}(;Lᵥ=latent_heat_condensation,R_dry,R_vapour,cₚ=heat_capacity,kwargs...)
 end
 
 """
@@ -57,7 +59,7 @@ function (CC::ClausiusClapeyron{NF})(temp_kelvin::NF) where NF
 end
 
 # convert to number format of struct
-function (CC::AbstractClausiusClapeyron{NF})(temp_kelvin) where NF
+function (CC::ClausiusClapeyron{NF})(temp_kelvin) where NF
     CC(convert(NF,temp_kelvin))
 end
 
@@ -70,7 +72,7 @@ function grad(CC::ClausiusClapeyron{NF},temp_kelvin::NF) where NF
 end
 
 # convert to input argument to number format from struct
-grad(CC::AbstractClausiusClapeyron{NF},temp_kelvin) where NF = grad(CC,convert(NF,temp_kelvin))
+grad(CC::ClausiusClapeyron{NF},temp_kelvin) where NF = grad(CC,convert(NF,temp_kelvin))
 
 """
 $(TYPEDSIGNATURES)
@@ -99,7 +101,7 @@ Saturation humidity [kg/kg] from temperature [K], pressure [Pa] via
 function saturation_humidity(
     temp_kelvin::NF,
     pres::NF,
-    clausius_clapeyron::AbstractClausiusClapeyron{NF}
+    clausius_clapeyron::AbstractClausiusClapeyron,
 ) where NF
     sat_vap_pres = clausius_clapeyron(temp_kelvin)
     return saturation_humidity(sat_vap_pres,pres;mol_ratio=clausius_clapeyron.mol_ratio)
@@ -117,37 +119,19 @@ end
 $(TYPEDSIGNATURES)
 Calculate geopotentiala and dry static energy for the primitive equation model."""
 function get_thermodynamics!(column::ColumnVariables,model::PrimitiveEquation)
-    geopotential!(column.geopot,column.temp,model.constants)
-    dry_static_energy!(column, model.constants)
-end
-
-"""
-$(TYPEDSIGNATURES)
-Full to half-level interpolation for humidity, saturation humidity,
-dry static energy and saturation moist static energy.
-"""
-function vertical_interpolate!(
-    column::ColumnVariables,
-    model::PrimitiveEquation,
-)
-
-    for (full, half) in (
-        (column.humid,                      column.humid_half),
-        (column.sat_humid,                  column.sat_humid_half),
-        (column.dry_static_energy,          column.dry_static_energy_half),
-        (column.sat_moist_static_energy,    column.sat_moist_static_energy_half),
-    )
-        vertical_interpolate!(half, full, model.geometry)
-    end
+    geopotential!(column.geopot, column.temp, model.geopotential, column.surface_geopotential)
+    dry_static_energy!(column, model.atmosphere)
 end
 
 """
 $(TYPEDSIGNATURES)
 Compute the dry static energy SE = cₚT + Φ (latent heat times temperature plus geopotential)
 for the column."""
-function dry_static_energy!(column::ColumnVariables,constants::DynamicsConstants)
-
-    (;cₚ) = constants
+function dry_static_energy!(
+    column::ColumnVariables,
+    atmosphere::AbstractAtmosphere
+)
+    cₚ = atmosphere.heat_capacity
     (;dry_static_energy, geopot, temp) = column
 
     @inbounds for k in eachlayer(column)
@@ -157,9 +141,11 @@ function dry_static_energy!(column::ColumnVariables,constants::DynamicsConstants
     return nothing
 end
 
-function bulk_richardson!(column::ColumnVariables,constants::DynamicsConstants)
-
-    (;cₚ) = constants
+function bulk_richardson!(
+    column::ColumnVariables,
+    atmosphere::AbstractAtmosphere,
+)
+    cₚ = atmosphere.heat_capacity
     (;u, v, geopot, temp_virt, nlev, bulk_richardson) = column
 
     V² = u[nlev]^2 + v[nlev]^2
@@ -212,6 +198,8 @@ function moist_static_energy!(
     end
 end
 
+export TetensEquation
+
 """
 Parameters for computing saturation vapour pressure of water using the Tetens' equation,
 
@@ -220,7 +208,7 @@ Parameters for computing saturation vapour pressure of water using the Tetens' e
 where T is in Kelvin and i = 1,2 for saturation above and below freezing,
 respectively. From Tetens (1930), and Murray (1967) for below freezing.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct TetensEquation{NF<:AbstractFloat} <: AbstractClausiusClapeyron{NF}
+Base.@kwdef struct TetensEquation{NF<:AbstractFloat} <: AbstractClausiusClapeyron
     "Saturation water vapour pressure at 0°C [Pa]"
     e₀::NF = 610.78
 

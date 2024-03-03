@@ -111,6 +111,7 @@ Dates.second(x::Dates.Nanosecond) = round(Int,x.value*1e-9)
 Dates.second(x::Dates.Microsecond) = round(Int,x.value*1e-6)
 Dates.second(x::Dates.Millisecond) = round(Int,x.value*1e-3)
 
+# defined to convert from floats to Dates.Second (which require ints by default) via rounding
 function Base.convert(::Type{Second},x::AbstractFloat)
     xr = round(Int64,x)
     x == xr || @info "Rounding and converting $x to $xr for integer seconds."

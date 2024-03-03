@@ -1,7 +1,11 @@
-# default initial conditions by model
-initial_conditions_default(::Type{<:Barotropic}) = StartWithRandomVorticity()
-initial_conditions_default(::Type{<:ShallowWater}) = ZonalJet()
-initial_conditions_default(::Type{<:PrimitiveEquation}) = ZonalWind()
+abstract type InitialConditions end
+
+# EXPORT INITIAL CONDITIONS
+export  StartFromFile,
+        StartFromRest,
+        ZonalJet,
+        ZonalWind,
+        StartWithRandomVorticity
 
 Base.@kwdef struct StartFromRest <: InitialConditions 
     pressure_on_orography::Bool = false
@@ -23,7 +27,7 @@ end
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-Base.@kwdef struct StartWithRandomVorticity <: InitialConditions
+Base.@kwdef mutable struct StartWithRandomVorticity <: InitialConditions
     "Power of the spectral distribution k^power"
     power::Float64 = -3
 
@@ -58,7 +62,7 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Galewsky et al, 2004 zonal jet
 intitial conditions for the shallow water model. Default values as in Galewsky.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ZonalJet <: InitialConditions
+Base.@kwdef mutable struct ZonalJet <: InitialConditions
     "jet latitude [˚N]"
     latitude::Float64 = 45
     
@@ -179,6 +183,9 @@ $(TYPEDFIELDS)"""
 Base.@kwdef struct ZonalWind <: InitialConditions
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
+
+    "Sigma coordinates of the tropopause [1]"
+    σ_tropopause::Float64 = 0.2
     
     "max amplitude of zonal wind [m/s]"
     u₀::Float64 = 35
@@ -197,6 +204,9 @@ Base.@kwdef struct ZonalWind <: InitialConditions
     perturb_radius::Float64 = 1/10
 
     # TERMPERATURE
+    "reference dry-adiabtic lapse rate [K/m]"
+    lapse_rate::Float64 = 5/1000
+
     "temperature difference used for stratospheric lapse rate [K], Jablonowski uses ΔT = 4.8e5 [K]"
     ΔT::Float64 = 0                 
 
@@ -217,7 +227,8 @@ function initialize!(   progn::PrognosticVariables{NF},
 
     (;u₀, η₀, ΔT, Tmin, pressure_on_orography) = initial_conditions
     (;perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = initial_conditions
-    (;temp_ref, R_dry, lapse_rate, pres_ref, σ_tropopause) = model.atmosphere
+    (;lapse_rate, σ_tropopause) = initial_conditions
+    (;temp_ref, R_dry, pres_ref) = model.atmosphere
     (;radius, Grid, nlat_half, nlev) = model.spectral_grid
     (;rotation, gravity) = model.planet
     (;σ_levels_full) = model.geometry
@@ -275,15 +286,14 @@ function initialize!(   progn::PrognosticVariables{NF},
 
     # TEMPERATURE
     Tη = zero(σ_levels_full)
-    Γ = lapse_rate/1000                         # from [K/km] to [K/m]
 
     # vertical profile
     for k in 1:nlev
         σ = σ_levels_full[k]
-        Tη[k] = temp_ref*σ^(R_dry*Γ/gravity)    # Jablonowski and Williamson eq. 4
+        Tη[k] = temp_ref*σ^(R_dry*lapse_rate/gravity)   # Jablonowski and Williamson eq. 4
 
         if σ < σ_tropopause
-            Tη[k] += ΔT*(σ_tropopause-σ)^5      # Jablonowski and Williamson eq. 5
+            Tη[k] += ΔT*(σ_tropopause-σ)^5              # Jablonowski and Williamson eq. 5
         end
     end
 
@@ -315,7 +325,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     end
 
     # PRESSURE (constant everywhere)
-    lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
+    lnp₀ = log(pres_ref)            # logarithm of reference surface pressure [log(Pa)]
     progn.surface.timesteps[1].pres[1] = norm_sphere*lnp₀
 
     lnpₛ = ones(Grid{NF},nlat_half)
@@ -363,14 +373,13 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
     # gravity:      Gravitational acceleration [m/s^2]
     # R_dry:        Specific gas constant for dry air [J/kg/K]
-    (;temp_ref, temp_top, lapse_rate, R_dry, σ_tropopause) = model.atmosphere
+    (;temp_ref, lapse_rate, R_dry) = model.atmosphere
     (;gravity) = model.planet
     (;nlev, σ_levels_full) = model.geometry         
-    (; norm_sphere ) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
-    n_stratosphere_levels = findfirst(σ->σ>=σ_tropopause,σ_levels_full)
+    (;norm_sphere) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
 
     # Lapse rate scaled by gravity [K/m / (m²/s²)]
-    Γg⁻¹ = lapse_rate/gravity/1000                      # /1000 for lapse rate [K/km] → [K/m]
+    Γg⁻¹ = lapse_rate/gravity
 
     # SURFACE TEMPERATURE (store in k = nlev, but it's actually surface, i.e. k=nlev+1/2)
     # overwrite with lowermost layer further down
@@ -380,15 +389,8 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
         temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]           # lower temperature for higher mountains
     end
 
-    # TROPOPAUSE/STRATOSPHERE set the l=m=0 spectral coefficient (=mean value) only
-    # in uppermost levels (default: k=1,2) for lapse rate = 0
-    for k in 1:n_stratosphere_levels
-        temp = progn.layers[k].timesteps[1].temp
-        temp[1] = norm_sphere*temp_top
-    end
-
-    # TROPOSPHERE use lapserate and vertical coordinate σ for profile
-    for k in n_stratosphere_levels+1:nlev               # k=nlev overwrites the surface temperature
+    # Use lapserate and vertical coordinate σ for profile
+    for k in 1:nlev                                     # k=nlev overwrites the surface temperature
                                                         # with lowermost layer temperature
         temp = progn.layers[k].timesteps[1].temp
         σₖᴿ = σ_levels_full[k]^(R_dry*Γg⁻¹)             # from hydrostatic equation
@@ -406,7 +408,7 @@ hydrostatic equation with the reference temperature lapse rate."""
 function pressure_on_orography!(progn::PrognosticVariables,
                                 model::PrimitiveEquation)
     # temp_ref:     Reference absolute T [K] at surface z = 0, constant lapse rate
-    # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
+    # lapse_rate:   Reference temperature lapse rate -dT/dz [K/m]
     # gravity:      Gravitational acceleration [m/s^2]
     # R:            Specific gas constant for dry air [J/kg/K]
     # pres_ref:     Reference surface pressure [hPa]
@@ -414,12 +416,11 @@ function pressure_on_orography!(progn::PrognosticVariables,
     (; gravity ) = model.planet
     (; orography ) = model.orography # orography on the grid
 
-    Γ = lapse_rate/1000             # Lapse rate [K/km] -> [K/m]
-    lnp₀ = log(pres_ref*100)        # logarithm of reference surface pressure, *100 for [hPa] to [Pa]
+    lnp₀ = log(pres_ref)            # logarithm of reference surface pressure [log(Pa)]
     lnp_grid = zero(orography)      # allocate log surface pressure on grid
 
-    RΓg⁻¹ = R_dry*Γ/gravity         # for convenience
-    ΓT⁻¹ = Γ/temp_ref           
+    RΓg⁻¹ = R_dry*lapse_rate/gravity         # for convenience
+    ΓT⁻¹ = lapse_rate/temp_ref           
 
     for ij in eachgridpoint(lnp_grid,orography)
         lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹
@@ -437,14 +438,16 @@ function initialize_humidity!(  progn::PrognosticVariables,
     return nothing
 end
 
-function initialize_humidity!(  progn::PrognosticVariables,
-                                pres_surf_grid::AbstractGrid,
-                                model::PrimitiveWet)
+function initialize_humidity!(  
+    progn::PrognosticVariables{NF},
+    pres_surf_grid::AbstractGrid,
+    model::PrimitiveWet
+) where NF
 
-    (;relhumid_ref) = model.atmosphere      # relative humidity reference [1]
-
-    # ratio of scale heights [1], scale height [km], scale height for spec humidity [km]     
-    (;scale_height, scale_height_humid) = model.atmosphere
+    # TODO create a InitialHumidity <: InitialConditions to hold these parameters
+    relhumid_ref::NF = 0.7
+    scale_height_humid::NF = 2.5        # scale height for specific humidity [km]
+    scale_height::NF = 7.5              # scale height for pressure [km]
     scale_height_ratio = scale_height/scale_height_humid
 
     (;nlev, σ_levels_full) = model.geometry

@@ -1,5 +1,5 @@
 @testset "Extending forcing and drag" begin
-    Base.@kwdef struct JetDrag{NF} <: SpeedyWeather.AbstractDrag{NF}
+    Base.@kwdef struct JetDrag{NF} <: SpeedyWeather.AbstractDrag
 
         # DIMENSIONS from SpectralGrid
         "Spectral resolution as max degree of spherical harmonics"
@@ -63,7 +63,7 @@
         end
     end
     
-    Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing{NF}
+    Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing
         
         # DIMENSIONS from SpectralGrid
         "Spectral resolution as max degree of spherical harmonics"
@@ -113,8 +113,7 @@
     end
     
     function StochasticStirring(SG::SpectralGrid;kwargs...)
-        (;trunc,Grid,nlat_half) = SG
-        nlat = RingGrids.get_nlat(Grid,nlat_half)
+        (;trunc,nlat) = SG
         return StochasticStirring{SG.NF}(;trunc,nlat,kwargs...)
     end
     

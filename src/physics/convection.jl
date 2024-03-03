@@ -1,6 +1,7 @@
-abstract type AbstractConvection{NF} <: AbstractParameterization{NF} end
+abstract type AbstractConvection <: AbstractParameterization end
 
-Base.@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection{NF}
+export SimplifiedBettsMiller
+Base.@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection
     "number of vertical layers/levels"
     nlev::Int
 
@@ -37,7 +38,8 @@ function convection!(
     scheme::SimplifiedBettsMiller,
     model::PrimitiveEquation,
 )
-    convection!(column, scheme, model.clausius_clapeyron, model.geometry, model.constants, model.time_stepping)
+    convection!(column, scheme, model.clausius_clapeyron, 
+                    model.geometry, model.planet, model.atmosphere, model.time_stepping)
 end
 
 function convection!(
@@ -45,8 +47,9 @@ function convection!(
     SBM::SimplifiedBettsMiller,
     clausius_clapeyron::AbstractClausiusClapeyron,
     geometry::Geometry,
-    constants::DynamicsConstants,
-    time_stepping::TimeStepper,
+    planet::AbstractPlanet,
+    atmosphere::AbstractAtmosphere,
+    time_stepping::AbstractTimeStepper,
 ) where NF
 
     σ = geometry.σ_levels_full
@@ -136,12 +139,11 @@ function convection!(
         column.precip_convection += δq * Δσ[k]
     end
 
-    (;gravity, water_density) = constants
+    (;gravity) = planet
+    (;water_density) = atmosphere
     (;Δt_sec) = time_stepping
     pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv 
     column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
-    
-    # TODO at the moment the cloud top include shallow convection, should that be?
     column.cloud_top = min(column.cloud_top,level_zero_buoyancy)        # clouds reach to top of convection
 end
 

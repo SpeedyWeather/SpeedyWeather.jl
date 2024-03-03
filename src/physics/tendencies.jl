@@ -29,10 +29,10 @@ function parameterization_tendencies!(
         get_column!(column,diagn,progn,ij,jring,model)  
         
         # execute all parameterizations
-        parameterization_tendencies!(column,model)
+        parameterization_tendencies!(column, model)
 
         # write tendencies from parametrizations back into horizontal fields
-        write_column_tendencies!(diagn,column,model.constants,ij)
+        write_column_tendencies!(diagn, column, model.planet, ij)
     end
 end
 
@@ -42,27 +42,27 @@ function parameterization_tendencies!(
     )
 
     # Pre-compute thermodynamic quantities
-    get_thermodynamics!(column,model)
+    get_thermodynamics!(column, model)
 
-    temperature_relaxation!(column,model)
-    boundary_layer_drag!(column,model)
+    temperature_relaxation!(column, model)
+    boundary_layer_drag!(column, model)
 
     # VERTICAL DIFFUSION
     # diffusion_coefficient!(column,model)
     # momentum_diffusion!(column,model)
-    static_energy_diffusion!(column,model)
-    humidity_diffusion!(column,model)
+    static_energy_diffusion!(column, model)
+    humidity_diffusion!(column, model)
 
     # Calculate parametrizations
-    convection!(column,model)
-    large_scale_condensation!(column,model)
+    convection!(column, model)
+    large_scale_condensation!(column, model)
     # clouds!(column, model)
-    shortwave_radiation!(column,model)
-    longwave_radiation!(column,model)
-    surface_fluxes!(column,model)
+    shortwave_radiation!(column, model)
+    longwave_radiation!(column, model)
+    surface_fluxes!(column, model)
 
     # sum fluxes on half levels up and down for every layer
-    fluxes_to_tendencies!(column,model.geometry,model.constants)
+    fluxes_to_tendencies!(column, model.geometry, model.planet, model.atmosphere)
 end
 
 """
@@ -71,7 +71,8 @@ Convert the fluxes on half levels to tendencies on full levels."""
 function fluxes_to_tendencies!(
     column::ColumnVariables,
     geometry::Geometry,
-    constants::DynamicsConstants,
+    planet::AbstractPlanet,
+    atmosphere::AbstractAtmosphere,
 )
     
     (;nlev, u_tend, flux_u_upward, flux_u_downward) = column
@@ -81,10 +82,11 @@ function fluxes_to_tendencies!(
 
     Δσ = geometry.σ_levels_thick
     pₛ = column.pres[end]               # surface pressure
-    (;radius) = constants               # used for scaling
+    (;radius) = geometry               # used for scaling
 
     # for g/Δp and g/(Δp*cₚ), see Fortran SPEEDY documentation eq. (3,5)
-    g_pₛ = constants.gravity/pₛ
+    g_pₛ = planet.gravity/pₛ
+    cₚ = atmosphere.heat_capacity
 
     # fluxes are defined on half levels including top k=1/2 and surface k=nlev+1/2
     @inbounds for k in 1:nlev
@@ -106,7 +108,7 @@ function fluxes_to_tendencies!(
         # convert absorbed flux to tendency, accumulate with
         # non-flux tendencies and scale with radius
         g_Δp = g_pₛ/Δσ[k]
-        g_Δp_cₚ = g_Δp/constants.cₚ
+        g_Δp_cₚ = g_Δp/cₚ
         u_tend[k] = radius*(u_tend[k] + g_Δp*ΔF_u)
         v_tend[k] = radius*(v_tend[k] + g_Δp*ΔF_v)
         humid_tend[k] = radius*(humid_tend[k] + g_Δp*ΔF_humid)

@@ -6,6 +6,7 @@ function Base.show(io::IO,O::AbstractOcean)
     print_fields(io,O,keys)
 end
 
+export SeasonalOceanClimatology
 Base.@kwdef struct SeasonalOceanClimatology{NF,Grid<:AbstractGrid{NF}} <: AbstractOcean{NF,Grid}
 
     "number of latitudes on one hemisphere, Equator included"
@@ -41,8 +42,8 @@ function SeasonalOceanClimatology(SG::SpectralGrid;kwargs...)
     return SeasonalOceanClimatology{NF,Grid{NF}}(;nlat_half,kwargs...)
 end
 
-function initialize!(ocean::SeasonalOceanClimatology{NF,Grid}) where {NF,Grid}
-    load_monthly_climatology!(ocean.monthly_temperature,ocean)
+function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
+    load_monthly_climatology!(ocean.monthly_temperature, ocean)
 end
 
 function load_monthly_climatology!( 

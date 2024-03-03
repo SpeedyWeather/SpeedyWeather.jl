@@ -7,6 +7,7 @@ function Base.show(io::IO,L::AbstractLand)
     print_fields(io,L,keys)
 end
 
+export SeasonalLandTemperature
 Base.@kwdef struct SeasonalLandTemperature{NF,Grid<:AbstractGrid{NF}} <: AbstractLand{NF,Grid}
 
     "number of latitudes on one hemisphere, Equator included"
@@ -42,8 +43,8 @@ function SeasonalLandTemperature(SG::SpectralGrid;kwargs...)
     return SeasonalLandTemperature{NF,Grid{NF}}(;nlat_half,kwargs...)
 end
 
-function initialize!(land::SeasonalLandTemperature{NF,Grid}) where {NF,Grid}
-    load_monthly_climatology!(land.monthly_temperature,land)
+function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
+    load_monthly_climatology!(land.monthly_temperature, land)
 end
 
 function initialize!(   land::PrognosticVariablesLand,
@@ -97,6 +98,7 @@ function Base.show(io::IO,S::AbstractSoil)
     print_fields(io,S,keys)
 end
 
+export SeasonalSoilMoisture
 Base.@kwdef struct SeasonalSoilMoisture{NF,Grid<:AbstractGrid{NF}} <: AbstractSoil{NF,Grid}
 
     "number of latitudes on one hemisphere, Equator included"
@@ -146,7 +148,7 @@ function SeasonalSoilMoisture(SG::SpectralGrid;kwargs...)
     return SeasonalSoilMoisture{NF,Grid{NF}}(;nlat_half,kwargs...)
 end
 
-function initialize!(soil::SeasonalSoilMoisture{NF,Grid}) where {NF,Grid}
+function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveWet)
     load_monthly_climatology!(soil.monthly_soil_moisture_layer1,soil,varname=soil.varname_layer1)
     load_monthly_climatology!(soil.monthly_soil_moisture_layer2,soil,varname=soil.varname_layer2)
 end
@@ -172,14 +174,9 @@ function soil_timestep!(land::PrognosticVariablesLand{NF},
 end
 
 ## SOIL MOISTURE
-abstract type AbstractVegetation{NF,Grid} end
+abstract type AbstractVegetation{NF,Grid} <: AbstractParameterization end
 
-function Base.show(io::IO,A::AbstractVegetation)
-    println(io,"$(typeof(A)) <: AbstractVegetation")
-    keys = propertynames(A)
-    print_fields(io,A,keys)
-end
-
+export VegetationClimatology
 Base.@kwdef struct VegetationClimatology{NF,Grid<:AbstractGrid{NF}} <: AbstractVegetation{NF,Grid}
 
     "number of latitudes on one hemisphere, Equator included"
@@ -219,7 +216,7 @@ function VegetationClimatology(SG::SpectralGrid;kwargs...)
     return VegetationClimatology{NF,Grid{NF}}(;nlat_half,kwargs...)
 end
 
-function initialize!(vegetation::VegetationClimatology)
+function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
 
     # LOAD NETCDF FILE
     if vegetation.path == "SpeedyWeather.jl/input_data"
