@@ -208,7 +208,11 @@ function PrognosticVariables(SG::SpectralGrid,model::ModelSetup)
     surface = PrognosticSurfaceTimesteps(SG)
     ocean = PrognosticVariablesOcean(SG)
     land = PrognosticVariablesLand(SG)
-    particles = zeros(Particle{NF}, model.particle_advection.n_particles)
+
+    # particles advection
+    n_particles = hasfield(typeof(model),:particle_advection) ?
+                        model.particle_advection.n_particles : 0
+    particles = zeros(Particle{NF}, n_particles)
 
     scale = Ref(one(NF))        # initialize with scale=1, wrapped in RefValue for mutability
     clock = Clock()

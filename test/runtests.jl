@@ -20,6 +20,7 @@ include("spectral_gradients.jl")
 include("diffusion.jl")
 include("time_stepping.jl")
 include("vertical_advection.jl")
+include("particles.jl")
 
 # VERTICAL LEVELS
 include("vertical_levels.jl")
