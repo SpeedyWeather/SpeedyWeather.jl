@@ -14,7 +14,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     GO<:AbstractGeopotential,
     OR<:AbstractOrography,
     AC<:AbstractAdiabaticConversion,
-    IC<:InitialConditions,
+    IC<:AbstractInitialConditions,
     LS<:AbstractLandSeaMask,
     OC<:AbstractOcean,
     LA<:AbstractLand,
@@ -55,7 +55,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     coriolis::CO = Coriolis(spectral_grid)
     geopotential::GO = Geopotential(spectral_grid)
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
-    initial_conditions::IC = ZonalWind()
+    initial_conditions::IC = InitialConditions(PrimitiveWet)
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
