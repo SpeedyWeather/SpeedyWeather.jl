@@ -6,11 +6,11 @@ complicated setups.
 
 ## 2D turbulence on a non-rotating sphere
 
-!!! info "Setup script"
+!!! info "Setup script to copy and paste"
     ```julia
     using SpeedyWeather
     spectral_grid = SpectralGrid(trunc=63,nlev=1)
-    still_earth = Earth(rotation=0)
+    still_earth = Earth(spectral_grid, rotation=0)
     initial_conditions = StartWithRandomVorticity()
     model = BarotropicModel(;spectral_grid, initial_conditions, planet=still_earth)
     simulation = initialize!(model)
@@ -26,9 +26,11 @@ The `SpectralGrid` object will provide us with some more information
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=63,nlev=1)
 ```
-Next step we create a planet that's like Earth but not rotating
+Next step we create a planet that's like Earth but not rotating. As a convention,
+we always pass on the spectral grid object as the first argument to every other
+model component we create.
 ```@example barotropic_setup
-still_earth = Earth(rotation=0)
+still_earth = Earth(spectral_grid, rotation=0)
 ```
 There are other options to create a planet but they are irrelevant for the
 barotropic vorticity equations. We also want to specify the initial conditions,
@@ -63,7 +65,7 @@ with default settings. More options on output in [NetCDF output](@ref).
 
 ## Shallow water with mountains
 
-!!! info "Setup script"
+!!! info "Setup script to copy and past"
     ```julia
     using SpeedyWeather
     spectral_grid = SpectralGrid(trunc=63,nlev=1)
@@ -197,7 +199,7 @@ probably not surprising!
 
 ## Polar jet streams in shallow water
 
-Setup script:
+Setup script to copy and paste:
 ```@example jet_stream_setup
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=63,nlev=1)
@@ -246,7 +248,7 @@ nothing # hide
 
 ## Gravity waves on the sphere
 
-Setup script:
+Setup script to copy and paste:
 ```@example gravity_wave_setup
 using Random # hide
 Random.seed!(1234) # hide
