@@ -92,7 +92,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     hole_filling::HF = ClipNegatives()
     
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid, PrimitiveDry)
+    output::OW = OutputWriter(spectral_grid, PrimitiveWet)
     callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
     feedback::FB = Feedback()
 end
