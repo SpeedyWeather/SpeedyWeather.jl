@@ -73,7 +73,7 @@ end
 function get_column(    S::AbstractSimulation,
                         ij::Integer,
                         verbose::Bool = true)
-    (;prognostic_variables, diagnostic_variables) = S
+    (;prognostic_variables, diagnostic_variables, model) = S
 
     column = deepcopy(S.diagnostic_variables.columns[1])
     reset_column!(column)
