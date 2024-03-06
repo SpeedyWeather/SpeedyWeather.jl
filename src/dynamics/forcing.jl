@@ -4,7 +4,7 @@ abstract type AbstractForcing <: AbstractModelComponent end
 export NoForcing
 struct NoForcing <: AbstractForcing end
 NoForcing(SG::SpectralGrid) = NoForcing()
-initialize!(::NoForcing,::ModelSetup) = nothing
+initialize!(::NoForcing, ::ModelSetup) = nothing
 
 function forcing!(  diagn::DiagnosticVariablesLayer,
                     progn::PrognosticVariablesLayer,
@@ -41,7 +41,7 @@ Base.@kwdef mutable struct JetStreamForcing{NF} <: AbstractForcing
     time_scale::Second = Day(30)
 
     "precomputed amplitude vector [m/s²]"
-    amplitude::Vector{NF} = zeros(NF,nlat)
+    amplitude::Vector{NF} = zeros(NF, nlat)
 end
 
 JetStreamForcing(SG::SpectralGrid;kwargs...) = JetStreamForcing{SG.NF}(
@@ -50,7 +50,7 @@ JetStreamForcing(SG::SpectralGrid;kwargs...) = JetStreamForcing{SG.NF}(
 function initialize!(   forcing::JetStreamForcing,
                         model::ModelSetup)
 
-    (;latitude,width,speed,time_scale,amplitude) = forcing
+    (;latitude, width, speed, time_scale, amplitude) = forcing
     (;radius) = model.spectral_grid
     
     # Some constants similar to Galewsky 2004
@@ -60,7 +60,7 @@ function initialize!(   forcing::JetStreamForcing,
     A₀ = speed/eₙ/time_scale.value      # amplitude [m/s²] without lat dependency
     A₀ *= radius                        # scale by radius as are the momentum equations
 
-    (;nlat,colat) = model.geometry
+    (;nlat, colat) = model.geometry
 
     for j in 1:nlat
         # latitude in radians, abs for north/south symmetry
@@ -90,13 +90,13 @@ $(TYPEDSIGNATURES)
 
 Set for every latitude ring the tendency to the precomputed forcing
 in the momentum equations following the JetStreamForcing.
-The forcing is precomputed in `initialize!(::JetStreamForcing,::ModelSetup)`."""
+The forcing is precomputed in `initialize!(::JetStreamForcing, ::ModelSetup)`."""
 function forcing!(  diagn::DiagnosticVariablesLayer,
                     forcing::JetStreamForcing)
     Fu = diagn.tendencies.u_tend_grid
     (;amplitude) = forcing
 
-    @inbounds for (j,ring) in enumerate(eachring(Fu))
+    @inbounds for (j, ring) in enumerate(eachring(Fu))
         F = amplitude[j]
         for ij in ring
             Fu[ij] = F

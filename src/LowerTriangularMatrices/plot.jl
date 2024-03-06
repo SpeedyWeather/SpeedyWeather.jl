@@ -1,16 +1,16 @@
 function plot(L::LowerTriangularMatrix{T}; mode::Function=abs) where T
 
-    l,m = size(L)
+    l, m = size(L)
     title ="$l×$m LowerTriangularMatrix{$T}"
 
-    Lplot = similar(L,real(T))
+    Lplot = similar(L, real(T))
     for lm in eachharmonic(L)
         Lplot[lm] = mode(L[lm]) 
     end
 
     # use at most 33x32 points in height x width, but fewer for smaller matrices
-    height = min(l,33)
-    width = min(m,32)
+    height = min(l, 33)
+    width = min(m, 32)
 
     plot_kwargs = pairs((   xlabel="m",
                             xoffset=-1,

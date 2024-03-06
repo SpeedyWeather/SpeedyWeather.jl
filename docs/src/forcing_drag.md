@@ -60,7 +60,7 @@ For a more concrete example see [Custom forcing: define](@ref).
 To define the new type's initialization, at the most basic level you need
 to extend the `initialize!` function for this new type
 ```@example extending
-function initialize!(forcing::MyForcing,model::ModelSetup)
+function initialize!(forcing::MyForcing, model::ModelSetup)
     # fill in/change any fields of your new forcing here
     forcing.v[1] = 1
     # you can use information from other model components too
@@ -101,7 +101,7 @@ The other arguments should be treated read-only. You make use of the `time`
 or anything else in the `model`, but the latter likely comes with a performance
 penalty which is why we often unpack the model in a function barrier. But let's
 skip that detail for now. Generally, try to precompute what you can in
-`initialize!`. For the forcing you will need to force the velocities `u,v` in
+`initialize!`. For the forcing you will need to force the velocities `u, v` in
 grid-point space or the vorticity `vor`, divergence `div` in spectral space.
 This is not a constrain in most applications we came across, but in case it
 is in yours please reach out.
@@ -145,7 +145,7 @@ as defined in [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3
 \begin{aligned}
 \frac{\partial \zeta}{\partial t} &+ \nabla \cdot (\mathbf{u}(\zeta + f)) =
 S - r\zeta - \nu\nabla^{4}\zeta \\ 
-S_{l,m}^i &= A(1-\exp(-2\tfrac{\Delta t}{\tau}))Q^i_{l,m} + \exp(-\tfrac{dt}{\tau})S_{l,m}^{i-1} \\
+S_{l, m}^i &= A(1-\exp(-2\tfrac{\Delta t}{\tau}))Q^i_{l, m} + \exp(-\tfrac{dt}{\tau})S_{l, m}^{i-1} \\
 \end{aligned}
 ```
 
@@ -156,7 +156,7 @@ in spectral space, because that's where the forcing is defined: for degree
 ``l`` and order ``m`` of the spherical harmonics. ``A`` is a real amplitude.
 ``\Delta t`` the time step of the model, ``\tau`` the decorrelation time scale
 of the stochastic process. ``Q`` is for every spherical harmonic a complex random uniform
-number in ``[-1,1]`` in both its real and imaginary components. 
+number in ``[-1, 1]`` in both its real and imaginary components. 
 So we actually define our `StochasticStirring` forcing as follows and
 will explain the details in second
 
@@ -189,7 +189,7 @@ Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing
 
     # TO BE INITIALISED
     "Stochastic stirring term S"
-    S::LowerTriangularMatrix{Complex{NF}} = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
+    S::LowerTriangularMatrix{Complex{NF}} = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
 
     "a = A*sqrt(1 - exp(-2dt/τ)), the noise factor times the stirring strength [1/s²]"
     a::Base.RefValue{NF} = Ref(zero(NF))
@@ -198,7 +198,7 @@ Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing
     b::Base.RefValue{NF} = Ref(zero(NF))
 
     "Latitudinal mask, confined to mid-latitude storm track by default [1]"
-    lat_mask::Vector{NF} = zeros(NF,nlat)
+    lat_mask::Vector{NF} = zeros(NF, nlat)
 end
 ```
 
@@ -220,14 +220,14 @@ have the right size.
 Then we also see in the definition of `S` that there are prefactors ``A(1-\exp(-2\tfrac{\Delta t}{\tau}))``
 which depend on the forcing's parameters but also on the time step, which, at the time of the creation
 of `StochasticStirring` we might not know about! And definitely do not want to hardcode in.
-So to illustrate what you can do in this case we define two additional parameters `a,b` that
+So to illustrate what you can do in this case we define two additional parameters `a, b` that
 are just initialized as zero, but that will be precalculated in the `initialize!` function.
 However, we decided to define our `struct` as _immutable_ (meaning you cannot change it after
 creation unless its elements have mutable fields, like the elements in vectors). In order
 to make it mutable, we could write `mutable struct` instead, or as outlined here use `RefValue`s.
-Another option would be to just recalculate `a,b` in `forcing!` on every time step.
+Another option would be to just recalculate `a, b` in `forcing!` on every time step.
 Depending on exactly what you would like to do, you can choose your way.
-Anyway, we decide to include `a,b` as `RefValue`s so that we can always access the scalar 
+Anyway, we decide to include `a, b` as `RefValue`s so that we can always access the scalar 
 underneath with `a[]` and `b[]` and also change it with `a[] = 1` etc.
 
 Lastly, the [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2)
@@ -242,7 +242,7 @@ are therefore also added to the definition of `StochasticStirring`.
 
 ## Custom forcing: generator function
 
-Cool. Now you could create our new `StochasticStirring` forcing with `StochasticStirring{Float64}(trunc=31,nlat=48)`,
+Cool. Now you could create our new `StochasticStirring` forcing with `StochasticStirring{Float64}(trunc=31, nlat=48)`,
 and the default values would be chosen as well as the correct size of the arrays `S` and `lat_mask` we need
 and in double precision Float64. Furthermore, note that because `StochasticStirring{NF}` is parametric
 on the number format `NF`, these arrays are also allocated with the correct number format that will
@@ -252,14 +252,14 @@ But in SpeedyWeather we typically use the [SpectralGrid](@ref) object to pass on
 the resolution (and number format) so we want a generator function like
 ```@example extend
 function StochasticStirring(SG::SpectralGrid;kwargs...)
-    (;trunc,nlat) = SG
-    return StochasticStirring{SG.NF}(;trunc,nlat,kwargs...)
+    (;trunc, nlat) = SG
+    return StochasticStirring{SG.NF}(;trunc, nlat, kwargs...)
 end
 ```
 Which allows us to do
 ```@example extend
-spectral_grid = SpectralGrid(trunc=42,nlev=1)
-stochastic_stirring = StochasticStirring(spectral_grid,latitude=30,decorrelation_time=Day(5))
+spectral_grid = SpectralGrid(trunc=42, nlev=1)
+stochastic_stirring = StochasticStirring(spectral_grid, latitude=30, decorrelation_time=Day(5))
 ```
 So the respective resolution parameters and the number format are just pulled from the `SpectralGrid`
 as a first argument and the remaining parameters are just keyword arguments that one can change at creation.
@@ -285,8 +285,8 @@ function SpeedyWeather.initialize!( forcing::StochasticStirring,
     forcing.b[] = exp(-dt/τ)
     
     # precompute the latitudinal mask
-    (;Grid,nlat_half) = model.spectral_grid
-    latd = RingGrids.get_latd(Grid,nlat_half)
+    (;Grid, nlat_half) = model.spectral_grid
+    latd = RingGrids.get_latd(Grid, nlat_half)
     
     for j in eachindex(forcing.lat_mask)
         # Gaussian centred at forcing.latitude of width forcing.width
@@ -369,7 +369,7 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
     (;S) = forcing
     for lm in eachindex(S)
         # Barnes and Hartmann, 2011 Eq. 2
-        Qi = 2rand(Complex{NF}) - (1 + im)   # ~ [-1,1] in complex
+        Qi = 2rand(Complex{NF}) - (1 + im)   # ~ [-1, 1] in complex
         S[lm] = a*Qi + b*S[lm]
     end
 
@@ -397,7 +397,7 @@ Now this is actually where we implement the equation we started from in
 [Custom forcing: define](@ref) simply by looping over the spherical
 harmonics in `S` and updating its entries. Then we transform `S` into
 grid-point space using the `a_grid` work array that is in `dynamics_variables`,
-`b_grid` is another one you can use, so are `a,b` in spectral space.
+`b_grid` is another one you can use, so are `a, b` in spectral space.
 However, these are really work arrays, meaning you should expect them
 to be overwritten momentarily once the function concludes and no information
 will remain. Equivalently, these arrays may have an undefined state 
@@ -440,8 +440,8 @@ modular interface that you can create instances of individual model components
 and just put them together as you like, and as long as you follow some rules.
 
 ```@example extend
-spectral_grid = SpectralGrid(trunc=42,nlev=1)
-stochastic_stirring = StochasticStirring(spectral_grid,latitude=-45)
+spectral_grid = SpectralGrid(trunc=42, nlev=1)
+stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
 initial_conditions = StartFromRest()
 model = BarotropicModel(;spectral_grid, initial_conditions, forcing=stochastic_stirring)
 simulation = initialize!(model)

@@ -1,9 +1,9 @@
-abstract type AbstractOrography{NF,Grid} <: AbstractModelComponent end
+abstract type AbstractOrography{NF, Grid} <: AbstractModelComponent end
 export NoOrography
 
 """Orography with zero height in `orography` and zero surface geopotential `geopot_surf`.
 $(TYPEDFIELDS)"""
-struct NoOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
+struct NoOrography{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractOrography{NF, Grid}
     "height [m] on grid-point space."
     orography::Grid
     
@@ -16,19 +16,19 @@ $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
 function NoOrography(spectral_grid::SpectralGrid)
     (;NF, Grid, nlat_half, trunc) = spectral_grid
-    orography   = zeros(Grid{NF},nlat_half)
-    geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
-    return NoOrography{NF,Grid{NF}}(orography,geopot_surf)
+    orography   = zeros(Grid{NF}, nlat_half)
+    geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+    return NoOrography{NF, Grid{NF}}(orography, geopot_surf)
 end
 
 # no further initialization needed
-initialize!(::NoOrography,::ModelSetup) = nothing
+initialize!(::NoOrography, ::ModelSetup) = nothing
 
 export ZonalRidge
 
 """Zonal ridge orography after Jablonowski and Williamson, 2006.
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct ZonalRidge{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
+Base.@kwdef mutable struct ZonalRidge{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractOrography{NF, Grid}
     
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
@@ -49,20 +49,20 @@ $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
 function ZonalRidge(spectral_grid::SpectralGrid;kwargs...)
     (;NF, Grid, nlat_half, trunc) = spectral_grid
-    orography   = zeros(Grid{NF},nlat_half)
-    geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
-    return ZonalRidge{NF,Grid{NF}}(;orography,geopot_surf,kwargs...)
+    orography   = zeros(Grid{NF}, nlat_half)
+    geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+    return ZonalRidge{NF, Grid{NF}}(;orography, geopot_surf, kwargs...)
 end
 
 # function barrier
 function initialize!(   orog::ZonalRidge,
                         model::ModelSetup)
-    initialize!(orog,model.planet,model.spectral_transform,model.geometry)
+    initialize!(orog, model.planet, model.spectral_transform, model.geometry)
 end
 
 """
 $(TYPEDSIGNATURES)
-Initialize the arrays `orography`,`geopot_surf` in `orog` following 
+Initialize the arrays `orography`, `geopot_surf` in `orog` following 
 Jablonowski and Williamson, 2006.
 """
 function initialize!(   orog::ZonalRidge,
@@ -81,7 +81,7 @@ function initialize!(   orog::ZonalRidge,
     RΩ = radius*rotation                # [m/s]
     g⁻¹ = inv(gravity)                  # inverse gravity [s²/m]
 
-    for ij in eachindex(φ,orography)
+    for ij in eachindex(φ, orography)
         sinφ = sind(φ[ij])
         cosφ = cosd(φ[ij])
 
@@ -89,7 +89,7 @@ function initialize!(   orog::ZonalRidge,
         orography[ij] = g⁻¹*A*(A*(-2*sinφ^6*(cosφ^2 + 1/3) + 10/63) + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*RΩ)
     end
 
-    spectral!(geopot_surf,orography,S)      # to grid-point space
+    spectral!(geopot_surf, orography, S)      # to grid-point space
     geopot_surf .*= gravity                 # turn orography into surface geopotential
     spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
 end
@@ -98,7 +98,7 @@ export EarthOrography
 
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct EarthOrography{NF<:AbstractFloat,Grid<:AbstractGrid{NF}} <: AbstractOrography{NF,Grid}
+Base.@kwdef mutable struct EarthOrography{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractOrography{NF, Grid}
 
     # OPTIONS
     "path to the folder containing the orography file, pkg path default"
@@ -138,9 +138,9 @@ $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
 function EarthOrography(spectral_grid::SpectralGrid;kwargs...)
     (;NF, Grid, nlat_half, trunc) = spectral_grid
-    orography   = zeros(Grid{NF},nlat_half)
-    geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
-    return EarthOrography{NF,Grid{NF}}(;orography,geopot_surf,kwargs...)
+    orography   = zeros(Grid{NF}, nlat_half)
+    geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+    return EarthOrography{NF, Grid{NF}}(;orography, geopot_surf, kwargs...)
 end
 
 # function barrier
@@ -151,7 +151,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Initialize the arrays `orography`,`geopot_surf` in `orog` by reading the
+Initialize the arrays `orography`, `geopot_surf` in `orog` by reading the
 orography field from file.
 """
 function initialize!(   orog::EarthOrography,
@@ -163,27 +163,27 @@ function initialize!(   orog::EarthOrography,
 
     # LOAD NETCDF FILE
     if orog.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__,"../../input_data",orog.file)
+        path = joinpath(@__DIR__, "../../input_data", orog.file)
     else
-        path = joinpath(orog.path,orog.file)
+        path = joinpath(orog.path, orog.file)
     end
     ncfile = NCDataset(path)
 
     # height [m], wrap matrix into a grid
-    # TODO also read lat,lon from file and flip array in case it's not as expected
-    orography_highres = orog.file_Grid(ncfile["orog"][:,:])
+    # TODO also read lat, lon from file and flip array in case it's not as expected
+    orography_highres = orog.file_Grid(ncfile["orog"][:, :])
 
     # Interpolate/coarsen to desired resolution
-    interpolate!(orography,orography_highres)
-    spectral!(geopot_surf,orography,S)      # no *gravity yet
+    interpolate!(orography, orography_highres)
+    spectral!(geopot_surf, orography, S)      # no *gravity yet
   
     if orog.smoothing                       # smooth orography in spectral space?
-        SpeedyTransforms.spectral_smoothing!(geopot_surf,orog.smoothing_strength,
+        SpeedyTransforms.spectral_smoothing!(geopot_surf, orog.smoothing_strength,
                                                             power=orog.smoothing_power,
                                                             truncation=orog.smoothing_truncation)
     end
 
-    gridded!(orography,geopot_surf,S)       # to grid-point space
+    gridded!(orography, geopot_surf, S)       # to grid-point space
     geopot_surf .*= gravity                 # turn orography into surface geopotential
     spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
 end

@@ -48,12 +48,12 @@ Base.@kwdef mutable struct BarotropicModel{
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid,Barotropic)
-    callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
+    output::OW = OutputWriter(spectral_grid, Barotropic)
+    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
 
-has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
+has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor, )
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
 """

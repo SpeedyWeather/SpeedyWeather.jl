@@ -28,7 +28,7 @@ function get_column!(   C::ColumnVariables,
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
-    C.latd = geometry.latds[ij]     # pull latitude, longitude [˚N,˚E] for gridpoint ij from Geometry
+    C.latd = geometry.latds[ij]     # pull latitude, longitude [˚N, ˚E] for gridpoint ij from Geometry
     C.lond = geometry.londs[ij]
     C.ij = ij                       # grid-point index
     C.jring = jring                 # ring index j of column, used to index latitude vectors
@@ -43,7 +43,7 @@ function get_column!(   C::ColumnVariables,
     C.pres[1:end-1] .= σ_levels_full.*pₛ    # pressure on every level p = σ*pₛ
     C.pres[end] = pₛ                        # last element is surface pressure pₛ
 
-    @inbounds for (k,layer) = enumerate(D.layers)   # read out prognostic variables on grid
+    @inbounds for (k, layer) = enumerate(D.layers)   # read out prognostic variables on grid
         C.u[k] = layer.grid_variables.u_grid[ij]
         C.v[k] = layer.grid_variables.v_grid[ij]
         C.temp[k] = layer.grid_variables.temp_grid[ij]
@@ -65,9 +65,9 @@ function get_column!(   C::ColumnVariables,
                         model::PrimitiveEquation)
 
     SG = model.spectral_grid
-    rings = eachring(SG.Grid,SG.nlat_half)
-    jring = whichring(ij,rings)
-    get_column!(C,D,P,ij,jring,model)
+    rings = eachring(SG.Grid, SG.nlat_half)
+    jring = whichring(ij, rings)
+    get_column!(C, D, P, ij, jring, model)
 end
 
 function get_column(    S::AbstractSimulation,
@@ -103,7 +103,7 @@ function write_column_tendencies!(  D::DiagnosticVariables,
     (; nlev) = column
     @boundscheck nlev == D.nlev || throw(BoundsError)
 
-    @inbounds for (k,layer) = enumerate(D.layers)
+    @inbounds for (k, layer) = enumerate(D.layers)
         layer.tendencies.u_tend_grid[ij] = column.u_tend[k]
         layer.tendencies.v_tend_grid[ij] = column.v_tend[k]
         layer.tendencies.temp_tend_grid[ij] = column.temp_tend[k]

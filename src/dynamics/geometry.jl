@@ -21,7 +21,7 @@ Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry
 
     # GRID-POINT SPACE
     "maximum number of longitudes (at/around Equator)"
-    nlon_max::Int = get_nlon_max(Grid,nlat_half)
+    nlon_max::Int = get_nlon_max(Grid, nlat_half)
 
     "=nlon_max, same (used for compatibility), TODO: still needed?"
     nlon::Int = nlon_max
@@ -41,28 +41,28 @@ Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry
 
     # ARRAYS OF LANGITUDES/LONGITUDES
     "array of colatitudes in radians (0...π)"
-    colat::Vector{Float64} = get_colat(Grid,nlat_half)
+    colat::Vector{Float64} = get_colat(Grid, nlat_half)
 
     "array of latitudes in radians (π...-π)"
-    lat::Vector{NF} = get_lat(Grid,nlat_half)
+    lat::Vector{NF} = get_lat(Grid, nlat_half)
 
     "array of latitudes in degrees (90˚...-90˚)"
-    latd::Vector{Float64} = get_latd(Grid,nlat_half)
+    latd::Vector{Float64} = get_latd(Grid, nlat_half)
 
     "array of longitudes in degrees (0...360˚), empty for non-full grids"
-    lond::Vector{Float64} = get_lond(Grid,nlat_half)
+    lond::Vector{Float64} = get_lond(Grid, nlat_half)
 
     "longitude (0˚...360˚) for each grid point in ring order"
-    londs::Vector{NF} = get_latdlonds(Grid,nlat_half)[2]
+    londs::Vector{NF} = get_latdlonds(Grid, nlat_half)[2]
     
     "latitude (-90˚...˚90) for each grid point in ring order"
-    latds::Vector{NF} = get_latdlonds(Grid,nlat_half)[1]
+    latds::Vector{NF} = get_latdlonds(Grid, nlat_half)[1]
 
     "longitude (0...2π) for each grid point in ring order"
-    lons::Vector{NF} = RingGrids.get_latlons(Grid,nlat_half)[2]
+    lons::Vector{NF} = RingGrids.get_latlons(Grid, nlat_half)[2]
     
     "latitude (-π/2...π/2) for each grid point in ring order"
-    lats::Vector{NF} = RingGrids.get_latlons(Grid,nlat_half)[1]
+    lats::Vector{NF} = RingGrids.get_latlons(Grid, nlat_half)[1]
 
     "sin of latitudes"
     sinlat::Vector{NF} = sind.(latd)
@@ -90,10 +90,10 @@ Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry
     σ_levels_thick::Vector{NF} = σ_levels_half[2:end] - σ_levels_half[1:end-1]      
 
     "log of σ at full levels, include surface (σ=1) as last element"
-    ln_σ_levels_full::Vector{NF} = log.(vcat(σ_levels_full,1))
+    ln_σ_levels_full::Vector{NF} = log.(vcat(σ_levels_full, 1))
 
     "Full to half levels interpolation"
-    full_to_half_interpolation::Vector{NF} = σ_interpolation_weights(σ_levels_full,σ_levels_half)
+    full_to_half_interpolation::Vector{NF} = σ_interpolation_weights(σ_levels_full, σ_levels_half)
 end
 
 """
@@ -103,8 +103,8 @@ function Geometry(spectral_grid::SpectralGrid)
     return Geometry{spectral_grid.NF}(;spectral_grid)
 end
 
-function Base.show(io::IO,G::Geometry)
-    print(io,"$(typeof(G)) for $(G.spectral_grid)")
+function Base.show(io::IO, G::Geometry)
+    print(io, "$(typeof(G)) for $(G.spectral_grid)")
 end
 
 """

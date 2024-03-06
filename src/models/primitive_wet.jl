@@ -93,7 +93,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     
     # OUTPUT
     output::OW = OutputWriter(spectral_grid, PrimitiveWet)
-    callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
+    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
  
@@ -137,8 +137,8 @@ function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     initialize!(model.longwave_radiation, model)
 
     # initial conditions
-    prognostic_variables = PrognosticVariables(spectral_grid,model)
-    initialize!(prognostic_variables,model.initial_conditions,model)
+    prognostic_variables = PrognosticVariables(spectral_grid, model)
+    initialize!(prognostic_variables, model.initial_conditions, model)
     (;clock) = prognostic_variables
     clock.time = time       # set the time
 
@@ -146,6 +146,6 @@ function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     initialize!(prognostic_variables.ocean, clock.time, model)
     initialize!(prognostic_variables.land, clock.time, model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid,model)
-    return Simulation(prognostic_variables,diagnostic_variables,model)
+    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    return Simulation(prognostic_variables, diagnostic_variables, model)
 end

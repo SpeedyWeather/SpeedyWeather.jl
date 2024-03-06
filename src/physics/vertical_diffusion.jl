@@ -12,7 +12,7 @@ end
 # function barrier
 function static_energy_diffusion!(  column::ColumnVariables,
                                     model::PrimitiveEquation)
-    static_energy_diffusion!(column,model.static_energy_diffusion)
+    static_energy_diffusion!(column, model.static_energy_diffusion)
 end
 
 function static_energy_diffusion!(  column::ColumnVariables,
@@ -118,7 +118,7 @@ end
 # function barrier for all VerticalDiffusion, dispatch by type of humidity diffusion
 function humidity_diffusion!(   column::ColumnVariables,
                                 model::PrimitiveWet)
-    humidity_diffusion!(column,model.humidity_diffusion,model)
+    humidity_diffusion!(column, model.humidity_diffusion, model)
 end
 
 # do nothing for primitive dry

@@ -4,7 +4,7 @@ abstract type AbstractDrag <: AbstractModelComponent end
 export NoDrag
 struct NoDrag <: AbstractDrag end
 NoDrag(SG::SpectralGrid) = NoDrag()
-initialize!(::NoDrag,::ModelSetup) = nothing
+initialize!(::NoDrag, ::ModelSetup) = nothing
 
 function drag!(     diagn::DiagnosticVariablesLayer,
                     progn::PrognosticVariablesLayer,
@@ -45,10 +45,10 @@ end
 $(TYPEDSIGNATURES)
 Quadratic drag for the momentum equations.
 
-    F = -c_D/H*|(u,v)|*(u,v)
+    F = -c_D/H*|(u, v)|*(u, v)
 
 with c_D the non-dimensional drag coefficient as defined in `drag::QuadraticDrag`.
-c_D and layer thickness `H` are precomputed in intialize!(::QuadraticDrag,::ModelSetup)
+c_D and layer thickness `H` are precomputed in intialize!(::QuadraticDrag, ::ModelSetup)
 and scaled by the radius as are the momentum equations."""
 function drag!(     
     diagn::DiagnosticVariablesLayer,
@@ -64,7 +64,7 @@ function drag!(
     # total drag coefficient with radius scaling and /layer_thickness
     c = drag.c[]
 
-    @inbounds for ij in eachgridpoint(u,v,Fu,Fv)
+    @inbounds for ij in eachgridpoint(u, v, Fu, Fv)
         speed = sqrt(u[ij]^2 + v[ij]^2)
         Fu[ij] -= c*speed*u[ij]     # -= as the tendencies already contain forcing
         Fv[ij] -= c*speed*v[ij]

@@ -3,7 +3,7 @@ abstract type AbstractCondensation <: AbstractParameterization end
 export NoCondensation
 struct NoCondensation <: AbstractCondensation end
 NoCondesantion(::SpectralGrid) = NoCondensation()
-initialize!(::NoCondensation,::PrimitiveEquation) = nothing
+initialize!(::NoCondensation, ::PrimitiveEquation) = nothing
 large_scale_condensation!(::ColumnVariables, ::NoCondensation, ::PrimitiveEquation) = nothing
 
 export ImplicitCondensation
@@ -21,7 +21,7 @@ end
 ImplicitCondensation(SG::SpectralGrid;kwargs...) = ImplicitCondensation{SG.NF}(;kwargs...)
 
 # nothing to initialize with this scheme
-initialize!(scheme::ImplicitCondensation,model::PrimitiveEquation) = nothing
+initialize!(scheme::ImplicitCondensation, model::PrimitiveEquation) = nothing
 
 # do nothing fall back for primitive dry 
 function large_scale_condensation!( 

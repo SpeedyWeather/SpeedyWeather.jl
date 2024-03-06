@@ -33,7 +33,7 @@ function virtual_temperature!(
     # but a linear virtual temperature in spectral space to avoid another transform
     # does not cause any problems. Alternative do the transform or have a linear
     # virtual temperature in both grid and spectral space
-    # spectral!(temp_virt,temp_virt_grid,S)
+    # spectral!(temp_virt, temp_virt_grid, S)
 end
 
 """
@@ -47,7 +47,7 @@ function virtual_temperature!(  diagn::DiagnosticVariablesLayer,
     (;temp_grid, temp_virt_grid) = diagn.grid_variables
     (;temp_virt) = diagn.dynamics_variables
 
-    copyto!(temp_virt_grid,temp_grid)
+    copyto!(temp_virt_grid, temp_grid)
 end
 
 """
@@ -63,7 +63,7 @@ function linear_virtual_temperature!(
 )
     (;temp_virt) = diagn.dynamics_variables
     (;temp) = progn.timesteps[lf]
-    copyto!(temp_virt,temp)
+    copyto!(temp_virt, temp)
 end
 
 # function barrier
@@ -73,7 +73,7 @@ function linear_virtual_temperature!(
     model::PrimitiveWet,
     lf::Integer,
 )
-    linear_virtual_temperature!(diagn,progn,model.atmosphere,lf)
+    linear_virtual_temperature!(diagn, progn, model.atmosphere, lf)
 end
 
 """
@@ -96,7 +96,7 @@ function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
     (;temp_virt) = diagn.dynamics_variables
     μ = atmosphere.μ_virt_temp
     Tₖ = diagn.temp_average[]   
-    (;temp,humid) = progn.timesteps[lf]
+    (;temp, humid) = progn.timesteps[lf]
 
     @. temp_virt = temp + (Tₖ*μ)*humid
 end

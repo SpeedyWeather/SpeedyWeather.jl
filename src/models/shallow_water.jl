@@ -49,8 +49,8 @@ Base.@kwdef mutable struct ShallowWaterModel{
     geometry::GE = Geometry(spectral_grid)
 
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid,Barotropic)
-    callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
+    output::OW = OutputWriter(spectral_grid, Barotropic)
+    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
 
@@ -78,10 +78,10 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     # model.implicit is initialized in first_timesteps!
 
     # initial conditions
-    prognostic_variables = PrognosticVariables(spectral_grid,model)
-    initialize!(prognostic_variables,model.initial_conditions,model)
+    prognostic_variables = PrognosticVariables(spectral_grid, model)
+    initialize!(prognostic_variables, model.initial_conditions, model)
     prognostic_variables.clock.time = time       # set the time
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid,model)
-    return Simulation(prognostic_variables,diagnostic_variables,model)
+    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    return Simulation(prognostic_variables, diagnostic_variables, model)
 end

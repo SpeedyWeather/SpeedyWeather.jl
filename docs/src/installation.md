@@ -16,7 +16,7 @@ and all necessary dependencies. If you run into any troubles please raise an
 
 However, you may want to make use of the latest features, then install directly from the main branch with
 ```julia
-julia> Pkg.add(url="https://github.com/SpeedyWeather/SpeedyWeather.jl",rev="main")
+julia> Pkg.add(url="https://github.com/SpeedyWeather/SpeedyWeather.jl", rev="main")
 ```
 other branches than `main` can be similarly installed. You can also type, equivalently,
 ```julia

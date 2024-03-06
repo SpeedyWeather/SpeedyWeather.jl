@@ -20,19 +20,19 @@
     
         # TO BE INITIALISED
         "Relaxation back to reference vorticity"
-        ζ₀::LowerTriangularMatrix{Complex{NF}} = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
+        ζ₀::LowerTriangularMatrix{Complex{NF}} = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
     end
     
     function JetDrag(SG::SpectralGrid;kwargs...)
-        return JetDrag{SG.NF}(;SG.trunc,kwargs...)
+        return JetDrag{SG.NF}(;SG.trunc, kwargs...)
     end
     
     function SpeedyWeather.initialize!( drag::JetDrag,
                                         model::ModelSetup)
     
         (;spectral_grid, geometry) = model
-        (;Grid,NF,nlat_half) = spectral_grid
-        u = zeros(Grid{NF},nlat_half)
+        (;Grid, NF, nlat_half) = spectral_grid
+        u = zeros(Grid{NF}, nlat_half)
     
         lat = geometry.latds
     
@@ -40,9 +40,9 @@
             u[ij] = drag.u₀ * exp(-(lat[ij]-drag.latitude)^2/(2*drag.width^2))
         end
     
-        û = SpeedyTransforms.spectral(u,one_more_degree=true)
+        û = SpeedyTransforms.spectral(u, one_more_degree=true)
         v̂ = zero(û)
-        SpeedyTransforms.curl!(drag.ζ₀,û,v̂,model.spectral_transform)
+        SpeedyTransforms.curl!(drag.ζ₀, û, v̂, model.spectral_transform)
         return nothing
     end
     
@@ -58,7 +58,7 @@
         
         (;radius) = model.spectral_grid
         r = radius/drag.time_scale.value
-        for lm in eachindex(vor,vor_tend,ζ₀)
+        for lm in eachindex(vor, vor_tend, ζ₀)
             vor_tend[lm] -= r*(vor[lm] - ζ₀[lm])
         end
     end
@@ -100,7 +100,7 @@
         
         # TO BE INITIALISED
         "Stochastic stirring term S"
-        S::LowerTriangularMatrix{Complex{NF}} = zeros(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
+        S::LowerTriangularMatrix{Complex{NF}} = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
         
         "a = A*sqrt(1 - exp(-2dt/τ)), the noise factor times the stirring strength [1/s²]"
         a::Base.RefValue{NF} = Ref(zero(NF))
@@ -109,12 +109,12 @@
         b::Base.RefValue{NF} = Ref(zero(NF))
             
         "Latitudinal mask, confined to mid-latitude storm track by default [1]"
-        lat_mask::Vector{NF} = zeros(NF,nlat)
+        lat_mask::Vector{NF} = zeros(NF, nlat)
     end
     
     function StochasticStirring(SG::SpectralGrid;kwargs...)
-        (;trunc,nlat) = SG
-        return StochasticStirring{SG.NF}(;trunc,nlat,kwargs...)
+        (;trunc, nlat) = SG
+        return StochasticStirring{SG.NF}(;trunc, nlat, kwargs...)
     end
     
     function SpeedyWeather.initialize!( forcing::StochasticStirring,
@@ -131,8 +131,8 @@
         forcing.b[] = exp(-dt/τ)
         
         # precompute the latitudinal mask
-        (;Grid,nlat_half) = model.spectral_grid
-        latd = RingGrids.get_latd(Grid,nlat_half)
+        (;Grid, nlat_half) = model.spectral_grid
+        latd = RingGrids.get_latd(Grid, nlat_half)
         
         for j in eachindex(forcing.lat_mask)
             # Gaussian centred at forcing.latitude of width forcing.width
@@ -147,7 +147,7 @@
                                     forcing::StochasticStirring,
                                     time::DateTime,
                                     model::ModelSetup)
-        SpeedyWeather.forcing!(diagn,forcing,model.spectral_transform)
+        SpeedyWeather.forcing!(diagn, forcing, model.spectral_transform)
     end
     
     function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
@@ -159,50 +159,50 @@
         b = forcing.b[]    # = exp(-dt/τ)
         
         (;S) = forcing
-        lmax,mmax = size(S)
+        lmax, mmax = size(S)
         @inbounds for m in 1:mmax
             for l in m:lmax
                 if (forcing.mmin <= m <= forcing.mmax) &&
                     (forcing.lmin <= l <= forcing.lmax)
                     # Barnes and Hartmann, 2011 Eq. 2
-                    Qi = 2rand(Complex{NF}) - (1 + im)   # ~ [-1,1] in complex
-                    S[l,m] = a*Qi + b*S[l,m]
+                    Qi = 2rand(Complex{NF}) - (1 + im)   # ~ [-1, 1] in complex
+                    S[l, m] = a*Qi + b*S[l, m]
                 end
             end
         end
     
         # to grid-point space
         S_grid = diagn.dynamics_variables.a_grid
-        SpeedyTransforms.gridded!(S_grid,S,spectral_transform)
+        SpeedyTransforms.gridded!(S_grid, S, spectral_transform)
         
         # mask everything but mid-latitudes
-        RingGrids._scale_lat!(S_grid,forcing.lat_mask)
+        RingGrids._scale_lat!(S_grid, forcing.lat_mask)
         
         # back to spectral space
         (;vor_tend) = diagn.tendencies
-        SpeedyTransforms.spectral!(vor_tend,S_grid,spectral_transform)
+        SpeedyTransforms.spectral!(vor_tend, S_grid, spectral_transform)
         SpeedyTransforms.spectral_truncation!(vor_tend)    # set lmax+1 to zero
         
         return nothing
     end
 
-    spectral_grid = SpectralGrid(trunc=31,nlev=1)
+    spectral_grid = SpectralGrid(trunc=31, nlev=1)
     
-    drag = JetDrag(spectral_grid,time_scale=Day(6))
+    drag = JetDrag(spectral_grid, time_scale=Day(6))
     forcing = StochasticStirring(spectral_grid)
     initial_conditions = StartFromRest()
 
     # with barotropic model
-    model = BarotropicModel(;spectral_grid,initial_conditions,forcing,drag)
+    model = BarotropicModel(;spectral_grid, initial_conditions, forcing, drag)
     simulation = initialize!(model)
 
-    run!(simulation,period=Day(5))
+    run!(simulation, period=Day(5))
     @test simulation.model.feedback.nars_detected == false
 
     # with shallow water model
-    model = ShallowWaterModel(;spectral_grid,initial_conditions,forcing,drag)
+    model = ShallowWaterModel(;spectral_grid, initial_conditions, forcing, drag)
     simulation = initialize!(model)
 
-    run!(simulation,period=Day(5))
+    run!(simulation, period=Day(5))
     @test simulation.model.feedback.nars_detected == false
 end

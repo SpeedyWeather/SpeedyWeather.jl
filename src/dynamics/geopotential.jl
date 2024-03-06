@@ -3,8 +3,8 @@ abstract type AbstractGeopotential <: AbstractModelComponent end
 export Geopotential
 Base.@kwdef struct Geopotential{NF} <: AbstractGeopotential
     nlev::Int
-    Δp_geopot_half::Vector{NF} = zeros(NF,nlev)
-    Δp_geopot_full::Vector{NF} = zeros(NF,nlev)
+    Δp_geopot_half::Vector{NF} = zeros(NF, nlev)
+    Δp_geopot_full::Vector{NF} = zeros(NF, nlev)
 end
 
 Geopotential(SG::SpectralGrid) = Geopotential{SG.NF}(;nlev=SG.nlev)
@@ -61,7 +61,7 @@ function geopotential!(
     temp = diagn.layers[end].dynamics_variables.temp_virt
     geopot = diagn.layers[end].dynamics_variables.geopot
     
-    @inbounds for lm in eachharmonic(geopot,geopot_surf,temp)
+    @inbounds for lm in eachharmonic(geopot, geopot_surf, temp)
         geopot[lm] = geopot_surf[lm] + temp[lm]*Δp_geopot_full[end]
     end
 
@@ -72,7 +72,7 @@ function geopotential!(
         geopot_k  = diagn.layers[k].dynamics_variables.geopot
         geopot_k1 = diagn.layers[k+1].dynamics_variables.geopot
 
-        for lm in eachharmonic(temp_k,temp_k1,geopot_k,geopot_k1)
+        for lm in eachharmonic(temp_k, temp_k1, geopot_k, geopot_k1)
             geopot_k½ = geopot_k1[lm] + temp_k1[lm]*Δp_geopot_half[k+1] # 1st half layer integration
             geopot_k[lm] = geopot_k½  + temp_k[lm]*Δp_geopot_full[k]    # 2nd onto full layer
         end      
@@ -110,7 +110,7 @@ end
 function geopotential(  temp::Vector,
                         G::Geopotential) 
     geopot = zero(temp)
-    geopotential!(geopot,temp,G)
+    geopotential!(geopot, temp, G)
     return geopot
 end
 
