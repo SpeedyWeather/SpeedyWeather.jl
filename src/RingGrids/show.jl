@@ -6,12 +6,12 @@ function Base.array_summary(io::IO, grid::AbstractGrid, inds::Tuple{Vararg{Base.
     Base.showarg(io, grid, true)
 end
 
-function plot(A::AbstractGrid;title::String="$(get_nlat(A))-ring $(typeof(A))")
+function plot(A::AbstractGrid; title::String="$(get_nlat(A))-ring $(typeof(A))")
     A_full = interpolate(full_grid(typeof(A)), A.nlat_half, A)
-    plot(A_full;title)
+    plot(A_full; title)
 end
 
-function plot(A::AbstractFullGrid;title::String="$(get_nlat(A))-ring $(typeof(A))")
+function plot(A::AbstractFullGrid; title::String="$(get_nlat(A))-ring $(typeof(A))")
 
     A_matrix = Matrix(A)
     nlon, nlat = size(A_matrix)
@@ -33,5 +33,5 @@ function plot(A::AbstractFullGrid;title::String="$(get_nlat(A))-ring $(typeof(A)
                             colorbar=true,
                             width=width,
                             height=height))
-    return UnicodePlots.heatmap(A_view';plot_kwargs...)
+    return UnicodePlots.heatmap(A_view'; plot_kwargs...)
 end

@@ -89,9 +89,9 @@ end
 $(TYPEDSIGNATURES)
 Generator function for a Leapfrog struct using `spectral_grid`
 for the resolution information."""
-function Leapfrog(spectral_grid::SpectralGrid;kwargs...)
-    (;NF, trunc, radius) = spectral_grid
-    return Leapfrog{NF}(;trunc, radius, kwargs...)
+function Leapfrog(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, trunc, radius) = spectral_grid
+    return Leapfrog{NF}(; trunc, radius, kwargs...)
 end
 
 """
@@ -101,7 +101,7 @@ Initialize leapfrogging `L` by recalculating the timestep given the output time 
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
 function initialize!(L::Leapfrog, model::ModelSetup)
-    (;output_dt) = model.output
+    (; output_dt) = model.output
 
     if L.adjust_with_output
         # take actual output dt from model.output and recalculate timestep
@@ -133,8 +133,8 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
     @boundscheck lf == 1 || lf == 2 || throw(BoundsError())         # index lf picks leapfrog dim
     
     A_lf = lf == 1 ? A_old : A_new                      # view on either t or t+dt to dis/enable Williams filter        
-    (;robert_filter, williams_filter) = L               # coefficients for the Robert and Williams filter
-    dt_NF = convert(NF, dt)                              # time step dt in number format NF
+    (; robert_filter, williams_filter) = L              # coefficients for the Robert and Williams filter
+    dt_NF = convert(NF, dt)                             # time step dt in number format NF
 
     # LEAP FROG time step with or without Robert+Williams filter
     # Robert time filter to compress computational mode, Williams filter for 3rd order accuracy
@@ -180,7 +180,7 @@ function leapfrog!( progn::PrognosticSurfaceTimesteps,
                     lf::Int,                # leapfrog index to dis/enable Williams filter
                     model::ModelSetup)
                
-    (;pres_tend) = diagn
+    (; pres_tend) = diagn
     pres_old = progn.timesteps[1].pres
     pres_new = progn.timesteps[2].pres
     spectral_truncation!(pres_tend)         # set lmax+1 mode to zero
@@ -198,11 +198,11 @@ function first_timesteps!(
     output::AbstractOutputWriter,
 )
     
-    (;clock) = progn
+    (; clock) = progn
     clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
     
-    (;implicit) = model
-    (;Δt, Δt_millisec) = model.time_stepping
+    (; implicit) = model
+    (; Δt, Δt_millisec) = model.time_stepping
     Δt_millisec_half = Dates.Millisecond(Δt_millisec.value÷2)   # this might be 1ms off
 
     # FIRST TIME STEP (EULER FORWARD with dt=Δt/2)
@@ -247,7 +247,7 @@ function timestep!(
     lf2::Int=2,                     # leapfrog index 2 (time step used for tendencies)
 )
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
-    (;time) = progn.clock                           # current time
+    (; time) = progn.clock                           # current time
     
     # set the tendencies back to zero for accumulation
     zero_tendencies!(diagn)
@@ -274,7 +274,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     ) where {NF<:AbstractFloat}
 
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
-    (;time) = progn.clock                           # current time
+    (; time) = progn.clock                           # current time
 
     # set the tendencies back to zero for accumulation
     zero_tendencies!(diagn)
@@ -283,8 +283,8 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     diagn_layer = diagn.layers[1]                   # multi-layer shallow water not supported
 
     progn_lf = progn_layer.timesteps[lf2]           # pick the leapfrog time step lf2 for tendencies
-    (;pres) = progn.surface.timesteps[lf2]
-    (;implicit, spectral_transform) = model
+    (; pres) = progn.surface.timesteps[lf2]
+    (; implicit, spectral_transform) = model
 
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
     dynamics_tendencies!(diagn_layer, progn_lf, diagn.surface, pres, time, model)
@@ -296,7 +296,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     gridded!(diagn_layer, progn_lf, model)
 
     # SURFACE LAYER (pressure), no diffusion though
-    (;pres_grid) = diagn.surface
+    (; pres_grid) = diagn.surface
     leapfrog!(progn.surface, diagn.surface, dt, lf1, model)
     gridded!(pres_grid, pres, spectral_transform)
 end
@@ -313,7 +313,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
                     ) where {NF<:AbstractFloat}
 
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
-    (;time) = progn.clock                           # current time
+    (; time) = progn.clock                           # current time
 
     # set the tendencies back to zero for accumulation
     zero_tendencies!(diagn)
@@ -351,7 +351,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
             gridded!(diagn_layer, progn_layer_lf, model)              # propagate spectral state to grid
         else                                                        # surface level, time step for pressure
             leapfrog!(progn.surface, diagn.surface, dt, lf1, model)
-            (;pres_grid) = diagn.surface
+            (; pres_grid) = diagn.surface
             pres_lf = progn.surface.timesteps[lf2].pres
             gridded!(pres_grid, pres_lf, model.spectral_transform)
         end
@@ -368,16 +368,16 @@ function time_stepping!(
     model::ModelSetup,              # all model components
 )          
     
-    (;clock) = progn
-    (;Δt, Δt_millisec) = model.time_stepping
-    (;time_stepping) = model
+    (; clock) = progn
+    (; Δt, Δt_millisec) = model.time_stepping
+    (; time_stepping) = model
 
     # SCALING: we use vorticity*radius, divergence*radius in the dynamical core
     scale!(progn, model.spectral_grid.radius)
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
-    (;output, feedback) = model
+    (; output, feedback) = model
     lf = 1                                  # use first leapfrog index
     gridded!(diagn, progn, lf, model)
     initialize!(output, feedback, time_stepping, clock, diagn, model)

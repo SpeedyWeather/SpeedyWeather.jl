@@ -22,8 +22,8 @@ end
 TransparentShortwave(SG::SpectralGrid) = TransparentShortwave{SG.NF}()
 
 function initialize!(scheme::TransparentShortwave, model::PrimitiveEquation)
-    (;solar_constant, gravity) = model.planet
-    (;pres_ref) = model.atmosphere
+    (; solar_constant, gravity) = model.planet
+    (; pres_ref) = model.atmosphere
     cₚ = model.atmosphere.heat_capacity
     Δσ = model.geometry.σ_levels_thick
     scheme.S[] = (1 - scheme.albedo) * solar_constant * gravity / (Δσ[end] * pres_ref * cₚ)

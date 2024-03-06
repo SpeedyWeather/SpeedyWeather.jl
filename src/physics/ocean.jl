@@ -37,9 +37,9 @@ Base.@kwdef struct SeasonalOceanClimatology{NF, Grid<:AbstractGrid{NF}} <: Abstr
 end
 
 # generator function
-function SeasonalOceanClimatology(SG::SpectralGrid;kwargs...)
-    (;NF, Grid, nlat_half) = SG
-    return SeasonalOceanClimatology{NF, Grid{NF}}(;nlat_half, kwargs...)
+function SeasonalOceanClimatology(SG::SpectralGrid; kwargs...)
+    (; NF, Grid, nlat_half) = SG
+    return SeasonalOceanClimatology{NF, Grid{NF}}(; nlat_half, kwargs...)
 end
 
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
@@ -94,7 +94,7 @@ function ocean_timestep!(   ocean::PrognosticVariablesOcean,
                             time::DateTime,
                             model::PrimitiveEquation;
                             initialize::Bool = false)
-    ocean_timestep!(ocean, time, model.ocean;initialize)
+    ocean_timestep!(ocean, time, model.ocean; initialize)
 end
 
 function ocean_timestep!(   ocean::PrognosticVariablesOcean{NF},
@@ -115,7 +115,7 @@ function ocean_timestep!(   ocean::PrognosticVariablesOcean{NF},
     # TODO check whether this shifts the climatology by 1/2 a month
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
-    (;monthly_temperature) = ocean_model
+    (; monthly_temperature) = ocean_model
     @. ocean.sea_surface_temperature = (1-weight) * monthly_temperature[this_month] +
                                           weight  * monthly_temperature[next_month]
 

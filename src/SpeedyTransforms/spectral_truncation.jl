@@ -142,18 +142,18 @@ spectral_interpolation(alms::AbstractMatrix{NF}, ltrunc::Integer, mtrunc::Intege
 spectral_interpolation(alms::AbstractMatrix, trunc::Int) = spectral_interpolation(alms, trunc, trunc)
 
 """
-    A_smooth = spectral_smoothing(A::LowerTriangularMatrix, c;power=1)
+    A_smooth = spectral_smoothing(A::LowerTriangularMatrix, c; power=1)
 
 Smooth the spectral field `A` following A_smooth = (1-c*∇²ⁿ)A with power n of a normalised Laplacian
 so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c<0."""
-function spectral_smoothing(A::LowerTriangularMatrix, c::Real;power::Real=1)
+function spectral_smoothing(A::LowerTriangularMatrix, c::Real; power::Real=1)
     A_smooth = copy(A)
-    spectral_smoothing!(A_smooth, c;power)
+    spectral_smoothing!(A_smooth, c; power)
     return A_smooth
 end
 
 """
-    spectral_smoothing!(A::LowerTriangularMatrix, c;power=1)
+    spectral_smoothing!(A::LowerTriangularMatrix, c; power=1)
 
 Smooth the spectral field `A` following A *= (1-(1-c)*∇²ⁿ) with power n of a normalised Laplacian
 so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c>1."""

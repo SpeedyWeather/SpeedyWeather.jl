@@ -9,11 +9,11 @@ Base.@kwdef struct Coriolis{NF} <: AbstractCoriolis
     f::Vector{NF} = zeros(NF, nlat)
 end
 
-Coriolis(SG::SpectralGrid;kwargs...) = Coriolis{SG.NF}(nlat=SG.nlat;kwargs...)
+Coriolis(SG::SpectralGrid; kwargs...) = Coriolis{SG.NF}(nlat=SG.nlat; kwargs...)
 
 function initialize!(coriolis::Coriolis, model::ModelSetup)
-    (;rotation) = model.planet
-    (;sinlat, radius) = model.geometry
+    (; rotation) = model.planet
+    (; sinlat, radius) = model.geometry
 
     # =2Ωsin(lat) but scaled with radius as are the equations
     coriolis.f .= 2rotation * sinlat * radius
@@ -50,5 +50,5 @@ function coriolis(
     grid::Grid;
     rotation=DEFAULT_ROTATION
 ) where {Grid<:AbstractGrid}
-    return coriolis(Grid, grid.nlat_half;rotation)
+    return coriolis(Grid, grid.nlat_half; rotation)
 end

@@ -224,7 +224,7 @@ $(TYPEDSIGNATURES)
 Returns a vector `nlons` for the number of longitude points per latitude ring, north to south.
 Provide grid `Grid` and its resolution parameter `nlat_half`. For both_hemisphere==false only
 the northern hemisphere (incl Equator) is returned."""
-function get_nlons(Grid::Type{<:AbstractGrid}, nlat_half::Integer;both_hemispheres::Bool=false)
+function get_nlons(Grid::Type{<:AbstractGrid}, nlat_half::Integer; both_hemispheres::Bool=false)
     n = both_hemispheres ? get_nlat(Grid, nlat_half) : nlat_half
     return [get_nlon_per_ring(Grid, nlat_half, j) for j in 1:n]
 end

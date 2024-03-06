@@ -130,7 +130,7 @@ changes when `dealiasing` is passed onto `SpectralGrid` on the `FullGaussianGrid
 | 42    | 3          | 192x96                |
 | ...   | ...        | ...                   |
 
-You will obtain this information every time you create a `SpectralGrid(;Grid, trunc, dealiasing)`.
+You will obtain this information every time you create a `SpectralGrid(; Grid, trunc, dealiasing)`.
 
 ## [Full Gaussian grid](@id FullGaussianGrid)
 

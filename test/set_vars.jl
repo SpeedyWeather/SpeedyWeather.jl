@@ -3,7 +3,7 @@
     # test setting LowerTriangularMatrices
     spectral_grid = SpectralGrid()
     initial_conditions = StartFromRest()
-    M = PrimitiveWetModel(;spectral_grid, initial_conditions)
+    M = PrimitiveWetModel(; spectral_grid, initial_conditions)
     simulation = initialize!(M)
     P = simulation.prognostic_variables
  
@@ -74,7 +74,7 @@
     # test setting matrices 
     spectral_grid = SpectralGrid(Grid=FullGaussianGrid)
     initial_conditions = StartFromRest()
-    M = PrimitiveWetModel(;spectral_grid, initial_conditions)
+    M = PrimitiveWetModel(; spectral_grid, initial_conditions)
     simulation = initialize!(M)
     P = simulation.prognostic_variables
  

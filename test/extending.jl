@@ -23,15 +23,15 @@
         ζ₀::LowerTriangularMatrix{Complex{NF}} = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
     end
     
-    function JetDrag(SG::SpectralGrid;kwargs...)
-        return JetDrag{SG.NF}(;SG.trunc, kwargs...)
+    function JetDrag(SG::SpectralGrid; kwargs...)
+        return JetDrag{SG.NF}(; SG.trunc, kwargs...)
     end
     
     function SpeedyWeather.initialize!( drag::JetDrag,
                                         model::ModelSetup)
     
-        (;spectral_grid, geometry) = model
-        (;Grid, NF, nlat_half) = spectral_grid
+        (; spectral_grid, geometry) = model
+        (; Grid, NF, nlat_half) = spectral_grid
         u = zeros(Grid{NF}, nlat_half)
     
         lat = geometry.latds
@@ -52,11 +52,11 @@
                                     time::DateTime,
                                     model::ModelSetup)
     
-        (;vor) = progn
-        (;vor_tend) = diagn.tendencies
-        (;ζ₀) = drag
+        (; vor) = progn
+        (; vor_tend) = diagn.tendencies
+        (; ζ₀) = drag
         
-        (;radius) = model.spectral_grid
+        (; radius) = model.spectral_grid
         r = radius/drag.time_scale.value
         for lm in eachindex(vor, vor_tend, ζ₀)
             vor_tend[lm] -= r*(vor[lm] - ζ₀[lm])
@@ -112,16 +112,16 @@
         lat_mask::Vector{NF} = zeros(NF, nlat)
     end
     
-    function StochasticStirring(SG::SpectralGrid;kwargs...)
-        (;trunc, nlat) = SG
-        return StochasticStirring{SG.NF}(;trunc, nlat, kwargs...)
+    function StochasticStirring(SG::SpectralGrid; kwargs...)
+        (; trunc, nlat) = SG
+        return StochasticStirring{SG.NF}(; trunc, nlat, kwargs...)
     end
     
     function SpeedyWeather.initialize!( forcing::StochasticStirring,
                                         model::ModelSetup)
         
         # precompute forcing strength, scale with radius^2 as is the vorticity equation
-        (;radius) = model.spectral_grid
+        (; radius) = model.spectral_grid
         A = radius^2 * forcing.strength
         
         # precompute noise and auto-regressive factor, packed in RefValue for mutability
@@ -131,7 +131,7 @@
         forcing.b[] = exp(-dt/τ)
         
         # precompute the latitudinal mask
-        (;Grid, nlat_half) = model.spectral_grid
+        (; Grid, nlat_half) = model.spectral_grid
         latd = RingGrids.get_latd(Grid, nlat_half)
         
         for j in eachindex(forcing.lat_mask)
@@ -158,7 +158,7 @@
         a = forcing.a[]    # = sqrt(1 - exp(-2dt/τ))
         b = forcing.b[]    # = exp(-dt/τ)
         
-        (;S) = forcing
+        (; S) = forcing
         lmax, mmax = size(S)
         @inbounds for m in 1:mmax
             for l in m:lmax
@@ -179,7 +179,7 @@
         RingGrids._scale_lat!(S_grid, forcing.lat_mask)
         
         # back to spectral space
-        (;vor_tend) = diagn.tendencies
+        (; vor_tend) = diagn.tendencies
         SpeedyTransforms.spectral!(vor_tend, S_grid, spectral_transform)
         SpeedyTransforms.spectral_truncation!(vor_tend)    # set lmax+1 to zero
         
@@ -193,14 +193,14 @@
     initial_conditions = StartFromRest()
 
     # with barotropic model
-    model = BarotropicModel(;spectral_grid, initial_conditions, forcing, drag)
+    model = BarotropicModel(; spectral_grid, initial_conditions, forcing, drag)
     simulation = initialize!(model)
 
     run!(simulation, period=Day(5))
     @test simulation.model.feedback.nars_detected == false
 
     # with shallow water model
-    model = ShallowWaterModel(;spectral_grid, initial_conditions, forcing, drag)
+    model = ShallowWaterModel(; spectral_grid, initial_conditions, forcing, drag)
     simulation = initialize!(model)
 
     run!(simulation, period=Day(5))

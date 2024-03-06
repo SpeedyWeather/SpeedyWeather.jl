@@ -101,8 +101,8 @@ function initialize!(   progn::PrognosticVariables,
                         initial_conditions::ZonalJet,
                         model::ShallowWater)
 
-    (;latitude, width, umax) = initial_conditions               # for jet
-    (;perturb_lat, perturb_lon, perturb_xwidth,                 # for perturbation
+    (; latitude, width, umax) = initial_conditions               # for jet
+    (; perturb_lat, perturb_lon, perturb_xwidth,                 # for perturbation
         perturb_ywidth, perturb_height) = initial_conditions
 
     θ₀ = (latitude-width)/360*2π    # southern boundary of jet [radians]
@@ -114,8 +114,8 @@ function initialize!(   progn::PrognosticVariables,
     β = perturb_ywidth*2π/360       # meridional extent of interface perturbation [radians]
     λ = perturb_lon*2π/360          # perturbation longitude [radians]
 
-    (;rotation, gravity) = model.planet
-    (;radius) = model.spectral_grid
+    (; rotation, gravity) = model.planet
+    (; radius) = model.spectral_grid
 
     # always create on F64 grid then convert to spectral and interpolate there
     Grid = FullGaussianGrid
@@ -160,17 +160,17 @@ function initialize!(   progn::PrognosticVariables,
     η = spectral(η_grid)
 
     # interpolate in spectral space to desired resolution
-    (;lmax, mmax) = model.spectral_transform
-    (;NF) = model.spectral_grid
+    (; lmax, mmax) = model.spectral_transform
+    (; NF) = model.spectral_grid
     u = spectral_truncation(complex(NF), u, lmax, mmax)
     
     # get vorticity initial conditions from curl of u, v
     v = zero(u)     # meridional velocity zero for these initial conditions
-    (;vor) = progn.layers[end].timesteps[1]
+    (; vor) = progn.layers[end].timesteps[1]
     curl!(vor, u, v, model.spectral_transform)
 
     # transform interface height η (use pres as prognostic variable) in spectral
-    (;pres) = progn.surface.timesteps[1]
+    (; pres) = progn.surface.timesteps[1]
     copyto!(pres, η)
     spectral_truncation!(pres)
 end
@@ -225,14 +225,14 @@ function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::ZonalWind,
                         model::PrimitiveEquation) where NF
 
-    (;u₀, η₀, ΔT, Tmin, pressure_on_orography) = initial_conditions
-    (;perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = initial_conditions
-    (;lapse_rate, σ_tropopause) = initial_conditions
-    (;temp_ref, R_dry, pres_ref) = model.atmosphere
-    (;radius, Grid, nlat_half, nlev) = model.spectral_grid
-    (;rotation, gravity) = model.planet
-    (;σ_levels_full) = model.geometry
-    (;norm_sphere) = model.spectral_transform
+    (; u₀, η₀, ΔT, Tmin, pressure_on_orography) = initial_conditions
+    (; perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = initial_conditions
+    (; lapse_rate, σ_tropopause) = initial_conditions
+    (; temp_ref, R_dry, pres_ref) = model.atmosphere
+    (; radius, Grid, nlat_half, nlev) = model.spectral_grid
+    (; rotation, gravity) = model.planet
+    (; σ_levels_full) = model.geometry
+    (; norm_sphere) = model.spectral_transform
 
     φ, λ = model.geometry.latds, model.geometry.londs
     S = model.spectral_transform
@@ -277,7 +277,7 @@ function initialize!(   progn::PrognosticVariables{NF},
             D[ij] = -2perturb_uₚ*radius/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
         end
 
-        (;vor, div) = layer.timesteps[1]
+        (; vor, div) = layer.timesteps[1]
         spectral!(vor, ζ, S)
         spectral!(div, D, S)
         spectral_truncation!(vor)
@@ -319,7 +319,7 @@ function initialize!(   progn::PrognosticVariables{NF},
             T[ij] = Tη[k] + A1*((-2sinφ^6*(cosφ^2 + 1/3) + 10/63)*A2 + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*aΩ)
         end
 
-        (;temp) = layer.timesteps[1]
+        (; temp) = layer.timesteps[1]
         spectral!(temp, T, S)
         spectral_truncation!(temp)
     end
@@ -373,10 +373,10 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
     # gravity:      Gravitational acceleration [m/s^2]
     # R_dry:        Specific gas constant for dry air [J/kg/K]
-    (;temp_ref, lapse_rate, R_dry) = model.atmosphere
-    (;gravity) = model.planet
-    (;nlev, σ_levels_full) = model.geometry         
-    (;norm_sphere) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
+    (; temp_ref, lapse_rate, R_dry) = model.atmosphere
+    (; gravity) = model.planet
+    (; nlev, σ_levels_full) = model.geometry
+    (; norm_sphere) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
 
     # Lapse rate scaled by gravity [K/m / (m²/s²)]
     Γg⁻¹ = lapse_rate/gravity
@@ -450,7 +450,7 @@ function initialize_humidity!(
     scale_height::NF = 7.5              # scale height for pressure [km]
     scale_height_ratio = scale_height/scale_height_humid
 
-    (;nlev, σ_levels_full) = model.geometry
+    (; nlev, σ_levels_full) = model.geometry
 
     # Specific humidity at the surface (grid space)
     temp_grid = gridded(progn.layers[end].timesteps[1].temp, model.spectral_transform)
@@ -490,8 +490,8 @@ function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::RandomWaves,
                         model::ShallowWater) where NF
         
-    (;A, lmin, lmax) = initial_conditions
-    (;trunc) = progn
+    (; A, lmin, lmax) = initial_conditions
+    (; trunc) = progn
 
     η = progn.surface.timesteps[1].pres
     η .= randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)

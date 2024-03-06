@@ -20,7 +20,7 @@ Base.@kwdef struct UniformCooling{NF} <: AbstractLongwave
     time_scale_stratosphere::Second = Day(5)
 end
 
-UniformCooling(SG::SpectralGrid;kwargs...) = UniformCooling{SG.NF}(;kwargs...)
+UniformCooling(SG::SpectralGrid; kwargs...) = UniformCooling{SG.NF}(; kwargs...)
 initialize!(scheme::UniformCooling, model::PrimitiveEquation) = nothing
 
 function longwave_radiation!(
@@ -35,8 +35,8 @@ function longwave_radiation!(
     column::ColumnVariables{NF},
     scheme::UniformCooling,
 ) where NF
-    (;temp, temp_tend) = column
-    (;temp_min, temp_stratosphere) = scheme
+    (; temp, temp_tend) = column
+    (; temp_min, temp_stratosphere) = scheme
     
     cooling = -inv(convert(NF, scheme.time_scale.value))
     τ⁻¹ = inv(scheme.time_scale_stratosphere.value)

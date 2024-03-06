@@ -24,7 +24,7 @@ function get_column!(   C::ColumnVariables,
                         orography::AbstractOrography,
                         land_sea_mask::AbstractLandSeaMask)
 
-    (;σ_levels_full, ln_σ_levels_full) = geometry
+    (; σ_levels_full, ln_σ_levels_full) = geometry
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
@@ -73,7 +73,7 @@ end
 function get_column(    S::AbstractSimulation,
                         ij::Integer,
                         verbose::Bool = true)
-    (;prognostic_variables, diagnostic_variables, model) = S
+    (; prognostic_variables, diagnostic_variables, model) = S
 
     column = deepcopy(S.diagnostic_variables.columns[1])
     reset_column!(column)

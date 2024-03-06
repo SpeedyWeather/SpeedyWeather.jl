@@ -48,7 +48,7 @@ end
         @test_throws BoundsError A[34, 32] = 1
         @test_throws BoundsError A[561] = 1
 
-        # this can create a segfault so don't test regularly (but it worked ;)
+        # this can create a segfault so don't test regularly, but it worked ;)
         # g(A, i) = @inbounds A[i] = 1
         # g(A, i, j) = @inbounds A[i, j] = 1
         # g(A, 34, 32)

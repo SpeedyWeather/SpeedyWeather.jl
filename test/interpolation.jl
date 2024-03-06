@@ -167,7 +167,7 @@ end
             trunc = 10
             alms = randn(LowerTriangularMatrix{Complex{NF}}, 5, 5)
             alms = spectral_truncation(alms, trunc+2, trunc+1)
-            A = gridded(alms;Grid)
+            A = gridded(alms; Grid)
 
             # interpolate to FullGaussianGrid and back and compare
             nlat_half = 32

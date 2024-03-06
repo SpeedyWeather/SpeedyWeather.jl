@@ -58,9 +58,9 @@ end
 """
 $(TYPEDSIGNATURES)
 create a HeldSuarez temperature relaxation with arrays allocated given `spectral_grid`"""
-function HeldSuarez(SG::SpectralGrid;kwargs...) 
-    (;NF, nlat, nlev) = SG
-    return HeldSuarez{NF}(;nlev, nlat, kwargs...)
+function HeldSuarez(SG::SpectralGrid; kwargs...)
+    (; NF, nlat, nlev) = SG
+    return HeldSuarez{NF}(; nlev, nlat, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -69,11 +69,11 @@ equilibrium temperature Teq."""
 function initialize!(   scheme::HeldSuarez,
                         model::PrimitiveEquation)
 
-    (;σ_levels_full, coslat, sinlat) = model.geometry
-    (;σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = scheme
-    (;temp_relax_freq, temp_equil_a, temp_equil_b) = scheme
+    (; σ_levels_full, coslat, sinlat) = model.geometry
+    (; σb, ΔTy, Δθz, relax_time_slow, relax_time_fast, Tmax) = scheme
+    (; temp_relax_freq, temp_equil_a, temp_equil_b) = scheme
                            
-    (;pres_ref) = model.atmosphere
+    (; pres_ref) = model.atmosphere
     scheme.p₀[] = pres_ref              # surface reference pressure [Pa]
     scheme.κ[] = model.atmosphere.κ     # thermodynamic kappa R_dry/cₚ
 
@@ -110,12 +110,12 @@ function temperature_relaxation!(
     scheme::HeldSuarez,
     atmosphere::AbstractAtmosphere,
 )
-    (;temp, temp_tend, pres, ln_pres) = column
+    (; temp, temp_tend, pres, ln_pres) = column
     j = column.jring[]                      # latitude ring index j
-    (;Tmin, temp_relax_freq, temp_equil_a, temp_equil_b) = scheme
+    (; Tmin, temp_relax_freq, temp_equil_a, temp_equil_b) = scheme
 
     # surface reference pressure [Pa] and thermodynamic kappa R_dry/cₚ
-    (;pres_ref, κ) = atmosphere             
+    (; pres_ref, κ) = atmosphere
 
     @inbounds for k in eachlayer(column)
         lnp = ln_pres[k]                    # logarithm of pressure at level k
@@ -171,9 +171,9 @@ end
 """
 $(TYPEDSIGNATURES)
 create a JablonowskiRelaxation temperature relaxation with arrays allocated given `spectral_grid`"""
-function JablonowskiRelaxation(SG::SpectralGrid;kwargs...) 
-    (;NF, nlat, nlev) = SG
-    return JablonowskiRelaxation{NF}(;nlev, nlat, kwargs...)
+function JablonowskiRelaxation(SG::SpectralGrid; kwargs...) 
+    (; NF, nlat, nlev) = SG
+    return JablonowskiRelaxation{NF}(; nlev, nlat, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -182,11 +182,11 @@ equilibrium temperature Teq and the frequency (strength of relaxation)."""
 function initialize!(   scheme::JablonowskiRelaxation,
                         model::PrimitiveEquation)
 
-    (;σ_levels_full, coslat, sinlat) = model.geometry
-    (;σb, relax_time_slow, relax_time_fast, η₀, u₀, ΔT) = scheme
-    (;temp_relax_freq, temp_equil, σ_tropopause, lapse_rate) = scheme
-    (;gravity) = model.planet
-    (;R_dry, temp_ref) = model.atmosphere
+    (; σ_levels_full, coslat, sinlat) = model.geometry
+    (; σb, relax_time_slow, relax_time_fast, η₀, u₀, ΔT) = scheme
+    (; temp_relax_freq, temp_equil, σ_tropopause, lapse_rate) = scheme
+    (; gravity) = model.planet
+    (; R_dry, temp_ref) = model.atmosphere
     Ω = model.planet.rotation
 
     # slow relaxation [1/s] everywhere, fast in the tropics
@@ -235,9 +235,9 @@ vertical profile."""
 function temperature_relaxation!(   column::ColumnVariables,
                                     scheme::JablonowskiRelaxation)
 
-    (;temp, temp_tend) = column
+    (; temp, temp_tend) = column
     j = column.jring[]                      # latitude ring index j
-    (;temp_relax_freq, temp_equil) = scheme
+    (; temp_relax_freq, temp_equil) = scheme
 
     @inbounds for k in eachlayer(column)
         kₜ = temp_relax_freq[k, j]           # (inverse) relaxation time scale

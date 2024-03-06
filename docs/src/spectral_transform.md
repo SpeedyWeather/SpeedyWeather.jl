@@ -455,7 +455,7 @@ as further described in [Radius scaling](@ref scaling).
 
 ## References
 
-[^Malardel2016]: Malardel S, Wedi N, Deconinck W, Diamantakis M, Kühnlein C, Mozdzynski G, Hamrud M, Smolarkiewicz P. A new grid for the IFS. ECMWF newsletter. 2016;146(23-28):321. doi: [10.21957/zwdu9u5i](https://doi.org/10.21957/zwdu9u5i)
+[^Malardel2016]: Malardel S, Wedi N, Deconinck W, Diamantakis M, Kühnlein C, Mozdzynski G, Hamrud M, Smolarkiewicz P. A new grid for the IFS. ECMWF newsletter. 2016; 146(23-28):321. doi: [10.21957/zwdu9u5i](https://doi.org/10.21957/zwdu9u5i)
 [^Gorski2004]: Górski, Hivon, Banday, Wandelt, Hansen, Reinecke, Bartelmann, 2004. _HEALPix: A FRAMEWORK FOR HIGH-RESOLUTION DISCRETIZATION AND FAST ANALYSIS OF DATA DISTRIBUTED ON THE SPHERE_, The Astrophysical Journal. doi:[10.1086/427976](https://doi.org/10.1086/427976)
 [^Willmert2020]: Justin Willmert, 2020. [justinwillmert.com](https://justinwillmert.com/)
     - [Introduction to Associated Legendre Polynomials (Legendre.jl Series, Part I)](https://justinwillmert.com/articles/2020/introduction-to-associated-legendre-polynomials/)

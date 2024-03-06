@@ -75,14 +75,14 @@ function fluxes_to_tendencies!(
     atmosphere::AbstractAtmosphere,
 )
     
-    (;nlev, u_tend, flux_u_upward, flux_u_downward) = column
+    (; nlev, u_tend, flux_u_upward, flux_u_downward) = column
     (;      v_tend, flux_v_upward, flux_v_downward) = column
-    (;humid_tend, flux_humid_upward, flux_humid_downward) = column
-    (;temp_tend,  flux_temp_upward,  flux_temp_downward) = column
+    (; humid_tend, flux_humid_upward, flux_humid_downward) = column
+    (; temp_tend,  flux_temp_upward,  flux_temp_downward) = column
 
     Δσ = geometry.σ_levels_thick
     pₛ = column.pres[end]               # surface pressure
-    (;radius) = geometry               # used for scaling
+    (; radius) = geometry               # used for scaling
 
     # for g/Δp and g/(Δp*cₚ), see Fortran SPEEDY documentation eq. (3, 5)
     g_pₛ = planet.gravity/pₛ

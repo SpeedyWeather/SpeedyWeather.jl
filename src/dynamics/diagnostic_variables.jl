@@ -21,8 +21,8 @@ end
 # generator function based on a SpectralGrid
 function Base.zeros(::Type{Tendencies},
                     SG::SpectralGrid)
-    (;NF, trunc, Grid, nlat_half) = SG
-    return Tendencies{NF, Grid{NF}}(;nlat_half, trunc)
+    (; NF, trunc, Grid, nlat_half) = SG
+    return Tendencies{NF, Grid{NF}}(; nlat_half, trunc)
 end
 
 """
@@ -44,8 +44,8 @@ end
 
 # generator function based on a SpectralGrid
 function Base.zeros(::Type{GridVariables}, SG::SpectralGrid)
-    (;NF, Grid, nlat_half) = SG
-    return GridVariables{NF, Grid{NF}}(;nlat_half)
+    (; NF, Grid, nlat_half) = SG
+    return GridVariables{NF, Grid{NF}}(; nlat_half)
 end
 
 """
@@ -83,8 +83,8 @@ end
 # generator function based on a SpectralGrid
 function Base.zeros(::Type{DynamicsVariables},
                     SG::SpectralGrid)
-    (;NF, trunc, Grid, nlat_half) = SG
-    return DynamicsVariables{NF, Grid{NF}}(;nlat_half, trunc)
+    (; NF, trunc, Grid, nlat_half) = SG
+    return DynamicsVariables{NF, Grid{NF}}(; nlat_half, trunc)
 end
 
 export DiagnosticVariablesLayer
@@ -107,7 +107,7 @@ end
 function Base.zeros(::Type{DiagnosticVariablesLayer},
                     SG::SpectralGrid,
                     k::Integer=0)                   # use k=0 (i.e. unspecified) as default
-    (;npoints) = SG
+    (; npoints) = SG
     tendencies = zeros(Tendencies, SG)
     grid_variables = zeros(GridVariables, SG)
     dynamics_variables = zeros(DynamicsVariables, SG)
@@ -147,8 +147,8 @@ end
 function Base.zeros(::Type{SurfaceVariables},
                     SG::SpectralGrid)
 
-    (;NF, trunc, Grid, nlat_half, npoints) = SG
-    return SurfaceVariables{NF, Grid{NF}}(;nlat_half, trunc, npoints)
+    (; NF, trunc, Grid, nlat_half, npoints) = SG
+    return SurfaceVariables{NF, Grid{NF}}(; nlat_half, trunc, npoints)
 end
 
 export DiagnosticVariables
@@ -175,13 +175,13 @@ function Base.zeros(
     Model::Type{<:ModelSetup}
 )
 
-    (;NF, Grid, nlat_half, nlev, npoints) = SG
+    (; NF, Grid, nlat_half, nlev, npoints) = SG
     layers = [zeros(DiagnosticVariablesLayer, SG, k) for k in 1:nlev]
     surface = zeros(SurfaceVariables, SG)
     
     # create one column variable per thread to avoid race conditions
     nthreads = Threads.nthreads()
-    columns = [ColumnVariables{NF}(;nlev) for _ in 1:nthreads]
+    columns = [ColumnVariables{NF}(; nlev) for _ in 1:nthreads]
 
     scale = Ref(convert(SG.NF, SG.radius))
 

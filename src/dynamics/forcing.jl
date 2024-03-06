@@ -44,14 +44,14 @@ Base.@kwdef mutable struct JetStreamForcing{NF} <: AbstractForcing
     amplitude::Vector{NF} = zeros(NF, nlat)
 end
 
-JetStreamForcing(SG::SpectralGrid;kwargs...) = JetStreamForcing{SG.NF}(
-    ;nlat=SG.nlat, kwargs...)
+JetStreamForcing(SG::SpectralGrid; kwargs...) = JetStreamForcing{SG.NF}(
+    ; nlat=SG.nlat, kwargs...)
 
 function initialize!(   forcing::JetStreamForcing,
                         model::ModelSetup)
 
-    (;latitude, width, speed, time_scale, amplitude) = forcing
-    (;radius) = model.spectral_grid
+    (; latitude, width, speed, time_scale, amplitude) = forcing
+    (; radius) = model.spectral_grid
     
     # Some constants similar to Galewsky 2004
     θ₀ = (latitude-width)/360*2π        # southern boundary of jet [radians]
@@ -60,7 +60,7 @@ function initialize!(   forcing::JetStreamForcing,
     A₀ = speed/eₙ/time_scale.value      # amplitude [m/s²] without lat dependency
     A₀ *= radius                        # scale by radius as are the momentum equations
 
-    (;nlat, colat) = model.geometry
+    (; nlat, colat) = model.geometry
 
     for j in 1:nlat
         # latitude in radians, abs for north/south symmetry
@@ -94,7 +94,7 @@ The forcing is precomputed in `initialize!(::JetStreamForcing, ::ModelSetup)`.""
 function forcing!(  diagn::DiagnosticVariablesLayer,
                     forcing::JetStreamForcing)
     Fu = diagn.tendencies.u_tend_grid
-    (;amplitude) = forcing
+    (; amplitude) = forcing
 
     @inbounds for (j, ring) in enumerate(eachring(Fu))
         F = amplitude[j]

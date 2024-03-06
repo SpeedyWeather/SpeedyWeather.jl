@@ -60,9 +60,9 @@ end
 """$(TYPEDSIGNATURES)
 Generator function based on the resolutin in `spectral_grid`.
 Passes on keyword arguments."""
-function HyperDiffusion(spectral_grid::SpectralGrid;kwargs...)
-    (;NF, trunc, nlev) = spectral_grid        # take resolution parameters from spectral_grid
-    return HyperDiffusion{NF}(;trunc, nlev, kwargs...)
+function HyperDiffusion(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, trunc, nlev) = spectral_grid        # take resolution parameters from spectral_grid
+    return HyperDiffusion{NF}(; trunc, nlev, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -87,8 +87,8 @@ model time step."""
 function initialize!(   scheme::HyperDiffusion,
                         L::AbstractTimeStepper)
 
-    (;trunc, ∇²ⁿ_2D, ∇²ⁿ_2D_implicit, power) = scheme
-    (;Δt, radius) = L
+    (; trunc, ∇²ⁿ_2D, ∇²ⁿ_2D_implicit, power) = scheme
+    (; Δt, radius) = L
 
     # time scale times 1/radius because time step Δt is scaled with 1/radius
     time_scale = scheme.time_scale.value/radius
@@ -122,9 +122,9 @@ function initialize!(
     L::AbstractTimeStepper,
     vor_max::Real = 0,
 )
-    (;trunc, resolution_scaling, ∇²ⁿ, ∇²ⁿ_implicit) = scheme
-    (;power, power_stratosphere, tapering_σ) = scheme
-    (;Δt, radius) = L
+    (; trunc, resolution_scaling, ∇²ⁿ, ∇²ⁿ_implicit) = scheme
+    (; power, power_stratosphere, tapering_σ) = scheme
+    (; Δt, radius) = L
     σ = G.σ_levels_full[k]
 
     # Reduce diffusion time scale (=increase diffusion) with resolution
@@ -213,8 +213,8 @@ function horizontal_diffusion!( diagn::DiagnosticVariablesLayer,
     ∇²ⁿ_implicit = HD.∇²ⁿ_2D_implicit
 
     # Barotropic model diffuses vorticity (only variable)
-    (;vor) = progn.timesteps[lf]
-    (;vor_tend) = diagn.tendencies
+    (; vor) = progn.timesteps[lf]
+    (; vor_tend) = diagn.tendencies
     horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
 end
 
@@ -230,8 +230,8 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
     ∇²ⁿ_implicit = HD.∇²ⁿ_2D_implicit
 
     # ShallowWater model diffuses vorticity and divergence
-    (;vor, div) = progn.timesteps[lf]
-    (;vor_tend, div_tend) = diagn.tendencies
+    (; vor, div) = progn.timesteps[lf]
+    (; vor_tend, div_tend) = diagn.tendencies
     horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
     horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)
 end
@@ -252,8 +252,8 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
     ∇²ⁿ_implicit = HD.∇²ⁿ_implicit[k]
 
     # Primitive equation models diffuse vor and divergence more selective/adaptive
-    (;vor, div, temp, humid) = progn.timesteps[lf]
-    (;vor_tend, div_tend, temp_tend, humid_tend) = diagn.tendencies
+    (; vor, div, temp, humid) = progn.timesteps[lf]
+    (; vor_tend, div_tend, temp_tend, humid_tend) = diagn.tendencies
     horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
     horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)
 

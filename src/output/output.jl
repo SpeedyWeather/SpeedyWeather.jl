@@ -130,7 +130,7 @@ function OutputWriter(
     NF::Type{<:Union{Float32, Float64}} = DEFAULT_OUTPUT_NF,
     kwargs...
 ) where {Model<:ModelSetup}
-    return OutputWriter{NF, Model}(;spectral_grid, kwargs...)
+    return OutputWriter{NF, Model}(; spectral_grid, kwargs...)
 end
 
 # default variables to output by model
@@ -190,7 +190,7 @@ function initialize!(
     output.netcdf_file = dataset
     
     # DEFINE NETCDF DIMENSIONS TIME
-    (;startdate) = output
+    (; startdate) = output
     time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     defDim(dataset, "time", Inf)       # unlimited time dimension
     defVar(dataset, "time", Float64, ("time",),
@@ -198,7 +198,7 @@ function initialize!(
                        "standard_name"=>"time", "calendar"=>"proleptic_gregorian"))
     
     # DEFINE NETCDF DIMENSIONS SPACE
-    (;input_Grid, output_Grid, nlat_half) = output
+    (; input_Grid, output_Grid, nlat_half) = output
     
     if output.as_matrix == false        # interpolate onto (possibly different) output grid
         lond = get_lond(output_Grid, nlat_half)
@@ -209,7 +209,7 @@ function initialize!(
         lat_name, lat_units, lat_longname = "lat", "degrees_north", "latitude"
         
     else                                # output grid directly into a matrix (resort grid points, no interpolation)
-        (;nlat_half) = diagn            # don't use output.nlat_half as not supported for output_matrix
+        (; nlat_half) = diagn           # don't use output.nlat_half as not supported for output_matrix
         nlon, nlat = RingGrids.matrix_size(input_Grid, nlat_half)   # size of the matrix output
         lond = collect(1:nlon)                                      # just enumerate grid points for lond, latd
         latd = collect(1:nlat)
@@ -227,7 +227,7 @@ function initialize!(
     defVar(dataset, "lev", σ, ("lev",), attrib=Dict("units"=>"1", "long_name"=>"sigma levels"))
     
     # VARIABLES, define every variable here that could be output
-    (;compression_level) = output
+    (; compression_level) = output
     missing_value = convert(output_NF, output.missing_value)
     
     # given pres the right name, depending on ShallowWaterModel or PrimitiveEquationModel
@@ -401,13 +401,13 @@ function write_netcdf_variables!(   output::OutputWriter,
                                     diagn::DiagnosticVariables{NF, Grid, Model}) where {NF, Grid, Model}
 
     output.output_counter += 1                  # increase output step counter
-    (;output_vars) = output                     # Vector{Symbol} of variables to output
+    (; output_vars) = output                    # Vector{Symbol} of variables to output
     i = output.output_counter
 
-    (;u, v, vor, div, pres, temp, humid, precip_cond, precip_conv, cloud) = output
-    (;output_Grid, interpolator) = output
-    (;quadrant_rotation, matrix_quadrant) = output
-    (;netcdf_file, keepbits) = output
+    (; u, v, vor, div, pres, temp, humid, precip_cond, precip_conv, cloud) = output
+    (; output_Grid, interpolator) = output
+    (; quadrant_rotation, matrix_quadrant) = output
+    (; netcdf_file, keepbits) = output
 
     for (k, diagn_layer) in enumerate(diagn.layers)
         

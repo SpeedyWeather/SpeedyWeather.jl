@@ -4,7 +4,7 @@ scale_coslat²!( A::AbstractGrid) = _scale_coslat!(A, power=2)
 scale_coslat⁻¹!(A::AbstractGrid) = _scale_coslat!(A, power=-1)
 scale_coslat⁻²!(A::AbstractGrid) = _scale_coslat!(A, power=-2)
 
-function _scale_coslat!(A::Grid;power=1) where {Grid<:AbstractGrid}
+function _scale_coslat!(A::Grid; power=1) where {Grid<:AbstractGrid}
     coslat = sin.(get_colat(Grid, A.nlat_half))    # sin(colat) = cos(lat)
     coslat .^= power
     return _scale_lat!(A, coslat)
