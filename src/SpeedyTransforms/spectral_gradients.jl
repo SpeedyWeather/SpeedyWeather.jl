@@ -362,8 +362,8 @@ function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: (inv
     eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
     @boundscheck length(eigenvalues) >= lmax+1 || throw(BoundsError)
 
-    @inline kernel(o, a) = flipsign ? (add ? (o-a) : -a)  :
-                                     (add ? (o+a) :  a)
+    @inline kernel(o, a) = flipsign ? (add ? (o-a) : -a) :
+                                      (add ? (o+a) :  a)
 
     lm = 0
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
@@ -432,7 +432,7 @@ function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}}, # Output:
                 ) where {NF<:AbstractFloat}
 
     inverse = true
-    return ∇²!(∇⁻²alms, alms, S;add, flipsign, inverse)
+    return ∇²!(∇⁻²alms, alms, S; add, flipsign, inverse)
 end
 
 """

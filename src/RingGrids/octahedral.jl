@@ -149,7 +149,7 @@ full_grid(::Type{<:OctahedralClenshawGrid}) = FullClenshawGrid    # the full gri
 
 matrix_size(G::OctahedralClenshawGrid) = (2*(4+G.nlat_half), 2*(4+G.nlat_half))
 matrix_size(::Type{OctahedralClenshawGrid}, nlat_half::Integer) = (2*(4+nlat_half), 2*(4+nlat_half))
-Base.Matrix(G::OctahedralClenshawGrid{T};kwargs...) where T = Matrix!(zeros(T, matrix_size(G)...), G;kwargs...)
+Base.Matrix(G::OctahedralClenshawGrid{T}; kwargs...) where T = Matrix!(zeros(T, matrix_size(G)...), G; kwargs...)
 
 """
     Matrix!(M::AbstractMatrix,
@@ -164,10 +164,10 @@ Every quadrant of the grid `G` is rotated as specified in `quadrant_rotation`,
 eastward starting from 0˚E. The grid quadrants are moved into the matrix quadrant
 (i, j) as specified. Defaults are equivalent to centered at 0˚E and a rotation
 such that the North Pole is at M's midpoint."""
-Matrix!(M::AbstractMatrix, G::OctahedralClenshawGrid;kwargs...) = Matrix!((M, G);kwargs...)
+Matrix!(M::AbstractMatrix, G::OctahedralClenshawGrid; kwargs...) = Matrix!((M, G); kwargs...)
 
 """
-    Matrix!(MGs::Tuple{AbstractMatrix{T}, OctahedralClenshawGrid}...;kwargs...)
+    Matrix!(MGs::Tuple{AbstractMatrix{T}, OctahedralClenshawGrid}...; kwargs...)
 
 Like `Matrix!(::AbstractMatrix, ::OctahedralClenshawGrid)` but for simultaneous
 processing of tuples `((M1, G1), (M2, G2), ...)` with matrices `Mi` and grids `Gi`.

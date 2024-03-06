@@ -33,9 +33,9 @@ end
 """
 $(TYPEDSIGNATURES)
 Generator using the resolution from `spectral_grid`."""
-function ImplicitShallowWater(spectral_grid::SpectralGrid;kwargs...) 
-    (;NF, trunc) = spectral_grid
-    return ImplicitShallowWater{NF}(;trunc, kwargs...)
+function ImplicitShallowWater(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, trunc) = spectral_grid
+    return ImplicitShallowWater{NF}(; trunc, kwargs...)
 end
 
 # function barrier to unpack the constants struct for shallow water
@@ -53,9 +53,9 @@ function initialize!(
     atmosphere::AbstractAtmosphere,
 )
 
-    (;α, H, ξH, g∇², ξg∇², S⁻¹) = implicit          # precomputed arrays to be updated                
-    (;gravity) = planet                             # gravitational acceleration [m/s²]
-    (;layer_thickness) = atmosphere                 # shallow water layer thickness [m]
+    (; α, H, ξH, g∇², ξg∇², S⁻¹) = implicit          # precomputed arrays to be updated
+    (; gravity) = planet                             # gravitational acceleration [m/s²]
+    (; layer_thickness) = atmosphere                 # shallow water layer thickness [m]
 
     # implicit time step between i-1 and i+1
     # α = 0   means the gravity wave terms are evaluated at i-1 (forward)
@@ -65,7 +65,7 @@ function initialize!(
     # α = 0.5 slows gravity waves and prevents them from amplifying
     # α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
 
-    ξ = α*dt                    # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
+    ξ = α*dt                   # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
     H[] = layer_thickness      # update H the undisturbed layer thickness without mountains
     ξH[] = ξ*layer_thickness   # update ξ*H with new ξ, in RefValue for mutability
 
@@ -89,14 +89,14 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
                                 progn_surface::PrognosticSurfaceTimesteps{NF},
                                 implicit::ImplicitShallowWater) where NF
 
-    (;div_tend) = diagn.tendencies          # divergence tendency
+    (; div_tend) = diagn.tendencies          # divergence tendency
     div_old = progn.timesteps[1].div        # divergence at t
     div_new = progn.timesteps[2].div        # divergence at t+dt
     pres_old = progn_surface.timesteps[1].pres  # pressure/η at t
     pres_new = progn_surface.timesteps[2].pres  # pressure/η at t+dt
-    (;pres_tend) = diagn_surface            # tendency of pressure/η
+    (; pres_tend) = diagn_surface            # tendency of pressure/η
 
-    (;g∇², ξg∇², S⁻¹) = implicit
+    (; g∇², ξg∇², S⁻¹) = implicit
     H = implicit.H[]              # unpack as it's stored in a RefValue for mutation
     ξH = implicit.ξH[]            # unpack as it's stored in a RefValue for mutation
 
@@ -188,8 +188,8 @@ end
 """$(TYPEDSIGNATURES)
 Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid, kwargs...) 
-    (;NF, trunc, nlev) = spectral_grid
-    return ImplicitPrimitiveEquation{NF}(;trunc, nlev, kwargs...)
+    (; NF, trunc, nlev) = spectral_grid
+    return ImplicitPrimitiveEquation{NF}(; trunc, nlev, kwargs...)
 end
 
 # function barrier to unpack the constants struct for primitive eq models
@@ -215,11 +215,11 @@ function initialize!(
     adiabatic_conversion::AbstractAdiabaticConversion,
 )
 
-    (;trunc, nlev, α, temp_profile, S, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4) = implicit
-    (;σ_levels_full, σ_levels_thick) = geometry
-    (;R_dry, κ) = atmosphere
-    (;Δp_geopot_half, Δp_geopot_full) = geopotential
-    (;σ_lnp_A, σ_lnp_B) = adiabatic_conversion
+    (; trunc, nlev, α, temp_profile, S, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4) = implicit
+    (; σ_levels_full, σ_levels_thick) = geometry
+    (; R_dry, κ) = atmosphere
+    (; Δp_geopot_half, Δp_geopot_full) = geopotential
+    (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
 
     for k in 1:nlev    
         # use current vertical temperature profile                                     
@@ -312,15 +312,15 @@ function implicit_correction!(
     # escape immediately if explicit
     implicit.α == 0 && return nothing   
 
-    # (;Δp_geopot_half, Δp_geopot_full) = model.geometry     # = R*Δlnp on half or full levels
-    (;nlev, trunc, S⁻¹, R, U, L, W) = implicit
+    # (; Δp_geopot_half, Δp_geopot_full) = model.geometry     # = R*Δlnp on half or full levels
+    (; nlev, trunc, S⁻¹, R, U, L, W) = implicit
     ξ = implicit.ξ[]
     
     # MOVE THE IMPLICIT TERMS OF THE TEMPERATURE EQUATION FROM TIME STEP i TO i-1
     # geopotential and linear pressure gradient (divergence equation) are already evaluated at i-1
     # so is the -D̄ term for surface pressure in tendencies!
     @floop for k in 1:nlev
-        (;temp_tend) = diagn.layers[k].tendencies       # unpack temp_tend
+        (; temp_tend) = diagn.layers[k].tendencies       # unpack temp_tend
         for r in 1:nlev
             div_old = progn.layers[r].timesteps[1].div   # divergence at i-1
             div_new = progn.layers[r].timesteps[2].div   # divergence at i
@@ -333,17 +333,17 @@ function implicit_correction!(
     end       
     
     # SEMI IMPLICIT CORRECTIONS FOR DIVERGENCE
-    (;pres_tend) = diagn.surface
+    (; pres_tend) = diagn.surface
     @floop for k in 1:nlev    # loop from bottom layer to top for geopotential calculation
         
         # calculate the combined tendency G = G_D + ξRG_T + ξUG_lnps to solve for divergence δD
         G = diagn.layers[k].dynamics_variables.a        # reuse work arrays, used for combined tendency G
         geopot = diagn.layers[k].dynamics_variables.b   # used for geopotential
-        (;div_tend) = diagn.layers[k].tendencies        # unpack div_tend
+        (; div_tend) = diagn.layers[k].tendencies       # unpack div_tend
 
         # 1. the ξ*R*G_T term, vertical integration of geopotential (excl ξ, this is done in 2.)
         @inbounds for r in k:nlev                       # skip 1:k-1 as integration is surface to k
-            (;temp_tend) = diagn.layers[r].tendencies   # unpack temp_tend
+            (; temp_tend) = diagn.layers[r].tendencies  # unpack temp_tend
             @. geopot += R[k, r]*temp_tend
         end
 
@@ -379,7 +379,7 @@ function implicit_correction!(
 
     # NOW SOLVE THE δD = S⁻¹G to correct divergence tendency
     @floop for k in 1:nlev
-        (;div_tend) = diagn.layers[k].tendencies        # unpack div_tend
+        (; div_tend) = diagn.layers[k].tendencies       # unpack div_tend
 
         @inbounds for r in 1:nlev
             G = diagn.layers[r].dynamics_variables.a    # reuse work arrays
@@ -397,15 +397,15 @@ function implicit_correction!(
 
     # SEMI IMPLICIT CORRECTIONS FOR PRESSURE AND TEMPERATURE, insert δD to get δT, δlnpₛ
     @floop for k in 1:nlev
-        (;temp_tend) = diagn.layers[k].tendencies       # unpack temp_tend
+        (; temp_tend) = diagn.layers[k].tendencies       # unpack temp_tend
         @inbounds for r in 1:nlev
-            (;div_tend) = diagn.layers[r].tendencies    # unpack div_tend
+            (; div_tend) = diagn.layers[r].tendencies    # unpack div_tend
             @. temp_tend += ξ*L[k, r]*div_tend           # δT = G_T + ξLδD
         end
     end
 
     for k in 1:nlev     # not thread safe
-        (;div_tend) = diagn.layers[k].tendencies        # unpack div_tend
-        @. pres_tend += ξ*W[k]*div_tend                 # δlnpₛ = G_lnpₛ + ξWδD
+        (; div_tend) = diagn.layers[k].tendencies        # unpack div_tend
+        @. pres_tend += ξ*W[k]*div_tend                  # δlnpₛ = G_lnpₛ + ξWδD
     end
 end

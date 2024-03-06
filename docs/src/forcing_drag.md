@@ -251,9 +251,9 @@ be used throughout model integration.
 But in SpeedyWeather we typically use the [SpectralGrid](@ref) object to pass on the information of
 the resolution (and number format) so we want a generator function like
 ```@example extend
-function StochasticStirring(SG::SpectralGrid;kwargs...)
-    (;trunc, nlat) = SG
-    return StochasticStirring{SG.NF}(;trunc, nlat, kwargs...)
+function StochasticStirring(SG::SpectralGrid; kwargs...)
+    (; trunc, nlat) = SG
+    return StochasticStirring{SG.NF}(; trunc, nlat, kwargs...)
 end
 ```
 Which allows us to do
@@ -275,7 +275,7 @@ function SpeedyWeather.initialize!( forcing::StochasticStirring,
                                     model::ModelSetup)
     
     # precompute forcing strength, scale with radius^2 as is the vorticity equation
-    (;radius) = model.spectral_grid
+    (; radius) = model.spectral_grid
     A = radius^2 * forcing.strength
     
     # precompute noise and auto-regressive factor, packed in RefValue for mutability
@@ -285,7 +285,7 @@ function SpeedyWeather.initialize!( forcing::StochasticStirring,
     forcing.b[] = exp(-dt/τ)
     
     # precompute the latitudinal mask
-    (;Grid, nlat_half) = model.spectral_grid
+    (; Grid, nlat_half) = model.spectral_grid
     latd = RingGrids.get_latd(Grid, nlat_half)
     
     for j in eachindex(forcing.lat_mask)
@@ -366,7 +366,7 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
     a = forcing.a[]    # = sqrt(1 - exp(-2dt/τ))
     b = forcing.b[]    # = exp(-dt/τ)
     
-    (;S) = forcing
+    (; S) = forcing
     for lm in eachindex(S)
         # Barnes and Hartmann, 2011 Eq. 2
         Qi = 2rand(Complex{NF}) - (1 + im)   # ~ [-1, 1] in complex
@@ -381,7 +381,7 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
     
     # back to spectral space
-    (;vor_tend) = diagn.tendencies
+    (; vor_tend) = diagn.tendencies
     SpeedyTransforms.spectral!(vor_tend, S_grid, spectral_transform)
 
     return nothing
@@ -443,7 +443,7 @@ and just put them together as you like, and as long as you follow some rules.
 spectral_grid = SpectralGrid(trunc=42, nlev=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
 initial_conditions = StartFromRest()
-model = BarotropicModel(;spectral_grid, initial_conditions, forcing=stochastic_stirring)
+model = BarotropicModel(; spectral_grid, initial_conditions, forcing=stochastic_stirring)
 simulation = initialize!(model)
 run!(simulation)
 ```

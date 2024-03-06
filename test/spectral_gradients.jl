@@ -1,8 +1,8 @@
 @testset "Divergence of a non-divergent flow zero?" begin
     @testset for NF in (Float32, Float64)
 
-        spectral_grid = SpectralGrid(;NF, nlev=1)
-        m = ShallowWaterModel(;spectral_grid)
+        spectral_grid = SpectralGrid(; NF, nlev=1)
+        m = ShallowWaterModel(; spectral_grid)
         simulation = initialize!(m)
         p = simulation.prognostic_variables
         d = simulation.diagnostic_variables
@@ -48,8 +48,8 @@ end
 @testset "Curl of an irrotational flow zero?" begin
     @testset for NF in (Float32, Float64)
 
-        spectral_grid = SpectralGrid(;NF, nlev=1)
-        m = ShallowWaterModel(;spectral_grid)
+        spectral_grid = SpectralGrid(; NF, nlev=1)
+        m = ShallowWaterModel(; spectral_grid)
         simulation = initialize!(m)
         p = simulation.prognostic_variables
         d = simulation.diagnostic_variables
@@ -97,7 +97,7 @@ end
                         OctahedralClenshawGrid,
                         HEALPixGrid)
 
-            SG = SpectralGrid(NF;Grid, nlev=1)
+            SG = SpectralGrid(NF; Grid, nlev=1)
             G = Geometry(SG)
 
             A = Grid(randn(NF, SG.npoints))
@@ -173,8 +173,8 @@ end
 @testset "D, ζ -> u, v -> D, ζ" begin
     @testset for NF in (Float32, Float64)
 
-        spectral_grid = SpectralGrid(;NF, nlev=1)
-        m = ShallowWaterModel(;spectral_grid)
+        spectral_grid = SpectralGrid(; NF, nlev=1)
+        m = ShallowWaterModel(; spectral_grid)
         simulation = initialize!(m)
         p = simulation.prognostic_variables
         d = simulation.diagnostic_variables
@@ -188,7 +188,7 @@ end
         fill!(d.layers[1].tendencies.div_tend, 0)
 
         # create initial conditions
-        (;lmax, mmax) = m.spectral_transform
+        (; lmax, mmax) = m.spectral_transform
         vor0 = rand(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1)
         div0 = rand(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1)
         
@@ -294,8 +294,8 @@ end
     for NF in (Float32, Float64)
 
         trunc = 31
-        spectral_grid = SpectralGrid(;NF, trunc, Grid=FullGaussianGrid, nlev=1)
-        m = ShallowWaterModel(;spectral_grid)
+        spectral_grid = SpectralGrid(; NF, trunc, Grid=FullGaussianGrid, nlev=1)
+        m = ShallowWaterModel(; spectral_grid)
         simulation = initialize!(m)
         p = simulation.prognostic_variables
         d = simulation.diagnostic_variables

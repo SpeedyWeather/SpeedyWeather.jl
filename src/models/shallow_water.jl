@@ -4,7 +4,7 @@ export ShallowWaterModel
 The ShallowWaterModel contains all model components needed for the simulation of the
 shallow water equations. To be constructed like
 
-    model = ShallowWaterModel(;spectral_grid, kwargs...)
+    model = ShallowWaterModel(; spectral_grid, kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
@@ -63,7 +63,7 @@ Calls all `initialize!` functions for most components (=fields) of `model`,
 except for `model.output` and `model.feedback` which are always initialized
 in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
-    (;spectral_grid) = model
+    (; spectral_grid) = model
 
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for ShallowWaterModel, \
                                 SpectralGrid with nlev=$(spectral_grid.nlev) provided."

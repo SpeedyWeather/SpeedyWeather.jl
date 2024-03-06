@@ -31,7 +31,7 @@ With v0.6 the interface to SpeedyWeather.jl consist of 4 steps: define the grid,
 
 ```julia
 spectral_grid = SpectralGrid(trunc=31, Grid=OctahedralGaussianGrid, nlev=8)
-model = PrimitiveDryModel(;spectral_grid, orography = EarthOrography(spectral_grid))
+model = PrimitiveDryModel(; spectral_grid, orography = EarthOrography(spectral_grid))
 simulation = initialize!(model)
 run!(simulation, period=Day(10), output=true)
 ```

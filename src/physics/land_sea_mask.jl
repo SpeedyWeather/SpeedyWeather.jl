@@ -57,10 +57,10 @@ end
 """
 $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
-function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid;kwargs...)
-    (;NF, Grid, nlat_half) = spectral_grid
+function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, Grid, nlat_half) = spectral_grid
     land_sea_mask   = zeros(Grid{NF}, nlat_half)
-    return L{NF, Grid{NF}}(;land_sea_mask, kwargs...)
+    return L{NF, Grid{NF}}(; land_sea_mask, kwargs...)
 end
 
 """
@@ -69,7 +69,7 @@ Reads a high-resolution land-sea mask from file and interpolates (grid-call aver
 onto the model grid for a fractional sea mask."""
 function initialize!(land_sea_mask::LandSeaMask, model::PrimitiveEquation)
 
-    (;file_Grid) = land_sea_mask
+    (; file_Grid) = land_sea_mask
 
     # LOAD NETCDF FILE
     if land_sea_mask.path == "SpeedyWeather.jl/input_data"

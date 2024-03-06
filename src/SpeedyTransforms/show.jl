@@ -13,7 +13,7 @@ function prettymemory(b)
 end
 
 function Base.show(io::IO, S::SpectralTransform{NF}) where NF
-    (;lmax, mmax, Grid, nlat_half) = S
+    (; lmax, mmax, Grid, nlat_half) = S
 
     # add information about size of Legendre polynomials
     s = S.recompute_legendre ? Base.summarysize(S.Λ) : Base.summarysize(S.Λs)

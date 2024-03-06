@@ -29,7 +29,7 @@ Base.@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection
     humid_ref_profile::Vector{NF} = zeros(NF, nlev)
 end
 
-SimplifiedBettsMiller(SG::SpectralGrid;kwargs...) = SimplifiedBettsMiller{SG.NF}(nlev=SG.nlev;kwargs...)
+SimplifiedBettsMiller(SG::SpectralGrid; kwargs...) = SimplifiedBettsMiller{SG.NF}(nlev=SG.nlev; kwargs...)
 initialize!(::SimplifiedBettsMiller, ::PrimitiveWet) = nothing
 
 # function barrier for all AbstractConvection
@@ -70,10 +70,10 @@ function convection!(
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
-    (;temp_ref_profile, humid_ref_profile) = SBM
-    (;geopot, nlev, temp, temp_virt, humid, temp_tend, humid_tend) = column
+    (; temp_ref_profile, humid_ref_profile) = SBM
+    (; geopot, nlev, temp, temp_virt, humid, temp_tend, humid_tend) = column
     pₛ = column.pres[end]
-    (;Lᵥ, cₚ) = clausius_clapeyron
+    (; Lᵥ, cₚ) = clausius_clapeyron
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     temp_parcel = temp[nlev]
@@ -154,9 +154,9 @@ function convection!(
         column.precip_convection += δq * Δσ[k]
     end
 
-    (;gravity) = planet
-    (;water_density) = atmosphere
-    (;Δt_sec) = time_stepping
+    (; gravity) = planet
+    (; water_density) = atmosphere
+    (; Δt_sec) = time_stepping
     pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv 
     column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
     column.cloud_top = min(column.cloud_top, level_zero_buoyancy)        # clouds reach to top of convection
@@ -179,7 +179,7 @@ function pseudo_adiabat!(
     clausius_clapeyron::AbstractClausiusClapeyron,
 ) where NF
 
-    (;Lᵥ, R_dry, R_vapour, cₚ) = clausius_clapeyron
+    (; Lᵥ, R_dry, R_vapour, cₚ) = clausius_clapeyron
     R_cₚ = R_dry/cₚ
     ε = clausius_clapeyron.mol_ratio
     μ = (1-ε)/ε                             # for virtual temperature
@@ -261,7 +261,7 @@ Base.@kwdef struct DryBettsMiller{NF} <: AbstractConvection
     temp_ref_profile::Vector{NF} = zeros(NF, nlev)
 end
 
-DryBettsMiller(SG::SpectralGrid;kwargs...) = DryBettsMiller{SG.NF}(nlev=SG.nlev;kwargs...)
+DryBettsMiller(SG::SpectralGrid; kwargs...) = DryBettsMiller{SG.NF}(nlev=SG.nlev; kwargs...)
 initialize!(::DryBettsMiller, ::PrimitiveWet) = nothing
 
 # function barrier to unpack model
@@ -291,8 +291,8 @@ function convection!(
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
-    (;temp_ref_profile) = DBM
-    (;nlev, temp, temp_tend) = column
+    (; temp_ref_profile) = DBM
+    (; nlev, temp, temp_tend) = column
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     level_zero_buoyancy = dry_adiabat!(temp_ref_profile,

@@ -290,8 +290,8 @@ function update_locator!(   I::AbstractInterpolator{NF, Grid},   # GridGeometry 
 
     # find latitude ring indices corresponding to interpolation points
     (; latd ) = I.geometry           # latitudes of rings including north and south pole
-    (; js, Δys ) = I.locator          # to be updated: ring indices js, and meridional weights Δys
-    find_rings!(js, Δys, θs, latd;unsafe)  # next ring at or north of θ
+    (; js, Δys ) = I.locator         # to be updated: ring indices js, and meridional weights Δys
+    find_rings!(js, Δys, θs, latd; unsafe)  # next ring at or north of θ
 
     # find grid incides ij for top, bottom and left, right grid points around (θ, λ)
     find_grid_indices!(I, λs)            # next points left and right of λ on rings north and south

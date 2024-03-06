@@ -73,9 +73,9 @@ Initializes the a `Feedback` struct."""
 function initialize!(feedback::Feedback, clock::Clock, model::ModelSetup)
 
     # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
-    (;showspeed, desc) = feedback.progress_meter
-    (;verbose) = feedback
-    feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps-1;enabled=verbose, showspeed, desc)
+    (; showspeed, desc) = feedback.progress_meter
+    (; verbose) = feedback
+    feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps-1; enabled=verbose, showspeed, desc)
     
     # set to false to recheck for NaRs
     feedback.nars_detected = false

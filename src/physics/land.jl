@@ -38,9 +38,9 @@ Base.@kwdef struct SeasonalLandTemperature{NF, Grid<:AbstractGrid{NF}} <: Abstra
 end
 
 # generator function
-function SeasonalLandTemperature(SG::SpectralGrid;kwargs...)
-    (;NF, Grid, nlat_half) = SG
-    return SeasonalLandTemperature{NF, Grid{NF}}(;nlat_half, kwargs...)
+function SeasonalLandTemperature(SG::SpectralGrid; kwargs...)
+    (; NF, Grid, nlat_half) = SG
+    return SeasonalLandTemperature{NF, Grid{NF}}(; nlat_half, kwargs...)
 end
 
 function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
@@ -60,7 +60,7 @@ function land_timestep!(land::PrognosticVariablesLand,
                         model::PrimitiveEquation;
                         initialize::Bool = false)
     # the time step is dictated by the land "model" 
-    executed = land_timestep!(land, time, model.land;initialize)
+    executed = land_timestep!(land, time, model.land; initialize)
     executed && model isa PrimitiveWet && soil_timestep!(land, time, model.soil)
 end
 
@@ -82,7 +82,7 @@ function land_timestep!(land::PrognosticVariablesLand{NF},
     # TODO check whether this shifts the climatology by 1/2 a month
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
-    (;monthly_temperature) = land_model
+    (; monthly_temperature) = land_model
     @. land.land_surface_temperature = (1-weight) * monthly_temperature[this_month] +
                                           weight  * monthly_temperature[next_month]
 
@@ -143,9 +143,9 @@ Base.@kwdef struct SeasonalSoilMoisture{NF, Grid<:AbstractGrid{NF}} <: AbstractS
 end
 
 # generator function
-function SeasonalSoilMoisture(SG::SpectralGrid;kwargs...)
-    (;NF, Grid, nlat_half) = SG
-    return SeasonalSoilMoisture{NF, Grid{NF}}(;nlat_half, kwargs...)
+function SeasonalSoilMoisture(SG::SpectralGrid; kwargs...)
+    (; NF, Grid, nlat_half) = SG
+    return SeasonalSoilMoisture{NF, Grid{NF}}(; nlat_half, kwargs...)
 end
 
 function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveWet)
@@ -164,7 +164,7 @@ function soil_timestep!(land::PrognosticVariablesLand{NF},
     # TODO check whether this shifts the climatology by 1/2 a month
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
-    (;monthly_soil_moisture_layer1, monthly_soil_moisture_layer2) = soil_model
+    (; monthly_soil_moisture_layer1, monthly_soil_moisture_layer2) = soil_model
     @. land.soil_moisture_layer1 = (1-weight) * monthly_soil_moisture_layer1[this_month] +
                                         weight  * monthly_soil_moisture_layer1[next_month]
     @. land.soil_moisture_layer2 = (1-weight) * monthly_soil_moisture_layer2[this_month] +
@@ -211,9 +211,9 @@ Base.@kwdef struct VegetationClimatology{NF, Grid<:AbstractGrid{NF}} <: Abstract
 end
 
 # generator function
-function VegetationClimatology(SG::SpectralGrid;kwargs...)
-    (;NF, Grid, nlat_half) = SG
-    return VegetationClimatology{NF, Grid{NF}}(;nlat_half, kwargs...)
+function VegetationClimatology(SG::SpectralGrid; kwargs...)
+    (; NF, Grid, nlat_half) = SG
+    return VegetationClimatology{NF, Grid{NF}}(; nlat_half, kwargs...)
 end
 
 function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation)
@@ -259,9 +259,9 @@ function soil_moisture_availability!(
     soil::AbstractSoil,
     vegetation::AbstractVegetation) where NF
 
-    (;soil_moisture_availability) = diagn
-    (;soil_moisture_layer1, soil_moisture_layer2) = land
-    (;high_cover, low_cover) = vegetation
+    (; soil_moisture_availability) = diagn
+    (; soil_moisture_layer1, soil_moisture_layer2) = land
+    (; high_cover, low_cover) = vegetation
     
     D_top = convert(NF, soil.D_top)
     D_root = convert(NF, soil.D_root)

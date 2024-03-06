@@ -11,16 +11,16 @@ Base.@kwdef struct AdiabaticConversion{NF} <: AbstractAdiabaticConversion
     σ_lnp_B::Vector{NF} = zeros(NF, nlev)
 end
 
-AdiabaticConversion(SG::SpectralGrid;kwargs...) = AdiabaticConversion{SG.NF}(;nlev=SG.nlev, kwargs...)
+AdiabaticConversion(SG::SpectralGrid; kwargs...) = AdiabaticConversion{SG.NF}(; nlev=SG.nlev, kwargs...)
 
 function initialize!(
     adiabatic::AdiabaticConversion,
     model::PrimitiveEquation,
 )
-    (;σ_lnp_A, σ_lnp_B) = adiabatic
+    (; σ_lnp_A, σ_lnp_B) = adiabatic
 
     # ADIABATIC TERM, Simmons and Burridge, 1981, eq. 3.12
-    (;σ_levels_half, σ_levels_full, σ_levels_thick) = model.geometry
+    (; σ_levels_half, σ_levels_full, σ_levels_thick) = model.geometry
     # precompute ln(σ_k+1/2) - ln(σ_k-1/2) but swap sign, include 1/Δσₖ
     σ_lnp_A .= log.(σ_levels_half[1:end-1]./σ_levels_half[2:end]) ./ σ_levels_thick
     σ_lnp_A[1] = 0  # the corresponding sum is 1:k-1 so 0 to replace log(0) from above

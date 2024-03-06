@@ -25,5 +25,5 @@ function plot(L::LowerTriangularMatrix{T}; mode::Function=abs) where T
                             width=width,
                             height=height))
 
-    return UnicodePlots.heatmap(Lplot;plot_kwargs...)
+    return UnicodePlots.heatmap(Lplot; plot_kwargs...)
 end

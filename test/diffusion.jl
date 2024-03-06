@@ -2,14 +2,14 @@
     for NF in (Float32, Float64)
 
         spectral_grid = SpectralGrid(NF)
-        m = PrimitiveDryModel(;spectral_grid)
+        m = PrimitiveDryModel(; spectral_grid)
         simulation = initialize!(m)
         p = simulation.prognostic_variables
         d = simulation.diagnostic_variables
 
-        (;vor) = p.layers[1].timesteps[1]
-        (;vor_tend) = d.layers[1].tendencies
-        (;∇²ⁿ, ∇²ⁿ_implicit) = m.horizontal_diffusion
+        (; vor) = p.layers[1].timesteps[1]
+        (; vor_tend) = d.layers[1].tendencies
+        (; ∇²ⁿ, ∇²ⁿ_implicit) = m.horizontal_diffusion
 
         vor = randn(typeof(vor), size(vor)...)
 
@@ -18,7 +18,7 @@
 
         # diffusion tendency has opposite sign (real/imag respectively)
         # than prognostic variable to act as a dissipation 
-        (;lmax, mmax) = m.spectral_transform
+        (; lmax, mmax) = m.spectral_transform
         for m in 1:mmax+1
             for l in max(2, m):lmax
                 @test -sign(real(vor[l, m])) == sign(real(vor_tend[l, m]))

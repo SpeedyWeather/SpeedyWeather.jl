@@ -119,11 +119,11 @@ also `Δt` which is a scaled time step used internally, because SpeedyWeather.jl
 [scales the equations](@ref scaled_swm) with the radius of the Earth,
 but this is largely hidden (except here) from the user. With this new 
 `Leapfrog` time stepper constructed we can create a model by passing
-on the components (they are keyword arguments so either use `;time_stepping`
+on the components (they are keyword arguments so either use `; time_stepping`
 for which the naming must match, or `time_stepping=my_time_stepping` with
 any name)
 ```@example howto
-model = ShallowWaterModel(;spectral_grid, time_stepping)
+model = ShallowWaterModel(; spectral_grid, time_stepping)
 ```
 This logic continues for all model components. See the [Model setups](@ref)
 for examples. All model components are also subtype (i.e. `<:`) of
@@ -156,9 +156,9 @@ parameterizations. Conceptually you construct these different models with
 spectral_grid = SpectralGrid(trunc=..., ...)
 component1 = SomeComponent(spectral_grid, parameter1=..., ...)
 component2 = SomeOtherComponent(spectral_grid, parameter2=..., ...)
-model = BarotropicModel(;spectral_grid, all_other_components..., ...)
+model = BarotropicModel(; spectral_grid, all_other_components..., ...)
 ```
-or `model = ShallowWaterModel(;spectral_grid, ...)`, etc.
+or `model = ShallowWaterModel(; spectral_grid, ...)`, etc.
 
 ## [Model initialization](@id initialize)
 

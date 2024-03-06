@@ -50,8 +50,8 @@ end
 """
 $(TYPEDSIGNATURES)
 Create and initialize a clock from `time_stepping`"""
-function Clock(time_stepping::AbstractTimeStepper;kwargs...)
-    clock = Clock(;kwargs...)
+function Clock(time_stepping::AbstractTimeStepper; kwargs...)
+    clock = Clock(; kwargs...)
     initialize!(clock, time_stepping)
 end
 
@@ -133,8 +133,8 @@ end
 
 # generator function based on a SpectralGrid
 function PrognosticVariablesOcean(SG::SpectralGrid)
-    (;nlat_half, Grid, NF) = SG
-    return PrognosticVariablesOcean{NF, Grid{NF}}(;nlat_half)
+    (; nlat_half, Grid, NF) = SG
+    return PrognosticVariablesOcean{NF, Grid{NF}}(; nlat_half)
 end
 
 Base.@kwdef mutable struct PrognosticVariablesLand{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractVariables
@@ -161,8 +161,8 @@ end
 
 # generator function based on a SpectralGrid
 function PrognosticVariablesLand(SG::SpectralGrid)
-    (;nlat_half, Grid, NF) = SG
-    return PrognosticVariablesLand{NF, Grid{NF}}(;nlat_half)
+    (; nlat_half, Grid, NF) = SG
+    return PrognosticVariablesLand{NF, Grid{NF}}(; nlat_half)
 end
 
 """Collect the n time steps of PrognosticVariablesSurface
@@ -199,7 +199,7 @@ end
 
 function PrognosticVariables(SG::SpectralGrid, model::ModelSetup)
     
-    (;trunc, nlat_half, nlev, Grid, NF) = SG
+    (; trunc, nlat_half, nlev, Grid, NF) = SG
 
     # data structs
     layers = [PrognosticLayerTimesteps(SG) for _ in 1:nlev]      # vector of nlev layers

@@ -100,7 +100,7 @@ end
 $(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
 function Geometry(spectral_grid::SpectralGrid)
-    return Geometry{spectral_grid.NF}(;spectral_grid)
+    return Geometry{spectral_grid.NF}(; spectral_grid)
 end
 
 function Base.show(io::IO, G::Geometry)

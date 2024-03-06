@@ -15,7 +15,7 @@ end
 $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
 function NoOrography(spectral_grid::SpectralGrid)
-    (;NF, Grid, nlat_half, trunc) = spectral_grid
+    (; NF, Grid, nlat_half, trunc) = spectral_grid
     orography   = zeros(Grid{NF}, nlat_half)
     geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
     return NoOrography{NF, Grid{NF}}(orography, geopot_surf)
@@ -47,11 +47,11 @@ end
 """
 $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
-function ZonalRidge(spectral_grid::SpectralGrid;kwargs...)
-    (;NF, Grid, nlat_half, trunc) = spectral_grid
+function ZonalRidge(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, Grid, nlat_half, trunc) = spectral_grid
     orography   = zeros(Grid{NF}, nlat_half)
     geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
-    return ZonalRidge{NF, Grid{NF}}(;orography, geopot_surf, kwargs...)
+    return ZonalRidge{NF, Grid{NF}}(; orography, geopot_surf, kwargs...)
 end
 
 # function barrier
@@ -70,11 +70,11 @@ function initialize!(   orog::ZonalRidge,
                         S::SpectralTransform,
                         G::Geometry)
     
-    (;gravity, rotation) = P
-    (;radius) = G
+    (; gravity, rotation) = P
+    (; radius) = G
     φ = G.latds                         # latitude for each grid point [˚N]
 
-    (;orography, geopot_surf, η₀, u₀) = orog
+    (; orography, geopot_surf, η₀, u₀) = orog
 
     ηᵥ = (1-η₀)*π/2                     # ηᵥ-coordinate of the surface [1]
     A = u₀*cos(ηᵥ)^(3/2)                # amplitude [m/s]
@@ -136,11 +136,11 @@ end
 """
 $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
-function EarthOrography(spectral_grid::SpectralGrid;kwargs...)
-    (;NF, Grid, nlat_half, trunc) = spectral_grid
+function EarthOrography(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, Grid, nlat_half, trunc) = spectral_grid
     orography   = zeros(Grid{NF}, nlat_half)
     geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
-    return EarthOrography{NF, Grid{NF}}(;orography, geopot_surf, kwargs...)
+    return EarthOrography{NF, Grid{NF}}(; orography, geopot_surf, kwargs...)
 end
 
 # function barrier
@@ -158,8 +158,8 @@ function initialize!(   orog::EarthOrography,
                         P::AbstractPlanet,
                         S::SpectralTransform)
 
-    (;orography, geopot_surf) = orog
-    (;gravity) = P
+    (; orography, geopot_surf) = orog
+    (; gravity) = P
 
     # LOAD NETCDF FILE
     if orog.path == "SpeedyWeather.jl/input_data"

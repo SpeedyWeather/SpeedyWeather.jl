@@ -92,7 +92,7 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
-    (;spectral_grid) = model
+    (; spectral_grid) = model
 
     # NUMERICS (implicit is initialized later)
     initialize!(model.time_stepping, model)
@@ -120,7 +120,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)
     initialize!(prognostic_variables, model.initial_conditions, model)
-    (;clock) = prognostic_variables
+    (; clock) = prognostic_variables
     clock.time = time       # set the time
 
     # initialize ocean and land and synchronize clocks

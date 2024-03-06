@@ -49,7 +49,7 @@ Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
     nlev::Int = DEFAULT_NLEV
 
     "[OPTION] coordinates used to discretize the vertical"
-    vertical_coordinates::VerticalCoordinates = SigmaCoordinates(;nlev)
+    vertical_coordinates::VerticalCoordinates = SigmaCoordinates(; nlev)
 
     # make sure nlev and vertical_coordinates.nlev match
     function SpectralGrid(NF, trunc, Grid, dealiasing, radius, nlat_half, nlat, npoints, nlev, vertical_coordinates)
@@ -64,12 +64,12 @@ Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
 end
 
 # generator functions
-SpectralGrid(NF::Type{<:AbstractFloat};kwargs...) = SpectralGrid(;NF, kwargs...)
-SpectralGrid(Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(;Grid, kwargs...)
-SpectralGrid(NF::Type{<:AbstractFloat}, Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(;NF, Grid, kwargs...)
+SpectralGrid(NF::Type{<:AbstractFloat}; kwargs...) = SpectralGrid(; NF, kwargs...)
+SpectralGrid(Grid::Type{<:AbstractGrid}; kwargs...) = SpectralGrid(; Grid, kwargs...)
+SpectralGrid(NF::Type{<:AbstractFloat}, Grid::Type{<:AbstractGrid}; kwargs...) = SpectralGrid(; NF, Grid, kwargs...)
 
 function Base.show(io::IO, SG::SpectralGrid)
-    (;NF, trunc, Grid, radius, nlat, npoints, nlev, vertical_coordinates) = SG
+    (; NF, trunc, Grid, radius, nlat, npoints, nlev, vertical_coordinates) = SG
 
     # resolution information
     res_ave = sqrt(4π*radius^2/npoints)/1000  # in [km]
@@ -89,7 +89,7 @@ function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
                                             recompute_legendre::Bool = false,
                                             one_more_degree::Bool = true,
                                             kwargs...)
-    (;NF, Grid, trunc, dealiasing) = spectral_grid
-    return SpectralTransform(NF, Grid, trunc+one_more_degree, trunc;recompute_legendre, dealiasing, kwargs...)
+    (; NF, Grid, trunc, dealiasing) = spectral_grid
+    return SpectralTransform(NF, Grid, trunc+one_more_degree, trunc; recompute_legendre, dealiasing, kwargs...)
 end
 

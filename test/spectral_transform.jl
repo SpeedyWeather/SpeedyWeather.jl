@@ -50,7 +50,7 @@ spectral_resolutions_inexact = (127, 255)
                             FullHEALPixGrid,
                             FullOctaHEALPixGrid)
 
-                SG = SpectralGrid(NF;trunc, Grid)
+                SG = SpectralGrid(NF; trunc, Grid)
                 S = SpectralTransform(SG)
 
                 alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
@@ -71,7 +71,7 @@ end
     for trunc in spectral_resolutions
         for NF in (Float32, Float64)
 
-            SG = SpectralGrid(NF;trunc)
+            SG = SpectralGrid(NF; trunc)
             S1 = SpectralTransform(SG, recompute_legendre=true)
             S2 = SpectralTransform(SG, recompute_legendre=false)
 
@@ -94,7 +94,7 @@ end
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid)
 
-                SG = SpectralGrid(NF;trunc, Grid)
+                SG = SpectralGrid(NF; trunc, Grid)
                 S = SpectralTransform(SG, recompute_legendre=true)
 
                 lmax = 3
@@ -124,7 +124,7 @@ end
                                     FullHEALPixGrid,
                                     FullOctaHEALPixGrid)
                 
-                SG = SpectralGrid(NF;trunc, Grid)
+                SG = SpectralGrid(NF; trunc, Grid)
                 S = SpectralTransform(SG, recompute_legendre=true)
 
                 lmax = 3
@@ -159,7 +159,7 @@ end
                 # clenshaw-curtis grids are only exact for cubic truncation
                 dealiasing = Grid in (FullGaussianGrid, OctahedralGaussianGrid) ? 2 : 3
 
-                SG = SpectralGrid(NF;trunc, Grid, dealiasing)
+                SG = SpectralGrid(NF; trunc, Grid, dealiasing)
                 S = SpectralTransform(SG, recompute_legendre=false)
                 O = EarthOrography(SG, smoothing=true, smoothing_truncation=31)
                 E = Earth(SG)

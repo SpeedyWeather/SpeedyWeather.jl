@@ -37,15 +37,15 @@ Base.@kwdef struct StaticEnergyDiffusion{NF<:AbstractFloat} <: AbstractVerticalD
     Fstar::Base.RefValue{NF} = Ref(zero(NF))    # excluding the surface pressure pₛ
 end
 
-StaticEnergyDiffusion(SG::SpectralGrid;kwargs...) = StaticEnergyDiffusion{SG.NF}(;kwargs...)
+StaticEnergyDiffusion(SG::SpectralGrid; kwargs...) = StaticEnergyDiffusion{SG.NF}(; kwargs...)
 
 """$(TYPEDSIGNATURES)
 Initialize dry static energy diffusion."""
 function initialize!(   scheme::StaticEnergyDiffusion,
                         model::PrimitiveEquation)
 
-    (;nlev) = model.spectral_grid
-    (;gravity) = model.planet
+    (; nlev) = model.spectral_grid
+    (; gravity) = model.planet
     C₀ = 1/nlev                     # average Δσ
     
     # Fortran SPEEDY documentation equation (70), excluding the surface pressure pₛ
@@ -57,7 +57,7 @@ Apply dry static energy diffusion."""
 function static_energy_diffusion!(  column::ColumnVariables,
                                     scheme::StaticEnergyDiffusion)
     
-    (;nlev, dry_static_energy, flux_temp_upward, geopot) = column
+    (; nlev, dry_static_energy, flux_temp_upward, geopot) = column
     pₛ = column.pres[end]               # surface pressure
     Fstar = scheme.Fstar[]*pₛ
     Γˢᵉ = scheme.static_energy_lapse_rate 
@@ -97,15 +97,15 @@ Base.@kwdef struct HumidityDiffusion{NF<:AbstractFloat} <: AbstractVerticalDiffu
     Fstar::Base.RefValue{NF} = Ref(zero(NF))    # excluding the surface pressure pₛ
 end
 
-HumidityDiffusion(SG::SpectralGrid;kwargs...) = HumidityDiffusion{SG.NF}(;kwargs...)
+HumidityDiffusion(SG::SpectralGrid; kwargs...) = HumidityDiffusion{SG.NF}(; kwargs...)
 
 """$(TYPEDSIGNATURES)
 Initialize dry static energy diffusion."""
 function initialize!(   scheme::HumidityDiffusion,
                         model::PrimitiveEquation)
 
-    (;nlev) = model.spectral_grid
-    (;gravity) = model.planet
+    (; nlev) = model.spectral_grid
+    (; gravity) = model.planet
     C₀ = 1/nlev                     # average Δσ
     
     # Fortran SPEEDY documentation equation (70), excluding the surface pressure pₛ
@@ -147,7 +147,7 @@ function humidity_diffusion!(   column::ColumnVariables,
                                 scheme::HumidityDiffusion,
                                 geometry::Geometry)
     
-    (;nlev, sat_humid, rel_humid, flux_humid_upward) = column
+    (; nlev, sat_humid, rel_humid, flux_humid_upward) = column
     pₛ = column.pres[end]               # surface pressure
     Fstar = scheme.Fstar[]*pₛ           
     # Fstar = scheme.Fstar[]              # SPEEDY code version

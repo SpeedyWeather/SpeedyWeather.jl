@@ -38,8 +38,8 @@ function run!(  simulation::AbstractSimulation;
         period = Day(n_days) 
     end 
 
-    (;prognostic_variables, diagnostic_variables, model) = simulation
-    (;clock) = prognostic_variables
+    (; prognostic_variables, diagnostic_variables, model) = simulation
+    (; clock) = prognostic_variables
 
     # set the clock's enddate
     set_period!(clock, period)

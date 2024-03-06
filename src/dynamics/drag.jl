@@ -24,7 +24,7 @@ Base.@kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
     c::Base.RefValue{NF} = Ref(zero(NF))
 end
 
-QuadraticDrag(SG::SpectralGrid;kwargs...) = QuadraticDrag{SG.NF}(;kwargs...)
+QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
 
 function initialize!(   drag::QuadraticDrag,
                         model::ModelSetup)
