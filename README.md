@@ -33,7 +33,7 @@ With v0.6 the interface to SpeedyWeather.jl consist of 4 steps: define the grid,
 spectral_grid = SpectralGrid(trunc=31, Grid=OctahedralGaussianGrid, nlev=8)
 model = PrimitiveDryModel(;spectral_grid, orography = EarthOrography(spectral_grid))
 simulation = initialize!(model)
-run!(simulation,period=Day(10),output=true)
+run!(simulation, period=Day(10), output=true)
 ```
 and you will see
 
@@ -109,8 +109,8 @@ These modules can also be used independently of SpeedyWeather like so
 ```julia
 julia> using SpeedyWeather: LowerTriangularMatrices, RingGrids, SpeedyTransforms
 ```
-check out their documentation: [RingGrids](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/), 
-[LowerTriangularMatrices](https://speedyweather.github.io/SpeedyWeather.jl/dev/lowertriangularmatrices/), 
+check out their documentation: [RingGrids](https://speedyweather.github.io/SpeedyWeather.jl/dev/ringgrids/),
+[LowerTriangularMatrices](https://speedyweather.github.io/SpeedyWeather.jl/dev/lowertriangularmatrices/),
 [SpeedyTransforms](https://speedyweather.github.io/SpeedyWeather.jl/dev/speedytransforms/).
 
 ## Installation

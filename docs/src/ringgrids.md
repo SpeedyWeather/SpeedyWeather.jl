@@ -38,7 +38,7 @@ this way circling around the sphere till reaching the south pole. This may also 
 Data in a `Matrix` which follows this ring order can be put on a `FullGaussianGrid` like so
 ```@example ringgrids
 using SpeedyWeather.RingGrids
-map = randn(Float32,8,4)
+map = randn(Float32, 8, 4)
 ```
 
 ```@example ringgrids
@@ -54,11 +54,11 @@ Which can be reshaped to reobtain `map` from above. Alternatively you can `Matri
 ```@example ringgrids
 map == Matrix(FullGaussianGrid(map))
 ```
-You can also use `zeros`,`ones`,`rand`,`randn` to create a grid, whereby `nlat_half`, i.e. the number of latitude
+You can also use `zeros`, `ones`, `rand`, `randn` to create a grid, whereby `nlat_half`, i.e. the number of latitude
 rings on one hemisphere, Equator included, is used as a resolution parameter and here as a second argument.
 ```@example ringgrids
 nlat_half = 4
-grid = randn(OctahedralGaussianGrid{Float16},nlat_half)
+grid = randn(OctahedralGaussianGrid{Float16}, nlat_half)
 ```
 and any element type `T` can be used for `OctahedralGaussianGrid{T}` and similar for other grid types.
 
@@ -71,7 +71,7 @@ it on a map, RingGrids also exports `plot` function,
 based on [UnicodePlots](https://github.com/JuliaPlots/UnicodePlots.jl)' `heatmap`.
 ```@example ringgrids
 nlat_half = 24
-grid = randn(OctahedralGaussianGrid,nlat_half)
+grid = randn(OctahedralGaussianGrid, nlat_half)
 RingGrids.plot(grid)
 ```
 (Note that to skip the `RingGrids.` in the last line you can do `import SpeedyWeather.RingGrids: plot`,
@@ -86,7 +86,7 @@ exciting here are some examples how to make better use of the information that t
 We obtain the latitudes of the rings of a grid by calling `get_latd` (`get_lond` is only defined for full
 grids, or use `get_latdlonds` for latitudes, longitudes per grid point not per ring)
 ```@example ringgrids
-grid = randn(OctahedralClenshawGrid,5)
+grid = randn(OctahedralClenshawGrid, 5)
 latd = get_latd(grid)
 ```
 Now we could calculate Coriolis and add it on the grid as follows
@@ -95,7 +95,7 @@ rotation = 7.29e-5                  # angular frequency of Earth's rotation [rad
 coriolis = 2rotation*sind.(latd)    # vector of coriolis parameters per latitude ring
 
 rings = eachring(grid)
-for (j,ring) in enumerate(rings)
+for (j, ring) in enumerate(rings)
     f = coriolis[j]
     for ij in ring
         grid[ij] += f
@@ -123,36 +123,36 @@ request an interpolated value on some coordinates. Using our data on `grid` whic
 from above we can use the `interpolate` function to get it onto a `FullGaussianGrid` (or any other grid for
 purpose)
 ```@example ringgrids
-grid = randn(OctahedralGaussianGrid{Float32},4)
+grid = randn(OctahedralGaussianGrid{Float32}, 4)
 ```
 ```@example ringgrids
-interpolate(FullGaussianGrid,grid)
+interpolate(FullGaussianGrid, grid)
 ```
 By default this will linearly interpolate (it's an [Anvil interpolator](@ref), see below) onto a grid with the same
 `nlat_half`, but we can also coarse-grain or fine-grain by specifying `nlat_half` directly as 2nd argument
 ```@example ringgrids
-interpolate(FullGaussianGrid,6,grid)
+interpolate(FullGaussianGrid, 6, grid)
 ```
 So we got from an `8-ring OctahedralGaussianGrid{Float16}` to a `12-ring FullGaussianGrid{Float64}`, so it did
 a conversion from `Float16` to `Float64` on the fly too, because the default precision is `Float64` unless
-specified. `interpolate(FullGaussianGrid{Float16},6,grid)` would have interpolated onto a grid with element type
+specified. `interpolate(FullGaussianGrid{Float16}, 6, grid)` would have interpolated onto a grid with element type
 `Float16`.
 
 One can also interpolate onto a given coordinate ˚N, ˚E like so
 ```@example ringgrids
-interpolate(30.0,10.0,grid)
+interpolate(30.0, 10.0, grid)
 ```
 we interpolated the data from `grid` onto 30˚N, 10˚E. To do this simultaneously for many coordinates they can
 be packed into a vector too
 ```@example ringgrids
-interpolate([30.0,40.0,50.0],[10.0,10.0,10.0],grid)
+interpolate([30.0, 40.0, 50.0], [10.0, 10.0, 10.0], grid)
 ```
 which returns the data on `grid` at 30˚N, 40˚N, 50˚N, and 10˚E respectively. Note how the interpolation here
 retains the element type of `grid`.
 
 ## Performance for RingGrid interpolation
 
-Every time an interpolation like `interpolate(30.0,10.0,grid)` is called, several things happen, which
+Every time an interpolation like `interpolate(30.0, 10.0, grid)` is called, several things happen, which
 are important to understand to know how to get the fastest interpolation out of this module in a given situation.
 Under the hood an interpolation takes three arguments
 
@@ -173,24 +173,24 @@ of the output grid but its total number of points remain constants then you can 
 inside the interpolator and only else you will need to create a new interpolator. Let's look at this
 in practice. Say we have two grids an want to interpolate between them
 ```@example ringgrids
-grid_in = rand(HEALPixGrid,4)
-grid_out = zeros(FullClenshawGrid,6)
-interp = RingGrids.interpolator(grid_out,grid_in)
+grid_in = rand(HEALPixGrid, 4)
+grid_out = zeros(FullClenshawGrid, 6)
+interp = RingGrids.interpolator(grid_out, grid_in)
 ```
 Now we have created an interpolator `interp` which knows about the geometry where to interpolate
 *from* and the coordinates there to interpolate *to*. It is also initialized, meaning it has
 precomputed the indices to of `grid_in` that are supposed to be used. It just does not know about
 the data of `grid_in` (and neither of `grid_out` which will be overwritten anyway). We can now do
 ```@example ringgrids
-interpolate!(grid_out,grid_in,interp)
+interpolate!(grid_out, grid_in, interp)
 grid_out
 ```
-which is identical to `interpolate(grid_out,grid_in)` but you can reuse `interp` for other data.
+which is identical to `interpolate(grid_out, grid_in)` but you can reuse `interp` for other data.
 The interpolation can also handle various element types (the interpolator `interp` does not have
 to be updated for this either)
 ```@example ringgrids
-grid_out = zeros(FullClenshawGrid{Float16},6);
-interpolate!(grid_out,grid_in,interp)
+grid_out = zeros(FullClenshawGrid{Float16}, 6);
+interpolate!(grid_out, grid_in, interp)
 grid_out
 ```
 and we have converted data from a `HEALPixGrid{Float64}` (`Float64` is always default if not specified)
@@ -201,10 +201,10 @@ with a given type. Say we want to go from Float16 data on an `OctahedralGaussian
 on a `FullClenshawGrid` but using Float32 precision for the interpolation itself, we would do
 this by
 ```@example ringgrids
-grid_in = randn(OctahedralGaussianGrid{Float16},24)
-grid_out = zeros(FullClenshawGrid{Float16},24)
-interp = RingGrids.interpolator(Float32,grid_out,grid_in)
-interpolate!(grid_out,grid_in,interp)
+grid_in = randn(OctahedralGaussianGrid{Float16}, 24)
+grid_out = zeros(FullClenshawGrid{Float16}, 24)
+interp = RingGrids.interpolator(Float32, grid_out, grid_in)
+interpolate!(grid_out, grid_in, interp)
 grid_out
 ```
 As a last example we want to illustrate a situation where we would always want to interpolate onto
@@ -212,7 +212,7 @@ As a last example we want to illustrate a situation where we would always want t
 we would do (`AnvilInterpolator` is described in [Anvil interpolator](@ref))
 ```@example ringgrids
 npoints = 10    # number of coordinates to interpolate onto
-interp = AnvilInterpolator(Float32,HEALPixGrid,24,npoints)
+interp = AnvilInterpolator(Float32, HEALPixGrid, 24, npoints)
 ```
 with the first argument being the number format used during interpolation, then the input grid type,
 its resolution in terms of `nlat_half` and then the number of points to interpolate onto. However,
@@ -225,21 +225,21 @@ nothing # hide
 ```
 now we can update the locator inside our interpolator as follows
 ```@example ringgrids
-RingGrids.update_locator!(interp,latds,londs)
+RingGrids.update_locator!(interp, latds, londs)
 ```
 With data matching the input from above, a `nlat_half=24` HEALPixGrid, and allocate 10-element output vector
 ```@example ringgrids
 output_vec = zeros(10)
-grid_input = rand(HEALPixGrid,24)
+grid_input = rand(HEALPixGrid, 24)
 nothing # hide
 ```
 we can use the interpolator as follows
 ```@example ringgrids
-interpolate!(output_vec,grid_input,interp)
+interpolate!(output_vec, grid_input, interp)
 ```
 which is the approximately the same as doing it directly without creating an interpolator first and updating its locator
 ```@example ringgrids
-interpolate(latds,londs,grid_input)
+interpolate(latds, londs, grid_input)
 ```
 but allows for a reuse of the interpolator. Note that the two output arrays are not exactly identical because we manually
 set our interpolator `interp` to use `Float32` for the interpolation whereas the default is `Float64`.
@@ -247,14 +247,14 @@ set our interpolator `interp` to use `Float32` for the interpolation whereas the
 ## Anvil interpolator
 
 Currently the only interpolator implemented is a 4-point bilinear interpolator, which schematically works as follows.
-Anvil interpolation is the bilinear average of a,b,c,d which are values at grid points in an anvil-shaped configuration
-at location x, which is denoted by Δab,Δcd,Δy, the fraction of distances between a-b,c-d, and ab-cd, respectively.
-Note that a,c and b,d do not necessarily share the same longitude/x-coordinate.
+Anvil interpolation is the bilinear average of a, b, c, d which are values at grid points in an anvil-shaped configuration
+at location x, which is denoted by Δab, Δcd, Δy, the fraction of distances between a-b, c-d, and ab-cd, respectively.
+Note that a, c and b, d do not necessarily share the same longitude/x-coordinate.
 ```
-        0..............1    # fraction of distance Δab between a,b
+        0..............1    # fraction of distance Δab between a, b
         |<  Δab   >|
 
-0^      a -------- o - b    # anvil-shaped average of a,b,c,d at location x
+0^      a -------- o - b    # anvil-shaped average of a, b, c, d at location x
 .Δy                |
 .                  |
 .v                 x 
@@ -262,12 +262,12 @@ Note that a,c and b,d do not necessarily share the same longitude/x-coordinate.
 1         c ------ o ---- d
 
           |<  Δcd >|
-          0...............1 # fraction of distance Δcd between c,d
+          0...............1 # fraction of distance Δcd between c, d
 
 ^ fraction of distance Δy between a-b and c-d.
 ```
 This interpolation is chosen as by definition of the ring grids, a and b share the same latitude, so do c and d,
-but the longitudes can be different for all four, a,b,c,d.
+but the longitudes can be different for all four, a, b, c, d.
 
 ## Function index
 

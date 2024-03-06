@@ -1,15 +1,15 @@
 abstract type AbstractTemperatureRelaxation <: AbstractParameterization end
 
 # function barrier to unpack model.temperature_relaxation
-function temperature_relaxation!(column::ColumnVariables,model::PrimitiveEquation)
+function temperature_relaxation!(column::ColumnVariables, model::PrimitiveEquation)
     temperature_relaxation!(column, model.temperature_relaxation, model)
 end
 
 export NoTemperatureRelaxation
 struct NoTemperatureRelaxation <: AbstractTemperatureRelaxation end
 NoTemperatureRelaxation(::SpectralGrid) = NoTemperatureRelaxation()
-initialize!(::NoTemperatureRelaxation,::PrimitiveEquation) = nothing
-temperature_relaxation!(::ColumnVariables,::NoTemperatureRelaxation,::PrimitiveEquation) = nothing
+initialize!(::NoTemperatureRelaxation, ::PrimitiveEquation) = nothing
+temperature_relaxation!(::ColumnVariables, ::NoTemperatureRelaxation, ::PrimitiveEquation) = nothing
 
 export HeldSuarez
 
@@ -50,9 +50,9 @@ Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: AbstractTemperatureRelaxatio
     κ::Base.RefValue{NF} = Ref(zero(NF))
     p₀::Base.RefValue{NF} = Ref(zero(NF))
 
-    temp_relax_freq::Matrix{NF} = zeros(NF,nlev,nlat)   # (inverse) relax time scale per layer and lat
-    temp_equil_a::Vector{NF} = zeros(NF,nlat)           # terms to calc equilibrium temper func
-    temp_equil_b::Vector{NF} = zeros(NF,nlat)           # of latitude and pressure
+    temp_relax_freq::Matrix{NF} = zeros(NF, nlev, nlat)   # (inverse) relax time scale per layer and lat
+    temp_equil_a::Vector{NF} = zeros(NF, nlat)           # terms to calc equilibrium temper func
+    temp_equil_b::Vector{NF} = zeros(NF, nlat)           # of latitude and pressure
 end
 
 """
@@ -60,7 +60,7 @@ $(TYPEDSIGNATURES)
 create a HeldSuarez temperature relaxation with arrays allocated given `spectral_grid`"""
 function HeldSuarez(SG::SpectralGrid;kwargs...) 
     (;NF, nlat, nlev) = SG
-    return HeldSuarez{NF}(;nlev,nlat,kwargs...)
+    return HeldSuarez{NF}(;nlev, nlat, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -81,14 +81,14 @@ function initialize!(   scheme::HeldSuarez,
     kₐ = 1/relax_time_slow.value
     kₛ = 1/relax_time_fast.value
 
-    for (j,(cosϕ,sinϕ)) = enumerate(zip(coslat,sinlat))     # use ϕ for latitude here
-        for (k,σ) in enumerate(σ_levels_full)
+    for (j, (cosϕ, sinϕ)) = enumerate(zip(coslat, sinlat))     # use ϕ for latitude here
+        for (k, σ) in enumerate(σ_levels_full)
             # Held and Suarez equation 4
-            temp_relax_freq[k,j] =  kₐ + (kₛ - kₐ)*max(0,(σ-σb)/(1-σb))*cosϕ^4
+            temp_relax_freq[k, j] =  kₐ + (kₛ - kₐ)*max(0, (σ-σb)/(1-σb))*cosϕ^4
         end
 
-        # Held and Suarez equation 3, split into max(Tmin,(a - b*ln(p))*(p/p₀)^κ)
-        # precompute a,b to simplify online calculation
+        # Held and Suarez equation 3, split into max(Tmin, (a - b*ln(p))*(p/p₀)^κ)
+        # precompute a, b to simplify online calculation
         temp_equil_a[j] = Tmax - ΔTy*sinϕ^2 + Δθz*log(pres_ref)*cosϕ^2
         temp_equil_b[j] = -Δθz*cosϕ^2
     end
@@ -119,10 +119,10 @@ function temperature_relaxation!(
 
     @inbounds for k in eachlayer(column)
         lnp = ln_pres[k]                    # logarithm of pressure at level k
-        kₜ = temp_relax_freq[k,j]           # (inverse) relaxation time scale
+        kₜ = temp_relax_freq[k, j]           # (inverse) relaxation time scale
 
-        # Held and Suarez 1996, equation 3 with precomputed a,b during initilisation
-        Teq = max(Tmin,(temp_equil_a[j] + temp_equil_b[j]*lnp)*(pres[k]/pres_ref)^κ)
+        # Held and Suarez 1996, equation 3 with precomputed a, b during initilisation
+        Teq = max(Tmin, (temp_equil_a[j] + temp_equil_b[j]*lnp)*(pres[k]/pres_ref)^κ)
         temp_tend[k] -= kₜ*(temp[k] - Teq)  # Held and Suarez 1996, equation 2
     end
 end
@@ -164,8 +164,8 @@ Base.@kwdef mutable struct JablonowskiRelaxation{NF<:AbstractFloat} <: AbstractT
     relax_time_fast::Second = Day(4)
 
     # precomputed constants, allocate here, fill in initialize!
-    temp_relax_freq::Matrix{NF} = zeros(NF,nlev,nlat)   # (inverse) relax time scale per layer and lat
-    temp_equil::Matrix{NF} = zeros(NF,nlev,nlat)        # terms to calc equilibrium temperature as func
+    temp_relax_freq::Matrix{NF} = zeros(NF, nlev, nlat)   # (inverse) relax time scale per layer and lat
+    temp_equil::Matrix{NF} = zeros(NF, nlev, nlat)        # terms to calc equilibrium temperature as func
 end
 
 """
@@ -173,7 +173,7 @@ $(TYPEDSIGNATURES)
 create a JablonowskiRelaxation temperature relaxation with arrays allocated given `spectral_grid`"""
 function JablonowskiRelaxation(SG::SpectralGrid;kwargs...) 
     (;NF, nlat, nlev) = SG
-    return JablonowskiRelaxation{NF}(;nlev,nlat,kwargs...)
+    return JablonowskiRelaxation{NF}(;nlev, nlat, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -193,10 +193,10 @@ function initialize!(   scheme::JablonowskiRelaxation,
     kₐ = 1/relax_time_slow.value
     kₛ = 1/relax_time_fast.value
 
-    for (j,(cosϕ,sinϕ)) = enumerate(zip(coslat,sinlat))     # use ϕ for latitude here
-        for (k,σ) in enumerate(σ_levels_full)
+    for (j, (cosϕ, sinϕ)) = enumerate(zip(coslat, sinlat))     # use ϕ for latitude here
+        for (k, σ) in enumerate(σ_levels_full)
             # Held and Suarez equation 4
-            temp_relax_freq[k,j] =  kₐ + (kₛ - kₐ)*max(0,(σ-σb)/(1-σb))*cosϕ^4
+            temp_relax_freq[k, j] =  kₐ + (kₛ - kₐ)*max(0, (σ-σb)/(1-σb))*cosϕ^4
         
             # vertical profile
             Tη = temp_ref*σ^(R_dry*lapse_rate/gravity)      # Jablonowski and Williamson eq. 4
@@ -213,7 +213,7 @@ function initialize!(   scheme::JablonowskiRelaxation,
             A2 = 2u₀*cos(ηᵥ)^(3/2)
 
             # Jablonowski and Williamson, eq. (6) 
-            temp_equil[k,j] = Tη + A1*((-2sinϕ^6*(cosϕ^2 + 1/3) + 10/63)*A2 +
+            temp_equil[k, j] = Tη + A1*((-2sinϕ^6*(cosϕ^2 + 1/3) + 10/63)*A2 +
                                             (8/5*cosϕ^3*(sinϕ^2 + 2/3) - π/4)*Ω)
         end
     end
@@ -240,10 +240,10 @@ function temperature_relaxation!(   column::ColumnVariables,
     (;temp_relax_freq, temp_equil) = scheme
 
     @inbounds for k in eachlayer(column)
-        kₜ = temp_relax_freq[k,j]           # (inverse) relaxation time scale
+        kₜ = temp_relax_freq[k, j]           # (inverse) relaxation time scale
 
         # Held and Suarez 1996, equation 2, but using temp_equil from
         # Jablonowski and Williamson 2006, equation 6
-        temp_tend[k] -= kₜ*(temp[k] - temp_equil[k,j])  
+        temp_tend[k] -= kₜ*(temp[k] - temp_equil[k, j])  
     end
 end

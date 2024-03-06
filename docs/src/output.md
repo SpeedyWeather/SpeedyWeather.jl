@@ -37,7 +37,7 @@ Note that the choice of `output_dt` can affect the actual time step that is used
 integration, which is explained in the following.
 Example, we run the model at a resolution of T42 and the time step is going to be
 ```@example netcdf
-spectral_grid = SpectralGrid(trunc=42,nlev=1)
+spectral_grid = SpectralGrid(trunc=42, nlev=1)
 time_stepping = Leapfrog(spectral_grid)
 time_stepping.Δt_sec
 ```
@@ -54,7 +54,7 @@ to match the desired output time step exactly. This is important so that for dai
 noon this does not slowly shift towards night over years of model integration.
 One can always disable this adjustment with
 ```@example netcdf
-time_stepping = Leapfrog(spectral_grid,adjust_with_output=false)
+time_stepping = Leapfrog(spectral_grid, adjust_with_output=false)
 time_stepping.Δt_sec
 ```
 and a little info will be printed to explain that even though you wanted
@@ -68,18 +68,18 @@ The time axis of the NetCDF output will now look like
 ```@example netcdf
 using NCDatasets
 model.feedback.verbose = false # hide
-run!(simulation,period=Day(1),output=true)
+run!(simulation, period=Day(1), output=true)
 id = model.output.id
 ds = NCDataset("run_$id/output.nc")
 ds["time"][:]
 ```
 which is a bit ugly, that's why `adjust_with_output=true` is the default. In that case we would have
 ```@example netcdf
-time_stepping = Leapfrog(spectral_grid,adjust_with_output=true)
+time_stepping = Leapfrog(spectral_grid, adjust_with_output=true)
 output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(1))
 model = ShallowWaterModel(;spectral_grid, time_stepping, output)
 simulation = initialize!(model)
-run!(simulation,period=Day(1),output=true)
+run!(simulation, period=Day(1), output=true)
 id = model.output.id
 ds = NCDataset("run_$id/output.nc")
 ds["time"][:]
@@ -131,7 +131,7 @@ julia> my_output_writer = OutputWriter(spectral_grid, PrimitiveDry, path=path)
 ```
 This folder must already exist. If you want to give your run a name/identification you can pass on `id`
 ```julia
-julia> my_output_writer = OutputWriter(spectral_grid,PrimitiveDry,id="diffusion_test");
+julia> my_output_writer = OutputWriter(spectral_grid, PrimitiveDry, id="diffusion_test");
 ```
 which will be used instead of a 4 digit number like 0001, 0002 which is automatically determined if
 `id` is not provided. You will see the id of the run in the progress bar

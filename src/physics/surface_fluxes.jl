@@ -3,7 +3,7 @@ abstract type AbstractSurfaceThermodynamics <: AbstractParameterization end
 abstract type AbstractSurfaceHeat <: AbstractParameterization end
 abstract type AbstractEvaporation <: AbstractParameterization end
 
-function surface_fluxes!(column::ColumnVariables,model::PrimitiveEquation)
+function surface_fluxes!(column::ColumnVariables, model::PrimitiveEquation)
 
     # get temperature, humidity and density at surface
     surface_thermodynamics!(column, model.surface_thermodynamics, model.atmosphere, model)
@@ -13,7 +13,7 @@ function surface_fluxes!(column::ColumnVariables,model::PrimitiveEquation)
 
     # now call other heat and humidity fluxes
     sensible_heat_flux!(column, model.surface_heat_flux, model.atmosphere)
-    evaporation!(column,model)
+    evaporation!(column, model)
 end
 
 export SurfaceThermodynamicsConstant
@@ -96,8 +96,8 @@ function surface_wind_stress!(  column::ColumnVariables{NF},
     # add flux limiter to avoid heavy drag in (initial) shock
     u_flux = ρ*drag*V₀*surface_u
     v_flux = ρ*drag*V₀*surface_v
-    column.flux_u_upward[end] -= clamp(u_flux,-max_flux,max_flux)
-    column.flux_v_upward[end] -= clamp(v_flux,-max_flux,max_flux)
+    column.flux_u_upward[end] -= clamp(u_flux, -max_flux, max_flux)
+    column.flux_v_upward[end] -= clamp(v_flux, -max_flux, max_flux)
 
     # SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
     # column.flux_u_upward[end] -= ρ*drag*V₀*surface_u
@@ -149,8 +149,8 @@ function sensible_heat_flux!(
     flux_sea  = ρ*drag_sea*V₀*cₚ*(T_skin_sea  - T)
 
     # flux limiter
-    flux_land = clamp(flux_land,-max_flux,max_flux)
-    flux_sea = clamp(flux_sea,-max_flux,max_flux)
+    flux_land = clamp(flux_land, -max_flux, max_flux)
+    flux_sea = clamp(flux_sea, -max_flux, max_flux)
 
     # mix fluxes for fractional land-sea mask
     land_available = isfinite(T_skin_land)
@@ -214,8 +214,8 @@ function evaporation!(  column::ColumnVariables{NF},
 
     # SATURATION HUMIDITY OVER LAND AND OCEAN
     surface_pressure = pres[end]
-    sat_humid_land = saturation_humidity(skin_temperature_land,surface_pressure,clausius_clapeyron)
-    sat_humid_sea = saturation_humidity(skin_temperature_sea,surface_pressure,clausius_clapeyron)
+    sat_humid_land = saturation_humidity(skin_temperature_land, surface_pressure, clausius_clapeyron)
+    sat_humid_sea = saturation_humidity(skin_temperature_sea, surface_pressure, clausius_clapeyron)
 
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
@@ -227,8 +227,8 @@ function evaporation!(  column::ColumnVariables{NF},
                         (column.boundary_layer_drag, column.boundary_layer_drag) : 
                         (moisture_exchange_sea, moisture_exchange_land)
 
-    flux_sea = ρ*drag_sea*V₀*max(sat_humid_sea  - surface_humid,0)
-    flux_land = ρ*drag_land*V₀*α*max(sat_humid_land  - surface_humid,0)
+    flux_sea = ρ*drag_sea*V₀*max(sat_humid_sea  - surface_humid, 0)
+    flux_land = ρ*drag_land*V₀*α*max(sat_humid_land  - surface_humid, 0)
 
     # mix fluxes for fractional land-sea mask
     land_available = isfinite(skin_temperature_land) && isfinite(α)

@@ -10,8 +10,8 @@ end
 export NoBoundaryLayerDrag
 struct NoBoundaryLayerDrag <: AbstractBoundaryLayer end
 NoBoundaryLayerDrag(::SpectralGrid) = NoBoundaryLayerDrag()
-initialize!(::NoBoundaryLayerDrag,::PrimitiveEquation) = nothing
-boundary_layer_drag!(::ColumnVariables,::NoBoundaryLayerDrag,::PrimitiveEquation) = nothing
+initialize!(::NoBoundaryLayerDrag, ::PrimitiveEquation) = nothing
+boundary_layer_drag!(::ColumnVariables, ::NoBoundaryLayerDrag, ::PrimitiveEquation) = nothing
 
 export LinearDrag
 
@@ -27,7 +27,7 @@ Base.@kwdef struct LinearDrag{NF<:AbstractFloat} <: AbstractBoundaryLayer
     time_scale::Second = Hour(24)   # time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
 
     # PRECOMPUTED CONSTANTS
-    drag_coefs::Vector{NF} = zeros(NF,nlev)
+    drag_coefs::Vector{NF} = zeros(NF, nlev)
 end
 
 """
@@ -46,8 +46,8 @@ function initialize!(   scheme::LinearDrag,
 
     kf = 1/time_scale.value
 
-    for (k,σ) in enumerate(σ_levels_full)
-        drag_coefs[k] = -kf*max(0,(σ-σb)/(1-σb))    # drag only below σb, lin increasing to kf at σ=1
+    for (k, σ) in enumerate(σ_levels_full)
+        drag_coefs[k] = -kf*max(0, (σ-σb)/(1-σb))    # drag only below σb, lin increasing to kf at σ=1
     end
 end 
 
@@ -55,7 +55,7 @@ end
 function boundary_layer_drag!(  column::ColumnVariables,
                                 scheme::LinearDrag,
                                 model::PrimitiveEquation)
-    boundary_layer_drag!(column,scheme)
+    boundary_layer_drag!(column, scheme)
 end
 
 """
@@ -82,7 +82,7 @@ Base.@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
 end
 
 ConstantDrag(SG::SpectralGrid;kwargs...) = ConstantDrag{SG.NF}(;kwargs...)
-initialize!(::ConstantDrag,::PrimitiveEquation) = nothing
+initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
 function boundary_layer_drag!(  column::ColumnVariables,
                                 scheme::ConstantDrag,
                                 model::PrimitiveEquation)
@@ -108,7 +108,7 @@ Base.@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     drag_max::Base.RefValue{NF} = Ref(zero(NF))
 end
 
-BulkRichardsonDrag(SG::SpectralGrid,kwargs...) = BulkRichardsonDrag{SG.NF}(;kwargs...)
+BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(;kwargs...)
 
 function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
 
@@ -128,7 +128,7 @@ end
 function boundary_layer_drag!(  column::ColumnVariables,
                                 scheme::BulkRichardsonDrag,
                                 model::PrimitiveEquation)
-    boundary_layer_drag!(column,scheme)
+    boundary_layer_drag!(column, scheme)
 end
 
 function boundary_layer_drag!(

@@ -33,7 +33,7 @@ Base.@kwdef mutable struct Earth{NF<:AbstractFloat} <: AbstractPlanet
     length_of_year::Second = Day(365.25)
     
     "time of spring equinox (year irrelevant)"
-    equinox::DateTime = DateTime(2000,3,20) 
+    equinox::DateTime = DateTime(2000, 3, 20) 
 
     "angle [˚] rotation axis tilt wrt to orbit"
     axial_tilt::NF = 23.4

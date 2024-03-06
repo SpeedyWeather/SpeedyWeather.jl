@@ -1,6 +1,6 @@
 """
 $(TYPEDSIGNATURES)
-Compute tendencies for u,v,temp,humid from physical parametrizations.
+Compute tendencies for u, v, temp, humid from physical parametrizations.
 Extract for each vertical atmospheric column the prognostic variables
 (stored in `diagn` as they are grid-point transformed), loop over all
 grid-points, compute all parametrizations on a single-column basis,
@@ -13,20 +13,20 @@ function parameterization_tendencies!(
     model::PrimitiveEquation,
 )
     # TODO move into shortwave radiation code
-    cos_zenith!(time,model)
+    cos_zenith!(time, model)
 
     G = model.geometry
-    rings = eachring(G.Grid,G.nlat_half)
+    rings = eachring(G.Grid, G.nlat_half)
 
     @floop for ij in eachgridpoint(diagn)       # loop over all horizontal grid points
 
         thread_id = Threads.threadid()          # not two threads should use the same ColumnVariables
         column = diagn.columns[thread_id]
-        jring = whichring(ij,rings)             # ring index gridpoint ij is on
+        jring = whichring(ij, rings)             # ring index gridpoint ij is on
 
         # extract current column for contiguous memory access
         reset_column!(column)                   # set accumulators back to zero for next grid point
-        get_column!(column,diagn,progn,ij,jring,model)  
+        get_column!(column, diagn, progn, ij, jring, model)  
         
         # execute all parameterizations
         parameterization_tendencies!(column, model)
@@ -48,8 +48,8 @@ function parameterization_tendencies!(
     boundary_layer_drag!(column, model)
 
     # VERTICAL DIFFUSION
-    # diffusion_coefficient!(column,model)
-    # momentum_diffusion!(column,model)
+    # diffusion_coefficient!(column, model)
+    # momentum_diffusion!(column, model)
     static_energy_diffusion!(column, model)
     humidity_diffusion!(column, model)
 
@@ -84,7 +84,7 @@ function fluxes_to_tendencies!(
     pₛ = column.pres[end]               # surface pressure
     (;radius) = geometry               # used for scaling
 
-    # for g/Δp and g/(Δp*cₚ), see Fortran SPEEDY documentation eq. (3,5)
+    # for g/Δp and g/(Δp*cₚ), see Fortran SPEEDY documentation eq. (3, 5)
     g_pₛ = planet.gravity/pₛ
     cₚ = atmosphere.heat_capacity
 

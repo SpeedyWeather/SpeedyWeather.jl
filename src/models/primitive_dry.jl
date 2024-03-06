@@ -79,7 +79,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     
     # OUTPUT
     output::OW = OutputWriter(spectral_grid, PrimitiveDry)
-    callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
+    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
 
