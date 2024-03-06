@@ -162,7 +162,8 @@ end
                 SG = SpectralGrid(NF;trunc,Grid,dealiasing)
                 S = SpectralTransform(SG,recompute_legendre=false)
                 O = EarthOrography(SG,smoothing=true,smoothing_truncation=31)
-                initialize!(O,SpeedyWeather.Earth(),S)
+                E = Earth(SG)
+                initialize!(O,E,S)
 
                 oro_grid = O.orography
                 oro_spec = spectral(oro_grid,S)
