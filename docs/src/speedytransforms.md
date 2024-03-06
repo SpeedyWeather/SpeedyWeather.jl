@@ -345,10 +345,10 @@ RingGrids.scale_coslat⁻¹!(u)
 RingGrids.scale_coslat⁻¹!(v)
 
 S = SpectralTransform(u, one_more_degree=true)
-us = spectral(u,S)
-vs = spectral(v,S)
+us = spectral(u, S)
+vs = spectral(v, S)
 
-vor = curl(us,vs)
+vor = curl(us, vs)
 ```
 (Copies of) the velocity fields are unscaled by the cosine of latitude (see above),
 then transformed into spectral space, and the returned `vor` requires a manual division
@@ -389,7 +389,7 @@ We will fix that in future releases. Now we need to apply the inverse
 Laplace operator to ``f\zeta/g`` which we do as follows
 
 ```@example speedytransforms
-fζ_g_spectral = spectral(fζ_g, one_more_degree=true);
+fζ_g_spectral = spectral(fζ_g, one_more_degree=true)
 η = SpeedyTransforms.∇⁻²(fζ_g_spectral) * spectral_grid.radius^2
 η_grid = gridded(η, Grid=spectral_grid.Grid)
 nothing # hide
