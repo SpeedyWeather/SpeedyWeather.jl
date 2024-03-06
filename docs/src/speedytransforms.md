@@ -340,15 +340,15 @@ Here, `u,v` are the grid-point velocity fields, and the function `curl` takes in
 `LowerTriangularMatrix`s (no transform needed as all gradient operators act in spectral space),
 or, as shown here, arrays of the same grid and size. In this case, the function actually
 runs through the following steps
-```julia
-RingGrids.scale_coslat⁻¹!(u_grid)
-RingGrids.scale_coslat⁻¹!(v_grid)
+```@example speedytransforms
+RingGrids.scale_coslat⁻¹!(u)
+RingGrids.scale_coslat⁻¹!(v)
 
-S = SpectralTransform(u_grid,one_more_degree=true)
-us = spectral(u_grid,S)
-vs = spectral(v_grid,S)
+S = SpectralTransform(u,one_more_degree=true)
+us = spectral(u,S)
+vs = spectral(v,S)
 
-return curl(us,vs)
+vor = curl(us,vs)
 ```
 (Copies of) the velocity fields are unscaled by the cosine of latitude (see above),
 then transformed into spectral space, and the returned `vor` requires a manual division
@@ -366,7 +366,7 @@ meridional gradient. So as we want to take the curl of `us,vs` here, they need t
 additional degree, but in the returned lower triangular matrix this row is set to zero.
 
 !!! info "One more degree for vector quantities"
-    All gradient operators expect the input lower triangular matrices of shape ``N+1 \times N``.
+    All gradient operators expect the input lower triangular matrices of shape ``(N+1) \times N``.
     This one more degree of the spherical harmonics is required for the meridional derivative.
     Scalar quantities contain this degree too for size compatibility but they should not
     make use of it. Use `spectral_truncation` to add or remove this degree manually.
