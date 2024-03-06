@@ -193,8 +193,9 @@ function initialize!(
     (;startdate) = output
     time_string = "hours since $(Dates.format(startdate, "yyyy-mm-dd HH:MM:0.0"))"
     defDim(dataset, "time", Inf)       # unlimited time dimension
-    defVar(dataset, "time", Float64, ("time", ), attrib=Dict("units"=>time_string, "long_name"=>"time",
-            "standard_name"=>"time", "calendar"=>"proleptic_gregorian"))
+    defVar(dataset, "time", Float64, ("time",),
+           attrib=Dict("units"=>time_string, "long_name"=>"time",
+                       "standard_name"=>"time", "calendar"=>"proleptic_gregorian"))
     
     # DEFINE NETCDF DIMENSIONS SPACE
     (;input_Grid, output_Grid, nlat_half) = output
@@ -209,7 +210,7 @@ function initialize!(
         
     else                                # output grid directly into a matrix (resort grid points, no interpolation)
         (;nlat_half) = diagn            # don't use output.nlat_half as not supported for output_matrix
-        nlon, nlat = RingGrids.matrix_size(input_Grid, nlat_half)     # size of the matrix output
+        nlon, nlat = RingGrids.matrix_size(input_Grid, nlat_half)   # size of the matrix output
         lond = collect(1:nlon)                                      # just enumerate grid points for lond, latd
         latd = collect(1:nlat)
         lon_name, lon_units, lon_longname = "i", "1", "horizontal index i"
@@ -221,9 +222,9 @@ function initialize!(
     output.as_matrix || RingGrids.update_locator!(output.interpolator, latds, londs)
         
     σ = output_NF.(model.geometry.σ_levels_full)
-    defVar(dataset, lon_name, lond, (lon_name, ), attrib=Dict("units"=>lon_units, "long_name"=>lon_longname))
-    defVar(dataset, lat_name, latd, (lat_name, ), attrib=Dict("units"=>lat_units, "long_name"=>lat_longname))
-    defVar(dataset, "lev", σ, ("lev", ), attrib=Dict("units"=>"1", "long_name"=>"sigma levels"))
+    defVar(dataset, lon_name, lond, (lon_name,), attrib=Dict("units"=>lon_units, "long_name"=>lon_longname))
+    defVar(dataset, lat_name, latd, (lat_name,), attrib=Dict("units"=>lat_units, "long_name"=>lat_longname))
+    defVar(dataset, "lev", σ, ("lev",), attrib=Dict("units"=>"1", "long_name"=>"sigma levels"))
     
     # VARIABLES, define every variable here that could be output
     (;compression_level) = output

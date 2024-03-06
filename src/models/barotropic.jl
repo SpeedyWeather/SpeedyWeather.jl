@@ -53,7 +53,7 @@ Base.@kwdef mutable struct BarotropicModel{
     feedback::FB = Feedback()
 end
 
-has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor, )
+has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
 """

@@ -48,7 +48,7 @@ end
 end
 
 @testset "nans" begin
-    for s in ((3, ), (3, 4), (3, 4, 5))
+    for s in ((3,), (3, 4), (3, 4, 5))
         for T in (Float16, Float32, Float64)
             A = SpeedyWeather.nans(T, s...)
             for a in A
