@@ -3,11 +3,11 @@ abstract type AbstractGeopotential <: AbstractModelComponent end
 export Geopotential
 Base.@kwdef struct Geopotential{NF} <: AbstractGeopotential
     nlev::Int
-    Δp_geopot_half::Vector{NF} = zeros(NF,nlev)
-    Δp_geopot_full::Vector{NF} = zeros(NF,nlev)
+    Δp_geopot_half::Vector{NF} = zeros(NF, nlev)
+    Δp_geopot_full::Vector{NF} = zeros(NF, nlev)
 end
 
-Geopotential(SG::SpectralGrid) = Geopotential{SG.NF}(;nlev=SG.nlev)
+Geopotential(SG::SpectralGrid) = Geopotential{SG.NF}(; nlev=SG.nlev)
 
 """
 $(TYPEDSIGNATURES)
@@ -21,9 +21,9 @@ function initialize!(
     geopotential::Geopotential,
     model::PrimitiveEquation
 )
-    (;Δp_geopot_half, Δp_geopot_full, nlev) = geopotential
-    (;R_dry) = model.atmosphere
-    (;σ_levels_full, σ_levels_half) = model.geometry
+    (; Δp_geopot_half, Δp_geopot_full, nlev) = geopotential
+    (; R_dry) = model.atmosphere
+    (; σ_levels_full, σ_levels_half) = model.geometry
 
     # 1. integration onto half levels
     for k in 1:nlev-1               # k is full level index, 1=top, nlev=bottom
@@ -48,9 +48,9 @@ function geopotential!(
     orography::AbstractOrography,
 )
 
-    (;geopot_surf) = orography                          # = orography*gravity
-    (;Δp_geopot_half, Δp_geopot_full) = geopotential    # = R*Δlnp either on half or full levels
-    (;nlev) = diagn                                     # number of vertical levels
+    (; geopot_surf) = orography                          # = orography*gravity
+    (; Δp_geopot_half, Δp_geopot_full) = geopotential    # = R*Δlnp either on half or full levels
+    (; nlev) = diagn                                     # number of vertical levels
 
     @boundscheck nlev == length(Δp_geopot_full) || throw(BoundsError)
 
@@ -61,7 +61,7 @@ function geopotential!(
     temp = diagn.layers[end].dynamics_variables.temp_virt
     geopot = diagn.layers[end].dynamics_variables.geopot
     
-    @inbounds for lm in eachharmonic(geopot,geopot_surf,temp)
+    @inbounds for lm in eachharmonic(geopot, geopot_surf, temp)
         geopot[lm] = geopot_surf[lm] + temp[lm]*Δp_geopot_full[end]
     end
 
@@ -72,7 +72,7 @@ function geopotential!(
         geopot_k  = diagn.layers[k].dynamics_variables.geopot
         geopot_k1 = diagn.layers[k+1].dynamics_variables.geopot
 
-        for lm in eachharmonic(temp_k,temp_k1,geopot_k,geopot_k1)
+        for lm in eachharmonic(temp_k, temp_k1, geopot_k, geopot_k1)
             geopot_k½ = geopot_k1[lm] + temp_k1[lm]*Δp_geopot_half[k+1] # 1st half layer integration
             geopot_k[lm] = geopot_k½  + temp_k[lm]*Δp_geopot_full[k]    # 2nd onto full layer
         end      
@@ -92,7 +92,7 @@ function geopotential!(
 )
 
     nlev = length(geopot)
-    (;Δp_geopot_half, Δp_geopot_full) = G  # = R*Δlnp either on half or full levels
+    (; Δp_geopot_half, Δp_geopot_full) = G  # = R*Δlnp either on half or full levels
 
     @boundscheck length(temp) >= nlev || throw(BoundsError)
     @boundscheck length(Δp_geopot_full) >= nlev || throw(BoundsError)
@@ -110,7 +110,7 @@ end
 function geopotential(  temp::Vector,
                         G::Geopotential) 
     geopot = zero(temp)
-    geopotential!(geopot,temp,G)
+    geopotential!(geopot, temp, G)
     return geopot
 end
 
@@ -121,6 +121,6 @@ i.e. gravity times the interface displacement (field `pres`)"""
 function geopotential!( diagn::DiagnosticVariablesLayer,
                         pres::LowerTriangularMatrix,
                         planet::AbstractPlanet)
-    (;geopot) = diagn.dynamics_variables
+    (; geopot) = diagn.dynamics_variables
     geopot .= pres * planet.gravity
 end 

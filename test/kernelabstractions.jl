@@ -7,11 +7,11 @@ using KernelAbstractions
 
     @kernel function mul_test!(A, @Const(B), @Const(C))
         i, j = @index(Global, NTuple)
-        A[i,j] = B[i,j] * C[i,j]
+        A[i, j] = B[i, j] * C[i, j]
     end
     
-    B = SpeedyWeather.DeviceArray(device_setup, rand(10,10))
-    C = SpeedyWeather.DeviceArray(device_setup, rand(10,10))
+    B = SpeedyWeather.DeviceArray(device_setup, rand(10, 10))
+    C = SpeedyWeather.DeviceArray(device_setup, rand(10, 10))
     A = zero(B)
 
     SpeedyWeather.launch_kernel!(device_setup, mul_test!, size(B), A, B, C)

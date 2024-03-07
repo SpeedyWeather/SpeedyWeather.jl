@@ -59,5 +59,5 @@ Base.@kwdef mutable struct EarthAtmosphere{NF<:AbstractFloat} <: AbstractAtmosph
     layer_thickness::NF = 8500
 end
 
-EarthAtmosphere(SG::SpectralGrid;kwargs...) = EarthAtmosphere{SG.NF}(;kwargs...)
-EarthAtmosphere(::Type{NF};kwargs...) where NF = EarthAtmosphere{NF}(;kwargs...)
+EarthAtmosphere(SG::SpectralGrid; kwargs...) = EarthAtmosphere{SG.NF}(; kwargs...)
+EarthAtmosphere(::Type{NF}; kwargs...) where NF = EarthAtmosphere{NF}(; kwargs...)

@@ -9,24 +9,24 @@ Base.@kwdef struct SigmaCoordinates <: VerticalCoordinates
     nlev::Int = 8
     σ_half::Vector{Float64} = default_sigma_coordinates(nlev)
 
-    SigmaCoordinates(nlev::Integer,σ_half::AbstractVector) = sigma_okay(nlev,σ_half) ?
-    new(nlev,σ_half) : error("σ_half = $σ_half cannot be used for $nlev-level SigmaCoordinates")
+    SigmaCoordinates(nlev::Integer, σ_half::AbstractVector) = sigma_okay(nlev, σ_half) ?
+    new(nlev, σ_half) : error("σ_half = $σ_half cannot be used for $nlev-level SigmaCoordinates")
 end
 
 # obtain nlev from length of predefined σ_half levels
-SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(nlev=length(σ_half)-1;σ_half) 
+SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(nlev=length(σ_half)-1; σ_half)
 SigmaCoordinates(σ_half::AbstractRange) = SigmaCoordinates(collect(σ_half))
 
-function Base.show(io::IO,σ::SigmaCoordinates)
-    println(io,"$(σ.nlev)-level SigmaCoordinates")
+function Base.show(io::IO, σ::SigmaCoordinates)
+    println(io, "$(σ.nlev)-level SigmaCoordinates")
     nchars = length(string(σ.nlev))
     format = Printf.Format("%$(nchars)d")
     for k=1:σ.nlev
-        println(io,"├─ ", @sprintf("%1.4f",σ.σ_half[k]),"  k = ",Printf.format(format,k-1),".5")
+        println(io, "├─ ", @sprintf("%1.4f", σ.σ_half[k]), "  k = ", Printf.format(format, k-1), ".5")
         σk = (σ.σ_half[k] + σ.σ_half[k+1])/2
-        println(io,"│× ",@sprintf("%1.4f",σk),"  k = ",Printf.format(format,k))
+        println(io, "│× ", @sprintf("%1.4f", σk), "  k = ", Printf.format(format, k))
     end
-    print(io,"└─ ",@sprintf("%1.4f",σ.σ_half[end]),"  k = ",Printf.format(format,σ.nlev),".5")
+    print(io, "└─ ", @sprintf("%1.4f", σ.σ_half[end]), "  k = ", Printf.format(format, σ.nlev), ".5")
 end
 
 """
@@ -37,10 +37,10 @@ The first half level is at 0 the last at 1. Default levels are equally spaced fr
 function default_sigma_coordinates(nlev::Integer)
 
     # equi-distant in σ
-    σ_half = collect(range(0,1,nlev+1))
+    σ_half = collect(range(0, 1, nlev+1))
 
     # Frierson 2006 spacing, higher resolution in surface boundary layer and in stratosphere
-    # z = collect(range(1,0,nlev+1))
+    # z = collect(range(1, 0, nlev+1))
     # σ_half = @. exp(-5*(0.05*z + 0.95*z^3))
     # σ_half[1] = 0
     return σ_half
@@ -49,7 +49,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Check that nlev and σ_half match."""    
-function sigma_okay(nlev::Integer,σ_half::AbstractVector)
+function sigma_okay(nlev::Integer, σ_half::AbstractVector)
     @assert σ_half[1] >= 0 "First manually specified σ_half has to be >0"
     @assert σ_half[end] == 1 "Last manually specified σ_half has to be 1."
     @assert nlev == (length(σ_half) - 1) "nlev has to be length of σ_half - 1"

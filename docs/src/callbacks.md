@@ -73,11 +73,11 @@ function SpeedyWeather.initialize!(
     # allocate recorder: number of time steps (incl initial conditions) in simulation  
     callback.maximum_surface_wind_speed = zeros(progn.clock.n_timesteps + 1)
     
-    # where surface (=lowermost model layer) u,v on the grid are stored
-    (;u_grid, v_grid) = diagn.layers[diagn.nlev].grid_variables
+    # where surface (=lowermost model layer) u, v on the grid are stored
+    (; u_grid, v_grid) = diagn.layers[diagn.nlev].grid_variables
     
     # maximum wind speed of initial conditions
-    callback.maximum_surface_wind_speed[1] = max_2norm(u_grid,v_grid)
+    callback.maximum_surface_wind_speed[1] = max_2norm(u_grid, v_grid)
     
     # (re)set counter to 1
     callback.timestep_counter = 1
@@ -87,7 +87,7 @@ The `initialize!` function has to be extended for the new callback `::StormChase
 argument, then followed by prognostic and diagnostic variables and model. For correct
 multiple dispatch it is important to restrict the first argument to the new `StormChaser` type
 (to not call another callback instead), but the other type declarations are for clarity only.
-`initialize!(::AbstractCallback,args...)` is called once just before the main time loop,
+`initialize!(::AbstractCallback, args...)` is called once just before the main time loop,
 meaning after the initial conditions are set and after all other components are initialized.
 We replace the vector inside our storm chaser with a vector of the correct length so that
 we have a "recorder" allocated, a vector that can store the maximum surface wind speed on
@@ -96,7 +96,7 @@ time step counter to 1. We define the `max_2norm` function as follows
 
 ```@example callbacks
 """Maximum of the 2-norm of elements across two arrays."""
-function max_2norm(u::AbstractArray{T},v::AbstractArray{T}) where T
+function max_2norm(u::AbstractArray{T}, v::AbstractArray{T}) where T
     max_norm = zero(T)      # = u² + v²
     for ij in eachindex(u, v)
         # find largest wind speed squared
@@ -123,11 +123,11 @@ function SpeedyWeather.callback!(
     callback.timestep_counter += 1  
     i = callback.timestep_counter
 
-    # where surface (=lowermost model layer) u,v on the grid are stored
-    (;u_grid, v_grid) = diagn.layers[diagn.nlev].grid_variables
+    # where surface (=lowermost model layer) u, v on the grid are stored
+    (; u_grid, v_grid) = diagn.layers[diagn.nlev].grid_variables
 
     # maximum wind speed at current time step
-    callback.maximum_surface_wind_speed[i] = max_2norm(u_grid,v_grid)
+    callback.maximum_surface_wind_speed[i] = max_2norm(u_grid, v_grid)
 end
 ```
 The function signature for `callback!` is the same as for `initialize!`. You may
@@ -143,7 +143,7 @@ But in many cases you may not need to do anything, in which case you just just l
 it return `nothing`.
 
 ```@example callbacks
-SpeedyWeather.finish!(::StormChaser,args...) = nothing
+SpeedyWeather.finish!(::StormChaser, args...) = nothing
 ```
 
 !!! note "Always extend `initialize!`, `callback!` and `finish!`"
@@ -155,7 +155,7 @@ SpeedyWeather.finish!(::StormChaser,args...) = nothing
 
 ## Adding a callback
 
-Every model has a field `callbacks::Dict{Symbol,AbstractCallback}` such that the `callbacks`
+Every model has a field `callbacks::Dict{Symbol, AbstractCallback}` such that the `callbacks`
 keyword can be used to create a model with a dictionary of callbacks. Callbacks are identified
 with a `Symbol` key inside such a dictionary. We have a convenient `CallbackDict` generator function
 which can be used like `Dict` but the key-value pairs have to be of type `Symbol`-`AbstractCallback`.
@@ -188,8 +188,8 @@ Meaning that callbacks can be added before and after model construction
 ```@example callbacks
 spectral_grid = SpectralGrid()
 callbacks = CallbackDict(:callback_added_before => NoCallback())
-model = PrimitiveWetModel(;spectral_grid, callbacks)
-add!(model.callbacks,:callback_added_afterwards => NoCallback())
+model = PrimitiveWetModel(; spectral_grid, callbacks)
+add!(model.callbacks, :callback_added_afterwards => NoCallback())
 ```
 Let us add two more meaningful callbacks
 

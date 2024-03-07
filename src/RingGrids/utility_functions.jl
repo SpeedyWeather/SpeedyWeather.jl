@@ -23,23 +23,23 @@ function isdecreasing(x::Vector)
 end
 
 """
-    true/false = extrema_in(v::Vector,a::Real,b::Real)
+    true/false = extrema_in(v::Vector, a::Real, b::Real)
 
 For every element vᵢ in v does a<=vi<=b hold?"""
 function extrema_in(v::Vector,
                     a::Real,
                     b::Real)
     
-    vmin,vmax = extrema(v)
+    vmin, vmax = extrema(v)
     return (vmin >= a) && (vmax <= b)
 end
 
 # MATRIX rotations
 """
-    i_new,j_new = rotate_matrix_indices_90(i,j,s)
+    i_new, j_new = rotate_matrix_indices_90(i, j, s)
 
-Rotate indices `i,j` of a square matrix of size s x s anti-clockwise by 90˚.""" 
-@inline function rotate_matrix_indices_90(i::Integer,j::Integer,s::Integer)
+Rotate indices `i, j` of a square matrix of size s x s anti-clockwise by 90˚.""" 
+@inline function rotate_matrix_indices_90(i::Integer, j::Integer, s::Integer)
     @boundscheck 0 < i <= s || throw(BoundsError)
     @boundscheck 0 < j <= s || throw(BoundsError)
     i_new = s+1-j   # new i from rotation
@@ -48,10 +48,10 @@ Rotate indices `i,j` of a square matrix of size s x s anti-clockwise by 90˚."""
 end
 
 """
-    i_new,j_new = rotate_matrix_indices_180(i,j,s)
+    i_new, j_new = rotate_matrix_indices_180(i, j, s)
 
-Rotate indices `i,j` of a square matrix of size s x s by 180˚.""" 
-@inline function rotate_matrix_indices_180(i::Integer,j::Integer,s::Integer)
+Rotate indices `i, j` of a square matrix of size s x s by 180˚.""" 
+@inline function rotate_matrix_indices_180(i::Integer, j::Integer, s::Integer)
     @boundscheck 0 < i <= s || throw(BoundsError)
     @boundscheck 0 < j <= s || throw(BoundsError)
     i_new = s+1-i   # new i from rotation
@@ -60,10 +60,10 @@ Rotate indices `i,j` of a square matrix of size s x s by 180˚."""
 end
 
 """
-    i_new,j_new = rotate_matrix_indices_270(i,j,s)
+    i_new, j_new = rotate_matrix_indices_270(i, j, s)
 
-Rotate indices `i,j` of a square matrix of size s x s anti-clockwise by 270˚.""" 
-@inline function rotate_matrix_indices_270(i::Integer,j::Integer,s::Integer)
+Rotate indices `i, j` of a square matrix of size s x s anti-clockwise by 270˚.""" 
+@inline function rotate_matrix_indices_270(i::Integer, j::Integer, s::Integer)
     @boundscheck 0 < i <= s || throw(BoundsError)
     @boundscheck 0 < j <= s || throw(BoundsError)
     i_new = j       # new i from rotation
@@ -71,10 +71,10 @@ Rotate indices `i,j` of a square matrix of size s x s anti-clockwise by 270˚.""
     return i_new, j_new
 end
 
-@inline function rotate_matrix_indices(i::Integer,j::Integer,s::Integer,r::Integer)
-    r = mod(r,4)    # map 4 to 0 rotation, 5 to 1 rotation etc.
-    r == 0 && return i,j
-    r == 1 && return rotate_matrix_indices_90(i,j,s)
-    r == 2 && return rotate_matrix_indices_180(i,j,s)
-    r == 3 && return rotate_matrix_indices_270(i,j,s)
+@inline function rotate_matrix_indices(i::Integer, j::Integer, s::Integer, r::Integer)
+    r = mod(r, 4)    # map 4 to 0 rotation, 5 to 1 rotation etc.
+    r == 0 && return i, j
+    r == 1 && return rotate_matrix_indices_90(i, j, s)
+    r == 2 && return rotate_matrix_indices_180(i, j, s)
+    r == 3 && return rotate_matrix_indices_270(i, j, s)
 end

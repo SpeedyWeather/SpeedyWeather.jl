@@ -4,7 +4,7 @@ export BarotropicModel, initialize!
 The BarotropicModel contains all model components needed for the simulation of the
 barotropic vorticity equations. To be constructed like
 
-    model = BarotropicModel(;spectral_grid, kwargs...)
+    model = BarotropicModel(; spectral_grid, kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
@@ -50,8 +50,8 @@ Base.@kwdef mutable struct BarotropicModel{
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid,Barotropic)
-    callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
+    output::OW = OutputWriter(spectral_grid, Barotropic)
+    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
 
@@ -64,7 +64,7 @@ Calls all `initialize!` functions for most fields, representing components, of `
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!`."""
 function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
-    (;spectral_grid) = model
+    (; spectral_grid) = model
 
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for BarotropicModel, \
         SpectralGrid with nlev=$(spectral_grid.nlev) provided."
