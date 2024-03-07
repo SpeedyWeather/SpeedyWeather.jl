@@ -30,6 +30,13 @@ end
 
 @testset "Move particles" begin
     for NF in (Float16, Float32, Float64)
+        
+        p = Particle{NF}(lon=-350,lat=0)
+        @test mod(p) == Particle{NF}(lon=10,lat=0)        
+        
+        p = Particle{NF}(lon=370,lat=0)
+        @test mod(p) == Particle{NF}(lon=10,lat=0)
+
         p = rand(Particle{NF})
         @test p == mod(p)
         @test move(p,360,180) != p

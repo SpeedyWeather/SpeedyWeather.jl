@@ -46,7 +46,6 @@ function Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF,isactiv
     return Particle{NF,isactive}(lon,lat,σ)
 end
 
-
 # equality with same location and same activity
 function Base.:(==)(p1::Particle{NF1,active1},p2::Particle{NF2,active2}) where {NF1,active1,NF2,active2}
     return (active1==active2) && (p1.lon == p2.lon) && (p1.lat == p2.lat) && (p1.σ == p2.σ)
@@ -57,7 +56,7 @@ function Base.show(io::IO,p::Particle{NF,isactive}) where {NF,isactive}
     lon = @sprintf("%6.2f",p.lon)
     σ = @sprintf("%.2f",p.σ)
     activity = isactive ? "  active" : "inactive"
-    print(io,"Particle{$NF,$activity}($(lon)˚E, $(lat)˚N, σ=$σ)")
+    print(io,"Particle{$NF, $activity}($(lon)˚E, $(lat)˚N, σ=$σ)")
 end
 
 export move
@@ -83,12 +82,18 @@ function Base.mod(p::P) where {P<:Particle}
     (;lon, lat, σ) = p
     crossed_pole = lat > 90 || lat < -90
     lat = lat - 2crossed_pole*((lat + 90) % 180)
-    lon = (lon + 180*crossed_pole) % 360
+    lon = mod(lon + 180*crossed_pole,360)
     σ = clamp(σ,0,1)
     return P(lon,lat,σ)
 end
 
 abstract type AbstractParticleAdvection <: AbstractModelComponent end
+
+export NoParticleAdvection
+struct NoParticleAdvection <: AbstractParticleAdvection end
+n_particles(::NoParticleAdvection) = 0
+NoParticleAdvection(SG::SpectralGrid) = NoParticleAdvection()
+particle_advection!(particles,diagn,dt,::NoParticleAdvection) = nothing
 
 export ParticleAdvection
 Base.@kwdef struct ParticleAdvection{
@@ -99,7 +104,7 @@ Base.@kwdef struct ParticleAdvection{
     "Number of latitude rings on one hemisphere, Equator incl. Resolution parameter."
     nlat_half::Int
 
-    "Number of particles to advect"
+    "[OPTION] Number of particles to advect"
     n_particles::Int = 10
 
     "Work array"
@@ -111,6 +116,7 @@ Base.@kwdef struct ParticleAdvection{
 end
 
 ParticleAdvection(SG::SpectralGrid;kwargs...) = ParticleAdvection{SG.NF,SG.Grid}(;nlat_half=SG.nlat_half,kwargs...)
+n_particles(p::ParticleAdvection) = p.n_particles
 
 function initialize!(
     particles::Vector{P},
@@ -118,7 +124,7 @@ function initialize!(
 ) where {P<:Particle}
 
     for i in eachindex(particles)
-        particles[i] = P(lat=5*randn(),lon=5*randn())
+        particles[i] = rand(P)
     end
 end
 
@@ -128,6 +134,16 @@ function particle_advection!(
     dt::Real,
     particle_advection::AbstractParticleAdvection,
 ) where NF
+
+    # escape immediately for no particles
+    particle_advection.n_particles == 0 && return nothing
+
+    # also escape if no particle is active
+    any_active::Bool = false 
+    for particle in particles
+        any_active |= active(particle)
+    end
+    any_active || return nothing
 
     (;u_grid, v_grid) = diagn.layers[1].grid_variables
 
@@ -142,8 +158,10 @@ function particle_advection!(
     (;interpolator) = particle_advection
     RingGrids.update_locator!(interpolator,lats,lons)
 
-    degrees_per_meter = convert(NF,360/2π)
-    dt_NF = convert(NF,dt)
+    # effective time step in seconds * degree to move particles with coordinates in degrees
+    # technically 360/2πr with radius r, but timestep dt is already scaled as dt/r
+    degrees_per_meter = 360/2π
+    dt = convert(NF,dt*degrees_per_meter)
     u_interp = particle_advection.a
     v_interp = particle_advection.b
 
@@ -153,15 +171,13 @@ function particle_advection!(
     for i in eachindex(particles,u_interp,v_interp)
         particle = particles[i]
         u, v = u_interp[i], v_interp[i]
-        particles[i] = advect_2D(particle,u,v,dt_NF,degrees_per_meter)
+        particles[i] = advect_2D(particle,u,v,dt)
     end
-
-    return nothing
 end
 
-function advect_2D(particle::Particle{NF,true},u::NF,v::NF,dt::NF,d::NF) where NF
-    dlat = v * dt * d
-    dlon = u * dt * d/cosd(particle.lat)
+function advect_2D(particle::Particle{NF,true},u::NF,v::NF,dt::NF) where NF
+    dlat = v * dt
+    dlon = u * dt/cosd(particle.lat)
     return mod(move(particle,dlon,dlat))
 end
 
