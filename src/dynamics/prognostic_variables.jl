@@ -1,5 +1,3 @@
-abstract type AbstractVariables end
-
 const DEFAULT_DATE = DateTime(2000, 1, 1)
 
 """
@@ -192,7 +190,11 @@ function PrognosticSurfaceTimesteps(SG::SpectralGrid)
 end
 
 export PrognosticVariables
-struct PrognosticVariables{NF<:AbstractFloat, Grid<:AbstractGrid{NF}, M<:ModelSetup} <: AbstractVariables
+struct PrognosticVariables{
+    NF<:AbstractFloat,
+    Grid<:AbstractGrid{NF},
+    M<:ModelSetup
+} <: AbstractPrognosticVariables
 
     # dimensions
     trunc::Int              # max degree of spherical harmonics
@@ -204,7 +206,6 @@ struct PrognosticVariables{NF<:AbstractFloat, Grid<:AbstractGrid{NF}, M<:ModelSe
     surface::PrognosticSurfaceTimesteps{NF}
     ocean::PrognosticVariablesOcean{NF, Grid}
     land::PrognosticVariablesLand{NF, Grid}
-
     particles::Vector{Particle{NF}}
 
     # scaling
@@ -216,6 +217,7 @@ end
 function PrognosticVariables(SG::SpectralGrid, model::ModelSetup)
     
     (; trunc, nlat_half, nlev, Grid, NF) = SG
+    (; n_particles) = SG
 
     # data structs
     layers = [PrognosticLayerTimesteps(SG) for _ in 1:nlev]      # vector of nlev layers
@@ -224,8 +226,6 @@ function PrognosticVariables(SG::SpectralGrid, model::ModelSetup)
     land = PrognosticVariablesLand(SG)
 
     # particles advection
-    n_particles = hasfield(typeof(model),:particle_advection) ?
-                        SpeedyWeather.n_particles(model.particle_advection) : 0
     particles = zeros(Particle{NF}, n_particles)
 
     scale = Ref(one(NF))        # initialize with scale=1, wrapped in RefValue for mutability

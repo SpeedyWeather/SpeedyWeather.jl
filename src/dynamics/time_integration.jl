@@ -262,7 +262,8 @@ function timestep!(
         gridded!(diagn_layer, progn_lf, model)
     end
 
-    particle_advection!(progn.particles, diagn, dt, model.particle_advection)
+    # PARTICLE ADVECTION
+    particle_advection!(progn, diagn, lf2, model.particle_advection)
 end
 
 """
@@ -304,7 +305,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     gridded!(pres_grid, pres, spectral_transform)
     
     # PARTICLE ADVECTION
-    particle_advection!(progn.particles, diagn, dt, model.particle_advection)
+    particle_advection!(progn, diagn, lf2, model.particle_advection)
 end
 
 """
@@ -362,6 +363,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
             gridded!(pres_grid, pres_lf, model.spectral_transform)
         end
     end
+
+    # PARTICLE ADVECTION
+    particle_advection!(progn, diagn, lf2, model.particle_advection)
 end
 
 """

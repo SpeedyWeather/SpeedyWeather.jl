@@ -13,10 +13,10 @@ function initialize!(
     IC::InitialConditions,
     model::ModelSetup
 )
-    has(model,:vor)   && initialize!(progn, IC.vordiv, model)
-    has(model,:pres)  && initialize!(progn, IC.pres,   model)
-    has(model,:temp)  && initialize!(progn, IC.temp,   model)
-    has(model,:humid) && initialize!(progn, IC.humid,  model)
+    has(model, :vor)   && initialize!(progn, IC.vordiv, model)
+    has(model, :pres)  && initialize!(progn, IC.pres,   model)
+    has(model, :temp)  && initialize!(progn, IC.temp,   model)
+    has(model, :humid) && initialize!(progn, IC.humid,  model)
 end
 
 InitialConditions(::Type{<:Barotropic}) = InitialConditions(;vordiv = StartWithRandomVorticity())

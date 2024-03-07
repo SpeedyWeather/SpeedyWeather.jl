@@ -298,7 +298,7 @@ function interpolate(   ::Type{Grid},
     interpolate(Grid, A.nlat_half, A, I)
 end
 
-function update_locator!(   I::AbstractInterpolator{NF, Grid},   # GridGeometry and Locator
+function update_locator!(   I::AbstractInterpolator{NF, Grid},  # GridGeometry and Locator
                             θs::Vector,                         # latitudes to interpolate onto
                             λs::Vector;                         # longitudes to interpolate onto
                             unsafe::Bool=false,                 # true to disable safety checks

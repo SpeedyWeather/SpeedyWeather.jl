@@ -14,6 +14,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     GO<:AbstractGeopotential,
     OR<:AbstractOrography,
     AC<:AbstractAdiabaticConversion,
+    PA<:AbstractParticleAdvection,
     IC<:AbstractInitialConditions,
     LS<:AbstractLandSeaMask,
     OC<:AbstractOcean,
@@ -55,6 +56,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     coriolis::CO = Coriolis(spectral_grid)
     geopotential::GO = Geopotential(spectral_grid)
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
+    particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(PrimitiveWet)
     
     # BOUNDARY CONDITIONS
@@ -142,6 +144,10 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     (;clock) = prognostic_variables
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
+
+    # particle advection
+    initialize!(model.particle_advection, model)
+    initialize!(prognostic_variables.particles, model)
 
     # initialize ocean and land and synchronize clocks
     initialize!(prognostic_variables.ocean, clock.time, model)

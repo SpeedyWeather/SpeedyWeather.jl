@@ -151,21 +151,55 @@ function Base.zeros(::Type{SurfaceVariables},
     return SurfaceVariables{NF, Grid{NF}}(; nlat_half, trunc, npoints)
 end
 
+Base.@kwdef struct ParticleVariables{NF<:AbstractFloat,Grid<:AbstractGrid}
+    "Number of particles"
+    n_particles::Int
+
+    "Number of latitudes on one hemisphere (Eq. incld.), resolution parameter of Grid"
+    nlat_half::Int
+
+    "Work array: particle locations"
+    locations::Vector{Particle{NF}} = zeros(Particle{NF}, n_particles)
+
+    "Work array: velocity u"
+    u::Vector{NF} = zeros(NF,n_particles)
+
+    "Work array: velocity v"
+    v::Vector{NF} = zeros(NF,n_particles)
+
+    "Work array: velocity w = dσ/dt"
+    σ_tend::Vector{NF} = zeros(NF,n_particles)
+
+    "Interpolator to interpolate velocity fields onto particle positions"
+    interpolator::AnvilInterpolator{NF,Grid} = AnvilInterpolator(NF, Grid, nlat_half, n_particles)
+end
+
+function Base.zeros(::Type{ParticleVariables}, SG::SpectralGrid)
+    (; n_particles, nlat_half) = SG
+    ParticleVariables{SG.NF, SG.Grid}(; n_particles, nlat_half)
+end
+
 export DiagnosticVariables
 
 """
 All diagnostic variables.
 $(TYPEDFIELDS)"""
-struct DiagnosticVariables{NF<:AbstractFloat, Grid<:AbstractGrid{NF}, Model<:ModelSetup}
-    layers  ::Vector{DiagnosticVariablesLayer{NF, Grid}}
-    surface ::SurfaceVariables{NF, Grid}
-    columns ::Vector{ColumnVariables{NF}}
+struct DiagnosticVariables{
+    NF<:AbstractFloat,
+    Grid<:AbstractGrid{NF},
+    Model<:ModelSetup
+} <: AbstractDiagnosticVariables
 
-    nlat_half::Int      # resolution parameter of any Grid
-    nlev    ::Int       # number of vertical levels
-    npoints ::Int       # number of grid points
+    layers   ::Vector{DiagnosticVariablesLayer{NF, Grid}}
+    surface  ::SurfaceVariables{NF, Grid}
+    columns  ::Vector{ColumnVariables{NF}}
+    particles::ParticleVariables{NF}
 
-    scale::Base.RefValue{NF}   # vorticity and divergence are scaled by radius
+    nlat_half::Int              # resolution parameter of any Grid
+    nlev    ::Int               # number of vertical levels
+    npoints ::Int               # number of grid points
+
+    scale::Base.RefValue{NF}    # vorticity and divergence are scaled by radius
 end
 
 # generator function based on a SpectralGrid
@@ -183,10 +217,14 @@ function Base.zeros(
     nthreads = Threads.nthreads()
     columns = [ColumnVariables{NF}(; nlev) for _ in 1:nthreads]
 
+    # particle work arrays
+    particles = zeros(ParticleVariables, SG)
+
     scale = Ref(convert(SG.NF, SG.radius))
 
     return DiagnosticVariables{NF, Grid{NF}, Model}(
-        layers, surface, columns, nlat_half, nlev, npoints, scale)
+        layers, surface, columns, particles,
+        nlat_half, nlev, npoints, scale)
 end
 
 DiagnosticVariables(SG::SpectralGrid) = zeros(DiagnosticVariables, SG, DEFAULT_MODEL)

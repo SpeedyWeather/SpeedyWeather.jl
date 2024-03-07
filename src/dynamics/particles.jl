@@ -73,111 +73,15 @@ end
 @inline move(p::Particle{NF,false},args...) where NF = p
 
 export activate, deactivate, active
-activate(  p::Particle{NF}) where NF = Particle{NF, true}(p.lon,p.lat,p.σ)
-deactivate(p::Particle{NF}) where NF = Particle{NF,false}(p.lon,p.lat,p.σ)
+activate(  p::Particle{NF}) where NF = Particle{NF, true}(p.lon, p.lat, p.σ)
+deactivate(p::Particle{NF}) where NF = Particle{NF,false}(p.lon, p.lat, p.σ)
 active(::Particle{NF,isactive}) where {NF,isactive} = isactive
 
-function Base.mod(p::P) where {P<:Particle}
+@inline function Base.mod(p::P) where {P<:Particle}
     (;lon, lat, σ) = p
     crossed_pole = lat > 90 || lat < -90
     lat = lat - 2crossed_pole*((lat + 90) % 180)
-    lon = mod(lon + 180*crossed_pole,360)
-    σ = clamp(σ,0,1)
-    return P(lon,lat,σ)
+    lon = mod(lon + 180*crossed_pole, 360)
+    σ = clamp(σ, 0, 1)
+    return P(lon, lat, σ)
 end
-
-abstract type AbstractParticleAdvection <: AbstractModelComponent end
-
-export NoParticleAdvection
-struct NoParticleAdvection <: AbstractParticleAdvection end
-n_particles(::NoParticleAdvection) = 0
-NoParticleAdvection(SG::SpectralGrid) = NoParticleAdvection()
-particle_advection!(particles,diagn,dt,::NoParticleAdvection) = nothing
-
-export ParticleAdvection
-Base.@kwdef struct ParticleAdvection{
-    NF<:AbstractFloat,
-    Grid<:AbstractGrid,
-} <: AbstractParticleAdvection
-
-    "Number of latitude rings on one hemisphere, Equator incl. Resolution parameter."
-    nlat_half::Int
-
-    "[OPTION] Number of particles to advect"
-    n_particles::Int = 10
-
-    "Work array"
-    a::Vector{NF} = zeros(n_particles)
-    b::Vector{NF} = zeros(n_particles)
-
-    "Interpolator to interpolate velocity fields onto particle positions"
-    interpolator::AnvilInterpolator{NF,Grid} = AnvilInterpolator(NF, Grid, nlat_half, n_particles)
-end
-
-ParticleAdvection(SG::SpectralGrid;kwargs...) = ParticleAdvection{SG.NF,SG.Grid}(;nlat_half=SG.nlat_half,kwargs...)
-n_particles(p::ParticleAdvection) = p.n_particles
-
-function initialize!(
-    particles::Vector{P},
-    model::ModelSetup,
-) where {P<:Particle}
-
-    for i in eachindex(particles)
-        particles[i] = rand(P)
-    end
-end
-
-function particle_advection!(
-    particles::Vector{Particle{NF}},
-    diagn,
-    dt::Real,
-    particle_advection::ParticleAdvection,
-) where NF
-
-    # escape immediately for no particles
-    particle_advection.n_particles == 0 && return nothing
-
-    # also escape if no particle is active
-    any_active::Bool = false 
-    for particle in particles
-        any_active |= active(particle)
-    end
-    any_active || return nothing
-
-    (;u_grid, v_grid) = diagn.layers[1].grid_variables
-
-    lats = particle_advection.a
-    lons = particle_advection.b
-
-    for i in eachindex(particles,lats,lons)
-        lats[i] = particles[i].lat
-        lons[i] = particles[i].lon
-    end
-
-    (;interpolator) = particle_advection
-    RingGrids.update_locator!(interpolator,lats,lons)
-
-    # effective time step in seconds * degree to move particles with coordinates in degrees
-    # technically 360/2πr with radius r, but timestep dt is already scaled as dt/r
-    degrees_per_meter = 360/2π
-    dt = convert(NF,dt*degrees_per_meter)
-    u_interp = particle_advection.a
-    v_interp = particle_advection.b
-
-    interpolate!(u_interp,u_grid,interpolator)
-    interpolate!(v_interp,v_grid,interpolator)
-
-    for i in eachindex(particles,u_interp,v_interp)
-        particle = particles[i]
-        u, v = u_interp[i], v_interp[i]
-        particles[i] = advect_2D(particle,u,v,dt)
-    end
-end
-
-function advect_2D(particle::Particle{NF,true},u::NF,v::NF,dt::NF) where NF
-    dlat = v * dt
-    dlon = u * dt/cosd(particle.lat)
-    return mod(move(particle,dlon,dlat))
-end
-
-@inline advect_2D(p::Particle{NF,false},args...) where NF = p

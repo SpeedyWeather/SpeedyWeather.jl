@@ -1,7 +1,7 @@
 export ParticleTracker
 Base.@kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
     "[OPTION] Frequency to track particles at"
-    Δt::Second = Hour(1)
+    Δt::Second = Hour(3)
 
     "[OPTION] File name"
     file_name::String = "particles.jld2"
@@ -20,9 +20,9 @@ Base.@kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
 
     # tracking arrays
     times::Vector{DateTime} = zeros(DateTime, n_steps+1)
-    lons::Matrix{NF} = zeros(NF,n_particles, n_steps+1)
-    lats::Matrix{NF} = zeros(NF,n_particles, n_steps+1)
-    σs::Matrix{NF} = zeros(NF,n_particles, n_steps+1)
+    lons::Matrix{NF} = zeros(NF, n_particles, n_steps+1)
+    lats::Matrix{NF} = zeros(NF, n_particles, n_steps+1)
+    σs::Matrix{NF} = zeros(NF, n_particles, n_steps+1)
 end
 
 ParticleTracker(SG::SpectralGrid;kwargs...) = ParticleTracker{SG.NF}(;kwargs...)
@@ -34,7 +34,7 @@ function initialize!(
     model::ModelSetup,
 ) where NF
 
-    (;n_particles) = model.particle_advection
+    n_particles = length(progn.particles)
     callback.n_particles = n_particles
 
     # calculate tracking frequency, adjust tracking time step
@@ -75,7 +75,7 @@ function callback!(
     
     # otherwise call now, but escape if n_steps + 1 already reached as arrays are of that size
     callback.counter += 1  
-    callback.counter > callback.n_steps + 1 && return nothing
+    callback.counter > (callback.n_steps + 1) && return nothing
     i = callback.counter
 
     for (p,particle) in enumerate(progn.particles)
@@ -108,4 +108,5 @@ function finish!(
 
     # with no output run_path is "" by default
     run_path == "" && @info "ParticleTracker stored data in $(joinpath(pwd(),filename))"
+    return nothing
 end

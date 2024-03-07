@@ -83,6 +83,7 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     prognostic_variables.clock.start = time      # and store the start time
 
     # particle advection
+    initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
 
     diagnostic_variables = DiagnosticVariables(spectral_grid, model)
