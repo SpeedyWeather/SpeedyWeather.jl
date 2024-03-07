@@ -25,6 +25,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     SUT<:AbstractSurfaceThermodynamics,
     SUW<:AbstractSurfaceWind,
     SH<:AbstractSurfaceHeat,
+    CV<:AbstractConvection,
     SW<:AbstractShortwave,
     LW<:AbstractLongwave,
     TS<:AbstractTimeStepper,
@@ -64,8 +65,9 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
     surface_heat_flux::SH = SurfaceSensibleHeat(spectral_grid)
+    convection::CV = DryBettsMiller(spectral_grid)
     shortwave_radiation::SW = NoShortwave(spectral_grid)
-    longwave_radiation::LW = UniformCooling(spectral_grid)
+    longwave_radiation::LW = NoLongwave(spectral_grid)
     
     # NUMERICS
     device_setup::DS = DeviceSetup(CPUDevice())

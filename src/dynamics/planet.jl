@@ -42,6 +42,5 @@ Base.@kwdef mutable struct Earth{NF<:AbstractFloat} <: AbstractPlanet
     solar_constant::NF = 1365
 end
 
-Earth(;kwargs...) = Earth{DEFAULT_NF}(;kwargs...)
 Earth(SG::SpectralGrid;kwargs...) = Earth{SG.NF}(;kwargs...)
 Earth(::Type{NF};kwargs...) where NF = Earth{NF}(;kwargs...)
