@@ -13,10 +13,10 @@ function initialize!(
     IC::InitialConditions,
     model::ModelSetup
 )
-    has(model,:vor) && initialize!(progn,IC.vordiv,model)
-    has(model,:pres) && initialize!(progn,IC.pres,model)
-    has(model,:temp) && initialize!(progn,IC.temp,model)
-    has(model,:humid) && initialize!(progn,IC.humid,model)
+    has(model,:vor)   && initialize!(progn, IC.vordiv, model)
+    has(model,:pres)  && initialize!(progn, IC.pres,   model)
+    has(model,:temp)  && initialize!(progn, IC.temp,   model)
+    has(model,:humid) && initialize!(progn, IC.humid,  model)
 end
 
 InitialConditions(::Type{<:Barotropic}) = InitialConditions(;vordiv = StartWithRandomVorticity())
@@ -33,7 +33,7 @@ function InitialConditions(::Type{<:PrimitiveWet})
     pres = PressureOnOrography()
     temp = JablonowskiTemperature()
     humid = ConstantRelativeHumidity()
-    return InitialConditions(vordiv,pres,temp,humid)
+    return InitialConditions(;vordiv,pres,temp,humid)
 end
 
 export ZeroInitially
@@ -391,7 +391,11 @@ function initialize!(   progn_new::PrognosticVariables,
 
     restart_file = jldopen(joinpath(path,string("run_",run_id_to_string(id)),"restart.jld2"))
     progn_old = restart_file["prognostic_variables"]
-    # version = restart_file["version"]             # currently unused
+    version = restart_file["version"]
+    if version != pkgversion(SpeedyWeather)
+        @info "Restart file created with SpeedyWeather $version loaded"*
+                "but currently used is $(pkgversion(SpeedyWeather))"
+    end
     return copy!(progn_new, progn_old)
 end
 
@@ -503,19 +507,20 @@ function initialize!(
     (;nlev, σ_levels_full) = model.geometry
     lnpₛ = progn.surface.timesteps[1].pres
     pres_grid = gridded(lnpₛ, model.spectral_transform)
+    pres_grid .= exp.(pres_grid)
 
     for k in 1:nlev
         temp_grid = gridded(progn.layers[k].timesteps[1].temp, model.spectral_transform)
-        humid_surf_grid = zero(temp_grid)
+        humid_grid = zero(temp_grid)
 
-        for ij in eachgridpoint(humid_surf_grid)
+        for ij in eachgridpoint(humid_grid)
             pₖ = σ_levels_full[k] * pres_grid[ij]
             q_sat = saturation_humidity(temp_grid[ij], pₖ, model.clausius_clapeyron)
-            humid_surf_grid[ij] = relhumid_ref*q_sat
+            humid_grid[ij] = relhumid_ref*q_sat
         end
         
         (;humid) = progn.layers[k].timesteps[1]
-        spectral!(humid, humid_surf_grid, model.spectral_transform)
+        spectral!(humid, humid_grid, model.spectral_transform)
         spectral_truncation!(humid)
     end
 end
