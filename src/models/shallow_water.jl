@@ -19,7 +19,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     OR<:AbstractOrography,
     FR<:AbstractForcing,
     DR<:AbstractDrag,
-    IC<:InitialConditions,
+    IC<:AbstractInitialConditions,
     TS<:AbstractTimeStepper,
     ST<:SpectralTransform{NF},
     IM<:AbstractImplicit,
@@ -39,7 +39,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     orography::OR = EarthOrography(spectral_grid)
     forcing::FR = NoForcing()
     drag::DR = NoDrag()
-    initial_conditions::IC = ZonalJet()
+    initial_conditions::IC = InitialConditions(ShallowWater)
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -49,7 +49,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     geometry::GE = Geometry(spectral_grid)
 
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid, Barotropic)
+    output::OW = OutputWriter(spectral_grid, ShallowWater)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end

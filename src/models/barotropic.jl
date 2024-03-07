@@ -18,7 +18,7 @@ Base.@kwdef mutable struct BarotropicModel{
     CO<:AbstractCoriolis,
     FR<:AbstractForcing,
     DR<:AbstractDrag,
-    IC<:InitialConditions,
+    IC<:AbstractInitialConditions,
     TS<:AbstractTimeStepper,
     ST<:SpectralTransform{NF},
     IM<:AbstractImplicit,
@@ -38,7 +38,7 @@ Base.@kwdef mutable struct BarotropicModel{
     coriolis::CO = Coriolis(spectral_grid)
     forcing::FR = NoForcing()
     drag::DR = NoDrag()
-    initial_conditions::IC = StartWithRandomVorticity()
+    initial_conditions::IC = InitialConditions(Barotropic)
     
     # NUMERICS
     device_setup::DS = DeviceSetup(CPUDevice())
