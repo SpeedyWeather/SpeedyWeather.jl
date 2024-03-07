@@ -126,6 +126,7 @@ include("output/output.jl")
 include("output/feedback.jl")
 include("output/plot.jl")
 include("output/callbacks.jl")
+include("output/particle_tracker.jl")
 
 # MODELS
 include("models/simulation.jl")
