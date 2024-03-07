@@ -16,7 +16,6 @@ end
 Particle{NF}(;lon,lat,σ=0) where NF = Particle{NF}(lon,lat,σ)
 Particle{NF,isactive}(;lon,lat,σ=0) where {NF,isactive} = Particle{NF,isactive}(lon,lat,σ)
 Particle(;lon,lat,σ=0) = Particle(lon,lat,σ)
-Particle(;lon,lat,σ=0) = Particle(lon,lat,σ)
 
 # empty constructor map to zero
 Particle() = zero(Particle)
@@ -27,8 +26,8 @@ Particle{NF}(args...) where NF = Particle{NF,true}(args...)
 # promotion of arguments
 Particle(lon,lat) = Particle(lon,lat,0)
 Particle(lon::Integer,lat::Integer) = Particle(lon,lat,0)
-Particle(args::Integer...) = Particle{DEFAULT_NF,true}(args...)
-Particle(args...) = Particle{promote_type(typeof.(args)...),true}(args...)
+Particle(lon,lat,σ) = Particle{promote_type(typeof.((lon,lat,σ))...),true}(lon,lat,σ)
+Particle(lon::Integer,lat::Integer,σ::Integer) = Particle{DEFAULT_NF,true}(lon,lat,σ)
 
 # zero generators
 Base.zero(::Type{Particle}) = Particle{DEFAULT_NF,true}(0,0,0)
