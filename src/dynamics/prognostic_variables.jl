@@ -9,12 +9,24 @@ $(TYPEDFIELDS)."""
 Base.@kwdef mutable struct Clock
     "current model time"
     time::DateTime = DEFAULT_DATE
+
+    "start time of simulation"
+    start::DateTime = DEFAULT_DATE
     
     "period to integrate for, set in set_period!(::Clock, ::Dates.Period)"
     period::Second = Second(0)
 
+    "Counting all time steps during simulation"
+    timestep_counter::Int = 0
+
     "number of time steps to integrate for, set in initialize!(::Clock,::AbstractTimeStepper)"
     n_timesteps::Int = 0  
+end
+
+function timestep!(clock::Clock, Δt; increase_counter::Bool=true)
+    clock.time += Δt
+    # the first timestep is a half-step and doesn't count
+    clock.timestep_counter += increase_counter  
 end
 
 # pretty printing
@@ -29,6 +41,8 @@ $(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` in the `time_stepping`."""
 function initialize!(clock::Clock, time_stepping::AbstractTimeStepper)
     clock.n_timesteps = ceil(Int,clock.period.value/time_stepping.Δt_sec)
+    clock.start = clock.time    # store the start time
+    clock.timestep_counter = 0  # reset counter
     return clock
 end
 
@@ -211,7 +225,7 @@ function PrognosticVariables(SG::SpectralGrid,model::ModelSetup)
 
     # particles advection
     n_particles = hasfield(typeof(model),:particle_advection) ?
-                        model.particle_advection.n_particles : 0
+                        SpeedyWeather.n_particles(model.particle_advection) : 0
     particles = zeros(Particle{NF}, n_particles)
 
     scale = Ref(one(NF))        # initialize with scale=1, wrapped in RefValue for mutability

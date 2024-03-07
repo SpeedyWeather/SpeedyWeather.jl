@@ -61,34 +61,4 @@ end
 
 EarthAtmosphere(;kwargs...) = EarthAtmosphere{DEFAULT_NF}(;kwargs...)
 EarthAtmosphere(SG::SpectralGrid;kwargs...) = EarthAtmosphere{SG.NF}(;kwargs...)
-
-# "scale height for specific humidity [km]"
-# scale_height_humid::NF = 2.5
-
-# "relative humidity of near-surface air [1]"
-# relhumid_ref::NF = 0.7
-
-# "saturation water vapour pressure [Pa]"
-# water_pres_ref::NF = 17
-
-# # STANDARD ATMOSPHERE (reference values)
-# "moist adiabatic temperature lapse rate ``-dT/dz`` [K/km]"
-# lapse_rate::NF = 5
-
-# "absolute temperature at surface ``z=0`` [K]"
-# temp_ref::NF = 288
-
-# "absolute temperature in stratosphere [K]"
-# temp_top::NF = 216
-
-# "for stratospheric lapse rate [K] after Jablonowski"
-# ΔT_stratosphere::NF = 4.8e5
-
-# "start of the stratosphere in sigma coordinates"
-# σ_tropopause::NF = 0.2
-
-# "top of the planetary boundary layer in sigma coordinates"
-# σ_boundary_layer::NF = 0.93
-
-# "scale height for pressure [km]"
-# scale_height::NF = 7.5
+EarthAtmosphere(::Type{NF};kwargs...) where NF = EarthAtmosphere{NF}(;kwargs...)
