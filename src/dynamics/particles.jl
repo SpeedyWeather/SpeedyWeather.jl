@@ -132,7 +132,7 @@ function particle_advection!(
     particles::Vector{Particle{NF}},
     diagn,
     dt::Real,
-    particle_advection::AbstractParticleAdvection,
+    particle_advection::ParticleAdvection,
 ) where NF
 
     # escape immediately for no particles
