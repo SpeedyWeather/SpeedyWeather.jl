@@ -19,6 +19,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     OR<:AbstractOrography,
     FR<:AbstractForcing,
     DR<:AbstractDrag,
+    PA<:AbstractParticleAdvection,
     IC<:InitialConditions,
     TS<:AbstractTimeStepper,
     ST<:SpectralTransform{NF},
@@ -39,6 +40,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     orography::OR = EarthOrography(spectral_grid)
     forcing::FR = NoForcing()
     drag::DR = NoDrag()
+    particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = ZonalJet()
 
     # NUMERICS
@@ -49,7 +51,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     geometry::GE = Geometry(spectral_grid)
 
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid,Barotropic)
+    output::OW = OutputWriter(spectral_grid, ShallowWater)
     callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
     feedback::FB = Feedback()
 end
@@ -80,7 +82,11 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
-    prognostic_variables.clock.time = time       # set the time
+    prognostic_variables.clock.time = time       # set the current time
+    prognostic_variables.clock.start = time      # and store the start time
+
+    # particle advection
+    initialize!(prognostic_variables.particles, model)
 
     diagnostic_variables = DiagnosticVariables(spectral_grid,model)
     return Simulation(prognostic_variables,diagnostic_variables,model)

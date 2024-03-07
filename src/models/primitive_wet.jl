@@ -92,7 +92,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     hole_filling::HF = ClipNegatives()
     
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid, PrimitiveDry)
+    output::OW = OutputWriter(spectral_grid, PrimitiveWet)
     callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
     feedback::FB = Feedback()
 end
@@ -140,7 +140,8 @@ function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     prognostic_variables = PrognosticVariables(spectral_grid,model)
     initialize!(prognostic_variables,model.initial_conditions,model)
     (;clock) = prognostic_variables
-    clock.time = time       # set the time
+    clock.time = time       # set the current time
+    clock.start = time      # and store the start time
 
     # initialize ocean and land and synchronize clocks
     initialize!(prognostic_variables.ocean, clock.time, model)
