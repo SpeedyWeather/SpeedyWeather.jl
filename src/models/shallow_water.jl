@@ -4,7 +4,7 @@ export ShallowWaterModel
 The ShallowWaterModel contains all model components needed for the simulation of the
 shallow water equations. To be constructed like
 
-    model = ShallowWaterModel(;spectral_grid, kwargs...)
+    model = ShallowWaterModel(; spectral_grid, kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
@@ -50,7 +50,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
 
     # OUTPUT
     output::OW = OutputWriter(spectral_grid, ShallowWater)
-    callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
+    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
 
@@ -63,7 +63,7 @@ Calls all `initialize!` functions for most components (=fields) of `model`,
 except for `model.output` and `model.feedback` which are always initialized
 in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
-    (;spectral_grid) = model
+    (; spectral_grid) = model
 
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for ShallowWaterModel, \
                                 SpectralGrid with nlev=$(spectral_grid.nlev) provided."
@@ -78,10 +78,10 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     # model.implicit is initialized in first_timesteps!
 
     # initial conditions
-    prognostic_variables = PrognosticVariables(spectral_grid,model)
-    initialize!(prognostic_variables,model.initial_conditions,model)
+    prognostic_variables = PrognosticVariables(spectral_grid, model)
+    initialize!(prognostic_variables, model.initial_conditions, model)
     prognostic_variables.clock.time = time       # set the time
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid,model)
-    return Simulation(prognostic_variables,diagnostic_variables,model)
+    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    return Simulation(prognostic_variables, diagnostic_variables, model)
 end

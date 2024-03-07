@@ -66,12 +66,12 @@ function initialize!(   progn::PrognosticVariables{NF},
 
     lmax = progn.trunc+1
     power = initial_conditions.power + 1    # +1 as power is summed of orders m
-    ξ = randn(Complex{NF},lmax,lmax)*convert(NF,initial_conditions.amplitude)
+    ξ = randn(Complex{NF}, lmax, lmax)*convert(NF, initial_conditions.amplitude)
 
     for progn_layer in progn.layers
         for m in 1:lmax
             for l in m:lmax
-                progn_layer.timesteps[1].vor[l,m] = ξ[l,m]*l^power
+                progn_layer.timesteps[1].vor[l, m] = ξ[l, m]*l^power
             end
         end
         # don't perturb l=m=0 mode to have zero mean
@@ -118,8 +118,8 @@ function initialize!(   progn::PrognosticVariables,
                         initial_conditions::ZonalJet,
                         model::ModelSetup)
 
-    (;latitude, width, umax) = initial_conditions               # for jet
-    (;perturb_lat, perturb_lon, perturb_xwidth,                 # for perturbation
+    (; latitude, width, umax) = initial_conditions               # for jet
+    (; perturb_lat, perturb_lon, perturb_xwidth,                 # for perturbation
         perturb_ywidth, perturb_height) = initial_conditions
 
     θ₀ = (latitude-width)/360*2π    # southern boundary of jet [radians]
@@ -131,20 +131,20 @@ function initialize!(   progn::PrognosticVariables,
     β = perturb_ywidth*2π/360       # meridional extent of interface perturbation [radians]
     λ = perturb_lon*2π/360          # perturbation longitude [radians]
 
-    (;rotation, gravity) = model.planet
-    (;radius) = model.spectral_grid
+    (; rotation, gravity) = model.planet
+    (; radius) = model.spectral_grid
 
     # always create on F64 grid then convert to spectral and interpolate there
     Grid = FullGaussianGrid
     nlat_half = 64
-    u_grid = zeros(Grid,nlat_half)
-    η_grid = zeros(Grid,nlat_half)
-    colats = RingGrids.get_colat(Grid,nlat_half)
-    _,lons = RingGrids.get_colatlons(Grid,nlat_half)
+    u_grid = zeros(Grid, nlat_half)
+    η_grid = zeros(Grid, nlat_half)
+    colats = RingGrids.get_colat(Grid, nlat_half)
+    _, lons = RingGrids.get_colatlons(Grid, nlat_half)
     weights = FastGaussQuadrature.gausslegendre(2nlat_half)[2]
     η_sum = 0
 
-    for (j,ring) in enumerate(eachring(u_grid,η_grid))
+    for (j, ring) in enumerate(eachring(u_grid, η_grid))
         θ = π/2 - colats[j]             # latitude in radians
         coslat⁻¹j = 1/cos(θ)
         f = 2rotation*sin(θ)
@@ -177,18 +177,18 @@ function initialize!(   progn::PrognosticVariables,
     η = spectral(η_grid)
 
     # interpolate in spectral space to desired resolution
-    (;lmax,mmax) = model.spectral_transform
-    (;NF) = model.spectral_grid
-    u = spectral_truncation(complex(NF),u,lmax,mmax)
+    (; lmax, mmax) = model.spectral_transform
+    (; NF) = model.spectral_grid
+    u = spectral_truncation(complex(NF), u, lmax, mmax)
     
-    # get vorticity initial conditions from curl of u,v
+    # get vorticity initial conditions from curl of u, v
     v = zero(u)     # meridional velocity zero for these initial conditions
-    (;vor) = progn.layers[end].timesteps[1]
-    curl!(vor,u,v,model.spectral_transform)
+    (; vor) = progn.layers[end].timesteps[1]
+    curl!(vor, u, v, model.spectral_transform)
 
     # transform interface height η (use pres as prognostic variable) in spectral
-    (;pres) = progn.surface.timesteps[1]
-    copyto!(pres,η)
+    (; pres) = progn.surface.timesteps[1]
+    copyto!(pres, η)
     spectral_truncation!(pres)
 end
 
@@ -226,20 +226,20 @@ Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::ZonalWind,
                         model::PrimitiveEquation) where NF
-
-    (;u₀, η₀) = initial_conditions
-    (;perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = initial_conditions
-    (;radius, Grid, nlat_half) = model.spectral_grid
-    (;σ_levels_full) = model.geometry
+  
+    (; u₀, η₀) = initial_conditions
+    (; perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = initial_conditions
+    (; radius, Grid, nlat_half) = model.spectral_grid
+    (; σ_levels_full) = model.geometry
 
     φ, λ = model.geometry.latds, model.geometry.londs
     S = model.spectral_transform
 
     # VORTICITY
-    ζ = zeros(Grid{NF},nlat_half)   # relative vorticity
-    D = zeros(Grid{NF},nlat_half)   # divergence (perturbation only)
+    ζ = zeros(Grid{NF}, nlat_half)   # relative vorticity
+    D = zeros(Grid{NF}, nlat_half)   # divergence (perturbation only)
 
-    for (k,layer) in enumerate(progn.layers)
+    for (k, layer) in enumerate(progn.layers)
 
         η = σ_levels_full[k]    # Jablonowski and Williamson use η for σ coordinates
         ηᵥ = (η - η₀)*π/2       # auxiliary variable for vertical coordinate
@@ -247,7 +247,7 @@ function initialize!(   progn::PrognosticVariables{NF},
         # amplitude with height
         cos_ηᵥ = cos(ηᵥ)^(3/2)  # wind increases with height: 1 at model top, ~0.4 at surface
 
-        for (ij,(φij,λij)) in enumerate(zip(φ,λ))
+        for (ij, (φij, λij)) in enumerate(zip(φ, λ))
             sinφ = sind(φij)
             cosφ = cosd(φij)
             tanφ = tand(φij)
@@ -275,9 +275,9 @@ function initialize!(   progn::PrognosticVariables{NF},
             D[ij] = -2perturb_uₚ*radius/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
         end
 
-        (;vor,div) = layer.timesteps[1]
-        spectral!(vor,ζ,S)
-        spectral!(div,D,S)
+        (; vor, div) = layer.timesteps[1]
+        spectral!(vor, ζ, S)
+        spectral!(div, D, S)
         spectral_truncation!(vor)
         spectral_truncation!(div)
     end
@@ -336,12 +336,12 @@ function initialize!(   progn::PrognosticVariables{NF},
         end
     end
 
-    Tη .= max.(Tη,Tmin)
+    Tη .= max.(Tη, Tmin)
 
-    T = zeros(Grid{NF},nlat_half)   # temperature
+    T = zeros(Grid{NF}, nlat_half)   # temperature
     aΩ = radius*rotation
 
-    for (k,layer) in enumerate(progn.layers)
+    for (k, layer) in enumerate(progn.layers)
 
         η = σ_levels_full[k]    # Jablonowski and Williamson use η for σ coordinates
         ηᵥ = (η - η₀)*π/2       # auxiliary variable for vertical coordinate
@@ -350,7 +350,7 @@ function initialize!(   progn::PrognosticVariables{NF},
         A1 = 3/4*η*π*u₀/R_dry*sin(ηᵥ)*sqrt(cos(ηᵥ))
         A2 = 2u₀*cos(ηᵥ)^(3/2)
 
-        for (ij,φij) in enumerate(φ)
+        for (ij, φij) in enumerate(φ)
             sinφ = sind(φij)
             cosφ = cosd(φij)
 
@@ -358,8 +358,8 @@ function initialize!(   progn::PrognosticVariables{NF},
             T[ij] = Tη[k] + A1*((-2sinφ^6*(cosφ^2 + 1/3) + 10/63)*A2 + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*aΩ)
         end
 
-        (;temp) = layer.timesteps[1]
-        spectral!(temp,T,S)
+        (; temp) = layer.timesteps[1]
+        spectral!(temp, T, S)
         spectral_truncation!(temp)
     end
 end
@@ -376,7 +376,7 @@ Base.@kwdef struct StartFromFile <: AbstractInitialConditions
     path::String = pwd()
 
     "`run_id` of restart file in `run_????/restart.jld2`"
-    id::Union{String,Int} = 1
+    id::Union{String, Int} = 1
 end
 
 """
@@ -389,7 +389,7 @@ function initialize!(   progn_new::PrognosticVariables,
 
     (; path, id ) = initial_conditions
 
-    restart_file = jldopen(joinpath(path,string("run_",run_id_to_string(id)),"restart.jld2"))
+    restart_file = jldopen(joinpath(path, string("run_", run_id_to_string(id)), "restart.jld2"))
     progn_old = restart_file["prognostic_variables"]
     version = restart_file["version"]
     if version != pkgversion(SpeedyWeather)
@@ -408,10 +408,10 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     # lapse_rate:   Reference temperature lapse rate -dT/dz [K/km]
     # gravity:      Gravitational acceleration [m/s^2]
     # R_dry:        Specific gas constant for dry air [J/kg/K]
-    (;temp_ref, lapse_rate, R_dry) = model.atmosphere
-    (;gravity) = model.planet
-    (;nlev, σ_levels_full) = model.geometry         
-    (;norm_sphere) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
+    (; temp_ref, lapse_rate, R_dry) = model.atmosphere
+    (; gravity) = model.planet
+    (; nlev, σ_levels_full) = model.geometry
+    (; norm_sphere) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
 
     # Lapse rate scaled by gravity [K/m / (m²/s²)]
     Γg⁻¹ = lapse_rate/gravity
@@ -420,7 +420,7 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     # overwrite with lowermost layer further down
     temp_surf = progn.layers[end].timesteps[1].temp     # spectral temperature at k=nlev+1/2
     temp_surf[1] = norm_sphere*temp_ref                 # set global mean surface temperature
-    for lm in eachharmonic(geopot_surf,temp_surf)
+    for lm in eachharmonic(geopot_surf, temp_surf)
         temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]           # lower temperature for higher mountains
     end
 
@@ -430,7 +430,7 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
         temp = progn.layers[k].timesteps[1].temp
         σₖᴿ = σ_levels_full[k]^(R_dry*Γg⁻¹)             # from hydrostatic equation
 
-        for lm in eachharmonic(temp,temp_surf)
+        for lm in eachharmonic(temp, temp_surf)
             temp[lm] = temp_surf[lm]*σₖᴿ
         end
     end
@@ -466,7 +466,7 @@ function initialize!(   progn::PrognosticVariables,
     RΓg⁻¹ = R_dry*lapse_rate/gravity         # for convenience
     ΓT⁻¹ = lapse_rate/temp_ref           
 
-    for ij in eachgridpoint(lnp_grid,orography)
+    for ij in eachgridpoint(lnp_grid, orography)
         lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹
     end
 
@@ -503,8 +503,8 @@ function initialize!(
     IC::ConstantRelativeHumidity,
     model::ModelSetup,
 )
-    (;relhumid_ref) = IC
-    (;nlev, σ_levels_full) = model.geometry
+    (; relhumid_ref) = IC
+    (; nlev, σ_levels_full) = model.geometry
     lnpₛ = progn.surface.timesteps[1].pres
     pres_grid = gridded(lnpₛ, model.spectral_transform)
     pres_grid .= exp.(pres_grid)
@@ -540,26 +540,26 @@ end
 """
 $(TYPEDSIGNATURES)
 Random initial conditions for the interface displacement η
-in the shallow water equations. The flow (u,v) is zero initially.
+in the shallow water equations. The flow (u, v) is zero initially.
 This kicks off gravity waves that will interact with orography."""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::RandomWaves,
                         model::ShallowWater) where NF
         
-    (;A, lmin, lmax) = initial_conditions
-    (;trunc) = progn
+    (; A, lmin, lmax) = initial_conditions
+    (; trunc) = progn
 
     η = progn.surface.timesteps[1].pres
-    η .= randn(LowerTriangularMatrix{Complex{NF}},trunc+2,trunc+1)
+    η .= randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
 
     # zero out other wavenumbers
-    η[1:min(lmin,trunc+2),:] .= 0
-    η[min(lmax+2,trunc+2):trunc+2,:] .= 0
+    η[1:min(lmin, trunc+2), :] .= 0
+    η[min(lmax+2, trunc+2):trunc+2, :] .= 0
 
     # scale to amplitude
-    η_grid = gridded(η,model.spectral_transform)
-    η_min,η_max = extrema(η_grid)
-    η .*= (A/max(abs(η_min),abs(η_max)))
+    η_grid = gridded(η, model.spectral_transform)
+    η_min, η_max = extrema(η_grid)
+    η .*= (A/max(abs(η_min), abs(η_max)))
 
     return nothing
 end

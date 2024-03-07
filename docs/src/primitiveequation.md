@@ -19,7 +19,7 @@ logarithm of surface pressure ``\ln p_s``, temperature ``T`` and specific humidi
 \end{aligned}
 ```
 
-with velocity ``\mathbf{u} = (u,v)``, rotated velocity ``\mathbf{u}_\perp = (v,-u)``,
+with velocity ``\mathbf{u} = (u, v)``, rotated velocity ``\mathbf{u}_\perp = (v, -u)``,
 Coriolis parameter ``f``, ``W`` the [Vertical advection](@ref) operator, dry air gas constant ``R_d``,
 [Virtual temperature](@ref) ``T_v``, [Geopotential](@ref) ``\Phi``, pressure ``p``
 and surface pressure ``p_s``, thermodynamic ``\kappa = R\_d/c_p``
@@ -28,7 +28,7 @@ form ``(-1)^{n+1}\nu\nabla^{2n}`` with coefficient ``\nu`` and power ``n``  is a
 every variable that is advected, meaning ``\zeta, \mathcal{D}, T, q``, but left out
 here for clarity, see [Horizontal diffusion](@ref diffusion).
 
-The parameterizations for the tendencies of ``u,v,T,q`` from physical processes are denoted as
+The parameterizations for the tendencies of ``u, v, T, q`` from physical processes are denoted as
 ``\mathcal{P}_\mathbf{u} = (\mathcal{P}_u, \mathcal{P}_v), \mathcal{P}_T, \mathcal{P}_q``
 and are further described in the corresponding sections, see [Parameterizations](@ref).
 
@@ -101,7 +101,7 @@ T_v = (1 + \mu q)T
 ```
 
 For completeness we want to mention here that the above product, because it is a 
-product of two variables ``q,T`` has to be computed in grid-point space,
+product of two variables ``q, T`` has to be computed in grid-point space,
 see [Spherical Harmonic Transform](@ref).
 To obtain an approximation to the virtual temperature in spectral space without
 expensive transforms one can linearize
@@ -109,7 +109,7 @@ expensive transforms one can linearize
 T_v \approx T + \mu q\bar{T}
 ```
 with a global constant temperature ``\bar{T}``, for example obtained from the
-``l=m=0`` mode, ``\bar{T} = T_{0,0}\frac{1}{\sqrt{4\pi}}`` but depending on the
+``l=m=0`` mode, ``\bar{T} = T_{0, 0}\frac{1}{\sqrt{4\pi}}`` but depending on the
 normalization of the spherical harmonics that factor needs adjustment.
 We call this the _linear virtual temperature_ which is used for the geopotential
 calculation, see [#254](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/254).
@@ -117,7 +117,7 @@ calculation, see [#254](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues
 ## Vertical coordinates
 
 We start with some general considerations that apply when changing the vertical
-coordinate from height ``z`` to something else. Let ``\Psi(x,y,z,t)``
+coordinate from height ``z`` to something else. Let ``\Psi(x, y, z, t)``
 be some variable that depends on space and time. Now we want to express
 ``\Psi`` using some other coordinate ``\eta`` in the vertical. Regardless of
 the coordinate system the value of ``\Psi`` at the to ``z`` corresponding ``\eta``
@@ -125,7 +125,7 @@ the coordinate system the value of ``\Psi`` at the to ``z`` corresponding ``\eta
 not ``\Psi`` itself.
 
 ```math
-\Psi(x,y,\eta,t) = \Psi(x,y,z(x,y,\eta,t),t)
+\Psi(x, y, \eta, t) = \Psi(x, y, z(x, y, \eta, t), t)
 ```
 So you can think of ``z`` as a function of ``\eta`` and ``\eta`` as a function of ``z``.
 The chain rule lets us differentiate ``\Psi`` with respect to ``z`` or ``\eta``
@@ -133,7 +133,7 @@ The chain rule lets us differentiate ``\Psi`` with respect to ``z`` or ``\eta``
 \frac{\partial \Psi}{\partial z} = \frac{\partial \Psi}{\partial \eta}\frac{\partial \eta}{\partial z},
 \qquad \frac{\partial \Psi}{\partial \eta} = \frac{\partial \Psi}{\partial z}\frac{\partial z}{\partial \eta}
 ```
-But for derivatives with respect to ``x,y,t`` we have to apply the multi-variable
+But for derivatives with respect to ``x, y, t`` we have to apply the multi-variable
 chain-rule as both ``\Psi`` and ``\eta`` depend on it. So a derivative with respect to
 ``x`` on ``\eta`` levels (where ``\eta`` constant) becomes
 ```math
@@ -160,7 +160,7 @@ This coordinate system uses fraction of surface pressure in the vertical, i.e.
 ```math
 \sigma = \frac{p}{p_s}
 ```
-with ``\sigma = [0,1]`` and ``\sigma = 0`` being the top (zero pressure) and ``\sigma = 1``
+with ``\sigma = [0, 1]`` and ``\sigma = 0`` being the top (zero pressure) and ``\sigma = 1``
 the surface (at surface pressure). As a consequence the vertical dimension is also
 indexed from top to surface.
 
@@ -474,7 +474,7 @@ Vorticity advection in the primitive equation takes the form
 ```
 Meaning that we add the Coriolis parameter ``f`` and the relative vorticity ``\zeta``
 and multiply by the respective velocity component. While the primitive equations here
-are written with vorticity and divergence, we use ``u,v`` here as other tendencies
+are written with vorticity and divergence, we use ``u, v`` here as other tendencies
 will be added and the curl and divergence are only taken once after transform into
 spectral space. To obtain a tendency for vorticity and divergence, we rewrite this as
 ```math
@@ -483,7 +483,7 @@ spectral space. To obtain a tendency for vorticity and divergence, we rewrite th
 \frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot (f+\zeta)\mathbf{u}_\perp \\
 \end{aligned}
 ```
-with ``\mathbf{u}_\perp = (v,-u)`` the rotated velocity vector, see [Barotropic vorticity equation](@ref).
+with ``\mathbf{u}_\perp = (v, -u)`` the rotated velocity vector, see [Barotropic vorticity equation](@ref).
 
 ## Humidity equation
 
@@ -615,14 +615,14 @@ orography and a reference vertical temperature profile. The scheme described her
 Hoskins and Simmons [^HS75], which has also been used in Simmons and Burridge [^SB81].
 
 As before, let ``\delta V = \tfrac{V_{i+1} - V_{i-1}}{2\Delta t}`` be the tendency we need for the Leapfrog
-time stepping. With the implicit time step ``\xi = 2\alpha\Delta t``, ``\alpha \in [\tfrac{1}{2},1]`` we have
+time stepping. With the implicit time step ``\xi = 2\alpha\Delta t``, ``\alpha \in [\tfrac{1}{2}, 1]`` we have
 
 ```math
 \delta V = N_E(V_i) + N_I(V_{i-1}) + \xi N_I(\delta V)
 ```
 with ``N_E`` being the explicitly-treated non-linear terms and ``N_I`` the implicitly-treated linear terms, such that
 ``N_I`` is a linear operator. We can therefore solve for ``\delta V``
-by inverting ``N_I``, 
+by inverting ``N_I``,
 ```math
 \delta V = (1-\xi N_I)^{-1}G
 ```
@@ -677,7 +677,7 @@ The operators ``\mathbf{R, U, L, W}`` are all linear, meaning that we can apply 
 in spectral space to each spherical harmonic independently -- the vertical is coupled however.
 With ``N`` being the number of vertical levels and the prognostic variables like
 temperature for a given degree ``l`` and order ``m`` being a column vector in the vertical,
-``T_{l,m} \in \mathbb{R}^N``, these operators have the following shapes
+``T_{l, m} \in \mathbb{R}^N``, these operators have the following shapes
 
 ```math
 \begin{aligned}
@@ -690,13 +690,13 @@ temperature for a given degree ``l`` and order ``m`` being a column vector in th
 
 ``\mathbf{R}`` is an integration in the vertical hence it is an upper triangular matrix such that
 the first (an top-most) ``k=1`` element of the resulting vector depends on all vertical levels
-of the temperature mode ``T_{l,m}``, but the surface ``k=N`` only on the temperature mode at the surface.
-``\mathbf{U}`` takes the surface value of the ``l,m`` mode of the logarithm of surface pressure
-``(\ln p_s)_{l,m}`` and multiplies it element-wise with the reference temperature profile and
+of the temperature mode ``T_{l, m}``, but the surface ``k=N`` only on the temperature mode at the surface.
+``\mathbf{U}`` takes the surface value of the ``l, m`` mode of the logarithm of surface pressure
+``(\ln p_s)_{l, m}`` and multiplies it element-wise with the reference temperature profile and
 the dry gas constant. So the result is a column vector.
 ``\mathbf{L}`` is an ``N \times N`` matrix as the adiabatic conversion term couples all layers.
 ``\mathbf{W}`` is a row vector as it represents the vertical averaging of the spherical harmonics
-of a divergence profile. So, ``\mathbf{W}\mathcal{D}`` is a scalar product for every ``l,m``
+of a divergence profile. So, ``\mathbf{W}\mathcal{D}`` is a scalar product for every ``l, m``
 giving a contribution of all vertical layers in divergence to the (single-layer!) logarithm of
 surface pressure tendency.
 
@@ -727,13 +727,13 @@ which is of size ``l_{max} \times N \times N``, hence for every degree ``l`` of
 the spherical harmonics (which the Laplace operator depends on) a
 ``N \times N`` matrix coupling the ``N`` vertical levels. Furthermore, ``S`` depends
 - through ``\xi`` on the time step ``\Delta t``,
-- through ``\mathbf{R,W,L}`` on the vertical level spacing ``\Delta \sigma_k``
+- through ``\mathbf{R, W, L}`` on the vertical level spacing ``\Delta \sigma_k``
 - through ``\mathbf{U}`` on the reference temperature profile ``T_k``
 
 so for any changes of these the matrix inversion of ``\mathbf{S}`` has to
 be recomputed. Otherwise the algorithm for the semi-implicit scheme is as follows
 
-0\. Precompute the linear operators ``\mathbf{R,U,L,W}`` and with them the matrix inversion ``\mathbf{S}^{-1}``.
+0\. Precompute the linear operators ``\mathbf{R, U, L, W}`` and with them the matrix inversion ``\mathbf{S}^{-1}``.
 
 Then for every time step
 
@@ -768,8 +768,8 @@ obtaining velocities is done as in the shallow water model
 - Invert the [Laplacian](@ref) of ``\zeta_{lm}`` to obtain the stream function ``\Psi_{lm}`` in spectral space
 - Invert the [Laplacian](@ref) of ``D_{lm}`` to obtain the velocity potential ``\Phi_{lm}`` in spectral space
 - obtain velocities ``U_{lm} = (\cos(\theta)u)_{lm}, V_{lm} = (\cos(\theta)v)_{lm}`` from ``\nabla^\perp\Psi_{lm} + \nabla\Phi_{lm}``
-- Transform velocities ``U_{lm}``, ``V_{lm}`` to grid-point space ``U,V``
-- Unscale the ``\cos(\theta)`` factor to obtain ``u,v``
+- Transform velocities ``U_{lm}``, ``V_{lm}`` to grid-point space ``U, V``
+- Unscale the ``\cos(\theta)`` factor to obtain ``u, v``
 
 Additionally we
 
@@ -784,19 +784,19 @@ Now loop over
 4. For every layer ``k`` compute a linearized [Virtual temperature](@ref) in spectral space.
 5. For every layer ``k`` compute a temperature anomaly (virtual and absolute) relative to a vertical reference profile ``T_k`` in grid-point space.
 6. Compute the [Geopotential](@ref) ``\Phi`` by integrating the virtual temperature vertically in spectral space from surface to top.
-7. Integrate ``u,v,D`` vertically to obtain ``\bar{u},\bar{v},\bar{D}`` in grid-point space and also ``\bar{D}_{lm}`` in spectral space. Store on the fly also for every layer ``k`` the partial integration from 1 to ``k-1`` (top to layer above). These will be used in the adiabatic term of the [Temperature equation](@ref).
+7. Integrate ``u, v, D`` vertically to obtain ``\bar{u}, \bar{v}, \bar{D}`` in grid-point space and also ``\bar{D}_{lm}`` in spectral space. Store on the fly also for every layer ``k`` the partial integration from 1 to ``k-1`` (top to layer above). These will be used in the adiabatic term of the [Temperature equation](@ref).
 8. Compute the [Surface pressure tendency](@ref) with the vertical averages from the previous step. For the [semi-implicit time stepping](@ref implicit_primitive)
 9. For every layer ``k`` compute the [Vertical velocity](@ref).
 10. For every layer ``k`` add the linear contribution of the [Pressure gradient](@ref) ``RT_k (\ln p_s)_{lm}`` to the geopotential ``\Phi`` in spectral space.
-11. For every layer ``k`` compute the [Vertical advection](@ref) for ``u,v,T,q`` and add it to the respective tendency.
-12. For every layer ``k`` compute the tendency of ``u,v`` due to [Vorticity advection](@ref) and the [Pressure gradient](@ref) ``RT_v \nabla \ln p_s`` and add to the respective existing tendency. Unscale ``\cos(\theta)``, transform to spectral space, take curl and divergence to obtain tendencies for ``\zeta_{lm},\mathcal{D}_{lm}``.
+11. For every layer ``k`` compute the [Vertical advection](@ref) for ``u, v, T, q`` and add it to the respective tendency.
+12. For every layer ``k`` compute the tendency of ``u, v`` due to [Vorticity advection](@ref) and the [Pressure gradient](@ref) ``RT_v \nabla \ln p_s`` and add to the respective existing tendency. Unscale ``\cos(\theta)``, transform to spectral space, take curl and divergence to obtain tendencies for ``\zeta_{lm}, \mathcal{D}_{lm}``.
 13. For every layer ``k`` compute the adiabatic term and the horizontal advection in the [Temperature equation](@ref) in grid-point space, add to existing tendency and transform to spectral.
 14. For every layer ``k`` compute the horizontal advection of humidity ``q`` in the [Humidity equation](@ref) in grid-point space, add to existing tendency and transform to spectral.
 15. For every layer ``k`` compute the kinetic energy ``\tfrac{1}{2}(u^2 + v^2)``, transform to spectral and add to the [Geopotential](@ref). For the [semi-implicit time stepping](@ref implicit_primitive) also add the linear pressure gradient calculated from the previous time step. Now apply the Laplace operator and subtract from the divergence tendency.
 16. Correct the tendencies following the [semi-implicit time integration](@ref implicit_swm) to prevent fast gravity waves from causing numerical instabilities.
-17. Compute the [horizontal diffusion](@ref diffusion) for the advected variables ``\zeta,\mathcal{D},T,q``
+17. Compute the [horizontal diffusion](@ref diffusion) for the advected variables ``\zeta, \mathcal{D}, T, q``
 18. Compute a leapfrog time step as described in [Time integration](@ref leapfrog) with a [Robert-Asselin and Williams filter](@ref)
-19. Transform the new spectral state of ``\zeta_{lm}``, ``\mathcal{D}_{lm}``, ``T_{lm}``, ``q_{lm}`` and ``(\ln p_s)_{lm}`` to grid-point ``u,v,\zeta,\mathcal{D},T,q,\ln p_s`` as described in 0.
+19. Transform the new spectral state of ``\zeta_{lm}``, ``\mathcal{D}_{lm}``, ``T_{lm}``, ``q_{lm}`` and ``(\ln p_s)_{lm}`` to grid-point ``u, v, \zeta, \mathcal{D}, T, q, \ln p_s`` as described in 0.
 20. Possibly do some output
 21. Repeat from 1.
 

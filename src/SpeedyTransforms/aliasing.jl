@@ -9,11 +9,11 @@ to match spectral and grid resolution."""
 function RingGrids.get_nlat_half(   trunc::Integer,
                                     dealiasing::Real=DEFAULT_DEALIASING)
                     
-    return roundup_fft(ceil(Int,((1+dealiasing)*trunc+1)/4))
+    return roundup_fft(ceil(Int, ((1+dealiasing)*trunc+1)/4))
 end
 
 # inverse of get_nlat_half to reobtain dealiasing
-get_dealiasing(trunc,nlat_half) = (4nlat_half)/(trunc+1) - 1
+get_dealiasing(trunc, nlat_half) = (4nlat_half)/(trunc+1) - 1
 
 """
 $(TYPEDSIGNATURES)
@@ -23,22 +23,22 @@ following a dealiasing parameter (default 2) to match spectral and grid resoluti
 function get_truncation(nlat_half::Integer,
                         dealiasing::Real=DEFAULT_DEALIASING)
 
-    return floor(Int,(4nlat_half-1)/(dealiasing+1))
+    return floor(Int, (4nlat_half-1)/(dealiasing+1))
 end
 
 # unpack nlat_half from provided map
-get_truncation(map::AbstractGrid,dealiasing::Real=DEFAULT_DEALIASING) =
-    get_truncation(map.nlat_half,dealiasing)
+get_truncation(map::AbstractGrid, dealiasing::Real=DEFAULT_DEALIASING) =
+    get_truncation(map.nlat_half, dealiasing)
 
 """
     m = roundup_fft(n::Int;
-                    small_primes::Vector{Int}=[2,3,5])
+                    small_primes::Vector{Int}=[2, 3, 5])
 
 Returns an integer `m >= n` with only small prime factors 2, 3 (default, others can be specified
 with the keyword argument `small_primes`) to obtain an efficiently fourier-transformable number of
-longitudes, m = 2^i * 3^j * 5^k >= n, with i,j,k >=0.
+longitudes, m = 2^i * 3^j * 5^k >= n, with i, j, k >=0.
 """
-function roundup_fft(n::Integer;small_primes::Vector{T}=[2,3,5]) where {T<:Integer}
+function roundup_fft(n::Integer; small_primes::Vector{T}=[2, 3, 5]) where {T<:Integer}
     factors_not_in_small_primes = true      # starting condition for while loop
     n += isodd(n) ? 1 : 0                   # start with an even n
     while factors_not_in_small_primes
@@ -61,6 +61,6 @@ end
 """
     true/false = is_power_2(i::Integer)
 
-Checks whether an integer `i` is a power of 2, i.e. i = 2^k, with k = 0,1,2,3,...."""
+Checks whether an integer `i` is a power of 2, i.e. i = 2^k, with k = 0, 1, 2, 3, ...."""
 is_power_2(i::Integer) = i != 0 ? i & (i-1) == 0 : false
 is_power_2_or_0(i::Integer) = i & (i-1) == 0
