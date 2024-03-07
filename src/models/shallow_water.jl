@@ -20,7 +20,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     FR<:AbstractForcing,
     DR<:AbstractDrag,
     PA<:AbstractParticleAdvection,
-    IC<:InitialConditions,
+    IC<:AbstractInitialConditions,
     TS<:AbstractTimeStepper,
     ST<:SpectralTransform{NF},
     IM<:AbstractImplicit,
@@ -41,7 +41,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     forcing::FR = NoForcing()
     drag::DR = NoDrag()
     particle_advection::PA = NoParticleAdvection()
-    initial_conditions::IC = ZonalJet()
+    initial_conditions::IC = InitialConditions(ShallowWater)
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)

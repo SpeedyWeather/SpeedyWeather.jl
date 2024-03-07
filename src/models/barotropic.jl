@@ -19,7 +19,7 @@ Base.@kwdef mutable struct BarotropicModel{
     FR<:AbstractForcing,
     DR<:AbstractDrag,
     PA<:AbstractParticleAdvection,
-    IC<:InitialConditions,
+    IC<:AbstractInitialConditions,
     TS<:AbstractTimeStepper,
     ST<:SpectralTransform{NF},
     IM<:AbstractImplicit,
@@ -40,8 +40,8 @@ Base.@kwdef mutable struct BarotropicModel{
     forcing::FR = NoForcing()
     drag::DR = NoDrag()
     particle_advection::PA = NoParticleAdvection()
-    initial_conditions::IC = StartWithRandomVorticity()
-    
+    initial_conditions::IC = InitialConditions(Barotropic)
+
     # NUMERICS
     device_setup::DS = DeviceSetup(CPUDevice())
     time_stepping::TS = Leapfrog(spectral_grid)
