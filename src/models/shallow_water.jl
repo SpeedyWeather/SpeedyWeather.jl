@@ -19,7 +19,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     OR<:AbstractOrography,
     FR<:AbstractForcing,
     DR<:AbstractDrag,
-    IC<:InitialConditions,
+    IC<:AbstractInitialConditions,
     TS<:AbstractTimeStepper,
     ST<:SpectralTransform{NF},
     IM<:AbstractImplicit,
