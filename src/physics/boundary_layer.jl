@@ -10,8 +10,8 @@ end
 export NoBoundaryLayerDrag
 struct NoBoundaryLayerDrag <: AbstractBoundaryLayer end
 NoBoundaryLayerDrag(::SpectralGrid) = NoBoundaryLayerDrag()
-initialize!(::NoBoundaryLayerDrag,::PrimitiveEquation) = nothing
-boundary_layer_drag!(::ColumnVariables,::NoBoundaryLayerDrag,::PrimitiveEquation) = nothing
+initialize!(::NoBoundaryLayerDrag, ::PrimitiveEquation) = nothing
+boundary_layer_drag!(::ColumnVariables, ::NoBoundaryLayerDrag, ::PrimitiveEquation) = nothing
 
 export LinearDrag
 
@@ -27,13 +27,13 @@ Base.@kwdef struct LinearDrag{NF<:AbstractFloat} <: AbstractBoundaryLayer
     time_scale::Second = Hour(24)   # time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
 
     # PRECOMPUTED CONSTANTS
-    drag_coefs::Vector{NF} = zeros(NF,nlev)
+    drag_coefs::Vector{NF} = zeros(NF, nlev)
 end
 
 """
 $(TYPEDSIGNATURES)
 Generator function using `nlev` from `SG::SpectralGrid`"""
-LinearDrag(SG::SpectralGrid;kwargs...) = LinearDrag{SG.NF}(nlev=SG.nlev;kwargs...)
+LinearDrag(SG::SpectralGrid; kwargs...) = LinearDrag{SG.NF}(nlev=SG.nlev; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -41,13 +41,13 @@ Precomputes the drag coefficients for this `BoundaryLayerDrag` scheme."""
 function initialize!(   scheme::LinearDrag,
                         model::PrimitiveEquation)
 
-    (;σ_levels_full) = model.geometry
-    (;σb, time_scale, drag_coefs) = scheme
+    (; σ_levels_full) = model.geometry
+    (; σb, time_scale, drag_coefs) = scheme
 
     kf = 1/time_scale.value
 
-    for (k,σ) in enumerate(σ_levels_full)
-        drag_coefs[k] = -kf*max(0,(σ-σb)/(1-σb))    # drag only below σb, lin increasing to kf at σ=1
+    for (k, σ) in enumerate(σ_levels_full)
+        drag_coefs[k] = -kf*max(0, (σ-σb)/(1-σb))    # drag only below σb, lin increasing to kf at σ=1
     end
 end 
 
@@ -55,7 +55,7 @@ end
 function boundary_layer_drag!(  column::ColumnVariables,
                                 scheme::LinearDrag,
                                 model::PrimitiveEquation)
-    boundary_layer_drag!(column,scheme)
+    boundary_layer_drag!(column, scheme)
 end
 
 """
@@ -64,8 +64,8 @@ Compute tendency for boundary layer drag of a `column` and add to its tendencies
 function boundary_layer_drag!(  column::ColumnVariables,
                                 scheme::LinearDrag)
 
-    (;u, v, u_tend, v_tend) = column
-    (;drag_coefs) = scheme
+    (; u, v, u_tend, v_tend) = column
+    (; drag_coefs) = scheme
 
     @inbounds for k in eachlayer(column)
         kᵥ = drag_coefs[k]
@@ -81,8 +81,8 @@ Base.@kwdef struct ConstantDrag{NF} <: AbstractBoundaryLayer
     drag::NF = 1e-3
 end
 
-ConstantDrag(SG::SpectralGrid;kwargs...) = ConstantDrag{SG.NF}(;kwargs...)
-initialize!(::ConstantDrag,::PrimitiveEquation) = nothing
+ConstantDrag(SG::SpectralGrid; kwargs...) = ConstantDrag{SG.NF}(; kwargs...)
+initialize!(::ConstantDrag, ::PrimitiveEquation) = nothing
 function boundary_layer_drag!(  column::ColumnVariables,
                                 scheme::ConstantDrag,
                                 model::PrimitiveEquation)
@@ -108,27 +108,27 @@ Base.@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     drag_max::Base.RefValue{NF} = Ref(zero(NF))
 end
 
-BulkRichardsonDrag(SG::SpectralGrid,kwargs...) = BulkRichardsonDrag{SG.NF}(;kwargs...)
+BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kwargs...)
 
 function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
 
     # Typical height Z of lowermost layer from geopotential of reference surface temperature
     # minus surface geopotential (orography * gravity)
-    (;temp_ref) = model.atmosphere
-    (;gravity) = model.planet
-    (;Δp_geopot_full) = model.geopotential
+    (; temp_ref) = model.atmosphere
+    (; gravity) = model.planet
+    (; Δp_geopot_full) = model.geopotential
     Z = temp_ref * Δp_geopot_full[end] / gravity
     
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
-    (;κ, z₀) = scheme
+    (; κ, z₀) = scheme
     scheme.drag_max[] = (κ/log(Z/z₀))^2
 end
 
 function boundary_layer_drag!(  column::ColumnVariables,
                                 scheme::BulkRichardsonDrag,
                                 model::PrimitiveEquation)
-    boundary_layer_drag!(column,scheme)
+    boundary_layer_drag!(column, scheme)
 end
 
 function boundary_layer_drag!(
@@ -136,7 +136,7 @@ function boundary_layer_drag!(
     scheme::BulkRichardsonDrag,
 )
     
-    (;Ri_c) = scheme
+    (; Ri_c) = scheme
     drag_max = scheme.drag_max[]
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)

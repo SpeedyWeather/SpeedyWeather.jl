@@ -76,7 +76,7 @@ All grids shown have 16 latitude rings on one hemisphere, Equator included.
 The total number of grid points is denoted in the top left of every subplot.
 The sphere is shaded with grey, orange and turquoise regions to denote the
 hemispheres in **a** and **b**, the 8 octahedral faces **c**,
-**d**,**f** and the 12 dodecahedral faces (or base pixels) in **e**.
+**d**, **f** and the 12 dodecahedral faces (or base pixels) in **e**.
 Coastlines are added for orientation.
 
 ## Grid resolution
@@ -130,7 +130,7 @@ changes when `dealiasing` is passed onto `SpectralGrid` on the `FullGaussianGrid
 | 42    | 3          | 192x96                |
 | ...   | ...        | ...                   |
 
-You will obtain this information every time you create a `SpectralGrid(;Grid,trunc,dealiasing)`.
+You will obtain this information every time you create a `SpectralGrid(; Grid, trunc, dealiasing)`.
 
 ## [Full Gaussian grid](@id FullGaussianGrid)
 
@@ -145,7 +145,7 @@ which points that do not reduce in number towards the poles. That means for ever
 \phi_i = \frac{2\pi (i-1)}{N_\phi}
 ```
 
-with ``i = 1,...,N_\phi`` the in-ring index (1-based, counting from 0˚ eastward) and
+with ``i = 1, ..., N_\phi`` the in-ring index (1-based, counting from 0˚ eastward) and
 ``N_\phi`` the number of longitudinal points on the grid.
 The first longitude is therefore 0˚, meaning that there is no longitudinal offset on this grid.
 There are always twice as many points in zonal direction as there are in meridional,
@@ -156,7 +156,7 @@ For ``\theta`` in latitudes
 ```math
 \sin(\theta_j) = z_j(l) 
 ```
-As it can be easy to mix up latitudes, colatitudes and as the Legendre polynomials are defined in ``[0,1]``
+As it can be easy to mix up latitudes, colatitudes and as the Legendre polynomials are defined in ``[0, 1]``
 an overview of the first Gaussian latitudes (approximated for ``l>2`` for brevity)
 
 | ``l`` | Zero crossings ``z_j``      | Latitudes [˚N] |
@@ -188,8 +188,8 @@ But no points are on the poles as ``z=-1`` or ``1`` is never a zero crossing of 
 The octahedral Gaussian grid is a reduced grid, i.e. the number of longitudinal points reduces
 towards the poles. It still uses the Gaussian latitudes from the [full Gaussian grid](@ref FullGaussianGrid)
 so the exactness property of the spherical harmonic transform also holds for this grid.
-However, the longitudes ``\phi_i`` with ``i = 1,...,16+4j`` on the ``j``-th latitude ring
-(starting with 1 around the north pole), ``j=1,...,\tfrac{N_\theta}{2}``,
+However, the longitudes ``\phi_i`` with ``i = 1, ..., 16+4j`` on the ``j``-th latitude ring
+(starting with 1 around the north pole), ``j=1, ..., \tfrac{N_\theta}{2}``,
 are now, on the northern hemisphere,
 
 ```math
@@ -218,7 +218,7 @@ The colatitudes ``\theta_j``, and the longitudes ``\phi_i`` are
 ```math
 \theta_j = \frac{j}{N_\theta + 1}\pi, \quad \phi_i = \frac{2\pi (i-1)}{N_\phi}
 ```
-with ``i`` the in-ring zonal index ``i = 1,...,N_\phi`` and ``j = 1, ... ,N_\theta`` the
+with ``i`` the in-ring zonal index ``i = 1, ..., N_\phi`` and ``j = 1, ... , N_\theta`` the
 ring index starting with 1 around the north pole. There is no grid point on the poles,
 but in contrast to the Gaussian grids there is a ring on the Equator.
 The longitudes are shared with the full Gaussian grid.
@@ -269,7 +269,7 @@ of zonal grid points is constant (always ``2N``, so 32 at ``N=16``) and there ar
 the equatorial zone with the border at  ``\cos(\theta) = 2/3`` (``\theta`` in colatitudes).
 
 Following Górski, 2004[^G04], the ``z=cos(\theta)`` colatitude of the ``j``-th ring in the north polar cap,
-``j=1,...,N_{side}`` with ``2N_{side} = N`` is 
+``j=1, ..., N_{side}`` with ``2N_{side} = N`` is 
 
 ```math
 z = 1 - \frac{j^2}{3N_{side}^2}
@@ -278,14 +278,14 @@ and on that ring, the longitude ``\phi`` of the ``i``-th point (``i`` is the in-
 ```math
 \phi = \frac{\pi}{2j}(i-\tfrac{1}{2})
 ```
-The in-ring index ``i`` goes from ``i=1,...,4`` for the first (i.e. northern-most) ring,
-``i=1,...,8`` for the second ring and ``i = 1,...,4j`` for the ``j``-th ring in the northern polar cap.
+The in-ring index ``i`` goes from ``i=1, ..., 4`` for the first (i.e. northern-most) ring,
+``i=1, ..., 8`` for the second ring and ``i = 1, ..., 4j`` for the ``j``-th ring in the northern polar cap.
 
-In the north equatorial belt ``j=N_{side},...,2N_{side}`` this changes to
+In the north equatorial belt ``j=N_{side}, ..., 2N_{side}`` this changes to
 ```math
 z = \frac{4}{3} - \frac{2j}{3N_{side}}
 ```
-and the longitudes change to (``i`` is always ``i = 1,...,4N_{side}`` in the equatorial belt meaning the
+and the longitudes change to (``i`` is always ``i = 1, ..., 4N_{side}`` in the equatorial belt meaning the
 number of longitude points is constant here)
 ```math
 \phi = \frac{\pi}{2N_{side}}(i - \frac{s}{2}), \quad s = (j - N_{side} + 1) \mod 2
@@ -295,7 +295,7 @@ The modulo function comes in as there is an alternating longitudinal offset from
 ### Grid cell boundaries
 
 The cell boundaries are obtained by setting ``i = k + 1/2`` or ``i = k + 1/2 + j`` (half indices) into the
-equations above, such that ``z(\phi,k)``, a function for the cosine of colatitude ``z`` of index ``k`` and
+equations above, such that ``z(\phi, k)``, a function for the cosine of colatitude ``z`` of index ``k`` and
 the longitude ``\phi`` is obtained. These are then (northern polar cap)
 
 ```math
@@ -326,10 +326,10 @@ The latitude of the ``j``-th isolatitude ring on the `OctaHEALPixGrid` is define
 ```math
 z = 1 - \frac{j^2}{N^2},
 ```
-with ``j=1,...,N``, and similarly for the southern hemisphere by symmetry. On this grid ``N_{side} = N``
+with ``j=1, ..., N``, and similarly for the southern hemisphere by symmetry. On this grid ``N_{side} = N``
 where ``N``= `nlat_half`, the number of latitude rings on one hemisphere, Equator included,
 because each of the 4 basepixels spans from pole to pole and covers a quarter of the sphere.
-The longitudes with in-ring- index ``i = 1,...,4j`` are
+The longitudes with in-ring- index ``i = 1, ..., 4j`` are
 ```math
 \phi = \frac{\pi}{2j}(i - \tfrac{1}{2})
 ```

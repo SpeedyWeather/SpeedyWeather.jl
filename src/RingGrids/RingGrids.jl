@@ -9,9 +9,9 @@ import Statistics: mean
 import FastGaussQuadrature
 
 # GRIDS
-export  AbstractGrid, 
-        AbstractFullGrid, 
-        AbstractOctahedralGrid, 
+export  AbstractGrid,
+        AbstractFullGrid,
+        AbstractOctahedralGrid,
         AbstractHEALPixGrid,
         AbstractOctaHEALPixGrid
 

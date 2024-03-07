@@ -4,14 +4,14 @@ abstract type AbstractShortwave <: AbstractRadiation end
 export NoShortwave
 struct NoShortwave <: AbstractShortwave end
 NoShortwave(SG::SpectralGrid) = NoShortwave()
-initialize!(::NoShortwave,::PrimitiveEquation) = nothing
+initialize!(::NoShortwave, ::PrimitiveEquation) = nothing
 
 # function barrier for all AbstractShortwave
 function shortwave_radiation!(column::ColumnVariables, model::PrimitiveEquation)
     shortwave_radiation!(column, model.shortwave_radiation, model)
 end
 
-shortwave_radiation!(::ColumnVariables,::NoShortwave,::PrimitiveEquation) = nothing
+shortwave_radiation!(::ColumnVariables, ::NoShortwave, ::PrimitiveEquation) = nothing
 
 export TransparentShortwave
 Base.@kwdef struct TransparentShortwave{NF} <: AbstractShortwave
@@ -21,9 +21,9 @@ end
 
 TransparentShortwave(SG::SpectralGrid) = TransparentShortwave{SG.NF}()
 
-function initialize!(scheme::TransparentShortwave,model::PrimitiveEquation)
-    (;solar_constant, gravity) = model.planet
-    (;pres_ref) = model.atmosphere
+function initialize!(scheme::TransparentShortwave, model::PrimitiveEquation)
+    (; solar_constant, gravity) = model.planet
+    (; pres_ref) = model.atmosphere
     cₚ = model.atmosphere.heat_capacity
     Δσ = model.geometry.σ_levels_thick
     scheme.S[] = (1 - scheme.albedo) * solar_constant * gravity / (Δσ[end] * pres_ref * cₚ)
@@ -34,7 +34,7 @@ function shortwave_radiation!(
     scheme::TransparentShortwave,
     model::PrimitiveEquation,
 )
-    shortwave_radiation!(column,scheme,model.solar_zenith)
+    shortwave_radiation!(column, scheme, model.solar_zenith)
 end
 
 function shortwave_radiation!(

@@ -1,5 +1,5 @@
 abstract type AbstractVerticalAdvection end
-abstract type VerticalAdvection{NF,B} <: AbstractVerticalAdvection end
+abstract type VerticalAdvection{NF, B} <: AbstractVerticalAdvection end
 
 # Dispersive and diffusive advection schemes `NF` is the type, `B` the half-stencil size
 abstract type DiffusiveVerticalAdvection{NF, B}  <: VerticalAdvection{NF, B} end
@@ -48,7 +48,7 @@ function vertical_advection!(   layer::DiagnosticVariablesLayer,
 
     # for k==1 "above" term is 0, for k==nlev "below" term is zero
     # avoid out-of-bounds indexing with k_above, k_below as follows
-    k⁻ = max(1,k-1) # just saturate, because M_1/2 = 0 (which zeros that term)
+    k⁻ = max(1, k-1) # just saturate, because M_1/2 = 0 (which zeros that term)
         
     # mass fluxes, M_1/2 = M_nlev+1/2 = 0, but k=1/2 isn't explicitly stored
     σ_tend_above = diagn.layers[k⁻].dynamics_variables.σ_tend
@@ -62,7 +62,7 @@ function vertical_advection!(   layer::DiagnosticVariablesLayer,
         ξ_sten = retrieve_stencil(k, diagn.layers, var, nlev, scheme)
         ξ      = retrieve_time_step(scheme, layer.grid_variables, var)
 
-        _vertical_advection!(ξ_tend,σ_tend_above,σ_tend_below,ξ_sten,ξ,Δσₖ,scheme)
+        _vertical_advection!(ξ_tend, σ_tend_above, σ_tend_below, ξ_sten, ξ, Δσₖ, scheme)
     end
 
     if wet_core
@@ -70,7 +70,7 @@ function vertical_advection!(   layer::DiagnosticVariablesLayer,
         ξ_sten = retrieve_current_stencil(k, diagn.layers, :humid, nlev, scheme)
         ξ      = retrieve_current_time_step(layer.grid_variables, :humid)
 
-        _vertical_advection!(ξ_tend,σ_tend_above,σ_tend_below,ξ_sten,ξ,Δσₖ,scheme)
+        _vertical_advection!(ξ_tend, σ_tend_above, σ_tend_below, ξ_sten, ξ, Δσₖ, scheme)
     end
 end
 
@@ -82,7 +82,7 @@ function _vertical_advection!(  ξ_tend::Grid,                  # tendency of qu
                                 ξ::Grid,                       # ξ at level k
                                 Δσₖ::NF,                       # layer thickness on σ levels
                                 adv::VerticalAdvection{NF, B}  # vertical advection scheme
-                                ) where {NF<:AbstractFloat,Grid<:AbstractGrid{NF}, B}
+                                ) where {NF<:AbstractFloat, Grid<:AbstractGrid{NF}, B}
     Δσₖ⁻¹ = 1/Δσₖ                                      # precompute
 
     # += as the tendencies already contain the parameterizations
