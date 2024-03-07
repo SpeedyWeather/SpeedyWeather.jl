@@ -414,17 +414,6 @@ without overwriting other terms which, in fact, will be added to this
 array afterwards. In general, you can also force the momentum equations
 in grid-point space by writing into `u_tend_grid` and `v_tend_grid`.
 
-(Not needed anymore with SpeedyWeather.jl v0.8)
-~~Then one last detail is the call to `spectral_truncation!`. Despite the
-triangular spectral truncation in SpeedyWeather, the lower triangular matrices
-for the spherical harmonics are actually of size ``N+1 \times N``, because
-this additional degree (=row) is needed for vector quantities
-(see [One more degree for spectral fields](@ref)). Here particularly,
-this means that the last spectral transform will compute the spherical
-harmonics of this last degree which, however, scalar quantities like
-vorticity should not make use of. We therefore set this degree to zero
-with the call to `spectral_truncation!`, which does exactly that.~~
-
 ## Custom forcing: model construction
 
 Now that we have defined a new forcing, how to initialize it and what
