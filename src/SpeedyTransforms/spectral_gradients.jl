@@ -1,10 +1,10 @@
 """
 $(TYPEDSIGNATURES)
-Curl of a vector `u,v` written into `curl`, `curl = ∇×(u,v)`.
-`u,v` are expected to have a 1/coslat-scaling included, then `curl` is not scaled.
-`flipsign` option calculates -∇×(u,v) instead. `add` option calculates `curl += ∇×(u,v)` instead.
+Curl of a vector `u, v` written into `curl`, `curl = ∇×(u, v)`.
+`u, v` are expected to have a 1/coslat-scaling included, then `curl` is not scaled.
+`flipsign` option calculates -∇×(u, v) instead. `add` option calculates `curl += ∇×(u, v)` instead.
 `flipsign` and `add` can be combined. This functions only creates the kernel and calls the generic
-divergence function _divergence! subsequently with flipped u,v -> v,u for the curl."""
+divergence function _divergence! subsequently with flipped u, v -> v, u for the curl."""
 function curl!( curl::LowerTriangularMatrix,
                 u::LowerTriangularMatrix,
                 v::LowerTriangularMatrix,
@@ -14,16 +14,16 @@ function curl!( curl::LowerTriangularMatrix,
                 )
 
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
-    kernel(o,a,b,c) = flipsign ? (add ? o-(a+b-c) : -(a+b-c)) :
+    kernel(o, a, b, c) = flipsign ? (add ? o-(a+b-c) : -(a+b-c)) :
                                  (add ? o+(a+b-c) :   a+b-c )    
-    _divergence!(kernel,curl,v,u,S)             # flip u,v -> v,u
+    _divergence!(kernel, curl, v, u, S)             # flip u, v -> v, u
 end
 
 """
 $(TYPEDSIGNATURES)
-Divergence of a vector `u,v` written into `div`, `div = ∇⋅(u,v)`. 
-`u,v` are expected to have a 1/coslat-scaling included, then `div` is not scaled.
-`flipsign` option calculates -∇⋅(u,v) instead. `add` option calculates `div += ∇⋅(u,v)` instead.
+Divergence of a vector `u, v` written into `div`, `div = ∇⋅(u, v)`. 
+`u, v` are expected to have a 1/coslat-scaling included, then `div` is not scaled.
+`flipsign` option calculates -∇⋅(u, v) instead. `add` option calculates `div += ∇⋅(u, v)` instead.
 `flipsign` and `add` can be combined. This functions only creates the kernel and calls
 the generic divergence function _divergence! subsequently."""
 function divergence!(   div::LowerTriangularMatrix,
@@ -35,14 +35,14 @@ function divergence!(   div::LowerTriangularMatrix,
                         )
 
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    kernel(o,a,b,c) = flipsign ? (add ? o-(a-b+c) : -(a-b+c)) :
+    kernel(o, a, b, c) = flipsign ? (add ? o-(a-b+c) : -(a-b+c)) :
                                  (add ? o+(a-b+c) :   a-b+c )                
-    _divergence!(kernel,div,u,v,S)
+    _divergence!(kernel, div, u, v, S)
 end
 
 """
 $(TYPEDSIGNATURES)
-Generic divergence function of vector `u`,`v` that writes into the output into `div`.
+Generic divergence function of vector `u`, `v` that writes into the output into `div`.
 Generic as it uses the kernel `kernel` such that curl, div, add or flipsign
 options are provided through `kernel`, but otherwise a single function is used."""
 function _divergence!(  kernel,
@@ -55,15 +55,15 @@ function _divergence!(  kernel,
     @boundscheck size(u) == size(div) || throw(BoundsError)
     @boundscheck size(v) == size(div) || throw(BoundsError)
 
-    (; grad_y_vordiv1,grad_y_vordiv2 ) = S
+    (; grad_y_vordiv1, grad_y_vordiv2 ) = S
     @boundscheck size(grad_y_vordiv1) == size(div) || throw(BoundsError)
     @boundscheck size(grad_y_vordiv2) == size(div) || throw(BoundsError)
-    lmax,mmax = size(div) .- (2,1)              # 0-based lmax,mmax 
+    lmax, mmax = size(div) .- (2, 1)              # 0-based lmax, mmax 
 
     lm = 0
-    @inbounds for m in 1:mmax+1                 # 1-based l,m
+    @inbounds for m in 1:mmax+1                 # 1-based l, m
         
-        # DIAGONAL (separate to avoid access to v[l-1,m])
+        # DIAGONAL (separate to avoid access to v[l-1, m])
         lm += 1                                 
         ∂u∂λ  = ((m-1)*im)*u[lm]
         ∂v∂θ1 = zero(Complex{NF})               # always above the diagonal
@@ -89,16 +89,16 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Divergence (∇⋅) of two vector components `u,v` which need to have size (n+1)xn,
+Divergence (∇⋅) of two vector components `u, v` which need to have size (n+1)xn,
 the last row will be set to zero in the returned `LowerTriangularMatrix`.
-This function requires both `u,v` to be transforms of fields that are scaled with
+This function requires both `u, v` to be transforms of fields that are scaled with
 `1/cos(lat)`. An example usage is therefore
 
     RingGrids.scale_coslat⁻¹!(u_grid)
     RingGrids.scale_coslat⁻¹!(v_grid)
-    u = spectral(u_grid,one_more_degree=true)
-    v = spectral(v_grid,one_more_degree=true)
-    div = divergence(u,v)
+    u = spectral(u_grid, one_more_degree=true)
+    v = spectral(v_grid, one_more_degree=true)
+    div = divergence(u, v)
     div_grid = gridded(div)
 
 Both `div` and `div_grid` are scaled with the radius.
@@ -110,7 +110,7 @@ function divergence(u::LowerTriangularMatrix,
 
     S = SpectralTransform(u)
     div = similar(u)
-    divergence!(div,u,v,S,add=false,flipsign=false)
+    divergence!(div, u, v, S, add=false, flipsign=false)
     return div
 end
 
@@ -126,43 +126,43 @@ function _div_or_curl(  kernel!,
     RingGrids.scale_coslat⁻¹!(u_grid)
     RingGrids.scale_coslat⁻¹!(v_grid)
 
-    S = SpectralTransform(u_grid,one_more_degree=true)
-    us = spectral(u_grid,S)
-    vs = spectral(v_grid,S)
+    S = SpectralTransform(u_grid, one_more_degree=true)
+    us = spectral(u_grid, S)
+    vs = spectral(v_grid, S)
 
     div_or_vor = similar(us)
-    kernel!(div_or_vor,us,vs,S,add=false,flipsign=false)
+    kernel!(div_or_vor, us, vs, S, add=false, flipsign=false)
     return div_or_vor
 end
 
 """
 $(TYPEDSIGNATURES)
-Divergence (∇⋅) of two vector components `u,v` on a grid.
+Divergence (∇⋅) of two vector components `u, v` on a grid.
 Applies 1/coslat scaling, transforms to spectral space and returns
 the spectral divergence, which is scaled with the radius
 of the sphere. Divide by radius for unscaling."""
-divergence(u::Grid,v::Grid) where {Grid<:AbstractGrid} = _div_or_curl(divergence!,u,v)
+divergence(u::Grid, v::Grid) where {Grid<:AbstractGrid} = _div_or_curl(divergence!, u, v)
 
 """
 $(TYPEDSIGNATURES)
-Curl (∇×) of two vector components `u,v` on a grid.
+Curl (∇×) of two vector components `u, v` on a grid.
 Applies 1/coslat scaling, transforms to spectral space and returns
 the spectral curl, which is scaled with the radius
 of the sphere. Divide by radius for unscaling."""
-curl(u::Grid,v::Grid) where {Grid<:AbstractGrid} = _div_or_curl(curl!,u,v)
+curl(u::Grid, v::Grid) where {Grid<:AbstractGrid} = _div_or_curl(curl!, u, v)
 
 """
 $(TYPEDSIGNATURES)
-Curl (∇×) of two vector components `u,v` of size (n+1)xn, the last row
+Curl (∇×) of two vector components `u, v` of size (n+1)xn, the last row
 will be set to zero in the returned `LowerTriangularMatrix`. This function
-requires both `u,v` to be transforms of fields that are scaled with
+requires both `u, v` to be transforms of fields that are scaled with
 `1/cos(lat)`. An example usage is therefore
 
     RingGrids.scale_coslat⁻¹!(u_grid)
     RingGrids.scale_coslat⁻¹!(v_grid)
     u = spectral(u_grid)
     v = spectral(v_grid)
-    vor = curl(u,v)
+    vor = curl(u, v)
     vor_grid = gridded(div)
 """
 function curl(  u::LowerTriangularMatrix,
@@ -172,24 +172,24 @@ function curl(  u::LowerTriangularMatrix,
 
     S = SpectralTransform(u)
     vor = similar(u)
-    curl!(vor,u,v,S,add=false,flipsign=false)
+    curl!(vor, u, v, S, add=false, flipsign=false)
     return vor
 end
 
 """
 $(TYPEDSIGNATURES)
-Get U,V (=(u,v)*coslat) from vorticity ζ spectral space (divergence D=0)
+Get U, V (=(u, v)*coslat) from vorticity ζ spectral space (divergence D=0)
 Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity. Then
-compute zonal and meridional gradients to get U,V."""
+compute zonal and meridional gradients to get U, V."""
 function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
                         V::LowerTriangularMatrix{Complex{NF}},
                         vor::LowerTriangularMatrix{Complex{NF}},
                         S::SpectralTransform{NF}
                         ) where {NF<:AbstractFloat}
 
-    (; vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 ) = S
-    lmax,mmax = size(vor) .- (2,1)                  # 0-based lmax,mmax
+    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
+    lmax, mmax = size(vor) .- (2, 1)                  # 0-based lmax, mmax
     
     @boundscheck lmax == mmax || throw(BoundsError)
     @boundscheck size(U) == size(vor) || throw(BoundsError)
@@ -199,13 +199,13 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
     @boundscheck size(vordiv_to_uv2) == size(vor) || throw(BoundsError)
 
     lm = 0
-    @inbounds for m in 1:mmax                       # 1-based l,m, exclude last column
+    @inbounds for m in 1:mmax                       # 1-based l, m, exclude last column
 
-        # DIAGONAL (separated to avoid access to l-1,m which is above the diagonal)
+        # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
         lm += 1
 
         # U = -∂/∂lat(Ψ) and V = V = ∂/∂λ(Ψ) combined with Laplace inversion ∇⁻², omit radius R scaling
-        U[lm] = vordiv_to_uv2[lm]*vor[lm+1]         # - vordiv_to_uv1[lm]*vor[l-1,m] <- is zero
+        U[lm] = vordiv_to_uv2[lm]*vor[lm+1]         # - vordiv_to_uv1[lm]*vor[l-1, m] <- is zero
         V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
 
         # BELOW DIAGONAL
@@ -223,7 +223,7 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
         U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # meridional gradient again (but only 2nd term from above)
         V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]       # zonal gradient again (as above)
 
-        # LAST ROW (separated to avoid out-of-bounds access to l+2,m)
+        # LAST ROW (separated to avoid out-of-bounds access to l+2, m)
         lm += 1
         U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # meridional gradient again (but only 2nd term from above)
         V[lm] = zero(Complex{NF})                   # set explicitly to 0 as Ψ does not contribute to last row of V
@@ -245,11 +245,11 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Get U,V (=(u,v)*coslat) from vorticity ζ and divergence D in spectral space.
+Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
 Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity and
 velocity potential from divergence. Then compute zonal and meridional gradients
-to get U,V."""
+to get U, V."""
 function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
                             V::LowerTriangularMatrix{Complex{NF}},
                             vor::LowerTriangularMatrix{Complex{NF}},
@@ -257,8 +257,8 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
                             S::SpectralTransform{NF}
                             ) where {NF<:AbstractFloat}
 
-    (; vordiv_to_uv_x,vordiv_to_uv1,vordiv_to_uv2 ) = S
-    lmax,mmax = size(vor) .- (2,1)                  # 0-based lmax,mmax
+    (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
+    lmax, mmax = size(vor) .- (2, 1)                  # 0-based lmax, mmax
     @boundscheck lmax == mmax || throw(BoundsError)
     @boundscheck size(div) == size(vor) || throw(BoundsError)
     @boundscheck size(U) == size(vor) || throw(BoundsError)
@@ -268,12 +268,12 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
     @boundscheck size(vordiv_to_uv1) == size(vor) || throw(BoundsError)
 
     lm = 0
-    @inbounds for m in 1:mmax                       # 1-based l,m, skip last column
+    @inbounds for m in 1:mmax                       # 1-based l, m, skip last column
 
-        # DIAGONAL (separated to avoid access to l-1,m which is above the diagonal)
+        # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
         lm += 1
         
-        # div,vor contribution to meridional gradient
+        # div, vor contribution to meridional gradient
         ∂ζθ =  vordiv_to_uv2[lm]*vor[lm+1]          # lm-1 term is zero
         ∂Dθ = -vordiv_to_uv2[lm]*div[lm+1]          # lm-1 term is zero
         
@@ -289,7 +289,7 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
         for l in m+1:lmax                               # skip last row (lmax+2)
             lm += 1
             
-            # div,vor contribution to meridional gradient
+            # div, vor contribution to meridional gradient
             # ∂ζθ = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[lm-1]
             # ∂Dθ = vordiv_to_uv1[lm]*div[lm-1] - vordiv_to_uv2[lm]*div[lm+1]
             ∂ζθ = muladd(vordiv_to_uv2[lm], vor[lm+1], -vordiv_to_uv1[lm]*vor[lm-1])
@@ -304,7 +304,7 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
             V[lm] = muladd(z, vor[lm], ∂Dθ)         # = ∂ζλ + ∂Dθ            
         end
 
-        # SECOND LAST ROW (separated to imply that vor,div are zero in last row)
+        # SECOND LAST ROW (separated to imply that vor, div are zero in last row)
         lm += 1
         U[lm] = im*vordiv_to_uv_x[lm]*div[lm] - vordiv_to_uv1[lm]*vor[lm-1]
         V[lm] = im*vordiv_to_uv_x[lm]*vor[lm] + vordiv_to_uv1[lm]*div[lm-1]
@@ -356,20 +356,20 @@ function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: (inv
                 ) where {NF<:AbstractFloat}
 
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
-    lmax,mmax = size(alms) .- (1,1)     # 0-based degree l, order m of the Legendre polynomials
+    lmax, mmax = size(alms) .- (1, 1)     # 0-based degree l, order m of the Legendre polynomials
     
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
     eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
     @boundscheck length(eigenvalues) >= lmax+1 || throw(BoundsError)
 
-    @inline kernel(o,a) = flipsign ? (add ? (o-a) : -a)  :
-                                     (add ? (o+a) :  a)
+    @inline kernel(o, a) = flipsign ? (add ? (o-a) : -a) :
+                                      (add ? (o+a) :  a)
 
     lm = 0
     @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
         for l in m:lmax+1           # degree l = m:lmax but 1-based
             lm += 1
-            ∇²alms[lm] = kernel(∇²alms[lm],alms[lm]*eigenvalues[l])
+            ∇²alms[lm] = kernel(∇²alms[lm], alms[lm]*eigenvalues[l])
         end
     end
 
@@ -385,7 +385,7 @@ function ∇²(alms::LowerTriangularMatrix,    # Input: spectral coefficients
             S::SpectralTransform)           # precomputed eigenvalues
 
     ∇²alms = similar(alms)
-    ∇²!(∇²alms,alms,S,add=false,flipsign=false,inverse=false)
+    ∇²!(∇²alms, alms, S, add=false, flipsign=false, inverse=false)
     return ∇²alms
 end
 
@@ -394,7 +394,7 @@ $(TYPEDSIGNATURES)
 Returns the Laplace operator ∇² applied to input `alms`.
 The Laplace operator acts on the unit
 sphere and therefore omits the 1/radius^2 scaling"""
-∇²(alms::LowerTriangularMatrix) = ∇²(alms,SpectralTransform(alms))
+∇²(alms::LowerTriangularMatrix) = ∇²(alms, SpectralTransform(alms))
 
 """
 $(TYPEDSIGNATURES)
@@ -405,7 +405,7 @@ function ∇⁻²(   ∇²alms::LowerTriangularMatrix,  # Input: spectral coeffi
                 S::SpectralTransform)           # precomputed eigenvalues
 
     alms = similar(∇²alms)
-    ∇⁻²!(alms,∇²alms,S,add=false,flipsign=false)
+    ∇⁻²!(alms, ∇²alms, S, add=false, flipsign=false)
     return alms
 end
 
@@ -414,7 +414,7 @@ $(TYPEDSIGNATURES)
 Returns the inverse Laplace operator ∇⁻² applied to input `alms`.
 The Laplace operator acts on the unit
 sphere and therefore omits the radius^2 scaling"""
-∇⁻²(∇²alms::LowerTriangularMatrix) = ∇⁻²(∇²alms,SpectralTransform(∇²alms))
+∇⁻²(∇²alms::LowerTriangularMatrix) = ∇⁻²(∇²alms, SpectralTransform(∇²alms))
 
 """
     ∇⁻²!(   ∇⁻²alms::LowerTriangularMatrix,
@@ -424,7 +424,7 @@ sphere and therefore omits the radius^2 scaling"""
             flipsign::Bool=false)
 
 Calls `∇²!(∇⁻²alms, alms, S; add, flipsign, inverse=true)`."""
-function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}},# Output: inverse Laplacian of alms
+function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}}, # Output: inverse Laplacian of alms
                 alms::LowerTriangularMatrix{Complex{NF}},   # Input: spectral coefficients
                 S::SpectralTransform{NF};                   # precomputed eigenvalues
                 add::Bool=false,                            # add to output array or overwrite
@@ -432,7 +432,7 @@ function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}},# Output: 
                 ) where {NF<:AbstractFloat}
 
     inverse = true
-    return ∇²!(∇⁻²alms,alms,S;add,flipsign,inverse)
+    return ∇²!(∇⁻²alms, alms, S; add, flipsign, inverse)
 end
 
 """
@@ -446,16 +446,16 @@ function ∇!(dpdx::LowerTriangularMatrix{Complex{NF}},       # Output: zonal gr
             S::SpectralTransform{NF}                        # includes precomputed arrays
             ) where {NF<:AbstractFloat}
 
-    lmax,mmax = size(p) .- (1,1)                            # 0-based, include last row
+    lmax, mmax = size(p) .- (1, 1)                            # 0-based, include last row
     @boundscheck size(p) == size(dpdx) || throw(BoundsError)
     @boundscheck size(p) == size(dpdy) || throw(BoundsError)
 
     (; grad_y1, grad_y2 ) = S
 
     lm = 0
-    @inbounds for m in 1:mmax           # 1-based l,m, skip last column
+    @inbounds for m in 1:mmax           # 1-based l, m, skip last column
 
-        # DIAGONAL (separated to avoid access to l-1,m which is above the diagonal)
+        # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
         lm += 1
 
         dpdx[lm] = (m-1)*im*p[lm]       # zonal gradient: d/dlon = *i*m
@@ -486,5 +486,5 @@ function ∇!(dpdx::LowerTriangularMatrix{Complex{NF}},       # Output: zonal gr
         dpdy[lm] = grad_y1[lm]*p[lm-1]  # only 1st term
     end
 
-    return dpdx,dpdy
+    return dpdx, dpdy
 end

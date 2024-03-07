@@ -1,7 +1,7 @@
 # Barotropic vorticity model
 
 The barotropic vorticity model describes the evolution of a 2D non-divergent flow with
-velocity components ``\mathbf{u} = (u,v)`` through self-advection, forces and dissipation.
+velocity components ``\mathbf{u} = (u, v)`` through self-advection, forces and dissipation.
 Due to the non-divergent nature of the flow, it can be described by (the vertical component)
 of the relative vorticity ``\zeta = \nabla \times \mathbf{u}``.
 
@@ -27,7 +27,7 @@ We denote time``t``, velocity vector ``\mathbf{u} = (u, v)``, Coriolis parameter
 and hyperdiffusion ``(-1)^{n+1} \nu \nabla^{2n} \zeta``
 (``n`` is the hyperdiffusion order,  see [Horizontal diffusion](@ref diffusion)).
 We also include possible forcing terms
-``F_\zeta, \mathbf{F}_\mathbf{u} = (F_u,F_v)`` which act on the vorticity and/or on the
+``F_\zeta, \mathbf{F}_\mathbf{u} = (F_u, F_v)`` which act on the vorticity and/or on the
 zonal velocity ``u`` and the meridional velocity ``v`` and hence the curl
 ``\nabla \times \mathbf{F}_\mathbf{u}`` is a tendency for relative vorticity ``\zeta``.
 See [Extending SpeedyWeather](@ref) how to define these.
@@ -56,7 +56,7 @@ divergence of a flux we rewrite the barotropic vorticity equation as
 \frac{\partial \zeta}{\partial t} = F_\zeta +
 \nabla \times (\mathbf{F} + \mathbf{u}_\perp(\zeta + f)) + (-1)^{n+1}\nu\nabla^{2n}\zeta
 ```
-with ``\mathbf{u}_\perp = (v,-u)`` the rotated velocity vector, because
+with ``\mathbf{u}_\perp = (v, -u)`` the rotated velocity vector, because
 ``-\nabla\cdot\mathbf{u} = \nabla \times \mathbf{u}_\perp``. This is the form that is solved
 in the `BarotropicModel`, as outlined in the following section.
 
@@ -71,19 +71,19 @@ transform this model state to grid-point space:
 - obtain zonal velocity ``(\cos(\theta)u)_{lm}`` through a [Meridional derivative](@ref)
 - obtain meridional velocity ``(\cos(\theta)v)_{lm}`` through a [Zonal derivative](@ref)
 - Transform zonal and meridional velocity ``(\cos(\theta)u)_{lm}``, ``(\cos(\theta)v)_{lm}`` to grid-point space
-- Unscale the ``\cos(\theta)`` factor to obtain ``u,v``
+- Unscale the ``\cos(\theta)`` factor to obtain ``u, v``
 - Transform ``\zeta_{lm}`` to ``\zeta`` in grid-point space
 
 Now loop over
 
 1. Compute the forcing (or drag) terms ``F_\zeta, \mathbf{F}_\mathbf{u}``
-2. Multiply ``u,v`` with ``\zeta+f`` in grid-point space
+2. Multiply ``u, v`` with ``\zeta+f`` in grid-point space
 3. Add ``A = F_u + v(\zeta + f)`` and ``B = F_v - u(\zeta + f)``
 4. Transform these vector components to spectral space ``A_{lm}``, ``B_{lm}``
-5. Compute the curl of ``(A,B)_{lm}`` in spectral space, add to ``F_\zeta`` to accumulate the tendency of ``\zeta_{lm}``
+5. Compute the curl of ``(A, B)_{lm}`` in spectral space, add to ``F_\zeta`` to accumulate the tendency of ``\zeta_{lm}``
 6. Compute the [horizontal diffusion](@ref diffusion) based on that tendency
 7. Compute a leapfrog time step as described in [Time integration](@ref leapfrog) with a [Robert-Asselin and Williams filter](@ref)
-8. Transform the new spectral state of ``\zeta_{lm}`` to grid-point ``u,v,\zeta`` as described in 0.
+8. Transform the new spectral state of ``\zeta_{lm}`` to grid-point ``u, v, \zeta`` as described in 0.
 9. Possibly do some output
 10. Repeat from 1.
 
@@ -124,7 +124,7 @@ d\zeta \to \frac{d\zeta + (-1)^{n+1}\nu\nabla^{2n}\zeta_{i-1}}{1 - 2\Delta t \nu
 which only depends on ``\zeta_{i-1}``. Now let ``D_\text{explicit} = (-1)^{n+1}\nu\nabla^{2n}`` be the explicit part and
 ``D_\text{implicit} = 1 - (-1)^{n+1} 2\Delta t \nu\nabla^{2n}`` the implicit part. Both parts can be precomputed and are
 ``D_\text{implicit} = 1 - 2\Delta t \nu\nabla^{2n}`` the implicit part. Both parts can be precomputed and are
-only an element-wise multiplication in spectral space. For every spectral harmonic ``l,m`` we do
+only an element-wise multiplication in spectral space. For every spectral harmonic ``l, m`` we do
 ```math
 d\zeta \to D_\text{implicit}^{-1}(d\zeta + D_\text{explicit}\zeta_{i-1}).
 ```
@@ -140,19 +140,19 @@ with units ``(\text{m}^2\text{s}^{-1})(\text{m}^{-2}) = \text{s}^{-1}``.
 This motivates us to normalize the Laplace operator by a constant of units ``\text{m}^{-2}`` and the coefficient
 by its inverse such that it becomes a damping timescale of unit ``\text{s}^{-1}``. Given the application in
 spectral space we decide to normalize by the largest eigenvalue ``-l_\text{max}(l_\text{max}+1)`` such that
-all entries in the discrete spectral Laplace operator are in ``[0,1]``. This also has the effect that the
+all entries in the discrete spectral Laplace operator are in ``[0, 1]``. This also has the effect that the
 alternating sign drops out, such that higher wavenumbers are always dampened and not amplified.
 The normalized coefficient ``\nu^* = l_\text{max}(l_\text{max}+1)\nu`` (always positive) is
 therefore reinterpreted as the (inverse) time scale at which the highest wavenumber is dampened
 to zero due to diffusion. Together we have 
 ```math
-D^\text{explicit}_{l,m} = -\nu^* \frac{l(l+1)}{l_\text{max}(l_\text{max}+1)}
+D^\text{explicit}_{l, m} = -\nu^* \frac{l(l+1)}{l_\text{max}(l_\text{max}+1)}
 ```
 and the hyper-Laplacian of power ``n`` follows as
 ```math
-D^\text{explicit,n}_{l,m} = -\nu^* \left(\frac{l(l+1)}{l_\text{max}(l_\text{max}+1)}\right)^n
+D^\text{explicit, n}_{l, m} = -\nu^* \left(\frac{l(l+1)}{l_\text{max}(l_\text{max}+1)}\right)^n
 ```
-and the implicit part is accordingly ``D^\text{implicit,n}_{l,m} = 1 - 2\Delta t D^\text{explicit,n}_{l,m}``.
+and the implicit part is accordingly ``D^\text{implicit, n}_{l, m} = 1 - 2\Delta t D^\text{explicit, n}_{l, m}``.
 Note that the diffusion time scale ``\nu^*`` is then also scaled by the radius, see next section.
 
 ## [Radius scaling](@id scaling)
@@ -178,7 +178,7 @@ The [Barotropic vorticity equation](@ref) scaled with ``R^2`` is
 ```
 with
 - ``\tilde{t} = tR^{-1}``, the scaled time ``t``
-- ``\mathbf{u} = (u,v)``, the velocity vector (no scaling applied)
+- ``\mathbf{u} = (u, v)``, the velocity vector (no scaling applied)
 - ``\tilde{f} = fR``, the scaled Coriolis parameter ``f``
 - ``\tilde{\mathbf{F}} = R\mathbf{F}``, the scaled forcing vector ``\mathbf{F}``
 - ``\tilde{\nu} = \nu^* R``, the scaled diffusion coefficient ``\nu^*``, which itself is normalized to a damping time scale, see [Normalization of diffusion](@ref).
@@ -224,7 +224,7 @@ the leapfrog time steps that follow and that have been described above.
 
 This is particularly done in a way that after 2. we have ``t=0`` at ``i-1`` and ``t=\Delta t`` at ``i``
 available so that 3. can start the leapfrogging without any offset from the intuitive spacing
-``0,\Delta  t, 2\Delta t, 3\Delta t,...``. The following schematic can be useful
+``0, \Delta  t, 2\Delta t, 3\Delta t, ...``. The following schematic can be useful
 
 |                    | time at step ``i-1`` | time at step ``i`` | time step at ``i+1`` |
 | ------------------ | -------------------- | ------------------ | -------------------- |
@@ -274,7 +274,7 @@ u_i &= v_i + \frac{\nu\alpha}{2}(w_{i+1} - 2v_i + u_{i-1}) \\
 v_{i+1} &= w_{i+1} - \frac{\nu(1-\alpha)}{2}(w_{i+1} - 2v_i + u_{i-1})
 \end{aligned}
 ```
-with the Williams filter parameter ``\alpha \in [0.5,1]``. For ``\alpha=1``
+with the Williams filter parameter ``\alpha \in [0.5, 1]``. For ``\alpha=1``
 we're back with the Robert-Asselin filter (the first two lines).
 
 The Laplacian in the parentheses is often called a *displacement*,

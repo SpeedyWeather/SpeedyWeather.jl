@@ -40,8 +40,8 @@ end
 
 # generator function
 function ClausiusClapeyron(SG::SpectralGrid, atm::AbstractAtmosphere; kwargs...)
-    (;R_dry, R_vapour, latent_heat_condensation, heat_capacity) = atm
-    return ClausiusClapeyron{SG.NF}(;Lᵥ=latent_heat_condensation,R_dry,R_vapour,cₚ=heat_capacity,kwargs...)
+    (; R_dry, R_vapour, latent_heat_condensation, heat_capacity) = atm
+    return ClausiusClapeyron{SG.NF}(; Lᵥ=latent_heat_condensation, R_dry, R_vapour, cₚ=heat_capacity, kwargs...)
 end
 
 """
@@ -54,25 +54,25 @@ Clausius-Clapeyron equation,
 where T is in Kelvin, Lᵥ the the latent heat of vaporization and Rᵥ the gas constant
 of water vapour, T₀ is 0˚C in Kelvin."""
 function (CC::ClausiusClapeyron{NF})(temp_kelvin::NF) where NF
-    (;e₀, T₀⁻¹, Lᵥ_Rᵥ) = CC
+    (; e₀, T₀⁻¹, Lᵥ_Rᵥ) = CC
     return e₀ * exp(Lᵥ_Rᵥ*(T₀⁻¹ - inv(temp_kelvin)))
 end
 
 # convert to number format of struct
 function (CC::ClausiusClapeyron{NF})(temp_kelvin) where NF
-    CC(convert(NF,temp_kelvin))
+    CC(convert(NF, temp_kelvin))
 end
 
 """
 $(TYPEDSIGNATURES)
 Gradient of Clausius-Clapeyron wrt to temperature, evaluated at `temp_kelvin`."""
-function grad(CC::ClausiusClapeyron{NF},temp_kelvin::NF) where NF
+function grad(CC::ClausiusClapeyron{NF}, temp_kelvin::NF) where NF
     e = CC(temp_kelvin)
     return e*CC.Lᵥ_Rᵥ/temp_kelvin^2
 end
 
 # convert to input argument to number format from struct
-grad(CC::ClausiusClapeyron{NF},temp_kelvin) where NF = grad(CC,convert(NF,temp_kelvin))
+grad(CC::ClausiusClapeyron{NF}, temp_kelvin) where NF = grad(CC, convert(NF, temp_kelvin))
 
 """
 $(TYPEDSIGNATURES)
@@ -104,21 +104,21 @@ function saturation_humidity(
     clausius_clapeyron::AbstractClausiusClapeyron,
 ) where NF
     sat_vap_pres = clausius_clapeyron(temp_kelvin)
-    return saturation_humidity(sat_vap_pres,pres;mol_ratio=clausius_clapeyron.mol_ratio)
+    return saturation_humidity(sat_vap_pres, pres; mol_ratio=clausius_clapeyron.mol_ratio)
 end
 
 """
 $(TYPEDSIGNATURES)
 Gradient of Clausius-Clapeyron wrt to temperature, evaluated at `temp_kelvin`."""
-function grad_saturation_humidity(CC::ClausiusClapeyron{NF},temp_kelvin::NF,pres::NF) where NF
-    qsat = saturation_humidity(temp_kelvin,pres,CC)
+function grad_saturation_humidity(CC::ClausiusClapeyron{NF}, temp_kelvin::NF, pres::NF) where NF
+    qsat = saturation_humidity(temp_kelvin, pres, CC)
     return qsat*CC.Lᵥ_Rᵥ/temp_kelvin^2
 end
 
 """
 $(TYPEDSIGNATURES)
 Calculate geopotentiala and dry static energy for the primitive equation model."""
-function get_thermodynamics!(column::ColumnVariables,model::PrimitiveEquation)
+function get_thermodynamics!(column::ColumnVariables, model::PrimitiveEquation)
     geopotential!(column.geopot, column.temp, model.geopotential, column.surface_geopotential)
     dry_static_energy!(column, model.atmosphere)
 end
@@ -132,7 +132,7 @@ function dry_static_energy!(
     atmosphere::AbstractAtmosphere
 )
     cₚ = atmosphere.heat_capacity
-    (;dry_static_energy, geopot, temp) = column
+    (; dry_static_energy, geopot, temp) = column
 
     @inbounds for k in eachlayer(column)
         dry_static_energy[k] = cₚ * temp[k] + geopot[k]
@@ -146,7 +146,7 @@ function bulk_richardson!(
     atmosphere::AbstractAtmosphere,
 )
     cₚ = atmosphere.heat_capacity
-    (;u, v, geopot, temp_virt, nlev, bulk_richardson) = column
+    (; u, v, geopot, temp_virt, nlev, bulk_richardson) = column
 
     V² = u[nlev]^2 + v[nlev]^2
     Θ₀ = cₚ*temp_virt[nlev]
@@ -169,10 +169,10 @@ function saturation_humidity!(
     column::ColumnVariables,
     clausius_clapeyron::AbstractClausiusClapeyron,
 )
-    (;sat_humid, pres, temp) = column
+    (; sat_humid, pres, temp) = column
 
     for k in eachlayer(column)
-        sat_humid[k] = saturation_humidity(temp[k],pres[k],clausius_clapeyron)
+        sat_humid[k] = saturation_humidity(temp[k], pres[k], clausius_clapeyron)
     end
 end
 
@@ -188,9 +188,9 @@ function moist_static_energy!(
     column::ColumnVariables,
     clausius_clapeyron::AbstractClausiusClapeyron
 )
-    (;Lᵥ) = clausius_clapeyron      # latent heat of vaporization
-    (;sat_moist_static_energy, moist_static_energy, dry_static_energy) = column
-    (;humid, sat_humid) = column
+    (; Lᵥ) = clausius_clapeyron      # latent heat of vaporization
+    (; sat_moist_static_energy, moist_static_energy, dry_static_energy) = column
+    (; humid, sat_humid) = column
 
     for k in eachlayer(column)
         moist_static_energy[k] = dry_static_energy[k] + Lᵥ * humid[k]
@@ -205,7 +205,7 @@ Parameters for computing saturation vapour pressure of water using the Tetens' e
 
     eᵢ(T) = e₀ * exp(Cᵢ * (T - T₀) / (T + Tᵢ)),
 
-where T is in Kelvin and i = 1,2 for saturation above and below freezing,
+where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
 respectively. From Tetens (1930), and Murray (1967) for below freezing.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct TetensEquation{NF<:AbstractFloat} <: AbstractClausiusClapeyron
@@ -235,10 +235,10 @@ Tetens equation,
 
     eᵢ(T) = e₀ * exp(Cᵢ * (T - T₀) / (T - Tᵢ)),
 
-where T is in Kelvin and i = 1,2 for saturation above and below freezing,
+where T is in Kelvin and i = 1, 2 for saturation above and below freezing,
 respectively."""
 function (TetensCoefficients::TetensEquation{NF})(temp_kelvin::NF) where NF
-    (;e₀, T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
+    (; e₀, T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
     C, T = temp_kelvin > T₀ ? (C₁, T₁) : (C₂, T₂)      # change coefficients above/below freezing
     temp_celsius = temp_kelvin - T₀
     return e₀ * exp(C * temp_celsius / (temp_celsius + T))
@@ -247,8 +247,8 @@ end
 """
 $(TYPEDSIGNATURES)
 Gradient of the Tetens equation wrt to temperature, evaluated at `temp_kelvin`."""
-function grad(TetensCoefficients::TetensEquation{NF},temp_kelvin::NF) where NF
-    (;T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
+function grad(TetensCoefficients::TetensEquation{NF}, temp_kelvin::NF) where NF
+    (; T₀, C₁, C₂, T₁, T₂) = TetensCoefficients
     e = TetensCoefficients(temp_kelvin)             # saturation vapour pressure
     C, T = temp_kelvin > T₀ ? (C₁, T₁) : (C₂, T₂)   # change coefficients above/below freezing
     return e*C*T/(temp_kelvin - T₀ - T)^2           # chain rule: times derivative of inner function

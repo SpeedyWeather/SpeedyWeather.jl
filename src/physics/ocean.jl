@@ -1,13 +1,13 @@
-abstract type AbstractOcean{NF,Grid} end
+abstract type AbstractOcean{NF, Grid} end
 
-function Base.show(io::IO,O::AbstractOcean)
-    println(io,"$(typeof(O)) <: AbstractOcean")
+function Base.show(io::IO, O::AbstractOcean)
+    println(io, "$(typeof(O)) <: AbstractOcean")
     keys = propertynames(O)
-    print_fields(io,O,keys)
+    print_fields(io, O, keys)
 end
 
 export SeasonalOceanClimatology
-Base.@kwdef struct SeasonalOceanClimatology{NF,Grid<:AbstractGrid{NF}} <: AbstractOcean{NF,Grid}
+Base.@kwdef struct SeasonalOceanClimatology{NF, Grid<:AbstractGrid{NF}} <: AbstractOcean{NF, Grid}
 
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
@@ -33,13 +33,13 @@ Base.@kwdef struct SeasonalOceanClimatology{NF,Grid<:AbstractGrid{NF}} <: Abstra
 
     # to be filled from file
     "Monthly sea surface temperatures [K], interpolated onto Grid"
-    monthly_temperature::Vector{Grid} = [zeros(Grid,nlat_half) for _ in 1:12]
+    monthly_temperature::Vector{Grid} = [zeros(Grid, nlat_half) for _ in 1:12]
 end
 
 # generator function
-function SeasonalOceanClimatology(SG::SpectralGrid;kwargs...)
-    (;NF,Grid,nlat_half) = SG
-    return SeasonalOceanClimatology{NF,Grid{NF}}(;nlat_half,kwargs...)
+function SeasonalOceanClimatology(SG::SpectralGrid; kwargs...)
+    (; NF, Grid, nlat_half) = SG
+    return SeasonalOceanClimatology{NF, Grid{NF}}(; nlat_half, kwargs...)
 end
 
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
@@ -54,9 +54,9 @@ function load_monthly_climatology!(
 
     # LOAD NETCDF FILE
     if scheme.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__,"../../input_data",scheme.file)
+        path = joinpath(@__DIR__, "../../input_data", scheme.file)
     else
-        path = joinpath(scheme.path,scheme.file)
+        path = joinpath(scheme.path, scheme.file)
     end
     ncfile = NCDataset(path)
 
@@ -64,21 +64,21 @@ function load_monthly_climatology!(
     nx, ny = ncfile.dim["lon"], ncfile.dim["lat"]
     npoints = nx*ny
     NF_file = typeof(ncfile[varname].attrib["_FillValue"])
-    grid = scheme.file_Grid(zeros(NF_file,npoints))
-    interp = RingGrids.interpolator(Float32,monthly[1],grid)
+    grid = scheme.file_Grid(zeros(NF_file, npoints))
+    interp = RingGrids.interpolator(Float32, monthly[1], grid)
 
     # interpolate and store in monthly
     for month in 1:12
-        this_month = ncfile[varname][:,:,month]
+        this_month = ncfile[varname][:, :, month]
         ij = 0
         for j in 1:ny
             for i in 1:nx
                 ij += 1
-                x = this_month[i,j]
+                x = this_month[i, j]
                 grid[ij] = ismissing(x) ? scheme.missing_value : x
             end
         end
-        interpolate!(monthly[month],grid,interp)
+        interpolate!(monthly[month], grid, interp)
     end
     return nothing
 end
@@ -86,7 +86,7 @@ end
 function initialize!(   ocean::PrognosticVariablesOcean,
                         time::DateTime,
                         model::PrimitiveEquation)
-    ocean_timestep!(ocean,time,model,initialize=true)
+    ocean_timestep!(ocean, time, model, initialize=true)
 end
 
 # function barrier
@@ -94,7 +94,7 @@ function ocean_timestep!(   ocean::PrognosticVariablesOcean,
                             time::DateTime,
                             model::PrimitiveEquation;
                             initialize::Bool = false)
-    ocean_timestep!(ocean,time,model.ocean;initialize)
+    ocean_timestep!(ocean, time, model.ocean; initialize)
 end
 
 function ocean_timestep!(   ocean::PrognosticVariablesOcean{NF},
@@ -113,9 +113,9 @@ function ocean_timestep!(   ocean::PrognosticVariablesOcean{NF},
 
     # linear interpolation weight between the two months
     # TODO check whether this shifts the climatology by 1/2 a month
-    weight = convert(NF,Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
+    weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
-    (;monthly_temperature) = ocean_model
+    (; monthly_temperature) = ocean_model
     @. ocean.sea_surface_temperature = (1-weight) * monthly_temperature[this_month] +
                                           weight  * monthly_temperature[next_month]
 

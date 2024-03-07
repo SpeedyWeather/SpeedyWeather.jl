@@ -15,7 +15,7 @@ mutable struct Feedback <: AbstractFeedback
     output::Bool
 
     "identification of run, taken from ::OutputWriter"
-    id::Union{String,Int}
+    id::Union{String, Int}
 
     "path to run folder, taken from ::OutputWriter"
     run_path::String
@@ -25,28 +25,28 @@ mutable struct Feedback <: AbstractFeedback
     progress_meter::ProgressMeter.Progress
 
     "txt is a Nothing in case of no output"
-    progress_txt::Union{IOStream,Nothing}   
+    progress_txt::Union{IOStream, Nothing}   
 
     "did Infs/NaNs occur in the simulation?"
     nars_detected::Bool                     
 end
 
-function Base.show(io::IO,F::AbstractFeedback)
-    println(io,"$(typeof(F)) <: AbstractFeedback")
+function Base.show(io::IO, F::AbstractFeedback)
+    println(io, "$(typeof(F)) <: AbstractFeedback")
     keys = propertynames(F)
-    print_fields(io,F,keys)
+    print_fields(io, F, keys)
 end
 
-function Base.show(io::IO,P::ProgressMeter.Progress)
-    println(io,"$(typeof(P)) <: ProgressMeter.AbstractProgress")
+function Base.show(io::IO, P::ProgressMeter.Progress)
+    println(io, "$(typeof(P)) <: ProgressMeter.AbstractProgress")
     keys = propertynames(P)
-    print_fields(io,P,keys)
+    print_fields(io, P, keys)
 end
 
 """
 $(TYPEDSIGNATURES)
 Generator function for a Feedback struct."""
-function Feedback(verbose::Bool=true,debug::Bool=true)
+function Feedback(verbose::Bool=true, debug::Bool=true)
     
     # the following are synced with OutputWriter in
     # initialize!(::OutputWriter, ...) to avoid folder-race conditions
@@ -58,24 +58,24 @@ function Feedback(verbose::Bool=true,debug::Bool=true)
     # show progress meter via `enabled` through verbose parameter, initialize only for 1 time step
     desc = "Weather is speedy: "
     progress_meter = ProgressMeter.Progress(1, enabled=verbose, showspeed=true; desc)
-    progress_txt = nothing          # initialize with nothing, initialize in initialize!(::Feedback,...)
+    progress_txt = nothing          # initialize with nothing, initialize in initialize!(::Feedback, ...)
 
     nars_detected = false
-    return Feedback(verbose,debug,
-                    output,id,run_path,
-                    progress_meter,progress_txt,
+    return Feedback(verbose, debug,
+                    output, id, run_path,
+                    progress_meter, progress_txt,
                     nars_detected)
 end
 
 """
 $(TYPEDSIGNATURES)
 Initializes the a `Feedback` struct."""
-function initialize!(feedback::Feedback,clock::Clock,model::ModelSetup)
+function initialize!(feedback::Feedback, clock::Clock, model::ModelSetup)
 
     # reinitalize progress meter, minus one to exclude first_timesteps! which contain compilation
-    (;showspeed, desc) = feedback.progress_meter
-    (;verbose) = feedback
-    feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps-1;enabled=verbose, showspeed, desc)
+    (; showspeed, desc) = feedback.progress_meter
+    (; verbose) = feedback
+    feedback.progress_meter = ProgressMeter.Progress(clock.n_timesteps-1; enabled=verbose, showspeed, desc)
     
     # set to false to recheck for NaRs
     feedback.nars_detected = false
@@ -91,14 +91,14 @@ function initialize!(feedback::Feedback,clock::Clock,model::ModelSetup)
         days = clock.period.value/(3600*24)
         
         # create progress.txt file in run_????/
-        progress_txt = open(joinpath(run_path,"progress.txt"),"w")
+        progress_txt = open(joinpath(run_path, "progress.txt"), "w")
         s = "Starting SpeedyWeather.jl run $id on "*
-                Dates.format(Dates.now(),Dates.RFC1123Format)
-        write(progress_txt,s*"\n")
-        write(progress_txt,"Integrating:\n")
-        write(progress_txt,"$SG\n")
-        write(progress_txt,"Time: $days days at Δt = $(L.Δt_sec)s\n")
-        write(progress_txt,"\nAll data will be stored in $run_path\n")
+                Dates.format(Dates.now(), Dates.RFC1123Format)
+        write(progress_txt, s*"\n")
+        write(progress_txt, "Integrating:\n")
+        write(progress_txt, "$SG\n")
+        write(progress_txt, "Time: $days days at Δt = $(L.Δt_sec)s\n")
+        write(progress_txt, "\nAll data will be stored in $run_path\n")
         feedback.progress_txt = progress_txt
     end
 end
@@ -114,17 +114,17 @@ function progress!(feedback::Feedback)
 
     # write progress to txt file too
     if (counter/n*100 % 1) > ((counter+1)/n*100 % 1)  
-        percent = round(Int,(counter+1)/n*100)      # % of time steps completed
+        percent = round(Int, (counter+1)/n*100)      # % of time steps completed
         if feedback.output && (percent % 5 == 0)    # write every 5% step in txt 
-            write(feedback.progress_txt,@sprintf("\n%3d%%",percent))
+            write(feedback.progress_txt, @sprintf("\n%3d%%", percent))
             r = remaining_time(feedback.progress_meter)
-            write(feedback.progress_txt,", ETA: $r")
+            write(feedback.progress_txt, ", ETA: $r")
 
             time_elapsed = feedback.progress_meter.tlast - feedback.progress_meter.tinit
-            s = speedstring(time_elapsed/counter,DT_IN_SEC[])
-            write(feedback.progress_txt,", $s")
+            s = speedstring(time_elapsed/counter, DT_IN_SEC[])
+            write(feedback.progress_txt, ", $s")
 
-            feedback.nars_detected && write(feedback.progress_txt,", NaRs detected.")
+            feedback.nars_detected && write(feedback.progress_txt, ", NaRs detected.")
             flush(feedback.progress_txt)
         end
     end
@@ -133,7 +133,7 @@ end
 function progress!( feedback::Feedback,
                     progn::PrognosticVariables)
     progress!(feedback)
-    feedback.debug && nar_detection!(feedback,progn)
+    feedback.debug && nar_detection!(feedback, progn)
 end
 
 """
@@ -145,7 +145,7 @@ function finish!(F::Feedback)
     if F.output     # write final progress to txt file
         time_elapsed = F.progress_meter.tlast - F.progress_meter.tinit
         s = "\nIntegration done in $(readable_secs(time_elapsed))."
-        write(F.progress_txt,"\n$s\n")
+        write(F.progress_txt, "\n$s\n")
         flush(F.progress_txt)
     end
 end
@@ -153,7 +153,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Detect NaR (Not-a-Real) in the prognostic variables."""
-function nar_detection!(feedback::Feedback,progn::PrognosticVariables)
+function nar_detection!(feedback::Feedback, progn::PrognosticVariables)
 
     feedback.nars_detected && return nothing    # escape immediately if nans already detected
     i = feedback.progress_meter.counter         # time step
@@ -190,7 +190,7 @@ end
 $(TYPEDSIGNATURES)
 Define a ProgressMeter.speedstring method that also takes a time step
 `dt_in_sec` to translate sec/iteration to days/days-like speeds."""
-function speedstring(sec_per_iter,dt_in_sec)
+function speedstring(sec_per_iter, dt_in_sec)
     if sec_per_iter == Inf
         return "  N/A  days/day"
     end
@@ -217,7 +217,7 @@ const DT_IN_SEC = Ref(1800.0)
 # not just ::Any to effectively overwrite it
 function ProgressMeter.speedstring(sec_per_iter::AbstractFloat)
     dt_in_sec = SpeedyWeather.DT_IN_SEC[]   # pull global "constant"
-    speedstring(sec_per_iter,dt_in_sec)
+    speedstring(sec_per_iter, dt_in_sec)
 end
 
 """

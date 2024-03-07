@@ -3,7 +3,7 @@ abstract type AbstractCondensation <: AbstractParameterization end
 export NoCondensation
 struct NoCondensation <: AbstractCondensation end
 NoCondesantion(::SpectralGrid) = NoCondensation()
-initialize!(::NoCondensation,::PrimitiveEquation) = nothing
+initialize!(::NoCondensation, ::PrimitiveEquation) = nothing
 large_scale_condensation!(::ColumnVariables, ::NoCondensation, ::PrimitiveEquation) = nothing
 
 export ImplicitCondensation
@@ -18,10 +18,10 @@ Base.@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensati
     time_scale::NF = 9
 end
 
-ImplicitCondensation(SG::SpectralGrid;kwargs...) = ImplicitCondensation{SG.NF}(;kwargs...)
+ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
 
 # nothing to initialize with this scheme
-initialize!(scheme::ImplicitCondensation,model::PrimitiveEquation) = nothing
+initialize!(scheme::ImplicitCondensation, model::PrimitiveEquation) = nothing
 
 # do nothing fall back for primitive dry 
 function large_scale_condensation!( 
@@ -67,17 +67,17 @@ function large_scale_condensation!(
     time_stepping::AbstractTimeStepper,
 ) where NF
 
-    (;temp, humid, pres) = column           # prognostic vars: specific humidity, pressure
-    (;temp_tend, humid_tend) = column       # tendencies to write into
-    (;sat_humid) = column                   # intermediate variable, calculated in thermodynamics!
+    (; temp, humid, pres) = column           # prognostic vars: specific humidity, pressure
+    (; temp_tend, humid_tend) = column       # tendencies to write into
+    (; sat_humid) = column                   # intermediate variable, calculated in thermodynamics!
     
     # precompute scaling constant for precipitation output
     pₛ = pres[end]                          # surface pressure
-    (;Δt_sec) = time_stepping
+    (; Δt_sec) = time_stepping
     Δσ = geometry.σ_levels_thick
     pₛΔt_gρ = pₛ*Δt_sec/(planet.gravity * atmosphere.water_density)
 
-    (;Lᵥ, cₚ, Lᵥ_Rᵥ) = clausius_clapeyron
+    (; Lᵥ, cₚ, Lᵥ_Rᵥ) = clausius_clapeyron
     Lᵥ_cₚ = Lᵥ/cₚ                           # latent heat of vaporization over heat capacity
     max_heating = scheme.max_heating/Δt_sec
     time_scale = scheme.time_scale

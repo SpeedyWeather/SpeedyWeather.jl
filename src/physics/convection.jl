@@ -2,8 +2,8 @@ abstract type AbstractConvection <: AbstractParameterization end
 
 export NoConvection
 struct NoConvection <: AbstractConvection end
-initialize!(::NoConvection,::PrimitiveEquation) = nothing
-convection!(::ColumnVariables,::NoConvection,::PrimitiveEquation) = nothing
+initialize!(::NoConvection, ::PrimitiveEquation) = nothing
+convection!(::ColumnVariables, ::NoConvection, ::PrimitiveEquation) = nothing
 
 export SimplifiedBettsMiller
 
@@ -23,21 +23,21 @@ Base.@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection
     relative_humidity::NF = 0.7
 
     "temperature [K] reference profile to adjust to"
-    temp_ref_profile::Vector{NF} = zeros(NF,nlev)
+    temp_ref_profile::Vector{NF} = zeros(NF, nlev)
 
     "specific humidity [kg/kg] profile to adjust to"
-    humid_ref_profile::Vector{NF} = zeros(NF,nlev)
+    humid_ref_profile::Vector{NF} = zeros(NF, nlev)
 end
 
-SimplifiedBettsMiller(SG::SpectralGrid;kwargs...) = SimplifiedBettsMiller{SG.NF}(nlev=SG.nlev;kwargs...)
-initialize!(::SimplifiedBettsMiller,::PrimitiveWet) = nothing
+SimplifiedBettsMiller(SG::SpectralGrid; kwargs...) = SimplifiedBettsMiller{SG.NF}(nlev=SG.nlev; kwargs...)
+initialize!(::SimplifiedBettsMiller, ::PrimitiveWet) = nothing
 
 # function barrier for all AbstractConvection
 function convection!(
     column::ColumnVariables,
     model::PrimitiveEquation,
 )
-    convection!(column,model.convection,model)
+    convection!(column, model.convection, model)
 end
 
 # function barrier to unpack model
@@ -46,7 +46,7 @@ function convection!(
     scheme::SimplifiedBettsMiller,
     model::PrimitiveEquation,
 )
-    convection!(column, scheme, model.clausius_clapeyron, 
+    convection!(column, scheme, model.clausius_clapeyron,
                     model.geometry, model.planet, model.atmosphere, model.time_stepping)
 end
 
@@ -70,10 +70,10 @@ function convection!(
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
-    (;temp_ref_profile, humid_ref_profile) = SBM
-    (;geopot, nlev, temp, temp_virt, humid, temp_tend, humid_tend) = column
+    (; temp_ref_profile, humid_ref_profile) = SBM
+    (; geopot, nlev, temp, temp_virt, humid, temp_tend, humid_tend) = column
     pₛ = column.pres[end]
-    (;Lᵥ, cₚ) = clausius_clapeyron
+    (; Lᵥ, cₚ) = clausius_clapeyron
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     temp_parcel = temp[nlev]
@@ -84,7 +84,7 @@ function convection!(
                                             clausius_clapeyron)
             
     for k in level_zero_buoyancy:nlev
-        qsat = saturation_humidity(temp_ref_profile[k],pₛ*σ[k],clausius_clapeyron)
+        qsat = saturation_humidity(temp_ref_profile[k], pₛ*σ[k], clausius_clapeyron)
         humid_ref_profile[k] = qsat*SBM.relative_humidity
     end
 
@@ -154,12 +154,12 @@ function convection!(
         column.precip_convection += δq * Δσ[k]
     end
 
-    (;gravity) = planet
-    (;water_density) = atmosphere
-    (;Δt_sec) = time_stepping
+    (; gravity) = planet
+    (; water_density) = atmosphere
+    (; Δt_sec) = time_stepping
     pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv 
     column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
-    column.cloud_top = min(column.cloud_top,level_zero_buoyancy)        # clouds reach to top of convection
+    column.cloud_top = min(column.cloud_top, level_zero_buoyancy)        # clouds reach to top of convection
 end
 
 """
@@ -179,7 +179,7 @@ function pseudo_adiabat!(
     clausius_clapeyron::AbstractClausiusClapeyron,
 ) where NF
 
-    (;Lᵥ, R_dry, R_vapour, cₚ) = clausius_clapeyron
+    (; Lᵥ, R_dry, R_vapour, cₚ) = clausius_clapeyron
     R_cₚ = R_dry/cₚ
     ε = clausius_clapeyron.mol_ratio
     μ = (1-ε)/ε                             # for virtual temperature
@@ -202,7 +202,7 @@ function pseudo_adiabat!(
         if !saturated                       # if not saturated yet follow dry adiabat
             # dry adiabatic ascent and saturation humidity of that temperature 
             temp_parcel_dry = temp_parcel*(σ[k]/σ[k+1])^R_cₚ
-            sat_humid = saturation_humidity(temp_parcel_dry,σ[k]*pres,clausius_clapeyron)
+            sat_humid = saturation_humidity(temp_parcel_dry, σ[k]*pres, clausius_clapeyron)
                     
             # set to saturated when the dry adiabatic ascent would reach saturation
             # then follow moist adiabat instead (see below)
@@ -221,7 +221,7 @@ function pseudo_adiabat!(
                 
             # at new (lower) temperature condensation occurs immediately
             # new humidity equals to that saturation humidity
-            humid_parcel = saturation_humidity(temp_parcel,σ[k]*pres,clausius_clapeyron)
+            humid_parcel = saturation_humidity(temp_parcel, σ[k]*pres, clausius_clapeyron)
         else
             temp_parcel = temp_parcel_dry       # else parcel temperature following dry adiabat
         end
@@ -258,11 +258,11 @@ Base.@kwdef struct DryBettsMiller{NF} <: AbstractConvection
     time_scale::Second = Hour(4)
 
     "temperature [K] reference profile to adjust to"
-    temp_ref_profile::Vector{NF} = zeros(NF,nlev)
+    temp_ref_profile::Vector{NF} = zeros(NF, nlev)
 end
 
-DryBettsMiller(SG::SpectralGrid;kwargs...) = DryBettsMiller{SG.NF}(nlev=SG.nlev;kwargs...)
-initialize!(::DryBettsMiller,::PrimitiveWet) = nothing
+DryBettsMiller(SG::SpectralGrid; kwargs...) = DryBettsMiller{SG.NF}(nlev=SG.nlev; kwargs...)
+initialize!(::DryBettsMiller, ::PrimitiveWet) = nothing
 
 # function barrier to unpack model
 function convection!(
@@ -291,8 +291,8 @@ function convection!(
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
-    (;temp_ref_profile) = DBM
-    (;nlev, temp, temp_tend) = column
+    (; temp_ref_profile) = DBM
+    (; nlev, temp, temp_tend) = column
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     level_zero_buoyancy = dry_adiabat!(temp_ref_profile,
