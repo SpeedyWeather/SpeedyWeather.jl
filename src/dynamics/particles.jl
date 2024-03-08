@@ -1,13 +1,24 @@
 abstract type AbstractParticle{NF} end
 
 export Particle
+
+"""
+Particle with location lon (longitude), lat (latitude) and σ (vertical coordinate).
+Longitude is assumed to be in [0,360˚E), latitude in [-90˚,90˚N] and σ in [0,1] but
+not strictly enforced at creation, see `mod(::Particle)` and `ismod(::Particle)`.
+A particle is either active or inactive, determined by the Boolean in it's 2nd
+type parameter.
+$(TYPEDFIELDS)"""
 struct Particle{
     NF<:AbstractFloat,  # number format of coordinates
     isactive,           # bool indicating whether particle is active
 } <: AbstractParticle{NF}
-    lon::NF             # longitude [0,360˚]
-    lat::NF             # latitude [-90˚,90˚]
-    σ::NF               # vertical sigma coordinate [0,1] (top to surface)
+    "longitude in [0,360˚]"
+    lon::NF
+    "latitude [-90˚,90˚]"
+    lat::NF
+    "vertical sigma coordinate [0,1] (top to surface)"
+    σ::NF
 end
 
 # particle is by default active, of number format DEFAULT_NF and at 0˚N, 0˚E, σ=0
@@ -37,6 +48,8 @@ Base.zero(::P) where {P<:Particle} = zero(P)
 
 Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle}) = rand(rng,Particle{DEFAULT_NF,true})
 Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF}}) where NF = rand(rng,Particle{NF,true})
+
+# rand uniformly distributed over the globe with cos-distribution for poles
 function Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF,isactive}}) where {NF,isactive}
     lon = 360*rand(rng,NF)
     yπ = convert(NF,π)*(2rand(rng,NF)-1)    # yπ ∈ [-1,1]*π
@@ -47,7 +60,19 @@ end
 
 # equality with same location and same activity
 function Base.:(==)(p1::Particle{NF1,active1},p2::Particle{NF2,active2}) where {NF1,active1,NF2,active2}
-    return (active1==active2) && (p1.lon == p2.lon) && (p1.lat == p2.lat) && (p1.σ == p2.σ)
+    return  (active1 == active2) &&     # both active or both inactive
+            (p1.lat == p2.lat) &&       # same latitude
+            (p1.σ == p2.σ) &&           # same elevation
+            ((p1.lon == p2.lon) ||      # same longitude OR
+            (p1.lat*p2.lat == 8100))    # both at the north/south pole, because 90˚N, 0˚E == 90˚N, 10˚E
+end
+
+function Base.isapprox(p1::Particle{NF1,active1},p2::Particle{NF2,active2}) where {NF1,active1,NF2,active2}
+    return  (active1 == active2) &&     # both active or both inactive
+            (p1.lat ≈ p2.lat) &&       # same latitude
+            (p1.σ ≈ p2.σ) &&           # same elevation
+            ((p1.lon ≈ p2.lon) ||      # same longitude OR
+            (p1.lat*p2.lat == 8100))    # both at the north/south pole, because 90˚N, 0˚E == 90˚N, 10˚E
 end
 
 function Base.show(io::IO,p::Particle{NF,isactive}) where {NF,isactive}
@@ -59,29 +84,61 @@ function Base.show(io::IO,p::Particle{NF,isactive}) where {NF,isactive}
 end
 
 export move
+
+"""$(TYPEDSIGNATURES)
+Move a particle with increments (dlon, dlat, dσ) in those respective coordinates.
+Only active particles are moved."""
 @inline function move(p::Particle{NF,true},dlon,dlat,dσ) where NF
     (;lon, lat, σ) = p
     Particle{NF,true}(lon+dlon,lat+dlat,σ+dσ)
 end
 
+"""$(TYPEDSIGNATURES)
+Move a particle with increments (dlon, dlat) in 2D. No movement in vertical σ.
+Only active particles are moved."""
 @inline function move(p::Particle{NF,true},dlon,dlat) where NF
     (;lon, lat, σ) = p
     Particle{NF,true}(lon+dlon,lat+dlat,σ)
 end
 
-# don't move inactive particles
+"""$(TYPEDSIGNATURES)
+Inactive particles are not moved."""
 @inline move(p::Particle{NF,false},args...) where NF = p
 
 export activate, deactivate, active
+
+"""$(TYPEDSIGNATURES)
+Activate particle. Active particles can move."""
 activate(  p::Particle{NF}) where NF = Particle{NF, true}(p.lon, p.lat, p.σ)
+
+"""$(TYPEDSIGNATURES)
+Deactivate particle. Inactive particles cannot move."""
 deactivate(p::Particle{NF}) where NF = Particle{NF,false}(p.lon, p.lat, p.σ)
+
+"""$(TYPEDSIGNATURES)
+Check whether particle is active."""
 active(::Particle{NF,isactive}) where {NF,isactive} = isactive
 
+"""
+$(TYPEDSIGNATURES)
+Modulo operator for particle locations to map them back into [0,360˚E) and [-90˚,90˚N],
+in the horizontal and to clamp vertical σ coordinates into [0,1]."""
 @inline function Base.mod(p::P) where {P<:Particle}
     (;lon, lat, σ) = p
-    crossed_pole = lat > 90 || lat < -90
-    lat = lat - 2crossed_pole*((lat + 90) % 180)
-    lon = mod(lon + 180*crossed_pole, 360)
-    σ = clamp(σ, 0, 1)
+    pole_crossed = isodd((abs(lat) - 2eps(lat) + 90) ÷ 180)
+    lat = 90 - abs(mod(lat+90,360) - 180)   # new latitude is wrapped around poles
+    lon = mod(lon + 180*pole_crossed, 360)  # mod lon into [0,360˚E] but +180 for pole crossings
+    σ = clamp(σ, 0, 1)      # particle above top (σ<0) stays at top, ground (σ>1) stays on ground
     return P(lon, lat, σ)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Check that a particle is in longitude [0,360˚E), latitude [-90˚,90˚N], and σ in [0,1]."""
+function ismod(p::Particle)
+    valid::Bool = true
+    valid &= -90 <= p.lat <= 90     # poles included
+    valid &= 0 <= p.lon < 360       # 360˚E excluded (=0˚)
+    valid &= 0 <= p.σ <= 1          # top and ground included
+    return valid
 end

@@ -16,6 +16,45 @@
     @test active(Particle(1,2,3))
     @test ~active(deactivate(Particle(1,2,3)))
     @test ~active(Particle{Float64,false}(1,2,3))
+    @test Particle(lon=0,lat=90) == Particle(lon=10,lat=90)
+    @test Particle(lon=0,lat=-90) == Particle(lon=10,lat=-90)
+    @test Particle(lon=0,lat=-90) != Particle(lon=10,lat=90)
+end
+
+@testset "Modulo particles" begin
+    for NF in (Float16,Float32,Float64)
+        for n in 1:100
+            lat = 90 + n*eps(NF)
+            p = Particle(lon = 0, lat = lat)
+            @test mod(p).lat <= 90
+            @test SpeedyWeather.ismod(mod(p))
+            
+            lat = -90 - n*eps(NF)
+            p = Particle(lon = 0, lat = lat)
+            @test mod(Particle(lon = 0, lat = lat)).lat >= -90
+            @test SpeedyWeather.ismod(mod(p))
+
+            lat = 1000*randn(NF)
+            lon = 1000*randn(NF)
+            p = Particle(;lon,lat)
+            @test SpeedyWeather.ismod(mod(p))
+        end
+
+        # move particles 10x around the globe
+        for n in 1:10
+            p = rand(Particle{NF})
+            
+            # positive
+            @test p ≈ mod(Particle(lon = p.lon + n*360, lat = p.lat, σ=p.σ))
+            @test p ≈ mod(Particle(lon = p.lon, lat = p.lat + n*360, σ=p.σ))
+            @test p ≈ mod(Particle(lon = p.lon + n*360, lat = p.lat + n*360, σ=p.σ))
+
+            # negative
+            @test p ≈ mod(Particle(lon = p.lon - n*360, lat = p.lat, σ=p.σ))
+            @test p ≈ mod(Particle(lon = p.lon, lat = p.lat - n*360, σ=p.σ))
+            @test p ≈ mod(Particle(lon = p.lon - n*360, lat = p.lat - n*360, σ=p.σ))
+        end
+    end
 end
 
 @testset "Random particles" begin
