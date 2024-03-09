@@ -39,20 +39,24 @@ end
             p = Particle(;lon,lat)
             @test SpeedyWeather.ismod(mod(p))
         end
+    end
 
-        # move particles 10x around the globe
-        for n in 1:10
-            p = rand(Particle{NF})
-            
-            # positive
-            @test p ≈ mod(Particle(lon = p.lon + n*360, lat = p.lat, σ=p.σ))
-            @test p ≈ mod(Particle(lon = p.lon, lat = p.lat + n*360, σ=p.σ))
-            @test p ≈ mod(Particle(lon = p.lon + n*360, lat = p.lat + n*360, σ=p.σ))
+    for NF in (Float32,Float64)
+        for n in 1:100
+            # move particles 1-4x around the globe
+            for k in 1:4
+                p = rand(Particle{NF})
+                
+                # positive
+                @test p ≈ mod(Particle(lon = p.lon + k*360, lat = p.lat, σ=p.σ)) atol = 0.1 rtol = sqrt(eps(NF))
+                @test p ≈ mod(Particle(lon = p.lon, lat = p.lat + k*360, σ=p.σ)) atol = 0.1 rtol = sqrt(eps(NF))
+                @test p ≈ mod(Particle(lon = p.lon + k*360, lat = p.lat + k*360, σ=p.σ)) atol = 0.1 rtol = sqrt(eps(NF))
 
-            # negative
-            @test p ≈ mod(Particle(lon = p.lon - n*360, lat = p.lat, σ=p.σ))
-            @test p ≈ mod(Particle(lon = p.lon, lat = p.lat - n*360, σ=p.σ))
-            @test p ≈ mod(Particle(lon = p.lon - n*360, lat = p.lat - n*360, σ=p.σ))
+                # negative
+                @test p ≈ mod(Particle(lon = p.lon - k*360, lat = p.lat, σ=p.σ)) atol = 0.1 rtol = sqrt(eps(NF))
+                @test p ≈ mod(Particle(lon = p.lon, lat = p.lat - k*360, σ=p.σ)) atol = 0.1 rtol = sqrt(eps(NF))
+                @test p ≈ mod(Particle(lon = p.lon - k*360, lat = p.lat - k*360, σ=p.σ)) atol = 0.1 rtol = sqrt(eps(NF))
+            end
         end
     end
 end

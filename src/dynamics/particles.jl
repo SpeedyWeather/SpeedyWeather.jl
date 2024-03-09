@@ -67,12 +67,18 @@ function Base.:(==)(p1::Particle{NF1,active1},p2::Particle{NF2,active2}) where {
             (p1.lat*p2.lat == 8100))    # both at the north/south pole, because 90˚N, 0˚E == 90˚N, 10˚E
 end
 
-function Base.isapprox(p1::Particle{NF1,active1},p2::Particle{NF2,active2}) where {NF1,active1,NF2,active2}
-    return  (active1 == active2) &&     # both active or both inactive
-            (p1.lat ≈ p2.lat) &&       # same latitude
-            (p1.σ ≈ p2.σ) &&           # same elevation
-            ((p1.lon ≈ p2.lon) ||      # same longitude OR
-            (p1.lat*p2.lat == 8100))    # both at the north/south pole, because 90˚N, 0˚E == 90˚N, 10˚E
+function Base.isapprox(
+    p1::Particle{NF1,active1},
+    p2::Particle{NF2,active2};
+    kwargs...,
+) where {NF1,active1,NF2,active2}
+    b = (active1 == active2)                    # both active or both inactive
+    b &= isapprox(p1.lat, p2.lat; kwargs...)    # same latitude
+    b &= isapprox(p1.σ, p2.σ; kwargs...)        # same elevation
+    c =  isapprox(p1.lon, p2.lon; kwargs...)    # same longitude OR
+    b &= c | isapprox(p1.lat * p2.lat, 8100; kwargs...) # both at the north/south pole
+                                                        # because 90˚N, 0˚E == 90˚N, 10˚E
+    return b
 end
 
 function Base.show(io::IO,p::Particle{NF,isactive}) where {NF,isactive}
@@ -80,7 +86,7 @@ function Base.show(io::IO,p::Particle{NF,isactive}) where {NF,isactive}
     lon = @sprintf("%6.2f",p.lon)
     σ = @sprintf("%.2f",p.σ)
     activity = isactive ? "  active" : "inactive"
-    print(io,"Particle{$NF, $activity}($(lon)˚E, $(lat)˚N, σ=$σ)")
+    print(io,"Particle{$NF, $activity}($(lon)˚E, $(lat)˚N, σ = $σ)")
 end
 
 export move
