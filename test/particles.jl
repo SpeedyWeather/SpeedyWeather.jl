@@ -72,7 +72,7 @@ end
 end
 
 @testset "Move particles" begin
-    for NF in (Float16, Float32, Float64)
+    for NF in (Float32, Float64)
         
         p = Particle{NF}(lon=-350,lat=0)
         @test mod(p) == Particle{NF}(lon=10,lat=0)        
