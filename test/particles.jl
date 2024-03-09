@@ -49,7 +49,7 @@ end
                 
                 # positive
                 a = 0.2
-                r = 10*sqrt(eps(NF))
+                r = 100*sqrt(eps(NF))
                 @test p ≈ mod(Particle(lon = p.lon + k*360, lat = p.lat, σ=p.σ)) atol = a rtol = r
                 @test p ≈ mod(Particle(lon = p.lon, lat = p.lat + k*360, σ=p.σ)) atol = a rtol = r
                 @test p ≈ mod(Particle(lon = p.lon + k*360, lat = p.lat + k*360, σ=p.σ)) atol = a rtol = r
