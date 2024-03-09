@@ -9,7 +9,7 @@ Base.@kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
     "Number of particles to track"
     n_particles::Int = 0
     
-    "Number of timesteps to track particles at"
+    "Number of timesteps to track particles at (first and last incl)"
     n_steps::Int = 0
 
     "Count up the tracked particle positions"
@@ -19,10 +19,10 @@ Base.@kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
     every_n_timesteps::Int = 0
 
     # tracking arrays
-    times::Vector{DateTime} = zeros(DateTime, n_steps+1)
-    lons::Matrix{NF} = zeros(NF, n_particles, n_steps+1)
-    lats::Matrix{NF} = zeros(NF, n_particles, n_steps+1)
-    σs::Matrix{NF} = zeros(NF, n_particles, n_steps+1)
+    times::Vector{DateTime} = zeros(DateTime, n_steps)
+    lons::Matrix{NF} = zeros(NF, n_particles, n_steps)
+    lats::Matrix{NF} = zeros(NF, n_particles, n_steps)
+    σs::Matrix{NF} = zeros(NF, n_particles, n_steps)
 end
 
 ParticleTracker(SG::SpectralGrid;kwargs...) = ParticleTracker{SG.NF}(;kwargs...)
@@ -46,10 +46,10 @@ function initialize!(
     (;n_steps) = callback
 
     # allocate tracking arrays of correct size
-    callback.lons  = zeros(NF, n_particles, n_steps+1)
-    callback.lats  = zeros(NF, n_particles, n_steps+1)
-    callback.σs    = zeros(NF, n_particles, n_steps+1)
-    callback.times = zeros(DateTime, n_steps+1)
+    callback.lons  = zeros(NF, n_particles, n_steps)
+    callback.lats  = zeros(NF, n_particles, n_steps)
+    callback.σs    = zeros(NF, n_particles, n_steps)
+    callback.times = zeros(DateTime, n_steps)
 
     # set initial conditions
     for (p,particle) in enumerate(progn.particles)
@@ -75,7 +75,7 @@ function callback!(
     
     # otherwise call now, but escape if n_steps + 1 already reached as arrays are of that size
     callback.counter += 1  
-    callback.counter > (callback.n_steps + 1) && return nothing
+    callback.counter > callback.n_steps && return nothing
     i = callback.counter
 
     for (p,particle) in enumerate(progn.particles)
