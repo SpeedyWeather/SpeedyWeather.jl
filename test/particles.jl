@@ -48,8 +48,8 @@ end
                 p = rand(Particle{NF})
                 
                 # positive
-                a = 0.2
-                r = 100*sqrt(eps(NF))
+                a = 0.1
+                r = sqrt(sqrt(eps(NF)))
                 @test p ≈ mod(Particle(lon = p.lon + k*360, lat = p.lat, σ=p.σ)) atol = a rtol = r
                 @test p ≈ mod(Particle(lon = p.lon, lat = p.lat + k*360, σ=p.σ)) atol = a rtol = r
                 @test p ≈ mod(Particle(lon = p.lon + k*360, lat = p.lat + k*360, σ=p.σ)) atol = a rtol = r
