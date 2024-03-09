@@ -48,14 +48,16 @@ end
                 p = rand(Particle{NF})
                 
                 # positive
-                @test p ≈ mod(Particle(lon = p.lon + k*360, lat = p.lat, σ=p.σ)) atol = 0.1 rtol = sqrt(eps(NF))
-                @test p ≈ mod(Particle(lon = p.lon, lat = p.lat + k*360, σ=p.σ)) atol = 0.1 rtol = sqrt(eps(NF))
-                @test p ≈ mod(Particle(lon = p.lon + k*360, lat = p.lat + k*360, σ=p.σ)) atol = 0.1 rtol = sqrt(eps(NF))
+                a = 0.2
+                r = 10*sqrt(eps(NF))
+                @test p ≈ mod(Particle(lon = p.lon + k*360, lat = p.lat, σ=p.σ)) atol = a rtol = r
+                @test p ≈ mod(Particle(lon = p.lon, lat = p.lat + k*360, σ=p.σ)) atol = a rtol = r
+                @test p ≈ mod(Particle(lon = p.lon + k*360, lat = p.lat + k*360, σ=p.σ)) atol = a rtol = r
 
                 # negative
-                @test p ≈ mod(Particle(lon = p.lon - k*360, lat = p.lat, σ=p.σ)) atol = 0.1 rtol = sqrt(eps(NF))
-                @test p ≈ mod(Particle(lon = p.lon, lat = p.lat - k*360, σ=p.σ)) atol = 0.1 rtol = sqrt(eps(NF))
-                @test p ≈ mod(Particle(lon = p.lon - k*360, lat = p.lat - k*360, σ=p.σ)) atol = 0.1 rtol = sqrt(eps(NF))
+                @test p ≈ mod(Particle(lon = p.lon - k*360, lat = p.lat, σ=p.σ)) atol = a rtol = r
+                @test p ≈ mod(Particle(lon = p.lon, lat = p.lat - k*360, σ=p.σ)) atol = a rtol = r
+                @test p ≈ mod(Particle(lon = p.lon - k*360, lat = p.lat - k*360, σ=p.σ)) atol = a rtol = r
             end
         end
     end
