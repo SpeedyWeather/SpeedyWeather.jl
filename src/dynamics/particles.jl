@@ -17,7 +17,7 @@ struct Particle{
     lon::NF
     "latitude [-90˚,90˚]"
     lat::NF
-    "vertical sigma coordinate [0,1] (top to surface)"
+    "vertical sigma coordinate [0 (top) to 1 (surface)]"
     σ::NF
 end
 
