@@ -42,22 +42,22 @@ end
     end
 
     for NF in (Float32,Float64)
-        for n in 1:100
+        for n in 1:1000
             # move particles 1-4x around the globe
             for k in 1:4
                 p = rand(Particle{NF})
                 
                 # positive
-                a = 0.1
-                r = sqrt(sqrt(eps(NF)))
-                @test p ≈ mod(Particle(lon = p.lon + k*360, lat = p.lat, σ=p.σ)) atol = a rtol = r
-                @test p ≈ mod(Particle(lon = p.lon, lat = p.lat + k*360, σ=p.σ)) atol = a rtol = r
-                @test p ≈ mod(Particle(lon = p.lon + k*360, lat = p.lat + k*360, σ=p.σ)) atol = a rtol = r
+                atol = sqrt(eps(NF))    # at least 40m accurate for Float32
+                rtol = sqrt(eps(NF))    # and 1mm accurate for Float64
+                @test isapprox(p, mod(Particle(lon = p.lon + k*360, lat = p.lat, σ=p.σ)); atol, rtol)
+                @test isapprox(p, mod(Particle(lon = p.lon, lat = p.lat + k*360, σ=p.σ)); atol, rtol)
+                @test isapprox(p, mod(Particle(lon = p.lon + k*360, lat = p.lat + k*360, σ=p.σ)); atol, rtol)
 
                 # negative
-                @test p ≈ mod(Particle(lon = p.lon - k*360, lat = p.lat, σ=p.σ)) atol = a rtol = r
-                @test p ≈ mod(Particle(lon = p.lon, lat = p.lat - k*360, σ=p.σ)) atol = a rtol = r
-                @test p ≈ mod(Particle(lon = p.lon - k*360, lat = p.lat - k*360, σ=p.σ)) atol = a rtol = r
+                @test isapprox(p, mod(Particle(lon = p.lon - k*360, lat = p.lat, σ=p.σ)); atol, rtol)
+                @test isapprox(p, mod(Particle(lon = p.lon, lat = p.lat - k*360, σ=p.σ)); atol, rtol)
+                @test isapprox(p, mod(Particle(lon = p.lon - k*360, lat = p.lat - k*360, σ=p.σ)); atol, rtol)
             end
         end
     end
