@@ -75,28 +75,31 @@ end
 
 @testset "Move particles" begin
     for NF in (Float32, Float64)
+
+        atol = sqrt(eps(NF))    # at least 40m accurate for Float32
+        rtol = sqrt(eps(NF))    # and 1mm accurate for Float64
         
         p = Particle{NF}(lon=-350,lat=0)
-        @test mod(p) == Particle{NF}(lon=10,lat=0)        
+        @test mod(p) ≈ Particle{NF}(lon=10,lat=0) atol=atol rtol=rtol
         
         p = Particle{NF}(lon=370,lat=0)
-        @test mod(p) == Particle{NF}(lon=10,lat=0)
+        @test mod(p) ≈ Particle{NF}(lon=10,lat=0) atol=atol rtol=rtol
 
         p = rand(Particle{NF})
-        @test p == mod(p)
+        @test p ≈ mod(p) atol=atol rtol=rtol
         @test move(p,360,180) != p
-        @test mod(move(p,360,0)).lon ≈ p.lon
+        @test mod(move(p,360,0)).lon ≈ p.lon atol=atol rtol=rtol
 
         p = Particle{NF}(lon=10,lat=89)
-        @test mod(move(p,0,3)) == Particle{NF}(lon=190,lat=88)
+        @test mod(move(p,0,3)) ≈ Particle{NF}(lon=190,lat=88) atol=atol rtol=rtol
 
         p = Particle{NF}(lon=350,lat=89)
-        @test mod(move(p,12,0)) == Particle{NF}(lon=2,lat=89)
+        @test mod(move(p,12,0)) ≈ Particle{NF}(lon=2,lat=89) atol=atol rtol=rtol
 
         p = Particle{NF}(lon=0,lat=-80)
-        @test mod(move(p,0,-15)) == Particle{NF}(lon=180,lat=-85)
+        @test mod(move(p,0,-15)) ≈ Particle{NF}(lon=180,lat=-85) atol=atol rtol=rtol
 
         p = Particle{NF}(lon=0,lat=-89)
-        @test mod(move(p,-1,-4)) == Particle{NF}(lon=179,lat=-87)
+        @test mod(move(p,-1,-4)) ≈ Particle{NF}(lon=179,lat=-87) atol=atol rtol=rtol
     end
 end
