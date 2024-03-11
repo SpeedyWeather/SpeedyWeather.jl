@@ -1,4 +1,4 @@
-# Barotropic vorticity model
+# [Barotropic vorticity model](@id barotropic_vorticity_model)
 
 The barotropic vorticity model describes the evolution of a 2D non-divergent flow with
 velocity components ``\mathbf{u} = (u, v)`` through self-advection, forces and dissipation.

@@ -1,4 +1,4 @@
-# Shallow water model
+# [Shallow water model](@id shallow_water_model)
 
 The shallow water model describes the evolution of a 2D flow described by its velocity and
 an interface height that conceptually represents pressure.

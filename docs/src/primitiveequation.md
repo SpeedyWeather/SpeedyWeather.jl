@@ -1,4 +1,4 @@
-# Primitive equation model
+# [Primitive equation model](@id primitive_equation_model)
 
 The [primitive equations](https://en.wikipedia.org/wiki/Primitive_equations) are a hydrostatic approximation
 of the compressible Navier-Stokes equations for an ideal gas on a rotating sphere. We largely follow
