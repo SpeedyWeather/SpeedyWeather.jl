@@ -4,8 +4,8 @@ Abstract type for land-sea masks. Custom land-sea masks have to be defined as
     CustomMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF, Grid}
 
 and need to have at least a field called `land_sea_mask::Grid` that uses a `Grid` as defined
-by the spectral grid object, so of correct size and with the number format `NF``.
-All AbstractLandSeaMask have a convenient generator function to be used like
+by the spectral grid object, so of correct size and with the number format `NF`.
+All `AbstractLandSeaMask` have a convenient generator function to be used like
 `mask = CustomMask(spectral_grid, option=argument)`, but you may add your own or customize by
 defining `CustomMask(args...)` which should return an instance of type `CustomMask{NF, Grid}` with
 parameters matching the spectral grid. Then the initialize function has to be extended for
