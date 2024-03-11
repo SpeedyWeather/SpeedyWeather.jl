@@ -317,7 +317,7 @@ initialize or generally alter several model components in one, but that not advi
 and can easily lead to unexpected behaviour because of multiple dispatch.
 
 As a last note on `initialize!`, you can see that we scale the amplitude/strength `A`
-with the radius squared, this is because the [Barotropic vorticity equation](@ref)
+with the radius squared, this is because the [Barotropic vorticity equation](@ref barotropic_vorticity_model)
 are scaled that way, so we have to scale `S` too.
 
 ## Custom forcing: forcing! function
