@@ -18,7 +18,10 @@ Base.@kwdef struct ParticleAdvection2D{NF} <: AbstractParticleAdvection
     Δt::Base.RefValue{NF} = Ref(zero(NF))
 end
 
-ParticleAdvection2D(SG::SpectralGrid; kwargs...) = ParticleAdvection2D{SG.NF}(; kwargs...)
+function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
+    SG.n_particles == 0 && @warn "ParticleAdvection2D created but n_particles = 0 in spectral grid."
+    ParticleAdvection2D{SG.NF}(; kwargs...)
+end
 
 function initialize!(
     particle_advection::ParticleAdvection2D,
@@ -65,7 +68,7 @@ function particle_advection!(
     # escape immediately if advection not on this timestep
     clock.timestep_counter % particle_advection.every_n_timesteps == 0 || return nothing
 
-    # don't do particle advection on the 2nd time step
+    # don't do particle advection on the 2nd time step (which is half a leapfrog step that isn't counted)
     clock.timestep_counter == 0 && lf == 2 && return nothing
 
     # also escape if no particle is active
