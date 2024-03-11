@@ -7,7 +7,8 @@ Particle with location lon (longitude), lat (latitude) and σ (vertical coordina
 Longitude is assumed to be in [0,360˚E), latitude in [-90˚,90˚N] and σ in [0,1] but
 not strictly enforced at creation, see `mod(::Particle)` and `ismod(::Particle)`.
 A particle is either active or inactive, determined by the Boolean in it's 2nd
-type parameter.
+type parameter. By default, a particle is active, of number format DEFAULT_NF
+and at 0˚N, 0˚E, σ=0.
 $(TYPEDFIELDS)"""
 struct Particle{
     NF<:AbstractFloat,  # number format of coordinates
@@ -21,24 +22,21 @@ struct Particle{
     σ::NF
 end
 
-# particle is by default active, of number format DEFAULT_NF and at 0˚N, 0˚E, σ=0
-
 # keyword constructors
-Particle{NF}(;lon,lat,σ=0) where NF = Particle{NF}(lon,lat,σ)
-Particle{NF,isactive}(;lon,lat,σ=0) where {NF,isactive} = Particle{NF,isactive}(lon,lat,σ)
-Particle(;lon,lat,σ=0) = Particle(lon,lat,σ)
+Particle{NF}(;lon, lat, σ=0) where NF = Particle{NF}(lon, lat, σ)
+Particle{NF, isactive}(; lon, lat, σ=0) where {NF,isactive} = Particle{NF,isactive}(lon, lat, σ)
+Particle(;lon, lat, σ=0) = Particle(lon, lat, σ)
 
-# empty constructor map to zero
-Particle() = zero(Particle)
-Particle{NF}() where NF = zero(Particle{NF})
-Particle{NF,isactive}() where {NF,isactive} = zero(Particle{NF,isactive})
-Particle{NF}(args...) where NF = Particle{NF,true}(args...)
+# parametric constructors
+Particle{NF}(lon, lat) where NF = Particle{NF,true}(lon, lat, 0)
+Particle{NF, isactive}(lon, lat) where {NF, isactive} = Particle{NF, isactive}(lon, lat, 0)
+Particle{NF}(lon, lat, σ) where NF = Particle{NF,true}(lon, lat, σ)
 
-# promotion of arguments
-Particle(lon,lat) = Particle(lon,lat,0)
-Particle(lon::Integer,lat::Integer) = Particle(lon,lat,0)
-Particle(lon,lat,σ) = Particle{promote_type(typeof.((lon,lat,σ))...),true}(lon,lat,σ)
-Particle(lon::Integer,lat::Integer,σ::Integer) = Particle{DEFAULT_NF,true}(lon,lat,σ)
+# promotion of arguments if NF not provided
+Particle(lon, lat) = Particle(lon, lat, 0)
+Particle(lon, lat, σ) = Particle{promote_type(typeof.((lon, lat, σ))...), true}(lon, lat, σ)
+Particle(lon::Integer, lat::Integer) = Particle(lon,lat,0)
+Particle(lon::Integer, lat::Integer, σ::Integer) = Particle{DEFAULT_NF, true}(lon, lat, σ)
 
 # zero generators
 Base.zero(::Type{Particle}) = Particle{DEFAULT_NF,true}(0,0,0)
@@ -46,8 +44,8 @@ Base.zero(::Type{Particle{NF}}) where NF = Particle{NF,true}(0,0,0)
 Base.zero(::Type{Particle{NF,isactive}}) where {NF,isactive} = Particle{NF,isactive}(0,0,0)
 Base.zero(::P) where {P<:Particle} = zero(P)
 
-Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle}) = rand(rng,Particle{DEFAULT_NF,true})
-Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF}}) where NF = rand(rng,Particle{NF,true})
+Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle}) = rand(rng, Particle{DEFAULT_NF,true})
+Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF}}) where NF = rand(rng, Particle{NF,true})
 
 # rand uniformly distributed over the globe with cos-distribution for poles
 function Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF,isactive}}) where {NF,isactive}
@@ -94,7 +92,7 @@ export move
 """$(TYPEDSIGNATURES)
 Move a particle with increments (dlon, dlat, dσ) in those respective coordinates.
 Only active particles are moved."""
-@inline function move(p::Particle{NF,true},dlon,dlat,dσ) where NF
+@inline function move(p::Particle{NF,true}, dlon, dlat, dσ) where NF
     (;lon, lat, σ) = p
     Particle{NF,true}(lon+dlon,lat+dlat,σ+dσ)
 end
@@ -102,14 +100,14 @@ end
 """$(TYPEDSIGNATURES)
 Move a particle with increments (dlon, dlat) in 2D. No movement in vertical σ.
 Only active particles are moved."""
-@inline function move(p::Particle{NF,true},dlon,dlat) where NF
+@inline function move(p::Particle{NF,true}, dlon, dlat) where NF
     (;lon, lat, σ) = p
     Particle{NF,true}(lon+dlon,lat+dlat,σ)
 end
 
 """$(TYPEDSIGNATURES)
 Inactive particles are not moved."""
-@inline move(p::Particle{NF,false},args...) where NF = p
+@inline move(p::Particle{NF,false}, args...) where NF = p
 
 export activate, deactivate, active
 
