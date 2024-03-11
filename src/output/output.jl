@@ -82,7 +82,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32, Float64}, Model<:Mode
     timestep_counter::Int = 0               # time step counter
     output_counter::Int = 0                 # output step counter
     
-    # the netcdf file to be written into, will be create
+    # the netcdf file to be written into, will be created
     netcdf_file::Union{NCDataset, Nothing} = nothing
 
     # INPUT GRID (the one used in the dynamical core)
