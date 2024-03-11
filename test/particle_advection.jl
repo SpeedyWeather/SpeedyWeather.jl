@@ -14,6 +14,8 @@
         particle_advection = ParticleAdvection2D(spectral_grid)
 
         model = Model(;spectral_grid,particle_advection)
+        add!(model.callbacks, ParticleTracker(spectral_grid))
+
         simulation = initialize!(model)
         run!(simulation, period=Day(1))
 
@@ -22,3 +24,4 @@
         end
     end
 end
+
