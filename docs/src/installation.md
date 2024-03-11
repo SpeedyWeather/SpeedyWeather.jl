@@ -18,9 +18,9 @@ However, you may want to make use of the latest features, then install directly 
 ```julia
 julia> Pkg.add(url="https://github.com/SpeedyWeather/SpeedyWeather.jl", rev="main")
 ```
-other branches than `main` can be similarly installed. You can also type, equivalently,
+In a similar manner, other branched can be also installed. You can also type, equivalently,
 ```julia
-julia>] add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
+julia> ] add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
 ```
 
 ## Compatibility with Julia versions
