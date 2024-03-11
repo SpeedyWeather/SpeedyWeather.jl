@@ -79,6 +79,10 @@ function Base.isapprox(
     return b
 end
 
+Base.convert(::Type{Particle{NF}}, p::Particle) where NF = Particle{NF, active(p)}(p.lon, p.lat, p.σ)
+Base.convert(::Type{Particle{NF, isactive}}, p::Particle) where {NF, isactive} =
+                    Particle{NF, isactive}(p.lon, p.lat, p.σ)
+
 function Base.show(io::IO,p::Particle{NF,isactive}) where {NF,isactive}
     lat = @sprintf("%6.2f",p.lat)
     lon = @sprintf("%6.2f",p.lon)
@@ -117,11 +121,11 @@ activate(  p::Particle{NF}) where NF = Particle{NF, true}(p.lon, p.lat, p.σ)
 
 """$(TYPEDSIGNATURES)
 Deactivate particle. Inactive particles cannot move."""
-deactivate(p::Particle{NF}) where NF = Particle{NF,false}(p.lon, p.lat, p.σ)
+deactivate(p::Particle{NF}) where NF = Particle{NF, false}(p.lon, p.lat, p.σ)
 
 """$(TYPEDSIGNATURES)
 Check whether particle is active."""
-active(::Particle{NF,isactive}) where {NF,isactive} = isactive
+active(::Particle{NF, isactive}) where {NF, isactive} = isactive
 
 """
 $(TYPEDSIGNATURES)

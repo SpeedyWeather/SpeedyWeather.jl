@@ -80,6 +80,30 @@ end
     end
 end
 
+@testset "Particle conversion" begin
+    for NF in (Float16, Float32, Float64)
+        v = zeros(Particle{NF},5)       # active/inactive not specified
+        v[1] = Particle(lon=1, lat=2)
+        v[2] = Particle{Float64}(lon=1, lat=2)
+        v[3] = Particle{Float64, false}(lon=1, lat=2)
+
+        for particle in v
+            @test particle isa Particle{NF}
+        end
+    end
+
+    for NF in (Float16, Float32, Float64)
+        v = zeros(Particle{NF, true}, 5)                # all particles active
+        v[1] = Particle(lon=1, lat=2)
+        v[2] = Particle{Float64}(lon=1, lat=2)
+        v[3] = Particle{Float64, false}(lon=1, lat=2)   # will convert to active
+
+        for particle in v
+            @test particle isa Particle{NF, true}
+        end
+    end
+end
+
 @testset "Move particles" begin
     for NF in (Float32, Float64)
 
