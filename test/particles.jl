@@ -75,7 +75,7 @@ end
 
     for NF in (Float16, Float32, Float64)
         for i in 1:1000
-            @test ismod(rand(Particle{NF}))
+            @test SpeedyWeather.ismod(rand(Particle{NF}))
         end
     end
 end
