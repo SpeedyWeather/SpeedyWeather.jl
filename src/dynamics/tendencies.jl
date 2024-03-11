@@ -709,7 +709,7 @@ $(TYPEDSIGNATURES)
 Add the linear contribution of the pressure gradient to the geopotential.
 The pressure gradient in the divergence equation takes the form
 
-`-∇⋅(Rd*Tᵥ*∇lnpₛ) = -∇⋅(Rd*Tᵥ'*∇lnpₛ) - ∇²(Rd*Tₖ*lnpₛ)`
+    -∇⋅(Rd * Tᵥ * ∇lnpₛ) = -∇⋅(Rd * Tᵥ' * ∇lnpₛ) - ∇²(Rd * Tₖ * lnpₛ)
 
 So that the second term inside the Laplace operator can be added to the geopotential.
 Rd is the gas constant, Tᵥ the virtual temperature and Tᵥ' its anomaly wrt to the

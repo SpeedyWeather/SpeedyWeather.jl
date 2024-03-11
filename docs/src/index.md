@@ -15,10 +15,10 @@ a semi-implicit time integration and simple parameterizations to represent vario
 climate processes: Radiation, clouds, precipitation, surface fluxes, among others.
 
 SpeedyWeather.jl defines 
-- `BarotropicModel` for the 2D barotropic vorticity equation
-- `ShallowWaterModel` for the 2D shallow water equations
-- `PrimitiveDryModel` for the 3D primitive equations without humidity
-- `PrimitiveWetModel` for the 3D primitive equations with humidity
+- [`BarotropicModel`](@ref barotropic_vorticity_model) for the 2D barotropic vorticity equation
+- [`ShallowWaterModel`](@ref shallow_water_model) for the 2D shallow water equations
+- [`PrimitiveDryModel`](@ref primitive_equation_model) for the 3D primitive equations without humidity
+- [`PrimitiveWetModel`](@ref primitive_equation_model) for the 3D primitive equations with humidity
 
 and solves these equations in spherical coordinates as described in this documentation.
 

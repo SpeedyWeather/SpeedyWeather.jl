@@ -1,4 +1,4 @@
-# Primitive equation model
+# [Primitive equation model](@id primitive_equation_model)
 
 The [primitive equations](https://en.wikipedia.org/wiki/Primitive_equations) are a hydrostatic approximation
 of the compressible Navier-Stokes equations for an ideal gas on a rotating sphere. We largely follow
@@ -483,7 +483,8 @@ spectral space. To obtain a tendency for vorticity and divergence, we rewrite th
 \frac{\partial \mathcal{D}}{\partial t} &= \nabla \cdot (f+\zeta)\mathbf{u}_\perp \\
 \end{aligned}
 ```
-with ``\mathbf{u}_\perp = (v, -u)`` the rotated velocity vector, see [Barotropic vorticity equation](@ref).
+with ``\mathbf{u}_\perp = (v, -u)`` the rotated velocity vector, see [Barotropic vorticity
+equation](@ref barotropic_vorticity_model).
 
 ## Humidity equation
 
@@ -603,9 +604,8 @@ to the previous time step afterwards.
 
 ## [Semi-implicit time stepping](@id implicit_primitive)
 
-Conceptually, the semi-implicit time stepping in the [Primitive equation model](@ref) is
-the same as in the [Shallow water model](@ref implicit_swm),
-but
+Conceptually, the semi-implicit time stepping in the [Primitive equation model](@ref primitive_equation_model) is
+the same as in the [Shallow water model](@ref implicit_swm), but
 
 - tendencies for divergence ``\mathcal{D}``, logarithm of surface pressure ``\ln p_s`` but also temperature ``T`` are computed semi-implicitly,
 - the vertical layers are coupled, creating a linear equation system that is solved via matrix inversion.
@@ -643,7 +643,7 @@ available in spectral space. For the adiabatic conversion term in the [Temperatu
 we follow 2 as one would otherwise need to split this term into a non-linear and linear term,
 evaluating it essentially twice in grid-point space. 
 
-So what is ``G`` in the [Primitive equation model](@ref)? 
+So what is ``G`` in the [Primitive equation model](@ref primitive_equation_model)?
 
 ```math
 \begin{aligned}

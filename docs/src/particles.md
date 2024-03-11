@@ -10,7 +10,7 @@ vertical sigma coordinate ``\sigma``, see [Sigma coordinates](@ref)) that are mo
 ```
 
 This equation applies in 2D, i.e. ``\mathbf{x} = (\lambda, \theta)`` and ``\mathbf{u} = (u, v)`` or
-in 3D, but at the moment only 2D advection is supported. In the [Primitive equation model](@ref)
+in 3D, but at the moment only 2D advection is supported. In the [Primitive equation model](@ref primitive_equation_model)
 the vertical layer on which the advection takes place has to be specified. It is therefore not
 advected with the vertical velocity but maintains a constant pressure ratio compared to the
 surface pressure (``\sigma`` is constant).

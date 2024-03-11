@@ -140,14 +140,14 @@ roughly belong into one of three groups.
 
 ## [Creating a model](@id create_model)
 
-SpeedyWeather.jl implements (currently) 4 different models
+SpeedyWeather.jl currently includes 4 different models:
 
-1. `BarotropicModel`, see [Barotropic vorticity model](@ref)
-2. `ShallowWaterModel`, see [Shallow water model](@ref)
-3. `PrimitiveDryModel`, see [Primitive equation model](@ref) but with zero humidity.
-4. `PrimitiveWetModel`, see [Primitive equation model](@ref).
+1. [`BarotropicModel`](@ref barotropic_vorticity_model) for the 2D barotropic vorticity equation,
+2. [`ShallowWaterModel`](@ref shallow_water_model) for the 2D shallow water equations,
+3. [`PrimitiveDryModel`](@ref primitive_equation_model) for the 3D primitive equations without humidity, and
+4. [`PrimitiveWetModel`](@ref primitive_equation_model) for the 3D primitive equations with humidity.
 
-Overall they are kept quite similar, but there are still fundamental
+Overall, all above-mentioned models are kept quite similar, but there are still fundamental
 differences arising from the different equations. For example,
 the barotropic and shallow water models do not have any physical
 parameterizations. Conceptually you construct these different models with
