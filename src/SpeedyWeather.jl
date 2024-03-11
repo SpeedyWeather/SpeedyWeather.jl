@@ -84,6 +84,7 @@ include("physics/land_sea_mask.jl")
 
 # VARIABLES
 include("dynamics/particles.jl")
+include("dynamics/clock.jl")
 include("dynamics/prognostic_variables.jl")
 include("physics/define_column.jl")
 include("dynamics/diagnostic_variables.jl")
