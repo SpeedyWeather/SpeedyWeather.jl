@@ -18,7 +18,7 @@ However, you may want to make use of the latest features, then install directly 
 ```julia
 julia> Pkg.add(url="https://github.com/SpeedyWeather/SpeedyWeather.jl", rev="main")
 ```
-In a similar manner, other branched can be also installed. You can also type, equivalently,
+In a similar manner, other branches can be also installed. You can also type, equivalently,
 ```julia
 julia> ] add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
 ```
