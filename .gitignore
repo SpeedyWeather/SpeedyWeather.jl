@@ -36,3 +36,6 @@ run_*/
 
 # no video outputs
 *.mp4
+
+# not sure where they are from
+default.profraw

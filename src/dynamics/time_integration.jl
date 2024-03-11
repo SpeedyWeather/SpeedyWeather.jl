@@ -209,9 +209,9 @@ function first_timesteps!(
     lf1 = 1                             # without Robert+Williams filter
     lf2 = 1                             # evaluates all tendencies at t=0,
                                         # the first leapfrog index (=>Euler forward)
-    initialize!(implicit, Δt/2, diagn, model)  # update precomputed implicit terms with time step Δt/2
-    timestep!(progn, diagn, Δt/2, model, lf1, lf2)
-    clock.time += Δt_millisec_half      # update by half the leapfrog time step Δt used here
+    initialize!(implicit, Δt/2, diagn, model)       # update precomputed implicit terms with time step Δt/2
+    timestep!(progn, diagn, Δt/2, model, lf1, lf2)  # update time by half the leapfrog time step Δt used here
+    timestep!(clock, Δt_millisec_half, increase_counter=false)      
 
     # output, callbacks not called after the first Euler step as it's a half-step (i=0 to i=1/2)
     # populating the second leapfrog index to perform the second time step
@@ -222,8 +222,9 @@ function first_timesteps!(
     lf2 = 2                             # evaluate all tendencies at t=dt/2,
                                         # the 2nd leapfrog index (=>Leapfrog)
     timestep!(progn, diagn, Δt, model, lf1, lf2)
-    clock.time -= Δt_millisec_half      # remove prev Δt/2 in case not even ms
-    clock.time += Δt_millisec           # otherwise time is off by 1ms
+    # remove prev Δt/2 in case not even milliseconds, otherwise time is off by 1ms
+    timestep!(clock, -Δt_millisec_half, increase_counter=false) 
+    timestep!(clock, Δt_millisec) 
     
     # do output and callbacks after the first proper (from i=0 to i=1) time step
     write_output!(output, clock.time, diagn)
@@ -260,6 +261,9 @@ function timestep!(
         leapfrog!(progn_layer, diagn_layer, dt, lf1, model)
         gridded!(diagn_layer, progn_lf, model)
     end
+
+    # PARTICLE ADVECTION
+    particle_advection!(progn, diagn, lf2, model.particle_advection)
 end
 
 """
@@ -299,6 +303,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     (; pres_grid) = diagn.surface
     leapfrog!(progn.surface, diagn.surface, dt, lf1, model)
     gridded!(pres_grid, pres, spectral_transform)
+    
+    # PARTICLE ADVECTION
+    particle_advection!(progn, diagn, lf2, model.particle_advection)
 end
 
 """
@@ -356,6 +363,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
             gridded!(pres_grid, pres_lf, model.spectral_transform)
         end
     end
+
+    # PARTICLE ADVECTION
+    particle_advection!(progn, diagn, lf2, model.particle_advection)
 end
 
 """
@@ -382,28 +392,29 @@ function time_stepping!(
     gridded!(diagn, progn, lf, model)
     initialize!(output, feedback, time_stepping, clock, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)
+    
+    # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
+    # considered part of the model initialisation
+    first_timesteps!(progn,diagn, model, output)
+    
+    # only now initialise feedback for benchmark accuracy
     initialize!(feedback, clock, model)
 
-    # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
-    first_timesteps!(progn, diagn, model, output)
-
     # MAIN LOOP
-    for i in 2:clock.n_timesteps            # start at 2 as first Δt in first_timesteps!
-        
-        # calculate tendencies and leapfrog forward
-        timestep!(progn, diagn, 2Δt, model)   
-        clock.time += Δt_millisec           # time of lf=2 and diagn after timestep!
+    for _ in 2:clock.n_timesteps            # start at 2 as first Δt in first_timesteps!
+        timestep!(progn, diagn, 2Δt, model) # calculate tendencies and leapfrog forward
+        timestep!(clock, Δt_millisec)       # time of lf=2 and diagn after timestep!
 
         progress!(feedback, progn)           # updates the progress meter bar
         write_output!(output, clock.time, diagn)
         callback!(model.callbacks, progn, diagn, model)
     end
-
+    
     # UNSCALE, CLOSE, FINISH
+    finish!(feedback)                       # finish the progress meter, do first for benchmark accuracy
     unscale!(progn)                         # undo radius-scaling for vor, div from the dynamical core
     close(output)                           # close netCDF file
     write_restart_file(progn, output)       # as JLD2 
-    finish!(feedback)                       # finishes the progress meter bar
     finish!(model.callbacks, progn, diagn, model)
 
     return progn                            # to trigger UnicodePlot via show(::IO, ::PrognosticVariables)

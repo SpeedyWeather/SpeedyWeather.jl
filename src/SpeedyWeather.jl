@@ -83,6 +83,7 @@ include("dynamics/orography.jl")
 include("physics/land_sea_mask.jl")
 
 # VARIABLES
+include("dynamics/particles.jl")
 include("dynamics/prognostic_variables.jl")
 include("physics/define_column.jl")
 include("dynamics/diagnostic_variables.jl")
@@ -100,6 +101,7 @@ include("dynamics/implicit.jl")
 include("dynamics/scaling.jl")
 include("dynamics/tendencies.jl")
 include("dynamics/hole_filling.jl")
+include("dynamics/particle_advection.jl")
 
 # PARAMETERIZATIONS
 include("physics/albedo.jl")
@@ -125,6 +127,7 @@ include("output/output.jl")
 include("output/feedback.jl")
 include("output/plot.jl")
 include("output/callbacks.jl")
+include("output/particle_tracker.jl")
 
 # MODELS
 include("models/simulation.jl")

@@ -2,9 +2,11 @@
 $(TYPEDSIGNATURES)
 Scale the variable `var` inside `progn` with scalar `scale`.
 """
-function scale!(progn::PrognosticVariables{NF},
-                var::Symbol,
-                scale::Real) where NF
+function scale!(
+    progn::PrognosticVariables,
+    var::Symbol,
+    scale::Real,
+)
     if var == :pres
         for pres in progn.pres.timesteps
             pres .*= scale
@@ -25,19 +27,20 @@ Scales the prognostic variables vorticity and divergence with
 the Earth's radius which is used in the dynamical core."""
 function scale!(progn::PrognosticVariables,
                 scale::Real)
-    scale!(progn, :vor, scale)
-    scale!(progn, :div, scale)
-    progn.scale[] = scale   # store scaling information
+    new_scale = scale/progn.scale[]     # undo previous scale and new scale in one go
+    scale!(progn, :vor, new_scale)
+    scale!(progn, :div, new_scale)
+    progn.scale[] = scale               # store scaling information
 end
 
 """
 $(TYPEDSIGNATURES)
 Undo the radius-scaling of vorticity and divergence from scale!(progn, scale::Real)."""
 function unscale!(progn::PrognosticVariables)
-    scale = progn.scale[]
-    scale!(progn, :vor, inv(scale))
-    scale!(progn, :div, inv(scale))
-    progn.scale[] = 1       # set scale back to 1=unscaled
+    inv_scale = inv(progn.scale[])
+    scale!(progn, :vor, inv_scale)
+    scale!(progn, :div, inv_scale)
+    progn.scale[] = 1                   # set scale back to 1=unscaled
 end
 
 """

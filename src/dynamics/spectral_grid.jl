@@ -34,6 +34,9 @@ Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
     "[OPTION] radius of the sphere [m]"
     radius::Float64 = DEFAULT_RADIUS
 
+    "[OPTION] number of particles for particle advection [1]"
+    n_particles::Int = 0
+
     # SIZE OF GRID from trunc, Grid, dealiasing:
     "number of latitude rings on one hemisphere (Equator incl)"
     nlat_half::Int = SpeedyTransforms.get_nlat_half(trunc, dealiasing)
@@ -52,12 +55,12 @@ Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
     vertical_coordinates::VerticalCoordinates = SigmaCoordinates(; nlev)
 
     # make sure nlev and vertical_coordinates.nlev match
-    function SpectralGrid(NF, trunc, Grid, dealiasing, radius, nlat_half, nlat, npoints, nlev, vertical_coordinates)
+    function SpectralGrid(NF, trunc, Grid, dealiasing, radius, n_particles, nlat_half, nlat, npoints, nlev, vertical_coordinates)
         if nlev == vertical_coordinates.nlev
-            return new(NF, trunc, Grid, dealiasing, radius, nlat_half, nlat, npoints,
+            return new(NF, trunc, Grid, dealiasing, radius, n_particles, nlat_half, nlat, npoints,
                     nlev, vertical_coordinates)
         else    # use nlev from vert_coords:
-            return new(NF, trunc, Grid, dealiasing, radius, nlat_half, nlat, npoints,
+            return new(NF, trunc, Grid, dealiasing, radius, n_particles, nlat_half, nlat, npoints,
                     vertical_coordinates.nlev, vertical_coordinates)
         end
     end
@@ -70,6 +73,7 @@ SpectralGrid(NF::Type{<:AbstractFloat}, Grid::Type{<:AbstractGrid}; kwargs...) =
 
 function Base.show(io::IO, SG::SpectralGrid)
     (; NF, trunc, Grid, radius, nlat, npoints, nlev, vertical_coordinates) = SG
+    (; n_particles) = SG
 
     # resolution information
     res_ave = sqrt(4π*radius^2/npoints)/1000  # in [km]
@@ -79,6 +83,9 @@ function Base.show(io::IO, SG::SpectralGrid)
     println(io, "├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
     println(io, "├ Grid:       $nlat-ring $Grid{$NF}, $npoints grid points")
     println(io, "├ Resolution: $(s(res_ave))km (average)")
+    if n_particles > 0
+    println(io, "├ Particles:  $n_particles")
+    end
       print(io, "└ Vertical:   $nlev-level $(typeof(vertical_coordinates))")
 end
 

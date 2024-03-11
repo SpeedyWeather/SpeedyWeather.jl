@@ -41,10 +41,11 @@ function run!(  simulation::AbstractSimulation;
     (; prognostic_variables, diagnostic_variables, model) = simulation
     (; clock) = prognostic_variables
 
-    # set the clock's enddate
-    set_period!(clock, period)
-    initialize!(clock, model.time_stepping)
+    # CLOCK
+    set_period!(clock, period)              # set the clock's enddate      
+    initialize!(clock, model.time_stepping) # store the start date, reset counter
 
+    # OUTPUT
     model.output.output = output            # enable/disable output
 
     # run it, yeah!

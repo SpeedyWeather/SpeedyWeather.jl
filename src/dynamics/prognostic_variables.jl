@@ -1,5 +1,3 @@
-abstract type AbstractVariables end
-
 const DEFAULT_DATE = DateTime(2000, 1, 1)
 
 """
@@ -9,12 +7,24 @@ $(TYPEDFIELDS)."""
 Base.@kwdef mutable struct Clock
     "current model time"
     time::DateTime = DEFAULT_DATE
+
+    "start time of simulation"
+    start::DateTime = DEFAULT_DATE
     
     "period to integrate for, set in set_period!(::Clock, ::Dates.Period)"
     period::Second = Second(0)
 
+    "Counting all time steps during simulation"
+    timestep_counter::Int = 0
+
     "number of time steps to integrate for, set in initialize!(::Clock, ::AbstractTimeStepper)"
     n_timesteps::Int = 0  
+end
+
+function timestep!(clock::Clock, Δt; increase_counter::Bool=true)
+    clock.time += Δt
+    # the first timestep is a half-step and doesn't count
+    clock.timestep_counter += increase_counter  
 end
 
 # pretty printing
@@ -29,6 +39,8 @@ $(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` in the `time_stepping`."""
 function initialize!(clock::Clock, time_stepping::AbstractTimeStepper)
     clock.n_timesteps = ceil(Int, clock.period.value/time_stepping.Δt_sec)
+    clock.start = clock.time    # store the start time
+    clock.timestep_counter = 0  # reset counter
     return clock
 end
 
@@ -178,7 +190,11 @@ function PrognosticSurfaceTimesteps(SG::SpectralGrid)
 end
 
 export PrognosticVariables
-struct PrognosticVariables{NF<:AbstractFloat, Grid<:AbstractGrid{NF}, M<:ModelSetup} <: AbstractVariables
+struct PrognosticVariables{
+    NF<:AbstractFloat,
+    Grid<:AbstractGrid{NF},
+    M<:ModelSetup
+} <: AbstractPrognosticVariables
 
     # dimensions
     trunc::Int              # max degree of spherical harmonics
@@ -190,6 +206,7 @@ struct PrognosticVariables{NF<:AbstractFloat, Grid<:AbstractGrid{NF}, M<:ModelSe
     surface::PrognosticSurfaceTimesteps{NF}
     ocean::PrognosticVariablesOcean{NF, Grid}
     land::PrognosticVariablesLand{NF, Grid}
+    particles::Vector{Particle{NF}}
 
     # scaling
     scale::Base.RefValue{NF}
@@ -200,6 +217,7 @@ end
 function PrognosticVariables(SG::SpectralGrid, model::ModelSetup)
     
     (; trunc, nlat_half, nlev, Grid, NF) = SG
+    (; n_particles) = SG
 
     # data structs
     layers = [PrognosticLayerTimesteps(SG) for _ in 1:nlev]      # vector of nlev layers
@@ -207,12 +225,16 @@ function PrognosticVariables(SG::SpectralGrid, model::ModelSetup)
     ocean = PrognosticVariablesOcean(SG)
     land = PrognosticVariablesLand(SG)
 
+    # particles advection
+    particles = zeros(Particle{NF}, n_particles)
+
     scale = Ref(one(NF))        # initialize with scale=1, wrapped in RefValue for mutability
     clock = Clock()
 
     Model = model_class(model)  # strip away the parameters
-    return PrognosticVariables{NF, Grid{NF}, Model}(  trunc, nlat_half, nlev, N_STEPS,
-                                                    layers, surface, ocean, land, scale, clock)
+    return PrognosticVariables{NF, Grid{NF}, Model}(trunc, nlat_half, nlev, N_STEPS,
+                                                    layers, surface, ocean, land, particles,
+                                                    scale, clock)
 end
 
 has(::PrognosticVariables{NF, Grid, M}, var_name::Symbol) where {NF, Grid, M} = has(M, var_name)
