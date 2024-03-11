@@ -28,6 +28,7 @@ makedocs(
             "Running SpeedyWeather" => [
                 "How to run SpeedyWeather"=>"how_to_run_speedy.md",
                 "Model setups"=>"setups.md",
+                "Particle advection"=>"particles.md",
                 "NetCDF output"=>"output.md",
             ],
             "Extending SpeedyWeather" => [
@@ -37,12 +38,11 @@ makedocs(
                 "Land-Sea Mask"=>"land_sea_mask.md",
                 "Callbacks"=>"callbacks.md",
             ],
-            "Submodules" => [
-                "RingGrids"=>"ringgrids.md",
-                "LowerTriangularMatrices"=>"lowertriangularmatrices.md",
-                "SpeedyTransforms"=>"speedytransforms.md",
-            ],
-            "Function and type index"=>"functions.md"]
+            "RingGrids"=>"ringgrids.md",
+            "LowerTriangularMatrices"=>"lowertriangularmatrices.md",
+            "SpeedyTransforms"=>"speedytransforms.md",
+            "Function and type index"=>"functions.md",
+            ]
 )
 
 deploydocs(
