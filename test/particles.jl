@@ -72,6 +72,12 @@ end
     @test rand(Particle,5) isa Vector{Particle}
     @test rand(Particle{Float32},5) isa Vector{Particle{Float32}}
     @test rand(Particle{Float32,false},5) isa Vector{Particle{Float32,false}}
+
+    for NF in (Float16, Float32, Float64)
+        for i in 1:1000
+            @test ismod(rand(Particle{NF}))
+        end
+    end
 end
 
 @testset "Move particles" begin
