@@ -143,9 +143,10 @@ function advect_2D(
     dt::NF,                         # scaled time step [s*˚/m]    
 ) where NF
 
-    dlat = v * dt                           # increment in latitude [˚N]
-    dlon = u * dt/cosd(particle.lat)        # increment in longitude [˚E]
-    return mod(move(particle,dlon,dlat))    # move, mod back to [0, 360˚E], [-90, 90˚N]
+    dlat = v * dt                               # increment in latitude [˚N]
+    coslat = max(cosd(particle.lat), eps(NF))   # prevents division by zero
+    dlon = u * dt/coslat                        # increment in longitude [˚E]
+    return mod(move(particle,dlon,dlat))        # move, mod back to [0, 360˚E], [-90, 90˚N]
 end
 
-@inline advect_2D(p::Particle{NF,false}, args...) where NF = p
+@inline advect_2D(p::Particle{NF, false}, args...) where NF = p
