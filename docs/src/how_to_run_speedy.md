@@ -147,7 +147,7 @@ SpeedyWeather.jl currently includes 4 different models:
 3. [`PrimitiveDryModel`](@ref primitive_equation_model) for the 3D primitive equations without humidity, and
 4. [`PrimitiveWetModel`](@ref primitive_equation_model) for the 3D primitive equations with humidity.
 
-Overall, all above-mentioned models areare kept quite similar, but there are still fundamental
+Overall, all above-mentioned models are kept quite similar, but there are still fundamental
 differences arising from the different equations. For example,
 the barotropic and shallow water models do not have any physical
 parameterizations. Conceptually you construct these different models with
