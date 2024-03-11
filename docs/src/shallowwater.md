@@ -42,7 +42,7 @@ to force the respective variables, see [Extending SpeedyWeather](@ref).
 
 In the shallow water system the flow can be described through ``u, v`` or ``\zeta, \mathcal{D}`` which
 are related through the stream function ``\Psi`` and the velocity potential ``\Phi`` (which is zero
-in the [Barotropic vorticity equation](@ref)).
+in the [Barotropic vorticity equation](@ref barotropic_vorticity_model)).
 ```math
 \begin{aligned}
 \zeta &= \nabla^2 \Psi \\
@@ -66,7 +66,7 @@ divergence/curl of the forcing vector ``\mathbf{F}``, as
 \nabla \cdot (\mathbf{F} + \mathbf{u}_\perp(\zeta + f))
 \end{aligned}
 ```
-equivalently to how this is done in the [Barotropic vorticity equation](@ref)
+equivalently to how this is done in the [Barotropic vorticity equation](@ref barotropic_vorticity_model)
 with ``\mathbf{u}_\perp = (v, -u)``.
 
 ## Algorithm

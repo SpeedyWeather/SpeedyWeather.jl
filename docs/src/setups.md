@@ -1,8 +1,8 @@
 # Model setups
 
 The following is a collection of model setups, starting with an easy setup
-of the [Barotropic vorticity equation](@ref) and continuing with more
-complicated setups.
+of the [Barotropic vorticity equation](@ref barotropic_vorticity_model) and
+continuing with more complicated setups.
 
 ## 2D turbulence on a non-rotating sphere
 
@@ -330,7 +330,7 @@ run!(simulation, period=Day(9), output=true)
 nothing # hide
 ```
 
-The Jablonowski-Williamson baroclinic wave test case[^JW06] using the [Primitive equation model](@ref)
+The Jablonowski-Williamson baroclinic wave test case[^JW06] using the [Primitive equation model](@ref primitive_equation_model)
 particularly the dry model, as we switch off all physics with `physics=false`.
 We want to use 8 vertical levels, and a lower resolution of T31 on a [full Gaussian grid](@ref FullGaussianGrid).
 The Jablonowski-Williamson initial conditions are in `ZonalWind`, the orography

@@ -9,7 +9,7 @@ The dynamical core presented here to solve the barotropic vorticity equations la
 the idealized models with spectral dynamics developed at the
 Geophysical Fluid Dynamics Laboratory[^1]: A barotropic vorticity model[^2].
 
-Many concepts of the [Shallow water model](@ref) and the [Primitive equation model](@ref) are similar,
+Many concepts of the [Shallow water model](@ref shallow_water_model) and the [Primitive equation model](@ref primitive_equation_model) are similar,
 such that for example [horizontal diffusion](@ref diffusion) and the [Time integration](@ref leapfrog)
 are only explained here.
 
