@@ -49,9 +49,8 @@ Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF}}) where NF = ra
 
 # rand uniformly distributed over the globe with cos-distribution for poles
 function Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF,isactive}}) where {NF,isactive}
-    lon = 360*rand(rng,NF)
-    yπ = convert(NF,π)*(2rand(rng,NF)-1)    # yπ ∈ [-1,1]*π
-    lat = sign(yπ)*acosd((1 + cos(yπ))/2)   # cos-distributed latitude
+    lon = 360*rand(rng,NF)                  # ∈ [0,360˚E]
+    lat = asind(2rand(rng,NF)-1)            # cos-distributed latitude
     σ = rand(rng,NF)
     return Particle{NF,isactive}(lon,lat,σ)
 end
