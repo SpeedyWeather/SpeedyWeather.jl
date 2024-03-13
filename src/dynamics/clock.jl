@@ -1,5 +1,6 @@
 const DEFAULT_DATE = DateTime(2000, 1, 1)
 
+export Clock
 """
 Clock struct keeps track of the model time, how many days to integrate for
 and how many time steps this takes
@@ -21,7 +22,7 @@ Base.@kwdef mutable struct Clock
     n_timesteps::Int = 0
 
     "Time step"
-    Δt_millisec::Millisecond = Millisecond(0)
+    Δt::Millisecond = Millisecond(0)
 end
 
 function timestep!(clock::Clock, Δt; increase_counter::Bool=true)
@@ -44,23 +45,8 @@ function initialize!(clock::Clock, time_stepping::AbstractTimeStepper)
     clock.n_timesteps = ceil(Int, clock.period.value/time_stepping.Δt_sec)
     clock.start = clock.time    # store the start time
     clock.timestep_counter = 0  # reset counter
-    clock.Δt_millisec = time_stepping.Δt_millisec
+    clock.Δt = time_stepping.Δt_millisec
     return clock
-end
-
-"""
-$(TYPEDSIGNATURES)
-Set the `period` of the clock to a new value. Converts any `Dates.Period` input to `Second`."""
-function set_period!(clock::Clock, period::Period)
-    clock.period = Second(period)
-end
-
-"""
-$(TYPEDSIGNATURES)
-Set the `period` of the clock to a new value. Converts any `::Real` input to `Day`."""
-function set_period!(clock::Clock, period::Real)
-    @info "Input $period assumed to have units of days. Use Week($period), Hour($period), Minute($period) otherwise."
-    clock.period = Day(period)
 end
 
 """
