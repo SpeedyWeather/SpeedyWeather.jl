@@ -80,6 +80,9 @@ function initialize!(scheduler::Schedule, clock::Clock)
     return scheduler
 end
 
+# otherwise one needs to write SpeedyWeather.isscheduled inside custom callbacks
+export isscheduled  
+
 """
 $(TYPEDSIGNATURES)
 Evaluate whether (e.g. a callback) should be scheduled at the timestep given
