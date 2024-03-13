@@ -251,3 +251,152 @@ the simulation while running or to interfere with a simulation. We therefore
 encourage users to use callbacks as widely as possible, but if you run
 into any issues please open an issue in the repository and explain what
 you'd like to achieve and which errors you are facing. We are happy to help.
+
+## Schedules
+
+For convenience, SpeedyWeather.jl implements a [`Schedule`](@ref) which helps to
+schedule when callbacks are called. Because in many situations you don't want to call
+them on every time step but only periodically, say once a day, or only on specific
+dates and times, e.g. Jan 1 at noon. Several examples how to create schedules
+
+```@example schedule
+using SpeedyWeather
+
+# execute on timestep at or after Jan 2 2000
+event_schedule = Schedule(DateTime(2000,1,2))   
+
+# several events scheduled
+events = (DateTime(2000,1,3), DateTime(2000,1,5,12))
+several_events_schedule = Schedule(events...)
+
+# provided as Vector{DateTime} with times= keyword
+always_at_noon = [DateTime(2000,1,i,12) for i in 1:10]
+noon_schedule = Schedule(times=always_at_noon)
+
+# or using every= for periodic execution, here once a day
+periodic_schedule = Schedule(every=Day(1))
+```
+
+A `Schedule` has 5 fields, see [`Schedule`](@ref). `every` is an option
+to create a periodic schedule to execute every time that indicated
+period has passed. `steps` and `counter` will let you know how many
+callback execution steps there are and count them up. `times` is a 
+`Vector{DateTime}` containing scheduled events. `schedule` is the
+actual schedule inside a `Schedule`, implemented as `BitVector`
+indicating whether to execute on a given time step (`true`) or not
+(`false`).
+
+Let's show how to use a `Schedule` inside a callback
+
+```@example schedule
+struct MyScheduledCallback <: SpeedyWeather.AbstractCallback
+    schedule::Schedule
+    # add other fields here that you need
+end
+
+function SpeedyWeather.initialize!(
+    callback::MyScheduledCallback,
+    progn::PrognosticVariables,
+    args...
+)
+    # when initializing a scheduled callback also initialize its schedule!
+    initialize!(callback.schedule, progn.clock)
+
+    # initialize other things in your callback here
+end
+
+function SpeedyWeather.callback!(
+    callback::MyScheduledCallback,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::ModelSetup,
+)
+    # scheduled callbacks start with this line to execute only when scheduled!
+    # else escape immediately
+    SpeedyWeather.isscheduled(callback.schedule, progn.clock) || return nothing
+
+    # Just print the North Pole surface temperature to screen
+    (;time) = progn.clock
+    temp_at_north_pole = diagn.layers[end].grid_variables.temp_grid[1]
+    @info "North pole has a temperature of $temp_at_north_pole on $time."
+end
+
+# nothing needs to be done when finishing
+SpeedyWeather.finish!(::MyScheduledCallback, args...) = nothing
+```
+
+So in summary
+- add a field `schedule::Schedule` to your callback
+- add the line `initialize!(callback.schedule, progn.clock)` when initializing your callback
+- start your `callback!` method with `isscheduled(callback.schedule, progn.clock) || return nothing` to execute only when scheduled
+
+A `Schedule` is a field inside a callback as this allows you the set the callbacks
+desired schedule when creating it. In the example above we can create our callback
+that is supposed to print the North Pole's temperature like so
+```@example schedule
+north_pole_temp_at_noon_jan9 = MyScheduledCallback(Schedule(DateTime(2000,1,9,12)))
+```
+The default for `every` is `typemax(Int)` indicating "never". This just means that there
+is no periodically reoccuring schedule, only `schedule.times` would include some times
+for events that are scheduled. Now let's create a primitive equation model with that callback
+
+```@example schedule
+spectral_grid = SpectralGrid(trunc=31, nlev=5)
+model = PrimitiveWetModel(;spectral_grid)
+model.feedback.verbose = false      # hide to progress meter
+add!(model.callbacks, north_pole_temp_at_noon_jan9)
+
+# start simulation 7 days earlier
+simulation = initialize!(model, time = DateTime(2000,1,2,12))
+run!(simulation, period=Day(10))
+nothing # hide
+```
+
+So the callback gives us the temperature at the North Pole exactly when scheduled.
+We could have also stored this temperature, or conditionally changed parameters inside
+the model. There are plenty of ways how to use the scheduling, either by event, or in contrast,
+we could also schedule for once a day. As illustrated in the following
+
+```@example schedule
+north_pole_temp_daily = MyScheduledCallback(Schedule(every=Day(1)))
+add!(model.callbacks, north_pole_temp_daily)
+
+# resume simulation, start time is now 2000-1-12 noon
+run!(simulation, period=Day(5))
+nothing # hide
+```
+
+Note that the previous callback is still part of the model, we haven't
+deleted it with `delete!`. But because it's scheduled for a specific
+time that's in the past now that we resume the simulation it's schedule
+is empty (which is thrown as a warning). However, our new callback,
+scheduled daily, is active and prints daily at noon, because the
+simulation start time was noon.
+
+### Scheduling logic
+
+An event `Schedule` (created with `DateTime` object(s)) for callbacks, executes 
+on or after the specified times.
+For two consecutive time steps ``i``, ``i+1``, an event is scheduled at ``i+1``
+when it occurs in ``(i,i+1]``. So a simulation with timestep `i` on Jan-1 at 1am,
+and ``i+1`` at 2am, will execute a callback scheduled for 1am at ``i`` but scheduled
+for 1am and 1s (=01:00:01 on a 24H clock) at 2am. Because callbacks are
+always executed _after_ a timestep this also means that a simulation starting
+at midnight with a callback scheduled for midnight will not execute this
+callback as it is outside of the ``(i, i+1]`` range. You'd need to include
+this execution into the initialization. If several events inside the
+`Schedule` fall into the same time step (in the example above, 1am and 1s and
+1am 30min) the execution will not happen twice. Think of a scheduled callback
+as a binary "should the callback be executed now or not?". Which is in fact
+how it's implemented, as a `BitVector` of the length of the number of time steps.
+If the bit at a given timestep is true, execute, otherwise not.
+
+A periodic `Schedule` (created with `every = Hour(2)` or similar) will execute
+on the timestep _after_ that period (here 2 hours) has passed. If a simulation
+starts at midnight with one hour time steps then execution would take place
+after the timestep from 1am to 2am because that's when the clock switches to
+2am which is 2 hours after the start of the simulation. Note that therefore
+the initial timestep is not included, however, the last time step would be
+if the period is a multiple of the scheduling period. If the first timestep
+should be included (e.g. you want to do something with the initial conditions)
+then you'll need to include that into the initialization of the callback.
