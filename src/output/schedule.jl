@@ -56,9 +56,9 @@ function initialize!(scheduler::Schedule, clock::Clock)
         every_n_timesteps = max(1,round(Int, scheduler.every/clock.Δt))
         schedule[every_n_timesteps:every_n_timesteps:end] .= true
 
-        prev_every = scheduler.every
-        now_every = convert(typeof(prev_every), every_n_timesteps*clock.Δt)
-        scheduler.every = now_every
+        prev_every = readable_secs(scheduler.every.value)
+        scheduler.every = Second(Dates.second(every_n_timesteps*clock.Δt))
+        now_every = readable_secs(scheduler.every.value)
         s = "Scheduler adjusted from every $prev_every to every $now_every to match timestep."
         now_every != prev_every && @info s
     end
