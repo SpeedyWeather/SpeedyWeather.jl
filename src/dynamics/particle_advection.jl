@@ -27,6 +27,10 @@ function initialize!(
     particle_advection::ParticleAdvection2D,
     model::ModelSetup,
 )
+    (; nlev) = model.spectral_grid
+    (; layer) = particle_advection
+    nlev < layer && @warn "Particle advection on layer $layer on spectral grid with nlev=$nlev."
+
     (; every_n_timesteps) = particle_advection
     # Δt [˚*s/m] is scaled by radius to convert more easily from velocity [m/s]
     # to [˚/s] for particle locations in degree

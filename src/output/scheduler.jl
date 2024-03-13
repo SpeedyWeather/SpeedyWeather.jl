@@ -1,43 +1,59 @@
-abstract type AbstractScheduler <: AbstractModelComponent end
+abstract type AbstractSchedule <: AbstractModelComponent end
 
-export Scheduler
-Base.@kwdef mutable struct Scheduler <: AbstractScheduler
+export Schedule
+Base.@kwdef mutable struct Schedule <: AbstractSchedule
+    "Execute every time period, first timestep included. Default=never."
     every::Second = Second(typemax(Int))
+    
+    "Events scheduled at times"
     times::Vector{DateTime} = zeros(DateTime,0)
+
+    "Actual schedule, true=execute this timestep, false=don't"
     schedule::BitVector = BitVector(undef,0)
+
+    "Number of scheduled executions"
     steps::Int = length(schedule)
+
+    "Count up the number of executions"
+    counter::Int = 0
 end
 
-export PeriodicScheduler, EventScheduler
-PeriodicScheduler(every::Dates.TimePeriod) = Scheduler(; every)
-EventScheduler(times::DateTime...) = Scheduler(times=DateTime[times...])
-EventScheduler(times::Vector{DateTime}) = Scheduler(; times)
+Schedule(times::DateTime...) = Schedule(times=DateTime[times...])
 
-function initialize!(scheduler::Scheduler, clock::Clock)
+function initialize!(scheduler::Schedule, clock::Clock)
     schedule = falses(clock.n_timesteps)    # initialize schedule as BitVector
 
-    # periodic schedule
-    every_n_timesteps = max(1,round(Int, Millisecond(scheduler.every).value/clock.Δt_millisec.value))
-    schedule[1:every_n_timesteps:end] .= true
+    # PERIODIC SCHEDULE, always AFTER scheduler.every time period has passed
+    if scheduler.every.value < typemax(Int)
+        every_n_timesteps = max(1,round(Int, scheduler.every/clock.Δt))
+        schedule[every_n_timesteps:every_n_timesteps:end] .= true
 
-    # event schedule
-    time = clock.start
-    for event in scheduler.at_times
-        i::Int = 1
-        event_scheduled::Bool = false
-        while ~event_scheduled && i <= clock.n_timesteps
-            event_scheduled = time >= event >= clock.start
-            schedule[i] |= event_scheduled
-            time += clock.Δt_millisec
-            i += 1
+        prev_every = scheduler.every
+        now_every = convert(typeof(prev_every), every_n_timesteps*clock.Δt)
+        scheduler.every = now_every
+        s = "Scheduler adjusted from every $prev_every to every $now_every to match timestep."
+        now_every != prev_every && @info s
+    end
+
+    # ADD EVENT SCHEDULE, on first timestep ON or AFTER the scheduled time
+    # event on clock.start will not be executed, ()
+    for event in scheduler.times
+        i = ceil(Int, (event - clock.start)/clock.Δt)   #
+        if 0 < i <= clock.n_timesteps   # event needs to take place in (start, end] 
+            schedule[i] = true          # add to schedule, 
         end
     end
 
     scheduler.schedule = schedule   # set schedule
-    scheduler.steps = sum(schedule)
-    scheduler.steps == 0 && @warn "Empty schedule for Scheduler."
+    scheduler.steps = sum(schedule) # number of executions scheduled periodic + events
+    scheduler.steps == 0 && @warn "Empty schedule."
+    scheduler.counter = 0           # reset counter
 
     return scheduler
 end
 
-isscheduled(S::Scheduler, clock::Clock) = S.schedule[clock.timestep_counter]
+function isscheduled(S::Schedule, clock::Clock)
+    is_scheduled = S.schedule[clock.timestep_counter]
+    S.counter += is_scheduled
+    return is_scheduled
+end
