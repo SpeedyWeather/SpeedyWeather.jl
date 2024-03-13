@@ -18,7 +18,10 @@ Base.@kwdef mutable struct Clock
     timestep_counter::Int = 0
 
     "number of time steps to integrate for, set in initialize!(::Clock, ::AbstractTimeStepper)"
-    n_timesteps::Int = 0  
+    n_timesteps::Int = 0
+
+    "Time step"
+    Δt_millisec::Millisecond = Millisecond(0)
 end
 
 function timestep!(clock::Clock, Δt; increase_counter::Bool=true)
@@ -41,6 +44,7 @@ function initialize!(clock::Clock, time_stepping::AbstractTimeStepper)
     clock.n_timesteps = ceil(Int, clock.period.value/time_stepping.Δt_sec)
     clock.start = clock.time    # store the start time
     clock.timestep_counter = 0  # reset counter
+    clock.Δt_millisec = time_stepping.Δt_millisec
     return clock
 end
 
