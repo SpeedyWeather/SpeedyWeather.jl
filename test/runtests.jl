@@ -43,6 +43,7 @@ include("run_speedy.jl")
 # EXTENSION
 include("extending.jl")
 include("callbacks.jl")
+include("schedule.jl")
 
 # OUTPUT 
 include("netcdf_output.jl")
