@@ -127,7 +127,8 @@ https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/510c38c7-12cb-
 Advection of 5000 particles with wind in the lower-most layer of the primitive equation model at
 T85 (150km) resolution and 8 vertical layers.
 
-![frame_0161](https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/22357163-95ec-4e3a-8f6b-dbc2616595ff)
+https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a6192374-24d9-4065-9fcc-8b719190472f
+
 
 ## History
 
