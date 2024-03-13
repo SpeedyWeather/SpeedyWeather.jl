@@ -42,7 +42,7 @@ function run!(  simulation::AbstractSimulation;
     (; clock) = prognostic_variables
 
     # CLOCK
-    set_period!(clock, period)              # set the clock's enddate      
+    set_period!(clock, period)              # set how long to integrate for
     initialize!(clock, model.time_stepping) # store the start date, reset counter
 
     # OUTPUT

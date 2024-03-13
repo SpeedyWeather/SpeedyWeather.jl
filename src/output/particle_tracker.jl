@@ -9,8 +9,8 @@ of particles from particle advection. To be added like
 Output done via netCDF. Fields and options are
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
-    "[OPTION] Frequency to track particles at"
-    Δt::Second = Hour(3)
+    "[OPTION] when to schedule particle tracking"
+    schedule::Schedule = Schedule(every=Hour(3))
 
     "[OPTION] File name for netCDF file"
     file_name::String = "particles.nc"
@@ -27,15 +27,6 @@ Base.@kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
 
     "Number of particles to track"
     n_particles::Int = 0
-    
-    "Number of timesteps to track particles at (first and last incl)"
-    n_steps::Int = 0
-
-    "Count up the tracked particle positions"
-    counter::Int = 0
-
-    "Execute callback every n time steps"
-    every_n_timesteps::Int = 0
 
     "The netcdf file to be written into, will be created at initialization"
     netcdf_file::Union{NCDataset, Nothing} = nothing
@@ -56,15 +47,7 @@ function initialize!(
     model::ModelSetup,
 ) where NF
 
-    n_particles = length(progn.particles)
-    callback.n_particles = n_particles
-
-    # calculate tracking frequency, adjust tracking time step
-    (;time_stepping) = model
-    callback.every_n_timesteps = max(1,round(Int, 
-                    Millisecond(callback.Δt).value/time_stepping.Δt_millisec.value))
-    callback.Δt = Second(round(Int,callback.every_n_timesteps*time_stepping.Δt_sec))
-    callback.n_steps = progn.clock.n_timesteps ÷ callback.every_n_timesteps + 1
+    initialize!(callback.schedule, progn.clock)
 
     # if model.output doesn't output create a folder anyway to store the particles.nc file
     if model.output.output == false
@@ -93,6 +76,8 @@ function initialize!(
         "standard_name"=>"time", "calendar"=>"proleptic_gregorian"))
 
     # PARTICLE DIMENSION
+    n_particles = length(progn.particles)
+    callback.n_particles = n_particles
     defDim(dataset, "particle", n_particles)
     defVar(dataset, "particle", Int64, ("particle",),
         attrib=Dict("units"=>"1", "long_name"=>"particle identification number"))
@@ -129,25 +114,16 @@ function initialize!(
     callback.netcdf_file["lat"][:, 1]   = callback.lat
     callback.netcdf_file["sigma"][:, 1] = callback.σ
     NCDatasets.sync(callback.netcdf_file)
-    
-    # (re)set counter to 1
-    callback.counter = 1
 end
 
 function callback!(
-    callback::ParticleTracker{NF},
+    callback::ParticleTracker,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     model::ModelSetup,
-) where NF
-
-    # call callback this timestep?
-    progn.clock.timestep_counter % callback.every_n_timesteps == 0 || return nothing
-    
-    # otherwise call now, but escape if n_steps + 1 already reached as arrays are of that size
-    callback.counter += 1  
-    callback.counter > callback.n_steps && return nothing
-    i = callback.counter
+)
+    isscheduled(callback.schedule, progn.clock) || return nothing   # else escape immediately
+    i = callback.schedule.counter+1     # +1 for initial conditions (not scheduled)
 
     # pull particle locations into output work arrays
     for (p,particle) in enumerate(progn.particles)
@@ -164,8 +140,8 @@ function callback!(
         
     # write current particle locations to file
     (;time, start) = progn.clock
-    time_passed = Millisecond(time - start)      
-    callback.netcdf_file["time"][i]     = time_passed.value/3600_000    # [ms] -> [hrs]
+    time_passed_hrs = Millisecond(time - start).value/3600_000     # [ms] -> [hrs]
+    callback.netcdf_file["time"][i]     = time_passed_hrs
     callback.netcdf_file["lon"][:, i]   = callback.lon
     callback.netcdf_file["lat"][:, i]   = callback.lat
     callback.netcdf_file["sigma"][:, i] = callback.σ

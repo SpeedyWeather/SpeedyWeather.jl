@@ -247,13 +247,14 @@ the particle locations via netCDF. We can create it like
 ```@example particle_tracker
 using SpeedyWeather
 spectral_grid = SpectralGrid(n_particles = 100)
-particle_tracker = ParticleTracker(spectral_grid, Δt=Hour(3))
+particle_tracker = ParticleTracker(spectral_grid, schedule=Schedule(every=Hour(3)))
 ```
 
 which would output every 3 hours (the default). This output frequency might be slightly adjusted
-depending on the time step of the dynamics to output every `n` time steps. Further options
-on compression are available as keyword arguments `ParticleTracker(spectral_grid, keepbits=15)`
-for example. The callback is then added after the model is created
+depending on the time step of the dynamics to output every `n` time steps (an `@info` is thrown if
+that is the case), see [Schedules](@ref). Further options on compression are available
+as keyword arguments `ParticleTracker(spectral_grid, keepbits=15)` for example.
+The callback is then added after the model is created
 
 ```@example particle_tracker
 particle_advection = ParticleAdvection2D(spectral_grid)
