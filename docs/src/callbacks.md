@@ -313,7 +313,7 @@ function SpeedyWeather.callback!(
 )
     # scheduled callbacks start with this line to execute only when scheduled!
     # else escape immediately
-    SpeedyWeather.isscheduled(callback.schedule, progn.clock) || return nothing
+    isscheduled(callback.schedule, progn.clock) || return nothing
 
     # Just print the North Pole surface temperature to screen
     (;time) = progn.clock
