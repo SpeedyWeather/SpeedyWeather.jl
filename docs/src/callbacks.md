@@ -400,3 +400,40 @@ the initial timestep is not included, however, the last time step would be
 if the period is a multiple of the scheduling period. If the first timestep
 should be included (e.g. you want to do something with the initial conditions)
 then you'll need to include that into the initialization of the callback.
+
+Periodic schedules which do not match the simulation time step will be adjusted
+by rounding. Example, if you want a schedule which executes every hour
+but your simulation time step is 25min then it will be adjusted to execute
+every 2nd time step, meaning every 50min and not 1 hour. However, an info
+will be thrown if that is the case
+
+```@example schedule
+odd_schedule = MyScheduledCallback(Schedule(every = Minute(70)))
+add!(model.callbacks, odd_schedule)
+
+# resume simulation for 4 hours
+run!(simulation, period=Hour(4))
+nothing # hide
+```
+
+Now we get two empty schedules, one from callback that's supposed to
+execute on Jan 9 noon (this time has passed in our simulation) and
+one from the daily callback (we're not simulating for a day).
+You could just `delete!` those callbacks. You can see that while we
+wanted our `odd_schedule` to execute every 70min, it has to adjust it
+to every 60min to match the simulation time step of 30min.
+
+After the model initialization you can always check the simulation time step
+from `model.time_stepping` 
+
+```@example schedule
+model.time_stepping
+```
+
+Or converted into minutes (the time step internally is at millisecond accuracy)
+
+```@example schedule
+Minute(model.time_stepping.Δt_millisec)
+```
+
+which illustrates why the adjustment of our callback frequency was necessary.
