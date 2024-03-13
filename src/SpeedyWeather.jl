@@ -124,7 +124,7 @@ include("physics/ocean.jl")
 include("physics/land.jl")
 
 # OUTPUT
-include("output/scheduler.jl")
+include("output/schedule.jl")
 include("output/output.jl")
 include("output/feedback.jl")
 include("output/plot.jl")
