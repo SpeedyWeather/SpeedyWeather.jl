@@ -1,11 +1,29 @@
 abstract type AbstractSchedule <: AbstractModelComponent end
 
 export Schedule
+
+"""
+A schedule for callbacks, to execute them periodically after a given period has
+passed (first timestep excluded) or on/after specific times (initial time excluded).
+For two consecutive time steps i, i+1, an event is scheduled at i+1 when it occurs
+in (i,i+1]. Similarly, a periodic schedule of period p will be executed at
+start+p, but p is rounded to match the multiple of the model timestep.
+Periodic schedules and event schedules can be combined, executing at both.
+A Schedule is supposed to be added into callbacks as fields
+
+    Base.@kwdef struct MyCallback
+        schedule::Schedule = Schedule(every=Day(1))
+        other_fields
+    end
+
+see also initialize!(::Schedule,::Clock) and isscheduled(::Schedule,::Clock).
+Fields
+$(TYPEDFIELDS)"""
 Base.@kwdef mutable struct Schedule <: AbstractSchedule
-    "Execute every time period, first timestep included. Default=never."
+    "[OPTION] Execute every time period, first timestep excluded. Default=never."
     every::Second = Second(typemax(Int))
     
-    "Events scheduled at times"
+    "[OPTION] Events scheduled at times"
     times::Vector{DateTime} = zeros(DateTime,0)
 
     "Actual schedule, true=execute this timestep, false=don't"
@@ -18,8 +36,18 @@ Base.@kwdef mutable struct Schedule <: AbstractSchedule
     counter::Int = 0
 end
 
+"""
+$(TYPEDSIGNATURES)
+A Schedule based on DateTime arguments, For two consecutive time steps i, i+1, an event is
+scheduled at i+1 when it occurs in (i,i+1]."""
 Schedule(times::DateTime...) = Schedule(times=DateTime[times...])
 
+"""
+$(TYPEDSIGNATURES)
+Initialize a Schedule with a Clock (which is assumed to have been initialized).
+Takes both scheduler.every and scheduler.times into account, such that
+both periodic and events can be scheduled simulataneously. But execution will
+happen only once if they coincide on a given time step."""
 function initialize!(scheduler::Schedule, clock::Clock)
     schedule = falses(clock.n_timesteps)    # initialize schedule as BitVector
 
@@ -52,6 +80,11 @@ function initialize!(scheduler::Schedule, clock::Clock)
     return scheduler
 end
 
+"""
+$(TYPEDSIGNATURES)
+Evaluate whether (e.g. a callback) should be scheduled at the timestep given
+in clock. Returns true for scheduled executions, false for no execution on
+this time step."""
 function isscheduled(S::Schedule, clock::Clock)
     is_scheduled = S.schedule[clock.timestep_counter]
     S.counter += is_scheduled
