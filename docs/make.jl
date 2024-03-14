@@ -28,6 +28,7 @@ makedocs(
             "Running SpeedyWeather" => [
                 "How to run SpeedyWeather"=>"how_to_run_speedy.md",
                 "Model setups"=>"setups.md",
+                "Tree structure"=>"structure.md",
                 "Particle advection"=>"particles.md",
                 "NetCDF output"=>"output.md",
             ],
