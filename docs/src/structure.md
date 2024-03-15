@@ -11,6 +11,7 @@ extended Julia's `show` function to give you an overview of its contents,
 e.g. a `clock::Clock` is printed as
 
 ```@example structure
+using SpeedyWeather
 clock = Clock()
 ```
 
