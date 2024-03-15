@@ -1,7 +1,8 @@
 # Tree structure
 
 At the top of SpeedyWeather's type tree sits the `Simulation`, containing
-variables and model, which in itself contains model components and so on.
+variables and model, which in itself contains model components with their
+own fields and so on.
 (Note that we are talking about the structure of structs within structs
 not the type hierarchy as defined by subtyping abstract types.)
 This can quickly get complicated with a lot of nested structs. The following
@@ -16,24 +17,27 @@ clock = Clock()
 ```
 
 illustrating the fields within a clock, their types and (unless they are an array)
-also their values. For structs within structs however, this information, however,
+also their values. For structs within structs however, this information,
 would not be printed by default. You could use Julia's autocomplete like
 `clock.<tab>` by hitting tab after the `.` to inspect the fields of an instance
 but that would require you to manually go down every branch of that tree.
 To better visualise this, we have defined a `tree(S)` function for any instance
-`S` that's defined in SpeedyWeather which will print every field, and also
+`S` defined in SpeedyWeather which will print every field, and also
 its containing fields if they are also defined within SpeedyWeather.
+The "if defined in SpeedyWeather" is important because otherwise
+the tree would also show you the contents of a complex number or other types
+defined in Julia Base itself that we aren't interested in here. 
 But let's start at the top.
 
 ## Simulation
 
-When creating a Simulation, it's fields are
+When creating a `Simulation`, its fields are
 ```@example structure
 model = BarotropicModel()
 simulation = initialize!(model)
 ```
 the `prognostic_variables`, the `diagnostic_variables` and the `model` (that we just
-initialized.) We could now do `tree(simulation)` but that gets very lengthy and
+initialized). We could now do `tree(simulation)` but that gets very lengthy and
 so will split things into `tree(simulation.prognostic_variables)`,
 `tree(simulation.diagnostic_variables)` and `tree(simulation.model)` for more
 digestible chunks. You can also provide the `with_types=true` keyword to get
@@ -63,6 +67,11 @@ tree(simulation.diagnostic_variables)
 
 The `BarotropicModel` is the simplest model we have, which will not have many of
 the model components that are needed to define the primitive equations for example.
+Note that forcing or drag aren't further branched which is because the default
+`BarotropicModel` has `NoForcing` and `NoDrag` which don't have any fields. 
+If you create a model with non-default conponents they will show up here. 
+`tree` dynamicallt inspects the current contents of a (mutable) struct and
+that tree may look different depending on what model you have constructed!
 
 ```@example structure
 model = BarotropicModel()
