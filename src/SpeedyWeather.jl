@@ -138,4 +138,5 @@ include("models/barotropic.jl")
 include("models/shallow_water.jl")
 include("models/primitive_dry.jl")
 include("models/primitive_wet.jl")
+include("models/tree.jl")
 end
