@@ -34,7 +34,7 @@ simulation = initialize!(model)
 ```
 the `prognostic_variables`, the `diagnostic_variables` and the `model` (that we just
 initialized.) We could now do `tree(simulation)` but that gets very lengthy and
-so will will split things into `tree(simulation.prognostic_variables)`,
+so will split things into `tree(simulation.prognostic_variables)`,
 `tree(simulation.diagnostic_variables)` and `tree(simulation.model)` for more
 digestible chunks. You can also provide the `with_types=true` keyword to get
 also the types of these fields printed, but we'll skip that here.
