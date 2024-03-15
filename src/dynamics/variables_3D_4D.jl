@@ -32,16 +32,9 @@ end
 
 Base.size(G3D::GridVariable3D) = (G3D.npoints2D, length(G3D.data))
 
-@inline function Base.getindex(G::GridVariable3D, ij::Integer, k::Integer)
-    @boundscheck 0 < k <= length(G.data) || throw(BoundsError(G, (ij, k)))
-    @boundscheck 0 < ij <= G.npoints2D || throw(BoundsError(G, (ij, k)))
-    @inbounds r = G.data[k][ij]
-end
-
+Base.@propagate_inbounds Base.getindex(G::GridVariable3D, ij::Integer, k::Integer) = G.data[k][ij]
 Base.@propagate_inbounds function Base.setindex!(G::GridVariable3D, x, ij::Integer, k::Integer)
-    @boundscheck 0 < k <= length(G.data) || throw(BoundsError(G, (ij, k)))
-    @boundscheck 0 < ij <= G.npoints2D || throw(BoundsError(G, (ij, k)))
-    @inbounds G.data[k][ij] = x
+    G.data[k][ij] = x
 end
 
 ## GRID 4D
@@ -80,18 +73,9 @@ end
 
 Base.size(G4D::GridVariable4D) = (G4D.npoints2D, size(G4D.data)...)
 
-@inline function Base.getindex(G::GridVariable4D, ij::Integer, k::Integer, l::Integer)
-    @boundscheck 0 < k <= size(G.data,1) || throw(BoundsError(G, (ij, k, l)))
-    @boundscheck 0 < l <= size(G.data,2) || throw(BoundsError(G, (ij, k, l)))
-    @boundscheck 0 < ij <= G.npoints2D || throw(BoundsError(G, (ij, k, l)))
-    @inbounds G.data[k, l][ij]
-end
-
+Base.@propagate_inbounds Base.getindex(G::GridVariable4D, ij::Integer, k::Integer, l::Integer) = G.data[k, l][ij]
 Base.@propagate_inbounds function Base.setindex!(G::GridVariable4D, x, ij::Integer, k::Integer, l::Integer)
-    @boundscheck 0 < k <= size(G.data,1) || throw(BoundsError(G, (ij, k, l)))
-    @boundscheck 0 < l <= size(G.data,2) || throw(BoundsError(G, (ij, k, l)))
-    @boundscheck 0 < ij <= G.npoints2D || throw(BoundsError(G, (ij, k, l)))
-    @inbounds G.data[k, l][ij] = x
+    G.data[k, l][ij] = x
 end
 
 ## SPECTRAL 3D
@@ -99,17 +83,17 @@ export SpectralVariable3D
 
 """
 A horizontal LowerTriangularMatrix for spherical harmonic coefficients with a third
-dimension (time or vertical). Uses either (1) two indices lm, k with lm being the unravelled
-single index for the LowerTriangularMatrix (skipping the zeros in the upper triangle)
-and k the vertical layer or the timestep. Or (2) three indices l, m, k with l, m
-for the (1-indexed) spherical harmonic of degree l and order m.
+dimension (time or vertical). Uses either (1) two indices ij, k with ij being the unravelled
+single index for the LowerTriangularMatrix (skipping the zeros in the upper triangle, diagonal excl)
+and k the vertical layer or the timestep. Or (2) three indices i, j, k with i, j
+for the (1-indexed) spherical harmonic of degree i and order j.
 To be generated and indexed like
 
     m, n = 4, 4         # size of LowerTriangularMatrix
     nlayer = 8          # number of vertical layers (or timesteps)
     S = zeros(SpectralVariable3D{Float32}, m, n, nlayer)
-    S[1, 1, 3]          # l=m=1 (1-indexed) harmonic on layer 3
-    S[2, 3]             # single-indexed harmonic l=2, m=1 (1-indexed) harmonic on layer 3
+    S[1, 1, 3]          # i=j=1 (1-indexed) harmonic on layer 3
+    S[2, 3]             # single-indexed harmonic i=2, j=1 (1-indexed) harmonic on layer 3
 
 Fields are
 $(TYPEDFIELDS)"""
@@ -129,7 +113,22 @@ function Base.zeros(
     SpectralVariable3D{NF}(S3D, m, n)
 end
 
-Base.size(S3D::SpectralVariable3D) = (G4D.m, G4D.n, length(G4D.data))
+Base.size(S3D::SpectralVariable3D) = (S3D.m, S3D.n, length(S3D.data))
+
+# for single harmonic index ij or two indices i, j
+Base.@propagate_inbounds Base.getindex(S::SpectralVariable3D, ij::Integer, k::Integer) = S.data[k][ij]
+
+Base.@propagate_inbounds Base.getindex(S::SpectralVariable3D, i::Integer, j::Integer, k::Integer) = S.data[k][i, j]
+
+# for single harmonic index ij
+Base.@propagate_inbounds function Base.setindex!(S::SpectralVariable3D, x, ij::Integer, k::Integer)
+    S.data[k][ij] = x
+end
+
+# indexing harmonics by two indices i, j 
+Base.@propagate_inbounds function Base.setindex!(S::SpectralVariable3D, x, i::Integer, j::Integer, k::Integer)
+    S.data[k][i, j] = x
+end
 
 ## SPECTRAL 4D
 
@@ -137,7 +136,7 @@ export SpectralVariable4D
 
 """
 A horizontal LowerTriangularMatrix for spherical harmonic coefficients with a third and
-forth dimension (vertical and time). Uses either (1) three indices lm, k, t with lm being the unravelled
+forth dimension (vertical and time). Uses either (1) three indices ij, k, t with ij being the unravelled
 single index for the LowerTriangularMatrix (skipping the zeros in the upper triangle)
 and k the vertical layer and t the timestep. Or (2) four indices l, m, k, t with l, m
 for the (1-indexed) spherical harmonic of degree l and order m.
@@ -159,7 +158,7 @@ struct SpectralVariable4D{NF} <: AbstractArray{NF, 4}
 end
 
 function Base.zeros(
-    ::Type{SpectralVariable3D{NF}},
+    ::Type{SpectralVariable4D{NF}},
     m::Integer,     # length of 1st dim in LowerTriangularMatrix (degrees)
     n::Integer,     # length of 2nd dim in LowerTriangularMatrix (orders)
     k::Integer,     # length of 3rd dim (vertical)
@@ -169,4 +168,19 @@ function Base.zeros(
     SpectralVariable4D{NF}(S4D, m, n)
 end
 
-Base.size(S4D::SpectralVariable4D) = (G4D.m, G4D.n, size(G4D.data)...)
+
+Base.size(S4D::SpectralVariable4D) = (S4D.m, S4D.n, size(S4D.data)...)
+
+# for single harmonic index ij or two indices i, j
+Base.@propagate_inbounds Base.getindex(S::SpectralVariable4D, ij::Integer, k::Integer, t::Integer) = S.data[k, t][ij]
+Base.@propagate_inbounds Base.getindex(S::SpectralVariable4D, i::Integer, j::Integer, k::Integer, t::Integer) = S.data[k, t][i, j]
+
+# for single harmonic index ij
+Base.@propagate_inbounds function Base.setindex!(S::SpectralVariable4D, x, ij::Integer, k::Integer, t::Integer)
+    S.data[k, t][ij] = x
+end
+
+# indexing harmonics by two indices i, j 
+Base.@propagate_inbounds function Base.setindex!(S::SpectralVariable4D, x, i::Integer, j::Integer, k::Integer, t::Integer)
+    S.data[k, t][i, j] = x
+end
