@@ -146,8 +146,8 @@ To be generated and indexed like
     nlayer = 8          # number of vertical layers (or timesteps)
     ntimesteps = 2      # number of timesteps
     S = zeros(SpectralVariable3D{Float32}, m, n, nlayer, ntimesteps)
-    S[1, 1, 3, 1]       # l=m=1 (1-indexed) harmonic on layer 3 at timestep 1
-    S[2, 3, 1]          # single-indexed harmonic l=2, m=1 (1-indexed) harmonic on layer 3, timestep 1
+    S[1, 1, 3, 1]       # i=j=1 (1-indexed) harmonic on layer 3 at timestep 1
+    S[2, 3, 1]          # single-indexed harmonic ij=2 => i=2, j=1 (1-indexed) harmonic on layer 3, timestep 1
 
 Fields are
 $(TYPEDFIELDS)"""
