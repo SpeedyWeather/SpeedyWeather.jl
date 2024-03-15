@@ -83,6 +83,7 @@ include("dynamics/orography.jl")
 include("physics/land_sea_mask.jl")
 
 # VARIABLES
+include("dynamics/variables_3D_4D.jl")
 include("dynamics/particles.jl")
 include("dynamics/clock.jl")
 include("dynamics/prognostic_variables.jl")
