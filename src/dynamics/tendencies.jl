@@ -347,7 +347,7 @@ function vordiv_tendencies!(
     geometry::AbstractGeometry,
     S::SpectralTransform,
 )
-    (; R_dry) = atmosphere                      # gas constant for dry air
+    (; R_dry) = atmosphere                      # gas constant for dry air
     (; f) = coriolis                            # coriolis parameter
     (; coslat⁻¹) = geometry
 
@@ -472,13 +472,13 @@ function temperature_tendency!(
     
     # coefficients from Simmons and Burridge 1981
     σ_lnp_A = adiabatic_conversion.σ_lnp_A[diagn.k]         # eq. 3.12, -1/Δσₖ*ln(σ_k+1/2/σ_k-1/2)
-    σ_lnp_B = adiabatic_conversion.σ_lnp_B[diagn.k]         # eq. 3.12 -αₖ
+    σ_lnp_B = adiabatic_conversion.σ_lnp_B[diagn.k]         # eq. 3.12 -αₖ
     
     # semi-implicit: terms here are explicit+implicit evaluated at time step i
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
     # to move the implicit terms to i-1 which is cheaper then the alternative below
 
-    # Adiabatic conversion term following Simmons and Burridge 1981 but for σ coordinates 
+    # Adiabatic conversion term following Simmons and Burridge 1981 but for σ coordinates 
     # += as tend already contains parameterizations + vertical advection
     @. temp_tend_grid += temp_grid*div_grid +       # +T'D term of hori advection
         κ*(Tᵥ+Tₖ)*(                                 # +κTᵥ*Dlnp/Dt, adiabatic term
@@ -502,7 +502,7 @@ function humidity_tendency!(diagn::DiagnosticVariablesLayer,
     (; humid_tend, humid_tend_grid ) = diagn.tendencies
     (; humid_grid ) = diagn.grid_variables
 
-    # add horizontal advection to parameterization + vertical advection tendencies
+    # add horizontal advection to parameterization + vertical advection tendencies
     horizontal_advection!(humid_tend, humid_tend_grid, humid_grid, diagn, G, S, add=true)
 end
 
@@ -513,11 +513,11 @@ function horizontal_advection!(
     A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput: tendency to write into
     A_tend_grid::AbstractGrid{NF},              # Input: tendency incl prev terms
     A_grid::AbstractGrid{NF},                   # Input: grid field to be advected
-    diagn::DiagnosticVariablesLayer{NF},        
+    diagn::DiagnosticVariablesLayer,
     G::Geometry,
     S::SpectralTransform;
     add::Bool=true                              # add/overwrite A_tend_grid?
-) where NF                    
+) where NF
 
     (; div_grid) = diagn.grid_variables
     
@@ -547,7 +547,7 @@ Computes ∇⋅((u, v)*A) with the option to add/overwrite `A_tend` and to
 """
 function flux_divergence!(  A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput: tendency to write into
                             A_grid::AbstractGrid{NF},                   # Input: grid field to be advected
-                            diagn::DiagnosticVariablesLayer{NF},        
+                            diagn::DiagnosticVariablesLayer,        
                             G::Geometry{NF},
                             S::SpectralTransform{NF};
                             add::Bool=true,                 # add result to A_tend or overwrite for false
@@ -687,9 +687,9 @@ Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral s
     
 This version is used for both ShallowWater and PrimitiveEquation, only the geopotential
 calculation in geopotential! differs."""
-function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},     
+function bernoulli_potential!(  diagn::DiagnosticVariablesLayer,     
                                 S::SpectralTransform,
-                                ) where NF
+                                )
     
     (; u_grid, v_grid ) = diagn.grid_variables
     (; geopot ) = diagn.dynamics_variables
@@ -697,11 +697,11 @@ function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},
     bernoulli_grid = diagn.dynamics_variables.a_grid
     (; div_tend ) = diagn.tendencies
  
-    half = convert(NF, 0.5)
+    half = convert(eltype(u_grid), 0.5)
     @. bernoulli_grid = half*(u_grid^2 + v_grid^2)          # = ½(u² + v²) on grid
-    spectral!(bernoulli, bernoulli_grid, S)                   # to spectral space
+    spectral!(bernoulli, bernoulli_grid, S)                 # to spectral space
     bernoulli .+= geopot                                    # add geopotential Φ
-    ∇²!(div_tend, bernoulli, S, add=true, flipsign=true)        # add -∇²(½(u² + v²) + ϕ)
+    ∇²!(div_tend, bernoulli, S, add=true, flipsign=true)    # add -∇²(½(u² + v²) + ϕ)
 end
 
 """
@@ -749,9 +749,9 @@ function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
 
     # compute dynamic layer thickness h on the grid
     # pres_grid is η, the interface displacement, update to
-    # layer thickness h = η + H - Hb
-    # H is the layer thickness at rest without mountains
-    # Hb the orography
+    # layer thickness h = η + H - Hb
+    # H is the layer thickness at rest without mountains
+    # Hb the orography
     pres_grid .+= H .- orography
     
     # now do -∇⋅(uh, vh) and store in pres_tend
@@ -802,7 +802,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     
     # get spectral U, V from spectral vorticity via stream function Ψ
     # U = u*coslat = -coslat*∂Ψ/∂lat
-    # V = v*coslat = ∂Ψ/∂lon, radius omitted in both cases
+    # V = v*coslat = ∂Ψ/∂lon, radius omitted in both cases
     UV_from_vor!(U, V, vor, S)
 
     # transform from U, V in spectral to u, v on grid (U, V = u, v*coslat)

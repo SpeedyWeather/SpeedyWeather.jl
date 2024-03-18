@@ -186,9 +186,9 @@ would not just convert from `Float64` to `Float32` but also
 from an active to an inactive particle. In SpeedyWeather all particles can be
 activated or deactivated at any time.
 
-First, you create a [`SpectralGrid`](@ref) with the `n_particles` keyword
+First, you create a [`SpectralGrid`](@ref) with the `nparticles` keyword
 ```@example particle
-spectral_grid = SpectralGrid(n_particles = 3)
+spectral_grid = SpectralGrid(nparticles = 3)
 ```
 Then the particles live as `Vector{Particle}` inside the prognostic variables
 ```@example particle
@@ -246,7 +246,7 @@ the particle locations via netCDF. We can create it like
 
 ```@example particle_tracker
 using SpeedyWeather
-spectral_grid = SpectralGrid(n_particles = 100)
+spectral_grid = SpectralGrid(nparticles = 100)
 particle_tracker = ParticleTracker(spectral_grid, schedule=Schedule(every=Hour(3)))
 ```
 
@@ -285,7 +285,7 @@ ds["lat"]
 ```
 where the last two lines are lazy loading a matrix with each row a particle and each column a time step.
 You may do `ds["lon"][:,:]` to obtain the full `Matrix`. We had specified
-`spectral_grid.n_particles` above and we will have time steps in this file
+`spectral_grid.nparticles` above and we will have time steps in this file
 depending on the `period` the simulation ran for and the `particle_tracker.Δt` output
 frequency. We can visualise the particles' trajectories with
 
@@ -325,7 +325,7 @@ lines!(ga, GeoMakie.coastlines())
 ga.xticklabelsvisible[] = false
 ga.yticklabelsvisible[] = false
 
-n_particles = size(lon)[1]
-[lines!(ga, lon[i,:], lat[i,:]) for i in 1:n_particles]
+nparticles = size(lon)[1]
+[lines!(ga, lon[i,:], lat[i,:]) for i in 1:nparticles]
 fig
 ```

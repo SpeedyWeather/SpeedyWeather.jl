@@ -26,19 +26,19 @@ Base.@kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
     keepbits::Int = 15
 
     "Number of particles to track"
-    n_particles::Int = 0
+    nparticles::Int = 0
 
     "The netcdf file to be written into, will be created at initialization"
     netcdf_file::Union{NCDataset, Nothing} = nothing
 
     # tracking arrays
-    lon::Vector{NF} = zeros(NF, n_particles)
-    lat::Vector{NF} = zeros(NF, n_particles)
-    σ::Vector{NF} = zeros(NF, n_particles)
+    lon::Vector{NF} = zeros(NF, nparticles)
+    lat::Vector{NF} = zeros(NF, nparticles)
+    σ::Vector{NF} = zeros(NF, nparticles)
 end
 
 ParticleTracker(SG::SpectralGrid; kwargs...) =
-    ParticleTracker{SG.NF}(;n_particles = SG.n_particles, kwargs...)
+    ParticleTracker{SG.NF}(;nparticles = SG.nparticles, kwargs...)
 
 function initialize!(
     callback::ParticleTracker{NF},
@@ -76,9 +76,9 @@ function initialize!(
         "standard_name"=>"time", "calendar"=>"proleptic_gregorian"))
 
     # PARTICLE DIMENSION
-    n_particles = length(progn.particles)
-    callback.n_particles = n_particles
-    defDim(dataset, "particle", n_particles)
+    nparticles = length(progn.particles)
+    callback.nparticles = nparticles
+    defDim(dataset, "particle", nparticles)
     defVar(dataset, "particle", Int64, ("particle",),
         attrib=Dict("units"=>"1", "long_name"=>"particle identification number"))
 

@@ -20,11 +20,10 @@ struct GridVariable3D{NF, Grid<:AbstractGrid{NF}} <: AbstractMatrix{NF}
 end
 
 function Base.zeros(
-    ::Type{GridVariable3D},
-    Grid::Type{<:AbstractGrid{NF}},
+    ::Type{GridVariable3D{NF, Grid}},
     nlat_half::Integer,
     k::Integer,
-) where NF
+) where {NF, Grid}
     npoints2D = RingGrids.get_npoints(Grid, nlat_half)
     G3D = [zeros(Grid, nlat_half) for _ in 1:k]
     GridVariable3D{NF, Grid}(G3D, npoints2D)
@@ -60,12 +59,11 @@ struct GridVariable4D{NF, Grid<:AbstractGrid{NF}} <: AbstractArray{NF, 3}
 end
 
 function Base.zeros(
-    ::Type{GridVariable4D},
-    Grid::Type{<:AbstractGrid{NF}},
+    ::Type{GridVariable4D{NF, Grid}},
     nlat_half::Integer,
     k::Integer,
     l::Integer,
-) where NF
+) where {NF, Grid}
     npoints2D = RingGrids.get_npoints(Grid, nlat_half)
     G4D = [zeros(Grid, nlat_half) for _ in 1:k, _ in 1:l]
     GridVariable4D{NF, Grid}(G4D, npoints2D)
@@ -86,14 +84,14 @@ A horizontal LowerTriangularMatrix for spherical harmonic coefficients with a th
 dimension (time or vertical). Uses either (1) two indices ij, k with ij being the unravelled
 single index for the LowerTriangularMatrix (skipping the zeros in the upper triangle, diagonal excl)
 and k the vertical layer or the timestep. Or (2) three indices i, j, k with i, j
-for the (1-indexed) spherical harmonic of degree i and order j.
+for the (1-based) spherical harmonic of degree i and order j.
 To be generated and indexed like
 
     m, n = 4, 4         # size of LowerTriangularMatrix
     nlayer = 8          # number of vertical layers (or timesteps)
     S = zeros(SpectralVariable3D{Float32}, m, n, nlayer)
-    S[1, 1, 3]          # i=j=1 (1-indexed) harmonic on layer 3
-    S[2, 3]             # single-indexed harmonic i=2, j=1 (1-indexed) harmonic on layer 3
+    S[1, 1, 3]          # i=j=1 (1-based) harmonic on layer 3
+    S[2, 3]             # single-indexed harmonic i=2, j=1 (1-based) harmonic on layer 3
 
 Fields are
 $(TYPEDFIELDS)"""
@@ -139,15 +137,15 @@ A horizontal LowerTriangularMatrix for spherical harmonic coefficients with a th
 forth dimension (vertical and time). Uses either (1) three indices ij, k, t with ij being the unravelled
 single index for the LowerTriangularMatrix (skipping the zeros in the upper triangle)
 and k the vertical layer and t the timestep. Or (2) four indices l, m, k, t with l, m
-for the (1-indexed) spherical harmonic of degree l and order m.
+for the (1-based) spherical harmonic of degree l and order m.
 To be generated and indexed like
 
     m, n = 4, 4         # size of LowerTriangularMatrix
     nlayer = 8          # number of vertical layers (or timesteps)
     ntimesteps = 2      # number of timesteps
     S = zeros(SpectralVariable3D{Float32}, m, n, nlayer, ntimesteps)
-    S[1, 1, 3, 1]       # i=j=1 (1-indexed) harmonic on layer 3 at timestep 1
-    S[2, 3, 1]          # single-indexed harmonic ij=2 => i=2, j=1 (1-indexed) harmonic on layer 3, timestep 1
+    S[1, 1, 3, 1]       # i=j=1 (1-based) harmonic on layer 3 at timestep 1
+    S[2, 3, 1]          # single-indexed harmonic ij=2 => i=2, j=1 (1-based) harmonic on layer 3, timestep 1
 
 Fields are
 $(TYPEDFIELDS)"""

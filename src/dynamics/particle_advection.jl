@@ -19,7 +19,7 @@ Base.@kwdef struct ParticleAdvection2D{NF} <: AbstractParticleAdvection
 end
 
 function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
-    SG.n_particles == 0 && @warn "ParticleAdvection2D created but n_particles = 0 in spectral grid."
+    SG.nparticles == 0 && @warn "ParticleAdvection2D created but nparticles = 0 in spectral grid."
     ParticleAdvection2D{SG.NF}(; kwargs...)
 end
 
