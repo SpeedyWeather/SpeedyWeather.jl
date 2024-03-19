@@ -83,11 +83,11 @@ $(TYPEDSIGNATURES)
 Apply correction to the tendencies in `diagn` to prevent the gravity waves from amplifying.
 The correction is implicitly evaluated using the parameter `implicit.α` to switch between
 forward, centered implicit or backward evaluation of the gravity wave terms."""
-function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
-                                progn::PrognosticLayerTimesteps{NF},
-                                diagn_surface::SurfaceVariables{NF},
-                                progn_surface::PrognosticSurfaceTimesteps{NF},
-                                implicit::ImplicitShallowWater) where NF
+function implicit_correction!(  diagn::DiagnosticVariablesLayer,
+                                progn::PrognosticLayerTimesteps,
+                                diagn_surface::SurfaceVariables,
+                                progn_surface::PrognosticSurfaceTimesteps,
+                                implicit::ImplicitShallowWater)
 
     (; div_tend) = diagn.tendencies          # divergence tendency
     div_old = progn.timesteps[1].div        # divergence at t
