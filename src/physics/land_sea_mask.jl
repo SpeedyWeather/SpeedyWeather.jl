@@ -3,7 +3,7 @@ Abstract super type for land-sea masks. Custom land-sea masks have to be defined
 
     CustomMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF, Grid}
 
-and need to have at least a field called `land_sea_mask::Grid` that uses a `Grid` as defined
+and need to have at least a field called `mask::Grid` that uses a `Grid` as defined
 by the spectral grid object, so of correct size and with the number format `NF`.
 All `AbstractLandSeaMask` have a convenient generator function to be used like
 `mask = CustomMask(spectral_grid, option=argument)`, but you may add your own or customize by
@@ -13,7 +13,7 @@ that new mask
 
     initialize!(mask::CustomMask, model::PrimitiveEquation)
 
-which generally is used to tweak the mask.land_sea_mask grid as you like, using
+which generally is used to tweak the mask.mask grid as you like, using
 any other options you have included in `CustomMask` as fields or anything else (preferrably read-only,
 because this is only to initialize the land-sea mask, nothing else) from `model`. You can
 for example read something from file, set some values manually, or use coordinates from `model.geometry`.
@@ -51,7 +51,7 @@ Base.@kwdef struct LandSeaMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: Abs
 
     # FIELDS (to be initialized in initialize!)
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
-    land_sea_mask::Grid
+    mask::Grid
 end
 
 """
@@ -59,8 +59,8 @@ $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
 function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...)
     (; NF, Grid, nlat_half) = spectral_grid
-    land_sea_mask   = zeros(Grid{NF}, nlat_half)
-    return L{NF, Grid{NF}}(; land_sea_mask, kwargs...)
+    mask = zeros(Grid{NF}, nlat_half)
+    return L{NF, Grid{NF}}(; mask, kwargs...)
 end
 
 """
@@ -83,23 +83,23 @@ function initialize!(land_sea_mask::LandSeaMask, model::PrimitiveEquation)
     lsm_highres = file_Grid(ncfile["lsm"][:, :])
 
     # average onto grid cells of the model
-    RingGrids.grid_cell_average!(land_sea_mask.land_sea_mask, lsm_highres)
+    RingGrids.grid_cell_average!(land_sea_mask.mask, lsm_highres)
 
-    # TODO this shoudln't be necessary, but at the moment grid_cell_average! can return values > 1
-    clamp!(land_sea_mask.land_sea_mask, 0, 1)
+    # TODO this shoudln't be necessary, but at the moment grid_cell_average! can return values > 1
+    clamp!(land_sea_mask.mask, 0, 1)
 end
 
 """Land-sea mask with zero = sea everywhere.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct AquaPlanetMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF, Grid}
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
-    land_sea_mask::Grid
+    mask::Grid
 end
 
 """
 $(TYPEDSIGNATURES)
 Sets all grid points to 0 = sea."""
 function initialize!(land_sea_mask::AquaPlanetMask, model::PrimitiveEquation)
-    land_sea_mask.land_sea_mask .= 0    # set all to sea
+    land_sea_mask.mask .= 0    # set all to sea
     return nothing
 end
