@@ -171,7 +171,7 @@ function ocean_timestep!(   ocean::PrognosticVariablesOcean,
     # otherwise update ocean prognostic variables:
     ocean.time = time
     interpolate_monthly!(   ocean.sea_surface_temperature,
-                            oean_model.monthly_temperature,
+                            ocean_model.monthly_temperature,
                             time)
     return nothing
 end
