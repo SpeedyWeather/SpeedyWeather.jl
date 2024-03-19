@@ -365,16 +365,33 @@ nothing # hide
 
 ```@example aquaplanet
 using SpeedyWeather
+
+# components
 spectral_grid = SpectralGrid(trunc=31, nlev=5)
 ocean = AquaPlanet(spectral_grid)
-land_sea_mask = AquaPlanetMask(spectral_grid)
+land_sea_mask = AquaPlanetMask(spectral_grid, temp_equator=302, temp_poles=273)
 orography = NoOrography(spectral_grid)
+
+# create model, initialize, run
 model = PrimitiveWetModel(;spectral_grid, ocean, land_sea_mask, orography)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
 run!(simulation, period=Day(50), output=true)
 nothing # hide
 ```
+
+Here we have defined an aquaplanet simulation by
+- creating an `ocean::AquaPlanet`. This will use constant sea surface temperatures that only vary with latitude.
+- creating a `land_sea_mask::AquaPlanetMask` this will use a land-sea mask with `false`=ocean everywhere.
+- creating an `orography::NoOrography` which will have no orography and zero surface geopotential.
+
+All passed on to the model constructor for a `PrimitiveWetModel`, we have now a model with humidity
+and physics parameterization as they are defined by default (typing `model` will give you an overview
+of its components). We could have change the `model.land` and `model.vegetation` components too,
+but given the land-sea masks masks those contributions to the surface fluxes anyway, this is not
+necessary. Now with the following we visualize the surface humidity after the 50 days of
+simulation. We use 50 days as without mountains it takes longer for the initial conditions to
+become unstable.
 
 ```@example aquaplanet
 using PythonPlot, NCDatasets
@@ -389,7 +406,7 @@ lat = ds["lat"][:]
 lon = ds["lon"][:]
 
 fig, ax = subplots(1, 1, figsize=(10, 6))
-ax.pcolormesh(lon, lat, vor')
+ax.pcolormesh(lon, lat, humid')
 ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Surface humidity [kg/kg")
