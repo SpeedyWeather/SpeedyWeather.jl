@@ -130,7 +130,8 @@ function interpolate_monthly!(
     grid::Grid,
     monthly::Vector{Grid},
     time::DateTime,
-)
+) where Grid
+
     this_month = Dates.month(time)
     next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
 
@@ -161,7 +162,7 @@ Base.@kwdef struct ConstantOceanClimatology <: AbstractOcean
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "[OPTION] The missing value in the data respresenting land"
-    missing_value::NF = NF(NaN)
+    missing_value::Float64 = NaN
 end
 
 # generator function, just pass on kwargs
@@ -202,7 +203,7 @@ Base.@kwdef struct AquaPlanet{NF} <: AbstractOcean
     nlat::Int
 
     "[OPTION] Temperature on the Equator [K]"
-    temp_equator::NF = 300
+    temp_equator::NF = 302
 
     "[OPTION] Temperature at the poles [K]"
     temp_poles::NF = 273
@@ -213,8 +214,8 @@ end
 
 # generator function
 function AquaPlanet(SG::SpectralGrid; kwargs...)
-    (; nlat) = SG
-    ConstantOceanClimatology(; nlat, kwargs...)
+    (; NF, nlat) = SG
+    AquaPlanet{NF}(; nlat, kwargs...)
 end
 
 # nothing to initialize for model.ocean
@@ -228,7 +229,7 @@ end
 function initialize!(   
     ocean::PrognosticVariablesOcean,
     time::DateTime,
-    ocean_model::ConstantOceanClimatology,
+    ocean_model::AquaPlanet,
     model::PrimitiveEquation,
 )
     (; sea_surface_temperature) = ocean
