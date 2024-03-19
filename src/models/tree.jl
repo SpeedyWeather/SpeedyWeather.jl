@@ -29,7 +29,7 @@ function tree(
     kwargs...
 )
     s = "$(model_type(M)){...}"
-    s = ~with_size ? s : s*" ($(prettymemory(Base.summarysize(S))))"
+    s = ~with_size ? s : s*" ($(prettymemory(Base.summarysize(M))))"
     println(s)
     _tree(M, modules; with_size, kwargs...)
 end
