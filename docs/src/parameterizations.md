@@ -1,3 +1,0 @@
-# Parameterizations
-
-More to follow ...

@@ -135,8 +135,15 @@ Base.@kwdef struct MilleniumFlood <: SpeedyWeather.AbstractCallback
     schedule::Schedule = Schedule(DateTime(2000,1,1))
 end
 
-# nothing needs to be initialized
-SpeedyWeather.initialized!(::MilleniumFlood, args...) = nothing
+# initialize the schedule
+function SpeedyWeather.initialize!(
+    callback::MilleniumFlood,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::ModelSetup,
+)
+    initialize!(callback.schedule, progn.clock)
+end
 
 function SpeedyWeather.callback!(
     callback::MilleniumFlood,
@@ -166,6 +173,7 @@ land_sea_mask = LandSeaMask(spectral_grid)      # start with Earth's land-sea ma
 model = PrimitiveWetModel(;spectral_grid, land_sea_mask)
 add!(model, MilleniumFlood())   # or MilleniumFlood(::DateTime) for any non-default date
 model.feedback.verbose = false # hide
+
 simulation = initialize!(model, time=DateTime(1999,12,29))
 run!(simulation, period=Day(5))
 plot(model.land_sea_mask.mask)
