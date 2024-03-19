@@ -1,4 +1,4 @@
-abstract type AbstractOcean{NF, Grid} end
+abstract type AbstractOcean end
 
 function Base.show(io::IO, O::AbstractOcean)
     println(io, "$(typeof(O)) <: AbstractOcean")
@@ -6,32 +6,48 @@ function Base.show(io::IO, O::AbstractOcean)
     print_fields(io, O, keys)
 end
 
+# function barrier for all oceans
+function initialize!(   ocean::PrognosticVariablesOcean,
+                        time::DateTime,
+                        model::PrimitiveEquation)
+    initialize!(ocean, time, model.ocean, model)
+end
+
+# function barrier for all oceans
+function ocean_timestep!(   ocean::PrognosticVariablesOcean,
+                            time::DateTime,
+                            model::PrimitiveEquation)
+    ocean_timestep!(ocean, time, model.ocean)
+end
+
+
+## SEASONAL OCEAN CLIMATOLOGY
+
 export SeasonalOceanClimatology
-Base.@kwdef struct SeasonalOceanClimatology{NF, Grid<:AbstractGrid{NF}} <: AbstractOcean{NF, Grid}
+Base.@kwdef struct SeasonalOceanClimatology{NF, Grid<:AbstractGrid{NF}} <: AbstractOcean
 
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
 
-    # OPTIONS
-    "Time step used to update sea surface temperatures"
+    "[OPTION] Time step used to update sea surface temperatures"
     Δt::Dates.Day = Dates.Day(3)
 
-    "path to the folder containing the land-sea mask file, pkg path default"
+    "[OPTION] Path to the folder containing the sea surface temperatures, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
-    "filename of sea surface temperatures"
+    "[OPTION] Filename of sea surface temperatures"
     file::String = "sea_surface_temperature.nc"
 
-    "Variable name in netcdf file"
+    "[OPTION] Variable name in netcdf file"
     varname::String = "sst"
 
-    "Grid the sea surface temperature file comes on"
+    "[OPTION] Grid the sea surface temperature file comes on"
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
-    "The missing value in the data respresenting land"
+    "[OPTION] The missing value in the data respresenting land"
     missing_value::NF = NF(NaN)
 
-    # to be filled from file
+    # to be filled from file
     "Monthly sea surface temperatures [K], interpolated onto Grid"
     monthly_temperature::Vector{Grid} = [zeros(Grid, nlat_half) for _ in 1:12]
 end
@@ -83,41 +99,150 @@ function load_monthly_climatology!(
     return nothing
 end
 
-function initialize!(   ocean::PrognosticVariablesOcean,
-                        time::DateTime,
-                        model::PrimitiveEquation)
-    ocean_timestep!(ocean, time, model, initialize=true)
+function initialize!(   
+    ocean::PrognosticVariablesOcean,
+    time::DateTime,
+    ocean_model::SeasonalOceanClimatology,
+    model::PrimitiveEquation,
+)
+    ocean.time = time   # set initial time
+    interpolate_monthly!(   ocean.sea_surface_temperature,
+                            ocean_model.monthly_temperature,
+                            time)
 end
-
-# function barrier
+    
 function ocean_timestep!(   ocean::PrognosticVariablesOcean,
                             time::DateTime,
-                            model::PrimitiveEquation;
-                            initialize::Bool = false)
-    ocean_timestep!(ocean, time, model.ocean; initialize)
-end
-
-function ocean_timestep!(   ocean::PrognosticVariablesOcean{NF},
-                            time::DateTime,
-                            ocean_model::SeasonalOceanClimatology;
-                            initialize::Bool = false) where NF
+                            ocean_model::SeasonalOceanClimatology)
 
     # escape immediately if Δt of ocean model hasn't passed yet
-    # unless the ocean hasn't been initialized yet
-    initialize || (time - ocean.time) < ocean_model.Δt && return nothing
+    (time - ocean.time) < ocean_model.Δt && return nothing
 
     # otherwise update ocean prognostic variables:
     ocean.time = time
+    interpolate_monthly!(   ocean.sea_surface_temperature,
+                            oean_model.monthly_temperature,
+                            time)
+    return nothing
+end
+
+function interpolate_monthly!(
+    grid::Grid,
+    monthly::Vector{Grid},
+    time::DateTime,
+)
     this_month = Dates.month(time)
     next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
 
     # linear interpolation weight between the two months
-    # TODO check whether this shifts the climatology by 1/2 a month
-    weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
+    # TODO check whether this shifts the climatology by 1/2 a month
+    weight = convert(eltype(grid), Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
-    (; monthly_temperature) = ocean_model
-    @. ocean.sea_surface_temperature = (1-weight) * monthly_temperature[this_month] +
-                                          weight  * monthly_temperature[next_month]
+    @. grid = (1-weight) * monthly[this_month] +
+                 weight  * monthly[next_month]
 
+    return nothing
+end
+
+## CONSTANT OCEAN CLIMATOLOGY
+
+export ConstantOceanClimatology
+Base.@kwdef struct ConstantOceanClimatology <: AbstractOcean
+    "[OPTION] path to the folder containing the land-sea mask file, pkg path default"
+    path::String = "SpeedyWeather.jl/input_data"
+
+    "[OPTION] filename of sea surface temperatures"
+    file::String = "sea_surface_temperature.nc"
+
+    "[OPTION] Variable name in netcdf file"
+    varname::String = "sst"
+
+    "[OPTION] Grid the sea surface temperature file comes on"
+    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+
+    "[OPTION] The missing value in the data respresenting land"
+    missing_value::NF = NF(NaN)
+end
+
+# generator function, just pass on kwargs
+function ConstantOceanClimatology(SG::SpectralGrid; kwargs...)
+    ConstantOceanClimatology(; kwargs...)
+end
+
+# nothing to initialize for model.ocean
+initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
+
+# initialize 
+function initialize!(   
+    ocean::PrognosticVariablesOcean,
+    time::DateTime,
+    ocean_model::ConstantOceanClimatology,
+    model::PrimitiveEquation,
+)
+    Grid = typeof(ocean.sea_surface_temperature)
+    (; nlat_half) = ocean.sea_surface_temperature
+    monthly = [zeros(Grid, nlat_half) for _ in 1:12]
+    load_monthly_climatology!(monthly, ocean_model)
+    interpolate_monthly!(ocean.sea_surface_temperature, monthly, time)
+end
+
+function ocean_timestep!(
+    ocean::PrognosticVariablesOcean,
+    time::DateTime,
+    ocean_model::ConstantOceanClimatology
+)
+    return nothing
+end
+
+## CONSTANT OCEAN CLIMATOLOGY
+
+export AquaPlanet
+Base.@kwdef struct AquaPlanet{NF} <: AbstractOcean
+    "Number of latitude rings"
+    nlat::Int
+
+    "[OPTION] Temperature on the Equator [K]"
+    temp_equator::NF = 300
+
+    "[OPTION] Temperature at the poles [K]"
+    temp_poles::NF = 273
+
+    "Latitudinal temperature profile [K]"
+    temp_lat::Vector{NF} = zeros(NF, nlat)
+end
+
+# generator function
+function AquaPlanet(SG::SpectralGrid; kwargs...)
+    (; nlat) = SG
+    ConstantOceanClimatology(; nlat, kwargs...)
+end
+
+# nothing to initialize for model.ocean
+function initialize!(ocean_model::AquaPlanet, model::PrimitiveEquation)
+    (; coslat²) = model.geometry
+    (; temp_lat, temp_equator, temp_poles) = ocean_model
+    @. temp_lat = (temp_equator-temp_poles)*coslat² + temp_poles
+end
+
+# initialize 
+function initialize!(   
+    ocean::PrognosticVariablesOcean,
+    time::DateTime,
+    ocean_model::ConstantOceanClimatology,
+    model::PrimitiveEquation,
+)
+    (; sea_surface_temperature) = ocean
+    for (j, ring) in enumerate(eachring(sea_surface_temperature))
+        for ij in ring
+            sea_surface_temperature[ij] = ocean_model.temp_lat[j]
+        end
+    end
+end
+
+function ocean_timestep!(
+    ocean::PrognosticVariablesOcean,
+    time::DateTime,
+    ocean_model::AquaPlanet,
+)
     return nothing
 end
