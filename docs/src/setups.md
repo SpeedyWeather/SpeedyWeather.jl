@@ -361,6 +361,46 @@ nothing # hide
 ```
 ![Jablonowski pyplot](jablonowski.png)
 
+## Aquaplanet
+
+```@example aquaplanet
+using SpeedyWeather
+spectral_grid = SpectralGrid(trunc=31, nlev=5)
+ocean = AquaPlanet(spectral_grid)
+land_sea_mask = AquaPlanetMask(spectral_grid)
+orography = NoOrography(spectral_grid)
+model = PrimitiveWetModel(;spectral_grid, ocean, land_sea_mask, orography)
+simulation = initialize!(model)
+model.feedback.verbose = false # hide
+run!(simulation, period=Day(50), output=true)
+nothing # hide
+```
+
+```@example aquaplanet
+using PythonPlot, NCDatasets
+ioff() # hide
+
+id = model.output.id
+ds = NCDataset("run_$id/output.nc")
+timestep = ds.dim["time"]
+surface = ds.dim["lev"]
+humid = Matrix{Float32}(ds["humid"][:, :, surface, timestep])
+lat = ds["lat"][:]
+lon = ds["lon"][:]
+
+fig, ax = subplots(1, 1, figsize=(10, 6))
+ax.pcolormesh(lon, lat, vor')
+ax.set_xlabel("longitude")
+ax.set_ylabel("latitude")
+ax.set_title("Surface humidity [kg/kg")
+ax.colorbar()
+tight_layout() # hide
+savefig("aquaplanet.png", dpi=70) # hide
+nothing # hide
+```
+![Aquaplanet pyplot](aquaplanet.png)
+
+
 
 ## References
 
