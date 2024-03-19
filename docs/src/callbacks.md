@@ -225,7 +225,7 @@ global mean surface temperatures in Kelvin on every time step while the model ra
 model.callbacks[:temperature].temp
 ```
 
-## Intrusive callbacks
+## [Intrusive callbacks](@id intrusive_callbacks)
 
 In the sections above, callbacks were introduced as a tool to define custom
 diagnostics or simulation output. This is the simpler and recommended way of using 
@@ -242,6 +242,10 @@ sea and land-surface temperatures, but one is free to do this only partially too
 Another example would be to switch on/off certain model components over time.
 If these components are implemented as *mutable* struct then one could define
 a callback that weakens their respective strength parameter over time.
+
+As an example of a callback that changes the model components see
+
+- Millenium flood: [Time-dependent land-sea mask](@ref)
 
 Changing the diagnostic variables, however, will not have any effect. All of
 them are treated as work arrays, meaning that their state is completely
@@ -315,11 +319,11 @@ function SpeedyWeather.callback!(
     diagn::DiagnosticVariables,
     model::ModelSetup,
 )
-    # scheduled callbacks start with this line to execute only when scheduled!
+    # scheduled callbacks start with this line to execute only when scheduled!
     # else escape immediately
     isscheduled(callback.schedule, progn.clock) || return nothing
 
-    # Just print the North Pole surface temperature to screen
+    # Just print the North Pole surface temperature to screen
     (;time) = progn.clock
     temp_at_north_pole = diagn.layers[end].grid_variables.temp_grid[1]
     @info "North pole has a temperature of $temp_at_north_pole on $time."

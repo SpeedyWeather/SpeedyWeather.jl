@@ -417,7 +417,7 @@ ax.pcolormesh(lon, lat, humid')
 ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Surface humidity [kg/kg]")
-ax.colorbar()
+colorbar()
 tight_layout() # hide
 savefig("aquaplanet.png", dpi=70) # hide
 nothing # hide
