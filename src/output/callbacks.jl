@@ -30,7 +30,7 @@ export NoCallback
 struct NoCallback <: AbstractCallback end
 initialize!(::NoCallback, args...) = nothing     # executed once before the main time loop
 callback!(::NoCallback, args...) = nothing       # executed after every time step
-finish!(::NoCallback, args...) = nothing         # executed after main time loop finishes
+finish!(::NoCallback, args...) = nothing         # executed after main time loop finishes
 
 # simply loop over dict of callbacks
 for func in (:initialize!, :callback!, :finish!)
@@ -59,12 +59,24 @@ function add!(D::CALLBACK_DICT, key_callbacks::Pair{Symbol, <:AbstractCallback}.
     end
 end
 
-add!(D::CALLBACK_DICT, key::Symbol, callback::AbstractCallback) = add!(D, Pair(key, callback))
+"""
+$(TYPEDSIGNATURES)
+Add a or several callbacks to a model::ModelSetup. To be used like
 
-# also with string but flag conversion
+    add!(model, :my_callback => callback)
+    add!(model, :my_callback1 => callback, :my_callback2 => other_callback)
+"""
+add!(model::ModelSetup, key_callbacks::Pair{Symbol, <:AbstractCallback}...) =
+    add!(model.callbacks, key_callbacks)
+add!(D::CALLBACK_DICT, key::Symbol, callback::AbstractCallback) = add!(D, Pair(key, callback))
+add!(model::ModelSetup, key::Symbol, callback::AbstractCallback) =
+    add!(model.callbacks, Pair(key, callback))
+
+
+# also with string but flag conversion
 function add!(D::CALLBACK_DICT, key::String, callback::AbstractCallback)
     key_symbol = Symbol(key)
-    @info "Callback keys are Symbols. String \"$key\" converted to Symbol :$key_symbol."
+    @warn "Callback keys are Symbols. String \"$key\" converted to Symbol :$key_symbol."
     add!(D, key_symbol, callback)
 end
 
@@ -75,13 +87,23 @@ key which is randomly created like callback_????. To be used like
 
     add!(model.callbacks, callback)
     add!(model.callbacks, callback1, callback2)."""
-function add!(D::CALLBACK_DICT, callbacks::AbstractCallback...)
+function add!(D::CALLBACK_DICT, callbacks::AbstractCallback...; verbose=true)
     for callback in callbacks
         key = Symbol("callback_"*Random.randstring(4))
-        @info "$(typeof(callback)) callback added with key $key"
+        verbose && @info "$(typeof(callback)) callback added with key $key"
         add!(D, key => callback)
     end
 end
+
+"""
+$(TYPEDSIGNATURES)
+Add a or several callbacks to a mdoel without specifying the
+key which is randomly created like callback_????. To be used like
+
+    add!(model.callbacks, callback)
+    add!(model.callbacks, callback1, callback2)."""
+add!(model::ModelSetup, callbacks::AbstractCallback...) =
+    add!(model.callbacks, callbacks, verbose = model.feedback.verbose)
 
 # delete!(dict, key) already defined in Base
 
@@ -109,8 +131,8 @@ function initialize!(
     model::ModelSetup,
 ) where NF
     callback.temp = Vector{NF}(undef, progn.clock.n_timesteps+1) # replace with vector of correct length
-    callback.temp[1] = diagn.layers[diagn.nlev].temp_average[]   # set initial conditions
-    callback.timestep_counter = 1                                # (re)set counter to 1
+    callback.temp[1] = diagn.layers[diagn.nlev].temp_average[]   # set initial conditions
+    callback.timestep_counter = 1                                # (re)set counter to 1
 end
 
 """

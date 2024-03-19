@@ -184,13 +184,17 @@ add!(callbacks, :key1 => NoCallback(), :key2 => NoCallback())   # keys provided
 ```
 Meaning that callbacks can be added before and after model construction
 
-
 ```@example callbacks
 spectral_grid = SpectralGrid()
 callbacks = CallbackDict(:callback_added_before => NoCallback())
 model = PrimitiveWetModel(; spectral_grid, callbacks)
 add!(model.callbacks, :callback_added_afterwards => NoCallback())
+add!(model, :callback_added_afterwards2 => NoCallback())
 ```
+
+Note how the first argument can be `model.callbacks` as outlined in the sections above
+because this is the callbacks dictionary, but also simply
+`model`, which will add the callback to `model.callbacks`. It's equivalent.
 Let us add two more meaningful callbacks
 
 ```@example callbacks
