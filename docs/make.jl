@@ -37,6 +37,7 @@ makedocs(
                 "Parameterizations"=>"parameterizations.md",
                 "Orography"=>"orography.md",
                 "Land-Sea Mask"=>"land_sea_mask.md",
+                "Ocean"=>"ocean.md",
                 "Callbacks"=>"callbacks.md",
             ],
             "RingGrids"=>"ringgrids.md",

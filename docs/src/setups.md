@@ -413,11 +413,11 @@ lat = ds["lat"][:]
 lon = ds["lon"][:]
 
 fig, ax = subplots(1, 1, figsize=(10, 6))
-ax.pcolormesh(lon, lat, humid')
+q = ax.pcolormesh(lon, lat, humid')
 ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Surface humidity [kg/kg]")
-colorbar()
+colorbar(q)
 tight_layout() # hide
 savefig("aquaplanet.png", dpi=70) # hide
 nothing # hide
