@@ -103,7 +103,7 @@ key which is randomly created like callback_????. To be used like
     add!(model.callbacks, callback)
     add!(model.callbacks, callback1, callback2)."""
 add!(model::ModelSetup, callbacks::AbstractCallback...) =
-    add!(model.callbacks, callbacks, verbose = model.feedback.verbose)
+    add!(model.callbacks, callbacks..., verbose = model.feedback.verbose)
 
 # delete!(dict, key) already defined in Base
 
