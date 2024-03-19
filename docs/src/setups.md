@@ -36,8 +36,8 @@ There are other options to create a planet but they are irrelevant for the
 barotropic vorticity equations. We also want to specify the initial conditions,
 randomly distributed vorticity is already defined
 ```@example barotropic_setup
-using Random # hide
-Random.seed!(1234) # hide
+using Random # hide
+Random.seed!(1234) # hide
 initial_conditions = StartWithRandomVorticity()
 ```
 By default, the power of vorticity is spectrally distributed with ``k^{-3}``, ``k`` being the
@@ -124,7 +124,7 @@ Vorticity `vor` is stored as a lon x lat x vert x time array, we may want to loo
 which is the end of the previous simulation (time=6days) which we didn't store output for.
 ```@example galewsky_setup
 t = 1
-vor = Matrix{Float32}(ds["vor"][:, :, 1, t]) # convert from Matrix{Union{Missing, Float32}} to Matrix{Float32}
+vor = Matrix{Float32}(ds["vor"][:, :, 1, t]) # convert from Matrix{Union{Missing, Float32}} to Matrix{Float32}
 lat = ds["lat"][:]
 lon = ds["lon"][:]
 
@@ -211,7 +211,7 @@ simulation = initialize!(model)
 model.feedback.verbose = false # hide
 run!(simulation, period=Day(20))   # discard first 20 days   
 run!(simulation, period=Day(20), output=true)
-nothing # hide
+nothing # hide
 ```
 
 We want to simulate polar jet streams in the shallow water model. We add a `JetStreamForcing`
@@ -250,8 +250,8 @@ nothing # hide
 
 Setup script to copy and paste:
 ```@example gravity_wave_setup
-using Random # hide
-Random.seed!(1234) # hide
+using Random # hide
+Random.seed!(1234) # hide
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=127, nlev=1)
 time_stepping = SpeedyWeather.Leapfrog(spectral_grid, Δt_at_T31=Minute(30))
@@ -368,12 +368,12 @@ using SpeedyWeather
 
 # components
 spectral_grid = SpectralGrid(trunc=31, nlev=5)
-ocean = AquaPlanet(spectral_grid)
-land_sea_mask = AquaPlanetMask(spectral_grid, temp_equator=302, temp_poles=273)
+ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
+land_sea_mask = AquaPlanetMask(spectral_grid)
 orography = NoOrography(spectral_grid)
 
 # create model, initialize, run
-model = PrimitiveWetModel(;spectral_grid, ocean, land_sea_mask, orography)
+model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
 run!(simulation, period=Day(50), output=true)
@@ -389,9 +389,16 @@ All passed on to the model constructor for a `PrimitiveWetModel`, we have now a 
 and physics parameterization as they are defined by default (typing `model` will give you an overview
 of its components). We could have change the `model.land` and `model.vegetation` components too,
 but given the land-sea masks masks those contributions to the surface fluxes anyway, this is not
-necessary. Now with the following we visualize the surface humidity after the 50 days of
+necessary. Note that neither sea surface temperature, land-sea mask
+or orography have to agree. It is possible to have an ocean on top of a mountain.
+For an ocean grid-cell that is (partially) masked by the land-sea mask, its value will
+be (fractionally) ignored in the calculation of surface fluxes (potentially leading
+to a zero flux depending on land surface temperatures).
+
+Now with the following we visualize the surface humidity after the 50 days of
 simulation. We use 50 days as without mountains it takes longer for the initial conditions to
-become unstable.
+become unstable. The surface humidity shows small-scale patches in the tropics, which is a result
+of the convection scheme, causing updrafts and downdrafts in both humidity and temperature.
 
 ```@example aquaplanet
 using PythonPlot, NCDatasets
@@ -399,8 +406,8 @@ ioff() # hide
 
 id = model.output.id
 ds = NCDataset("run_$id/output.nc")
-timestep = ds.dim["time"]
-surface = ds.dim["lev"]
+timestep = ds.dim["time"]   # last time step
+surface = ds.dim["lev"]     # surface layer
 humid = Matrix{Float32}(ds["humid"][:, :, surface, timestep])
 lat = ds["lat"][:]
 lon = ds["lon"][:]
@@ -409,7 +416,7 @@ fig, ax = subplots(1, 1, figsize=(10, 6))
 ax.pcolormesh(lon, lat, humid')
 ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
-ax.set_title("Surface humidity [kg/kg")
+ax.set_title("Surface humidity [kg/kg]")
 ax.colorbar()
 tight_layout() # hide
 savefig("aquaplanet.png", dpi=70) # hide
