@@ -5,7 +5,7 @@ SpeedyWeather uses a _fractional_ land-sea mask, i.e. for every grid-point
 
 - 1 indicates land
 - 0 indicates ocean
-- (0,1) indicates a grid-cell partially covered by ocean and land
+- a value in between indicates a grid-cell partially covered by ocean and land
 
 The land-sea mask determines solely how to weight the surface fluxes
 coming from land or from the ocean. For the sensible heat fluxes this uses
@@ -97,8 +97,8 @@ the entire mask to zero afterwards `land_sea_mask.mask .= 0`.
 
 ## Custom land-sea mask
 
-You can define a custom land-sea mask type as outlined in [`AbstractLandSeaMask`](@ref).
-A custom land-sea mask have to be defined as a new type (`struct` or `mutable struct`)
+Every (custom) land-sea mask has to be a subtype of `AbstractLandSeaMask`.
+A custom land-sea mask has to be defined as a new type (`struct` or `mutable struct`)
 
 ```julia
 CustomMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF, Grid}
@@ -117,7 +117,7 @@ initialize!(mask::CustomMask, model::PrimitiveEquation)
 ```
 
 which generally is used to tweak the mask.mask grid as you like, using
-any other options you have included in `CustomMask` as fields or anything else (preferrably read-only,
+any other options you have included in `CustomMask` as fields or anything else (preferably read-only,
 because this is only to initialize the land-sea mask, nothing else) from `model`. You can
 for example read something from file, set some values manually, or use coordinates from `model.geometry`.
 
