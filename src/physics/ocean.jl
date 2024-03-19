@@ -1,3 +1,46 @@
+"""
+Abstract super type for ocean models, which control the sea surface temperature
+and sea ice concentration as boundary conditions to a SpeedyWeather simulation.
+A new ocean model has to be defined as
+
+    CustomOceanModel <: AbstractOcean
+
+and can have parameters like CustomOceanModel{T} and fields. They need to extend
+the following functions
+
+    function initialize!(ocean_model::CustomOceanModel, model::PrimitiveEquation)
+        # your code here to initialize the ocean model itself
+        # you can use other fields from model, e.g. model.geometry
+    end
+
+    function initialize!(   
+        ocean::PrognosticVariablesOcean,
+        time::DateTime,
+        ocean_model::CustomOceanModel,
+        model::PrimitiveEquation,
+    )
+        # your code here to initialize the prognostic variables for the ocean
+        # namely, ocean.sea_surface_temperature, ocean.sea_ice_concentration, e.g.
+        # ocean.sea_surface_temperature .= 300      # 300K everywhere
+    end
+
+    function ocean_timestep!(
+        ocean::PrognosticVariablesOcean,
+        time::DateTime,
+        ocean_model::CustomOceanModel,
+    )
+        # your code here to change the ocean.sea_surface_temperature and/or
+        # ocean.sea_ice_concentration on any timestep
+    end
+
+Temperatures in ocean.sea_surface_temperature have units of Kelvin,
+or NaN for no ocean. Note that neither sea surface temperature, land-sea mask
+or orography have to agree. It is possible to have an ocean on top of a mountain.
+For an ocean grid-cell that is (partially) masked by the land-sea mask, its value will
+be (fractionally) ignored in the calculation of surface fluxes (potentially leading
+to a zero flux depending on land surface temperatures). For an ocean grid-cell that is NaN
+but not masked by the land-sea mask, its value is always ignored.
+"""
 abstract type AbstractOcean end
 
 function Base.show(io::IO, O::AbstractOcean)
@@ -24,6 +67,13 @@ end
 ## SEASONAL OCEAN CLIMATOLOGY
 
 export SeasonalOceanClimatology
+
+"""
+Seasonal ocean climatology that reads monthly sea surface temperature
+fields from file, and interpolates them in time regularly
+(default every 3 days) to be stored in the prognostic variables.
+Fields and options are
+$(TYPEDFIELDS)"""
 Base.@kwdef struct SeasonalOceanClimatology{NF, Grid<:AbstractGrid{NF}} <: AbstractOcean
 
     "number of latitudes on one hemisphere, Equator included"
@@ -146,8 +196,20 @@ function interpolate_monthly!(
 end
 
 ## CONSTANT OCEAN CLIMATOLOGY
-
 export ConstantOceanClimatology
+
+"""
+Constant ocean climatology that reads monthly sea surface temperature
+fields from file, and interpolates them only for the initial conditions
+in time to be stored in the prognostic variables. It is therefore an
+ocean from climatology but without a seasonal cycle that is constant in time.
+To be created like
+
+    ocean = SeasonalOceanClimatology(spectral_grid)
+
+and the ocean time is set with initialize!(model, time=time).
+Fields and options are
+$(TYPEDFIELDS)"""
 Base.@kwdef struct ConstantOceanClimatology <: AbstractOcean
     "[OPTION] path to the folder containing the land-sea mask file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
@@ -196,8 +258,16 @@ function ocean_timestep!(
 end
 
 ## CONSTANT OCEAN CLIMATOLOGY
-
 export AquaPlanet
+
+"""
+AquaPlanet sea surface temperatures that are constant in time and longitude,
+but vary in latitude following a coslat². To be created like
+
+    ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
+
+Fields and options are
+$(TYPEDFIELDS)"""
 Base.@kwdef struct AquaPlanet{NF} <: AbstractOcean
     "Number of latitude rings"
     nlat::Int
@@ -234,7 +304,7 @@ function initialize!(
 )
     (; sea_surface_temperature) = ocean
     for (j, ring) in enumerate(eachring(sea_surface_temperature))
-        for ij in ring
+        for ij in ring  # set every ring of SST to latitude profile
             sea_surface_temperature[ij] = ocean_model.temp_lat[j]
         end
     end

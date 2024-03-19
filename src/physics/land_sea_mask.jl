@@ -1,5 +1,5 @@
 """
-Abstract type for land-sea masks. Custom land-sea masks have to be defined as
+Abstract super type for land-sea masks. Custom land-sea masks have to be defined as
 
     CustomMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF, Grid}
 
