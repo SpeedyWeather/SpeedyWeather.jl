@@ -61,17 +61,18 @@ export SpeedyTransforms, SpectralTransform
 export spectral, gridded, spectral_truncation
 include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
+import .SpeedyTransforms: prettymemory
 
 # Utility for GPU / KernelAbstractions
 include("gpu.jl")                               
 
-# abstract types
+# abstract types
 include("models/abstract_models.jl")
 include("dynamics/abstract_types.jl")
 include("output/abstract_types.jl")
 include("physics/abstract_types.jl")
 
-# GEOMETRY CONSTANTS ETC
+# GEOMETRY CONSTANTS ETC
 include("dynamics/vertical_coordinates.jl")
 include("dynamics/spectral_grid.jl")
 include("dynamics/geometry.jl")
@@ -82,7 +83,7 @@ include("dynamics/adiabatic_conversion.jl")
 include("dynamics/orography.jl")
 include("physics/land_sea_mask.jl")
 
-# VARIABLES
+# VARIABLES
 include("dynamics/particles.jl")
 include("dynamics/clock.jl")
 include("dynamics/prognostic_variables.jl")

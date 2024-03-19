@@ -108,3 +108,24 @@ field tree is the longest, defining many components for the physics parameteriza
 model = PrimitiveWetModel()
 tree(model)
 ```
+
+## Size of a Simulation
+
+The `tree` function also allows for the `with_size::Bool` keyword (default `false`),
+which will also print the size of the respective branches to give you an idea of
+how much memory a SpeedyWeather simulation uses.
+
+```@example structure
+tree(simulation, max_level=1, with_size=true)
+```
+
+And with `max_level` you can truncate the tree to go down at most that many levels.
+1MB is a typical size for a one-level T31 resolution simulation. In comparison,
+a higher resolution `PrimitiveWetModel` would use
+
+```@example structure
+spectral_grid = SpectralGrid(trunc=127, nlev=8)
+model = PrimitiveWetModel(;spectral_grid)
+simulation = initialize!(model)
+tree(simulation, max_level=1, with_size=true)
+```
