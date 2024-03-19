@@ -67,7 +67,7 @@ Add a or several callbacks to a model::ModelSetup. To be used like
     add!(model, :my_callback1 => callback, :my_callback2 => other_callback)
 """
 add!(model::ModelSetup, key_callbacks::Pair{Symbol, <:AbstractCallback}...) =
-    add!(model.callbacks, key_callbacks)
+    add!(model.callbacks, key_callbacks...)
 add!(D::CALLBACK_DICT, key::Symbol, callback::AbstractCallback) = add!(D, Pair(key, callback))
 add!(model::ModelSetup, key::Symbol, callback::AbstractCallback) =
     add!(model.callbacks, Pair(key, callback))
