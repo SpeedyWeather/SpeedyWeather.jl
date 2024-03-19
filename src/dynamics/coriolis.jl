@@ -20,6 +20,8 @@ function initialize!(coriolis::Coriolis, model::ModelSetup)
     return nothing
 end
 
+export coriolis
+
 """
 $(TYPEDSIGNATURES)
 Return the Coriolis parameter `f` on the grid `Grid` of resolution `nlat_half`
@@ -27,11 +29,11 @@ on a planet of `ratation` [1/s]. Default rotation of Earth."""
 function coriolis(
     ::Type{Grid},
     nlat_half::Integer;
-    rotation=DEFAULT_ROTATION
+    rotation = DEFAULT_ROTATION
 ) where {Grid<:AbstractGrid}
     
-    f = zeros(Grid, nlat_half)
-    lat = get_lat(Grid, nlat_half)
+    f = zeros(Grid, nlat_half)      # preallocate
+    lat = get_lat(Grid, nlat_half)  # in radians [-π/2, π/2]
 
     for (j, ring) in enumerate(eachring(f))
         fⱼ = 2rotation*sin(lat[j])
@@ -48,7 +50,7 @@ Return the Coriolis parameter `f` on a grid like `grid`
 on a planet of `ratation` [1/s]. Default rotation of Earth."""
 function coriolis(
     grid::Grid;
-    rotation=DEFAULT_ROTATION
+    kwargs...
 ) where {Grid<:AbstractGrid}
-    return coriolis(Grid, grid.nlat_half; rotation)
+    return coriolis(Grid, grid.nlat_half; kwargs...)
 end
