@@ -32,16 +32,16 @@ function get_column!(   C::ColumnVariables,
     C.lond = geometry.londs[ij]
     C.ij = ij                       # grid-point index
     C.jring = jring                 # ring index j of column, used to index latitude vectors
-    C.land_fraction = land_sea_mask.land_sea_mask[ij]
+    C.land_fraction = land_sea_mask.mask[ij]
     C.orography = orography.orography[ij]
     C.surface_geopotential = C.orography * planet.gravity
 
     # pressure [Pa] or [log(Pa)]
-    lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics
+    lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics
     pₛ = exp(lnpₛ)                          # convert back here
     C.ln_pres .= ln_σ_levels_full .+ lnpₛ   # log pressure on every level ln(p) = ln(σ) + ln(pₛ)
-    C.pres[1:end-1] .= σ_levels_full.*pₛ    # pressure on every level p = σ*pₛ
-    C.pres[end] = pₛ                        # last element is surface pressure pₛ
+    C.pres[1:end-1] .= σ_levels_full.*pₛ    # pressure on every level p = σ*pₛ
+    C.pres[end] = pₛ                        # last element is surface pressure pₛ
 
     @inbounds for (k, layer) = enumerate(D.layers)   # read out prognostic variables on grid
         C.u[k] = layer.grid_variables.u_grid[ij]
