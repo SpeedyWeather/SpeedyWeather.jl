@@ -1,6 +1,6 @@
 abstract type AbstractBoundaryLayer <: AbstractParameterization end
 
-# function barrier for all boundary layer drags
+# function barrier for all boundary layer drags
 function boundary_layer_drag!(  column::ColumnVariables,
                                 model::PrimitiveEquation)
     boundary_layer_drag!(column, model.boundary_layer_drag, model)
@@ -26,7 +26,7 @@ Base.@kwdef struct LinearDrag{NF<:AbstractFloat} <: AbstractBoundaryLayer
     σb::NF = 0.7                    # sigma coordinate below which linear drag is applied
     time_scale::Second = Hour(24)   # time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
 
-    # PRECOMPUTED CONSTANTS
+    # PRECOMPUTED CONSTANTS
     drag_coefs::Vector{NF} = zeros(NF, nlev)
 end
 
@@ -51,7 +51,7 @@ function initialize!(   scheme::LinearDrag,
     end
 end 
 
-# function barrier
+# function barrier
 function boundary_layer_drag!(  column::ColumnVariables,
                                 scheme::LinearDrag,
                                 model::PrimitiveEquation)
@@ -113,7 +113,7 @@ BulkRichardsonDrag(SG::SpectralGrid, kwargs...) = BulkRichardsonDrag{SG.NF}(; kw
 function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
 
     # Typical height Z of lowermost layer from geopotential of reference surface temperature
-    # minus surface geopotential (orography * gravity)
+    # minus surface geopotential (orography * gravity)
     (; temp_ref) = model.atmosphere
     (; gravity) = model.planet
     (; Δp_geopot_full) = model.geopotential
@@ -147,8 +147,8 @@ function boundary_layer_drag!(
     # if Ri_c > Ri_a > 0 then = κ^2/log(zₐ/z₀)^2 * (1-Ri_a/Ri_c)^2
     # if Ri_c < 0 then κ^2/log(zₐ/z₀)^2
     # but Z ≈ zₐ given that the lowermost layer height is proportional to temperature
-    # which doesn't change much with instantaneous temperature variations but with
-    # vertical resolution, hence κ^2/log(Z/z₀)^2 is precalculated in initialize!
+    # which doesn't change much with instantaneous temperature variations but with
+    # vertical resolution, hence κ^2/log(Z/z₀)^2 is precalculated in initialize!
     Ri_a = clamp(Ri_a, 0, Ri_c)
     column.boundary_layer_drag = drag_max*(1-Ri_a/Ri_c)^2
 end

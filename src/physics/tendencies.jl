@@ -41,19 +41,10 @@ function parameterization_tendencies!(
     model::PrimitiveEquation
     )
 
-    # Pre-compute thermodynamic quantities
     get_thermodynamics!(column, model)
-
     temperature_relaxation!(column, model)
     boundary_layer_drag!(column, model)
-
-    # VERTICAL DIFFUSION
-    # diffusion_coefficient!(column, model)
-    # momentum_diffusion!(column, model)
-    static_energy_diffusion!(column, model)
-    humidity_diffusion!(column, model)
-
-    # Calculate parametrizations
+    vertical_diffusion!(column, model)
     convection!(column, model)
     large_scale_condensation!(column, model)
     # clouds!(column, model)

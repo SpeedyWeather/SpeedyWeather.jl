@@ -121,6 +121,7 @@ Calculate geopotentiala and dry static energy for the primitive equation model."
 function get_thermodynamics!(column::ColumnVariables, model::PrimitiveEquation)
     geopotential!(column.geopot, column.temp, model.geopotential, column.surface_geopotential)
     dry_static_energy!(column, model.atmosphere)
+    bulk_richardson!(column, model.atmosphere)
 end
 
 """
@@ -141,6 +142,10 @@ function dry_static_energy!(
     return nothing
 end
 
+"""
+$(TYPEDSIGNATURES)
+Calculate the bulk richardson number following Frierson, 2007.
+For vertical stability in the boundary layer."""
 function bulk_richardson!(
     column::ColumnVariables,
     atmosphere::AbstractAtmosphere,

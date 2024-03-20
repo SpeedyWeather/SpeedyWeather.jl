@@ -1,179 +1,118 @@
 abstract type AbstractVerticalDiffusion <: AbstractParameterization end
 
+## FUNCTION BARRIERS for all AbstractVerticalDiffusion
+function vertical_diffusion!(   column::ColumnVariables,
+                                model::PrimitiveEquation)
+    vertical_diffusion!(column, model.vertical_diffusion, model)
+end
+
+## NO VERTICAL DIFFUSION
 export NoVerticalDiffusion
 struct NoVerticalDiffusion <: AbstractVerticalDiffusion end
 NoVerticalDiffusion(SG::SpectralGrid) = NoVerticalDiffusion()
 
-function initialize!(   scheme::NoVerticalDiffusion,
-                        model::PrimitiveEquation)
+# define dummy functions
+initialize!(::NoVerticalDiffusion,::PrimitiveEquation) = nothing
+vertical_diffusion!(::ColumnVariables, ::NoVerticalDiffusion, ::PrimitiveEquation) = nothing
+
+
+Base.@kwdef struct BulkRichardsonDiffusion{NF} <: AbstractVerticalDiffusion
+    nlev::Int
+
+    "[OPTION] von Kármán constant [1]"
+    κ::NF = 0.4
+
+    "[OPTION] roughness length [m]"
+    z₀::NF = 3.21e-5
+
+    "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
+    Ri_c::NF = 1
+
+    "[OPTION] Surface layer fraction"
+    fb::NF = 0.1
+
+    "[OPTION] diffuse static energy?"
+    diffuse_static_energy::Bool = true
+
+    "[OPTION] diffuse momentum?"
+    diffuse_momentum::Bool = true
+
+    "[OPTION] diffuse humidity? Ignored for PrimitiveDryModels"
+    diffuse_humidity::Bool = true
+
+    # precomputed operators
+    ∇²_above::Vector{NF} = zeros(NF, nlev-1)
+    ∇²_below::Vector{NF} = zeros(NF, nlev-1)
+    Δσ::Vector{NF} = zeros(NF, nlev-1)
+end
+
+BulkRichardsonDiffusion(SG::SpectralGrid; kwargs...) = BulkRichardsonDiffusion{SG.NF}(; nlev=SG.nlev, kwargs...)
+
+function initialize!(scheme::BulkRichardsonDiffusion, model::PrimitiveEquation)
+    Δσ = model.geometry.σ_levels_thick
+    
+    # 1. thickness Δσ of half levels
+    # 2. 1/Δσ² but for variable Δσ on half levels = 1/(1/2*Δσₖ(Δσ_k-1 + Δσₖ))
+    # 3. as 2. but for half levels below = 1/(1/2*Δσₖ(Δσ_k+1 + Δσₖ))
+    @. scheme.Δσ = 1/2*(Δσ[2:end] + Δσ[1:end-1])
+    @. scheme.∇²_above = inv(Δσ[2:end]*scheme.Δσ)
+    @. scheme.∇²_below = inv(Δσ[1:end-1]*scheme.Δσ)
+
     return nothing
-end 
-
-# function barrier
-function static_energy_diffusion!(  column::ColumnVariables,
-                                    model::PrimitiveEquation)
-    static_energy_diffusion!(column, model.static_energy_diffusion)
 end
 
-function static_energy_diffusion!(  column::ColumnVariables,
-                                    scheme::NoVerticalDiffusion)
+function vertical_diffusion!(
+    column::ColumnVariables,
+    scheme::BulkRichardsonDiffusion,
+    model::PrimitiveEquation)
+
+    (; diffuse_momentum, diffuse_static_energy, diffuse_humidity) = scheme
+    any(( diffuse_momentum, diffuse_static_energy, diffuse_humidity)) || return nothing
+    
+    K = get_diffusion_coefficients!(column, scheme)
+
+    (; u, u_tend, v, v_tend, dry_static_energy, temp_tend, humid, humid_tend) = column
+    diffuse_momentum                            && vertical_diffusion!(u_tend, u, K, scheme)
+    diffuse_momentum                            && vertical_diffusion!(v_tend, v, K, scheme)
+    diffuse_static_energy                       && vertical_diffusion!(temp_tend, dry_static_energy, K, scheme)
+    model isa PrimitiveWet && diffuse_humidity  && vertical_diffusion!(humid_tend, humid, K, scheme)
     return nothing
 end
 
-export StaticEnergyDiffusion
+function get_diffusion_coefficients!(column, scheme)
+    Ri = column.bulk_richardson
+    K = column.a        # reuse work array for diffusion coefficients
+    (; Ri_c) = scheme
+    (; nlev) = column
 
-"""
-Diffusion of dry static energy: A relaxation towards a reference
-gradient of static energy wrt to geopotential, see Fortran SPEEDY documentation.
-$(TYPEDFIELDS)"""
-Base.@kwdef struct StaticEnergyDiffusion{NF<:AbstractFloat} <: AbstractVerticalDiffusion
-    "time scale for strength"
-    time_scale::Second = Hour(6)
+    # calculate here
+    column.boundary_layer_depth = nlev+1
+    fill!(K,0)
 
-    "[1] ∂SE/∂Φ, vertical gradient of static energy SE with geopotential Φ"
-    static_energy_lapse_rate::NF = 0.1          
-    
-    # precomputations
-    Fstar::Base.RefValue{NF} = Ref(zero(NF))    # excluding the surface pressure pₛ
+    return K
 end
 
-StaticEnergyDiffusion(SG::SpectralGrid; kwargs...) = StaticEnergyDiffusion{SG.NF}(; kwargs...)
+function vertical_diffusion!(   
+    tend::AbstractVector,
+    var::AbstractVector,
+    K::AbstractVector,
+    scheme::BulkRichardsonDiffusion,
+)
+    (; Δσ, ∇²_above, ∇²_below) = scheme
+    nlev = length(tend)
 
-"""$(TYPEDSIGNATURES)
-Initialize dry static energy diffusion."""
-function initialize!(   scheme::StaticEnergyDiffusion,
-                        model::PrimitiveEquation)
+    # @inbounds begin
+        # top layer with no flux boundary conditions at k=1/2
+        tend[1] += K[1] * ∇²_below[1] * (var[2] - var[1])
 
-    (; nlev) = model.spectral_grid
-    (; gravity) = model.planet
-    C₀ = 1/nlev                     # average Δσ
-    
-    # Fortran SPEEDY documentation equation (70), excluding the surface pressure pₛ
-    scheme.Fstar[] = C₀/gravity/scheme.time_scale.value
-end
-
-"""$(TYPEDSIGNATURES)
-Apply dry static energy diffusion."""
-function static_energy_diffusion!(  column::ColumnVariables,
-                                    scheme::StaticEnergyDiffusion)
-    
-    (; nlev, dry_static_energy, flux_temp_upward, geopot) = column
-    pₛ = column.pres[end]               # surface pressure
-    Fstar = scheme.Fstar[]*pₛ
-    Γˢᵉ = scheme.static_energy_lapse_rate 
-
-    # relax static energy profile back to a reference gradient Γˢᵉ
-    @inbounds for k in 1:nlev-1
-        # Fortran SPEEDY doc eq (74)
-        SEstar = dry_static_energy[k+1] + Γˢᵉ*(geopot[k] - geopot[k+1])
-        SE = dry_static_energy[k]
-        if SE < SEstar
-            # SPEEDY code applies the flux to all layers below
-            # effectively fluxing temperature from below the surface to
-            # given height. It doesn't really make sense to me in
-            # a meteorology sense to me since it can flux through stable layers,
-            # but it's more stable and that's good enough for now.
-            for kk = k+1:nlev
-                flux_temp_upward[kk] += Fstar*(SEstar - SE)
-            end
+        # full Laplacian in other layers
+        for k in 2:nlev-1
+            # discrete Laplacian, like the (1, -2, 1)-stencil but for variable Δσ
+            ∇²_at_k = ∇²_above[k-1] + ∇²_below[k]
+            tend[k] += K[k]*(∇²_below[k]*var[k+1] - ∇²_at_k*var[k] + ∇²_above[k-1]*var[k-1])
         end
-    end
-end
 
-export HumidityDiffusion
-
-"""
-Diffusion of dry static energy: A relaxation towards a reference
-gradient of static energy wrt to geopotential, see Fortran SPEEDY documentation.
-$(TYPEDFIELDS)"""
-Base.@kwdef struct HumidityDiffusion{NF<:AbstractFloat} <: AbstractVerticalDiffusion
-    "time scale for strength"
-    time_scale::Second = Hour(24)
-
-    "[1] ∂RH/∂σ, vertical gradient of relative humidity RH wrt sigma coordinate σ"
-    humidity_gradient::NF = 0.5
-
-    # precomputations
-    Fstar::Base.RefValue{NF} = Ref(zero(NF))    # excluding the surface pressure pₛ
-end
-
-HumidityDiffusion(SG::SpectralGrid; kwargs...) = HumidityDiffusion{SG.NF}(; kwargs...)
-
-"""$(TYPEDSIGNATURES)
-Initialize dry static energy diffusion."""
-function initialize!(   scheme::HumidityDiffusion,
-                        model::PrimitiveEquation)
-
-    (; nlev) = model.spectral_grid
-    (; gravity) = model.planet
-    C₀ = 1/nlev                     # average Δσ
-    
-    # Fortran SPEEDY documentation equation (70), excluding the surface pressure pₛ
-    scheme.Fstar[] = C₀/gravity/scheme.time_scale.value
-
-    # SPEEDY code version
-    # scheme.Fstar[] = C₀/scheme.time_scale.value
-end
-
-# function barrier for all VerticalDiffusion, dispatch by type of humidity diffusion
-function humidity_diffusion!(   column::ColumnVariables,
-                                model::PrimitiveWet)
-    humidity_diffusion!(column, model.humidity_diffusion, model)
-end
-
-# do nothing for primitive dry
-function humidity_diffusion!(   column::ColumnVariables,
-                                model::PrimitiveDry)
-    return nothing
-end
-
-# do nothing for no vertical diffusion
-function humidity_diffusion!(   column::ColumnVariables,
-                                scheme::NoVerticalDiffusion,
-                                model::PrimitiveEquation)
-    return nothing
-end
-
-# function barrier to unpack model
-function humidity_diffusion!(   column::ColumnVariables,
-                                scheme::HumidityDiffusion,
-                                model::PrimitiveEquation)
-    humidity_diffusion!(column, scheme, model.geometry)
-end
-
-"""$(TYPEDSIGNATURES)
-Apply humidity diffusion."""
-function humidity_diffusion!(   column::ColumnVariables,
-                                scheme::HumidityDiffusion,
-                                geometry::Geometry)
-    
-    (; nlev, sat_humid, rel_humid, flux_humid_upward) = column
-    pₛ = column.pres[end]               # surface pressure
-    Fstar = scheme.Fstar[]*pₛ           
-    # Fstar = scheme.Fstar[]              # SPEEDY code version
-    Γ = scheme.humidity_gradient        # relative humidity wrt σ
-    σ = geometry.σ_levels_full
-    σ_half = geometry.σ_levels_half
-
-    # relax humidity profile back to a reference gradient Γ
-    # SPEEDY skips the uppermost levels, but maybe less relevant due to the
-    # σ_half[k] scaling of the flux
-    for k in 1:nlev-1  
-
-        Γσ = Γ*(σ[k+1] - σ[k])
-        Δrel_humid = rel_humid[k+1] - rel_humid[k]
-
-        # Fortran SPEEDY doc eq (71)
-        if Δrel_humid > Γσ
-            # Fortran SPEEDY doc eq (72)
-            # the σ_half[k] is not in the documentation, but it makes the diffusion
-            # weaker higher up, so it's maybe not bad after all
-            flux_humid_upward[k+1] += Fstar*σ_half[k]*sat_humid[k]*Δrel_humid
-        
-            # SPEEDY code version
-            # flux = Fstar*σ_half[k]*sat_humid[k]*Δrel_humid
-            # humid_tend[k] += flux*rsig[k]
-            # humid_tend[k+1] -= flux*rsig[k+1]
-        end
-    end
+        # bottom layer with no flux boundary conditions at k=nlev+1/2
+        tend[end] += K[end] * ∇²_above[end] * (var[end-1] - var[end])
+    # end
 end
