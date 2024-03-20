@@ -4,7 +4,7 @@ export BarotropicModel, initialize!
 The BarotropicModel contains all model components needed for the simulation of the
 barotropic vorticity equations. To be constructed like
 
-    model = BarotropicModel(;spectral_grid, kwargs...)
+    model = BarotropicModel(; spectral_grid, kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
@@ -18,7 +18,8 @@ Base.@kwdef mutable struct BarotropicModel{
     CO<:AbstractCoriolis,
     FR<:AbstractForcing,
     DR<:AbstractDrag,
-    IC<:InitialConditions,
+    PA<:AbstractParticleAdvection,
+    IC<:AbstractInitialConditions,
     TS<:AbstractTimeStepper,
     ST<:SpectralTransform{NF},
     IM<:AbstractImplicit,
@@ -38,8 +39,9 @@ Base.@kwdef mutable struct BarotropicModel{
     coriolis::CO = Coriolis(spectral_grid)
     forcing::FR = NoForcing()
     drag::DR = NoDrag()
-    initial_conditions::IC = StartWithRandomVorticity()
-    
+    particle_advection::PA = NoParticleAdvection()
+    initial_conditions::IC = InitialConditions(Barotropic)
+
     # NUMERICS
     device_setup::DS = DeviceSetup(CPUDevice())
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -48,8 +50,8 @@ Base.@kwdef mutable struct BarotropicModel{
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid,Barotropic)
-    callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
+    output::OW = OutputWriter(spectral_grid, Barotropic)
+    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
 
@@ -62,7 +64,7 @@ Calls all `initialize!` functions for most fields, representing components, of `
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!`."""
 function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
-    (;spectral_grid) = model
+    (; spectral_grid) = model
 
     spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for BarotropicModel, \
         SpectralGrid with nlev=$(spectral_grid.nlev) provided."
@@ -77,7 +79,12 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)
     initialize!(prognostic_variables, model.initial_conditions, model)
-    prognostic_variables.clock.time = time       # set the time
+    prognostic_variables.clock.time = time       # set the current time
+    prognostic_variables.clock.start = time      # and store the start time
+
+    # particle advection
+    initialize!(model.particle_advection, model)
+    initialize!(prognostic_variables.particles, model)
 
     diagnostic_variables = DiagnosticVariables(spectral_grid, model)
     return Simulation(prognostic_variables, diagnostic_variables, model)

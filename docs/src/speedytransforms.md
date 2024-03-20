@@ -20,7 +20,7 @@ back to obtain the divergence in grid-point space. Examples are outlined in [Gra
 !!! info "SpeedyTransforms assumes a unit sphere"
     The operators in SpeedyTransforms generally assume a sphere of radius ``R=1``.
     For the transforms themselves that does not make a difference, but the gradient operators
-    `div`,`curl`,`∇`,`∇²`,`∇⁻²` omit the radius scaling. You will have to do this manually.
+    `div`, `curl`, `∇`, `∇²`, `∇⁻²` omit the radius scaling. You will have to do this manually.
     Also note that the meridional derivate expects a ``\cos^{-1}(\theta)`` scaling.
     More in [Gradient operators](@ref).
 
@@ -39,8 +39,8 @@ As an example, we want to transform the ``l=m=1`` spherical harmonic from spectr
 to grid-point space.
 
 ```@example speedytransforms
-alms = zeros(LowerTriangularMatrix{ComplexF64},6,6)     # spectral coefficients
-alms[2,2] = 1                                           # only l=1,m=1 harmonic
+alms = zeros(LowerTriangularMatrix{ComplexF64}, 6, 6)     # spectral coefficients
+alms[2, 2] = 1                                           # only l=1, m=1 harmonic
 alms
 ```
 Now `gridded` is the function that takes spectral coefficients `alms` and converts
@@ -77,7 +77,7 @@ a transform error that is larger than the rounding error from floating-point ari
 While the default grid for [SpeedyTransforms](@ref) is the [`FullGaussianGrid`](@ref FullGaussianGrid)
 we can transform onto other grids by specifying `Grid` too
 ```@example speedytransforms
-map = gridded(alms,Grid=HEALPixGrid)
+map = gridded(alms, Grid=HEALPixGrid)
 plot(map)
 ```
 which, if transformed back, however, can yield a larger transform error as discussed above
@@ -90,7 +90,7 @@ grid-spectral resolution (see [Matching spectral and grid resolution](@ref)) fol
 truncation, but you can always truncate/interpolate in spectral space with `spectral_truncation`,
 `spectral_interpolation` which takes `trunc` = ``l_{max} = m_{max}`` as second argument
 ```@example speedytransforms
-spectral_truncation(alms,2)
+spectral_truncation(alms, 2)
 ```
 Yay, we just chopped off ``l > 2`` from `alms` which contained the harmonics up to degree and
 order 5 before.
@@ -110,7 +110,7 @@ create a `SpectralTransform` is to start with a `SpectralGrid`, which already de
 which spectral resolution is supposed to be combined with a given grid.
 ```@example speedytransforms
 using SpeedyWeather
-spectral_grid = SpectralGrid(Float32,trunc=5,Grid=OctahedralGaussianGrid,dealiasing=3)
+spectral_grid = SpectralGrid(Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3)
 ```
 (We `using SpeedyWeather` here as `SpectralGrid` is exported therein).
 We also specify the number format `Float32` here to be used for the transform although this
@@ -128,7 +128,7 @@ recomputation or pre-computation of the Legendre polynomials, fore more informat
 Passing on `S` the `SpectralTransform` now allows us to transform directly on the grid
 defined therein.
 ```@example speedytransforms
-map = gridded(alms,S)
+map = gridded(alms, S)
 plot(map)
 ```
 Yay, this is again the ``l=m=1`` harmonic, but this time on a slightly higher resolution
@@ -136,7 +136,7 @@ Yay, this is again the ``l=m=1`` harmonic, but this time on a slightly higher re
 Note that also the number format was converted on the fly to Float32 because that is the number
 format we specified in `S`! And from grid to spectral
 ```@example speedytransforms
-alms2 = spectral(map,S)
+alms2 = spectral(map, S)
 ```
 As you can see the rounding error is now more like ``10^{-8}`` as we are using Float32
 (the [OctahedralGaussianGrid](@ref OctahedralGaussianGrid) is another _exact_ grid).
@@ -153,14 +153,14 @@ For this interface to SpeedyTransforms this means that on a grid-to-spectral tra
 one more degree than orders of the spherical harmonics by default. You can, however, always truncate
 this additional degree, say to T5 (hence matrix size is 6x6)
 ```@example speedytransforms
-spectral_truncation(alms2,5,5)
+spectral_truncation(alms2, 5, 5)
 ```
-`spectral_truncation(alms2,5)` would have returned the same, a single argument is then assumed
+`spectral_truncation(alms2, 5)` would have returned the same, a single argument is then assumed
 equal for both degrees and orders. Alternatively, you can also pass on the `one_more_degree=false`
 argument to the `SpectralTransform` constructor
 
 ```@example speedytransforms
-S = SpectralTransform(spectral_grid,one_more_degree=false)
+S = SpectralTransform(spectral_grid, one_more_degree=false)
 ```
 As you can see the `7x6 LowerTriangularMatrix` in the description above dropped down to
 `6x6 LowerTriangularMatrix`, this is the size of the input that is expected (otherwise
@@ -171,9 +171,9 @@ you will get a `BoundsError`).
 How to take some data and compute a power spectrum with SpeedyTransforms you may ask.
 Say you have some global data in a matrix `m` that looks, for example, like
 ```@example speedytransforms
-alms = randn(LowerTriangularMatrix{Complex{Float32}},32,32) # hide
-spectral_truncation!(alms,10) # hide
-map = gridded(alms,Grid=FullClenshawGrid) # hide
+alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32) # hide
+spectral_truncation!(alms, 10) # hide
+map = gridded(alms, Grid=FullClenshawGrid) # hide
 m = Matrix(map) # hide
 m
 ```
@@ -201,8 +201,8 @@ Plotting this yields
 ```@example speedytransforms
 using UnicodePlots
 k = 0:length(power)-1
-lineplot(k,power,yscale=:log10,ylim=(1e-15,10),xlim=extrema(k),
-    ylabel="power",xlabel="wavenumber",height=10,width=60)
+lineplot(k, power, yscale=:log10, ylim=(1e-15, 10), xlim=extrema(k),
+    ylabel="power", xlabel="wavenumber", height=10, width=60)
 ```
 
 The power spectrum of our data is about 1 up to wavenumber 10 and then close to zero for
@@ -222,7 +222,7 @@ for higher wavenumbers with ``k^{-2}``
 
 ```@example speedytransforms
 k = 1:32
-alms = randn(LowerTriangularMatrix{Complex{Float32}},32,32)
+alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32)
 alms .*= k.^-2
 ```
 Awesome. For higher degrees and orders the amplitude clearly decreases! Now
@@ -252,7 +252,7 @@ about 100km resolution
 
 ```@example speedytransforms
 spectral_grid = SpectralGrid(trunc=127)
-SpectralTransform(spectral_grid,recompute_legendre=false)
+SpectralTransform(spectral_grid, recompute_legendre=false)
 ```
 the polynomials are about 3MB in size. Easy that is not much. But at T1023 on the
 O1536 octahedral Gaussian grid, this is already 1.5GB, cubically increasing with the
@@ -260,7 +260,7 @@ spectral truncation T. `recompute_legendre=true` (default `false` when
 constructing a `SpectralTransform` object which may be reused) would lower this
 to kilobytes
 ```@example speedytransforms
-SpectralTransform(spectral_grid,recompute_legendre=true)
+SpectralTransform(spectral_grid, recompute_legendre=true)
 ```
 
 ## Gradient operators
@@ -300,7 +300,7 @@ And the Laplace operators omit a ``R^2`` (radius ``R``) scaling, i.e.
 ## Example: Geostrophy
 
 Now, we want to use the following example to illustrate
-their use: We have ``u,v`` and want to calculate ``\eta`` in the shallow water
+their use: We have ``u, v`` and want to calculate ``\eta`` in the shallow water
 system from it following geostrophy. Analytically we have
 ```math
 -fv = -g\partial_\lambda \eta, \quad fu = -g\partial_\theta \eta
@@ -309,7 +309,7 @@ which becomes, if you take the divergence of these two equations
 ```math
 \zeta = \frac{g}{f}\nabla^2 \eta
 ```
-Meaning that if we start with ``u,v`` we can obtain the relative vorticity
+Meaning that if we start with ``u, v`` we can obtain the relative vorticity
 ``\zeta`` and, using Coriolis parameter ``f`` and gravity ``g``, invert
 the Laplace operator to obtain displacement ``\eta``. How to do this with
 SpeedyTransforms? 
@@ -318,37 +318,37 @@ Let us start by generating some data
 ```@example speedytransforms
 using SpeedyWeather
 
-spectral_grid = SpectralGrid(trunc=31,nlev=1)
+spectral_grid = SpectralGrid(trunc=31, nlev=1)
 forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
 drag = QuadraticDrag(spectral_grid)
-model = ShallowWaterModel(;spectral_grid,forcing,drag)
+model = ShallowWaterModel(; spectral_grid, forcing, drag)
 model.feedback.verbose = false # hide
 simulation = initialize!(model);
-run!(simulation,period=Day(30))
+run!(simulation, period=Day(30))
 nothing # hide
 ```
 
-Now pretend you only have `u,v` to get vorticity (which is actually the prognostic variable in the model,
+Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
 so calculated anyway...).
 ```@example speedytransforms
 u = simulation.diagnostic_variables.layers[1].grid_variables.u_grid
 v = simulation.diagnostic_variables.layers[1].grid_variables.v_grid
-vor = SpeedyTransforms.curl(u,v) / spectral_grid.radius
+vor = SpeedyTransforms.curl(u, v) / spectral_grid.radius
 nothing # hide
 ```
-Here, `u,v` are the grid-point velocity fields, and the function `curl` takes in either
+Here, `u, v` are the grid-point velocity fields, and the function `curl` takes in either
 `LowerTriangularMatrix`s (no transform needed as all gradient operators act in spectral space),
 or, as shown here, arrays of the same grid and size. In this case, the function actually
 runs through the following steps
-```julia
-RingGrids.scale_coslat⁻¹!(u_grid)
-RingGrids.scale_coslat⁻¹!(v_grid)
+```@example speedytransforms
+RingGrids.scale_coslat⁻¹!(u)
+RingGrids.scale_coslat⁻¹!(v)
 
-S = SpectralTransform(u_grid,one_more_degree=true)
-us = spectral(u_grid,S)
-vs = spectral(v_grid,S)
+S = SpectralTransform(u, one_more_degree=true)
+us = spectral(u, S)
+vs = spectral(v, S)
 
-return curl(us,vs)
+vor = curl(us, vs)
 ```
 (Copies of) the velocity fields are unscaled by the cosine of latitude (see above),
 then transformed into spectral space, and the returned `vor` requires a manual division
@@ -362,11 +362,11 @@ if otherwise the returned `LowerTriangularMatrix` would be of size 32x32, settin
 to true would return 33x32. The reason is that while most people would expect
 square lower triangular matrices for a triangular spectral truncation, all vector quantities
 always need one more degree (= one more row) because of a recursion relation in the
-meridional gradient. So as we want to take the curl of `us,vs` here, they need this
+meridional gradient. So as we want to take the curl of `us, vs` here, they need this
 additional degree, but in the returned lower triangular matrix this row is set to zero.
 
 !!! info "One more degree for vector quantities"
-    All gradient operators expect the input lower triangular matrices of shape ``N+1 \times N``.
+    All gradient operators expect the input lower triangular matrices of shape ``(N+1) \times N``.
     This one more degree of the spherical harmonics is required for the meridional derivative.
     Scalar quantities contain this degree too for size compatibility but they should not
     make use of it. Use `spectral_truncation` to add or remove this degree manually.
@@ -378,20 +378,22 @@ that we also used in `spectral_grid`. The Coriolis parameter for a grid like `vo
 is obtained, and we do the following for ``f\zeta/g``.
 
 ```@example speedytransforms
-vor_grid = gridded(vor,Grid=spectral_grid.Grid)
-f = SpeedyWeather.coriolis(vor_grid)
-fζ_g = spectral_grid.Grid(vor_grid .* f ./ model.planet.gravity)
+vor_grid = gridded(vor, Grid=spectral_grid.Grid)
+f = coriolis(vor_grid)      # create Coriolis parameter f on same grid with default rotation
+g = model.planet.gravity
+fζ_g = zero(f)              # preallocate on same grid
+@. fζ_g = vor_grid * f / g  # in-place and element-wise
 nothing # hide
 ```
-The last line is a bit awkward for now, as the element-wise multiplication between
-two grids escapes the grid and returns a vector that we wrap again into a grid.
-We will fix that in future releases. Now we need to apply the inverse
-Laplace operator to ``f\zeta/g`` which we do as follows
+The last two lines are a bit awkward for now, as the element-wise multiplication between
+two grids would escapes the grid and returns a vector that we wrap again into a Grid.
+However, by preallocating the new variable with `zero` we guarantee to stay on that grid.
+Now we need to apply the inverse Laplace operator to ``f\zeta/g`` which we do as follows
 
 ```@example speedytransforms
-fζ_g_spectral = spectral(fζ_g,one_more_degree=true);
+fζ_g_spectral = spectral(fζ_g, one_more_degree=true)
 η = SpeedyTransforms.∇⁻²(fζ_g_spectral) * spectral_grid.radius^2
-η_grid = gridded(η,Grid=spectral_grid.Grid)
+η_grid = gridded(η, Grid=spectral_grid.Grid)
 nothing # hide
 ```
 

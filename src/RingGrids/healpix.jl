@@ -7,35 +7,35 @@ abstract type AbstractHEALPixGrid{T} <: AbstractGrid{T} end
 
 npoints_healpix(nlat_half::Integer) = 3*nlat_half^2
 nside_healpix(nlat_half::Integer) = nlat_half÷2
-nlat_half_healpix(npoints::Integer) = round(Int,sqrt(npoints/3))  # inverse of npoints_healpix
-nlon_healpix(nlat_half::Integer,j::Integer) = min(4j,2nlat_half,8nlat_half-4j)
+nlat_half_healpix(npoints::Integer) = round(Int, sqrt(npoints/3))  # inverse of npoints_healpix
+nlon_healpix(nlat_half::Integer, j::Integer) = min(4j, 2nlat_half, 8nlat_half-4j)
 nlon_max_healpix(nlat_half::Integer) = 2nlat_half
 
 nlat_odd(::Type{<:AbstractHEALPixGrid}) = true
-get_nlon_max(::Type{<:AbstractHEALPixGrid},nlat_half::Integer) = nlon_max_healpix(nlat_half)
+get_nlon_max(::Type{<:AbstractHEALPixGrid}, nlat_half::Integer) = nlon_max_healpix(nlat_half)
 
-function get_nlon_per_ring(G::Type{<:AbstractHEALPixGrid},nlat_half::Integer,j::Integer)
-    nlat = get_nlat(G,nlat_half)
+function get_nlon_per_ring(G::Type{<:AbstractHEALPixGrid}, nlat_half::Integer, j::Integer)
+    nlat = get_nlat(G, nlat_half)
     @assert 0 < j <= nlat "Ring $j is outside H$nlat_half grid."
-    return nlon_healpix(nlat_half,j)
+    return nlon_healpix(nlat_half, j)
 end
 
-get_npoints(::Type{<:AbstractHEALPixGrid},nlat_half::Integer) = npoints_healpix(nlat_half)
+get_npoints(::Type{<:AbstractHEALPixGrid}, nlat_half::Integer) = npoints_healpix(nlat_half)
 
-function get_colatlons(Grid::Type{<:AbstractHEALPixGrid},nlat_half::Integer)
-    nlat = get_nlat(Grid,nlat_half)
-    npoints = get_npoints(Grid,nlat_half)
+function get_colatlons(Grid::Type{<:AbstractHEALPixGrid}, nlat_half::Integer)
+    nlat = get_nlat(Grid, nlat_half)
+    npoints = get_npoints(Grid, nlat_half)
     nside = nside_healpix(nlat_half)
-    colat = get_colat(Grid,nlat_half)
+    colat = get_colat(Grid, nlat_half)
 
     colats = zeros(npoints)
     lons = zeros(npoints)
 
     ij = 1
     for j in 1:nlat
-        nlon = get_nlon_per_ring(Grid,nlat_half,j)
+        nlon = get_nlon_per_ring(Grid, nlat_half, j)
 
-        # s = 1 for polar caps, s=2,1,2,1,... in the equatorial zone
+        # s = 1 for polar caps, s=2, 1, 2, 1, ... in the equatorial zone
         s = (j < nside) || (j >= 3nside) ? 1 : ((j - nside) % 2 + 1)
         lon = [π/(nlon÷2)*(i - s/2) for i in 1:nlon]
     
@@ -77,7 +77,7 @@ function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
                                 nlat_half::Integer) # resolution param
 
     nlat = length(rings)
-    @boundscheck nlat == get_nlat(Grid,nlat_half) || throw(BoundsError)
+    @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
 
     index_end = 0
     nside = nside_healpix(nlat_half)                # side length of a basepixel
@@ -90,7 +90,7 @@ function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
     end
 
     # Equatorial belt
-    nlon_max = get_nlon_max(Grid,nlat_half)         # number of grid points on belt
+    nlon_max = get_nlon_max(Grid, nlat_half)         # number of grid points on belt
     @inbounds for j in nside:3nside
         index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
         index_end += nlon_max                       # nlon constant in belt
@@ -98,7 +98,7 @@ function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
     end
 
     # South polar cap
-    @inbounds for (j,j_mir) in zip( 3nside+1:nlat,  # South only
+    @inbounds for (j, j_mir) in zip( 3nside+1:nlat,  # South only
                                     nside-1:-1:1)   # mirror index
 
         index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
@@ -118,19 +118,19 @@ struct HEALPixGrid{T} <: AbstractHEALPixGrid{T}
     data::Vector{T}    # data vector, ring by ring, north to south
     nlat_half::Int     # number of latitude rings on one hemisphere (Equator included)
 
-    HEALPixGrid{T}(data::AbstractVector,nlat_half::Integer) where T = length(data) == npoints_healpix(nlat_half) ?
-    new(data,nlat_half) : error("$(length(data))-element Vector{$(eltype(data))}"*
+    HEALPixGrid{T}(data::AbstractVector, nlat_half::Integer) where T = length(data) == npoints_healpix(nlat_half) ?
+    new(data, nlat_half) : error("$(length(data))-element Vector{$(eltype(data))}"*
     "cannot be used to create an H$nlat_half HEALPixGrid{$T}.")
 end
 
 # infer nlat_half from data vector length, infer parametric type from eltype of data
-HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid{T}(data,nlat_half_healpix(length(data)))
-HEALPixGrid(data::AbstractVector,n::Integer...) = HEALPixGrid{eltype(data)}(data,n...)
+HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid{T}(data, nlat_half_healpix(length(data)))
+HEALPixGrid(data::AbstractVector, n::Integer...) = HEALPixGrid{eltype(data)}(data, n...)
 
-function get_colat(::Type{<:HEALPixGrid},nlat_half::Integer)
+function get_colat(::Type{<:HEALPixGrid}, nlat_half::Integer)
     nlat_half == 0 && return Float64[]
     
-    nlat = get_nlat(HEALPixGrid,nlat_half)
+    nlat = get_nlat(HEALPixGrid, nlat_half)
     nside = nside_healpix(nlat_half)
     colat = zeros(nlat)
     
@@ -144,5 +144,5 @@ end
 full_grid(::Type{<:HEALPixGrid}) = FullHEALPixGrid    # the full grid with same latitudes
 function matrix_size(G::HEALPixGrid)
     nside = nside_healpix(G.nlat_half)
-    return (5nside,5nside)
+    return (5nside, 5nside)
 end

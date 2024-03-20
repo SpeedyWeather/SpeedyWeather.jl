@@ -6,7 +6,7 @@
     @test length(G.σ_levels_full) == 4
 
     # manual levels
-    σ = SigmaCoordinates([0,0.4,0.6,1])
+    σ = SigmaCoordinates([0, 0.4, 0.6, 1])
     spectral_grid = SpectralGrid(vertical_coordinates=σ)
     G = Geometry(spectral_grid)
     @test spectral_grid.nlev == 3
@@ -14,8 +14,8 @@
     @test length(G.σ_levels_full) == 3
 
     # specify both
-    σ = SigmaCoordinates([0,0.4,0.6,1])
-    spectral_grid = SpectralGrid(nlev=3,vertical_coordinates=σ)
+    σ = SigmaCoordinates([0, 0.4, 0.6, 1])
+    spectral_grid = SpectralGrid(nlev=3, vertical_coordinates=σ)
     G = Geometry(spectral_grid)
     @test spectral_grid.nlev == 3
     @test length(G.σ_levels_half) == 4

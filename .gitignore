@@ -40,3 +40,6 @@ run_*/
 # JOSS paper
 docs/joss/media
 docs/joss/paper.jats
+
+# not sure where they are from
+default.profraw

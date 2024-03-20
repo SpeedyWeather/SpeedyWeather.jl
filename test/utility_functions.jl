@@ -3,21 +3,21 @@ using Dates: CompoundPeriod, Day, Hour, Minute, Second, Millisecond
 @testset "Increasing/decresing vectors" begin
     @test SpeedyWeather.isincreasing(collect(1:10))
     @test SpeedyWeather.isincreasing(sort(rand(10)))
-    @test ~SpeedyWeather.isincreasing(rand(Float32,10))
+    @test ~SpeedyWeather.isincreasing(rand(Float32, 10))
     @test ~SpeedyWeather.isincreasing(randn(10))
 end
 
 @testset "clip negatives" begin
-    for T in (Float16,Float32,Float64)
-        A = randn(T,30,50)
+    for T in (Float16, Float32, Float64)
+        A = randn(T, 30, 50)
         SpeedyWeather.clip_negatives!(A)
         @test all(A .>= 0)
     end
 end
 
 @testset "flip sign" begin
-    for T in (Float16,Float32,Float64)
-        A = randn(T,30,50)
+    for T in (Float16, Float32, Float64)
+        A = randn(T, 30, 50)
         A2 = copy(A)
         SpeedyWeather.flipsign!(A)
         SpeedyWeather.flipsign!(A)
@@ -48,9 +48,9 @@ end
 end
 
 @testset "nans" begin
-    for s in ((3,),(3,4),(3,4,5))
-        for T in (Float16,Float32,Float64)
-            A = SpeedyWeather.nans(T,s...)
+    for s in ((3,), (3, 4), (3, 4, 5))
+        for T in (Float16, Float32, Float64)
+            A = SpeedyWeather.nans(T, s...)
             for a in A
                 @test isnan(a)
             end

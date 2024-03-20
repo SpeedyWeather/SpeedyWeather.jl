@@ -53,7 +53,7 @@ spectral and grid-point space constant (see [Matching spectral and grid resoluti
 ```@example howto
 spectral_grid = SpectralGrid(trunc=85)
 ```
-Typical values are 31,42,63,85,127,170,... although you can technically
+Typical values are 31, 42, 63, 85, 127, 170, ... although you can technically
 use any integer, see [Available horizontal resolutions](@ref) for details.
 Now with T85 (which is a common notation for `trunc=85`) the grid
 is of higher resolution too. You may play with the `dealiasing` factor,
@@ -61,7 +61,7 @@ a larger factor increases the grid resolution that is matched with a given
 spectral resolution. You don't choose the resolution of the grid directly,
 but using the `Grid` argument you can change its type (see [Grids](@ref))
 ```@example howto
-spectral_grid = SpectralGrid(trunc=85,dealiasing=3,Grid=HEALPixGrid)
+spectral_grid = SpectralGrid(trunc=85, dealiasing=3, Grid=HEALPixGrid)
 ```
 
 ## Vertical coordinates and resolution
@@ -74,7 +74,7 @@ spectral_grid = SpectralGrid(nlev=1)
 ```
 For a single vertical level the type of the vertical coordinates does not matter,
 but in general you can change the spacing of the sigma coordinates
-which have to be discretized in ``[0,1]``
+which have to be discretized in ``[0, 1]``
 ```@example howto
 vertical_coordinates = SigmaCoordinates(0:0.2:1)
 ```
@@ -111,19 +111,19 @@ Meaning that if you want to have a shorter or longer time step you can create a 
 `Leapfrog` time stepper. All time inputs are supposed to be given with the help of  `Dates` (e.g. `Minute()`, `Hour()`, ...). But remember that every model component depends on a
 `SpectralGrid` as first argument.
 ```@example howto
-spectral_grid = SpectralGrid(trunc=63,nlev=1)
-time_stepping = Leapfrog(spectral_grid,Δt_at_T31=Minute(15))
+spectral_grid = SpectralGrid(trunc=63, nlev=1)
+time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(15))
 ```
 The actual time step at the given resolution (here T63) is then `Δt_sec`, there's
 also `Δt` which is a scaled time step used internally, because SpeedyWeather.jl
 [scales the equations](@ref scaled_swm) with the radius of the Earth,
 but this is largely hidden (except here) from the user. With this new 
 `Leapfrog` time stepper constructed we can create a model by passing
-on the components (they are keyword arguments so either use `;time_stepping`
+on the components (they are keyword arguments so either use `; time_stepping`
 for which the naming must match, or `time_stepping=my_time_stepping` with
 any name)
 ```@example howto
-model = ShallowWaterModel(;spectral_grid,time_stepping)
+model = ShallowWaterModel(; spectral_grid, time_stepping)
 ```
 This logic continues for all model components. See the [Model setups](@ref)
 for examples. All model components are also subtype (i.e. `<:`) of
@@ -140,25 +140,25 @@ roughly belong into one of three groups.
 
 ## [Creating a model](@id create_model)
 
-SpeedyWeather.jl implements (currently) 4 different models
+SpeedyWeather.jl currently includes 4 different models:
 
-1. `BarotropicModel`, see [Barotropic vorticity model](@ref)
-2. `ShallowWaterModel`, see [Shallow water model](@ref)
-3. `PrimitiveDryModel`, see [Primitive equation model](@ref) but with zero humidity.
-4. `PrimitiveWetModel`, see [Primitive equation model](@ref).
+1. [`BarotropicModel`](@ref barotropic_vorticity_model) for the 2D barotropic vorticity equation,
+2. [`ShallowWaterModel`](@ref shallow_water_model) for the 2D shallow water equations,
+3. [`PrimitiveDryModel`](@ref primitive_equation_model) for the 3D primitive equations without humidity, and
+4. [`PrimitiveWetModel`](@ref primitive_equation_model) for the 3D primitive equations with humidity.
 
-Overall they are kept quite similar, but there are still fundamental
+Overall, all above-mentioned models are kept quite similar, but there are still fundamental
 differences arising from the different equations. For example,
 the barotropic and shallow water models do not have any physical
 parameterizations. Conceptually you construct these different models with
 
 ```julia
-spectral_grid = SpectralGrid(trunc=...,...)
-component1 = SomeComponent(spectral_grid,parameter1=...,...)
-component2 = SomeOtherComponent(spectral_grid,parameter2=...,...)
-model = BarotropicModel(;spectral_grid,all_other_components...,...)
+spectral_grid = SpectralGrid(trunc=..., ...)
+component1 = SomeComponent(spectral_grid, parameter1=..., ...)
+component2 = SomeOtherComponent(spectral_grid, parameter2=..., ...)
+model = BarotropicModel(; spectral_grid, all_other_components..., ...)
 ```
-or `model = ShallowWaterModel(;spectral_grid,...)`, etc.
+or `model = ShallowWaterModel(; spectral_grid, ...)`, etc.
 
 ## [Model initialization](@id initialize)
 
@@ -206,7 +206,7 @@ By default this runs for 10 days without output. These are the options left
 to change, so with
 ```@example howto
 model.output.id = "test" # hide
-run!(simulation,period=Day(5),output=true)
+run!(simulation, period=Day(5), output=true)
 ```
 You would continue this simulation (the previous `run!` call already integrated
 10 days!) for another 5 days and storing default [NetCDF output](@ref).

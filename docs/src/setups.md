@@ -1,20 +1,20 @@
 # Model setups
 
 The following is a collection of model setups, starting with an easy setup
-of the [Barotropic vorticity equation](@ref) and continuing with more
-complicated setups.
+of the [Barotropic vorticity equation](@ref barotropic_vorticity_model) and
+continuing with more complicated setups.
 
 ## 2D turbulence on a non-rotating sphere
 
-!!! info "Setup script"
+!!! info "Setup script to copy and paste"
     ```julia
     using SpeedyWeather
-    spectral_grid = SpectralGrid(trunc=63,nlev=1)
-    still_earth = Earth(rotation=0)
+    spectral_grid = SpectralGrid(trunc=63, nlev=1)
+    still_earth = Earth(spectral_grid, rotation=0)
     initial_conditions = StartWithRandomVorticity()
-    model = BarotropicModel(;spectral_grid, initial_conditions, planet=still_earth)
+    model = BarotropicModel(; spectral_grid, initial_conditions, planet=still_earth)
     simulation = initialize!(model)
-    run!(simulation,period=Day(20))
+    run!(simulation, period=Day(20))
     ```
 
 We want to use the barotropic model to simulate some free-decaying 2D turbulence
@@ -24,18 +24,20 @@ T63 (see [Available horizontal resolutions](@ref)) and `nlev=1` vertical levels.
 The `SpectralGrid` object will provide us with some more information
 ```@example barotropic_setup
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=63,nlev=1)
+spectral_grid = SpectralGrid(trunc=63, nlev=1)
 ```
-Next step we create a planet that's like Earth but not rotating
+Next step we create a planet that's like Earth but not rotating. As a convention,
+we always pass on the spectral grid object as the first argument to every other
+model component we create.
 ```@example barotropic_setup
-still_earth = Earth(rotation=0)
+still_earth = Earth(spectral_grid, rotation=0)
 ```
 There are other options to create a planet but they are irrelevant for the
 barotropic vorticity equations. We also want to specify the initial conditions,
 randomly distributed vorticity is already defined
 ```@example barotropic_setup
-using Random # hide
-Random.seed!(1234) # hide
+using Random # hide
+Random.seed!(1234) # hide
 initial_conditions = StartWithRandomVorticity()
 ```
 By default, the power of vorticity is spectrally distributed with ``k^{-3}``, ``k`` being the
@@ -44,7 +46,7 @@ horizontal wavenumber, and the amplitude is ``10^{-5}\text{s}^{-1}``.
 Now we want to construct a `BarotropicModel`
 with these
 ```@example barotropic_setup
-model = BarotropicModel(;spectral_grid, initial_conditions, planet=still_earth)
+model = BarotropicModel(; spectral_grid, initial_conditions, planet=still_earth)
 nothing # hide
 ```
 The `model` contains all the parameters, but isn't initialized yet, which we can do
@@ -53,25 +55,25 @@ plotted for surface relative vorticity with a unicode plot. The resolution of th
 is not necessarily representative but it lets us have a quick look at the result
 ```@example barotropic_setup
 simulation = initialize!(model)
-run!(simulation,period=Day(20))
+run!(simulation, period=Day(20))
 ```
 
 Woohoo! Something is moving! You could pick up where this simulation stopped by simply
-doing `run!(simulation,period=Day(50))` again. We didn't store any output, which
-you can do by `run!(simulation,output=true)`, which will switch on NetCDF output
+doing `run!(simulation, period=Day(50))` again. We didn't store any output, which
+you can do by `run!(simulation, output=true)`, which will switch on NetCDF output
 with default settings. More options on output in [NetCDF output](@ref).
 
 ## Shallow water with mountains
 
-!!! info "Setup script"
+!!! info "Setup script to copy and past"
     ```julia
     using SpeedyWeather
-    spectral_grid = SpectralGrid(trunc=63,nlev=1)
+    spectral_grid = SpectralGrid(trunc=63, nlev=1)
     orography = NoOrography(spectral_grid)
     initial_conditions = ZonalJet()
-    model = ShallowWaterModel(;spectral_grid, orography, initial_conditions)
+    model = ShallowWaterModel(; spectral_grid, orography, initial_conditions)
     simulation = initialize!(model)
-    run!(simulation,period=Day(6))
+    run!(simulation, period=Day(6))
     ```
 
 As a second example, let's investigate the Galewsky et al.[^G04] test case for the shallow
@@ -79,7 +81,7 @@ water equations with and without mountains. As the shallow water system has also
 one level, we can reuse the `SpectralGrid` from Example 1.
 ```@example galewsky_setup
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=63,nlev=1)
+spectral_grid = SpectralGrid(trunc=63, nlev=1)
 ```
 Now as a first simulation, we want to disable any orography, so we create a `NoOrography`
 ```@example galewsky_setup
@@ -95,14 +97,14 @@ initial_conditions = ZonalJet()
 The jet sits at 45˚N with a maximum velocity of 80m/s and a perturbation as described in their paper.
 Now we construct a model, but this time a `ShallowWaterModel`
 ```@example galewsky_setup
-model = ShallowWaterModel(;spectral_grid, orography, initial_conditions)
+model = ShallowWaterModel(; spectral_grid, orography, initial_conditions)
 simulation = initialize!(model)
-run!(simulation,period=Day(6))
+run!(simulation, period=Day(6))
 ```
 Oh yeah. That looks like the wobbly jet in their paper. Let's run it again for another 6 days
 but this time also store [NetCDF output](@ref).
 ```@example galewsky_setup
-run!(simulation,period=Day(6),output=true)
+run!(simulation, period=Day(6), output=true)
 ```
 The progress bar tells us that the simulation run got the identification "0001"
 (which just counts up, so yours might be higher), meaning that
@@ -122,12 +124,12 @@ Vorticity `vor` is stored as a lon x lat x vert x time array, we may want to loo
 which is the end of the previous simulation (time=6days) which we didn't store output for.
 ```@example galewsky_setup
 t = 1
-vor = Matrix{Float32}(ds["vor"][:,:,1,t]) # convert from Matrix{Union{Missing,Float32}} to Matrix{Float32}
+vor = Matrix{Float32}(ds["vor"][:, :, 1, t]) # convert from Matrix{Union{Missing, Float32}} to Matrix{Float32}
 lat = ds["lat"][:]
 lon = ds["lon"][:]
 
-fig,ax = subplots(1,1,figsize=(10,6))
-ax.pcolormesh(lon,lat,vor')
+fig, ax = subplots(1, 1, figsize=(10, 6))
+ax.pcolormesh(lon, lat, vor')
 ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Relative vorticity")
@@ -142,8 +144,8 @@ And now the last time step, that means time = 12days is
 
 ```@example galewsky_setup
 t = ds.dim["time"]
-vor = Matrix{Float32}(ds["vor"][:,:,1,t])
-ax.pcolormesh(lon,lat,vor')
+vor = Matrix{Float32}(ds["vor"][:, :, 1, t])
+ax.pcolormesh(lon, lat, vor')
 savefig("galewsky2.png", dpi=70) # hide
 nothing # hide
 ```
@@ -162,9 +164,9 @@ Same as before, create a model, initialize into a simulation, run. This time dir
 compare with the last plot
 
 ```@example galewsky_setup
-model = ShallowWaterModel(;spectral_grid, orography, initial_conditions)
+model = ShallowWaterModel(; spectral_grid, orography, initial_conditions)
 simulation = initialize!(model)
-run!(simulation,period=Day(12),output=true)
+run!(simulation, period=Day(12), output=true)
 ```
 
 This time the run got a new run id, which you see in the progress bar, but can again always check
@@ -177,10 +179,10 @@ id = model.output.id
 ```@example galewsky_setup
 ds = NCDataset("run_$id/output.nc")
 time = 49
-vor = Matrix{Float32}(ds["vor"][:,:,1,time])
+vor = Matrix{Float32}(ds["vor"][:, :, 1, time])
 
-fig,ax = subplots(1,1,figsize=(10,6))
-ax.pcolormesh(lon,lat,vor')
+fig, ax = subplots(1, 1, figsize=(10, 6))
+ax.pcolormesh(lon, lat, vor')
 ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Relative vorticity")
@@ -197,25 +199,25 @@ probably not surprising!
 
 ## Polar jet streams in shallow water
 
-Setup script:
+Setup script to copy and paste:
 ```@example jet_stream_setup
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=63,nlev=1)
-forcing = JetStreamForcing(spectral_grid,latitude=60)
+spectral_grid = SpectralGrid(trunc=63, nlev=1)
+forcing = JetStreamForcing(spectral_grid, latitude=60)
 drag = QuadraticDrag(spectral_grid)
-output = OutputWriter(spectral_grid,ShallowWater,output_dt=Hour(6),output_vars=[:u,:v,:pres,:orography])
-model = ShallowWaterModel(;spectral_grid,output,drag,forcing)
+output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(6), output_vars=[:u, :v, :pres, :orography])
+model = ShallowWaterModel(; spectral_grid, output, drag, forcing)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation,period=Day(20))   # discard first 20 days   
-run!(simulation,period=Day(20),output=true)
-nothing # hide
+run!(simulation, period=Day(20))   # discard first 20 days   
+run!(simulation, period=Day(20), output=true)
+nothing # hide
 ```
 
 We want to simulate polar jet streams in the shallow water model. We add a `JetStreamForcing`
 that adds momentum at 60˚N to inject kinetic energy into the model. This energy needs to be removed
 (the [diffusion](@ref diffusion) is likely not sufficient) through a drag, we have implemented
-a `QuadraticDrag` and use the default drag coefficient. Outputting ``u,v,\eta`` (called `:pres`,
+a `QuadraticDrag` and use the default drag coefficient. Outputting ``u, v, \eta`` (called `:pres`,
 as it is the pressure equivalent in the shallow water system) we run 20 days without output
 to give the system some time to adapt to the forcing. And visualize zonal wind after another
 20 days with
@@ -227,16 +229,16 @@ ioff() # hide
 id = model.output.id
 ds = NCDataset("run_$id/output.nc")
 timestep = ds.dim["time"]
-u = Matrix{Float32}(ds["u"][:,:,1,timestep])
+u = Matrix{Float32}(ds["u"][:, :, 1, timestep])
 lat = ds["lat"][:]
 lon = ds["lon"][:]
 
-fig,ax = subplots(1,1,figsize=(10,6))
-q = ax.pcolormesh(lon,lat,u')
+fig, ax = subplots(1, 1, figsize=(10, 6))
+q = ax.pcolormesh(lon, lat, u')
 ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Zonal wind [m/s]")
-colorbar(q,ax=ax)
+colorbar(q, ax=ax)
 tight_layout() # hide
 savefig("polar_jets.png", dpi=70) # hide
 nothing # hide
@@ -246,21 +248,21 @@ nothing # hide
 
 ## Gravity waves on the sphere
 
-Setup script:
+Setup script to copy and paste:
 ```@example gravity_wave_setup
-using Random # hide
-Random.seed!(1234) # hide
+using Random # hide
+Random.seed!(1234) # hide
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=127,nlev=1)
-time_stepping = SpeedyWeather.Leapfrog(spectral_grid,Δt_at_T31=Minute(30))
-implicit = SpeedyWeather.ImplicitShallowWater(spectral_grid,α=0.5)
-orography = EarthOrography(spectral_grid,smoothing=false)
+spectral_grid = SpectralGrid(trunc=127, nlev=1)
+time_stepping = SpeedyWeather.Leapfrog(spectral_grid, Δt_at_T31=Minute(30))
+implicit = SpeedyWeather.ImplicitShallowWater(spectral_grid, α=0.5)
+orography = EarthOrography(spectral_grid, smoothing=false)
 initial_conditions = SpeedyWeather.RandomWaves()
-output = OutputWriter(spectral_grid,ShallowWater,output_dt=Hour(12),output_vars=[:u,:pres,:div,:orography])
-model = ShallowWaterModel(;spectral_grid,orography,output,initial_conditions,implicit,time_stepping)
+output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(12), output_vars=[:u, :pres, :div, :orography])
+model = ShallowWaterModel(; spectral_grid, orography, output, initial_conditions, implicit, time_stepping)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation,period=Day(2),output=true)
+run!(simulation, period=Day(2), output=true)
 nothing # hide
 ```
 
@@ -297,12 +299,12 @@ ioff() # hide
 id = model.output.id
 ds = NCDataset("run_$id/output.nc")
 timestep = ds.dim["time"]
-div = Matrix{Float32}(ds["div"][:,:,1,timestep])
+div = Matrix{Float32}(ds["div"][:, :, 1, timestep])
 lat = ds["lat"][:]
 lon = ds["lon"][:]
 
-fig,ax = subplots(1,1,figsize=(10,6))
-ax.pcolormesh(lon,lat,div')
+fig, ax = subplots(1, 1, figsize=(10, 6))
+ax.pcolormesh(lon, lat, div')
 ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Divergence")
@@ -318,17 +320,17 @@ Can you spot the Himalayas or the Andes?
 
 ```@example jablonowski
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31,nlev=8,Grid=FullGaussianGrid,dealiasing=3)
+spectral_grid = SpectralGrid(trunc=31, nlev=8, Grid=FullGaussianGrid, dealiasing=3)
 orography = ZonalRidge(spectral_grid)
 initial_conditions = ZonalWind()
-model = PrimitiveDryModel(;spectral_grid,orography,initial_conditions,physics=false)
+model = PrimitiveDryModel(; spectral_grid, orography, initial_conditions, physics=false)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation,period=Day(9),output=true)
+run!(simulation, period=Day(9), output=true)
 nothing # hide
 ```
 
-The Jablonowski-Williamson baroclinic wave test case[^JW06] using the [Primitive equation model](@ref)
+The Jablonowski-Williamson baroclinic wave test case[^JW06] using the [Primitive equation model](@ref primitive_equation_model)
 particularly the dry model, as we switch off all physics with `physics=false`.
 We want to use 8 vertical levels, and a lower resolution of T31 on a [full Gaussian grid](@ref FullGaussianGrid).
 The Jablonowski-Williamson initial conditions are in `ZonalWind`, the orography
@@ -344,12 +346,12 @@ id = model.output.id
 ds = NCDataset("run_$id/output.nc")
 timestep = ds.dim["time"]
 surface = ds.dim["lev"]
-vor = Matrix{Float32}(ds["vor"][:,:,surface,timestep])
+vor = Matrix{Float32}(ds["vor"][:, :, surface, timestep])
 lat = ds["lat"][:]
 lon = ds["lon"][:]
 
-fig,ax = subplots(1,1,figsize=(10,6))
-ax.pcolormesh(lon,lat,vor')
+fig, ax = subplots(1, 1, figsize=(10, 6))
+ax.pcolormesh(lon, lat, vor')
 ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Surface relative vorticity")
@@ -358,6 +360,70 @@ savefig("jablonowski.png", dpi=70) # hide
 nothing # hide
 ```
 ![Jablonowski pyplot](jablonowski.png)
+
+## Aquaplanet
+
+```@example aquaplanet
+using SpeedyWeather
+
+# components
+spectral_grid = SpectralGrid(trunc=31, nlev=5)
+ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
+land_sea_mask = AquaPlanetMask(spectral_grid)
+orography = NoOrography(spectral_grid)
+
+# create model, initialize, run
+model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography)
+simulation = initialize!(model)
+model.feedback.verbose = false # hide
+run!(simulation, period=Day(50), output=true)
+nothing # hide
+```
+
+Here we have defined an aquaplanet simulation by
+- creating an `ocean::AquaPlanet`. This will use constant sea surface temperatures that only vary with latitude.
+- creating a `land_sea_mask::AquaPlanetMask` this will use a land-sea mask with `false`=ocean everywhere.
+- creating an `orography::NoOrography` which will have no orography and zero surface geopotential.
+
+All passed on to the model constructor for a `PrimitiveWetModel`, we have now a model with humidity
+and physics parameterization as they are defined by default (typing `model` will give you an overview
+of its components). We could have change the `model.land` and `model.vegetation` components too,
+but given the land-sea masks masks those contributions to the surface fluxes anyway, this is not
+necessary. Note that neither sea surface temperature, land-sea mask
+or orography have to agree. It is possible to have an ocean on top of a mountain.
+For an ocean grid-cell that is (partially) masked by the land-sea mask, its value will
+be (fractionally) ignored in the calculation of surface fluxes (potentially leading
+to a zero flux depending on land surface temperatures).
+
+Now with the following we visualize the surface humidity after the 50 days of
+simulation. We use 50 days as without mountains it takes longer for the initial conditions to
+become unstable. The surface humidity shows small-scale patches in the tropics, which is a result
+of the convection scheme, causing updrafts and downdrafts in both humidity and temperature.
+
+```@example aquaplanet
+using PythonPlot, NCDatasets
+ioff() # hide
+
+id = model.output.id
+ds = NCDataset("run_$id/output.nc")
+timestep = ds.dim["time"]   # last time step
+surface = ds.dim["lev"]     # surface layer
+humid = Matrix{Float32}(ds["humid"][:, :, surface, timestep])
+lat = ds["lat"][:]
+lon = ds["lon"][:]
+
+fig, ax = subplots(1, 1, figsize=(10, 6))
+q = ax.pcolormesh(lon, lat, humid')
+ax.set_xlabel("longitude")
+ax.set_ylabel("latitude")
+ax.set_title("Surface humidity [kg/kg]")
+colorbar(q)
+tight_layout() # hide
+savefig("aquaplanet.png", dpi=70) # hide
+nothing # hide
+```
+![Aquaplanet pyplot](aquaplanet.png)
+
 
 
 ## References

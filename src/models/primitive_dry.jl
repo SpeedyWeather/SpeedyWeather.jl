@@ -14,7 +14,8 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     GO<:AbstractGeopotential,
     OR<:AbstractOrography,
     AC<:AbstractAdiabaticConversion,
-    IC<:InitialConditions,
+    PA<:AbstractParticleAdvection,
+    IC<:AbstractInitialConditions,
     LS<:AbstractLandSeaMask,
     OC<:AbstractOcean,
     LA<:AbstractLand,
@@ -25,6 +26,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     SUT<:AbstractSurfaceThermodynamics,
     SUW<:AbstractSurfaceWind,
     SH<:AbstractSurfaceHeat,
+    CV<:AbstractConvection,
     SW<:AbstractShortwave,
     LW<:AbstractLongwave,
     TS<:AbstractTimeStepper,
@@ -47,7 +49,8 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     coriolis::CO = Coriolis(spectral_grid)
     geopotential::GO = Geopotential(spectral_grid)
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
-    initial_conditions::IC = ZonalWind()
+    particle_advection::PA = NoParticleAdvection()
+    initial_conditions::IC = InitialConditions(PrimitiveDry)
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
@@ -64,8 +67,9 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
     surface_heat_flux::SH = SurfaceSensibleHeat(spectral_grid)
+    convection::CV = DryBettsMiller(spectral_grid)
     shortwave_radiation::SW = NoShortwave(spectral_grid)
-    longwave_radiation::LW = UniformCooling(spectral_grid)
+    longwave_radiation::LW = NoLongwave(spectral_grid)
     
     # NUMERICS
     device_setup::DS = DeviceSetup(CPUDevice())
@@ -77,7 +81,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     
     # OUTPUT
     output::OW = OutputWriter(spectral_grid, PrimitiveDry)
-    callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
+    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
 
@@ -90,7 +94,7 @@ Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
-    (;spectral_grid) = model
+    (; spectral_grid) = model
 
     # NUMERICS (implicit is initialized later)
     initialize!(model.time_stepping, model)
@@ -118,8 +122,13 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)
     initialize!(prognostic_variables, model.initial_conditions, model)
-    (;clock) = prognostic_variables
-    clock.time = time       # set the time
+    (; clock) = prognostic_variables
+    clock.time = time       # set the current time
+    clock.start = time      # and store the start time
+
+    # particle advection
+    initialize!(model.particle_advection, model)
+    initialize!(prognostic_variables.particles, model)
 
     # initialize ocean and land and synchronize clocks
     initialize!(prognostic_variables.ocean, clock.time, model)

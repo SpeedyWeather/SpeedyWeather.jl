@@ -11,10 +11,10 @@ abstract type PrimitiveWet <: PrimitiveEquation end
 abstract type AbstractModelComponent end
 
 # print all fields with type <: Number
-function Base.show(io::IO,P::AbstractModelComponent)
-    println(io,"$(typeof(P)) <: $(supertype(typeof(P)))")
+function Base.show(io::IO, P::AbstractModelComponent)
+    println(io, "$(typeof(P)) <: $(supertype(typeof(P)))")
     keys = propertynames(P)
-    print_fields(io,P,keys)
+    print_fields(io, P, keys)
 end
 
 """$(TYPEDSIGNATURES)
@@ -38,14 +38,14 @@ model_type(::Type{<:PrimitiveDry}) = PrimitiveDryModel
 model_type(::Type{<:PrimitiveWet}) = PrimitiveWetModel
 model_type(model::ModelSetup) = model_type(typeof(model))
 
-function Base.show(io::IO,M::ModelSetup)
-    println(io,"$(model_type(M)) <: $(model_class(M))")
+function Base.show(io::IO, M::ModelSetup)
+    println(io, "$(model_type(M)) <: $(model_class(M))")
     properties = propertynames(M)
     n = length(properties)
-    for (i,key) in enumerate(properties)
-        val = getfield(M,key)
+    for (i, key) in enumerate(properties)
+        val = getfield(M, key)
         s = i == n ? "└" : "├"  # choose ending └ for last property
         p = i == n ? print : println
-        p(io,"$s $key: $(typeof(val))")
+        p(io, "$s $key: $(typeof(val))")
     end
 end

@@ -20,6 +20,8 @@ include("spectral_gradients.jl")
 include("diffusion.jl")
 include("time_stepping.jl")
 include("vertical_advection.jl")
+include("particles.jl")
+include("particle_advection.jl")
 
 # VERTICAL LEVELS
 include("vertical_levels.jl")
@@ -29,6 +31,7 @@ include("geopotential.jl")
 include("column_variables.jl")
 include("orography.jl")
 include("land_sea_mask.jl")
+include("ocean.jl")
 # include("thermodynamics.jl")
 # include("large_scale_condensation.jl")
 # include("convection.jl")
@@ -41,6 +44,7 @@ include("run_speedy.jl")
 # EXTENSION
 include("extending.jl")
 include("callbacks.jl")
+include("schedule.jl")
 
 # OUTPUT 
 include("netcdf_output.jl")

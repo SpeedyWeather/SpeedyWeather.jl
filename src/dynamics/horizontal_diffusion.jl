@@ -48,21 +48,21 @@ Base.@kwdef mutable struct HyperDiffusion{NF} <: AbstractHorizontalDiffusion
 
     # ARRAYS, precalculated for each spherical harmonics degree
     # Barotropic and ShallowWater are fine with a constant time scale 
-    ∇²ⁿ_2D::Vector{NF} = zeros(NF,trunc+2)              # initialized with zeros, ones
-    ∇²ⁿ_2D_implicit::Vector{NF} = ones(NF,trunc+2)      # as this corresponds to no diffusion
+    ∇²ⁿ_2D::Vector{NF} = zeros(NF, trunc+2)              # initialized with zeros, ones
+    ∇²ⁿ_2D_implicit::Vector{NF} = ones(NF, trunc+2)      # as this corresponds to no diffusion
 
     # PrimitiveEquation models need something more adaptive
     # and for each layer (to allow for varying orders/strength in the vertical)
-    ∇²ⁿ::Vector{Vector{NF}} = [zeros(NF,trunc+2) for _ in 1:nlev]           # explicit part
-    ∇²ⁿ_implicit::Vector{Vector{NF}} = [ones(NF,trunc+2) for _ in 1:nlev]   # implicit part
+    ∇²ⁿ::Vector{Vector{NF}} = [zeros(NF, trunc+2) for _ in 1:nlev]           # explicit part
+    ∇²ⁿ_implicit::Vector{Vector{NF}} = [ones(NF, trunc+2) for _ in 1:nlev]   # implicit part
 end
 
 """$(TYPEDSIGNATURES)
 Generator function based on the resolutin in `spectral_grid`.
 Passes on keyword arguments."""
-function HyperDiffusion(spectral_grid::SpectralGrid;kwargs...)
-    (;NF,trunc,nlev) = spectral_grid        # take resolution parameters from spectral_grid
-    return HyperDiffusion{NF}(;trunc,nlev,kwargs...)
+function HyperDiffusion(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, trunc, nlev) = spectral_grid        # take resolution parameters from spectral_grid
+    return HyperDiffusion{NF}(; trunc, nlev, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -73,11 +73,11 @@ the vertical.
 function initialize!(   scheme::HyperDiffusion,
                         model::ModelSetup)
     # always initialize the 2D arrays
-    initialize!(scheme,model.time_stepping)
+    initialize!(scheme, model.time_stepping)
     
     # and the 3D arrays (different diffusion per layer) for primitive eq
     for k in 1:scheme.nlev 
-        initialize!(scheme,k,model.geometry,model.time_stepping)
+        initialize!(scheme, k, model.geometry, model.time_stepping)
     end
 end
 
@@ -87,8 +87,8 @@ model time step."""
 function initialize!(   scheme::HyperDiffusion,
                         L::AbstractTimeStepper)
 
-    (;trunc,∇²ⁿ_2D,∇²ⁿ_2D_implicit,power) = scheme
-    (;Δt, radius) = L
+    (; trunc, ∇²ⁿ_2D, ∇²ⁿ_2D_implicit, power) = scheme
+    (; Δt, radius) = L
 
     # time scale times 1/radius because time step Δt is scaled with 1/radius
     time_scale = scheme.time_scale.value/radius
@@ -122,9 +122,9 @@ function initialize!(
     L::AbstractTimeStepper,
     vor_max::Real = 0,
 )
-    (;trunc, resolution_scaling, ∇²ⁿ, ∇²ⁿ_implicit) = scheme
-    (;power, power_stratosphere, tapering_σ) = scheme
-    (;Δt, radius) = L
+    (; trunc, resolution_scaling, ∇²ⁿ, ∇²ⁿ_implicit) = scheme
+    (; power, power_stratosphere, tapering_σ) = scheme
+    (; Δt, radius) = L
     σ = G.σ_levels_full[k]
 
     # Reduce diffusion time scale (=increase diffusion) with resolution
@@ -136,7 +136,7 @@ function initialize!(
     # increase diffusion if maximum vorticity per layer is larger than scheme.vor_max
     if scheme.adaptive
         # /= as 1/time_scale*∇²ⁿ below
-        time_scale /= 1 + (scheme.adaptive_strength-1)*max(0,vor_max/scheme.vor_max - 1)
+        time_scale /= 1 + (scheme.adaptive_strength-1)*max(0, vor_max/scheme.vor_max - 1)
     end
 
     # NORMALISATION
@@ -148,7 +148,7 @@ function initialize!(
     
     # VERTICAL TAPERING for the stratosphere
     # go from 1 to 0 between σ=0 and tapering_σ
-    tapering = max(0,(tapering_σ-σ)/tapering_σ)         # ∈ [0,1]
+    tapering = max(0, (tapering_σ-σ)/tapering_σ)         # ∈ [0, 1]
     p = power + tapering*(power_stratosphere - power) 
         
     @inbounds for l in 0:trunc+1   # diffusion for every degree l, but indendent of order m
@@ -174,7 +174,7 @@ function initialize!(
     scheme.adaptive || return nothing
     vor_min, vor_max = extrema(diagn.grid_variables.vor_grid)
     vor_abs_max = max(abs(vor_min), abs(vor_max))/G.radius
-    initialize!(scheme,diagn.k,G,L,vor_abs_max)
+    initialize!(scheme, diagn.k, G, L, vor_abs_max)
 end
 
 """$(TYPEDSIGNATURES)
@@ -187,14 +187,14 @@ function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   
                                 ∇²ⁿ_expl::AbstractVector{NF},                   # explicit spectral damping
                                 ∇²ⁿ_impl::AbstractVector{NF}                    # implicit spectral damping
                                 ) where {NF<:AbstractFloat}
-    lmax,mmax = size(tendency)      # 1-based
+    lmax, mmax = size(tendency)      # 1-based
     @boundscheck size(tendency) == size(A) || throw(BoundsError)
     @boundscheck lmax <= length(∇²ⁿ_expl) == length(∇²ⁿ_impl) || throw(BoundsError)
 
     lm = 0
     @inbounds for m in 1:mmax   # loops over all columns/order m
         for l in m:lmax-1       # but skips the lmax+2 degree (1-based)
-            lm += 1             # single index lm corresponding to harmonic l,m
+            lm += 1             # single index lm corresponding to harmonic l, m
             tendency[lm] = (tendency[lm] + ∇²ⁿ_expl[l]*A[lm])*∇²ⁿ_impl[l]
         end
         lm += 1             # skip last row for scalar quantities
@@ -213,9 +213,9 @@ function horizontal_diffusion!( diagn::DiagnosticVariablesLayer,
     ∇²ⁿ_implicit = HD.∇²ⁿ_2D_implicit
 
     # Barotropic model diffuses vorticity (only variable)
-    (;vor) = progn.timesteps[lf]
-    (;vor_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend,vor,∇²ⁿ,∇²ⁿ_implicit)
+    (; vor) = progn.timesteps[lf]
+    (; vor_tend) = diagn.tendencies
+    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
 end
 
 """$(TYPEDSIGNATURES)
@@ -230,10 +230,10 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
     ∇²ⁿ_implicit = HD.∇²ⁿ_2D_implicit
 
     # ShallowWater model diffuses vorticity and divergence
-    (;vor,div) = progn.timesteps[lf]
-    (;vor_tend,div_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend,vor,∇²ⁿ,∇²ⁿ_implicit)
-    horizontal_diffusion!(div_tend,div,∇²ⁿ,∇²ⁿ_implicit)
+    (; vor, div) = progn.timesteps[lf]
+    (; vor_tend, div_tend) = diagn.tendencies
+    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
+    horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)
 end
 
 """$(TYPEDSIGNATURES)
@@ -246,20 +246,20 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
                                 lf::Int=1)      # leapfrog index used (2 is unstable)
     
     HD = model.horizontal_diffusion
-    initialize!(HD,diagn,model.geometry,model.time_stepping)
+    initialize!(HD, diagn, model.geometry, model.time_stepping)
     k = diagn.k                                 # current layer k
     ∇²ⁿ = HD.∇²ⁿ[k]                             # now pick operators at k
     ∇²ⁿ_implicit = HD.∇²ⁿ_implicit[k]
 
     # Primitive equation models diffuse vor and divergence more selective/adaptive
-    (;vor,div,temp,humid) = progn.timesteps[lf]
-    (;vor_tend,div_tend,temp_tend,humid_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend,vor,∇²ⁿ,∇²ⁿ_implicit)
-    horizontal_diffusion!(div_tend,div,∇²ⁿ,∇²ⁿ_implicit)
+    (; vor, div, temp, humid) = progn.timesteps[lf]
+    (; vor_tend, div_tend, temp_tend, humid_tend) = diagn.tendencies
+    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
+    horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)
 
     # but use the weaker normal diffusion for temperature, humidity
     ∇²ⁿ = HD.∇²ⁿ_2D
     ∇²ⁿ_implicit = HD.∇²ⁿ_2D_implicit
-    horizontal_diffusion!(temp_tend,temp,∇²ⁿ,∇²ⁿ_implicit)
-    model isa PrimitiveWet && horizontal_diffusion!(humid_tend,humid,∇²ⁿ,∇²ⁿ_implicit)
+    horizontal_diffusion!(temp_tend, temp, ∇²ⁿ, ∇²ⁿ_implicit)
+    model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, ∇²ⁿ, ∇²ⁿ_implicit)
 end

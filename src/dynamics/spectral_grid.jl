@@ -34,52 +34,59 @@ Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
     "[OPTION] radius of the sphere [m]"
     radius::Float64 = DEFAULT_RADIUS
 
+    "[OPTION] number of particles for particle advection [1]"
+    n_particles::Int = 0
+
     # SIZE OF GRID from trunc, Grid, dealiasing:
     "number of latitude rings on one hemisphere (Equator incl)"
-    nlat_half::Int = SpeedyTransforms.get_nlat_half(trunc,dealiasing)
+    nlat_half::Int = SpeedyTransforms.get_nlat_half(trunc, dealiasing)
 
     "number of latitude rings on both hemispheres"
-    nlat::Int = RingGrids.get_nlat(Grid,nlat_half)
+    nlat::Int = RingGrids.get_nlat(Grid, nlat_half)
 
     "total number of grid points in the horizontal"
-    npoints::Int = RingGrids.get_npoints(Grid,nlat_half)
+    npoints::Int = RingGrids.get_npoints(Grid, nlat_half)
 
     # VERTICAL
     "[OPTION] number of vertical levels"
     nlev::Int = DEFAULT_NLEV
 
     "[OPTION] coordinates used to discretize the vertical"
-    vertical_coordinates::VerticalCoordinates = SigmaCoordinates(;nlev)
+    vertical_coordinates::VerticalCoordinates = SigmaCoordinates(; nlev)
 
     # make sure nlev and vertical_coordinates.nlev match
-    function SpectralGrid(NF,trunc,Grid,dealiasing,radius,nlat_half,nlat,npoints,nlev,vertical_coordinates)
+    function SpectralGrid(NF, trunc, Grid, dealiasing, radius, n_particles, nlat_half, nlat, npoints, nlev, vertical_coordinates)
         if nlev == vertical_coordinates.nlev
-            return new(NF,trunc,Grid,dealiasing,radius,nlat_half,nlat,npoints,
-                    nlev,vertical_coordinates)
+            return new(NF, trunc, Grid, dealiasing, radius, n_particles, nlat_half, nlat, npoints,
+                    nlev, vertical_coordinates)
         else    # use nlev from vert_coords:
-            return new(NF,trunc,Grid,dealiasing,radius,nlat_half,nlat,npoints,
-                    vertical_coordinates.nlev,vertical_coordinates)
+            return new(NF, trunc, Grid, dealiasing, radius, n_particles, nlat_half, nlat, npoints,
+                    vertical_coordinates.nlev, vertical_coordinates)
         end
     end
 end
 
 # generator functions
-SpectralGrid(NF::Type{<:AbstractFloat};kwargs...) = SpectralGrid(;NF,kwargs...)
-SpectralGrid(Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(;Grid,kwargs...)
-SpectralGrid(NF::Type{<:AbstractFloat},Grid::Type{<:AbstractGrid};kwargs...) = SpectralGrid(;NF,Grid,kwargs...)
+SpectralGrid(NF::Type{<:AbstractFloat}; kwargs...) = SpectralGrid(; NF, kwargs...)
+SpectralGrid(Grid::Type{<:AbstractGrid}; kwargs...) = SpectralGrid(; Grid, kwargs...)
+SpectralGrid(NF::Type{<:AbstractFloat}, Grid::Type{<:AbstractGrid}; kwargs...) = SpectralGrid(; NF, Grid, kwargs...)
 
-function Base.show(io::IO,SG::SpectralGrid)
-    (;NF, trunc, Grid, radius, nlat, npoints, nlev, vertical_coordinates) = SG
+function Base.show(io::IO, SG::SpectralGrid)
+    (; NF, trunc, Grid, radius, nlat, npoints, nlev, vertical_coordinates) = SG
+    (; n_particles) = SG
 
     # resolution information
     res_ave = sqrt(4π*radius^2/npoints)/1000  # in [km]
-    s(x) = x > 1000 ? @sprintf("%i",x) : @sprintf("%.3g",x)
+    s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
 
-    println(io,"$(typeof(SG)):")
-    println(io,"├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
-    println(io,"├ Grid:       $nlat-ring $Grid{$NF}, $npoints grid points")
-    println(io,"├ Resolution: $(s(res_ave))km (average)")
-      print(io,"└ Vertical:   $nlev-level $(typeof(vertical_coordinates))")
+    println(io, "$(typeof(SG)):")
+    println(io, "├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
+    println(io, "├ Grid:       $nlat-ring $Grid{$NF}, $npoints grid points")
+    println(io, "├ Resolution: $(s(res_ave))km (average)")
+    if n_particles > 0
+    println(io, "├ Particles:  $n_particles")
+    end
+      print(io, "└ Vertical:   $nlev-level $(typeof(vertical_coordinates))")
 end
 
 """
@@ -89,7 +96,7 @@ function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
                                             recompute_legendre::Bool = false,
                                             one_more_degree::Bool = true,
                                             kwargs...)
-    (;NF, Grid, trunc, dealiasing) = spectral_grid
-    return SpectralTransform(NF,Grid,trunc+one_more_degree,trunc;recompute_legendre,dealiasing,kwargs...)
+    (; NF, Grid, trunc, dealiasing) = spectral_grid
+    return SpectralTransform(NF, Grid, trunc+one_more_degree, trunc; recompute_legendre, dealiasing, kwargs...)
 end
 

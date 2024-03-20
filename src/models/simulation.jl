@@ -16,11 +16,11 @@ struct Simulation{Model<:ModelSetup} <: AbstractSimulation{Model}
     model::Model
 end
 
-function Base.show(io::IO,S::AbstractSimulation)
-    println(io,"Simulation{$(model_type(S.model))}")
-    println(io,"├ $(typeof(S.prognostic_variables))")
-    println(io,"├ $(typeof(S.diagnostic_variables))")
-    print(io,"└ model::$(model_type(S.model))")
+function Base.show(io::IO, S::AbstractSimulation)
+    println(io, "Simulation{$(model_type(S.model))}")
+    println(io, "├ $(typeof(S.prognostic_variables))")
+    println(io, "├ $(typeof(S.diagnostic_variables))")
+    print(io, "└ model::$(model_type(S.model))")
 end
 
 export run!
@@ -30,7 +30,7 @@ $(TYPEDSIGNATURES)
 Run a SpeedyWeather.jl `simulation`. The `simulation.model` is assumed to be initialized."""
 function run!(  simulation::AbstractSimulation;
                 period = Day(10),
-                output::Bool = false, 
+                output::Bool = false,
                 n_days::Union{Nothing, Real} = nothing)
     
     if !isnothing(n_days)
@@ -38,15 +38,16 @@ function run!(  simulation::AbstractSimulation;
         period = Day(n_days) 
     end 
 
-    (;prognostic_variables, diagnostic_variables, model) = simulation
-    (;clock) = prognostic_variables
+    (; prognostic_variables, diagnostic_variables, model) = simulation
+    (; clock) = prognostic_variables
 
-    # set the clock's enddate
-    set_period!(clock, period)
-    initialize!(clock, model.time_stepping)
+    # CLOCK
+    set_period!(clock, period)              # set how long to integrate for
+    initialize!(clock, model.time_stepping) # store the start date, reset counter
 
+    # OUTPUT
     model.output.output = output            # enable/disable output
 
     # run it, yeah!
-    time_stepping!(prognostic_variables,diagnostic_variables,model)
+    time_stepping!(prognostic_variables, diagnostic_variables, model)
 end

@@ -1,4 +1,4 @@
-# Shallow water model
+# [Shallow water model](@id shallow_water_model)
 
 The shallow water model describes the evolution of a 2D flow described by its velocity and
 an interface height that conceptually represents pressure.
@@ -11,7 +11,7 @@ The Shallow Water Equations[^2].
 
 ## Shallow water equations
 
-The shallow water equations of velocity ``\mathbf{u} = (u,v)`` and interface height ``\eta``
+The shallow water equations of velocity ``\mathbf{u} = (u, v)`` and interface height ``\eta``
 (i.e. the deviation from the fluid's rest height ``H``) are,
 formulated in terms of relative vorticity ``\zeta = \nabla \times \mathbf{u}``,
 divergence ``\mathcal{D} = \nabla \cdot \mathbf{u}``
@@ -37,12 +37,12 @@ h = \eta + H - H_b
 ```
 that is, the layer thickness at rest ``H`` plus the interface height ``\eta`` minus orography ``H_b``.
 We also add various possible forcing terms
-``F_\zeta, F_\mathcal{D}, F_\eta, \mathbf{F}_\mathbf{u} = (F_u,F_v)`` which can be defined 
+``F_\zeta, F_\mathcal{D}, F_\eta, \mathbf{F}_\mathbf{u} = (F_u, F_v)`` which can be defined 
 to force the respective variables, see [Extending SpeedyWeather](@ref). 
 
-In the shallow water system the flow can be described through ``u,v`` or ``\zeta,\mathcal{D}`` which
+In the shallow water system the flow can be described through ``u, v`` or ``\zeta, \mathcal{D}`` which
 are related through the stream function ``\Psi`` and the velocity potential ``\Phi`` (which is zero
-in the [Barotropic vorticity equation](@ref)).
+in the [Barotropic vorticity equation](@ref barotropic_vorticity_model)).
 ```math
 \begin{aligned}
 \zeta &= \nabla^2 \Psi \\
@@ -50,11 +50,11 @@ in the [Barotropic vorticity equation](@ref)).
 \mathbf{u} &= \nabla^\perp \Psi + \nabla \Phi
 \end{aligned}
 ```
-With ``\nabla^\perp`` being the rotated gradient operator, in cartesian coordinates ``x,y``:
+With ``\nabla^\perp`` being the rotated gradient operator, in cartesian coordinates ``x, y``:
 ``\nabla^\perp = (-\partial_y, \partial_x)``. See [Derivatives in spherical coordinates](@ref)
 for further details. Especially because the inversion of the [Laplacian](@ref) and the
 gradients of ``\Psi, \Phi`` can be computed in a single pass, see
-[U,V from vorticity and divergence](@ref).
+[U, V from vorticity and divergence](@ref).
 
 The divergence/curl of the vorticity flux ``\mathbf{u}(\zeta + f)`` are combined with the
 divergence/curl of the forcing vector ``\mathbf{F}``, as
@@ -66,8 +66,8 @@ divergence/curl of the forcing vector ``\mathbf{F}``, as
 \nabla \cdot (\mathbf{F} + \mathbf{u}_\perp(\zeta + f))
 \end{aligned}
 ```
-equivalently to how this is done in the [Barotropic vorticity equation](@ref)
-with ``\mathbf{u}_\perp = (v,-u)``.
+equivalently to how this is done in the [Barotropic vorticity equation](@ref barotropic_vorticity_model)
+with ``\mathbf{u}_\perp = (v, -u)``.
 
 ## Algorithm
 
@@ -76,27 +76,27 @@ and interface height ``\eta_{lm}`` in spectral space and transform this model st
 - Invert the [Laplacian](@ref) of ``\zeta_{lm}`` to obtain the stream function ``\Psi_{lm}`` in spectral space
 - Invert the [Laplacian](@ref) of ``D_{lm}`` to obtain the velocity potential ``\Phi_{lm}`` in spectral space
 - obtain velocities ``U_{lm} = (\cos(\theta)u)_{lm}, V_{lm} = (\cos(\theta)v)_{lm}`` from ``\nabla^\perp\Psi_{lm} + \nabla\Phi_{lm}``
-- Transform velocities ``U_{lm}``, ``V_{lm}`` to grid-point space ``U,V``
-- Unscale the ``\cos(\theta)`` factor to obtain ``u,v``
+- Transform velocities ``U_{lm}``, ``V_{lm}`` to grid-point space ``U, V``
+- Unscale the ``\cos(\theta)`` factor to obtain ``u, v``
 - Transform ``\zeta_{lm}``, ``D_{lm}``, ``\eta_{lm}`` to ``\zeta, D, \eta`` in grid-point space
 
 Now loop over
 
 1. Compute the forcing (or drag) terms ``F_\zeta, F_\mathcal{D}, F_\eta, \mathbf{F}_\mathbf{u}``
-2. Multiply ``u,v`` with ``\zeta+f`` in grid-point space
+2. Multiply ``u, v`` with ``\zeta+f`` in grid-point space
 3. Add ``A = F_u + v(\zeta + f)`` and ``B = F_v - u(\zeta + f)``
 4. Transform these vector components to spectral space ``A_{lm}``, ``B_{lm}``
-5. Compute the curl of ``(A,B)_{lm}`` in spectral space and add to forcing of ``\zeta_{lm}``
-5. Compute the divergence of ``(A,B)_{lm}`` in spectral space and add to forcing of divergence ``\mathcal{D}_{lm}``
+5. Compute the curl of ``(A, B)_{lm}`` in spectral space and add to forcing of ``\zeta_{lm}``
+5. Compute the divergence of ``(A, B)_{lm}`` in spectral space and add to forcing of divergence ``\mathcal{D}_{lm}``
 6. Compute the kinetic energy ``\frac{1}{2}(u^2 + v^2)`` and transform to spectral space
 6. Add to the kinetic energy the "geopotential" ``g\eta_{lm}`` in spectral space to obtain the Bernoulli potential
 7. Take the Laplacian of the Bernoulli potential and subtract from the divergence tendency
-7. Compute the volume fluxes ``uh,vh`` in grid-point space via ``h = \eta + H - H_b``
+7. Compute the volume fluxes ``uh, vh`` in grid-point space via ``h = \eta + H - H_b``
 7. Transform to spectral space and take the divergence for ``-\nabla \cdot (\mathbf{u}h)``. Add to forcing for ``\eta``.
 7. Correct the tendencies following the [semi-implicit time integration](@ref implicit_swm) to prevent fast gravity waves from causing numerical instabilities
-6. Compute the [horizontal diffusion](@ref diffusion) based on the ``\zeta,\mathcal{D}`` tendencies
+6. Compute the [horizontal diffusion](@ref diffusion) based on the ``\zeta, \mathcal{D}`` tendencies
 7. Compute a leapfrog time step as described in [Time integration](@ref leapfrog) with a [Robert-Asselin and Williams filter](@ref)
-8. Transform the new spectral state of ``\zeta_{lm}``, ``\mathcal{D}_{lm}``, ``\eta_{lm}`` to grid-point ``u,v,\zeta,\mathcal{D},\eta`` as described in 0.
+8. Transform the new spectral state of ``\zeta_{lm}``, ``\mathcal{D}_{lm}``, ``\eta_{lm}`` to grid-point ``u, v, \zeta, \mathcal{D}, \eta`` as described in 0.
 9. Possibly do some output
 10. Repeat from 1.
 
@@ -135,7 +135,7 @@ in ``N_E`` and into the linear terms ``N_I``, solved implicitly, that are respon
 the gravity waves. Linearization happens around a state of rest without orography.
 
 We could already assume to evaluate ``N_I`` at ``i+1``, but in fact,
-we can introduce ``\alpha \in [0,1]`` so that for ``\alpha=0`` we use ``i-1`` (i.e. explicit),
+we can introduce ``\alpha \in [0, 1]`` so that for ``\alpha=0`` we use ``i-1`` (i.e. explicit),
 for ``\alpha=1/2`` it is centred implicit ``\tfrac{1}{2}N_I(V_{i-1}) + \tfrac{1}{2}N_I(V_{i+1})``,
 and for ``\alpha=1`` a fully backwards scheme ``N_I(V_{i+1})`` evaluated at ``i+1``.
 
@@ -213,7 +213,7 @@ we have
 ```
 
 The idea of the semi-implicit time stepping is now as follows:
-1) Evaluate the right-hand side explicitly at time step ``i`` to obtain the explicit, preliminary tendencies ``N_\mathcal{D},N_\eta`` (and ``N_\zeta`` without a need for semi-implicit correction)
+1) Evaluate the right-hand side explicitly at time step ``i`` to obtain the explicit, preliminary tendencies ``N_\mathcal{D}, N_\eta`` (and ``N_\zeta`` without a need for semi-implicit correction)
 2) Move the implicit terms from ``i`` to ``i-1`` when calculating ``G_\mathcal{D}, G_\eta``
 3) Solve for ``\delta \mathcal{D}``, the new, corrected tendency for divergence.
 4) With ``\delta \mathcal{D}`` obtain ``\delta \eta``, the new, corrected tendency for ``\eta``.

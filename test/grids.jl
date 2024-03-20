@@ -1,25 +1,25 @@
 @testset "Grid indexing" begin
-    for NF in (Float32,Float64)
+    for NF in (Float32, Float64)
 
         # with vector and resolution parameter provided
-        L = FullClenshawGrid(randn(NF,96*47),24)        # L24 grid
-        F = FullGaussianGrid(randn(NF,96*48),24)        # F24 grid
-        O = OctahedralGaussianGrid(randn(NF,3168),24)   # O24 grid
-        C = OctahedralClenshawGrid(randn(NF,3056),24)   # C24 grid
-        H = HEALPixGrid(randn(NF,3072),32)              # H32 grid
-        J = OctaHEALPixGrid(randn(NF,4096),32)             # J32 grid
-        K = FullOctaHEALPixGrid(randn(NF,128*63),32)       # K32 grid
+        L = FullClenshawGrid(randn(NF, 96*47), 24)        # L24 grid
+        F = FullGaussianGrid(randn(NF, 96*48), 24)        # F24 grid
+        O = OctahedralGaussianGrid(randn(NF, 3168), 24)   # O24 grid
+        C = OctahedralClenshawGrid(randn(NF, 3056), 24)   # C24 grid
+        H = HEALPixGrid(randn(NF, 3072), 32)              # H32 grid
+        J = OctaHEALPixGrid(randn(NF, 4096), 32)             # J32 grid
+        K = FullOctaHEALPixGrid(randn(NF, 128*63), 32)       # K32 grid
 
         # without resolution parameter provided (inferred from vector length)
-        L2 = FullClenshawGrid(randn(NF,96*47))          # L24 grid
-        F2 = FullGaussianGrid(randn(NF,96*48))          # F24 grid
-        O2 = OctahedralGaussianGrid(randn(NF,3168))     # O24 grid
-        C2 = OctahedralClenshawGrid(randn(NF,3056))     # C24 grid
-        H2 = HEALPixGrid(randn(NF,3072))                # H32 grid
-        J2 = OctaHEALPixGrid(randn(NF,4096))               # J32 grid
-        K2 = FullOctaHEALPixGrid(randn(NF,128*63))         # K32 grid
+        L2 = FullClenshawGrid(randn(NF, 96*47))          # L24 grid
+        F2 = FullGaussianGrid(randn(NF, 96*48))          # F24 grid
+        O2 = OctahedralGaussianGrid(randn(NF, 3168))     # O24 grid
+        C2 = OctahedralClenshawGrid(randn(NF, 3056))     # C24 grid
+        H2 = HEALPixGrid(randn(NF, 3072))                # H32 grid
+        J2 = OctaHEALPixGrid(randn(NF, 4096))               # J32 grid
+        K2 = FullOctaHEALPixGrid(randn(NF, 128*63))         # K32 grid
 
-        for (grid1,grid2) in zip([L,F,O,C,H,J,K],[L2,F2,O2,C2,H2,J2,K2])
+        for (grid1, grid2) in zip([L, F, O, C, H, J, K], [L2, F2, O2, C2, H2, J2, K2])
             @test size(grid1) == size(grid2)
         end
 
@@ -52,7 +52,7 @@
 end
 
 @testset "Grid generators" begin
-    for NF in (Float32,Float64)
+    for NF in (Float32, Float64)
         for G in (  FullClenshawGrid,
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
@@ -64,7 +64,7 @@ end
                     )
 
             n = 4      # resolution parameter nlat_half
-            G1 = zeros(G{NF},n)
+            G1 = zeros(G{NF}, n)
             G2 = zero(G1)
             G3 = G(G2)
 
@@ -85,7 +85,7 @@ end
 end
 
 @testset "Grid generators: ones" begin
-    for NF in (Float32,Float64)
+    for NF in (Float32, Float64)
         for G in (  FullClenshawGrid,
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
@@ -97,11 +97,11 @@ end
                     )
 
             n = 4      # resolution parameter nlat_half
-            G1 = ones(G,n)
+            G1 = ones(G, n)
             @test all(G1 .== 1)
             @test eltype(G1) == Float64
 
-            G2 = ones(G{NF},n)
+            G2 = ones(G{NF}, n)
             @test all(G2 .== 1)
             @test eltype(G2) == NF
         end
@@ -109,7 +109,7 @@ end
 end
 
 @testset "Grid generators: rand, randn" begin
-    for NF in (Float32,Float64)
+    for NF in (Float32, Float64)
         for G in (  FullClenshawGrid,
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
@@ -121,23 +121,23 @@ end
                     )
 
             n = 4      # resolution parameter nlat_half
-            G1 = rand(G,n)
+            G1 = rand(G, n)
             @test eltype(G1) == Float64
             
-            G1 = randn(G,n)
+            G1 = randn(G, n)
             @test eltype(G1) == Float64
             
-            G1 = rand(G{NF},n)
+            G1 = rand(G{NF}, n)
             @test eltype(G1) == NF
             
-            G1 = randn(G{NF},n)
+            G1 = randn(G{NF}, n)
             @test eltype(G1) == NF
         end
     end
 end
 
 @testset "Grid generators: undef" begin
-    for NF in (Float32,Float64)
+    for NF in (Float32, Float64)
         for G in (  FullClenshawGrid,
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
@@ -149,10 +149,10 @@ end
                     )
 
             n = 4      # resolution parameter nlat_half
-            G1 = G(undef,n)
+            G1 = G(undef, n)
             @test eltype(G1) == Float64
             
-            G1 = G{NF}(undef,n)
+            G1 = G{NF}(undef, n)
             @test eltype(G1) == NF
         end
     end
@@ -170,12 +170,12 @@ end
                 )
 
         n = 32      # resolution parameter nlat_half
-        grid = zeros(G,n)
+        grid = zeros(G, n)
 
         # precompute indices and boundscheck
-        rings = RingGrids.eachring(grid,grid)   
+        rings = RingGrids.eachring(grid, grid)   
 
-        for (j,ring) in enumerate(rings)
+        for (j, ring) in enumerate(rings)
             for ij in ring
                 grid[ij] += 1
             end
@@ -185,7 +185,7 @@ end
             @test grid[ij] == 1
         end
 
-        @test sum(grid) == RingGrids.get_npoints(G,n)
+        @test sum(grid) == RingGrids.get_npoints(G, n)
     end
 end
 
@@ -200,12 +200,12 @@ end
                 FullOctaHEALPixGrid,
                 )
 
-        @testset for n in [8,16,24,32]      # resolution parameter nlat_half
-            grid = zeros(G,n)
+        @testset for n in [8, 16, 24, 32]      # resolution parameter nlat_half
+            grid = zeros(G, n)
 
             # precompute indices and boundscheck
             rings = SpeedyWeather.eachring(grid)   
-            rings2 = [SpeedyWeather.each_index_in_ring(grid,j) for j in 1:SpeedyWeather.get_nlat(grid)]
+            rings2 = [SpeedyWeather.each_index_in_ring(grid, j) for j in 1:SpeedyWeather.get_nlat(grid)]
 
             @test rings == rings2
         end

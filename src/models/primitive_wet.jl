@@ -14,7 +14,8 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     GO<:AbstractGeopotential,
     OR<:AbstractOrography,
     AC<:AbstractAdiabaticConversion,
-    IC<:InitialConditions,
+    PA<:AbstractParticleAdvection,
+    IC<:AbstractInitialConditions,
     LS<:AbstractLandSeaMask,
     OC<:AbstractOcean,
     LA<:AbstractLand,
@@ -55,7 +56,8 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     coriolis::CO = Coriolis(spectral_grid)
     geopotential::GO = Geopotential(spectral_grid)
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
-    initial_conditions::IC = ZonalWind()
+    particle_advection::PA = NoParticleAdvection()
+    initial_conditions::IC = InitialConditions(PrimitiveWet)
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
@@ -92,8 +94,8 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     hole_filling::HF = ClipNegatives()
     
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid, PrimitiveDry)
-    callbacks::Dict{Symbol,AbstractCallback} = Dict{Symbol,AbstractCallback}()
+    output::OW = OutputWriter(spectral_grid, PrimitiveWet)
+    callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
  
@@ -105,8 +107,8 @@ $(TYPEDSIGNATURES)
 Calls all `initialize!` functions for components of `model`,
 except for `model.output` and `model.feedback` which are always called
 at in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
-function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
-    (;spectral_grid) = model
+function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
+    (; spectral_grid) = model
 
     # NUMERICS (implicit is initialized later)
     initialize!(model.time_stepping, model)
@@ -137,15 +139,20 @@ function initialize!(model::PrimitiveWet;time::DateTime = DEFAULT_DATE)
     initialize!(model.longwave_radiation, model)
 
     # initial conditions
-    prognostic_variables = PrognosticVariables(spectral_grid,model)
-    initialize!(prognostic_variables,model.initial_conditions,model)
+    prognostic_variables = PrognosticVariables(spectral_grid, model)
+    initialize!(prognostic_variables,model.initial_conditions, model)
     (;clock) = prognostic_variables
-    clock.time = time       # set the time
+    clock.time = time       # set the current time
+    clock.start = time      # and store the start time
+
+    # particle advection
+    initialize!(model.particle_advection, model)
+    initialize!(prognostic_variables.particles, model)
 
     # initialize ocean and land and synchronize clocks
     initialize!(prognostic_variables.ocean, clock.time, model)
     initialize!(prognostic_variables.land, clock.time, model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid,model)
-    return Simulation(prognostic_variables,diagnostic_variables,model)
+    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    return Simulation(prognostic_variables, diagnostic_variables, model)
 end
