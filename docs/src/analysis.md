@@ -18,15 +18,9 @@ and analysis are done interactively with the same library: SpeedyWeather.jl.
 Now you could run a SpeedyWeather simulation, and analyse the [NetCDF output](@ref)
 but that comes with several issues related to accuracy
 
-- If you use a reduced grid for the simulation, then the output will (by default) be
-interpolated on a full grid. This interpolation comes introduces an error.
-
-- Computing integrals over gridded data on the sphere by weighting every grid point
-according to its area is not the most accurate numerical integration.
-
-- Computing gradients over gridded data comes with similar issues. While our
-[RingGrids](@ref) are always equidistant in longitude, they are not necessarily
-in latitude.
+- If you use a reduced grid for the simulation, then the output will (by default) be interpolated on a full grid. This interpolation comes introduces an error.
+- Computing integrals over gridded data on the sphere by weighting every grid point according to its area is not the most accurate numerical integration.
+- Computing gradients over gridded data comes with similar issues. While our [RingGrids](@ref) are always equidistant in longitude, they are not necessarily in latitude.
 
 The first point you can avoid by running a simulation on one of the full grids that
 are implemented, see [SpectralGrid](@ref). But that also impacts the simulation
