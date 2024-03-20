@@ -20,8 +20,10 @@ but that comes with several issues related to accuracy
 
 - If you use a reduced grid for the simulation, then the output will (by default) be
 interpolated on a full grid. This interpolation comes introduces an error.
+
 - Computing integrals over gridded data on the sphere by weighting every grid point
 according to its area is not the most accurate numerical integration.
+
 - Computing gradients over gridded data comes with similar issues. While our
 [RingGrids](@ref) are always equidistant in longitude, they are not necessarily
 in latitude.
@@ -51,21 +53,21 @@ The total volume is defined as the integral of the dynamic layer thickness
 over the surface ``A`` of the sphere
 
 ```math
-\iint h dA = \iint \eta dA + \iint H dA - \\int H_b dA
+\iint h dA = \iint \eta dA + \iint H dA - \iint H_b dA
 ```
 
 to check for conservation we want to assess that
 
 ```math
-\frac{\partial}{\partial t} \\int h dA = 0
+\frac{\partial}{\partial t} \iint h dA = 0
 ```
 
-And because ``V = \iint H dA - \\int H_b dA``, the total volume at rest,
+And because ``V = \iint H dA - \iint H_b dA``, the total volume at rest,
 is a constant (``H`` is a global constant, the orography ``H_b`` does not change with time)
-we can just check whether ``\\int \eta dA`` changes over time.
+we can just check whether ``\iint \eta dA`` changes over time.
 Instead of computing this integral in grid-point space, we use the spectral
 ``\eta`` whereby the coefficient of the first spherical harmonic (the ``l = m = 0`` mode,
-see [Spherical Harmonic Transform](@ref) encodes the global average.
+or wavenumber 0, see [Spherical Harmonic Transform](@ref)) encodes the global average.
 
 ```@example analysis
 using SpeedyWeather
@@ -81,6 +83,8 @@ of that simulation with
 simulation.prognostic_variables.surface.timesteps[1].pres[1]
 ```
 
+`[1]` pulls the first element of the underlying [LowerTriangularMatrix](@ref lowertriangularmatrices)
+which is the coefficient of the ``l = m = 0`` mode.
 Its imaginary part is always zero (which is true for any zonal harmonic ``m=0`` as its
 imaginary part would just unnecessarily rotate something zonally constant in zonal direction),
 so you can `real` it. Also for spherical harmonic transforms there is a norm of the sphere
@@ -118,7 +122,7 @@ an exactly zero tendency.
 
 The total energy in the shallow water equation is the sum of the kinetic energy
 ``\frac{1}{2}(u^2 + v^2)`` and the potential energy ``gh`` integrated over the
-total volume (times ``h`` for the vertical then integrated over the sphere``\\int dA``).
+total volume (times ``h`` for the vertical then integrated over the sphere``\iint dA``).
 
 ```math
 \\iint \frac{h}{2}(u^2 + v^2) + gh^2 dA
@@ -209,6 +213,7 @@ Hb = model.orography.orography
 # potential vorticity
 q = zero(ζ)
 @. q = (f + ζ) / h
+nothing # hide
 ```
 
 and we can compare the relative vorticity field to
