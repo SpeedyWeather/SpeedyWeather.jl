@@ -2,6 +2,7 @@ abstract type AbstractConvection <: AbstractParameterization end
 
 export NoConvection
 struct NoConvection <: AbstractConvection end
+NoConvection(::SpectralGrid) = NoConvection()
 initialize!(::NoConvection, ::PrimitiveEquation) = nothing
 convection!(::ColumnVariables, ::NoConvection, ::PrimitiveEquation) = nothing
 
