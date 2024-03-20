@@ -21,16 +21,10 @@ Base.@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection
 
     "[OPTION] Relative humidity for reference profile"
     relative_humidity::NF = 0.7
-
-    "temperature [K] reference profile to adjust to"
-    temp_ref_profile::Vector{NF} = zeros(NF, nlev)
-
-    "specific humidity [kg/kg] profile to adjust to"
-    humid_ref_profile::Vector{NF} = zeros(NF, nlev)
 end
 
 SimplifiedBettsMiller(SG::SpectralGrid; kwargs...) = SimplifiedBettsMiller{SG.NF}(nlev=SG.nlev; kwargs...)
-initialize!(::SimplifiedBettsMiller, ::PrimitiveWet) = nothing
+initialize!(::SimplifiedBettsMiller, ::PrimitiveEquation) = nothing
 
 # function barrier for all AbstractConvection
 function convection!(
@@ -44,7 +38,7 @@ end
 function convection!(
     column::ColumnVariables,
     scheme::SimplifiedBettsMiller,
-    model::PrimitiveEquation,
+    model::PrimitiveWet,
 )
     convection!(column, scheme, model.clausius_clapeyron,
                     model.geometry, model.planet, model.atmosphere, model.time_stepping)
@@ -70,11 +64,14 @@ function convection!(
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
-    (; temp_ref_profile, humid_ref_profile) = SBM
     (; geopot, nlev, temp, temp_virt, humid, temp_tend, humid_tend) = column
     pₛ = column.pres[end]
     (; Lᵥ, cₚ) = clausius_clapeyron
-
+    
+    # use work arrays for temp_ref_profile, humid_ref_profile
+    temp_ref_profile = column.a     # temperature [K] reference profile to adjust to
+    humid_ref_profile = column.b    # specific humidity [kg/kg] profile to adjust to
+    
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     temp_parcel = temp[nlev]
     humid_parcel = humid[nlev]
@@ -88,7 +85,7 @@ function convection!(
         humid_ref_profile[k] = qsat*SBM.relative_humidity
     end
 
-    local Pq::NF = 0        # precipitation due to drying
+    local Pq::NF = 0        # precipitation due to drying
     local PT::NF = 0        # precipitation due to cooling
     local ΔT::NF = 0        # vertically uniform temperature profile adjustment
     local Qref::NF = 0      # = ∫_pₛ^p_LZB -humid_ref_profile dp
@@ -111,7 +108,7 @@ function convection!(
     deep_convection = Pq > 0 && PT > 0
     shallow_convection = Pq <= 0 && PT > 0
 
-    # escape immediately for no convection
+    # escape immediately for no convection
     no_convection = !(deep_convection || shallow_convection)
     no_convection && return nothing
 
@@ -123,24 +120,24 @@ function convection!(
         ΔT = (PT - Pq*Lᵥ/cₚ)/Δσ_lzb         # eq (5) but reusing PT, Pq, and /cₚ already included
 
         for k in level_zero_buoyancy:nlev
-            temp_ref_profile[k] -= ΔT       # equation (6)
+            temp_ref_profile[k] -= ΔT       # equation (6)
         end
     
     elseif shallow_convection
         
         # FRIERSON'S QREF SCHEME
         # "changing the reference profiles for both temperature and humidity so the
-        # precipitation is zero.
+        # precipitation is zero.
 
         for k in level_zero_buoyancy:nlev
-            Qref -= humid_ref_profile[k]*Δσ[k]  # eq (11) but in σ coordinates
+            Qref -= humid_ref_profile[k]*Δσ[k]  # eq (11) but in σ coordinates
         end
-        fq = 1 - Pq/Qref                    # = 1 - Δq/Qref in eq (12) but we reuse Pq
+        fq = 1 - Pq/Qref                    # = 1 - Δq/Qref in eq (12) but we reuse Pq
 
         ΔT = PT/Δσ_lzb                      # equation (14), reuse PT and in σ coordinates
         for k in level_zero_buoyancy:nlev
-            humid_ref_profile[k] *= fq      # update humidity profile, eq (13)
-            temp_ref_profile[k] -= ΔT       # update temperature profile, eq (15)
+            humid_ref_profile[k] *= fq      # update humidity profile, eq (13)
+            temp_ref_profile[k] -= ΔT       # update temperature profile, eq (15)
         end
     end
 
@@ -157,9 +154,9 @@ function convection!(
     (; gravity) = planet
     (; water_density) = atmosphere
     (; Δt_sec) = time_stepping
-    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv 
+    pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv 
     column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
-    column.cloud_top = min(column.cloud_top, level_zero_buoyancy)        # clouds reach to top of convection
+    column.cloud_top = min(column.cloud_top, level_zero_buoyancy)       # clouds reach to top of convection
 end
 
 """
@@ -196,7 +193,7 @@ function pseudo_adiabat!(
     local k::Int = nlev                     # layer index top to surface
     local temp_virt_parcel::NF = temp_parcel * (1 + μ*humid_parcel)
 
-    while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
+    while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
         k -= 1                              # one level up
             
         if !saturated                       # if not saturated yet follow dry adiabat
@@ -205,7 +202,7 @@ function pseudo_adiabat!(
             sat_humid = saturation_humidity(temp_parcel_dry, σ[k]*pres, clausius_clapeyron)
                     
             # set to saturated when the dry adiabatic ascent would reach saturation
-            # then follow moist adiabat instead (see below)
+            # then follow moist adiabat instead (see below)
             saturated = humid_parcel >= sat_humid
         end
     
@@ -216,20 +213,20 @@ function pseudo_adiabat!(
             B = q*Lᵥ^2 / ((1-q)^2 * cₚ * R_vapour)
             Γ = (1 + A/Tᵥ) / (1 + B/T^2)
                 
-            ΔΦ = geopot[k] - geopot[k+1]                            # vertical gradient in geopotential
+            ΔΦ = geopot[k] - geopot[k+1]                            # vertical gradient in geopotential
             temp_parcel = temp_parcel - ΔΦ/cₚ*Γ                     # new temperature of parcel at k
                 
             # at new (lower) temperature condensation occurs immediately
             # new humidity equals to that saturation humidity
             humid_parcel = saturation_humidity(temp_parcel, σ[k]*pres, clausius_clapeyron)
         else
-            temp_parcel = temp_parcel_dry       # else parcel temperature following dry adiabat
+            temp_parcel = temp_parcel_dry       # else parcel temperature following dry adiabat
         end
     
         # use dry/moist adiabatic ascent for reference profile
         temp_ref_profile[k] = temp_parcel
 
-        # check whether parcel is still buoyant wrt to environment
+        # check whether parcel is still buoyant wrt to environment
         # use virtual temperature as it's equivalent to density
         temp_virt_parcel = temp_parcel*(1 + μ*humid_parcel)         # virtual temperature of parcel
         buoyant = temp_virt_parcel > temp_virt_environment[k] ? true : false      
@@ -256,13 +253,10 @@ Base.@kwdef struct DryBettsMiller{NF} <: AbstractConvection
 
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
-
-    "temperature [K] reference profile to adjust to"
-    temp_ref_profile::Vector{NF} = zeros(NF, nlev)
 end
 
 DryBettsMiller(SG::SpectralGrid; kwargs...) = DryBettsMiller{SG.NF}(nlev=SG.nlev; kwargs...)
-initialize!(::DryBettsMiller, ::PrimitiveWet) = nothing
+initialize!(::DryBettsMiller, ::PrimitiveEquation) = nothing
 
 # function barrier to unpack model
 function convection!(
@@ -291,8 +285,10 @@ function convection!(
     σ = geometry.σ_levels_full
     σ_half = geometry.σ_levels_half
     Δσ = geometry.σ_levels_thick
-    (; temp_ref_profile) = DBM
     (; nlev, temp, temp_tend) = column
+
+    # use work arrays for temp_ref_profile
+    temp_ref_profile = column.a     # temperature [K] reference profile to adjust to
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
     level_zero_buoyancy = dry_adiabat!(temp_ref_profile,
@@ -314,13 +310,13 @@ function convection!(
 
     # ADJUST PROFILES FOLLOWING FRIERSON 2007
     convection = PT > 0
-    convection || return nothing            # escape immediately for no convection
+    convection || return nothing            # escape immediately for no convection
 
     # height of zero buoyancy level in σ coordinates
     Δσ_lzb = σ_half[nlev+1] - σ_half[level_zero_buoyancy]   
     ΔT = PT/Δσ_lzb                          # eq (5) or (14) but reusing PT
     for k in level_zero_buoyancy:nlev
-        temp_ref_profile[k] -= ΔT           # equation (6) or equation (15)
+        temp_ref_profile[k] -= ΔT           # equation (6) or equation (15)
         temp_tend[k] -= (temp[k] - temp_ref_profile[k]) / DBM.time_scale.value
     end
 end
@@ -352,14 +348,14 @@ function dry_adiabat!(
     local buoyant::Bool = true              # is the parcel still buoyant?
     local k::Int = nlev                     # layer index top to surface
 
-    while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
+    while buoyant && k > 1                  # calculate moist adiabat while buoyant till top
         k -= 1                              # one level up
             
         # dry adiabatic ascent
         temp_parcel = temp_parcel*(σ[k]/σ[k+1])^R_cₚ
         temp_ref_profile[k] = temp_parcel
 
-        # check whether parcel is still buoyant wrt to environment
+        # check whether parcel is still buoyant wrt to environment
         buoyant = temp_parcel > temp_environment[k] ? true : false      
     end
     
