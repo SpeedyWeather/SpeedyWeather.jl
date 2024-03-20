@@ -98,8 +98,8 @@ a = model.spectral_transform.norm_sphere    # = 2√π = 3.5449078
 So the initial conditions in this simulation are such that the global mean interface displacement
 is that value in meters. You would need to multiply by the area of the sphere
 ``4\pi r^2`` (radius ``r``) to get the actual integral from above, but because that doesn't
-change either, we just want to check that `η_mean` doesn't change. Which is equivalent
-to ``\partial_t \\iint \eta dA = 0`` and so volume conservation and because density is constant
+change with time either, we just want to check that `η_mean` doesn't change with time.
+Which is equivalent to ``\partial_t \iint \eta dA = 0`` and so volume conservation and because density is constant
 also mass conservation. Let's check what happens after the simulation ran for some days
 
 ```@example analysis
@@ -125,7 +125,7 @@ The total energy in the shallow water equation is the sum of the kinetic energy
 total volume (times ``h`` for the vertical then integrated over the sphere``\iint dA``).
 
 ```math
-\\iint \frac{h}{2}(u^2 + v^2) + gh^2 dA
+\iint \frac{h}{2}(u^2 + v^2) + gh^2 dA
 ```
 
 In contrast to the [Mass conservation](@ref) which, with respect to the
