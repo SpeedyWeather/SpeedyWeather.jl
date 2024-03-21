@@ -118,29 +118,31 @@ function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
     (; gravity) = model.planet
     (; Δp_geopot_full) = model.geopotential
     Z = temp_ref * Δp_geopot_full[end] / gravity
-    
+
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
     (; κ, z₀) = scheme
+    @info log(Z/z₀)
     scheme.drag_max[] = (κ/log(Z/z₀))^2
 end
 
 function boundary_layer_drag!(  column::ColumnVariables,
                                 scheme::BulkRichardsonDrag,
                                 model::PrimitiveEquation)
-    boundary_layer_drag!(column, scheme)
+    boundary_layer_drag!(column, scheme, model.atmosphere)
 end
 
 function boundary_layer_drag!(
     column::ColumnVariables,
     scheme::BulkRichardsonDrag,
+    atmopshere::AbstractAtmosphere,
 )
     
     (; Ri_c) = scheme
     drag_max = scheme.drag_max[]
 
     # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
-    Ri_a = column.bulk_richardson[column.nlev]
+    Ri_a = bulk_richardson_surface(column, atmopshere)
 
     # clamp to get the cases, eq (12-14)
     # if Ri_a > Ri_c then C = 0
@@ -153,4 +155,20 @@ function boundary_layer_drag!(
     column.boundary_layer_drag = drag_max*(1-Ri_a/Ri_c)^2
 end
 
+"""
+$(TYPEDSIGNATURES)
+Calculate the bulk richardson number following Frierson, 2007.
+For vertical stability in the boundary layer."""
+function bulk_richardson_surface(
+    column::ColumnVariables,
+    atmosphere::AbstractAtmosphere,
+)
+    cₚ = atmosphere.heat_capacity
+    (; u, v, geopot, temp_virt, nlev, bulk_richardson) = column
+
+    V² = u[nlev]^2 + v[nlev]^2
+    Θ₀ = cₚ*temp_virt[nlev]
+    Θ₁ = Θ₀ + geopot[nlev]
+    bulk_richardson = geopot[nlev]*(Θ₁ - Θ₀) / (Θ₀*V²)
+end
 
