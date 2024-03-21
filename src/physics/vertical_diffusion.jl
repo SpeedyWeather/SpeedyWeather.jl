@@ -28,9 +28,6 @@ Base.@kwdef struct BulkRichardsonDiffusion{NF} <: AbstractVerticalDiffusion
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
     Ri_c::NF = 1
 
-    "[OPTION] Surface layer fraction"
-    fb::NF = 0.1
-
     "[OPTION] diffuse static energy?"
     diffuse_static_energy::Bool = true
 
@@ -63,10 +60,10 @@ function initialize!(scheme::BulkRichardsonDiffusion, model::PrimitiveEquation)
     σ_half = model.geometry.σ_levels_half
 
     for k in 1:nlev
-        k₋ = max(k, 1)      # sets the gradient across surface and top to 0
-        k₊ = min(k, nlev)   # = no flux boundary conditions
-        scheme.∇²_above[k] = inv(2*(σ[k] - σ[k₋]) * (σ_half[k+1] - σ_half[k]))
-        scheme.∇²_below[k] = inv(2*(σ[k₊] - σ[k]) * (σ_half[k+1] - σ_half[k]))
+        σ₋ = k <= 1    ? -Inf : σ[k-1]   # sets the gradient across surface and top to 0
+        σ₊ = k >= nlev ?  Inf : σ[k+1]   # = no flux boundary conditions
+        scheme.∇²_above[k] = inv(2*(σ[k] - σ₋) * (σ_half[k+1] - σ_half[k]))
+        scheme.∇²_below[k] = inv(2*(σ₊ - σ[k]) * (σ_half[k+1] - σ_half[k]))
     end
 
     # Typical height Z of lowermost layer from geopotential of reference surface temperature
@@ -99,8 +96,10 @@ function vertical_diffusion!(
     (; u, u_tend, v, v_tend, dry_static_energy, temp_tend, humid, humid_tend) = column
     diffuse_momentum                            && vertical_diffusion!(u_tend, u, K, h, scheme)
     diffuse_momentum                            && vertical_diffusion!(v_tend, v, K, h, scheme)
-    diffuse_static_energy                       && vertical_diffusion!(temp_tend, dry_static_energy, K, h, scheme)
     model isa PrimitiveWet && diffuse_humidity  && vertical_diffusion!(humid_tend, humid, K, h, scheme)
+    
+    K ./= model.atmosphere.heat_capacity
+    diffuse_static_energy                       && vertical_diffusion!(temp_tend, dry_static_energy, K, h, scheme)
     return nothing
 end
 
@@ -112,14 +111,14 @@ function get_diffusion_coefficients!(
     Ri = bulk_richardson!(column, atmosphere)
 
     K = column.b        # reuse work array for diffusion coefficients
-    (; Ri_c, fb, κsqrtC_g) = scheme
-    (; nlev, geopot) = column
+    (; Ri_c, κZsqrtC_g) = scheme
+    (; nlev, u, v, geopot) = column
     Ri_a = Ri[nlev]     # surface bulk Richardson number
 
     # Boundary layer depth is highest layer for which Ri < Ri_c (the "critical" threshold)
     # as well as all layers below
     h::Int = nlev
-    while Ri[h] < Ri_c && h > 0
+    while h > 0 && Ri[h] < Ri_c
         h -= 1
     end
     h += 1  # uppermost layer where Ri < Ri_c
@@ -127,10 +126,10 @@ function get_diffusion_coefficients!(
 
     # Calculate diffusion coefficients
     surface_speed = sqrt(u[nlev]^2 + v[nlev]^2)
-    Kb = κZsqrtC_g * surface_speed
+    Kb = κZsqrtC_g[] * surface_speed
 
     for k in 1:nlev
-        K[k] = k > h ? 0 : Kb
+        K[k] = k > h ? Kb*geopot[k] : 0
     end
 
     return K, h
@@ -154,7 +153,6 @@ function vertical_diffusion!(
         # sets the gradient across surface and top to 0 = no flux boundary conditions
         k₋ = max(k, 1)      # index above (- in σ direction which is 0 at top and 1 at surface)
         k₊ = min(k, nlev)   # index below (+ in σ direction which is 0 at top and 1 at surface)
-
 
         K_∂var_below = (var[k₊] - var[k]) * (K[k₊] + K[k])  # average diffusion coefficient K here
         K_∂var_above = (var[k] - var[k₋]) * (K[k] + K[k₋])  # but 1/2 is already baked into the ∇² operators

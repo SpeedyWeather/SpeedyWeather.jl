@@ -121,7 +121,6 @@ Calculate geopotentiala and dry static energy for the primitive equation model."
 function get_thermodynamics!(column::ColumnVariables, model::PrimitiveEquation)
     geopotential!(column.geopot, column.temp, model.geopotential, column.surface_geopotential)
     dry_static_energy!(column, model.atmosphere)
-    bulk_richardson!(column, model.atmosphere)
 end
 
 """
@@ -137,31 +136,6 @@ function dry_static_energy!(
 
     @inbounds for k in eachlayer(column)
         dry_static_energy[k] = cₚ * temp[k] + geopot[k]
-    end
-
-    return nothing
-end
-
-"""
-$(TYPEDSIGNATURES)
-Calculate the bulk richardson number following Frierson, 2007.
-For vertical stability in the boundary layer."""
-function bulk_richardson!(
-    column::ColumnVariables,
-    atmosphere::AbstractAtmosphere,
-)
-    cₚ = atmosphere.heat_capacity
-    (; u, v, geopot, temp_virt, nlev, bulk_richardson) = column
-
-    V² = u[nlev]^2 + v[nlev]^2
-    Θ₀ = cₚ*temp_virt[nlev]
-    Θ₁ = Θ₀ + geopot[nlev]
-    bulk_richardson[nlev] = geopot[nlev]*(Θ₁ - Θ₀)/Θ₀/V²
-
-    @inbounds for k in nlev-1:-1:1
-        V² = u[k]^2 + v[k]^2
-        virtual_dry_static_energy = cₚ * temp_virt[k] + geopot[k]
-        bulk_richardson[k] = geopot[k]*(virtual_dry_static_energy - Θ₁)/Θ₁/V²
     end
 
     return nothing
@@ -193,7 +167,7 @@ function moist_static_energy!(
     column::ColumnVariables,
     clausius_clapeyron::AbstractClausiusClapeyron
 )
-    (; Lᵥ) = clausius_clapeyron      # latent heat of vaporization
+    (; Lᵥ) = clausius_clapeyron      # latent heat of vaporization
     (; sat_moist_static_energy, moist_static_energy, dry_static_energy) = column
     (; humid, sat_humid) = column
 

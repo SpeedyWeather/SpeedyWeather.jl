@@ -122,7 +122,6 @@ function initialize!(scheme::BulkRichardsonDrag, model::PrimitiveEquation)
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
     (; κ, z₀) = scheme
-    @info log(Z/z₀)
     scheme.drag_max[] = (κ/log(Z/z₀))^2
 end
 
@@ -164,7 +163,7 @@ function bulk_richardson_surface(
     atmosphere::AbstractAtmosphere,
 )
     cₚ = atmosphere.heat_capacity
-    (; u, v, geopot, temp_virt, nlev, bulk_richardson) = column
+    (; u, v, geopot, temp_virt, nlev) = column
 
     V² = u[nlev]^2 + v[nlev]^2
     Θ₀ = cₚ*temp_virt[nlev]
