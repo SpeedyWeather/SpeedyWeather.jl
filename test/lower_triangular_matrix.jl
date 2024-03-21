@@ -129,6 +129,20 @@ end
         copyto!(L2, L1)
 
         @test L2 == L2c
+
+        # with ranges
+        L1 = zeros(LowerTriangularMatrix{NF}, 33, 32);
+        L2 = randn(LowerTriangularMatrix{NF}, 65, 64);
+        L2T = spectral_truncation(L2,(size(L1) .- 1)...)
+
+        copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
+        @test L1 == L2T
+
+        copyto!(L1, L2, 1:65, 1:64)     # size of bigger matrix
+        @test L1 == L2T
+
+        copyto!(L1, L2, 1:50, 1:50)     # in between
+        @test L1 == L2T
     end
 end
 
