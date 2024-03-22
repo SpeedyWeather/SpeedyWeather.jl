@@ -140,7 +140,7 @@ function get_diffusion_coefficients!(
 
         K[1:kₕ-1] .= 0                              # diffusion above boundary layer 0
         for k in kₕ:nlev
-            z = max(geopot[k]*gravity⁻¹ - orography)     # height [m] above surface
+            z = max(geopot[k]*gravity⁻¹ - orography, z₀)    # height [m] above surface
             zmin = min(z, fb*h)         # height [m] to evaluate Kb(z) at
             K_k = K0 * zmin             # = κuₐ√Cz in eq. (19, 20)
 
