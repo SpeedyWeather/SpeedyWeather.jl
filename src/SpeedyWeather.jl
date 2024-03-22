@@ -37,7 +37,7 @@ export initialize!, finish!
 include("utility_functions.jl")
 
 # LowerTriangularMatrices for spherical harmonics
-export LowerTriangularMatrices, LowerTriangularMatrix
+export LowerTriangularMatrices, LowerTriangularMatrix, LowerTriangularArray
 include("LowerTriangularMatrices/LowerTriangularMatrices.jl")
 using .LowerTriangularMatrices
 

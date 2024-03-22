@@ -4,7 +4,7 @@ using DocStringExtensions
 import Adapt
 import UnicodePlots
 
-export LowerTriangularMatrix, eachharmonic
+export LowerTriangularMatrix, LowerTriangularArray, eachharmonic
 # export plot
 
 include("lower_triangular_matrix.jl")
