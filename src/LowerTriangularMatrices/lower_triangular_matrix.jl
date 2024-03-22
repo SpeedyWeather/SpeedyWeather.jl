@@ -11,7 +11,7 @@ struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T}} <: AbstractArra
     m::Int              # number of rows
     n::Int              # number of columns
 
-    LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray} = length(data) == prod(size(data)[2:end]) * nonzeros(m, n) ? new(data, m, n) : error("$(length(data))-element Vector{$(eltype(data))} cannot be used to create a $(m)x$(n) LowerTriangularArray{$T,$N,$ArrayType} with $(nonzeros(m, n)) non-zero entries.")  #TODO: adjust error string
+    LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray} = length(data) == prod(size(data)[2:end]) * nonzeros(m, n) ? new(data, m, n) : error("$(size(data))-sized Array{$(eltype(data))} cannot be used to create a $(m)x$(n)x$(size(data)[2:end]) LowerTriangularArray{$T,$N,$ArrayType} with $(prod(size(data)[2:end]))x$(nonzeros(m, n)) non-zero entries.")  #TODO: adjust error string
 end
 
 const LowerTriangularMatrix{T, ArrayType} = LowerTriangularArray{T, 2, ArrayType}
@@ -173,6 +173,7 @@ end
 
 # helper function for conversion etc on GPU, returns indices of the lower triangle
 lowertriangle_indices(M::AbstractMatrix) = tril!(trues(size(M)))
+lowertriangle_indices(m::Integer, n::Integer) = tril!(trues((m,n)))
 
 function lowertriangle_indices(M::AbstractArray{T,N}) where {T,N}
     @boundscheck N >= 3 || throw(BoundsError)
@@ -183,10 +184,10 @@ function lowertriangle_indices(M::AbstractArray{T,N}) where {T,N}
     repeat(indices, 1, 1, size(M)[3:end]...)
 end  
 
-# GPU version and fallback for higher dimensions
-function LowerTriangularArray(M::ArrayType) where {T, ArrayType<:AbstractArray{T}} 
+# GPU version and fallback for higher dime  nsions
+function LowerTriangularArray(M::ArrayType) where {T, N, ArrayType<:AbstractArray{T,N}} 
     m, n = size(M)[1:2]
-    LowerTriangularArray(M[lowertriangle_indices(M)], m, n)
+    LowerTriangularArray(M[lowertriangle_indices(m,n),[Colon() for i=1:N-2]...], m, n)
 end
 
 LowerTriangularMatrix(M::AbstractMatrix) = LowerTriangularArray(M)
@@ -246,7 +247,7 @@ function Base.copyto!(  M::AbstractArray{T},               # copy to M
     upper_triangle_indices = @. ~lower_triangle_indices
 
     M[upper_triangle_indices] .= zero(T)
-    M[lower_triangle_indices] .= convert.(T, L.data)
+    M[lower_triangle_indices] = convert.(T, L.data)
 
     M
 end
