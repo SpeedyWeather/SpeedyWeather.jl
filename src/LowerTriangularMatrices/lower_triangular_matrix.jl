@@ -74,26 +74,44 @@ nonzeros(m::Integer, n::Integer) = m*n-triangle_number(n-1)
     return r
 end
 
+# integer + other indices (:, ranges, etc...)
+@inline function Base.getindex(L::LowerTriangularArray{T,N}, k::Integer, I::Vararg{R,M}) where {T,N,R,M}
+    @boundscheck M == N-2 || throw(BoundsError(L, I))
+    @boundscheck 0 < k <= size(L.data,1) || throw(BoundsError(L, k)) 
+    @inbounds r = getindex(L.data, k, I...) # TODO: Question: We could also just let the regular getindex handle the boundscheck
+    return r
+end
+
 # l,m sph indexing, no. indices has to be equal to N 
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, I::Vararg{Integer,N}) where {T,N}
     i, j = I[1:2]
     @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
-    j > i && return zero(T) 
+    j > i && return zero(getindex(L.data, 1, I[3:end]...)) # to get a zero element in the correct shape, we just take the zero element of some valid element, there are probably faster ways to do this, but I don't know how (espacially when ":" are used), and this is just a fallback anyway 
     k = ij2k(i, j, L.m)
     @inbounds r = getindex(L.data, k, I[3:end]...)
     return r
 end
 
-@inline Base.getindex(L::LowerTriangularArray, r::AbstractRange) = getindex(L.data,r)
-@inline Base.getindex(L::LowerTriangularArray, r::AbstractRange, I...) = getindex(L.data,r,I)
+# l,m sph indexing with integer + other indices
+@inline function Base.getindex(L::LowerTriangularArray{T,N}, i::Integer, j::Integer, I::Vararg{R,M}) where {T,N,R,M}
+    @boundscheck M == N-2 || throw(BoundsError(L, I))
+    @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
+    j > i && return zero(getindex(L.data, 1, I...)) # to get a zero element in the correct shape, we just take the zero element of some valid element, there are probably faster ways to do this, but I don't know how, and this is just a fallback anyway 
+    k = ij2k(i, j, L.m)
+    @inbounds r = getindex(L.data, k, I...)
+    return r
+end
 
-Base.@propagate_inbounds function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Integer, M}) where {T,N,M} 
+@inline Base.getindex(L::LowerTriangularArray, r::AbstractRange) = getindex(L.data,r)
+@inline Base.getindex(L::LowerTriangularArray, r::AbstractRange, I...) = getindex(L.data, r, I...)
+
+Base.@propagate_inbounds function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, M}) where {T,N,M} 
     @boundscheck M == N-1 || throw(BoundsError(L, I))
     setindex!(L.data, x, I...)
 end 
 
-Base.@propagate_inbounds function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Integer, N}) where {T,N}
-    i, j = I[1:2]
+Base.@propagate_inbounds function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T,N}
+    i, j = I[1:2] # TODO: check if i,j are Int?
     @boundscheck i >= j || throw(BoundsError(L, (i, j)))
     k = ij2k(i, j, L.m)
     setindex!(L.data, x, k, I[3:end]...)
