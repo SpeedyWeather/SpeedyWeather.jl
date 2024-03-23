@@ -131,7 +131,7 @@ function get_diffusion_coefficients!(
     if kₕ <= nlev   # boundary layer depth is at least 1 layer thick (calculate diffusion)
 
         # Calculate diffusion coefficients following Frierson 2006, eq. 16-20
-        h = geopot[kₕ]*gravity⁻¹ - orography
+        h = max(geopot[kₕ]*gravity⁻¹ - orography, 0)# always positive to avoid error in log 
         Ri_a = Ri[nlev]                             # surface bulk Richardson number
         Ri_a = clamp(Ri_a, 0, Ri_c)                 # cases of eq. 12-14
         sqrtC = scheme.sqrtC_max[]*(1-Ri_a/Ri_c)    # sqrt of eq. 12-14
