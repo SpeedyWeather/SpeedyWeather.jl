@@ -47,8 +47,11 @@ function LowerTriangularMatrix{T,ArrayType}(::UndefInitializer, m::Integer, n::I
     return LowerTriangularMatrix(ArrayType(undef, nonzeros(m, n)), m, n)
 end
 
-Base.randn(::Type{LowerTriangularArray{T,N,ArrayType}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N,ArrayType} = LowerTriangularMatrix(randn(T, prod(I)*nonzeros(m, n), I...), m, n)
-Base.rand(::Type{LowerTriangularArray{T,N,ArrayType}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N,ArrayType} = LowerTriangularMatrix(rand(T, prod(I)*nonzeros(m, n), I...), m, n)
+Base.randn(::Type{LowerTriangularArray{T,N,ArrayType}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N,ArrayType<:AbstractArray{T}} = LowerTriangularArray(ArrayType(randn(T, prod(I)*nonzeros(m, n), I...)), m, n)
+Base.rand(::Type{LowerTriangularArray{T,N,ArrayType}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N,ArrayType<:AbstractArray{T}} = LowerTriangularArray(ArrayType(rand(T, prod(I)*nonzeros(m, n), I...)), m, n)
+
+Base.randn(::Type{LowerTriangularArray{T}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N} = LowerTriangularArray(randn(T, prod(I)*nonzeros(m, n), I...), m, n)
+Base.rand(::Type{LowerTriangularArray{T}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N} = LowerTriangularArray(randn(T, prod(I)*nonzeros(m, n), I...), m, n)
 
 Base.randn(::Type{LowerTriangularMatrix}, m::Integer, n::Integer) = LowerTriangularMatrix(randn(nonzeros(m, n)), m, n)
 Base.rand(::Type{LowerTriangularMatrix}, m::Integer, n::Integer) = LowerTriangularMatrix(rand(nonzeros(m, n)), m, n)

@@ -29,6 +29,10 @@ import JLArrays
     end
 end
 
+NF = Float32
+mmax = 32 
+idims = (5,)
+lmax = mmax 
 @testset "LowerTriangularArray: N-dim" begin 
     @testset for NF in (Float32, Float64)
         mmax = 32
@@ -95,7 +99,7 @@ end
 end
 
 @testset "LowerTriangularArray: @inbounds" begin
-    A = randn(LowerTriangularArray, 33, 32, 1, 1)
+    A = randn(LowerTriangularArray{Float64}, 33, 32, 1, 1)
     
     @testset "getindex" begin
         @test_throws BoundsError A[34, 32, 1, 1]   # outside of i, j range
@@ -129,7 +133,7 @@ end
                 # fill
                 fill!(L, 2)
                 for lm in SpeedyWeather.eachharmonic(L)
-                    @test L[lm, [Colon() for i=1:length(idims)]...] == 2
+                    @test all(L[lm, [Colon() for i=1:length(idims)]...] .== 2)
                 end
 
                 # copy
@@ -141,8 +145,8 @@ end
                 @test L2[1, [1 for i=1:length(idims)]...] == 3
 
                 # convert
-                L = randn(LowerTriangularArray{NF,2+length(idims),Array}, lmax, mmax, idims...)
-                L3 = convert(LowerTriangularArray{Float16, 2+length(idims),Array}, L)
+                L = randn(LowerTriangularArray{NF}, lmax, mmax, idims...)
+                L3 = convert(LowerTriangularArray{Float16}, L)
                 for lm in SpeedyWeather.eachharmonic(L, L3)
                     @test Float16(L[lm, [1 for i=1:length(idims)]...]) == L3[lm, [1 for i=1:length(idims)]...] 
                 end
@@ -207,7 +211,7 @@ end
 @testset "LowerTriangularArray: *, +, eachindex, similar" begin
     @testset for idims = ((), (5,), (5,5))
         @testset for NF in (Float16, Float32, Float64)
-            L = randn(LowerTriangularArray{NF,2+length(idims),Array}, 3, 3, idims...)
+            L = randn(LowerTriangularArray{NF}, 3, 3, idims...)
 
             @test (L+L) == 2L
             @test (L+L) == L*2
@@ -266,8 +270,8 @@ end
 @testset "LowerTriangularArray: copyto!" begin
     @testset for idims = ((), (5,), (5,5))
         @testset for NF in (Float16, Float32, Float64)
-            L1 = randn(LowerTriangularArray{NF, 2+length(idims), Array}, 10, 10, idims...)
-            L2 = randn(LowerTriangularArray{NF, 2+length(idims), Array}, 5, 5, idims...)
+            L1 = randn(LowerTriangularArray{NF}, 10, 10, idims...)
+            L2 = randn(LowerTriangularArray{NF}, 5, 5, idims...)
             L1c = copy(L1)
 
             copyto!(L2, L1)  # bigger into smaller
@@ -276,8 +280,8 @@ end
             @test L1 == L1c
 
             # now smaller into bigger
-            L1 = randn(LowerTriangularArray{NF, 2+length(idims), Array}, 10, 10, idims...)
-            L2 = randn(LowerTriangularArray{NF, 2+length(idims), Array}, 5, 5, idims...)
+            L1 = randn(LowerTriangularArray{NF}, 10, 10, idims...)
+            L2 = randn(LowerTriangularArray{NF}, 5, 5, idims...)
             L2c = copy(L2)
 
             copyto!(L1, L2)
@@ -286,8 +290,8 @@ end
             @test L2 == L2c
 
             # with ranges
-            L1 = zeros(LowerTriangularArray{NF, 2+length(idims), Array}, 33, 32, idims...);
-            L2 = randn(LowerTriangularArray{NF, 2+length(idims), Array}, 65, 64, idims...);
+            L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
+            L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
             L2T = spectral_truncation(L2,(size(L1) .- 1)...)
 
             copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
