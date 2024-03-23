@@ -41,6 +41,7 @@ Base.@kwdef struct BulkRichardsonDiffusion{NF} <: AbstractVerticalDiffusion
     diffuse_humidity::Bool = true
 
     # precomputed constants
+    logZ_z₀::Base.RefValue{NF} = Ref(zero(NF))
     sqrtC_max::Base.RefValue{NF} = Ref(zero(NF))
 
     # precomputed operators
@@ -81,6 +82,7 @@ function initialize!(scheme::BulkRichardsonDiffusion, model::PrimitiveEquation)
     # maximum drag Cmax from that height, stable conditions would decrease Cmax towards 0
     # Frierson 2006, eq (12)
     (; κ, z₀) = scheme
+    scheme.logZ_z₀[] = log(Z/z₀)        # ≈ log(z/z₀) avoid log during integration
     scheme.sqrtC_max[] = κ/log(Z/z₀)
 
     return nothing
@@ -115,6 +117,7 @@ function get_diffusion_coefficients!(
 )
     K = column.b        # reuse work array for diffusion coefficients
     (; Ri_c, κ, z₀, fb) = scheme
+    logZ_z₀ = scheme.logZ_z₀[]
     (; nlev, u, v, geopot, orography) = column
     gravity⁻¹ = inv(planet.gravity)
 
@@ -148,7 +151,7 @@ function get_diffusion_coefficients!(
             K_k *= z < fb*h ? 1 : zfac(z, h, fb)
 
             # multiply with Ri-dependent factor in eq. (20) ?
-            K_k *= Ri[kₕ] <= 0 ? 1 : Rifac(Ri[kₕ], Ri_c, zmin, z₀)
+            K_k *= Ri[kₕ] <= 0 ? 1 : Rifac(Ri[kₕ], Ri_c, logZ_z₀)
             K[k] = K_k                  # write diffusion coefficient into array
         end
     else
@@ -165,7 +168,14 @@ end
 # Ri-dependent factor in Frierson, 2006 eq (20)
 @inline function Rifac(Ri, Ri_c, z, z₀)
     Ri_Ri_c = Ri/Ri_c
-    inv(1 + Ri_Ri_c * log(z/z₀) / (1 - Ri_Ri_c))
+    return inv(1 + Ri_Ri_c * log(z/z₀) / (1 - Ri_Ri_c))
+end
+
+# Approximate: Ri-dependent factor in Frierson, 2006 eq (20)
+# because 1 / (1 + log(z/z₀)) is so weakly dependent on z for 10-10000m
+@inline function Rifac(Ri, Ri_c, logz_z₀)
+    Ri_Ri_c = Ri/Ri_c
+    return inv(1 + Ri_Ri_c * logz_z₀ / (1 - Ri_Ri_c))
 end
 
 function vertical_diffusion!(   
@@ -180,8 +190,9 @@ function vertical_diffusion!(
     nlev == 1 && return nothing     # escape immediately for single-layer (no diffusion)
 
     @boundscheck nlev == length(var) == length(K) || throw(BoundsError)
+    @boundscheck nlev == length(∇²_above) == length(∇²_below) || throw(BoundsError)
 
-    for k in nlev:-1:kₕ          # diffusion only in surface boundary layer of thickness h
+    @inbounds for k in kₕ:nlev      # diffusion only in surface boundary layer of thickness h
         
         # sets the gradient across surface and top to 0 = no flux boundary conditions
         k₋ = max(k, 1)      # index above (- in σ direction which is 0 at top and 1 at surface)
