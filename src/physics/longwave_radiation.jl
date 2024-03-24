@@ -100,10 +100,11 @@ function longwave_radiation!(
     
     Fₖ::NF = 0                      # flux into lowermost layer from below
 
-    @inbounds for k in nlev-1:-1:1
+    # integrate from surface up, skipping surface (k=nlev+1) and top-of-atmosphere flux (k=1)
+    @inbounds for k in nlev:-1:2    
         # Seeley and Wordsworth, 2023 eq (1)
-        Fₖ = Fₖ + (T[k] - T[k+1])*α*(Tₜ - T[k+1])   # upward flux from layer k+1 into k
-        F[k+1] += Fₖ                                # flux vector uses k+1 to store, accumulate
+        Fₖ += (T[k-1] - T[k]) * α * (Tₜ - T[k]) # upward flux from layer k into k-1
+        F[k] += Fₖ                              # accumulate fluxes
     end
 
     # Relax the uppermost level towards prescribed "tropopause temperature"
