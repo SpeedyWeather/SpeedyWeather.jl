@@ -395,7 +395,7 @@ function time_stepping!(
     
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
     # considered part of the model initialisation
-    first_timesteps!(progn,diagn, model, output)
+    first_timesteps!(progn, diagn, model, output)
     
     # only now initialise feedback for benchmark accuracy
     initialize!(feedback, clock, model)
@@ -405,7 +405,7 @@ function time_stepping!(
         timestep!(progn, diagn, 2Δt, model) # calculate tendencies and leapfrog forward
         timestep!(clock, Δt_millisec)       # time of lf=2 and diagn after timestep!
 
-        progress!(feedback, progn)           # updates the progress meter bar
+        progress!(feedback, progn)          # updates the progress meter bar
         write_output!(output, clock.time, diagn)
         callback!(model.callbacks, progn, diagn, model)
     end

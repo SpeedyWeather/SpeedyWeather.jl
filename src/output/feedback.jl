@@ -72,7 +72,7 @@ $(TYPEDSIGNATURES)
 Initializes the a `Feedback` struct."""
 function initialize!(feedback::Feedback, clock::Clock, model::ModelSetup)
 
-    # set to false to recheck for NaRs
+    # set to false to recheck for NaRs
     feedback.nars_detected = false
 
     # hack: redefine element in global constant dt_in_sec
@@ -158,17 +158,12 @@ function nar_detection!(feedback::Feedback, progn::PrognosticVariables)
 
     feedback.nars_detected && return nothing    # escape immediately if nans already detected
     i = feedback.progress_meter.counter         # time step
-    nars_detected_here = false
-    (; vor ) = progn.layers[end].timesteps[2] # only check for surface vorticity
+    (; vor ) = progn.layers[end].timesteps[2]   # only check for surface vorticity
 
-    if ~nars_detected_here
-        nars_vor = ~isfinite(vor[1])    # just check first mode
-                                        # spectral transform propagates NaRs globally anyway
-        nars_vor && @warn "NaN or Inf detected at time step $i"
-        nars_detected_here |= nars_vor
-    end
-
-    feedback.nars_detected |= nars_detected_here
+    # just check first harmonic, spectral transform propagates NaRs globally anyway
+    nars_detected_here = ~isfinite(vor[1])
+    nars_detected_here && @warn "NaN or Inf detected at time step $i"
+    feedback.nars_detected = nars_detected_here
 end
 
 """

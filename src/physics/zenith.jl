@@ -140,10 +140,10 @@ export SolarZenith
 """Solar zenith angle varying with daily and seasonal cycle.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct SolarZenith{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractZenith{NF, Grid}
-    # DIMENSIONS
+    # DIMENSIONS
     nlat_half::Int
 
-    # OPTIONS
+    # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
     equation_of_time::Bool = true
@@ -243,10 +243,10 @@ export SolarZenithSeason
 """Solar zenith angle varying with seasonal cycle only.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct SolarZenithSeason{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractZenith{NF, Grid}
-    # DIMENSIONS
+    # DIMENSIONS
     nlat_half::Int
 
-    # OPTIONS
+    # OPTIONS
     length_of_day::Second = Hour(24)
     length_of_year::Second = Day(365.25)
     seasonal_cycle::Bool = true
@@ -291,7 +291,7 @@ function cos_zenith!(
             
         ϕ = lat[j]
         h₀ = abs(δ) + abs(ϕ) < π/2 ?        # polar day/night?
-        acos(-tan(ϕ) * tan(δ)) :            # if not: calculate length of day
+        acos(-tan(ϕ) * tan(δ)) :            # if not: calculate length of day
         ϕ*δ > 0 ? π : 0                     # polar day if signs are equal, otherwise polar night
         
         sinϕ, cosϕ = sinlat[j], coslat[j]

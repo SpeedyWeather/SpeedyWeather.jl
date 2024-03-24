@@ -1,9 +1,14 @@
 export PrimitiveWetModel
 
 """
-$(SIGNATURES)
-The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
-whether scalars or arrays that do not change throughout model integration.
+The PrimitiveWetModel contains all model components (themselves structs) needed for the
+simulation of the primitive equations with humidity. To be constructed like
+
+    model = PrimitiveWetModel(; spectral_grid, kwargs...)
+
+with `spectral_grid::SpectralGrid` used to initalize all non-default components
+passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
+model components, are
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct PrimitiveWetModel{
     NF<:AbstractFloat,
@@ -142,8 +147,8 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     prognostic_variables = PrognosticVariables(spectral_grid, model)
     initialize!(prognostic_variables,model.initial_conditions, model)
     (;clock) = prognostic_variables
-    clock.time = time       # set the current time
-    clock.start = time      # and store the start time
+    clock.time = time       # set the current time
+    clock.start = time      # and store the start time
 
     # particle advection
     initialize!(model.particle_advection, model)

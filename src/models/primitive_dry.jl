@@ -1,9 +1,14 @@
 export PrimitiveDryModel
 
 """
-$(SIGNATURES)
-The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
-whether scalars or arrays that do not change throughout model integration.
+The PrimitiveDryModel contains all model components (themselves structs) needed for the
+simulation of the primitive equations without humidity. To be constructed like
+
+    model = PrimitiveDryModel(; spectral_grid, kwargs...)
+
+with `spectral_grid::SpectralGrid` used to initalize all non-default components
+passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
+model components, are
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct PrimitiveDryModel{
     NF<:AbstractFloat,
