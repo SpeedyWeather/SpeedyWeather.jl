@@ -67,7 +67,6 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const sat_humid::Vector{NF} = zeros(NF, nlev)                # Saturation specific humidity [kg/kg]
     const dry_static_energy::Vector{NF} = zeros(NF, nlev)        # Dry static energy [J/kg]
     const temp_virt::Vector{NF} = zeros(NF, nlev)                # virtual temperature [K]
-    const bulk_richardson::Vector{NF} = zeros(NF, nlev)          # bulk richardson number [1]
     const geopot::Vector{NF} = zeros(NF, nlev)                   # gepotential height [m]
 
     # CONVECTION AND PRECIPITATION
