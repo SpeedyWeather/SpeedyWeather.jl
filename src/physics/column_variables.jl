@@ -84,7 +84,7 @@ function get_column(    S::AbstractSimulation,
                 ij,
                 model)
 
-    # execute all parameterizations for this column to return a consistent state
+    # execute all parameterizations for this column to return a consistent state
     parameterization_tendencies!(column, S.model)
 
     verbose && @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
@@ -110,16 +110,16 @@ function write_column_tendencies!(  D::DiagnosticVariables,
         layer.tendencies.humid_tend_grid[ij] = column.humid_tend[k]
     end
 
-    # accumulate (set back to zero when netcdf output)
+    # accumulate (set back to zero when netcdf output)
     D.surface.precip_large_scale[ij] += column.precip_large_scale
     D.surface.precip_convection[ij] += column.precip_convection
 
-    # Output cloud top in height [m] from geopotential height divided by gravity,
+    # Output cloud top in height [m] from geopotential height divided by gravity,
     # but NaN for no clouds
     D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.geopot[column.cloud_top]
     D.surface.cloud_top[ij] /= planet.gravity
     
-    # just use layer index 1 (top) to nlev (surface) for analysis, but 0 for no clouds
+    # just use layer index 1 (top) to nlev (surface) for analysis, but 0 for no clouds
     # D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.cloud_top
     return nothing
 end

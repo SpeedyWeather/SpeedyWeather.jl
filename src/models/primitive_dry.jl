@@ -27,7 +27,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     ZE<:AbstractZenith,
     BL<:AbstractBoundaryLayer,
     TR<:AbstractTemperatureRelaxation,
-    SE<:AbstractVerticalDiffusion,
+    VD<:AbstractVerticalDiffusion,
     SUT<:AbstractSurfaceThermodynamics,
     SUW<:AbstractSurfaceWind,
     SH<:AbstractSurfaceHeat,
@@ -68,7 +68,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     physics::Bool = true
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     temperature_relaxation::TR = NoTemperatureRelaxation(spectral_grid)
-    static_energy_diffusion::SE = NoVerticalDiffusion(spectral_grid)
+    vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
     surface_heat_flux::SH = SurfaceSensibleHeat(spectral_grid)
@@ -120,7 +120,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     # parameterizations
     initialize!(model.boundary_layer_drag, model)
     initialize!(model.temperature_relaxation, model)
-    initialize!(model.static_energy_diffusion, model)
+    initialize!(model.vertical_diffusion, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
 
@@ -128,8 +128,8 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     prognostic_variables = PrognosticVariables(spectral_grid, model)
     initialize!(prognostic_variables, model.initial_conditions, model)
     (; clock) = prognostic_variables
-    clock.time = time       # set the current time
-    clock.start = time      # and store the start time
+    clock.time = time       # set the current time
+    clock.start = time      # and store the start time
 
     # particle advection
     initialize!(model.particle_advection, model)

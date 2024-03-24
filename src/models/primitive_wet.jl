@@ -30,8 +30,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     CC<:AbstractClausiusClapeyron,
     BL<:AbstractBoundaryLayer,
     TR<:AbstractTemperatureRelaxation,
-    SE<:AbstractVerticalDiffusion,
-    HU<:AbstractVerticalDiffusion,
+    VD<:AbstractVerticalDiffusion,
     SUT<:AbstractSurfaceThermodynamics,
     SUW<:AbstractSurfaceWind,
     SH<:AbstractSurfaceHeat,
@@ -78,8 +77,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     temperature_relaxation::TR = NoTemperatureRelaxation(spectral_grid)
-    static_energy_diffusion::SE = NoVerticalDiffusion(spectral_grid)
-    humidity_diffusion::HU = NoVerticalDiffusion(spectral_grid)
+    vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
     surface_heat_flux::SH = SurfaceSensibleHeat(spectral_grid)
@@ -96,7 +94,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     implicit::IM = ImplicitPrimitiveEquation(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
-    hole_filling::HF = ClipNegatives()
+    hole_filling::HF = ClipNegatives(spectral_grid)
     
     # OUTPUT
     output::OW = OutputWriter(spectral_grid, PrimitiveWet)
@@ -124,7 +122,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.geopotential, model)
     initialize!(model.adiabatic_conversion, model)
 
-    # boundary conditionss
+    # boundary conditions
     initialize!(model.orography, model)
     initialize!(model.land_sea_mask, model)
     initialize!(model.ocean, model)
@@ -136,8 +134,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     # parameterizations
     initialize!(model.boundary_layer_drag, model)
     initialize!(model.temperature_relaxation, model)
-    initialize!(model.static_energy_diffusion, model)
-    initialize!(model.humidity_diffusion, model)
+    initialize!(model.vertical_diffusion, model)
     initialize!(model.large_scale_condensation, model)
     initialize!(model.convection, model)
     initialize!(model.shortwave_radiation, model)
