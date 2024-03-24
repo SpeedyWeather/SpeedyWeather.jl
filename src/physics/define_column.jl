@@ -74,6 +74,9 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     precip_convection::NF = 0               # Precipitation due to convection [m]
     precip_large_scale::NF = 0              # precipitation due to large-scale condensation [m]
 
+    # RADIATION
+    cos_zenith::NF = 0                      # cosine of solar zenith angle
+
     # WORK ARRAYS
     const a::Vector{NF} = zeros(NF, nlev)
     const b::Vector{NF} = zeros(NF, nlev)
