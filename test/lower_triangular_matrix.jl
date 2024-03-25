@@ -146,7 +146,7 @@ end
 
                 # convert
                 L = randn(LowerTriangularArray{NF}, lmax, mmax, idims...)
-                L3 = convert(LowerTriangularArray{Float16}, L)
+                L3 = convert(LowerTriangularArray{Float16, 2+length(idims), Array{Float16,1+length(idims)}}, L)
                 for lm in SpeedyWeather.eachharmonic(L, L3)
                     @test Float16(L[lm, [1 for i=1:length(idims)]...]) == L3[lm, [1 for i=1:length(idims)]...] 
                 end
