@@ -15,11 +15,8 @@ shortwave_radiation!(::ColumnVariables, ::NoShortwave, ::PrimitiveEquation) = no
 
 ## SHORTWAVE RADIATION FOR A FULLY TRANSPARENT ATMOSPHERE
 export TransparentShortwave
-Base.@kwdef struct TransparentShortwave{NF} <: AbstractShortwave
-    albedo::NF = 0.8
-end
-
-TransparentShortwave(SG::SpectralGrid; kwargs...) = TransparentShortwave{SG.NF}(; kwargs...)
+struct TransparentShortwave <: AbstractShortwave end
+TransparentShortwave(SG::SpectralGrid) = TransparentShortwave()
 initialize!(::TransparentShortwave, ::PrimitiveEquation) = nothing
 
 function shortwave_radiation!(
@@ -35,8 +32,7 @@ function shortwave_radiation!(
     scheme::TransparentShortwave,
     planet::AbstractPlanet,
 )
-    (; cos_zenith) = column
-    (; albedo) = scheme
+    (; cos_zenith, albedo) = column
     (; solar_constant) = planet
     column.flux_temp_upward[end] += (1-albedo) * solar_constant * cos_zenith
 end
