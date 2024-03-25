@@ -25,6 +25,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     OC<:AbstractOcean,
     LA<:AbstractLand,
     ZE<:AbstractZenith,
+    AL<:AbstractAlbedo,
     BL<:AbstractBoundaryLayer,
     TR<:AbstractTemperatureRelaxation,
     VD<:AbstractVerticalDiffusion,
@@ -63,6 +64,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     ocean::OC = SeasonalOceanClimatology(spectral_grid)
     land::LA = SeasonalLandTemperature(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    albedo::AL = AlbedoClimatology(spectral_grid)
     
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -116,6 +118,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.ocean, model)
     initialize!(model.land, model)
     initialize!(model.solar_zenith, time, model)
+    initialize!(model.albedo, model)
 
     # parameterizations
     initialize!(model.boundary_layer_drag, model)

@@ -25,6 +25,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     OC<:AbstractOcean,
     LA<:AbstractLand,
     ZE<:AbstractZenith,
+    AL<:AbstractAlbedo,
     SO<:AbstractSoil,
     VG<:AbstractVegetation,
     CC<:AbstractClausiusClapeyron,
@@ -69,6 +70,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     ocean::OC = SeasonalOceanClimatology(spectral_grid)
     land::LA = SeasonalLandTemperature(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    albedo::AL = AlbedoClimatology(spectral_grid)
     soil::SO = SeasonalSoilMoisture(spectral_grid)
     vegetation::VG = VegetationClimatology(spectral_grid)
     
@@ -84,8 +86,8 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     evaporation::EV = SurfaceEvaporation(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
-    shortwave_radiation::SW = NoShortwave(spectral_grid)
-    longwave_radiation::LW = UniformCooling(spectral_grid)
+    shortwave_radiation::SW = TransparentShortwave(spectral_grid)
+    longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     
     # NUMERICS
     device_setup::DS = DeviceSetup(CPUDevice())
@@ -130,6 +132,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.soil, model)
     initialize!(model.vegetation, model)
     initialize!(model.solar_zenith, time, model)
+    initialize!(model.albedo, model)
 
     # parameterizations
     initialize!(model.boundary_layer_drag, model)

@@ -76,6 +76,7 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
 
     # RADIATION
     cos_zenith::NF = 0                      # cosine of solar zenith angle
+    albedo::NF = 0                          # surface albedo
 
     # WORK ARRAYS
     const a::Vector{NF} = zeros(NF, nlev)
