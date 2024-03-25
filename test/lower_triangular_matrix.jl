@@ -387,8 +387,8 @@ end
     @test similar(L) isa LowerTriangularArray
 
     # copyto! 
-    L1 = randn(LowerTriangularArray{NF,3,JLArray{NF}}, 10, 10, 5)
-    L2 = randn(LowerTriangularArray{NF,3,JLArray{NF}}, 5, 5, 5)
+    L1 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
+    L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 5, 5, 5))
     
     L1c = copy(L1)
 
@@ -398,8 +398,8 @@ end
     @test all(L1 .== L1c)
 
     # now smaller into bigger
-    L1 = randn(LowerTriangularArray{NF,3,JLArray{NF}}, 10, 10, 5)
-    L2 = randn(LowerTriangularArray{NF,3,JLArray{NF}}, 5, 5, 5)
+    L1 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
+    L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 5, 5, 5))
     L2c = copy(L2)
 
     copyto!(L1, L2)
@@ -409,7 +409,7 @@ end
 
     # with ranges
     L1 = zeros(LowerTriangularArray{NF,3,JLArray{NF}}, 33, 32, 5);
-    L2 = randn(LowerTriangularArray{NF,3,JLArray{NF}}, 65, 64, 5);
+    L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 65, 64, 5));
     L2T = spectral_truncation(L2,(size(L1) .- 1)...)
 
     copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix

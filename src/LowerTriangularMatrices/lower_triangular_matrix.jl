@@ -138,7 +138,7 @@ Base.eachindex(Ls::LowerTriangularArray...) = eachindex((L.data for L in Ls)...)
 
 creates `unit_range::UnitRange` to loop over all non-zeros/spherical harmonics numbers in a LowerTriangularArray `L`.
 Like `eachindex` but skips the upper triangle with zeros in `L`."""
-eachharmonic(L::LowerTriangularArray) = axes(L.data, 1) # TODO: do we want to keep this like that for n-dim arrays or change it? also adjust docstring when this is decided 
+eachharmonic(L::LowerTriangularArray) = axes(L.data, 1) 
 
 """
     unit_range = eachharmonic(Ls::LowerTriangularMatrix...)
@@ -146,10 +146,10 @@ eachharmonic(L::LowerTriangularArray) = axes(L.data, 1) # TODO: do we want to ke
 creates `unit_range::UnitRange` to loop over all non-zeros in the LowerTriangularMatrices
 provided as arguments. Checks bounds first. All LowerTriangularMatrix's need to be of the same size.
 Like `eachindex` but skips the upper triangle with zeros in `L`."""
-function eachharmonic(Ls::LowerTriangularArray...) 
-    N_harmonics = [size(L.data,1) for L in Ls]
-    @boundscheck all(y->y==N_harmonics[1], N_harmonics) || throw(BoundsError)
-    return eachharmonic(Ls[1]) # TODO: do we want to keep this like that for n-dim arrays or change it? also adjust docstring when this is decided 
+function eachharmonic(L1::LowerTriangularArray, Ls::LowerTriangularArray...) 
+    n = size(L1.data,1) 
+    Base._all_match_first(L->size(L.data,1), n, L1, Ls...) || throw(BoundsError)
+    return eachharmonic(L1) 
 end 
 
 # CONVERSIONS
@@ -252,19 +252,29 @@ function Base.copyto!(  L1::LowerTriangularArray{T,N,ArrayType1},   # copy to L1
                         ls::AbstractUnitRange,          # range of indices in 1st dim
                         ms::AbstractUnitRange) where {T, S, N, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}  # range of indices in 2nd dim
 
-    lmax, mmax = size(L2)        # use the size of L2 for boundscheck
-    @boundscheck maximum(ls) <= lmax || throw(BoundsError)
-    @boundscheck maximum(ms) <= mmax || throw(BoundsError)
+    lmax_2, mmax_2 = size(L2)[1:2]       # use the size of L2 for boundscheck
+    @boundscheck maximum(ls) <= lmax_2 || throw(BoundsError)
+    @boundscheck maximum(ms) <= mmax_2 || throw(BoundsError)
+
+    lmax_1, mmax_1 = size(L1)[1:2]
 
     # we'll setup the 1D-indices that correspond the given range here
-    ind_L1 = lowertriangle_indices(L1.m, L1.n)
-    ind_L1[ls[end]+1:end, :] .= 0 
-    ind_L1[:, ms[end+1]:end] .= 0 
+    ind_L1 = lowertriangle_indices(lmax_1, mmax_1)
+    if maximum(ls) < lmax_1
+        ind_L1[ls[end]+1:end, :] .= 0
+    end 
+    if maximum(ms) < mmax_1
+        ind_L1[:, ms[end+1]:end] .= 0 
+    end 
     ind_L1 = reshape(ind_L1, :)
 
-    ind_L2 = lowertriangle_indices(L2.m, L2.m) 
-    ind_L2[ls[end]+1:end, :] .= 0 
-    ind_L2[:, ms[end+1]:end] .= 0 
+    ind_L2 = lowertriangle_indices(lmax_2, mmax_2) 
+    if maximum(ls) < lmax_2
+        ind_L2[ls[end]+1:end, :] .= 0 
+    end 
+    if maximum(ms) < mmax_2
+        ind_L2[:, ms[end+1]:end] .= 0 
+    end
     ind_L2 = reshape(ind_L2, :)
 
     L1[ind_l1,[Colon() for i=1:(N-2)]...] = T.(L2[ind_l2,[Colon() for i=1:(N-2)]...])
@@ -287,7 +297,7 @@ function Base.copyto!(  M::AbstractArray{T},               # copy to M
     @boundscheck size(L) == size(M) || throw(BoundsError)
 
     lower_triangle_indices = lowertriangle_indices(M)
-    upper_triangle_indices = @. ~lower_triangle_indices
+    upper_triangle_indices = @. ~lower_triangle_indices # upper triangle without main diagonal 
 
     M[upper_triangle_indices] .= zero(T)
     M[lower_triangle_indices] = convert.(T, L.data)
