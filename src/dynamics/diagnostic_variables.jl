@@ -57,7 +57,7 @@ Base.@kwdef struct DynamicsVariables{NF<:AbstractFloat, Grid<:AbstractGrid{NF}}
     trunc::Int
 
     # MULTI-PURPOSE VECTOR (a, b), work array to be reused in various places, examples:
-    # uω_coslat⁻¹, vω_coslat⁻¹ = a, b                        (all models)
+    # uω_coslat⁻¹, vω_coslat⁻¹ = a, b                        (all models)
     # uω_coslat⁻¹_grid, vω_coslat⁻¹_grid = a_grid, b_grid    (all models)
     # uh_coslat⁻¹, vh_coslat⁻¹ = a, b                        (ShallowWaterModel)
     # uh_coslat⁻¹_grid, vh_coslat⁻¹_grid = a_grid, b_grid   (ShallowWaterModel)
@@ -138,8 +138,8 @@ Base.@kwdef struct SurfaceVariables{NF<:AbstractFloat, Grid<:AbstractGrid{NF}}
     div_mean::LTM{Complex{NF}} = zeros(LTM{Complex{NF}}, trunc+2, trunc+1)    # divergence (in spectral though)
     
     precip_large_scale::Grid = zeros(Grid, nlat_half)    # large scale precipitation (for output)
-    precip_convection::Grid = zeros(Grid, nlat_half)     # convective precipitation (for output)
-    cloud_top::Grid = zeros(Grid, nlat_half)             # cloud top [hPa]
+    precip_convection::Grid = zeros(Grid, nlat_half)     # convective precipitation (for output)
+    cloud_top::Grid = zeros(Grid, nlat_half)             # cloud top [hPa]
     soil_moisture_availability::Grid = zeros(Grid, nlat_half)
 end
 
@@ -217,10 +217,10 @@ function Base.zeros(
     nthreads = Threads.nthreads()
     columns = [ColumnVariables{NF}(; nlev) for _ in 1:nthreads]
 
-    # particle work arrays
+    # particle work arrays
     particles = zeros(ParticleVariables, SG)
 
-    scale = Ref(convert(SG.NF, SG.radius))
+    scale = Ref(one(NF))
 
     return DiagnosticVariables{NF, Grid{NF}, Model}(
         layers, surface, columns, particles,
