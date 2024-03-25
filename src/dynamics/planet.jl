@@ -39,7 +39,7 @@ Base.@kwdef mutable struct Earth{NF<:AbstractFloat} <: AbstractPlanet
     axial_tilt::NF = 23.4
 
     "Total solar irradiance at the distance of 1 AU [W/m²]"
-    solar_constant::NF = 1365
+    solar_constant::NF = 1365/4     # for testing
 end
 
 Earth(SG::SpectralGrid; kwargs...) = Earth{SG.NF}(; kwargs...)
