@@ -11,7 +11,7 @@ struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T}} <: AbstractArra
     m::Int              # number of rows
     n::Int              # number of columns
 
-    LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray} = length(data) == prod(size(data)[2:end]) * nonzeros(m, n) ? new(data, m, n) : error("$(size(data))-sized Array{$(eltype(data))} cannot be used to create a $(m)x$(n)x$(size(data)[2:end]) LowerTriangularArray{$T,$N,$ArrayType} with $(prod(size(data)[2:end]))x$(nonzeros(m, n)) non-zero entries.")  #TODO: adjust error string
+    LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray} = length(data) == prod(size(data)[2:end]) * nonzeros(m, n) ? new(data, m, n) : error("$(size(data))-sized Array{$(eltype(data))} cannot be used to create a $(m)x$(n)x$(size(data)[2:end]) LowerTriangularArray{$T,$N,$ArrayType} with $(prod(size(data)[2:end]))x$(nonzeros(m, n)) non-zero entries.")  #TODO: adjust error string, enforce Array dimensionality?
 end
 
 const LowerTriangularMatrix{T, ArrayType} = LowerTriangularArray{T, 2, ArrayType}
@@ -52,9 +52,6 @@ end
 function LowerTriangularMatrix{T,ArrayType}(::UndefInitializer, m::Integer, n::Integer) where {T,ArrayType<:AbstractArray{T}}
     return LowerTriangularMatrix(ArrayType(undef, nonzeros(m, n)), m, n)
 end
-
-Base.randn(::Type{LowerTriangularArray{T,N,ArrayType}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N,ArrayType<:AbstractArray{T}} = LowerTriangularArray(ArrayType(randn(T, nonzeros(m, n), I...)), m, n)
-Base.rand(::Type{LowerTriangularArray{T,N,ArrayType}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N,ArrayType<:AbstractArray{T}} = LowerTriangularArray(ArrayType(rand(T, nonzeros(m, n), I...)), m, n)
 
 Base.randn(::Type{LowerTriangularArray{T}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N} = LowerTriangularArray(randn(T, nonzeros(m, n), I...), m, n)
 Base.rand(::Type{LowerTriangularArray{T}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N} = LowerTriangularArray(randn(T, nonzeros(m, n), I...), m, n)
@@ -227,10 +224,11 @@ function Base.copyto!(L1::LowerTriangularArray{T,N,ArrayType1}, L2::LowerTriangu
     L1
 end
 
+# CPU version
 function Base.copyto!(  L1::LowerTriangularArray{T,N,ArrayType1},   # copy to L1
                         L2::LowerTriangularArray{S,N,ArrayType2},      # copy from L2
                         ls::AbstractUnitRange,          # range of indices in 1st dim
-                        ms::AbstractUnitRange) where {T, S, N, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}  # range of indices in 2nd dim
+                        ms::AbstractUnitRange) where {T, S, N, ArrayType1<:Array{T}, ArrayType2<:Array{S}}  # range of indices in 2nd dim
 
     lmax, mmax = size(L2)        # use the size of L2 for boundscheck
     @boundscheck maximum(ls) <= lmax || throw(BoundsError)
@@ -241,11 +239,38 @@ function Base.copyto!(  L1::LowerTriangularArray{T,N,ArrayType1},   # copy to L1
     @inbounds for m in 1:mmax
         for l in m:lmax
             lm += 1
-            L1[lm] = (l in ls) && (m in ms) ? convert(T, L2[l, m]) : L1[lm]
+            L1[lm,[Colon() for i=1:(N-2)]...] = (l in ls) && (m in ms) ? T.(L2[l, m, [Colon() for i=1:(N-2)]...]) : L1[lm, [Colon() for i=1:(N-2)]...]
         end
     end
+
     L1
-end # do with intersection of the index arrays instead
+end 
+
+# Fallback / GPU version
+function Base.copyto!(  L1::LowerTriangularArray{T,N,ArrayType1},   # copy to L1
+                        L2::LowerTriangularArray{S,N,ArrayType2},      # copy from L2
+                        ls::AbstractUnitRange,          # range of indices in 1st dim
+                        ms::AbstractUnitRange) where {T, S, N, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}  # range of indices in 2nd dim
+
+    lmax, mmax = size(L2)        # use the size of L2 for boundscheck
+    @boundscheck maximum(ls) <= lmax || throw(BoundsError)
+    @boundscheck maximum(ms) <= mmax || throw(BoundsError)
+
+    # we'll setup the 1D-indices that correspond the given range here
+    ind_L1 = lowertriangle_indices(L1.m, L1.n)
+    ind_L1[ls[end]+1:end, :] .= 0 
+    ind_L1[:, ms[end+1]:end] .= 0 
+    ind_L1 = reshape(ind_L1, :)
+
+    ind_L2 = lowertriangle_indices(L2.m, L2.m) 
+    ind_L2[ls[end]+1:end, :] .= 0 
+    ind_L2[:, ms[end+1]:end] .= 0 
+    ind_L2 = reshape(ind_L2, :)
+
+    L1[ind_l1,[Colon() for i=1:(N-2)]...] = T.(L2[ind_l2,[Colon() for i=1:(N-2)]...])
+
+    L1
+end 
 
 function Base.copyto!(  L::LowerTriangularArray{T},    # copy to L
                         M::AbstractMatrix) where T      # copy from M
@@ -306,7 +331,7 @@ Base.:(*)(s::Number, L::LowerTriangularArray) = L*s         # commutative
 Base.:(/)(L::LowerTriangularArray, s::Number) = L*inv(s)
 Base.:(/)(s::Number, L::LowerTriangularArray) = L/s
 
-# TODO: what if m / n unequal 
+# TODO: what if m / n unequal, do a boundscheck? 
 Base.:(+)(L1::LowerTriangularArray{T,N,ArrayType}, L2::LowerTriangularArray{T,N,ArrayType}) where {T,N,ArrayType} = LowerTriangularArray{T,N,ArrayType}(L1.data + L2.data, L1.m, L1.n)
 function Base.:(+)(L1::LowerTriangularArray{T,N,ArrayType}, L2::LowerTriangularArray{S,N,ArrayType}) where {T,S,N,ArrayType}
     R = promote_type(T, S)

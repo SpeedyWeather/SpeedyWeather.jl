@@ -1,4 +1,5 @@
-import JLArrays
+using JLArrays
+using Adapt
 
 @testset "LowerTriangularMatrix" begin
     @testset for NF in (Float32, Float64)
@@ -292,7 +293,7 @@ end
             # with ranges
             L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
             L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
-            L2T = spectral_truncation(L2,(size(L1) .- 1)...)
+            L2T = spectral_truncation(L2,(size(L1)[1:2] .- 1)...)
 
             copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
             @test L1 == L2T
@@ -328,22 +329,116 @@ end
     end
 end 
 
+
+@testset "LowerTriangularArray: GPU (JLArrays)" begin 
+    # TODO: so far very basic GPU test, might integrate them into the other tests, as I already did with the broadcast test, but there are some key differences to avoid scalar indexing
+    NF = Float32
+    L_cpu = randn(LowerTriangularArray{NF}, 10, 10, 5)
+
+    # constructors/adapt
+    L = adapt(JLArray, L_cpu)
+    L2 = LowerTriangularArray(adapt(JLArray, L_cpu.data), 10, 10)
+    @test all(L .== L2) 
+
+    # getindex 
+    @test typeof(L[1,:]) <: JLArray 
+    for lm in SpeedyWeather.eachharmonic(L)
+        @test Array(L[lm,:]) == L_cpu[lm,:]  
+    end 
+
+    # setindex! 
+    A_test = JLArray(rand(NF,size(L_cpu,3)))
+    L[1,:] = A_test
+    @test L[1,:] == A_test
+
+    # fill 
+    fill!(L, 2)
+    for lm in SpeedyWeather.eachharmonic(L2)
+        @test all(L[lm, [Colon() for i=1:length(idims)]...] .== 2)
+    end 
+
+    # copy 
+    L2 = copy(L)
+    @test all(L2 .== L)
+
+    rand_array = JLArray(rand(NF,5))
+    L2[1,:] = rand_array
+    @test all(L[1,:] .== 2)     # should be a deep copy
+    @test all(L2[1,:] .== rand_array)
+
+    # rand + convert
+    L3 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
+    L4 = convert(LowerTriangularArray{Float16,3,JLArray{Float16}}, L3)
+
+    for lm in SpeedyWeather.eachharmonic(L, L3)
+        @test all(Float16.(L3[lm, :]) .== L4[lm, :])
+    end 
+    
+    # * 
+    @test all((L+L) .== L*2)
+    @test all((L-L) .== zero(L))
+
+    # similar 
+    @test size(similar(L)) == size(L)
+    @test eltype(L) == eltype(similar(L, eltype(L)))
+
+    @test (5, 7, 5) == size(similar(L, 5, 7, idims...))
+    @test (5, 7, 5) == size(similar(L, (5, 7,  idims...)))
+    @test similar(L) isa LowerTriangularArray
+
+    # copyto! 
+    L1 = randn(LowerTriangularArray{NF,3,JLArray{NF}}, 10, 10, 5)
+    L2 = randn(LowerTriangularArray{NF,3,JLArray{NF}}, 5, 5, 5)
+    
+    L1c = copy(L1)
+
+    copyto!(L2, L1)  # bigger into smaller
+    copyto!(L1, L2)  # and back should be identical
+
+    @test all(L1 .== L1c)
+
+    # now smaller into bigger
+    L1 = randn(LowerTriangularArray{NF,3,JLArray{NF}}, 10, 10, 5)
+    L2 = randn(LowerTriangularArray{NF,3,JLArray{NF}}, 5, 5, 5)
+    L2c = copy(L2)
+
+    copyto!(L1, L2)
+    copyto!(L2, L1)
+
+    @test all(L2 .== L2c)
+
+    # with ranges
+    L1 = zeros(LowerTriangularArray{NF,3,JLArray{NF}}, 33, 32, 5);
+    L2 = randn(LowerTriangularArray{NF,3,JLArray{NF}}, 65, 64, 5);
+    L2T = spectral_truncation(L2,(size(L1) .- 1)...)
+
+    copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
+    @test all(L1 .== L2T)
+
+    copyto!(L1, L2, 1:65, 1:64)     # size of bigger matrix
+    @test all(L1 .== L2T)
+
+    copyto!(L1, L2, 1:50, 1:50)     # in between
+    @test all(L1 .== L2T)
+end 
+
 @testset "LowerTriangularArray: broadcast" begin 
     @testset for idims = ((), (5,), (5,5))
         @testset for NF in (Float16, Float32, Float64)
-            L1 = randn(LowerTriangularArray{NF, 2+length(idims), Array}, 10, 10, idims...)
+            @testset for ArrayType in (Array, JLArray)
+            L1 = randn(LowerTriangularArray{NF, 2+length(idims), ArrayType{NF}}, 10, 10, idims...)
             L2 = copy(L1) 
 
             L2 .*= NF(5)
             @test L1 .* NF(5) ≈ L2 
 
-            L1 = randn(LowerTriangularArray{NF, 2+length(idims), Array}, 10, 10, idims...)
+            L1 = randn(LowerTriangularArray{NF, 2+length(idims), ArrayType{NF}}, 10, 10, idims...)
             L2 = copy(L1) 
 
             L2 ./= NF(5)
             @test L1 ./ NF(5) ≈ L2 
 
-            L1 = randn(LowerTriangularArray{NF, 2+length(idims), Array}, 10, 10, idims...)
+            L1 = randn(LowerTriangularArray{NF, 2+length(idims), ArrayType{NF}}, 10, 10, idims...)
             L2 = copy(L1)
 
             L2 .^= NF(2)
