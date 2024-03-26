@@ -11,8 +11,15 @@ struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T}} <: AbstractArra
     m::Int              # number of rows
     n::Int              # number of columns
 
-    LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray} = length(data) == prod(size(data)[2:end]) * nonzeros(m, n) ? new(data, m, n) : error("$(size(data))-sized Array{$(eltype(data))} cannot be used to create a $(m)x$(n)x$(size(data)[2:end]) LowerTriangularArray{$T,$N,$ArrayType} with $(prod(size(data)[2:end]))x$(nonzeros(m, n)) non-zero entries.")  #TODO: adjust error string, enforce Array dimensionality?
+    LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray} = check_lta_input_array(data, m, n, N) ? new(data, m, n) : error(lta_error_message(data, m, n, T, N, ArrayType))
 end
+
+check_lta_input_array(data, m, n, N) = (ndims(data) == N-1) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
+
+function lta_error_message(data, m, n, T, N, ArrayType) 
+    size_tuple = (m, n, size(data[2:end])...)
+    "$(size(data))-sized $(typeof(data)) cannot be used to create a $size_tuple LowerTriangularArray{$T,$N,$ArrayType}"
+end 
 
 const LowerTriangularMatrix{T, ArrayType} = LowerTriangularArray{T, 2, ArrayType}
 
@@ -78,17 +85,13 @@ nonzeros(m::Integer, n::Integer) = m*n-triangle_number(n-1)
 # direct indexing, no. indices have to be one less than `N` for the correct dimensionality, so N!=M
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, I::Vararg{Integer,M}) where {T,N,M}
     @boundscheck M == N-1 || throw(BoundsError(L, I))
-    @boundscheck 0 < I[1] <= size(L.data,1) || throw(BoundsError(L, I[1])) 
-    @inbounds r = getindex(L.data, I...) # TODO: Question: We could also just let the regular getindex handle the boundscheck
-    return r
+    getindex(L.data, I...) 
 end
 
 # integer + other indices (:, ranges, etc...)
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, k::Integer, I::Vararg{R,M}) where {T,N,R,M}
     @boundscheck M == N-2 || throw(BoundsError(L, I))
-    @boundscheck 0 < k <= size(L.data,1) || throw(BoundsError(L, k)) 
-    @inbounds r = getindex(L.data, k, I...) # TODO: Question: We could also just let the regular getindex handle the boundscheck
-    return r
+    getindex(L.data, k, I...)
 end
 
 # l,m sph indexing, no. indices has to be equal to N 
@@ -339,17 +342,25 @@ end
 
 Base.:(*)(s::Number, L::LowerTriangularArray) = L*s         # commutative
 Base.:(/)(L::LowerTriangularArray, s::Number) = L*inv(s)
-Base.:(/)(s::Number, L::LowerTriangularArray) = L/s
 
-# TODO: what if m / n unequal, do a boundscheck? 
-Base.:(+)(L1::LowerTriangularArray{T,N,ArrayType}, L2::LowerTriangularArray{T,N,ArrayType}) where {T,N,ArrayType} = LowerTriangularArray{T,N,ArrayType}(L1.data + L2.data, L1.m, L1.n)
+function Base.:(+)(L1::LowerTriangularArray{T,N,ArrayType}, L2::LowerTriangularArray{T,N,ArrayType}) where {T,N,ArrayType} 
+    @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
+    LowerTriangularArray{T,N,ArrayType}(L1.data + L2.data, L1.m, L1.n)
+end
+
 function Base.:(+)(L1::LowerTriangularArray{T,N,ArrayType}, L2::LowerTriangularArray{S,N,ArrayType}) where {T,S,N,ArrayType}
+    @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
     R = promote_type(T, S)
     LowerTriangularArray{R,N,ArrayType}(R.(L1.data) + R.(L2.data), L1.m, L1.n)
 end
 
-Base.:(-)(L1::LowerTriangularArray{T,N,ArrayType}, L2::LowerTriangularArray{T,N,ArrayType}) where {T,N,ArrayType} = LowerTriangularArray{T,N,ArrayType}(L1.data - L2.data, L1.m, L1.n)
+function Base.:(-)(L1::LowerTriangularArray{T,N,ArrayType}, L2::LowerTriangularArray{T,N,ArrayType}) where {T,N,ArrayType} 
+    @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
+    LowerTriangularArray{T,N,ArrayType}(L1.data - L2.data, L1.m, L1.n)
+end 
+
 function Base.:(-)(L1::LowerTriangularArray{T,N,ArrayType}, L2::LowerTriangularArray{S,N,ArrayType}) where {T,S,N,ArrayType}
+    @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
     R = promote_type(T, S)
     LowerTriangularArray{R,N,ArrayType}(R.(L1.data) - R.(L2.data), L1.m, L1.n)
 end
