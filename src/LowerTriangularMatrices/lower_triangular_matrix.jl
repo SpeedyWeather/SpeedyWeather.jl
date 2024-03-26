@@ -261,26 +261,28 @@ function Base.copyto!(  L1::LowerTriangularArray{T,N,ArrayType1},   # copy to L1
 
     lmax_1, mmax_1 = size(L1)[1:2]
 
-    # we'll setup the 1D-indices that correspond the given range here
+    # we'll setup the 1D-indices that correspond to the given range here
     ind_L1 = lowertriangle_indices(lmax_1, mmax_1)
+    ind_L1_smaller = deepcopy(ind_L1) # threshold the lower triangular based on the ls and ms
     if maximum(ls) < lmax_1
-        ind_L1[ls[end]+1:end, :] .= 0
+        ind_L1_smaller[ls[end]+1:end, :] .= 0
     end 
     if maximum(ms) < mmax_1
-        ind_L1[:, ms[end+1]:end] .= 0 
+        ind_L1_smaller[:, ms[end]+1:end] .= 0 
     end 
-    ind_L1 = reshape(ind_L1, :)
+    ind_L1 = ind_L1_smaller[ind_L1] # also flattens the indices into indices for the L1.data array
 
-    ind_L2 = lowertriangle_indices(lmax_2, mmax_2) 
+    ind_L2 = lowertriangle_indices(lmax_2, mmax_2)
+    ind_L2_smaller = deepcopy(ind_L2) # threshold the lower triangular based on the ls and ms
     if maximum(ls) < lmax_2
-        ind_L2[ls[end]+1:end, :] .= 0 
+        ind_L2_smaller[ls[end]+1:end, :] .= 0 
     end 
     if maximum(ms) < mmax_2
-        ind_L2[:, ms[end+1]:end] .= 0 
+        ind_L2_smaller[:, ms[end]+1:end] .= 0 
     end
-    ind_L2 = reshape(ind_L2, :)
+    ind_L2 = ind_L2_smaller[ind_L2] # also flattens the indices into indices for the L2.data array
 
-    L1[ind_l1,[Colon() for i=1:(N-2)]...] = T.(L2[ind_l2,[Colon() for i=1:(N-2)]...])
+    L1.data[ind_L1,[Colon() for i=1:(N-2)]...] = T.(L2.data[ind_L2,[Colon() for i=1:(N-2)]...])
 
     L1
 end 
@@ -343,29 +345,17 @@ end
 Base.:(*)(s::Number, L::LowerTriangularArray) = L*s         # commutative
 Base.:(/)(L::LowerTriangularArray, s::Number) = L*inv(s)
 
-function Base.:(+)(L1::LowerTriangularArray{T,N,ArrayType}, L2::LowerTriangularArray{T,N,ArrayType}) where {T,N,ArrayType} 
-    @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
-    LowerTriangularArray{T,N,ArrayType}(L1.data + L2.data, L1.m, L1.n)
-end
-
 function Base.:(+)(L1::LowerTriangularArray{T,N,ArrayType}, L2::LowerTriangularArray{S,N,ArrayType}) where {T,S,N,ArrayType}
     @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
-    R = promote_type(T, S)
-    LowerTriangularArray{R,N,ArrayType}(R.(L1.data) + R.(L2.data), L1.m, L1.n)
+    LowerTriangularArray(L1.data + L2.data, L1.m, L1.n)
 end
-
-function Base.:(-)(L1::LowerTriangularArray{T,N,ArrayType}, L2::LowerTriangularArray{T,N,ArrayType}) where {T,N,ArrayType} 
-    @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
-    LowerTriangularArray{T,N,ArrayType}(L1.data - L2.data, L1.m, L1.n)
-end 
 
 function Base.:(-)(L1::LowerTriangularArray{T,N,ArrayType}, L2::LowerTriangularArray{S,N,ArrayType}) where {T,S,N,ArrayType}
     @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
-    R = promote_type(T, S)
-    LowerTriangularArray{R,N,ArrayType}(R.(L1.data) - R.(L2.data), L1.m, L1.n)
+    LowerTriangularArray(L1.data - L2.data, L1.m, L1.n)
 end
 
-Base.:(-)(L::LowerTriangularArray) = LowerTriangularMatrix(-L.data, size(L)...)
+Base.:(-)(L::LowerTriangularArray) = LowerTriangularArray(-L.data, L.m, L.n)
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
 
 """

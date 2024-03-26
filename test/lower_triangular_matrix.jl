@@ -171,7 +171,7 @@ end
                 end
 
                 # copy
-                L2 = copy(L)
+                L2 = deepcopy(L)
                 @test L2 == L
 
                 L2[1] = 3
@@ -236,7 +236,7 @@ end
     @testset for NF in (Float16, Float32, Float64)
         L1 = randn(LowerTriangularMatrix{NF}, 10, 10)
         L2 = randn(LowerTriangularMatrix{NF}, 5, 5)
-        L1c = copy(L1)
+        L1c = deepcopy(L1)
 
         copyto!(L2, L1)  # bigger into smaller
         copyto!(L1, L2)  # and back should be identical
@@ -246,7 +246,7 @@ end
         # now smaller into bigger
         L1 = randn(LowerTriangularMatrix{NF}, 10, 10)
         L2 = randn(LowerTriangularMatrix{NF}, 5, 5)
-        L2c = copy(L2)
+        L2c = deepcopy(L2)
 
         copyto!(L1, L2)
         copyto!(L2, L1)
@@ -273,7 +273,7 @@ end
         @testset for NF in (Float16, Float32, Float64)
             L1 = randn(LowerTriangularArray{NF}, 10, 10, idims...)
             L2 = randn(LowerTriangularArray{NF}, 5, 5, idims...)
-            L1c = copy(L1)
+            L1c = deepcopy(L1)
 
             copyto!(L2, L1)  # bigger into smaller
             copyto!(L1, L2)  # and back should be identical
@@ -283,7 +283,7 @@ end
             # now smaller into bigger
             L1 = randn(LowerTriangularArray{NF}, 10, 10, idims...)
             L2 = randn(LowerTriangularArray{NF}, 5, 5, idims...)
-            L2c = copy(L2)
+            L2c = deepcopy(L2)
 
             copyto!(L1, L2)
             copyto!(L2, L1)
@@ -310,19 +310,19 @@ end
 @testset "LowerTriangularMatrix: broadcast" begin 
     @testset for NF in (Float16, Float32, Float64)
         L1 = randn(LowerTriangularMatrix{NF}, 10, 10)
-        L2 = copy(L1) 
+        L2 = deepcopy(L1) 
 
         L2 .*= NF(5)
         @test L1 .* NF(5) ≈ L2 
 
         L1 = randn(LowerTriangularMatrix{NF}, 10, 10)
-        L2 = copy(L1) 
+        L2 = deepcopy(L1) 
 
         L2 ./= NF(5)
         @test L1 ./ NF(5) ≈ L2 
 
         L1 = randn(LowerTriangularMatrix{NF}, 10, 10)
-        L2 = copy(L1)
+        L2 = deepcopy(L1)
 
         L2 .^= NF(2)
         @test L1 .^ NF(2) ≈ L2
@@ -358,7 +358,7 @@ end
     end 
 
     # copy 
-    L2 = copy(L)
+    L2 = deepcopy(L)
     @test all(L2 .== L)
 
     rand_array = JLArray(rand(NF,5))
@@ -390,7 +390,7 @@ end
     L1 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
     L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 5, 5, 5))
     
-    L1c = copy(L1)
+    L1c = deepcopy(L1)
 
     copyto!(L2, L1)  # bigger into smaller
     copyto!(L1, L2)  # and back should be identical
@@ -400,7 +400,7 @@ end
     # now smaller into bigger
     L1 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
     L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 5, 5, 5))
-    L2c = copy(L2)
+    L2c = deepcopy(L2)
 
     copyto!(L1, L2)
     copyto!(L2, L1)
@@ -427,19 +427,19 @@ end
         @testset for NF in (Float16, Float32, Float64)
             @testset for ArrayType in (Array, JLArray)
             L1 = randn(LowerTriangularArray{NF, 2+length(idims), ArrayType{NF}}, 10, 10, idims...)
-            L2 = copy(L1) 
+            L2 = deepcopy(L1) 
 
             L2 .*= NF(5)
             @test L1 .* NF(5) ≈ L2 
 
             L1 = randn(LowerTriangularArray{NF, 2+length(idims), ArrayType{NF}}, 10, 10, idims...)
-            L2 = copy(L1) 
+            L2 = deepcopy(L1) 
 
             L2 ./= NF(5)
             @test L1 ./ NF(5) ≈ L2 
 
             L1 = randn(LowerTriangularArray{NF, 2+length(idims), ArrayType{NF}}, 10, 10, idims...)
-            L2 = copy(L1)
+            L2 = deepcopy(L1)
 
             L2 .^= NF(2)
             @test L1 .^ NF(2) ≈ L2
