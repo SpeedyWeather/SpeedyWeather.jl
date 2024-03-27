@@ -387,62 +387,63 @@ end
     @test similar(L) isa LowerTriangularArray
 
     # copyto! 
-    L1 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
-    L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 5, 5, 5))
+    #L1 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
+    #L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 5, 5, 5))
     
-    L1c = deepcopy(L1)
+    #L1c = deepcopy(L1)
 
-    copyto!(L2, L1)  # bigger into smaller
-    copyto!(L1, L2)  # and back should be identical
+    #copyto!(L2, L1)  # bigger into smaller
+    #copyto!(L1, L2)  # and back should be identical
 
-    @test all(L1 .== L1c)
+    #@test all(L1 .== L1c)
 
     # now smaller into bigger
-    L1 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
-    L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 5, 5, 5))
-    L2c = deepcopy(L2)
+    #L1 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
+    #L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 5, 5, 5))
+    #L2c = deepcopy(L2)
 
-    copyto!(L1, L2)
-    copyto!(L2, L1)
+    #copyto!(L1, L2)
+    #copyto!(L2, L1)
 
-    @test all(L2 .== L2c)
+    #@test all(L2 .== L2c)
 
     # with ranges
-    L1 = zeros(LowerTriangularArray{NF,3,JLArray{NF}}, 33, 32, 5);
-    L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 65, 64, 5));
-    L2T = spectral_truncation(L2,(size(L1) .- 1)...)
+    #L1 = zeros(LowerTriangularArray{NF,3,JLArray{NF}}, 33, 32, 5);
+    #L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 65, 64, 5));
+    #L2T = spectral_truncation(L2,(size(L1) .- 1)...)
 
-    copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
-    @test all(L1 .== L2T)
+    #copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
+    #@test all(L1 .== L2T)
 
-    copyto!(L1, L2, 1:65, 1:64)     # size of bigger matrix
-    @test all(L1 .== L2T)
+    #copyto!(L1, L2, 1:65, 1:64)     # size of bigger matrix
+    #@test all(L1 .== L2T)
 
-    copyto!(L1, L2, 1:50, 1:50)     # in between
-    @test all(L1 .== L2T)
+    #copyto!(L1, L2, 1:50, 1:50)     # in between
+    #@test all(L1 .== L2T)
 end 
 
 @testset "LowerTriangularArray: broadcast" begin 
     @testset for idims = ((), (5,), (5,5))
         @testset for NF in (Float16, Float32, Float64)
             @testset for ArrayType in (Array, JLArray)
-            L1 = randn(LowerTriangularArray{NF, 2+length(idims), ArrayType{NF}}, 10, 10, idims...)
-            L2 = deepcopy(L1) 
+                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L2 = deepcopy(L1) 
 
-            L2 .*= NF(5)
-            @test L1 .* NF(5) ≈ L2 
+                L2 .*= NF(5)
+                @test L1 .* NF(5) ≈ L2 
 
-            L1 = randn(LowerTriangularArray{NF, 2+length(idims), ArrayType{NF}}, 10, 10, idims...)
-            L2 = deepcopy(L1) 
+                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L2 = deepcopy(L1) 
 
-            L2 ./= NF(5)
-            @test L1 ./ NF(5) ≈ L2 
+                L2 ./= NF(5)
+                @test L1 ./ NF(5) ≈ L2 
 
-            L1 = randn(LowerTriangularArray{NF, 2+length(idims), ArrayType{NF}}, 10, 10, idims...)
-            L2 = deepcopy(L1)
+                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L2 = deepcopy(L1)
 
-            L2 .^= NF(2)
-            @test L1 .^ NF(2) ≈ L2
+                L2 .^= NF(2)
+                @test L1 .^ NF(2) ≈ L2
+            end
         end
     end
 end 

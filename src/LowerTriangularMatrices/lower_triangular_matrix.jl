@@ -1,11 +1,16 @@
 import LinearAlgebra: tril!
+import GPUArrays
 
 """
-    L = LowerTriangularArray{T, N, ArrayType}(v::AbstractArray{T,N}, m::Int, n::Int)
-
-A lower triangular matrix implementation that only stores the non-zero entries explicitly.
+$(TYPEDSIGNATURES)
+A lower triangular array implementation that only stores the non-zero entries explicitly.
 `L<:AbstractMatrix` although in general we have `L[i] != Matrix(L)[i]`, the former skips
-zero entries, tha latter includes them."""
+zero entries, tha latter includes them. 
+
+Supports n-dimensional lower triangular arrays, so that for all trailing dimensions `L[:,:,..]`
+is a matrix in lower triangular form, e.g. a (5x5x3)-LowerTriangularArray would hold 3 lower
+triangular matrices.
+"""
 struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T}} <: AbstractArray{T,N}
     data::ArrayType     # non-zero elements unravelled into an array with one dimension less N-1
     m::Int              # number of rows
@@ -71,10 +76,7 @@ Base.rand(::Type{LowerTriangularMatrix{T}}, m::Integer, n::Integer) where T = Lo
 
 # INDEXING
 """
-    k = ij2k(   i::Integer,     # row index of matrix
-                j::Integer,     # column index of matrix
-                m::Integer)     # number of rows in matrix
-
+$(TYPEDSIGNATURES)
 Converts the index pair `i, j` of an `m`x`n` LowerTriangularMatrix `L` to a single
 index `k` that indexes the same element in the corresponding vector that stores
 only the lower triangle (the non-zero entries) of `L`."""
@@ -117,6 +119,7 @@ end
 @inline Base.getindex(L::LowerTriangularArray, r::AbstractRange) = getindex(L.data,r)
 @inline Base.getindex(L::LowerTriangularArray, r::AbstractRange, I...) = getindex(L.data, r, I...)
 @inline Base.getindex(L::LowerTriangularArray, i::Integer) = getindex(L.data,i)
+@inline Base.getindex(L::LowerTriangularArray, I::CartesianIndex) = getindex(L, Tuple(I)...)
 
 Base.@propagate_inbounds function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, M}) where {T,N,M} 
     @boundscheck M == N-1 || throw(BoundsError(L, I))
@@ -130,22 +133,22 @@ Base.@propagate_inbounds function Base.setindex!(L::LowerTriangularArray{T,N}, x
     setindex!(L.data, x, k, I[3:end]...)
 end
 
-@inline Base.setindex!(L::LowerTriangularMatrix, x::AbstractVector, r::AbstractRange, I...) = setindex!(L.data, x, r, I...)
+@inline Base.setindex!(L::LowerTriangularArray, x::AbstractVector, r::AbstractRange, I...) = setindex!(L.data, x, r, I...)
+@inline Base.setindex!(L::LowerTriangularArray, x, i::Integer) = setindex!(L.data, x, i)
+@inline Base.setindex!(L::LowerTriangularArray, x, I::CartesianIndex) = setindex!(L, x, Tuple(I)...)
 
 # propagate index to data vector
 Base.eachindex(L ::LowerTriangularArray)    = eachindex(L.data)
 Base.eachindex(Ls::LowerTriangularArray...) = eachindex((L.data for L in Ls)...)
 
 """
-    unit_range = eachharmonic(L::LowerTriangularArray)
-
+$(TYPEDSIGNATURES)
 creates `unit_range::UnitRange` to loop over all non-zeros/spherical harmonics numbers in a LowerTriangularArray `L`.
 Like `eachindex` but skips the upper triangle with zeros in `L`."""
 eachharmonic(L::LowerTriangularArray) = axes(L.data, 1) 
 
 """
-    unit_range = eachharmonic(Ls::LowerTriangularMatrix...)
-
+$(TYPEDSIGNATURES)
 creates `unit_range::UnitRange` to loop over all non-zeros in the LowerTriangularMatrices
 provided as arguments. Checks bounds first. All LowerTriangularMatrix's need to be of the same size.
 Like `eachindex` but skips the upper triangle with zeros in `L`."""
@@ -157,9 +160,8 @@ end
 
 # CONVERSIONS
 """ 
-    L = LowerTriangularMatrix(M)
-
-Create a LowerTriangularMatrix `L` from Matrix `M` by copying over the non-zero elements in `M`."""
+$(TYPEDSIGNATURES)
+Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
 function LowerTriangularArray(M::Matrix{T}) where T # CPU version 
     m, n = size(M)
     L = LowerTriangularArray{T,2,Array{T,1}}(undef, size(M)...)
@@ -202,6 +204,10 @@ function lowertriangle_indices(M::AbstractArray{T,N}) where {T,N}
 end  
 
 # GPU version and fallback for higher dimensions
+"""
+$(TYPEDSIGNATURES)
+Create a LowerTriangularArray `L` from Array `M` by copying over the non-zero elements in `M`.
+"""
 function LowerTriangularArray(M::ArrayType) where {T, N, ArrayType<:AbstractArray{T,N}} 
     m, n = size(M)[1:2]
     LowerTriangularArray(M[lowertriangle_indices(m,n),[Colon() for i=1:N-2]...], m, n)
@@ -359,8 +365,7 @@ Base.:(-)(L::LowerTriangularArray) = LowerTriangularArray(-L.data, L.m, L.n)
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
 
 """
-    fill!(L::LowerTriangularArray, x)
-
+$(TYPEDSIGNATURES)
 Fills the elements of `L` with `x`. Faster than fill!(::AbstractArray, x)
 as only the non-zero elements in `L` are assigned with x."""
 function Base.fill!(L::LowerTriangularArray{T}, x) where T
@@ -378,13 +383,12 @@ function scale!(L::LowerTriangularArray{T}, s::Number) where T
 end
 
 # Broadcast (more or less copied and adjusted from LinearAlgebra.jl)
-import Base: similar, copyto!
 import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
 import LinearAlgebra: isstructurepreserving, fzeropreserving
 
 struct LowerTriangularStyle <: Broadcast.AbstractArrayStyle{2} end
 
-Base.BroadcastStyle(::Type{<:LowerTriangularMatrix}) = LowerTriangularStyle()
+Base.BroadcastStyle(::Type{<:LowerTriangularMatrix{T,ArrayType}}) where {T,ArrayType<:Array{T}} = LowerTriangularStyle()
 
 function Base.similar(bc::Broadcasted{LowerTriangularStyle}, ::Type{NF}) where NF
     inds = axes(bc)
@@ -412,6 +416,11 @@ function Base.copyto!(dest::LowerTriangularMatrix{T}, bc::Broadcasted{<:LowerTri
     end
     return dest
 end
+
+
+# GPU Broadcast support (adapted from GPUArrays.jl testsuite)
+GPUArrays.backend(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray} = GPUArrays.backend(ArrayType)
+Broadcast.BroadcastStyle(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray} = Broadcast.BroadcastStyle(ArrayType)
 
 # GPU methods (could be moved to an extension, in case this becomes a standalone package)
 Adapt.adapt_structure(to, x::LowerTriangularArray) = LowerTriangularArray(Adapt.adapt(to, x.data), x.m, x.n)
