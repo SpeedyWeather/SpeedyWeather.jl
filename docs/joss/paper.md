@@ -73,7 +73,7 @@ affiliations:
  - name: The University of Melbourne, Parkville, VIC, Australia
    index: 8
    
-date: 14 September 2023
+date: 27 March 2024
 bibliography: paper.bib
 
 ---
@@ -105,8 +105,9 @@ experience and productivity.
 
 The user interface of SpeedyWeather.jl is heavily influenced by
 the Julia ocean model Oceananigans.jl [@Ramadhan2020].
-A monolithic interface based on parameter files is avoided in favor of a
-library-style interface.
+A monolithic interface [@Mazlami2017], controlling most of the model's functionality
+through arguments of a single function or through parameter files (often called namelists in Fortran),
+is avoided in favor of a library-style interface.
 A model is constructed bottom-up by first defining the discretization
 and any non-default model components with their respective parameters.
 All components are then collected into a single model object which, once
@@ -217,7 +218,7 @@ who have also committed to the SpeedyWeather.jl repository, and the wider Julia 
 for help and support.
 MK acknowledges funding from the National Science Foundation.
 MK and TK acknowledge funding from the European Research Council
-under the European Union’s Horizon 2020 research and innovation programme for the ITHACA grant (no. 741112).
+under the European Union's Horizon 2020 research and innovation programme for the ITHACA grant (no. 741112).
 NCC acknowledges support by the Australian Research Council DECRA Fellowship DE210100749.
 
 # References
