@@ -12,8 +12,8 @@ function parameterization_tendencies!(
     time::DateTime,
     model::PrimitiveEquation,
 )
-    # TODO move into shortwave radiation code
-    cos_zenith!(time, model)
+    # TODO move into shortwave radiation code?
+    cos_zenith!(diagn, time, model)
 
     G = model.geometry
     rings = eachring(G.Grid, G.nlat_half)
@@ -82,7 +82,7 @@ function fluxes_to_tendencies!(
     # fluxes are defined on half levels including top k=1/2 and surface k=nlev+1/2
     @inbounds for k in 1:nlev
 
-        # Absorbed flux in a given layer, i.e. flux in minus flux out from above and below
+        # Absorbed flux in a given layer, i.e. flux in minus flux out from above and below
         # Fortran SPEEDY documentation eq. (2)
         ΔF_u = (flux_u_upward[k+1] - flux_u_upward[k]) +
             (flux_u_downward[k] - flux_u_downward[k+1])

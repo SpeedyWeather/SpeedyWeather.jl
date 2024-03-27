@@ -7,22 +7,30 @@ function get_column!(
     jring::Integer,     # ring index 1 around North Pole to J around South Pole
     model::PrimitiveEquation,
 )
-    get_column!(C, D, P, ij, jring, model.geometry, model.planet, model.orography, model.land_sea_mask)
+    get_column!(C, D, P, ij, jring, 
+        model.geometry,
+        model.planet,
+        model.orography,
+        model.land_sea_mask,
+        model.albedo)
 end
 
 """
 $(TYPEDSIGNATURES)
 Update `C::ColumnVariables` by copying the prognostic variables from `D::DiagnosticVariables`
 at gridpoint index `ij`. Provide `G::Geometry` for coordinate information."""
-function get_column!(   C::ColumnVariables,
-                        D::DiagnosticVariables,
-                        P::PrognosticVariables,
-                        ij::Integer,        # grid point index
-                        jring::Integer,     # ring index 1 around North Pole to J around South Pole
-                        geometry::Geometry,
-                        planet::AbstractPlanet,
-                        orography::AbstractOrography,
-                        land_sea_mask::AbstractLandSeaMask)
+function get_column!(   
+    C::ColumnVariables,
+    D::DiagnosticVariables,
+    P::PrognosticVariables,
+    ij::Integer,        # grid point index
+    jring::Integer,     # ring index 1 around North Pole to J around South Pole
+    geometry::Geometry,
+    planet::AbstractPlanet,
+    orography::AbstractOrography,
+    land_sea_mask::AbstractLandSeaMask,
+    albedo::AbstractAlbedo,
+)
 
     (; σ_levels_full, ln_σ_levels_full) = geometry
 
@@ -55,6 +63,10 @@ function get_column!(   C::ColumnVariables,
     C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
     C.skin_temperature_land = P.land.land_surface_temperature[ij]
     C.soil_moisture_availability = D.surface.soil_moisture_availability[ij]
+
+    # RADIATION
+    C.cos_zenith = D.surface.cos_zenith[ij]
+    C.albedo = albedo.albedo[ij]
 end
 
 """Recalculate ring index if not provided."""

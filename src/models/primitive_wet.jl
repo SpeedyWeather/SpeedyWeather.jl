@@ -1,9 +1,14 @@
 export PrimitiveWetModel
 
 """
-$(SIGNATURES)
-The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
-whether scalars or arrays that do not change throughout model integration.
+The PrimitiveWetModel contains all model components (themselves structs) needed for the
+simulation of the primitive equations with humidity. To be constructed like
+
+    model = PrimitiveWetModel(; spectral_grid, kwargs...)
+
+with `spectral_grid::SpectralGrid` used to initalize all non-default components
+passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
+model components, are
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct PrimitiveWetModel{
     NF<:AbstractFloat,
@@ -20,6 +25,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     OC<:AbstractOcean,
     LA<:AbstractLand,
     ZE<:AbstractZenith,
+    AL<:AbstractAlbedo,
     SO<:AbstractSoil,
     VG<:AbstractVegetation,
     CC<:AbstractClausiusClapeyron,
@@ -64,6 +70,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     ocean::OC = SeasonalOceanClimatology(spectral_grid)
     land::LA = SeasonalLandTemperature(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    albedo::AL = AlbedoClimatology(spectral_grid)
     soil::SO = SeasonalSoilMoisture(spectral_grid)
     vegetation::VG = VegetationClimatology(spectral_grid)
     
@@ -79,8 +86,8 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     evaporation::EV = SurfaceEvaporation(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
-    shortwave_radiation::SW = NoShortwave(spectral_grid)
-    longwave_radiation::LW = UniformCooling(spectral_grid)
+    shortwave_radiation::SW = TransparentShortwave(spectral_grid)
+    longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     
     # NUMERICS
     device_setup::DS = DeviceSetup(CPUDevice())
@@ -125,6 +132,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.soil, model)
     initialize!(model.vegetation, model)
     initialize!(model.solar_zenith, time, model)
+    initialize!(model.albedo, model)
 
     # parameterizations
     initialize!(model.boundary_layer_drag, model)
