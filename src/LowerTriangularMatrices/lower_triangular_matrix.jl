@@ -85,6 +85,18 @@ only the lower triangle (the non-zero entries) of `L`."""
 triangle_number(n::Integer) = n*(n+1)÷2
 nonzeros(m::Integer, n::Integer) = m*n-triangle_number(n-1)
 
+"""
+$(TYPEDSIGNATURES)
+Converts the linear index `k` in the lower triangle into a pair `(i, j)` of indices 
+of the matrix in column-major form. (Formula taken from 
+Angeletti et al, 2019, https://hal.science/hal-02047514/document)
+"""
+@inline function k2ij(k::Integer, m::Integer) 
+    kp = triangle_number(m) - k 
+    p = Int(floor((sqrt(1 + 8*kp) - 1)/2))
+    (k - m*(m-1)÷2 + p*(p+1)÷2, m - p)
+end 
+
 # direct indexing, no. indices have to be one less than `N` for the correct dimensionality, so N!=M
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, I::Vararg{Integer,M}) where {T,N,M}
     @boundscheck M == N-1 || throw(BoundsError(L, I))
@@ -435,7 +447,7 @@ function Base.copyto!(dest::LowerTriangularArray{T,N,ArrayType}, bc::Broadcasted
     return dest
 end
 
-# GPU Broadcast support (adapted from GPUArrays.jl testsuite)
+# GPU Broadcast support (adapted from GPUArrays.jl), if this ever becomes a standalone package, this could go into an extension
 GPUArrays.backend(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray} = GPUArrays.backend(ArrayType)
 Broadcast.BroadcastStyle(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray} = Broadcast.BroadcastStyle(ArrayType)
 
