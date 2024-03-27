@@ -13,12 +13,12 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const nlev::Int = 0                     # number of vertical levels
     
     # COORDINATES
-    ij::Int = 0                             # grid-point index
+    ij::Int = 0                             # grid-point index
     jring::Int = 0                          # latitude ring the column is on
     lond::NF = 0                            # longitude
     latd::NF = 0                            # latitude, needed for shortwave radiation
     land_fraction::NF = 0                   # fraction of the column that is over land
-    orography::NF = 0                       # orography height [m]
+    orography::NF = 0                       # orography height [m]
 
     # PROGNOSTIC VARIABLES
     const u::Vector{NF} = zeros(NF, nlev)            # zonal velocity [m/s]
@@ -31,9 +31,9 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const pres::Vector{NF} = zeros(NF, nlev+1)       # pressure [Pa]
 
     # TENDENCIES to accumulate the parametrizations into
-    const u_tend::Vector{NF} = zeros(NF, nlev)                   # zonal velocity [m/s²]
+    const u_tend::Vector{NF} = zeros(NF, nlev)                   # zonal velocity [m/s²]
     const v_tend::Vector{NF} = zeros(NF, nlev)                   # meridional velocity [m/s²]
-    const temp_tend::Vector{NF} = zeros(NF, nlev)                # absolute temperature [K/s]
+    const temp_tend::Vector{NF} = zeros(NF, nlev)                # absolute temperature [K/s]
     const humid_tend::Vector{NF} = zeros(NF, nlev)               # specific humidity [kg/kg/s]
 
     # FLUXES, arrays to be used for various parameterizations, on half levels incl top and bottom
@@ -49,7 +49,7 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const flux_humid_upward::Vector{NF} = zeros(NF, nlev+1)
     const flux_humid_downward::Vector{NF} = zeros(NF, nlev+1)
 
-    # boundary layer
+    # boundary layer
     boundary_layer_depth::Int = 0
     boundary_layer_drag::NF = 0
     surface_geopotential::NF = 0
@@ -67,11 +67,20 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const sat_humid::Vector{NF} = zeros(NF, nlev)                # Saturation specific humidity [kg/kg]
     const dry_static_energy::Vector{NF} = zeros(NF, nlev)        # Dry static energy [J/kg]
     const temp_virt::Vector{NF} = zeros(NF, nlev)                # virtual temperature [K]
-    const bulk_richardson::Vector{NF} = zeros(NF, nlev)          # bulk richardson number [1]
     const geopot::Vector{NF} = zeros(NF, nlev)                   # gepotential height [m]
 
     # CONVECTION AND PRECIPITATION
     cloud_top::Int = nlev + 1               # layer index k of top-most layer with clouds
     precip_convection::NF = 0               # Precipitation due to convection [m]
     precip_large_scale::NF = 0              # precipitation due to large-scale condensation [m]
+
+    # RADIATION
+    cos_zenith::NF = 0                      # cosine of solar zenith angle
+    albedo::NF = 0                          # surface albedo
+
+    # WORK ARRAYS
+    const a::Vector{NF} = zeros(NF, nlev)
+    const b::Vector{NF} = zeros(NF, nlev)
+    const c::Vector{NF} = zeros(NF, nlev)
+    const d::Vector{NF} = zeros(NF, nlev)
 end

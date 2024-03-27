@@ -20,10 +20,10 @@ end
 
 ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
 
-# nothing to initialize with this scheme
+# nothing to initialize with this scheme
 initialize!(scheme::ImplicitCondensation, model::PrimitiveEquation) = nothing
 
-# do nothing fall back for primitive dry 
+# do nothing fall back for primitive dry 
 function large_scale_condensation!( 
     column::ColumnVariables,
     model::PrimitiveEquation,
@@ -88,8 +88,8 @@ function large_scale_condensation!(
             # tendency for Implicit humid = sat_humid, divide by leapfrog time step below
             δq = sat_humid[k] - humid[k]
 
-            # implicit correction, Frierson et al. 2006 eq. (21)
-            dqsat_dT = sat_humid[k] * Lᵥ_Rᵥ/temp[k]^2       # derivative of qsat wrt to temp
+            # implicit correction, Frierson et al. 2006 eq. (21)
+            dqsat_dT = sat_humid[k] * Lᵥ_Rᵥ/temp[k]^2       # derivative of qsat wrt to temp
             δq /= ((1 + Lᵥ_cₚ*dqsat_dT) * time_scale*Δt_sec) 
 
             # latent heat release with maximum heating limiter for stability
@@ -98,10 +98,11 @@ function large_scale_condensation!(
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top
-            column.cloud_top = min(column.cloud_top, k)     # Page 7 (last sentence)
+            # Fortran SPEEDY documentation Page 7 (last sentence)
+            column.cloud_top = min(column.cloud_top, k)
     
             # 2. Precipitation due to large-scale condensation [kg/m²/s] /ρ for [m/s]
-            # += for vertical integral
+            # += for vertical integral
             ΔpₖΔt_gρ = Δσ[k] * pₛΔt_gρ                      # Formula 4 *Δt for [m] of rain during Δt
             column.precip_large_scale -= ΔpₖΔt_gρ * δq      # Formula 25, unit [m]
 

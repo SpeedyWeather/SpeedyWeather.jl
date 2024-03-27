@@ -52,13 +52,13 @@ function get_Δt_millisec(
     adjust_with_output::Bool,
     output_dt::Dates.TimePeriod = DEFAULT_OUTPUT_DT,
 )
-    # linearly scale Δt with trunc+1 (which are often powers of two)
+    # linearly scale Δt with trunc+1 (which are often powers of two)
     resolution_factor = (DEFAULT_TRUNC+1)/(trunc+1)
 
     # radius also affects grid spacing, scale proportionally
     radius_factor = radius/DEFAULT_RADIUS
 
-    # maybe rename to _at_trunc_and_radius?
+    # maybe rename to _at_trunc_and_radius?
     Δt_at_trunc = Second(Δt_at_T31).value * resolution_factor * radius_factor
 
     if adjust_with_output && (output_dt > Millisecond(0))
@@ -73,7 +73,7 @@ function get_Δt_millisec(
         Δt_millisec_unadjusted = round(Int, 1000*Δt_at_trunc)
         Δt_ratio = Δt_millisec.value/Δt_millisec_unadjusted
 
-        if abs(Δt_ratio - 1) > 0.05     # only when +-5% changes
+        if abs(Δt_ratio - 1) > 0.05     # only when +-5% changes
             p = round(Int, (Δt_ratio - 1)*100)
             ps = p > 0 ? "+" : ""
             @info "Time step changed from $Δt_millisec_unadjusted to $Δt_millisec ($ps$p%) to match output frequency."
@@ -114,7 +114,7 @@ function initialize!(L::Leapfrog, model::ModelSetup)
     n = round(Int, Millisecond(output_dt).value/L.Δt_millisec.value)
     nΔt = n*L.Δt_millisec
     if nΔt != output_dt
-        @info "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms (=$(nΔt.value/1000)s), but output_dt = $(output_dt.value)s"
+        @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms (=$(nΔt.value/1000)s), but output_dt = $(output_dt.value)s"
     end
 end
 
@@ -133,7 +133,7 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
     @boundscheck lf == 1 || lf == 2 || throw(BoundsError())         # index lf picks leapfrog dim
     
     A_lf = lf == 1 ? A_old : A_new                      # view on either t or t+dt to dis/enable Williams filter        
-    (; robert_filter, williams_filter) = L              # coefficients for the Robert and Williams filter
+    (; robert_filter, williams_filter) = L              # coefficients for the Robert and Williams filter
     dt_NF = convert(NF, dt)                             # time step dt in number format NF
 
     # LEAP FROG time step with or without Robert+Williams filter
@@ -183,7 +183,7 @@ function leapfrog!( progn::PrognosticSurfaceTimesteps,
     (; pres_tend) = diagn
     pres_old = progn.timesteps[1].pres
     pres_new = progn.timesteps[2].pres
-    spectral_truncation!(pres_tend)         # set lmax+1 mode to zero
+    spectral_truncation!(pres_tend)         # set lmax+1 mode to zero
     leapfrog!(pres_old, pres_new, pres_tend, dt, lf, model.time_stepping)
 end
 
@@ -214,13 +214,13 @@ function first_timesteps!(
     timestep!(clock, Δt_millisec_half, increase_counter=false)      
 
     # output, callbacks not called after the first Euler step as it's a half-step (i=0 to i=1/2)
-    # populating the second leapfrog index to perform the second time step
+    # populating the second leapfrog index to perform the second time step
 
     # SECOND TIME STEP (UNFILTERED LEAPFROG with dt=Δt, leapfrogging from t=0 over t=Δt/2 to t=Δt)
     initialize!(implicit, Δt, diagn, model)    # update precomputed implicit terms with time step Δt
     lf1 = 1                             # without Robert+Williams filter
     lf2 = 2                             # evaluate all tendencies at t=dt/2,
-                                        # the 2nd leapfrog index (=>Leapfrog)
+                                        # the 2nd leapfrog index (=>Leapfrog)
     timestep!(progn, diagn, Δt, model, lf1, lf2)
     # remove prev Δt/2 in case not even milliseconds, otherwise time is off by 1ms
     timestep!(clock, -Δt_millisec_half, increase_counter=false) 
@@ -290,11 +290,11 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     (; pres) = progn.surface.timesteps[lf2]
     (; implicit, spectral_transform) = model
 
-    # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
+    # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
     dynamics_tendencies!(diagn_layer, progn_lf, diagn.surface, pres, time, model)
     implicit_correction!(diagn_layer, progn_layer, diagn.surface, progn.surface, implicit)
     
-    # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
+    # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
     horizontal_diffusion!(progn_layer, diagn_layer, model)
     leapfrog!(progn_layer, diagn_layer, dt, lf1, model)
     gridded!(diagn_layer, progn_lf, model)
@@ -383,7 +383,7 @@ function time_stepping!(
     (; time_stepping) = model
 
     # SCALING: we use vorticity*radius, divergence*radius in the dynamical core
-    scale!(progn, model.spectral_grid.radius)
+    scale!(progn, diagn, model.spectral_grid.radius)
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
@@ -395,9 +395,9 @@ function time_stepping!(
     
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
     # considered part of the model initialisation
-    first_timesteps!(progn,diagn, model, output)
+    first_timesteps!(progn, diagn, model, output)
     
-    # only now initialise feedback for benchmark accuracy
+    # only now initialise feedback for benchmark accuracy
     initialize!(feedback, clock, model)
 
     # MAIN LOOP
@@ -405,14 +405,15 @@ function time_stepping!(
         timestep!(progn, diagn, 2Δt, model) # calculate tendencies and leapfrog forward
         timestep!(clock, Δt_millisec)       # time of lf=2 and diagn after timestep!
 
-        progress!(feedback, progn)           # updates the progress meter bar
+        progress!(feedback, progn)          # updates the progress meter bar
         write_output!(output, clock.time, diagn)
         callback!(model.callbacks, progn, diagn, model)
     end
     
-    # UNSCALE, CLOSE, FINISH
+    # UNSCALE, CLOSE, FINISH
     finish!(feedback)                       # finish the progress meter, do first for benchmark accuracy
     unscale!(progn)                         # undo radius-scaling for vor, div from the dynamical core
+    unscale!(diagn)                         # undo radius-scaling for vor, div from the dynamical core
     close(output)                           # close netCDF file
     write_restart_file(progn, output)       # as JLD2 
     finish!(model.callbacks, progn, diagn, model)

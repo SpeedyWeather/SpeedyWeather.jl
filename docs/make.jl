@@ -28,6 +28,8 @@ makedocs(
             "Running SpeedyWeather" => [
                 "How to run SpeedyWeather"=>"how_to_run_speedy.md",
                 "Model setups"=>"setups.md",
+                "Analysis"=>"analysis.md",
+                "Tree structure"=>"structure.md",
                 "Particle advection"=>"particles.md",
                 "NetCDF output"=>"output.md",
             ],
@@ -36,6 +38,7 @@ makedocs(
                 "Parameterizations"=>"parameterizations.md",
                 "Orography"=>"orography.md",
                 "Land-Sea Mask"=>"land_sea_mask.md",
+                "Ocean"=>"ocean.md",
                 "Callbacks"=>"callbacks.md",
             ],
             "RingGrids"=>"ringgrids.md",

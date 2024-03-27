@@ -78,7 +78,7 @@ function initialize!(   orog::ZonalRidge,
 
     ηᵥ = (1-η₀)*π/2                     # ηᵥ-coordinate of the surface [1]
     A = u₀*cos(ηᵥ)^(3/2)                # amplitude [m/s]
-    RΩ = radius*rotation                # [m/s]
+    RΩ = radius*rotation                # [m/s]
     g⁻¹ = inv(gravity)                  # inverse gravity [s²/m]
 
     for ij in eachindex(φ, orography)
@@ -114,7 +114,7 @@ Base.@kwdef mutable struct EarthOrography{NF<:AbstractFloat, Grid<:AbstractGrid{
     scale::Float64 = 1
 
     "smooth the orography field?"
-    smoothing::Bool = true
+    smoothing::Bool = false
 
     "power of Laplacian for smoothing"
     smoothing_power::Float64 = 1.0

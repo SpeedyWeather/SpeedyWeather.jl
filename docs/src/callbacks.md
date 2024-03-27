@@ -184,13 +184,17 @@ add!(callbacks, :key1 => NoCallback(), :key2 => NoCallback())   # keys provided
 ```
 Meaning that callbacks can be added before and after model construction
 
-
 ```@example callbacks
 spectral_grid = SpectralGrid()
 callbacks = CallbackDict(:callback_added_before => NoCallback())
 model = PrimitiveWetModel(; spectral_grid, callbacks)
 add!(model.callbacks, :callback_added_afterwards => NoCallback())
+add!(model, :callback_added_afterwards2 => NoCallback())
 ```
+
+Note how the first argument can be `model.callbacks` as outlined in the sections above
+because this is the callbacks dictionary, but also simply
+`model`, which will add the callback to `model.callbacks`. It's equivalent.
 Let us add two more meaningful callbacks
 
 ```@example callbacks
@@ -221,7 +225,7 @@ global mean surface temperatures in Kelvin on every time step while the model ra
 model.callbacks[:temperature].temp
 ```
 
-## Intrusive callbacks
+## [Intrusive callbacks](@id intrusive_callbacks)
 
 In the sections above, callbacks were introduced as a tool to define custom
 diagnostics or simulation output. This is the simpler and recommended way of using 
@@ -239,6 +243,10 @@ Another example would be to switch on/off certain model components over time.
 If these components are implemented as *mutable* struct then one could define
 a callback that weakens their respective strength parameter over time.
 
+As an example of a callback that changes the model components see
+
+- Millenium flood: [Time-dependent land-sea mask](@ref)
+
 Changing the diagnostic variables, however, will not have any effect. All of
 them are treated as work arrays, meaning that their state is completely
 overwritten on every time step.  Changing the prognostic variables in spectral space
@@ -251,3 +259,189 @@ the simulation while running or to interfere with a simulation. We therefore
 encourage users to use callbacks as widely as possible, but if you run
 into any issues please open an issue in the repository and explain what
 you'd like to achieve and which errors you are facing. We are happy to help.
+
+## Schedules
+
+For convenience, SpeedyWeather.jl implements a [`Schedule`](@ref) which helps to
+schedule when callbacks are called. Because in many situations you don't want to call
+them on every time step but only periodically, say once a day, or only on specific
+dates and times, e.g. Jan 1 at noon. Several examples how to create schedules
+
+```@example schedule
+using SpeedyWeather
+
+# execute on timestep at or after Jan 2 2000
+event_schedule = Schedule(DateTime(2000,1,2))   
+
+# several events scheduled
+events = (DateTime(2000,1,3), DateTime(2000,1,5,12))
+several_events_schedule = Schedule(events...)
+
+# provided as Vector{DateTime} with times= keyword
+always_at_noon = [DateTime(2000,1,i,12) for i in 1:10]
+noon_schedule = Schedule(times=always_at_noon)
+
+# or using every= for periodic execution, here once a day
+periodic_schedule = Schedule(every=Day(1))
+```
+
+A `Schedule` has 5 fields, see [`Schedule`](@ref). `every` is an option
+to create a periodic schedule to execute every time that indicated
+period has passed. `steps` and `counter` will let you know how many
+callback execution steps there are and count them up. `times` is a 
+`Vector{DateTime}` containing scheduled events. `schedule` is the
+actual schedule inside a `Schedule`, implemented as `BitVector`
+indicating whether to execute on a given time step (`true`) or not
+(`false`).
+
+Let's show how to use a `Schedule` inside a callback
+
+```@example schedule
+struct MyScheduledCallback <: SpeedyWeather.AbstractCallback
+    schedule::Schedule
+    # add other fields here that you need
+end
+
+function SpeedyWeather.initialize!(
+    callback::MyScheduledCallback,
+    progn::PrognosticVariables,
+    args...
+)
+    # when initializing a scheduled callback also initialize its schedule!
+    initialize!(callback.schedule, progn.clock)
+
+    # initialize other things in your callback here
+end
+
+function SpeedyWeather.callback!(
+    callback::MyScheduledCallback,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::ModelSetup,
+)
+    # scheduled callbacks start with this line to execute only when scheduled!
+    # else escape immediately
+    isscheduled(callback.schedule, progn.clock) || return nothing
+
+    # Just print the North Pole surface temperature to screen
+    (;time) = progn.clock
+    temp_at_north_pole = diagn.layers[end].grid_variables.temp_grid[1]
+    @info "North pole has a temperature of $temp_at_north_pole on $time."
+end
+
+# nothing needs to be done when finishing
+SpeedyWeather.finish!(::MyScheduledCallback, args...) = nothing
+```
+
+So in summary
+- add a field `schedule::Schedule` to your callback
+- add the line `initialize!(callback.schedule, progn.clock)` when initializing your callback
+- start your `callback!` method with `isscheduled(callback.schedule, progn.clock) || return nothing` to execute only when scheduled
+
+A `Schedule` is a field inside a callback as this allows you the set the callbacks
+desired schedule when creating it. In the example above we can create our callback
+that is supposed to print the North Pole's temperature like so
+```@example schedule
+north_pole_temp_at_noon_jan9 = MyScheduledCallback(Schedule(DateTime(2000,1,9,12)))
+```
+The default for `every` is `typemax(Int)` indicating "never". This just means that there
+is no periodically reoccuring schedule, only `schedule.times` would include some times
+for events that are scheduled. Now let's create a primitive equation model with that callback
+
+```@example schedule
+spectral_grid = SpectralGrid(trunc=31, nlev=5)
+model = PrimitiveWetModel(;spectral_grid)
+model.feedback.verbose = false      # hide to progress meter
+add!(model.callbacks, north_pole_temp_at_noon_jan9)
+
+# start simulation 7 days earlier
+simulation = initialize!(model, time = DateTime(2000,1,2,12))
+run!(simulation, period=Day(10))
+nothing # hide
+```
+
+So the callback gives us the temperature at the North Pole exactly when scheduled.
+We could have also stored this temperature, or conditionally changed parameters inside
+the model. There are plenty of ways how to use the scheduling, either by event, or in contrast,
+we could also schedule for once a day. As illustrated in the following
+
+```@example schedule
+north_pole_temp_daily = MyScheduledCallback(Schedule(every=Day(1)))
+add!(model.callbacks, north_pole_temp_daily)
+
+# resume simulation, start time is now 2000-1-12 noon
+run!(simulation, period=Day(5))
+nothing # hide
+```
+
+Note that the previous callback is still part of the model, we haven't
+deleted it with `delete!`. But because it's scheduled for a specific
+time that's in the past now that we resume the simulation it's schedule
+is empty (which is thrown as a warning). However, our new callback,
+scheduled daily, is active and prints daily at noon, because the
+simulation start time was noon.
+
+### Scheduling logic
+
+An event `Schedule` (created with `DateTime` object(s)) for callbacks, executes 
+on or after the specified times.
+For two consecutive time steps ``i``, ``i+1``, an event is scheduled at ``i+1``
+when it occurs in ``(i,i+1]``. So a simulation with timestep `i` on Jan-1 at 1am,
+and ``i+1`` at 2am, will execute a callback scheduled for 1am at ``i`` but scheduled
+for 1am and 1s (=01:00:01 on a 24H clock) at 2am. Because callbacks are
+always executed _after_ a timestep this also means that a simulation starting
+at midnight with a callback scheduled for midnight will not execute this
+callback as it is outside of the ``(i, i+1]`` range. You'd need to include
+this execution into the initialization. If several events inside the
+`Schedule` fall into the same time step (in the example above, 1am and 1s and
+1am 30min) the execution will not happen twice. Think of a scheduled callback
+as a binary "should the callback be executed now or not?". Which is in fact
+how it's implemented, as a `BitVector` of the length of the number of time steps.
+If the bit at a given timestep is true, execute, otherwise not.
+
+A periodic `Schedule` (created with `every = Hour(2)` or similar) will execute
+on the timestep _after_ that period (here 2 hours) has passed. If a simulation
+starts at midnight with one hour time steps then execution would take place
+after the timestep from 1am to 2am because that's when the clock switches to
+2am which is 2 hours after the start of the simulation. Note that therefore
+the initial timestep is not included, however, the last time step would be
+if the period is a multiple of the scheduling period. If the first timestep
+should be included (e.g. you want to do something with the initial conditions)
+then you'll need to include that into the initialization of the callback.
+
+Periodic schedules which do not match the simulation time step will be adjusted
+by rounding. Example, if you want a schedule which executes every hour
+but your simulation time step is 25min then it will be adjusted to execute
+every 2nd time step, meaning every 50min and not 1 hour. However, an info
+will be thrown if that is the case
+
+```@example schedule
+odd_schedule = MyScheduledCallback(Schedule(every = Minute(70)))
+add!(model.callbacks, odd_schedule)
+
+# resume simulation for 4 hours
+run!(simulation, period=Hour(4))
+nothing # hide
+```
+
+Now we get two empty schedules, one from callback that's supposed to
+execute on Jan 9 noon (this time has passed in our simulation) and
+one from the daily callback (we're not simulating for a day).
+You could just `delete!` those callbacks. You can see that while we
+wanted our `odd_schedule` to execute every 70min, it has to adjust it
+to every 60min to match the simulation time step of 30min.
+
+After the model initialization you can always check the simulation time step
+from `model.time_stepping` 
+
+```@example schedule
+model.time_stepping
+```
+
+Or converted into minutes (the time step internally is at millisecond accuracy)
+
+```@example schedule
+Minute(model.time_stepping.Δt_millisec)
+```
+
+which illustrates why the adjustment of our callback frequency was necessary.

@@ -159,7 +159,7 @@ function Base.copyto!(  L1::LowerTriangularMatrix{T},   # copy to L1
 
     lmax, mmax = size(L1)        # but the size of L1 to loop
     lm = 0
-    @inbounds for m in 1:maximum(ms)
+    @inbounds for m in 1:mmax
         for l in m:lmax
             lm += 1
             L1[lm] = (l in ls) && (m in ms) ? convert(T, L2[l, m]) : L1[lm]

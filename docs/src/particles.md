@@ -241,4 +241,91 @@ which we will do in the next section
 
 ## Tracking particles
 
-to be completed
+A [`ParticleTracker`](@ref) is implemented as a callback, see [Callbacks](@ref), outputting
+the particle locations via netCDF. We can create it like
+
+```@example particle_tracker
+using SpeedyWeather
+spectral_grid = SpectralGrid(n_particles = 100)
+particle_tracker = ParticleTracker(spectral_grid, schedule=Schedule(every=Hour(3)))
+```
+
+which would output every 3 hours (the default). This output frequency might be slightly adjusted
+depending on the time step of the dynamics to output every `n` time steps (an `@info` is thrown if
+that is the case), see [Schedules](@ref). Further options on compression are available
+as keyword arguments `ParticleTracker(spectral_grid, keepbits=15)` for example.
+The callback is then added after the model is created
+
+```@example particle_tracker
+particle_advection = ParticleAdvection2D(spectral_grid)
+model = ShallowWaterModel(;spectral_grid, particle_advection)
+add!(model.callbacks, particle_tracker)
+```
+
+which will give it a random key too in case you need to remove it again (more on this in 
+[Callbacks](@ref)). If you now run the simulation the particle tracker is called on
+`particle_tracker.every_n_timesteps` and it continuously writes into `particle_tracker.netcdf_file`
+which is placed in the run folder similar to other [NetCDF output](@ref). For example,
+the run id can be obtained after the simulation by `model.output.id`.
+
+```@example particle_tracker
+simulation = initialize!(model)
+run!(simulation, period=Day(10))
+model.output.id
+```
+so that you can read the netCDF file with
+
+```@example particle_tracker
+using NCDatasets
+run_id = "run_$(model.output.id)"                    # create a run_???? string with output id
+path = joinpath(run_id, particle_tracker.file_name)  # by default "run_????/particles.nc"
+ds = NCDataset(path)
+ds["lon"]
+ds["lat"]
+```
+where the last two lines are lazy loading a matrix with each row a particle and each column a time step.
+You may do `ds["lon"][:,:]` to obtain the full `Matrix`. We had specified
+`spectral_grid.n_particles` above and we will have time steps in this file
+depending on the `period` the simulation ran for and the `particle_tracker.Δt` output
+frequency. We can visualise the particles' trajectories with
+
+```@example particle_tracker
+lon = ds["lon"][:,:]
+lat = ds["lat"][:,:]
+
+using PythonPlot
+ioff() # hide
+fig, ax = subplots(1, 1, figsize=(10, 6))
+ax.plot(lon', lat')
+ax.set_xlabel("longitude")
+ax.set_ylabel("latitude")
+ax.set_title("Particle advection")
+tight_layout() # hide
+savefig("particles.png", dpi=70) # hide
+nothing # hide
+```
+![Particle trajectories](particles.png)
+
+Instead of providing a polished example with a nice projection we decided to keep it simple here
+because this is probably how you will first look at your data too. As you can see, some particles
+in the Northern Hemisphere have been advected with a zonal jet and perform some wavy motions as
+the jet does too. However, there are also some horizontal lines which are automatically plotted
+when a particles travels across the prime meridian 0˚E = 360˚E. Ideally you would want to use
+a more advanced projection and plot the particle trajectories as geodetics. 
+
+With Makie.jl you can do
+
+```julia
+using GeoMakie, GLMakie
+
+fig = Figure()
+ga = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=19 +lat_0=50")
+
+lines!(ga, GeoMakie.coastlines())
+ga.xticklabelsvisible[] = false
+ga.yticklabelsvisible[] = false
+
+n_particles = size(lon)[1]
+[lines!(ga, lon[i,:], lat[i,:]) for i in 1:n_particles]
+fig
+```

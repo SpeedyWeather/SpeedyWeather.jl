@@ -9,9 +9,10 @@ The dynamical core presented here to solve the barotropic vorticity equations la
 the idealized models with spectral dynamics developed at the
 Geophysical Fluid Dynamics Laboratory[^1]: A barotropic vorticity model[^2].
 
-Many concepts of the [Shallow water model](@ref shallow_water_model) and the [Primitive equation model](@ref primitive_equation_model) are similar,
-such that for example [horizontal diffusion](@ref diffusion) and the [Time integration](@ref leapfrog)
-are only explained here.
+Many concepts of the [Shallow water model](@ref shallow_water_model) and the
+[Primitive equation model](@ref primitive_equation_model) are similar,
+such that for example [horizontal diffusion](@ref diffusion) and the
+[Time integration](@ref leapfrog) are only explained here.
 
 ## Barotropic vorticity equation
 
@@ -62,8 +63,8 @@ in the `BarotropicModel`, as outlined in the following section.
 
 ## Algorithm
 
-We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrate the barotropic vorticity equation.
-As an initial step
+We briefly outline the algorithm that SpeedyWeather.jl uses in order to integrate the barotropic
+vorticity equation. As an initial step
 
 0\. Start with initial conditions of ``\zeta_{lm}`` in spectral space and
 transform this model state to grid-point space:
@@ -91,18 +92,22 @@ Now loop over
 
 ## [Horizontal diffusion](@id diffusion)
 
-In SpeedyWeather.jl we use hyperdiffusion through an ``n``-th power Laplacian ``(-1)^{n+1}\nabla^{2n}`` (hyper when ``n>1``) which
-can be implemented as a multiplication of the spectral coefficients ``\Psi_{lm}`` with ``(-l(l+1))^nR^{-2n}`` (see
-spectral [Laplacian](@ref)) It is therefore computationally not more expensive to apply hyperdiffusion over diffusion
-as the ``(-l(l+1))^nR^{-2n}`` can be precomputed. Note the sign change ``(-1)^{n+1}`` here is such that the dissipative nature of the diffusion operator is retained for ``n`` odd and even.
+In SpeedyWeather.jl we use hyperdiffusion through an ``n``-th power Laplacian ``(-1)^{n+1}\nabla^{2n}``
+(hyper when ``n>1``) which
+can be implemented as a multiplication of the spectral coefficients ``\Psi_{lm}`` with
+``(-l(l+1))^nR^{-2n}`` (see spectral [Laplacian](@ref)). It is therefore computationally not more
+expensive to apply hyperdiffusion over diffusion as the ``(-l(l+1))^nR^{-2n}`` can be precomputed.
+Note the sign change ``(-1)^{n+1}`` here is such that the dissipative nature of the diffusion operator
+is retained for ``n`` odd and even.
 
 In SpeedyWeather.jl the diffusion is applied _implicitly_. For that, consider a
-[leapfrog scheme](https://en.wikipedia.org/wiki/Leapfrog_integration) with time step ``\Delta t`` of variable ``\zeta`` to
-obtain from time steps ``i-1`` and ``i``, the next time step ``i+1``
+[leapfrog scheme](https://en.wikipedia.org/wiki/Leapfrog_integration) with time step ``\Delta t`` of
+variable ``\zeta`` to obtain from time steps ``i-1`` and ``i``, the next time step ``i+1``
 ```math
 \zeta_{i+1} = \zeta_{i-1} + 2\Delta t d\zeta,
 ```
-with ``d\zeta`` being some tendency evaluated from ``\zeta_i``. Now we want to add a diffusion term ``(-1)^{n+1}\nu \nabla^{2n}\zeta``
+with ``d\zeta`` being some tendency evaluated from ``\zeta_i``. Now we want to add a diffusion term
+``(-1)^{n+1}\nu \nabla^{2n}\zeta``
 with coefficient ``\nu``, which however, is implicitly calculated from ``\zeta_{i+1}``, then
 
 ```math
@@ -129,7 +134,8 @@ only an element-wise multiplication in spectral space. For every spectral harmon
 d\zeta \to D_\text{implicit}^{-1}(d\zeta + D_\text{explicit}\zeta_{i-1}).
 ```
 Hence 2 multiplications and 1 subtraction with precomputed constants.
-However, we will normalize the (hyper-)Laplacians as described in the following. This also will take care of the alternating sign such that the diffusion operation is dissipative regardless the power ``n``.
+However, we will normalize the (hyper-)Laplacians as described in the following. This also will take care of
+the alternating sign such that the diffusion operation is dissipative regardless the power ``n``.
 
 ### Normalization of diffusion
 

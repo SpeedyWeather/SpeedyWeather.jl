@@ -27,6 +27,10 @@ function initialize!(
     particle_advection::ParticleAdvection2D,
     model::ModelSetup,
 )
+    (; nlev) = model.spectral_grid
+    (; layer) = particle_advection
+    nlev < layer && @warn "Particle advection on layer $layer on spectral grid with nlev=$nlev."
+
     (; every_n_timesteps) = particle_advection
     # Δt [˚*s/m] is scaled by radius to convert more easily from velocity [m/s]
     # to [˚/s] for particle locations in degree
@@ -97,6 +101,8 @@ function particle_advection!(
 
     for i in eachindex(particles, u_old, v_old)
         # sum up Heun's first term in 1/2*Δt*(uv_old + uv_new) on the fly
+        # on first time step old u=v=0, so we just modulo all particles
+        # so that one could start with a particle at -120˚E => 240˚E here 
         particles[i] = advect_2D(particles[i], u_old[i], v_old[i], Δt_half)
         
         # predictor step, used to evaluate u_new, v_new 
