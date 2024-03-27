@@ -105,7 +105,8 @@ simulation = initialize!(model)</code></pre><pre class="documenter-example-outpu
 │├ precip_large_scale
 │├ precip_convection
 │├ cloud_top
-│└ soil_moisture_availability
+│├ soil_moisture_availability
+│└ cos_zenith
 ├┐columns
 │├ nlev
 │├ ij
@@ -151,6 +152,8 @@ simulation = initialize!(model)</code></pre><pre class="documenter-example-outpu
 │├ cloud_top
 │├ precip_convection
 │├ precip_large_scale
+│├ cos_zenith
+│├ albedo
 │├ a
 │├ b
 │├ c
@@ -746,7 +749,6 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ missing_value
 │└ monthly_temperature
 ├┐solar_zenith
-│├ nlat_half
 │├ length_of_day
 │├ length_of_year
 │├ equation_of_time
@@ -762,8 +764,14 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 ││├ c1
 ││├ s2
 ││└ c2
-│├ initial_time
-│└ cos_zenith
+│└ initial_time
+├┐albedo
+│├ nlat_half
+│├ path
+│├ file
+│├ varname
+│├ file_Grid
+│└ albedo
 ├ physics
 ├┐boundary_layer_drag
 │├ κ
@@ -801,7 +809,10 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ nlev
 │└ time_scale
 ├ shortwave_radiation
-├ longwave_radiation
+├┐longwave_radiation
+│├ α
+│├ temp_tropopause
+│└ time_scale
 ├┐device_setup
 │├ device
 │├ device_KA
@@ -1074,7 +1085,6 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ missing_value
 │└ monthly_temperature
 ├┐solar_zenith
-│├ nlat_half
 │├ length_of_day
 │├ length_of_year
 │├ equation_of_time
@@ -1090,8 +1100,14 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 ││├ c1
 ││├ s2
 ││└ c2
-│├ initial_time
-│└ cos_zenith
+│└ initial_time
+├┐albedo
+│├ nlat_half
+│├ path
+│├ file
+│├ varname
+│├ file_Grid
+│└ albedo
 ├┐soil
 │├ nlat_half
 │├ D_top
@@ -1173,10 +1189,9 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │└ relative_humidity
 ├ shortwave_radiation
 ├┐longwave_radiation
-│├ time_scale
-│├ temp_min
-│├ temp_stratosphere
-│└ time_scale_stratosphere
+│├ α
+│├ temp_tropopause
+│└ time_scale
 ├┐device_setup
 │├ device
 │├ device_KA
@@ -1299,13 +1314,13 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
  ├ run_path
  ├ progress_meter
  ├ progress_txt
- └ nars_detected</code></pre><h2 id="Size-of-a-Simulation"><a class="docs-heading-anchor" href="#Size-of-a-Simulation">Size of a Simulation</a><a id="Size-of-a-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Size-of-a-Simulation" title="Permalink"></a></h2><p>The <code>tree</code> function also allows for the <code>with_size::Bool</code> keyword (default <code>false</code>), which will also print the size of the respective branches to give you an idea of how much memory a SpeedyWeather simulation uses.</p><pre><code class="language-julia hljs">tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{BarotropicModel} (1.20 MB)
+ └ nars_detected</code></pre><h2 id="Size-of-a-Simulation"><a class="docs-heading-anchor" href="#Size-of-a-Simulation">Size of a Simulation</a><a id="Size-of-a-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Size-of-a-Simulation" title="Permalink"></a></h2><p>The <code>tree</code> function also allows for the <code>with_size::Bool</code> keyword (default <code>false</code>), which will also print the size of the respective branches to give you an idea of how much memory a SpeedyWeather simulation uses.</p><pre><code class="language-julia hljs">tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{BarotropicModel} (1.22 MB)
 ├┐prognostic_variables (122.80 KB)
-├┐diagnostic_variables (481.51 KB)
+├┐diagnostic_variables (494.28 KB)
 └┐model (600.20 KB)</code></pre><p>And with <code>max_level</code> you can truncate the tree to go down at most that many levels. 1MB is a typical size for a one-level T31 resolution simulation. In comparison, a higher resolution <code>PrimitiveWetModel</code> would use</p><pre><code class="language-julia hljs">spectral_grid = SpectralGrid(trunc=127, nlev=8)
 model = PrimitiveWetModel(;spectral_grid)
 simulation = initialize!(model)
-tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{PrimitiveWetModel} (58.94 MB)
+tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{PrimitiveWetModel} (59.10 MB)
 ├┐prognostic_variables (5.40 MB)
-├┐diagnostic_variables (33.44 MB)
-└┐model (20.09 MB)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../analysis/">« Analysis</a><a class="docs-footer-nextpage" href="../particles/">Particle advection »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.3.0 on <span class="colophon-date" title="Sunday 24 March 2024 04:11">Sunday 24 March 2024</span>. Using Julia version 1.10.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+├┐diagnostic_variables (33.60 MB)
+└┐model (20.09 MB)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../analysis/">« Analysis</a><a class="docs-footer-nextpage" href="../particles/">Particle advection »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.3.0 on <span class="colophon-date" title="Wednesday 27 March 2024 21:27">Wednesday 27 March 2024</span>. Using Julia version 1.10.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
