@@ -1,0 +1,33 @@
+Starting SpeedyWeather.jl run 0005 on Fri, 15 Mar 2024 17:47:53
+Integrating:
+SpectralGrid:
+├ Spectral:   T63 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
+├ Grid:       96-ring OctahedralGaussianGrid{Float32}, 10944 grid points
+├ Resolution: 216km (average)
+└ Vertical:   1-level SigmaCoordinates
+Time: 12.0 days at Δt = 900.0s
+
+All data will be stored in /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/docs/build/run_0005
+
+  5%, ETA: 0:00:02,   Inf millenia/day
+ 10%, ETA: 0:00:01,  2.48 millenia/day
+ 15%, ETA: 0:00:01, 1971.29 years/day
+ 20%, ETA: 0:00:01,  2.64 millenia/day
+ 25%, ETA: 0:00:01,  2.24 millenia/day
+ 30%, ETA: 0:00:01,  2.04 millenia/day
+ 35%, ETA: 0:00:01, 1901.75 years/day
+ 40%, ETA: 0:00:01, 1814.08 years/day
+ 45%, ETA: 0:00:01,  2.04 millenia/day
+ 50%, ETA: 0:00:01, 1952.00 years/day
+ 55%, ETA: 0:00:01, 1871.51 years/day
+ 60%, ETA: 0:00:01, 1821.03 years/day
+ 65%, ETA: 0:00:01, 1974.10 years/day
+ 70%, ETA: 0:00:00, 1917.70 years/day
+ 75%, ETA: 0:00:00, 1868.98 years/day
+ 80%, ETA: 0:00:00, 1830.72 years/day
+ 85%, ETA: 0:00:00, 1946.14 years/day
+ 90%, ETA: 0:00:00, 1904.91 years/day
+ 95%, ETA: 0:00:00, 1865.78 years/day
+100%, ETA: 0:00:00, 1963.08 years/day
+
+Integration done in 1 second, 440 milliseconds.
