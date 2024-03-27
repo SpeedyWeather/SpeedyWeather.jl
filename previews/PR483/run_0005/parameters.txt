@@ -12,7 +12,7 @@ Earth{Float32} <: SpeedyWeather.AbstractPlanet
 ├ length_of_year::Second = 31557600 seconds
 ├ equinox::DateTime = 2000-03-20T00:00:00
 ├ axial_tilt::Float32 = 23.4
-└ solar_constant::Float32 = 1365.0
+└ solar_constant::Float32 = 341.25
 EarthAtmosphere{Float32} <: SpeedyWeather.AbstractAtmosphere
 ├ mol_mass_dry_air::Float32 = 28.9649
 ├ mol_mass_vapour::Float32 = 18.0153
@@ -54,7 +54,7 @@ OutputWriter{Float32, ShallowWater}
 ├ run_path::String = /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/docs/build/run_0005
 ├ filename::String = output.nc
 ├ write_restart::Bool = true
-├ pkg_version::VersionNumber = 0.8.0
+├ pkg_version::VersionNumber = 0.9.0
 ├ startdate::DateTime = 2000-01-01T00:00:00
 ├ output_dt::Second = 21600 seconds
 ├ missing_value::Float32 = NaN
@@ -130,20 +130,12 @@ Variables
      long_name            = meridional wind
      _FillValue           = NaN
 
-  pres   (192 × 96 × 1)
+  vor   (192 × 96 × 1 × 1)
     Datatype:    Union{Missing, Float32} (Float32)
-    Dimensions:  lon × lat × time
+    Dimensions:  lon × lat × lev × time
     Attributes:
-     units                = m
-     long_name            = interface displacement
-     _FillValue           = NaN
-
-  orography   (192 × 96)
-    Datatype:    Union{Missing, Float32} (Float32)
-    Dimensions:  lon × lat
-    Attributes:
-     units                = m
-     long_name            = orography
+     units                = 1/s
+     long_name            = relative vorticity
      _FillValue           = NaN
 
 
@@ -158,8 +150,7 @@ Variables
 ├ npoints::Int64 = 18432
 ├ nlev::Int64 = 1
 └── arrays: output_vars, u, v, vor, div, temp, pres, humid, precip_cond, precip_conv, cloud
-InitialConditions{ZonalJet, ZeroInitially, ZeroInitially, ZeroInitially} <: SpeedyWeather.AbstractInitialConditions
-├ vordiv::ZonalJet = ZonalJet <: SpeedyWeather.AbstractInitialConditions
+ZonalJet <: SpeedyWeather.AbstractInitialConditions
 ├ latitude::Float64 = 45.0
 ├ width::Float64 = 19.28571428571429
 ├ umax::Float64 = 80.0
@@ -168,12 +159,6 @@ InitialConditions{ZonalJet, ZeroInitially, ZeroInitially, ZeroInitially} <: Spee
 ├ perturb_xwidth::Float64 = 19.098593171027442
 ├ perturb_ywidth::Float64 = 3.819718634205488
 └ perturb_height::Float64 = 120.0
-├ pres::ZeroInitially = ZeroInitially <: SpeedyWeather.AbstractInitialConditions
-
-├ temp::ZeroInitially = ZeroInitially <: SpeedyWeather.AbstractInitialConditions
-
-└ humid::ZeroInitially = ZeroInitially <: SpeedyWeather.AbstractInitialConditions
-
 HyperDiffusion{Float32} <: SpeedyWeather.AbstractHorizontalDiffusion
 ├ trunc::Int64 = 63
 ├ nlev::Int64 = 1
@@ -189,15 +174,15 @@ HyperDiffusion{Float32} <: SpeedyWeather.AbstractHorizontalDiffusion
 ImplicitShallowWater{Float32} <: SpeedyWeather.AbstractImplicit
 ├ trunc::Int64 = 63
 ├ α::Float64 = 1.0
-├ H::Base.RefValue{Float32} = Base.RefValue{Float32}(8500.0f0)
-├ ξH::Base.RefValue{Float32} = Base.RefValue{Float32}(2.4015067f0)
+├ H::Base.RefValue{Float32} = Base.RefValue{Float32}(0.0f0)
+├ ξH::Base.RefValue{Float32} = Base.RefValue{Float32}(0.0f0)
 └── arrays: g∇², ξg∇², S⁻¹
 EarthOrography{Float32, OctahedralGaussianGrid{Float32}} <: SpeedyWeather.AbstractOrography{Float32, OctahedralGaussianGrid{Float32}}
 ├ path::String = SpeedyWeather.jl/input_data
 ├ file::String = orography.nc
 ├ file_Grid::UnionAll = FullGaussianGrid
 ├ scale::Float64 = 1.0
-├ smoothing::Bool = true
+├ smoothing::Bool = false
 ├ smoothing_power::Float64 = 1.0
 ├ smoothing_strength::Float64 = 0.1
 ├ smoothing_truncation::Int64 = 85
