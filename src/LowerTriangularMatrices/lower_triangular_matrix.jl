@@ -1,5 +1,6 @@
 import LinearAlgebra: tril!
 import GPUArrays
+import Base: axes
 
 """
 $(TYPEDSIGNATURES)
@@ -40,7 +41,7 @@ Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)  # sizeof the underlying d
 for zeros_or_ones in (:zeros, :ones)
     @eval begin
         function Base.$zeros_or_ones(::Type{LowerTriangularArray{T,N,ArrayType}}, m::Integer, n::Integer, I::Vararg{Integer,M}) where {T,N,M,ArrayType}
-            return LowerTriangularArray($zeros_or_ones(T, nonzeros(m, n), I...), m, n)
+            return LowerTriangularArray(ArrayType($zeros_or_ones(T, nonzeros(m, n), I...)), m, n)
         end
         
         # default CPU 
@@ -382,32 +383,31 @@ function scale!(L::LowerTriangularArray{T}, s::Number) where T
     L
 end
 
-# Broadcast (more or less copied and adjusted from LinearAlgebra.jl)
+# Broadcast CPU (more or less adjusted from LinearAlgebra.jl)
 import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
 import LinearAlgebra: isstructurepreserving, fzeropreserving
 
-struct LowerTriangularStyle <: Broadcast.AbstractArrayStyle{2} end
+struct LowerTriangularStyle{N} <: Broadcast.AbstractArrayStyle{N} end
 
-Base.BroadcastStyle(::Type{<:LowerTriangularMatrix{T,ArrayType}}) where {T,ArrayType<:Array{T}} = LowerTriangularStyle()
+Base.BroadcastStyle(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType<:Array} = LowerTriangularStyle{N}()
 
-function Base.similar(bc::Broadcasted{LowerTriangularStyle}, ::Type{NF}) where NF
+function Base.similar(bc::Broadcasted{LowerTriangularStyle{N}}, ::Type{NF}) where {N,NF}
     inds = axes(bc)
     if isstructurepreserving(bc) || fzeropreserving(bc) 
-        return LowerTriangularMatrix{NF}(undef, inds[1][end], inds[2][end])
+        return LowerTriangularArray{NF,N,Array{NF}}(undef, [ind[end] for ind in inds]...)
     end
     return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), NF)
 end
 
-LowerTriangularStyle(::Val{0}) = LowerTriangularStyle()
-LowerTriangularStyle(::Val{1}) = LowerTriangularStyle()
-LowerTriangularStyle(::Val{2}) = LowerTriangularStyle()
+LowerTriangularStyle{N}(::Val{M}) where {N,M} = LowerTriangularStyle{N}()
 
-function Base.copyto!(dest::LowerTriangularMatrix{T}, bc::Broadcasted{<:LowerTriangularStyle}) where T
+function Base.copyto!(dest::LowerTriangularArray{T,2,ArrayType}, bc::Broadcasted{LowerTriangularStyle{2}}) where {T,ArrayType}
     axs = axes(dest)
     axes(bc) == axs || Broadcast.throwdm(axes(bc), axs)
 
     lmax, mmax = size(dest)
     lm = 0
+
     for m in 1:mmax
         for l in m:lmax
             lm += 1
@@ -417,6 +417,23 @@ function Base.copyto!(dest::LowerTriangularMatrix{T}, bc::Broadcasted{<:LowerTri
     return dest
 end
 
+function Base.copyto!(dest::LowerTriangularArray{T,N,ArrayType}, bc::Broadcasted{LowerTriangularStyle{N}}) where {T,N,ArrayType}
+    axs = axes(dest)
+    axes(bc) == axs || Broadcast.throwdm(axes(bc), axs)
+
+    lmax, mmax = size(dest)
+    lm = 0
+    
+    for m in 1:mmax
+        for l in m:lmax
+            lm += 1
+            for I in Iterators.product(axs[3:end]...)
+                dest.data[lm, I...] = Broadcast._broadcast_getindex(bc, CartesianIndex(l, m, I...))
+            end 
+        end
+    end
+    return dest
+end
 
 # GPU Broadcast support (adapted from GPUArrays.jl testsuite)
 GPUArrays.backend(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray} = GPUArrays.backend(ArrayType)
