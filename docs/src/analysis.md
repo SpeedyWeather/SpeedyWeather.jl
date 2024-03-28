@@ -574,28 +574,29 @@ as we do here
 using PythonPlot
 
 # unpack callback
-(; time, M, C, Λ, K, P, Q)  = model.callbacks[:diagnostics_recorder]
+(; M, C, Λ, K, P, Q)  = model.callbacks[:diagnostics_recorder]
+t = model.callbacks[:diagnostics_recorder].time
 
 fig, axs = subplots(3, 2, figsize=(6,6), sharex=true)
 
 # note: python indexing
-axs[0,0].plot(time, M)
+axs[0,0].plot(t, M)
 axs[0,0].set_title("Mass")
 
-axs[1,0].plot(time, Λ)
+axs[1,0].plot(t, Λ)
 axs[1,0].set_title("Angular momentum")
 
-axs[2,0].plot(time, P)
+axs[2,0].plot(t, P)
 axs[2,0].set_title("Potential energy")
 axs[2,0].set_xlabel("time")
 
-axs[0,1].plot(time, C)
+axs[0,1].plot(t, C)
 axs[0,1].set_title("Circulation")
 
-axs[1,1].plot(time, K)
+axs[1,1].plot(t, K)
 axs[1,1].set_title("Kinetic energy")
 
-axs[2,1].plot(time, Q)
+axs[2,1].plot(t, Q)
 axs[2,1].set_title("Potential enstrophy")
 axs[2,1].set_xlabel("time")
 
