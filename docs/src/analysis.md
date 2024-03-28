@@ -554,22 +554,23 @@ provided) and reinitialize the simulation to start from the
 initial conditions.
 
 ```@example analysis
-global_diagnostics = GlobalDiagnostics()
-add!(model.callbacks, :global_diagnostics => global_diagnostics)
+# don't name it global_diagnostics because that's a function already!
+diagnostics_recorder = GlobalDiagnostics()
+add!(model.callbacks, :diagnostics_recorder => diagnostics_recorder)
 simulation = initialize!(model)
 
 run!(simulation, period=Day(20))
 ```
 
 Then one could check the output file `global_diagnostics.nc`,
-or directly use the callback through its key `:global_diagnostics`
+or directly use the callback through its key `:diagnostics_recorder`
 as we do here
 
 ```@example analysis
 using PythonPlot
 
 # unpack callback
-(; time, M, C, Λ, K, P, Q)  = model.callbacks[:global_diagnostics]
+(; time, M, C, Λ, K, P, Q)  = model.callbacks[:diagnostics_recorder]
 
 fig, axs = subplots(3, 2, figsize=(6,6), sharex=true)
 
