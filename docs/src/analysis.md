@@ -578,25 +578,26 @@ using PythonPlot
 
 fig, axs = subplots(3, 2, figsize=(6,6), sharex=true)
 
-axs[1,1].plot(time, M)
-axs[1,1].set_title("Mass")
+# note: python indexing
+axs[0,0].plot(time, M)
+axs[0,0].set_title("Mass")
 
-axs[2,1].plot(time, Λ)
-axs[2,1].set_title("Angular momentum")
+axs[1,0].plot(time, Λ)
+axs[1,0].set_title("Angular momentum")
 
-axs[3,1].plot(time, P)
-axs[3,1].set_title("Potential energy")
-axs[3,1].set_xlabel("time")
+axs[2,0].plot(time, P)
+axs[2,0].set_title("Potential energy")
+axs[2,0].set_xlabel("time")
 
-axs[1,2].plot(time, C)
-axs[1,2].set_title("Circulation")
+axs[0,1].plot(time, C)
+axs[0,1].set_title("Circulation")
 
-axs[2,2].plot(time, K)
-axs[2,2].set_title("Kinetic energy")
+axs[1,1].plot(time, K)
+axs[1,1].set_title("Kinetic energy")
 
-axs[3,2].plot(time, Q)
-axs[3,2].set_title("Potential enstrophy")
-axs[3,2].set_xlabel("time")
+axs[2,1].plot(time, Q)
+axs[2,1].set_title("Potential enstrophy")
+axs[2,1].set_xlabel("time")
 
 tight_layout() # hide
 savefig("global_diagnostics.png") # hide
