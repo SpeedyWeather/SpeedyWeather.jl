@@ -400,12 +400,13 @@ Now the `global_diagnostics` function is defined as
 
 ```@example analysis
 function global_diagnostics(u, v, ζ, η, model)
-    h = zero(u)     # preallocate
+    h = zero(u)     # preallocate grids of same size
     q = zero(u)
     λ = zero(u)
     k = zero(u)
     p = zero(u)
-    
+    z = zero(u)
+
     # constants from model
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
@@ -483,7 +484,7 @@ function SpeedyWeather.initialize!(
     callback.P = zeros(length)
     callback.Q = zeros(length)
     
-    M, C, Λ, K, P, Z = global_diagnostics(diagn, model)
+    M, C, Λ, K, P, Q = global_diagnostics(diagn, model)
     
     callback.time[1] = progn.clock.time
     callback.M[1] = M  # set initial conditions
