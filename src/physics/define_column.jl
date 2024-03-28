@@ -67,13 +67,16 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     const sat_humid::Vector{NF} = zeros(NF, nlev)                # Saturation specific humidity [kg/kg]
     const dry_static_energy::Vector{NF} = zeros(NF, nlev)        # Dry static energy [J/kg]
     const temp_virt::Vector{NF} = zeros(NF, nlev)                # virtual temperature [K]
-    const bulk_richardson::Vector{NF} = zeros(NF, nlev)          # bulk richardson number [1]
     const geopot::Vector{NF} = zeros(NF, nlev)                   # gepotential height [m]
 
     # CONVECTION AND PRECIPITATION
     cloud_top::Int = nlev + 1               # layer index k of top-most layer with clouds
     precip_convection::NF = 0               # Precipitation due to convection [m]
     precip_large_scale::NF = 0              # precipitation due to large-scale condensation [m]
+
+    # RADIATION
+    cos_zenith::NF = 0                      # cosine of solar zenith angle
+    albedo::NF = 0                          # surface albedo
 
     # WORK ARRAYS
     const a::Vector{NF} = zeros(NF, nlev)
