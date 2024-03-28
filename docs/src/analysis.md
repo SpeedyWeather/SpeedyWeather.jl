@@ -577,7 +577,7 @@ using PythonPlot
 (; M, C, Λ, K, P, Q)  = model.callbacks[:diagnostics_recorder]
 t = model.callbacks[:diagnostics_recorder].time
 
-fig, axs = subplots(3, 2, figsize=(6,6), sharex=true)
+fig, axs = subplots(3, 2, figsize=(8,6), sharex=true)
 
 # note: python indexing
 axs[0,0].plot(t, M)
@@ -599,6 +599,10 @@ axs[1,1].set_title("Kinetic energy")
 axs[2,1].plot(t, Q)
 axs[2,1].set_title("Potential enstrophy")
 axs[2,1].set_xlabel("time")
+
+# format time axis to Jan-1 etc
+time_fmt = matplotlib.dates.DateFormatter("%b-%d")
+axs[0,0].xaxis.set_major_formatter(time_fmt)
 
 tight_layout() # hide
 savefig("global_diagnostics.png") # hide
