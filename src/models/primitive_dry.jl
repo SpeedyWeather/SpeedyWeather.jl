@@ -1,9 +1,14 @@
 export PrimitiveDryModel
 
 """
-$(SIGNATURES)
-The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
-whether scalars or arrays that do not change throughout model integration.
+The PrimitiveDryModel contains all model components (themselves structs) needed for the
+simulation of the primitive equations without humidity. To be constructed like
+
+    model = PrimitiveDryModel(; spectral_grid, kwargs...)
+
+with `spectral_grid::SpectralGrid` used to initalize all non-default components
+passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
+model components, are
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct PrimitiveDryModel{
     NF<:AbstractFloat,
@@ -20,6 +25,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     OC<:AbstractOcean,
     LA<:AbstractLand,
     ZE<:AbstractZenith,
+    AL<:AbstractAlbedo,
     BL<:AbstractBoundaryLayer,
     TR<:AbstractTemperatureRelaxation,
     VD<:AbstractVerticalDiffusion,
@@ -58,6 +64,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     ocean::OC = SeasonalOceanClimatology(spectral_grid)
     land::LA = SeasonalLandTemperature(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    albedo::AL = AlbedoClimatology(spectral_grid)
     
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -68,8 +75,8 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     surface_wind::SUW = SurfaceWind(spectral_grid)
     surface_heat_flux::SH = SurfaceSensibleHeat(spectral_grid)
     convection::CV = DryBettsMiller(spectral_grid)
-    shortwave_radiation::SW = NoShortwave(spectral_grid)
-    longwave_radiation::LW = NoLongwave(spectral_grid)
+    shortwave_radiation::SW = TransparentShortwave(spectral_grid)
+    longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     
     # NUMERICS
     device_setup::DS = DeviceSetup(CPUDevice())
@@ -111,6 +118,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.ocean, model)
     initialize!(model.land, model)
     initialize!(model.solar_zenith, time, model)
+    initialize!(model.albedo, model)
 
     # parameterizations
     initialize!(model.boundary_layer_drag, model)

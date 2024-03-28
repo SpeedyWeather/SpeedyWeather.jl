@@ -30,7 +30,7 @@ model_class(::Type{<:PrimitiveDry}) = PrimitiveDry
 model_class(::Type{<:PrimitiveWet}) = PrimitiveWet
 model_class(model::ModelSetup) = model_class(typeof(model))
 
-# model type is the parameter-free type of a model
+# model type is the parameter-free type of a model
 # TODO what happens if we have several concrete types under each abstract type?
 model_type(::Type{<:Barotropic}) = BarotropicModel
 model_type(::Type{<:ShallowWater}) = ShallowWaterModel
@@ -44,7 +44,7 @@ function Base.show(io::IO, M::ModelSetup)
     n = length(properties)
     for (i, key) in enumerate(properties)
         val = getfield(M, key)
-        s = i == n ? "└" : "├"  # choose ending └ for last property
+        s = i == n ? "└" : "├"  # choose ending └ for last property
         p = i == n ? print : println
         p(io, "$s $key: $(typeof(val))")
     end
