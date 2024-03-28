@@ -82,7 +82,7 @@ Converts the index pair `i, j` of an `m`x`n` LowerTriangularMatrix `L` to a sing
 index `k` that indexes the same element in the corresponding vector that stores
 only the lower triangle (the non-zero entries) of `L`."""
 @inline ij2k(i::Integer, j::Integer, m::Integer) = i+(j-1)*m-j*(j-1)÷2
-triangle_number(n::Integer) = n*(n+1)÷2
+@inline triangle_number(n::Integer) = n*(n+1)÷2
 nonzeros(m::Integer, n::Integer) = m*n-triangle_number(n-1)
 
 """
@@ -235,8 +235,6 @@ function Base.Matrix(L::LowerTriangularMatrix{T}) where T
     copyto!(M, L)
 end
             
-Base.copy(L::LowerTriangularArray{T}) where T = deepcopy(LowerTriangularArray(L)) # TODO: I enforce a deepcopy here, as the old tests want it to be a deep copy
-
 function Base.copyto!(L1::LowerTriangularArray{T,N,ArrayType1}, L2::LowerTriangularArray) where {T, N, ArrayType1<:AbstractArray{T}}
     # if sizes don't match copy over the largest subset of indices
     size(L1) != size(L2) && return copyto!(L1, L2,  Base.OneTo(minimum(size.((L1, L2), 1))),
