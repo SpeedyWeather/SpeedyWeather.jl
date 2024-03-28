@@ -245,8 +245,8 @@ absolute angular momentum (AAM) defined as
 ```
 
 should be conserved (``\partial_t\Lambda = 0``).  Here ``u`` is the zonal velocity,
-``\Omega`` the angular velocity of the Earth, ``r = a \cos\phi`` the momentum arm,
-and ``a`` the radius of Earth.
+``\Omega`` the angular velocity of the Earth, ``r = R \cos\phi`` the momentum arm,
+and ``R`` the radius of Earth.
 
 Following previous examples, let us define a `total_angular_momentum` function as
 
@@ -259,10 +259,10 @@ function total_angular_momentum(u, η, model)
     
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
-    a = model.planet.radius
+    R = model.spectral_grid.radius
     Ω = model.planet.rotation
 
-    r = a * cos.(model.geometry.lats)       # create r on that grid
+    r = R * cos.(model.geometry.lats)       # create r on that grid
     
     @. h = η + H - Hb           # layer thickness between the bottom and free surface
     @. Λ = (u*r + Ω*r^2) * h    # vertically-integrated AAM
