@@ -476,13 +476,14 @@ function SpeedyWeather.initialize!(
     model::ModelSetup,
 )
     # replace with vector of correct length
-    length = progn.clock.n_timesteps + 1    # +1 for initial conditions
-    callback.M = zeros(length)
-    callback.C = zeros(length)
-    callback.Λ = zeros(length)
-    callback.K = zeros(length)
-    callback.P = zeros(length)
-    callback.Q = zeros(length)
+    n = progn.clock.n_timesteps + 1    # +1 for initial conditions
+    callback.time = zeros(DateTime, n)
+    callback.M = zeros(n)
+    callback.C = zeros(n)
+    callback.Λ = zeros(n)
+    callback.K = zeros(n)
+    callback.P = zeros(n)
+    callback.Q = zeros(n)
     
     M, C, Λ, K, P, Q = global_diagnostics(diagn, model)
     
@@ -518,6 +519,8 @@ function SpeedyWeather.callback!(
     callback.Q[i] = Q  # set initial conditions
 end
 
+using NCDatasets
+
 # define how to finish a GlobalDiagnostics callback after simulation finished
 function SpeedyWeather.finish!(
     callback::GlobalDiagnostics,
@@ -531,7 +534,7 @@ function SpeedyWeather.finish!(
     ds = NCDataset(joinpath(pwd(), "global_diagnostics.nc"), "c")
     
     defDim(ds, "time", n_timesteps)
-    defVar(ds, "time",                  callback,time,  ("time",))
+    defVar(ds, "time",                  callback.time,  ("time",))
     defVar(ds, "mass",                  callback.M,     ("time",))
     defVar(ds, "circulation",           callback.C,     ("time",))
     defVar(ds, "angular momentum",      callback.Λ,     ("time",))
