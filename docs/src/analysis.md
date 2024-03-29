@@ -307,9 +307,11 @@ Following previous fashion, we define a function `total_circulation` for this
 ```@example analysis
 function total_circulation(ζ, model)
     f = coriolis(ζ)  # create f on that grid
+    C = zero(ζ)
+    @. C = ζ + f
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
-    return C_mean = real(spectral(ζ .+ f)[1]) / model.spectral_transform.norm_sphere
+    return C_mean = real(spectral(C)[1]) / model.spectral_transform.norm_sphere
 end
 
 total_circulation(ζ, model)
