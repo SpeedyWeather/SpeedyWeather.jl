@@ -124,8 +124,10 @@ total volume (times ``h=\eta+H-H_b`` for the vertical then integrated over the s
 ``\iint dA``).
 
 ```math
-E = \iint \left[ \int_{H_b}^{\eta}\frac{1}{2}\left(u^2 + v^2 + gz\right)dz \right]dA \\
-  = \iint \frac{1}{2}\left(u^2 + v^2 + gh\right)h dA
+\begin{align}
+E & = \iint \left[ \int_{H_b}^{\eta}\frac{1}{2}\left(u^2 + v^2 + gz\right)dz \right]dA \\
+  & = \iint \frac{1}{2}\left(u^2 + v^2 + gh\right)h dA
+\end{align}
 ```
 
 In contrast to the [Mass conservation](@ref) which, with respect to the
@@ -136,8 +138,9 @@ space for the global integral as before. Let us define a `total_energy` function
 ```@example analysis
 using SpeedyWeather
 function total_energy(u, v, η, model)
+    # allocate grid variable
     h = zero(u)
-    E = zero(u)                             # allocate grid variable
+    E = zero(u)
     
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
@@ -147,7 +150,7 @@ function total_energy(u, v, η, model)
     @. E = h/2*(u^2 + v^2) + g*h^2 # vertically-integrated mechanical energy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
-    E_mean = real(spectral(E)[1]) / model.spectral_transform.norm_sphere
+    return E_mean = real(spectral(E)[1]) / model.spectral_transform.norm_sphere
 end
 ```
 
@@ -164,7 +167,7 @@ TE = total_energy(u, v, η, model)
 ```
 
 with units of ``m^3 s^{-2}`` (multiplying by surface area of the sphere
-and density of the fluid would turn it into joule = ``kg m^2 s^{-2}``).
+and density of the fluid would turn it into joule = ``kg \, m^2 s^{-2}``).
 To know in general where to find the respective variables ``u, v, \eta`` inside our
 simulation object see [Prognostic variables](@ref) and [Diagnostic variables](@ref).
 Now let us continue the simulation
@@ -254,8 +257,9 @@ Following previous examples, let us define a `total_angular_momentum` function a
 using SpeedyWeather
 
 function total_angular_momentum(u, η, model)
+    # allocate grid variable
     h = zero(u)
-    Λ = zero(u)                             # allocate grid variable
+    Λ = zero(u)
     
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
@@ -268,7 +272,7 @@ function total_angular_momentum(u, η, model)
     @. Λ = (u*r + Ω*r^2) * h    # vertically-integrated AAM
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
-    Λ_mean = real(spectral(Λ)[1]) / model.spectral_transform.norm_sphere
+    return Λ_mean = real(spectral(Λ)[1]) / model.spectral_transform.norm_sphere
 end
 ```
 
@@ -298,21 +302,21 @@ Total circulation is defined as the area-integrated absolute vorticity:
 C = \iint \left(\zeta + f\right) dA
 ```
 
-Following previous fashion, we define a function ``total_circulation`` for this:
+Following previous fashion, we define a function `total_circulation` for this:
 
 ```@example analysis
 function total_circulation(ζ, model)
     f = coriolis(ζ)  # create f on that grid
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
-    C_mean = real(spectral(ζ .+ f)[1]) / model.spectral_transform.norm_sphere
+    return C_mean = real(spectral(ζ .+ f)[1]) / model.spectral_transform.norm_sphere
 end
 ```
 
 !!! note "Global-integrated circulation"
     Note that the area integral of relative vorticity ``\zeta`` and planetary vorticity
     ``f`` over the whole surface of a sphere are analytically exactly zero.
-    Numerically, ``C_mean`` should be a small number but may not be exactly zero due
+    Numerically, `C_mean` should be a small number but may not be exactly zero due
     to numerical precision and errors in the spectral transform.
 
 ## Potential enstrophy
@@ -345,11 +349,11 @@ function total_enstrophy(ζ, η, model)
     @. Q = q^2 / 2      # Potential enstrophy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
-    Q_mean = real(spectral(Q)[1]) / model.spectral_transform.norm_sphere
+    return Q_mean = real(spectral(Q)[1]) / model.spectral_transform.norm_sphere
 end
 ```
 
-Then by evaluting ``Q_mean`` at different time steps, one can similarly
+Then by evaluting `Q_mean` at different time steps, one can similarly
 check how ``Q`` is changing over time.
 
 ```@example analysis
@@ -371,7 +375,7 @@ Q_later/Q
 Now we want to calculate all the above global diagnostics periodically
 during a simulation. For that we will use [Callbacks](@ref), which
 let us inject code into a simulation that is executed after every
-time step (or at any other scheduled time, see [Schedules]@ref)).
+time step (or at any other scheduled time, see [Schedules](@ref)).
 
 So we define a function `global_diagnostics` to calculate the
 integrals together. We could reuse the
@@ -450,8 +454,8 @@ end
 ```
 
 Then we define a new callback `GlobalDiagnostics` subtype of SpeedyWeather's
-``AbstractCallback`` and define new methods of ``initialize!``,
-``callback!`` and ``finish!`` for it (see [Callbacks](@ref) for more
+`AbstractCallback` and define new methods of `initialize!`,
+`callback!` and `finish!` for it (see [Callbacks](@ref) for more
 details)
 
 ```@example analysis
@@ -496,6 +500,8 @@ function SpeedyWeather.initialize!(
     callback.Q[1] = Q  # set initial conditions
     
     callback.timestep_counter = 1  # (re)set counter to 1
+    
+    return nothing
 end
 
 # define what a GlobalDiagnostics callback does on every time step
@@ -543,6 +549,8 @@ function SpeedyWeather.finish!(
     defVar(ds, "potential enstrophy",   callback.Q,     ("time",))
     
     close(ds)
+
+    return nothing
 end
 ```
 
