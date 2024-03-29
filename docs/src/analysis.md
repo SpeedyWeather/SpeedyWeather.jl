@@ -529,13 +529,14 @@ function SpeedyWeather.callback!(
     
     M, C, Λ, K, P, Q = global_diagnostics(diagn, model)
     
+    # store current time and diagnostics for timestep i
     callback.time[i] = progn.clock.time
-    callback.M[i] = M  # set initial conditions
-    callback.C[i] = C  # set initial conditions
-    callback.Λ[i] = Λ  # set initial conditions
-    callback.K[i] = K  # set initial conditions
-    callback.P[i] = P  # set initial conditions
-    callback.Q[i] = Q  # set initial conditions
+    callback.M[i] = M 
+    callback.C[i] = C 
+    callback.Λ[i] = Λ 
+    callback.K[i] = K 
+    callback.P[i] = P 
+    callback.Q[i] = Q 
 end
 
 using NCDatasets
@@ -552,6 +553,7 @@ function SpeedyWeather.finish!(
     # create a netCDF file in current path
     ds = NCDataset(joinpath(pwd(), "global_diagnostics.nc"), "c")
     
+    # save diagnostics variables within
     defDim(ds, "time", n_timesteps)
     defVar(ds, "time",                  callback.time,  ("time",))
     defVar(ds, "mass",                  callback.M,     ("time",))
