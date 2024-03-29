@@ -1,9 +1,14 @@
 export PrimitiveWetModel
 
 """
-$(SIGNATURES)
-The PrimitiveDryModel struct holds all other structs that contain precalculated constants,
-whether scalars or arrays that do not change throughout model integration.
+The PrimitiveWetModel contains all model components (themselves structs) needed for the
+simulation of the primitive equations with humidity. To be constructed like
+
+    model = PrimitiveWetModel(; spectral_grid, kwargs...)
+
+with `spectral_grid::SpectralGrid` used to initalize all non-default components
+passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
+model components, are
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct PrimitiveWetModel{
     NF<:AbstractFloat,
@@ -20,13 +25,13 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     OC<:AbstractOcean,
     LA<:AbstractLand,
     ZE<:AbstractZenith,
+    AL<:AbstractAlbedo,
     SO<:AbstractSoil,
     VG<:AbstractVegetation,
     CC<:AbstractClausiusClapeyron,
     BL<:AbstractBoundaryLayer,
     TR<:AbstractTemperatureRelaxation,
-    SE<:AbstractVerticalDiffusion,
-    HU<:AbstractVerticalDiffusion,
+    VD<:AbstractVerticalDiffusion,
     SUT<:AbstractSurfaceThermodynamics,
     SUW<:AbstractSurfaceWind,
     SH<:AbstractSurfaceHeat,
@@ -65,6 +70,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     ocean::OC = SeasonalOceanClimatology(spectral_grid)
     land::LA = SeasonalLandTemperature(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
+    albedo::AL = AlbedoClimatology(spectral_grid)
     soil::SO = SeasonalSoilMoisture(spectral_grid)
     vegetation::VG = VegetationClimatology(spectral_grid)
     
@@ -73,16 +79,15 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     clausius_clapeyron::CC = ClausiusClapeyron(spectral_grid, atmosphere)
     boundary_layer_drag::BL = BulkRichardsonDrag(spectral_grid)
     temperature_relaxation::TR = NoTemperatureRelaxation(spectral_grid)
-    static_energy_diffusion::SE = NoVerticalDiffusion(spectral_grid)
-    humidity_diffusion::HU = NoVerticalDiffusion(spectral_grid)
+    vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
     surface_heat_flux::SH = SurfaceSensibleHeat(spectral_grid)
     evaporation::EV = SurfaceEvaporation(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
-    shortwave_radiation::SW = NoShortwave(spectral_grid)
-    longwave_radiation::LW = UniformCooling(spectral_grid)
+    shortwave_radiation::SW = TransparentShortwave(spectral_grid)
+    longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     
     # NUMERICS
     device_setup::DS = DeviceSetup(CPUDevice())
@@ -91,7 +96,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     implicit::IM = ImplicitPrimitiveEquation(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
-    hole_filling::HF = ClipNegatives()
+    hole_filling::HF = ClipNegatives(spectral_grid)
     
     # OUTPUT
     output::OW = OutputWriter(spectral_grid, PrimitiveWet)
@@ -119,7 +124,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.geopotential, model)
     initialize!(model.adiabatic_conversion, model)
 
-    # boundary conditionss
+    # boundary conditions
     initialize!(model.orography, model)
     initialize!(model.land_sea_mask, model)
     initialize!(model.ocean, model)
@@ -127,12 +132,12 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.soil, model)
     initialize!(model.vegetation, model)
     initialize!(model.solar_zenith, time, model)
+    initialize!(model.albedo, model)
 
     # parameterizations
     initialize!(model.boundary_layer_drag, model)
     initialize!(model.temperature_relaxation, model)
-    initialize!(model.static_energy_diffusion, model)
-    initialize!(model.humidity_diffusion, model)
+    initialize!(model.vertical_diffusion, model)
     initialize!(model.large_scale_condensation, model)
     initialize!(model.convection, model)
     initialize!(model.shortwave_radiation, model)
@@ -142,8 +147,8 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     prognostic_variables = PrognosticVariables(spectral_grid, model)
     initialize!(prognostic_variables,model.initial_conditions, model)
     (;clock) = prognostic_variables
-    clock.time = time       # set the current time
-    clock.start = time      # and store the start time
+    clock.time = time       # set the current time
+    clock.start = time      # and store the start time
 
     # particle advection
     initialize!(model.particle_advection, model)

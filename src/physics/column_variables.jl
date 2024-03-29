@@ -7,22 +7,30 @@ function get_column!(
     jring::Integer,     # ring index 1 around North Pole to J around South Pole
     model::PrimitiveEquation,
 )
-    get_column!(C, D, P, ij, jring, model.geometry, model.planet, model.orography, model.land_sea_mask)
+    get_column!(C, D, P, ij, jring, 
+        model.geometry,
+        model.planet,
+        model.orography,
+        model.land_sea_mask,
+        model.albedo)
 end
 
 """
 $(TYPEDSIGNATURES)
 Update `C::ColumnVariables` by copying the prognostic variables from `D::DiagnosticVariables`
 at gridpoint index `ij`. Provide `G::Geometry` for coordinate information."""
-function get_column!(   C::ColumnVariables,
-                        D::DiagnosticVariables,
-                        P::PrognosticVariables,
-                        ij::Integer,        # grid point index
-                        jring::Integer,     # ring index 1 around North Pole to J around South Pole
-                        geometry::Geometry,
-                        planet::AbstractPlanet,
-                        orography::AbstractOrography,
-                        land_sea_mask::AbstractLandSeaMask)
+function get_column!(   
+    C::ColumnVariables,
+    D::DiagnosticVariables,
+    P::PrognosticVariables,
+    ij::Integer,        # grid point index
+    jring::Integer,     # ring index 1 around North Pole to J around South Pole
+    geometry::Geometry,
+    planet::AbstractPlanet,
+    orography::AbstractOrography,
+    land_sea_mask::AbstractLandSeaMask,
+    albedo::AbstractAlbedo,
+)
 
     (; σ_levels_full, ln_σ_levels_full) = geometry
 
@@ -55,6 +63,10 @@ function get_column!(   C::ColumnVariables,
     C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
     C.skin_temperature_land = P.land.land_surface_temperature[ij]
     C.soil_moisture_availability = D.surface.soil_moisture_availability[ij]
+
+    # RADIATION
+    C.cos_zenith = D.surface.cos_zenith[ij]
+    C.albedo = albedo.albedo[ij]
 end
 
 """Recalculate ring index if not provided."""
@@ -84,7 +96,7 @@ function get_column(    S::AbstractSimulation,
                 ij,
                 model)
 
-    # execute all parameterizations for this column to return a consistent state
+    # execute all parameterizations for this column to return a consistent state
     parameterization_tendencies!(column, S.model)
 
     verbose && @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
@@ -110,16 +122,16 @@ function write_column_tendencies!(  D::DiagnosticVariables,
         layer.tendencies.humid_tend_grid[ij] = column.humid_tend[k]
     end
 
-    # accumulate (set back to zero when netcdf output)
+    # accumulate (set back to zero when netcdf output)
     D.surface.precip_large_scale[ij] += column.precip_large_scale
     D.surface.precip_convection[ij] += column.precip_convection
 
-    # Output cloud top in height [m] from geopotential height divided by gravity,
+    # Output cloud top in height [m] from geopotential height divided by gravity,
     # but NaN for no clouds
     D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.geopot[column.cloud_top]
     D.surface.cloud_top[ij] /= planet.gravity
     
-    # just use layer index 1 (top) to nlev (surface) for analysis, but 0 for no clouds
+    # just use layer index 1 (top) to nlev (surface) for analysis, but 0 for no clouds
     # D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.cloud_top
     return nothing
 end

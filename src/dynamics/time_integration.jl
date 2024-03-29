@@ -383,7 +383,7 @@ function time_stepping!(
     (; time_stepping) = model
 
     # SCALING: we use vorticity*radius, divergence*radius in the dynamical core
-    scale!(progn, model.spectral_grid.radius)
+    scale!(progn, diagn, model.spectral_grid.radius)
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
@@ -395,7 +395,7 @@ function time_stepping!(
     
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
     # considered part of the model initialisation
-    first_timesteps!(progn,diagn, model, output)
+    first_timesteps!(progn, diagn, model, output)
     
     # only now initialise feedback for benchmark accuracy
     initialize!(feedback, clock, model)
@@ -405,12 +405,12 @@ function time_stepping!(
         timestep!(progn, diagn, 2Δt, model) # calculate tendencies and leapfrog forward
         timestep!(clock, Δt_millisec)       # time of lf=2 and diagn after timestep!
 
-        progress!(feedback, progn)           # updates the progress meter bar
+        progress!(feedback, progn)          # updates the progress meter bar
         write_output!(output, clock.time, diagn)
         callback!(model.callbacks, progn, diagn, model)
     end
     
-    # UNSCALE, CLOSE, FINISH
+    # UNSCALE, CLOSE, FINISH
     finish!(feedback)                       # finish the progress meter, do first for benchmark accuracy
     unscale!(progn)                         # undo radius-scaling for vor, div from the dynamical core
     unscale!(diagn)                         # undo radius-scaling for vor, div from the dynamical core

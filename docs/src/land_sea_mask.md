@@ -43,7 +43,7 @@ land_sea_mask = LandSeaMask(spectral_grid)
 
 which will automatically interpolate the land-sea mask onto grid and resolution
 as defined in `spectral_grid` at initialization. The actual mask is in
-`land_sea_mask.land_sea_mask` and you can visualise it with
+`land_sea_mask.mask` and you can visualise it with
 
 ```@example landseamask
 model = PrimitiveWetModel(;spectral_grid, land_sea_mask)
@@ -180,4 +180,6 @@ plot(model.land_sea_mask.mask)
 ```
 
 And the land-sea mask has succesfully been set to ocean everywhere at the start
-of the 21st century.
+of the 21st century. Note that while we added an `@info` line into the
+`callback!` function, this is here not printed because of how the
+Documenter works. If you execute this in the REPL you'll see it.

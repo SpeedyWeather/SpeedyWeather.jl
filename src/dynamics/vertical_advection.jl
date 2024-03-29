@@ -85,7 +85,7 @@ function _vertical_advection!(  ξ_tend::Grid,                  # tendency of qu
                                 ) where {NF<:AbstractFloat, Grid<:AbstractGrid{NF}, B}
     Δσₖ⁻¹ = 1/Δσₖ                                      # precompute
 
-    # += as the tendencies already contain the parameterizations
+    # += as the tendencies already contain the parameterizations
     for ij in eachgridpoint(ξ_tend)
         σ̇⁻ = σ_tend_above[ij]       # velocity into layer k from above
         σ̇⁺ = σ_tend_below[ij]       # velocity out of layer k to below
