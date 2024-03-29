@@ -41,11 +41,15 @@ $(TYPEDSIGNATURES)
 Scales the prognostic variables vorticity and divergence with
 the Earth's radius which is used in the dynamical core."""
 function scale!(progn::PrognosticVariables,
+                diagn::DiagnosticVariables,
                 scale::Real)
     new_scale = scale/progn.scale[]     # undo previous scale and new scale in one go
     scale!(progn, :vor, new_scale)
     scale!(progn, :div, new_scale)
     progn.scale[] = scale               # store scaling information
+    diagn.scale[] = scale               # store scaling information
+    # no need to actually scale the diagnostic variables as they will be
+    # overwritten by the transform of the prognostic variables anyway
 end
 
 """
