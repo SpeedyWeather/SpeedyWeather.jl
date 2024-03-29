@@ -98,6 +98,8 @@ struct OctahedralGaussianGrid{T} <: AbstractOctahedralGrid{T}
     "cannot be used to create a O$(nlat_half) OctahedralGaussianGrid{$T}.")
 end
 
+nonparametric_type(::Type{<:OctahedralGaussianGrid}) = OctahedralGaussianGrid
+
 # number of points and longitudes per ring on the octahedral grid
 npoints_octahedral(nlat_half::Integer, nlat_oddp::Bool) =
     nlat_oddp ? max(0, 4nlat_half^2 + 32nlat_half - 16) : 4nlat_half^2 + 36nlat_half # max(0, ...) needed to avoid negative array size when nlat_half==0
@@ -135,6 +137,8 @@ struct OctahedralClenshawGrid{T} <: AbstractOctahedralGrid{T}
     new(data, nlat_half) : error("$(length(data))-element Vector{$(eltype(data))}"*
     "cannot be used to create a O$(nlat_half) OctahedralClenshawGrid{$T}.")
 end
+
+nonparametric_type(::Type{<:OctahedralClenshawGrid}) = OctahedralClenshawGrid
 
 # infer nlat_half from data vector length, infer parametric type from eltype of data
 OctahedralClenshawGrid{T}(data::AbstractVector) where T = OctahedralClenshawGrid{T}(data,

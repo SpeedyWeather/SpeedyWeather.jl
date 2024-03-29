@@ -230,3 +230,16 @@ function get_nlons(Grid::Type{<:AbstractGrid}, nlat_half::Integer; both_hemisphe
 end
 
 get_nlon_max(grid::Grid) where {Grid<:AbstractGrid} = get_nlon_max(Grid, grid.nlat_half)
+
+## BROADCASTING
+# following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
+import Base.Broadcast: BroadcastStyle, Broadcasted
+struct AbstractGridStyle{Grid} <: Broadcast.AbstractArrayStyle{1} end
+Base.BroadcastStyle(::Type{Grid}) where {Grid<:AbstractGrid} = AbstractGridStyle{nonparametric_type(Grid)}()
+
+function Base.similar(bc::Broadcasted{AbstractGridStyle{Grid}}, ::Type{T}) where {Grid, T}
+    Grid(Vector{T}(undef,length(bc)))
+end
+
+AbstractGridStyle{Grid}(::Val{0}) where Grid = AbstractGridStyle{Grid}()
+AbstractGridStyle{Grid}(::Val{1}) where Grid = AbstractGridStyle{Grid}()

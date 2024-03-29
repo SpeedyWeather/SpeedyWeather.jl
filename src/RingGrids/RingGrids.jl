@@ -7,6 +7,7 @@ import UnicodePlots
 # NUMERICS
 import Statistics: mean
 import FastGaussQuadrature
+import LinearAlgebra
 
 # GRIDS
 export  AbstractGrid,

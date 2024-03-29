@@ -123,6 +123,8 @@ struct HEALPixGrid{T} <: AbstractHEALPixGrid{T}
     "cannot be used to create an H$nlat_half HEALPixGrid{$T}.")
 end
 
+nonparametric_type(::Type{<:HEALPixGrid}) = HEALPixGrid
+
 # infer nlat_half from data vector length, infer parametric type from eltype of data
 HEALPixGrid{T}(data::AbstractVector) where T = HEALPixGrid{T}(data, nlat_half_healpix(length(data)))
 HEALPixGrid(data::AbstractVector, n::Integer...) = HEALPixGrid{eltype(data)}(data, n...)
