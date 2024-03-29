@@ -146,8 +146,8 @@ function total_energy(u, v, η, model)
     Hb = model.orography.orography
     g = model.planet.gravity
     
-    @. h = η + H - Hb  # layer thickness between the bottom and free surface
-    @. E = h/2*(u^2 + v^2) + g*h^2 # vertically-integrated mechanical energy
+    @. h = η + H - Hb               # layer thickness between the bottom and free surface
+    @. E = h/2*(u^2 + v^2) + g*h^2  # vertically-integrated mechanical energy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
     return E_mean = real(spectral(E)[1]) / model.spectral_transform.norm_sphere
@@ -302,7 +302,7 @@ Total circulation is defined as the area-integrated absolute vorticity:
 C = \iint \left(\zeta + f\right) dA
 ```
 
-Following previous fashion, we define a function `total_circulation` for this:
+Following previous fashion, we define a function `total_circulation` for this
 
 ```@example analysis
 function total_circulation(ζ, model)
@@ -311,6 +311,8 @@ function total_circulation(ζ, model)
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
     return C_mean = real(spectral(ζ .+ f)[1]) / model.spectral_transform.norm_sphere
 end
+
+total_circulation(ζ, model)
 ```
 
 !!! note "Global-integrated circulation"
@@ -584,6 +586,7 @@ add!(model.callbacks, :diagnostics_recorder => diagnostics_recorder)
 simulation = initialize!(model)
 
 run!(simulation, period=Day(20))
+nothing # hide
 ```
 
 Then one could check the output file `global_diagnostics.nc`,
@@ -626,5 +629,6 @@ axs[0,0].xaxis.set_major_formatter(time_fmt)
 
 tight_layout() # hide
 savefig("global_diagnostics.png") # hide
+nothing # hide
 ```
 ![Global diagnostics](global_diagnostics.png)
