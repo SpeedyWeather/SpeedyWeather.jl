@@ -94,7 +94,7 @@ a = model.spectral_transform.norm_sphere    # = 2√π = 3.5449078
 
 So the initial conditions in this simulation are such that the global mean interface displacement
 is that value in meters. You would need to multiply by the area of the sphere
-``4\pi r^2`` (radius ``r``) to get the actual integral from above, but because that doesn't
+``4\pi R^2`` (radius ``R``) to get the actual integral from above, but because that doesn't
 change with time either, we just want to check that `η_mean` doesn't change with time.
 Which is equivalent to ``\partial_t \iint \eta dA = 0`` and so volume conservation and
 because density is constant also mass conservation.
@@ -248,7 +248,7 @@ absolute angular momentum (AAM) defined as
 ```
 
 should be conserved (``\partial_t\Lambda = 0``).  Here ``u`` is the zonal velocity,
-``\Omega`` the angular velocity of the Earth, ``r = R \cos\phi`` the momentum arm,
+``\Omega`` the angular velocity of the Earth, ``r = R \cos\phi`` the momentum arm at latitude ``\phi``,
 and ``R`` the radius of Earth.
 
 Following previous examples, let us define a `total_angular_momentum` function as
@@ -266,7 +266,7 @@ function total_angular_momentum(u, η, model)
     R = model.spectral_grid.radius
     Ω = model.planet.rotation
 
-    r = R * cos.(model.geometry.lats)       # create r on that grid
+    r = R * cos.(model.geometry.lats)       # momentum arm for every grid point
     
     @. h = η + H - Hb           # layer thickness between the bottom and free surface
     @. Λ = (u*r + Ω*r^2) * h    # vertically-integrated AAM
@@ -277,7 +277,7 @@ end
 ```
 
 Anytime we stop the simulation, we can calculate ``\Lambda`` using this function
-(ignoring the multiplication by ``4\pi a^2`` to get total ``\Lambda``).
+(ignoring the multiplication by ``4\pi R^2`` to get total ``\Lambda``).
 ```@example analysis
 # use u, η from current state of simulation
 Λ_current = total_angular_momentum(u, η, model)
@@ -453,6 +453,17 @@ function global_diagnostics(diagn::DiagnosticVariables, model::ModelSetup)
 end
 ```
 
+!!! note "Radius scaling of vorticity and divergence"
+    The prognostic variables vorticity and divergence are scaled with the radius of the
+    sphere during a simulation, see [Radius scaling](@ref scaling). This did not apply
+    above because we only analyzed vorticity _before_ or _after_ the simulation, i.e.
+    outside of the `run!(simulation)` call. The radius scaling is only applied just
+    before the time integration and is undone directly after it. However, because
+    now we are accessing the vorticity _during_ the simulation we need to unscale
+    the vorticity (and divergence) manually. General recommendation is to divide
+    by `diagn.scale[]` (and not `radius`) as `diagn.scale[]` always reflects whether
+    a vorticity and divergence are currently scaled (scale = radius) or not (scale = 1).
+
 Then we define a new callback `GlobalDiagnostics` subtype of SpeedyWeather's
 `AbstractCallback` and define new methods of `initialize!`,
 `callback!` and `finish!` for it (see [Callbacks](@ref) for more
@@ -558,7 +569,8 @@ Note that `callback!` will execute _every_ time step. If
 execution is only desired periodically, you can use [Schedules](@ref).
 At `finish!` we decide to write the timeseries of our global
 diagnostics as netCDF file via NCDatasets.jl to the current
-path `pwd()`.
+path `pwd()`. We need to add `using NCDatasets` here, as SpeedyWeather
+does not re-export the functionality therein.
 
 Now we create a `GlobalDiagnostics` callback, add it to the
 model with key `:global_diagnostics` (you get a random key if not
