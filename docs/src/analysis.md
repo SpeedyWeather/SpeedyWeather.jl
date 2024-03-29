@@ -338,19 +338,14 @@ We define a function ``total_enstrophy`` for this
 
 ```@example analysis
 function total_enstrophy(ζ, η, model)
-    h = zero(ζ)
-    q = zero(ζ)
-    Q = zero(ζ)
-    
-    # constants used by Speedy model
+    # constants from model
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
-
-    f = coriolis(u)        # create f on that grid
+    f = coriolis(ζ)     # create f on the grid
     
-    @. h = η + H - Hb   # thickness
-    @. q = (ζ + f) / h  # Potential vorticity
-    @. Q = q^2 / 2      # Potential enstrophy
+    h = @. η + H - Hb   # thickness
+    q = @. (ζ + f) / h  # Potential vorticity
+    Q = @. q^2 / 2      # Potential enstrophy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
     return Q_mean = real(spectral(Q)[1]) / model.spectral_transform.norm_sphere
