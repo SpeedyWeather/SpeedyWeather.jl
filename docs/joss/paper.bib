@@ -72,6 +72,20 @@ address = {Exeter, Devon },
 url = {https://scitools.org.uk/cartopy}
 }
 
+@article {CESM,
+      author = {James W. Hurrell and M. M. Holland and P. R. Gent and S. Ghan and Jennifer E. Kay and P. J. Kushner and J.-F. Lamarque and W. G. Large and D. Lawrence and K. Lindsay and W. H. Lipscomb and M. C. Long and N. Mahowald and D. R. Marsh and R. B. Neale and P. Rasch and S. Vavrus and M. Vertenstein and D. Bader and W. D. Collins and J. J. Hack and J. Kiehl and S. Marshall"},
+      title = {The Community Earth System Model: A Framework for Collaborative Research},
+      journal = {Bulletin of the American Meteorological Society},
+      year = {2013},
+      publisher = {American Meteorological Society},
+      address = {Boston MA, USA},
+      volume = {94},
+      number = {9},
+      doi = {10.1175/BAMS-D-12-00121.1},
+      pages= {1339 - 1360},
+      url = {https://journals.ametsoc.org/view/journals/bams/94/9/bams-d-12-00121.1.xml},
+}
+
 @article{Corby1972,
   title = {A General Circulation Model of the Atmosphere Suitable for Long Period Integrations},
   author = {Corby, G. A. and Gilchrist, A. and Newson, R. L.},
@@ -85,6 +99,13 @@ url = {https://scitools.org.uk/cartopy}
   urldate = {2023-03-07},
   abstract = {The design of a general circulation model using the primitive equations in spherical form is described, including a statement of the finite difference forms used to integrate the system and explanations of the motives for unusual aspects of the finite difference scheme. The model incorporates the hydrological cycle, topography, a simple scheme for the radiative exchanges and arrangements for the simulation of deep free convection (sub grid-scale) and for the representation of exchanges of momentum, sensible and latent heat with the underlying surface. An experiment performed with the model forms the subject of a separate paper.},
   langid = {english},
+}
+
+@Manual{Dask,
+  title = {Dask: Library for dynamic task scheduling},
+  author = {{Dask Development Team}},
+  year = {2016},
+  url = {http://dask.pydata.org},
 }
 
 @article{Gorski2005,
@@ -167,6 +188,20 @@ url = {https://scitools.org.uk/cartopy}
   doi = {10.1109/MCSE.2007.55},
   abstract = {Matplotlib is a 2D graphics package used for Python for application development, interactive scripting,and publication-quality image generation across user interfaces and operating systems},
   keywords = {application development,Computer languages,Equations,Graphical user interfaces,Graphics,Image generation,Interpolation,Operating systems,Packaging,Programming profession,Python,scientific programming,scripting languages,User interfaces},
+}
+
+@article{ICON,
+  author = {Giorgetta, M. A. and Brokopf, R. and Crueger, T. and Esch, M. and Fiedler, S. and Helmert, J. and Hohenegger, C. and Kornblueh, L. and Köhler, M. and Manzini, E. and Mauritsen, T. and Nam, C. and Raddatz, T. and Rast, S. and Reinert, D. and Sakradzija, M. and Schmidt, H. and Schneck, R. and Schnur, R. and Silvers, L. and Wan, H. and Zängl, G. and Stevens, B.},
+  title = {ICON-A, the Atmosphere Component of the ICON Earth System Model: I. Model Description},
+  journal = {Journal of Advances in Modeling Earth Systems},
+  volume = {10},
+  number = {7},
+  pages = {1613-1637},
+  keywords = {ICON-A, atmospheric GCM, model description, model tuning},
+  doi = {10.1029/2017MS001242},
+  url = {https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/2017MS001242},
+  eprint = {https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/2017MS001242},
+  year = {2018}
 }
 
 @article{Jablonowski2006,
@@ -258,6 +293,19 @@ year = {2020}
   doi={10.1109/ICWS.2017.61},
 }
 
+@article{MITgcm,
+author = {Marshall, John and Adcroft, Alistair and Hill, Chris and Perelman, Lev and Heisey, Curt},
+title = {A finite-volume, incompressible Navier Stokes model for studies of the ocean on parallel computers},
+journal = {Journal of Geophysical Research: Oceans},
+volume = {102},
+number = {C3},
+pages = {5753-5766},
+doi = {https://doi.org/10.1029/96JC02775},
+url = {https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/96JC02775},
+eprint = {https://agupubs.onlinelibrary.wiley.com/doi/pdf/10.1029/96JC02775},
+year = {1997},
+}
+
 @article{Molteni2003,
   title = {Atmospheric Simulations Using a {{GCM}} with Simplified Physical Parametrizations. {{I}}: Model Climatology and Variability in Multi-Decadal Experiments},
   shorttitle = {Atmospheric Simulations Using a {{GCM}} with Simplified Physical Parametrizations. {{I}}},
@@ -290,9 +338,44 @@ year = {2020}
   issn = {1520-0493, 0027-0644},
   doi = {10.1175/MWR-D-17-0257.1},
   urldate = {2021-06-02},
-  abstract = {{$<$}section class="abstract"{$><$}h2 class="abstractTitle text-title my-1" id="d145702010e111"{$>$}Abstract{$<$}/h2{$><$}p{$>$}Reducing the computational cost of weather and climate simulations would lower electric energy consumption. From the standpoint of reducing costs, the use of reduced precision arithmetic has become an active area of research. Here the impact of using single-precision arithmetic on simulation accuracy is examined by conducting Jablonowski and Williamson's baroclinic wave tests using the dynamical core of a global fully compressible nonhydrostatic model. The model employs a finite-volume method discretized on an icosahedral grid system and its mesh size is set to 220, 56, 14, and 3.5 km. When double-precision arithmetic is fully replaced by single-precision arithmetic, a spurious wavenumber-5 structure becomes dominant in both hemispheres, rather than the expected baroclinic wave growth only in the Northern Hemisphere. It was found that this spurious wave growth comes from errors in the calculation of gridcell geometrics. Therefore, an additional simulation was conducted using double precision for calculations that only need to be performed for model setup, including calculation of gridcell geometrics, and single precision everywhere else, meaning that all calculations performed each time step used single precision. In this case, the model successfully simulated the growth of the baroclinic wave with only small errors and a 46\% reduction in runtime. These results suggest that the use of single-precision arithmetic will allow significant reduction of computational costs in next-generation weather and climate simulations using a fully compressible nonhydrostatic global model with the finite-volume method.{$<$}/p{$><$}/section{$>$}},
   chapter = {Monthly Weather Review},
   langid = {english},
+}
+
+@misc{NCDatasets,
+  author = {Alexander Barth},
+  title = {NCDatasets: A julia package for manipulating netCDF data sets},
+  year = {2023},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/Alexander-Barth/NCDatasets.jl}},
+  commit = {90ed5641684604096558a77020038583e1f2459f}
+}
+
+@misc{NEMO,
+	title = {NEMO ocean engine},
+	url = {http://hdl.handle.net/2122/13309},
+	author = {Gurvan Madec and Romain Bourdallé-Badie and Pierre-Antoine Bouttier and Clement Bricaud and Diego Bruciaferri and Daley Calvert and Jérôme Chanut and Emanuela Clementi and Andrew Coward and Damiano Delrosso and Christian Ethé and Simona Flavoni and Tim Graham and James Harle and Doroteaciro Iovino and Dan Lea and Claire Lévy and Tomas Lovato and Nicolas Martin and Sébastien Masson and Silvia Mocavero and Julien Paul and Clément Rousset and Dave Storkey and Andrea Storto and Martin Vancoppenolle},
+  doi = {10.5281/zenodo.3248739},
+  year = {2017},
+},
+
+@article{Numpy,
+  title = {Array Programming with {{NumPy}}},
+  author = {Harris, Charles R. and Millman, K. Jarrod and {van der Walt}, St{\'e}fan J. and Gommers, Ralf and Virtanen, Pauli and Cournapeau, David and Wieser, Eric and Taylor, Julian and Berg, Sebastian and Smith, Nathaniel J. and Kern, Robert and Picus, Matti and Hoyer, Stephan and {van Kerkwijk}, Marten H. and Brett, Matthew and Haldane, Allan and {del R{\'i}o}, Jaime Fern{\'a}ndez and Wiebe, Mark and Peterson, Pearu and {G{\'e}rard-Marchant}, Pierre and Sheppard, Kevin and Reddy, Tyler and Weckesser, Warren and Abbasi, Hameer and Gohlke, Christoph and Oliphant, Travis E.},
+  year = {2020},
+  month = sep,
+  journal = {Nature},
+  volume = {585},
+  number = {7825},
+  pages = {357--362},
+  publisher = {{Nature Publishing Group}},
+  issn = {1476-4687},
+  doi = {10.1038/s41586-020-2649-2},
+  urldate = {2024-03-29},
+  copyright = {2020 The Author(s)},
+  langid = {english},
+  keywords = {Computational neuroscience,Computational science,Computer science,Software,Solar physics},
 }
 
 @article{Ramadhan2020,
@@ -308,7 +391,6 @@ year = {2020}
   issn = {2475-9066},
   doi = {10.21105/joss.02018},
   urldate = {2023-09-14},
-  abstract = {Ramadhan et al., (2020). Oceananigans.jl: Fast and friendly geophysical fluid dynamics on GPUs. Journal of Open Source Software, 5(53), 2018, https://doi.org/10.21105/joss.02018},
   langid = {english},
 }
 
@@ -321,6 +403,7 @@ year = {2020}
   volume = {115},
   number = {39},
   pages = {9684--9689},
+  doi = {10.1073/pnas.1810286115},
 }
 
 @article{Schneider2023,
@@ -336,7 +419,6 @@ year = {2020}
   issn = {1758-6798},
   doi = {10.1038/s41558-023-01769-3},
   urldate = {2023-09-14},
-  abstract = {There are contrasting views on how to produce the accurate predictions that are needed to guide climate change adaptation. Here, we argue for harnessing artificial intelligence, building on domain-specific knowledge and generating ensembles of moderately high-resolution (10\textendash 50 km) climate simulations as anchors for detailed hazard models.},
   copyright = {2023 Springer Nature Limited},
   langid = {english},
   keywords = {Climate and Earth system modelling,Projection and prediction},
@@ -355,7 +437,6 @@ year = {2020}
   issn = {1520-0493, 0027-0644},
   doi = {10.1175/1520-0493(1978)106<0405:SOTSIM>2.0.CO;2},
   urldate = {2023-03-07},
-  abstract = {Abstract The stability of the semi-implicit method of time integration of the primitive equations is examined when the actual temperature deviates from the reference profile about which the implicitly treated gravity wave terms are linearized. The stability criterion is shown in general to be much more stringent than might he assumed from a simple analytical solution. Instability may occur when there exists a region in which the static stability of the actual atmosphere differs significantly from that of the reference atmosphere, and for realistic actual profiles and commonly chosen reference profiles it is likely to arise at vertical resolutions that are little higher than those used in previous tests of the scheme. Stabilization is achieved either by an appropriate change of reference profile or by a modification of the time-averaging of gravity wave terms. Both may result in a small further reduction in gravity wave phase speeds. Alternatives are mentioned which give better phase speeds at the expense of a reduced time step.},
   chapter = {Monthly Weather Review},
   langid = {english},
 }
@@ -373,7 +454,6 @@ year = {2020}
   issn = {1520-0493, 0027-0644},
   doi = {10.1175/1520-0493(1981)109<0758:AEAAMC>2.0.CO;2},
   urldate = {2023-03-07},
-  abstract = {Abstract An energy and angular-momentum conserving vertical finite-difference scheme is introduced for a general terrain-following vertical coordinate which is a function of pressure and its surface value. A corresponding semi-implicit time scheme is also defined. These schemes am used to compare the usual sigma coordinate with the hybrid coordinate which reduces to pressure above a fixed level and with a modified hybrid coordinate which tends uniformly to pressure at upper levels. Error in the representation of the stratospheric pressure gradient over steep orography can be significantly reduced by use of the hybrid coordinate but the semi-implicit scheme is less stable. The modified hybrid coordinate offers a useful compromise.},
   chapter = {Monthly Weather Review},
   langid = {english},
 }
@@ -391,7 +471,6 @@ year = {2020}
   issn = {0027-0644, 1520-0493},
   doi = {10.1175/MWR-D-16-0228.1},
   urldate = {2020-02-25},
-  abstract = {Earth's climate is a nonlinear dynamical system with scale-dependent Lyapunov exponents. As such, an important theoretical question for modeling weather and climate is how much real information is carried in a model's physical variables as a function of scale and variable type. Answering this question is of crucial practical importance given that the development of weather and climate models is strongly constrained by available supercomputer power. As a starting point for answering this question, the impact of limiting almost all real-number variables in the forecasting mode of ECMWF Integrated Forecast System (IFS) from 64 to 32 bits is investigated. Results for annual integrations and medium-range ensemble forecasts indicate no noticeable reduction in accuracy, and an average gain in computational efficiency by approximately 40\%. This study provides the motivation for more scale-selective reductions in numerical precision.},
   langid = {english}
 }
 
@@ -408,7 +487,6 @@ year = {2020}
   issn = {0027-0644, 1520-0493},
   doi = {10.1175/2010MWR3601.1},
   urldate = {2021-12-17},
-  abstract = {Errors caused by discrete time stepping may be an important component of total model error in contemporary atmospheric and oceanic simulations. To reduce time-stepping errors in leapfrog integrations, the Robert\textendash Asselin\textendash Williams (RAW) filter was proposed by the author as a simple improvement to the widely used Robert\textendash Asselin (RA) filter. The present paper examines the behavior of the RAW filter in semi-implicit integrations. First, in a linear theoretical analysis, the stability and accuracy are interrogated by deriving analytic expressions for the amplitude errors and phase errors. Then, power-series expansions are used to interpret the leading-order errors for small time steps and hence to identify optimal values of the filter parameters. Finally, the RAW filter is tested in a realistic nonlinear setting, by applying it to semi-implicit integrations of the elastic pendulum equations. The results suggest that replacing the RA filter with the RAW filter could reduce time-stepping errors in semi-implicit integrations.},
   langid = {english},
 }
 
@@ -423,7 +501,6 @@ year = {2020}
   publisher = {{arXiv}},
   doi = {10.48550/arXiv.1907.07587},
   urldate = {2023-09-15},
-  abstract = {Scientific computing is increasingly incorporating the advancements in machine learning and the ability to work with large amounts of data. At the same time, machine learning models are becoming increasingly sophisticated and exhibit many features often seen in scientific computing, stressing the capabilities of machine learning frameworks. Just as the disciplines of scientific computing and machine learning have shared common underlying infrastructure in the form of numerical linear algebra, we now have the opportunity to further share new computational infrastructure, and thus ideas, in the form of Differentiable Programming. We describe Zygote, a Differentiable Programming system that is able to take gradients of general program structures. We implement this system in the Julia programming language. Our system supports almost all language constructs (control flow, recursion, mutation, etc.) and compiles high-performance code without requiring any user intervention or refactoring to stage computations. This enables an expressive programming model for deep learning, but more importantly, it enables us to incorporate a large ecosystem of libraries in our models in a straightforward way. We discuss our approach to automatic differentiation, including its support for advanced techniques such as mixed-mode, complex and checkpointed differentiation, and present several examples of differentiating programs.},
   archiveprefix = {arxiv},
   keywords = {Computer Science - Machine Learning,Computer Science - Programming Languages},
 }
@@ -437,7 +514,7 @@ year = {2020}
   pages = {12472--12485},
   publisher = {{Curran Associates, Inc.}},
   urldate = {2023-09-15},
-  abstract = {Applying differentiable programming techniques and machine learning algorithms to foreign programs requires developers to either rewrite their code in a machine learning framework, or otherwise provide derivatives of the foreign code. This paper presents Enzyme, a high-performance automatic differentiation (AD) compiler plugin for the LLVM compiler framework capable of synthesizing gradients of statically analyzable programs expressed in the LLVM intermediate representation (IR). Enzyme synthesizes gradients for programs written in any language whose compiler targets LLVM IR including C, C++, Fortran, Julia, Rust, Swift, MLIR, etc., thereby providing native AD capabilities in these languages. Unlike traditional source-to-source and operator-overloading tools, Enzyme performs AD on optimized IR. On a machine-learning focused benchmark suite including Microsoft's ADBench, AD on optimized IR achieves a geometric mean speedup of 4.2 times over AD on IR before optimization allowing Enzyme to achieve state-of-the-art performance. Packaging Enzyme for PyTorch and TensorFlow provides convenient access to gradients of foreign code with state-of-the-art performance, enabling foreign code to be directly incorporated into existing machine learning workflows.},
+  doi = {10.48550/arXiv.2010.01709},
 }
 
 
@@ -457,7 +534,7 @@ year = {2020}
   year = {2022},
   school = {University of Reading},
   type = {PhD thesis},
-  note = {Available at \url{https://www.doi.org/10.48683/1926.00109229}}
+  doi = {10.48683/1926.00109229},
 }
 
 @article{Rose2018,
@@ -504,13 +581,26 @@ howpublished = {Astrophysics Source Code Library, record ascl:1110.013},
  eprintclass = {ascl},
       eprint = {1110.013},
       adsurl = {https://ui.adsabs.harvard.edu/abs/2011ascl.soft10013S},
-     adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+     adsnote = {Provided by the SAO/NASA Astrophysics Data System},
+     howpublished = {\url{https://ascl.net/1110.013}},
 }
 
 @misc{Willmert2020,
   author = {Willmert, J.},
   title = {Blog Series: Notes on Calculating the Spherical Harmonics},
-  howpublished = {\url{https://justinwillmert.com/articles/2020/notes-on-calculating-the-spherical-harmonics/}},
+  howpublished = {\url{http://web.archive.org/web/*/https://justinwillmert.com/articles/2020/notes-on-calculating-the-spherical-harmonics/}},
   year = 2020,
   note = {Accessed: 2023-10-16}
+}
+
+@article{Xarray,
+  title     = {xarray: {N-D} labeled arrays and datasets in {Python}},
+  author    = {Hoyer, S. and J. Hamman},
+  journal   = {Journal of Open Research Software},
+  volume    = {5},
+  number    = {1},
+  year      = {2017},
+  publisher = {Ubiquity Press},
+  doi       = {10.5334/jors.148},
+  url       = {https://doi.org/10.5334/jors.148}
 }

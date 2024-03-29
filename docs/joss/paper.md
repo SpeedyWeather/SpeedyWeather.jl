@@ -132,14 +132,15 @@ evaporation, and precipitation due to large-scale condensation and convection.
 \label{fig:primitive}](primitive.png)
 
 SpeedyWeather.jl relies on Julia's multiple dispatch programming paradigm [@Bezanson2017]
-to be extensible with new components including parameterizations, forcings, drag,
+to be extensible with new components including parameterizations, forcing, drag,
 or even the grid.
 All such supported model components define an abstract type that can be
 subtyped to introduce, for example, a new parameterization.
-To define precipitation due to the physical process of large-scale condensation,
-one would define `MyCondensation` as a new subtype of `AbstractCondensation`.
-One then only needs to extend the `initialize!` and `condensation!`
-functions for this new type. Passing on `condensation = MyCondensation()`
+To define a new parameterization for convection in a given vertical column of the atmosphere,
+one would define `MyConvection` as a new subtype of `AbstractConvection`.
+One then only needs to extend the `initialize!` (executed once during model initialization)
+and `convection!` (executed on every time step)
+functions for this new type. Passing on `convection = MyConvection()`
 to the model constructor then implements this new model component without
 the need to branch off or overwrite existing model components.
 Conceptually similar scientific modelling paradigms have been very successful
@@ -165,7 +166,10 @@ but Float64 and other custom number formats can be used with a single
 code basis [@Klower2022; @Klower2020].
 Julia will compile to the choice of number format, the grid,
 and and other model components just-in-time. A simple parallelization
-across vertical layers is supported by Julia's multithreading.
+(across vertical layers for the dynamical core, across horizontal grid points
+for the parameterizations) is supported by Julia's multithreading.
+No distributed-memory parallelization is currently supported,
+GPU support is planned.
 
 SpeedyWeather.jl internally uses three sub-modules `RingGrids`,
 `LowerTriangularMatrices`, and `SpeedyTransforms`. `RingGrids` is a module that discretizes
@@ -176,8 +180,7 @@ their coefficients in a lower triangular matrix representation.
 the grid-point space as defined by `RingGrids` and the spectral space defined in
 `LowerTriangularMatrices`. These three modules are independently usable
 and therefore support SpeedyWeather's library-like user interface.
-Output is stored as NetCDF files using
-[NCDatasets.jl](https://github.com/Alexander-Barth/NCDatasets.jl).
+Output is stored as NetCDF files using NCDatasets.jl[@NCDatasets].
 
 ![Relative vorticity simulated with the shallow water model in SpeedyWeather.jl.
 The simulation used a spectral resolution of T1023 (about 20 km) and Float32
@@ -191,18 +194,20 @@ NASA's blue marble from June 2004. \label{fig:swm}](swm.png)
 SpeedyWeather.jl is a fresh approach to atmospheric models that have been
 very influential in many areas of scientific  and high-performance computing
 as well as climate change mitigation and adaptation.
-Most weather, ocean and climate models are written in Fortran and have been
+Most weather, ocean and climate models are written in Fortran
+(e.g. ICON [@ICON], CESM [@CESM], MITgcm [@MITgcm], NEMO [@NEMO]) and have been
 developed over decades. From this tradition follows a specific programming
 style and associated user interface.
 SpeedyWeather.jl aims to overcome the constraints of traditional Fortran-based models.
-The modern trend sees simulations in Fortran and data analysis in Python,
+The modern trend sees simulations in Fortran and data analysis in Python
+(e.g. NumPy [@Numpy], Xarray [@Xarray], Dask [@Dask], Matplotlib [@Hunter2007]),
 making it virtually impossible to interact with various model components directly.
 In SpeedyWeather.jl, interfaces to the model components are exposed to the user.
 Furthermore, data-driven climate modelling [@Rasp2018; @Schneider2023],
 which replaces existing model components with machine learning,
-is more difficult in Fortran due to the lack of
-established machine learning frameworks [@Meyer2022a].
-In Julia, Flux.jl is available for machine learning [@Innes2019] as well as automatic
+is more difficult in Fortran due to the lack of established machine learning
+frameworks [@Meyer2022a]. 
+In Julia, Flux.jl [@Innes2019] is available for machine learning as well as automatic
 differentiation with Enzyme [@Moses2020] for gradients-based optimization.
 
 With SpeedyWeather.jl we hope to provide a platform for data-driven
