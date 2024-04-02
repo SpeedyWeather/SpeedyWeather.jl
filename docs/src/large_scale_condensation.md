@@ -64,7 +64,7 @@ T_{i+1} - T_i &= -\frac{L_v}{c_p}( q_{i+1} - q_i )
 \end{aligned}
 ```
 
-With Euler forward time stepping this is great, but with our [leapfrog timestepping + RAW filter](@id leapfrog)
+With Euler forward time stepping this is great, but with our [leapfrog timestepping + RAW filter](@ref leapfrog)
 this is very dispersive (see [#445](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/445))
 although the implicit formulation is already much better.
 We therefore introduce a time step ``\Delta t_c`` which makes the implicit condensation not immediate
