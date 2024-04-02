@@ -87,7 +87,7 @@ models which solve different sets of equations:
 
 - the primitive equations with and without humidity (\autoref{fig:primitive}),
 - the shallow water equations (\autoref{fig:swm}), and
-- the barotropic vorticity equation.
+- the barotropic vorticity equation (\autoref{fig:particles}).
 
 The primitive equation model in SpeedyWeather.jl is an
 atmospheric general circulation model [@Kucharski2013] with simple parameterizations
@@ -215,6 +215,12 @@ atmospheric modelling and in general an interactive model that makes difficult
 problems easy to simulate. Climate models that are user-friendly, trainable,
 but also easily extensible will suddenly make many complex
 research ideas possible.
+
+![Particle trajectories advected in the barotropic vorticity model. The barotropic
+vorticity equations were stochastically stirred at wave numbers 8 to 40 for homogeneous
+turbulence on the sphere. The simulation was computed at T340 (about 40km global resolution).
+Visualized are 20,000 particles (white dots) with trajectories (colored randomly)
+for the previous 6 hours. \label{fig:particles}](particles.jpg)
 
 # Acknowledgements
 
