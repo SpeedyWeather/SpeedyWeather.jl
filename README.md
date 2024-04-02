@@ -177,6 +177,15 @@ and all dependencies automatically. For more information see the
 Please use the current minor version of Julia,
 compatibilities with older versions are not guaranteed.
 
+## Benchmarks
+
+The primitive equations at 400km resolution with 8 vertical layers are simulated by
+SpeedyWeather.jl at about 500 simulated years per day, i.e. one year takes about
+3min single-threaded on a CPU. Multi-threading will increase the speed typically by 2-4x.
+
+For an overview of typical simulation speeds a user can expect under different model setups see
+[Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/benchmark).
+
 ## Copyright and license
 
 Copyright (c) 2020 Milan Klöwer for SpeedyWeather.jl  
