@@ -1,6 +1,5 @@
 import LinearAlgebra: tril!
 import GPUArrays
-import Base: axes
 
 """
 $(TYPEDSIGNATURES)
@@ -210,7 +209,7 @@ lowertriangle_indices(m::Integer, n::Integer) = tril!(trues((m,n)))
 function lowertriangle_indices(M::AbstractArray{T,N}) where {T,N}
     @boundscheck N >= 3 || throw(BoundsError)
 
-    indices = lowertriangle_indices(getindex(M,:,:,[1 for i=1:(N-2)]...)) # TODO: this assumes 1-indexing and won't work for some fancy indexed arrays
+    indices = lowertriangle_indices(getindex(M,:,:,[axes(M,3)[1] for i=3:N]...)) 
     indices = reshape(indices, size(indices,1), size(indices,2), [1 for i=1:(N-2)]...)
     
     repeat(indices, 1, 1, size(M)[3:end]...)
@@ -410,22 +409,6 @@ function Base.similar(bc::Broadcasted{LowerTriangularStyle{N}}, ::Type{NF}) wher
 end
 
 LowerTriangularStyle{N}(::Val{M}) where {N,M} = LowerTriangularStyle{N}()
-
-function Base.copyto!(dest::LowerTriangularArray{T,2,ArrayType}, bc::Broadcasted{LowerTriangularStyle{2}}) where {T,ArrayType}
-    axs = axes(dest)
-    axes(bc) == axs || Broadcast.throwdm(axes(bc), axs)
-
-    lmax, mmax = size(dest)
-    lm = 0
-
-    for m in 1:mmax
-        for l in m:lmax
-            lm += 1
-            dest.data[lm] = Broadcast._broadcast_getindex(bc, CartesianIndex(l, m))
-        end
-    end
-    return dest
-end
 
 function Base.copyto!(dest::LowerTriangularArray{T,N,ArrayType}, bc::Broadcasted{LowerTriangularStyle{N}}) where {T,N,ArrayType}
     axs = axes(dest)
