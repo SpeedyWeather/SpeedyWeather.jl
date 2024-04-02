@@ -1,9 +1,12 @@
 # Benchmarks
 
-created for SpeedyWeather.jl v0.9.0 on Tue, 02 Apr 2024 13:47:54. 
+created for SpeedyWeather.jl v0.9.0 on Tue, 02 Apr 2024 13:53:20. 
 
-All simulations have been benchmarked over several seconds (wallclock time) without output. Benchmarking excludes initialization and is started just before the main time loop and finishes right after. All simulations single-threaded on a CPU, more details:
-<details><summary>Machine details</summary>
+All simulations have been benchmarked over several seconds (wallclock time) without output. Benchmarking excludes initialization and is started just before the main time loop and finishes right after. The benchmarking results here are not very robust, timings that change with +-50% are not uncommon. Proper benchmarking for performance optimization uses the minimum or median of many executions, while we run a simulation for several time steps which effectively represents the mean, susceptible to outliers that slow down the simulation. However, this is what a user will experience in most situations anyway and the following therefore presents a rough idea of how fast a SpeedyWeather simulation will run, and how much memory it requires.
+
+### Machine details
+
+All simulations single-threaded on a CPU:
 ```julia
 julia> versioninfo()
 Julia Version 1.10.2
@@ -20,10 +23,10 @@ Threads: 1 default, 0 interactive, 1 GC (on 8 virtual cores)
 Environment:
   LD_LIBRARY_PATH = /Users/milan/.julia/conda/3/lib:
 ```
-</details>
-The benchmarking results here are not very robust, timings that change with +-50% are not uncommon. Proper benchmarking for performance optimization uses the minimum or median of many executions, while we run a simulation for several time steps which effectively represents the mean, susceptible to outliers that slow down the simulation. However, this is what a user will experience in most situations anyway and the following therefore presents a rough idea of how fast a SpeedyWeather simulation will run, and how much memory it requires.
 
-Explanation
+### Explanation
+
+Abbreviations in the tables below are as follows, omitted columns use defaults.
 - NF: Number format, default: Float32
 - T: Spectral resolution, maximum degree of spherical harmonics, default: T31
 - L: Number of vertical layers, default: 8 (for 3D models)
