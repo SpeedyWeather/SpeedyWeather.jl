@@ -39,7 +39,8 @@ to first order yields
 
 ```math
 q_{i+1} - q_i = q^\star(T_{i+1}) - q_i = q^\star(T_i) + (T_{i+1} - T_i)
-\frac{\partial q^\star}{\partial T} (T_i) + O(\delta T^2) - q_i```
+\frac{\partial q^\star}{\partial T} (T_i) + O(\delta T^2) - q_i
+```
 
 Now we make a linear approximation to the derivative and drop the ``O(\delta T^2)`` term.
 Inserting the (explicit) latent heat release yields
