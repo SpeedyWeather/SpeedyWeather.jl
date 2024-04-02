@@ -26,7 +26,7 @@ write(md, "in most situations anyway and the following therefore presents a roug
 write(md, "SpeedyWeather simulation will run, and how much memory it requires.\n\n")
 
 write(md, "### Machine details\n\n")
-write(md, "All simulations single-threaded on a CPU:\n")
+write(md, "All benchmark simulation were single-threaded on a CPU:\n")
 
 write(md, "```julia\njulia> versioninfo()\n")
 versioninfo(md)
@@ -43,7 +43,13 @@ write(md, "- Dynamics: With dynamics?, default: true\n")
 write(md, "- Physics: With physical parameterizations?, default: true (for primitive equation models)\n")
 write(md, "- Δt: time step [s].\n")
 write(md, "- SYPD: Speed of simulation, simulated years per wallclock day.\n")
-write(md, "- Memory: Memory footprint of simulation, variables and constants.\n")
+write(md, "- Memory: Memory footprint of simulation, variables and constants.\n\n")
+
+write(md, "### Running the benchmarks\n\n")
+write(md, "The benchmark suite here can be reproduced by executing:\n\n")
+write(md, "```> julia manual_benchmarking.jl```\n\n")
+write(md, "inside `the SpeedyWeather.jl/benchmark` folder. It will create this `README.md` which can be pushed ")
+write(md, "to the repository for updates or comparison.")
 
 # Write benchmark suites into markdown
 for key in keys(benchmarks)

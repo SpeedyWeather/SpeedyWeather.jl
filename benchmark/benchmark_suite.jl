@@ -21,7 +21,7 @@ default_nlev(models) = [default_nlev(model) for model in models]
 
 # this should return number of timesteps so that every simulation
 # only takes seconds
-n_timesteps(trunc, nlev) = max(10, round(Int, 3e8/trunc^3/nlev^2))
+n_timesteps(trunc, nlev) = max(10, round(Int, 4e8/trunc^3/nlev^2))
 
 function run_benchmark_suite!(suite::BenchmarkSuite)
     for i in 1:suite.nruns
