@@ -1,9 +1,21 @@
 # Benchmarks
 
-created for SpeedyWeather.jl v0.9.0 on Tue, 02 Apr 2024 11:46:14. 
+created for SpeedyWeather.jl v0.9.0 on Tue, 02 Apr 2024 12:14:41. 
 
-All simulations have been benchmarked over several seconds (wallclock time) without output. Benchmarking excludes initialization and is started just before the main time loop and finishes right after. All simulations single-threaded on a CPU. 
-
+All simulations have been benchmarked over several seconds (wallclock time) without output. Benchmarking excludes initialization and is started just before the main time loop and finishes right after. All simulations single-threaded on a CPU, <details><summary>Machine details</summary>Julia Version 1.10.2
+Commit bd47eca2c8a (2024-03-01 10:14 UTC)
+Build Info:
+  Official https://julialang.org/ release
+Platform Info:
+  OS: macOS (x86_64-apple-darwin22.4.0)
+  CPU: 8 × Intel(R) Core(TM) i5-1030NG7 CPU @ 1.10GHz
+  WORD_SIZE: 64
+  LIBM: libopenlibm
+  LLVM: libLLVM-15.0.7 (ORCJIT, icelake-client)
+Threads: 1 default, 0 interactive, 1 GC (on 8 virtual cores)
+Environment:
+  LD_LIBRARY_PATH = /Users/milan/.julia/conda/3/lib:
+</details>
 The benchmarking results here are not very robust, timings that change with +-50% are not uncommon. Proper benchmarking for performance optimization uses the minimum or median of many executions, while we run a simulation for several time steps which effectively represents the mean, susceptible to outliers that slow down the simulation. However, this is what a user will experience in most situations anyway and the following therefore presents a rough idea of how fast a SpeedyWeather simulation will run, and how much memory it requires.
 
 Explanation
