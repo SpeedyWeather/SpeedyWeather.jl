@@ -184,7 +184,7 @@ SpeedyWeather.jl at about 500 simulated years per day, i.e. one year takes about
 3min single-threaded on a CPU. Multi-threading will increase the speed typically by 2-4x.
 
 For an overview of typical simulation speeds a user can expect under different model setups see
-[Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/benchmark/benchmarks.md).
+[Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/benchmark).
 
 ## Copyright and license
 

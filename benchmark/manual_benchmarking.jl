@@ -1,27 +1,29 @@
 using SpeedyWeather, Dates, Printf
 import SpeedyWeather.SpeedyTransforms: prettymemory
 
-include("benchmark_suite.jl")
-include("define_benchmarks.jl")
+# include("benchmark_suite.jl")
+# include("define_benchmarks.jl")
 
-## RUN BENCHMARKS
-for key in keys(benchmarks)
-    suite = benchmarks[key]
-    run_benchmark_suite!(suite)
-end
+# ## RUN BENCHMARKS
+# for key in keys(benchmarks)
+#     suite = benchmarks[key]
+#     run_benchmark_suite!(suite)
+# end
 
 ## WRITE into benchmarks.md
-md = open("benchmarks.md", "w")
+md = open("README.md", "w")
 write(md, "# Benchmarks\n")
 
 version = SpeedyWeather.pkgversion(SpeedyWeather)
 write(md, "\ncreated for SpeedyWeather.jl v$version on $(Dates.format(Dates.now(), Dates.RFC1123Format)). \n\n")
 write(md, "All simulations have been benchmarked over several seconds (wallclock time) without output. ")
 write(md, "Benchmarking excludes initialization and is started just before the main time loop and finishes right after. ")
-write(md, "All simulations single-threaded on a CPU, more details:")
-write(md, "<details><summary>Machine details</summary>")
+write(md, "All simulations single-threaded on a CPU, more details:\n")
+
+write(md, "<details><summary>Machine details</summary>\n")
+write(md, "```julia\njulia> versioninfo()\n")
 versioninfo(md)
-write(md,"</details>")
+write(md,"```\n</details>")
 
 write(md, "\n")
 write(md, "The benchmarking results here are not very robust, timings that change with +-50% are not uncommon. ")
