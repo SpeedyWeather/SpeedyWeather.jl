@@ -96,6 +96,8 @@ struct OctaHEALPixGrid{T} <: AbstractOctaHEALPixGrid{T}
     "cannot be used to create an H$nlat_half OctaHEALPixGrid{$T}.")
 end
 
+nonparametric_type(::Type{<:OctaHEALPixGrid}) = OctaHEALPixGrid
+
 npoints_octahealpix(nlat_half::Integer) = 4nlat_half^2
 nlat_half_octahealpix(npoints::Integer) = round(Int, sqrt(npoints/4))  # inverse of npoints_octahealpix
 nlat_octahealpix(nlat_half::Integer) = 2nlat_half-1

@@ -138,16 +138,12 @@ space for the global integral as before. Let us define a `total_energy` function
 ```@example analysis
 using SpeedyWeather
 function total_energy(u, v, η, model)
-    # allocate grid variable
-    h = zero(u)
-    E = zero(u)
-    
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
     g = model.planet.gravity
     
-    @. h = η + H - Hb               # layer thickness between the bottom and free surface
-    @. E = h/2*(u^2 + v^2) + g*h^2  # vertically-integrated mechanical energy
+    h = @. η + H - Hb               # layer thickness between the bottom and free surface
+    E = @. h/2*(u^2 + v^2) + g*h^2  # vertically-integrated mechanical energy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
     return E_mean = real(spectral(E)[1]) / model.spectral_transform.norm_sphere
@@ -218,14 +214,12 @@ f = coriolis(ζ)     # create f on that grid
 
 # layer thickness
 η = simulation.diagnostic_variables.surface.pres_grid
-h = zero(η)
 H = model.atmosphere.layer_thickness
 Hb = model.orography.orography
-@. h = η + H - Hb
+h = @. η + H - Hb
 
 # potential vorticity
-q = zero(ζ)
-@. q = (f + ζ) / h
+q = @. (f + ζ) / h
 nothing # hide
 ```
 
@@ -257,10 +251,6 @@ Following previous examples, let us define a `total_angular_momentum` function a
 using SpeedyWeather
 
 function total_angular_momentum(u, η, model)
-    # allocate grid variable
-    h = zero(u)
-    Λ = zero(u)
-    
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
     R = model.spectral_grid.radius
@@ -268,8 +258,8 @@ function total_angular_momentum(u, η, model)
 
     r = R * cos.(model.geometry.lats)       # momentum arm for every grid point
     
-    @. h = η + H - Hb           # layer thickness between the bottom and free surface
-    @. Λ = (u*r + Ω*r^2) * h    # vertically-integrated AAM
+    h = @. η + H - Hb           # layer thickness between the bottom and free surface
+    Λ = @. (u*r + Ω*r^2) * h    # vertically-integrated AAM
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
     return Λ_mean = real(spectral(Λ)[1]) / model.spectral_transform.norm_sphere
@@ -306,10 +296,8 @@ Following previous fashion, we define a function `total_circulation` for this
 
 ```@example analysis
 function total_circulation(ζ, model)
-    f = coriolis(ζ)  # create f on that grid
-    C = zero(ζ)
-    @. C = ζ + f
-
+    f = coriolis(ζ)         # create f on the grid of ζ
+    C = ζ .+ f              # absolute vorticity
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
     return C_mean = real(spectral(C)[1]) / model.spectral_transform.norm_sphere
 end
@@ -338,19 +326,14 @@ We define a function ``total_enstrophy`` for this
 
 ```@example analysis
 function total_enstrophy(ζ, η, model)
-    h = zero(ζ)
-    q = zero(ζ)
-    Q = zero(ζ)
-    
-    # constants used by Speedy model
+    # constants from model
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
-
-    f = coriolis(u)        # create f on that grid
+    f = coriolis(ζ)     # create f on the grid
     
-    @. h = η + H - Hb   # thickness
-    @. q = (ζ + f) / h  # Potential vorticity
-    @. Q = q^2 / 2      # Potential enstrophy
+    h = @. η + H - Hb   # thickness
+    q = @. (ζ + f) / h  # Potential vorticity
+    Q = @. q^2 / 2      # Potential enstrophy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
     return Q_mean = real(spectral(Q)[1]) / model.spectral_transform.norm_sphere
@@ -390,9 +373,7 @@ to show how to global integral ``\iint dV`` can be written more efficiently
 # define a global integral, reusing a precomputed SpectralTransform S
 # times surface area of sphere omitted
 function ∬dA(v, h, S::SpectralTransform)
-    vh = zero(h)
-    @. vh = v * h
-    return real(spectral(vh, S)[1]) / S.norm_sphere
+    return real(spectral(v .* h, S)[1]) / S.norm_sphere
 end
 
 # use SpectralTransform from model
@@ -408,13 +389,6 @@ Now the `global_diagnostics` function is defined as
 
 ```@example analysis
 function global_diagnostics(u, v, ζ, η, model)
-    h = zero(u)     # preallocate grids of same size
-    q = zero(u)
-    λ = zero(u)
-    k = zero(u)
-    p = zero(u)
-    z = zero(u)
-
     # constants from model
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
@@ -425,12 +399,12 @@ function global_diagnostics(u, v, ζ, η, model)
     r = R * cos.(model.geometry.lats)   # create r on that grid
     f = coriolis(u)                     # create f on that grid
     
-    @. h = η + H - Hb           # thickness
-    @. q = (ζ + f) / h          # potential vorticity
-    @. λ = u * r + Ω * r^2      # angular momentum
-    @. k = 1/2 * (u^2 + v^2)    # kinetic energy
-    @. p = 1/2 * g * h          # potential energy
-    @. z = q^2/2                # potential enstrophy
+    h = @. η + H - Hb           # thickness
+    q = @. (ζ + f) / h          # potential vorticity
+    λ = @. u * r + Ω * r^2      # angular momentum
+    k = @. 1/2 * (u^2 + v^2)    # kinetic energy
+    p = @. 1/2 * g * h          # potential energy
+    z = @. q^2/2                # potential enstrophy
 
     M = ∬dA(1, h, model)        # mean mass
     C = ∬dA(q, h, model)        # mean circulation
@@ -450,8 +424,7 @@ function global_diagnostics(diagn::DiagnosticVariables, model::ModelSetup)
     η = diagn.surface.pres_grid
     
     # vorticity during simulation is scaled by radius R, unscale here
-    ζ = zero(ζR)
-    @. ζ = ζR / diagn.scale[]
+    ζ = ζR ./ diagn.scale[]
 
     return global_diagnostics(u, v, ζ, η, model)
 end
@@ -531,7 +504,7 @@ function SpeedyWeather.callback!(
     
     M, C, Λ, K, P, Q = global_diagnostics(diagn, model)
     
-    # store current time and diagnostics for timestep i
+    # store current time and diagnostics for timestep i
     callback.time[i] = progn.clock.time
     callback.M[i] = M 
     callback.C[i] = C 
@@ -555,7 +528,7 @@ function SpeedyWeather.finish!(
     # create a netCDF file in current path
     ds = NCDataset(joinpath(pwd(), "global_diagnostics.nc"), "c")
     
-    # save diagnostics variables within
+    # save diagnostics variables within
     defDim(ds, "time", n_timesteps)
     defVar(ds, "time",                  callback.time,  ("time",))
     defVar(ds, "mass",                  callback.M,     ("time",))

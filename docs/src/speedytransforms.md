@@ -381,13 +381,9 @@ is obtained, and we do the following for ``f\zeta/g``.
 vor_grid = gridded(vor, Grid=spectral_grid.Grid)
 f = coriolis(vor_grid)      # create Coriolis parameter f on same grid with default rotation
 g = model.planet.gravity
-fζ_g = zero(f)              # preallocate on same grid
-@. fζ_g = vor_grid * f / g  # in-place and element-wise
+fζ_g = @. vor_grid * f / g  # in-place and element-wise
 nothing # hide
 ```
-The last two lines are a bit awkward for now, as the element-wise multiplication between
-two grids would escapes the grid and returns a vector that we wrap again into a Grid.
-However, by preallocating the new variable with `zero` we guarantee to stay on that grid.
 Now we need to apply the inverse Laplace operator to ``f\zeta/g`` which we do as follows
 
 ```@example speedytransforms
