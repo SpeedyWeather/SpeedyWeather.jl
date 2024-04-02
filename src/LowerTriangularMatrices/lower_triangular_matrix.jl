@@ -349,6 +349,7 @@ function Base.similar(L::LowerTriangularArray{S,N,ArrayType}, ::Type{T}) where {
     return LowerTriangularArray{T,N,new_array_type}(undef, size(L)...)
 end
 
+Base.similar(L::LowerTriangularArray{T,N,ArrayType}, ::Type{T}) where {T, N, ArrayType} = LowerTriangularArray{T,N,ArrayType}(undef, size(L)...)
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
 # ARITHMETIC
