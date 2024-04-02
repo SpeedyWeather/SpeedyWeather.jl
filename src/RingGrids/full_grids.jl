@@ -94,6 +94,8 @@ struct FullClenshawGrid{T} <: AbstractFullGrid{T}
         "L$nlat_half ($(4nlat_half)x$(2nlat_half - 1)) FullClenshawGrid{$T}.")
 end
 
+nonparametric_type(::Type{<:FullClenshawGrid}) = FullClenshawGrid
+
 # subtract the otherwise double-counted 4nlat_half equator points
 npoints_clenshaw(nlat_half::Integer) = 8nlat_half^2 - 4nlat_half
 nlat_half_clenshaw(npoints::Integer) = round(Int, 1/4 + sqrt(1/16 + npoints/8))  # inverse
@@ -123,6 +125,8 @@ struct FullGaussianGrid{T} <: AbstractFullGrid{T}
     new(data, nlat_half) : error("$(length(data))-element Vector{$(eltype(data))} cannot be used to create a "*
         "F$nlat_half ($(4nlat_half)x$(2nlat_half)) FullGaussianGrid{$T}.")
 end
+
+nonparametric_type(::Type{<:FullGaussianGrid}) = FullGaussianGrid
 
 npoints_gaussian(nlat_half::Integer) = 8nlat_half^2
 nlat_half_gaussian(npoints::Integer) = round(Int, sqrt(npoints/8))
@@ -154,6 +158,8 @@ struct FullHEALPixGrid{T} <: AbstractFullGrid{T}
         "H$nlat_half ($(4nlat_half)x$(2nlat_half-1)) FullHEALPixGrid{$T}.")
 end
 
+nonparametric_type(::Type{<:FullHEALPixGrid}) = FullHEALPixGrid
+
 npoints_fullhealpix(nlat_half::Integer) = 4nlat_half*(2nlat_half-1)
 nlat_half_fullhealpix(npoints::Integer) = round(Int, 1/4 + sqrt(1/16 + npoints/8))
 
@@ -181,6 +187,9 @@ struct FullOctaHEALPixGrid{T} <: AbstractFullGrid{T}
     new(data, nlat_half) : error("$(length(data))-element Vector{$(eltype(data))} cannot be used to create a "*
         "F$nlat_half ($(4nlat_half)x$(2nlat_half - 1)) FullOctaHEALPixGrid{$T}.")
 end
+
+nonparametric_type(::Type{<:FullOctaHEALPixGrid}) = FullOctaHEALPixGrid
+
 npoints_fulloctahealpix(nlat_half::Integer) = 8nlat_half^2 - 4nlat_half
 nlat_half_fulloctahealpix(npoints::Integer) = round(Int, 1/4 + sqrt(1/16 + npoints/8))
 

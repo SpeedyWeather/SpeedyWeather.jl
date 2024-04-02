@@ -211,3 +211,48 @@ end
         end
     end
 end
+
+@testset "Grid broadcasting" begin
+    n = 2
+    @testset for G in ( FullClenshawGrid,
+                        FullGaussianGrid,
+                        OctahedralGaussianGrid,
+                        OctahedralClenshawGrid,
+                        HEALPixGrid,
+                        OctaHEALPixGrid,
+                        FullHEALPixGrid,
+                        FullOctaHEALPixGrid,
+                        )
+
+        @test zeros(G, n) .+ 1 == ones(G, n)
+        @test ones(G, n)  .- 1 == zeros(G, n)
+        @test ones(G, n)/1 == ones(G, n)
+        @test zeros(G, n) + ones(G, n) == ones(G, n)
+        @test 2ones(G, n) == ones(G, n) + ones(G, n)
+
+        # promote types, Grid{Float16} -> Grid{Float64} etc
+        @test all(ones(G{Float16}, n)*2.0 .=== 2.0)
+        @test all(ones(G{Float16}, n)*2f0 .=== 2f0)
+        @test all(ones(G{Float32}, n)*2.0 .=== 2.0)
+
+        # promote types across grids
+        @test all(ones(G{Float16}, n) + ones(G{Float32}, n) .=== 2f0)
+        @test all(ones(G{Float16}, n) + ones(G{Float64}, n) .=== 2.0)
+        @test all(ones(G{Float32}, n) + ones(G{Float64}, n) .=== 2.0)
+
+        # promote types across grids
+        @test all(ones(G{Float16}, n) - ones(G{Float32}, n) .=== 0f0)
+        @test all(ones(G{Float16}, n) - ones(G{Float64}, n) .=== 0.0)
+        @test all(ones(G{Float32}, n) - ones(G{Float64}, n) .=== 0.0)
+
+        # promote types across grids
+        @test all(ones(G{Float16}, n) .* ones(G{Float32}, n) .=== 1f0)
+        @test all(ones(G{Float16}, n) .* ones(G{Float64}, n) .=== 1.0)
+        @test all(ones(G{Float32}, n) .* ones(G{Float64}, n) .=== 1.0)
+
+        # promote types across grids
+        @test all(ones(G{Float16}, n) ./ ones(G{Float32}, n) .=== 1f0)
+        @test all(ones(G{Float16}, n) ./ ones(G{Float64}, n) .=== 1.0)
+        @test all(ones(G{Float32}, n) ./ ones(G{Float64}, n) .=== 1.0)
+    end 
+end

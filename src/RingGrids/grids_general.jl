@@ -230,3 +230,25 @@ function get_nlons(Grid::Type{<:AbstractGrid}, nlat_half::Integer; both_hemisphe
 end
 
 get_nlon_max(grid::Grid) where {Grid<:AbstractGrid} = get_nlon_max(Grid, grid.nlat_half)
+
+## BROADCASTING
+# following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
+import Base.Broadcast: BroadcastStyle, Broadcasted
+
+# {1} as grids are <:AbstractVector, Grid here is the non-parameteric Grid type!
+struct AbstractGridStyle{Grid} <: Broadcast.AbstractArrayStyle{1} end
+
+# important to remove Grid{T} parameter T (eltype/number format) here to broadcast
+# automatically across the same grid type but with different T
+# e.g. FullGaussianGrid{Float32} and FullGaussianGrid{Float64}
+Base.BroadcastStyle(::Type{Grid}) where {Grid<:AbstractGrid} =
+    AbstractGridStyle{nonparametric_type(Grid)}()
+
+# allocation for broadcasting, create a new Grid with undef of type/number format T
+function Base.similar(bc::Broadcasted{AbstractGridStyle{Grid}}, ::Type{T}) where {Grid, T}
+    Grid(Vector{T}(undef,length(bc)))
+end
+
+# ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors
+AbstractGridStyle{Grid}(::Val{0}) where Grid = AbstractGridStyle{Grid}()
+AbstractGridStyle{Grid}(::Val{1}) where Grid = AbstractGridStyle{Grid}()
