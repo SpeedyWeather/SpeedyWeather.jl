@@ -126,10 +126,10 @@ enable even inexperienced users to run simulations in just a few lines of code.
 
 ![Surface humidity, air temperature, wind speed and precipitation simulated
 with the primitive equation model in SpeedyWeather.jl. Spectral resolution is
-T127 (about 100km) on an octahedral Gaussian grid [@Malardel2016] with simple
+T340 (about 40km) on an octahedral Gaussian grid [@Malardel2016] with simple
 physics to represent unresolved processes such as surface fluxes including
 evaporation, and precipitation due to large-scale condensation and convection.
-\label{fig:primitive}](primitive.png)
+\label{fig:primitive}](primitive.jpg)
 
 SpeedyWeather.jl relies on Julia's multiple dispatch programming paradigm [@Bezanson2017]
 to be extensible with new components including parameterizations, forcing, drag,
