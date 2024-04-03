@@ -133,7 +133,7 @@ ax.pcolormesh(lon, lat, vor')
 ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Relative vorticity")
-tight_layout() # hide
+tight_layout() # hide
 savefig("galewsky1.png", dpi=70) # hide
 nothing # hide
 ```
@@ -321,8 +321,13 @@ Can you spot the Himalayas or the Andes?
 ```@example jablonowski
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlev=8, Grid=FullGaussianGrid, dealiasing=3)
+
 orography = ZonalRidge(spectral_grid)
-initial_conditions = ZonalWind()
+initial_conditions = InitialConditions(
+    vordiv = ZonalWind(),
+    temp = JablonowskiTemperature(),
+    pres = ZeroInitially())
+
 model = PrimitiveDryModel(; spectral_grid, orography, initial_conditions, physics=false)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
@@ -330,13 +335,16 @@ run!(simulation, period=Day(9), output=true)
 nothing # hide
 ```
 
-The Jablonowski-Williamson baroclinic wave test case[^JW06] using the [Primitive equation model](@ref primitive_equation_model)
-particularly the dry model, as we switch off all physics with `physics=false`.
-We want to use 8 vertical levels, and a lower resolution of T31 on a [full Gaussian grid](@ref FullGaussianGrid).
-The Jablonowski-Williamson initial conditions are in `ZonalWind`, the orography
-is just a `ZonalRidge`. There is no forcing and the initial conditions are
-baroclinically unstable which kicks off a wave propagating eastward.
-This wave becomes obvious when visualised with
+The Jablonowski-Williamson baroclinic wave test case[^JW06] using the
+[Primitive equation model](@ref primitive_equation_model) particularly the dry model,
+as we switch off all physics with `physics=false`.
+We want to use 8 vertical levels, and a lower resolution of T31 on a
+[full Gaussian grid](@ref FullGaussianGrid).
+The Jablonowski-Williamson initial conditions are `ZonalWind` for vorticity and divergence
+(curl and divergence of ``u, v``), `JablonowskiTemperature` for temperature and
+`ZeroInitially` for pressure. The orography is just a `ZonalRidge`.
+There is no forcing and the initial conditions are baroclinically unstable which kicks
+off a wave propagating eastward. This wave becomes obvious when visualised with
 
 ```@example jablonowski
 using PythonPlot, NCDatasets
