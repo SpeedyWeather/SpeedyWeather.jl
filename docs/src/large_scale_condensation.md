@@ -55,7 +55,7 @@ And solving for ``\delta q`` yields
 \left[ 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T} (T^i) \right] \delta q = q^\star(T_i) - q_i
 ```
 
-meaning that the implicit immediate condensation can be formulated as
+meaning that the implicit immediate condensation can be formulated as (see also [^Frierson2006])
 
 ```math
 \begin{aligned}
@@ -86,3 +86,25 @@ numerical stability, we tie it here to the time step of the numerical integratio
 This also means that at higher resolution condensation is more immediate than
 at low resolution, but the dispersive time integration of this term is in all
 cases similar (and not much higher at lower resolution).
+
+## Large-scale precipitation
+
+The tendencies ``\delta q`` in units of  kg/kg/s are vertically integrated to
+diagnose the large-scale precipitation ``P`` in units of meters
+
+```math
+P = -\int \frac{\Delta t}{g \rho} \delta q dp
+```
+
+with gravity ``g``, water density ``\rho`` and time step ``\Delta t``. ``P``
+is therefore interpreted as the amount of precipitation that falls down
+during the time step ``\Delta t`` of the time integration. Note that ``\delta q``
+is always negative due to the ``q > q^\star`` condition for saturation,
+hence ``P`` is positive only.
+It is then accumulated over several time steps, e.g. over the course of an
+hour to yield a typical rain rate of mm/h.
+The water density is taken as reference density of ``1000~kg/m^3``
+
+## References
+
+[^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566, DOI:[10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1). 
