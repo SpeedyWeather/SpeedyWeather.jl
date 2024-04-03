@@ -34,28 +34,28 @@ that because the saturation humidity is calculated from the current temperature 
 which is increased due to the latent heat release, the humidity after this time step will be
 undersaturated. Ideally, one would want to condense towards the new saturation humidity
 ``q^\star(T_{i+1})`` so that condensation draws the relative humidity back down to 100% not below it. 
-Taylor expansion at ``i`` with ``\delta T = T_{i+1} - T_i`` (and ``\delta q`` similarly)
+Taylor expansion at ``i`` with ``\Delta T = T_{i+1} - T_i`` (and ``\delta q`` similarly)
 to first order yields
 
 ```math
 q_{i+1} - q_i = q^\star(T_{i+1}) - q_i = q^\star(T_i) + (T_{i+1} - T_i)
-\frac{\partial q^\star}{\partial T} (T_i) + O(\delta T^2) - q_i
+\frac{\partial q^\star}{\partial T} (T_i) + O(\Delta T^2) - q_i
 ```
 
-Now we make a linear approximation to the derivative and drop the ``O(\delta T^2)`` term.
+Now we make a linear approximation to the derivative and drop the ``O(\Delta T^2)`` term.
 Inserting the (explicit) latent heat release yields
 
 ```math
-\delta q = q^\star(T_i) + -\frac{L_v}{c_p} \delta q \frac{\partial q^\star}{\partial T} (T_i) - q_i
+\Delta q = q^\star(T_i) + -\frac{L_v}{c_p} \Delta q \frac{\partial q^\star}{\partial T} (T_i) - q_i
 ```
 
-And solving for ``\delta q`` yields
+And solving for ``\Delta q`` yields
 
 ```math
-\left[ 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T} (T^i) \right] \delta q = q^\star(T_i) - q_i
+\left[ 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T} (T^i) \right] \Delta q = q^\star(T_i) - q_i
 ```
 
-meaning that the implicit immediate condensation can be formulated as
+meaning that the implicit immediate condensation can be formulated as (see also [^Frierson2006])
 
 ```math
 \begin{aligned}
@@ -72,9 +72,9 @@ anymore but over several time steps ``\Delta t`` of the leapfrogging.
 
 ```math
 \begin{aligned}
-\frac{q_{i+1} - q_i}{\Delta t} &= \frac{q^\star(T_i) - q_i}{ \Delta t_c
+\delta q = \frac{q_{i+1} - q_i}{\Delta t} &= \frac{q^\star(T_i) - q_i}{ \Delta t_c
 \left( 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right)} \\
-\frac{T_{i+1} - T_i}{\Delta t} &= -\frac{L_v}{c_p}( \frac{q_{i+1} - q_i}{\Delta t} )
+\delta T = \frac{T_{i+1} - T_i}{\Delta t} &= -\frac{L_v}{c_p}( \frac{q_{i+1} - q_i}{\Delta t} )
 \end{aligned}
 ```
 
@@ -86,3 +86,25 @@ numerical stability, we tie it here to the time step of the numerical integratio
 This also means that at higher resolution condensation is more immediate than
 at low resolution, but the dispersive time integration of this term is in all
 cases similar (and not much higher at lower resolution).
+
+## Large-scale precipitation
+
+The tendencies ``\delta q`` in units of  kg/kg/s are vertically
+integrated to diagnose the large-scale precipitation ``P`` in units of meters
+
+```math
+P = -\int \frac{\Delta t}{g \rho} \delta q dp
+```
+
+with gravity ``g``, water density ``\rho`` and time step ``\Delta t``.
+``P`` is therefore interpreted as the amount of precipitation that falls down
+during the time step ``\Delta t`` of the time integration. Note that ``\delta q``
+is always negative due to the ``q > q^\star`` condition for saturation,
+hence ``P`` is positive only.
+It is then accumulated over several time steps, e.g. over the course of an
+hour to yield a typical rain rate of mm/h.
+The water density is taken as reference density of ``1000~kg/m^3``
+
+## References
+
+[^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566, DOI:[10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1).
