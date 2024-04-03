@@ -18,7 +18,7 @@ function plot(A::AbstractFullGrid; title::String="$(get_nlat(A))-ring $(typeof(A
     A_view = view(A_matrix, :, nlat:-1:1)
 
     # use at most 30 points in height, but fewer for smaller grids
-    # small grids are then displayed as 1 character per grid point
+    # small grids are then displayed as 1 character per grid point
     height = min(nlat, 30)
     width = 2height
 
