@@ -74,7 +74,7 @@ into the upper triangle of a `LowerTriangularMatrix`, for example
 ```@repl LowerTriangularMatrices
 L[2, 1] = 0    # valid index
 
-L[1, 2] = 0    # invalid index in the upper triangle
+L[1, 2] = 0    # invalid index in the upper triangle
 ```
 
 ## Linear algebra with `LowerTriangularMatrix`
