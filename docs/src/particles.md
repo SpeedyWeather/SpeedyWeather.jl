@@ -277,7 +277,7 @@ so that you can read the netCDF file with
 
 ```@example particle_tracker
 using NCDatasets
-run_id = "run_$(model.output.id)"                    # create a run_???? string with output id
+run_id = "run_$(model.output.id)"                    # create a run_???? string with output id
 path = joinpath(run_id, particle_tracker.file_name)  # by default "run_????/particles.nc"
 ds = NCDataset(path)
 ds["lon"]
@@ -300,7 +300,7 @@ ax.plot(lon', lat')
 ax.set_xlabel("longitude")
 ax.set_ylabel("latitude")
 ax.set_title("Particle advection")
-tight_layout() # hide
+tight_layout() # hide
 savefig("particles.png", dpi=70) # hide
 nothing # hide
 ```
