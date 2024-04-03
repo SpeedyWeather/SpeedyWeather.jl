@@ -72,9 +72,9 @@ anymore but over several time steps ``\Delta t`` of the leapfrogging.
 
 ```math
 \begin{aligned}
-\frac{q_{i+1} - q_i}{\Delta t} &= \frac{q^\star(T_i) - q_i}{ \Delta t_c
+\delta q = \frac{q_{i+1} - q_i}{\Delta t} &= \frac{q^\star(T_i) - q_i}{ \Delta t_c
 \left( 1 + \frac{L_v}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right)} \\
-\frac{T_{i+1} - T_i}{\Delta t} &= -\frac{L_v}{c_p}( \frac{q_{i+1} - q_i}{\Delta t} )
+\delta T = \frac{T_{i+1} - T_i}{\Delta t} &= -\frac{L_v}{c_p}( \frac{q_{i+1} - q_i}{\Delta t} )
 \end{aligned}
 ```
 
@@ -89,11 +89,11 @@ cases similar (and not much higher at lower resolution).
 
 ## Large-scale precipitation
 
-The tendencies ``\delta q = \tfrac{\Delta q}{\Delta t}`` in units of  kg/kg/s are vertically
+The tendencies ``\delta q`` in units of  kg/kg/s are vertically
 integrated to diagnose the large-scale precipitation ``P`` in units of meters
 
 ```math
-P = -\int \frac{\Delta t}{g \rho} \Delta q dp
+P = -\int \frac{\Delta t}{g \rho} \delta q dp
 ```
 
 with gravity ``g``, water density ``\rho`` and time step ``\Delta t``.

@@ -83,11 +83,14 @@ environmental temperature ``T`` and specific humidity ``q`` in the column
 ```math
 \begin{aligned}
 \delta q &= - \frac{q - q_{ref}}{\tau_{SBM}} \\
-\detla T &= - \frac{T - T_{ref}}{\tau_{SBM}}
+\delta T &= - \frac{T - T_{ref}}{\tau_{SBM}}
 \end{aligned}
 ```
 
 with the second parameter of the parameterization, the time scale ``\tau_{SBM}``.
+Note that because this is a first-guess relaxation, these tendencies are not actually
+the resulting tendencies from this scheme. Those will be calculated in [Corrected relaxation](@ref).
+
 Note that above the level of zero buoyancy no relaxation takes place ``\delta T = \delta q = 0``,
 or, equivalently ``T = T_{ref}``, ``q = q_{ref}`` there.
 Vertically integration from surface ``p_0`` to level of zero buoyancy in 
@@ -95,8 +98,8 @@ pressure coordinates ``p_{LZB}`` yields
 
 ```math
 \begin{aligned}
-P_q &= - \int_{p_0}^p_{LZB} \delta q \frac{dp}{g} \\
-P_T &= \int_{p_0}^p_{LZB} \frac{c_p}{L_v} \delta T \frac{dp}{g}
+P_q &= - \int_{p_0}^{p_{LZB}} \delta q \frac{dp}{g} \\
+P_T &= \int_{p_0}^{p_{LZB}} \frac{c_p}{L_v} \delta T \frac{dp}{g}
 \end{aligned}
 ```
 
@@ -126,23 +129,58 @@ Following Frierson, 2007 [^Frierson2007] in order to conserve enthalpy we correc
 the reference profile for temperature ``T_{ref} \to T_{ref, 2}`` so that ``P_T = P_q``.
 
 ```math
-T_{ref, 2} = T_{ref} + \frac{1}{\delta p c_p} \int_{p_0}^p_{LZB} c_p (T - T_{ref}) + L_v (q - q_{ref}) dp
+T_{ref, 2} = T_{ref} + \frac{1}{\Delta p c_p} \int_{p_0}^{p_{LZB}} c_p (T - T_{ref}) + L_v (q - q_{ref}) dp
 ```
 
-with the terms inside the integral rearranged compared to Frierson, 2007 to show
+``\Delta p`` is the pressure difference ``p_{LZB} - p_0``.
+The terms inside the integral are rearranged compared to Frierson, 2007 to show
 that the vertical integral in [First-guess relaxation](@ref) really only has to be computed once.
 
 ## Shallow convection
 
-In the following we describe the qref scheme from Frierson, 2007 which corrects
+In the following we describe the "qref" scheme from Frierson, 2007 which corrects
 reference profiles for both temperature and humidity to guarantee that ``P_q = 0``,
 i.e. no precipitation during convection. In that sense, shallow convection is
-non-precipitating.
+non-precipitating. Although shallow convection is supposed to be shallow
+we do not change the height of the convection and keep using the ``p_{LZB}``
+determined during the calculation of the [Reference profiles](@ref).
 
+```math
+\begin{aligned}
+\Delta q &= \int_{p_0}^{p_{LZB}} q - q_{ref} dp \\
+Q_{ref}  &= \int_{p_0}^{p_{LZB}} -q_{ref} dp \\
+f_q      &= 1 - \frac{\Delta q}{Q_ref} \\
+q_{ref, 2} &= f_q q_{ref} \\
+\Delta T &= \frac{1}{\Delta p} \int_{p_0}^{p_{LZB}} -(T - T_{ref}) dp \\
+T_{ref,2} = T_{ref} - \Delta T
+```
 
+## Corrected relaxation
 
+After the reference profiles have been corrected in [Deep convection](@ref)
+and [Shallow convection](@ref) we actually calculate tendencies from
 
+```math
+\begin{aligned}
+\delta q &= - \frac{q - q_{ref, 2}}{\tau_{SBM}} \\
+\delta T &= - \frac{T - T_{ref, 2}}{\tau_{SBM}}
+\end{aligned}
+```
 
+with ``\tau_{SBM} = 2h`` as default.
+
+## Convective precipitation
+
+The convective precipitation ``P`` results then from the vertical integration of the
+``\delta q`` tendencies,
+similar to [Large-scale precipitation](@ref).
+
+```math
+P = -\int \frac{\Delta t}{g \rho} \delta q dp
+```
+
+In the shallow convection case ``P=0`` due to the correction even though in
+the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0`` by definition.
 
 ## References
 
