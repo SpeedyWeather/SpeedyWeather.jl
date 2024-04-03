@@ -107,4 +107,4 @@ The water density is taken as reference density of ``1000~kg/m^3``
 
 ## References
 
-[^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566, DOI:[10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1). 
+[^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566, DOI:[10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1).
