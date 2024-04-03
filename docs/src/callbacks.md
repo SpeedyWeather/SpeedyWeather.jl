@@ -73,13 +73,13 @@ function SpeedyWeather.initialize!(
     # allocate recorder: number of time steps (incl initial conditions) in simulation  
     callback.maximum_surface_wind_speed = zeros(progn.clock.n_timesteps + 1)
     
-    # where surface (=lowermost model layer) u, v on the grid are stored
+    # where surface (=lowermost model layer) u, v on the grid are stored
     (; u_grid, v_grid) = diagn.layers[diagn.nlev].grid_variables
     
     # maximum wind speed of initial conditions
     callback.maximum_surface_wind_speed[1] = max_2norm(u_grid, v_grid)
     
-    # (re)set counter to 1
+    # (re)set counter to 1
     callback.timestep_counter = 1
 end
 ```

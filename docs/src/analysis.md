@@ -604,8 +604,8 @@ axs[2,1].set_xlabel("time")
 time_fmt = matplotlib.dates.DateFormatter("%b-%d")
 axs[0,0].xaxis.set_major_formatter(time_fmt)
 
-tight_layout() # hide
-savefig("global_diagnostics.png") # hide
+tight_layout() # hide
+savefig("global_diagnostics.png") # hide
 nothing # hide
 ```
 ![Global diagnostics](global_diagnostics.png)

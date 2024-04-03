@@ -211,7 +211,7 @@ As a last example we want to illustrate a situation where we would always want t
 10 coordinates, but their locations may change. In order to avoid recreating an interpolator object
 we would do (`AnvilInterpolator` is described in [Anvil interpolator](@ref))
 ```@example ringgrids
-npoints = 10    # number of coordinates to interpolate onto
+npoints = 10    # number of coordinates to interpolate onto
 interp = AnvilInterpolator(Float32, HEALPixGrid, 24, npoints)
 ```
 with the first argument being the number format used during interpolation, then the input grid type,

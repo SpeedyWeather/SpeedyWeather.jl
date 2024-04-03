@@ -38,7 +38,7 @@ To define a new forcing type, at the most basic level you would do
 using SpeedyWeather
 
 struct MyForcing{NF} <: SpeedyWeather.AbstractForcing
-    # define some parameters and work arrays here
+    # define some parameters and work arrays here
     a::NF
     v::Vector{NF}
 end
@@ -454,7 +454,7 @@ supertypes, and in fact you could define a forcing as a subtype of `AbstractDrag
 and vice versa. So for a drag, most straight-forwardly you would do
 ```@example extend
 struct MyDrag <: SpeedyWeather.AbstractDrag
-    # parameters and arrays
+    # parameters and arrays
 end
 ```
 then define the `initialize!` function as before, but extend the method `drag!`
