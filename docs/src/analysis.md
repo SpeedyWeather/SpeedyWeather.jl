@@ -576,7 +576,7 @@ using CairoMakie
 # unpack callback
 (; M, C, Λ, K, P, Q)  = model.callbacks[:diagnostics_recorder]
 t = model.callbacks[:diagnostics_recorder].time
-days = [Dates.Second(ti - t[1]).value/3600/24 for ti in t]
+days = [Second(ti - t[1]).value/3600/24 for ti in t]
 
 fig = Figure();
 axs = [Axis(fig[row, col]) for row in 1:3, col in 1:2]
