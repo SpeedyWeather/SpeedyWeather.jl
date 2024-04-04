@@ -30,10 +30,6 @@ using Adapt
     end
 end
 
-NF = Float32
-mmax = 32 
-idims = (5,)
-lmax = mmax 
 @testset "LowerTriangularArray: N-dim" begin 
     @testset for NF in (Float32, Float64)
         mmax = 32
@@ -271,6 +267,24 @@ end
 @testset "LowerTriangularArray: copyto!" begin
     @testset for idims = ((), (5,), (5,5))
         @testset for NF in (Float16, Float32, Float64)
+
+            # copyto! same size 
+            L1 = randn(LowerTriangularArray{NF}, 10, 10, idims...)
+            L2 = similar(L1)
+            copyto!(L2, L1)
+
+            @test all(L2 .== L1)
+            
+            # copyto! Array 
+            M = zeros(NF, 10, 10, idims...)
+            copyto!(M, L1)
+
+            ind = SpeedyWeather.LowerTriangularMatrices.lowertriangle_indices(M)
+            not_ind = @. ~(ind)
+
+            @test all(M[not_ind] .== zero(NF))
+            @test all(LowerTriangularArray(M) .== L1)
+
             L1 = randn(LowerTriangularArray{NF}, 10, 10, idims...)
             L2 = randn(LowerTriangularArray{NF}, 5, 5, idims...)
             L1c = deepcopy(L1)
@@ -333,6 +347,8 @@ end
 @testset "LowerTriangularArray: GPU (JLArrays)" begin 
     # TODO: so far very basic GPU test, might integrate them into the other tests, as I already did with the broadcast test, but there are some key differences to avoid scalar indexing
     NF = Float32
+    idims = (5,)
+
     L_cpu = randn(LowerTriangularArray{NF}, 10, 10, 5)
 
     # constructors/adapt
@@ -386,40 +402,32 @@ end
     @test (5, 7, 5) == size(similar(L, (5, 7,  idims...)))
     @test similar(L) isa LowerTriangularArray
 
-    # copyto! 
-    #L1 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
-    #L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 5, 5, 5))
+    # copyto! same size 
+    L1 = randn(LowerTriangularArray{NF}, 10, 10, idims...)
+    L1 = adapt(JLArray, L1)
+    L2 = similar(L1)
+    copyto!(L2, L1)
+
+    @test all(L2 .== L1)
     
-    #L1c = deepcopy(L1)
+    # test the truncating copyto! function 
+    # we can't do this with JLArrays, as they don't support mix indexing with BitArrays
+    # like Array and CuArray do
+    # So, we do this with regular Array but with the _copyto_core! function that implements 
+    # the core of this copyto! in a GPU compatible way, and is called by copyto! on with CuArrays
 
-    #copyto!(L2, L1)  # bigger into smaller
-    #copyto!(L1, L2)  # and back should be identical
+    L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
+    L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
+    L2T = spectral_truncation(L2,(size(L1)[1:2] .- 1)...)
 
-    #@test all(L1 .== L1c)
+    SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:33, 1:32)     # size of smaller matrix
+    @test L1 == L2T
 
-    # now smaller into bigger
-    #L1 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
-    #L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 5, 5, 5))
-    #L2c = deepcopy(L2)
+    SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:65, 1:64)     # size of bigger matrix
+    @test L1 == L2T
 
-    #copyto!(L1, L2)
-    #copyto!(L2, L1)
-
-    #@test all(L2 .== L2c)
-
-    # with ranges
-    #L1 = zeros(LowerTriangularArray{NF,3,JLArray{NF}}, 33, 32, 5);
-    #L2 = adapt(JLArray, randn(LowerTriangularArray{NF}, 65, 64, 5));
-    #L2T = spectral_truncation(L2,(size(L1) .- 1)...)
-
-    #copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
-    #@test all(L1 .== L2T)
-
-    #copyto!(L1, L2, 1:65, 1:64)     # size of bigger matrix
-    #@test all(L1 .== L2T)
-
-    #copyto!(L1, L2, 1:50, 1:50)     # in between
-    #@test all(L1 .== L2T)
+    SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:50, 1:50)     # in between
+    @test L1 == L2T
 end 
 
 @testset "LowerTriangularArray: broadcast" begin 

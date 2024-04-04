@@ -60,6 +60,8 @@ function LowerTriangularArray{T,N,ArrayType}(::UndefInitializer, I::Vararg{Integ
     return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), I[1], I[2])
 end
 
+LowerTriangularArray{T,N,ArrayType}(::UndefInitializer, size::S) where {T,N,ArrayType<:AbstractArray{T}, S<:Tuple} = LowerTriangularArray{T,N,ArrayType}(undef, size...)
+   
 function LowerTriangularMatrix{T,ArrayType}(::UndefInitializer, m::Integer, n::Integer) where {T,ArrayType<:AbstractArray{T}}
     return LowerTriangularMatrix(ArrayType(undef, nonzeros(m, n)), m, n)
 end
@@ -265,8 +267,10 @@ function Base.copyto!(  L1::LowerTriangularArray{T,N,ArrayType1},   # copy to L1
     L1
 end 
 
-# Fallback / GPU version
-function Base.copyto!(  L1::LowerTriangularArray{T,N,ArrayType1},   # copy to L1
+# Fallback / GPU version (the two versions _copyto! and copyto! are there to enable tests of this function with regular Arrays)
+Base.copyto!(L1::LowerTriangularArray{T,N,ArrayType1}, L2::LowerTriangularArray{S,N,ArrayType2}, ls::AbstractUnitRange, ms::AbstractUnitRange) where {T, S, N, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}} = _copyto_core!(L1, L2, ls, ms)
+
+function _copyto_core!( L1::LowerTriangularArray{T,N,ArrayType1},   # copy to L1
                         L2::LowerTriangularArray{S,N,ArrayType2},      # copy from L2
                         ls::AbstractUnitRange,          # range of indices in 1st dim
                         ms::AbstractUnitRange) where {T, S, N, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}  # range of indices in 2nd dim

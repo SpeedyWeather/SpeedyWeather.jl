@@ -112,6 +112,7 @@ back to normal matrix-land.
 
 `LowerTriangularArray{T,N,ArrayType}` wraps around an array of type `ArrayType`. If this array is a GPU array (e.g. `CuArray`), all operations are performed on GPU as well. The implementation was written so that scalar indexing is avoided in almost all cases, so that GPU operation should be performant. To use `LowerTriangularArray` on GPU you can e.g. just `adapt` an exisiting `LowerTriangularArray`.
 ```julia 
+using Adapt
 L = rand(LowerTriangularArray{Float32}, 5, 5, 5)
 L_gpu = adapt(CuArray, L)
 ```
