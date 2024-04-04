@@ -488,9 +488,9 @@ end
 import Base: map! 
 
 # TODO: do we need this? does it work? it's in GPUArrays.jl implemented as well
-function Base.map!(f, dest::LowerTriangularArray{T,N,ArrayType}, xs::AbstractArray...) where {T,N,ArrayType<:GPUArrays.AbstractGPUArray} 
-    map!(f, dest.data, xs)
-end 
+#function Base.map!(f, dest::LowerTriangularArray{T,N,ArrayType}, xs::AbstractArray...) where {T,N,ArrayType<:GPUArrays.AbstractGPUArray} 
+#    map!(f, dest.data, xs)
+#end 
 
 Broadcast.BroadcastStyle(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray} = Broadcast.BroadcastStyle(ArrayType)
 GPUArrays.backend(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray} = GPUArrays.backend(ArrayType)
