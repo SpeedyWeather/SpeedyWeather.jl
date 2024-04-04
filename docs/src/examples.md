@@ -414,7 +414,7 @@ using CairoMakie
 humid = simulation.diagnostic_variables.layers[end].grid_variables.humid_grid
 heatmap(humid, title="Surface specific humidity [kg/kg]")
 
-savefig("aquaplanet.png", ans) # hide
+save("aquaplanet.png", ans) # hide
 nothing # hide
 ```
 ![Aquaplanet pyplot](aquaplanet.png)
