@@ -384,7 +384,7 @@ orography = NoOrography(spectral_grid)
 model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation, period=Day(50))
+run!(simulation, period=Day(50), output=true)
 nothing # hide
 ```
 
