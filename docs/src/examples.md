@@ -1,4 +1,4 @@
-# Model setups
+# Examples
 
 The following is a collection of model setups, starting with an easy setup
 of the [Barotropic vorticity equation](@ref barotropic_vorticity_model) and
@@ -409,11 +409,25 @@ become unstable. The surface humidity shows small-scale patches in the tropics, 
 of the convection scheme, causing updrafts and downdrafts in both humidity and temperature.
 
 ```@example aquaplanet
-humid = simulation.diagnostic_variables.layers[end].grid_variables.humid_grid
+using PythonPlot, NCDatasets
+ioff() # hide
+id = model.output.id
+ds = NCDataset("run_$id/output.nc")
+timestep = ds.dim["time"]   # last time step
+surface = ds.dim["lev"]     # surface layer
+humid = Matrix{Float32}(ds["humid"][:, :, surface, timestep])
+lat = ds["lat"][:]
+lon = ds["lon"][:]
 
-using CairoMakie
-heatmap(humid, title="Surface humidity [kg/kg]")
-save("aquaplanet.png", ans) # hide
+fig, ax = subplots(1, 1, figsize=(10, 6))
+q = ax.pcolormesh(lon, lat, humid')
+ax.set_xlabel("longitude")
+ax.set_ylabel("latitude")
+ax.set_title("Surface humidity [kg/kg]")
+colorbar(q)
+tight_layout() # hide
+savefig("aquaplanet.png", dpi=70) # hide
+nothing # hide
 ```
 ![Aquaplanet pyplot](aquaplanet.png)
 

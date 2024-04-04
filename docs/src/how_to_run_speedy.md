@@ -125,9 +125,9 @@ any name)
 ```@example howto
 model = ShallowWaterModel(; spectral_grid, time_stepping)
 ```
-This logic continues for all model components. See the [Model setups](@ref)
-for examples. All model components are also subtype (i.e. `<:`) of
-some abstract supertype, this feature can be made use of to redefine
+This logic continues for all model components, see [Examples](@ref).
+All model components are also subtype (i.e. `<:`) of some abstract supertype,
+this feature can be made use of to redefine
 not just constant parameters of existing model components but also
 to define new ones. This is more elaborated in [Extending SpeedyWeather](@ref).
 
