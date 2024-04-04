@@ -384,7 +384,7 @@ orography = NoOrography(spectral_grid)
 model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation, period=Day(50), output=true)
+run!(simulation, period=Day(50))
 nothing # hide
 ```
 
@@ -409,24 +409,12 @@ become unstable. The surface humidity shows small-scale patches in the tropics, 
 of the convection scheme, causing updrafts and downdrafts in both humidity and temperature.
 
 ```@example aquaplanet
-using PythonPlot, NCDatasets
-ioff() # hide
-id = model.output.id
-ds = NCDataset("run_$id/output.nc")
-timestep = ds.dim["time"]   # last time step
-surface = ds.dim["lev"]     # surface layer
-humid = Matrix{Float32}(ds["humid"][:, :, surface, timestep])
-lat = ds["lat"][:]
-lon = ds["lon"][:]
+using CairoMakie
 
-fig, ax = subplots(1, 1, figsize=(10, 6))
-q = ax.pcolormesh(lon, lat, humid')
-ax.set_xlabel("longitude")
-ax.set_ylabel("latitude")
-ax.set_title("Surface humidity [kg/kg]")
-colorbar(q)
-tight_layout() # hide
-savefig("aquaplanet.png", dpi=70) # hide
+humid = simulation.diagnostic_variables.layers[end].grid_variables.humid_grid
+heatmap(humid, title="Surface specific humidity [kg/kg]")
+
+savefig("aquaplanet.png", ans) # hide
 nothing # hide
 ```
 ![Aquaplanet pyplot](aquaplanet.png)
