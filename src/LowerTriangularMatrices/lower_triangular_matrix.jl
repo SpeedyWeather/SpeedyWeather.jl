@@ -94,6 +94,7 @@ Angeletti et al, 2019, https://hal.science/hal-02047514/document)
     p = Int(floor((sqrt(1 + 8*kp) - 1)/2))
     (k - m*(m-1)÷2 + p*(p+1)÷2, m - p)
 end 
+k2ij(I::CartesianIndex, m::Int) = CartesianIndex(k2ij(I[1], m)...,I.I[2:end]...) 
 
 # direct indexing, no. indices have to be one less than `N` for the correct dimensionality, so N!=M
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, I::Vararg{Integer,M}) where {T,N,M}
@@ -465,7 +466,7 @@ end
             while i < nelem
                 i += 1
                 I = GPUArrays.@cartesianidx(dest.data, i) 
-                @inbounds dest.data[I] = bc[k2ij(I[1], dest.m),[I[i] for i=2:N]...] 
+                @inbounds dest.data[I] = bc[k2ij(I, dest.m)] 
                 # TODO: broken: the indexing doesnt work, probably we need to define a new macro for the lowertriangle to do it better
                 # TODO 1: the k2ij is costly, if we intend to accelarate this, this needs to be precomputed
             end                                                                     # TODO 2: CartesianIndex can't be indexed with ranges, hence the [I[i] for i=2:N], but this seems suboptimal as well    
@@ -481,12 +482,15 @@ end
     GPUArrays.gpu_call(broadcast_kernel, dest, bc, config.elements_per_thread;
              threads=config.threads, blocks=config.blocks)
 
-    if eltype(dest) <: GPUArrays.BrokenBroadcast
-        throw(ArgumentError("Broadcast operation resulting in $(eltype(eltype(dest))) is not GPU compatible"))
-    end
-
     return dest
 end
+
+import Base: map! 
+
+# TODO: do we need this? does it work? it's in GPUArrays.jl implemented as well
+function Base.map!(f, dest::LowerTriangularArray{T,N,ArrayType}, xs::AbstractArray...) where {T,N,ArrayType<:GPUArrays.AbstractGPUArray} 
+    map!(f, dest.data, xs)
+end 
 
 Broadcast.BroadcastStyle(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray} = Broadcast.BroadcastStyle(ArrayType)
 GPUArrays.backend(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray} = GPUArrays.backend(ArrayType)
