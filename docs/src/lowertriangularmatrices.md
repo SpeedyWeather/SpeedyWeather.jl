@@ -18,7 +18,7 @@ using SpeedyWeather.LowerTriangularMatrices
 L = rand(LowerTriangularMatrix{Float32}, 5, 5)
 L2 = rand(LowerTriangularArray{Float32}, 5, 5, 5)
 ```
-or the `undef` initializors `LowerTriangularMatrix{Float32}(undef, 3, 3)`, `.
+or the `undef` initializor `LowerTriangularMatrix{Float32}(undef, 3, 3)`.
 The element type is arbitrary though, you can use any type `T` too.
 
 Alternatively, it can be created through conversion from `Array`, which drops the upper triangle
