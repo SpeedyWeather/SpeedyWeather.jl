@@ -180,7 +180,7 @@ variables, it also initializes the clock in
 `simulation.prognostic_variables.clock`. To initialize with a specific
 time, do
 ```@example howto
-simulation = intialize!(model, time=DateTime(2020,5,1))
+simulation = initialize!(model, time=DateTime(2020,5,1))
 simulation.prognostic_variables.clock.time
 ```
 to set the time to 1st May, 2020 (but you can also do that manually).
