@@ -1,8 +1,10 @@
 module LowerTriangularMatrices
 
 using DocStringExtensions
-import Adapt
+import Adapt, KernelAbstractions
 import UnicodePlots
+import LinearAlgebra: tril!
+import GPUArrays
 
 export LowerTriangularMatrix, LowerTriangularArray, eachharmonic
 # export plot

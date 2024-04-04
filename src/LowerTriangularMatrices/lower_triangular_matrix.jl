@@ -1,5 +1,4 @@
-import LinearAlgebra: tril!
-import GPUArrays
+
 
 """
 $(TYPEDSIGNATURES)
@@ -399,7 +398,7 @@ import LinearAlgebra: isstructurepreserving, fzeropreserving
 
 struct LowerTriangularStyle{N} <: Broadcast.AbstractArrayStyle{N} end
 
-Base.BroadcastStyle(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType<:Array} = LowerTriangularStyle{N}()
+Base.BroadcastStyle(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType} = LowerTriangularStyle{N}()
 
 function Base.similar(bc::Broadcasted{LowerTriangularStyle{N}}, ::Type{NF}) where {N,NF}
     inds = axes(bc)
@@ -411,7 +410,7 @@ end
 
 LowerTriangularStyle{N}(::Val{M}) where {N,M} = LowerTriangularStyle{N}()
 
-function Base.copyto!(dest::LowerTriangularArray{T,N,ArrayType}, bc::Broadcasted{LowerTriangularStyle{N}}) where {T,N,ArrayType}
+function Base.copyto!(dest::LowerTriangularArray{T,N,ArrayType}, bc::Broadcasted{LowerTriangularStyle{N}}) where {T,N,ArrayType <: Array}
     axs = axes(dest)
     axes(bc) == axs || Broadcast.throwdm(axes(bc), axs)
 
@@ -429,10 +428,66 @@ function Base.copyto!(dest::LowerTriangularArray{T,N,ArrayType}, bc::Broadcasted
     return dest
 end
 
-# GPU Broadcast support (adapted from GPUArrays.jl), if this ever becomes a standalone package, this could go into an extension
-GPUArrays.backend(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray} = GPUArrays.backend(ArrayType)
+# GPU methods (should be moved to an extension, in case this becomes a standalone package)
+import GPUArrays._copyto!
+
+"""
+function GPUArrays._copyto!(dest::LowerTriangularArray{T,N,ArrayType}, bc::Broadcasted) where {T,N,ArrayType}
+    axs = axes(dest)
+    axes(bc) == axs || Broadcast.throwdm(axes(bc), axs)
+
+    # write KA kernel
+    dev = KernelAbstractions.get_backend(dest.data)
+    copyto!_kernel!(dev, workgroup_size(dev))(dest.data, bc, dest.m, ndrange=size(dest.data))
+
+    synchronize!(dev)
+    return dest
+end
+
+KernelAbstractions.@kernel function copyto!_kernel!(dest, bc, @Const(m))
+    I = KernelAbstractions.@index(Global, Cartesian)
+    dest[I] = bc[k2ij(I[1], m),I[2:end]...] # TODO: the k2ij is costly, if we intend to accalerate this, this needs to be precomputed
+end 
+
+function workgroup_size(device::KernelAbstractions.Backend)
+    return device isa KernelAbstractions.GPU ? 256 : 16 
+end
+"""
+
+# copied and adjusted from GPUArrays.jl
+@inline function GPUArrays._copyto!(dest::LowerTriangularArray{T,N,ArrayType}, bc::Broadcasted) where {T,N,ArrayType}
+    axes(dest) == axes(bc) || Broadcast.throwdm(axes(dest), axes(bc))
+    isempty(dest) && return dest
+    bc = Broadcast.preprocess(dest, bc)
+
+    broadcast_kernel = function (ctx, dest, bc, nelem)
+            i = 0
+            while i < nelem
+                i += 1
+                I = GPUArrays.@cartesianidx(dest.data, i) 
+                @inbounds dest.data[I] = bc[k2ij(I[1], dest.m),[I[i] for i=2:N]...] 
+                # TODO: broken: the indexing doesnt work, probably we need to define a new macro for the lowertriangle to do it better
+                # TODO 1: the k2ij is costly, if we intend to accelarate this, this needs to be precomputed
+            end                                                                     # TODO 2: CartesianIndex can't be indexed with ranges, hence the [I[i] for i=2:N], but this seems suboptimal as well    
+            return
+        end
+
+    elements = length(dest.data)
+    elements_per_thread = typemax(Int)
+    heuristic = GPUArrays.launch_heuristic(GPUArrays.backend(dest), broadcast_kernel, dest, bc, 1;
+                                 elements, elements_per_thread)
+    config = GPUArrays.launch_configuration(GPUArrays.backend(dest), heuristic;
+                                  elements, elements_per_thread)
+    GPUArrays.gpu_call(broadcast_kernel, dest, bc, config.elements_per_thread;
+             threads=config.threads, blocks=config.blocks)
+
+    if eltype(dest) <: GPUArrays.BrokenBroadcast
+        throw(ArgumentError("Broadcast operation resulting in $(eltype(eltype(dest))) is not GPU compatible"))
+    end
+
+    return dest
+end
+
 Broadcast.BroadcastStyle(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray} = Broadcast.BroadcastStyle(ArrayType)
-
-# GPU methods (could be moved to an extension, in case this becomes a standalone package)
+GPUArrays.backend(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray} = GPUArrays.backend(ArrayType)
 Adapt.adapt_structure(to, x::LowerTriangularArray) = LowerTriangularArray(Adapt.adapt(to, x.data), x.m, x.n)
-
