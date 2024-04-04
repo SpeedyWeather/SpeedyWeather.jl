@@ -48,7 +48,7 @@ Quadratic drag for the momentum equations.
     F = -c_D/H*|(u, v)|*(u, v)
 
 with c_D the non-dimensional drag coefficient as defined in `drag::QuadraticDrag`.
-c_D and layer thickness `H` are precomputed in intialize!(::QuadraticDrag, ::ModelSetup)
+c_D and layer thickness `H` are precomputed in initialize!(::QuadraticDrag, ::ModelSetup)
 and scaled by the radius as are the momentum equations."""
 function drag!(     
     diagn::DiagnosticVariablesLayer,

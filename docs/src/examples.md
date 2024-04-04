@@ -1,4 +1,4 @@
-# Model setups
+# Examples
 
 The following is a collection of model setups, starting with an easy setup
 of the [Barotropic vorticity equation](@ref barotropic_vorticity_model) and
@@ -112,44 +112,61 @@ data is stored in the folder `/run_0001`. In general we can check this also via
 ```@example galewsky_setup
 id = model.output.id
 ```
-So let's plot that data properly (and not just using UnicodePlots). `$id` in the following just means
+So let's plot that data properly (and not just using UnicodePlots.jl). `$id` in the following just means
 that the string is interpolated to `run_0001` if this is the first unnamed run in your folder.
 ```@example galewsky_setup
-using PythonPlot, NCDatasets
-ioff() # hide
+using NCDatasets
 ds = NCDataset("run_$id/output.nc")
 ds["vor"]
 ```
 Vorticity `vor` is stored as a lon x lat x vert x time array, we may want to look at the first time step,
-which is the end of the previous simulation (time=6days) which we didn't store output for.
+which is the end of the previous simulation (time = 6days) which we didn't store output for.
 ```@example galewsky_setup
 t = 1
 vor = Matrix{Float32}(ds["vor"][:, :, 1, t]) # convert from Matrix{Union{Missing, Float32}} to Matrix{Float32}
 lat = ds["lat"][:]
 lon = ds["lon"][:]
 
-fig, ax = subplots(1, 1, figsize=(10, 6))
-ax.pcolormesh(lon, lat, vor')
-ax.set_xlabel("longitude")
-ax.set_ylabel("latitude")
-ax.set_title("Relative vorticity")
-tight_layout() # hide
-savefig("galewsky1.png", dpi=70) # hide
+using CairoMakie
+heatmap(lon, lat, vor)
+save("galewsky0.png", ans) # hide
+nothing # hide
+```
+![Galewsky jet](galewsky0.png)
+
+You see that in comparison the unicode plot heavily coarse-grains the simulation, well it's unicode after all!
+Here, we have unpacked the netCDF file using [NCDatasets.jl](https://github.com/Alexander-Barth/NCDatasets.jl)
+and then plotted via `heatmap(lon, lat, vor)`. While you can do that to give you more control
+on the plotting, SpeedyWeather.jl also defines an extension for Makie.jl, see [Extensions](@ref)
+because if our matrix `vor` here was an `AbstractGrid` (see [RingGrids](@ref)) then all
+its geographic information (which grid point is where) is encoded in the type. So we can also do
+```@example galewsky_setup
+vor_grid = FullGaussianGrid(vor)
+
+using CairoMakie    # this will load the extension so that Makie can plot grids directly
+heatmap(vor_grid, title="Relative vorticity [1/s]")
+save("galewsky1.png", ans) # hide
 nothing # hide
 ```
 ![Galewsky jet pyplot1](galewsky1.png)
 
-You see that in comparison the unicode plot heavily coarse-grains the simulation, well it's unicode after all!
-And now the last time step, that means time = 12days is
+Note that here you need to know which grid the data comes on (an error is thrown if `FullGaussianGrid(vor)`
+is not size compatible). By default the output will be on the FullGaussianGrid, but if you
+play around with other grids, you'd need to change this here. 
+
+We did want to showcase the usage of [NetCDF output](@ref) here, but from now on
+we will use `heatmap` to plot data on our grids directly, without storing output first.
+So for our current simulation, that means at time = 12 days, vorticity on the grid
+is stored in the diagnostic variables and can be visualised with
 
 ```@example galewsky_setup
 t = ds.dim["time"]
-vor = Matrix{Float32}(ds["vor"][:, :, 1, t])
-ax.pcolormesh(lon, lat, vor')
-savefig("galewsky2.png", dpi=70) # hide
+vor = simulation.diagnostic_variables.layers[1].grid_variables.vor_grid
+heatmap(vor, title="Relative vorticity [1/s]")
+save("galewsky2.png", ans) # hide
 nothing # hide
 ```
-![Galewsky jet pyplot2](galewsky2.png)
+![Galewsky jet](galewsky2.png)
 
 The jet broke up into many small eddies, but the turbulence is still confined to the northern hemisphere, cool!
 How this may change when we add mountains (we had `NoOrography` above!), say Earth's orography, you may ask?
@@ -178,19 +195,18 @@ id = model.output.id
 
 ```@example galewsky_setup
 ds = NCDataset("run_$id/output.nc")
-time = 49
-vor = Matrix{Float32}(ds["vor"][:, :, 1, time])
+```
 
-fig, ax = subplots(1, 1, figsize=(10, 6))
-ax.pcolormesh(lon, lat, vor')
-ax.set_xlabel("longitude")
-ax.set_ylabel("latitude")
-ax.set_title("Relative vorticity")
-tight_layout() # hide
-savefig("galewsky3.png", dpi=70) # hide
+You could plot the [NetCDF output](@ref) now as before, but we'll be plotting directly
+from the current state of the `simulation`
+
+```@example galewsky_setup
+vor = simulation.diagnostic_variables.layers[1].grid_variables.vor_grid
+heatmap(vor, title="Relative vorticity [1/s]")
+save("galewsky3.png", ans) # hide
 nothing # hide
 ```
-![Galewsky jet pyplot3](galewsky3.png)
+![Galewsky jet](galewsky3.png)
 
 Interesting! The initial conditions have zero velocity in the southern hemisphere, but still, one can see
 some imprint of the orography on vorticity. You can spot the coastline of Antarctica; the Andes and
@@ -203,44 +219,29 @@ Setup script to copy and paste:
 ```@example jet_stream_setup
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=63, nlev=1)
+
 forcing = JetStreamForcing(spectral_grid, latitude=60)
 drag = QuadraticDrag(spectral_grid)
-output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(6), output_vars=[:u, :v, :pres, :orography])
-model = ShallowWaterModel(; spectral_grid, output, drag, forcing)
+
+model = ShallowWaterModel(; spectral_grid, drag, forcing)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation, period=Day(20))   # discard first 20 days   
-run!(simulation, period=Day(20), output=true)
+run!(simulation, period=Day(40))
 nothing # hide
 ```
 
 We want to simulate polar jet streams in the shallow water model. We add a `JetStreamForcing`
 that adds momentum at 60˚N to inject kinetic energy into the model. This energy needs to be removed
 (the [diffusion](@ref diffusion) is likely not sufficient) through a drag, we have implemented
-a `QuadraticDrag` and use the default drag coefficient. Outputting ``u, v, \eta`` (called `:pres`,
-as it is the pressure equivalent in the shallow water system) we run 20 days without output
-to give the system some time to adapt to the forcing. And visualize zonal wind after another
-20 days with
+a `QuadraticDrag` and use the default drag coefficient. Then visualize zonal wind after
+40 days with
 
 ```@example jet_stream_setup
-using PythonPlot, NCDatasets
-ioff() # hide
+using CairoMakie
 
-id = model.output.id
-ds = NCDataset("run_$id/output.nc")
-timestep = ds.dim["time"]
-u = Matrix{Float32}(ds["u"][:, :, 1, timestep])
-lat = ds["lat"][:]
-lon = ds["lon"][:]
-
-fig, ax = subplots(1, 1, figsize=(10, 6))
-q = ax.pcolormesh(lon, lat, u')
-ax.set_xlabel("longitude")
-ax.set_ylabel("latitude")
-ax.set_title("Zonal wind [m/s]")
-colorbar(q, ax=ax)
-tight_layout() # hide
-savefig("polar_jets.png", dpi=70) # hide
+u = simulation.diagnostic_variables.layers[1].grid_variables.u_grid
+heatmap(u, title="Zonal wind [m/s]")
+save("polar_jets.png", ans) # hide
 nothing # hide
 ```
 ![Polar jets pyplot](polar_jets.png)
@@ -254,15 +255,18 @@ using Random # hide
 Random.seed!(1234) # hide
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=127, nlev=1)
+
+# model components
 time_stepping = SpeedyWeather.Leapfrog(spectral_grid, Δt_at_T31=Minute(30))
 implicit = SpeedyWeather.ImplicitShallowWater(spectral_grid, α=0.5)
 orography = EarthOrography(spectral_grid, smoothing=false)
 initial_conditions = SpeedyWeather.RandomWaves()
-output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(12), output_vars=[:u, :pres, :div, :orography])
-model = ShallowWaterModel(; spectral_grid, orography, output, initial_conditions, implicit, time_stepping)
+
+# construct, initialize, run
+model = ShallowWaterModel(; spectral_grid, orography, initial_conditions, implicit, time_stepping)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation, period=Day(2), output=true)
+run!(simulation, period=Day(2))
 nothing # hide
 ```
 
@@ -277,39 +281,31 @@ harmonic coefficients of ``\eta`` to between given wavenumbers to some random va
 ```@example gravity_wave_setup
 SpeedyWeather.RandomWaves()
 ```
-so that the amplitude `A` is as desired, here 2000m. Our layer thickness is by default
+so that the amplitude `A` is as desired, here 2000m. Our layer thickness in meters is by default
 ```@example gravity_wave_setup
 model.atmosphere.layer_thickness
 ```
-8.5km so those waves are with an amplitude of 2000m quite strong.
+so those waves are with an amplitude of 2000m quite strong.
 But the semi-implicit time integration can handle that even with fairly large time steps of
 ```@example gravity_wave_setup
 model.time_stepping.Δt_sec
 ```
-seconds. Note that the gravity wave speed here is ``\sqrt{gH}`` so almost 300m/s.
-Let us also output divergence, as gravity waves are quite pronounced in that variable.
-But given the speed of gravity waves we don't have to integrate for long.
-Visualise with
-
+seconds. Note that the gravity wave speed here is ``\sqrt{gH}`` so almost 300m/s,
+given the speed of gravity waves we don't have to integrate for long.
+Visualise the dynamic layer thickness ``h = \eta + H + H_b`` 
+(interface displacement ``\eta``, layer thickness at rest ``H`` and orography ``H_b``)
+with
 
 ```@example gravity_wave_setup
-using PythonPlot, NCDatasets
-ioff() # hide
+using CairoMakie
 
-id = model.output.id
-ds = NCDataset("run_$id/output.nc")
-timestep = ds.dim["time"]
-div = Matrix{Float32}(ds["div"][:, :, 1, timestep])
-lat = ds["lat"][:]
-lon = ds["lon"][:]
+H = model.atmosphere.layer_thickness
+Hb = model.orography.orography
+η = simulation.diagnostic_variables.surface.pres_grid
+h = @. η + H - Hb   # @. to broadcast grid + scalar - grid
 
-fig, ax = subplots(1, 1, figsize=(10, 6))
-ax.pcolormesh(lon, lat, div')
-ax.set_xlabel("longitude")
-ax.set_ylabel("latitude")
-ax.set_title("Divergence")
-tight_layout() # hide
-savefig("gravity_waves.png", dpi=70) # hide
+heatmap(h, title="Dynamic layer thickness h")
+save("gravity_waves.png", ans) # hide
 nothing # hide
 ```
 ![Gravity waves pyplot](gravity_waves.png)
@@ -331,7 +327,7 @@ initial_conditions = InitialConditions(
 model = PrimitiveDryModel(; spectral_grid, orography, initial_conditions, physics=false)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation, period=Day(9), output=true)
+run!(simulation, period=Day(9))
 nothing # hide
 ```
 
@@ -347,24 +343,11 @@ There is no forcing and the initial conditions are baroclinically unstable which
 off a wave propagating eastward. This wave becomes obvious when visualised with
 
 ```@example jablonowski
-using PythonPlot, NCDatasets
-ioff() # hide
+using CairoMakie
 
-id = model.output.id
-ds = NCDataset("run_$id/output.nc")
-timestep = ds.dim["time"]
-surface = ds.dim["lev"]
-vor = Matrix{Float32}(ds["vor"][:, :, surface, timestep])
-lat = ds["lat"][:]
-lon = ds["lon"][:]
-
-fig, ax = subplots(1, 1, figsize=(10, 6))
-ax.pcolormesh(lon, lat, vor')
-ax.set_xlabel("longitude")
-ax.set_ylabel("latitude")
-ax.set_title("Surface relative vorticity")
-tight_layout() # hide
-savefig("jablonowski.png", dpi=70) # hide
+vor = simulation.diagnostic_variables.layers[end].grid_variables.vor_grid
+heatmap(vor, title="Surface relative vorticity")
+save("jablonowski.png", ans) # hide
 nothing # hide
 ```
 ![Jablonowski pyplot](jablonowski.png)
@@ -384,7 +367,7 @@ orography = NoOrography(spectral_grid)
 model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation, period=Day(50), output=true)
+run!(simulation, period=Day(50))
 nothing # hide
 ```
 
@@ -409,25 +392,12 @@ become unstable. The surface humidity shows small-scale patches in the tropics, 
 of the convection scheme, causing updrafts and downdrafts in both humidity and temperature.
 
 ```@example aquaplanet
-using PythonPlot, NCDatasets
-ioff() # hide
+using CairoMakie
 
-id = model.output.id
-ds = NCDataset("run_$id/output.nc")
-timestep = ds.dim["time"]   # last time step
-surface = ds.dim["lev"]     # surface layer
-humid = Matrix{Float32}(ds["humid"][:, :, surface, timestep])
-lat = ds["lat"][:]
-lon = ds["lon"][:]
+humid = simulation.diagnostic_variables.layers[end].grid_variables.humid_grid
+heatmap(humid, title="Surface specific humidity [kg/kg]")
 
-fig, ax = subplots(1, 1, figsize=(10, 6))
-q = ax.pcolormesh(lon, lat, humid')
-ax.set_xlabel("longitude")
-ax.set_ylabel("latitude")
-ax.set_title("Surface humidity [kg/kg]")
-colorbar(q)
-tight_layout() # hide
-savefig("aquaplanet.png", dpi=70) # hide
+save("aquaplanet.png", ans) # hide
 nothing # hide
 ```
 ![Aquaplanet pyplot](aquaplanet.png)
