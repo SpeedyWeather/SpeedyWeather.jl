@@ -1,6 +1,7 @@
 module SpeedyWeatherMakieExt
 
 using SpeedyWeather, Makie
+using DocStringExtensions
 
 """
 $(TYPEDSIGNATURES)
