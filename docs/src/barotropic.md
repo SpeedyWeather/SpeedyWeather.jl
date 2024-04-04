@@ -299,8 +299,8 @@ following leapfrog time steps.
 
 [^1]: Geophysical Fluid Dynamics Laboratory, [Idealized models with spectral dynamics](https://www.gfdl.noaa.gov/idealized-models-with-spectral-dynamics/)
 [^2]: Geophysical Fluid Dynamics Laboratory, [The barotropic vorticity equation](https://www.gfdl.noaa.gov/wp-content/uploads/files/user_files/pjp/barotropic.pdf).
-[^Robert66]: Robert, André. “The Integration of a Low Order Spectral Form of the Primitive Meteorological Equations.” Journal of the Meteorological Society of Japan 44 (1966): 237-245.
-[^Asselin72]: ASSELIN, R., 1972: Frequency Filter for Time Integrations. Mon. Wea. Rev., 100, 487–490, doi:[10.1175/1520-0493(1972)100<0487:FFFTI>2.3.CO;2](https://doi.org/10.1175/1520-0493(1972)100<0487:FFFTI>2.3.CO;2.)
-[^Williams2009]: Williams, P. D., 2009: A Proposed Modification to the Robert–Asselin Time Filter. Mon. Wea. Rev., 137, 2538–2546, [10.1175/2009MWR2724.1](https://doi.org/10.1175/2009MWR2724.1).
-[^Amezcua2011]: Amezcua, J., E. Kalnay, and P. D. Williams, 2011: The Effects of the RAW Filter on the Climatology and Forecast Skill of the SPEEDY Model. Mon. Wea. Rev., 139, 608–619, doi:[10.1175/2010MWR3530.1](https://doi.org/10.1175/2010MWR3530.1). 
-[^Williams2011]: Williams, P. D., 2011: The RAW Filter: An Improvement to the Robert–Asselin Filter in Semi-Implicit Integrations. Mon. Wea. Rev., 139, 1996–2007, doi:[10.1175/2010MWR3601.1](https://doi.org/10.1175/2010MWR3601.1). 
+[^Robert66]: Robert, André. "The Integration of a Low Order Spectral Form of the Primitive Meteorological Equations." Journal of the Meteorological Society of Japan 44 (1966): 237-245.
+[^Asselin72]: ASSELIN, R., 1972: Frequency Filter for Time Integrations. Mon. Wea. Rev., 100, 487-490, doi:[10.1175/1520-0493(1972)100<0487:FFFTI>2.3.CO;2](https://doi.org/10.1175/1520-0493(1972)100<0487:FFFTI>2.3.CO;2.)
+[^Williams2009]: Williams, P. D., 2009: A Proposed Modification to the Robert-Asselin Time Filter. Mon. Wea. Rev., 137, 2538-2546, [10.1175/2009MWR2724.1](https://doi.org/10.1175/2009MWR2724.1).
+[^Amezcua2011]: Amezcua, J., E. Kalnay, and P. D. Williams, 2011: The Effects of the RAW Filter on the Climatology and Forecast Skill of the SPEEDY Model. Mon. Wea. Rev., 139, 608-619, doi:[10.1175/2010MWR3530.1](https://doi.org/10.1175/2010MWR3530.1). 
+[^Williams2011]: Williams, P. D., 2011: The RAW Filter: An Improvement to the Robert-Asselin Filter in Semi-Implicit Integrations. Mon. Wea. Rev., 139, 1996-2007, doi:[10.1175/2010MWR3601.1](https://doi.org/10.1175/2010MWR3601.1). 

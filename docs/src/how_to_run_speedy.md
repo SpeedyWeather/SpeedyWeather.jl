@@ -205,7 +205,7 @@ run!(simulation)
 By default this runs for 10 days without output. These are the options left
 to change, so with
 ```@example howto
-model.output.id = "test" # hide
+model.output.id = "test" # hide
 run!(simulation, period=Day(5), output=true)
 ```
 You would continue this simulation (the previous `run!` call already integrated
