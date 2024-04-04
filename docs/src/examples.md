@@ -140,7 +140,7 @@ and then plotted via `heatmap(lon, lat, vor)`. While you can do that to give you
 on the plotting, SpeedyWeather.jl also defines an extension for Makie.jl, see [Extensions](@ref)
 because if our matrix `vor` here was an `AbstractGrid` (see [RingGrids](@ref)) then all
 its geographic information (which grid point is where) is encoded in the type. So we can also do
-```@example galwesky_setup
+```@example galewsky_setup
 vor_grid = FullGaussianGrid(vor)
 
 using CairoMakie    # this will load the extension so that Makie can plot grids directly
