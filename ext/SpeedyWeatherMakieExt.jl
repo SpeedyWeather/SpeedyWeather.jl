@@ -38,3 +38,5 @@ function Makie.heatmap(
     resize_to_layout!(fig)
     return fig
 end
+
+end # module
