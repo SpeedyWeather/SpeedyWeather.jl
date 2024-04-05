@@ -60,7 +60,7 @@ model = PrimitiveDryModel(;
 
     # Held-Suarez forcing and drag
     temperature_relaxation = HeldSuarez(spectral_grid),
-    drag = LinearDrag(spectral_grid),
+    boundary_layer_drag = LinearDrag(spectral_grid),
 
     # switch off other physics
     convection = NoConvection(),
@@ -70,8 +70,7 @@ model = PrimitiveDryModel(;
 
     # switch off surface fluxes (makes ocean/land/land-sea mask redundant)
     surface_wind = NoSurfaceWind(),
-    surface_evaporation = NoSurfaceEvaporation(),
-    surface_sensible_heat = NoSurfaceSensibleHeat(),
+    surface_heat_flux = NoSurfaceHeatFlux(),
 
     # use Earth's orography
     orography = EarthOrography(spectral_grid)
@@ -87,9 +86,10 @@ The code above defines the Held-Suarez forcing [^HS94] in terms of temperature r
 and a linear drag term that is applied near the planetary boundary but switches off
 all other physics in the primitive equation model without humidity.
 Switching off the surface wind would also automatically turn off the surface evaporation
-and sensible heat flux as that one is proportional to the surface wind (which is zero
-with `NoSurfaceWind`). But to also avoid the calculation being run at all we use
-`NoSurfaceEvaporation()` and `NoSurfaceSensibleHeat()` for the model constructor.
+(not relevant in the primitive _dry_ model) and sensible heat flux as that one is proportional
+to the surface wind (which is zero with `NoSurfaceWind`).
+But to also avoid the calculation being run at all we use `NoSurfaceHeatFlux()`
+for the model constructor.
 Many of the `NoSomething` model components do not require the
 spectral grid to be passed on, but as a convention we allow every model component
 to have it for construction even if not required.

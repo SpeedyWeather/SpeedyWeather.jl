@@ -34,7 +34,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     VD<:AbstractVerticalDiffusion,
     SUT<:AbstractSurfaceThermodynamics,
     SUW<:AbstractSurfaceWind,
-    SH<:AbstractSurfaceSensibleHeat,
+    SH<:AbstractSurfaceHeatFlux,
     EV<:AbstractSurfaceEvaporation,
     LSC<:AbstractCondensation,
     CV<:AbstractConvection,
@@ -82,7 +82,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
-    surface_heat_flux::SH = SurfaceSensibleHeat(spectral_grid)
+    surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     surface_evaporation::EV = SurfaceEvaporation(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)

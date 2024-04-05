@@ -1,6 +1,6 @@
 abstract type AbstractSurfaceThermodynamics <: AbstractParameterization end
 abstract type AbstractSurfaceWind <: AbstractParameterization end
-abstract type AbstractSurfaceSensibleHeat <: AbstractParameterization end
+abstract type AbstractSurfaceHeatFlux <: AbstractParameterization end
 abstract type AbstractSurfaceEvaporation <: AbstractParameterization end
 
 # defines the order in which they are called und unpacks to dispatch
@@ -13,7 +13,7 @@ function surface_fluxes!(column::ColumnVariables, model::PrimitiveEquation)
     surface_wind_stress!(column, model.surface_wind, model)
 
     # now call other heat (wet and dry) and humidity fluxes (PrimitiveWet only)
-    sensible_heat_flux!(column, model.surface_heat_flux, model)
+    surface_heat_flux!(column, model.surface_heat_flux, model)
     model isa PrimitiveWet && surface_evaporation!(column, model.surface_evaporation, model)
 end
 
@@ -117,14 +117,14 @@ function surface_wind_stress!(  column::ColumnVariables,
 end
 
 ## SENSIBLE HEAT FLUX
-export NoSurfaceSensibleHeat
-struct NoSurfaceSensibleHeat <: AbstractSurfaceSensibleHeat end
-NoSurfaceSensibleHeat(::SpectralGrid) = NoSurfaceSensibleHeat()
-initialize!(::NoSurfaceSensibleHeat, ::PrimitiveEquation) = nothing
-sensible_heat_flux!(::ColumnVariables, ::NoSurfaceSensibleHeat, ::PrimitiveEquation) = nothing
+export NoSurfaceHeatFlux
+struct NoSurfaceHeatFlux <: AbstractSurfaceHeatFlux end
+NoSurfaceHeatFlux(::SpectralGrid) = NoSurfaceHeatFlux()
+initialize!(::NoSurfaceHeatFlux, ::PrimitiveEquation) = nothing
+surface_heat_flux!(::ColumnVariables, ::NoSurfaceHeatFlux, ::PrimitiveEquation) = nothing
 
-export SurfaceSensibleHeat
-Base.@kwdef struct SurfaceSensibleHeat{NF<:AbstractFloat} <: AbstractSurfaceSensibleHeat
+export SurfaceHeatFlux
+Base.@kwdef struct SurfaceHeatFlux{NF<:AbstractFloat} <: AbstractSurfaceHeatFlux
     
     "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
@@ -139,13 +139,13 @@ Base.@kwdef struct SurfaceSensibleHeat{NF<:AbstractFloat} <: AbstractSurfaceSens
     max_flux::NF = 100
 end
 
-SurfaceSensibleHeat(SG::SpectralGrid; kwargs...) = SurfaceSensibleHeat{SG.NF}(; kwargs...)
-initialize!(::SurfaceSensibleHeat, ::PrimitiveEquation) = nothing
+SurfaceHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceHeatFlux{SG.NF}(; kwargs...)
+initialize!(::SurfaceHeatFlux, ::PrimitiveEquation) = nothing
 
-function sensible_heat_flux!(   
+function surface_heat_flux!(   
     column::ColumnVariables,
-    heat_flux::SurfaceSensibleHeat,
-    model::PrimitivEquation,
+    heat_flux::SurfaceHeatFlux,
+    model::PrimitiveEquation,
 )   
     cₚ = model.atmosphere.heat_capacity
     (; heat_exchange_land, heat_exchange_sea, max_flux) = heat_flux
@@ -193,7 +193,7 @@ end
 
 ## SURFACE EVAPORATION
 export NoSurfaceEvaporation
-struct NoSurfaceEvaporation <: AbstractSurfaceSensibleHeat end
+struct NoSurfaceEvaporation <: AbstractSurfaceHeatFlux end
 NoSurfaceEvaporation(::SpectralGrid) = NoSurfaceEvaporation()
 initialize!(::NoSurfaceEvaporation, ::PrimitiveEquation) = nothing
 surface_evaporation!(::ColumnVariables, ::NoSurfaceEvaporation, ::PrimitiveEquation) = nothing
