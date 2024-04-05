@@ -31,7 +31,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     VD<:AbstractVerticalDiffusion,
     SUT<:AbstractSurfaceThermodynamics,
     SUW<:AbstractSurfaceWind,
-    SH<:AbstractSurfaceHeat,
+    SH<:AbstractSurfaceSensibleHeat,
     CV<:AbstractConvection,
     SW<:AbstractShortwave,
     LW<:AbstractLongwave,
@@ -126,6 +126,9 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
+    initialize!(model.surface_thermodynamics, model)
+    initialize!(model.surface_wind, model)
+    initialize!(model.surface_heat_flux, model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)

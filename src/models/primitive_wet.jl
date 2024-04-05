@@ -34,8 +34,8 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     VD<:AbstractVerticalDiffusion,
     SUT<:AbstractSurfaceThermodynamics,
     SUW<:AbstractSurfaceWind,
-    SH<:AbstractSurfaceHeat,
-    EV<:AbstractEvaporation,
+    SH<:AbstractSurfaceSensibleHeat,
+    EV<:AbstractSurfaceEvaporation,
     LSC<:AbstractCondensation,
     CV<:AbstractConvection,
     SW<:AbstractShortwave,
@@ -83,7 +83,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
     surface_heat_flux::SH = SurfaceSensibleHeat(spectral_grid)
-    evaporation::EV = SurfaceEvaporation(spectral_grid)
+    surface_evaporation::EV = SurfaceEvaporation(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
@@ -142,6 +142,10 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.convection, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
+    initialize!(model.surface_thermodynamics, model)
+    initialize!(model.surface_wind, model)
+    initialize!(model.surface_heat_flux, model)
+    initialize!(model.surface_evaporation, model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)
