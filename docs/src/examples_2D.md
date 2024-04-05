@@ -1,8 +1,10 @@
-# Examples
+# [Examples 2D](@id Examples)
 
-The following is a collection of model setups, starting with an easy setup
+The following is a collection of example model setups, starting with an easy setup
 of the [Barotropic vorticity equation](@ref barotropic_vorticity_model) and
-continuing with more complicated setups.
+continuing with the [shallow water model](@ref shallow_water_model).
+
+See also [Examples 3D](@ref) for examples with the primitive equation models.
 
 ## 2D turbulence on a non-rotating sphere
 
@@ -304,7 +306,7 @@ Hb = model.orography.orography
 η = simulation.diagnostic_variables.surface.pres_grid
 h = @. η + H - Hb   # @. to broadcast grid + scalar - grid
 
-heatmap(h, title="Dynamic layer thickness h")
+heatmap(h, title="Dynamic layer thickness h", colormap=:oslo)
 save("gravity_waves.png", ans) # hide
 nothing # hide
 ```
@@ -312,99 +314,6 @@ nothing # hide
 
 Can you spot the Himalayas or the Andes?
 
-## Jablonowski-Williamson baroclinic wave
-
-```@example jablonowski
-using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlev=8, Grid=FullGaussianGrid, dealiasing=3)
-
-orography = ZonalRidge(spectral_grid)
-initial_conditions = InitialConditions(
-    vordiv = ZonalWind(),
-    temp = JablonowskiTemperature(),
-    pres = ZeroInitially())
-
-model = PrimitiveDryModel(; spectral_grid, orography, initial_conditions, physics=false)
-simulation = initialize!(model)
-model.feedback.verbose = false # hide
-run!(simulation, period=Day(9))
-nothing # hide
-```
-
-The Jablonowski-Williamson baroclinic wave test case[^JW06] using the
-[Primitive equation model](@ref primitive_equation_model) particularly the dry model,
-as we switch off all physics with `physics=false`.
-We want to use 8 vertical levels, and a lower resolution of T31 on a
-[full Gaussian grid](@ref FullGaussianGrid).
-The Jablonowski-Williamson initial conditions are `ZonalWind` for vorticity and divergence
-(curl and divergence of ``u, v``), `JablonowskiTemperature` for temperature and
-`ZeroInitially` for pressure. The orography is just a `ZonalRidge`.
-There is no forcing and the initial conditions are baroclinically unstable which kicks
-off a wave propagating eastward. This wave becomes obvious when visualised with
-
-```@example jablonowski
-using CairoMakie
-
-vor = simulation.diagnostic_variables.layers[end].grid_variables.vor_grid
-heatmap(vor, title="Surface relative vorticity")
-save("jablonowski.png", ans) # hide
-nothing # hide
-```
-![Jablonowski pyplot](jablonowski.png)
-
-## Aquaplanet
-
-```@example aquaplanet
-using SpeedyWeather
-
-# components
-spectral_grid = SpectralGrid(trunc=31, nlev=5)
-ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
-land_sea_mask = AquaPlanetMask(spectral_grid)
-orography = NoOrography(spectral_grid)
-
-# create model, initialize, run
-model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography)
-simulation = initialize!(model)
-model.feedback.verbose = false # hide
-run!(simulation, period=Day(50))
-nothing # hide
-```
-
-Here we have defined an aquaplanet simulation by
-- creating an `ocean::AquaPlanet`. This will use constant sea surface temperatures that only vary with latitude.
-- creating a `land_sea_mask::AquaPlanetMask` this will use a land-sea mask with `false`=ocean everywhere.
-- creating an `orography::NoOrography` which will have no orography and zero surface geopotential.
-
-All passed on to the model constructor for a `PrimitiveWetModel`, we have now a model with humidity
-and physics parameterization as they are defined by default (typing `model` will give you an overview
-of its components). We could have change the `model.land` and `model.vegetation` components too,
-but given the land-sea masks masks those contributions to the surface fluxes anyway, this is not
-necessary. Note that neither sea surface temperature, land-sea mask
-or orography have to agree. It is possible to have an ocean on top of a mountain.
-For an ocean grid-cell that is (partially) masked by the land-sea mask, its value will
-be (fractionally) ignored in the calculation of surface fluxes (potentially leading
-to a zero flux depending on land surface temperatures).
-
-Now with the following we visualize the surface humidity after the 50 days of
-simulation. We use 50 days as without mountains it takes longer for the initial conditions to
-become unstable. The surface humidity shows small-scale patches in the tropics, which is a result
-of the convection scheme, causing updrafts and downdrafts in both humidity and temperature.
-
-```@example aquaplanet
-using CairoMakie
-
-humid = simulation.diagnostic_variables.layers[end].grid_variables.humid_grid
-heatmap(humid, title="Surface specific humidity [kg/kg]")
-
-save("aquaplanet.png", ans) # hide
-nothing # hide
-```
-![Aquaplanet pyplot](aquaplanet.png)
-
-
-
 ## References
 
 [^G04]: Galewsky, Scott, Polvani, 2004. *An initial-value problem for testing numerical models of the global shallow-water equations*, Tellus A. DOI: [10.3402/tellusa.v56i5.14436](https://doi.org/10.3402/tellusa.v56i5.14436)
-[^JW06]: Jablonowski, C. and Williamson, D.L. (2006), A baroclinic instability test case for atmospheric model dynamical cores. Q.J.R. Meteorol. Soc., 132: 2943-2975. [10.1256/qj.06.12](https://doi.org/10.1256/qj.06.12)

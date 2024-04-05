@@ -15,7 +15,7 @@ precipitating as the condensed humidity forms cloud droplets that
 eventually fall down as convective precipitation.
 See also [Large-scale condensation](@ref) in comparison.
 
-## Simplified Betts-Miller convective adjustment
+## [Simplified Betts-Miller convective adjustment](@ref BettsMiller)
 
 We follow the simplification of the Betts-Miller convection scheme
 [^Betts1986][^BettsMiller1986] as studied by Frierson, 2007 [^Frierson2007].

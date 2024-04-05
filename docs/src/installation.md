@@ -37,5 +37,5 @@ This is an
 [extension](https://pkgdocs.julialang.org/v1.10/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)),
 meaning that this functionality is only loaded from SpeedyWeather when `using Makie`
 (or its backends CairoMakie.jl, GLMakie.jl, ...). Hence, if you want to make use of this
-extension (some [Examples](@ref) show this) you need to install Makie.jl manually.
+extension (some [Examples](@ref Examples) show this) you need to install Makie.jl manually.
 
