@@ -216,6 +216,7 @@ Base.@kwdef struct SurfaceEvaporation{NF<:AbstractFloat} <: AbstractSurfaceEvapo
 end
 
 SurfaceEvaporation(SG::SpectralGrid; kwargs...) = SurfaceEvaporation{SG.NF}(; kwargs...)
+initialize!(::SurfaceEvaporation, ::PrimitiveWet) = nothing
 
 function surface_evaporation!(  column::ColumnVariables,
                                 evaporation::SurfaceEvaporation,
