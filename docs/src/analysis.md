@@ -571,41 +571,41 @@ or directly use the callback through its key `:diagnostics_recorder`
 as we do here
 
 ```@example analysis
-using PythonPlot
+using CairoMakie
 
 # unpack callback
 (; M, C, Λ, K, P, Q)  = model.callbacks[:diagnostics_recorder]
 t = model.callbacks[:diagnostics_recorder].time
+days = [Second(ti - t[1]).value/3600/24 for ti in t]
 
-fig, axs = subplots(3, 2, figsize=(8,6), sharex=true)
+fig = Figure();
+axs = [Axis(fig[row, col]) for row in 1:3, col in 1:2]
 
-# note: python indexing
-axs[0,0].plot(t, M)
-axs[0,0].set_title("Mass")
+lines!(axs[1,1], days, M)
+axs[1,1].title = "Mass"
+hidexdecorations!(axs[1,1])
 
-axs[1,0].plot(t, Λ)
-axs[1,0].set_title("Angular momentum")
+lines!(axs[2,1], days, Λ)
+axs[2,1].title = "Angular momentum"
+hidexdecorations!(axs[2,1])
 
-axs[2,0].plot(t, P)
-axs[2,0].set_title("Potential energy")
-axs[2,0].set_xlabel("time")
+lines!(axs[3,1], days, P)
+axs[3,1].title = "Potential energy"
+axs[3,1].xlabel = "time [day]"
 
-axs[0,1].plot(t, C)
-axs[0,1].set_title("Circulation")
+lines!(axs[1,2], days, C)
+axs[1,2].title = "Circulation"
+hidexdecorations!(axs[1,2])
 
-axs[1,1].plot(t, K)
-axs[1,1].set_title("Kinetic energy")
+lines!(axs[2,2], days, K)
+axs[2,2].title = "Kinetic energy"
+hidexdecorations!(axs[2,2])
 
-axs[2,1].plot(t, Q)
-axs[2,1].set_title("Potential enstrophy")
-axs[2,1].set_xlabel("time")
-
-# format time axis to Jan-1 etc
-time_fmt = matplotlib.dates.DateFormatter("%b-%d")
-axs[0,0].xaxis.set_major_formatter(time_fmt)
-
-tight_layout() # hide
-savefig("global_diagnostics.png") # hide
+lines!(axs[3,2], days, Q)
+axs[3,2].title = "Potential enstrophy"
+axs[3,2].xlabel = "time [day]"
+fig
+save("global_diagnostics.png", fig) # hide
 nothing # hide
 ```
 ![Global diagnostics](global_diagnostics.png)
