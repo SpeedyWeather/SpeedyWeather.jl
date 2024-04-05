@@ -241,7 +241,7 @@ heatmap(map, title="k⁻²-distributed noise")
 save("random_noise.png", ans) # hide
 nothing # hide
 ```
-!(Random noise)[random_noise.png]
+![Random noise](random_noise.png)
 
 You can always access the underlying data in `map` via `map.data` in case you
 need to get rid of the wrapping into a grid again!
@@ -412,7 +412,7 @@ heatmap(η_grid, title="Geostrophic interface displacement η [m]")
 save("eta_geostrophic.png", ans) # hide
 nothing # hide
 ```
-!(Geostrophic eta)[eta_geostrophic.png]
+![Geostrophic eta](eta_geostrophic.png)
 
 Which is the interface displacement assuming geostrophy.
 The actual interface displacement contains also ageostrophy
@@ -422,7 +422,7 @@ heatmap(η_grid2, title="Interface displacement η [m] with ageostrophy")
 save("eta_ageostrophic.png", ans) # hide
 nothing # hide
 ```
-!(Ageostrophic eta)[eta_ageostrophic.png]
+![Ageostrophic eta](eta_ageostrophic.png)
 
 Strikingly similar! The remaining differences are the ageostrophic motions but
 also note that the mean is off. This is because geostrophy only use/defines the gradient
