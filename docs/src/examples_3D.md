@@ -50,7 +50,62 @@ nothing # hide
 
 ## Held-Suarez forcing
 
+```@example heldsuarez
+using SpeedyWeather
+spectral_grid = SpectralGrid(trunc=31, nlev=8)
 
+# construct model with only Held-Suarez forcing, no other physics
+model = PrimitiveDryModel(;
+    spectral_grid,
+
+    # Held-Suarez forcing and drag
+    temperature_relaxation = HeldSuarez(spectral_grid),
+    drag = LinearDrag(spectral_grid),
+
+    # switch off other physics
+    convection = NoConvection(),
+    shortwave_radiation = NoShortwave(),
+    longwave_radiation = NoLongwave(),
+    vertical_diffusion = NoVerticalDiffusion(),
+
+    # switch off surface fluxes (makes ocean/land/land-sea mask redundant)
+    surface_wind = NoSurfaceWind(),
+    surface_evaporation = NoSurfaceEvaporation(),
+    surface_sensible_heat = NoSurfaceSensibleHeat(),
+
+    # use Earth's orography
+    orography = EarthOrography(spectral_grid)
+)
+
+simulation = initialize!(model)
+model.feedback.verbose = false # hide
+run!(simulation, period=Day(20))
+nothing # hide
+```
+
+The code above defines the Held-Suarez forcing [^HS94] in terms of temperature relaxation
+and a linear drag term that is applied near the planetary boundary but switches off
+all other physics in the primitive equation model without humidity.
+Switching off the surface wind would also automatically turn off the surface evaporation
+and sensible heat flux as that one is proportional to the surface wind (which is zero
+with `NoSurfaceWind`). But to also avoid the calculation being run at all we use
+`NoSurfaceEvaporation()` and `NoSurfaceSensibleHeat()` for the model constructor.
+Many of the `NoSomething` model components do not require the
+spectral grid to be passed on, but as a convention we allow every model component
+to have it for construction even if not required.
+
+Visualising surface temperature with
+
+```@example heldsuarez
+using CairoMakie
+
+temp = simulation.diagnostic_variables.layers[end].grid_variables.temp_grid
+heatmap(temp, title="Surface temperature [K]", colormap=:thermal)
+
+save("heldsuarez.png", ans) # hide
+nothing # hide
+```
+![Held-Suarez](heldsuarez.png)
 
 ## Aquaplanet
 
@@ -157,4 +212,6 @@ And the comparison looks like
 
 ## References
 
-[^JW06]: Jablonowski, C. and Williamson, D.L. (2006), A baroclinic instability test case for atmospheric model dynamical cores. Q.J.R. Meteorol. Soc., 132: 2943-2975. [10.1256/qj.06.12](https://doi.org/10.1256/qj.06.12)
+[^JW06]: Jablonowski, C. and Williamson, D.L. (2006), A baroclinic instability test case for atmospheric model dynamical cores. Q.J.R. Meteorol. Soc., 132: 2943-2975. DOI:[10.1256/qj.06.12](https://doi.org/10.1256/qj.06.12)
+
+[^HS94]: Held, I. M. & Suarez, M. J. A Proposal for the Intercomparison of the Dynamical Cores of Atmospheric General Circulation Models. Bulletin of the American Meteorological Society 75, 1825-1830 (1994). DOI:[10.1175/1520-0477(1994)075<1825:APFTIO>2.0.CO;2](https://doi.org/10.1175/1520-0477(1994)075<1825:APFTIO>2.0.CO;2)

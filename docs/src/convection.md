@@ -152,7 +152,8 @@ Q_{ref}  &= \int_{p_0}^{p_{LZB}} -q_{ref} dp \\
 f_q      &= 1 - \frac{\Delta q}{Q_ref} \\
 q_{ref, 2} &= f_q q_{ref} \\
 \Delta T &= \frac{1}{\Delta p} \int_{p_0}^{p_{LZB}} -(T - T_{ref}) dp \\
-T_{ref,2} = T_{ref} - \Delta T
+T_{ref,2} &= T_{ref} - \Delta T
+\end{aligned}
 ```
 
 ## Corrected relaxation
