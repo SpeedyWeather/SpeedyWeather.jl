@@ -21,6 +21,7 @@ end
 export SurfaceThermodynamicsConstant
 struct SurfaceThermodynamicsConstant <: AbstractSurfaceThermodynamics end
 SurfaceThermodynamicsConstant(SG::SpectralGrid) = SurfaceThermodynamicsConstant()
+initialize!(::SurfaceThermodynamicsConstant,::PrimitiveEquation) = nothing
 
 function surface_thermodynamics!(   column::ColumnVariables,
                                     ::SurfaceThermodynamicsConstant,
@@ -38,9 +39,8 @@ end
 
 function surface_thermodynamics!(   column::ColumnVariables,
                                     ::SurfaceThermodynamicsConstant,
-                                    atmosphere::AbstractAtmosphere,
                                     model::PrimitiveDry)
-    (; R_dry) = atmosphere
+    (; R_dry) = model.atmosphere
     # surface value is same as lowest model level
     column.surface_temp = column.temp[end]   # todo use constant POTENTIAL temperature
     column.surface_air_density = column.pres[end]/(R_dry*column.surface_temp)
