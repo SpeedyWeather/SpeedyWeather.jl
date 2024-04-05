@@ -177,6 +177,7 @@ convection = DryBettsMiller(spectral_grid, time_scale=Hour(4))
 model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography, convection)
 
 simulation = initialize!(model)
+model.feedback.verbose = false # hide
 run!(simulation, period=Day(50))
 
 humid = simulation.diagnostic_variables.layers[end].grid_variables.humid_grid
@@ -197,6 +198,7 @@ convection = NoConvection(spectral_grid)
 model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography, convection)
 
 simulation = initialize!(model)
+model.feedback.verbose = false # hide
 run!(simulation, period=Day(50))
 
 humid = simulation.diagnostic_variables.layers[end].grid_variables.humid_grid

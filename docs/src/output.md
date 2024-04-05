@@ -86,7 +86,7 @@ ds["time"][:]
 ```
 very neatly hourly output in the NetCDF file!
 
-## Example 2: Output onto a higher/lower resolution grid
+## [Example 2: Output onto a higher/lower resolution grid](@id output_grid)
 
 Say we want to run the model at a given horizontal resolution but want to output on another resolution,
 the `OutputWriter` takes as argument `output_Grid<:AbstractFullGrid` and `nlat_half::Int`.
