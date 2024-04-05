@@ -15,7 +15,7 @@ struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T}} <: AbstractArra
     m::Int              # number of rows
     n::Int              # number of columns
 
-    LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray} = check_lta_input_array(data, m, n, N) ? new(data, m, n) : error(lta_error_message(data, m, n, T, N, ArrayType))
+    LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray{T}} = check_lta_input_array(data, m, n, N) ? new(data, m, n) : error(lta_error_message(data, m, n, T, N, ArrayType))
 end
 
 check_lta_input_array(data, m, n, N) = (ndims(data) == N-1) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
@@ -25,10 +25,10 @@ function lta_error_message(data, m, n, T, N, ArrayType)
     "$(size(data))-sized $(typeof(data)) cannot be used to create a $size_tuple LowerTriangularArray{$T,$N,$ArrayType}"
 end 
 
-const LowerTriangularMatrix{T, ArrayType} = LowerTriangularArray{T, 2, ArrayType}
+const LowerTriangularMatrix{T} = LowerTriangularArray{T, 2, Vector{T}}
 
 LowerTriangularArray(data::ArrayType, m::Integer, n::Integer) where {T, N, ArrayType<:AbstractArray{T,N}} = LowerTriangularArray{T, N+1, ArrayType}(data, m, n)
-LowerTriangularMatrix(data::ArrayType, m::Integer, n::Integer) where {T, ArrayType<:AbstractVector{T}} = LowerTriangularMatrix{T, ArrayType}(data, m, n)
+LowerTriangularMatrix(data::Vector{T}, m::Integer, n::Integer) where T = LowerTriangularMatrix{T}(data, m, n)
 
 # SIZE ETC
 Base.length(L::LowerTriangularArray) = length(L.data)  # define length as number of non-zero elements
@@ -47,9 +47,8 @@ for zeros_or_ones in (:zeros, :ones)
             return LowerTriangularArray($zeros_or_ones(T, nonzeros(m, n), I...), m, n)
         end
         
-        # use Float64 and Vector as default if type T and ArrayType not provided
-        Base.$zeros_or_ones(::Type{LowerTriangularMatrix}, m::Integer, n::Integer) = $zeros_or_ones(LowerTriangularMatrix{Float64, Vector{Float64}}, m, n)
-        Base.$zeros_or_ones(::Type{LowerTriangularMatrix{T}}, m::Integer, n::Integer) where T = $zeros_or_ones(LowerTriangularMatrix{T, Vector{T}}, m, n)
+        # use Float64 as default if type T is not provided
+        Base.$zeros_or_ones(::Type{LowerTriangularMatrix}, m::Integer, n::Integer) = $zeros_or_ones(LowerTriangularMatrix{Float64}, m, n)
     end
 end
 
@@ -62,8 +61,8 @@ end
 
 LowerTriangularArray{T,N,ArrayType}(::UndefInitializer, size::S) where {T,N,ArrayType<:AbstractArray{T}, S<:Tuple} = LowerTriangularArray{T,N,ArrayType}(undef, size...)
    
-function LowerTriangularMatrix{T,ArrayType}(::UndefInitializer, m::Integer, n::Integer) where {T,ArrayType<:AbstractArray{T}}
-    return LowerTriangularMatrix(ArrayType(undef, nonzeros(m, n)), m, n)
+function LowerTriangularMatrix{T}(::UndefInitializer, m::Integer, n::Integer) where T
+    return LowerTriangularMatrix(Vector{T}(undef, nonzeros(m, n)), m, n)
 end
 
 Base.randn(::Type{LowerTriangularArray{T}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N} = LowerTriangularArray(randn(T, nonzeros(m, n), I...), m, n)
@@ -135,12 +134,22 @@ end
 @inline Base.getindex(L::LowerTriangularArray, i::Integer) = getindex(L.data,i)
 @inline Base.getindex(L::LowerTriangularArray, I::CartesianIndex) = getindex(L, Tuple(I)...)
 
+# setindex with lm, ..
 Base.@propagate_inbounds function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, M}) where {T,N,M} 
     @boundscheck M == N-1 || throw(BoundsError(L, I))
     setindex!(L.data, x, I...)
 end 
 
+# setindex with il, im, ..
 Base.@propagate_inbounds function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T,N}
+    i, j = I[1:2] # TODO: check if i,j are Int?
+    @boundscheck i >= j || throw(BoundsError(L, (i, j)))
+    k = ij2k(i, j, L.m)
+    setindex!(L.data, x, k, I[3:end]...)
+end
+
+# this is specifically here for the weird way in which AssociatedLegendrePolynomials.jl indexes with an empty CartesianIndex
+Base.@propagate_inbounds function Base.setindex!(L::LowerTriangularArray{T,N}, x, i::CartesianIndex, I::Vararg{Any, N}) where {T,N}
     i, j = I[1:2] # TODO: check if i,j are Int?
     @boundscheck i >= j || throw(BoundsError(L, (i, j)))
     k = ij2k(i, j, L.m)
@@ -176,29 +185,15 @@ end
 """ 
 $(TYPEDSIGNATURES)
 Create a LowerTriangularArray `L` from Matrix `M` by copying over the non-zero elements in `M`."""
-function LowerTriangularArray(M::Matrix{T}) where T # CPU version 
+function LowerTriangularMatrix(M::Matrix{T}) where T # CPU version 
     m, n = size(M)
-    L = LowerTriangularArray{T,2,Array{T,1}}(undef, size(M)...)
+    L = LowerTriangularMatrix{T}(undef, size(M)...)
     
     k = 0
     @inbounds for j in 1:n      # only loop over lower triangle
         for i in j:m
             k += 1              # next element in lower triangle
             L[k] = M[i, j]       # and copy data into vector
-        end
-    end
-    return L
-end
-
-function LowerTriangularArray(M::Array{T,3}) where T # CPU version 
-    m, n = size(M)[1:2]
-    L = LowerTriangularArray{T,3,Array{T,2}}(undef, size(M)...)
-    
-    k = 0
-    @inbounds for j in 1:n      # only loop over lower triangle
-        for i in j:m
-            k += 1              # next element in lower triangle
-            L[k, :] = M[i, j, :]       # and copy data into vector 
         end
     end
     return L
@@ -284,22 +279,28 @@ function _copyto_core!( L1::LowerTriangularArray{T,N,ArrayType1},   # copy to L1
     # we'll setup the 1D-indices that correspond to the given range here
     ind_L1 = lowertriangle_indices(lmax_1, mmax_1)
     ind_L1_smaller = deepcopy(ind_L1) # threshold the lower triangular based on the ls and ms
-    if maximum(ls) < lmax_1
+    if maximum(ls) < lmax_1 # threshold L1 based on ls 
         ind_L1_smaller[ls[end]+1:end, :] .= 0
     end 
-    if maximum(ms) < mmax_1
+    if maximum(ms) < mmax_1 # threshold L1 based on ms
         ind_L1_smaller[:, ms[end]+1:end] .= 0 
     end 
     ind_L1 = ind_L1_smaller[ind_L1] # also flattens the indices into indices for the L1.data array
 
     ind_L2 = lowertriangle_indices(lmax_2, mmax_2)
-    ind_L2_smaller = deepcopy(ind_L2) # threshold the lower triangular based on the ls and ms
-    if maximum(ls) < lmax_2
-        ind_L2_smaller[ls[end]+1:end, :] .= 0 
+    ind_L2_smaller = deepcopy(ind_L2) # threshold the lower triangular based on the ls and ms and L1,L2
+    if maximum(ls) > lmax_1 # so that L2 can fit into L1 
+        ind_L2_smaller[lmax_1+1:end, :] .= 0 
     end 
-    if maximum(ms) < mmax_2
-        ind_L2_smaller[:, ms[end]+1:end] .= 0 
+    if maximum(ls) < lmax_2 # threshold L2 based on ls
+        ind_L2_smaller[ls[end]+1:end, :] .= 0
+    end 
+    if maximum(ms) > mmax_1 # so that L2 can fit into L1 
+        ind_L2_smaller[:, mmax_1+1:end] .= 0 
     end
+    if maximum(ms) < mmax_2 # threshold L2 based on ms
+        ind_L2_smaller[:, ms[end]+1:end] .= 0 
+    end 
     ind_L2 = ind_L2_smaller[ind_L2] # also flattens the indices into indices for the L2.data array
 
     L1.data[ind_L1,[Colon() for i=1:(N-2)]...] = T.(L2.data[ind_L2,[Colon() for i=1:(N-2)]...])
@@ -330,8 +331,8 @@ function Base.copyto!(  M::AbstractArray{T},               # copy to M
     M
 end
 
-function LowerTriangularMatrix{T}(M::LowerTriangularMatrix{T2,ArrayType}) where {T,T2,ArrayType}
-    L = LowerTriangularMatrix{T,ArrayType}(undef, size(M)...)
+function LowerTriangularMatrix{T}(M::LowerTriangularMatrix{T2}) where {T,T2}
+    L = LowerTriangularMatrix{T}(undef, size(M)...)
     copyto!(L, M)
     return L
 end
@@ -341,7 +342,7 @@ function Base.convert(::Type{LowerTriangularArray{T1,N,ArrayTypeT1}}, L::LowerTr
 end
 
 function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix) where T
-    return LowerTriangularMatrix{T,Vector{T}}(L.data, L.m, L.n)
+    return LowerTriangularMatrix{T}(L.data, L.m, L.n)
 end
 
 function Base.similar(::LowerTriangularArray{T,N,ArrayType}, size::S) where {T, N, ArrayType, S<:Tuple}

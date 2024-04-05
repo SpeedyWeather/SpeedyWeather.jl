@@ -411,23 +411,34 @@ end
     @test all(L2 .== L1)
     
     # test the truncating copyto! function 
-    # we can't do this with JLArrays, as they don't support mix indexing with BitArrays
+    # we can't do this with JLArrays, as they don't support mixed indexing with BitArrays
     # like Array and CuArray do
     # So, we do this with regular Array but with the _copyto_core! function that implements 
-    # the core of this copyto! in a GPU compatible way, and is called by copyto! on with CuArrays
+    # the core of this copyto! in a GPU compatible way, and is called by copyto! with CuArrays
 
     L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
     L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
     L2T = spectral_truncation(L2,(size(L1)[1:2] .- 1)...)
+    L3 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
 
     SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:33, 1:32)     # size of smaller matrix
     @test L1 == L2T
 
+    # test that GPU and CPU method yield the same
+    SpeedyWeather.LowerTriangularMatrices.copyto!(L3, L2, 1:33, 1:32)     # size of smaller matrix
+    @test L1 == L3 
+
     SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:65, 1:64)     # size of bigger matrix
     @test L1 == L2T
 
+    SpeedyWeather.LowerTriangularMatrices.copyto!(L3, L2, 1:65, 1:64)     # size of bigger matrix
+    @test L1 == L3 
+
     SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:50, 1:50)     # in between
     @test L1 == L2T
+
+    SpeedyWeather.LowerTriangularMatrices.copyto!(L3, L2, 1:50, 1:50)     # in between
+    @test L3 == L1
 end 
 
 @testset "LowerTriangularArray: broadcast" begin 
@@ -451,6 +462,34 @@ end
 
                 L2 .^= NF(2)
                 @test all(L1 .^ NF(2) .≈ L2)
+
+                # tests mirroring usage in dynamical core
+                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L3 = deepcopy(L2)
+
+                @. L2 += L1*NF(5)
+                @test all(L2 .≈ (L3 + L1*NF(5)))
+
+                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+
+                @. L3 = -L1 - L2
+                @test all(L3 .≈ (-L1 - L2))
+
+                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L3 = deepcopy(L2)
+
+                L2 .+= L1 
+                L3 += L1
+                @test all(L2 .≈ L3)
+
+                L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
+                L2 = similar(L1)
+
+                L2 .= NF(5) * L1
+                @test all(L2 .≈ (L1*NF(5)))
             end
         end
     end
