@@ -186,8 +186,14 @@ We now wrap this matrix
 therefore to associate it with the necessary grid information
 ```@example speedytransforms
 map = FullClenshawGrid(m)
-plot(map)
+
+using CairoMakie
+heatmap(map)
+save("random_pattern.png", ans) # hide
+nothing # hide
 ```
+![Random pattern](random_pattern.png)
+
 Now we transform into spectral space and call `power_spectrum(::LowerTriangularMatrix)`
 ```@example speedytransforms
 alms = spectral(map)
@@ -225,12 +231,17 @@ k = 1:32
 alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32)
 alms .*= k.^-2
 ```
-Awesome. For higher degrees and orders the amplitude clearly decreases! Now
-to grid-point space and let us visualize the result
+Awesome. For higher degrees and orders the amplitude clearly decreases!
+Now to grid-point space and let us visualize the result
 ```@example speedytransforms
 map = gridded(alms)
-plot(map)
+
+using CairoMakie
+heatmap(map, title="k⁻²-distributed noise")
+save("random_noise.png", ans) # hide
+nothing # hide
 ```
+!(Random noise)[random_noise.png]
 
 You can always access the underlying data in `map` via `map.data` in case you
 need to get rid of the wrapping into a grid again!
@@ -348,7 +359,7 @@ S = SpectralTransform(u, one_more_degree=true)
 us = spectral(u, S)
 vs = spectral(v, S)
 
-vor = curl(us, vs)
+vor = curl(us, vs) / spectral_grid.radius
 ```
 (Copies of) the velocity fields are unscaled by the cosine of latitude (see above),
 then transformed into spectral space, and the returned `vor` requires a manual division
@@ -388,20 +399,31 @@ Now we need to apply the inverse Laplace operator to ``f\zeta/g`` which we do as
 
 ```@example speedytransforms
 fζ_g_spectral = spectral(fζ_g, one_more_degree=true)
-η = SpeedyTransforms.∇⁻²(fζ_g_spectral) * spectral_grid.radius^2
+
+R = spectral_grid.radius
+η = SpeedyTransforms.∇⁻²(fζ_g_spectral) * R^2
 η_grid = gridded(η, Grid=spectral_grid.Grid)
 nothing # hide
 ```
-
 Note the manual scaling with the radius ``R^2`` here. We now compare the results
 ```@example speedytransforms
-plot(η_grid)
+using CairoMakie
+heatmap(η_grid, title="Geostrophic interface displacement η [m]")
+save("eta_geostrophic.png", ans) # hide
+nothing # hide
 ```
-Which is the interface displacement assuming geostrophy. The actual interface
-displacement contains also ageostrophy
+!(Geostrophic eta)[eta_geostrophic.png]
+
+Which is the interface displacement assuming geostrophy.
+The actual interface displacement contains also ageostrophy
 ```@example speedytransforms
-plot(simulation.diagnostic_variables.surface.pres_grid)
+η_grid2 = simulation.diagnostic_variables.surface.pres_grid
+heatmap(η_grid2, title="Interface displacement η [m] with ageostrophy")
+save("eta_ageostrophic.png", ans) # hide
+nothing # hide
 ```
+!(Ageostrophic eta)[eta_ageostrophic.png]
+
 Strikingly similar! The remaining differences are the ageostrophic motions but
 also note that the mean is off. This is because geostrophy only use/defines the gradient
 of ``\eta`` not the absolute values itself. Our geostrophic ``\eta_g`` has by construction
