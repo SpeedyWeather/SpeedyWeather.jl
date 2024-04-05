@@ -5,7 +5,8 @@
 Currently implemented is
 
 ```@example radiation
-using SpeedyWeather, InteractiveUtils
+using InteractiveUtils # hide
+using SpeedyWeather
 subtypes(SpeedyWeather.AbstractLongwave)
 ```
 
