@@ -73,7 +73,7 @@ about dos and don'ts. Just express your interest to contribute and we'll be happ
 ## Example use
 
 For a more comprehensive tutorial with several examples, see
-[Examples](https://speedyweather.github.io/SpeedyWeather.jl/dev/examples/) in the documentation.
+[Examples](https://speedyweather.github.io/SpeedyWeather.jl/dev/examples_2D/) in the documentation.
 The interface to SpeedyWeather.jl consist of 5 steps: define the grid, create model components,
 construct the model, initialize, run
 

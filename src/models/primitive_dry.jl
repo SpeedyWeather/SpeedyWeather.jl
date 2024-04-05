@@ -31,7 +31,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     VD<:AbstractVerticalDiffusion,
     SUT<:AbstractSurfaceThermodynamics,
     SUW<:AbstractSurfaceWind,
-    SH<:AbstractSurfaceHeat,
+    SH<:AbstractSurfaceHeatFlux,
     CV<:AbstractConvection,
     SW<:AbstractShortwave,
     LW<:AbstractLongwave,
@@ -73,7 +73,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
-    surface_heat_flux::SH = SurfaceSensibleHeat(spectral_grid)
+    surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     convection::CV = DryBettsMiller(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
@@ -126,6 +126,9 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
+    initialize!(model.surface_thermodynamics, model)
+    initialize!(model.surface_wind, model)
+    initialize!(model.surface_heat_flux, model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)

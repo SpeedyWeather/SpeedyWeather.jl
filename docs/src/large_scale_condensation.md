@@ -11,6 +11,20 @@ quantities such as specific humidity, pressure and temperature within a
 given grid cell, even though there might be considerably variability of
 these quantities within a grid cell if the resolution was higher.
 
+## Condensation implementations
+
+Currently implemented are
+
+```@example condensation
+using InteractiveUtils # hide
+using SpeedyWeather
+subtypes(SpeedyWeather.AbstractCondensation)
+```
+
+which are described in the following.
+
+## Explicit large-scale condensation
+
 We parameterize this process of _large-scale condensation_ when relative humidity
 in a grid cell reaches saturation and remove the excess humidity quickly
 (given time integration constraints, see below) and with an implicit (in the time
@@ -32,10 +46,14 @@ quantities at time step ``i`` to calculate the tendency. The latent heat release
 condensation is in the second equation. However, treating this explicitly poses the problem
 that because the saturation humidity is calculated from the current temperature ``T_i``,
 which is increased due to the latent heat release, the humidity after this time step will be
-undersaturated. Ideally, one would want to condense towards the new saturation humidity
-``q^\star(T_{i+1})`` so that condensation draws the relative humidity back down to 100% not below it. 
-Taylor expansion at ``i`` with ``\Delta T = T_{i+1} - T_i`` (and ``\delta q`` similarly)
-to first order yields
+undersaturated.
+
+## Implicit large-scale condensation
+
+Ideally, one would want to condense towards the _new_ saturation humidity
+``q^\star(T_{i+1})`` at ``i+1`` so that condensation draws the relative humidity back down
+to 100% not below it.  Taylor expansion at ``i`` of the equation above with ``q^\star(T_{i+1})``
+and ``\Delta T = T_{i+1} - T_i`` (and ``\Delta q`` similarly) to first order yields
 
 ```math
 q_{i+1} - q_i = q^\star(T_{i+1}) - q_i = q^\star(T_i) + (T_{i+1} - T_i)
