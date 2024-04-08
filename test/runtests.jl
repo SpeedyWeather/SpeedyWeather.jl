@@ -7,7 +7,7 @@ include("dates.jl")
 include("lower_triangular_matrix.jl")
 include("grids.jl")
 include("interpolation.jl")
-#include("set_vars.jl")
+include("set_vars.jl")
 
 # GPU/KERNELABSTRACTIONS
 include("kernelabstractions.jl")
@@ -17,21 +17,21 @@ include("spectral_transform.jl")
 include("spectral_gradients.jl")
 
 # DYNAMICS
-#include("diffusion.jl")
-#include("time_stepping.jl")
-#include("vertical_advection.jl")
-#include("particles.jl")
-#include("particle_advection.jl")
+include("diffusion.jl")
+include("time_stepping.jl")
+include("vertical_advection.jl")
+include("particles.jl")
+include("particle_advection.jl")
 
 # VERTICAL LEVELS
-#include("vertical_levels.jl")
-#include("geopotential.jl")
+include("vertical_levels.jl")
+include("geopotential.jl")
 
 # PHYSICS
-#include("column_variables.jl")
-#include("orography.jl")
-#include("land_sea_mask.jl")
-#include("ocean.jl")
+include("column_variables.jl")
+include("orography.jl")
+include("land_sea_mask.jl")
+include("ocean.jl")
 # include("thermodynamics.jl")
 # include("large_scale_condensation.jl")
 # include("convection.jl")
@@ -39,12 +39,12 @@ include("spectral_gradients.jl")
 # include("shortwave_radiation.jl")
 
 # INITIALIZATION AND INTEGRATION
-#include("run_speedy.jl")
+include("run_speedy.jl")
 
 # EXTENSION
-#include("extending.jl")
-#include("callbacks.jl")
-#include("schedule.jl")
+include("extending.jl")
+include("callbacks.jl")
+include("schedule.jl")
 
 # OUTPUT 
-#include("netcdf_output.jl")
+include("netcdf_output.jl")
