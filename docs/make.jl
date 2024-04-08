@@ -27,7 +27,8 @@ makedocs(
             ],
             "Running SpeedyWeather" => [
                 "How to run SpeedyWeather"=>"how_to_run_speedy.md",
-                "Examples"=>"examples.md",
+                "Examples 2D"=>"examples_2D.md",
+                "Examples 3D"=>"examples_3D.md",
                 "Analysis"=>"analysis.md",
                 "Tree structure"=>"structure.md",
                 "Particle advection"=>"particles.md",

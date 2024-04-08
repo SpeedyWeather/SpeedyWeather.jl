@@ -11,7 +11,7 @@ user may want to adjust are chosen and live in their respective model components
 4. [Run that simulation](@ref run).
 
 In the following we will describe these steps in more detail.
-If you want to start with some examples first, see [Examples](@ref)
+If you want to start with some examples first, see [Examples](@ref Examples)
 which has easy and more advanced examples of how to set up
 SpeedyWeather.jl to run the simulation you want.
 
@@ -125,7 +125,7 @@ any name)
 ```@example howto
 model = ShallowWaterModel(; spectral_grid, time_stepping)
 ```
-This logic continues for all model components, see [Examples](@ref).
+This logic continues for all model components, see [Examples](@ref Examples).
 All model components are also subtype (i.e. `<:`) of some abstract supertype,
 this feature can be made use of to redefine
 not just constant parameters of existing model components but also

@@ -15,7 +15,17 @@ precipitating as the condensed humidity forms cloud droplets that
 eventually fall down as convective precipitation.
 See also [Large-scale condensation](@ref) in comparison.
 
-## Simplified Betts-Miller convective adjustment
+## Convection implementations
+
+Currently implemented are
+```@example convection
+using InteractiveUtils # hide
+using SpeedyWeather
+subtypes(SpeedyWeather.AbstractConvection)
+```
+which are described in the following.
+
+## [Simplified Betts-Miller convection](@id BettsMiller)
 
 We follow the simplification of the Betts-Miller convection scheme
 [^Betts1986][^BettsMiller1986] as studied by Frierson, 2007 [^Frierson2007].
@@ -24,9 +34,9 @@ convection as an adjustment towards a (pseudo-) moist adiabat
 reference profile and its associated humidity profile. Meaning that
 conceptually for every vertical column in the atmosphere we
 
-1. Diagnose the vertical temperature and humidity profile of the environment relative to the surface and calculate the adiabat to the level of zero buoyancy.
+1. Diagnose the vertical temperature and humidity profile of the environment relative to the adiabat up to the level of zero buoyancy.
 2. Decide whether convection should take place and whether it is deep (precipitating) or shallow (non-precipitating).
-3. Relax temperature and humidity towards (adjusted) profiles from 1.
+3. Relax temperature and humidity towards (corrected) profiles from 1.
 
 ## Reference profiles
 
@@ -152,7 +162,8 @@ Q_{ref}  &= \int_{p_0}^{p_{LZB}} -q_{ref} dp \\
 f_q      &= 1 - \frac{\Delta q}{Q_ref} \\
 q_{ref, 2} &= f_q q_{ref} \\
 \Delta T &= \frac{1}{\Delta p} \int_{p_0}^{p_{LZB}} -(T - T_{ref}) dp \\
-T_{ref,2} = T_{ref} - \Delta T
+T_{ref,2} &= T_{ref} - \Delta T
+\end{aligned}
 ```
 
 ## Corrected relaxation
@@ -181,6 +192,16 @@ P = -\int \frac{\Delta t}{g \rho} \delta q dp
 
 In the shallow convection case ``P=0`` due to the correction even though in
 the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0`` by definition.
+
+## Dry convection
+
+In the primitive equation model with humidity the [Betts-Miller convection scheme](@ref BettsMiller)
+as described above is defined. Without humidity, a dry version reduces to the
+[Shallow convection](@ref) case. The two different shallow convection schemes in
+Frierson 2007[^Frierson2007], the "shallower" shallow convection scheme and the "qref"
+(as implemented here in [Shallow convection](@ref)) in that case also reduce to
+the same formulation. The dry Betts-Miller convection scheme is the default
+in the primitive equation model without humidity.
 
 ## References
 
