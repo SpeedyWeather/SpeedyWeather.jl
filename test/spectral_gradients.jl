@@ -194,10 +194,10 @@ end
         
         vor0[1, 1] = 0                   # zero mean
         div0[1, 1] = 0
-        vor0[:, 1] .= real(vor0[:, 1])    # set imaginary component of m=0 to 0
-        div0[:, 1] .= real(div0[:, 1])    # as the rotation of zonal modes is arbitrary
-        vor0[end, :] .= 0                # set unusued last row (l=lmax+1) to zero
-        div0[end, :] .= 0
+        vor0[1:lmax+1, 1] .= real(vor0[1:lmax+1, 1])    # set imaginary component of m=0 to 0
+        div0[1:lmax+1, 1] .= real(div0[1:lmax+1, 1])    # as the rotation of zonal modes is arbitrary
+        vor0[end, 1:mmax+1] .= 0                # set unusued last row (l=lmax+1) to zero
+        div0[end, 1:mmax+1] .= 0
 
         # copy into prognostic variables
         p.layers[1].timesteps[1].vor .= vor0

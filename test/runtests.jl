@@ -2,19 +2,19 @@ using SpeedyWeather
 using Test
 
 # GENERAL
-#include("utility_functions.jl")
-#include("dates.jl")
+include("utility_functions.jl")
+include("dates.jl")
 include("lower_triangular_matrix.jl")
-#include("grids.jl")
-#include("interpolation.jl")
+include("grids.jl")
+include("interpolation.jl")
 #include("set_vars.jl")
 
 # GPU/KERNELABSTRACTIONS
-#include("kernelabstractions.jl")
+include("kernelabstractions.jl")
 
 # SPECTRAL TRANSFORM
-#include("spectral_transform.jl")
-#include("spectral_gradients.jl")
+include("spectral_transform.jl")
+include("spectral_gradients.jl")
 
 # DYNAMICS
 #include("diffusion.jl")
@@ -32,7 +32,6 @@ include("lower_triangular_matrix.jl")
 #include("orography.jl")
 #include("land_sea_mask.jl")
 #include("ocean.jl")
-
 # include("thermodynamics.jl")
 # include("large_scale_condensation.jl")
 # include("convection.jl")

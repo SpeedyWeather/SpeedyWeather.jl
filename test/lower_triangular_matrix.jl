@@ -26,6 +26,9 @@ using Adapt
             @test_throws BoundsError L[lmax*mmax+1] = 1
 
             @test Matrix(L) == A
+
+            @test all(L[:,1] .== A[:,1])
+            @test all(L[:,2] .== A[:,2])
         end
     end
 end
@@ -59,6 +62,13 @@ end
                 @test_throws BoundsError L[lmax*mmax+1, [1 for i=1:length(idims)]...] = 1
 
                 @test Array(L) == A
+
+                if length(idims) == 1 
+                    L1 = L[:,1] 
+                    @test typeof(L1) <: LowerTriangularArray
+                    @test all(L1.data .== L.data[:,1])
+                    @test all([L1[i] == L[i,1] for i=1:size(L.data,1)])
+                end
             end
         end
     end

@@ -5,6 +5,7 @@ import Adapt, KernelAbstractions
 import UnicodePlots
 import LinearAlgebra: tril!
 import GPUArrays
+import Base: view
 
 export LowerTriangularMatrix, LowerTriangularArray, eachharmonic
 # export plot

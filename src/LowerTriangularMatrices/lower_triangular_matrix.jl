@@ -129,6 +129,15 @@ end
     return r
 end
 
+# indexing with : + other indices, returns a LowerTriangularArray
+@inline function Base.getindex(L::LowerTriangularArray{T,N}, col::Colon, I...) where {T,N}
+    return LowerTriangularArray(getindex(L.data, col, I...), L.m, L.n)
+end
+
+@inline function Base.getindex(L::LowerTriangularMatrix{T}, col::Colon, i::Integer) where T
+    return Matrix(L)[:,i]
+end
+
 @inline Base.getindex(L::LowerTriangularArray, r::AbstractRange) = getindex(L.data,r)
 @inline Base.getindex(L::LowerTriangularArray, r::AbstractRange, I...) = getindex(L.data, r, I...)
 @inline Base.getindex(L::LowerTriangularArray, i::Integer) = getindex(L.data,i)
