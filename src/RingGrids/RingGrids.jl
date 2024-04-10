@@ -67,15 +67,12 @@ export  interpolate,
         update_locator,
         update_locator!
 
-# export  plot
-
 include("utility_functions.jl")
-
-include("grids_general.jl")
-include("full_grids.jl")
-include("octahedral.jl")
-include("healpix.jl")
-include("octahealpix.jl")
+include("general.jl")
+include("grids/full_grids.jl")
+include("grids/octahedral.jl")
+include("grids/healpix.jl")
+include("grids/octahealpix.jl")
 include("quadrature_weights.jl")
 include("interpolation.jl")
 include("show.jl")

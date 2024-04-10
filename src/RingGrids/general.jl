@@ -1,29 +1,41 @@
-abstract type AbstractGrid{T} <: AbstractVector{T} end
+abstract type AbstractGridArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractArray{T,N} end
+abstract type AbstractFullGridArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractGridArray{T,N} end
+abstract type AbstractReducedGridArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractGridArray{T,N} end
 
 # all AbstractGrids have their grid points stored in a vector field `data`
 # propagate length, size, getindex, setindex! for that
-Base.length(G::AbstractGrid) = length(G.data)
-Base.size(G::AbstractGrid) = size(G.data)
-@inline function Base.getindex(G::AbstractGrid, k::Integer)
-    @boundscheck 0 < k <= length(G.data) || throw(BoundsError(G, k))
-    @inbounds r = G.data[k]
-    return r
+Base.length(G::AbstractGridArray) = length(G.data)
+Base.size(G::AbstractGridArray) = size(G.data)
+Base.sizeof(G::AbstractGridArray) = sizeof(G.data)
+
+@inline Base.getindex(G::AbstractGridArray, ijk::Integer...) = getindex(G.data,ijk...)
+@inline Base.getindex(G::AbstractGridArray, r::AbstractRange) = get_index(G.data, r)
+
+
+
+@inline function Base.getindex(L::AbstractGridArray, col::Colon, I...)
+    return AbstractGridArray(getindex(L.data, col, I...), L.m, L.n)
 end
 
+
+
+@inline Base.getindex(L::AbstractGridArray, r::AbstractRange) = getindex(L.data,r)
+@inline Base.getindex(L::AbstractGridArray, r::AbstractRange, I...) = getindex(L.data, r, I...)
+@inline Base.getindex(L::AbstractGridArray, i::Integer) = getindex(L.data,i)
+@inline Base.getindex(L::AbstractGridArray, I::CartesianIndex) = getindex(L, Tuple(I)...)
+
+
+@inline Base.setindex!(G::AbstractGrid, x::AbstractVector, r::AbstractRange) = setindex!(G.data, x, r)
 @inline Base.setindex!(G::AbstractGrid, x, k::Integer) = setindex!(G.data, x, k)
 
-# with ranges
-@inline Base.getindex(G::AbstractGrid, r::AbstractRange) = G.data[r]
-@inline Base.setindex!(G::AbstractGrid, x::AbstractVector, r::AbstractRange) = setindex!(G.data, x, r)
 
-function grids_match(A::AbstractGrid, B::AbstractGrid)
+function grids_match(A::AbstractGridArray, B::AbstractGridArray)
     length(A) == length(B) && return _grids_match(typeof(A), typeof(B))
     return false
 end
 
-function _grids_match(A::Type{<:AbstractGrid}, B::Type{<:AbstractGrid})
-    # throws an error for non-parametric types...
-    return A.name.wrapper == B.name.wrapper
+function _grids_match(A::Type{<:AbstractGridArray}, B::Type{<:AbstractGridArray})
+    return nonparametric_type(A) == nonparametric_type(B)
 end
 
 """
