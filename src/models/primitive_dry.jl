@@ -11,45 +11,46 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct PrimitiveDryModel{
-    NF<:AbstractFloat,
-    DS<:DeviceSetup,
-    PL<:AbstractPlanet,
-    AT<:AbstractAtmosphere,
-    CO<:AbstractCoriolis,
-    GO<:AbstractGeopotential,
-    OR<:AbstractOrography,
-    AC<:AbstractAdiabaticConversion,
-    PA<:AbstractParticleAdvection,
-    IC<:AbstractInitialConditions,
-    LS<:AbstractLandSeaMask,
-    OC<:AbstractOcean,
-    LA<:AbstractLand,
-    ZE<:AbstractZenith,
-    AL<:AbstractAlbedo,
-    BL<:AbstractBoundaryLayer,
-    TR<:AbstractTemperatureRelaxation,
-    VD<:AbstractVerticalDiffusion,
-    SUT<:AbstractSurfaceThermodynamics,
-    SUW<:AbstractSurfaceWind,
-    SH<:AbstractSurfaceHeatFlux,
-    CV<:AbstractConvection,
-    SW<:AbstractShortwave,
-    LW<:AbstractLongwave,
-    TS<:AbstractTimeStepper,
-    ST<:SpectralTransform{NF},
-    IM<:AbstractImplicit,
-    HD<:AbstractHorizontalDiffusion,
-    VA<:AbstractVerticalAdvection,
-    GE<:AbstractGeometry,
-    OW<:AbstractOutputWriter,
-    FB<:AbstractFeedback,
+    # TODO add constraints again when we stop supporting julia v1.9
+    DS,     # <:DeviceSetup,
+    GE,     # <:AbstractGeometry,
+    PL,     # <:AbstractPlanet,
+    AT,     # <:AbstractAtmosphere,
+    CO,     # <:AbstractCoriolis,
+    GO,     # <:AbstractGeopotential,
+    OR,     # <:AbstractOrography,
+    AC,     # <:AbstractAdiabaticConversion,
+    PA,     # <:AbstractParticleAdvection,
+    IC,     # <:AbstractInitialConditions,
+    LS,     # <:AbstractLandSeaMask,
+    OC,     # <:AbstractOcean,
+    LA,     # <:AbstractLand,
+    ZE,     # <:AbstractZenith,
+    AL,     # <:AbstractAlbedo,
+    BL,     # <:AbstractBoundaryLayer,
+    TR,     # <:AbstractTemperatureRelaxation,
+    VD,     # <:AbstractVerticalDiffusion,
+    SUT,    # <:AbstractSurfaceThermodynamics,
+    SUW,    # <:AbstractSurfaceWind,
+    SH,     # <:AbstractSurfaceHeatFlux,
+    CV,     # <:AbstractConvection,
+    SW,     # <:AbstractShortwave,
+    LW,     # <:AbstractLongwave,
+    TS,     # <:AbstractTimeStepper,
+    ST,     # <:SpectralTransform{NF},
+    IM,     # <:AbstractImplicit,
+    HD,     # <:AbstractHorizontalDiffusion,
+    VA,     # <:AbstractVerticalAdvection,
+    OW,     # <:AbstractOutputWriter,
+    FB,     # <:AbstractFeedback,
 } <: PrimitiveDry
 
-    spectral_grid::SpectralGrid = SpectralGrid()
-    geometry::GE = Geometry(spectral_grid)
+    spectral_grid::SpectralGrid
+    device_setup::DS = DeviceSetup(CPUDevice())
     
     # DYNAMICS
     dynamics::Bool = true
+    geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
     atmosphere::AT = EarthAtmosphere(spectral_grid)
     coriolis::CO = Coriolis(spectral_grid)
@@ -79,7 +80,6 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     
     # NUMERICS
-    device_setup::DS = DeviceSetup(CPUDevice())
     time_stepping::TS = Leapfrog(spectral_grid)
     spectral_transform::ST = SpectralTransform(spectral_grid)
     implicit::IM = ImplicitPrimitiveEquation(spectral_grid)
