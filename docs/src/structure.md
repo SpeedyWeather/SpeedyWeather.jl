@@ -85,7 +85,7 @@ The `ShallowWaterModel` is similar to the `BarotropicModel`, but it contains for
 orography, that the `BarotropicModel` doesn't have.
 
 ```@example structure
-model = ShallowWater(; spectral_grid)
+model = ShallowWaterModel(; spectral_grid)
 tree(model)
 ```
 
