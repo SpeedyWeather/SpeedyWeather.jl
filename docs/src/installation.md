@@ -25,7 +25,7 @@ julia> ] add https://github.com/SpeedyWeather/SpeedyWeather.jl#main
 
 ## Compatibility with Julia versions
 
-SpeedyWeather.jl requires Julia v1.8 or later. The package is tested on Julia v1.8, 1.9, and 1.10.
+SpeedyWeather.jl requires Julia v1.9 or later. The package is tested on Julia 1.9, and 1.10.
 
 ## Extensions
 
