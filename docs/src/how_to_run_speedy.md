@@ -93,7 +93,7 @@ however, a new user might first want to know which components there are,
 so let's flip the logic around and assume you know you want to run a `ShallowWaterModel`.
 You can create a default `ShallowWaterModel` like so and inspect its components
 ```@example howto
-model = ShallowWaterModel()
+model = ShallowWaterModel(; spectral_grid)
 ```
 
 So by default the `ShallowWaterModel` uses a [Leapfrog `time_stepping`](@ref leapfrog),
