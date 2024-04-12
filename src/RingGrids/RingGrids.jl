@@ -68,15 +68,31 @@ export  interpolate,
         update_locator!
 
 include("utility_functions.jl")
+
+# GENERAL
 include("general.jl")
-include("grids/full_grids.jl")
-include("grids/octahedral.jl")
-include("grids/healpix.jl")
-include("grids/octahealpix.jl")
-include("quadrature_weights.jl")
-include("interpolation.jl")
-include("show.jl")
-include("similar.jl")
+include("full_grids.jl")
+# include("reduced_grids.jl")
 include("scaling.jl")
+
+# FULL GRIDS
+include("grids/full_gaussian.jl")
+# include("grids/full_clenshaw.jl")
+# include("grids/full_healpix.jl")
+# include("grids/full_octahealpix.jl")
+
+# REDUCED GRIDS
+# include("grids/octahedral_gaussian.jl")
+# include("grids/octahedral_clenshaw.jl")
+# include("grids/healpix.jl")
+# include("grids/octahealpix.jl")
+
+# INTEGRATION AND INTERPOLATION
+# include("quadrature_weights.jl")
+# include("interpolation.jl")
+# include("similar.jl")
+
+# OUTPUT
+include("show.jl")
 
 end

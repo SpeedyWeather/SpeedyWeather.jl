@@ -213,9 +213,9 @@ function interpolate(   A::AbstractGrid{NF},        # field to interpolate
                         I::AbstractInterpolator     # indices in I are assumed to be calculated already!
                         ) where NF                  # use number format from input data also for output
 
-    (; npoints ) = I.locator             # number of points to interpolate onto
-    Aout = Vector{NF}(undef, npoints)        # preallocate: onto θs, λs interpolated values of A
-    interpolate!(Aout, A, I)                  # perform interpolation, store in As
+    (; npoints ) = I.locator                # number of points to interpolate onto
+    Aout = Vector{NF}(undef, npoints)       # preallocate: onto θs, λs interpolated values of A
+    interpolate!(Aout, A, I)                # perform interpolation, store in As
 end
 
 function interpolate!(  Aout::Vector,       # Out: interpolated values
@@ -315,7 +315,7 @@ end
 
 function find_rings!(   js::Vector{<:Integer},  # Out: ring indices j
                         Δys::Vector,            # Out: distance fractions to ring further south
-                        θs::Vector,             # latitudes to interpolate onto
+                        θs::Vector,             # latitudes to interpolate onto
                         latd::Vector;           # latitudes of the rings on the original grid
                         unsafe::Bool=false)     # skip safety checks when true
     
@@ -511,7 +511,7 @@ function grid_cell_average!(
     lon_in = get_lon(input)
     nlon_in = length(lon_in)
 
-    # output grid coordinates, append -π, 2π to have grid points
+    # output grid coordinates, append -π, 2π to have grid points
     # towards the poles definitely included
     colat_out = vcat(-π, get_colat(output), 2π)
     _, lons_out = get_colatlons(output)
@@ -522,7 +522,7 @@ function grid_cell_average!(
         Δϕ = 2π/length(ring)        # longitude spacing on this ring
 
         # indices for lat_out are shifted as north and south pole are included
-        θ0 = (colat_out[j]   + colat_out[j+1])/2    # northern edge
+        θ0 = (colat_out[j]   + colat_out[j+1])/2    # northern edge
         θ1 = (colat_out[j+1] + colat_out[j+2])/2    # southern edge
 
         # matrix indices for input grid that lie in output grid cell
