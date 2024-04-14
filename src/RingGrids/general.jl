@@ -1,9 +1,6 @@
 abstract type AbstractGridArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractArray{T, N} end
 const AbstractGrid{T} = AbstractGridArray{T, 1, Vector{T}}
 
-# nonparametric_type(G::Type{<:AbstractGridArray}) = @warn "Please define nonparametric_type(::$G)"
-# horizontal_grid_type(G::Type{<:AbstractGridArray}) = @warn "Please define horizontal_grid_type(::$G)"
-
 # LENGTH SIZE
 Base.length(G::AbstractGridArray) = length(G.data)
 Base.size(G::AbstractGridArray) = size(G.data)
@@ -20,6 +17,9 @@ get_nlat(grid::Grid) where {Grid<:AbstractGridArray} = get_nlat(Grid, grid.nlat_
 get_npoints(grid::Grid) where {Grid<:AbstractGridArray} = get_npoints(Grid, grid.nlat_half)
 get_npoints(G::Type{<:AbstractGridArray}, nlat_half::Integer, k::Integer...) = prod(k) * get_npoints2D(G, nlat_half)
 get_npoints2D(grid::Grid) where {Grid<:AbstractGridArray} = get_npoints2D(Grid, grid.nlat_half)
+
+# size of the matrix of the horizontal grid if representable as such (not all grids)
+matrix_size(grid::Grid) where {Grid<:AbstractGridArray} = matrix_size(Grid, grid.nlat_half)
 
 ## INDEXING
 @inline Base.getindex(G::AbstractGridArray, ijk::Integer...) = getindex(G.data,ijk...)
@@ -109,7 +109,38 @@ for f in (:zeros, :ones, :rand, :randn)
 end
 
 # zero element of an AbstractGridArray instance grid by creating new zero(grid.data)
-Base.zero(grid::Grid) where {Grid<:AbstractGridArray} = Grid(zero(grid.data), grid.nlat_half, grid.rings)
+Base.zero(grid::Grid) where {Grid<:AbstractGridArray} =
+    nonparametric_type(Grid)(zero(grid.data), grid.nlat_half, grid.rings)
+
+# similar data but everything else identical
+function Base.similar(grid::Grid) where {Grid<:AbstractGridArray}
+    return nonparametric_type(Grid)(similar(grid.data), grid.nlat_half, grid.rings)
+end
+
+# data with new type T but everything else identical
+function Base.similar(grid::Grid, ::Type{T}) where {Grid<:AbstractGridArray, T}
+    return nonparametric_type(Grid)(similar(grid.data, T), grid.nlat_half, grid.rings)
+end
+
+# data with same type T but new size
+function Base.similar(
+    grid::Grid,
+    nlat_half::Integer,
+    k::Integer...
+) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType}
+    similar_data = similar(grid.data, get_npoints2D(Grid, nlat_half), k...)
+    return nonparametric_type(Grid)(similar_data, nlat_half)
+end
+
+function Base.similar(
+    grid::Grid,
+    ::Type{Tnew},
+    nlat_half::Integer,
+    k::Integer...
+) where {Grid<:AbstractGridArray, Tnew}
+    similar_data = similar(grid.data, Tnew, get_npoints2D(Grid, nlat_half), k...)
+    return nonparametric_type(Grid)(similar_data, nlat_half)
+end
 
 # general version with ArrayType{T, N}(undef, ...) generator
 function (::Type{Grid})(
@@ -164,6 +195,7 @@ get_lond(grid::Grid) where {Grid<:AbstractGridArray} = get_lond(Grid, grid.nlat_
 get_lon(grid::Grid) where {Grid<:AbstractGridArray} = get_lon(Grid, grid.nlat_half)
 get_colat(grid::Grid) where {Grid<:AbstractGridArray} = get_colat(Grid, grid.nlat_half)
 get_colatlons(grid::Grid) where {Grid<:AbstractGridArray} = get_colatlons(Grid, grid.nlat_half)
+get_nlon_max(grid::Grid) where {Grid<:AbstractGridArray} = get_nlon_max(Grid, grid.nlat_half)
 
 function get_lat(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
     return π/2 .- get_colat(Grid, nlat_half)
@@ -177,7 +209,28 @@ end
 get_lon(::Type{<:AbstractGridArray}, nlat_half::Integer) = Float64[]
 get_lond(::Type{<:AbstractGridArray}, nlat_half::Integer) = Float64[]
 
+"""
+$(TYPEDSIGNATURES)
+Returns a vector `nlons` for the number of longitude points per latitude ring, north to south.
+Provide grid `Grid` and its resolution parameter `nlat_half`. For both_hemisphere==false only
+the northern hemisphere (incl Equator) is returned."""
+function get_nlons(Grid::Type{<:AbstractGridArray}, nlat_half::Integer; both_hemispheres::Bool=false)
+    n = both_hemispheres ? get_nlat(Grid, nlat_half) : nlat_half
+    return [get_nlon_per_ring(Grid, nlat_half, j) for j in 1:n]
+end
+
 ## ITERATORS
+"""
+$(TYPEDSIGNATURES)
+CartesianIndices for the 2nd to last dimension of an AbstractGridArray,
+to be used like
+
+for k in eachgrid(grid)
+    for ring in eachring(grid)
+        for ij in ring
+            grid[ij, k]"""
+@inline eachgrid(grid::AbstractGridArray) = CartesianIndices(size(grid)[2:end])
+
 """
 $(TYPEDSIGNATURES)
 Vector{UnitRange} `rings` to loop over every ring of grid `grid`
@@ -187,7 +240,7 @@ and then each grid point per ring. To be used like
     for ring in rings
         for ij in ring
             grid[ij]"""
-eachring(grid::AbstractGridArray) = grid.rings
+@inline eachring(grid::AbstractGridArray) = grid.rings
 
 function eachring(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
     rings = Vector{UnitRange{Int}}(undef, get_nlat(Grid, nlat_half))
@@ -244,18 +297,6 @@ function whichring(ij::Integer, rings::Vector{UnitRange{Int}})
     end
     return j
 end
-
-"""
-$(TYPEDSIGNATURES)
-Returns a vector `nlons` for the number of longitude points per latitude ring, north to south.
-Provide grid `Grid` and its resolution parameter `nlat_half`. For both_hemisphere==false only
-the northern hemisphere (incl Equator) is returned."""
-function get_nlons(Grid::Type{<:AbstractGridArray}, nlat_half::Integer; both_hemispheres::Bool=false)
-    n = both_hemispheres ? get_nlat(Grid, nlat_half) : nlat_half
-    return [get_nlon_per_ring(Grid, nlat_half, j) for j in 1:n]
-end
-
-get_nlon_max(grid::Grid) where {Grid<:AbstractGridArray} = get_nlon_max(Grid, grid.nlat_half)
 
 ## BROADCASTING
 

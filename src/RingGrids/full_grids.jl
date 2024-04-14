@@ -10,52 +10,19 @@ const AbstractFullGrid{T} = AbstractFullGridArray{T, 1, Vector{T}}
 
 full_grid(G::Type{<:AbstractFullGridArray}) = G
 
-
-get_nlon(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer) = get_nlon_max(Grid, nlat_half)
-get_nlon_max(::Type{<:AbstractFullGrid}, nlat_half::Integer) = 4nlat_half
-get_nlon_per_ring(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer, j::Integer) = 
+## SIZE
+get_nlon_max(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer) = get_nlon(Grid, nlat_half)
+get_nlon_per_ring(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer, j::Integer) =
     get_nlon(Grid, nlat_half)
+matrix_size(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer) =
+    (get_nlon(Grid, nlat_half), get_nlat(Grid, nlat_half))
 
-function get_lon(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer)
-    nlat_half == 0 && return Float64[]
-    nlon = get_nlon(Grid, nlat_half)
-    return collect(range(0, 2π-π/nlon, step=2π/nlon))
-end
-
-function get_lond(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer)
-    lon = get_lon(Grid, nlat_half)
-    lon .*= 360/2π      # convert to lond in-place
-    return lon          # = lond
-end
-
+## CONVERSION
 # convert an AbstractMatrix to the full grids, and vice versa
-(Grid::Type{<:AbstractFullGrid})(M::AbstractMatrix{T}) where T = Grid{T}(vec(M))
-Base.Matrix(grid::AbstractFullGrid{T}) where T = Matrix{T}(reshape(grid.data, :, get_nlat(grid)))
-matrix_size(grid::AbstractFullGrid) = (get_nlon_max(grid), get_nlat(grid))
-matrix_size(Grid::Type{<:AbstractFullGrid}, n::Integer) = (get_nlon_max(Grid, n), get_nlat(Grid, n))
+(Grid::Type{<:AbstractFullGrid})(M::AbstractMatrix) = Grid(vec(M))
+Base.Array(grid::AbstractFullGridArray) = Array(reshape(grid.data, :, get_nlat(grid), size(grid.data)[2:end]...))
 
-function get_colatlons(Grid::Type{<:AbstractFullGrid}, nlat_half::Integer)
-
-    colat = get_colat(Grid, nlat_half)       # vector of colats [0, π]
-    lon = get_lon(Grid, nlat_half)           # vector of longitudes [0, 2π)
-    nlon = get_nlon(Grid, nlat_half)         # number of longitudes
-    nlat = get_nlat(Grid, nlat_half)         # number of latitudes
-
-    npoints = get_npoints(Grid, nlat_half)   # total number of grid points
-    colats = zeros(npoints)                 # preallocate
-    lons = zeros(npoints)
-
-    for j in 1:nlat                         # populate preallocated colats, lons
-        for i in 1:nlon
-            ij = i + (j-1)*nlon             # continuous index ij
-            colats[ij] = colat[j]
-            lons[ij] = lon[i]
-        end
-    end
-
-    return colats, lons
-end
-
+## INDEXING
 function each_index_in_ring(
     Grid::Type{<:AbstractFullGridArray},    # function for full grids
     j::Integer,                             # ring index north to south
@@ -83,4 +50,33 @@ function each_index_in_ring!(
         index_end += nlon               # only calculate last index per ring
         rings[j] = index_1st:index_end  # write UnitRange to rings vector
     end
+end
+
+## COORDINATES
+function get_lond(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
+    lon = get_lon(Grid, nlat_half)
+    lon .*= 360/2π      # convert to lond in-place
+    return lon          # = lond
+end
+
+function get_colatlons(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
+
+    colat = get_colat(Grid, nlat_half)      # vector of colats [0, π]
+    lon = get_lon(Grid, nlat_half)          # vector of longitudes [0, 2π)
+    nlon = get_nlon(Grid, nlat_half)        # number of longitudes
+    nlat = get_nlat(Grid, nlat_half)        # number of latitudes
+
+    npoints = get_npoints(Grid, nlat_half)  # total number of grid points
+    colats = zeros(npoints)                 # preallocate
+    lons = zeros(npoints)
+
+    for j in 1:nlat                         # populate preallocated colats, lons
+        for i in 1:nlon
+            ij = i + (j-1)*nlon             # continuous index ij
+            colats[ij] = colat[j]
+            lons[ij] = lon[i]
+        end
+    end
+
+    return colats, lons
 end
