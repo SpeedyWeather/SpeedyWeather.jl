@@ -1,3 +1,33 @@
+struct FullClenshawArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractFullGridArray{T, N, ArrayType}
+    data::ArrayType                 # data array, ring by ring, north to south
+    nlat_half::Int                  # number of latitudes on one hemisphere
+    rings::Vector{UnitRange{Int}}   # TODO make same array type as data?
+
+    FullClenshawArray(data::A, nlat_half, rings) where {A <: AbstractArray{T, N}} where {T, N} =
+        check_inputs(data, nlat_half, rings, FullClenshawArray) ?
+        new{T, N, A}(data, nlat_half, rings) :
+        error_message(data, nlat_half, rings, FullClenshawArray, T, N, A)
+end
+
+# TYPES
+const FullClenshawGrid{T} = FullClenshawArray{T, 1, Vector{T}}
+nonparametric_type(::Type{<:FullClenshawArray}) = FullClenshawArray
+horizontal_grid_type(::Type{<:FullClenshawArray}) = FullClenshawGrid
+
+# SIZE
+nlat_odd(::Type{<:FullClenshawArray}) = true
+get_npoints2D(::Type{<:FullClenshawArray}, nlat_half::Integer) = 8 * nlat_half^2 - 4nlat_half
+get_nlat_half(::Type{<:FullClenshawArray}, npoints2D::Integer) = round(Int, 1/4 + sqrt(1/16 + npoints2D/8))
+get_nlon(::Type{<:FullClenshawArray}, nlat_half::Integer) = 4nlat_half
+
+## COORDINATES
+get_colat(::Type{<:FullClenshawArray}, nlat_half::Integer) = [j/(2nlat_half)*π for j in 1:2nlat_half-1]
+get_lon(::Type{<:FullClenshawArray}, nlat_half::Integer) = get_lon(FullGaussianArray, nlat_half)
+
+# QUADRATURE
+get_quadrature_weights(::Type{<:FullClenshawArray}, nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
+
+
 """
     G = FullClenshawGrid{T}
 
@@ -5,27 +35,4 @@ A FullClenshawGrid is a regular latitude-longitude grid with an odd number of `n
 latitudes, the central latitude ring is on the Equator. The same `nlon` longitudes for every latitude ring.
 The grid points are closer in zonal direction around the poles. The values of all grid points are stored
 in a vector field `data` that unravels the data 0 to 360˚, then ring by ring, which are sorted north to south."""
-struct FullClenshawGrid{T} <: AbstractFullGrid{T}
-    data::Vector{T}    # data vector, ring by ring, north to south
-    nlat_half::Int  # number of latitudes on one hemisphere (incl Equator)
-
-    FullClenshawGrid{T}(data::AbstractVector, nlat_half::Integer) where T = length(data) == npoints_clenshaw(nlat_half) ?
-    new(data, nlat_half) : error("$(length(data))-element Vector{$(eltype(data))} cannot be used to create a "*
-        "L$nlat_half ($(4nlat_half)x$(2nlat_half - 1)) FullClenshawGrid{$T}.")
-end
-
-nonparametric_type(::Type{<:FullClenshawGrid}) = FullClenshawGrid
-
-# subtract the otherwise double-counted 4nlat_half equator points
-npoints_clenshaw(nlat_half::Integer) = 8nlat_half^2 - 4nlat_half
-nlat_half_clenshaw(npoints::Integer) = round(Int, 1/4 + sqrt(1/16 + npoints/8))  # inverse
-
-# infer nlat_half from data vector length, infer parametric type from eltype of data
-FullClenshawGrid{T}(data::AbstractVector) where T = FullClenshawGrid{T}(data, nlat_half_clenshaw(length(data)))
-FullClenshawGrid(data::AbstractVector, n::Integer...) = FullClenshawGrid{eltype(data)}(data, n...)
-
-nlat_odd(::Type{<:FullClenshawGrid}) = true
-get_npoints(::Type{<:FullClenshawGrid}, nlat_half::Integer) = npoints_clenshaw(nlat_half)
-get_colat(::Type{<:FullClenshawGrid}, nlat_half::Integer) = [j/(2nlat_half)*π for j in 1:2nlat_half-1]
-get_quadrature_weights(::Type{<:FullClenshawGrid}, nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
-full_grid(::Type{<:FullClenshawGrid}) = FullClenshawGrid    # the full grid with same latitudes
+FullClenshawGrid

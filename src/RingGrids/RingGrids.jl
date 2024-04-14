@@ -10,16 +10,30 @@ import FastGaussQuadrature
 import LinearAlgebra
 
 # GRIDS
+export  AbstractGridArray,
+        AbstractFullGridArray,
+        AbstractReducedGridArray
+
 export  AbstractGrid,
         AbstractFullGrid,
         AbstractOctahedralGrid,
         AbstractHEALPixGrid,
         AbstractOctaHEALPixGrid
 
+export  FullGaussianArray,
+        FullClenshawArray,
+        FullHEALPixArray,
+        FullOctaHEALPixArray
+
 export  FullGaussianGrid,
         FullClenshawGrid,
         FullHEALPixGrid,
         FullOctaHEALPixGrid
+
+export  OctahedralGaussianArray,
+        OctahedralClenshawArray,
+        HEALPixArray,
+        OctaHEALPixArray
 
 export  OctahedralGaussianGrid,
         OctahedralClenshawGrid,
@@ -52,7 +66,11 @@ export  grids_match,
 export  scale_coslat!,
         scale_coslat²!,
         scale_coslat⁻¹!,
-        scale_coslat⁻²!
+        scale_coslat⁻²!,
+        scale_coslat,
+        scale_coslat²,
+        scale_coslat⁻¹,
+        scale_coslat⁻²
 
 # INTERPOLATION
 export  AbstractInterpolator,
@@ -77,9 +95,9 @@ include("scaling.jl")
 
 # FULL GRIDS
 include("grids/full_gaussian.jl")
-# include("grids/full_clenshaw.jl")
-# include("grids/full_healpix.jl")
-# include("grids/full_octahealpix.jl")
+include("grids/full_clenshaw.jl")
+include("grids/full_healpix.jl")
+include("grids/full_octahealpix.jl")
 
 # REDUCED GRIDS
 # include("grids/octahedral_gaussian.jl")
