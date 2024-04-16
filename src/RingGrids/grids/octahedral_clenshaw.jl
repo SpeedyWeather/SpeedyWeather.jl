@@ -13,11 +13,11 @@ end
 const OctahedralClenshawGrid{T} = OctahedralClenshawArray{T, 1, Vector{T}}
 nonparametric_type(::Type{<:OctahedralClenshawArray}) = OctahedralClenshawArray
 horizontal_grid_type(::Type{<:OctahedralClenshawArray}) = OctahedralClenshawGrid
-full_grid(::Type{<:OctahedralClenshawArray}) = FullClenshawArray
+full_array_type(::Type{<:OctahedralClenshawArray}) = FullClenshawArray
 
 # SIZE
 nlat_odd(::Type{<:OctahedralClenshawArray}) = true
-npoints_pole(::Type{<:OctahedralClenshawArray}) = 0
+npoints_pole(::Type{<:OctahedralClenshawArray}) = 16
 npoints_added_per_ring(::Type{<:OctahedralClenshawArray}) = 4
 
 function get_npoints2D(::Type{<:OctahedralClenshawArray}, nlat_half::Integer)
@@ -26,7 +26,7 @@ function get_npoints2D(::Type{<:OctahedralClenshawArray}, nlat_half::Integer)
 end
 
 function get_nlat_half(::Type{<:OctahedralClenshawArray}, npoints2D::Integer)
-    m, o = npoints_added_per_ring(OctahedralClenshawArray), npoints_pole(OctahedraClenshawArray)
+    m, o = npoints_added_per_ring(OctahedralClenshawArray), npoints_pole(OctahedralClenshawArray)
     return round(Int, -o/m + sqrt(((o/m)^2 + (o+npoints2D)/m)))
 end
 
@@ -40,7 +40,7 @@ end
 
 matrix_size(grid::Grid) where {Grid<:OctahedralClenshawGrid} = matrix_size(Grid, grid.nlat_half)
 function matrix_size(::Type{OctahedralClenshawGrid}, nlat_half::Integer)
-    m, o = npoints_added_per_ring(OctahedralClenshawArray), npoints_pole(OctahedraClenshawArray)
+    m, o = npoints_added_per_ring(OctahedralClenshawArray), npoints_pole(OctahedralClenshawArray)
     m != 4 && @warn "This algorithm has not been generalised for m!=4."
     N = (o + 4n)÷2
     return (N, N)
@@ -57,6 +57,53 @@ end
 
 ## QUADRATURE
 get_quadrature_weights(::Type{<:OctahedralClenshawArray}, nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
+
+## INDEXING
+function each_index_in_ring(Grid::Type{<:OctahedralClenshawArray},
+                            j::Integer,                     # ring index north to south
+                            nlat_half::Integer)             # resolution param
+
+    nlat = get_nlat(Grid, nlat_half)
+    
+    # TODO make m, o dependent
+    m, o = npoints_added_per_ring(OctahedralClenshawArray), npoints_pole(OctahedralClenshawArray)
+    m != 4 || o != 16 && @warn "This algorithm has not been generalised for m!=4, o!=16."
+
+    @boundscheck 0 < j <= nlat || throw(BoundsError)        # ring index valid?
+    if j <= nlat_half                                       # northern hemisphere incl Equator
+        index_1st = 2j*(j+7) - 15                           # first in-ring index i
+        index_end = 2j*(j+9)                                # last in-ring index i
+    else                                                    # southern hemisphere excl Equator
+        j = nlat - j + 1                                    # mirror ring index around Equator
+        n = get_npoints2D(Grid, nlat_half) + 1              # number of grid points + 1
+        index_1st = n - 2j*(j+9)                            # count backwards
+        index_end = n - (2j*(j+7) - 15)
+    end
+    return index_1st:index_end                              # range of i's in ring
+end
+
+function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
+                                Grid::Type{<:OctahedralClenshawArray},
+                                nlat_half::Integer) # resolution param
+
+    nlat = length(rings)
+    @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
+    m, o = npoints_added_per_ring(OctahedralClenshawArray), npoints_pole(OctahedralClenshawArray)
+
+    index_end = 0
+    @inbounds for j in 1:nlat_half                  # North incl Eq only
+        index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
+        index_end += o + m*j                        # add number of grid points per ring
+        rings[j] = index_1st:index_end              # turn into UnitRange
+    end
+    @inbounds for (j, j_mirrored) in zip(   nlat_half+1:nlat,       # South only
+                                            nlat-nlat_half:-1:1)    # reverse index
+
+        index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
+        index_end += o + m*j_mirrored               # add number of grid points per ring
+        rings[j] = index_1st:index_end              # turn into UnitRange
+    end
+end
 
 ## CONVERSION
 """

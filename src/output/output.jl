@@ -88,7 +88,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32, Float64}, Model<:Mode
     # INPUT GRID (the one used in the dynamical core)
     input_Grid::Type{<:AbstractGrid} = spectral_grid.Grid
     
-    # Output as matrix (particularly for reduced grids)
+    # Output as matrix (particularly for reduced grids)
     "[OPTION] sort grid points into a matrix (interpolation-free), for OctahedralClenshawGrid, OctaHEALPixGrid only"
     as_matrix::Bool = false
 
@@ -98,7 +98,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32, Float64}, Model<:Mode
     
     # OUTPUT GRID
     "[OPTION] the grid used for output, full grids only"
-    output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid(input_Grid)
+    output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid_type(input_Grid)
     
     "[OPTION] the resolution of the output grid, default: same nlat_half as in the dynamical core"
     nlat_half::Int = spectral_grid.nlat_half

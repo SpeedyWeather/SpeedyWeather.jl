@@ -1,8 +1,6 @@
 abstract type AbstractReducedGridArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractGridArray{T, N, ArrayType} end
 const AbstractReducedGrid{T} = AbstractReducedGridArray{T, 1, Vector{T}}
 
-full_grid(G::Type{<:AbstractReducedGridArray}) = @warn "Please define full_grid(::$(nonparametric_type(G))"
-
 # all reduced grids have their maximum number of longitude points around the equator, i.e. j = nlat_half
 get_nlon_max(Grid::Type{<:AbstractReducedGridArray}, nlat_half::Integer) = get_nlon_per_ring(Grid, nlat_half, nlat_half)
 

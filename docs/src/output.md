@@ -96,13 +96,13 @@ for the model integration.
 ```julia
 my_output_writer = OutputWriter(spectral_grid, ShallowWater, output_Grid=FullClenshawGrid, nlat_half=48)
 ```
-Note that by default the output is on the corresponding full of the grid used in the dynamical core
+Note that by default the output is on the corresponding full type of the grid type used in the dynamical core
 so that interpolation only happens at most in the zonal direction as they share the location of the
 latitude rings. You can check this by
 ```@example netcdf
-RingGrids.full_grid(OctahedralGaussianGrid)
+RingGrids.full_grid_type(OctahedralGaussianGrid)
 ```
-So the corresponding full grid of an `OctahedralGaussianGrid` is the `FullGaussiangrid` and the same resolution
+So the corresponding full grid of an `OctahedralGaussianGrid` is the `FullGaussianGrid` and the same resolution
 `nlat_half` is chosen by default in the output writer (which you can change though as shown above).
 Overview of the corresponding full grids
 

@@ -13,7 +13,7 @@ end
 const OctahedralGaussianGrid{T} = OctahedralGaussianArray{T, 1, Vector{T}}
 nonparametric_type(::Type{<:OctahedralGaussianArray}) = OctahedralGaussianArray
 horizontal_grid_type(::Type{<:OctahedralGaussianArray}) = OctahedralGaussianGrid
-full_grid(::Type{<:OctahedralGaussianArray}) = FullGaussianArray
+full_array_type(::Type{<:OctahedralGaussianArray}) = FullGaussianArray
 
 # SIZE
 nlat_odd(::Type{<:OctahedralGaussianArray}) = false

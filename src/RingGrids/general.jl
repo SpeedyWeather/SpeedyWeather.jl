@@ -1,7 +1,15 @@
 abstract type AbstractGridArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractArray{T, N} end
+
+# Horizontal 2D grids with N=1
 const AbstractGrid{T} = AbstractGridArray{T, 1, Vector{T}}
 
-# LENGTH SIZE
+## TYPES
+nonparametric_type(grid::AbstractGridArray) = nonparametric_type(typeof(grid))
+full_array_type(grid::AbstractGridArray) = full_array_type(typeof(grid))
+full_grid_type(grid::AbstractGridArray) = horizontal_grid_type(full_array_type(grid))
+horizontal_grid_type(grid::AbstractGridArray) = horizontal_grid_type(typeof(grid))
+
+## SIZE
 Base.length(G::AbstractGridArray) = length(G.data)
 Base.size(G::AbstractGridArray) = size(G.data)
 Base.sizeof(G::AbstractGridArray) = sizeof(G.data)

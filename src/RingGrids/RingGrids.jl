@@ -102,11 +102,11 @@ include("grids/full_octahealpix.jl")
 # REDUCED GRIDS
 include("grids/octahedral_gaussian.jl")
 include("grids/octahedral_clenshaw.jl")
-# include("grids/healpix.jl")
-# include("grids/octahealpix.jl")
+include("grids/healpix.jl")
+include("grids/octahealpix.jl")
 
 # INTEGRATION AND INTERPOLATION
-# include("quadrature_weights.jl")
+include("quadrature_weights.jl")
 include("interpolation.jl")
 
 # OUTPUT

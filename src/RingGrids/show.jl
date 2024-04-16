@@ -7,7 +7,7 @@ function Base.array_summary(io::IO, grid::AbstractGrid, inds::Tuple{Vararg{Base.
 end
 
 function plot(A::AbstractGrid; title::String="$(get_nlat(A))-ring $(typeof(A))")
-    A_full = interpolate(full_grid(typeof(A)), A.nlat_half, A)
+    A_full = interpolate(full_grid_type(A), A.nlat_half, A)
     plot(A_full; title)
 end
 

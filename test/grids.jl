@@ -2,20 +2,20 @@
     for NF in (Float32, Float64)
 
         # with vector and resolution parameter provided
-        L = FullClenshawGrid(randn(NF, 96*47), 24)        # L24 grid
-        F = FullGaussianGrid(randn(NF, 96*48), 24)        # F24 grid
-        O = OctahedralGaussianGrid(randn(NF, 3168), 24)   # O24 grid
-        C = OctahedralClenshawGrid(randn(NF, 3056), 24)   # C24 grid
-        H = HEALPixGrid(randn(NF, 3072), 32)              # H32 grid
-        J = OctaHEALPixGrid(randn(NF, 4096), 32)             # J32 grid
-        K = FullOctaHEALPixGrid(randn(NF, 128*63), 32)       # K32 grid
+        L = FullClenshawGrid(randn(NF, 96*47), 24)          # L24 grid
+        F = FullGaussianGrid(randn(NF, 96*48), 24)          # F24 grid
+        O = OctahedralGaussianGrid(randn(NF, 3168), 24)     # O24 grid
+        C = OctahedralClenshawGrid(randn(NF, 3056), 24)     # C24 grid
+        H = HEALPixGrid(randn(NF, 3072), 32)                # H32 grid
+        J = OctaHEALPixGrid(randn(NF, 4096), 32)            # J32 grid
+        K = FullOctaHEALPixGrid(randn(NF, 128*63), 32)      # K32 grid
 
         # without resolution parameter provided (inferred from vector length)
-        L2 = FullClenshawGrid(randn(NF, 96*47))          # L24 grid
-        F2 = FullGaussianGrid(randn(NF, 96*48))          # F24 grid
-        O2 = OctahedralGaussianGrid(randn(NF, 3168))     # O24 grid
-        C2 = OctahedralClenshawGrid(randn(NF, 3056))     # C24 grid
-        H2 = HEALPixGrid(randn(NF, 3072))                # H32 grid
+        L2 = FullClenshawGrid(randn(NF, 96*47))             # L24 grid
+        F2 = FullGaussianGrid(randn(NF, 96*48))             # F24 grid
+        O2 = OctahedralGaussianGrid(randn(NF, 3168))        # O24 grid
+        C2 = OctahedralClenshawGrid(randn(NF, 3056))        # C24 grid
+        H2 = HEALPixGrid(randn(NF, 3072))                   # H32 grid
         J2 = OctaHEALPixGrid(randn(NF, 4096))               # J32 grid
         K2 = FullOctaHEALPixGrid(randn(NF, 128*63))         # K32 grid
 
@@ -204,8 +204,8 @@ end
             grid = zeros(G, n)
 
             # precompute indices and boundscheck
-            rings = SpeedyWeather.eachring(grid)   
-            rings2 = [SpeedyWeather.each_index_in_ring(grid, j) for j in 1:SpeedyWeather.get_nlat(grid)]
+            rings = RingGrids.eachring(grid)   
+            rings2 = [RingGrids.each_index_in_ring(grid, j) for j in 1:RingGrids.get_nlat(grid)]
 
             @test rings == rings2
         end
@@ -229,6 +229,14 @@ end
         @test ones(G, n)/1 == ones(G, n)
         @test zeros(G, n) + ones(G, n) == ones(G, n)
         @test 2ones(G, n) == ones(G, n) + ones(G, n)
+
+        # don't promote to Array
+        grid = zeros(G, n)
+        @test typeof(grid + grid) isa G
+        @test typeof(grid - grid) isa G
+        @test typeof(grid .* grid) isa G
+        @test typeof(grid ./ grid) isa G
+        @test typeof(2grid) isa G
 
         # promote types, Grid{Float16} -> Grid{Float64} etc
         @test all(ones(G{Float16}, n)*2.0 .=== 2.0)
