@@ -90,7 +90,7 @@ include("utility_functions.jl")
 # GENERAL
 include("general.jl")
 include("full_grids.jl")
-# include("reduced_grids.jl")
+include("reduced_grids.jl")
 include("scaling.jl")
 
 # FULL GRIDS
@@ -100,15 +100,14 @@ include("grids/full_healpix.jl")
 include("grids/full_octahealpix.jl")
 
 # REDUCED GRIDS
-# include("grids/octahedral_gaussian.jl")
-# include("grids/octahedral_clenshaw.jl")
+include("grids/octahedral_gaussian.jl")
+include("grids/octahedral_clenshaw.jl")
 # include("grids/healpix.jl")
 # include("grids/octahealpix.jl")
 
 # INTEGRATION AND INTERPOLATION
 # include("quadrature_weights.jl")
-# include("interpolation.jl")
-# include("similar.jl")
+include("interpolation.jl")
 
 # OUTPUT
 include("show.jl")

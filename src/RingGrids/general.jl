@@ -132,6 +132,7 @@ function Base.similar(
     return nonparametric_type(Grid)(similar_data, nlat_half)
 end
 
+# data with new type T and new size
 function Base.similar(
     grid::Grid,
     ::Type{Tnew},
