@@ -7,9 +7,9 @@ using Adapt
         @testset for lmax = (mmax, mmax+1)
             A = randn(Complex{NF}, lmax, mmax)
 
-            SpeedyWeather.spectral_truncation!(A)
+            SpeedyTransforms.spectral_truncation!(A)
 
-            L = SpeedyWeather.LowerTriangularMatrix(A)
+            L = LowerTriangularMatrix(A)
 
             @test size(L) == size(A)
 
@@ -41,11 +41,11 @@ end
                 A = randn(Complex{NF}, lmax, mmax, idims...)
 
                 # replaces spectraltrunction! here, we just set the elements zero manually
-                ind = SpeedyWeather.LowerTriangularMatrices.lowertriangle_indices(A)
+                ind = LowerTriangularMatrices.lowertriangle_indices(A)
                 ind = @. ~(ind)
                 A[ind] .= zero(Complex{NF})
 
-                L = SpeedyWeather.LowerTriangularArray(A)
+                L = LowerTriangularArray(A)
 
                 @test size(L) == size(A)
 
@@ -72,7 +72,6 @@ end
             end
         end
     end
-
 end 
 
 @testset "LowerTriangularMatrix: @inbounds" begin
@@ -106,13 +105,13 @@ end
 end
 
 @testset "LowerTriangularArray: @inbounds" begin
-    A = randn(LowerTriangularArray{Float64}, 33, 32, 1, 1)
+    A = randn(LowerTriangularArray, 33, 32, 1, 1)
     
     @testset "getindex" begin
-        @test_throws BoundsError A[34, 32, 1, 1]   # outside of i, j range
-        @test_throws BoundsError A[561, 1, 1]     # outside of k range
-        @test_throws BoundsError A[33, 32, 2, 1]     # outside of 3rd dim range
-        @test_throws BoundsError A[33, 32, 1, 2]     # outside of 4th dim range
+        @test_throws BoundsError A[34, 32, 1, 1]    # outside of i, j range
+        @test_throws BoundsError A[561, 1, 1]       # outside of k range
+        @test_throws BoundsError A[33, 32, 2, 1]    # outside of 3rd dim range
+        @test_throws BoundsError A[33, 32, 1, 2]    # outside of 4th dim range
     end
 
     @testset "setindex!" begin

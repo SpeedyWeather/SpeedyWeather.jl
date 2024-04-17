@@ -6,7 +6,8 @@ import UnicodePlots
 import LinearAlgebra: tril!
 import GPUArrays
 
-export LowerTriangularMatrix, LowerTriangularArray, eachharmonic
+export LowerTriangularMatrix, LowerTriangularArray
+export eachharmonic
 # export plot
 
 include("lower_triangular_matrix.jl")
