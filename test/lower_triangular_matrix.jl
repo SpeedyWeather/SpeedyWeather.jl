@@ -1,5 +1,6 @@
 using JLArrays
 using Adapt
+import Random
 
 @testset "LowerTriangularMatrix" begin
     @testset for NF in (Float32, Float64)
@@ -122,6 +123,49 @@ end
     end
 end
 
+@testset "Zeros, ones, rand, and randn constructors" begin
+    for f in (ones, zeros, rand, randn)
+        s = (5, 5)
+        
+        # for 2D doesn't matter whether you say Matrix or Array, size is determined by s
+        L = f(LowerTriangularMatrix, s...)
+        L2 = f(LowerTriangularArray, s...)
+        @test typeof(L) == typeof(L2)
+        @test size(L) == size(L2)
+        
+        L = f(LowerTriangularMatrix{Float16}, s...)
+        L2 = f(LowerTriangularArray{Float16}, s...)
+        @test typeof(L) == typeof(L2)
+        @test size(L) == size(L2)
+        
+        JL = adapt(JLArray, L)
+        JL2 = adapt(JLArray, L2)
+        @test typeof(JL) == typeof(JL2) == typeof(zero(JL))
+        @test size(JL) == size(JL2) == size(zero(JL))
+        
+        L = f(LowerTriangularMatrix{Float16}, s...)
+        L2 = f(LowerTriangularArray{Float16, 2, Vector{Float16}}, s...)
+        JL = f(LowerTriangularArray{Float16, 2, JLArray{Float16, 1}}, s...)
+        @test typeof(L) == typeof(L2)
+        @test size(L) == size(L2)
+        @test typeof(L) != typeof(JL)
+        @test size(L) == size(L2)
+
+        # higher dims
+        for s in ((2, 3, 4), (2, 3, 4, 5))
+            N = length(s)
+            Random.seed!(123)
+            L =  f(LowerTriangularArray{Float16, N,   Array{Float16, N-1}}, s...)
+            Random.seed!(123)
+            JL = f(LowerTriangularArray{Float16, N, JLArray{Float16, N-1}}, s...)
+            JL2 = adapt(JLArray, L)
+            @test all(JL2 .== JL)
+            @test typeof(JL2) == typeof(JL)
+            @test size(JL2) == size(JL)
+        end
+    end
+end
+
 @testset "LowerTriangularArray: fill, copy, randn, convert" begin
     @testset for NF in (Float32, Float64)
         mmax = 32
@@ -201,6 +245,9 @@ end
         @test (L+L) == L*2
         @test (L-L) == zero(L)
 
+        @test L+L isa LowerTriangularMatrix
+        @test 2L isa LowerTriangularMatrix
+
         @test eachindex(L) == eachindex(L.data)
         @test eachindex(L, L) == eachindex(L.data, L.data)
 
@@ -222,6 +269,9 @@ end
             @test (L+L) == 2L
             @test (L+L) == L*2
             @test (L-L) == zero(L)
+
+            @test L+L isa LowerTriangularArray
+            @test 2L isa LowerTriangularArray
 
             @test eachindex(L) == eachindex(L.data)
             @test eachindex(L, L) == eachindex(L.data, L.data)
@@ -273,6 +323,7 @@ end
         @test L1 == L2T
     end
 end
+
 @testset "LowerTriangularArray: copyto!" begin
     @testset for idims = ((), (5,), (5,5))
         @testset for NF in (Float16, Float32, Float64)

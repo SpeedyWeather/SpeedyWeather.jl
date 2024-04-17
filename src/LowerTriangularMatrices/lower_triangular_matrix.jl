@@ -54,27 +54,35 @@ for f in (:zeros, :ones, :rand, :randn)
             ::Type{LowerTriangularArray{T, N, ArrayType}}, 
             m::Integer,
             n::Integer,
-            k::Integer...
-        ) where {T, N, ArrayType}
-            return LowerTriangularArray(ArrayType($f(T, nonzeros(m, n), k...)), m, n)
+            I::Vararg{Integer, M},
+        ) where {T, N, M, ArrayType}
+            return LowerTriangularArray(ArrayType($f(T, nonzeros(m, n), I...)), m, n)
         end
         
         # default CPU, use Array
-        function Base.$f(::Type{LowerTriangularArray{T}}, m::Integer, n::Integer, k::Integer...) where T
-            return LowerTriangularArray($f(T, nonzeros(m, n), k...), m, n)
+        function Base.$f(
+            ::Type{LowerTriangularArray{T}},
+            m::Integer,
+            n::Integer, 
+            I::Vararg{Integer, M},
+        ) where {T, M}
+            return LowerTriangularArray($f(T, nonzeros(m, n), I...), m, n)
         end
         
         # use Float64 as default if type T is not provided
-        Base.$f(::Type{<:LowerTriangularArray}, mnk::Integer...) = $f(LowerTriangularArray{Float64}, mnk...)
+        Base.$f(::Type{LowerTriangularArray}, m::Integer, nk::Integer...) =
+            $f(LowerTriangularArray{Float64}, m, nk...)
+        Base.$f(::Type{LowerTriangularMatrix}, m::Integer, n::Integer) =
+            $f(LowerTriangularArray{Float64}, m, n)
     end
 end
 
 Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, size(L)...)
-Base.one(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, size(L)...)
+Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, size(L)...)
 
 function LowerTriangularArray{T, N, ArrayType}(
     ::UndefInitializer,
-    I::Vararg{Integer,N}
+    I::Vararg{Integer,N},
 ) where {T, N, ArrayType<:AbstractArray{T}}
     return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), I[1], I[2])
 end
@@ -82,7 +90,7 @@ end
 function LowerTriangularArray{T, N, ArrayType}(
     ::UndefInitializer,
     size::S,
-) where {T,N,ArrayType<:AbstractArray{T}, S<:Tuple}
+) where {T, N, ArrayType<:AbstractArray{T}, S<:Tuple}
     return LowerTriangularArray{T, N, ArrayType}(undef, size...)
 end
    
@@ -157,7 +165,9 @@ end
 @inline Base.getindex(L::LowerTriangularArray, r::AbstractRange) = getindex(L.data,r)
 @inline Base.getindex(L::LowerTriangularArray, r::AbstractRange, I...) = getindex(L.data, r, I...)
 @inline Base.getindex(L::LowerTriangularArray, i::Integer) = getindex(L.data,i)
-@inline Base.getindex(L::LowerTriangularArray, I::CartesianIndex) = getindex(L.data, I)
+
+# important to do Tuple(I) here for the j > i case as one of the getindex methods above is called
+@inline Base.getindex(L::LowerTriangularArray, I::CartesianIndex) = getindex(L, Tuple(I)...)
 
 # setindex with lm, ..
 @inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, M}) where {T, N, M} 
