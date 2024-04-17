@@ -1,6 +1,48 @@
 using JLArrays
 using Adapt
 
+@testset "Grid types" begin
+    for G in (  
+        FullClenshawGrid,
+        FullGaussianGrid,
+        OctahedralGaussianGrid,
+        OctahedralClenshawGrid,
+        HEALPixGrid,
+        OctaHEALPixGrid,
+        FullHEALPixGrid,
+        FullOctaHEALPixGrid
+        )
+
+        full = RingGrids.full_grid_type(G) 
+        @test full == RingGrids.full_grid_type(G)
+        @test full <: RingGrids.AbstractFullGrid
+        if ~(G <: RingGrids.AbstractFullGrid)
+            @test G <: RingGrids.AbstractReducedGrid
+        end
+    end
+
+    for G in (  
+        FullClenshawArray,
+        FullGaussianArray,
+        OctahedralGaussianArray,
+        OctahedralClenshawArray,
+        HEALPixArray,
+        OctaHEALPixArray,
+        FullHEALPixArray,
+        FullOctaHEALPixArray
+        )
+
+        full = RingGrids.full_grid_type(G) 
+        @test full == RingGrids.full_grid_type(G)
+        @test full == RingGrids.horizontal_grid_type(RingGrids.full_array_type(G))
+        @test RingGrids.full_array_type(G) == RingGrids.full_array_type(RingGrids.horizontal_grid_type(G))
+        @test full <: RingGrids.AbstractFullGridArray
+        if ~(G <: RingGrids.AbstractFullGridArray)
+            @test G <: RingGrids.AbstractReducedGridArray
+        end
+    end
+end
+
 @testset "Grid indexing" begin
     for NF in (Float32, Float64)
 

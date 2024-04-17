@@ -7,7 +7,8 @@ An `AbstractFullGrid` is a horizontal grid with a constant number of longitude
 points across latitude rings. Different latitudes can be used, Gaussian latitudes,
 equi-angle latitdes, or others."""
 const AbstractFullGrid{T} = AbstractFullGridArray{T, 1, Vector{T}}
-full_grid_type(Grid::Type{<:AbstractFullGridArray}) = nonparametric_type(Grid)
+full_grid_type(Grid::Type{<:AbstractFullGridArray}) = horizontal_grid_type(Grid)
+full_array_type(Grid::Type{<:AbstractFullGridArray}) = nonparametric_type(Grid)
 
 ## SIZE
 get_nlon_max(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer) = get_nlon(Grid, nlat_half)

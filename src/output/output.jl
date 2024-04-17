@@ -38,7 +38,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32, Float64}, Model<:Mode
 
     spectral_grid::SpectralGrid
 
-    # FILE OPTIONS
+    # FILE OPTIONS
     output::Bool = false                    
     
     "[OPTION] path to output folder, run_???? will be created within"
@@ -175,7 +175,7 @@ function initialize!(
     feedback.progress_meter.desc = "Weather is speedy: run $(output.id) "
     feedback.output = true          # if output=true set feedback.output=true too!
 
-    # OUTPUT FREQUENCY
+    # OUTPUT FREQUENCY
     output.output_every_n_steps = max(1, round(Int,
             Millisecond(output.output_dt).value/time_stepping.Δt_millisec.value))
     output.output_dt = Second(round(Int, output.output_every_n_steps*time_stepping.Δt_sec))
