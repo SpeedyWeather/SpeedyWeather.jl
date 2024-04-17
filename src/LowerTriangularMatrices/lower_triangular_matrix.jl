@@ -1,34 +1,38 @@
-
-
 """
 $(TYPEDSIGNATURES)
 A lower triangular array implementation that only stores the non-zero entries explicitly.
 `L<:AbstractMatrix` although in general we have `L[i] != Matrix(L)[i]`, the former skips
 zero entries, tha latter includes them. 
 
-Supports n-dimensional lower triangular arrays, so that for all trailing dimensions `L[:,:,..]`
+Supports n-dimensional lower triangular arrays, so that for all trailing dimensions `L[:, :, ..]`
 is a matrix in lower triangular form, e.g. a (5x5x3)-LowerTriangularArray would hold 3 lower
-triangular matrices.
-"""
+triangular matrices."""
 struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T}} <: AbstractArray{T,N}
     data::ArrayType     # non-zero elements unravelled into an array with one dimension less N-1
     m::Int              # number of rows
     n::Int              # number of columns
 
-    LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray{T}} = check_lta_input_array(data, m, n, N) ? new(data, m, n) : error(lta_error_message(data, m, n, T, N, ArrayType))
+    LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray{T}} =
+        check_lta_input_array(data, m, n, N) ?
+        new(data, m, n) :
+        error(lta_error_message(data, m, n, T, N, ArrayType))
 end
 
-check_lta_input_array(data, m, n, N) = (ndims(data) == N-1) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
+check_lta_input_array(data, m, n, N) =
+    (ndims(data) == N-1) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
 
 function lta_error_message(data, m, n, T, N, ArrayType) 
     size_tuple = (m, n, size(data[2:end])...)
     "$(size(data))-sized $(typeof(data)) cannot be used to create a $size_tuple LowerTriangularArray{$T,$N,$ArrayType}"
 end 
 
+"""2-dimensional `LowerTriangularArray` of type `T`` with its non-zero entries unravelled into a `Vector{T}`"""
 const LowerTriangularMatrix{T} = LowerTriangularArray{T, 2, Vector{T}}
 
-LowerTriangularArray(data::ArrayType, m::Integer, n::Integer) where {T, N, ArrayType<:AbstractArray{T,N}} = LowerTriangularArray{T, N+1, ArrayType}(data, m, n)
-LowerTriangularMatrix(data::Vector{T}, m::Integer, n::Integer) where T = LowerTriangularMatrix{T}(data, m, n)
+LowerTriangularArray(data::ArrayType, m::Integer, n::Integer) where {T, N, ArrayType<:AbstractArray{T,N}} =
+    LowerTriangularArray{T, N+1, ArrayType}(data, m, n)
+LowerTriangularMatrix(data::Vector{T}, m::Integer, n::Integer) where T =
+    LowerTriangularMatrix{T}(data, m, n)
 
 # SIZE ETC
 Base.length(L::LowerTriangularArray) = length(L.data)  # define length as number of non-zero elements
@@ -36,26 +40,29 @@ Base.size(L::LowerTriangularArray) = (L.m, L.n, size(L.data)[2:end]...)  # defin
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)  # sizeof the underlying data vector
 
 # CREATE INSTANCES (ZEROS, ONES, UNDEF)
-for zeros_or_ones in (:zeros, :ones)
+for f in (:zeros, :ones, :rand, :randn)
     @eval begin
-        function Base.$zeros_or_ones(::Type{LowerTriangularArray{T,N,ArrayType}}, m::Integer, n::Integer, I::Vararg{Integer,M}) where {T,N,M,ArrayType}
-            return LowerTriangularArray(ArrayType($zeros_or_ones(T, nonzeros(m, n), I...)), m, n)
+        function Base.$f(::Type{LowerTriangularArray{T, N, ArrayType}}, m::Integer, n::Integer, k::Integer...) where {T, N, ArrayType}
+            return LowerTriangularArray(ArrayType($f(T, nonzeros(m, n), k...)), m, n)
         end
         
         # default CPU 
-        function Base.$zeros_or_ones(::Type{LowerTriangularArray{T}}, m::Integer, n::Integer, I::Vararg{Integer,M}) where {T,M}
-            return LowerTriangularArray($zeros_or_ones(T, nonzeros(m, n), I...), m, n)
+        function Base.$f(::Type{LowerTriangularArray{T}}, m::Integer, n::Integer, k::Integer...) where T
+            return LowerTriangularArray($f(T, nonzeros(m, n), k...), m, n)
         end
         
         # use Float64 as default if type T is not provided
-        Base.$zeros_or_ones(::Type{LowerTriangularMatrix}, m::Integer, n::Integer) = $zeros_or_ones(LowerTriangularMatrix{Float64}, m, n)
+        Base.$f(::Type{<:LowerTriangularArray}, mnk::Integer...) = $f(LowerTriangularArray{Float64}, mnk...)
     end
 end
 
-Base.zero(L::LowerTriangularArray{T,N,AT}) where {T,N,AT} = zeros(LowerTriangularArray{T,N,AT}, size(L)...)
-Base.one(L::LowerTriangularArray{T,N,AT}) where {T,N,AT} = zeros(LowerTriangularArray{T,N,AT}, size(L)...)
+Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, size(L)...)
+Base.one(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, size(L)...)
 
-function LowerTriangularArray{T,N,ArrayType}(::UndefInitializer, I::Vararg{Integer,N}) where {T,N,ArrayType<:AbstractArray{T}}
+function LowerTriangularArray{T, N, ArrayType}(
+    ::UndefInitializer,
+    I::Vararg{Integer,N}
+) where {T, N, ArrayType<:AbstractArray{T}}
     return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), I[1], I[2])
 end
 
@@ -64,15 +71,6 @@ LowerTriangularArray{T,N,ArrayType}(::UndefInitializer, size::S) where {T,N,Arra
 function LowerTriangularMatrix{T}(::UndefInitializer, m::Integer, n::Integer) where T
     return LowerTriangularMatrix(Vector{T}(undef, nonzeros(m, n)), m, n)
 end
-
-Base.randn(::Type{LowerTriangularArray{T}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N} = LowerTriangularArray(randn(T, nonzeros(m, n), I...), m, n)
-Base.rand(::Type{LowerTriangularArray{T}}, m::Integer, n::Integer, I::Vararg{Integer,N}) where {T,N} = LowerTriangularArray(randn(T, nonzeros(m, n), I...), m, n)
-
-Base.randn(::Type{LowerTriangularMatrix}, m::Integer, n::Integer) = LowerTriangularMatrix(randn(nonzeros(m, n)), m, n)
-Base.rand(::Type{LowerTriangularMatrix}, m::Integer, n::Integer) = LowerTriangularMatrix(rand(nonzeros(m, n)), m, n)
-
-Base.randn(::Type{LowerTriangularMatrix{T}}, m::Integer, n::Integer) where T = LowerTriangularMatrix(randn(T, nonzeros(m, n)), m, n)
-Base.rand(::Type{LowerTriangularMatrix{T}}, m::Integer, n::Integer) where T = LowerTriangularMatrix(rand(T, nonzeros(m, n)), m, n)
 
 # INDEXING
 """
