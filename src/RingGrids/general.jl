@@ -308,26 +308,22 @@ function whichring(ij::Integer, rings::Vector{UnitRange{Int}})
 end
 
 ## BROADCASTING
+# following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
+import Base.Broadcast: BroadcastStyle, Broadcasted
 
-# # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
-# import Base.Broadcast: BroadcastStyle, Broadcasted
+# {1} as grids are <:AbstractVector, Grid here is the non-parameteric Grid type!
+struct AbstractGridArrayStyle{N, Grid} <: Broadcast.AbstractArrayStyle{N} end
 
-# # {1} as grids are <:AbstractVector, Grid here is the non-parameteric Grid type!
-# struct AbstractGridArrayStyle{Grid} <: Broadcast.AbstractArrayStyle{1} end
+# important to remove Grid{T} parameter T (eltype/number format) here to broadcast
+# automatically across the same grid type but with different T
+# e.g. FullGaussianGrid{Float32} and FullGaussianGrid{Float64}
+Base.BroadcastStyle(::Type{Grid}) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType} =
+    AbstractGridArrayStyle{N, nonparametric_type(Grid)}()
 
-# # important to remove Grid{T} parameter T (eltype/number format) here to broadcast
-# # automatically across the same grid type but with different T
-# # e.g. FullGaussianGrid{Float32} and FullGaussianGrid{Float64}
-# Base.BroadcastStyle(::Type{Grid}) where {Grid<:AbstractGridArray} =
-#     AbstractGridArrayStyle{nonparametric_type(Grid)}()
+# allocation for broadcasting, create a new Grid with undef of type/number format T
+function Base.similar(bc::Broadcasted{AbstractGridArrayStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
+    return Grid(Array{T}(undef,size(bc)...))
+end
 
-# # allocation for broadcasting, create a new Grid with undef of type/number format T
-# function Base.similar(bc::Broadcasted{AbstractGridArrayStyle{Grid}}, ::Type{T}) where {Grid, T}
-#     Grid(Vector{T}(undef,length(bc)))
-# end
-
-# # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-# AbstractGridArrayStyle{Grid}(::Val{0}) where Grid = AbstractGridArrayStyle{Grid}()
-# AbstractGridArrayStyle{Grid}(::Val{1}) where Grid = AbstractGridArrayStyle{Grid}()
-# AbstractGridArrayStyle{Grid}(::Val{2}) where Grid = AbstractGridArrayStyle{Grid}()
-# AbstractGridArrayStyle{Grid}(::Val{3}) where Grid = AbstractGridArrayStyle{Grid}()
+# ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
+AbstractGridArrayStyle{N, Grid}(::Val{M}) where {N, Grid, M} = AbstractGridArrayStyle{N, Grid}()

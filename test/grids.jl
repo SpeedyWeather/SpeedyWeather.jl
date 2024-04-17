@@ -232,11 +232,11 @@ end
 
         # don't promote to Array
         grid = zeros(G, n)
-        @test typeof(grid + grid) isa G
-        @test typeof(grid - grid) isa G
-        @test typeof(grid .* grid) isa G
-        @test typeof(grid ./ grid) isa G
-        @test typeof(2grid) isa G
+        @test (grid + grid) isa G
+        @test (grid - grid) isa G
+        @test (grid .* grid) isa G
+        @test (grid ./ grid) isa G
+        @test 2grid isa G
 
         # promote types, Grid{Float16} -> Grid{Float64} etc
         @test all(ones(G{Float16}, n)*2.0 .=== 2.0)
