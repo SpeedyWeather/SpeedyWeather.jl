@@ -320,10 +320,13 @@ Base.BroadcastStyle(::Type{Grid}) where {Grid<:AbstractGridArray{T, N, ArrayType
 
 # allocation for broadcasting, create a new Grid with undef of type/number format T
 function Base.similar(bc::Broadcasted{AbstractGridArrayStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
+    # this escapes for Array and JLArray
     # if isstructurepreserving(bc) || fzeropreserving(bc) 
     #     return Grid(Array{T}(undef, size(bc)...))
     # end
     # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
+
+    # this doesn't escape for Array but for JLArray
     return Grid(Array{T}(undef, size(bc)...))
 end
 

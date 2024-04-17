@@ -1,3 +1,6 @@
+using JLArrays
+using Adapt
+
 @testset "Grid indexing" begin
     for NF in (Float32, Float64)
 
@@ -322,8 +325,6 @@ end
         end
     end
 end
-
-using JLArrays
 
 @testset "AbstractGridArray: GPU (JLArrays)" begin 
     NF = Float32
