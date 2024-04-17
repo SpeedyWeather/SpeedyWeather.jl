@@ -9,6 +9,11 @@ import Statistics: mean
 import FastGaussQuadrature
 import LinearAlgebra
 
+# GPU
+import Adapt
+import KernelAbstractions
+import GPUArrays
+
 # GRIDS
 export  AbstractGridArray,
         AbstractFullGridArray,
