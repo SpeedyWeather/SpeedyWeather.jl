@@ -42,7 +42,7 @@ matrix_size(grid::Grid) where {Grid<:OctahedralClenshawGrid} = matrix_size(Grid,
 function matrix_size(::Type{OctahedralClenshawGrid}, nlat_half::Integer)
     m, o = npoints_added_per_ring(OctahedralClenshawArray), npoints_pole(OctahedralClenshawArray)
     m != 4 && @warn "This algorithm has not been generalised for m!=4."
-    N = (o + 4n)÷2
+    N = (o + 4nlat_half)÷2
     return (N, N)
 end
 
