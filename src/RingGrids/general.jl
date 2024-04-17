@@ -30,18 +30,15 @@ get_npoints2D(grid::Grid) where {Grid<:AbstractGridArray} = get_npoints2D(Grid, 
 matrix_size(grid::Grid) where {Grid<:AbstractGridArray} = matrix_size(Grid, grid.nlat_half)
 
 ## INDEXING
-@inline Base.getindex(G::AbstractGridArray, ijk::Integer...) = getindex(G.data,ijk...)
-@inline Base.getindex(G::AbstractGridArray, r::AbstractRange, k::Integer...) = getindex(G.data, r, k...)
-@inline Base.getindex(G::AbstractGridArray, ij::Integer, k::AbstractRange) = getindex(G.data, ij, k)
-@inline Base.getindex(G::AbstractGridArray, I::CartesianIndex) = getindex(G, Tuple(I)...)
+@inline Base.getindex(G::AbstractGridArray, ijk...) = getindex(G.data, ijk...)
 
 @inline function Base.getindex(
     G::GridArray,
     col::Colon,
-    k...,
-) where {GridArray<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType}
+    k::Integer...,
+) where {GridArray<:AbstractGridArray}
     GridArray_ = nonparametric_type(GridArray)
-    return GridArray_{T, 1}(getindex(G.data, col, k...), G.nlat_half)
+    return GridArray_(getindex(G.data, col, k...), G.nlat_half, G.rings)
 end
 
 @inline Base.setindex!(G::AbstractGridArray, x, ijk::Integer...) =

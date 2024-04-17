@@ -214,14 +214,14 @@ end
 
 @testset "Grid broadcasting" begin
     n = 2
-    @testset for G in ( FullClenshawGrid,
-                        FullGaussianGrid,
-                        OctahedralGaussianGrid,
-                        OctahedralClenshawGrid,
-                        HEALPixGrid,
-                        OctaHEALPixGrid,
-                        FullHEALPixGrid,
-                        FullOctaHEALPixGrid,
+    @testset for G in ( FullClenshawArray,
+                        FullGaussianArray,
+                        OctahedralGaussianArray,
+                        OctahedralClenshawArray,
+                        HEALPixArray,
+                        OctaHEALPixArray,
+                        FullHEALPixArray,
+                        FullOctaHEALPixArray,
                         )
 
         @test zeros(G, n) .+ 1 == ones(G, n)
@@ -231,12 +231,14 @@ end
         @test 2ones(G, n) == ones(G, n) + ones(G, n)
 
         # don't promote to Array
-        grid = zeros(G, n)
-        @test (grid + grid) isa G
-        @test (grid - grid) isa G
-        @test (grid .* grid) isa G
-        @test (grid ./ grid) isa G
-        @test 2grid isa G
+        for s in ((n,), (n, n), (n, n, n), (n, n, n, n))
+            grid = zeros(G, s...)
+            @test (grid + grid) isa G
+            @test (grid - grid) isa G
+            @test (grid .* grid) isa G
+            @test (grid ./ grid) isa G
+            @test 2grid isa G
+        end
 
         # promote types, Grid{Float16} -> Grid{Float64} etc
         @test all(ones(G{Float16}, n)*2.0 .=== 2.0)
@@ -263,4 +265,33 @@ end
         @test all(ones(G{Float16}, n) ./ ones(G{Float64}, n) .=== 1.0)
         @test all(ones(G{Float32}, n) ./ ones(G{Float64}, n) .=== 1.0)
     end 
+end
+
+@testset "N-dimensional indexing" begin
+    m, n, p = 2, 3, 4
+    @testset for G in ( FullClenshawGrid,
+                        FullGaussianGrid,
+                        OctahedralGaussianGrid,
+                        OctahedralClenshawGrid,
+                        HEALPixGrid,
+                        OctaHEALPixGrid,
+                        FullHEALPixGrid,
+                        FullOctaHEALPixGrid,
+                        )
+
+        grid = rand(G, m, n, p)
+        @test grid[:, 1, 1] isa G
+        @test grid[1] == grid.data[1]
+        @test grid[1, 1, 1] == grid.data[1, 1, 1]
+
+        @test grid[1:2, 1:2, 1:2] == grid.data[1:2, 1:2, 1:2]
+        @test grid[1, 1, :] == grid.data[1, 1, :]
+
+        idx = CartesianIndex((1, 2, 3))
+        @test grid[idx] == grid.data[idx]
+        
+        ids = CartesianIndices((m, n, p))
+        @test grid[ids] == grid.data[ids]
+        @test grid[ids] isa Array
+    end
 end
