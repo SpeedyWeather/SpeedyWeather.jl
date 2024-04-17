@@ -40,27 +40,32 @@ export  OctahedralGaussianGrid,
         HEALPixGrid,
         OctaHEALPixGrid
 
-# GRID FUNCTIONS
+# SIZE
 export  grids_match,
-        get_truncation,
-        get_resolution,
         get_nlat,
         get_nlat_half,
-        get_npoints,
-        get_latdlonds,
+        get_npoints2D
+
+# COORDINATES
+export  get_latdlonds,
         get_lat,
         get_colat,
         get_latd,
         get_lond,
-        each_index_in_ring,
-        each_index_in_ring!,
-        eachgridpoint,
+        get_nlons,
+        get_nlon_max
+
+# INTEGRATION
+export  get_quadrature_weights,
+        get_solid_angles
+
+# ITERATORS
+export  eachgrid,
         eachring,
         whichring,
-        get_nlons,
-        get_nlon_max,
-        get_quadrature_weights,
-        get_solid_angles
+        eachgridpoint,
+        each_index_in_ring,
+        each_index_in_ring!
 
 # SCALING
 export  scale_coslat!,

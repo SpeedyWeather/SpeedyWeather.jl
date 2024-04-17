@@ -295,3 +295,30 @@ end
         @test grid[ids] isa Array
     end
 end
+
+@testset "Loop indexing" begin
+    n = 2
+    @testset for G in ( FullClenshawArray,
+                        FullGaussianArray,
+                        OctahedralGaussianArray,
+                        OctahedralClenshawArray,
+                        HEALPixArray,
+                        OctaHEALPixArray,
+                        FullHEALPixArray,
+                        FullOctaHEALPixArray,
+                        )
+
+        for s in ((n,), (n, n), (n, n, n), (n, n, n, n))
+            grid = zeros(G, s...)
+
+            for k in eachgrid(grid)
+                for (j, ring) in enumerate(eachring(grid))
+                    for ij in ring
+                        grid[ij, k] = 1
+                    end
+                end
+            end
+            @test all(grid .== 1)
+        end
+    end
+end
