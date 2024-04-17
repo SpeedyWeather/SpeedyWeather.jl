@@ -43,14 +43,14 @@ using .LowerTriangularMatrices
 
 # RingGrids
 export RingGrids
-export  FullClenshawGrid,
-        FullGaussianGrid,
-        FullHEALPixGrid,
-        FullOctaHEALPixGrid,
-        OctahedralGaussianGrid,
-        OctahedralClenshawGrid,
-        HEALPixGrid,
-        OctaHEALPixGrid,
+export  FullClenshawGrid, FullClenshawArray,
+        FullGaussianGrid, FullGaussianArray,
+        FullHEALPixGrid, FullHEALPixArray,
+        FullOctaHEALPixGrid, FullOctaHEALPixArray,
+        OctahedralGaussianGrid, OctahedralGaussianArray,
+        OctahedralClenshawGrid, OctahedralClenshawArray,
+        HEALPixGrid, HEALPixArray,
+        OctaHEALPixGrid, OctaHEALPixArray,
         plot
 
 include("RingGrids/RingGrids.jl")

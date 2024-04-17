@@ -14,7 +14,7 @@ struct GridGeometry{G<:AbstractGrid}
     lon_offsets::Vector{Float64}    # longitude offsets of first grid point per ring
 end
 
-GridGeometry(grid::AbstractGrid) = GridGeometry(typeof(grid), grid.nlat_half)
+GridGeometry(grid::AbstractGridArray) = GridGeometry(horizontal_grid_type(grid), grid.nlat_half)
 
 """
     G = GridGeometry(   Grid::Type{<:AbstractGrid},
@@ -26,14 +26,14 @@ unravelled indices ij."""
 function GridGeometry(  Grid::Type{<:AbstractGrid}, # which grid to calculate the geometry for
                         nlat_half::Integer)         # resolution parameter number of rings
 
-    nlat = get_nlat(Grid, nlat_half)                 # total number of latitude rings
-    npoints = get_npoints(Grid, nlat_half)           # total number of grid points
+    nlat = get_nlat(Grid, nlat_half)                # total number of latitude rings
+    npoints = get_npoints(Grid, nlat_half)          # total number of grid points
 
     # LATITUDES
-    colat = get_colat(Grid, nlat_half)               # colatitude in radians
+    colat = get_colat(Grid, nlat_half)              # colatitude in radians
     lat = π/2 .- colat                              # latitude in radians
     latd = lat*360/2π                               # 90˚...-90˚, in degrees
-    latd_poles = cat(90, latd, -90, dims=1)            # latd, but poles incl
+    latd_poles = cat(90, latd, -90, dims=1)         # latd, but poles incl
 
     # Hack: use -90.00...1˚N instead of exactly -90˚N for the <=, > comparison
     # in find_rings! that way the last ring to the south pole can be an open
@@ -42,11 +42,11 @@ function GridGeometry(  Grid::Type{<:AbstractGrid}, # which grid to calculate th
     latd_poles[end] = latd_poles[end] - eps(latd_poles[end])
 
     # COORDINATES for every grid point in ring order
-    _, londs = get_latdlonds(Grid, nlat_half)         # in degrees [0˚...360˚E]                         
+    _, londs = get_latdlonds(Grid, nlat_half)       # in degrees [0˚...360˚E]                         
 
     # RINGS and LONGITUDE OFFSETS
-    rings = eachring(Grid, nlat_half)                # Vector{UnitRange} descr start/end index on ring
-    nlons = get_nlons(Grid, nlat_half,               # number of longitude points per ring
+    rings = eachring(Grid, nlat_half)               # Vector{UnitRange} descr start/end index on ring
+    nlons = get_nlons(Grid, nlat_half,              # number of longitude points per ring
                         both_hemispheres=true)
     lon_offsets = [londs[ring[1]] for ring in rings]# offset of the first point from 0˚E
 

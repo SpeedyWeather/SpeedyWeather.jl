@@ -258,8 +258,7 @@ end
 $(TYPEDSIGNATURES)
 Same as `eachring(grid)` but performs a bounds check to assess that all grids
 in `grids` are of same size."""
-function eachring(grid1::Grid, grids::Grid...) where {Grid<:AbstractGridArray}
-    @inline 
+function eachring(grid1::Grid, grids::Grid...) where {Grid<:AbstractGridArray} 
     n = length(grid1)
     Base._all_match_first(X->length(X), n, grid1, grids...) || throw(BoundsError)
     return eachring(grid1)
