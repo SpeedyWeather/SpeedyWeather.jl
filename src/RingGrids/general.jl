@@ -7,6 +7,7 @@ const AbstractGrid{T} = AbstractGridArray{T, 1, Vector{T}}
 nonparametric_type(grid::AbstractGridArray) = nonparametric_type(typeof(grid))
 full_array_type(grid::AbstractGridArray) = full_array_type(typeof(grid))
 full_grid_type(grid::AbstractGridArray) = horizontal_grid_type(full_array_type(grid))
+full_grid_type(Grid::Type{<:AbstractGridArray}) = horizontal_grid_type(full_array_type(Grid))
 horizontal_grid_type(grid::AbstractGridArray) = horizontal_grid_type(typeof(grid))
 
 ## SIZE
@@ -305,7 +306,8 @@ end
 
 ## BROADCASTING
 # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
-import Base.Broadcast: BroadcastStyle, Broadcasted
+import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
+import LinearAlgebra: isstructurepreserving, fzeropreserving
 
 # {1} as grids are <:AbstractVector, Grid here is the non-parameteric Grid type!
 struct AbstractGridArrayStyle{N, Grid} <: Broadcast.AbstractArrayStyle{N} end
@@ -318,8 +320,30 @@ Base.BroadcastStyle(::Type{Grid}) where {Grid<:AbstractGridArray{T, N, ArrayType
 
 # allocation for broadcasting, create a new Grid with undef of type/number format T
 function Base.similar(bc::Broadcasted{AbstractGridArrayStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
-    return Grid(Array{T}(undef,size(bc)...))
+    # if isstructurepreserving(bc) || fzeropreserving(bc) 
+    #     return Grid(Array{T}(undef, size(bc)...))
+    # end
+    # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
+    return Grid(Array{T}(undef, size(bc)...))
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 AbstractGridArrayStyle{N, Grid}(::Val{M}) where {N, Grid, M} = AbstractGridArrayStyle{N, Grid}()
+
+## GPU
+function Broadcast.BroadcastStyle(
+    ::Type{Grid},
+) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
+    return Broadcast.BroadcastStyle(ArrayType)
+end
+
+function GPUArrays.backend(
+    ::Type{Grid},
+) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
+    return GPUArrays.backend(ArrayType)
+end
+
+function Adapt.adapt_structure(to, grid::Grid) where {Grid <: AbstractGridArray}
+    Grid_ = nonparametric_type(Grid)
+    return Grid_(Adapt.adapt(to, grid.data), grid.nlat_half, grid.rings)
+end

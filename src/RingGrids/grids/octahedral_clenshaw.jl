@@ -192,30 +192,6 @@ function Matrix!(   MGs::Tuple{AbstractMatrix{T}, OctahedralClenshawGrid}...;
     return Tuple(Mi for (Mi, Gi) in MGs)
 end
 
-## INDEXING
-function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
-                                Grid::Type{<:OctahedralClenshawArray},
-                                nlat_half::Integer) # resolution param
-
-    nlat = length(rings)
-    @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
-    m, o = npoints_added_per_ring(OctahedralClenshawArray), npoints_pole(OctahedralClenshawArray)
-
-    index_end = 0
-    @inbounds for j in 1:nlat_half                  # North incl Eq only
-        index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
-        index_end += o + m*j                        # add number of grid points per ring
-        rings[j] = index_1st:index_end              # turn into UnitRange
-    end
-    @inbounds for (j, j_mirrored) in zip(   nlat_half+1:nlat,       # South only
-                                            nlat-nlat_half:-1:1)    # reverse index
-
-        index_1st = index_end + 1                   # 1st index is +1 from prev ring's last index
-        index_end += o + m*j_mirrored               # add number of grid points per ring
-        rings[j] = index_1st:index_end              # turn into UnitRange
-    end
-end
-
 """
     G = OctahedralClenshawGrid{T}
 

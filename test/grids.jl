@@ -322,3 +322,47 @@ end
         end
     end
 end
+
+using JLArrays
+
+@testset "AbstractGridArray: GPU (JLArrays)" begin 
+    NF = Float32
+    @testset for Grid in ( 
+        FullClenshawArray,
+        FullGaussianArray,
+        OctahedralGaussianArray,
+        OctahedralClenshawArray,
+        HEALPixArray,
+        OctaHEALPixArray,
+        FullHEALPixArray,
+        FullOctaHEALPixArray,
+    )
+        G_cpu = randn(Grid{NF}, 2, 3, 4)
+
+        # constructors/adapt
+        G = adapt(JLArray, G_cpu)
+        G2 = Grid(adapt(JLArray, G_cpu.data))
+        # @test G == G2
+        # @test all(G .== G2) 
+
+        # getindex 
+        # @test G[1, :] isa JLArray
+        # @test G[:, 1] isa Grid{NF, 1, JLArray{NF}}
+        # for k in eachgrid(G)
+        #     for (j, ring) in enumerate(eachring(G))
+        #         @test Array(L[lm,:]) == L_cpu[lm,:]  
+        #     end
+        # end 
+
+        # # setindex! 
+        # A_test = JLArray(rand(NF,size(L_cpu,3)))
+        # L[1,:] = A_test
+        # @test L[1,:] == A_test
+
+        # # fill 
+        # fill!(L, 2)
+        # for lm in SpeedyWeather.eachharmonic(L2)
+        #     @test all(L[lm, [Colon() for i=1:length(idims)]...] .== 2)
+        # end 
+    end
+end
