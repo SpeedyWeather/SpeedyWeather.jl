@@ -51,7 +51,7 @@ export  FullClenshawGrid, FullClenshawArray,
         OctahedralClenshawGrid, OctahedralClenshawArray,
         HEALPixGrid, HEALPixArray,
         OctaHEALPixGrid, OctaHEALPixArray,
-        plot
+        eachring, eachgrid, plot
 
 include("RingGrids/RingGrids.jl")
 using .RingGrids
