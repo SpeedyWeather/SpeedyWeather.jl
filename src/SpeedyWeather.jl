@@ -59,6 +59,9 @@ using .RingGrids
 # SpeedyTransforms
 export SpeedyTransforms, SpectralTransform
 export spectral, gridded, spectral_truncation
+export curl, divergence, curl!, divergence!
+export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
+
 include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory

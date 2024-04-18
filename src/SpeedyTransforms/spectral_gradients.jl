@@ -205,7 +205,7 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
         lm += 1
 
         # U = -∂/∂lat(Ψ) and V = V = ∂/∂λ(Ψ) combined with Laplace inversion ∇⁻², omit radius R scaling
-        U[lm] = vordiv_to_uv2[lm]*vor[lm+1]         # - vordiv_to_uv1[lm]*vor[l-1, m] <- is zero
+        U[lm] = vordiv_to_uv2[lm]*vor[lm+1]         # - vordiv_to_uv1[lm]*vor[l-1, m] <- is zero
         V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
 
         # BELOW DIAGONAL
@@ -328,13 +328,7 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
 end
 
 """
-    ∇²!(    ∇²alms::LowerTriangularMatrix,
-            alms::LowerTriangularMatrix,
-            S::SpectralTransform;
-            add::Bool=false,
-            flipsign::Bool=false,
-            inverse::Bool=false)
-
+$(TYPEDSIGNATURES)
 Laplace operator ∇² applied to the spectral coefficients `alms` in spherical
 coordinates. The radius `R` is omitted in the eigenvalues which are precomputed in `S`.
 ∇²! is the in-place version which directly stores the output in the first argument `∇²alms`.
@@ -412,18 +406,10 @@ end
 """
 $(TYPEDSIGNATURES)
 Returns the inverse Laplace operator ∇⁻² applied to input `alms`.
-The Laplace operator acts on the unit
-sphere and therefore omits the radius^2 scaling"""
+The Laplace operator acts on the unit sphere and therefore omits the radius^2 scaling"""
 ∇⁻²(∇²alms::LowerTriangularMatrix) = ∇⁻²(∇²alms, SpectralTransform(∇²alms))
 
-"""
-    ∇⁻²!(   ∇⁻²alms::LowerTriangularMatrix,
-            alms::LowerTriangularMatrix,
-            S::SpectralTransform;
-            add::Bool=false,
-            flipsign::Bool=false)
-
-Calls `∇²!(∇⁻²alms, alms, S; add, flipsign, inverse=true)`."""
+"""$(TYPEDSIGNATURES) Calls `∇²!(∇⁻²alms, alms, S; add, flipsign, inverse=true)`."""
 function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}}, # Output: inverse Laplacian of alms
                 alms::LowerTriangularMatrix{Complex{NF}},   # Input: spectral coefficients
                 S::SpectralTransform{NF};                   # precomputed eigenvalues
@@ -435,10 +421,8 @@ function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}}, # Output:
     return ∇²!(∇⁻²alms, alms, S; add, flipsign, inverse)
 end
 
-"""
-$(TYPEDSIGNATURES)
-Applies the gradient operator ∇ applied to input `p` and stores the result in
-`dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
+"""$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
+in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
 on the unit sphere and therefore omits the radius scaling"""
 function ∇!(dpdx::LowerTriangularMatrix{Complex{NF}},       # Output: zonal gradient
             dpdy::LowerTriangularMatrix{Complex{NF}},       # Output: meridional gradient
@@ -487,4 +471,42 @@ function ∇!(dpdx::LowerTriangularMatrix{Complex{NF}},       # Output: zonal gr
     end
 
     return dpdx, dpdy
+end
+
+"""$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
+using an existing `SpectralTransform` `S`. The 1/radius-scaling is omitted,
+as is the 1/coslat scaling."""
+function ∇(p::LowerTriangularMatrix, S::SpectralTransform)
+    dpdx = similar(p)
+    dpdy = similar(p)
+    return ∇!(dpdx, dpdy, p, S)
+end
+
+"""$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`.
+Precomputes a `SpectralTransform` `S`. The 1/radius-scaling is omitted,
+as is the 1/coslat scaling."""
+function ∇(p::LowerTriangularMatrix)
+    S = SpectralTransform(p, one_more_degree=true)
+    return ∇(p, S)
+end
+
+"""$(TYPEDSIGNATURES) The zonal and meridional gradient of `grid`.
+Transform to spectral space, takes the gradient and unscales the 1/coslat
+scaling in the gradient, but omits the 1/radius scaling that has to be
+applied manually. Makes use of an existing spectral transform `S`."""
+function ∇(grid::AbstractGrid, S::SpectralTransform)
+    p = spectral(grid, S)
+    dpdx, dpdy = ∇(p, S)
+    dpdx_grid = gridded(dpdx, S, unscale_coslat=true)
+    dpdy_grid = gridded(dpdy, S, unscale_coslat=true)
+    return dpdx_grid, dpdy_grid
+end
+
+"""$(TYPEDSIGNATURES) The zonal and meridional gradient of `grid`.
+Transform to spectral space, takes the gradient and unscales the 1/coslat
+scaling in the gradient, but omits the 1/radius scaling that has to be
+applied manually."""
+function ∇(grid::AbstractGrid)
+    S = SpectralTransform(grid, one_more_degree=true)
+    return ∇(grid, S)
 end
