@@ -1,3 +1,24 @@
+"""An `OctaHEALPixArray` is an array of OctaHEALPix grids, subtyping `AbstractReducedGridArray`.
+First dimension of the underlying `N`-dimensional `data` represents the horizontal dimension,
+in ring order (0 to 360˚E, then north to south), other dimensions are used for the vertical and/or
+time or other dimensions. The resolution parameter of the horizontal grid is `nlat_half`
+(number of latitude rings on one hemisphere, Equator included) and the ring indices are
+precomputed in `rings`.
+
+An OctaHEALPix grid has 4 faces, each `nlat_half x nlat_half` in size,
+covering 90˚ in longitude, pole to pole. As part of the HEALPix family of grids,
+the grid points are equal area. They start with 4 longitude points on the northern-most ring,
+increase by 4 points per ring  towards the Equator with one ring on the Equator before reducing
+the number of points again towards the south pole by 4 per ring. There is no equatorial belt for
+OctaHEALPix grids. The southern hemisphere is symmetric to the northern, mirrored around the Equator.
+OctaHEALPix grids have a ring on the Equator. For more details see
+Górski et al. 2005, DOI:10.1086/427976, the OctaHEALPix grid belongs to the family of
+HEALPix grids with Nθ = 1, Nφ = 4 but is not explicitly mentioned therein.
+
+`rings` are the precomputed ring indices, for nlat_half = 3 (in contrast to HEALPix this can be odd)
+it is `rings = [1:4, 5:12, 13:24, 25:32, 33:36]`. For efficient looping see `eachring` and `eachgrid`.
+Fields are
+$(TYPEDFIELDS)"""
 struct OctaHEALPixArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractReducedGridArray{T, N, ArrayType}
     data::ArrayType                 # data array, ring by ring, north to south
     nlat_half::Int                  # number of latitudes on one hemisphere
@@ -15,10 +36,15 @@ nonparametric_type(::Type{<:OctaHEALPixArray}) = OctaHEALPixArray
 horizontal_grid_type(::Type{<:OctaHEALPixArray}) = OctaHEALPixGrid
 full_array_type(::Type{<:OctaHEALPixArray}) = FullOctaHEALPixArray
 
+"""An `OctaHEALPixArray` but constrained to `N=1` dimensions (horizontal only) and data is a `Vector{T}`."""
+OctaHEALPixGrid
+
 ## SIZE
 nlat_odd(::Type{<:OctaHEALPixArray}) = true
 get_npoints2D(::Type{<:OctaHEALPixArray}, nlat_half::Integer) = 4*nlat_half^2
 get_nlat_half(::Type{<:OctaHEALPixArray}, npoints2D::Integer) = round(Int, sqrt(npoints2D/4))
+
+# number of longitude 
 function get_nlon_per_ring(Grid::Type{<:OctaHEALPixArray}, nlat_half::Integer, j::Integer)
     nlat = get_nlat(Grid, nlat_half)
     @assert 0 < j <= nlat "Ring $j is outside P$nlat_half grid."
@@ -33,6 +59,7 @@ function get_colat(::Type{<:OctaHEALPixArray}, nlat_half::Integer)
     nlat_half == 0 && return Float64[]
     colat = zeros(get_nlat(OctaHEALPixArray, nlat_half))
     for j in 1:nlat_half
+        # Górski et al. 2005 eq 4 but without the 1/3 and Nside=nlat_half
         colat[j] = acos(1-(j/nlat_half)^2)  # northern hemisphere
         colat[2nlat_half-j] = π - colat[j]  # southern hemisphere
     end
@@ -41,6 +68,8 @@ end
 
 function get_lon_per_ring(Grid::Type{<:OctaHEALPixArray}, nlat_half::Integer, j::Integer)
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
+    # equidistant longitudes with equal offsets from 0˚ and 360˚,
+    # e.g. 45, 135, 225, 315 for nlon=4
     return collect(π/nlon:2π/nlon:2π)
 end
 
@@ -168,11 +197,3 @@ function Matrix!(   MGs::Tuple{AbstractMatrix{T}, OctaHEALPixGrid}...;
     ntuples == 1 && return M
     return Tuple(Mi for (Mi, Gi) in MGs)
 end
-
-"""
-    H = OctaHEALPixGrid{T}
-
-A OctaHEALPix grid with 4 base faces, each `nlat_half`x`nlat_half` grid points, each covering the same area.
-The values of all grid points are stored in a vector field `data` that unravels the data 0 to 360˚,
-then ring by ring, which are sorted north to south."""
-OctaHEALPixGrid

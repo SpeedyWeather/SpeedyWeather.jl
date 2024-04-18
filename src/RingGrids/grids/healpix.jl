@@ -1,3 +1,23 @@
+"""A `HEALPixArray` is an array of HEALPix grids, subtyping `AbstractReducedGridArray`.
+First dimension of the underlying `N`-dimensional `data` represents the horizontal dimension,
+in ring order (0 to 360˚E, then north to south), other dimensions are used for the vertical and/or
+time or other dimensions. The resolution parameter of the horizontal grid is `nlat_half`
+(number of latitude rings on one hemisphere, Equator included) which has to be even
+(non-fatal error thrown otherwise) which is less strict than the original HEALPix
+formulation (only powers of two for nside = nlat_half/2). Ring indices are precomputed in `rings`.
+
+A HEALPix grid has 12 faces, each `nside`x`nside` grid points, each covering the same area
+of the sphere. They start with 4 longitude points on the northern-most ring,
+increase by 4 points per ring in the "polar cap" (the top half of the 4 northern-most faces)
+but have a constant number of longitude points in the equatorial belt. The southern hemisphere
+is symmetric to the northern, mirrored around the Equator. HEALPix grids have a ring on the
+Equator. For more details see Górski et al. 2005, DOI:10.1086/427976. 
+
+`rings` are the precomputed ring indices, for nlat_half = 4 it is
+`rings = [1:4, 5:12, 13:20, 21:28, 29:36, 37:44, 45:48]`. So the first ring has indices
+1:4 in the unravelled first dimension, etc. For efficient looping see `eachring` and `eachgrid`.
+Fields are
+$(TYPEDFIELDS)"""
 struct HEALPixArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractReducedGridArray{T, N, ArrayType}
     data::ArrayType                 # data array, ring by ring, north to south
     nlat_half::Int                  # number of latitudes on one hemisphere
@@ -15,17 +35,33 @@ nonparametric_type(::Type{<:HEALPixArray}) = HEALPixArray
 horizontal_grid_type(::Type{<:HEALPixArray}) = HEALPixGrid
 full_array_type(::Type{<:HEALPixArray}) = FullHEALPixArray
 
+"""An `HEALPixArray` but constrained to `N=1` dimensions (horizontal only) and data is a `Vector{T}`."""
+HEALPixGrid
+
 ## SIZE
 nlat_odd(::Type{<:HEALPixArray}) = true
 get_npoints2D(::Type{<:HEALPixArray}, nlat_half::Integer) = 3*nlat_half^2
 get_nlat_half(::Type{<:HEALPixArray}, npoints2D::Integer) = round(Int, sqrt(npoints2D/3))
+
+"""$(TYPEDSIGNATURES) Number of longitude points for ring `j` on `Grid` of resolution
+`nlat_half`."""
 function get_nlon_per_ring(Grid::Type{<:HEALPixArray}, nlat_half::Integer, j::Integer)
     nlat = get_nlat(Grid, nlat_half)
     @assert 0 < j <= nlat "Ring $j is outside H$nlat_half grid."
     return min(4j, 2nlat_half, 8nlat_half-4j)
 end
 
-nside_healpix(nlat_half::Integer) = nlat_half÷2
+"""$(TYPEDSIGNATURES) The original `Nside` resolution parameter of the HEALPix grids.
+The number of grid points on one side of each (square) face.
+While we use `nlat_half` across all ring grids, this function translates this to
+Nside. Even `nlat_half` only."""
+function nside_healpix(nlat_half::Integer)
+    iseven(nlat_half) || @error "Odd nlat_half=$nlat_half not supported for HEALPix."
+    return nlat_half÷2
+end
+
+# for future reordering the HEALPix ring order into a matrix consisting of the
+# 12 square faces of a HEALPix grid.
 function matrix_size(::Type{<:HEALPixArray}, nlat_half::Integer)
     nside = nside_healpix(nlat_half)
     return (5nside, 5nside)
@@ -39,6 +75,7 @@ function get_colat(::Type{<:HEALPixArray}, nlat_half::Integer)
     nside = nside_healpix(nlat_half)
     colat = zeros(nlat)
     
+    # Górski et al 2005 eq 4 and 8
     for j in 1:nside        colat[j] = acos(1-j^2/3nside^2)                 end     # north polar cap
     for j in nside+1:3nside colat[j] = acos(4/3 - 2j/3nside)                end     # equatorial belt
     for j in 3nside+1:nlat  colat[j] = acos((2nlat_half-j)^2/3nside^2-1)    end     # south polar cap
@@ -50,6 +87,7 @@ function get_lon_per_ring(Grid::Type{<:HEALPixArray}, nlat_half::Integer, j::Int
     nside = nside_healpix(nlat_half)
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
 
+    # Górski et al 2005 eq 5 and 9
     # s = 1 for polar caps, s=2, 1, 2, 1, ... in the equatorial zone
     s = (j < nside) || (j >= 3nside) ? 1 : ((j - nside) % 2 + 1)
     lon = [π/(nlon÷2)*(i - s/2) for i in 1:nlon]
@@ -87,6 +125,9 @@ function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
 
     nlat = length(rings)
     @boundscheck nlat == get_nlat(Grid, nlat_half) || throw(BoundsError)
+    
+    # HEALPix not defined for odd nlat_half, the last rings would not be written
+    @boundscheck iseven(nlat_half) || throw(BoundsError)
 
     index_end = 0
     nside = nside_healpix(nlat_half)                # side length of a basepixel
@@ -115,12 +156,3 @@ function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
         rings[j] = index_1st:index_end              # turn into UnitRange
     end
 end
-
-"""
-    H = HEALPixGrid{T}
-
-A HEALPix grid with 12 faces, each `nside`x`nside` grid points, each covering the same area.
-The number of latitude rings on one hemisphere (incl Equator) `nlat_half` is used as resolution parameter.
-The values of all grid points are stored in a vector field `v` that unravels the data 0 to 360˚,
-then ring by ring, which are sorted north to south."""
-HEALPixGrid

@@ -1,3 +1,21 @@
+"""An `OctahedralClenshawArray` is an array of octahedral grids, subtyping `AbstractReducedGridArray`,
+that use equidistant latitudes for each ring, the same as for `FullClenshawArray`.
+First dimension of the underlying `N`-dimensional `data` represents the horizontal dimension,
+in ring order (0 to 360˚E, then north to south), other dimensions are used for the vertical and/or
+time or other dimensions. The resolution parameter of the horizontal grid is `nlat_half`
+(number of latitude rings on one hemisphere, Equator included) and the ring indices are
+precomputed in `rings`.
+
+These grids are called octahedral (same as for the `OctahedralGaussianArray` which only uses different
+latitudes) because after starting with 20 points on the first ring around the north pole (default) they
+increase the number of longitude points for each ring by 4, such that they can be conceptually thought
+of as lying on the 4 faces of an octahedron on each hemisphere. Hence, these grids have 20, 24, 28, ...
+longitude points for ring 1, 2, 3, ... Clenshaw grids have a ring on the Equator which has 16 + 4nlat_half
+longitude points before reducing the number of longitude points per ring by 4 towards the southern-most
+ring `j = nlat`. `rings` are the precomputed ring indices, the the example above
+`rings = [1:20, 21:44, 45:72, ...]`. For efficient looping see `eachring` and `eachgrid`.
+Fields are
+$(TYPEDFIELDS)"""
 struct OctahedralClenshawArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractReducedGridArray{T, N, ArrayType}
     data::ArrayType                 # data array, ring by ring, north to south
     nlat_half::Int                  # number of latitudes on one hemisphere
@@ -14,6 +32,9 @@ const OctahedralClenshawGrid{T} = OctahedralClenshawArray{T, 1, Vector{T}}
 nonparametric_type(::Type{<:OctahedralClenshawArray}) = OctahedralClenshawArray
 horizontal_grid_type(::Type{<:OctahedralClenshawArray}) = OctahedralClenshawGrid
 full_array_type(::Type{<:OctahedralClenshawArray}) = FullClenshawArray
+
+"""An `OctahedralClenshawArray` but constrained to `N=1` dimensions (horizontal only) and data is a `Vector{T}`."""
+OctahedralClenshawGrid
 
 # SIZE
 nlat_odd(::Type{<:OctahedralClenshawArray}) = true
@@ -46,7 +67,8 @@ function matrix_size(::Type{OctahedralClenshawGrid}, nlat_half::Integer)
     return (N, N)
 end
 
-Base.Matrix(G::OctahedralClenshawGrid{T}; kwargs...) where T = Matrix!(zeros(T, matrix_size(G)...), G; kwargs...)
+Base.Matrix(G::OctahedralClenshawGrid{T}; kwargs...) where T =
+    Matrix!(zeros(T, matrix_size(G)...), G; kwargs...)
 
 ## COORDINATES
 get_colat(::Type{<:OctahedralClenshawArray}, nlat_half::Integer) = get_colat(FullClenshawArray, nlat_half)
@@ -56,7 +78,8 @@ function get_lon_per_ring(Grid::Type{<:OctahedralClenshawArray}, nlat_half::Inte
 end
 
 ## QUADRATURE
-get_quadrature_weights(::Type{<:OctahedralClenshawArray}, nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)
+get_quadrature_weights(::Type{<:OctahedralClenshawArray}, nlat_half::Integer) =
+    clenshaw_curtis_weights(nlat_half)
 
 ## INDEXING
 function each_index_in_ring(Grid::Type{<:OctahedralClenshawArray},
@@ -107,12 +130,7 @@ end
 
 ## CONVERSION
 """
-    Matrix!(M::AbstractMatrix,
-            G::OctahedralClenshawGrid;
-            quadrant_rotation=(0, 1, 2, 3),
-            matrix_quadrant=((2, 2), (1, 2), (1, 1), (2, 1)),
-            )
-
+$(TYPEDSIGNATURES)
 Sorts the gridpoints in `G` into the matrix `M` without interpolation.
 Every quadrant of the grid `G` is rotated as specified in `quadrant_rotation`,
 0 is no rotation, 1 is 90˚ clockwise, 2 is 180˚ etc. Grid quadrants are counted
@@ -122,8 +140,7 @@ such that the North Pole is at M's midpoint."""
 Matrix!(M::AbstractMatrix, G::OctahedralClenshawGrid; kwargs...) = Matrix!((M, G); kwargs...)
 
 """
-    Matrix!(MGs::Tuple{AbstractMatrix{T}, OctahedralClenshawGrid}...; kwargs...)
-
+$(TYPEDSIGNATURES)
 Like `Matrix!(::AbstractMatrix, ::OctahedralClenshawGrid)` but for simultaneous
 processing of tuples `((M1, G1), (M2, G2), ...)` with matrices `Mi` and grids `Gi`.
 All matrices and grids have to be of the same size respectively."""
@@ -191,14 +208,3 @@ function Matrix!(   MGs::Tuple{AbstractMatrix{T}, OctahedralClenshawGrid}...;
     ntuples == 1 && return M
     return Tuple(Mi for (Mi, Gi) in MGs)
 end
-
-"""
-    G = OctahedralClenshawGrid{T}
-
-An Octahedral Clenshaw grid that uses `nlat` equi-spaced latitudes. Like FullClenshawGrid, the central
-latitude ring is on the Equator. Like OctahedralGaussianGrid, the number of longitude points per
-latitude ring decreases towards the poles. Starting with 20 equi-spaced longitude points (starting at 0˚E)
-on the rings around the poles, each latitude ring towards the equator has consecuitively 4 more points,
-one for each face of the octahedron. E.g. 20, 24, 28, 32, ...nlon-4, nlon, nlon, nlon-4, ..., 32, 28, 24, 20.
-The maximum number of longitue points is `nlon`. The values of all grid points are stored in a vector
-field `v` that unravels the data 0 to 360˚, then ring by ring, which are sorted north to south."""
