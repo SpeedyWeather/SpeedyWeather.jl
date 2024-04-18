@@ -369,13 +369,6 @@ Base.BroadcastStyle(::Type{Grid}) where {Grid<:AbstractGridArray{T, N, ArrayType
 
 # allocation for broadcasting, create a new Grid with undef of type/number format T
 function Base.similar(bc::Broadcasted{AbstractGridArrayStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
-    # this escapes for Array and JLArray
-    # if isstructurepreserving(bc) || fzeropreserving(bc) 
-    #     return Grid(Array{T}(undef, size(bc)...))
-    # end
-    # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
-
-    # this doesn't escape for Array but for JLArray
     return Grid(Array{T}(undef, size(bc)...))
 end
 
@@ -383,16 +376,20 @@ end
 AbstractGridArrayStyle{N, Grid}(::Val{M}) where {N, Grid, M} = AbstractGridArrayStyle{N, Grid}()
 
 ## GPU
-function Broadcast.BroadcastStyle(
-    ::Type{Grid},
-) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
-    return Broadcast.BroadcastStyle(ArrayType)
+struct AbstractGPUGridArrayStyle{N, ArrayType, Grid} <: GPUArrays.AbstractGPUArrayStyle{N} end
+
+Base.BroadcastStyle(::Type{Grid}) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray} =
+    AbstractGPUGridArrayStyle{N, ArrayType, nonparametric_type(Grid)}()
+
+# ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
+AbstractGPUGridArrayStyle{N, ArrayType, Grid}(::Val{M}) where {N, ArrayType, Grid, M} = AbstractGPUGridArrayStyle{N, ArrayType, Grid}()
+
+function GPUArrays.backend(::Type{Grid}) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
+    return GPUArrays.backend(ArrayType)
 end
 
-function GPUArrays.backend(
-    ::Type{Grid},
-) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
-    return GPUArrays.backend(ArrayType)
+function Base.similar(bc::Broadcasted{AbstractGPUGridArrayStyle{N, ArrayType, Grid}}, ::Type{T}) where {N, ArrayType, Grid, T}
+    return Grid(T.(ArrayType(undef, size(bc)...)))
 end
 
 function Adapt.adapt_structure(to, grid::Grid) where {Grid <: AbstractGridArray}
