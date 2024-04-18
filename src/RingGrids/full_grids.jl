@@ -1,11 +1,11 @@
+"""Subtype of `AbstractGridArray` for all N-dimensional arrays of ring grids that have the
+same number of longitude points on every ring. As such these (horizontal) grids are representable
+as a matrix, with denser grid points towards the poles."""
 abstract type AbstractFullGridArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractGridArray{T, N, ArrayType} end
 
-"""
-abstract type AbstractFullGrid{T} <: AbstractGrid{T} end
-
-An `AbstractFullGrid` is a horizontal grid with a constant number of longitude
+"""An `AbstractFullGrid` is a horizontal grid with a constant number of longitude
 points across latitude rings. Different latitudes can be used, Gaussian latitudes,
-equi-angle latitdes, or others."""
+equi-angle latitudes (also called Clenshaw from Clenshaw-Curtis quadrature), or others."""
 const AbstractFullGrid{T} = AbstractFullGridArray{T, 1, Vector{T}}
 full_grid_type(Grid::Type{<:AbstractFullGridArray}) = horizontal_grid_type(Grid)
 full_array_type(Grid::Type{<:AbstractFullGridArray}) = nonparametric_type(Grid)
@@ -24,18 +24,22 @@ Base.Array(grid::AbstractFullGridArray) = Array(reshape(grid.data, :, get_nlat(g
 Base.Matrix(grid::AbstractFullGridArray) = Array(grid)
 
 ## INDEXING
+
+"""$(TYPEDSIGNATURES) `UnitRange` for every grid point of grid `Grid` of resolution `nlat_half`
+on ring `j` (`j=1` is closest ring around north pole, `j=nlat` around south pole)."""
 function each_index_in_ring(
     Grid::Type{<:AbstractFullGridArray},    # function for full grids
     j::Integer,                             # ring index north to south
     nlat_half::Integer,
 )
     @boundscheck 0 < j <= get_nlat(Grid, nlat_half) || throw(BoundsError)    # valid ring index?
-    nlon = 4nlat_half               # number of longitudes per ring (const)
-    index_1st = (j-1)*nlon + 1      # first in-ring index i
-    index_end = j*nlon              # last in-ring index i  
-    return index_1st:index_end      # range of js in ring
+    nlon = get_nlon(Grid, nlat_half)    # number of longitudes per ring (const)
+    index_1st = (j-1)*nlon + 1          # first in-ring index i
+    index_end = j*nlon                  # last in-ring index i  
+    return index_1st:index_end          # range of js in ring
 end
 
+# precompute ring indices for full grids
 function each_index_in_ring!(   
     rings::Vector{<:UnitRange{<:Integer}},
     Grid::Type{<:AbstractFullGridArray},

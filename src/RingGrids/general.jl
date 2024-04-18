@@ -1,33 +1,69 @@
+"""Abstract supertype for all arrays of ring grids, representing `N`-dimensional
+data on the sphere in two dimensions (but unravelled into a vector in the first dimension,
+the actual "ring grid") plus additional `N-1` dimensions for the vertical and/or time etc.
+Parameter `T` is the `eltype` of the underlying data, held as in the array type `ArrayType`
+(Julia's `Array` for CPU or others for GPU).
+
+Ring grids have several consecuitive grid points share the same latitude (= a ring),
+grid points on a given ring are equidistant. Grid points are ordered 0 to 360˚E,
+starting around the north pole, ring by ring to the south pole. """
 abstract type AbstractGridArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractArray{T, N} end
 
-# Horizontal 2D grids with N=1
+"""Abstract supertype for all ring grids, representing 2-dimensional data on the
+sphere unravelled into a Julia `Vector`. Subtype of `AbstractGridArray` with
+`N=1` and `ArrayType=Vector{T}` of `eltype T`.""" 
 const AbstractGrid{T} = AbstractGridArray{T, 1, Vector{T}}
 
 ## TYPES
+"""$(TYPEDSIGNATURES) For any instance of `AbstractGridArray` type its n-dimensional type
+(*Grid{T, N, ...} returns *Array) but without any parameters `{T, N, ArrayType}`"""
 nonparametric_type(grid::AbstractGridArray) = nonparametric_type(typeof(grid))
+
+"""$(TYPEDSIGNATURES) Full grid array type for `grid`. Always returns the N-dimensional `*Array`
+not the two-dimensional (`N=1`) `*Grid`. For reduced grids the corresponding full grid that
+share the same latitudes."""
 full_array_type(grid::AbstractGridArray) = full_array_type(typeof(grid))
+
+"""$(TYPEDSIGNATURES) Full (horizontal) grid type for `grid`. Always returns the two-dimensional
+(`N=1`) `*Grid` type. For reduced grids the corresponding full grid that share the same latitudes."""
 full_grid_type(grid::AbstractGridArray) = horizontal_grid_type(full_array_type(grid))
 full_grid_type(Grid::Type{<:AbstractGridArray}) = horizontal_grid_type(full_array_type(Grid))
+
+"""$(TYPEDSIGNATURES) The two-dimensional (`N=1`) `*Grid` for `grid`, which can be an N-dimensional
+`*GridArray`."""
 horizontal_grid_type(grid::AbstractGridArray) = horizontal_grid_type(typeof(grid))
 
 ## SIZE
-Base.length(G::AbstractGridArray) = length(G.data)
-Base.size(G::AbstractGridArray) = size(G.data)
-Base.sizeof(G::AbstractGridArray) = sizeof(G.data)
+Base.length(G::AbstractGridArray) = length(G.data)  # total number of grid points
+Base.size(G::AbstractGridArray) = size(G.data)      # size of underlying data (horizontal is unravelled)
 
+"""$(TYPEDSIGNATURES) Size of underlying data array plus precomputed ring indices."""
+Base.sizeof(G::AbstractGridArray) = sizeof(G.data) + sizeof(G.rings)
+
+"""$(TYPEDSIGNATURES) Resolution paraemeters `nlat_half` of a `grid`.
+Number of latitude rings on one hemisphere, Equator included."""
 get_nlat_half(grid::AbstractGridArray) = grid.nlat_half
+
+"""$(TYPEDSIGNATURES) True for a `grid` that has an odd number of
+latitude rings `nlat` (both hemispheres)."""
 nlat_odd(grid::AbstractGridArray) = nlat_odd(typeof(grid))
 
 # get total number of latitude rings, *(nlat_half > 0) to return 0 for nlat_half = 0
 get_nlat(Grid::Type{<:AbstractGridArray}, nlat_half::Integer) = 2nlat_half - nlat_odd(Grid)*(nlat_half > 0)
+
+"""$(TYPEDSIGNATURES) Get number of latitude rings, pole to pole."""
 get_nlat(grid::Grid) where {Grid<:AbstractGridArray} = get_nlat(Grid, grid.nlat_half)
 
-# get total number of grid points vs horizontal (2D) only
+"""$(TYPEDSIGNATURES) Total number of grid points in all dimensions of `grid`.
+Equivalent to length of the underlying data array."""
 get_npoints(grid::Grid) where {Grid<:AbstractGridArray} = get_npoints(Grid, grid.nlat_half)
 get_npoints(G::Type{<:AbstractGridArray}, nlat_half::Integer, k::Integer...) = prod(k) * get_npoints2D(G, nlat_half)
+
+"""$(TYPEDSIGNATURES) Number of grid points in the horizontal dimension only,
+even if `grid` is N-dimensional."""
 get_npoints2D(grid::Grid) where {Grid<:AbstractGridArray} = get_npoints2D(Grid, grid.nlat_half)
 
-# size of the matrix of the horizontal grid if representable as such (not all grids)
+"""$(TYPEDSIGNATURES) Size of the matrix of the horizontal grid if representable as such (not all grids)."""
 matrix_size(grid::Grid) where {Grid<:AbstractGridArray} = matrix_size(Grid, grid.nlat_half)
 
 ## INDEXING
@@ -38,7 +74,7 @@ matrix_size(grid::Grid) where {Grid<:AbstractGridArray} = matrix_size(Grid, grid
     col::Colon,
     k::Integer...,
 ) where {GridArray<:AbstractGridArray}
-    GridArray_ = nonparametric_type(GridArray)
+    GridArray_ = nonparametric_type(GridArray)  # obtain parameters from G.data
     return GridArray_(getindex(G.data, col, k...), G.nlat_half, G.rings)
 end
 
@@ -50,6 +86,8 @@ end
     setindex!(G.data, x, ij, k)
 
 ## CONSTRUCTORS
+"""$(TYPEDSIGNATURES) True for `data`, `nlat_half` and `rings` that all match in size
+to construct a grid of type `Grid`."""
 function check_inputs(data, nlat_half, rings, Grid)
     check = true
     check &= size(data, 1) == get_npoints2D(Grid, nlat_half)    # test number of 2D grid points
@@ -71,15 +109,15 @@ end
 
 # if no rings are provided, calculate them
 function (::Type{Grid})(data::AbstractArray, nlat_half::Integer) where {Grid<:AbstractGridArray}
-    GridArray_ = nonparametric_type(Grid)
-    rings = eachring(Grid, nlat_half)
+    GridArray_ = nonparametric_type(Grid)   # strip away parameters of type, obtain parameters from data
+    rings = eachring(Grid, nlat_half)       # precompute indices to access the variable-length rings
     return GridArray_(data, nlat_half, rings)
 end
 
 # if no nlat_half provided calculate it
 function (::Type{Grid})(data::AbstractArray) where {Grid<:AbstractGridArray}
-    npoints2D = size(data, 1)
-    nlat_half = get_nlat_half(Grid, npoints2D)
+    npoints2D = size(data, 1)                   # from 1st dim of data
+    nlat_half = get_nlat_half(Grid, npoints2D)  # get nlat_half of Grid
     return Grid(data, nlat_half)
 end
 
@@ -177,6 +215,9 @@ function (::Type{Grid})(
 end
 
 ## COORDINATES
+
+"""$(TYPEDSIGNATURES) Latitudes (in degrees, -90˚-90˚N) and longitudes (0-360˚E)  for
+every (horizontal) grid point in `grid`. Ordered 0-360˚E then north to south."""
 get_latdlonds(grid::Grid) where {Grid<:AbstractGridArray} = get_latdlonds(Grid, grid.nlat_half)
 
 function get_latdlonds(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
@@ -189,6 +230,10 @@ function get_latdlonds(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
     return latds, londs
 end
 
+"""$(TYPEDSIGNATURES) Latitudes (in radians, 0-2π) and longitudes (-π/2 - π/2) for
+every (horizontal) grid point in `grid`."""
+get_latlons(grid::Grid) where {Grid<:AbstractGridArray} = get_latlons(Grid, grid.nlat_half)
+
 function get_latlons(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
     colats, lons = get_colatlons(Grid, nlat_half)   # colatitudes, longitudes in radians
     lats = colats                                   # flat copy rename before conversion
@@ -196,11 +241,23 @@ function get_latlons(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
     return lats, lons
 end
 
+"""$(TYPEDSIGNATURES) Latitude (radians) for each ring in `grid`, north to south."""
 get_lat(grid::Grid) where {Grid<:AbstractGridArray} = get_lat(Grid, grid.nlat_half)
+
+"""$(TYPEDSIGNATURES) Latitude (degrees) for each ring in `grid`, north to south."""
 get_latd(grid::Grid) where {Grid<:AbstractGridArray} = get_latd(Grid, grid.nlat_half)
+
+"""$(TYPEDSIGNATURES) Longitude (degrees) for meridional column (full grids only)."""
 get_lond(grid::Grid) where {Grid<:AbstractGridArray} = get_lond(Grid, grid.nlat_half)
+
+"""$(TYPEDSIGNATURES) Longitude (radians) for meridional column (full grids only)."""
 get_lon(grid::Grid) where {Grid<:AbstractGridArray} = get_lon(Grid, grid.nlat_half)
+
+"""$(TYPEDSIGNATURES) Colatitudes (radians) for meridional column (full grids only)."""
 get_colat(grid::Grid) where {Grid<:AbstractGridArray} = get_colat(Grid, grid.nlat_half)
+
+"""$(TYPEDSIGNATURES) Latitudes (in radians, 0-π) and longitudes (0 - 2π) for
+every (horizontal) grid point in `grid`."""
 get_colatlons(grid::Grid) where {Grid<:AbstractGridArray} = get_colatlons(Grid, grid.nlat_half)
 get_nlon_max(grid::Grid) where {Grid<:AbstractGridArray} = get_nlon_max(Grid, grid.nlat_half)
 
@@ -211,10 +268,6 @@ end
 function get_latd(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
     return get_lat(Grid, nlat_half) * (360/2π)
 end
-
-# only defined for full grids, empty vector as fallback
-get_lon(::Type{<:AbstractGridArray}, nlat_half::Integer) = Float64[]
-get_lond(::Type{<:AbstractGridArray}, nlat_half::Integer) = Float64[]
 
 """
 $(TYPEDSIGNATURES)
@@ -250,40 +303,38 @@ and then each grid point per ring. To be used like
 @inline eachring(grid::AbstractGridArray) = grid.rings
 
 function eachring(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
-    rings = Vector{UnitRange{Int}}(undef, get_nlat(Grid, nlat_half))
-    each_index_in_ring!(rings, Grid, nlat_half)
+    rings = Vector{UnitRange{Int}}(undef, get_nlat(Grid, nlat_half))    # allocate
+    each_index_in_ring!(rings, Grid, nlat_half)                         # calculate iteratively
     return rings
 end
 
-"""
-$(TYPEDSIGNATURES)
-Same as `eachring(grid)` but performs a bounds check to assess that all grids
-in `grids` are of same size."""
+"""$(TYPEDSIGNATURES) Same as `eachring(grid)` but performs a bounds check to assess
+that all `grids` are of same size."""
 function eachring(grid1::Grid, grids::Grid...) where {Grid<:AbstractGridArray} 
     n = length(grid1)
     Base._all_match_first(X->length(X), n, grid1, grids...) || throw(BoundsError)
     return eachring(grid1)
 end
 
+"""$(TYPEDSIGNATURES) True if both `A` and `B` are of the same type
+(regardless type parameter `T` or underyling array type `ArrayType`) and
+of same size."""
 function grids_match(A::AbstractGridArray, B::AbstractGridArray)
     length(A) == length(B) && return grids_match(typeof(A), typeof(B))
     return false
 end
 
 function grids_match(A::Type{<:AbstractGridArray}, B::Type{<:AbstractGridArray})
+    # eltypes can be different and also array types of underlying data
     return nonparametric_type(A) == nonparametric_type(B)
 end
 
-"""
-$(TYPEDSIGNATURES)
-UnitRange to access data on grid `grid` on ring `j`."""
+"""$(TYPEDSIGNATURES) UnitRange to access data on grid `grid` on ring `j`."""
 function each_index_in_ring(grid::Grid, j::Integer) where {Grid<:AbstractGridArray}
     return each_index_in_ring(Grid, j, grid.nlat_half)
 end
 
-"""
-$(TYPEDSIGNATURES)
-UnitRange to access each grid point on grid `grid`."""
+""" $(TYPEDSIGNATURES) UnitRange to access each grid point on grid `grid`."""
 eachgridpoint(grid::AbstractGridArray) = Base.OneTo(get_npoints(grid))
 function eachgridpoint(grid1::Grid, grids::Grid...) where {Grid<:AbstractGridArray}
     n = length(grid1)
@@ -291,10 +342,8 @@ function eachgridpoint(grid1::Grid, grids::Grid...) where {Grid<:AbstractGridArr
     return eachgridpoint(grid1)
 end
 
-"""
-$(TYPEDSIGNATURES)
-Obtain ring index j from gridpoint ij and Vector{UnitRange} describing rind indices
-as obtained from eachring(::Grid)"""
+"""$(TYPEDSIGNATURES) Obtain ring index `j` from gridpoint `ij` and `rings`
+describing rind indices as obtained from `eachring(::Grid)`"""
 function whichring(ij::Integer, rings::Vector{UnitRange{Int}})
     @boundscheck 0 < ij <= rings[end][end] || throw(BoundsError)
     j = 1

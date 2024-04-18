@@ -1,3 +1,13 @@
+"""A `FullHEALPixArray` is an array of full grids, subtyping `AbstractFullGridArray`, that use
+HEALPix latitudes for each ring. This type primarily equists to interpolate data from
+the (reduced) HEALPixGrid onto a full grid for output.
+
+First dimension of the underlying `N`-dimensional `data` represents the horizontal dimension,
+in ring order (0 to 360˚E, then north to south), other dimensions are used for the vertical
+and/or time or other dimensions. The resolution parameter of the horizontal grid is
+`nlat_half` (number of latitude rings on one hemisphere, Equator included) and the ring indices
+are precomputed in `rings`. Fields are
+$(TYPEDFIELDS)"""
 struct FullHEALPixArray{T, N, ArrayType <: AbstractArray{T, N}} <: AbstractFullGridArray{T, N, ArrayType}
     data::ArrayType                 # data array, ring by ring, north to south
     nlat_half::Int                  # number of latitudes on one hemisphere
@@ -14,6 +24,9 @@ const FullHEALPixGrid{T} = FullHEALPixArray{T, 1, Vector{T}}
 nonparametric_type(::Type{<:FullHEALPixArray}) = FullHEALPixArray
 horizontal_grid_type(::Type{<:FullHEALPixArray}) = FullHEALPixGrid
 
+"""A `FullHEALPixArray` but constrained to `N=1` dimensions (horizontal only) and data is a `Vector{T}`."""
+FullHEALPixGrid
+
 # SIZE
 nlat_odd(::Type{<:FullHEALPixArray}) = true
 get_npoints2D(::Type{<:FullHEALPixArray}, nlat_half::Integer) = 4nlat_half * (2nlat_half-1)
@@ -26,13 +39,3 @@ get_lon(::Type{<:FullHEALPixArray}, nlat_half::Integer) = get_lon(FullGaussianAr
 
 # QUADRATURE
 get_quadrature_weights(::Type{<:FullHEALPixArray}, nlat_half::Integer) = healpix_weights(nlat_half)
-
-
-"""
-    G = FullHEALPixGrid{T}
-
-A full HEALPix grid is a regular latitude-longitude grid that uses `nlat` latitudes from the HEALPix grid,
-and the same `nlon` longitudes for every latitude ring. The grid points are closer in zonal direction
-around the poles. The values of all grid points are stored in a vector field `v` that unravels
-the data 0 to 360˚, then ring by ring, which are sorted north to south."""
-FullHEALPixGrid
