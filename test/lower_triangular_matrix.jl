@@ -76,36 +76,116 @@ end
 end 
 
 @testset "LowerTriangularMatrix: @inbounds" begin
-    A = randn(LowerTriangularMatrix, 33, 32)
+    m, n = 5, 5
+    A = randn(LowerTriangularMatrix, m, n)
     
-    @testset "getindex" begin
-        @test_throws BoundsError A[34, 32]   # outside of i, j range
-        @test_throws BoundsError A[561]     # outside of k range
+    # @testset "getindex" begin
+        @test_throws BoundsError A[m, n+1]  # outside of i, j range
+        @test_throws BoundsError A[m+1, n]  # outside of i, j range
 
-        # # shouldn't throw an error if @inbounds
-        # f(A, i) = @inbounds A[i]             # wrap into function
-        # f(A, i, j) = @inbounds A[i, j]
-        
-        # f(A, 33, 32)                          # inside ranges
-        # f(A, 560)
+        mn = LowerTriangularMatrices.nonzeros(m, n)
+        @test_throws BoundsError A[mn+1]    # outside of k range
 
-        # f(A, 34, 32)                          # outside ranges
-        # f(A, 561)
-    end
+        # with @inbounds accessing [1,2] should return [5]
+        # because the j > 1 is skipped and ij2k(1, 2, 5) = 5
+        # which isn't correct but would never be called without @inbounds
+        f(A, i) = @inbounds A[i]             # wrap into function
+        f(A, i, j) = @inbounds A[i, j]
 
-    @testset "setindex!" begin
-        @test_throws BoundsError A[34, 32] = 1
-        @test_throws BoundsError A[561] = 1
+        @test f(A, 1) == A[1]       # valid
+        @test f(A, 2, 1) == A[2]    # valid
+        @test f(A, 1, 2) == A[m]    # invalid
 
-        # this can create a segfault so don't test regularly, but it worked ;)
-        # g(A, i) = @inbounds A[i] = 1
-        # g(A, i, j) = @inbounds A[i, j] = 1
-        # g(A, 34, 32)
-        # g(A, 561)
-    end
+        @test f(A, CartesianIndex(2, 1)) == A[2, 1]
+        @test f(A, CartesianIndex(1, 2)) == A[n, 1]
+    # end
+
+    # @testset "setindex!" begin
+        @test_throws BoundsError A[m+1, n] = 1  # invalid
+        @test_throws BoundsError A[m, n+1] = 1  # invalid
+        @test_throws BoundsError A[1, 2] = 1    # upper triangle
+
+        mn = LowerTriangularMatrices.nonzeros(m, n)
+        @test_throws BoundsError A[mn+1] = 1
+
+        # with @inbounds accessing [1,2] should return [5]
+        # because the j > 1 is skipped and ij2k(1, 2, 5) = 5
+        # which isn't correct but would never be called without @inbounds
+        g!(A, i) = @inbounds A[i] = 1               # wrap into function
+        g!(A, i, j) = @inbounds A[i, j] = 1
+
+        g!(A, 1)                                    # valid
+        @test f(A, 1) == A[1] == 1
+
+        g!(A, 2, 1)                                 # valid
+        @test f(A, 2, 1) == A[2] == A[2,1] == 1
+
+        g!(A, 1, 2)                                 # invalid
+        @test f(A, 1, 2) == A[n] == A[n,1] == 1
+    # end
 end
 
 @testset "LowerTriangularArray: @inbounds" begin
+    m, n, p = 5, 5, 5
+    A = randn(LowerTriangularArray, m, n, p)
+    
+    # @testset "getindex" begin
+        @test_throws BoundsError A[m, n+1, p+1]  # outside or range
+        @test_throws BoundsError A[m, n+1, p  ]  # outside or range
+        @test_throws BoundsError A[m+1, n, p  ]  # outside or range
+
+        mnp = LowerTriangularMatrices.nonzeros(m, n)*p
+        @test_throws BoundsError A[mnp+1]       # outside of k range
+
+        # with @inbounds accessing [1,2] should return [5]
+        # because the j > 1 boundscheck is skipped and ij2k(1, 2, 5) = 5
+        # which isn't correct but would never be called without @inbounds
+        f(A, i) = @inbounds A[i]            # wrap into function
+        f(A, i, j) = @inbounds A[i, j]
+        f(A, i, j, k) = @inbounds A[i, j, k]
+
+        @test f(A, 1) == A[1]               # valid
+        @test f(A, 2, 1) == A[2]            # valid
+        @test f(A, 1, 2, 3) == A[m, 1, 3]   # invalid
+        @test f(A, 1, 1, 1) == A[1, 1, 1]   # valid
+
+        @test f(A, CartesianIndex(3)) == A[3]
+        @test f(A, CartesianIndex(2, 1)) == A[2, 1]
+        @test f(A, CartesianIndex(2, 1, 1)) == A[2, 1]
+        @test f(A, CartesianIndex(1, 2, 1)) == A[n, 1]  # invalid
+    # end
+
+    # @testset "setindex!" begin
+        @test_throws BoundsError A[m+1, n, p  ] = 1  # invalid
+        @test_throws BoundsError A[m, n+1, p  ] = 1  # invalid
+        @test_throws BoundsError A[m, n+1, p+1] = 1  # invalid
+        @test_throws BoundsError A[1, 2,   1  ] = 1  # upper triangle
+
+        mnp = LowerTriangularMatrices.nonzeros(m, n)*p
+        @test_throws BoundsError A[mnp+1] = 1
+
+        # with @inbounds accessing [1,2] should return [5]
+        # because the j > 1 is skipped and ij2k(1, 2, 5) = 5
+        # which isn't correct but would never be called without @inbounds
+        g!(A, i) = @inbounds A[i] = 1               # wrap into function
+        g!(A, i, j) = @inbounds A[i, j] = 1
+        g!(A, i, j, k) = @inbounds A[i, j, k] = 1
+
+        g!(A, 1)                                    # valid
+        @test f(A, 1) == A[1] == 1
+
+        g!(A, 2, 1)                                 # valid
+        @test f(A, 2, 1) == A[2] == A[2,1] == 1
+
+        g!(A, 1, 2)                                 # valid
+        @test f(A, 1, 2) == A[1, 2] == 1
+
+        g!(A, 1, 2, 1)                              # invalid
+        @test f(A, 1, 2, 1) == A[n] == A[n, 1] == A[n, 1, 1] == 1
+    # end
+end
+
+@testset "4D LowerTriangularArray: @inbounds" begin
     A = randn(LowerTriangularArray, 33, 32, 1, 1)
     
     @testset "getindex" begin

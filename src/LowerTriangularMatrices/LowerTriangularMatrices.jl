@@ -1,14 +1,21 @@
 module LowerTriangularMatrices
 
+# STRUCTURE
 using DocStringExtensions
-import Adapt, KernelAbstractions
-import UnicodePlots
-import LinearAlgebra: tril!
+
+# GPU
+import Adapt
 import GPUArrays
+
+# NUMERICS
+import LinearAlgebra: tril!
+
+# VISUALISATION
+import UnicodePlots
+# export plot
 
 export LowerTriangularMatrix, LowerTriangularArray
 export eachharmonic
-# export plot
 
 include("lower_triangular_matrix.jl")
 include("plot.jl")

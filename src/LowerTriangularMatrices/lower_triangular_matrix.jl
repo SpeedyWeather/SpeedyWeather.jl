@@ -133,8 +133,8 @@ end
     return getindex(L.data, k, I...)
 end
 
-# l,m sph indexing, no. indices has to be equal to N 
-@inline function Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Integer, N}) where {T, N}
+# double index i,j, i.e. spherical harmoinc indexing (1-based), no. indices has to be equal to N 
+Base.@propagate_inbounds function Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Integer, N}) where {T, N}
     i, j = I[1:2]
     @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
     @boundscheck j > i && return zero(T)
@@ -162,12 +162,12 @@ end
     return Matrix(L)[:,i]
 end
 
-@inline Base.getindex(L::LowerTriangularArray, r::AbstractRange) = getindex(L.data,r)
-@inline Base.getindex(L::LowerTriangularArray, r::AbstractRange, I...) = getindex(L.data, r, I...)
-@inline Base.getindex(L::LowerTriangularArray, i::Integer) = getindex(L.data,i)
+# Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, r::AbstractRange) = getindex(L.data, r)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, r::AbstractRange, I...) = getindex(L.data, r, I...)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, i::Integer) = getindex(L.data, i)
 
 # important to do Tuple(I) here for the j > i case as one of the getindex methods above is called
-@inline Base.getindex(L::LowerTriangularArray, I::CartesianIndex) = getindex(L, Tuple(I)...)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, I::CartesianIndex) = getindex(L, Tuple(I)...)
 
 # setindex with lm, ..
 @inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, M}) where {T, N, M} 
