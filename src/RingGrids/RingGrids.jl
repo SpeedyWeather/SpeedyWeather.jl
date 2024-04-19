@@ -11,8 +11,8 @@ import LinearAlgebra
 
 # GPU
 import Adapt
-import KernelAbstractions
 import GPUArrays
+import CUDA
 
 # GRIDS
 export  AbstractGridArray,

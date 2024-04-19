@@ -19,6 +19,10 @@ const AbstractGrid{T} = AbstractGridArray{T, 1, Vector{T}}
 (*Grid{T, N, ...} returns *Array) but without any parameters `{T, N, ArrayType}`"""
 nonparametric_type(grid::AbstractGridArray) = nonparametric_type(typeof(grid))
 
+# also needed for other array types
+nonparametric_type(::Type{Array}) = Array
+nonparametric_type(::Type{CuArray}) = CuArray
+
 """$(TYPEDSIGNATURES) Full grid array type for `grid`. Always returns the N-dimensional `*Array`
 not the two-dimensional (`N=1`) `*Grid`. For reduced grids the corresponding full grid that
 share the same latitudes."""
@@ -193,7 +197,8 @@ function (::Type{Grid})(
     nlat_half::Integer,
     k::Integer...,
 ) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType}
-    return Grid(ArrayType{T, N}(undef, get_npoints2D(Grid, nlat_half), k...), nlat_half)
+    ArrayType_ = nonparametric_type(ArrayType)
+    return Grid(ArrayType_{T, N}(undef, get_npoints2D(Grid, nlat_half), k...), nlat_half)
 end
 
 # CPU version with Array{T, N}(undef, ...) generator
