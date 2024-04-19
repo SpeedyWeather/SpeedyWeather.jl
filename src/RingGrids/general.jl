@@ -21,7 +21,7 @@ nonparametric_type(grid::AbstractGridArray) = nonparametric_type(typeof(grid))
 
 # also needed for other array types
 nonparametric_type(::Type{Array}) = Array
-nonparametric_type(::Type{CuArray}) = CuArray
+nonparametric_type(::Type{CUDA.CuArray}) = CuArray
 
 """$(TYPEDSIGNATURES) Full grid array type for `grid`. Always returns the N-dimensional `*Array`
 not the two-dimensional (`N=1`) `*Grid`. For reduced grids the corresponding full grid that
