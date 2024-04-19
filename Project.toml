@@ -35,7 +35,7 @@ JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
 
 [extensions]
 SpeedyWeatherMakieExt = "Makie"
-SpeedyWeatherJLArraysExt = "JLArrays
+SpeedyWeatherJLArraysExt = "JLArrays"
 
 [compat]
 AbstractFFTs = "1"

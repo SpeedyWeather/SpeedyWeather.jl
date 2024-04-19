@@ -14,17 +14,16 @@ import Adapt
 import GPUArrays
 import CUDA
 
-# GRIDS
+# ABSTRACT GRIDS (2D) AND GRIDARRAYS (3D+)
 export  AbstractGridArray,
         AbstractFullGridArray,
         AbstractReducedGridArray
 
 export  AbstractGrid,
         AbstractFullGrid,
-        AbstractOctahedralGrid,
-        AbstractHEALPixGrid,
-        AbstractOctaHEALPixGrid
+        AbstractReducedGrid
 
+# CONCRETE GRIDS (2D) AND GRIDARRAYS (3D+)
 export  FullGaussianArray,
         FullClenshawArray,
         FullHEALPixArray,
