@@ -1,3 +1,5 @@
+const DEFAULT_RADIUS = 1
+
 """
 $(TYPEDSIGNATURES)
 Curl of a vector `u, v` written into `curl`, `curl = ∇×(u, v)`.
@@ -15,7 +17,7 @@ function curl!( curl::LowerTriangularMatrix,
 
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
     kernel(o, a, b, c) = flipsign ? (add ? o-(a+b-c) : -(a+b-c)) :
-                                 (add ? o+(a+b-c) :   a+b-c )    
+                                    (add ? o+(a+b-c) :   a+b-c )    
     _divergence!(kernel, curl, v, u, S)             # flip u, v -> v, u
 end
 
@@ -36,7 +38,7 @@ function divergence!(   div::LowerTriangularMatrix,
 
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
     kernel(o, a, b, c) = flipsign ? (add ? o-(a-b+c) : -(a-b+c)) :
-                                 (add ? o+(a-b+c) :   a-b+c )                
+                                    (add ? o+(a-b+c) :   a-b+c )                
     _divergence!(kernel, div, u, v, S)
 end
 
@@ -104,19 +106,28 @@ This function requires both `u, v` to be transforms of fields that are scaled wi
 Both `div` and `div_grid` are scaled with the radius.
 """
 function divergence(u::LowerTriangularMatrix,
-                    v::LowerTriangularMatrix)
+                    v::LowerTriangularMatrix;
+                    radius = DEFAULT_RADIUS)
 
     @assert size(u) == size(v) "Size $(size(u)) and $(size(v)) incompatible."
 
     S = SpectralTransform(u)
     div = similar(u)
     divergence!(div, u, v, S, add=false, flipsign=false)
+
+    if radius != 1
+        div .*= inv(radius)
+    end
+
     return div
 end
 
-function _div_or_curl(  kernel!,
-                        u::Grid,
-                        v::Grid) where {Grid<:AbstractGrid}
+function _div_or_curl(  
+    kernel!,
+    u::Grid,
+    v::Grid;
+    radius = DEFAULT_RADIUS
+) where {Grid<:AbstractGrid}
 
     @assert size(u) == size(v) "Size $(size(u)) and $(size(v)) incompatible."
 
@@ -132,6 +143,11 @@ function _div_or_curl(  kernel!,
 
     div_or_vor = similar(us)
     kernel!(div_or_vor, us, vs, S, add=false, flipsign=false)
+
+    if radius != 1
+        div_or_vor .*= inv(radius)
+    end
+
     return div_or_vor
 end
 
@@ -141,7 +157,7 @@ Divergence (∇⋅) of two vector components `u, v` on a grid.
 Applies 1/coslat scaling, transforms to spectral space and returns
 the spectral divergence, which is scaled with the radius
 of the sphere. Divide by radius for unscaling."""
-divergence(u::Grid, v::Grid) where {Grid<:AbstractGrid} = _div_or_curl(divergence!, u, v)
+divergence(u::Grid, v::Grid; kwargs...) where {Grid<:AbstractGrid} = _div_or_curl(divergence!, u, v; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -149,7 +165,7 @@ Curl (∇×) of two vector components `u, v` on a grid.
 Applies 1/coslat scaling, transforms to spectral space and returns
 the spectral curl, which is scaled with the radius
 of the sphere. Divide by radius for unscaling."""
-curl(u::Grid, v::Grid) where {Grid<:AbstractGrid} = _div_or_curl(curl!, u, v)
+curl(u::Grid, v::Grid; kwargs...) where {Grid<:AbstractGrid} = _div_or_curl(curl!, u, v; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -166,13 +182,19 @@ requires both `u, v` to be transforms of fields that are scaled with
     vor_grid = gridded(div)
 """
 function curl(  u::LowerTriangularMatrix,
-                v::LowerTriangularMatrix)
+                v::LowerTriangularMatrix;
+                radius = DEFAULT_RADIUS)
 
     @assert size(u) == size(v) "Size $(size(u)) and $(size(v)) incompatible."
 
     S = SpectralTransform(u)
     vor = similar(u)
     curl!(vor, u, v, S, add=false, flipsign=false)
+
+    if radius != 1
+        vor .*= inv(radius)
+    end
+
     return vor
 end
 
@@ -375,11 +397,18 @@ $(TYPEDSIGNATURES)
 Laplace operator ∇² applied to input `alms`, using precomputed
 eigenvalues from `S`. The Laplace operator acts on the unit
 sphere and therefore omits the 1/radius^2 scaling"""
-function ∇²(alms::LowerTriangularMatrix,    # Input: spectral coefficients
-            S::SpectralTransform)           # precomputed eigenvalues
-
+function ∇²(
+    alms::LowerTriangularMatrix,    # Input: spectral coefficients
+    S::SpectralTransform;           # precomputed eigenvalues
+    radius = DEFAULT_RADIUS,
+)
     ∇²alms = similar(alms)
     ∇²!(∇²alms, alms, S, add=false, flipsign=false, inverse=false)
+
+    if radius != 1
+        ∇²alms .*= inv(radius^2)
+    end
+
     return ∇²alms
 end
 
@@ -388,18 +417,26 @@ $(TYPEDSIGNATURES)
 Returns the Laplace operator ∇² applied to input `alms`.
 The Laplace operator acts on the unit
 sphere and therefore omits the 1/radius^2 scaling"""
-∇²(alms::LowerTriangularMatrix) = ∇²(alms, SpectralTransform(alms))
+∇²(alms::LowerTriangularMatrix; kwargs...) = ∇²(alms, SpectralTransform(alms); kwargs...)
 
 """
 $(TYPEDSIGNATURES)
 InverseLaplace operator ∇⁻² applied to input `alms`, using precomputed
 eigenvalues from `S`. The Laplace operator acts on the unit
 sphere and therefore omits the radius^2 scaling"""
-function ∇⁻²(   ∇²alms::LowerTriangularMatrix,  # Input: spectral coefficients
-                S::SpectralTransform)           # precomputed eigenvalues
+function ∇⁻²(
+    ∇²alms::LowerTriangularMatrix,  # Input: spectral coefficients
+    S::SpectralTransform;           # precomputed eigenvalues
+    radius = DEFAULT_RADIUS,
+)
 
     alms = similar(∇²alms)
     ∇⁻²!(alms, ∇²alms, S, add=false, flipsign=false)
+
+    if radius != 1
+        ∇²alms .*= radius^2
+    end
+
     return alms
 end
 
@@ -407,7 +444,7 @@ end
 $(TYPEDSIGNATURES)
 Returns the inverse Laplace operator ∇⁻² applied to input `alms`.
 The Laplace operator acts on the unit sphere and therefore omits the radius^2 scaling"""
-∇⁻²(∇²alms::LowerTriangularMatrix) = ∇⁻²(∇²alms, SpectralTransform(∇²alms))
+∇⁻²(∇²alms::LowerTriangularMatrix; kwargs...) = ∇⁻²(∇²alms, SpectralTransform(∇²alms); kwargs...)
 
 """$(TYPEDSIGNATURES) Calls `∇²!(∇⁻²alms, alms, S; add, flipsign, inverse=true)`."""
 function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}}, # Output: inverse Laplacian of alms
@@ -476,27 +513,34 @@ end
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
 using an existing `SpectralTransform` `S`. The 1/radius-scaling is omitted,
 as is the 1/coslat scaling."""
-function ∇(p::LowerTriangularMatrix, S::SpectralTransform)
+function ∇(p::LowerTriangularMatrix, S::SpectralTransform; radius = DEFAULT_RADIUS)
     dpdx = similar(p)
     dpdy = similar(p)
-    return ∇!(dpdx, dpdy, p, S)
+    ∇!(dpdx, dpdy, p, S)
+
+    if radius != 1
+        dpdx .*= inv(radius)
+        dpdy .*= inv(radius)
+    end
+
+    return dpdx, dpdy
 end
 
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`.
 Precomputes a `SpectralTransform` `S`. The 1/radius-scaling is omitted,
 as is the 1/coslat scaling."""
-function ∇(p::LowerTriangularMatrix)
+function ∇(p::LowerTriangularMatrix; kwargs...)
     S = SpectralTransform(p, one_more_degree=true)
-    return ∇(p, S)
+    return ∇(p, S; kwargs...)
 end
 
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `grid`.
 Transform to spectral space, takes the gradient and unscales the 1/coslat
 scaling in the gradient, but omits the 1/radius scaling that has to be
 applied manually. Makes use of an existing spectral transform `S`."""
-function ∇(grid::AbstractGrid, S::SpectralTransform)
+function ∇(grid::AbstractGrid, S::SpectralTransform; kwargs...)
     p = spectral(grid, S)
-    dpdx, dpdy = ∇(p, S)
+    dpdx, dpdy = ∇(p, S; kwargs...)
     dpdx_grid = gridded(dpdx, S, unscale_coslat=true)
     dpdy_grid = gridded(dpdy, S, unscale_coslat=true)
     return dpdx_grid, dpdy_grid
@@ -506,7 +550,7 @@ end
 Transform to spectral space, takes the gradient and unscales the 1/coslat
 scaling in the gradient, but omits the 1/radius scaling that has to be
 applied manually."""
-function ∇(grid::AbstractGrid)
+function ∇(grid::AbstractGrid; kwargs...)
     S = SpectralTransform(grid, one_more_degree=true)
-    return ∇(grid, S)
+    return ∇(grid, S; kwargs...)
 end
