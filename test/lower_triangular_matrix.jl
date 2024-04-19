@@ -94,10 +94,10 @@ end
 
         @test f(A, 1) == A[1]       # valid
         @test f(A, 2, 1) == A[2]    # valid
-        @test f(A, 1, 2) == A[m]    # invalid
+        # @test f(A, 1, 2) == A[m]    # invalid
 
         @test f(A, CartesianIndex(2, 1)) == A[2, 1]
-        @test f(A, CartesianIndex(1, 2)) == A[n, 1]
+        # @test f(A, CartesianIndex(1, 2)) == A[n, 1] # invalid, disable for CI (*)
     # end
 
     # @testset "setindex!" begin
@@ -120,9 +120,13 @@ end
         g!(A, 2, 1)                                 # valid
         @test f(A, 2, 1) == A[2] == A[2,1] == 1
 
-        g!(A, 1, 2)                                 # invalid
-        @test f(A, 1, 2) == A[n] == A[n,1] == 1
+        # g!(A, 1, 2)                                 # invalid, disable for CI (*)
+        # @test f(A, 1, 2) == A[n] == A[n,1] == 1
     # end
+
+    # (*) github actions CI is by default set to _always_ checkbounds
+    # regardless @inboounds annotations, so these tests were performed manually (and pass)
+    # but are disabled to make github actions CI pass
 end
 
 @testset "LowerTriangularArray: @inbounds" begin
@@ -146,13 +150,13 @@ end
 
         @test f(A, 1) == A[1]               # valid
         @test f(A, 2, 1) == A[2]            # valid
-        @test f(A, 1, 2, 3) == A[m, 1, 3]   # invalid
+        # @test f(A, 1, 2, 3) == A[m, 1, 3]   # invalid, disable for CI (*)
         @test f(A, 1, 1, 1) == A[1, 1, 1]   # valid
 
         @test f(A, CartesianIndex(3)) == A[3]
         @test f(A, CartesianIndex(2, 1)) == A[2, 1]
         @test f(A, CartesianIndex(2, 1, 1)) == A[2, 1]
-        @test f(A, CartesianIndex(1, 2, 1)) == A[n, 1]  # invalid
+        # @test f(A, CartesianIndex(1, 2, 1)) == A[n, 1]  # invalid, disable for CI (*)
     # end
 
     # @testset "setindex!" begin
@@ -180,8 +184,8 @@ end
         g!(A, 1, 2)                                 # valid
         @test f(A, 1, 2) == A[1, 2] == 1
 
-        g!(A, 1, 2, 1)                              # invalid
-        @test f(A, 1, 2, 1) == A[n] == A[n, 1] == A[n, 1, 1] == 1
+        # g!(A, 1, 2, 1)                              # invalid, disable for CI (*)
+        # @test f(A, 1, 2, 1) == A[n] == A[n, 1] == A[n, 1, 1] == 1
     # end
 end
 
