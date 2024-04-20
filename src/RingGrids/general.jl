@@ -383,18 +383,28 @@ AbstractGridArrayStyle{N, Grid}(::Val{M}) where {N, Grid, M} = AbstractGridArray
 ## GPU
 struct AbstractGPUGridArrayStyle{N, ArrayType, Grid} <: GPUArrays.AbstractGPUArrayStyle{N} end
 
-Base.BroadcastStyle(::Type{Grid}) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray} =
-    AbstractGPUGridArrayStyle{N, ArrayType, nonparametric_type(Grid)}()
+function Base.BroadcastStyle(
+    ::Type{Grid}
+) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
+    return AbstractGPUGridArrayStyle{N, ArrayType, nonparametric_type(Grid)}()
+end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-AbstractGPUGridArrayStyle{N, ArrayType, Grid}(::Val{M}) where {N, ArrayType, Grid, M} = AbstractGPUGridArrayStyle{N, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{N, ArrayType, Grid}(::Val{M}) where {N, ArrayType, Grid, M} =
+    AbstractGPUGridArrayStyle{N, ArrayType, Grid}()
 
-function GPUArrays.backend(::Type{Grid}) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
+function GPUArrays.backend(
+    ::Type{Grid}
+) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
     return GPUArrays.backend(ArrayType)
 end
 
-function Base.similar(bc::Broadcasted{AbstractGPUGridArrayStyle{N, ArrayType, Grid}}, ::Type{T}) where {N, ArrayType, Grid, T}
-    return Grid(T.(ArrayType(undef, size(bc)...)))
+function Base.similar(
+    bc::Broadcasted{AbstractGPUGridArrayStyle{N, ArrayType, Grid}},
+    ::Type{T},
+) where {N, ArrayType, Grid, T}
+    ArrayType_ = nonparametric_type(ArrayType)
+    return Grid(ArrayType_{T}(undef, size(bc)...))
 end
 
 function Adapt.adapt_structure(to, grid::Grid) where {Grid <: AbstractGridArray}
