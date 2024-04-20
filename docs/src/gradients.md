@@ -59,9 +59,9 @@ using SpeedyWeather, CairoMakie
 # create some data with wave numbers 0,1,2,3,4
 trunc = 64                  # 1-based maximum degree of spherical harmonics
 L = randn(LowerTriangularMatrix{ComplexF32}, trunc, trunc)
-spectral_truncation!(L, 5)  # remove higher wave numbers
+spectral_truncation!(L, 5)              # remove higher wave numbers
 G = gridded(L)
-heatmap(G)                  # requires using CairoMakie (or other Makie backends)
+heatmap(G, title="Some fake data G")    # requires `using CairoMakie`
 save("gradient_data.png", ans) # hide
 nothing # hide
 ```
@@ -80,9 +80,9 @@ Use `∇(G, radius=6.371e6)` for a gradient on Earth in units of "data unit"
 divided by meters.
 
 ```@example gradient
-heatmap(dGdx)
+heatmap(dGdx, title="dG/dx on the unit sphere")
 save("dGdx.png", ans) # hide
-heatmap(dGdy)
+heatmap(dGdy, title="dG/dy on the unit sphere")
 save("dGdy.png", ans) # hide
 nothing # hide
 ```
