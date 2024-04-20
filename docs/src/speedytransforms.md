@@ -17,13 +17,6 @@ Combined with the spectral transform, you could for example start with a velocit
 field in grid-point space, transform to spectral, compute its divergence and transform
 back to obtain the divergence in grid-point space. Examples are outlined in [Gradient operators](@ref).
 
-!!! info "SpeedyTransforms assumes a unit sphere"
-    The operators in SpeedyTransforms generally assume a sphere of radius ``R=1``.
-    For the transforms themselves that does not make a difference, but the gradient operators
-    `div`, `curl`, `∇`, `∇²`, `∇⁻²` omit the radius scaling. You will have to do this manually.
-    Also note that the meridional derivate expects a ``\cos^{-1}(\theta)`` scaling.
-    More in [Gradient operators](@ref).
-
 ## Example transform
 
 Lets start with a simple transform. We could be `using SpeedyWeather` but to be more verbose
@@ -100,7 +93,7 @@ to interpolate directly between grids. If you want to control directly the resol
 grid `gridded` is supposed to transform onto you have to provide a `SpectralTransform` instance.
 More on that now.
 
-## The `SpectralTransform` struct
+## [The `SpectralTransform` struct](@id SpectralTransform)
 
 Both `spectral` and `gridded` create an instance of `SpectralTransform` under the hood. This object
 contains all precomputed information that is required for the transform, either way: 
@@ -273,162 +266,6 @@ to kilobytes
 ```@example speedytransforms
 SpectralTransform(spectral_grid, recompute_legendre=true)
 ```
-
-## Gradient operators
-
-`SpeedyTransforms` also includes many gradient operators to take derivatives in
-spherical harmonics. These are in particular ``\nabla, \nabla \cdot, \nabla \times,
-\nabla^2, \nabla^{-2}``. However, the actually implemented operators are,
-in contrast to the mathematical [Derivatives in spherical coordinates](@ref)
-due to reasons of scaling as follows. Let the implemented operators be
-``\hat{\nabla}`` etc.
-
-```math
-\hat{\nabla} A = \left(\frac{\partial A}{\partial \lambda}, \cos(\theta)\frac{\partial A}{\partial \theta} \right) =
-R\cos(\theta)\nabla A
-```
-So the zonal derivative omits the radius and the ``\cos^{-1}(\theta)`` scaling.
-The meridional derivative adds a ``\cos(\theta)`` due to a recursion relation
-being defined that way, which, however, is actually convenient because the whole
-operator is therefore scaled by ``R\cos(\theta)``. The curl and divergence operators
-expect the input velocity fields to be scaled by ``\cos^{-1}(\theta)``, i.e.
-
-```math
-\begin{aligned}
-\hat{\nabla} \cdot (\cos^{-1}(\theta)\mathbf{u}) &= \frac{\partial u}{\partial \lambda} +
-\cos\theta\frac{\partial v}{\partial \theta} = R\nabla \cdot \mathbf{u}, \\
-\hat{\nabla} \times (\cos^{-1}(\theta)\mathbf{u}) &= \frac{\partial v}{\partial \lambda} -
-\cos\theta\frac{\partial u}{\partial \theta} = R\nabla \times \mathbf{u}.
-\end{aligned}
-```
-
-And the Laplace operators omit a ``R^2`` (radius ``R``) scaling, i.e.
-
-```math
-\hat{\nabla}^{-2}A = \frac{1}{R^2}\nabla^{-2}A , \quad \hat{\nabla}^{2}A = R^2\nabla^{2}A
-```
-
-## Example: Geostrophy
-
-Now, we want to use the following example to illustrate
-their use: We have ``u, v`` and want to calculate ``\eta`` in the shallow water
-system from it following geostrophy. Analytically we have
-```math
--fv = -g\partial_\lambda \eta, \quad fu = -g\partial_\theta \eta
-```
-which becomes, if you take the divergence of these two equations
-```math
-\zeta = \frac{g}{f}\nabla^2 \eta
-```
-Meaning that if we start with ``u, v`` we can obtain the relative vorticity
-``\zeta`` and, using Coriolis parameter ``f`` and gravity ``g``, invert
-the Laplace operator to obtain displacement ``\eta``. How to do this with
-SpeedyTransforms? 
-
-Let us start by generating some data
-```@example speedytransforms
-using SpeedyWeather
-
-spectral_grid = SpectralGrid(trunc=31, nlev=1)
-forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
-drag = QuadraticDrag(spectral_grid)
-model = ShallowWaterModel(; spectral_grid, forcing, drag)
-model.feedback.verbose = false # hide
-simulation = initialize!(model);
-run!(simulation, period=Day(30))
-nothing # hide
-```
-
-Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
-so calculated anyway...).
-```@example speedytransforms
-u = simulation.diagnostic_variables.layers[1].grid_variables.u_grid
-v = simulation.diagnostic_variables.layers[1].grid_variables.v_grid
-vor = SpeedyTransforms.curl(u, v) / spectral_grid.radius
-nothing # hide
-```
-Here, `u, v` are the grid-point velocity fields, and the function `curl` takes in either
-`LowerTriangularMatrix`s (no transform needed as all gradient operators act in spectral space),
-or, as shown here, arrays of the same grid and size. In this case, the function actually
-runs through the following steps
-```@example speedytransforms
-RingGrids.scale_coslat⁻¹!(u)
-RingGrids.scale_coslat⁻¹!(v)
-
-S = SpectralTransform(u, one_more_degree=true)
-us = spectral(u, S)
-vs = spectral(v, S)
-
-vor = curl(us, vs) / spectral_grid.radius
-```
-(Copies of) the velocity fields are unscaled by the cosine of latitude (see above),
-then transformed into spectral space, and the returned `vor` requires a manual division
-by the radius. We always unscale vector fields by the cosine of latitude before any
-`curl`, or `div` operation, as these omit those.
-
-## One more degree for spectral fields
-
-The `SpectralTransform` in general takes a `one_more_degree` keyword argument,
-if otherwise the returned `LowerTriangularMatrix` would be of size 32x32, setting this
-to true would return 33x32. The reason is that while most people would expect
-square lower triangular matrices for a triangular spectral truncation, all vector quantities
-always need one more degree (= one more row) because of a recursion relation in the
-meridional gradient. So as we want to take the curl of `us, vs` here, they need this
-additional degree, but in the returned lower triangular matrix this row is set to zero.
-
-!!! info "One more degree for vector quantities"
-    All gradient operators expect the input lower triangular matrices of shape ``(N+1) \times N``.
-    This one more degree of the spherical harmonics is required for the meridional derivative.
-    Scalar quantities contain this degree too for size compatibility but they should not
-    make use of it. Use `spectral_truncation` to add or remove this degree manually.
-
-## Example: Geostrophy (continued)
-
-Now we transfer `vor` into grid-point space, but specify that we want it on the grid
-that we also used in `spectral_grid`. The Coriolis parameter for a grid like `vor_grid`
-is obtained, and we do the following for ``f\zeta/g``.
-
-```@example speedytransforms
-vor_grid = gridded(vor, Grid=spectral_grid.Grid)
-f = coriolis(vor_grid)      # create Coriolis parameter f on same grid with default rotation
-g = model.planet.gravity
-fζ_g = @. vor_grid * f / g  # in-place and element-wise
-nothing # hide
-```
-Now we need to apply the inverse Laplace operator to ``f\zeta/g`` which we do as follows
-
-```@example speedytransforms
-fζ_g_spectral = spectral(fζ_g, one_more_degree=true)
-
-R = spectral_grid.radius
-η = SpeedyTransforms.∇⁻²(fζ_g_spectral) * R^2
-η_grid = gridded(η, Grid=spectral_grid.Grid)
-nothing # hide
-```
-Note the manual scaling with the radius ``R^2`` here. We now compare the results
-```@example speedytransforms
-using CairoMakie
-heatmap(η_grid, title="Geostrophic interface displacement η [m]")
-save("eta_geostrophic.png", ans) # hide
-nothing # hide
-```
-![Geostrophic eta](eta_geostrophic.png)
-
-Which is the interface displacement assuming geostrophy.
-The actual interface displacement contains also ageostrophy
-```@example speedytransforms
-η_grid2 = simulation.diagnostic_variables.surface.pres_grid
-heatmap(η_grid2, title="Interface displacement η [m] with ageostrophy")
-save("eta_ageostrophic.png", ans) # hide
-nothing # hide
-```
-![Ageostrophic eta](eta_ageostrophic.png)
-
-Strikingly similar! The remaining differences are the ageostrophic motions but
-also note that the mean is off. This is because geostrophy only use/defines the gradient
-of ``\eta`` not the absolute values itself. Our geostrophic ``\eta_g`` has by construction
-a mean of zero (that is how we define the inverse Laplace operator) but the actual ``\eta``
-is some 1400m higher.
 
 ## Functions and type index
 
