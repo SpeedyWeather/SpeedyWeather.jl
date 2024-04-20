@@ -1,4 +1,4 @@
-module SpeedyWeatherMakieExt
+module SpeedyWeatherJLArraysExt
 
 using SpeedyWeather, JLArrays
 
