@@ -44,7 +44,10 @@ makedocs(
             ],
             "RingGrids"=>"ringgrids.md",
             "LowerTriangularMatrices"=>"lowertriangularmatrices.md",
-            "SpeedyTransforms"=>"speedytransforms.md",
+            "SpeedyTransforms" => [
+                "Spectral transforms" => "speedytransforms.md",
+                "Gradient operators" => "gradients.md",
+            ],
             "Function and type index"=>"functions.md",
             ]
 )
