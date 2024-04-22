@@ -237,7 +237,7 @@ function SpectralTransform( map::AbstractGrid{NF};          # gridded field
                             one_more_degree::Bool=false,
                             ) where NF                      # number format NF
 
-    Grid = typeof(map)
+    Grid = RingGrids.nonparametric_type(typeof(map))
     trunc = get_truncation(map)
     return SpectralTransform(NF, Grid, trunc+one_more_degree, trunc; recompute_legendre)
 end
@@ -546,7 +546,7 @@ function spectral(  map::AbstractGrid{NF};          # gridded field
                     one_more_degree::Bool = false,  # for lmax+2 x mmax+1 output size
                     ) where NF                      # number format NF
 
-    Grid = typeof(map)
+    Grid = RingGrids.nonparametric_type(typeof(map))
     trunc = get_truncation(map.nlat_half)
     S = SpectralTransform(NF, Grid, trunc+one_more_degree, trunc; recompute_legendre)
     return spectral(map, S)
