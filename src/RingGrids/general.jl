@@ -71,7 +71,8 @@ get_npoints2D(grid::Grid) where {Grid<:AbstractGridArray} = get_npoints2D(Grid, 
 matrix_size(grid::Grid) where {Grid<:AbstractGridArray} = matrix_size(Grid, grid.nlat_half)
 
 ## INDEXING
-@inline Base.getindex(G::AbstractGridArray, ijk...) = getindex(G.data, ijk...)
+# simply propagate all indices forward
+Base.@propagate_inbounds Base.getindex(G::AbstractGridArray, ijk...) = getindex(G.data, ijk...)
 
 @inline function Base.getindex(
     G::GridArray,
@@ -82,12 +83,9 @@ matrix_size(grid::Grid) where {Grid<:AbstractGridArray} = matrix_size(Grid, grid
     return GridArray_(getindex(G.data, col, k...), G.nlat_half, G.rings)
 end
 
-@inline Base.setindex!(G::AbstractGridArray, x, ijk::Integer...) =
-    setindex!(G.data, x, ijk...)
-@inline Base.setindex!(G::AbstractGridArray, x::AbstractVector, ij::AbstractRange, k::Integer...) =
-    setindex!(G.data, x, ij, k...)
-@inline Base.setindex!(G::AbstractGridArray, x::AbstractVector, ij::Integer, k::AbstractRange) =
-    setindex!(G.data, x, ij, k)
+# simply propagate all indices forward
+Base.@propagate_inbounds Base.setindex!(G::AbstractGridArray, x, ijk...) = setindex!(G.data, x, ijk...)
+Base.fill!(G::AbstractGridArray, x) = fill!(G.data, x)
 
 ## CONSTRUCTORS
 """$(TYPEDSIGNATURES) True for `data`, `nlat_half` and `rings` that all match in size
@@ -320,6 +318,10 @@ function eachring(grid1::Grid, grids::Grid...) where {Grid<:AbstractGridArray}
     Base._all_match_first(X->length(X), n, grid1, grids...) || throw(BoundsError)
     return eachring(grid1)
 end
+
+# equality 
+Base.:(==)(G1::AbstractGridArray, G2::AbstractGridArray) = grids_match(G1, G2) && G1.data == G2.data
+Base.all(G::AbstractGridArray) = all(G.data)
 
 """$(TYPEDSIGNATURES) True if both `A` and `B` are of the same type
 (regardless type parameter `T` or underyling array type `ArrayType`) and

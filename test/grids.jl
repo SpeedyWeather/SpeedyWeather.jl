@@ -368,6 +368,8 @@ end
     end
 end
 
+RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
+
 @testset "AbstractGridArray: GPU (JLArrays)" begin 
     NF = Float32
     @testset for Grid in ( 
@@ -380,32 +382,44 @@ end
         FullHEALPixArray,
         FullOctaHEALPixArray,
     )
-        G_cpu = randn(Grid{NF}, 2, 3, 4)
+        s = (2, 3, 4)
+        ndims = length(s)
+
+        G_cpu = randn(Grid{NF}, s...)
 
         # constructors/adapt
         G = adapt(JLArray, G_cpu)
         G2 = Grid(adapt(JLArray, G_cpu.data))
-        # @test G == G2
-        # @test all(G .== G2) 
+        @test G == G2
+
+        # broadcasting doesn't escape
+        @test G  + G isa Grid{NF, ndims, JLArray{NF, ndims}}
+        @test G .+ G isa Grid{NF, ndims, JLArray{NF, ndims}}
+        @test G_cpu  + G_cpu isa Grid{NF, ndims, Array{NF, ndims}}
+        @test G_cpu .+ G_cpu isa Grid{NF, ndims, Array{NF, ndims}}
 
         # getindex 
-        # @test G[1, :] isa JLArray
-        # @test G[:, 1] isa Grid{NF, 1, JLArray{NF}}
-        # for k in eachgrid(G)
-        #     for (j, ring) in enumerate(eachring(G))
-        #         @test Array(L[lm,:]) == L_cpu[lm,:]  
-        #     end
-        # end 
+        @test G[1, :, :] isa JLArray{NF, 2}
+        @test G[:, 1, 1] isa Grid{NF, 1, JLArray{NF, 1}}
+        for k in eachgrid(G)
+            for (j, ring) in enumerate(eachring(G))
+                @test G[ring, k] == adapt(JLArray, G_cpu[ring, k])
+                @test Array(G[ring, k]) == G_cpu[ring, k]
+            end
+        end
 
-        # # setindex! 
-        # A_test = JLArray(rand(NF,size(L_cpu,3)))
-        # L[1,:] = A_test
-        # @test L[1,:] == A_test
+        # setindex! 
+        G_test = JLArray(rand(NF,s[3]))
+        G[1, 1, :] .= G_test                # with .
+        @test G[1, 1, :] == G_test
 
-        # # fill 
-        # fill!(L, 2)
-        # for lm in SpeedyWeather.eachharmonic(L2)
-        #     @test all(L[lm, [Colon() for i=1:length(idims)]...] .== 2)
-        # end 
+        G_test = JLArray(rand(NF,s[3]))
+        G[1, 1, :] = G_test                 # without .
+        @test G[1, 1, :] == G_test
+
+
+        # fill 
+        fill!(G, 2)
+        @test all(G .== 2)
     end
 end
