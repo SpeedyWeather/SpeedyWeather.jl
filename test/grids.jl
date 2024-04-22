@@ -417,6 +417,15 @@ RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
         G[1, 1, :] = G_test                 # without .
         @test G[1, 1, :] == G_test
 
+        # with other grid {Array}
+        G_test = rand(Grid, s[1])
+        G[:, 1, 1] = G_test                 # conversion to float64 -> float32
+        @test Array(G[:, 1, 1].data) ≈ G_test
+
+        # with other grid {JLArray}
+        G_test = adapt(JLArray,rand(Grid, s[1]))
+        G[:, 1, 1] = G_test
+        @test G[:, 1, 1].data ≈ G_test.data
 
         # fill 
         fill!(G, 2)
