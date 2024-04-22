@@ -46,8 +46,7 @@ function GridGeometry(  Grid::Type{<:AbstractGrid}, # which grid to calculate th
 
     # RINGS and LONGITUDE OFFSETS
     rings = eachring(Grid, nlat_half)               # Vector{UnitRange} descr start/end index on ring
-    nlons = get_nlons(Grid, nlat_half,              # number of longitude points per ring
-                        both_hemispheres=true)
+    nlons = get_nlons(Grid, nlat_half)              # number of longitude points per ring, pole to pole
     lon_offsets = [londs[ring[1]] for ring in rings]# offset of the first point from 0˚E
 
     return GridGeometry{Grid}(nlat_half, nlat, npoints, latd_poles, londs, rings, nlons, lon_offsets)

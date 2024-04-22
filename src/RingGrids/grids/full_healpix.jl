@@ -38,4 +38,4 @@ get_colat(::Type{<:FullHEALPixArray}, nlat_half::Integer) = get_colat(HEALPixGri
 get_lon(::Type{<:FullHEALPixArray}, nlat_half::Integer) = get_lon(FullGaussianArray, nlat_half)
 
 # QUADRATURE
-get_quadrature_weights(::Type{<:FullHEALPixArray}, nlat_half::Integer) = healpix_weights(nlat_half)
+get_quadrature_weights(::Type{<:FullHEALPixArray}, nlat_half::Integer) = equal_area_weights(FullHEALPixArray, nlat_half)

@@ -39,7 +39,8 @@ struct SpectralTransform{NF<:AbstractFloat}
     Λs::Vector{LowerTriangularMatrix{NF}}   # Legendre polynomials for all latitudes (all precomputed)
     
     # SOLID ANGLES ΔΩ FOR QUADRATURE
-    # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
+    # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
+    # vector is pole to pole although only northern hemisphere required
     solid_angles::Vector{NF}                # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
 
     # RECURSION FACTORS

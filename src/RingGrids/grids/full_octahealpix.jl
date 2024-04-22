@@ -38,4 +38,5 @@ get_colat(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = get_colat(OctaHE
 get_lon(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = get_lon(FullGaussianArray, nlat_half)
 
 # QUADRATURE
-get_quadrature_weights(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = octahealpix_weights(nlat_half)
+get_quadrature_weights(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) =
+    equal_area_weights(FullOctaHEALPixArray, nlat_half)
