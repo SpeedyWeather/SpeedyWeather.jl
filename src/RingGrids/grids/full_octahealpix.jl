@@ -37,6 +37,6 @@ get_nlon(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = 4nlat_half
 get_colat(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = get_colat(OctaHEALPixGrid, nlat_half)
 get_lon(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = get_lon(FullGaussianArray, nlat_half)
 
-# QUADRATURE
+# QUADRATURE (use weights from reduced grids though!)
 get_quadrature_weights(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) =
-    equal_area_weights(FullOctaHEALPixArray, nlat_half)
+    equal_area_weights(OctaHEALPixArray, nlat_half)

@@ -279,7 +279,9 @@ end
         for s in ((n,), (n, n), (n, n, n), (n, n, n, n))
             grid = zeros(G, s...)
             @test (grid + grid) isa G
+            @test (grid .+ grid) isa G
             @test (grid - grid) isa G
+            @test (grid .- grid) isa G
             @test (grid .* grid) isa G
             @test (grid ./ grid) isa G
             @test 2grid isa G

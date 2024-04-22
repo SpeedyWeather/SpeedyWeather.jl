@@ -37,5 +37,5 @@ get_nlon(::Type{<:FullHEALPixArray}, nlat_half::Integer) = 4nlat_half
 get_colat(::Type{<:FullHEALPixArray}, nlat_half::Integer) = get_colat(HEALPixGrid, nlat_half)
 get_lon(::Type{<:FullHEALPixArray}, nlat_half::Integer) = get_lon(FullGaussianArray, nlat_half)
 
-# QUADRATURE
-get_quadrature_weights(::Type{<:FullHEALPixArray}, nlat_half::Integer) = equal_area_weights(FullHEALPixArray, nlat_half)
+# QUADRATURE (use weights from reduced grids though!)
+get_quadrature_weights(::Type{<:FullHEALPixArray}, nlat_half::Integer) = equal_area_weights(HEALPixArray, nlat_half)
