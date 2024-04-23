@@ -302,9 +302,15 @@ and then each grid point per ring. To be used like
     rings = eachring(grid)
     for ring in rings
         for ij in ring
-            grid[ij]"""
+            grid[ij]
+            
+Accesses precomputed `grid.rings`."""
 @inline eachring(grid::AbstractGridArray) = grid.rings
 
+"""$(TYPEDSIGNATURES)
+Computes the ring indices `i0:i1` for start and end of every longitudinal point
+on a given ring `j` of `Grid` at resolution `nlat_half`. Used to loop
+over rings of a grid. These indices are also precomputed in every `grid.rings`."""
 function eachring(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
     rings = Vector{UnitRange{Int}}(undef, get_nlat(Grid, nlat_half))    # allocate
     each_index_in_ring!(rings, Grid, nlat_half)                         # calculate iteratively
@@ -319,9 +325,10 @@ function eachring(grid1::Grid, grids::Grid...) where {Grid<:AbstractGridArray}
     return eachring(grid1)
 end
 
-# equality 
+# equality and comparison, somehow needed as not covered by broadcasting
 Base.:(==)(G1::AbstractGridArray, G2::AbstractGridArray) = grids_match(G1, G2) && G1.data == G2.data
 Base.all(G::AbstractGridArray) = all(G.data)
+Base.any(G::AbstractGridArray) = any(G.data)
 
 """$(TYPEDSIGNATURES) True if both `A` and `B` are of the same type
 (regardless type parameter `T` or underyling array type `ArrayType`) and
