@@ -23,7 +23,8 @@ check_lta_input_array(data, m, n, N) =
 
 function lta_error_message(data, m, n, T, N, ArrayType) 
     size_tuple = (m, n, size(data[2:end])...)
-    "$(size(data))-sized $(typeof(data)) cannot be used to create a $size_tuple LowerTriangularArray{$T,$N,$ArrayType}"
+    return "$(size(data))-sized $(typeof(data)) cannot be used to create "*
+                "a $size_tuple LowerTriangularArray{$T,$N,$ArrayType}"
 end 
 
 """2-dimensional `LowerTriangularArray` of type `T`` with its non-zero entries unravelled into a `Vector{T}`"""
@@ -104,9 +105,9 @@ $(TYPEDSIGNATURES)
 Converts the index pair `i, j` of an `m`x`n` LowerTriangularMatrix `L` to a single
 index `k` that indexes the same element in the corresponding vector that stores
 only the lower triangle (the non-zero entries) of `L`."""
-@inline ij2k(i::Integer, j::Integer, m::Integer) = i+(j-1)*m-j*(j-1)÷2
+@inline ij2k(i::Integer, j::Integer, m::Integer) = i + (j-1)*m - j*(j-1)÷2
 @inline triangle_number(n::Integer) = n*(n+1)÷2
-nonzeros(m::Integer, n::Integer) = m*n-triangle_number(n-1)
+nonzeros(m::Integer, n::Integer) = m*n - triangle_number(n-1)
 
 """
 $(TYPEDSIGNATURES)
@@ -413,74 +414,60 @@ Base.similar(L::LowerTriangularArray{T,N,ArrayType}, ::Type{T}) where {T, N, Arr
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
 # ARITHMETIC
-# only mul/div with scalar and addition/subtraction, others are converted to Matrix
-function Base.:(*)(L::LowerTriangularArray{T}, s::Number) where T
-    sT = convert(T, s)
-    LowerTriangularArray(L.data .* sT, L.m, L.n)
-end
-
-Base.:(*)(s::Number, L::LowerTriangularArray) = L*s         # commutative
-Base.:(/)(L::LowerTriangularArray, s::Number) = L*inv(s)
-
-function Base.:(+)(
-    L1::LowerTriangularArray{T, N, ArrayType},
-    L2::LowerTriangularArray{S, N, ArrayType},
-) where {T, S, N, ArrayType}
-    @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
-    LowerTriangularArray(L1.data + L2.data, L1.m, L1.n)
-end
-
-function Base.:(-)(
-    L1::LowerTriangularArray{T,N,ArrayType},
-    L2::LowerTriangularArray{S,N,ArrayType}
-) where {T, S, N, ArrayType}
-    @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
-    LowerTriangularArray(L1.data - L2.data, L1.m, L1.n)
-end
-
-Base.:(-)(L::LowerTriangularArray) = LowerTriangularArray(-L.data, L.m, L.n)
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
 
 """
 $(TYPEDSIGNATURES)
 Fills the elements of `L` with `x`. Faster than fill!(::AbstractArray, x)
 as only the non-zero elements in `L` are assigned with x."""
-function Base.fill!(L::LowerTriangularArray{T}, x) where T
-    xT = convert(T, x)
-    fill!(L.data, xT)
-
-    L
+function Base.fill!(L::LowerTriangularArray, x)
+    fill!(L.data, x)
+    return L
 end
 
-function scale!(L::LowerTriangularArray{T}, s::Number) where T
-    sT = convert(T, s)
-    L.data .*= sT
+# Broadcast CPU/GPU
+import Base.Broadcast: BroadcastStyle, Broadcasted
 
-    L
+struct LowerTriangularStyle{N, ArrayType} <: Broadcast.AbstractArrayStyle{N} end        # CPU with scalar indexing
+struct LowerTriangularGPUStyle{N, ArrayType} <: GPUArrays.AbstractGPUArrayStyle{N} end  # GPU without
+
+Base.BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} =
+    LowerTriangularStyle{N, ArrayType}()
+
+Base.BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray} =
+    LowerTriangularGPUStyle{N, ArrayType}()
+
+# ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
+LowerTriangularStyle{N, ArrayType}(::Val{M}) where {N, ArrayType, M} =
+    LowerTriangularStyle{N, ArrayType}()
+LowerTriangularGPUStyle{N, ArrayType}(::Val{M}) where {N, ArrayType, M} =
+    LowerTriangularGPUStyle{N, ArrayType}()
+
+# also needed for other array types
+nonparametric_type(::Type{<:Array}) = Array
+# nonparametric_type(::Type{<:CUDA.CuArray}) = CuArray
+
+function Base.similar(
+    bc::Broadcasted{LowerTriangularStyle{N, ArrayType}},
+    ::Type{T},
+) where {N, ArrayType, T}
+    ArrayType_ = nonparametric_type(ArrayType)
+    # TODO ArrayType_{NF, N-1} needed? No this seems to be inferred from size
+    return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
 end
 
-# Broadcast CPU (more or less adjusted from LinearAlgebra.jl)
-import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
-import LinearAlgebra: isstructurepreserving, fzeropreserving
-
-struct LowerTriangularStyle{N} <: Broadcast.AbstractArrayStyle{N} end
-
-Base.BroadcastStyle(::Type{LowerTriangularArray{T,N,ArrayType}}) where {T,N,ArrayType} =
-    LowerTriangularStyle{N}()
-
-function Base.similar(bc::Broadcasted{LowerTriangularStyle{N}}, ::Type{NF}) where {N,NF}
-    inds = axes(bc)
-    if isstructurepreserving(bc) || fzeropreserving(bc) 
-        return LowerTriangularArray{NF,N,Array{NF}}(undef, [ind[end] for ind in inds]...)
-    end
-    return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), NF)
+function Base.similar(
+    bc::Broadcasted{LowerTriangularGPUStyle{N, ArrayType}},
+    ::Type{T},
+) where {N, ArrayType, T}
+    ArrayType_ = nonparametric_type(ArrayType)
+    # TODO ArrayType_{NF, N-1} needed? No this seems to be inferred from size
+    return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
 end
-
-LowerTriangularStyle{N}(::Val{M}) where {N,M} = LowerTriangularStyle{N}()
 
 function Base.copyto!(
     dest::LowerTriangularArray{T, N, ArrayType},
-    bc::Broadcasted{LowerTriangularStyle{N}},
+    bc::Broadcasted{LowerTriangularStyle{N, ArrayType}},
 ) where {T, N, ArrayType <: Array}
     axs = axes(dest)
     axes(bc) == axs || Broadcast.throwdm(axes(bc), axs)
@@ -506,7 +493,7 @@ import GPUArrays._copyto!
 @inline function GPUArrays._copyto!(
     dest::LowerTriangularArray{T, N, ArrayType},
     bc::Broadcasted
-) where {T,N,ArrayType}
+) where {T, N, ArrayType}
 
     axes(dest) == axes(bc) || Broadcast.throwdm(axes(dest), axes(bc))
     isempty(dest) && return dest
@@ -535,17 +522,11 @@ import GPUArrays._copyto!
     return dest
 end
 
-function Broadcast.BroadcastStyle(
-    ::Type{LowerTriangularArray{T, N, ArrayType}}
-) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray}
-    return Broadcast.BroadcastStyle(ArrayType)
-end
-
 function GPUArrays.backend(
     ::Type{LowerTriangularArray{T, N, ArrayType}}
-) where {T,N,ArrayType <: GPUArrays.AbstractGPUArray}
+) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
     return GPUArrays.backend(ArrayType)
 end
 
-Adapt.adapt_structure(to, x::LowerTriangularArray) =
-    LowerTriangularArray(Adapt.adapt(to, x.data), x.m, x.n)
+Adapt.adapt_structure(to, L::LowerTriangularArray) =
+    LowerTriangularArray(Adapt.adapt(to, L.data), L.m, L.n)
