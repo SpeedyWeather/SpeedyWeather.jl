@@ -1,4 +1,7 @@
 using JLArrays
+
+# remove with extension
+LowerTriangularMatrices.nonparametric_type(::Type{<:JLArray}) = JLArray
 using Adapt
 import Random
 
@@ -243,9 +246,8 @@ end
             Random.seed!(123)
             JL = f(LowerTriangularArray{Float16, N, JLArray{Float16, N-1}}, s...)
             JL2 = adapt(JLArray, L)
-            @test all(JL2 .== JL)
-            @test typeof(JL2) == typeof(JL)
-            @test size(JL2) == size(JL)
+            @test all(JL2 .== JL)   # equality via broadcasting
+            @test JL2 == JL         # checks for type and data equality
         end
     end
 end
@@ -417,7 +419,7 @@ end
             L2 = similar(L1)
             copyto!(L2, L1)
 
-            @test all(L2 .== L1)
+            @test L2 == L1
             
             # copyto! Array 
             M = zeros(NF, 10, 10, idims...)
@@ -427,7 +429,7 @@ end
             not_ind = @. ~(ind)
 
             @test all(M[not_ind] .== zero(NF))
-            @test all(LowerTriangularArray(M) .== L1)
+            @test LowerTriangularArray(M) == L1
 
             L1 = randn(LowerTriangularArray{NF}, 10, 10, idims...)
             L2 = randn(LowerTriangularArray{NF}, 5, 5, idims...)
@@ -592,34 +594,34 @@ end
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = deepcopy(L1) 
 
-                L2 .*= NF(5)
-                @test all(L1 .* NF(5) .≈ L2) 
+                L2 .*= 5
+                @test 5L1 == L2
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = deepcopy(L1) 
 
-                L2 ./= NF(5)
-                @test all(L1 ./ NF(5) .≈ L2) 
+                L2 ./= 5
+                @test L1/5 == L2
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = deepcopy(L1)
 
-                L2 .^= NF(2)
-                @test all(L1 .^ NF(2) .≈ L2)
+                L2 .^= 2
+                @test L1.^2 == L2
 
                 # tests mirroring usage in dynamical core
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L3 = deepcopy(L2)
 
-                @. L2 += L1*NF(5)
-                @test all(L2 .≈ (L3 + L1*NF(5)))
+                @. L2 += 5L1
+                @test L2 == L3 + 5L1
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
 
                 @. L3 = -L1 - L2
-                @test all(L3 .≈ (-L1 - L2))
+                @test L3 == -L1 - L2
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
@@ -627,13 +629,13 @@ end
 
                 L2 .+= L1 
                 L3 += L1
-                @test all(L2 .≈ L3)
+                @test L2 == L3
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = similar(L1)
 
-                L2 .= NF(5) * L1
-                @test all(L2 .≈ (L1*NF(5)))
+                L2 .= 5L1
+                @test L2 == 5L1
             end
         end
     end
