@@ -425,16 +425,21 @@ function Base.fill!(L::LowerTriangularArray, x)
     return L
 end
 
+Base.:(==)(L1::LowerTriangularArray, L2::LowerTriangularArray) = typeof(L1) == typeof(L2) && L1.data == L2.data
+Base.all(L::LowerTriangularArray) = all(L.data)
+Base.any(L::LowerTriangularArray) = any(L.data)
+
 # Broadcast CPU/GPU
-import Base.Broadcast: BroadcastStyle, Broadcasted
+import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
+import LinearAlgebra: isstructurepreserving, fzeropreserving
 
 struct LowerTriangularStyle{N, ArrayType} <: Broadcast.AbstractArrayStyle{N} end        # CPU with scalar indexing
 struct LowerTriangularGPUStyle{N, ArrayType} <: GPUArrays.AbstractGPUArrayStyle{N} end  # GPU without
 
-Base.BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} =
+BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} =
     LowerTriangularStyle{N, ArrayType}()
 
-Base.BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray} =
+BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray} =
     LowerTriangularGPUStyle{N, ArrayType}()
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
@@ -452,16 +457,31 @@ function Base.similar(
     ::Type{T},
 ) where {N, ArrayType, T}
     ArrayType_ = nonparametric_type(ArrayType)
-    # TODO ArrayType_{NF, N-1} needed? No this seems to be inferred from size
+    #TODO branch currently not hit because these are always false, although they should be true for
+    # operations like +, -, ... then returning a `LowerTriangularArray` again
+    if isstructurepreserving(bc) || fzeropreserving(bc)
+        return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
+    end
+    # TODO should return the similar for operations that escape the structure, e.g. .==
+    # but given the TODO above return a `LowerTriangularArray` in both cases
+    # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
     return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
 end
 
+# same function as above, but needs to be defined for both CPU and GPU style
 function Base.similar(
     bc::Broadcasted{LowerTriangularGPUStyle{N, ArrayType}},
     ::Type{T},
 ) where {N, ArrayType, T}
     ArrayType_ = nonparametric_type(ArrayType)
-    # TODO ArrayType_{NF, N-1} needed? No this seems to be inferred from size
+    #TODO branch currently not hit because these are always false, although they should be true for
+    # operations like +, -, ... then returning a `LowerTriangularArray` again
+    if isstructurepreserving(bc) || fzeropreserving(bc)
+        return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
+    end
+    # TODO should return the similar for operations that escape the structure, e.g. .==
+    # but given the TODO above return a `LowerTriangularArray` in both cases
+    # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
     return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
 end
 
@@ -474,7 +494,7 @@ function Base.copyto!(
 
     lmax, mmax = size(dest)
     lm = 0
-    
+
     for m in 1:mmax
         for l in m:lmax
             lm += 1
@@ -494,7 +514,7 @@ import GPUArrays._copyto!
     dest::LowerTriangularArray{T, N, ArrayType},
     bc::Broadcasted
 ) where {T, N, ArrayType}
-
+    
     axes(dest) == axes(bc) || Broadcast.throwdm(axes(dest), axes(bc))
     isempty(dest) && return dest
     bc = Broadcast.preprocess(dest, bc)
