@@ -427,6 +427,8 @@ end
 
 Base.:(==)(L1::LowerTriangularArray, L2::LowerTriangularArray) =
     typeof(L1) == typeof(L2) && L1.data == L2.data
+Base.isapprox(L1::LowerTriangularArray, L2::LowerTriangularArray; kwargs...) =
+    isapprox(L1.data, L2.data; kwargs...)
 Base.all(L::LowerTriangularArray) = all(L.data)
 Base.any(L::LowerTriangularArray) = any(L.data)
 
