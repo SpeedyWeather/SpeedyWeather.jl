@@ -471,9 +471,9 @@ function Base.similar(
     ArrayType_ = nonparametric_type(ArrayType)
     #TODO branch currently not hit because these are always false, although they should be true for
     # operations like +, -, ... then returning a `LowerTriangularArray` again
-    if isstructurepreserving(bc) || fzeropreserving(bc)
-        return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
-    end
+    # if isstructurepreserving(bc) || fzeropreserving(bc)
+    #     return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
+    # end
     # TODO should return the similar for operations that escape the structure, e.g. .==
     # but given the TODO above return a `LowerTriangularArray` in both cases
     # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
@@ -488,9 +488,9 @@ function Base.similar(
     ArrayType_ = nonparametric_type(ArrayType)
     #TODO branch currently not hit because these are always false, although they should be true for
     # operations like +, -, ... then returning a `LowerTriangularArray` again
-    if isstructurepreserving(bc) || fzeropreserving(bc)
-        return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
-    end
+    # if isstructurepreserving(bc) || fzeropreserving(bc)
+    #     return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
+    # end
     # TODO should return the similar for operations that escape the structure, e.g. .==
     # but given the TODO above return a `LowerTriangularArray` in both cases
     # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
