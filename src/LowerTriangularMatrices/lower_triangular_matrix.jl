@@ -425,7 +425,8 @@ function Base.fill!(L::LowerTriangularArray, x)
     return L
 end
 
-Base.:(==)(L1::LowerTriangularArray, L2::LowerTriangularArray) = typeof(L1) == typeof(L2) && L1.data == L2.data
+Base.:(==)(L1::LowerTriangularArray, L2::LowerTriangularArray) =
+    typeof(L1) == typeof(L2) && L1.data == L2.data
 Base.all(L::LowerTriangularArray) = all(L.data)
 Base.any(L::LowerTriangularArray) = any(L.data)
 
@@ -433,14 +434,25 @@ Base.any(L::LowerTriangularArray) = any(L.data)
 import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
 import LinearAlgebra: isstructurepreserving, fzeropreserving
 
-struct LowerTriangularStyle{N, ArrayType} <: Broadcast.AbstractArrayStyle{N} end        # CPU with scalar indexing
-struct LowerTriangularGPUStyle{N, ArrayType} <: GPUArrays.AbstractGPUArrayStyle{N} end  # GPU without
+# CPU with scalar indexing
+struct LowerTriangularStyle{N, ArrayType} <: Broadcast.AbstractArrayStyle{N} end
 
-BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType} =
-    LowerTriangularStyle{N, ArrayType}()
+# GPU without scalar indexing
+struct LowerTriangularGPUStyle{N, ArrayType} <: GPUArrays.AbstractGPUArrayStyle{N} end
 
-BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray} =
-    LowerTriangularGPUStyle{N, ArrayType}()
+function BroadcastStyle(::Type{LowerTriangularArray{T, N, ArrayType}}) where {T, N, ArrayType}
+    # remove number format parameter for broadcasting with type promotion
+    ArrayType_ = nonparametric_type(ArrayType)
+    return LowerTriangularStyle{N, ArrayType_}()
+end
+
+function BroadcastStyle(
+    ::Type{LowerTriangularArray{T, N, ArrayType}},
+) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
+    # remove number format parameter for broadcasting with type promotion
+    ArrayType_ = nonparametric_type(ArrayType)
+    return LowerTriangularGPUStyle{N, ArrayType_}()
+end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
 LowerTriangularStyle{N, ArrayType}(::Val{M}) where {N, ArrayType, M} =
@@ -486,9 +498,9 @@ function Base.similar(
 end
 
 function Base.copyto!(
-    dest::LowerTriangularArray{T, N, ArrayType},
+    dest::LowerTriangularArray{T, N, ArrayTypeP},
     bc::Broadcasted{LowerTriangularStyle{N, ArrayType}},
-) where {T, N, ArrayType <: Array}
+) where {T, N, ArrayTypeP <: Array, ArrayType <: Array}
     axs = axes(dest)
     axes(bc) == axs || Broadcast.throwdm(axes(bc), axs)
 
