@@ -51,7 +51,7 @@ happen only once if they coincide on a given time step."""
 function initialize!(scheduler::Schedule, clock::Clock)
     schedule = falses(clock.n_timesteps)    # initialize schedule as BitVector
 
-    # PERIODIC SCHEDULE, always AFTER scheduler.every time period has passed
+    # PERIODIC SCHEDULE, always AFTER scheduler.every time period has passed
     if scheduler.every.value < typemax(Int)
         every_n_timesteps = max(1,round(Int, scheduler.every/clock.Δt))
         schedule[every_n_timesteps:every_n_timesteps:end] .= true
