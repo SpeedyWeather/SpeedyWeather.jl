@@ -11,7 +11,7 @@ user may want to adjust are chosen and live in their respective model components
 4. [Run that simulation](@ref run).
 
 In the following we will describe these steps in more detail.
-If you want to start with some examples first, see [Model setups](@ref)
+If you want to start with some examples first, see [Examples](@ref Examples)
 which has easy and more advanced examples of how to set up
 SpeedyWeather.jl to run the simulation you want.
 
@@ -93,7 +93,7 @@ however, a new user might first want to know which components there are,
 so let's flip the logic around and assume you know you want to run a `ShallowWaterModel`.
 You can create a default `ShallowWaterModel` like so and inspect its components
 ```@example howto
-model = ShallowWaterModel()
+model = ShallowWaterModel(; spectral_grid)
 ```
 
 So by default the `ShallowWaterModel` uses a [Leapfrog `time_stepping`](@ref leapfrog),
@@ -125,9 +125,9 @@ any name)
 ```@example howto
 model = ShallowWaterModel(; spectral_grid, time_stepping)
 ```
-This logic continues for all model components. See the [Model setups](@ref)
-for examples. All model components are also subtype (i.e. `<:`) of
-some abstract supertype, this feature can be made use of to redefine
+This logic continues for all model components, see [Examples](@ref Examples).
+All model components are also subtype (i.e. `<:`) of some abstract supertype,
+this feature can be made use of to redefine
 not just constant parameters of existing model components but also
 to define new ones. This is more elaborated in [Extending SpeedyWeather](@ref).
 
@@ -175,6 +175,18 @@ However, from a user perspective all that needs to be done here is
 simulation = initialize!(model)
 ```
 and we have initialized the `ShallowWaterModel` we have defined earlier.
+As `initialize!(model)` also initializes the prognostic (and diagnostic)
+variables, it also initializes the clock in
+`simulation.prognostic_variables.clock`. To initialize with a specific
+time, do
+```@example howto
+simulation = initialize!(model, time=DateTime(2020,5,1))
+simulation.prognostic_variables.clock.time
+```
+to set the time to 1st May, 2020 (but you can also do that manually).
+This time is used by components that depend on time, e.g. the solar
+zenith angle calculation.
+
 After this step you can continue to tweak your model setup but note that
 some model components are immutable, or that your changes may not be
 propagated to other model components that rely on it. But you can, for
@@ -205,7 +217,7 @@ run!(simulation)
 By default this runs for 10 days without output. These are the options left
 to change, so with
 ```@example howto
-model.output.id = "test" # hide
+model.output.id = "test" # hide
 run!(simulation, period=Day(5), output=true)
 ```
 You would continue this simulation (the previous `run!` call already integrated

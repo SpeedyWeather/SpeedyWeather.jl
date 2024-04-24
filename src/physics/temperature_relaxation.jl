@@ -14,7 +14,7 @@ temperature_relaxation!(::ColumnVariables, ::NoTemperatureRelaxation, ::Primitiv
 export HeldSuarez
 
 """
-Struct that defines the temperature relaxation from Held and Suarez, 1996 BAMS
+Temperature relaxation from Held and Suarez, 1996 BAMS
 $(TYPEDFIELDS)"""
 Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: AbstractTemperatureRelaxation
     # DIMENSIONS
@@ -50,9 +50,9 @@ Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: AbstractTemperatureRelaxatio
     κ::Base.RefValue{NF} = Ref(zero(NF))
     p₀::Base.RefValue{NF} = Ref(zero(NF))
 
-    temp_relax_freq::Matrix{NF} = zeros(NF, nlev, nlat)   # (inverse) relax time scale per layer and lat
-    temp_equil_a::Vector{NF} = zeros(NF, nlat)           # terms to calc equilibrium temper func
-    temp_equil_b::Vector{NF} = zeros(NF, nlat)           # of latitude and pressure
+    temp_relax_freq::Matrix{NF} = zeros(NF, nlev, nlat) # (inverse) relax time scale per layer and lat
+    temp_equil_a::Vector{NF} = zeros(NF, nlat)          # terms to calc equilibrium temper func
+    temp_equil_b::Vector{NF} = zeros(NF, nlat)          # of latitude and pressure
 end
 
 """
@@ -111,7 +111,7 @@ function temperature_relaxation!(
     atmosphere::AbstractAtmosphere,
 )
     (; temp, temp_tend, pres, ln_pres) = column
-    j = column.jring[]                      # latitude ring index j
+    j = column.jring[]                      # latitude ring index j
     (; Tmin, temp_relax_freq, temp_equil_a, temp_equil_b) = scheme
 
     # surface reference pressure [Pa] and thermodynamic kappa R_dry/cₚ
@@ -165,7 +165,7 @@ Base.@kwdef mutable struct JablonowskiRelaxation{NF<:AbstractFloat} <: AbstractT
 
     # precomputed constants, allocate here, fill in initialize!
     temp_relax_freq::Matrix{NF} = zeros(NF, nlev, nlat)   # (inverse) relax time scale per layer and lat
-    temp_equil::Matrix{NF} = zeros(NF, nlev, nlat)        # terms to calc equilibrium temperature as func
+    temp_equil::Matrix{NF} = zeros(NF, nlev, nlat)        # terms to calc equilibrium temperature as func
 end
 
 """
@@ -236,7 +236,7 @@ function temperature_relaxation!(   column::ColumnVariables,
                                     scheme::JablonowskiRelaxation)
 
     (; temp, temp_tend) = column
-    j = column.jring[]                      # latitude ring index j
+    j = column.jring[]                      # latitude ring index j
     (; temp_relax_freq, temp_equil) = scheme
 
     @inbounds for k in eachlayer(column)
@@ -244,6 +244,6 @@ function temperature_relaxation!(   column::ColumnVariables,
 
         # Held and Suarez 1996, equation 2, but using temp_equil from
         # Jablonowski and Williamson 2006, equation 6
-        temp_tend[k] -= kₜ*(temp[k] - temp_equil[k, j])  
+        temp_tend[k] -= kₜ*(temp[k] - temp_equil[k, j])
     end
 end

@@ -38,7 +38,7 @@ To define a new forcing type, at the most basic level you would do
 using SpeedyWeather
 
 struct MyForcing{NF} <: SpeedyWeather.AbstractForcing
-    # define some parameters and work arrays here
+    # define some parameters and work arrays here
     a::NF
     v::Vector{NF}
 end
@@ -416,11 +416,11 @@ in grid-point space by writing into `u_tend_grid` and `v_tend_grid`.
 
 ## Custom forcing: model construction
 
-Now that we have defined a new forcing, how to initialize it and what
-it is supposed to execute on every time step, we explain how to construct
-a model with this new forcing. We generally follow other [Model setups],
-start with the [SpectralGrid](@ref), use that to get a `StochasticStirring`
-forcing instance. This calls the generator function from [Custom forcing: generator function](@ref).
+Now that we have defined a new forcing, as well as how to initialize it and what
+it is supposed to execute on every time step, we also want to use it.
+We generally follow other [Examples](@ref Examples), start with the [SpectralGrid](@ref)
+and use that to get an instance of `StochasticStirring`.
+This calls the generator function from [Custom forcing: generator function](@ref).
 Here we want to stir vorticity not at the default latitude of 45N, but on the southern
 hemisphere to illustrate how to pass on non-default parameters. We explicitly set the
 `initial_conditions` to rest and pass them as well as `forcing=stochastic_stirring`
@@ -454,7 +454,7 @@ supertypes, and in fact you could define a forcing as a subtype of `AbstractDrag
 and vice versa. So for a drag, most straight-forwardly you would do
 ```@example extend
 struct MyDrag <: SpeedyWeather.AbstractDrag
-    # parameters and arrays
+    # parameters and arrays
 end
 ```
 then define the `initialize!` function as before, but extend the method `drag!`

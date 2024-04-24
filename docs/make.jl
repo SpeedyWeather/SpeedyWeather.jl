@@ -27,7 +27,8 @@ makedocs(
             ],
             "Running SpeedyWeather" => [
                 "How to run SpeedyWeather"=>"how_to_run_speedy.md",
-                "Model setups"=>"setups.md",
+                "Examples 2D"=>"examples_2D.md",
+                "Examples 3D"=>"examples_3D.md",
                 "Analysis"=>"analysis.md",
                 "Tree structure"=>"structure.md",
                 "Particle advection"=>"particles.md",
@@ -43,7 +44,10 @@ makedocs(
             ],
             "RingGrids"=>"ringgrids.md",
             "LowerTriangularMatrices"=>"lowertriangularmatrices.md",
-            "SpeedyTransforms"=>"speedytransforms.md",
+            "SpeedyTransforms" => [
+                "Spectral transforms" => "speedytransforms.md",
+                "Gradient operators" => "gradients.md",
+            ],
             "Function and type index"=>"functions.md",
             ]
 )

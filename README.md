@@ -52,7 +52,7 @@ components and parameter choices; not too complicated to implement and understan
 Finding a good balance is difficult but we try our best. 
 
 This means in practice, that while SpeedyWeather is currently developed, many more physical processes
-and other featuers will be implemented. On our TODO is
+and other features will be implemented. On our TODO is
 
 - A (somewhat) realistic radiation scheme with a daily cycle, depending on clouds and humidity
 - Longwave radiation that depends on (global) CO2 concentrations to represent climate change
@@ -72,13 +72,17 @@ about dos and don'ts. Just express your interest to contribute and we'll be happ
 
 ## Example use
 
-The interface to SpeedyWeather.jl consist of 4 steps: define the grid, create the model, initialize, run
+For a more comprehensive tutorial with several examples, see
+[Examples](https://speedyweather.github.io/SpeedyWeather.jl/dev/examples_2D/) in the documentation.
+The interface to SpeedyWeather.jl consist of 5 steps: define the grid, create model components,
+construct the model, initialize, run
 
 ```julia
-spectral_grid = SpectralGrid(trunc=31, Grid=OctahedralGaussianGrid, nlev=8)
-model = PrimitiveWetModel(; spectral_grid, orography = EarthOrography(spectral_grid))
-simulation = initialize!(model)
-run!(simulation, period=Day(10), output=true)
+spectral_grid = SpectralGrid(trunc=31, nlev=8)          # define resolution
+orography = EarthOrography(spectral_grid)               # create non-default components
+model = PrimitiveWetModel(; spectral_grid, orography)   # construct model
+simulation = initialize!(model)                         # initialize all model components
+run!(simulation, period=Day(10), output=true)           # aaaand action!
 ```
 and you will see
 
@@ -169,13 +173,22 @@ check out their documentation: [RingGrids](https://speedyweather.github.io/Speed
 
 SpeedyWeather.jl is registered in Julia's registry, so open the package manager with `]` and
 ```julia
-(@v1.8) pkg> add SpeedyWeather
+(@v1.10) pkg> add SpeedyWeather
 ```
 which will install the [latest release]([url](https://github.com/SpeedyWeather/SpeedyWeather.jl/releases))
 and all dependencies automatically. For more information see the
 [Installation](https://speedyweather.github.io/SpeedyWeather.jl/dev/installation/) in the documentation.
 Please use the current minor version of Julia,
 compatibilities with older versions are not guaranteed.
+
+## Benchmarks
+
+The primitive equations at 400km resolution with 8 vertical layers are simulated by
+SpeedyWeather.jl at about 500 simulated years per day, i.e. one year takes about
+3min single-threaded on a CPU. Multi-threading will increase the speed typically by 2-4x.
+
+For an overview of typical simulation speeds a user can expect under different model setups see
+[Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/benchmark).
 
 ## Copyright and license
 

@@ -11,51 +11,52 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct PrimitiveWetModel{
-    NF<:AbstractFloat,
-    DS<:DeviceSetup,
-    PL<:AbstractPlanet,
-    AT<:AbstractAtmosphere,
-    CO<:AbstractCoriolis,
-    GO<:AbstractGeopotential,
-    OR<:AbstractOrography,
-    AC<:AbstractAdiabaticConversion,
-    PA<:AbstractParticleAdvection,
-    IC<:AbstractInitialConditions,
-    LS<:AbstractLandSeaMask,
-    OC<:AbstractOcean,
-    LA<:AbstractLand,
-    ZE<:AbstractZenith,
-    AL<:AbstractAlbedo,
-    SO<:AbstractSoil,
-    VG<:AbstractVegetation,
-    CC<:AbstractClausiusClapeyron,
-    BL<:AbstractBoundaryLayer,
-    TR<:AbstractTemperatureRelaxation,
-    VD<:AbstractVerticalDiffusion,
-    SUT<:AbstractSurfaceThermodynamics,
-    SUW<:AbstractSurfaceWind,
-    SH<:AbstractSurfaceHeat,
-    EV<:AbstractEvaporation,
-    LSC<:AbstractCondensation,
-    CV<:AbstractConvection,
-    SW<:AbstractShortwave,
-    LW<:AbstractLongwave,
-    TS<:AbstractTimeStepper,
-    ST<:SpectralTransform{NF},
-    IM<:AbstractImplicit,
-    HD<:AbstractHorizontalDiffusion,
-    VA<:AbstractVerticalAdvection,
-    HF<:AbstractHoleFilling,
-    GE<:AbstractGeometry,
-    OW<:AbstractOutputWriter,
-    FB<:AbstractFeedback,
+    # TODO add constraints again when we stop supporting julia v1.9
+    DS,     # <:DeviceSetup,
+    GE,     # <:AbstractGeometry,
+    PL,     # <:AbstractPlanet,
+    AT,     # <:AbstractAtmosphere,
+    CO,     # <:AbstractCoriolis,
+    GO,     # <:AbstractGeopotential,
+    OR,     # <:AbstractOrography,
+    AC,     # <:AbstractAdiabaticConversion,
+    PA,     # <:AbstractParticleAdvection,
+    IC,     # <:AbstractInitialConditions,
+    LS,     # <:AbstractLandSeaMask,
+    OC,     # <:AbstractOcean,
+    LA,     # <:AbstractLand,
+    ZE,     # <:AbstractZenith,
+    AL,     # <:AbstractAlbedo,
+    SO,     # <:AbstractSoil,
+    VG,     # <:AbstractVegetation,
+    CC,     # <:AbstractClausiusClapeyron,
+    BL,     # <:AbstractBoundaryLayer,
+    TR,     # <:AbstractTemperatureRelaxation,
+    VD,     # <:AbstractVerticalDiffusion,
+    SUT,    # <:AbstractSurfaceThermodynamics,
+    SUW,    # <:AbstractSurfaceWind,
+    SH,     # <:AbstractSurfaceHeatFlux,
+    EV,     # <:AbstractSurfaceEvaporation,
+    LSC,    # <:AbstractCondensation,
+    CV,     # <:AbstractConvection,
+    SW,     # <:AbstractShortwave,
+    LW,     # <:AbstractLongwave,
+    TS,     # <:AbstractTimeStepper,
+    ST,     # <:SpectralTransform{NF},
+    IM,     # <:AbstractImplicit,
+    HD,     # <:AbstractHorizontalDiffusion,
+    VA,     # <:AbstractVerticalAdvection,
+    HF,     # <:AbstractHoleFilling,
+    OW,     # <:AbstractOutputWriter,
+    FB,     # <:AbstractFeedback,
 } <: PrimitiveWet
 
-    spectral_grid::SpectralGrid = SpectralGrid()
-    geometry::GE = Geometry(spectral_grid)
+    spectral_grid::SpectralGrid
+    device_setup::DS = DeviceSetup(CPUDevice())
     
     # DYNAMICS
     dynamics::Bool = true
+    geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
     atmosphere::AT = EarthAtmosphere(spectral_grid)
     coriolis::CO = Coriolis(spectral_grid)
@@ -82,15 +83,14 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     vertical_diffusion::VD = BulkRichardsonDiffusion(spectral_grid)
     surface_thermodynamics::SUT = SurfaceThermodynamicsConstant(spectral_grid)
     surface_wind::SUW = SurfaceWind(spectral_grid)
-    surface_heat_flux::SH = SurfaceSensibleHeat(spectral_grid)
-    evaporation::EV = SurfaceEvaporation(spectral_grid)
+    surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
+    surface_evaporation::EV = SurfaceEvaporation(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     
     # NUMERICS
-    device_setup::DS = DeviceSetup(CPUDevice())
     time_stepping::TS = Leapfrog(spectral_grid)
     spectral_transform::ST = SpectralTransform(spectral_grid)
     implicit::IM = ImplicitPrimitiveEquation(spectral_grid)
@@ -142,6 +142,10 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.convection, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
+    initialize!(model.surface_thermodynamics, model)
+    initialize!(model.surface_wind, model)
+    initialize!(model.surface_heat_flux, model)
+    initialize!(model.surface_evaporation, model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)
