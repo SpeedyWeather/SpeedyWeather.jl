@@ -23,7 +23,7 @@ export  SpectralTransform,
         spectral,
         spectral!
 
-# ALIASING
+# ALIASING
 export  get_nlat_half
 
 # GRADIENTS
@@ -33,9 +33,8 @@ export  curl,
         divergence!,
         UV_from_vor!,
         UV_from_vordiv!,
-        ∇²!,
-        ∇⁻²!,
-        ∇!
+        ∇²!, ∇⁻²!, ∇!,
+        ∇², ∇⁻², ∇
 
 # TRUNCATION
 export  spectral_truncation,

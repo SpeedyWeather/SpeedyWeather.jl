@@ -20,7 +20,7 @@ function power_spectrum(alms::LowerTriangularMatrix{Complex{NF}};
 
     # divide by number of orders m at l for normalization, "average power at l"
     if normalize
-        @inbounds for l in 1:trunc  # 1-based degree, hence:
+        @inbounds for l in 1:trunc  # 1-based degree, hence:
             spectrum[l] /= 2l-1     # 1/(2l + 1) but l → l-1
         end
     end
