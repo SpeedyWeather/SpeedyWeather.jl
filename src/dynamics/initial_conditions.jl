@@ -143,6 +143,7 @@ function initialize!(   progn::PrognosticVariables,
     _, lons = RingGrids.get_colatlons(Grid, nlat_half)
     weights = FastGaussQuadrature.gausslegendre(2nlat_half)[2]
     η_sum = 0
+    latstr = π/2
 
     for (j, ring) in enumerate(eachring(u_grid, η_grid))
         θ = π/2 - colats[j]             # latitude in radians
@@ -158,7 +159,12 @@ function initialize!(   progn::PrognosticVariables,
 
         # integration for layer thickness h / interface height η
         w = weights[j]
-        η_sum += 2w*(radius*u_θ/gravity * (f + tan(θ)/radius*u_θ))
+        dlat = θ - latstr
+        latstr = θ
+        # TODO
+        # we may need a better algorithm here
+        η_sum += -dlat*(radius*u_θ/gravity * (f + tan(θ)/radius*u_θ))
+        #η_sum += 2w*(radius*u_θ/gravity * (f + tan(θ)/radius*u_θ))
 
         # lon-constant part of perturbation
         ηθ = perturb_height*cos(θ)*exp(-((θ₂-θ)/β)^2)
