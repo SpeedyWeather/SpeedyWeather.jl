@@ -370,8 +370,6 @@ end
     end
 end
 
-RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
-
 @testset "AbstractGridArray: GPU (JLArrays)" begin 
     NF = Float32
     @testset for Grid in ( 
