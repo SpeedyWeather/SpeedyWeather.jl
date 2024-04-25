@@ -69,7 +69,6 @@ julia = "1.9"
 [extras]
 JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
 
 [targets]
 test = ["Test", "JLArrays"]
