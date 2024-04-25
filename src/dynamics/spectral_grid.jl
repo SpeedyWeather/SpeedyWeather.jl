@@ -75,7 +75,7 @@ function Base.show(io::IO, SG::SpectralGrid)
     (; NF, trunc, Grid, radius, nlat, npoints, nlev, vertical_coordinates) = SG
     (; n_particles) = SG
 
-    # resolution information
+    # resolution information
     res_ave = sqrt(4π*radius^2/npoints)/1000  # in [km]
     s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
 
