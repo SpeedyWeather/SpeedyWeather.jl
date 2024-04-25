@@ -31,7 +31,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
 } <: ShallowWater
     
     spectral_grid::SpectralGrid
-    device_setup::DS = DeviceSetup(CPUDevice())
+    device_setup::DS = DeviceSetup(spectral_grid.device)
 
     # DYNAMICS
     geometry::GE = Geometry(spectral_grid)

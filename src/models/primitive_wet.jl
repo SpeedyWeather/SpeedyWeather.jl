@@ -52,7 +52,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
 } <: PrimitiveWet
 
     spectral_grid::SpectralGrid
-    device_setup::DS = DeviceSetup(CPUDevice())
+    device_setup::DS = DeviceSetup(spectral_grid.device)
     
     # DYNAMICS
     dynamics::Bool = true

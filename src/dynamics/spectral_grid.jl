@@ -1,8 +1,12 @@
 abstract type AbstractSpectralGrid end
 abstract type AbstractGeometry end
 
+# computing
 const DEFAULT_NF = Float32
-const DEFAULT_MODEL = PrimitiveDry
+const DEFAULT_DEVICE = CPU()
+const DEFAULT_ARRAYTYPE = Array
+
+# numerics
 const DEFAULT_GRID = OctahedralGaussianGrid
 const DEFAULT_RADIUS = 6.371e6
 const DEFAULT_TRUNC = 31
@@ -21,6 +25,12 @@ Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
     "[OPTION] number format used throughout the model"
     NF::Type{<:AbstractFloat} = DEFAULT_NF
 
+    "[OPTION] device archictecture to run on"
+    device::AbstractDevice = DEFAULT_DEVICE
+
+    "[OPTION] array type to use for all variables"
+    ArrayType::Type{<:AbstractArray} = default_array_type(device)
+
     # HORIZONTAL
     "[OPTION] horizontal resolution as the maximum degree of spherical harmonics"
     trunc::Int = DEFAULT_TRUNC
@@ -35,7 +45,7 @@ Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
     radius::Float64 = DEFAULT_RADIUS
 
     "[OPTION] number of particles for particle advection [1]"
-    n_particles::Int = 0
+    nparticles::Int = 0
 
     # SIZE OF GRID from trunc, Grid, dealiasing:
     "number of latitude rings on one hemisphere (Equator incl)"
@@ -53,27 +63,12 @@ Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
 
     "[OPTION] coordinates used to discretize the vertical"
     vertical_coordinates::VerticalCoordinates = SigmaCoordinates(; nlev)
-
-    # make sure nlev and vertical_coordinates.nlev match
-    function SpectralGrid(NF, trunc, Grid, dealiasing, radius, n_particles, nlat_half, nlat, npoints, nlev, vertical_coordinates)
-        if nlev == vertical_coordinates.nlev
-            return new(NF, trunc, Grid, dealiasing, radius, n_particles, nlat_half, nlat, npoints,
-                    nlev, vertical_coordinates)
-        else    # use nlev from vert_coords:
-            return new(NF, trunc, Grid, dealiasing, radius, n_particles, nlat_half, nlat, npoints,
-                    vertical_coordinates.nlev, vertical_coordinates)
-        end
-    end
 end
-
-# generator functions
-SpectralGrid(NF::Type{<:AbstractFloat}; kwargs...) = SpectralGrid(; NF, kwargs...)
-SpectralGrid(Grid::Type{<:AbstractGrid}; kwargs...) = SpectralGrid(; Grid, kwargs...)
-SpectralGrid(NF::Type{<:AbstractFloat}, Grid::Type{<:AbstractGrid}; kwargs...) = SpectralGrid(; NF, Grid, kwargs...)
 
 function Base.show(io::IO, SG::SpectralGrid)
     (; NF, trunc, Grid, radius, nlat, npoints, nlev, vertical_coordinates) = SG
-    (; n_particles) = SG
+    (; device, ArrayType) = SG
+    (; nparticles) = SG
 
     # resolution information
     res_ave = sqrt(4π*radius^2/npoints)/1000  # in [km]
@@ -83,10 +78,11 @@ function Base.show(io::IO, SG::SpectralGrid)
     println(io, "├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
     println(io, "├ Grid:       $nlat-ring $Grid{$NF}, $npoints grid points")
     println(io, "├ Resolution: $(s(res_ave))km (average)")
-    if n_particles > 0
-    println(io, "├ Particles:  $n_particles")
+    if nparticles > 0
+    println(io, "├ Particles:  $nparticles")
     end
-      print(io, "└ Vertical:   $nlev-level $(typeof(vertical_coordinates))")
+    println(io, "├ Vertical:   $nlev-level $(typeof(vertical_coordinates))")
+      print(io, "└ Device:     $(typeof(device)) using $ArrayType")
 end
 
 """

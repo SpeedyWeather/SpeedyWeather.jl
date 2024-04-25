@@ -10,14 +10,17 @@ Base.@kwdef mutable struct Leapfrog{NF<:AbstractFloat} <: AbstractTimeStepper
     "spectral resolution (max degree of spherical harmonics)"
     trunc::Int                      
 
+    "Number of timesteps stored simultaneously in prognostic variables"
+    nsteps::Int = 2
+
     # OPTIONS
-    "time step in minutes for T31, scale linearly to `trunc`"
+    "Time step in minutes for T31, scale linearly to `trunc`"
     Δt_at_T31::Second = Minute(30)
 
-    "radius of sphere [m], used for scaling"
+    "Radius of sphere [m], used for scaling"
     radius::NF = DEFAULT_RADIUS
 
-    "adjust Δt_at_T31 with the output_dt to reach output_dt exactly in integer time steps"
+    "Adjust Δt_at_T31 with the output_dt to reach output_dt exactly in integer time steps"
     adjust_with_output::Bool = true
 
     # NUMERICS

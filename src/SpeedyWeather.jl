@@ -45,7 +45,7 @@ include("LowerTriangularMatrices/LowerTriangularMatrices.jl")
 using .LowerTriangularMatrices
 
 # RingGrids
-export RingGrids
+export  RingGrids
 export  FullClenshawGrid, FullClenshawArray,
         FullGaussianGrid, FullGaussianArray,
         FullHEALPixGrid, FullHEALPixArray,

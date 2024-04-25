@@ -1,4 +1,4 @@
-# const LTM = LowerTriangularMatrix     # already defined in prognostic_variables
+const LTM = LowerTriangularMatrix
 
 """
 Tendencies of the prognostic spectral variables for a given layer.
@@ -154,30 +154,30 @@ end
 
 Base.@kwdef struct ParticleVariables{NF<:AbstractFloat,Grid<:AbstractGrid}
     "Number of particles"
-    n_particles::Int
+    nparticles::Int
 
     "Number of latitudes on one hemisphere (Eq. incld.), resolution parameter of Grid"
     nlat_half::Int
 
     "Work array: particle locations"
-    locations::Vector{Particle{NF}} = zeros(Particle{NF}, n_particles)
+    locations::Vector{Particle{NF}} = zeros(Particle{NF}, nparticles)
 
     "Work array: velocity u"
-    u::Vector{NF} = zeros(NF,n_particles)
+    u::Vector{NF} = zeros(NF,nparticles)
 
     "Work array: velocity v"
-    v::Vector{NF} = zeros(NF,n_particles)
+    v::Vector{NF} = zeros(NF,nparticles)
 
     "Work array: velocity w = dσ/dt"
-    σ_tend::Vector{NF} = zeros(NF,n_particles)
+    σ_tend::Vector{NF} = zeros(NF,nparticles)
 
     "Interpolator to interpolate velocity fields onto particle positions"
-    interpolator::AnvilInterpolator{NF,Grid} = AnvilInterpolator(NF, Grid, nlat_half, n_particles)
+    interpolator::AnvilInterpolator{NF,Grid} = AnvilInterpolator(NF, Grid, nlat_half, nparticles)
 end
 
 function Base.zeros(::Type{ParticleVariables}, SG::SpectralGrid)
-    (; n_particles, nlat_half) = SG
-    ParticleVariables{SG.NF, SG.Grid}(; n_particles, nlat_half)
+    (; nparticles, nlat_half) = SG
+    ParticleVariables{SG.NF, SG.Grid}(; nparticles, nlat_half)
 end
 
 export DiagnosticVariables
@@ -228,11 +228,5 @@ function Base.zeros(
         nlat_half, nlev, npoints, scale)
 end
 
-DiagnosticVariables(SG::SpectralGrid) = zeros(DiagnosticVariables, SG, DEFAULT_MODEL)
 DiagnosticVariables(SG::SpectralGrid, Model::Type{<:ModelSetup}) = zeros(DiagnosticVariables, SG, Model)
 DiagnosticVariables(SG::SpectralGrid, model::ModelSetup) = zeros(DiagnosticVariables, SG, model_class(model))
-
-# LOOP OVER ALL GRID POINTS (extend from RingGrids module)
-RingGrids.eachgridpoint(diagn::DiagnosticVariables) = Base.OneTo(diagn.npoints)
-RingGrids.eachgridpoint(layer::DiagnosticVariablesLayer) = Base.OneTo(layer.npoints)
-RingGrids.eachgridpoint(surface::SurfaceVariables) = Base.OneTo(surface.npoints)

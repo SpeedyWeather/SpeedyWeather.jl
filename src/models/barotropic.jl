@@ -30,7 +30,7 @@ Base.@kwdef mutable struct BarotropicModel{
 } <: Barotropic
     
     spectral_grid::SpectralGrid
-    device_setup::DS = DeviceSetup(CPUDevice())
+    device_setup::DS = DeviceSetup(spectral_grid.device)
     
     # DYNAMICS
     geometry::GE = Geometry(spectral_grid)

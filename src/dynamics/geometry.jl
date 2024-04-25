@@ -100,6 +100,9 @@ end
 $(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
 function Geometry(spectral_grid::SpectralGrid)
+    error_message = "nlev=$(spectral_grid.nlev) does not match length nlev="*
+        "$(spectral_grid.vertical_coordinates.nlev) in spectral_grid.vertical_coordinates."
+    @assert spectral_grid.nlev == spectral_grid.vertical_coordinates.nlev error_message
     return Geometry{spectral_grid.NF}(; spectral_grid)
 end
 
