@@ -1,8 +1,6 @@
-"""
-    true/false = isincreasing(v::Vector)
-
+"""$(TYPEDSIGNATURES)
 Check whether elements of a vector `v` are strictly increasing."""
-function isincreasing(x::Vector)
+function isincreasing(x::AbstractVector)
     is_increasing = true
     for i in 2:length(x)
         is_increasing &= x[i-1] < x[i] ? true : false
@@ -10,11 +8,9 @@ function isincreasing(x::Vector)
     return is_increasing
 end
 
-"""
-    true/false = isdecreasing(v::Vector)
-
+"""$(TYPEDSIGNATURES)
 Check whether elements of a vector `v` are strictly decreasing."""
-function isdecreasing(x::Vector)
+function isdecreasing(x::AbstractVector)
     is_decreasing = true
     for i in 2:length(x)
         is_decreasing &= x[i-1] > x[i] ? true : false
@@ -22,22 +18,15 @@ function isdecreasing(x::Vector)
     return is_decreasing
 end
 
-"""
-    true/false = extrema_in(v::Vector, a::Real, b::Real)
-
+"""$(TYPEDSIGNATURES)
 For every element vᵢ in v does a<=vi<=b hold?"""
-function extrema_in(v::Vector,
-                    a::Real,
-                    b::Real)
-    
+function extrema_in(v::AbstractVector, a::Real, b::Real)
     vmin, vmax = extrema(v)
     return (vmin >= a) && (vmax <= b)
 end
 
 # MATRIX rotations
-"""
-    i_new, j_new = rotate_matrix_indices_90(i, j, s)
-
+"""$(TYPEDSIGNATURES)
 Rotate indices `i, j` of a square matrix of size s x s anti-clockwise by 90˚.""" 
 @inline function rotate_matrix_indices_90(i::Integer, j::Integer, s::Integer)
     @boundscheck 0 < i <= s || throw(BoundsError)
@@ -47,9 +36,7 @@ Rotate indices `i, j` of a square matrix of size s x s anti-clockwise by 90˚.""
     return i_new, j_new
 end
 
-"""
-    i_new, j_new = rotate_matrix_indices_180(i, j, s)
-
+"""$(TYPEDSIGNATURES)
 Rotate indices `i, j` of a square matrix of size s x s by 180˚.""" 
 @inline function rotate_matrix_indices_180(i::Integer, j::Integer, s::Integer)
     @boundscheck 0 < i <= s || throw(BoundsError)
@@ -59,9 +46,7 @@ Rotate indices `i, j` of a square matrix of size s x s by 180˚."""
     return i_new, j_new
 end
 
-"""
-    i_new, j_new = rotate_matrix_indices_270(i, j, s)
-
+"""$(TYPEDSIGNATURES)
 Rotate indices `i, j` of a square matrix of size s x s anti-clockwise by 270˚.""" 
 @inline function rotate_matrix_indices_270(i::Integer, j::Integer, s::Integer)
     @boundscheck 0 < i <= s || throw(BoundsError)

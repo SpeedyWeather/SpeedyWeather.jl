@@ -12,7 +12,7 @@ function Makie.heatmap(
     title::String = "$(RingGrids.get_nlat(grid))-ring $(typeof(grid))",
     kwargs...   # pass on to Makie.heatmap
 )
-    full_grid = RingGrids.interpolate(RingGrids.full_grid(typeof(grid)), grid.nlat_half, grid)
+    full_grid = RingGrids.interpolate(RingGrids.full_grid_type(grid), grid.nlat_half, grid)
     heatmap(full_grid; title, kwargs...)
 end
 

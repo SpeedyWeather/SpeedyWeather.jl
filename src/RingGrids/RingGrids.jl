@@ -9,50 +9,77 @@ import Statistics: mean
 import FastGaussQuadrature
 import LinearAlgebra
 
-# GRIDS
+# GPU
+import Adapt
+import GPUArrays
+import CUDA
+
+# ABSTRACT GRIDS (2D) AND GRIDARRAYS (3D+)
+export  AbstractGridArray,
+        AbstractFullGridArray,
+        AbstractReducedGridArray
+
 export  AbstractGrid,
         AbstractFullGrid,
-        AbstractOctahedralGrid,
-        AbstractHEALPixGrid,
-        AbstractOctaHEALPixGrid
+        AbstractReducedGrid
+
+# CONCRETE GRIDS (2D) AND GRIDARRAYS (3D+)
+export  FullGaussianArray,
+        FullClenshawArray,
+        FullHEALPixArray,
+        FullOctaHEALPixArray
 
 export  FullGaussianGrid,
         FullClenshawGrid,
         FullHEALPixGrid,
         FullOctaHEALPixGrid
 
+export  OctahedralGaussianArray,
+        OctahedralClenshawArray,
+        HEALPixArray,
+        OctaHEALPixArray
+
 export  OctahedralGaussianGrid,
         OctahedralClenshawGrid,
         HEALPixGrid,
         OctaHEALPixGrid
 
-# GRID FUNCTIONS
+# SIZE
 export  grids_match,
-        get_truncation,
-        get_resolution,
         get_nlat,
         get_nlat_half,
-        get_npoints,
-        get_latdlonds,
+        get_npoints2D
+
+# COORDINATES
+export  get_latdlonds,
         get_lat,
         get_colat,
         get_latd,
         get_lond,
-        each_index_in_ring,
-        each_index_in_ring!,
-        eachgridpoint,
+        get_nlons,
+        get_nlon_max
+
+# INTEGRATION
+export  get_quadrature_weights,
+        get_solid_angles
+
+# ITERATORS
+export  eachgrid,
         eachring,
         whichring,
-        get_nlons,
-        get_nlon_max,
-        get_quadrature_weights,
-        get_solid_angles
+        eachgridpoint,
+        each_index_in_ring,
+        each_index_in_ring!
 
 # SCALING
 export  scale_coslat!,
         scale_coslat²!,
         scale_coslat⁻¹!,
-        scale_coslat⁻²!
+        scale_coslat⁻²!,
+        scale_coslat,
+        scale_coslat²,
+        scale_coslat⁻¹,
+        scale_coslat⁻²
 
 # INTERPOLATION
 export  AbstractInterpolator,
@@ -67,19 +94,31 @@ export  interpolate,
         update_locator,
         update_locator!
 
-# export  plot
-
 include("utility_functions.jl")
 
-include("grids_general.jl")
+# GENERAL
+include("general.jl")
 include("full_grids.jl")
-include("octahedral.jl")
-include("healpix.jl")
-include("octahealpix.jl")
+include("reduced_grids.jl")
+include("scaling.jl")
+
+# FULL GRIDS
+include("grids/full_gaussian.jl")
+include("grids/full_clenshaw.jl")
+include("grids/full_healpix.jl")
+include("grids/full_octahealpix.jl")
+
+# REDUCED GRIDS
+include("grids/octahedral_gaussian.jl")
+include("grids/octahedral_clenshaw.jl")
+include("grids/healpix.jl")
+include("grids/octahealpix.jl")
+
+# INTEGRATION AND INTERPOLATION
 include("quadrature_weights.jl")
 include("interpolation.jl")
+
+# OUTPUT
 include("show.jl")
-include("similar.jl")
-include("scaling.jl")
 
 end

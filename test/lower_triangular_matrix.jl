@@ -1,8 +1,4 @@
-using JLArrays
-
-# remove with extension
-LowerTriangularMatrices.nonparametric_type(::Type{<:JLArray}) = JLArray
-using Adapt
+using JLArrays, Adapt
 import Random
 
 @testset "LowerTriangularMatrix" begin
