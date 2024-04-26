@@ -143,7 +143,7 @@ The following explains what's necessary for this. The new `MyOrography` has to b
 (`mutable` or not)
 
 ```@example orography
-@kwdef struct MyOrography{NF, Grid<:AbstractGrid{NF}} <: AbstractOrography{NF, Grid}
+@kwdef struct MyOrography{NF, Grid<:RingGrids.AbstractGrid{NF}} <: SpeedyWeather.AbstractOrography{NF, Grid}
     constant_height::Float64 = 100
     # add some other parameters with default values here
 
