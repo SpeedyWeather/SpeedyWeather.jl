@@ -13,12 +13,16 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Generator function pulling the resolution information from `spectral_grid`."""
-function NoOrography(spectral_grid::SpectralGrid)
+Generator function pulling the resolution information from `spectral_grid` for
+all Orography <: AbstractOrography."""
+function (::Type{Orography})(
+    spectral_grid::SpectralGrid;
+    kwargs...
+) where Orography <: AbstractOrography
     (; NF, Grid, nlat_half, trunc) = spectral_grid
     orography   = zeros(Grid{NF}, nlat_half)
     geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
-    return NoOrography{NF, Grid{NF}}(orography, geopot_surf)
+    return Orography{NF, Grid{NF}}(; orography, geopot_surf, kwargs...)
 end
 
 # no further initialization needed
@@ -42,16 +46,6 @@ Base.@kwdef mutable struct ZonalRidge{NF<:AbstractFloat, Grid<:AbstractGrid{NF}}
     
     "surface geopotential, height*gravity [m²/s²]"
     const geopot_surf::LowerTriangularMatrix{Complex{NF}} 
-end
-
-"""
-$(TYPEDSIGNATURES)
-Generator function pulling the resolution information from `spectral_grid`."""
-function ZonalRidge(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, Grid, nlat_half, trunc) = spectral_grid
-    orography   = zeros(Grid{NF}, nlat_half)
-    geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
-    return ZonalRidge{NF, Grid{NF}}(; orography, geopot_surf, kwargs...)
 end
 
 # function barrier
@@ -92,6 +86,7 @@ function initialize!(   orog::ZonalRidge,
     spectral!(geopot_surf, orography, S)      # to grid-point space
     geopot_surf .*= gravity                 # turn orography into surface geopotential
     spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
+    return nothing
 end
 
 export EarthOrography
@@ -131,16 +126,6 @@ Base.@kwdef mutable struct EarthOrography{NF<:AbstractFloat, Grid<:AbstractGrid{
     
     "surface geopotential, height*gravity [m²/s²]"
     const geopot_surf::LowerTriangularMatrix{Complex{NF}} 
-end
-
-"""
-$(TYPEDSIGNATURES)
-Generator function pulling the resolution information from `spectral_grid`."""
-function EarthOrography(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, Grid, nlat_half, trunc) = spectral_grid
-    orography   = zeros(Grid{NF}, nlat_half)
-    geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
-    return EarthOrography{NF, Grid{NF}}(; orography, geopot_surf, kwargs...)
 end
 
 # function barrier
@@ -186,4 +171,5 @@ function initialize!(   orog::EarthOrography,
     gridded!(orography, geopot_surf, S)       # to grid-point space
     geopot_surf .*= gravity                 # turn orography into surface geopotential
     spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
+    return nothing    
 end
