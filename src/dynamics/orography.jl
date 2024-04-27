@@ -1,9 +1,9 @@
-abstract type AbstractOrography{NF, Grid} <: AbstractModelComponent end
+abstract type AbstractOrography <: AbstractModelComponent end
 export NoOrography
 
 """Orography with zero height in `orography` and zero surface geopotential `geopot_surf`.
 $(TYPEDFIELDS)"""
-struct NoOrography{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractOrography{NF, Grid}
+@kwdef struct NoOrography{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractOrography
     "height [m] on grid-point space."
     orography::Grid
     
@@ -32,7 +32,7 @@ export ZonalRidge
 
 """Zonal ridge orography after Jablonowski and Williamson, 2006.
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct ZonalRidge{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractOrography{NF, Grid}
+@kwdef struct ZonalRidge{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractOrography
     
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
@@ -42,10 +42,10 @@ Base.@kwdef mutable struct ZonalRidge{NF<:AbstractFloat, Grid<:AbstractGrid{NF}}
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
-    const orography::Grid
+    orography::Grid
     
     "surface geopotential, height*gravity [m²/s²]"
-    const geopot_surf::LowerTriangularMatrix{Complex{NF}} 
+    geopot_surf::LowerTriangularMatrix{Complex{NF}} 
 end
 
 # function barrier
@@ -93,7 +93,7 @@ export EarthOrography
 
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct EarthOrography{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractOrography{NF, Grid}
+@kwdef struct EarthOrography{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractOrography
 
     # OPTIONS
     "path to the folder containing the orography file, pkg path default"
@@ -122,10 +122,10 @@ Base.@kwdef mutable struct EarthOrography{NF<:AbstractFloat, Grid<:AbstractGrid{
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
-    const orography::Grid
+    orography::Grid
     
     "surface geopotential, height*gravity [m²/s²]"
-    const geopot_surf::LowerTriangularMatrix{Complex{NF}} 
+    geopot_surf::LowerTriangularMatrix{Complex{NF}} 
 end
 
 # function barrier
