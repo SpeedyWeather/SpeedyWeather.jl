@@ -140,14 +140,15 @@ scalar fields do not use, see [One more degree for spectral fields](@ref).
 
 You can also define a new orography like we defined `ZonalRidge` or `EarthOrography`.
 The following explains what's necessary for this. The new `MyOrography` has to be defined as
-(`mutable` or not)
+(`mutable` or not, but always with `@kwdef`)
 
 ```@example orography
-@kwdef struct MyOrography{NF, Grid<:RingGrids.AbstractGrid{NF}} <: SpeedyWeather.AbstractOrography{NF, Grid}
+@kwdef struct MyOrography{NF, Grid<:RingGrids.AbstractGrid{NF}} <: SpeedyWeather.AbstractOrography
+    # optional, any parameters as fields here, e.g.
     constant_height::Float64 = 100
-    # add some other parameters with default values here
+    # add some other parameters with default values
 
-    # every <:AbstractOrography needs those
+    # mandatory, every <:AbstractOrography needs those (same name, same type)
     orography::Grid                                 # in grid-point space [m]
     geopot_surf::LowerTriangularMatrix{Complex{NF}} # in spectral space *gravity [m^2/s^2]
 end

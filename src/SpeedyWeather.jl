@@ -46,6 +46,8 @@ using .LowerTriangularMatrices
 
 # RingGrids
 export RingGrids
+export  AbstractGrid, AbstractGridArray,
+        AbstractFullGridarray, AbstractReducedGridArray
 export  FullClenshawGrid, FullClenshawArray,
         FullGaussianGrid, FullGaussianArray,
         FullHEALPixGrid, FullHEALPixArray,
