@@ -263,7 +263,7 @@ function timestep!(
     end
 
     # PARTICLE ADVECTION
-    particle_advection!(progn, diagn, lf2, model.particle_advection)
+    particle_advection!(progn, diagn, model.particle_advection)
 end
 
 """
@@ -279,6 +279,8 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
 
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (; time) = progn.clock                           # current time
+
+    @info (progn.clock.timestep_counter, time)
 
     # set the tendencies back to zero for accumulation
     zero_tendencies!(diagn)
@@ -305,7 +307,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     gridded!(pres_grid, pres, spectral_transform)
     
     # PARTICLE ADVECTION
-    particle_advection!(progn, diagn, lf2, model.particle_advection)
+    particle_advection!(progn, diagn, model.particle_advection)
 end
 
 """
@@ -365,7 +367,7 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     end
 
     # PARTICLE ADVECTION
-    particle_advection!(progn, diagn, lf2, model.particle_advection)
+    particle_advection!(progn, diagn, model.particle_advection)
 end
 
 """
@@ -390,6 +392,7 @@ function time_stepping!(
     (; output, feedback) = model
     lf = 1                                  # use first leapfrog index
     gridded!(diagn, progn, lf, model)
+    initialize!(progn.particles, progn, diagn, model.particle_advection)
     initialize!(output, feedback, time_stepping, clock, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)
     
