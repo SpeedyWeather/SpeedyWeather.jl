@@ -1,10 +1,12 @@
 abstract type AbstractParticleAdvection <: AbstractModelComponent end
 
+# dummy no particle advection type
 export NoParticleAdvection
 struct NoParticleAdvection <: AbstractParticleAdvection end
 NoParticleAdvection(::SpectralGrid) = NoParticleAdvection()
 initialize!(::NoParticleAdvection, ::ModelSetup) = nothing
-particle_advection!(progn, diagn, lf, ::NoParticleAdvection) = nothing
+initialize!(particles, progn, diagn, ::NoParticleAdvection) = nothing
+particle_advection!(progn, diagn, ::NoParticleAdvection) = nothing
 
 export ParticleAdvection2D
 Base.@kwdef struct ParticleAdvection2D{NF} <: AbstractParticleAdvection
