@@ -87,9 +87,6 @@ function initialize!(
     v0 = diagn.particles.v
     interpolate!(u0, u_grid, interpolator)
     interpolate!(v0, v_grid, interpolator)
-
-    print("PA: Initial velocities interpolated on initial locations")
-    @info (progn.clock.timestep_counter, progn.clock.time)
 end
 
 
@@ -116,9 +113,6 @@ function particle_advection!(
     # escape immediately if advection not on this timestep
     n = particle_advection.every_n_timesteps
     clock.timestep_counter % n == (n-1) || return nothing   
-
-    print("PA: ")
-    @info (clock.timestep_counter, clock.time + clock.Δt)
 
     # also escape if no particle is active
     any_active::Bool = false 

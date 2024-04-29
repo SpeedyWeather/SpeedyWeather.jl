@@ -280,8 +280,6 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (; time) = progn.clock                           # current time
 
-    @info (progn.clock.timestep_counter, time)
-
     # set the tendencies back to zero for accumulation
     zero_tendencies!(diagn)
 
