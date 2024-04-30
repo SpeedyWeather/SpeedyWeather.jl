@@ -108,10 +108,14 @@ function particle_advection!(
     length(particles) == 0 && return nothing
 
     # decide whether to execute on this time step:
-    # execute always on last time step *before* time step iscdivisible by
+    # execute always on last time step *before* time step is divisible by
     # `particle_advection.every_n_timesteps`, e.g. 7, 15, 23, ... for n=8 which
     # already contains u, v at i=8, 16, 24, etc as executed after `gridded!`
     # even though the clock hasn't be step forward yet, this means time = time + Δt here
+
+    # should not be called on the 1st step in first_timesteps, which is excluded
+    # with a lf2 == 2 check before this function is called
+        
     # escape immediately if advection not on this timestep
     n = particle_advection.every_n_timesteps
     clock.timestep_counter % n == (n-1) || return nothing   

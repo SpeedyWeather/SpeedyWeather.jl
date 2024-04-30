@@ -195,9 +195,7 @@ function first_timesteps!(
     progn::PrognosticVariables,         # all prognostic variables
     diagn::DiagnosticVariables,         # all pre-allocated diagnostic variables
     model::ModelSetup,                  # everything that is constant at runtime
-    output::AbstractOutputWriter,
 )
-    
     (; clock) = progn
     clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
     
@@ -227,7 +225,7 @@ function first_timesteps!(
     timestep!(clock, Δt_millisec) 
     
     # do output and callbacks after the first proper (from i=0 to i=1) time step
-    write_output!(output, clock.time, diagn)
+    write_output!(model.output, clock.time, diagn)
     callback!(model.callbacks, progn, diagn, model)
 
     # from now on precomputed implicit terms with 2Δt
@@ -242,10 +240,10 @@ Calculate a single time step for the `model <: Barotropic`."""
 function timestep!( 
     progn::PrognosticVariables,     # all prognostic variables
     diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
-    dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
+    dt::Real,                       # time step (mostly =2Δt, but for first_timesteps! =Δt, Δt/2)
     model::Barotropic,              # everything that's constant at runtime
-    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
-    lf2::Int=2,                     # leapfrog index 2 (time step used for tendencies)
+    lf1::Integer=2,                 # leapfrog index 1 (dis/enables Robert+Williams filter)
+    lf2::Integer=2,                 # leapfrog index 2 (time step used for tendencies)
 )
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (; time) = progn.clock                           # current time
@@ -262,20 +260,22 @@ function timestep!(
         gridded!(diagn_layer, progn_lf, model)
     end
 
-    # PARTICLE ADVECTION
-    particle_advection!(progn, diagn, model.particle_advection)
+    # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
+    not_first_timestep = lf2 == 2
+    not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
 end
 
 """
 $(TYPEDSIGNATURES)
 Calculate a single time step for the `model <: ShallowWater`."""
-function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
-                    diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
-                    dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
-                    model::ShallowWater,            # everything that's constant at runtime
-                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
-                    lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
-                    ) where {NF<:AbstractFloat}
+function timestep!( 
+    progn::PrognosticVariables,     # all prognostic variables
+    diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
+    dt::Real,                       # time step (mostly =2Δt, but for first_timesteps! =Δt, Δt/2)
+    model::ShallowWater,            # everything that's constant at runtime
+    lf1::Integer=2,                 # leapfrog index 1 (dis/enables Robert+Williams filter)
+    lf2::Integer=2,                 # leapfrog index 2 (time step used for tendencies)
+)
 
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (; time) = progn.clock                           # current time
@@ -304,20 +304,22 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
     leapfrog!(progn.surface, diagn.surface, dt, lf1, model)
     gridded!(pres_grid, pres, spectral_transform)
     
-    # PARTICLE ADVECTION
-    particle_advection!(progn, diagn, model.particle_advection)
+    # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
+    not_first_timestep = lf2 == 2
+    not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
 end
 
 """
 $(TYPEDSIGNATURES)
 Calculate a single time step for the `model<:PrimitiveEquation`"""
-function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
-                    diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
-                    dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
-                    model::PrimitiveEquation,       # everything that's constant at runtime
-                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
-                    lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
-                    ) where {NF<:AbstractFloat}
+function timestep!( 
+    progn::PrognosticVariables,     # all prognostic variables
+    diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
+    dt::Real,                       # time step (mostly =2Δt, but for first_timesteps! =Δt, Δt/2)
+    model::PrimitiveEquation,       # everything that's constant at runtime
+    lf1::Integer=2,                 # leapfrog index 1 (dis/enables Robert+Williams filter)
+    lf2::Integer=2,                 # leapfrog index 2 (time step used for tendencies)
+)
 
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (; time) = progn.clock                           # current time
@@ -364,8 +366,9 @@ function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
         end
     end
 
-    # PARTICLE ADVECTION
-    particle_advection!(progn, diagn, model.particle_advection)
+    # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
+    not_first_timestep = lf2 == 2
+    not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
 end
 
 """
@@ -396,7 +399,7 @@ function time_stepping!(
     
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
     # considered part of the model initialisation
-    first_timesteps!(progn, diagn, model, output)
+    first_timesteps!(progn, diagn, model)
     
     # only now initialise feedback for benchmark accuracy
     initialize!(feedback, clock, model)
