@@ -32,7 +32,7 @@ Particle{NF}(lon, lat) where NF = Particle{NF,true}(lon, lat, 0)
 Particle{NF, isactive}(lon, lat) where {NF, isactive} = Particle{NF, isactive}(lon, lat, 0)
 Particle{NF}(lon, lat, σ) where NF = Particle{NF,true}(lon, lat, σ)
 
-# promotion of arguments if NF not provided
+# promotion of arguments if NF not provided
 Particle(lon, lat) = Particle(lon, lat, 0)
 Particle(lon, lat, σ) = Particle{promote_type(typeof.((lon, lat, σ))...), true}(lon, lat, σ)
 Particle(lon::Integer, lat::Integer) = Particle(lon,lat,0)
@@ -57,10 +57,10 @@ end
 
 # equality with same location and same activity
 function Base.:(==)(p1::Particle{NF1,active1},p2::Particle{NF2,active2}) where {NF1,active1,NF2,active2}
-    return  (active1 == active2) &&     # both active or both inactive
-            (p1.lat == p2.lat) &&       # same latitude
+    return  (active1 == active2) &&     # both active or both inactive
+            (p1.lat == p2.lat) &&       # same latitude
             (p1.σ == p2.σ) &&           # same elevation
-            ((p1.lon == p2.lon) ||      # same longitude OR
+            ((p1.lon == p2.lon) ||      # same longitude OR
             (p1.lat*p2.lat == 8100))    # both at the north/south pole, because 90˚N, 0˚E == 90˚N, 10˚E
 end
 
@@ -69,10 +69,10 @@ function Base.isapprox(
     p2::Particle{NF2,active2};
     kwargs...,
 ) where {NF1,active1,NF2,active2}
-    b = (active1 == active2)                    # both active or both inactive
-    b &= isapprox(p1.lat, p2.lat; kwargs...)    # same latitude
+    b = (active1 == active2)                    # both active or both inactive
+    b &= isapprox(p1.lat, p2.lat; kwargs...)    # same latitude
     b &= isapprox(p1.σ, p2.σ; kwargs...)        # same elevation
-    c =  isapprox(p1.lon, p2.lon; kwargs...)    # same longitude OR
+    c =  isapprox(p1.lon, p2.lon; kwargs...)    # same longitude OR
     b &= c | isapprox(p1.lat * p2.lat, 8100; kwargs...) # both at the north/south pole
                                                         # because 90˚N, 0˚E == 90˚N, 10˚E
     return b
