@@ -102,8 +102,14 @@ section of the [documentation](https://speedyweather.github.io/SpeedyWeather.jl/
 
 ## Gallery
 
-Here is video of some relative vorticity in the shallow water model, simulated at T1023 spectral resolution
-(about 10km) on an
+Specific humidity in the primitive equation model simulated at T340 spectral resolution (about 40km)
+with 16 vertical levels (shown here is level 15, just above the surface) on the octahedral Gaussian grid
+computed in single precision multi-threaded on 16 CPUs. With convection, large-scale condensation, surface fluxes
+and some simplified radiation (the daily cycle is visible)
+
+https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/614f04cf-5080-4c89-9fd6-35efd54103a7
+
+Relative vorticity in the shallow water model, simulated at T1023 spectral resolution (about 10km) on an
 [octahedral Clenshaw-Curtis grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids)
 with more than 4 million grid points
 
