@@ -193,7 +193,7 @@ end
 
 ## SURFACE EVAPORATION
 export NoSurfaceEvaporation
-struct NoSurfaceEvaporation <: AbstractSurfaceHeatFlux end
+struct NoSurfaceEvaporation <: AbstractSurfaceEvaporation end
 NoSurfaceEvaporation(::SpectralGrid) = NoSurfaceEvaporation()
 initialize!(::NoSurfaceEvaporation, ::PrimitiveEquation) = nothing
 surface_evaporation!(::ColumnVariables, ::NoSurfaceEvaporation, ::PrimitiveEquation) = nothing
