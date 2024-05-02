@@ -1,4 +1,4 @@
-# Land-sea mask
+# The land-sea mask
 
 The following describes how a custom land-sea mask can be defined.
 SpeedyWeather uses a _fractional_ land-sea mask, i.e. for every grid-point
@@ -7,29 +7,13 @@ SpeedyWeather uses a _fractional_ land-sea mask, i.e. for every grid-point
 - 0 indicates ocean
 - a value in between indicates a grid-cell partially covered by ocean and land
 
-The land-sea mask determines solely how to weight the surface fluxes
-coming from land or from the ocean. For the sensible heat fluxes this uses
-land and sea surface temperatures and weights the respective fluxes
-proportional to the fractional mask. Similar for evaporation.
-You can therefore define an ocean on top of a mountain, or a land without
-heat fluxes when the land-surface temperature is not defined, i.e. `NaN`.
-Let ``F_L, F_S`` be the fluxes coming from land and sea, respectively.
-Then the land-sea mask ``a \in [0,1]`` weights them as follows for the
-total flux ``F``
-
-```math
-F = aF_L + (1-a)F_S
-```
-
-but ``F=F_L`` if the sea flux is NaN (because the ocean temperature is not defined)
-and ``F=F_S`` if the land flux is NaN (because the land temperature or soil moisture
-is not defined, for sensible heat fluxes or evaporation), and ``F=0`` if both fluxes
-are NaN.
-
 Setting the land-sea mask to ocean therefore will disable any fluxes that
 may come from land, and vice versa. However, with an ocean-everywhere land-sea mask
 you must also define sea surface temperatures everywhere, otherwise the fluxes
 in those regions will be zero.
+
+For more details, see [Surface fluxes](@ref) and the [Land-sea mask](@ref)
+section therein.
 
 ## Manual land-sea mask
 
