@@ -15,7 +15,7 @@ NoVerticalDiffusion(SG::SpectralGrid) = NoVerticalDiffusion()
 initialize!(::NoVerticalDiffusion,::PrimitiveEquation) = nothing
 vertical_diffusion!(::ColumnVariables, ::NoVerticalDiffusion, ::PrimitiveEquation) = nothing
 
-
+export BulkRichardsonDiffusion
 Base.@kwdef struct BulkRichardsonDiffusion{NF} <: AbstractVerticalDiffusion
     nlev::Int
 
@@ -135,9 +135,9 @@ function get_diffusion_coefficients!(
 
         # Calculate diffusion coefficients following Frierson 2006, eq. 16-20
         h = max(geopot[kₕ]*gravity⁻¹ - orography, 0)# always positive to avoid error in log 
-        Ri_a = Ri[nlev]                             # surface bulk Richardson number
-        Ri_a = clamp(Ri_a, 0, Ri_c)                 # cases of eq. 12-14
-        sqrtC = scheme.sqrtC_max[]*(1-Ri_a/Ri_c)    # sqrt of eq. 12-14
+        Ri_N = Ri[nlev]                             # surface bulk Richardson number
+        Ri_N = clamp(Ri_N, 0, Ri_c)                 # cases of eq. 12-14
+        sqrtC = scheme.sqrtC_max[]*(1-Ri_N/Ri_c)    # sqrt of eq. 12-14
         surface_speed = sqrt(u[nlev]^2 + v[nlev]^2)
         K0 = κ * surface_speed * sqrtC              # height-independent K eq. 19, 20
 
@@ -145,12 +145,13 @@ function get_diffusion_coefficients!(
         for k in kₕ:nlev
             z = max(geopot[k]*gravity⁻¹ - orography, z₀)    # height [m] above surface
             zmin = min(z, fb*h)         # height [m] to evaluate Kb(z) at
-            K_k = K0 * zmin             # = κuₐ√Cz in eq. (19, 20)
+            K_k = K0 * zmin             # = κ*u_N*√Cz in eq. (19, 20)
 
             # multiply with z-dependent factor in eq. (18) ?
             K_k *= z < fb*h ? 1 : zfac(z, h, fb)
 
             # multiply with Ri-dependent factor in eq. (20) ?
+            # TODO use Ri[kₕ] or Ri_N here? 
             K_k *= Ri[kₕ] <= 0 ? 1 : Rifac(Ri[kₕ], Ri_c, logZ_z₀)
             K[k] = K_k                  # write diffusion coefficient into array
         end
