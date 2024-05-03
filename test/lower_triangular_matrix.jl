@@ -597,7 +597,7 @@ end
                 L2 = deepcopy(L1) 
 
                 L2 ./= 5
-                @test L1/5 == L2
+                @test L1/5 ≈ L2
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = deepcopy(L1)
