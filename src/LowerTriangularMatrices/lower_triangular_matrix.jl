@@ -414,7 +414,40 @@ Base.similar(L::LowerTriangularArray{T,N,ArrayType}, ::Type{T}) where {T, N, Arr
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
 # ARITHMETIC
+# While these would work just via broadcast (and the abstractarray interface), these explicit definitions are significantly faster
+# only mul/div with scalar and addition/subtraction, others are handled via the custom broadcast
+function Base.:(*)(L::LowerTriangularArray{T}, s::Number) where T
+    sT = convert(T, s)
+    LowerTriangularArray(L.data .* sT, L.m, L.n)
+end
+
+Base.:(*)(s::Number, L::LowerTriangularArray) = L*s         # commutative
+Base.:(/)(L::LowerTriangularArray, s::Number) = L*inv(s)
+
+function Base.:(+)(
+    L1::LowerTriangularArray{T, N, ArrayType},
+    L2::LowerTriangularArray{S, N, ArrayType},
+) where {T, S, N, ArrayType}
+    @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
+    LowerTriangularArray(L1.data + L2.data, L1.m, L1.n)
+end
+
+function Base.:(-)(
+    L1::LowerTriangularArray{T,N,ArrayType},
+    L2::LowerTriangularArray{S,N,ArrayType}
+) where {T, S, N, ArrayType}
+    @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
+    LowerTriangularArray(L1.data - L2.data, L1.m, L1.n)
+end
+
+Base.:(-)(L::LowerTriangularArray) = LowerTriangularArray(-L.data, L.m, L.n)
+
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
+
+function scale!(L::LowerTriangularArray{T}, s::Number) where T
+    sT = convert(T, s)
+    L.data .*= sT
+end
 
 """
 $(TYPEDSIGNATURES)
