@@ -140,18 +140,19 @@ function boundary_layer_drag!(
     (; Ri_c) = scheme
     drag_max = scheme.drag_max[]
 
-    # bulk Richardson number at lowermost layer from Frierson, 2006, eq. (15)
-    Ri_a = bulk_richardson_surface(column, atmopshere)
+    # bulk Richardson number at lowermost layer N from Frierson, 2006, eq. (15)
+    # they call it Ri_a = Ri_N here
+    Ri_N = bulk_richardson_surface(column, atmopshere)
 
     # clamp to get the cases, eq (12-14)
-    # if Ri_a > Ri_c then C = 0
-    # if Ri_c > Ri_a > 0 then = κ^2/log(zₐ/z₀)^2 * (1-Ri_a/Ri_c)^2
-    # if Ri_c < 0 then κ^2/log(zₐ/z₀)^2
-    # but Z ≈ zₐ given that the lowermost layer height is proportional to temperature
+    # if Ri_N > Ri_c then C = 0
+    # if Ri_c > Ri_N > 0 then = κ^2/log(z_N/z₀)^2 * (1-Ri_N/Ri_c)^2
+    # if Ri_c < 0 then κ^2/log(z_N/z₀)^2
+    # but Z ≈ z_N given that the lowermost layer height is proportional to temperature
     # which doesn't change much with instantaneous temperature variations but with
     # vertical resolution, hence κ^2/log(Z/z₀)^2 is precalculated in initialize!
-    Ri_a = clamp(Ri_a, 0, Ri_c)
-    column.boundary_layer_drag = drag_max*(1-Ri_a/Ri_c)^2
+    Ri_N = clamp(Ri_N, 0, Ri_c)
+    column.boundary_layer_drag = drag_max*(1-Ri_N/Ri_c)^2
 end
 
 """
