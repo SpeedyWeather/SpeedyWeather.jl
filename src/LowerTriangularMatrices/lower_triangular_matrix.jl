@@ -416,9 +416,9 @@ Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
 # ARITHMETIC
 # While these would work just via broadcast (and the abstractarray interface), these explicit definitions are significantly faster
 # only mul/div with scalar and addition/subtraction, others are handled via the custom broadcast
-Base.:(*)(L::LowerTriangularArray{T}, s::Number) where T = LowerTriangularArray(L.data .* sT, L.m, L.n)
+Base.:(*)(L::LowerTriangularArray{T}, s::Number) where T = LowerTriangularArray(L.data .* s, L.m, L.n)
 Base.:(*)(s::Number, L::LowerTriangularArray) = L*s         # commutative
-Base.:(/)(L::LowerTriangularArray{T}, s::Number) where T = LowerTriangularArray(L.data ./ sT, L.m, L.n)
+Base.:(/)(L::LowerTriangularArray{T}, s::Number) where T = LowerTriangularArray(L.data ./ s, L.m, L.n)
 
 function Base.:(+)(
     L1::LowerTriangularArray{T, N, ArrayType},
