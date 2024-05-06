@@ -208,7 +208,8 @@ For longwave this is similar but using `<: AbstractLongwave` and `longwave_radia
 [Surface fluxes](@ref) are the most complicated to customize as they depend on
 the [Ocean](@ref) and Land model, [The land-sea mask](@ref), and by default the
 [## Bulk Richardson-based drag coefficient](@ref), see [Custom boundary layer drag](@ref).
-The computation of the surface fluxes is split into three components that
+The computation of the surface fluxes is split into four (five if you include the
+boundary layer drag coefficent in [Custom boundary layer drag](@ref)) components that
 are called one after another
 
 1. Surface thermodynamics to calculate the surface values of lowermost layer variables
@@ -216,8 +217,28 @@ are called one after another
 - define `initialize!(::CustomSurfaceThermodynamics, ::PrimitiveEquation)`
 - define `surface_thermodynamics!(::ColumnVariables, ::CustomSurfaceThermodynamics, ::PrimitiveEquation)`
 - expected to set `column.surface_temp`, `.surface_humid`, `.surface_air_density`
-2. Surface wind to calculate wind stress (momentum flux) as well as surface wind used for
+
+2. Surface wind to calculate wind stress (momentum flux) as well as surface wind used
+- subtype `CustomSurfaceWind <: AbstractSurfaceWind`
+- define `initialize!(::CustomSurfaceWind, ::PrimitiveEquation)`
+- define `surface_wind_stress!(::ColumnVariables, ::CustomSurfaceWind, ::PrimitiveEquation)`
+- expected to set `column.surface_wind_speed` for other fluxes
+- and accumulate (`+=`) into `column.flux_u_upward` and `.flux_v_upward`
+
 3. Surface (sensible) heat flux
+- subtype `CustomSurfaceHeatFlux <: AbstractSurfaceHeatFlux`
+- define `initialize!(::CustomSurfaceHeatFlux, ::PrimitiveEquation)`
+- define `surface_heat_flux!(::ColumnVariables, ::CustomSurfaceHeatFlux, ::PrimitiveEquation)`
+- expected to accumulate (`+=`) into `column.flux_temp_upward`
+
 4. Surface evaporation
+- subtype `CustomSurfaceEvaporation <: AbstractSurfaceEvaporation`
+- define `initialize!(::CustomSurfaceEvaporation, ::PrimitiveEquation)`
+- define `surface_evaporation!(::ColumnVariables, ::CustomSurfaceEvaporation, ::PrimitiveEquation)`
+- expected to accumulate (`+=`) into `column.flux_humid_upward`
 
-
+You can customize individual components and leave the other ones as default
+or by setting them to `NoSurfaceWind`, `NoSurfaceHeatFlux`, `NoSurfaceEvaporation`,
+but note that without the surface wind the heat and evaporative fluxes
+are also effectively disabled as they scale with the `column.surface_wind_speed`
+set by default with the `surface_wind_stress!` in (2.) above.
