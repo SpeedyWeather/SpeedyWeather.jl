@@ -8,7 +8,7 @@ implemented. For the mathematical formulation and the physics they represent see
 - [Convection](@ref)
 - [Large-scale condensation](@ref)
 - [Radiation](@ref)
-- [Surface fluxes](@ref)
+- [Surface fluxes](@ref) 
 
 We generally recommend reading [Extending SpeedyWeather](@ref) first,
 which explains the logic of how to extend many of the components in
@@ -17,12 +17,21 @@ many of the details, but want to highlight which abstract supertype
 new parameterizations have to subtype respectively and which functions
 and signatures they have to extend.
 
-Note that the parameterizations are executed in the order of the list
-above. That way, for example, radiation can depend on calculations in
-large-scale condensation but not vice versa (only at the next time step).
-We start by highlighting some general do's and dont's for
-parameterization before listing specifics for individual parameterizations.
+In general, every parameterization "class" (e.g. convection) is just a
+*conceptual* class for clarity. You can define a custom convection
+parameterization that acts as a longwave radiation and vice versa.
+This also means that if you want to implement a parameterization
+that does not fit into any of the "classes" described here you
+can still implement it under any name and any class. From a software
+engineering perspective they are all the same except that they
+are executed in the order as outlined in [Pass on to model construction](@ref).
+That's also why below we write for every parameterization
+"expected to write into `some.array_name`" as this would correspond
+conceptually to this class, but no hard requirement exists that a
+parameterization actually does that.
 
+We start by highlighting some general do's and don'ts for
+parameterization before listing specifics for individual parameterizations.
 
 ## Use `ColumnVariables` work arrays
 
@@ -73,6 +82,92 @@ at the beginning of the evaluation of the parameterization for that grid point,
 meaning you can do `tend += a` even for the first parameterization that writes into
 a given tendency as this translates to `tend = 0 + a`.
 
+## Pass on to model construction
+
+After defining a (custom) parameterization it is recommended to also define
+a generator function that takes in the `SpectralGrid` object
+(see [How to run SpeedyWeather.jl](@ref)) as first (positional) argument,
+all other arguments can then be passed on as keyword arguments with defaults
+defined. Creating the default convection parameterization for example would be
+```@example parameterization
+using SpeedyWeather
+spectral_grid = SpectralGrid(trunc=31, nlev=8)
+convection = SimplifiedBettsMiller(spectral_grid, time_scale=Hour(4))
+```
+Further keyword arguments can be added or omitted all together (using the default
+setup), only the `spectral_grid` is required. We have chosen here the name
+of that parameterization to be `convection` but you could choose any other name too.
+However, with this choice one can conveniently pass on via matching
+the `convection` field inside `PrimitiveWetModel`, see
+[Keyword Arguments](https://docs.julialang.org/en/v1/manual/functions/#Keyword-Arguments).
+
+```@example parameterization
+model = PrimitiveWetModel(;spectal_grid, convection)
+```
+otherwise we would need to write
+
+```@example parameterization
+my_convection = SimplifiedBettsMiller(spectral_grid)
+model = PrimitiveWetModel(;spectal_grid, convection=my_convection)
+```
+The following is an overview of what the parameterization fields inside the
+model are called. See also [Tree structure](@ref), and therein [PrimitiveDryModel](@ref)
+and [PrimitiveWetModel](@ref)
+
+- `model.boundary_layer_drag`
+- `model.temperature_relaxation`
+- `model.vertical_diffusion`
+- `model.convection`
+- `model.large_scale_condensation` (`PrimitiveWetModel` only)
+- `model.shortwave_radiation`
+- `model.longwave_radiation`
+- `model.surface_thermodynamics`
+- `model.surface_wind`
+- `model.surface_heat_flux`
+- `model.surface_evaporation` (`PrimitiveWetModel` only)
+
+Note that the parameterizations are executed in the order of the list
+above. That way, for example, radiation can depend on calculations in
+large-scale condensation but not vice versa (only at the next time step).
+
+## Custom boundary layer drag
+
+A boundary layer drag can serve two purposes: (1) Actually define a tendency
+to the momentum equations that acts as a drag term, or (2) calculate the
+drag coefficient ``C`` in `column.boundary_layer_drag` that is used
+in the [Surface fluxes](@ref).
+
+- subtype `CustomDrag <: AbstractBoundaryLayer`
+- define `initialize!(::CustomDrag, ::PrimitiveEquation)`
+- define `boundary_layer_drag!(::ColumnVariables, ::CustomDrag, ::PrimitiveEquation)`
+- expected to accumulate (`+=`) into `column.u_tend` and `column.v_tend`
+- or calculate `column.boundary_layer_drag` to be used in surface fluxes
+
+## Custom temperature relaxation
+
+By default, there is no temperature relaxation in the primitive equation
+models (i.e. `temperature_relaxation = NoTemperatureRelaxation()`).
+This parameterization exists for the [Held-Suarez forcing](@ref).
+
+- subtype `CustomTemperatureRelaxation <: AbstractTemperatureRelaxation`
+- define `initialize!(::CustomTemperatureRelaxation, ::PrimitiveEquation)`
+- define `temperature_relaxation!(::ColumnVariables, ::CustomTemperatureRelaxation, ::PrimitiveEquation)`
+- expected to accumulate (`+=`) into `column.temp_tend`
+
+## Custom vertical diffusion
+
+While vertical diffusion may be applied to temperature (usually via some form of static energy
+to account for adiabatic diffusion), humidity and/or momentum, they are grouped together.
+You can define a vertical diffusion for only one or several of these variables where you then
+can internally call functions like `diffuse_temperature!(...)` for each variable.
+For vertical diffusion
+
+- subtype `CustomVerticalDiffusion <: AbstractVerticalDiffusion`
+- define `initialize!(::CustomVerticalDiffusion, ::PrimitiveEquation)`
+- define `vertical_diffusion!(::ColumnVariables, ::CustomVerticalDiffusion, ::PrimitiveEquation)`
+- expected to accumulate (`+=`) into `column.temp_tend`, and similarly for `humid`, `u`, and/or `v`
+- or using fluxes like `column.flux_temp_upward`
+
 ## Custom convection
 
 - subtype `CustomConvection <: AbstractConvection`
@@ -108,21 +203,21 @@ For shortwave
 
 For longwave this is similar but using `<: AbstractLongwave` and `longwave_radiation!`.
 
-## Custom vertical diffusion
-
-While vertical diffusion may be applied to temperature (usually via some form of static energy
-to account for adiabatic diffusion), humidity and/or momentum, they are grouped together.
-You can define a vertical diffusion for only one or several of these variables where you then
-can internally call functions like `diffuse_temperature!(...)` for each variable.
-For vertical diffusion
-
-- subtype `CustomVerticalDiffusion <: AbstractVerticalDiffusion`
-- define `initialize!(::CustomVerticalDiffusion, ::PrimitiveEquation)`
-- define `vertical_diffusion!(::ColumnVariables, ::CustomVerticalDiffusion, ::PrimitiveEquation)`
-- expected to accumulate (`+=`) into `column.temp_tend`, and similarly for `humid`, `u`, and/or `v`
-- or using fluxes like `column.flux_temp_upward`
-
 ## Custom surface fluxes
 
 [Surface fluxes](@ref) are the most complicated to customize as they depend on
-the [Ocean](@ref) and Land model and [The land-sea mask](@ref). We give a brief overview,
+the [Ocean](@ref) and Land model, [The land-sea mask](@ref), and by default the
+[## Bulk Richardson-based drag coefficient](@ref), see [Custom boundary layer drag](@ref).
+The computation of the surface fluxes is split into three components that
+are called one after another
+
+1. Surface thermodynamics to calculate the surface values of lowermost layer variables
+- subtype `CustomSurfaceThermodynamics <: AbstractSurfaceThermodynamics`
+- define `initialize!(::CustomSurfaceThermodynamics, ::PrimitiveEquation)`
+- define `surface_thermodynamics!(::ColumnVariables, ::CustomSurfaceThermodynamics, ::PrimitiveEquation)`
+- expected to set `column.surface_temp`, `.surface_humid`, `.surface_air_density`
+2. Surface wind to calculate wind stress (momentum flux) as well as surface wind used for
+3. Surface (sensible) heat flux
+4. Surface evaporation
+
+
