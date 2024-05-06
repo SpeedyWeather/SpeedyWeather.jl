@@ -102,13 +102,15 @@ the `convection` field inside `PrimitiveWetModel`, see
 [Keyword Arguments](https://docs.julialang.org/en/v1/manual/functions/#Keyword-Arguments).
 
 ```@example parameterization
-model = PrimitiveWetModel(;spectal_grid, convection)
+model = PrimitiveWetModel(;spectral_grid, convection)
+nothing # hide
 ```
 otherwise we would need to write
 
 ```@example parameterization
 my_convection = SimplifiedBettsMiller(spectral_grid)
-model = PrimitiveWetModel(;spectal_grid, convection=my_convection)
+model = PrimitiveWetModel(;spectral_grid, convection=my_convection)
+nothing # hide
 ```
 The following is an overview of what the parameterization fields inside the
 model are called. See also [Tree structure](@ref), and therein [PrimitiveDryModel](@ref)
