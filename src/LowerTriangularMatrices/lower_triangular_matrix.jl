@@ -441,8 +441,7 @@ Base.:(-)(L::LowerTriangularArray) = LowerTriangularArray(-L.data, L.m, L.n)
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
 
 function scale!(L::LowerTriangularArray{T}, s::Number) where T
-    sT = convert(T, s)
-    L.data .*= sT
+    L.data .*= s
 end
 
 """
