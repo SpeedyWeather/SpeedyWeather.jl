@@ -207,9 +207,9 @@ For longwave this is similar but using `<: AbstractLongwave` and `longwave_radia
 
 [Surface fluxes](@ref) are the most complicated to customize as they depend on
 the [Ocean](@ref) and Land model, [The land-sea mask](@ref), and by default the
-[## Bulk Richardson-based drag coefficient](@ref), see [Custom boundary layer drag](@ref).
+[Bulk Richardson-based drag coefficient](@ref), see [Custom boundary layer drag](@ref).
 The computation of the surface fluxes is split into four (five if you include the
-boundary layer drag coefficent in [Custom boundary layer drag](@ref)) components that
+boundary layer drag coefficient in [Custom boundary layer drag](@ref)) components that
 are called one after another
 
 1. Surface thermodynamics to calculate the surface values of lowermost layer variables
