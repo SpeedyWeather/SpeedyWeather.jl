@@ -8,7 +8,7 @@ prognostic variables which has a field `ocean`, i.e. `simulation.prognostic_vari
 
 Both are two-dimensional grids using the same grid type and resolution as
 the dynamical core. So both sea surface temperature and sea ice concentration
-are globally defined but their mask is defined with [`The land-sea mask`](@ref).
+are globally defined but their mask is defined with [The land-sea mask](@ref).
 However, one should still set grid cells where the sea surface temperature
 is not defined to `NaN` in which case any fluxes are zero. This is important
 when a fractional land-sea mask does not align with the sea surface
@@ -22,7 +22,7 @@ be (fractionally) ignored in the calculation of surface fluxes (potentially lead
 to a zero flux depending on land surface temperatures). For an ocean grid cell
 that is `NaN` but not masked by the land-sea mask, its value is always ignored.
 
-# Ocean model
+# Custom ocean model
 
 Now the ocean model is expected to change `ocean.sea_surface_temperature`
 and/or `ocean.sea_ice_concentration` on a given time step.
