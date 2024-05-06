@@ -1,4 +1,4 @@
-# Vertical Diffusion
+# Vertical diffusion
 
 Vertical diffusion in SpeedyWeather.jl is implemented as a Laplacian in
 the vertical [Sigma coordinates](@ref) with a diffusion coefficient ``K``
