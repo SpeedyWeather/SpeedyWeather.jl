@@ -438,6 +438,24 @@ end
 
 Base.:(-)(L::LowerTriangularArray) = LowerTriangularArray(-L.data, L.m, L.n)
 
+"""
+$(TYPEDSIGNATURES)
+Adds `L1` to `L`, so that `L .+= L1`
+"""
+function add!(L::LowerTriangularArray, L1::LowerTriangularArray)
+    L.data .+= L1.data
+    return L
+end 
+
+"""
+$(TYPEDSIGNATURES)
+Adds `L1` and `L2` to `L`, so that `L .+= L1 .+ L2`
+"""
+function add!(L::LowerTriangularArray, L1::LowerTriangularArray, L2::LowerTriangularArray)
+    L.data .+= L1.data + L2.data
+    return L
+end 
+
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
 
 function scale!(L::LowerTriangularArray{T}, s::Number) where T
