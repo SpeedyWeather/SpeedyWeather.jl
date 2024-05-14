@@ -33,6 +33,13 @@ parameterization actually does that.
 We start by highlighting some general do's and don'ts for
 parameterization before listing specifics for individual parameterizations.
 
+!!! info "Parameterizations for PrimitiveEquation models only"
+    The parameterizations described here can only be used for the primitive
+    equation models `PrimitiveDryModel` and `PrimitiveWetModel` as the
+    parameterizations are defined to act on a vertical column.
+    For the 2D models `BarotropicModel` and `ShallowWaterModel` additional
+    terms have to be defined as a custom forcing or drag, see [Extending SpeedyWeather](@ref).
+
 ## Use `ColumnVariables` work arrays
 
 When defining a new (mutable) parameterization with (mutable) fields
