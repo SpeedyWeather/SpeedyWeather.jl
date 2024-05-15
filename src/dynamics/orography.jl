@@ -117,8 +117,8 @@ $(TYPEDFIELDS)"""
     "highest degree l is multiplied by"
     smoothing_strength::Float64 = 0.1
 
-    "resolution of orography in spectral trunc"
-    smoothing_truncation::Int = 85
+    "fraction of highest wavenumbers to smooth"
+    smoothing_fraction::Float64 = 0.05
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
@@ -143,7 +143,7 @@ function initialize!(   orog::EarthOrography,
                         P::AbstractPlanet,
                         S::SpectralTransform)
 
-    (; orography, geopot_surf) = orog
+    (; orography, geopot_surf, scale) = orog
     (; gravity) = P
 
     # LOAD NETCDF FILE
@@ -160,15 +160,19 @@ function initialize!(   orog::EarthOrography,
 
     # Interpolate/coarsen to desired resolution
     interpolate!(orography, orography_highres)
-    spectral!(geopot_surf, orography, S)      # no *gravity yet
+    orography *= scale                          # scale orography (default 1)
+    spectral!(geopot_surf, orography, S)        # no *gravity yet
   
     if orog.smoothing                       # smooth orography in spectral space?
+        # translate smoothing_fraction to trunc to truncate beyond
+        trunc = (size(geopot_surf, 1) - 2)
+        truncation = round(Int, trunc * (1-orog.smoothing_fraction))
         SpeedyTransforms.spectral_smoothing!(geopot_surf, orog.smoothing_strength,
-                                                            power=orog.smoothing_power,
-                                                            truncation=orog.smoothing_truncation)
+                                                            power=orog.smoothing_power;
+                                                            truncation)
     end
 
-    gridded!(orography, geopot_surf, S)       # to grid-point space
+    gridded!(orography, geopot_surf, S)     # to grid-point space
     geopot_surf .*= gravity                 # turn orography into surface geopotential
     spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
     return nothing    
