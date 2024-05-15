@@ -109,7 +109,7 @@ $(TYPEDFIELDS)"""
     scale::Float64 = 1
 
     "smooth the orography field?"
-    smoothing::Bool = false
+    smoothing::Bool = true
 
     "power of Laplacian for smoothing"
     smoothing_power::Float64 = 1.0
