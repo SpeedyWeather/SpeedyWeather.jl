@@ -160,7 +160,7 @@ function initialize!(   orog::EarthOrography,
 
     # Interpolate/coarsen to desired resolution
     interpolate!(orography, orography_highres)
-    orography *= scale                          # scale orography (default 1)
+    orography .*= scale                         # scale orography (default 1)
     spectral!(geopot_surf, orography, S)        # no *gravity yet
   
     if orog.smoothing                       # smooth orography in spectral space?
