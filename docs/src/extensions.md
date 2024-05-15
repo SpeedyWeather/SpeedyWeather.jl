@@ -140,6 +140,7 @@ a given variable into global scope which removes the necessity to write
 You may wonder which abstract model components there are, you can always check this
 with
 ```@example extending
+using InteractiveUtils # hide
 subtypes(SpeedyWeather.AbstractModelComponent)
 ```
 
