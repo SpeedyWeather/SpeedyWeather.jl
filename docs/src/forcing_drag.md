@@ -309,7 +309,7 @@ many.
 
 ## Custom drag
 
-From the barotropic vorticity equation in [Custom forcing and](@ref) we omitted
+From the barotropic vorticity equation in [Custom forcing and drag](@ref) we omitted
 the drag term ``-r\zeta`` which however can be defined in a strikingly similar way.
 This section is just to outline some differences.
 
