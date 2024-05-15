@@ -258,7 +258,7 @@ You could recompute the `spectral_transform` object inside the function
 but that is inefficient.
 
 Now this is actually where we implement the equation we started from in
-[Custom forcing: define](@ref) simply by looping over the spherical
+[Custom forcing and drag](@ref) simply by looping over the spherical
 harmonics in `S` and updating its entries. Then we transform `S` into
 grid-point space using the `a_grid` work array that is in `dynamics_variables`,
 `b_grid` is another one you can use, so are `a, b` in spectral space.
@@ -309,7 +309,7 @@ many.
 
 ## Custom drag
 
-From the barotropic vorticity equation in [Custom forcing and drag](@ref) we omitted
+From the barotropic vorticity equation in [Custom forcing and](@ref) we omitted
 the drag term ``-r\zeta`` which however can be defined in a strikingly similar way.
 This section is just to outline some differences.
 
