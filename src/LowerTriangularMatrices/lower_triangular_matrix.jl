@@ -1,14 +1,14 @@
 """
 $(TYPEDSIGNATURES)
 A lower triangular array implementation that only stores the non-zero entries explicitly.
-`L<:AbstractMatrix` although in general we have `L[i] != Matrix(L)[i]`, the former skips
-zero entries, tha latter includes them.
+`L<:AbstractArray{T,N-1}` although we do allow both "flat" `N-1`-dimensional indexing and 
+additional `N`-dimensional or "matrix-style" indexing.
 
 Supports n-dimensional lower triangular arrays, so that for all trailing dimensions `L[:, :, ..]`
 is a matrix in lower triangular form, e.g. a (5x5x3)-LowerTriangularArray would hold 3 lower
 triangular matrices."""
-struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T}} <: AbstractArray{T,N}
-    data::ArrayType     # non-zero elements unravelled into an array with one dimension less N-1
+struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T,N}} <: AbstractArray{T,N}
+    data::ArrayType     # non-zero elements unravelled into an in which the lower triangle is flattened
     m::Int              # number of rows
     n::Int              # number of columns
 
@@ -19,7 +19,7 @@ struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T}} <: AbstractArra
 end
 
 check_lta_input_array(data, m, n, N) =
-    (ndims(data) == N-1) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
+    (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
 
 function lta_error_message(data, m, n, T, N, ArrayType) 
     size_tuple = (m, n, size(data[2:end])...)
@@ -28,10 +28,10 @@ function lta_error_message(data, m, n, T, N, ArrayType)
 end 
 
 """2-dimensional `LowerTriangularArray` of type `T`` with its non-zero entries unravelled into a `Vector{T}`"""
-const LowerTriangularMatrix{T} = LowerTriangularArray{T, 2, Vector{T}}
+const LowerTriangularMatrix{T} = LowerTriangularArray{T, 1, Vector{T}}
 
 LowerTriangularArray(data::ArrayType, m::Integer, n::Integer) where {T, N, ArrayType<:AbstractArray{T,N}} =
-    LowerTriangularArray{T, N+1, ArrayType}(data, m, n)
+    LowerTriangularArray{T, N, ArrayType}(data, m, n)
 LowerTriangularMatrix(data::Vector{T}, m::Integer, n::Integer) where T =
     LowerTriangularMatrix{T}(data, m, n)
 
@@ -41,8 +41,8 @@ Length of a `LowerTriangularArray` defined as number of non-zero elements."""
 Base.length(L::LowerTriangularArray) = length(L.data)
 
 """$(TYPEDSIGNATURES)
-Size of a `LowerTriangularArray` defined as matrix size including zero upper triangle."""
-Base.size(L::LowerTriangularArray) = (L.m, L.n, size(L.data)[2:end]...)
+Size of a `LowerTriangularArray` defined as size of the flattened array."""
+Base.size(L::LowerTriangularArray) = size(L.data)
 
 # sizeof the underlying data vector
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
@@ -122,20 +122,17 @@ Angeletti et al, 2019, https://hal.science/hal-02047514/document)
 end 
 k2ij(I::CartesianIndex, m::Int) = CartesianIndex(k2ij(I[1], m)...,I.I[2:end]...) 
 
-# direct indexing, no. indices have to be one less than `N` for the correct dimensionality, so N!=M
-@inline function Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Integer, M}) where {T, N, M}
-    @boundscheck M == N-1 || throw(BoundsError(L, I))
-    return getindex(L.data, I...) 
+# direct indexing, no. indices have to be equal to `N` for the correct dimensionality
+@inline function Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{S, N}) where {T, S, N} = getindex(L.data, I...) 
+
+# indexing with : + other indices, returns a LowerTriangularArray
+@inline function Base.getindex(L::LowerTriangularArray{T,N}, col::Colon, I...) where {T,N}
+    return LowerTriangularArray(getindex(L.data, col, I...), L.m, L.n)
 end
 
-# integer + other indices (:, ranges, etc...)
-@inline function Base.getindex(L::LowerTriangularArray{T, N}, k::Integer, I::Vararg{R, M}) where {T,N,R,M}
-    @boundscheck M == N-2 || throw(BoundsError(L, I))
-    return getindex(L.data, k, I...)
-end
-
-# double index i,j, i.e. spherical harmoinc indexing (1-based), no. indices has to be equal to N 
-Base.@propagate_inbounds function Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Integer, N}) where {T, N}
+# l,m sph "matrix-style" indexing with integers, no. indices has to be equal to N+1
+Base.@propagate_inbounds function Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Integer, M}) where {T, N}
+    @boundscheck M = N+1 || throw(BoundsError(L, I))
     i, j = I[1:2]
     @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
     @boundscheck j > i && return zero(T)
@@ -143,9 +140,9 @@ Base.@propagate_inbounds function Base.getindex(L::LowerTriangularArray{T, N}, I
     return getindex(L.data, k, I[3:end]...)
 end
 
-# l,m sph indexing with integer + other indices
+# l,m sph "matrix-style"  indexing with integer + other indices
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, i::Integer, j::Integer, I::Vararg{R, M}) where {T, N, R, M}
-    @boundscheck M == N-2 || throw(BoundsError(L, I))
+    @boundscheck M == N-1 || throw(BoundsError(L, I))
     @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
     # to get a zero element in the correct shape, we just take the zero element of some valid element,
     # there are probably faster ways to do this, but I don't know how, and this is just a fallback anyway 
@@ -154,38 +151,31 @@ end
     return getindex(L.data, k, I...)
 end
 
-# indexing with : + other indices, returns a LowerTriangularArray
-@inline function Base.getindex(L::LowerTriangularArray{T,N}, col::Colon, I...) where {T,N}
-    return LowerTriangularArray(getindex(L.data, col, I...), L.m, L.n)
-end
-
 @inline function Base.getindex(L::LowerTriangularMatrix{T}, col::Colon, i::Integer) where T
     return Matrix(L)[:,i]
 end
 
-# Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, r::AbstractRange) = getindex(L.data, r)
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, r::AbstractRange, I...) = getindex(L.data, r, I...)
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, i::Integer) = getindex(L.data, i)
 
 # important to do Tuple(I) here for the j > i case as one of the getindex methods above is called
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, I::CartesianIndex) = getindex(L, Tuple(I)...)
 
 # setindex with lm, ..
-@inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, M}) where {T, N, M} 
-    @boundscheck M == N-1 || throw(BoundsError(L, I))
+@inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N} 
     setindex!(L.data, x, I...)
 end 
 
 # setindex with il, im, ..
-@inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N}
-    i, j = I[1:2] # TODO: check if i,j are Int?
+@inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, M}) where {T, N, M}
+    i, j = I[1:2] 
     @boundscheck i >= j || throw(BoundsError(L, (i, j)))
     k = ij2k(i, j, L.m)
     setindex!(L.data, x, k, I[3:end]...)
 end
 
 # this is specifically here for the weird way in which AssociatedLegendrePolynomials.jl indexes with an empty CartesianIndex
-@inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, i::CartesianIndex, I::Vararg{Any, N}) where {T,N}
+@inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, i::CartesianIndex, I::Vararg{Any, M}) where {T,N, M}
+    @boundscheck N+1==M || throw(BoundsError(L,I))
     i, j = I[1:2] # TODO: check if i,j are Int?
     @boundscheck i >= j || throw(BoundsError(L, (i, j)))
     k = ij2k(i, j, L.m)
@@ -248,6 +238,7 @@ function lowertriangle_indices(M::AbstractArray{T, N}) where {T, N}
     repeat(indices, 1, 1, size(M)[3:end]...)
 end  
 
+########continue here
 # GPU version and fallback for higher dimensions
 """
 $(TYPEDSIGNATURES)
