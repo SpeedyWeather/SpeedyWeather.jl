@@ -27,6 +27,9 @@ $(TYPEDFIELDS)"""
     
     "[OPTION] diffusion time scale"
     time_scale::Second = Minute(60)
+
+    "[OPTION] diffusion time scale for temperature and humidity"
+    time_scale_temp_humid::Second = Minute(144)
     
     "[OPTION] stronger diffusion with resolution? 0: constant with trunc, 1: (inverse) linear with trunc, etc"
     resolution_scaling::Float64 = 0.5
@@ -42,7 +45,7 @@ $(TYPEDFIELDS)"""
     ∇²ⁿ::Vector{Vector{NF}} = [zeros(NF, trunc+2) for _ in 1:nlev]           # explicit part
     ∇²ⁿ_implicit::Vector{Vector{NF}} = [ones(NF, trunc+2) for _ in 1:nlev]   # implicit part
 
-    # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
+    # ARRAYS but no scaling or tapering and using time_scale_temp_humid
     ∇²ⁿc::Vector{Vector{NF}} = [zeros(NF, trunc+2) for _ in 1:nlev]           # explicit part
     ∇²ⁿc_implicit::Vector{Vector{NF}} = [ones(NF, trunc+2) for _ in 1:nlev]   # implicit part
 end
@@ -81,7 +84,7 @@ function initialize!(
     # Reduce diffusion time scale (=increase diffusion, always in seconds) with resolution
     # times 1/radius because time step Δt is scaled with 1/radius
     time_scale = scheme.time_scale.value/radius * (32/(trunc+1))^resolution_scaling
-    time_scale_constant = scheme.time_scale.value/radius
+    time_scale_constant = scheme.time_scale_temp_humid.value/radius
 
     # NORMALISATION
     # Diffusion is applied by multiplication of the eigenvalues of the Laplacian -l*(l+1)
@@ -148,14 +151,13 @@ function horizontal_diffusion!( diagn::DiagnosticVariablesLayer,
                                 progn::PrognosticLayerTimesteps,
                                 model::Barotropic,
                                 lf::Int=1)      # leapfrog index used (2 is unstable)
-    # use diffusion operators with "c" that don't taper or scale with resolution
-    ∇²ⁿc = model.horizontal_diffusion.∇²ⁿc[diagn.k]
-    ∇²ⁿc_implicit = model.horizontal_diffusion.∇²ⁿc_implicit[diagn.k]
+    ∇²ⁿ = model.horizontal_diffusion.∇²ⁿ[diagn.k]
+    ∇²ⁿ_implicit = model.horizontal_diffusion.∇²ⁿ_implicit[diagn.k]
 
     # Barotropic model diffuses vorticity (only variable)
     (; vor) = progn.timesteps[lf]
     (; vor_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend, vor, ∇²ⁿc, ∇²ⁿc_implicit)
+    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
 end
 
 """$(TYPEDSIGNATURES)
@@ -164,15 +166,14 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
                                 diagn::DiagnosticVariablesLayer,
                                 model::ShallowWater,
                                 lf::Int=1)      # leapfrog index used (2 is unstable)
-    # use diffusion operators with "c" that don't taper or scale with resolution
-    ∇²ⁿc = model.horizontal_diffusion.∇²ⁿc[diagn.k]
-    ∇²ⁿc_implicit = model.horizontal_diffusion.∇²ⁿc_implicit[diagn.k]
+    ∇²ⁿ = model.horizontal_diffusion.∇²ⁿ[diagn.k]
+    ∇²ⁿ_implicit = model.horizontal_diffusion.∇²ⁿ_implicit[diagn.k]
 
     # ShallowWater model diffuses vorticity and divergence
     (; vor, div) = progn.timesteps[lf]
     (; vor_tend, div_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend, vor, ∇²ⁿc, ∇²ⁿc_implicit)
-    horizontal_diffusion!(div_tend, div, ∇²ⁿc, ∇²ⁿc_implicit)
+    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
+    horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)
 end
 
 """$(TYPEDSIGNATURES)
@@ -182,7 +183,7 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
                                 diagn::DiagnosticVariablesLayer,
                                 model::PrimitiveEquation,
                                 lf::Int=1)      # leapfrog index used (2 is unstable)
-    # use diffusion operators that don't taper or scale with resolution for temperature and humidity
+    # use weaker diffusion operators that don't taper or scale with resolution for temperature and humidity
     ∇²ⁿc = model.horizontal_diffusion.∇²ⁿc[diagn.k]
     ∇²ⁿc_implicit = model.horizontal_diffusion.∇²ⁿc_implicit[diagn.k]
 
