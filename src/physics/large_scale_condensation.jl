@@ -12,7 +12,7 @@ Large scale condensation as with implicit precipitation.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
     "Flux limiter for latent heat release [W/m²] per timestep"
-    max_heating::NF = 0.2
+    max_heating::NF = 1
 
     "Time scale in multiples of time step Δt, the larger the less immediate"
     time_scale::NF = 3
@@ -58,18 +58,18 @@ relative humidity. Calculates the tendencies for specific humidity
 and temperature from latent heat release and integrates the
 large-scale precipitation vertically for output."""
 function large_scale_condensation!(
-    column::ColumnVariables{NF},
+    column::ColumnVariables,
     scheme::ImplicitCondensation,
     clausius_clapeyron::AbstractClausiusClapeyron,
     geometry::Geometry,
     planet::AbstractPlanet,
     atmosphere::AbstractAtmosphere,
     time_stepping::AbstractTimeStepper,
-) where NF
+)
 
     (; pres) = column                       # prognostic vars: pressure
     temp = column.temp_prev                 # but use temp, humid from
-    humid = column.temp_prev                # from previous time step for numerical stability
+    humid = column.humid_prev               # from previous time step for numerical stability
     (; temp_tend, humid_tend) = column      # tendencies to write into
     (; sat_humid) = column                  # intermediate variable, calculated in thermodynamics!
     

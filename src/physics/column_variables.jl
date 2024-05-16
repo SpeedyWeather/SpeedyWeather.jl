@@ -12,7 +12,8 @@ function get_column!(
         model.planet,
         model.orography,
         model.land_sea_mask,
-        model.albedo)
+        model.albedo,
+        model.implicit)
 end
 
 """
@@ -30,9 +31,11 @@ function get_column!(
     orography::AbstractOrography,
     land_sea_mask::AbstractLandSeaMask,
     albedo::AbstractAlbedo,
+    implicit::AbstractImplicit,
 )
 
     (; σ_levels_full, ln_σ_levels_full) = geometry
+    (; temp_profile) = implicit     # reference temperature on this layer
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
@@ -58,10 +61,10 @@ function get_column!(
         C.temp_virt[k] = layer.grid_variables.temp_virt_grid[ij]    # actually diagnostic
         C.humid[k] = layer.grid_variables.humid_grid[ij] 
 
-        # and at previous time step
+        # and at previous time step, add temp reference profile back in as temp_grid_prev is anomaly
         C.u_prev[k] = layer.grid_variables.u_grid_prev[ij]
         C.v_prev[k] = layer.grid_variables.v_grid_prev[ij]
-        C.temp_prev[k] = layer.grid_variables.temp_grid_prev[ij]
+        C.temp_prev[k] = layer.grid_variables.temp_grid_prev[ij] + temp_profile[k]
         C.humid_prev[k] = layer.grid_variables.humid_grid_prev[ij] 
     end
 

@@ -392,7 +392,7 @@ function time_stepping!(
     # propagate spectral state to grid variables for initial condition output
     (; output, feedback) = model
     lf = 1                                  # use first leapfrog index
-    gridded!(diagn, progn, lf, model)
+    gridded!(diagn, progn, lf, model, initialize=true)
     initialize!(progn.particles, progn, diagn, model.particle_advection)
     initialize!(output, feedback, time_stepping, clock, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)
