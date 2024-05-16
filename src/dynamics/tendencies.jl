@@ -856,7 +856,7 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     
     (; vor_grid, div_grid, u_grid, v_grid ) = diagn.grid_variables
     (; temp_grid, humid_grid ) = diagn.grid_variables
-    (; temp_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid_variables
+    (; temp_grid_prev, humid_grid_prev,u_grid_prev, v_grid_prev) = diagn.grid_variables
     (; vor, div, temp, humid) = progn
     U = diagn.dynamics_variables.a      # reuse work arrays for velocities spectral
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
