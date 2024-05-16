@@ -57,6 +57,12 @@ function get_column!(
         C.temp[k] = layer.grid_variables.temp_grid[ij]
         C.temp_virt[k] = layer.grid_variables.temp_virt_grid[ij]    # actually diagnostic
         C.humid[k] = layer.grid_variables.humid_grid[ij] 
+
+        # and at previous time step
+        C.u_prev[k] = layer.grid_variables.u_grid_prev[ij]
+        C.v_prev[k] = layer.grid_variables.v_grid_prev[ij]
+        C.temp_prev[k] = layer.grid_variables.temp_grid_prev[ij]
+        C.humid_prev[k] = layer.grid_variables.humid_grid_prev[ij] 
     end
 
     # TODO skin = surface approximation for now

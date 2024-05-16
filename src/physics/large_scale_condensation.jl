@@ -11,11 +11,11 @@ export ImplicitCondensation
 Large scale condensation as with implicit precipitation.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
-    "Flux limiter for latent heat release [K] per timestep"
+    "Flux limiter for latent heat release [W/m²] per timestep"
     max_heating::NF = 0.2
 
-    "Time scale in multiples of time step Δt"
-    time_scale::NF = 9
+    "Time scale in multiples of time step Δt, the larger the less immediate"
+    time_scale::NF = 3
 end
 
 ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
@@ -67,9 +67,11 @@ function large_scale_condensation!(
     time_stepping::AbstractTimeStepper,
 ) where NF
 
-    (; temp, humid, pres) = column           # prognostic vars: specific humidity, pressure
-    (; temp_tend, humid_tend) = column       # tendencies to write into
-    (; sat_humid) = column                   # intermediate variable, calculated in thermodynamics!
+    (; pres) = column                       # prognostic vars: pressure
+    temp = column.temp_prev                 # but use temp, humid from
+    humid = column.temp_prev                # from previous time step for numerical stability
+    (; temp_tend, humid_tend) = column      # tendencies to write into
+    (; sat_humid) = column                  # intermediate variable, calculated in thermodynamics!
     
     # precompute scaling constant for precipitation output
     pₛ = pres[end]                          # surface pressure

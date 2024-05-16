@@ -861,8 +861,9 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     U = diagn.dynamics_variables.a      # reuse work arrays for velocities spectral
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
 
-    # retain previous time step for vertical advection
+    # retain previous time step for vertical advection and some parameterizations
     @. temp_grid_prev = temp_grid
+    @. humid_grid_prev = humid_grid
     @. u_grid_prev = u_grid
     @. v_grid_prev = v_grid
 
@@ -874,18 +875,18 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
     UV_from_vordiv!(U, V, vor, div, S)
 
-    gridded!(vor_grid, vor, S)                # get vorticity on grid from spectral vor
-    gridded!(div_grid, div, S)                # get divergence on grid from spectral div
-    gridded!(temp_grid, temp, S)              # (absolute) temperature
+    gridded!(vor_grid, vor, S)                  # get vorticity on grid from spectral vor
+    gridded!(div_grid, div, S)                  # get divergence on grid from spectral div
+    gridded!(temp_grid, temp, S)                # (absolute) temperature
     
-    if wet_core                             # specific humidity (wet core only)
+    if wet_core                                 # specific humidity (wet core only)
         gridded!(humid_grid, humid, S)        
         hole_filling!(humid_grid, model.hole_filling, model)  # remove negative humidity
     end
 
     # include humidity effect into temp for everything stability-related
     temperature_average!(diagn, temp, S)
-    virtual_temperature!(diagn, temp, model)  # temp = virt temp for dry core
+    virtual_temperature!(diagn, temp, model)    # temp = virt temp for dry core
 
     # transform from U, V in spectral to u, v on grid (U, V = u, v*coslat)
     gridded!(u_grid, U, S, unscale_coslat=true)
