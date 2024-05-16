@@ -5,11 +5,9 @@ export HyperDiffusion
 """
 Horizontal hyper diffusion of vor, div, temp, humid; implicitly in spectral space
 with a `power` of the Laplacian (default = 4) and the strength controlled by
-`time_scale` (default = 1 hour). Options exist to scale the diffusion by resolution, and adaptive
-depending on the current vorticity maximum to increase diffusion in active
-layers. Furthermore the power can be decreased above the `tapering_σ` to
-`power_stratosphere` (default 2). For Barotropic, ShallowWater,
-the default non-adaptive constant-time scale hyper diffusion is used. Options are
+`time_scale` (default = 1 hour). By default, the time scale (=1/strength of diffusion)
+is reduced with increasing resolution, and the power is linearly decreased in the vertical
+above the `tapering_σ` sigma level to `power_stratosphere` (default 2). Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct HyperDiffusion{NF} <: AbstractHorizontalDiffusion
     # DIMENSIONS
@@ -20,20 +18,20 @@ $(TYPEDFIELDS)"""
     nlev::Int
     
     # PARAMETERS
-    "power of Laplacian"
+    "[OPTION] power of Laplacian"
     power::Float64 = 4.0
     
-    "diffusion time scale"
+    "[OPTION] diffusion time scale"
     time_scale::Second = Minute(60)
     
-    "stronger diffusion with resolution? 0: constant with trunc, 1: (inverse) linear with trunc, etc"
+    "[OPTION] stronger diffusion with resolution? 0: constant with trunc, 1: (inverse) linear with trunc, etc"
     resolution_scaling::Float64 = 0.5
 
     # incrased diffusion in stratosphere
-    "different power for tropopause/stratosphere"
+    "[OPTION] different power for tropopause/stratosphere"
     power_stratosphere::Float64 = 2.0
     
-    "linearly scale towards power_stratosphere above this σ"
+    "[OPTION] linearly scale towards power_stratosphere above this σ"
     tapering_σ::Float64 = 0.2
 
     # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
@@ -60,9 +58,8 @@ function initialize!(   scheme::HyperDiffusion,
 end
 
 """$(TYPEDSIGNATURES)
-Precomputes the hyper diffusion terms in `scheme` for layer `k` based on the
-model time step in `L`, the vertical level sigma level in `G`, and
-the current (absolute) vorticity maximum level `vor_max`"""
+Precomputes the hyper diffusion terms for all layers based on the
+model time step in `L`, the vertical level sigma level in `G`."""
 function initialize!(   
     scheme::HyperDiffusion,
     G::AbstractGeometry,
@@ -132,7 +129,7 @@ function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   
 end
 
 """$(TYPEDSIGNATURES)
-Apply horizontal diffusion to vorticity in the Barotropic models."""
+Apply horizontal diffusion to vorticity in the BarotropicModel."""
 function horizontal_diffusion!( diagn::DiagnosticVariablesLayer,
                                 progn::PrognosticLayerTimesteps,
                                 model::Barotropic,
@@ -147,7 +144,7 @@ function horizontal_diffusion!( diagn::DiagnosticVariablesLayer,
 end
 
 """$(TYPEDSIGNATURES)
-Apply horizontal diffusion to vorticity and diffusion in the ShallowWater models."""
+Apply horizontal diffusion to vorticity and divergence in the ShallowWaterModel."""
 function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
                                 diagn::DiagnosticVariablesLayer,
                                 model::ShallowWater,
@@ -163,9 +160,8 @@ function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
 end
 
 """$(TYPEDSIGNATURES)
-Apply horizontal diffusion applied to vorticity, diffusion and temperature
-in the PrimitiveEquation models. Uses the constant diffusion for temperature
-but possibly adaptive diffusion for vorticity and divergence."""
+Apply horizontal diffusion applied to vorticity, divergence, temperature, and
+humidity (PrimitiveWet only) in the PrimitiveEquation models."""
 function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
                                 diagn::DiagnosticVariablesLayer,
                                 model::PrimitiveEquation,
