@@ -69,14 +69,15 @@ nothing # hide
 ![EarthOrography](earth_orography.png)
 
 typing `?EarthOrography` shows the various options that are provided.
-An orogaphy at T85 resolution that is as smooth as it would be at T31
-for example can be created with
+An orogaphy at T85 resolution that is as smooth as it would be at T42
+(controlled by the `smoothing_fraction`, the fraction of highest wavenumbers
+which are the top half here, about T43 to T85) for example can be created with
 
 ```@example orography
-orography = EarthOrography(spectral_grid, smoothing=true, smoothing_truncation=31)
+orography = EarthOrography(spectral_grid, smoothing=true, smoothing_fraction=0.5)
 initialize!(orography, model)
 
-heatmap(orography.orography, title="Earth's orography at T85 resolution, smoothed to T31")
+heatmap(orography.orography, title="Earth's orography at T85 resolution, smoothed to T42")
 save("earth_orography_smooth.png", ans) # hide
 nothing # hide
 ```

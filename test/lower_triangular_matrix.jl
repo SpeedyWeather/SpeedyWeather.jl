@@ -613,11 +613,18 @@ end
                 @. L2 += 5L1
                 @test L2 == L3 + 5L1
 
+                SpeedyWeather.LowerTriangularMatrices.add!(L3,5L1)
+                @test L3 == L2 
+
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
 
                 @. L3 = -L1 - L2
                 @test L3 == -L1 - L2
+
+                L4 = adapt(ArrayType, zeros(LowerTriangularArray{NF}, 10, 10, idims...))
+                SpeedyWeather.LowerTriangularMatrices.add!(L4,-L1,-L2)
+                @test L4 == L3
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
@@ -632,6 +639,8 @@ end
 
                 L2 .= 5L1
                 @test L2 == 5L1
+
+                # add! test here
             end
         end
     end
