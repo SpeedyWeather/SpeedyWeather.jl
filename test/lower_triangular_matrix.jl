@@ -34,6 +34,11 @@ import SpeedyWeather.LowerTriangularMatrices: matrix_size
     end
 end
 
+NF = Float32 
+mmax = 32 
+idims = (5,)
+lmax = mmax 
+
 @testset "LowerTriangularArray: N-dim" begin 
     @testset for NF in (Float32, Float64)
         mmax = 32
@@ -230,8 +235,8 @@ end
         @test size(JL) == size(JL2) == size(zero(JL))
         
         L = f(LowerTriangularMatrix{Float16}, s...)
-        L2 = f(LowerTriangularArray{Float16, 2, Vector{Float16}}, s...)
-        JL = f(LowerTriangularArray{Float16, 2, JLArray{Float16, 1}}, s...)
+        L2 = f(LowerTriangularArray{Float16, 1, Vector{Float16}}, s...)
+        JL = f(LowerTriangularArray{Float16, 1, JLArray{Float16, 1}}, s...)
         @test typeof(L) == typeof(L2)
         @test size(L) == size(L2)
         @test typeof(L) != typeof(JL)
@@ -241,9 +246,9 @@ end
         for s in ((2, 3, 4), (2, 3, 4, 5))
             N = length(s)
             Random.seed!(123)
-            L =  f(LowerTriangularArray{Float16, N,   Array{Float16, N-1}}, s...)
+            L =  f(LowerTriangularArray{Float16, N-1,   Array{Float16, N-1}}, s...)
             Random.seed!(123)
-            JL = f(LowerTriangularArray{Float16, N, JLArray{Float16, N-1}}, s...)
+            JL = f(LowerTriangularArray{Float16, N-1, JLArray{Float16, N-1}}, s...)
             JL2 = adapt(JLArray, L)
             @test all(JL2 .== JL)   # equality via broadcasting
             @test JL2 == JL         # checks for type and data equality
@@ -281,7 +286,7 @@ end
 
                 # convert
                 L = randn(LowerTriangularArray{NF}, lmax, mmax, idims...)
-                L3 = convert(LowerTriangularArray{Float16, 2+length(idims), Array{Float16,1+length(idims)}}, L)
+                L3 = convert(LowerTriangularArray{Float16, 1+length(idims), Array{Float16,1+length(idims)}}, L)
                 for lm in SpeedyWeather.eachharmonic(L, L3)
                     @test Float16(L[lm, [1 for i=1:length(idims)]...]) == L3[lm, [1 for i=1:length(idims)]...] 
                 end
@@ -529,7 +534,7 @@ end
 
     # rand + convert
     L3 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
-    L4 = convert(LowerTriangularArray{Float16,3,JLArray{Float16}}, L3)
+    L4 = convert(LowerTriangularArray{Float16,2,JLArray{Float16}}, L3)
 
     for lm in SpeedyWeather.eachharmonic(L, L3)
         @test all(Float16.(L3[lm, :]) .== L4[lm, :])

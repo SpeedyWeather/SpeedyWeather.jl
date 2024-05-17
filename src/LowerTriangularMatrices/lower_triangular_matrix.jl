@@ -84,8 +84,8 @@ for f in (:zeros, :ones, :rand, :randn)
     end
 end
 
-Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, size(L)...)
-Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, size(L)...)
+Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, matrix_size(L)...)
+Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, matrix_size(L)...)
 
 function LowerTriangularArray{T, N, ArrayType}(
     ::UndefInitializer,
@@ -128,10 +128,8 @@ Angeletti et al, 2019, https://hal.science/hal-02047514/document)
 end 
 k2ij(I::CartesianIndex, m::Int) = CartesianIndex(k2ij(I[1], m)...,I.I[2:end]...) 
 
-
-# maybe really only Vararg{S,N} and Vararg{S,M}?
 # direct indexing, no. indices have to be equal to `N` for the correct dimensionality
-@inline Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{S, N}) where {T, S, N} = getindex(L.data, I...) 
+@inline Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Any, N}) where {T, N} = getindex(L.data, I...) 
 
 # indexing with : + other indices, returns a LowerTriangularArray
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, col::Colon, I...) where {T,N}
@@ -139,7 +137,7 @@ k2ij(I::CartesianIndex, m::Int) = CartesianIndex(k2ij(I[1], m)...,I.I[2:end]...)
 end
 
 # l,m sph "matrix-style"  indexing with integer + other indices
-@inline function Base.getindex(L::LowerTriangularArray{T,N}, I::Vararg{S, M}) where {T, S, N, M}
+@inline function Base.getindex(L::LowerTriangularArray{T,N}, I::Vararg{Any, M}) where {T, N, M}
     @boundscheck M == N+1 || throw(BoundsError(L, I))
     i, j = I[1:2]
     @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
@@ -155,7 +153,13 @@ end
 end
 
 # important to do Tuple(I) here for the j > i case as one of the getindex methods above is called
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, I::CartesianIndex) = getindex(L, Tuple(I)...)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, I::CartesianIndex{M}) where {T,N,M} = getindex(L, Tuple(I)...)
+
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, i::Integer) where {T,N} = getindex(L.data, i)
+
+# needed to remove ambigouities in 1D case 
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer) where {T,V<:AbstractVector{T}} = getindex(L.data, i)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, I::CartesianIndex{M}) where {T,V<:AbstractVector{T},M} = getindex(L, Tuple(I)...)
 
 # setindex with lm, ..
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N} = setindex!(L.data, x, I...)
@@ -178,6 +182,9 @@ end
 end
 
 @inline Base.setindex!(L::LowerTriangularArray, x, I::CartesianIndex) = setindex!(L, x, Tuple(I)...)
+@inline Base.setindex!(L::LowerTriangularArray{T,N}, x, i::Integer) where {T,N} = setindex!(L.data, x, i)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, i::Integer) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, i)
+
 
 # propagate index to data vector
 Base.eachindex(L ::LowerTriangularArray)    = eachindex(L.data)
