@@ -128,9 +128,10 @@ Angeletti et al, 2019, https://hal.science/hal-02047514/document)
 end 
 k2ij(I::CartesianIndex, m::Int) = CartesianIndex(k2ij(I[1], m)...,I.I[2:end]...) 
 
+
+# maybe really only Vararg{S,N} and Vararg{S,M}?
 # direct indexing, no. indices have to be equal to `N` for the correct dimensionality
 @inline Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{S, N}) where {T, S, N} = getindex(L.data, I...) 
-@inline Base.getindex(L::LowerTriangularArray{T, 1}, i) where T = getindex(L.data, i) 
 
 # indexing with : + other indices, returns a LowerTriangularArray
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, col::Colon, I...) where {T,N}
@@ -138,25 +139,15 @@ k2ij(I::CartesianIndex, m::Int) = CartesianIndex(k2ij(I[1], m)...,I.I[2:end]...)
 end
 
 # l,m sph "matrix-style"  indexing with integer + other indices
-@inline function Base.getindex(L::LowerTriangularArray{T,N}, i::Integer, j::Integer, I::Vararg{R, M}) where {T, N, R, M}
-    @boundscheck M == N-1 || throw(BoundsError(L, I))
+@inline function Base.getindex(L::LowerTriangularArray{T,N}, I::Vararg{S, M}) where {T, S, N, M}
+    @boundscheck M == N+1 || throw(BoundsError(L, I))
+    i, j = I[1:2]
     @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
     # to get a zero element in the correct shape, we just take the zero element of some valid element,
     # there are probably faster ways to do this, but I don't know how, and this is just a fallback anyway 
-    @boundscheck j > i && return zero(getindex(L.data, 1, I...)) 
+    @boundscheck j > i && return zero(getindex(L.data, 1, I[3:end]...)) 
     k = ij2k(i, j, L.m)
-    return getindex(L.data, k, I...)
-end
-
-# l,m sph "matrix-style"  indexing with integer + other indices
-@inline function Base.getindex(L::LowerTriangularArray{T,1}, i::Integer, j::Integer) where {T, N, M}
-    @boundscheck M == N-1 || throw(BoundsError(L, I))
-    @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
-    # to get a zero element in the correct shape, we just take the zero element of some valid element,
-    # there are probably faster ways to do this, but I don't know how, and this is just a fallback anyway 
-    @boundscheck j > i && return zero(T) 
-    k = ij2k(i, j, L.m)
-    return getindex(L.data, k)
+    return getindex(L.data, k, I[3:end]...)
 end
 
 @inline function Base.getindex(L::LowerTriangularMatrix{T}, col::Colon, i::Integer) where T
