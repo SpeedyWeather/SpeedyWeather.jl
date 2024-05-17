@@ -22,7 +22,7 @@ Base.@kwdef mutable struct Leapfrog{NF<:AbstractFloat} <: AbstractTimeStepper
 
     # NUMERICS
     "Robert (1966) time filter coefficeint to suppress comput. mode"
-    robert_filter::NF = 0.05
+    robert_filter::NF = 0.1
 
     "Williams time filter (Amezcua 2011) coefficient for 3rd order acc"
     williams_filter::NF = 0.53

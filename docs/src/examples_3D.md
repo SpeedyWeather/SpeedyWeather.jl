@@ -113,7 +113,7 @@ nothing # hide
 using SpeedyWeather
 
 # components
-spectral_grid = SpectralGrid(trunc=31, nlev=5)
+spectral_grid = SpectralGrid(trunc=31, nlev=8)
 ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
 land_sea_mask = AquaPlanetMask(spectral_grid)
 orography = NoOrography(spectral_grid)
@@ -122,7 +122,7 @@ orography = NoOrography(spectral_grid)
 model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography)
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation, period=Day(50))
+run!(simulation, period=Day(20))
 nothing # hide
 ```
 
@@ -178,7 +178,7 @@ model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography, conv
 
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation, period=Day(50))
+run!(simulation, period=Day(20))
 
 humid = simulation.diagnostic_variables.layers[end].grid_variables.humid_grid
 heatmap(humid, title="No deep convection: Surface specific humidity [kg/kg]", colormap=:oslo)
@@ -199,7 +199,7 @@ model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography, conv
 
 simulation = initialize!(model)
 model.feedback.verbose = false # hide
-run!(simulation, period=Day(50))
+run!(simulation, period=Day(20))
 
 humid = simulation.diagnostic_variables.layers[end].grid_variables.humid_grid
 heatmap(humid, title="No convection: Surface specific humidity [kg/kg]", colormap=:oslo)
