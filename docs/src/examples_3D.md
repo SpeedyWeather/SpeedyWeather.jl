@@ -242,7 +242,8 @@ the precipitation that comes from these parameterizations
 using CairoMakie
 
 (; precip_large_scale, precip_convection) = simulation.diagnostic_variables.surface
-heatmap(precip_large_scale, title="Large-scale precipiation [mm]: Accumulated since start", colormap=:oslo)
+m2mm = 1000     # convert from [m] to [mm]
+heatmap(m2mm*precip_large_scale, title="Large-scale precipiation [mm]: Accumulated since start", colormap=:dense)
 save("large-scale_precipitation_acc.png", ans) # hide
 nothing # hide
 ```
@@ -263,14 +264,19 @@ simulation.diagnostic_variables.surface.precip_convection .= 0
 run!(simulation, period=Hour(6))
 
 # visualise, precip_* arrays are flat copies, no need to read them out again!
-heatmap(precip_large_scale, title="Large-scale precipiation [mm/6hrs]", colormap=:dense)
+m2mm_hr = (1000*Hour(1)/Hour(6))    # convert from [m] to [mm/hr]
+heatmap(m2mm_hr*precip_large_scale, title="Large-scale precipiation [mm/hr]", colormap=:dense)
 save("large-scale_precipitation.png", ans) # hide
-heatmap(precip_convection, title="Convective precipiation [mm/6hrs]", colormap=:dense)
+heatmap(m2mm_hr*precip_convection, title="Convective precipiation [mm/hr]", colormap=:dense)
 save("convective_precipitation.png", ans) # hide
 nothing # hide
 ```
 ![Large-scale precipitation](large-scale_precipitation.png)
 ![Convective precipitation](convective_precipitation.png)
+
+As the precipitation fields are accumulated meters over the integration period
+(in the case of no output) we divide by 6 hours to get a precipitation rate ``[m/s]``
+but then multiply with 1 hour and 1000 to get the typical precipitation unit of ``[mm/hr]``.
 
 ## References
 
