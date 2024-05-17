@@ -89,8 +89,8 @@ Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, matrix_size(L).
 
 function LowerTriangularArray{T, N, ArrayType}(
     ::UndefInitializer,
-    I::Vararg{Integer,N},
-) where {T, N, ArrayType<:AbstractArray{T}}
+    I::Vararg{Integer,M},
+) where {T, N, M, ArrayType<:AbstractArray{T}}
     return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), I[1], I[2])
 end
 
@@ -264,8 +264,8 @@ end
             
 function Base.copyto!(
     L1::LowerTriangularArray{T, N, ArrayType1},
-    L2::LowerTriangularArray
-) where {T, N, ArrayType1<:AbstractArray{T}}
+    L2::LowerTriangularArray{S, N}
+) where {T, S, N, ArrayType1<:AbstractArray{T}}
     # if sizes don't match copy over the largest subset of indices
     size(L1) != size(L2) && return copyto!(L1, L2,  Base.OneTo(minimum(size.((L1, L2), 1))),
                                                     Base.OneTo(minimum(size.((L1, L2), 2))))
@@ -280,7 +280,7 @@ function Base.copyto!(
     L2::LowerTriangularArray{S,N,ArrayType2},   # copy from L2
     ls::AbstractUnitRange,                      # range of indices in 1st dim
     ms::AbstractUnitRange,                      # range of indices in 2nd dim
-) where {T, S, N, ArrayType1<:Array{T}, ArrayType2<:Array{S}}
+) where {T, S, N, ArrayType1<:Array{T,N}, ArrayType2<:Array{S,N}}
 
     lmax, mmax = matrix_size(L2)[1:2]        # use the size of L2 for boundscheck
     @boundscheck maximum(ls) <= lmax || throw(BoundsError)
@@ -355,18 +355,18 @@ function _copyto_core!(
     L1
 end 
 
-function Base.copyto!(  L::LowerTriangularArray{T},    # copy to L
-                        M::AbstractMatrix) where T      # copy from M
-
+function Base.copyto!(  L::LowerTriangularArray{T,N},    # copy to L
+                        M::AbstractArray{S,N2}) where {T,S,N,N2}      # copy from M
+    @boundscheck (N+1) == N2 || throw(BoundsError)
     @boundscheck matrix_size(L) == size(M) || throw(BoundsError)
     L.data .= convert.(T, M[lowertriangle_indices(M)])
 
     L
 end
 
-function Base.copyto!(  M::AbstractArray{T},               # copy to M
-                        L::LowerTriangularArray) where T   # copy from L
-
+function Base.copyto!(  M::AbstractArray{T,N},               # copy to M
+                        L::LowerTriangularArray{S,N2}) where {T,S,N,N2}   # copy from L
+    @boundscheck (N-1) == N2 || throw(BoundsError)
     @boundscheck matrix_size(L) == size(M) || throw(BoundsError)
 
     lower_triangle_indices = lowertriangle_indices(M)
@@ -400,14 +400,15 @@ function Base.similar(::LowerTriangularArray{T,N,ArrayType}, size::S) where {T, 
 end
 
 function Base.similar(L::LowerTriangularArray{S,N,ArrayType}, ::Type{T}) where {T, S, N, ArrayType}
-    new_array_type = typeof(T.(L.data)) # TODO: not sure how else to infer this type 
-    return LowerTriangularArray{T,N,new_array_type}(undef, size(L)...)
+    ArrayType_ = nonparametric_type(ArrayType) # TODO: not sure how else to infer this type 
+    return LowerTriangularArray{T,N,ArrayType_{T,N}}(undef, matrix_size(L)...)
 end
 
 Base.similar(L::LowerTriangularArray{T,N,ArrayType}, ::Type{T}) where {T, N, ArrayType} =
-    LowerTriangularArray{T,N,ArrayType}(undef, size(L)...)
+    LowerTriangularArray{T,N,ArrayType}(undef, matrix_size(L)...)
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
+
 # ARITHMETIC
 # While these would work just via broadcast (and the abstractarray interface), these explicit definitions are significantly faster
 # only mul/div with scalar and addition/subtraction, others are handled via the custom broadcast
@@ -456,6 +457,7 @@ Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
 function scale!(L::LowerTriangularArray{T}, s::Number) where T
     L.data .*= s
 end
+
 
 """
 $(TYPEDSIGNATURES)
@@ -507,11 +509,20 @@ LowerTriangularGPUStyle{N, ArrayType}(::Val{M}) where {N, ArrayType, M} =
 nonparametric_type(::Type{<:Array}) = Array
 # nonparametric_type(::Type{<:CUDA.CuArray}) = CuArray
 
+"`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments. 
+Adapted from Julia documentation of Broadcast interface"
+find_L(bc::Base.Broadcast.Broadcasted) = find_L(bc.args)
+find_L(args::Tuple) = find_L(find_L(args[1]), Base.tail(args))
+find_L(x) = x
+find_L(::Tuple{}) = nothing
+find_L(a::LowerTriangularArray, rest) = a
+find_L(::Any, rest) = find_L(rest)
+
 function Base.similar(
     bc::Broadcasted{LowerTriangularStyle{N, ArrayType}},
     ::Type{T},
 ) where {N, ArrayType, T}
-    ArrayType_ = nonparametric_type(ArrayType)
+    #ArrayType_ = nonparametric_type(ArrayType)
     #TODO branch currently not hit because these are always false, although they should be true for
     # operations like +, -, ... then returning a `LowerTriangularArray` again
     # if isstructurepreserving(bc) || fzeropreserving(bc)
@@ -520,7 +531,8 @@ function Base.similar(
     # TODO should return the similar for operations that escape the structure, e.g. .==
     # but given the TODO above return a `LowerTriangularArray` in both cases
     # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
-    return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
+    L = find_L(bc)
+    return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, matrix_size(L))
 end
 
 # same function as above, but needs to be defined for both CPU and GPU style
@@ -528,7 +540,7 @@ function Base.similar(
     bc::Broadcasted{LowerTriangularGPUStyle{N, ArrayType}},
     ::Type{T},
 ) where {N, ArrayType, T}
-    ArrayType_ = nonparametric_type(ArrayType)
+    #ArrayType_ = nonparametric_type(ArrayType)
     #TODO branch currently not hit because these are always false, although they should be true for
     # operations like +, -, ... then returning a `LowerTriangularArray` again
     # if isstructurepreserving(bc) || fzeropreserving(bc)
@@ -537,7 +549,8 @@ function Base.similar(
     # TODO should return the similar for operations that escape the structure, e.g. .==
     # but given the TODO above return a `LowerTriangularArray` in both cases
     # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
-    return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
+    L = find_L(bc)
+    return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, matrix_size(L))
 end
 
 """
