@@ -212,6 +212,72 @@ And the comparison looks like
 ![Aquaplanet, no deep convection](aquaplanet_nodeepconvection.png)
 ![Aquaplanet, no convection](aquaplanet_noconvection.png)
 
+## Large-scale vs convective precipitation
+
+```@example precipitation
+using SpeedyWeather
+
+# components
+spectral_grid = SpectralGrid(trunc=31, nlev=8)
+large_scale_condensation = ImplicitCondensation(spectral_grid)
+convection = SimplifiedBettsMiller(spectral_grid)
+
+# create model, initialize, run
+model = PrimitiveWetModel(; spectral_grid, large_scale_condensation, convection)
+simulation = initialize!(model)
+model.feedback.verbose = false # hide
+run!(simulation, period=Day(10))
+nothing # hide
+```
+
+We run the default `PrimitiveWetModel` with `ImplicitCondensation` as large-scale condensation
+(see [Implicit large-scale condensation](@ref)) and the `SimplifiedBettsMiller`
+for convection (see [Simplified Betts-Miller](@ref BettsMiller)). These schemes
+have some additional parameters, we leave them as default for now, but you could
+do `ImplicitCondensation(spectral_grid, relative_humidity_threshold = 0.8)` to
+let it rain at 80% instead of 100% relative humidity. We now want to analyse
+the precipitation that comes from these parameterizations
+
+```@example precipitation
+using CairoMakie
+
+(; precip_large_scale, precip_convection) = simulation.diagnostic_variables.surface
+m2mm = 1000     # convert from [m] to [mm]
+heatmap(m2mm*precip_large_scale, title="Large-scale precipiation [mm]: Accumulated over 10 days", colormap=:dense)
+save("large-scale_precipitation_acc.png", ans) # hide
+nothing # hide
+```
+![Large-scale precipitation](large-scale_precipitation_acc.png)
+
+Precipitation (both large-scale and convective) are written into the
+`simulation.diagnostic_variables.surface` which, however, accumulate all precipitation
+until netCDF output is written. As we didn't specify `output=true` here, they accumulated
+precipitation over the last 10 days of the simulation which includes the initial
+adjustment of humidity in the tropics (the large band of precipitation here).
+So let us reset these accumulators and integrate for another 6 hours to get the
+precipitation only in the period.
+
+```@example precipitation
+# reset accumulators and simulate 6 hours
+simulation.diagnostic_variables.surface.precip_large_scale .= 0
+simulation.diagnostic_variables.surface.precip_convection .= 0
+run!(simulation, period=Hour(6))
+
+# visualise, precip_* arrays are flat copies, no need to read them out again!
+m2mm_hr = (1000*Hour(1)/Hour(6))    # convert from [m] to [mm/hr]
+heatmap(m2mm_hr*precip_large_scale, title="Large-scale precipiation [mm/hr]", colormap=:dense)
+save("large-scale_precipitation.png", ans) # hide
+heatmap(m2mm_hr*precip_convection, title="Convective precipiation [mm/hr]", colormap=:dense)
+save("convective_precipitation.png", ans) # hide
+nothing # hide
+```
+![Large-scale precipitation](large-scale_precipitation.png)
+![Convective precipitation](convective_precipitation.png)
+
+As the precipitation fields are accumulated meters over the integration period
+(in the case of no output) we divide by 6 hours to get a precipitation rate ``[m/s]``
+but then multiply with 1 hour and 1000 to get the typical precipitation unit of ``[mm/hr]``.
+
 ## References
 
 [^JW06]: Jablonowski, C. and Williamson, D.L. (2006), A baroclinic instability test case for atmospheric model dynamical cores. Q.J.R. Meteorol. Soc., 132: 2943-2975. DOI:[10.1256/qj.06.12](https://doi.org/10.1256/qj.06.12)
