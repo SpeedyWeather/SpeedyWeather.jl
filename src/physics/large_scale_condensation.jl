@@ -15,7 +15,7 @@ Base.@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensati
     relative_humidity_threshold::NF = 1
     
     "Flux limiter for latent heat release [W/m²] per timestep"
-    max_heating::NF = 1
+    max_heating::NF = 10           # currently not needed? maybe too high?
 
     "Time scale in multiples of time step Δt, the larger the less immediate"
     time_scale::NF = 3
