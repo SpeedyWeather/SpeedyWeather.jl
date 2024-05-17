@@ -243,7 +243,7 @@ using CairoMakie
 
 (; precip_large_scale, precip_convection) = simulation.diagnostic_variables.surface
 m2mm = 1000     # convert from [m] to [mm]
-heatmap(m2mm*precip_large_scale, title="Large-scale precipiation [mm]: Accumulated since start", colormap=:dense)
+heatmap(m2mm*precip_large_scale, title="Large-scale precipiation [mm]: Accumulated over 10 days", colormap=:dense)
 save("large-scale_precipitation_acc.png", ans) # hide
 nothing # hide
 ```
