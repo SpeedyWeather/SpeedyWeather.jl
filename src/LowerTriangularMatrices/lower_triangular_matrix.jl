@@ -13,9 +13,10 @@ struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T,N}} <: AbstractAr
     n::Int              # number of columns
 
     LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray{T}} =
-        check_lta_input_array(data, m, n, N) ?
-        new(data, m, n) :
+        check_lta_input_array(data, m, n, N) ? 
+        new(data, m, n)  :
         error(lta_error_message(data, m, n, T, N, ArrayType))
+ 
 end
 
 check_lta_input_array(data, m, n, N) =
@@ -30,8 +31,8 @@ end
 """2-dimensional `LowerTriangularArray` of type `T`` with its non-zero entries unravelled into a `Vector{T}`"""
 const LowerTriangularMatrix{T} = LowerTriangularArray{T, 1, Vector{T}}
 
-LowerTriangularArray(data::ArrayType, m::Integer, n::Integer) where {T, N, ArrayType<:AbstractArray{T,N}} =
-    LowerTriangularArray{T, N, ArrayType}(data, m, n)
+LowerTriangularArray(data::ArrayType, m::Integer, n::Integer) where {T, N, ArrayType<:AbstractArray{T,N}} = LowerTriangularArray{T, N, ArrayType}(data, m, n)
+
 LowerTriangularMatrix(data::Vector{T}, m::Integer, n::Integer) where T =
     LowerTriangularMatrix{T}(data, m, n)
 
@@ -43,6 +44,11 @@ Base.length(L::LowerTriangularArray) = length(L.data)
 """$(TYPEDSIGNATURES)
 Size of a `LowerTriangularArray` defined as size of the flattened array."""
 Base.size(L::LowerTriangularArray) = size(L.data)
+
+"""$(TYPEDSIGNATURES)
+Size of a expanded `LowerTriangularArray` as if it were a full matrix,  
+returns `(L.m, L.n, size(L.data)[2:end])``."""
+matrix_size(L::LowerTriangularArray)  = (L.m, L.n, size(L.data)[2:end]...)
 
 # sizeof the underlying data vector
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
@@ -123,21 +129,12 @@ end
 k2ij(I::CartesianIndex, m::Int) = CartesianIndex(k2ij(I[1], m)...,I.I[2:end]...) 
 
 # direct indexing, no. indices have to be equal to `N` for the correct dimensionality
-@inline function Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{S, N}) where {T, S, N} = getindex(L.data, I...) 
+@inline Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{S, N}) where {T, S, N} = getindex(L.data, I...) 
+@inline Base.getindex(L::LowerTriangularArray{T, 1}, i) where T = getindex(L.data, i) 
 
 # indexing with : + other indices, returns a LowerTriangularArray
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, col::Colon, I...) where {T,N}
     return LowerTriangularArray(getindex(L.data, col, I...), L.m, L.n)
-end
-
-# l,m sph "matrix-style" indexing with integers, no. indices has to be equal to N+1
-Base.@propagate_inbounds function Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Integer, M}) where {T, N}
-    @boundscheck M = N+1 || throw(BoundsError(L, I))
-    i, j = I[1:2]
-    @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
-    @boundscheck j > i && return zero(T)
-    k = ij2k(i, j, L.m)
-    return getindex(L.data, k, I[3:end]...)
 end
 
 # l,m sph "matrix-style"  indexing with integer + other indices
@@ -151,19 +148,26 @@ end
     return getindex(L.data, k, I...)
 end
 
+# l,m sph "matrix-style"  indexing with integer + other indices
+@inline function Base.getindex(L::LowerTriangularArray{T,1}, i::Integer, j::Integer) where {T, N, M}
+    @boundscheck M == N-1 || throw(BoundsError(L, I))
+    @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
+    # to get a zero element in the correct shape, we just take the zero element of some valid element,
+    # there are probably faster ways to do this, but I don't know how, and this is just a fallback anyway 
+    @boundscheck j > i && return zero(T) 
+    k = ij2k(i, j, L.m)
+    return getindex(L.data, k)
+end
+
 @inline function Base.getindex(L::LowerTriangularMatrix{T}, col::Colon, i::Integer) where T
     return Matrix(L)[:,i]
 end
-
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, i::Integer) = getindex(L.data, i)
 
 # important to do Tuple(I) here for the j > i case as one of the getindex methods above is called
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, I::CartesianIndex) = getindex(L, Tuple(I)...)
 
 # setindex with lm, ..
-@inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N} 
-    setindex!(L.data, x, I...)
-end 
+@inline Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N} = setindex!(L.data, x, I...)
 
 # setindex with il, im, ..
 @inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, M}) where {T, N, M}
@@ -182,8 +186,6 @@ end
     setindex!(L.data, x, k, I[3:end]...)
 end
 
-@inline Base.setindex!(L::LowerTriangularArray, x::AbstractVector, r::AbstractRange, I...) = setindex!(L.data, x, r, I...)
-@inline Base.setindex!(L::LowerTriangularArray, x, i::Integer) = setindex!(L.data, x, i)
 @inline Base.setindex!(L::LowerTriangularArray, x, I::CartesianIndex) = setindex!(L, x, Tuple(I)...)
 
 # propagate index to data vector
@@ -238,7 +240,6 @@ function lowertriangle_indices(M::AbstractArray{T, N}) where {T, N}
     repeat(indices, 1, 1, size(M)[3:end]...)
 end  
 
-########continue here
 # GPU version and fallback for higher dimensions
 """
 $(TYPEDSIGNATURES)
@@ -253,10 +254,15 @@ LowerTriangularArray(L::LowerTriangularArray) = LowerTriangularArray(L.data, L.m
 LowerTriangularMatrix(M::AbstractMatrix) = LowerTriangularArray(M)
 
 function Base.Matrix(L::LowerTriangularMatrix{T}) where T
-    m, n = size(L)
+    m, n = matrix_size(L)
     M = zeros(T, m, n)
     copyto!(M, L)
 end
+
+function Base.Array(L::LowerTriangularArray{T}) where T
+    A = zeros(T, matrix_size(L))
+    copyto!(A, L)
+end 
             
 function Base.copyto!(
     L1::LowerTriangularArray{T, N, ArrayType1},
@@ -278,11 +284,11 @@ function Base.copyto!(
     ms::AbstractUnitRange,                      # range of indices in 2nd dim
 ) where {T, S, N, ArrayType1<:Array{T}, ArrayType2<:Array{S}}
 
-    lmax, mmax = size(L2)        # use the size of L2 for boundscheck
+    lmax, mmax = matrix_size(L2)[1:2]        # use the size of L2 for boundscheck
     @boundscheck maximum(ls) <= lmax || throw(BoundsError)
     @boundscheck maximum(ms) <= mmax || throw(BoundsError)
 
-    lmax, mmax = size(L1)        # but the size of L1 to loop
+    lmax, mmax = matrix_size(L1)[1:2]        # but the size of L1 to loop
     lm = 0
     @inbounds for m in 1:mmax
         for l in m:lmax
@@ -313,11 +319,11 @@ function _copyto_core!(
     ms::AbstractUnitRange,                      # range of indices in 2nd dim
 ) where {T, S, N, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}
 
-    lmax_2, mmax_2 = size(L2)[1:2]       # use the size of L2 for boundscheck
+    lmax_2, mmax_2 = matrix_size(L2)[1:2]       # use the size of L2 for boundscheck
     @boundscheck maximum(ls) <= lmax_2 || throw(BoundsError)
     @boundscheck maximum(ms) <= mmax_2 || throw(BoundsError)
 
-    lmax_1, mmax_1 = size(L1)[1:2]
+    lmax_1, mmax_1 = matrix_size(L1)[1:2]
 
     # we'll setup the 1D-indices that correspond to the given range here
     ind_L1 = lowertriangle_indices(lmax_1, mmax_1)
@@ -354,7 +360,7 @@ end
 function Base.copyto!(  L::LowerTriangularArray{T},    # copy to L
                         M::AbstractMatrix) where T      # copy from M
 
-    @boundscheck size(L) == size(M) || throw(BoundsError)
+    @boundscheck matrix_size(L) == size(M) || throw(BoundsError)
     L.data .= convert.(T, M[lowertriangle_indices(M)])
 
     L
@@ -363,7 +369,7 @@ end
 function Base.copyto!(  M::AbstractArray{T},               # copy to M
                         L::LowerTriangularArray) where T   # copy from L
 
-    @boundscheck size(L) == size(M) || throw(BoundsError)
+    @boundscheck matrix_size(L) == size(M) || throw(BoundsError)
 
     lower_triangle_indices = lowertriangle_indices(M)
     upper_triangle_indices = @. ~lower_triangle_indices # upper triangle without main diagonal 
@@ -536,6 +542,7 @@ function Base.similar(
     return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
 end
 
+"""
 function Base.copyto!(
     dest::LowerTriangularArray{T, N, ArrayTypeP},
     bc::Broadcasted{LowerTriangularStyle{N, ArrayType}},
@@ -592,6 +599,7 @@ import GPUArrays._copyto!
 
     return dest
 end
+"""
 
 function GPUArrays.backend(
     ::Type{LowerTriangularArray{T, N, ArrayType}}

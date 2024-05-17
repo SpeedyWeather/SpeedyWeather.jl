@@ -1,5 +1,6 @@
 using JLArrays, Adapt
 import Random
+import SpeedyWeather.LowerTriangularMatrices: matrix_size
 
 @testset "LowerTriangularMatrix" begin
     @testset for NF in (Float32, Float64)
@@ -11,7 +12,7 @@ import Random
 
             L = LowerTriangularMatrix(A)
 
-            @test size(L) == size(A)
+            @test matrix_size(L) == size(A)
 
             for m in 1:mmax
                 for l in 1:lmax
@@ -33,6 +34,12 @@ import Random
     end
 end
 
+NF = Float32 
+mmax = 32 
+idims = (5,)
+lmax = mmax 
+
+
 @testset "LowerTriangularArray: N-dim" begin 
     @testset for NF in (Float32, Float64)
         mmax = 32
@@ -47,7 +54,9 @@ end
 
                 L = LowerTriangularArray(A)
 
-                @test size(L) == size(A)
+                @test matrix_size(L) == size(A)
+                @test size(L)[2:end] == size(A)[3:end]
+                @test size(L)[1] == SpeedyWeather.LowerTriangularMatrices.nonzeros(size(A,1), size(A,2))
 
                 for m in 1:mmax
                     for l in 1:lmax
