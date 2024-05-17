@@ -11,6 +11,9 @@ export ImplicitCondensation
 Large scale condensation as with implicit precipitation.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
+    "Relative humidity threshold [1 = 100%] to trigger condensation"
+    relative_humidity_threshold::NF = 1
+    
     "Flux limiter for latent heat release [W/m²] per timestep"
     max_heating::NF = 1
 
@@ -82,10 +85,10 @@ function large_scale_condensation!(
     (; Lᵥ, cₚ, Lᵥ_Rᵥ) = clausius_clapeyron
     Lᵥ_cₚ = Lᵥ/cₚ                           # latent heat of vaporization over heat capacity
     max_heating = scheme.max_heating/Δt_sec
-    time_scale = scheme.time_scale
+    (; time_scale, relative_humidity_threshold) = scheme
 
     @inbounds for k in eachindex(column)
-        if humid[k] > sat_humid[k]
+        if humid[k] > sat_humid[k]*relative_humidity_threshold
 
             # tendency for Implicit humid = sat_humid, divide by leapfrog time step below
             δq = sat_humid[k] - humid[k]
