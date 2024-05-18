@@ -183,7 +183,7 @@ end
 
 # this is to avoid ambigouities
 @inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, i::Integer) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, i)
-@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{1}) where {T,V<:AbstractVector{T}} = setindex!(L, x, I)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{1}) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, I)
 @inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{2}) where {T,V<:AbstractVector{T}} = setindex!(L, x, Tuple(I)...)
 
 # propagate index to data vector
