@@ -36,7 +36,7 @@ function spectral_truncation!(  alms::LowerTriangularMatrix{NF},    # spectral f
                                 mtrunc::Integer,                    # truncate to max order mtrunc
                                 ) where NF                          # number format NF (can be complex)
     
-    lmax, mmax = size(alms) .- 1         # 0-based degree l, order m of the legendre polynomials
+    lmax, mmax = LowerTriangularMatrices.matrix_size(alms) .- 1         # 0-based degree l, order m of the legendre polynomials
 
     lm = 1
     @inbounds for m in 1:mmax+1         # order m = 0, mmax but 1-based
@@ -71,7 +71,7 @@ to enforce that all coefficients for which the degree l is larger than order m a
 spectral_truncation!(alms::AbstractMatrix) = spectral_truncation!(alms, size(alms)...)
 
 function spectral_truncation!(alms::LowerTriangularMatrix{NF}) where NF
-    lmax, mmax = size(alms)
+    lmax, mmax = LowerTriangularMatrices.matrix_size(alms)
     alms[mmax+1:lmax, :] .= 0 # set everything to zero below the triangle
     return alms
 end
@@ -90,7 +90,7 @@ function spectral_truncation(   ::Type{NF},                     # number format 
                                 mtrunc::Integer,                # truncate to max order mtrunc
                                 ) where NF
     
-    lmax, mmax = size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics
+    lmax, mmax = LowerTriangularMatrices.matrix_size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics
     
     # interpolate to higher resolution if output larger than input
     (ltrunc > lmax || mtrunc > mmax) && return spectral_interpolation(NF, alms, ltrunc, mtrunc)
@@ -109,13 +109,13 @@ function spectral_truncation(   ::Type{NF},                     # number format 
     mtrunc::Integer,                # truncate to max order mtrunc
     ) where {NF,T,N}
 
-    lmax, mmax = size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics
+    lmax, mmax = LowerTriangularMatrices.matrix_size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics
 
     # interpolate to higher resolution if output larger than input
     (ltrunc > lmax || mtrunc > mmax) && return spectral_interpolation(NF, alms, ltrunc, mtrunc)
 
     # preallocate new (smaller) array
-    alms_trunc = zeros(typeof(alms), ltrunc+1, mtrunc+1, size(alms)[3:end]...)  
+    alms_trunc = zeros(typeof(alms), ltrunc+1, mtrunc+1, size(alms)[2:end]...)  
 
     # copy data over, copyto! copies the largest matching subset of harmonics
     copyto!(alms_trunc, alms)
@@ -138,18 +138,18 @@ spectral space. If `trunc` is smaller or equal to the implicit truncation in `al
 than `spectral_truncation` is automatically called instead, returning `alms_trunc`, a coefficient matrix that
 is smaller than `alms`, implicitly setting higher degrees and orders to zero."""
 function spectral_interpolation(::Type{NF},                     # number format NF (can be complex)
-                                alms::LowerTriangularMatrix,    # spectral field to be truncated
+                                alms::LowerTriangularArray,     # spectral field to be truncated
                                 ltrunc::Integer,                # truncate to max degree ltrunc
                                 mtrunc::Integer                 # truncate to max order mtrunc
                                 ) where NF                  
     
-    lmax, mmax = size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics 
+    lmax, mmax = LowerTriangularMatrices.matrix_size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics 
     
     # truncate to lower resolution if output smaller than input
     (ltrunc <= lmax && mtrunc <= mmax) && return spectral_truncation(NF, alms, ltrunc, mtrunc)
 
     # allocate new (larger) array
-    alms_trunc = zeros(LowerTriangularMatrix{NF}, ltrunc+1, mtrunc+1)  
+    alms_trunc = zeros(LowerTriangularArray{NF}, ltrunc+1, mtrunc+1, size(alms)[2:end])  
 
     # copy data over
     copyto!(alms_trunc, alms)
@@ -181,7 +181,7 @@ function spectral_smoothing!(   A::LowerTriangularMatrix,
                                 power::Real=1,          # power of Laplacian used for smoothing
                                 truncation::Int=-1)     # smoothing wrt wavenumber (0 = largest)
                         
-    lmax, mmax = size(A)
+    lmax, mmax = LowerTriangularMatrices.matrix_size(A)
     # normalize by largest eigenvalue by default, or wrt to given truncation
     eigenvalue_norm = truncation == -1 ? -mmax*(mmax+1) : -truncation*(truncation+1)
 

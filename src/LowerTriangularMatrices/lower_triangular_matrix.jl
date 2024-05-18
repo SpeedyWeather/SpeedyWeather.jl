@@ -49,6 +49,7 @@ Base.size(L::LowerTriangularArray) = size(L.data)
 Size of a expanded `LowerTriangularArray` as if it were a full matrix,  
 returns `(L.m, L.n, size(L.data)[2:end])``."""
 matrix_size(L::LowerTriangularArray)  = (L.m, L.n, size(L.data)[2:end]...)
+matrix_size(L::LowerTriangularArray, i::Int) = matrix_size(L)[i] 
 
 # sizeof the underlying data vector
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
@@ -166,6 +167,7 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, I::Cartes
 
 # setindex with il, im, ..
 @inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, M}) where {T, N, M}
+    @boundscheck N+1==M || throw(BoundsError(L,I))
     i, j = I[1:2] 
     @boundscheck i >= j || throw(BoundsError(L, (i, j)))
     k = ij2k(i, j, L.m)
@@ -173,18 +175,16 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, I::Cartes
 end
 
 # this is specifically here for the weird way in which AssociatedLegendrePolynomials.jl indexes with an empty CartesianIndex
-@inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, i::CartesianIndex, I::Vararg{Any, M}) where {T,N, M}
-    @boundscheck N+1==M || throw(BoundsError(L,I))
-    i, j = I[1:2] # TODO: check if i,j are Int?
-    @boundscheck i >= j || throw(BoundsError(L, (i, j)))
-    k = ij2k(i, j, L.m)
-    setindex!(L.data, x, k, I[3:end]...)
-end
+@inline Base.setindex!(L::LowerTriangularArray{T,N}, x, i::CartesianIndex{0}, I::Vararg{Any, M}) where {T,N, M} = setindex!(L, x, I)
+
 
 @inline Base.setindex!(L::LowerTriangularArray, x, I::CartesianIndex) = setindex!(L, x, Tuple(I)...)
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, i::Integer) where {T,N} = setindex!(L.data, x, i)
-@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, i::Integer) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, i)
 
+# this is to avoid ambigouities
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, i::Integer) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, i)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{1}) where {T,V<:AbstractVector{T}} = setindex!(L, x, I)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{2}) where {T,V<:AbstractVector{T}} = setindex!(L, x, Tuple(I)...)
 
 # propagate index to data vector
 Base.eachindex(L ::LowerTriangularArray)    = eachindex(L.data)
@@ -263,12 +263,12 @@ function Base.Array(L::LowerTriangularArray{T}) where T
 end 
             
 function Base.copyto!(
-    L1::LowerTriangularArray{T, N, ArrayType1},
-    L2::LowerTriangularArray{S, N}
-) where {T, S, N, ArrayType1<:AbstractArray{T}}
+    L1::LowerTriangularArray{T},
+    L2::LowerTriangularArray
+) where T
     # if sizes don't match copy over the largest subset of indices
-    size(L1) != size(L2) && return copyto!(L1, L2,  Base.OneTo(minimum(size.((L1, L2), 1))),
-                                                    Base.OneTo(minimum(size.((L1, L2), 2))))
+    size(L1) != size(L2) && return copyto!(L1, L2,  Base.OneTo(minimum(matrix_size.((L1, L2), 1))),
+                                                    Base.OneTo(minimum(matrix_size.((L1, L2), 2))))
 
     L1.data .= convert.(T, L2.data)
     L1
@@ -291,9 +291,9 @@ function Base.copyto!(
     @inbounds for m in 1:mmax
         for l in m:lmax
             lm += 1
-            L1[lm,[Colon() for i=1:(N-2)]...] = (l in ls) && (m in ms) ?
-                                                T.(L2[l, m, [Colon() for i=1:(N-2)]...]) :
-                                                L1[lm, [Colon() for i=1:(N-2)]...]
+            L1[lm,[Colon() for i=1:(N-1)]...] = (l in ls) && (m in ms) ?
+                                                T.(L2[l, m, [Colon() for i=1:(N-1)]...]) :
+                                                L1[lm, [Colon() for i=1:(N-1)]...]
         end
     end
 
@@ -350,23 +350,21 @@ function _copyto_core!(
     end 
     ind_L2 = ind_L2_smaller[ind_L2] # also flattens the indices into indices for the L2.data array
 
-    L1.data[ind_L1,[Colon() for i=1:(N-2)]...] = T.(L2.data[ind_L2,[Colon() for i=1:(N-2)]...])
+    L1.data[ind_L1,[Colon() for i=1:(N-1)]...] = T.(L2.data[ind_L2,[Colon() for i=1:(N-1)]...])
 
     L1
 end 
 
-function Base.copyto!(  L::LowerTriangularArray{T,N},    # copy to L
-                        M::AbstractArray{S,N2}) where {T,S,N,N2}      # copy from M
-    @boundscheck (N+1) == N2 || throw(BoundsError)
+function Base.copyto!(  L::LowerTriangularArray{T},    # copy to L
+                        M::AbstractArray) where T    # copy from M
     @boundscheck matrix_size(L) == size(M) || throw(BoundsError)
     L.data .= convert.(T, M[lowertriangle_indices(M)])
 
     L
 end
 
-function Base.copyto!(  M::AbstractArray{T,N},               # copy to M
-                        L::LowerTriangularArray{S,N2}) where {T,S,N,N2}   # copy from L
-    @boundscheck (N-1) == N2 || throw(BoundsError)
+function Base.copyto!(  M::AbstractArray{T},               # copy to M
+                        L::LowerTriangularArray) where T   # copy from L
     @boundscheck matrix_size(L) == size(M) || throw(BoundsError)
 
     lower_triangle_indices = lowertriangle_indices(M)
@@ -393,6 +391,10 @@ end
 
 function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix) where T
     return LowerTriangularMatrix{T}(L.data, L.m, L.n)
+end
+
+function Base.similar(::LowerTriangularArray{T,N,ArrayType}, I::Integer...) where {T, N, ArrayType}
+    return LowerTriangularArray{T,N,ArrayType}(undef, I...)
 end
 
 function Base.similar(::LowerTriangularArray{T,N,ArrayType}, size::S) where {T, N, ArrayType, S<:Tuple}

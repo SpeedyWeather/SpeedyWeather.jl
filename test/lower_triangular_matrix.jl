@@ -344,8 +344,8 @@ end
         @test size(similar(L)) == size(L)
         @test eltype(L) == eltype(similar(L, eltype(L)))
 
-        @test (5, 7) == size(similar(L, 5, 7))
-        @test (5, 7) == size(similar(L, (5, 7)))
+        @test (5, 7) == matrix_size(similar(L, 5, 7))
+        @test (5, 7) == matrix_size(similar(L, (5, 7)))
         @test similar(L) isa LowerTriangularMatrix
         @test similar(L, Float64) isa LowerTriangularMatrix{Float64}
     end
@@ -369,8 +369,8 @@ end
             @test size(similar(L)) == size(L)
             @test eltype(L) == eltype(similar(L, eltype(L)))
 
-            @test (5, 7, idims...) == size(similar(L, 5, 7, idims...))
-            @test (5, 7, idims...) == size(similar(L, (5, 7,  idims...)))
+            @test (5, 7, idims...) == matrix_size(similar(L, 5, 7, idims...))
+            @test (5, 7, idims...) == matrix_size(similar(L, (5, 7,  idims...)))
             @test similar(L) isa LowerTriangularArray
             @test similar(L, Float64) isa LowerTriangularArray{Float64}
         end
@@ -401,7 +401,7 @@ end
         # with ranges
         L1 = zeros(LowerTriangularMatrix{NF}, 33, 32);
         L2 = randn(LowerTriangularMatrix{NF}, 65, 64);
-        L2T = spectral_truncation(L2,(size(L1) .- 1)...)
+        L2T = spectral_truncation(L2,(matrix_size(L1) .- 1)...)
 
         copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
         @test L1 == L2T
@@ -457,7 +457,7 @@ end
             # with ranges
             L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
             L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
-            L2T = spectral_truncation(L2,(size(L1)[1:2] .- 1)...)
+            L2T = spectral_truncation(L2,(matrix_size(L1)[1:2] .- 1)...)
 
             copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
             @test L1 == L2T
@@ -513,7 +513,7 @@ end
     end 
 
     # setindex! 
-    A_test = JLArray(rand(NF,size(L_cpu,3)))
+    A_test = JLArray(rand(NF,size(L_cpu,2)))
     L[1,:] = A_test
     @test L[1,:] == A_test
 
@@ -534,7 +534,7 @@ end
 
     # rand + convert
     L3 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
-    L4 = convert(LowerTriangularArray{Float16,2,JLArray{Float16}}, L3)
+    L4 = convert(LowerTriangularArray{Float16,2,JLArray{Float16,2}}, L3)
 
     for lm in SpeedyWeather.eachharmonic(L, L3)
         @test all(Float16.(L3[lm, :]) .== L4[lm, :])
@@ -548,8 +548,8 @@ end
     @test size(similar(L)) == size(L)
     @test eltype(L) == eltype(similar(L, eltype(L)))
 
-    @test (5, 7, 5) == size(similar(L, 5, 7, idims...))
-    @test (5, 7, 5) == size(similar(L, (5, 7,  idims...)))
+    @test (5, 7, 5) == matrix_size(similar(L, 5, 7, idims...))
+    @test (5, 7, 5) == matrix_size(similar(L, (5, 7,  idims...)))
     @test similar(L) isa LowerTriangularArray
 
     # copyto! same size 
@@ -568,7 +568,7 @@ end
 
     L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
     L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
-    L2T = spectral_truncation(L2,(size(L1)[1:2] .- 1)...)
+    L2T = spectral_truncation(L2,(matrix_size(L1)[1:2] .- 1)...)
     L3 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
 
     SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:33, 1:32)     # size of smaller matrix
