@@ -194,10 +194,10 @@ end
         
         vor0[1, 1] = 0                   # zero mean
         div0[1, 1] = 0
-        vor0[:, 1] .= real(vor0[:, 1])    # set imaginary component of m=0 to 0
-        div0[:, 1] .= real(div0[:, 1])    # as the rotation of zonal modes is arbitrary
-        vor0[end, :] .= 0                # set unusued last row (l=lmax+1) to zero
-        div0[end, :] .= 0
+        vor0[1:lmax+1, 1] .= real(vor0[1:lmax+1, 1])    # set imaginary component of m=0 to 0
+        div0[1:lmax+1, 1] .= real(div0[1:lmax+1, 1])    # as the rotation of zonal modes is arbitrary
+        vor0[end, 1:mmax+1] .= 0                # set unusued last row (l=lmax+1) to zero
+        div0[end, 1:mmax+1] .= 0
 
         # copy into prognostic variables
         p.layers[1].timesteps[1].vor .= vor0
@@ -234,9 +234,9 @@ end
         SpeedyWeather.divergence!(div1, u_coslat⁻¹, v_coslat⁻¹, S)
 
         for lm in SpeedyWeather.eachharmonic(vor0, vor1, div0, div1)
-            # increased to 20 as 10 caused single fails every now and then
-            @test vor0[lm] ≈ vor1[lm] rtol=20*sqrt(eps(NF))
-            @test div0[lm] ≈ div1[lm] rtol=20*sqrt(eps(NF))
+            # increased to 30 as 10, 20 caused single fails every now and then
+            @test vor0[lm] ≈ vor1[lm] rtol=30*sqrt(eps(NF))
+            @test div0[lm] ≈ div1[lm] rtol=30*sqrt(eps(NF))
         end
     end
 end

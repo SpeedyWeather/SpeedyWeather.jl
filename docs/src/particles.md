@@ -277,7 +277,7 @@ so that you can read the netCDF file with
 
 ```@example particle_tracker
 using NCDatasets
-run_id = "run_$(model.output.id)"                    # create a run_???? string with output id
+run_id = "run_$(model.output.id)"                    # create a run_???? string with output id
 path = joinpath(run_id, particle_tracker.file_name)  # by default "run_????/particles.nc"
 ds = NCDataset(path)
 ds["lon"]
@@ -292,16 +292,15 @@ frequency. We can visualise the particles' trajectories with
 ```@example particle_tracker
 lon = ds["lon"][:,:]
 lat = ds["lat"][:,:]
+n_particles = size(lon,1)
 
-using PythonPlot
-ioff() # hide
-fig, ax = subplots(1, 1, figsize=(10, 6))
-ax.plot(lon', lat')
-ax.set_xlabel("longitude")
-ax.set_ylabel("latitude")
-ax.set_title("Particle advection")
-tight_layout() # hide
-savefig("particles.png", dpi=70) # hide
+using CairoMakie
+fig = lines(lon[1, :], lat[1, :])                               # first particle only
+[lines!(fig.axis, lon[i,:], lat[i,:]) for i in 2:n_particles]   # add lines for other particles
+
+# display updated figure
+fig
+save("particles.png", fig) # hide
 nothing # hide
 ```
 ![Particle trajectories](particles.png)
@@ -313,19 +312,16 @@ the jet does too. However, there are also some horizontal lines which are automa
 when a particles travels across the prime meridian 0˚E = 360˚E. Ideally you would want to use
 a more advanced projection and plot the particle trajectories as geodetics. 
 
-With Makie.jl you can do
+With [GeoMakie.jl](https://github.com/MakieOrg/GeoMakie.jl) you can do
 
-```julia
-using GeoMakie, GLMakie
+```@example particle_tracker
+using GeoMakie, CairoMakie
 
 fig = Figure()
-ga = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=19 +lat_0=50")
-
-lines!(ga, GeoMakie.coastlines())
-ga.xticklabelsvisible[] = false
-ga.yticklabelsvisible[] = false
-
-n_particles = size(lon)[1]
+ga = GeoAxis(fig[1, 1]; dest = "+proj=ortho +lon_0=45 +lat_0=45")
 [lines!(ga, lon[i,:], lat[i,:]) for i in 1:n_particles]
 fig
+save("particles_geomakie.png", fig) # hide
+nothing # hide
 ```
+![Particle advection](particles_geomakie.png)

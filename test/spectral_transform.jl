@@ -161,7 +161,7 @@ end
 
                 SG = SpectralGrid(NF; trunc, Grid, dealiasing)
                 S = SpectralTransform(SG, recompute_legendre=false)
-                O = EarthOrography(SG, smoothing=true, smoothing_truncation=31)
+                O = EarthOrography(SG, smoothing=true)
                 E = Earth(SG)
                 initialize!(O, E, S)
 

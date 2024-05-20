@@ -37,28 +37,37 @@ export initialize!, finish!
 include("utility_functions.jl")
 
 # LowerTriangularMatrices for spherical harmonics
-export LowerTriangularMatrices, LowerTriangularMatrix
+export  LowerTriangularMatrices, 
+        LowerTriangularMatrix,
+        LowerTriangularArray
+        
 include("LowerTriangularMatrices/LowerTriangularMatrices.jl")
 using .LowerTriangularMatrices
 
 # RingGrids
 export RingGrids
-export  FullClenshawGrid,
-        FullGaussianGrid,
-        FullHEALPixGrid,
-        FullOctaHEALPixGrid,
-        OctahedralGaussianGrid,
-        OctahedralClenshawGrid,
-        HEALPixGrid,
-        OctaHEALPixGrid,
-        plot
+export  AbstractGrid, AbstractGridArray,
+        AbstractFullGridarray, AbstractReducedGridArray
+export  FullClenshawGrid, FullClenshawArray,
+        FullGaussianGrid, FullGaussianArray,
+        FullHEALPixGrid, FullHEALPixArray,
+        FullOctaHEALPixGrid, FullOctaHEALPixArray,
+        OctahedralGaussianGrid, OctahedralGaussianArray,
+        OctahedralClenshawGrid, OctahedralClenshawArray,
+        HEALPixGrid, HEALPixArray,
+        OctaHEALPixGrid, OctaHEALPixArray,
+        eachring, eachgrid, plot
 
 include("RingGrids/RingGrids.jl")
 using .RingGrids
 
 # SpeedyTransforms
 export SpeedyTransforms, SpectralTransform
-export spectral, gridded, spectral_truncation
+export spectral, gridded, spectral!, gridded!
+export spectral_truncation, spectral_truncation!
+export curl, divergence, curl!, divergence!
+export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
+
 include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory

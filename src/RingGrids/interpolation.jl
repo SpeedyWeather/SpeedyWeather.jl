@@ -14,7 +14,7 @@ struct GridGeometry{G<:AbstractGrid}
     lon_offsets::Vector{Float64}    # longitude offsets of first grid point per ring
 end
 
-GridGeometry(grid::AbstractGrid) = GridGeometry(typeof(grid), grid.nlat_half)
+GridGeometry(grid::AbstractGridArray) = GridGeometry(horizontal_grid_type(grid), grid.nlat_half)
 
 """
     G = GridGeometry(   Grid::Type{<:AbstractGrid},
@@ -26,14 +26,14 @@ unravelled indices ij."""
 function GridGeometry(  Grid::Type{<:AbstractGrid}, # which grid to calculate the geometry for
                         nlat_half::Integer)         # resolution parameter number of rings
 
-    nlat = get_nlat(Grid, nlat_half)                 # total number of latitude rings
-    npoints = get_npoints(Grid, nlat_half)           # total number of grid points
+    nlat = get_nlat(Grid, nlat_half)                # total number of latitude rings
+    npoints = get_npoints(Grid, nlat_half)          # total number of grid points
 
     # LATITUDES
-    colat = get_colat(Grid, nlat_half)               # colatitude in radians
+    colat = get_colat(Grid, nlat_half)              # colatitude in radians
     lat = π/2 .- colat                              # latitude in radians
     latd = lat*360/2π                               # 90˚...-90˚, in degrees
-    latd_poles = cat(90, latd, -90, dims=1)            # latd, but poles incl
+    latd_poles = cat(90, latd, -90, dims=1)         # latd, but poles incl
 
     # Hack: use -90.00...1˚N instead of exactly -90˚N for the <=, > comparison
     # in find_rings! that way the last ring to the south pole can be an open
@@ -42,12 +42,11 @@ function GridGeometry(  Grid::Type{<:AbstractGrid}, # which grid to calculate th
     latd_poles[end] = latd_poles[end] - eps(latd_poles[end])
 
     # COORDINATES for every grid point in ring order
-    _, londs = get_latdlonds(Grid, nlat_half)         # in degrees [0˚...360˚E]                         
+    _, londs = get_latdlonds(Grid, nlat_half)       # in degrees [0˚...360˚E]                         
 
     # RINGS and LONGITUDE OFFSETS
-    rings = eachring(Grid, nlat_half)                # Vector{UnitRange} descr start/end index on ring
-    nlons = get_nlons(Grid, nlat_half,               # number of longitude points per ring
-                        both_hemispheres=true)
+    rings = eachring(Grid, nlat_half)               # Vector{UnitRange} descr start/end index on ring
+    nlons = get_nlons(Grid, nlat_half)              # number of longitude points per ring, pole to pole
     lon_offsets = [londs[ring[1]] for ring in rings]# offset of the first point from 0˚E
 
     return GridGeometry{Grid}(nlat_half, nlat, npoints, latd_poles, londs, rings, nlons, lon_offsets)
@@ -213,9 +212,9 @@ function interpolate(   A::AbstractGrid{NF},        # field to interpolate
                         I::AbstractInterpolator     # indices in I are assumed to be calculated already!
                         ) where NF                  # use number format from input data also for output
 
-    (; npoints ) = I.locator             # number of points to interpolate onto
-    Aout = Vector{NF}(undef, npoints)        # preallocate: onto θs, λs interpolated values of A
-    interpolate!(Aout, A, I)                  # perform interpolation, store in As
+    (; npoints ) = I.locator                # number of points to interpolate onto
+    Aout = Vector{NF}(undef, npoints)       # preallocate: onto θs, λs interpolated values of A
+    interpolate!(Aout, A, I)                # perform interpolation, store in As
 end
 
 function interpolate!(  Aout::Vector,       # Out: interpolated values
@@ -315,7 +314,7 @@ end
 
 function find_rings!(   js::Vector{<:Integer},  # Out: ring indices j
                         Δys::Vector,            # Out: distance fractions to ring further south
-                        θs::Vector,             # latitudes to interpolate onto
+                        θs::Vector,             # latitudes to interpolate onto
                         latd::Vector;           # latitudes of the rings on the original grid
                         unsafe::Bool=false)     # skip safety checks when true
     
@@ -511,7 +510,7 @@ function grid_cell_average!(
     lon_in = get_lon(input)
     nlon_in = length(lon_in)
 
-    # output grid coordinates, append -π, 2π to have grid points
+    # output grid coordinates, append -π, 2π to have grid points
     # towards the poles definitely included
     colat_out = vcat(-π, get_colat(output), 2π)
     _, lons_out = get_colatlons(output)
@@ -522,7 +521,7 @@ function grid_cell_average!(
         Δϕ = 2π/length(ring)        # longitude spacing on this ring
 
         # indices for lat_out are shifted as north and south pole are included
-        θ0 = (colat_out[j]   + colat_out[j+1])/2    # northern edge
+        θ0 = (colat_out[j]   + colat_out[j+1])/2    # northern edge
         θ1 = (colat_out[j+1] + colat_out[j+2])/2    # southern edge
 
         # matrix indices for input grid that lie in output grid cell

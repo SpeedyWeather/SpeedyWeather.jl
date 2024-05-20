@@ -11,29 +11,29 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct BarotropicModel{
-    NF<:AbstractFloat,
-    DS<:DeviceSetup,
-    PL<:AbstractPlanet,
-    AT<:AbstractAtmosphere,
-    CO<:AbstractCoriolis,
-    FR<:AbstractForcing,
-    DR<:AbstractDrag,
-    PA<:AbstractParticleAdvection,
-    IC<:AbstractInitialConditions,
-    TS<:AbstractTimeStepper,
-    ST<:SpectralTransform{NF},
-    IM<:AbstractImplicit,
-    HD<:AbstractHorizontalDiffusion,
-    GE<:AbstractGeometry,
-    OW<:AbstractOutputWriter,
-    FB<:AbstractFeedback,
+    # TODO add constraints again when we stop supporting julia v1.9
+    DS,     # <:DeviceSetup,
+    GE,     # <:AbstractGeometry,
+    PL,     # <:AbstractPlanet,
+    AT,     # <:AbstractAtmosphere,
+    CO,     # <:AbstractCoriolis,
+    FR,     # <:AbstractForcing,
+    DR,     # <:AbstractDrag,
+    PA,     # <:AbstractParticleAdvection,
+    IC,     # <:AbstractInitialConditions,
+    TS,     # <:AbstractTimeStepper,
+    ST,     # <:SpectralTransform{NF},
+    IM,     # <:AbstractImplicit,
+    HD,     # <:AbstractHorizontalDiffusion,
+    OW,     # <:AbstractOutputWriter,
+    FB,     # <:AbstractFeedback,
 } <: Barotropic
     
-    # GRID
-    spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
-    geometry::GE = Geometry(spectral_grid)
+    spectral_grid::SpectralGrid
+    device_setup::DS = DeviceSetup(CPUDevice())
     
     # DYNAMICS
+    geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
     atmosphere::AT = EarthAtmosphere(spectral_grid)
     coriolis::CO = Coriolis(spectral_grid)
@@ -43,7 +43,6 @@ Base.@kwdef mutable struct BarotropicModel{
     initial_conditions::IC = InitialConditions(Barotropic)
 
     # NUMERICS
-    device_setup::DS = DeviceSetup(CPUDevice())
     time_stepping::TS = Leapfrog(spectral_grid)
     spectral_transform::ST = SpectralTransform(spectral_grid)
     implicit::IM = NoImplicit(spectral_grid)

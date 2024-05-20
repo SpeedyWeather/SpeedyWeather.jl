@@ -11,29 +11,30 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct ShallowWaterModel{
-    NF<:AbstractFloat,
-    DS<:DeviceSetup,
-    PL<:AbstractPlanet,
-    AT<:AbstractAtmosphere,
-    CO<:AbstractCoriolis,
-    OR<:AbstractOrography,
-    FR<:AbstractForcing,
-    DR<:AbstractDrag,
-    PA<:AbstractParticleAdvection,
-    IC<:AbstractInitialConditions,
-    TS<:AbstractTimeStepper,
-    ST<:SpectralTransform{NF},
-    IM<:AbstractImplicit,
-    HD<:AbstractHorizontalDiffusion,
-    GE<:AbstractGeometry,
-    OW<:AbstractOutputWriter,
-    FB<:AbstractFeedback,
+    # TODO add constraints again when we stop supporting julia v1.9
+    DS,     # <:DeviceSetup,
+    GE,     # <:AbstractGeometry,
+    PL,     # <:AbstractPlanet,
+    AT,     # <:AbstractAtmosphere,
+    CO,     # <:AbstractCoriolis,
+    OR,     # <:AbstractOrography,
+    FR,     # <:AbstractForcing,
+    DR,     # <:AbstractDrag,
+    PA,     # <:AbstractParticleAdvection,
+    IC,     # <:AbstractInitialConditions,
+    TS,     # <:AbstractTimeStepper,
+    ST,     # <:SpectralTransform{NF},
+    IM,     # <:AbstractImplicit,
+    HD,     # <:AbstractHorizontalDiffusion,
+    OW,     # <:AbstractOutputWriter,
+    FB,     # <:AbstractFeedback,
 } <: ShallowWater
     
-    spectral_grid::SpectralGrid = SpectralGrid(nlev=1)
+    spectral_grid::SpectralGrid
     device_setup::DS = DeviceSetup(CPUDevice())
 
     # DYNAMICS
+    geometry::GE = Geometry(spectral_grid)
     planet::PL = Earth(spectral_grid)
     atmosphere::AT = EarthAtmosphere(spectral_grid)
     coriolis::CO = Coriolis(spectral_grid)
@@ -48,7 +49,6 @@ Base.@kwdef mutable struct ShallowWaterModel{
     spectral_transform::ST = SpectralTransform(spectral_grid)
     implicit::IM = ImplicitShallowWater(spectral_grid)
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
-    geometry::GE = Geometry(spectral_grid)
 
     # OUTPUT
     output::OW = OutputWriter(spectral_grid, ShallowWater)

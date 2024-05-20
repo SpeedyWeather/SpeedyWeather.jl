@@ -1,7 +1,10 @@
+const DEFAULT_RADIUS = 1
+
 """
 $(TYPEDSIGNATURES)
 Curl of a vector `u, v` written into `curl`, `curl = ∇×(u, v)`.
-`u, v` are expected to have a 1/coslat-scaling included, then `curl` is not scaled.
+`u, v` are expected to have a 1/coslat-scaling included, otherwise `curl` is scaled.
+Acts on the unit sphere, i.e. it omits 1/radius scaling as all inplace gradient operators.
 `flipsign` option calculates -∇×(u, v) instead. `add` option calculates `curl += ∇×(u, v)` instead.
 `flipsign` and `add` can be combined. This functions only creates the kernel and calls the generic
 divergence function _divergence! subsequently with flipped u, v -> v, u for the curl."""
@@ -15,14 +18,15 @@ function curl!( curl::LowerTriangularMatrix,
 
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
     kernel(o, a, b, c) = flipsign ? (add ? o-(a+b-c) : -(a+b-c)) :
-                                 (add ? o+(a+b-c) :   a+b-c )    
+                                    (add ? o+(a+b-c) :   a+b-c )    
     _divergence!(kernel, curl, v, u, S)             # flip u, v -> v, u
 end
 
 """
 $(TYPEDSIGNATURES)
 Divergence of a vector `u, v` written into `div`, `div = ∇⋅(u, v)`. 
-`u, v` are expected to have a 1/coslat-scaling included, then `div` is not scaled.
+`u, v` are expected to have a 1/coslat-scaling included, otherwise `div` is scaled.
+Acts on the unit sphere, i.e. it omits 1/radius scaling as all inplace gradient operators.
 `flipsign` option calculates -∇⋅(u, v) instead. `add` option calculates `div += ∇⋅(u, v)` instead.
 `flipsign` and `add` can be combined. This functions only creates the kernel and calls
 the generic divergence function _divergence! subsequently."""
@@ -36,7 +40,7 @@ function divergence!(   div::LowerTriangularMatrix,
 
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
     kernel(o, a, b, c) = flipsign ? (add ? o-(a-b+c) : -(a-b+c)) :
-                                 (add ? o+(a-b+c) :   a-b+c )                
+                                    (add ? o+(a-b+c) :   a-b+c )                
     _divergence!(kernel, div, u, v, S)
 end
 
@@ -44,7 +48,9 @@ end
 $(TYPEDSIGNATURES)
 Generic divergence function of vector `u`, `v` that writes into the output into `div`.
 Generic as it uses the kernel `kernel` such that curl, div, add or flipsign
-options are provided through `kernel`, but otherwise a single function is used."""
+options are provided through `kernel`, but otherwise a single function is used.
+Acts on the unit sphere, i.e. it omits 1/radius scaling as all inplace gradient operators.
+"""
 function _divergence!(  kernel,
                         div::LowerTriangularMatrix{Complex{NF}},
                         u::LowerTriangularMatrix{Complex{NF}},
@@ -92,31 +98,41 @@ $(TYPEDSIGNATURES)
 Divergence (∇⋅) of two vector components `u, v` which need to have size (n+1)xn,
 the last row will be set to zero in the returned `LowerTriangularMatrix`.
 This function requires both `u, v` to be transforms of fields that are scaled with
-`1/cos(lat)`. An example usage is therefore
+`1/cos(lat)`. Acts on the unit sphere, i.e. it omits 1/radius scaling unless
+`radius` keyword argument is provided.
+An example usage is therefore
 
     RingGrids.scale_coslat⁻¹!(u_grid)
     RingGrids.scale_coslat⁻¹!(v_grid)
     u = spectral(u_grid, one_more_degree=true)
     v = spectral(v_grid, one_more_degree=true)
-    div = divergence(u, v)
+    div = divergence(u, v, radius = 6.371e6)
     div_grid = gridded(div)
-
-Both `div` and `div_grid` are scaled with the radius.
 """
 function divergence(u::LowerTriangularMatrix,
-                    v::LowerTriangularMatrix)
+                    v::LowerTriangularMatrix;
+                    radius = DEFAULT_RADIUS)
 
     @assert size(u) == size(v) "Size $(size(u)) and $(size(v)) incompatible."
 
     S = SpectralTransform(u)
     div = similar(u)
     divergence!(div, u, v, S, add=false, flipsign=false)
+
+    if radius != 1
+        div .*= inv(radius)
+    end
+
     return div
 end
 
-function _div_or_curl(  kernel!,
-                        u::Grid,
-                        v::Grid) where {Grid<:AbstractGrid}
+# called by divergence or curl
+function _div_or_curl(  
+    kernel!,
+    u::Grid,
+    v::Grid;
+    radius = DEFAULT_RADIUS
+) where {Grid<:AbstractGrid}
 
     @assert size(u) == size(v) "Size $(size(u)) and $(size(v)) incompatible."
 
@@ -132,6 +148,11 @@ function _div_or_curl(  kernel!,
 
     div_or_vor = similar(us)
     kernel!(div_or_vor, us, vs, S, add=false, flipsign=false)
+
+    if radius != 1
+        div_or_vor .*= inv(radius)
+    end
+
     return div_or_vor
 end
 
@@ -139,40 +160,48 @@ end
 $(TYPEDSIGNATURES)
 Divergence (∇⋅) of two vector components `u, v` on a grid.
 Applies 1/coslat scaling, transforms to spectral space and returns
-the spectral divergence, which is scaled with the radius
-of the sphere. Divide by radius for unscaling."""
-divergence(u::Grid, v::Grid) where {Grid<:AbstractGrid} = _div_or_curl(divergence!, u, v)
+the spectral divergence. Acts on the unit sphere, i.e. it omits 1/radius scaling unless
+`radius` keyword argument is provided.
+"""
+divergence(u::Grid, v::Grid; kwargs...) where {Grid<:AbstractGrid} = _div_or_curl(divergence!, u, v; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
 Curl (∇×) of two vector components `u, v` on a grid.
 Applies 1/coslat scaling, transforms to spectral space and returns
-the spectral curl, which is scaled with the radius
-of the sphere. Divide by radius for unscaling."""
-curl(u::Grid, v::Grid) where {Grid<:AbstractGrid} = _div_or_curl(curl!, u, v)
+the spectral curl. Acts on the unit sphere, i.e. it omits 1/radius scaling unless
+`radius` keyword argument is provided."""
+curl(u::Grid, v::Grid; kwargs...) where {Grid<:AbstractGrid} = _div_or_curl(curl!, u, v; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
 Curl (∇×) of two vector components `u, v` of size (n+1)xn, the last row
 will be set to zero in the returned `LowerTriangularMatrix`. This function
 requires both `u, v` to be transforms of fields that are scaled with
-`1/cos(lat)`. An example usage is therefore
+`1/cos(lat)`. Acts on the unit sphere, i.e. it omits 1/radius scaling unless
+`radius` keyword argument is provided. An example usage is therefore
 
     RingGrids.scale_coslat⁻¹!(u_grid)
     RingGrids.scale_coslat⁻¹!(v_grid)
     u = spectral(u_grid)
     v = spectral(v_grid)
-    vor = curl(u, v)
+    vor = curl(u, v, radius=6.371e6)
     vor_grid = gridded(div)
 """
 function curl(  u::LowerTriangularMatrix,
-                v::LowerTriangularMatrix)
+                v::LowerTriangularMatrix;
+                radius = DEFAULT_RADIUS)
 
     @assert size(u) == size(v) "Size $(size(u)) and $(size(v)) incompatible."
 
     S = SpectralTransform(u)
     vor = similar(u)
     curl!(vor, u, v, S, add=false, flipsign=false)
+
+    if radius != 1
+        vor .*= inv(radius)
+    end
+
     return vor
 end
 
@@ -181,7 +210,9 @@ $(TYPEDSIGNATURES)
 Get U, V (=(u, v)*coslat) from vorticity ζ spectral space (divergence D=0)
 Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity. Then
-compute zonal and meridional gradients to get U, V."""
+compute zonal and meridional gradients to get U, V.
+Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
+"""
 function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
                         V::LowerTriangularMatrix{Complex{NF}},
                         vor::LowerTriangularMatrix{Complex{NF}},
@@ -205,7 +236,7 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
         lm += 1
 
         # U = -∂/∂lat(Ψ) and V = V = ∂/∂λ(Ψ) combined with Laplace inversion ∇⁻², omit radius R scaling
-        U[lm] = vordiv_to_uv2[lm]*vor[lm+1]         # - vordiv_to_uv1[lm]*vor[l-1, m] <- is zero
+        U[lm] = vordiv_to_uv2[lm]*vor[lm+1]         # - vordiv_to_uv1[lm]*vor[l-1, m] <- is zero
         V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]
 
         # BELOW DIAGONAL
@@ -249,7 +280,9 @@ Get U, V (=(u, v)*coslat) from vorticity ζ and divergence D in spectral space.
 Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity and
 velocity potential from divergence. Then compute zonal and meridional gradients
-to get U, V."""
+to get U, V.
+Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
+"""
 function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
                             V::LowerTriangularMatrix{Complex{NF}},
                             vor::LowerTriangularMatrix{Complex{NF}},
@@ -328,16 +361,11 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
 end
 
 """
-    ∇²!(    ∇²alms::LowerTriangularMatrix,
-            alms::LowerTriangularMatrix,
-            S::SpectralTransform;
-            add::Bool=false,
-            flipsign::Bool=false,
-            inverse::Bool=false)
-
+$(TYPEDSIGNATURES)
 Laplace operator ∇² applied to the spectral coefficients `alms` in spherical
-coordinates. The radius `R` is omitted in the eigenvalues which are precomputed in `S`.
+coordinates. The eigenvalues which are precomputed in `S`.
 ∇²! is the in-place version which directly stores the output in the first argument `∇²alms`.
+Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
 
 Keyword arguments
 =================
@@ -378,52 +406,60 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Laplace operator ∇² applied to input `alms`, using precomputed
-eigenvalues from `S`. The Laplace operator acts on the unit
-sphere and therefore omits the 1/radius^2 scaling"""
-function ∇²(alms::LowerTriangularMatrix,    # Input: spectral coefficients
-            S::SpectralTransform)           # precomputed eigenvalues
-
+Laplace operator ∇² applied to input `alms`, using precomputed eigenvalues from `S`.
+Acts on the unit sphere, i.e. it omits 1/radius^2 scaling unless
+`radius` keyword argument is provided."""
+function ∇²(
+    alms::LowerTriangularMatrix,    # Input: spectral coefficients
+    S::SpectralTransform;           # precomputed eigenvalues
+    radius = DEFAULT_RADIUS,
+)
     ∇²alms = similar(alms)
     ∇²!(∇²alms, alms, S, add=false, flipsign=false, inverse=false)
+
+    if radius != 1
+        ∇²alms .*= inv(radius^2)
+    end
+
     return ∇²alms
 end
 
 """
 $(TYPEDSIGNATURES)
 Returns the Laplace operator ∇² applied to input `alms`.
-The Laplace operator acts on the unit
-sphere and therefore omits the 1/radius^2 scaling"""
-∇²(alms::LowerTriangularMatrix) = ∇²(alms, SpectralTransform(alms))
+Acts on the unit sphere, i.e. it omits 1/radius^2 scaling unless
+`radius` keyword argument is provided."""
+∇²(alms::LowerTriangularMatrix; kwargs...) = ∇²(alms, SpectralTransform(alms); kwargs...)
 
 """
 $(TYPEDSIGNATURES)
 InverseLaplace operator ∇⁻² applied to input `alms`, using precomputed
-eigenvalues from `S`. The Laplace operator acts on the unit
-sphere and therefore omits the radius^2 scaling"""
-function ∇⁻²(   ∇²alms::LowerTriangularMatrix,  # Input: spectral coefficients
-                S::SpectralTransform)           # precomputed eigenvalues
+eigenvalues from `S`. Acts on the unit sphere, i.e. it omits radius^2 scaling unless
+`radius` keyword argument is provided."""
+function ∇⁻²(
+    ∇²alms::LowerTriangularMatrix,  # Input: spectral coefficients
+    S::SpectralTransform;           # precomputed eigenvalues
+    radius = DEFAULT_RADIUS,
+)
 
     alms = similar(∇²alms)
     ∇⁻²!(alms, ∇²alms, S, add=false, flipsign=false)
+
+    if radius != 1
+        ∇²alms .*= radius^2
+    end
+
     return alms
 end
 
 """
 $(TYPEDSIGNATURES)
 Returns the inverse Laplace operator ∇⁻² applied to input `alms`.
-The Laplace operator acts on the unit
-sphere and therefore omits the radius^2 scaling"""
-∇⁻²(∇²alms::LowerTriangularMatrix) = ∇⁻²(∇²alms, SpectralTransform(∇²alms))
+Acts on the unit sphere, i.e. it omits radius^2 scaling unless
+`radius` keyword argument is provided."""
+∇⁻²(∇²alms::LowerTriangularMatrix; kwargs...) = ∇⁻²(∇²alms, SpectralTransform(∇²alms); kwargs...)
 
-"""
-    ∇⁻²!(   ∇⁻²alms::LowerTriangularMatrix,
-            alms::LowerTriangularMatrix,
-            S::SpectralTransform;
-            add::Bool=false,
-            flipsign::Bool=false)
-
-Calls `∇²!(∇⁻²alms, alms, S; add, flipsign, inverse=true)`."""
+"""$(TYPEDSIGNATURES) Calls `∇²!(∇⁻²alms, alms, S; add, flipsign, inverse=true)`."""
 function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}}, # Output: inverse Laplacian of alms
                 alms::LowerTriangularMatrix{Complex{NF}},   # Input: spectral coefficients
                 S::SpectralTransform{NF};                   # precomputed eigenvalues
@@ -435,11 +471,9 @@ function ∇⁻²!(  ∇⁻²alms::LowerTriangularMatrix{Complex{NF}}, # Output:
     return ∇²!(∇⁻²alms, alms, S; add, flipsign, inverse)
 end
 
-"""
-$(TYPEDSIGNATURES)
-Applies the gradient operator ∇ applied to input `p` and stores the result in
-`dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
-on the unit sphere and therefore omits the radius scaling"""
+"""$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
+in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
+on the unit sphere and therefore omits the 1/radius scaling"""
 function ∇!(dpdx::LowerTriangularMatrix{Complex{NF}},       # Output: zonal gradient
             dpdy::LowerTriangularMatrix{Complex{NF}},       # Output: meridional gradient
             p::LowerTriangularMatrix{Complex{NF}},          # Input: spectral coefficients
@@ -487,4 +521,49 @@ function ∇!(dpdx::LowerTriangularMatrix{Complex{NF}},       # Output: zonal gr
     end
 
     return dpdx, dpdy
+end
+
+"""$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
+using an existing `SpectralTransform` `S`. Acts on the unit sphere,
+i.e. it omits 1/radius scaling unless `radius` keyword argument is provided."""
+function ∇(p::LowerTriangularMatrix, S::SpectralTransform; radius = DEFAULT_RADIUS)
+    dpdx = similar(p)
+    dpdy = similar(p)
+    ∇!(dpdx, dpdy, p, S)
+
+    if radius != 1
+        dpdx .*= inv(radius)
+        dpdy .*= inv(radius)
+    end
+
+    return dpdx, dpdy
+end
+
+"""$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`.
+Precomputes a `SpectralTransform` `S`. Acts on the unit-sphere,
+i.e. it omits 1/radius scaling unless `radius` keyword argument is provided."""
+function ∇(p::LowerTriangularMatrix; kwargs...)
+    S = SpectralTransform(p, one_more_degree=true)
+    return ∇(p, S; kwargs...)
+end
+
+"""$(TYPEDSIGNATURES) The zonal and meridional gradient of `grid`.
+Transform to spectral space, takes the gradient and unscales the 1/coslat
+scaling in the gradient. Acts on the unit-sphere, i.e. it omits 1/radius scaling unless
+`radius` keyword argument is provided. Makes use of an existing spectral transform `S`."""
+function ∇(grid::AbstractGrid, S::SpectralTransform; kwargs...)
+    p = spectral(grid, S)
+    dpdx, dpdy = ∇(p, S; kwargs...)
+    dpdx_grid = gridded(dpdx, S, unscale_coslat=true)
+    dpdy_grid = gridded(dpdy, S, unscale_coslat=true)
+    return dpdx_grid, dpdy_grid
+end
+
+"""$(TYPEDSIGNATURES) The zonal and meridional gradient of `grid`.
+Transform to spectral space, takes the gradient and unscales the 1/coslat
+scaling in the gradient. Acts on the unit-sphere, i.e. it omits 1/radius scaling unless
+`radius` keyword argument is provided."""
+function ∇(grid::AbstractGrid; kwargs...)
+    S = SpectralTransform(grid, one_more_degree=true)
+    return ∇(grid, S; kwargs...)
 end

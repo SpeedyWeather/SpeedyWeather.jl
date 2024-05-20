@@ -103,7 +103,26 @@ function spectral_truncation(   ::Type{NF},                     # number format 
     return alms_trunc
 end
 
-spectral_truncation(alms::AbstractMatrix{NF}, ltrunc::Integer, mtrunc::Integer) where NF =
+function spectral_truncation(   ::Type{NF},                     # number format NF (can be complex)
+    alms::LowerTriangularArray{T,N},    # spectral field to be truncated
+    ltrunc::Integer,                # truncate to max degree ltrunc
+    mtrunc::Integer,                # truncate to max order mtrunc
+    ) where {NF,T,N}
+
+    lmax, mmax = size(alms) .- 1     # 0-based degree l, order m of the spherical harmonics
+
+    # interpolate to higher resolution if output larger than input
+    (ltrunc > lmax || mtrunc > mmax) && return spectral_interpolation(NF, alms, ltrunc, mtrunc)
+
+    # preallocate new (smaller) array
+    alms_trunc = zeros(typeof(alms), ltrunc+1, mtrunc+1, size(alms)[3:end]...)  
+
+    # copy data over, copyto! copies the largest matching subset of harmonics
+    copyto!(alms_trunc, alms)
+    return alms_trunc
+end
+
+spectral_truncation(alms::AbstractArray{NF}, ltrunc::Integer, mtrunc::Integer) where NF =
     spectral_truncation(NF, alms, ltrunc, mtrunc)
 spectral_truncation(alms::AbstractMatrix, trunc::Int) = spectral_truncation(alms, trunc, trunc)
 

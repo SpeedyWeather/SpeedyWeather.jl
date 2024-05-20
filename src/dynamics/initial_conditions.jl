@@ -132,22 +132,16 @@ function initialize!(   progn::PrognosticVariables,
     λ = perturb_lon*2π/360          # perturbation longitude [radians]
 
     (; rotation, gravity) = model.planet
-    (; radius) = model.spectral_grid
+    (; Grid, NF, radius, nlat_half) = model.spectral_grid
+    (; coslat⁻¹) = model.geometry
 
-    # always create on F64 grid then convert to spectral and interpolate there
-    Grid = FullGaussianGrid
-    nlat_half = 64
-    u_grid = zeros(Grid, nlat_half)
-    η_grid = zeros(Grid, nlat_half)
-    colats = RingGrids.get_colat(Grid, nlat_half)
+    u_grid = zeros(Grid{NF}, nlat_half)
+    η_perturb_grid = zeros(Grid{NF}, nlat_half)
+    lat = RingGrids.get_lat(Grid, nlat_half)
     _, lons = RingGrids.get_colatlons(Grid, nlat_half)
-    weights = FastGaussQuadrature.gausslegendre(2nlat_half)[2]
-    η_sum = 0
 
-    for (j, ring) in enumerate(eachring(u_grid, η_grid))
-        θ = π/2 - colats[j]             # latitude in radians
-        coslat⁻¹j = 1/cos(θ)
-        f = 2rotation*sin(θ)
+    for (j, ring) in enumerate(eachring(u_grid, η_perturb_grid))
+        θ = lat[j]             # latitude in radians
         
         # velocity per latitude
         if θ₀ < θ < θ₁
@@ -156,39 +150,56 @@ function initialize!(   progn::PrognosticVariables,
             u_θ = 0
         end
 
-        # integration for layer thickness h / interface height η
-        w = weights[j]
-        η_sum += 2w*(radius*u_θ/gravity * (f + tan(θ)/radius*u_θ))
-
         # lon-constant part of perturbation
         ηθ = perturb_height*cos(θ)*exp(-((θ₂-θ)/β)^2)
 
         # store in all longitudes
         for ij in ring
-            u_grid[ij] = u_θ/radius*coslat⁻¹j   # include scaling for curl!
+            u_grid[ij] = u_θ/radius*coslat⁻¹[j]   # include scaling for curl!
             
             # calculate perturbation (possibly shifted in lon compared to Galewsky 2004)
             ϕ = lons[ij] - λ
-            η_grid[ij] = η_sum + exp(-(ϕ/α)^2)*ηθ
+            η_perturb_grid[ij] = exp(-(ϕ/α)^2)*ηθ
         end
     end
 
-    u = spectral(u_grid)
-    η = spectral(η_grid)
-
-    # interpolate in spectral space to desired resolution
-    (; lmax, mmax) = model.spectral_transform
-    (; NF) = model.spectral_grid
-    u = spectral_truncation(complex(NF), u, lmax, mmax)
+    # the following obtain initial conditions for η from u, v=0 via
+    # 0 = -∇⋅((ζ+f)*(-v, u)) - ∇²((u^2 + v^2)/2), i.e.
+    # invert the Laplacian for
+    # ∇²(gη) = -∇⋅(0, (ζ+f)*u) - ∇²(u^2/2)
+    u = spectral(u_grid, model.spectral_transform)
     
     # get vorticity initial conditions from curl of u, v
     v = zero(u)     # meridional velocity zero for these initial conditions
     (; vor) = progn.layers[end].timesteps[1]
     curl!(vor, u, v, model.spectral_transform)
 
-    # transform interface height η (use pres as prognostic variable) in spectral
+    # compute the div = -∇⋅(0,(ζ+f)*u) = -∇×((ζ+f)*u, 0) term, v=0
+    vor_grid = gridded(vor, model.spectral_transform)
+    f = coriolis(vor_grid; rotation)
+
+    # includes 1/coslat/radius from above for curl!
+    # but *radius^2 for the ∇⁻²! operation below!
+    vor_flux_grid = @. (vor_grid + f) * u_grid * radius^2
+    vor_flux = spectral(vor_flux_grid, model.spectral_transform)
+    div = zero(v)
+    curl!(div, vor_flux, v, model.spectral_transform)
+
+    # compute the -∇²(u^2/2) term, add to div, divide by gravity
+    RingGrids.scale_coslat!(u_grid)     # remove coslat scaling
+    u_grid .*= radius                   # no radius scaling as we'll apply ∇⁻²(∇²) (would cancel)
+    @. u_grid = convert(NF,1/2) * u_grid^2
+    u²_half = spectral!(u, u_grid, model.spectral_transform)
+    ∇²!(div, u²_half, model.spectral_transform, flipsign=true, add=true)
+    div .*= inv(gravity)
+
+    # invert Laplacian to obtain η
     (; pres) = progn.surface.timesteps[1]
-    copyto!(pres, η)
+    ∇⁻²!(pres, div, model.spectral_transform)
+
+    # add perturbation
+    η_perturb = spectral!(u, η_perturb_grid, model.spectral_transform)
+    pres .+= η_perturb
     spectral_truncation!(pres)
 end
 
