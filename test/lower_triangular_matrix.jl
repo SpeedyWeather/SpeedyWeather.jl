@@ -34,11 +34,6 @@ import SpeedyWeather.LowerTriangularMatrices: matrix_size
     end
 end
 
-NF = Float32 
-mmax = 32 
-idims = (5,)
-lmax = mmax 
-
 @testset "LowerTriangularArray: N-dim" begin 
     @testset for NF in (Float32, Float64)
         mmax = 32
