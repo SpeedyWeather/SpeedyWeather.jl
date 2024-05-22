@@ -486,15 +486,6 @@ function Base.similar(
     bc::Broadcasted{LowerTriangularStyle{N, ArrayType}},
     ::Type{T},
 ) where {N, ArrayType, T}
-    #ArrayType_ = nonparametric_type(ArrayType)
-    #TODO branch currently not hit because these are always false, although they should be true for
-    # operations like +, -, ... then returning a `LowerTriangularArray` again
-    # if isstructurepreserving(bc) || fzeropreserving(bc)
-    #     return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
-    # end
-    # TODO should return the similar for operations that escape the structure, e.g. .==
-    # but given the TODO above return a `LowerTriangularArray` in both cases
-    # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
     L = find_L(bc)
     return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, matrix_size(L))
 end
@@ -504,77 +495,9 @@ function Base.similar(
     bc::Broadcasted{LowerTriangularGPUStyle{N, ArrayType}},
     ::Type{T},
 ) where {N, ArrayType, T}
-    #ArrayType_ = nonparametric_type(ArrayType)
-    #TODO branch currently not hit because these are always false, although they should be true for
-    # operations like +, -, ... then returning a `LowerTriangularArray` again
-    # if isstructurepreserving(bc) || fzeropreserving(bc)
-    #     return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
-    # end
-    # TODO should return the similar for operations that escape the structure, e.g. .==
-    # but given the TODO above return a `LowerTriangularArray` in both cases
-    # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
     L = find_L(bc)
     return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, matrix_size(L))
 end
-
-"""
-function Base.copyto!(
-    dest::LowerTriangularArray{T, N, ArrayTypeP},
-    bc::Broadcasted{LowerTriangularStyle{N, ArrayType}},
-) where {T, N, ArrayTypeP <: Array, ArrayType <: Array}
-    axs = axes(dest)
-    axes(bc) == axs || Broadcast.throwdm(axes(bc), axs)
-
-    lmax, mmax = size(dest)
-    lm = 0
-
-    for m in 1:mmax
-        for l in m:lmax
-            lm += 1
-            for I in Iterators.product(axs[3:end]...)
-                dest.data[lm, I...] = Broadcast._broadcast_getindex(bc, CartesianIndex(l, m, I...))
-            end 
-        end
-    end
-    return dest
-end
-
-# GPU methods (should be moved to an extension, in case this becomes a standalone package)
-import GPUArrays._copyto!
-
-# copied and adjusted from GPUArrays.jl
-@inline function GPUArrays._copyto!(
-    dest::LowerTriangularArray{T, N, ArrayType},
-    bc::Broadcasted
-) where {T, N, ArrayType}
-    
-    axes(dest) == axes(bc) || Broadcast.throwdm(axes(dest), axes(bc))
-    isempty(dest) && return dest
-    bc = Broadcast.preprocess(dest, bc)
-
-    broadcast_kernel = function (ctx, dest, bc, nelem)
-            i = 0
-            while i < nelem
-                i += 1
-                I = GPUArrays.@cartesianidx(dest.data, i) 
-                # TODO: the k2ij is costly, if we intend to accelarate this, this needs to be precomputed
-                @inbounds dest.data[I] = bc[k2ij(I, dest.m)]
-            end                                                                     
-            return
-        end
-
-    elements = length(dest.data)
-    elements_per_thread = typemax(Int)
-    heuristic = GPUArrays.launch_heuristic(GPUArrays.backend(dest), broadcast_kernel, dest, bc, 1;
-                                 elements, elements_per_thread)
-    config = GPUArrays.launch_configuration(GPUArrays.backend(dest), heuristic;
-                                  elements, elements_per_thread)
-    GPUArrays.gpu_call(broadcast_kernel, dest, bc, config.elements_per_thread;
-             threads=config.threads, blocks=config.blocks)
-
-    return dest
-end
-"""
 
 function GPUArrays.backend(
     ::Type{LowerTriangularArray{T, N, ArrayType}}
