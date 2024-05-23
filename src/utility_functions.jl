@@ -87,7 +87,7 @@ function print_fields(io::IO, A, keys;arrays::Bool=false)
         ~last ? println(io, "├ $key::$(typeof(val)) = $val") :
                 print(io,  "└ $key::$(typeof(val)) = $val")
     end
-    if filtered                 # add the names of arrays
+    if filtered                 # add the names of arrays
         s = "└── arrays: "
         for key in keys
             if ~(key in keys_filtered)

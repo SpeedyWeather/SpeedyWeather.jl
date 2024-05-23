@@ -1,3 +1,4 @@
+const DEFAULT_NSTEPS = 2
 export Leapfrog
 
 """

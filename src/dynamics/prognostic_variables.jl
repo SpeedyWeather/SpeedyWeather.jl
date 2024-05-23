@@ -52,13 +52,13 @@ Base.@kwdef struct PrognosticVariablesLand{
 end
 
 export PrognosticVariables
-Base.@kwdef struct PrognosticVariables{
+@kwdef struct PrognosticVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
     SpectralVariable3D,     # <: LowerTriangularArray
     SpectralVariable4D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractGridArray
-    ParticleVector,          # <: AbstractGridArray
+    ParticleVector,         # <: AbstractGridArray
 } <: AbstractPrognosticVariables
 
     # DIMENSIONS
@@ -112,25 +112,31 @@ Base.@kwdef struct PrognosticVariables{
     clock::Clock = Clock()
 end
 
-function PrognosticVariables(SG::SpectralGrid, model::ModelSetup)
+"""$(TYPEDSIGNATURES)
+Generator function."""
+function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
     (; trunc, nlat_half, nlev, nparticles) = SG
-    (; nsteps) = model.time_stepping
     (; NF, ArrayType) = SG
     (; SpectralVariable3D, SpectralVariable4D, GridVariable2D, ParticleVector) = SG
 
     return PrognosticVariables{NF, ArrayType, 
         SpectralVariable3D, SpectralVariable4D, GridVariable2D, ParticleVector}(;
-            trunc, nlat_half, nlayers=nlev, nsteps, nparticles
+            trunc, nlat_half, nlayers=nlev, nsteps, nparticles,
         )
+end
+
+"""$(TYPEDSIGNATURES)
+Generator function."""
+function PrognosticVariables(SG::SpectralGrid, model::ModelSetup)
+    PrognosticVariables(SG, nsteps = model.timestepping.nsteps)
 end
 
 function Base.show(
     io::IO,
     progn::PrognosticVariables{NF, ArrayType},
 ) where {NF, ArrayType}
-    ArrayType_ = LowerTriangularMatrices.nonparametric_type(ArrayType)
     Grid = typeof(progn.ocean.sea_surface_temperature)
-    println(io, "PrognosticVariables{$NF, <:$ArrayType_}")
+    println(io, "PrognosticVariables{$NF, $ArrayType}")
     
     # variables
     (; trunc, nlat_half, nlayers, nsteps, nparticles) = progn
@@ -147,7 +153,7 @@ function Base.show(
     println(io, "│├ land_surface_temperature: $nlat-ring $Grid")
     println(io, "│├ soil_moisture_layer1:     $nlat-ring $Grid")
     println(io, "│└ soil_moisture_layer2:     $nlat-ring $Grid")
-    println(io, "├ particles: $nparticles ($NF)")
+    println(io, "├ particles: $nparticles-element $(typeof(progn.particles))")
     println(io, "├ scale: $(progn.scale[])")
     print(io,   "└ clock: $(progn.clock.time)")
 end

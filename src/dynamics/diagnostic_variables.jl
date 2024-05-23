@@ -266,7 +266,7 @@ $(TYPEDFIELDS)"""
 @kwdef struct ParticleVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    ParticleVector,          # <: AbstractGridArray
+    ParticleVector,         # <: AbstractGridArray
     VectorNF,               # Vector{NF} or CuVector{NF}
     Grid,                   # <:AbstractGridArray
 } <: AbstractDiagnosticVariables
@@ -312,13 +312,13 @@ $(TYPEDFIELDS)"""
 struct DiagnosticVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
+    Grid,                   # <:AbstractGridArray
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractGridArray
     GridVariable3D,         # <: AbstractGridArray
     ParticleVector,         # <: AbstractGridArray
     VectorNF,               # Vector{NF} or CuVector{NF}
-    Grid,                   # <:AbstractGridArray
 } <: AbstractDiagnosticVariables
 
     # DIMENSIONS
@@ -369,4 +369,22 @@ function DiagnosticVariables(SG::SpectralGrid)
         tendencies, grid, dynamics, physics, particles, columns,
         scale,
     )
+end
+
+function Base.show(
+    io::IO,
+    diagn::DiagnosticVariables{NF, ArrayType, Grid},
+) where {NF, ArrayType, Grid}
+    println(io, "DiagnosticVariables{$NF, $ArrayType, $Grid}")
+    
+    (; trunc, nlat_half, nlayers, nparticles) = diagn
+    nlat = RingGrids.get_nlat(Grid, nlat_half)
+    println(io, "├ resolution: T$trunc, $nlat rings, $nlayers layers, $nparticles particles")
+    println(io, "├ tendencies::Tendencies")
+    println(io, "├ grid::GridVariables")
+    println(io, "├ dynamics::DynamicsVariables")
+    println(io, "├ physics::PhysicsVariables")
+    println(io, "├ particles::ParticleVariables")
+    println(io, "├ columns::Vector{ColumnVariables}")
+    print(io,   "└ scale: $(diagn.scale[])")
 end
