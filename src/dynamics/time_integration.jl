@@ -272,14 +272,14 @@ end
 """
 $(TYPEDSIGNATURES)
 Calculate a single time step for the `model <: ShallowWater`."""
-function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
-                    diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
-                    dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
-                    model::ShallowWater,            # everything that's constant at runtime
-                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
-                    lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
-                    ) where {NF<:AbstractFloat}
-
+function timestep!( 
+    progn::PrognosticVariables,     # all prognostic variables
+    diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
+    dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
+    model::ShallowWater,            # everything that's constant at runtime
+    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
+    lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
+)
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (; time) = progn.clock                           # current time
 
@@ -314,13 +314,14 @@ end
 """
 $(TYPEDSIGNATURES)
 Calculate a single time step for the `model<:PrimitiveEquation`"""
-function timestep!( progn::PrognosticVariables{NF}, # all prognostic variables
-                    diagn::DiagnosticVariables{NF}, # all pre-allocated diagnostic variables
-                    dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
-                    model::PrimitiveEquation,       # everything that's constant at runtime
-                    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
-                    lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
-                    ) where {NF<:AbstractFloat}
+function timestep!( 
+    progn::PrognosticVariables,     # all prognostic variables
+    diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
+    dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
+    model::PrimitiveEquation,       # everything that's constant at runtime
+    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
+    lf2::Int=2                      # leapfrog index 2 (time step used for tendencies)
+)
 
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
     (; time) = progn.clock                           # current time
