@@ -4,15 +4,16 @@ function Base.show(io::IO, A::AbstractVariables)
     print_fields(io, A, keys)
 end
 
+# to be removed
 struct PrognosticLayerTimesteps end
 struct PrognosticSurfaceTimesteps end
 struct PrognosticVariablesLayer end
 
 export PrognosticVariablesOcean
-Base.@kwdef struct PrognosticVariablesOcean{
-    NF<:AbstractFloat,
-    ArrayType2D<:AbstractArray{NF, 1},
-    Grid<:AbstractGridArray{NF, 1, ArrayType2D},
+@kwdef struct PrognosticVariablesOcean{
+    NF,                     # <: AbstractFloat
+    ArrayType,              # Array, CuArray, ...
+    GridVariable2D,         # <: AbstractGridArray
 } <: AbstractPrognosticVariables
     # DIMENSION
     "Number of latitude rings on one hemisphere (Equator incl.), resolution parameter of grid"
@@ -20,17 +21,17 @@ Base.@kwdef struct PrognosticVariablesOcean{
 
     # OCEAN VARIABLES
     "Sea surface temperature [K]"
-    sea_surface_temperature::Grid = zeros(Grid, nlat_half)
+    sea_surface_temperature::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     "Sea ice concentration [1]"
-    sea_ice_concentration::Grid = zeros(Grid, nlat_half)
+    sea_ice_concentration::GridVariable2D = zeros(GridVariable2D, nlat_half)
 end
 
 export PrognosticVariablesLand
 Base.@kwdef struct PrognosticVariablesLand{
-    NF<:AbstractFloat,
-    ArrayType2D<:AbstractArray{NF, 1},
-    Grid<:AbstractGridArray{NF, 1, ArrayType2D},
+    NF,                     # <: AbstractFloat
+    ArrayType,              # Array, CuArray, ...
+    GridVariable2D,         # <: AbstractGridArray
 } <: AbstractPrognosticVariables
     # DIMENSION
     "Number of latitude rings on one hemisphere (Equator incl.), resolution parameter of grid"
@@ -38,28 +39,26 @@ Base.@kwdef struct PrognosticVariablesLand{
 
     # LAND VARIABLES
     "Land surface temperature [K]"
-    land_surface_temperature::Grid = zeros(Grid, nlat_half)
+    land_surface_temperature::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     "Snow depth [m]"
-    snow_depth::Grid = zeros(Grid, nlat_half)
+    snow_depth::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     "Soil moisture layer 1, volume fraction [1]"
-    soil_moisture_layer1::Grid = zeros(Grid, nlat_half)
+    soil_moisture_layer1::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     "Soil moisture layer 2, volume fraction [1]"
-    soil_moisture_layer2::Grid = zeros(Grid, nlat_half)
+    soil_moisture_layer2::GridVariable2D = zeros(GridVariable2D, nlat_half)
 end
-
-const LTA = LowerTriangularArray
 
 export PrognosticVariables
 Base.@kwdef struct PrognosticVariables{
-    NF<:AbstractFloat,
-    ArrayType2D<:AbstractArray{NF, 1},
-    Grid<:AbstractGridArray{NF, 1, ArrayType2D},
-    ArrayTypeComplex3D<:AbstractArray{Complex{NF}, 2},
-    ArrayTypeComplex4D<:AbstractArray{Complex{NF}, 3},
-    M<:ModelSetup,
+    NF,                     # <: AbstractFloat
+    ArrayType,              # Array, CuArray, ...
+    SpectralVariable3D,     # <: LowerTriangularArray
+    SpectralVariable4D,     # <: LowerTriangularArray
+    GridVariable2D,         # <: AbstractGridArray
+    ParticleVector,          # <: AbstractGridArray
 } <: AbstractPrognosticVariables
 
     # DIMENSIONS
@@ -80,34 +79,31 @@ Base.@kwdef struct PrognosticVariables{
 
     # LAYERED VARIABLES
     "Vorticity of horizontal wind field [1/s], but scaled by scale (=radius during simulation)"
-    vor::LTA{Complex{NF}, 4, ArrayTypeComplex4D} =
-        zeros(LTA{Complex{NF}, 4, ArrayTypeComplex4D}, trunc+2, trunc+1, nlayers, nsteps)
+    vor::SpectralVariable4D = zeros(SpectralVariable4D, trunc+2, trunc+1, nlayers, nsteps)
 
     "Divergence of horizontal wind field [1/s], but scaled by scale (=radius during simulation)"
-    div::LTA{Complex{NF}, 4, ArrayTypeComplex4D} =
-        zeros(LTA{Complex{NF}, 4, ArrayTypeComplex4D}, trunc+2, trunc+1, nlayers, nsteps)
+    div::SpectralVariable4D = zeros(SpectralVariable4D, trunc+2, trunc+1, nlayers, nsteps)
 
     "Absolute temperature [K]"
-    temp::LTA{Complex{NF}, 4, ArrayTypeComplex4D} =
-        zeros(LTA{Complex{NF}, 4, ArrayTypeComplex4D}, trunc+2, trunc+1, nlayers, nsteps)
+    temp::SpectralVariable4D = zeros(SpectralVariable4D, trunc+2, trunc+1, nlayers, nsteps)
 
     "Specific humidity [kg/kg]"
-    humid::LTA{Complex{NF}, 4, ArrayTypeComplex4D} =
-        zeros(LTA{Complex{NF}, 4, ArrayTypeComplex4D}, trunc+2, trunc+1, nlayers, nsteps)
+    humid::SpectralVariable4D = zeros(SpectralVariable4D, trunc+2, trunc+1, nlayers, nsteps)
 
     # SURFACE VARIABLES
     "log of surface pressure [log(Pa)] for PrimitiveEquation, interface displacement [m] for ShallowWaterModel"
-    pres::LTA{Complex{NF}, 3, ArrayTypeComplex3D} =
-        zeros(LTA{Complex{NF}, 3, ArrayTypeComplex3D}, trunc+2, trunc+1, nsteps)
+    pres::SpectralVariable3D = zeros(SpectralVariable3D, trunc+2, trunc+1, nsteps)
 
     "Ocean variables, sea surface temperature and sea ice concentration"
-    ocean::PrognosticVariablesOcean{NF, ArrayType2D, Grid} = PrognosticVariablesOcean{NF, ArrayType2D, Grid}(;nlat_half)
+    ocean::PrognosticVariablesOcean{NF, ArrayType, GridVariable2D} =
+        PrognosticVariablesOcean{NF, ArrayType, GridVariable2D}(; nlat_half)
     
     "Land variables, land surface temperature, snow and soil moisture"
-    land::PrognosticVariablesLand{NF, ArrayType2D, Grid} = PrognosticVariablesLand{NF, ArrayType2D, Grid}(;nlat_half)
+    land::PrognosticVariablesLand{NF, ArrayType, GridVariable2D} =
+        PrognosticVariablesLand{NF, ArrayType, GridVariable2D}(; nlat_half)
 
     "Particles for particle advection"
-    particles::Vector{Particle{NF}} = zeros(Particle{NF}, nparticles)
+    particles::ParticleVector = zeros(ParticleVector, nparticles)
 
     "Scaling for vor, div. scale=1 outside simulation, =radius during simulation"
     scale::Base.RefValue{NF} = Ref(one(NF))
@@ -117,265 +113,284 @@ Base.@kwdef struct PrognosticVariables{
 end
 
 function PrognosticVariables(SG::SpectralGrid, model::ModelSetup)
-    (; trunc, nlat_half, nlev, Grid, NF, nparticles) = SG
-    (; ArrayType) = SG
-    Model = model_class(model)  # strip away the parameters
+    (; trunc, nlat_half, nlev, nparticles) = SG
     (; nsteps) = model.time_stepping
+    (; NF, ArrayType) = SG
+    (; SpectralVariable3D, SpectralVariable4D, GridVariable2D, ParticleVector) = SG
 
-    ArrayType2D = ArrayType{NF, 1}
-    GridType = RingGrids.nonparametric_type(Grid){NF, 1, ArrayType2D}
-    ArrayTypeComplex3D = ArrayType{Complex{NF}, 2}
-    ArrayTypeComplex4D = ArrayType{Complex{NF}, 3}
-
-    return PrognosticVariables{NF, ArrayType2D, GridType, ArrayTypeComplex3D, ArrayTypeComplex4D, Model}(;
-            trunc, nlat_half, nlayers=nlev, nsteps, nparticles)
+    return PrognosticVariables{NF, ArrayType, 
+        SpectralVariable3D, SpectralVariable4D, GridVariable2D, ParticleVector}(;
+            trunc, nlat_half, nlayers=nlev, nsteps, nparticles
+        )
 end
 
-function Base.show(io::IO, progn::PrognosticVariables)
-    k = progn.nlayers
-    ζ = progn.vor[:, k, 1]  # create a view on surface relative vorticity
-    ζ_grid = gridded(ζ)     # to grid space
-    print(io, plot(ζ_grid, title="Surface relative vorticity"))
-end
-
-has(::PrognosticVariables{NF, Grid, M}, var_name::Symbol) where {NF, Grid, M} = has(M, var_name)
-
-"""
-    copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
-
-Copies entries of `progn_old` into `progn_new`. Only copies those variables that are present 
-in the model of both `progn_new` and `progn_old`.
-"""
-function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
-
-    var_names = propertynames(progn_old.layers[1].timesteps[1])
-
-    for var_name in var_names
-        if has(progn_new, var_name) 
-            var = get_var(progn_old, var_name) 
-            set_var!(progn_new, var_name, var)
-        end
-    end 
-    pres = get_pressure(progn_old)
-    set_pressure!(progn_new, pres)
+function Base.show(
+    io::IO,
+    progn::PrognosticVariables{NF, ArrayType},
+) where {NF, ArrayType}
+    ArrayType_ = LowerTriangularMatrices.nonparametric_type(ArrayType)
+    Grid = typeof(progn.ocean.sea_surface_temperature)
+    println(io, "PrognosticVariables{$NF, <:$ArrayType_}")
     
-    # synchronize the clock
+    # variables
+    (; trunc, nlat_half, nlayers, nsteps, nparticles) = progn
+    nlat = RingGrids.get_nlat(Grid, nlat_half)
+    println(io, "├ vor:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
+    println(io, "├ div:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
+    println(io, "├ temp:  T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
+    println(io, "├ humid: T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
+    println(io, "├ pres:  T$trunc, 1-layer, $nsteps-steps LowerTriangularArray{$NF}")
+    println(io, "├┐ocean: PrognosticVariablesOcean{$NF}")
+    println(io, "│├ sea_surface_temperature:  $nlat-ring $Grid")
+    println(io, "│└ sea_ice_concentration:    $nlat-ring $Grid")
+    println(io, "├┐land:  PrognosticVariablesLand{$NF}")
+    println(io, "│├ land_surface_temperature: $nlat-ring $Grid")
+    println(io, "│├ soil_moisture_layer1:     $nlat-ring $Grid")
+    println(io, "│└ soil_moisture_layer2:     $nlat-ring $Grid")
+    println(io, "├ particles: $nparticles ($NF)")
+    println(io, "├ scale: $(progn.scale[])")
+    print(io,   "└ clock: $(progn.clock.time)")
+end
+
+# has(::PrognosticVariables{NF, Grid, M}, var_name::Symbol) where {NF, Grid, M} = has(M, var_name)
+
+"""$(TYPEDSIGNATURES)
+Copies entries of `progn_old` into `progn_new`."""
+function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
+    # dynamics
+    progn_new.vor .= progn_old.vor
+    progn_new.div .= progn_old.div
+    progn_new.temp .= progn_old.temp
+    progn_new.humid .= progn_old.humid
+    progn_new.pres .= progn_old.pres
+
+    # ocean
+    progn_new.ocean.sea_surface_temperature .= progn_old.ocean.sea_surface_temperature
+    progn_new.ocean.sea_ice_concentration .= progn_old.ocean.sea_ice_concentration
+    
+    # land
+    progn_new.land.land_surface_temperature .= progn_old.land.land_surface_temperature
+    progn_new.land.soil_moisture_layer1 .= progn_old.land.soil_moisture_layer1
+    progn_new.land.soil_moisture_layer2 .= progn_old.land.soil_moisture_layer2
+
+    progn_new.particles .= progn_old.particles
     progn_new.clock.time = progn_old.clock.time
+    progn_new.scale[] = progn_old.scale[]
 
     return progn_new
 end
 
-# SET_VAR FUNCTIONS TO ASSIGN NEW VALUES TO PrognosticVariables
+# # SET_VAR FUNCTIONS TO ASSIGN NEW VALUES TO PrognosticVariables
 
-"""
-    set_var!(progn::PrognosticVariables{NF},        
-             varname::Symbol,
-             var::Vector{<:LowerTriangularMatrix};
-             lf::Integer=1) where NF
+# """
+#     set_var!(progn::PrognosticVariables{NF},        
+#              varname::Symbol,
+#              var::Vector{<:LowerTriangularMatrix};
+#              lf::Integer=1) where NF
 
-Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
-with values given in `var` a vector with all information for all layers in spectral space.
-"""
-function set_var!(progn::PrognosticVariables{NF},
-                  varname::Symbol,
-                  var::Vector{<:LowerTriangularMatrix};
-                  lf::Integer=1) where NF
+# Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
+# with values given in `var` a vector with all information for all layers in spectral space.
+# """
+# function set_var!(progn::PrognosticVariables{NF},
+#                   varname::Symbol,
+#                   var::Vector{<:LowerTriangularMatrix};
+#                   lf::Integer=1) where NF
 
-    @assert length(var) == length(progn.layers)
-    @assert has(progn, varname) "PrognosticVariables has no variable $varname"
+#     @assert length(var) == length(progn.layers)
+#     @assert has(progn, varname) "PrognosticVariables has no variable $varname"
 
-    for (progn_layer, var_layer) in zip(progn.layers, var)
-        _set_var_core!(getfield(progn_layer.timesteps[lf], varname), var_layer)
-    end 
+#     for (progn_layer, var_layer) in zip(progn.layers, var)
+#         _set_var_core!(getfield(progn_layer.timesteps[lf], varname), var_layer)
+#     end 
 
-    return progn 
-end 
+#     return progn 
+# end 
 
-function _set_var_core!(var_old::LowerTriangularMatrix{T}, var_new::LowerTriangularMatrix{R}) where {T, R}
-    lmax, mmax = size(var_old) .- (1, 1)
-    var_new_trunc = spectral_truncation!(var_new, mmax+1, mmax)
-    copyto!(var_old, var_new_trunc)
-end 
+# function _set_var_core!(var_old::LowerTriangularMatrix{T}, var_new::LowerTriangularMatrix{R}) where {T, R}
+#     lmax, mmax = size(var_old) .- (1, 1)
+#     var_new_trunc = spectral_truncation!(var_new, mmax+1, mmax)
+#     copyto!(var_old, var_new_trunc)
+# end 
 
-"""
-    set_var!(progn::PrognosticVariables{NF},        
-             varname::Symbol,
-             var::Vector{<:AbstractGrid};
-             lf::Integer=1) where NF
+# """
+#     set_var!(progn::PrognosticVariables{NF},        
+#              varname::Symbol,
+#              var::Vector{<:AbstractGrid};
+#              lf::Integer=1) where NF
 
-Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
-with values given in `var` a vector with all information for all layers in grid space.
-"""
-function set_var!(progn::PrognosticVariables{NF},
-                  varname::Symbol,
-                  var::Vector{<:AbstractGrid};
-                  lf::Integer=1) where NF
+# Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
+# with values given in `var` a vector with all information for all layers in grid space.
+# """
+# function set_var!(progn::PrognosticVariables{NF},
+#                   varname::Symbol,
+#                   var::Vector{<:AbstractGrid};
+#                   lf::Integer=1) where NF
 
-    @assert length(var) == length(progn.layers)
-    var_sph = [spectral(var_layer, one_more_degree=true) for var_layer in var]
-    return set_var!(progn, varname, var_sph; lf=lf)
-end 
+#     @assert length(var) == length(progn.layers)
+#     var_sph = [spectral(var_layer, one_more_degree=true) for var_layer in var]
+#     return set_var!(progn, varname, var_sph; lf=lf)
+# end 
 
-"""
-    set_var!(progn::PrognosticVariables{NF},
-             varname::Symbol,
-             var::Vector{<:AbstractGrid},
-             M::ModelSetup;
-             lf::Integer=1) where NF
+# """
+#     set_var!(progn::PrognosticVariables{NF},
+#              varname::Symbol,
+#              var::Vector{<:AbstractGrid},
+#              M::ModelSetup;
+#              lf::Integer=1) where NF
 
-Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
-with values given in `var` a vector with all information for all layers in grid space.
-"""
-function set_var!(progn::PrognosticVariables{NF},
-                  varname::Symbol,
-                  var::Vector{<:AbstractGrid},
-                  M::ModelSetup;
-                  lf::Integer=1) where NF
+# Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
+# with values given in `var` a vector with all information for all layers in grid space.
+# """
+# function set_var!(progn::PrognosticVariables{NF},
+#                   varname::Symbol,
+#                   var::Vector{<:AbstractGrid},
+#                   M::ModelSetup;
+#                   lf::Integer=1) where NF
 
-    @assert length(var) == length(progn.layers)
+#     @assert length(var) == length(progn.layers)
     
-    var_sph = [spectral(var_layer, M.spectral_transform) for var_layer in var]
+#     var_sph = [spectral(var_layer, M.spectral_transform) for var_layer in var]
 
-    return set_var!(progn, varname, var_sph; lf=lf)
-end 
+#     return set_var!(progn, varname, var_sph; lf=lf)
+# end 
 
-"""
-    set_var!(progn::PrognosticVariables{NF},
-             varname::Symbol,
-             var::Vector{<:AbstractMatrix},
-             Grid::Type{<:AbstractGrid}=FullGaussianGrid;
-             lf::Integer=1) where NF
+# """
+#     set_var!(progn::PrognosticVariables{NF},
+#              varname::Symbol,
+#              var::Vector{<:AbstractMatrix},
+#              Grid::Type{<:AbstractGrid}=FullGaussianGrid;
+#              lf::Integer=1) where NF
 
-Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
-with values given in `var` a vector with all information for all layers in grid space.
-"""
-function set_var!(progn::PrognosticVariables{NF},
-                  varname::Symbol,
-                  var::Vector{<:AbstractMatrix},
-                  Grid::Type{<:AbstractGrid}=FullGaussianGrid;
-                  lf::Integer=1) where NF
+# Sets the prognostic variable with the name `varname` in all layers at leapfrog index `lf` 
+# with values given in `var` a vector with all information for all layers in grid space.
+# """
+# function set_var!(progn::PrognosticVariables{NF},
+#                   varname::Symbol,
+#                   var::Vector{<:AbstractMatrix},
+#                   Grid::Type{<:AbstractGrid}=FullGaussianGrid;
+#                   lf::Integer=1) where NF
 
-    @assert length(var) == length(progn.layers)
+#     @assert length(var) == length(progn.layers)
 
-    var_grid = [spectral(var_layer; Grid, one_more_degree=true) for var_layer in var]
+#     var_grid = [spectral(var_layer; Grid, one_more_degree=true) for var_layer in var]
 
-    return set_var!(progn, varname, var_grid; lf=lf)
-end 
+#     return set_var!(progn, varname, var_grid; lf=lf)
+# end 
 
-"""
-    function set_var!(progn::PrognosticVariables{NF},
-                      varname::Symbol,
-                      s::Number;
-                      lf::Integer=1) where NF
+# """
+#     function set_var!(progn::PrognosticVariables{NF},
+#                       varname::Symbol,
+#                       s::Number;
+#                       lf::Integer=1) where NF
 
-Sets all values of prognostic variable `varname` at leapfrog index `lf` to the scalar `s`.
-"""
-function set_var!(progn::PrognosticVariables{NF},
-                  varname::Symbol,
-                  s::Number;
-                  lf::Integer=1) where NF
+# Sets all values of prognostic variable `varname` at leapfrog index `lf` to the scalar `s`.
+# """
+# function set_var!(progn::PrognosticVariables{NF},
+#                   varname::Symbol,
+#                   s::Number;
+#                   lf::Integer=1) where NF
 
-    for progn_layer in progn.layers
-        fill!(getfield(progn_layer.timesteps[lf], varname), s)
-    end 
+#     for progn_layer in progn.layers
+#         fill!(getfield(progn_layer.timesteps[lf], varname), s)
+#     end 
 
-    return progn 
-end 
+#     return progn 
+# end 
 
-"""
-    set_vorticity!(progn::PrognosticVariables, varargs...; kwargs...)
+# """
+#     set_vorticity!(progn::PrognosticVariables, varargs...; kwargs...)
 
-See [`set_var!`](@ref)
-"""
-set_vorticity!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :vor, varargs...; kwargs...)
+# See [`set_var!`](@ref)
+# """
+# set_vorticity!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :vor, varargs...; kwargs...)
 
-"""
-    set_divergence!(progn::PrognosticVariables, varargs...; kwargs...)
+# """
+#     set_divergence!(progn::PrognosticVariables, varargs...; kwargs...)
 
-See [`set_var!`](@ref)
-"""
-set_divergence!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :div, varargs...; kwargs...)
+# See [`set_var!`](@ref)
+# """
+# set_divergence!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :div, varargs...; kwargs...)
 
-"""
-    set_temperature!(progn::PrognosticVariables, varargs...; kwargs...)
+# """
+#     set_temperature!(progn::PrognosticVariables, varargs...; kwargs...)
 
-See [`set_var!`](@ref)
-"""
-set_temperature!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :temp, varargs...; kwargs...)
+# See [`set_var!`](@ref)
+# """
+# set_temperature!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :temp, varargs...; kwargs...)
 
-"""
-    set_humidity!(progn::PrognosticVariables, varargs...; kwargs...)
+# """
+#     set_humidity!(progn::PrognosticVariables, varargs...; kwargs...)
 
-See [`set_var!`](@ref)
-"""
-set_humidity!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :humid, varargs...; kwargs...)
+# See [`set_var!`](@ref)
+# """
+# set_humidity!(progn::PrognosticVariables, varargs...; kwargs...) = set_var!(progn, :humid, varargs...; kwargs...)
 
-"""
-    set_pressure!(progn::PrognosticVariables{NF},
-                  pressure::LowerTriangularMatrix;
-                  lf::Integer=1) where NF
+# """
+#     set_pressure!(progn::PrognosticVariables{NF},
+#                   pressure::LowerTriangularMatrix;
+#                   lf::Integer=1) where NF
 
-Sets the prognostic variable with the surface pressure in spectral space at leapfrog index `lf`.
-"""
-function set_pressure!(progn::PrognosticVariables,
-                       pressure::LowerTriangularMatrix;
-                       lf::Integer=1)
+# Sets the prognostic variable with the surface pressure in spectral space at leapfrog index `lf`.
+# """
+# function set_pressure!(progn::PrognosticVariables,
+#                        pressure::LowerTriangularMatrix;
+#                        lf::Integer=1)
 
-    _set_var_core!(progn.surface.timesteps[lf].pres, pressure)
+#     _set_var_core!(progn.surface.timesteps[lf].pres, pressure)
 
-    return progn
-end
+#     return progn
+# end
 
-"""
-    set_pressure!(progn::PrognosticVariables{NF},
-                  pressure::AbstractGrid,
-                  M::ModelSetup;
-                  lf::Integer=1) where NF
+# """
+#     set_pressure!(progn::PrognosticVariables{NF},
+#                   pressure::AbstractGrid,
+#                   M::ModelSetup;
+#                   lf::Integer=1) where NF
 
-Sets the prognostic variable with the surface pressure in grid space at leapfrog index `lf`.
-"""
-set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid, M::ModelSetup; lf::Integer=1) =
-    set_pressure!(progn, spectral(pressure, M.spectral_transform); lf)
+# Sets the prognostic variable with the surface pressure in grid space at leapfrog index `lf`.
+# """
+# set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid, M::ModelSetup; lf::Integer=1) =
+#     set_pressure!(progn, spectral(pressure, M.spectral_transform); lf)
 
-"""
-    set_pressure!(progn::PrognosticVariables{NF},
-                  pressure::AbstractGrid,
-                  lf::Integer=1) where NF
+# """
+#     set_pressure!(progn::PrognosticVariables{NF},
+#                   pressure::AbstractGrid,
+#                   lf::Integer=1) where NF
 
-Sets the prognostic variable with the surface pressure in grid space at leapfrog index `lf`.
-"""
-set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid; lf::Integer=1) =
-    set_pressure!(progn, spectral(pressure, one_more_degree=true); lf)
+# Sets the prognostic variable with the surface pressure in grid space at leapfrog index `lf`.
+# """
+# set_pressure!(progn::PrognosticVariables, pressure::AbstractGrid; lf::Integer=1) =
+#     set_pressure!(progn, spectral(pressure, one_more_degree=true); lf)
 
-"""
-    set_pressure!(progn::PrognosticVariables{NF},
-                  pressure::AbstractMatrix,
-                  Grid::Type{<:AbstractGrid},
-                  lf::Integer=1) where NF
+# """
+#     set_pressure!(progn::PrognosticVariables{NF},
+#                   pressure::AbstractMatrix,
+#                   Grid::Type{<:AbstractGrid},
+#                   lf::Integer=1) where NF
 
-Sets the prognostic variable with the surface pressure in grid space at leapfrog index `lf`.
-"""
-set_pressure!(progn::PrognosticVariables, pressure::AbstractMatrix; lf::Integer=1,
-    Grid::Type{<:AbstractGrid}=FullGaussianGrid) = set_pressure!(progn, spectral(pressure; Grid, one_more_degree=true); lf)
+# Sets the prognostic variable with the surface pressure in grid space at leapfrog index `lf`.
+# """
+# set_pressure!(progn::PrognosticVariables, pressure::AbstractMatrix; lf::Integer=1,
+#     Grid::Type{<:AbstractGrid}=FullGaussianGrid) = set_pressure!(progn, spectral(pressure; Grid, one_more_degree=true); lf)
   
-"""
-    get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1)
+# """
+#     get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1)
 
-Returns the prognostic variable `var_name` at leapfrog index `lf` as a `Vector{LowerTriangularMatrices}`.
-"""
-function get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1)
-    @assert has(progn, var_name) "PrognosticVariables has no variable $var_name"
-    return [getfield(layer.timesteps[lf], var_name) for layer in progn.layers]
-end 
+# Returns the prognostic variable `var_name` at leapfrog index `lf` as a `Vector{LowerTriangularMatrices}`.
+# """
+# function get_var(progn::PrognosticVariables, var_name::Symbol; lf::Integer=1)
+#     @assert has(progn, var_name) "PrognosticVariables has no variable $var_name"
+#     return [getfield(layer.timesteps[lf], var_name) for layer in progn.layers]
+# end 
 
-get_vorticity(progn::PrognosticVariables; kwargs...) = get_var(progn, :vor; kwargs...)
-get_divergence(progn::PrognosticVariables; kwargs...) = get_var(progn, :div; kwargs...)
-get_temperature(progn::PrognosticVariables; kwargs...) = get_var(progn, :temp; kwargs...)
-get_humidity(progn::PrognosticVariables; kwargs...) = get_var(progn, :humid; kwargs...)
-get_pressure(progn::PrognosticVariables; lf::Integer=1) = progn.surface.timesteps[lf].pres
+# get_vorticity(progn::PrognosticVariables; kwargs...) = get_var(progn, :vor; kwargs...)
+# get_divergence(progn::PrognosticVariables; kwargs...) = get_var(progn, :div; kwargs...)
+# get_temperature(progn::PrognosticVariables; kwargs...) = get_var(progn, :temp; kwargs...)
+# get_humidity(progn::PrognosticVariables; kwargs...) = get_var(progn, :humid; kwargs...)
+# get_pressure(progn::PrognosticVariables; lf::Integer=1) = progn.surface.timesteps[lf].pres
 
-function Base.show(io::IO, P::PrognosticVariables)
-    ζ = P.layers[end].timesteps[1].vor          # create a view on surface relative vorticity
-    ζ_grid = gridded(ζ)                         # to grid space
-    print(io, plot(ζ_grid, title="Surface relative vorticity"))
-end
+# function Base.show(io::IO, P::PrognosticVariables)
+#     ζ = P.layers[end].timesteps[1].vor          # create a view on surface relative vorticity
+#     ζ_grid = gridded(ζ)                         # to grid space
+#     print(io, plot(ζ_grid, title="Surface relative vorticity"))
+# end
