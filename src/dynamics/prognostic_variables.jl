@@ -28,7 +28,7 @@ export PrognosticVariablesOcean
 end
 
 export PrognosticVariablesLand
-Base.@kwdef struct PrognosticVariablesLand{
+@kwdef struct PrognosticVariablesLand{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
     GridVariable2D,         # <: AbstractGridArray
@@ -55,10 +55,11 @@ export PrognosticVariables
 @kwdef struct PrognosticVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
+    NSTEPS,                 # number of timesteps
+    SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
-    SpectralVariable4D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractGridArray
-    ParticleVector,         # <: AbstractGridArray
+    ParticleVector,         # <: AbstractVector{Particle{NF}}
 } <: AbstractPrognosticVariables
 
     # DIMENSIONS
@@ -71,28 +72,29 @@ export PrognosticVariables
     "number of vertical layers"
     nlayers::Int
 
-    "Number time steps that are stored, 2 for leapfrog"
-    nsteps::Int
-
     "Number of particles for particle advection"
     nparticles::Int
 
     # LAYERED VARIABLES
     "Vorticity of horizontal wind field [1/s], but scaled by scale (=radius during simulation)"
-    vor::SpectralVariable4D = zeros(SpectralVariable4D, trunc+2, trunc+1, nlayers, nsteps)
+    vor::NTuple{NSTEPS, SpectralVariable3D} =
+        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), NSTEPS)
 
     "Divergence of horizontal wind field [1/s], but scaled by scale (=radius during simulation)"
-    div::SpectralVariable4D = zeros(SpectralVariable4D, trunc+2, trunc+1, nlayers, nsteps)
+    div::NTuple{NSTEPS, SpectralVariable3D} =
+        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), NSTEPS)
 
     "Absolute temperature [K]"
-    temp::SpectralVariable4D = zeros(SpectralVariable4D, trunc+2, trunc+1, nlayers, nsteps)
+    temp::NTuple{NSTEPS, SpectralVariable3D} =
+        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), NSTEPS)
 
     "Specific humidity [kg/kg]"
-    humid::SpectralVariable4D = zeros(SpectralVariable4D, trunc+2, trunc+1, nlayers, nsteps)
+    humid::NTuple{NSTEPS, SpectralVariable3D} =
+        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), NSTEPS)
 
-    # SURFACE VARIABLES
-    "log of surface pressure [log(Pa)] for PrimitiveEquation, interface displacement [m] for ShallowWaterModel"
-    pres::SpectralVariable3D = zeros(SpectralVariable3D, trunc+2, trunc+1, nsteps)
+    "Logarithm of surface pressure [log(Pa)] for PrimitiveEquation, interface displacement [m] for ShallowWaterModel"
+    pres::NTuple{NSTEPS, SpectralVariable2D} =
+        ntuple(i -> zeros(SpectralVariable2D, trunc+2, trunc+1), NSTEPS)
 
     "Ocean variables, sea surface temperature and sea ice concentration"
     ocean::PrognosticVariablesOcean{NF, ArrayType, GridVariable2D} =
@@ -117,11 +119,11 @@ Generator function."""
 function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
     (; trunc, nlat_half, nlev, nparticles) = SG
     (; NF, ArrayType) = SG
-    (; SpectralVariable3D, SpectralVariable4D, GridVariable2D, ParticleVector) = SG
+    (; SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector) = SG
 
-    return PrognosticVariables{NF, ArrayType, 
-        SpectralVariable3D, SpectralVariable4D, GridVariable2D, ParticleVector}(;
-            trunc, nlat_half, nlayers=nlev, nsteps, nparticles,
+    return PrognosticVariables{NF, ArrayType, nsteps,
+        SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}(;
+            trunc, nlat_half, nlayers=nlev, nparticles,
         )
 end
 
@@ -133,19 +135,19 @@ end
 
 function Base.show(
     io::IO,
-    progn::PrognosticVariables{NF, ArrayType},
-) where {NF, ArrayType}
+    progn::PrognosticVariables{NF, ArrayType, NSTEPS},
+) where {NF, ArrayType, NSTEPS}
     Grid = typeof(progn.ocean.sea_surface_temperature)
     println(io, "PrognosticVariables{$NF, $ArrayType}")
     
     # variables
-    (; trunc, nlat_half, nlayers, nsteps, nparticles) = progn
+    (; trunc, nlat_half, nlayers, nparticles) = progn
     nlat = RingGrids.get_nlat(Grid, nlat_half)
-    println(io, "├ vor:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
-    println(io, "├ div:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
-    println(io, "├ temp:  T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
-    println(io, "├ humid: T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
-    println(io, "├ pres:  T$trunc, 1-layer, $nsteps-steps LowerTriangularArray{$NF}")
+    println(io, "├ vor:   T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
+    println(io, "├ div:   T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
+    println(io, "├ temp:  T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
+    println(io, "├ humid: T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
+    println(io, "├ pres:  T$trunc, 1-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
     println(io, "├┐ocean: PrognosticVariablesOcean{$NF}")
     println(io, "│├ sea_surface_temperature:  $nlat-ring $Grid")
     println(io, "│└ sea_ice_concentration:    $nlat-ring $Grid")
