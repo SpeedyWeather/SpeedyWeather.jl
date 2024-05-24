@@ -393,8 +393,8 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 end
 
 function transform!(
-    map::AbstractGridArray{NF},     # gridded output
-    alms::LowerTriangularArray,     # spectral coefficients input
+    grids::AbstractGridArray{NF},   # gridded output
+    specs::LowerTriangularArray,    # spectral coefficients input
     S::SpectralTransform;           # precomputed transform
     unscale_coslat::Bool=false,     # unscale with cos(lat) on the fly?
 ) where NF                          # number format NF
@@ -404,10 +404,10 @@ function transform!(
     (; recompute_legendre, Λ, Λs, m_truncs ) = S
     (; brfft_plans ) = S
 
-    # recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
-    # recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
-    lmax = alms.m - 1            # 0-based maximum degree l of spherical harmonics
-    mmax = alms.n - 1            # 0-based maximum order m of spherical harmonics
+    # recompute_legendre && @boundscheck size(specs) == size(Λ) || throw(BoundsError)
+    # recompute_legendre || @boundscheck size(specs) == size(Λs[1]) || throw(BoundsError)
+    lmax = specs.m - 1            # 0-based maximum degree l of spherical harmonics
+    mmax = specs.n - 1            # 0-based maximum order m of spherical harmonics
 
     # @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     # @boundscheck nlat == length(cos_colat) || throw(BoundsError)
@@ -418,12 +418,11 @@ function transform!(
     gn = zeros(Complex{NF}, nfreq_max)      # phase factors for northern latitudes
     gs = zeros(Complex{NF}, nfreq_max)      # phase factors for southern latitudes
 
-    rings = eachring(map)                   # precomputed ring indices
+    rings = eachring(grids)                 # precomputed ring indices
 
     Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
 
-    for k in eachgrid(map)
-        @info k
+    for k in eachgrid(grids)
         for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
             j_south = nlat - j_north + 1        # southern latitude index
             nlon = nlons[j_north]               # number of longitudes on this ring
@@ -449,16 +448,16 @@ function transform!(
                 # but put both into one loop for contiguous memory access
                 for lm_even in lm:2:lm_end-even_degrees     
                     # split into even, i.e. iseven(l+m)
-                    # acc_even += alms[lm_even] * Λj[lm_even], but written with muladd
-                    acc_even = muladd(alms[lm_even, k], Λj[lm_even], acc_even)
+                    # acc_even += specs[lm_even] * Λj[lm_even], but written with muladd
+                    acc_even = muladd(specs[lm_even, k], Λj[lm_even], acc_even)
 
                     # and odd (isodd(l+m)) harmonics
-                    # acc_odd += alms[lm_odd] * Λj[lm_odd], but written with muladd
-                    acc_odd = muladd(alms[lm_even+1, k], Λj[lm_even+1], acc_odd)
+                    # acc_odd += specs[lm_odd] * Λj[lm_odd], but written with muladd
+                    acc_odd = muladd(specs[lm_even+1, k], Λj[lm_even+1], acc_odd)
                 end
 
                 # for even number of degrees, one acc_even iteration is skipped, do now
-                acc_even = even_degrees ? muladd(alms[lm_end, k], Λj[lm_end], acc_even) : acc_even
+                acc_even = even_degrees ? muladd(specs[lm_end, k], Λj[lm_end], acc_even) : acc_even
 
                 acc_n = (acc_even + acc_odd)        # accumulators for northern
                 acc_s = (acc_even - acc_odd)        # and southern hemisphere
@@ -481,11 +480,11 @@ function transform!(
             # INVERSE FOURIER TRANSFORM in zonal direction
             brfft_plan = brfft_plans[j_north]       # FFT planned wrt nlon on ring
             ilons = rings[j_north]                  # in-ring indices northern ring
-            LinearAlgebra.mul!(view(map.data, ilons, k), brfft_plan, view(gn, 1:nfreq))  # perform FFT
+            LinearAlgebra.mul!(view(grids.data, ilons, k), brfft_plan, view(gn, 1:nfreq))  # perform FFT
 
             # southern latitude, don't call redundant 2nd fft if ring is on equator 
             ilons = rings[j_south]                  # in-ring indices southern ring
-            not_equator && LinearAlgebra.mul!(view(map.data, ilons, k), brfft_plan, view(gs, 1:nfreq))  # perform FFT
+            not_equator && LinearAlgebra.mul!(view(grids.data, ilons, k), brfft_plan, view(gs, 1:nfreq))  # perform FFT
 
             fill!(gn, zero(Complex{NF}))            # set phase factors back to zero
             fill!(gs, zero(Complex{NF}))
@@ -598,6 +597,105 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     end
 
     return alms
+end
+
+function transform!(                    # grid -> spectral
+    specs::LowerTriangularArray,        # output: spectral coefficients
+    grids::AbstractGridArray{NF},       # input: gridded values
+    S::SpectralTransform                # precomputed spectral transform
+) where NF                              # number format
+    
+    (; nlat, nlat_half, nlons, nfreq_max, cos_colat ) = S
+    (; recompute_legendre, Λ, Λs, solid_angles ) = S
+    (; rfft_plans, lon_offsets, m_truncs ) = S
+    
+    # recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
+    # recompute_legendre || @boundscheck size(specs) == size(Λs[1]) || throw(BoundsError)
+    lmax = specs.m - 1            # 0-based maximum degree l of spherical harmonics
+    mmax = specs.n - 1            # 0-based maximum order m of spherical harmonics
+
+    # TODO check sizes
+    # @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
+    # @boundscheck nlat == length(cos_colat) || throw(BoundsError)
+    # @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
+    # @boundscheck get_nlat_half(map) == S.nlat_half || throw(BoundsError)
+
+    # preallocate work warrays
+    fn = zeros(Complex{NF}, nfreq_max)      # Fourier-transformed northern latitude
+    fs = zeros(Complex{NF}, nfreq_max)      # Fourier-transformed southern latitude
+
+    rings = eachring(grids)                 # precompute ring indices
+
+    # partial sums are accumulated in specs, force zeros initially.
+    fill!(specs, 0)
+
+    Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
+
+    for k in eachgrid(grids)
+        for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
+            j_south = nlat - j_north + 1        # corresponding southern latitude index
+            nlon = nlons[j_north]               # number of longitudes on this ring
+            nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
+            m_trunc = m_truncs[j_north]         # (lin/quad/cub) max frequency to shorten loop over m
+            not_equator = j_north != j_south    # is the latitude ring not on equator?
+
+            # FOURIER TRANSFORM in zonal direction
+            rfft_plan = rfft_plans[j_north]         # FFT planned wrt nlon on ring
+            ilons = rings[j_north]                  # in-ring indices northern ring
+            LinearAlgebra.mul!(view(fn, 1:nfreq), rfft_plan, view(grids.data, ilons, k))   # Northern latitude
+
+            ilons = rings[j_south]                  # in-ring indices southern ring
+                                                    # Southern latitude (don't call FFT on Equator)
+                                                    # then fill fs with zeros and no changes needed further down
+            not_equator ? LinearAlgebra.mul!(view(fs, 1:nfreq), rfft_plan, view(grids.data, ilons, k)) : fill!(fs, 0)
+
+            # LEGENDRE TRANSFORM in meridional direction
+            # Recalculate or use precomputed Legendre polynomials Λ
+            recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
+            Λj = recompute_legendre ? Λ : Λs[j_north]
+            
+            # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
+            ΔΩ = solid_angles[j_north]                      # = sinθ Δθ Δϕ, solid angle for a grid point
+
+            lm = 1                                          # single index for spherical harmonics
+            for m in 1:m_trunc                              # Σ_{m=0}^{mmax}, but 1-based index
+
+                an, as = fn[m], fs[m]
+
+                # SOLID ANGLE QUADRATURE WEIGHTS and LONGITUDE OFFSET
+                o = lon_offsets[m, j_north]                 # longitude offset rotation
+                ΔΩ_rotated = ΔΩ*conj(o)                     # complex conjugate for rotation back to prime meridian
+
+                # LEGENDRE TRANSFORM
+                a_even = (an + as)*ΔΩ_rotated               # sign flip due to anti-symmetry with
+                a_odd = (an - as)*ΔΩ_rotated                # odd polynomials 
+
+                # integration over l = m:lmax+1
+                lm_end = lm + lmax-m+1                      # first index lm plus lmax-m+1 (length of column -1)
+                even_degrees = iseven(lm+lm_end)            # is there an even number of degrees in column m?
+                
+                # anti-symmetry: sign change of odd harmonics on southern hemisphere
+                # but put both into one loop for contiguous memory access
+                for lm_even in lm:2:lm_end-even_degrees
+                    # lm_odd = lm_even+1
+                    # split into even, i.e. iseven(l+m)
+                    # specs[lm_even] += a_even * Λj[lm_even]#, but written with muladd
+                    specs[lm_even, k] = muladd(a_even, Λj[lm_even], specs[lm_even, k])
+                    
+                    # and odd (isodd(l+m)) harmonics
+                    # specs[lm_odd] += a_odd * Λj[lm_odd]#, but written with muladd
+                    specs[lm_even+1, k] = muladd(a_odd, Λj[lm_even+1], specs[lm_even+1, k])
+                end
+
+                # for even number of degrees, one even iteration is skipped, do now
+                specs[lm_end, k] = even_degrees ? muladd(a_even, Λj[lm_end], specs[lm_end, k]) : specs[lm_end, k]
+
+                lm = lm_end + 1                             # first index of next m column
+            end
+        end
+    end
+
+    return specs
 end
 
 """

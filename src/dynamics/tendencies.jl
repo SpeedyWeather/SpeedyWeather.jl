@@ -846,11 +846,12 @@ function SpeedyTransforms.transform!(
     S::SpectralTransform,
     lf::Integer = 2,
 )   
-    (; vor_grid, pres_grid) = diagn.grid
+    (; vor_grid) = diagn.grid
     vor = progn.vor[lf]
-    pres = progn.pres[lf]
+    # pres = progn.pres[lf]/
     transform!(vor_grid, vor, S)
-    transform!(pres_grid, pres, S)
+    transform!(vor, vor_grid, S)
+    # transform!(pres_grid, pres, S)
     return nothing
 end
 
