@@ -123,6 +123,8 @@ $TYPEDFIELDS."""
     # PREVIOUS TIME STEP
     "Absolute temperature [K] at previous time step"
     temp_grid_prev  ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
+    "Specific humidity [kg/kg] at previous time step"
+    humid_grid_prev ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
     "Zonal velocity [m/s] at previous time step"
     u_grid_prev     ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
     "Meridional velocity [m/s] at previous time step"
@@ -388,3 +390,45 @@ function Base.show(
     println(io, "├ columns::Vector{ColumnVariables}")
     print(io,   "└ scale: $(diagn.scale[])")
 end
+
+"""$(TYPEDSIGNATURES)
+Set the tendencies for the barotropic model to `x`."""
+function Base.fill!(tendencies::Tendencies, x, ::Type{<:Barotropic})
+    fill!(tendencies.u_tend_grid, x)
+    fill!(tendencies.v_tend_grid, x)
+    fill!(tendencies.vor_tend, x)
+    return tendencies
+end
+
+"""$(TYPEDSIGNATURES)
+Set the tendencies for the shallow-water model to `x`."""
+function Base.fill!(tendencies::Tendencies, x, ::Type{<:ShallowWater})
+    fill!(tendencies, x, Barotropic)    # all tendencies also in Barotropic
+    fill!(tendencies.div_tend, x)       # plus divergence and pressure
+    fill!(tendencies.pres_tend_grid, x)
+    fill!(tendencies.pres_tend, x)
+    return tendencies
+end
+
+"""$(TYPEDSIGNATURES)
+Set the tendencies for the primitive dry model to `x`."""
+function Base.fill!(tendencies::Tendencies, x, ::Type{<:PrimitiveDry})
+    fill!(tendencies, x, ShallowWater)  # all tendencies also in ShallowWater
+    fill!(tendencies.temp_tend, x)      # plus temperature 
+    fill!(tendencies.temp_tend_grid, x)
+    return tendencies
+end
+
+"""
+$(TYPEDSIGNATURES)
+Set the tendencies for the primitive wet model to `x`."""
+function Base.fill!(tendencies::Tendencies, x, ::Type{<:PrimitiveWet})
+    fill!(tendencies, x, PrimitiveDry)  # all tendencies also in PrimitiveDry
+    fill!(tendencies.humid_tend, x)     # plus humidity
+    fill!(tendencies.humid_tend_grid, x)
+    return tendencies
+end
+
+# fallback to primitive wet
+Base.fill!(tendencies::Tendencies, x) = Base.fill!(tendencies, x, PrimitiveWet)
+Base.fill!(tendencies::Tendencies, x, model::ModelSetup) = Base.fill!(tendencies, x, typeof(model))
