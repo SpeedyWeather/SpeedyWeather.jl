@@ -21,7 +21,8 @@ export  SpectralTransform,
         gridded,
         gridded!,
         spectral,
-        spectral!
+        spectral!,
+        transform!
 
 # ALIASING
 export  get_nlat_half

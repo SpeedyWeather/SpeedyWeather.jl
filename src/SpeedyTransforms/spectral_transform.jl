@@ -392,6 +392,109 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
     return map
 end
 
+function transform!(
+    map::AbstractGridArray{NF},     # gridded output
+    alms::LowerTriangularArray,     # spectral coefficients input
+    S::SpectralTransform;           # precomputed transform
+    unscale_coslat::Bool=false,     # unscale with cos(lat) on the fly?
+) where NF                          # number format NF
+
+    (; nlat, nlons, nlat_half, nfreq_max ) = S
+    (; cos_colat, sin_colat, lon_offsets ) = S
+    (; recompute_legendre, Λ, Λs, m_truncs ) = S
+    (; brfft_plans ) = S
+
+    # recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
+    # recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
+    lmax = alms.m - 1            # 0-based maximum degree l of spherical harmonics
+    mmax = alms.n - 1            # 0-based maximum order m of spherical harmonics
+
+    # @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
+    # @boundscheck nlat == length(cos_colat) || throw(BoundsError)
+    # @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
+    # @boundscheck get_nlat_half(map) == S.nlat_half || throw(BoundsError)
+
+    # preallocate work arrays
+    gn = zeros(Complex{NF}, nfreq_max)      # phase factors for northern latitudes
+    gs = zeros(Complex{NF}, nfreq_max)      # phase factors for southern latitudes
+
+    rings = eachring(map)                   # precomputed ring indices
+
+    Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
+
+    for k in eachgrid(map)
+        @info k
+        for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
+            j_south = nlat - j_north + 1        # southern latitude index
+            nlon = nlons[j_north]               # number of longitudes on this ring
+            nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
+            m_trunc = m_truncs[j_north]         # (lin/quad/cub) max frequency to shorten loop over m
+            not_equator = j_north != j_south    # is the latitude ring not on equator?
+
+            # Recalculate or use precomputed Legendre polynomials Λ
+            recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
+            Λj = recompute_legendre ? Λ : Λs[j_north]
+
+            # inverse Legendre transform by looping over wavenumbers l, m
+            lm = 1                              # single index for non-zero l, m indices
+            for m in 1:m_trunc                  # Σ_{m=0}^{mmax}, but 1-based index, shortened to m_trunc
+                acc_odd  = zero(Complex{NF})    # accumulator for isodd(l+m)
+                acc_even = zero(Complex{NF})    # accumulator for iseven(l+m)
+
+                # integration over l = m:lmax+1
+                lm_end = lm + lmax-m+1              # first index lm plus lmax-m+1 (length of column -1)
+                even_degrees = iseven(lm+lm_end)    # is there an even number of degrees in column m?
+
+                # anti-symmetry: sign change of odd harmonics on southern hemisphere
+                # but put both into one loop for contiguous memory access
+                for lm_even in lm:2:lm_end-even_degrees     
+                    # split into even, i.e. iseven(l+m)
+                    # acc_even += alms[lm_even] * Λj[lm_even], but written with muladd
+                    acc_even = muladd(alms[lm_even, k], Λj[lm_even], acc_even)
+
+                    # and odd (isodd(l+m)) harmonics
+                    # acc_odd += alms[lm_odd] * Λj[lm_odd], but written with muladd
+                    acc_odd = muladd(alms[lm_even+1, k], Λj[lm_even+1], acc_odd)
+                end
+
+                # for even number of degrees, one acc_even iteration is skipped, do now
+                acc_even = even_degrees ? muladd(alms[lm_end, k], Λj[lm_end], acc_even) : acc_even
+
+                acc_n = (acc_even + acc_odd)        # accumulators for northern
+                acc_s = (acc_even - acc_odd)        # and southern hemisphere
+                
+                # CORRECT FOR LONGITUDE OFFSETTS
+                o = lon_offsets[m, j_north]         # longitude offset rotation            
+
+                gn[m] = muladd(acc_n, o, gn[m])     # accumulate in phase factors for northern
+                gs[m] = muladd(acc_s, o, gs[m])     # and southern hemisphere
+
+                lm = lm_end + 1                     # first index of next m column
+            end
+
+            if unscale_coslat
+                @inbounds cosθ = sin_colat[j_north] # sin(colat) = cos(lat)
+                gn ./= cosθ                         # scale in place          
+                gs ./= cosθ
+            end
+
+            # INVERSE FOURIER TRANSFORM in zonal direction
+            brfft_plan = brfft_plans[j_north]       # FFT planned wrt nlon on ring
+            ilons = rings[j_north]                  # in-ring indices northern ring
+            LinearAlgebra.mul!(view(map.data, ilons, k), brfft_plan, view(gn, 1:nfreq))  # perform FFT
+
+            # southern latitude, don't call redundant 2nd fft if ring is on equator 
+            ilons = rings[j_south]                  # in-ring indices southern ring
+            not_equator && LinearAlgebra.mul!(view(map.data, ilons, k), brfft_plan, view(gs, 1:nfreq))  # perform FFT
+
+            fill!(gn, zero(Complex{NF}))            # set phase factors back to zero
+            fill!(gs, zero(Complex{NF}))
+        end
+    end
+
+    return map
+end
+
 """
     spectral!(  alms::LowerTriangularMatrix,
                 map::AbstractGrid,
