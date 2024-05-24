@@ -27,9 +27,10 @@ function surface_thermodynamics!(   column::ColumnVariables,
                                     ::SurfaceThermodynamicsConstant,
                                     model::PrimitiveWet)
 
-    # surface value is same as lowest model level
-    column.surface_temp = column.temp[end]      # todo use constant POTENTIAL temperature
-    column.surface_humid = column.humid[end]    # humidity at surface is the same as 
+    # surface value is same as lowest model level, use previous time step
+    # for numerical stability
+    column.surface_temp = column.temp_prev[end]      # todo use constant POTENTIAL temperature
+    column.surface_humid = column.humid_prev[end]    # humidity at surface is the same as 
 
     # surface air density via virtual temperature
     (; R_dry) = model.atmosphere
@@ -41,8 +42,9 @@ function surface_thermodynamics!(   column::ColumnVariables,
                                     ::SurfaceThermodynamicsConstant,
                                     model::PrimitiveDry)
     (; R_dry) = model.atmosphere
-    # surface value is same as lowest model level
-    column.surface_temp = column.temp[end]   # todo use constant POTENTIAL temperature
+    # surface value is same as lowest model level, but use previous
+    # time step for numerical stability
+    column.surface_temp = column.temp_prev[end]   # todo use constant POTENTIAL temperature
     column.surface_air_density = column.pres[end]/(R_dry*column.surface_temp)
 end
 
@@ -71,7 +73,7 @@ Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind
     drag_sea::NF = 1.8e-3
 
     "Flux limiter to cap the max of surface momentum fluxes [kg/m/s²]"
-    max_flux::NF = 0.1
+    max_flux::NF = 10       # currently not needed? maybe too high?
 end
 
 SurfaceWind(SG::SpectralGrid; kwargs...) = SurfaceWind{SG.NF}(; kwargs...)
@@ -85,9 +87,9 @@ function surface_wind_stress!(  column::ColumnVariables,
     (; f_wind, V_gust, drag_land, drag_sea) = surface_wind
     (; max_flux) = surface_wind
 
-    # SPEEDY documentation eq. 49
-    column.surface_u = f_wind*column.u[end] 
-    column.surface_v = f_wind*column.v[end]
+    # SPEEDY documentation eq. 49, but use previous time step for numerical stability
+    column.surface_u = f_wind*column.u_prev[end] 
+    column.surface_v = f_wind*column.v_prev[end]
     (; surface_u, surface_v) = column
 
     # SPEEDY documentation eq. 50
@@ -136,7 +138,7 @@ Base.@kwdef struct SurfaceHeatFlux{NF<:AbstractFloat} <: AbstractSurfaceHeatFlux
     heat_exchange_sea::NF = 0.9e-3
 
     "Flux limiter for surface heat fluxes [W/m²]"
-    max_flux::NF = 100
+    max_flux::NF = 100          # currently not needed? maybe too high?
 end
 
 SurfaceHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceHeatFlux{SG.NF}(; kwargs...)
@@ -193,7 +195,7 @@ end
 
 ## SURFACE EVAPORATION
 export NoSurfaceEvaporation
-struct NoSurfaceEvaporation <: AbstractSurfaceHeatFlux end
+struct NoSurfaceEvaporation <: AbstractSurfaceEvaporation end
 NoSurfaceEvaporation(::SpectralGrid) = NoSurfaceEvaporation()
 initialize!(::NoSurfaceEvaporation, ::PrimitiveEquation) = nothing
 surface_evaporation!(::ColumnVariables, ::NoSurfaceEvaporation, ::PrimitiveEquation) = nothing

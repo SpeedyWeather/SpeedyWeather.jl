@@ -750,7 +750,7 @@ function SpeedyTransforms.transform!(
     vor =  progn.vor[lf]            # relative vorticity at leapfrog step lf
     div =  progn.div[lf]            # divergence at leapfrog step lf
     pres = progn.pres[lf]           # interface displacement η at leapfrog step lf
-    
+
     U = diagn.dynamics.a            # reuse work arrays for velocities spectral
     V = diagn.dynamics.b            # U = u*coslat, V=v*coslat
     S = model.spectral_transform
@@ -781,7 +781,8 @@ function SpeedyTransforms.transform!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     lf::Integer,
-    model::PrimitiveEquation,
+    model::PrimitiveEquation;
+    initialize::Bool = false,
 )   
     (; vor_grid, div_grid, pres_grid, u_grid, v_grid, temp_grid, humid_grid) = diagn.grid
     (; temp_grid_prev, humid_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid
@@ -796,11 +797,13 @@ function SpeedyTransforms.transform!(
     V = diagn.dynamics.b            # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
-    # retain previous time step for vertical advection
-    @. temp_grid_prev = temp_grid
-    @. humid_grid_prev = humid_grid
-    @. u_grid_prev = u_grid
-    @. v_grid_prev = v_grid
+    # retain previous time step for vertical advection and some parameterizations
+    if initialize == false              # only store prev after initial step
+        @. temp_grid_prev = temp_grid   # this is temperature anomaly wrt to implicit reference profile!
+        @. humid_grid_prev = humid_grid
+        @. u_grid_prev = u_grid
+        @. v_grid_prev = v_grid
+    end
 
     transform!(vor_grid, vor, S)    # get vorticity on grid from spectral vor
     transform!(div_grid, div, S)    # get divergence on grid from spectral div
@@ -823,8 +826,16 @@ function SpeedyTransforms.transform!(
     
     # include humidity effect into temp for everything stability-related
     temperature_average!(diagn, temp, S)
-    virtual_temperature!(diagn, temp, model)  # temp = virt temp for dry core
+    virtual_temperature!(diagn, temp, model)    # temp = virt temp for dry core
 
+    if initialize   # at initial step store prev <- current
+        # subtract the reference temperature profile as temp_grid is too after every time step
+        @. temp_grid_prev = temp_grid - model.implicit.temp_profile[diagn.k]
+        @. humid_grid_prev = humid_grid
+        @. u_grid_prev = u_grid
+        @. v_grid_prev = v_grid
+    end
+  
     return nothing
 end
 
@@ -852,7 +863,6 @@ function temperature_average!(
     temp::LowerTriangularMatrix,
     S::SpectralTransform,
 )
-    
     # average from l=m=0 harmonic divided by norm of the sphere
     diagn.temp_average[] = real(temp[1])/S.norm_sphere
 end 

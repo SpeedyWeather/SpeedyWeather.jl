@@ -148,7 +148,11 @@ function saturation_humidity!(
     column::ColumnVariables,
     clausius_clapeyron::AbstractClausiusClapeyron,
 )
-    (; sat_humid, pres, temp) = column
+    (; sat_humid, pres) = column
+
+    # use previous time step for temperature for stability of large-scale condensation
+    # TODO also use previous pressure, but sat_humid is only weakly dependent on it, skip for now
+    temp = column.temp_prev
 
     for k in eachlayer(column)
         sat_humid[k] = saturation_humidity(temp[k], pres[k], clausius_clapeyron)

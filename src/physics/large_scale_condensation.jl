@@ -11,11 +11,14 @@ export ImplicitCondensation
 Large scale condensation as with implicit precipitation.
 $(TYPEDFIELDS)"""
 Base.@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensation
-    "Flux limiter for latent heat release [K] per timestep"
-    max_heating::NF = 0.2
+    "Relative humidity threshold [1 = 100%] to trigger condensation"
+    relative_humidity_threshold::NF = 1
+    
+    "Flux limiter for latent heat release [W/m²] per timestep"
+    max_heating::NF = 10           # currently not needed? maybe too high?
 
-    "Time scale in multiples of time step Δt"
-    time_scale::NF = 9
+    "Time scale in multiples of time step Δt, the larger the less immediate"
+    time_scale::NF = 3
 end
 
 ImplicitCondensation(SG::SpectralGrid; kwargs...) = ImplicitCondensation{SG.NF}(; kwargs...)
@@ -58,18 +61,20 @@ relative humidity. Calculates the tendencies for specific humidity
 and temperature from latent heat release and integrates the
 large-scale precipitation vertically for output."""
 function large_scale_condensation!(
-    column::ColumnVariables{NF},
+    column::ColumnVariables,
     scheme::ImplicitCondensation,
     clausius_clapeyron::AbstractClausiusClapeyron,
     geometry::Geometry,
     planet::AbstractPlanet,
     atmosphere::AbstractAtmosphere,
     time_stepping::AbstractTimeStepper,
-) where NF
+)
 
-    (; temp, humid, pres) = column           # prognostic vars: specific humidity, pressure
-    (; temp_tend, humid_tend) = column       # tendencies to write into
-    (; sat_humid) = column                   # intermediate variable, calculated in thermodynamics!
+    (; pres) = column                       # prognostic vars: pressure
+    temp = column.temp_prev                 # but use temp, humid from
+    humid = column.humid_prev               # from previous time step for numerical stability
+    (; temp_tend, humid_tend) = column      # tendencies to write into
+    (; sat_humid) = column                  # intermediate variable, calculated in thermodynamics!
     
     # precompute scaling constant for precipitation output
     pₛ = pres[end]                          # surface pressure
@@ -80,10 +85,10 @@ function large_scale_condensation!(
     (; Lᵥ, cₚ, Lᵥ_Rᵥ) = clausius_clapeyron
     Lᵥ_cₚ = Lᵥ/cₚ                           # latent heat of vaporization over heat capacity
     max_heating = scheme.max_heating/Δt_sec
-    time_scale = scheme.time_scale
+    (; time_scale, relative_humidity_threshold) = scheme
 
     @inbounds for k in eachindex(column)
-        if humid[k] > sat_humid[k]
+        if humid[k] > sat_humid[k]*relative_humidity_threshold
 
             # tendency for Implicit humid = sat_humid, divide by leapfrog time step below
             δq = sat_humid[k] - humid[k]

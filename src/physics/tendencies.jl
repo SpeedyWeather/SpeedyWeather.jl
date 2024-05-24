@@ -36,6 +36,9 @@ function parameterization_tendencies!(
     end
 end
 
+"""$(TYPEDSIGNATURES)
+Calls for `column` one physics parameterization after another
+and convert fluxes to tendencies."""
 function parameterization_tendencies!(
     column::ColumnVariables,
     model::PrimitiveEquation

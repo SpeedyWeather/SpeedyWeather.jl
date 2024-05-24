@@ -46,6 +46,8 @@ using .LowerTriangularMatrices
 
 # RingGrids
 export  RingGrids
+export  AbstractGrid, AbstractGridArray,
+        AbstractFullGridarray, AbstractReducedGridArray
 export  FullClenshawGrid, FullClenshawArray,
         FullGaussianGrid, FullGaussianArray,
         FullHEALPixGrid, FullHEALPixArray,
@@ -61,7 +63,7 @@ using .RingGrids
 
 # SpeedyTransforms
 export SpeedyTransforms, SpectralTransform
-export spectral, gridded
+export spectral, gridded, spectral!, gridded!
 export spectral_truncation, spectral_truncation!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
