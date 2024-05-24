@@ -240,31 +240,26 @@ function first_timesteps!(
     return nothing
 end
 
-"""
-$(TYPEDSIGNATURES)
-Calculate a single time step for the `model <: Barotropic`."""
+"""$(TYPEDSIGNATURES)
+Calculate a single time step for the barotropic model."""
 function timestep!( 
     progn::PrognosticVariables,     # all prognostic variables
     diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
     dt::Real,                       # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
     model::Barotropic,              # everything that's constant at runtime
-    lf1::Int=2,                     # leapfrog index 1 (dis/enables Robert+Williams filter)
-    lf2::Int=2,                     # leapfrog index 2 (time step used for tendencies)
+    lf1::Integer = 2,               # leapfrog index 1 (dis/enables Robert+Williams filter)
+    lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
 )
-    model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
-    (; time) = progn.clock                           # current time
+    model.feedback.nars_detected && return nothing  # exit immediately if NaNs/Infs already present
     
     # set the tendencies back to zero for accumulation
-    zero_tendencies!(diagn)
+    fill!(diagn.tendencies, 0, Barotropic)
 
-    # LOOP OVER LAYERS FOR TENDENCIES, DIFFUSION, LEAPFROGGING AND PROPAGATE STATE TO GRID
-    for (progn_layer, diagn_layer) in zip(progn.layers, diagn.layers)
-        progn_lf = progn_layer.timesteps[lf2]       # pick the leapfrog time step lf2 for tendencies
-        dynamics_tendencies!(diagn_layer, progn_lf, time, model)
-        horizontal_diffusion!(diagn_layer, progn_layer, model)
-        leapfrog!(progn_layer, diagn_layer, dt, lf1, model)
-        gridded!(diagn_layer, progn_lf, model)
-    end
+    # TENDENCIES, DIFFUSION, LEAPFROGGING AND TRANSFORM SPECTRAL STATE TO GRID
+    dynamics_tendencies!(diagn, progn, lf2, model)
+    horizontal_diffusion!(diagn, progn, model)
+    leapfrog!(progn, diagn, dt, lf1, lf2, model)
+    transform!(diagn, progn, lf2, model)
 
     # PARTICLE ADVECTION
     particle_advection!(progn, diagn, lf2, model.particle_advection)

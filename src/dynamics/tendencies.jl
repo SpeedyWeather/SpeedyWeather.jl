@@ -1,13 +1,14 @@
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Calculate all tendencies for the BarotropicModel."""
-function dynamics_tendencies!(  diagn::DiagnosticVariablesLayer,
-                                progn::PrognosticVariablesLayer,
-                                time::DateTime,
-                                model::Barotropic)
-    forcing!(diagn, progn, model.forcing, time, model)  # = (Fᵤ, Fᵥ) forcing for u, v
-    drag!(diagn, progn, model.drag, time, model)         # drag term for u, v
-    vorticity_flux!(diagn, model)                       # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
+function dynamics_tendencies!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    lf::Integer,
+    model::Barotropic
+)
+    forcing!(diagn, progn, model.forcing, model)    # = (Fᵤ, Fᵥ) forcing for u, v
+    drag!(diagn, progn, model.drag, model)          # drag term for u, v
+    vorticity_flux!(diagn, model)                   # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
 end
 
 """
@@ -88,62 +89,6 @@ function dynamics_tendencies!(  diagn::DiagnosticVariables,
         humidity_tendency!(layer, model)            # horizontal advection of humidity (nothing for wetcore)
         bernoulli_potential!(layer, S)              # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
     end
-end
-
-"""
-$(TYPEDSIGNATURES)
-Set the tendencies in `diagn` to zero."""
-function zero_tendencies!(diagn::DiagnosticVariables{NF, Grid, Model}) where {NF, Grid, Model<:Barotropic}
-    for layer in diagn.layers
-        fill!(layer.tendencies.u_tend_grid, 0)
-        fill!(layer.tendencies.v_tend_grid, 0)
-        fill!(layer.tendencies.vor_tend, 0)
-    end
-end
-
-"""
-$(TYPEDSIGNATURES)
-Set the tendencies in `diagn` to zero."""
-function zero_tendencies!(diagn::DiagnosticVariables{NF, Grid, Model}) where {NF, Grid, Model<:ShallowWater}
-    for layer in diagn.layers
-        fill!(layer.tendencies.u_tend_grid, 0)
-        fill!(layer.tendencies.v_tend_grid, 0)
-        fill!(layer.tendencies.vor_tend, 0)
-        fill!(layer.tendencies.div_tend, 0)
-    end
-    fill!(diagn.surface.pres_tend_grid, 0)
-    fill!(diagn.surface.pres_tend, 0)
-end
-
-"""
-$(TYPEDSIGNATURES)
-Set the tendencies in `diagn` to zero."""
-function zero_tendencies!(diagn::DiagnosticVariables{NF, Grid, Model}) where {NF, Grid, Model<:PrimitiveDry}
-    for layer in diagn.layers
-        fill!(layer.tendencies.u_tend_grid, 0)
-        fill!(layer.tendencies.v_tend_grid, 0)
-        fill!(layer.tendencies.vor_tend, 0)
-        fill!(layer.tendencies.div_tend, 0)
-        fill!(layer.tendencies.temp_tend_grid, 0)
-    end
-    fill!(diagn.surface.pres_tend_grid, 0)
-    fill!(diagn.surface.pres_tend, 0)
-end
-
-"""
-$(TYPEDSIGNATURES)
-Set the tendencies in `diagn` to zero."""
-function zero_tendencies!(diagn::DiagnosticVariables{NF, Grid, Model}) where {NF, Grid, Model<:PrimitiveWet}
-    for layer in diagn.layers
-        fill!(layer.tendencies.u_tend_grid, 0)
-        fill!(layer.tendencies.v_tend_grid, 0)
-        fill!(layer.tendencies.vor_tend, 0)
-        fill!(layer.tendencies.div_tend, 0)
-        fill!(layer.tendencies.temp_tend_grid, 0)
-        fill!(layer.tendencies.humid_tend_grid, 0)
-    end
-    fill!(diagn.surface.pres_tend_grid, 0)
-    fill!(diagn.surface.pres_tend, 0)
 end
 
 function pressure_gradient!(diagn::DiagnosticVariables,
@@ -760,45 +705,22 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Propagate the spectral state of `progn` to `diagn` using time step/leapfrog index `lf`.
-Function barrier that calls gridded! for the respective `model`."""
-function SpeedyTransforms.gridded!( 
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    lf::Int,
-    model::ModelSetup)
-
-    # all variables on layers
-    for (progn_layer, diagn_layer) in zip(progn.layers, diagn.layers)
-        progn_layer_lf = progn_layer.timesteps[lf]
-        gridded!(diagn_layer, progn_layer_lf, model)
-    end
-
-    # surface only for ShallowWaterModel or PrimitiveEquation
-    S = model.spectral_transform
-    (; pres_grid) = diagn.surface
-    (; pres) = progn.surface.timesteps[lf]
-    model isa Barotropic || gridded!(pres_grid, pres, S)
-
-    return nothing
-end
-
-"""
-$(TYPEDSIGNATURES)
 Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the barotropic vorticity model.
 Updates grid vorticity, spectral stream function and spectral and grid velocities u, v."""
-function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,   
-                                    progn::PrognosticVariablesLayer,
-                                    model::Barotropic)
-    
-    (; vor_grid, u_grid, v_grid ) = diagn.grid_variables
-    (; vor ) = progn                    # relative vorticity
-    U = diagn.dynamics_variables.a      # reuse work arrays for velocities in spectral
-    V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
+function SpeedyTransforms.transform!(
+    diagn::DiagnosticVariables,   
+    progn::PrognosticVariables,
+    lf::Integer,
+    model::Barotropic,
+)    
+    (; vor_grid, u_grid, v_grid ) = diagn.grid
+    vor = progn.vor[lf]             # relative vorticity at leapfrog step lf
+    U = diagn.dynamics.a            # reuse work arrays for velocities in spectral
+    V = diagn.dynamics.b            # U = u*coslat, V=v*coslat
     S = model.spectral_transform
 
-    gridded!(vor_grid, vor, S)          # get vorticity on grid from spectral vor
+    transform!(vor_grid, vor, S)    # get vorticity on grid from spectral vor
     
     # get spectral U, V from spectral vorticity via stream function Ψ
     # U = u*coslat = -coslat*∂Ψ/∂lat
@@ -806,8 +728,8 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     UV_from_vor!(U, V, vor, S)
 
     # transform from U, V in spectral to u, v on grid (U, V = u, v*coslat)
-    gridded!(u_grid, U, S, unscale_coslat=true)
-    gridded!(v_grid, V, S, unscale_coslat=true)
+    transform!(u_grid, U, S, unscale_coslat=true)
+    transform!(v_grid, V, S, unscale_coslat=true)
  
     return nothing
 end
@@ -818,28 +740,33 @@ Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the shallow water model. Updates grid vorticity,
 grid divergence, grid interface displacement (`pres_grid`) and the velocities
 u, v."""
-function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
-                                    progn::PrognosticVariablesLayer,
-                                    model::ShallowWater,                # everything that's constant
-                                    )
+function SpeedyTransforms.transform!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    lf::Integer,
+    model::ShallowWater,
+)
+    (; vor_grid, div_grid, pres_grid, u_grid, v_grid ) = diagn.grid
+    vor =  progn.vor[lf]            # relative vorticity at leapfrog step lf
+    div =  progn.div[lf]            # divergence at leapfrog step lf
+    pres = progn.pres[lf]           # interface displacement η at leapfrog step lf
     
-    (; vor_grid, div_grid, u_grid, v_grid ) = diagn.grid_variables
-    (; vor, div) = progn
-    U = diagn.dynamics_variables.a      # reuse work arrays for velocities spectral
-    V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
+    U = diagn.dynamics.a            # reuse work arrays for velocities spectral
+    V = diagn.dynamics.b            # U = u*coslat, V=v*coslat
     S = model.spectral_transform
-
+    
+    transform!(vor_grid,  vor,  S)  # get vorticity on grid from spectral vor
+    transform!(div_grid,  div,  S)  # get divergence on grid from spectral div
+    transform!(pres_grid, pres, S)  # get η on grid from spectral η
+    
     # get spectral U, V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
     UV_from_vordiv!(U, V, vor, div, S)
 
-    gridded!(vor_grid, vor, S)            # get vorticity on grid from spectral vor
-    gridded!(div_grid, div, S)            # get divergence on grid from spectral div
-
     # transform from U, V in spectral to u, v on grid (U, V = u, v*coslat)
-    gridded!(u_grid, U, S, unscale_coslat=true)
-    gridded!(v_grid, V, S, unscale_coslat=true)
+    transform!(u_grid, U, S, unscale_coslat=true)
+    transform!(v_grid, V, S, unscale_coslat=true)
 
     return nothing
 end
@@ -850,47 +777,69 @@ Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for primitive equation models. Updates grid vorticity,
 grid divergence, grid temperature, pressure (`pres_grid`) and the velocities
 u, v."""
-function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
-                                    progn::PrognosticVariablesLayer,
-                                    model::PrimitiveEquation)           # everything that's constant
-    
-    (; vor_grid, div_grid, u_grid, v_grid ) = diagn.grid_variables
-    (; temp_grid, humid_grid ) = diagn.grid_variables
-    (; temp_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid_variables
-    (; vor, div, temp, humid) = progn
-    U = diagn.dynamics_variables.a      # reuse work arrays for velocities spectral
-    V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
+function SpeedyTransforms.transform!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    lf::Integer,
+    model::PrimitiveEquation,
+)   
+    (; vor_grid, div_grid, pres_grid, u_grid, v_grid, temp_grid, humid_grid) = diagn.grid
+    (; temp_grid_prev, humid_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid
+
+    vor   = progn.vor[lf]           # relative vorticity at leapfrog step lf
+    div   = progn.div[lf]           # divergence at leapfrog step lf
+    temp  = progn.temp[lf]          # temperature at leapfrog step lf
+    humid = progn.humid[lf]         # humidity at leapfrog step lf
+    pres  = progn.pres[lf]          # logarithm of surface pressure at leapfrog step lf
+
+    U = diagn.dynamics.a            # reuse work arrays
+    V = diagn.dynamics.b            # U = u*coslat, V=v*coslat
+    S = model.spectral_transform
 
     # retain previous time step for vertical advection
     @. temp_grid_prev = temp_grid
+    @. humid_grid_prev = humid_grid
     @. u_grid_prev = u_grid
     @. v_grid_prev = v_grid
 
-    S = model.spectral_transform
-    wet_core = model isa PrimitiveWet
+    transform!(vor_grid, vor, S)    # get vorticity on grid from spectral vor
+    transform!(div_grid, div, S)    # get divergence on grid from spectral div
+    transform!(temp_grid, temp, S)  # -- tempereture --
+    transform!(pres_grid, pres, S)  # -- pressure --
+    
+    if model isa PrimitiveWet
+        transform!(humid_grid, humid, S)        
+        hole_filling!(humid_grid, model.hole_filling, model)  # remove negative humidity
+    end
 
     # get spectral U, V from vorticity and divergence via stream function Ψ and vel potential ϕ
     # U = u*coslat = -coslat*∂Ψ/∂lat + ∂ϕ/dlon
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
     UV_from_vordiv!(U, V, vor, div, S)
-
-    gridded!(vor_grid, vor, S)                # get vorticity on grid from spectral vor
-    gridded!(div_grid, div, S)                # get divergence on grid from spectral div
-    gridded!(temp_grid, temp, S)              # (absolute) temperature
     
-    if wet_core                             # specific humidity (wet core only)
-        gridded!(humid_grid, humid, S)        
-        hole_filling!(humid_grid, model.hole_filling, model)  # remove negative humidity
-    end
-
+    # transform from U, V in spectral to u, v on grid (U, V = u, v*coslat)
+    transform!(u_grid, U, S, unscale_coslat=true)
+    transform!(v_grid, V, S, unscale_coslat=true)
+    
     # include humidity effect into temp for everything stability-related
     temperature_average!(diagn, temp, S)
     virtual_temperature!(diagn, temp, model)  # temp = virt temp for dry core
 
-    # transform from U, V in spectral to u, v on grid (U, V = u, v*coslat)
-    gridded!(u_grid, U, S, unscale_coslat=true)
-    gridded!(v_grid, V, S, unscale_coslat=true)
+    return nothing
+end
 
+# just to test
+function SpeedyTransforms.transform!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    S::SpectralTransform,
+    lf::Integer = 2,
+)   
+    (; vor_grid, pres_grid) = diagn.grid
+    vor = progn.vor[lf]
+    pres = progn.pres[lf]
+    transform!(vor_grid, vor, S)
+    transform!(pres_grid, pres, S)
     return nothing
 end
 
