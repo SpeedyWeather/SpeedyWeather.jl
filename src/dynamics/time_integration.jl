@@ -126,19 +126,21 @@ end
 $(TYPEDSIGNATURES)
 Performs one leapfrog time step with (`lf=2`) or without (`lf=1`) Robert+Williams filter
 (see Williams (2009), Montly Weather Review, Eq. 7-9)."""
-function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic variable at t
-                    A_new::LowerTriangularMatrix{Complex{NF}},      # prognostic variable at t+dt
-                    tendency::LowerTriangularMatrix{Complex{NF}},   # tendency (dynamics+physics) of A
-                    dt::Real,                                       # time step (=2Δt, but for init steps =Δt, Δt/2)
-                    lf::Int,                                        # leapfrog index to dis/enable Williams filter
-                    L::Leapfrog{NF},                                # struct with constants
-                    ) where {NF<:AbstractFloat}                     # number format NF
+function leapfrog!(
+    A_old::LowerTriangularArray,        # prognostic variable at t
+    A_new::LowerTriangularArray,        # prognostic variable at t+dt
+    tendency::LowerTriangularArray,     # tendency (dynamics+physics) of A
+    dt::Real,                           # time step (=2Δt, but for init steps =Δt, Δt/2)
+    lf::Int,                            # leapfrog index to dis/enable Williams filter
+    L::Leapfrog{NF},                    # struct with constants
+) where NF                              # number format NF
 
     @boundscheck lf == 1 || lf == 2 || throw(BoundsError())         # index lf picks leapfrog dim
-    
-    A_lf = lf == 1 ? A_old : A_new                      # view on either t or t+dt to dis/enable Williams filter        
-    (; robert_filter, williams_filter) = L              # coefficients for the Robert and Williams filter
-    dt_NF = convert(NF, dt)                             # time step dt in number format NF
+    @boundscheck size(A_old) == size(A_new) == size(tendency) || throw(BoundsError())
+
+    A_lf = lf == 1 ? A_old : A_new              # view on either t or t+dt to dis/enable Williams filter        
+    (; robert_filter, williams_filter) = L      # coefficients for the Robert and Williams filter
+    dt_NF = convert(NF, dt)                     # time step dt in number format NF
 
     # LEAP FROG time step with or without Robert+Williams filter
     # Robert time filter to compress computational mode, Williams filter for 3rd order accuracy
@@ -148,7 +150,7 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
     w1 = lf == 1 ? zero(NF) : robert_filter*williams_filter/2       # = ν*α/2 in Williams (2009, Eq. 8)
     w2 = lf == 1 ? zero(NF) : robert_filter*(1-williams_filter)/2   # = ν(1-α)/2 in Williams (2009, Eq. 9)
 
-    @inbounds for lm in eachharmonic(A_old, A_new, A_lf, tendency)
+    @inbounds for lm in eachindex(A_old, A_new, tendency)
         a_old = A_old[lm]                       # double filtered value from previous time step (t-Δt)
         a_new = a_old + dt_NF*tendency[lm]      # Leapfrog/Euler step depending on dt=Δt, 2Δt (unfiltered at t+Δt)
         a_update = a_old - 2A_lf[lm] + a_new    # Eq. 8&9 in Williams (2009), calculate only once
@@ -158,37 +160,24 @@ function leapfrog!( A_old::LowerTriangularMatrix{Complex{NF}},      # prognostic
 end
 
 # variables that are leapfrogged in the respective models that are on layers (so excl surface pressure)
-leapfrog_layer_vars(::Barotropic) = (:vor,)
-leapfrog_layer_vars(::ShallowWater) = (:vor, :div)
-leapfrog_layer_vars(::PrimitiveDry) = (:vor, :div, :temp)
-leapfrog_layer_vars(::PrimitiveWet) = (:vor, :div, :temp, :humid)
+leapfrog_vars(::Barotropic)   = (:vor,)
+leapfrog_vars(::ShallowWater) = (:vor, :div, :pres)
+leapfrog_vars(::PrimitiveDry) = (:vor, :div, :temp, :pres)
+leapfrog_vars(::PrimitiveWet) = (:vor, :div, :temp, :humid, :pres)
 
-function leapfrog!( progn::PrognosticLayerTimesteps,
-                    diagn::DiagnosticVariablesLayer,
-                    dt::Real,               # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
-                    lf::Int,                # leapfrog index to dis/enable Williams filter
-                    model::ModelSetup)
-               
-    for var in leapfrog_layer_vars(model)
-        var_old = getproperty(progn.timesteps[1], var)
-        var_new = getproperty(progn.timesteps[2], var)
-        var_tend = getproperty(diagn.tendencies, Symbol(var, :_tend))
-        spectral_truncation!(var_tend)      # set lmax+1 mode to zero
+function leapfrog!(
+    progn::PrognosticVariables,
+    tend::Tendencies,
+    dt::Real,               # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
+    lf::Int,                # leapfrog index to dis/enable Williams filter
+    model::ModelSetup,
+)
+    for var in leapfrog_vars(model)
+        var_old, var_new = getproperty(progn, var)
+        var_tend = getproperty(tend, Symbol(var, :_tend))
+        spectral_truncation!(var_tend)
         leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
     end
-end
-
-function leapfrog!( progn::PrognosticSurfaceTimesteps,
-                    diagn::SurfaceVariables,
-                    dt::Real,               # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
-                    lf::Int,                # leapfrog index to dis/enable Williams filter
-                    model::ModelSetup)
-               
-    (; pres_tend) = diagn
-    pres_old = progn.timesteps[1].pres
-    pres_new = progn.timesteps[2].pres
-    spectral_truncation!(pres_tend)         # set lmax+1 mode to zero
-    leapfrog!(pres_old, pres_new, pres_tend, dt, lf, model.time_stepping)
 end
 
 """

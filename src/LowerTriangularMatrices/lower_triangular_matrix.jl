@@ -215,7 +215,10 @@ function eachharmonic(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
     n = size(L1.data,1) 
     Base._all_match_first(L->size(L.data,1), n, L1, Ls...) || throw(BoundsError)
     return eachharmonic(L1) 
-end 
+end
+
+# TODO change to 2:end when size uses flat indexing
+eachmatrix(L::LowerTriangularArray) = CartesianIndices(size(L)[3:end])
 
 # CONVERSIONS
 """ 

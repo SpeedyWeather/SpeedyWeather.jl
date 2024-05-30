@@ -70,9 +70,17 @@ Truncate spectral coefficients `alms` in-place by setting the upper right triang
 to enforce that all coefficients for which the degree l is larger than order m are zero."""
 spectral_truncation!(alms::AbstractMatrix) = spectral_truncation!(alms, size(alms)...)
 
-function spectral_truncation!(alms::LowerTriangularMatrix{NF}) where NF
+function spectral_truncation!(alms::LowerTriangularMatrix)
     lmax, mmax = size(alms)
     alms[mmax+1:lmax, :] .= 0 # set everything to zero below the triangle
+    return alms
+end
+
+function spectral_truncation!(alms::LowerTriangularArray)
+    lmax, mmax = size(alms)
+    for k in eachmatrix(alms)
+        alms[mmax+1:lmax, :, k] .= 0 # set everything to zero below the triangle
+    end
     return alms
 end
 
