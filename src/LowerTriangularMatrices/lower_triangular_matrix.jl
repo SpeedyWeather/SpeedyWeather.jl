@@ -1,25 +1,26 @@
 """
 $(TYPEDSIGNATURES)
 A lower triangular array implementation that only stores the non-zero entries explicitly.
-`L<:AbstractMatrix` although in general we have `L[i] != Matrix(L)[i]`, the former skips
-zero entries, tha latter includes them.
+`L<:AbstractArray{T,N-1}` although we do allow both "flat" `N-1`-dimensional indexing and 
+additional `N`-dimensional or "matrix-style" indexing.
 
 Supports n-dimensional lower triangular arrays, so that for all trailing dimensions `L[:, :, ..]`
 is a matrix in lower triangular form, e.g. a (5x5x3)-LowerTriangularArray would hold 3 lower
 triangular matrices."""
-struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T}} <: AbstractArray{T,N}
-    data::ArrayType     # non-zero elements unravelled into an array with one dimension less N-1
+struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T,N}} <: AbstractArray{T,N}
+    data::ArrayType     # non-zero elements unravelled into an in which the lower triangle is flattened
     m::Int              # number of rows
     n::Int              # number of columns
 
     LowerTriangularArray{T, N, ArrayType}(data, m, n) where {T, N, ArrayType<:AbstractArray{T}} =
-        check_lta_input_array(data, m, n, N) ?
-        new(data, m, n) :
+        check_lta_input_array(data, m, n, N) ? 
+        new(data, m, n)  :
         error(lta_error_message(data, m, n, T, N, ArrayType))
+ 
 end
 
 check_lta_input_array(data, m, n, N) =
-    (ndims(data) == N-1) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
+    (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
 
 function lta_error_message(data, m, n, T, N, ArrayType) 
     size_tuple = (m, n, size(data[2:end])...)
@@ -28,10 +29,10 @@ function lta_error_message(data, m, n, T, N, ArrayType)
 end 
 
 """2-dimensional `LowerTriangularArray` of type `T`` with its non-zero entries unravelled into a `Vector{T}`"""
-const LowerTriangularMatrix{T} = LowerTriangularArray{T, 2, Vector{T}}
+const LowerTriangularMatrix{T} = LowerTriangularArray{T, 1, Vector{T}}
 
-LowerTriangularArray(data::ArrayType, m::Integer, n::Integer) where {T, N, ArrayType<:AbstractArray{T,N}} =
-    LowerTriangularArray{T, N+1, ArrayType}(data, m, n)
+LowerTriangularArray(data::ArrayType, m::Integer, n::Integer) where {T, N, ArrayType<:AbstractArray{T,N}} = LowerTriangularArray{T, N, ArrayType}(data, m, n)
+
 LowerTriangularMatrix(data::Vector{T}, m::Integer, n::Integer) where T =
     LowerTriangularMatrix{T}(data, m, n)
 
@@ -41,11 +42,56 @@ Length of a `LowerTriangularArray` defined as number of non-zero elements."""
 Base.length(L::LowerTriangularArray) = length(L.data)
 
 """$(TYPEDSIGNATURES)
-Size of a `LowerTriangularArray` defined as matrix size including zero upper triangle."""
-Base.size(L::LowerTriangularArray) = (L.m, L.n, size(L.data)[2:end]...)
+Size of a `LowerTriangularArray` defined as size of the flattened array."""
+Base.size(L::LowerTriangularArray) = size(L.data)
+
+"""$(TYPEDSIGNATURES)
+Size of a expanded `LowerTriangularArray` as if it were a full matrix,  
+returns `(L.m, L.n, size(L.data)[2:end])``."""
+matrix_size(L::LowerTriangularArray)  = (L.m, L.n, size(L.data)[2:end]...)
+matrix_size(L::LowerTriangularArray, i::Int) = matrix_size(L)[i] 
 
 # sizeof the underlying data vector
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
+
+function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularMatrix)
+    Base.array_summary(io, L, axes(L))
+    
+    # the following is copied over from base/arrayshow.jl
+    X = Matrix(L)
+    # 2) compute new IOContext
+    if !haskey(io, :compact) && length(axes(X, 2)) > 1
+        io = IOContext(io, :compact => true)
+    end
+    if get(io, :limit, false)::Bool && eltype(X) === Method
+        # override usual show method for Vector{Method}: don't abbreviate long lists
+        io = IOContext(io, :limit => false)
+    end
+
+    if get(io, :limit, false)::Bool && displaysize(io)[1]-4 <= 0
+        return print(io, " …")
+    else
+        println(io)
+    end
+
+    # 3) update typeinfo
+    #
+    # it must come after printing the summary, which can exploit :typeinfo itself
+    # (e.g. views)
+    # we assume this function is always called from top-level, i.e. that it's not nested
+    # within another "show" method; hence we always print the summary, without
+    # checking for current :typeinfo (this could be changed in the future)
+    io = IOContext(io, :typeinfo => eltype(X))
+
+    # 4) show actual content
+    recur_io = IOContext(io, :SHOWN_SET => X)
+    Base.print_array(recur_io, X)
+end
+
+function Base.array_summary(io::IO, L::LowerTriangularMatrix{T}, inds::Tuple{Vararg{Base.OneTo}}) where T
+    mn = matrix_size(L)
+    print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T}")
+end
 
 # CREATE INSTANCES (ZEROS, ONES, UNDEF)
 for f in (:zeros, :ones, :rand, :randn)
@@ -78,13 +124,13 @@ for f in (:zeros, :ones, :rand, :randn)
     end
 end
 
-Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, size(L)...)
-Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, size(L)...)
+Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, matrix_size(L)...)
+Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, matrix_size(L)...)
 
 function LowerTriangularArray{T, N, ArrayType}(
     ::UndefInitializer,
-    I::Vararg{Integer,N},
-) where {T, N, ArrayType<:AbstractArray{T}}
+    I::Vararg{Integer,M},
+) where {T, N, M, ArrayType<:AbstractArray{T}}
     return LowerTriangularArray(ArrayType(undef, nonzeros(I[1], I[2]), I[3:end]...), I[1], I[2])
 end
 
@@ -122,79 +168,66 @@ Angeletti et al, 2019, https://hal.science/hal-02047514/document)
 end 
 k2ij(I::CartesianIndex, m::Int) = CartesianIndex(k2ij(I[1], m)...,I.I[2:end]...) 
 
-# direct indexing, no. indices have to be one less than `N` for the correct dimensionality, so N!=M
-@inline function Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Integer, M}) where {T, N, M}
-    @boundscheck M == N-1 || throw(BoundsError(L, I))
-    return getindex(L.data, I...) 
-end
-
-# integer + other indices (:, ranges, etc...)
-@inline function Base.getindex(L::LowerTriangularArray{T, N}, k::Integer, I::Vararg{R, M}) where {T,N,R,M}
-    @boundscheck M == N-2 || throw(BoundsError(L, I))
-    return getindex(L.data, k, I...)
-end
-
-# double index i,j, i.e. spherical harmoinc indexing (1-based), no. indices has to be equal to N 
-Base.@propagate_inbounds function Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Integer, N}) where {T, N}
-    i, j = I[1:2]
-    @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
-    @boundscheck j > i && return zero(T)
-    k = ij2k(i, j, L.m)
-    return getindex(L.data, k, I[3:end]...)
-end
-
-# l,m sph indexing with integer + other indices
-@inline function Base.getindex(L::LowerTriangularArray{T,N}, i::Integer, j::Integer, I::Vararg{R, M}) where {T, N, R, M}
-    @boundscheck M == N-2 || throw(BoundsError(L, I))
-    @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
-    # to get a zero element in the correct shape, we just take the zero element of some valid element,
-    # there are probably faster ways to do this, but I don't know how, and this is just a fallback anyway 
-    @boundscheck j > i && return zero(getindex(L.data, 1, I...)) 
-    k = ij2k(i, j, L.m)
-    return getindex(L.data, k, I...)
-end
+# direct indexing, no. indices have to be equal to `N` for the correct dimensionality
+@inline Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Any, N}) where {T, N} = getindex(L.data, I...) 
 
 # indexing with : + other indices, returns a LowerTriangularArray
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, col::Colon, I...) where {T,N}
     return LowerTriangularArray(getindex(L.data, col, I...), L.m, L.n)
 end
 
+# l,m sph "matrix-style"  indexing with integer + other indices
+@inline function Base.getindex(L::LowerTriangularArray{T,N}, I::Vararg{Any, M}) where {T, N, M}
+    @boundscheck M == N+1 || throw(BoundsError(L, I))
+    i, j = I[1:2]
+    @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
+    # to get a zero element in the correct shape, we just take the zero element of some valid element,
+    # there are probably faster ways to do this, but I don't know how, and this is just a fallback anyway 
+    @boundscheck j > i && return zero(getindex(L.data, 1, I[3:end]...)) 
+    k = ij2k(i, j, L.m)
+    return getindex(L.data, k, I[3:end]...)
+end
+
 @inline function Base.getindex(L::LowerTriangularMatrix{T}, col::Colon, i::Integer) where T
     return Matrix(L)[:,i]
 end
 
-# Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, r::AbstractRange) = getindex(L.data, r)
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, r::AbstractRange, I...) = getindex(L.data, r, I...)
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, i::Integer) = getindex(L.data, i)
-
 # important to do Tuple(I) here for the j > i case as one of the getindex methods above is called
-Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray, I::CartesianIndex) = getindex(L, Tuple(I)...)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, I::CartesianIndex{M}) where {T,N,M} = getindex(L, Tuple(I)...)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, I::CartesianIndex{N}) where {T,N} = getindex(L.data, I)
+
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, i::Integer) where {T,N} = getindex(L.data, i)
+
+# needed to remove ambigouities in 1D case 
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer) where {T,V<:AbstractVector{T}} = getindex(L.data, i)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, I::CartesianIndex{M}) where {T,V<:AbstractVector{T},M} = getindex(L, Tuple(I)...)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer, I::CartesianIndex{0}) where {T,V<:AbstractVector{T}} = getindex(L, i)
 
 # setindex with lm, ..
-@inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, M}) where {T, N, M} 
-    @boundscheck M == N-1 || throw(BoundsError(L, I))
-    setindex!(L.data, x, I...)
-end 
+@inline Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N} = setindex!(L.data, x, I...)
 
 # setindex with il, im, ..
-@inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N}
-    i, j = I[1:2] # TODO: check if i,j are Int?
+@inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, M}) where {T, N, M}
+    @boundscheck N+1==M || throw(BoundsError(L,I))
+    i, j = I[1:2] 
     @boundscheck i >= j || throw(BoundsError(L, (i, j)))
     k = ij2k(i, j, L.m)
     setindex!(L.data, x, k, I[3:end]...)
 end
 
 # this is specifically here for the weird way in which AssociatedLegendrePolynomials.jl indexes with an empty CartesianIndex
-@inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, i::CartesianIndex, I::Vararg{Any, N}) where {T,N}
-    i, j = I[1:2] # TODO: check if i,j are Int?
-    @boundscheck i >= j || throw(BoundsError(L, (i, j)))
-    k = ij2k(i, j, L.m)
-    setindex!(L.data, x, k, I[3:end]...)
-end
+@inline Base.setindex!(L::LowerTriangularArray{T,N}, x, i::CartesianIndex{0}, I::Vararg{Any, M}) where {T,N, M} = setindex!(L, x, I)
 
-@inline Base.setindex!(L::LowerTriangularArray, x::AbstractVector, r::AbstractRange, I...) = setindex!(L.data, x, r, I...)
-@inline Base.setindex!(L::LowerTriangularArray, x, i::Integer) = setindex!(L.data, x, i)
+
 @inline Base.setindex!(L::LowerTriangularArray, x, I::CartesianIndex) = setindex!(L, x, Tuple(I)...)
+@inline Base.setindex!(L::LowerTriangularArray{T,N}, x, I::CartesianIndex{N}) where {T,N} = setindex!(L.data, x, I)
+@inline Base.setindex!(L::LowerTriangularArray{T,N}, x, i::Integer) where {T,N} = setindex!(L.data, x, i)
+
+# this is to avoid ambigouities
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, i::Integer) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, i)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{1}) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, I)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{2}) where {T,V<:AbstractVector{T}} = setindex!(L, x, Tuple(I)...)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, i::Integer, I::CartesianIndex{0}) where {T,V<:AbstractVector{T}} = setindex!(L, x, i)
 
 # propagate index to data vector
 Base.eachindex(L ::LowerTriangularArray)    = eachindex(L.data)
@@ -265,18 +298,23 @@ LowerTriangularArray(L::LowerTriangularArray) = LowerTriangularArray(L.data, L.m
 LowerTriangularMatrix(M::AbstractMatrix) = LowerTriangularArray(M)
 
 function Base.Matrix(L::LowerTriangularMatrix{T}) where T
-    m, n = size(L)
+    m, n = matrix_size(L)
     M = zeros(T, m, n)
     copyto!(M, L)
 end
+
+function Base.Array(L::LowerTriangularArray{T}) where T
+    A = zeros(T, matrix_size(L))
+    copyto!(A, L)
+end 
             
 function Base.copyto!(
-    L1::LowerTriangularArray{T, N, ArrayType1},
+    L1::LowerTriangularArray{T},
     L2::LowerTriangularArray
-) where {T, N, ArrayType1<:AbstractArray{T}}
+) where T
     # if sizes don't match copy over the largest subset of indices
-    size(L1) != size(L2) && return copyto!(L1, L2,  Base.OneTo(minimum(size.((L1, L2), 1))),
-                                                    Base.OneTo(minimum(size.((L1, L2), 2))))
+    size(L1) != size(L2) && return copyto!(L1, L2,  Base.OneTo(minimum(matrix_size.((L1, L2), 1))),
+                                                    Base.OneTo(minimum(matrix_size.((L1, L2), 2))))
 
     L1.data .= convert.(T, L2.data)
     L1
@@ -288,20 +326,20 @@ function Base.copyto!(
     L2::LowerTriangularArray{S,N,ArrayType2},   # copy from L2
     ls::AbstractUnitRange,                      # range of indices in 1st dim
     ms::AbstractUnitRange,                      # range of indices in 2nd dim
-) where {T, S, N, ArrayType1<:Array{T}, ArrayType2<:Array{S}}
+) where {T, S, N, ArrayType1<:Array{T,N}, ArrayType2<:Array{S,N}}
 
-    lmax, mmax = size(L2)        # use the size of L2 for boundscheck
+    lmax, mmax = matrix_size(L2)[1:2]        # use the size of L2 for boundscheck
     @boundscheck maximum(ls) <= lmax || throw(BoundsError)
     @boundscheck maximum(ms) <= mmax || throw(BoundsError)
 
-    lmax, mmax = size(L1)        # but the size of L1 to loop
+    lmax, mmax = matrix_size(L1)[1:2]        # but the size of L1 to loop
     lm = 0
     @inbounds for m in 1:mmax
         for l in m:lmax
             lm += 1
-            L1[lm,[Colon() for i=1:(N-2)]...] = (l in ls) && (m in ms) ?
-                                                T.(L2[l, m, [Colon() for i=1:(N-2)]...]) :
-                                                L1[lm, [Colon() for i=1:(N-2)]...]
+            L1[lm,[Colon() for i=1:(N-1)]...] = (l in ls) && (m in ms) ?
+                                                T.(L2[l, m, [Colon() for i=1:(N-1)]...]) :
+                                                L1[lm, [Colon() for i=1:(N-1)]...]
         end
     end
 
@@ -325,11 +363,11 @@ function _copyto_core!(
     ms::AbstractUnitRange,                      # range of indices in 2nd dim
 ) where {T, S, N, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}
 
-    lmax_2, mmax_2 = size(L2)[1:2]       # use the size of L2 for boundscheck
+    lmax_2, mmax_2 = matrix_size(L2)[1:2]       # use the size of L2 for boundscheck
     @boundscheck maximum(ls) <= lmax_2 || throw(BoundsError)
     @boundscheck maximum(ms) <= mmax_2 || throw(BoundsError)
 
-    lmax_1, mmax_1 = size(L1)[1:2]
+    lmax_1, mmax_1 = matrix_size(L1)[1:2]
 
     # we'll setup the 1D-indices that correspond to the given range here
     ind_L1 = lowertriangle_indices(lmax_1, mmax_1)
@@ -358,15 +396,14 @@ function _copyto_core!(
     end 
     ind_L2 = ind_L2_smaller[ind_L2] # also flattens the indices into indices for the L2.data array
 
-    L1.data[ind_L1,[Colon() for i=1:(N-2)]...] = T.(L2.data[ind_L2,[Colon() for i=1:(N-2)]...])
+    L1.data[ind_L1,[Colon() for i=1:(N-1)]...] = T.(L2.data[ind_L2,[Colon() for i=1:(N-1)]...])
 
     L1
 end 
 
 function Base.copyto!(  L::LowerTriangularArray{T},    # copy to L
-                        M::AbstractMatrix) where T      # copy from M
-
-    @boundscheck size(L) == size(M) || throw(BoundsError)
+                        M::AbstractArray) where T    # copy from M
+    @boundscheck matrix_size(L) == size(M) || throw(BoundsError)
     L.data .= convert.(T, M[lowertriangle_indices(M)])
 
     L
@@ -374,8 +411,7 @@ end
 
 function Base.copyto!(  M::AbstractArray{T},               # copy to M
                         L::LowerTriangularArray) where T   # copy from L
-
-    @boundscheck size(L) == size(M) || throw(BoundsError)
+    @boundscheck matrix_size(L) == size(M) || throw(BoundsError)
 
     lower_triangle_indices = lowertriangle_indices(M)
     upper_triangle_indices = @. ~lower_triangle_indices # upper triangle without main diagonal 
@@ -403,61 +439,27 @@ function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix
     return LowerTriangularMatrix{T}(L.data, L.m, L.n)
 end
 
+function Base.similar(::LowerTriangularArray{T,N,ArrayType}, I::Integer...) where {T, N, ArrayType}
+    return LowerTriangularArray{T,N,ArrayType}(undef, I...)
+end
+
 function Base.similar(::LowerTriangularArray{T,N,ArrayType}, size::S) where {T, N, ArrayType, S<:Tuple}
     return LowerTriangularArray{T,N,ArrayType}(undef, size...)
 end
 
 function Base.similar(L::LowerTriangularArray{S,N,ArrayType}, ::Type{T}) where {T, S, N, ArrayType}
-    new_array_type = typeof(T.(L.data)) # TODO: not sure how else to infer this type 
-    return LowerTriangularArray{T,N,new_array_type}(undef, size(L)...)
+    ArrayType_ = nonparametric_type(ArrayType) # TODO: not sure how else to infer this type 
+    return LowerTriangularArray{T,N,ArrayType_{T,N}}(undef, matrix_size(L)...)
 end
 
 Base.similar(L::LowerTriangularArray{T,N,ArrayType}, ::Type{T}) where {T, N, ArrayType} =
-    LowerTriangularArray{T,N,ArrayType}(undef, size(L)...)
+    LowerTriangularArray{T,N,ArrayType}(undef, matrix_size(L)...)
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
 # ARITHMETIC
-# While these would work just via broadcast (and the abstractarray interface), these explicit definitions are significantly faster
-# only mul/div with scalar and addition/subtraction, others are handled via the custom broadcast
 Base.:(*)(L::LowerTriangularArray{T}, s::Number) where T = LowerTriangularArray(L.data .* s, L.m, L.n)
 Base.:(*)(s::Number, L::LowerTriangularArray) = L*s         # commutative
 Base.:(/)(L::LowerTriangularArray{T}, s::Number) where T = LowerTriangularArray(L.data ./ s, L.m, L.n)
-
-function Base.:(+)(
-    L1::LowerTriangularArray{T, N, ArrayType},
-    L2::LowerTriangularArray{S, N, ArrayType},
-) where {T, S, N, ArrayType}
-    @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
-    LowerTriangularArray(L1.data + L2.data, L1.m, L1.n)
-end
-
-function Base.:(-)(
-    L1::LowerTriangularArray{T,N,ArrayType},
-    L2::LowerTriangularArray{S,N,ArrayType}
-) where {T, S, N, ArrayType}
-    @boundscheck (L1.m == L2.m) && (L1.n == L2.n) || throw(BoundsError)
-    LowerTriangularArray(L1.data - L2.data, L1.m, L1.n)
-end
-
-Base.:(-)(L::LowerTriangularArray) = LowerTriangularArray(-L.data, L.m, L.n)
-
-"""
-$(TYPEDSIGNATURES)
-Adds `L1` to `L`, so that `L .+= L1`
-"""
-function add!(L::LowerTriangularArray, L1::LowerTriangularArray)
-    L.data .+= L1.data
-    return L
-end 
-
-"""
-$(TYPEDSIGNATURES)
-Adds `L1` and `L2` to `L`, so that `L .+= L1 .+ L2`
-"""
-function add!(L::LowerTriangularArray, L1::LowerTriangularArray, L2::LowerTriangularArray)
-    L.data .+= L1.data + L2.data
-    return L
-end 
 
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
 
@@ -515,20 +517,21 @@ LowerTriangularGPUStyle{N, ArrayType}(::Val{M}) where {N, ArrayType, M} =
 nonparametric_type(::Type{<:Array}) = Array
 # nonparametric_type(::Type{<:CUDA.CuArray}) = CuArray
 
+"`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments. 
+Adapted from Julia documentation of Broadcast interface"
+find_L(bc::Base.Broadcast.Broadcasted) = find_L(bc.args)
+find_L(args::Tuple) = find_L(find_L(args[1]), Base.tail(args))
+find_L(x) = x
+find_L(::Tuple{}) = nothing
+find_L(a::LowerTriangularArray, rest) = a
+find_L(::Any, rest) = find_L(rest)
+
 function Base.similar(
     bc::Broadcasted{LowerTriangularStyle{N, ArrayType}},
     ::Type{T},
 ) where {N, ArrayType, T}
-    ArrayType_ = nonparametric_type(ArrayType)
-    #TODO branch currently not hit because these are always false, although they should be true for
-    # operations like +, -, ... then returning a `LowerTriangularArray` again
-    # if isstructurepreserving(bc) || fzeropreserving(bc)
-    #     return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
-    # end
-    # TODO should return the similar for operations that escape the structure, e.g. .==
-    # but given the TODO above return a `LowerTriangularArray` in both cases
-    # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
-    return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
+    L = find_L(bc)
+    return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, matrix_size(L))
 end
 
 # same function as above, but needs to be defined for both CPU and GPU style
@@ -536,73 +539,8 @@ function Base.similar(
     bc::Broadcasted{LowerTriangularGPUStyle{N, ArrayType}},
     ::Type{T},
 ) where {N, ArrayType, T}
-    ArrayType_ = nonparametric_type(ArrayType)
-    #TODO branch currently not hit because these are always false, although they should be true for
-    # operations like +, -, ... then returning a `LowerTriangularArray` again
-    # if isstructurepreserving(bc) || fzeropreserving(bc)
-    #     return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
-    # end
-    # TODO should return the similar for operations that escape the structure, e.g. .==
-    # but given the TODO above return a `LowerTriangularArray` in both cases
-    # return similar(convert(Broadcasted{DefaultArrayStyle{ndims(bc)}}, bc), T)
-    return LowerTriangularArray{T, N, ArrayType_{T}}(undef, size(bc)...)
-end
-
-function Base.copyto!(
-    dest::LowerTriangularArray{T, N, ArrayTypeP},
-    bc::Broadcasted{LowerTriangularStyle{N, ArrayType}},
-) where {T, N, ArrayTypeP <: Array, ArrayType <: Array}
-    axs = axes(dest)
-    axes(bc) == axs || Broadcast.throwdm(axes(bc), axs)
-
-    lmax, mmax = size(dest)
-    lm = 0
-
-    for m in 1:mmax
-        for l in m:lmax
-            lm += 1
-            for I in Iterators.product(axs[3:end]...)
-                dest.data[lm, I...] = Broadcast._broadcast_getindex(bc, CartesianIndex(l, m, I...))
-            end 
-        end
-    end
-    return dest
-end
-
-# GPU methods (should be moved to an extension, in case this becomes a standalone package)
-import GPUArrays._copyto!
-
-# copied and adjusted from GPUArrays.jl
-@inline function GPUArrays._copyto!(
-    dest::LowerTriangularArray{T, N, ArrayType},
-    bc::Broadcasted
-) where {T, N, ArrayType}
-    
-    axes(dest) == axes(bc) || Broadcast.throwdm(axes(dest), axes(bc))
-    isempty(dest) && return dest
-    bc = Broadcast.preprocess(dest, bc)
-
-    broadcast_kernel = function (ctx, dest, bc, nelem)
-            i = 0
-            while i < nelem
-                i += 1
-                I = GPUArrays.@cartesianidx(dest.data, i) 
-                # TODO: the k2ij is costly, if we intend to accelarate this, this needs to be precomputed
-                @inbounds dest.data[I] = bc[k2ij(I, dest.m)]
-            end                                                                     
-            return
-        end
-
-    elements = length(dest.data)
-    elements_per_thread = typemax(Int)
-    heuristic = GPUArrays.launch_heuristic(GPUArrays.backend(dest), broadcast_kernel, dest, bc, 1;
-                                 elements, elements_per_thread)
-    config = GPUArrays.launch_configuration(GPUArrays.backend(dest), heuristic;
-                                  elements, elements_per_thread)
-    GPUArrays.gpu_call(broadcast_kernel, dest, bc, config.elements_per_thread;
-             threads=config.threads, blocks=config.blocks)
-
-    return dest
+    L = find_L(bc)
+    return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, matrix_size(L))
 end
 
 function GPUArrays.backend(

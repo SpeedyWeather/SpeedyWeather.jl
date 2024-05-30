@@ -12,10 +12,9 @@ import LinearAlgebra: tril!
 
 # VISUALISATION
 import UnicodePlots
-# export plot
 
 export LowerTriangularMatrix, LowerTriangularArray
-export eachharmonic, eachmatrix, add!
+export eachharmonic, eachmatrix, matrix_size
 
 include("lower_triangular_matrix.jl")
 include("plot.jl")
