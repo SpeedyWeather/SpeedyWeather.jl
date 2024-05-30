@@ -3,12 +3,12 @@ Calculate all tendencies for the BarotropicModel."""
 function dynamics_tendencies!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
-    lf::Integer,
+    lf::Integer,                    # leapfrog index to evaluate tendencies at
     model::Barotropic
 )
-    forcing!(diagn, progn, model.forcing, model)    # = (Fᵤ, Fᵥ) forcing for u, v
-    drag!(diagn, progn, model.drag, model)          # drag term for u, v
-    vorticity_flux!(diagn, model)                   # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
+    forcing!(diagn, progn, model.forcing, model, lf)    # = (Fᵤ, Fᵥ) forcing for u, v
+    drag!(diagn, progn, model.drag, model, lf)          # drag term for u, v
+    vorticity_flux!(diagn, model)                       # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
 end
 
 """
@@ -540,7 +540,7 @@ with
 with `Fᵤ, Fᵥ` from `u_tend_grid`/`v_tend_grid` that are assumed to be alread
 set in `forcing!`. Set `div=false` for the BarotropicModel which doesn't
 require the divergence tendency."""
-function vorticity_flux_curldiv!(   diagn::DiagnosticVariablesLayer,
+function vorticity_flux_curldiv!(   diagn::DiagnosticVariables,
                                     coriolis::AbstractCoriolis,
                                     geometry::Geometry,
                                     S::SpectralTransform;
@@ -550,31 +550,33 @@ function vorticity_flux_curldiv!(   diagn::DiagnosticVariablesLayer,
     (; f) = coriolis
     (; coslat⁻¹) = geometry
 
-    (; u_tend_grid, v_tend_grid) = diagn.tendencies  # already contains forcing
-    u = diagn.grid_variables.u_grid             # velocity
-    v = diagn.grid_variables.v_grid             # velocity
-    vor = diagn.grid_variables.vor_grid         # relative vorticity
+    (; u_tend_grid, v_tend_grid) = diagn.tendencies     # already contains forcing
+    u = diagn.grid.u_grid                               # velocity
+    v = diagn.grid.v_grid                               # velocity
+    vor = diagn.grid.vor_grid                           # relative vorticity
 
     # precompute ring indices and boundscheck
     rings = eachring(u_tend_grid, v_tend_grid, u, v, vor)
 
-    @inbounds for (j, ring) in enumerate(rings)
-        coslat⁻¹j = coslat⁻¹[j]
-        f_j = f[j]
-        for ij in ring
-            ω = vor[ij] + f_j                   # absolute vorticity
-            u_tend_grid[ij] = (u_tend_grid[ij] + v[ij]*ω)*coslat⁻¹j
-            v_tend_grid[ij] = (v_tend_grid[ij] - u[ij]*ω)*coslat⁻¹j
+    for k in eachgrid(u)
+        for (j, ring) in enumerate(rings)
+            coslat⁻¹j = coslat⁻¹[j]
+            f_j = f[j]
+            for ij in ring
+                ω = vor[ij, k] + f_j                   # absolute vorticity
+                u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v[ij, k]*ω)*coslat⁻¹j
+                v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u[ij, k]*ω)*coslat⁻¹j
+            end
         end
     end
 
     # divergence and curl of that u, v_tend vector for vor, div tendencies
     (; vor_tend, div_tend ) = diagn.tendencies
-    u_tend = diagn.dynamics_variables.a
-    v_tend = diagn.dynamics_variables.b
+    u_tend = diagn.dynamics.a
+    v_tend = diagn.dynamics.b
 
-    spectral!(u_tend, u_tend_grid, S)
-    spectral!(v_tend, v_tend_grid, S)
+    transform!(u_tend, u_tend_grid, S)
+    transform!(v_tend, v_tend_grid, S)
 
     curl!(vor_tend, u_tend, v_tend, S; add)                 # ∂ζ/∂t = ∇×(u_tend, v_tend)
     div && divergence!(div_tend, u_tend, v_tend, S; add)    # ∂D/∂t = ∇⋅(u_tend, v_tend)
@@ -595,7 +597,7 @@ with
 
 with Fᵤ, Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
 vorticity ζ, coriolis f."""
-function vorticity_flux!(diagn::DiagnosticVariablesLayer, model::ShallowWater)
+function vorticity_flux!(diagn::DiagnosticVariables, model::ShallowWater)
     C = model.coriolis
     G = model.geometry
     S = model.spectral_transform
@@ -615,7 +617,7 @@ with
 
 with Fᵤ, Fᵥ the forcing from `forcing!` already in `u_tend_grid`/`v_tend_grid` and
 vorticity ζ, coriolis f."""
-function vorticity_flux!(diagn::DiagnosticVariablesLayer, model::Barotropic)
+function vorticity_flux!(diagn::DiagnosticVariables, model::Barotropic)
     C = model.coriolis
     G = model.geometry
     S = model.spectral_transform
@@ -712,7 +714,8 @@ function SpeedyTransforms.transform!(
     diagn::DiagnosticVariables,   
     progn::PrognosticVariables,
     lf::Integer,
-    model::Barotropic,
+    model::Barotropic;
+    kwargs...
 )    
     (; vor_grid, u_grid, v_grid ) = diagn.grid
     vor = progn.vor[lf]             # relative vorticity at leapfrog step lf
@@ -744,7 +747,8 @@ function SpeedyTransforms.transform!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     lf::Integer,
-    model::ShallowWater,
+    model::ShallowWater;
+    kwargs...
 )
     (; vor_grid, div_grid, pres_grid, u_grid, v_grid ) = diagn.grid
     vor =  progn.vor[lf]            # relative vorticity at leapfrog step lf

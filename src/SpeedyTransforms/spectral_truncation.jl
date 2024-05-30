@@ -69,9 +69,13 @@ function spectral_truncation!(alms::LowerTriangularMatrix)
 end
 
 function spectral_truncation!(alms::LowerTriangularArray)
-    lmax, mmax = matrix_size(alms)
+    lmax, mmax = matrix_size(alms)[1:2]
     for k in eachmatrix(alms)
-        alms[mmax+1:lmax, :, k] .= 0 # set everything to zero below the triangle
+        for m in 1:mmax
+            for l in mmax+1:lmax    # set everything to zero below the triangle
+                alms[l, m, k] = 0
+            end
+        end
     end
     return alms
 end

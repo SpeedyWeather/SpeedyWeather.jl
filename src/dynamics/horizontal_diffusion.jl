@@ -126,37 +126,41 @@ Apply horizontal diffusion to a 2D field `A` in spectral space by updating its t
 with an implicitly calculated diffusion term. The implicit diffusion of the next time step is split
 into an explicit part `∇²ⁿ_expl` and an implicit part `∇²ⁿ_impl`, such that both can be calculated
 in a single forward step by using `A` as well as its tendency `tendency`."""
-function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   # tendency of a 
-                                A::LowerTriangularMatrix{Complex{NF}},          # spectral horizontal field
-                                ∇²ⁿ_expl::AbstractVector{NF},                   # explicit spectral damping
-                                ∇²ⁿ_impl::AbstractVector{NF}                    # implicit spectral damping
-                                ) where NF
-    lmax, mmax = matrix_size(tendency)      # 1-based
+function horizontal_diffusion!( 
+    tendency::LowerTriangularArray,     # tendency of a 
+    A::LowerTriangularArray,            # spectral horizontal field
+    ∇²ⁿ_expl::AbstractVector,           # explicit spectral damping (vector of k vectors of lmax length)
+    ∇²ⁿ_impl::AbstractVector            # implicit spectral damping (vector of k vectors of lmax length)
+)
+    lmax, mmax = matrix_size(tendency)[1:2]      # 1-based
 
     @boundscheck size(tendency) == size(A) || throw(BoundsError)
-    @boundscheck lmax <= length(∇²ⁿ_expl) == length(∇²ⁿ_impl) || throw(BoundsError)
+    @boundscheck lmax <= length(∇²ⁿ_expl[1]) == length(∇²ⁿ_impl[1]) || throw(BoundsError)
 
-    lm = 0
-    @inbounds for m in 1:mmax   # loops over all columns/order m
-        for l in m:lmax-1       # but skips the lmax+2 degree (1-based)
-            lm += 1             # single index lm corresponding to harmonic l, m
-            tendency[lm] = (tendency[lm] + ∇²ⁿ_expl[l]*A[lm])*∇²ⁿ_impl[l]
+    for k in eachmatrix(tendency)
+        lm = 0
+        for m in 1:mmax             # loops over all columns/order m
+            for l in m:lmax-1       # but skips the lmax+2 degree (1-based)
+                lm += 1             # single index lm corresponding to harmonic l, m
+                tendency[lm, k] = (tendency[lm, k] + ∇²ⁿ_expl[k][l]*A[lm, k]) * ∇²ⁿ_impl[k][l]
+            end
+            lm += 1                 # skip last row for scalar quantities
         end
-        lm += 1                 # skip last row for scalar quantities
     end
 end
 
 """$(TYPEDSIGNATURES)
 Apply horizontal diffusion to vorticity in the BarotropicModel."""
-function horizontal_diffusion!( diagn::DiagnosticVariablesLayer,
-                                progn::PrognosticLayerTimesteps,
-                                model::Barotropic,
-                                lf::Int=1)      # leapfrog index used (2 is unstable)
-    ∇²ⁿ = model.horizontal_diffusion.∇²ⁿ[diagn.k]
-    ∇²ⁿ_implicit = model.horizontal_diffusion.∇²ⁿ_implicit[diagn.k]
+function horizontal_diffusion!( 
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    model::Barotropic,
+    lf::Integer = 1,    # leapfrog index used (2 is unstable)
+)
+    (; ∇²ⁿ, ∇²ⁿ_implicit) = model.horizontal_diffusion
 
     # Barotropic model diffuses vorticity (only variable)
-    (; vor) = progn.timesteps[lf]
+    vor = progn.vor[lf]
     (; vor_tend) = diagn.tendencies
     horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
 end

@@ -8,9 +8,9 @@ Acts on the unit sphere, i.e. it omits 1/radius scaling as all inplace gradient 
 `flipsign` option calculates -∇×(u, v) instead. `add` option calculates `curl += ∇×(u, v)` instead.
 `flipsign` and `add` can be combined. This functions only creates the kernel and calls the generic
 divergence function _divergence! subsequently with flipped u, v -> v, u for the curl."""
-function curl!( curl::LowerTriangularMatrix,
-                u::LowerTriangularMatrix,
-                v::LowerTriangularMatrix,
+function curl!( curl::LowerTriangularArray,
+                u::LowerTriangularArray,
+                v::LowerTriangularArray,
                 S::SpectralTransform;
                 flipsign::Bool=false,
                 add::Bool=false,
@@ -30,9 +30,9 @@ Acts on the unit sphere, i.e. it omits 1/radius scaling as all inplace gradient 
 `flipsign` option calculates -∇⋅(u, v) instead. `add` option calculates `div += ∇⋅(u, v)` instead.
 `flipsign` and `add` can be combined. This functions only creates the kernel and calls
 the generic divergence function _divergence! subsequently."""
-function divergence!(   div::LowerTriangularMatrix,
-                        u::LowerTriangularMatrix,
-                        v::LowerTriangularMatrix,
+function divergence!(   div::LowerTriangularArray,
+                        u::LowerTriangularArray,
+                        v::LowerTriangularArray,
                         S::SpectralTransform;
                         flipsign::Bool=false,
                         add::Bool=false,
@@ -51,43 +51,48 @@ Generic as it uses the kernel `kernel` such that curl, div, add or flipsign
 options are provided through `kernel`, but otherwise a single function is used.
 Acts on the unit sphere, i.e. it omits 1/radius scaling as all inplace gradient operators.
 """
-function _divergence!(  kernel,
-                        div::LowerTriangularMatrix{Complex{NF}},
-                        u::LowerTriangularMatrix{Complex{NF}},
-                        v::LowerTriangularMatrix{Complex{NF}},
-                        S::SpectralTransform{NF}
-                        ) where {NF<:AbstractFloat}
+function _divergence!(  
+    kernel,
+    div::LowerTriangularArray{NF},
+    u::LowerTriangularArray,
+    v::LowerTriangularArray,
+    S::SpectralTransform
+) where NF                          # target number format
 
     @boundscheck size(u) == size(div) || throw(BoundsError)
     @boundscheck size(v) == size(div) || throw(BoundsError)
 
     (; grad_y_vordiv1, grad_y_vordiv2 ) = S
-    @boundscheck size(grad_y_vordiv1) == size(div) || throw(BoundsError)
-    @boundscheck size(grad_y_vordiv2) == size(div) || throw(BoundsError)
-    lmax, mmax = matrix_size(div) .- (2, 1)              # 0-based lmax, mmax 
+    @boundscheck matrix_size(grad_y_vordiv1) == matrix_size(div)[1:2] || throw(BoundsError)
+    @boundscheck matrix_size(grad_y_vordiv2) == matrix_size(div)[1:2] || throw(BoundsError)
+    lmax, mmax, _ = matrix_size(div)
+    lmax -= 2   # 0-based lmax, mmax
+    mmax -= 1
 
-    lm = 0
-    @inbounds for m in 1:mmax+1                 # 1-based l, m
-        
-        # DIAGONAL (separate to avoid access to v[l-1, m])
-        lm += 1                                 
-        ∂u∂λ  = ((m-1)*im)*u[lm]
-        ∂v∂θ1 = zero(Complex{NF})               # always above the diagonal
-        ∂v∂θ2 = grad_y_vordiv2[lm]*v[lm+1]
-        div[lm] = kernel(div[lm], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
-
-        # BELOW DIAGONAL (but skip last row)
-        for l in m+1:lmax+1
-            lm += 1
+    for k in eachmatrix(div)
+        lm = 0
+        for m in 1:mmax+1                   # 1-based l, m
+            
+            # DIAGONAL (separate to avoid access to v[l-1, m])
+            lm += 1                                 
             ∂u∂λ  = ((m-1)*im)*u[lm]
-            ∂v∂θ1 = grad_y_vordiv1[lm]*v[lm-1]
-            ∂v∂θ2 = grad_y_vordiv2[lm]*v[lm+1]  # this pulls in data from the last row though
+            ∂v∂θ1 = zero(NF)                # always above the diagonal
+            ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm+1, k]
             div[lm] = kernel(div[lm], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
-        end
 
-        # Last row, only vectors make use of the lmax+1 row, set to zero for scalars div, curl
-        lm += 1
-        div[lm] = zero(Complex{NF})
+            # BELOW DIAGONAL (but skip last row)
+            for l in m+1:lmax+1
+                lm += 1
+                ∂u∂λ  = ((m-1)*im)*u[lm, k]
+                ∂v∂θ1 = grad_y_vordiv1[lm] * v[lm-1, k]
+                ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm+1, k]  # this pulls in data from the last row though
+                div[lm] = kernel(div[lm, k], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
+            end
+
+            # Last row, only vectors make use of the lmax+1 row, set to zero for scalars div, curl
+            lm += 1
+            div[lm] = zero(NF)
+        end
     end
 
     return nothing

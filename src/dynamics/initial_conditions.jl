@@ -64,18 +64,20 @@ function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::StartWithRandomVorticity,
                         model::ModelSetup) where NF
 
-    lmax = progn.trunc+1
+    lmax = progn.trunc + 1
     power = initial_conditions.power + 1    # +1 as power is summed of orders m
     ξ = randn(Complex{NF}, lmax, lmax)*convert(NF, initial_conditions.amplitude)
+    vor = progn.vor[1]                      # use first leapfrog step
 
-    for progn_layer in progn.layers
+    for k in eachmatrix(vor)
         for m in 1:lmax
             for l in m:lmax
-                progn_layer.timesteps[1].vor[l, m] = ξ[l, m]*l^power
+                vor[l, m, k] = ξ[l, m]*l^power
             end
         end
+        
         # don't perturb l=m=0 mode to have zero mean
-        progn_layer.timesteps[1].vor[1] = 0
+        vor[1, k] = 0
     end
 end
 

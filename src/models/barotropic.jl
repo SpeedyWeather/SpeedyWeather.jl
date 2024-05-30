@@ -85,6 +85,6 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    diagnostic_variables = DiagnosticVariables(spectral_grid)
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end

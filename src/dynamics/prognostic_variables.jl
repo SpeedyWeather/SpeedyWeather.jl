@@ -130,7 +130,7 @@ end
 """$(TYPEDSIGNATURES)
 Generator function."""
 function PrognosticVariables(SG::SpectralGrid, model::ModelSetup)
-    PrognosticVariables(SG, nsteps = model.timestepping.nsteps)
+    PrognosticVariables(SG, nsteps = model.time_stepping.nsteps)
 end
 
 function Base.show(

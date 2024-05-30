@@ -245,7 +245,7 @@ function timestep!(
     # TENDENCIES, DIFFUSION, LEAPFROGGING AND TRANSFORM SPECTRAL STATE TO GRID
     dynamics_tendencies!(diagn, progn, lf2, model)
     horizontal_diffusion!(diagn, progn, model)
-    leapfrog!(progn, diagn, dt, lf1, lf2, model)
+    leapfrog!(progn, diagn.tendencies, dt, lf1, model)
     transform!(diagn, progn, lf2, model)
 
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
@@ -379,7 +379,7 @@ function time_stepping!(
     # propagate spectral state to grid variables for initial condition output
     (; output, feedback) = model
     lf = 1                                  # use first leapfrog index
-    gridded!(diagn, progn, lf, model, initialize=true)
+    transform!(diagn, progn, lf, model, initialize=true)
     initialize!(progn.particles, progn, diagn, model.particle_advection)
     initialize!(output, feedback, time_stepping, clock, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)
@@ -409,5 +409,6 @@ function time_stepping!(
     write_restart_file(progn, output)       # as JLD2 
     finish!(model.callbacks, progn, diagn, model)
 
-    return progn                            # to trigger UnicodePlot via show(::IO, ::PrognosticVariables)
+    # return a UnicodePlot of surface vorticity
+    return plot(diagn.grid.vor_grid[:, end])
 end 
