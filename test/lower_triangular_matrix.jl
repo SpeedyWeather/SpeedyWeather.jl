@@ -586,6 +586,10 @@ end
     @test L3 == L1
 end 
 
+idims=(5,)
+NF = Float32
+ArrayType=JLArray
+
 @testset "LowerTriangularArray: broadcast" begin 
     @testset for idims = ((), (5,), (5,5))
         @testset for NF in (Float16, Float32, Float64)
@@ -600,13 +604,13 @@ end
                 L2 = deepcopy(L1) 
 
                 L2 ./= 5
-                @test L1/5 == L2
+                @test (L1.data ./ 5) == L2.data
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = deepcopy(L1)
 
                 L2 .^= 2
-                @test L1.^2 == L2
+                @test L1.data.^2 == L2.data
 
                 # tests mirroring usage in dynamical core
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
@@ -614,22 +618,22 @@ end
                 L3 = deepcopy(L2)
 
                 @. L2 += 5L1
-                @test L2 == L3 + 5L1
+                @test L2.data == L3.data .+ 5L1.data
 
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
 
                 @. L3 = -L1 - L2
-                @test L3 == -L1 - L2
+                @test L3.data == -L1.data - L2.data
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
-                L3 = deepcopy(L2)
+                L3 = Array(L2)
 
                 L2 .+= L1 
-                L3 += L1
-                @test L2 == L3
+                L3.data .+= L1.data
+                @test L2.data == L3.data
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = similar(L1)

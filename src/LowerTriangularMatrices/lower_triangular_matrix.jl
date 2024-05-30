@@ -201,6 +201,7 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, i::Integer)
 # needed to remove ambigouities in 1D case 
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer) where {T,V<:AbstractVector{T}} = getindex(L.data, i)
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, I::CartesianIndex{M}) where {T,V<:AbstractVector{T},M} = getindex(L, Tuple(I)...)
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer, I::CartesianIndex{0}) where {T,V<:AbstractVector{T}} = getindex(L, i)
 
 # setindex with lm, ..
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N} = setindex!(L.data, x, I...)
@@ -226,6 +227,7 @@ end
 @inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, i::Integer) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, i)
 @inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{1}) where {T,V<:AbstractVector{T}} = setindex!(L.data, x, I)
 @inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, I::CartesianIndex{2}) where {T,V<:AbstractVector{T}} = setindex!(L, x, Tuple(I)...)
+@inline Base.setindex!(L::LowerTriangularArray{T,1,V}, x, i::Integer, I::CartesianIndex{0}) where {T,V<:AbstractVector{T}} = setindex!(L, x, i)
 
 # propagate index to data vector
 Base.eachindex(L ::LowerTriangularArray)    = eachindex(L.data)
