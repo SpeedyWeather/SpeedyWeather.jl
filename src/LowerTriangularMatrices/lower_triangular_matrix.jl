@@ -250,8 +250,7 @@ function eachharmonic(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
     return eachharmonic(L1) 
 end
 
-# TODO change to 2:end when size uses flat indexing
-eachmatrix(L::LowerTriangularArray) = CartesianIndices(size(L)[3:end])
+eachmatrix(L::LowerTriangularArray) = CartesianIndices(size(L)[2:end])
 
 # CONVERSIONS
 """ 

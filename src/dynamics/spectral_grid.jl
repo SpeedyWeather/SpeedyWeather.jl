@@ -1,5 +1,4 @@
 abstract type AbstractSpectralGrid end
-abstract type AbstractGeometry end
 
 # computing
 const DEFAULT_NF = Float32
@@ -64,10 +63,10 @@ Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
     "[OPTION] coordinates used to discretize the vertical"
     vertical_coordinates::VerticalCoordinates = SigmaCoordinates(; nlev)
 
-    # ARRAY TYPES
-    SpectralVariable2D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 2, ArrayType{Complex{NF}, 1}}
-    SpectralVariable3D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 3, ArrayType{Complex{NF}, 2}}
-    SpectralVariable4D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 4, ArrayType{Complex{NF}, 3}}
+    # ARRAY TYPES (horizontal dimension in grid/spectral is flattened to 1D)
+    SpectralVariable2D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}}
+    SpectralVariable3D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 2, ArrayType{Complex{NF}, 2}}
+    SpectralVariable4D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 3, ArrayType{Complex{NF}, 3}}
     GridVariable2D::Type{<:AbstractArray} = RingGrids.nonparametric_type(Grid){NF, 1, ArrayType{NF, 1}}
     GridVariable3D::Type{<:AbstractArray} = RingGrids.nonparametric_type(Grid){NF, 2, ArrayType{NF, 2}}
     GridVariable4D::Type{<:AbstractArray} = RingGrids.nonparametric_type(Grid){NF, 3, ArrayType{NF, 3}}

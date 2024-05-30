@@ -839,22 +839,6 @@ function SpeedyTransforms.transform!(
     return nothing
 end
 
-# just to test
-function SpeedyTransforms.transform!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    S::SpectralTransform,
-    lf::Integer = 2,
-)   
-    (; vor_grid) = diagn.grid
-    vor = progn.vor[lf]
-    # pres = progn.pres[lf]/
-    transform!(vor_grid, vor, S)
-    transform!(vor, vor_grid, S)
-    # transform!(pres_grid, pres, S)
-    return nothing
-end
-
 """ 
 $(TYPEDSIGNATURES)
 Calculates the average temperature of a layer from the l=m=0 harmonic
