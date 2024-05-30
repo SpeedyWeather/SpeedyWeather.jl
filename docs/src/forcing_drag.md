@@ -25,9 +25,9 @@ So we actually define our `StochasticStirring` forcing as follows and
 will explain the details in second
 
 ```@example extend
-using SpeedyWeather, Dates
+using SpeedyWeather
 
-Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing
+@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing
 
     # DIMENSIONS from SpectralGrid
     "Spectral resolution as max degree of spherical harmonics"
@@ -42,7 +42,7 @@ Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing
     decorrelation_time::Second = Day(2)
 
     "Stirring strength A [1/s²]"
-    strength::NF = 7e-11
+    strength::NF = 5e-11
 
     "Stirring latitude [˚N]"
     latitude::NF = 45
@@ -69,7 +69,7 @@ end
 So, first the scalar parameters, are added as fields of type `NF` (you could harcode `Float64` too)
 with some default values as suggested in the
 [Vallis et al., 2004](https://doi.org/10.1175/1520-0469(2004)061%3C0264:AMASDM%3E2.0.CO;2) paper.
-In order to be able to define the default values, we add the `Base.@kwdef` macro
+In order to be able to define the default values, we add the `@kwdef` macro
 before the `struct` definition. Then we need the term `S` as coefficients of the spherical harmonics, which
 is a `LowerTriangularMatrix`, however we want its elements to be of number format `NF`,
 which is also the parametric type of `StochasticStirring{NF}`, this is done because it will
@@ -203,7 +203,7 @@ function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
 end
 ```
 The function has to be as outlined above. The first argument has to be of type
-``DiagnosticVariablesLayer`` as it acts on a layer of the diagnostic variables,
+`DiagnosticVariablesLayer` as it acts on a layer of the diagnostic variables,
 where the current model state in grid-point space and the tendencies (in spectral space)
 are defined. The second argument has to be a `PrognosticVariablesLayer` because,
 in general, the forcing may use the prognostic variables in spectral space.
@@ -293,13 +293,22 @@ modular interface that you can create instances of individual model components
 and just put them together as you like, and as long as you follow some rules.
 
 ```@example extend
-spectral_grid = SpectralGrid(trunc=42, nlev=1)
+spectral_grid = SpectralGrid(trunc=85, nlev=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
 initial_conditions = StartFromRest()
 model = BarotropicModel(; spectral_grid, initial_conditions, forcing=stochastic_stirring)
+model.feedback.verbose = false # hide
 simulation = initialize!(model)
 run!(simulation)
+
+# visualisation
+using CairoMakie
+vor = simulation.diagnostic_variables.layers[1].grid_variables.vor_grid
+heatmap(vor, title="Stochastically stirred vorticity")
+save("stochastic_stirring.png", ans) # hide
+nothing # hide
 ```
+![Stochastic stirring](stochastic_stirring.png)
 
 Yay! As you can see the vorticity does something funky on the southern hemisphere
 but not on the northern, as we do not force there. Awesome! Adding new

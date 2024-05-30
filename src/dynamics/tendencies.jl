@@ -766,12 +766,14 @@ function SpeedyTransforms.gridded!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     lf::Int,
-    model::ModelSetup)
+    model::ModelSetup;
+    kwargs...
+)
 
     # all variables on layers
     for (progn_layer, diagn_layer) in zip(progn.layers, diagn.layers)
         progn_layer_lf = progn_layer.timesteps[lf]
-        gridded!(diagn_layer, progn_layer_lf, model)
+        gridded!(diagn_layer, progn_layer_lf, model; kwargs...)
     end
 
     # surface only for ShallowWaterModel or PrimitiveEquation
@@ -788,9 +790,12 @@ $(TYPEDSIGNATURES)
 Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the barotropic vorticity model.
 Updates grid vorticity, spectral stream function and spectral and grid velocities u, v."""
-function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,   
-                                    progn::PrognosticVariablesLayer,
-                                    model::Barotropic)
+function SpeedyTransforms.gridded!( 
+    diagn::DiagnosticVariablesLayer,   
+    progn::PrognosticVariablesLayer,
+    model::Barotropic;
+    kwargs...
+)
     
     (; vor_grid, u_grid, v_grid ) = diagn.grid_variables
     (; vor ) = progn                    # relative vorticity
@@ -818,10 +823,12 @@ Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for the shallow water model. Updates grid vorticity,
 grid divergence, grid interface displacement (`pres_grid`) and the velocities
 u, v."""
-function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
-                                    progn::PrognosticVariablesLayer,
-                                    model::ShallowWater,                # everything that's constant
-                                    )
+function SpeedyTransforms.gridded!( 
+    diagn::DiagnosticVariablesLayer,
+    progn::PrognosticVariablesLayer,
+    model::ShallowWater;
+    kwargs...
+)
     
     (; vor_grid, div_grid, u_grid, v_grid ) = diagn.grid_variables
     (; vor, div) = progn
@@ -850,21 +857,27 @@ Propagate the spectral state of the prognostic variables `progn` to the
 diagnostic variables in `diagn` for primitive equation models. Updates grid vorticity,
 grid divergence, grid temperature, pressure (`pres_grid`) and the velocities
 u, v."""
-function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
-                                    progn::PrognosticVariablesLayer,
-                                    model::PrimitiveEquation)           # everything that's constant
+function SpeedyTransforms.gridded!( 
+    diagn::DiagnosticVariablesLayer,
+    progn::PrognosticVariablesLayer,
+    model::PrimitiveEquation;
+    initialize=false
+)
     
     (; vor_grid, div_grid, u_grid, v_grid ) = diagn.grid_variables
     (; temp_grid, humid_grid ) = diagn.grid_variables
-    (; temp_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid_variables
+    (; temp_grid_prev, humid_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid_variables
     (; vor, div, temp, humid) = progn
     U = diagn.dynamics_variables.a      # reuse work arrays for velocities spectral
     V = diagn.dynamics_variables.b      # U = u*coslat, V=v*coslat
 
-    # retain previous time step for vertical advection
-    @. temp_grid_prev = temp_grid
-    @. u_grid_prev = u_grid
-    @. v_grid_prev = v_grid
+    # retain previous time step for vertical advection and some parameterizations
+    if initialize == false              # only store prev after initial step
+        @. temp_grid_prev = temp_grid   # this is temperature anomaly wrt to implicit reference profile!
+        @. humid_grid_prev = humid_grid
+        @. u_grid_prev = u_grid
+        @. v_grid_prev = v_grid
+    end
 
     S = model.spectral_transform
     wet_core = model isa PrimitiveWet
@@ -874,22 +887,30 @@ function SpeedyTransforms.gridded!( diagn::DiagnosticVariablesLayer,
     # V = v*coslat =  coslat*∂ϕ/∂lat + ∂Ψ/dlon
     UV_from_vordiv!(U, V, vor, div, S)
 
-    gridded!(vor_grid, vor, S)                # get vorticity on grid from spectral vor
-    gridded!(div_grid, div, S)                # get divergence on grid from spectral div
-    gridded!(temp_grid, temp, S)              # (absolute) temperature
+    gridded!(vor_grid, vor, S)                  # get vorticity on grid from spectral vor
+    gridded!(div_grid, div, S)                  # get divergence on grid from spectral div
+    gridded!(temp_grid, temp, S)                # (absolute) temperature
     
-    if wet_core                             # specific humidity (wet core only)
+    if wet_core                                 # specific humidity (wet core only)
         gridded!(humid_grid, humid, S)        
         hole_filling!(humid_grid, model.hole_filling, model)  # remove negative humidity
     end
 
     # include humidity effect into temp for everything stability-related
     temperature_average!(diagn, temp, S)
-    virtual_temperature!(diagn, temp, model)  # temp = virt temp for dry core
+    virtual_temperature!(diagn, temp, model)    # temp = virt temp for dry core
 
     # transform from U, V in spectral to u, v on grid (U, V = u, v*coslat)
     gridded!(u_grid, U, S, unscale_coslat=true)
     gridded!(v_grid, V, S, unscale_coslat=true)
+
+    if initialize   # at initial step store prev <- current
+        # subtract the reference temperature profile as temp_grid is too after every time step
+        @. temp_grid_prev = temp_grid - model.implicit.temp_profile[diagn.k]
+        @. humid_grid_prev = humid_grid
+        @. u_grid_prev = u_grid
+        @. v_grid_prev = v_grid
+    end
 
     return nothing
 end
@@ -903,7 +924,6 @@ function temperature_average!(
     temp::LowerTriangularMatrix,
     S::SpectralTransform,
 )
-    
     # average from l=m=0 harmonic divided by norm of the sphere
     diagn.temp_average[] = real(temp[1])/S.norm_sphere
 end 

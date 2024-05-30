@@ -21,10 +21,16 @@ Base.@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnV
     orography::NF = 0                       # orography height [m]
 
     # PROGNOSTIC VARIABLES
-    const u::Vector{NF} = zeros(NF, nlev)            # zonal velocity [m/s]
-    const v::Vector{NF} = zeros(NF, nlev)            # meridional velocity [m/s]
-    const temp::Vector{NF} = zeros(NF, nlev)         # absolute temperature [K]
-    const humid::Vector{NF} = zeros(NF, nlev)        # specific humidity [kg/kg]
+    const u::Vector{NF} = zeros(NF, nlev)           # zonal velocity [m/s]
+    const v::Vector{NF} = zeros(NF, nlev)           # meridional velocity [m/s]
+    const temp::Vector{NF} = zeros(NF, nlev)        # absolute temperature [K]
+    const humid::Vector{NF} = zeros(NF, nlev)       # specific humidity [kg/kg]
+
+    # PROGNOSTIC VARIABLES at previous time step
+    const u_prev::Vector{NF} = zeros(NF, nlev)      # zonal velocity [m/s]
+    const v_prev::Vector{NF} = zeros(NF, nlev)      # meridional velocity [m/s]
+    const temp_prev::Vector{NF} = zeros(NF, nlev)   # absolute temperature [K]
+    const humid_prev::Vector{NF} = zeros(NF, nlev)  # specific humidity [kg/kg]
 
     # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
     const ln_pres::Vector{NF} = zeros(NF, nlev+1)    # logarithm of pressure [log(Pa)]

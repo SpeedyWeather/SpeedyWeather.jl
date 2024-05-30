@@ -22,7 +22,7 @@ Base.@kwdef mutable struct Leapfrog{NF<:AbstractFloat} <: AbstractTimeStepper
 
     # NUMERICS
     "Robert (1966) time filter coefficeint to suppress comput. mode"
-    robert_filter::NF = 0.05
+    robert_filter::NF = 0.1
 
     "Williams time filter (Amezcua 2011) coefficient for 3rd order acc"
     williams_filter::NF = 0.53
@@ -392,7 +392,7 @@ function time_stepping!(
     # propagate spectral state to grid variables for initial condition output
     (; output, feedback) = model
     lf = 1                                  # use first leapfrog index
-    gridded!(diagn, progn, lf, model)
+    gridded!(diagn, progn, lf, model, initialize=true)
     initialize!(progn.particles, progn, diagn, model.particle_advection)
     initialize!(output, feedback, time_stepping, clock, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)
