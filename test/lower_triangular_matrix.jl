@@ -629,7 +629,7 @@ ArrayType=JLArray
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
-                L3 = Array(L2)
+                L3 = deepcopy(L2)
 
                 L2 .+= L1 
                 L3.data .+= L1.data
