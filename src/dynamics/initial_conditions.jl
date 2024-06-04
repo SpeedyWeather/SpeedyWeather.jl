@@ -85,7 +85,7 @@ export ZonalJet
 
 """
 A struct that contains all parameters for the Galewsky et al, 2004 zonal jet
-intitial conditions for the shallow water model. Default values as in Galewsky.
+intitial conditions for the ShallowWaterModel. Default values as in Galewsky.
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct ZonalJet <: AbstractInitialConditions
     "jet latitude [˚N]"
@@ -134,8 +134,8 @@ function initialize!(   progn::PrognosticVariables,
     λ = perturb_lon*2π/360          # perturbation longitude [radians]
 
     (; rotation, gravity) = model.planet
-    (; Grid, NF, radius, nlat_half) = model.spectral_grid
-    (; coslat⁻¹) = model.geometry
+    (; Grid, NF, nlat_half) = model.spectral_grid
+    (; coslat⁻¹, radius) = model.geometry
 
     u_grid = zeros(Grid{NF}, nlat_half)
     η_perturb_grid = zeros(Grid{NF}, nlat_half)
@@ -169,23 +169,21 @@ function initialize!(   progn::PrognosticVariables,
     # 0 = -∇⋅((ζ+f)*(-v, u)) - ∇²((u^2 + v^2)/2), i.e.
     # invert the Laplacian for
     # ∇²(gη) = -∇⋅(0, (ζ+f)*u) - ∇²(u^2/2)
-    u = spectral(u_grid, model.spectral_transform)
+    u = transform(u_grid, model.spectral_transform)
     
     # get vorticity initial conditions from curl of u, v
     v = zero(u)     # meridional velocity zero for these initial conditions
-    (; vor) = progn.layers[end].timesteps[1]
-    curl!(vor, u, v, model.spectral_transform)
+    vor = curl(u, v, model.spectral_transform)
 
     # compute the div = -∇⋅(0,(ζ+f)*u) = -∇×((ζ+f)*u, 0) term, v=0
-    vor_grid = gridded(vor, model.spectral_transform)
+    vor_grid = transform(vor, model.spectral_transform)
     f = coriolis(vor_grid; rotation)
 
     # includes 1/coslat/radius from above for curl!
     # but *radius^2 for the ∇⁻²! operation below!
     vor_flux_grid = @. (vor_grid + f) * u_grid * radius^2
-    vor_flux = spectral(vor_flux_grid, model.spectral_transform)
-    div = zero(v)
-    curl!(div, vor_flux, v, model.spectral_transform)
+    vor_flux = transform(vor_flux_grid, model.spectral_transform)
+    div = curl(vor_flux, v, model.spectral_transform)
 
     # compute the -∇²(u^2/2) term, add to div, divide by gravity
     RingGrids.scale_coslat!(u_grid)     # remove coslat scaling
@@ -196,13 +194,14 @@ function initialize!(   progn::PrognosticVariables,
     div .*= inv(gravity)
 
     # invert Laplacian to obtain η
-    (; pres) = progn.surface.timesteps[1]
+    pres = progn.pres[1]
     ∇⁻²!(pres, div, model.spectral_transform)
 
-    # add perturbation
-    η_perturb = spectral!(u, η_perturb_grid, model.spectral_transform)
+    # add perturbation (reuse u array)
+    η_perturb = transform!(u, η_perturb_grid, model.spectral_transform)
     pres .+= η_perturb
     spectral_truncation!(pres)
+    return nothing
 end
 
 export ZonalWind

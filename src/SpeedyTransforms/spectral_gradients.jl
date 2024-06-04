@@ -65,7 +65,7 @@ function _divergence!(
     (; grad_y_vordiv1, grad_y_vordiv2 ) = S
     @boundscheck matrix_size(grad_y_vordiv1) == matrix_size(div)[1:2] || throw(BoundsError)
     @boundscheck matrix_size(grad_y_vordiv2) == matrix_size(div)[1:2] || throw(BoundsError)
-    lmax, mmax, _ = matrix_size(div)
+    lmax, mmax = matrix_size(div)[1:2]
     lmax -= 2   # 0-based lmax, mmax
     mmax -= 1
 
@@ -114,20 +114,25 @@ An example usage is therefore
     div = divergence(u, v, radius = 6.371e6)
     div_grid = gridded(div)
 """
-function divergence(u::LowerTriangularMatrix,
-                    v::LowerTriangularMatrix;
+function divergence(u::LowerTriangularArray,
+                    v::LowerTriangularArray;
                     radius = DEFAULT_RADIUS)
 
-    @assert size(u) == size(v) "Size $(size(u)) and $(size(v)) incompatible."
-
     S = SpectralTransform(u)
-    div = similar(u)
-    divergence!(div, u, v, S, add=false, flipsign=false)
+    div = divergence(u, v, S)
 
     if radius != 1
         div .*= inv(radius)
     end
 
+    return div
+end
+
+function divergence(u::LowerTriangularArray,
+                    v::LowerTriangularArray,
+                    S::SpectralTransform)
+    div = similar(u)
+    divergence!(div, u, v, S, add=false, flipsign=false)
     return div
 end
 
@@ -137,9 +142,7 @@ function _div_or_curl(
     u::Grid,
     v::Grid;
     radius = DEFAULT_RADIUS
-) where {Grid<:AbstractGrid}
-
-    @assert size(u) == size(v) "Size $(size(u)) and $(size(v)) incompatible."
+) where {Grid<:AbstractGridArray}
 
     u_grid = copy(u)
     v_grid = copy(v)
@@ -148,8 +151,8 @@ function _div_or_curl(
     RingGrids.scale_coslat⁻¹!(v_grid)
 
     S = SpectralTransform(u_grid, one_more_degree=true)
-    us = spectral(u_grid, S)
-    vs = spectral(v_grid, S)
+    us = transform(u_grid, S)
+    vs = transform(v_grid, S)
 
     div_or_vor = similar(us)
     kernel!(div_or_vor, us, vs, S, add=false, flipsign=false)
@@ -168,7 +171,7 @@ Applies 1/coslat scaling, transforms to spectral space and returns
 the spectral divergence. Acts on the unit sphere, i.e. it omits 1/radius scaling unless
 `radius` keyword argument is provided.
 """
-divergence(u::Grid, v::Grid; kwargs...) where {Grid<:AbstractGrid} = _div_or_curl(divergence!, u, v; kwargs...)
+divergence(u::Grid, v::Grid; kwargs...) where {Grid<:AbstractGridArray} = _div_or_curl(divergence!, u, v; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -176,7 +179,7 @@ Curl (∇×) of two vector components `u, v` on a grid.
 Applies 1/coslat scaling, transforms to spectral space and returns
 the spectral curl. Acts on the unit sphere, i.e. it omits 1/radius scaling unless
 `radius` keyword argument is provided."""
-curl(u::Grid, v::Grid; kwargs...) where {Grid<:AbstractGrid} = _div_or_curl(curl!, u, v; kwargs...)
+curl(u::Grid, v::Grid; kwargs...) where {Grid<:AbstractGridArray} = _div_or_curl(curl!, u, v; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -193,15 +196,12 @@ requires both `u, v` to be transforms of fields that are scaled with
     vor = curl(u, v, radius=6.371e6)
     vor_grid = gridded(div)
 """
-function curl(  u::LowerTriangularMatrix,
-                v::LowerTriangularMatrix;
+function curl(  u::LowerTriangularArray,
+                v::LowerTriangularArray;
                 radius = DEFAULT_RADIUS)
 
-    @assert size(u) == size(v) "Size $(size(u)) and $(size(v)) incompatible."
-
     S = SpectralTransform(u)
-    vor = similar(u)
-    curl!(vor, u, v, S, add=false, flipsign=false)
+    vor = curl(u, v, S)
 
     if radius != 1
         vor .*= inv(radius)
@@ -209,6 +209,15 @@ function curl(  u::LowerTriangularMatrix,
 
     return vor
 end
+
+function curl(  u::LowerTriangularArray,
+                v::LowerTriangularArray,
+                S::SpectralTransform)
+    vor = similar(u)
+    curl!(vor, u, v, S, add=false, flipsign=false)
+    return vor
+end
+
 
 """
 $(TYPEDSIGNATURES)
@@ -294,80 +303,81 @@ velocity potential from divergence. Then compute zonal and meridional gradients
 to get U, V.
 Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
 """
-function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
-                            V::LowerTriangularMatrix{Complex{NF}},
-                            vor::LowerTriangularMatrix{Complex{NF}},
-                            div::LowerTriangularMatrix{Complex{NF}},
-                            S::SpectralTransform{NF}
-                            ) where {NF<:AbstractFloat}
-
+function UV_from_vordiv!(   
+    U::LowerTriangularArray,
+    V::LowerTriangularArray,
+    vor::LowerTriangularArray,
+    div::LowerTriangularArray,
+    S::SpectralTransform,
+)
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
-    lmax, mmax = matrix_size(vor) .- (2, 1)                  # 0-based lmax, mmax
+    lmax, mmax = matrix_size(vor)[1:2] .- (2, 1)                  # 0-based lmax, mmax
+    
     @boundscheck lmax == mmax || throw(BoundsError)
     @boundscheck size(div) == size(vor) || throw(BoundsError)
     @boundscheck size(U) == size(vor) || throw(BoundsError)
     @boundscheck size(V) == size(vor) || throw(BoundsError)
-    @boundscheck size(vordiv_to_uv_x) == size(vor) || throw(BoundsError)
-    @boundscheck size(vordiv_to_uv1) == size(vor) || throw(BoundsError)
-    @boundscheck size(vordiv_to_uv1) == size(vor) || throw(BoundsError)
+    @boundscheck size(vordiv_to_uv_x, 1) == size(vor, 1) || throw(BoundsError)
+    @boundscheck size(vordiv_to_uv1, 1) == size(vor, 1) || throw(BoundsError)
+    @boundscheck size(vordiv_to_uv1, 1) == size(vor, 1) || throw(BoundsError)
 
-    lm = 0
-    @inbounds for m in 1:mmax                       # 1-based l, m, skip last column
+    for k in eachmatrix(U)
+        lm = 0
+        for m in 1:mmax                                 # 1-based l, m, skip last column
 
-        # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
-        lm += 1
-        
-        # div, vor contribution to meridional gradient
-        ∂ζθ =  vordiv_to_uv2[lm]*vor[lm+1]          # lm-1 term is zero
-        ∂Dθ = -vordiv_to_uv2[lm]*div[lm+1]          # lm-1 term is zero
-        
-        # the following is moved into the muladd        
-        # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]       # divergence contribution to zonal gradient
-        # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]       # vorticity contribution to zonal gradient
-
-        z = im*vordiv_to_uv_x[lm]
-        U[lm] = muladd(z, div[lm], ∂ζθ)             # = ∂Dλ + ∂ζθ
-        V[lm] = muladd(z, vor[lm], ∂Dθ)             # = ∂ζλ + ∂Dθ
-
-        # BELOW DIAGONAL (all terms)
-        for l in m+1:lmax                               # skip last row (lmax+2)
+            # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
             lm += 1
             
             # div, vor contribution to meridional gradient
-            # ∂ζθ = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[lm-1]
-            # ∂Dθ = vordiv_to_uv1[lm]*div[lm-1] - vordiv_to_uv2[lm]*div[lm+1]
-            ∂ζθ = muladd(vordiv_to_uv2[lm], vor[lm+1], -vordiv_to_uv1[lm]*vor[lm-1])
-            ∂Dθ = muladd(vordiv_to_uv1[lm], div[lm-1], -vordiv_to_uv2[lm]*div[lm+1])
-
-            # The following is moved into the muladd
-            # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]   # divergence contribution to zonal gradient
-            # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]   # vorticity contribution to zonal gradient
+            ∂ζθ =  vordiv_to_uv2[lm]*vor[lm+1, k]       # lm-1 term is zero
+            ∂Dθ = -vordiv_to_uv2[lm]*div[lm+1, k]       # lm-1 term is zero
+            
+            # the following is moved into the muladd        
+            # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]       # divergence contribution to zonal gradient
+            # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]       # vorticity contribution to zonal gradient
 
             z = im*vordiv_to_uv_x[lm]
-            U[lm] = muladd(z, div[lm], ∂ζθ)         # = ∂Dλ + ∂ζθ
-            V[lm] = muladd(z, vor[lm], ∂Dθ)         # = ∂ζλ + ∂Dθ            
+            U[lm, k] = muladd(z, div[lm, k], ∂ζθ)       # = ∂Dλ + ∂ζθ
+            V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)       # = ∂ζλ + ∂Dθ
+
+            # BELOW DIAGONAL (all terms)
+            for l in m+1:lmax                           # skip last row (lmax+2)
+                lm += 1
+                
+                # div, vor contribution to meridional gradient
+                # ∂ζθ = vordiv_to_uv2[lm]*vor[lm+1] - vordiv_to_uv1[lm]*vor[lm-1]
+                # ∂Dθ = vordiv_to_uv1[lm]*div[lm-1] - vordiv_to_uv2[lm]*div[lm+1]
+                ∂ζθ = muladd(vordiv_to_uv2[lm], vor[lm+1, k], -vordiv_to_uv1[lm]*vor[lm-1, k])
+                ∂Dθ = muladd(vordiv_to_uv1[lm], div[lm-1, k], -vordiv_to_uv2[lm]*div[lm+1, k])
+
+                # The following is moved into the muladd
+                # ∂Dλ = im*vordiv_to_uv_x[lm]*div[lm]   # divergence contribution to zonal gradient
+                # ∂ζλ = im*vordiv_to_uv_x[lm]*vor[lm]   # vorticity contribution to zonal gradient
+
+                z = im*vordiv_to_uv_x[lm]
+                U[lm, k] = muladd(z, div[lm, k], ∂ζθ)   # = ∂Dλ + ∂ζθ
+                V[lm, k] = muladd(z, vor[lm, k], ∂Dθ)   # = ∂ζλ + ∂Dθ            
+            end
+
+            # SECOND LAST ROW (separated to imply that vor, div are zero in last row)
+            lm += 1
+            U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k] - vordiv_to_uv1[lm]*vor[lm-1, k]
+            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k] + vordiv_to_uv1[lm]*div[lm-1, k]
+
+            # LAST ROW (separated to avoid out-of-bounds access to lmax+3)
+            lm += 1
+            U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]  # only last term from 2nd last row
+            V[lm, k] =  vordiv_to_uv1[lm]*div[lm-1, k]  # only last term from 2nd last row
         end
 
-        # SECOND LAST ROW (separated to imply that vor, div are zero in last row)
-        lm += 1
-        U[lm] = im*vordiv_to_uv_x[lm]*div[lm] - vordiv_to_uv1[lm]*vor[lm-1]
-        V[lm] = im*vordiv_to_uv_x[lm]*vor[lm] + vordiv_to_uv1[lm]*div[lm-1]
+        # LAST COLUMN 
+        lm += 1                                         # second last row
+        U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k]     # other terms are zero
+        V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k]     # other terms are zero
 
-        # LAST ROW (separated to avoid out-of-bounds access to lmax+3
-        lm += 1
-        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # only last term from 2nd last row
-        V[lm] =  vordiv_to_uv1[lm]*div[lm-1]        # only last term from 2nd last row
-    end
-
-    # LAST COLUMN 
-    @inbounds begin
-        lm += 1                                     # second last row
-        U[lm] = im*vordiv_to_uv_x[lm]*div[lm]       # other terms are zero
-        V[lm] = im*vordiv_to_uv_x[lm]*vor[lm]       # other terms are zero
-
-        lm += 1                                     # last row
-        U[lm] = -vordiv_to_uv1[lm]*vor[lm-1]        # other terms are zero
-        V[lm] =  vordiv_to_uv1[lm]*div[lm-1]        # other terms are zero
+        lm += 1                                         # last row
+        U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]      # other terms are zero
+        V[lm, k] =  vordiv_to_uv1[lm]*div[lm-1, k]      # other terms are zero
     end
 end
 

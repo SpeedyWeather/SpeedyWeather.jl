@@ -392,9 +392,9 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 end
 
 function transform!(
-    grids::AbstractGridArray{NF},   # gridded output
+    grids::AbstractGridArray,       # gridded output
     specs::LowerTriangularArray,    # spectral coefficients input
-    S::SpectralTransform;           # precomputed transform
+    S::SpectralTransform{NF};       # precomputed transform
     unscale_coslat::Bool=false,     # unscale with cos(lat) on the fly?
 ) where NF                          # number format NF
 
@@ -598,7 +598,7 @@ end
 function transform!(                    # grid -> spectral
     specs::LowerTriangularArray,        # output: spectral coefficients
     grids::AbstractGridArray{NF},       # input: gridded values
-    S::SpectralTransform                # precomputed spectral transform
+    S::SpectralTransform{NF}            # precomputed spectral transform
 ) where NF                              # number format
     
     (; nlat, nlat_half, nlons, nfreq_max, cos_colat ) = S
@@ -616,7 +616,7 @@ function transform!(                    # grid -> spectral
     # @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
     # @boundscheck get_nlat_half(map) == S.nlat_half || throw(BoundsError)
 
-    # preallocate work warrays
+    # preallocate work arrays
     fn = zeros(Complex{NF}, nfreq_max)      # Fourier-transformed northern latitude
     fs = zeros(Complex{NF}, nfreq_max)      # Fourier-transformed southern latitude
 
@@ -776,7 +776,27 @@ function spectral(  map::AbstractGrid,          # gridded field
 
     map_NF = similar(map, NF)                   # convert map to NF
     copyto!(map_NF, map)
-    
+
     alms = LowerTriangularMatrix{Complex{NF}}(undef, S.lmax+1, S.mmax+1)
     return spectral!(alms, map_NF, S)           # in-place version
+end
+
+function transform(
+    grids::AbstractGridArray,
+    S::SpectralTransform{NF},
+) where NF
+    ks = size(grids)[2:end]     # the non-horizontal dimensions
+    specs = zeros(LowerTriangularArray{Complex{NF}}, S.lmax+1, S.mmax+1, ks...)
+    transform!(specs, grids, S)
+    return specs
+end
+
+function transform(
+    specs::LowerTriangularArray,
+    S::SpectralTransform{NF},
+) where NF
+    ks = size(specs)[2:end]     # the non-horizontal dimensions
+    grids = zeros(S.Grid{NF}, S.nlat_half, ks...)
+    transform!(grids, specs, S)
+    return grids
 end

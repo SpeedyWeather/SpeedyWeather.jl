@@ -159,11 +159,8 @@ function leapfrog!(
     end
 end
 
-# variables that are leapfrogged in the respective models that are on layers (so excl surface pressure)
-leapfrog_vars(::Barotropic)   = (:vor,)
-leapfrog_vars(::ShallowWater) = (:vor, :div, :pres)
-leapfrog_vars(::PrimitiveDry) = (:vor, :div, :temp, :pres)
-leapfrog_vars(::PrimitiveWet) = (:vor, :div, :temp, :humid, :pres)
+# variables that are leapfrogged in the respective models, e.g. :vor_tend, :div_tend, etc...
+tendency_names(model::ModelSetup) = tuple((Symbol(var, :_tend) for var in prognostic_variables(model))...)
 
 function leapfrog!(
     progn::PrognosticVariables,
@@ -172,9 +169,9 @@ function leapfrog!(
     lf::Int,                # leapfrog index to dis/enable Williams filter
     model::ModelSetup,
 )
-    for var in leapfrog_vars(model)
-        var_old, var_new = getproperty(progn, var)
-        var_tend = getproperty(tend, Symbol(var, :_tend))
+    for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
+        var_old, var_new = getfield(progn, varname)
+        var_tend = getfield(tend, tendname)
         spectral_truncation!(var_tend)
         leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
     end
@@ -265,31 +262,18 @@ function timestep!(
     lf2::Integer = 2,               # leapfrog index 2 (time step used for tendencies)
 )
     model.feedback.nars_detected && return nothing  # exit immediately if NaRs already present
-    (; time) = progn.clock                          # current time
 
     # set the tendencies back to zero for accumulation
-    zero_tendencies!(diagn)
-
-    progn_layer = progn.layers[1]                   # only calculate tendencies for the first layer
-    diagn_layer = diagn.layers[1]                   # multi-layer shallow water not supported
-
-    progn_lf = progn_layer.timesteps[lf2]           # pick the leapfrog time step lf2 for tendencies
-    (; pres) = progn.surface.timesteps[lf2]
-    (; implicit, spectral_transform) = model
+    fill!(diagn.tendencies, 0, ShallowWater)
 
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
-    dynamics_tendencies!(diagn_layer, progn_lf, diagn.surface, pres, time, model)
+    dynamics_tendencies!(diagn, progn, lf2, model)
     implicit_correction!(diagn_layer, progn_layer, diagn.surface, progn.surface, implicit)
     
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
-    horizontal_diffusion!(progn_layer, diagn_layer, model)
-    leapfrog!(progn_layer, diagn_layer, dt, lf1, model)
-    gridded!(diagn_layer, progn_lf, model)
-
-    # SURFACE LAYER (pressure), no diffusion though
-    (; pres_grid) = diagn.surface
-    leapfrog!(progn.surface, diagn.surface, dt, lf1, model)
-    gridded!(pres_grid, pres, spectral_transform)
+    horizontal_diffusion!(diagn, progn, model)
+    leapfrog!(progn, diagn.tendencies, dt, lf1, model)
+    transform!(diagn, progn, lf2, model)
     
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2

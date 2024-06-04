@@ -4,7 +4,7 @@ function dynamics_tendencies!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     lf::Integer,                    # leapfrog index to evaluate tendencies at
-    model::Barotropic
+    model::Barotropic,
 )
     forcing!(diagn, progn, model.forcing, model, lf)    # = (Fᵤ, Fᵥ) forcing for u, v
     drag!(diagn, progn, model.drag, model, lf)          # drag term for u, v
@@ -15,25 +15,23 @@ end
 $(TYPEDSIGNATURES)
 Calculate all tendencies for the ShallowWaterModel."""
 function dynamics_tendencies!(  
-    diagn::DiagnosticVariablesLayer,
-    progn::PrognosticVariablesLayer,
-    surface::SurfaceVariables,
-    pres::LowerTriangularMatrix,    # spectral pressure/η for geopotential
-    time::DateTime,                 # time to evaluate the tendencies at
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    lf::Integer,                    # leapfrog index to evaluate tendencies at
     model::ShallowWater,
 )
     (; forcing, drag, planet, atmosphere, orography) = model
     (; spectral_transform, geometry) = model
 
     # for compatibility with other ModelSetups pressure pres = interface displacement η here
-    forcing!(diagn, progn, forcing, time, model)    # = (Fᵤ, Fᵥ, Fₙ) forcing for u, v, η
-    drag!(diagn, progn, drag, time, model)          # drag term for momentum u, v
-    
+    forcing!(diagn, progn, forcing, model, lf)      # = (Fᵤ, Fᵥ, Fₙ) forcing for u, v, η
+    drag!(diagn, progn, drag, model, lf)            # drag term for u, v
+
     # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for vorticity
     # = ∇⋅(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for divergence
     vorticity_flux!(diagn, model)
-                                           
-    geopotential!(diagn, pres, planet)              # geopotential Φ = gη in shallow water
+
+    geopotential!(diagn, progn.pres[lf], planet)    # geopotential Φ = gη in shallow water
     bernoulli_potential!(diagn, spectral_transform) # = -∇²(E+Φ), tendency for divergence
     
     # = -∇⋅(uh, vh), tendency for "pressure" η
@@ -634,19 +632,19 @@ Computes the Laplace operator ∇² of the Bernoulli potential `B` in spectral s
     
 This version is used for both ShallowWater and PrimitiveEquation, only the geopotential
 calculation in geopotential! differs."""
-function bernoulli_potential!(  diagn::DiagnosticVariablesLayer{NF},     
-                                S::SpectralTransform,
-                                ) where NF
-    
-    (; u_grid, v_grid ) = diagn.grid_variables
-    (; geopot ) = diagn.dynamics_variables
-    bernoulli = diagn.dynamics_variables.a                  # reuse work arrays for Bernoulli potential
-    bernoulli_grid = diagn.dynamics_variables.a_grid
+function bernoulli_potential!(
+    diagn::DiagnosticVariables,   
+    S::SpectralTransform,
+)   
+    (; u_grid, v_grid ) = diagn.grid
+    (; geopot ) = diagn.dynamics
+    bernoulli = diagn.dynamics.a                            # reuse work arrays a, a_grid
+    bernoulli_grid = diagn.dynamics.a_grid
     (; div_tend ) = diagn.tendencies
  
-    half = convert(NF, 0.5)
+    half = convert(eltype(bernoulli_grid), 0.5)
     @. bernoulli_grid = half*(u_grid^2 + v_grid^2)          # = ½(u² + v²) on grid
-    spectral!(bernoulli, bernoulli_grid, S)                 # to spectral space
+    transform!(bernoulli, bernoulli_grid, S)                # to spectral space
     bernoulli .+= geopot                                    # add geopotential Φ
     ∇²!(div_tend, bernoulli, S, add=true, flipsign=true)    # add -∇²(½(u² + v²) + ϕ)
 end

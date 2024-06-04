@@ -64,6 +64,7 @@ using .RingGrids
 # SpeedyTransforms
 export SpeedyTransforms, SpectralTransform
 export spectral, gridded, spectral!, gridded!
+export transform, transform!
 export spectral_truncation, spectral_truncation!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!

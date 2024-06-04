@@ -118,9 +118,14 @@ end
 $(TYPEDSIGNATURES)
 calculates the geopotential in the ShallowWaterModel as g*η,
 i.e. gravity times the interface displacement (field `pres`)"""
-function geopotential!( diagn::DiagnosticVariablesLayer,
-                        pres::LowerTriangularMatrix,
+function geopotential!( diagn::DiagnosticVariables,
+                        pres::LowerTriangularArray,
                         planet::AbstractPlanet)
-    (; geopot) = diagn.dynamics_variables
-    geopot .= pres * planet.gravity
-end 
+    (; geopot) = diagn.dynamics
+
+    # don't use broadcasting as geopot will have size Nxnlayers but pres N
+    # [lm] indexing bypasses the incompatible sizes (necessary for primitive models)
+    for lm in eachindex(geopot, pres)
+        geopot[lm] = pres[lm] * planet.gravity
+    end
+end
