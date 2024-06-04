@@ -23,11 +23,11 @@ Base.@kwdef struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit
     α::Float64 = 1
 
     # PRECOMPUTED ARRAYS, to be initiliased with initialize!
-    H::Base.RefValue{NF} = Ref(zero(NF))    # layer_thickness
-    ξH::Base.RefValue{NF} = Ref(zero(NF))   # = 2αΔt*layer_thickness, store in RefValue for mutability
-    g∇²::Vector{NF} = zeros(NF, trunc+2)     # = gravity*eigenvalues
-    ξg∇²::Vector{NF} = zeros(NF, trunc+2)    # = 2αΔt*gravity*eigenvalues
-    S⁻¹::Vector{NF} = zeros(NF, trunc+2)     # = 1 / (1-ξH*ξg∇²), implicit operator
+    H::Base.RefValue{NF} = Ref(zero(NF))        # layer_thickness
+    ξH::Base.RefValue{NF} = Ref(zero(NF))       # = 2αΔt*layer_thickness, store in RefValue for mutability
+    g∇²::Vector{NF} = zeros(NF, trunc+2)        # = gravity*eigenvalues
+    ξg∇²::Vector{NF} = zeros(NF, trunc+2)       # = 2αΔt*gravity*eigenvalues
+    S⁻¹::Vector{NF} = zeros(NF, trunc+2)        # = 1 / (1-ξH*ξg∇²), implicit operator
 end
 
 """
@@ -62,7 +62,7 @@ function initialize!(
     # α = 0.5 evaluates at i+1 and i-1 (centered implicit)
     # α = 1   evaluates at i+1 (backward implicit)
     # α ∈ [0.5, 1] are also possible which controls the strength of the gravity wave dampening.
-    # α = 0.5 slows gravity waves and prevents them from amplifying
+    # α = 0.5 slows gravity waves and prevents them from amplifying
     # α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
 
     ξ = α*dt                   # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
@@ -83,45 +83,44 @@ $(TYPEDSIGNATURES)
 Apply correction to the tendencies in `diagn` to prevent the gravity waves from amplifying.
 The correction is implicitly evaluated using the parameter `implicit.α` to switch between
 forward, centered implicit or backward evaluation of the gravity wave terms."""
-function implicit_correction!(  diagn::DiagnosticVariablesLayer,
-                                progn::PrognosticLayerTimesteps,
-                                diagn_surface::SurfaceVariables,
-                                progn_surface::PrognosticSurfaceTimesteps,
+function implicit_correction!(  diagn::DiagnosticVariables,
+                                progn::PrognosticVariables,
                                 implicit::ImplicitShallowWater)
 
-    (; div_tend) = diagn.tendencies          # divergence tendency
-    div_old = progn.timesteps[1].div        # divergence at t
-    div_new = progn.timesteps[2].div        # divergence at t+dt
-    pres_old = progn_surface.timesteps[1].pres  # pressure/η at t
-    pres_new = progn_surface.timesteps[2].pres  # pressure/η at t+dt
-    (; pres_tend) = diagn_surface            # tendency of pressure/η
+    (; div_tend, pres_tend) = diagn.tendencies # tendency of divergence and pressure/η
+    div_old = progn.div[1]      # divergence at t
+    div_new = progn.div[2]      # divergence at t+dt
+    pres_old = progn.pres[1]    # pressure/η at t
+    pres_new = progn.pres[2]    # pressure/η at t+dt
 
     (; g∇², ξg∇², S⁻¹) = implicit
     H = implicit.H[]              # unpack as it's stored in a RefValue for mutation
     ξH = implicit.ξH[]            # unpack as it's stored in a RefValue for mutation
 
-    lmax, mmax = matrix_size(div_tend) .- (2, 1)
+    lmax, mmax = matrix_size(div_tend)[1:2] .- (2, 1)
     @boundscheck length(S⁻¹) == lmax+2 || throw(BoundsError)
     @boundscheck length(ξg∇²) == lmax+2 || throw(BoundsError)
     @boundscheck length(g∇²) == lmax+2 || throw(BoundsError)
 
-    lm = 0
-    @inbounds for m in 1:mmax+1
-        for l in m:lmax+1
-            lm += 1     # single index lm corresponding to harmonic l, m with a LowerTriangularMatrix
-            
-            # calculate the G = N(Vⁱ) + NI(Vⁱ⁻¹ - Vⁱ) term.
-            # Vⁱ is a prognostic variable at time step i
-            # N is the right hand side of ∂V\∂t = N(V)
-            # NI is the part of N that's calculated semi-implicitily: N = NE + NI
-            G_div = div_tend[lm] - g∇²[l]*(pres_old[lm] - pres_new[lm])
-            G_η   = pres_tend[lm] - H*(div_old[lm] - div_new[lm])
+    for k in eachmatrix(div_tend)
+        lm = 0
+        for m in 1:mmax+1
+            for l in m:lmax+1
+                lm += 1     # single index lm corresponding to harmonic l, m with a LowerTriangularMatrix
+                
+                # calculate the G = N(Vⁱ) + NI(Vⁱ⁻¹ - Vⁱ) term.
+                # Vⁱ is a prognostic variable at time step i
+                # N is the right hand side of ∂V\∂t = N(V)
+                # NI is the part of N that's calculated semi-implicitily: N = NE + NI
+                G_div = div_tend[lm, k] - g∇²[l]*(pres_old[lm] - pres_new[lm])
+                G_η   = pres_tend[lm] - H*(div_old[lm, k] - div_new[lm, k])
 
-            # using the Gs correct the tendencies for semi-implicit time stepping
-            div_tend[lm] = S⁻¹[l]*(G_div - ξg∇²[l]*G_η)
-            pres_tend[lm] = G_η - ξH*div_tend[lm]
+                # using the Gs correct the tendencies for semi-implicit time stepping
+                div_tend[lm, k] = S⁻¹[l]*(G_div - ξg∇²[l]*G_η)
+                pres_tend[lm] = G_η - ξH*div_tend[lm, k]
+            end
+            lm += 1     # loop skips last row
         end
-        lm += 1     # loop skips last row
     end
 end
 

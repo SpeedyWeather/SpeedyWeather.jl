@@ -59,8 +59,9 @@ function _divergence!(
     S::SpectralTransform
 ) where NF                          # target number format
 
-    @boundscheck size(u) == size(div) || throw(BoundsError)
-    @boundscheck size(v) == size(div) || throw(BoundsError)
+    #TODO allow better for (N,1) == (N,) sizes
+    @boundscheck size(u,1) == size(div,1) || throw(BoundsError)
+    @boundscheck size(v,1) == size(div,1) || throw(BoundsError)
 
     (; grad_y_vordiv1, grad_y_vordiv2 ) = S
     @boundscheck matrix_size(grad_y_vordiv1) == matrix_size(div)[1:2] || throw(BoundsError)
@@ -396,16 +397,17 @@ Keyword arguments
   - `inverse=true` computes ∇⁻²(alms) instead
 
 Default is `add=false`, `flipsign=false`, `inverse=false`. These options can be combined."""
-function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: (inverse) Laplacian of alms
-                alms::LowerTriangularMatrix{Complex{NF}},   # Input: spectral coefficients
-                S::SpectralTransform{NF};                   # precomputed eigenvalues
-                add::Bool=false,                            # add to output array or overwrite
-                flipsign::Bool=false,                       # -∇² or ∇²
-                inverse::Bool=false,                        # ∇⁻² or ∇²
-                ) where {NF<:AbstractFloat}
+function ∇²!(
+    ∇²alms::LowerTriangularArray,   # Output: (inverse) Laplacian of alms
+    alms::LowerTriangularArray,     # Input: spectral coefficients
+    S::SpectralTransform;           # precomputed eigenvalues
+    add::Bool=false,                # add to output array or overwrite
+    flipsign::Bool=false,           # -∇² or ∇²
+    inverse::Bool=false,            # ∇⁻² or ∇²
+)
 
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
-    lmax, mmax = matrix_size(alms) .- (1, 1)     # 0-based degree l, order m of the Legendre polynomials
+    lmax, mmax = matrix_size(alms)[1:2] .- (1, 1)    # 0-based lmax, mmax
     
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
     eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
@@ -414,11 +416,13 @@ function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: (inv
     @inline kernel(o, a) = flipsign ? (add ? (o-a) : -a) :
                                       (add ? (o+a) :  a)
 
-    lm = 0
-    @inbounds for m in 1:mmax+1     # order m = 0:mmax but 1-based
-        for l in m:lmax+1           # degree l = m:lmax but 1-based
-            lm += 1
-            ∇²alms[lm] = kernel(∇²alms[lm], alms[lm]*eigenvalues[l])
+    for k in eachmatrix(alms)
+        lm = 0
+        for m in 1:mmax+1     # order m = 0:mmax but 1-based
+            for l in m:lmax+1           # degree l = m:lmax but 1-based
+                lm += 1
+                ∇²alms[lm, k] = kernel(∇²alms[lm, k], alms[lm, k]*eigenvalues[l])
+            end
         end
     end
 

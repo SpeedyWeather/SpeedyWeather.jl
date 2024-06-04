@@ -217,6 +217,13 @@ function (::Type{Grid})(
     return Grid(Array{Float64}(undef, get_npoints2D(Grid, nlat_half), k...), nlat_half)
 end
 
+function Base.convert(
+    ::Type{Grid},
+    grid::AbstractGridArray,
+) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType}
+    return Grid(ArrayType(grid.data))
+end
+
 ## COORDINATES
 
 """$(TYPEDSIGNATURES) Latitudes (in degrees, -90˚-90˚N) and longitudes (0-360˚E)  for

@@ -268,7 +268,7 @@ function timestep!(
 
     # GET TENDENCIES, CORRECT THEM FOR SEMI-IMPLICIT INTEGRATION
     dynamics_tendencies!(diagn, progn, lf2, model)
-    implicit_correction!(diagn_layer, progn_layer, diagn.surface, progn.surface, implicit)
+    implicit_correction!(diagn, progn, model.implicit)
     
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
     horizontal_diffusion!(diagn, progn, model)

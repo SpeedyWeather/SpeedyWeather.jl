@@ -167,15 +167,17 @@ end
 
 """$(TYPEDSIGNATURES)
 Apply horizontal diffusion to vorticity and divergence in the ShallowWaterModel."""
-function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
-                                diagn::DiagnosticVariablesLayer,
-                                model::ShallowWater,
-                                lf::Int=1)      # leapfrog index used (2 is unstable)
-    ∇²ⁿ = model.horizontal_diffusion.∇²ⁿ[diagn.k]
-    ∇²ⁿ_implicit = model.horizontal_diffusion.∇²ⁿ_implicit[diagn.k]
+function horizontal_diffusion!( 
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    model::ShallowWater,
+    lf::Integer = 1,    # leapfrog index used (2 is unstable)
+)
+    (; ∇²ⁿ, ∇²ⁿ_implicit) = model.horizontal_diffusion
 
     # ShallowWater model diffuses vorticity and divergence
-    (; vor, div) = progn.timesteps[lf]
+    vor = progn.vor[lf]
+    div = progn.div[lf]
     (; vor_tend, div_tend) = diagn.tendencies
     horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
     horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)

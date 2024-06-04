@@ -58,7 +58,10 @@ Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
 
     # VERTICAL
     "[OPTION] number of vertical levels"
-    nlev::Int = DEFAULT_NLEV
+    nlayers::Int = DEFAULT_NLEV
+
+    "[DEPRECATED] number of vertical levels"
+    nlev::Int = nlayers
 
     "[OPTION] coordinates used to discretize the vertical"
     vertical_coordinates::VerticalCoordinates = SigmaCoordinates(; nlev)
@@ -74,7 +77,7 @@ Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
 end
 
 function Base.show(io::IO, SG::SpectralGrid)
-    (; NF, trunc, Grid, radius, nlat, npoints, nlev, vertical_coordinates) = SG
+    (; NF, trunc, Grid, radius, nlat, npoints, nlayers, vertical_coordinates) = SG
     (; device, ArrayType) = SG
     (; nparticles) = SG
 
@@ -89,7 +92,7 @@ function Base.show(io::IO, SG::SpectralGrid)
     if nparticles > 0
     println(io, "├ Particles:  $nparticles")
     end
-    println(io, "├ Vertical:   $nlev-level $(typeof(vertical_coordinates))")
+    println(io, "├ Vertical:   $nlayers-layer $(typeof(vertical_coordinates))")
       print(io, "└ Device:     $(typeof(device)) using $ArrayType")
 end
 

@@ -35,7 +35,7 @@ function dynamics_tendencies!(
     bernoulli_potential!(diagn, spectral_transform) # = -∇²(E+Φ), tendency for divergence
     
     # = -∇⋅(uh, vh), tendency for "pressure" η
-    volume_flux_divergence!(diagn, surface, orography, atmosphere, geometry, spectral_transform)
+    volume_flux_divergence!(diagn, orography, atmosphere, geometry, spectral_transform)
 end
 
 """
@@ -488,36 +488,41 @@ Computes ∇⋅((u, v)*A) with the option to add/overwrite `A_tend` and to
 - `A_tend += ∇⋅((u, v)*A)` for `add=true`, `flip_sign=false`
 - `A_tend -= ∇⋅((u, v)*A)` for `add=true`, `flip_sign=true`
 """
-function flux_divergence!(  A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput: tendency to write into
-                            A_grid::AbstractGrid{NF},                   # Input: grid field to be advected
-                            diagn::DiagnosticVariablesLayer{NF},        
-                            G::Geometry{NF},
-                            S::SpectralTransform{NF};
-                            add::Bool=true,                 # add result to A_tend or overwrite for false
-                            flipsign::Bool=true) where NF   # compute -∇⋅((u, v)*A) (true) or ∇⋅((u, v)*A)? 
-
-    (; u_grid, v_grid) = diagn.grid_variables
+function flux_divergence!(
+    A_tend::LowerTriangularArray,   # Ouput: tendency to write into
+    A_grid::AbstractGridArray,      # Input: grid field to be advected
+    diagn::DiagnosticVariables,     # for u_grid, v_grid
+    G::Geometry,
+    S::SpectralTransform;
+    add::Bool=true,                 # add result to A_tend or overwrite for false
+    flipsign::Bool=true,            # compute -∇⋅((u, v)*A) (true) or ∇⋅((u, v)*A)? 
+)
+    (; u_grid, v_grid) = diagn.grid
     (; coslat⁻¹) = G
 
+    @boundscheck size(A_grid,1) == size(u_grid,1) || throw(BoundsError)
+    @boundscheck size(A_grid,2) == size(u_grid,2) || throw(BoundsError)
+
     # reuse general work arrays a, b, a_grid, b_grid
-    uA = diagn.dynamics_variables.a             # = u*A in spectral
-    vA = diagn.dynamics_variables.b             # = v*A in spectral
-    uA_grid = diagn.dynamics_variables.a_grid   # = u*A on grid
-    vA_grid = diagn.dynamics_variables.b_grid   # = v*A on grid
+    uA = diagn.dynamics.a           # = u*A in spectral
+    vA = diagn.dynamics.b           # = v*A in spectral
+    uA_grid = diagn.dynamics.a_grid # = u*A on grid
+    vA_grid = diagn.dynamics.b_grid # = v*A on grid
 
-    rings = eachring(uA_grid, vA_grid, u_grid, v_grid, A_grid)  # precompute ring indices
-
-    @inbounds for (j, ring) in enumerate(rings)
-        coslat⁻¹j = coslat⁻¹[j]
-        for ij in ring
-            Acoslat⁻¹j = A_grid[ij]*coslat⁻¹j
-            uA_grid[ij] = u_grid[ij]*Acoslat⁻¹j
-            vA_grid[ij] = v_grid[ij]*Acoslat⁻¹j
+    rings = eachring(A_grid)        # precomputed ring indices
+    for k in eachgrid(A_grid)
+        for (j, ring) in enumerate(rings)
+            coslat⁻¹j = coslat⁻¹[j]
+            for ij in ring
+                Acoslat⁻¹j = A_grid[ij, k]*coslat⁻¹j
+                uA_grid[ij, k] = u_grid[ij, k]*Acoslat⁻¹j
+                vA_grid[ij, k] = v_grid[ij, k]*Acoslat⁻¹j
+            end
         end
     end
 
-    spectral!(uA, uA_grid, S)
-    spectral!(vA, vA_grid, S)
+    transform!(uA, uA_grid, S)
+    transform!(vA, vA_grid, S)
 
     divergence!(A_tend, uA, vA, S; add, flipsign)
     return nothing
@@ -681,14 +686,16 @@ end
 """
 $(TYPEDSIGNATURES)
 Computes the (negative) divergence of the volume fluxes `uh, vh` for the continuity equation, -∇⋅(uh, vh)."""
-function volume_flux_divergence!(   diagn::DiagnosticVariablesLayer,
-                                    surface::SurfaceVariables,
-                                    orog::AbstractOrography,
-                                    atmosphere::AbstractAtmosphere,
-                                    G::AbstractGeometry,
-                                    S::SpectralTransform)                        
+function volume_flux_divergence!(
+    diagn::DiagnosticVariables,
+    orog::AbstractOrography,
+    atmosphere::AbstractAtmosphere,
+    G::AbstractGeometry,
+    S::SpectralTransform
+)                        
 
-    (; pres_grid, pres_tend ) = surface
+    (; pres_grid) = diagn.grid
+    (; pres_tend ) = diagn.tendencies
     (; orography ) = orog
     H = atmosphere.layer_thickness
 
