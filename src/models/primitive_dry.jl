@@ -92,7 +92,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     feedback::FB = Feedback()
 end
 
-has(::Type{<:PrimitiveDry}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres)
+prognostic_variables(::Type{<:PrimitiveDry}) = (:vor, :div, :temp, :pres)
 default_concrete_model(::Type{PrimitiveDry}) = PrimitiveDryModel
 
 """

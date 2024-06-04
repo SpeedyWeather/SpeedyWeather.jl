@@ -103,8 +103,8 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
- 
-has(::Type{<:PrimitiveWet}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres, :humid)
+
+prognostic_variables(::Type{<:PrimitiveWet}) = (:vor, :div, :temp, :humid, :pres)
 default_concrete_model(::Type{PrimitiveWet}) = PrimitiveWetModel
  
 """

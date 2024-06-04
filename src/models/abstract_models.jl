@@ -20,8 +20,9 @@ end
 """$(TYPEDSIGNATURES)
 Returns true if the model `M` has a prognostic variable `var_name`, false otherwise.
 The default fallback is that all variables are included. """
-has(M::Type{<:ModelSetup}, var_name::Symbol) = var_name in (:vor, :div, :temp, :humid, :pres)
-has(M::ModelSetup, var_name) = has(typeof(M), var_name)
+has(Model::Type{<:ModelSetup}, var_name::Symbol) = var_name in prognostic_variables(Model)
+has(model::ModelSetup, var_name) = has(typeof(model), var_name)
+prognostic_variables(model::ModelSetup) = prognostic_variables(typeof(model))
 
 # model class is the abstract supertype
 model_class(::Type{<:Barotropic}) = Barotropic
