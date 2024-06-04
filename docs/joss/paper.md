@@ -180,7 +180,7 @@ their coefficients in a lower triangular matrix representation.
 the grid-point space as defined by `RingGrids` and the spectral space defined in
 `LowerTriangularMatrices`. These three modules are independently usable
 and therefore support SpeedyWeather's library-like user interface.
-Output is stored as NetCDF files using NCDatasets.jl[@NCDatasets].
+Output is stored as NetCDF files using NCDatasets.jl [@NCDatasets].
 
 ![Relative vorticity simulated with the shallow water model in SpeedyWeather.jl.
 The simulation used a spectral resolution of T1023 (about 20 km) and Float32
