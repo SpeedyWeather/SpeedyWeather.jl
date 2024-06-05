@@ -299,7 +299,7 @@ Generator function."""
 function ParticleVariables(SG::SpectralGrid)
     (; nlat_half, nparticles, NF, ArrayType, Grid) = SG
     (; ParticleVector) = SG
-    VectorNF = ArrayType{NF}
+    VectorNF = ArrayType{NF, 1}
     return ParticleVariables{NF, ArrayType, ParticleVector, VectorNF, Grid}(; nlat_half, nparticles)
 end
 
@@ -336,12 +336,26 @@ struct DiagnosticVariables{
     "Number of particles for particle advection"
     nparticles::Int
 
+    "Tendencies (spectral and grid) of the prognostic variables"
     tendencies::Tendencies{NF, ArrayType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D}
+    
+    "Gridded prognostic variables"
     grid::GridVariables{NF, ArrayType, GridVariable2D, GridVariable3D}
+    
+    "Intermediate variables for the dynamical core"
     dynamics::DynamicsVariables{NF, ArrayType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D}
+    
+    "Global fields returned from physics parameterizations"
     physics::PhysicsVariables{NF, ArrayType, GridVariable2D}
+    
+    "Intermediate variables for the particle advection"
     particles::ParticleVariables{NF, ArrayType, ParticleVector, VectorNF, Grid}
+    
+    "Vertical column for the physics parameterizations"
     columns::Vector{ColumnVariables{NF}}
+
+    "Average temperature of every horizontal layer [K]"
+    temp_average::VectorNF
 
     "Scale applied to vorticity and divergence"
     scale::Base.RefValue{NF}
@@ -351,8 +365,7 @@ end
 Generator function."""
 function DiagnosticVariables(SG::SpectralGrid)
 
-    (; trunc, nlat_half, nparticles, NF) = SG
-    nlayers = SG.nlev
+    (; trunc, nlat_half, nparticles, NF, nlayers) = SG
 
     tendencies = Tendencies(SG)
     grid = GridVariables(SG)
@@ -364,12 +377,14 @@ function DiagnosticVariables(SG::SpectralGrid)
     nthreads = Threads.nthreads()
     columns = [ColumnVariables{NF}(; nlev=nlayers) for _ in 1:nthreads]
 
+    temp_average = SG.ArrayType{NF, 1}(undef, nlayers)
+
     scale = Ref(one(NF))
 
     return DiagnosticVariables(
         trunc, nlat_half, nlayers, nparticles,
-        tendencies, grid, dynamics, physics, particles, columns,
-        scale,
+        tendencies, grid, dynamics, physics, particles,
+        columns, temp_average, scale,
     )
 end
 
@@ -388,6 +403,7 @@ function Base.show(
     println(io, "├ physics::PhysicsVariables")
     println(io, "├ particles::ParticleVariables")
     println(io, "├ columns::Vector{ColumnVariables}")
+    println(io, "├ temp_average::$(typeof(diagn.temp_average))")
     print(io,   "└ scale: $(diagn.scale[])")
 end
 

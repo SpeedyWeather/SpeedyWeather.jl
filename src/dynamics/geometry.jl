@@ -29,8 +29,11 @@ Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry
     "number of latitude rings"
     nlat::Int = spectral_grid.nlat
 
-    "number of vertical levels"
+    "[DEPRECATED] number of vertical levels"
     nlev::Int = spectral_grid.nlev
+    
+    "number of vertical levels"
+    nlayers::Int = spectral_grid.nlayers
 
     "total number of grid points"
     npoints::Int = spectral_grid.npoints

@@ -500,17 +500,15 @@ function flux_divergence!(
     (; u_grid, v_grid) = diagn.grid
     (; coslat⁻¹) = G
 
-    @boundscheck size(A_grid,1) == size(u_grid,1) || throw(BoundsError)
-    @boundscheck size(A_grid,2) == size(u_grid,2) || throw(BoundsError)
-
     # reuse general work arrays a, b, a_grid, b_grid
     uA = diagn.dynamics.a           # = u*A in spectral
     vA = diagn.dynamics.b           # = v*A in spectral
     uA_grid = diagn.dynamics.a_grid # = u*A on grid
     vA_grid = diagn.dynamics.b_grid # = v*A on grid
 
-    rings = eachring(A_grid)        # precomputed ring indices
-    for k in eachgrid(A_grid)
+    # precomputed ring indices and check grids_match
+    rings = eachring(A_grid, u_grid, v_grid)
+    for k in eachgrid(u_grid, v_grid)
         for (j, ring) in enumerate(rings)
             coslat⁻¹j = coslat⁻¹[j]
             for ij in ring
@@ -558,9 +556,8 @@ function vorticity_flux_curldiv!(   diagn::DiagnosticVariables,
     v = diagn.grid.v_grid                               # velocity
     vor = diagn.grid.vor_grid                           # relative vorticity
 
-    # precompute ring indices and boundscheck
+    # precompute ring indices and check grids match
     rings = eachring(u_tend_grid, v_tend_grid, u, v, vor)
-
     for k in eachgrid(u)
         for (j, ring) in enumerate(rings)
             coslat⁻¹j = coslat⁻¹[j]
@@ -853,10 +850,12 @@ $(TYPEDSIGNATURES)
 Calculates the average temperature of a layer from the l=m=0 harmonic
 and stores the result in `diagn.temp_average`"""
 function temperature_average!(
-    diagn::DiagnosticVariablesLayer,
-    temp::LowerTriangularMatrix,
+    diagn::DiagnosticVariables,
+    temp::LowerTriangularArray,
     S::SpectralTransform,
 )
-    # average from l=m=0 harmonic divided by norm of the sphere
-    diagn.temp_average[] = real(temp[1])/S.norm_sphere
+    for k in eachmatrix(temp)
+        # average from l=m=0 harmonic divided by norm of the sphere
+        diagn.temp_average[k] = real(temp[1, k])/S.norm_sphere
+    end
 end 

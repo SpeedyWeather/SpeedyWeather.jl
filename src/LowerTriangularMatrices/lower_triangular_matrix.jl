@@ -45,11 +45,29 @@ Base.length(L::LowerTriangularArray) = length(L.data)
 Size of a `LowerTriangularArray` defined as size of the flattened array."""
 Base.size(L::LowerTriangularArray) = size(L.data)
 
+# super type to be used for ZeroBased (0-based), OneBased (1-based) indexing of the spherical harmonics
+abstract type IndexBasis end
+
+"""Abstract type to dispatch for 0-based indexing of the spherical harmonic
+degree l and order m, i.e. l=m=0 is the mean, the zonal modes are m=0 etc.
+This indexing is more common in mathematics."""
+abstract type ZeroBased <: IndexBasis end
+
+"""Abstract type to dispatch for 1-based indexing of the spherical harmonic
+degree l and order m, i.e. l=m=1 is the mean, the zonal modes are m=1 etc.
+This indexing is matches Julia's 1-based indexing for arrays."""
+abstract type OneBased <: IndexBasis end
+
+
 """$(TYPEDSIGNATURES)
 Size of a expanded `LowerTriangularArray` as if it were a full matrix,  
 returns `(L.m, L.n, size(L.data)[2:end])``."""
-matrix_size(L::LowerTriangularArray)  = (L.m, L.n, size(L.data)[2:end]...)
+matrix_size(L::LowerTriangularArray) = (L.m, L.n, size(L.data)[2:end]...)
 matrix_size(L::LowerTriangularArray, i::Int) = matrix_size(L)[i] 
+
+# matrix_size(L::LowerTriangularArray, base::Type{<:IndexBasis} = OneBased) = (L.m, L.n)
+matrix_size(L::LowerTriangularArray, base::Type{OneBased})  = (L.m,   L.n)
+matrix_size(L::LowerTriangularArray, base::Type{ZeroBased}) = (L.m-1, L.n-1)
 
 # sizeof the underlying data vector
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
@@ -245,12 +263,67 @@ creates `unit_range::UnitRange` to loop over all non-zeros in the LowerTriangula
 provided as arguments. Checks bounds first. All LowerTriangularMatrix's need to be of the same size.
 Like `eachindex` but skips the upper triangle with zeros in `L`."""
 function eachharmonic(L1::LowerTriangularArray, Ls::LowerTriangularArray...) 
-    n = size(L1.data,1) 
-    Base._all_match_first(L->size(L.data,1), n, L1, Ls...) || throw(BoundsError)
+    lowertriangular_match(L1, Ls...; horizontal_only=true) || throw(DimensionMismatch(L1, Ls...))
     return eachharmonic(L1) 
 end
 
+"""$(TYPEDSIGNATURES) Iterator for the non-horizontal dimensions in
+LowerTriangularArrays. To be used like
+
+    for k in eachmatrix(L)
+        L[1, k]
+    
+to loop over every non-horizontal dimension of L."""
 eachmatrix(L::LowerTriangularArray) = CartesianIndices(size(L)[2:end])
+
+"""$(TYPEDSIGNATURES) Iterator for the non-horizontal dimensions in
+LowerTriangularArrays. Checks that the LowerTriangularArrays match according to
+`lowertriangular_match`."""
+function eachmatrix(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
+    lowertriangular_match(L1, Ls...) || throw(DimensionMismatch(L1, Ls...))
+    return eachmatrix(L1)
+end
+
+"""$(TYPEDSIGNATURES) True if both `L1` and `L2` are of the same size (as matrix),
+but ignores singleton dimensions, e.g. 5x5 and 5x5x1 would match.
+With `horizontal_only=true` (default `false`) ignore the non-horizontal dimensions,
+e.g. 5x5, 5x5x1, 5x5x2 would all match."""
+function lowertriangular_match(
+    L1::LowerTriangularArray,
+    L2::LowerTriangularArray;
+    horizontal_only::Bool=false,
+)
+    horizontal_match = matrix_size(L1)[1:2] == matrix_size(L2)[1:2]
+    horizontal_only && return horizontal_match
+    return horizontal_match && length(L1) == length(L2)     # ignores singleton dimensions
+end
+
+
+"""$(TYPEDSIGNATURES) True if all lower triangular matrices provided as arguments
+match according to `lowertriangular_match` wrt to `L1` (and therefore all)."""
+function lowertriangular_match(L1::LowerTriangularArray, Ls::LowerTriangularArray...; kwargs...)
+    length(Ls) == 0 && return true   # single L1 always matches itself
+    # cut the Ls tuple short on every iteration of the recursion
+    return lowertriangular_match(L1, Ls[1]; kwargs...) && lowertriangular_match(L1, Ls[2:end]...; kwargs...)
+end
+
+"""$(TYPEDSIGNATURES)
+Returns a tuple like (1,2,3) as string "1×2×3". To be used with size2x_string(size()"""
+function size2x_string(t::Tuple)
+    s = "$(t[1])"
+    for i in t[2:end]
+        s *= "×$i"
+    end
+    return s
+end
+
+function Base.DimensionMismatch(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
+    s = "LowerTriangularArrays do not match; $(size2x_string(matrix_size(L1)))"
+    for L in Ls
+        s *= ", $(size2x_string(matrix_size(L)))"
+    end
+    return DimensionMismatch(s)
+end
 
 # CONVERSIONS
 """ 

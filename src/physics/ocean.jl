@@ -155,7 +155,7 @@ function initialize!(
     ocean_model::SeasonalOceanClimatology,
     model::PrimitiveEquation,
 )
-    ocean.time = time   # set initial time
+    # ocean.time = time   # set initial time
     interpolate_monthly!(   ocean.sea_surface_temperature,
                             ocean_model.monthly_temperature,
                             time)
@@ -165,11 +165,11 @@ function ocean_timestep!(   ocean::PrognosticVariablesOcean,
                             time::DateTime,
                             ocean_model::SeasonalOceanClimatology)
 
-    # escape immediately if Δt of ocean model hasn't passed yet
-    (time - ocean.time) < ocean_model.Δt && return nothing
+    # # escape immediately if Δt of ocean model hasn't passed yet
+    # (time - ocean.time) < ocean_model.Δt && return nothing
 
-    # otherwise update ocean prognostic variables:
-    ocean.time = time
+    # # otherwise update ocean prognostic variables:
+    # ocean.time = time
     interpolate_monthly!(   ocean.sea_surface_temperature,
                             ocean_model.monthly_temperature,
                             time)

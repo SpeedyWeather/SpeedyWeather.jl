@@ -1,6 +1,6 @@
 abstract type AbstractImplicit <: AbstractModelComponent end
 
-# BAROTROPIC MODEL (no implicit needed)
+# BAROTROPIC MODEL (no implicit needed)
 export NoImplicit
 struct NoImplicit <: AbstractImplicit end
 NoImplicit(SG::SpectralGrid) = NoImplicit()
@@ -14,13 +14,13 @@ export ImplicitShallowWater
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the shallow water model.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit
+@kwdef struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit
 
     # DIMENSIONS
     trunc::Int
 
-    "coefficient for semi-implicit computations to filter gravity waves"
-    α::Float64 = 1
+    "[OPTION] coefficient for semi-implicit computations to filter gravity waves, 0.5 <= α <= 1"
+    α::NF = 1
 
     # PRECOMPUTED ARRAYS, to be initiliased with initialize!
     H::Base.RefValue{NF} = Ref(zero(NF))        # layer_thickness
@@ -71,7 +71,7 @@ function initialize!(
 
     # loop over degree l of the harmonics (implicit terms are independent of order m)
     @inbounds for l in eachindex(g∇², ξg∇², S⁻¹)
-        eigenvalue = -l*(l-1)               # =∇², with without 1/radius², 1-based -l*l(l+1) → -l*(l-1)
+        eigenvalue = -l*(l-1)               # =∇², with without 1/radius², 1-based -l*(l+1) → -l*(l-1)
         g∇²[l] = gravity*eigenvalue         # doesn't actually change with dt
         ξg∇²[l] = ξ*g∇²[l]                  # update ξg∇² with new ξ
         S⁻¹[l] = inv(1 - ξH[]*ξg∇²[l])      # update 1/(1-ξ²gH∇²) with new ξ
@@ -139,7 +139,7 @@ Base.@kwdef struct ImplicitPrimitiveEquation{NF<:AbstractFloat} <: AbstractImpli
     "number of vertical levels"
     nlev::Int
 
-    # PARAMETERS
+    # PARAMETERS
     "time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
     α::Float64 = 1
 

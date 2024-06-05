@@ -257,6 +257,25 @@ end
     end
 end
 
+@testset "Ring indices" begin
+
+    g1 = zeros(OctahedralGaussianGrid, 2)
+    g2 = zeros(OctahedralGaussianGrid, 2, 1)    # matches above
+    g3 = zeros(OctahedralGaussianGrid, 2, 2)    # matches horizontally only
+    g4 = zeros(OctahedralClenshawGrid, 2)       # does not match above
+
+    @test eachring(g1) == eachring(g1, g2) == eachring(g1, g2, g2, g1)
+    @test eachring(g1) == eachring(g2, g3)
+    @test_throws DimensionMismatch eachring(g1, g4)
+    @test_throws DimensionMismatch eachring(g2, g4)
+    @test_throws DimensionMismatch eachring(g3, g4)
+
+    @test RingGrids.grids_match(g1, g3) == false
+    @test RingGrids.grids_match(g2, g3) == false
+    @test RingGrids.grids_match(g1, g3, horizontal_only=true)
+    @test RingGrids.grids_match(g2, g3, horizontal_only=true)
+end
+
 @testset "Grid broadcasting" begin
     n = 2
     @testset for G in ( FullClenshawArray,

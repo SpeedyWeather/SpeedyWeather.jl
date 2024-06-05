@@ -13,15 +13,13 @@ initialize!(::ClipNegatives, ::PrimitiveWet) = nothing
 
 # function barrier
 function hole_filling!(
-    A::AbstractGrid,
+    q::AbstractGridArray,
     H::ClipNegatives,
     model::PrimitiveWet
 )
-    hole_filling!(A, H)
+    hole_filling!(q, H)
 end
 
-function hole_filling!(A::AbstractGrid,::ClipNegatives)
-    @inbounds for ij in eachgridpoint(A)
-        A[ij] = max(A[ij], 0)
-    end
+function hole_filling!(q::AbstractGridArray,::ClipNegatives)
+    @. q = max(q, 0)
 end

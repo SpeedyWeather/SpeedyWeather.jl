@@ -14,6 +14,7 @@ import LinearAlgebra: tril!
 import UnicodePlots
 
 export LowerTriangularMatrix, LowerTriangularArray
+export IndexBasis, OneBased, ZeroBased
 export eachharmonic, eachmatrix, matrix_size
 
 include("lower_triangular_matrix.jl")

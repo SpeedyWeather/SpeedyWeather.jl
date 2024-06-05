@@ -69,7 +69,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     ξ = randn(Complex{NF}, lmax, lmax)*convert(NF, initial_conditions.amplitude)
     vor = progn.vor[1]                      # use first leapfrog step
 
-    for k in eachmatrix(vor)
+    for k in eachmatrix(vor)                # same vorticity across all vertical layers
         for m in 1:lmax
             for l in m:lmax
                 vor[l, m, k] = ξ[l, m]*l^power
@@ -83,8 +83,7 @@ end
 
 export ZonalJet
 
-"""
-A struct that contains all parameters for the Galewsky et al, 2004 zonal jet
+"""A struct that contains all parameters for the Galewsky et al, 2004 zonal jet
 intitial conditions for the ShallowWaterModel. Default values as in Galewsky.
 $(TYPEDFIELDS)"""
 Base.@kwdef mutable struct ZonalJet <: AbstractInitialConditions
@@ -137,12 +136,12 @@ function initialize!(   progn::PrognosticVariables,
     (; Grid, NF, nlat_half) = model.spectral_grid
     (; coslat⁻¹, radius) = model.geometry
 
-    u_grid = zeros(Grid{NF}, nlat_half)
+    u_grid = zeros(Grid{NF}, nlat_half, 1)
     η_perturb_grid = zeros(Grid{NF}, nlat_half)
     lat = RingGrids.get_lat(Grid, nlat_half)
     _, lons = RingGrids.get_colatlons(Grid, nlat_half)
 
-    for (j, ring) in enumerate(eachring(u_grid, η_perturb_grid))
+    for (j, ring) in enumerate(eachring(u_grid))
         θ = lat[j]             # latitude in radians
         
         # velocity per latitude
@@ -173,9 +172,10 @@ function initialize!(   progn::PrognosticVariables,
     
     # get vorticity initial conditions from curl of u, v
     v = zero(u)     # meridional velocity zero for these initial conditions
-    vor = curl(u, v, model.spectral_transform)
+    vor = progn.vor[1]
+    curl!(vor, u, v, model.spectral_transform)
 
-    # compute the div = -∇⋅(0,(ζ+f)*u) = -∇×((ζ+f)*u, 0) term, v=0
+    # compute the div = -∇⋅(0,(ζ+f)*u) = ∇×((ζ+f)*u, 0) term, v=0
     vor_grid = transform(vor, model.spectral_transform)
     f = coriolis(vor_grid; rotation)
 
@@ -189,7 +189,7 @@ function initialize!(   progn::PrognosticVariables,
     RingGrids.scale_coslat!(u_grid)     # remove coslat scaling
     u_grid .*= radius                   # no radius scaling as we'll apply ∇⁻²(∇²) (would cancel)
     @. u_grid = convert(NF,1/2) * u_grid^2
-    u²_half = spectral!(u, u_grid, model.spectral_transform)
+    u²_half = transform!(u, u_grid, model.spectral_transform)
     ∇²!(div, u²_half, model.spectral_transform, flipsign=true, add=true)
     div .*= inv(gravity)
 
@@ -198,7 +198,7 @@ function initialize!(   progn::PrognosticVariables,
     ∇⁻²!(pres, div, model.spectral_transform)
 
     # add perturbation (reuse u array)
-    η_perturb = transform!(u, η_perturb_grid, model.spectral_transform)
+    η_perturb = transform(η_perturb_grid, model.spectral_transform)
     pres .+= η_perturb
     spectral_truncation!(pres)
     return nothing
@@ -241,17 +241,20 @@ function initialize!(   progn::PrognosticVariables{NF},
   
     (; u₀, η₀) = initial_conditions
     (; perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = initial_conditions
-    (; radius, Grid, nlat_half) = model.spectral_grid
+    (; radius, Grid, nlat_half, nlayers) = model.spectral_grid
     (; σ_levels_full) = model.geometry
 
     φ, λ = model.geometry.latds, model.geometry.londs
     S = model.spectral_transform
 
     # VORTICITY
-    ζ = zeros(Grid{NF}, nlat_half)   # relative vorticity
-    D = zeros(Grid{NF}, nlat_half)   # divergence (perturbation only)
+    vor_grid = zeros(Grid{NF}, nlat_half, nlayers)     # relative vorticity
+    div_grid = zeros(Grid{NF}, nlat_half, nlayers)     # divergence (perturbation only)
 
-    for (k, layer) in enumerate(progn.layers)
+    vor = progn.vor[1]  # write into first leapfrog time step
+    div = progn.div[1]
+
+    for k in eachgrid(vor_grid, div_grid)
 
         η = σ_levels_full[k]    # Jablonowski and Williamson use η for σ coordinates
         ηᵥ = (η - η₀)*π/2       # auxiliary variable for vertical coordinate
@@ -265,7 +268,7 @@ function initialize!(   progn::PrognosticVariables{NF},
             tanφ = tand(φij)
 
             # Jablonowski and Williamson, eq. (3) 
-            ζ[ij] = -4u₀/radius*cos_ηᵥ*sinφ*cosφ*(2 - 5sinφ^2) 
+            vor_grid[ij, k] = -4u₀/radius*cos_ηᵥ*sinφ*cosφ*(2 - 5sinφ^2) 
 
             # PERTURBATION
             sinφc = sind(perturb_lat)       # location of centre
@@ -280,19 +283,19 @@ function initialize!(   progn::PrognosticVariables{NF},
             exp_decay = exp(-(r/R)^2)
 
             # Jablonowski and Williamson, eq. (12) 
-            ζ[ij] += perturb_uₚ/radius*exp_decay*
+            vor_grid[ij, k] += perturb_uₚ/radius*exp_decay*
                 (tanφ - 2*(radius/R)^2*acos(X)*X_norm*(sinφc*cosφ - cosφc*sinφ*cosd(λij-λc)))
             
             # Jablonowski and Williamson, eq. (13) 
-            D[ij] = -2perturb_uₚ*radius/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
+            div_grid[ij, k] = -2perturb_uₚ*radius/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
         end
-
-        (; vor, div) = layer.timesteps[1]
-        spectral!(vor, ζ, S)
-        spectral!(div, D, S)
-        spectral_truncation!(vor)
-        spectral_truncation!(div)
     end
+
+    transform!(vor, vor_grid, S)
+    transform!(div, div_grid, S)
+    spectral_truncation!(vor)
+    spectral_truncation!(div)
+    return nothing
 end
 
 export JablonowskiTemperature
@@ -330,7 +333,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     (;σ_tropopause) = initial_conditions
     lapse_rate = model.atmosphere.moist_lapse_rate
     (;temp_ref, R_dry) = model.atmosphere
-    (;radius, Grid, nlat_half, nlev) = model.spectral_grid
+    (;radius, Grid, nlat_half, nlayers) = model.spectral_grid
     (;rotation, gravity) = model.planet
     (;σ_levels_full) = model.geometry
 
@@ -339,7 +342,7 @@ function initialize!(   progn::PrognosticVariables{NF},
 
     # vertical profile
     Tη = zero(σ_levels_full)
-    for k in 1:nlev
+    for k in 1:nlayers
         σ = σ_levels_full[k]
         Tη[k] = temp_ref*σ^(R_dry*lapse_rate/gravity)   # Jablonowski and Williamson eq. 4
 
@@ -349,12 +352,12 @@ function initialize!(   progn::PrognosticVariables{NF},
     end
 
     Tη .= max.(Tη, Tmin)
-
-    T = zeros(Grid{NF}, nlat_half)   # temperature
+    temp_grid = zeros(Grid{NF}, nlat_half, nlayers)     # temperature
     aΩ = radius*rotation
 
-    for (k, layer) in enumerate(progn.layers)
+    temp = progn.temp[1]        # write into first leapfrog time step
 
+    for k in eachgrid(temp_grid)
         η = σ_levels_full[k]    # Jablonowski and Williamson use η for σ coordinates
         ηᵥ = (η - η₀)*π/2       # auxiliary variable for vertical coordinate
 
@@ -367,13 +370,13 @@ function initialize!(   progn::PrognosticVariables{NF},
             cosφ = cosd(φij)
 
              # Jablonowski and Williamson, eq. (6) 
-            T[ij] = Tη[k] + A1*((-2sinφ^6*(cosφ^2 + 1/3) + 10/63)*A2 + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*aΩ)
+            temp_grid[ij, k] = Tη[k] + A1*((-2sinφ^6*(cosφ^2 + 1/3) + 10/63)*A2 + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*aΩ)
         end
-
-        (; temp) = layer.timesteps[1]
-        spectral!(temp, T, S)
-        spectral_truncation!(temp)
     end
+
+    transform!(temp, temp_grid, S)
+    spectral_truncation!(temp)
+    return nothing
 end
 
 export StartFromFile
@@ -423,7 +426,7 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     (; temp_ref, lapse_rate, R_dry) = model.atmosphere
     (; gravity) = model.planet
     (; nlev, σ_levels_full) = model.geometry
-    (; norm_sphere) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
+    (; norm_sphere) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
 
     # Lapse rate scaled by gravity [K/m / (m²/s²)]
     Γg⁻¹ = lapse_rate/gravity
@@ -482,9 +485,10 @@ function initialize!(   progn::PrognosticVariables,
         lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹
     end
 
-    lnp = progn.surface.timesteps[1].pres
-    spectral!(lnp, lnp_grid, model.spectral_transform)
-    spectral_truncation!(lnp)       # set lmax+1 row to zero
+    lnp = progn.pres[1]
+    transform!(lnp, lnp_grid, model.spectral_transform)
+    spectral_truncation!(lnp)       # set last row to zero as not used for scale variables like pres
+    return nothing
 end
 
 export ConstantPressure
@@ -516,25 +520,28 @@ function initialize!(
     model::ModelSetup,
 )
     (; relhumid_ref) = IC
-    (; nlev, σ_levels_full) = model.geometry
-    lnpₛ = progn.surface.timesteps[1].pres
-    pres_grid = gridded(lnpₛ, model.spectral_transform)
+    (; nlayers, σ_levels_full) = model.geometry
+
+    # get pressure [Pa] on grid
+    lnpₛ = progn.pres[1]
+    pres_grid = transform(lnpₛ, model.spectral_transform)
     pres_grid .= exp.(pres_grid)
 
-    for k in 1:nlev
-        temp_grid = gridded(progn.layers[k].timesteps[1].temp, model.spectral_transform)
-        humid_grid = zero(temp_grid)
+    temp_grid = transform(progn.temp[1], model.spectral_transform)
+    humid_grid = zero(temp_grid)
 
+    for k in eachgrid(temp_grid, humid_grid)
         for ij in eachgridpoint(humid_grid)
             pₖ = σ_levels_full[k] * pres_grid[ij]
-            q_sat = saturation_humidity(temp_grid[ij], pₖ, model.clausius_clapeyron)
-            humid_grid[ij] = relhumid_ref*q_sat
+            q_sat = saturation_humidity(temp_grid[ij, k], pₖ, model.clausius_clapeyron)
+            humid_grid[ij, k] = relhumid_ref*q_sat
         end
-        
-        (;humid) = progn.layers[k].timesteps[1]
-        spectral!(humid, humid_grid, model.spectral_transform)
-        spectral_truncation!(humid)
     end
+        
+    humid = progn.humid[1]
+    transform!(humid, humid_grid, model.spectral_transform)
+    spectral_truncation!(humid)
+    return nothing
 end
 
 export RandomWaves

@@ -5,7 +5,7 @@ export Leapfrog
 Leapfrog time stepping defined by the following fields
 $(TYPEDFIELDS)
 """
-Base.@kwdef mutable struct Leapfrog{NF<:AbstractFloat} <: AbstractTimeStepper
+@kwdef mutable struct Leapfrog{NF<:AbstractFloat} <: AbstractTimeStepper
 
     # DIMENSIONS
     "spectral resolution (max degree of spherical harmonics)"
@@ -394,5 +394,5 @@ function time_stepping!(
     finish!(model.callbacks, progn, diagn, model)
 
     # return a UnicodePlot of surface vorticity
-    return plot(diagn.grid.vor_grid[:, end])
+    return plot(diagn.grid.vor_grid[:, end], title="Surface relative vorticity [1/s]")
 end 
