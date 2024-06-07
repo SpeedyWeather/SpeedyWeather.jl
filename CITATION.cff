@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+preferred-citation:
+  type: article
+  authors:
+  - family-names: "Klöwer"
+    given-names: "Milan"
+    orcid: "https://orcid.org/0000-0002-3920-4356"
+  - family-names: "Gelbrecht"
+    given-names: "Maximilian"
+    orcid: "https://orcid.org/0000-0002-0729-6671"
+  - family-names: "Hotta"
+    given-names: "Daisuke"
+    orcid: "https://orcid.org/0000-0003-2287-0608"
+  - family-names: "Willmert"
+    given-names: "Justin"
+    orcid: "https://orcid.org/0000-0002-6452-4693"
+  - family-names: "Silvestri"
+    given-names: "Simone"
+    orcid: "https://orcid.org/0000-0002-7156-946X"
+  - family-names: "Wagner"
+    given-names: "Gregory L"
+    orcid: "https://orcid.org/0000-0003-3377-6852"
+  - family-names: "White"
+    given-names: "Alistair"
+    orcid: "https://orcid.org/0000-0001-7235-6450"
+  - family-names: "Hatfield"
+    given-names: "Sam"
+    orcid: "https://orcid.org/0000-0002-6542-6032"
+  - family-names: "Kimpson"
+    given-names: "Tom"
+    orcid: "https://orcid.org/0000-0002-8149-4094"
+  - family-names: "Constantinou"
+    given-names: "Navid C"
+    orcid: "https://orcid.org/0000-0001-5317-2445"
+  title: "SpeedyWeather.jl: Reinventing atmospheric general circulation models towards interactivity and extensibility"
+  journal: "Journal of Open Source Software"
+  doi: "10.21105/joss.06323"
+  volume: 9
+  issue: 98
+  start: 6323
+  year: 2024
