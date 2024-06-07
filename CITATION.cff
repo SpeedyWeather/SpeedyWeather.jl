@@ -32,6 +32,8 @@ preferred-citation:
   - family-names: "Constantinou"
     given-names: "Navid C"
     orcid: "https://orcid.org/0000-0001-5317-2445"
+  - family-names: "Hill"
+    given-names: "Chris"
   title: "SpeedyWeather.jl: Reinventing atmospheric general circulation models towards interactivity and extensibility"
   journal: "Journal of Open Source Software"
   doi: "10.21105/joss.06323"
