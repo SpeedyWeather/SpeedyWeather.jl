@@ -54,7 +54,7 @@ authors:
 
   - name: Chris Hill
     affiliation: 1
-    
+
 affiliations:
  - name: Massachusetts Institute of Technology, Cambridge, MA, USA
    index: 1
