@@ -50,11 +50,11 @@ authors:
 
   - name: Navid C Constantinou
     orcid: 0000-0002-8149-4094
-    affiliation: 8
+    affiliation: "8, 9"
 
   - name: Chris Hill
     affiliation: 1
-    
+
 affiliations:
  - name: Massachusetts Institute of Technology, Cambridge, MA, USA
    index: 1
@@ -70,10 +70,12 @@ affiliations:
    index: 6
  - name: University of Minnesota, Minneapolis, MN, USA
    index: 7
- - name: The University of Melbourne, Parkville, VIC, Australia
+ - name: University of Melbourne, Parkville, VIC, Australia
    index: 8
+ - name: ARC Centre of Excellence for the Weather of the 21st Century, University of Melbourne, Parkville, VIC, Australia
+   index: 9
    
-date: 27 March 2024
+date: 7 June 2024
 bibliography: paper.bib
 
 ---
@@ -230,6 +232,6 @@ for help and support.
 MK acknowledges funding from the National Science Foundation.
 MK and TK acknowledge funding from the European Research Council
 under the European Union's Horizon 2020 research and innovation programme for the ITHACA grant (no. 741112).
-NCC acknowledges support by the Australian Research Council DECRA Fellowship DE210100749.
+NCC acknowledges support by the Australian Research Council under DECRA Fellowship DE210100749 and the Center of Excellence for the Weather of the 21st Century CE230100012.
 
 # References
