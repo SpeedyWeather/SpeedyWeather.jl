@@ -8,7 +8,7 @@ function Base.show(io::IO, L::AbstractLand)
 end
 
 export SeasonalLandTemperature
-Base.@kwdef struct SeasonalLandTemperature{NF, Grid<:AbstractGrid{NF}} <: AbstractLand{NF, Grid}
+@kwdef struct SeasonalLandTemperature{NF, Grid<:AbstractGrid{NF}} <: AbstractLand{NF, Grid}
 
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
@@ -47,28 +47,34 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     load_monthly_climatology!(land.monthly_temperature, land)
 end
 
-function initialize!(   land::PrognosticVariablesLand,
-                        time::DateTime,
+function initialize!(   land::PrognosticVariablesLand,  # just for dispatch
+                        progn::PrognosticVariables,
+                        diagn::DiagnosticVariables,
                         model::PrimitiveEquation)
-    land_timestep!(land, time, model.land, initialize=true)
-    model isa PrimitiveWet && soil_timestep!(land, time, model.soil)
+    land_timestep!(progn, diagn, model.land, model, initialize=true)
+    model isa PrimitiveWet && soil_timestep!(progn, diagn, model.soil, model)
 end
 
 # function barrier
-function land_timestep!(land::PrognosticVariablesLand,
-                        time::DateTime,
-                        model::PrimitiveEquation;
-                        initialize::Bool = false)
+function land_timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation;
+    initialize::Bool = false,
+)
     # the time step is dictated by the land "model" 
-    executed = land_timestep!(land, time, model.land; initialize)
-    executed && model isa PrimitiveWet && soil_timestep!(land, time, model.soil)
+    executed = land_timestep!(progn, diagn, model.land, model; initialize)
+    executed && model isa PrimitiveWet && soil_timestep!(progn, diagn, model.soil, model)
 end
 
-function land_timestep!(land::PrognosticVariablesLand{NF},
-                        time::DateTime,
-                        land_model::SeasonalLandTemperature;
-                        initialize::Bool = false) where NF
-
+function land_timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    land_model::SeasonalLandTemperature,
+    model::PrimitiveEquation;
+    initialize::Bool = false
+)
+    (; time) = progn.clock
     # # escape immediately if Δt of land model hasn't passed yet
     # # unless the land hasn't been initialized yet
     # initialize || (time - land.time) < land_model.Δt && return false    # = executed
@@ -80,11 +86,12 @@ function land_timestep!(land::PrognosticVariablesLand{NF},
 
     # linear interpolation weight between the two months
     # TODO check whether this shifts the climatology by 1/2 a month
+    NF = eltype(progn.land.land_surface_temperature)
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
     (; monthly_temperature) = land_model
-    @. land.land_surface_temperature = (1-weight) * monthly_temperature[this_month] +
-                                          weight  * monthly_temperature[next_month]
+    @. progn.land.land_surface_temperature = (1-weight) * monthly_temperature[this_month] +
+                                                weight  * monthly_temperature[next_month]
 
     return true # = executed
 end
@@ -99,23 +106,23 @@ function Base.show(io::IO, S::AbstractSoil)
 end
 
 export SeasonalSoilMoisture
-Base.@kwdef struct SeasonalSoilMoisture{NF, Grid<:AbstractGrid{NF}} <: AbstractSoil{NF, Grid}
+@kwdef struct SeasonalSoilMoisture{NF, Grid<:AbstractGrid{NF}} <: AbstractSoil{NF, Grid}
 
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
 
     # OPTIONS
     "Depth of top soil layer [m]"
-    D_top::Float64 = 0.07
+    D_top::NF = 0.07
 
     "Depth of root layer [m]"
-    D_root::Float64 = 0.21
+    D_root::NF = 0.21
 
     "Soil wetness at field capacity [volume fraction]"
-    W_cap::Float64 = 0.3
+    W_cap::NF = 0.3
 
     "Soil wetness at wilting point [volume fraction]"
-    W_wilt::Float64 = 0.17
+    W_wilt::NF = 0.17
 
     # READ CLIMATOLOGY FROM FILE
     "path to the folder containing the soil moisture file, pkg path default"
@@ -134,7 +141,7 @@ Base.@kwdef struct SeasonalSoilMoisture{NF, Grid<:AbstractGrid{NF}} <: AbstractS
     "The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
 
-    # to be filled from file
+    # to be filled from file
     "Monthly soil moisture volume fraction [1], top layer, interpolated onto Grid"
     monthly_soil_moisture_layer1::Vector{Grid} = [zeros(Grid, nlat_half) for _ in 1:12]
 
@@ -153,21 +160,26 @@ function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveWet)
     load_monthly_climatology!(soil.monthly_soil_moisture_layer2, soil, varname=soil.varname_layer2)
 end
 
-function soil_timestep!(land::PrognosticVariablesLand{NF},
-                        time::DateTime,
-                        soil_model::SeasonalSoilMoisture) where NF
+function soil_timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    soil_model::SeasonalSoilMoisture,
+    model::PrimitiveEquation,
+)
+    (; time) = progn.clock
 
     this_month = Dates.month(time)
     next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
 
     # linear interpolation weight between the two months
     # TODO check whether this shifts the climatology by 1/2 a month
+    NF = eltype(progn.land.soil_moisture_layer1)
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
     (; monthly_soil_moisture_layer1, monthly_soil_moisture_layer2) = soil_model
-    @. land.soil_moisture_layer1 = (1-weight) * monthly_soil_moisture_layer1[this_month] +
+    @. progn.land.soil_moisture_layer1 = (1-weight) * monthly_soil_moisture_layer1[this_month] +
                                         weight  * monthly_soil_moisture_layer1[next_month]
-    @. land.soil_moisture_layer2 = (1-weight) * monthly_soil_moisture_layer2[this_month] +
+    @. progn.land.soil_moisture_layer2 = (1-weight) * monthly_soil_moisture_layer2[this_month] +
                                         weight  * monthly_soil_moisture_layer2[next_month]
 
     return nothing
@@ -177,14 +189,14 @@ end
 abstract type AbstractVegetation{NF, Grid} <: AbstractParameterization end
 
 export VegetationClimatology
-Base.@kwdef struct VegetationClimatology{NF, Grid<:AbstractGrid{NF}} <: AbstractVegetation{NF, Grid}
+@kwdef struct VegetationClimatology{NF, Grid<:AbstractGrid{NF}} <: AbstractVegetation{NF, Grid}
 
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
 
     # OPTIONS
     "Combine high and low vegetation factor, a in high + a*low [1]"
-    low_veg_factor::Float64 = 0.8
+    low_veg_factor::NF = 0.8
 
     "path to the folder containing the soil moisture file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
@@ -240,34 +252,29 @@ end
 
 # function barrier
 function soil_moisture_availability!(
-    diagn::SurfaceVariables,
-    land::PrognosticVariablesLand,
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     model::PrimitiveWet)
-    soil_moisture_availability!(diagn, land, model.soil, model.vegetation)
+    soil_moisture_availability!(diagn, progn, model.soil, model.vegetation)
 end
 
 function soil_moisture_availability!(
-    ::SurfaceVariables,
-    ::PrognosticVariablesLand,
+    ::DiagnosticVariables,
+    ::PrognosticVariables,
     ::PrimitiveDry)
     return nothing
 end
 
 function soil_moisture_availability!(
-    diagn::SurfaceVariables{NF},
-    land::PrognosticVariablesLand,
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     soil::AbstractSoil,
-    vegetation::AbstractVegetation) where NF
-
-    (; soil_moisture_availability) = diagn
-    (; soil_moisture_layer1, soil_moisture_layer2) = land
-    (; high_cover, low_cover) = vegetation
-    
-    D_top = convert(NF, soil.D_top)
-    D_root = convert(NF, soil.D_root)
-    W_cap = convert(NF, soil.W_cap)
-    W_wilt = convert(NF, soil.W_wilt)
-    low_veg_factor = convert(NF, vegetation.low_veg_factor)
+    vegetation::AbstractVegetation,
+)
+    (; soil_moisture_availability) = diagn.physics
+    (; soil_moisture_layer1, soil_moisture_layer2) = progn.land
+    (; high_cover, low_cover, low_veg_factor) = vegetation
+    (; D_top, D_root, W_cap, W_wilt) = soil
 
     # precalculate
     r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))

@@ -130,65 +130,65 @@ export ImplicitPrimitiveEquation
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the primitive equation model.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ImplicitPrimitiveEquation{NF<:AbstractFloat} <: AbstractImplicit
+@kwdef struct ImplicitPrimitiveEquation{NF<:AbstractFloat} <: AbstractImplicit
     
     # DIMENSIONS
     "spectral resolution"
     trunc::Int
 
-    "number of vertical levels"
-    nlev::Int
+    "number of vertical layers"
+    nlayers::Int
 
     # PARAMETERS
     "time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
-    α::Float64 = 1
+    α::NF = 1
 
     # PRECOMPUTED ARRAYS, to be initiliased with initialize!
-    "vertical temperature profile, obtained from diagn"
-    temp_profile::Vector{NF} = zeros(NF, nlev)
+    "vertical temperature profile, obtained from diagn on first time step"
+    temp_profile::Vector{NF} = zeros(NF, nlayers)
 
     "time step 2α*Δt packed in RefValue for mutability"
     ξ::Base.RefValue{NF} = Ref{NF}(0)       
     
     "divergence: operator for the geopotential calculation"
-    R::Matrix{NF} = zeros(NF, nlev, nlev)     
+    R::Matrix{NF} = zeros(NF, nlayers, nlayers)     
     
     "divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"
-    U::Vector{NF} = zeros(NF, nlev)
+    U::Vector{NF} = zeros(NF, nlayers)
     
     "temperature: operator for the TₖD + κTₖDlnps/Dt term"
-    L::Matrix{NF} = zeros(NF, nlev, nlev)
+    L::Matrix{NF} = zeros(NF, nlayers, nlayers)
 
     "pressure: vertical averaging of the -D̄ term in the log surface pres equation"
-    W::Vector{NF} = zeros(NF, nlev)
+    W::Vector{NF} = zeros(NF, nlayers)
     
     "components to construct L, 1/ 2Δσ"
-    L0::Vector{NF} = zeros(NF, nlev)
+    L0::Vector{NF} = zeros(NF, nlayers)
 
     "vert advection term in the temperature equation (below+above)"
-    L1::Matrix{NF} = zeros(NF, nlev, nlev)
+    L1::Matrix{NF} = zeros(NF, nlayers, nlayers)
 
     "factor in front of the div_sum_above term"
-    L2::Vector{NF} = zeros(NF, nlev)
+    L2::Vector{NF} = zeros(NF, nlayers)
 
     "_sum_above operator itself"
-    L3::Matrix{NF} = zeros(NF, nlev, nlev)
+    L3::Matrix{NF} = zeros(NF, nlayers, nlayers)
 
     "factor in front of div term in Dlnps/Dt"
-    L4::Vector{NF} = zeros(NF, nlev)
+    L4::Vector{NF} = zeros(NF, nlayers)
 
     "for every l the matrix to be inverted"
-    S::Matrix{NF} = zeros(NF, nlev, nlev)
+    S::Matrix{NF} = zeros(NF, nlayers, nlayers)
 
     "combined inverted operator: S = 1 - ξ²(RL + UW)"
-    S⁻¹::Array{NF, 3} = zeros(NF, trunc+1, nlev, nlev)   
+    S⁻¹::Array{NF, 3} = zeros(NF, trunc+1, nlayers, nlayers)   
 end
 
 """$(TYPEDSIGNATURES)
 Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid, kwargs...) 
-    (; NF, trunc, nlev) = spectral_grid
-    return ImplicitPrimitiveEquation{NF}(; trunc, nlev, kwargs...)
+    (; NF, trunc, nlayers) = spectral_grid
+    return ImplicitPrimitiveEquation{NF}(; trunc, nlayers, kwargs...)
 end
 
 # function barrier to unpack the constants struct for primitive eq models
@@ -214,29 +214,27 @@ function initialize!(
     adiabatic_conversion::AbstractAdiabaticConversion,
 )
 
-    (; trunc, nlev, α, temp_profile, S, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4) = implicit
+    (; trunc, nlayers, α, temp_profile, S, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4) = implicit
     (; σ_levels_full, σ_levels_thick) = geometry
     (; R_dry, κ) = atmosphere
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
     (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
 
-    for k in 1:nlev    
-        # use current vertical temperature profile                                     
-        temp_profile[k] = diagn.layers[k].temp_average[]   
+    # use current vertical temperature profile                                     
+    temp_profile .= diagn.temp_average
         
-        # return immediately if temp_profile contains NaRs, model blew up in that case
-        if !isfinite(temp_profile[k]) return nothing end
-    end
+    # return immediately if temp_profile contains NaRs, model blew up in that case
+    all(isfinite.(temp_profile)) || return nothing
 
     # set up R, U, L, W operators from
     # δD = G_D + ξ(RδT + Uδlnps)        divergence D correction
     # δT = G_T + ξLδD                   temperature T correction
     # δlnps = G_lnps + ξWδD             log surface pressure lnps correction
-    # 
+    #
     # G_X is the uncorrected explicit tendency calculated as RHS_expl(Xⁱ) + RHS_impl(Xⁱ⁻¹)
     # with RHS_expl being the nonlinear terms calculated from the centered time step i
     # and RHS_impl are the linear terms that are supposed to be calcualted semi-implicitly
-    # however, they have sofar only been evaluated explicitly at time step i-1
+    # however, they have sofar only been evaluated explicitly at time step i-1
     # and are subject to be corrected to δX following the equations above
     # R, U, L, W are linear operators that are therefore defined here and inverted
     # to obtain δD first, and then δT and δlnps through substitution
@@ -245,9 +243,9 @@ function initialize!(
     implicit.ξ[] = ξ                # also store in Implicit struct
     
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
-    @inbounds for k in 1:nlev               # vertical geopotential integration as matrix operator
-        R[1:k, k] .= -Δp_geopot_full[k]      # otherwise equivalent to geopotential! with zero orography
-        R[1:k-1, k] .+= -Δp_geopot_half[k]   # incl the minus but excluding the eigenvalues as with U 
+    @inbounds for k in 1:nlayers                # vertical geopotential integration as matrix operator
+        R[1:k, k] .= -Δp_geopot_full[k]         # otherwise equivalent to geopotential! with zero orography
+        R[1:k-1, k] .+= -Δp_geopot_half[k]      # incl the minus but excluding the eigenvalues as with U 
     end
     U .= -R_dry*temp_profile        # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence
     
@@ -256,16 +254,16 @@ function initialize!(
     L2 .= κ*temp_profile.*σ_lnp_A    # factor in front of the div_sum_above term                       
     L4 .= κ*temp_profile.*σ_lnp_B    # factor in front of div term in Dlnps/Dt
 
-    @inbounds for k in 1:nlev
+    @inbounds for k in 1:nlayers
         Tₖ = temp_profile[k]                    # average temperature at k
-        k_above = max(1, k-1)                    # layer index above
-        k_below = min(k+1, nlev)                 # layer index below
+        k_above = max(1, k-1)                   # layer index above
+        k_below = min(k+1, nlayers)             # layer index below
         ΔT_above = Tₖ - temp_profile[k_above]   # temperature difference to layer above
         ΔT_below = temp_profile[k_below] - Tₖ   # and to layer below
         σₖ = σ_levels_full[k]                   # should be Σ_r=1^k Δσᵣ for model top at >0hPa
         σₖ_above = σ_levels_full[k_above]
 
-        for r in 1:nlev
+        for r in 1:nlayers
             L1[k, r] = ΔT_below*σ_levels_thick[r]*σₖ         # vert advection operator below
             L1[k, r] -= k>=r ? σ_levels_thick[r] : 0
 
@@ -284,19 +282,19 @@ function initialize!(
     W .= -σ_levels_thick                # the -D̄ term in the log surface pres equation
 
     # solving the equations above for δD yields
-    # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
+    # δD = SG, with G = G_D + ξRG_T + ξUG_lnps and the operator S
     # S = 1 - ξ²(RL + UW) that has to be inverted to obtain δD from the Gs
-    I = LinearAlgebra.I(nlev)
+    I = LinearAlgebra.I(nlayers)
     @inbounds for l in 1:trunc+1
         eigenvalue = -l*(l-1)           # 1-based, -l*(l+1) → -l*(l-1)
         S .= I .- ξ^2*eigenvalue*(R*L .+ U*W')
 
         # inv(S) but saving memory:
         luS = LinearAlgebra.lu!(S)      # in-place LU decomposition (overwriting S)
-        Sinv = L1                       # reuse L1 matrix to store inv(S)
-        Sinv .= I                       # use ldiv! so last arg needs to be unity matrix
-        LinearAlgebra.ldiv!(luS, Sinv)   # now do S\I = S⁻¹ via LU decomposition
-        S⁻¹[l, :, :] .= Sinv              # store in array
+        Sinv = L1                       # reuse L1 matrix to store inv(S)
+        Sinv .= I                       # use ldiv! so last arg needs to be unity matrix
+        LinearAlgebra.ldiv!(luS, Sinv)  # now do S\I = S⁻¹ via LU decomposition
+        S⁻¹[l, :, :] .= Sinv            # store in array
     end
 end
 

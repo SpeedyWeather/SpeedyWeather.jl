@@ -35,9 +35,9 @@ function get_column!(
 )
 
     (; σ_levels_full, ln_σ_levels_full) = geometry
-    (; temp_profile) = implicit     # reference temperature on this layer
+    (; temp_profile) = implicit      # reference temperature on this layer
 
-    @boundscheck C.nlev == D.nlev || throw(BoundsError)
+    @boundscheck C.nlayers == D.nlayers || throw(BoundsError)
 
     C.latd = geometry.latds[ij]     # pull latitude, longitude [˚N, ˚E] for gridpoint ij from Geometry
     C.lond = geometry.londs[ij]
@@ -54,18 +54,21 @@ function get_column!(
     C.pres[1:end-1] .= σ_levels_full.*pₛ    # pressure on every level p = σ*pₛ
     C.pres[end] = pₛ                        # last element is surface pressure pₛ
 
-    @inbounds for (k, layer) = enumerate(D.layers)   # read out prognostic variables on grid
-        C.u[k] = layer.grid_variables.u_grid[ij]
-        C.v[k] = layer.grid_variables.v_grid[ij]
-        C.temp[k] = layer.grid_variables.temp_grid[ij]
-        C.temp_virt[k] = layer.grid_variables.temp_virt_grid[ij]    # actually diagnostic
-        C.humid[k] = layer.grid_variables.humid_grid[ij] 
+    (; u_grid, v_grid, temp_grid, temp_virt_grid, humid_grid) = diagn.grid
+    (; u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev) = diagn.grid
+
+    @inbounds for k in eachgrid(u_grid, v_grid, temp_grid, humid_grid)
+        C.u[k] = u_grid[ij, k]
+        C.v[k] = v_grid[ij, k]
+        C.temp[k] = temp_grid[ij, k]
+        C.temp_virt[k] = temp_virt_grid[ij, k]  # actually diagnostic
+        C.humid[k] = humid_grid[ij, k] 
 
         # and at previous time step, add temp reference profile back in as temp_grid_prev is anomaly
-        C.u_prev[k] = layer.grid_variables.u_grid_prev[ij]
-        C.v_prev[k] = layer.grid_variables.v_grid_prev[ij]
-        C.temp_prev[k] = layer.grid_variables.temp_grid_prev[ij] + temp_profile[k]
-        C.humid_prev[k] = layer.grid_variables.humid_grid_prev[ij] 
+        C.u_prev[k] = u_grid_prev[ij, k]
+        C.v_prev[k] = v_grid_prev[ij, k]
+        C.temp_prev[k] = temp_grid_prev[ij, k] + temp_profile[k]
+        C.humid_prev[k] = humid_grid_prev[ij, k] 
     end
 
     # TODO skin = surface approximation for now

@@ -136,15 +136,16 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     (; clock) = prognostic_variables
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
-
+    
+    diagnostic_variables = DiagnosticVariables(spectral_grid)
+    
     # particle advection
     initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
 
     # initialize ocean and land and synchronize clocks
-    initialize!(prognostic_variables.ocean, clock.time, model)
-    initialize!(prognostic_variables.land, clock.time, model)
+    initialize!(prognostic_variables.ocean, time, model)
+    initialize!(prognostic_variables.land,  prognostic_variables, diagnostic_variables, model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid)
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end

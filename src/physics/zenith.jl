@@ -126,7 +126,7 @@ end
 # function barrier
 function cos_zenith!(diagn::DiagnosticVariables, time::DateTime, model::PrimitiveEquation)
     (; solar_zenith, geometry) = model
-    (; cos_zenith) = diagn.surface
+    (; cos_zenith) = diagn.physics
     cos_zenith!(cos_zenith, solar_zenith, time, geometry)
 end
 

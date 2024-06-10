@@ -811,8 +811,8 @@ function SpeedyTransforms.transform!(
         @. v_grid_prev = v_grid
     end
 
-    transform!(vor_grid, vor, S)    # get vorticity on grid from spectral vor
-    transform!(div_grid, div, S)    # get divergence on grid from spectral div
+    transform!(vor_grid,  vor,  S)  # get vorticity on grid from spectral vor
+    transform!(div_grid,  div,  S)  # get divergence on grid from spectral div
     transform!(temp_grid, temp, S)  # -- tempereture --
     transform!(pres_grid, pres, S)  # -- pressure --
     
@@ -832,17 +832,24 @@ function SpeedyTransforms.transform!(
     
     # include humidity effect into temp for everything stability-related
     temperature_average!(diagn, temp, S)
-    virtual_temperature!(diagn, temp, model)    # temp = virt temp for dry core
+    virtual_temperature!(diagn, model)      # temp = virt temp for dry core
 
     if initialize   # at initial step store prev <- current
-        # subtract the reference temperature profile as temp_grid is too after every time step
-        @. temp_grid_prev = temp_grid - model.implicit.temp_profile[diagn.k]
+        # subtract the reference temperature profile Tₖ as temp_grid is too after every time step
+        # the Tₖ is added for the physics parameterizations again
+        # technically Tₖ is from model.implicit (which is held constant throughout) integration
+        # but given it's the initial step here using the instantaneous diagn.temp_average is the same
+        for k in eachgrid(temp_grid_prev, temp_grid)
+            Tₖ = diagn.temp_average[k]
+            for ij in eachgridpoint(temp_grid_prev, temp_grid)
+                temp_grid_prev[ij, k] = temp_grid[ij, k] - Tₖ
+            end
+        end
+
         @. humid_grid_prev = humid_grid
         @. u_grid_prev = u_grid
         @. v_grid_prev = v_grid
     end
-  
-    return nothing
 end
 
 """ 

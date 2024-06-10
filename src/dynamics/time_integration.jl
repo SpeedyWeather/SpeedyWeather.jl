@@ -296,13 +296,13 @@ function timestep!(
     (; time) = progn.clock                           # current time
 
     # set the tendencies back to zero for accumulation
-    zero_tendencies!(diagn)
+    fill!(diagn.tendencies, 0, PrimitiveWet)
 
     if model.physics                                # switch on/off all physics parameterizations
         # time step ocean (temperature and TODO sea ice) and land (temperature and soil moisture)
-        ocean_timestep!(progn.ocean, time, model)
-        land_timestep!(progn.land, time, model)
-        soil_moisture_availability!(diagn.surface, progn.land, model)
+        ocean_timestep!(progn, diagn, model)
+        land_timestep!(progn, diagn, model)
+        soil_moisture_availability!(diagn, progn, model)
 
         # calculate all parameterizations
         parameterization_tendencies!(diagn, progn, time, model)
