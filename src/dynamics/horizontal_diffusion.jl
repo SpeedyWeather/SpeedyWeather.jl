@@ -19,7 +19,7 @@ $(TYPEDFIELDS)"""
     trunc::Int
 
     "number of vertical levels"
-    nlev::Int
+    nlayers::Int
     
     # PARAMETERS
     "[OPTION] power of Laplacian"
@@ -42,20 +42,20 @@ $(TYPEDFIELDS)"""
     tapering_σ::Float64 = 0.2
 
     # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
-    ∇²ⁿ::Vector{Vector{NF}} = [zeros(NF, trunc+2) for _ in 1:nlev]           # explicit part
-    ∇²ⁿ_implicit::Vector{Vector{NF}} = [ones(NF, trunc+2) for _ in 1:nlev]   # implicit part
+    ∇²ⁿ::Vector{Vector{NF}} = [zeros(NF, trunc+2) for _ in 1:nlayers]           # explicit part
+    ∇²ⁿ_implicit::Vector{Vector{NF}} = [ones(NF, trunc+2) for _ in 1:nlayers]   # implicit part
 
     # ARRAYS but no scaling or tapering and using time_scale_temp_humid
-    ∇²ⁿc::Vector{Vector{NF}} = [zeros(NF, trunc+2) for _ in 1:nlev]           # explicit part
-    ∇²ⁿc_implicit::Vector{Vector{NF}} = [ones(NF, trunc+2) for _ in 1:nlev]   # implicit part
+    ∇²ⁿc::Vector{Vector{NF}} = [zeros(NF, trunc+2) for _ in 1:nlayers]           # explicit part
+    ∇²ⁿc_implicit::Vector{Vector{NF}} = [ones(NF, trunc+2) for _ in 1:nlayers]   # implicit part
 end
 
 """$(TYPEDSIGNATURES)
 Generator function based on the resolutin in `spectral_grid`.
 Passes on keyword arguments."""
 function HyperDiffusion(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, trunc, nlev) = spectral_grid        # take resolution parameters from spectral_grid
-    return HyperDiffusion{NF}(; trunc, nlev, kwargs...)
+    (; NF, trunc, nlayers) = spectral_grid        # take resolution parameters from spectral_grid
+    return HyperDiffusion{NF}(; trunc, nlayers, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -76,7 +76,7 @@ function initialize!(
     G::AbstractGeometry,
     L::AbstractTimeStepper,
 )
-    (; trunc, nlev, resolution_scaling) = scheme
+    (; trunc, nlayers, resolution_scaling) = scheme
     (; ∇²ⁿ, ∇²ⁿ_implicit, ∇²ⁿc, ∇²ⁿc_implicit) = scheme
     (; power, power_stratosphere, tapering_σ) = scheme
     (; Δt, radius) = L
@@ -93,7 +93,7 @@ function initialize!(
     # (=more scale-selective for smaller wavenumbers)
     largest_eigenvalue = -trunc*(trunc+1)
     
-    for k in 1:nlev
+    for k in 1:nlayers
         # VERTICAL TAPERING for the stratosphere
         # go from 1 to 0 between σ=0 and tapering_σ
         σ = G.σ_levels_full[k]
