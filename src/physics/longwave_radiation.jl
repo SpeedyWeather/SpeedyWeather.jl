@@ -25,7 +25,7 @@ relaxation term with `time_scale_stratosphere` towards `temp_stratosphere` is ap
 
 Fields are
 $(TYPEDFIELDS)"""
-Base.@kwdef struct UniformCooling{NF} <: AbstractLongwave
+@kwdef struct UniformCooling{NF} <: AbstractLongwave
     "[OPTION] time scale of cooling, default = -1.5K/day = -1K/16hrs"
     time_scale::Second = Hour(16)
 
@@ -83,7 +83,7 @@ layer towards the tropopause temperature `T_t` with time scale `τ = 24h`
 (Seeley and Wordsworth, 2023 use 6h, which is unstable a low resolutions here).
 Fields are
 $(TYPEDFIELDS)"""
-Base.@kwdef struct JeevanjeeRadiation{NF} <: AbstractLongwave
+@kwdef struct JeevanjeeRadiation{NF} <: AbstractLongwave
     "Radiative forcing constant (W/m²/K²)"
     α::NF = 0.025
 
@@ -111,7 +111,7 @@ function longwave_radiation!(
     scheme::JeevanjeeRadiation,
 ) where NF
 
-    (; nlev, temp_tend) = column
+    (; nlayers, temp_tend) = column
     T = column.temp                 # to match Seeley, 2023 notation
     F = column.flux_temp_upward
     (; α, time_scale) = scheme
@@ -119,8 +119,8 @@ function longwave_radiation!(
     
     Fₖ::NF = 0                      # flux into lowermost layer from below
 
-    # integrate from surface up, skipping surface (k=nlev+1) and top-of-atmosphere flux (k=1)
-    @inbounds for k in nlev:-1:2    
+    # integrate from surface up, skipping surface (k=nlayers+1) and top-of-atmosphere flux (k=1)
+    @inbounds for k in nlayers:-1:2
         # Seeley and Wordsworth, 2023 eq (1)
         Fₖ += (T[k-1] - T[k]) * α * (Tₜ - T[k]) # upward flux from layer k into k-1
         F[k] += Fₖ                              # accumulate fluxes

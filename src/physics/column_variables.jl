@@ -48,14 +48,14 @@ function get_column!(
     C.surface_geopotential = C.orography * planet.gravity
 
     # pressure [Pa] or [log(Pa)]
-    lnpₛ = D.surface.pres_grid[ij]          # logarithm of surf pressure used in dynamics
+    lnpₛ = D.grid.pres_grid[ij]             # logarithm of surf pressure used in dynamics
     pₛ = exp(lnpₛ)                          # convert back here
     C.ln_pres .= ln_σ_levels_full .+ lnpₛ   # log pressure on every level ln(p) = ln(σ) + ln(pₛ)
     C.pres[1:end-1] .= σ_levels_full.*pₛ    # pressure on every level p = σ*pₛ
     C.pres[end] = pₛ                        # last element is surface pressure pₛ
 
-    (; u_grid, v_grid, temp_grid, temp_virt_grid, humid_grid) = diagn.grid
-    (; u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev) = diagn.grid
+    (; u_grid, v_grid, temp_grid, temp_virt_grid, humid_grid) = D.grid
+    (; u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev) = D.grid
 
     @inbounds for k in eachgrid(u_grid, v_grid, temp_grid, humid_grid)
         C.u[k] = u_grid[ij, k]
@@ -74,22 +74,22 @@ function get_column!(
     # TODO skin = surface approximation for now
     C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
     C.skin_temperature_land = P.land.land_surface_temperature[ij]
-    C.soil_moisture_availability = D.surface.soil_moisture_availability[ij]
+    C.soil_moisture_availability = D.physics.soil_moisture_availability[ij]
 
     # RADIATION
-    C.cos_zenith = D.surface.cos_zenith[ij]
+    C.cos_zenith = D.physics.cos_zenith[ij]
     C.albedo = albedo.albedo[ij]
 end
 
 """Recalculate ring index if not provided."""
-function get_column!(   C::ColumnVariables,
-                        D::DiagnosticVariables,
-                        P::PrognosticVariables,
-                        ij::Int,            # grid point index
-                        model::PrimitiveEquation)
-
-    SG = model.spectral_grid
-    rings = eachring(SG.Grid, SG.nlat_half)
+function get_column!(
+    C::ColumnVariables,
+    D::DiagnosticVariables,
+    P::PrognosticVariables,
+    ij::Int,            # grid point index
+    model::PrimitiveEquation
+)
+    rings = eachring(D.grid.vor_grid)
     jring = whichring(ij, rings)
     get_column!(C, D, P, ij, jring, model)
 end
@@ -119,32 +119,33 @@ end
 $(TYPEDSIGNATURES)
 Write the parametrization tendencies from `C::ColumnVariables` into the horizontal fields
 of tendencies stored in `D::DiagnosticVariables` at gridpoint index `ij`."""
-function write_column_tendencies!(  D::DiagnosticVariables,
-                                    column::ColumnVariables,
-                                    planet::AbstractPlanet,
-                                    ij::Int)            # grid point index
+function write_column_tendencies!(
+    diagn::DiagnosticVariables,
+    column::ColumnVariables,
+    planet::AbstractPlanet,
+    ij::Integer,                                # grid point index
+)
+    (; nlayers) = column
+    @boundscheck nlayers == diagn.nlayers || throw(BoundsError)
 
-    (; nlev) = column
-    @boundscheck nlev == D.nlev || throw(BoundsError)
-
-    @inbounds for (k, layer) = enumerate(D.layers)
-        layer.tendencies.u_tend_grid[ij] = column.u_tend[k]
-        layer.tendencies.v_tend_grid[ij] = column.v_tend[k]
-        layer.tendencies.temp_tend_grid[ij] = column.temp_tend[k]
-        layer.tendencies.humid_tend_grid[ij] = column.humid_tend[k]
+    @inbounds for k in eachgrid(diagn.grid.vor_grid)
+        diagn.tendencies.u_tend_grid[ij, k] = column.u_tend[k]
+        diagn.tendencies.v_tend_grid[ij, k] = column.v_tend[k]
+        diagn.tendencies.temp_tend_grid[ij, k] = column.temp_tend[k]
+        diagn.tendencies.humid_tend_grid[ij, k] = column.humid_tend[k]
     end
 
     # accumulate (set back to zero when netcdf output)
-    D.surface.precip_large_scale[ij] += column.precip_large_scale
-    D.surface.precip_convection[ij] += column.precip_convection
+    diagn.physics.precip_large_scale[ij] += column.precip_large_scale
+    diagn.physics.precip_convection[ij] += column.precip_convection
 
     # Output cloud top in height [m] from geopotential height divided by gravity,
     # but NaN for no clouds
-    D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.geopot[column.cloud_top]
-    D.surface.cloud_top[ij] /= planet.gravity
+    diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.geopot[column.cloud_top]
+    diagn.physics.cloud_top[ij] /= planet.gravity
     
     # just use layer index 1 (top) to nlev (surface) for analysis, but 0 for no clouds
-    # D.surface.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.cloud_top
+    # diagn.physics.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.cloud_top
     return nothing
 end
 
@@ -171,7 +172,7 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     column.flux_temp_downward .= 0
 
     # Convection and precipitation
-    column.cloud_top = column.nlev+1            # also diagnostic from condensation
+    column.cloud_top = column.nlayers+1
     column.precip_convection = 0
     column.precip_large_scale = 0
 
@@ -179,5 +180,5 @@ function reset_column!(column::ColumnVariables{NF}) where NF
 end
 
 # iterator for convenience
-eachlayer(column::ColumnVariables) = Base.OneTo(column.nlev)
-Base.eachindex(column::ColumnVariables) = Base.OneTo(column.nlev)
+eachlayer(column::ColumnVariables) = eachindex(column)
+Base.eachindex(column::ColumnVariables) = Base.OneTo(column.nlayers)

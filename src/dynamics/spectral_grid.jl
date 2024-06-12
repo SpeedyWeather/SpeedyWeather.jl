@@ -9,7 +9,7 @@ const DEFAULT_ARRAYTYPE = Array
 const DEFAULT_GRID = OctahedralGaussianGrid
 const DEFAULT_RADIUS = 6.371e6
 const DEFAULT_TRUNC = 31
-const DEFAULT_NLEV = 8
+const DEFAULT_NLAYERS = 8
 
 export SpectralGrid
 
@@ -20,7 +20,7 @@ $(TYPEDFIELDS)
 
 `nlat_half` and `npoints` should not be chosen but are derived from `trunc`,
 `Grid` and `dealiasing`."""
-Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
+@kwdef struct SpectralGrid <: AbstractSpectralGrid
     "[OPTION] number format used throughout the model"
     NF::Type{<:AbstractFloat} = DEFAULT_NF
 
@@ -58,7 +58,7 @@ Base.@kwdef struct SpectralGrid <: AbstractSpectralGrid
 
     # VERTICAL
     "[OPTION] number of vertical levels"
-    nlayers::Int = DEFAULT_NLEV
+    nlayers::Int = DEFAULT_NLAYERS
 
     "[DEPRECATED] number of vertical levels"
     nlev::Int = nlayers

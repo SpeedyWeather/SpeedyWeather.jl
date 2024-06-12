@@ -41,9 +41,8 @@ Calls for `column` one physics parameterization after another
 and convert fluxes to tendencies."""
 function parameterization_tendencies!(
     column::ColumnVariables,
-    model::PrimitiveEquation
-    )
-
+    model::PrimitiveEquation,
+)
     get_thermodynamics!(column, model)
     temperature_relaxation!(column, model)
     boundary_layer_drag!(column, model)
@@ -69,8 +68,8 @@ function fluxes_to_tendencies!(
     atmosphere::AbstractAtmosphere,
 )
     
-    (; nlev, u_tend, flux_u_upward, flux_u_downward) = column
-    (;      v_tend, flux_v_upward, flux_v_downward) = column
+    (; u_tend, flux_u_upward, flux_u_downward) = column
+    (; v_tend, flux_v_upward, flux_v_downward) = column
     (; humid_tend, flux_humid_upward, flux_humid_downward) = column
     (; temp_tend,  flux_temp_upward,  flux_temp_downward) = column
 
@@ -78,12 +77,12 @@ function fluxes_to_tendencies!(
     pₛ = column.pres[end]               # surface pressure
     (; radius) = geometry               # used for scaling
 
-    # for g/Δp and g/(Δp*cₚ), see Fortran SPEEDY documentation eq. (3, 5)
+    # for g/Δp and g/(Δp*c_p), see Fortran SPEEDY documentation eq. (3, 5)
     g_pₛ = planet.gravity/pₛ
     cₚ = atmosphere.heat_capacity
 
-    # fluxes are defined on half levels including top k=1/2 and surface k=nlev+1/2
-    @inbounds for k in 1:nlev
+    # fluxes are defined on half levels including top k=1/2 and surface k=nlayers+1/2
+    @inbounds for k in eachindex(u_tend, v_tend, humid_tend, temp_tend)
 
         # Absorbed flux in a given layer, i.e. flux in minus flux out from above and below
         # Fortran SPEEDY documentation eq. (2)

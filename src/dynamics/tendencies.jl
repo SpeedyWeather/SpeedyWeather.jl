@@ -41,95 +41,110 @@ end
 """
 $(TYPEDSIGNATURES)
 Calculate all tendencies for the PrimitiveEquation model (wet or dry)."""
-function dynamics_tendencies!(  diagn::DiagnosticVariables,
-                                progn::PrognosticVariables,
-                                model::PrimitiveEquation,
-                                lf::Int=2)          # leapfrog index for tendencies
+function dynamics_tendencies!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    model::PrimitiveEquation,
+    lf::Integer,                # leapfrog index for tendencies
+)
 
-    O = model.orography
-    G = model.geometry
-    S = model.spectral_transform
-    GP = model.geopotential
-    A = model.atmosphere
-    I = model.implicit
-    (; surface ) = diagn
+    (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit) = model
 
     # for semi-implicit corrections (α >= 0.5) linear gravity-wave related tendencies are
     # evaluated at previous timestep i-1 (i.e. lf=1 leapfrog time step) 
     # nonlinear terms and parameterizations are always evaluated at lf
-    lf_implicit = model.implicit.α == 0 ? lf : 1
+    lf_implicit = implicit.α == 0 ? lf : 1
 
-    pressure_gradient!(diagn, progn, lf, S)         # calculate ∇ln(pₛ)
+    # calculate ∇ln(pₛ), then (u_k, v_k)⋅∇ln(p_s)
+    pressure_gradient_flux!(diagn, progn, lf, spectral_transform)
 
-    @floop for (diagn_layer, progn_layer) in zip(diagn.layers, progn.layers)
-        pressure_flux!(diagn_layer, surface)        # calculate (uₖ, vₖ)⋅∇ln(pₛ)
+    # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
+    linear_virtual_temperature!(diagn, progn, model, lf_implicit)
 
-        # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
-        linear_virtual_temperature!(diagn_layer, progn_layer, model, lf_implicit)
-        temperature_anomaly!(diagn_layer, I)        # temperature relative to profile
-    end
+    # temperature relative to profile
+    temperature_anomaly!(diagn, implicit)
 
-    geopotential!(diagn, GP, O)                     # from ∂Φ/∂ln(pₛ) = -RTᵥ for bernoulli_potential!
-    vertical_integration!(diagn, progn, lf_implicit, G)# get ū, v̄, D̄ on grid; D̄ in spectral
-    surface_pressure_tendency!(surface, S)          # ∂ln(pₛ)/∂t = -(ū, v̄)⋅∇ln(pₛ) - D̄
+    # from ∂Φ/∂ln(pₛ) = -RTᵥ for bernoulli_potential!
+    geopotential!(diagn, geopotential, orography)
 
-    @floop for layer in diagn.layers
-        vertical_velocity!(layer, surface, G)       # calculate σ̇ for the vertical mass flux M = pₛσ̇
-                                                    # add the RTₖlnpₛ term to geopotential
-        linear_pressure_gradient!(layer, progn.surface, lf_implicit, A, I)
-    end                                             # wait all because vertical_velocity! needs to
-                                                    # finish before vertical_advection!
-    @floop for layer in diagn.layers
-        vertical_advection!(layer, diagn, model)    # use σ̇ for the vertical advection of u, v, T, q
+    # get ū, v̄, D̄ on grid; D̄ in spectral
+    vertical_integration!(diagn, progn, lf_implicit, geometry)
 
-        vordiv_tendencies!(layer, surface, model)   # vorticity advection, pressure gradient term
-        temperature_tendency!(layer, model)         # hor. advection + adiabatic term
-        humidity_tendency!(layer, model)            # horizontal advection of humidity (nothing for wetcore)
-        bernoulli_potential!(layer, S)              # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
-    end
+    # ∂ln(pₛ)/∂t = -(ū, v̄)⋅∇ln(pₛ) - D̄
+    surface_pressure_tendency!(surface, spectral_transform)
+
+    # calculate vertical velocity σ̇ in sigma coordinates for the vertical mass flux M = pₛσ̇
+    vertical_velocity!(layer, surface, geometry)       
+    
+    # add the RTₖlnpₛ term to geopotential
+    linear_pressure_gradient!(layer, progn.surface, lf_implicit, atmosphere, implicit)
+
+    # use σ̇ for the vertical advection of u, v, T, q
+    vertical_advection!(layer, diagn, model)
+
+    # vorticity advection, pressure gradient term
+    vordiv_tendencies!(layer, surface, model)
+
+    # hor. advection + adiabatic term
+    temperature_tendency!(layer, model)
+
+    # horizontal advection of humidity (nothing for wetcore)
+    humidity_tendency!(layer, model)
+
+    # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
+    bernoulli_potential!(layer, spectral_transform)
 end
 
-function pressure_gradient!(diagn::DiagnosticVariables,
-                            progn::PrognosticVariables,
-                            lf::Integer,                   # leapfrog index
-                            S::SpectralTransform)
-    
-    (; pres) = progn.surface.timesteps[lf]                 # log of surface pressure
-    ∇lnp_x_spec = diagn.layers[1].dynamics_variables.a     # reuse work arrays for gradients
-    ∇lnp_y_spec = diagn.layers[1].dynamics_variables.b     # in spectral space
-    (; ∇lnp_x, ∇lnp_y) = diagn.surface                     # but store in grid space
+"""$(TYPEDSIGNATURES)
+Compute the gradient ∇lnp_s of the logarithm of surface pressure, followed by
+its flux, (u,v) * ∇lnp_s."""
+function pressure_gradient_flux!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    lf::Integer,                   # leapfrog index
+    S::SpectralTransform,
+)
+    # PRESSURE GRADIENT
+    pres = progn.pres[lf]                   # log of surface pressure at leapfrog step lf
+    ∇lnp_x_spec = diagn.dynamics.a_2D       # reuse 2D work arrays for gradients
+    ∇lnp_y_spec = diagn.dynamics.b_2D       # in spectral space
+    (; ∇lnp_x, ∇lnp_y) = diagn.dynamics     # but store in grid space
 
     ∇!(∇lnp_x_spec, ∇lnp_y_spec, pres, S)                  # CALCULATE ∇ln(pₛ)
     gridded!(∇lnp_x, ∇lnp_x_spec, S, unscale_coslat=true)  # transform to grid: zonal gradient
     gridded!(∇lnp_y, ∇lnp_y_spec, S, unscale_coslat=true)  # meridional gradient
+
+    (; u_grid, v_grid ) = diagn.grid
+    (; uv∇lnp ) = diagn.dynamics
+
+    # PRESSURE GRADIENT FLUX
+    for k in eachgrid(u_grid, v_grid, uv∇lnp)
+        for ij in eachgridpoint(u_grid, v_grid, uv∇lnp)
+            # the (u, v)⋅∇lnp_s term
+            uv∇lnp[ij, k] = u_grid[ij, k]*∇lnp_x[ij] + v_grid[ij, k]*∇lnp_y[ij]
+        end
+    end
 end
 
-function pressure_flux!(diagn::DiagnosticVariablesLayer,
-                        surf::SurfaceVariables)
-
-    (; ∇lnp_x, ∇lnp_y ) = surf   # zonal, meridional gradient of log surface pressure
-    (; u_grid, v_grid ) = diagn.grid_variables
-    (; uv∇lnp ) = diagn.dynamics_variables
-    
-    @. uv∇lnp = u_grid*∇lnp_x + v_grid*∇lnp_y               # the (u, v)⋅∇lnpₛ term
-end
-
-"""Convert absolute and virtual temperature to anomalies wrt to the reference profile"""
+"""$(TYPEDSIGNATURES)
+Convert absolute and virtual temperature to anomalies wrt to the reference profile"""
 function temperature_anomaly!(
-    diagn::DiagnosticVariablesLayer,
-    I::ImplicitPrimitiveEquation,
-    )
-                    
-    Tₖ = I.temp_profile[diagn.k]    # reference temperature on this layer
-    (; temp_grid, temp_virt_grid ) = diagn.grid_variables
+    diagn::DiagnosticVariables,
+    implicit::ImplicitPrimitiveEquation,
+)                    
+    (; temp_profile) = implicit     # reference temperature profile
+    (; temp_grid, temp_virt_grid ) = diagn.grid
 
-    @. temp_grid -= Tₖ              # absolute temperature -> anomaly
-    @. temp_virt_grid -= Tₖ         # virtual temperature -> anomaly
+    for k in eachgrid(temp_grid, temp_virt_grid)
+        Tₖ = temp_profile[k]
+        for ij in eachgridpoint(temp_grid, temp_virt_grid)
+            temp_grid[ij, k]      -= Tₖ  # absolute temperature -> anomaly
+            temp_virt_grid[ij, k] -= Tₖ  # virtual temperature -> anomaly
+        end
+    end
 end
 
-"""
-    vertical_integration!(Diag::DiagnosticVariables, G::Geometry)
-
+"""$(TYPEDSIGNATURES)
 Calculates the vertically averaged (weighted by the thickness of the σ level)
 velocities (*coslat) and divergence. E.g.
 
@@ -137,53 +152,50 @@ velocities (*coslat) and divergence. E.g.
 
 u, v are averaged in grid-point space, divergence in spectral space.
 """
-function vertical_integration!( diagn::DiagnosticVariables{NF},
-                                progn::PrognosticVariables{NF},
-                                lf::Int,    # leapfrog index for D̄_spec
-                                G::Geometry{NF}) where NF
-    
-    (; σ_levels_thick, nlev ) = G
-    (; ∇lnp_x, ∇lnp_y ) = diagn.surface  # zonal, meridional grad of log surface pressure
-    
-    ū = diagn.surface.u_mean_grid           # rename for convenience
-    v̄ = diagn.surface.v_mean_grid
-    D̄ = diagn.surface.div_mean_grid
-    D̄_spec = diagn.surface.div_mean
+function vertical_integration!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    lf::Integer,                # leapfrog index for D̄_spec
+    geometry::Geometry,
+)
+    (; σ_levels_thick, nlayers ) = geometry
+    (; ∇lnp_x, ∇lnp_y ) = diagn.dynamics    # zonal, meridional grad of log surface pressure
+    (; u_grid, v_grid, div_grid) = diagn.grid
+    (; u_mean_grid, v_mean_grid, div_mean_grid, div_mean) = diagn.dynamics
+    (; div_sum_above, uv∇lnp_sum_above) = diagn.dynamics
+    div = progn.div[lf]
 
-    @boundscheck nlev == diagn.nlev || throw(BoundsError)
+    @boundscheck nlayers == diagn.nlayers || throw(BoundsError)
 
-    fill!(ū, 0)     # reset accumulators from previous vertical average
-    fill!(v̄, 0)
-    fill!(D̄, 0)
-    fill!(D̄_spec, 0)
+    fill!(u_mean_grid, 0)       # reset accumulators from previous vertical average
+    fill!(v_mean_grid, 0)
+    fill!(div_mean_grid, 0)
+    fill!(div_mean, 0)
 
-    @inbounds for k in 1:nlev
+    for k in 1:nlayers          # integrate from top to bottom
 
         # arrays for layer-thickness weighted column averages
         Δσₖ = σ_levels_thick[k]
-        u = diagn.layers[k].grid_variables.u_grid
-        v = diagn.layers[k].grid_variables.v_grid
-        D = diagn.layers[k].grid_variables.div_grid
-        D_spec = progn.layers[k].timesteps[lf].div
-        
-        # for the Σ_r=1^k-1 Δσᵣ(Dᵣ +  u̲⋅∇lnpₛ) vertical integration
-        # Simmons and Burridge, 1981 eq 3.12 split into div and u̲⋅∇lnpₛ
-        D̄ᵣ = diagn.layers[k].dynamics_variables.div_sum_above
-        ūv̄∇lnpᵣ = diagn.layers[k].dynamics_variables.uv∇lnp_sum_above
 
         # GRID-POINT SPACE: u, v, D with thickness weighting Δσₖ
         # before this k's u, v, D are added to ū, v̄, D̄ store in the
         # sum_above fields for a 1:k-1 integration
         # which is =0 for k=1 as ū, v̄, D̄ accumulators are 0-initialised
-        @. D̄ᵣ = D̄
-        @. ūv̄∇lnpᵣ = ū*∇lnp_x + v̄*∇lnp_y
+        for ij in eachgridpoint(u_mean_grid, v_mean_grid, div_mean_grid)
+            # for the Σ_r=1^k-1 Δσᵣ(Dᵣ +  u̲⋅∇lnpₛ) vertical integration
+            # Simmons and Burridge, 1981 eq 3.12 split into div and u̲⋅∇lnpₛ
+            div_sum_above[ij, k] = div_mean_grid[ij]
+            uv∇lnp_sum_above[ij, k] = u_mean_grid[ij]*∇lnp_x[ij] + v_mean_grid[ij]*∇lnp_y[ij]
 
-        @. ū += u*Δσₖ  # now add the k-th element to the sum
-        @. v̄ += v*Δσₖ
-        @. D̄ += D*Δσₖ
+            u_mean_grid[ij] += u_grid[ij, k]*Δσₖ  # now add the k-th element to the sum
+            v_mean_grid[ij] += v_grid[ij, k]*Δσₖ
+            div_mean_grid[ij] += div_grid[ij, k]*Δσₖ
+        end
         
         # SPECTRAL SPACE: divergence
-        @. D̄_spec += D_spec*Δσₖ
+        for lm in eachharmonic(div, div_mean)
+            div_mean[lm] += div[lm, k]*Δσₖ
+        end
     end
 end
         

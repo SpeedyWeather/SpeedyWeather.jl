@@ -52,16 +52,6 @@ function linear_virtual_temperature!(
     copyto!(temp_virt, temp)
 end
 
-# function barrier
-function linear_virtual_temperature!(  
-    diagn::DiagnosticVariablesLayer,
-    progn::PrognosticLayerTimesteps,
-    model::PrimitiveWet,
-    lf::Integer,
-)
-    linear_virtual_temperature!(diagn, progn, model.atmosphere, lf)
-end
-
 """
 $(TYPEDSIGNATURES)
 Calculates a linearised virtual temperature Tᵥ as
@@ -74,20 +64,28 @@ specific humidity q and
     μ = (1-ξ)/ξ, ξ = R_dry/R_vapour.
     
 in spectral space."""
-function linear_virtual_temperature!(   diagn::DiagnosticVariablesLayer,
-                                        progn::PrognosticLayerTimesteps,
-                                        atmosphere::AbstractAtmosphere,
-                                        lf::Int)
-    
-    (; temp_virt) = diagn.dynamics_variables
-    μ = atmosphere.μ_virt_temp
-    Tₖ = diagn.temp_average[]   
-    (; temp, humid) = progn.timesteps[lf]
+function linear_virtual_temperature!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    model::PrimitiveEquation,
+    lf::Integer,
+)
+    (; temp_virt) = diagn.dynamics
+    μ = model.atmosphere.μ_virt_temp
+    (; temp_average) = diagn
+    temp = progn.temp[lf]
+    humid = progn.humid[lf]
 
     # TODO check that doing a non-linear virtual temperature in grid-point space
     # but a linear virtual temperature in spectral space to avoid another transform
     # does not cause any problems. Alternative do the transform or have a linear
     # virtual temperature in both grid and spectral space
     # spectral!(temp_virt, temp_virt_grid, S)
-    @. temp_virt = temp + (Tₖ*μ)*humid
+
+    for k in eachmatrix(temp_virt, temp, humid)
+        Tₖ = temp_average[k]
+        for lm in eachharmonic(temp_virt, temp, humid)
+            temp_virt[lm, k] = temp[lm, k] + (Tₖ*μ)*humid[lm, k]
+        end
+    end
 end

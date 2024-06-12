@@ -161,26 +161,38 @@ $(TYPEDFIELDS)"""
     nlat_half::Int          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
     nlayers::Int            # number of vertical layers
 
+    "Multi-purpose a, 3D work array to be reused in various places"
+    a::SpectralVariable3D = zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers)
+    
+    "Multi-purpose b, 3D work array to be reused in various places"
+    b::SpectralVariable3D = zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers)
+    
+    "Multi-purpose a, 3D work array to be reused in various places"
+    a_grid::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
+    
+    "Multi-purpose b, 3D work array to be reused in various places"
+    b_grid::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
+    
     "Multi-purpose a, work array to be reused in various places"
-    a       ::SpectralVariable3D    = zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers)
+    a_2D::SpectralVariable2D = zeros(SpectralVariable2D, trunc+2, trunc+1)
     
     "Multi-purpose b, work array to be reused in various places"
-    b       ::SpectralVariable3D    = zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers)
+    b_2D::SpectralVariable2D = zeros(SpectralVariable2D, trunc+2, trunc+1)
     
     "Multi-purpose a, work array to be reused in various places"
-    a_grid  ::GridVariable3D        = zeros(GridVariable3D, nlat_half, nlayers)
+    a_2D_grid::GridVariable2D = zeros(GridVariable2D, nlat_half)
     
     "Multi-purpose b, work array to be reused in various places"
-    b_grid  ::GridVariable3D        = zeros(GridVariable3D, nlat_half, nlayers)
-    
+    b_2D_grid::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
     "Pressure flux (uₖ, vₖ)⋅∇ln(pₛ)"
-    uv∇lnp          ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
+    uv∇lnp::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
     
     "Sum of Δσₖ-weighted uv∇lnp above"
     uv∇lnp_sum_above::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
     
     "Sum of div_weighted from top to k"
-    div_sum_above   ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
+    div_sum_above::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
     
     "Virtual temperature [K], spectral for geopotential"
     temp_virt::SpectralVariable3D = zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers)
@@ -375,7 +387,7 @@ function DiagnosticVariables(SG::SpectralGrid)
     
     # create one column variable per thread to avoid race conditions
     nthreads = Threads.nthreads()
-    columns = [ColumnVariables{NF}(; nlev=nlayers) for _ in 1:nthreads]
+    columns = [ColumnVariables{NF}(; nlayers) for _ in 1:nthreads]
 
     temp_average = SG.ArrayType{NF, 1}(undef, nlayers)
 

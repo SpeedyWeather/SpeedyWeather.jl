@@ -47,34 +47,27 @@ function geopotential!(
     geopotential::Geopotential,
     orography::AbstractOrography,
 )
-
+    (; geopot, temp_virt) = diagn.dynamics
     (; geopot_surf) = orography                          # = orography*gravity
     (; Δp_geopot_half, Δp_geopot_full) = geopotential    # = R*Δlnp either on half or full levels
-    (; nlev) = diagn                                     # number of vertical levels
+    (; nlayers) = diagn                                 # number of vertical levels
 
-    @boundscheck nlev == length(Δp_geopot_full) || throw(BoundsError)
+    @boundscheck nlayers == length(Δp_geopot_full) || throw(BoundsError)
 
     # for PrimitiveDry virtual temperature = absolute temperature here
     # note these are not anomalies here as they are only in grid-point fields
     
     # BOTTOM FULL LAYER
-    temp = diagn.layers[end].dynamics_variables.temp_virt
-    geopot = diagn.layers[end].dynamics_variables.geopot
-    
-    @inbounds for lm in eachharmonic(geopot, geopot_surf, temp)
-        geopot[lm] = geopot_surf[lm] + temp[lm]*Δp_geopot_full[end]
+    local k::Int = nlayers
+    for lm in eachharmonic(geopot, geopot_surf, temp_virt)
+        geopot[lm, k] = geopot_surf[lm] + temp_virt[lm, k]*Δp_geopot_full[k]
     end
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
-    @inbounds for k in nlev-1:-1:1
-        temp_k    = diagn.layers[k].dynamics_variables.temp_virt
-        temp_k1   = diagn.layers[k+1].dynamics_variables.temp_virt
-        geopot_k  = diagn.layers[k].dynamics_variables.geopot
-        geopot_k1 = diagn.layers[k+1].dynamics_variables.geopot
-
-        for lm in eachharmonic(temp_k, temp_k1, geopot_k, geopot_k1)
-            geopot_k½ = geopot_k1[lm] + temp_k1[lm]*Δp_geopot_half[k+1] # 1st half layer integration
-            geopot_k[lm] = geopot_k½  + temp_k[lm]*Δp_geopot_full[k]    # 2nd onto full layer
+    for k in nlayers-1:-1:1
+        for lm in eachharmonic(geopot, temp_virt)
+            geopot_k½ = geopot[lm, k+1] + temp_virt[lm, k+1]*Δp_geopot_half[k+1] # 1st half layer integration
+            geopot[lm, k] = geopot_k½  + temp_virt[lm, k]*Δp_geopot_full[k]      # 2nd onto full layer
         end      
     end
 end
