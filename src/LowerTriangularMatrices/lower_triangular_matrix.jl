@@ -46,6 +46,24 @@ Size of a `LowerTriangularArray` defined as size of the flattened array."""
 Base.size(L::LowerTriangularArray) = size(L.data)
 
 """$(TYPEDSIGNATURES)
+Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
+and as if it were a full matrix when `as <: AbstractMatrix`` ."""
+function Base.size(L::LowerTriangularArray; as::T=Vector) 
+    if T<:AbstractVector 
+        size(L.data)
+    elseif T<:AbstractMatrix 
+        matrix_size(L)
+    else 
+        error("Unknown `as` input.")
+    end 
+end 
+
+"""$(TYPEDSIGNATURES)
+Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
+and as if it were a full matrix when `as <: AbstractMatrix`` ."""
+Base.size(L::LowerTriangularArray, i::Integer; as::T=Vector) = size(L; as=as)[i]
+   
+"""$(TYPEDSIGNATURES)
 Size of a expanded `LowerTriangularArray` as if it were a full matrix,  
 returns `(L.m, L.n, size(L.data)[2:end])``."""
 matrix_size(L::LowerTriangularArray)  = (L.m, L.n, size(L.data)[2:end]...)

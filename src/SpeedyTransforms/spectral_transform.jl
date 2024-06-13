@@ -35,7 +35,7 @@ struct SpectralTransform{NF<:AbstractFloat}
 
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool                # Pre or recompute Legendre polynomials
-    Λ::Matrix{NF}            # Legendre polynomials for one latitude (requires recomputing)
+    Λ::AssociatedLegendrePolMatrix{NF}      # Legendre polynomials for one latitude (requires recomputing)
     Λs::Vector{LowerTriangularMatrix{NF}}   # Legendre polynomials for all latitudes (all precomputed)
     
     # SOLID ANGLES ΔΩ FOR QUADRATURE
@@ -124,7 +124,7 @@ function SpectralTransform( ::Type{NF},                         # Number format 
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
 
     # PREALLOCATE LEGENDRE POLYNOMIALS, +1 for 1-based indexing
-    Λ = zeros(NF, lmax+1, mmax+1)    # Legendre polynomials for one latitude
+    Λ = AssociatedLegendrePolArray{NF,2,1,Vector{NF}}(zeros(LowerTriangularMatrix{NF}, lmax+1, mmax+1))    # Legendre polynomials for one latitude
 
     # allocate memory in Λs for polynomials at all latitudes or allocate dummy array if precomputed
     # Λs is of size (lmax+1) x (mmax+1) x nlat_half unless recomputed
@@ -330,7 +330,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
         # Recalculate or use precomputed Legendre polynomials Λ
         recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
-        Λj = recompute_legendre ? LowerTriangularMatrix(Λ) : Λs[j_north]
+        Λj = recompute_legendre ? Λ.data : Λs[j_north]
 
         # inverse Legendre transform by looping over wavenumbers l, m
         lm = 1                              # single index for non-zero l, m indices
@@ -448,7 +448,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         # LEGENDRE TRANSFORM in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
         recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
-        Λj = recompute_legendre ? LowerTriangularMatrix(Λ) : Λs[j_north]
+        Λj = recompute_legendre ? Λ.data : Λs[j_north]
         
         # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
         ΔΩ = solid_angles[j_north]                      # = sinθ Δθ Δϕ, solid angle for a grid point

@@ -14,6 +14,9 @@ import SpeedyWeather.LowerTriangularMatrices: matrix_size
 
             @test matrix_size(L) == size(A)
 
+            @test size(A) == size(L, as=Matrix)
+            @test size(L.data) == size(L, as=Vector)
+
             for m in 1:mmax
                 for l in 1:lmax
                     @test A[l, m] == L[l, m]
@@ -51,6 +54,9 @@ end
                 @test matrix_size(L) == size(A)
                 @test size(L)[2:end] == size(A)[3:end]
                 @test size(L)[1] == SpeedyWeather.LowerTriangularMatrices.nonzeros(size(A,1), size(A,2))
+
+                @test size(A) == size(L, as=Matrix)
+                @test size(L.data) == size(L, as=Vector)
 
                 for m in 1:mmax
                     for l in 1:lmax
