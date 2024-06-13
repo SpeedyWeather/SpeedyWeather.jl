@@ -35,7 +35,7 @@ struct SpectralTransform{NF<:AbstractFloat}
 
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool                # Pre or recompute Legendre polynomials
-    Λ::LowerTriangularMatrix{NF}            # Legendre polynomials for one latitude (requires recomputing)
+    Λ::AssociatedLegendrePolMatrix{NF}      # Legendre polynomials for one latitude (requires recomputing)
     Λs::Vector{LowerTriangularMatrix{NF}}   # Legendre polynomials for all latitudes (all precomputed)
     
     # SOLID ANGLES ΔΩ FOR QUADRATURE
@@ -124,7 +124,7 @@ function SpectralTransform( ::Type{NF},                         # Number format 
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
 
     # PREALLOCATE LEGENDRE POLYNOMIALS, +1 for 1-based indexing
-    Λ = zeros(LowerTriangularMatrix{NF}, lmax+1, mmax+1)    # Legendre polynomials for one latitude
+    Λ = AssociatedLegendrePolArray{NF,2,1,Vector{NF}}(zeros(LowerTriangularMatrix{NF}, lmax+1, mmax+1))    # Legendre polynomials for one latitude
 
     # allocate memory in Λs for polynomials at all latitudes or allocate dummy array if precomputed
     # Λs is of size (lmax+1) x (mmax+1) x nlat_half unless recomputed
@@ -213,10 +213,7 @@ function SpectralTransform( ::Type{NF},                         # Number format 
 end
 
 """
-    S = SpectralTransform(  alms::AbstractMatrix{Complex{NF}};
-                            recompute_legendre::Bool=true,
-                            Grid::Type{<:AbstractGrid}=DEFAULT_GRID)
-
+$(TYPEDSIGNATURES)
 Generator function for a `SpectralTransform` struct based on the size of the spectral
 coefficients `alms` and the grid `Grid`. Recomputes the Legendre polynomials by default."""
 function SpectralTransform( alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
@@ -229,9 +226,20 @@ function SpectralTransform( alms::AbstractMatrix{Complex{NF}};  # spectral coeff
 end
 
 """
-    S = SpectralTransform(  map::AbstractGrid;
-                            recompute_legendre::Bool=true)
+$(TYPEDSIGNATURES)
+Generator function for a `SpectralTransform` struct based on the size of the spectral
+coefficients `alms` and the grid `Grid`. Recomputes the Legendre polynomials by default."""
+function SpectralTransform( alms::LowerTriangularMatrix{Complex{NF}};  # spectral coefficients
+                            recompute_legendre::Bool = true,    # saves memory
+                            Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
+                            ) where NF                          # number format NF
+    
+        lmax, mmax = size(alms, as=Matrix) .- 1        # -1 for 0-based degree l, order m
+        return SpectralTransform(NF, Grid, lmax, mmax; recompute_legendre)
+end
 
+"""
+$(TYPEDSIGNATURES)
 Generator function for a `SpectralTransform` struct based on the size and grid type of
 gridded field `map`. Recomputes the Legendre polynomials by default."""
 function SpectralTransform( map::AbstractGrid{NF};          # gridded field
@@ -245,8 +253,7 @@ function SpectralTransform( map::AbstractGrid{NF};          # gridded field
 end
 
 """
-    ϵ = ϵ(NF, l, m) 
-
+$(TYPEDSIGNATURES)
 Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of the spherical harmonics.
 ϵ(l, m) = sqrt((l^2-m^2)/(4*l^2-1)) and then converted to number format NF."""
 function ϵlm(::Type{NF}, l::Int, m::Int) where NF
@@ -254,18 +261,13 @@ function ϵlm(::Type{NF}, l::Int, m::Int) where NF
 end
 
 """
-    ϵ = ϵ(l, m) 
-
+$(TYPEDSIGNATURES)
 Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of the spherical harmonics.
 ϵ(l, m) = sqrt((l^2-m^2)/(4*l^2-1)) with default number format Float64."""
 ϵlm(l::Int, m::Int) = ϵlm(Float64, l, m)
 
 """
-    get_recursion_factors(  ::Type{NF}, # number format NF
-                            lmax::Int,  # max degree l of spherical harmonics (0-based here)
-                            mmax::Int   # max order m of spherical harmonics
-                            ) where {NF<:AbstractFloat}
-        
+$(TYPEDSIGNATURES)     
 Returns a matrix of recursion factors `ϵ` up to degree `lmax` and order `mmax` of number format `NF`."""
 function get_recursion_factors( ::Type{NF}, # number format NF
                                 lmax::Int,  # max degree l of spherical harmonics (0-based here)
@@ -286,10 +288,7 @@ end
 get_recursion_factors(lmax::Int, mmax::Int) = get_recursion_factors(Float64, lmax, mmax)
 
 """
-    gridded!(   map::AbstractGrid,
-                alms::LowerTriangularMatrix,
-                S::SpectralTransform)
-
+$(TYPEDSIGNATURES)
 Spectral transform (spectral to grid) of the spherical harmonic coefficients `alms` to a gridded field
 `map`. The spectral transform is number format-flexible as long as the parametric types of `map`, `alms`, `S`
 are identical. The spectral transform is grid-flexible as long as the `typeof(map)<:AbstractGrid`. 
@@ -305,9 +304,9 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
     (; recompute_legendre, Λ, Λs, m_truncs ) = S
     (; brfft_plans ) = S
 
-    recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
+    recompute_legendre && @boundscheck size(alms; as=Matrix) == size(Λ) || throw(BoundsError)
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
-    lmax, mmax = size(alms) .- 1            # maximum degree l, order m of spherical harmonics
+    lmax, mmax = size(alms; as=Matrix) .- 1            # maximum degree l, order m of spherical harmonics
 
     @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
@@ -331,7 +330,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
         # Recalculate or use precomputed Legendre polynomials Λ
         recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
-        Λj = recompute_legendre ? Λ : Λs[j_north]
+        Λj = recompute_legendre ? Λ.data : Λs[j_north]
 
         # inverse Legendre transform by looping over wavenumbers l, m
         lm = 1                              # single index for non-zero l, m indices
@@ -393,10 +392,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 end
 
 """
-    spectral!(  alms::LowerTriangularMatrix,
-                map::AbstractGrid,
-                S::SpectralTransform)
-
+$(TYPEDSIGNATURES)
 Spectral transform (grid to spectral space) from the gridded field `map` on a `grid<:AbstractGrid` to
 a `LowerTriangularMatrix` of spherical harmonic coefficients `alms`. Uses FFT in the zonal direction,
 and a Legendre Transform in the meridional direction exploiting symmetries. The spectral transform is
@@ -412,9 +408,9 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     (; recompute_legendre, Λ, Λs, solid_angles ) = S
     (; rfft_plans, lon_offsets, m_truncs ) = S
     
-    recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
+    recompute_legendre && @boundscheck size(alms; as=Matrix) == size(Λ) || throw(BoundsError)
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
-    lmax, mmax = size(alms) .- 1    # maximum degree l, order m of spherical harmonics
+    lmax, mmax = size(alms; as=Matrix) .- 1    # maximum degree l, order m of spherical harmonics
 
     @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
@@ -452,7 +448,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         # LEGENDRE TRANSFORM in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
         recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
-        Λj = recompute_legendre ? Λ : Λs[j_north]
+        Λj = recompute_legendre ? Λ.data : Λs[j_north]
         
         # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
         ΔΩ = solid_angles[j_north]                      # = sinθ Δθ Δϕ, solid angle for a grid point
@@ -502,13 +498,13 @@ $(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map`. Based on the size of `alms` the grid type `grid`, the spatial resolution is retrieved based
 on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `gridded(alms, S)`."""
-function gridded(   alms::AbstractMatrix{T};            # spectral coefficients
+function gridded(   alms::LowerTriangularMatrix{T};            # spectral coefficients
                     recompute_legendre::Bool = true,    # saves memory
                     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
                     kwargs...
                     ) where {NF, T<:Complex{NF}}        # number format NF
 
-    lmax, mmax = size(alms) .- 1                        # -1 for 0-based degree l, order m
+    lmax, mmax = size(alms; as=Matrix) .- 1                        # -1 for 0-based degree l, order m
     S = SpectralTransform(NF, Grid, lmax, mmax; recompute_legendre)
     return gridded(alms, S; kwargs...)
 end
@@ -518,7 +514,7 @@ $(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map` with precalculated properties based on the SpectralTransform struct `S`. `alms` is converted to
 a `LowerTriangularMatrix` to execute the in-place `gridded!`."""
-function gridded(   alms::AbstractMatrix,       # spectral coefficients
+function gridded(   alms::LowerTriangularMatrix,       # spectral coefficients
                     S::SpectralTransform{NF};   # struct for spectral transform parameters
                     kwargs...
                     ) where NF                  # number format NF
@@ -528,16 +524,6 @@ function gridded(   alms::AbstractMatrix,       # spectral coefficients
     copyto!(almsᴸ, alms)                        # drop the upper triangle and convert to NF  
     gridded!(map, almsᴸ, S; kwargs...)          # now execute the in-place version
     return map
-end
-
-"""
-$(TYPEDSIGNATURES)
-Converts `map` to `grid(map)` to execute `spectral(map::AbstractGrid; kwargs...)`."""
-function spectral(  map::AbstractMatrix;            # gridded field
-                    Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
-                    kwargs...)
-
-    return spectral(Grid(map); kwargs...)
 end
 
 """

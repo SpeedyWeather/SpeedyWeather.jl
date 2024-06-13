@@ -43,6 +43,7 @@ export  spectral_truncation,
         power_spectrum
 
 include("aliasing.jl")
+include("legendrepolarray.jl")
 include("spectral_transform.jl")
 include("spectral_gradients.jl")
 include("spectral_truncation.jl")
