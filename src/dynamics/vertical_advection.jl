@@ -67,8 +67,8 @@ function vertical_advection!(   layer::DiagnosticVariablesLayer,
 
     if wet_core
         ξ_tend = getproperty(layer.tendencies, :humid_tend_grid)
-        ξ_sten = retrieve_current_stencil(k, diagn.layers, :humid, nlev, scheme)
-        ξ      = retrieve_current_time_step(layer.grid_variables, :humid)
+        ξ_sten = retrieve_stencil(k, diagn.layers, :humid, nlev, scheme)
+        ξ      = retrieve_time_step(scheme, layer.grid_variables, :humid)
 
         _vertical_advection!(ξ_tend, σ_tend_above, σ_tend_below, ξ_sten, ξ, Δσₖ, scheme)
     end
@@ -97,6 +97,7 @@ function _vertical_advection!(  ξ_tend::Grid,                  # tendency of qu
     end
 end
 
+# Reconstruction of centered variables at vertical interfaces
 @inline reconstructed_at_face(ij, ::UpwindVerticalAdvection{NF, 1}, u, ξ) where NF = ifelse(u > 0, ξ[1][ij], ξ[2][ij])
 @inline reconstructed_at_face(ij, ::UpwindVerticalAdvection{NF, 2}, u, ξ) where NF = ifelse(u > 0, (2ξ[1][ij] + 5ξ[2][ij] - ξ[3][ij]) / 6,
                                                                                                    (2ξ[4][ij] + 5ξ[3][ij] - ξ[2][ij]) / 6)
