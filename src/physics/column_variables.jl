@@ -35,7 +35,7 @@ function get_column!(
 )
 
     (; σ_levels_full, ln_σ_levels_full) = geometry
-    (; temp_profile) = implicit     # reference temperature on this layer
+    (; temp_profile) = implicit     # reference temperature
 
     @boundscheck C.nlev == D.nlev || throw(BoundsError)
 
@@ -61,7 +61,6 @@ function get_column!(
 
         # add temp reference profile back in as temp_grid_prev is anomaly
         C.temp[k] = layer.grid_variables.temp_grid_prev[ij] + temp_profile[k]
-        C.temp_virt[k] = layer.grid_variables.temp_virt_grid[ij] + temp_profile[k]    # actually diagnostic
         C.humid[k] = layer.grid_variables.humid_grid_prev[ij] 
     end
 
