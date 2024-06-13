@@ -38,8 +38,7 @@ function dynamics_tendencies!(
     volume_flux_divergence!(diagn, orography, atmosphere, geometry, spectral_transform)
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Calculate all tendencies for the PrimitiveEquation model (wet or dry)."""
 function dynamics_tendencies!(
     diagn::DiagnosticVariables,
@@ -71,16 +70,16 @@ function dynamics_tendencies!(
     vertical_integration!(diagn, progn, lf_implicit, geometry)
 
     # ∂ln(pₛ)/∂t = -(ū, v̄)⋅∇ln(pₛ) - D̄
-    surface_pressure_tendency!(surface, spectral_transform)
+    surface_pressure_tendency!(diagn, spectral_transform)
 
-    # calculate vertical velocity σ̇ in sigma coordinates for the vertical mass flux M = pₛσ̇
-    vertical_velocity!(layer, surface, geometry)       
+    # calculate vertical velocity σ̇ in sigma coordinates for the vertical mass flux M = p_s*σ̇
+    vertical_velocity!(diagn, geometry)       
     
     # add the RTₖlnpₛ term to geopotential
-    linear_pressure_gradient!(layer, progn.surface, lf_implicit, atmosphere, implicit)
+    linear_pressure_gradient!(diagn, progn, lf_implicit, atmosphere, implicit)
 
     # use σ̇ for the vertical advection of u, v, T, q
-    vertical_advection!(layer, diagn, model)
+    vertical_advection!(diagn, progn, model)
 
     # vorticity advection, pressure gradient term
     vordiv_tendencies!(layer, surface, model)
@@ -216,52 +215,54 @@ of the logarithm of surface pressure ln(p_s) and D̄ the vertically averaged div
 3. D̄ is subtracted in spectral space.
 4. Set tendency of the l=m=0 mode to 0 for better mass conservation."""
 function surface_pressure_tendency!(
-    surf::SurfaceVariables,
+    diagn::DiagnosticVariables,
     S::SpectralTransform,
 )
-    (; pres_tend, pres_tend_grid, ∇lnp_x, ∇lnp_y ) = surf
+    (; pres_tend, pres_tend_grid) = diagn.tendencies
+    (; ∇lnp_x, ∇lnp_y, u_mean_grid, v_mean_grid, div_mean) = diagn.dynamics
     
-    # vertical averages need to be computed first!
-    ū = surf.u_mean_grid            # rename for convenience
-    v̄ = surf.v_mean_grid
-    D̄ = surf.div_mean               # spectral
-
     # in grid-point space the the (ū, v̄)⋅∇lnpₛ term (swap sign in spectral)
-    @. pres_tend_grid = ū*∇lnp_x + v̄*∇lnp_y
-    spectral!(pres_tend, pres_tend_grid, S)
+    @. pres_tend_grid = u_mean_grid*∇lnp_x + v_mean_grid*∇lnp_y
+    transform!(pres_tend, pres_tend_grid, S)
     
-    # for semi-implicit D̄ is calc at time step i-1 in vertical_integration!
-    @. pres_tend = -pres_tend - D̄   # the -D̄ term in spectral and swap sign
+    # for semi-implicit div_mean is calc at time step i-1 in vertical_integration!
+    @. pres_tend = -pres_tend - div_mean    # add the -div_mean term in spectral, swap sign
     
     pres_tend[1] = 0                # for mass conservation
     return nothing
 end
 
 function vertical_velocity!(
-    diagn::DiagnosticVariablesLayer,
-    surf::SurfaceVariables,
-    G::Geometry,
+    diagn::DiagnosticVariables,
+    geometry::Geometry,
 )
-    (; k) = diagn                               # vertical level
-    Δσₖ = G.σ_levels_thick[k]                   # σ level thickness at k
-    σk_half = G.σ_levels_half[k+1]              # σ at k+1/2
-    σ̇ = diagn.dynamics_variables.σ_tend         # vertical mass flux M = pₛσ̇ at k+1/2
+    (; σ_levels_thick, σ_levels_half, nlayers) = geometry
+    (; σ_tend)= diagn.dynamics                  
     
-                                                # sum of Δσ-weighted div, uv∇lnp from 1:k-1
-    (; div_sum_above, uv∇lnp, uv∇lnp_sum_above) = diagn.dynamics_variables
-    (; div_grid) = diagn.grid_variables
+    # sum of Δσ-weighted div, uv∇lnp from 1:k-1
+    (; div_sum_above, uv∇lnp, uv∇lnp_sum_above) = diagn.dynamics
+    (; div_mean_grid) = diagn.dynamics          # vertical avrgd div to be added to ūv̄∇lnp
+    (; σ_tend) = diagn.dynamics                 # vertical mass flux M = pₛσ̇ at k+1/2
+    (; div_grid) = diagn.grid
+    ūv̄∇lnp = diagn.tendencies.pres_tend_grid    # calc'd in surface_pressure_tendency! (excl -D̄)
 
-    ūv̄∇lnp = surf.pres_tend_grid                # calc'd in surface_pressure_tendency! (excl -D̄)
-    D̄ = surf.div_mean_grid                      # vertical avrgd div to be added to ūv̄∇lnp
+    for k in eachgrid(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp)
+        if k == nlayers
+            # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlev+1/2 (stored in layer k)
+            # set to zero for bottom layer then
+            σ_tend[:, k] .= 0
+        else
+            Δσₖ = σ_levels_thick[k]
+            σₖ_half = σ_levels_half[Tuple(k)[1]+1]
 
-    # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlev+1/2 (stored in layer k)
-    # set to zero for bottom layer then, and exit immediately
-    k == G.nlev && (fill!(σ̇, 0); return nothing)
-
-    # Hoskins and Simmons, 1975 just before eq. (6)
-    σ̇ .= σk_half*(D̄ .+ ūv̄∇lnp) .-
-        (div_sum_above .+ Δσₖ*div_grid) .-      # for 1:k integral add level k σₖ-weighted div 
-        (uv∇lnp_sum_above .+ Δσₖ*uv∇lnp)        # and level k σₖ-weighted uv∇lnp here
+            for ij in eachgridpoint(σ_tend)
+                # Hoskins and Simmons, 1975 just before eq. (6)
+                σ_tend[ij, k] = σₖ_half*(div_mean_grid[ij] + ūv̄∇lnp[ij]) -
+                                (div_sum_above[ij, k] + Δσₖ*div_grid[ij, k]) -
+                                (uv∇lnp_sum_above[ij, k] + Δσₖ*uv∇lnp[ij, k])
+            end
+        end
+    end
 end
 
 """
@@ -674,22 +675,27 @@ So that the second term inside the Laplace operator can be added to the geopoten
 Rd is the gas constant, Tᵥ the virtual temperature and Tᵥ' its anomaly wrt to the
 average or reference temperature Tₖ, lnpₛ is the logarithm of surface pressure."""
 function linear_pressure_gradient!( 
-    diagn::DiagnosticVariablesLayer,
-    surface::PrognosticSurfaceTimesteps,
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     lf::Int,                # leapfrog index to evaluate tendencies on
     atmosphere::AbstractAtmosphere,
-    I::ImplicitPrimitiveEquation,
+    implicit::ImplicitPrimitiveEquation,
 )                          
-    (; R_dry) = atmosphere                   # dry gas constant 
-    Tₖ = I.temp_profile[diagn.k]             # reference profile at layer k      
-    (; pres) = surface.timesteps[lf]         # logarithm of surface pressure
-    (; geopot) = diagn.dynamics_variables
+    (; R_dry) = atmosphere                  # dry gas constant 
+    (; temp_profile) = implicit             # reference profile at layer k
+    pres = progn.pres[lf]                   # logarithm of surface pressure at leapfrog index lf
+    (; geopot) = diagn.dynamics
 
     # -R_dry*Tₖ*∇²lnpₛ, linear part of the ∇⋅RTᵥ∇lnpₛ pressure gradient term
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
     # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
     # -∇² is applied in bernoulli_potential!
-    @. geopot += R_dry*Tₖ*pres
+    for k in eachmatrix(geopot)
+        R_dryTₖ = R_dry*temp_profile[k]
+        for lm in eachharmonic(pres)
+            geopot[lm, k] += R_dryTₖ*pres[lm]
+        end
+    end
 end
 
 """
