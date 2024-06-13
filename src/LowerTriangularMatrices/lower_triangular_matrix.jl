@@ -48,7 +48,7 @@ Base.size(L::LowerTriangularArray) = size(L.data)
 """$(TYPEDSIGNATURES)
 Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
 and as if it were a full matrix when `as <: AbstractMatrix`` ."""
-function Base.size(L::LowerTriangularArray; as::T=Vector) 
+function Base.size(L::LowerTriangularArray; as::T=Vector) where T
     if T<:AbstractVector 
         size(L.data)
     elseif T<:AbstractMatrix 
@@ -61,7 +61,7 @@ end
 """$(TYPEDSIGNATURES)
 Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
 and as if it were a full matrix when `as <: AbstractMatrix`` ."""
-Base.size(L::LowerTriangularArray, i::Integer; as::T=Vector) = size(L; as=as)[i]
+Base.size(L::LowerTriangularArray, i::Integer; as::T=Vector) where T = size(L; as=as)[i]
    
 """$(TYPEDSIGNATURES)
 Size of a expanded `LowerTriangularArray` as if it were a full matrix,  
