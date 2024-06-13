@@ -42,19 +42,15 @@ Length of a `LowerTriangularArray` defined as number of non-zero elements."""
 Base.length(L::LowerTriangularArray) = length(L.data)
 
 """$(TYPEDSIGNATURES)
-Size of a `LowerTriangularArray` defined as size of the flattened array."""
-Base.size(L::LowerTriangularArray) = size(L.data)
-
-"""$(TYPEDSIGNATURES)
 Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
 and as if it were a full matrix when `as <: AbstractMatrix`` ."""
-function Base.size(L::LowerTriangularArray; as::T=Vector) where T
-    if T<:AbstractVector 
-        size(L.data)
-    elseif T<:AbstractMatrix 
-        matrix_size(L)
+function Base.size(L::LowerTriangularArray; as::Type=Vector)
+    if as<:AbstractVector 
+        return size(L.data)
+    elseif as<:AbstractMatrix 
+        return matrix_size(L)
     else 
-        error("Unknown `as` input.")
+        error("Unknown `as` input type in size(::LowerTriangularArray; as=...).")
     end 
 end 
 
