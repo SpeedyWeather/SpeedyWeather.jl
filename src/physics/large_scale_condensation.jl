@@ -15,7 +15,7 @@ Base.@kwdef struct ImplicitCondensation{NF<:AbstractFloat} <: AbstractCondensati
     relative_humidity_threshold::NF = 1
     
     "Flux limiter for latent heat release [W/m²] per timestep"
-    max_heating::NF = 10           # currently not needed? maybe too high?
+    max_heating::NF = 0.2
 
     "Time scale in multiples of time step Δt, the larger the less immediate"
     time_scale::NF = 3
@@ -70,9 +70,7 @@ function large_scale_condensation!(
     time_stepping::AbstractTimeStepper,
 )
 
-    (; pres) = column                       # prognostic vars: pressure
-    temp = column.temp_prev                 # but use temp, humid from
-    humid = column.humid_prev               # from previous time step for numerical stability
+    (; pres, temp, humid) = column          # prognostic vars (from previous time step for numerical stability)
     (; temp_tend, humid_tend) = column      # tendencies to write into
     (; sat_humid) = column                  # intermediate variable, calculated in thermodynamics!
     

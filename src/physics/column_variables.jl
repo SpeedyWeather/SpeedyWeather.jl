@@ -54,18 +54,15 @@ function get_column!(
     C.pres[1:end-1] .= σ_levels_full.*pₛ    # pressure on every level p = σ*pₛ
     C.pres[end] = pₛ                        # last element is surface pressure pₛ
 
-    @inbounds for (k, layer) = enumerate(D.layers)   # read out prognostic variables on grid
-        C.u[k] = layer.grid_variables.u_grid[ij]
-        C.v[k] = layer.grid_variables.v_grid[ij]
-        C.temp[k] = layer.grid_variables.temp_grid[ij]
-        C.temp_virt[k] = layer.grid_variables.temp_virt_grid[ij]    # actually diagnostic
-        C.humid[k] = layer.grid_variables.humid_grid[ij] 
+    @inbounds for (k, layer) = enumerate(D.layers)
+        # read out prognostic variables on grid at previous time step
+        C.u[k] = layer.grid_variables.u_grid_prev[ij]
+        C.v[k] = layer.grid_variables.v_grid_prev[ij]
 
-        # and at previous time step, add temp reference profile back in as temp_grid_prev is anomaly
-        C.u_prev[k] = layer.grid_variables.u_grid_prev[ij]
-        C.v_prev[k] = layer.grid_variables.v_grid_prev[ij]
-        C.temp_prev[k] = layer.grid_variables.temp_grid_prev[ij] + temp_profile[k]
-        C.humid_prev[k] = layer.grid_variables.humid_grid_prev[ij] 
+        # add temp reference profile back in as temp_grid_prev is anomaly
+        C.temp[k] = layer.grid_variables.temp_grid_prev[ij] + temp_profile[k]
+        C.temp_virt[k] = layer.grid_variables.temp_virt_grid[ij] + temp_profile[k]    # actually diagnostic
+        C.humid[k] = layer.grid_variables.humid_grid_prev[ij] 
     end
 
     # TODO skin = surface approximation for now
