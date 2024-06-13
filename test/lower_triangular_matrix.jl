@@ -592,9 +592,6 @@ end
     @test L3 == L1
 end 
 
-idims=(5,)
-NF = Float32
-ArrayType=JLArray
 
 @testset "LowerTriangularArray: broadcast" begin 
     @testset for idims = ((), (5,), (5,5))
