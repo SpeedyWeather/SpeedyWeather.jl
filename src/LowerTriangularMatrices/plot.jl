@@ -1,6 +1,6 @@
 function plot(L::LowerTriangularMatrix{T}; mode::Function=abs) where T
 
-    l, m = matrix_size(L)
+    l, m = size(L, as=Matrix)
     title ="$l×$m LowerTriangularMatrix{$T}"
 
     Lplot = similar(L, real(T))

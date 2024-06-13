@@ -234,7 +234,7 @@ function SpectralTransform( alms::LowerTriangularMatrix{Complex{NF}};  # spectra
                             Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
                             ) where NF                          # number format NF
     
-        lmax, mmax = matrix_size(alms) .- 1        # -1 for 0-based degree l, order m
+        lmax, mmax = size(alms, as=Matrix) .- 1        # -1 for 0-based degree l, order m
         return SpectralTransform(NF, Grid, lmax, mmax; recompute_legendre)
 end
 
@@ -304,9 +304,9 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
     (; recompute_legendre, Λ, Λs, m_truncs ) = S
     (; brfft_plans ) = S
 
-    recompute_legendre && @boundscheck matrix_size(alms) == size(Λ) || throw(BoundsError)
+    recompute_legendre && @boundscheck size(alms; as=Matrix) == size(Λ) || throw(BoundsError)
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
-    lmax, mmax = matrix_size(alms) .- 1            # maximum degree l, order m of spherical harmonics
+    lmax, mmax = size(alms; as=Matrix) .- 1            # maximum degree l, order m of spherical harmonics
 
     @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
@@ -408,9 +408,9 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     (; recompute_legendre, Λ, Λs, solid_angles ) = S
     (; rfft_plans, lon_offsets, m_truncs ) = S
     
-    recompute_legendre && @boundscheck matrix_size(alms) == size(Λ) || throw(BoundsError)
+    recompute_legendre && @boundscheck size(alms; as=Matrix) == size(Λ) || throw(BoundsError)
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
-    lmax, mmax = matrix_size(alms) .- 1    # maximum degree l, order m of spherical harmonics
+    lmax, mmax = size(alms; as=Matrix) .- 1    # maximum degree l, order m of spherical harmonics
 
     @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
@@ -498,29 +498,13 @@ $(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map`. Based on the size of `alms` the grid type `grid`, the spatial resolution is retrieved based
 on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `gridded(alms, S)`."""
-function gridded(   alms::AbstractMatrix{T};            # spectral coefficients
-                    recompute_legendre::Bool = true,    # saves memory
-                    Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
-                    kwargs...
-                    ) where {NF, T<:Complex{NF}}        # number format NF
-
-    lmax, mmax = size(alms) .- 1                        # -1 for 0-based degree l, order m
-    S = SpectralTransform(NF, Grid, lmax, mmax; recompute_legendre)
-    return gridded(alms, S; kwargs...)
-end
-
-"""
-$(TYPEDSIGNATURES)
-Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
-field `map`. Based on the size of `alms` the grid type `grid`, the spatial resolution is retrieved based
-on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `gridded(alms, S)`."""
 function gridded(   alms::LowerTriangularMatrix{T};            # spectral coefficients
                     recompute_legendre::Bool = true,    # saves memory
                     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
                     kwargs...
                     ) where {NF, T<:Complex{NF}}        # number format NF
 
-    lmax, mmax = matrix_size(alms) .- 1                        # -1 for 0-based degree l, order m
+    lmax, mmax = size(alms; as=Matrix) .- 1                        # -1 for 0-based degree l, order m
     S = SpectralTransform(NF, Grid, lmax, mmax; recompute_legendre)
     return gridded(alms, S; kwargs...)
 end
@@ -530,7 +514,7 @@ $(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map` with precalculated properties based on the SpectralTransform struct `S`. `alms` is converted to
 a `LowerTriangularMatrix` to execute the in-place `gridded!`."""
-function gridded(   alms::Union{AbstractMatrix, LowerTriangularMatrix},       # spectral coefficients
+function gridded(   alms::LowerTriangularMatrix,       # spectral coefficients
                     S::SpectralTransform{NF};   # struct for spectral transform parameters
                     kwargs...
                     ) where NF                  # number format NF
@@ -540,16 +524,6 @@ function gridded(   alms::Union{AbstractMatrix, LowerTriangularMatrix},       # 
     copyto!(almsᴸ, alms)                        # drop the upper triangle and convert to NF  
     gridded!(map, almsᴸ, S; kwargs...)          # now execute the in-place version
     return map
-end
-
-"""
-$(TYPEDSIGNATURES)
-Converts `map` to `grid(map)` to execute `spectral(map::AbstractGrid; kwargs...)`."""
-function spectral(  map::AbstractMatrix;            # gridded field
-                    Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
-                    kwargs...)
-
-    return spectral(Grid(map); kwargs...)
 end
 
 """

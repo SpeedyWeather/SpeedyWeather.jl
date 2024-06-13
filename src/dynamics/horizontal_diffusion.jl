@@ -131,7 +131,7 @@ function horizontal_diffusion!( tendency::LowerTriangularMatrix{Complex{NF}},   
                                 ∇²ⁿ_expl::AbstractVector{NF},                   # explicit spectral damping
                                 ∇²ⁿ_impl::AbstractVector{NF}                    # implicit spectral damping
                                 ) where NF
-    lmax, mmax = matrix_size(tendency)      # 1-based
+    lmax, mmax = size(tendency; as=Matrix)      # 1-based
 
     @boundscheck size(tendency) == size(A) || throw(BoundsError)
     @boundscheck lmax <= length(∇²ⁿ_expl) == length(∇²ⁿ_impl) || throw(BoundsError)

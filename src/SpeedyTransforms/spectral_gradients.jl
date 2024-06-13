@@ -64,7 +64,7 @@ function _divergence!(  kernel,
     (; grad_y_vordiv1, grad_y_vordiv2 ) = S
     @boundscheck size(grad_y_vordiv1) == size(div) || throw(BoundsError)
     @boundscheck size(grad_y_vordiv2) == size(div) || throw(BoundsError)
-    lmax, mmax = matrix_size(div) .- (2, 1)              # 0-based lmax, mmax 
+    lmax, mmax = size(div, as=Matrix) .- (2, 1)              # 0-based lmax, mmax 
 
     lm = 0
     @inbounds for m in 1:mmax+1                 # 1-based l, m
@@ -220,7 +220,7 @@ function UV_from_vor!(  U::LowerTriangularMatrix{Complex{NF}},
                         ) where {NF<:AbstractFloat}
 
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
-    lmax, mmax = matrix_size(vor) .- (2, 1)                  # 0-based lmax, mmax
+    lmax, mmax = size(vor, as=Matrix) .- (2, 1)                  # 0-based lmax, mmax
     
     @boundscheck lmax == mmax || throw(BoundsError)
     @boundscheck size(U) == size(vor) || throw(BoundsError)
@@ -291,7 +291,7 @@ function UV_from_vordiv!(   U::LowerTriangularMatrix{Complex{NF}},
                             ) where {NF<:AbstractFloat}
 
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
-    lmax, mmax = matrix_size(vor) .- (2, 1)                  # 0-based lmax, mmax
+    lmax, mmax = size(vor, as=Matrix) .- (2, 1)                  # 0-based lmax, mmax
     @boundscheck lmax == mmax || throw(BoundsError)
     @boundscheck size(div) == size(vor) || throw(BoundsError)
     @boundscheck size(U) == size(vor) || throw(BoundsError)
@@ -384,7 +384,7 @@ function ∇²!(   ∇²alms::LowerTriangularMatrix{Complex{NF}}, # Output: (inv
                 ) where {NF<:AbstractFloat}
 
     @boundscheck size(alms) == size(∇²alms) || throw(BoundsError)
-    lmax, mmax = matrix_size(alms) .- (1, 1)     # 0-based degree l, order m of the Legendre polynomials
+    lmax, mmax = size(alms; as=Matrix) .- (1, 1)     # 0-based degree l, order m of the Legendre polynomials
     
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
     eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
@@ -480,7 +480,7 @@ function ∇!(dpdx::LowerTriangularMatrix{Complex{NF}},       # Output: zonal gr
             S::SpectralTransform{NF}                        # includes precomputed arrays
             ) where {NF<:AbstractFloat}
 
-    lmax, mmax = matrix_size(p) .- (1, 1)                            # 0-based, include last row
+    lmax, mmax = size(p, as=Matrix) .- (1, 1)                            # 0-based, include last row
     @boundscheck size(p) == size(dpdx) || throw(BoundsError)
     @boundscheck size(p) == size(dpdy) || throw(BoundsError)
 

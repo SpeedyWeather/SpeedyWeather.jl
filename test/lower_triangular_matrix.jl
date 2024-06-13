@@ -1,6 +1,5 @@
 using JLArrays, Adapt
 import Random
-import SpeedyWeather.LowerTriangularMatrices: matrix_size
 
 @testset "LowerTriangularMatrix" begin
     @testset for NF in (Float32, Float64)
@@ -12,7 +11,7 @@ import SpeedyWeather.LowerTriangularMatrices: matrix_size
 
             L = LowerTriangularMatrix(A)
 
-            @test matrix_size(L) == size(A)
+            @test size(L, as=Matrix) == size(A)
 
             @test size(A) == size(L, as=Matrix)
             @test size(L.data) == size(L, as=Vector)
@@ -51,12 +50,11 @@ end
 
                 L = LowerTriangularArray(A)
 
-                @test matrix_size(L) == size(A)
+                @test size(L, as=Matrix) == size(A)
+                @test size(L.data) == size(L, as=Vector)
                 @test size(L)[2:end] == size(A)[3:end]
                 @test size(L)[1] == SpeedyWeather.LowerTriangularMatrices.nonzeros(size(A,1), size(A,2))
 
-                @test size(A) == size(L, as=Matrix)
-                @test size(L.data) == size(L, as=Vector)
 
                 for m in 1:mmax
                     for l in 1:lmax
@@ -345,8 +343,8 @@ end
         @test size(similar(L)) == size(L)
         @test eltype(L) == eltype(similar(L, eltype(L)))
 
-        @test (5, 7) == matrix_size(similar(L, 5, 7))
-        @test (5, 7) == matrix_size(similar(L, (5, 7)))
+        @test (5, 7) == size(similar(L, 5, 7), as=Matrix)
+        @test (5, 7) == size(similar(L, (5, 7)), as=Matrix)
         @test similar(L) isa LowerTriangularMatrix
         @test similar(L, Float64) isa LowerTriangularMatrix{Float64}
     end
@@ -370,8 +368,8 @@ end
             @test size(similar(L)) == size(L)
             @test eltype(L) == eltype(similar(L, eltype(L)))
 
-            @test (5, 7, idims...) == matrix_size(similar(L, 5, 7, idims...))
-            @test (5, 7, idims...) == matrix_size(similar(L, (5, 7,  idims...)))
+            @test (5, 7, idims...) == size(similar(L, 5, 7, idims...); as=Matrix)
+            @test (5, 7, idims...) == size(similar(L, (5, 7,  idims...)); as=Matrix)
             @test similar(L) isa LowerTriangularArray
             @test similar(L, Float64) isa LowerTriangularArray{Float64}
         end
@@ -402,7 +400,7 @@ end
         # with ranges
         L1 = zeros(LowerTriangularMatrix{NF}, 33, 32);
         L2 = randn(LowerTriangularMatrix{NF}, 65, 64);
-        L2T = spectral_truncation(L2,(matrix_size(L1) .- 1)...)
+        L2T = spectral_truncation(L2,(size(L1; as=Matrix) .- 1)...)
 
         copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
         @test L1 == L2T
@@ -458,7 +456,7 @@ end
             # with ranges
             L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
             L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
-            L2T = spectral_truncation(L2,(matrix_size(L1)[1:2] .- 1)...)
+            L2T = spectral_truncation(L2,(size(L1; as=Matrix)[1:2] .- 1)...)
 
             copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
             @test L1 == L2T
@@ -549,8 +547,8 @@ end
     @test size(similar(L)) == size(L)
     @test eltype(L) == eltype(similar(L, eltype(L)))
 
-    @test (5, 7, 5) == matrix_size(similar(L, 5, 7, idims...))
-    @test (5, 7, 5) == matrix_size(similar(L, (5, 7,  idims...)))
+    @test (5, 7, 5) == size(similar(L, 5, 7, idims...), as=Matrix)
+    @test (5, 7, 5) == size(similar(L, (5, 7,  idims...)), as=Matrix)
     @test similar(L) isa LowerTriangularArray
 
     # copyto! same size 
@@ -569,7 +567,7 @@ end
 
     L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
     L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
-    L2T = spectral_truncation(L2,(matrix_size(L1)[1:2] .- 1)...)
+    L2T = spectral_truncation(L2,(size(L1; as=Matrix)[1:2] .- 1)...)
     L3 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
 
     SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:33, 1:32)     # size of smaller matrix

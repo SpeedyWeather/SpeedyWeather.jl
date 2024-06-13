@@ -13,7 +13,7 @@ end
 """2-dimensional `AssociatedLegendrePolArray` of type `T`` with its non-zero entries unravelled into a `Vector{T}`"""
 const AssociatedLegendrePolMatrix{T} = AssociatedLegendrePolArray{T, 2, 1, Vector{T}}
 
-Base.size(A::AssociatedLegendrePolArray) = matrix_size(A.data)
+Base.size(A::AssociatedLegendrePolArray) = size(A.data; as=Matrix)
 @inline Base.getindex(A::AssociatedLegendrePolArray, I...) = getindex(A.data, I...)
 @inline Base.setindex!(A::AssociatedLegendrePolArray, v, I...) = setindex!(A.data, v, I...)
 

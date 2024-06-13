@@ -13,7 +13,6 @@ import Primes
 # SPEEDYWEATHER MODULES
 using ..LowerTriangularMatrices
 using ..RingGrids
-import ..LowerTriangularMatrices: matrix_size
 
 const DEFAULT_GRID = FullGaussianGrid
 
