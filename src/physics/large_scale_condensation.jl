@@ -96,8 +96,9 @@ function large_scale_condensation!(
             δq /= ((1 + Lᵥ_cₚ*dqsat_dT) * time_scale*Δt_sec) 
 
             # latent heat release with maximum heating limiter for stability
-            δT = min(max_heating, -Lᵥ_cₚ * δq)
-            δq = -δT/Lᵥ_cₚ                                  # also limit drying for enthalpy conservation
+            # δT = min(max_heating, -Lᵥ_cₚ * δq)
+            # δq = -δT/Lᵥ_cₚ                                  # also limit drying for enthalpy conservation
+            δT = -Lᵥ_cₚ * δq
 
             # If there is large-scale condensation at a level higher (i.e. smaller k) than
             # the cloud-top previously diagnosed due to convection, then increase the cloud-top

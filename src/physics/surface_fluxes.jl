@@ -73,7 +73,7 @@ Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind
     drag_sea::NF = 1.8e-3
 
     "Flux limiter to cap the max of surface momentum fluxes [kg/m/s²]"
-    max_flux::NF = 0.1
+    max_flux::NF = 1
 end
 
 SurfaceWind(SG::SpectralGrid; kwargs...) = SurfaceWind{SG.NF}(; kwargs...)
@@ -108,8 +108,12 @@ function surface_wind_stress!(  column::ColumnVariables,
     # add flux limiter to avoid heavy drag in (initial) shock
     u_flux = ρ*drag*V₀*surface_u
     v_flux = ρ*drag*V₀*surface_v
-    column.flux_u_upward[end] -= clamp(u_flux, -max_flux, max_flux)
-    column.flux_v_upward[end] -= clamp(v_flux, -max_flux, max_flux)
+
+    # u_flux = clamp(u_flux, -max_flux, max_flux)
+    # v_flux = clamp(v_flux, -max_flux, max_flux)
+
+    column.flux_u_upward[end] -= u_flux
+    column.flux_v_upward[end] -= v_flux
 
     # SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
     # column.flux_u_upward[end] -= ρ*drag*V₀*surface_u
@@ -168,9 +172,9 @@ function surface_heat_flux!(
     flux_land = ρ*drag_land*V₀*cₚ*(T_skin_land - T)
     flux_sea  = ρ*drag_sea*V₀*cₚ*(T_skin_sea  - T)
 
-    # flux limiter
-    flux_land = clamp(flux_land, -max_flux, max_flux)
-    flux_sea = clamp(flux_sea, -max_flux, max_flux)
+    # # flux limiter
+    # flux_land = clamp(flux_land, -max_flux, max_flux)
+    # flux_sea = clamp(flux_sea, -max_flux, max_flux)
 
     # mix fluxes for fractional land-sea mask
     land_available = isfinite(T_skin_land)
