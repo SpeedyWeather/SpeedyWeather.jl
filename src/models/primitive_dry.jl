@@ -76,7 +76,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     surface_wind::SUW = SurfaceWind(spectral_grid)
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     convection::CV = DryBettsMiller(spectral_grid)
-    shortwave_radiation::SW = NoShortwave(spectral_grid)
+    shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     
     # NUMERICS
