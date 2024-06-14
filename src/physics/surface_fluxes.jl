@@ -71,9 +71,6 @@ Base.@kwdef struct SurfaceWind{NF<:AbstractFloat} <: AbstractSurfaceWind
     
     "Otherwise, Drag coefficient over sea [1]"
     drag_sea::NF = 1.8e-3
-
-    "Flux limiter to cap the max of surface momentum fluxes [kg/m/s²]"
-    max_flux::NF = 1
 end
 
 SurfaceWind(SG::SpectralGrid; kwargs...) = SurfaceWind{SG.NF}(; kwargs...)
@@ -85,7 +82,6 @@ function surface_wind_stress!(  column::ColumnVariables,
 
     (; land_fraction) = column
     (; f_wind, V_gust, drag_land, drag_sea) = surface_wind
-    (; max_flux) = surface_wind
 
     # SPEEDY documentation eq. 49, but use previous time step for numerical stability
     column.surface_u = f_wind*column.u[end] 
@@ -105,19 +101,9 @@ function surface_wind_stress!(  column::ColumnVariables,
     V₀ = column.surface_wind_speed
     drag = land_fraction*drag_land + (1-land_fraction)*drag_sea
 
-    # add flux limiter to avoid heavy drag in (initial) shock
-    u_flux = ρ*drag*V₀*surface_u
-    v_flux = ρ*drag*V₀*surface_v
-
-    # u_flux = clamp(u_flux, -max_flux, max_flux)
-    # v_flux = clamp(v_flux, -max_flux, max_flux)
-
-    column.flux_u_upward[end] -= u_flux
-    column.flux_v_upward[end] -= v_flux
-
     # SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
-    # column.flux_u_upward[end] -= ρ*drag*V₀*surface_u
-    # column.flux_v_upward[end] -= ρ*drag*V₀*surface_v
+    column.flux_u_upward[end] -= ρ*drag*V₀*surface_u
+    column.flux_v_upward[end] -= ρ*drag*V₀*surface_v
     
     return nothing
 end
@@ -140,9 +126,6 @@ Base.@kwdef struct SurfaceHeatFlux{NF<:AbstractFloat} <: AbstractSurfaceHeatFlux
 
     "Otherwise, use the following drag coefficient for heat fluxes over sea"
     heat_exchange_sea::NF = 0.9e-3
-
-    "Flux limiter for surface heat fluxes [W/m²]"
-    max_flux::NF = 100          # currently not needed? maybe too high?
 end
 
 SurfaceHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceHeatFlux{SG.NF}(; kwargs...)
@@ -171,10 +154,6 @@ function surface_heat_flux!(
     # SPEEDY documentation Eq. 54 and 56
     flux_land = ρ*drag_land*V₀*cₚ*(T_skin_land - T)
     flux_sea  = ρ*drag_sea*V₀*cₚ*(T_skin_sea  - T)
-
-    # # flux limiter
-    # flux_land = clamp(flux_land, -max_flux, max_flux)
-    # flux_sea = clamp(flux_sea, -max_flux, max_flux)
 
     # mix fluxes for fractional land-sea mask
     land_available = isfinite(T_skin_land)

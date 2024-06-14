@@ -16,7 +16,7 @@ initialize!(::NoVerticalDiffusion,::PrimitiveEquation) = nothing
 vertical_diffusion!(::ColumnVariables, ::NoVerticalDiffusion, ::PrimitiveEquation) = nothing
 
 export BulkRichardsonDiffusion
-Base.@kwdef struct BulkRichardsonDiffusion{NF} <: AbstractVerticalDiffusion
+@kwdef struct BulkRichardsonDiffusion{NF} <: AbstractVerticalDiffusion
     nlev::Int
 
     "[OPTION] von Kármán constant [1]"
