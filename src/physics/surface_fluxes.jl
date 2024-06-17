@@ -137,7 +137,7 @@ function surface_heat_flux!(
     model::PrimitiveEquation,
 )   
     cₚ = model.atmosphere.heat_capacity
-    (; heat_exchange_land, heat_exchange_sea, max_flux) = heat_flux
+    (; heat_exchange_land, heat_exchange_sea) = heat_flux
 
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
