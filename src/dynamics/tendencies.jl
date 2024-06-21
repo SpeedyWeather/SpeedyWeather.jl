@@ -79,7 +79,7 @@ function dynamics_tendencies!(
     linear_pressure_gradient!(diagn, progn, lf_implicit, atmosphere, implicit)
 
     # use σ̇ for the vertical advection of u, v, T, q
-    vertical_advection!(diagn, progn, model)
+    vertical_advection!(diagn, model)
 
     # vorticity advection, pressure gradient term
     vordiv_tendencies!(layer, surface, model)
