@@ -379,10 +379,15 @@ function each_index_in_ring(grid::Grid, j::Integer) where {Grid<:AbstractGridArr
     return each_index_in_ring(Grid, j, grid.nlat_half)
 end
 
-""" $(TYPEDSIGNATURES) UnitRange to access each grid point on grid `grid`."""
+""" $(TYPEDSIGNATURES) UnitRange to access each horizontal grid point on grid `grid`.
+For a `NxM` (`N` horizontal grid points, `M` vertical layers) `OneTo(N)` is returned."""
 eachgridpoint(grid::AbstractGridArray) = Base.OneTo(get_npoints(grid))
+
+""" $(TYPEDSIGNATURES) Like `eachgridpoint(::AbstractGridArray)` but checks for
+equal size between input arguments first."""
 function eachgridpoint(grid1::Grid, grids::Grid...) where {Grid<:AbstractGridArray}
     n = length(grid1)
+    # TODO check only nonparametric_type and nlat_half identical!
     Base._all_match_first(X->length(X), n, grid1, grids...) || throw(BoundsError)
     return eachgridpoint(grid1)
 end

@@ -186,20 +186,23 @@ end
 """$(TYPEDSIGNATURES)
 Apply horizontal diffusion applied to vorticity, divergence, temperature, and
 humidity (PrimitiveWet only) in the PrimitiveEquation models."""
-function horizontal_diffusion!( progn::PrognosticLayerTimesteps,
-                                diagn::DiagnosticVariablesLayer,
-                                model::PrimitiveEquation,
-                                lf::Int=1)      # leapfrog index used (2 is unstable)
+function horizontal_diffusion!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    model::PrimitiveEquation,
+    lf::Integer = 1,    # leapfrog index used (2 is unstable)
+)
     # use weaker diffusion operators that don't taper or scale with resolution for temperature and humidity
-    ∇²ⁿc = model.horizontal_diffusion.∇²ⁿc[diagn.k]
-    ∇²ⁿc_implicit = model.horizontal_diffusion.∇²ⁿc_implicit[diagn.k]
+    (; ∇²ⁿc, ∇²ⁿc_implicit) = model.horizontal_diffusion
 
     # and the ones that do for vorticity and divergence
-    ∇²ⁿ = model.horizontal_diffusion.∇²ⁿ[diagn.k]
-    ∇²ⁿ_implicit = model.horizontal_diffusion.∇²ⁿ_implicit[diagn.k]
+    (; ∇²ⁿ, ∇²ⁿ_implicit) = model.horizontal_diffusion
 
     # Primitive equation models diffuse vor, divergence, temp (and humidity for wet core)
-    (; vor, div, temp, humid) = progn.timesteps[lf]
+    vor = progn.vor[lf]
+    div = progn.div[lf]
+    temp = progn.temp[lf]
+    humid = progn.humid[lf]
     (; vor_tend, div_tend, temp_tend, humid_tend) = diagn.tendencies
     horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
     horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)

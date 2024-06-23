@@ -82,16 +82,16 @@ function dynamics_tendencies!(
     vertical_advection!(diagn, model)
 
     # vorticity advection, pressure gradient term
-    vordiv_tendencies!(layer, surface, model)
+    vordiv_tendencies!(diagn, model)
 
     # hor. advection + adiabatic term
-    temperature_tendency!(layer, model)
+    temperature_tendency!(diagn, model)
 
     # horizontal advection of humidity (nothing for wetcore)
-    humidity_tendency!(layer, model)
+    humidity_tendency!(diagn, model)
 
     # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
-    bernoulli_potential!(layer, spectral_transform)
+    bernoulli_potential!(diagn, spectral_transform)
 end
 
 """$(TYPEDSIGNATURES)
@@ -269,12 +269,11 @@ end
 $(TYPEDSIGNATURES)
 Function barrier to unpack `model`."""
 function vordiv_tendencies!(
-    diagn::DiagnosticVariablesLayer,
-    surf::SurfaceVariables,
+    diagn::DiagnosticVariables,
     model::PrimitiveEquation,
 )
     (; coriolis, atmosphere, geometry, spectral_transform) = model
-    vordiv_tendencies!(diagn, surf, coriolis, atmosphere, geometry, spectral_transform)
+    vordiv_tendencies!(diagn, coriolis, atmosphere, geometry, spectral_transform)
 end
 
 """$(TYPEDSIGNATURES)
@@ -296,8 +295,7 @@ spectral space
 
 `+ ...` because there's more terms added later for divergence."""
 function vordiv_tendencies!(
-    diagn::DiagnosticVariablesLayer,
-    surf::SurfaceVariables,
+    diagn::DiagnosticVariables,
     coriolis::AbstractCoriolis,
     atmosphere::AbstractAtmosphere,
     geometry::AbstractGeometry,
@@ -307,84 +305,65 @@ function vordiv_tendencies!(
     (; f) = coriolis                            # coriolis parameter
     (; coslat⁻¹) = geometry
 
-    (; u_tend_grid, v_tend_grid) = diagn.tendencies  # already contains vertical advection
-    u = diagn.grid_variables.u_grid             # velocity
-    v = diagn.grid_variables.v_grid             # velocity
-    vor = diagn.grid_variables.vor_grid         # relative vorticity
-    ∇lnp_x = surf.∇lnp_x                        # zonal gradient of logarithm of surface pressure
-    ∇lnp_y = surf.∇lnp_y                        # meridional gradient thereof
-    Tᵥ = diagn.grid_variables.temp_virt_grid    # virtual temperature (anomaly!)
+     # tendencies already contain parameterizations + advection, therefore accumulate
+    (; u_tend_grid, v_tend_grid) = diagn.tendencies
+    (; u_grid, v_grid, vor_grid, temp_virt_grid) = diagn.grid   # velocities, vorticity
+    (; ∇lnp_x, ∇lnp_y) = diagn.dynamics         # zonal/meridional gradient of logarithm of surface pressure
 
     # precompute ring indices and boundscheck
-    rings = eachring(u_tend_grid, v_tend_grid, u, v, vor, ∇lnp_x, ∇lnp_y, Tᵥ)
+    rings = eachring(u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_virt_grid)
 
-    @inbounds for (j, ring) in enumerate(rings)
-        coslat⁻¹j = coslat⁻¹[j]
-        f_j = f[j]
-        for ij in ring
-            ω = vor[ij] + f_j                   # absolute vorticity
-            RTᵥ = R_dry*Tᵥ[ij]                  # dry gas constant * virtual temperature anomaly
-            u_tend_grid[ij] = (u_tend_grid[ij] + v[ij]*ω - RTᵥ*∇lnp_x[ij])*coslat⁻¹j
-            v_tend_grid[ij] = (v_tend_grid[ij] - u[ij]*ω - RTᵥ*∇lnp_y[ij])*coslat⁻¹j
+    for k in eachgrid(u_tend_grid, v_tend_grid)
+        for (j, ring) in enumerate(rings)
+            coslat⁻¹j = coslat⁻¹[j]
+            f_j = f[j]
+            for ij in ring
+                ω = vor_grid[ij, k] + f_j               # absolute vorticity
+                RTᵥ = R_dry*temp_virt_grid[ij, k]       # dry gas constant * virtual temperature anomaly(!)
+                u_tend_grid[ij, k] = (u_tend_grid[ij, k] + v_grid[ij, k]*ω - RTᵥ*∇lnp_x[ij])*coslat⁻¹j
+                v_tend_grid[ij, k] = (v_tend_grid[ij, k] - u_grid[ij, k]*ω - RTᵥ*∇lnp_y[ij])*coslat⁻¹j
+            end
         end
     end
 
     # divergence and curl of that u, v_tend vector for vor, div tendencies
     (; vor_tend, div_tend ) = diagn.tendencies
-    u_tend = diagn.dynamics_variables.a
-    v_tend = diagn.dynamics_variables.b
+    u_tend = diagn.dynamics.a
+    v_tend = diagn.dynamics.b
 
-    spectral!(u_tend, u_tend_grid, S)
-    spectral!(v_tend, v_tend_grid, S)
+    transform!(u_tend, u_tend_grid, S)
+    transform!(v_tend, v_tend_grid, S)
 
     curl!(vor_tend, u_tend, v_tend, S)         # ∂ζ/∂t = ∇×(u_tend, v_tend)
     divergence!(div_tend, u_tend, v_tend, S)   # ∂D/∂t = ∇⋅(u_tend, v_tend)
     return nothing
 end
 
-# function barrier
-function tendencies_physics_only!(
-    diagn::DiagnosticVariablesLayer,
-    model::PrimitiveEquation
-)
-    wet_core = model isa PrimitiveWet
-    tendencies_physics_only!(diagn, model.geometry, model.spectral_transform, wet_core)
-end
-
-"""For dynamics=false, after calling parameterization_tendencies! call this function
+"""$(TYPEDSIGNATURES)
+For dynamics=false, after calling parameterization_tendencies! call this function
 to transform the physics tendencies from grid-point to spectral space including the
 necessary coslat⁻¹ scaling."""
 function tendencies_physics_only!(
-    diagn::DiagnosticVariablesLayer,
-    G::AbstractGeometry,
-    S::SpectralTransform,
-    wet_core::Bool = true
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation,
 )
-    (; coslat⁻¹) = G
+    (; coslat⁻¹) = model.geometry
+    S = model.spectral_transform
 
     # already contain parameterizations
     (; u_tend_grid, v_tend_grid, temp_tend_grid, humid_tend_grid) = diagn.tendencies
-
-    # precompute ring indices and boundscheck
-    rings = eachring(u_tend_grid, v_tend_grid)
-
-    @inbounds for (j, ring) in enumerate(rings)
-        coslat⁻¹j = coslat⁻¹[j]
-        for ij in ring
-            u_tend_grid[ij] *= coslat⁻¹j
-            v_tend_grid[ij] *= coslat⁻¹j
-        end
-    end
+    RingGrids._scale_lat!(u_tend_grid, coslat⁻¹)
+    RingGrids._scale_lat!(v_tend_grid, coslat⁻¹)
 
     # divergence and curl of that u, v_tend vector for vor, div tendencies
     (; vor_tend, div_tend, temp_tend, humid_tend) = diagn.tendencies
-    u_tend = diagn.dynamics_variables.a
-    v_tend = diagn.dynamics_variables.b
+    u_tend = diagn.dynamics.a
+    v_tend = diagn.dynamics.b
 
-    spectral!(u_tend, u_tend_grid, S)
-    spectral!(v_tend, v_tend_grid, S)
-    spectral!(temp_tend, temp_tend_grid, S)
-    wet_core && spectral!(humid_tend, humid_tend_grid, S)
+    transform!(u_tend, u_tend_grid, S)
+    transform!(v_tend, v_tend_grid, S)
+    transform!(temp_tend, temp_tend_grid, S)
+    model isa PrimitiveWet && transform!(humid_tend, humid_tend_grid, S)
 
     curl!(vor_tend, u_tend, v_tend, S)         # ∂ζ/∂t = ∇×(u_tend, v_tend)
     divergence!(div_tend, u_tend, v_tend, S)   # ∂D/∂t = ∇⋅(u_tend, v_tend)
@@ -393,12 +372,12 @@ end
 
 # function barrier
 function temperature_tendency!(
-    diagn::DiagnosticVariablesLayer,
+    diagn::DiagnosticVariables,
     model::PrimitiveEquation,
 )
-    (; adiabatic_conversion, atmosphere, geometry, spectral_transform, implicit) = model
-    temperature_tendency!(diagn, adiabatic_conversion, atmosphere, geometry,
-                            spectral_transform, implicit)
+    (; adiabatic_conversion, atmosphere, implicit, geometry, spectral_transform) = model
+    temperature_tendency!(diagn, adiabatic_conversion, atmosphere, implicit,
+                            geometry, spectral_transform)
 end
 
 """
@@ -411,38 +390,44 @@ Compute the temperature tendency
 `T'` is the anomaly with respect to the reference/average temperature. Tᵥ is the virtual
 temperature used in the adiabatic term κTᵥ*Dlnp/Dt."""
 function temperature_tendency!(
-    diagn::DiagnosticVariablesLayer,
+    diagn::DiagnosticVariables,
     adiabatic_conversion::AbstractAdiabaticConversion,
     atmosphere::AbstractAtmosphere,
+    implicit::ImplicitPrimitiveEquation,
     G::Geometry,
     S::SpectralTransform,
-    I::ImplicitPrimitiveEquation,
 )
     (; temp_tend, temp_tend_grid)  = diagn.tendencies
-    (; div_grid, temp_grid) = diagn.grid_variables
-    (; uv∇lnp, uv∇lnp_sum_above, div_sum_above) = diagn.dynamics_variables
-    
-    (; κ) = atmosphere                          # thermodynamic kappa = R_Dry/heat_capacity
-    Tᵥ = diagn.grid_variables.temp_virt_grid    # anomaly wrt to Tₖ
-    Tₖ = I.temp_profile[diagn.k]                # average layer temperature from reference profile
-    
-    # coefficients from Simmons and Burridge 1981
-    σ_lnp_A = adiabatic_conversion.σ_lnp_A[diagn.k]         # eq. 3.12, -1/Δσₖ*ln(σ_k+1/2/σ_k-1/2)
-    σ_lnp_B = adiabatic_conversion.σ_lnp_B[diagn.k]         # eq. 3.12 -αₖ
-    
+    (; div_grid, temp_grid) = diagn.grid
+    (; uv∇lnp, uv∇lnp_sum_above, div_sum_above) = diagn.dynamics
+    (; κ) = atmosphere              # thermodynamic kappa = R_Dry/heat_capacity
+    Tᵥ = diagn.grid.temp_virt_grid  # anomaly wrt to Tₖ
+    (; temp_profile) = implicit
+
     # semi-implicit: terms here are explicit+implicit evaluated at time step i
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
     # to move the implicit terms to i-1 which is cheaper then the alternative below
 
-    # Adiabatic conversion term following Simmons and Burridge 1981 but for σ coordinates 
-    # += as tend already contains parameterizations + vertical advection
-    @. temp_tend_grid += temp_grid*div_grid +       # +T'D term of hori advection
-        κ*(Tᵥ+Tₖ)*(                                 # +κTᵥ*Dlnp/Dt, adiabatic term
-            σ_lnp_A * (div_sum_above+uv∇lnp_sum_above) +    # eq. 3.12 1st term
-            σ_lnp_B * (div_grid+uv∇lnp) +                   # eq. 3.12 2nd term
-            uv∇lnp)                                         # eq. 3.13
+    for k in eachgrid(temp_tend_grid, temp_grid, div_grid, Tᵥ, div_sum_above, uv∇lnp_sum_above)
+        Tₖ = temp_profile[k]    # average layer temperature from reference profile
+        
+        # coefficients from Simmons and Burridge 1981
+        σ_lnp_A = adiabatic_conversion.σ_lnp_A[k]   # eq. 3.12, -1/Δσₖ*ln(σ_k+1/2/σ_k-1/2)
+        σ_lnp_B = adiabatic_conversion.σ_lnp_B[k]   # eq. 3.12 -αₖ
+        
+        # Adiabatic conversion term following Simmons and Burridge 1981 but for σ coordinates 
+        # += as tend already contains parameterizations + vertical advection
+        for ij in eachgridpoint(temp_tend_grid, temp_grid, div_grid, Tᵥ)
+            temp_tend_grid[ij, k] +=
+                temp_grid[ij, k] * div_grid[ij, k] +            # +T'D term of hori advection
+                κ * (Tᵥ[ij, k] + Tₖ)*(                          # +κTᵥ*Dlnp/Dt, adiabatic term
+                σ_lnp_A * (div_sum_above[ij, k] + uv∇lnp_sum_above[ij, k]) +    # eq. 3.12 1st term
+                σ_lnp_B * (div_grid[ij, k] + uv∇lnp[ij, k]) +                   # eq. 3.12 2nd term
+                uv∇lnp[ij, k])                                                  # eq. 3.13
+        end
+    end
 
-    spectral!(temp_tend, temp_tend_grid, S)
+    transform!(temp_tend, temp_tend_grid, S)
 
     # now add the -∇⋅((u, v)*T') term
     flux_divergence!(temp_tend, temp_grid, diagn, G, S, add=true, flipsign=true)
@@ -450,42 +435,44 @@ function temperature_tendency!(
     return nothing
 end
 
-function humidity_tendency!(diagn::DiagnosticVariablesLayer,
+function humidity_tendency!(diagn::DiagnosticVariables,
                             model::PrimitiveWet)
     G = model.geometry
     S = model.spectral_transform
 
     (; humid_tend, humid_tend_grid ) = diagn.tendencies
-    (; humid_grid ) = diagn.grid_variables
+    (; humid_grid ) = diagn.grid
 
     # add horizontal advection to parameterization + vertical advection tendencies
     horizontal_advection!(humid_tend, humid_tend_grid, humid_grid, diagn, G, S, add=true)
 end
 
 # no humidity tendency for dry core
-humidity_tendency!(::DiagnosticVariablesLayer, ::PrimitiveDry) = nothing
+humidity_tendency!(::DiagnosticVariables, ::PrimitiveDry) = nothing
 
 function horizontal_advection!( 
-    A_tend::LowerTriangularMatrix{Complex{NF}}, # Ouput: tendency to write into
-    A_tend_grid::AbstractGrid{NF},              # Input: tendency incl prev terms
-    A_grid::AbstractGrid{NF},                   # Input: grid field to be advected
-    diagn::DiagnosticVariablesLayer{NF},        
+    A_tend::LowerTriangularArray,       # Ouput: tendency to write into
+    A_tend_grid::AbstractGridArray,     # Input: tendency incl prev terms
+    A_grid::AbstractGridArray,          # Input: grid field to be advected
+    diagn::DiagnosticVariables,
     G::Geometry,
     S::SpectralTransform;
-    add::Bool=true                              # add/overwrite A_tend_grid?
-) where NF                    
+    add::Bool=true,                     # add/overwrite A_tend_grid?
+)
 
-    (; div_grid) = diagn.grid_variables
+    (; div_grid) = diagn.grid
     
     @inline kernel(a, b, c) = add ? a+b*c : b*c
 
-    # +A*div term of the advection operator
-    @inbounds for ij in eachgridpoint(A_tend_grid, A_grid, div_grid)
-        # add as tend already contains parameterizations + vertical advection
-        A_tend_grid[ij] = kernel(A_tend_grid[ij], A_grid[ij], div_grid[ij])
+    for k in eachgrid(A_tend_grid, A_grid, div_grid)
+        # +A*div term of the advection operator
+        @inbounds for ij in eachgridpoint(A_tend_grid, A_grid, div_grid)
+            # add as tend already contains parameterizations + vertical advection
+            A_tend_grid[ij, k] = kernel(A_tend_grid[ij, k], A_grid[ij, k], div_grid[ij, k])
+        end
     end
 
-    spectral!(A_tend, A_tend_grid, S)  # for +A*div in spectral space
+    transform!(A_tend, A_tend_grid, S)  # for +A*div in spectral space
     
     # now add the -∇⋅((u, v)*A) term
     flux_divergence!(A_tend, A_grid, diagn, G, S, add=true, flipsign=true)

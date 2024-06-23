@@ -305,87 +305,69 @@ function implicit_correction!(
     implicit::ImplicitPrimitiveEquation,
     progn::PrognosticVariables,
 )
-
     # escape immediately if explicit
     implicit.α == 0 && return nothing   
 
-    # (; Δp_geopot_half, Δp_geopot_full) = model.geometry     # = R*Δlnp on half or full levels
-    (; nlev, trunc, S⁻¹, R, U, L, W) = implicit
+    (; nlayers, trunc) = implicit
+    (; S⁻¹, R, U, L, W) = implicit
     ξ = implicit.ξ[]
     
     # MOVE THE IMPLICIT TERMS OF THE TEMPERATURE EQUATION FROM TIME STEP i TO i-1
     # geopotential and linear pressure gradient (divergence equation) are already evaluated at i-1
     # so is the -D̄ term for surface pressure in tendencies!
-    @floop for k in 1:nlev
-        (; temp_tend) = diagn.layers[k].tendencies       # unpack temp_tend
-        for r in 1:nlev
-            div_old = progn.layers[r].timesteps[1].div   # divergence at i-1
-            div_new = progn.layers[r].timesteps[2].div   # divergence at i
+    (; temp_tend) = diagn.tendencies
+    div_old, div_new = progn.div    # divergence at i-1 (old), i (new, i.e. current)
 
-            # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
-            # for temperature tendency do the latter as its cheaper.
-            @. temp_tend += L[k, r]*(div_old-div_new)
-            # @. temp_tend += L[k, r]*div_old    # for the former
+    for k in eachmatrix(temp_tend, div_old, div_new)
+        for r in eachmatrix(temp_tend, div_old, div_new)
+            for lm in eachharmonic(temp_tend, div_old, div_new)
+                # RHS_expl(Vⁱ) + RHS_impl(Vⁱ⁻¹) = RHS(Vⁱ) + RHS_impl(Vⁱ⁻¹ - Vⁱ)
+                # for temperature tendency do the latter as its cheaper.
+                temp_tend[lm, k] += L[k, r] * (div_old[lm, r] - div_new[lm, r])
+                # temp_tend[lm, k] += L[k, r] * div_old[lm, r]    # for the former
+            end
         end
-    end       
+    end
     
     # SEMI IMPLICIT CORRECTIONS FOR DIVERGENCE
-    (; pres_tend) = diagn.surface
-    @floop for k in 1:nlev    # loop from bottom layer to top for geopotential calculation
-        
-        # calculate the combined tendency G = G_D + ξRG_T + ξUG_lnps to solve for divergence δD
-        G = diagn.layers[k].dynamics_variables.a        # reuse work arrays, used for combined tendency G
-        geopot = diagn.layers[k].dynamics_variables.b   # used for geopotential
-        (; div_tend) = diagn.layers[k].tendencies       # unpack div_tend
+    # calculate the combined tendency G = G_D + ξRG_T + ξUG_lnps to solve for divergence δD
+    (; pres_tend, div_tend) = diagn.tendencies
+    G = diagn.dynamics.a        # reuse work arrays, used for combined tendency G
+    geopot = diagn.dynamics.b   # used for geopotential
 
-        # 1. the ξ*R*G_T term, vertical integration of geopotential (excl ξ, this is done in 2.)
-        @inbounds for r in k:nlev                       # skip 1:k-1 as integration is surface to k
-            (; temp_tend) = diagn.layers[r].tendencies  # unpack temp_tend
-            @. geopot += R[k, r]*temp_tend
+    for k in 1:nlayers
+        for r in k:nlayers      # skip 1:k-1 as integration is surface to k
+            for lm in eachharmonic(temp_tend, div_old, div_new)
+                # 1. the ξ*R*G_T term, vertical integration of geopotential (excl ξ, this is done in 2.)
+                geopot[lm, k] += R[k, r]*temp_tend[lm, r]
+            end
         end
-
-        # alternative way to calculate the geopotential (not thread-safe because geopot from below is reused)
-        # R is not used here as it's cheaper to reuse the geopotential from k+1 than
-        # to multiply with the entire upper triangular matrix R which recalculates
-        # the geopotential for k from all lower levels k...nlev
-        # TODO swap sign here and not in + geopot[lm] further down
-        # if k == nlev
-        #     @. geopot = Δp_geopot_full[k]*temp_tend        # surface geopotential without orography 
-        # else
-        #     temp_tend_k1 = diagn.layers[k+1].tendencies.temp_tend   # temp tendency from layer below
-        #     geopot_k1 = diagn.layers[k+1].dynamics_variables.b      # geopotential from layer below
-        #     @. geopot = geopot_k1 + Δp_geopot_half[k+1]*temp_tend_k1 + Δp_geopot_full[k]*temp_tend
-        # end
 
         # 2. the G = G_D + ξRG_T + ξUG_lnps terms using geopot from above 
         lm = 0
-        @inbounds for m in 1:trunc+1    # loops over all columns/order m
+        for m in 1:trunc+1              # loops over all columns/order m
             for l in m:trunc+1          # but skips the lmax+2 degree (1-based)
                 lm += 1                 # single index lm corresponding to harmonic l, m
                                         # ∇² not part of U so *eigenvalues here
                 eigenvalue = -l*(l-1)   # 1-based, -l*(l+1) → -l*(l-1)
-                G[lm] = div_tend[lm] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopot[lm])      
+                G[lm, k] = div_tend[lm, k] + ξ*eigenvalue*(U[k]*pres_tend[lm] + geopot[lm, k])
+
+                # div_tend is now in G, fill with zeros here so that it can be used as an accumulator
+                # in the δD = S⁻¹G calculation below
+                div_tend[lm, k] = 0
             end
             lm += 1         # skip last row, LowerTriangularMatrices are of size lmax+2 x mmax+1
         end
-
-        # div_tend is now in G, fill with zeros here so that it can be used as an accumulator
-        # in the δD = S⁻¹G calculation below
-        fill!(div_tend, 0)
     end
 
     # NOW SOLVE THE δD = S⁻¹G to correct divergence tendency
-    @floop for k in 1:nlev
-        (; div_tend) = diagn.layers[k].tendencies       # unpack div_tend
-
-        @inbounds for r in 1:nlev
-            G = diagn.layers[r].dynamics_variables.a    # reuse work arrays
-
+    for k in eachmatrix(div_tend, G)
+        for r in eachmatrix(div_tend, G)
             lm = 0
-            for m in 1:trunc+1       # loops over all columns/order m
-                for l in m:trunc+1   # but skips the lmax+2 degree (1-based)
+            for m in 1:trunc+1      # loops over all columns/order m
+                for l in m:trunc+1  # but skips the lmax+2 degree (1-based)
                     lm += 1         # single index lm corresponding to harmonic l, m
-                    div_tend[lm] += S⁻¹[l, k, r]*G[lm]
+                    div_tend[lm, k] += S⁻¹[l, k, r]*G[lm, r]
                 end
                 lm += 1             # skip last row, LowerTriMatrices are of size lmax+2 x mmax+1
             end
@@ -393,16 +375,17 @@ function implicit_correction!(
     end
 
     # SEMI IMPLICIT CORRECTIONS FOR PRESSURE AND TEMPERATURE, insert δD to get δT, δlnpₛ
-    @floop for k in 1:nlev
-        (; temp_tend) = diagn.layers[k].tendencies       # unpack temp_tend
-        @inbounds for r in 1:nlev
-            (; div_tend) = diagn.layers[r].tendencies    # unpack div_tend
-            @. temp_tend += ξ*L[k, r]*div_tend           # δT = G_T + ξLδD
+    for k in eachmatrix(div_tend, temp_tend)
+        for r in eachmatrix(div_tend, temp_tend)
+            for lm in eachharmonic(div_tend, temp_tend)
+                # δT = G_T + ξLδD
+                temp_tend[lm, k] += ξ*L[k, r]*div_tend[lm, r]
+            end
         end
-    end
 
-    for k in 1:nlev     # not thread safe
-        (; div_tend) = diagn.layers[k].tendencies        # unpack div_tend
-        @. pres_tend += ξ*W[k]*div_tend                  # δlnpₛ = G_lnpₛ + ξWδD
+        for lm in eachharmonic(div_tend, temp_tend)
+            # δlnpₛ = G_lnpₛ + ξWδD
+            pres_tend[lm] += ξ*W[k]*div_tend[lm, k]
+        end
     end
 end

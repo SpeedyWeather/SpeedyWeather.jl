@@ -23,8 +23,9 @@ Generic latitude scaling applied to `A` in-place with latitude-like vector `v`."
 function _scale_lat!(grid::AbstractGridArray{T}, v::AbstractVector) where T
     @boundscheck get_nlat(grid) == length(v) || throw(BoundsError)
     
+    rings = eachring(grid)
     @inbounds for k in eachgrid(grid)
-        for (j, ring) in enumerate(eachring(grid))
+        for (j, ring) in enumerate(rings)
             vj = convert(T, v[j])
             for ij in ring
                 grid[ij, k] *= vj
