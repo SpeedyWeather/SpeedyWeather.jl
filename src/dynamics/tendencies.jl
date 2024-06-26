@@ -109,9 +109,9 @@ function pressure_gradient_flux!(
     ∇lnp_y_spec = diagn.dynamics.b_2D       # in spectral space
     (; ∇lnp_x, ∇lnp_y) = diagn.dynamics     # but store in grid space
 
-    ∇!(∇lnp_x_spec, ∇lnp_y_spec, pres, S)                  # CALCULATE ∇ln(pₛ)
-    gridded!(∇lnp_x, ∇lnp_x_spec, S, unscale_coslat=true)  # transform to grid: zonal gradient
-    gridded!(∇lnp_y, ∇lnp_y_spec, S, unscale_coslat=true)  # meridional gradient
+    ∇!(∇lnp_x_spec, ∇lnp_y_spec, pres, S)                   # CALCULATE ∇ln(pₛ)
+    transform!(∇lnp_x, ∇lnp_x_spec, S, unscale_coslat=true) # transform to grid: zonal gradient
+    transform!(∇lnp_y, ∇lnp_y_spec, S, unscale_coslat=true) # meridional gradient
 
     (; u_grid, v_grid ) = diagn.grid
     (; uv∇lnp ) = diagn.dynamics
@@ -343,7 +343,7 @@ end
 For dynamics=false, after calling parameterization_tendencies! call this function
 to transform the physics tendencies from grid-point to spectral space including the
 necessary coslat⁻¹ scaling."""
-function tendencies_physics_only!(
+function physics_tendencies_only!(
     diagn::DiagnosticVariables,
     model::PrimitiveEquation,
 )
