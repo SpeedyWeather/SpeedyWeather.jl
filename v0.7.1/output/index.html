@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>NetCDF output · SpeedyWeather.jl</title><meta name="title" content="NetCDF output · SpeedyWeather.jl"/><meta property="og:title" content="NetCDF output · SpeedyWeather.jl"/><meta property="twitter:title" content="NetCDF output · SpeedyWeather.jl"/><meta name="description" content="Documentation for SpeedyWeather.jl."/><meta property="og:description" content="Documentation for SpeedyWeather.jl."/><meta property="twitter:description" content="Documentation for SpeedyWeather.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">SpeedyWeather.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../installation/">Installation</a></li><li><a class="tocitem" href="../how_to_run_speedy/">How to run SpeedyWeather.jl</a></li><li><a class="tocitem" href="../setups/">Model setups</a></li><li><a class="tocitem" href="../spectral_transform/">Spherical Harmonic Transform</a></li><li><a class="tocitem" href="../grids/">Grids</a></li><li><a class="tocitem" href="../barotropic/">Barotropic model</a></li><li><a class="tocitem" href="../shallowwater/">Shallow water model</a></li><li><a class="tocitem" href="../primitiveequation/">Primitive equation model</a></li><li><a class="tocitem" href="../parameterizations/">Parameterizations</a></li><li><a class="tocitem" href="../extending/">Extending SpeedyWeather</a></li><li class="is-active"><a class="tocitem" href>NetCDF output</a><ul class="internal"><li><a class="tocitem" href="#Accessing-the-NetCDF-output-writer"><span>Accessing the NetCDF output writer</span></a></li><li><a class="tocitem" href="#Example-1:-NetCDF-output-every-hour"><span>Example 1: NetCDF output every hour</span></a></li><li><a class="tocitem" href="#Example-2:-Output-onto-a-higher/lower-resolution-grid"><span>Example 2: Output onto a higher/lower resolution grid</span></a></li><li><a class="tocitem" href="#Example-3:-Changing-the-output-path-or-identification"><span>Example 3: Changing the output path or identification</span></a></li><li><a class="tocitem" href="#Further-options"><span>Further options</span></a></li></ul></li><li><a class="tocitem" href="../ringgrids/">Submodule: RingGrids</a></li><li><a class="tocitem" href="../lowertriangularmatrices/">Submodule: LowerTriangularMatrices</a></li><li><a class="tocitem" href="../speedytransforms/">Submodule: SpeedyTransforms</a></li><li><a class="tocitem" href="../functions/">Function and type index</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>NetCDF output</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>NetCDF output</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/SpeedyWeather/SpeedyWeather.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/docs/src/output.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="NetCDF-output"><a class="docs-heading-anchor" href="#NetCDF-output">NetCDF output</a><a id="NetCDF-output-1"></a><a class="docs-heading-anchor-permalink" href="#NetCDF-output" title="Permalink"></a></h1><p>SpeedyWeather.jl uses NetCDF to output the data of a simulation. The following describes the details of this and how to change the way in which the NetCDF output is written. There are many options to this available.</p><h2 id="Accessing-the-NetCDF-output-writer"><a class="docs-heading-anchor" href="#Accessing-the-NetCDF-output-writer">Accessing the NetCDF output writer</a><a id="Accessing-the-NetCDF-output-writer-1"></a><a class="docs-heading-anchor-permalink" href="#Accessing-the-NetCDF-output-writer" title="Permalink"></a></h2><p>The output writer is a component of every Model, i.e. <code>BarotropicModel</code>, <code>ShallowWaterModel</code>, <code>PrimitiveDryModel</code> and <code>PrimitiveWetModel</code>, hence a non-default output writer can be passed on as a keyword argument to the model constructor</p><pre><code class="language-julia hljs">using SpeedyWeather
+spectral_grid = SpectralGrid()
+output = OutputWriter(spectral_grid, ShallowWater)
+model = ShallowWaterModel(;spectral_grid, output=output)</code></pre><p>So after we have defined the grid through the <code>SpectralGrid</code> object we can use and change the implemented <code>OutputWriter</code> by passing on additional arguments. The <code>spectral_grid</code> has to be the first argument then the model type (<code>Barotropic</code>, <code>ShallowWater</code>, <code>PrimitiveDry</code>, or <code>PrimitiveWet</code>) which helps the output writer to make default choices on which variables to output. Then we can also pass on further keyword arguments. So let&#39;s start with an example.</p><h2 id="Example-1:-NetCDF-output-every-hour"><a class="docs-heading-anchor" href="#Example-1:-NetCDF-output-every-hour">Example 1: NetCDF output every hour</a><a id="Example-1:-NetCDF-output-every-hour-1"></a><a class="docs-heading-anchor-permalink" href="#Example-1:-NetCDF-output-every-hour" title="Permalink"></a></h2><p>If we want to increase the frequency of the output we can choose <code>output_dt</code> (default <code>=Hour(6)</code>) like so</p><pre><code class="language-julia hljs">output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(1))
+model = ShallowWaterModel(;spectral_grid, output=output)</code></pre><p>which will now output every hour. It is important to pass on the new output writer <code>output</code> to the model constructor, otherwise it will not be part of your model and the default is used instead. Note that the choice of <code>output_dt</code> can affect the actual time step that is used for the model integration, which is explained in the following. Example, we run the model at a resolution of T42 and the time step is going to be</p><pre><code class="language-julia hljs">spectral_grid = SpectralGrid(trunc=42,nlev=1)
+time_stepping = Leapfrog(spectral_grid)
+time_stepping.Δt_sec</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1350.0f0</code></pre><p>seconds. Depending on the output frequency (we chose <code>output_dt = Hour(1)</code> above) this will be slightly adjusted during model initialization:</p><pre><code class="language-julia hljs">output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(1))
+model = ShallowWaterModel(;spectral_grid, time_stepping, output)
+simulation = initialize!(model)
+model.time_stepping.Δt_sec</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1200.0f0</code></pre><p>The shorter the output time step the more the model time step needs to be adjusted to match the desired output time step exactly. This is important so that for daily output at noon this does not slowly shift towards night over years of model integration. One can always disable this adjustment with</p><pre><code class="language-julia hljs">time_stepping = Leapfrog(spectral_grid,adjust_with_output=false)
+time_stepping.Δt_sec</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1339.535f0</code></pre><p>and a little info will be printed to explain that even though you wanted <code>output_dt = Hour(1)</code> you will not actually get this upon initialization:</p><pre><code class="language-julia hljs">model = ShallowWaterModel(;spectral_grid, time_stepping, output)
+simulation = initialize!(model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">SpeedyWeather.Simulation{ShallowWaterModel{Float32, SpeedyWeather.CPUDevice}}
+├ ShallowWaterModel{Float32, SpeedyWeather.CPUDevice}
+├ PrognosticVariables{Float32, OctahedralGaussianGrid{Float32}, ShallowWater}
+└ DiagnosticVariables{Float32, OctahedralGaussianGrid{Float32}, ShallowWater}</code></pre><p>The time axis of the NetCDF output will now look like</p><pre><code class="language-julia hljs">using NCDatasets
+run!(simulation,period=Day(1),output=true)
+id = model.output.id
+ds = NCDataset(&quot;run_$id/output.nc&quot;)
+ds[&quot;time&quot;][:]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">22-element Vector{DateTime}:
+ 2000-01-01T00:00:00
+ 2000-01-01T01:06:58.605
+ 2000-01-01T02:13:57.210
+ 2000-01-01T03:20:55.815
+ 2000-01-01T04:27:54.420
+ 2000-01-01T05:34:53.025
+ 2000-01-01T06:41:51.630
+ 2000-01-01T07:48:50.235
+ 2000-01-01T08:55:48.840
+ 2000-01-01T10:02:47.445
+ ⋮
+ 2000-01-01T14:30:41.865
+ 2000-01-01T15:37:40.470
+ 2000-01-01T16:44:39.075
+ 2000-01-01T17:51:37.680
+ 2000-01-01T18:58:36.285
+ 2000-01-01T20:05:34.890
+ 2000-01-01T21:12:33.495
+ 2000-01-01T22:19:32.100
+ 2000-01-01T23:26:30.705</code></pre><p>which is a bit ugly, that&#39;s why <code>adjust_with_output=true</code> is the default. In that case we would have</p><pre><code class="language-julia hljs">time_stepping = Leapfrog(spectral_grid,adjust_with_output=true)
+output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(1))
+model = ShallowWaterModel(;spectral_grid, time_stepping, output)
+simulation = initialize!(model)
+run!(simulation,period=Day(1),output=true)
+id = model.output.id
+ds = NCDataset(&quot;run_$id/output.nc&quot;)
+ds[&quot;time&quot;][:]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">25-element Vector{DateTime}:
+ 2000-01-01T00:00:00
+ 2000-01-01T01:00:00
+ 2000-01-01T02:00:00
+ 2000-01-01T03:00:00
+ 2000-01-01T04:00:00
+ 2000-01-01T05:00:00
+ 2000-01-01T06:00:00
+ 2000-01-01T07:00:00
+ 2000-01-01T08:00:00
+ 2000-01-01T09:00:00
+ ⋮
+ 2000-01-01T16:00:00
+ 2000-01-01T17:00:00
+ 2000-01-01T18:00:00
+ 2000-01-01T19:00:00
+ 2000-01-01T20:00:00
+ 2000-01-01T21:00:00
+ 2000-01-01T22:00:00
+ 2000-01-01T23:00:00
+ 2000-01-02T00:00:00</code></pre><p>very neatly hourly output in the NetCDF file!</p><h2 id="Example-2:-Output-onto-a-higher/lower-resolution-grid"><a class="docs-heading-anchor" href="#Example-2:-Output-onto-a-higher/lower-resolution-grid">Example 2: Output onto a higher/lower resolution grid</a><a id="Example-2:-Output-onto-a-higher/lower-resolution-grid-1"></a><a class="docs-heading-anchor-permalink" href="#Example-2:-Output-onto-a-higher/lower-resolution-grid" title="Permalink"></a></h2><p>Say we want to run the model at a given horizontal resolution but want to output on another resolution, the <code>OutputWriter</code> takes as argument <code>output_Grid&lt;:AbstractFullGrid</code> and <code>nlat_half::Int</code>. So for example <code>output_Grid=FullClenshawGrid</code> and <code>nlat_half=48</code> will always interpolate onto a regular 192x95 longitude-latitude grid of 1.875˚ resolution, regardless the grid and resolution used for the model integration.</p><pre><code class="language-julia hljs">julia&gt; my_output_writer = OutputWriter(spectral_grid, ShallowWater, output_Grid=FullClenshawGrid, nlat_half=48)</code></pre><p>Note that by default the output is on the corresponding full of the grid used in the dynamical core so that interpolation only happens at most in the zonal direction as they share the location of the latitude rings. You can check this by</p><pre><code class="language-julia hljs">julia&gt; RingGrids.full_grid(OctahedralGaussianGrid)
+FullGaussianGrid</code></pre><p>So the corresponding full grid of an <code>OctahedralGaussianGrid</code> is the <code>FullGaussiangrid</code> and the same resolution <code>nlat_half</code> is chosen by default in the output writer (which you can change though as shown above). Overview of the corresponding full grids</p><table><tr><th style="text-align: right">Grid</th><th style="text-align: right">Corresponding full grid</th></tr><tr><td style="text-align: right">FullGaussianGrid</td><td style="text-align: right">FullGaussianGrid</td></tr><tr><td style="text-align: right">FullClenshawGrid</td><td style="text-align: right">FullClenshawGrid</td></tr><tr><td style="text-align: right">OctahadralGaussianGrid</td><td style="text-align: right">FullGaussianGrid</td></tr><tr><td style="text-align: right">OctahedralClensawhGrid</td><td style="text-align: right">FullClenshawGrid</td></tr><tr><td style="text-align: right">HEALPixGrid</td><td style="text-align: right">FullHEALPixGrid</td></tr><tr><td style="text-align: right">OctaHEALPixGrid</td><td style="text-align: right">FullOctaHEALPixGrid</td></tr></table><p>The grids <code>FullHEALPixGrid</code>, <code>FullOctaHEALPixGrid</code> share the same latitude rings as their reduced grids, but have always as many longitude points as they are at most around the equator. These grids are not tested in the dynamical core (but you may use them experimentally) and mostly designed for output purposes.</p><h2 id="Example-3:-Changing-the-output-path-or-identification"><a class="docs-heading-anchor" href="#Example-3:-Changing-the-output-path-or-identification">Example 3: Changing the output path or identification</a><a id="Example-3:-Changing-the-output-path-or-identification-1"></a><a class="docs-heading-anchor-permalink" href="#Example-3:-Changing-the-output-path-or-identification" title="Permalink"></a></h2><p>That&#39;s easy by passing on <code>path=&quot;/my/favourite/path/&quot;</code> and the folder <code>run_*</code> with <code>*</code> the identification of the run (that&#39;s the <code>id</code> keyword, which can be manually set but is also automatically determined as a number counting up depending on which folders already exist) will be created within.</p><pre><code class="language-julia hljs">julia&gt; path = pwd()
+&quot;/Users/milan&quot;
+julia&gt; my_output_writer = OutputWriter(spectral_grid, PrimitiveDry, path=path)</code></pre><p>This folder must already exist. If you want to give your run a name/identification you can pass on <code>id</code></p><pre><code class="nohighlight hljs">julia&gt; my_output_writer = OutputWriter(spectral_grid,PrimitiveDry,id=&quot;diffusion_test&quot;);</code></pre><p>which will be used instead of a 4 digit number like 0001, 0002 which is automatically determined if <code>id</code> is not provided. You will see the id of the run in the progress bar</p><pre><code class="nohighlight hljs">Weather is speedy: run diffusion_test 100%|███████████████████████| Time: 0:00:12 (19.20 years/day)</code></pre><p>and the run folder, here <code>run_diffusion_test</code>, is also named accordingly</p><pre><code class="language-julia hljs">shell&gt; ls
+...
+run_diffusion_test
+...</code></pre><h2 id="Further-options"><a class="docs-heading-anchor" href="#Further-options">Further options</a><a id="Further-options-1"></a><a class="docs-heading-anchor-permalink" href="#Further-options" title="Permalink"></a></h2><p>Further options are described in the <code>OutputWriter</code> docstring, (also accessible via <code>julia&gt;?OutputWriter</code> for example). Note that some fields are actual options, but others are derived from the options you provided or are arrays/objects the output writer needs, but shouldn&#39;t be passed on by the user. The actual options are declared as <code>[OPTION]</code> in the following</p><pre><code class="language-julia hljs">help?&gt; OutputWriter
+search: OutputWriter
+
+  NetCDF output writer. Contains all output options and auxiliary fields for
+  output interpolation. To be initialised with
+  OutputWriter(::SpectralGrid,::Type{&lt;:ModelSetup},kwargs...) to pass on the
+  resolution information and the model type which chooses which variables to
+  output. Options include
+
+    •  spectral_grid::SpectralGrid
+
+    •  output::Bool
+
+    •  path::String: [OPTION] path to output folder, run_???? will be
+       created within
+
+    •  id::String: [OPTION] run identification number/string
+
+    •  run_path::String
+
+    •  filename::String: [OPTION] name of the output netcdf file
+
+    •  write_restart::Bool: [OPTION] also write restart file if
+       output==true?
+
+    •  pkg_version::VersionNumber
+
+    •  startdate::DateTime
+
+    •  output_dt::Second: [OPTION] output frequency, time step
+
+    •  output_vars::Vector{Symbol}: [OPTION] which variables to output,
+       u, v, vor, div, pres, temp, humid
+
+    •  missing_value::Union{Float32, Float64}: [OPTION] missing value to
+       be used in netcdf output
+
+    •  compression_level::Int64: [OPTION] lossless compression level;
+       1=low but fast, 9=high but slow
+
+    •  shuffle::Bool: [OPTION] shuffle/bittranspose filter for
+       compression
+
+    •  keepbits::SpeedyWeather.Keepbits: [OPTION] mantissa bits to keep
+       for every variable
+
+    •  output_every_n_steps::Int64
+
+    •  timestep_counter::Int64
+
+    •  output_counter::Int64
+
+    •  netcdf_file::Union{Nothing, NCDatasets.NCDataset}
+
+    •  input_Grid::Type{&lt;:AbstractGrid}
+
+    •  as_matrix::Bool: [OPTION] sort grid points into a matrix
+       (interpolation-free), for OctahedralClenshawGrid, OctaHEALPixGrid
+       only
+
+    •  quadrant_rotation::NTuple{4, Int64}
+
+    •  matrix_quadrant::NTuple{4, Tuple{Int64, Int64}}
+
+    •  output_Grid::Type{&lt;:AbstractFullGrid}: [OPTION] the grid used for
+       output, full grids only
+
+    •  nlat_half::Int64: [OPTION] the resolution of the output grid,
+       default: same nlat_half as in the dynamical core</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../extending/">« Extending SpeedyWeather</a><a class="docs-footer-nextpage" href="../ringgrids/">Submodule: RingGrids »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.2.1 on <span class="colophon-date" title="Wednesday 6 December 2023 22:59">Wednesday 6 December 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
