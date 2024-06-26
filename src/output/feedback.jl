@@ -158,10 +158,10 @@ function nar_detection!(feedback::Feedback, progn::PrognosticVariables)
 
     feedback.nars_detected && return nothing    # escape immediately if nans already detected
     i = feedback.progress_meter.counter         # time step
-    (; vor ) = progn.layers[end].timesteps[2]   # only check for surface vorticity
+    vor0 = progn.vor[2][1, end]                 # only check 0-0 mode of surface vorticity
 
     # just check first harmonic, spectral transform propagates NaRs globally anyway
-    nars_detected_here = ~isfinite(vor[1])
+    nars_detected_here = ~isfinite(vor0)
     nars_detected_here && @warn "NaN or Inf detected at time step $i"
     feedback.nars_detected = nars_detected_here
 end

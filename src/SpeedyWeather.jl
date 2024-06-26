@@ -13,7 +13,7 @@ import LinearAlgebra: LinearAlgebra, Diagonal
 import Base.Threads: Threads, @threads
 import FLoops: FLoops, @floop
 import KernelAbstractions
-import CUDA: CUDA, CUDAKernels
+import CUDA: CUDA, CUDAKernels, CuArray
 import Adapt: Adapt, adapt, adapt_structure
 
 # INPUT OUTPUT
@@ -45,7 +45,7 @@ include("LowerTriangularMatrices/LowerTriangularMatrices.jl")
 using .LowerTriangularMatrices
 
 # RingGrids
-export RingGrids
+export  RingGrids
 export  AbstractGrid, AbstractGridArray,
         AbstractFullGridarray, AbstractReducedGridArray
 export  FullClenshawGrid, FullClenshawArray,
@@ -64,6 +64,7 @@ using .RingGrids
 # SpeedyTransforms
 export SpeedyTransforms, SpectralTransform
 export spectral, gridded, spectral!, gridded!
+export transform, transform!
 export spectral_truncation, spectral_truncation!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!

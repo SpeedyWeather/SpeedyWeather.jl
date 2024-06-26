@@ -1,20 +1,20 @@
 abstract type AbstractDrag <: AbstractModelComponent end
 
-## NO DRAG
+## NO DRAG
 export NoDrag
 struct NoDrag <: AbstractDrag end
 NoDrag(SG::SpectralGrid) = NoDrag()
 initialize!(::NoDrag, ::ModelSetup) = nothing
 
-function drag!(     diagn::DiagnosticVariablesLayer,
-                    progn::PrognosticVariablesLayer,
+function drag!(     diagn::DiagnosticVariables,
+                    progn::PrognosticVariables,
                     drag::NoDrag,
-                    time::DateTime,
-                    model::ModelSetup)
+                    model::ModelSetup,
+                    lf::Integer)
     return nothing
 end
 
-# Quadratic drag
+# Quadratic drag
 export QuadraticDrag
 Base.@kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"

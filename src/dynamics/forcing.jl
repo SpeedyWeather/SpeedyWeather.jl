@@ -1,20 +1,20 @@
 abstract type AbstractForcing <: AbstractModelComponent end
 
-## NO FORCING = dummy forcing
+## NO FORCING = dummy forcing
 export NoForcing
 struct NoForcing <: AbstractForcing end
 NoForcing(SG::SpectralGrid) = NoForcing()
 initialize!(::NoForcing, ::ModelSetup) = nothing
 
-function forcing!(  diagn::DiagnosticVariablesLayer,
-                    progn::PrognosticVariablesLayer,
+function forcing!(  diagn::DiagnosticVariables,
+                    progn::PrognosticVariables,
                     forcing::NoForcing,
-                    time::DateTime,
-                    model::ModelSetup)
+                    model::ModelSetup,
+                    lf::Integer)
     return nothing
 end
 
-# JET STREAM FORCING
+# JET STREAM FORCING
 export JetStreamForcing
 
 """

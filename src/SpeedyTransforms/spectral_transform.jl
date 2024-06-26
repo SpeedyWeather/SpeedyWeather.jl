@@ -1,8 +1,7 @@
 """
-    S = SpectralTransform{NF<:AbstractFloat}(...)
-
-SpectralTransform struct that contains all parameters and preallocated arrays
-for the spectral transform."""
+SpectralTransform struct that contains all parameters and precomputed arrays
+to perform a spectral transform. Fields are
+$(TYPEDFIELDS)"""
 struct SpectralTransform{NF<:AbstractFloat}
 
     # GRID
@@ -35,7 +34,7 @@ struct SpectralTransform{NF<:AbstractFloat}
 
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool                # Pre or recompute Legendre polynomials
-    Λ::LowerTriangularMatrix{NF}            # Legendre polynomials for one latitude (requires recomputing)
+    Λ::Matrix{NF}            # Legendre polynomials for one latitude (requires recomputing)
     Λs::Vector{LowerTriangularMatrix{NF}}   # Legendre polynomials for all latitudes (all precomputed)
     
     # SOLID ANGLES ΔΩ FOR QUADRATURE
@@ -71,14 +70,15 @@ Generator function for a SpectralTransform struct. With `NF` the number format,
 `Grid` the grid type `<:AbstractGrid` and spectral truncation `lmax, mmax` this function sets up
 necessary constants for the spetral transform. Also plans the Fourier transforms, retrieves the colatitudes,
 and preallocates the Legendre polynomials (if recompute_legendre == false) and quadrature weights."""
-function SpectralTransform( ::Type{NF},                         # Number format NF
-                            Grid::Type{<:AbstractGridArray},    # type of spatial grid used
-                            lmax::Int,                          # Spectral truncation: degrees
-                            mmax::Int;                          # Spectral truncation: orders
-                            recompute_legendre::Bool = true,        # re or precompute legendre polynomials?
-                            legendre_shortcut::Symbol = :linear,    # shorten Legendre loop over order m
-                            dealiasing::Real=DEFAULT_DEALIASING
-                            ) where NF
+function SpectralTransform(
+    ::Type{NF},                             # Number format NF
+    Grid::Type{<:AbstractGridArray},        # type of spatial grid used
+    lmax::Int,                              # Spectral truncation: degrees
+    mmax::Int;                              # Spectral truncation: orders
+    recompute_legendre::Bool = true,        # re or precompute legendre polynomials?
+    legendre_shortcut::Symbol = :linear,    # shorten Legendre loop over order m
+    dealiasing::Real=DEFAULT_DEALIASING
+) where NF
 
     Grid = RingGrids.nonparametric_type(Grid)   # always use nonparametric super type
 
@@ -124,7 +124,7 @@ function SpectralTransform( ::Type{NF},                         # Number format 
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
 
     # PREALLOCATE LEGENDRE POLYNOMIALS, +1 for 1-based indexing
-    Λ = zeros(LowerTriangularMatrix{NF}, lmax+1, mmax+1)    # Legendre polynomials for one latitude
+    Λ = zeros(NF, lmax+1, mmax+1)    # Legendre polynomials for one latitude
 
     # allocate memory in Λs for polynomials at all latitudes or allocate dummy array if precomputed
     # Λs is of size (lmax+1) x (mmax+1) x nlat_half unless recomputed
@@ -213,10 +213,7 @@ function SpectralTransform( ::Type{NF},                         # Number format 
 end
 
 """
-    S = SpectralTransform(  alms::AbstractMatrix{Complex{NF}};
-                            recompute_legendre::Bool=true,
-                            Grid::Type{<:AbstractGrid}=DEFAULT_GRID)
-
+$(TYPEDSIGNATURES)
 Generator function for a `SpectralTransform` struct based on the size of the spectral
 coefficients `alms` and the grid `Grid`. Recomputes the Legendre polynomials by default."""
 function SpectralTransform( alms::AbstractMatrix{Complex{NF}};  # spectral coefficients
@@ -229,9 +226,20 @@ function SpectralTransform( alms::AbstractMatrix{Complex{NF}};  # spectral coeff
 end
 
 """
-    S = SpectralTransform(  map::AbstractGrid;
-                            recompute_legendre::Bool=true)
+$(TYPEDSIGNATURES)
+Generator function for a `SpectralTransform` struct based on the size of the spectral
+coefficients `alms` and the grid `Grid`. Recomputes the Legendre polynomials by default."""
+function SpectralTransform( alms::LowerTriangularMatrix{Complex{NF}};  # spectral coefficients
+                            recompute_legendre::Bool = true,    # saves memory
+                            Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
+                            ) where NF                          # number format NF
+    
+        lmax, mmax = matrix_size(alms) .- 1        # -1 for 0-based degree l, order m
+        return SpectralTransform(NF, Grid, lmax, mmax; recompute_legendre)
+end
 
+"""
+$(TYPEDSIGNATURES)
 Generator function for a `SpectralTransform` struct based on the size and grid type of
 gridded field `map`. Recomputes the Legendre polynomials by default."""
 function SpectralTransform( map::AbstractGrid{NF};          # gridded field
@@ -244,9 +252,34 @@ function SpectralTransform( map::AbstractGrid{NF};          # gridded field
     return SpectralTransform(NF, Grid, trunc+one_more_degree, trunc; recompute_legendre)
 end
 
-"""
-    ϵ = ϵ(NF, l, m) 
+# CHECK MATCHING SIZES
+function ismatching(S::SpectralTransform, L::LowerTriangularArray)
+    return (S.lmax, S.mmax) == matrix_size(L, ZeroBased)
+end
 
+function ismatching(S::SpectralTransform, grid::AbstractGridArray)
+    match = S.Grid == RingGrids.nonparametric_type(typeof(grid)) && S.nlat_half == grid.nlat_half
+    return match
+end
+
+# make `matches` commutative
+ismatching(L::LowerTriangularArray, S::SpectralTransform) = ismatching(S, L)
+ismatching(G::AbstractGridArray,    S::SpectralTransform) = ismatching(S, G)
+
+function Base.DimensionMismatch(S::SpectralTransform, L::LowerTriangularArray)
+    s = "SpectralTransform(lmax=$(S.lmax), mmax=$(S.mmax)) and $(matrix_size(L))
+        LowerTriangularArray do not match."
+    return DimensionMismatch(s)
+end
+
+function Base.DimensionMismatch(S::SpectralTransform{NF1}, G::AbstractGridArray{NF2}) where {NF1, NF2}
+    s = "SpectralTransform{$NF1}($(S.Grid), nlat_half=$(S.nlat_half)) and "*
+        "$(RingGrids.nonparametric_type(G)){$NF2} with nlat_half=$(G.nlat_half) do not match."
+    return DimensionMismatch(s)
+end
+
+"""
+$(TYPEDSIGNATURES)
 Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of the spherical harmonics.
 ϵ(l, m) = sqrt((l^2-m^2)/(4*l^2-1)) and then converted to number format NF."""
 function ϵlm(::Type{NF}, l::Int, m::Int) where NF
@@ -254,18 +287,13 @@ function ϵlm(::Type{NF}, l::Int, m::Int) where NF
 end
 
 """
-    ϵ = ϵ(l, m) 
-
+$(TYPEDSIGNATURES)
 Recursion factors `ϵ` as a function of degree `l` and order `m` (0-based) of the spherical harmonics.
 ϵ(l, m) = sqrt((l^2-m^2)/(4*l^2-1)) with default number format Float64."""
 ϵlm(l::Int, m::Int) = ϵlm(Float64, l, m)
 
 """
-    get_recursion_factors(  ::Type{NF}, # number format NF
-                            lmax::Int,  # max degree l of spherical harmonics (0-based here)
-                            mmax::Int   # max order m of spherical harmonics
-                            ) where {NF<:AbstractFloat}
-        
+$(TYPEDSIGNATURES)     
 Returns a matrix of recursion factors `ϵ` up to degree `lmax` and order `mmax` of number format `NF`."""
 function get_recursion_factors( ::Type{NF}, # number format NF
                                 lmax::Int,  # max degree l of spherical harmonics (0-based here)
@@ -286,10 +314,7 @@ end
 get_recursion_factors(lmax::Int, mmax::Int) = get_recursion_factors(Float64, lmax, mmax)
 
 """
-    gridded!(   map::AbstractGrid,
-                alms::LowerTriangularMatrix,
-                S::SpectralTransform)
-
+$(TYPEDSIGNATURES)
 Spectral transform (spectral to grid) of the spherical harmonic coefficients `alms` to a gridded field
 `map`. The spectral transform is number format-flexible as long as the parametric types of `map`, `alms`, `S`
 are identical. The spectral transform is grid-flexible as long as the `typeof(map)<:AbstractGrid`. 
@@ -305,9 +330,9 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
     (; recompute_legendre, Λ, Λs, m_truncs ) = S
     (; brfft_plans ) = S
 
-    recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
+    recompute_legendre && @boundscheck matrix_size(alms) == size(Λ) || throw(BoundsError)
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
-    lmax, mmax = size(alms) .- 1            # maximum degree l, order m of spherical harmonics
+    lmax, mmax = matrix_size(alms) .- 1            # maximum degree l, order m of spherical harmonics
 
     @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
@@ -331,7 +356,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
         # Recalculate or use precomputed Legendre polynomials Λ
         recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
-        Λj = recompute_legendre ? Λ : Λs[j_north]
+        Λj = recompute_legendre ? LowerTriangularMatrix(Λ) : Λs[j_north]
 
         # inverse Legendre transform by looping over wavenumbers l, m
         lm = 1                              # single index for non-zero l, m indices
@@ -392,11 +417,122 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
     return map
 end
 
-"""
-    spectral!(  alms::LowerTriangularMatrix,
-                map::AbstractGrid,
-                S::SpectralTransform)
+"""$(TYPEDSIGNATURES)
+Spectral transform (spectral to grid space) from n-dimensional array `specs` of spherical harmonic
+coefficients to an n-dimensional array `grids` of ring grids. Uses FFT in the zonal direction,
+and a Legendre Transform in the meridional direction exploiting symmetries. The spectral transform is
+number format-flexible but `grids` and the spectral transform `S` have to have the same number format.
+Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`.
+The spectral transform is grid-flexible as long as the `typeof(grids)<:AbstractGridArray` and `S.Grid`
+matches."""
+function transform!(
+    grids::AbstractGridArray,       # gridded output
+    specs::LowerTriangularArray,    # spectral coefficients input
+    S::SpectralTransform{NF};       # precomputed transform
+    unscale_coslat::Bool=false,     # unscale with cos(lat) on the fly?
+) where NF                          # number format NF
 
+    (; nlat, nlons, nlat_half, nfreq_max ) = S
+    (; cos_colat, sin_colat, lon_offsets ) = S
+    (; recompute_legendre, Λ, Λs, m_truncs ) = S
+    (; brfft_plans ) = S
+
+    @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
+    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, grids))
+
+
+    # recompute_legendre && @boundscheck size(specs) == size(Λ) || throw(BoundsError)
+    # recompute_legendre || @boundscheck size(specs) == size(Λs[1]) || throw(BoundsError)
+    lmax = specs.m - 1            # 0-based maximum degree l of spherical harmonics
+    mmax = specs.n - 1            # 0-based maximum order m of spherical harmonics
+
+    # @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
+    # @boundscheck nlat == length(cos_colat) || throw(BoundsError)
+    # @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
+    # @boundscheck get_nlat_half(map) == S.nlat_half || throw(BoundsError)
+
+    # preallocate work arrays
+    gn = zeros(Complex{NF}, nfreq_max)      # phase factors for northern latitudes
+    gs = zeros(Complex{NF}, nfreq_max)      # phase factors for southern latitudes
+
+    rings = eachring(grids)                 # precomputed ring indices
+
+    Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
+
+    for k in eachgrid(grids)                    # loop over all grids (e.g. vertical dimension)
+        for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
+            j_south = nlat - j_north + 1        # southern latitude index
+            nlon = nlons[j_north]               # number of longitudes on this ring
+            nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
+            m_trunc = m_truncs[j_north]         # (lin/quad/cub) max frequency to shorten loop over m
+            not_equator = j_north != j_south    # is the latitude ring not on equator?
+
+            # Recalculate or use precomputed Legendre polynomials Λ
+            recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
+            Λj = recompute_legendre ? Λ : Λs[j_north]
+
+            # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m
+            lm = 1                              # single index for non-zero l, m indices
+            for m in 1:m_trunc                  # Σ_{m=0}^{mmax}, but 1-based index, shortened to m_trunc
+                acc_odd  = zero(Complex{NF})    # accumulator for isodd(l+m)
+                acc_even = zero(Complex{NF})    # accumulator for iseven(l+m)
+
+                # integration over l = m:lmax+1
+                lm_end = lm + lmax-m+1              # first index lm plus lmax-m+1 (length of column -1)
+                even_degrees = iseven(lm+lm_end)    # is there an even number of degrees in column m?
+
+                # anti-symmetry: sign change of odd harmonics on southern hemisphere
+                # but put both into one loop for contiguous memory access
+                for lm_even in lm:2:lm_end-even_degrees     
+                    # split into even, i.e. iseven(l+m)
+                    # acc_even += specs[lm_even] * Λj[lm_even], but written with muladd
+                    acc_even = muladd(specs[lm_even, k], Λj[lm_even], acc_even)
+
+                    # and odd (isodd(l+m)) harmonics
+                    # acc_odd += specs[lm_odd] * Λj[lm_odd], but written with muladd
+                    acc_odd = muladd(specs[lm_even+1, k], Λj[lm_even+1], acc_odd)
+                end
+
+                # for even number of degrees, one acc_even iteration is skipped, do now
+                acc_even = even_degrees ? muladd(specs[lm_end, k], Λj[lm_end], acc_even) : acc_even
+
+                acc_n = (acc_even + acc_odd)        # accumulators for northern
+                acc_s = (acc_even - acc_odd)        # and southern hemisphere
+                
+                # CORRECT FOR LONGITUDE OFFSETTS
+                o = lon_offsets[m, j_north]         # longitude offset rotation            
+
+                gn[m] = muladd(acc_n, o, gn[m])     # accumulate in phase factors for northern
+                gs[m] = muladd(acc_s, o, gs[m])     # and southern hemisphere
+
+                lm = lm_end + 1                     # first index of next m column
+            end
+
+            if unscale_coslat
+                @inbounds cosθ = sin_colat[j_north] # sin(colat) = cos(lat)
+                gn ./= cosθ                         # scale in place          
+                gs ./= cosθ
+            end
+
+            # INVERSE FOURIER TRANSFORM in zonal direction
+            brfft_plan = brfft_plans[j_north]       # FFT planned wrt nlon on ring
+            ilons = rings[j_north]                  # in-ring indices northern ring
+            LinearAlgebra.mul!(view(grids.data, ilons, k), brfft_plan, view(gn, 1:nfreq))  # perform FFT
+
+            # southern latitude, don't call redundant 2nd fft if ring is on equator 
+            ilons = rings[j_south]                  # in-ring indices southern ring
+            not_equator && LinearAlgebra.mul!(view(grids.data, ilons, k), brfft_plan, view(gs, 1:nfreq))  # perform FFT
+
+            fill!(gn, zero(Complex{NF}))            # set phase factors back to zero
+            fill!(gs, zero(Complex{NF}))
+        end
+    end
+
+    return grids
+end
+
+"""
+$(TYPEDSIGNATURES)
 Spectral transform (grid to spectral space) from the gridded field `map` on a `grid<:AbstractGrid` to
 a `LowerTriangularMatrix` of spherical harmonic coefficients `alms`. Uses FFT in the zonal direction,
 and a Legendre Transform in the meridional direction exploiting symmetries. The spectral transform is
@@ -412,9 +548,9 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     (; recompute_legendre, Λ, Λs, solid_angles ) = S
     (; rfft_plans, lon_offsets, m_truncs ) = S
     
-    recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
+    recompute_legendre && @boundscheck matrix_size(alms) == size(Λ) || throw(BoundsError)
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
-    lmax, mmax = size(alms) .- 1    # maximum degree l, order m of spherical harmonics
+    lmax, mmax = matrix_size(alms) .- 1    # maximum degree l, order m of spherical harmonics
 
     @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
@@ -452,7 +588,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         # LEGENDRE TRANSFORM in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
         recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
-        Λj = recompute_legendre ? Λ : Λs[j_north]
+        Λj = recompute_legendre ? LowerTriangularMatrix(Λ) : Λs[j_north]
         
         # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
         ΔΩ = solid_angles[j_north]                      # = sinθ Δθ Δϕ, solid angle for a grid point
@@ -497,6 +633,113 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     return alms
 end
 
+"""$(TYPEDSIGNATURES)
+Spectral transform (grid to spectral space) from n-dimensional array of `grids` to an n-dimensional
+array `specs` of spherical harmonic coefficients. Uses FFT in the zonal direction,
+and a Legendre Transform in the meridional direction exploiting symmetries. The spectral transform is
+number format-flexible but `grids` and the spectral transform `S` have to have the same number format.
+Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`.
+The spectral transform is grid-flexible as long as the `typeof(grids)<:AbstractGridArray` and `S.Grid`
+matches."""
+function transform!(                    # grid -> spectral
+    specs::LowerTriangularArray,        # output: spectral coefficients
+    grids::AbstractGridArray{NF},       # input: gridded values
+    S::SpectralTransform{NF}            # precomputed spectral transform
+) where NF                              # number format
+    
+    (; nlat, nlat_half, nlons, nfreq_max, cos_colat ) = S
+    (; recompute_legendre, Λ, Λs, solid_angles ) = S
+    (; rfft_plans, lon_offsets, m_truncs ) = S
+    
+    # recompute_legendre && @boundscheck size(alms) == size(Λ) || throw(BoundsError)
+    # recompute_legendre || @boundscheck size(specs) == size(Λs[1]) || throw(BoundsError)
+    lmax = specs.m - 1            # 0-based maximum degree l of spherical harmonics
+    mmax = specs.n - 1            # 0-based maximum order m of spherical harmonics
+
+    # TODO check sizes
+    # @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
+    # @boundscheck nlat == length(cos_colat) || throw(BoundsError)
+    # @boundscheck typeof(map) <: S.Grid || throw(BoundsError)
+    # @boundscheck get_nlat_half(map) == S.nlat_half || throw(BoundsError)
+
+    # preallocate work arrays
+    fn = zeros(Complex{NF}, nfreq_max)      # Fourier-transformed northern latitude
+    fs = zeros(Complex{NF}, nfreq_max)      # Fourier-transformed southern latitude
+
+    rings = eachring(grids)                 # precompute ring indices
+
+    # partial sums are accumulated in specs, force zeros initially.
+    fill!(specs, 0)
+
+    Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
+
+    for k in eachgrid(grids)
+        for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
+            j_south = nlat - j_north + 1        # corresponding southern latitude index
+            nlon = nlons[j_north]               # number of longitudes on this ring
+            nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
+            m_trunc = m_truncs[j_north]         # (lin/quad/cub) max frequency to shorten loop over m
+            not_equator = j_north != j_south    # is the latitude ring not on equator?
+
+            # FOURIER TRANSFORM in zonal direction
+            rfft_plan = rfft_plans[j_north]         # FFT planned wrt nlon on ring
+            ilons = rings[j_north]                  # in-ring indices northern ring
+            LinearAlgebra.mul!(view(fn, 1:nfreq), rfft_plan, view(grids.data, ilons, k))   # Northern latitude
+
+            ilons = rings[j_south]                  # in-ring indices southern ring
+                                                    # Southern latitude (don't call FFT on Equator)
+                                                    # then fill fs with zeros and no changes needed further down
+            not_equator ? LinearAlgebra.mul!(view(fs, 1:nfreq), rfft_plan, view(grids.data, ilons, k)) : fill!(fs, 0)
+
+            # LEGENDRE TRANSFORM in meridional direction
+            # Recalculate or use precomputed Legendre polynomials Λ
+            recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
+            Λj = recompute_legendre ? Λ : Λs[j_north]
+            
+            # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
+            ΔΩ = solid_angles[j_north]                      # = sinθ Δθ Δϕ, solid angle for a grid point
+
+            lm = 1                                          # single index for spherical harmonics
+            for m in 1:m_trunc                              # Σ_{m=0}^{mmax}, but 1-based index
+
+                an, as = fn[m], fs[m]
+
+                # SOLID ANGLE QUADRATURE WEIGHTS and LONGITUDE OFFSET
+                o = lon_offsets[m, j_north]                 # longitude offset rotation
+                ΔΩ_rotated = ΔΩ*conj(o)                     # complex conjugate for rotation back to prime meridian
+
+                # LEGENDRE TRANSFORM
+                a_even = (an + as)*ΔΩ_rotated               # sign flip due to anti-symmetry with
+                a_odd = (an - as)*ΔΩ_rotated                # odd polynomials 
+
+                # integration over l = m:lmax+1
+                lm_end = lm + lmax-m+1                      # first index lm plus lmax-m+1 (length of column -1)
+                even_degrees = iseven(lm+lm_end)            # is there an even number of degrees in column m?
+                
+                # anti-symmetry: sign change of odd harmonics on southern hemisphere
+                # but put both into one loop for contiguous memory access
+                for lm_even in lm:2:lm_end-even_degrees
+                    # lm_odd = lm_even+1
+                    # split into even, i.e. iseven(l+m)
+                    # specs[lm_even] += a_even * Λj[lm_even]#, but written with muladd
+                    specs[lm_even, k] = muladd(a_even, Λj[lm_even], specs[lm_even, k])
+                    
+                    # and odd (isodd(l+m)) harmonics
+                    # specs[lm_odd] += a_odd * Λj[lm_odd]#, but written with muladd
+                    specs[lm_even+1, k] = muladd(a_odd, Λj[lm_even+1], specs[lm_even+1, k])
+                end
+
+                # for even number of degrees, one even iteration is skipped, do now
+                specs[lm_end, k] = even_degrees ? muladd(a_even, Λj[lm_end], specs[lm_end, k]) : specs[lm_end, k]
+
+                lm = lm_end + 1                             # first index of next m column
+            end
+        end
+    end
+
+    return specs
+end
+
 """
 $(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
@@ -516,9 +759,25 @@ end
 """
 $(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
+field `map`. Based on the size of `alms` the grid type `grid`, the spatial resolution is retrieved based
+on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `gridded(alms, S)`."""
+function gridded(   alms::LowerTriangularMatrix{T};            # spectral coefficients
+                    recompute_legendre::Bool = true,    # saves memory
+                    Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
+                    kwargs...
+                    ) where {NF, T<:Complex{NF}}        # number format NF
+
+    lmax, mmax = matrix_size(alms) .- 1                        # -1 for 0-based degree l, order m
+    S = SpectralTransform(NF, Grid, lmax, mmax; recompute_legendre)
+    return gridded(alms, S; kwargs...)
+end
+
+"""
+$(TYPEDSIGNATURES)
+Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map` with precalculated properties based on the SpectralTransform struct `S`. `alms` is converted to
 a `LowerTriangularMatrix` to execute the in-place `gridded!`."""
-function gridded(   alms::AbstractMatrix,       # spectral coefficients
+function gridded(   alms::Union{AbstractMatrix, LowerTriangularMatrix},       # spectral coefficients
                     S::SpectralTransform{NF};   # struct for spectral transform parameters
                     kwargs...
                     ) where NF                  # number format NF
@@ -563,7 +822,27 @@ function spectral(  map::AbstractGrid,          # gridded field
 
     map_NF = similar(map, NF)                   # convert map to NF
     copyto!(map_NF, map)
-    
+
     alms = LowerTriangularMatrix{Complex{NF}}(undef, S.lmax+1, S.mmax+1)
     return spectral!(alms, map_NF, S)           # in-place version
+end
+
+function transform(
+    grids::AbstractGridArray,
+    S::SpectralTransform{NF},
+) where NF
+    ks = size(grids)[2:end]     # the non-horizontal dimensions
+    specs = zeros(LowerTriangularArray{Complex{NF}}, S.lmax+1, S.mmax+1, ks...)
+    transform!(specs, grids, S)
+    return specs
+end
+
+function transform(
+    specs::LowerTriangularArray,
+    S::SpectralTransform{NF},
+) where NF
+    ks = size(specs)[2:end]     # the non-horizontal dimensions
+    grids = zeros(S.Grid{NF}, S.nlat_half, ks...)
+    transform!(grids, specs, S)
+    return grids
 end

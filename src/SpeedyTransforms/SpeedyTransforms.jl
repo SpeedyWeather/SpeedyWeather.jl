@@ -13,6 +13,7 @@ import Primes
 # SPEEDYWEATHER MODULES
 using ..LowerTriangularMatrices
 using ..RingGrids
+import ..LowerTriangularMatrices: matrix_size
 
 const DEFAULT_GRID = FullGaussianGrid
 
@@ -21,7 +22,9 @@ export  SpectralTransform,
         gridded,
         gridded!,
         spectral,
-        spectral!
+        spectral!,
+        transform!,
+        transform
 
 # ALIASING
 export  get_nlat_half

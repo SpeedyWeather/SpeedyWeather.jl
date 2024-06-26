@@ -30,7 +30,7 @@ Base.@kwdef mutable struct BarotropicModel{
 } <: Barotropic
     
     spectral_grid::SpectralGrid
-    device_setup::DS = DeviceSetup(CPUDevice())
+    device_setup::DS = DeviceSetup(spectral_grid.device)
     
     # DYNAMICS
     geometry::GE = Geometry(spectral_grid)
@@ -54,7 +54,7 @@ Base.@kwdef mutable struct BarotropicModel{
     feedback::FB = Feedback()
 end
 
-has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
+prognostic_variables(::Type{<:Barotropic}) = (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
 """
@@ -85,6 +85,6 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    diagnostic_variables = DiagnosticVariables(spectral_grid)
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end

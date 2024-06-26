@@ -29,8 +29,11 @@ Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry
     "number of latitude rings"
     nlat::Int = spectral_grid.nlat
 
-    "number of vertical levels"
+    "[DEPRECATED] number of vertical levels"
     nlev::Int = spectral_grid.nlev
+    
+    "number of vertical levels"
+    nlayers::Int = spectral_grid.nlayers
 
     "total number of grid points"
     npoints::Int = spectral_grid.npoints
@@ -100,6 +103,9 @@ end
 $(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
 function Geometry(spectral_grid::SpectralGrid)
+    error_message = "nlev=$(spectral_grid.nlev) does not match length nlev="*
+        "$(spectral_grid.vertical_coordinates.nlev) in spectral_grid.vertical_coordinates."
+    @assert spectral_grid.nlev == spectral_grid.vertical_coordinates.nlev error_message
     return Geometry{spectral_grid.NF}(; spectral_grid)
 end
 
