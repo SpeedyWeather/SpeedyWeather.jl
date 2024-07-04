@@ -60,6 +60,30 @@ We are more than happy to guide you, especially when you don't know where to sta
 We can point you to the respective code, highlight how everything is connected and tell you
 about dos and don'ts. Just express your interest to contribute and we'll be happy to have you.
 
+## Citing
+
+If you use SpeedyWeather.jl in research, teaching, or other activities, we would be grateful 
+if you could mention SpeedyWeather.jl and cite our paper in JOSS:
+
+Klöwer et al., (2024). SpeedyWeather.jl: Reinventing atmospheric general circulation models towards interactivity and extensibility. _Journal of Open Source Software_, **9(98)**, 6323, doi:[10.21105/joss.06323](https://doi.org/10.21105/joss.06323).
+
+The bibtex entry for the paper is:
+
+```bibtex
+@article{SpeedyWeatherJOSS,
+    doi = {10.21105/joss.06323},
+    url = {https://doi.org/10.21105/joss.06323},
+    year = {2024},
+    publisher = {The Open Journal},
+    volume = {9},
+    number = {98},
+    pages = {6323},
+    author = {Milan Klöwer and Maximilian Gelbrecht and Daisuke Hotta and Justin Willmert and Simone Silvestri and Gregory L. Wagner and Alistair White and Sam Hatfield and Tom Kimpson and Navid C. Constantinou and Chris Hill},
+    title = {{SpeedyWeather.jl: Reinventing atmospheric general circulation models towards interactivity and extensibility}},
+    journal = {Journal of Open Source Software}
+}
+```
+
 ## Funding
 
 MK received funding by the European Research Council under Horizon 2020 within the ITHACA project,

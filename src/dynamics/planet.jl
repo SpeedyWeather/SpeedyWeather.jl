@@ -1,6 +1,6 @@
 abstract type AbstractPlanet <: AbstractModelComponent end
 
-const DEFAULT_ROTATION = 7.29e-5    # default angular frequency of Earth's rotation [1/s]
+const DEFAULT_ROTATION = 7.29e-5    # default angular frequency of Earth's rotation [1/s]
 const DEFAULT_GRAVITY = 9.81        # default gravitational acceleration on Earth [m/s²]
 
 export Earth
@@ -12,7 +12,7 @@ characteristics. Note that `radius` is not part of it as this should be chosen
 in `SpectralGrid`. Keyword arguments are
 $(TYPEDFIELDS)
 """
-Base.@kwdef mutable struct Earth{NF<:AbstractFloat} <: AbstractPlanet
+@kwdef mutable struct Earth{NF<:AbstractFloat} <: AbstractPlanet
 
     "angular frequency of Earth's rotation [rad/s]"
     rotation::NF = DEFAULT_ROTATION
@@ -39,7 +39,7 @@ Base.@kwdef mutable struct Earth{NF<:AbstractFloat} <: AbstractPlanet
     axial_tilt::NF = 23.4
 
     "Total solar irradiance at the distance of 1 AU [W/m²]"
-    solar_constant::NF = 1365/4     # for testing
+    solar_constant::NF = 1365
 end
 
 Earth(SG::SpectralGrid; kwargs...) = Earth{SG.NF}(; kwargs...)

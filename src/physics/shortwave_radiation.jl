@@ -34,5 +34,8 @@ function shortwave_radiation!(
 )
     (; cos_zenith, albedo) = column
     (; solar_constant) = planet
-    column.flux_temp_upward[end] += (1-albedo) * solar_constant * cos_zenith
+
+    # reduce strength by 1/4 as this currently just hits the air temperature in lowermost
+    # layer directly and not through a skin temperature
+    column.flux_temp_upward[end] += ((1-albedo) * solar_constant * cos_zenith)/4
 end
