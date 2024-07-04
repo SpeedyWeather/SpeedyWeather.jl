@@ -16,7 +16,7 @@ initialize!(::NoVerticalDiffusion,::PrimitiveEquation) = nothing
 vertical_diffusion!(::ColumnVariables, ::NoVerticalDiffusion, ::PrimitiveEquation) = nothing
 
 export BulkRichardsonDiffusion
-Base.@kwdef struct BulkRichardsonDiffusion{NF} <: AbstractVerticalDiffusion
+@kwdef struct BulkRichardsonDiffusion{NF} <: AbstractVerticalDiffusion
     nlev::Int
 
     "[OPTION] von Kármán constant [1]"
@@ -26,7 +26,7 @@ Base.@kwdef struct BulkRichardsonDiffusion{NF} <: AbstractVerticalDiffusion
     z₀::NF = 3.21e-5
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
-    Ri_c::NF = 1
+    Ri_c::NF = 10
 
     "[OPTION] Fraction of surface boundary layer"
     fb::NF = 0.1
@@ -216,7 +216,7 @@ function bulk_richardson!(
 )
     cₚ = atmosphere.heat_capacity
     (; u, v, geopot, temp_virt, nlev) = column
-    bulk_richardson = column.a      # reuse work array
+    bulk_richardson = column.d      # reuse work array
 
     # surface layer
     V² = u[nlev]^2 + v[nlev]^2

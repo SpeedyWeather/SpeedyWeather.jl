@@ -121,6 +121,7 @@ Calculate geopotentiala and dry static energy for the primitive equation model."
 function get_thermodynamics!(column::ColumnVariables, model::PrimitiveEquation)
     geopotential!(column.geopot, column.temp, model.geopotential, column.surface_geopotential)
     dry_static_energy!(column, model.atmosphere)
+    virtual_temperature!(column, model)
 end
 
 """
@@ -148,13 +149,11 @@ function saturation_humidity!(
     column::ColumnVariables,
     clausius_clapeyron::AbstractClausiusClapeyron,
 )
-    (; sat_humid, pres) = column
-
     # use previous time step for temperature for stability of large-scale condensation
     # TODO also use previous pressure, but sat_humid is only weakly dependent on it, skip for now
-    temp = column.temp_prev
+    (; sat_humid, pres, temp) = column
 
-    for k in eachlayer(column)
+    @inbounds for k in eachlayer(column)
         sat_humid[k] = saturation_humidity(temp[k], pres[k], clausius_clapeyron)
     end
 end
@@ -175,7 +174,7 @@ function moist_static_energy!(
     (; sat_moist_static_energy, moist_static_energy, dry_static_energy) = column
     (; humid, sat_humid) = column
 
-    for k in eachlayer(column)
+    @inbounds for k in eachlayer(column)
         moist_static_energy[k] = dry_static_energy[k] + Lᵥ * humid[k]
         sat_moist_static_energy[k] = dry_static_energy[k] + Lᵥ * sat_humid[k]
     end
