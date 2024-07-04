@@ -176,12 +176,12 @@ end
 
 Smooth the spectral field `A` following A *= (1-(1-c)*∇²ⁿ) with power n of a normalised Laplacian
 so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c>1."""
-function spectral_smoothing!(   A::LowerTriangularMatrix,
+function spectral_smoothing!(   L::LowerTriangularMatrix,
                                 c::Real;
-                                power::Real=1,          # power of Laplacian used for smoothing
+                                power::Real=1,          # power of Laplacian used for smoothing
                                 truncation::Int=-1)     # smoothing wrt wavenumber (0 = largest)
                         
-    lmax, mmax = size(A; as=Matrix)
+    lmax, mmax = size(L; as=Matrix)
     # normalize by largest eigenvalue by default, or wrt to given truncation
     eigenvalue_norm = truncation == -1 ? -mmax*(mmax+1) : -truncation*(truncation+1)
 
@@ -191,7 +191,7 @@ function spectral_smoothing!(   A::LowerTriangularMatrix,
             eigenvalue_normalised = -l*(l-1)/eigenvalue_norm
             # for eigenvalue_norm < largest eigenvalue the factor becomes negative
             # set to zero in that case
-            A[lm] *= max(1 - (1-c)*eigenvalue_normalised^power, 0)
+            L[lm] *= max(1 - (1-c)*eigenvalue_normalised^power, 0)
             lm += 1
         end
     end

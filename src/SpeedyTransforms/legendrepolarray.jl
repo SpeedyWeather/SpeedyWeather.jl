@@ -6,8 +6,8 @@ This enables easier use with AssociatedLegendrePolynomials.jl which otherwise co
 "matrix-style" (l, m) indexing of `LowerTriangularArray`. This type however doesn't support any
 other operations than indexing and is purerly intended for internal purposes. 
 """
-struct AssociatedLegendrePolArray{T,N,M,V} <: AbstractArray{T,N}
-    data::LowerTriangularArray{T,M,V}
+struct AssociatedLegendrePolArray{T, N, M, V} <: AbstractArray{T, N}
+    data::LowerTriangularArray{T, M, V}
 end 
 
 """2-dimensional `AssociatedLegendrePolArray` of type `T`` with its non-zero entries unravelled into a `Vector{T}`"""

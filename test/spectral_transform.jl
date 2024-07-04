@@ -136,8 +136,10 @@ end
                         map = gridded(alms, S)
                         alms2 = spectral(map, S)
 
+                        tol = 1e-3
+
                         for lm in SpeedyWeather.eachharmonic(alms, alms2)
-                            @test alms[lm] ≈ alms2[lm] atol=1e-3 rtol=1e-3
+                            @test alms[lm] ≈ alms2[lm] atol=tol rtol=tol
                         end
                     end
                 end
@@ -173,7 +175,7 @@ end
                 oro_grid2 = gridded(oro_spec1, S)
                 oro_spec2 = spectral(oro_grid2, S)
 
-                tol = 1e-1
+                tol = 1e-3
 
                 for lm in SpeedyWeather.eachharmonic(oro_spec1, oro_spec2)
                     @test oro_spec1[lm] ≈ oro_spec2[lm] atol=tol rtol=tol
