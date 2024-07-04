@@ -15,7 +15,7 @@ import UnicodePlots
 # export plot
 
 export LowerTriangularMatrix, LowerTriangularArray
-export eachharmonic
+export eachharmonic, eachmatrix
 
 include("lower_triangular_matrix.jl")
 include("plot.jl")
