@@ -43,7 +43,7 @@ export  LowerTriangularMatrices,
 
 # indexing styles for LowerTriangularArray/Matrix
 export  OneBased, ZeroBased
-export  eachmatrix
+export  eachmatrix, eachharmonic
         
 include("LowerTriangularMatrices/LowerTriangularMatrices.jl")
 using .LowerTriangularMatrices

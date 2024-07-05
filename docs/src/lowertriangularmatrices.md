@@ -14,7 +14,7 @@ Higher dimensional `LowerTriangularArray` are 'batches' of 2D `LowerTriangularMa
 So, for example a ``(10\times 10\times 10)`` `LowerTriangularArray` holds 10 `LowerTriangularMatrix` of size ``(10\times 10)`` in one array.  
 
 !!! warn "LowerTriangularMatrix is actually a vector"
-    `LowerTriangularMatrix` and `LowerTriangularArray` can in many ways be used as `Matrix` or `Array`, however,
+    `LowerTriangularMatrix` and `LowerTriangularArray` can in many ways be used very much like a `Matrix` or `Array`, however,
     because they unravel the lower triangle into a vector their dimensionality is one less than their `Array` counterparts.
     A `LowerTriangularMatrix` should therefore be treated as a vector rather than a matrix with some (limited) added
     functionality to allow for matrix-indexing (vector or flat-indexing is the default though). More details below.
@@ -31,14 +31,19 @@ L2 = rand(LowerTriangularArray{Float32}, 5, 5, 5)
 or the `undef` initializer `LowerTriangularMatrix{Float32}(undef, 3, 3)`.
 The element type is arbitrary though, you can use any type `T` too.
 
+Note how for a matrix both the upper triangle and the lower triangle are shown in the terminal.
+The zeros are evident. However, for higher dimensional `LowerTriangularArray` we fall back to
+show the unravelled first two dimensions. Hence, here, the first column is the first
+matrix with 15 elements forming a 5x5 matrix, but the zeros are not shown.
+
 Alternatively, it can be created through conversion from `Array`, which drops the upper triangle
 entries and sets them to zero (which are not stored however)
 ```@repl LowerTriangularMatrices
 M = rand(Float16, 3, 3)
 L = LowerTriangularMatrix(M)
 
-M2 = rand(Float16, 3, 3, 5)
-L2 = LowerTriangularArray(M)
+M2 = rand(Float16, 3, 3, 2)
+L2 = LowerTriangularArray(M2)
 ```
 
 ## Size of `LowerTriangularArray`
@@ -88,21 +93,26 @@ We illustrate the two types of indexing `LowerTriangularArray` supports.
 - Matrix indexing, by denoting two indices, column and row `[l, m, ..]`
 - Vector/flat indexing, by denoting a single index `[lm, ..]`.
 
-The double or matrix index works as expected
+The matrix index works as expected
 
 ```@repl LowerTriangularMatrices
+L
+
 L[2, 2]
 ```
-But the single index skips the zero entries in the upper triangle, i.e.
+But the single index skips the zero entries in the upper triangle, i.e. a `2, 2` index points to the
+same element as the index `6`
 ```@repl LowerTriangularMatrices
-L[4]
+L[6]
 ```
 which, important, is different from single indices of an `AbstractMatrix`
 ```@repl LowerTriangularMatrices
-Matrix(L)[4]
+Matrix(L)[6]
 ```
+which would point to the first element in the upper triangle (hence zero).
+
 In performance-critical code a single index should be used, as this directly maps
-to the index of the underlying data vector. The double index is somewhat slower
+to the index of the underlying data vector. The matrix index is somewhat slower
 as it first has to be converted to the corresponding single index.
 
 Consequently, many loops in SpeedyWeather.jl are build with the following structure
@@ -134,10 +144,10 @@ L[2, 3]     # in the upper triangle
 ```
 
 Higher dimensional `LowerTriangularArray` can be indexed with multidimensional array indices 
-like most other arrays types. Both the single index and the double index for the lower 
+like most other arrays types. Both the vector index and the matrix index for the lower 
 triangle work as shown here
 ```@repl LowerTriangularMatrices
-L = rand(LowerTriangularMatrix{Float32}, 3, 3, 5)
+L = rand(LowerTriangularArray{Float32}, 3, 3, 5)
 
 L[2, 1] # second lower triangle element of the first lower triangle matrix 
 
@@ -171,7 +181,7 @@ eachmatrix(L)
 
 together they can be used as
 
-```@repl
+```@repl LowerTriangularMatrices
 for k in eachmatrix(L)
     for lm in eachharmonic(L)
         L[lm, k]
@@ -186,38 +196,39 @@ lower triangular matrix).
 ## Linear algebra with `LowerTriangularArray`
 
 The [LowerTriangularMatrices](@ref lowertriangularmatrices) module's main purpose is not linear algebra,
-and its implementation may not be efficient, however, many operations work as expected
+and typical matrix operations will not work with `LowerTriangularMatrix` because it's treated as a vector
+not as a matrix, meaning that the following will not work as expected
+
 ```@repl LowerTriangularMatrices
 L = rand(LowerTriangularMatrix{Float32}, 3, 3)
-
-L + L
-
 L * L
+inv(L)
 ```
-Note, however, that the latter includes a conversion to `Matrix`, which is true for many
-operations, including `inv` or `\`. Hence when trying to do more sophisticated linear
-algebra with `LowerTriangularMatrix` we quickly leave lower triangular-land and go
-back to normal matrix-land. But we have implemented broadcasting for `LowerTriangularArray`
-so that many element-wise operations come naturally
+
+And many other operations that require `L` to be a `AbstractMatrix` which it isn't. In contrast, typical
+vector operations like a scalar product between two "LowerTriangularMatrix" vectors does work
+
+
+```@repl LowerTriangularMatrices
+L' * L
+```
+
+## Broadcasting with `LowerTriangularArray`
+
+In contrast to linear algebra, many element-wise operations work as expected thanks to broadcasting,
+so operations that can be written in `.` notation whether implicit `+`, `2*`, ... or explicitly
+written `.+`, `.^`, ... or via the `@.` macro
 
 ```@repl LowerTriangularMatrices
 L + L
-```
-
-```@repl LowerTriangularMatrices
 2L
-```
 
-also using `.` dot notation.
-
-```@repl LowerTriangularMatrices
-c = 0.5
-@. L + 2L - c*L 
+@. L + 2L - 1.1*L / L^2
 ```
 
 ## GPU 
 
-`LowerTriangularArray{T,N,ArrayType}` wraps around an array of type `ArrayType`.
+`LowerTriangularArray{T, N, ArrayType}` wraps around an array of type `ArrayType`.
 If this array is a GPU array (e.g. `CuArray`), all operations are performed on GPU as well.
 The implementation was written so that scalar indexing is avoided in almost all cases,
 so that GPU operation should be performant.
