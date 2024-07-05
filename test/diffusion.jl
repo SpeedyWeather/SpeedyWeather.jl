@@ -11,7 +11,7 @@
         (; vor_tend) = d.layers[1].tendencies
         (; ∇²ⁿ, ∇²ⁿ_implicit) = m.horizontal_diffusion
 
-        vor = randn(typeof(vor), size(vor)...)
+        vor = randn(LowerTriangularArray{eltype(vor)}, size(vor, as=Matrix)...)
 
         # ∇²ⁿ, ∇²ⁿ_implicit are nlev-vectors, one array per layer, pick surface
         SpeedyWeather.horizontal_diffusion!(vor_tend, vor, ∇²ⁿ[end], ∇²ⁿ_implicit[end])

@@ -222,7 +222,7 @@ function set_var!(progn::PrognosticVariables{NF},
 end 
 
 function _set_var_core!(var_old::LowerTriangularMatrix{T}, var_new::LowerTriangularMatrix{R}) where {T, R}
-    lmax, mmax = size(var_old) .- (1, 1)
+    lmax, mmax = size(var_old, as=Matrix) .- (1, 1)
     var_new_trunc = spectral_truncation!(var_new, mmax+1, mmax)
     copyto!(var_old, var_new_trunc)
 end 

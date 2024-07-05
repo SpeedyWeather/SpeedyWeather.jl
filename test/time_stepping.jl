@@ -2,7 +2,7 @@
 # dF/dt = iωF 
 F(x::Complex{T}, ω::T) where T = im*ω*x
 function F(L::LowerTriangularMatrix{Complex{T}}, ω::T) where T
-    tend = LowerTriangularMatrix{Complex{T}}(undef, size(L)...)
+    tend = LowerTriangularMatrix{Complex{T}}(undef, size(L, as=Matrix)...)
     for lm in SpeedyWeather.eachharmonic(L, tend)
         tend[lm] = F(L[lm], ω)
     end

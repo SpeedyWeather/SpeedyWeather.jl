@@ -7,11 +7,14 @@ import Random
         @testset for lmax = (mmax, mmax+1)
             A = randn(Complex{NF}, lmax, mmax)
 
-            SpeedyTransforms.spectral_truncation!(A)
+            spectral_truncation!(A)
 
             L = LowerTriangularMatrix(A)
 
-            @test size(L) == size(A)
+            @test size(L, as=Matrix) == size(A)
+
+            @test size(A) == size(L, as=Matrix)
+            @test size(L.data) == size(L, as=Vector)
 
             for m in 1:mmax
                 for l in 1:lmax
@@ -47,7 +50,11 @@ end
 
                 L = LowerTriangularArray(A)
 
-                @test size(L) == size(A)
+                @test size(L, as=Matrix) == size(A)
+                @test size(L.data) == size(L, as=Vector)
+                @test size(L)[2:end] == size(A)[3:end]
+                @test size(L)[1] == SpeedyWeather.LowerTriangularMatrices.nonzeros(size(A,1), size(A,2))
+
 
                 for m in 1:mmax
                     for l in 1:lmax
@@ -72,6 +79,29 @@ end
             end
         end
     end
+end
+
+@testset "LowerTriangularArray: OneBased vs ZeroBased" begin 
+
+    L = zeros(LowerTriangularMatrix, 5, 5)
+
+    @test size(L) == size(L, as=Vector)
+    @test size(L, as=Matrix) == (5, 5)
+    @test size(L, 1) == 15
+    @test size(L, 1, as=Matrix) == 5
+    @test size(L, 2, as=Matrix) == 5
+    @test size(L, 1, ZeroBased, as=Matrix) == 4
+    @test size(L, 2, ZeroBased, as=Matrix) == 4
+    @test size(L, OneBased, as=Matrix) == (5, 5)
+    @test_throws MethodError size(L, ZeroBased)
+    @test_throws MethodError size(L, ZeroBased, as=Vector)
+
+    L = zeros(LowerTriangularArray, 5, 5, 2)
+    m, n = size(L, as=Matrix)
+    @test (m, n) == (5, 5)
+
+    lmax, mmax = size(L, ZeroBased, as=Matrix)
+    @test (lmax, mmax) == (4, 4)
 end 
 
 @testset "LowerTriangularMatrix: @inbounds" begin
@@ -206,6 +236,9 @@ end
     end
 end
 
+# only needed when the extension isn't loaded
+# LowerTriangularMatrices.nonparametric_type(::Type{<:JLArray}) = JLArray
+
 @testset "Zeros, ones, rand, and randn constructors" begin
     for f in (ones, zeros, rand, randn)
         s = (5, 5)
@@ -227,8 +260,8 @@ end
         @test size(JL) == size(JL2) == size(zero(JL))
         
         L = f(LowerTriangularMatrix{Float16}, s...)
-        L2 = f(LowerTriangularArray{Float16, 2, Vector{Float16}}, s...)
-        JL = f(LowerTriangularArray{Float16, 2, JLArray{Float16, 1}}, s...)
+        L2 = f(LowerTriangularArray{Float16, 1, Vector{Float16}}, s...)
+        JL = f(LowerTriangularArray{Float16, 1, JLArray{Float16, 1}}, s...)
         @test typeof(L) == typeof(L2)
         @test size(L) == size(L2)
         @test typeof(L) != typeof(JL)
@@ -238,9 +271,9 @@ end
         for s in ((2, 3, 4), (2, 3, 4, 5))
             N = length(s)
             Random.seed!(123)
-            L =  f(LowerTriangularArray{Float16, N,   Array{Float16, N-1}}, s...)
+            L =  f(LowerTriangularArray{Float16, N-1,   Array{Float16, N-1}}, s...)
             Random.seed!(123)
-            JL = f(LowerTriangularArray{Float16, N, JLArray{Float16, N-1}}, s...)
+            JL = f(LowerTriangularArray{Float16, N-1, JLArray{Float16, N-1}}, s...)
             JL2 = adapt(JLArray, L)
             @test all(JL2 .== JL)   # equality via broadcasting
             @test JL2 == JL         # checks for type and data equality
@@ -278,7 +311,7 @@ end
 
                 # convert
                 L = randn(LowerTriangularArray{NF}, lmax, mmax, idims...)
-                L3 = convert(LowerTriangularArray{Float16, 2+length(idims), Array{Float16,1+length(idims)}}, L)
+                L3 = convert(LowerTriangularArray{Float16, 1+length(idims), Array{Float16,1+length(idims)}}, L)
                 for lm in SpeedyWeather.eachharmonic(L, L3)
                     @test Float16(L[lm, [1 for i=1:length(idims)]...]) == L3[lm, [1 for i=1:length(idims)]...] 
                 end
@@ -336,8 +369,8 @@ end
         @test size(similar(L)) == size(L)
         @test eltype(L) == eltype(similar(L, eltype(L)))
 
-        @test (5, 7) == size(similar(L, 5, 7))
-        @test (5, 7) == size(similar(L, (5, 7)))
+        @test (5, 7) == size(similar(L, 5, 7), as=Matrix)
+        @test (5, 7) == size(similar(L, (5, 7)), as=Matrix)
         @test similar(L) isa LowerTriangularMatrix
         @test similar(L, Float64) isa LowerTriangularMatrix{Float64}
     end
@@ -361,8 +394,8 @@ end
             @test size(similar(L)) == size(L)
             @test eltype(L) == eltype(similar(L, eltype(L)))
 
-            @test (5, 7, idims...) == size(similar(L, 5, 7, idims...))
-            @test (5, 7, idims...) == size(similar(L, (5, 7,  idims...)))
+            @test (5, 7, idims...) == size(similar(L, 5, 7, idims...); as=Matrix)
+            @test (5, 7, idims...) == size(similar(L, (5, 7,  idims...)); as=Matrix)
             @test similar(L) isa LowerTriangularArray
             @test similar(L, Float64) isa LowerTriangularArray{Float64}
         end
@@ -393,7 +426,7 @@ end
         # with ranges
         L1 = zeros(LowerTriangularMatrix{NF}, 33, 32);
         L2 = randn(LowerTriangularMatrix{NF}, 65, 64);
-        L2T = spectral_truncation(L2,(size(L1) .- 1)...)
+        L2T = spectral_truncation(L2,(size(L1; as=Matrix) .- 1)...)
 
         copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
         @test L1 == L2T
@@ -449,7 +482,7 @@ end
             # with ranges
             L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
             L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
-            L2T = spectral_truncation(L2,(size(L1)[1:2] .- 1)...)
+            L2T = spectral_truncation(L2,(size(L1; as=Matrix)[1:2] .- 1)...)
 
             copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
             @test L1 == L2T
@@ -505,7 +538,7 @@ end
     end 
 
     # setindex! 
-    A_test = JLArray(rand(NF,size(L_cpu,3)))
+    A_test = JLArray(rand(NF,size(L_cpu,2)))
     L[1,:] = A_test
     @test L[1,:] == A_test
 
@@ -526,7 +559,7 @@ end
 
     # rand + convert
     L3 = adapt(JLArray, randn(LowerTriangularArray{NF}, 10, 10, 5))
-    L4 = convert(LowerTriangularArray{Float16,3,JLArray{Float16}}, L3)
+    L4 = convert(LowerTriangularArray{Float16,2,JLArray{Float16,2}}, L3)
 
     for lm in SpeedyWeather.eachharmonic(L, L3)
         @test all(Float16.(L3[lm, :]) .== L4[lm, :])
@@ -540,8 +573,8 @@ end
     @test size(similar(L)) == size(L)
     @test eltype(L) == eltype(similar(L, eltype(L)))
 
-    @test (5, 7, 5) == size(similar(L, 5, 7, idims...))
-    @test (5, 7, 5) == size(similar(L, (5, 7,  idims...)))
+    @test (5, 7, 5) == size(similar(L, 5, 7, idims...), as=Matrix)
+    @test (5, 7, 5) == size(similar(L, (5, 7,  idims...)), as=Matrix)
     @test similar(L) isa LowerTriangularArray
 
     # copyto! same size 
@@ -560,7 +593,7 @@ end
 
     L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
     L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
-    L2T = spectral_truncation(L2,(size(L1)[1:2] .- 1)...)
+    L2T = spectral_truncation(L2, (size(L1, ZeroBased; as=Matrix)[1:2])...)
     L3 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
 
     SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:33, 1:32)     # size of smaller matrix
@@ -583,6 +616,7 @@ end
     @test L3 == L1
 end 
 
+
 @testset "LowerTriangularArray: broadcast" begin 
     @testset for idims = ((), (5,), (5,5))
         @testset for NF in (Float16, Float32, Float64)
@@ -597,13 +631,13 @@ end
                 L2 = deepcopy(L1) 
 
                 L2 ./= 5
-                @test L1/5 == L2
+                @test (L1.data ./ 5) == L2.data
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = deepcopy(L1)
 
                 L2 .^= 2
-                @test L1.^2 == L2
+                @test L1.data.^2 == L2.data
 
                 # tests mirroring usage in dynamical core
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
@@ -611,36 +645,28 @@ end
                 L3 = deepcopy(L2)
 
                 @. L2 += 5L1
-                @test L2 == L3 + 5L1
+                @test L2.data == L3.data .+ 5L1.data
 
-                SpeedyWeather.LowerTriangularMatrices.add!(L3,5L1)
-                @test L3 == L2 
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
 
                 @. L3 = -L1 - L2
-                @test L3 == -L1 - L2
-
-                L4 = adapt(ArrayType, zeros(LowerTriangularArray{NF}, 10, 10, idims...))
-                SpeedyWeather.LowerTriangularMatrices.add!(L4,-L1,-L2)
-                @test L4 == L3
+                @test L3.data == -L1.data - L2.data
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L3 = deepcopy(L2)
 
                 L2 .+= L1 
-                L3 += L1
-                @test L2 == L3
+                L3.data .+= L1.data
+                @test L2.data == L3.data
 
                 L1 = adapt(ArrayType, randn(LowerTriangularArray{NF}, 10, 10, idims...))
                 L2 = similar(L1)
 
                 L2 .= 5L1
                 @test L2 == 5L1
-
-                # add! test here
             end
         end
     end
