@@ -255,7 +255,7 @@ end
 
 # CHECK MATCHING SIZES
 function ismatching(S::SpectralTransform, L::LowerTriangularArray)
-    return (S.lmax, S.mmax) == size(L, ZeroBased, as=Matrix)
+    return (S.lmax, S.mmax) == size(L, ZeroBased, as=Matrix)[1:2]
 end
 
 function ismatching(S::SpectralTransform, grid::AbstractGridArray)
@@ -751,7 +751,7 @@ function gridded(   alms::LowerTriangularMatrix{T};            # spectral coeffi
                     kwargs...
                     ) where {NF, T<:Complex{NF}}        # number format NF
 
-    lmax, mmax = size(alms; as=Matrix) .- 1                        # -1 for 0-based degree l, order m
+    lmax, mmax = size(alms, ZeroBased, as=Matrix)
     S = SpectralTransform(NF, Grid, lmax, mmax; recompute_legendre)
     return gridded(alms, S; kwargs...)
 end
@@ -767,7 +767,7 @@ function gridded(   alms::LowerTriangularMatrix{T};            # spectral coeffi
                     kwargs...
                     ) where {NF, T<:Complex{NF}}        # number format NF
 
-    lmax, mmax = matrix_size(alms) .- 1                        # -1 for 0-based degree l, order m
+    lmax, mmax = size(alms, ZeroBased, as=Matrix)
     S = SpectralTransform(NF, Grid, lmax, mmax; recompute_legendre)
     return gridded(alms, S; kwargs...)
 end

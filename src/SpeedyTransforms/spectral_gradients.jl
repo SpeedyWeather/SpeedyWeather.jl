@@ -303,7 +303,7 @@ function UV_from_vordiv!(
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
     # maximum degree l, order m of spherical harmonics (1-based)
-    lmax, mmax = matrix_size(U, OneBased, as=Matrix)
+    lmax, mmax = size(U, OneBased, as=Matrix)
 
     #TODO add @inbounds back in
     for k in eachmatrix(U, V, vor, div)                 # also checks size compatibility
@@ -398,7 +398,7 @@ function ∇²!(
                                       (add ? (o+a) :  a)
     
     # maximum degree l, order m of spherical harmonics (1-based)
-    lmax, mmax = matrix_size(alms, OneBased)
+    lmax, mmax = size(alms, OneBased, as=Matrix)
 
     #TODO add @inbounds back in
     for k in eachmatrix(∇²alms, alms)

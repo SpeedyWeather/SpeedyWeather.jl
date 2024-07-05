@@ -56,7 +56,7 @@ function get_column!(
 
     (; u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev) = D.grid
 
-    @inbounds for k in eachgrid(u_grid, v_grid, temp_grid, humid_grid)
+    @inbounds for k in eachgrid(u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev)
         # read out prognostic variables on grid at previous time step
         # for numerical stability
         C.u[k] = u_grid_prev[ij, k]
