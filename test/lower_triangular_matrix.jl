@@ -79,6 +79,29 @@ end
             end
         end
     end
+end
+
+@testset "LowerTriangularArray: OneBased vs ZeroBased" begin 
+
+    L = zeros(LowerTriangularMatrix, 5, 5)
+
+    @test size(L) == size(L, as=Vector)
+    @test size(L, as=Matrix) == (5, 5)
+    @test size(L, 1) == 15
+    @test size(L, 1, as=Matrix) == 5
+    @test size(L, 2, as=Matrix) == 5
+    @test size(L, 1, ZeroBased, as=Matrix) == 4
+    @test size(L, 2, ZeroBased, as=Matrix) == 4
+    @test size(L, OneBased, as=Matrix) == (5, 5)
+    @test_throws MethodError size(L, ZeroBased)
+    @test_throws MethodError size(L, ZeroBased, as=Vector)
+
+    L = zeros(LowerTriangularArray, 5, 5, 2)
+    m, n = size(L, as=Matrix)
+    @test (m, n) == (5, 5)
+
+    lmax, mmax = size(L, ZeroBased, as=Matrix)
+    @test (lmax, mmax) == (4, 4)
 end 
 
 @testset "LowerTriangularMatrix: @inbounds" begin

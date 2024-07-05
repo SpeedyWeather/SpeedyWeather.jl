@@ -22,8 +22,6 @@ end
 check_lta_input_array(data, m, n, N) =
     (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
 
-matrix_size(data::AbstractArray, m::Integer, n::Integer) = (m, n, size(data)[2:end]...)
-
 function lta_error_message(data, m, n, T, N, ArrayType) 
     return "$(size2x_string(size(data)))-sized $(typeof(data)) cannot be used to create "*
             "a $(size2x_string(matrix_size(data, m, n))) LowerTriangularArray{$T, $N, $ArrayType}"
@@ -42,14 +40,34 @@ LowerTriangularMatrix(data::Vector{T}, m::Integer, n::Integer) where T =
 Length of a `LowerTriangularArray` defined as number of non-zero elements."""
 Base.length(L::LowerTriangularArray) = length(L.data)
 
+# super type to be used for ZeroBased (0-based), OneBased (1-based) indexing of the spherical harmonics
+abstract type IndexBasis end
+
+"""Abstract type to dispatch for 0-based indexing of the spherical harmonic
+degree l and order m, i.e. l=m=0 is the mean, the zonal modes are m=0 etc.
+This indexing is more common in mathematics."""
+abstract type ZeroBased <: IndexBasis end
+
+"""Abstract type to dispatch for 1-based indexing of the spherical harmonic
+degree l and order m, i.e. l=m=1 is the mean, the zonal modes are m=1 etc.
+This indexing matches Julia's 1-based indexing for arrays."""
+abstract type OneBased <: IndexBasis end
+
+# get matrix size of LTA from its data array and m, n (number of rows and columns)
+matrix_size(data::AbstractArray, m::Integer, n::Integer) = (m, n, size(data)[2:end]...)
+
 """$(TYPEDSIGNATURES)
 Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
 and as if it were a full matrix when `as <: AbstractMatrix`` ."""
-Base.size(L::LowerTriangularArray; as::T=Vector) where T = size(L, as)
-Base.size(L::LowerTriangularArray, i::Integer; as::T=Vector) where T = size(L; as=as)[i]
-   
-Base.size(L::LowerTriangularArray, as::Type{Matrix}) = matrix_size(L.data, L.m, L.n)
-Base.size(L::LowerTriangularArray, as::Type{Vector}) = size(L.data)
+Base.size(L::LowerTriangularArray, base::Type{<:IndexBasis}=OneBased; as=Vector) = size(L, base, as)
+Base.size(L::LowerTriangularArray, i::Integer, base::Type{<:IndexBasis}=OneBased; as=Vector) = size(L, base; as=as)[i]
+
+# use multiple dispatch to chose the right options of basis and vector/flat vs matrix indexing
+# matrix indexing can be zero based (natural for spherical harmonics) or one-based,
+# vector/flat indexing has only one based indexing
+Base.size(L::LowerTriangularArray, base::Type{OneBased}, as::Type{Matrix}) = matrix_size(L.data, L.m, L.n)
+Base.size(L::LowerTriangularArray, base::Type{ZeroBased}, as::Type{Matrix}) = matrix_size(L.data, L.m-1, L.n-1)
+Base.size(L::LowerTriangularArray, base::Type{OneBased}, as::Type{Vector}) = size(L.data)
 
 # sizeof the underlying data vector
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
