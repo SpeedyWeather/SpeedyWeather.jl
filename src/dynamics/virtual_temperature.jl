@@ -36,6 +36,26 @@ function virtual_temperature!(
     return nothing
 end
 
+function virtual_temperature!(
+    column::ColumnVariables,
+    model::PrimitiveEquation,
+)
+    (; temp, temp_virt, humid) = column
+    μ = model.atmosphere.μ_virt_temp
+
+    @. temp_virt = temp*(1 + μ*humid)
+    return nothing
+end
+
+function virtual_temperature!(
+    column::ColumnVariables,
+    model::PrimitiveDry,
+)
+    (; temp, temp_virt) = column
+    @. temp_virt = temp             # temp = temp_virt for PrimitiveDry
+    return nothing
+end
+
 """
 $(TYPEDSIGNATURES)
 Linear virtual temperature for `model::PrimitiveDry`: Just copy over

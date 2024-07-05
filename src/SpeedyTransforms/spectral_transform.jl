@@ -34,7 +34,7 @@ struct SpectralTransform{NF<:AbstractFloat}
 
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool                # Pre or recompute Legendre polynomials
-    Λ::Matrix{NF}            # Legendre polynomials for one latitude (requires recomputing)
+    Λ::AssociatedLegendrePolMatrix{NF}      # Legendre polynomials for one latitude (requires recomputing)
     Λs::Vector{LowerTriangularMatrix{NF}}   # Legendre polynomials for all latitudes (all precomputed)
     
     # SOLID ANGLES ΔΩ FOR QUADRATURE
@@ -124,7 +124,8 @@ function SpectralTransform(
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
 
     # PREALLOCATE LEGENDRE POLYNOMIALS, +1 for 1-based indexing
-    Λ = zeros(NF, lmax+1, mmax+1)    # Legendre polynomials for one latitude
+    # Legendre polynomials for one latitude
+    Λ = AssociatedLegendrePolArray{NF, 2, 1, Vector{NF}}(zeros(LowerTriangularMatrix{NF}, lmax+1, mmax+1))
 
     # allocate memory in Λs for polynomials at all latitudes or allocate dummy array if precomputed
     # Λs is of size (lmax+1) x (mmax+1) x nlat_half unless recomputed
@@ -229,13 +230,13 @@ end
 $(TYPEDSIGNATURES)
 Generator function for a `SpectralTransform` struct based on the size of the spectral
 coefficients `alms` and the grid `Grid`. Recomputes the Legendre polynomials by default."""
-function SpectralTransform( alms::LowerTriangularMatrix{Complex{NF}};  # spectral coefficients
-                            recompute_legendre::Bool = true,    # saves memory
-                            Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
-                            ) where NF                          # number format NF
-    
-        lmax, mmax = matrix_size(alms) .- 1        # -1 for 0-based degree l, order m
-        return SpectralTransform(NF, Grid, lmax, mmax; recompute_legendre)
+function SpectralTransform(
+    alms::LowerTriangularMatrix{Complex{NF}};  # spectral coefficients
+    recompute_legendre::Bool = true,           # saves memory
+    Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
+) where NF                                     # number format NF
+    lmax, mmax = size(alms, ZeroBased, as=Matrix)        # 0-based degree l, order m
+    return SpectralTransform(NF, Grid, lmax, mmax; recompute_legendre)
 end
 
 """
@@ -254,7 +255,7 @@ end
 
 # CHECK MATCHING SIZES
 function ismatching(S::SpectralTransform, L::LowerTriangularArray)
-    return (S.lmax, S.mmax) == matrix_size(L, ZeroBased)
+    return (S.lmax, S.mmax) == size(L, ZeroBased, as=Matrix)
 end
 
 function ismatching(S::SpectralTransform, grid::AbstractGridArray)
@@ -262,13 +263,13 @@ function ismatching(S::SpectralTransform, grid::AbstractGridArray)
     return match
 end
 
-# make `matches` commutative
+# make `ismatching` commutative
 ismatching(L::LowerTriangularArray, S::SpectralTransform) = ismatching(S, L)
 ismatching(G::AbstractGridArray,    S::SpectralTransform) = ismatching(S, G)
 
 function Base.DimensionMismatch(S::SpectralTransform, L::LowerTriangularArray)
-    s = "SpectralTransform(lmax=$(S.lmax), mmax=$(S.mmax)) and $(matrix_size(L))
-        LowerTriangularArray do not match."
+    s = "SpectralTransform(lmax=$(S.lmax), mmax=$(S.mmax)) and $(size(L, as=Matrix)) "*
+        "LowerTriangularArray do not match."
     return DimensionMismatch(s)
 end
 
@@ -330,9 +331,9 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
     (; recompute_legendre, Λ, Λs, m_truncs ) = S
     (; brfft_plans ) = S
 
-    recompute_legendre && @boundscheck matrix_size(alms) == size(Λ) || throw(BoundsError)
+    recompute_legendre && @boundscheck size(alms, as=Matrix) == size(Λ) || throw(BoundsError)
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
-    lmax, mmax = matrix_size(alms) .- 1            # maximum degree l, order m of spherical harmonics
+    lmax, mmax = size(alms, ZeroBased, as=Matrix)  # maximum degree l, order m of spherical harmonics
 
     @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
@@ -356,7 +357,7 @@ function gridded!(  map::AbstractGrid{NF},                      # gridded output
 
         # Recalculate or use precomputed Legendre polynomials Λ
         recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
-        Λj = recompute_legendre ? LowerTriangularMatrix(Λ) : Λs[j_north]
+        Λj = recompute_legendre ? Λ.data : Λs[j_north]
 
         # inverse Legendre transform by looping over wavenumbers l, m
         lm = 1                              # single index for non-zero l, m indices
@@ -439,7 +440,6 @@ function transform!(
 
     @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, grids))
-
 
     # recompute_legendre && @boundscheck size(specs) == size(Λ) || throw(BoundsError)
     # recompute_legendre || @boundscheck size(specs) == size(Λs[1]) || throw(BoundsError)
@@ -548,9 +548,9 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
     (; recompute_legendre, Λ, Λs, solid_angles ) = S
     (; rfft_plans, lon_offsets, m_truncs ) = S
     
-    recompute_legendre && @boundscheck matrix_size(alms) == size(Λ) || throw(BoundsError)
+    recompute_legendre && @boundscheck size(alms, as=Matrix) == size(Λ) || throw(BoundsError)
     recompute_legendre || @boundscheck size(alms) == size(Λs[1]) || throw(BoundsError)
-    lmax, mmax = matrix_size(alms) .- 1    # maximum degree l, order m of spherical harmonics
+    lmax, mmax = size(alms, ZeroBased, as=Matrix)  # maximum degree l, order m of spherical harmonics
 
     @boundscheck maximum(m_truncs) <= nfreq_max || throw(BoundsError)
     @boundscheck nlat == length(cos_colat) || throw(BoundsError)
@@ -588,7 +588,7 @@ function spectral!( alms::LowerTriangularMatrix{Complex{NF}},   # output: spectr
         # LEGENDRE TRANSFORM in meridional direction
         # Recalculate or use precomputed Legendre polynomials Λ
         recompute_legendre && Legendre.unsafe_legendre!(Λw, Λ, lmax, mmax, Float64(cos_colat[j_north]))
-        Λj = recompute_legendre ? LowerTriangularMatrix(Λ) : Λs[j_north]
+        Λj = recompute_legendre ? Λ.data : Λs[j_north]
         
         # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
         ΔΩ = solid_angles[j_north]                      # = sinθ Δθ Δϕ, solid angle for a grid point
@@ -745,13 +745,13 @@ $(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map`. Based on the size of `alms` the grid type `grid`, the spatial resolution is retrieved based
 on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `gridded(alms, S)`."""
-function gridded(   alms::AbstractMatrix{T};            # spectral coefficients
+function gridded(   alms::LowerTriangularMatrix{T};            # spectral coefficients
                     recompute_legendre::Bool = true,    # saves memory
                     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
                     kwargs...
                     ) where {NF, T<:Complex{NF}}        # number format NF
 
-    lmax, mmax = size(alms) .- 1                        # -1 for 0-based degree l, order m
+    lmax, mmax = size(alms; as=Matrix) .- 1                        # -1 for 0-based degree l, order m
     S = SpectralTransform(NF, Grid, lmax, mmax; recompute_legendre)
     return gridded(alms, S; kwargs...)
 end
@@ -777,7 +777,7 @@ $(TYPEDSIGNATURES)
 Spectral transform (spectral to grid space) from spherical coefficients `alms` to a newly allocated gridded
 field `map` with precalculated properties based on the SpectralTransform struct `S`. `alms` is converted to
 a `LowerTriangularMatrix` to execute the in-place `gridded!`."""
-function gridded(   alms::Union{AbstractMatrix, LowerTriangularMatrix},       # spectral coefficients
+function gridded(   alms::LowerTriangularMatrix,       # spectral coefficients
                     S::SpectralTransform{NF};   # struct for spectral transform parameters
                     kwargs...
                     ) where NF                  # number format NF
@@ -787,16 +787,6 @@ function gridded(   alms::Union{AbstractMatrix, LowerTriangularMatrix},       # 
     copyto!(almsᴸ, alms)                        # drop the upper triangle and convert to NF  
     gridded!(map, almsᴸ, S; kwargs...)          # now execute the in-place version
     return map
-end
-
-"""
-$(TYPEDSIGNATURES)
-Converts `map` to `grid(map)` to execute `spectral(map::AbstractGrid; kwargs...)`."""
-function spectral(  map::AbstractMatrix;            # gridded field
-                    Grid::Type{<:AbstractGrid}=DEFAULT_GRID,
-                    kwargs...)
-
-    return spectral(Grid(map); kwargs...)
 end
 
 """

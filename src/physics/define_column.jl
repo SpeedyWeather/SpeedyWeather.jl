@@ -26,12 +26,6 @@ $(TYPEDFIELDS)"""
     const temp::Vector{NF} = zeros(NF, nlayers)         # absolute temperature [K]
     const humid::Vector{NF} = zeros(NF, nlayers)        # specific humidity [kg/kg]
 
-    # PROGNOSTIC VARIABLES at previous time step
-    const u_prev::Vector{NF} = zeros(NF, nlayers)       # zonal velocity [m/s]
-    const v_prev::Vector{NF} = zeros(NF, nlayers)       # meridional velocity [m/s]
-    const temp_prev::Vector{NF} = zeros(NF, nlayers)    # absolute temperature [K]
-    const humid_prev::Vector{NF} = zeros(NF, nlayers)   # specific humidity [kg/kg]
-
     # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
     const ln_pres::Vector{NF} = zeros(NF, nlayers+1)    # logarithm of pressure [log(Pa)]
     const pres::Vector{NF} = zeros(NF, nlayers+1)       # pressure [Pa]

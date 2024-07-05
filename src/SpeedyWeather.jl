@@ -40,6 +40,10 @@ include("utility_functions.jl")
 export  LowerTriangularMatrices, 
         LowerTriangularMatrix,
         LowerTriangularArray
+
+# indexing styles for LowerTriangularArray/Matrix
+export  OneBased, ZeroBased
+export  eachmatrix, eachharmonic
         
 include("LowerTriangularMatrices/LowerTriangularMatrices.jl")
 using .LowerTriangularMatrices

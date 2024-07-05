@@ -102,7 +102,7 @@ $(TYPEDFIELDS)"""
     z₀::NF = 3.21e-5
 
     "Critical Richardson number for stable mixing cutoff [1]"
-    Ri_c::NF = 1
+    Ri_c::NF = 10
 
     "Maximum drag coefficient, κ²/log(zₐ/z₀) for zₐ from reference temperature"
     drag_max::Base.RefValue{NF} = Ref(zero(NF))

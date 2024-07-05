@@ -59,10 +59,9 @@ function _divergence!(
     S::SpectralTransform
 )
     (; grad_y_vordiv1, grad_y_vordiv2 ) = S
+  
     @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
-
-    # maximum degree l, order m of spherical harmonics (1-based)
-    lmax, mmax = matrix_size(div, OneBased)
+    lmax, mmax = size(div, OneBased, as=Matrix)
 
     #TODO add @inbounds back in
     for k in eachmatrix(div, u, v)          # also checks size compatibility
@@ -232,9 +231,9 @@ function UV_from_vor!(
 )
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
-
+    
     # maximum degree l, order m of spherical harmonics (1-based)
-    lmax, mmax = matrix_size(U, OneBased)
+    lmax, mmax = size(U, OneBased, as=Matrix)
 
     #TODO add @inbounds back in
     for k in eachmatrix(U, V, vor)                          # also checks size compatibility
@@ -304,7 +303,7 @@ function UV_from_vordiv!(
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
 
     # maximum degree l, order m of spherical harmonics (1-based)
-    lmax, mmax = matrix_size(U, OneBased)
+    lmax, mmax = matrix_size(U, OneBased, as=Matrix)
 
     #TODO add @inbounds back in
     for k in eachmatrix(U, V, vor, div)                 # also checks size compatibility
@@ -494,7 +493,7 @@ function ∇!(
     @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
 
     # maximum degree l, order m of spherical harmonics (1-based)
-    lmax, mmax = matrix_size(p, OneBased)
+    lmax, mmax = size(p, OneBased, as=Matrix)
 
     #TODO add @inbounds back in
     for k in eachmatrix(dpdx, dpdy, p)      # also performs size checks

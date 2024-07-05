@@ -159,7 +159,8 @@
         b = forcing.b[]    # = exp(-dt/τ)
         
         (; S) = forcing
-        lmax, mmax = matrix_size(S)
+        lmax, mmax = size(S, as=Matrix)
+
         @inbounds for m in 1:mmax
             for l in m:lmax
                 if (forcing.mmin <= m <= forcing.mmax) &&

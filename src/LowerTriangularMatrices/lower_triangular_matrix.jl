@@ -23,9 +23,8 @@ check_lta_input_array(data, m, n, N) =
     (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
 
 function lta_error_message(data, m, n, T, N, ArrayType) 
-    size_tuple = (m, n, size(data[2:end])...)
-    return "$(size(data))-sized $(typeof(data)) cannot be used to create "*
-                "a $size_tuple LowerTriangularArray{$T,$N,$ArrayType}"
+    return "$(size2x_string(size(data)))-sized $(typeof(data)) cannot be used to create "*
+            "a $(size2x_string(matrix_size(data, m, n))) LowerTriangularArray{$T, $N, $ArrayType}"
 end 
 
 """2-dimensional `LowerTriangularArray` of type `T`` with its non-zero entries unravelled into a `Vector{T}`"""
@@ -41,10 +40,6 @@ LowerTriangularMatrix(data::Vector{T}, m::Integer, n::Integer) where T =
 Length of a `LowerTriangularArray` defined as number of non-zero elements."""
 Base.length(L::LowerTriangularArray) = length(L.data)
 
-"""$(TYPEDSIGNATURES)
-Size of a `LowerTriangularArray` defined as size of the flattened array."""
-Base.size(L::LowerTriangularArray) = size(L.data)
-
 # super type to be used for ZeroBased (0-based), OneBased (1-based) indexing of the spherical harmonics
 abstract type IndexBasis end
 
@@ -55,19 +50,24 @@ abstract type ZeroBased <: IndexBasis end
 
 """Abstract type to dispatch for 1-based indexing of the spherical harmonic
 degree l and order m, i.e. l=m=1 is the mean, the zonal modes are m=1 etc.
-This indexing is matches Julia's 1-based indexing for arrays."""
+This indexing matches Julia's 1-based indexing for arrays."""
 abstract type OneBased <: IndexBasis end
 
+# get matrix size of LTA from its data array and m, n (number of rows and columns)
+matrix_size(data::AbstractArray, m::Integer, n::Integer) = (m, n, size(data)[2:end]...)
 
 """$(TYPEDSIGNATURES)
-Size of a expanded `LowerTriangularArray` as if it were a full matrix,  
-returns `(L.m, L.n, size(L.data)[2:end])``."""
-matrix_size(L::LowerTriangularArray) = (L.m, L.n, size(L.data)[2:end]...)
-matrix_size(L::LowerTriangularArray, i::Int) = matrix_size(L)[i] 
+Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
+and as if it were a full matrix when `as <: AbstractMatrix`` ."""
+Base.size(L::LowerTriangularArray, base::Type{<:IndexBasis}=OneBased; as=Vector) = size(L, base, as)
+Base.size(L::LowerTriangularArray, i::Integer, base::Type{<:IndexBasis}=OneBased; as=Vector) = size(L, base; as=as)[i]
 
-# matrix_size(L::LowerTriangularArray, base::Type{<:IndexBasis} = OneBased) = (L.m, L.n)
-matrix_size(L::LowerTriangularArray, base::Type{OneBased})  = (L.m,   L.n)
-matrix_size(L::LowerTriangularArray, base::Type{ZeroBased}) = (L.m-1, L.n-1)
+# use multiple dispatch to chose the right options of basis and vector/flat vs matrix indexing
+# matrix indexing can be zero based (natural for spherical harmonics) or one-based,
+# vector/flat indexing has only one based indexing
+Base.size(L::LowerTriangularArray, base::Type{OneBased}, as::Type{Matrix}) = matrix_size(L.data, L.m, L.n)
+Base.size(L::LowerTriangularArray, base::Type{ZeroBased}, as::Type{Matrix}) = matrix_size(L.data, L.m-1, L.n-1)
+Base.size(L::LowerTriangularArray, base::Type{OneBased}, as::Type{Vector}) = size(L.data)
 
 # sizeof the underlying data vector
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
@@ -107,7 +107,7 @@ function Base.show(io::IO, ::MIME"text/plain", L::LowerTriangularMatrix)
 end
 
 function Base.array_summary(io::IO, L::LowerTriangularMatrix{T}, inds::Tuple{Vararg{Base.OneTo}}) where T
-    mn = matrix_size(L)
+    mn = size(L; as=Matrix)
     print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T}")
 end
 
@@ -142,8 +142,8 @@ for f in (:zeros, :ones, :rand, :randn)
     end
 end
 
-Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, matrix_size(L)...)
-Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, matrix_size(L)...)
+Base.zero(L::LTA) where {LTA <: LowerTriangularArray} = zeros(LTA, size(L; as=Matrix)...)
+Base.one(L::LTA) where {LTA <: LowerTriangularArray} = ones(LTA, size(L; as=Matrix)...)
 
 function LowerTriangularArray{T, N, ArrayType}(
     ::UndefInitializer,
@@ -182,7 +182,9 @@ Angeletti et al, 2019, https://hal.science/hal-02047514/document)
 @inline function k2ij(k::Integer, m::Integer) 
     kp = triangle_number(m) - k 
     p = Int(floor((sqrt(1 + 8*kp) - 1)/2))
-    (k - m*(m-1)÷2 + p*(p+1)÷2, m - p)
+    i = k - m*(m-1)÷2 + p*(p+1)÷2
+    j = m - p
+    return i, j
 end 
 k2ij(I::CartesianIndex, m::Int) = CartesianIndex(k2ij(I[1], m)...,I.I[2:end]...) 
 
@@ -226,9 +228,9 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Intege
 
 # setindex with il, im, ..
 @inline function Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, M}) where {T, N, M}
-    @boundscheck N+1==M || throw(BoundsError(L,I))
+    @boundscheck N+1==M || throw(BoundsError(L, I))
     i, j = I[1:2] 
-    @boundscheck i >= j || throw(BoundsError(L, (i, j)))
+    @boundscheck i >= j || throw(BoundsError(L, I))
     k = ij2k(i, j, L.m)
     setindex!(L.data, x, k, I[3:end]...)
 end
@@ -293,7 +295,7 @@ function lowertriangular_match(
     L2::LowerTriangularArray;
     horizontal_only::Bool=false,
 )
-    horizontal_match = matrix_size(L1)[1:2] == matrix_size(L2)[1:2]
+    horizontal_match = size(L1, as=Matrix)[1:2] == size(L2, as=Matrix)[1:2]
     horizontal_only && return horizontal_match
     return horizontal_match && length(L1) == length(L2)     # ignores singleton dimensions
 end
@@ -318,9 +320,9 @@ function size2x_string(t::Tuple)
 end
 
 function Base.DimensionMismatch(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
-    s = "LowerTriangularArrays do not match; $(size2x_string(matrix_size(L1)))"
+    s = "LowerTriangularArrays do not match; $(size2x_string(size(L1, as=Matrix)))"
     for L in Ls
-        s *= ", $(size2x_string(matrix_size(L)))"
+        s *= ", $(size2x_string(size(L, as=Matrix)))"
     end
     return DimensionMismatch(s)
 end
@@ -344,7 +346,7 @@ function LowerTriangularMatrix(M::Matrix{T}) where T # CPU version
 end
 
 # helper function for conversion etc on GPU, returns indices of the lower triangle
-lowertriangle_indices(M::AbstractMatrix) = tril!(trues(size(M)))
+lowertriangle_indices(M::AbstractMatrix) = lowertriangle_indices(size(M)...)
 lowertriangle_indices(m::Integer, n::Integer) = tril!(trues((m,n)))
 
 function lowertriangle_indices(M::AbstractArray{T, N}) where {T, N}
@@ -370,13 +372,13 @@ LowerTriangularArray(L::LowerTriangularArray) = LowerTriangularArray(L.data, L.m
 LowerTriangularMatrix(M::AbstractMatrix) = LowerTriangularArray(M)
 
 function Base.Matrix(L::LowerTriangularMatrix{T}) where T
-    m, n = matrix_size(L)
+    m, n = size(L, as=Matrix)
     M = zeros(T, m, n)
     copyto!(M, L)
 end
 
 function Base.Array(L::LowerTriangularArray{T}) where T
-    A = zeros(T, matrix_size(L))
+    A = zeros(T, size(L, as=Matrix))
     copyto!(A, L)
 end 
             
@@ -385,8 +387,8 @@ function Base.copyto!(
     L2::LowerTriangularArray
 ) where T
     # if sizes don't match copy over the largest subset of indices
-    size(L1) != size(L2) && return copyto!(L1, L2,  Base.OneTo(minimum(matrix_size.((L1, L2), 1))),
-                                                    Base.OneTo(minimum(matrix_size.((L1, L2), 2))))
+    size(L1) != size(L2) && return copyto!(L1, L2,  Base.OneTo(minimum(size.((L1, L2), 1; as=Matrix))),
+                                                    Base.OneTo(minimum(size.((L1, L2), 2; as=Matrix))))
 
     L1.data .= convert.(T, L2.data)
     L1
@@ -400,11 +402,11 @@ function Base.copyto!(
     ms::AbstractUnitRange,                      # range of indices in 2nd dim
 ) where {T, S, N, ArrayType1<:Array{T,N}, ArrayType2<:Array{S,N}}
 
-    lmax, mmax = matrix_size(L2)[1:2]        # use the size of L2 for boundscheck
+    lmax, mmax = size(L2; as=Matrix)            # use the size of L2 for boundscheck
     @boundscheck maximum(ls) <= lmax || throw(BoundsError)
     @boundscheck maximum(ms) <= mmax || throw(BoundsError)
 
-    lmax, mmax = matrix_size(L1)[1:2]        # but the size of L1 to loop
+    lmax, mmax = size(L1; as=Matrix)            # but the size of L1 to loop
     lm = 0
     @inbounds for m in 1:mmax
         for l in m:lmax
@@ -435,11 +437,11 @@ function _copyto_core!(
     ms::AbstractUnitRange,                      # range of indices in 2nd dim
 ) where {T, S, N, ArrayType1<:AbstractArray{T}, ArrayType2<:AbstractArray{S}}
 
-    lmax_2, mmax_2 = matrix_size(L2)[1:2]       # use the size of L2 for boundscheck
+    lmax_2, mmax_2 = size(L2, as=Matrix)     # use the size of L2 for boundscheck
     @boundscheck maximum(ls) <= lmax_2 || throw(BoundsError)
     @boundscheck maximum(ms) <= mmax_2 || throw(BoundsError)
 
-    lmax_1, mmax_1 = matrix_size(L1)[1:2]
+    lmax_1, mmax_1 = size(L1, as=Matrix)
 
     # we'll setup the 1D-indices that correspond to the given range here
     ind_L1 = lowertriangle_indices(lmax_1, mmax_1)
@@ -473,9 +475,10 @@ function _copyto_core!(
     L1
 end 
 
-function Base.copyto!(  L::LowerTriangularArray{T},    # copy to L
+function Base.copyto!(  L::LowerTriangularArray{T},  # copy to L
                         M::AbstractArray) where T    # copy from M
-    @boundscheck matrix_size(L) == size(M) || throw(BoundsError)
+  
+    @boundscheck size(L, as=Matrix) == size(M) || throw(BoundsError)
     L.data .= convert.(T, M[lowertriangle_indices(M)])
 
     L
@@ -483,7 +486,8 @@ end
 
 function Base.copyto!(  M::AbstractArray{T},               # copy to M
                         L::LowerTriangularArray) where T   # copy from L
-    @boundscheck matrix_size(L) == size(M) || throw(BoundsError)
+  
+    @boundscheck size(L, as=Matrix) == size(M) || throw(BoundsError)
 
     lower_triangle_indices = lowertriangle_indices(M)
     upper_triangle_indices = @. ~lower_triangle_indices # upper triangle without main diagonal 
@@ -504,40 +508,31 @@ function Base.convert(
     ::Type{LowerTriangularArray{T1, N, ArrayTypeT1}},
     L::LowerTriangularArray{T2, N, ArrayTypeT2},
 ) where {T1, T2, N, ArrayTypeT1<:AbstractArray{T1}, ArrayTypeT2<:AbstractArray{T2}}
-    return LowerTriangularArray{T1,N,ArrayTypeT1}(L.data, L.m, L.n)
+    return LowerTriangularArray{T1, N, ArrayTypeT1}(L.data, L.m, L.n)
 end
 
 function Base.convert(::Type{LowerTriangularMatrix{T}}, L::LowerTriangularMatrix) where T
     return LowerTriangularMatrix{T}(L.data, L.m, L.n)
 end
 
-function Base.similar(::LowerTriangularArray{T,N,ArrayType}, I::Integer...) where {T, N, ArrayType}
+function Base.similar(::LowerTriangularArray{T, N, ArrayType}, I::Integer...) where {T, N, ArrayType}
     return LowerTriangularArray{T,N,ArrayType}(undef, I...)
 end
 
-function Base.similar(::LowerTriangularArray{T,N,ArrayType}, size::S) where {T, N, ArrayType, S<:Tuple}
+function Base.similar(::LowerTriangularArray{T, N, ArrayType}, size::S) where {T, N, ArrayType, S<:Tuple}
     return LowerTriangularArray{T,N,ArrayType}(undef, size...)
 end
 
-function Base.similar(L::LowerTriangularArray{S,N,ArrayType}, ::Type{T}) where {T, S, N, ArrayType}
+function Base.similar(L::LowerTriangularArray{S, N, ArrayType}, ::Type{T}) where {T, S, N, ArrayType}
     ArrayType_ = nonparametric_type(ArrayType) # TODO: not sure how else to infer this type 
-    return LowerTriangularArray{T,N,ArrayType_{T,N}}(undef, matrix_size(L)...)
+    return LowerTriangularArray{T, N, ArrayType_{T, N}}(undef, size(L; as=Matrix)...)
 end
 
-Base.similar(L::LowerTriangularArray{T,N,ArrayType}, ::Type{T}) where {T, N, ArrayType} =
-    LowerTriangularArray{T,N,ArrayType}(undef, matrix_size(L)...)
+Base.similar(L::LowerTriangularArray{T, N, ArrayType}, ::Type{T}) where {T, N, ArrayType} =
+    LowerTriangularArray{T, N, ArrayType}(undef, size(L; as=Matrix)...)
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
-# ARITHMETIC
-Base.:(*)(L::LowerTriangularArray{T}, s::Number) where T = LowerTriangularArray(L.data .* s, L.m, L.n)
-Base.:(*)(s::Number, L::LowerTriangularArray) = L*s         # commutative
-Base.:(/)(L::LowerTriangularArray{T}, s::Number) where T = LowerTriangularArray(L.data ./ s, L.m, L.n)
-
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
-
-function scale!(L::LowerTriangularArray{T}, s::Number) where T
-    L.data .*= s
-end
 
 """
 $(TYPEDSIGNATURES)
@@ -603,7 +598,7 @@ function Base.similar(
     ::Type{T},
 ) where {N, ArrayType, T}
     L = find_L(bc)
-    return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, matrix_size(L))
+    return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, size(L; as=Matrix))
 end
 
 # same function as above, but needs to be defined for both CPU and GPU style
@@ -612,7 +607,7 @@ function Base.similar(
     ::Type{T},
 ) where {N, ArrayType, T}
     L = find_L(bc)
-    return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, matrix_size(L))
+    return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, size(L; as=Matrix))
 end
 
 function GPUArrays.backend(

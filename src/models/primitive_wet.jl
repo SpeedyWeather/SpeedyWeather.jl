@@ -87,7 +87,7 @@ Base.@kwdef mutable struct PrimitiveWetModel{
     surface_evaporation::EV = SurfaceEvaporation(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
-    shortwave_radiation::SW = TransparentShortwave(spectral_grid)
+    shortwave_radiation::SW = NoShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     
     # NUMERICS

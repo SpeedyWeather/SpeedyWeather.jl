@@ -196,6 +196,30 @@ SpeedyWeather.jl at about 500 simulated years per day, i.e. one year takes about
 For an overview of typical simulation speeds a user can expect under different model setups see
 [Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/benchmark).
 
+## Citing
+
+If you use SpeedyWeather.jl in research, teaching, or other activities, we would be grateful 
+if you could mention SpeedyWeather.jl and cite our paper in JOSS:
+
+> Klöwer et al., (2024). SpeedyWeather.jl: Reinventing atmospheric general circulation models towards interactivity and extensibility. Journal of Open Source Software, 9(98), 6323, doi:[10.21105/joss.06323](https://doi.org/10.21105/joss.06323).
+
+The bibtex entry for the paper is:
+
+```bibtex
+@article{SpeedyWeatherJOSS,
+    doi = {10.21105/joss.06323},
+    url = {https://doi.org/10.21105/joss.06323},
+    year = {2024},
+    publisher = {The Open Journal},
+    volume = {9},
+    number = {98},
+    pages = {6323},
+    author = {Milan Klöwer and Maximilian Gelbrecht and Daisuke Hotta and Justin Willmert and Simone Silvestri and Gregory L. Wagner and Alistair White and Sam Hatfield and Tom Kimpson and Navid C. Constantinou and Chris Hill},
+    title = {{SpeedyWeather.jl: Reinventing atmospheric general circulation models towards interactivity and extensibility}},
+    journal = {Journal of Open Source Software}
+}
+```
+
 ## Copyright and license
 
 Copyright (c) 2020 Milan Klöwer for SpeedyWeather.jl  

@@ -97,7 +97,9 @@ function implicit_correction!(  diagn::DiagnosticVariables,
     H = implicit.H[]              # unpack as it's stored in a RefValue for mutation
     ξH = implicit.ξH[]            # unpack as it's stored in a RefValue for mutation
 
-    lmax, mmax = matrix_size(div_tend)[1:2] .- (2, 1)
+    lmax, mmax = size(div_tend, ZeroBased, as=Matrix)
+    lmax -= 1
+
     @boundscheck length(S⁻¹) == lmax+2 || throw(BoundsError)
     @boundscheck length(ξg∇²) == lmax+2 || throw(BoundsError)
     @boundscheck length(g∇²) == lmax+2 || throw(BoundsError)

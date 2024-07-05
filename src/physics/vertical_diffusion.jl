@@ -26,7 +26,7 @@ export BulkRichardsonDiffusion
     z₀::NF = 3.21e-5
 
     "[OPTION] Critical Richardson number for stable mixing cutoff [1]"
-    Ri_c::NF = 1
+    Ri_c::NF = 10
 
     "[OPTION] Fraction of surface boundary layer"
     fb::NF = 0.1

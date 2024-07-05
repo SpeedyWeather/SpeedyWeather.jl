@@ -132,7 +132,7 @@ function horizontal_diffusion!(
     ∇²ⁿ_expl::AbstractVector,           # explicit spectral damping (vector of k vectors of lmax length)
     ∇²ⁿ_impl::AbstractVector            # implicit spectral damping (vector of k vectors of lmax length)
 )
-    lmax, mmax = matrix_size(tendency)[1:2]      # 1-based
+    lmax, mmax = size(tendency; as=Matrix)      # 1-based
 
     @boundscheck size(tendency) == size(A) || throw(BoundsError)
     @boundscheck lmax <= length(∇²ⁿ_expl[1]) == length(∇²ⁿ_impl[1]) || throw(BoundsError)
