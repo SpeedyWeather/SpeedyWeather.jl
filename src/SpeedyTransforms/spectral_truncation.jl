@@ -101,6 +101,22 @@ spectral_interpolation(alms::LowerTriangularArray, trunc::Integer) = spectral_in
 
 """
 $(TYPEDSIGNATURES)
+Set imaginary component of m=0 modes (the zonal modes in the first column) to 0."""
+function zero_imaginary_zonal_modes!(
+    alms::LowerTriangularArray,
+)
+    lmax, mmax = size(alms, OneBased, as=Matrix)
+
+    for k in eachmatrix(alms)
+        for l in 1:lmax
+            alms[l, k] = real(alms[l, k])
+        end
+    end
+    return alms
+end
+
+"""
+$(TYPEDSIGNATURES)
 Smooth the spectral field `A` following A_smooth = (1-c*∇²ⁿ)A with power n of a normalised Laplacian
 so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c<0."""
 function spectral_smoothing(A::LowerTriangularArray, c::Real; power::Real=1)
