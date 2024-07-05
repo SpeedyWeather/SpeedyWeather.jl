@@ -7,7 +7,7 @@ import Random
         @testset for lmax = (mmax, mmax+1)
             A = randn(Complex{NF}, lmax, mmax)
 
-            SpeedyTransforms.spectral_truncation!(A)
+            spectral_truncation!(A)
 
             L = LowerTriangularMatrix(A)
 

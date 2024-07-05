@@ -31,6 +31,23 @@ end
 
 """
 $(TYPEDSIGNATURES)
+Sets the upper triangle of `A` to zero."""
+function spectral_truncation!(A::AbstractMatrix)
+    lmax, mmax = size(A)
+
+    for m in 1:mmax
+        for l in 1:lmax
+            if  m > l
+                A[l, m] = 0
+            end
+        end
+    end
+    return A
+end
+
+
+"""
+$(TYPEDSIGNATURES)
 Triangular truncation of `alms` to degree and order `trunc` in-place."""
 spectral_truncation!(alms::LowerTriangularArray, trunc::Integer) = spectral_truncation!(alms, trunc, trunc)
 
