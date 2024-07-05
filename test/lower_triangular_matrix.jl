@@ -593,7 +593,7 @@ end
 
     L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
     L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
-    L2T = spectral_truncation(L2,(size(L1; as=Matrix)[1:2] .- 1)...)
+    L2T = spectral_truncation(L2, (size(L1, ZeroBased; as=Matrix)[1:2])...)
     L3 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
 
     SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:33, 1:32)     # size of smaller matrix
