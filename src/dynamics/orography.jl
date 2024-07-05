@@ -163,13 +163,12 @@ function initialize!(   orog::EarthOrography,
     orography .*= scale                         # scale orography (default 1)
     spectral!(geopot_surf, orography, S)        # no *gravity yet
   
-    if orog.smoothing                       # smooth orography in spectral space?
-        # translate smoothing_fraction to trunc to truncate beyond
-        trunc = (size(geopot_surf, 1) - 2)
-        truncation = round(Int, trunc * (1-orog.smoothing_fraction))
-        SpeedyTransforms.spectral_smoothing!(geopot_surf, orog.smoothing_strength,
-                                                            power=orog.smoothing_power;
-                                                            truncation)
+    if orog.smoothing                           # smooth orography in spectral space?
+        trunc = (size(geopot_surf, 1, as=Matrix) - 2)   # get trunc=lmax from size of geopot_surf
+        truncation = round(Int, trunc * (1-orog.smoothing_fraction))    # degree of harmonics to be truncated
+        c = orog.smoothing_strength
+        power = orog.smoothing_power
+        SpeedyTransforms.spectral_smoothing!(geopot_surf, c; power, truncation)
     end
 
     gridded!(orography, geopot_surf, S)     # to grid-point space
