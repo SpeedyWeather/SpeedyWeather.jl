@@ -221,9 +221,14 @@ for higher wavenumbers with ``k^{-2}``
 
 ```@example speedytransforms
 k = 1:32
-alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32)
-alms .*= k.^-2
+A = randn(Complex{Float32}, 32, 32)
+A .*= k.^-2
+alms = LowerTriangularArray(A)
 ```
+We first create a Julia `Matrix` so that the matrix-vector broadcasting `.*= k`
+is correctly applied across dimensions of `A` and then convert to a
+`LowerTriangularMatrix`.
+
 Awesome. For higher degrees and orders the amplitude clearly decreases!
 Now to grid-point space and let us visualize the result
 ```@example speedytransforms

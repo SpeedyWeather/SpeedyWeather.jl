@@ -1,7 +1,7 @@
 function power_spectrum(alms::LowerTriangularMatrix{Complex{NF}};
                         normalize::Bool=true) where NF
     
-    lmax, mmax = size(alms)      # 1-based max degree l, order m
+    lmax, mmax = size(alms; as=Matrix)      # 1-based max degree l, order m
     trunc = min(lmax, mmax)      # consider only the triangle
                                 # ignore higher degrees if lmax > mmax
     spectrum = zeros(NF, trunc)   

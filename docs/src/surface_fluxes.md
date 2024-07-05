@@ -191,11 +191,6 @@ with ``\rho_s = \frac{p_s}{R_d T_N}`` the surface air density calculated from
 surface pressure ``p_s`` and lowermost layer temperature ``T_N``.
 Better would be to extrapolate ``T_N`` to ``T_s`` a surface air temperature
 assuming adiabatic descent but that is currently not implemented.
-In practice we use a flux limiter for numerical stability which limits the magnitude
-(preserving the sign). Choosing ``F_{uv, max}^\uparrow = 0.5 Pa`` would mean
-that the drag for winds faster than about ``33~m/s`` (typical ``C = 5\cdot 10^{-4}``)
-does not further increase. This can help to prevent oscillations drag terms can produce
-for sudden strong wind gusts.
 
 ## Surface heat fluxes
 
@@ -211,9 +206,6 @@ land surface layer or the mixed layer in the ocean. We then compute
 ```math
 F_T^\uparrow = \rho_s C V_0 c_p (T_{skin} - T_s)
 ```
-
-and apply a similar flux limiter as for the momentum flux to prevent a sudden strong heating
-or cooling. For ``F_{T, max}^\uparrow = 100~W/m^2`` 
 
 ## Surface evaporation
 
