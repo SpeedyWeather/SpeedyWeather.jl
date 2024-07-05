@@ -100,7 +100,7 @@ function implicit_correction!(  diagn::DiagnosticVariablesLayer{NF},
     H = implicit.H[]              # unpack as it's stored in a RefValue for mutation
     ξH = implicit.ξH[]            # unpack as it's stored in a RefValue for mutation
 
-    lmax, mmax = size(div_tend) .- (2, 1)
+    lmax, mmax = size(div_tend; as=Matrix) .- (2, 1)
     @boundscheck length(S⁻¹) == lmax+2 || throw(BoundsError)
     @boundscheck length(ξg∇²) == lmax+2 || throw(BoundsError)
     @boundscheck length(g∇²) == lmax+2 || throw(BoundsError)

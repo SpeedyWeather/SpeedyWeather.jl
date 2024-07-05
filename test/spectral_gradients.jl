@@ -194,10 +194,13 @@ end
         
         vor0[1, 1] = 0                   # zero mean
         div0[1, 1] = 0
-        vor0[1:lmax+1, 1] .= real(vor0[1:lmax+1, 1])    # set imaginary component of m=0 to 0
-        div0[1:lmax+1, 1] .= real(div0[1:lmax+1, 1])    # as the rotation of zonal modes is arbitrary
-        vor0[end, 1:mmax+1] .= 0                # set unusued last row (l=lmax+1) to zero
-        div0[end, 1:mmax+1] .= 0
+
+        # set imaginary component of m=0 to 0 as the rotation of zonal modes is arbitrary
+        SpeedyTransforms.zero_imaginary_zonal_modes!(vor0)
+        SpeedyTransforms.zero_imaginary_zonal_modes!(div0)
+
+        spectral_truncation!(vor0)      # set unusued last row (l=lmax+1) to zero
+        spectral_truncation!(div0)
 
         # copy into prognostic variables
         p.layers[1].timesteps[1].vor .= vor0
@@ -301,8 +304,8 @@ end
         d = simulation.diagnostic_variables
 
         a = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
-        SpeedyWeather.spectral_truncation!(a)
-        a[:, 1] .= real.(a[:, 1])
+        spectral_truncation!(a)
+        SpeedyTransforms.zero_imaginary_zonal_modes!(a)
 
         dadx = zero(a)
         dady = zero(a)
