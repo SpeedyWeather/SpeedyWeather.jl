@@ -39,7 +39,7 @@
 #         @test all(P.layers[i].timesteps[lf].vor .== 0)
 #     end
 
-#     grid_data = [gridded(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
+#     grid_data = [transform(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
 
 #     SpeedyWeather.set_vorticity!(P, grid_data)
 #     SpeedyWeather.set_divergence!(P, grid_data)
@@ -55,7 +55,7 @@
 #     end 
 #     @test P.surface.timesteps[lf].pres ≈ sph_data[1]
 
-#     grid_data = [gridded(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
+#     grid_data = [transform(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
 
 #     SpeedyWeather.set_vorticity!(P, grid_data, M)
 #     SpeedyWeather.set_divergence!(P, grid_data, M)
@@ -83,7 +83,7 @@
 #     mmax = M.spectral_transform.mmax
 #     lf = 1
 
-#     grid_data = [gridded(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
+#     grid_data = [transform(sph_data[i], M.spectral_transform) for i in eachindex(sph_data)]
 #     matrix_data = [Matrix(grid_data[i]) for i in eachindex(grid_data)]
 
 #     SpeedyWeather.set_vorticity!(P, matrix_data)

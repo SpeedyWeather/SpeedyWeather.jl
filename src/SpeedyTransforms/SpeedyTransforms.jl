@@ -18,10 +18,6 @@ const DEFAULT_GRID = FullGaussianGrid
 
 # TRANSFORM
 export  SpectralTransform,
-        gridded,
-        gridded!,
-        spectral,
-        spectral!,
         transform!,
         transform
 

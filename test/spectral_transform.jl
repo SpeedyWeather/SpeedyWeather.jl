@@ -57,7 +57,7 @@ spectral_resolutions_inexact = (127, 255)
                 fill!(alms, 0)
                 alms[1, 1] = 1
 
-                map = gridded(alms, S)
+                map = transform(alms, S)
             
                 for ij in SpeedyWeather.eachgridpoint(map)
                     @test map[ij] ≈ map[1] > zero(NF)
@@ -77,8 +77,8 @@ end
 
             alms = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
 
-            map1 = gridded(alms, S1)
-            map2 = gridded(alms, S2)
+            map1 = transform(alms, S1)
+            map2 = transform(alms, S2)
         
             # is only approx as recompute_legendre may use a different precision
             @test map1 ≈ map2
@@ -103,8 +103,8 @@ end
                         alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
                         alms[l, m] = 1
 
-                        map = gridded(alms, S)
-                        alms2 = spectral(map, S)
+                        map = transform(alms, S)
+                        alms2 = transform(map, S)
 
                         for lm in SpeedyWeather.eachharmonic(alms, alms2)
                             @test alms[lm] ≈ alms2[lm] atol=100*eps(NF)
@@ -133,8 +133,8 @@ end
                         alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
                         alms[l, m] = 1
 
-                        map = gridded(alms, S)
-                        alms2 = spectral(map, S)
+                        map = transform(alms, S)
+                        alms2 = transform(map, S)
 
                         tol = 1e-3
 
@@ -168,12 +168,12 @@ end
                 initialize!(O, E, S)
 
                 oro_grid = O.orography
-                oro_spec = spectral(oro_grid, S)
+                oro_spec = transform(oro_grid, S)
 
-                oro_grid1 = gridded(oro_spec, S)
-                oro_spec1 = spectral(oro_grid1, S)
-                oro_grid2 = gridded(oro_spec1, S)
-                oro_spec2 = spectral(oro_grid2, S)
+                oro_grid1 = transform(oro_spec, S)
+                oro_spec1 = transform(oro_grid1, S)
+                oro_grid2 = transform(oro_spec1, S)
+                oro_spec2 = transform(oro_grid2, S)
 
                 tol = 1e-3
 

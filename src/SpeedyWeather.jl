@@ -18,7 +18,7 @@ import Adapt: Adapt, adapt, adapt_structure
 
 # INPUT OUTPUT
 import TOML
-import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day
+import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, Week
 import Printf: Printf, @sprintf
 import Random: randstring
 import NCDatasets: NCDatasets, NCDataset, defDim, defVar
@@ -29,7 +29,7 @@ import UnicodePlots
 import ProgressMeter
 
 # to avoid a `using Dates` to pass on DateTime arguments
-export DateTime, Second, Minute, Hour, Day
+export DateTime, Second, Minute, Hour, Day, Week
 
 # export functions that have many cross-component methods
 export initialize!, finish!
@@ -67,7 +67,6 @@ using .RingGrids
 
 # SpeedyTransforms
 export SpeedyTransforms, SpectralTransform
-export spectral, gridded, spectral!, gridded!
 export transform, transform!
 export spectral_truncation, spectral_truncation!
 export curl, divergence, curl!, divergence!

@@ -24,7 +24,7 @@
         heights = [27000, 18000, 13000, 9000, 6000, 3700, 1800, 700] 
 
         for k in 1:8
-            geopot_grid = Matrix(gridded(d.layers[k].dynamics_variables.geopot))
+            geopot_grid = Matrix(transform(d.layers[k].dynamics_variables.geopot))
             height_over_ocean = geopot_grid[48, 24]/model.planet.gravity    # middle of pacific
             @test heights[k] ≈ height_over_ocean rtol=0.5                         # very large error allowed
         end

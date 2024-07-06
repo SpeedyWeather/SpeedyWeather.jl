@@ -100,7 +100,7 @@ function linear_virtual_temperature!(
     # but a linear virtual temperature in spectral space to avoid another transform
     # does not cause any problems. Alternative do the transform or have a linear
     # virtual temperature in both grid and spectral space
-    # spectral!(temp_virt, temp_virt_grid, S)
+    # transform!(temp_virt, temp_virt_grid, S)
 
     for k in eachmatrix(temp_virt, temp, humid)
         Tₖ = temp_average[k]

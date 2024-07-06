@@ -104,10 +104,10 @@ An example usage is therefore
 
     RingGrids.scale_coslat⁻¹!(u_grid)
     RingGrids.scale_coslat⁻¹!(v_grid)
-    u = spectral(u_grid, one_more_degree=true)
-    v = spectral(v_grid, one_more_degree=true)
+    u = transform(u_grid, one_more_degree=true)
+    v = transform(v_grid, one_more_degree=true)
     div = divergence(u, v, radius = 6.371e6)
-    div_grid = gridded(div)
+    div_grid = transform(div)
 """
 function divergence(u::LowerTriangularArray,
                     v::LowerTriangularArray;
@@ -187,10 +187,10 @@ requires both `u, v` to be transforms of fields that are scaled with
 
     RingGrids.scale_coslat⁻¹!(u_grid)
     RingGrids.scale_coslat⁻¹!(v_grid)
-    u = spectral(u_grid)
-    v = spectral(v_grid)
+    u = transform(u_grid)
+    v = transform(v_grid)
     vor = curl(u, v, radius=6.371e6)
-    vor_grid = gridded(div)
+    vor_grid = transform(div)
 """
 function curl(  u::LowerTriangularArray,
                 v::LowerTriangularArray;

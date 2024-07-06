@@ -311,8 +311,8 @@ end
         dady = zero(a)
         SpeedyWeather.∇!(dadx, dady, a, m.spectral_transform)
 
-        dadx_grid = gridded(dadx, m.spectral_transform)
-        dady_grid = gridded(dady, m.spectral_transform)
+        dadx_grid = transform(dadx, m.spectral_transform)
+        dady_grid = transform(dady, m.spectral_transform)
         
         RingGrids.scale_coslat⁻²!(dadx_grid)
         RingGrids.scale_coslat⁻²!(dady_grid)

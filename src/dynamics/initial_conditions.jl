@@ -576,7 +576,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     η[min(lmax+2, trunc+2):trunc+2, :] .= 0
 
     # scale to amplitude
-    η_grid = gridded(η, model.spectral_transform)
+    η_grid = transform(η, model.spectral_transform)
     η_min, η_max = extrema(η_grid)
     η .*= (A/max(abs(η_min), abs(η_max)))
 

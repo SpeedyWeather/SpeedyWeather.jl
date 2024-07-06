@@ -79,13 +79,13 @@ end
 """$(TYPEDSIGNATURES)
 Generator function."""
 function Tendencies(SG::SpectralGrid)
-    (; trunc, nlat_half, nlev, NF, ArrayType) = SG
+    (; trunc, nlat_half, nlayers, NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
     return Tendencies{NF, ArrayType, SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D}(;
-            trunc, nlat_half, nlayers=nlev
+            trunc, nlat_half, nlayers,
         )
 end
 
@@ -136,11 +136,11 @@ end
 """$(TYPEDSIGNATURES)
 Generator function."""
 function GridVariables(SG::SpectralGrid)
-    (; nlat_half, nlev, NF, ArrayType) = SG
+    (; nlat_half, nlayers, NF, ArrayType) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
     return GridVariables{NF, ArrayType, GridVariable2D, GridVariable3D}(;
-            nlat_half, nlayers=nlev
+            nlat_half, nlayers,
         )
 end
 
@@ -225,13 +225,13 @@ end
 """$(TYPEDSIGNATURES)
 Generator function."""
 function DynamicsVariables(SG::SpectralGrid)
-    (; trunc, nlat_half, nlev, NF, ArrayType) = SG
+    (; trunc, nlat_half, nlayers, NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
     return DynamicsVariables{NF, ArrayType, SpectralVariable2D, SpectralVariable3D,
         GridVariable2D, GridVariable3D}(;
-            trunc, nlat_half, nlayers=nlev
+            trunc, nlat_half, nlayers,
         )
 end
 

@@ -196,7 +196,7 @@ end
 
 function interpolate(   latds::Vector{NF},     # latitudes to interpolate onto (90˚N...-90˚N)
                         londs::Vector{NF},     # longitudes to interpolate into (0˚...360˚E)
-                        A::AbstractGrid,    # gridded field to interpolate from
+                        A::AbstractGrid,       # gridded field to interpolate from
                         Interpolator::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR,
                         ) where NF          # number format used for interpolation
     n = length(latds)

@@ -377,5 +377,6 @@ function time_stepping!(
     finish!(model.callbacks, progn, diagn, model)
 
     # return a UnicodePlot of surface vorticity
-    return plot(diagn.grid.vor_grid[:, end], title="Surface relative vorticity [1/s]")
+    surface_vorticity = diagn.grid.vor_grid[:, end]
+    return plot(surface_vorticity, title="Surface relative vorticity [1/s]")
 end 

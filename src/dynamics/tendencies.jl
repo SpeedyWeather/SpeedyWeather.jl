@@ -818,7 +818,7 @@ function SpeedyTransforms.transform!(
 
     transform!(vor_grid,  vor,  S)  # get vorticity on grid from spectral vor
     transform!(div_grid,  div,  S)  # get divergence on grid from spectral div
-    transform!(temp_grid, temp, S)  # -- tempereture --
+    transform!(temp_grid, temp, S)  # -- temperature --
     transform!(pres_grid, pres, S)  # -- pressure --
     
     if model isa PrimitiveWet

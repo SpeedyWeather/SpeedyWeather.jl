@@ -83,7 +83,7 @@ function initialize!(   orog::ZonalRidge,
         orography[ij] = g⁻¹*A*(A*(-2*sinφ^6*(cosφ^2 + 1/3) + 10/63) + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*RΩ)
     end
 
-    spectral!(geopot_surf, orography, S)      # to grid-point space
+    transform!(geopot_surf, orography, S)   # to grid-point space
     geopot_surf .*= gravity                 # turn orography into surface geopotential
     spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
     return nothing
@@ -160,18 +160,20 @@ function initialize!(   orog::EarthOrography,
 
     # Interpolate/coarsen to desired resolution
     interpolate!(orography, orography_highres)
-    orography .*= scale                         # scale orography (default 1)
-    spectral!(geopot_surf, orography, S)        # no *gravity yet
+    orography .*= scale                     # scale orography (default 1)
+    transform!(geopot_surf, orography, S)   # no *gravity yet
   
-    if orog.smoothing                           # smooth orography in spectral space?
-        trunc = (size(geopot_surf, 1, as=Matrix) - 2)   # get trunc=lmax from size of geopot_surf
-        truncation = round(Int, trunc * (1-orog.smoothing_fraction))    # degree of harmonics to be truncated
+    if orog.smoothing                       # smooth orography in spectral space?
+        # get trunc=lmax from size of geopot_surf
+        trunc = (size(geopot_surf, 1, as=Matrix) - 2)
+        # degree of harmonics to be truncated
+        truncation = round(Int, trunc * (1-orog.smoothing_fraction))
         c = orog.smoothing_strength
         power = orog.smoothing_power
         SpeedyTransforms.spectral_smoothing!(geopot_surf, c; power, truncation)
     end
 
-    gridded!(orography, geopot_surf, S)     # to grid-point space
+    transform!(orography, geopot_surf, S)   # to grid-point space
     geopot_surf .*= gravity                 # turn orography into surface geopotential
     spectral_truncation!(geopot_surf)       # set the lmax+1 harmonics to zero
     return nothing    

@@ -146,7 +146,7 @@ function total_energy(u, v, η, model)
     E = @. h/2*(u^2 + v^2) + g*h^2  # vertically-integrated mechanical energy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
-    return E_mean = real(spectral(E)[1]) / model.spectral_transform.norm_sphere
+    return E_mean = real(transform(E)[1]) / model.spectral_transform.norm_sphere
 end
 ```
 
@@ -262,7 +262,7 @@ function total_angular_momentum(u, η, model)
     Λ = @. (u*r + Ω*r^2) * h    # vertically-integrated AAM
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
-    return Λ_mean = real(spectral(Λ)[1]) / model.spectral_transform.norm_sphere
+    return Λ_mean = real(transform(Λ)[1]) / model.spectral_transform.norm_sphere
 end
 ```
 
@@ -299,7 +299,7 @@ function total_circulation(ζ, model)
     f = coriolis(ζ)         # create f on the grid of ζ
     C = ζ .+ f              # absolute vorticity
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
-    return C_mean = real(spectral(C)[1]) / model.spectral_transform.norm_sphere
+    return C_mean = real(transform(C)[1]) / model.spectral_transform.norm_sphere
 end
 
 total_circulation(ζ, model)
@@ -336,7 +336,7 @@ function total_enstrophy(ζ, η, model)
     Q = @. q^2 / 2      # Potential enstrophy
 
     # transform to spectral, take l=m=0 mode at [1] and normalize for mean
-    return Q_mean = real(spectral(Q)[1]) / model.spectral_transform.norm_sphere
+    return Q_mean = real(transform(Q)[1]) / model.spectral_transform.norm_sphere
 end
 ```
 
@@ -373,14 +373,14 @@ to show how to global integral ``\iint dV`` can be written more efficiently
 # define a global integral, reusing a precomputed SpectralTransform S
 # times surface area of sphere omitted
 function ∬dA(v, h, S::SpectralTransform)
-    return real(spectral(v .* h, S)[1]) / S.norm_sphere
+    return real(transform(v .* h, S)[1]) / S.norm_sphere
 end
 
 # use SpectralTransform from model
 ∬dA(v, h, model::ModelSetup) = ∬dA(v, h, model.spectral_transform)
 ```
 By reusing `model.spectral_transform` we do not have to re-precompute
-the spectral tranform on every call to `spectral`. Providing
+the spectral tranform on every call to `transform`. Providing
 the spectral transform from model as the 2nd argument simply reuses
 a previously precomputed spectral transform which is much faster
 and uses less memory.
