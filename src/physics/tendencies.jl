@@ -18,7 +18,7 @@ function parameterization_tendencies!(
     G = model.geometry
     rings = eachring(G.Grid, G.nlat_half)
 
-    @floop for ij in eachgridpoint(diagn)       # loop over all horizontal grid points
+    for ij in eachgridpoint(diagn)       # loop over all horizontal grid points
 
         thread_id = Threads.threadid()          # not two threads should use the same ColumnVariables
         column = diagn.columns[thread_id]

@@ -105,6 +105,7 @@ Dates.Second(x::AbstractFloat) = convert(Second, x)
 Dates.Minute(x::AbstractFloat) = Second(60x)
 Dates.Hour(  x::AbstractFloat) = Minute(60x)
 Dates.Day(   x::AbstractFloat) = Hour(24x)
+Dates.Week(  x::AbstractFloat) = Day(7x)
 
 # use Dates.second to round to integer seconds
 Dates.second(x::Dates.Nanosecond) = round(Int, x.value*1e-9)

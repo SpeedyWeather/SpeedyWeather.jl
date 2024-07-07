@@ -498,7 +498,7 @@ function ∇!(
     #TODO add @inbounds back in
     for k in eachmatrix(dpdx, dpdy, p)      # also performs size checks
         lm = 0
-        @inbounds for m in 1:mmax-1         # 1-based l, m, skip last column
+        for m in 1:mmax-1         # 1-based l, m, skip last column
 
             # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
             lm += 1
@@ -510,7 +510,7 @@ function ∇!(
             for l in m+1:lmax-1                     # skip last row
                 lm += 1
                 dpdx[lm, k] = (m-1)*im*p[lm, k]
-                dpdy[lm, k] = grad_y1[lm]*p[lm-1, k] + grad_y2[lm, k]*p[lm+1, k]
+                dpdy[lm, k] = grad_y1[lm]*p[lm-1, k] + grad_y2[lm]*p[lm+1, k]
             end
 
             # LAST ROW (separated to avoid out-of-bounds access to lmax+1
@@ -520,7 +520,7 @@ function ∇!(
         end
 
         # LAST COLUMN
-        @inbounds begin
+        # @inbounds begin
             lm += 1                                 # second last row
             dpdx[lm, k] = (mmax-1)*im*p[lm, k]
             dpdy[lm, k] = grad_y2[lm]*p[lm+1, k]    # only 2nd term
@@ -528,7 +528,7 @@ function ∇!(
             lm += 1                                 # last row
             dpdx[lm, k] = (mmax-1)*im*p[lm, k]
             dpdy[lm, k] = grad_y1[lm]*p[lm-1, k]    # only 1st term
-        end
+        # end
     end
 
     return dpdx, dpdy

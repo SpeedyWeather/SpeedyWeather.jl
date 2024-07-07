@@ -475,12 +475,21 @@ function _copyto_core!(
     L1
 end 
 
-function Base.copyto!(  L::LowerTriangularArray{T},  # copy to L
-                        M::AbstractArray) where T    # copy from M
+function Base.copyto!(
+    L::LowerTriangularArray{T},     # copy to L
+    M::AbstractArray,               # copy from M
+) where T
   
-    @boundscheck size(L, as=Matrix) == size(M) || throw(BoundsError)
-    L.data .= convert.(T, M[lowertriangle_indices(M)])
+    # if matrix sizes agree copy over the non-zero elements
+    if size(L, as=Matrix) == size(M)
+        L.data .= convert.(T, M[lowertriangle_indices(M)])
 
+    # if vector sizes agree copy straight into underlying data array
+    elseif size(L) == size(M)
+        L.data .= convert.(T, M)
+    else    # not matching sizes
+        throw(DimensionMismatch)
+    end
     L
 end
 
