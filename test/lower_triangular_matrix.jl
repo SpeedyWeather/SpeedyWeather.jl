@@ -449,7 +449,14 @@ end
             copyto!(L2, L1)
 
             @test L2 == L1
-            
+
+            # copyto! Vector 
+            L1 = randn(LowerTriangularArray{NF}, 10, 10, idims...)
+            V = randn(size(L1, as=Vector)...)
+            copyto!(L1, V)
+
+            @test L1.data == NF.(V) 
+
             # copyto! Array 
             M = zeros(NF, 10, 10, idims...)
             copyto!(M, L1)
