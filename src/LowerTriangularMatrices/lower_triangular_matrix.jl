@@ -496,6 +496,16 @@ function Base.copyto!(  M::AbstractArray{T},               # copy to M
     M
 end
 
+# copyto! from Vector to LA
+function Base.copyto!(  L::LowerTriangularArray{T,N}, 
+                        V::AbstractArray{S,N}) where {T,S,N}
+    @boundscheck size(L, as=Vector) == size(V) || throw(BoundsError)
+
+    L.data .= convert.(T, V)
+     
+    L 
+end 
+
 function LowerTriangularMatrix{T}(M::LowerTriangularMatrix{T2}) where {T,T2}
     L = LowerTriangularMatrix{T}(undef, size(M)...)
     copyto!(L, M)
