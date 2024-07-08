@@ -29,9 +29,9 @@ function initialize!(
     particle_advection::ParticleAdvection2D,
     model::ModelSetup,
 )
-    (; nlev) = model.spectral_grid
+    (; nlayers) = model.spectral_grid
     (; layer) = particle_advection
-    nlev < layer && @warn "Particle advection on layer $layer on spectral grid with nlev=$nlev."
+    nlayers < layer && @warn "Particle advection on layer $layer on spectral grid with nlayers=$nlayers."
 
     (; every_n_timesteps) = particle_advection
     # Δt [˚*s/m] is scaled by radius to convert more easily from velocity [m/s]
@@ -48,7 +48,7 @@ an equal-area uniformity."""
 function initialize!(
     particles::Vector{P},
     model::ModelSetup,
-) where {P<:Particle}
+) where {P <: Particle}
     for i in eachindex(particles)
         # uniform random in lon (360*rand), lat (cos-distribution), σ (rand)
         particles[i] = rand(P)
@@ -69,7 +69,8 @@ function initialize!(
     length(particles) == 0 && return nothing
 
     k = particle_advection.layer
-    (; u_grid, v_grid) = diagn.layers[k].grid_variables
+    u_grid = view(diagn.grid.u_grid, :, k)
+    v_grid = view(diagn.grid.v_grid, :, k)
     (; interpolator) = diagn.particles
     
     # interpolate initial velocity on initial locations
@@ -90,7 +91,6 @@ function initialize!(
     interpolate!(u0, u_grid, interpolator)
     interpolate!(v0, v_grid, interpolator)
 end
-
 
 # function barrier
 function particle_advection!(progn, diagn, adv::ParticleAdvection2D)
@@ -157,7 +157,8 @@ function particle_advection!(
 
     # CORRECTOR STEP, use u, v at new location and new time step
     k = particle_advection.layer
-    (; u_grid, v_grid) = diagn.layers[k].grid_variables
+    u_grid = view(diagn.grid.u_grid, :, k)
+    v_grid = view(diagn.grid.v_grid, :, k)
     (; interpolator) = diagn.particles
     RingGrids.update_locator!(interpolator, lats, lons)
 

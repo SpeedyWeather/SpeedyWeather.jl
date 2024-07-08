@@ -15,7 +15,6 @@ function virtual_temperature!(
     
     (; temp_grid, humid_grid, temp_virt_grid) = diagn.grid
     μ = model.atmosphere.μ_virt_temp
-    # @. temp_virt_grid = temp_grid * (1 + μ*humid_grid)    # same as loop but a bit slower (?)
 
     @inbounds for ijk in eachindex(temp_virt_grid, temp_grid, humid_grid)
         temp_virt_grid[ijk] = temp_grid[ijk]*(1 + μ*humid_grid[ijk])
@@ -64,8 +63,8 @@ as humidity is zero in this `model`."""
 function linear_virtual_temperature!(   
     diagn::DiagnosticVariablesLayer,
     progn::PrognosticLayerTimesteps,
-    model::PrimitiveDry,
     lf::Integer,
+    model::PrimitiveDry,
 )
     (; temp_virt) = diagn.dynamics_variables
     (; temp) = progn.timesteps[lf]
@@ -87,8 +86,8 @@ in spectral space."""
 function linear_virtual_temperature!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
-    model::PrimitiveEquation,
     lf::Integer,
+    model::PrimitiveEquation,
 )
     (; temp_virt) = diagn.dynamics
     μ = model.atmosphere.μ_virt_temp

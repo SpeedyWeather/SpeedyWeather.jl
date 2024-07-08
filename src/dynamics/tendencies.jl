@@ -58,7 +58,7 @@ function dynamics_tendencies!(
     pressure_gradient_flux!(diagn, progn, lf, spectral_transform)
 
     # calculate Tᵥ = T + Tₖμq in spectral as a approxmation to Tᵥ = T(1+μq) used for geopotential
-    linear_virtual_temperature!(diagn, progn, model, lf_implicit)
+    linear_virtual_temperature!(diagn, progn, lf_implicit, model)
 
     # temperature relative to profile
     temperature_anomaly!(diagn, implicit)

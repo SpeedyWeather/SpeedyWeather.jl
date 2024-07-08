@@ -217,18 +217,18 @@ function interpolate(   A::AbstractGrid{NF},        # field to interpolate
     interpolate!(Aout, A, I)                # perform interpolation, store in As
 end
 
-function interpolate!(  Aout::Vector,       # Out: interpolated values
-                        A::Grid,            # gridded values to interpolate from
-                        interpolator::AnvilInterpolator{NF, Grid},   # geometry info and work arrays       
-                        ) where {NF<:AbstractFloat, Grid<:AbstractGrid}
-
+function interpolate!(
+    Aout::AbstractVector,               # Out: interpolated values
+    A::AbstractVector,                  # gridded values to interpolate from
+    interpolator::AnvilInterpolator,    # geometry info and work arrays       
+)
     (; ij_as, ij_bs, ij_cs, ij_ds, Δabs, Δcds, Δys ) = interpolator.locator
     (; npoints ) = interpolator.geometry
     
     # 1) Aout's length must match the interpolator
-    # 2) input grid A must match the interpolator's geometry (Grids are checked with dispatch)
+    # 2) input A must match the interpolator's geometry points (do not check grids for view support)
     @boundscheck length(Aout) == length(ij_as) || throw(BoundsError)    
-    @boundscheck A.nlat_half == interpolator.geometry.nlat_half || throw(BoundsError)
+    @boundscheck length(A) == npoints || throw(BoundsError)
 
     A_northpole, A_southpole = average_on_poles(A, interpolator.geometry.rings)
 
@@ -251,11 +251,13 @@ function interpolate!(  Aout::Vector,       # Out: interpolated values
     return Aout
 end
 
-function interpolate!(  Aout::AbstractGrid,     # Out: grid to interpolate onto
-                        A::AbstractGrid,        # In: gridded data to interpolate from
-                        interpolator::AbstractInterpolator)
-    
-    grids_match(Aout, A) && return copyto!(Aout.data, A.data)     # if grids match just copy data over (eltypes might differ)
+function interpolate!(
+    Aout::AbstractGrid,     # Out: grid to interpolate onto
+    A::AbstractGrid,        # In: gridded data to interpolate from
+    interpolator::AnvilInterpolator,
+)
+    # if grids match just copy data over (eltypes might differ)
+    grids_match(Aout, A) && return copyto!(Aout.data, A.data)
     interpolate!(Aout.data, A, interpolator)
 end
 
@@ -429,7 +431,7 @@ $(TYPEDSIGNATURES)
 Computes the average at the North and South pole from a given grid `A` and it's precomputed
 ring indices `rings`. The North pole average is an equally weighted average of all grid points
 on the northern-most ring. Similar for the South pole."""
-function average_on_poles(  A::AbstractGrid{NF},
+function average_on_poles(  A::AbstractVector{NF},
                             rings::Vector{<:UnitRange{<:Integer}}
                             ) where {NF<:AbstractFloat}
     

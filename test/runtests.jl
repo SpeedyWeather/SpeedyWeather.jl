@@ -24,7 +24,7 @@ include("particles.jl")
 include("particle_advection.jl")
 
 # VERTICAL LEVELS
-include("vertical_levels.jl")
+include("vertical_coordinates.jl")
 include("geopotential.jl")
 
 # PHYSICS

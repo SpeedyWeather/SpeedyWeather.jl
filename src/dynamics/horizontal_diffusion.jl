@@ -137,7 +137,7 @@ function horizontal_diffusion!(
     @boundscheck size(tendency) == size(A) || throw(BoundsError)
     @boundscheck lmax <= length(∇²ⁿ_expl[1]) == length(∇²ⁿ_impl[1]) || throw(BoundsError)
 
-    for k in eachmatrix(tendency)
+    for k in eachmatrix(tendency, A)
         lm = 0
         for m in 1:mmax             # loops over all columns/order m
             for l in m:lmax-1       # but skips the lmax+2 degree (1-based)

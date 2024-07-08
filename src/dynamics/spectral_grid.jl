@@ -64,7 +64,7 @@ $(TYPEDFIELDS)
     nlev::Int = nlayers
 
     "[OPTION] coordinates used to discretize the vertical"
-    vertical_coordinates::VerticalCoordinates = SigmaCoordinates(; nlev)
+    vertical_coordinates::VerticalCoordinates = SigmaCoordinates(; nlayers)
 
     # ARRAY TYPES (horizontal dimension in grid/spectral is flattened to 1D)
     SpectralVariable2D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}}
