@@ -113,7 +113,7 @@ which would point to the first element in the upper triangle (hence zero).
 
 In performance-critical code a single index should be used, as this directly maps
 to the index of the underlying data vector. The matrix index is somewhat slower
-as it first has to be converted to the corresponding single index.
+as it first has to be converted to the corresponding single index. 
 
 Consequently, many loops in SpeedyWeather.jl are build with the following structure
 ```@repl LowerTriangularMatrices
@@ -128,6 +128,11 @@ end
 which loops over all lower triangle entries of `L::LowerTriangularArray` and the single
 index `ij` is simply counted up. However, one could also use `[i, j]` as indices in the
 loop body or to perform any calculation (`i+j` here).
+
+!!! warn "`end` doesn't work for matrix indexing"
+    Indexing `LowerTriangularMatrix` and `LowerTriangularArray` in matrix style (`[i, j]`) with 
+    `end` doesn't work. It either returns an error or wrong results as the `end` is lowered by 
+    Julia to the size of the underlying flat array dimension.
 
 The `setindex!` functionality of matrixes will throw a `BoundsError` when trying to write
 into the upper triangle of a `LowerTriangularArray`, for example
