@@ -475,7 +475,7 @@ function _copyto_core!(
     L1
 end 
 
-function Base.copyto!(  L::LowerTriangularArray{T},    # copy to L
+function Base.copyto!(  L::LowerTriangularArray{T},  # copy to L
                         M::AbstractArray) where T    # copy from M
     @boundscheck size(L, as=Matrix) == size(M) || throw(BoundsError)
     L.data .= convert.(T, M[lowertriangle_indices(M)])
@@ -497,13 +497,13 @@ function Base.copyto!(  M::AbstractArray{T},               # copy to M
 end
 
 # copyto! from Vector to LA
-function Base.copyto!(  L::LowerTriangularArray{T,N}, 
-    V::AbstractArray{S,N}) where {T,S,N}
-@boundscheck size(L, as=Vector) == size(V) || throw(BoundsError)
+function Base.copyto!(  L::LowerTriangularArray{T,N},       # copy to L
+                        V::AbstractArray{S,N}) where {T,S,N}# copy from V
+    @boundscheck size(L, as=Vector) == size(V) || throw(BoundsError)
 
-L.data .= convert.(T, V)
+    L.data .= convert.(T, V)
 
-L 
+    L 
 end 
 
 function LowerTriangularMatrix{T}(M::LowerTriangularMatrix{T2}) where {T,T2}
