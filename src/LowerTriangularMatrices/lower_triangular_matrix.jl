@@ -121,7 +121,8 @@ for f in (:zeros, :ones, :rand, :randn)
             n::Integer,
             I::Vararg{Integer, M},
         ) where {T, N, M, ArrayType}
-            return LowerTriangularArray(ArrayType($f(T, nonzeros(m, n), I...)), m, n)
+            ArrayType_ = nonparametric_type(ArrayType)
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(m, n), I...)), m, n)
         end
         
         # default CPU, use Array

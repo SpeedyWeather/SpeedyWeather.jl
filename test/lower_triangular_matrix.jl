@@ -277,6 +277,13 @@ end
             JL2 = adapt(JLArray, L)
             @test all(JL2 .== JL)   # equality via broadcasting
             @test JL2 == JL         # checks for type and data equality
+
+            Random.seed!(123)
+            L = f(LowerTriangularArray{Float16}, s...)
+            Random.seed!(123)
+            L2 = f(LowerTriangularMatrix{Float16}, s...)
+
+            @test L == L2
         end
     end
 end
