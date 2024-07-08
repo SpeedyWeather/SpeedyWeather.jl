@@ -28,16 +28,18 @@ QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
 
 function initialize!(   drag::QuadraticDrag,
                         model::ModelSetup)
-    # c = c_D / H * R
+    # c = c_D / H * R
     drag.c[] = drag.c_D / model.atmosphere.layer_thickness * model.geometry.radius
 end
 
 # function barrier
-function drag!(     diagn::DiagnosticVariablesLayer,
-                    progn::PrognosticVariablesLayer,
-                    drag::QuadraticDrag,
-                    time::DateTime,
-                    model::ModelSetup)
+function drag!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    drag::QuadraticDrag,
+    model::ModelSetup,
+    lf::Integer,
+)
     drag!(diagn, drag)
 end
 
@@ -51,12 +53,11 @@ with c_D the non-dimensional drag coefficient as defined in `drag::QuadraticDrag
 c_D and layer thickness `H` are precomputed in initialize!(::QuadraticDrag, ::ModelSetup)
 and scaled by the radius as are the momentum equations."""
 function drag!(     
-    diagn::DiagnosticVariablesLayer,
-    drag::QuadraticDrag{NF},
-) where NF
-    
-    u = diagn.grid_variables.u_grid
-    v = diagn.grid_variables.v_grid
+    diagn::DiagnosticVariables,
+    drag::QuadraticDrag,
+)
+    u = diagn.grid.u_grid
+    v = diagn.grid.v_grid
 
     Fu = diagn.tendencies.u_tend_grid
     Fv = diagn.tendencies.v_tend_grid
@@ -64,9 +65,10 @@ function drag!(
     # total drag coefficient with radius scaling and /layer_thickness
     c = drag.c[]
 
+    k = diagn.nlayers   # only apply to surface layer 
     @inbounds for ij in eachgridpoint(u, v, Fu, Fv)
-        speed = sqrt(u[ij]^2 + v[ij]^2)
-        Fu[ij] -= c*speed*u[ij]     # -= as the tendencies already contain forcing
-        Fv[ij] -= c*speed*v[ij]
+        speed = sqrt(u[ij, k]^2 + v[ij, k]^2)
+        Fu[ij, k] -= c*speed*u[ij, k]     # -= as the tendencies already contain forcing
+        Fv[ij, k] -= c*speed*v[ij, k]
     end
 end

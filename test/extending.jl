@@ -1,5 +1,5 @@
 @testset "Extending forcing and drag" begin
-    Base.@kwdef struct JetDrag{NF} <: SpeedyWeather.AbstractDrag
+    @kwdef struct JetDrag{NF} <: SpeedyWeather.AbstractDrag
 
         # DIMENSIONS from SpectralGrid
         "Spectral resolution as max degree of spherical harmonics"
@@ -10,13 +10,13 @@
         time_scale::Second = Day(6)
     
         "Jet strength [m/s]"
-        u₀::Float64 = 20
+        u₀::NF = 20
     
         "latitude of Gaussian jet [˚N]"
-        latitude::Float64 = 30
+        latitude::NF = 30
     
         "Width of Gaussian jet [˚]"
-        width::Float64 = 6
+        width::NF = 6
     
         # TO BE INITIALISED
         "Relaxation back to reference vorticity"
@@ -40,30 +40,34 @@
             u[ij] = drag.u₀ * exp(-(lat[ij]-drag.latitude)^2/(2*drag.width^2))
         end
     
-        û = SpeedyTransforms.transform(u, one_more_degree=true)
+        û = SpeedyTransforms.transform(u, model.spectral_transform)
         v̂ = zero(û)
         SpeedyTransforms.curl!(drag.ζ₀, û, v̂, model.spectral_transform)
         return nothing
     end
     
-    function SpeedyWeather.drag!(   diagn::DiagnosticVariablesLayer,
-                                    progn::PrognosticVariablesLayer,
-                                    drag::JetDrag,
-                                    time::DateTime,
-                                    model::ModelSetup)
+    function SpeedyWeather.drag!(
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        drag::JetDrag,
+        model::ModelSetup,
+        lf::Integer,
+    )
     
-        (; vor) = progn
+        vor = progn.vor[lf]
         (; vor_tend) = diagn.tendencies
         (; ζ₀) = drag
         
         (; radius) = model.spectral_grid
         r = radius/drag.time_scale.value
-        for lm in eachindex(vor, vor_tend, ζ₀)
-            vor_tend[lm] -= r*(vor[lm] - ζ₀[lm])
+
+        k = diagn.nlayers   # drag only on surface layer
+        for lm in eachharmonic(vor_tend)
+            vor_tend[lm, k] -= r*(vor[lm, k] - ζ₀[lm])
         end
     end
     
-    Base.@kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing
+    @kwdef struct StochasticStirring{NF} <: SpeedyWeather.AbstractForcing
         
         # DIMENSIONS from SpectralGrid
         "Spectral resolution as max degree of spherical harmonics"
@@ -78,13 +82,13 @@
         decorrelation_time::Second = Day(2)
     
         "Stirring strength A [1/s²]"
-        strength::Float64 = 1e-11
+        strength::NF = 1e-11
     
         "Stirring latitude [˚N]"
-        latitude::Float64 = 45
+        latitude::NF = 45
     
         "Stirring width [˚]"
-        width::Float64 = 24
+        width::NF = 24
     
         "Minimum degree of spherical harmonics to force"
         lmin::Int = 8
@@ -142,18 +146,21 @@
         return nothing
     end
     
-    function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
-                                    progn::PrognosticVariablesLayer,
-                                    forcing::StochasticStirring,
-                                    time::DateTime,
-                                    model::ModelSetup)
+    function SpeedyWeather.forcing!(
+        diagn::DiagnosticVariables,
+        progn::PrognosticVariables,
+        forcing::StochasticStirring,
+        model::ModelSetup,
+        lf::Integer,
+    )
         SpeedyWeather.forcing!(diagn, forcing, model.spectral_transform)
     end
     
-    function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
-                                    forcing::StochasticStirring{NF},
-                                    spectral_transform::SpectralTransform) where NF
-        
+    function SpeedyWeather.forcing!(
+        diagn::DiagnosticVariables,
+        forcing::StochasticStirring{NF},
+        spectral_transform::SpectralTransform,
+    ) where NF
         # noise and auto-regressive factors
         a = forcing.a[]    # = sqrt(1 - exp(-2dt/τ))
         b = forcing.b[]    # = exp(-dt/τ)
@@ -173,21 +180,21 @@
         end
     
         # to grid-point space
-        S_grid = diagn.dynamics_variables.a_grid
-        SpeedyTransforms.gridded!(S_grid, S, spectral_transform)
+        S_grid = diagn.dynamics.a_2D_grid
+        transform!(S_grid, S, spectral_transform)
         
         # mask everything but mid-latitudes
         RingGrids._scale_lat!(S_grid, forcing.lat_mask)
         
         # back to spectral space
-        (; vor_tend) = diagn.tendencies
-        SpeedyTransforms.spectral!(vor_tend, S_grid, spectral_transform)
-        SpeedyTransforms.spectral_truncation!(vor_tend)    # set lmax+1 to zero
-        
+        S_masked = diagn.dynamics.a_2D
+        transform!(S_masked, S_grid, spectral_transform)
+        k = diagn.nlayers       # only force surface layer
+        diagn.tendencies.vor_tend[:, k] .+= S_masked
         return nothing
     end
 
-    spectral_grid = SpectralGrid(trunc=31, nlev=1)
+    spectral_grid = SpectralGrid(trunc=31, nlayers=1)
     
     drag = JetDrag(spectral_grid, time_scale=Day(6))
     forcing = StochasticStirring(spectral_grid)
