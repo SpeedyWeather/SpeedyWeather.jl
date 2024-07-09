@@ -210,7 +210,15 @@ end
 end
 
 @inline function Base.getindex(L::LowerTriangularMatrix{T}, col::Colon, i::Integer) where T
-    return Matrix(L)[:,i]
+    if i==1
+        return L.data[1:size(L, 1, as=Matrix)]
+    else 
+        return Matrix(L)[:,i]
+    end
+end
+
+@inline function Base.getindex(L::LowerTriangularMatrix{T}, i::Integer, col::Colon) where T
+    return Matrix(L)[i,:] 
 end
 
 # important to do Tuple(I) here for the j > i case as one of the getindex methods above is called
@@ -223,6 +231,7 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, i::Integer)
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer) where {T,V<:AbstractVector{T}} = getindex(L.data, i)
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, I::CartesianIndex{M}) where {T,V<:AbstractVector{T},M} = getindex(L, Tuple(I)...)
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer, I::CartesianIndex{0}) where {T,V<:AbstractVector{T}} = getindex(L, i)
+
 
 # setindex with lm, ..
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N} = setindex!(L.data, x, I...)
