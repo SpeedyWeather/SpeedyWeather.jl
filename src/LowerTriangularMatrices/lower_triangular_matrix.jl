@@ -121,7 +121,8 @@ for f in (:zeros, :ones, :rand, :randn)
             n::Integer,
             I::Vararg{Integer, M},
         ) where {T, N, M, ArrayType}
-            return LowerTriangularArray(ArrayType($f(T, nonzeros(m, n), I...)), m, n)
+            ArrayType_ = nonparametric_type(ArrayType)
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(m, n), I...)), m, n)
         end
         
         # default CPU, use Array
@@ -475,7 +476,7 @@ function _copyto_core!(
     L1
 end 
 
-function Base.copyto!(  L::LowerTriangularArray{T},    # copy to L
+function Base.copyto!(  L::LowerTriangularArray{T},  # copy to L
                         M::AbstractArray) where T    # copy from M
     @boundscheck size(L, as=Matrix) == size(M) || throw(BoundsError)
     L.data .= convert.(T, M[lowertriangle_indices(M)])
@@ -495,6 +496,16 @@ function Base.copyto!(  M::AbstractArray{T},               # copy to M
 
     M
 end
+
+# copyto! from Vector to LA
+function Base.copyto!(  L::LowerTriangularArray{T,N},       # copy to L
+                        V::AbstractArray{S,N}) where {T,S,N}# copy from V
+    @boundscheck size(L, as=Vector) == size(V) || throw(BoundsError)
+
+    L.data .= convert.(T, V)
+
+    L 
+end 
 
 function LowerTriangularMatrix{T}(M::LowerTriangularMatrix{T2}) where {T,T2}
     L = LowerTriangularMatrix{T}(undef, size(M)...)
