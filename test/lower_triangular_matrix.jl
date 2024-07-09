@@ -32,6 +32,8 @@ import Random
 
             @test all(L[:,1] .== A[:,1])
             @test all(L[:,2] .== A[:,2])
+            @test all(L[1,:] .== A[1,:])
+            @test all(L[2,:] .== A[2,:])
         end
     end
 end
