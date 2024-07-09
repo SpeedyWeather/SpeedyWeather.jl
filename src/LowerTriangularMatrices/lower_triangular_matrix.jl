@@ -121,7 +121,8 @@ for f in (:zeros, :ones, :rand, :randn)
             n::Integer,
             I::Vararg{Integer, M},
         ) where {T, N, M, ArrayType}
-            return LowerTriangularArray(ArrayType($f(T, nonzeros(m, n), I...)), m, n)
+            ArrayType_ = nonparametric_type(ArrayType)
+            return LowerTriangularArray(ArrayType_($f(T, nonzeros(m, n), I...)), m, n)
         end
         
         # default CPU, use Array
@@ -209,7 +210,15 @@ end
 end
 
 @inline function Base.getindex(L::LowerTriangularMatrix{T}, col::Colon, i::Integer) where T
-    return Matrix(L)[:,i]
+    if i==1
+        return L.data[1:size(L, 1, as=Matrix)]
+    else 
+        return Matrix(L)[:,i]
+    end
+end
+
+@inline function Base.getindex(L::LowerTriangularMatrix{T}, i::Integer, col::Colon) where T
+    return Matrix(L)[i,:] 
 end
 
 # important to do Tuple(I) here for the j > i case as one of the getindex methods above is called
@@ -222,6 +231,7 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, i::Integer)
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer) where {T,V<:AbstractVector{T}} = getindex(L.data, i)
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, I::CartesianIndex{M}) where {T,V<:AbstractVector{T},M} = getindex(L, Tuple(I)...)
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer, I::CartesianIndex{0}) where {T,V<:AbstractVector{T}} = getindex(L, i)
+
 
 # setindex with lm, ..
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N} = setindex!(L.data, x, I...)
@@ -391,7 +401,7 @@ function Base.copyto!(
                                                     Base.OneTo(minimum(size.((L1, L2), 2; as=Matrix))))
 
     L1.data .= convert.(T, L2.data)
-    L1
+    return L1
 end
 
 # CPU version
@@ -417,7 +427,7 @@ function Base.copyto!(
         end
     end
 
-    L1
+    return L1
 end 
 
 # Fallback / GPU version (the two versions _copyto! and copyto! are there to enable tests of this function with regular Arrays)
@@ -472,25 +482,16 @@ function _copyto_core!(
 
     L1.data[ind_L1,[Colon() for i=1:(N-1)]...] = T.(L2.data[ind_L2,[Colon() for i=1:(N-1)]...])
 
-    L1
+    return L1
 end 
 
-function Base.copyto!(
-    L::LowerTriangularArray{T},     # copy to L
-    M::AbstractArray,               # copy from M
-) where T
-  
-    # if matrix sizes agree copy over the non-zero elements
-    if size(L, as=Matrix) == size(M)
-        L.data .= convert.(T, M[lowertriangle_indices(M)])
 
-    # if vector sizes agree copy straight into underlying data array
-    elseif size(L) == size(M)
-        L.data .= convert.(T, M)
-    else    # not matching sizes
-        throw(DimensionMismatch)
-    end
-    L
+# copyto! using matrix indexing from Matrix/Array
+function Base.copyto!(  L::LowerTriangularArray{T},  # copy to L
+                        M::AbstractArray) where T    # copy from M
+    @boundscheck size(L, as=Matrix) == size(M) || throw(BoundsError)
+    L.data .= convert.(T, M[lowertriangle_indices(M)])
+    return L
 end
 
 function Base.copyto!(  M::AbstractArray{T},               # copy to M
@@ -504,8 +505,16 @@ function Base.copyto!(  M::AbstractArray{T},               # copy to M
     M[upper_triangle_indices] .= zero(T)
     M[lower_triangle_indices] = convert.(T, L.data)
 
-    M
+    return M
 end
+
+# copyto! from Vector/Array to using vector indexing
+function Base.copyto!(  L::LowerTriangularArray{T,N},       # copy to L
+                        V::AbstractArray{S,N}) where {T,S,N}# copy from V
+    @boundscheck size(L, as=Vector) == size(V) || throw(BoundsError)
+    L.data .= convert.(T, V)
+    return L 
+end 
 
 function LowerTriangularMatrix{T}(M::LowerTriangularMatrix{T2}) where {T,T2}
     L = LowerTriangularMatrix{T}(undef, size(M)...)
