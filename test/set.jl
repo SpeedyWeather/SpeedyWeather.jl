@@ -1,16 +1,39 @@
-# @testset "Test PrognosticVariables set_vars! and get_var" begin 
+@testset "Test PrognosticVariables set!" begin 
 
-#     # test setting LowerTriangularMatrices
-#     spectral_grid = SpectralGrid()
-#     initial_conditions = StartFromRest()
-#     M = PrimitiveWetModel(; spectral_grid, initial_conditions)
-#     simulation = initialize!(M)
-#     P = simulation.prognostic_variables
+    N_lev = 8 
+    N_trunc = 31
+    spectral_grid = SpectralGrid(trunc=N_trunc, nlev=N_lev)          # define resolution
+    model = PrimitiveWetModel(; spectral_grid)   # construct model
+    initial_conditions = 
+    simulation = initialize!(model)                         # initialize all model components
  
-#     nlev = M.geometry.nlev
-#     lmax = M.spectral_transform.lmax
-#     mmax = M.spectral_transform.mmax
-#     lf = 1
+    lmax = M.spectral_transform.lmax
+    mmax = M.spectral_transform.mmax
+    lf = 2
+
+    # test data 
+    L = rand(LowerTriangularArray, N_trunc+2, N_trunc+1, N_lev)
+    L2 = rand(LowerTriangularArray, N_trunc-5, N_trunc-6, N_lev)  # smaller  
+    L3 = rand(LowerTriangularArray, N_trunc+6, N_trunc+5, N_lev)  # bigger 
+    A = rand(spectral_grid.Grid, spectral_grid.nlat_half)   # same grid 
+    B = rand(OctaHEALPixGrid, spectral_grid.nlat_half)      # different grid 
+    f(lon, lat, sig) = sind(lon)*cosd(lat)*(1 - sig)
+
+    # set things ...
+    set!(simulation, vor=L, lf = lf)
+    @test simulation.prognostic_variables.vor[lf] == L
+
+    set!(simulation, div=L, lf = lf; add=true)
+    @test simulation.prognostic_variables.div[lf] == (simulation.prognostic_variables.div[lf] .+ L)
+
+    set!(simulation, temp=L2, lf=lf)
+
+    set!(simulation, humid=L3, lf=lf)
+
+    set!(simulation, pres=L[:,1], lf=lf)
+
+    
+
 
 #     sph_data = [rand(LowerTriangularMatrix{spectral_grid.NF}, lmax+1, mmax+1) for i=1:nlev]
 

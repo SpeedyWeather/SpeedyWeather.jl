@@ -187,3 +187,114 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
 
     return progn_new
 end
+
+"""
+$(TYPEDSIGNATURES)
+Sets new values for the keyword arguments (velocities, vorticity, divergence, etc..) into the
+prognostic variable struct `progn` at timestep index `lf`. If `add==true` they are added to the 
+current value instead. If a `SpectralTransform` S is provided, it is used when needed to set 
+the variable, otherwise it is recomputed. 
+
+The input may be:
+* A function or callable object `f(lond, latd, σ) -> value`
+* An instance of `AbstractGridArray` 
+* An instance of `LowerTriangularArray` 
+* A scalar `<: Number`
+"""
+function set!(
+    progn::PrognosticVariables,
+    geometry::Geometry;
+    u = nothing,
+    v = nothing,
+    vor = nothing,
+    div = nothing,
+    temp = nothing,
+    humid = nothing,
+    pres = nothing,
+    
+    lf::Integer = 1,
+    add::Bool = false,
+    S::Union{Nothing, SpectralTransform} = nothing,
+)
+    isnothing(vor)   || set!(progn.vor[lf],     vor, geometry, S; add)
+    isnothing(div)   || set!(progn.div[lf],     div, geometry, S; add)
+    isnothing(temp)  || set!(progn.temp[lf],   temp, geometry, S; add)
+    isnothing(humid) || set!(progn.humid[lf], humid, geometry, S; add)
+    isnothing(pres)  || set!(progn.pres[lf],   pres, geometry, S; add)
+
+    isnothing(u) | isnothing(v) || set_vordiv!(progn.vor[lf], progn.div[lf], vor, div; add)
+end
+
+function set!(var::LowerTriangularArray{T}, L::LowerTriangularArray, varargs...; add::Bool) where T
+    if add 
+        if size(var) == size(L)
+            var .+= T.(L) 
+        else 
+            var .+= T.(spectral_truncation(L, size(var, as=Matrix)[1:2]...))
+        end 
+    else 
+        copyto!(var, L)
+    end 
+end 
+
+function set!(var::LowerTriangularArray{T}, grids::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add) where T
+    specs = isnothing(S) ? transform(grids) : transform(grids, S)
+    set!(var, specs; add)
+end
+
+function set!(var::LowerTriangularArray, f::Function, geometry::Geometry, S::Union{SpectralTransform, Nothing}; add::Bool)
+    grid = zeros(geometry.Grid, geometry.nlat_half)
+    grid = set!(grid, f, geometry; add)
+    if isnothing(S)
+        spec = transform(grid) # redo that one here
+        copyto!(var, spec)
+    else 
+        transform!(var, grid, S)
+    end 
+end
+
+function set!(var::LowerTriangularArray{T}, s::Number; add::Bool) where T
+    kernel(a, b) = add ? a+b : b
+    sT = T(s)
+    for lm in eachindex(var)
+        var[lm] = kernel(a, sT)
+    end 
+end 
+
+function set!(var::AbstractGridArray{T}, grids::AbstractGridArray, geometry::Geometry; add) where T
+    if add 
+        if grids_match(var, grids)
+            var .+= grids
+        else 
+            var .+= interpolate(typeof(var), geometry.nlat_half, grids)
+        end
+    else 
+        interpolate!(var, grids)
+    end 
+end 
+
+function set!(var::AbstractGridArray{T}, specs::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add) where T
+    grids = isnothing(S) ? transform(specs) : transform(specs, S)
+    set!(var, grids; add)
+end
+
+
+function set!(var::AbstractGridArray, f::Function, geometry::Geometry; add)
+    (; londs, latds, σ_levels_full) = geometry
+    kernel(a, b) = add ? a+b : b
+    for k in eachgrid(var)
+        for ij in eachgridpoint(var)
+            var[ij, k] = kernel(var[ij, k], f(londs[ij], latds[ij], σ_levels_full[k]))
+        end
+    end
+end
+
+function set!(var::AbstractGridArray{T}, s::Number; add::Bool) where T
+    kernel(a, b) = add ? a+b : b
+    sT = T(s)
+    for lm in eachindex(var)
+        var[lm] = kernel(a, sT)
+    end 
+end 
+
+set!(S::AbstractSimulation; kwargs...) = set!(S.prognostic_variables, S.model.geometry; S=S.model.spectral_transform, kwargs...)
