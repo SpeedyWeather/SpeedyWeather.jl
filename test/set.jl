@@ -16,6 +16,7 @@
     L2 = rand(LowerTriangularArray, N_trunc-5, N_trunc-6, N_lev)  # smaller  
     L3 = rand(LowerTriangularArray, N_trunc+6, N_trunc+5, N_lev)  # bigger 
     A = rand(spectral_grid.Grid, spectral_grid.nlat_half, N_lev)   # same grid 
+    B = rand(spectral_grid.Grid, spectral_grid.nlat_half, N_lev)
     A_spec = transform(A, model.spectral_transform)
     B = rand(OctaHEALPixGrid, spectral_grid.nlat_half, N_lev)      # different grid 
     f(lon, lat, sig) = sind(lon)*cosd(lat)*(1 - sig)
@@ -74,6 +75,13 @@
 
 
     # vor_div 
+    set_vordiv!(simulation, u=A , v=B)
 
+    u2 = similar(A)
+    v2 = similar(B)
+    UV_from_vordiv!(u2, v2, simulation.prognostic_variables.vor[lf], simulation.prognostic_variables.div[lf],  )
+
+    @test A ≈ u2 
+    @test B ≈ v2
 
 # end

@@ -240,13 +240,14 @@ function set!(
     isnothing(u) | isnothing(v) || set_vordiv!(progn.vor[lf], progn.div[lf], vor, div; add)
 end
 
+# set LTA <- LTA 
 function set!(var::LowerTriangularArray{T}, L::LowerTriangularArray, varargs...; add::Bool) where T
     if add 
         if size(var) == size(L)
             var .+= T.(L) 
         else 
             L_var = similar(var)
-            copyto!(L_var, T.(spectral_truncation(L, size(var, as=Matrix)[1:2]...)))
+            copyto!(L_var, L) # truncates if needed
             var .+= L_var
         end 
     else 
@@ -254,22 +255,26 @@ function set!(var::LowerTriangularArray{T}, L::LowerTriangularArray, varargs...;
     end 
 end 
 
+# set LTA <- Grid 
 function set!(var::LowerTriangularArray{T}, grids::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add) where T
     specs = isnothing(S) ? transform(grids) : transform(grids, S)
     set!(var, specs; add)
 end
 
+# set LTA <- func 
 function set!(var::LowerTriangularArray, f::Function, geometry::Geometry, S::Union{SpectralTransform, Nothing}; add::Bool)
     grid = zeros(geometry.Grid, geometry.nlat_half)
     grid = set!(grid, f, geometry; add)
+
     if isnothing(S)
-        spec = transform(grid) # redo that one here
+        spec = transform(grid)
         copyto!(var, spec)
     else 
         transform!(var, grid, S)
     end 
 end
 
+# set LTA <- number
 function set!(var::LowerTriangularArray{T}, s::Number; add::Bool) where T
     kernel(a, b) = add ? a+b : b
     sT = T(s)
@@ -278,6 +283,7 @@ function set!(var::LowerTriangularArray{T}, s::Number; add::Bool) where T
     end 
 end 
 
+# set Grid <- Grid
 function set!(var::AbstractGridArray{T}, grids::AbstractGridArray, geometry::Geometry; add) where T
     if add 
         if grids_match(var, grids)
@@ -290,13 +296,14 @@ function set!(var::AbstractGridArray{T}, grids::AbstractGridArray, geometry::Geo
     end 
 end 
 
+# set Grid <- LTA
 function set!(var::AbstractGridArray{T}, specs::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add) where T
     grids = isnothing(S) ? transform(specs) : transform(specs, S)
     set!(var, grids; add)
 end
 
-
-function set!(var::AbstractGridArray, f::Function, geometry::Geometry; add)
+# set Grid <- Func
+function set!(var::AbstractGridArray, f::Function, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add)
     (; londs, latds, σ_levels_full) = geometry
     kernel(a, b) = add ? a+b : b
     for k in eachgrid(var)
@@ -306,14 +313,52 @@ function set!(var::AbstractGridArray, f::Function, geometry::Geometry; add)
     end
 end
 
-function set!(var::AbstractGridArray{T}, s::Number; add::Bool) where T
+# set Grid <- Number 
+function set!(var::AbstractGridArray{T}, s::Number, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add::Bool) where T
     kernel(a, b) = add ? a+b : b
     sT = T(s)
-    for lm in eachindex(var)
-        var[lm] = kernel(a, sT)
-    end 
+    for k in eachgrid(var)
+        for ij in eachgridpoint(var)
+            var[ij, k] = kernel(var[ij, k], sT)
+        end
+    end
 end 
 
-set_vordiv!()
+# set vor_div <- func 
+function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u, v, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add) 
+    u_L = similar(vor)
+    set!(u_L, u, geometry, S)
+    v_L = similar(vor)
+    set!(v_L, v, geometry, S)
+
+    set_vordiv!(vor, div, u_L, v_L, geometry, S; add)
+end
+
+# set vor_div <- grid 
+function set_vordiv!(vor, div, u::AbstractGridArray, v::AbstractGridArray)
+    u_spec = isnothing(S) ? transform(u) : transform(u, S)
+    v_spec = isnothing(S) ? transform(v) : transform(v, S)
+    set_vordiv!(vor, div, u_spec, v_spec, geometry, S; add)
+end 
+
+# set vor_div <- LTA
+function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::LowerTriangularArray, v::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add::Bool) 
+  
+    S = isnothing(S) ? SpectralTransform(geometry.spectral_grid) : S
+    
+    if size(vor) == size(u) == size(v)
+        u_new = similar(vor)
+        copyto!(u_new, u) # truncates 
+
+        v_new = similar(vor)
+        copyto!(v_new, u)
+
+        curl!(vor, u_new, v_new, S; add)
+        divergence!(div, u_new, v_new, S; add)
+    else 
+        curl!(vor, u, v, S; add)
+        divergence!(div, u, v, S; add)
+    end
+end 
 
 set!(S::AbstractSimulation; kwargs...) = set!(S.prognostic_variables, S.model.geometry; S=S.model.spectral_transform, kwargs...)
