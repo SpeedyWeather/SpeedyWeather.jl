@@ -153,6 +153,7 @@ function Base.show(
     println(io, "│└ sea_ice_concentration:    $nlat-ring $Grid")
     println(io, "├┐land:  PrognosticVariablesLand{$NF}")
     println(io, "│├ land_surface_temperature: $nlat-ring $Grid")
+    println(io, "│├ snow_depth: $nlat-ring $Grid")
     println(io, "│├ soil_moisture_layer1:     $nlat-ring $Grid")
     println(io, "│└ soil_moisture_layer2:     $nlat-ring $Grid")
     println(io, "├ particles: $nparticles-element $(typeof(progn.particles))")
@@ -178,6 +179,7 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     
     # land
     progn_new.land.land_surface_temperature .= progn_old.land.land_surface_temperature
+    progn_new.land.snow_depth .= progn_old.land.snow_depth
     progn_new.land.soil_moisture_layer1 .= progn_old.land.soil_moisture_layer1
     progn_new.land.soil_moisture_layer2 .= progn_old.land.soil_moisture_layer2
 
@@ -211,7 +213,12 @@ function set!(
     temp = nothing,
     humid = nothing,
     pres = nothing,
-    
+    sea_surface_temperature = nothing, 
+    sea_ice_concentration = nothing, 
+    land_surface_temperature = nothing, 
+    snow_depth = nothing, 
+    soil_moisture_layer1 = nothing, 
+    soil_moisture_layer2 = nothing,
     lf::Integer = 1,
     add::Bool = false,
     S::Union{Nothing, SpectralTransform} = nothing,
@@ -222,6 +229,14 @@ function set!(
     isnothing(humid) || set!(progn.humid[lf], humid, geometry, S; add)
     isnothing(pres)  || set!(progn.pres[lf],   pres, geometry, S; add)
 
+    isnothing(sea_surface_temperature)  || set!(progn.ocean.sea_surface_temperature, sea_surface_temperature, geometry, S; add)
+    isnothing(sea_ice_concentration)    || set!(progn.ocean.sea_ice_concentration, sea_ice_concentration, geometry, S; add)
+
+    isnothing(land_surface_temperature) || set!(progn.land.land_surface_temperature, land_surface_temperature, geometry, S; add)
+    isnothing(snow_depth)               || set!(progn.land.snow_depth, snow_depth, geometry, S; add)
+    isnothing(soil_moisture_layer1)     || set!(progn.land.soil_moisture_layer1, soil_moisture_layer1, geometry, S; add)
+    isnothing(soil_moisture_layer2)     || set!(progn.land.soil_moisture_layer2, soil_moisture_layer2, geometry, S; add)
+
     isnothing(u) | isnothing(v) || set_vordiv!(progn.vor[lf], progn.div[lf], vor, div; add)
 end
 
@@ -230,7 +245,9 @@ function set!(var::LowerTriangularArray{T}, L::LowerTriangularArray, varargs...;
         if size(var) == size(L)
             var .+= T.(L) 
         else 
-            var .+= T.(spectral_truncation(L, size(var, as=Matrix)[1:2]...))
+            L_var = similar(var)
+            copyto!(L_var, T.(spectral_truncation(L, size(var, as=Matrix)[1:2]...)))
+            var .+= L_var
         end 
     else 
         copyto!(var, L)
@@ -296,5 +313,7 @@ function set!(var::AbstractGridArray{T}, s::Number; add::Bool) where T
         var[lm] = kernel(a, sT)
     end 
 end 
+
+set_vordiv!()
 
 set!(S::AbstractSimulation; kwargs...) = set!(S.prognostic_variables, S.model.geometry; S=S.model.spectral_transform, kwargs...)
