@@ -201,7 +201,7 @@ The input may be:
 * A function or callable object `f(lond, latd, σ) -> value`
 * An instance of `AbstractGridArray` 
 * An instance of `LowerTriangularArray` 
-* A scalar `<: Number`
+* A scalar `<: Number` (interpreted as a constant field in grid space)
 """
 function set!(
     progn::PrognosticVariables,
@@ -246,8 +246,7 @@ function set!(var::LowerTriangularArray{T}, L::LowerTriangularArray, varargs...;
         if size(var) == size(L)
             var .+= T.(L) 
         else 
-            L_var = similar(var)
-            copyto!(L_var, L) # truncates if needed
+            L_var = spectral_truncation(L, size(var, 1, as=Matrix), size(var, 2, as=Matrix))
             var .+= L_var
         end 
     else 
@@ -256,15 +255,15 @@ function set!(var::LowerTriangularArray{T}, L::LowerTriangularArray, varargs...;
 end 
 
 # set LTA <- Grid 
-function set!(var::LowerTriangularArray{T}, grids::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add) where T
+function set!(var::LowerTriangularArray{T}, grids::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add) where T
     specs = isnothing(S) ? transform(grids) : transform(grids, S)
     set!(var, specs; add)
 end
 
 # set LTA <- func 
-function set!(var::LowerTriangularArray, f::Function, geometry::Geometry, S::Union{SpectralTransform, Nothing}; add::Bool)
+function set!(var::LowerTriangularArray, f::Function, geometry::Geometry, S::Union{SpectralTransform, Nothing}=nothing; add::Bool)
     grid = zeros(geometry.Grid, geometry.nlat_half)
-    grid = set!(grid, f, geometry; add)
+    grid = set!(grid, f, geometry, S; add)
 
     if isnothing(S)
         spec = transform(grid)
@@ -284,7 +283,7 @@ function set!(var::LowerTriangularArray{T}, s::Number; add::Bool) where T
 end 
 
 # set Grid <- Grid
-function set!(var::AbstractGridArray{T}, grids::AbstractGridArray, geometry::Geometry; add) where T
+function set!(var::AbstractGridArray{T}, grids::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add) where T
     if add 
         if grids_match(var, grids)
             var .+= grids
@@ -297,13 +296,13 @@ function set!(var::AbstractGridArray{T}, grids::AbstractGridArray, geometry::Geo
 end 
 
 # set Grid <- LTA
-function set!(var::AbstractGridArray{T}, specs::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add) where T
+function set!(var::AbstractGridArray{T}, specs::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add) where T
     grids = isnothing(S) ? transform(specs) : transform(specs, S)
-    set!(var, grids; add)
+    set!(var, grids, geometry, S; add)
 end
 
 # set Grid <- Func
-function set!(var::AbstractGridArray, f::Function, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add)
+function set!(var::AbstractGridArray, f::Function, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add)
     (; londs, latds, σ_levels_full) = geometry
     kernel(a, b) = add ? a+b : b
     for k in eachgrid(var)
@@ -314,7 +313,7 @@ function set!(var::AbstractGridArray, f::Function, geometry::Geometry, S::Union{
 end
 
 # set Grid <- Number 
-function set!(var::AbstractGridArray{T}, s::Number, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add::Bool) where T
+function set!(var::AbstractGridArray{T}, s::Number, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool) where T
     kernel(a, b) = add ? a+b : b
     sT = T(s)
     for k in eachgrid(var)
@@ -325,7 +324,7 @@ function set!(var::AbstractGridArray{T}, s::Number, geometry::Geometry, S::Union
 end 
 
 # set vor_div <- func 
-function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u, v, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add) 
+function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u, v, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool) 
     u_L = similar(vor)
     set!(u_L, u, geometry, S)
     v_L = similar(vor)
@@ -335,18 +334,18 @@ function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u, v,
 end
 
 # set vor_div <- grid 
-function set_vordiv!(vor, div, u::AbstractGridArray, v::AbstractGridArray)
+function set_vordiv!(vor, div, u::AbstractGridArray, v::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool)
     u_spec = isnothing(S) ? transform(u) : transform(u, S)
     v_spec = isnothing(S) ? transform(v) : transform(v, S)
     set_vordiv!(vor, div, u_spec, v_spec, geometry, S; add)
 end 
 
 # set vor_div <- LTA
-function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::LowerTriangularArray, v::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}; add::Bool) 
+function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::LowerTriangularArray, v::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool) 
   
     S = isnothing(S) ? SpectralTransform(geometry.spectral_grid) : S
     
-    if size(vor) == size(u) == size(v)
+    if size(vor) != size(u) != size(v)
         u_new = similar(vor)
         copyto!(u_new, u) # truncates 
 
