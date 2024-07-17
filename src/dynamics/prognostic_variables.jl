@@ -382,18 +382,18 @@ function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::Lo
         v_ = v
     end 
 
-    if size(vor) != size(u) != size(v)
+    if size(vor) != size(u_) != size(v_)
         u_new = zero(vor)
-        copyto!(u_new, u) 
+        copyto!(u_new, u_) 
 
         v_new = zero(vor)
-        copyto!(v_new, u)
+        copyto!(v_new, v_)
 
         curl!(vor, u_new, v_new, S; add)
         divergence!(div, u_new, v_new, S; add)
     else 
-        curl!(vor, u, v, S; add)
-        divergence!(div, u, v, S; add)
+        curl!(vor, u_, v_, S; add)
+        divergence!(div, u_, v_, S; add)
     end
 end 
 

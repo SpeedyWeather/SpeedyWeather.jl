@@ -89,7 +89,7 @@ import SpeedyWeather: set!
     A2 = rand(spectral_grid.Grid{Float32}, spectral_grid.nlat_half, N_lev)   
     A2_spec = transform(A, model.spectral_transform)
 
-    set!(simulation, u=A_spec, v=A2_spec)
+    set!(simulation, u=A, v=A2)
 
     u2_spec = similar(A_spec)
     v2_spec = similar(A2_spec)
