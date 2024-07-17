@@ -86,14 +86,23 @@ import SpeedyWeather: set!
     @test all(prog_new.ocean.sea_surface_temperature .≈ 6.)
 
     # vor_div 
-    set!(simulation, u=L, v=(2 .* L))
+    A2 = rand(spectral_grid.Grid{Float32}, spectral_grid.nlat_half, N_lev)   
+    A2_spec = transform(A, model.spectral_transform)
 
-    u2 = similar(L)
-    v2 = similar(L)
-    SpeedyWeather.SpeedyTransforms.UV_from_vordiv!(u2, v2, prog_new.vor[lf], prog_new.div[lf], model.spectral_transform)
+    set!(simulation, u=A_spec, v=A2_spec)
 
-    @test L ≈ u2 
-    @test (2 .* L) ≈ v2
+    u2_spec = similar(A_spec)
+    v2_spec = similar(A2_spec)
+
+    SpeedyWeather.SpeedyTransforms.UV_from_vordiv!(u2_spec, v2_spec, prog_new.vor[lf], prog_new.div[lf], model.spectral_transform)
+
+    u2 = transform(u2_spec, model.spectral_transform)
+    v2 = transform(v2_spec, model.spectral_transform)
+    RingGrids.scale_coslat⁻¹!(u2)
+    RingGrids.scale_coslat⁻¹!(v2)
+
+    @test A ≈ u2 
+    @test A2 ≈ v2
 
     # functions 
     (; londs, latds, σ_levels_full) = model.geometry

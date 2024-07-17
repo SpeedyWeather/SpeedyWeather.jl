@@ -195,7 +195,9 @@ $(TYPEDSIGNATURES)
 Sets new values for the keyword arguments (velocities, vorticity, divergence, etc..) into the
 prognostic variable struct `progn` at timestep index `lf`. If `add==true` they are added to the 
 current value instead. If a `SpectralTransform` S is provided, it is used when needed to set 
-the variable, otherwise it is recomputed. 
+the variable, otherwise it is recomputed. In case `u` and `v` are set, `coslat_scaling_included`
+specficies whether or not the 1/cos(lat) scaling is already included in the arrays or not (default:
+`false`)
 
 The input may be:
 * A function or callable object `f(lond, latd, σ) -> value` or `f(lond, latd) -> value` (surface level variables)
@@ -222,6 +224,7 @@ function set!(
     lf::Integer = 1,
     add::Bool = false,
     S::Union{Nothing, SpectralTransform} = nothing,
+    coslat_scaling_included::Bool = false,
 )
     isnothing(vor)   || set!(progn.vor[lf],     vor, geometry, S; add)
     isnothing(div)   || set!(progn.div[lf],     div, geometry, S; add)
@@ -237,7 +240,7 @@ function set!(
     isnothing(soil_moisture_layer1)     || set!(progn.land.soil_moisture_layer1, soil_moisture_layer1, geometry, S; add)
     isnothing(soil_moisture_layer2)     || set!(progn.land.soil_moisture_layer2, soil_moisture_layer2, geometry, S; add)
 
-    isnothing(u) | isnothing(v) || set_vordiv!(progn.vor[lf], progn.div[lf], u, v, geometry, S; add)
+    isnothing(u) | isnothing(v) || set_vordiv!(progn.vor[lf], progn.div[lf], u, v, geometry, S; add, coslat_scaling_included)
 end
 
 # set LTA <- LTA 
@@ -340,32 +343,50 @@ function set!(var::AbstractGridArray{T,1}, s::Number, geometry::Union{Geometry, 
 end 
 
 # set vor_div <- func 
-function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u, v, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool) 
-    u_L = similar(vor)
+function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u, v, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false) 
+    
+    u_L = similar(vor) 
     set!(u_L, u, geometry, S)
     v_L = similar(vor)
     set!(v_L, v, geometry, S)
 
-    set_vordiv!(vor, div, u_L, v_L, geometry, S; add)
+    set_vordiv!(vor, div, u_L, v_L, geometry, S; add, coslat_scaling_included)
 end
 
 # set vor_div <- grid 
-function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::AbstractGridArray, v::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool)
-    u_spec = isnothing(S) ? transform(u) : transform(u, S)
-    v_spec = isnothing(S) ? transform(v) : transform(v, S)
+function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::AbstractGridArray, v::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false)
+    
+    if !coslat_scaling_included
+        u_ = RingGrids.scale_coslat⁻¹(u)
+        v_ = RingGrids.scale_coslat⁻¹(v)
+    else
+        u_ = u 
+        v_ = v
+    end 
+    
+    u_spec = isnothing(S) ? transform(u_) : transform(u_, S)
+    v_spec = isnothing(S) ? transform(v_) : transform(v_, S)
     set_vordiv!(vor, div, u_spec, v_spec, geometry, S; add)
 end 
 
 # set vor_div <- LTA
-function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::LowerTriangularArray, v::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool) 
+function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::LowerTriangularArray, v::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false) 
   
     S = isnothing(S) ? SpectralTransform(geometry.spectral_grid) : S
     
-    if size(vor) != size(u) != size(v)
-        u_new = similar(vor)
-        copyto!(u_new, u) # truncates 
+    if !coslat_scaling_included
+        u_ = transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
+        v_ = transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
+    else
+        u_ = u 
+        v_ = v
+    end 
 
-        v_new = similar(vor)
+    if size(vor) != size(u) != size(v)
+        u_new = zero(vor)
+        copyto!(u_new, u) 
+
+        v_new = zero(vor)
         copyto!(v_new, u)
 
         curl!(vor, u_new, v_new, S; add)
