@@ -326,20 +326,7 @@ end
 function set!(var::AbstractGridArray, s::Number, geometry::Union{Geometry, Nothing}=nothing, S::Union{Nothing, SpectralTransform}=nothing; add::Bool)
     kernel(a, b) = add ? a+b : b
     sT = T(s)
-    for k in eachgrid(var)
-        for ij in eachgridpoint(var)
-            var[ij, k] = kernel(var[ij, k], sT)
-        end
-    end
-end 
-
-# set Grid (surface/single level) <- Number 
-function set!(var::AbstractGridArray{T,1}, s::Number, geometry::Union{Geometry, Nothing}=nothing, S::Union{Nothing, SpectralTransform}=nothing; add::Bool) where T
-    kernel(a, b) = add ? a+b : b
-    sT = T(s)
-    for ij in eachgridpoint(var)
-        var[ij] = kernel(var[ij], sT)
-    end
+    var .= kernel.(var, sT)
 end 
 
 # set vor_div <- func 
@@ -366,7 +353,7 @@ function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::Ab
     
     u_spec = isnothing(S) ? transform(u_) : transform(u_, S)
     v_spec = isnothing(S) ? transform(v_) : transform(v_, S)
-    set_vordiv!(vor, div, u_spec, v_spec, geometry, S; add)
+    set_vordiv!(vor, div, u_spec, v_spec, geometry, S; add, coslat_scaling_included=true)
 end 
 
 # set vor_div <- LTA
