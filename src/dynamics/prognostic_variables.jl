@@ -195,7 +195,7 @@ $(TYPEDSIGNATURES)
 Sets new values for the keyword arguments (velocities, vorticity, divergence, etc..) into the
 prognostic variable struct `progn` at timestep index `lf`. If `add==true` they are added to the 
 current value instead. If a `SpectralTransform` S is provided, it is used when needed to set 
-the variable, otherwise it is recomputed. In case `u` and `v` are set, `coslat_scaling_included`
+the variable, otherwise it is recomputed. In case `u` and `v` are provied, `coslat_scaling_included`
 specficies whether or not the 1/cos(lat) scaling is already included in the arrays or not (default:
 `false`)
 
@@ -330,12 +330,12 @@ function set!(var::AbstractGridArray, s::Number, geometry::Union{Geometry, Nothi
 end 
 
 # set vor_div <- func 
-function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u, v, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false) 
+function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u_func, v_func, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false) 
     
     u_L = similar(vor) 
-    set!(u_L, u, geometry, S)
+    set!(u_L, u_func, geometry, S)
     v_L = similar(vor)
-    set!(v_L, v, geometry, S)
+    set!(v_L, v_func, geometry, S)
 
     set_vordiv!(vor, div, u_L, v_L, geometry, S; add, coslat_scaling_included)
 end
@@ -343,16 +343,12 @@ end
 # set vor_div <- grid 
 function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::AbstractGridArray, v::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false)
     
-    if !coslat_scaling_included
-        u_ = RingGrids.scale_coslat⁻¹(u)
-        v_ = RingGrids.scale_coslat⁻¹(v)
-    else
-        u_ = u 
-        v_ = v
-    end 
-    
+    u_ = coslat_scaling_included ? u : RingGrids.scale_coslat⁻¹(u)
+    v_ = coslat_scaling_included ? v : RingGrids.scale_coslat⁻¹(v)
+
     u_spec = isnothing(S) ? transform(u_) : transform(u_, S)
     v_spec = isnothing(S) ? transform(v_) : transform(v_, S)
+
     set_vordiv!(vor, div, u_spec, v_spec, geometry, S; add, coslat_scaling_included=true)
 end 
 
@@ -360,14 +356,9 @@ end
 function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::LowerTriangularArray, v::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false) 
   
     S = isnothing(S) ? SpectralTransform(geometry.spectral_grid) : S
-    
-    if !coslat_scaling_included
-        u_ = transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
-        v_ = transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
-    else
-        u_ = u 
-        v_ = v
-    end 
+     
+    u_ = coslat_scaling_included ? u : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
+    v_ = coslat_scaling_included ? v : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
 
     if size(vor) != size(u_) != size(v_)
         u_new = zero(vor)

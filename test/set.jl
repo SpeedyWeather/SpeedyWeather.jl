@@ -87,19 +87,16 @@ import SpeedyWeather: set!
 
     # vor_div 
     A2 = rand(spectral_grid.Grid{Float32}, spectral_grid.nlat_half, N_lev)   
-    A2_spec = transform(A, model.spectral_transform)
 
     set!(simulation, u=A, v=A2)
 
     u2_spec = similar(A_spec)
-    v2_spec = similar(A2_spec)
+    v2_spec = similar(A_spec)
 
     SpeedyWeather.SpeedyTransforms.UV_from_vordiv!(u2_spec, v2_spec, prog_new.vor[lf], prog_new.div[lf], model.spectral_transform)
 
-    u2 = transform(u2_spec, model.spectral_transform)
-    v2 = transform(v2_spec, model.spectral_transform)
-    RingGrids.scale_coslat⁻¹!(u2)
-    RingGrids.scale_coslat⁻¹!(v2)
+    u2 = transform(u2_spec, model.spectral_transform, unscale_coslat=true)
+    v2 = transform(v2_spec, model.spectral_transform, unscale_coslat=true)
 
     @test A ≈ u2 
     @test A2 ≈ v2
