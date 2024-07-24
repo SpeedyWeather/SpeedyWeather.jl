@@ -32,6 +32,8 @@ import Random
 
             @test all(L[:,1] .== A[:,1])
             @test all(L[:,2] .== A[:,2])
+            @test all(L[1,:] .== A[1,:])
+            @test all(L[2,:] .== A[2,:])
         end
     end
 end
@@ -276,6 +278,13 @@ end
             JL2 = adapt(JLArray, L)
             @test all(JL2 .== JL)   # equality via broadcasting
             @test JL2 == JL         # checks for type and data equality
+
+            Random.seed!(123)
+            L = f(LowerTriangularArray{Float16}, s...)
+            Random.seed!(123)
+            L2 = f(LowerTriangularMatrix{Float16}, s...)
+
+            @test L == L2
         end
     end
 end
@@ -450,7 +459,14 @@ end
             copyto!(L2, L1)
 
             @test L2 == L1
-            
+
+            # copyto! Vector 
+            L1 = randn(LowerTriangularArray{NF}, 10, 10, idims...)
+            V = randn(size(L1, as=Vector)...)
+            copyto!(L1, V)
+
+            @test L1.data == NF.(V) 
+
             # copyto! Array 
             M = zeros(NF, 10, 10, idims...)
             copyto!(M, L1)
