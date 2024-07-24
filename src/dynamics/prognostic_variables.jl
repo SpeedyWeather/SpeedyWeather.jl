@@ -276,11 +276,32 @@ function set!(var::LowerTriangularArray, f::Function, geometry::Geometry{NF}, S:
     end 
 end
 
-# set LTA <- number (change it to directly only set the [1,1] element, but not sure about the normalization)
+# set LTA <- number
 function set!(var::LowerTriangularArray{T}, s::Number, geometry::Geometry{NF}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where {T, NF}
-    grid = ones(geometry.Grid{NF}, geometry.nlat_half, geometry.nlev) .* s
-    s_spec = isnothing(S) ? transform(grid) : transform(grid, S)
-    set!(var, s_spec, geometry, S; add)
+    
+    # appropiate normalization, assume standard 2√π normalisation if no transform is given 
+    norm_sphere = isnothing(S) ? 2sqrt(π) : S.norm_sphere
+
+    # all elements are zero except for the 0,0 one
+    var_new = zero(var)
+    for k in eachmatrix(var)
+        var_new[1,k] = norm_sphere * s
+    end 
+
+    set!(var, var_new, geometry, S; add)
+end 
+
+# set LTA (2D) <- number
+function set!(var::LowerTriangularArray{T,1}, s::Number, geometry::Geometry{NF}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where {T, NF}
+    
+    # appropiate normalization, assume standard 2√π normalisation if no transform is given 
+    norm_sphere = isnothing(S) ? 2sqrt(π) : S.norm_sphere
+
+    # all elements are zero except for the 0,0 one
+    var_new = zero(var)
+    var_new[1] = norm_sphere * s
+
+    set!(var, var_new, geometry, S; add)
 end 
 
 # set Grid <- Grid
