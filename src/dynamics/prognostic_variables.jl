@@ -323,7 +323,7 @@ function set!(var::AbstractGridArray{T,1}, f::Function, geometry::Geometry, S::U
 end
 
 # set Grid <- Number 
-function set!(var::AbstractGridArray, s::Number, geometry::Union{Geometry, Nothing}=nothing, S::Union{Nothing, SpectralTransform}=nothing; add::Bool)
+function set!(var::AbstractGridArray{T}, s::Number, geometry::Union{Geometry, Nothing}=nothing, S::Union{Nothing, SpectralTransform}=nothing; add::Bool) where T
     kernel(a, b) = add ? a+b : b
     sT = T(s)
     var .= kernel.(var, sT)
