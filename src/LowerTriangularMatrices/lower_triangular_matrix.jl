@@ -568,6 +568,8 @@ Base.isapprox(L1::LowerTriangularArray, L2::LowerTriangularArray; kwargs...) =
 Base.all(L::LowerTriangularArray) = all(L.data)
 Base.any(L::LowerTriangularArray) = any(L.data)
 
+Base.repeat(L::LowerTriangularArray, counts...) = LowerTriangularArray(repeat(L.data, counts...), L.m, L.n)
+
 # Broadcast CPU/GPU
 import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
 import LinearAlgebra: isstructurepreserving, fzeropreserving
