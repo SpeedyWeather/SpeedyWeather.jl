@@ -60,9 +60,6 @@ $(TYPEDFIELDS)
     "[OPTION] number of vertical levels"
     nlayers::Int = DEFAULT_NLAYERS
 
-    "[DEPRECATED] number of vertical levels"
-    nlev::Int = nlayers
-
     "[OPTION] coordinates used to discretize the vertical"
     vertical_coordinates::VerticalCoordinates = SigmaCoordinates(; nlayers)
 

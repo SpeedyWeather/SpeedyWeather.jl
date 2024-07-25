@@ -117,13 +117,13 @@ end
 """$(TYPEDSIGNATURES)
 Generator function."""
 function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
-    (; trunc, nlat_half, nlev, nparticles) = SG
+    (; trunc, nlat_half, nlayers, nparticles) = SG
     (; NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector) = SG
 
     return PrognosticVariables{NF, ArrayType, nsteps,
         SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}(;
-            trunc, nlat_half, nlayers=nlev, nparticles,
+            trunc, nlat_half, nlayers=nlayers, nparticles,
         )
 end
 

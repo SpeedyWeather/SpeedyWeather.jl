@@ -74,8 +74,9 @@ function SpeedyWeather.initialize!(
     callback.maximum_surface_wind_speed = zeros(progn.clock.n_timesteps + 1)
     
     # where surface (=lowermost model layer) u, v on the grid are stored
-    (; u_grid, v_grid) = diagn.layers[diagn.nlev].grid_variables
-    
+    u_grid = diagn.grid.u_grid[:,diagn.nlayers]
+    v_grid = diagn.grid.u_grid[:,diagn.nlayers]
+
     # maximum wind speed of initial conditions
     callback.maximum_surface_wind_speed[1] = max_2norm(u_grid, v_grid)
     
@@ -124,7 +125,8 @@ function SpeedyWeather.callback!(
     i = callback.timestep_counter
 
     # where surface (=lowermost model layer) u, v on the grid are stored
-    (; u_grid, v_grid) = diagn.layers[diagn.nlev].grid_variables
+    u_grid = diagn.grid.u_grid[:,diagn.nlayers]
+    v_grid = diagn.grid.u_grid[:,diagn.nlayers]
 
     # maximum wind speed at current time step
     callback.maximum_surface_wind_speed[i] = max_2norm(u_grid, v_grid)
@@ -325,7 +327,8 @@ function SpeedyWeather.callback!(
 
     # Just print the North Pole surface temperature to screen
     (;time) = progn.clock
-    temp_at_north_pole = diagn.layers[end].grid_variables.temp_grid[1]
+    temp_at_north_pole = diagn.grid.temp_grid[1,end]
+
     @info "North pole has a temperature of $temp_at_north_pole on $time."
 end
 
@@ -349,7 +352,7 @@ is no periodically reoccuring schedule, only `schedule.times` would include some
 for events that are scheduled. Now let's create a primitive equation model with that callback
 
 ```@example schedule
-spectral_grid = SpectralGrid(trunc=31, nlev=5)
+spectral_grid = SpectralGrid(trunc=31, nlayers=5)
 model = PrimitiveWetModel(;spectral_grid)
 model.feedback.verbose = false      # hide to progress meter
 add!(model.callbacks, north_pole_temp_at_noon_jan9)

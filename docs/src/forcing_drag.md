@@ -122,7 +122,7 @@ end
 ```
 Which allows us to do
 ```@example extend
-spectral_grid = SpectralGrid(trunc=42, nlev=1)
+spectral_grid = SpectralGrid(trunc=42, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=30, decorrelation_time=Day(5))
 ```
 So the respective resolution parameters and the number format are just pulled from the `SpectralGrid`
@@ -293,7 +293,7 @@ modular interface that you can create instances of individual model components
 and just put them together as you like, and as long as you follow some rules.
 
 ```@example extend
-spectral_grid = SpectralGrid(trunc=85, nlev=1)
+spectral_grid = SpectralGrid(trunc=85, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
 initial_conditions = StartFromRest()
 model = BarotropicModel(; spectral_grid, initial_conditions, forcing=stochastic_stirring)
@@ -303,7 +303,7 @@ run!(simulation)
 
 # visualisation
 using CairoMakie
-vor = simulation.diagnostic_variables.layers[1].grid_variables.vor_grid
+vor = simulation.diagnostic_variables.grid.vor_grid[:,1]
 heatmap(vor, title="Stochastically stirred vorticity")
 save("stochastic_stirring.png", ans) # hide
 nothing # hide
