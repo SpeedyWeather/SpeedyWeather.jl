@@ -37,7 +37,7 @@ Note that the choice of `output_dt` can affect the actual time step that is used
 integration, which is explained in the following.
 Example, we run the model at a resolution of T42 and the time step is going to be
 ```@example netcdf
-spectral_grid = SpectralGrid(trunc=42, nlev=1)
+spectral_grid = SpectralGrid(trunc=42, nlayer=1)
 time_stepping = Leapfrog(spectral_grid)
 time_stepping.Δt_sec
 ```
