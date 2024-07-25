@@ -469,12 +469,16 @@ function initialize!(   progn::PrognosticVariables,
     (; orography ) = model.orography # orography on the grid
 
     lnp₀ = log(pres_ref)            # logarithm of reference surface pressure [log(Pa)]
+    lnp_grid = zero(orography)      # allocate log surface pressure on grid
+
     RΓg⁻¹ = R_dry*lapse_rate/gravity         # for convenience
     ΓT⁻¹ = lapse_rate/temp_ref           
 
-    lnp_func(latd, lond) = lnp₀ + log(1 - ΓT⁻¹*interpolate(latd, lond, orography))/RΓg⁻¹
-
-    set!(progn, model.geometry, S=model.spectral_transform, pres=lnp_func, lf=1)
+    for ij in eachgridpoint(lnp_grid, orography)
+        lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹
+    end
+    
+    set!(progn, model.geometry, S=model.spectral_transform, pres=lnp_grid, lf=1)
 
     return nothing
 end

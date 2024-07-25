@@ -200,7 +200,8 @@ and vorticity are set and `coslat_scaling_included` specficies whether or not th
 scaling is already included in the arrays or not (default: `false`)
 
 The input may be:
-* A function or callable object `f(lond, latd, σ) -> value` or `f(lond, latd) -> value` (surface level variables)
+* A function or callable object `f(lond, latd, σ) -> value` (multilevel variables) 
+* A function or callable object `f(lond, latd) -> value` (surface level variables)
 * An instance of `AbstractGridArray` 
 * An instance of `LowerTriangularArray` 
 * A scalar `<: Number` (interpreted as a constant field in grid space)
@@ -254,6 +255,7 @@ function set!(var::LowerTriangularArray{T}, L::LowerTriangularArray, varargs...;
         end 
     else 
         copyto!(var, L)
+        #Q: additional truncate here to be safe?
     end 
 end 
 
@@ -265,15 +267,9 @@ end
 
 # set LTA <- func 
 function set!(var::LowerTriangularArray, f::Function, geometry::Geometry{NF}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where NF
-    grid = zeros(geometry.Grid{NF}, geometry.nlat_half, geometry.nlev)
-    set!(grid, f, geometry, S; add)
-
-    if isnothing(S)
-        spec = transform(grid)
-        copyto!(var, spec)
-    else 
-        transform!(var, grid, S)
-    end 
+    grid = ndims(var) == 1 ? zeros(geometry.Grid{NF}, geometry.nlat_half) : zeros(geometry.Grid{NF}, geometry.nlat_half, geometry.nlev)
+    set!(grid, f, geometry, S; add=false)
+    set!(var, grid, geometry, S; add)
 end
 
 # set LTA <- number
@@ -284,22 +280,12 @@ function set!(var::LowerTriangularArray{T}, s::Number, geometry::Geometry{NF}, S
 
     # all elements are zero except for the 0,0 one
     var_new = zero(var)
-    for k in eachmatrix(var)
-        var_new[1,k] = norm_sphere * s
+
+    if ndims(var) == 1 
+        var_new[1] = norm_sphere * s
+    else 
+        var_new[1,:] .= norm_sphere * s 
     end 
-
-    set!(var, var_new, geometry, S; add)
-end 
-
-# set LTA (2D) <- number
-function set!(var::LowerTriangularArray{T,1}, s::Number, geometry::Geometry{NF}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where {T, NF}
-    
-    # appropiate normalization, assume standard 2√π normalisation if no transform is given 
-    norm_sphere = isnothing(S) ? 2sqrt(π) : S.norm_sphere
-
-    # all elements are zero except for the 0,0 one
-    var_new = zero(var)
-    var_new[1] = norm_sphere * s
 
     set!(var, var_new, geometry, S; add)
 end 
