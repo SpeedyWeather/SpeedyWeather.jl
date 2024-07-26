@@ -387,7 +387,7 @@ function write_netcdf_time!(output::OutputWriter,
     i = output.output_counter
 
     time_passed = Millisecond(time-startdate)
-    time_hrs = time_passed.value/3600_000       # [ms] -> [hrs]
+    time_hrs = time_passed.value/3600_000       # [ms] -> [hrs]
     netcdf_file["time"][i] = time_hrs
     NCDatasets.sync(netcdf_file)
 
@@ -417,7 +417,7 @@ function write_netcdf_variables!(   output::OutputWriter,
 
             # create (matrix, grid) tuples for simultaneous grid -> matrix conversion
             # TODO this currently does the Matrix! conversion to all variables, not just output_vars
-            # as arrays are always initialised  
+            # as arrays are always initialised  
             MGs = ((M, G) for (M, G) in zip((u, v, vor, div, temp, humid),
                                           (u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid))
                                            if length(M) > 0)
