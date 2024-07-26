@@ -1,5 +1,5 @@
 @testset "Sec, min, hrs arguments" begin
-    SG = SpectralGrid(trunc=42, nlev=1)
+    SG = SpectralGrid(trunc=42, nlayers=1)
     L1 = Leapfrog(SG, Δt_at_T31=30)
     L2 = Leapfrog(SG, Δt_at_T31=Second(30))
     @test L1.Δt == L2.Δt
@@ -27,7 +27,7 @@
 
     # clock tests
     c1 = SpeedyWeather.Clock()
-    SG2 = SpectralGrid(trunc=31, nlev=1)
+    SG2 = SpectralGrid(trunc=31, nlayers=1)
     L6 = Leapfrog(SG2, Δt_at_T31=Hour(1), adjust_with_output=false)
 
     SpeedyWeather.set_period!(c1, Hour(10))

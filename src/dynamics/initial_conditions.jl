@@ -425,22 +425,22 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     # R_dry:        Specific gas constant for dry air [J/kg/K]
     (; temp_ref, lapse_rate, R_dry) = model.atmosphere
     (; gravity) = model.planet
-    (; nlev, σ_levels_full) = model.geometry
+    (; nlayers, σ_levels_full) = model.geometry
     (; norm_sphere) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
 
     # Lapse rate scaled by gravity [K/m / (m²/s²)]
     Γg⁻¹ = lapse_rate/gravity
 
-    # SURFACE TEMPERATURE (store in k = nlev, but it's actually surface, i.e. k=nlev+1/2)
+    # SURFACE TEMPERATURE (store in k = nlayers, but it's actually surface, i.e. k=nlayers+1/2)
     # overwrite with lowermost layer further down
-    temp_surf = progn.layers[end].timesteps[1].temp     # spectral temperature at k=nlev+1/2
+    temp_surf = progn.layers[end].timesteps[1].temp     # spectral temperature at k=nlayers+1/2
     temp_surf[1] = norm_sphere*temp_ref                 # set global mean surface temperature
     for lm in eachharmonic(geopot_surf, temp_surf)
         temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]           # lower temperature for higher mountains
     end
 
     # Use lapserate and vertical coordinate σ for profile
-    for k in 1:nlev                                     # k=nlev overwrites the surface temperature
+    for k in 1:nlayers                                     # k=nlayers overwrites the surface temperature
                                                         # with lowermost layer temperature
         temp = progn.layers[k].timesteps[1].temp
         σₖᴿ = σ_levels_full[k]^(R_dry*Γg⁻¹)             # from hydrostatic equation

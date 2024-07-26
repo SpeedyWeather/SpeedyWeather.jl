@@ -68,7 +68,7 @@ or wavenumber 0, see [Spherical Harmonic Transform](@ref)) encodes the global av
 
 ```@example analysis
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlev=1)
+spectral_grid = SpectralGrid(trunc=31, nlayers=1)
 model = ShallowWaterModel(;spectral_grid)
 simulation = initialize!(model)
 ```
@@ -77,19 +77,19 @@ Now we check ``\eta_{0,0}`` the ``l = m = 0`` coefficent of the inital condition
 of that simulation with
 
 ```@example analysis
-simulation.prognostic_variables.surface.timesteps[1].pres[1]
+simulation.prognostic_variables.pres[1][1]
 ```
 
-`[1]` pulls the first element of the underlying [LowerTriangularMatrix](@ref lowertriangularmatrices)
-which is the coefficient of the ``l = m = 0`` mode.
-Its imaginary part is always zero (which is true for any zonal harmonic ``m=0`` as its
+`[1][1]` pulls the first Leapfrog time step and of that the first element of the underlying
+[LowerTriangularMatrix](@ref lowertriangularmatrices) which is the coefficient of the ``l = m = 0``
+harmonic. Its imaginary part is always zero (which is true for any zonal harmonic ``m=0`` as its
 imaginary part would just unnecessarily rotate something zonally constant in zonal direction),
 so you can `real` it. Also for spherical harmonic transforms there is a norm of the sphere
 by which you have to divide to get your mean value in the original units
 
 ```@example analysis
 a = model.spectral_transform.norm_sphere    # = 2√π = 3.5449078
-η_mean = real(simulation.prognostic_variables.surface.timesteps[1].pres[1]) / a
+η_mean = real(simulation.prognostic_variables.pres[1][1]) / a
 ```
 
 So the initial conditions in this simulation are such that the global mean interface displacement
@@ -105,7 +105,7 @@ model.feedback.verbose = false # hide
 run!(simulation, period=Day(10))
 
 # now we check η_mean again
-η_mean_later = real(simulation.prognostic_variables.surface.timesteps[1].pres[1]) / a
+η_mean_later = real(simulation.prognostic_variables.pres[1][1]) / a
 ```
 
 which is _exactly_ the same. So mass is conserved, woohoo. 
@@ -155,9 +155,9 @@ So at the current state of our simulation we have a total energy
 
 ```@example analysis
 # flat copies for convenience
-u = simulation.diagnostic_variables.layers[1].grid_variables.u_grid
-v = simulation.diagnostic_variables.layers[1].grid_variables.v_grid
-η = simulation.diagnostic_variables.surface.pres_grid
+u = simulation.diagnostic_variables.grid.u_grid[:, 1]
+v = simulation.diagnostic_variables.grid.v_grid[:, 1]
+η = simulation.diagnostic_variables.grid.pres_grid
 
 TE = total_energy(u, v, η, model)
 ```
@@ -209,11 +209,11 @@ as
 
 ```@example analysis
 # vorticity
-ζ = simulation.diagnostic_variables.layers[1].grid_variables.vor_grid
+ζ = simulation.diagnostic_variables.grid.vor_grid[:,1]
 f = coriolis(ζ)     # create f on that grid
 
 # layer thickness
-η = simulation.diagnostic_variables.surface.pres_grid
+η = simulation.diagnostic_variables.grid.pres_grid
 H = model.atmosphere.layer_thickness
 Hb = model.orography.orography
 h = @. η + H - Hb
@@ -389,22 +389,24 @@ Now the `global_diagnostics` function is defined as
 
 ```@example analysis
 function global_diagnostics(u, v, ζ, η, model)
+    
     # constants from model
+    NF = model.spectral_grid.NF     # number format used
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
     R = model.spectral_grid.radius
     Ω = model.planet.rotation
     g = model.planet.gravity
 
-    r = R * cos.(model.geometry.lats)   # create r on that grid
-    f = coriolis(u)                     # create f on that grid
+    r = NF.(R * cos.(model.geometry.lats))  # create r on that grid
+    f = coriolis(u)                         # create f on that grid
     
     h = @. η + H - Hb           # thickness
     q = @. (ζ + f) / h          # potential vorticity
-    λ = @. u * r + Ω * r^2      # angular momentum
-    k = @. 1/2 * (u^2 + v^2)    # kinetic energy
-    p = @. 1/2 * g * h          # potential energy
-    z = @. q^2/2                # potential enstrophy
+    λ = @. u * r + Ω * r^2      # angular momentum (in the right number format NF)
+    k = @. (u^2 + v^2) / 2      # kinetic energy
+    p = @. g * h / 2            # potential energy
+    z = @. q^2 / 2              # potential enstrophy
 
     M = ∬dA(1, h, model)        # mean mass
     C = ∬dA(q, h, model)        # mean circulation
@@ -418,10 +420,10 @@ end
 
 # unpack diagnostic variables and call global_diagnostics from above
 function global_diagnostics(diagn::DiagnosticVariables, model::ModelSetup)
-    u = diagn.layers[1].grid_variables.u_grid
-    v = diagn.layers[1].grid_variables.v_grid
-    ζR = diagn.layers[1].grid_variables.vor_grid
-    η = diagn.surface.pres_grid
+    u = diagn.grid.u_grid[:, 1]
+    v = diagn.grid.v_grid[:, 1]
+    ζR = diagn.grid.vor_grid[:, 1]
+    η = diagn.grid.pres_grid
     
     # vorticity during simulation is scaled by radius R, unscale here
     ζ = ζR ./ diagn.scale[]

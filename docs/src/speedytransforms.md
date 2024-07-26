@@ -106,7 +106,7 @@ create a `SpectralTransform` is to start with a `SpectralGrid`, which already de
 which spectral resolution is supposed to be combined with a given grid.
 ```@example speedytransforms
 using SpeedyWeather
-spectral_grid = SpectralGrid(Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3)
+spectral_grid = SpectralGrid(NF=Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3)
 ```
 (We `using SpeedyWeather` here as `SpectralGrid` is exported therein).
 We also specify the number format `Float32` here to be used for the transform although this
@@ -274,6 +274,19 @@ to kilobytes
 ```@example speedytransforms
 SpectralTransform(spectral_grid, recompute_legendre=true)
 ```
+
+## Batched Transforms 
+
+SpeedyTransforms also supports batched transforms. With batched input data the `transform` is performed along the leading dimension, and all further dimensions are interpreted as batch dimensions. Take for example 
+
+```@example speedytransforms 
+alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32, 5) 
+grids = transform(alms)
+```
+
+In this case we first randomly generated five (32x32) `LowerTriangularMatrix` that hold the
+coefficients and then transformed all five matrices batched to the grid space with the 
+transform command, yielding 5 `RingGrids` with each 48-rings. 
 
 ## Functions and type index
 

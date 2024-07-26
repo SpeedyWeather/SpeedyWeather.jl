@@ -109,7 +109,7 @@ SpeedyTransforms?
 
 Let us start by generating some data
 ```@example gradient
-spectral_grid = SpectralGrid(trunc=31, nlev=1)
+spectral_grid = SpectralGrid(trunc=31, nlayers=1)
 forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
 drag = QuadraticDrag(spectral_grid)
 model = ShallowWaterModel(; spectral_grid, forcing, drag)
@@ -122,8 +122,8 @@ nothing # hide
 Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
 so calculated anyway...).
 ```@example gradient
-u = simulation.diagnostic_variables.layers[1].grid_variables.u_grid
-v = simulation.diagnostic_variables.layers[1].grid_variables.v_grid
+u = simulation.diagnostic_variables.grid.u_grid[:, 1]
+v = simulation.diagnostic_variables.grid.v_grid[:, 1]
 vor = curl(u, v, radius = spectral_grid.radius)
 nothing # hide
 ```
@@ -200,7 +200,7 @@ nothing # hide
 Which is the interface displacement assuming geostrophy.
 The actual interface displacement contains also ageostrophy
 ```@example gradient
-η_grid2 = simulation.diagnostic_variables.surface.pres_grid
+η_grid2 = simulation.diagnostic_variables.grid.pres_grid
 heatmap(η_grid2, title="Interface displacement η [m] with ageostrophy")
 save("eta_ageostrophic.png", ans) # hide
 nothing # hide

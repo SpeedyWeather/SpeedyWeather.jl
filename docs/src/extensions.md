@@ -91,9 +91,9 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
                     model::ModelSetup)
     # whatever the forcing is supposed to do, in the end you want
     # to write into the tendency fields
-    diagn.tendencies.u_tend_grid[1] = forcing.a
-    diagn.tendencies.v_tend_grid[1] = forcing.a
-    diagn.tendencies.vor_tend[1] = forcing.a
+    diagn.tendencies.u_tend_grid = forcing.a
+    diagn.tendencies.v_tend_grid = forcing.a
+    diagn.tendencies.vor_tend = forcing.a
 end
 ```
 `DiagnosticVariablesLayer` is the type of the first argument, because it contains

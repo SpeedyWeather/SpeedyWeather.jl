@@ -147,7 +147,7 @@ end
 Calculates the vertically averaged (weighted by the thickness of the σ level)
 velocities (*coslat) and divergence. E.g.
 
-    u_mean = ∑_k=1^nlev Δσ_k * u_k
+    u_mean = ∑_k=1^nlayers Δσ_k * u_k
 
 u, v are averaged in grid-point space, divergence in spectral space.
 """
@@ -248,7 +248,7 @@ function vertical_velocity!(
 
     for k in eachgrid(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp)
         if k == nlayers
-            # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlev+1/2 (stored in layer k)
+            # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlayers+1/2 (stored in layer k)
             # set to zero for bottom layer then
             σ_tend[:, k] .= 0
         else

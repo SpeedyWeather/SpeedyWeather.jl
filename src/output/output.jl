@@ -107,7 +107,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32, Float64}, Model<:Mode
     nlat::Int =  as_matrix ? RingGrids.matrix_size(input_Grid, spectral_grid.nlat_half)[2] :
                                                     RingGrids.get_nlat(output_Grid, nlat_half)
     npoints::Int = nlon*nlat
-    nlev::Int = spectral_grid.nlev
+    nlayers::Int = spectral_grid.nlayers
     interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(NF, input_Grid, spectral_grid.nlat_half, npoints)
 
     # fields to output (only one layer, reuse over layers)

@@ -138,8 +138,8 @@ function write_column_tendencies!(
     diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.geopot[column.cloud_top]
     diagn.physics.cloud_top[ij] /= planet.gravity
     
-    # just use layer index 1 (top) to nlev (surface) for analysis, but 0 for no clouds
-    # diagn.physics.cloud_top[ij] = column.cloud_top == nlev+1 ? 0 : column.cloud_top
+    # just use layer index 1 (top) to nlayers (surface) for analysis, but 0 for no clouds
+    # diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.cloud_top
     return nothing
 end
 
