@@ -389,23 +389,24 @@ Now the `global_diagnostics` function is defined as
 
 ```@example analysis
 function global_diagnostics(u, v, ζ, η, model)
+    
     # constants from model
-    NF = model.spectral_grid.NF # number format used
+    NF = model.spectral_grid.NF     # number format used
     H = model.atmosphere.layer_thickness
     Hb = model.orography.orography
     R = model.spectral_grid.radius
     Ω = model.planet.rotation
     g = model.planet.gravity
 
-    r = R * cos.(model.geometry.lats)   # create r on that grid
-    f = coriolis(u)                     # create f on that grid
+    r = NF.(R * cos.(model.geometry.lats))  # create r on that grid
+    f = coriolis(u)                         # create f on that grid
     
     h = @. η + H - Hb           # thickness
     q = @. (ζ + f) / h          # potential vorticity
-    λ = @. NF(u * r + Ω * r^2 )    # angular momentum (in the right number format NF)
-    k = @. NF(1/2 * (u^2 + v^2))   # kinetic energy
-    p = @. NF(1/2 * g * h)         # potential energy
-    z = @. NF(q^2/2)               # potential enstrophy
+    λ = @. u * r + Ω * r^2      # angular momentum (in the right number format NF)
+    k = @. (u^2 + v^2) / 2      # kinetic energy
+    p = @. g * h / 2            # potential energy
+    z = @. q^2 / 2              # potential enstrophy
 
     M = ∬dA(1, h, model)        # mean mass
     C = ∬dA(q, h, model)        # mean circulation
