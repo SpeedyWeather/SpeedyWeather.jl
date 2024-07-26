@@ -281,7 +281,7 @@ SpeedyTransforms also supports batched transforms. With batched input data the `
 will also be exectued over the whole batch. The transform is performed along the leading 
 dimension, and all further dimensions are interpreted as batch dimensions. Take for example 
 
-```@example speedytransform 
+```@example speedytransforms 
 alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32, 5) 
 grids = transform(alms)
 ```
