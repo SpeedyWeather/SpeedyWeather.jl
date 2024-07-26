@@ -106,7 +106,7 @@ create a `SpectralTransform` is to start with a `SpectralGrid`, which already de
 which spectral resolution is supposed to be combined with a given grid.
 ```@example speedytransforms
 using SpeedyWeather
-spectral_grid = SpectralGrid(Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3)
+spectral_grid = SpectralGrid(NF=Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3)
 ```
 (We `using SpeedyWeather` here as `SpectralGrid` is exported therein).
 We also specify the number format `Float32` here to be used for the transform although this
