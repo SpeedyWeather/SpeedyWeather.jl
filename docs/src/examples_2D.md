@@ -166,7 +166,7 @@ So for our current simulation, that means at time = 12 days, vorticity on the gr
 is stored in the diagnostic variables and can be visualised with
 
 ```@example galewsky_setup
-vor = simulation.diagnostic_variables.grid.vor_grid[:,1]
+vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky2.png", ans) # hide
 nothing # hide
@@ -206,7 +206,7 @@ You could plot the [NetCDF output](@ref) now as before, but we'll be plotting di
 from the current state of the `simulation`
 
 ```@example galewsky_setup
-vor = simulation.diagnostic_variables.layers[1].grid_variables.vor_grid
+vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]   # 1 to index surface
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky3.png", ans) # hide
 nothing # hide
@@ -244,7 +244,7 @@ a `QuadraticDrag` and use the default drag coefficient. Then visualize zonal win
 ```@example jet_stream_setup
 using CairoMakie
 
-u = simulation.diagnostic_variables.grid.u_grid[:,1]
+u = simulation.diagnostic_variables.grid.u_grid[:, 1]
 heatmap(u, title="Zonal wind [m/s]")
 save("polar_jets.png", ans) # hide
 nothing # hide

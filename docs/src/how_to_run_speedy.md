@@ -199,7 +199,7 @@ conditions can be set with the `initial_conditions` model component
 which are then set during `initialize!(::ModelSetup)`, but you can also
 change them now, before the model runs 
 ```@example howto
-simulation.prognostic_variables.vor[1][1,1] = 0
+simulation.prognostic_variables.vor[1][1, 1] = 0
 ```
 So with this we have set the zero mode of vorticity of the first (and only)
 layer in the shallow water to zero. Because the leapfrogging is a 2-step
