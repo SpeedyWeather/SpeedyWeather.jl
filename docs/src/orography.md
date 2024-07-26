@@ -127,7 +127,7 @@ you want to reflect this in the surface geopotential `geopot_surf` which is
 used in the primitive equations by
 
 ```@example orography
-spectral!(orography.geopot_surf, orography.orography, model.spectral_transform)
+transform!(orography.geopot_surf, orography.orography, model.spectral_transform)
 orography.geopot_surf .*= model.planet.gravity
 spectral_truncation!(orography.geopot_surf)
 ```
@@ -181,7 +181,7 @@ function SpeedyWeather.initialize!(
 
     # then also calculate the surface geopotential for primitive equations
     # given orography we just set
-    spectral!(geopot_surf, orography, model.spectral_transform)
+    transform!(geopot_surf, orography, model.spectral_transform)
     geopot_surf .*= model.planet.gravity
     spectral_truncation!(geopot_surf)
     return nothing

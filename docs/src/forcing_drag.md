@@ -239,14 +239,14 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
 
     # to grid-point space
     S_grid = diagn.dynamics_variables.a_grid
-    SpeedyTransforms.gridded!(S_grid, S, spectral_transform)
+    transform!(S_grid, S, spectral_transform)
     
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
     
     # back to spectral space
     (; vor_tend) = diagn.tendencies
-    SpeedyTransforms.spectral!(vor_tend, S_grid, spectral_transform)
+    transform!(vor_tend, S_grid, spectral_transform)
 
     return nothing
 end
@@ -303,7 +303,7 @@ run!(simulation)
 
 # visualisation
 using CairoMakie
-vor = simulation.diagnostic_variables.grid.vor_grid[:,1]
+vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
 heatmap(vor, title="Stochastically stirred vorticity")
 save("stochastic_stirring.png", ans) # hide
 nothing # hide

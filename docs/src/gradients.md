@@ -122,8 +122,8 @@ nothing # hide
 Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
 so calculated anyway...).
 ```@example gradient
-u = simulation.diagnostic_variables.grid.u_grid[:,1]
-v = simulation.diagnostic_variables.grid.v_grid[:,1]
+u = simulation.diagnostic_variables.grid.u_grid[:, 1]
+v = simulation.diagnostic_variables.grid.v_grid[:, 1]
 vor = curl(u, v, radius = spectral_grid.radius)
 nothing # hide
 ```
