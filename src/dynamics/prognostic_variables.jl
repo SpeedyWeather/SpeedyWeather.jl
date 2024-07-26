@@ -383,3 +383,4 @@ function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::Lo
 end 
 
 set!(S::AbstractSimulation; kwargs...) = set!(S.prognostic_variables, S.model.geometry; S=S.model.spectral_transform, kwargs...)
+set!(progn::PrognosticVariables, model::ModelSetup; kwargs...) = set!(progn, model.geometry; S=mode.spectral_transform, kwargs...)

@@ -78,7 +78,7 @@ function initialize!(   progn::PrognosticVariables{NF},
 
     ξ = repeat(ξ, 1, model.spectral_grid.nlev) # repeat for each level to have the same IC across all vertical layers
     
-    set!(progn, model.geometry, S=model.spectral_transform, vor=ξ, lf=1)
+    set!(progn, model; vor=ξ, lf=1)
 end
 
 export ZonalJet
@@ -288,7 +288,7 @@ function initialize!(   progn::PrognosticVariables{NF},
         end
     end
 
-    set!(progn, model.geometry, S=model.spectral_transform, vor=vor_grid, div=vor_grid, lf=1)
+    set!(progn, model; vor=vor_grid, div=vor_grid, lf=1)
 
     return nothing
 end
@@ -367,7 +367,7 @@ function initialize!(   progn::PrognosticVariables{NF},
         end
     end
 
-    set!(progn, model.geometry, S=model.spectral_transform, temp=temp_grid, lf=1)
+    set!(progn, model; temp=temp_grid, lf=1)
 
     return nothing
 end
@@ -426,7 +426,7 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
 
     # SURFACE TEMPERATURE (store in k = nlev, but it's actually surface, i.e. k=nlev+1/2)
     # overwrite with lowermost layer further down
-    temp_surf = progn.layers[end].timesteps[1].temp     # spectral temperature at k=nlev+1/2
+    temp_surf = progn.temp[1][:,end]     # spectral temperature at k=nlev+1/2
     temp_surf[1] = norm_sphere*temp_ref                 # set global mean surface temperature
     for lm in eachharmonic(geopot_surf, temp_surf)
         temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]           # lower temperature for higher mountains
@@ -478,7 +478,7 @@ function initialize!(   progn::PrognosticVariables,
         lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹
     end
     
-    set!(progn, model.geometry, S=model.spectral_transform, pres=lnp_grid, lf=1)
+    set!(progn; pres=lnp_grid, lf=1)
 
     return nothing
 end
@@ -494,7 +494,7 @@ function initialize!(   progn::PrognosticVariables,
     
     # logarithm of reference surface pressure [log(Pa)]
     # set the l=m=0 mode, normalize correctly
-    set!(progn, model.geometry, S=model.spectral_transform, pres=log(pres_ref) * norm_sphere)
+    set!(progn; pres=log(pres_ref) * norm_sphere)
 
     return nothing
 end
@@ -528,7 +528,7 @@ function initialize!(
         end
     end
     
-    set!(progn, model.geometry, S=model.spectral_transform, humid=humid_grid, lf=1)
+    set!(progn, model; humid=humid_grid, lf=1)
 
     return nothing
 end
@@ -557,8 +557,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     (; A, lmin, lmax) = initial_conditions
     (; trunc) = progn
 
-    η = progn.surface.timesteps[1].pres
-    η .= randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+    η = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
 
     # zero out other wavenumbers
     η[1:min(lmin, trunc+2), :] .= 0
@@ -568,6 +567,8 @@ function initialize!(   progn::PrognosticVariables{NF},
     η_grid = transform(η, model.spectral_transform)
     η_min, η_max = extrema(η_grid)
     η .*= (A/max(abs(η_min), abs(η_max)))
+
+    set!(progn, model; pres=η)
 
     return nothing
 end
