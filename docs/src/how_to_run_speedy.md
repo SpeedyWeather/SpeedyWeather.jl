@@ -67,10 +67,10 @@ spectral_grid = SpectralGrid(trunc=85, dealiasing=3, Grid=HEALPixGrid)
 ## Vertical coordinates and resolution
 
 The number of vertical layers or levels (we use both terms often interchangeably)
-is determined through the `nlev` argument. Especially for the
+is determined through the `nlayers` argument. Especially for the
 `BarotropicModel` and the `ShallowWaterModel` you want to set this to
 ```@example howto
-spectral_grid = SpectralGrid(nlev=1)
+spectral_grid = SpectralGrid(nlayers=1)
 ```
 For a single vertical level the type of the vertical coordinates does not matter,
 but in general you can change the spacing of the sigma coordinates
@@ -111,7 +111,7 @@ Meaning that if you want to have a shorter or longer time step you can create a 
 `Leapfrog` time stepper. All time inputs are supposed to be given with the help of  `Dates` (e.g. `Minute()`, `Hour()`, ...). But remember that every model component depends on a
 `SpectralGrid` as first argument.
 ```@example howto
-spectral_grid = SpectralGrid(trunc=63, nlev=1)
+spectral_grid = SpectralGrid(trunc=63, nlayers=1)
 time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(15))
 ```
 The actual time step at the given resolution (here T63) is then `Δt_sec`, there's
@@ -197,15 +197,15 @@ simulation.model.output.output_dt = Second(3600)
 Now, if there's output, it will be every hour. Furthermore the initial
 conditions can be set with the `initial_conditions` model component
 which are then set during `initialize!(::ModelSetup)`, but you can also
-change them now, before the model runs
+change them now, before the model runs 
 ```@example howto
-simulation.prognostic_variables.layers[1].timesteps[1].vor[1] = 0
+simulation.prognostic_variables.vor[1][1,1] = 0
 ```
 So with this we have set the zero mode of vorticity of the first (and only)
 layer in the shallow water to zero. Because the leapfrogging is a 2-step
 time stepping scheme we set here the first. As it is often tricky
 to set the initial conditions in spectral space, it is generally advised
-to do so through the `initial_conditions` model component.
+to do so through the `initial_conditions` model component or with [`SpeedyWeather.set!`](@ref).
 
 ## [Run a simulation](@id run)
 

@@ -275,6 +275,19 @@ to kilobytes
 SpectralTransform(spectral_grid, recompute_legendre=true)
 ```
 
+## Batched Transforms 
+
+SpeedyTransforms also supports batched transforms. With batched input data the `transform` is performed along the leading dimension, and all further dimensions are interpreted as batch dimensions. Take for example 
+
+```@example speedytransforms 
+alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32, 5) 
+grids = transform(alms)
+```
+
+In this case we first randomly generated five (32x32) `LowerTriangularMatrix` that hold the
+coefficients and then transformed all five matrices batched to the grid space with the 
+transform command, yielding 5 `RingGrids` with each 48-rings. 
+
 ## Functions and type index
 
 ```@autodocs

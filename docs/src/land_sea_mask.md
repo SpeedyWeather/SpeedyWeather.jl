@@ -21,7 +21,7 @@ You can create the default land-sea mask as follows
 
 ```@example landseamask
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlev=8)
+spectral_grid = SpectralGrid(trunc=31, nlayer=8)
 land_sea_mask = LandSeaMask(spectral_grid)
 ```
 

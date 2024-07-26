@@ -32,8 +32,8 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Generator function using `nlev` from `SG::SpectralGrid`"""
-LinearDrag(SG::SpectralGrid; kwargs...) = LinearDrag{SG.NF}(nlev=SG.nlev; kwargs...)
+Generator function using `nlayers` from `SG::SpectralGrid`"""
+LinearDrag(SG::SpectralGrid; kwargs...) = LinearDrag{SG.NF}(nlayers=SG.nlayers; kwargs...)
 
 """
 $(TYPEDSIGNATURES)

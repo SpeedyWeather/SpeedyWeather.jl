@@ -13,7 +13,7 @@
 
         vor .= randn(LowerTriangularArray{eltype(vor)}, size(vor, as=Matrix)...)
 
-        # ∇²ⁿ, ∇²ⁿ_implicit are nlev-vectors, one array per layer, pick surface
+        # ∇²ⁿ, ∇²ⁿ_implicit are nlayers-vectors, one array per layer, pick surface
         SpeedyWeather.horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
 
         # diffusion tendency has opposite sign (real/imag respectively)
