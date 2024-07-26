@@ -277,9 +277,7 @@ SpectralTransform(spectral_grid, recompute_legendre=true)
 
 ## Batched Transforms 
 
-SpeedyTransforms also supports batched transforms. With batched input data the `transform` 
-will also be exectued over the whole batch. The transform is performed along the leading 
-dimension, and all further dimensions are interpreted as batch dimensions. Take for example 
+SpeedyTransforms also supports batched transforms. With batched input data the `transform` is performed along the leading dimension, and all further dimensions are interpreted as batch dimensions. Take for example 
 
 ```@example speedytransforms 
 alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32, 5) 
