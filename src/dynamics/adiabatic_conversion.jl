@@ -2,16 +2,16 @@ abstract type AbstractAdiabaticConversion <: AbstractModelComponent end
 
 export AdiabaticConversion
 Base.@kwdef struct AdiabaticConversion{NF} <: AbstractAdiabaticConversion
-    nlev::Int
+    nlayers::Int
 
     "σ-related factor A needed for adiabatic conversion term"
-    σ_lnp_A::Vector{NF} = zeros(NF, nlev)
+    σ_lnp_A::Vector{NF} = zeros(NF, nlayers)
     
     "σ-related factor B needed for adiabatic conversion term"
-    σ_lnp_B::Vector{NF} = zeros(NF, nlev)
+    σ_lnp_B::Vector{NF} = zeros(NF, nlayers)
 end
 
-AdiabaticConversion(SG::SpectralGrid; kwargs...) = AdiabaticConversion{SG.NF}(; nlev=SG.nlev, kwargs...)
+AdiabaticConversion(SG::SpectralGrid; kwargs...) = AdiabaticConversion{SG.NF}(; nlayers=SG.nlayers, kwargs...)
 
 function initialize!(
     adiabatic::AdiabaticConversion,

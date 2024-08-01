@@ -7,7 +7,7 @@ Construct Geometry struct containing parameters and arrays describing an iso-lat
 and the vertical levels. Pass on `SpectralGrid` to calculate the following fields
 $(TYPEDFIELDS)
 """
-Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry
+@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry
 
     "SpectralGrid that defines spectral and grid resolution"
     spectral_grid::SpectralGrid
@@ -28,9 +28,9 @@ Base.@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry
 
     "number of latitude rings"
     nlat::Int = spectral_grid.nlat
-
+    
     "number of vertical levels"
-    nlev::Int = spectral_grid.nlev
+    nlayers::Int = spectral_grid.nlayers
 
     "total number of grid points"
     npoints::Int = spectral_grid.npoints
@@ -100,6 +100,9 @@ end
 $(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
 function Geometry(spectral_grid::SpectralGrid)
+    error_message = "nlayers=$(spectral_grid.nlayers) does not match length nlayers="*
+        "$(spectral_grid.vertical_coordinates.nlayers) in spectral_grid.vertical_coordinates."
+    @assert spectral_grid.nlayers == spectral_grid.vertical_coordinates.nlayers error_message
     return Geometry{spectral_grid.NF}(; spectral_grid)
 end
 
@@ -116,16 +119,16 @@ function σ_interpolation_weights(
     σ_levels_half::AbstractVector)
 
     weights = zero(σ_levels_full)
-    nlev = length(weights)
-    nlev == 1 && return weights     # escape early for 1 layer to avoid out-of-bounds access
+    nlayers = length(weights)
+    nlayers == 1 && return weights     # escape early for 1 layer to avoid out-of-bounds access
 
-    for k in 1:nlev-1
+    for k in 1:nlayers-1
         weights[k] = (log(σ_levels_half[k+1]) - log(σ_levels_full[k])) /
                         (log(σ_levels_full[k+1]) - log(σ_levels_full[k]))
     end
     # was log(0.99) in Fortran SPEEDY code but doesn't make sense to me
-    weights[end] =  (log(σ_levels_half[nlev+1]) - log(σ_levels_full[nlev])) /
-                        (log(σ_levels_full[nlev]) - log(σ_levels_full[nlev-1]))
+    weights[end] =  (log(σ_levels_half[nlayers+1]) - log(σ_levels_full[nlayers])) /
+                        (log(σ_levels_full[nlayers]) - log(σ_levels_full[nlayers-1]))
     
     return weights
 end
@@ -134,30 +137,30 @@ end
 """
 $(TYPEDSIGNATURES)
 Given a vector in column defined at full levels, do a linear interpolation in
-log(σ) to calculate its values at half-levels, skipping top (k=1/2), extrapolating to bottom (k=NLEV+1/2).
+log(σ) to calculate its values at half-levels, skipping top (k=1/2), extrapolating to bottom (k=nlayers+1/2).
 """
 function vertical_interpolate!(
     A_half::Vector,             # quantity A on half levels (excl top)
     A_full::Vector,             # quantity A on full levels
     G::Geometry,
 )
-    nlev = length(A_half)
+    nlayers = length(A_half)
     weights = G.full_to_half_interpolation
 
     # full levels contain one more for surface
     # TODO this is currently confusing because the surface fluxes use full[end]
     # as surface value which is technically on half levels though!
-    @boundscheck nlev <= length(A_full) || throw(BoundsError)
-    @boundscheck nlev <= length(weights) || throw(BoundsError)
+    @boundscheck nlayers <= length(A_full) || throw(BoundsError)
+    @boundscheck nlayers <= length(weights) || throw(BoundsError)
 
     # For A at each full level k, compute A at the half-level below, i.e. at the boundary
     # between the full levels k and k+1. Fortran SPEEDY documentation eq. (1)
-    for k = 1:nlev-1
+    for k = 1:nlayers-1
         A_half[k] = A_full[k] + weights[k]*(A_full[k+1] - A_full[k])
     end
 
     # Compute the values at the surface separately
-    A_half[nlev] = A_full[nlev] + weights[nlev]*(A_full[nlev] - A_full[nlev-1])
+    A_half[nlayers] = A_full[nlayers] + weights[nlayers]*(A_full[nlayers] - A_full[nlayers-1])
 
     return nothing
 end

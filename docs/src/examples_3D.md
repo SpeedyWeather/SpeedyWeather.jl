@@ -12,7 +12,7 @@ See also [Examples 2D](@ref Examples) for examples with the
 
 ```@example jablonowski
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlev=8, Grid=FullGaussianGrid, dealiasing=3)
+spectral_grid = SpectralGrid(trunc=31, nlayers=8, Grid=FullGaussianGrid, dealiasing=3)
 
 orography = ZonalRidge(spectral_grid)
 initial_conditions = InitialConditions(
@@ -41,7 +41,7 @@ off a wave propagating eastward. This wave becomes obvious when visualised with
 ```@example jablonowski
 using CairoMakie
 
-vor = simulation.diagnostic_variables.layers[end].grid_variables.vor_grid
+vor = simulation.diagnostic_variables.grid.vor_grid[:, end]
 heatmap(vor, title="Surface relative vorticity")
 save("jablonowski.png", ans) # hide
 nothing # hide
@@ -52,7 +52,7 @@ nothing # hide
 
 ```@example heldsuarez
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlev=8)
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 
 # construct model with only Held-Suarez forcing, no other physics
 model = PrimitiveDryModel(;
@@ -99,7 +99,7 @@ Visualising surface temperature with
 ```@example heldsuarez
 using CairoMakie
 
-temp = simulation.diagnostic_variables.layers[end].grid_variables.temp_grid
+temp = simulation.diagnostic_variables.grid.temp_grid[:, end]
 heatmap(temp, title="Surface temperature [K]", colormap=:thermal)
 
 save("heldsuarez.png", ans) # hide
@@ -113,7 +113,7 @@ nothing # hide
 using SpeedyWeather
 
 # components
-spectral_grid = SpectralGrid(trunc=31, nlev=8)
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 ocean = AquaPlanet(spectral_grid, temp_equator=302, temp_poles=273)
 land_sea_mask = AquaPlanetMask(spectral_grid)
 orography = NoOrography(spectral_grid)
@@ -149,7 +149,7 @@ of the convection scheme, causing updrafts and downdrafts in both humidity and t
 ```@example aquaplanet
 using CairoMakie
 
-humid = simulation.diagnostic_variables.layers[end].grid_variables.humid_grid
+humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
 heatmap(humid, title="Surface specific humidity [kg/kg]", colormap=:oslo)
 
 save("aquaplanet.png", ans) # hide
@@ -180,7 +180,7 @@ simulation = initialize!(model)
 model.feedback.verbose = false # hide
 run!(simulation, period=Day(20))
 
-humid = simulation.diagnostic_variables.layers[end].grid_variables.humid_grid
+humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
 heatmap(humid, title="No deep convection: Surface specific humidity [kg/kg]", colormap=:oslo)
 save("aquaplanet_nodeepconvection.png", ans) # hide
 nothing # hide
@@ -201,7 +201,7 @@ simulation = initialize!(model)
 model.feedback.verbose = false # hide
 run!(simulation, period=Day(20))
 
-humid = simulation.diagnostic_variables.layers[end].grid_variables.humid_grid
+humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
 heatmap(humid, title="No convection: Surface specific humidity [kg/kg]", colormap=:oslo)
 save("aquaplanet_noconvection.png", ans) # hide
 nothing # hide
@@ -218,7 +218,7 @@ And the comparison looks like
 using SpeedyWeather
 
 # components
-spectral_grid = SpectralGrid(trunc=31, nlev=8)
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 large_scale_condensation = ImplicitCondensation(spectral_grid)
 convection = SimplifiedBettsMiller(spectral_grid)
 
@@ -241,7 +241,7 @@ the precipitation that comes from these parameterizations
 ```@example precipitation
 using CairoMakie
 
-(; precip_large_scale, precip_convection) = simulation.diagnostic_variables.surface
+(; precip_large_scale, precip_convection) = simulation.diagnostic_variables.physics
 m2mm = 1000     # convert from [m] to [mm]
 heatmap(m2mm*precip_large_scale, title="Large-scale precipiation [mm]: Accumulated over 10 days", colormap=:dense)
 save("large-scale_precipitation_acc.png", ans) # hide
@@ -259,8 +259,8 @@ precipitation only in the period.
 
 ```@example precipitation
 # reset accumulators and simulate 6 hours
-simulation.diagnostic_variables.surface.precip_large_scale .= 0
-simulation.diagnostic_variables.surface.precip_convection .= 0
+simulation.diagnostic_variables.physics.precip_large_scale .= 0
+simulation.diagnostic_variables.physics.precip_convection .= 0
 run!(simulation, period=Hour(6))
 
 # visualise, precip_* arrays are flat copies, no need to read them out again!

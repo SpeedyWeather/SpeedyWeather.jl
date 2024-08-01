@@ -7,17 +7,9 @@ function scale!(
     var::Symbol,
     scale::Real,
 )
-    if var == :pres
-        for pres in progn.pres.timesteps
-            pres .*= scale
-        end
-    else
-        for layer in progn.layers
-            for step in layer.timesteps
-                variable = getfield(step, var)
-                variable .*= scale
-            end
-        end
+    variable_nsteps = getfield(progn, var)
+    for step in variable_nsteps
+        step .*= scale
     end
 end
 
@@ -30,10 +22,8 @@ function scale!(
     var::Symbol,
     scale::Real,
 )
-    for layer in diagn.layers
-        variable = getfield(layer.grid_variables, var)
-        variable .*= scale
-    end
+    variable = getfield(diagn.grid, var)
+    variable .*= scale
 end
 
 """

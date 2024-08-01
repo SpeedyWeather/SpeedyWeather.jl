@@ -43,6 +43,10 @@ Base.zero(::Type{Particle}) = Particle{DEFAULT_NF,true}(0,0,0)
 Base.zero(::Type{Particle{NF}}) where NF = Particle{NF,true}(0,0,0)
 Base.zero(::Type{Particle{NF,isactive}}) where {NF,isactive} = Particle{NF,isactive}(0,0,0)
 Base.zero(::P) where {P<:Particle} = zero(P)
+function Base.zeros(ArrayType::Type{<:AbstractArray{P}}, n::Int...) where {P<:Particle}
+    z = ArrayType(undef, n...)
+    fill!(z, zero(P))
+end
 
 Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle}) = rand(rng, Particle{DEFAULT_NF,true})
 Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF}}) where NF = rand(rng, Particle{NF,true})

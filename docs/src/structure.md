@@ -33,7 +33,7 @@ But let's start at the top.
 
 When creating a `Simulation`, its fields are
 ```@example structure
-spectral_grid = SpectralGrid(nlev = 1)
+spectral_grid = SpectralGrid(nlayers = 1)
 model = BarotropicModel(; spectral_grid)
 simulation = initialize!(model)
 ```
@@ -126,7 +126,7 @@ And with `max_level` you can truncate the tree to go down at most that many leve
 a higher resolution `PrimitiveWetModel` would use
 
 ```@example structure
-spectral_grid = SpectralGrid(trunc=127, nlev=8)
+spectral_grid = SpectralGrid(trunc=127, nlayers=8)
 model = PrimitiveWetModel(;spectral_grid)
 simulation = initialize!(model)
 tree(simulation, max_level=1, with_size=true)

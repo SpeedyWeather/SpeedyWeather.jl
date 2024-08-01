@@ -22,7 +22,7 @@ Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: AbstractTemperatureRelaxatio
     nlat::Int
 
     "number of vertical levels"
-    nlev::Int
+    nlayers::Int
     
     # OPTIONS
     "sigma coordinate below which faster surface relaxation is applied"
@@ -50,7 +50,7 @@ Base.@kwdef struct HeldSuarez{NF<:AbstractFloat} <: AbstractTemperatureRelaxatio
     κ::Base.RefValue{NF} = Ref(zero(NF))
     p₀::Base.RefValue{NF} = Ref(zero(NF))
 
-    temp_relax_freq::Matrix{NF} = zeros(NF, nlev, nlat) # (inverse) relax time scale per layer and lat
+    temp_relax_freq::Matrix{NF} = zeros(NF, nlayers, nlat) # (inverse) relax time scale per layer and lat
     temp_equil_a::Vector{NF} = zeros(NF, nlat)          # terms to calc equilibrium temper func
     temp_equil_b::Vector{NF} = zeros(NF, nlat)          # of latitude and pressure
 end
@@ -59,8 +59,8 @@ end
 $(TYPEDSIGNATURES)
 create a HeldSuarez temperature relaxation with arrays allocated given `spectral_grid`"""
 function HeldSuarez(SG::SpectralGrid; kwargs...)
-    (; NF, nlat, nlev) = SG
-    return HeldSuarez{NF}(; nlev, nlat, kwargs...)
+    (; NF, nlat, nlayers) = SG
+    return HeldSuarez{NF}(; nlayers, nlat, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
@@ -136,7 +136,7 @@ Base.@kwdef mutable struct JablonowskiRelaxation{NF<:AbstractFloat} <: AbstractT
     
     # DIMENSIONS
     nlat::Int
-    nlev::Int
+    nlayers::Int
 
     # OPTIONS
     "sigma coordinate below which relax_time_fast is applied [1]"
@@ -164,16 +164,16 @@ Base.@kwdef mutable struct JablonowskiRelaxation{NF<:AbstractFloat} <: AbstractT
     relax_time_fast::Second = Day(4)
 
     # precomputed constants, allocate here, fill in initialize!
-    temp_relax_freq::Matrix{NF} = zeros(NF, nlev, nlat)   # (inverse) relax time scale per layer and lat
-    temp_equil::Matrix{NF} = zeros(NF, nlev, nlat)        # terms to calc equilibrium temperature as func
+    temp_relax_freq::Matrix{NF} = zeros(NF, nlayers, nlat)   # (inverse) relax time scale per layer and lat
+    temp_equil::Matrix{NF} = zeros(NF, nlayers, nlat)        # terms to calc equilibrium temperature as func
 end
 
 """
 $(TYPEDSIGNATURES)
 create a JablonowskiRelaxation temperature relaxation with arrays allocated given `spectral_grid`"""
 function JablonowskiRelaxation(SG::SpectralGrid; kwargs...) 
-    (; NF, nlat, nlev) = SG
-    return JablonowskiRelaxation{NF}(; nlev, nlat, kwargs...)
+    (; NF, nlat, nlayers) = SG
+    return JablonowskiRelaxation{NF}(; nlayers, nlat, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)

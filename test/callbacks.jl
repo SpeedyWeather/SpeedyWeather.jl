@@ -33,14 +33,15 @@ end
         callback::StormChaser,
         progn::PrognosticVariables,
         diagn::DiagnosticVariables,
-        model::ModelSetup,
+        model::AbstractModel,
     )
         # allocate recorder: number of time steps (incl initial conditions) in simulation  
         callback.maximum_surface_wind_speed = zeros(progn.clock.n_timesteps + 1)
         
         # where surface (=lowermost model layer) u, v on the grid are stored
-        (; u_grid, v_grid) = diagn.layers[diagn.nlev].grid_variables
-        
+        u_grid = diagn.grid.u_grid[:, diagn.nlayers]
+        v_grid = diagn.grid.u_grid[:, diagn.nlayers]
+
         # maximum wind speed of initial conditions
         callback.maximum_surface_wind_speed[1] = max_2norm(u_grid, v_grid)
         
@@ -61,7 +62,7 @@ end
         callback::StormChaser,
         progn::PrognosticVariables,
         diagn::DiagnosticVariables,
-        model::ModelSetup,
+        model::AbstractModel,
     )
     
         # increase counter
@@ -69,8 +70,9 @@ end
         i = callback.timestep_counter
     
         # where surface (=lowermost model layer) u, v on the grid are stored
-        (; u_grid, v_grid) = diagn.layers[diagn.nlev].grid_variables
-    
+        u_grid = diagn.grid.u_grid[:,diagn.nlayers]
+        v_grid = diagn.grid.u_grid[:,diagn.nlayers]
+        
         # maximum wind speed at current time step
         callback.maximum_surface_wind_speed[i] = max_2norm(u_grid, v_grid)
     end
@@ -85,7 +87,7 @@ end
     key = :storm_chaser
     add!(model.callbacks, key => storm_chaser)      # with :storm_chaser key
     add!(model.callbacks, NoCallback())             # add dummy too 
-    add!(model, NoCallback())                       # add dummy with ::ModelSetup interface
+    add!(model, NoCallback())                       # add dummy with ::AbstractModel interface
 
     simulation = initialize!(model)
     run!(simulation, period=Day(1))

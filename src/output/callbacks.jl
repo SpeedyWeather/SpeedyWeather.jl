@@ -61,15 +61,15 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Add a or several callbacks to a model::ModelSetup. To be used like
+Add a or several callbacks to a model::AbstractModel. To be used like
 
     add!(model, :my_callback => callback)
     add!(model, :my_callback1 => callback, :my_callback2 => other_callback)
 """
-add!(model::ModelSetup, key_callbacks::Pair{Symbol, <:AbstractCallback}...) =
+add!(model::AbstractModel, key_callbacks::Pair{Symbol, <:AbstractCallback}...) =
     add!(model.callbacks, key_callbacks...)
 add!(D::CALLBACK_DICT, key::Symbol, callback::AbstractCallback) = add!(D, Pair(key, callback))
-add!(model::ModelSetup, key::Symbol, callback::AbstractCallback) =
+add!(model::AbstractModel, key::Symbol, callback::AbstractCallback) =
     add!(model.callbacks, Pair(key, callback))
 
 
@@ -102,7 +102,7 @@ key which is randomly created like callback_????. To be used like
 
     add!(model.callbacks, callback)
     add!(model.callbacks, callback1, callback2)."""
-add!(model::ModelSetup, callbacks::AbstractCallback...) =
+add!(model::AbstractModel, callbacks::AbstractCallback...) =
     add!(model.callbacks, callbacks..., verbose = model.feedback.verbose)
 
 # delete!(dict, key) already defined in Base
@@ -128,11 +128,11 @@ function initialize!(
     callback::GlobalSurfaceTemperatureCallback{NF},
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 ) where NF
-    callback.temp = Vector{NF}(undef, progn.clock.n_timesteps+1) # replace with vector of correct length
-    callback.temp[1] = diagn.layers[diagn.nlev].temp_average[]   # set initial conditions
-    callback.timestep_counter = 1                                # (re)set counter to 1
+    callback.temp = Vector{NF}(undef, progn.clock.n_timesteps+1)    # replace with vector of correct length
+    callback.temp[1] = diagn.temp_average[diagn.nlayers]            # set initial conditions
+    callback.timestep_counter = 1                                   # (re)set counter to 1
 end
 
 """
@@ -143,11 +143,11 @@ function callback!(
     callback::GlobalSurfaceTemperatureCallback,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     callback.timestep_counter += 1  
     i = callback.timestep_counter
-    callback.temp[i] = diagn.layers[diagn.nlev].temp_average[]
+    callback.temp[i] = diagn.temp_average[diagn.nlayers]
 end
 
 # nothing to finish

@@ -1,6 +1,6 @@
 @testset "Ocean models" begin
     
-    spectral_grid = SpectralGrid(trunc=31, nlev=5)
+    spectral_grid = SpectralGrid(trunc=31, nlayers=5)
 
     for OceanModel in ( SeasonalOceanClimatology, 
                         ConstantOceanClimatology,

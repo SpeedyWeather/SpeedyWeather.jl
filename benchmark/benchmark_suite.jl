@@ -30,12 +30,12 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         Model = suite.model[i]
         NF = suite.NF[i]
         trunc = suite.trunc[i]
-        nlev = suite.nlev[i]
+        nlayers = suite.nlev[i]
         Grid = suite.Grid[i]
         dynamics = suite.dynamics[i]
         physics = suite.physics[i]
 
-        spectral_grid = SpectralGrid(;NF, trunc, Grid, nlev)
+        spectral_grid = SpectralGrid(;NF, trunc, Grid, nlayers)
         suite.nlat[i] = spectral_grid.nlat
 
         model = Model(;spectral_grid)

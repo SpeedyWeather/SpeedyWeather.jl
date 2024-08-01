@@ -27,7 +27,7 @@ function get_truncation(nlat_half::Integer,
 end
 
 # unpack nlat_half from provided map
-get_truncation(map::AbstractGrid, dealiasing::Real=DEFAULT_DEALIASING) =
+get_truncation(map::AbstractGridArray, dealiasing::Real=DEFAULT_DEALIASING) =
     get_truncation(map.nlat_half, dealiasing)
 
 """

@@ -98,7 +98,7 @@ all other arguments can then be passed on as keyword arguments with defaults
 defined. Creating the default convection parameterization for example would be
 ```@example parameterization
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlev=8)
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 convection = SimplifiedBettsMiller(spectral_grid, time_scale=Hour(4))
 ```
 Further keyword arguments can be added or omitted all together (using the default

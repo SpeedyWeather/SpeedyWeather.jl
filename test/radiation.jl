@@ -1,6 +1,6 @@
 @testset "Longwave radiation" begin
 
-    spectral_grid = SpectralGrid(trunc=31, nlev=5)
+    spectral_grid = SpectralGrid(trunc=31, nlayers=5)
 
     for Radiation in (NoLongwave,
                         UniformCooling,

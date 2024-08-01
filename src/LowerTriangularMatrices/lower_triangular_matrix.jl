@@ -401,7 +401,7 @@ function Base.copyto!(
                                                     Base.OneTo(minimum(size.((L1, L2), 2; as=Matrix))))
 
     L1.data .= convert.(T, L2.data)
-    L1
+    return L1
 end
 
 # CPU version
@@ -427,7 +427,7 @@ function Base.copyto!(
         end
     end
 
-    L1
+    return L1
 end 
 
 # Fallback / GPU version (the two versions _copyto! and copyto! are there to enable tests of this function with regular Arrays)
@@ -482,19 +482,21 @@ function _copyto_core!(
 
     L1.data[ind_L1,[Colon() for i=1:(N-1)]...] = T.(L2.data[ind_L2,[Colon() for i=1:(N-1)]...])
 
-    L1
+    return L1
 end 
 
+
+# copyto! using matrix indexing from Matrix/Array
 function Base.copyto!(  L::LowerTriangularArray{T},  # copy to L
                         M::AbstractArray) where T    # copy from M
     @boundscheck size(L, as=Matrix) == size(M) || throw(BoundsError)
     L.data .= convert.(T, M[lowertriangle_indices(M)])
-
-    L
+    return L
 end
 
 function Base.copyto!(  M::AbstractArray{T},               # copy to M
                         L::LowerTriangularArray) where T   # copy from L
+  
     @boundscheck size(L, as=Matrix) == size(M) || throw(BoundsError)
 
     lower_triangle_indices = lowertriangle_indices(M)
@@ -503,17 +505,15 @@ function Base.copyto!(  M::AbstractArray{T},               # copy to M
     M[upper_triangle_indices] .= zero(T)
     M[lower_triangle_indices] = convert.(T, L.data)
 
-    M
+    return M
 end
 
-# copyto! from Vector to LA
+# copyto! from Vector/Array to using vector indexing
 function Base.copyto!(  L::LowerTriangularArray{T,N},       # copy to L
                         V::AbstractArray{S,N}) where {T,S,N}# copy from V
     @boundscheck size(L, as=Vector) == size(V) || throw(BoundsError)
-
     L.data .= convert.(T, V)
-
-    L 
+    return L 
 end 
 
 function LowerTriangularMatrix{T}(M::LowerTriangularMatrix{T2}) where {T,T2}

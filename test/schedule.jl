@@ -2,7 +2,7 @@
     # especially T170 uses 337500 milliseconds time steps
     # not representable as seconds
     for trunc in (31,42,63,85,127,170,255,341)
-        spectral_grid = SpectralGrid(trunc=trunc, nlev=1)
+        spectral_grid = SpectralGrid(trunc=trunc, nlayers=1)
         time_stepping = Leapfrog(spectral_grid)
 
         clock = Clock()

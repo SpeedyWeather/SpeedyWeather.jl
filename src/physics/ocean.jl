@@ -57,15 +57,14 @@ function initialize!(   ocean::PrognosticVariablesOcean,
 end
 
 # function barrier for all oceans
-function ocean_timestep!(   ocean::PrognosticVariablesOcean,
-                            time::DateTime,
+function ocean_timestep!(   progn::PrognosticVariables,
+                            diagn::DiagnosticVariables,
                             model::PrimitiveEquation)
-    ocean_timestep!(ocean, time, model.ocean)
+    ocean_timestep!(progn, diagn, model.ocean, model)
 end
 
 
 ## SEASONAL OCEAN CLIMATOLOGY
-
 export SeasonalOceanClimatology
 
 """
@@ -74,7 +73,7 @@ fields from file, and interpolates them in time regularly
 (default every 3 days) to be stored in the prognostic variables.
 Fields and options are
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SeasonalOceanClimatology{NF, Grid<:AbstractGrid{NF}} <: AbstractOcean
+@kwdef struct SeasonalOceanClimatology{NF, Grid<:AbstractGrid{NF}} <: AbstractOcean
 
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
@@ -155,24 +154,25 @@ function initialize!(
     ocean_model::SeasonalOceanClimatology,
     model::PrimitiveEquation,
 )
-    ocean.time = time   # set initial time
+    # ocean.time = time   # set initial time
     interpolate_monthly!(   ocean.sea_surface_temperature,
                             ocean_model.monthly_temperature,
                             time)
 end
     
-function ocean_timestep!(   ocean::PrognosticVariablesOcean,
-                            time::DateTime,
-                            ocean_model::SeasonalOceanClimatology)
+function ocean_timestep!(   progn::PrognosticVariables,
+                            diagn::DiagnosticVariables,
+                            ocean_model::SeasonalOceanClimatology,
+                            model::PrimitiveEquation)
 
-    # escape immediately if Δt of ocean model hasn't passed yet
-    (time - ocean.time) < ocean_model.Δt && return nothing
+    # # escape immediately if Δt of ocean model hasn't passed yet
+    # (time - ocean.time) < ocean_model.Δt && return nothing
 
-    # otherwise update ocean prognostic variables:
-    ocean.time = time
-    interpolate_monthly!(   ocean.sea_surface_temperature,
+    # # otherwise update ocean prognostic variables:
+    # ocean.time = time
+    interpolate_monthly!(   progn.ocean.sea_surface_temperature,
                             ocean_model.monthly_temperature,
-                            time)
+                            progn.clock.time)
     return nothing
 end
 
@@ -210,7 +210,7 @@ To be created like
 and the ocean time is set with initialize!(model, time=time).
 Fields and options are
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ConstantOceanClimatology <: AbstractOcean
+@kwdef struct ConstantOceanClimatology <: AbstractOcean
     "[OPTION] path to the folder containing the land-sea mask file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -250,9 +250,10 @@ function initialize!(
 end
 
 function ocean_timestep!(
-    ocean::PrognosticVariablesOcean,
-    time::DateTime,
-    ocean_model::ConstantOceanClimatology
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    ocean_model::ConstantOceanClimatology,
+    model::PrimitiveEquation,
 )
     return nothing
 end
@@ -268,7 +269,7 @@ but vary in latitude following a coslat². To be created like
 
 Fields and options are
 $(TYPEDFIELDS)"""
-Base.@kwdef struct AquaPlanet{NF} <: AbstractOcean
+@kwdef struct AquaPlanet{NF} <: AbstractOcean
     "Number of latitude rings"
     nlat::Int
 
@@ -311,9 +312,10 @@ function initialize!(
 end
 
 function ocean_timestep!(
-    ocean::PrognosticVariablesOcean,
-    time::DateTime,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
     ocean_model::AquaPlanet,
+    model::PrimitiveEquation,
 )
     return nothing
 end

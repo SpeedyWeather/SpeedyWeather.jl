@@ -19,7 +19,7 @@ end
     # loop over different precisions
     @testset for NF in (Float16, Float32, Float64)
 
-        spectral_grid = SpectralGrid(NF)
+        spectral_grid = SpectralGrid(; NF)
         L = Leapfrog(spectral_grid)
 
         # INITIAL CONDITIONS
@@ -59,7 +59,7 @@ end
     # loop over different precisions
     @testset for NF in (Float16, Float32, Float64)
 
-        spectral_grid = SpectralGrid(NF)
+        spectral_grid = SpectralGrid(; NF)
         L = Leapfrog(spectral_grid)
 
         # INITIAL CONDITIONS
@@ -87,7 +87,7 @@ end
         @test M_RAW < 1
 
         # CHECK THAT NO WILLIAMS FILTER IS WORSE
-        spectral_grid = SpectralGrid(NF)
+        spectral_grid = SpectralGrid(; NF)
         L = Leapfrog(spectral_grid, williams_filter=1)
 
         # INITIAL CONDITIONS

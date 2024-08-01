@@ -31,7 +31,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
 } <: ShallowWater
     
     spectral_grid::SpectralGrid
-    device_setup::DS = DeviceSetup(CPUDevice())
+    device_setup::DS = DeviceSetup(spectral_grid.device)
 
     # DYNAMICS
     geometry::GE = Geometry(spectral_grid)
@@ -56,7 +56,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     feedback::FB = Feedback()
 end
 
-has(::Type{<:ShallowWater}, var_name::Symbol) = var_name in (:vor, :div, :pres)
+prognostic_variables(::Type{<:ShallowWater}) = (:vor, :div, :pres)
 default_concrete_model(::Type{ShallowWater}) = ShallowWaterModel
 
 """
@@ -67,8 +67,8 @@ in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     (; spectral_grid) = model
 
-    spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for ShallowWaterModel, \
-                                SpectralGrid with nlev=$(spectral_grid.nlev) provided."
+    spectral_grid.nlayers > 1 && @warn "Only nlayers=1 supported for ShallowWaterModel, \
+                                SpectralGrid with nlayers=$(spectral_grid.nlayers) provided."
 
     # initialize components
     initialize!(model.time_stepping, model)
@@ -89,6 +89,6 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    diagnostic_variables = DiagnosticVariables(spectral_grid)
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end

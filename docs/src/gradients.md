@@ -60,7 +60,7 @@ using SpeedyWeather, CairoMakie
 trunc = 64                  # 1-based maximum degree of spherical harmonics
 L = randn(LowerTriangularMatrix{ComplexF32}, trunc, trunc)
 spectral_truncation!(L, 5)              # remove higher wave numbers
-G = gridded(L)
+G = transform(L)
 heatmap(G, title="Some fake data G")    # requires `using CairoMakie`
 save("gradient_data.png", ans) # hide
 nothing # hide
@@ -109,7 +109,7 @@ SpeedyTransforms?
 
 Let us start by generating some data
 ```@example gradient
-spectral_grid = SpectralGrid(trunc=31, nlev=1)
+spectral_grid = SpectralGrid(trunc=31, nlayers=1)
 forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
 drag = QuadraticDrag(spectral_grid)
 model = ShallowWaterModel(; spectral_grid, forcing, drag)
@@ -122,8 +122,8 @@ nothing # hide
 Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
 so calculated anyway...).
 ```@example gradient
-u = simulation.diagnostic_variables.layers[1].grid_variables.u_grid
-v = simulation.diagnostic_variables.layers[1].grid_variables.v_grid
+u = simulation.diagnostic_variables.grid.u_grid[:, 1]
+v = simulation.diagnostic_variables.grid.v_grid[:, 1]
 vor = curl(u, v, radius = spectral_grid.radius)
 nothing # hide
 ```
@@ -136,8 +136,8 @@ RingGrids.scale_coslat⁻¹!(u)
 RingGrids.scale_coslat⁻¹!(v)
 
 S = SpectralTransform(u, one_more_degree=true)
-us = spectral(u, S)
-vs = spectral(v, S)
+us = transform(u, S)
+vs = transform(v, S)
 
 vor = curl(us, vs, radius = spectral_grid.radius)
 ```
@@ -172,7 +172,7 @@ that we also used in `spectral_grid`. The Coriolis parameter for a grid like `vo
 is obtained, and we do the following for ``f\zeta/g``.
 
 ```@example gradient
-vor_grid = gridded(vor, Grid=spectral_grid.Grid)
+vor_grid = transform(vor, Grid=spectral_grid.Grid)
 f = coriolis(vor_grid)      # create Coriolis parameter f on same grid with default rotation
 g = model.planet.gravity
 fζ_g = @. vor_grid * f / g  # in-place and element-wise
@@ -181,11 +181,11 @@ nothing # hide
 Now we need to apply the inverse Laplace operator to ``f\zeta/g`` which we do as follows
 
 ```@example gradient
-fζ_g_spectral = spectral(fζ_g, one_more_degree=true)
+fζ_g_spectral = transform(fζ_g, one_more_degree=true)
 
 R = spectral_grid.radius
 η = SpeedyTransforms.∇⁻²(fζ_g_spectral) * R^2
-η_grid = gridded(η, Grid=spectral_grid.Grid)
+η_grid = transform(η, Grid=spectral_grid.Grid)
 nothing # hide
 ```
 Note the manual scaling with the radius ``R^2`` here. We now compare the results
@@ -200,7 +200,7 @@ nothing # hide
 Which is the interface displacement assuming geostrophy.
 The actual interface displacement contains also ageostrophy
 ```@example gradient
-η_grid2 = simulation.diagnostic_variables.surface.pres_grid
+η_grid2 = simulation.diagnostic_variables.grid.pres_grid
 heatmap(η_grid2, title="Interface displacement η [m] with ageostrophy")
 save("eta_ageostrophic.png", ans) # hide
 nothing # hide

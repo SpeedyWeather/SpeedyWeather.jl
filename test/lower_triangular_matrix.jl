@@ -57,7 +57,6 @@ end
                 @test size(L)[2:end] == size(A)[3:end]
                 @test size(L)[1] == SpeedyWeather.LowerTriangularMatrices.nonzeros(size(A,1), size(A,2))
 
-
                 for m in 1:mmax
                     for l in 1:lmax
                         @test A[l, m, [Colon() for i=1:length(idims)]...] == L[l, m, [Colon() for i=1:length(idims)]...]
@@ -377,9 +376,10 @@ end
 
         @test size(similar(L)) == size(L)
         @test eltype(L) == eltype(similar(L, eltype(L)))
-
+    
         @test (5, 7) == size(similar(L, 5, 7), as=Matrix)
         @test (5, 7) == size(similar(L, (5, 7)), as=Matrix)
+
         @test similar(L) isa LowerTriangularMatrix
         @test similar(L, Float64) isa LowerTriangularMatrix{Float64}
     end
@@ -403,8 +403,9 @@ end
             @test size(similar(L)) == size(L)
             @test eltype(L) == eltype(similar(L, eltype(L)))
 
-            @test (5, 7, idims...) == size(similar(L, 5, 7, idims...); as=Matrix)
-            @test (5, 7, idims...) == size(similar(L, (5, 7,  idims...)); as=Matrix)
+            @test (5, 7, idims...) == size(similar(L, 5, 7, idims...), as=Matrix)
+            @test (5, 7, idims...) == size(similar(L, (5, 7,  idims...)), as=Matrix)
+
             @test similar(L) isa LowerTriangularArray
             @test similar(L, Float64) isa LowerTriangularArray{Float64}
         end
@@ -435,7 +436,7 @@ end
         # with ranges
         L1 = zeros(LowerTriangularMatrix{NF}, 33, 32);
         L2 = randn(LowerTriangularMatrix{NF}, 65, 64);
-        L2T = spectral_truncation(L2,(size(L1; as=Matrix) .- 1)...)
+        L2T = spectral_truncation(L2, size(L1, ZeroBased, as=Matrix)...)
 
         copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
         @test L1 == L2T
@@ -498,7 +499,7 @@ end
             # with ranges
             L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
             L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
-            L2T = spectral_truncation(L2,(size(L1; as=Matrix)[1:2] .- 1)...)
+            L2T = spectral_truncation(L2, (size(L1, ZeroBased,  as=Matrix)[1:2])...)
 
             copyto!(L1, L2, 1:33, 1:32)     # size of smaller matrix
             @test L1 == L2T
@@ -591,6 +592,7 @@ end
 
     @test (5, 7, 5) == size(similar(L, 5, 7, idims...), as=Matrix)
     @test (5, 7, 5) == size(similar(L, (5, 7,  idims...)), as=Matrix)
+
     @test similar(L) isa LowerTriangularArray
 
     # copyto! same size 
@@ -607,10 +609,11 @@ end
     # So, we do this with regular Array but with the _copyto_core! function that implements 
     # the core of this copyto! in a GPU compatible way, and is called by copyto! with CuArrays
 
-    L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
-    L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...);
+    L1 = zeros(LowerTriangularArray{NF}, 33, 32, idims...)
+    L2 = randn(LowerTriangularArray{NF}, 65, 64, idims...)
+
     L2T = spectral_truncation(L2, (size(L1, ZeroBased; as=Matrix)[1:2])...)
-    L3 = zeros(LowerTriangularArray{NF}, 33, 32, idims...);
+    L3 = zeros(LowerTriangularArray{NF}, 33, 32, idims...)
 
     SpeedyWeather.LowerTriangularMatrices._copyto_core!(L1, L2, 1:33, 1:32)     # size of smaller matrix
     @test L1 == L2T
@@ -631,7 +634,6 @@ end
     SpeedyWeather.LowerTriangularMatrices.copyto!(L3, L2, 1:50, 1:50)     # in between
     @test L3 == L1
 end 
-
 
 @testset "LowerTriangularArray: broadcast" begin 
     @testset for idims = ((), (5,), (5,5))

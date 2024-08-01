@@ -78,7 +78,7 @@ The interface to SpeedyWeather.jl consist of 5 steps: define the grid, create mo
 construct the model, initialize, run
 
 ```julia
-spectral_grid = SpectralGrid(trunc=31, nlev=8)          # define resolution
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)          # define resolution
 orography = EarthOrography(spectral_grid)               # create non-default components
 model = PrimitiveWetModel(; spectral_grid, orography)   # construct model
 simulation = initialize!(model)                         # initialize all model components

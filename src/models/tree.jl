@@ -25,7 +25,7 @@ as long as they are defined within the modules argument (default SpeedyWeather).
 Other keyword arguments are `max_level::Integer=10`, `with_types::Bool=false`
 or `with_size::Bool=false."""
 function tree(
-    M::ModelSetup;
+    M::AbstractModel;
     modules=SpeedyWeather,
     with_size::Bool = false,
     kwargs...

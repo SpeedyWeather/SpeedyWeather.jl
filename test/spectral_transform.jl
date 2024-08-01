@@ -50,14 +50,14 @@ spectral_resolutions_inexact = (127, 255)
                             FullHEALPixGrid,
                             FullOctaHEALPixGrid)
 
-                SG = SpectralGrid(NF; trunc, Grid)
+                SG = SpectralGrid(; NF, trunc, Grid)
                 S = SpectralTransform(SG)
 
                 alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
                 fill!(alms, 0)
                 alms[1, 1] = 1
 
-                map = gridded(alms, S)
+                map = transform(alms, S)
             
                 for ij in SpeedyWeather.eachgridpoint(map)
                     @test map[ij] ≈ map[1] > zero(NF)
@@ -71,14 +71,14 @@ end
     for trunc in spectral_resolutions
         for NF in (Float32, Float64)
 
-            SG = SpectralGrid(NF; trunc)
+            SG = SpectralGrid(; NF, trunc)
             S1 = SpectralTransform(SG, recompute_legendre=true)
             S2 = SpectralTransform(SG, recompute_legendre=false)
 
             alms = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
 
-            map1 = gridded(alms, S1)
-            map2 = gridded(alms, S2)
+            map1 = transform(alms, S1)
+            map2 = transform(alms, S2)
         
             # is only approx as recompute_legendre may use a different precision
             @test map1 ≈ map2
@@ -94,7 +94,7 @@ end
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid)
 
-                SG = SpectralGrid(NF; trunc, Grid)
+                SG = SpectralGrid(; NF, trunc, Grid)
                 S = SpectralTransform(SG, recompute_legendre=true)
 
                 lmax = 3
@@ -103,8 +103,8 @@ end
                         alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
                         alms[l, m] = 1
 
-                        map = gridded(alms, S)
-                        alms2 = spectral(map, S)
+                        map = transform(alms, S)
+                        alms2 = transform(map, S)
 
                         for lm in SpeedyWeather.eachharmonic(alms, alms2)
                             @test alms[lm] ≈ alms2[lm] atol=100*eps(NF)
@@ -124,7 +124,7 @@ end
                                     FullHEALPixGrid,
                                     FullOctaHEALPixGrid)
                 
-                SG = SpectralGrid(NF; trunc, Grid)
+                SG = SpectralGrid(; NF, trunc, Grid)
                 S = SpectralTransform(SG, recompute_legendre=true)
 
                 lmax = 3
@@ -133,8 +133,8 @@ end
                         alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
                         alms[l, m] = 1
 
-                        map = gridded(alms, S)
-                        alms2 = spectral(map, S)
+                        map = transform(alms, S)
+                        alms2 = transform(map, S)
 
                         tol = 1e-3
 
@@ -161,19 +161,19 @@ end
                 # clenshaw-curtis grids are only exact for cubic truncation
                 dealiasing = Grid in (FullGaussianGrid, OctahedralGaussianGrid) ? 2 : 3
 
-                SG = SpectralGrid(NF; trunc, Grid, dealiasing)
+                SG = SpectralGrid(; NF, trunc, Grid, dealiasing)
                 S = SpectralTransform(SG, recompute_legendre=false)
                 O = EarthOrography(SG, smoothing=true)
                 E = Earth(SG)
                 initialize!(O, E, S)
 
                 oro_grid = O.orography
-                oro_spec = spectral(oro_grid, S)
+                oro_spec = transform(oro_grid, S)
 
-                oro_grid1 = gridded(oro_spec, S)
-                oro_spec1 = spectral(oro_grid1, S)
-                oro_grid2 = gridded(oro_spec1, S)
-                oro_spec2 = spectral(oro_grid2, S)
+                oro_grid1 = transform(oro_spec, S)
+                oro_spec1 = transform(oro_grid1, S)
+                oro_grid2 = transform(oro_spec1, S)
+                oro_spec2 = transform(oro_grid2, S)
 
                 tol = 1e-3
 

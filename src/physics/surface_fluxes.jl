@@ -34,7 +34,7 @@ function surface_thermodynamics!(   column::ColumnVariables,
 
     # surface air density via virtual temperature
     (; R_dry) = model.atmosphere
-    Tᵥ = column.temp_virt[column.nlev]
+    Tᵥ = column.temp_virt[column.nlayers]
     column.surface_air_density = column.pres[end]/(R_dry*Tᵥ)
 end
 

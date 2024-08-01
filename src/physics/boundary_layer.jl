@@ -17,23 +17,23 @@ export LinearDrag
 
 """Linear boundary layer drag following Held and Suarez, 1996 BAMS
 $(TYPEDFIELDS)"""
-Base.@kwdef struct LinearDrag{NF<:AbstractFloat} <: AbstractBoundaryLayer
+@kwdef struct LinearDrag{NF<:AbstractFloat} <: AbstractBoundaryLayer
     
     # DIMENSIONS
-    nlev::Int
+    nlayers::Int
     
     # PARAMETERS
     σb::NF = 0.7                    # sigma coordinate below which linear drag is applied
     time_scale::Second = Hour(24)   # time scale for linear drag coefficient at σ=1 (=1/kf in HS96)
 
     # PRECOMPUTED CONSTANTS
-    drag_coefs::Vector{NF} = zeros(NF, nlev)
+    drag_coefs::Vector{NF} = zeros(NF, nlayers)
 end
 
 """
 $(TYPEDSIGNATURES)
-Generator function using `nlev` from `SG::SpectralGrid`"""
-LinearDrag(SG::SpectralGrid; kwargs...) = LinearDrag{SG.NF}(nlev=SG.nlev; kwargs...)
+Generator function using `nlayers` from `SG::SpectralGrid`"""
+LinearDrag(SG::SpectralGrid; kwargs...) = LinearDrag{SG.NF}(nlayers=SG.nlayers; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -94,7 +94,7 @@ export BulkRichardsonDrag
 """Boundary layer drag coefficient from the bulk Richardson number,
 following Frierson, 2006, Journal of the Atmospheric Sciences.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
+@kwdef struct BulkRichardsonDrag{NF} <: AbstractBoundaryLayer
     "von Kármán constant [1]"
     κ::NF = 0.4
 
@@ -164,11 +164,13 @@ function bulk_richardson_surface(
     atmosphere::AbstractAtmosphere,
 )
     cₚ = atmosphere.heat_capacity
-    (; u, v, geopot, temp_virt, nlev) = column
+    (; u, v, geopot, temp_virt) = column
+    surface = column.nlayers    # surface index = nlayers
 
-    V² = u[nlev]^2 + v[nlev]^2
-    Θ₀ = cₚ*temp_virt[nlev]
-    Θ₁ = Θ₀ + geopot[nlev]
-    bulk_richardson = geopot[nlev]*(Θ₁ - Θ₀) / (Θ₀*V²)
+    V² = u[surface]^2 + v[surface]^2
+    Θ₀ = cₚ*temp_virt[surface]
+    Θ₁ = Θ₀ + geopot[surface]
+    bulk_richardson = geopot[surface]*(Θ₁ - Θ₀) / (Θ₀*V²)
+    return bulk_richardson
 end
 
