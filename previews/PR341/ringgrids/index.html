@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Submodule: RingGrids · SpeedyWeather.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">SpeedyWeather.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../installation/">Installation</a></li><li><a class="tocitem" href="../how_to_run_speedy/">How to run SpeedyWeather.jl</a></li><li><a class="tocitem" href="../spectral_transform/">Spherical harmonic transform</a></li><li><a class="tocitem" href="../grids/">Grids</a></li><li><a class="tocitem" href="../dynamical_core/">Dynamical core</a></li><li><a class="tocitem" href="../parametrizations/">Parameterizations</a></li><li><a class="tocitem" href="../boundary_conditions/">Boundary conditions</a></li><li><a class="tocitem" href="../extending/">Extending SpeedyWeather</a></li><li><a class="tocitem" href="../output/">NetCDF output</a></li><li class="is-active"><a class="tocitem" href>Submodule: RingGrids</a><ul class="internal"><li><a class="tocitem" href="#Creating-data-on-a-RingGrid"><span>Creating data on a RingGrid</span></a></li><li><a class="tocitem" href="#Indexing-RingGrids"><span>Indexing RingGrids</span></a></li><li><a class="tocitem" href="#Interpolation-on-RingGrids"><span>Interpolation on RingGrids</span></a></li><li><a class="tocitem" href="#Performance-for-RingGrid-interpolation"><span>Performance for RingGrid interpolation</span></a></li><li><a class="tocitem" href="#Anvil-interpolator"><span>Anvil interpolator</span></a></li><li><a class="tocitem" href="#Function-index"><span>Function index</span></a></li></ul></li><li><a class="tocitem" href="../lowertriangularmatrices/">Submodule: LowerTriangularMatrices</a></li><li><a class="tocitem" href="../speedytransforms/">Submodule: SpeedyTransforms</a></li><li><a class="tocitem" href="../functions/">Function and type index</a></li><li><a class="tocitem" href="../conventions/">Style and convention guide</a></li><li><a class="tocitem" href="../development/">Development notes</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Submodule: RingGrids</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Submodule: RingGrids</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/docs/src/ringgrids.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="RingGrids"><a class="docs-heading-anchor" href="#RingGrids">RingGrids</a><a id="RingGrids-1"></a><a class="docs-heading-anchor-permalink" href="#RingGrids" title="Permalink"></a></h1><p>RingGrids is a submodule that has been developed for SpeedyWeather.jl which is technically independent (SpeedyWeather.jl however imports it and so does SpeedyTransforms) and can also be used without running simulations. It is just not put into its own respective repository.</p><p>RingGrids defines several iso-latitude grids, which are mathematically described in the section on <a href="../grids/#Grids">Grids</a>. In brief, they include the regular latitude-longitude grids (here called <code>FullClenshawGrid</code>) as well as grids which latitudes are shifted to the Gaussian latitudes and <em>reduced</em> grids, meaning that they have a decreasing number of longitudinal points towards the poles to be more equal-area than <em>full</em> grids.</p><p>RingGrids defines and exports the following grids:</p><ul><li>full grids: <code>FullClenshawGrid</code>, <code>FullGaussianGrid</code>, <code>FullHEALPix</code>, and <code>FullOctaHEALPix</code></li><li>reduced grids: <code>OctahedralGaussianGrid</code>, <code>OctahedralClenshawGrid</code>, <code>OctaHEALPixGrid</code> and <code>HEALPixGrid</code></li></ul><p>The following explanation of how to use these can be mostly applied to any of them, however, there are certain functions that are not defined, e.g. the full grids can be trivially converted to a <code>Matrix</code> but not the <code>OctahedralGaussianGrid</code>.</p><h2 id="Creating-data-on-a-RingGrid"><a class="docs-heading-anchor" href="#Creating-data-on-a-RingGrid">Creating data on a RingGrid</a><a id="Creating-data-on-a-RingGrid-1"></a><a class="docs-heading-anchor-permalink" href="#Creating-data-on-a-RingGrid" title="Permalink"></a></h2><p>Every grid in RingGrids has a <code>data</code> field, which is a vector containing the data on the grid. The grid points are unravelled west to east then north to south, meaning that it starts at 90˚N and 0˚E then walks eastward for 360˚ before jumping on the next latitude ring further south, this way circling around the sphere till reaching the south pole. This may also be called <em>ring order</em>.</p><p>Data on a 96x48 <code>Matrix</code> which follows this ring order can be put on a <code>FullGaussianGrid</code> like so</p><pre><code class="language-julia hljs">julia&gt; map
+96×48 Matrix{Float32}:
+ -0.219801   -0.519598   1.2066    …   0.81304    -1.16023    1.0353
+ -0.55615    -1.05712   -0.227948     -2.06369     1.10353    1.60918
+  0.446913   -0.856431   1.58896      -1.0894     -0.894315   0.632353
+  0.445915   -0.107201  -0.577785      0.574784   -0.825049   1.29677
+  1.194      -0.353374   1.30581       0.465554    0.358457  -0.726567
+  1.28693     1.43997    0.691283  …  -0.330544   -0.267588   0.181308
+  ⋮                                ⋱   ⋮
+ -0.432703    0.17233    0.89222       0.888913    1.32787   -0.248779
+ -0.404498    0.127172  -0.64237       0.127979   -1.55253   -2.00749
+ -0.857746   -0.433251  -0.468293      1.09825    -0.291169   1.07452
+  0.375367   -0.218278   0.492855     -0.287976    0.878996  -1.19745
+ -0.0619525  -0.129129  -1.35502   …   0.0824819   0.481736   0.845638
+
+julia&gt; grid = FullGaussianGrid(map)
+4608-element, 48-ring FullGaussianGrid{Float32}:
+ -0.21980117
+ -0.5561496
+  0.44691312
+  0.4459149
+  1.1940043
+  1.2869298
+  ⋮
+ -0.24877885
+ -2.007495
+  1.0745221
+ -1.197454
+  0.84563845</code></pre><p>A full Gaussian grid has always <span>$2N$</span> x <span>$N$</span> grid points, but a <code>FullClenshawGrid</code> has <span>$2N$</span> x <span>$N-1$</span>, if those dimensions don&#39;t match, the creation will throw an error. To reobtain the data from a grid, you can access its <code>data</code> field which returns a normal <code>Vector</code></p><pre><code class="language-julia hljs">julia&gt; grid.data
+4608-element Vector{Float32}:
+ -0.21980117
+ -0.5561496
+  0.44691312
+  0.4459149
+  1.1940043
+  1.2869298
+  ⋮
+ -0.24877885
+ -2.007495
+  1.0745221
+ -1.197454
+  0.84563845</code></pre><p>Which can be reshaped to reobtain <code>map</code> from above. Alternatively you can <code>Matrix(grid)</code> to do this in one step</p><pre><code class="language-julia hljs">julia&gt; map == Matrix(FullGaussianGrid(map))
+true</code></pre><p>You can also use <code>zeros</code>,<code>ones</code>,<code>rand</code>,<code>randn</code> to create a grid, whereby <code>nlat_half</code>, i.e. the number of latitude rings on one hemisphere, Equator included, is used as a resolution parameter and here as a second argument.</p><pre><code class="language-julia hljs">julia&gt; nlat_half = 4
+julia&gt; grid = randn(OctahedralGaussianGrid{Float16},nlat_half)
+208-element, 8-ring OctahedralGaussianGrid{Float16}:
+ -1.868
+  0.493
+  0.3142
+  1.871
+  1.349
+  0.623
+  ⋮
+  1.064
+  0.4346
+ -0.641
+  0.1445
+  0.3909</code></pre><p>and any element type <code>T</code> can be used for <code>OctahedralGaussianGrid{T}</code> and similar for other grid types.</p><h2 id="Indexing-RingGrids"><a class="docs-heading-anchor" href="#Indexing-RingGrids">Indexing RingGrids</a><a id="Indexing-RingGrids-1"></a><a class="docs-heading-anchor-permalink" href="#Indexing-RingGrids" title="Permalink"></a></h2><p>All RingGrids have a single index <code>ij</code> which follows the ring order. While this is obviously not super exciting here are some examples how to make better use of the information that the data sits on a grid.</p><p>We obtain the latitudes of the rings of a grid by calling <code>get_latd</code> (<code>get_lond</code> is only defined for full grids, or use <code>get_latdlonds</code> for latitudes, longitudes per grid point not per ring)</p><pre><code class="language-julia hljs">julia&gt; latd = get_latd(grid)
+8-element Vector{Float64}:
+  73.79921362856324
+  52.81294318999426
+  31.704091745007943
+  10.569882312576093
+ -10.569882312576093
+ -31.704091745007943
+ -52.81294318999426
+ -73.79921362856324</code></pre><p>Now we could calculate Coriolis and add it on the grid as follows</p><pre><code class="language-julia hljs">rotation = 7.29e-5                  # angular frequency of Earth&#39;s rotation [rad/s]
+coriolis = 2rotation*sind.(latd)    # vector of coriolis parameters per latitude ring
+
+rings = eachring(grid)
+for (j,ring) in enumerate(rings)
+    f = coriolis[j]
+    for ij in ring
+        grid[ij] += f
+    end
+end</code></pre><p><code>eachring</code> creates a vector of <code>UnitRange</code> indices, such that we can loop over the ring index <code>j</code> (<code>j=1</code> being closest to the North pole) pull the coriolis parameter at that latitude and then loop over all in-ring indices <code>i</code> (changing longitudes) to do something on the grid. Something similar can be done to scale/unscale with the cosine of latitude for example. We can always loop over all grid-points like so</p><pre><code class="language-julia hljs">for ij in eachgridpoint(grid)
+    grid[ij]
+end</code></pre><p>or use <code>eachindex</code> instead.</p><h2 id="Interpolation-on-RingGrids"><a class="docs-heading-anchor" href="#Interpolation-on-RingGrids">Interpolation on RingGrids</a><a id="Interpolation-on-RingGrids-1"></a><a class="docs-heading-anchor-permalink" href="#Interpolation-on-RingGrids" title="Permalink"></a></h2><p>In most cases we will want to use RingGrids so that our data directly comes with the geometric information of where the grid-point is one the sphere. We have seen how to use <code>get_latd</code>, <code>get_lond</code>, ... for that above. This information generally can also be used to interpolate our data from grid to another or to request an interpolated value on some coordinates. Using our data on <code>grid</code> which is an <code>OctahedralGaussianGrid</code> from above we can use the <code>interpolate</code> function to get it onto a <code>FullGaussianGrid</code> (or any other grid for purpose)</p><pre><code class="language-julia hljs">julia&gt; grid
+208-element, 8-ring OctahedralGaussianGrid{Float16}:
+ -1.868
+  0.493
+  0.3142
+  1.871
+  1.349
+  0.623
+  ⋮
+  1.064
+  0.4346
+ -0.641
+  0.1445
+  0.3909
+
+julia&gt; interpolate(FullGaussianGrid,grid)
+128-element, 8-ring FullGaussianGrid{Float64}:
+ -1.8681640625
+  0.4482421875
+  1.0927734375
+  1.4794921875
+  0.623046875
+ -0.6435546875
+  ⋮
+ -0.57763671875
+  1.064453125
+  0.16552734375
+ -0.248291015625
+  0.329345703125</code></pre><p>By default this will linearly interpolate (it&#39;s an anvil interpolator, see below) onto a grid with the same <code>nlat_half</code>, but we can also coarse-grain or fine-grain by specifying <code>nlat_half</code> directly as 2nd argument</p><pre><code class="language-julia hljs">julia&gt; interpolate(FullGaussianGrid,6,grid)
+288-element, 12-ring FullGaussianGrid{Float64}:
+ -1.248046875
+  0.08984375
+  0.2763671875
+  0.76513671875
+  1.1767578125
+  ⋮
+  0.26416015625
+ -0.295166015625
+ -0.271728515625
+  0.0511474609375
+  0.0814208984375</code></pre><p>So we got from an <code>8-ring OctahedralGaussianGrid{Float16}</code> to a <code>12-ring FullGaussianGrid{Float64}</code>, so it did a conversion from <code>Float16</code> to <code>Float64</code> on the fly too, because the default precision is <code>Float64</code> unless specified. <code>interpolate(FullGaussianGrid{Float16},6,grid)</code> would have interpolated onto a grid with element type <code>Float16</code>.</p><p>One can also interpolate onto a give cordinate ˚N, ˚E like so</p><pre><code class="language-julia hljs">julia&gt; interpolate(30.0,10.0,grid)
+1-element Vector{Float16}:
+ 0.9297</code></pre><p>we interpolated the data from <code>grid</code> onto 30˚N, 10˚E. To do this simultaneously for many coordinates they can be packed into a vector too</p><pre><code class="language-julia hljs">julia&gt; interpolate([30.0,40.0,50.0],[10.0,10.0,10.0],grid)
+3-element Vector{Float16}:
+  0.9297
+  0.08887
+ -0.929</code></pre><p>which returns the data on <code>grid</code> at 30˚N, 40˚N, 50˚N, and 10˚E respectively. Note how the interpolation here retains the element type of <code>grid</code>.</p><h2 id="Performance-for-RingGrid-interpolation"><a class="docs-heading-anchor" href="#Performance-for-RingGrid-interpolation">Performance for RingGrid interpolation</a><a id="Performance-for-RingGrid-interpolation-1"></a><a class="docs-heading-anchor-permalink" href="#Performance-for-RingGrid-interpolation" title="Permalink"></a></h2><p>Every time an interpolation like <code>interpolate(30.0,10.0,grid)</code> is called, several things happen, which are important to understand to know how to get the fastest interpolation out of this module in a given situation. Under the hood an interpolation takes three arguments</p><ul><li>output vector</li><li>input grid</li><li>interpolator</li></ul><p>The output vector is just an array into which the interpolated data is written, providing this prevents unnecessary allocation of memory in case the destination array of the interpolation already exists. The input grid contains the data which is subject to interpolation, it must come on a ring grid, however, its coordinate information is actually already in the interpolator. The interpolator knows about the geometry of the grid the data is coming on and the coordinates it is supposed to interpolate onto. It has therefore precalculated the indices that are needed to access the right data on the input grid and the weights it needs to apply in the actual interplation operation. The only thing it does not know is the actual data values of that grid. So in the case you want to interpolate from grid A to grid B many times, you can just reuse the same interpolator. If you want to change the coordinates of the output grid but its total number of points remain constants then you can update the locator inside the interpolator and only else you will need to create a new interpolator. Let&#39;s look at this in practice. Say we have two grids an want to interpolate between them</p><pre><code class="language-julia hljs">julia&gt; grid_in = rand(HEALPixGrid,4)
+julia&gt; grid_out = zeros(FullClenshawGrid,6)
+julia&gt; interp = RingGrids.interpolator(grid_out,grid_in)</code></pre><p>Now we have created an interpolator <code>interp</code> which knows about the geometry where to interpolate <em>from</em> and the coordinates there to interpolate <em>to</em>. It is also initialized, meaning it has precomputed the indices to of <code>grid_in</code> that are supposed to be used. It just does not know about the data of <code>grid_in</code> (and neither of <code>grid_out</code> which will be overwritten anyway). We can now do</p><pre><code class="language-julia hljs">julia&gt; interpolate!(grid_out,grid_in,interp);
+julia&gt; grid_out
+264-element, 11-ring FullClenshawGrid{Float64}:
+ 0.47698810225785837
+ 0.49923033302273034
+ 0.5214725637876022
+ 0.5437147945524742
+ ⋮
+ 0.6277318221906577
+ 0.5934538182075797
+ 0.6009226488782581
+ 0.6083914795489366</code></pre><p>which is identical to <code>interpolate(grid_out,grid_in)</code> but you can reuse <code>interp</code> with more data. The interpolation can also handle various element types (the interpolator <code>interp</code> does not have to be updated for this either)</p><pre><code class="language-julia hljs">julia&gt; grid_out = zeros(FullClenshawGrid{Float16},6);
+julia&gt; interpolate!(grid_out,grid_in,interp)
+julia&gt; grid_out
+264-element, 11-ring FullClenshawGrid{Float16}:
+ 0.477
+ 0.4993
+ 0.5215
+ 0.544
+ 0.5493
+ 0.555
+ ⋮
+ 0.662
+ 0.628
+ 0.5933
+ 0.601
+ 0.6084</code></pre><p>and we have converted data from a <code>HEALPixGrid{Float64}</code> (which is always default if not specified) to a <code>FullClenshawGrid{Float16}</code> including the type conversion Float64-Float16 on the fly. Technically there are three data types and their combinations possible: The input data will come with a type, the output array has an element type and the interpolator has precomputed weights with a given type. Say we want to go from Float16 data on an <code>OctahedralGaussianGrid</code> to Float16 on a <code>FullClenshawGrid</code> but using Float32 precision for the interpolation itself, we would do this by</p><pre><code class="language-julia hljs">julia&gt; grid_in = randn(OctahedralGaussianGrid{Float16},24)
+julia&gt; grid_out = zeros(FullClenshawGrid{Float16},24)
+julia&gt; interp = RingGrids.interpolator(Float32,grid_out,grid_in)
+julia&gt; interpolate!(grid_out,grid_in,interp)
+julia&gt; grid_out
+4512-element, 47-ring FullClenshawGrid{Float16}:
+ -0.954
+ -0.724
+ -0.4941
+ -0.264
+ -0.03433
+  0.1796
+  ⋮
+ -0.5703
+ -0.3481
+ -0.07666
+  0.1958
+  0.467</code></pre><p>As a last example we want to illustrate a situation where we would always want to interplate onto 10 coordinates, but their locations may change. In order to avoid recreating an interpolator object we would do (<code>AnvilInterpolator</code> is described in <a href="#Anvil-interpolator">Anvil interpolator</a>)</p><pre><code class="language-julia hljs">julia&gt; npoints = 10    # number of coordinates to interpolate onto
+julia&gt; interp = AnvilInterpolator(Float32,HEALPixGrid,24,npoints)</code></pre><p>with the first argument being the number format used during interpolation, then the input grid type, its resolution in terms of <code>nlat_half</code> and then the number of points to interpolate onto. However, <code>interp</code> is not yet initialized as it does not know about the destination coordinates yet. Let&#39;s define them, but note that we already decided there&#39;s only 10 of them above.</p><pre><code class="language-julia hljs">julia&gt; latds = collect(0.0:5.0:45.0)
+10-element Vector{Float64}:
+  0.0
+  5.0
+  ⋮
+ 40.0
+ 45.0
+
+julia&gt; londs = collect(-10.0:2.0:8.0)
+10-element Vector{Float64}:
+ -10.0
+  -8.0
+  -6.0
+  ⋮
+   6.0
+   8.0</code></pre><p>now we can update the locator inside our interpolator as follows</p><pre><code class="language-julia hljs">julia&gt; RingGrids.update_locator!(interp,latds,londs)</code></pre><p>With data matching the input from above, a <code>nlat_half=24</code> HEALPixGrid, and allocate 10-element output vector</p><pre><code class="language-julia hljs">julia&gt; output_vec = zeros(10)
+julia&gt; grid_input = rand(HEALPixGrid,24)</code></pre><p>we can use the interpolator as follows</p><pre><code class="language-julia hljs">julia&gt; interpolate!(output_vec,grid_input,interp)
+10-element Vector{Float64}:
+ 0.3182548251299291
+ 0.7499448926757676
+ 0.25733825675836064
+  ⋮
+ 0.2949249541923441
+ 0.6690698461409016
+ 0.6159433564856793</code></pre><p>which is the approximately the same as doing it directly without creating an interpolator first and updating its locator</p><pre><code class="language-julia hljs">julia&gt; interpolate(latds,londs,grid_input)
+10-element Vector{Float64}:
+ 0.31825482404891603
+ 0.7499448923165136
+ 0.25733824520344434
+  ⋮
+ 0.294924962125593
+ 0.6690698486360254
+ 0.6159433558779497</code></pre><p>but allows for a reuse of the interpolator. Note that the two output arrays are not exactly identical because we manually set our interpolator <code>interp</code> to use <code>Float32</code> for the interplation whereas the default is <code>Float64</code>.</p><h2 id="Anvil-interpolator"><a class="docs-heading-anchor" href="#Anvil-interpolator">Anvil interpolator</a><a id="Anvil-interpolator-1"></a><a class="docs-heading-anchor-permalink" href="#Anvil-interpolator" title="Permalink"></a></h2><p>Currently the only interpolator implemented is a 4-point bilinear interpolator, which schematically works as follows. Anvil interpolation is the bilinear average of a,b,c,d which are values at grid points in an anvil-shaped configuration at location x, which is denoted by Δab,Δcd,Δy, the fraction of distances between a-b,c-d, and ab-cd, respectively. Note that a,c and b,d do not necessarily share the same longitude/x-coordinate.</p><pre><code class="nohighlight hljs">        0..............1    # fraction of distance Δab between a,b
+        |&lt;  Δab   &gt;|
+
+0^      a -------- o - b    # anvil-shaped average of a,b,c,d at location x
+.Δy                |
+.                  |
+.v                 x 
+.                  |
+1         c ------ o ---- d
+
+          |&lt;  Δcd &gt;|
+          0...............1 # fraction of distance Δcd between c,d
+
+^ fraction of distance Δy between a-b and c-d.</code></pre><p>This interpolation is chosen as by definiton of the ring grids, a and b share the same latitude, so do c and d, but the longitudes can be different for all four, a,b,c,d.</p><h2 id="Function-index"><a class="docs-heading-anchor" href="#Function-index">Function index</a><a id="Function-index-1"></a><a class="docs-heading-anchor-permalink" href="#Function-index" title="Permalink"></a></h2><article class="docstring"><header><a class="docstring-binding" id="SpeedyWeather.RingGrids.each_index_in_ring" href="#SpeedyWeather.RingGrids.each_index_in_ring"><code>SpeedyWeather.RingGrids.each_index_in_ring</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">i = each_index_in_ring(grid,j)</code></pre><p>UnitRange <code>i</code> to access data on grid <code>grid</code> on ring <code>j</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/34a961053c37de17466ed8e6ccb54a200c1035c5/src/RingGrids/grids_general.jl#L149-L152">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="SpeedyWeather.RingGrids.eachgridpoint" href="#SpeedyWeather.RingGrids.eachgridpoint"><code>SpeedyWeather.RingGrids.eachgridpoint</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">ijs = eachgridpoint(grid)</code></pre><p>UnitRange <code>ijs</code> to access each grid point on grid <code>grid</code>.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/34a961053c37de17466ed8e6ccb54a200c1035c5/src/RingGrids/grids_general.jl#L157-L160">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="SpeedyWeather.RingGrids.eachring" href="#SpeedyWeather.RingGrids.eachring"><code>SpeedyWeather.RingGrids.eachring</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">eachring(grid::SpeedyWeather.RingGrids.AbstractGrid) -&gt; Any
+</code></pre><p>Vector{UnitRange} <code>rings</code> to loop over every ring of grid <code>grid</code> and then each grid point per ring. To be used like</p><pre><code class="nohighlight hljs">rings = eachring(grid)
+for ring in rings
+    for ij in ring
+        grid[ij]</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/34a961053c37de17466ed8e6ccb54a200c1035c5/src/RingGrids/grids_general.jl#L168">source</a></section><section><div><pre><code class="language-julia hljs">eachring(
+    grid1::SpeedyWeather.RingGrids.AbstractGrid,
+    grids::Grid&lt;:SpeedyWeather.RingGrids.AbstractGrid...
+) -&gt; Any
+</code></pre><p>Same as <code>eachring(grid)</code> but performs a bounds check to assess that all grids in <code>grids</code> are of same size.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/34a961053c37de17466ed8e6ccb54a200c1035c5/src/RingGrids/grids_general.jl#L185">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="SpeedyWeather.RingGrids.whichring" href="#SpeedyWeather.RingGrids.whichring"><code>SpeedyWeather.RingGrids.whichring</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">whichring(
+    ij::Integer,
+    rings::Vector{UnitRange{Int64}}
+) -&gt; Int64
+</code></pre><p>Obtain ring index j from gridpoint ij and Vector{UnitRange} describing rind indices as obtained from eachring(::Grid)</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/34a961053c37de17466ed8e6ccb54a200c1035c5/src/RingGrids/grids_general.jl#L196">source</a></section></article><article class="docstring"><header><a class="docstring-binding" id="SpeedyWeather.RingGrids.get_nlons" href="#SpeedyWeather.RingGrids.get_nlons"><code>SpeedyWeather.RingGrids.get_nlons</code></a> — <span class="docstring-category">Function</span></header><section><div><pre><code class="language-julia hljs">get_nlons(
+    Grid::Type{&lt;:SpeedyWeather.RingGrids.AbstractGrid},
+    nlat_half::Integer;
+    both_hemispheres
+) -&gt; Any
+</code></pre><p>Returns a vector <code>nlons</code> for the number of longitude points per latitude ring, north to south. Provide grid <code>Grid</code> and its resolution parameter <code>nlat_half</code>. For both_hemisphere==false only the northern hemisphere (incl Equator) is returned.</p></div><a class="docs-sourcelink" target="_blank" href="https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/34a961053c37de17466ed8e6ccb54a200c1035c5/src/RingGrids/grids_general.jl#L209">source</a></section></article></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../output/">« NetCDF output</a><a class="docs-footer-nextpage" href="../lowertriangularmatrices/">Submodule: LowerTriangularMatrices »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Wednesday 31 May 2023 19:05">Wednesday 31 May 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
