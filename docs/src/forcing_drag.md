@@ -136,7 +136,7 @@ Now let us have a closer look at the details of the `initialize!` function, in o
 actually do
 ```@example extend
 function SpeedyWeather.initialize!( forcing::StochasticStirring,
-                                    model::ModelSetup)
+                                    model::AbstractModel)
     
     # precompute forcing strength, scale with radius^2 as is the vorticity equation
     (; radius) = model.spectral_grid
@@ -164,7 +164,7 @@ As we want to add a method for the `StochasticStirring` to the `initialize!` fun
 within `SpeedyWeather` we add the `SpeedyWeather.` to add this method in the right
 [Scope of variables](@ref). The `initialize!` function _must_ have that function signature,
 instance of your new type `StochasticStirring` first, then the second argument a
-`model` of type `ModelSetup` or, if your forcing (and in general component) _only makes
+`model` of type `AbstractModel` or, if your forcing (and in general component) _only makes
 sense_ in a specific model, you could also write `model::Barotropic` for example,
 to be more restrictive. Inside the `initialize!` method we are defining we can
 use parameters from other components. For example, the definition of the `S` term
@@ -197,7 +197,7 @@ function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
                                 progn::PrognosticVariablesLayer,
                                 forcing::StochasticStirring,
                                 time::DateTime,
-                                model::ModelSetup)
+                                model::AbstractModel)
     # function barrier only
     forcing!(diagn, forcing, model.spectral_transform)
 end
@@ -208,7 +208,7 @@ where the current model state in grid-point space and the tendencies (in spectra
 are defined. The second argument has to be a `PrognosticVariablesLayer` because,
 in general, the forcing may use the prognostic variables in spectral space.
 The third argument has to be of the type of our new forcing,
-the third argument is time which you may use or skip, the last element is a `ModelSetup`,
+the third argument is time which you may use or skip, the last element is a `AbstractModel`,
 but as before you can be more restrictive to define a forcing only for the
 `BarotropicModel` for example, use ``model::Barotropic`` in that case.
 

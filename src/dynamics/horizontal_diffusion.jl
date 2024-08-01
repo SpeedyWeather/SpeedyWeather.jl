@@ -64,7 +64,7 @@ model time step, and possibly with a changing strength/power in
 the vertical.
 """
 function initialize!(   scheme::HyperDiffusion,
-                        model::ModelSetup)
+                        model::AbstractModel)
     initialize!(scheme, model.geometry, model.time_stepping)
 end
 

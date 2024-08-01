@@ -23,7 +23,7 @@ function dynamics_tendencies!(
     (; forcing, drag, planet, atmosphere, orography) = model
     (; spectral_transform, geometry) = model
 
-    # for compatibility with other ModelSetups pressure pres = interface displacement η here
+    # for compatibility with other AbstractModels pressure pres = interface displacement η here
     forcing!(diagn, progn, forcing, model, lf)      # = (Fᵤ, Fᵥ, Fₙ) forcing for u, v, η
     drag!(diagn, progn, drag, model, lf)            # drag term for u, v
 

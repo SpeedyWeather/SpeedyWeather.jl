@@ -163,13 +163,13 @@ my_orography = MyOrography(spectral_grid, constant_height=200)
 
 Now we have to extend the `initialize!` function. The first argument has to be
 `::MyOrography` i.e. the new type we just defined, the second argument has to be
-`::ModelSetup` although you could constrain it to `::ShallowWater` for example
+`::AbstractModel` although you could constrain it to `::ShallowWater` for example
 but then it cannot be used for primitive equations.
 
 ```@example orography
 function SpeedyWeather.initialize!(
     orog::MyOrography,      # first argument as to be ::MyOrography, i.e. your new type
-    model::ModelSetup,      # second argument, use anything from model read-only
+    model::AbstractModel,      # second argument, use anything from model read-only
 )
     (; orography, geopot_surf) = orog   # unpack
 

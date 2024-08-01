@@ -4,7 +4,7 @@ abstract type AbstractParticleAdvection <: AbstractModelComponent end
 export NoParticleAdvection
 struct NoParticleAdvection <: AbstractParticleAdvection end
 NoParticleAdvection(::SpectralGrid) = NoParticleAdvection()
-initialize!(::NoParticleAdvection, ::ModelSetup) = nothing
+initialize!(::NoParticleAdvection, ::AbstractModel) = nothing
 initialize!(particles, progn, diagn, ::NoParticleAdvection) = nothing
 particle_advection!(progn, diagn, ::NoParticleAdvection) = nothing
 
@@ -27,7 +27,7 @@ end
 
 function initialize!(
     particle_advection::ParticleAdvection2D,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     (; nlayers) = model.spectral_grid
     (; layer) = particle_advection
@@ -47,7 +47,7 @@ vertical σ coordinates. This uses a cosin-distribution in latitude for
 an equal-area uniformity."""
 function initialize!(
     particles::Vector{P},
-    model::ModelSetup,
+    model::AbstractModel,
 ) where {P <: Particle}
     for i in eachindex(particles)
         # uniform random in lon (360*rand), lat (cos-distribution), σ (rand)

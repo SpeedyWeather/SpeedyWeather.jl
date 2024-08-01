@@ -31,10 +31,10 @@ export OutputWriter
 """
 $(TYPEDSIGNATURES)
 NetCDF output writer. Contains all output options and auxiliary fields for output interpolation.
-To be initialised with `OutputWriter(::SpectralGrid, ::Type{<:ModelSetup}, kwargs...)` to pass on the
+To be initialised with `OutputWriter(::SpectralGrid, ::Type{<:AbstractModel}, kwargs...)` to pass on the
 resolution information and the model type which chooses which variables to output. Options include
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32, Float64}, Model<:ModelSetup} <: AbstractOutputWriter
+Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32, Float64}, Model<:AbstractModel} <: AbstractOutputWriter
 
     spectral_grid::SpectralGrid
 
@@ -129,7 +129,7 @@ function OutputWriter(
     ::Type{Model};
     NF::Type{<:Union{Float32, Float64}} = DEFAULT_OUTPUT_NF,
     kwargs...
-) where {Model<:ModelSetup}
+) where {Model<:AbstractModel}
     return OutputWriter{NF, Model}(; spectral_grid, kwargs...)
 end
 
@@ -160,7 +160,7 @@ function initialize!(
     time_stepping::AbstractTimeStepper,
     clock::Clock,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 ) where {output_NF, Model}
     
     output.output || return nothing     # exit immediately for no output
@@ -562,7 +562,7 @@ get_full_output_file_path(output::OutputWriter) = joinpath(output.run_path, outp
 $(TYPEDSIGNATURES)
 Loads a `var_name` trajectory of the model `M` that has been saved in a netCDF file during the time stepping.
 """
-function load_trajectory(var_name::Union{Symbol, String}, model::ModelSetup) 
+function load_trajectory(var_name::Union{Symbol, String}, model::AbstractModel) 
     @assert model.output.output "Output is turned off"
     return Array(NCDataset(get_full_output_file_path(model.output))[string(var_name)])
 end

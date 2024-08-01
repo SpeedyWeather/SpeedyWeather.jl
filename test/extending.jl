@@ -28,7 +28,7 @@
     end
     
     function SpeedyWeather.initialize!( drag::JetDrag,
-                                        model::ModelSetup)
+                                        model::AbstractModel)
     
         (; spectral_grid, geometry) = model
         (; Grid, NF, nlat_half) = spectral_grid
@@ -50,7 +50,7 @@
         diagn::DiagnosticVariables,
         progn::PrognosticVariables,
         drag::JetDrag,
-        model::ModelSetup,
+        model::AbstractModel,
         lf::Integer,
     )
     
@@ -122,7 +122,7 @@
     end
     
     function SpeedyWeather.initialize!( forcing::StochasticStirring,
-                                        model::ModelSetup)
+                                        model::AbstractModel)
         
         # precompute forcing strength, scale with radius^2 as is the vorticity equation
         (; radius) = model.spectral_grid
@@ -150,7 +150,7 @@
         diagn::DiagnosticVariables,
         progn::PrognosticVariables,
         forcing::StochasticStirring,
-        model::ModelSetup,
+        model::AbstractModel,
         lf::Integer,
     )
         SpeedyWeather.forcing!(diagn, forcing, model.spectral_transform)

@@ -33,7 +33,7 @@ end
         callback::StormChaser,
         progn::PrognosticVariables,
         diagn::DiagnosticVariables,
-        model::ModelSetup,
+        model::AbstractModel,
     )
         # allocate recorder: number of time steps (incl initial conditions) in simulation  
         callback.maximum_surface_wind_speed = zeros(progn.clock.n_timesteps + 1)
@@ -62,7 +62,7 @@ end
         callback::StormChaser,
         progn::PrognosticVariables,
         diagn::DiagnosticVariables,
-        model::ModelSetup,
+        model::AbstractModel,
     )
     
         # increase counter
@@ -87,7 +87,7 @@ end
     key = :storm_chaser
     add!(model.callbacks, key => storm_chaser)      # with :storm_chaser key
     add!(model.callbacks, NoCallback())             # add dummy too 
-    add!(model, NoCallback())                       # add dummy with ::ModelSetup interface
+    add!(model, NoCallback())                       # add dummy with ::AbstractModel interface
 
     simulation = initialize!(model)
     run!(simulation, period=Day(1))

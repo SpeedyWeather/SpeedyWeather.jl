@@ -11,7 +11,7 @@ end
 function initialize!(
     progn::PrognosticVariables,
     IC::InitialConditions,
-    model::ModelSetup
+    model::AbstractModel
 )
     has(model, :vor)   && initialize!(progn, IC.vordiv, model)
     has(model, :pres)  && initialize!(progn, IC.pres,   model)
@@ -38,12 +38,12 @@ end
 
 export ZeroInitially
 struct ZeroInitially <: AbstractInitialConditions end
-initialize!(::PrognosticVariables,::ZeroInitially,::ModelSetup) = nothing
+initialize!(::PrognosticVariables,::ZeroInitially,::AbstractModel) = nothing
 
 # to avoid a breaking change, like ZeroInitially
 export StartFromRest
 struct StartFromRest <: AbstractInitialConditions end
-initialize!(::PrognosticVariables,::StartFromRest,::ModelSetup) = nothing
+initialize!(::PrognosticVariables,::StartFromRest,::AbstractModel) = nothing
 
 export StartWithRandomVorticity
 
@@ -62,7 +62,7 @@ $(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::StartWithRandomVorticity,
-                        model::ModelSetup) where NF
+                        model::AbstractModel) where NF
 
     lmax = progn.trunc + 1
     power = initial_conditions.power + 1    # +1 as power is summed of orders m
@@ -117,7 +117,7 @@ $(TYPEDSIGNATURES)
 Initial conditions from Galewsky, 2004, Tellus"""
 function initialize!(   progn::PrognosticVariables,
                         initial_conditions::ZonalJet,
-                        model::ModelSetup)
+                        model::AbstractModel)
 
     (; latitude, width, umax) = initial_conditions               # for jet
     (; perturb_lat, perturb_lon, perturb_xwidth,                 # for perturbation
@@ -327,7 +327,7 @@ $(TYPEDSIGNATURES)
 Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::JablonowskiTemperature,
-                        model::ModelSetup) where NF
+                        model::AbstractModel) where NF
 
     (;u₀, η₀, ΔT, Tmin) = initial_conditions
     (;σ_tropopause) = initial_conditions
@@ -400,7 +400,7 @@ Restart from a previous SpeedyWeather.jl simulation via the restart file restart
 Applies interpolation in the horizontal but not in the vertical."""
 function initialize!(   progn_new::PrognosticVariables,
                         initial_conditions::StartFromFile,
-                        model::ModelSetup)
+                        model::AbstractModel)
 
     (; path, id ) = initial_conditions
 
@@ -517,7 +517,7 @@ end
 function initialize!(  
     progn::PrognosticVariables,
     IC::ConstantRelativeHumidity,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     (; relhumid_ref) = IC
     (; nlayers, σ_levels_full) = model.geometry

@@ -196,7 +196,7 @@ simulation.model.output.output_dt = Second(3600)
 ```
 Now, if there's output, it will be every hour. Furthermore the initial
 conditions can be set with the `initial_conditions` model component
-which are then set during `initialize!(::ModelSetup)`, but you can also
+which are then set during `initialize!(::AbstractModel)`, but you can also
 change them now, before the model runs 
 ```@example howto
 simulation.prognostic_variables.vor[1][1, 1] = 0

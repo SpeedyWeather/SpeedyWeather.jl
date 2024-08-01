@@ -124,7 +124,7 @@ function SpeedyWeather.initialize!(
     callback::MilleniumFlood,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     initialize!(callback.schedule, progn.clock)
 end
@@ -133,7 +133,7 @@ function SpeedyWeather.callback!(
     callback::MilleniumFlood,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     # escape immediately if not scheduled yet
     isscheduled(callback.schedule, progn.clock) || return nothing

@@ -68,7 +68,7 @@ function SpeedyWeather.initialize!(
     callback::StormChaser,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     # allocate recorder: number of time steps (incl initial conditions) in simulation  
     callback.maximum_surface_wind_speed = zeros(progn.clock.n_timesteps + 1)
@@ -117,7 +117,7 @@ function SpeedyWeather.callback!(
     callback::StormChaser,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModeldel,
 )
 
     # increase counter
@@ -319,7 +319,7 @@ function SpeedyWeather.callback!(
     callback::MyScheduledCallback,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     # scheduled callbacks start with this line to execute only when scheduled!
     # else escape immediately

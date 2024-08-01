@@ -157,7 +157,7 @@ end
 function initialize!(
     S::AbstractZenith,
     initial_time::DateTime,
-    model::ModelSetup
+    model::AbstractModel
 )
     S.initial_time[] = initial_time     # to fix the season if no seasonal cycle
 end

@@ -377,7 +377,7 @@ function ∬dA(v, h, S::SpectralTransform)
 end
 
 # use SpectralTransform from model
-∬dA(v, h, model::ModelSetup) = ∬dA(v, h, model.spectral_transform)
+∬dA(v, h, model::AbstractModel) = ∬dA(v, h, model.spectral_transform)
 ```
 By reusing `model.spectral_transform` we do not have to re-precompute
 the spectral tranform on every call to `transform`. Providing
@@ -419,7 +419,7 @@ function global_diagnostics(u, v, ζ, η, model)
 end
 
 # unpack diagnostic variables and call global_diagnostics from above
-function global_diagnostics(diagn::DiagnosticVariables, model::ModelSetup)
+function global_diagnostics(diagn::DiagnosticVariables, model::AbstractModel)
     u = diagn.grid.u_grid[:, 1]
     v = diagn.grid.v_grid[:, 1]
     ζR = diagn.grid.vor_grid[:, 1]
@@ -467,7 +467,7 @@ function SpeedyWeather.initialize!(
     callback::GlobalDiagnostics,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     # replace with vector of correct length
     n = progn.clock.n_timesteps + 1    # +1 for initial conditions
@@ -499,7 +499,7 @@ function SpeedyWeather.callback!(
     callback::GlobalDiagnostics,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     callback.timestep_counter += 1  
     i = callback.timestep_counter
@@ -523,7 +523,7 @@ function SpeedyWeather.finish!(
     callback::GlobalDiagnostics,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     n_timesteps = callback.timestep_counter
 

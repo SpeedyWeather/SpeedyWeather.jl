@@ -459,6 +459,6 @@ end
 
 # fallback to primitive wet
 Base.fill!(tendencies::Tendencies, x) = Base.fill!(tendencies, x, PrimitiveWet)
-Base.fill!(tendencies::Tendencies, x, model::ModelSetup) = Base.fill!(tendencies, x, typeof(model))
+Base.fill!(tendencies::Tendencies, x, model::AbstractModel) = Base.fill!(tendencies, x, typeof(model))
 
 RingGrids.eachgridpoint(diagn::DiagnosticVariables) = eachgridpoint(diagn.grid.vor_grid)
