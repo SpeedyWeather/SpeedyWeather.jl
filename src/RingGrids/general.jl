@@ -410,12 +410,12 @@ end
 AbstractGPUGridArrayStyle{N, ArrayType, Grid}(::Val{N}) where {N, ArrayType, Grid} =
     AbstractGPUGridArrayStyle{N, ArrayType, Grid}()
 
-AbstractGPUGridArrayStyle{1, ArrayType, Grid}(::Val{2}) where {Grid} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
-AbstractGPUGridArrayStyle{1, ArrayType, Grid}(::Val{0}) where {Grid} = AbstractGPUGridArrayStyle{1, ArrayType, Grid}()
-AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{3}) where {Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
-AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{1}) where {Grid} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
-AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{4}) where {Grid} = AbstractGPUGridArrayStyle{4, ArrayType, Grid}()
-AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{2}) where {Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{1, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{1, ArrayType, Grid}(::Val{0}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{1, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{3}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{1}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{4}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{4, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
     
 function GPUArrays.backend(
     ::Type{Grid}
