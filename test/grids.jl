@@ -311,6 +311,18 @@ end
         @test all(ones(G{Float16}, n) ./ ones(G{Float32}, n) .=== 1f0)
         @test all(ones(G{Float16}, n) ./ ones(G{Float64}, n) .=== 1.0)
         @test all(ones(G{Float32}, n) ./ ones(G{Float64}, n) .=== 1.0)
+
+        # dimension mismatches, but still broadcasting
+        g1 = rand(G, n)
+        g2 = rand(G, n, 1)
+        g2_2 = rand(G, n, 2)
+        g3 = rand(G, n, 1, 1)
+
+        @test (g1 .* g2)[:,1] == (g1 .* g2[:,1])
+        @test (g2 .* g1)[:,1] == (g1 .* g2[:,1])
+        @test (g2 .* g3)[:,1,1] == (g2[:,1] .* g3[:,1,1])
+        @test (g1 .* g2_2)[:,1] == (g1 .* g2_2[:,1])
+        @test (g1 .* g2_2)[:,2] == (g1 .* g2_2[:,2])
     end 
 end
 
