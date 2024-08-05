@@ -289,7 +289,7 @@ end
     end
 end
 
-@testset "LowerTriangularArray: fill, copy, randn, convert" begin
+@testset "LowerTriangularArray: fill, copy, randn, convert, repeat" begin
     @testset for NF in (Float32, Float64)
         mmax = 32
         @testset for idims = ((), (5,), (5,5))
@@ -323,6 +323,10 @@ end
                 for lm in SpeedyWeather.eachharmonic(L, L3)
                     @test Float16(L[lm, [1 for i=1:length(idims)]...]) == L3[lm, [1 for i=1:length(idims)]...] 
                 end
+
+                L_rep = repeat(L, 1, [2 for i=1:length(idims)]...)
+                @test typeof(L_rep) <: LowerTriangularArray
+                @test size(L_rep, as=Vector) == (size(L,1), [10 for i=1:length(idims)]...) # 10 = 2 * 5 = 2*idims[i]
             end
         end
     end

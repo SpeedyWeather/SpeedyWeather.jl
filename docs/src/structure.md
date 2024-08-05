@@ -55,6 +55,8 @@ use temperature for example (but you could use nevertheless).
 tree(simulation.prognostic_variables)
 ```
 
+The prognostic variable struct can be mutated (e.g. to set new initial conditions) with the [`SpeedyWeather.set!`](@ref) function. 
+
 ## Diagnostic variables
 
 Similar for the diagnostic variables, regardless the model type, they contain the
