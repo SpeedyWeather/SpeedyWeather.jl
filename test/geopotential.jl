@@ -1,7 +1,7 @@
 @testset "Geopotential reasonable" begin
     for NF in (Float32, Float64)
-        nlev = 8
-        spectral_grid = SpectralGrid(; NF, nlev, Grid=FullGaussianGrid)
+        nlayers = 8
+        spectral_grid = SpectralGrid(; NF, nlayers, Grid=FullGaussianGrid)
         model = PrimitiveWetModel(; spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables

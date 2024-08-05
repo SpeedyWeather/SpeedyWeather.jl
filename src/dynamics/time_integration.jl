@@ -104,7 +104,7 @@ Initialize leapfrogging `L` by recalculating the timestep given the output time 
 `output_dt` from `model.output`. Recalculating will slightly adjust the time step to
 be a divisor such that an integer number of time steps matches exactly with the output
 time step."""
-function initialize!(L::Leapfrog, model::ModelSetup)
+function initialize!(L::Leapfrog, model::AbstractModel)
     (; output_dt) = model.output
 
     if L.adjust_with_output
@@ -160,14 +160,14 @@ function leapfrog!(
 end
 
 # variables that are leapfrogged in the respective models, e.g. :vor_tend, :div_tend, etc...
-tendency_names(model::ModelSetup) = tuple((Symbol(var, :_tend) for var in prognostic_variables(model))...)
+tendency_names(model::AbstractModel) = tuple((Symbol(var, :_tend) for var in prognostic_variables(model))...)
 
 function leapfrog!(
     progn::PrognosticVariables,
     tend::Tendencies,
     dt::Real,               # time step (mostly =2Δt, but for init steps =Δt, Δt/2)
     lf::Int,                # leapfrog index to dis/enable Williams filter
-    model::ModelSetup,
+    model::AbstractModel,
 )
     for (varname, tendname) in zip(prognostic_variables(model), tendency_names(model))
         var_old, var_new = getfield(progn, varname)
@@ -184,7 +184,7 @@ prognostic variables with two time steps (t=0, Δt) that can then be used in the
 function first_timesteps!(  
     progn::PrognosticVariables,         # all prognostic variables
     diagn::DiagnosticVariables,         # all pre-allocated diagnostic variables
-    model::ModelSetup,                  # everything that is constant at runtime
+    model::AbstractModel,                  # everything that is constant at runtime
 )
     (; clock) = progn
     clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
@@ -332,7 +332,7 @@ and calls the output and feedback functions."""
 function time_stepping!(
     progn::PrognosticVariables,     # all prognostic variables
     diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
-    model::ModelSetup,              # all model components
+    model::AbstractModel,              # all model components
 )          
     
     (; clock) = progn

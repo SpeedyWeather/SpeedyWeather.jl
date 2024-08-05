@@ -2,12 +2,12 @@ abstract type AbstractGeopotential <: AbstractModelComponent end
 
 export Geopotential
 Base.@kwdef struct Geopotential{NF} <: AbstractGeopotential
-    nlev::Int
-    Δp_geopot_half::Vector{NF} = zeros(NF, nlev)
-    Δp_geopot_full::Vector{NF} = zeros(NF, nlev)
+    nlayers::Int
+    Δp_geopot_half::Vector{NF} = zeros(NF, nlayers)
+    Δp_geopot_full::Vector{NF} = zeros(NF, nlayers)
 end
 
-Geopotential(SG::SpectralGrid) = Geopotential{SG.NF}(; nlev=SG.nlev)
+Geopotential(SG::SpectralGrid) = Geopotential{SG.NF}(; nlayers=SG.nlayers)
 
 """
 $(TYPEDSIGNATURES)
@@ -21,18 +21,18 @@ function initialize!(
     geopotential::Geopotential,
     model::PrimitiveEquation
 )
-    (; Δp_geopot_half, Δp_geopot_full, nlev) = geopotential
+    (; Δp_geopot_half, Δp_geopot_full, nlayers) = geopotential
     (; R_dry) = model.atmosphere
     (; σ_levels_full, σ_levels_half) = model.geometry
 
     # 1. integration onto half levels
-    for k in 1:nlev-1               # k is full level index, 1=top, nlev=bottom
+    for k in 1:nlayers-1               # k is full level index, 1=top, nlayers=bottom
         # used for: Φ_{k+1/2} = Φ_{k+1} + R*T_{k+1}*(ln(p_{k+1}) - ln(p_{k+1/2}))
         Δp_geopot_half[k+1] = R_dry*log(σ_levels_full[k+1]/σ_levels_half[k+1])
     end
 
     # 2. integration onto full levels (same formula but k -> k-1/2)
-    for k in 1:nlev
+    for k in 1:nlayers
         # used for: Φ_k = Φ_{k+1/2} + R*T_k*(ln(p_{k+1/2}) - ln(p_k))
         Δp_geopot_full[k] = R_dry*log(σ_levels_half[k+1]/σ_levels_full[k])
     end
@@ -84,18 +84,18 @@ function geopotential!(
     geopot_surf::Real = 0
 )
 
-    nlev = length(geopot)
+    nlayers = length(geopot)
     (; Δp_geopot_half, Δp_geopot_full) = G  # = R*Δlnp either on half or full levels
 
-    @boundscheck length(temp) >= nlev || throw(BoundsError)
-    @boundscheck length(Δp_geopot_full) >= nlev || throw(BoundsError)
-    @boundscheck length(Δp_geopot_half) >= nlev || throw(BoundsError)
+    @boundscheck length(temp) >= nlayers || throw(BoundsError)
+    @boundscheck length(Δp_geopot_full) >= nlayers || throw(BoundsError)
+    @boundscheck length(Δp_geopot_half) >= nlayers || throw(BoundsError)
 
     # bottom layer
-    geopot[nlev] = geopot_surf + temp[nlev]*Δp_geopot_full[end]
+    geopot[nlayers] = geopot_surf + temp[nlayers]*Δp_geopot_full[end]
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
-    @inbounds for k in nlev-1:-1:1
+    @inbounds for k in nlayers-1:-1:1
         geopot[k] = geopot[k+1] + temp[k+1]*Δp_geopot_half[k+1] + temp[k]*Δp_geopot_full[k]
     end
 end

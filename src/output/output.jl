@@ -31,10 +31,10 @@ export OutputWriter
 """
 $(TYPEDSIGNATURES)
 NetCDF output writer. Contains all output options and auxiliary fields for output interpolation.
-To be initialised with `OutputWriter(::SpectralGrid, ::Type{<:ModelSetup}, kwargs...)` to pass on the
+To be initialised with `OutputWriter(::SpectralGrid, ::Type{<:AbstractModel}, kwargs...)` to pass on the
 resolution information and the model type which chooses which variables to output. Options include
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32, Float64}, Model<:ModelSetup} <: AbstractOutputWriter
+Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32, Float64}, Model<:AbstractModel} <: AbstractOutputWriter
 
     spectral_grid::SpectralGrid
 
@@ -107,7 +107,7 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32, Float64}, Model<:Mode
     nlat::Int =  as_matrix ? RingGrids.matrix_size(input_Grid, spectral_grid.nlat_half)[2] :
                                                     RingGrids.get_nlat(output_Grid, nlat_half)
     npoints::Int = nlon*nlat
-    nlev::Int = spectral_grid.nlev
+    nlayers::Int = spectral_grid.nlayers
     interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(NF, input_Grid, spectral_grid.nlat_half, npoints)
 
     # fields to output (only one layer, reuse over layers)
@@ -129,7 +129,7 @@ function OutputWriter(
     ::Type{Model};
     NF::Type{<:Union{Float32, Float64}} = DEFAULT_OUTPUT_NF,
     kwargs...
-) where {Model<:ModelSetup}
+) where {Model<:AbstractModel}
     return OutputWriter{NF, Model}(; spectral_grid, kwargs...)
 end
 
@@ -160,7 +160,7 @@ function initialize!(
     time_stepping::AbstractTimeStepper,
     clock::Clock,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 ) where {output_NF, Model}
     
     output.output || return nothing     # exit immediately for no output
@@ -387,7 +387,7 @@ function write_netcdf_time!(output::OutputWriter,
     i = output.output_counter
 
     time_passed = Millisecond(time-startdate)
-    time_hrs = time_passed.value/3600_000       # [ms] -> [hrs]
+    time_hrs = time_passed.value/3600_000       # [ms] -> [hrs]
     netcdf_file["time"][i] = time_hrs
     NCDatasets.sync(netcdf_file)
 
@@ -417,7 +417,7 @@ function write_netcdf_variables!(   output::OutputWriter,
 
             # create (matrix, grid) tuples for simultaneous grid -> matrix conversion
             # TODO this currently does the Matrix! conversion to all variables, not just output_vars
-            # as arrays are always initialised  
+            # as arrays are always initialised  
             MGs = ((M, G) for (M, G) in zip((u, v, vor, div, temp, humid),
                                           (u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid))
                                            if length(M) > 0)
@@ -562,7 +562,7 @@ get_full_output_file_path(output::OutputWriter) = joinpath(output.run_path, outp
 $(TYPEDSIGNATURES)
 Loads a `var_name` trajectory of the model `M` that has been saved in a netCDF file during the time stepping.
 """
-function load_trajectory(var_name::Union{Symbol, String}, model::ModelSetup) 
+function load_trajectory(var_name::Union{Symbol, String}, model::AbstractModel) 
     @assert model.output.output "Output is turned off"
     return Array(NCDataset(get_full_output_file_path(model.output))[string(var_name)])
 end

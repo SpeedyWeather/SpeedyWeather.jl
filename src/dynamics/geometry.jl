@@ -28,9 +28,6 @@ $(TYPEDFIELDS)
 
     "number of latitude rings"
     nlat::Int = spectral_grid.nlat
-
-    "[DEPRECATED] number of vertical levels"
-    nlev::Int = spectral_grid.nlev
     
     "number of vertical levels"
     nlayers::Int = spectral_grid.nlayers
@@ -140,7 +137,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Given a vector in column defined at full levels, do a linear interpolation in
-log(σ) to calculate its values at half-levels, skipping top (k=1/2), extrapolating to bottom (k=NLEV+1/2).
+log(σ) to calculate its values at half-levels, skipping top (k=1/2), extrapolating to bottom (k=nlayers+1/2).
 """
 function vertical_interpolate!(
     A_half::Vector,             # quantity A on half levels (excl top)

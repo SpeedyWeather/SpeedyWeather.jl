@@ -44,7 +44,7 @@ function initialize!(
     callback::ParticleTracker{NF},
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 ) where NF
 
     initialize!(callback.schedule, progn.clock)
@@ -120,7 +120,7 @@ function callback!(
     callback::ParticleTracker,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     isscheduled(callback.schedule, progn.clock) || return nothing   # else escape immediately
     i = callback.schedule.counter+1     # +1 for initial conditions (not scheduled)

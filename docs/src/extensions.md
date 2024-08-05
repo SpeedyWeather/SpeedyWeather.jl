@@ -61,7 +61,7 @@ For a more concrete example see [Custom forcing and drag](@ref).
 To define the new type's initialization, at the most basic level you need
 to extend the `initialize!` function for this new type
 ```@example extending
-function initialize!(forcing::MyForcing, model::ModelSetup)
+function initialize!(forcing::MyForcing, model::AbstractModel)
     # fill in/change any fields of your new forcing here
     forcing.v[1] = 1
     # you can use information from other model components too
@@ -88,12 +88,12 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
                     progn::PrognosticVariablesLayer,
                     forcing::MyForcing,
                     time::DateTime,
-                    model::ModelSetup)
+                    model::AbstractModel)
     # whatever the forcing is supposed to do, in the end you want
     # to write into the tendency fields
-    diagn.tendencies.u_tend_grid[1] = forcing.a
-    diagn.tendencies.v_tend_grid[1] = forcing.a
-    diagn.tendencies.vor_tend[1] = forcing.a
+    diagn.tendencies.u_tend_grid = forcing.a
+    diagn.tendencies.v_tend_grid = forcing.a
+    diagn.tendencies.vor_tend = forcing.a
 end
 ```
 `DiagnosticVariablesLayer` is the type of the first argument, because it contains
@@ -121,7 +121,7 @@ The `initialize!` function is a function *inside* the SpeedyWeather module,
 as we want to define a new method for it *outside* that can be called *inside*
 we actually need to write
 ```@example extending
-function SpeedyWeather.initialize!(forcing::MyForcing, model::SpeedyWeather.ModelSetup)
+function SpeedyWeather.initialize!(forcing::MyForcing, model::SpeedyWeather.AbstractModel)
     # how to initialize it
 end
 ```
@@ -131,9 +131,9 @@ You also probably want to make use of functions that are already defined inside
 SpeedyWeather or its submodules `SpeedyTransforms`, or `RingGrids`. If something
 does not seem to be defined, although you can see it in the documentation or
 directly in the code, you probably need to specify its module too! Alternatively,
-note that you can also always do `import SpeedWeather: ModelSetup` to bring
+note that you can also always do `import SpeedWeather: AbstractModel` to bring
 a given variable into global scope which removes the necessity to write
-`SpeedyWeather.ModelSetup`.
+`SpeedyWeather.AbstractModel`.
 
 ## Abstract model components
 

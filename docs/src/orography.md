@@ -127,7 +127,7 @@ you want to reflect this in the surface geopotential `geopot_surf` which is
 used in the primitive equations by
 
 ```@example orography
-spectral!(orography.geopot_surf, orography.orography, model.spectral_transform)
+transform!(orography.geopot_surf, orography.orography, model.spectral_transform)
 orography.geopot_surf .*= model.planet.gravity
 spectral_truncation!(orography.geopot_surf)
 ```
@@ -163,13 +163,13 @@ my_orography = MyOrography(spectral_grid, constant_height=200)
 
 Now we have to extend the `initialize!` function. The first argument has to be
 `::MyOrography` i.e. the new type we just defined, the second argument has to be
-`::ModelSetup` although you could constrain it to `::ShallowWater` for example
+`::AbstractModel` although you could constrain it to `::ShallowWater` for example
 but then it cannot be used for primitive equations.
 
 ```@example orography
 function SpeedyWeather.initialize!(
     orog::MyOrography,      # first argument as to be ::MyOrography, i.e. your new type
-    model::ModelSetup,      # second argument, use anything from model read-only
+    model::AbstractModel,      # second argument, use anything from model read-only
 )
     (; orography, geopot_surf) = orog   # unpack
 
@@ -181,7 +181,7 @@ function SpeedyWeather.initialize!(
 
     # then also calculate the surface geopotential for primitive equations
     # given orography we just set
-    spectral!(geopot_surf, orography, model.spectral_transform)
+    transform!(geopot_surf, orography, model.spectral_transform)
     geopot_surf .*= model.planet.gravity
     spectral_truncation!(geopot_surf)
     return nothing

@@ -1,6 +1,6 @@
 @testset "Convection" begin
     
-    spectral_grid = SpectralGrid(trunc=31, nlev=8)
+    spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 
     for Convection in ( NoConvection,
                         SimplifiedBettsMiller,

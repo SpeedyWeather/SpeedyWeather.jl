@@ -4,12 +4,12 @@ abstract type AbstractForcing <: AbstractModelComponent end
 export NoForcing
 struct NoForcing <: AbstractForcing end
 NoForcing(SG::SpectralGrid) = NoForcing()
-initialize!(::NoForcing, ::ModelSetup) = nothing
+initialize!(::NoForcing, ::AbstractModel) = nothing
 
 function forcing!(  diagn::DiagnosticVariables,
                     progn::PrognosticVariables,
                     forcing::NoForcing,
-                    model::ModelSetup,
+                    model::AbstractModel,
                     lf::Integer)
     return nothing
 end
@@ -48,7 +48,7 @@ JetStreamForcing(SG::SpectralGrid; kwargs...) = JetStreamForcing{SG.NF}(
     ; nlat=SG.nlat, kwargs...)
 
 function initialize!(   forcing::JetStreamForcing,
-                        model::ModelSetup)
+                        model::AbstractModel)
 
     (; latitude, width, speed, time_scale, amplitude) = forcing
     (; radius) = model.spectral_grid
@@ -81,7 +81,7 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
                     progn::PrognosticVariablesLayer,
                     forcing::JetStreamForcing,
                     time::DateTime,
-                    model::ModelSetup)
+                    model::AbstractModel)
     forcing!(diagn, forcing)
 end
 
@@ -90,7 +90,7 @@ $(TYPEDSIGNATURES)
 
 Set for every latitude ring the tendency to the precomputed forcing
 in the momentum equations following the JetStreamForcing.
-The forcing is precomputed in `initialize!(::JetStreamForcing, ::ModelSetup)`."""
+The forcing is precomputed in `initialize!(::JetStreamForcing, ::AbstractModel)`."""
 function forcing!(  diagn::DiagnosticVariablesLayer,
                     forcing::JetStreamForcing)
     Fu = diagn.tendencies.u_tend_grid

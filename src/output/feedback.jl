@@ -70,7 +70,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Initializes the a `Feedback` struct."""
-function initialize!(feedback::Feedback, clock::Clock, model::ModelSetup)
+function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
 
     # set to false to recheck for NaRs
     feedback.nars_detected = false

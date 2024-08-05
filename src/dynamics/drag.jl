@@ -4,12 +4,12 @@ abstract type AbstractDrag <: AbstractModelComponent end
 export NoDrag
 struct NoDrag <: AbstractDrag end
 NoDrag(SG::SpectralGrid) = NoDrag()
-initialize!(::NoDrag, ::ModelSetup) = nothing
+initialize!(::NoDrag, ::AbstractModel) = nothing
 
 function drag!(     diagn::DiagnosticVariables,
                     progn::PrognosticVariables,
                     drag::NoDrag,
-                    model::ModelSetup,
+                    model::AbstractModel,
                     lf::Integer)
     return nothing
 end
@@ -27,7 +27,7 @@ end
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
 
 function initialize!(   drag::QuadraticDrag,
-                        model::ModelSetup)
+                        model::AbstractModel)
     # c = c_D / H * R
     drag.c[] = drag.c_D / model.atmosphere.layer_thickness * model.geometry.radius
 end
@@ -37,7 +37,7 @@ function drag!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     drag::QuadraticDrag,
-    model::ModelSetup,
+    model::AbstractModel,
     lf::Integer,
 )
     drag!(diagn, drag)
@@ -50,7 +50,7 @@ Quadratic drag for the momentum equations.
     F = -c_D/H*|(u, v)|*(u, v)
 
 with c_D the non-dimensional drag coefficient as defined in `drag::QuadraticDrag`.
-c_D and layer thickness `H` are precomputed in initialize!(::QuadraticDrag, ::ModelSetup)
+c_D and layer thickness `H` are precomputed in initialize!(::QuadraticDrag, ::AbstractModel)
 and scaled by the radius as are the momentum equations."""
 function drag!(     
     diagn::DiagnosticVariables,

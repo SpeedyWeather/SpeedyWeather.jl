@@ -11,7 +11,7 @@ end
 function initialize!(
     progn::PrognosticVariables,
     IC::InitialConditions,
-    model::ModelSetup
+    model::AbstractModel
 )
     has(model, :vor)   && initialize!(progn, IC.vordiv, model)
     has(model, :pres)  && initialize!(progn, IC.pres,   model)
@@ -38,12 +38,12 @@ end
 
 export ZeroInitially
 struct ZeroInitially <: AbstractInitialConditions end
-initialize!(::PrognosticVariables,::ZeroInitially,::ModelSetup) = nothing
+initialize!(::PrognosticVariables,::ZeroInitially,::AbstractModel) = nothing
 
 # to avoid a breaking change, like ZeroInitially
 export StartFromRest
 struct StartFromRest <: AbstractInitialConditions end
-initialize!(::PrognosticVariables,::StartFromRest,::ModelSetup) = nothing
+initialize!(::PrognosticVariables,::StartFromRest,::AbstractModel) = nothing
 
 export StartWithRandomVorticity
 
@@ -62,7 +62,7 @@ $(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::StartWithRandomVorticity,
-                        model::ModelSetup) where NF
+                        model::AbstractModel) where NF
 
     lmax = progn.trunc + 1
     power = initial_conditions.power + 1    # +1 as power is summed of orders m
@@ -117,7 +117,7 @@ $(TYPEDSIGNATURES)
 Initial conditions from Galewsky, 2004, Tellus"""
 function initialize!(   progn::PrognosticVariables,
                         initial_conditions::ZonalJet,
-                        model::ModelSetup)
+                        model::AbstractModel)
 
     (; latitude, width, umax) = initial_conditions               # for jet
     (; perturb_lat, perturb_lon, perturb_xwidth,                 # for perturbation
@@ -322,7 +322,7 @@ $(TYPEDSIGNATURES)
 Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::JablonowskiTemperature,
-                        model::ModelSetup) where NF
+                        model::AbstractModel) where NF
 
     (;u₀, η₀, ΔT, Tmin) = initial_conditions
     (;σ_tropopause) = initial_conditions
@@ -393,7 +393,7 @@ Restart from a previous SpeedyWeather.jl simulation via the restart file restart
 Applies interpolation in the horizontal but not in the vertical."""
 function initialize!(   progn_new::PrognosticVariables,
                         initial_conditions::StartFromFile,
-                        model::ModelSetup)
+                        model::AbstractModel)
 
     (; path, id ) = initial_conditions
 
@@ -418,22 +418,23 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
     # R_dry:        Specific gas constant for dry air [J/kg/K]
     (; temp_ref, lapse_rate, R_dry) = model.atmosphere
     (; gravity) = model.planet
-    (; nlev, σ_levels_full) = model.geometry
+    (; nlayers, σ_levels_full) = model.geometry
     (; norm_sphere) = model.spectral_transform # normalization of the l=m=0 spherical harmonic
 
     # Lapse rate scaled by gravity [K/m / (m²/s²)]
     Γg⁻¹ = lapse_rate/gravity
 
-    # SURFACE TEMPERATURE (store in k = nlev, but it's actually surface, i.e. k=nlev+1/2)
+    # SURFACE TEMPERATURE (store in k = nlayers, but it's actually surface, i.e. k=nlayers+1/2)
     # overwrite with lowermost layer further down
     temp_surf = progn.temp[1][:,end]     # spectral temperature at k=nlev+1/2
+
     temp_surf[1] = norm_sphere*temp_ref                 # set global mean surface temperature
     for lm in eachharmonic(geopot_surf, temp_surf)
         temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]           # lower temperature for higher mountains
     end
 
     # Use lapserate and vertical coordinate σ for profile
-    for k in 1:nlev                                     # k=nlev overwrites the surface temperature
+    for k in 1:nlayers                                     # k=nlayers overwrites the surface temperature
                                                         # with lowermost layer temperature
         temp = progn.layers[k].timesteps[1].temp
         σₖᴿ = σ_levels_full[k]^(R_dry*Γg⁻¹)             # from hydrostatic equation
@@ -507,7 +508,7 @@ end
 function initialize!(  
     progn::PrognosticVariables,
     IC::ConstantRelativeHumidity,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     (; relhumid_ref) = IC
     (; nlayers, σ_levels_full) = model.geometry

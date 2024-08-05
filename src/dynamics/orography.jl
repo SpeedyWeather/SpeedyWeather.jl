@@ -26,7 +26,7 @@ function (::Type{Orography})(
 end
 
 # no further initialization needed
-initialize!(::NoOrography, ::ModelSetup) = nothing
+initialize!(::NoOrography, ::AbstractModel) = nothing
 
 export ZonalRidge
 
@@ -50,7 +50,7 @@ end
 
 # function barrier
 function initialize!(   orog::ZonalRidge,
-                        model::ModelSetup)
+                        model::AbstractModel)
     initialize!(orog, model.planet, model.spectral_transform, model.geometry)
 end
 
@@ -130,7 +130,7 @@ end
 
 # function barrier
 function initialize!(   orog::EarthOrography,
-                        model::ModelSetup)
+                        model::AbstractModel)
     initialize!(orog, model.planet, model.spectral_transform)
 end
 

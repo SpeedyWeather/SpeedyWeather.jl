@@ -5,7 +5,7 @@ $(TYPEDSIGNATURES)
 Simulation is a container struct to be used with `run!(::Simulation)`.
 It contains
 $(TYPEDFIELDS)"""
-struct Simulation{Model<:ModelSetup} <: AbstractSimulation{Model}
+struct Simulation{Model<:AbstractModel} <: AbstractSimulation{Model}
     "define the current state of the model"
     prognostic_variables::PrognosticVariables
 

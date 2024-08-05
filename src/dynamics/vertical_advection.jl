@@ -56,7 +56,7 @@ function _vertical_advection!(
     for k in eachgrid(ξ_tend, σ_tend, ξ)
         Δσₖ⁻¹ = inv(Δσ[k])          # inverse layer thickness, compute inv only once
 
-        # for k=1 "above" term (at k-1/2) is 0, for k==nlev "below" term (at k+1/2) is zero
+        # for k=1 "above" term (at k-1/2) is 0, for k==nlayers "below" term (at k+1/2) is zero
         # avoid out-of-bounds indexing with k⁻, k⁺
         kint = Tuple(k)[1]
         k⁻ = max(1, kint-1)    # TODO check that this actually zeros velocity at k=1/2
