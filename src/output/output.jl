@@ -100,6 +100,9 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32, Float64}, Model<:Abst
     "[OPTION] the grid used for output, full grids only"
     output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid_type(input_Grid)
     
+    output_GridVariable2D::Type{<:AbstractArray} = RingGrids.nonparametric_type(output_Grid){NF, 1, Array{NF, 1}}
+    output_GridVariable3D::Type{<:AbstractArray} = RingGrids.nonparametric_type(output_Grid){NF, 2, Array{NF, 2}}
+
     "[OPTION] the resolution of the output grid, default: same nlat_half as in the dynamical core"
     nlat_half::Int = spectral_grid.nlat_half
     nlon::Int = as_matrix ? RingGrids.matrix_size(input_Grid, spectral_grid.nlat_half)[1] :
@@ -110,12 +113,12 @@ Base.@kwdef mutable struct OutputWriter{NF<:Union{Float32, Float64}, Model<:Abst
     nlayers::Int = spectral_grid.nlayers
     interpolator::AbstractInterpolator = DEFAULT_INTERPOLATOR(NF, input_Grid, spectral_grid.nlat_half, npoints)
 
-    # fields to output (only one layer, reuse over layers)
-    const u::Matrix{NF} = fill(missing_value, nlon, nlat)
-    const v::Matrix{NF} = fill(missing_value, nlon, nlat)
-    const vor::Matrix{NF} = fill(missing_value, nlon, nlat)
-    const div::Matrix{NF} = fill(missing_value, nlon, nlat)
-    const temp::Matrix{NF} = fill(missing_value, nlon, nlat)
+    # fields to output 
+    const u::Array{NF,3} = fill(missing_value, nlon, nlat, nlayers)
+    const v::Array{NF,3} = fill(missing_value, nlon, nlat, nlayers)
+    const vor::Array{NF,3} = fill(missing_value, nlon, nlat, nlayers)
+    const div::Array{NF,3} = fill(missing_value, nlon, nlat, nlayers)
+    const temp::Array{NF,3} = fill(missing_value, nlon, nlat, nlayers)
     const pres::Matrix{NF} = fill(missing_value, nlon, nlat)
     const humid::Matrix{NF} = fill(missing_value, nlon, nlat)
     const precip_cond::Matrix{NF} = fill(missing_value, nlon, nlat)
@@ -405,58 +408,57 @@ function write_netcdf_variables!(   output::OutputWriter,
     i = output.output_counter
 
     (; u, v, vor, div, pres, temp, humid, precip_cond, precip_conv, cloud) = output
-    (; output_Grid, interpolator) = output
+    (; output_Grid, output_GridVariable2D, output_GridVariable3D, interpolator) = output
     (; quadrant_rotation, matrix_quadrant) = output
     (; netcdf_file, keepbits) = output
-
-    for (k, diagn_layer) in enumerate(diagn.layers)
         
-        (; u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid ) = diagn_layer.grid_variables
+    # 3D Variables 
+    (; u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid ) = diagn.grid
 
-        if output.as_matrix     # resort gridded variables interpolation-free into a matrix
+    if output.as_matrix     # resort gridded variables interpolation-free into a matrix
 
-            # create (matrix, grid) tuples for simultaneous grid -> matrix conversion
-            # TODO this currently does the Matrix! conversion to all variables, not just output_vars
-            # as arrays are always initialised  
-            MGs = ((M, G) for (M, G) in zip((u, v, vor, div, temp, humid),
-                                          (u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid))
-                                           if length(M) > 0)
+        # create (matrix, grid) tuples for simultaneous grid -> matrix conversion
+        # TODO this currently does the Matrix! conversion to all variables, not just output_vars
+        # as arrays are always initialised  
+        MGs = ((M, G) for (M, G) in zip((u, v, vor, div, temp, humid),
+                                        (u_grid, v_grid, vor_grid, div_grid, temp_grid, humid_grid))
+                                        if length(M) > 0)
                                                     
-            RingGrids.Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
+        RingGrids.Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
 
-        else                    # or interpolate onto a full grid
-            :u in output_vars       && RingGrids.interpolate!(output_Grid(u),    u_grid, interpolator)
-            :v in output_vars       && RingGrids.interpolate!(output_Grid(v),    v_grid, interpolator)
-            :vor in output_vars     && RingGrids.interpolate!(output_Grid(vor),  vor_grid, interpolator)
-            :div in output_vars     && RingGrids.interpolate!(output_Grid(div),  div_grid, interpolator)
-            :temp in output_vars    && RingGrids.interpolate!(output_Grid(temp), temp_grid, interpolator)
-            :humid in output_vars   && RingGrids.interpolate!(output_Grid(humid), humid_grid, interpolator)
-        end
-
-        # UNSCALE THE SCALED VARIABLES
-        unscale!(vor, diagn.scale[]) # was vor*radius, back to vor
-        unscale!(div, diagn.scale[]) # same
-        temp .-= 273.15             # convert to ˚C
-
-        # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
-        :u in output_vars     && round!(u,    keepbits.u)
-        :v in output_vars     && round!(v,    keepbits.v)
-        :vor in output_vars   && round!(vor,  keepbits.vor)
-        :div in output_vars   && round!(div,  keepbits.div)
-        :temp in output_vars  && round!(temp, keepbits.temp)
-        :humid in output_vars && round!(humid, keepbits.humid)
-
-        # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
-        :u in output_vars     && (netcdf_file["u"][:, :, k, i] = u)
-        :v in output_vars     && (netcdf_file["v"][:, :, k, i] = v)
-        :vor in output_vars   && (netcdf_file["vor"][:, :, k, i] = vor)
-        :div in output_vars   && (netcdf_file["div"][:, :, k, i] = div)
-        :temp in output_vars  && (netcdf_file["temp"][:, :, k, i] = temp)
-        :humid in output_vars && (netcdf_file["humid"][:, :, k, i] = humid)
+    else                    # or interpolate onto a full grid
+        :u in output_vars       && RingGrids.interpolate!(output_GridVariable3D(u),    u_grid, interpolator)
+        :v in output_vars       && RingGrids.interpolate!(output_GridVariable3D(v),    v_grid, interpolator)
+        :vor in output_vars     && RingGrids.interpolate!(output_GridVariable3D(vor),  vor_grid, interpolator)
+        :div in output_vars     && RingGrids.interpolate!(output_GridVariable3D(div),  div_grid, interpolator)
+        :temp in output_vars    && RingGrids.interpolate!(output_GridVariable3D(temp), temp_grid, interpolator)
+        :humid in output_vars   && RingGrids.interpolate!(output_GridVariable3D(humid), humid_grid, interpolator)
     end
 
-    # surface pressure, i.e. interface displacement η
-    (; pres_grid, precip_large_scale, precip_convection, cloud_top ) = diagn.surface
+    # UNSCALE THE SCALED VARIABLES
+    unscale!(vor, diagn.scale[]) # was vor*radius, back to vor
+    unscale!(div, diagn.scale[]) # same
+    temp .-= 273.15             # convert to ˚C
+
+    # ROUNDING FOR ROUND+LOSSLESS COMPRESSION
+    :u in output_vars     && round!(u,    keepbits.u)
+    :v in output_vars     && round!(v,    keepbits.v)
+    :vor in output_vars   && round!(vor,  keepbits.vor)
+    :div in output_vars   && round!(div,  keepbits.div)
+    :temp in output_vars  && round!(temp, keepbits.temp)
+    :humid in output_vars && round!(humid, keepbits.humid)
+
+    # WRITE VARIABLES TO FILE, APPEND IN TIME DIMENSION
+    :u in output_vars     && (netcdf_file["u"][:, :, :, i] = u)
+    :v in output_vars     && (netcdf_file["v"][:, :, :, i] = v)
+    :vor in output_vars   && (netcdf_file["vor"][:, :, :, i] = vor)
+    :div in output_vars   && (netcdf_file["div"][:, :, :, i] = div)
+    :temp in output_vars  && (netcdf_file["temp"][:, :, :, i] = temp)
+    :humid in output_vars && (netcdf_file["humid"][:, :, :, i] = humid)
+
+    # 2D Variables: surface pressure, i.e. interface displacement η
+    pres_grid = diagn.grid.pres_grid
+    (; precip_large_scale, precip_convection, cloud_top) = diagn.physics
 
     if output.as_matrix
         if :pres in output_vars || :precip_cond in output_vars || :precip_conv in output_vars || :cloud in output_vars
@@ -466,11 +468,11 @@ function write_netcdf_variables!(   output::OutputWriter,
             RingGrids.Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
         end
     else
-        :pres in output_vars && RingGrids.interpolate!(output_Grid(pres), pres_grid, interpolator)
-        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_cond), precip_large_scale, interpolator)
-        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_conv), precip_convection, interpolator)
-        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_conv), precip_convection, interpolator)
-        :cloud in output_vars && RingGrids.interpolate!(output_Grid(cloud), cloud_top, interpolator)
+        :pres in output_vars && RingGrids.interpolate!(output_GridVariable2D(pres), pres_grid, interpolator)
+        :precip in output_vars && RingGrids.interpolate!(output_GridVariable2D(precip_cond), precip_large_scale, interpolator)
+        :precip in output_vars && RingGrids.interpolate!(output_GridVariable2D(precip_conv), precip_convection, interpolator)
+        :precip in output_vars && RingGrids.interpolate!(output_GridVariable2D(precip_conv), precip_convection, interpolator)
+        :cloud in output_vars && RingGrids.interpolate!(output_GridVariable2D(cloud), cloud_top, interpolator)
     end
 
     # after output set precip accumulators back to zero
@@ -517,33 +519,28 @@ function write_restart_file(progn::PrognosticVariables{T},
     write_restart || return nothing         # exit immediately if no restart file desired
     
     # COMPRESSION OF RESTART FILE
-    for layer in progn.layers
+    # copy over leapfrog 2 to 1
+    copyto!(progn.vor[1], progn.vor[2])
+    copyto!(progn.div[1], progn.div[2])
+    copyto!(progn.temp[1], progn.temp[2])
+    copyto!(progn.humid[1], progn.humid[2])
+    copyto!(progn.pres[1], progn.pres[2])
 
-        # copy over leapfrog 2 to 1
-        copyto!(layer.timesteps[1].vor, layer.timesteps[2].vor)
-        copyto!(layer.timesteps[1].div, layer.timesteps[2].div)
-        copyto!(layer.timesteps[1].temp, layer.timesteps[2].temp)
-        copyto!(layer.timesteps[1].humid, layer.timesteps[2].humid)
-
-        # bitround 1st leapfrog step to output precision
-        if T <: Base.IEEEFloat  # currently not defined for other formats...
-            round!(layer.timesteps[1].vor, keepbits.vor)
-            round!(layer.timesteps[1].div, keepbits.div)
-            round!(layer.timesteps[1].temp, keepbits.temp)
-            round!(layer.timesteps[1].humid, keepbits.humid)
-        end
-
-        # remove 2nd leapfrog step by filling with zeros
-        fill!(layer.timesteps[2].vor, 0)
-        fill!(layer.timesteps[2].div, 0)
-        fill!(layer.timesteps[2].temp, 0)
-        fill!(layer.timesteps[2].humid, 0)
+    # bitround 1st leapfrog step to output precision
+    if T <: Base.IEEEFloat  # currently not defined for other formats...
+        round!(progn.vor[1], keepbits.vor)
+        round!(progn.div[1], keepbits.div)
+        round!(progn.temp[1], keepbits.temp)
+        round!(progn.humid[1], keepbits.humid)
+        round!(progn.pres[1], keepbits.pres)
     end
 
-    # same for surface pressure
-    copyto!(progn.surface.timesteps[1].pres, progn.surface.timesteps[2].pres)
-    T <: Base.IEEEFloat && round!(progn.surface.timesteps[1].pres, keepbits.pres)
-    fill!(progn.surface.timesteps[2].pres, 0)
+    # remove 2nd leapfrog step by filling with zeros
+    fill!(progn.vor[2], 0)
+    fill!(progn.div[2], 0)
+    fill!(progn.temp[2], 0)
+    fill!(progn.humid[2], 0)
+    fill!(progn.pres[2], 0)
 
     jldopen(joinpath(run_path, "restart.jld2"), "w"; compress=true) do f
         f["prognostic_variables"] = progn
