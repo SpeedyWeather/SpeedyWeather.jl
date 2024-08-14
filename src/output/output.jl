@@ -471,7 +471,6 @@ function write_netcdf_variables!(   output::OutputWriter,
         :pres in output_vars && RingGrids.interpolate!(output_GridVariable2D(pres), pres_grid, interpolator)
         :precip in output_vars && RingGrids.interpolate!(output_GridVariable2D(precip_cond), precip_large_scale, interpolator)
         :precip in output_vars && RingGrids.interpolate!(output_GridVariable2D(precip_conv), precip_convection, interpolator)
-        :precip in output_vars && RingGrids.interpolate!(output_GridVariable2D(precip_conv), precip_convection, interpolator)
         :cloud in output_vars && RingGrids.interpolate!(output_GridVariable2D(cloud), cloud_top, interpolator)
     end
 
