@@ -19,7 +19,12 @@ matrix_size(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer) =
 
 ## CONVERSION
 # convert an AbstractMatrix to the full grids, and vice versa
-(Grid::Type{<:AbstractFullGrid})(M::AbstractMatrix) = Grid(vec(M))
+function (Grid::Type{<:AbstractFullGrid})(M::AbstractArray) 
+    M_flat = reshape(M, :, size(M)[3:end]...) # identical to vec(M) for M <: AbstractMatrix
+    npoints2D = size(M_flat, 1)
+    nlat_half = get_nlat_half(Grid, npoints2D)  # get nlat_half of Grid
+    Grid(M_flat, nlat_half)
+end 
 Base.Array(grid::AbstractFullGridArray) = Array(reshape(grid.data, :, get_nlat(grid), size(grid.data)[2:end]...))
 Base.Matrix(grid::AbstractFullGridArray) = Array(grid)
 
