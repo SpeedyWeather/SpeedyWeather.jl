@@ -51,7 +51,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid, ShallowWater)
+    output::OW = NetCDFOutput(spectral_grid, ShallowWater)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end

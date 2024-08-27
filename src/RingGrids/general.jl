@@ -302,8 +302,8 @@ for k in eachgrid(grid)
 @inline eachgrid(grid::AbstractGridArray) = CartesianIndices(size(grid)[2:end])
 
 # several arguments to check for matching grids
-function eachgrid(grid1::AbstractGridArray, grids::AbstractGridArray...)
-    grids_match(grid1, grids...) || throw(DimensionMismatch(grid1, grids...))
+function eachgrid(grid1::AbstractGridArray, grids::AbstractGridArray...; kwargs...)
+    grids_match(grid1, grids...; kwargs...) || throw(DimensionMismatch(grid1, grids...))
     return eachgrid(grid1)
 end
 
@@ -353,13 +353,28 @@ Base.any(G::AbstractGridArray) = any(G.data)
 
 """$(TYPEDSIGNATURES) True if both `A` and `B` are of the same nonparametric grid type
 (e.g. OctahedralGaussianArray, regardless type parameter `T` or underyling array type `ArrayType`)
-and of same resolution (nlat_half) and total grid points (length). Sizes of (4,) and (4,1)
-would match for example, but (8,1) and (4,2) would not (nlat_half not identical)."""
-function grids_match(A::AbstractGridArray, B::AbstractGridArray; horizontal_only::Bool = false)
-    resolution_match = get_nlat_half(A) == get_nlat_half(B)
-    npoints_match = horizontal_only ? true : length(A) == length(B)
-    resolution_match && npoints_match && return grids_match(typeof(A), typeof(B))
-    return false
+and of same resolution (`nlat_half`) and total grid points (`length`). Sizes of `(4,)` and `(4,1)`
+would match for example, but `(8,1)` and `(4,2)` would not (`nlat_half` not identical)."""
+function grids_match(
+    A::AbstractGridArray,
+    B::AbstractGridArray;
+    horizontal_only::Bool = false,
+    vertical_only::Bool = false,
+)
+    @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only = $horizontal_ony and vertical_only = $vertical_only"
+
+    horizontal_match = get_nlat_half(A) == get_nlat_half(B)
+    vertical_match = size(A)[2:end] == size(B)[2:end]
+    type_match = grids_match(typeof(A), typeof(B))
+
+    if horizontal_only
+        # type also has to match as two different grid types can have the same nlat_half
+        return horizontal_match && type_match
+    elseif vertical_only
+        return vertical_match
+    else
+        return horizontal_match && vertical_match && type_match
+    end
 end
 
 # eltypes can be different and also array types of underlying data
