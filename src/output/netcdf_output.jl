@@ -7,7 +7,7 @@ const DEFAULT_OUTPUT_DT = Hour(6)
 const OUTPUT_VARIABLES_DICT = Dict{Symbol, AbstractOutputVariable}
 OutputVariablesDict() = OUTPUT_VARIABLES_DICT()
 
-# default compression
+const DEFAULT_MISSING_VALUE = NaN
 const DEFAULT_COMPRESSION_LEVEL = 1
 const DEFAULT_SHUFFLE = false
 const DEFAULT_KEEPBITS = 15
@@ -46,7 +46,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] output frequency, time step"
     output_dt::Second = Second(DEFAULT_OUTPUT_DT)
 
-    "[OPTION] which variables to output, u, v, vor, div, pres, temp, humid"
+    "[OPTION] dictionary of variables to output, e.g. u, v, vor, div, pres, temp, humid"
     variables::OUTPUT_VARIABLES_DICT = OutputVariablesDict()
 
     # TIME STEPS AND COUNTERS (initialize later)
@@ -64,6 +64,13 @@ $(TYPEDFIELDS)"""
     const grid3D::Grid3D
 end
 
+"""
+$(TYPEDSIGNATURES)
+Constructor for NetCDFOutput based on `S::SpectralGrid` and optionally
+the `Model` type (e.g. `ShallowWater`, `PrimitiveWet`) as second positional argument.
+The output grid is optionally determined by keyword arguments `output_Grid` (its type, full grid required),
+`nlat_half` (resolution) and `output_NF` (number format). By default, uses the full grid
+equivalent of the grid and resolution used in `SpectralGrid` `S`."""
 function NetCDFOutput(
     S::SpectralGrid,
     Model::Type{<:AbstractModel} = Barotropic;
@@ -113,18 +120,33 @@ function Base.show(io::IO, output::NetCDFOutput{Grid}) where Grid
     end
 end
 
+"""
+$(TYPEDSIGNATURES)
+Add `outputvariables` to a dictionary defining the variables subject to NetCDF output."""
 function add!(D::OUTPUT_VARIABLES_DICT, outputvariables::AbstractOutputVariable...)
-    for outputvariable in outputvariables
+    for outputvariable in outputvariables   # loop over all variables in arguments
         key = Symbol(outputvariable.name)   # use name as key::Symbol
         D[key] = outputvariable
     end
+    return D
 end
 
-add!(output::NetCDFOutput, outputvariables::AbstractOutputVariable...) =
+"""$(TYPEDSIGNATURES)
+Add `outputvariables` to the dictionary in `output::NetCDFOutput`, i.e. at `output.variables`."""
+function add!(output::NetCDFOutput, outputvariables::AbstractOutputVariable...)
     add!(output.variables, outputvariables...)
-add!(model::AbstractModel, outputvariables::AbstractOutputVariable...) =
-    add!(model.output, outputvariables...)
+    return output
+end
 
+"""$(TYPEDSIGNATURES)
+Add `outputvariables` to the dictionary in `output::NetCDFOutput` of `model`, i.e. at `model.output.variables`."""
+function add!(model::AbstractModel, outputvariables::AbstractOutputVariable...)
+    add!(model.output, outputvariables...)
+    return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Add default variables to output for a `Barotropic` model: Vorticity, zonal and meridional velocity."""
 function add_default!(
     output_variables::OUTPUT_VARIABLES_DICT,
     Model::Type{<:Barotropic},
@@ -132,6 +154,9 @@ function add_default!(
     add!(output_variables, VorticityOutput(), ZonalVelocityOutput(), MeridionalVelocityOutput())
 end
 
+"""$(TYPEDSIGNATURES)
+Add default variables to output for a `ShallowWater` model, same as for a `Barotropic` model but also
+the interface displacement."""
 function add_default!(
     variables::Dict{Symbol, AbstractOutputVariable},
     Model::Type{<:ShallowWater},
@@ -140,6 +165,9 @@ function add_default!(
     add!(variables, InterfaceDisplacementOutput())
 end
 
+"""$(TYPEDSIGNATURES)
+Add default variables to output for a `PrimitiveDry` model, same as for a `Barotropic` model but also
+the surface pressure and temperature."""
 function add_default!(
     variables::Dict{Symbol, AbstractOutputVariable},
     Model::Type{<:PrimitiveDry},
@@ -148,6 +176,9 @@ function add_default!(
     add!(variables, SurfacePressureOutput(), TemperatureOutput())
 end
 
+"""$(TYPEDSIGNATURES)
+Add default variables to output for a `PrimitiveWet` model, same as for a `PrimitiveDry` model but also
+the specific humidity."""
 function add_default!(
     variables::Dict{Symbol, AbstractOutputVariable},
     Model::Type{<:PrimitiveWet},
@@ -156,6 +187,9 @@ function add_default!(
     add!(variables, HumidityOutput())
 end
 
+"""$(TYPEDSIGNATURES)
+Initialize NetCDF `output` by creating a netCDF file and storing the initial conditions
+of `diagn` (and `progn`). To be called just before the first timesteps."""
 function initialize!(   
     output::NetCDFOutput{Grid2D, Grid3D, Interpolator},
     feedback::AbstractFeedback,
@@ -218,7 +252,8 @@ function initialize!(
     # VARIABLES, define every output variable in the netCDF file and write initial conditions
     output_NF = eltype(output.grid2D)
     for (key, var) in output.variables
-        attributes = Dict("long_name"=>var.long_name, "units"=>var.unit, "_FillValue"=>output_NF(var.missing_value))
+        missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
+        attributes = Dict("long_name"=>var.long_name, "units"=>var.unit, "_FillValue"=>output_NF(missing_value))
         dims = collect(dim for (dim, this_dim) in zip(all_dims, var.dims_xyzt) if this_dim)
 
         # pick defaults if compression 
@@ -229,28 +264,24 @@ function initialize!(
         output!(output, var, progn, diagn, model)
     end
 
-    # # also export parameters into run????/parameters.txt
-    # parameters_txt = open(joinpath(output.run_path, "parameters.txt"), "w")
-    # println(parameters_txt, model.spectral_grid)
-    # println(parameters_txt, model.planet)
-    # println(parameters_txt, model.atmosphere)
-    # println(parameters_txt, model.time_stepping)
-    # println(parameters_txt, model.output)
-    # println(parameters_txt, model.initial_conditions)
-    # println(parameters_txt, model.horizontal_diffusion)
-    # model isa Union{ShallowWater, PrimitiveEquation} && println(parameters_txt, model.implicit)
-    # model isa Union{ShallowWater, PrimitiveEquation} && println(parameters_txt, model.orography)
-    # close(parameters_txt)
+    # also export parameters into run????/parameters.txt
+    parameters_txt = open(joinpath(output.run_path, "parameters.txt"), "w")
+    for property in propertynames(model)
+        println("model.$property")
+        println(getfield(model, property,))
+        println()
+    end
+    close(parameters_txt)
 end
 
 Base.close(output::NetCDFOutput) = NCDatasets.close(output.netcdf_file)
-Base.close(::Nothing) = nothing
+Base.close(::Nothing) = nothing     # in case of no netCDF output nothing to close
 
 """
 $(TYPEDSIGNATURES)
-Writes the variables from `diagn` of time step `i` at time `time` into `outputter.netcdf_file`.
-Simply escapes for no netcdf output of if output shouldn't be written on this time step.
-Interpolates onto output grid and resolution as specified in `outputter`, converts to output
+Writes the variables from `progn` or `diagn` of time step `i` at time `time` into `output.netcdf_file`.
+Simply escapes for no netcdf output or if output shouldn't be written on this time step.
+Interpolates onto output grid and resolution as specified in `output`, converts to output
 number format, truncates the mantissa for higher compression and applies lossless compression."""
 function output!(
     output::NetCDFOutput,
@@ -286,6 +317,9 @@ function output!(
     return nothing
 end
 
+"""$(TYPEDSIGNATURES)
+Loop over every variable in `output.variables` to call the respective `output!` method
+to write into the `output.netcdf_file`."""
 function output!(
     output::NetCDFOutput,
     output_variables::OUTPUT_VARIABLES_DICT,
@@ -298,19 +332,56 @@ function output!(
     end
 end
 
+function Base.show(io::IO, outputvariable::AbstractOutputVariable)
+    print(io, "$(typeof(outputvariable)) <: SpeedyWeather.AbstractOutputVariable")
+    for field in propertynames(outputvariable)
+        value = getfield(outputvariable, field)
+        print(io, "\n├ $field::$(typeof(value)) = $value")
+    end
+end
+
 ## VORTICITY -------------
 
+"""Defines netCDF output of vorticity. Fields are
+$(TYPEDFIELDS)
+
+Custom variable output defined similarly with required
+fields marked, optional fields otherwise use defaults.
+Initialize with `VorticityOutput()` and non-default
+fields can always be passed on as keyword arguments,
+e.g. `VorticityOutput(long_name="relative vorticity", compression_level=0)`."""
 @kwdef mutable struct VorticityOutput <: AbstractOutputVariable
+
+    "[Required] short name of variable (unique) used in netCDF file and key for dictionary"
     name::String = "vor"
+
+    "[Required] unit of variable"
     unit::String = "s^-1"
+
+    "[Required] long name of variable used in netCDF file"
     long_name::String = "relative vorticity"
+
+    "[Required] NetCDF dimensions the variable uses, lon, lat, layer, time"
     dims_xyzt::NTuple{4, Bool} = (true, true, true, true)
+
+    "[Optional] missing value for the variable, if not specified uses NaN"
     missing_value::Float64 = NaN
+
+    "[Optional] compression level of the lossless compressor, 1=lowest/fastest, 9=highest/slowest, 3=default"
     compression_level::Int = 3
+
+    "[Optional] bitshuffle the data for compression, false = default"
     shuffle::Bool = true
+
+    "[Optional] number of mantissa bits to keep for compression (default: 15)"
     keepbits::Int = 5
 end
 
+"""$(TYPEDSIGNATURES)
+Output the vorticity field `vor` from `diagn.grid` into the netCDF file `output.netcdf_file`.
+Interpolates the vorticity field onto the output grid and resolution as specified in `output`.
+Method required for all output variables `<: AbstractOutputVariable` with dispatch over the
+second argument."""
 function output!(
     output::NetCDFOutput,
     variable::VorticityOutput,
@@ -318,19 +389,21 @@ function output!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    vor = output.grid3D
-    (; vor_grid) = diagn.grid
+    vor = output.grid3D             # use output grid, vorticity is 3D
+    (; vor_grid) = diagn.grid       # unpack vorticity from gridded diagnostic variables
     RingGrids.interpolate!(vor, vor_grid, output.interpolator)
 
     unscale!(vor, diagn.scale[])    # was vor*radius, back to vor
-    round!(vor, variable.keepbits)
-    i = output.output_counter
+    round!(vor, variable.keepbits)  # bitrounding for compression
+    i = output.output_counter       # write into timestep i
     output.netcdf_file[variable.name][:, :, :, i] = vor
     return nothing
 end
 
 ## U velocity -------------
 
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct ZonalVelocityOutput <: AbstractOutputVariable
     name::String = "u"
     unit::String = "m/s"
@@ -342,6 +415,9 @@ end
     keepbits::Int = 7
 end
 
+"""$(TYPEDSIGNATURES)
+`output!` method for `ZonalVelocityOutput` to write the zonal velocity field `u` from `diagn.grid`,
+see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
 function output!(
     output::NetCDFOutput,
     variable::ZonalVelocityOutput,
@@ -361,6 +437,8 @@ end
 
 ## V velocity -------------
 
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct MeridionalVelocityOutput <: AbstractOutputVariable
     name::String = "v"
     unit::String = "m/s"
@@ -372,6 +450,8 @@ end
     keepbits::Int = 7
 end
 
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
 function output!(
     output::NetCDFOutput,
     variable::MeridionalVelocityOutput,
@@ -391,6 +471,8 @@ end
 
 ## DIVERGENCE -------------
 
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct DivergenceOutput <: AbstractOutputVariable
     name::String = "div"
     unit::String = "s^-1"
@@ -402,6 +484,8 @@ end
     keepbits::Int = 5
 end
 
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
 function output!(
     output::NetCDFOutput,
     variable::DivergenceOutput,
@@ -422,6 +506,8 @@ end
 
 ## INTERFACE DISPLACEMENT -------------
 
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct InterfaceDisplacementOutput <: AbstractOutputVariable
     name::String = "eta"
     unit::String = "m"
@@ -433,6 +519,8 @@ end
     keepbits::Int = 7
 end
 
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
 function output!(
     output::NetCDFOutput,
     variable::InterfaceDisplacementOutput,
@@ -452,6 +540,8 @@ end
 
 ## SURFACE PRESSURE -------------
 
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct SurfacePressureOutput <: AbstractOutputVariable
     name::String = "pres"
     unit::String = "hPa"
@@ -463,6 +553,8 @@ end
     keepbits::Int = 12
 end
 
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
 function output!(
     output::NetCDFOutput,
     variable::SurfacePressureOutput,
@@ -486,6 +578,8 @@ end
 
 ## TEMPERATURE -------------
 
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct TemperatureOutput <: AbstractOutputVariable
     name::String = "temp"
     unit::String = "degC"
@@ -497,6 +591,8 @@ end
     keepbits::Int = 10
 end
 
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
 function output!(
     output::NetCDFOutput,
     variable::TemperatureOutput,
@@ -517,6 +613,8 @@ end
 
 ## HUMIDITY -------------
 
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct HumidityOutput <: AbstractOutputVariable
     name::String = "humid"
     unit::String = "kg/kg"
@@ -528,6 +626,8 @@ end
     keepbits::Int = 7
 end
 
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
 function output!(
     output::NetCDFOutput,
     variable::HumidityOutput,
@@ -547,6 +647,8 @@ end
 
 ## OROGRAPHY -------------
 
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct OrographyOutput <: AbstractOutputVariable
     name::String = "orography"
     unit::String = "m"
@@ -555,9 +657,11 @@ end
     missing_value::Float64 = NaN
     compression_level::Int = DEFAULT_COMPRESSION_LEVEL
     shuffle::Bool = DEFAULT_SHUFFLE
-    keepbits::Int = Base.significand_bits(NF)
+    keepbits::Int = 15
 end
 
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
 function output!(
     output::NetCDFOutput,
     variable::OrographyOutput,
@@ -579,6 +683,8 @@ end
 
 ## PRECIPITATION -------------
 
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct ConvectivePrecipitationOutput <: AbstractOutputVariable
     name::String = "precip_conv"
     unit::String = "mm/hr"
@@ -590,6 +696,8 @@ end
     keepbits::Int = 7
 end
 
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
 function output!(
     output::NetCDFOutput,
     variable::ConvectivePrecipitationOutput,
@@ -614,6 +722,8 @@ function output!(
     return nothing
 end
 
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct LargeScalePrecipitationOutput <: AbstractOutputVariable
     name::String = "precip_cond"
     unit::String = "mm/hr"
@@ -625,6 +735,8 @@ end
     keepbits::Int = 7
 end
 
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
 function output!(
     output::NetCDFOutput,
     variable::LargeScalePrecipitationOutput,
@@ -651,6 +763,8 @@ end
 
 ## CLOUDS -------------
 
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct CloudTopOutput <: AbstractOutputVariable
     name::String = "cloud_top"
     unit::String = "m"
@@ -662,6 +776,8 @@ end
     keepbits::Int = 7
 end
 
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
 function output!(
     output::NetCDFOutput,
     variable::CloudTopOutput,

@@ -61,6 +61,7 @@ export  FullClenshawGrid, FullClenshawArray,
         HEALPixGrid, HEALPixArray,
         OctaHEALPixGrid, OctaHEALPixArray,
         eachring, eachgrid, plot
+export  AnvilInterpolator
 
 include("RingGrids/RingGrids.jl")
 using .RingGrids
