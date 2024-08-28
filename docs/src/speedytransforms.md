@@ -178,7 +178,7 @@ to
 We now wrap this matrix
 therefore to associate it with the necessary grid information
 ```@example speedytransforms
-map = FullClenshawGrid(m)
+map = FullClenshawGrid(m, input_as=Matrix)
 
 using CairoMakie
 heatmap(map)
