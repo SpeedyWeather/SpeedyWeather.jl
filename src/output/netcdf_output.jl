@@ -184,7 +184,7 @@ function add_default!(
     Model::Type{<:PrimitiveWet},
 )
     add_default!(variables, PrimitiveDry)
-    add!(variables, HumidityOutput())
+    add!(variables, HumidityOutput(), ConvectivePrecipitationOutput(), LargeScalePrecipitationOutput(), CloudTopOutput())
 end
 
 """$(TYPEDSIGNATURES)
