@@ -27,7 +27,7 @@ Base.@kwdef struct SeasonalLandTemperature{NF, Grid<:AbstractGrid{NF}} <: Abstra
     varname::String = "lst"
 
     "Grid the land surface temperature file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid{NF}
 
     "The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
@@ -129,7 +129,7 @@ Base.@kwdef struct SeasonalSoilMoisture{NF, Grid<:AbstractGrid{NF}} <: AbstractS
     varname_layer2::String = "swl2"
 
     "Grid the soil moisture file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid{NF}
 
     "The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
@@ -197,7 +197,7 @@ Base.@kwdef struct VegetationClimatology{NF, Grid<:AbstractGrid{NF}} <: Abstract
     varname_vegl::String = "vegl"
 
     "Grid the soil moisture file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
+    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid{NF}
 
     "The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
@@ -227,8 +227,8 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
     ncfile = NCDataset(path)
 
     # high and low vegetation cover
-    vegh = vegetation.file_Grid(ncfile[vegetation.varname_vegh][:, :])
-    vegl = vegetation.file_Grid(ncfile[vegetation.varname_vegl][:, :])
+    vegh = vegetation.file_Grid(ncfile[vegetation.varname_vegh][:, :], input_as=Matrix)
+    vegl = vegetation.file_Grid(ncfile[vegetation.varname_vegl][:, :], input_as=Matrix)
 
     # interpolate onto grid
     high_vegetation_cover = vegetation.high_cover

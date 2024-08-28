@@ -19,15 +19,28 @@ matrix_size(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer) =
 
 ## CONVERSION
 # convert an AbstractMatrix to the full grids, and vice versa
-function (Grid::Type{<:AbstractFullGrid})(M::AbstractArray) 
+"""
+($TYPEDSIGNATURES)
+Initialize an instance of the grid from an Array. If `input_as==Vector` this leading dimension is 
+interpreted as a flat vector of all horizontal entries in one layer. If `input_as==Matrx` the first
+two leading dimensions are interpreted as longitute and latitude. This is only possible for full 
+grids that are a subtype of `AbstractFullGridArray`.
+"""
+(Grid::Type{<:AbstractFullGridArray})(M::AbstractArray; input_as=Vector) = Grid(M, input_as)
+
+function (Grid::Type{<:AbstractFullGridArray})(M::AbstractArray, input_as::Type{Matrix})
     M_flat = reshape(M, :, size(M)[3:end]...) # identical to vec(M) for M <: AbstractMatrix
     npoints2D = size(M_flat, 1)
     nlat_half = get_nlat_half(Grid, npoints2D)  # get nlat_half of Grid
     Grid(M_flat, nlat_half)
 end 
+
 Base.Array(grid::AbstractFullGridArray) = Array(reshape(grid.data, :, get_nlat(grid), size(grid.data)[2:end]...))
 Base.Matrix(grid::AbstractFullGridArray) = Array(grid)
 
+function full_grid_from_matrix(Grid::Type{<:AbstractFullGridArray{T,N}}, M::AbstractArray{S,N2}) where {T,S,N,N2}
+   
+end 
 ## INDEXING
 
 """$(TYPEDSIGNATURES) `UnitRange` for every grid point of grid `Grid` of resolution `nlat_half`

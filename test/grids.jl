@@ -205,20 +205,22 @@ end
 
 @testset "FullGrids conversions to/from Arrays" begin 
     for idims in ((), (5,), (5,5))
+        NF = Float64
+        N = length(idims)+1
         data = rand(8,4, idims...)
-        grid = FullGaussianGrid(data)
+        grid = FullGaussianArray(data, input_as=Matrix)
         @test Array(grid) == data
 
         data = rand(8,3, idims...)
-        grid = FullClenshawGrid(data)
+        grid = FullClenshawArray(data, input_as=Matrix)
         @test Array(grid) == data
 
         data = rand(8,3, idims...)
-        grid = FullHEALPixGrid(data)
+        grid = FullHEALPixArray(data, input_as=Matrix)
         @test Array(grid) == data
 
         data = rand(8,3, idims...)
-        grid = FullOctaHEALPixGrid(data)
+        grid = FullOctaHEALPixArray(data, input_as=Matrix)
         @test Array(grid) == data
     end   
 end 
