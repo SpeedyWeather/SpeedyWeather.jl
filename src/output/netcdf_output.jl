@@ -114,9 +114,10 @@ function Base.show(io::IO, output::NetCDFOutput{Grid}) where Grid
     println(io, "├ interpolator: $(typeof(output.interpolator))")
     println(io, "├ path: $(joinpath(output.run_path, output.filename))")
     println(io, "├ frequency: $(output.output_dt)")
-    println(io, "└┐ variables:")
-    for (key, var) in output.variables
-        println(io, " ├ $key: $(var.long_name) [$(var.unit)]")
+    print(io,   "└┐ variables:")
+    nvars = length(output.variables)
+    for (i, (key, var)) in enumerate(output.variables)
+        print(io, "\n $(i==nvars ? "└" : "├") $key: $(var.long_name) [$(var.unit)]")
     end
 end
 
