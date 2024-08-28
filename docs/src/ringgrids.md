@@ -52,7 +52,7 @@ grid.data
 ```
 Which can be reshaped to reobtain `map` from above. Alternatively you can `Matrix(grid)` to do this in one step
 ```@example ringgrids
-map == Matrix(FullGaussianGrid{Float32}(map))
+map == Matrix(FullGaussianGrid(map))
 ```
 You can also use `zeros`, `ones`, `rand`, `randn` to create a grid, whereby `nlat_half`, i.e. the number of latitude
 rings on one hemisphere, Equator included, is used as a resolution parameter and here as a second argument.
