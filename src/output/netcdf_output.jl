@@ -345,10 +345,9 @@ end
 """Defines netCDF output of vorticity. Fields are
 $(TYPEDFIELDS)
 
-Custom variable output defined similarly with required
-fields marked, optional fields otherwise use defaults.
-Initialize with `VorticityOutput()` and non-default
-fields can always be passed on as keyword arguments,
+Custom variable output defined similarly with required fields marked,
+optional fields otherwise use variable-independent defaults. Initialize with `VorticityOutput()`
+and non-default fields can always be passed on as keyword arguments,
 e.g. `VorticityOutput(long_name="relative vorticity", compression_level=0)`."""
 @kwdef mutable struct VorticityOutput <: AbstractOutputVariable
 
@@ -706,7 +705,7 @@ function output!(
     model::AbstractModel,
 )
     precip = output.grid2D
-    (; precip_convection) = diagn.grid.physics
+    (; precip_convection) = diagn.physics
     RingGrids.interpolate!(precip, precip_convection, output.interpolator)
     
     # after output set precip accumulator back to zero
@@ -745,7 +744,7 @@ function output!(
     model::AbstractModel,
 )
     precip = output.grid2D
-    (; precip_large_scale) = diagn.grid.physics
+    (; precip_large_scale) = diagn.physics
     RingGrids.interpolate!(precip, precip_large_scale, output.interpolator)
 
     # after output set precip accumulator back to zero
@@ -786,7 +785,7 @@ function output!(
     model::AbstractModel,
 )
     cloud = output.grid2D
-    (; cloud_top) = diagn.grid.physics
+    (; cloud_top) = diagn.physics
     RingGrids.interpolate!(cloud, cloud_top, output.interpolator)
 
     round!(cloud, variable.keepbits)
