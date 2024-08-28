@@ -267,9 +267,8 @@ function initialize!(
     # also export parameters into run????/parameters.txt
     parameters_txt = open(joinpath(output.run_path, "parameters.txt"), "w")
     for property in propertynames(model)
-        println("model.$property")
-        println(getfield(model, property,))
-        println()
+        println(parameters_txt, "model.$property")
+        println(parameters_txt, getfield(model, property,), "\n")
     end
     close(parameters_txt)
 end
