@@ -146,7 +146,7 @@ From the netCDF file you need to use the longitude and latitude dimensions.
 
 So we can also just do
 ```@example galewsky_setup
-vor_grid = FullGaussianGrid(vor)
+vor_grid = FullGaussianGrid(vor, input_as=Matrix)
 
 using CairoMakie    # this will load the extension so that Makie can plot grids directly
 heatmap(vor_grid, title="Relative vorticity [1/s]")
