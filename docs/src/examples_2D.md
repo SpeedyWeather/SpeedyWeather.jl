@@ -142,9 +142,11 @@ and then plotted via `heatmap(lon, lat, vor)`. While you can do that to give you
 on the plotting, SpeedyWeather.jl also defines an extension for Makie.jl, see [Extensions](@ref).
 Because if our matrix `vor` here was an `AbstractGrid` (see [RingGrids](@ref)) then all
 its geographic information (which grid point is where) would directly be encoded in the type.
-From the netCDF file you need to use the longitude and latitude dimensions.
+From the netCDF file, however, you would need to use the longitude and latitude dimensions.
 
-So we can also just do
+So we can also just do (`input_as=Matrix` here as all our grids use and expect a horizontal dimension
+flattened into a vector by default)
+
 ```@example galewsky_setup
 vor_grid = FullGaussianGrid(vor, input_as=Matrix)
 
