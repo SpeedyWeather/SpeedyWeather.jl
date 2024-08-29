@@ -27,7 +27,7 @@ Base.@kwdef struct SeasonalLandTemperature{NF, Grid<:AbstractGrid{NF}} <: Abstra
     varname::String = "lst"
 
     "Grid the land surface temperature file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid{NF}
+    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
