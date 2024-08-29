@@ -76,7 +76,7 @@ function initialize!(   progn::PrognosticVariables{NF},
         end
     end
 
-    ξ = repeat(ξ, 1, model.spectral_grid.nlev) # repeat for each level to have the same IC across all vertical layers
+    ξ = repeat(ξ, 1, model.spectral_grid.nlayers) # repeat for each level to have the same IC across all vertical layers
     
     set!(progn, model; vor=ξ, lf=1)
 end
@@ -479,7 +479,7 @@ function initialize!(   progn::PrognosticVariables,
         lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹
     end
     
-    set!(progn; pres=lnp_grid, lf=1)
+    set!(progn, model; pres=lnp_grid, lf=1)
 
     return nothing
 end
@@ -495,7 +495,7 @@ function initialize!(   progn::PrognosticVariables,
     
     # logarithm of reference surface pressure [log(Pa)]
     # set the l=m=0 mode, normalize correctly
-    set!(progn; pres=log(pres_ref) * norm_sphere)
+    set!(progn, model; pres=log(pres_ref) * norm_sphere)
 
     return nothing
 end

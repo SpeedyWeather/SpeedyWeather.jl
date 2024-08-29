@@ -254,9 +254,10 @@ function set!(var::LowerTriangularArray{T}, L::LowerTriangularArray, varargs...;
             var .+= L_var
         end 
     else 
+        size(var) != size(L) || fill!(var, zero(T)) # copyto! copies over the largest subset, when size(var) > size(L), the copyto! isn't enough by itself
         copyto!(var, L)
-        #Q: additional truncate here to be safe?
     end 
+    return var
 end 
 
 # set LTA <- Grid 
@@ -267,7 +268,7 @@ end
 
 # set LTA <- func 
 function set!(var::LowerTriangularArray, f::Function, geometry::Geometry{NF}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where NF
-    grid = ndims(var) == 1 ? zeros(geometry.Grid{NF}, geometry.nlat_half) : zeros(geometry.Grid{NF}, geometry.nlat_half, geometry.nlev)
+    grid = ndims(var) == 1 ? zeros(geometry.Grid{NF}, geometry.nlat_half) : zeros(geometry.Grid{NF}, geometry.nlat_half, geometry.nlayers)
     set!(grid, f, geometry, S; add=false)
     set!(var, grid, geometry, S; add)
 end
@@ -281,10 +282,8 @@ function set!(var::LowerTriangularArray{T}, s::Number, geometry::Geometry{NF}, S
     # all elements are zero except for the 0,0 one
     var_new = zero(var)
 
-    if ndims(var) == 1 
-        var_new[1] = norm_sphere * s
-    else 
-        var_new[1,:] .= norm_sphere * s 
+    for k in eachmatrix(var_new)
+        var_new[1, k] = norm_sphere * s
     end 
 
     set!(var, var_new, geometry, S; add)
@@ -301,6 +300,7 @@ function set!(var::AbstractGridArray, grids::AbstractGridArray, geometry::Geomet
     else 
         interpolate!(var, grids)
     end 
+    return var 
 end 
 
 # set Grid <- LTA
@@ -318,6 +318,7 @@ function set!(var::AbstractGridArray, f::Function, geometry::Geometry, S::Union{
             var[ij, k] = kernel(var[ij, k], f(londs[ij], latds[ij], σ_levels_full[k]))
         end
     end
+    return var
 end
 
 # set Grid (surface/single level) <- Func
@@ -327,6 +328,7 @@ function set!(var::AbstractGridArray{T,1}, f::Function, geometry::Geometry, S::U
     for ij in eachgridpoint(var)
         var[ij] = kernel(var[ij], f(londs[ij], latds[ij]))
     end
+    return var
 end
 
 # set Grid <- Number 
@@ -383,4 +385,4 @@ function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::Lo
 end 
 
 set!(S::AbstractSimulation; kwargs...) = set!(S.prognostic_variables, S.model.geometry; S=S.model.spectral_transform, kwargs...)
-set!(progn::PrognosticVariables, model::ModelSetup; kwargs...) = set!(progn, model.geometry; S=mode.spectral_transform, kwargs...)
+set!(progn::PrognosticVariables, model::AbstractModel; kwargs...) = set!(progn, model.geometry; S=model.spectral_transform, kwargs...)

@@ -5,7 +5,7 @@ import SpeedyWeather: set!
 
     N_lev = 8 
     N_trunc = 31
-    spectral_grid = SpectralGrid(trunc=N_trunc, nlev=N_lev) # define resolution
+    spectral_grid = SpectralGrid(trunc=N_trunc, nlayers=N_lev) # define resolution
     model = PrimitiveWetModel(; spectral_grid)              # construct model
     simulation = initialize!(model)                         # initialize all model components
  
