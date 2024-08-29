@@ -46,7 +46,7 @@ function run!(  simulation::AbstractSimulation;
     initialize!(clock, model.time_stepping) # store the start date, reset counter
 
     # OUTPUT
-    model.output.output = output            # enable/disable output
+    model.output.active = output            # enable/disable output
 
     # run it, yeah!
     time_stepping!(prognostic_variables, diagnostic_variables, model)

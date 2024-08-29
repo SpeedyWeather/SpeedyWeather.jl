@@ -61,6 +61,7 @@ export  FullClenshawGrid, FullClenshawArray,
         HEALPixGrid, HEALPixArray,
         OctaHEALPixGrid, OctaHEALPixArray,
         eachring, eachgrid, plot
+export  AnvilInterpolator
 
 include("RingGrids/RingGrids.jl")
 using .RingGrids
@@ -139,7 +140,8 @@ include("physics/land.jl")
 
 # OUTPUT
 include("output/schedule.jl")
-include("output/output.jl")
+include("output/netcdf_output.jl")
+include("output/restart_file.jl")
 include("output/feedback.jl")
 include("output/plot.jl")
 include("output/callbacks.jl")

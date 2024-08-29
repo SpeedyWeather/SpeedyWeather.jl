@@ -215,7 +215,7 @@ function first_timesteps!(
     timestep!(clock, Δt_millisec) 
     
     # do output and callbacks after the first proper (from i=0 to i=1) time step
-    write_output!(model.output, clock.time, diagn)
+    output!(model.output, progn, diagn, model)
     callback!(model.callbacks, progn, diagn, model)
 
     # from now on precomputed implicit terms with 2Δt
@@ -337,7 +337,6 @@ function time_stepping!(
     
     (; clock) = progn
     (; Δt, Δt_millisec) = model.time_stepping
-    (; time_stepping) = model
 
     # SCALING: we use vorticity*radius, divergence*radius in the dynamical core
     scale!(progn, diagn, model.spectral_grid.radius)
@@ -348,7 +347,7 @@ function time_stepping!(
     lf = 1                                  # use first leapfrog index
     transform!(diagn, progn, lf, model, initialize=true)
     initialize!(progn.particles, progn, diagn, model.particle_advection)
-    initialize!(output, feedback, time_stepping, clock, diagn, model)
+    initialize!(output, feedback, progn, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)
     
     # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
@@ -364,7 +363,7 @@ function time_stepping!(
         timestep!(clock, Δt_millisec)       # time of lf=2 and diagn after timestep!
 
         progress!(feedback, progn)          # updates the progress meter bar
-        write_output!(output, clock.time, diagn)
+        output!(output, progn, diagn, model)
         callback!(model.callbacks, progn, diagn, model)
     end
     
@@ -373,7 +372,7 @@ function time_stepping!(
     unscale!(progn)                         # undo radius-scaling for vor, div from the dynamical core
     unscale!(diagn)                         # undo radius-scaling for vor, div from the dynamical core
     close(output)                           # close netCDF file
-    write_restart_file(progn, output)       # as JLD2 
+    write_restart_file(output, progn)       # as JLD2 
     finish!(model.callbacks, progn, diagn, model)
 
     # return a UnicodePlot of surface vorticity

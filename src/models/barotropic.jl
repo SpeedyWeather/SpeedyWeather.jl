@@ -49,7 +49,7 @@ Base.@kwdef mutable struct BarotropicModel{
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid, Barotropic)
+    output::OW = NetCDFOutput(spectral_grid, Barotropic)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end

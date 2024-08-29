@@ -87,7 +87,7 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
     
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid, PrimitiveDry)
+    output::OW = NetCDFOutput(spectral_grid, PrimitiveDry)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
