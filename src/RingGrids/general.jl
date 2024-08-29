@@ -438,7 +438,14 @@ function Base.similar(bc::Broadcasted{AbstractGridArrayStyle{N, Grid}}, ::Type{T
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-AbstractGridArrayStyle{N, Grid}(::Val{M}) where {N, Grid, M} = AbstractGridArrayStyle{N, Grid}()
+# when there's a dimension mismatch always choose the larger dimension
+AbstractGridArrayStyle{N, Grid}(::Val{N}) where {N, Grid} = AbstractGridArrayStyle{N, Grid}()
+AbstractGridArrayStyle{1, Grid}(::Val{2}) where {Grid} = AbstractGridArrayStyle{2, Grid}()
+AbstractGridArrayStyle{1, Grid}(::Val{0}) where {Grid} = AbstractGridArrayStyle{1, Grid}()
+AbstractGridArrayStyle{2, Grid}(::Val{3}) where {Grid} = AbstractGridArrayStyle{3, Grid}()
+AbstractGridArrayStyle{2, Grid}(::Val{1}) where {Grid} = AbstractGridArrayStyle{2, Grid}()
+AbstractGridArrayStyle{3, Grid}(::Val{4}) where {Grid} = AbstractGridArrayStyle{4, Grid}()
+AbstractGridArrayStyle{3, Grid}(::Val{2}) where {Grid} = AbstractGridArrayStyle{3, Grid}()
 
 ## GPU
 struct AbstractGPUGridArrayStyle{N, ArrayType, Grid} <: GPUArrays.AbstractGPUArrayStyle{N} end
@@ -450,9 +457,17 @@ function Base.BroadcastStyle(
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-AbstractGPUGridArrayStyle{N, ArrayType, Grid}(::Val{M}) where {N, ArrayType, Grid, M} =
+# when there's a dimension mismatch always choose the larger dimension
+AbstractGPUGridArrayStyle{N, ArrayType, Grid}(::Val{N}) where {N, ArrayType, Grid} =
     AbstractGPUGridArrayStyle{N, ArrayType, Grid}()
 
+AbstractGPUGridArrayStyle{1, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{1, ArrayType, Grid}(::Val{0}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{1, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{3}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{1}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{4}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{4, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
+    
 function GPUArrays.backend(
     ::Type{Grid}
 ) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
