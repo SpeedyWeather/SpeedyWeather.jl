@@ -197,7 +197,7 @@ Base.@kwdef struct VegetationClimatology{NF, Grid<:AbstractGrid{NF}} <: Abstract
     varname_vegl::String = "vegl"
 
     "Grid the soil moisture file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid{NF}
+    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)

@@ -38,11 +38,7 @@ end
 Base.Array(grid::AbstractFullGridArray) = Array(reshape(grid.data, :, get_nlat(grid), size(grid.data)[2:end]...))
 Base.Matrix(grid::AbstractFullGridArray) = Array(grid)
 
-function full_grid_from_matrix(Grid::Type{<:AbstractFullGridArray{T,N}}, M::AbstractArray{S,N2}) where {T,S,N,N2}
-   
-end 
 ## INDEXING
-
 """$(TYPEDSIGNATURES) `UnitRange` for every grid point of grid `Grid` of resolution `nlat_half`
 on ring `j` (`j=1` is closest ring around north pole, `j=nlat` around south pole)."""
 function each_index_in_ring(
