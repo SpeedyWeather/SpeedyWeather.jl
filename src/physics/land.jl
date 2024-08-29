@@ -129,7 +129,7 @@ Base.@kwdef struct SeasonalSoilMoisture{NF, Grid<:AbstractGrid{NF}} <: AbstractS
     varname_layer2::String = "swl2"
 
     "Grid the soil moisture file comes on"
-    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid{NF}
+    file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
