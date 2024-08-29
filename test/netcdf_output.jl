@@ -102,8 +102,8 @@ end
     period = Day(1)
 
     # test also output at various resolutions
+    spectral_grid = SpectralGrid(nlayers=8)
     for output_dt in (Hour(1), Minute(120), Hour(3), Hour(6), Day(1))
-        spectral_grid = SpectralGrid(nlayers=8)
         output = NetCDFOutput(spectral_grid, PrimitiveWet, path=tmp_output_path; output_dt)
         model = PrimitiveWetModel(; spectral_grid, output)
         simulation = initialize!(model)
