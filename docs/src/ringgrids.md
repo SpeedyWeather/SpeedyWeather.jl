@@ -44,6 +44,10 @@ map = randn(Float32, 8, 4)
 ```@example ringgrids
 grid = FullGaussianGrid(map, input_as=Matrix)
 ```
+Note that `input_as=Matrix` is necessary as, RingGrids have a flattened horizontal dimension into a vector.
+To distinguish the 2nd horizontal dimension from a possible vertical dimension the keyword argument here
+is required.
+
 A full Gaussian grid has always ``2N`` x ``N`` grid points, but a `FullClenshawGrid` has ``2N`` x ``N-1``,
 if those dimensions don't match, the creation will throw an error. To reobtain the data from a grid,
 you can access its `data` field which returns a normal `Vector`
