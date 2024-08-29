@@ -77,6 +77,7 @@ function NetCDFOutput(
     output_Grid::Type{<:AbstractFullGrid} = RingGrids.full_grid_type(S.Grid),
     nlat_half::Integer = S.nlat_half, 
     output_NF::DataType = DEFAULT_OUTPUT_NF,
+    output_dt::Period = Second(DEFAULT_OUTPUT_DT),  # only needed for dispatch
     kwargs...)
 
     # INPUT GRID
@@ -99,6 +100,7 @@ function NetCDFOutput(
     grid3D = output_Grid3D(undef, nlat_half, nlayers)
 
     output = NetCDFOutput(;
+        output_dt=Second(output_dt),    # convert to seconds for dispatch
         interpolator,
         grid2D,
         grid3D,
@@ -144,6 +146,16 @@ Add `outputvariables` to the dictionary in `output::NetCDFOutput` of `model`, i.
 function add!(model::AbstractModel, outputvariables::AbstractOutputVariable...)
     add!(model.output, outputvariables...)
     return nothing
+end
+
+"""$(TYPEDSIGNATURES)
+Delete output variables from `output` by their (short name) (Symbol or String), corresponding
+to the keys in the dictionary."""
+function Base.delete!(output::NetCDFOutput, keys::Union{String, Symbol}...)
+    for key in keys
+        delete!(output.variables, Symbol(key))
+    end
+    return output
 end
 
 """$(TYPEDSIGNATURES)
