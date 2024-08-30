@@ -21,18 +21,17 @@ matrix_size(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer) =
 # convert an AbstractMatrix to the full grids, and vice versa
 """
 ($TYPEDSIGNATURES)
-Initialize an instance of the grid from an Array. If `input_as==Vector` this leading dimension is 
-interpreted as a flat vector of all horizontal entries in one layer. If `input_as==Matrx` the first
-two leading dimensions are interpreted as longitute and latitude. This is only possible for full 
-grids that are a subtype of `AbstractFullGridArray`.
+Initialize an instance of the grid from an Array. For keyword argument `input_as=Vector` (default)
+the leading dimension is interpreted as a flat vector of all horizontal entries in one layer.
+For `input_as==Matrx` the first two leading dimensions are interpreted as longitute and latitude.
+This is only possible for full grids that are a subtype of `AbstractFullGridArray`.
 """
 (Grid::Type{<:AbstractFullGridArray})(M::AbstractArray; input_as=Vector) = Grid(M, input_as)
 
 function (Grid::Type{<:AbstractFullGridArray})(M::AbstractArray, input_as::Type{Matrix})
-    M_flat = reshape(M, :, size(M)[3:end]...) # identical to vec(M) for M <: AbstractMatrix
-    npoints2D = size(M_flat, 1)
-    nlat_half = get_nlat_half(Grid, npoints2D)  # get nlat_half of Grid
-    Grid(M_flat, nlat_half)
+    # flatten the two horizontal dimensions into one, identical to vec(M) for M <: AbstractMatrix
+    M_flat = reshape(M, :, size(M)[3:end]...)
+    Grid(M_flat)
 end 
 
 Base.Array(grid::AbstractFullGridArray) = Array(reshape(grid.data, :, get_nlat(grid), size(grid.data)[2:end]...))
