@@ -117,11 +117,17 @@ function (::Type{Grid})(data::AbstractArray, nlat_half::Integer) where {Grid<:Ab
 end
 
 # if no nlat_half provided calculate it
-function (::Type{Grid})(data::AbstractArray) where {Grid<:AbstractGridArray}
+(::Type{Grid})(M::AbstractArray; input_as=Vector) where Grid<:AbstractGridArray = Grid(M, input_as)
+
+function (::Type{Grid})(data::AbstractArray, input_as::Type{Vector}) where Grid<:AbstractGridArray
     npoints2D = size(data, 1)                   # from 1st dim of data
     nlat_half = get_nlat_half(Grid, npoints2D)  # get nlat_half of Grid
     return Grid(data, nlat_half)
 end
+
+function (::Type{Grid})(data::AbstractArray, input_as::Type{Matrix})  where Grid<:AbstractGridArray
+    error("Only full grids can be created from matrix input")
+end 
 
 for f in (:zeros, :ones, :rand, :randn)
     @eval begin

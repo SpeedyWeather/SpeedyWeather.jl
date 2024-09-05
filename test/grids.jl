@@ -203,6 +203,28 @@ end
     end
 end
 
+@testset "FullGrids conversions to/from Arrays" begin 
+    for idims in ((), (5,), (5,5))
+        NF = Float64
+        N = length(idims)+1
+        data = rand(8,4, idims...)
+        grid = FullGaussianArray(data, input_as=Matrix)
+        @test Array(grid) == data
+
+        data = rand(8,3, idims...)
+        grid = FullClenshawArray(data, input_as=Matrix)
+        @test Array(grid) == data
+
+        data = rand(8,3, idims...)
+        grid = FullHEALPixArray(data, input_as=Matrix)
+        @test Array(grid) == data
+
+        data = rand(8,3, idims...)
+        grid = FullOctaHEALPixArray(data, input_as=Matrix)
+        @test Array(grid) == data
+    end   
+end 
+
 @testset "Grid indices" begin
     for G in (  FullClenshawGrid,
                 FullGaussianGrid,
