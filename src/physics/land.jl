@@ -13,7 +13,7 @@ Base.@kwdef struct SeasonalLandTemperature{NF, Grid<:AbstractGrid{NF}} <: Abstra
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
 
-    # OPTIONS
+    # OPTIONS
     "Time step used to update land surface temperatures"
     Δt::Dates.Day = Dates.Day(3)
 
@@ -32,7 +32,7 @@ Base.@kwdef struct SeasonalLandTemperature{NF, Grid<:AbstractGrid{NF}} <: Abstra
     "The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
 
-    # to be filled from file
+    # to be filled from file
     "Monthly land surface temperatures [K], interpolated onto Grid"
     monthly_temperature::Vector{Grid} = [zeros(Grid, nlat_half) for _ in 1:12]
 end
@@ -70,7 +70,7 @@ function land_timestep!(land::PrognosticVariablesLand{NF},
                         initialize::Bool = false) where NF
 
     # escape immediately if Δt of land model hasn't passed yet
-    # unless the land hasn't been initialized yet
+    # unless the land hasn't been initialized yet
     initialize || (time - land.time) < land_model.Δt && return false    # = executed
 
     # otherwise update land prognostic variables:
@@ -79,7 +79,7 @@ function land_timestep!(land::PrognosticVariablesLand{NF},
     next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
 
     # linear interpolation weight between the two months
-    # TODO check whether this shifts the climatology by 1/2 a month
+    # TODO check whether this shifts the climatology by 1/2 a month
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
     (; monthly_temperature) = land_model
@@ -104,7 +104,7 @@ Base.@kwdef struct SeasonalSoilMoisture{NF, Grid<:AbstractGrid{NF}} <: AbstractS
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
 
-    # OPTIONS
+    # OPTIONS
     "Depth of top soil layer [m]"
     D_top::Float64 = 0.07
 
@@ -117,7 +117,7 @@ Base.@kwdef struct SeasonalSoilMoisture{NF, Grid<:AbstractGrid{NF}} <: AbstractS
     "Soil wetness at wilting point [volume fraction]"
     W_wilt::Float64 = 0.17
 
-    # READ CLIMATOLOGY FROM FILE
+    # READ CLIMATOLOGY FROM FILE
     "path to the folder containing the soil moisture file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -134,7 +134,7 @@ Base.@kwdef struct SeasonalSoilMoisture{NF, Grid<:AbstractGrid{NF}} <: AbstractS
     "The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
 
-    # to be filled from file
+    # to be filled from file
     "Monthly soil moisture volume fraction [1], top layer, interpolated onto Grid"
     monthly_soil_moisture_layer1::Vector{Grid} = [zeros(Grid, nlat_half) for _ in 1:12]
 
@@ -161,7 +161,7 @@ function soil_timestep!(land::PrognosticVariablesLand{NF},
     next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
 
     # linear interpolation weight between the two months
-    # TODO check whether this shifts the climatology by 1/2 a month
+    # TODO check whether this shifts the climatology by 1/2 a month
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
     (; monthly_soil_moisture_layer1, monthly_soil_moisture_layer2) = soil_model
@@ -182,7 +182,7 @@ Base.@kwdef struct VegetationClimatology{NF, Grid<:AbstractGrid{NF}} <: Abstract
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
 
-    # OPTIONS
+    # OPTIONS
     "Combine high and low vegetation factor, a in high + a*low [1]"
     low_veg_factor::Float64 = 0.8
 
@@ -202,7 +202,7 @@ Base.@kwdef struct VegetationClimatology{NF, Grid<:AbstractGrid{NF}} <: Abstract
     "The missing value in the data respresenting ocean"
     missing_value::NF = NF(NaN)
 
-    # to be filled from file
+    # to be filled from file
     "High vegetation cover [1], interpolated onto Grid"
     high_cover::Grid = zeros(Grid, nlat_half)
 
@@ -227,8 +227,8 @@ function initialize!(vegetation::VegetationClimatology, model::PrimitiveEquation
     ncfile = NCDataset(path)
 
     # high and low vegetation cover
-    vegh = vegetation.file_Grid(ncfile[vegetation.varname_vegh][:, :])
-    vegl = vegetation.file_Grid(ncfile[vegetation.varname_vegl][:, :])
+    vegh = vegetation.file_Grid(ncfile[vegetation.varname_vegh].var[:, :], input_as=Matrix)
+    vegl = vegetation.file_Grid(ncfile[vegetation.varname_vegl].var[:, :], input_as=Matrix)
 
     # interpolate onto grid
     high_vegetation_cover = vegetation.high_cover
@@ -277,7 +277,7 @@ function soil_moisture_availability!(
                             soil_moisture_layer2,
                             high_cover, low_cover)
         
-        # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
+        # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
         veg = max(0, high_cover[ij] + low_veg_factor*low_cover[ij])
 
         # Fortran SPEEDY documentation eq. 51
