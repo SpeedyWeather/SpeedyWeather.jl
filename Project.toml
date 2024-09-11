@@ -30,12 +30,12 @@ TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [weakdeps]
-Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [extensions]
-SpeedyWeatherMakieExt = "Makie"
 SpeedyWeatherJLArraysExt = "JLArrays"
+SpeedyWeatherMakieExt = "Makie"
 
 [compat]
 AbstractFFTs = "1"
@@ -52,7 +52,7 @@ FastGaussQuadrature = "0.4, 0.5, 1"
 GPUArrays = "10"
 GenericFFT = "0.1"
 JLArrays = "0.1.4"
-JLD2 = "0.4"
+JLD2 = "0.4, 0.5"
 KernelAbstractions = "0.9"
 LinearAlgebra = "1.9"
 Makie = "0.20, 0.21"
