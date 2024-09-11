@@ -111,7 +111,7 @@ end
             n = 4      # resolution parameter nlat_half
             G1 = zeros(G{NF}, n)
             G2 = zero(G1)
-            G3 = G(G2)
+            G3 = G(G2.data)
 
             @test G1 == G2
             @test G1 == G3
