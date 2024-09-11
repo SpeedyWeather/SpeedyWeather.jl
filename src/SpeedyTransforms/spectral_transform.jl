@@ -337,7 +337,7 @@ function transform!(                # SPECTRAL TO GRID
 
     Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
 
-    for k in eachgrid(grids)                    # loop over all grids (e.g. vertical dimension)
+    @inbounds for k in eachgrid(grids)          # loop over all grids (e.g. vertical dimension)
         for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
             j_south = nlat - j_north + 1        # southern latitude index
             nlon = nlons[j_north]               # number of longitudes on this ring
@@ -444,7 +444,7 @@ function transform!(                    # grid -> spectral
 
     Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
 
-    for k in eachgrid(grids)
+    @inbounds for k in eachgrid(grids)
         for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
             j_south = nlat - j_north + 1        # corresponding southern latitude index
             nlon = nlons[j_north]               # number of longitudes on this ring

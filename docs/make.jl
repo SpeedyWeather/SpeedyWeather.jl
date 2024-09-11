@@ -1,4 +1,5 @@
-using Documenter, SpeedyWeather
+using Documenter
+using SpeedyWeather
 
 makedocs(
     format = Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",

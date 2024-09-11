@@ -117,7 +117,7 @@ function SpeedyWeather.callback!(
     callback::StormChaser,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::AbstractModeldel,
+    model::AbstractModel,
 )
 
     # increase counter

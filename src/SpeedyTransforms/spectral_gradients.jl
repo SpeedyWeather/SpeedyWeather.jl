@@ -63,10 +63,9 @@ function _divergence!(
     @boundscheck ismatching(S, div) || throw(DimensionMismatch(S, div))
     lmax, mmax = size(div, OneBased, as=Matrix)
 
-    #TODO add @inbounds back in
     for k in eachmatrix(div, u, v)          # also checks size compatibility
         lm = 0
-        for m in 1:mmax                     # 1-based l, m
+        @inbounds for m in 1:mmax           # 1-based l, m
             
             # DIAGONAL (separate to avoid access to v[l-1, m])
             lm += 1                                 
@@ -235,10 +234,9 @@ function UV_from_vor!(
     # maximum degree l, order m of spherical harmonics (1-based)
     lmax, mmax = size(U, OneBased, as=Matrix)
 
-    #TODO add @inbounds back in
     for k in eachmatrix(U, V, vor)                          # also checks size compatibility
         lm = 0
-        for m in 1:mmax-1                                   # 1-based l, m, exclude last column
+        @inbounds for m in 1:mmax-1                         # 1-based l, m, exclude last column
 
             # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
             lm += 1
@@ -305,10 +303,9 @@ function UV_from_vordiv!(
     # maximum degree l, order m of spherical harmonics (1-based)
     lmax, mmax = size(U, OneBased, as=Matrix)
 
-    #TODO add @inbounds back in
     for k in eachmatrix(U, V, vor, div)                 # also checks size compatibility
         lm = 0
-        for m in 1:mmax-1                               # 1-based l, m, skip last column
+        @inbounds for m in 1:mmax-1                     # 1-based l, m, skip last column
 
             # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
             lm += 1
@@ -355,14 +352,16 @@ function UV_from_vordiv!(
             V[lm, k] =  vordiv_to_uv1[lm]*div[lm-1, k]  # only last term from 2nd last row
         end
 
-        # LAST COLUMN 
-        lm += 1                                         # second last row
-        U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k]     # other terms are zero
-        V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k]     # other terms are zero
+        # LAST COLUMN
+        @inbounds begin
+            lm += 1                                         # second last row
+            U[lm, k] = im*vordiv_to_uv_x[lm]*div[lm, k]     # other terms are zero
+            V[lm, k] = im*vordiv_to_uv_x[lm]*vor[lm, k]     # other terms are zero
 
-        lm += 1                                         # last row
-        U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]      # other terms are zero
-        V[lm, k] =  vordiv_to_uv1[lm]*div[lm-1, k]      # other terms are zero
+            lm += 1                                         # last row
+            U[lm, k] = -vordiv_to_uv1[lm]*vor[lm-1, k]      # other terms are zero
+            V[lm, k] =  vordiv_to_uv1[lm]*div[lm-1, k]      # other terms are zero
+        end
     end
 end
 
@@ -400,10 +399,9 @@ function ∇²!(
     # maximum degree l, order m of spherical harmonics (1-based)
     lmax, mmax = size(alms, OneBased, as=Matrix)
 
-    #TODO add @inbounds back in
     for k in eachmatrix(∇²alms, alms)
         lm = 0
-        for m in 1:mmax
+        @inbounds for m in 1:mmax
             for l in m:lmax
                 lm += 1
                 ∇²alms[lm, k] = kernel(∇²alms[lm, k], alms[lm, k]*eigenvalues[l])
@@ -495,10 +493,9 @@ function ∇!(
     # maximum degree l, order m of spherical harmonics (1-based)
     lmax, mmax = size(p, OneBased, as=Matrix)
 
-    #TODO add @inbounds back in
     for k in eachmatrix(dpdx, dpdy, p)      # also performs size checks
         lm = 0
-        for m in 1:mmax-1         # 1-based l, m, skip last column
+        @inbounds for m in 1:mmax-1         # 1-based l, m, skip last column
 
             # DIAGONAL (separated to avoid access to l-1, m which is above the diagonal)
             lm += 1
@@ -520,7 +517,7 @@ function ∇!(
         end
 
         # LAST COLUMN
-        # @inbounds begin
+        @inbounds begin
             lm += 1                                 # second last row
             dpdx[lm, k] = (mmax-1)*im*p[lm, k]
             dpdy[lm, k] = grad_y2[lm]*p[lm+1, k]    # only 2nd term
@@ -528,7 +525,7 @@ function ∇!(
             lm += 1                                 # last row
             dpdx[lm, k] = (mmax-1)*im*p[lm, k]
             dpdy[lm, k] = grad_y1[lm]*p[lm-1, k]    # only 1st term
-        # end
+        end
     end
 
     return dpdx, dpdy
