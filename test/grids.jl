@@ -64,7 +64,7 @@ end
         J2 = OctaHEALPixGrid(randn(NF, 4096))               # J32 grid
         K2 = FullOctaHEALPixGrid(randn(NF, 128*63))         # K32 grid
 
-        for (grid1, grid2) in zip([L, F, O, C, H, J, K], [L2, F2, O2, C2, H2, J2, K2])
+        for (grid1, grid2) in zip((L, F, O, C, H, J, K), (L2, F2, O2, C2, H2, J2, K2))
             @test size(grid1) == size(grid2)
         end
 
