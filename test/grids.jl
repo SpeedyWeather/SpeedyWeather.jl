@@ -424,7 +424,12 @@ end
 end
 
 # needed when extension is not loaded (manual testing)
-RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
+# RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
+
+# define for Julia 1.9
+if VERSION < v"1.10"
+    JLArrays.JLDeviceArray{T, N}(A::JLArrays.JLDeviceArray{T, N}) where {T,N} = A
+end
 
 @testset "AbstractGridArray: GPU (JLArrays)" begin 
     NF = Float32
