@@ -113,6 +113,7 @@ end
 function Base.show(io::IO, output::NetCDFOutput{Grid}) where Grid
     println(io, "NetCDFOutput{$Grid}")
     println(io, "├ status: $(output.active ? "active" : "inactive/uninitialized")")
+    println(io, "├ write restart file: $(output.write_restart) (if active)")
     println(io, "├ interpolator: $(typeof(output.interpolator))")
     println(io, "├ path: $(joinpath(output.run_path, output.filename))")
     println(io, "├ frequency: $(output.output_dt)")
