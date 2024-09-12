@@ -11,7 +11,7 @@ function write_restart_file(
 ) where T
     
     # exit immediately if no output or no restart file desired
-    output.active || output.write_restart || return nothing  
+    output.active && output.write_restart || return nothing  
     
     # move 2nd leapfrog to 1st to compress restart file
     copyto!(progn.vor[1],   progn.vor[2])
@@ -36,6 +36,7 @@ function write_restart_file(
     fill!(progn.humid[2], 0)
     fill!(progn.pres[2],  0)
 
+    @info output.run_path
     jldopen(joinpath(output.run_path, "restart.jld2"), "w"; compress=true) do f
         f["prognostic_variables"] = progn
         f["version"] = output.pkg_version
