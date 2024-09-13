@@ -337,7 +337,9 @@ function transform!(                # SPECTRAL TO GRID
 
     Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
 
-    @inbounds for k in eachgrid(grids)          # loop over all grids (e.g. vertical dimension)
+    # loop over all specs/grids (e.g. vertical dimension)
+    # k, k_grid only differ when specs/grids have a singleton dimension
+    @inbounds for (k, k_grid) in zip(eachmatrix(specs), eachgrid(grids))
         for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
             j_south = nlat - j_north + 1        # southern latitude index
             nlon = nlons[j_north]               # number of longitudes on this ring
@@ -395,11 +397,11 @@ function transform!(                # SPECTRAL TO GRID
             # INVERSE FOURIER TRANSFORM in zonal direction
             brfft_plan = brfft_plans[j_north]       # FFT planned wrt nlon on ring
             ilons = rings[j_north]                  # in-ring indices northern ring
-            LinearAlgebra.mul!(view(grids.data, ilons, k), brfft_plan, view(gn, 1:nfreq))  # perform FFT
+            LinearAlgebra.mul!(view(grids.data, ilons, k_grid), brfft_plan, view(gn, 1:nfreq))  # perform FFT
 
             # southern latitude, don't call redundant 2nd fft if ring is on equator 
             ilons = rings[j_south]                  # in-ring indices southern ring
-            not_equator && LinearAlgebra.mul!(view(grids.data, ilons, k), brfft_plan, view(gs, 1:nfreq))  # perform FFT
+            not_equator && LinearAlgebra.mul!(view(grids.data, ilons, k_grid), brfft_plan, view(gs, 1:nfreq))  # perform FFT
 
             fill!(gn, zero(Complex{NF}))            # set phase factors back to zero
             fill!(gs, zero(Complex{NF}))
@@ -444,7 +446,9 @@ function transform!(                    # grid -> spectral
 
     Λw = Legendre.Work(Legendre.λlm!, Λ, Legendre.Scalar(zero(Float64)))
 
-    @inbounds for k in eachgrid(grids)
+    # loop over all specs/grids (e.g. vertical dimension)
+    # k, k_grid only differ when specs/grids have a singleton dimension
+    @inbounds for (k, k_grid) in zip(eachmatrix(specs), eachgrid(grids))
         for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
             j_south = nlat - j_north + 1        # corresponding southern latitude index
             nlon = nlons[j_north]               # number of longitudes on this ring
@@ -455,12 +459,12 @@ function transform!(                    # grid -> spectral
             # FOURIER TRANSFORM in zonal direction
             rfft_plan = rfft_plans[j_north]         # FFT planned wrt nlon on ring
             ilons = rings[j_north]                  # in-ring indices northern ring
-            LinearAlgebra.mul!(view(fn, 1:nfreq), rfft_plan, view(grids.data, ilons, k))   # Northern latitude
+            LinearAlgebra.mul!(view(fn, 1:nfreq), rfft_plan, view(grids.data, ilons, k_grid))   # Northern latitude
 
             ilons = rings[j_south]                  # in-ring indices southern ring
                                                     # Southern latitude (don't call FFT on Equator)
                                                     # then fill fs with zeros and no changes needed further down
-            not_equator ? LinearAlgebra.mul!(view(fs, 1:nfreq), rfft_plan, view(grids.data, ilons, k)) : fill!(fs, 0)
+            not_equator ? LinearAlgebra.mul!(view(fs, 1:nfreq), rfft_plan, view(grids.data, ilons, k_grid)) : fill!(fs, 0)
 
             # LEGENDRE TRANSFORM in meridional direction
             # Recalculate or use precomputed Legendre polynomials Λ

@@ -116,6 +116,55 @@ end
     end
 end
 
+@testset "Transform: Singleton dimensions" begin
+    @testset for trunc in spectral_resolutions
+        for NF in (Float32, Float64)
+            for Grid in (   FullGaussianGrid,
+                            FullClenshawGrid,
+                            OctahedralGaussianGrid,
+                            OctahedralClenshawGrid)
+
+                SG = SpectralGrid(; NF, trunc, Grid)
+                S = SpectralTransform(SG, recompute_legendre=true)
+
+                lmax = 3
+                for l in 1:lmax
+                    for m in 1:l
+                        alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+                        alms[l, m] = 1
+
+                        map = transform(alms, S)
+                        
+                        # add singleton dimension for lower triangular matrix
+                        alms2 = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1, 1)
+                        alms2[:, 1] = alms
+                        map2 = deepcopy(map)
+                        transform!(map2, alms2, S)
+
+                        for ij in eachindex(map, map2)
+                            @test map[ij] == map2[ij]
+                        end
+
+                        # add singleton dimension for grid
+                        grid = randn(SG.GridVariable2D, SG.nlat_half)
+                        alms = transform(grid, S)
+                        alms2 = deepcopy(alms)
+
+                        grid3D = zeros(SG.GridVariable3D, SG.nlat_half, 1)
+                        grid3D[:, 1] = grid
+
+                        transform!(alms2, grid3D, S)
+
+                        for lm in eachindex(alms, alms2)
+                            @test alms[lm] == alms2[lm]
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 @testset "Transform: Individual Legendre polynomials (inexact transforms)" begin
     @testset for trunc in spectral_resolutions_inexact
         @testset for NF in (Float32, Float64)
