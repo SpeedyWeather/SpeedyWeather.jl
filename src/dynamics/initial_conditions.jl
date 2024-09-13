@@ -1,7 +1,7 @@
 abstract type AbstractInitialConditions <: AbstractModelComponent end
 
 export InitialConditions
-Base.@kwdef struct InitialConditions{V,P,T,H} <: AbstractInitialConditions
+@kwdef struct InitialConditions{V,P,T,H} <: AbstractInitialConditions
     vordiv::V = ZeroInitially()
     pres::P = ZeroInitially()
     temp::T = ZeroInitially()
@@ -49,7 +49,7 @@ export StartWithRandomVorticity
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct StartWithRandomVorticity <: AbstractInitialConditions
+@kwdef mutable struct StartWithRandomVorticity <: AbstractInitialConditions
     "Power of the spectral distribution k^power"
     power::Float64 = -3
 
@@ -86,7 +86,7 @@ export ZonalJet
 """A struct that contains all parameters for the Galewsky et al, 2004 zonal jet
 intitial conditions for the ShallowWaterModel. Default values as in Galewsky.
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct ZonalJet <: AbstractInitialConditions
+@kwdef mutable struct ZonalJet <: AbstractInitialConditions
     "jet latitude [˚N]"
     latitude::Float64 = 45
     
@@ -211,7 +211,7 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
 intitial conditions for the primitive equation model. Default values as in Jablonowski.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct ZonalWind <: AbstractInitialConditions
+@kwdef struct ZonalWind <: AbstractInitialConditions
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
     
@@ -305,7 +305,7 @@ $(TYPEDSIGNATURES)
 Create a struct that contains all parameters for the Jablonowski and Williamson, 2006
 intitial conditions for the primitive equation model. Default values as in Jablonowski.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct JablonowskiTemperature <: AbstractInitialConditions
+@kwdef struct JablonowskiTemperature <: AbstractInitialConditions
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
 
@@ -386,7 +386,7 @@ Restart from a previous SpeedyWeather.jl simulation via the restart file restart
 Applies interpolation in the horizontal but not in the vertical. restart.jld2 is
 identified by
 $(TYPEDFIELDS)"""
-Base.@kwdef struct StartFromFile <: AbstractInitialConditions
+@kwdef struct StartFromFile <: AbstractInitialConditions
     "path for restart file"
     path::String = pwd()
 
@@ -510,7 +510,7 @@ function initialize!(   progn::PrognosticVariables,
 end
 
 export ConstantRelativeHumidity
-Base.@kwdef struct ConstantRelativeHumidity <: AbstractInitialConditions
+@kwdef struct ConstantRelativeHumidity <: AbstractInitialConditions
     relhumid_ref::Float64 = 0.7
 end
 
@@ -549,12 +549,14 @@ export RandomWaves
 """Parameters for random initial conditions for the interface displacement η
 in the shallow water equations.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct RandomWaves <: AbstractInitialConditions  
-    # random interface displacement field
-    A::Float64 = 2000       # amplitude [m]
+@kwdef struct RandomWaves <: AbstractInitialConditions  
+    # random interface displacement field
+    A::Float64 = 2000       # amplitude [m]
     lmin::Int64 = 10        # minimum wavenumber
     lmax::Int64 = 20        # maximum wavenumber
 end
+
+RandomWaves(S::SpectralGrid; kwargs...) = RandomWaves(;kwargs...) 
 
 """
 $(TYPEDSIGNATURES)
@@ -568,7 +570,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     (; A, lmin, lmax) = initial_conditions
     (; trunc) = progn
 
-    η = progn.surface.timesteps[1].pres
+    η = progn.pres[1]
     η .= randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
 
     # zero out other wavenumbers

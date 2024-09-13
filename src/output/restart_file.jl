@@ -36,7 +36,6 @@ function write_restart_file(
     fill!(progn.humid[2], 0)
     fill!(progn.pres[2],  0)
 
-    @info output.run_path
     jldopen(joinpath(output.run_path, "restart.jld2"), "w"; compress=true) do f
         f["prognostic_variables"] = progn
         f["version"] = output.pkg_version
