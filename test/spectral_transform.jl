@@ -165,6 +165,27 @@ end
     end
 end
 
+@testset "Transform: Real to real transform" begin
+    for NF in (Float32, Float64)
+        # test Float64 -> Float32
+        spectral_grid = SpectralGrid(; NF)
+        Lreal = randn(LowerTriangularMatrix{NF}, spectral_grid.trunc+2, spectral_grid.trunc+1)
+        Lcomplex = complex.(Lreal)
+        
+        grid1 = zeros(spectral_grid.GridVariable2D, spectral_grid.nlat_half)
+        grid2 = zeros(spectral_grid.GridVariable2D, spectral_grid.nlat_half)
+        
+        S = SpectralTransform(spectral_grid)
+
+        transform!(grid1, Lreal, S)
+        transform!(grid2, Lcomplex, S)
+
+        for ij in eachindex(grid1, grid2)
+            @test grid1[ij] ≈ grid2[ij]
+        end
+    end
+end
+
 @testset "Transform: Individual Legendre polynomials (inexact transforms)" begin
     @testset for trunc in spectral_resolutions_inexact
         @testset for NF in (Float32, Float64)
