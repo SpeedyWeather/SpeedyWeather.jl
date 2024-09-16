@@ -169,6 +169,8 @@ end
     for NF in (Float32, Float64)
         # test Float64 -> Float32
         spectral_grid = SpectralGrid(; NF)
+
+        # create real and complex otherwise identical
         Lreal = randn(LowerTriangularMatrix{NF}, spectral_grid.trunc+2, spectral_grid.trunc+1)
         Lcomplex = complex.(Lreal)
         
@@ -184,6 +186,67 @@ end
             @test grid1[ij] ≈ grid2[ij]
         end
     end
+end
+
+@testset "Transform: NF flexibility spectral inputs" begin
+
+    # test Float64 -> Float32
+    spectral_grid = SpectralGrid()
+    L_f32 = randn(LowerTriangularMatrix{ComplexF32}, spectral_grid.trunc+2, spectral_grid.trunc+1)
+    L_f64 = ComplexF64.(L_f32)
+    
+    grid1 = zeros(spectral_grid.GridVariable2D, spectral_grid.nlat_half)
+    grid2 = zeros(spectral_grid.GridVariable2D, spectral_grid.nlat_half)
+    
+    S = SpectralTransform(spectral_grid)
+
+    transform!(grid1, L_f64, S)  # Float64 -> Float32
+    transform!(grid2, L_f32, S)  # Float32 -> Float32
+
+    for ij in eachindex(grid1, grid2)
+        @test grid1[ij] ≈ grid2[ij] atol=sqrt(eps(Float32))
+    end
+
+    # TODO NF flexibility for grid inputs currently not supported for a good reason:
+    # the fourier transform is pre-planned for number type NF so you can't use another one
+    # above in spectral->grid this doesn't matter as the fourier transform is applied after
+    # the Legendre transform (which isn't pre-planned and hence NF flexible)
+    # consequently, the following is commented out
+
+    # L1 = deepcopy(L_f32)
+    # L2 = deepcopy(L_f32)
+    # fill!(L1, 0)
+    # fill!(L2, 0)
+
+    # grid3_f32 = randn(spectral_grid.GridVariable2D, spectral_grid.nlat_half)
+    # grid3_f64 = Float64.(grid3_f32)
+
+    # transform!(L1, grid3_f32, S)
+    # transform!(L2, grid3_f64, S)    # throws an error
+end
+
+@testset "Transform: NF flexibility for spectral outputs" begin
+
+    # test Float32 -> Float64
+    spectral_grid = SpectralGrid()
+    NF = spectral_grid.NF
+    grid = randn(spectral_grid.Grid{NF}, spectral_grid.nlat_half)
+    
+    L1 = zeros(LowerTriangularMatrix{Complex{Float32}}, spectral_grid.trunc+2, spectral_grid.trunc+1)
+    L2 = zeros(LowerTriangularMatrix{Complex{Float64}}, spectral_grid.trunc+2, spectral_grid.trunc+1)
+    
+    S = SpectralTransform(spectral_grid)
+
+    transform!(L1, grid, S)  # Float32 -> Float32
+    transform!(L2, grid, S)  # Float32 -> Float64
+
+    for lm in eachindex(L1, L2)
+        @test L1[lm] ≈ L2[lm]
+    end
+
+    # TODO similar to the above, NF flexibility for grid outputs currently not supported because
+    # the fourier transform is pre-planned and inplace with LinearAlgebra.mul! which cannot write into
+    # another eltype than the FFT plan
 end
 
 @testset "Transform: Individual Legendre polynomials (inexact transforms)" begin
