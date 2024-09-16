@@ -4,25 +4,39 @@ SpeedyWeather.jl uses NetCDF to output the data of a simulation.
 The following describes the details of this and how to change the way in which the NetCDF output is written.
 There are many options to this available.
 
-## Accessing the NetCDF output writer
-
-The output writer is a component of every Model, i.e. `BarotropicModel`, `ShallowWaterModel`, `PrimitiveDryModel` and `PrimitiveWetModel`,
-hence a non-default output writer can be passed on as a keyword argument to the model constructor
+## Creating `NetCDFOutput`
 
 ```@example netcdf
 using SpeedyWeather
 spectral_grid = SpectralGrid()
-output = NetCDFOutput(spectral_grid, ShallowWater)
+output = NetCDFOutput(spectral_grid)
+```
+
+With `NetCDFOutput(::SpectralGrid, ...)` one creates a `NetCDFOutput` writer with several options,
+which are explained in the following. By default, the `NetCDFOutput` is created when constructing
+the model, i.e.
+
+```@example netcdf
+model = ShallowWaterModel(;spectral_grid)
+model.output
+```
+
+The output writer is a component of every Model, i.e. `BarotropicModel`, `ShallowWaterModel`, `PrimitiveDryModel`
+and `PrimitiveWetModel`, and they only differ in their default `output.variables` (e.g. the primitive
+models would by default output temperature which does not exist in the 2D models `BarotropicModel` or `ShallowWaterModel`).
+But any `NetCDFOutput` can be passed onto the model constructor with the `output` keyword argument.
+
+```@example netcdf
+output = NetCDFOutput(spectral_grid, Barotropic)
 model = ShallowWaterModel(; spectral_grid, output=output)
 nothing # hide
 ```
 
-So after we have defined the grid through the `SpectralGrid` object we can use and change
-the implemented `NetCDFOutput` by passing on additional arguments.
-The `spectral_grid` has to be the first argument then the model type
-(`Barotropic`, `ShallowWater`, `PrimitiveDry`, or `PrimitiveWet`)
-which helps the output writer to make default choices on which variables to output.
-Then we can also pass on further keyword arguments. So let's start with an example.
+Here, we created `NetCDFOutput` for the model class `Barotropic` (2nd positional argument, outputting only vorticity and velocity)
+but use it in the `ShallowWaterModel`. By default the `NetCDFOutput` is set to inactive, i.e.
+`output.active` is `false`. It is only turned on (and initialized) with `run!(simulation, output=true)`.
+So you may change the `NetCDFOutput` as you like but only calling `run!(simulation)` will not
+trigger it as `output=false` is the default here.
 
 ## Example 1: NetCDF output every hour
 
@@ -30,7 +44,7 @@ If we want to increase the frequency of the output we can choose `output_dt` (de
 ```@example netcdf
 output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
 model = ShallowWaterModel(; spectral_grid, output=output)
-nothing # hide
+model.output
 ```
 which will now output every hour. It is important to pass on the new output writer `output` to the
 model constructor, otherwise it will not be part of your model and the default is used instead.
@@ -120,7 +134,11 @@ The grids `FullHEALPixGrid`, `FullOctaHEALPixGrid` share the same latitude rings
 but have always as many longitude points as they are at most around the equator. These grids are not
 tested in the dynamical core (but you may use them experimentally) and mostly designed for output purposes.
 
-## Example 3: Changing the output path or identification
+## Example 3: Adding or removing variables from `NetCDFOutput`
+
+(coming soon...)
+
+## Example 4: Changing the output path or identification
 
 That's easy by passing on `path="/my/favourite/path/"` and the folder `run_*` with `*` the identification
 of the run (that's the `id` keyword, which can be manually set but is also automatically determined as a
