@@ -257,7 +257,7 @@ ismatching(L::LowerTriangularArray, S::SpectralTransform) = ismatching(S, L)
 ismatching(G::AbstractGridArray,    S::SpectralTransform) = ismatching(S, G)
 
 function Base.DimensionMismatch(S::SpectralTransform, L::LowerTriangularArray)
-    s = "SpectralTransform(lmax=$(S.lmax), mmax=$(S.mmax)) and $(size(L, as=Matrix)) "*
+    s = "SpectralTransform(lmax=$(S.lmax), mmax=$(S.mmax)) and $(LowerTriangularMatrices.size2x_string(size(L, as=Matrix))) "*
         "LowerTriangularArray do not match."
     return DimensionMismatch(s)
 end
@@ -324,7 +324,7 @@ function transform!(                # SPECTRAL TO GRID
     (; brfft_plans ) = S
 
     @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
-    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, grids))
+    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
 
     lmax = specs.m - 1            # 0-based maximum degree l of spherical harmonics
     mmax = specs.n - 1            # 0-based maximum order m of spherical harmonics
@@ -430,7 +430,7 @@ function transform!(                    # grid -> spectral
     (; rfft_plans, lon_offsets, m_truncs ) = S
     
     @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
-    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, grids))
+    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
 
     lmax = specs.m - 1            # 0-based maximum degree l of spherical harmonics
     mmax = specs.n - 1            # 0-based maximum order m of spherical harmonics

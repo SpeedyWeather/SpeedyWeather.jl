@@ -320,7 +320,7 @@ function lowertriangular_match(L1::LowerTriangularArray, Ls::LowerTriangularArra
 end
 
 """$(TYPEDSIGNATURES)
-Returns a tuple like (1,2,3) as string "1×2×3". To be used with size2x_string(size()"""
+Returns a tuple like `(1,2,3)` as string "1×2×3". To be used with `size2x_string(size(a))` with `a` some array."""
 function size2x_string(t::Tuple)
     s = "$(t[1])"
     for i in t[2:end]
