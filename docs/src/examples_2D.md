@@ -141,7 +141,7 @@ Here, we have unpacked the netCDF file using [NCDatasets.jl](https://github.com/
 and then plotted via `heatmap(lon, lat, vor)`. While you can do that to give you more control
 on the plotting, SpeedyWeather.jl also defines an extension for Makie.jl, see [Extensions](@ref).
 Because if our matrix `vor` here was an `AbstractGrid` (see [RingGrids](@ref)) then all
-its geographic information (which grid point is where) would directly be encoded in the type.
+its geographic information (which grid point is where) would be implicitly known from the type.
 From the netCDF file, however, you would need to use the longitude and latitude dimensions.
 
 So we can also just do (`input_as=Matrix` here as all our grids use and expect a horizontal dimension
@@ -166,6 +166,8 @@ We did want to showcase the usage of [NetCDF output](@ref) here, but from now on
 we will use `heatmap` to plot data on our grids directly, without storing output first.
 So for our current simulation, that means at time = 12 days, vorticity on the grid
 is stored in the diagnostic variables and can be visualised with
+(`[:, 1]` is horizontal x vertical dimension, so all grid points on the first and
+only vertical layer)
 
 ```@example galewsky_setup
 vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
@@ -215,8 +217,8 @@ nothing # hide
 ```
 ![Galewsky jet](galewsky3.png)
 
-Interesting! The initial conditions have zero velocity in the southern hemisphere, but still, one can see
-some imprint of the orography on vorticity. You can spot the coastline of Antarctica; the Andes and
+Interesting! One can clearly see some imprint of the orography on vorticity and there is especially
+more vorticity in the southern hemisphere. You can spot the coastline of Antarctica; the Andes and
 Greenland are somewhat visible too. Mountains also completely changed the flow after 12 days,
 probably not surprising!
 
@@ -238,7 +240,7 @@ nothing # hide
 ```
 
 We want to simulate polar jet streams in the shallow water model. We add a `JetStreamForcing`
-that adds momentum at 60˚N to inject kinetic energy into the model. This energy needs to be removed
+that adds momentum at 60˚N and 60˚S an to inject kinetic energy into the model. This energy needs to be removed
 (the [diffusion](@ref diffusion) is likely not sufficient) through a drag, we have implemented
 a `QuadraticDrag` and use the default drag coefficient. Then visualize zonal wind after
 40 days with

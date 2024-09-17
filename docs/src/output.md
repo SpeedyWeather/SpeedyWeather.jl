@@ -108,8 +108,8 @@ the `NetCDFOutput` takes as argument `output_Grid<:AbstractFullGrid` and `nlat_h
 So for example `output_Grid=FullClenshawGrid` and `nlat_half=48` will always interpolate onto a
 regular 192x95 longitude-latitude grid of 1.875˚ resolution, regardless the grid and resolution used
 for the model integration.
-```julia
-my_output_writer = NetCDFOutput(spectral_grid, ShallowWater, output_Grid=FullClenshawGrid, nlat_half=48)
+```@example netcdf
+my_output_writer = NetCDFOutput(spectral_grid, output_Grid=FullClenshawGrid, nlat_half=48)
 ```
 Note that by default the output is on the corresponding full type of the grid type used in the dynamical core
 so that interpolation only happens at most in the zonal direction as they share the location of the
@@ -172,7 +172,7 @@ so `output.variables[:div]` just returns the `SpeedyWeather.DivergenceOutput()` 
 just created using `:div` as key. With those keys one can also `delete!` a variable
 from netCDF output
 
-```@example
+```@example netcdf
 delete!(output, :div)
 ```
 

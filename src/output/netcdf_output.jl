@@ -1,4 +1,4 @@
-abstract type AbstractOutput end
+abstract type AbstractOutput <: AbstractModelComponent end
 abstract type AbstractOutputVariable end
 
 # default number format for output
