@@ -1,5 +1,5 @@
 using Documenter
-using SpeedyWeather
+# using SpeedyWeather
 
 makedocs(
     format = Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",
@@ -26,6 +26,7 @@ makedocs(
                 "Orography"=>"orography.md",
                 "Land-Sea Mask"=>"land_sea_mask.md",
                 "Ocean"=>"ocean.md",
+                "NetCDF output variables"=>"custom_netcdf_output.md",
                 "Callbacks"=>"callbacks.md",
             ],
             "Dynamics" => [

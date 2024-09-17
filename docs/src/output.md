@@ -134,9 +134,50 @@ The grids `FullHEALPixGrid`, `FullOctaHEALPixGrid` share the same latitude rings
 but have always as many longitude points as they are at most around the equator. These grids are not
 tested in the dynamical core (but you may use them experimentally) and mostly designed for output purposes.
 
-## Example 3: Adding or removing variables from `NetCDFOutput`
+## Example 3: Adding variables to `NetCDFOutput`
 
-(coming soon...)
+One can easily add or remove variables from being output with the `NetCDFOut` writer. The following
+variables are predefined (note they are not exported so you have to prefix `SpeedyWeather.`)
+
+```@example netcdf
+using InteractiveUtils # hide
+subtypes(SpeedyWeather.AbstractOutputVariable)
+```
+
+"Defined" here means that every such type contains information about a variables (long) name,
+its units, dimensions, any missing values and compression options. For `HumidityOutput` for example
+we have
+
+```@example netcdf
+SpeedyWeather.HumidityOutput()
+```
+
+You can choose name and unit as you like, e.g. `SpeedyWeather.HumidityOutput(unit = "1")` or change
+the compression options, e.g. `SpeedyWeather.HumidityOutput(keepbits = 5)` but more customisation
+is discussed in [Customizing netCDF output](@ref).
+
+We can add new output variables with `add!` 
+
+```@example netcdf
+output = NetCDFOutput(spectral_grid)            # default variables
+add!(output, SpeedyWeather.DivergenceOutput())  # output also divergence
+output
+```
+
+If you didn't create a `NetCDFOut` separately, you can also apply this directly to `model`,
+either `add!(model, SpeedyWeather.DivergenceOutput())` or `add!(model.output, args...),
+which technically also just forwards to `add!(model.output.variables, args...)`.
+`output.variables` is a dictionary were the variable names (as `Symbol`s) are used as keys,
+so `output.variables[:div]` just returns the `SpeedyWeather.DivergenceOutput()` we have
+just created using `:div` as key. With those keys one can also `delete!` a variable
+from netCDF output
+
+```@example
+delete!(output, :div)
+```
+
+If you change the `name` of an output variable, i.e. `SpeedyWeather.DivergenceOutput(name="divergence")`
+the key would change accordingly to `:divergence`.
 
 ## Example 4: Changing the output path or identification
 
