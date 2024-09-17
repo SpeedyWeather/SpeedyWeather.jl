@@ -65,7 +65,7 @@ at in `time_stepping!`."""
 function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     (; spectral_grid) = model
 
-    spectral_grid.nlayers > 1 && @warn "Only nlayers=1 supported for BarotropicModel, \
+    spectral_grid.nlayers > 1 && @error "Only nlayers=1 supported for BarotropicModel, \
         SpectralGrid with nlayers=$(spectral_grid.nlayers) provided."
 
     # initialize components

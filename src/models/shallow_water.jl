@@ -67,7 +67,7 @@ in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     (; spectral_grid) = model
 
-    spectral_grid.nlayers > 1 && @warn "Only nlayers=1 supported for ShallowWaterModel, \
+    spectral_grid.nlayers > 1 && @error "Only nlayers=1 supported for ShallowWaterModel, \
                                 SpectralGrid with nlayers=$(spectral_grid.nlayers) provided."
 
     # initialize components
