@@ -19,12 +19,25 @@ matrix_size(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer) =
 
 ## CONVERSION
 # convert an AbstractMatrix to the full grids, and vice versa
-(Grid::Type{<:AbstractFullGrid})(M::AbstractMatrix) = Grid(vec(M))
+"""
+($TYPEDSIGNATURES)
+Initialize an instance of the grid from an Array. For keyword argument `input_as=Vector` (default)
+the leading dimension is interpreted as a flat vector of all horizontal entries in one layer.
+For `input_as==Matrx` the first two leading dimensions are interpreted as longitute and latitude.
+This is only possible for full grids that are a subtype of `AbstractFullGridArray`.
+"""
+(Grid::Type{<:AbstractFullGridArray})(M::AbstractArray; input_as=Vector) = Grid(M, input_as)
+
+function (Grid::Type{<:AbstractFullGridArray})(M::AbstractArray, input_as::Type{Matrix})
+    # flatten the two horizontal dimensions into one, identical to vec(M) for M <: AbstractMatrix
+    M_flat = reshape(M, :, size(M)[3:end]...)
+    Grid(M_flat)
+end 
+
 Base.Array(grid::AbstractFullGridArray) = Array(reshape(grid.data, :, get_nlat(grid), size(grid.data)[2:end]...))
 Base.Matrix(grid::AbstractFullGridArray) = Array(grid)
 
 ## INDEXING
-
 """$(TYPEDSIGNATURES) `UnitRange` for every grid point of grid `Grid` of resolution `nlat_half`
 on ring `j` (`j=1` is closest ring around north pole, `j=nlat` around south pole)."""
 function each_index_in_ring(

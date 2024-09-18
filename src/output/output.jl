@@ -275,7 +275,7 @@ function initialize!(
         orog_grid = model.orography.orography
         orog_matrix = output.u
         output.as_matrix && (orog_matrix = Matrix(orog_grid))
-        output.as_matrix || RingGrids.interpolate!(output_Grid(output.u), orog_grid, output.interpolator)
+        output.as_matrix || RingGrids.interpolate!(output_Grid(output.u, input_as=Matrix), orog_grid, output.interpolator)
         defVar(dataset, "orography", orog_matrix, (lon_name, lat_name), attrib=orog_attribs)
     end
 
@@ -425,12 +425,12 @@ function write_netcdf_variables!(   output::OutputWriter,
             RingGrids.Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
 
         else                    # or interpolate onto a full grid
-            :u in output_vars       && RingGrids.interpolate!(output_Grid(u),    u_grid, interpolator)
-            :v in output_vars       && RingGrids.interpolate!(output_Grid(v),    v_grid, interpolator)
-            :vor in output_vars     && RingGrids.interpolate!(output_Grid(vor),  vor_grid, interpolator)
-            :div in output_vars     && RingGrids.interpolate!(output_Grid(div),  div_grid, interpolator)
-            :temp in output_vars    && RingGrids.interpolate!(output_Grid(temp), temp_grid, interpolator)
-            :humid in output_vars   && RingGrids.interpolate!(output_Grid(humid), humid_grid, interpolator)
+            :u in output_vars       && RingGrids.interpolate!(output_Grid(u, input_as=Matrix),    u_grid, interpolator)
+            :v in output_vars       && RingGrids.interpolate!(output_Grid(v, input_as=Matrix),    v_grid, interpolator)
+            :vor in output_vars     && RingGrids.interpolate!(output_Grid(vor, input_as=Matrix),  vor_grid, interpolator)
+            :div in output_vars     && RingGrids.interpolate!(output_Grid(div, input_as=Matrix),  div_grid, interpolator)
+            :temp in output_vars    && RingGrids.interpolate!(output_Grid(temp, input_as=Matrix), temp_grid, interpolator)
+            :humid in output_vars   && RingGrids.interpolate!(output_Grid(humid, input_as=Matrix), humid_grid, interpolator)
         end
 
         # UNSCALE THE SCALED VARIABLES
@@ -466,11 +466,11 @@ function write_netcdf_variables!(   output::OutputWriter,
             RingGrids.Matrix!(MGs...; quadrant_rotation, matrix_quadrant)
         end
     else
-        :pres in output_vars && RingGrids.interpolate!(output_Grid(pres), pres_grid, interpolator)
-        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_cond), precip_large_scale, interpolator)
-        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_conv), precip_convection, interpolator)
-        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_conv), precip_convection, interpolator)
-        :cloud in output_vars && RingGrids.interpolate!(output_Grid(cloud), cloud_top, interpolator)
+        :pres in output_vars && RingGrids.interpolate!(output_Grid(pres, input_as=Matrix), pres_grid, interpolator)
+        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_cond, input_as=Matrix), precip_large_scale, interpolator)
+        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_conv, input_as=Matrix), precip_convection, interpolator)
+        :precip in output_vars && RingGrids.interpolate!(output_Grid(precip_conv, input_as=Matrix), precip_convection, interpolator)
+        :cloud in output_vars && RingGrids.interpolate!(output_Grid(cloud, input_as=Matrix), cloud_top, interpolator)
     end
 
     # after output set precip accumulators back to zero
