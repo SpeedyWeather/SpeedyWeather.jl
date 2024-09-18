@@ -55,7 +55,7 @@ add!(output, VerticalVelocityOutput())
 ```
 
 Note that here we skip the `SpeedyWeather.` which would point to the
-SpeedyWeather scope as we have defined `VerticalVelocityOutput` in
+SpeedyWeather scope but we have defined `VerticalVelocityOutput` in
 the global scope.
 
 ## Define how to output a new variable
@@ -63,22 +63,87 @@ the global scope.
 While we have defined a new output variable we have not actually
 defined how to output it. Because in the end we will need to
 write that variable into the netcdf file in `NetCDFOutput`,
-which we describe now.
+which we describe now. We have to extend extend
+SpeedyWeather's `output!` function with the following
+function signature
 
 ```@example netcdf_custom
-function output!(
+function SpeedyWeather.output!(
     output::NetCDFOutput,
     variable::VerticalVelocityOutput,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    w = output.grid3D
-    (; σ_tend) = diagn.dynamics
+    # INTERPOLATION
+    w = output.grid3D               # scratch grid to interpolate into
+    (; σ_tend) = diagn.dynamics     # point to data in diagnostic variables
     RingGrids.interpolate!(w, σ_tend , output.interpolator)
 
-    i = output.output_counter   # output time step to write
+    # WRITE TO NETCDF
+    i = output.output_counter       # output time step to write
     output.netcdf_file[variable.name][:, :, :, i] = w
     return nothing
 end
+```
+
+The first argument has to be `::NetCDFOutput` as this is
+the argument we write into (i.e. mutate). The second argument
+has to be `::VerticalVelocityOutput` so that Julia's multiple
+dispatch calls this `output!` method for our new variable.
+Then the prognostic, diagnostic variables and the model
+follows which allows us generally to read any data and use
+it to write into the netCDF file.
+
+In most cases you will need to interpolate any gridded variables
+inside the model (which can be on a reduced grd) onto the output grid
+(which has to be a full grid, see [Output grid](@ref)). For that
+the `NetCDFOutput` has two scratch arrays `grid3D` and `grid2D`
+which are of type and size as defined by the `output_Grid` and
+`nlat_half` arguments when creating the `NetCDFOutput`.
+So the three lines for interpolation are essentially those in
+which your definition of a new output variable is linked
+with where to find that variable in `diagnostic_variables`.
+You can, in principle, also do any kind of computation here,
+for example adding two variables, normalising data and so on.
+In the end it has to be on the `output_Grid` hence you
+probably do not want to skip the interpolation step but you
+are generally allowed to do much more here before or after
+the interpolation.
+
+The last two lines are then just about actually writing to
+netcdf. For any variable that is written on every output
+time step you can use the output counter `i` to point to the
+correct index `i` in the netcdf file as shown here.
+For 2D variables (horizontal+time) the indexing would be
+`[:, :, i]`. 2D variables without time you only want to write
+once (because they do not change) the indexing would change to
+`[:, :]` and you then probably want to add a line at the top
+like `output.output_counter > 1 || return nothing` to escape
+immediately after the first output time step. But you could
+also check for a specific condition (e.g. a new temperature
+record in a given location) and only then write to netcdf.
+Just some ideas how to customize this even further.
+
+## Output a new variable
+
+Now let's try this in a primitive dry model
+
+```@example netcdf_custom
+model = PrimitiveDryModel(;spectral_grid, output)
+model.output.variables[:w]
+```
+
+By passing on `output` to the model constructor the output variables
+now contain `w` and we see it here as we have defined it earlier.
+
+```@example netcdf_custom
+simulation = initialize!(model)
+run!(simulation, period=Day(5), output=true)
+
+# read netcdf data
+using NCDatasets
+path = joinpath(model.output.run_path, model.output.filename)
+ds = NCDataset(path)
+w = ds["w"]
 ```
