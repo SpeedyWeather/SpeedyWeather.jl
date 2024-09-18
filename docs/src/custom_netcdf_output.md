@@ -6,11 +6,11 @@ alongside the default variables in the netCDF file. We explain here
 how to define a new output variable largely following the logic
 of [Extending SpeedyWeather](@ref).
 
-## Define a new output variable
+## New output variable
 
 Say we want to output the [Vertical velocity](@ref). In [Sigma coordinates](@ref)
 on every time step, one has to integrate the divergence vertically to
-know where the flow is not divergence free, meaning that the horizontally
+know where the flow is not divergence-free, meaning that the horizontally
 converging or diverging motion is balanced by a vertical velocity.
 This leads to the variable ``\partial \sigma / \partial t``, which
 is the equivalent of [Vertical velocity](@ref) in the [Sigma coordinates](@ref).
@@ -34,14 +34,14 @@ using SpeedyWeather
 @kwdef struct VerticalVelocityOutput <: SpeedyWeather.AbstractOutputVariable
     name::String = "w"
     unit::String = "s^-1"
-    long_name::String = "vertical velocity"
+    long_name::String = "vertical velocity dσ/dt"
     dims_xyzt::NTuple{4, Bool} = (true, true, true, true)
 end
 ```
 
 By default (using the `@kwdef` macro) we set the dimensions in `dims_xyzt`
 to 4D because the vertical velocity is a 3D variable that we want to output
-on every time step. So while it is a required field for every output variable
+on every time step. So while `dims_xyzt` is a required field for every output variable
 you should not actually change it as it is an inherent property of the output
 variable.
 
@@ -54,11 +54,11 @@ output = NetCDFOutput(spectral_grid)
 add!(output, VerticalVelocityOutput())
 ```
 
-Note that here we skip the `SpeedyWeather.` which would point to the
+Note that here we skip the `SpeedyWeather.` prefix which would point to the
 SpeedyWeather scope but we have defined `VerticalVelocityOutput` in
 the global scope.
 
-## Define how to output a new variable
+## Extend the `output!` function
 
 While we have defined a new output variable we have not actually
 defined how to output it. Because in the end we will need to
@@ -125,7 +125,7 @@ also check for a specific condition (e.g. a new temperature
 record in a given location) and only then write to netcdf.
 Just some ideas how to customize this even further.
 
-## Output a new variable
+## Reading the new variable
 
 Now let's try this in a primitive dry model
 
@@ -145,5 +145,31 @@ run!(simulation, period=Day(5), output=true)
 using NCDatasets
 path = joinpath(model.output.run_path, model.output.filename)
 ds = NCDataset(path)
-w = ds["w"]
+ds["w"]
 ```
+
+Fantastic, it's all there. We wrap this back into a `FullGaussianGrid`
+but ignore the mask (there are no masked values) in the netCDF file
+which causes a `Union{Missing, Float32}` element type by reading out
+the raw data with `.var`. And visualise the vertical velocity
+in sigma coordinates (remember this is actually ``\partial \sigma / \partial t``)
+of the last time step (index `end`) stored on layer ``k=4`` (counted from the top)
+
+```@example netcdf_custom
+w = FullGaussianGrid(ds["w"].var[:, :, :, :], input_as=Matrix)
+
+using CairoMakie
+heatmap(w[:, 4, end], title="vertical velocity dσ/dt at k=4")
+save("sigma_tend.png", ans) # hide
+nothing # hide
+```
+![Sigma tendency](sigma_tend.png)
+
+This is now the vertical velocity between layer ``k=4`` and ``k=5``.
+You can check that the vertical velocity on layer ``k=8`` is actually
+zero (because that is the boundary condition at the surface)
+and so would be the velocity between ``k=0`` and ``k=1`` at the top
+of the atmosphere, which however is not explicitly stored.
+The vertical velocity is strongest on the wind and leeward side of
+mountains which is reassuring and all the analysis we want to
+do here for now.
