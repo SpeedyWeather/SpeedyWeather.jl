@@ -38,7 +38,7 @@ but use it in the `ShallowWaterModel`. By default the `NetCDFOutput` is set to i
 So you may change the `NetCDFOutput` as you like but only calling `run!(simulation)` will not
 trigger it as `output=false` is the default here.
 
-## Example 1: NetCDF output every hour
+## Output frequency
 
 If we want to increase the frequency of the output we can choose `output_dt` (default `=Hour(6)`) like so
 ```@example netcdf
@@ -101,7 +101,7 @@ ds["time"][:]
 ```
 very neatly hourly output in the NetCDF file!
 
-## [Example 2: Output onto a higher/lower resolution grid](@id output_grid)
+## Output grid
 
 Say we want to run the model at a given horizontal resolution but want to output on another resolution,
 the `NetCDFOutput` takes as argument `output_Grid<:AbstractFullGrid` and `nlat_half::Int`.
@@ -134,7 +134,7 @@ The grids `FullHEALPixGrid`, `FullOctaHEALPixGrid` share the same latitude rings
 but have always as many longitude points as they are at most around the equator. These grids are not
 tested in the dynamical core (but you may use them experimentally) and mostly designed for output purposes.
 
-## Example 3: Adding variables to `NetCDFOutput`
+## Output variables
 
 One can easily add or remove variables from being output with the `NetCDFOut` writer. The following
 variables are predefined (note they are not exported so you have to prefix `SpeedyWeather.`)
@@ -164,8 +164,8 @@ add!(output, SpeedyWeather.DivergenceOutput())  # output also divergence
 output
 ```
 
-If you didn't create a `NetCDFOut` separately, you can also apply this directly to `model`,
-either `add!(model, SpeedyWeather.DivergenceOutput())` or `add!(model.output, args...),
+If you didn't create a `NetCDFOutput` separately, you can also apply this directly to `model`,
+either `add!(model, SpeedyWeather.DivergenceOutput())` or `add!(model.output, args...)`,
 which technically also just forwards to `add!(model.output.variables, args...)`.
 `output.variables` is a dictionary were the variable names (as `Symbol`s) are used as keys,
 so `output.variables[:div]` just returns the `SpeedyWeather.DivergenceOutput()` we have
@@ -179,7 +179,7 @@ delete!(output, :div)
 If you change the `name` of an output variable, i.e. `SpeedyWeather.DivergenceOutput(name="divergence")`
 the key would change accordingly to `:divergence`.
 
-## Example 4: Changing the output path or identification
+## Output path and identification
 
 That's easy by passing on `path="/my/favourite/path/"` and the folder `run_*` with `*` the identification
 of the run (that's the `id` keyword, which can be manually set but is also automatically determined as a
@@ -187,11 +187,11 @@ number counting up depending on which folders already exist) will be created wit
 ```julia
 julia> path = pwd()
 "/Users/milan"
-julia> my_output_writer = NetCDFOutput(spectral_grid, PrimitiveDry, path=path)
+julia> my_output_writer = NetCDFOutput(spectral_grid, path=path)
 ```
 This folder must already exist. If you want to give your run a name/identification you can pass on `id`
 ```julia
-julia> my_output_writer = NetCDFOutput(spectral_grid, PrimitiveDry, id="diffusion_test");
+julia> my_output_writer = NetCDFOutput(spectral_grid, id="diffusion_test");
 ```
 which will be used instead of a 4 digit number like 0001, 0002 which is automatically determined if
 `id` is not provided. You will see the id of the run in the progress bar

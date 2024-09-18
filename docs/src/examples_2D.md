@@ -160,7 +160,7 @@ nothing # hide
 Note that here you need to know which grid the data comes on (an error is thrown if `FullGaussianGrid(vor)`
 is not size compatible). By default the output will be on the FullGaussianGrid, but if you
 play around with other grids, you'd need to change this here,
-see [NetCDF output on other grids](@ref output_grid).
+see [NetCDF output](@ref) and [Output grid](@ref).
 
 We did want to showcase the usage of [NetCDF output](@ref) here, but from now on
 we will use `heatmap` to plot data on our grids directly, without storing output first.
