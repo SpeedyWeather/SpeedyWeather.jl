@@ -246,7 +246,7 @@ the particle locations via netCDF. We can create it like
 
 ```@example particle_tracker
 using SpeedyWeather
-spectral_grid = SpectralGrid(nparticles = 100)
+spectral_grid = SpectralGrid(nparticles = 100, nlayers=1)
 particle_tracker = ParticleTracker(spectral_grid, schedule=Schedule(every=Hour(3)))
 ```
 

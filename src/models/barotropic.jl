@@ -25,7 +25,7 @@ Base.@kwdef mutable struct BarotropicModel{
     ST,     # <:SpectralTransform{NF},
     IM,     # <:AbstractImplicit,
     HD,     # <:AbstractHorizontalDiffusion,
-    OW,     # <:AbstractOutputWriter,
+    OU,     # <:AbstractOutput,
     FB,     # <:AbstractFeedback,
 } <: Barotropic
     
@@ -49,7 +49,7 @@ Base.@kwdef mutable struct BarotropicModel{
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid, Barotropic)
+    output::OU = NetCDFOutput(spectral_grid, Barotropic)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
@@ -65,7 +65,7 @@ at in `time_stepping!`."""
 function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     (; spectral_grid) = model
 
-    spectral_grid.nlayers > 1 && @warn "Only nlayers=1 supported for BarotropicModel, \
+    spectral_grid.nlayers > 1 && @error "Only nlayers=1 supported for BarotropicModel, \
         SpectralGrid with nlayers=$(spectral_grid.nlayers) provided."
 
     # initialize components

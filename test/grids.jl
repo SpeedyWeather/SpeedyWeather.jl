@@ -64,7 +64,7 @@ end
         J2 = OctaHEALPixGrid(randn(NF, 4096))               # J32 grid
         K2 = FullOctaHEALPixGrid(randn(NF, 128*63))         # K32 grid
 
-        for (grid1, grid2) in zip([L, F, O, C, H, J, K], [L2, F2, O2, C2, H2, J2, K2])
+        for (grid1, grid2) in zip((L, F, O, C, H, J, K), (L2, F2, O2, C2, H2, J2, K2))
             @test size(grid1) == size(grid2)
         end
 
@@ -111,7 +111,7 @@ end
             n = 4      # resolution parameter nlat_half
             G1 = zeros(G{NF}, n)
             G2 = zero(G1)
-            G3 = G(G2)
+            G3 = G(G2.data)
 
             @test G1 == G2
             @test G1 == G3
@@ -202,6 +202,28 @@ end
         end
     end
 end
+
+@testset "FullGrids conversions to/from Arrays" begin 
+    for idims in ((), (5,), (5,5))
+        NF = Float64
+        N = length(idims)+1
+        data = rand(8,4, idims...)
+        grid = FullGaussianArray(data, input_as=Matrix)
+        @test Array(grid) == data
+
+        data = rand(8,3, idims...)
+        grid = FullClenshawArray(data, input_as=Matrix)
+        @test Array(grid) == data
+
+        data = rand(8,3, idims...)
+        grid = FullHEALPixArray(data, input_as=Matrix)
+        @test Array(grid) == data
+
+        data = rand(8,3, idims...)
+        grid = FullOctaHEALPixArray(data, input_as=Matrix)
+        @test Array(grid) == data
+    end   
+end 
 
 @testset "Grid indices" begin
     for G in (  FullClenshawGrid,
@@ -330,6 +352,18 @@ end
         @test all(ones(G{Float16}, n) ./ ones(G{Float32}, n) .=== 1f0)
         @test all(ones(G{Float16}, n) ./ ones(G{Float64}, n) .=== 1.0)
         @test all(ones(G{Float32}, n) ./ ones(G{Float64}, n) .=== 1.0)
+
+        # dimension mismatches, but still broadcasting
+        g1 = rand(G, n)
+        g2 = rand(G, n, 1)
+        g2_2 = rand(G, n, 2)
+        g3 = rand(G, n, 1, 1)
+
+        @test (g1 .* g2)[:,1] == (g1 .* g2[:,1])
+        @test (g2 .* g1)[:,1] == (g1 .* g2[:,1])
+        @test (g2 .* g3)[:,1,1] == (g2[:,1] .* g3[:,1,1])
+        @test (g1 .* g2_2)[:,1] == (g1 .* g2_2[:,1])
+        @test (g1 .* g2_2)[:,2] == (g1 .* g2_2[:,2])
     end 
 end
 
@@ -390,7 +424,12 @@ end
 end
 
 # needed when extension is not loaded (manual testing)
-RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
+# RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
+
+# define for Julia 1.9
+if VERSION < v"1.10"
+    JLArrays.JLDeviceArray{T, N}(A::JLArrays.JLDeviceArray{T, N}) where {T,N} = A
+end
 
 @testset "AbstractGridArray: GPU (JLArrays)" begin 
     NF = Float32

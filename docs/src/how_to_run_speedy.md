@@ -108,8 +108,9 @@ just ignore those. But the `Leapfrog` time stepper comes with `Δt_at_T31` which
 is the parameter used to scale the time step automatically. This means at a spectral
 resolution of T31 it would use 30min steps, at T63 it would be ~half that, 15min, etc.
 Meaning that if you want to have a shorter or longer time step you can create a new
-`Leapfrog` time stepper. All time inputs are supposed to be given with the help of  `Dates` (e.g. `Minute()`, `Hour()`, ...). But remember that every model component depends on a
-`SpectralGrid` as first argument.
+`Leapfrog` time stepper. All time inputs are supposed to be given with the help of 
+`Dates` (e.g. `Minute()`, `Hour()`, ...). But remember that (almost) every model component
+depends on a `SpectralGrid` as first argument.
 ```@example howto
 spectral_grid = SpectralGrid(trunc=63, nlayers=1)
 time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(15))
@@ -205,7 +206,7 @@ So with this we have set the zero mode of vorticity of the first (and only)
 layer in the shallow water to zero. Because the leapfrogging is a 2-step
 time stepping scheme we set here the first. As it is often tricky
 to set the initial conditions in spectral space, it is generally advised
-to do so through the `initial_conditions` model component or with [`SpeedyWeather.set!`](@ref).
+to do so through the `initial_conditions` model component.
 
 ## [Run a simulation](@id run)
 

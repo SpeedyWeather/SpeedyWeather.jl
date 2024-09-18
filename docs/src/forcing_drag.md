@@ -193,24 +193,38 @@ defined for our new `StochasticStirring` forcing. But if you define it as follow
 then this will be called automatically with multiple dispatch.
 
 ```@example extend
-function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
-                                progn::PrognosticVariablesLayer,
-                                forcing::StochasticStirring,
-                                time::DateTime,
-                                model::AbstractModel)
+function SpeedyWeather.forcing!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    forcing::StochasticStirring,
+    model::AbstractModel,
+    lf::Integer,
+)
     # function barrier only
     forcing!(diagn, forcing, model.spectral_transform)
 end
 ```
-The function has to be as outlined above. The first argument has to be of type
-`DiagnosticVariablesLayer` as it acts on a layer of the diagnostic variables,
-where the current model state in grid-point space and the tendencies (in spectral space)
-are defined. The second argument has to be a `PrognosticVariablesLayer` because,
-in general, the forcing may use the prognostic variables in spectral space.
-The third argument has to be of the type of our new forcing,
-the third argument is time which you may use or skip, the last element is a `AbstractModel`,
-but as before you can be more restrictive to define a forcing only for the
-`BarotropicModel` for example, use ``model::Barotropic`` in that case.
+The function signature (types and number of its arguments) has to be as outlined above.
+The first argument has to be of type `DiagnosticVariables` as the diagnostic variables,
+are the ones you want to change (likely the tendencies within) to apply a forcing.
+But technically you can change anything else too, although the results may be unexpected.
+The diagnostic variables contain the current model state in grid-point space and the
+tendencies (in grid and spectral space). The second argument has to be of type
+`PrognosticVariables` because, in general, the forcing may use (information from)
+the prognostic variables in spectral space, which includes in `progn.clock.time` the current
+time for time-dependent forcing. But all prognostic variables should be considered read-only.
+The third argument has to be of the type of our new custom forcing, here `StochasticStirring`,
+so that multiple dispatch calls the correct method of `forcing!`. The forth argument is of type
+`AbstractModel`, so that the forcing can also make use of anything inside `model`, e.g.
+`model.geometry` or `model.planet` etc. But you can be more restrictive to define a forcing only
+for the `BarotropicModel` for example, use ``model::Barotropic`` in that case.
+Or you could define two methods, one for `Barotropic` one for all other models with
+`AbstractModel` (not `Barotropic` as a more specific method is prioritised with multiple
+dispatch). The 5th argument is the leapfrog index `lf` which after the first time step will
+be `lf=2` to denote that tendencies are evaluated at the current time not at the previous time
+(how leapfrogging works). Unless you want to read the prognostic variables, for which
+you need to know whether to read `lf=1` or `lf=2`, you can ignore this (but need to include
+it as argument).
 
 As you can see, for now not much is actually happening inside this function,
 this is what is often called a function barrier, the only thing we do in here
@@ -222,9 +236,11 @@ makes that possible. And it also tells you more clearly what a function depends 
 So we define the actual `forcing!` function that's then called as follows
 
 ```@example extend
-function forcing!(  diagn::DiagnosticVariablesLayer,
-                    forcing::StochasticStirring{NF},
-                    spectral_transform::SpectralTransform) where NF
+function forcing!(
+    diagn::DiagnosticVariables,
+    forcing::StochasticStirring{NF},
+    spectral_transform::SpectralTransform
+) where NF
     
     # noise and auto-regressive factors
     a = forcing.a[]    # = sqrt(1 - exp(-2dt/τ))
@@ -238,7 +254,7 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
     end
 
     # to grid-point space
-    S_grid = diagn.dynamics_variables.a_grid
+    S_grid = diagn.dynamics.a_grid  # use scratch array "a"
     transform!(S_grid, S, spectral_transform)
     
     # mask everything but mid-latitudes

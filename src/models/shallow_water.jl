@@ -26,7 +26,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     ST,     # <:SpectralTransform{NF},
     IM,     # <:AbstractImplicit,
     HD,     # <:AbstractHorizontalDiffusion,
-    OW,     # <:AbstractOutputWriter,
+    OU,     # <:AbstractOutput,
     FB,     # <:AbstractFeedback,
 } <: ShallowWater
     
@@ -51,7 +51,7 @@ Base.@kwdef mutable struct ShallowWaterModel{
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid, ShallowWater)
+    output::OU = NetCDFOutput(spectral_grid, ShallowWater)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
@@ -67,7 +67,7 @@ in `time_stepping!` and `model.implicit` which is done in `first_timesteps!`."""
 function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     (; spectral_grid) = model
 
-    spectral_grid.nlayers > 1 && @warn "Only nlayers=1 supported for ShallowWaterModel, \
+    spectral_grid.nlayers > 1 && @error "Only nlayers=1 supported for ShallowWaterModel, \
                                 SpectralGrid with nlayers=$(spectral_grid.nlayers) provided."
 
     # initialize components

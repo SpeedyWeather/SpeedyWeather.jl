@@ -225,12 +225,21 @@ nothing # hide
 
 and we can compare the relative vorticity field to
 ```@example analysis
-plot(ζ)
+using CairoMakie
+heatmap(ζ, title="Relative vorticity [1/s]")
+save("analysis_vor.png", ans) # hide
+nothing # hide
 ```
+![Relative vorticity](analysis_vor.png)
+
+
 the potential vorticity
 ```@example analysis
-plot(q)
+heatmap(ζ, title="Potential vorticity [1/ms]")
+save("analysis_pv.png", ans) # hide
+nothing # hide
 ```
+![Potential vorticity](analysis_pv.png)
 
 ## Absolute angular momentum
 

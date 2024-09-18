@@ -166,12 +166,14 @@ end
 """$(TYPEDSIGNATURES)
 Copies entries of `progn_old` into `progn_new`."""
 function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
-    # dynamics
-    progn_new.vor .= progn_old.vor
-    progn_new.div .= progn_old.div
-    progn_new.temp .= progn_old.temp
-    progn_new.humid .= progn_old.humid
-    progn_new.pres .= progn_old.pres
+
+    for i in eachindex(progn_new.vor)   # each leapfrog time step
+        progn_new.vor[i] .= progn_old.vor[i]
+        progn_new.div[i] .= progn_old.div[i]
+        progn_new.temp[i] .= progn_old.temp[i]
+        progn_new.humid[i] .= progn_old.humid[i]
+        progn_new.pres[i] .= progn_old.pres[i]
+    end
 
     # ocean
     progn_new.ocean.sea_surface_temperature .= progn_old.ocean.sea_surface_temperature
@@ -183,7 +185,17 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     progn_new.land.soil_moisture_layer1 .= progn_old.land.soil_moisture_layer1
     progn_new.land.soil_moisture_layer2 .= progn_old.land.soil_moisture_layer2
 
-    progn_new.particles .= progn_old.particles
+    # copy largest subset of particles
+    if length(progn_new.particles) != length(progn_old.particles)
+        nnew = length(progn_new.particles)
+        nold = length(progn_old.particles)
+        nsub = min(nnew, nold)
+        @warn "Number of particles changed (origin: $nold, destination: $nnew), copying over only the largest subset ($nsub particles)"
+        progn_new.particles[1:nsub] .= progn_old.particles[1:nsub]
+    else
+        progn_new.particles .= progn_old.particles
+    end
+
     progn_new.clock.time = progn_old.clock.time
     progn_new.scale[] = progn_old.scale[]
 

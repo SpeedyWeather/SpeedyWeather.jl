@@ -4,32 +4,47 @@ SpeedyWeather.jl uses NetCDF to output the data of a simulation.
 The following describes the details of this and how to change the way in which the NetCDF output is written.
 There are many options to this available.
 
-## Accessing the NetCDF output writer
-
-The output writer is a component of every Model, i.e. `BarotropicModel`, `ShallowWaterModel`, `PrimitiveDryModel` and `PrimitiveWetModel`, hence a non-default output writer can be passed on as a keyword argument to the model constructor
+## Creating `NetCDFOutput`
 
 ```@example netcdf
 using SpeedyWeather
 spectral_grid = SpectralGrid()
-output = OutputWriter(spectral_grid, ShallowWater)
+output = NetCDFOutput(spectral_grid)
+```
+
+With `NetCDFOutput(::SpectralGrid, ...)` one creates a `NetCDFOutput` writer with several options,
+which are explained in the following. By default, the `NetCDFOutput` is created when constructing
+the model, i.e.
+
+```@example netcdf
+model = ShallowWaterModel(;spectral_grid)
+model.output
+```
+
+The output writer is a component of every Model, i.e. `BarotropicModel`, `ShallowWaterModel`, `PrimitiveDryModel`
+and `PrimitiveWetModel`, and they only differ in their default `output.variables` (e.g. the primitive
+models would by default output temperature which does not exist in the 2D models `BarotropicModel` or `ShallowWaterModel`).
+But any `NetCDFOutput` can be passed onto the model constructor with the `output` keyword argument.
+
+```@example netcdf
+output = NetCDFOutput(spectral_grid, Barotropic)
 model = ShallowWaterModel(; spectral_grid, output=output)
 nothing # hide
 ```
 
-So after we have defined the grid through the `SpectralGrid` object we can use and change
-the implemented `OutputWriter` by passing on additional arguments.
-The `spectral_grid` has to be the first argument then the model type
-(`Barotropic`, `ShallowWater`, `PrimitiveDry`, or `PrimitiveWet`)
-which helps the output writer to make default choices on which variables to output.
-Then we can also pass on further keyword arguments. So let's start with an example.
+Here, we created `NetCDFOutput` for the model class `Barotropic` (2nd positional argument, outputting only vorticity and velocity)
+but use it in the `ShallowWaterModel`. By default the `NetCDFOutput` is set to inactive, i.e.
+`output.active` is `false`. It is only turned on (and initialized) with `run!(simulation, output=true)`.
+So you may change the `NetCDFOutput` as you like but only calling `run!(simulation)` will not
+trigger it as `output=false` is the default here.
 
-## Example 1: NetCDF output every hour
+## Output frequency
 
 If we want to increase the frequency of the output we can choose `output_dt` (default `=Hour(6)`) like so
 ```@example netcdf
-output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(1))
+output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
 model = ShallowWaterModel(; spectral_grid, output=output)
-nothing # hide
+model.output
 ```
 which will now output every hour. It is important to pass on the new output writer `output` to the
 model constructor, otherwise it will not be part of your model and the default is used instead.
@@ -44,7 +59,7 @@ time_stepping.Δt_sec
 seconds. Depending on the output frequency (we chose `output_dt = Hour(1)` above)
 this will be slightly adjusted during model initialization:
 ```@example netcdf
-output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(1))
+output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
 model = ShallowWaterModel(; spectral_grid, time_stepping, output)
 simulation = initialize!(model)
 model.time_stepping.Δt_sec
@@ -76,7 +91,7 @@ ds["time"][:]
 which is a bit ugly, that's why `adjust_with_output=true` is the default. In that case we would have
 ```@example netcdf
 time_stepping = Leapfrog(spectral_grid, adjust_with_output=true)
-output = OutputWriter(spectral_grid, ShallowWater, output_dt=Hour(1))
+output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
 model = ShallowWaterModel(; spectral_grid, time_stepping, output)
 simulation = initialize!(model)
 run!(simulation, period=Day(1), output=true)
@@ -86,15 +101,15 @@ ds["time"][:]
 ```
 very neatly hourly output in the NetCDF file!
 
-## [Example 2: Output onto a higher/lower resolution grid](@id output_grid)
+## Output grid
 
 Say we want to run the model at a given horizontal resolution but want to output on another resolution,
-the `OutputWriter` takes as argument `output_Grid<:AbstractFullGrid` and `nlat_half::Int`.
+the `NetCDFOutput` takes as argument `output_Grid<:AbstractFullGrid` and `nlat_half::Int`.
 So for example `output_Grid=FullClenshawGrid` and `nlat_half=48` will always interpolate onto a
 regular 192x95 longitude-latitude grid of 1.875˚ resolution, regardless the grid and resolution used
 for the model integration.
-```julia
-my_output_writer = OutputWriter(spectral_grid, ShallowWater, output_Grid=FullClenshawGrid, nlat_half=48)
+```@example netcdf
+my_output_writer = NetCDFOutput(spectral_grid, output_Grid=FullClenshawGrid, nlat_half=48)
 ```
 Note that by default the output is on the corresponding full type of the grid type used in the dynamical core
 so that interpolation only happens at most in the zonal direction as they share the location of the
@@ -119,7 +134,52 @@ The grids `FullHEALPixGrid`, `FullOctaHEALPixGrid` share the same latitude rings
 but have always as many longitude points as they are at most around the equator. These grids are not
 tested in the dynamical core (but you may use them experimentally) and mostly designed for output purposes.
 
-## Example 3: Changing the output path or identification
+## Output variables
+
+One can easily add or remove variables from being output with the `NetCDFOut` writer. The following
+variables are predefined (note they are not exported so you have to prefix `SpeedyWeather.`)
+
+```@example netcdf
+using InteractiveUtils # hide
+subtypes(SpeedyWeather.AbstractOutputVariable)
+```
+
+"Defined" here means that every such type contains information about a variables (long) name,
+its units, dimensions, any missing values and compression options. For `HumidityOutput` for example
+we have
+
+```@example netcdf
+SpeedyWeather.HumidityOutput()
+```
+
+You can choose name and unit as you like, e.g. `SpeedyWeather.HumidityOutput(unit = "1")` or change
+the compression options, e.g. `SpeedyWeather.HumidityOutput(keepbits = 5)` but more customisation
+is discussed in [Customizing netCDF output](@ref).
+
+We can add new output variables with `add!` 
+
+```@example netcdf
+output = NetCDFOutput(spectral_grid)            # default variables
+add!(output, SpeedyWeather.DivergenceOutput())  # output also divergence
+output
+```
+
+If you didn't create a `NetCDFOutput` separately, you can also apply this directly to `model`,
+either `add!(model, SpeedyWeather.DivergenceOutput())` or `add!(model.output, args...)`,
+which technically also just forwards to `add!(model.output.variables, args...)`.
+`output.variables` is a dictionary were the variable names (as `Symbol`s) are used as keys,
+so `output.variables[:div]` just returns the `SpeedyWeather.DivergenceOutput()` we have
+just created using `:div` as key. With those keys one can also `delete!` a variable
+from netCDF output
+
+```@example netcdf
+delete!(output, :div)
+```
+
+If you change the `name` of an output variable, i.e. `SpeedyWeather.DivergenceOutput(name="divergence")`
+the key would change accordingly to `:divergence`.
+
+## Output path and identification
 
 That's easy by passing on `path="/my/favourite/path/"` and the folder `run_*` with `*` the identification
 of the run (that's the `id` keyword, which can be manually set but is also automatically determined as a
@@ -127,11 +187,11 @@ number counting up depending on which folders already exist) will be created wit
 ```julia
 julia> path = pwd()
 "/Users/milan"
-julia> my_output_writer = OutputWriter(spectral_grid, PrimitiveDry, path=path)
+julia> my_output_writer = NetCDFOutput(spectral_grid, path=path)
 ```
 This folder must already exist. If you want to give your run a name/identification you can pass on `id`
 ```julia
-julia> my_output_writer = OutputWriter(spectral_grid, PrimitiveDry, id="diffusion_test");
+julia> my_output_writer = NetCDFOutput(spectral_grid, id="diffusion_test");
 ```
 which will be used instead of a 4 digit number like 0001, 0002 which is automatically determined if
 `id` is not provided. You will see the id of the run in the progress bar
@@ -148,11 +208,11 @@ run_diffusion_test
 
 ## Further options
 
-Further options are described in the `OutputWriter` docstring, (also accessible via `julia>?OutputWriter` for example).
+Further options are described in the `NetCDFOutput` docstring, (also accessible via `julia>?NetCDFOutput` for example).
 Note that some fields are actual options, but others are derived from the options you provided or are
 arrays/objects the output writer needs, but shouldn't be passed on by the user.
 The actual options are declared as `[OPTION]` in the following
 
 ```@example netcdf
-@doc OutputWriter
+@doc NetCDFOutput
 ```

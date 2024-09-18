@@ -46,7 +46,7 @@ end
 In Julia this introduces a new (so-called compound) type that is a subtype of `AbstractForcing`,
 we have a bunch of these abstract super types defined (see [Abstract model components](@ref))
 and you want to piggy-back on them because of multiple-dispatch. This new type could also be 
-a `mutable struct`, could have keywords defined with `Base.@kwdef` and can
+a `mutable struct`, could have keywords defined with `@kwdef` and can
 also be parametric with respect to the number format `NF` or grid, but let's skip
 those details for now. Conceptually you include into the type any parameters
 (example the float `a` here) that you may need and especially those that you want to change
@@ -59,7 +59,7 @@ to define a mask here that somehow includes the information of your region.
 For a more concrete example see [Custom forcing and drag](@ref).
 
 To define the new type's initialization, at the most basic level you need
-to extend the `initialize!` function for this new type
+to extend the `initialize!` function for this new type. A dummy example:
 ```@example extending
 function initialize!(forcing::MyForcing, model::AbstractModel)
     # fill in/change any fields of your new forcing here
@@ -84,11 +84,13 @@ As the last step we have to extend the `forcing!` function which is the function
 that is called on _every_ step of the time integration. This new method
 for `forcing!` needs to have the following function signature
 ```@example extending
-function forcing!(  diagn::DiagnosticVariablesLayer,
-                    progn::PrognosticVariablesLayer,
-                    forcing::MyForcing,
-                    time::DateTime,
-                    model::AbstractModel)
+function forcing!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    forcing::MyForcing,
+    model::AbstractModel,
+    lf::Integer,
+)
     # whatever the forcing is supposed to do, in the end you want
     # to write into the tendency fields
     diagn.tendencies.u_tend_grid = forcing.a
@@ -96,12 +98,12 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
     diagn.tendencies.vor_tend = forcing.a
 end
 ```
-`DiagnosticVariablesLayer` is the type of the first argument, because it contains
+`DiagnosticVariables` is the type of the first argument, because it contains
 the tendencies you will want to change, so this is supposed to be read and write.
-The other arguments should be treated read-only. You make use of the `time`
-or anything else in the `model`, but the latter likely comes with a performance
-penalty which is why we often unpack the model in a function barrier. But let's
-skip that detail for now. Generally, try to precompute what you can in
+The other arguments should be treated read-only. You can make use of anything else
+in `model`, but often we unpack the model in a function barrier (which can help with
+type inference and therefore performance). But let's skip that detail for now.
+Generally, try to precompute what you can in
 `initialize!`. For the forcing you will need to force the velocities `u, v` in
 grid-point space or the vorticity `vor`, divergence `div` in spectral space.
 This is not a constrain in most applications we came across, but in case it
@@ -156,13 +158,11 @@ does not mean it is not possible. Just reach out by
 creating an issue in this case.
 
 Similarly, `AbstractParameterization` has several
-subtypes that define conceptual classes of parameterizations,
-namely
+subtypes that define conceptual classes of parameterizations, namely
 ```@example extending
 subtypes(SpeedyWeather.AbstractParameterization)
 ```
 
-but these are discussed in more detail in
-[Parameterizations](@ref). For a more concrete example
-of how to define a new forcing for the 2D models,
+but these are discussed in more detail in [Parameterizations](@ref).
+For a more concrete example of how to define a new forcing for the 2D models,
 see [Custom forcing and drag](@ref).

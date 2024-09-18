@@ -56,6 +56,6 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
     end
     ncfile = NCDataset(path)
 
-    a = albedo.file_Grid(ncfile[albedo.varname][:, :])
+    a = albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as=Matrix)
     interpolate!(albedo.albedo, a)
 end

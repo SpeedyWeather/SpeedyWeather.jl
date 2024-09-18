@@ -117,11 +117,17 @@ function (::Type{Grid})(data::AbstractArray, nlat_half::Integer) where {Grid<:Ab
 end
 
 # if no nlat_half provided calculate it
-function (::Type{Grid})(data::AbstractArray) where {Grid<:AbstractGridArray}
+(::Type{Grid})(M::AbstractArray; input_as=Vector) where Grid<:AbstractGridArray = Grid(M, input_as)
+
+function (::Type{Grid})(data::AbstractArray, input_as::Type{Vector}) where Grid<:AbstractGridArray
     npoints2D = size(data, 1)                   # from 1st dim of data
     nlat_half = get_nlat_half(Grid, npoints2D)  # get nlat_half of Grid
     return Grid(data, nlat_half)
 end
+
+function (::Type{Grid})(data::AbstractArray, input_as::Type{Matrix})  where Grid<:AbstractGridArray
+    error("Only full grids can be created from matrix input")
+end 
 
 for f in (:zeros, :ones, :rand, :randn)
     @eval begin
@@ -302,8 +308,8 @@ for k in eachgrid(grid)
 @inline eachgrid(grid::AbstractGridArray) = CartesianIndices(size(grid)[2:end])
 
 # several arguments to check for matching grids
-function eachgrid(grid1::AbstractGridArray, grids::AbstractGridArray...)
-    grids_match(grid1, grids...) || throw(DimensionMismatch(grid1, grids...))
+function eachgrid(grid1::AbstractGridArray, grids::AbstractGridArray...; kwargs...)
+    grids_match(grid1, grids...; kwargs...) || throw(DimensionMismatch(grid1, grids...))
     return eachgrid(grid1)
 end
 
@@ -353,13 +359,28 @@ Base.any(G::AbstractGridArray) = any(G.data)
 
 """$(TYPEDSIGNATURES) True if both `A` and `B` are of the same nonparametric grid type
 (e.g. OctahedralGaussianArray, regardless type parameter `T` or underyling array type `ArrayType`)
-and of same resolution (nlat_half) and total grid points (length). Sizes of (4,) and (4,1)
-would match for example, but (8,1) and (4,2) would not (nlat_half not identical)."""
-function grids_match(A::AbstractGridArray, B::AbstractGridArray; horizontal_only::Bool = false)
-    resolution_match = get_nlat_half(A) == get_nlat_half(B)
-    npoints_match = horizontal_only ? true : length(A) == length(B)
-    resolution_match && npoints_match && return grids_match(typeof(A), typeof(B))
-    return false
+and of same resolution (`nlat_half`) and total grid points (`length`). Sizes of `(4,)` and `(4,1)`
+would match for example, but `(8,1)` and `(4,2)` would not (`nlat_half` not identical)."""
+function grids_match(
+    A::AbstractGridArray,
+    B::AbstractGridArray;
+    horizontal_only::Bool = false,
+    vertical_only::Bool = false,
+)
+    @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only = $horizontal_ony and vertical_only = $vertical_only"
+
+    horizontal_match = get_nlat_half(A) == get_nlat_half(B)
+    vertical_match = size(A)[2:end] == size(B)[2:end]
+    type_match = grids_match(typeof(A), typeof(B))
+
+    if horizontal_only
+        # type also has to match as two different grid types can have the same nlat_half
+        return horizontal_match && type_match
+    elseif vertical_only
+        return vertical_match
+    else
+        return horizontal_match && vertical_match && type_match
+    end
 end
 
 # eltypes can be different and also array types of underlying data
@@ -423,7 +444,14 @@ function Base.similar(bc::Broadcasted{AbstractGridArrayStyle{N, Grid}}, ::Type{T
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-AbstractGridArrayStyle{N, Grid}(::Val{M}) where {N, Grid, M} = AbstractGridArrayStyle{N, Grid}()
+# when there's a dimension mismatch always choose the larger dimension
+AbstractGridArrayStyle{N, Grid}(::Val{N}) where {N, Grid} = AbstractGridArrayStyle{N, Grid}()
+AbstractGridArrayStyle{1, Grid}(::Val{2}) where {Grid} = AbstractGridArrayStyle{2, Grid}()
+AbstractGridArrayStyle{1, Grid}(::Val{0}) where {Grid} = AbstractGridArrayStyle{1, Grid}()
+AbstractGridArrayStyle{2, Grid}(::Val{3}) where {Grid} = AbstractGridArrayStyle{3, Grid}()
+AbstractGridArrayStyle{2, Grid}(::Val{1}) where {Grid} = AbstractGridArrayStyle{2, Grid}()
+AbstractGridArrayStyle{3, Grid}(::Val{4}) where {Grid} = AbstractGridArrayStyle{4, Grid}()
+AbstractGridArrayStyle{3, Grid}(::Val{2}) where {Grid} = AbstractGridArrayStyle{3, Grid}()
 
 ## GPU
 struct AbstractGPUGridArrayStyle{N, ArrayType, Grid} <: GPUArrays.AbstractGPUArrayStyle{N} end
@@ -435,9 +463,17 @@ function Base.BroadcastStyle(
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
-AbstractGPUGridArrayStyle{N, ArrayType, Grid}(::Val{M}) where {N, ArrayType, Grid, M} =
+# when there's a dimension mismatch always choose the larger dimension
+AbstractGPUGridArrayStyle{N, ArrayType, Grid}(::Val{N}) where {N, ArrayType, Grid} =
     AbstractGPUGridArrayStyle{N, ArrayType, Grid}()
 
+AbstractGPUGridArrayStyle{1, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{1, ArrayType, Grid}(::Val{0}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{1, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{3}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{1}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{4}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{4, ArrayType, Grid}()
+AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
+    
 function GPUArrays.backend(
     ::Type{Grid}
 ) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}

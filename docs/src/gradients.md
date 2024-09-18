@@ -165,6 +165,13 @@ additional degree, but in the returned lower triangular matrix this row is set t
     Scalar quantities contain this degree too for size compatibility but they should not
     make use of it. Use `spectral_truncation` to add or remove this degree manually.
 
+You may also generally assume that a `SpectralTransform` struct precomputed for
+some truncation, say ``l_{max} = m_{max} = T`` could also be used for smaller
+lower triangular matrices. While this is mathematically true, this does not work
+here in practice because [`LowerTriangularMatrices`](@ref lowertriangularmatrices)
+are implemented as a vector. So always use a `SpectralTransform` struct that
+fits matches your resolution exactly (otherwise an error will be thrown).
+
 ## Example: Geostrophy (continued)
 
 Now we transfer `vor` into grid-point space, but specify that we want it on the grid

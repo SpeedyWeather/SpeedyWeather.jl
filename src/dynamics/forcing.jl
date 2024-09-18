@@ -24,15 +24,21 @@ Galewsky, 2004, but mirrored for both hemispheres.
 
 $(TYPEDFIELDS)
 """
-Base.@kwdef mutable struct JetStreamForcing{NF} <: AbstractForcing
+@kwdef mutable struct JetStreamForcing{NF} <: AbstractForcing
     "Number of latitude rings"
     nlat::Int = 0
+
+    "Number of vertical layers"
+    nlayers::Int = 0
 
     "jet latitude [˚N]"
     latitude::NF = 45
     
     "jet width [˚], default ≈ 19.29˚"
     width::NF = (1/4-1/7)*180
+
+    "sigma level [1], vertical location of jet"
+    sigma::NF = 0.2
 
     "jet speed scale [m/s]"
     speed::NF = 85
@@ -42,10 +48,13 @@ Base.@kwdef mutable struct JetStreamForcing{NF} <: AbstractForcing
 
     "precomputed amplitude vector [m/s²]"
     amplitude::Vector{NF} = zeros(NF, nlat)
+
+    "precomputed vertical tapering"
+    tapering::Vector{NF} = zeros(NF, nlayers)
 end
 
 JetStreamForcing(SG::SpectralGrid; kwargs...) = JetStreamForcing{SG.NF}(
-    ; nlat=SG.nlat, kwargs...)
+    ; nlat=SG.nlat, nlayers=SG.nlayers, kwargs...)
 
 function initialize!(   forcing::JetStreamForcing,
                         model::AbstractModel)
@@ -53,12 +62,12 @@ function initialize!(   forcing::JetStreamForcing,
     (; latitude, width, speed, time_scale, amplitude) = forcing
     (; radius) = model.spectral_grid
     
-    # Some constants similar to Galewsky 2004
+    # Some constants similar to Galewsky 2004
     θ₀ = (latitude-width)/360*2π        # southern boundary of jet [radians]
     θ₁ = (latitude+width)/360*2π        # northern boundary of jet
     eₙ = exp(-4/(θ₁-θ₀)^2)              # normalisation, so that speed is at max
     A₀ = speed/eₙ/time_scale.value      # amplitude [m/s²] without lat dependency
-    A₀ *= radius                        # scale by radius as are the momentum equations
+    A₀ *= radius                        # scale by radius as are the momentum equations
 
     (; nlat, colat) = model.geometry
 
@@ -73,33 +82,45 @@ function initialize!(   forcing::JetStreamForcing,
         end
     end
 
+    # vertical tapering
+    (; nlayers, sigma, tapering) = forcing
+    (; σ_levels_full) = model.geometry
+
+    for k in 1:nlayers
+        tapering[k] = 1 - abs(sigma - σ_levels_full[k])
+    end
+
     return nothing
 end
 
 # function barrier
-function forcing!(  diagn::DiagnosticVariablesLayer,
-                    progn::PrognosticVariablesLayer,
-                    forcing::JetStreamForcing,
-                    time::DateTime,
-                    model::AbstractModel)
+function forcing!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    forcing::JetStreamForcing,
+    model::AbstractModel,
+    lf::Integer,
+)
     forcing!(diagn, forcing)
 end
 
-"""
-$(TYPEDSIGNATURES)
-
+"""$(TYPEDSIGNATURES)
 Set for every latitude ring the tendency to the precomputed forcing
 in the momentum equations following the JetStreamForcing.
 The forcing is precomputed in `initialize!(::JetStreamForcing, ::AbstractModel)`."""
-function forcing!(  diagn::DiagnosticVariablesLayer,
-                    forcing::JetStreamForcing)
-    Fu = diagn.tendencies.u_tend_grid
-    (; amplitude) = forcing
+function forcing!(
+    diagn::DiagnosticVariables,
+    forcing::JetStreamForcing)
 
-    @inbounds for (j, ring) in enumerate(eachring(Fu))
-        F = amplitude[j]
-        for ij in ring
-            Fu[ij] = F
+    Fu = diagn.tendencies.u_tend_grid
+    (; amplitude, tapering) = forcing
+
+    @inbounds for k in eachgrid(Fu) 
+        for (j, ring) in enumerate(eachring(Fu))
+            F = amplitude[j]
+            for ij in ring
+                Fu[ij] = tapering[k]*F
+            end
         end
     end
 end

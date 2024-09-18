@@ -50,7 +50,7 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         simulation = initialize!(model)
         suite.memory[i] = Base.summarysize(simulation)
 
-        nsteps = n_timesteps(trunc, nlev)
+        nsteps = n_timesteps(trunc, nlayers)
         period = Second(round(Int,model.time_stepping.Δt_sec * (nsteps+1)))
         run!(simulation; period)
 
