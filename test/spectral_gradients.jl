@@ -197,8 +197,6 @@ end
         spectral_truncation!(vor)      # set unusued last row (l=lmax+1) to zero
         spectral_truncation!(div)
 
-        @info vor
-
         # get corresponding u_grid, v_grid (excl *coslat scaling)
         lf = 1
         SpeedyWeather.transform!(diagn, progn, lf, model)

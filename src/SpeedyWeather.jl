@@ -83,7 +83,6 @@ include("gpu.jl")
 # abstract types
 include("models/abstract_models.jl")
 include("dynamics/abstract_types.jl")
-include("output/abstract_types.jl")
 include("physics/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
@@ -140,9 +139,9 @@ include("physics/land.jl")
 
 # OUTPUT
 include("output/schedule.jl")
+include("output/feedback.jl")
 include("output/netcdf_output.jl")
 include("output/restart_file.jl")
-include("output/feedback.jl")
 include("output/plot.jl")
 include("output/callbacks.jl")
 include("output/particle_tracker.jl")

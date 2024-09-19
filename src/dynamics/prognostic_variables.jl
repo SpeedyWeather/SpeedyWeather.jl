@@ -202,6 +202,8 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     return progn_new
 end
 
+export set!
+
 """
 $(TYPEDSIGNATURES)
 Sets new values for the keyword arguments (velocities, vorticity, divergence, etc..) into the
@@ -239,21 +241,26 @@ function set!(
     S::Union{Nothing, SpectralTransform} = nothing,
     coslat_scaling_included::Bool = false,
 )
+    # ATMOSPHERE
     isnothing(vor)   || set!(progn.vor[lf],     vor, geometry, S; add)
     isnothing(div)   || set!(progn.div[lf],     div, geometry, S; add)
     isnothing(temp)  || set!(progn.temp[lf],   temp, geometry, S; add)
     isnothing(humid) || set!(progn.humid[lf], humid, geometry, S; add)
     isnothing(pres)  || set!(progn.pres[lf],   pres, geometry, S; add)
-
+    
+    # or provide u, v instead of vor, div
+    isnothing(u) | isnothing(v) || set_vordiv!(progn.vor[lf], progn.div[lf], u, v, geometry, S; add, coslat_scaling_included)
+    
+    # OCEAN
     isnothing(sea_surface_temperature)  || set!(progn.ocean.sea_surface_temperature, sea_surface_temperature, geometry, S; add)
     isnothing(sea_ice_concentration)    || set!(progn.ocean.sea_ice_concentration, sea_ice_concentration, geometry, S; add)
 
+    # LAND
     isnothing(land_surface_temperature) || set!(progn.land.land_surface_temperature, land_surface_temperature, geometry, S; add)
     isnothing(snow_depth)               || set!(progn.land.snow_depth, snow_depth, geometry, S; add)
     isnothing(soil_moisture_layer1)     || set!(progn.land.soil_moisture_layer1, soil_moisture_layer1, geometry, S; add)
     isnothing(soil_moisture_layer2)     || set!(progn.land.soil_moisture_layer2, soil_moisture_layer2, geometry, S; add)
-
-    isnothing(u) | isnothing(v) || set_vordiv!(progn.vor[lf], progn.div[lf], u, v, geometry, S; add, coslat_scaling_included)
+    return nothing
 end
 
 # set LTA <- LTA 

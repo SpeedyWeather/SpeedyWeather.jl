@@ -1,3 +1,5 @@
+abstract type AbstractFeedback end
+
 export Feedback
 
 """
