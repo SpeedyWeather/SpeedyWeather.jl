@@ -153,6 +153,7 @@ function Base.show(
     println(io, "│└ sea_ice_concentration:    $nlat-ring $Grid")
     println(io, "├┐land:  PrognosticVariablesLand{$NF}")
     println(io, "│├ land_surface_temperature: $nlat-ring $Grid")
+    println(io, "│├ snow_depth: $nlat-ring $Grid")
     println(io, "│├ soil_moisture_layer1:     $nlat-ring $Grid")
     println(io, "│└ soil_moisture_layer2:     $nlat-ring $Grid")
     println(io, "├ particles: $nparticles-element $(typeof(progn.particles))")
@@ -180,6 +181,7 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     
     # land
     progn_new.land.land_surface_temperature .= progn_old.land.land_surface_temperature
+    progn_new.land.snow_depth .= progn_old.land.snow_depth
     progn_new.land.soil_moisture_layer1 .= progn_old.land.soil_moisture_layer1
     progn_new.land.soil_moisture_layer2 .= progn_old.land.soil_moisture_layer2
 
@@ -199,3 +201,200 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
 
     return progn_new
 end
+
+"""
+$(TYPEDSIGNATURES)
+Sets new values for the keyword arguments (velocities, vorticity, divergence, etc..) into the
+prognostic variable struct `progn` at timestep index `lf`. If `add==true` they are added to the 
+current value instead. If a `SpectralTransform` S is provided, it is used when needed to set 
+the variable, otherwise it is recomputed. In case `u` and `v` are provied, actually the divergence
+and vorticity are set and `coslat_scaling_included` specficies whether or not the 1/cos(lat) 
+scaling is already included in the arrays or not (default: `false`)
+
+The input may be:
+* A function or callable object `f(lond, latd, σ) -> value` (multilevel variables) 
+* A function or callable object `f(lond, latd) -> value` (surface level variables)
+* An instance of `AbstractGridArray` 
+* An instance of `LowerTriangularArray` 
+* A scalar `<: Number` (interpreted as a constant field in grid space)
+"""
+function set!(
+    progn::PrognosticVariables,
+    geometry::Geometry;
+    u = nothing,
+    v = nothing,
+    vor = nothing,
+    div = nothing,
+    temp = nothing,
+    humid = nothing,
+    pres = nothing,
+    sea_surface_temperature = nothing, 
+    sea_ice_concentration = nothing, 
+    land_surface_temperature = nothing, 
+    snow_depth = nothing, 
+    soil_moisture_layer1 = nothing, 
+    soil_moisture_layer2 = nothing,
+    lf::Integer = 1,
+    add::Bool = false,
+    S::Union{Nothing, SpectralTransform} = nothing,
+    coslat_scaling_included::Bool = false,
+)
+    isnothing(vor)   || set!(progn.vor[lf],     vor, geometry, S; add)
+    isnothing(div)   || set!(progn.div[lf],     div, geometry, S; add)
+    isnothing(temp)  || set!(progn.temp[lf],   temp, geometry, S; add)
+    isnothing(humid) || set!(progn.humid[lf], humid, geometry, S; add)
+    isnothing(pres)  || set!(progn.pres[lf],   pres, geometry, S; add)
+
+    isnothing(sea_surface_temperature)  || set!(progn.ocean.sea_surface_temperature, sea_surface_temperature, geometry, S; add)
+    isnothing(sea_ice_concentration)    || set!(progn.ocean.sea_ice_concentration, sea_ice_concentration, geometry, S; add)
+
+    isnothing(land_surface_temperature) || set!(progn.land.land_surface_temperature, land_surface_temperature, geometry, S; add)
+    isnothing(snow_depth)               || set!(progn.land.snow_depth, snow_depth, geometry, S; add)
+    isnothing(soil_moisture_layer1)     || set!(progn.land.soil_moisture_layer1, soil_moisture_layer1, geometry, S; add)
+    isnothing(soil_moisture_layer2)     || set!(progn.land.soil_moisture_layer2, soil_moisture_layer2, geometry, S; add)
+
+    isnothing(u) | isnothing(v) || set_vordiv!(progn.vor[lf], progn.div[lf], u, v, geometry, S; add, coslat_scaling_included)
+end
+
+# set LTA <- LTA 
+function set!(var::LowerTriangularArray{T}, L::LowerTriangularArray, varargs...; add::Bool) where T
+    if add 
+        if size(var) == size(L)
+            var .+= T.(L) 
+        else 
+            L_var = spectral_truncation(L, size(var, 1, as=Matrix), size(var, 2, as=Matrix))
+            var .+= L_var
+        end 
+    else 
+        size(var) != size(L) || fill!(var, zero(T)) # copyto! copies over the largest subset, when size(var) > size(L), the copyto! isn't enough by itself
+        copyto!(var, L)
+    end 
+    return var
+end 
+
+# set LTA <- Grid 
+function set!(var::LowerTriangularArray, grids::AbstractGridArray, geometry::Union{Geometry, Nothing}=nothing, S::Union{Nothing, SpectralTransform}=nothing; add)
+    specs = isnothing(S) ? transform(grids) : transform(grids, S)
+    set!(var, specs; add)
+end
+
+# set LTA <- func 
+function set!(var::LowerTriangularArray, f::Function, geometry::Geometry{NF}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where NF
+    grid = ndims(var) == 1 ? zeros(geometry.Grid{NF}, geometry.nlat_half) : zeros(geometry.Grid{NF}, geometry.nlat_half, geometry.nlayers)
+    set!(grid, f, geometry, S; add=false)
+    set!(var, grid, geometry, S; add)
+end
+
+# set LTA <- number
+function set!(var::LowerTriangularArray{T}, s::Number, geometry::Geometry{NF}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where {T, NF}
+    
+    # appropiate normalization, assume standard 2√π normalisation if no transform is given 
+    norm_sphere = isnothing(S) ? 2sqrt(π) : S.norm_sphere
+
+    # all elements are zero except for the 0,0 one
+    var_new = zero(var)
+
+    for k in eachmatrix(var_new)
+        var_new[1, k] = norm_sphere * s
+    end 
+
+    set!(var, var_new, geometry, S; add)
+end 
+
+# set Grid <- Grid
+function set!(var::AbstractGridArray, grids::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add)
+    if add 
+        if grids_match(var, grids)
+            var .+= grids
+        else 
+            var .+= interpolate(typeof(var), geometry.nlat_half, grids)
+        end
+    else 
+        interpolate!(var, grids)
+    end 
+    return var 
+end 
+
+# set Grid <- LTA
+function set!(var::AbstractGridArray, specs::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add)
+    grids = isnothing(S) ? transform(specs) : transform(specs, S)
+    set!(var, grids, geometry, S; add)
+end
+
+# set Grid <- Func
+function set!(var::AbstractGridArray, f::Function, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add)
+    (; londs, latds, σ_levels_full) = geometry
+    kernel(a, b) = add ? a+b : b
+    for k in eachgrid(var)
+        for ij in eachgridpoint(var)
+            var[ij, k] = kernel(var[ij, k], f(londs[ij], latds[ij], σ_levels_full[k]))
+        end
+    end
+    return var
+end
+
+# set Grid (surface/single level) <- Func
+function set!(var::AbstractGridArray{T,1}, f::Function, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add) where T
+    (; londs, latds) = geometry
+    kernel(a, b) = add ? a+b : b
+    for ij in eachgridpoint(var)
+        var[ij] = kernel(var[ij], f(londs[ij], latds[ij]))
+    end
+    return var
+end
+
+# set Grid <- Number 
+function set!(var::AbstractGridArray{T}, s::Number, geometry::Union{Geometry, Nothing}=nothing, S::Union{Nothing, SpectralTransform}=nothing; add::Bool) where T
+    kernel(a, b) = add ? a+b : b
+    sT = T(s)
+    var .= kernel.(var, sT)
+end 
+
+# set vor_div <- func 
+function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u_func, v_func, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false) 
+    
+    u_L = similar(vor) 
+    set!(u_L, u_func, geometry, S)
+    v_L = similar(vor)
+    set!(v_L, v_func, geometry, S)
+
+    set_vordiv!(vor, div, u_L, v_L, geometry, S; add, coslat_scaling_included)
+end
+
+# set vor_div <- grid 
+function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::AbstractGridArray, v::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false)
+    
+    u_ = coslat_scaling_included ? u : RingGrids.scale_coslat⁻¹(u)
+    v_ = coslat_scaling_included ? v : RingGrids.scale_coslat⁻¹(v)
+
+    u_spec = isnothing(S) ? transform(u_) : transform(u_, S)
+    v_spec = isnothing(S) ? transform(v_) : transform(v_, S)
+
+    set_vordiv!(vor, div, u_spec, v_spec, geometry, S; add, coslat_scaling_included=true)
+end 
+
+# set vor_div <- LTA
+function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::LowerTriangularArray, v::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false) 
+  
+    S = isnothing(S) ? SpectralTransform(geometry.spectral_grid) : S
+     
+    u_ = coslat_scaling_included ? u : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
+    v_ = coslat_scaling_included ? v : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
+
+    if size(vor) != size(u_) != size(v_)
+        u_new = zero(vor)
+        copyto!(u_new, u_) 
+
+        v_new = zero(vor)
+        copyto!(v_new, v_)
+
+        curl!(vor, u_new, v_new, S; add)
+        divergence!(div, u_new, v_new, S; add)
+    else 
+        curl!(vor, u_, v_, S; add)
+        divergence!(div, u_, v_, S; add)
+    end
+end 
+
+set!(S::AbstractSimulation; kwargs...) = set!(S.prognostic_variables, S.model.geometry; S=S.model.spectral_transform, kwargs...)
+set!(progn::PrognosticVariables, model::AbstractModel; kwargs...) = set!(progn, model.geometry; S=model.spectral_transform, kwargs...)

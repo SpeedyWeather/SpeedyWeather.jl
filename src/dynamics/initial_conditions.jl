@@ -66,19 +66,19 @@ function initialize!(   progn::PrognosticVariables{NF},
 
     lmax = progn.trunc + 1
     power = initial_conditions.power + 1    # +1 as power is summed of orders m
-    ξ = randn(Complex{NF}, lmax, lmax)*convert(NF, initial_conditions.amplitude)
-    vor = progn.vor[1]                      # use first leapfrog step
+                   
+    ξ = randn(LowerTriangularArray{Complex{NF}}, lmax, lmax, 1)*convert(NF, initial_conditions.amplitude)
+    ξ[1] = 0 # don't perturb l=m=0 mode to have zero mean
 
-    for k in eachmatrix(vor)                # same vorticity across all vertical layers
-        for m in 1:lmax
-            for l in m:lmax
-                vor[l, m, k] = ξ[l, m]*l^power
-            end
+    for m in 1:lmax
+        for l in m:lmax
+            ξ[l, m, 1] *= l^power
         end
-        
-        # don't perturb l=m=0 mode to have zero mean
-        vor[1, k] = 0
     end
+
+    ξ = repeat(ξ, 1, model.spectral_grid.nlayers) # repeat for each level to have the same IC across all vertical layers
+    
+    set!(progn, model; vor=ξ, lf=1)
 end
 
 export ZonalJet
@@ -251,9 +251,6 @@ function initialize!(   progn::PrognosticVariables{NF},
     vor_grid = zeros(Grid{NF}, nlat_half, nlayers)     # relative vorticity
     div_grid = zeros(Grid{NF}, nlat_half, nlayers)     # divergence (perturbation only)
 
-    vor = progn.vor[1]  # write into first leapfrog time step
-    div = progn.div[1]
-
     for k in eachgrid(vor_grid, div_grid)
 
         η = σ_levels_full[k]    # Jablonowski and Williamson use η for σ coordinates
@@ -291,10 +288,8 @@ function initialize!(   progn::PrognosticVariables{NF},
         end
     end
 
-    transform!(vor, vor_grid, S)
-    transform!(div, div_grid, S)
-    spectral_truncation!(vor)
-    spectral_truncation!(div)
+    set!(progn, model; vor=vor_grid, div=vor_grid, lf=1)
+
     return nothing
 end
 
@@ -355,8 +350,6 @@ function initialize!(   progn::PrognosticVariables{NF},
     temp_grid = zeros(Grid{NF}, nlat_half, nlayers)     # temperature
     aΩ = radius*rotation
 
-    temp = progn.temp[1]        # write into first leapfrog time step
-
     for k in eachgrid(temp_grid)
         η = σ_levels_full[k]    # Jablonowski and Williamson use η for σ coordinates
         ηᵥ = (η - η₀)*π/2       # auxiliary variable for vertical coordinate
@@ -374,8 +367,8 @@ function initialize!(   progn::PrognosticVariables{NF},
         end
     end
 
-    transform!(temp, temp_grid, S)
-    spectral_truncation!(temp)
+    set!(progn, model; temp=temp_grid, lf=1)
+
     return nothing
 end
 
@@ -433,7 +426,8 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
 
     # SURFACE TEMPERATURE (store in k = nlayers, but it's actually surface, i.e. k=nlayers+1/2)
     # overwrite with lowermost layer further down
-    temp_surf = progn.layers[end].timesteps[1].temp     # spectral temperature at k=nlayers+1/2
+    temp_surf = progn.temp[1][:,end]     # spectral temperature at k=nlev+1/2
+
     temp_surf[1] = norm_sphere*temp_ref                 # set global mean surface temperature
     for lm in eachharmonic(geopot_surf, temp_surf)
         temp_surf[lm] -= Γg⁻¹*geopot_surf[lm]           # lower temperature for higher mountains
@@ -484,10 +478,9 @@ function initialize!(   progn::PrognosticVariables,
     for ij in eachgridpoint(lnp_grid, orography)
         lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹
     end
+    
+    set!(progn, model; pres=lnp_grid, lf=1)
 
-    lnp = progn.pres[1]
-    transform!(lnp, lnp_grid, model.spectral_transform)
-    spectral_truncation!(lnp)       # set last row to zero as not used for scale variables like pres
     return nothing
 end
 
@@ -502,10 +495,8 @@ function initialize!(   progn::PrognosticVariables,
     
     # logarithm of reference surface pressure [log(Pa)]
     # set the l=m=0 mode, normalize correctly
-    progn.surface.timesteps[1].pres[1] = log(pres_ref) * norm_sphere
+    set!(progn, model; pres=log(pres_ref) * norm_sphere)
 
-    # set other modes explicitly to zero
-    progn.surface.timesteps[1].pres[2:end] .= 0
     return nothing
 end
 
@@ -537,10 +528,9 @@ function initialize!(
             humid_grid[ij, k] = relhumid_ref*q_sat
         end
     end
-        
-    humid = progn.humid[1]
-    transform!(humid, humid_grid, model.spectral_transform)
-    spectral_truncation!(humid)
+    
+    set!(progn, model; humid=humid_grid, lf=1)
+
     return nothing
 end
 
@@ -570,8 +560,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     (; A, lmin, lmax) = initial_conditions
     (; trunc) = progn
 
-    η = progn.pres[1]
-    η .= randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+    η = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
 
     # zero out other wavenumbers
     η[1:min(lmin, trunc+2), :] .= 0
@@ -581,6 +570,8 @@ function initialize!(   progn::PrognosticVariables{NF},
     η_grid = transform(η, model.spectral_transform)
     η_min, η_max = extrema(η_grid)
     η .*= (A/max(abs(η_min), abs(η_max)))
+
+    set!(progn, model; pres=η)
 
     return nothing
 end
