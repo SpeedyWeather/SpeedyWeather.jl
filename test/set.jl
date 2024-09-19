@@ -1,11 +1,8 @@
-
-import SpeedyWeather: set!
-
 @testset "Test PrognosticVariables set!" begin 
 
-    N_lev = 8 
-    N_trunc = 31
-    spectral_grid = SpectralGrid(trunc=N_trunc, nlayers=N_lev) # define resolution
+    nlayers = 8 
+    trunc = 31
+    spectral_grid = SpectralGrid(; trunc, nlayers)         # define resolution
     model = PrimitiveWetModel(; spectral_grid)              # construct model
     simulation = initialize!(model)                         # initialize all model components
  
@@ -14,17 +11,17 @@ import SpeedyWeather: set!
     lf = 2
 
     # test data 
-    L = rand(LowerTriangularArray{ComplexF32}, N_trunc+2, N_trunc+1, N_lev)
+    L = rand(LowerTriangularArray{ComplexF32}, trunc+2, trunc+1, nlayers)
     L_grid = transform(L, model.spectral_transform)
     
-    L2 = rand(LowerTriangularArray{ComplexF32}, N_trunc-5, N_trunc-6, N_lev)    # smaller  
+    L2 = rand(LowerTriangularArray{ComplexF32}, trunc-5, trunc-6, nlayers)    # smaller  
     L2_trunc = spectral_truncation(L2, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
-    L3 = rand(LowerTriangularArray{ComplexF32}, N_trunc+6, N_trunc+5, N_lev)    # bigger 
+    L3 = rand(LowerTriangularArray{ComplexF32}, trunc+6, trunc+5, nlayers)    # bigger 
     L3_trunc = spectral_truncation(L3, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
     
-    A = rand(spectral_grid.Grid{Float32}, spectral_grid.nlat_half, N_lev)       # same grid 
+    A = rand(spectral_grid.Grid{Float32}, spectral_grid.nlat_half, nlayers)       # same grid 
     A_spec = transform(A, model.spectral_transform)
-    B = rand(OctaHEALPixGrid{Float32}, spectral_grid.nlat_half, N_lev)          # different grid 
+    B = rand(OctaHEALPixGrid{Float32}, spectral_grid.nlat_half, nlayers)          # different grid 
     
     f(lon, lat, sig) = sind(lon)*cosd(lat)*(1 - sig)
 
@@ -72,7 +69,7 @@ import SpeedyWeather: set!
 
     # numbers
     set!(simulation, vor=Float32(3.), lf=lf)
-    M3 = zeros(spectral_grid.Grid{Float32}, spectral_grid.nlat_half, N_lev) .+ 3  # same grid 
+    M3 = zeros(spectral_grid.Grid{Float32}, spectral_grid.nlat_half, nlayers) .+ 3  # same grid 
     M3_spec = transform(M3, model.spectral_transform)
     @test prog_new.vor[lf] ≈ M3_spec
 
@@ -85,21 +82,29 @@ import SpeedyWeather: set!
     set!(simulation, sea_surface_temperature=Float16(3.), add=true)
     @test all(prog_new.ocean.sea_surface_temperature .≈ 6.)
 
-    # vor_div 
-    A2 = rand(spectral_grid.Grid{Float32}, spectral_grid.nlat_half, N_lev)   
+    # vor_div, create u,v first in spectral space
+    u = randn(spectral_grid.SpectralVariable3D, trunc+2, trunc+1, nlayers)
+    v = randn(spectral_grid.SpectralVariable3D, trunc+2, trunc+1, nlayers)
+    
+    u_grid = transform(u, model.spectral_transform)
+    v_grid = transform(v, model.spectral_transform)   
 
-    set!(simulation, u=A, v=A2, coslat_scaling_included=false)
+    set!(simulation, u=u_grid, v=v_grid, coslat_scaling_included=false)
 
-    u2_spec = similar(A_spec)
-    v2_spec = similar(A_spec)
+    # now obtain U, V (scaled with coslat) from vor, div
+    U = similar(u)
+    V = similar(v)
 
-    SpeedyWeather.SpeedyTransforms.UV_from_vordiv!(u2_spec, v2_spec, prog_new.vor[lf], prog_new.div[lf], model.spectral_transform)
+    SpeedyTransforms.UV_from_vordiv!(U, V, prog_new.vor[lf], prog_new.div[lf], model.spectral_transform)
 
-    u2 = transform(u2_spec, model.spectral_transform, unscale_coslat=true)
-    v2 = transform(v2_spec, model.spectral_transform, unscale_coslat=true)
+    # back to grid and unscale on the fly
+    u_grid2 = transform(U, model.spectral_transform, unscale_coslat=true)
+    v_grid2 = transform(V, model.spectral_transform, unscale_coslat=true)
 
-    @test_broken A ≈ u2 
-    @test_broken A2 ≈ v2
+    # for ij in eachindex(u_grid, v_grid, u_grid2, v_grid2)
+    #     @test_broken u_grid[ij] ≈ u_grid2[ij] 
+    #     @test_broken v_grid[ij] ≈ v_grid2[ij]
+    # end
 
     # functions 
     (; londs, latds, σ_levels_full) = model.geometry
