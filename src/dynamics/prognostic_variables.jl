@@ -341,7 +341,13 @@ function set!(var::AbstractGridArray, f::Function, geometry::Geometry, S::Union{
 end
 
 # set Grid (surface/single level) <- Func
-function set!(var::AbstractGridArray{T,1}, f::Function, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add) where T
+function set!(
+    var::AbstractGridArray{T,1},
+    f::Function,
+    geometry::Geometry,
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add
+) where T
     (; londs, latds) = geometry
     kernel(a, b) = add ? a+b : b
     for ij in eachgridpoint(var)
@@ -351,15 +357,29 @@ function set!(var::AbstractGridArray{T,1}, f::Function, geometry::Geometry, S::U
 end
 
 # set Grid <- Number 
-function set!(var::AbstractGridArray{T}, s::Number, geometry::Union{Geometry, Nothing}=nothing, S::Union{Nothing, SpectralTransform}=nothing; add::Bool) where T
+function set!(
+    var::AbstractGridArray{T}, 
+    s::Number, 
+    geometry::Union{Geometry, Nothing}=nothing, 
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add::Bool,
+) where T
     kernel(a, b) = add ? a+b : b
     sT = T(s)
     var .= kernel.(var, sT)
 end 
 
 # set vor_div <- func 
-function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u_func, v_func, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false) 
-    
+function set_vordiv!(
+    vor::LowerTriangularArray,
+    div::LowerTriangularArray,
+    u_func,
+    v_func,
+    geometry::Geometry,
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add::Bool,
+    coslat_scaling_included::Bool=false,
+)
     u_L = similar(vor) 
     set!(u_L, u_func, geometry, S)
     v_L = similar(vor)
@@ -369,8 +389,16 @@ function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u_fun
 end
 
 # set vor_div <- grid 
-function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::AbstractGridArray, v::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false)
-    
+function set_vordiv!(
+    vor::LowerTriangularArray,
+    div::LowerTriangularArray,
+    u::AbstractGridArray,
+    v::AbstractGridArray,
+    geometry::Geometry,
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add::Bool,
+    coslat_scaling_included::Bool=false,
+)
     u_ = coslat_scaling_included ? u : RingGrids.scale_coslat⁻¹(u)
     v_ = coslat_scaling_included ? v : RingGrids.scale_coslat⁻¹(v)
 
@@ -381,8 +409,16 @@ function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::Ab
 end 
 
 # set vor_div <- LTA
-function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::LowerTriangularArray, v::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add::Bool, coslat_scaling_included::Bool=false) 
-  
+function set_vordiv!(
+    vor::LowerTriangularArray,
+    div::LowerTriangularArray,
+    u::LowerTriangularArray,
+    v::LowerTriangularArray,
+    geometry::Geometry,
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add::Bool,
+    coslat_scaling_included::Bool=false,
+) 
     S = isnothing(S) ? SpectralTransform(geometry.spectral_grid) : S
      
     u_ = coslat_scaling_included ? u : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
@@ -395,13 +431,19 @@ function set_vordiv!(vor::LowerTriangularArray, div::LowerTriangularArray, u::Lo
         v_new = zero(vor)
         copyto!(v_new, v_)
 
-        curl!(vor, u_new, v_new, S; add)
-        divergence!(div, u_new, v_new, S; add)
+        curl!(vor, u_new, v_new, S; add, radius=geometry.radius)
+        divergence!(div, u_new, v_new, S; add, radius=geometry.radius)
     else 
-        curl!(vor, u_, v_, S; add)
-        divergence!(div, u_, v_, S; add)
+        curl!(vor, u_, v_, S; add, radius=geometry.radius)
+        divergence!(div, u_, v_, S; add, radius=geometry.radius)
     end
 end 
 
-set!(S::AbstractSimulation; kwargs...) = set!(S.prognostic_variables, S.model.geometry; S=S.model.spectral_transform, kwargs...)
-set!(progn::PrognosticVariables, model::AbstractModel; kwargs...) = set!(progn, model.geometry; S=model.spectral_transform, kwargs...)
+function set!(S::AbstractSimulation; kwargs...)
+    set!(S.prognostic_variables, S.model.geometry; S=S.model.spectral_transform, kwargs...)
+end
+
+function set!(progn::PrognosticVariables, model::AbstractModel; kwargs...)
+    progn.scale[] != 1 && @warn "Prognostic variables are scaled with $(progn.scale[]), but `set!` assumes unscaled variables."
+    set!(progn, model.geometry; S=model.spectral_transform, kwargs...)
+end

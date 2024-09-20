@@ -2,26 +2,28 @@
 
     nlayers = 8 
     trunc = 31
-    spectral_grid = SpectralGrid(; trunc, nlayers)         # define resolution
-    model = PrimitiveWetModel(; spectral_grid)              # construct model
-    simulation = initialize!(model)                         # initialize all model components
+    NF = Float64
+    complex_NF = Complex{NF}
+    spectral_grid = SpectralGrid(; NF, trunc, nlayers)  # define resolution
+    model = PrimitiveWetModel(; spectral_grid)          # construct model
+    simulation = initialize!(model)                     # initialize all model components
  
     lmax = model.spectral_transform.lmax
     mmax = model.spectral_transform.mmax
     lf = 2
 
     # test data 
-    L = rand(LowerTriangularArray{ComplexF32}, trunc+2, trunc+1, nlayers)
+    L = rand(spectral_grid.SpectralVariable3D, trunc+2, trunc+1, nlayers)
     L_grid = transform(L, model.spectral_transform)
     
-    L2 = rand(LowerTriangularArray{ComplexF32}, trunc-5, trunc-6, nlayers)    # smaller  
+    L2 = rand(spectral_grid.SpectralVariable3D, trunc-5, trunc-6, nlayers)    # smaller  
     L2_trunc = spectral_truncation(L2, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
-    L3 = rand(LowerTriangularArray{ComplexF32}, trunc+6, trunc+5, nlayers)    # bigger 
+    L3 = rand(spectral_grid.SpectralVariable3D, trunc+6, trunc+5, nlayers)    # bigger 
     L3_trunc = spectral_truncation(L3, size(L, 1, ZeroBased, as=Matrix), size(L, 2, ZeroBased, as=Matrix))
     
-    A = rand(spectral_grid.Grid{Float32}, spectral_grid.nlat_half, nlayers)       # same grid 
+    A = rand(spectral_grid.Grid{NF}, spectral_grid.nlat_half, nlayers)       # same grid 
     A_spec = transform(A, model.spectral_transform)
-    B = rand(OctaHEALPixGrid{Float32}, spectral_grid.nlat_half, nlayers)          # different grid 
+    B = rand(OctaHEALPixGrid{NF}, spectral_grid.nlat_half, nlayers)          # different grid 
     
     f(lon, lat, sig) = sind(lon)*cosd(lat)*(1 - sig)
 
@@ -69,7 +71,7 @@
 
     # numbers
     set!(simulation, vor=Float32(3.), lf=lf)
-    M3 = zeros(spectral_grid.Grid{Float32}, spectral_grid.nlat_half, nlayers) .+ 3  # same grid 
+    M3 = zeros(spectral_grid.Grid{NF}, spectral_grid.nlat_half, nlayers) .+ 3  # same grid 
     M3_spec = transform(M3, model.spectral_transform)
     @test prog_new.vor[lf] ≈ M3_spec
 
@@ -86,10 +88,17 @@
     u = randn(spectral_grid.SpectralVariable3D, trunc+2, trunc+1, nlayers)
     v = randn(spectral_grid.SpectralVariable3D, trunc+2, trunc+1, nlayers)
     
+    # set imaginary component of m=0 to 0 as the rotation of zonal modes is arbitrary
+    SpeedyTransforms.zero_imaginary_zonal_modes!(u)
+    SpeedyTransforms.zero_imaginary_zonal_modes!(v)
+
+    spectral_truncation!(u, 25)     # truncate to lowest 11 wavenumbers
+    spectral_truncation!(v, 25)
+
     u_grid = transform(u, model.spectral_transform)
     v_grid = transform(v, model.spectral_transform)   
 
-    set!(simulation, u=u_grid, v=v_grid, coslat_scaling_included=false)
+    set!(simulation, u=u_grid, v=v_grid, coslat_scaling_included=false, lf=lf)
 
     # now obtain U, V (scaled with coslat) from vor, div
     U = similar(u)
@@ -101,16 +110,19 @@
     u_grid2 = transform(U, model.spectral_transform, unscale_coslat=true)
     v_grid2 = transform(V, model.spectral_transform, unscale_coslat=true)
 
-    # for ij in eachindex(u_grid, v_grid, u_grid2, v_grid2)
-    #     @test_broken u_grid[ij] ≈ u_grid2[ij] 
-    #     @test_broken v_grid[ij] ≈ v_grid2[ij]
+    u2 = transform(u_grid2, model.spectral_transform)
+    v2 = transform(v_grid2, model.spectral_transform)
+
+    # for lm in eachindex(u, v, u2, v2)
+    #     @test u[lm] ≈ u2[lm] atol = sqrt(sqrt(eps(spectral_grid.NF)))
+    #     @test v[lm] ≈ v2[lm] atol = sqrt(sqrt(eps(spectral_grid.NF)))
     # end
 
     # functions 
     (; londs, latds, σ_levels_full) = model.geometry
     for k in SpeedyWeather.RingGrids.eachgrid(A)
         for ij in SpeedyWeather.RingGrids.eachgridpoint(A)
-            A[ij,k] = f(londs[ij],latds[ij],σ_levels_full[k])
+            A[ij,k] = f(londs[ij], latds[ij], σ_levels_full[k])
         end 
     end 
     transform!(A_spec, A, model.spectral_transform)
