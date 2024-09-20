@@ -4,10 +4,11 @@ const DEFAULT_RADIUS = 1
 $(TYPEDSIGNATURES)
 Curl of a vector `u, v` written into `curl`, `curl = ∇×(u, v)`.
 `u, v` are expected to have a 1/coslat-scaling included, otherwise `curl` is scaled.
-Acts on the unit sphere, i.e. it omits 1/radius scaling as all inplace gradient operators.
-`flipsign` option calculates -∇×(u, v) instead. `add` option calculates `curl += ∇×(u, v)` instead.
-`flipsign` and `add` can be combined. This functions only creates the kernel and calls the generic
-divergence function _divergence! subsequently with flipped u, v -> v, u for the curl."""
+Acts on the unit sphere, i.e. it omits 1/radius scaling as all gradient operators
+unless the `radius` keyword argument is provided. `flipsign` option calculates -∇×(u, v) instead.
+`add` option calculates `curl += ∇×(u, v)` instead. `flipsign` and `add` can be combined.
+This functions only creates the kernel and calls the generic divergence function _divergence!
+subsequently with flipped u, v -> v, u for the curl."""
 function curl!(
     curl::LowerTriangularArray,
     u::LowerTriangularArray,
@@ -15,21 +16,22 @@ function curl!(
     S::SpectralTransform;
     flipsign::Bool=false,
     add::Bool=false,
+    kwargs...,
 )
     # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
     kernel(o, a, b, c) = flipsign ? (add ? o-(a+b-c) : -(a+b-c)) :
                                     (add ? o+(a+b-c) :   a+b-c )    
-    _divergence!(kernel, curl, v, u, S)             # flip u, v -> v, u
+    _divergence!(kernel, curl, v, u, S; kwargs...)      # flip u, v -> v, u
 end
 
 """
 $(TYPEDSIGNATURES)
 Divergence of a vector `u, v` written into `div`, `div = ∇⋅(u, v)`. 
 `u, v` are expected to have a 1/coslat-scaling included, otherwise `div` is scaled.
-Acts on the unit sphere, i.e. it omits 1/radius scaling as all inplace gradient operators.
-`flipsign` option calculates -∇⋅(u, v) instead. `add` option calculates `div += ∇⋅(u, v)` instead.
-`flipsign` and `add` can be combined. This functions only creates the kernel and calls
-the generic divergence function _divergence! subsequently."""
+Acts on the unit sphere, i.e. it omits 1/radius scaling as all gradient operators,
+unless the `radius` keyword argument is provided. `flipsign` option calculates -∇⋅(u, v) instead.
+`add` option calculates `div += ∇⋅(u, v)` instead. `flipsign` and `add` can be combined.
+This functions only creates the kernel and calls the generic divergence function _divergence! subsequently."""
 function divergence!(
     div::LowerTriangularArray,
     u::LowerTriangularArray,
@@ -37,11 +39,12 @@ function divergence!(
     S::SpectralTransform;
     flipsign::Bool=false,
     add::Bool=false,
+    kwargs...,
 )
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
     kernel(o, a, b, c) = flipsign ? (add ? o-(a-b+c) : -(a-b+c)) :
                                     (add ? o+(a-b+c) :   a-b+c )                
-    _divergence!(kernel, div, u, v, S)
+    _divergence!(kernel, div, u, v, S; kwargs...)
 end
 
 """
@@ -49,14 +52,15 @@ $(TYPEDSIGNATURES)
 Generic divergence function of vector `u`, `v` that writes into the output into `div`.
 Generic as it uses the kernel `kernel` such that curl, div, add or flipsign
 options are provided through `kernel`, but otherwise a single function is used.
-Acts on the unit sphere, i.e. it omits 1/radius scaling as all inplace gradient operators.
-"""
+Acts on the unit sphere, i.e. it omits 1/radius scaling as all gradient operators,
+unless the `radius` keyword argument is provided."""
 function _divergence!(  
     kernel,
     div::LowerTriangularArray,
     u::LowerTriangularArray,
     v::LowerTriangularArray,
-    S::SpectralTransform
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
 )
     (; grad_y_vordiv1, grad_y_vordiv2 ) = S
   
@@ -89,6 +93,11 @@ function _divergence!(
         end
     end
 
+    # /radius scaling if not unit sphere
+    if radius != 1
+        div .*= inv(radius)
+    end
+
     return div
 end
 
@@ -110,23 +119,18 @@ An example usage is therefore
 """
 function divergence(u::LowerTriangularArray,
                     v::LowerTriangularArray;
-                    radius = DEFAULT_RADIUS)
+                    kwargs...)
 
     S = SpectralTransform(u)
-    div = divergence(u, v, S)
-
-    if radius != 1
-        div .*= inv(radius)
-    end
-
-    return div
+    return divergence(u, v, S; kwargs...)
 end
 
 function divergence(u::LowerTriangularArray,
                     v::LowerTriangularArray,
-                    S::SpectralTransform)
+                    S::SpectralTransforml;
+                    kwargs...)
     div = similar(u)
-    return divergence!(div, u, v, S, add=false, flipsign=false)
+    return divergence!(div, u, v, S; add=false, flipsign=false, kwargs...)
 end
 
 # called by divergence or curl
@@ -134,7 +138,7 @@ function _div_or_curl(
     kernel!,
     u::Grid,
     v::Grid;
-    radius = DEFAULT_RADIUS
+    kwargs...,
 ) where {Grid<:AbstractGridArray}
 
     u_grid = copy(u)
@@ -148,12 +152,7 @@ function _div_or_curl(
     vs = transform(v_grid, S)
 
     div_or_vor = similar(us)
-    kernel!(div_or_vor, us, vs, S, add=false, flipsign=false)
-
-    if radius != 1
-        div_or_vor .*= inv(radius)
-    end
-
+    kernel!(div_or_vor, us, vs, S; add=false, flipsign=false, kwargs...)
     return div_or_vor
 end
 
@@ -193,23 +192,18 @@ requires both `u, v` to be transforms of fields that are scaled with
 """
 function curl(  u::LowerTriangularArray,
                 v::LowerTriangularArray;
-                radius = DEFAULT_RADIUS)
+                kwargs...)
 
     S = SpectralTransform(u)
-    vor = curl(u, v, S)
-
-    if radius != 1
-        vor .*= inv(radius)
-    end
-
-    return vor
+    return curl(u, v, S; kwargs...)
 end
 
 function curl(  u::LowerTriangularArray,
                 v::LowerTriangularArray,
-                S::SpectralTransform)
+                S::SpectralTransform;
+                kwargs...)
     vor = similar(u)
-    curl!(vor, u, v, S, add=false, flipsign=false)
+    curl!(vor, u, v, S; add=false, flipsign=false, kwargs...)
     return vor
 end
 
@@ -220,13 +214,14 @@ Get U, V (=(u, v)*coslat) from vorticity ζ spectral space (divergence D=0)
 Two operations are combined into a single linear operation. First, invert the
 spherical Laplace ∇² operator to get stream function from vorticity. Then
 compute zonal and meridional gradients to get U, V.
-Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
-"""
+Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators,
+unless the `radius` keyword argument is provided."""
 function UV_from_vor!(  
     U::LowerTriangularArray,
     V::LowerTriangularArray,
     vor::LowerTriangularArray,
-    S::SpectralTransform,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
 )
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
@@ -278,7 +273,13 @@ function UV_from_vor!(
         end
     end
 
-    return nothing
+    # *radius scaling if not unit sphere (*radius² for ∇⁻² then /radius to get from stream function to velocity)
+    if radius != 1
+        U .*= radius
+        V .*= radius
+    end
+
+    return U, V
 end
 
 """
@@ -295,7 +296,8 @@ function UV_from_vordiv!(
     V::LowerTriangularArray,
     vor::LowerTriangularArray,
     div::LowerTriangularArray,
-    S::SpectralTransform,
+    S::SpectralTransform;
+    radius = DEFAULT_RADIUS,
 )
     (; vordiv_to_uv_x, vordiv_to_uv1, vordiv_to_uv2 ) = S
     @boundscheck ismatching(S, U) || throw(DimensionMismatch(S, U))
@@ -363,6 +365,14 @@ function UV_from_vordiv!(
             V[lm, k] =  vordiv_to_uv1[lm]*div[lm-1, k]      # other terms are zero
         end
     end
+
+    # *radius scaling if not unit sphere (*radius² for ∇⁻², then /radius to get from stream function to velocity)
+    if radius != 1
+        U .*= radius
+        V .*= radius
+    end
+
+    return U, V
 end
 
 """
@@ -370,7 +380,8 @@ $(TYPEDSIGNATURES)
 Laplace operator ∇² applied to the spectral coefficients `alms` in spherical
 coordinates. The eigenvalues which are precomputed in `S`.
 ∇²! is the in-place version which directly stores the output in the first argument `∇²alms`.
-Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators.
+Acts on the unit sphere, i.e. it omits any radius scaling as all inplace gradient operators,
+unless the `radius` keyword argument is provided.
 
 Keyword arguments
 =================
@@ -387,6 +398,7 @@ function ∇²!(
     add::Bool=false,                # add to output array or overwrite
     flipsign::Bool=false,           # -∇² or ∇²
     inverse::Bool=false,            # ∇⁻² or ∇²
+    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
 )
     @boundscheck ismatching(S, ∇²alms) || throw(DimensionMismatch(S, ∇²alms))
 
@@ -409,6 +421,12 @@ function ∇²!(
         end
     end
 
+    # /radius² or *radius² scaling if not unit sphere
+    if radius != 1
+        R_plusminus_squared = inverse ? radius^2 : inv(radius^2)
+        ∇²alms .*= R_plusminus_squared
+    end
+
     return ∇²alms
 end
 
@@ -420,15 +438,10 @@ Acts on the unit sphere, i.e. it omits 1/radius^2 scaling unless
 function ∇²(
     alms::LowerTriangularArray,     # Input: spectral coefficients
     S::SpectralTransform;           # precomputed eigenvalues
-    radius = DEFAULT_RADIUS,
+    kwargs...,
 )
     ∇²alms = similar(alms)
-    ∇²!(∇²alms, alms, S, add=false, flipsign=false, inverse=false)
-
-    if radius != 1
-        ∇²alms .*= inv(radius^2)
-    end
-
+    ∇²!(∇²alms, alms, S; add=false, flipsign=false, inverse=false, kwargs...)
     return ∇²alms
 end
 
@@ -447,15 +460,10 @@ eigenvalues from `S`. Acts on the unit sphere, i.e. it omits radius^2 scaling un
 function ∇⁻²(
     ∇²alms::LowerTriangularArray,   # Input: spectral coefficients
     S::SpectralTransform;           # precomputed eigenvalues
-    radius = DEFAULT_RADIUS,
+    kwargs...,
 )
     alms = similar(∇²alms)
-    ∇⁻²!(alms, ∇²alms, S, add=false, flipsign=false)
-
-    if radius != 1
-        ∇²alms .*= radius^2
-    end
-
+    ∇⁻²!(alms, ∇²alms, S; add=false, flipsign=false, kwargs...)
     return alms
 end
 
@@ -473,19 +481,21 @@ function ∇⁻²!(
     S::SpectralTransform;           # precomputed eigenvalues
     add::Bool = false,              # add to output array or overwrite
     flipsign::Bool = false,         # -∇⁻² or ∇⁻²
+    kwargs...,
 )
     inverse = true
-    return ∇²!(∇⁻²alms, alms, S; add, flipsign, inverse)
+    return ∇²!(∇⁻²alms, alms, S; add, flipsign, inverse, kwargs...)
 end
 
 """$(TYPEDSIGNATURES) Applies the gradient operator ∇ applied to input `p` and stores the result
 in `dpdx` (zonal derivative) and `dpdy` (meridional derivative). The gradient operator acts
-on the unit sphere and therefore omits the 1/radius scaling"""
+on the unit sphere and therefore omits the 1/radius scaling unless `radius` keyword argument is provided."""
 function ∇!(
     dpdx::LowerTriangularArray,     # Output: zonal gradient
     dpdy::LowerTriangularArray,     # Output: meridional gradient
     p::LowerTriangularArray,        # Input: spectral coefficients
-    S::SpectralTransform,           # includes precomputed arrays
+    S::SpectralTransform;           # includes precomputed arrays
+    radius = DEFAULT_RADIUS,        # scale with radius if provided, otherwise unit sphere
 )
     (; grad_y1, grad_y2) = S
     @boundscheck ismatching(S, p) || throw(DimensionMismatch(S, p))
@@ -528,22 +538,23 @@ function ∇!(
         end
     end
 
+    # 1/radius factor if not unit sphere
+    if radius != 1
+        R⁻¹ = inv(radius)
+        dpdx .*= R⁻¹
+        dpdy .*= R⁻¹
+    end
+
     return dpdx, dpdy
 end
 
 """$(TYPEDSIGNATURES) The zonal and meridional gradient of `p`
 using an existing `SpectralTransform` `S`. Acts on the unit sphere,
 i.e. it omits 1/radius scaling unless `radius` keyword argument is provided."""
-function ∇(p::LowerTriangularArray, S::SpectralTransform; radius = DEFAULT_RADIUS)
+function ∇(p::LowerTriangularArray, S::SpectralTransform; kwargs...)
     dpdx = similar(p)
     dpdy = similar(p)
-    ∇!(dpdx, dpdy, p, S)
-
-    if radius != 1
-        dpdx .*= inv(radius)
-        dpdy .*= inv(radius)
-    end
-
+    ∇!(dpdx, dpdy, p, S; kwargs...)
     return dpdx, dpdy
 end
 
