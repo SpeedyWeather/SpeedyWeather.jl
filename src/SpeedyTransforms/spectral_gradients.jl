@@ -125,9 +125,10 @@ function divergence(u::LowerTriangularArray,
     return divergence(u, v, S; kwargs...)
 end
 
+# use SpectralTransform if provided
 function divergence(u::LowerTriangularArray,
                     v::LowerTriangularArray,
-                    S::SpectralTransforml;
+                    S::SpectralTransform;
                     kwargs...)
     div = similar(u)
     return divergence!(div, u, v, S; add=false, flipsign=false, kwargs...)
@@ -198,6 +199,7 @@ function curl(  u::LowerTriangularArray,
     return curl(u, v, S; kwargs...)
 end
 
+# use SpectralTransform if provided
 function curl(  u::LowerTriangularArray,
                 v::LowerTriangularArray,
                 S::SpectralTransform;
@@ -206,7 +208,6 @@ function curl(  u::LowerTriangularArray,
     curl!(vor, u, v, S; add=false, flipsign=false, kwargs...)
     return vor
 end
-
 
 """
 $(TYPEDSIGNATURES)
