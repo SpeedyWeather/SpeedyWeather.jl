@@ -391,8 +391,11 @@ end
 """$(TYPEDSIGNATURES) True if all grids `A, B, C, ...` provided as arguments
 match according to `grids_match` wrt to `A` (and therefore all)."""
 function grids_match(A::AbstractGridArray, B::AbstractGridArray...; kwargs...)
-    length(B) == 0 && return true   # single grid A always matches itself
-    return grids_match(A, B[1]; kwargs...) && grids_match(A, B[2:end]...; kwargs...)
+    match = true    # single grid A always matches itself
+    for Bi in B     # check for all matching respectively with A
+        match &= grids_match(A, Bi; kwargs...)
+    end
+    return match
 end
 
 """$(TYPEDSIGNATURES) UnitRange to access data on grid `grid` on ring `j`."""

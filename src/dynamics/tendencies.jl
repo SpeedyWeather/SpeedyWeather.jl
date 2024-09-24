@@ -43,8 +43,8 @@ Calculate all tendencies for the PrimitiveEquation model (wet or dry)."""
 function dynamics_tendencies!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
-    model::PrimitiveEquation,
     lf::Integer,                # leapfrog index for tendencies
+    model::PrimitiveEquation,
 )
 
     (; orography, geometry, spectral_transform, geopotential, atmosphere, implicit) = model
@@ -92,6 +92,8 @@ function dynamics_tendencies!(
 
     # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
     bernoulli_potential!(diagn, spectral_transform)
+
+    return nothing
 end
 
 """$(TYPEDSIGNATURES)
@@ -237,7 +239,7 @@ function vertical_velocity!(
     geometry::Geometry,
 )
     (; σ_levels_thick, σ_levels_half, nlayers) = geometry
-    (; σ_tend)= diagn.dynamics                  
+    (; σ_tend) = diagn.dynamics                  
     
     # sum of Δσ-weighted div, uv∇lnp from 1:k-1
     (; div_sum_above, uv∇lnp, uv∇lnp_sum_above) = diagn.dynamics
@@ -246,23 +248,25 @@ function vertical_velocity!(
     (; div_grid) = diagn.grid
     ūv̄∇lnp = diagn.tendencies.pres_tend_grid    # calc'd in surface_pressure_tendency! (excl -D̄)
 
-    for k in eachgrid(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp)
-        if k == nlayers
-            # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlayers+1/2 (stored in layer k)
-            # set to zero for bottom layer then
-            σ_tend[:, k] .= 0
-        else
-            Δσₖ = σ_levels_thick[k]
-            σₖ_half = σ_levels_half[Tuple(k)[1]+1]
+    grids_match(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp) ||
+        throw(DimensionMismatch(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp))
 
-            @inbounds for ij in eachgridpoint(σ_tend)
-                # Hoskins and Simmons, 1975 just before eq. (6)
-                σ_tend[ij, k] = σₖ_half*(div_mean_grid[ij] + ūv̄∇lnp[ij]) -
-                                (div_sum_above[ij, k] + Δσₖ*div_grid[ij, k]) -
-                                (uv∇lnp_sum_above[ij, k] + Δσₖ*uv∇lnp[ij, k])
-            end
+    @inbounds for k in 1:nlayers-1
+        Δσₖ = σ_levels_thick[k]
+        σₖ_half = σ_levels_half[k+1]
+
+        for ij in eachgridpoint(σ_tend)
+            # Hoskins and Simmons, 1975 just before eq. (6)
+            σ_tend[ij, k] = σₖ_half*(div_mean_grid[ij] + ūv̄∇lnp[ij]) -
+                (div_sum_above[ij, k] + Δσₖ*div_grid[ij, k]) -
+                (uv∇lnp_sum_above[ij, k] + Δσₖ*uv∇lnp[ij, k])
         end
     end
+
+    # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlayers+1/2 (stored in layer k)
+    # set to zero for bottom layer then
+    σ_tend[:, nlayers] .= 0
+    return nothing
 end
 
 """
@@ -649,6 +653,7 @@ function bernoulli_potential!(
     transform!(bernoulli, bernoulli_grid, S)                # to spectral space
     bernoulli .+= geopot                                    # add geopotential Φ
     ∇²!(div_tend, bernoulli, S, add=true, flipsign=true)    # add -∇²(½(u² + v²) + ϕ)
+    return nothing
 end
 
 """

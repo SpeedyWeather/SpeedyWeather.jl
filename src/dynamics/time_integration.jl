@@ -309,7 +309,7 @@ function timestep!(
     end
 
     if model.dynamics                                           # switch on/off all dynamics
-        dynamics_tendencies!(diagn, progn, model, lf2)          # dynamical core
+        dynamics_tendencies!(diagn, progn, lf2, model)          # dynamical core
         implicit_correction!(diagn, model.implicit, progn)      # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space
         physics_tendencies_only!(diagn, model)
