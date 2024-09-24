@@ -10,7 +10,7 @@ with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
 model components, are
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct BarotropicModel{
+@kwdef mutable struct BarotropicModel{
     # TODO add constraints again when we stop supporting julia v1.9
     DS,     # <:DeviceSetup,
     GE,     # <:AbstractGeometry,

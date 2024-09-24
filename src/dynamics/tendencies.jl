@@ -117,7 +117,7 @@ function pressure_gradient_flux!(
     (; uv∇lnp ) = diagn.dynamics
 
     # PRESSURE GRADIENT FLUX
-    for k in eachgrid(u_grid, v_grid, uv∇lnp)
+    @inbounds for k in eachgrid(u_grid, v_grid, uv∇lnp)
         for ij in eachgridpoint(u_grid, v_grid, uv∇lnp)
             # the (u, v)⋅∇lnp_s term
             uv∇lnp[ij, k] = u_grid[ij, k]*∇lnp_x[ij] + v_grid[ij, k]*∇lnp_y[ij]
@@ -134,7 +134,7 @@ function temperature_anomaly!(
     (; temp_profile) = implicit     # reference temperature profile
     (; temp_grid, temp_virt_grid ) = diagn.grid
 
-    for k in eachgrid(temp_grid, temp_virt_grid)
+    @inbounds for k in eachgrid(temp_grid, temp_virt_grid)
         Tₖ = temp_profile[k]
         for ij in eachgridpoint(temp_grid, temp_virt_grid)
             temp_grid[ij, k]      -= Tₖ  # absolute temperature -> anomaly
@@ -166,12 +166,12 @@ function vertical_integration!(
 
     @boundscheck nlayers == diagn.nlayers || throw(BoundsError)
 
-    fill!(u_mean_grid, 0)       # reset accumulators from previous vertical average
+    fill!(u_mean_grid, 0)           # reset accumulators from previous vertical average
     fill!(v_mean_grid, 0)
     fill!(div_mean_grid, 0)
     fill!(div_mean, 0)
 
-    for k in 1:nlayers          # integrate from top to bottom
+    @inbounds for k in 1:nlayers    # integrate from top to bottom
 
         # arrays for layer-thickness weighted column averages
         Δσₖ = σ_levels_thick[k]
@@ -255,7 +255,7 @@ function vertical_velocity!(
             Δσₖ = σ_levels_thick[k]
             σₖ_half = σ_levels_half[Tuple(k)[1]+1]
 
-            for ij in eachgridpoint(σ_tend)
+            @inbounds for ij in eachgridpoint(σ_tend)
                 # Hoskins and Simmons, 1975 just before eq. (6)
                 σ_tend[ij, k] = σₖ_half*(div_mean_grid[ij] + ūv̄∇lnp[ij]) -
                                 (div_sum_above[ij, k] + Δσₖ*div_grid[ij, k]) -
@@ -313,7 +313,7 @@ function vordiv_tendencies!(
     # precompute ring indices and boundscheck
     rings = eachring(u_tend_grid, v_tend_grid, u_grid, v_grid, vor_grid, temp_virt_grid)
 
-    for k in eachgrid(u_tend_grid, v_tend_grid)
+    @inbounds for k in eachgrid(u_tend_grid, v_tend_grid)
         for (j, ring) in enumerate(rings)
             coslat⁻¹j = coslat⁻¹[j]
             f_j = f[j]
@@ -408,7 +408,7 @@ function temperature_tendency!(
     # implicit_correction! then calculated the implicit terms from Vi-1 minus Vi
     # to move the implicit terms to i-1 which is cheaper then the alternative below
 
-    for k in eachgrid(temp_tend_grid, temp_grid, div_grid, Tᵥ, div_sum_above, uv∇lnp_sum_above)
+    @inbounds for k in eachgrid(temp_tend_grid, temp_grid, div_grid, Tᵥ, div_sum_above, uv∇lnp_sum_above)
         Tₖ = temp_profile[k]    # average layer temperature from reference profile
         
         # coefficients from Simmons and Burridge 1981
@@ -508,7 +508,7 @@ function flux_divergence!(
 
     # precomputed ring indices and check grids_match
     rings = eachring(A_grid, u_grid, v_grid)
-    for k in eachgrid(u_grid, v_grid)
+    @inbounds for k in eachgrid(u_grid, v_grid)
         for (j, ring) in enumerate(rings)
             coslat⁻¹j = coslat⁻¹[j]
             for ij in ring
@@ -558,7 +558,7 @@ function vorticity_flux_curldiv!(   diagn::DiagnosticVariables,
 
     # precompute ring indices and check grids match
     rings = eachring(u_tend_grid, v_tend_grid, u, v, vor)
-    for k in eachgrid(u)
+    @inbounds for k in eachgrid(u)
         for (j, ring) in enumerate(rings)
             coslat⁻¹j = coslat⁻¹[j]
             f_j = f[j]
@@ -677,7 +677,7 @@ function linear_pressure_gradient!(
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
     # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
     # -∇² is applied in bernoulli_potential!
-    for k in eachmatrix(geopot)
+    @inbounds for k in eachmatrix(geopot)
         R_dryTₖ = R_dry*temp_profile[k]
         for lm in eachharmonic(pres)
             geopot[lm, k] += R_dryTₖ*pres[lm]
@@ -844,7 +844,7 @@ function SpeedyTransforms.transform!(
         # the Tₖ is added for the physics parameterizations again
         # technically Tₖ is from model.implicit (which is held constant throughout) integration
         # but given it's the initial step here using the instantaneous diagn.temp_average is the same
-        for k in eachgrid(temp_grid_prev, temp_grid)
+        @inbounds for k in eachgrid(temp_grid_prev, temp_grid)
             Tₖ = diagn.temp_average[k]
             for ij in eachgridpoint(temp_grid_prev, temp_grid)
                 temp_grid_prev[ij, k] = temp_grid[ij, k] - Tₖ
@@ -866,7 +866,7 @@ function temperature_average!(
     temp::LowerTriangularArray,
     S::SpectralTransform,
 )
-    for k in eachmatrix(temp)
+    @inbounds for k in eachmatrix(temp)
         # average from l=m=0 harmonic divided by norm of the sphere
         diagn.temp_average[k] = real(temp[1, k])/S.norm_sphere
     end
