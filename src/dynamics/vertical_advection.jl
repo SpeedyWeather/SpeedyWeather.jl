@@ -20,13 +20,22 @@ WENOVerticalAdvection(spectral_grid)                =     WENOVerticalAdvection{
 @inline retrieve_time_step(::DiffusiveVerticalAdvection,  variables, var) = retrieve_previous_time_step(variables, var)
 @inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) =  retrieve_current_time_step(variables, var)
 
+# TODO this allocates a vector = bad!
 @inline function retrieve_stencil(k, nlayers, ::VerticalAdvection{NF, B}) where {NF, B}
     k_stencil = max.(min.(nlayers, k-B:k+B), 1)
     return k_stencil
 end
 
-function vertical_advection!(diagn::DiagnosticVariables, model::PrimitiveEquation)
-            
+# non-allocating version for default centered advection
+@inline function retrieve_stencil(k, nlayers, ::VerticalAdvection{NF, 1}) where NF
+    k_stencil = (max(1, k-1), k, min(nlayers, k+1))
+    return k_stencil
+end
+
+function vertical_advection!(
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation,
+)
     Δσ = model.geometry.σ_levels_thick
     advection_scheme = model.vertical_advection
     (; σ_tend) = diagn.dynamics
@@ -45,24 +54,24 @@ function vertical_advection!(diagn::DiagnosticVariables, model::PrimitiveEquatio
 end
 
 function _vertical_advection!(
-    ξ_tend::Grid,                   # tendency of quantity ξ at k
-    σ_tend::Grid,                   # vertical velocity at k+1/2
-    ξ::Grid,                        # ξ at level k
-    Δσ,                             # layer thickness on σ levels
-    adv::VerticalAdvection{NF, B}   # vertical advection scheme of order B
-) where {NF<:AbstractFloat, Grid<:AbstractGridArray{NF}, B}
-    nlayers = size(ξ)[end]
+    ξ_tend::AbstractGridArray,  # tendency of quantity ξ
+    σ_tend::AbstractGridArray,  # vertical velocity at k+1/2
+    ξ::AbstractGridArray,       # ξ
+    Δσ,                         # layer thickness on σ levels
+    adv::VerticalAdvection      # vertical advection scheme of order B
+)
+    grids_match(ξ_tend, σ_tend, ξ) || throw(DimensionMismatch(ξ_tend, σ_tend, ξ))
 
-    for k in eachgrid(ξ_tend, σ_tend, ξ)
+    nlayers = size(ξ, 2)
+    @inbounds for k in 1:nlayers
         Δσₖ⁻¹ = inv(Δσ[k])          # inverse layer thickness, compute inv only once
 
         # for k=1 "above" term (at k-1/2) is 0, for k==nlayers "below" term (at k+1/2) is zero
         # avoid out-of-bounds indexing with k⁻, k⁺
-        kint = Tuple(k)[1]
-        k⁻ = max(1, kint-1)    # TODO check that this actually zeros velocity at k=1/2
+        k⁻ = max(1, k-1)    # TODO check that this actually zeros velocity at k=1/2
         k⁺ = k
 
-        k_stencil = retrieve_stencil(kint, nlayers, adv)
+        k_stencil = retrieve_stencil(k, nlayers, adv)
 
         for ij in eachgridpoint(ξ_tend)
             σ̇⁻ = σ_tend[ij, k⁻]       # velocity into layer k from above
