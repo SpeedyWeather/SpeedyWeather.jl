@@ -11,7 +11,6 @@ import LinearAlgebra: LinearAlgebra, Diagonal
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
-import FLoops: FLoops, @floop           # currently not used
 import KernelAbstractions
 import CUDA: CUDA, CUDAKernels, CuArray
 import Adapt: Adapt, adapt, adapt_structure
