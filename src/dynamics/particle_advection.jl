@@ -4,7 +4,7 @@ abstract type AbstractParticleAdvection <: AbstractModelComponent end
 export NoParticleAdvection
 struct NoParticleAdvection <: AbstractParticleAdvection end
 NoParticleAdvection(::SpectralGrid) = NoParticleAdvection()
-initialize!(::NoParticleAdvection, ::ModelSetup) = nothing
+initialize!(::NoParticleAdvection, ::AbstractModel) = nothing
 initialize!(particles, progn, diagn, ::NoParticleAdvection) = nothing
 particle_advection!(progn, diagn, ::NoParticleAdvection) = nothing
 
@@ -21,17 +21,17 @@ Base.@kwdef struct ParticleAdvection2D{NF} <: AbstractParticleAdvection
 end
 
 function ParticleAdvection2D(SG::SpectralGrid; kwargs...)
-    SG.n_particles == 0 && @warn "ParticleAdvection2D created but n_particles = 0 in spectral grid."
+    SG.nparticles == 0 && @warn "ParticleAdvection2D created but nparticles = 0 in spectral grid."
     ParticleAdvection2D{SG.NF}(; kwargs...)
 end
 
 function initialize!(
     particle_advection::ParticleAdvection2D,
-    model::ModelSetup,
+    model::AbstractModel,
 )
-    (; nlev) = model.spectral_grid
+    (; nlayers) = model.spectral_grid
     (; layer) = particle_advection
-    nlev < layer && @warn "Particle advection on layer $layer on spectral grid with nlev=$nlev."
+    nlayers < layer && @warn "Particle advection on layer $layer on spectral grid with nlayers=$nlayers."
 
     (; every_n_timesteps) = particle_advection
     # Δt [˚*s/m] is scaled by radius to convert more easily from velocity [m/s]
@@ -47,8 +47,8 @@ vertical σ coordinates. This uses a cosin-distribution in latitude for
 an equal-area uniformity."""
 function initialize!(
     particles::Vector{P},
-    model::ModelSetup,
-) where {P<:Particle}
+    model::AbstractModel,
+) where {P <: Particle}
     for i in eachindex(particles)
         # uniform random in lon (360*rand), lat (cos-distribution), σ (rand)
         particles[i] = rand(P)
@@ -69,7 +69,8 @@ function initialize!(
     length(particles) == 0 && return nothing
 
     k = particle_advection.layer
-    (; u_grid, v_grid) = diagn.layers[k].grid_variables
+    u_grid = view(diagn.grid.u_grid, :, k)
+    v_grid = view(diagn.grid.v_grid, :, k)
     (; interpolator) = diagn.particles
     
     # interpolate initial velocity on initial locations
@@ -91,7 +92,6 @@ function initialize!(
     interpolate!(v0, v_grid, interpolator)
 end
 
-
 # function barrier
 function particle_advection!(progn, diagn, adv::ParticleAdvection2D)
     particle_advection!(progn.particles, diagn, progn.clock, adv)
@@ -110,7 +110,7 @@ function particle_advection!(
     # decide whether to execute on this time step:
     # execute always on last time step *before* time step is divisible by
     # `particle_advection.every_n_timesteps`, e.g. 7, 15, 23, ... for n=8 which
-    # already contains u, v at i=8, 16, 24, etc as executed after `gridded!`
+    # already contains u, v at i=8, 16, 24, etc as executed after `transform!`
     # even though the clock hasn't be step forward yet, this means time = time + Δt here
 
     # should not be called on the 1st step in first_timesteps, which is excluded
@@ -157,7 +157,8 @@ function particle_advection!(
 
     # CORRECTOR STEP, use u, v at new location and new time step
     k = particle_advection.layer
-    (; u_grid, v_grid) = diagn.layers[k].grid_variables
+    u_grid = view(diagn.grid.u_grid, :, k)
+    v_grid = view(diagn.grid.v_grid, :, k)
     (; interpolator) = diagn.particles
     RingGrids.update_locator!(interpolator, lats, lons)
 

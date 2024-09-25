@@ -1,11 +1,11 @@
 """
-    AssociatedLegendrePolArray{T,N,M,V} <: AbstractArray{T,N}
+    AssociatedLegendrePolArray{T, N, M, V} <: AbstractArray{T,N}
 
 Type that wraps around a `LowerTriangularArray{T,M,V}` but is a subtype of `AbstractArray{T,M+1}`. 
 This enables easier use with AssociatedLegendrePolynomials.jl which otherwise couldn't use the 
 "matrix-style" (l, m) indexing of `LowerTriangularArray`. This type however doesn't support any
 other operations than indexing and is purerly intended for internal purposes. 
-"""
+$(TYPEDFIELDS)"""
 struct AssociatedLegendrePolArray{T, N, M, V} <: AbstractArray{T, N}
     data::LowerTriangularArray{T, M, V}
 end 

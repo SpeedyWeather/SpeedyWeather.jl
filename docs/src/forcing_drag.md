@@ -122,7 +122,7 @@ end
 ```
 Which allows us to do
 ```@example extend
-spectral_grid = SpectralGrid(trunc=42, nlev=1)
+spectral_grid = SpectralGrid(trunc=42, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=30, decorrelation_time=Day(5))
 ```
 So the respective resolution parameters and the number format are just pulled from the `SpectralGrid`
@@ -136,7 +136,7 @@ Now let us have a closer look at the details of the `initialize!` function, in o
 actually do
 ```@example extend
 function SpeedyWeather.initialize!( forcing::StochasticStirring,
-                                    model::ModelSetup)
+                                    model::AbstractModel)
     
     # precompute forcing strength, scale with radius^2 as is the vorticity equation
     (; radius) = model.spectral_grid
@@ -164,7 +164,7 @@ As we want to add a method for the `StochasticStirring` to the `initialize!` fun
 within `SpeedyWeather` we add the `SpeedyWeather.` to add this method in the right
 [Scope of variables](@ref). The `initialize!` function _must_ have that function signature,
 instance of your new type `StochasticStirring` first, then the second argument a
-`model` of type `ModelSetup` or, if your forcing (and in general component) _only makes
+`model` of type `AbstractModel` or, if your forcing (and in general component) _only makes
 sense_ in a specific model, you could also write `model::Barotropic` for example,
 to be more restrictive. Inside the `initialize!` method we are defining we can
 use parameters from other components. For example, the definition of the `S` term
@@ -193,24 +193,38 @@ defined for our new `StochasticStirring` forcing. But if you define it as follow
 then this will be called automatically with multiple dispatch.
 
 ```@example extend
-function SpeedyWeather.forcing!(diagn::DiagnosticVariablesLayer,
-                                progn::PrognosticVariablesLayer,
-                                forcing::StochasticStirring,
-                                time::DateTime,
-                                model::ModelSetup)
+function SpeedyWeather.forcing!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    forcing::StochasticStirring,
+    model::AbstractModel,
+    lf::Integer,
+)
     # function barrier only
     forcing!(diagn, forcing, model.spectral_transform)
 end
 ```
-The function has to be as outlined above. The first argument has to be of type
-`DiagnosticVariablesLayer` as it acts on a layer of the diagnostic variables,
-where the current model state in grid-point space and the tendencies (in spectral space)
-are defined. The second argument has to be a `PrognosticVariablesLayer` because,
-in general, the forcing may use the prognostic variables in spectral space.
-The third argument has to be of the type of our new forcing,
-the third argument is time which you may use or skip, the last element is a `ModelSetup`,
-but as before you can be more restrictive to define a forcing only for the
-`BarotropicModel` for example, use ``model::Barotropic`` in that case.
+The function signature (types and number of its arguments) has to be as outlined above.
+The first argument has to be of type `DiagnosticVariables` as the diagnostic variables,
+are the ones you want to change (likely the tendencies within) to apply a forcing.
+But technically you can change anything else too, although the results may be unexpected.
+The diagnostic variables contain the current model state in grid-point space and the
+tendencies (in grid and spectral space). The second argument has to be of type
+`PrognosticVariables` because, in general, the forcing may use (information from)
+the prognostic variables in spectral space, which includes in `progn.clock.time` the current
+time for time-dependent forcing. But all prognostic variables should be considered read-only.
+The third argument has to be of the type of our new custom forcing, here `StochasticStirring`,
+so that multiple dispatch calls the correct method of `forcing!`. The forth argument is of type
+`AbstractModel`, so that the forcing can also make use of anything inside `model`, e.g.
+`model.geometry` or `model.planet` etc. But you can be more restrictive to define a forcing only
+for the `BarotropicModel` for example, use ``model::Barotropic`` in that case.
+Or you could define two methods, one for `Barotropic` one for all other models with
+`AbstractModel` (not `Barotropic` as a more specific method is prioritised with multiple
+dispatch). The 5th argument is the leapfrog index `lf` which after the first time step will
+be `lf=2` to denote that tendencies are evaluated at the current time not at the previous time
+(how leapfrogging works). Unless you want to read the prognostic variables, for which
+you need to know whether to read `lf=1` or `lf=2`, you can ignore this (but need to include
+it as argument).
 
 As you can see, for now not much is actually happening inside this function,
 this is what is often called a function barrier, the only thing we do in here
@@ -222,9 +236,11 @@ makes that possible. And it also tells you more clearly what a function depends 
 So we define the actual `forcing!` function that's then called as follows
 
 ```@example extend
-function forcing!(  diagn::DiagnosticVariablesLayer,
-                    forcing::StochasticStirring{NF},
-                    spectral_transform::SpectralTransform) where NF
+function forcing!(
+    diagn::DiagnosticVariables,
+    forcing::StochasticStirring{NF},
+    spectral_transform::SpectralTransform
+) where NF
     
     # noise and auto-regressive factors
     a = forcing.a[]    # = sqrt(1 - exp(-2dt/τ))
@@ -238,15 +254,15 @@ function forcing!(  diagn::DiagnosticVariablesLayer,
     end
 
     # to grid-point space
-    S_grid = diagn.dynamics_variables.a_grid
-    SpeedyTransforms.gridded!(S_grid, S, spectral_transform)
+    S_grid = diagn.dynamics.a_grid  # use scratch array "a"
+    transform!(S_grid, S, spectral_transform)
     
     # mask everything but mid-latitudes
     RingGrids._scale_lat!(S_grid, forcing.lat_mask)
     
     # back to spectral space
     (; vor_tend) = diagn.tendencies
-    SpeedyTransforms.spectral!(vor_tend, S_grid, spectral_transform)
+    transform!(vor_tend, S_grid, spectral_transform)
 
     return nothing
 end
@@ -293,7 +309,7 @@ modular interface that you can create instances of individual model components
 and just put them together as you like, and as long as you follow some rules.
 
 ```@example extend
-spectral_grid = SpectralGrid(trunc=85, nlev=1)
+spectral_grid = SpectralGrid(trunc=85, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
 initial_conditions = StartFromRest()
 model = BarotropicModel(; spectral_grid, initial_conditions, forcing=stochastic_stirring)
@@ -303,7 +319,7 @@ run!(simulation)
 
 # visualisation
 using CairoMakie
-vor = simulation.diagnostic_variables.layers[1].grid_variables.vor_grid
+vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
 heatmap(vor, title="Stochastically stirred vorticity")
 save("stochastic_stirring.png", ans) # hide
 nothing # hide

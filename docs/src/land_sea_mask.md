@@ -21,7 +21,7 @@ You can create the default land-sea mask as follows
 
 ```@example landseamask
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=31, nlev=8)
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 land_sea_mask = LandSeaMask(spectral_grid)
 ```
 
@@ -124,7 +124,7 @@ function SpeedyWeather.initialize!(
     callback::MilleniumFlood,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     initialize!(callback.schedule, progn.clock)
 end
@@ -133,7 +133,7 @@ function SpeedyWeather.callback!(
     callback::MilleniumFlood,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     # escape immediately if not scheduled yet
     isscheduled(callback.schedule, progn.clock) || return nothing

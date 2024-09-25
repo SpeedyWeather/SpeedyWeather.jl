@@ -17,6 +17,16 @@ Combined with the spectral transform, you could for example start with a velocit
 field in grid-point space, transform to spectral, compute its divergence and transform
 back to obtain the divergence in grid-point space. Examples are outlined in [Gradient operators](@ref).
 
+## Notation: Spectral resolution
+
+There are different ways to describe the spectral resolution, the truncation wavenumber (e.g. T31),
+the maximum degree ``l`` and order ``m`` of the spherical harmonics (e.g. ``l_{max}=31``, ``m_{max} = 31``),
+or the size of the lower triangular matrix, e.g. 32x32. In this example, they are all equivalent.
+We often use the truncation, i.e. T31, for brevity but sometimes it is important to describe
+degree and order independently (see for example [One more degree for spectral fields](@ref)).
+Note also how truncation, degree and order are 0-based, but matrix sizes are 1-based. 
+
+
 ## Example transform
 
 Lets start with a simple transform. We could be `using SpeedyWeather` but to be more verbose
@@ -29,20 +39,22 @@ using SpeedyWeather.SpeedyTransforms
 ```
 
 As an example, we want to transform the ``l=m=1`` spherical harmonic from spectral space in `alms`
-to grid-point space.
+to grid-point space. Note, the ``+1`` on both degree (first index) and order (second index) for
+0-based harmonics versus 1-based matrix indexing, see [Size of `LowerTriangularArray`](@ref).
+Create a `LowerTriangularMatrix` for T5 resolution, i.e. 6x6 matrix size
 
 ```@example speedytransforms
-alms = zeros(LowerTriangularMatrix{ComplexF64}, 6, 6)     # spectral coefficients
-alms[2, 2] = 1                                           # only l=1, m=1 harmonic
+alms = zeros(LowerTriangularMatrix{ComplexF64}, 6, 6)     # spectral coefficients T5
+alms[2, 2] = 1                                            # only l=1, m=1 harmonic
 alms
 ```
-Now `gridded` is the function that takes spectral coefficients `alms` and converts
-them a grid-point space `map`
+Now `transform` is the function that takes spectral coefficients `alms` and converts
+them a grid-point space `map` (or vice versa)
 
 ```@example speedytransforms
-map = gridded(alms)
+map = transform(alms)
 ```
-By default, the `gridded` transforms onto a [`FullGaussianGrid`](@ref FullGaussianGrid) unravelled here
+By default, the `transforms` transforms onto a [`FullGaussianGrid`](@ref FullGaussianGrid) unravelled here
 into a vector west to east, starting at the prime meridian, then north to south, see [RingGrids](@ref).
 We can visualize `map` quickly with a UnicodePlot via `plot` (see [Visualising RingGrid data](@ref))
 ```@example speedytransforms
@@ -50,9 +62,9 @@ import SpeedyWeather.RingGrids: plot    # not necessary when `using SpeedyWeathe
 plot(map)
 ```
 Yay! This is the what the ``l=m=1`` spherical harmonic is supposed to look like!
-Now let's go back to spectral space with `spectral`
+Now let's go back to spectral space with `transform`
 ```@example speedytransforms
-alms2 = spectral(map)
+alms2 = transform(map)
 ```
 Comparing with `alms` from above you can see that the transform is exact up to a typical rounding error
 from `Float64`. 
@@ -70,15 +82,15 @@ a transform error that is larger than the rounding error from floating-point ari
 While the default grid for [SpeedyTransforms](@ref) is the [`FullGaussianGrid`](@ref FullGaussianGrid)
 we can transform onto other grids by specifying `Grid` too
 ```@example speedytransforms
-map = gridded(alms, Grid=HEALPixGrid)
+map = transform(alms, Grid=HEALPixGrid)
 plot(map)
 ```
 which, if transformed back, however, can yield a larger transform error as discussed above
 ```@example speedytransforms
-spectral(map)
+transform(map)
 ```
 On such a coarse grid the transform error (absolute and relative) is about ``10^{-2}``, this decreases
-for higher resolution. The `gridded` and `spectral` functions will choose a corresponding
+for higher resolution. The `transform` function will choose a corresponding
 grid-spectral resolution (see [Matching spectral and grid resolution](@ref)) following quadratic
 truncation, but you can always truncate/interpolate in spectral space with `spectral_truncation`,
 `spectral_interpolation` which takes `trunc` = ``l_{max} = m_{max}`` as second argument
@@ -90,20 +102,23 @@ order 5 before.
 If the second argument in `spectral_truncation` is larger than `alms` then it will automatically
 call `spectral_interpolation` and vice versa. Also see [Interpolation on RingGrids](@ref)
 to interpolate directly between grids. If you want to control directly the resolution of the
-grid `gridded` is supposed to transform onto you have to provide a `SpectralTransform` instance.
+grid you want to `transform` onto, use the keyword `dealiasing` (default: 2 for quadratic,
+see [Matching spectral and grid resolution](@ref)).
+But you can also provide a `SpectralTransform` instance to reuse a precomputed spectral transform.
 More on that now.
 
 ## [The `SpectralTransform` struct](@id SpectralTransform)
 
-Both `spectral` and `gridded` create an instance of `SpectralTransform` under the hood. This object
-contains all precomputed information that is required for the transform, either way: 
+The function `transform` only with arguments as shown above,
+will create an instance of `SpectralTransform` under the hood.
+This object contains all precomputed information that is required for the transform, either way: 
 The Legendre polynomials, pre-planned Fourier transforms, precomputed gradient, divergence and
 curl operators, the spherical harmonic eigenvalues among others. Maybe the most intuitive way to
 create a `SpectralTransform` is to start with a `SpectralGrid`, which already defines
 which spectral resolution is supposed to be combined with a given grid.
 ```@example speedytransforms
 using SpeedyWeather
-spectral_grid = SpectralGrid(Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3)
+spectral_grid = SpectralGrid(NF=Float32, trunc=5, Grid=OctahedralGaussianGrid, dealiasing=3)
 ```
 (We `using SpeedyWeather` here as `SpectralGrid` is exported therein).
 We also specify the number format `Float32` here to be used for the transform although this
@@ -119,31 +134,30 @@ recomputation or pre-computation of the Legendre polynomials, fore more informat
 [(P)recompute Legendre polynomials](@ref).
 
 Passing on `S` the `SpectralTransform` now allows us to transform directly on the grid
-defined therein.
+defined therein. Note that we recreate `alms` to be of size 7x6 instead of 6x6 for T5
+spectral resolution because SpeedyWeather uses internally [One more degree for spectral fields](@ref)
+meaning also that's the default when creating a `SpectralTransform` from a `SpectralGrid`.
+But results don't change if the last degree (row) contains only zeros.
+
 ```@example speedytransforms
-map = gridded(alms, S)
+alms = zeros(LowerTriangularMatrix{ComplexF64}, 7, 6)     # spectral coefficients
+alms[2, 2] = 1                                            # only l=1, m=1 harmonic
+
+map = transform(alms, S)
 plot(map)
 ```
+
 Yay, this is again the ``l=m=1`` harmonic, but this time on a slightly higher resolution
 `OctahedralGaussianGrid` as specified in the `SpectralTransform` `S`.
 Note that also the number format was converted on the fly to Float32 because that is the number
 format we specified in `S`! And from grid to spectral
 ```@example speedytransforms
-alms2 = spectral(map, S)
+alms2 = transform(map, S)
 ```
 As you can see the rounding error is now more like ``10^{-8}`` as we are using Float32
 (the [OctahedralGaussianGrid](@ref OctahedralGaussianGrid) is another _exact_ grid).
-Note, however, that the returned `LowerTriangularMatrix` is of size 7x6, not 6x6
-what we started from. The underlying reason is that internally SpeedyWeather uses
-`LowerTriangularMatrix`s of size ``l_{max} + 2 \times m_{max} + 1``.
-One ``+1`` on both degree and order for 0-based harmonics versus 1-based matrix sizes,
-but an additional ``+1`` for the degrees which is required by the meridional derivative.
-For consistency, all `LowerTriangularMatrix`s in SpeedyWeather.jl carry this additional degree
-but only the vector quantities explicitly make use of it. 
-See [Meridional derivative](@ref) for details.
-
-For this interface to SpeedyTransforms this means that on a grid-to-spectral transform you will get
-one more degree than orders of the spherical harmonics by default. You can, however, always truncate
+While for this interface to SpeedyTransforms this means that on a grid-to-spectral transform you will
+get one more degree than orders of the spherical harmonics by default. You can, however, always truncate
 this additional degree, say to T5 (hence matrix size is 6x6)
 ```@example speedytransforms
 spectral_truncation(alms2, 5, 5)
@@ -166,17 +180,19 @@ Say you have some global data in a matrix `m` that looks, for example, like
 ```@example speedytransforms
 alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32) # hide
 spectral_truncation!(alms, 10) # hide
-map = gridded(alms, Grid=FullClenshawGrid) # hide
+map = transform(alms, Grid=FullClenshawGrid) # hide
 m = Matrix(map) # hide
 m
 ```
 You hopefully know which grid this data comes on, let us assume it is a regular
-latitude-longitude grid, which we call the `FullClenshawGrid`. Note that for the spectral
-transform this should not include the poles, so the 96x47 matrix size here corresponds
-to 
+latitude-longitude grid, which we call the `FullClenshawGrid` (in analogy to the Gaussian grid based
+on the Gaussian quadrature). Note that for the spectral transform this should not include the poles,
+so the 96x47 matrix size here corresponds to 23 latitudes north and south of the Equator respectively
+plus the equator (=47).
 
-We now wrap this matrix
-therefore to associate it with the necessary grid information
+We now wrap this matrix into a `FullClenshawGrid` (`input_as=Matrix` is required because all
+grids organise their data as vectors, see [Creating data on a RingGrid](@ref))
+therefore to associate it with the necessary grid information like its coordinates
 ```@example speedytransforms
 map = FullClenshawGrid(m, input_as=Matrix)
 
@@ -189,7 +205,7 @@ nothing # hide
 
 Now we transform into spectral space and call `power_spectrum(::LowerTriangularMatrix)`
 ```@example speedytransforms
-alms = spectral(map)
+alms = transform(map)
 power = SpeedyTransforms.power_spectrum(alms)
 nothing # hide
 ```
@@ -232,7 +248,7 @@ is correctly applied across dimensions of `A` and then convert to a
 Awesome. For higher degrees and orders the amplitude clearly decreases!
 Now to grid-point space and let us visualize the result
 ```@example speedytransforms
-map = gridded(alms)
+map = transform(alms)
 
 using CairoMakie
 heatmap(map, title="k⁻²-distributed noise")
@@ -271,6 +287,19 @@ to kilobytes
 ```@example speedytransforms
 SpectralTransform(spectral_grid, recompute_legendre=true)
 ```
+
+## Batched Transforms 
+
+SpeedyTransforms also supports batched transforms. With batched input data the `transform` is performed along the leading dimension, and all further dimensions are interpreted as batch dimensions. Take for example 
+
+```@example speedytransforms 
+alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32, 5) 
+grids = transform(alms)
+```
+
+In this case we first randomly generated five (32x32) `LowerTriangularMatrix` that hold the
+coefficients and then transformed all five matrices batched to the grid space with the 
+transform command, yielding 5 `RingGrids` with each 48-rings. 
 
 ## Functions and type index
 

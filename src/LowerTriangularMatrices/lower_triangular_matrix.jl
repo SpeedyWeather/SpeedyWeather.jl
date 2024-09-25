@@ -231,7 +231,7 @@ Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,N}, i::Integer)
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer) where {T,V<:AbstractVector{T}} = getindex(L.data, i)
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, I::CartesianIndex{M}) where {T,V<:AbstractVector{T},M} = getindex(L, Tuple(I)...)
 Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer, I::CartesianIndex{0}) where {T,V<:AbstractVector{T}} = getindex(L, i)
-
+Base.@propagate_inbounds Base.getindex(L::LowerTriangularArray{T,1,V}, i::Integer, I::CartesianIndices{0}) where {T,V<:AbstractVector{T}} = getindex(L, i)
 
 # setindex with lm, ..
 @inline Base.setindex!(L::LowerTriangularArray{T,N}, x, I::Vararg{Any, N}) where {T, N} = setindex!(L.data, x, I...)
@@ -320,7 +320,7 @@ function lowertriangular_match(L1::LowerTriangularArray, Ls::LowerTriangularArra
 end
 
 """$(TYPEDSIGNATURES)
-Returns a tuple like (1,2,3) as string "1×2×3". To be used with size2x_string(size()"""
+Returns a tuple like `(1,2,3)` as string "1×2×3". To be used with `size2x_string(size(a))` with `a` some array."""
 function size2x_string(t::Tuple)
     s = "$(t[1])"
     for i in t[2:end]
@@ -401,7 +401,7 @@ function Base.copyto!(
                                                     Base.OneTo(minimum(size.((L1, L2), 2; as=Matrix))))
 
     L1.data .= convert.(T, L2.data)
-    L1
+    return L1
 end
 
 # CPU version
@@ -427,7 +427,7 @@ function Base.copyto!(
         end
     end
 
-    L1
+    return L1
 end 
 
 # Fallback / GPU version (the two versions _copyto! and copyto! are there to enable tests of this function with regular Arrays)
@@ -482,19 +482,21 @@ function _copyto_core!(
 
     L1.data[ind_L1,[Colon() for i=1:(N-1)]...] = T.(L2.data[ind_L2,[Colon() for i=1:(N-1)]...])
 
-    L1
+    return L1
 end 
 
+
+# copyto! using matrix indexing from Matrix/Array
 function Base.copyto!(  L::LowerTriangularArray{T},  # copy to L
                         M::AbstractArray) where T    # copy from M
     @boundscheck size(L, as=Matrix) == size(M) || throw(BoundsError)
     L.data .= convert.(T, M[lowertriangle_indices(M)])
-
-    L
+    return L
 end
 
 function Base.copyto!(  M::AbstractArray{T},               # copy to M
                         L::LowerTriangularArray) where T   # copy from L
+  
     @boundscheck size(L, as=Matrix) == size(M) || throw(BoundsError)
 
     lower_triangle_indices = lowertriangle_indices(M)
@@ -503,17 +505,15 @@ function Base.copyto!(  M::AbstractArray{T},               # copy to M
     M[upper_triangle_indices] .= zero(T)
     M[lower_triangle_indices] = convert.(T, L.data)
 
-    M
+    return M
 end
 
-# copyto! from Vector to LA
+# copyto! from Vector/Array to using vector indexing
 function Base.copyto!(  L::LowerTriangularArray{T,N},       # copy to L
                         V::AbstractArray{S,N}) where {T,S,N}# copy from V
     @boundscheck size(L, as=Vector) == size(V) || throw(BoundsError)
-
     L.data .= convert.(T, V)
-
-    L 
+    return L 
 end 
 
 function LowerTriangularMatrix{T}(M::LowerTriangularMatrix{T2}) where {T,T2}
@@ -567,6 +567,8 @@ Base.isapprox(L1::LowerTriangularArray, L2::LowerTriangularArray; kwargs...) =
     isapprox(L1.data, L2.data; kwargs...)
 Base.all(L::LowerTriangularArray) = all(L.data)
 Base.any(L::LowerTriangularArray) = any(L.data)
+
+Base.repeat(L::LowerTriangularArray, counts...) = LowerTriangularArray(repeat(L.data, counts...), L.m, L.n)
 
 # Broadcast CPU/GPU
 import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle

@@ -20,91 +20,88 @@ WENOVerticalAdvection(spectral_grid)                =     WENOVerticalAdvection{
 @inline retrieve_time_step(::DiffusiveVerticalAdvection,  variables, var) = retrieve_previous_time_step(variables, var)
 @inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) =  retrieve_current_time_step(variables, var)
 
-@inline function retrieve_current_stencil(k, layers, var, nlev, ::VerticalAdvection{NF, B}) where {NF, B}
-    k_stencil = max.(min.(nlev, k-B:k+B), 1)
-    ξ_stencil = Tuple(retrieve_current_time_step(layers[k].grid_variables, var) for k in k_stencil)
-    return ξ_stencil
+@inline function retrieve_stencil(k, nlayers, ::VerticalAdvection{NF, B}) where {NF, B}
+    # creates allocation-free tuples for k-B:k+B but clamped into (1, nlayers)
+    # e.g. (1, 1, 2), (1, 2, 3), (2, 3, 4) ... (for k=1, 2, 3; B=1)
+    return ntuple(i -> clamp(i+k-B-1, 1, nlayers), 2B+1)
 end
 
-@inline function retrieve_previous_stencil(k, layers, var, nlev, ::VerticalAdvection{NF, B}) where {NF, B}
-    k_stencil = max.(min.(nlev, k-B:k+B), 1)
-    ξ_stencil = Tuple(retrieve_previous_time_step(layers[k].grid_variables, var) for k in k_stencil)
-    return ξ_stencil
-end
-
-@inline retrieve_stencil(k, layers, var, nlev, scheme::DiffusiveVerticalAdvection)  = retrieve_previous_stencil(k, layers, var, nlev, scheme)
-@inline retrieve_stencil(k, layers, var, nlev, scheme::DispersiveVerticalAdvection) =  retrieve_current_stencil(k, layers, var, nlev, scheme)
-
-function vertical_advection!(   layer::DiagnosticVariablesLayer,
-                                diagn::DiagnosticVariables,
-                                model::PrimitiveEquation)
-            
-    (; k ) = layer       # which layer are we on?
-    
-    wet_core = model isa PrimitiveWet
-    (; σ_levels_thick, nlev ) = model.geometry
-     
-    scheme = model.vertical_advection
-
-    # for k==1 "above" term is 0, for k==nlev "below" term is zero
-    # avoid out-of-bounds indexing with k_above, k_below as follows
-    k⁻ = max(1, k-1) # just saturate, because M_1/2 = 0 (which zeros that term)
-        
-    # mass fluxes, M_1/2 = M_nlev+1/2 = 0, but k=1/2 isn't explicitly stored
-    σ_tend_above = diagn.layers[k⁻].dynamics_variables.σ_tend
-    σ_tend_below = layer.dynamics_variables.σ_tend
-    
-    # layer thickness Δσ on level k
-    Δσₖ = σ_levels_thick[k]
+function vertical_advection!(
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation,
+)
+    Δσ = model.geometry.σ_levels_thick
+    advection_scheme = model.vertical_advection
+    (; σ_tend) = diagn.dynamics
     
     for var in (:u, :v, :temp)
-        ξ_tend = getproperty(layer.tendencies, Symbol(var, :_tend_grid))
-        ξ_sten = retrieve_stencil(k, diagn.layers, var, nlev, scheme)
-        ξ      = retrieve_time_step(scheme, layer.grid_variables, var)
-
-        _vertical_advection!(ξ_tend, σ_tend_above, σ_tend_below, ξ_sten, ξ, Δσₖ, scheme)
+        ξ_tend = getproperty(diagn.tendencies, Symbol(var, :_tend_grid))
+        ξ      = retrieve_time_step(advection_scheme, diagn.grid, var)
+        _vertical_advection!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
     end
 
-    if wet_core
-        ξ_tend = getproperty(layer.tendencies, :humid_tend_grid)
-        ξ_sten = retrieve_current_stencil(k, diagn.layers, :humid, nlev, scheme)
-        ξ      = retrieve_current_time_step(layer.grid_variables, :humid)
-
-        _vertical_advection!(ξ_tend, σ_tend_above, σ_tend_below, ξ_sten, ξ, Δσₖ, scheme)
+    if model isa PrimitiveWet   # advect humidity only with primitive wet core
+        ξ_tend = getproperty(diagn.tendencies, :humid_tend_grid)
+        ξ      = retrieve_time_step(advection_scheme, diagn.grid, :humid)
+        _vertical_advection!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
     end
 end
 
-# MULTI THREADED VERSION only writes into layer k
-function _vertical_advection!(  ξ_tend::Grid,                  # tendency of quantity ξ at k
-                                σ_tend_above::Grid,            # vertical velocity at k-1/2
-                                σ_tend_below::Grid,            # vertical velocity at k+1/2
-                                ξ_sten,                        # ξ stencil for vertical advection (from k-B to k+B)
-                                ξ::Grid,                       # ξ at level k
-                                Δσₖ::NF,                       # layer thickness on σ levels
-                                adv::VerticalAdvection{NF, B}  # vertical advection scheme
-                                ) where {NF<:AbstractFloat, Grid<:AbstractGrid{NF}, B}
-    Δσₖ⁻¹ = 1/Δσₖ                                      # precompute
+function _vertical_advection!(
+    ξ_tend::AbstractGridArray,  # tendency of quantity ξ
+    σ_tend::AbstractGridArray,  # vertical velocity at k+1/2
+    ξ::AbstractGridArray,       # ξ
+    Δσ,                         # layer thickness on σ levels
+    adv::VerticalAdvection      # vertical advection scheme of order B
+)
+    grids_match(ξ_tend, σ_tend, ξ) || throw(DimensionMismatch(ξ_tend, σ_tend, ξ))
 
-    # += as the tendencies already contain the parameterizations
-    for ij in eachgridpoint(ξ_tend)
-        σ̇⁻ = σ_tend_above[ij]       # velocity into layer k from above
-        σ̇⁺ = σ_tend_below[ij]       # velocity out of layer k to below
+    nlayers = size(ξ, 2)
+    @inbounds for k in 1:nlayers
+        Δσₖ⁻¹ = inv(Δσ[k])          # inverse layer thickness, compute inv only once
 
-        ξᶠ⁺ = reconstructed_at_face(ij, adv, σ̇⁺, ξ_sten[2:end])
-        ξᶠ⁻ = reconstructed_at_face(ij, adv, σ̇⁻, ξ_sten[1:end-1])
+        # for k=1 "above" term (at k-1/2) is 0, for k==nlayers "below" term (at k+1/2) is zero
+        # avoid out-of-bounds indexing with k⁻, k⁺
+        k⁻ = max(1, k-1)    # TODO check that this actually zeros velocity at k=1/2
+        k⁺ = k
 
-        ξ_tend[ij] -=  Δσₖ⁻¹ * (σ̇⁺ * ξᶠ⁺ - σ̇⁻ * ξᶠ⁻ - ξ[ij] * (σ̇⁺ - σ̇⁻))
+        k_stencil = retrieve_stencil(k, nlayers, adv)
+
+        for ij in eachgridpoint(ξ_tend)
+            σ̇⁻ = σ_tend[ij, k⁻]       # velocity into layer k from above
+            σ̇⁺ = σ_tend[ij, k⁺]       # velocity out of layer k to below
+            
+            ξᶠ⁺ = reconstructed_at_face(ξ, ij, k_stencil[2:end],   σ̇⁺, adv)
+            ξᶠ⁻ = reconstructed_at_face(ξ, ij, k_stencil[1:end-1], σ̇⁻, adv)
+            
+            # -= as the tendencies already contain the parameterizations
+            ξ_tend[ij, k] -=  Δσₖ⁻¹ * (σ̇⁺ * ξᶠ⁺ - σ̇⁻ * ξᶠ⁻ - ξ[ij, k] * (σ̇⁺ - σ̇⁻))
+        end
     end
 end
 
-@inline reconstructed_at_face(ij, ::UpwindVerticalAdvection{NF, 1}, u, ξ) where NF = ifelse(u > 0, ξ[1][ij], ξ[2][ij])
-@inline reconstructed_at_face(ij, ::UpwindVerticalAdvection{NF, 2}, u, ξ) where NF = ifelse(u > 0, (2ξ[1][ij] + 5ξ[2][ij] - ξ[3][ij]) / 6,
-                                                                                                   (2ξ[4][ij] + 5ξ[3][ij] - ξ[2][ij]) / 6)
-@inline reconstructed_at_face(ij, ::UpwindVerticalAdvection{NF, 3}, u, ξ) where NF = ifelse(u > 0, (2ξ[1][ij] - 13ξ[2][ij] + 47ξ[3][ij] + 27ξ[4][ij] - 3ξ[5][ij]) / 60,
-                                                                                                   (2ξ[6][ij] - 13ξ[5][ij] + 47ξ[4][ij] + 27ξ[3][ij] - 3ξ[2][ij]) / 60)
+# 1st order upwind
+@inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 1}) where NF =
+    ifelse(u > 0,   ξ[ij, k[1]],
+                    ξ[ij, k[2]])
 
-@inline reconstructed_at_face(ij, ::CenteredVerticalAdvection{NF, 1}, u, ξ) where NF = ( ξ[1][ij] +  ξ[2][ij]) / 2
-@inline reconstructed_at_face(ij, ::CenteredVerticalAdvection{NF, 2}, u, ξ) where NF = (-ξ[1][ij] + 7ξ[2][ij] + 7ξ[3][ij] - ξ[4][ij]) / 12
+# 3rd order upwind
+@inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 2}) where NF =
+    ifelse(u > 0,   (2ξ[ij, k[1]] + 5ξ[ij, k[2]] - ξ[ij, k[3]]) / 6,
+                    (2ξ[ij, k[4]] + 5ξ[ij, k[3]] - ξ[ij, k[2]]) / 6)
+
+# 5th order upwind
+@inline reconstructed_at_face(ξ, ij, k, u, ::UpwindVerticalAdvection{NF, 3}) where NF =
+    ifelse(u > 0,   (2ξ[ij, k[1]] - 13ξ[ij, k[2]] + 47ξ[ij, k[3]] + 27ξ[ij, k[4]] - 3ξ[ij, k[5]]) / 60,
+                    (2ξ[ij, k[6]] - 13ξ[ij, k[5]] + 47ξ[ij, k[4]] + 27ξ[ij, k[3]] - 3ξ[ij, k[2]]) / 60)
+
+# 2nd order centered
+@inline reconstructed_at_face(ξ, ij, k, u, ::CenteredVerticalAdvection{NF, 1}) where NF =
+    (ξ[ij, k[1]] +  ξ[ij, k[2]]) / 2
+
+# 4th order centered
+@inline reconstructed_at_face(ξ, ij, k, u, ::CenteredVerticalAdvection{NF, 2}) where NF =
+    (-ξ[ij, k[1]] + 7ξ[ij, k[2]] + 7ξ[ij, k[3]] - ξ[ij, k[4]]) / 12
 
 const ε  = 1e-6
 const d₀ = 3/10
@@ -135,15 +132,15 @@ const d₂ = 1/10
     return p₀(S₀) * w₀ + p₁(S₁) * w₁ + p₂(S₂) * w₂
 end
 
-@inline function reconstructed_at_face(ij, ::WENOVerticalAdvection{NF}, u, ξ) where NF
+@inline function reconstructed_at_face(ξ, ij, k, u, ::WENOVerticalAdvection{NF}) where NF
     if u > 0
-        S₀ = (ξ[3][ij], ξ[4][ij], ξ[5][ij])
-        S₁ = (ξ[2][ij], ξ[3][ij], ξ[4][ij])
-        S₂ = (ξ[1][ij], ξ[2][ij], ξ[3][ij])
+        S₀ = (ξ[ij, k[3]], ξ[ij, k[4]], ξ[ij, k[5]])
+        S₁ = (ξ[ij, k[2]], ξ[ij, k[3]], ξ[ij, k[4]])
+        S₂ = (ξ[ij, k[1]], ξ[ij, k[2]], ξ[ij, k[3]])
     else
-        S₀ = (ξ[4][ij], ξ[3][ij], ξ[2][ij])
-        S₁ = (ξ[5][ij], ξ[4][ij], ξ[3][ij])
-        S₂ = (ξ[6][ij], ξ[5][ij], ξ[4][ij])
+        S₀ = (ξ[ij, k[4]], ξ[ij, k[3]], ξ[ij, k[2]])
+        S₁ = (ξ[ij, k[5]], ξ[ij, k[4]], ξ[ij, k[3]])
+        S₂ = (ξ[ij, k[6]], ξ[ij, k[5]], ξ[ij, k[4]])
     end
     return weno_reconstruction(S₀, S₁, S₂, NF)
 end

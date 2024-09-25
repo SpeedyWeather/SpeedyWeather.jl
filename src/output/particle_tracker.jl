@@ -26,31 +26,31 @@ Base.@kwdef mutable struct ParticleTracker{NF} <: AbstractCallback
     keepbits::Int = 15
 
     "Number of particles to track"
-    n_particles::Int = 0
+    nparticles::Int = 0
 
     "The netcdf file to be written into, will be created at initialization"
     netcdf_file::Union{NCDataset, Nothing} = nothing
 
     # tracking arrays
-    lon::Vector{NF} = zeros(NF, n_particles)
-    lat::Vector{NF} = zeros(NF, n_particles)
-    σ::Vector{NF} = zeros(NF, n_particles)
+    lon::Vector{NF} = zeros(NF, nparticles)
+    lat::Vector{NF} = zeros(NF, nparticles)
+    σ::Vector{NF} = zeros(NF, nparticles)
 end
 
 ParticleTracker(SG::SpectralGrid; kwargs...) =
-    ParticleTracker{SG.NF}(;n_particles = SG.n_particles, kwargs...)
+    ParticleTracker{SG.NF}(;nparticles = SG.nparticles, kwargs...)
 
 function initialize!(
     callback::ParticleTracker{NF},
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 ) where NF
 
     initialize!(callback.schedule, progn.clock)
 
     # if model.output doesn't output create a folder anyway to store the particles.nc file
-    if model.output.output == false
+    if model.output.active == false
         (;output, feedback) = model
         output.id = get_run_id(output.path, output.id)
         output.run_path = create_output_folder(output.path, output.id) 
@@ -76,13 +76,13 @@ function initialize!(
         "standard_name"=>"time", "calendar"=>"proleptic_gregorian"))
 
     # PARTICLE DIMENSION
-    n_particles = length(progn.particles)
-    callback.n_particles = n_particles
-    defDim(dataset, "particle", n_particles)
+    nparticles = length(progn.particles)
+    callback.nparticles = nparticles
+    defDim(dataset, "particle", nparticles)
     defVar(dataset, "particle", Int64, ("particle",),
         attrib=Dict("units"=>"1", "long_name"=>"particle identification number"))
 
-    # coordinates of particles (the variables inside netCDF)
+    # coordinates of particles (the variables inside netCDF)
     defVar(dataset, "lon", NF, ("particle", "time"), attrib = 
         Dict("long_name"=>"longitude", "units"=>"degrees_north"),
         deflatelevel=callback.compression_level, shuffle=callback.shuffle)
@@ -95,14 +95,14 @@ function initialize!(
         Dict("long_name"=>"vertical sigma coordinate", "units"=>"1"),
         deflatelevel=callback.compression_level, shuffle=callback.shuffle)
 
-    # pull particle locations into output work arrays
+    # pull particle locations into output work arrays
     for (p,particle) in enumerate(progn.particles)
         callback.lon[p] = particle.lon
         callback.lat[p] = particle.lat
         callback.σ[p]   = particle.σ
     end
     
-    # rounding
+    # rounding
     (; keepbits) = callback
     round!(callback.lon, keepbits)
     round!(callback.lat, keepbits)
@@ -120,19 +120,19 @@ function callback!(
     callback::ParticleTracker,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::ModelSetup,
+    model::AbstractModel,
 )
     isscheduled(callback.schedule, progn.clock) || return nothing   # else escape immediately
     i = callback.schedule.counter+1     # +1 for initial conditions (not scheduled)
 
-    # pull particle locations into output work arrays
+    # pull particle locations into output work arrays
     for (p,particle) in enumerate(progn.particles)
         callback.lon[p] = particle.lon
         callback.lat[p] = particle.lat
         callback.σ[p]   = particle.σ
     end
     
-    # rounding
+    # rounding
     (; keepbits) = callback
     round!(callback.lon, keepbits)
     round!(callback.lat, keepbits)
@@ -140,7 +140,7 @@ function callback!(
         
     # write current particle locations to file
     (;time, start) = progn.clock
-    time_passed_hrs = Millisecond(time - start).value/3600_000     # [ms] -> [hrs]
+    time_passed_hrs = Millisecond(time - start).value/3600_000     # [ms] -> [hrs]
     callback.netcdf_file["time"][i]     = time_passed_hrs
     callback.netcdf_file["lon"][:, i]   = callback.lon
     callback.netcdf_file["lat"][:, i]   = callback.lat

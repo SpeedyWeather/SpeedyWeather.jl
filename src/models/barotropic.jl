@@ -10,7 +10,7 @@ with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
 model components, are
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct BarotropicModel{
+@kwdef mutable struct BarotropicModel{
     # TODO add constraints again when we stop supporting julia v1.9
     DS,     # <:DeviceSetup,
     GE,     # <:AbstractGeometry,
@@ -25,12 +25,12 @@ Base.@kwdef mutable struct BarotropicModel{
     ST,     # <:SpectralTransform{NF},
     IM,     # <:AbstractImplicit,
     HD,     # <:AbstractHorizontalDiffusion,
-    OW,     # <:AbstractOutputWriter,
+    OU,     # <:AbstractOutput,
     FB,     # <:AbstractFeedback,
 } <: Barotropic
     
     spectral_grid::SpectralGrid
-    device_setup::DS = DeviceSetup(CPUDevice())
+    device_setup::DS = DeviceSetup(spectral_grid.device)
     
     # DYNAMICS
     geometry::GE = Geometry(spectral_grid)
@@ -49,12 +49,12 @@ Base.@kwdef mutable struct BarotropicModel{
     horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
 
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid, Barotropic)
+    output::OU = NetCDFOutput(spectral_grid, Barotropic)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
 
-has(::Type{<:Barotropic}, var_name::Symbol) = var_name in (:vor,)
+prognostic_variables(::Type{<:Barotropic}) = (:vor,)
 default_concrete_model(::Type{Barotropic}) = BarotropicModel
 
 """
@@ -65,8 +65,8 @@ at in `time_stepping!`."""
 function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     (; spectral_grid) = model
 
-    spectral_grid.nlev > 1 && @warn "Only nlev=1 supported for BarotropicModel, \
-        SpectralGrid with nlev=$(spectral_grid.nlev) provided."
+    spectral_grid.nlayers > 1 && @error "Only nlayers=1 supported for BarotropicModel, \
+        SpectralGrid with nlayers=$(spectral_grid.nlayers) provided."
 
     # initialize components
     initialize!(model.time_stepping, model)
@@ -85,6 +85,6 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
+    diagnostic_variables = DiagnosticVariables(spectral_grid)
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end

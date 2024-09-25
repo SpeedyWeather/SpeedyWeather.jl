@@ -11,7 +11,7 @@ See also [Examples 3D](@ref) for examples with the primitive equation models.
 !!! info "Setup script to copy and paste"
     ```julia
     using SpeedyWeather
-    spectral_grid = SpectralGrid(trunc=63, nlev=1)
+    spectral_grid = SpectralGrid(trunc=63, nlayers=1)
     still_earth = Earth(spectral_grid, rotation=0)
     initial_conditions = StartWithRandomVorticity()
     model = BarotropicModel(; spectral_grid, initial_conditions, planet=still_earth)
@@ -22,11 +22,11 @@ See also [Examples 3D](@ref) for examples with the primitive equation models.
 We want to use the barotropic model to simulate some free-decaying 2D turbulence
 on the sphere without rotation. We start by defining the `SpectralGrid` object.
 To have a resolution of about 200km, we choose a spectral resolution of
-T63 (see [Available horizontal resolutions](@ref)) and `nlev=1` vertical levels.
+T63 (see [Available horizontal resolutions](@ref)) and `nlayers=1` vertical levels.
 The `SpectralGrid` object will provide us with some more information
 ```@example barotropic_setup
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=63, nlev=1)
+spectral_grid = SpectralGrid(trunc=63, nlayers=1)
 ```
 Next step we create a planet that's like Earth but not rotating. As a convention,
 we always pass on the spectral grid object as the first argument to every other
@@ -70,7 +70,7 @@ with default settings. More options on output in [NetCDF output](@ref).
 !!! info "Setup script to copy and past"
     ```julia
     using SpeedyWeather
-    spectral_grid = SpectralGrid(trunc=63, nlev=1)
+    spectral_grid = SpectralGrid(trunc=63, nlayers=1)
     orography = NoOrography(spectral_grid)
     initial_conditions = ZonalJet()
     model = ShallowWaterModel(; spectral_grid, orography, initial_conditions)
@@ -83,7 +83,7 @@ water equations with and without mountains. As the shallow water system has also
 one level, we can reuse the `SpectralGrid` from Example 1.
 ```@example galewsky_setup
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=63, nlev=1)
+spectral_grid = SpectralGrid(trunc=63, nlayers=1)
 ```
 Now as a first simulation, we want to disable any orography, so we create a `NoOrography`
 ```@example galewsky_setup
@@ -141,7 +141,7 @@ Here, we have unpacked the netCDF file using [NCDatasets.jl](https://github.com/
 and then plotted via `heatmap(lon, lat, vor)`. While you can do that to give you more control
 on the plotting, SpeedyWeather.jl also defines an extension for Makie.jl, see [Extensions](@ref).
 Because if our matrix `vor` here was an `AbstractGrid` (see [RingGrids](@ref)) then all
-its geographic information (which grid point is where) would directly be encoded in the type.
+its geographic information (which grid point is where) would be implicitly known from the type.
 From the netCDF file, however, you would need to use the longitude and latitude dimensions.
 
 So we can also just do (`input_as=Matrix` here as all our grids use and expect a horizontal dimension
@@ -160,15 +160,17 @@ nothing # hide
 Note that here you need to know which grid the data comes on (an error is thrown if `FullGaussianGrid(vor)`
 is not size compatible). By default the output will be on the FullGaussianGrid, but if you
 play around with other grids, you'd need to change this here,
-see [NetCDF output on other grids](@ref output_grid).
+see [NetCDF output](@ref) and [Output grid](@ref).
 
 We did want to showcase the usage of [NetCDF output](@ref) here, but from now on
 we will use `heatmap` to plot data on our grids directly, without storing output first.
 So for our current simulation, that means at time = 12 days, vorticity on the grid
 is stored in the diagnostic variables and can be visualised with
+(`[:, 1]` is horizontal x vertical dimension, so all grid points on the first and
+only vertical layer)
 
 ```@example galewsky_setup
-vor = simulation.diagnostic_variables.layers[1].grid_variables.vor_grid
+vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky2.png", ans) # hide
 nothing # hide
@@ -208,15 +210,15 @@ You could plot the [NetCDF output](@ref) now as before, but we'll be plotting di
 from the current state of the `simulation`
 
 ```@example galewsky_setup
-vor = simulation.diagnostic_variables.layers[1].grid_variables.vor_grid
+vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]   # 1 to index surface
 heatmap(vor, title="Relative vorticity [1/s]")
 save("galewsky3.png", ans) # hide
 nothing # hide
 ```
 ![Galewsky jet](galewsky3.png)
 
-Interesting! The initial conditions have zero velocity in the southern hemisphere, but still, one can see
-some imprint of the orography on vorticity. You can spot the coastline of Antarctica; the Andes and
+Interesting! One can clearly see some imprint of the orography on vorticity and there is especially
+more vorticity in the southern hemisphere. You can spot the coastline of Antarctica; the Andes and
 Greenland are somewhat visible too. Mountains also completely changed the flow after 12 days,
 probably not surprising!
 
@@ -225,7 +227,7 @@ probably not surprising!
 Setup script to copy and paste:
 ```@example jet_stream_setup
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=63, nlev=1)
+spectral_grid = SpectralGrid(trunc=63, nlayers=1)
 
 forcing = JetStreamForcing(spectral_grid, latitude=60)
 drag = QuadraticDrag(spectral_grid)
@@ -238,7 +240,7 @@ nothing # hide
 ```
 
 We want to simulate polar jet streams in the shallow water model. We add a `JetStreamForcing`
-that adds momentum at 60˚N to inject kinetic energy into the model. This energy needs to be removed
+that adds momentum at 60˚N and 60˚S an to inject kinetic energy into the model. This energy needs to be removed
 (the [diffusion](@ref diffusion) is likely not sufficient) through a drag, we have implemented
 a `QuadraticDrag` and use the default drag coefficient. Then visualize zonal wind after
 40 days with
@@ -246,7 +248,7 @@ a `QuadraticDrag` and use the default drag coefficient. Then visualize zonal win
 ```@example jet_stream_setup
 using CairoMakie
 
-u = simulation.diagnostic_variables.layers[1].grid_variables.u_grid
+u = simulation.diagnostic_variables.grid.u_grid[:, 1]
 heatmap(u, title="Zonal wind [m/s]")
 save("polar_jets.png", ans) # hide
 nothing # hide
@@ -261,7 +263,7 @@ Setup script to copy and paste:
 using Random # hide
 Random.seed!(1234) # hide
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=127, nlev=1)
+spectral_grid = SpectralGrid(trunc=127, nlayers=1)
 
 # model components
 time_stepping = SpeedyWeather.Leapfrog(spectral_grid, Δt_at_T31=Minute(30))
@@ -308,7 +310,7 @@ using CairoMakie
 
 H = model.atmosphere.layer_thickness
 Hb = model.orography.orography
-η = simulation.diagnostic_variables.surface.pres_grid
+η = simulation.diagnostic_variables.grid.pres_grid
 h = @. η + H - Hb   # @. to broadcast grid + scalar - grid
 
 heatmap(h, title="Dynamic layer thickness h", colormap=:oslo)

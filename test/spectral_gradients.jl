@@ -1,42 +1,41 @@
 @testset "Divergence of a non-divergent flow zero?" begin
     @testset for NF in (Float32, Float64)
 
-        spectral_grid = SpectralGrid(; NF, nlev=1)
-        m = ShallowWaterModel(; spectral_grid)
-        simulation = initialize!(m)
-        p = simulation.prognostic_variables
-        d = simulation.diagnostic_variables
+        spectral_grid = SpectralGrid(; NF, nlayers=1)
+        model = ShallowWaterModel(; spectral_grid)
+        simulation = initialize!(model)
+        progn = simulation.prognostic_variables
+        diagn = simulation.diagnostic_variables
 
-        fill!(p.layers[1].timesteps[1].vor, 0)                  # make sure vorticity and divergence are 0
-        fill!(p.layers[1].timesteps[1].div, 0)
-        fill!(d.layers[1].tendencies.vor_tend, 0)
+        # make sure vorticity and divergence are 0
+        progn.vor[1] .= 0
+        progn.div[1] .= 0
+        diagn.tendencies.vor_tend .= 0
 
         # start with some vorticity only
-        vor0 = randn(LowerTriangularMatrix{Complex{NF}}, p.trunc+2, p.trunc+1)
-        p.layers[1].timesteps[1].vor .= vor0
+        progn.vor[1] .= randn(Complex{NF}, size(progn.vor[1])...)
 
+        # get corresponding non-divergent u_grid, v_grid
         lf = 1
-        SpeedyWeather.gridded!(d, p, lf, m)   # get corresponding non-divergent u_grid, v_grid
+        transform!(diagn, progn, lf, model)
 
-        u_grid = d.layers[1].grid_variables.u_grid
-        v_grid = d.layers[1].grid_variables.v_grid
+        (; u_grid, v_grid) = diagn.grid
 
-        # check we've actually created non-zero U=u*coslat, V=v*coslat
+        # check we've actually created non-zero u,v excl coslat scaling
         @test all(u_grid .!= 0)
         @test all(v_grid .!= 0)
 
-        G = m.geometry
-        S = m.spectral_transform
         RingGrids.scale_coslat⁻¹!(u_grid)
         RingGrids.scale_coslat⁻¹!(v_grid)
-
-        uω_coslat⁻¹ = d.layers[1].dynamics_variables.a
-        vω_coslat⁻¹ = d.layers[1].dynamics_variables.b
-
-        SpeedyWeather.spectral!(uω_coslat⁻¹, u_grid, S)
-        SpeedyWeather.spectral!(vω_coslat⁻¹, v_grid, S)
+        
+        uω_coslat⁻¹ = diagn.dynamics.a
+        vω_coslat⁻¹ = diagn.dynamics.b
+        
+        S = model.spectral_transform
+        SpeedyWeather.transform!(uω_coslat⁻¹, u_grid, S)
+        SpeedyWeather.transform!(vω_coslat⁻¹, v_grid, S)
     
-        div = zero(vor0)
+        div = progn.div[1]
         SpeedyWeather.divergence!(div, uω_coslat⁻¹, vω_coslat⁻¹, S)
 
         for div_lm in div
@@ -48,42 +47,39 @@ end
 @testset "Curl of an irrotational flow zero?" begin
     @testset for NF in (Float32, Float64)
 
-        spectral_grid = SpectralGrid(; NF, nlev=1)
-        m = ShallowWaterModel(; spectral_grid)
-        simulation = initialize!(m)
-        p = simulation.prognostic_variables
-        d = simulation.diagnostic_variables
+        spectral_grid = SpectralGrid(; NF, nlayers=1)
+        model = ShallowWaterModel(; spectral_grid)
+        simulation = initialize!(model)
+        progn = simulation.prognostic_variables
+        diagn = simulation.diagnostic_variables
 
-        fill!(p.layers[1].timesteps[1].vor, 0)                  # make sure vorticity and divergence are 0
-        fill!(p.layers[1].timesteps[1].div, 0)
-        fill!(d.layers[1].tendencies.div_tend, 0)
+        # make sure vorticity and divergence are 0
+        progn.vor[1] .= 0
+        progn.div[1] .= 0
+        diagn.tendencies.div_tend .= 0
 
-        # start with some vorticity only
-        div0 = randn(LowerTriangularMatrix{Complex{NF}}, p.trunc+2, p.trunc+1)
-        p.layers[1].timesteps[1].div .= div0
+        # start with some divergence only
+        progn.div[1] .= randn(Complex{NF}, size(progn.div[1])...)
 
+        # get corresponding non-divergent u_grid, v_grid
         lf = 1
-        SpeedyWeather.gridded!(d, p, lf, m)   # get corresponding non-divergent u_grid, v_grid
+        transform!(diagn, progn, lf, model)
 
-        u_grid = d.layers[1].grid_variables.u_grid
-        v_grid = d.layers[1].grid_variables.v_grid
+        (; u_grid, v_grid) = diagn.grid
 
-        # check we've actually created non-zero U=u*coslat, V=v*coslat
+        # check we've actually created non-zero u,v (excl coslat scaling)
         @test all(u_grid .!= 0)
         @test all(v_grid .!= 0)
 
-        G = m.geometry
-        S = m.spectral_transform
-        C = m.coriolis
-
         # to evaluate ∇×(uv) use curl of vorticity fluxes (=∇×(uv(ζ+f))) with ζ=1, f=0
-        fill!(d.layers[1].grid_variables.vor_grid, 1)
-        fill!(m.coriolis.f, 0)
+        progn.div[1] .= 1
+        model.coriolis.f .= 0
 
         # calculate uω, vω in spectral space
-        SpeedyWeather.vorticity_flux_curldiv!(d.layers[1], C, G, S, div=true)
+        (; coriolis, geometry, spectral_transform) = model
+        SpeedyWeather.vorticity_flux_curldiv!(diagn, coriolis, geometry, spectral_transform, div=true)
 
-        for div_lm in d.layers[1].tendencies.div_tend
+        for div_lm in diagn.tendencies.div_tend
             @test abs(div_lm) < sqrt(eps(NF))
         end
     end
@@ -97,7 +93,7 @@ end
                         OctahedralClenshawGrid,
                         HEALPixGrid)
 
-            SG = SpectralGrid(NF; Grid, nlev=1)
+            SG = SpectralGrid(; NF, Grid, nlayers=1)
             G = Geometry(SG)
 
             A = Grid(randn(NF, SG.npoints))
@@ -118,7 +114,7 @@ end
 @testset "Flipsign in divergence!, curl!" begin
     @testset for NF in (Float32, Float64)
 
-        SG = SpectralGrid(NF)
+        SG = SpectralGrid(; NF)
         S = SpectralTransform(SG)
 
         lmax, mmax = S.lmax, S.mmax
@@ -140,7 +136,7 @@ end
 @testset "Add in divergence!, curl!" begin
     @testset for NF in (Float32, Float64)
 
-        SG = SpectralGrid(NF)
+        SG = SpectralGrid(; NF)
         S = SpectralTransform(SG)
 
         lmax, mmax = S.lmax, S.mmax
@@ -173,73 +169,59 @@ end
 @testset "D, ζ -> u, v -> D, ζ" begin
     @testset for NF in (Float32, Float64)
 
-        spectral_grid = SpectralGrid(; NF, nlev=1)
-        m = ShallowWaterModel(; spectral_grid)
-        simulation = initialize!(m)
-        p = simulation.prognostic_variables
-        d = simulation.diagnostic_variables
+        spectral_grid = SpectralGrid(; NF, nlayers=2)
+        model = PrimitiveDryModel(; spectral_grid)
+        simulation = initialize!(model)
+        progn = simulation.prognostic_variables
+        diagn = simulation.diagnostic_variables
+        vor = progn.vor[1]
+        div = progn.div[1]
 
         # make sure vorticity and divergence are 0
-        fill!(p.layers[1].timesteps[1].vor, 0)
-        fill!(p.layers[1].timesteps[1].div, 0)
-
-        # make sure vorticity and divergence are 0
-        fill!(d.layers[1].tendencies.vor_tend, 0)                  
-        fill!(d.layers[1].tendencies.div_tend, 0)
+        vor .= 0
+        div .= 0
 
         # create initial conditions
-        (; lmax, mmax) = m.spectral_transform
-        vor0 = rand(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1)
-        div0 = rand(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1)
+        vor .= rand(Complex{NF}, size(vor)...)
+        div .= rand(Complex{NF}, size(div)...)
         
-        vor0[1, 1] = 0                   # zero mean
-        div0[1, 1] = 0
+        for k in eachmatrix(vor, div)
+            vor[1, k] = 0     # zero mean on every layer
+            div[1, k] = 0
+        end
 
         # set imaginary component of m=0 to 0 as the rotation of zonal modes is arbitrary
-        SpeedyTransforms.zero_imaginary_zonal_modes!(vor0)
-        SpeedyTransforms.zero_imaginary_zonal_modes!(div0)
+        SpeedyTransforms.zero_imaginary_zonal_modes!(vor)
+        SpeedyTransforms.zero_imaginary_zonal_modes!(div)
 
-        spectral_truncation!(vor0)      # set unusued last row (l=lmax+1) to zero
-        spectral_truncation!(div0)
+        spectral_truncation!(vor)      # set unusued last row (l=lmax+1) to zero
+        spectral_truncation!(div)
 
-        # copy into prognostic variables
-        p.layers[1].timesteps[1].vor .= vor0
-        p.layers[1].timesteps[1].div .= div0
-
-        vor1 = zero(vor0)
-        div1 = zero(div0)
-
-        # get corresponding irrotational u_grid, v_grid (incl *coslat scaling)
+        # get corresponding u_grid, v_grid (excl *coslat scaling)
         lf = 1
-        SpeedyWeather.gridded!(d, p, lf, m)   
+        SpeedyWeather.transform!(diagn, progn, lf, model)
 
         # check we've actually created non-zero u, v
-        @test all(d.layers[1].grid_variables.u_grid .!= 0)
-        @test all(d.layers[1].grid_variables.v_grid .!= 0)
-
-        u = d.layers[1].grid_variables.u_grid
-        v = d.layers[1].grid_variables.v_grid
+        (; u_grid, v_grid) = diagn.grid
+        @test all(u_grid .!= 0)
+        @test all(v_grid .!= 0)
 
         # times coslat² in grid space
-        G = m.geometry
-        RingGrids.scale_coslat⁻¹!(u)
-        RingGrids.scale_coslat⁻¹!(v)
+        RingGrids.scale_coslat⁻¹!(u_grid)
+        RingGrids.scale_coslat⁻¹!(v_grid)
 
         # transform back
-        S = m.spectral_transform
-        u_coslat⁻¹ = zero(vor0)
-        v_coslat⁻¹ = zero(vor0)
-        SpeedyWeather.spectral!(u_coslat⁻¹, u, S)
-        SpeedyWeather.spectral!(v_coslat⁻¹, v, S)
+        u_coslat⁻¹ = transform(u_grid, model.spectral_transform)
+        v_coslat⁻¹ = transform(v_grid, model.spectral_transform)
 
         # curl and div in spectral space
-        SpeedyWeather.curl!(vor1, u_coslat⁻¹, v_coslat⁻¹, S)
-        SpeedyWeather.divergence!(div1, u_coslat⁻¹, v_coslat⁻¹, S)
+        vor2 = curl(u_coslat⁻¹, v_coslat⁻¹, model.spectral_transform)
+        div2 = divergence(u_coslat⁻¹, v_coslat⁻¹, model.spectral_transform)
 
-        for lm in SpeedyWeather.eachharmonic(vor0, vor1, div0, div1)
+        for lm in eachindex(vor, div, vor2, div2)
             # increased to 30 as 10, 20 caused single fails every now and then
-            @test vor0[lm] ≈ vor1[lm] rtol=30*sqrt(eps(NF))
-            @test div0[lm] ≈ div1[lm] rtol=30*sqrt(eps(NF))
+            @test vor[lm] ≈ vor2[lm] rtol=30*sqrt(eps(NF))
+            @test div[lm] ≈ div2[lm] rtol=30*sqrt(eps(NF))
         end
     end
 end
@@ -294,48 +276,44 @@ end
 end
 
 @testset "∇×∇=0 and ∇⋅∇=∇²" begin
-    for NF in (Float32, Float64)
+    for nlayers in (1, 2)
+        for NF in (Float32, Float64)
 
-        trunc = 31
-        spectral_grid = SpectralGrid(; NF, trunc, Grid=FullGaussianGrid, nlev=1)
-        m = ShallowWaterModel(; spectral_grid)
-        simulation = initialize!(m)
-        p = simulation.prognostic_variables
-        d = simulation.diagnostic_variables
+            trunc = 31
+            spectral_grid = SpectralGrid(; NF, trunc, Grid=FullGaussianGrid, nlayers)
+            model = PrimitiveDryModel(; spectral_grid)
+            simulation = initialize!(model)
+            progn = simulation.prognostic_variables
+            diagn = simulation.diagnostic_variables
 
-        a = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
-        spectral_truncation!(a)
-        SpeedyTransforms.zero_imaginary_zonal_modes!(a)
+            a = randn(LowerTriangularArray{Complex{NF}}, trunc+2, trunc+1, nlayers)
+            spectral_truncation!(a)
+            SpeedyTransforms.zero_imaginary_zonal_modes!(a)
 
-        dadx = zero(a)
-        dady = zero(a)
-        SpeedyWeather.∇!(dadx, dady, a, m.spectral_transform)
+            dadx, dady = ∇(a, model.spectral_transform)
+            dadx_grid = transform(dadx, model.spectral_transform)
+            dady_grid = transform(dady, model.spectral_transform)
+            
+            RingGrids.scale_coslat⁻²!(dadx_grid)
+            RingGrids.scale_coslat⁻²!(dady_grid)
 
-        dadx_grid = gridded(dadx, m.spectral_transform)
-        dady_grid = gridded(dady, m.spectral_transform)
-        
-        RingGrids.scale_coslat⁻²!(dadx_grid)
-        RingGrids.scale_coslat⁻²!(dady_grid)
+            transform!(dadx, dadx_grid, model.spectral_transform)
+            transform!(dady, dady_grid, model.spectral_transform)
 
-        SpeedyWeather.spectral!(dadx, dadx_grid, m.spectral_transform)
-        SpeedyWeather.spectral!(dady, dady_grid, m.spectral_transform)
+            # CURL(GRAD(A)) = 0
+            ∇x∇a = curl(dadx, dady, model.spectral_transform)
 
-        # CURL(GRAD(A)) = 0
-        ∇x∇a = zero(a)
-        SpeedyWeather.curl!(∇x∇a, dadx, dady, m.spectral_transform)
+            for lm in eachharmonic(∇x∇a)
+                @test ∇x∇a[lm] ≈ 0 atol=5*sqrt(eps(NF))
+            end
+            
+            # DIV(GRAD(A)) = LAPLACE(A)
+            ∇dot∇a = divergence(dadx, dady, model.spectral_transform)
+            ∇²a = ∇²(a, model.spectral_transform)
 
-        for lm in SpeedyWeather.eachharmonic(∇x∇a)
-            @test ∇x∇a[lm] ≈ 0 atol=5*sqrt(eps(NF))
-        end
-        
-        # DIV(GRAD(A)) = LAPLACE(A)
-        div_∇a = zero(a)
-        SpeedyWeather.divergence!(div_∇a, dadx, dady, m.spectral_transform)
-        ∇²a = zero(a)
-        SpeedyWeather.∇²!(∇²a, a, m.spectral_transform)
-
-        for lm in SpeedyWeather.eachharmonic(div_∇a, ∇²a)
-            @test div_∇a[lm] ≈ ∇²a[lm] atol=5*sqrt(eps(NF)) rtol=5*sqrt(eps(NF))
+            for lm in eachindex(∇dot∇a, ∇²a)
+                @test ∇dot∇a[lm] ≈ ∇²a[lm] atol=5*sqrt(eps(NF)) rtol=5*sqrt(eps(NF))
+            end
         end
     end
 end

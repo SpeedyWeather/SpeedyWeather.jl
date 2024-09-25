@@ -223,6 +223,13 @@ function (::Type{Grid})(
     return Grid(Array{Float64}(undef, get_npoints2D(Grid, nlat_half), k...), nlat_half)
 end
 
+function Base.convert(
+    ::Type{Grid},
+    grid::AbstractGridArray,
+) where {Grid<:AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType}
+    return Grid(ArrayType(grid.data))
+end
+
 ## COORDINATES
 
 """$(TYPEDSIGNATURES) Latitudes (in degrees, -90˚-90˚N) and longitudes (0-360˚E)  for
@@ -300,6 +307,12 @@ for k in eachgrid(grid)
             grid[ij, k]"""
 @inline eachgrid(grid::AbstractGridArray) = CartesianIndices(size(grid)[2:end])
 
+# several arguments to check for matching grids
+function eachgrid(grid1::AbstractGridArray, grids::AbstractGridArray...; kwargs...)
+    grids_match(grid1, grids...; kwargs...) || throw(DimensionMismatch(grid1, grids...))
+    return eachgrid(grid1)
+end
+
 """
 $(TYPEDSIGNATURES)
 Vector{UnitRange} `rings` to loop over every ring of grid `grid`
@@ -324,11 +337,19 @@ function eachring(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
 end
 
 """$(TYPEDSIGNATURES) Same as `eachring(grid)` but performs a bounds check to assess
-that all `grids` are of same size."""
-function eachring(grid1::Grid, grids::Grid...) where {Grid<:AbstractGridArray} 
-    n = length(grid1)
-    Base._all_match_first(X->length(X), n, grid1, grids...) || throw(BoundsError)
+that all `grids` according to `grids_match` (non-parametric grid type, nlat_half and length)."""
+function eachring(grid1::AbstractGridArray, grids::AbstractGridArray...)
+    # for eachring grids only need to match in the horizontal, but can different vertical (or other) dimensions
+    grids_match(grid1, grids...; horizontal_only = true) || throw(DimensionMismatch(grid1, grids...))
     return eachring(grid1)
+end
+
+function Base.DimensionMismatch(grid1::AbstractGridArray, grids::AbstractGridArray...)
+    s = "AbstractGridArrays do not match; $(size(grid1)) $(nonparametric_type(grid1))"
+    for grid in grids
+        s *= ", $(size(grid))-$(nonparametric_type(grid))"
+    end
+    return DimensionMismatch(s)
 end
 
 # equality and comparison, somehow needed as not covered by broadcasting
@@ -336,17 +357,45 @@ Base.:(==)(G1::AbstractGridArray, G2::AbstractGridArray) = grids_match(G1, G2) &
 Base.all(G::AbstractGridArray) = all(G.data)
 Base.any(G::AbstractGridArray) = any(G.data)
 
-"""$(TYPEDSIGNATURES) True if both `A` and `B` are of the same type
-(regardless type parameter `T` or underyling array type `ArrayType`) and
-of same size."""
-function grids_match(A::AbstractGridArray, B::AbstractGridArray)
-    length(A) == length(B) && return grids_match(typeof(A), typeof(B))
-    return false
+"""$(TYPEDSIGNATURES) True if both `A` and `B` are of the same nonparametric grid type
+(e.g. OctahedralGaussianArray, regardless type parameter `T` or underyling array type `ArrayType`)
+and of same resolution (`nlat_half`) and total grid points (`length`). Sizes of `(4,)` and `(4,1)`
+would match for example, but `(8,1)` and `(4,2)` would not (`nlat_half` not identical)."""
+function grids_match(
+    A::AbstractGridArray,
+    B::AbstractGridArray;
+    horizontal_only::Bool = false,
+    vertical_only::Bool = false,
+)
+    @assert ~(horizontal_only && vertical_only) "Conflicting options: horizontal_only = $horizontal_ony and vertical_only = $vertical_only"
+
+    horizontal_match = get_nlat_half(A) == get_nlat_half(B)
+    vertical_match = size(A)[2:end] == size(B)[2:end]
+    type_match = grids_match(typeof(A), typeof(B))
+
+    if horizontal_only
+        # type also has to match as two different grid types can have the same nlat_half
+        return horizontal_match && type_match
+    elseif vertical_only
+        return vertical_match
+    else
+        return horizontal_match && vertical_match && type_match
+    end
 end
 
+# eltypes can be different and also array types of underlying data
 function grids_match(A::Type{<:AbstractGridArray}, B::Type{<:AbstractGridArray})
-    # eltypes can be different and also array types of underlying data
     return nonparametric_type(A) == nonparametric_type(B)
+end
+
+"""$(TYPEDSIGNATURES) True if all grids `A, B, C, ...` provided as arguments
+match according to `grids_match` wrt to `A` (and therefore all)."""
+function grids_match(A::AbstractGridArray, B::AbstractGridArray...; kwargs...)
+    match = true    # single grid A always matches itself
+    for Bi in B     # check for all matching respectively with A
+        match &= grids_match(A, Bi; kwargs...)
+    end
+    return match
 end
 
 """$(TYPEDSIGNATURES) UnitRange to access data on grid `grid` on ring `j`."""
@@ -354,10 +403,15 @@ function each_index_in_ring(grid::Grid, j::Integer) where {Grid<:AbstractGridArr
     return each_index_in_ring(Grid, j, grid.nlat_half)
 end
 
-""" $(TYPEDSIGNATURES) UnitRange to access each grid point on grid `grid`."""
+""" $(TYPEDSIGNATURES) UnitRange to access each horizontal grid point on grid `grid`.
+For a `NxM` (`N` horizontal grid points, `M` vertical layers) `OneTo(N)` is returned."""
 eachgridpoint(grid::AbstractGridArray) = Base.OneTo(get_npoints(grid))
+
+""" $(TYPEDSIGNATURES) Like `eachgridpoint(::AbstractGridArray)` but checks for
+equal size between input arguments first."""
 function eachgridpoint(grid1::Grid, grids::Grid...) where {Grid<:AbstractGridArray}
     n = length(grid1)
+    # TODO check only nonparametric_type and nlat_half identical!
     Base._all_match_first(X->length(X), n, grid1, grids...) || throw(BoundsError)
     return eachgridpoint(grid1)
 end

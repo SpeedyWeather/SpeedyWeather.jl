@@ -10,7 +10,7 @@ with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
 model components, are
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct PrimitiveDryModel{
+@kwdef mutable struct PrimitiveDryModel{
     # TODO add constraints again when we stop supporting julia v1.9
     DS,     # <:DeviceSetup,
     GE,     # <:AbstractGeometry,
@@ -41,12 +41,12 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     IM,     # <:AbstractImplicit,
     HD,     # <:AbstractHorizontalDiffusion,
     VA,     # <:AbstractVerticalAdvection,
-    OW,     # <:AbstractOutputWriter,
+    OU,     # <:AbstractOutput,
     FB,     # <:AbstractFeedback,
 } <: PrimitiveDry
 
     spectral_grid::SpectralGrid
-    device_setup::DS = DeviceSetup(CPUDevice())
+    device_setup::DS = DeviceSetup(spectral_grid.device)
     
     # DYNAMICS
     dynamics::Bool = true
@@ -87,12 +87,12 @@ Base.@kwdef mutable struct PrimitiveDryModel{
     vertical_advection::VA = CenteredVerticalAdvection(spectral_grid)
     
     # OUTPUT
-    output::OW = OutputWriter(spectral_grid, PrimitiveDry)
+    output::OU = NetCDFOutput(spectral_grid, PrimitiveDry)
     callbacks::Dict{Symbol, AbstractCallback} = Dict{Symbol, AbstractCallback}()
     feedback::FB = Feedback()
 end
 
-has(::Type{<:PrimitiveDry}, var_name::Symbol) = var_name in (:vor, :div, :temp, :pres)
+prognostic_variables(::Type{<:PrimitiveDry}) = (:vor, :div, :temp, :pres)
 default_concrete_model(::Type{PrimitiveDry}) = PrimitiveDryModel
 
 """
@@ -136,15 +136,16 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     (; clock) = prognostic_variables
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
-
+    
+    diagnostic_variables = DiagnosticVariables(spectral_grid)
+    
     # particle advection
     initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
 
     # initialize ocean and land and synchronize clocks
-    initialize!(prognostic_variables.ocean, clock.time, model)
-    initialize!(prognostic_variables.land, clock.time, model)
+    initialize!(prognostic_variables.ocean, time, model)
+    initialize!(prognostic_variables.land,  prognostic_variables, diagnostic_variables, model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
