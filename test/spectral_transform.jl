@@ -50,14 +50,14 @@ spectral_resolutions_inexact = (127, 255)
                             FullHEALPixGrid,
                             FullOctaHEALPixGrid)
 
-                SG = SpectralGrid(NF; trunc, Grid)
+                SG = SpectralGrid(; NF, trunc, Grid)
                 S = SpectralTransform(SG)
 
                 alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
                 fill!(alms, 0)
                 alms[1, 1] = 1
 
-                map = gridded(alms, S)
+                map = transform(alms, S)
             
                 for ij in SpeedyWeather.eachgridpoint(map)
                     @test map[ij] ≈ map[1] > zero(NF)
@@ -71,14 +71,14 @@ end
     for trunc in spectral_resolutions
         for NF in (Float32, Float64)
 
-            SG = SpectralGrid(NF; trunc)
+            SG = SpectralGrid(; NF, trunc)
             S1 = SpectralTransform(SG, recompute_legendre=true)
             S2 = SpectralTransform(SG, recompute_legendre=false)
 
             alms = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
 
-            map1 = gridded(alms, S1)
-            map2 = gridded(alms, S2)
+            map1 = transform(alms, S1)
+            map2 = transform(alms, S2)
         
             # is only approx as recompute_legendre may use a different precision
             @test map1 ≈ map2
@@ -94,7 +94,7 @@ end
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid)
 
-                SG = SpectralGrid(NF; trunc, Grid)
+                SG = SpectralGrid(; NF, trunc, Grid)
                 S = SpectralTransform(SG, recompute_legendre=true)
 
                 lmax = 3
@@ -103,8 +103,8 @@ end
                         alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
                         alms[l, m] = 1
 
-                        map = gridded(alms, S)
-                        alms2 = spectral(map, S)
+                        map = transform(alms, S)
+                        alms2 = transform(map, S)
 
                         for lm in SpeedyWeather.eachharmonic(alms, alms2)
                             @test alms[lm] ≈ alms2[lm] atol=100*eps(NF)
@@ -116,15 +116,15 @@ end
     end
 end
 
-@testset "Transform: Individual Legendre polynomials (inexact transforms)" begin
-    @testset for trunc in spectral_resolutions_inexact
-        @testset for NF in (Float32, Float64)
-            @testset for Grid in (  HEALPixGrid,
-                                    OctaHEALPixGrid,
-                                    FullHEALPixGrid,
-                                    FullOctaHEALPixGrid)
-                
-                SG = SpectralGrid(NF; trunc, Grid)
+@testset "Transform: Singleton dimensions" begin
+    @testset for trunc in spectral_resolutions
+        for NF in (Float32, Float64)
+            for Grid in (   FullGaussianGrid,
+                            FullClenshawGrid,
+                            OctahedralGaussianGrid,
+                            OctahedralClenshawGrid)
+
+                SG = SpectralGrid(; NF, trunc, Grid)
                 S = SpectralTransform(SG, recompute_legendre=true)
 
                 lmax = 3
@@ -133,8 +133,141 @@ end
                         alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
                         alms[l, m] = 1
 
-                        map = gridded(alms, S)
-                        alms2 = spectral(map, S)
+                        map = transform(alms, S)
+                        
+                        # add singleton dimension for lower triangular matrix
+                        alms2 = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1, 1)
+                        alms2[:, 1] = alms
+                        map2 = deepcopy(map)
+                        transform!(map2, alms2, S)
+
+                        for ij in eachindex(map, map2)
+                            @test map[ij] == map2[ij]
+                        end
+
+                        # add singleton dimension for grid
+                        grid = randn(SG.GridVariable2D, SG.nlat_half)
+                        alms = transform(grid, S)
+                        alms2 = deepcopy(alms)
+
+                        grid3D = zeros(SG.GridVariable3D, SG.nlat_half, 1)
+                        grid3D[:, 1] = grid
+
+                        transform!(alms2, grid3D, S)
+
+                        for lm in eachindex(alms, alms2)
+                            @test alms[lm] == alms2[lm]
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+@testset "Transform: Real to real transform" begin
+    for NF in (Float32, Float64)
+        # test Float64 -> Float32
+        spectral_grid = SpectralGrid(; NF)
+
+        # create real and complex otherwise identical
+        Lreal = randn(LowerTriangularMatrix{NF}, spectral_grid.trunc+2, spectral_grid.trunc+1)
+        Lcomplex = complex.(Lreal)
+        
+        grid1 = zeros(spectral_grid.GridVariable2D, spectral_grid.nlat_half)
+        grid2 = zeros(spectral_grid.GridVariable2D, spectral_grid.nlat_half)
+        
+        S = SpectralTransform(spectral_grid)
+
+        transform!(grid1, Lreal, S)
+        transform!(grid2, Lcomplex, S)
+
+        for ij in eachindex(grid1, grid2)
+            @test grid1[ij] ≈ grid2[ij]
+        end
+    end
+end
+
+@testset "Transform: NF flexibility spectral inputs" begin
+
+    # test Float64 -> Float32
+    spectral_grid = SpectralGrid()
+    L_f32 = randn(LowerTriangularMatrix{ComplexF32}, spectral_grid.trunc+2, spectral_grid.trunc+1)
+    L_f64 = ComplexF64.(L_f32)
+    
+    grid1 = zeros(spectral_grid.GridVariable2D, spectral_grid.nlat_half)
+    grid2 = zeros(spectral_grid.GridVariable2D, spectral_grid.nlat_half)
+    
+    S = SpectralTransform(spectral_grid)
+
+    transform!(grid1, L_f64, S)  # Float64 -> Float32
+    transform!(grid2, L_f32, S)  # Float32 -> Float32
+
+    for ij in eachindex(grid1, grid2)
+        @test grid1[ij] ≈ grid2[ij] atol=sqrt(eps(Float32))
+    end
+
+    # TODO NF flexibility for grid inputs currently not supported for a good reason:
+    # the fourier transform is pre-planned for number type NF so you can't use another one
+    # above in spectral->grid this doesn't matter as the fourier transform is applied after
+    # the Legendre transform (which isn't pre-planned and hence NF flexible)
+    # consequently, the following is commented out
+
+    # L1 = deepcopy(L_f32)
+    # L2 = deepcopy(L_f32)
+    # fill!(L1, 0)
+    # fill!(L2, 0)
+
+    # grid3_f32 = randn(spectral_grid.GridVariable2D, spectral_grid.nlat_half)
+    # grid3_f64 = Float64.(grid3_f32)
+
+    # transform!(L1, grid3_f32, S)
+    # transform!(L2, grid3_f64, S)    # throws an error
+end
+
+@testset "Transform: NF flexibility for spectral outputs" begin
+
+    # test Float32 -> Float64
+    spectral_grid = SpectralGrid()
+    NF = spectral_grid.NF
+    grid = randn(spectral_grid.Grid{NF}, spectral_grid.nlat_half)
+    
+    L1 = zeros(LowerTriangularMatrix{Complex{Float32}}, spectral_grid.trunc+2, spectral_grid.trunc+1)
+    L2 = zeros(LowerTriangularMatrix{Complex{Float64}}, spectral_grid.trunc+2, spectral_grid.trunc+1)
+    
+    S = SpectralTransform(spectral_grid)
+
+    transform!(L1, grid, S)  # Float32 -> Float32
+    transform!(L2, grid, S)  # Float32 -> Float64
+
+    for lm in eachindex(L1, L2)
+        @test L1[lm] ≈ L2[lm]
+    end
+
+    # TODO similar to the above, NF flexibility for grid outputs currently not supported because
+    # the fourier transform is pre-planned and inplace with LinearAlgebra.mul! which cannot write into
+    # another eltype than the FFT plan
+end
+
+@testset "Transform: Individual Legendre polynomials (inexact transforms)" begin
+    @testset for trunc in spectral_resolutions_inexact
+        @testset for NF in (Float32, Float64)
+            @testset for Grid in (  HEALPixGrid,
+                                    OctaHEALPixGrid,
+                                    FullHEALPixGrid,
+                                    FullOctaHEALPixGrid)
+                
+                SG = SpectralGrid(; NF, trunc, Grid)
+                S = SpectralTransform(SG, recompute_legendre=true)
+
+                lmax = 3
+                for l in 1:lmax
+                    for m in 1:l
+                        alms = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+                        alms[l, m] = 1
+
+                        map = transform(alms, S)
+                        alms2 = transform(map, S)
 
                         tol = 1e-3
 
@@ -161,19 +294,19 @@ end
                 # clenshaw-curtis grids are only exact for cubic truncation
                 dealiasing = Grid in (FullGaussianGrid, OctahedralGaussianGrid) ? 2 : 3
 
-                SG = SpectralGrid(NF; trunc, Grid, dealiasing)
+                SG = SpectralGrid(; NF, trunc, Grid, dealiasing)
                 S = SpectralTransform(SG, recompute_legendre=false)
                 O = EarthOrography(SG, smoothing=true)
                 E = Earth(SG)
                 initialize!(O, E, S)
 
                 oro_grid = O.orography
-                oro_spec = spectral(oro_grid, S)
+                oro_spec = transform(oro_grid, S)
 
-                oro_grid1 = gridded(oro_spec, S)
-                oro_spec1 = spectral(oro_grid1, S)
-                oro_grid2 = gridded(oro_spec1, S)
-                oro_spec2 = spectral(oro_grid2, S)
+                oro_grid1 = transform(oro_spec, S)
+                oro_spec1 = transform(oro_grid1, S)
+                oro_grid2 = transform(oro_spec1, S)
+                oro_spec2 = transform(oro_grid2, S)
 
                 tol = 1e-3
 

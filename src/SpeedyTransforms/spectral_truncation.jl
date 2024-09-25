@@ -45,7 +45,6 @@ function spectral_truncation!(A::AbstractMatrix)
     return A
 end
 
-
 """
 $(TYPEDSIGNATURES)
 Triangular truncation of `alms` to degree and order `trunc` in-place."""
@@ -132,8 +131,7 @@ function zero_imaginary_zonal_modes!(
     return alms
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Smooth the spectral field `A` following A_smooth = (1-c*∇²ⁿ)A with power n of a normalised Laplacian
 so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c<0."""
 function spectral_smoothing(A::LowerTriangularArray, c::Real; power::Real=1)
@@ -142,8 +140,7 @@ function spectral_smoothing(A::LowerTriangularArray, c::Real; power::Real=1)
     return A_smooth
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Smooth the spectral field `A` following A *= (1-(1-c)*∇²ⁿ) with power n of a normalised Laplacian
 so that the highest degree lmax is dampened by multiplication with c. Anti-diffusion for c>1."""
 function spectral_smoothing!(   L::LowerTriangularArray,
@@ -152,6 +149,7 @@ function spectral_smoothing!(   L::LowerTriangularArray,
                                 truncation::Int=-1)     # smoothing wrt wavenumber (0 = largest)
                         
     lmax, mmax = size(L; as=Matrix)
+        
     # normalize by largest eigenvalue by default, or wrt to given truncation
     eigenvalue_norm = truncation == -1 ? -mmax*(mmax+1) : -truncation*(truncation+1)
 

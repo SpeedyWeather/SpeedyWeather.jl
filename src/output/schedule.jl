@@ -53,7 +53,7 @@ function initialize!(scheduler::Schedule, clock::Clock)
 
     # PERIODIC SCHEDULE, always AFTER scheduler.every time period has passed
     if scheduler.every.value < typemax(Int)
-        every_n_timesteps = max(1,round(Int, scheduler.every/clock.Δt))
+        every_n_timesteps = max(1, round(Int, scheduler.every/clock.Δt))
         schedule[every_n_timesteps:every_n_timesteps:end] .= true
 
         prev_every = readable_secs(scheduler.every.value)

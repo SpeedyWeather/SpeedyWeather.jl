@@ -7,7 +7,7 @@ include("dates.jl")
 include("lower_triangular_matrix.jl")
 include("grids.jl")
 include("interpolation.jl")
-#include("set_vars.jl")
+include("set.jl")
 
 # GPU/KERNELABSTRACTIONS
 include("kernelabstractions.jl")
@@ -24,7 +24,7 @@ include("particles.jl")
 include("particle_advection.jl")
 
 # VERTICAL LEVELS
-include("vertical_levels.jl")
+include("vertical_coordinates.jl")
 include("geopotential.jl")
 
 # PHYSICS

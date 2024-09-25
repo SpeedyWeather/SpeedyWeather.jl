@@ -3,7 +3,7 @@ using KernelAbstractions
 @testset "KernelAbstractions tests" begin 
 
     # only on CPU (currently)
-    device_setup = SpeedyWeather.DeviceSetup(SpeedyWeather.CPUDevice())
+    device_setup = SpeedyWeather.DeviceSetup(SpeedyWeather.CPU())
 
     @kernel function mul_test!(A, @Const(B), @Const(C))
         i, j = @index(Global, NTuple)

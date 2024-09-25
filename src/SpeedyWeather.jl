@@ -11,14 +11,13 @@ import LinearAlgebra: LinearAlgebra, Diagonal
 
 # GPU, PARALLEL
 import Base.Threads: Threads, @threads
-import FLoops: FLoops, @floop
 import KernelAbstractions
-import CUDA: CUDA, CUDAKernels
+import CUDA: CUDA, CUDAKernels, CuArray
 import Adapt: Adapt, adapt, adapt_structure
 
 # INPUT OUTPUT
 import TOML
-import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day
+import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, Week
 import Printf: Printf, @sprintf
 import Random: randstring
 import NCDatasets: NCDatasets, NCDataset, defDim, defVar
@@ -29,7 +28,7 @@ import UnicodePlots
 import ProgressMeter
 
 # to avoid a `using Dates` to pass on DateTime arguments
-export DateTime, Second, Minute, Hour, Day
+export DateTime, Second, Minute, Hour, Day, Week
 
 # export functions that have many cross-component methods
 export initialize!, finish!
@@ -49,7 +48,7 @@ include("LowerTriangularMatrices/LowerTriangularMatrices.jl")
 using .LowerTriangularMatrices
 
 # RingGrids
-export RingGrids
+export  RingGrids
 export  AbstractGrid, AbstractGridArray,
         AbstractFullGridarray, AbstractReducedGridArray
 export  FullClenshawGrid, FullClenshawArray,
@@ -61,13 +60,14 @@ export  FullClenshawGrid, FullClenshawArray,
         HEALPixGrid, HEALPixArray,
         OctaHEALPixGrid, OctaHEALPixArray,
         eachring, eachgrid, plot
+export  AnvilInterpolator
 
 include("RingGrids/RingGrids.jl")
 using .RingGrids
 
 # SpeedyTransforms
 export SpeedyTransforms, SpectralTransform
-export spectral, gridded, spectral!, gridded!
+export transform, transform!
 export spectral_truncation, spectral_truncation!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
@@ -82,7 +82,6 @@ include("gpu.jl")
 # abstract types
 include("models/abstract_models.jl")
 include("dynamics/abstract_types.jl")
-include("output/abstract_types.jl")
 include("physics/abstract_types.jl")
 
 # GEOMETRY CONSTANTS ETC
@@ -139,8 +138,9 @@ include("physics/land.jl")
 
 # OUTPUT
 include("output/schedule.jl")
-include("output/output.jl")
 include("output/feedback.jl")
+include("output/netcdf_output.jl")
+include("output/restart_file.jl")
 include("output/plot.jl")
 include("output/callbacks.jl")
 include("output/particle_tracker.jl")

@@ -18,10 +18,8 @@ const DEFAULT_GRID = FullGaussianGrid
 
 # TRANSFORM
 export  SpectralTransform,
-        gridded,
-        gridded!,
-        spectral,
-        spectral!
+        transform!,
+        transform
 
 # ALIASING
 export  get_nlat_half

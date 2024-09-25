@@ -64,7 +64,7 @@ end
         J2 = OctaHEALPixGrid(randn(NF, 4096))               # J32 grid
         K2 = FullOctaHEALPixGrid(randn(NF, 128*63))         # K32 grid
 
-        for (grid1, grid2) in zip([L, F, O, C, H, J, K], [L2, F2, O2, C2, H2, J2, K2])
+        for (grid1, grid2) in zip((L, F, O, C, H, J, K), (L2, F2, O2, C2, H2, J2, K2))
             @test size(grid1) == size(grid2)
         end
 
@@ -111,7 +111,7 @@ end
             n = 4      # resolution parameter nlat_half
             G1 = zeros(G{NF}, n)
             G2 = zero(G1)
-            G3 = G(G2)
+            G3 = G(G2.data)
 
             @test G1 == G2
             @test G1 == G3
@@ -279,6 +279,25 @@ end
     end
 end
 
+@testset "Ring indices" begin
+
+    g1 = zeros(OctahedralGaussianGrid, 2)
+    g2 = zeros(OctahedralGaussianGrid, 2, 1)    # matches above
+    g3 = zeros(OctahedralGaussianGrid, 2, 2)    # matches horizontally only
+    g4 = zeros(OctahedralClenshawGrid, 2)       # does not match above
+
+    @test eachring(g1) == eachring(g1, g2) == eachring(g1, g2, g2, g1)
+    @test eachring(g1) == eachring(g2, g3)
+    @test_throws DimensionMismatch eachring(g1, g4)
+    @test_throws DimensionMismatch eachring(g2, g4)
+    @test_throws DimensionMismatch eachring(g3, g4)
+
+    @test RingGrids.grids_match(g1, g3) == false
+    @test RingGrids.grids_match(g2, g3) == false
+    @test RingGrids.grids_match(g1, g3, horizontal_only=true)
+    @test RingGrids.grids_match(g2, g3, horizontal_only=true)
+end
+
 @testset "Grid broadcasting" begin
     n = 2
     @testset for G in ( FullClenshawArray,
@@ -402,6 +421,14 @@ end
             @test all(grid .== 1)
         end
     end
+end
+
+# needed when extension is not loaded (manual testing)
+# RingGrids.nonparametric_type(::Type{<:JLArray}) = JLArray
+
+# define for Julia 1.9
+if VERSION < v"1.10"
+    JLArrays.JLDeviceArray{T, N}(A::JLArrays.JLDeviceArray{T, N}) where {T,N} = A
 end
 
 @testset "AbstractGridArray: GPU (JLArrays)" begin 

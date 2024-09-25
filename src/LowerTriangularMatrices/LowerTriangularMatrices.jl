@@ -12,7 +12,6 @@ import LinearAlgebra: tril!
 
 # VISUALISATION
 import UnicodePlots
-# export plot
 
 export LowerTriangularMatrix, LowerTriangularArray
 export eachharmonic, eachmatrix

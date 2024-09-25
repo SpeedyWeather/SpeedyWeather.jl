@@ -11,7 +11,7 @@ end
 
 Coriolis(SG::SpectralGrid; kwargs...) = Coriolis{SG.NF}(nlat=SG.nlat; kwargs...)
 
-function initialize!(coriolis::Coriolis, model::ModelSetup)
+function initialize!(coriolis::Coriolis, model::AbstractModel)
     (; rotation) = model.planet
     (; sinlat, radius) = model.geometry
 
@@ -28,17 +28,18 @@ Return the Coriolis parameter `f` on the grid `Grid` of resolution `nlat_half`
 on a planet of `ratation` [1/s]. Default rotation of Earth."""
 function coriolis(
     ::Type{Grid},
-    nlat_half::Integer;
+    nlat_half::Integer,     # resolution parameter
+    ks::Integer...;         # non-horizontal dimensions
     rotation = DEFAULT_ROTATION
-) where {Grid<:AbstractGrid}
+) where {Grid<:AbstractGridArray}
     
-    f = zeros(Grid, nlat_half)      # preallocate
-    lat = get_lat(Grid, nlat_half)  # in radians [-π/2, π/2]
+    f = zeros(Grid, nlat_half, ks...)       # preallocate
+    lat = get_lat(Grid, nlat_half)          # in radians [-π/2, π/2]
 
     for (j, ring) in enumerate(eachring(f))
         fⱼ = 2rotation*sin(lat[j])
         for ij in ring
-            f[ij] = fⱼ
+            f[ij, :] .= fⱼ                  # setindex across all ks dimensions
         end
     end
     return f
@@ -51,6 +52,6 @@ on a planet of `ratation` [1/s]. Default rotation of Earth."""
 function coriolis(
     grid::Grid;
     kwargs...
-) where {Grid<:AbstractGrid}
-    return coriolis(Grid, grid.nlat_half; kwargs...)
+) where {Grid<:AbstractGridArray}
+    return coriolis(Grid, grid.nlat_half, size(grid)[2:end]...; kwargs...)
 end
