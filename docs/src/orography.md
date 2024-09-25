@@ -98,7 +98,8 @@ the orography itself need to come on one of the full grids
 SpeedyWeather defines, i.e. `FullGaussianGrid` or `FullClenshawGrid`
 (a regular lat-lon grid, see [FullClenshawGrid](@ref FullClenshawGrid)),
 which you can specify. Best to inspect the correct orientation with
-`plot(mars_orography.orography)` (where the first is whatever name you chose here).
+`plot(mars_orography.orography)` (or `heatmap` after `using CairoMakie`;
+the scope `mars_orography.` is whatever name you chose here).
 You can use smoothing as above.
 
 ## Changing orography manually
@@ -108,23 +109,46 @@ in either `orography.orography` (to set it for the shallow-water model)
 or `orography.geopot_surf` (for the primitive equations, but this is in
 spectral space, advanced!). After the orography has been initialised
 (for testing to `initialize!(orography, model)` but in most cases when 
-you do `simulation = initialize!(model)`), for example you can do
+you do `simulation = initialize!(model)`). While you can do things like
+`sort!(orography.orography)` (sorting all mountains towards the south pole)
+as the orography is an array, the `set!` function
+is more convenient, for example you can do
 
 ```@example orography
-sort!(orography.orography)
+set!(model, orography=(λ,φ) -> 2000*cosd(φ) + 300*sind(λ) + 100*randn())
+
+using CairoMakie
+heatmap(model.orography.orography, title="Zonal 2000m ridge with noise")
+save("orography_set.png", ans) # hide
 nothing # hide
 ```
+![Orography with set!](orography_set.png)
 
-to move all mountains to the south pole, or
+But note that while `model.orography` is still of type `EarthOrography`
+we have now muted the arrays within - so do not be confused!
+The `set!` function automatically propagates the grid array in
+`orography.orography` to spectral space in `orography.geopot_surf`
+to synchronize those two arrays that are supposed to hold essentially
+the same information just on in grid the other in spectral space.
+`set!` also allows for the `add` keyword, making it possible to
+add (or remove) mountains, e.g. imagine Hawaii would suddenly increase
+massively in size, covering a 10˚x10˚ area with some additional 2000m
 
 ```@example orography
-orography.orography[1] = 100
-```
+model.orography = EarthOrography(spectral_grid)     # reset orography
+initialize!(model.orography, model)                 # initially that reset orography
 
-to set the grid point `1` (at 0˚E, on the first ring around the north pole)
-to a height of 100m. Whichever way you tweak the orography manually
-you want to reflect this in the surface geopotential `geopot_surf` which is
-used in the primitive equations by
+# blow up Hawaii by adding a 2000m high 10˚x10˚ large island
+set!(model, orography=(λ,φ) -> 15 < φ < 25 && 195 < λ < 205 ? 2000 : 0, add=true)
+heatmap(model.orography.orography, title="Super Hawaii orography")
+save("orography_hawaii.png", ans) # hide
+nothing # hide
+```
+![Orography with super Hawaii](orography_hawaii.png)
+
+If you don't use `set!`, you want to reflect any changes to `orography.orography`
+in the surface geopotential `geopot_surf` (which is used in the primitive equations)
+manually by
 
 ```@example orography
 transform!(orography.geopot_surf, orography.orography, model.spectral_transform)

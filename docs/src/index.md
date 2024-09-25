@@ -52,6 +52,7 @@ The development of  SpeedyWeather.jl is lead by [Milan Klöwer](https://github.c
 - [Navid Constantinou](https://github.com/navidcy)
 - [Simone Silvestri](https://github.com/simone-silvestri)
 
+(Apologies if you've recently started contributing but this isn't reflected here yet, create a pull request!)
 Any contributions are always welcome!
 
 Open-source lives from large teams of (even occasional) contributors. If you are interested to
@@ -87,5 +88,6 @@ The bibtex entry for the paper is:
 ## Funding
 
 MK received funding by the European Research Council under Horizon 2020 within the ITHACA project,
-grant agreement number 741112 from 2021-2022. Since 2023 this project is also funded by the
-National Science Foundation NSF.
+grant agreement number 741112 from 2021-2022. From 2022-2024 this project is also funded by the
+National Science Foundation NSF. Since 2024, the main funding is from Schmidt Sciences through
+a Eric & Wendy Schmidt AI in Science Fellowship.
