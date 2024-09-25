@@ -20,16 +20,10 @@ WENOVerticalAdvection(spectral_grid)                =     WENOVerticalAdvection{
 @inline retrieve_time_step(::DiffusiveVerticalAdvection,  variables, var) = retrieve_previous_time_step(variables, var)
 @inline retrieve_time_step(::DispersiveVerticalAdvection, variables, var) =  retrieve_current_time_step(variables, var)
 
-# TODO this allocates a vector = bad!
 @inline function retrieve_stencil(k, nlayers, ::VerticalAdvection{NF, B}) where {NF, B}
-    k_stencil = max.(min.(nlayers, k-B:k+B), 1)
-    return k_stencil
-end
-
-# non-allocating version for default centered advection
-@inline function retrieve_stencil(k, nlayers, ::VerticalAdvection{NF, 1}) where NF
-    k_stencil = (max(1, k-1), k, min(nlayers, k+1))
-    return k_stencil
+    # creates allocation-free tuples for k-B:k+B but clamped into (1, nlayers)
+    # e.g. (1, 1, 2), (1, 2, 3), (2, 3, 4) ... (for k=1, 2, 3; B=1)
+    return ntuple(i -> clamp(i+k-B-1, 1, nlayers), 2B+1)
 end
 
 function vertical_advection!(
