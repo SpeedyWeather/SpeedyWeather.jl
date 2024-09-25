@@ -1,5 +1,5 @@
 # dictionary of all benchmark suites, define with whatever key ::Symbol
-benchmarks = Dict{Symbol,BenchmarkSuite}()
+benchmarks = Dict{Symbol,AbstractBenchmarkSuite}()
 
 # Models
 benchmarks[:benchmark100] = BenchmarkSuite(
@@ -63,3 +63,11 @@ benchmarks[:benchmark601] = BenchmarkSuite(
     physics = [true, false, true],
     dynamics = [true, true, false],
     )
+
+## DYNAMICS, benchmark individual functions 
+benchmarks[:benchmark700] = BenchmarkSuiteDynamics(
+    title = "Individual dynamics functions",
+    nruns = 1, 
+    physics = [true],
+    dynamics = [true],
+)

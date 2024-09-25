@@ -53,52 +53,7 @@ write(md, "to the repository for updates or comparison.")
 
 # Write benchmark suites into markdown
 for key in keys(benchmarks)
-
-    suite = benchmarks[key]
-
-    write(md, "\n## $(suite.title)\n\n")
-
-    print_NF = any(suite.NF .!= suite.NF[1])
-    print_Grid = any(suite.Grid .!= suite.Grid[1])
-    print_nlat = any(suite.nlat .!= suite.nlat[1]) 
-    print_dynamics = any(suite.dynamics .!= suite.dynamics[1])
-    print_physics = any(suite.physics .!= suite.physics[1])
-
-    column_header = "| Model "
-    column_header *= print_NF ? "| NF " : ""
-    column_header *= "| T "
-    column_header *= "| L "
-    column_header *= print_Grid ? "| Grid " : ""
-    column_header *= print_nlat ? "| Rings " : ""
-    column_header *= print_dynamics ? "| Dynamics " : ""
-    column_header *= print_physics ? "| Physics " : ""
-    column_header *= "| Δt | SYPD | Memory|"
-
-    ncolumns = length(findall('|',column_header)) - 1
-    second_row = repeat("| - ", ncolumns) * "|"
-
-    write(md,"$column_header\n")
-    write(md,"$second_row\n")
-
-    for i in 1:suite.nruns
-
-        row = "| $(suite.model[i]) "
-        row *= print_NF ? "| $(suite.NF[i]) " : ""
-        row *= "| $(suite.trunc[i]) "
-        row *= "| $(suite.nlev[i]) "
-        row *= print_Grid ? "| $(suite.Grid[i]) " : ""
-        row *= print_nlat ? "| $(suite.nlat[i]) " : ""
-        row *= print_dynamics ? "| $(suite.dynamics[i]) " : ""
-        row *= print_physics  ? "| $(suite.physics[i]) " : ""
-
-        Δt = round(Int,suite.Δt[i])
-        sypd = suite.SYPD[i]
-        SYPD = isfinite(sypd) ? round(Int, sypd) : 0
-        memory = prettymemory(suite.memory[i])
-        row *= "| $Δt | $SYPD | $memory |"
-
-        write(md,"$row\n")
-    end
+    write_results(md, benchmarks[key])
 end
 
 close(md)
