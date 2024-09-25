@@ -72,6 +72,9 @@ export PrognosticVariables
     "number of vertical layers"
     nlayers::Int
 
+    "Number of tracers"
+    ntracers::Int
+
     "Number of particles for particle advection"
     nparticles::Int
 
@@ -104,6 +107,10 @@ export PrognosticVariables
     land::PrognosticVariablesLand{NF, ArrayType, GridVariable2D} =
         PrognosticVariablesLand{NF, ArrayType, GridVariable2D}(; nlat_half)
 
+    "Tracers, last dimension is for n tracers [?]"
+    tracers::NTuple{NSTEPS, SpectralVariable4D} =
+            ntuple(i -> zeros(SpectralVariable4D, trunc+2, trunc+1, nlayers, ntracers), NSTEPS)
+
     "Particles for particle advection"
     particles::ParticleVector = zeros(ParticleVector, nparticles)
 
@@ -117,13 +124,13 @@ end
 """$(TYPEDSIGNATURES)
 Generator function."""
 function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
-    (; trunc, nlat_half, nlayers, nparticles) = SG
+    (; trunc, nlat_half, nlayers, ntracers, nparticles) = SG
     (; NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector) = SG
 
     return PrognosticVariables{NF, ArrayType, nsteps,
         SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}(;
-            trunc, nlat_half, nlayers=nlayers, nparticles,
+            trunc, nlat_half, nlayers, ntracers, nparticles,
         )
 end
 
@@ -141,7 +148,7 @@ function Base.show(
     println(io, "PrognosticVariables{$NF, $ArrayType}")
     
     # variables
-    (; trunc, nlat_half, nlayers, nparticles) = progn
+    (; trunc, nlat_half, nlayers, ntracers, nparticles) = progn
     nlat = RingGrids.get_nlat(Grid, nlat_half)
     println(io, "├ vor:   T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
     println(io, "├ div:   T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
@@ -156,6 +163,7 @@ function Base.show(
     println(io, "│├ snow_depth: $nlat-ring $Grid")
     println(io, "│├ soil_moisture_layer1:     $nlat-ring $Grid")
     println(io, "│└ soil_moisture_layer2:     $nlat-ring $Grid")
+    println(io, "├ tracers: $(ntracers)x T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
     println(io, "├ particles: $nparticles-element $(typeof(progn.particles))")
     println(io, "├ scale: $(progn.scale[])")
     print(io,   "└ clock: $(progn.clock.time)")
@@ -184,6 +192,8 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     progn_new.land.snow_depth .= progn_old.land.snow_depth
     progn_new.land.soil_moisture_layer1 .= progn_old.land.soil_moisture_layer1
     progn_new.land.soil_moisture_layer2 .= progn_old.land.soil_moisture_layer2
+
+    # TODO copy over tracers
 
     # copy largest subset of particles
     if length(progn_new.particles) != length(progn_old.particles)

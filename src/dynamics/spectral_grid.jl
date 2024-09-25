@@ -43,6 +43,9 @@ $(TYPEDFIELDS)
     "[OPTION] radius of the sphere [m]"
     radius::Float64 = DEFAULT_RADIUS
 
+    "[OPTION] number of tracers [?]"
+    ntracers::Int = 0
+
     "[OPTION] number of particles for particle advection [1]"
     nparticles::Int = 0
 
@@ -76,7 +79,7 @@ end
 function Base.show(io::IO, SG::SpectralGrid)
     (; NF, trunc, Grid, radius, nlat, npoints, nlayers, vertical_coordinates) = SG
     (; device, ArrayType) = SG
-    (; nparticles) = SG
+    (; ntracers, nparticles) = SG
 
     # resolution information
     res_ave = sqrt(4π*radius^2/npoints)/1000  # in [km]
@@ -86,9 +89,8 @@ function Base.show(io::IO, SG::SpectralGrid)
     println(io, "├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
     println(io, "├ Grid:       $nlat-ring $Grid{$NF}, $npoints grid points")
     println(io, "├ Resolution: $(s(res_ave))km (average)")
-    if nparticles > 0
-    println(io, "├ Particles:  $nparticles")
-    end
+    ntracers > 0 && println(io,   "├ Tracers:  $ntracers")
+    nparticles > 0 && println(io, "├ Particles:  $nparticles")
     println(io, "├ Vertical:   $nlayers-layer $(typeof(vertical_coordinates))")
       print(io, "└ Device:     $(typeof(device)) using $ArrayType")
 end
