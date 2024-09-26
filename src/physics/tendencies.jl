@@ -18,11 +18,11 @@ function parameterization_tendencies!(
     G = model.geometry
     rings = eachring(G.Grid, G.nlat_half)
 
-    for ij in eachgridpoint(diagn)       # loop over all horizontal grid points
+    for ij in eachgridpoint(diagn)              # loop over all horizontal grid points
 
         thread_id = Threads.threadid()          # not two threads should use the same ColumnVariables
         column = diagn.columns[thread_id]
-        jring = whichring(ij, rings)             # ring index gridpoint ij is on
+        jring = whichring(ij, rings)            # ring index gridpoint ij is on
 
         # extract current column for contiguous memory access
         reset_column!(column)                   # set accumulators back to zero for next grid point

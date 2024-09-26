@@ -4,11 +4,6 @@ function Base.show(io::IO, A::AbstractVariables)
     print_fields(io, A, keys)
 end
 
-# to be removed
-struct PrognosticLayerTimesteps end
-struct PrognosticSurfaceTimesteps end
-struct PrognosticVariablesLayer end
-
 export PrognosticVariablesOcean
 @kwdef struct PrognosticVariablesOcean{
     NF,                     # <: AbstractFloat
@@ -55,7 +50,8 @@ export PrognosticVariables
 @kwdef struct PrognosticVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
-    NSTEPS,                 # number of timesteps
+    nsteps,                 # number of timesteps
+    ntracers,               # number of tracers
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractGridArray
@@ -72,32 +68,29 @@ export PrognosticVariables
     "number of vertical layers"
     nlayers::Int
 
-    "Number of tracers"
-    ntracers::Int
-
     "Number of particles for particle advection"
     nparticles::Int
 
     # LAYERED VARIABLES
     "Vorticity of horizontal wind field [1/s], but scaled by scale (=radius during simulation)"
-    vor::NTuple{NSTEPS, SpectralVariable3D} =
-        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), NSTEPS)
+    vor::NTuple{nsteps, SpectralVariable3D} =
+        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), nsteps)
 
     "Divergence of horizontal wind field [1/s], but scaled by scale (=radius during simulation)"
-    div::NTuple{NSTEPS, SpectralVariable3D} =
-        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), NSTEPS)
+    div::NTuple{nsteps, SpectralVariable3D} =
+        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), nsteps)
 
     "Absolute temperature [K]"
-    temp::NTuple{NSTEPS, SpectralVariable3D} =
-        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), NSTEPS)
+    temp::NTuple{nsteps, SpectralVariable3D} =
+        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), nsteps)
 
     "Specific humidity [kg/kg]"
-    humid::NTuple{NSTEPS, SpectralVariable3D} =
-        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), NSTEPS)
+    humid::NTuple{nsteps, SpectralVariable3D} =
+        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), nsteps)
 
     "Logarithm of surface pressure [log(Pa)] for PrimitiveEquation, interface displacement [m] for ShallowWaterModel"
-    pres::NTuple{NSTEPS, SpectralVariable2D} =
-        ntuple(i -> zeros(SpectralVariable2D, trunc+2, trunc+1), NSTEPS)
+    pres::NTuple{nsteps, SpectralVariable2D} =
+        ntuple(i -> zeros(SpectralVariable2D, trunc+2, trunc+1), nsteps)
 
     "Ocean variables, sea surface temperature and sea ice concentration"
     ocean::PrognosticVariablesOcean{NF, ArrayType, GridVariable2D} =
@@ -108,8 +101,8 @@ export PrognosticVariables
         PrognosticVariablesLand{NF, ArrayType, GridVariable2D}(; nlat_half)
 
     "Tracers, last dimension is for n tracers [?]"
-    tracers::NTuple{NSTEPS, SpectralVariable4D} =
-            ntuple(i -> zeros(SpectralVariable4D, trunc+2, trunc+1, nlayers, ntracers), NSTEPS)
+    tracers::NTuple{ntracers, NTuple{nsteps, SpectralVariable3D}} =
+            ntuple(j -> ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), nsteps), ntracers)
 
     "Particles for particle advection"
     particles::ParticleVector = zeros(ParticleVector, nparticles)
@@ -128,9 +121,9 @@ function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
     (; NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector) = SG
 
-    return PrognosticVariables{NF, ArrayType, nsteps,
+    return PrognosticVariables{NF, ArrayType, nsteps, ntracers,
         SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}(;
-            trunc, nlat_half, nlayers, ntracers, nparticles,
+            trunc, nlat_half, nlayers, nparticles,
         )
 end
 
@@ -142,19 +135,19 @@ end
 
 function Base.show(
     io::IO,
-    progn::PrognosticVariables{NF, ArrayType, NSTEPS},
-) where {NF, ArrayType, NSTEPS}
+    progn::PrognosticVariables{NF, ArrayType, nsteps, ntracers},
+) where {NF, ArrayType, nsteps, ntracers}
     Grid = typeof(progn.ocean.sea_surface_temperature)
     println(io, "PrognosticVariables{$NF, $ArrayType}")
     
     # variables
-    (; trunc, nlat_half, nlayers, ntracers, nparticles) = progn
+    (; trunc, nlat_half, nlayers, nparticles) = progn
     nlat = RingGrids.get_nlat(Grid, nlat_half)
-    println(io, "├ vor:   T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
-    println(io, "├ div:   T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
-    println(io, "├ temp:  T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
-    println(io, "├ humid: T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
-    println(io, "├ pres:  T$trunc, 1-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
+    println(io, "├ vor:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
+    println(io, "├ div:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
+    println(io, "├ temp:  T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
+    println(io, "├ humid: T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
+    println(io, "├ pres:  T$trunc, 1-layer, $nsteps-steps LowerTriangularArray{$NF}")
     println(io, "├┐ocean: PrognosticVariablesOcean{$NF}")
     println(io, "│├ sea_surface_temperature:  $nlat-ring $Grid")
     println(io, "│└ sea_ice_concentration:    $nlat-ring $Grid")
@@ -163,7 +156,7 @@ function Base.show(
     println(io, "│├ snow_depth: $nlat-ring $Grid")
     println(io, "│├ soil_moisture_layer1:     $nlat-ring $Grid")
     println(io, "│└ soil_moisture_layer2:     $nlat-ring $Grid")
-    println(io, "├ tracers: $(ntracers)x T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
+    println(io, "├ tracers: T$trunc, $nlayers-layer, $ntracers-tracer $nsteps-steps LowerTriangularArray{$NF}")
     println(io, "├ particles: $nparticles-element $(typeof(progn.particles))")
     println(io, "├ scale: $(progn.scale[])")
     print(io,   "└ clock: $(progn.clock.time)")

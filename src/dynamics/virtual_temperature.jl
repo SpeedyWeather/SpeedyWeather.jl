@@ -61,13 +61,13 @@ Linear virtual temperature for `model::PrimitiveDry`: Just copy over
 arrays from `temp` to `temp_virt` at timestep `lf` in spectral space
 as humidity is zero in this `model`."""
 function linear_virtual_temperature!(   
-    diagn::DiagnosticVariablesLayer,
-    progn::PrognosticLayerTimesteps,
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     lf::Integer,
     model::PrimitiveDry,
 )
-    (; temp_virt) = diagn.dynamics_variables
-    (; temp) = progn.timesteps[lf]
+    (; temp_virt) = diagn.dynamics
+    temp = progn.temp[lf]
     copyto!(temp_virt, temp)
 end
 
