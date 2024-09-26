@@ -32,8 +32,13 @@ as defined in `spectral_grid` at initialization. The actual mask is in
 ```@example landseamask
 model = PrimitiveWetModel(;spectral_grid, land_sea_mask)
 simulation = initialize!(model)     # triggers also initialization of model.land_sea_mask
-plot(land_sea_mask.mask)
+
+using CairoMakie
+heatmap(land_sea_mask.mask, title="Land-sea mask at T31 resolution")
+save("land-sea_mask.png", ans) # hide
+nothing # hide
 ```
+![Land-sea mask](land-sea_mask.png)
 
 Now before you run a simulation you could manually change the land-sea mask by
 
@@ -160,10 +165,13 @@ model.feedback.verbose = false # hide
 
 simulation = initialize!(model, time=DateTime(1999,12,29))
 run!(simulation, period=Day(5))
-plot(model.land_sea_mask.mask)
+heatmap(model.land_sea_mask.mask, title="Land-sea mask after MilleniumFlood callback")
+save("land-sea_mask2.png", ans) # hide
+nothing # hide
 ```
+![Land-sea mask2](land-sea_mask2.png)
 
-And the land-sea mask has succesfully been set to ocean everywhere at the start
+And the land-sea mask has successfully been set to ocean everywhere at the start
 of the 21st century. Note that while we added an `@info` line into the
 `callback!` function, this is here not printed because of how the
 Documenter works. If you execute this in the REPL you'll see it.

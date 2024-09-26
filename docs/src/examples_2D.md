@@ -52,9 +52,10 @@ model = BarotropicModel(; spectral_grid, initial_conditions, planet=still_earth)
 nothing # hide
 ```
 The `model` contains all the parameters, but isn't initialized yet, which we can do
-with and then run it. The `run!` command will always return the prognostic variables, which, by default, are 
-plotted for surface relative vorticity with a unicode plot. The resolution of the plot
-is not necessarily representative but it lets us have a quick look at the result
+with and then run it. The `run!` command will always return a unicode plot
+(via [UnicodePlots.jl](https://github.com/JuliaPlots/UnicodePlots.jl))
+of the surface relative vorticity. This is just to get a quick idea of what was simulated.
+The resolution of the plot is not necessarily representative.
 ```@example barotropic_setup
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
@@ -319,7 +320,11 @@ nothing # hide
 ```
 ![Gravity waves pyplot](gravity_waves.png)
 
-Can you spot the Himalayas or the Andes?
+Mountains like the Himalayas or the Andes are quite obvious because the atmospheric layer
+is much thinner there. The pressure gradient is relative to ``z=0`` so in a fluid
+at rest the mountains would just "reach into" the fluid, thinning the layer the higher
+the mountain. As the atmosphere here is not at rest the layer thickness is not perfectly
+(anti-)correlated with orography but almost so.
 
 ## References
 

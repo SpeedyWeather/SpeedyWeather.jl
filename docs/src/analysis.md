@@ -235,7 +235,7 @@ nothing # hide
 
 the potential vorticity
 ```@example analysis
-heatmap(ζ, title="Potential vorticity [1/ms]")
+heatmap(q, title="Potential vorticity [1/m/s]")
 save("analysis_pv.png", ans) # hide
 nothing # hide
 ```
@@ -349,7 +349,7 @@ function total_enstrophy(ζ, η, model)
 end
 ```
 
-Then by evaluting `Q_mean` at different time steps, one can similarly
+Then by evaluating `Q_mean` at different time steps, one can similarly
 check how ``Q`` is changing over time.
 
 ```@example analysis
