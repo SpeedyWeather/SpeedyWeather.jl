@@ -68,6 +68,4 @@ benchmarks[:benchmark601] = BenchmarkSuite(
 benchmarks[:benchmark700] = BenchmarkSuiteDynamics(
     title = "Individual dynamics functions",
     nruns = 1, 
-    physics = [true],
-    dynamics = [true],
 )

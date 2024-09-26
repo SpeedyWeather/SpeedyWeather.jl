@@ -121,8 +121,6 @@ end
     nlev::Vector{Int} = default_nlev(model)
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
-    dynamics::Vector{Bool} = fill(true, nruns)
-    physics::Vector{Bool} = fill(true, nruns)
     function_names::Vector{String} = default_function_names()
     time_median::Vector{Vector{Float64}} = [fill(0.0, length(function_names)) for i=1:nruns]
     memory::Vector{Vector{Int}} = [fill(0, length(function_names)) for i=1:nruns]
@@ -150,20 +148,11 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
         trunc = suite.trunc[i]
         nlayers = suite.nlev[i]
         Grid = suite.Grid[i]
-        dynamics = suite.dynamics[i]
-        physics = suite.physics[i]
 
         spectral_grid = SpectralGrid(;NF, trunc, Grid, nlayers)
         suite.nlat[i] = spectral_grid.nlat
 
         model = Model(;spectral_grid)
-        if Model <: PrimitiveEquation
-            model.physics = physics
-            model.dynamics = dynamics
-        else
-            suite.dynamics[i] = true
-            suite.physics[i] = false
-        end
 
         simulation = initialize!(model)
 
