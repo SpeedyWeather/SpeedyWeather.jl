@@ -122,7 +122,7 @@ end
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
     function_names::Vector{String} = default_function_names()
-    time_median::Vector{Vector{Float64}} = [fill(0.0, length(function_names)) for i=1:nruns]
+    time::Vector{Vector{Float64}} = [fill(0.0, length(function_names)) for i=1:nruns]
     memory::Vector{Vector{Int}} = [fill(0, length(function_names)) for i=1:nruns]
     allocs::Vector{Vector{Int}} = [fill(0, length(function_names)) for i=1:nruns]
 end 
@@ -131,9 +131,9 @@ default_function_names() = ["pressure_gradient_flux!", "linear_virtual_temperatu
 
 function add_results!(suite::BenchmarkSuiteDynamics, trial::BenchmarkTools.Trial, i_run::Integer, i_func::Integer)
 
-    t = median(trial)
+    t = minimum(trial)
 
-    suite.time_median[i_run][i_func] = t.time 
+    suite.time[i_run][i_func] = t.time 
     suite.memory[i_run][i_func] = t.memory 
     suite.allocs[i_run][i_func] = t.allocs
 
@@ -233,7 +233,7 @@ function write_results(md, suite::BenchmarkSuiteDynamics)
 
         for i_func in 1:length(suite.function_names)
 
-            time = BenchmarkTools.prettytime(suite.time_median[i_run][i_func])
+            time = BenchmarkTools.prettytime(suite.time[i_run][i_func])
             memory = BenchmarkTools.prettymemory(suite.memory[i_run][i_func])
 
             row = "| $(suite.function_names[i_func]) "
