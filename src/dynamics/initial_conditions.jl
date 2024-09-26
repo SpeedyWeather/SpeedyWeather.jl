@@ -426,7 +426,7 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
 
     # SURFACE TEMPERATURE (store in k = nlayers, but it's actually surface, i.e. k=nlayers+1/2)
     # overwrite with lowermost layer further down
-    temp_surf = progn.temp[1][:,end]     # spectral temperature at k=nlev+1/2
+    temp_surf = progn.temp[1][:,end]     # spectral temperature at k=nlayers+1/2
 
     temp_surf[1] = norm_sphere*temp_ref                 # set global mean surface temperature
     for lm in eachharmonic(geopot_surf, temp_surf)

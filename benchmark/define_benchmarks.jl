@@ -1,5 +1,5 @@
 # dictionary of all benchmark suites, define with whatever key ::Symbol
-benchmarks = Dict{Symbol,BenchmarkSuite}()
+benchmarks = Dict{Symbol,AbstractBenchmarkSuite}()
 
 # Models
 benchmarks[:benchmark100] = BenchmarkSuite(
@@ -40,11 +40,11 @@ benchmarks[:benchmark400] = BenchmarkSuite(
             HEALPixGrid, OctaHEALPixGrid],
     )
 
-## NLEV
+## nlayers
 benchmarks[:benchmark500] = BenchmarkSuite(
     title = "Number of vertical layers",
     nruns = 4,
-    nlev = [4, 8, 12, 16],
+    nlayers = [4, 8, 12, 16],
     )
 
 ## PHYSICS/DYNAMICS
@@ -63,3 +63,9 @@ benchmarks[:benchmark601] = BenchmarkSuite(
     physics = [true, false, true],
     dynamics = [true, true, false],
     )
+
+## DYNAMICS, benchmark individual functions 
+benchmarks[:benchmark700] = BenchmarkSuiteDynamics(
+    title = "Individual dynamics functions",
+    nruns = 1, 
+)
