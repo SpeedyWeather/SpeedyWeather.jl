@@ -107,11 +107,13 @@ You can use smoothing as above.
 You can also change orography manually, that means by mutating the elements
 in either `orography.orography` (to set it for the shallow-water model)
 or `orography.geopot_surf` (for the primitive equations, but this is in
-spectral space, advanced!). After the orography has been initialised
-(for testing to `initialize!(orography, model)` but in most cases when 
-you do `simulation = initialize!(model)`). While you can do things like
-`sort!(orography.orography)` (sorting all mountains towards the south pole)
-as the orography is an array, the `set!` function
+spectral space, advanced!). This should be done _after_ the orography has been
+initialised which will overwrite these arrays (again).
+You can just initialize orography with `initialize!(orography, model)`
+but that also automatically happens in `simulation = initialize!(model)`.
+Orography is just stored as an array, so you can do things like
+`sort!(orography.orography)` (sorting all mountains towards the south pole).
+But for most practical purposes, the `set!` function
 is more convenient, for example you can do
 
 ```@example orography
@@ -124,22 +126,28 @@ nothing # hide
 ```
 ![Orography with set!](orography_set.png)
 
+passing on a function with arguments longitude (0 to 360˚E in that unit,
+so use `cosd`, `sind` etc.) and latitude (-90 to 90˚N).
 But note that while `model.orography` is still of type `EarthOrography`
-we have now muted the arrays within - so do not be confused!
+we have now muted the arrays within - so do not be confused that it is
+not the Earth's orography anymore.
+
 The `set!` function automatically propagates the grid array in
 `orography.orography` to spectral space in `orography.geopot_surf`
 to synchronize those two arrays that are supposed to hold essentially
-the same information just on in grid the other in spectral space.
+the same information just one in grid the other in spectral space.
 `set!` also allows for the `add` keyword, making it possible to
 add (or remove) mountains, e.g. imagine Hawaii would suddenly increase
-massively in size, covering a 10˚x10˚ area with some additional 2000m
+massively in size, covering a 5˚x5˚ area with a 4000m "peak"
+(given that horizontal extent it is probably more a mountain range...)
 
 ```@example orography
 model.orography = EarthOrography(spectral_grid)     # reset orography
 initialize!(model.orography, model)                 # initially that reset orography
 
-# blow up Hawaii by adding a 2000m high 10˚x10˚ large island
-set!(model, orography=(λ,φ) -> 15 < φ < 25 && 195 < λ < 205 ? 2000 : 0, add=true)
+# blow up Hawaii by adding a 4000m peak on a 10˚x10˚ large island
+H, λ₀, φ₀, σ = 4000, 200, 20, 5         # height, lon, lat position, and width
+set!(model, orography=(λ,φ) -> H*exp((-(λ-λ₀)^2 - (φ-φ₀)^2)/2σ^2), add=true)
 heatmap(model.orography.orography, title="Super Hawaii orography")
 save("orography_hawaii.png", ans) # hide
 nothing # hide
@@ -147,8 +155,8 @@ nothing # hide
 ![Orography with super Hawaii](orography_hawaii.png)
 
 If you don't use `set!`, you want to reflect any changes to `orography.orography`
-in the surface geopotential `geopot_surf` (which is used in the primitive equations)
-manually by
+in the surface geopotential `orography.geopot_surf`
+(which is used in the primitive equations) manually by
 
 ```@example orography
 transform!(orography.geopot_surf, orography.orography, model.spectral_transform)
@@ -192,7 +200,7 @@ but then it cannot be used for primitive equations.
 
 ```@example orography
 function SpeedyWeather.initialize!(
-    orog::MyOrography,      # first argument as to be ::MyOrography, i.e. your new type
+    orog::MyOrography,         # first argument as to be ::MyOrography, i.e. your new type
     model::AbstractModel,      # second argument, use anything from model read-only
 )
     (; orography, geopot_surf) = orog   # unpack
