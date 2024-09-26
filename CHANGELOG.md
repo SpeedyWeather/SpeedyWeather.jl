@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Introduced n tracers that are passively advected
 - Introduced a new `set!` function that allows to set `PrognosticVariables` to new values with keyword arguments
 - Restructured dynamical core with prognostic/diagnostic variables array-agnostic and 3-dimensional [#525](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/525)
 - Modularised NetCDF output [#573](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/573)
