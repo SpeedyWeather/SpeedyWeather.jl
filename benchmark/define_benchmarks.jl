@@ -40,11 +40,11 @@ benchmarks[:benchmark400] = BenchmarkSuite(
             HEALPixGrid, OctaHEALPixGrid],
     )
 
-## NLEV
+## nlayers
 benchmarks[:benchmark500] = BenchmarkSuite(
     title = "Number of vertical layers",
     nruns = 4,
-    nlev = [4, 8, 12, 16],
+    nlayers = [4, 8, 12, 16],
     )
 
 ## PHYSICS/DYNAMICS

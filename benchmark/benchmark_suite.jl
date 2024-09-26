@@ -7,7 +7,7 @@ abstract type AbstractBenchmarkSuite end
     model::Vector = fill(PrimitiveWetModel, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
     trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
-    nlev::Vector{Int} = default_nlev(model)
+    nlayers::Vector{Int} = default_nlayers(model)
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
     dynamics::Vector{Bool} = fill(true, nruns)
@@ -17,14 +17,14 @@ abstract type AbstractBenchmarkSuite end
     memory::Vector{Int} = fill(0, nruns)
 end
 
-default_nlev(::Type{<:Barotropic}) = 1
-default_nlev(::Type{<:ShallowWater}) = 1
-default_nlev(::Type{<:PrimitiveEquation}) = 8
-default_nlev(models) = [default_nlev(model) for model in models]
+default_nlayers(::Type{<:Barotropic}) = 1
+default_nlayers(::Type{<:ShallowWater}) = 1
+default_nlayers(::Type{<:PrimitiveEquation}) = 8
+default_nlayers(models) = [default_nlayers(model) for model in models]
 
 # this should return number of timesteps so that every simulation
 # only takes seconds
-n_timesteps(trunc, nlev) = max(10, round(Int, 4e8/trunc^3/nlev^2))
+n_timesteps(trunc, nlayers) = max(10, round(Int, 4e8/trunc^3/nlayers^2))
 
 function run_benchmark_suite!(suite::BenchmarkSuite)
     for i in 1:suite.nruns
@@ -33,7 +33,7 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         Model = suite.model[i]
         NF = suite.NF[i]
         trunc = suite.trunc[i]
-        nlayers = suite.nlev[i]
+        nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
         dynamics = suite.dynamics[i]
         physics = suite.physics[i]
@@ -96,7 +96,7 @@ function write_results(md, suite::BenchmarkSuite)
         row = "| $(suite.model[i]) "
         row *= print_NF ? "| $(suite.NF[i]) " : ""
         row *= "| $(suite.trunc[i]) "
-        row *= "| $(suite.nlev[i]) "
+        row *= "| $(suite.nlayers[i]) "
         row *= print_Grid ? "| $(suite.Grid[i]) " : ""
         row *= print_nlat ? "| $(suite.nlat[i]) " : ""
         row *= print_dynamics ? "| $(suite.dynamics[i]) " : ""
@@ -118,7 +118,7 @@ end
     model::Vector = fill(PrimitiveWetModel, nruns)
     NF::Vector = fill(SpeedyWeather.DEFAULT_NF, nruns)
     trunc::Vector{Int} = fill(SpeedyWeather.DEFAULT_TRUNC, nruns)
-    nlev::Vector{Int} = default_nlev(model)
+    nlayers::Vector{Int} = default_nlayers(model)
     Grid::Vector = fill(SpeedyWeather.DEFAULT_GRID, nruns)
     nlat::Vector{Int} = fill(0, nruns)
     function_names::Vector{String} = default_function_names()
@@ -146,7 +146,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
         Model = suite.model[i]
         NF = suite.NF[i]
         trunc = suite.trunc[i]
-        nlayers = suite.nlev[i]
+        nlayers = suite.nlayers[i]
         Grid = suite.Grid[i]
 
         spectral_grid = SpectralGrid(;NF, trunc, Grid, nlayers)
@@ -214,7 +214,7 @@ function write_results(md, suite::BenchmarkSuiteDynamics)
         title_row = "$(suite.model[i_run]) "
         title_row *= "| $(suite.NF[i_run]) " 
         title_row *= "| T$(suite.trunc[i_run]) "
-        title_row *= "L$(suite.nlev[i_run]) "
+        title_row *= "L$(suite.nlayers[i_run]) "
         title_row *= "| $(suite.Grid[i_run]) " 
         title_row *= "| $(suite.nlat[i_run]) Rings" 
 
