@@ -166,8 +166,10 @@ spectral_truncation!(orography.geopot_surf)
 
 In the first line, the surface geopotential is still missing the gravity,
 which is multiplied in the second line. The `spectral_truncation!`
-only removes the ``l_{max}+1`` degree of the spherical harmonics that
-scalar fields do not use, see [One more degree for spectral fields](@ref).
+removes the ``l_{max}+1`` degree of the spherical harmonics
+as illustrated in the spectral representation or the surface geopotential
+here. This is because scalar fields do not use that last degree,
+see [One more degree for spectral fields](@ref).
 
 ## Defining a new orography type
 
