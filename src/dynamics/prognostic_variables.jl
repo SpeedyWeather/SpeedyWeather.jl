@@ -238,28 +238,28 @@ function set!(
     soil_moisture_layer2 = nothing,
     lf::Integer = 1,
     add::Bool = false,
-    S::Union{Nothing, SpectralTransform} = nothing,
+    spectral_transform::Union{Nothing, SpectralTransform} = nothing,
     coslat_scaling_included::Bool = false,
 )
     # ATMOSPHERE
-    isnothing(vor)   || set!(progn.vor[lf],     vor, geometry, S; add)
-    isnothing(div)   || set!(progn.div[lf],     div, geometry, S; add)
-    isnothing(temp)  || set!(progn.temp[lf],   temp, geometry, S; add)
-    isnothing(humid) || set!(progn.humid[lf], humid, geometry, S; add)
-    isnothing(pres)  || set!(progn.pres[lf],   pres, geometry, S; add)
+    isnothing(vor)   || set!(progn.vor[lf],     vor, geometry, spectral_transform; add)
+    isnothing(div)   || set!(progn.div[lf],     div, geometry, spectral_transform; add)
+    isnothing(temp)  || set!(progn.temp[lf],   temp, geometry, spectral_transform; add)
+    isnothing(humid) || set!(progn.humid[lf], humid, geometry, spectral_transform; add)
+    isnothing(pres)  || set!(progn.pres[lf],   pres, geometry, spectral_transform; add)
     
     # or provide u, v instead of vor, div
-    isnothing(u) | isnothing(v) || set_vordiv!(progn.vor[lf], progn.div[lf], u, v, geometry, S; add, coslat_scaling_included)
+    isnothing(u) | isnothing(v) || set_vordiv!(progn.vor[lf], progn.div[lf], u, v, geometry, spectral_transform; add, coslat_scaling_included)
     
     # OCEAN
-    isnothing(sea_surface_temperature)  || set!(progn.ocean.sea_surface_temperature, sea_surface_temperature, geometry, S; add)
-    isnothing(sea_ice_concentration)    || set!(progn.ocean.sea_ice_concentration, sea_ice_concentration, geometry, S; add)
+    isnothing(sea_surface_temperature)  || set!(progn.ocean.sea_surface_temperature, sea_surface_temperature, geometry, spectral_transform; add)
+    isnothing(sea_ice_concentration)    || set!(progn.ocean.sea_ice_concentration, sea_ice_concentration, geometry, spectral_transform; add)
 
     # LAND
-    isnothing(land_surface_temperature) || set!(progn.land.land_surface_temperature, land_surface_temperature, geometry, S; add)
-    isnothing(snow_depth)               || set!(progn.land.snow_depth, snow_depth, geometry, S; add)
-    isnothing(soil_moisture_layer1)     || set!(progn.land.soil_moisture_layer1, soil_moisture_layer1, geometry, S; add)
-    isnothing(soil_moisture_layer2)     || set!(progn.land.soil_moisture_layer2, soil_moisture_layer2, geometry, S; add)
+    isnothing(land_surface_temperature) || set!(progn.land.land_surface_temperature, land_surface_temperature, geometry, spectral_transform; add)
+    isnothing(snow_depth)               || set!(progn.land.snow_depth, snow_depth, geometry, spectral_transform; add)
+    isnothing(soil_moisture_layer1)     || set!(progn.land.soil_moisture_layer1, soil_moisture_layer1, geometry, spectral_transform; add)
+    isnothing(soil_moisture_layer2)     || set!(progn.land.soil_moisture_layer2, soil_moisture_layer2, geometry, spectral_transform; add)
     return nothing
 end
 
@@ -439,11 +439,18 @@ function set_vordiv!(
     end
 end 
 
+"""
+$(TYPEDSIGNATURES)
+
+Sets properties of the simuluation `S`. Convenience wrapper to call the other concrete 
+`set!` methods. All `kwargs` are forwarded to these methods, which are documented 
+seperately. See their documentation for possible `kwargs`. 
+"""
 function set!(S::AbstractSimulation; kwargs...)
-    set!(S.prognostic_variables, S.model.geometry; S=S.model.spectral_transform, kwargs...)
+    set!(S.prognostic_variables, S.model.geometry; spectral_transform=S.model.spectral_transform, kwargs...)
 end
 
 function set!(progn::PrognosticVariables, model::AbstractModel; kwargs...)
     progn.scale[] != 1 && @warn "Prognostic variables are scaled with $(progn.scale[]), but `set!` assumes unscaled variables."
-    set!(progn, model.geometry; S=model.spectral_transform, kwargs...)
+    set!(progn, model.geometry; spectral_transform=model.spectral_transform, kwargs...)
 end
