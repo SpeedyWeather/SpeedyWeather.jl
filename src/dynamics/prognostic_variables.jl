@@ -443,14 +443,14 @@ end
 $(TYPEDSIGNATURES)
 
 Sets properties of the simuluation `S`. Convenience wrapper to call the other concrete 
-`set!` methods. All `kwargs` are forwarded to those methods, which are documented 
+`set!` methods. All `kwargs` are forwarded to these methods, which are documented 
 seperately. See their documentation for possible `kwargs`. 
 """
 function set!(S::AbstractSimulation; kwargs...)
-    set!(S.prognostic_variables, S.model.geometry; S=S.model.spectral_transform, kwargs...)
+    set!(S.prognostic_variables, S.model.geometry; spectral_transform=S.model.spectral_transform, kwargs...)
 end
 
 function set!(progn::PrognosticVariables, model::AbstractModel; kwargs...)
     progn.scale[] != 1 && @warn "Prognostic variables are scaled with $(progn.scale[]), but `set!` assumes unscaled variables."
-    set!(progn, model.geometry; S=model.spectral_transform, kwargs...)
+    set!(progn, model.geometry; spectral_transform=model.spectral_transform, kwargs...)
 end
