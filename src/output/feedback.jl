@@ -25,7 +25,7 @@ $(TYPEDFIELDS)"""
     # PROGRESS
     "struct containing everything progress related"
     progress_meter::ProgressMeter.Progress =
-        ProgressMeter.Progress(1, enabled=isinteractive, showspeed=true; desc="Weather is speedy: ")
+        ProgressMeter.Progress(1, enabled=verbose, showspeed=true; desc="Weather is speedy: ")
 
     "txt is a Nothing in case of no output"
     progress_txt::Union{IOStream, Nothing} = nothing
