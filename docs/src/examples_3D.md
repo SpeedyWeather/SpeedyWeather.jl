@@ -22,7 +22,6 @@ initial_conditions = InitialConditions(
 
 model = PrimitiveDryModel(; spectral_grid, orography, initial_conditions, physics=false)
 simulation = initialize!(model)
-model.feedback.verbose = false # hide
 run!(simulation, period=Day(9))
 nothing # hide
 ```
@@ -77,7 +76,6 @@ model = PrimitiveDryModel(;
 )
 
 simulation = initialize!(model)
-model.feedback.verbose = false # hide
 run!(simulation, period=Day(20))
 nothing # hide
 ```
@@ -121,7 +119,6 @@ orography = NoOrography(spectral_grid)
 # create model, initialize, run
 model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography)
 simulation = initialize!(model)
-model.feedback.verbose = false # hide
 run!(simulation, period=Day(20))
 nothing # hide
 ```
@@ -177,7 +174,6 @@ convection = DryBettsMiller(spectral_grid, time_scale=Hour(4))
 model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography, convection)
 
 simulation = initialize!(model)
-model.feedback.verbose = false # hide
 run!(simulation, period=Day(20))
 
 humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
@@ -198,7 +194,6 @@ convection = NoConvection(spectral_grid)
 model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography, convection)
 
 simulation = initialize!(model)
-model.feedback.verbose = false # hide
 run!(simulation, period=Day(20))
 
 humid = simulation.diagnostic_variables.grid.humid_grid[:, end]
@@ -225,7 +220,6 @@ convection = SimplifiedBettsMiller(spectral_grid)
 # create model, initialize, run
 model = PrimitiveWetModel(; spectral_grid, large_scale_condensation, convection)
 simulation = initialize!(model)
-model.feedback.verbose = false # hide
 run!(simulation, period=Day(10))
 nothing # hide
 ```

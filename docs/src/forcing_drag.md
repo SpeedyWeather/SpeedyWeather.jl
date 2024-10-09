@@ -313,7 +313,6 @@ spectral_grid = SpectralGrid(trunc=85, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
 initial_conditions = StartFromRest()
 model = BarotropicModel(; spectral_grid, initial_conditions, forcing=stochastic_stirring)
-model.feedback.verbose = false # hide
 simulation = initialize!(model)
 run!(simulation)
 

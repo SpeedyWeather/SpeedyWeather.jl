@@ -101,7 +101,6 @@ because density is constant also mass conservation.
 Let's check what happens after the simulation ran for some days
 
 ```@example analysis
-model.feedback.verbose = false # hide
 run!(simulation, period=Day(10))
 
 # now we check η_mean again

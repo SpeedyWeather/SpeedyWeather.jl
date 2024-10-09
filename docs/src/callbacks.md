@@ -354,7 +354,6 @@ for events that are scheduled. Now let's create a primitive equation model with 
 ```@example schedule
 spectral_grid = SpectralGrid(trunc=31, nlayers=5)
 model = PrimitiveWetModel(;spectral_grid)
-model.feedback.verbose = false      # hide to progress meter
 add!(model.callbacks, north_pole_temp_at_noon_jan9)
 
 # start simulation 7 days earlier
