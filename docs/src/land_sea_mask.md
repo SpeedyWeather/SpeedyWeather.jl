@@ -161,7 +161,6 @@ would then have this `MilleniumFlood` take place
 land_sea_mask = LandSeaMask(spectral_grid)      # start with Earth's land-sea mask
 model = PrimitiveWetModel(;spectral_grid, land_sea_mask)
 add!(model, MilleniumFlood())   # or MilleniumFlood(::DateTime) for any non-default date
-model.feedback.verbose = false # hide
 
 simulation = initialize!(model, time=DateTime(1999,12,29))
 run!(simulation, period=Day(5))
