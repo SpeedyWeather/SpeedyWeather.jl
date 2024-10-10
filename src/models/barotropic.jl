@@ -11,7 +11,6 @@ passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, repr
 model components, are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct BarotropicModel{
-    # TODO add constraints again when we stop supporting julia v1.9
     DS,     # <:DeviceSetup,
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,

@@ -179,7 +179,7 @@ check out their documentation: [RingGrids](https://speedyweather.github.io/Speed
 
 SpeedyWeather.jl is registered in Julia's registry, so open the package manager with `]` and
 ```julia
-(@v1.10) pkg> add SpeedyWeather
+(@v1.11) pkg> add SpeedyWeather
 ```
 which will install the [latest release]([url](https://github.com/SpeedyWeather/SpeedyWeather.jl/releases))
 and all dependencies automatically. For more information see the
