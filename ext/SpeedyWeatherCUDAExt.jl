@@ -24,7 +24,7 @@ Return default used device for KernelAbstractions, either `CPU` or `CUDADevice` 
 SpeedyWeather.Device_KernelAbstractions() = CUDA.functional() ? KernelAbstractions.CUDADevice : KernelAbstractions.CPU
 SpeedyWeather.Device_KernelAbstractions(::GPU) = KernelAbstractions.CUDADevice
 
-SpeedyWeahter.DeviceArray(::GPU, x) = Adapt.adapt(CuArray, x)
+SpeedyWeather.DeviceArray(::GPU, x) = Adapt.adapt(CuArray, x)
 
 """$(TYPEDSIGNATURES)
 Returns a `CuArray` when `device<:GPU` is used. Doesn't uses `adapt`, therefore always returns CuArray."""
