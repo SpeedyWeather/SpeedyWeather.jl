@@ -17,7 +17,7 @@ export LowerTriangularMatrix, LowerTriangularArray
 export eachharmonic, eachmatrix
 export OneBased, ZeroBased
 
-include("lower_triangular_matrix.jl")
+include("lower_triangular_array.jl")
 include("plot.jl")
 
 end

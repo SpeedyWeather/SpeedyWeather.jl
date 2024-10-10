@@ -2,8 +2,16 @@
 SpectralTransform struct that contains all parameters and precomputed arrays
 to perform a spectral transform. Fields are
 $(TYPEDFIELDS)"""
-struct SpectralTransform{NF<:AbstractFloat}
-
+struct SpectralTransform{
+    NF,
+    ArrayType,
+    VectorType,                 # <: ArrayType{NF, 1},
+    VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
+    VectorIntType,              # <: ArrayType{Int, 1},
+    MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
+    LowerTriangularMatrixType,  # <: LowerTriangularArray{NF, 1, ArrayType{NF}},
+    LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
+}
     # GRID
     Grid::Type{<:AbstractGridArray} # grid type used
     nlat_half::Int                  # resolution parameter of grid (# of latitudes on one hemisphere, Eq incl)
@@ -12,56 +20,56 @@ struct SpectralTransform{NF<:AbstractFloat}
     lmax::Int               # Maximum degree l=[0, lmax] of spherical harmonics
     mmax::Int               # Maximum order m=[0, l] of spherical harmonics
     nfreq_max::Int          # Maximum (at Equator) number of Fourier frequencies (real FFT)
-    m_truncs::Vector{Int}   # Maximum order m to retain per latitude ring
+    m_truncs::VectorIntType # Maximum order m to retain per latitude ring
 
     # CORRESPONDING GRID SIZE
     nlon_max::Int           # Maximum number of longitude points (at Equator)
-    nlons::Vector{Int}      # Number of longitude points per ring
+    nlons::VectorIntType    # Number of longitude points per ring
     nlat::Int               # Number of latitude rings
 
     # CORRESPONDING GRID VECTORS
-    colat::Vector{NF}                   # Gaussian colatitudes (0, π) North to South Pole 
-    cos_colat::Vector{NF}               # Cosine of colatitudes
-    sin_colat::Vector{NF}               # Sine of colatitudes
-    lon_offsets::Matrix{Complex{NF}}    # Offset of first lon per ring from prime meridian
+    colat::VectorType               # Gaussian colatitudes (0, π) North to South Pole 
+    cos_colat::VectorType           # Cosine of colatitudes
+    sin_colat::VectorType           # Sine of colatitudes
+    lon_offsets::MatrixComplexType  # Offset of first lon per ring from prime meridian
 
     # NORMALIZATION
-    norm_sphere::NF         # normalization of the l=0, m=0 mode
+    norm_sphere::NF                         # normalization of the l=0, m=0 mode
 
     # FFT plans, one plan for each latitude ring
-    rfft_plans::Vector{AbstractFFTs.Plan}     # FFT plan for grid to spectral transform
-    brfft_plans::Vector{AbstractFFTs.Plan}    # spectral to grid transform (inverse)
+    rfft_plans::Vector{AbstractFFTs.Plan}   # FFT plan for grid to spectral transform
+    brfft_plans::Vector{AbstractFFTs.Plan}  # spectral to grid transform (inverse)
 
     # LEGENDRE POLYNOMIALS
     recompute_legendre::Bool                # Pre or recompute Legendre polynomials
     Λ::AssociatedLegendrePolMatrix{NF}      # Legendre polynomials for one latitude (requires recomputing)
-    Λs::Vector{LowerTriangularMatrix{NF}}   # Legendre polynomials for all latitudes (all precomputed)
+    Λs::Vector{LowerTriangularMatrixType}   # Legendre polynomials for all latitudes (all precomputed)
     
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
     # vector is pole to pole although only northern hemisphere required
-    solid_angles::Vector{NF}                # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
+    solid_angles::VectorType                # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
 
     # RECURSION FACTORS
-    ϵlms::LowerTriangularMatrix{NF}         # precomputed for meridional gradients grad_y1, grad_y2
+    ϵlms::LowerTriangularMatrixType     # precomputed for meridional gradients grad_y1, grad_y2
 
     # GRADIENT MATRICES (on unit sphere, no 1/radius-scaling included)
-    grad_x ::Vector{Complex{NF}}            # = i*m but precomputed
-    grad_y1::LowerTriangularMatrix{NF}      # precomputed meridional gradient factors, term 1
-    grad_y2::LowerTriangularMatrix{NF}      # term 2
+    grad_x ::VectorComplexType          # = i*m but precomputed
+    grad_y1::LowerTriangularMatrixType  # precomputed meridional gradient factors, term 1
+    grad_y2::LowerTriangularMatrixType  # term 2
 
     # GRADIENT MATRICES FOR U, V -> Vorticity, Divergence
-    grad_y_vordiv1::LowerTriangularMatrix{NF}
-    grad_y_vordiv2::LowerTriangularMatrix{NF}
+    grad_y_vordiv1::LowerTriangularMatrixType
+    grad_y_vordiv2::LowerTriangularMatrixType
 
     # GRADIENT MATRICES FOR Vorticity, Divergence -> U, V
-    vordiv_to_uv_x::LowerTriangularMatrix{NF}
-    vordiv_to_uv1::LowerTriangularMatrix{NF}
-    vordiv_to_uv2::LowerTriangularMatrix{NF}
+    vordiv_to_uv_x::LowerTriangularMatrixType
+    vordiv_to_uv1::LowerTriangularMatrixType
+    vordiv_to_uv2::LowerTriangularMatrixType
 
     # EIGENVALUES (on unit sphere, no 1/radius²-scaling included)
-    eigenvalues  ::Vector{NF}               # = -l*(l+1), degree l of spherical harmonic
-    eigenvalues⁻¹::Vector{NF}               # = -1/(l*(l+1))
+    eigenvalues  ::VectorType           # = -l*(l+1), degree l of spherical harmonic
+    eigenvalues⁻¹::VectorType           # = -1/(l*(l+1))
 end
 
 """
@@ -71,12 +79,13 @@ Generator function for a SpectralTransform struct. With `NF` the number format,
 necessary constants for the spetral transform. Also plans the Fourier transforms, retrieves the colatitudes,
 and preallocates the Legendre polynomials (if recompute_legendre == false) and quadrature weights."""
 function SpectralTransform(
-    ::Type{NF},                             # Number format NF
-    Grid::Type{<:AbstractGridArray},        # type of spatial grid used
-    lmax::Int,                              # Spectral truncation: degrees
-    mmax::Int;                              # Spectral truncation: orders
-    recompute_legendre::Bool = true,        # re or precompute legendre polynomials?
-    legendre_shortcut::Symbol = :linear,    # shorten Legendre loop over order m
+    ::Type{NF},                                 # Number format NF
+    Grid::Type{<:AbstractGridArray},            # type of spatial grid used
+    lmax::Int,                                  # Spectral truncation: degrees
+    mmax::Int;                                  # Spectral truncation: orders
+    ArrayType::Type{<:AbstractArray} = Array,   # Array type used for spectral coefficients
+    recompute_legendre::Bool = true,            # re or precompute legendre polynomials?
+    legendre_shortcut::Symbol = :linear,        # shorten Legendre loop over order m
     dealiasing::Real=DEFAULT_DEALIASING
 ) where NF
 
@@ -199,18 +208,30 @@ function SpectralTransform(
     eigenvalues⁻¹ = inv.(eigenvalues)
     eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
 
-    # conversion to NF happens here
-    SpectralTransform{NF}(  Grid, nlat_half,
-                            lmax, mmax, nfreq_max, m_truncs,
-                            nlon_max, nlons, nlat,
-                            colat, cos_colat, sin_colat, lon_offsets,
-                            norm_sphere,
-                            rfft_plans, brfft_plans,
-                            recompute_legendre, Λ, Λs, solid_angles,
-                            ϵlms, grad_x, grad_y1, grad_y2,
-                            grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
-                            vordiv_to_uv1, vordiv_to_uv2,
-                            eigenvalues, eigenvalues⁻¹)
+    # guarantee a nonparametric type to construct lower triangular types correctly
+    ArrayType_ = RingGrids.nonparametric_type(ArrayType)
+    return SpectralTransform{
+        NF,
+        ArrayType_,
+        ArrayType_{NF, 1},
+        ArrayType_{Complex{NF}, 1},
+        ArrayType_{Int, 1},
+        ArrayType_{Complex{NF}, 2},
+        LowerTriangularArray{NF, 1, ArrayType_{NF, 1}},
+        LowerTriangularArray{NF, 2, ArrayType_{NF, 2}},
+    }(
+        Grid, nlat_half,
+        lmax, mmax, nfreq_max, m_truncs,
+        nlon_max, nlons, nlat,
+        colat, cos_colat, sin_colat, lon_offsets,
+        norm_sphere,
+        rfft_plans, brfft_plans,
+        recompute_legendre, Λ, Λs, solid_angles,
+        ϵlms, grad_x, grad_y1, grad_y2,
+        grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
+        vordiv_to_uv1, vordiv_to_uv2,
+        eigenvalues, eigenvalues⁻¹
+    )
 end
 
 """
@@ -218,13 +239,13 @@ $(TYPEDSIGNATURES)
 Generator function for a `SpectralTransform` struct based on the size of the spectral
 coefficients `alms` and the grid `Grid`. Recomputes the Legendre polynomials by default."""
 function SpectralTransform(
-    alms::LowerTriangularArray{NF};         # spectral coefficients
-    recompute_legendre::Bool = true,        # saves memory
+    alms::LowerTriangularArray{NF, N, ArrayType};   # spectral coefficients
+    recompute_legendre::Bool = true,                # saves memory
     Grid::Type{<:AbstractGrid} = DEFAULT_GRID,
     dealiasing::Real = DEFAULT_DEALIASING,
-) where NF                                  # number format NF (can be complex)
-    lmax, mmax = size(alms, ZeroBased, as=Matrix)        # 0-based degree l, order m
-    return SpectralTransform(real(NF), Grid, lmax, mmax; recompute_legendre, dealiasing)
+) where {NF, N, ArrayType}                          # number format NF (can be complex)
+    lmax, mmax = size(alms, ZeroBased, as=Matrix)   # 0-based degree l, order m
+    return SpectralTransform(real(NF), Grid, lmax, mmax; ArrayType, recompute_legendre, dealiasing)
 end
 
 """
@@ -232,17 +253,18 @@ $(TYPEDSIGNATURES)
 Generator function for a `SpectralTransform` struct based on the size and grid type of
 gridded field `grids`. Recomputes the Legendre polynomials by default."""
 function SpectralTransform(
-    grids::AbstractGridArray{NF};   # gridded field
-    recompute_legendre::Bool=true,  # saves memory as transform is garbage collected anyway
-    one_more_degree::Bool=false,    # returns a square LowerTriangularMatrix by default
+    grids::AbstractGridArray{NF, N, ArrayType};     # gridded field
+    recompute_legendre::Bool=true,                  # saves memory as transform is garbage collected anyway
+    one_more_degree::Bool=false,                    # returns a square LowerTriangularMatrix by default
     dealiasing::Real = DEFAULT_DEALIASING,
-) where NF                      # number format NF
+) where {NF, N, ArrayType}                          # number format NF
     Grid = RingGrids.nonparametric_type(typeof(grids))
     trunc = get_truncation(grids, dealiasing)
-    return SpectralTransform(NF, Grid, trunc+one_more_degree, trunc; recompute_legendre, dealiasing)
+    return SpectralTransform(NF, Grid, trunc+one_more_degree, trunc; ArrayType, recompute_legendre, dealiasing)
 end
 
 # CHECK MATCHING SIZES
+# TODO use dispatch to return false if array types don't match?
 function ismatching(S::SpectralTransform, L::LowerTriangularArray)
     return (S.lmax, S.mmax) == size(L, ZeroBased, as=Matrix)[1:2]
 end

@@ -16,7 +16,6 @@ struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T,N}} <: AbstractAr
         check_lta_input_array(data, m, n, N) ? 
         new(data, m, n)  :
         error(lta_error_message(data, m, n, T, N, ArrayType))
- 
 end
 
 check_lta_input_array(data, m, n, N) =
