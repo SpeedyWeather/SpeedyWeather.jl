@@ -53,11 +53,6 @@ function flipsign!(A::AbstractArray)
     A
 end
 
-# define as will only become availale in Julia 1.9
-pkgversion(m::Module) = VersionNumber(TOML.parsefile(joinpath(
-    dirname(string(first(methods(m.eval)).file)), "..", "Project.toml"))["version"])
-
-# NAN initialisation
 """
     A = nans(T, dims...)
 
