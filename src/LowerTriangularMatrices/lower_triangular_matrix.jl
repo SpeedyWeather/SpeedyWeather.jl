@@ -602,7 +602,6 @@ LowerTriangularGPUStyle{N, ArrayType}(::Val{M}) where {N, ArrayType, M} =
 
 # also needed for other array types
 nonparametric_type(::Type{<:Array}) = Array
-# nonparametric_type(::Type{<:CUDA.CuArray}) = CuArray
 
 "`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments. 
 Adapted from Julia documentation of Broadcast interface"
