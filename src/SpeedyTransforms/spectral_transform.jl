@@ -279,7 +279,7 @@ ismatching(L::LowerTriangularArray, S::SpectralTransform) = ismatching(S, L)
 ismatching(G::AbstractGridArray,    S::SpectralTransform) = ismatching(S, G)
 
 function Base.DimensionMismatch(S::SpectralTransform, L::LowerTriangularArray)
-    s = "SpectralTransform(lmax=$(S.lmax), mmax=$(S.mmax)) and $(LowerTriangularMatrices.size2x_string(size(L, as=Matrix))) "*
+    s = "SpectralTransform for $(S.lmax+1)x$(S.mmax+1)xN LowerTriangularArrays and $(Base.dims2string(size(L, as=Matrix))) "*
         "LowerTriangularArray do not match."
     return DimensionMismatch(s)
 end

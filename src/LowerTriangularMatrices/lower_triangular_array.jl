@@ -22,8 +22,8 @@ check_lta_input_array(data, m, n, N) =
     (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
 
 function lta_error_message(data, m, n, T, N, ArrayType) 
-    return "$(size2x_string(size(data)))-sized $(typeof(data)) cannot be used to create "*
-            "a $(size2x_string(matrix_size(data, m, n))) LowerTriangularArray{$T, $N, $ArrayType}"
+    return "$(Base.dims2string(size(data))) $(typeof(data)) cannot be used to create "*
+            "a $(Base.dims2string(matrix_size(data, m, n))) LowerTriangularArray{$T, $N, $ArrayType}"
 end 
 
 """2-dimensional `LowerTriangularArray` of type `T`` with its non-zero entries unravelled into a `Vector{T}`"""
@@ -107,6 +107,7 @@ end
 
 function Base.array_summary(io::IO, L::LowerTriangularMatrix{T}, inds::Tuple{Vararg{Base.OneTo}}) where T
     mn = size(L; as=Matrix)
+    @info Base.dims2string(length.(inds))
     print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T}")
 end
 
@@ -318,20 +319,10 @@ function lowertriangular_match(L1::LowerTriangularArray, Ls::LowerTriangularArra
     return lowertriangular_match(L1, Ls[1]; kwargs...) && lowertriangular_match(L1, Ls[2:end]...; kwargs...)
 end
 
-"""$(TYPEDSIGNATURES)
-Returns a tuple like `(1,2,3)` as string "1×2×3". To be used with `size2x_string(size(a))` with `a` some array."""
-function size2x_string(t::Tuple)
-    s = "$(t[1])"
-    for i in t[2:end]
-        s *= "×$i"
-    end
-    return s
-end
-
 function Base.DimensionMismatch(L1::LowerTriangularArray, Ls::LowerTriangularArray...)
-    s = "LowerTriangularArrays do not match; $(size2x_string(size(L1, as=Matrix)))"
+    s = "LowerTriangularArrays do not match; $(Base.dims2string(size(L1, as=Matrix)))"
     for L in Ls
-        s *= ", $(size2x_string(size(L, as=Matrix)))"
+        s *= ", $(Base.dims2string(size(L, as=Matrix)))"
     end
     return DimensionMismatch(s)
 end
@@ -601,7 +592,6 @@ LowerTriangularGPUStyle{N, ArrayType}(::Val{M}) where {N, ArrayType, M} =
 
 # also needed for other array types
 nonparametric_type(::Type{<:Array}) = Array
-# nonparametric_type(::Type{<:CUDA.CuArray}) = CuArray
 
 "`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments. 
 Adapted from Julia documentation of Broadcast interface"
