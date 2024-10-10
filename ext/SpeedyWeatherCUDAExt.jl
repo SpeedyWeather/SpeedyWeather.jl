@@ -2,6 +2,7 @@ module SpeedyWeatherCUDAExt
 
 using SpeedyWeather
 import CUDA: CUDA, CUDAKernels, CuArray
+using DocStringExtensions
 
 # for RingGrids and LowerTriangularMatrices:
 # every Array needs this method to strip away the parameters
