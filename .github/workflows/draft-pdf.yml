@@ -21,8 +21,8 @@ jobs:
           # PDF. Note, this should be the same directory as the input
           # paper.md
           path: docs/joss/paper.pdf
-        # These lines have been added following
-        # https://github.com/openjournals/openjournals-draft-action/issues/15
+        # These lines have been added following
+        # https://github.com/openjournals/openjournals-draft-action/issues/15
       - name: save pdf to repo
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
