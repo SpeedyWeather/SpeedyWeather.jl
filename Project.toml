@@ -8,7 +8,6 @@ AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 AssociatedLegendrePolynomials = "2119f1ac-fb78-50f5-8cc0-dda848ebdb19"
 BitInformation = "de688a37-743e-4ac2-a6f0-bd62414d1aa7"
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
@@ -29,10 +28,12 @@ TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [weakdeps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [extensions]
+SpeedyWeatherCUDAExt = "CUDA"
 SpeedyWeatherJLArraysExt = "JLArrays"
 SpeedyWeatherMakieExt = "Makie"
 
@@ -65,8 +66,9 @@ UnicodePlots = "3.3"
 julia = "1.10"
 
 [extras]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "JLArrays"]
+test = ["Test", "JLArrays", "CUDA"]
