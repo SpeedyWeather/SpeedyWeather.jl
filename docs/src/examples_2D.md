@@ -235,7 +235,6 @@ drag = QuadraticDrag(spectral_grid)
 
 model = ShallowWaterModel(; spectral_grid, drag, forcing)
 simulation = initialize!(model)
-model.feedback.verbose = false # hide
 run!(simulation, period=Day(40))
 nothing # hide
 ```
@@ -275,7 +274,6 @@ initial_conditions = SpeedyWeather.RandomWaves()
 # construct, initialize, run
 model = ShallowWaterModel(; spectral_grid, orography, initial_conditions, implicit, time_stepping)
 simulation = initialize!(model)
-model.feedback.verbose = false # hide
 run!(simulation, period=Day(2))
 nothing # hide
 ```

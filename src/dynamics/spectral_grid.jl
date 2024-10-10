@@ -100,7 +100,7 @@ function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
                                             recompute_legendre::Bool = false,
                                             one_more_degree::Bool = true,
                                             kwargs...)
-    (; NF, Grid, trunc, dealiasing) = spectral_grid
-    return SpectralTransform(NF, Grid, trunc+one_more_degree, trunc; recompute_legendre, dealiasing, kwargs...)
+    (; NF, Grid, trunc, dealiasing, ArrayType) = spectral_grid
+    return SpectralTransform(NF, Grid, trunc+one_more_degree, trunc; ArrayType, recompute_legendre, dealiasing, kwargs...)
 end
 
