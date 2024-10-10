@@ -21,27 +21,16 @@ Indicates that SpeedyWeather.jl runs on a single GPU
 """
 struct GPU <: AbstractDevice end 
 
-"""$(TYPEDSIGNATURES)
-Return default used device for internal purposes, either `CPU` or `GPU` if a GPU is available.
-"""
-Device() = CUDA.functional() ? GPU() : CPU()
 
 """$(TYPEDSIGNATURES)
 Default array type on `device`."""
 default_array_type(device::AbstractDevice) = default_array_type(typeof(device))
-default_array_type(::Type{GPU}) = CuArray
 default_array_type(::Type{CPU}) = Array
-
-"""$(TYPEDSIGNATURES)
-Return default used device for KernelAbstractions, either `CPU` or `CUDADevice` if a GPU is available
-"""
-Device_KernelAbstractions() = CUDA.functional() ? KernelAbstractions.CUDADevice : KernelAbstractions.CPU
 
 """$(TYPEDSIGNATURES)
 Return used device for use with KernelAbstractions
 """
 Device_KernelAbstractions(::CPU) = KernelAbstractions.CPU
-Device_KernelAbstractions(::GPU) = KernelAbstractions.CUDADevice
 
 """$(TYPEDSIGNATURES)
 Holds information about the device the model is running on and workgroup size. 
@@ -57,7 +46,6 @@ struct DeviceSetup{S<:AbstractDevice, T}
     n::Int
 end 
 
-DeviceSetup() = DeviceSetup(Device(), Device_KernelAbstractions(Device()), workgroup_size(Device()))
 DeviceSetup(device::AbstractDevice) = DeviceSetup(device, Device_KernelAbstractions(device), workgroup_size(device))
 DeviceSetup(device::AbstractDevice, n::Integer) = DeviceSetup(device, Device_KernelAbstractions(device), n)
 
@@ -70,16 +58,11 @@ function workgroup_size(device::AbstractDevice)
 end
 
 """$(TYPEDSIGNATURES)
-Adapts `x` to a `CuArray` when `device::GPU` is used, otherwise a regular `Array`.
+Adapts `x` to an `Array` when `device::CPU` is used. Define for `CPU` for compatibility with adapt to CuArrays etc.
 Uses `adapt`, thus also can return SubArrays etc."""
-DeviceArray(::GPU, x) = Adapt.adapt(CuArray, x)
 DeviceArray(::CPU, x) = Adapt.adapt(Array, x)
 DeviceArray(dev::DeviceSetup, x) = DeviceArray(dev.device, x)
 
-"""$(TYPEDSIGNATURES)
-Returns a `CuArray` when `device<:GPU` is used, otherwise a regular `Array`.
-Doesn't uses `adapt`, therefore always returns CuArray/Array."""
-DeviceArrayNotAdapt(::GPU, x) = CuArray(x)
 DeviceArrayNotAdapt(::CPU, x) = Array(x)
 DeviceArrayNotAdapt(dev::DeviceSetup, x) = DeviceArrayNotAdapt(dev.device, x)
 
