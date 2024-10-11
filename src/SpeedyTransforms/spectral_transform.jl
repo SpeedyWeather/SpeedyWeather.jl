@@ -4,7 +4,7 @@ const DEFAULT_GRID = FullGaussianGrid
 """SpectralTransform struct that contains all parameters and precomputed arrays
 to perform a spectral transform. Fields are
 $(TYPEDFIELDS)"""
-struct SpectralTransform{
+mutable struct SpectralTransform{
     NF,
     ArrayType,
     VectorType,                 # <: ArrayType{NF, 1},
@@ -258,7 +258,8 @@ function SpectralTransform(
     kwargs...
 ) where {NF, N, ArrayType}                          # number format NF (can be complex)
     lmax, mmax = size(alms, ZeroBased, as=Matrix)   # 0-based degree l, order m
-    return SpectralTransform(real(NF), lmax, mmax; ArrayType, kwargs...)
+    nlayers = size(alms, 2)
+    return SpectralTransform(real(NF), lmax, mmax; ArrayType, nlayers, kwargs...)
 end
 
 """
@@ -272,7 +273,8 @@ function SpectralTransform(
 ) where {NF, N, ArrayType}                          # number format NF
     Grid = RingGrids.nonparametric_type(typeof(grids))
     trunc = get_truncation(grids, dealiasing)
-    return SpectralTransform(NF, trunc+one_more_degree, trunc; Grid, ArrayType, kwargs...)
+    nlayers = size(grids, 2)
+    return SpectralTransform(NF, trunc+one_more_degree, trunc; Grid, ArrayType, nlayers, kwargs...)
 end
 
 # CHECK MATCHING SIZES
