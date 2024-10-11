@@ -4,7 +4,7 @@ const DEFAULT_GRID = FullGaussianGrid
 """SpectralTransform struct that contains all parameters and precomputed arrays
 to perform a spectral transform. Fields are
 $(TYPEDFIELDS)"""
-mutable struct SpectralTransform{
+struct SpectralTransform{
     NF,
     ArrayType,
     VectorType,                 # <: ArrayType{NF, 1},
@@ -52,6 +52,7 @@ mutable struct SpectralTransform{
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     scratch_memory_north::ArrayComplexType
     scratch_memory_south::ArrayComplexType
+    scratch_memory_grid::Vector{Matrix{NF}} # scratch memory with 1-stride for FFT output
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -124,30 +125,25 @@ function SpectralTransform(
     end
     m_truncs = min.(m_truncs, mmax+1)    # only to mmax in any case (otherwise BoundsError)
 
-    # PLAN THE FFTs
-    FFT_package = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
-    rfft_plans = [FFT_package.plan_rfft(zeros(NF, nlon)) for nlon in nlons]
-    brfft_plans = [FFT_package.plan_brfft(zeros(Complex{NF}, nlon÷2 + 1), nlon) for nlon in nlons]
-    
     # NORMALIZATION
     norm_sphere = 2sqrt(π)  # norm_sphere at l=0, m=0 translates to 1s everywhere in grid space
-
+    
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
     _, lons = RingGrids.get_colatlons(Grid, nlat_half)
     rings = eachring(Grid, nlat_half)                       # compute ring indices
     lon1s = [lons[rings[j].start] for j in 1:nlat_half]     # pick lons at first index for each ring
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]
-
+    
     # PREALLOCATE LEGENDRE POLYNOMIALS, +1 for 1-based indexing
     # Legendre polynomials for one latitude
     Λ = AssociatedLegendrePolArray{NF, 2, 1, Vector{NF}}(zeros(LowerTriangularMatrix{NF}, lmax+1, mmax+1))
-
+    
     # allocate memory in Λs for polynomials at all latitudes or allocate dummy array if precomputed
     # Λs is of size (lmax+1) x (mmax+1) x nlat_half unless recomputed
     # for recomputed only Λ is used, not Λs, create dummy array of 0-size instead
     b = ~recompute_legendre                 # true for precomputed
     Λs = [zeros(LowerTriangularMatrix{NF}, b*(lmax+1), b*(mmax+1)) for _ in 1:nlat_half]
-
+    
     if recompute_legendre == false          # then precompute all polynomials
         Λtemp = zeros(NF, lmax+1, mmax+1)   # preallocate matrix
         for j in 1:nlat_half                # only one hemisphere due to symmetry
@@ -156,11 +152,17 @@ function SpectralTransform(
             copyto!(Λs[j], Λtemp)
         end
     end
-
+    
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     scratch_memory_north = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
     scratch_memory_south = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
+    scratch_memory_grid = [zeros(NF, nlon, nlayers) for nlon in nlons]
 
+    # PLAN THE FFTs
+    FFT_package = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
+    rfft_plans = [FFT_package.plan_rfft(zeros(NF, nlon, nlayers), 1) for nlon in nlons]
+    brfft_plans = [FFT_package.plan_brfft(view(scratch_memory_north, 1:nlon÷2 + 1, :, 1), nlon, 1) for nlon in nlons]
+    
     # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
     # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
@@ -238,7 +240,7 @@ function SpectralTransform(
         norm_sphere,
         rfft_plans, brfft_plans,
         recompute_legendre, Λ, Λs,
-        scratch_memory_north, scratch_memory_south,
+        scratch_memory_north, scratch_memory_south, scratch_memory_grid,
         solid_angles, grad_x, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,
@@ -290,7 +292,8 @@ ismatching(L::LowerTriangularArray, S::SpectralTransform) = ismatching(S, L)
 ismatching(G::AbstractGridArray,    S::SpectralTransform) = ismatching(S, G)
 
 function Base.DimensionMismatch(S::SpectralTransform, L::LowerTriangularArray)
-    s = "SpectralTransform for $(S.lmax+1)x$(S.mmax+1)xN LowerTriangularArrays and $(Base.dims2string(size(L, as=Matrix))) "*
+    s = "SpectralTransform for $(S.lmax+1)x$(S.mmax+1)x$(S.nlayers) LowerTriangularArrays"*
+        "and $(Base.dims2string(size(L, as=Matrix))) "*
         "LowerTriangularArray do not match."
     return DimensionMismatch(s)
 end
@@ -416,26 +419,27 @@ function transform!(                # SPECTRAL TO GRID
         end
     end
 
-    # INVERSE FOURIER TRANSFORM in zonal direction
-    # loop over all specs/grids (e.g. vertical dimension)
-    # k, k_grid only differ when specs/grids have a singleton dimension
-    rings = eachring(grids)                     # precomputed ring indices
+    # INVERSE FOURIER TRANSFORM in zonal direction (batched in the vertical)
+    rings = eachring(grids)                 # precomputed ring indices
 
-    @inbounds for (k, k_grid) in zip(eachmatrix(specs), eachgrid(grids))
-        for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
-            j = j_north                         # symmetric index / ring-away from pole index
-            j_south = nlat - j_north + 1        # southern latitude index
-            nlon = nlons[j]                     # number of longitudes on this ring (north or south)
-            nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
-            not_equator = j_north != j_south    # is the latitude ring not on equator?
+    @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
+        j = j_north                         # symmetric index / ring-away from pole index
+        j_south = nlat - j_north + 1        # southern latitude index
+        nlon = nlons[j]                     # number of longitudes on this ring (north or south)
+        nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
+        not_equator = j_north != j_south    # is the latitude ring not on equator?
 
-            brfft_plan = brfft_plans[j]         # FFT planned wrt nlon on ring
-            ilons = rings[j_north]              # in-ring indices northern ring
-            LinearAlgebra.mul!(view(grids.data, ilons, k_grid), brfft_plan, view(gn, 1:nfreq, k, j))  # perform FFT
+        brfft_plan = brfft_plans[j]         # FFT planned wrt nlon on ring
+        ilons = rings[j_north]              # in-ring indices northern ring
+        out = S.scratch_memory_grid[j]      # output array
+        LinearAlgebra.mul!(out, brfft_plan, view(gn, 1:nfreq, :, j))  # perform FFT
+        grids[ilons, :] .= out
 
-            # southern latitude, don't call redundant 2nd fft if ring is on equator 
-            ilons = rings[j_south]              # in-ring indices southern ring
-            not_equator && LinearAlgebra.mul!(view(grids.data, ilons, k_grid), brfft_plan, view(gs, 1:nfreq, k, j))  # perform FFT
+        # southern latitude, don't call redundant 2nd fft if ring is on equator 
+        ilons = rings[j_south]              # in-ring indices southern ring
+        if not_equator
+            LinearAlgebra.mul!(out, brfft_plan, view(gs, 1:nfreq, :, j))  # perform FFT
+            grids[ilons, :] .= out
         end
     end
 
