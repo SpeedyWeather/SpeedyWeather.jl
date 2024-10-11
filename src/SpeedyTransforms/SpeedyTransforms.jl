@@ -14,8 +14,6 @@ import Primes
 using ..LowerTriangularMatrices
 using ..RingGrids
 
-const DEFAULT_GRID = FullGaussianGrid
-
 # TRANSFORM
 export  SpectralTransform,
         transform!,
