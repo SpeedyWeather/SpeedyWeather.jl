@@ -588,7 +588,7 @@ function transform(                     # SPECTRAL TO GRID
     kwargs...                           # pass on unscale_coslat=true/false(default)
 ) where NF                              # number format NF
     lmax, mmax = size(specs, ZeroBased, as=Matrix)
-    S = SpectralTransform(real(NF), Grid, lmax, mmax; recompute_legendre, dealiasing)
+    S = SpectralTransform(real(NF), lmax, mmax; Grid, recompute_legendre, dealiasing)
     return transform(specs, S; kwargs...)
 end
 
@@ -606,6 +606,6 @@ function transform(
 
     Grid = RingGrids.nonparametric_type(typeof(grids))
     trunc = get_truncation(grids.nlat_half, dealiasing)
-    S = SpectralTransform(NF, Grid, trunc+one_more_degree, trunc; recompute_legendre, dealiasing)
+    S = SpectralTransform(NF, trunc+one_more_degree, trunc; Grid, recompute_legendre, dealiasing)
     return transform(grids, S)
 end
