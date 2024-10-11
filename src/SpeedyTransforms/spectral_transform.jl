@@ -58,9 +58,6 @@ mutable struct SpectralTransform{
     # vector is pole to pole although only northern hemisphere required
     solid_angles::VectorType                # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
 
-    # RECURSION FACTORS
-    ϵlms::LowerTriangularMatrixType     # precomputed for meridional gradients grad_y1, grad_y2
-
     # GRADIENT MATRICES (on unit sphere, no 1/radius-scaling included)
     grad_x ::VectorComplexType          # = i*m but precomputed
     grad_y1::LowerTriangularMatrixType  # precomputed meridional gradient factors, term 1
@@ -242,7 +239,7 @@ function SpectralTransform(
         rfft_plans, brfft_plans,
         recompute_legendre, Λ, Λs,
         scratch_memory_north, scratch_memory_south,
-        solid_angles, ϵlms, grad_x, grad_y1, grad_y2,
+        solid_angles, grad_x, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,
         eigenvalues, eigenvalues⁻¹
