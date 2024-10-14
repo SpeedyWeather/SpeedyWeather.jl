@@ -40,6 +40,7 @@ export  spectral_truncation,
 
 include("aliasing.jl")
 include("legendrepolarray.jl")
+include("legendre_shortcuts.jl")
 include("spectral_transform.jl")
 include("spectral_gradients.jl")
 include("spectral_truncation.jl")
