@@ -51,7 +51,9 @@ struct SpectralTransform{
     # state is undetermined, only read after writing to it
     scratch_memory_north::ArrayComplexType
     scratch_memory_south::ArrayComplexType
-    scratch_memory_grid::VectorType         # scratch memory with 1-stride for FFT output
+    scratch_memory_grid::VectorType                 # scratch memory with 1-stride for FFT output
+    scratch_memory_column_odd::VectorComplexType    # scratch memory for vertically batched Legendre transform
+    scratch_memory_column_even::VectorComplexType   # scratch memory for vertically batched Legendre transform
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -136,7 +138,9 @@ function SpectralTransform(
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     scratch_memory_north = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
     scratch_memory_south = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
-    scratch_memory_grid = zeros(NF, nlon_max*nlayers)
+    scratch_memory_grid  = zeros(NF, nlon_max*nlayers)
+    scratch_memory_column_odd  = zeros(Complex{NF}, nlayers)    # for vertically batched Legendre transform
+    scratch_memory_column_even = zeros(Complex{NF}, nlayers)
 
     # PLAN THE FFTs
     FFT_package = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
@@ -222,6 +226,7 @@ function SpectralTransform(
         rfft_plans, brfft_plans,
         legendre_polynomials,
         scratch_memory_north, scratch_memory_south, scratch_memory_grid,
+        scratch_memory_column_odd, scratch_memory_column_even,
         solid_angles, grad_x, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,

@@ -11,6 +11,7 @@ function _fourier!(
     (; brfft_plans) = S                     # pre-planned transforms
 
     @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
+    @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, nlayers, nlat_half) || throw(DimensionMismatch(S, grids))
 
     rings = eachring(grids)                 # precomputed ring indices
 
