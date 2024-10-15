@@ -77,7 +77,13 @@ function _legendre!(
     end
 end
 
-@inline function fused_oddeven_matvec!(
+"""$(TYPEDSIGNATURES)
+A matrix-vector multiplication betwen a matrix `M` and a vector `v` but split into odd and even elements
+along the first dimension of `M` and `v`, i.e. it implicitly takes the transpose of `M` as argument,
+so that `size(M, 1) == size(v))`. It is the generalisation of `fused_oddeven_dot` to matrices,
+batching the dot product in the 2nd dimension of `M`. `odd` and `even` are the results of the dot product
+and have to be provided as preallocated arrays. Returns `(odd, even)`."""
+@inline function _fused_oddeven_matvec!(
     odd::AbstractVector,
     even::AbstractVector,
     M::AbstractMatrix,
@@ -145,7 +151,7 @@ function _legendre_batched!(
             # dot product but split into even and odd harmonics on the fly for better performance
             # function is 1-based (odd, even, odd, ...) but here use 0-based indexing to name
             # the "even" and "odd" harmonics, batched in the vertical so it's a mat vec multiplication
-            even, odd = fused_oddeven_matvec!(even, odd, spec_view, legendre_view)
+            even, odd = _fused_oddeven_matvec!(even, odd, spec_view, legendre_view)
 
             # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
             o = lon_offsets[m, j]           # rotation through multiplication with complex unit vector
