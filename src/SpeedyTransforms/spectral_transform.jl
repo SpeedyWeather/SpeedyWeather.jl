@@ -51,7 +51,7 @@ struct SpectralTransform{
     # state is undetermined, only read after writing to it
     scratch_memory_north::ArrayComplexType
     scratch_memory_south::ArrayComplexType
-    scratch_memory_grid::Vector{Matrix{NF}} # scratch memory with 1-stride for FFT output
+    scratch_memory_grid::VectorType         # scratch memory with 1-stride for FFT output
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -136,7 +136,7 @@ function SpectralTransform(
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     scratch_memory_north = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
     scratch_memory_south = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
-    scratch_memory_grid = [zeros(NF, nlon, nlayers) for nlon in nlons]
+    scratch_memory_grid = zeros(NF, nlon_max*nlayers)
 
     # PLAN THE FFTs
     FFT_package = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
@@ -320,110 +320,23 @@ number format-flexible but `grids` and the spectral transform `S` have to have t
 Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`.
 The spectral transform is grid-flexible as long as the `typeof(grids)<:AbstractGridArray` and `S.Grid`
 matches."""
-function transform!(                # SPECTRAL TO GRID
-    grids::AbstractGridArray,       # gridded output
-    specs::LowerTriangularArray,    # spectral coefficients input
-    S::SpectralTransform{NF};       # precomputed transform
-    unscale_coslat::Bool = false,   # unscale with cos(lat) on the fly?
-) where NF                          # number format NF
+function transform!(                    # SPECTRAL TO GRID
+    grids::AbstractGridArray,           # gridded output
+    specs::LowerTriangularArray,        # spectral coefficients input
+    S::SpectralTransform;               # precomputed transform
+    unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
+)
+    # use scratch memory for Legendre but not yet Fourier-transformed data
+    g_north = S.scratch_memory_north    # phase factors for northern latitudes
+    g_south = S.scratch_memory_south    # phase factors for southern latitudes
 
-    (; nlat, nlons, nlat_half) = S                  # dimensions
-    (; lmax, mmax ) = S                             # 0-based max degree l, order m of spherical harmonics
-    (; coslat⁻¹, lon_offsets ) = S  
-    (; legendre_polynomials, mmax_truncation ) = S  # for Legendre transform
-    (; brfft_plans) = S                             # for Fourier transform
+    # INVERSE LEGENDRE TRANSFORM in meridional direction
+    _legendre!(g_north, g_south, specs, S; unscale_coslat)
 
-    @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
-    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-    @boundscheck size(grids, 2) == size(specs, 2) <= S.nlayers || throw(DimensionMismatch(S, specs))
-
-    # use scratch memory for Legendre but not yet Fourier transformed data
-    gnorth = S.scratch_memory_north                 # phase factors for northern latitudes
-    gsouth = S.scratch_memory_south                 # phase factors for northern latitudes
-
-    # INVERSE LEGENDRE TRANSFORM
-    @inbounds for k in eachmatrix(specs)            # loop over all specs/grids (e.g. vertical dimension)
-        for j in 1:nlat_half                        # symmetry: loop over northern latitudes only
-            gnorth[:, k, j] .= 0                    # reset scratch memory
-            gsouth[:, k, j] .= 0                    # reset scratch memory
-
-            # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m
-            lm = 1                                  # single runnging index for non-zero l, m indices
-            for m in 1:mmax_truncation[j] + 1       # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
-                lm_end = lm + lmax-m+1              # last index in column
-                
-                # view on column
-                spec_view = view(specs.data, lm:lm_end, k)
-                legendre_view = view(legendre_polynomials.data, lm:lm_end, j)
-                
-                # dot product but split into even and odd harmonics on the fly for better performance
-                # function is 1-based (odd, even, odd, ...) but here use 0-based indexing to name
-                # the "even" and "odd" harmonics
-                acc_even, acc_odd = fused_oddeven_dot(spec_view, legendre_view)
-
-                acc_n = (acc_even + acc_odd)        # accumulators for northern
-                acc_s = (acc_even - acc_odd)        # and southern hemisphere
-                
-                # CORRECT FOR LONGITUDE OFFSETTS
-                o = lon_offsets[m, j]               # longitude offset rotation
-
-                gnorth[m, k, j] = muladd(acc_n, o, gnorth[m, k, j])     # accumulate in phase factors for northern
-                gsouth[m, k, j] = muladd(acc_s, o, gsouth[m, k, j])     # and southern hemisphere
-
-                lm = lm_end + 1                     # first index of next m column
-            end
-
-            if unscale_coslat
-                gnorth[:, k, j] .*= coslat⁻¹[j]     # scale in place
-                gsouth[:, k, j] .*= coslat⁻¹[j]
-            end
-        end
-    end
-
-    # INVERSE FOURIER TRANSFORM in zonal direction (batched in the vertical)
-    rings = eachring(grids)                 # precomputed ring indices
-
-    @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
-        j = j_north                         # symmetric index / ring-away from pole index
-        j_south = nlat - j_north + 1        # southern latitude index
-        nlon = nlons[j]                     # number of longitudes on this ring (north or south)
-        nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
-        not_equator = j_north != j_south    # is the latitude ring not on equator?
-
-        brfft_plan = brfft_plans[j]         # FFT planned wrt nlon on ring
-        ilons = rings[j_north]              # in-ring indices northern ring
-
-        # TODO `out` currently needed as FFT requires stride 1 output
-        out = S.scratch_memory_grid[j]      # output array
-        LinearAlgebra.mul!(out, brfft_plan, view(gnorth, 1:nfreq, :, j))        # perform FFT
-        grids[ilons, :] .= out
-
-        # southern latitude, don't call redundant 2nd fft if ring is on equator 
-        ilons = rings[j_south]              # in-ring indices southern ring
-        if not_equator
-            LinearAlgebra.mul!(out, brfft_plan, view(gsouth, 1:nfreq, :, j))    # perform FFT
-            grids[ilons, :] .= out
-        end
-    end
+    # INVERSE FOURIER TRANSFORM in zonal direction
+    _fourier!(grids, g_north, g_south, S)
 
     return grids
-end
-
-@inline function fused_oddeven_dot(a::AbstractVector, b::AbstractVector)
-    odd  = zero(eltype(a))      # dot prodcut with elements 1, 3, 5, ... of a, b
-    even = zero(eltype(a))      # dot product with elements 2, 4, 6, ... of a, b
-    
-    n = length(a)
-    n_even = n - isodd(n)       # if n is odd do last odd element after the loop
-    
-    @inbounds for i in 1:2:n_even
-        odd = muladd(a[i], b[i], odd)
-        even = muladd(a[i+1], b[i+1], even)
-    end
-    
-    # now do the last element if n is odd
-    odd = isodd(n) ? muladd(a[end], b[end], odd) : odd
-    return odd, even
 end
 
 """$(TYPEDSIGNATURES)
