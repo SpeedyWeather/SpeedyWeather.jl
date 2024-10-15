@@ -170,3 +170,68 @@ function _legendre!(
         end
     end
 end
+
+"""$(TYPEDSIGNATURES)
+Legendre transform, batched in the vertical."""
+function _legendre!(                        # GRID TO SPECTRAL
+    specs::LowerTriangularArray,            # Fourier and Legendre-transformed output
+    f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed input, northern latitudes
+    f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
+    S::SpectralTransform,                   # precomputed transform
+)
+    (; nlat_half, nlayers) = S              # dimensions    
+    (; lmax, mmax) = S                      # 0-based max degree l, order m of spherical harmonics  
+    (; legendre_polynomials) = S            # precomputed Legendre polynomials    
+    (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 0-based  
+    (; solid_anles, lon_offsets) = S
+
+    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
+    @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
+
+    north = S.scratch_memory_column_north   # use scratch memory for vertically-batched dot product
+    south = S.scratch_memory_column_south
+
+    @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
+        j = j_north                         # symmetric index / ring-away from pole index
+        j_south = nlat - j_north + 1        # corresponding southern latitude index
+
+        # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
+        ΔΩ = solid_angles[j]                # = sinθ Δθ Δϕ, solid angle for a grid point
+
+        lm = 1                              # single running index for spherical harmonics
+        for m in 1:mmax_truncation[j] + 1   # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
+
+            # SOLID ANGLE QUADRATURE WEIGHTS and LONGITUDE OFFSET
+            o = lon_offsets[m, j]           # longitude offset rotation by multiplication with complex unit vector
+            ΔΩ_rotated = ΔΩ*conj(o)         # complex conjugate for rotation back to prime meridian
+            
+            an, as = fn[m], fs[m]
+                
+            # LEGENDRE TRANSFORM
+            a_even = (an + as)*ΔΩ_rotated               # sign flip due to anti-symmetry with
+            a_odd = (an - as)*ΔΩ_rotated                # odd polynomials 
+
+            # integration over l = m:lmax+1
+            lm_end = lm + lmax-m+1                      # first index lm plus lmax-m+1 (length of column -1)
+            even_degrees = iseven(lm+lm_end)            # is there an even number of degrees in column m?
+            
+            # anti-symmetry: sign change of odd harmonics on southern hemisphere
+            # but put both into one loop for contiguous memory access
+            for lm_even in lm:2:lm_end-even_degrees
+                # lm_odd = lm_even+1
+                # split into even, i.e. iseven(l+m)
+                # specs[lm_even] += a_even * Λj[lm_even]#, but written with muladd
+                specs[lm_even, k] = muladd(a_even, Λj[lm_even], specs[lm_even, k])
+                
+                # and odd (isodd(l+m)) harmonics
+                # specs[lm_odd] += a_odd * Λj[lm_odd]#, but written with muladd
+                specs[lm_even+1, k] = muladd(a_odd, Λj[lm_even+1], specs[lm_even+1, k])
+            end
+
+            # for even number of degrees, one even iteration is skipped, do now
+            specs[lm_end, k] = even_degrees ? muladd(a_even, Λj[lm_end], specs[lm_end, k]) : specs[lm_end, k]
+
+            lm = lm_end + 1                             # first index of next m column
+        end
+    end
+end
