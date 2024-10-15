@@ -7,11 +7,12 @@ function _fourier!(
     g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
     S::SpectralTransform,                   # precomputed transform
 )
-    (; nlat, nlons, nlat_half, nlayers) = S # dimensions
+    (; nlat, nlons, nlat_half) = S          # dimensions
     (; brfft_plans) = S                     # pre-planned transforms
+    nlayers = size(grids, 2)                # number of vertical layers
 
     @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
-    @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, nlayers, nlat_half) || throw(DimensionMismatch(S, grids))
+    @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, grids))
 
     rings = eachring(grids)                 # precomputed ring indices
 
@@ -29,13 +30,13 @@ function _fourier!(
         # FFTW is in-place writing into `out` via `mul`
         # FFTW requires stride-1 output, hence view on scratch memory
         out = reshape(view(S.scratch_memory_grid, 1:nlon*nlayers), (nlon, nlayers))
-        LinearAlgebra.mul!(out, brfft_plan, view(g_north, 1:nfreq, :, j))
+        LinearAlgebra.mul!(out, brfft_plan, view(g_north, 1:nfreq, 1:nlayers, j))
         grids[ilons, :] = out
 
         # southern latitude, don't call redundant 2nd FFT if ring is on equator 
         ilons = rings[j_south]              # in-ring indices southern ring
         if not_equator
-            LinearAlgebra.mul!(out, brfft_plan, view(g_south, 1:nfreq, :, j))
+            LinearAlgebra.mul!(out, brfft_plan, view(g_south, 1:nfreq, 1:nlayers, j))
             grids[ilons, :] = out
         end
     end

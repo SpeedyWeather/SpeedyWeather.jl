@@ -95,9 +95,9 @@ and have to be provided as preallocated arrays. Returns `(odd, even)`."""
 
     @boundscheck axes(north) == axes(south) || throw(DimensionMismatch)
     @boundscheck axes(M, 1) == axes(v) || throw(DimensionMismatch)
-    @boundscheck axes(M, 2) == axes(north) || throw(DimensionMismatch)
+    @boundscheck axes(M, 2) <= axes(north) || throw(DimensionMismatch)
     
-    @inbounds for j in eachindex(north, south)
+    @inbounds for j in 1:n
         odd_j  = zero(eltype(north))    # dot prodcut with elements 1, 3, 5, ... of M, v
         even_j = zero(eltype(south))    # dot product with elements 2, 4, 6, ... of M, v
 

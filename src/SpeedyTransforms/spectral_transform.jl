@@ -263,14 +263,17 @@ function SpectralTransform(
 end
 
 # CHECK MATCHING SIZES
-# TODO use dispatch to return false if array types don't match?
 function ismatching(S::SpectralTransform, L::LowerTriangularArray)
-    return (S.lmax, S.mmax) == size(L, ZeroBased, as=Matrix)[1:2]
+    resolution_math = (S.lmax, S.mmax) == size(L, ZeroBased, as=Matrix)[1:2]
+    vertical_match = size(L, 2) <= S.nlayers
+    return resolution_math && vertical_match
 end
 
 function ismatching(S::SpectralTransform, grid::AbstractGridArray)
-    match = S.Grid == RingGrids.nonparametric_type(typeof(grid)) && S.nlat_half == grid.nlat_half
-    return match
+    type_match = S.Grid == RingGrids.nonparametric_type(typeof(grid))
+    resolution_match = S.nlat_half == grid.nlat_half
+    vertical_match = size(grid, 2) <= S.nlayers
+    return type_match && resolution_match && vertical_match
 end
 
 # make `ismatching` commutative
