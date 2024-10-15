@@ -26,7 +26,7 @@ end
 Inverse Legendre transform of the spherical harmonic coefficients `specs`,
 to be stored in `g_north` and `g_south` for northern and southern latitudes respectively.
 Not to be called directly, use `transform!` instead."""
-function _legendre!(
+function _legendre_unbatched!(
     g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed output, northern latitudes
     g_south::AbstractArray{<:Complex, 3},   # and southern latitudes
     specs::LowerTriangularArray,            # Legendre-transformed input
@@ -84,8 +84,8 @@ so that `size(M, 1) == size(v))`. It is the generalisation of `fused_oddeven_dot
 batching the dot product in the 2nd dimension of `M`. `odd` and `even` are the results of the dot product
 and have to be provided as preallocated arrays. Returns `(odd, even)`."""
 @inline function _fused_oddeven_matvec!(
-    odd::AbstractVector,
-    even::AbstractVector,
+    north::AbstractVector,
+    south::AbstractVector,
     M::AbstractMatrix,
     v::AbstractVector,
 )
@@ -93,30 +93,31 @@ and have to be provided as preallocated arrays. Returns `(odd, even)`."""
     isoddm = isodd(m)
     m_even = m - isoddm         # if m is odd do last odd element after the loop
 
-    @boundscheck axes(odd) == axes(even) || throw(DimensionMismatch)
+    @boundscheck axes(north) == axes(south) || throw(DimensionMismatch)
     @boundscheck axes(M, 1) == axes(v) || throw(DimensionMismatch)
-    @boundscheck axes(M, 2) == axes(odd) || throw(DimensionMismatch)
+    @boundscheck axes(M, 2) == axes(north) || throw(DimensionMismatch)
     
-    @inbounds for j in eachindex(odd, even)
-        odd_j  = zero(eltype(odd))
-        even_j = zero(eltype(even))
+    @inbounds for j in eachindex(north, south)
+        odd_j  = zero(eltype(north))    # dot prodcut with elements 1, 3, 5, ... of M, v
+        even_j = zero(eltype(south))    # dot product with elements 2, 4, 6, ... of M, v
 
         for i in 1:2:m_even
             odd_j = muladd(M[i, j], v[i], odd_j)
             even_j = muladd(M[i+1, j], v[i+1], even_j)
         end
 
-        # now do the last row if m is odd
-        odd[j] = muladd(M[end, j], isoddm*v[end], odd_j)
-        even[j] = even_j
+        # now do the last row if m is odd, all written as muladds
+        odd_j = muladd(M[end, j], isoddm*v[end], odd_j)
+        north[j] = muladd( 1, even_j, odd_j)    # north = odd + even
+        south[j] = muladd(-1, even_j, odd_j)    # sotuh = odd - even (note 1-based here)
     end
 
-    return odd, even
+    return north, south
 end
 
 """$(TYPEDSIGNATURES)
 Inverse Legendre transform, batched in the vertical."""
-function _legendre_batched!(
+function _legendre!(
     g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed output, northern latitudes
     g_south::AbstractArray{<:Complex, 3},   # and southern latitudes
     specs::LowerTriangularArray,            # Legendre-transformed input
@@ -132,8 +133,8 @@ function _legendre_batched!(
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
-    odd  = S.scratch_memory_column_odd      # use scratch memory for vertically-batched dot product
-    even = S.scratch_memory_column_even
+    north = S.scratch_memory_column_north   # use scratch memory for vertically-batched dot product
+    south = S.scratch_memory_column_south
 
     @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
         g_north[:, :, j] .= 0               # reset scratch memory
@@ -151,13 +152,13 @@ function _legendre_batched!(
             # dot product but split into even and odd harmonics on the fly for better performance
             # function is 1-based (odd, even, odd, ...) but here use 0-based indexing to name
             # the "even" and "odd" harmonics, batched in the vertical so it's a mat vec multiplication
-            even, odd = _fused_oddeven_matvec!(even, odd, spec_view, legendre_view)
+            north, south = _fused_oddeven_matvec!(north, south, spec_view, legendre_view)
 
             # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
             o = lon_offsets[m, j]           # rotation through multiplication with complex unit vector
             for k in eachindex(even, odd)
-                g_north[m, k, j] += o*(even[k] + odd[k])
-                g_south[m, k, j] += o*(even[k] - odd[k])
+                g_north[m, k, j] = muladd(o, north[k], g_north[m, k, j])
+                g_south[m, k, j] = muladd(o, south[k], g_south[m, k, j])
             end
 
             lm = lm_end + 1                         # first index of next m column
