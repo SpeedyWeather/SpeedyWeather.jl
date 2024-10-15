@@ -9,7 +9,8 @@ i.e. `odd = a1*b1 + a3*b3 + ...` and `even = a2*b2 + a4*b4 + ...`. Returns `(odd
     even = zero(eltype(a))      # dot product with elements 2, 4, 6, ... of a, b
     
     n = length(a)
-    n_even = n - isodd(n)       # if n is odd do last odd element after the loop
+    isoddn = isodd(n)
+    n_even = n - isoddn         # if n is odd do last odd element after the loop
     
     @inbounds for i in 1:2:n_even
         odd = muladd(a[i], b[i], odd)
@@ -17,37 +18,7 @@ i.e. `odd = a1*b1 + a3*b3 + ...` and `even = a2*b2 + a4*b4 + ...`. Returns `(odd
     end
     
     # now do the last element if n is odd
-    odd = isodd(n) ? muladd(a[end], b[end], odd) : odd
-    return odd, even
-end
-
-@inline function fused_oddeven_matvec!(
-    odd::AbstractVector,
-    even::AbstractVector,
-    M::AbstractMatrix,
-    v::AbstractVector,
-)
-    m, n = size(M)              # indexed with i, j
-    m_even = m - isodd(m)       # if m is odd do last odd element after the loop
-
-    @boundscheck axes(odd) == axes(even) || throw(DimensionMismatch)
-    @boundscheck axes(M, 1) == axes(v) || throw(DimensionMismatch)
-    @boundscheck axes(M, 2) == axes(odd) || throw(DimensionMismatch)
-    
-    @inbounds for j in eachindex(odd, even)
-        for i in 1:2:m_even
-            odd[j] = muladd(M[i, j], v[i], odd[j])
-            even[j] = muladd(M[i+1, j], v[i+1], even[j])
-        end
-    end
-    
-    # now do the last column if n is odd
-    if isodd(m)
-        @inbounds for j in eachindex(odd, even)
-            odd[j] = muladd(M[end, j], v[end], odd[j])
-        end
-    end
-
+    odd = muladd(a[end], isoddn*b[end], odd)
     return odd, even
 end
 
@@ -77,7 +48,7 @@ function _legendre!(
             g_south[:, k, j] .= 0                   # reset scratch memory
 
             # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m
-            lm = 1                                  # single runnging index for non-zero l, m indices
+            lm = 1                                  # single running index for non-zero l, m indices
             for m in 1:mmax_truncation[j] + 1       # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
                 lm_end = lm + lmax-m+1              # last index in column
 
@@ -90,10 +61,10 @@ function _legendre!(
                 # the "even" and "odd" harmonics
                 even, odd = fused_oddeven_dot(spec_view, legendre_view)
 
-                # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
-                o = lon_offsets[m, j]                                       # longitude offset rotation
-                g_north[m, k, j] = muladd(even+odd, o, g_north[m, k, j])    # accumulate in phase factors for northern
-                g_south[m, k, j] = muladd(even-odd, o, g_south[m, k, j])    # and southern hemisphere
+                # # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
+                o = lon_offsets[m, j]
+                g_north[m, k, j] += o*(even+odd)    # accumulate in phase factors for northern
+                g_south[m, k, j] += o*(even-odd)    # and southern hemisphere
 
                 lm = lm_end + 1                         # first index of next m column
             end
@@ -106,7 +77,40 @@ function _legendre!(
     end
 end
 
-function _legendre2!(
+@inline function fused_oddeven_matvec!(
+    odd::AbstractVector,
+    even::AbstractVector,
+    M::AbstractMatrix,
+    v::AbstractVector,
+)
+    m, n = size(M)              # indexed with i, j
+    isoddm = isodd(m)
+    m_even = m - isoddm         # if m is odd do last odd element after the loop
+
+    @boundscheck axes(odd) == axes(even) || throw(DimensionMismatch)
+    @boundscheck axes(M, 1) == axes(v) || throw(DimensionMismatch)
+    @boundscheck axes(M, 2) == axes(odd) || throw(DimensionMismatch)
+    
+    @inbounds for j in eachindex(odd, even)
+        odd_j  = zero(eltype(odd))
+        even_j = zero(eltype(even))
+
+        for i in 1:2:m_even
+            odd_j = muladd(M[i, j], v[i], odd_j)
+            even_j = muladd(M[i+1, j], v[i+1], even_j)
+        end
+
+        # now do the last row if m is odd
+        odd[j] = muladd(M[end, j], isoddm*v[end], odd_j)
+        even[j] = even_j
+    end
+
+    return odd, even
+end
+
+"""$(TYPEDSIGNATURES)
+Inverse Legendre transform, batched in the vertical."""
+function _legendre_batched!(
     g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed output, northern latitudes
     g_south::AbstractArray{<:Complex, 3},   # and southern latitudes
     specs::LowerTriangularArray,            # Legendre-transformed input
@@ -130,24 +134,24 @@ function _legendre2!(
         g_south[:, :, j] .= 0               # reset scratch memory
 
         # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m
-        lm = 1                                  # single runnging index for non-zero l, m indices
-        for m in 1:mmax_truncation[j] + 1       # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
-            lm_end = lm + lmax-m+1              # last index in column
+        lm = 1                              # single running index for non-zero l, m indices
+        for m in 1:mmax_truncation[j] + 1   # Σ_{m=0}^{mmax}, but 1-based index, shortened to mmax_truncation
+            lm_end = lm + lmax-m+1          # last index in column
 
             # view on lower triangular column, but batched in vertical
             spec_view = view(specs.data, lm:lm_end, :)
             legendre_view = view(legendre_polynomials.data, lm:lm_end, j)
-                
+
             # dot product but split into even and odd harmonics on the fly for better performance
             # function is 1-based (odd, even, odd, ...) but here use 0-based indexing to name
             # the "even" and "odd" harmonics, batched in the vertical so it's a mat vec multiplication
             even, odd = fused_oddeven_matvec!(even, odd, spec_view, legendre_view)
 
             # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
-            o = lon_offsets[m, j]                   # longitude offset rotation
+            o = lon_offsets[m, j]           # rotation through multiplication with complex unit vector
             for k in eachindex(even, odd)
-                @fastmath g_north[m, k, j] += o*(even[k]+odd[k])    # accumulate in phase factors for northern
-                @fastmath g_south[m, k, j] += o*(even[k]-odd[k])    # and southern hemisphere
+                g_north[m, k, j] += o*(even[k] + odd[k])
+                g_south[m, k, j] += o*(even[k] - odd[k])
             end
 
             lm = lm_end + 1                         # first index of next m column

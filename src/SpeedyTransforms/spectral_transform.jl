@@ -336,7 +336,7 @@ function transform!(                    # SPECTRAL TO GRID
     g_south = S.scratch_memory_south    # phase factors for southern latitudes
 
     # INVERSE LEGENDRE TRANSFORM in meridional direction
-    _legendre!(g_north, g_south, specs, S; unscale_coslat)
+    _legendre_batched!(g_north, g_south, specs, S; unscale_coslat)
 
     # INVERSE FOURIER TRANSFORM in zonal direction
     _fourier!(grids, g_north, g_south, S)
