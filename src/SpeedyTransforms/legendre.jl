@@ -129,7 +129,7 @@ function _legendre!(
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
     (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 0-based  
     (; coslat⁻¹, lon_offsets ) = S
-    nlayers = size(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
+    nlayers = axes(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
 
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
@@ -138,8 +138,8 @@ function _legendre!(
     south = S.scratch_memory_column_south
 
     @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
-        g_north[:, 1:nlayers, j] .= 0       # reset scratch memory
-        g_south[:, 1:nlayers, j] .= 0       # reset scratch memory
+        g_north[:, nlayers, j] .= 0       # reset scratch memory
+        g_south[:, nlayers, j] .= 0       # reset scratch memory
 
         # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m
         lm = 1                              # single running index for non-zero l, m indices
@@ -157,7 +157,7 @@ function _legendre!(
 
             # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
             o = lon_offsets[m, j]           # rotation through multiplication with complex unit vector
-            for k in 1:nlayers
+            for k in nlayers
                 g_north[m, k, j] = muladd(o, north[k], g_north[m, k, j])
                 g_south[m, k, j] = muladd(o, south[k], g_south[m, k, j])
             end
@@ -166,8 +166,8 @@ function _legendre!(
         end
 
         if unscale_coslat
-            g_north[:, 1:nlayers, j] .*= coslat⁻¹[j]        # scale in place
-            g_south[:, 1:nlayers, j] .*= coslat⁻¹[j]
+            g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
+            g_south[:, nlayers, j] .*= coslat⁻¹[j]
         end
     end
 end
@@ -200,14 +200,15 @@ function _legendre!(                        # GRID TO SPECTRAL
     f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
     S::SpectralTransform,                   # precomputed transform
 )
-    (; nlat, nlat_half, nlayers) = S        # dimensions    
+    (; nlat, nlat_half) = S                  # dimensions    
     (; lmax, mmax) = S                      # 0-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
     (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 0-based  
     (; solid_angles, lon_offsets) = S
+    nlayers = axes(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
 
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-    @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
+    @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
     even = S.scratch_memory_column_north     # use scratch memory for outer product
     odd = S.scratch_memory_column_south
@@ -228,7 +229,7 @@ function _legendre!(                        # GRID TO SPECTRAL
             ΔΩ_rotated = ΔΩ*conj(o)         # complex conjugate for rotation back to prime meridian
             
             # LEGENDRE TRANSFORM
-            for k in 1:nlayers
+            for k in nlayers
                 fn, fs  = f_north[m, k, j], f_south[m, k, j]
                 @fastmath even[k] = ΔΩ_rotated*(fn + fs)
                 @fastmath odd[k]  = ΔΩ_rotated*(fn - fs)
