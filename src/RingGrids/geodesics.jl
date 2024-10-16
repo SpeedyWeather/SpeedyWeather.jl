@@ -40,7 +40,7 @@ function Haversine(             # functor for Haversine struct
 end
 
 # allow for any <:AbstractSphericalDistance also non-tupled arguments lon1, lat1, lon2, lat2
-(F::AbstractSphericalDistance)(lon1, lat1, lon2, lat2; kwargs...) = F((lon1, lat1), (lon2, lat2); kwargs...) 
+(F::Type{<:AbstractSphericalDistance})(lon1, lat1, lon2, lat2; kwargs...) = F((lon1, lat1), (lon2, lat2); kwargs...) 
 
 """$(TYPEDSIGNATURES)
 Spherical distance, or great-circle distance, between two points `lonlat1` and `lonlat2`
