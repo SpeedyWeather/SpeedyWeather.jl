@@ -40,7 +40,7 @@ function _fourier!(                         # GRID TO SPECTRAL
         if not_equator                      # skip FFT, redundant because north did that latitude already
             LinearAlgebra.mul!(out, rfft_plan, ring_layers)
         else
-            out .= 0    # TODO necessary?
+            fill!(out, 0)
         end
         f_south[1:nfreq, 1:nlayers, j] .= out               # copy into correct stride
 

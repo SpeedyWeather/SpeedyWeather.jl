@@ -243,7 +243,7 @@ coefficients `specs`. Use keyword arguments `nlat_half`, `Grid` or `deliasing` (
 not provided) to define the grid."""
 function SpectralTransform(
     specs::LowerTriangularArray{NF, N, ArrayType};  # spectral coefficients
-    nlat_half::Integer = 0,                         # resolution parameter nlat_half,
+    nlat_half::Integer = 0,                         # resolution parameter nlat_half
     dealiasing::Real = DEFAULT_DEALIASING,          # dealiasing factor
     kwargs...
 ) where {NF, N, ArrayType}                          # number format NF (can be complex)
@@ -298,12 +298,20 @@ end
 SpectralTransform(specs::LowerTriangularArray, grids::AbstractGridArray) = SpectralTransform(grids, specs)
 
 # CHECK MATCHING SIZES
+"""$(TYPEDSIGNATURES)
+Spectral transform `S` and lower triangular matrix `L` match if the
+spectral dimensions `(lmax, mmax)` match and the number of vertical layers is
+equal or larger in the transform (constraints due to allocated scratch memory size)."""
 function ismatching(S::SpectralTransform, L::LowerTriangularArray)
     resolution_math = (S.lmax, S.mmax) == size(L, ZeroBased, as=Matrix)[1:2]
     vertical_match = length(axes(L, 2)) <= S.nlayers
     return resolution_math && vertical_match
 end
 
+"""$(TYPEDSIGNATURES)
+Spectral transform `S` and `grid` match if the resolution `nlat_half` and the
+type of the grid match and the number of vertical layers is equal or larger in
+the transform (constraints due to allocated scratch memory size)."""
 function ismatching(S::SpectralTransform, grid::AbstractGridArray)
     type_match = S.Grid == RingGrids.nonparametric_type(typeof(grid))
     resolution_match = S.nlat_half == grid.nlat_half
@@ -390,12 +398,11 @@ number format-flexible but `grids` and the spectral transform `S` have to have t
 Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`.
 The spectral transform is grid-flexible as long as the `typeof(grids)<:AbstractGridArray` and `S.Grid`
 matches."""
-function transform!(                    # grid -> spectral
+function transform!(                    # GRID TO SPECTRAL
     specs::LowerTriangularArray,        # output: spectral coefficients
-    grids::AbstractGridArray{NF},       # input: gridded values
-    S::SpectralTransform{NF}            # precomputed spectral transform
-) where NF                              # number format
-    
+    grids::AbstractGridArray,           # input: gridded values
+    S::SpectralTransform,               # precomputed spectral transform
+)
     # use scratch memory for Fourier but not yet Legendre-transformed data
     f_north = S.scratch_memory_north    # phase factors for northern latitudes
     f_south = S.scratch_memory_south    # phase factors for southern latitudes
@@ -445,7 +452,7 @@ Spectral transform (spectral to grid space) from spherical coefficients `alms` t
 field `map`. Based on the size of `alms` the grid type `grid`, the spatial resolution is retrieved based
 on the truncation defined for `grid`. SpectralTransform struct `S` is allocated to execute `transform(alms, S)`."""
 function transform(
-    specs::LowerTriangularArray;
+    specs::LowerTriangularArray;                # SPECTRAL TO GRID
     unscale_coslat::Bool = false,               # separate from kwargs as argument for transform!
     kwargs...                                   # arguments for SpectralTrasnform constructor
 )
