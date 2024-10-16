@@ -3,7 +3,7 @@ Fast Fourier transform in zonal direction of `grids`."""
 function _fourier!(                         # GRID TO SPECTRAL
     f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed output
     f_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
-    grids::AbstractGridArray,               # gridded output
+    grids::AbstractGridArray,               # gridded input
     S::SpectralTransform,                   # precomputed transform
 )
     (; nlat, nlons, nlat_half) = S          # dimensions
@@ -26,20 +26,24 @@ function _fourier!(                         # GRID TO SPECTRAL
         ilons = rings[j_north]              # in-ring indices northern ring
         
         # FOURIER TRANSFORM in zonal direction, northern latitude
-        grid_in = reshape(view(S.scratch_memory_grid, 1:nlon*nlayers), (nlon, nlayers))
-        grid_in[:,:] = view(grids.data, ilons, :)
-        out = view(f_north, 1:nfreq, 1:nlayers, j)
-        LinearAlgebra.mul!(out, rfft_plan, grid_in)   # Northern latitude
+        # views and copies necessary for stride-1 inputs and outputs required by FFTW
+        ring_layers = reshape(view(S.scratch_memory_grid, 1:nlon*nlayers), (nlon, nlayers))
+        ring_layers[:,:] = view(grids.data, ilons, :)
+
+        out = reshape(view(S.scratch_memory_spec, 1:nfreq*nlayers), (nfreq, nlayers))
+        LinearAlgebra.mul!(out, rfft_plan, ring_layers)     # Northern latitude
+        f_north[1:nfreq, 1:nlayers, j] .= out               # copy into correct stride
 
         # and southern latitude if not on Equator (
         ilons = rings[j_south]              # in-ring indices southern ring
-        grid_in[:,:] = view(grids.data, ilons, :)
-        out = view(f_south, 1:nfreq, 1:nlayers, j)
+        ring_layers[:,:] = view(grids.data, ilons, :)
         if not_equator                      # skip FFT, redundant because north did that latitude already
-            LinearAlgebra.mul!(out, rfft_plan, grid_in)
+            LinearAlgebra.mul!(out, rfft_plan, ring_layers)
         else
             out .= 0    # TODO necessary?
         end
+        f_south[1:nfreq, 1:nlayers, j] .= out               # copy into correct stride
+
     end
 end
 

@@ -124,21 +124,22 @@ function _legendre!(
     S::SpectralTransform;                   # precomputed transform
     unscale_coslat::Bool = false,           # unscale by cosine of latitude on the fly?
 )
-    (; nlat_half, nlayers) = S              # dimensions    
+    (; nlat_half) = S                       # dimensions    
     (; lmax, mmax ) = S                     # 0-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
     (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 0-based  
     (; coslat⁻¹, lon_offsets ) = S
+    nlayers = size(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
 
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-    @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
+    @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
     north = S.scratch_memory_column_north   # use scratch memory for vertically-batched dot product
     south = S.scratch_memory_column_south
 
     @inbounds for j in 1:nlat_half          # symmetry: loop over northern latitudes only
-        g_north[:, :, j] .= 0               # reset scratch memory
-        g_south[:, :, j] .= 0               # reset scratch memory
+        g_north[:, 1:nlayers, j] .= 0       # reset scratch memory
+        g_south[:, 1:nlayers, j] .= 0       # reset scratch memory
 
         # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m
         lm = 1                              # single running index for non-zero l, m indices
@@ -156,7 +157,7 @@ function _legendre!(
 
             # CORRECT FOR LONGITUDE OFFSETTS (if grid points don't start at 0°E)
             o = lon_offsets[m, j]           # rotation through multiplication with complex unit vector
-            for k in eachindex(even, odd)
+            for k in 1:nlayers
                 g_north[m, k, j] = muladd(o, north[k], g_north[m, k, j])
                 g_south[m, k, j] = muladd(o, south[k], g_south[m, k, j])
             end
@@ -165,9 +166,29 @@ function _legendre!(
         end
 
         if unscale_coslat
-            g_north[:, :, j] .*= coslat⁻¹[j]        # scale in place
-            g_south[:, :, j] .*= coslat⁻¹[j]
+            g_north[:, 1:nlayers, j] .*= coslat⁻¹[j]        # scale in place
+            g_south[:, 1:nlayers, j] .*= coslat⁻¹[j]
         end
+    end
+end
+
+function _fused_oddeven_outer_product_accumulate!(
+    specs::AbstractMatrix,
+    legendre::AbstractVector,
+    even::AbstractVector,
+    odd::AbstractVector,
+)
+    lmax, nlayers = size(specs)
+    isoddlmax = isodd(lmax)
+    lmax_even = lmax - isoddlmax
+
+    @inbounds for k in 1:nlayers
+        even_k, odd_k = even[k], odd[k]
+        for l in 1:2:lmax_even
+            specs[l,   k] = muladd(legendre[l],  even_k, specs[l,   k])
+            specs[l+1, k] = muladd(legendre[l+1], odd_k, specs[l+1, k])
+        end
+        specs[end, k] = muladd(legendre[end], isoddlmax*even_k, specs[end, k])
     end
 end
 
@@ -179,21 +200,22 @@ function _legendre!(                        # GRID TO SPECTRAL
     f_south::AbstractArray{<:Complex, 3},   # and southern latitudes
     S::SpectralTransform,                   # precomputed transform
 )
-    (; nlat_half, nlayers) = S              # dimensions    
+    (; nlat, nlat_half, nlayers) = S        # dimensions    
     (; lmax, mmax) = S                      # 0-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
     (; mmax_truncation) = S                 # Legendre shortcut, shortens loop over m, 0-based  
-    (; solid_anles, lon_offsets) = S
+    (; solid_angles, lon_offsets) = S
 
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
-    north = S.scratch_memory_column_north   # use scratch memory for vertically-batched dot product
-    south = S.scratch_memory_column_south
+    even = S.scratch_memory_column_north     # use scratch memory for outer product
+    odd = S.scratch_memory_column_south
+
+    fill!(specs, 0)                         # reset as we accumulate into specs
 
     @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
         j = j_north                         # symmetric index / ring-away from pole index
-        j_south = nlat - j_north + 1        # corresponding southern latitude index
 
         # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
         ΔΩ = solid_angles[j]                # = sinθ Δθ Δϕ, solid angle for a grid point
@@ -205,33 +227,21 @@ function _legendre!(                        # GRID TO SPECTRAL
             o = lon_offsets[m, j]           # longitude offset rotation by multiplication with complex unit vector
             ΔΩ_rotated = ΔΩ*conj(o)         # complex conjugate for rotation back to prime meridian
             
-            an, as = fn[m], fs[m]
-                
             # LEGENDRE TRANSFORM
-            a_even = (an + as)*ΔΩ_rotated               # sign flip due to anti-symmetry with
-            a_odd = (an - as)*ΔΩ_rotated                # odd polynomials 
-
-            # integration over l = m:lmax+1
-            lm_end = lm + lmax-m+1                      # first index lm plus lmax-m+1 (length of column -1)
-            even_degrees = iseven(lm+lm_end)            # is there an even number of degrees in column m?
-            
-            # anti-symmetry: sign change of odd harmonics on southern hemisphere
-            # but put both into one loop for contiguous memory access
-            for lm_even in lm:2:lm_end-even_degrees
-                # lm_odd = lm_even+1
-                # split into even, i.e. iseven(l+m)
-                # specs[lm_even] += a_even * Λj[lm_even]#, but written with muladd
-                specs[lm_even, k] = muladd(a_even, Λj[lm_even], specs[lm_even, k])
-                
-                # and odd (isodd(l+m)) harmonics
-                # specs[lm_odd] += a_odd * Λj[lm_odd]#, but written with muladd
-                specs[lm_even+1, k] = muladd(a_odd, Λj[lm_even+1], specs[lm_even+1, k])
+            for k in 1:nlayers
+                fn, fs  = f_north[m, k, j], f_south[m, k, j]
+                @fastmath even[k] = ΔΩ_rotated*(fn + fs)
+                @fastmath odd[k]  = ΔΩ_rotated*(fn - fs)
             end
 
-            # for even number of degrees, one even iteration is skipped, do now
-            specs[lm_end, k] = even_degrees ? muladd(a_even, Λj[lm_end], specs[lm_end, k]) : specs[lm_end, k]
+            # integration over l = m:lmax+1
+            lm_end = lm + lmax-m+1                      # last index in column m
+            spec_view = view(specs.data, lm:lm_end, :)
+            legendre_view = view(legendre_polynomials.data, lm:lm_end, j)
 
-            lm = lm_end + 1                             # first index of next m column
+            _fused_oddeven_outer_product_accumulate!(spec_view, legendre_view, even, odd)
+
+            lm = lm_end + 1                             # first index of next column m+1
         end
     end
 end
