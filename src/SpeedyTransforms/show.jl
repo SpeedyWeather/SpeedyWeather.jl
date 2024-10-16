@@ -16,8 +16,13 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
     (; lmax, mmax, Grid, nlat_half, nlayers) = S
 
     # add information about size of Legendre polynomials and scratch memory
-    s_str = prettymemory(Base.summarysize(S.legendre_polynomials))
-    m_str = prettymemory(Base.summarysize(S.scratch_memory_north)*2 + Base.summarysize(S.scratch_memory_grid))
+    polysize_str = prettymemory(Base.summarysize(S.legendre_polynomials))
+    memorysize_str = prettymemory(
+                Base.summarysize(S.scratch_memory_north) +      # add all scratch_memories
+                Base.summarysize(S.scratch_memory_south) + 
+                Base.summarysize(S.scratch_memory_grid) + 
+                Base.summarysize(S.scratch_memory_spec)
+            )
 
     dealias = get_dealiasing(mmax, nlat_half)
     truncations = ["<linear", "linear", "quadratic", "cubic", ">cubic"]
@@ -28,6 +33,6 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
     println(io, "├ Spectral:   T$mmax, $(lmax+1)x$(mmax+1) LowerTriangularMatrix{Complex{$NF}}")
     println(io, "├ Grid:       $(RingGrids.get_nlat(Grid, nlat_half))-ring $Grid{$NF}")
     println(io, "├ Truncation: dealiasing = $dealiasing ($truncation)")
-    println(io, "├ Legendre:   Polynomials $s_str, shortcut: $(short_name(S.LegendreShortcut))")
-      print(io, "└ Memory:     for $nlayers layers ($m_str)")
+    println(io, "├ Legendre:   Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
+      print(io, "└ Memory:     for $nlayers layers ($memorysize_str)")
 end
