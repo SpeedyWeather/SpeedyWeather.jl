@@ -90,7 +90,7 @@ $(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct. With `NF` the number format,
 `Grid` the grid type `<:AbstractGrid` and spectral truncation `lmax, mmax` this function sets up
 necessary constants for the spetral transform. Also plans the Fourier transforms, retrieves the colatitudes,
-and preallocates the Legendre polynomials (if recompute_legendre == false) and quadrature weights."""
+and preallocates the Legendre polynomials and quadrature weights."""
 function SpectralTransform(
     ::Type{NF},                                     # Number format NF
     lmax::Integer,                                  # Spectral truncation: degrees
