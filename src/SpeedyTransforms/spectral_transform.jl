@@ -42,9 +42,13 @@ struct SpectralTransform{
     # NORMALIZATION
     norm_sphere::NF                         # normalization of the l=0, m=0 mode
 
-    # FFT plans, one plan for each latitude ring
+    # FFT plans, one plan for each latitude ring, batched in the vertical
     rfft_plans::Vector{AbstractFFTs.Plan}   # FFT plan for grid to spectral transform
     brfft_plans::Vector{AbstractFFTs.Plan}  # spectral to grid transform (inverse)
+
+    # FFT plans, but unbatched
+    rfft_plans_1D::Vector{AbstractFFTs.Plan}
+    brfft_plans_1D::Vector{AbstractFFTs.Plan}
 
     # LEGENDRE POLYNOMIALS, for all latitudes, precomputed
     legendre_polynomials::LowerTriangularArrayType
@@ -64,7 +68,6 @@ struct SpectralTransform{
     solid_angles::VectorType                # = ΔΩ = sinθ Δθ Δϕ (solid angle of grid point)
 
     # GRADIENT MATRICES (on unit sphere, no 1/radius-scaling included)
-    grad_x ::VectorComplexType          # = i*m but precomputed
     grad_y1::LowerTriangularMatrixType  # precomputed meridional gradient factors, term 1
     grad_y2::LowerTriangularMatrixType  # term 2
 
@@ -139,15 +142,35 @@ function SpectralTransform(
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     scratch_memory_north = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
     scratch_memory_south = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
+
+    # SCRATCH MEMORY TO 1-STRIDE DATA FOR FFTs
     scratch_memory_grid  = zeros(NF, nlon_max*nlayers)
     scratch_memory_spec  = zeros(Complex{NF}, nfreq_max*nlayers)
-    scratch_memory_column_north = zeros(Complex{NF}, nlayers)    # for vertically batched Legendre transform
+
+    # SCRATCH MEMORY COLUMNS FOR VERTICALLY BATCHED LEGENDRE TRANSFORM
+    scratch_memory_column_north = zeros(Complex{NF}, nlayers)
     scratch_memory_column_south = zeros(Complex{NF}, nlayers)
 
     # PLAN THE FFTs
     FFT_package = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
-    rfft_plans = [FFT_package.plan_rfft(zeros(NF, nlon, nlayers), 1) for nlon in nlons]
-    brfft_plans = [FFT_package.plan_brfft(view(scratch_memory_north, 1:nlon÷2 + 1, :, 1), nlon, 1) for nlon in nlons]
+    rfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
+    brfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
+    rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
+    brfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
+
+    fake_grid_data = zeros(Grid{NF}, nlat_half, nlayers)
+
+    for (j, nlon) in enumerate(nlons)
+        real_matrix_input = view(fake_grid_data.data, rings[j], :)
+        complex_matrix_input = view(scratch_memory_north, 1:nlon÷2 + 1, :, 1)
+        real_vector_input = view(fake_grid_data.data, rings[j], 1)
+        complex_vector_input = view(scratch_memory_north, 1:nlon÷2 + 1, 1, 1)
+
+        rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1)
+        brfft_plans[j] = FFT_package.plan_brfft(complex_matrix_input, nlon, 1)
+        rfft_plans_1D[j] = FFT_package.plan_rfft(real_vector_input, 1)
+        brfft_plans_1D[j] = FFT_package.plan_brfft(complex_vector_input, nlon, 1)
+    end
     
     # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
@@ -160,8 +183,6 @@ function SpectralTransform(
     ϵlms = get_recursion_factors(lmax+1, mmax)
 
     # GRADIENTS (on unit sphere, hence 1/radius-scaling is omitted)
-    grad_x = [im*m for m in 0:mmax]         # zonal gradient (precomputed currently not used)
-
     # meridional gradient for scalars (coslat scaling included)
     grad_y1 = zeros(LowerTriangularMatrix, lmax+1, mmax+1)      # term 1, mul with harmonic l-1, m
     grad_y2 = zeros(LowerTriangularMatrix, lmax+1, mmax+1)      # term 2, mul with harmonic l+1, m
@@ -225,12 +246,12 @@ function SpectralTransform(
         nlon_max, nlons, nlat,
         coslat, coslat⁻¹, lon_offsets,
         norm_sphere,
-        rfft_plans, brfft_plans,
+        rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
         legendre_polynomials,
         scratch_memory_north, scratch_memory_south,
         scratch_memory_grid, scratch_memory_spec,
         scratch_memory_column_north, scratch_memory_column_south,
-        solid_angles, grad_x, grad_y1, grad_y2,
+        solid_angles, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,
         eigenvalues, eigenvalues⁻¹
@@ -454,7 +475,7 @@ on the truncation defined for `grid`. SpectralTransform struct `S` is allocated 
 function transform(
     specs::LowerTriangularArray;                # SPECTRAL TO GRID
     unscale_coslat::Bool = false,               # separate from kwargs as argument for transform!
-    kwargs...                                   # arguments for SpectralTrasnform constructor
+    kwargs...                                   # arguments for SpectralTransform constructor
 )
     S = SpectralTransform(specs; kwargs...)     # precompute transform
     return transform(specs, S; unscale_coslat)  # do the transform

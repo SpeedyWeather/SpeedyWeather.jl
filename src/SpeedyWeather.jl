@@ -6,7 +6,6 @@ using DocStringExtensions
 # NUMERICS
 import Primes
 import Random
-import FastGaussQuadrature
 import LinearAlgebra: LinearAlgebra, Diagonal
 
 # GPU, PARALLEL

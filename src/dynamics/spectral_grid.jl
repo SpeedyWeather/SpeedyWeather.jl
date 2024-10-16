@@ -79,7 +79,7 @@ function Base.show(io::IO, SG::SpectralGrid)
     (; nparticles) = SG
 
     # resolution information
-    ave_resolution = sqrt(4π*radius^2/npoints)/1000  # in [km]
+    average_resolution = sqrt(4π*radius^2/npoints)/1000  # in [km]
     s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
 
     println(io, "$(typeof(SG)):")
