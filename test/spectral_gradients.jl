@@ -233,7 +233,7 @@ end
         alms2 = copy(alms)
         alms3 = copy(alms)
 
-        S = SpectralTransform(alms, recompute_legendre=false)
+        S = SpectralTransform(alms)
 
         # ∇⁻²! same as inverse=true
         SpeedyWeather.∇²!(alms2, alms, S, inverse=true);

@@ -107,7 +107,6 @@ end
 
 function Base.array_summary(io::IO, L::LowerTriangularMatrix{T}, inds::Tuple{Vararg{Base.OneTo}}) where T
     mn = size(L; as=Matrix)
-    @info Base.dims2string(length.(inds))
     print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T}")
 end
 
