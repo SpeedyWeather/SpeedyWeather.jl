@@ -1,3 +1,6 @@
+import .EnzymeRules: reverse, augmented_primal
+using .EnzymeRules
+
 """
 $(TYPEDSIGNATURES)
 Computes the scale for the adjoint/pullback of all discrete Fourier transforms. 
@@ -25,3 +28,11 @@ function rfft_adjoint_scale(n_freq::Int, n_real::Int)
         return [1; [2 for i=2:n_freq]]
     end 
 end 
+
+function augmented_primal(config::RevConfigWidth{1}, func::Const{typeof{_fourier!}}, )
+
+end 
+
+function reverse()
+
+end
