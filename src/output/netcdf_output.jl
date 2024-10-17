@@ -38,7 +38,7 @@ $(TYPEDFIELDS)"""
     
     "[OPTION] also write restart file if output==true?"
     write_restart::Bool = true
-    pkg_version::VersionNumber = pkgversion(SpeedyWeather)
+    pkg_version::VersionNumber = isnothing(pkgversion(SpeedyWeather)) ? v"0.0.0" : pkgversion(SpeedyWeather)
 
     # WHAT/WHEN OPTIONS
     startdate::DateTime = DateTime(2000, 1, 1)

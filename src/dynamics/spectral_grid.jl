@@ -79,13 +79,13 @@ function Base.show(io::IO, SG::SpectralGrid)
     (; nparticles) = SG
 
     # resolution information
-    res_ave = sqrt(4π*radius^2/npoints)/1000  # in [km]
+    average_resolution = sqrt(4π*radius^2/npoints)/1000  # in [km]
     s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
 
     println(io, "$(typeof(SG)):")
     println(io, "├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
     println(io, "├ Grid:       $nlat-ring $Grid{$NF}, $npoints grid points")
-    println(io, "├ Resolution: $(s(res_ave))km (average)")
+    println(io, "├ Resolution: $(s(average_resolution))km (average)")
     if nparticles > 0
     println(io, "├ Particles:  $nparticles")
     end
@@ -97,9 +97,8 @@ end
 $(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""
 function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
-                                            recompute_legendre::Bool = false,
                                             one_more_degree::Bool = true,
                                             kwargs...)
-    (; NF, Grid, trunc, nlayers, dealiasing, ArrayType) = spectral_grid
-    return SpectralTransform(NF, Grid, trunc+one_more_degree, trunc; ArrayType, nlayers, recompute_legendre, dealiasing, kwargs...)
+    (; NF, Grid, trunc, nlat_half, nlayers, ArrayType) = spectral_grid
+    return SpectralTransform(NF, trunc+one_more_degree, trunc, nlat_half; Grid, ArrayType, nlayers, kwargs...)
 end

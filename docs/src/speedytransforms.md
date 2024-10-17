@@ -266,7 +266,7 @@ The spectral transform uses a Legendre transform in meridional direction. For th
 Legendre polynomials are required, at each latitude ring this is a ``l_{max} \times m_{max}``
 lower triangular matrix. Storing precomputed Legendre polynomials therefore quickly
 increase in size with resolution. One can recompute them to save memory, but that 
-uses more arithmetic operations. There is therefore a memory-compute tradeoff.
+uses more arithmetic operations. There is therefore a memory-compute trade-off.
 
 For a single transform, there is no need to precompute the polynomials as the
 `SpectralTransform` object will be garbage collected again anyway. For low resolution
@@ -290,7 +290,9 @@ SpectralTransform(spectral_grid, recompute_legendre=true)
 
 ## Batched Transforms 
 
-SpeedyTransforms also supports batched transforms. With batched input data the `transform` is performed along the leading dimension, and all further dimensions are interpreted as batch dimensions. Take for example 
+SpeedyTransforms also supports batched transforms. With batched input data the `transform`
+is performed along the leading dimension, and all further dimensions are interpreted as
+batch dimensions. Take for example 
 
 ```@example speedytransforms 
 alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32, 5) 
