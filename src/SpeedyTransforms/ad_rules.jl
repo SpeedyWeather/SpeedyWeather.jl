@@ -31,6 +31,7 @@ function rfft_adjoint_scale(n_freq::Int, n_real::Int)
     end 
 end 
 
+### Custom rule for _fourier!(f_north, f_north, grid, S)
 function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
     f_north::Duplicated, f_south::Duplicated, grids::Duplicated, S::Const) 
 
@@ -72,3 +73,5 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing)
 end
+
+### Custom rule for _fourier!(grid, f_north, f_south, grid, S)
