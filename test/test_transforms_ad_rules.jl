@@ -1,8 +1,10 @@
-using EnzymeTestUtils, Enzyme
+using EnzymeTestUtils, Enzyme, FiniteDifferences
 
 grids = [FullGaussianGrid, OctahedralClenshawGrid] # one full and one reduced grid 
 
 @testset "SpeedyTransforms: AD Rules" begin
+
+
     @testset "_fourier! Enzyme rules" begin
         
         @testset "reverse rule" begin
@@ -28,8 +30,22 @@ grids = [FullGaussianGrid, OctahedralClenshawGrid] # one full and one reduced gr
         # WIP
     end 
 
+
     @testset "Complete Transform" begin
         # make a high level finite difference test of the whole transform
         # can't use Enzyme or ChainRule Test tools for tests for that
+        for grid in grids 
+
+            spectral_grid = SpectralGrid(Grid=grid)
+            S = SpectralTransform(spectral_grid)
+            grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+            dgrid = zero(grid)
+            specs = rand(LowerTriangularArray{spectral_grid.NF}, spectral_grid.trunc+2, spectral_grid.trunc+1, spectral_grid.nlayers)
+            dspecs = zero(specs)
+
+            autodiff(Reverse, transform!, Const, Duplicated(specs, dspecs), Duplicated(grid, dgrid), Const(S))
+
+            # finite difference comparision 
+
     end 
 end 
