@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added custom EnzymeRules for the SpectralTransform [#589](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589)
 - De-interweave SpectralTransform [#587](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/587)
 - Array-agnostic SpectralTransform [#583](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/583)
 - Move CUDA dependency into extension [#586](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/586)
