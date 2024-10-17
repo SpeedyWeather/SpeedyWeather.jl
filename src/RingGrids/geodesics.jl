@@ -1,4 +1,4 @@
-const DEFAULT_RADIUS = 6371e3  # Earth mean radius in meters.
+const DEFAULT_RADIUS = 6371000  # Earth mean radius in meters, defined as integer for more type stability 
 
 """
     abstract type AbstractSphericalDistance end
