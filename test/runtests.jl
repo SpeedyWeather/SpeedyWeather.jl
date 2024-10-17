@@ -2,6 +2,7 @@ using SpeedyWeather
 using Test
 
 # GENERAL
+#include("test_transforms_ad_rules.jl") # TODO: put the test somewhere else (and next to the transforms)
 include("utility_functions.jl")
 include("dates.jl")
 include("lower_triangular_matrix.jl")
