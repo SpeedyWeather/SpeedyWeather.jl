@@ -24,7 +24,7 @@ as default
 
 ```@example haurwitz
 using SpeedyWeather
-spectral_grid = SpectralGrid(trunc=127, nlayers=1)
+spectral_grid = SpectralGrid(trunc=63, nlayers=1)
 model = BarotropicModel(; spectral_grid)
 simulation = initialize!(model)
 ```
@@ -133,7 +133,7 @@ initial_conditions = InitialConditions(
                         temp=JablonowskiTemperature(),
                         pres=PressureOnOrography())
 
-orography = NoOrography()
+orography = NoOrography(spectral_grid)
 model = PrimitiveDryModel(; spectral_grid, initial_conditions, orography, physics=false)
 simulation = initialize!(model)
 run!(simulation, period=Day(10))
