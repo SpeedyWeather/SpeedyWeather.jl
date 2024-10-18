@@ -18,6 +18,11 @@
     end
 end
 
+@testset "Spherical distance degrees -180:180 or 0:360" begin
+    # either -180 to 180 or 0 to 360˚E
+    @test spherical_distance((-90, 0), (-180, 0)) ≈ spherical_distance((270, 0), (180, 0))
+end
+
 @testset "Spherical distance invariants" begin
 
     # Ensure that function preserves the invariant that shifting in the longitude
