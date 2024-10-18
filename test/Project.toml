@@ -1,0 +1,10 @@
+[deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+EnzymeTestUtils = "12d8515a-0907-448a-8884-5fe00fdf1c5a"
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
