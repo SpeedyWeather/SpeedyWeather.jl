@@ -15,6 +15,7 @@ Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 EnzymeTestUtils = "12d8515a-0907-448a-8884-5fe00fdf1c5a"
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 GPUArrays = "0c68f7d7-f131-5f86-a1c3-88cf8149b2d7"
 GenericFFT = "a8297547-1b15-4a5a-a998-a2ac5f1cef28"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
@@ -31,11 +32,13 @@ UnicodePlots = "b8865327-cd53-5732-bb35-84acbb429228"
 
 [weakdeps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [extensions]
 SpeedyWeatherCUDAExt = "CUDA"
+SpeedyWeatherFiniteDifferencesExt = "FiniteDifferences"
 SpeedyWeatherJLArraysExt = "JLArrays"
 SpeedyWeatherMakieExt = "Makie"
 
