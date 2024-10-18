@@ -10,11 +10,13 @@ function adjoint_scale(S::SpectralTransform)
     (; nlat_half, nlons, rfft_plans) = S
     nfreqs = [rfft_plan.osz[1] for rfft_plan in rfft_plans] # TODO: This works with FFTW, but does it with CUFFT as well?
 
-    scale = zeros(Int, maximum(nfreqs), nlat_half)
+    scale = zeros(Int, maximum(nfreqs), nlat_half) 
 
     for i=1:nlat_half
         scale[1:nfreqs[i],i] = rfft_adjoint_scale(nfreqs[i], nlons[i])
     end 
+
+    # TODO: transfer array to GPU in case we are on GPU
     return reshape(scale, maximum(nfreqs), 1, nlat_half) # the scratch memory is (Freq x lvl x lat), so we insert 
                                                          # an additional dimension here for easier matrix multiply
 end 
@@ -36,6 +38,9 @@ function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typ
     f_north::Const, f_south::Const, grids::Duplicated, S::Const) 
 
     println("Augmented Primal Used") # TODO: remove 
+    @show EnzymeRules.overwritten(config)
+    @show EnzymeRules.needs_primal(config)
+    @show EnzymeRules.needs_shadow(config)
 
     func.val(f_north.val, f_south.val, grids.val, S.val) # forward pass
 
@@ -54,7 +59,8 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
     f_north::Const, f_south::Const, grids::Duplicated, S::Const)
 
     println("Custom Reverse Used") # TODO: remove
-
+    @show config 
+ 
     # adjoint/vjp of FFT has a different scaling, compute it, apply it later to f_north, f_south
     scale = adjoint_scale(S.val)
     
