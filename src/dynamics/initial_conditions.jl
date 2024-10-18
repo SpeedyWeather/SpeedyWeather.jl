@@ -308,7 +308,7 @@ end
 """$(TYPEDSIGNATURES)
 Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
 with an additional cut-off amplitude `c` to filter out tiny harmonics in the vorticity field."""
-function intialize!(
+function initialize!(
     progn::PrognosticVariables,
     initial_conditions::RossbyHaurwitzWave,
     model::AbstractModel,
