@@ -79,7 +79,8 @@ in grid coordinates. So to show vorticity again in grid space we transform
 back
 
 ```@example haurwitz
-vor = simulation.prognostic_variables.vor[1]    # 1 = first leapfrog timestep
+# [1] for first leapfrog time step, [:, 1] for all values on first layer
+vor = simulation.prognostic_variables.vor[1][:, 1]
 vor_grid = transform(vor)
 
 using CairoMakie
