@@ -205,7 +205,7 @@ which clearly shows that the mountain is only on the Eastern hemisphere
 
 ```@example orography
 λ₀ = 0         # move "Super Hawaii" mountain onto the prime meridian
-set!(model, orography=(λ,φ) -> H*exp((-spherical_distance((λ,φ), (λ₀,φ₀), radius=1)^2/2σ^2)
+set!(model, orography=(λ,φ) -> H*exp(-spherical_distance((λ,φ), (λ₀,φ₀), radius=1)^2/2σ^2))
 heatmap(model.orography.orography, title="Mountain on prime meridian, spherical distance")
 save("mountain_spherical.png", ans) # hide
 nothing # hide
