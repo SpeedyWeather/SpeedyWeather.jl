@@ -1,12 +1,20 @@
 # function barrier for batched or serial transforms as FFTW plans cannot be reused for fewer vertical layers
 function _fourier!(f_north, f_south, grids::AbstractGridArray, S::SpectralTransform)
-    _fourier! = if size(grids, 2) == S.nlayers _fourier_batched! else _fourier_serial! end
+    _fourier! = if size(grids, 2) == S.nlayers > 1
+        _fourier_batched!
+    else
+        _fourier_serial!
+    end
     return _fourier!(f_north, f_south, grids, S)
 end
 
 # function barrier for batched or serial transforms as FFTW plans cannot be reused for fewer vertical layers
 function _fourier!(grids::AbstractGridArray, f_north, f_south, S::SpectralTransform)
-    _fourier! = if size(grids, 2) == S.nlayers _fourier_batched! else _fourier_serial! end
+    _fourier! = if size(grids, 2) == S.nlayers > 1
+        _fourier_batched!
+    else
+        _fourier_serial!
+    end
     return _fourier!(grids, f_north, f_south, S)
 end
 
