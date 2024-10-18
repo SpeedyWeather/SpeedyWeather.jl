@@ -81,7 +81,8 @@ end
 
     # but integers always go to Float64 due to the trigonometric functions
     for T in (Int16, Int32, Int64)
-        p1, p2 = (rand(T), rand(T)), (rand(T), rand(T))
+        d = -180:360    # sensible range for degrees
+        p1, p2 = T.(rand(d), rand(d)), T.(rand(d), rand(d))
         @test typeof(spherical_distance(p1, p2)) == Float64
     end
 end
