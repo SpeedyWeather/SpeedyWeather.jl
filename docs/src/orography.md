@@ -181,12 +181,12 @@ orography=(λ,φ) -> H*exp((-(λ-λ₀)^2 - (φ-φ₀)^2)/2σ^2)
 
 note however, that this approximates the distance on the sphere with
 Cartesian coordinates which is here not too bad as we are not too far north
-(where longitude distance become considerably shorter) and also as
+(where longitudinal distances would become considerably shorter) and also as
 we are far away from the prime meridian. If ``\lambda_0 = 0`` in the example
 above then calculating ``\lambda - \lambda_0`` for ``\lambda = 359˚E``
-is really far even though ``\lambda`` is actually relatively close to
-the prime meridian. To avoid this problem, we define a function called
-`spherical_distance` (inputs in degrees, output in meters) to actually
+yields a really far distance even though ``\lambda`` is actually relatively close to
+the prime meridian. To avoid this problem, SpeedyWeather (actually RingGrids)
+defines a function called `spherical_distance` (inputs in degrees, output in meters) to actually
 calculate the [great-circle distance](https://en.wikipedia.org/wiki/Great-circle_distance)
 or spherical distance. Compare
 
