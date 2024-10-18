@@ -134,7 +134,7 @@ initial_conditions = InitialConditions(
                         pres=PressureOnOrography())
 
 orography = NoOrography()
-model = PrimitiveDryModel(; spectral_grid, initial_conditions, orography physics=false)
+model = PrimitiveDryModel(; spectral_grid, initial_conditions, orography, physics=false)
 simulation = initialize!(model)
 run!(simulation, period=Day(10))
 nothing # hide
