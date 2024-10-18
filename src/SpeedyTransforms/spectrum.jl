@@ -1,3 +1,6 @@
+"""$(TYPEDSIGNATURES)
+Compute the power spectrum of the spherical harmonic coefficients
+`alms` (lower triangular matrix) of type `Complex{NF}`."""
 function power_spectrum(alms::LowerTriangularMatrix{Complex{NF}};
                         normalize::Bool=true) where NF
     
