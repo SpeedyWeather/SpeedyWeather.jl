@@ -42,7 +42,7 @@ grid_types = [FullGaussianGrid, OctahedralClenshawGrid] # one full and one reduc
 
             # finite difference comparision
 
-            fd_jvpi = j′vp(central_fdm(5,1), x -> transform(x, S), specs, grid)
+            fd_jvp = j′vp(central_fdm(5,1), x -> transform(x, S), specs, grid)
  
         end 
     end 
