@@ -171,6 +171,47 @@ as illustrated in the spectral representation or the surface geopotential
 here. This is because scalar fields do not use that last degree,
 see [One more degree for spectral fields](@ref).
 
+## Spherical distance
+
+In the example above we have defined the "Super Hawaii orography" as
+
+```julia
+orography=(λ,φ) -> H*exp((-(λ-λ₀)^2 - (φ-φ₀)^2)/2σ^2)
+```
+
+note however, that this approximates the distance on the sphere with
+Cartesian coordinates which is here not too bad as we are not too far north
+(where longitudinal distances would become considerably shorter) and also as
+we are far away from the prime meridian. If ``\lambda_0 = 0`` in the example
+above then calculating ``\lambda - \lambda_0`` for ``\lambda = 359˚E``
+yields a really far distance even though ``\lambda`` is actually relatively close to
+the prime meridian. To avoid this problem, SpeedyWeather (actually RingGrids)
+defines a function called `spherical_distance` (inputs in degrees, output in meters) to actually
+calculate the [great-circle distance](https://en.wikipedia.org/wiki/Great-circle_distance)
+or spherical distance. Compare
+
+```@example orography
+λ₀ = 0         # move "Super Hawaii" mountain onto the prime meridian
+set!(model, orography=(λ,φ) -> H*exp((-(λ-λ₀)^2 - (φ-φ₀)^2)/2σ^2))
+heatmap(model.orography.orography, title="Mountain on prime meridian, cartesian coordinates")
+save("mountain_cartesian.png", ans) # hide
+nothing # hide
+```
+![Mountain in cartesian coordinates](mountain_cartesian.png)
+
+which clearly shows that the mountain is only on the Eastern hemisphere
+(the signal on the western hemisphere is due to the interpolation during plotting)
+-- probably not what you wanted. Rewrite this as
+
+```@example orography
+λ₀ = 0         # move "Super Hawaii" mountain onto the prime meridian
+set!(model, orography=(λ,φ) -> H*exp(-spherical_distance((λ,φ), (λ₀,φ₀), radius=1)^2/2σ^2))
+heatmap(model.orography.orography, title="Mountain on prime meridian, spherical distance")
+save("mountain_spherical.png", ans) # hide
+nothing # hide
+```
+![Mountain in spherical coordinates](mountain_spherical.png)
+
 ## Defining a new orography type
 
 You can also define a new orography like we defined `ZonalRidge` or `EarthOrography`.
