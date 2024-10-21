@@ -115,6 +115,7 @@ include("dynamics/scaling.jl")
 include("dynamics/tendencies.jl")
 include("dynamics/hole_filling.jl")
 include("dynamics/particle_advection.jl")
+include("dynamics/random_process.jl")
 
 # PARAMETERIZATIONS
 include("physics/albedo.jl")
