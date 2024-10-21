@@ -120,7 +120,7 @@ is more convenient, for example you can do
 set!(model, orography=(λ,φ) -> 2000*cosd(φ) + 300*sind(λ) + 100*randn())
 
 using CairoMakie
-heatmap(model.orography.orography, title="Zonal 2000m ridge with noise")
+heatmap(model.orography.orography, title="Zonal 2000m ridge [m] with noise")
 save("orography_set.png", ans) # hide
 nothing # hide
 ```
@@ -148,7 +148,7 @@ initialize!(model.orography, model)                 # initially that reset orogr
 # blow up Hawaii by adding a 4000m peak on a 10˚x10˚ large island
 H, λ₀, φ₀, σ = 4000, 200, 20, 5         # height, lon, lat position, and width
 set!(model, orography=(λ,φ) -> H*exp((-(λ-λ₀)^2 - (φ-φ₀)^2)/2σ^2), add=true)
-heatmap(model.orography.orography, title="Super Hawaii orography")
+heatmap(model.orography.orography, title="Super Hawaii orography [m]")
 save("orography_hawaii.png", ans) # hide
 nothing # hide
 ```
@@ -162,6 +162,7 @@ in the surface geopotential `orography.geopot_surf`
 transform!(orography.geopot_surf, orography.orography, model.spectral_transform)
 orography.geopot_surf .*= model.planet.gravity
 spectral_truncation!(orography.geopot_surf)
+nothing # hide
 ```
 
 In the first line, the surface geopotential is still missing the gravity,
@@ -170,6 +171,53 @@ removes the ``l_{max}+1`` degree of the spherical harmonics
 as illustrated in the spectral representation or the surface geopotential
 here. This is because scalar fields do not use that last degree,
 see [One more degree for spectral fields](@ref).
+
+## Spherical distance
+
+In the example above we have defined the "Super Hawaii orography" as
+
+```julia
+orography=(λ,φ) -> H*exp((-(λ-λ₀)^2 - (φ-φ₀)^2)/2σ^2)
+```
+
+note however, that this approximates the distance on the sphere with
+Cartesian coordinates which is here not too bad as we are not too far north
+(where longitudinal distances would become considerably shorter) and also as
+we are far away from the prime meridian. If ``\lambda_0 = 0`` in the example
+above then calculating ``\lambda - \lambda_0`` for ``\lambda = 359˚E``
+yields a really far distance even though ``\lambda`` is actually relatively close to
+the prime meridian. To avoid this problem, SpeedyWeather (actually RingGrids)
+defines a function called `spherical_distance` (inputs in degrees, output in meters) to actually
+calculate the [great-circle distance](https://en.wikipedia.org/wiki/Great-circle_distance)
+or spherical distance. Compare
+
+```@example orography
+λ₀ = 0         # move "Super Hawaii" mountain onto the prime meridian
+set!(model, orography=(λ,φ) -> H*exp((-(λ-λ₀)^2 - (φ-φ₀)^2)/2σ^2))
+heatmap(model.orography.orography, title="Mountain [m] on prime meridian, cartesian coordinates")
+save("mountain_cartesian.png", ans) # hide
+nothing # hide
+```
+![Mountain in cartesian coordinates](mountain_cartesian.png)
+
+which clearly shows that the mountain is only on the Eastern hemisphere
+-- probably not what you wanted. Note also that because we did not provide
+`add=true` the orography we set through `set!` overwrites the previous
+orography (`add=false` is the default). Rewrite this as
+
+```@example orography
+λ₀ = 0         # move "Super Hawaii" mountain onto the prime meridian
+set!(model, orography=(λ,φ) -> H*exp(-spherical_distance((λ,φ), (λ₀,φ₀), radius=360/2π)^2/2σ^2))
+heatmap(model.orography.orography, title="Mountain [m] on prime meridian, spherical distance")
+save("mountain_spherical.png", ans) # hide
+nothing # hide
+```
+![Mountain in spherical coordinates](mountain_spherical.png)
+
+And the mountain also shows up on the western hemisphere! Note that we could have defined
+the width ``\sigma`` of the mountain in meters, or we keep using degrees as before
+but then use `radius = 360/2π` to convert radians into degrees. If you set `radius=1`
+then radians are returned and so we could have defined ``\sigma`` in terms of radians too.
 
 ## Defining a new orography type
 

@@ -293,6 +293,44 @@ function initialize!(   progn::PrognosticVariables{NF},
     return nothing
 end
 
+export RossbyHaurwitzWave
+
+"""Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
+with an additional cut-off amplitude `c` to filter out tiny harmonics in the vorticity field.
+Parameters are $(TYPEDFIELDS)"""
+@kwdef struct RossbyHaurwitzWave <: AbstractInitialConditions
+    m::Int = 4
+    ω::Float64 = 7.848e-6
+    K::Float64 = 7.848e-6
+    c::Float64 = 1e-10
+end
+
+"""$(TYPEDSIGNATURES)
+Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
+with an additional cut-off amplitude `c` to filter out tiny harmonics in the vorticity field."""
+function initialize!(
+    progn::PrognosticVariables,
+    initial_conditions::RossbyHaurwitzWave,
+    model::AbstractModel,
+)
+    (; m, ω, K, c) = initial_conditions
+    (; geometry) = model
+
+    # Rossby-Haurwitz wave defined through vorticity ζ as a function of
+    # longitude λ, latitude θ (in degrees), sigma level σ (vertically constant though)
+    # see Williamson et al. 1992, J Computational Physics, eq 145
+    ζ(λ, θ, σ) = 2ω*sind(θ) - K*sind(θ)*cosd(θ)^m*(m^2 + 3m + 2)*cosd(m*λ)
+    set!(progn, geometry, vor = ζ)
+    set!(progn, geometry, div = 0)  # technically not needed, but set to zero for completeness
+
+    # filter low values below cutoff amplitude c
+    vor = progn.vor[1]  # 1 = first leapfrog timestep
+    low_values = abs.(vor) .< c
+    vor[low_values] .= 0
+
+    return nothing
+end
+
 export JablonowskiTemperature
 
 """
