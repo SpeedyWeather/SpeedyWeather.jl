@@ -162,9 +162,9 @@ function SpectralTransform(
 
     for (j, nlon) in enumerate(nlons)
         real_matrix_input = view(fake_grid_data.data, rings[j], :)
-        complex_matrix_input = view(scratch_memory_north, 1:nlon÷2 + 1, :, 1)
+        complex_matrix_input = view(scratch_memory_north, 1:nlon÷2 + 1, :, j)
         real_vector_input = view(fake_grid_data.data, rings[j], 1)
-        complex_vector_input = view(scratch_memory_north, 1:nlon÷2 + 1, 1, 1)
+        complex_vector_input = view(scratch_memory_north, 1:nlon÷2 + 1, 1, j)
 
         rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1)
         brfft_plans[j] = FFT_package.plan_brfft(complex_matrix_input, nlon, 1)
@@ -478,6 +478,7 @@ function transform(
     kwargs...                                   # arguments for SpectralTransform constructor
 )
     S = SpectralTransform(specs; kwargs...)     # precompute transform
+
     return transform(specs, S; unscale_coslat)  # do the transform
 end
 
