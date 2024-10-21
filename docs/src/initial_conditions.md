@@ -8,9 +8,11 @@ are three ways to do this
 2. Use the `set!` function
 3. Set the `initial_conditions` component of a model
 
-where 1 is a rather low-level, the `set!` function builds a convenient
-interface around 1 (so you don't have to know about grid and spectral space details)
-and 3 collects method 1 or 2 (or a combination of both) into a single struct
+where 1 is a rather low-level and largely requires you to directly set the
+complex coefficients of the spherical harmonics (advanced!).
+So the `set!` function builds a convenient interface around 1 such that you
+don't have to know about details of grid or spectral space.
+3 then collects method 1 or 2 (or a combination of both) into a single struct
 to "save" some initial conditions for one or several variables.
 This lets you use predefined (inside SpeedyWeather or externally) initial conditions
 as easy as `initial_conditions = RossbyHaurwitzWave()`.
@@ -32,30 +34,35 @@ simulation = initialize!(model)
 Now `simulation.prognostic_variables` contains already some
 initial conditions as defined by `model.initial_conditions` (that's method 3).
 Regardless of what those are, we can still mutate them
-before starting a simulation. The Rossby-Haurwitz wave[^Williamson92] is
-defined as an initial condition for vorticity ``\zeta`` (which is the sole
-prognostic variable in the barotropic vorticity model) as
+before starting a simulation, but if you (re-)initialize the model,
+the initial conditions will be set back to what's defined in `model.initial_conditions.
+We will illustrate the `set!` function now that conveniently lets you (re)set the
+current state of the prognostic variables:
+
+The Rossby-Haurwitz wave[^Williamson92] is defined as an initial condition for
+vorticity ``\zeta`` (which is the sole prognostic variable in the
+barotropic vorticity model) as
 
 ```math
 ζ(λ, θ) = 2ω*\sin(θ) - K*\sin(θ)*\cos(θ)^R*(R^2 + 3R + 2)*\cos(R*λ)
 ```
 with longitude ``\lambda`` and latitude ``\theta``. The parameters
-are order ``R = 4``, frequencies ``\omega = 7.848e-6s^{-1}, K = 7.848e-6s^{-1}``.
+are order ``m = 4``, frequencies ``\omega = 7.848e-6s^{-1}, K = 7.848e-6s^{-1}``.
 Now setting these initial conditions is as simple as
 
 ```@example haurwitz
-R = 4
+m = 4
 ω = 7.848e-6
 K = 7.848e-6
 
-ζ(λ, θ, σ) = 2ω*sind(θ) - K*sind(θ)*cosd(θ)^R*(R^2 + 3R + 2)*cosd(R*λ)
+ζ(λ, θ, σ) = 2ω*sind(θ) - K*sind(θ)*cosd(θ)^m*(m^2 + 3m + 2)*cosd(m*λ)
 set!(simulation, vor=ζ)
 ```
 
 with only two difference from the mathematical notation. (1) SpeedyWeather's
 coordinates are in degrees, so we replaced ``\sin, \cos`` with `sind` and `cosd`;
 and (2) To generalise to vertical coordinates, the function `ζ(λ, θ, σ)` takes
-exactly three arguments, with `σ` denoting the vertical [Sigma coordinates](@ref).
+*exactly* three arguments, with `σ` denoting the vertical [Sigma coordinates](@ref).
 This is important so that we can use the same definition of initial conditions
 for the 2D barotropic vorticity model also for the 3D primitive equations.
 
@@ -96,19 +103,25 @@ That's the Rossby-Haurwitz wave! This wave is supposed to travel
 a simulation for some days
 
 ```@example haurwitz
-run!(simulation, period=Day(10))
+run!(simulation, period=Day(3))
 
 # a running simulation always transforms spectral variables
 # so we don't have to do the transform manually but just pull 
 # layer 1 (there's only 1) from the diagnostic variables
 vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
 
-heatmap(vor, title="Relative vorticity [1/s], Rossby Haurwitz wave after 10 days")
+heatmap(vor, title="Relative vorticity [1/s], Rossby Haurwitz wave after 3 days")
 save("haurwitz_day10.png", ans) # hide
 nothing # hide
 ```
 ![Rossby-Haurwitz wave after day 10](haurwitz_day10.png)
 
+Looks like before, but shifted eastward! That's the Rossby-Haurwitz wave.
+The `set!` function accepts not just a function as outlined above, but also
+scalars, like `set!(simulation, div=0)` (which is always the case in the
+`BarotropicModel`) or grids, or `LowerTriangularArray`s representing
+variables in the spectral space. See `?set!`, the `set!` docstring for more
+details.
 
 ## Rossby-Haurwitz wave in primitive equations
 
@@ -137,7 +150,7 @@ initial_conditions = InitialConditions(
 orography = NoOrography(spectral_grid)
 model = PrimitiveDryModel(; spectral_grid, initial_conditions, orography, physics=false)
 simulation = initialize!(model)
-run!(simulation, period=Day(10))
+run!(simulation, period=Day(5))
 nothing # hide
 ```
 
@@ -147,7 +160,7 @@ Note that we chose a lower resolution here (T42) as we are simulating
 
 ```@example haurwitz
 vor = simulation.diagnostic_variables.grid.vor_grid[:, 8]
-heatmap(vor, title="Relative vorticity [1/s]")
+heatmap(vor, title="Relative vorticity [1/s], primitive Rossby-Haurwitz wave")
 
 save("haurwitz_primitive.png", ans) # hide
 nothing # hide
@@ -156,7 +169,7 @@ nothing # hide
 
 As you can see the actual Rossby-Haurwitz wave is not as stable anymore
 (because those initial conditions are not a stable solution of the primitive equations)
-and so the 10-day integration looks very different from the barotropic model!
+and so the 3-day integration looks already different from the barotropic model!
 
 ## References
 
