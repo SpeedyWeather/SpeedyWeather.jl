@@ -44,7 +44,7 @@ vorticity ``\zeta`` (which is the sole prognostic variable in the
 barotropic vorticity model) as
 
 ```math
-ζ(λ, θ) = 2ω*\sin(θ) - K*\sin(θ)*\cos(θ)^R*(R^2 + 3R + 2)*\cos(R*λ)
+ζ(λ, θ) = 2ω*\sin(θ) - K*\sin(θ)*\cos(θ)^m*(m^2 + 3m + 2)*\cos(m*λ)
 ```
 with longitude ``\lambda`` and latitude ``\theta``. The parameters
 are order ``m = 4``, frequencies ``\omega = 7.848e-6s^{-1}, K = 7.848e-6s^{-1}``.

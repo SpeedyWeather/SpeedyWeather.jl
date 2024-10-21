@@ -299,7 +299,7 @@ export RossbyHaurwitzWave
 with an additional cut-off amplitude `c` to filter out tiny harmonics in the vorticity field.
 Parameters are $(TYPEDFIELDS)"""
 @kwdef struct RossbyHaurwitzWave <: AbstractInitialConditions
-    R::Int = 4
+    m::Int = 4
     ω::Float64 = 7.848e-6
     K::Float64 = 7.848e-6
     c::Float64 = 1e-10
@@ -313,13 +313,13 @@ function initialize!(
     initial_conditions::RossbyHaurwitzWave,
     model::AbstractModel,
 )
-    (; R, ω, K, c) = initial_conditions
+    (; m, ω, K, c) = initial_conditions
     (; geometry) = model
 
     # Rossby-Haurwitz wave defined through vorticity ζ as a function of
     # longitude λ, latitude θ (in degrees), sigma level σ (vertically constant though)
     # see Williamson et al. 1992, J Computational Physics, eq 145
-    ζ(λ, θ, σ) = 2ω*sind(θ) - K*sind(θ)*cosd(θ)^R*(R^2 + 3R + 2)*cosd(R*λ)
+    ζ(λ, θ, σ) = 2ω*sind(θ) - K*sind(θ)*cosd(θ)^m*(m^2 + 3m + 2)*cosd(m*λ)
     set!(progn, geometry, vor = ζ)
     set!(progn, geometry, div = 0)  # technically not needed, but set to zero for completeness
 
