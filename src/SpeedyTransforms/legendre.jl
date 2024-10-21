@@ -9,9 +9,9 @@
     isoddlmax = isodd(length(lmax))
     lmax_even = length(lmax) - isoddlmax    # if lmax is odd do last odd element after the loop
 
-    @boundscheck axes(north) == axes(south) || throw(DimensionMismatch)
-    @boundscheck axes(specs, 1) == axes(legendre) || throw(DimensionMismatch)
-    @boundscheck axes(specs, 2) <= axes(north) || throw(DimensionMismatch)
+    @boundscheck size(north) == size(south) || throw(DimensionMismatch)
+    @boundscheck size(specs, 1) == length(legendre) || throw(DimensionMismatch)
+    @boundscheck size(specs, 2) <= length(north) || throw(DimensionMismatch)
     
     @inbounds for k in nlayers
         # "even" and "odd" coined with 0-based indexing, i.e. the even l=0 mode is 1st element
@@ -91,7 +91,7 @@ function _legendre!(
 end
 
 # (forward) Legendre kernel, called from _legendre!
-function _fused_oddeven_outer_product_accumulate!(
+@inline function _fused_oddeven_outer_product_accumulate!(
     specs::AbstractMatrix,      # output, accumulated spherical harmonic coefficients
     legendre::AbstractVector,   # input, Legendre polynomials
     even::AbstractVector,       # input, even harmonics
@@ -100,6 +100,10 @@ function _fused_oddeven_outer_product_accumulate!(
     lmax, nlayers = size(specs)
     isoddlmax = isodd(lmax)
     lmax_even = lmax - isoddlmax
+
+    @boundscheck size(odd) == size(even) || throw(DimensionMismatch)
+    @boundscheck size(specs, 1) == length(legendre) || throw(DimensionMismatch)
+    @boundscheck size(specs, 2) <= length(even) || throw(DimensionMismatch)
 
     @inbounds for k in 1:nlayers
         even_k, odd_k = even[k], odd[k]
