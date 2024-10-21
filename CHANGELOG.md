@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Rossby-Haurwitz wave initial conditions [#591](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/591)
 - Haversine formula and AbstractSphericalDistance [#588](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/588)
 - Array-agnostic SpectralTransform [#583](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/583)
 - Move CUDA dependency into extension [#586](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/586)

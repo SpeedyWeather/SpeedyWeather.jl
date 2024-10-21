@@ -18,7 +18,7 @@ struct Haversine <: AbstractSphericalDistance end
 Haversine formula calculating the great-circle or spherical distance (in meters) on the sphere
 between two tuples of  longitude-latitude points in degrees ˚E, ˚N. Use keyword argument `radius`
 to change the radius of the sphere (default 6371e3 meters, Earth's radius), use `radius=1`
-to return the central angle in radians."""
+to return the central angle in radians or `radius=360/2π` to return degrees."""
 function Haversine(             # functor for Haversine struct
     lonlat1::Tuple,             # point 1 in spherical coordinates
     lonlat2::Tuple;             # point 2
