@@ -56,6 +56,26 @@ end
                 @test size(L.data) == size(L, as=Vector)
                 @test size(L)[2:end] == size(A)[3:end]
                 @test size(L)[1] == SpeedyWeather.LowerTriangularMatrices.nonzeros(size(A,1), size(A,2))
+                
+                # with integer to request length of one specific dimension
+                @test size(L)[1] == size(L, 1)
+                @test size(L)[1] == size(L, 1, as=Vector)
+                @test size(L)[1] == size(L, 1, OneBased, as=Vector)
+
+                @test size(L, 1, as=Matrix) == lmax
+                @test size(L, 2, as=Matrix) == mmax
+                @test size(L, 1, ZeroBased, as=Matrix) == lmax-1
+                @test size(L, 2, ZeroBased, as=Matrix) == mmax-1
+
+                # all additional dimensions are or size 1, as defined for Array too
+                @test size(L, 2+length(idims)) == 1
+                @test size(L, 3+length(idims)) == 1
+                @test size(L, 4+length(idims)) == 1
+                @test size(L, 5+length(idims)) == 1
+
+                @test size(L, 3+length(idims), as=Matrix) == 1
+                @test size(L, 4+length(idims), as=Matrix) == 1
+                @test size(L, 5+length(idims), as=Matrix) == 1
 
                 for m in 1:mmax
                     for l in 1:lmax

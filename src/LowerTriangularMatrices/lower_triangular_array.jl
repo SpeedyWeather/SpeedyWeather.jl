@@ -55,18 +55,31 @@ abstract type OneBased <: IndexBasis end
 # get matrix size of LTA from its data array and m, n (number of rows and columns)
 matrix_size(data::AbstractArray, m::Integer, n::Integer) = (m, n, size(data)[2:end]...)
 
+# extend to get the size of the i-th dimension, with 1 returned for any additional dimension
+# as it is also defined for Array
+function matrix_size(data::AbstractArray, m::Integer, n::Integer, i::Integer)
+    i == 1 && return m      # first dimension is the number of rows m
+    i == 2 && return n      # second dimension is the number of columns n
+    return size(data, i-1)  # -1 as m, n are collapsed into a vector in the data array
+end 
+
 """$(TYPEDSIGNATURES)
 Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
 and as if it were a full matrix when `as <: AbstractMatrix`` ."""
 Base.size(L::LowerTriangularArray, base::Type{<:IndexBasis}=OneBased; as=Vector) = size(L, base, as)
-Base.size(L::LowerTriangularArray, i::Integer, base::Type{<:IndexBasis}=OneBased; as=Vector) = size(L, base; as=as)[i]
+Base.size(L::LowerTriangularArray, i::Integer, base::Type{<:IndexBasis}=OneBased; as=Vector) = size(L, i, base, as)
 
 # use multiple dispatch to chose the right options of basis and vector/flat vs matrix indexing
 # matrix indexing can be zero based (natural for spherical harmonics) or one-based,
-# vector/flat indexing has only one based indexing
+# vector/flat indexing has only one-based indexing
 Base.size(L::LowerTriangularArray, base::Type{OneBased}, as::Type{Matrix}) = matrix_size(L.data, L.m, L.n)
 Base.size(L::LowerTriangularArray, base::Type{ZeroBased}, as::Type{Matrix}) = matrix_size(L.data, L.m-1, L.n-1)
 Base.size(L::LowerTriangularArray, base::Type{OneBased}, as::Type{Vector}) = size(L.data)
+
+# size(L, i, ...) to get the size of the i-th dimension, with 1 returned for any additional dimension 
+Base.size(L::LowerTriangularArray, i::Integer, base::Type{OneBased}, as::Type{Matrix}) = matrix_size(L.data, L.m, L.n, i)
+Base.size(L::LowerTriangularArray, i::Integer, base::Type{ZeroBased}, as::Type{Matrix}) = matrix_size(L.data, L.m-1, L.n-1, i)
+Base.size(L::LowerTriangularArray, i::Integer, base::Type{OneBased}, as::Type{Vector}) = size(L.data, i)
 
 # sizeof the underlying data vector
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)

@@ -162,9 +162,9 @@ function SpectralTransform(
 
     for (j, nlon) in enumerate(nlons)
         real_matrix_input = view(fake_grid_data.data, rings[j], :)
-        complex_matrix_input = view(scratch_memory_north, 1:nlon÷2 + 1, :, 1)
+        complex_matrix_input = view(scratch_memory_north, 1:nlon÷2 + 1, :, j)
         real_vector_input = view(fake_grid_data.data, rings[j], 1)
-        complex_vector_input = view(scratch_memory_north, 1:nlon÷2 + 1, 1, 1)
+        complex_vector_input = view(scratch_memory_north, 1:nlon÷2 + 1, 1, j)
 
         rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1)
         brfft_plans[j] = FFT_package.plan_brfft(complex_matrix_input, nlon, 1)
@@ -346,14 +346,15 @@ ismatching(G::AbstractGridArray,    S::SpectralTransform) = ismatching(S, G)
 
 function Base.DimensionMismatch(S::SpectralTransform, L::LowerTriangularArray)
     s = "SpectralTransform for $(S.lmax+1)x$(S.mmax+1)x$(S.nlayers) LowerTriangularArrays "*
-        "and $(Base.dims2string(size(L, as=Matrix))) "*
+        "with $(Base.dims2string(size(L, as=Matrix))) "*
         "LowerTriangularArray do not match."
     return DimensionMismatch(s)
 end
 
-function Base.DimensionMismatch(S::SpectralTransform{NF1}, G::AbstractGridArray{NF2}) where {NF1, NF2}
-    s = "SpectralTransform{$NF1}($(S.Grid), nlat_half=$(S.nlat_half)) and "*
-        "$(RingGrids.nonparametric_type(G)){$NF2} with nlat_half=$(G.nlat_half) do not match."
+function Base.DimensionMismatch(S::SpectralTransform, G::AbstractGridArray)
+    sz = (RingGrids.get_npoints2D(S.Grid, S.nlat_half), S.nlayers)
+    s = "SpectralTransform for $(Base.dims2string(sz)) $(S.Grid) with "*
+        "$(Base.dims2string(size(G))) $(RingGrids.nonparametric_type(G)) do not match."
     return DimensionMismatch(s)
 end
 
@@ -398,6 +399,10 @@ function transform!(                    # SPECTRAL TO GRID
     S::SpectralTransform;               # precomputed transform
     unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
 )
+    # catch incorrect sizes early
+    @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
+    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
+
     # use scratch memory for Legendre but not yet Fourier-transformed data
     g_north = S.scratch_memory_north    # phase factors for northern latitudes
     g_south = S.scratch_memory_south    # phase factors for southern latitudes
@@ -424,6 +429,10 @@ function transform!(                    # GRID TO SPECTRAL
     grids::AbstractGridArray,           # input: gridded values
     S::SpectralTransform,               # precomputed spectral transform
 )
+    # catch incorrect sizes early
+    @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
+    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
+
     # use scratch memory for Fourier but not yet Legendre-transformed data
     f_north = S.scratch_memory_north    # phase factors for northern latitudes
     f_south = S.scratch_memory_south    # phase factors for southern latitudes
@@ -478,6 +487,7 @@ function transform(
     kwargs...                                   # arguments for SpectralTransform constructor
 )
     S = SpectralTransform(specs; kwargs...)     # precompute transform
+
     return transform(specs, S; unscale_coslat)  # do the transform
 end
 
