@@ -93,6 +93,9 @@ function Base.show(io::IO, SG::SpectralGrid)
       print(io, "└ Device:     $(typeof(device)) using $ArrayType")
 end
 
+# also allow spectral grid to be passed on as first an only positional argument to model constructors
+(M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(spectral_grid=SG; kwargs...)
+
 """
 $(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""
