@@ -115,7 +115,8 @@ SpectralTransform{Float32, Array}:
 ├ Spectral:   T42, 44x43 LowerTriangularMatrix{Complex{Float32}}
 ├ Grid:       64-ring OctahedralGaussianArray{Float32}
 ├ Truncation: dealiasing = 1.98 (linear)
-└ Legendre:   recompute polynomials false (128.68 KB)
+├ Legendre:   Polynomials 126.66 KB, shortcut: linear
+└ Memory:     for 1 layers (38.73 KB)
 
 model.implicit
 ImplicitShallowWater{Float32} <: SpeedyWeather.AbstractImplicit
@@ -165,7 +166,7 @@ Feedback <: AbstractFeedback
 ├ start::Int64 = 0
 ├ barlen::Nothing = nothing
 ├ barglyphs::ProgressMeter.BarGlyphs = ProgressMeter.BarGlyphs('|', '█', ['▏', '▎', '▍', '▌', '▋', '▊', '▉'], ' ', '|')
-└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0004 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (140315293570128, 140316598563536, 2152)), 0, 1, false, false, 1.729216299325792e9, 1.729216299325792e9, 1.729216299325792e9)
+└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0004 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (0, 0, 144556828538)), 0, 1, false, false, 1.729583294521899e9, 1.729583294521899e9, 1.729583294521899e9)
 ├ progress_txt::Nothing = nothing
 └ nars_detected::Bool = false
 
