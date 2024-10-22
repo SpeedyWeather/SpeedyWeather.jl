@@ -66,9 +66,8 @@ UnicodePlots = "3.3"
 julia = "1.10"
 
 [extras]
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 JLArrays = "27aeb0d3-9eb9-45fb-866b-73c2ecf80fcb"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "JLArrays", "CUDA"]
+test = ["Test", "JLArrays"]
