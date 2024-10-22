@@ -1,0 +1,195 @@
+SpectralGrid:
+├ Spectral:   T127 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
+├ Grid:       192-ring OctahedralGaussianGrid{Float32}, 40320 grid points
+├ Resolution: 112km (average), 100km × 104km (Equator)
+└ Vertical:   1-level SigmaCoordinates
+Earth <: AbstractPlanet
+├ rotation::Float64 = 7.29e-5
+├ gravity::Float64 = 9.81
+├ daily_cycle::Bool = true
+├ length_of_day::Float64 = 24.0
+├ seasonal_cycle::Bool = true
+├ length_of_year::Float64 = 365.25
+├ equinox::DateTime = 2000-03-20T00:00:00
+└ axial_tilt::Float64 = 23.4
+EarthAtmosphere
+├ mol_mass_dry_air::Float64 = 28.9649
+├ mol_mass_vapour::Float64 = 18.0153
+├ cₚ::Float64 = 1004.0
+├ R_gas::Float64 = 8.3145
+├ R_dry::Float64 = 287.05433127682124
+├ R_vapour::Float64 = 461.52437095135804
+├ water_density::Float64 = 1000.0
+├ latent_heat_condensation::Float64 = 2.501e6
+├ latent_heat_sublimation::Float64 = 2.801e6
+├ stefan_boltzmann::Float64 = 5.67e-8
+├ lapse_rate::Float64 = 5.0
+├ temp_ref::Float64 = 288.0
+├ temp_top::Float64 = 216.0
+├ ΔT_stratosphere::Float64 = 480000.0
+├ σ_tropopause::Float64 = 0.2
+├ σ_boundary_layer::Float64 = 0.93
+├ scale_height::Float64 = 7.5
+├ pres_ref::Float64 = 1000.0
+├ scale_height_humid::Float64 = 2.5
+├ relhumid_ref::Float64 = 0.7
+├ water_pres_ref::Float64 = 17.0
+└ layer_thickness::Float64 = 8.5
+Leapfrog{Float32} <: TimeStepper
+├ trunc::Int64 = 127
+├ Δt_at_T31::Second = 1800 seconds
+├ radius::Float32 = 6.371e6
+├ adjust_with_output::Bool = true
+├ robert_filter::Float32 = 0.05
+├ williams_filter::Float32 = 0.53
+├ Δt_millisec::Dates.Millisecond = 450000 milliseconds
+├ Δt_sec::Float32 = 450.0
+└ Δt::Float32 = 7.063255e-5
+OutputWriter{Float32, ShallowWater}
+├ spectral_grid::SpectralGrid = SpectralGrid:
+├ Spectral:   T127 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
+├ Grid:       192-ring OctahedralGaussianGrid{Float32}, 40320 grid points
+├ Resolution: 112km (average), 100km × 104km (Equator)
+└ Vertical:   1-level SigmaCoordinates
+├ output::Bool = true
+├ path::String = /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/docs/build
+├ id::String = 0006
+├ run_path::String = /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/docs/build/run_0006
+├ filename::String = output.nc
+├ write_restart::Bool = true
+├ pkg_version::VersionNumber = 0.7.0
+├ startdate::DateTime = 2000-01-01T00:00:00
+├ output_dt::Second = 43200 seconds
+├ missing_value::Float32 = NaN
+├ compression_level::Int64 = 3
+├ shuffle::Bool = true
+├ keepbits::SpeedyWeather.Keepbits = SpeedyWeather.Keepbits
+├ u::Int64 = 7
+├ v::Int64 = 7
+├ vor::Int64 = 5
+├ div::Int64 = 5
+├ temp::Int64 = 10
+├ pres::Int64 = 12
+├ humid::Int64 = 7
+├ precip_cond::Int64 = 7
+├ precip_conv::Int64 = 7
+└ cloud::Int64 = 7
+├ output_every_n_steps::Int64 = 96
+├ timestep_counter::Int64 = 0
+├ output_counter::Int64 = 1
+├ netcdf_file::NCDatasets.NCDataset{Nothing} = Dataset: /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/docs/build/run_0006/output.nc
+Group: /
+
+Dimensions
+   time = 1
+   lon = 384
+   lat = 192
+   lev = 1
+
+Variables
+  time   (1)
+    Datatype:    DateTime (Float64)
+    Dimensions:  time
+    Attributes:
+     units                = hours since 2000-01-01 00:00:0.0
+     calendar             = proleptic_gregorian
+     long_name            = time
+     standard_name        = time
+
+  lon   (384)
+    Datatype:    Float64 (Float64)
+    Dimensions:  lon
+    Attributes:
+     units                = degrees_east
+     long_name            = longitude
+
+  lat   (192)
+    Datatype:    Float64 (Float64)
+    Dimensions:  lat
+    Attributes:
+     units                = degrees_north
+     long_name            = latitude
+
+  lev   (1)
+    Datatype:    Float32 (Float32)
+    Dimensions:  lev
+    Attributes:
+     units                = 1
+     long_name            = sigma levels
+
+  u   (384 × 192 × 1 × 1)
+    Datatype:    Union{Missing, Float32} (Float32)
+    Dimensions:  lon × lat × lev × time
+    Attributes:
+     units                = m/s
+     long_name            = zonal wind
+     _FillValue           = NaN
+
+  div   (384 × 192 × 1 × 1)
+    Datatype:    Union{Missing, Float32} (Float32)
+    Dimensions:  lon × lat × lev × time
+    Attributes:
+     units                = 1/s
+     long_name            = divergence
+     _FillValue           = NaN
+
+  pres   (384 × 192 × 1)
+    Datatype:    Union{Missing, Float32} (Float32)
+    Dimensions:  lon × lat × time
+    Attributes:
+     units                = m
+     long_name            = interface displacement
+     _FillValue           = NaN
+
+  orography   (384 × 192)
+    Datatype:    Union{Missing, Float32} (Float32)
+    Dimensions:  lon × lat
+    Attributes:
+     units                = m
+     long_name            = orography
+     _FillValue           = NaN
+
+
+├ input_Grid::UnionAll = OctahedralGaussianGrid
+├ as_matrix::Bool = false
+├ quadrant_rotation::NTuple{4, Int64} = (0, 1, 2, 3)
+├ matrix_quadrant::NTuple{4, Tuple{Int64, Int64}} = ((2, 2), (1, 2), (1, 1), (2, 1))
+├ output_Grid::UnionAll = FullGaussianGrid
+├ nlat_half::Int64 = 96
+├ nlon::Int64 = 384
+├ nlat::Int64 = 192
+├ npoints::Int64 = 73728
+├ nlev::Int64 = 1
+└── arrays: output_vars, u, v, vor, div, temp, pres, humid, precip_cond, precip_conv, cloud
+SpeedyWeather.RandomWaves <: InitialConditions
+├ A::Float64 = 2000.0
+├ lmin::Int64 = 10
+└ lmax::Int64 = 20
+HyperDiffusion{Float32}
+├ trunc::Int64 = 127
+├ nlev::Int64 = 1
+├ power::Float64 = 4.0
+├ time_scale::Second = 8640 seconds
+├ resolution_scaling::Float64 = 0.5
+├ power_stratosphere::Float64 = 2.0
+├ tapering_σ::Float64 = 0.2
+├ adaptive::Bool = true
+├ vor_max::Float64 = 0.0001
+├ adaptive_strength::Float64 = 2.0
+└── arrays: ∇²ⁿ_2D, ∇²ⁿ_2D_implicit, ∇²ⁿ, ∇²ⁿ_implicit
+ImplicitShallowWater{Float32} <: AbstractImplicit
+├ trunc::Int64 = 127
+├ α::Float64 = 0.5
+├ H::Base.RefValue{Float32} = Base.RefValue{Float32}(0.0f0)
+├ ξH::Base.RefValue{Float32} = Base.RefValue{Float32}(0.0f0)
+└── arrays: g∇², ξg∇², S⁻¹
+EarthOrography{Float32, OctahedralGaussianGrid{Float32}} <: AbstractOrography
+├ path::String = SpeedyWeather.jl/input_data
+├ file::String = orography.nc
+├ file_Grid::UnionAll = FullGaussianGrid
+├ scale::Float64 = 1.0
+├ smoothing::Bool = false
+├ smoothing_power::Float64 = 1.0
+├ smoothing_strength::Float64 = 0.1
+├ smoothing_truncation::Int64 = 85
+└── arrays: orography, geopot_surf
