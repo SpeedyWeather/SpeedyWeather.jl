@@ -40,7 +40,7 @@ grid_type = grid_types[2]
     @testset "Complete Transform Enzyme" begin
         # make a high level finite difference test of the whole transform
         # can't use Enzyme or ChainRule Test tools for tests for that
-        for grid_type in grids 
+        for grid_type in grid_types
 
             spectral_grid = SpectralGrid(Grid=grid_type)
 
