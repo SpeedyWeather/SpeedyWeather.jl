@@ -45,13 +45,17 @@ grid_type = grid_types[2]
             grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
             dgrid = zero(grid)
             specs = zeros(LowerTriangularArray{Complex{spectral_grid.NF}}, spectral_grid.trunc+2, spectral_grid.trunc+1, spectral_grid.nlayers)
-            dspecs = one(specs)
+            dspecs = zero(specs)
+            fill!(dspecs, 1+1im)
+            dS = deepcopy(S)
 
-            autodiff(Reverse, transform!, Const, Duplicated(specs, dspecs), Duplicated(grid, dgrid), Const(S))
+            autodiff(Reverse, transform!, Const, Duplicated(specs, dspecs), Duplicated(grid, dgrid), Duplicated(S, dS))
+
+            dspecs2 = zero(specs)
+            fill!(dspecs2, 1+1im)
 
             # finite difference comparision, seeded with a one adjoint to get the direct gradient
-            fd_grad = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), one(specs), grid)
-            
+            fd_grad = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dspecs2, grid)
             @test isapprox(dgrid, fd_jvp[1])
         end 
     end 

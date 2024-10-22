@@ -35,7 +35,7 @@ end
 
 ### Custom rule for _fourier!(f_north, f_north, grid, S)
 function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
-    f_north::Duplicated, f_south::Duplicated, grids::Duplicated, S::Const) 
+    f_north::Duplicated, f_south::Duplicated, grids::Duplicated, S::Union{Const, MixedDuplicated}) 
 
     println("Augmented Primal Used") # TODO: remove 
     @show EnzymeRules.overwritten(config)
@@ -56,7 +56,7 @@ function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typ
 end 
 
 function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, tape,
-    f_north::Duplicated, f_south::Duplicated, grids::Duplicated, S::Const)
+    f_north::Duplicated, f_south::Duplicated, grids::Duplicated, S::Union{Const, MixedDuplicated})
 
     println("Custom Reverse Used") # TODO: remove
     @show config 
