@@ -1,21 +1,39 @@
 using SpeedyWeather
 using EnzymeTestUtils, Enzyme
+import EnzymeTestUtils: test_approx
 using FiniteDifferences
 import FiniteDifferences: j′vp, grad, central_fdm
+import AbstractFFTs
 
 grid_types = [FullGaussianGrid, OctahedralClenshawGrid] # one full and one reduced grid 
-grid_type = grid_types[2]
+
+# currenlty there's an issue with EnzymeTestUtils not being able to work with structs with undefined fields like FFT plans
+# https://github.com/EnzymeAD/Enzyme.jl/issues/1992
+# This is a very hacky workaround 
+function EnzymeTestUtils.test_approx(x::AbstractFFTs.Plan, y::AbstractFFTs.Plan, msg; kwargs...)
+    EnzymeTestUtils.@test_msg "$msg: types must match" typeof(x) == typeof(y)
+    names = fieldnames(typeof(x))[1:end-1] # exclude pinv field (which is the last field)
+    if isempty(names)
+        EnzymeTestUtils.@test_msg msg x == y
+    else
+        for k in names
+            if k isa Symbol && hasproperty(x, k)
+                msg_new = "$msg: ::$(typeof(x)).$k"
+            else
+                msg_new = "$msg: getfield(::$(typeof(x)), $k)"
+            end
+            EnzymeTestUtils.test_approx(getfield(x, k), getfield(y, k), msg_new; kwargs...)
+        end
+    end
+    return nothing
+end 
+
 @testset "SpeedyTransforms: AD Rules" begin
 
     @testset "_fourier! Enzyme rules" begin
         
         @testset "reverse rule" begin
-            for grid_type in grid_types,
-                Tf_n in (Const,),
-                Tf_s in (Const,),
-                Tf_grids in (Duplicated,),
-                Tf_S in (Const,),
-                fun in (SpeedyWeather.SpeedyTransforms._fourier!, )
+            for grid_type in grid_types
 
                 spectral_grid = SpectralGrid(Grid=grid_type)
                 S = SpectralTransform(spectral_grid)
@@ -23,16 +41,8 @@ grid_type = grid_types[2]
                 f_north = S.scratch_memory_north
                 f_south = S.scratch_memory_south
 
-                # not working currenlty
-                #test_reverse(fun, Const, (f_north, Tf_n), (f_south, Tf_s), (grid, Tf_grids), (S, Tf_S))
-
-                function speedy_fourier!(f, grid, S)
-                    nothing
-                end 
-
-                #dgrid = zero(grid)
-
-                #autodiff(Reverse, _fourier!, Const, Const(f_north), Const(f_south), Duplicated(grid, dgrid) )
+                # not working currenlty, the test is stuck 
+                #test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const))
             end
         end
     end 
