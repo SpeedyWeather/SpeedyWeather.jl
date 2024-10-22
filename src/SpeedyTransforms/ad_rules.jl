@@ -35,7 +35,7 @@ end
 
 ### Custom rule for _fourier!(f_north, f_north, grid, S)
 function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, 
-    f_north::Const, f_south::Const, grids::Duplicated, S::Const) 
+    f_north::Duplicated, f_south::Duplicated, grids::Duplicated, S::Const) 
 
     println("Augmented Primal Used") # TODO: remove 
     @show EnzymeRules.overwritten(config)
@@ -56,7 +56,7 @@ function augmented_primal(config::EnzymeRules.RevConfigWidth{1}, func::Const{typ
 end 
 
 function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, tape,
-    f_north::Const, f_south::Const, grids::Duplicated, S::Const)
+    f_north::Duplicated, f_south::Duplicated, grids::Duplicated, S::Const)
 
     println("Custom Reverse Used") # TODO: remove
     @show config 
@@ -69,12 +69,12 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
 
     # compute the actual vjp
     dgridval = zero(gridsval)
-    _fourier!(dgridval, scale .* f_north.val, scale .* f_south.val, S.val) # inverse FFT (w/o normalization)
+    _fourier!(dgridval, f_north.dval ./ scale, f_south.dval ./ scale, S.val) # inverse FFT (w/o normalization)
     grids.dval .+= dgridval 
 
     # no derivative wrt the f_north and f_south that were input because they are overwritten
-    #make_zero!(f_north.dval) 
-    #make_zero!(f_south.dval)
+    make_zero!(f_north.dval) 
+    make_zero!(f_south.dval)
 
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing)
