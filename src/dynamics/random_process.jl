@@ -50,20 +50,19 @@ independently. Transformed after every time step to grid space with a
 provided and an independent `random_number_generator` is used
 that is reseeded on every `initialize!`. Fields are $(TYPEDFIELDS)"""
 @kwdef struct SpectralAR1Process{NF} <: AbstractRandomProcess
-    "[OPTION] Time scales of every AR1 process respectively"
-    time_scales::Vector{Second} = [Hour(6 + 2h) for h in 0:10]
+    trunc::Int
+    
+    "[OPTION] Time scale of the AR1 process"
+    time_scale::Second = Hour(6)
 
-    "[OPTION] Wavenumbers of every AR1 process respectively"
-    wavenumbers::Vector{Int} = [26-h for h in 0:10]
+    "[OPTION] Wavenumber of the AR1 process"
+    wavenumber::Int = 12
 
-    "[OPTION] Standard deviations of every AR1 process respectively"
-    standard_deviations::Vector{NF} = [0.4-h/20 for h in 0:10]
+    "[OPTION] Standard deviation of the AR1 process"
+    standard_deviation::NF = 1/3
 
     "[OPTION] Range to clamp values into after every transform into grid space"
     clamp::NTuple{2, NF} = (-1, 1)
-
-    "[OPTION] Function to be called for random number generation"
-    rand_function::Function = randn
 
     "[OPTION] Random number generator seed"
     seed::Int = 123
@@ -71,29 +70,39 @@ that is reseeded on every `initialize!`. Fields are $(TYPEDFIELDS)"""
     "Independent random number generator for this random process"
     random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
 
-    "Precomputed auto-regressive factors [1], function of time scale"
-    autoregressive_factors::Vector{NF} = zeros(NF, length(time_scales))
+    "Precomputed auto-regressive factor [1], function of time scale and model time step"
+    autoregressive_factor::Base.RefValue{NF} = Ref(zero(NF))
 
-    "Precomputed noise factors [1], function of time scale"
-    noise_factors::Vector{NF} = zeros(NF, length(time_scales))
+    "Precomputed noise factors [1] for evert total wavenumber l"
+    noise_factors::Vector{NF} = zeros(NF, trunc+2)
 end
 
 # generator function
-SpectralAR1Process(SG::SpectralGrid, kwargs...) = SpectralAR1Process{SG.NF}(; kwargs...)
+SpectralAR1Process(SG::SpectralGrid; kwargs...) = SpectralAR1Process{SG.NF}(trunc=SG.trunc; kwargs...)
 
 function initialize!(
     process::SpectralAR1Process,
     model::AbstractModel,
 )
-    (; time_scales, wavenumbers, standard_deviations) = process
-    @assert maximum(wavenumbers) <= model.spectral_grid.trunc
-    @assert length(time_scales) == length(wavenumbers) == length(standard_deviations) || throw(DimensionMismatch)
-
+    # auto-regressive factor in the AR1 process
     dt = model.time_stepping.Δt_sec         # in seconds
+    process.autoregressive_factor[] = exp(-dt/Second(process.time_scale).value)
 
-    for (i, (τ, σ)) in enumerate(zip(process.time_scales, process.standard_deviations))
-        process.autoregressive_factors[i] = exp(-dt/Second(τ).value)
-        process.noise_factors[i] = σ*sqrt(1 - exp(-dt/Second(τ).value))
+    # noise factors per total wavenumber in the AR1 process
+    k = process.wavenumber
+    a = process.autoregressive_factor[]
+    σ = process.standard_deviation
+
+    # ECMWF Tech Memorandum 598, Appendix 8, eq. 18
+    # TODO *norm_sphere seems to be needed, maybe ECMWF uses another normalization of the harmonics?
+    F₀_denominator = 2*sum([(2l + 1)*exp(-l*(l+1)/(k*(k+1))) for l in 1:process.trunc])
+    F₀ = sqrt(σ^2 * (1-a^2) / F₀_denominator)*model.spectral_transform.norm_sphere
+
+    for l in eachindex(process.noise_factors)       # total wavenumber, but 1-based
+        eigenvalue = l*(l-1)                        # (negative) eigenvalue l*(l+1) but 1-based l->l-1
+
+        # ECMWF Tech Memorandum 598, Appendix 8, eq. 17
+        process.noise_factors[l] = F₀*exp(-eigenvalue/(2k*(k+1)))
     end
 
     # reseed the random number generator
@@ -107,13 +116,24 @@ function random_process!(
 ) where NF
 
     (; random_pattern) = progn
-    (; wavenumbers, autoregressive_factors, noise_factors) = process
-    (; rand_function) = process
+    lmax, mmax = size(random_pattern, OneBased, as=Matrix)  # max degree l, order m of harmonics (1-based)
 
-    for (l, a, ξ) in zip(wavenumbers, autoregressive_factors,  noise_factors)
-        for m in 0:l-1
-            r = 2rand(process.random_number_generator, Complex{NF}) - (1 + im)
-            random_pattern[l+1, m+1] = a*random_pattern[l+1, m+1] + ξ*r
+    a = process.autoregressive_factor[]
+    RNG = process.random_number_generator
+    s = convert(NF, 2/sqrt(2))              # to scale: std(real(randn(Complex))) = √2/2 to 1
+
+    lm = 0
+    @inbounds for m in 1:mmax
+        for l in m:lmax
+            lm += 1
+
+            # draw from independent N(0,1) in real and imaginary parts
+            r = s*randn(RNG, Complex{NF})   # scale to unit variance in real/imaginary
+
+            # ECMWF Tech Memorandum 598, Appendix 8, eq. 14
+            ξ = process.noise_factors[l]
+            random_pattern[lm] *= a         # auto-regressive term
+            random_pattern[lm] += ξ*r       # noise term
         end
     end
 end
