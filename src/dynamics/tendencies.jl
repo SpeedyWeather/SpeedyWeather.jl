@@ -746,6 +746,9 @@ function SpeedyTransforms.transform!(
     transform!(u_grid, U, S, unscale_coslat=true)
     transform!(v_grid, V, S, unscale_coslat=true)
  
+    # transform random pattern for random process unless NoRandomProcess
+    transform!(diagn, progn, lf, model.random_process, S)
+
     return nothing
 end
 
@@ -783,6 +786,9 @@ function SpeedyTransforms.transform!(
     # transform from U, V in spectral to u, v on grid (U, V = u, v*coslat)
     transform!(u_grid, U, S, unscale_coslat=true)
     transform!(v_grid, V, S, unscale_coslat=true)
+
+    # transform random pattern for random process unless NoRandomProcess
+    transform!(diagn, progn, lf, model.random_process, S)
 
     return nothing
 end
@@ -860,6 +866,11 @@ function SpeedyTransforms.transform!(
         @. u_grid_prev = u_grid
         @. v_grid_prev = v_grid
     end
+
+    # transform random pattern for random process unless NoRandomProcess
+    transform!(diagn, progn, lf, model.random_process, S)
+
+    return nothing
 end
 
 """ 

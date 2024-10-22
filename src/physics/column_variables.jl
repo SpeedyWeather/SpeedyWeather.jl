@@ -65,6 +65,9 @@ function get_column!(
         C.humid[k] = humid_grid_prev[ij, k] 
     end
 
+    # extract value from random pattern for this column
+    C.random_value = D.grid.random_pattern[ij]
+
     # TODO skin = surface approximation for now
     C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
     C.skin_temperature_land = P.land.land_surface_temperature[ij]

@@ -49,6 +49,9 @@ $(TYPEDFIELDS)"""
     const flux_humid_upward::Vector{NF} = zeros(NF, nlayers+1)
     const flux_humid_downward::Vector{NF} = zeros(NF, nlayers+1)
 
+    # random value (scalar) from random pattern controlled by model.random_process
+    random_value::NF = 0
+
     # boundary layer
     boundary_layer_depth::Int = 0
     boundary_layer_drag::NF = 0

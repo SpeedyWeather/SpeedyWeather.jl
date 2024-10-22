@@ -175,6 +175,10 @@ function leapfrog!(
         spectral_truncation!(var_tend)
         leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
     end
+
+    # evolve the random pattern in time
+    random_process!(progn, model.random_process)
+    return nothing
 end
 
 """

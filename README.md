@@ -7,10 +7,12 @@
 [![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/dev/)
 
 SpeedyWeather.jl is a global spectral atmospheric model with simple physics which is developed as a research playground
-with an everything-flexible attitude as long as it is speedy. With minimal code redundancies it supports
+with an everything-flexible attitude as long as it is speedy. It is easy to use and easy to extend, making 
+atmospheric modelling an interactive experience -- in the terminal, in a notebook or conventionally through scripts.
+With minimal code redundancies it supports
 
 **Dynamics and physics**
-- Different physical equations (barotropic vorticity, shallow water, primitive equations)
+- Different physical equations (barotropic vorticity, shallow water, primitive equations, with and without humidity)
 - Particle advection in 2D for all equations
 - Physics parameterizations for convection, precipitation, boundary layer, etc.
 
@@ -18,7 +20,7 @@ with an everything-flexible attitude as long as it is speedy. With minimal code 
 - Different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
 - Different resolutions (T31 to T1023 and higher, i.e. 400km to 10km using linear, quadratic or cubic truncation)
 - Different arithmetics: Float32 (default), Float64, and (experimental) BFloat16, stochastic rounding
-- multi-threading, layer-wise for dynamics, grid point-wise for physics
+- a very fast and flexible spherical harmonics transform library SpeedyTransforms
 
 **User interface**
 - Extensibility: New model components (incl. parameterizations) can be externally defined
@@ -30,9 +32,9 @@ and Julia will compile to these choices just-in-time.
 
 For an overview of the functionality and explanation see the
 [documentation](https://speedyweather.github.io/SpeedyWeather.jl/dev).
-But as the documentation always lags behind our full functionality you are encouraged
-to [raise an issue](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues) describing
-what you'd like to use SpeedyWeather for.
+You are always encouraged to [raise an issue](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues)
+(even it is not actually an issue but an idea, a suggestion or really anything)
+describing what you'd like to use SpeedyWeather for. We're keen to help!
 
 ## Vision and roadmap
 
@@ -78,7 +80,7 @@ The interface to SpeedyWeather.jl consist of 5 steps: define the grid, create mo
 construct the model, initialize, run
 
 ```julia
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)          # define resolution
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)       # define resolution
 orography = EarthOrography(spectral_grid)               # create non-default components
 model = PrimitiveWetModel(; spectral_grid, orography)   # construct model
 simulation = initialize!(model)                         # initialize all model components
