@@ -6,7 +6,6 @@ using DocStringExtensions
 # NUMERICS
 import Primes
 import Random
-import FastGaussQuadrature
 import LinearAlgebra: LinearAlgebra, Diagonal
 
 # GPU, PARALLEL
@@ -60,6 +59,7 @@ export  FullClenshawGrid, FullClenshawArray,
         OctaHEALPixGrid, OctaHEALPixArray,
         eachring, eachgrid, plot
 export  AnvilInterpolator
+export  spherical_distance
 
 include("RingGrids/RingGrids.jl")
 using .RingGrids
