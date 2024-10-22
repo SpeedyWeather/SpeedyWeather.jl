@@ -43,27 +43,51 @@ random_process!(progn::PrognosticVariables, process::NoRandomProcess) = nothing
 
 export SpectralAR1Process
 
+"""First-order auto-regressive random process (AR1) in spectral space,
+evolving `wavenumbers` with respectice `time_scales` and `standard_deviations`
+independently. Transformed after every time step to grid space with a
+`clamp` applied to limit extrema. For reproducability `seed` can be
+provided and an independent `random_number_generator` is used
+that is reseeded on every `initialize!`. Fields are $(TYPEDFIELDS)"""
 @kwdef struct SpectralAR1Process{NF} <: AbstractRandomProcess
-    time_scales::Vector{Second} = [Hour(6), Day(3), Day(30)]
-    wavenumbers::Vector{Int} = [26, 16, 8]
-    standard_deviations::Vector{NF} = [0.52, 0.18, 0.06]
+    "[OPTION] Time scales of every AR1 process respectively"
+    time_scales::Vector{Second} = [Hour(6 + 2h) for h in 0:10]
+
+    "[OPTION] Wavenumbers of every AR1 process respectively"
+    wavenumbers::Vector{Int} = [26-h for h in 0:10]
+
+    "[OPTION] Standard deviations of every AR1 process respectively"
+    standard_deviations::Vector{NF} = [0.4-h/20 for h in 0:10]
+
+    "[OPTION] Range to clamp values into after every transform into grid space"
     clamp::NTuple{2, NF} = (-1, 1)
+
+    "[OPTION] Function to be called for random number generation"
     rand_function::Function = randn
 
+    "[OPTION] Random number generator seed"
     seed::Int = 123
+
+    "Independent random number generator for this random process"
     random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
 
+    "Precomputed auto-regressive factors [1], function of time scale"
     autoregressive_factors::Vector{NF} = zeros(NF, length(time_scales))
+
+    "Precomputed noise factors [1], function of time scale"
     noise_factors::Vector{NF} = zeros(NF, length(time_scales))
 end
 
+# generator function
 SpectralAR1Process(SG::SpectralGrid, kwargs...) = SpectralAR1Process{SG.NF}(; kwargs...)
 
 function initialize!(
     process::SpectralAR1Process,
     model::AbstractModel,
 )
-    @assert maximum(process.wavenumbers) <= model.spectral_grid.trunc
+    (; time_scales, wavenumbers, standard_deviations) = process
+    @assert maximum(wavenumbers) <= model.spectral_grid.trunc
+    @assert length(time_scales) == length(wavenumbers) == length(standard_deviations) || throw(DimensionMismatch)
 
     dt = model.time_stepping.Δt_sec         # in seconds
 
@@ -88,7 +112,7 @@ function random_process!(
 
     for (l, a, ξ) in zip(wavenumbers, autoregressive_factors,  noise_factors)
         for m in 0:l-1
-            r = rand_function(process.random_number_generator, Complex{NF})
+            r = 2rand(process.random_number_generator, Complex{NF}) - (1 + im)
             random_pattern[l+1, m+1] = a*random_pattern[l+1, m+1] + ξ*r
         end
     end
