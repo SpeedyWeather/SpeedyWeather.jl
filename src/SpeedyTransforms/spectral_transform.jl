@@ -3,6 +3,9 @@ const DEFAULT_GRID = FullGaussianGrid
 
 abstract type AbstractSpectralTransform end
 
+# which_FFT_package(::Type{<:AbstractArray{NF}}) where NF<:AbstractFloat = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
+# get_zeros_func(::Type{<:AbstractArray}) = zeros
+
 """SpectralTransform struct that contains all parameters and precomputed arrays
 to perform a spectral transform. Fields are
 $(TYPEDFIELDS)"""
@@ -103,6 +106,7 @@ function SpectralTransform(
 ) where NF
 
     Grid = RingGrids.nonparametric_type(Grid)   # always use nonparametric concrete type
+    zeros_ = get_zeros_func(ArrayType)
 
     # RESOLUTION PARAMETERS
     nlat = get_nlat(Grid, nlat_half)            # 2nlat_half but one less if grids have odd # of lat rings
@@ -140,7 +144,7 @@ function SpectralTransform(
     end
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    scratch_memory_north = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
+    scratch_memory_north = zeros_(Complex{NF}, nfreq_max, nlayers, nlat_half)
     scratch_memory_south = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
 
     # SCRATCH MEMORY TO 1-STRIDE DATA FOR FFTs
@@ -151,26 +155,18 @@ function SpectralTransform(
     scratch_memory_column_north = zeros(Complex{NF}, nlayers)
     scratch_memory_column_south = zeros(Complex{NF}, nlayers)
 
-    # PLAN THE FFTs
-    FFT_package = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
     rfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
 
-    fake_grid_data = zeros(Grid{NF}, nlat_half, nlayers)
+    fake_grid_data = zeros_(Grid{NF}, nlat_half, nlayers)
 
-    for (j, nlon) in enumerate(nlons)
-        real_matrix_input = view(fake_grid_data.data, rings[j], :)
-        complex_matrix_input = view(scratch_memory_north, 1:nlon÷2 + 1, :, j)
-        real_vector_input = view(fake_grid_data.data, rings[j], 1)
-        complex_vector_input = view(scratch_memory_north, 1:nlon÷2 + 1, 1, j)
-
-        rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1)
-        brfft_plans[j] = FFT_package.plan_brfft(complex_matrix_input, nlon, 1)
-        rfft_plans_1D[j] = FFT_package.plan_rfft(real_vector_input, 1)
-        brfft_plans_1D[j] = FFT_package.plan_brfft(complex_vector_input, nlon, 1)
-    end
+    # PLAN THE FFTs
+    plan_FFTs!(
+        rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
+        fake_grid_data, scratch_memory_north, rings, nlons
+    )
     
     # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with

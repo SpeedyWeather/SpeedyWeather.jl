@@ -14,6 +14,10 @@ import Primes
 using ..LowerTriangularMatrices
 using ..RingGrids
 
+# import SpeedyWeatherCUDAExt
+using SpeedyWeather
+Base.get_extension(SpeedyWeather, :SpeedyWeatherCUDAExt)
+
 # TRANSFORM
 export  SpectralTransform,
         transform!,
@@ -38,6 +42,7 @@ export  spectral_truncation,
         spectral_interpolation,
         power_spectrum
 
+# include("../gpu.jl")
 include("aliasing.jl")
 include("legendrepolarray.jl")
 include("legendre_shortcuts.jl")
