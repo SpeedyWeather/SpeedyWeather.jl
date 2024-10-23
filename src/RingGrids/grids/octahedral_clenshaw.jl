@@ -38,7 +38,7 @@ OctahedralClenshawGrid
 
 # SIZE
 nlat_odd(::Type{<:OctahedralClenshawArray}) = true
-npoints_pole(::Type{<:OctahedralClenshawArray}) = 16
+npoints_pole(::Type{<:OctahedralClenshawArray}) = 0
 npoints_added_per_ring(::Type{<:OctahedralClenshawArray}) = 4
 
 function get_npoints2D(::Type{<:OctahedralClenshawArray}, nlat_half::Integer)
