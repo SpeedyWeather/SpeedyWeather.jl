@@ -46,11 +46,13 @@ end
 @testset "Grid indexing" begin
     for NF in (Float32, Float64)
 
+        # TODO maybe don't hardcode the vector length but use get_npoints
+
         # with vector and resolution parameter provided
         L = FullClenshawGrid(randn(NF, 96*47), 24)          # L24 grid
         F = FullGaussianGrid(randn(NF, 96*48), 24)          # F24 grid
-        O = OctahedralGaussianGrid(randn(NF, 3168), 24)     # O24 grid
-        C = OctahedralClenshawGrid(randn(NF, 3056), 24)     # C24 grid
+        O = OctahedralGaussianGrid(randn(NF, 2400), 24)     # O24 grid
+        C = OctahedralClenshawGrid(randn(NF, 2304), 24)     # C24 grid
         H = HEALPixGrid(randn(NF, 3072), 32)                # H32 grid
         J = OctaHEALPixGrid(randn(NF, 4096), 32)            # J32 grid
         K = FullOctaHEALPixGrid(randn(NF, 128*63), 32)      # K32 grid
@@ -58,8 +60,8 @@ end
         # without resolution parameter provided (inferred from vector length)
         L2 = FullClenshawGrid(randn(NF, 96*47))             # L24 grid
         F2 = FullGaussianGrid(randn(NF, 96*48))             # F24 grid
-        O2 = OctahedralGaussianGrid(randn(NF, 3168))        # O24 grid
-        C2 = OctahedralClenshawGrid(randn(NF, 3056))        # C24 grid
+        O2 = OctahedralGaussianGrid(randn(NF, 2400))        # O24 grid
+        C2 = OctahedralClenshawGrid(randn(NF, 2304))        # C24 grid
         H2 = HEALPixGrid(randn(NF, 3072))                   # H32 grid
         J2 = OctaHEALPixGrid(randn(NF, 4096))               # J32 grid
         K2 = FullOctaHEALPixGrid(randn(NF, 128*63))         # K32 grid
