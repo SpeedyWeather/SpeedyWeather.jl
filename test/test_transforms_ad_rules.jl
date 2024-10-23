@@ -6,6 +6,7 @@ import FiniteDifferences: j′vp, grad, central_fdm
 import AbstractFFTs
 
 grid_types = [FullGaussianGrid, OctahedralClenshawGrid] # one full and one reduced grid 
+grid_dealiasing = [2, 3]
 
 # currenlty there's an issue with EnzymeTestUtils not being able to work with structs with undefined fields like FFT plans
 # https://github.com/EnzymeAD/Enzyme.jl/issues/1992
@@ -33,9 +34,9 @@ end
     @testset "_fourier! Enzyme rules" begin
         
         @testset "reverse rule" begin
-            for grid_type in grid_types
+            for (i_grid, grid_type) in enumerate(grid_types)
 
-                spectral_grid = SpectralGrid(Grid=grid_type)
+                spectral_grid = SpectralGrid(Grid=grid_type, dealiasing=grid_dealiasing[i_grid])
                 S = SpectralTransform(spectral_grid)
                 grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
                 f_north = S.scratch_memory_north
@@ -50,9 +51,9 @@ end
     @testset "Complete Transform Enzyme" begin
         # make a high level finite difference test of the whole transform
         # can't use Enzyme or ChainRule Test tools for tests for that
-        for grid_type in grid_types
+        for (i_grid, grid_type) in enumerate(grid_types)
 
-            spectral_grid = SpectralGrid(Grid=grid_type)
+            spectral_grid = SpectralGrid(Grid=grid_type, dealiasing=grid_dealiasing[i_grid])
 
             # forwards 
             S = SpectralTransform(spectral_grid)
@@ -103,8 +104,7 @@ end
                 return nothing
             end 
 
-            spec = rand(LowerTriangularArray{Complex{spectral_grid.NF}}, spectral_grid.trunc+2, spectral_grid.trunc+1, spectral_grid.nlayers)
-            grid = transform(spec, S)
+            grid = rand(S.Grid{spectral_grid.NF}, S.nlat_half, S.nlayers)
             spec = transform(grid, S)
             grid = transform(spec, S)
             grid_copy = deepcopy(grid)
@@ -138,8 +138,11 @@ end
 
             autodiff(Reverse, transform_identity!, Const, Duplicated(spec, dspec), Duplicated(S, dS))
 
-            @test all(isapprox.(dspec[1:S.lmax+1:end,:], 1))
-            @test all(isapprox.(dspec[S.lmax+2:end,:], 1+im)) 
+            @test all(all.([isapprox.(dspec[il,1,:], 1) for il in 1:S.lmax+1])) # m = 0 => Im = 0
+
+            for i in eachmatrix(dspec)
+                @test all(isapprox.(dspec[:,i][S.lmax+2:end], 1+im)) 
+            end 
         end 
     end 
 
