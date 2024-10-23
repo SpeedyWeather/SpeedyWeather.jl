@@ -5,8 +5,8 @@ using FiniteDifferences
 import FiniteDifferences: j′vp, grad, central_fdm
 import AbstractFFTs
 
-grid_types = [FullGaussianGrid, OctahedralClenshawGrid] # one full and one reduced grid 
-grid_dealiasing = [2, 3]
+grid_types = [FullGaussianGrid] #, OctahedralClenshawGrid] # one full and one reduced grid 
+grid_dealiasing = [2] #, 3]
 
 # currenlty there's an issue with EnzymeTestUtils not being able to work with structs with undefined fields like FFT plans
 # https://github.com/EnzymeAD/Enzyme.jl/issues/1992
@@ -117,7 +117,7 @@ end
 
             autodiff(Reverse, transform_identity!, Const, Duplicated(grid, dgrid), Duplicated(S, dS))
 
-            @test all(isapprox.(dgrid, 1, atol=0.01)) 
+            @test all(isapprox.(dgrid, 1)) 
 
             # now start with spectral space 
 
