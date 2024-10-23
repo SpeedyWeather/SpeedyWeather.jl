@@ -105,6 +105,8 @@ end
 
             spec = rand(LowerTriangularArray{Complex{spectral_grid.NF}}, spectral_grid.trunc+2, spectral_grid.trunc+1, spectral_grid.nlayers)
             grid = transform(spec, S)
+            spec = transform(grid, S)
+            grid = transform(spec, S)
             grid_copy = deepcopy(grid)
             
             transform_identity!(grid, S)
