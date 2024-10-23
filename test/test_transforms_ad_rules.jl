@@ -42,7 +42,7 @@ end
                 f_south = S.scratch_memory_south
 
                 # not working currenlty, the test is stuck 
-                #test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const))
+                test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const))
             end
         end
     end 
@@ -91,6 +91,53 @@ end
             fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dgrid2, specs)
 
             @test isapprox(dspecs, fd_jvp[1])
+
+            # test that d S^{-1}(S(x)) / dx = dx/dx = 1 (in both direction)
+
+            # start with grid (but with a truncated one)
+
+            function transform_identity!(x::AbstractGridArray{T}, S::SpectralTransform{T}) where T
+                x_SH = zeros(LowerTriangularArray{Complex{T}}, S.lmax+1, S.mmax+1, S.nlayers)
+                transform!(x_SH, x, S)
+                transform!(x, x_SH, S)
+                return nothing
+            end 
+
+            spec = rand(LowerTriangularArray{Complex{spectral_grid.NF}}, spectral_grid.trunc+2, spectral_grid.trunc+1, spectral_grid.nlayers)
+            grid = transform(spec, S)
+            grid_copy = deepcopy(grid)
+            
+            transform_identity!(grid, S)
+            @test isapprox(grid, grid_copy)
+
+            dgrid = similar(grid)
+            fill!(dgrid, 1)
+
+            autodiff(Reverse, transform_identity!, Const, Duplicated(grid, dgrid), Duplicated(S, dS))
+
+            @test all(isapprox.(dgrid, 1, atol=0.01)) 
+
+            # now start with spectral space 
+            
+            function transform_identity!(x::LowerTriangularArray{Complex{T}}, S::SpectralTransform{T}) where T
+                x_grid = zeros(S.Grid{T}, S.nlat_half, S.nlayers)
+                transform!(x_grid, x, S)
+                transform!(x, x_grid, S)
+                return nothing
+            end 
+
+            spec = transform(grid, S)
+            spec_copy = deepcopy(spec)
+            transform_identity!(spec, S)
+            @test isapprox(spec, spec_copy)
+
+            dspec = similar(spec)
+            fill!(dspec, 1+im)
+
+            autodiff(Reverse, transform_identity!, Const, Duplicated(spec, dspec), Duplicated(S, dS))
+
+            @test all(isapprox.(dspec[1:S.lmax+1:end,:], 1))
+            @test all(isapprox.(dspec[S.lmax+2:end,:], 1+im)) 
         end 
     end 
 
