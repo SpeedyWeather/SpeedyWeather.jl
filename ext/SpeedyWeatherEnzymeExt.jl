@@ -1,11 +1,18 @@
+module SpeedyWeatherEnzymeExt
+
+using SpeedyWeather
 using Enzyme
 import .EnzymeRules: reverse, augmented_primal
 using .EnzymeRules
 
-"""
-$(TYPEDSIGNATURES)
-Computes the scale for the adjoint/pullback of all discrete Fourier transforms. 
-"""
+# import all functions for which we define rules
+import SpeedyWeather.SpeedyTransforms: _fourier!
+
+# Rules for SpeedyTransforms
+
+# _fourier! 
+
+# Computes the scale for the adjoint/pullback of all discrete Fourier transforms. 
 function adjoint_scale(S::SpectralTransform)
     (; nlat_half, nlons, rfft_plans) = S
     nfreqs = [rfft_plan.osz[1] for rfft_plan in rfft_plans] # TODO: This works with FFTW, but does it with CUFFT as well?
@@ -21,10 +28,7 @@ function adjoint_scale(S::SpectralTransform)
                                                          # an additional dimension here for easier matrix multiply
 end 
 
-"""
-$(TYPEDSIGNATURES)
-Computes the scale for the adjoint/pullback of a real discrete fourier transform.
-"""
+# Computes the scale for the adjoint/pullback of a real discrete fourier transform.
 function rfft_adjoint_scale(n_freq::Int, n_real::Int)
     if iseven(n_real)
         return [1; [2 for i=2:(n_freq-1)]; 1]
@@ -106,4 +110,6 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
 
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing)
+end
+
 end

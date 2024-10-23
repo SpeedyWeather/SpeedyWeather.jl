@@ -48,6 +48,5 @@ include("spectral_gradients.jl")
 include("spectral_truncation.jl")
 include("spectrum.jl")
 include("show.jl")
-include("ad_rules.jl")
 
 end
