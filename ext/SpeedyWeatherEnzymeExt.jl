@@ -15,7 +15,7 @@ import SpeedyWeather.SpeedyTransforms: _fourier!
 # Computes the scale for the adjoint/pullback of all discrete Fourier transforms. 
 function adjoint_scale(S::SpectralTransform)
     (; nlat_half, nlons, rfft_plans) = S
-    nfreqs = [rfft_plan.osz[1] for rfft_plan in rfft_plans] # TODO: This works with FFTW, but does it with CUFFT as well?
+    nfreqs = [rfft_plan.osz[1] for rfft_plan in rfft_plans] # TODO: This works with FFTW, but does it with cuFFT as well?
 
     scale = zeros(Int, maximum(nfreqs), nlat_half) 
 
@@ -57,13 +57,13 @@ end
 function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_fourier!)}, ::Type{<:Const}, tape,
     f_north::Duplicated, f_south::Duplicated, grids::Duplicated{<:AbstractGridArray}, S::Union{Const, MixedDuplicated})
 
-    # adjoint/vjp of FFT has a different scaling, compute it, apply it later to f_north, f_south
+    # adjoint/jvp of FFT has a different scaling, compute it, apply it later to f_north, f_south
     scale = adjoint_scale(S.val)
     
     # retrieve grids value, either from original grids or from tape if grids may have been overwritten.
     gridsval = overwritten(config)[4] ? tape : grids.val
 
-    # compute the actual vjp
+    # compute the adjoint
     dgridval = zero(gridsval)
     _fourier!(dgridval, f_north.dval ./ scale, f_south.dval ./ scale, S.val) # inverse FFT (w/o normalization)
     grids.dval .+= dgridval 
@@ -96,7 +96,7 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
     
     # TODO: retrieve from tape here if overwritten? 
 
-    # compute the actual vjp
+    # compute the adjoint # TODO: could we reuse the f_north.val for that a well? and not allocate here
     dfnorthval = zero(f_north.val)
     dfsouthval = zero(f_south.val)
 

@@ -5,7 +5,7 @@ using FiniteDifferences
 import FiniteDifferences: j′vp, grad, central_fdm
 import AbstractFFTs
 
-grid_types = [FullGaussianGrid] #, OctahedralClenshawGrid] # one full and one reduced grid 
+grid_types = [FullGaussianGrid] #, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
 grid_dealiasing = [2] #, 3]
 
 # currenlty there's an issue with EnzymeTestUtils not being able to work with structs with undefined fields like FFT plans
@@ -43,7 +43,7 @@ end
                 f_south = S.scratch_memory_south
 
                 # not working currenlty, the test is stuck 
-                #test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const))
+                # test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const))
             end
         end
     end 
@@ -93,7 +93,7 @@ end
 
             @test isapprox(dspecs, fd_jvp[1])
 
-            # test that d S^{-1}(S(x)) / dx = dx/dx = 1 (in both direction)
+            # test that d S^{-1}(S(x)) / dx = dx/dx = 1 (starting in both domains)
 
             # start with grid (but with a truncated one)
 
@@ -104,6 +104,12 @@ end
                 return nothing
             end 
 
+            function transform_identity(x::AbstractGridArray{T}, S::SpectralTransform{T}) where T
+                x_copy = deepcopy(x)
+                transform_identity!(x_copy, S) 
+                return x_copy
+            end
+              
             grid = rand(S.Grid{spectral_grid.NF}, S.nlat_half, S.nlayers)
             spec = transform(grid, S)
             grid = transform(spec, S)
@@ -117,7 +123,14 @@ end
 
             autodiff(Reverse, transform_identity!, Const, Duplicated(grid, dgrid), Duplicated(S, dS))
 
-            @test all(isapprox.(dgrid, 1)) 
+            @test_broken all(isapprox.(dgrid, 1)) 
+            # TODO: broken: currenlty the whole field is 0.912 instead of 1., seems like a normalisation issue?
+            # but a FD differentiation yields the same, so this is a problem with the setup
+            
+            dgrid2 = similar(grid)
+            fill!(dgrid2, 1)
+            fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_identity(x, S), dgrid2, grid)
+            @test isapprox(dgrid, fd_jvp[1], rtol=0.01)
 
             # now start with spectral space 
 
