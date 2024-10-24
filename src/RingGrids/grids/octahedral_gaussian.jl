@@ -40,7 +40,7 @@ nlat_odd(::Type{<:OctahedralGaussianArray}) = false
 
 """$(TYPEDSIGNATURES) [EXPERIMENTAL] additional number of longitude points on the first and last ring.
 Change to 0 to start with 4 points on the first ring."""
-npoints_pole(::Type{<:OctahedralGaussianArray}) = 16
+npoints_pole(::Type{<:OctahedralGaussianArray}) = 0
 
 """$(TYPEDSIGNATURES) [EVEN MORE EXPERIMENTAL] number of longitude points added (removed) for every ring
 towards the Equator (on the southern hemisphere towards the south pole)."""
