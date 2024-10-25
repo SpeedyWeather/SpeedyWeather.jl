@@ -29,7 +29,7 @@ import ProgressMeter
 export DateTime, Second, Minute, Hour, Day, Week
 
 # export functions that have many cross-component methods
-export initialize!, finish!
+export initialize!, finalize!
 
 include("utility_functions.jl")
 
