@@ -105,6 +105,9 @@ function initialize!(
         process.noise_factors[l] = F₀*exp(-eigenvalue/(2k*(k+1)))
     end
 
+    # set mean of random pattern to zero
+    process.noise_factors[1] = 0
+
     # reseed the random number generator
     Random.seed!(process.random_number_generator, process.seed)
     return nothing
