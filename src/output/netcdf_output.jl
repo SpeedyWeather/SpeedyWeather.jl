@@ -368,8 +368,10 @@ function finalize!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    for (key, var) in output.variables
-        finalize!(output, var, progn, diagn, model)
+    if output.active    # only finalize if active otherwise output.netcdf_file is nothing
+        for (key, var) in output.variables
+            finalize!(output, var, progn, diagn, model)
+        end
     end
 
     close(output)
