@@ -250,10 +250,10 @@ $(TYPEDFIELDS)"""
 
     nlat_half::Int
 
-    "Accumualted large-scale precipitation [m]"
+    "Accumulated large-scale precipitation [m]"
     precip_large_scale::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
-    "Accumualted large-scale precipitation [m]"
+    "Accumulated large-scale precipitation [m]"
     precip_convection::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     "Cloud top [m]"
