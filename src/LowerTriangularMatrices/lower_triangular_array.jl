@@ -631,10 +631,10 @@ function Base.similar(
     return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, size(L; as=Matrix))
 end
 
-function GPUArrays.backend(
+function GPUArrays.get_backend(
     ::Type{LowerTriangularArray{T, N, ArrayType}}
 ) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
-    return GPUArrays.backend(ArrayType)
+    return GPUArrays.get_backend(ArrayType)
 end
 
 Adapt.adapt_structure(to, L::LowerTriangularArray) =
