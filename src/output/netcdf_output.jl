@@ -261,20 +261,11 @@ function initialize!(
     defVar(dataset, "lon", lond, ("lon",), attrib=Dict("units"=>"degrees_east", "long_name"=>"longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib=Dict("units"=>"degrees_north", "long_name"=>"latitude"))
     defVar(dataset, "layer", σ, ("layer",), attrib=Dict("units"=>"1", "long_name"=>"sigma layer"))
-    all_dims = ["lon", "lat", "layer", "time"]
 
     # VARIABLES, define every output variable in the netCDF file and write initial conditions
     output_NF = eltype(output.grid2D)
     for (key, var) in output.variables
-        missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
-        attributes = Dict("long_name"=>var.long_name, "units"=>var.unit, "_FillValue"=>output_NF(missing_value))
-        dims = collect(dim for (dim, this_dim) in zip(all_dims, var.dims_xyzt) if this_dim)
-
-        # pick defaults if compression 
-        deflatelevel = hasfield(typeof(var), :compression_level) ? var.compression_level : DEFAULT_COMPRESSION_LEVEL
-        shuffle = hasfield(typeof(var), :shuffle) ? var.shuffle : DEFAULT_SHUFFLE
-
-        defVar(dataset, var.name, output_NF, dims, attrib=attributes; deflatelevel, shuffle)
+        define_variable!(dataset, var, output_NF)
         output!(output, var, progn, diagn, model)
     end
 
@@ -290,6 +281,24 @@ end
 Base.close(output::NetCDFOutput) = NCDatasets.close(output.netcdf_file)
 Base.close(::Nothing) = nothing     # in case of no netCDF output nothing to close
 
+function define_variable!(
+    dataset::NCDataset,
+    var::AbstractOutputVariable,
+    output_NF::Type{<:AbstractFloat} = DEFAULT_OUTPUT_NF,
+)
+    missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
+    attributes = Dict("long_name"=>var.long_name, "units"=>var.unit, "_FillValue"=>output_NF(missing_value))
+
+    all_dims = ("lon", "lat", "layer", "time")
+    dims = collect(dim for (dim, this_dim) in zip(all_dims, var.dims_xyzt) if this_dim)
+
+    # pick defaults for compression if not defined
+    deflatelevel = hasfield(typeof(var), :compression_level) ? var.compression_level : DEFAULT_COMPRESSION_LEVEL
+    shuffle = hasfield(typeof(var), :shuffle) ? var.shuffle : DEFAULT_SHUFFLE
+
+    defVar(dataset, var.name, output_NF, dims, attrib=attributes; deflatelevel, shuffle)
+end
+
 """
 $(TYPEDSIGNATURES)
 Writes the variables from `progn` or `diagn` of time step `i` at time `time` into `output.netcdf_file`.
@@ -302,7 +311,7 @@ function output!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    output.timestep_counter += 1                                 # increase counter
+    output.timestep_counter += 1                                    # increase counter
     (; active, output_every_n_steps, timestep_counter ) = output
     active || return nothing                                        # escape immediately for no netcdf output
     timestep_counter % output_every_n_steps == 0 || return nothing  # escape if output not written on this step
@@ -352,6 +361,33 @@ function Base.show(io::IO, outputvariable::AbstractOutputVariable)
         print(io, "\n├ $field::$(typeof(value)) = $value")
     end
 end
+
+function finalize!(
+    output::NetCDFOutput,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::AbstractModel,
+)
+    for (key, var) in output.variables
+        finalize!(output, var, progn, diagn, model)
+    end
+
+    close(output)
+end
+
+# default finalize method for output variables
+function finalize!(
+    output::NetCDFOutput,
+    var::AbstractOutputVariable,
+    args...
+)
+    # do nothing unless finalize! is defined for var <: AbstractOutputVariable
+    return nothing
+end
+
+"""Dummy output variable that doesn't do anything."""
+struct NoOutputVariable <: AbstractOutputVariable end
+output!(output::NetCDFOutput, variable::NoOutputVariable, args...) = nothing
 
 ## VORTICITY -------------
 
@@ -699,13 +735,14 @@ end
 Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct ConvectivePrecipitationOutput <: AbstractOutputVariable
     name::String = "precip_conv"
-    unit::String = "mm/hr"
-    long_name::String = "convective precipitation"
+    unit::String = "mm"
+    long_name::String = "accumulated convective precipitation"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 7
+    rate::AbstractOutputVariable = ConvectivePrecipitationRateOutput()
 end
 
 """$(TYPEDSIGNATURES)
@@ -717,16 +754,11 @@ function output!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
+    # this is accumualted convective precipitation
     precip = output.grid2D
     (; precip_convection) = diagn.physics
     RingGrids.interpolate!(precip, precip_convection, output.interpolator)
-    
-    # after output set precip accumulator back to zero
-    precip_convection .= 0
-
-    # convert from [m] to [mm/hr] rain rate over output time step (e.g. 6hours)
-    s = (1000*Hour(1)/output.output_dt)
-    precip .*= s
+    precip .*= 1000             # convert from [m] to [mm]
 
     round!(precip, variable.keepbits)
     i = output.output_counter   # output time step to write
@@ -734,17 +766,58 @@ function output!(
     return nothing
 end
 
+# at finalize step postprocess the convective precipitation to get the rate
+finalize!(output::NetCDFOutput, variable::ConvectivePrecipitationOutput, args...) = output!(output, variable.rate, variable)
+
+abstract type AbstractRainRateOutputVariable <: AbstractOutputVariable end
+
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
-@kwdef mutable struct LargeScalePrecipitationOutput <: AbstractOutputVariable
-    name::String = "precip_cond"
+@kwdef mutable struct ConvectivePrecipitationRateOutput <: AbstractRainRateOutputVariable
+    name::String = "precip_conv_rate"
     unit::String = "mm/hr"
-    long_name::String = "large-scale precipitation"
+    long_name::String = "convective precipitation rate"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 7
+end
+
+function output!(
+    output::NetCDFOutput,
+    variable::AbstractRainRateOutputVariable,
+    acc_variable::AbstractOutputVariable,
+)
+    # use .var to prevent Union{Missing, Float32} that NCDatasets uses
+    accumulated = output.netcdf_file[acc_variable.name].var[:, :, :]
+
+    # rate is defined as average precip since last output step, so first step is 0
+    # convert from accumulated [m] to [mm/hr] rain rate over output time step (e.g. 6hours)
+    s = Hour(1)/output.output_dt
+    nx, ny = size(accumulated)
+    rate = cat(zeros(eltype(accumulated), nx, ny), diff(accumulated, dims=3), dims=3)
+    rate .*= s
+
+    # DEFINE NEW NETCDF VARIABLE AND WRITE
+    define_variable!(output.netcdf_file, variable, eltype(rate))
+
+    output.netcdf_file[variable.name][:, :, :] = rate
+    return nothing
+end
+
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
+@kwdef mutable struct LargeScalePrecipitationOutput <: AbstractOutputVariable
+    name::String = "precip_cond"
+    unit::String = "mm"
+    long_name::String = "accumulated large-scale precipitation"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+    rate::AbstractOutputVariable = LargeScalePrecipitationRateOutput()
 end
 
 """$(TYPEDSIGNATURES)
@@ -756,22 +829,35 @@ function output!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    precip = output.grid2D
+    # this is accumulated large-scale precipitation
     (; precip_large_scale) = diagn.physics
+    precip = output.grid2D
     RingGrids.interpolate!(precip, precip_large_scale, output.interpolator)
-
-    # after output set precip accumulator back to zero
-    precip_large_scale .= 0
-
-    # convert from [m] to [mm/hr] rain rate over output time step (e.g. 6hours)
-    s = (1000*Hour(1)/output.output_dt)
-    precip .*= s
+    precip .*= 1000             # convert from [m] to [mm]
 
     round!(precip, variable.keepbits)
     i = output.output_counter   # output time step to write
     output.netcdf_file[variable.name][:, :, i] = precip
     return nothing
 end
+
+# at finalize step postprocess the convective precipitation to get the rate
+finalize!(output::NetCDFOutput, variable::LargeScalePrecipitationOutput, args...) = output!(output, variable.rate, variable)
+
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
+@kwdef mutable struct LargeScalePrecipitationRateOutput <: AbstractRainRateOutputVariable
+    name::String = "precip_cond_rate"
+    unit::String = "mm/hr"
+    long_name::String = "large-scale precipitation rate"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+# no need to redefine output! already defined for AbstractRainRateOutputVariable
 
 ## CLOUDS -------------
 
