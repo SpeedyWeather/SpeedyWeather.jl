@@ -38,7 +38,7 @@ OctahedralClenshawGrid
 
 # SIZE
 nlat_odd(::Type{<:OctahedralClenshawArray}) = true
-npoints_pole(::Type{<:OctahedralClenshawArray}) = 0
+npoints_pole(::Type{<:OctahedralClenshawArray}) = 16
 npoints_added_per_ring(::Type{<:OctahedralClenshawArray}) = 4
 
 function get_npoints2D(::Type{<:OctahedralClenshawArray}, nlat_half::Integer)
@@ -82,29 +82,6 @@ get_quadrature_weights(::Type{<:OctahedralClenshawArray}, nlat_half::Integer) =
     clenshaw_curtis_weights(nlat_half)
 
 ## INDEXING
-function each_index_in_ring(Grid::Type{<:OctahedralClenshawArray},
-                            j::Integer,                     # ring index north to south
-                            nlat_half::Integer)             # resolution param
-
-    nlat = get_nlat(Grid, nlat_half)
-    
-    # TODO make m, o dependent
-    m, o = npoints_added_per_ring(OctahedralClenshawArray), npoints_pole(OctahedralClenshawArray)
-    m != 4 || o != 16 && @warn "This algorithm has not been generalised for m!=4, o!=16."
-
-    @boundscheck 0 < j <= nlat || throw(BoundsError)        # ring index valid?
-    if j <= nlat_half                                       # northern hemisphere incl Equator
-        index_1st = 2j*(j+7) - 15                           # first in-ring index i
-        index_end = 2j*(j+9)                                # last in-ring index i
-    else                                                    # southern hemisphere excl Equator
-        j = nlat - j + 1                                    # mirror ring index around Equator
-        n = get_npoints2D(Grid, nlat_half) + 1              # number of grid points + 1
-        index_1st = n - 2j*(j+9)                            # count backwards
-        index_end = n - (2j*(j+7) - 15)
-    end
-    return index_1st:index_end                              # range of i's in ring
-end
-
 function each_index_in_ring!(   rings::Vector{<:UnitRange{<:Integer}},
                                 Grid::Type{<:OctahedralClenshawArray},
                                 nlat_half::Integer) # resolution param

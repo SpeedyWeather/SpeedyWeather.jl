@@ -57,6 +57,7 @@ export  FullClenshawGrid, FullClenshawArray,
         OctahedralClenshawGrid, OctahedralClenshawArray,
         HEALPixGrid, HEALPixArray,
         OctaHEALPixGrid, OctaHEALPixArray,
+        OctaminimalGaussianGrid, OctaminimalGaussianArray,
         eachring, eachgrid, plot
 export  AnvilInterpolator
 export  spherical_distance
