@@ -20,6 +20,7 @@ $(TYPEDFIELDS)"""
     DR,     # <:AbstractDrag,
     PA,     # <:AbstractParticleAdvection,
     IC,     # <:AbstractInitialConditions,
+    RP,     # <:AbstractRandomProcess,
     TS,     # <:AbstractTimeStepper,
     ST,     # <:SpectralTransform{NF},
     IM,     # <:AbstractImplicit,
@@ -40,6 +41,7 @@ $(TYPEDFIELDS)"""
     drag::DR = NoDrag()
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(Barotropic)
+    random_process::RP = NoRandomProcess()
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -73,6 +75,7 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.forcing, model)
     initialize!(model.drag, model)
     initialize!(model.horizontal_diffusion, model)
+    initialize!(model.random_process, model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)
