@@ -148,8 +148,8 @@ function SpeedyWeather.callback!(
     @info "Everything flooded on $(progn.clock.time)"
 end
 
-# nothing needs to be done when finishing
-SpeedyWeather.finish!(::MilleniumFlood, args...) = nothing
+# nothing needs to be done after simulation is finished
+SpeedyWeather.finalize!(::MilleniumFlood, args...) = nothing
 ```
 
 Note that the flooding will take place only at the start of the 21st century,

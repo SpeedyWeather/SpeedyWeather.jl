@@ -244,12 +244,11 @@ nothing # hide
 ![Large-scale precipitation](large-scale_precipitation_acc.png)
 
 Precipitation (both large-scale and convective) are written into the
-`simulation.diagnostic_variables.surface` which, however, accumulate all precipitation
-until netCDF output is written. As we didn't specify `output=true` here, they accumulated
-precipitation over the last 10 days of the simulation which includes the initial
-adjustment of humidity in the tropics (the large band of precipitation here).
-So let us reset these accumulators and integrate for another 6 hours to get the
-precipitation only in the period.
+`simulation.diagnostic_variables.physics` which, however, accumulate all precipitation
+during simulation. In the NetCDF output, precipitation rate (in mm/hr) is calculated
+from accumulated precipitation as a post-processing step.
+More interactively, you can also reset these accumulators and integrate for another 6 hours
+to get the precipitation only in that period.
 
 ```@example precipitation
 # reset accumulators and simulate 6 hours
@@ -269,7 +268,7 @@ nothing # hide
 ![Convective precipitation](convective_precipitation.png)
 
 As the precipitation fields are accumulated meters over the integration period
-(in the case of no output) we divide by 6 hours to get a precipitation rate ``[m/s]``
+we divide by 6 hours to get a precipitation rate ``[m/s]``
 but then multiply with 1 hour and 1000 to get the typical precipitation unit of ``[mm/hr]``.
 
 ## References
