@@ -7,6 +7,7 @@ using Adapt
         FullGaussianGrid,
         OctahedralGaussianGrid,
         OctahedralClenshawGrid,
+        OctaminimalGaussianGrid,
         HEALPixGrid,
         OctaHEALPixGrid,
         FullHEALPixGrid,
@@ -26,6 +27,7 @@ using Adapt
         FullGaussianArray,
         OctahedralGaussianArray,
         OctahedralClenshawArray,
+        OctaminimalGaussianGrid,
         HEALPixArray,
         OctaHEALPixArray,
         FullHEALPixArray,
@@ -45,54 +47,37 @@ end
 
 @testset "Grid indexing" begin
     for NF in (Float32, Float64)
+        for Grid in (
+            FullClenshawGrid,
+            FullGaussianGrid,
+            OctahedralGaussianGrid,
+            OctahedralClenshawGrid,
+            OctaminimalGaussianGrid,
+            HEALPixGrid,
+            OctaHEALPixGrid,
+            FullHEALPixGrid,
+            FullOctaHEALPixGrid
+            )
+            for nlat_half in (4, 8, 16, 24, 32)
+                
+                npoints = RingGrids.get_npoints(Grid, nlat_half)
+        
+                grid1 = Grid(randn(NF, npoints), nlat_half)
+                grid2 = Grid(randn(NF, npoints))
+                grid3 = zeros(Grid{NF}, nlat_half)
 
-        # with vector and resolution parameter provided
-        L = FullClenshawGrid(randn(NF, 96*47), 24)          # L24 grid
-        F = FullGaussianGrid(randn(NF, 96*48), 24)          # F24 grid
-        O = OctahedralGaussianGrid(randn(NF, 3168), 24)     # O24 grid
-        C = OctahedralClenshawGrid(randn(NF, 3056), 24)     # C24 grid
-        H = HEALPixGrid(randn(NF, 3072), 32)                # H32 grid
-        J = OctaHEALPixGrid(randn(NF, 4096), 32)            # J32 grid
-        K = FullOctaHEALPixGrid(randn(NF, 128*63), 32)      # K32 grid
+                @test size(grid1) == size(grid2) == size(grid3)
 
-        # without resolution parameter provided (inferred from vector length)
-        L2 = FullClenshawGrid(randn(NF, 96*47))             # L24 grid
-        F2 = FullGaussianGrid(randn(NF, 96*48))             # F24 grid
-        O2 = OctahedralGaussianGrid(randn(NF, 3168))        # O24 grid
-        C2 = OctahedralClenshawGrid(randn(NF, 3056))        # C24 grid
-        H2 = HEALPixGrid(randn(NF, 3072))                   # H32 grid
-        J2 = OctaHEALPixGrid(randn(NF, 4096))               # J32 grid
-        K2 = FullOctaHEALPixGrid(randn(NF, 128*63))         # K32 grid
+                # getindex
+                for ij in eachindex(grid1) grid1[ij] end
 
-        for (grid1, grid2) in zip((L, F, O, C, H, J, K), (L2, F2, O2, C2, H2, J2, K2))
-            @test size(grid1) == size(grid2)
+                # setindex
+                for ij in eachindex(grid1) grid1[ij] = 0 end
+
+                @test all(grid1 .== 0)
+                @test grid1 == grid3
+            end
         end
-
-        # getindex
-        for ij in eachindex(L) L[ij] end
-        for ij in eachindex(F) F[ij] end
-        for ij in eachindex(O) O[ij] end
-        for ij in eachindex(C) C[ij] end
-        for ij in eachindex(H) H[ij] end
-        for ij in eachindex(J) J[ij] end
-        for ij in eachindex(K) K[ij] end
-
-        # set index
-        for ij in eachindex(L) L[ij] = 0 end
-        for ij in eachindex(F) F[ij] = 0 end
-        for ij in eachindex(O) O[ij] = 0 end
-        for ij in eachindex(C) C[ij] = 0 end
-        for ij in eachindex(H) H[ij] = 0 end
-        for ij in eachindex(J) J[ij] = 0 end
-        for ij in eachindex(K) K[ij] = 0 end
-
-        @test all(L .== 0)
-        @test all(F .== 0)
-        @test all(O .== 0)
-        @test all(C .== 0)
-        @test all(H .== 0)
-        @test all(J .== 0)
-        @test all(K .== 0)
     end
 end
 
@@ -102,6 +87,7 @@ end
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
                     OctahedralClenshawGrid,
+                    OctaminimalGaussianGrid,
                     HEALPixGrid,
                     OctaHEALPixGrid,
                     FullHEALPixGrid,
@@ -135,6 +121,7 @@ end
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
                     OctahedralClenshawGrid,
+                    OctaminimalGaussianGrid,
                     HEALPixGrid,
                     OctaHEALPixGrid,
                     FullHEALPixGrid,
@@ -159,6 +146,7 @@ end
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
                     OctahedralClenshawGrid,
+                    OctaminimalGaussianGrid,
                     HEALPixGrid,
                     OctaHEALPixGrid,
                     FullHEALPixGrid,
@@ -187,6 +175,7 @@ end
                     FullGaussianGrid,
                     OctahedralGaussianGrid,
                     OctahedralClenshawGrid,
+                    OctaminimalGaussianGrid,
                     HEALPixGrid,
                     OctaHEALPixGrid,
                     FullHEALPixGrid,
@@ -230,6 +219,7 @@ end
                 FullGaussianGrid,
                 OctahedralGaussianGrid,
                 OctahedralClenshawGrid,
+                OctaminimalGaussianGrid,
                 HEALPixGrid,
                 OctaHEALPixGrid,
                 FullHEALPixGrid,
@@ -261,6 +251,7 @@ end
                 FullGaussianGrid,
                 OctahedralGaussianGrid,
                 OctahedralClenshawGrid,
+                OctaminimalGaussianGrid,
                 HEALPixGrid,
                 OctaHEALPixGrid,
                 FullHEALPixGrid,
@@ -304,6 +295,7 @@ end
                         FullGaussianArray,
                         OctahedralGaussianArray,
                         OctahedralClenshawArray,
+                        OctaminimalGaussianArray,
                         HEALPixArray,
                         OctaHEALPixArray,
                         FullHEALPixArray,
@@ -373,6 +365,7 @@ end
                         FullGaussianGrid,
                         OctahedralGaussianGrid,
                         OctahedralClenshawGrid,
+                        OctaminimalGaussianGrid,
                         HEALPixGrid,
                         OctaHEALPixGrid,
                         FullHEALPixGrid,
@@ -402,6 +395,7 @@ end
                         FullGaussianArray,
                         OctahedralGaussianArray,
                         OctahedralClenshawArray,
+                        OctaminimalGaussianArray,
                         HEALPixArray,
                         OctaHEALPixArray,
                         FullHEALPixArray,
@@ -433,6 +427,7 @@ end
         FullGaussianArray,
         OctahedralGaussianArray,
         OctahedralClenshawArray,
+        OctaminimalGaussianArray,
         HEALPixArray,
         OctaHEALPixArray,
         FullHEALPixArray,

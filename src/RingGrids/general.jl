@@ -399,7 +399,7 @@ end
 
 """$(TYPEDSIGNATURES) UnitRange to access data on grid `grid` on ring `j`."""
 function each_index_in_ring(grid::Grid, j::Integer) where {Grid<:AbstractGridArray}
-    return each_index_in_ring(Grid, j, grid.nlat_half)
+    return grid.rings[j]
 end
 
 """ $(TYPEDSIGNATURES) UnitRange to access each horizontal grid point on grid `grid`.
