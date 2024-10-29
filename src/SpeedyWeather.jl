@@ -78,6 +78,7 @@ import .SpeedyTransforms: prettymemory
 
 # to be defined in extensions
 export globe
+globe() = nothing        # dummy function to be defined in extensions
 
 # Utility for GPU / KernelAbstractions
 include("gpu.jl")                               
