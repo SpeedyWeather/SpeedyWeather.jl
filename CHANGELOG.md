@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- GeoMakie weak dependecy, globe function for 3D data visualisation [#600](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/600)
+
 ## v0.12.0
 
 - OctaminimalGaussianArray/Grid to start with 4 points around the poles [#595](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/595)
