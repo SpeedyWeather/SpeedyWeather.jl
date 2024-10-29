@@ -8,7 +8,7 @@ include("faces.jl")
 SpeedyWeather.globe(Grid::Type{<:AbstractGridArray}, nlat_half::Integer) = SpeedyWeather.globe(SpectralGrid(; Grid, nlat_half))
 SpeedyWeather.globe(SG::SpectralGrid) = globe(Geometry(SG))
 
-function SpeedyWeather.globe(geometry::Geometry)
+function SpeedyWeather.globe(geometry::Geometry{NF, Grid}) where {NF, Grid}
 
     faces, facesr = _faces(geometry)
 
@@ -37,9 +37,11 @@ function SpeedyWeather.globe(geometry::Geometry)
         end
     end
 
-    # add equator
-    lpe = lines!(ax, 0:360, zeros(361); color)
-    lpe.transformation.transform_func[] = transf
+    if RingGrids.nlat_odd(Grid) == false
+        # add equator
+        lpe = lines!(ax, 0:360, zeros(361); color)
+        lpe.transformation.transform_func[] = transf
+    end
 
     # coastlines
     lpc = lines!(GeoMakie.coastlines(50); color, linewidth=1)
