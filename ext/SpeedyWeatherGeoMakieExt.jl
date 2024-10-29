@@ -1,7 +1,7 @@
 module SpeedyWeatherGeoMakieExt
 
 using SpeedyWeather
-using GeoMakie, Geodesy
+using GeoMakie
 
 function _faces(geometry::Geometry{NF, <:OctaminimalGaussianArray}) where NF
 
@@ -43,6 +43,8 @@ SpeedyWeather.globe(SG::SpectralGrid) = globe(Geometry(SG))
 function SpeedyWeather.globe(geometry::Geometry)
 
     faces, facesr = _faces(geometry)
+
+    transf = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
 
     fig = Figure(size=(800, 800));
     ax = LScene(fig[1,1], show_axis=false);
