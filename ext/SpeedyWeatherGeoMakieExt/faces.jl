@@ -32,7 +32,7 @@ function _faces(geometry::Geometry{NF, Grid}) where {NF, Grid<:OctaminimalGaussi
     return faces, facesr
 end
 
-function _faces(geometry::Geometry{NF, Grid}) where {NF, Grid<:OctahedralGaussianArray}
+function _faces(geometry::Geometry{NF, Grid}) where {NF, Grid<:Union{OctahedralGaussianArray, OctahedralClenshawArray}}
 
     faces = zeros(geometry.nlon_max÷4+1, geometry.nlat+2, 2)
     fill!(faces, NaN)
