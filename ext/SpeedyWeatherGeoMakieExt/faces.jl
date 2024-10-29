@@ -60,4 +60,6 @@ function _faces(geometry::Geometry{NF, Grid}) where {NF, Grid<:Union{OctahedralG
 
     faces[:, end, 1] = faces[:, end-1, 1]
     faces[:, end, 2] .= -90
+
+    return faces, facesr
 end
