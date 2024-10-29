@@ -76,6 +76,9 @@ include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
 
+# to be defined in extensions
+export globe
+
 # Utility for GPU / KernelAbstractions
 include("gpu.jl")                               
 

@@ -37,11 +37,10 @@ function _faces(geometry::Geometry{NF, <:OctaminimalGaussianArray}) where NF
     return faces, facesr
 end
 
-export globe
-globe(Grid::Type{<:AbstractGridArray}, nlat_half::Integer) = globe(SpectralGrid(; Grid, nlat_half))
-globe(SG::SpectralGrid) = globe(Geometry(SG))
+SpeedyWeather.globe(Grid::Type{<:AbstractGridArray}, nlat_half::Integer) = SpeedyWeather.globe(SpectralGrid(; Grid, nlat_half))
+SpeedyWeather.globe(SG::SpectralGrid) = globe(Geometry(SG))
 
-function globe(geometry::Geometry)
+function SpeedyWeather.globe(geometry::Geometry)
 
     faces, facesr = _faces(geometry)
 
