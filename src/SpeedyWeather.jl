@@ -76,9 +76,9 @@ include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
 
-# to be defined in extensions
+# to be defined in GeoMakie extension
 export globe
-globe() = nothing        # dummy function to be defined in extensions
+function globe end
 
 # Utility for GPU / KernelAbstractions
 include("gpu.jl")                               

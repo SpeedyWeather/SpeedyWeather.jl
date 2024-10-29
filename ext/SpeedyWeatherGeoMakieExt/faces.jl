@@ -1,12 +1,12 @@
-function _faces(geometry::Geometry{NF, <:OctaminimalGaussianArray}) where NF
+function _faces(geometry::Geometry{NF, Grid}) where {NF, Grid<:OctaminimalGaussianArray}
 
     faces = zeros(geometry.nlon_max÷4+1, geometry.nlat+2, 2)
     fill!(faces, NaN)
     facesr = deepcopy(faces)
 
     for (j, latd) in enumerate(geometry.latd)
-        nlon = RingGrids.get_nlon_per_ring(geometry.Grid, geometry.nlat_half, j)
-        lond = RingGrids.get_lon_per_ring(geometry.Grid, geometry.nlat_half, j) * (360/2π)
+        nlon = RingGrids.get_nlon_per_ring(Grid, geometry.nlat_half, j)
+        lond = RingGrids.get_lon_per_ring(Grid, geometry.nlat_half, j) * (360/2π)
         nlon ÷= 4
         dϕ = 90/nlon
             
