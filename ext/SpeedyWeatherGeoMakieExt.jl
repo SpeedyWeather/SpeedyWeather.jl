@@ -3,7 +3,7 @@ module SpeedyWeatherGeoMakieExt
 using SpeedyWeather
 using GeoMakie, Geodesy
 
-function _faces(geometry::Geometry{NF, <:OctaminimalGaussianArray})
+function _faces(geometry::Geometry{NF, <:OctaminimalGaussianArray}) where NF
 
     faces = zeros(geometry.nlon_max÷4+1, geometry.nlat+2, 2)
     fill!(faces, NaN)
