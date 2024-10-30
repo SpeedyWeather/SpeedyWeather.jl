@@ -258,7 +258,7 @@ The callback is then added after the model is created
 
 ```@example particle_tracker
 particle_advection = ParticleAdvection2D(spectral_grid)
-model = ShallowWaterModel(spectral_grid, particle_advection)
+model = ShallowWaterModel(spectral_grid; particle_advection)
 add!(model.callbacks, particle_tracker)
 ```
 
