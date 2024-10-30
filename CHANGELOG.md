@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- SpectralFiltering for horizontal diffusion [#601](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/601)
+
 ## v0.12.0
 
 - OctaminimalGaussianArray/Grid to start with 4 points around the poles [#595](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/595)
