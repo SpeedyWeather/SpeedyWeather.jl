@@ -159,7 +159,7 @@ would then have this `MilleniumFlood` take place
 
 ```@example landseamask
 land_sea_mask = LandSeaMask(spectral_grid)      # start with Earth's land-sea mask
-model = PrimitiveWetModel(spectral_grid, land_sea_mask)
+model = PrimitiveWetModel(spectral_grid; land_sea_mask)
 add!(model, MilleniumFlood())   # or MilleniumFlood(::DateTime) for any non-default date
 
 simulation = initialize!(model, time=DateTime(1999,12,29))

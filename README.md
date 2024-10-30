@@ -190,9 +190,19 @@ compatibilities with older versions are not guaranteed.
 
 ## Benchmarks
 
-The primitive equations at 400km resolution with 8 vertical layers are simulated by
-SpeedyWeather.jl at about 500 simulated years per day, i.e. one year takes about
-3min single-threaded on a CPU. Multi-threading will increase the speed typically by 2-4x.
+The primitive equations at 400km resolution with 8 vertical layers can be simulated by
+SpeedyWeather.jl at 1800 simulated years per day (SYPD) on a single core of newer CPUs with arm architecture
+(M-series MacBooks for example). At that speed, simulating one year takes about 50 seconds
+without output. The complex fused-multiply adds of the spectral transform compile efficiently to
+the large vector extensions of the newer arm chips in single precision.
+Another considerable speed-up comes from the reduced grids minimizing the number of columns for
+which expensive parameterizations like convection have to be computed. The parameterizations
+take up 40-60% of the total simulation time, depending on the grid. Particularly the
+`OctaminimalGaussianGrid`, `OctaHEALPixGrid` and the `HEALPixGrid` are increasingly faster,
+at a small accuracy sacrifice of the then inexact spectral transforms. 
+
+On older CPUs, like the Intel CPU MacBooks, the 1800 SYPD drop to about 500-600 SYPD,
+which is still 2x faster than Fortran SPEEDY which is reported to reach 240 SYPD.
 
 For an overview of typical simulation speeds a user can expect under different model setups see
 [Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/benchmark).
