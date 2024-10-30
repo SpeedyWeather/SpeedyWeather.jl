@@ -39,6 +39,7 @@ include("ocean.jl")
 # include("convection.jl")
 # include("longwave_radiation.jl")
 # include("shortwave_radiation.jl")
+include("random_process.jl")
 
 # INITIALIZATION AND INTEGRATION
 include("run_speedy.jl")

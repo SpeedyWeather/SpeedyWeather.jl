@@ -175,6 +175,10 @@ function leapfrog!(
         spectral_truncation!(var_tend)
         leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
     end
+
+    # evolve the random pattern in time
+    random_process!(progn, model.random_process)
+    return nothing
 end
 
 """
@@ -368,12 +372,12 @@ function time_stepping!(
     end
     
     # UNSCALE, CLOSE, FINISH
-    finish!(feedback)                       # finish the progress meter, do first for benchmark accuracy
+    finalize!(feedback)                     # finish the progress meter, do first for benchmark accuracy
     unscale!(progn)                         # undo radius-scaling for vor, div from the dynamical core
     unscale!(diagn)                         # undo radius-scaling for vor, div from the dynamical core
-    close(output)                           # close netCDF file
+    finalize!(output, progn, diagn, model)  # possibly post-process output, then close netCDF file
     write_restart_file(output, progn)       # as JLD2 
-    finish!(model.callbacks, progn, diagn, model)
+    finalize!(model.callbacks, progn, diagn, model)
 
     # return a UnicodePlot of surface vorticity
     surface_vorticity = diagn.grid.vor_grid[:, end]

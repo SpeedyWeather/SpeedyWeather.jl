@@ -29,7 +29,7 @@ import ProgressMeter
 export DateTime, Second, Minute, Hour, Day, Week
 
 # export functions that have many cross-component methods
-export initialize!, finish!
+export initialize!, finalize!
 
 include("utility_functions.jl")
 
@@ -57,6 +57,7 @@ export  FullClenshawGrid, FullClenshawArray,
         OctahedralClenshawGrid, OctahedralClenshawArray,
         HEALPixGrid, HEALPixArray,
         OctaHEALPixGrid, OctaHEALPixArray,
+        OctaminimalGaussianGrid, OctaminimalGaussianArray,
         eachring, eachgrid, plot
 export  AnvilInterpolator
 export  spherical_distance
@@ -115,6 +116,7 @@ include("dynamics/scaling.jl")
 include("dynamics/tendencies.jl")
 include("dynamics/hole_filling.jl")
 include("dynamics/particle_advection.jl")
+include("dynamics/random_process.jl")
 
 # PARAMETERIZATIONS
 include("physics/albedo.jl")
