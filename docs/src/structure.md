@@ -129,7 +129,7 @@ a higher resolution `PrimitiveWetModel` would use
 
 ```@example structure
 spectral_grid = SpectralGrid(trunc=127, nlayers=8)
-model = PrimitiveWetModel(;spectral_grid)
+model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
 tree(simulation, max_level=1, with_size=true)
 ```

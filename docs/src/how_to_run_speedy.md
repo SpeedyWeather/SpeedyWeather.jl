@@ -124,7 +124,7 @@ on the components (they are keyword arguments so either use `; time_stepping`
 for which the naming must match, or `time_stepping=my_time_stepping` with
 any name)
 ```@example howto
-model = ShallowWaterModel(; spectral_grid, time_stepping)
+model = ShallowWaterModel(spectral_grid; time_stepping)
 ```
 This logic continues for all model components, see [Examples](@ref Examples).
 All model components are also subtype (i.e. `<:`) of some abstract supertype,
@@ -157,9 +157,9 @@ parameterizations. Conceptually you construct these different models with
 spectral_grid = SpectralGrid(trunc=..., ...)
 component1 = SomeComponent(spectral_grid, parameter1=..., ...)
 component2 = SomeOtherComponent(spectral_grid, parameter2=..., ...)
-model = BarotropicModel(; spectral_grid, all_other_components..., ...)
+model = BarotropicModel(spectral_grid; all_other_components..., ...)
 ```
-or `model = ShallowWaterModel(; spectral_grid, ...)`, etc.
+or `model = ShallowWaterModel(spectral_grid; ...)`, etc.
 
 ## [Model initialization](@id initialize)
 

@@ -76,21 +76,20 @@ about dos and don'ts. Just express your interest to contribute and we'll be happ
 
 For a more comprehensive tutorial with several examples, see
 [Examples](https://speedyweather.github.io/SpeedyWeather.jl/dev/examples_2D/) in the documentation.
-The interface to SpeedyWeather.jl consist of 5 steps: define the grid, create model components,
+The basic interface to SpeedyWeather.jl consist of 4 steps: define the grid,
 construct the model, initialize, run
 
 ```julia
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)       # define resolution
-orography = EarthOrography(spectral_grid)               # create non-default components
-model = PrimitiveWetModel(; spectral_grid, orography)   # construct model
-simulation = initialize!(model)                         # initialize all model components
-run!(simulation, period=Day(10), output=true)           # aaaand action!
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)   # define resolution
+model = PrimitiveWetModel(spectral_grid)            # construct model
+simulation = initialize!(model)                     # initialize all model components
+run!(simulation, period=Day(10), output=true)       # aaaand action!
 ```
 and you will see
 
 <img src="https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a04fbb10-1cc1-4f77-93f2-7bdf047f277d" width="450"><br>
 
-Hurray🥳 In 5 seconds we just simulated 10 days of the Earth's atmosphere at a speed of 440 years per day.
+Hurray🥳 In a few seconds seconds we just simulated 10 days of the Earth's atmosphere at a speed of 440 years per day.
 This simulation used a T31 spectral resolution on an
 [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids)
 (~400km resolution) solving the primitive equations on 8 vertical levels.

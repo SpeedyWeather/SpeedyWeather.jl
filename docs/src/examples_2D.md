@@ -14,7 +14,7 @@ See also [Examples 3D](@ref) for examples with the primitive equation models.
     spectral_grid = SpectralGrid(trunc=63, nlayers=1)
     still_earth = Earth(spectral_grid, rotation=0)
     initial_conditions = StartWithRandomVorticity()
-    model = BarotropicModel(; spectral_grid, initial_conditions, planet=still_earth)
+    model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth)
     simulation = initialize!(model)
     run!(simulation, period=Day(20))
     ```
@@ -48,7 +48,7 @@ horizontal wavenumber, and the amplitude is ``10^{-5}\text{s}^{-1}``.
 Now we want to construct a `BarotropicModel`
 with these
 ```@example barotropic_setup
-model = BarotropicModel(; spectral_grid, initial_conditions, planet=still_earth)
+model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth)
 nothing # hide
 ```
 The `model` contains all the parameters, but isn't initialized yet, which we can do
@@ -74,7 +74,7 @@ with default settings. More options on output in [NetCDF output](@ref).
     spectral_grid = SpectralGrid(trunc=63, nlayers=1)
     orography = NoOrography(spectral_grid)
     initial_conditions = ZonalJet()
-    model = ShallowWaterModel(; spectral_grid, orography, initial_conditions)
+    model = ShallowWaterModel(spectral_grid; orography, initial_conditions)
     simulation = initialize!(model)
     run!(simulation, period=Day(6))
     ```
@@ -100,7 +100,7 @@ initial_conditions = ZonalJet()
 The jet sits at 45˚N with a maximum velocity of 80m/s and a perturbation as described in their paper.
 Now we construct a model, but this time a `ShallowWaterModel`
 ```@example galewsky_setup
-model = ShallowWaterModel(; spectral_grid, orography, initial_conditions)
+model = ShallowWaterModel(spectral_grid; orography, initial_conditions)
 simulation = initialize!(model)
 run!(simulation, period=Day(6))
 ```
@@ -191,7 +191,7 @@ options too, but let's not change them. Same as before, create a model, initiali
 This time directly for 12 days so that we can compare with the last plot
 
 ```@example galewsky_setup
-model = ShallowWaterModel(; spectral_grid, orography, initial_conditions)
+model = ShallowWaterModel(spectral_grid; orography, initial_conditions)
 simulation = initialize!(model)
 run!(simulation, period=Day(12), output=true)
 ```
@@ -233,7 +233,7 @@ spectral_grid = SpectralGrid(trunc=63, nlayers=1)
 forcing = JetStreamForcing(spectral_grid, latitude=60)
 drag = QuadraticDrag(spectral_grid)
 
-model = ShallowWaterModel(; spectral_grid, drag, forcing)
+model = ShallowWaterModel(spectral_grid; drag, forcing)
 simulation = initialize!(model)
 run!(simulation, period=Day(40))
 nothing # hide
@@ -272,7 +272,7 @@ orography = EarthOrography(spectral_grid, smoothing=false)
 initial_conditions = SpeedyWeather.RandomWaves()
 
 # construct, initialize, run
-model = ShallowWaterModel(; spectral_grid, orography, initial_conditions, implicit, time_stepping)
+model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit, time_stepping)
 simulation = initialize!(model)
 run!(simulation, period=Day(2))
 nothing # hide

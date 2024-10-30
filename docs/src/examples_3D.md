@@ -20,7 +20,7 @@ initial_conditions = InitialConditions(
     temp = JablonowskiTemperature(),
     pres = ZeroInitially())
 
-model = PrimitiveDryModel(; spectral_grid, orography, initial_conditions, physics=false)
+model = PrimitiveDryModel(spectral_grid; orography, initial_conditions, physics=false)
 simulation = initialize!(model)
 run!(simulation, period=Day(9))
 nothing # hide
@@ -117,7 +117,7 @@ land_sea_mask = AquaPlanetMask(spectral_grid)
 orography = NoOrography(spectral_grid)
 
 # create model, initialize, run
-model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography)
+model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography)
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
 nothing # hide
@@ -171,7 +171,7 @@ and `orography` (because `spectral_grid` hasn't changed this is possible).
 convection = DryBettsMiller(spectral_grid, time_scale=Hour(4))
 
 # reuse other model components from before
-model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography, convection)
+model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convection)
 
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
@@ -191,7 +191,7 @@ don't require the `spectral_grid` to be passed on, but some do!)
 convection = NoConvection(spectral_grid)
 
 # reuse other model components from before
-model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography, convection)
+model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convection)
 
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
@@ -218,7 +218,7 @@ large_scale_condensation = ImplicitCondensation(spectral_grid)
 convection = SimplifiedBettsMiller(spectral_grid)
 
 # create model, initialize, run
-model = PrimitiveWetModel(; spectral_grid, large_scale_condensation, convection)
+model = PrimitiveWetModel(spectral_grid; large_scale_condensation, convection)
 simulation = initialize!(model)
 run!(simulation, period=Day(10))
 nothing # hide

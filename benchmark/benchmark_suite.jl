@@ -41,7 +41,7 @@ function run_benchmark_suite!(suite::BenchmarkSuite)
         spectral_grid = SpectralGrid(;NF, trunc, Grid, nlayers)
         suite.nlat[i] = spectral_grid.nlat
 
-        model = Model(;spectral_grid)
+        model = Model(spectral_grid)
         if Model <: PrimitiveEquation
             model.physics = physics
             model.dynamics = dynamics
@@ -152,7 +152,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
         spectral_grid = SpectralGrid(;NF, trunc, Grid, nlayers)
         suite.nlat[i] = spectral_grid.nlat
 
-        model = Model(;spectral_grid)
+        model = Model(spectral_grid)
 
         simulation = initialize!(model)
 

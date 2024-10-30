@@ -217,3 +217,39 @@ function horizontal_diffusion!(
     horizontal_diffusion!(temp_tend, temp, ∇²ⁿc, ∇²ⁿc_implicit)
     model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, ∇²ⁿc, ∇²ⁿc_implicit)
 end
+
+@kwdef mutable struct SpectralFilter{
+    NF,
+    MatrixType,
+} <: AbstractHorizontalDiffusion
+
+    # DIMENSIONS
+    "spectral resolution"
+    trunc::Int
+
+    "number of vertical levels"
+    nlayers::Int
+    
+    # PARAMETERS
+    "[OPTION] relative wavenumber"
+    wavenumber::NF = 0
+
+    "[OPTION] Scale-selectiveness"
+    scale::NF = 0.05
+    
+    "[OPTION] diffusion time scale"
+    time_scale::Second = Minute(144)
+
+    # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
+    ∇²ⁿ::MatrixType = zeros(NF, trunc+2, nlayers)           # explicit part
+    ∇²ⁿ_implicit::MatrixType = ones(NF, trunc+2, nlayers)   # implicit part
+end
+
+"""$(TYPEDSIGNATURES)
+Generator function based on the resolutin in `spectral_grid`.
+Passes on keyword arguments."""
+function SpectralFilter(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, trunc, nlayers, ArrayType) = spectral_grid        # take resolution parameters from spectral_grid
+    MatrixType = ArrayType{NF, 2}
+    return SpectralFilter{NF, MatrixType}(; trunc, nlayers, kwargs...)
+end
