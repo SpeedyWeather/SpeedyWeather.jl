@@ -137,17 +137,18 @@ function horizontal_diffusion!(
     ∇²ⁿ_impl::AbstractMatrix,           # implicit spectral damping (lmax x nlayers matrix)
 )
     lmax, mmax = size(tendency, OneBased, as=Matrix)
+    nlayers = size(var, 2)
 
     @boundscheck size(tendency) == size(var) || throw(BoundsError)
     @boundscheck lmax <= size(∇²ⁿ_expl, 1) == size(∇²ⁿ_impl, 1) || throw(BoundsError)
-    @boundscheck k <= size(∇²ⁿ_expl, 2) == size(∇²ⁿ_impl, 2) || throw(BoundsError)
+    @boundscheck nlayers <= size(∇²ⁿ_expl, 2) == size(∇²ⁿ_impl, 2) || throw(BoundsError)
 
-    @inbounds for k in eachmatrix(tendency, A)
+    @inbounds for k in eachmatrix(tendency, var)
         lm = 0                      # running index
         for m in 1:mmax             # loops over all columns/order m
             for l in m:lmax
                 lm += 1             # single index lm corresponding to harmonic l, m
-                tendency[lm, k] = (tendency[lm, k] + ∇²ⁿ_expl[l, k]*A[lm, k]) * ∇²ⁿ_impl[l, k]
+                tendency[lm, k] = (tendency[lm, k] + ∇²ⁿ_expl[l, k]*var[lm, k]) * ∇²ⁿ_impl[l, k]
             end
         end
     end
