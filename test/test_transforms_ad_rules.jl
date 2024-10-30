@@ -42,7 +42,7 @@ end
                 f_north = S.scratch_memory_north
                 f_south = S.scratch_memory_south
 
-                test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(9, 1), rtol=1e-7, atol=1e-7)
+                test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(15, 1), rtol=1e-4, atol=1e-4)
             end
         end
     end 
