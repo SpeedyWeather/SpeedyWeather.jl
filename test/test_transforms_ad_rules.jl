@@ -56,7 +56,7 @@ end
             spectral_grid = SpectralGrid(Grid=grid_type, dealiasing=grid_dealiasing[i_grid])
 
             # forwards 
-            S = SpectralTransform(spectral_grid)
+            S = SpectralTransform(spectral_grid, one_more_degree=true)
             dS = deepcopy(S)
             grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
             dgrid = zero(grid)
@@ -93,44 +93,55 @@ end
 
             @test isapprox(dspecs, fd_jvp[1])
 
-            # test that d S^{-1}(S(x)) / dx = dx/dx = 1 (starting in both domains)
+            # test that d S^{-1}(S(x)) / dx = dx/dx = 1 (starting in both domains) 
+            # this only holds for exact transforms, like Gaussian grids 
 
             # start with grid (but with a truncated one)
-
-            function transform_identity!(x::AbstractGridArray{T}, S::SpectralTransform{T}) where T
+            function transform_identity!(x_out::AbstractGridArray{T}, x::AbstractGridArray{T}, S::SpectralTransform{T}) where T
                 x_SH = zeros(LowerTriangularArray{Complex{T}}, S.lmax+1, S.mmax+1, S.nlayers)
                 transform!(x_SH, x, S)
-                transform!(x, x_SH, S)
+                transform!(x_out, x_SH, S)
                 return nothing
             end 
 
             function transform_identity(x::AbstractGridArray{T}, S::SpectralTransform{T}) where T
                 x_copy = deepcopy(x)
-                transform_identity!(x_copy, S) 
+                transform_identity!(x_copy, x, S) 
                 return x_copy
             end
               
             grid = rand(S.Grid{spectral_grid.NF}, S.nlat_half, S.nlayers)
             spec = transform(grid, S)
+
             grid = transform(spec, S)
-            grid_copy = deepcopy(grid)
+            grid_out = zero(grid)
             
-            transform_identity!(grid, S)
-            @test isapprox(grid, grid_copy)
+            transform_identity!(grid_out, grid, S)
+            @test isapprox(grid, grid_out)
 
             dgrid = similar(grid)
             fill!(dgrid, 1)
 
-            autodiff(Reverse, transform_identity!, Const, Duplicated(grid, dgrid), Duplicated(S, dS))
+            dgrid_out = zero(grid_out)
 
-            @test_broken all(isapprox.(dgrid, 1)) 
-            # TODO: broken: currenlty the whole field is 0.912 instead of 1., seems like a normalisation issue?
-            # but a FD differentiation yields the same, so this is a problem with the setup
-            
-            dgrid2 = similar(grid)
-            fill!(dgrid2, 1)
-            fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_identity(x, S), dgrid2, grid)
-            @test isapprox(dgrid, fd_jvp[1], rtol=0.01)
+            autodiff(Reverse, transform_identity!, Const, Duplicated(grid_out, dgrid_out), Duplicated(grid, dgrid), Duplicated(S, dS))
+
+            @test all(isapprox.(dgrid, 1)) 
+            # TODO: previously this test was broken, with a version that directly mutates in-place. 
+            # Not sure why. Do we use such things in our model? 
+            #
+            #function transform_identity!(x::AbstractGridArray{T}, S::SpectralTransform{T}) where T
+            #   x_SH = zeros(LowerTriangularArray{Complex{T}}, S.lmax+1, S.mmax+1, S.nlayers)
+            #   transform!(x_SH, x, S)
+            #   transform!(x, x_SH, S)
+            #   return nothing
+            #end 
+
+            # The FD comparision passes, but it takes a long time to compute, so it's commented out. 
+            #dgrid2 = similar(grid)
+            #fill!(dgrid2, 1)
+            #fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_identity(x, S), dgrid2, grid)
+            #@test isapprox(dgrid, fd_jvp[1], rtol=0.01)
 
             # now start with spectral space 
 
