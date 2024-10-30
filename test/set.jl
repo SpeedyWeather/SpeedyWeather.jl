@@ -5,7 +5,7 @@
     NF = Float64
     complex_NF = Complex{NF}
     spectral_grid = SpectralGrid(; NF, trunc, nlayers)  # define resolution
-    model = PrimitiveWetModel(; spectral_grid)          # construct model
+    model = PrimitiveWetModel(spectral_grid)            # construct model
     simulation = initialize!(model)                     # initialize all model components
  
     lmax = model.spectral_transform.lmax

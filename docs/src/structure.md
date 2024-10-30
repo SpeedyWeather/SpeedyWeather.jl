@@ -34,7 +34,7 @@ But let's start at the top.
 When creating a `Simulation`, its fields are
 ```@example structure
 spectral_grid = SpectralGrid(nlayers = 1)
-model = BarotropicModel(; spectral_grid)
+model = BarotropicModel(spectral_grid)
 simulation = initialize!(model)
 ```
 the `prognostic_variables`, the `diagnostic_variables` and the `model` (that we just
@@ -77,7 +77,7 @@ If you create a model with non-default conponents they will show up here.
 that tree may look different depending on what model you have constructed!
 
 ```@example structure
-model = BarotropicModel(; spectral_grid)
+model = BarotropicModel(spectral_grid)
 tree(model)
 ```
 
@@ -87,7 +87,7 @@ The `ShallowWaterModel` is similar to the `BarotropicModel`, but it contains for
 orography, that the `BarotropicModel` doesn't have.
 
 ```@example structure
-model = ShallowWaterModel(; spectral_grid)
+model = ShallowWaterModel(spectral_grid)
 tree(model)
 ```
 
@@ -99,7 +99,7 @@ aren't needed.
 
 ```@example structure
 spectral_grid = SpectralGrid()
-model = PrimitiveDryModel(; spectral_grid)
+model = PrimitiveDryModel(spectral_grid)
 tree(model)
 ```
 
@@ -109,7 +109,7 @@ The `PrimitiveWetModel` is the most complex model we currently have, hence its
 field tree is the longest, defining many components for the physics parameterizations.
 
 ```@example structure
-model = PrimitiveWetModel(; spectral_grid)
+model = PrimitiveWetModel(spectral_grid)
 tree(model)
 ```
 

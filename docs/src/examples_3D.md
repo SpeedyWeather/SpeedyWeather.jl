@@ -54,7 +54,7 @@ using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 
 # construct model with only Held-Suarez forcing, no other physics
-model = PrimitiveDryModel(;
+model = PrimitiveDryModel(
     spectral_grid,
 
     # Held-Suarez forcing and drag

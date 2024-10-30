@@ -2,7 +2,7 @@
     for NF in (Float32, Float64)
 
         spectral_grid = SpectralGrid(; NF)
-        model = PrimitiveDryModel(; spectral_grid)
+        model = PrimitiveDryModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables

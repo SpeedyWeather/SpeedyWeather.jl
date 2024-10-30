@@ -27,7 +27,7 @@ as default
 ```@example haurwitz
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=63, nlayers=1)
-model = BarotropicModel(; spectral_grid)
+model = BarotropicModel(spectral_grid)
 simulation = initialize!(model)
 ```
 

@@ -28,7 +28,7 @@ But any `NetCDFOutput` can be passed onto the model constructor with the `output
 
 ```@example netcdf
 output = NetCDFOutput(spectral_grid, Barotropic)
-model = ShallowWaterModel(spectral_grid; output=output)
+model = ShallowWaterModel(spectral_grid, output=output)
 nothing # hide
 ```
 
@@ -43,7 +43,7 @@ trigger it as `output=false` is the default here.
 If we want to increase the frequency of the output we can choose `output_dt` (default `=Hour(6)`) like so
 ```@example netcdf
 output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
-model = ShallowWaterModel(spectral_grid; output=output)
+model = ShallowWaterModel(spectral_grid, output=output)
 model.output
 ```
 which will now output every hour. It is important to pass on the new output writer `output` to the
