@@ -5,8 +5,8 @@ using FiniteDifferences
 import FiniteDifferences: j′vp, grad, central_fdm
 import AbstractFFTs
 
-grid_types = [FullGaussianGrid] #, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
-grid_dealiasing = [2] #, 3]
+grid_types = [FullGaussianGrid]#, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
+grid_dealiasing = [2]#, 3]
 
 # currenlty there's an issue with EnzymeTestUtils not being able to work with structs with undefined fields like FFT plans
 # https://github.com/EnzymeAD/Enzyme.jl/issues/1992
@@ -33,7 +33,7 @@ end
 
     @testset "_fourier! Enzyme rules" begin
         
-        @testset "reverse rule" begin
+        @testset "EnzymeTestUtils reverse rule test" begin
             for (i_grid, grid_type) in enumerate(grid_types)
 
                 spectral_grid = SpectralGrid(Grid=grid_type, nlayers=1, trunc=5, dealiasing=grid_dealiasing[i_grid])
@@ -176,6 +176,5 @@ end
 
     @testset "Complete Transform ChainRules" begin 
         # WIP
-    end 
-
+    end
 end 
