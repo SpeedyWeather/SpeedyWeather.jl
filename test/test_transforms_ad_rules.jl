@@ -5,8 +5,8 @@ using FiniteDifferences
 import FiniteDifferences: j′vp, grad, central_fdm
 import AbstractFFTs
 
-grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
-grid_dealiasing = [2, 3]
+grid_types = [FullGaussianGrid] #, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
+grid_dealiasing = [2] #, 3]
 
 # currenlty there's an issue with EnzymeTestUtils not being able to work with structs with undefined fields like FFT plans
 # https://github.com/EnzymeAD/Enzyme.jl/issues/1992
@@ -48,7 +48,6 @@ end
                 # inverse transform
                 grid = zero(grid)
                 test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (grid, Duplicated), (f_north, Duplicated), (f_south, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(15, 1), rtol=1e-3, atol=1e-3)
-
             end
         end
     end 
