@@ -47,7 +47,6 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
 
         rfft_plan = rfft_plans[j]           # FFT planned wrt nlon on ring
         ilons = rings[j_north]              # in-ring indices northern ring
-        
         # FOURIER TRANSFORM in zonal direction, northern latitude
         # views and copies necessary for stride-1 outputs required by FFTW
         ring_layers = view(grids.data, ilons, :)
@@ -164,7 +163,7 @@ end
 (Inverse) Fast Fourier transform (spectral to grid) of Legendre-transformed inputs `g_north` and `g_south`
 to be stored in `grids`. Serial version that does not require the number of vertical layers to be the same
 as precomputed in `S`. Not to be called directly, use `transform!` instead."""
-function _fourier_serial!(                  # GRID TO SPECTRAL
+function _fourier_serial!(                  # SPECTRAL TO GRID
     grids::AbstractGridArray,               # gridded output
     g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed input
     g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
@@ -203,14 +202,13 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
     end
 end
 
-get_zeros_func(::Type{<:AbstractArray}) = zeros
+which_FFT_package(::Type{<:AbstractArray{NF}}) where NF<:AbstractFloat = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
 
 """$(TYPEDSIGNATURES)
 Util function to generate FFT plans based on the array type of the fake Grid 
 data provided. Uses views, which is less allocate-y than indexing but breaks 
 when using CuArrays (see CUDA extension for alternative implementation for 
 CuArrays)."""
-
 function plan_FFTs!(
     rfft_plans::Vector{AbstractFFTs.Plan},
     brfft_plans::Vector{AbstractFFTs.Plan},
@@ -222,7 +220,7 @@ function plan_FFTs!(
     nlons::Vector{<:Int}
 ) where {NF<:AbstractFloat, N}
     # Determine which FFT package to use (currently either FFTW or GenericFFT)
-    FFT_package = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
+    FFT_package = which_FFT_package(Array{NF})
 
     # For each ring generate an FFT plan (for all layers and for a single layer)
     for (j, nlon) in enumerate(nlons)

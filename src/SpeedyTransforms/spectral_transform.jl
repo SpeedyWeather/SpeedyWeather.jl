@@ -3,9 +3,6 @@ const DEFAULT_GRID = FullGaussianGrid
 
 abstract type AbstractSpectralTransform end
 
-# which_FFT_package(::Type{<:AbstractArray{NF}}) where NF<:AbstractFloat = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
-# get_zeros_func(::Type{<:AbstractArray}) = zeros
-
 """SpectralTransform struct that contains all parameters and precomputed arrays
 to perform a spectral transform. Fields are
 $(TYPEDFIELDS)"""
@@ -14,7 +11,6 @@ struct SpectralTransform{
     ArrayType,
     VectorType,                 # <: ArrayType{NF, 1},
     VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
-    VectorIntType,              # <: ArrayType{Int, 1},
     MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
     ArrayComplexType,           # <: ArrayType{Complex{NF}, 3},
     LowerTriangularMatrixType,  # <: LowerTriangularArray{NF, 1, ArrayType{NF}},
@@ -30,12 +26,12 @@ struct SpectralTransform{
     mmax::Int                       # Maximum order m=[0, l] of spherical harmonics
     nfreq_max::Int                  # Maximum (at Equator) number of Fourier frequencies (real FFT)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} # Legendre shortcut for truncation of m loop
-    mmax_truncation::VectorIntType  # Maximum order m to retain per latitude ring
+    mmax_truncation::Vector{Int}   # Maximum order m to retain per latitude ring
 
     # CORRESPONDING GRID SIZE
-    nlon_max::Int           # Maximum number of longitude points (at Equator)
-    nlons::VectorIntType    # Number of longitude points per ring
-    nlat::Int               # Number of latitude rings
+    nlon_max::Int                   # Maximum number of longitude points (at Equator)
+    nlons::Vector{Int}              # Number of longitude points per ring
+    nlat::Int                       # Number of latitude rings
 
     # CORRESPONDING GRID VECTORS
     coslat::VectorType              # Cosine of latitudes, north to south
@@ -106,7 +102,6 @@ function SpectralTransform(
 ) where NF
 
     Grid = RingGrids.nonparametric_type(Grid)   # always use nonparametric concrete type
-    zeros_ = get_zeros_func(ArrayType)
 
     # RESOLUTION PARAMETERS
     nlat = get_nlat(Grid, nlat_half)            # 2nlat_half but one less if grids have odd # of lat rings
@@ -144,7 +139,8 @@ function SpectralTransform(
     end
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    scratch_memory_north = zeros_(Complex{NF}, nfreq_max, nlayers, nlat_half)
+    # north is converted to array type now for help with making the FFT plans
+    scratch_memory_north = ArrayType(zeros(Complex{NF}, nfreq_max, nlayers, nlat_half))
     scratch_memory_south = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
 
     # SCRATCH MEMORY TO 1-STRIDE DATA FOR FFTs
@@ -160,7 +156,7 @@ function SpectralTransform(
     rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
 
-    fake_grid_data = zeros_(Grid{NF}, nlat_half, nlayers)
+    fake_grid_data = adapt(ArrayType, zeros(Grid{NF}, nlat_half, nlayers))
 
     # PLAN THE FFTs
     plan_FFTs!(
@@ -230,7 +226,6 @@ function SpectralTransform(
         ArrayType_,
         ArrayType_{NF, 1},
         ArrayType_{Complex{NF}, 1},
-        ArrayType_{Int, 1},
         ArrayType_{Complex{NF}, 2},
         ArrayType_{Complex{NF}, 3},
         LowerTriangularArray{NF, 1, ArrayType_{NF, 1}},

@@ -9,6 +9,7 @@ import FFTW
 import GenericFFT
 import LinearAlgebra
 import Primes
+import Adapt: adapt
 
 # SPEEDYWEATHER MODULES
 using ..LowerTriangularMatrices
