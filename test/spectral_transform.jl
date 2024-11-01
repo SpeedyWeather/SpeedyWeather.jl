@@ -45,6 +45,7 @@ spectral_resolutions_inexact = (127, 255)
                             FullClenshawGrid,
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid,
+                            OctaminimalGaussianGrid,
                             HEALPixGrid,
                             OctaHEALPixGrid,
                             FullHEALPixGrid,
@@ -89,8 +90,8 @@ end
 
 @testset "Transform: Individual Legendre polynomials" begin
     @testset for trunc in spectral_resolutions
-        for NF in (Float32, Float64)
-            for Grid in (   FullGaussianGrid,
+        @testset for NF in (Float32, Float64)
+            @testset for Grid in (   FullGaussianGrid,
                             FullClenshawGrid,
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid)
@@ -123,7 +124,8 @@ end
             for Grid in (   FullGaussianGrid,
                             FullClenshawGrid,
                             OctahedralGaussianGrid,
-                            OctahedralClenshawGrid)
+                            OctahedralClenshawGrid,
+                            OctaminimalGaussianGrid)
 
                 SG = SpectralGrid(; NF, trunc, Grid)
                 S = SpectralTransform(SG)
@@ -255,6 +257,7 @@ end
         @testset for NF in (Float32, Float64)
             @testset for Grid in (  HEALPixGrid,
                                     OctaHEALPixGrid,
+                                    OctaminimalGaussianGrid,
                                     FullHEALPixGrid,
                                     FullOctaHEALPixGrid)
                 

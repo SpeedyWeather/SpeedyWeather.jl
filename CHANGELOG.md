@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## v0.12.0
+
+- OctaminimalGaussianArray/Grid to start with 4 points around the poles [#595](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/595)
+- Output both accumulated and precipitation rate as netCDF [#596](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/596)
+- Random processes for random pattern generation [#592](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/592)
 - Also allow SpectralGrid as positional argument to model constructors [#593](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/593)
 - De-interweave SpectralTransform [#587](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/587)
 - Rossby-Haurwitz wave initial conditions [#591](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/591)

@@ -96,6 +96,9 @@ export PrognosticVariables
     pres::NTuple{NSTEPS, SpectralVariable2D} =
         ntuple(i -> zeros(SpectralVariable2D, trunc+2, trunc+1), NSTEPS)
 
+    "Random pattern following a random process [1]"
+    random_pattern::SpectralVariable2D = zeros(SpectralVariable2D, trunc+2, trunc+1)
+
     "Ocean variables, sea surface temperature and sea ice concentration"
     ocean::PrognosticVariablesOcean{NF, ArrayType, GridVariable2D} =
         PrognosticVariablesOcean{NF, ArrayType, GridVariable2D}(; nlat_half)
@@ -148,6 +151,7 @@ function Base.show(
     println(io, "├ temp:  T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
     println(io, "├ humid: T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
     println(io, "├ pres:  T$trunc, 1-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
+    println(io, "├ random_pattern: T$trunc, 1-layer LowerTriangularArray{$NF}")
     println(io, "├┐ocean: PrognosticVariablesOcean{$NF}")
     println(io, "│├ sea_surface_temperature:  $nlat-ring $Grid")
     println(io, "│└ sea_ice_concentration:    $nlat-ring $Grid")

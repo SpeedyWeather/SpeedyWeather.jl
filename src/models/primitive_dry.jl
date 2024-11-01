@@ -21,6 +21,7 @@ $(TYPEDFIELDS)"""
     AC,     # <:AbstractAdiabaticConversion,
     PA,     # <:AbstractParticleAdvection,
     IC,     # <:AbstractInitialConditions,
+    RP,     # <:AbstractRandomProcess,
     LS,     # <:AbstractLandSeaMask,
     OC,     # <:AbstractOcean,
     LA,     # <:AbstractLand,
@@ -57,6 +58,7 @@ $(TYPEDFIELDS)"""
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(PrimitiveDry)
+    random_process::RP = NoRandomProcess()
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
@@ -110,6 +112,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.coriolis, model)
     initialize!(model.geopotential, model)
     initialize!(model.adiabatic_conversion, model)
+    initialize!(model.random_process, model)
 
     # boundary conditionss
     initialize!(model.orography, model)
