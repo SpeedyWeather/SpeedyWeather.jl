@@ -201,10 +201,10 @@ function horizontal_diffusion!(
     lf::Integer = 1,    # leapfrog index used (2 is unstable)
 )
     # use weaker diffusion operators that don't taper or scale with resolution for temperature and humidity
-    (; ∇²ⁿc, ∇²ⁿc_implicit) = model.horizontal_diffusion
+    (; ∇²ⁿc, ∇²ⁿc_implicit) = diffusion
 
     # and the ones that do for vorticity and divergence
-    (; ∇²ⁿ, ∇²ⁿ_implicit) = model.horizontal_diffusion
+    (; ∇²ⁿ, ∇²ⁿ_implicit) = diffusion
 
     # Primitive equation models diffuse vor, divergence, temp (and humidity for wet core)
     vor = progn.vor[lf]
@@ -218,6 +218,7 @@ function horizontal_diffusion!(
     model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, ∇²ⁿc, ∇²ⁿc_implicit)
 end
 
+export SpectralFilter
 @kwdef mutable struct SpectralFilter{
     NF,
     MatrixType,
@@ -252,4 +253,60 @@ function SpectralFilter(spectral_grid::SpectralGrid; kwargs...)
     (; NF, trunc, nlayers, ArrayType) = spectral_grid        # take resolution parameters from spectral_grid
     MatrixType = ArrayType{NF, 2}
     return SpectralFilter{NF, MatrixType}(; trunc, nlayers, kwargs...)
+end
+
+function initialize!(diffusion::SpectralFilter, model::AbstractModel)
+    initialize!(diffusion, model.time_stepping)
+end
+
+function initialize!(   
+    diffusion::SpectralFilter,
+    L::AbstractTimeStepper,
+)
+    (; trunc, nlayers) = diffusion
+    (; ∇²ⁿ, ∇²ⁿ_implicit) = diffusion
+    (; scale, wavenumber, power) = diffusion
+    (; Δt, radius) = L
+
+    # times 1/radius because time step Δt is scaled with 1/radius
+    time_scale = Second(diffusion.time_scale).value/radius
+    
+    for k in 1:nlayers
+        for l in 0:trunc    # diffusion for every degree l, but indendent of order m
+            # Explicit part
+            ∇²ⁿ[l+1, k] =  (erfc(scale*(l - trunc - wavenumber)))^power / time_scale
+            
+            # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
+            ∇²ⁿ_implicit[l+1, k] = 1/(1-2Δt*∇²ⁿ[l+1, k])                    
+        end
+        
+        # last degree is only used by vector quantities; set to zero for implicit and explicit
+        # to set any tendency at lmax+1,1:mmax to zero (what it should be anyway)
+        ∇²ⁿ[trunc+2, k] = 0
+        ∇²ⁿ_implicit[trunc+2, k] = 0
+    end
+end
+
+"""$(TYPEDSIGNATURES)
+Apply horizontal diffusion applied to vorticity, divergence, temperature, and
+humidity (PrimitiveWet only) in the PrimitiveEquation models."""
+function horizontal_diffusion!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    diffusion::SpectralFilter,
+    model::PrimitiveEquation,
+    lf::Integer = 1,    # leapfrog index used (2 is unstable)
+)
+    (; ∇²ⁿ, ∇²ⁿ_implicit) = diffusion
+
+    # Primitive equation models diffuse vor, divergence, temp (and humidity for wet core)
+    vor = progn.vor[lf]
+    div = progn.div[lf]
+    temp = progn.temp[lf]
+    humid = progn.humid[lf]
+    (; vor_tend, div_tend, temp_tend, humid_tend) = diagn.tendencies
+    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
+    horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)
+    horizontal_diffusion!(temp_tend, temp, ∇²ⁿ, ∇²ⁿ_implicit)
+    model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, ∇²ⁿ, ∇²ⁿ_implicit)
 end
