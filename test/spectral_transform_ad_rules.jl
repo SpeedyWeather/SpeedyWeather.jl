@@ -5,8 +5,8 @@ using FiniteDifferences
 import FiniteDifferences: j′vp, grad, central_fdm
 import AbstractFFTs
 
-grid_types = [FullGaussianGrid]#, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
-grid_dealiasing = [2]#, 3]
+grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
+grid_dealiasing = [2, 3]
 
 # currenlty there's an issue with EnzymeTestUtils not being able to work with structs with undefined fields like FFT plans
 # https://github.com/EnzymeAD/Enzyme.jl/issues/1992
@@ -30,24 +30,27 @@ function EnzymeTestUtils.test_approx(x::AbstractFFTs.Plan, y::AbstractFFTs.Plan,
 end 
 
 @testset "SpeedyTransforms: AD Rules" begin
-
-    @testset "_fourier! Enzyme rules" begin
-        
+    @testset "_fourier! Enzyme rules" begin      
         @testset "EnzymeTestUtils reverse rule test" begin
             for (i_grid, grid_type) in enumerate(grid_types)
+                
+                # these tests don't pass for reduced grids 
+                # this is likely due to FiniteDifferences and not our EnzymeRules 
+                # see comments in https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589
+                if !(grid_type <: AbstractReducedGridArray)
+                    spectral_grid = SpectralGrid(Grid=grid_type, nlayers=1, trunc=5, dealiasing=grid_dealiasing[i_grid])
+                    S = SpectralTransform(spectral_grid)
+                    grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+                    f_north = S.scratch_memory_north
+                    f_south = S.scratch_memory_south
 
-                spectral_grid = SpectralGrid(Grid=grid_type, nlayers=1, trunc=5, dealiasing=grid_dealiasing[i_grid])
-                S = SpectralTransform(spectral_grid)
-                grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
-                f_north = S.scratch_memory_north
-                f_south = S.scratch_memory_south
+                    # forward transform 
+                    test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(15, 1), rtol=1e-3, atol=1e-3)
 
-                # forward transform 
-                test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(15, 1), rtol=1e-3, atol=1e-3)
-
-                # inverse transform
-                grid = zero(grid)
-                test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (grid, Duplicated), (f_north, Duplicated), (f_south, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(15, 1), rtol=1e-3, atol=1e-3)
+                    # inverse transform
+                    grid = zero(grid)
+                    test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (grid, Duplicated), (f_north, Duplicated), (f_south, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(15, 1), rtol=1e-3, atol=1e-3)
+                end 
             end
         end
     end 
@@ -132,6 +135,7 @@ end
 
             @test all(isapprox.(dgrid, 1)) 
             # TODO: previously this test was broken, with a version that directly mutates in-place. 
+            # FD yields the same non-one values though. 
             # Not sure why. Do we use such things in our model? 
             #
             #function transform_identity!(x::AbstractGridArray{T}, S::SpectralTransform{T}) where T
@@ -140,7 +144,6 @@ end
             #   transform!(x, x_SH, S)
             #   return nothing
             #end 
-
             # The FD comparision passes, but it takes a long time to compute, so it's commented out. 
             #dgrid2 = similar(grid)
             #fill!(dgrid2, 1)
