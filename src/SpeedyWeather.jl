@@ -61,6 +61,7 @@ export  FullClenshawGrid, FullClenshawArray,
         eachring, eachgrid, plot
 export  AnvilInterpolator
 export  spherical_distance
+export  zonal_mean
 
 include("RingGrids/RingGrids.jl")
 using .RingGrids

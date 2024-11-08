@@ -5,7 +5,7 @@ using  DocStringExtensions
 import UnicodePlots
 
 # NUMERICS
-import Statistics: mean
+import Statistics: Statistics, mean
 import FastGaussQuadrature
 import LinearAlgebra
 
@@ -95,6 +95,9 @@ export  interpolate,
         update_locator,
         update_locator!
 
+# STATISTICS
+export zonal_mean
+
 include("utility_functions.jl")
 
 # GENERAL
@@ -121,6 +124,7 @@ include("grids/octaminimal_gaussian.jl")
 include("quadrature_weights.jl")
 include("interpolation.jl")
 include("vertices.jl")
+include("statistics.jl")
 
 # OUTPUT
 include("show.jl")
