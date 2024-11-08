@@ -120,6 +120,7 @@ include("grids/octaminimal_gaussian.jl")
 # INTEGRATION AND INTERPOLATION
 include("quadrature_weights.jl")
 include("interpolation.jl")
+include("vertices.jl")
 
 # OUTPUT
 include("show.jl")

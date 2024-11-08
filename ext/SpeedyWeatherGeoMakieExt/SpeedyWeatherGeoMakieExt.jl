@@ -3,14 +3,14 @@ module SpeedyWeatherGeoMakieExt
 using SpeedyWeather
 using GeoMakie
 
+using DocStringExtensions
+
 include("faces.jl")
 
-SpeedyWeather.globe(Grid::Type{<:AbstractGridArray}, nlat_half::Integer) = SpeedyWeather.globe(SpectralGrid(; Grid, nlat_half))
-SpeedyWeather.globe(SG::SpectralGrid) = globe(Geometry(SG))
+SpeedyWeather.globe(SG::SpectralGrid) = globe(SG.Grid, SG.nlat_half)
+SpeedyWeather.globe(geometry::Geometry{NF, Grid}) where {NF, Grid} = globe(Grid, geometry.nlat_half)
 
-function SpeedyWeather.globe(geometry::Geometry{NF, Grid}) where {NF, Grid}
-
-    faces, facesr = _faces(geometry)
+function SpeedyWeather.globe(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
 
     transf = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
 
@@ -23,25 +23,13 @@ function SpeedyWeather.globe(geometry::Geometry{NF, Grid}) where {NF, Grid}
 
     # cell centers
     color = :black
-    s = scatter!(ax, geometry.londs, geometry.latds, markersize=5; color)
+    latds, londs = RingGrids.get_latdlonds(Grid, nlat_half)
+    s = scatter!(ax, londs, latds, markersize=5; color)
     s.transformation.transform_func[] = transf
 
-    # cell faces
-    for i in 1:geometry.nlon_max÷4
-        for offset in [0, 90, 180, 270]
-            lp1 = lines!(ax, facesr[i, :, 1] .+ offset, facesr[i, :, 2]; color)
-            lp2 = lines!(ax, offset .- faces[i, :, 1], faces[i, :, 2]; color)
-
-            lp1.transformation.transform_func[] = transf
-            lp2.transformation.transform_func[] = transf
-        end
-    end
-
-    if RingGrids.nlat_odd(Grid) == false
-        # add equator
-        lpe = lines!(ax, 0:360, zeros(361); color)
-        lpe.transformation.transform_func[] = transf
-    end
+    # cell faces, a vector of Point2, concanated all vertices for each grid point
+    faces = get_faces(Grid, nlat_half)
+    lp = lines!(ax, vec(faces); color)
 
     # coastlines
     lpc = lines!(GeoMakie.coastlines(50); color, linewidth=1)
