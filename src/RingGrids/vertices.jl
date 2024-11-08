@@ -78,3 +78,45 @@ function get_vertices(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
 
     return north, west, south, east
 end
+
+"""$(TYPEDSIGNATURES)
+Vertices for full grids, other definition than for reduced grids to prevent
+a diamond shape of the cells. Use default rectangular instead."""
+function get_vertices(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
+
+    npoints = get_npoints2D(Grid, nlat_half)
+    nlat = get_nlat(Grid, nlat_half)
+    nlon = get_nlon(Grid, nlat_half)
+    latd = get_latd(Grid, nlat_half)
+    lond = get_lond(Grid, nlat_half)
+    dλ = lond[2] - lond[1]
+
+    # vertices for full grids are at north west, north east etc
+    nwest = zeros(2, npoints)
+    neast = zeros(2, npoints)
+    seast = zeros(2, npoints)
+    swest = zeros(2, npoints)
+
+    # longitude is just shifted
+    west = mod.(lond .- dλ/2, 360)
+    east = mod.(lond .+ dλ/2, 360)
+
+    @inbounds for j in 1:nlat
+        ring = nlon*(j-1) + 1 : nlon*j
+        nwest[1, ring] = west
+        swest[1, ring] = west
+        neast[1, ring] = east
+        seast[1, ring] = east
+
+        # average ring latitudes
+        φ_north = j == 1 ? 90 : (latd[j] + latd[j-1])/2
+        φ_south = j == nlat ? 90 : (latd[j] + latd[j+1])/2
+        nwest[2, ring] .= φ_north
+        swest[2, ring] .= φ_south
+        neast[2, ring] .= φ_north
+        seast[2, ring] .= φ_south
+    end
+
+    # retain clockwise order
+    return nwest, neast, seast, swest
+end    
