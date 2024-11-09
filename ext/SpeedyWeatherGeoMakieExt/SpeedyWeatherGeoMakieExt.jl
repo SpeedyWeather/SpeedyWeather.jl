@@ -39,7 +39,8 @@ function SpeedyWeather.globe(
 
     # cell faces, a vector of Point2, concatenated all vertices for each grid point
     if faces
-        faces = get_faces(Grid, nlat_half)
+        # add nan after every face to avoid lines linking grid cells
+        faces = get_faces(Grid, nlat_half, add_nan=true)
         f = lines!(ax, vec(faces); color)
         f.transformation.transform_func[] = transf
     end
@@ -48,6 +49,35 @@ function SpeedyWeather.globe(
     if coastlines
         cl = lines!(GeoMakie.coastlines(50); color, linewidth=1)
         cl.transformation.transform_func[] = transf
+    end
+
+    # Makie stuff
+    cc = cameracontrols(ax.scene)
+    cc.settings.mouse_translationspeed[] = 0.0
+    cc.settings.zoom_shift_lookat[] = false
+    Makie.update_cam!(ax.scene, cc)
+
+    return fig
+end
+
+function globe(
+    grid::AbstractGrid;
+    colormap = :viridis,
+    coastlines::Bool = true,
+)
+    transf = GeoMakie.Geodesy.ECEFfromLLA(GeoMakie.Geodesy.WGS84())
+
+    fig = Figure(size=(800, 800));
+    ax = LScene(fig[1,1], show_axis=false);
+
+    faces = get_faces(grid)
+    polygons = [Polygon(faces[:, ij]) for ij in axes(faces, 2)]
+    p = poly!(ax, polygons, color=grid.data; colormap)
+    p.transformation.transform_func[] = transf
+
+    if coastlines
+        c = lines!(GeoMakie.coastlines(50); color=:white, linewidth=1, alpha=0.7)
+        c.transformation.transform_func[] = transf
     end
 
     # Makie stuff
