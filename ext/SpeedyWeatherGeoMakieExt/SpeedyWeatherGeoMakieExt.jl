@@ -60,7 +60,7 @@ function SpeedyWeather.globe(
     return fig
 end
 
-function globe(
+function SpeedyWeather.globe(
     grid::AbstractGrid;
     colormap = :viridis,
     coastlines::Bool = true,
