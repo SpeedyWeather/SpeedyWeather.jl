@@ -63,7 +63,7 @@ function SpeedyWeather.globe(
     return fig
 end
 
-import Makie.GeometryBasics: Polygon
+import GeoMakie.Makie.GeometryBasics: Polygon
 
 """($TYPEDSIGNATURES)
 Create a 3D interactive globe plot of the data in `grid` displayed as polygons bounded by
