@@ -10,6 +10,9 @@ include("faces.jl")
 SpeedyWeather.globe(SG::SpectralGrid) = globe(SG.Grid, SG.nlat_half)
 SpeedyWeather.globe(geometry::Geometry{NF, Grid}) where {NF, Grid} = globe(Grid, geometry.nlat_half)
 
+"""($TYPEDSIGNATURES)
+Create a 3D interactive globe plot of the grid `Grid` at resolution `nlat_half` displaying
+cell centers and faces. Optionally, add coastlines and a background image of the Earth."""
 function SpeedyWeather.globe(
     Grid::Type{<:AbstractGridArray},
     nlat_half::Integer;
@@ -60,6 +63,11 @@ function SpeedyWeather.globe(
     return fig
 end
 
+import Makie.GeometryBasics: Polygon
+
+"""($TYPEDSIGNATURES)
+Create a 3D interactive globe plot of the data in `grid` displayed as polygons bounded by
+the cell faces. Optionally, add coastlines (default true)."""
 function SpeedyWeather.globe(
     grid::AbstractGrid;
     colormap = :viridis,
