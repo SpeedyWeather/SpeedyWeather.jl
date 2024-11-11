@@ -132,9 +132,44 @@ changes when `dealiasing` is passed onto `SpectralGrid` on the `FullGaussianGrid
 
 You will obtain this information every time you create a `SpectralGrid(; Grid, trunc, dealiasing)`.
 
+## Interactively exploring the grids
+
+Based on [GeoMakie.jl](https://github.com/MakieOrg/GeoMakie.jl) SpeedyWeather.jl has an extension
+(meaning only loaded when also `using GeoMakie`) that defines the `globe` function which
+visualises the implemented grids at the desired resolution. With the `CairoMakie` backend
+these visualisations are static, but `using GLMakie` they are interactive. For example
+
+```julia
+using SpeedyWeather
+using GLMakie, GeoMakie
+
+# grid type, resolution parameter nlat_half
+globe(FullGaussianGrid, 24)
+```
+
+This will open a window with interactive zoom and rotation, visualising a full Gaussian grid
+at a resolution of `nlat_half = 24` (i.e. 96x48 grid points). You can visualise all grids
+at a wide range of resolutions for non-interactive plotting use `interactive=false`,
+which is also what one should do when `using CairoMakie`. Additional keyword arguments are
+`coastlines`, `background` among others, check `?globe`. You also can visualise data
+on a grid directly this way which will draw polygons for the cell faces, e.g.
+
+```julia
+grid = rand(FullGaussianGrid, 24)
+globe(grid)
+```
+
 ## [Full Gaussian grid](@id FullGaussianGrid)
 
 (called `FullGaussianGrid`)
+
+```@example grids
+using CairoMakie, GeoMakie
+globe(FullGaussianGrid, 24, interactive=false)
+save("full_gaussian_grid.png", ans) # hide
+nothing # hide
+```
+![FullGaussianGrid](full_gaussian_grid.png)
 
 The full Gaussian grid is a grid that uses regularly spaced longitudes
 which points that do not reduce in number towards the poles. That means for every latitude
