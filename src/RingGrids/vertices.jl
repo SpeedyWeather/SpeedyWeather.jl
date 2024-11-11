@@ -1,10 +1,10 @@
 """$(TYPEDSIGNATURES)
-Vertices are defined for every grid point on a ring grid through 4 points: north, west, south, east.
+Vertices are defined for every grid point on a ring grid through 4 points: east, south, west, north.
     
-    - north: longitude mid-point between the two closest grid points on one ring to the north
     - east: longitude mid-point with the next grid point east
     - south: longitude mid-point between the two closest grid points on one ring to the south
     - west: longitude mid-point with the next grid point west
+    - north: longitude mid-point between the two closest grid points on one ring to the north
 
 Example
 
@@ -14,8 +14,8 @@ Example
 
          o ----- s ------ o
 
-with cell center c (the grid point), n, e, s, w the vertices and o the surrounding grid points.
-Returns 2xnpoints arrays for north, west, south, east, each containing the longitude and latitude of the vertices."""
+with cell center c (the grid point), e, s, w, n the vertices and o the surrounding grid points.
+Returns 2xnpoints arrays for east, south, west, north each containing the longitude and latitude of the vertices."""
 function get_vertices(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
 
     npoints = get_npoints2D(Grid, nlat_half)
@@ -29,10 +29,10 @@ function get_vertices(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
     I = AnvilInterpolator(Grid, nlat_half, npoints)
     update_locator!(I, latds .+ Δ, londs .+ Δ)
 
-    north = zeros(2, npoints)
     east = zeros(2, npoints)
     south = zeros(2, npoints)
     west = zeros(2, npoints)
+    north = zeros(2, npoints)
 
     (; ij_as, ij_bs, ij_cs, ij_ds) = I.locator
     @inbounds for (ij, (a, b, c, d)) in enumerate(zip(ij_as, ij_bs, ij_cs, ij_ds))
@@ -76,7 +76,7 @@ function get_vertices(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
         west[2, ij] = (latds[a] + latds[b])/2
     end
 
-    return north, west, south, east
+    return east, south, west, north
 end
 
 """$(TYPEDSIGNATURES)
@@ -92,10 +92,10 @@ function get_vertices(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
     dλ = lond[2] - lond[1]
 
     # vertices for full grids are at north west, north east etc
-    nwest = zeros(2, npoints)
-    neast = zeros(2, npoints)
     seast = zeros(2, npoints)
     swest = zeros(2, npoints)
+    nwest = zeros(2, npoints)
+    neast = zeros(2, npoints)
 
     # longitude is just shifted
     west = mod.(lond .- dλ/2, 360)
@@ -118,5 +118,5 @@ function get_vertices(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
     end
 
     # retain clockwise order
-    return nwest, neast, seast, swest
+    return seast, swest, nwest, neast
 end    
