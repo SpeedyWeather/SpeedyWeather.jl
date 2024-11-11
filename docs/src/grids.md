@@ -164,7 +164,7 @@ globe(grid)
 (called `FullGaussianGrid`)
 
 ```@example grids
-using CairoMakie, GeoMakie
+using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
 globe(FullGaussianGrid, 24, interactive=false)
 save("full_gaussian_grid.png", ans) # hide
 nothing # hide
@@ -172,7 +172,7 @@ nothing # hide
 ![FullGaussianGrid](full_gaussian_grid.png)
 
 The full Gaussian grid is a grid that uses regularly spaced longitudes
-which points that do not reduce in number towards the poles. That means for every latitude
+with points that do not reduce in number towards the poles. That means for every latitude
 ``\theta`` the longitudes
 ``\phi`` are
 
@@ -220,6 +220,14 @@ But no points are on the poles as ``z=-1`` or ``1`` is never a zero crossing of 
 
 (called `OctahedralGaussianGrid`)
 
+```@example grids
+using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
+globe(OctahedralGaussianGrid, 24, interactive=false)
+save("octahedral_gaussian_grid.png", ans) # hide
+nothing # hide
+```
+![OctahedralGaussianGrid](octahedral_gaussian_grid.png)
+
 The octahedral Gaussian grid is a reduced grid, i.e. the number of longitudinal points reduces
 towards the poles. It still uses the Gaussian latitudes from the [full Gaussian grid](@ref FullGaussianGrid)
 so the exactness property of the spherical harmonic transform also holds for this grid.
@@ -244,9 +252,44 @@ The grid cells of an octahedral Gaussian grid are not exactly equal area, but ar
 a factor of two. This largely solves the efficiency problem of having too many grid points near
 the poles for computational, memory and data storage reasons.
 
+## [Octaminimal Gaussian grid](@id OctaminimalGaussianGrid)
+
+(called `OctaminimalGaussianGrid`)
+
+```@example grids
+using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
+globe(OctaminimalGaussianGrid, 24, interactive=false)
+save("octaminimal_gaussian_grid.png", ans) # hide
+nothing # hide
+```
+![OctaminimalGaussianGrid](octaminimal_gaussian_grid.png)
+
+The `OctaminimalGaussianGrid` is similar to the `OctahedralGaussianGrid` but starts with
+4 points around the poles. It therefore minimizes the number of grid points for the
+Gaussian grids at the cost of a (somewhat) inexact spectral transform. But for `nlat_half = 24`
+(i.e. 48 latitude rings) this grid reduces the number of horizontal grid points from 3168
+to 2400, i.e. -24% which speeds up the computation on the grid (dynamics and physics) as well
+as the spectral transform. The octaminimal Gaussian grid is intended to be used for low
+resolutions as for higher resolutions the relative increase in the number of grid points
+with the octahedral Gaussian grid becomes negligible. 
+
+Furthermore the longitudes are rotated: Instead of no offset where the first point on
+every ring starts at 0˚E, an offset of ``360/2n`` degrees is chosen similar to how
+the longitudinal points in the HEALPix grids
+([HEALPixGrid](@ref HEALPixGrid) and [OctaHEALPixGrid](@ref OctaHEALPixGrid))
+are chosen. This allows for a more even distribution of grid points near the poles.
+
 ## [Full Clenshaw-Curtis grid](@id FullClenshawGrid)
 
 (called `FullClenshawGrid`)
+
+```@example grids
+using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
+globe(FullClenshawGrid, 24, interactive=false)
+save("full_clenshaw_grid.png", ans) # hide
+nothing # hide
+```
+![FullClenshawGrid](full_clenshaw_grid.png)
 
 The full Clenshaw-Curtis grid is a regular longitude-latitude grid, but a specific one:
 The colatitudes ``\theta_j``, and the longitudes ``\phi_i`` are
@@ -276,6 +319,14 @@ masked anyway.
 
 (called `OctahedralClenshawGrid`)
 
+```@example grids
+using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
+globe(OctahedralClenshawGrid, 24, interactive=false)
+save("octahedral_clenshaw_grid.png", ans) # hide
+nothing # hide
+```
+![OctahedralClenshawGrid](octahedral_clenshaw_grid.png)
+
 In the same as we constructed the octahedral Gaussian grid from the full Gaussian grid,
 the octahedral Clenshaw-Curtis grid can be constructed from the full Clenshaw-Curtis grid.
 It therefore shares the latitudes with the full grid, but the longitudes with the
@@ -294,6 +345,14 @@ and memory than the full grid. Hotta and Ujiie[^HU18] describe this grid in more
 ## [HEALPix grid](@id HEALPixGrid)
 
 (called `HEALPixGrid`)
+
+```@example grids
+using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
+globe(HEALPixGrid, 24, interactive=false)
+save("healpix_grid.png", ans) # hide
+nothing # hide
+```
+![HEALPixGrid](healpix_grid.png)
 
 Technically, HEALPix grids are a class of grids that tessalate the sphere into faces that are often
 called basepixels. For each member of this class there are ``N_\varphi`` basepixels in zonal direction
@@ -344,6 +403,14 @@ z = \frac{2}{3}-\frac{4k}{3N_{side}} \pm \frac{8\phi}{3\pi}
 ## [OctaHEALPix grid](@id OctaHEALPixGrid)
 
 (called `OctaHEALPixGrid`)
+
+```@example grids
+using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
+globe(OctaHEALPixGrid, 24, interactive=false)
+save("octahealpix_grid.png", ans) # hide
+nothing # hide
+```
+![HEALPixGrid](octahealpix_grid.png)
 
 While the classic HEALPix grid is based on a [dodecahedron](https://en.wikipedia.org/wiki/Rhombic_dodecahedron),
 other choices for ``N_\varphi`` and ``N_\theta`` in the class of HEALPix grids will change the number of faces
