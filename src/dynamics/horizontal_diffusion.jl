@@ -236,10 +236,16 @@ export SpectralFilter
     wavenumber::NF = 0
 
     "[OPTION] Scale-selectiveness"
-    scale::NF = 0.05
+    scale::NF = 0.052
     
     "[OPTION] diffusion time scale"
-    time_scale::Second = Minute(144)
+    time_scale::Second = Hour(1)
+
+    "[OPTION] resolution scaling to shorten time_scale with trunc"
+    resolution_scaling::NF = 1
+
+    "[OPTION] power of the error function"
+    power::NF = 4
 
     # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
     ∇²ⁿ::MatrixType = zeros(NF, trunc+2, nlayers)           # explicit part
@@ -265,16 +271,16 @@ function initialize!(
 )
     (; trunc, nlayers) = diffusion
     (; ∇²ⁿ, ∇²ⁿ_implicit) = diffusion
-    (; scale, wavenumber, power) = diffusion
+    (; scale, wavenumber, power, resolution_scaling) = diffusion
     (; Δt, radius) = L
 
     # times 1/radius because time step Δt is scaled with 1/radius
-    time_scale = Second(diffusion.time_scale).value/radius
+    time_scale = Second(diffusion.time_scale).value/radius * (32/(trunc+1))^resolution_scaling
     
     for k in 1:nlayers
         for l in 0:trunc    # diffusion for every degree l, but indendent of order m
             # Explicit part
-            ∇²ⁿ[l+1, k] =  (erfc(scale*(l - trunc - wavenumber)))^power / time_scale
+            ∇²ⁿ[l+1, k] =  -(1 + erf(scale*(l - trunc - wavenumber)))^power / time_scale
             
             # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
             ∇²ⁿ_implicit[l+1, k] = 1/(1-2Δt*∇²ⁿ[l+1, k])                    
