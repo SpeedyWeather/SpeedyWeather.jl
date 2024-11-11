@@ -15,10 +15,6 @@ import Adapt: adapt
 using ..LowerTriangularMatrices
 using ..RingGrids
 
-# import SpeedyWeatherCUDAExt
-using SpeedyWeather
-Base.get_extension(SpeedyWeather, :SpeedyWeatherCUDAExt)
-
 # TRANSFORM
 export  SpectralTransform,
         transform!,
