@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- GeoMakie weak dependecy, globe function for 3D data visualisation [#600](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/600)
 - Zonal mean for AbstractGridArray [#603](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/603)
 
 ## v0.12.0

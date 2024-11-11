@@ -290,8 +290,8 @@ function set!(var::LowerTriangularArray, grids::AbstractGridArray, geometry::Uni
 end
 
 # set LTA <- func 
-function set!(var::LowerTriangularArray, f::Function, geometry::Geometry{NF}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where NF
-    grid = ndims(var) == 1 ? zeros(geometry.Grid{NF}, geometry.nlat_half) : zeros(geometry.Grid{NF}, geometry.nlat_half, geometry.nlayers)
+function set!(var::LowerTriangularArray, f::Function, geometry::Geometry{NF, Grid}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where {NF, Grid}
+    grid = ndims(var) == 1 ? zeros(Grid{NF}, geometry.nlat_half) : zeros(Grid{NF}, geometry.nlat_half, geometry.nlayers)
     set!(grid, f, geometry, S; add=false)
     set!(var, grid, geometry, S; add)
 end
