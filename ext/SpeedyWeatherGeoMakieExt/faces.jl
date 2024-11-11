@@ -1,23 +1,5 @@
 import GeoMakie: GeometryBasics
 
-function GeometryBasics.earcut_triangulate(polygon::Vector{Vector{Point{3,Float64}}})
-    # Here, we are assuming that the polygon is actually planar,
-    # but the plane is in 3D, and not necessarily the XY plane.
-    # So, we can find the plane of best fit using the first three points of the polygon!
-    p1, p2, p3 = polygon[1][1], polygon[1][2], polygon[1][3]
-    v1 = p2 - p1
-    v2 = p3 - p1
-    normal = cross(v1, v2)
-    x = v1
-    y = cross(normal, x)
-
-    projected_polygon = map(ring -> map(p -> Point2{Float64}(dot(p, x), dot(p, y)), ring), polygon)
-    lengths = map(x -> UInt32(length(x)), projected_polygon)
-    len = UInt32(length(lengths))
-    array = ccall((:u32_triangulate_f64, GeometryBasics.libearcut), Tuple{Ptr{GeometryBasics.GLTriangleFace},Cint},
-                  (Ptr{Ptr{Float64}}, Ptr{UInt32}, UInt32), projected_polygon, lengths, len)
-    return unsafe_wrap(Vector{GeometryBasics.GLTriangleFace}, array[1], array[2]; own=true)
-end
 
 """$(TYPEDSIGNATURES)
 Transpose (and copy) the 4 vertices of every grid point to obtain the faces of the grid.
