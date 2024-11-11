@@ -410,7 +410,7 @@ globe(OctaHEALPixGrid, 24, interactive=false)
 save("octahealpix_grid.png", ans) # hide
 nothing # hide
 ```
-![HEALPixGrid](octahealpix_grid.png)
+![OctaHEALPixGrid](octahealpix_grid.png)
 
 While the classic HEALPix grid is based on a [dodecahedron](https://en.wikipedia.org/wiki/Rhombic_dodecahedron),
 other choices for ``N_\varphi`` and ``N_\theta`` in the class of HEALPix grids will change the number of faces
