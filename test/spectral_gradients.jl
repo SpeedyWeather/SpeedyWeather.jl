@@ -94,7 +94,6 @@ end
                         HEALPixGrid)
 
             SG = SpectralGrid(; NF, Grid, nlayers=1)
-            G = Geometry(SG)
 
             A = Grid(randn(NF, SG.npoints))
             B = copy(A)
