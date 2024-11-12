@@ -232,11 +232,11 @@ export SpectralFilter
     nlayers::Int
     
     # PARAMETERS
-    "[OPTION] relative wavenumber"
-    wavenumber::NF = 0
+    "[OPTION] shift diffusion to higher (positive shift) or lower (neg) wavenumbers, relative to trunc"
+    shift::NF = 0
 
-    "[OPTION] Scale-selectiveness"
-    scale::NF = 0.052
+    "[OPTION] Scale-selectiveness, steepness of the sigmoid, higher is more selective"
+    scale::NF = 0.06
     
     "[OPTION] diffusion time scale"
     time_scale::Second = Hour(1)
@@ -271,7 +271,7 @@ function initialize!(
 )
     (; trunc, nlayers) = diffusion
     (; ∇²ⁿ, ∇²ⁿ_implicit) = diffusion
-    (; scale, wavenumber, power, resolution_scaling) = diffusion
+    (; scale, shift, power, resolution_scaling) = diffusion
     (; Δt, radius) = L
 
     # times 1/radius because time step Δt is scaled with 1/radius
@@ -280,7 +280,7 @@ function initialize!(
     for k in 1:nlayers
         for l in 0:trunc    # diffusion for every degree l, but indendent of order m
             # Explicit part
-            ∇²ⁿ[l+1, k] =  -(1 + erf(scale*(l - trunc - wavenumber)))^power / time_scale
+            ∇²ⁿ[l+1, k] =  -(1 + tanh(scale*(l - trunc - shift)))^power / time_scale
             
             # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
             ∇²ⁿ_implicit[l+1, k] = 1/(1-2Δt*∇²ⁿ[l+1, k])                    
