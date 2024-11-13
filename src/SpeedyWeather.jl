@@ -61,6 +61,7 @@ export  FullClenshawGrid, FullClenshawArray,
         eachring, eachgrid, plot
 export  AnvilInterpolator
 export  spherical_distance
+export  zonal_mean
 
 include("RingGrids/RingGrids.jl")
 using .RingGrids
@@ -75,6 +76,10 @@ export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
 include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
+
+# to be defined in GeoMakie extension
+export globe
+function globe end
 
 # Utility for GPU / KernelAbstractions
 include("gpu.jl")                               

@@ -483,3 +483,29 @@ end
         @test all(G .== 2)
     end
 end
+
+@testset "Zonal mean" begin
+    @testset for NF in (Int32, Int64, Float16, Float32, Float64)
+        @testset for Grid in ( 
+            FullClenshawArray,
+            FullGaussianArray,
+            OctahedralGaussianArray,
+            OctahedralClenshawArray,
+            OctaminimalGaussianArray,
+            HEALPixArray,
+            OctaHEALPixArray,
+            FullHEALPixArray,
+            FullOctaHEALPixArray,
+        )
+            nlat_half = 4
+            npoints = RingGrids.get_npoints(Grid, nlat_half)
+            grid = Grid{NF}(1:npoints, nlat_half)
+        
+            zm = zonal_mean(grid)
+
+            for (j, m) in enumerate(zonal_mean(grid))
+                @test m == sum(RingGrids.eachring(grid)[j]) / RingGrids.get_nlon_per_ring(grid, j)
+            end
+        end
+    end
+end

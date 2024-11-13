@@ -7,13 +7,10 @@ Construct Geometry struct containing parameters and arrays describing an iso-lat
 and the vertical levels. Pass on `SpectralGrid` to calculate the following fields
 $(TYPEDFIELDS)
 """
-@kwdef struct Geometry{NF<:AbstractFloat} <: AbstractGeometry
+@kwdef struct Geometry{NF<:AbstractFloat, Grid<:AbstractGrid} <: AbstractGeometry
 
     "SpectralGrid that defines spectral and grid resolution"
     spectral_grid::SpectralGrid
-
-    "grid of the dynamical core"
-    Grid::Type{<:AbstractGrid} = spectral_grid.Grid
 
     "resolution parameter nlat_half of Grid, # of latitudes on one hemisphere (incl Equator)"
     nlat_half::Int = spectral_grid.nlat_half      
@@ -32,7 +29,7 @@ $(TYPEDFIELDS)
     "number of vertical levels"
     nlayers::Int = spectral_grid.nlayers
 
-    "total number of grid points"
+    "total number of horizontal grid points"
     npoints::Int = spectral_grid.npoints
 
     "Planet's radius [m]"
@@ -99,11 +96,11 @@ end
 """
 $(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
-function Geometry(spectral_grid::SpectralGrid)
-    error_message = "nlayers=$(spectral_grid.nlayers) does not match length nlayers="*
-        "$(spectral_grid.vertical_coordinates.nlayers) in spectral_grid.vertical_coordinates."
-    @assert spectral_grid.nlayers == spectral_grid.vertical_coordinates.nlayers error_message
-    return Geometry{spectral_grid.NF}(; spectral_grid)
+function Geometry(SG::SpectralGrid)
+    error_message = "nlayers=$(SG.nlayers) does not match length nlayers="*
+        "$(SG.vertical_coordinates.nlayers) in spectral_grid.vertical_coordinates."
+    @assert SG.nlayers == SG.vertical_coordinates.nlayers error_message
+    return Geometry{SG.NF, SG.Grid}(; spectral_grid=SG)
 end
 
 function Base.show(io::IO, G::Geometry)
