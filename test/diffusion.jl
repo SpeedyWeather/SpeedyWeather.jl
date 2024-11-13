@@ -1,6 +1,6 @@
 @testset "Horizontal diffusion of random" begin
-    for HD in (HyperDiffusion, SpectralFilter)
-        for NF in (Float32, Float64)
+    @testset for HD in (HyperDiffusion, SpectralFilter)
+        @testset for NF in (Float32, Float64)
 
             spectral_grid = SpectralGrid(; NF)
             horizontal_diffusion = HD(spectral_grid)

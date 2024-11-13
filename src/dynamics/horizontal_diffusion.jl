@@ -30,13 +30,13 @@ $(TYPEDFIELDS)"""
     power::NF = 4
     
     "[OPTION] diffusion time scale"
-    time_scale::Second = Minute(60)
+    time_scale::Second = Minute(144)
 
     "[OPTION] diffusion time scale for temperature and humidity"
-    time_scale_temp_humid::Second = Minute(144)
+    time_scale_div::Second = Minute(60)
     
     "[OPTION] stronger diffusion with resolution? 0: constant with trunc, 1: (inverse) linear with trunc, etc"
-    resolution_scaling::NF = 0.5
+    resolution_scaling::NF = 1
 
     # incrased diffusion in stratosphere
     "[OPTION] different power for tropopause/stratosphere"
@@ -49,9 +49,9 @@ $(TYPEDFIELDS)"""
     expl::MatrixType = zeros(NF, trunc+2, nlayers)      # explicit part
     impl::MatrixType = ones(NF, trunc+2, nlayers)       # implicit part
 
-    # ARRAYS but no scaling or tapering and using time_scale_temp_humid
-    expl_c::MatrixType = zeros(NF, trunc+2, nlayers)    # explicit part
-    impl_c::MatrixType = ones(NF, trunc+2, nlayers)     # implicit part
+    # ARRAYS using time_scale_div
+    expl_div::MatrixType = zeros(NF, trunc+2, nlayers)    # explicit part
+    impl_div::MatrixType = ones(NF, trunc+2, nlayers)     # implicit part
 end
 
 """$(TYPEDSIGNATURES)
@@ -83,15 +83,15 @@ function initialize!(
     (; trunc, nlayers, resolution_scaling) = diffusion
     ∇²ⁿ = diffusion.expl
     ∇²ⁿ_implicit = diffusion.impl
-    ∇²ⁿc = diffusion.expl_c
-    ∇²ⁿc_implicit = diffusion.impl_c
+    ∇²ⁿ_div = diffusion.expl_div
+    ∇²ⁿ_div_implicit = diffusion.impl_div
     (; power, power_stratosphere, tapering_σ) = diffusion
     (; Δt, radius) = L
 
     # Reduce diffusion time scale (=increase diffusion, always in seconds) with resolution
     # times 1/radius because time step Δt is scaled with 1/radius
     time_scale = Second(diffusion.time_scale).value/radius * (32/(trunc+1))^resolution_scaling
-    time_scale_constant = Second(diffusion.time_scale_temp_humid).value/radius
+    time_scale_div = Second(diffusion.time_scale_div).value/radius * (32/(trunc+1))^resolution_scaling
 
     # NORMALISATION
     # Diffusion is applied by multiplication of the eigenvalues of the Laplacian -l*(l+1)
@@ -111,20 +111,20 @@ function initialize!(
             eigenvalue_norm = -l*(l+1)/largest_eigenvalue   # normalised diffusion ∇², power=1
 
             # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
-            ∇²ⁿ[l+1, k] = -eigenvalue_norm^p/time_scale
-            ∇²ⁿc[l+1, k] = -eigenvalue_norm^power/time_scale_constant
+            ∇²ⁿ[l+1, k] = -eigenvalue_norm^power/time_scale
+            ∇²ⁿ_div[l+1, k] = -eigenvalue_norm^p/time_scale_div
             
             # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
             ∇²ⁿ_implicit[l+1, k] = 1/(1-2Δt*∇²ⁿ[l+1, k])           
-            ∇²ⁿc_implicit[l+1, k] = 1/(1-2Δt*∇²ⁿc[l+1, k])           
+            ∇²ⁿ_div_implicit[l+1, k] = 1/(1-2Δt*∇²ⁿ_div[l+1, k])           
         end
         
         # last degree is only used by vector quantities; set to zero for implicit and explicit
         # to set any tendency at lmax+1,1:mmax to zero (what it should be anyway)
         ∇²ⁿ[trunc+2, k] = 0
         ∇²ⁿ_implicit[trunc+2, k] = 0
-        ∇²ⁿc[trunc+2, k] = 0
-        ∇²ⁿc_implicit[trunc+2, k] = 0
+        ∇²ⁿ_div[trunc+2, k] = 0
+        ∇²ⁿ_div_implicit[trunc+2, k] = 0
     end
 end
 
@@ -183,14 +183,14 @@ function horizontal_diffusion!(
     model::ShallowWater,
     lf::Integer = 1,    # leapfrog index used (2 is unstable)
 )
-    (; expl, impl) = model.horizontal_diffusion
+    (; expl, impl, expl_div, impl_div) = model.horizontal_diffusion
 
     # ShallowWater model diffuses vorticity and divergence
     vor = progn.vor[lf]
     div = progn.div[lf]
     (; vor_tend, div_tend) = diagn.tendencies
     horizontal_diffusion!(vor_tend, vor, expl, impl)
-    horizontal_diffusion!(div_tend, div, expl, impl)
+    horizontal_diffusion!(div_tend, div, expl_div, impl_div)
 end
 
 """$(TYPEDSIGNATURES)
@@ -199,14 +199,14 @@ humidity (PrimitiveWet only) in the PrimitiveEquation models."""
 function horizontal_diffusion!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
-    diffusion::HyperDiffusion,
+    diffusion::AbstractHorizontalDiffusion,
     model::PrimitiveEquation,
     lf::Integer = 1,    # leapfrog index used (2 is unstable)
 )
-    # use weaker diffusion operators that don't taper or scale with resolution for temperature and humidity
-    (; expl_c, impl_c) = diffusion
+    # use stronger diffusion operators that taper and change power with height for divergence
+    (; expl_div, impl_div) = diffusion
 
-    # and the ones that do for vorticity and divergence
+    # and those for all other variables
     (; expl, impl) = diffusion
 
     # Primitive equation models diffuse vor, divergence, temp (and humidity for wet core)
@@ -216,9 +216,9 @@ function horizontal_diffusion!(
     humid = progn.humid[lf]
     (; vor_tend, div_tend, temp_tend, humid_tend) = diagn.tendencies
     horizontal_diffusion!(vor_tend, vor, expl, impl)
-    horizontal_diffusion!(div_tend, div, expl, impl)
-    horizontal_diffusion!(temp_tend, temp, expl_c, impl_c)
-    model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, expl_c, impl_c)
+    horizontal_diffusion!(div_tend, div, expl_div, impl_div)
+    horizontal_diffusion!(temp_tend, temp, expl, impl)
+    model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, expl, impl)
 end
 
 export SpectralFilter
@@ -246,6 +246,9 @@ export SpectralFilter
     "[OPTION] diffusion time scale"
     time_scale::Second = Hour(4)
 
+    "[OPTION] stronger diffusion time scale for divergence"
+    time_scale_div::Second = Hour(1)
+
     "[OPTION] resolution scaling to shorten time_scale with trunc"
     resolution_scaling::NF = 1
 
@@ -255,6 +258,10 @@ export SpectralFilter
     # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
     expl::MatrixType = zeros(NF, trunc+2, nlayers)  # explicit part
     impl::MatrixType = ones(NF, trunc+2, nlayers)   # implicit part
+    
+    # ARRAYS using time_scale_div for divergence
+    expl_div::MatrixType = zeros(NF, trunc+2, nlayers)  # explicit part
+    impl_div::MatrixType = ones(NF, trunc+2, nlayers)   # implicit part
 end
 
 """$(TYPEDSIGNATURES)
@@ -275,49 +282,30 @@ function initialize!(
     L::AbstractTimeStepper,
 )
     (; trunc, nlayers) = diffusion
-    (; expl, impl) = diffusion
+    (; expl, impl, expl_div, impl_div) = diffusion
     (; scale, shift, power, resolution_scaling) = diffusion
     (; Δt, radius) = L
 
     # times 1/radius because time step Δt is scaled with 1/radius
     time_scale = Second(diffusion.time_scale).value/radius * (32/(trunc+1))^resolution_scaling
+    time_scale_div = Second(diffusion.time_scale_div).value/radius * (32/(trunc+1))^resolution_scaling
     
     for k in 1:nlayers
         for l in 0:trunc    # diffusion for every degree l, but indendent of order m
             # Explicit part for (tend + expl*var) * impl
             expl[l+1, k] =  -(1 + tanh(scale*(l - trunc - shift)))^power / time_scale
+            expl_div[l+1, k] =  -(1 + tanh(scale*(l - trunc - shift)))^power / time_scale_div
             
             # and implicit part of the diffusion
-            impl[l+1, k] = 1/(1-2Δt*expl[l+1, k])                    
+            impl[l+1, k] = 1/(1-2Δt*expl[l+1, k])
+            impl_div[l+1, k] = 1/(1-2Δt*expl_div[l+1, k])
         end
         
         # last degree is only used by vector quantities; set to zero for implicit and explicit
         # to set any tendency at lmax+1,1:mmax to zero (what it should be anyway)
         expl[trunc+2, k] = 0
         impl[trunc+2, k] = 0
+        expl_div[trunc+2, k] = 0
+        impl_div[trunc+2, k] = 0
     end
-end
-
-"""$(TYPEDSIGNATURES)
-Apply horizontal diffusion applied to vorticity, divergence, temperature, and
-humidity (PrimitiveWet only) in the PrimitiveEquation models."""
-function horizontal_diffusion!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    diffusion::SpectralFilter,
-    model::PrimitiveEquation,
-    lf::Integer = 1,    # leapfrog index used (2 is unstable)
-)
-    (; expl, impl) = diffusion
-
-    # Primitive equation models diffuse vor, divergence, temp (and humidity for wet core)
-    vor = progn.vor[lf]
-    div = progn.div[lf]
-    temp = progn.temp[lf]
-    humid = progn.humid[lf]
-    (; vor_tend, div_tend, temp_tend, humid_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend, vor, expl, impl)
-    horizontal_diffusion!(div_tend, div, expl, impl)
-    horizontal_diffusion!(temp_tend, temp, expl, impl)
-    model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, expl, impl)
 end
