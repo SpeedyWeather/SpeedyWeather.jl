@@ -302,10 +302,6 @@ Parameters are $(TYPEDFIELDS)"""
     m::Int = 4
     ω::Float64 = 7.848e-6
     K::Float64 = 7.848e-6
-    Ω::Float64 = 7.292e-5
-    a::Float64 = 6.37122e6
-    g::Float64 = 9.80616
-    h0::Float64 = 8e3
     c::Float64 = 1e-10
 end
 
@@ -317,8 +313,11 @@ function initialize!(
     initial_conditions::RossbyHaurwitzWave,
     model::AbstractModel,
 )
-    (; m, ω, K, Ω, a, g, h0, c) = initial_conditions
+    (; m, ω, K, c) = initial_conditions
     (; geometry) = model
+    Ω = model.planet.rotation
+    a = model.spectral_grid.radius
+    g = model.planet.gravity
 
     # Rossby-Haurwitz wave defined through vorticity ζ as a function of
     # longitude λ, latitude θ (in degrees), sigma level σ (vertically constant though)
@@ -328,11 +327,11 @@ function initialize!(
     A(λ, θ) = ω/2 * (2Ω+ω)*cosd(θ)^2 + K^2/4*cosd(θ)^(2m)*((m+1)*cosd(θ)^2 + (2m^2-m-2) - 2m^2/(cosd(θ)^2))
     B(λ, θ) = (2(Ω+ω)*K)/((m+1)*(m+2))*cosd(θ)^m*( (m^2+2m+2) - (m+1)^2*cosd(θ)^2 )
     C(λ, θ) = K^2/4*cosd(θ)^(2m)*((m+1) * cosd(θ)^2 - (m + 2))
-    #η(λ, θ) = h0 + a^2/g*(A(λ,θ) + B(λ,θ)*cosd(m*λ) + C(λ,θ)*cosd(2m*λ))
+
     η(λ, θ) = a^2/g*(A(λ,θ) + B(λ,θ)*cosd(m*λ) + C(λ,θ)*cosd(2m*λ))
 
     set!(progn, geometry, vor = ζ)
-    set!(progn, geometry, pres = η)
+    model isa ShallowWater && set!(progn, geometry, pres = η)
     set!(progn, geometry, div = 0)  # technically not needed, but set to zero for completeness
 
     # filter low values below cutoff amplitude c
