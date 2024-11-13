@@ -4,16 +4,18 @@
 
             spectral_grid = SpectralGrid(; NF)
             horizontal_diffusion = HD(spectral_grid)
-            model = PrimitiveDryModel(spectral_grid; horizontal_diffusion)
+            model = PrimitiveWetModel(spectral_grid; horizontal_diffusion)
             simulation = initialize!(model)
+
+            # run for a day to have non-zero vor, vor_tend
+            run!(simulation, period=Day(1))
+
             progn = simulation.prognostic_variables
             diagn = simulation.diagnostic_variables
 
             (; expl, impl) = model.horizontal_diffusion
             vor = progn.vor[1]
             (; vor_tend) = diagn.tendencies
-
-            vor .= randn(LowerTriangularArray{eltype(vor)}, size(vor, as=Matrix)...)
 
             # apply diffusion
             SpeedyWeather.horizontal_diffusion!(vor_tend, vor, expl, impl)
