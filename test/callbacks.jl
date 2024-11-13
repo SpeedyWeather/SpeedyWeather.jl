@@ -81,7 +81,7 @@ end
 
     spectral_grid = SpectralGrid()
     callbacks = CallbackDict(NoCallback())
-    model = PrimitiveWetModel(; spectral_grid, callbacks)
+    model = PrimitiveWetModel(spectral_grid; callbacks)
     
     storm_chaser = StormChaser(spectral_grid)
     key = :storm_chaser

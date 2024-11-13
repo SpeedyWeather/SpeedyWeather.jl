@@ -69,7 +69,7 @@ or wavenumber 0, see [Spherical Harmonic Transform](@ref)) encodes the global av
 ```@example analysis
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=1)
-model = ShallowWaterModel(;spectral_grid)
+model = ShallowWaterModel(spectral_grid)
 simulation = initialize!(model)
 ```
 

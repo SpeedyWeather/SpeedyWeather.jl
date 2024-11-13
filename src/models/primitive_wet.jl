@@ -4,7 +4,7 @@ export PrimitiveWetModel
 The PrimitiveWetModel contains all model components (themselves structs) needed for the
 simulation of the primitive equations with humidity. To be constructed like
 
-    model = PrimitiveWetModel(; spectral_grid, kwargs...)
+    model = PrimitiveWetModel(spectral_grid; kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing

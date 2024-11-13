@@ -76,21 +76,20 @@ about dos and don'ts. Just express your interest to contribute and we'll be happ
 
 For a more comprehensive tutorial with several examples, see
 [Examples](https://speedyweather.github.io/SpeedyWeather.jl/dev/examples_2D/) in the documentation.
-The interface to SpeedyWeather.jl consist of 5 steps: define the grid, create model components,
+The basic interface to SpeedyWeather.jl consist of 4 steps: define the grid,
 construct the model, initialize, run
 
 ```julia
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)       # define resolution
-orography = EarthOrography(spectral_grid)               # create non-default components
-model = PrimitiveWetModel(; spectral_grid, orography)   # construct model
-simulation = initialize!(model)                         # initialize all model components
-run!(simulation, period=Day(10), output=true)           # aaaand action!
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)   # define resolution
+model = PrimitiveWetModel(spectral_grid)            # construct model
+simulation = initialize!(model)                     # initialize all model components
+run!(simulation, period=Day(10), output=true)       # aaaand action!
 ```
 and you will see
 
 <img src="https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a04fbb10-1cc1-4f77-93f2-7bdf047f277d" width="450"><br>
 
-Hurray🥳 In 5 seconds we just simulated 10 days of the Earth's atmosphere at a speed of 440 years per day.
+Hurray🥳 In a few seconds seconds we just simulated 10 days of the Earth's atmosphere at a speed of 440 years per day.
 This simulation used a T31 spectral resolution on an
 [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids)
 (~400km resolution) solving the primitive equations on 8 vertical levels.
@@ -191,9 +190,19 @@ compatibilities with older versions are not guaranteed.
 
 ## Benchmarks
 
-The primitive equations at 400km resolution with 8 vertical layers are simulated by
-SpeedyWeather.jl at about 500 simulated years per day, i.e. one year takes about
-3min single-threaded on a CPU. Multi-threading will increase the speed typically by 2-4x.
+The primitive equations at 400km resolution with 8 vertical layers can be simulated by
+SpeedyWeather.jl at 1800 simulated years per day (SYPD) on a single core of newer CPUs with arm architecture
+(M-series MacBooks for example). At that speed, simulating one year takes about 50 seconds
+without output. The complex fused-multiply adds of the spectral transform compile efficiently to
+the large vector extensions of the newer arm chips in single precision.
+Another considerable speed-up comes from the reduced grids minimizing the number of columns for
+which expensive parameterizations like convection have to be computed. The parameterizations
+take up 40-60% of the total simulation time, depending on the grid. Particularly the
+`OctaminimalGaussianGrid`, `OctaHEALPixGrid` and the `HEALPixGrid` are increasingly faster,
+at a small accuracy sacrifice of the then inexact spectral transforms. 
+
+On older CPUs, like the Intel CPU MacBooks, the 1800 SYPD drop to about 500-600 SYPD,
+which is still 2x faster than Fortran SPEEDY which is reported to reach 240 SYPD.
 
 For an overview of typical simulation speeds a user can expect under different model setups see
 [Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/benchmark).

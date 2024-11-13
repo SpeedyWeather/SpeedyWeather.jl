@@ -201,14 +201,14 @@
     initial_conditions = StartFromRest()
 
     # with barotropic model
-    model = BarotropicModel(; spectral_grid, initial_conditions, forcing, drag)
+    model = BarotropicModel(spectral_grid; initial_conditions, forcing, drag)
     simulation = initialize!(model)
 
     run!(simulation, period=Day(5))
     @test simulation.model.feedback.nars_detected == false
 
     # with shallow water model
-    model = ShallowWaterModel(; spectral_grid, initial_conditions, forcing, drag)
+    model = ShallowWaterModel(spectral_grid; initial_conditions, forcing, drag)
     simulation = initialize!(model)
 
     run!(simulation, period=Day(5))
