@@ -30,10 +30,10 @@ $(TYPEDFIELDS)"""
     power::NF = 4
     
     "[OPTION] diffusion time scale"
-    time_scale::Second = Minute(144)
+    time_scale::Second = Hour(4)
 
     "[OPTION] diffusion time scale for temperature and humidity"
-    time_scale_div::Second = Minute(60)
+    time_scale_div::Second = Hour(1)
     
     "[OPTION] stronger diffusion with resolution? 0: constant with trunc, 1: (inverse) linear with trunc, etc"
     resolution_scaling::NF = 1
@@ -247,7 +247,7 @@ export SpectralFilter
     time_scale::Second = Hour(4)
 
     "[OPTION] stronger diffusion time scale for divergence"
-    time_scale_div::Second = Hour(1)
+    time_scale_div::Second = Minute(30)
 
     "[OPTION] resolution scaling to shorten time_scale with trunc"
     resolution_scaling::NF = 1
@@ -256,7 +256,7 @@ export SpectralFilter
     power::NF = 4
 
     "[OPTION] power of the tanh function for divergence"
-    power_div::NF = 2
+    power_div::NF = 4
 
     # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
     expl::MatrixType = zeros(NF, trunc+2, nlayers)  # explicit part

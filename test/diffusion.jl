@@ -7,8 +7,8 @@
             model = PrimitiveWetModel(spectral_grid; horizontal_diffusion)
             simulation = initialize!(model)
 
-            # run for a day to have non-zero vor, vor_tend
-            run!(simulation, period=Day(1))
+            # # run for a day to have non-zero vor, vor_tend
+            # run!(simulation, period=Day(1))
 
             progn = simulation.prognostic_variables
             diagn = simulation.diagnostic_variables
