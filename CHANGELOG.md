@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- SpectralFiltering for horizontal diffusion [#601](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/601)
+- SpectralFilter for horizontal diffusion [#601](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/601)
+- GeoMakie weak dependecy, globe function for 3D data visualisation [#600](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/600)
+- Zonal mean for AbstractGridArray [#603](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/603)
 
 ## v0.12.0
 
