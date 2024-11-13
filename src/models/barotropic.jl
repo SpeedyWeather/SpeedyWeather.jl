@@ -47,7 +47,7 @@ $(TYPEDFIELDS)"""
     time_stepping::TS = Leapfrog(spectral_grid)
     spectral_transform::ST = SpectralTransform(spectral_grid)
     implicit::IM = NoImplicit(spectral_grid)
-    horizontal_diffusion::HD = HyperDiffusion(spectral_grid)
+    horizontal_diffusion::HD = SpectralFilter(spectral_grid)
 
     # OUTPUT
     output::OU = NetCDFOutput(spectral_grid, Barotropic)
