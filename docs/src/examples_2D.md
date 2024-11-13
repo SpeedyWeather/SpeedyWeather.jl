@@ -266,13 +266,12 @@ using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=127, nlayers=1)
 
 # model components
-time_stepping = SpeedyWeather.Leapfrog(spectral_grid, Δt_at_T31=Minute(30))
-implicit = SpeedyWeather.ImplicitShallowWater(spectral_grid, α=0.5)
+implicit = ImplicitShallowWater(spectral_grid, α=0.5)
 orography = EarthOrography(spectral_grid, smoothing=false)
-initial_conditions = SpeedyWeather.RandomWaves()
+initial_conditions = RandomWaves(lmin=10, lmax=30)      # between wavenumber 10 and 30
 
 # construct, initialize, run
-model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit, time_stepping)
+model = ShallowWaterModel(spectral_grid; orography, initial_conditions, implicit)
 simulation = initialize!(model)
 run!(simulation, period=Day(2))
 nothing # hide
@@ -287,7 +286,7 @@ But we also want to keep orography, and particularly no smoothing on it, to have
 as rough as possible. The initial conditions are set to `RandomWaves` which set the spherical
 harmonic coefficients of ``\eta`` to between given wavenumbers to some random values
 ```@example gravity_wave_setup
-SpeedyWeather.RandomWaves()
+RandomWaves()
 ```
 so that the amplitude `A` is as desired, here 2000m. Our layer thickness in meters is by default
 ```@example gravity_wave_setup
