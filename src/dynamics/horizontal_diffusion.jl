@@ -166,7 +166,7 @@ function horizontal_diffusion!(
     model::Barotropic,
     lf::Integer = 1,    # leapfrog index used (2 is unstable)
 )
-    (; expl, impl) = model.horizontal_diffusion
+    (; expl, impl) = diffusion
 
     # Barotropic model diffuses vorticity (only variable)
     vor = progn.vor[lf]
@@ -183,7 +183,7 @@ function horizontal_diffusion!(
     model::ShallowWater,
     lf::Integer = 1,    # leapfrog index used (2 is unstable)
 )
-    (; expl, impl, expl_div, impl_div) = model.horizontal_diffusion
+    (; expl, impl, expl_div, impl_div) = diffusion
 
     # ShallowWater model diffuses vorticity and divergence
     vor = progn.vor[lf]
@@ -252,8 +252,11 @@ export SpectralFilter
     "[OPTION] resolution scaling to shorten time_scale with trunc"
     resolution_scaling::NF = 1
 
-    "[OPTION] power of the error function"
+    "[OPTION] power of the tanh function"
     power::NF = 4
+
+    "[OPTION] power of the tanh function for divergence"
+    power_div::NF = 2
 
     # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
     expl::MatrixType = zeros(NF, trunc+2, nlayers)  # explicit part
@@ -283,7 +286,7 @@ function initialize!(
 )
     (; trunc, nlayers) = diffusion
     (; expl, impl, expl_div, impl_div) = diffusion
-    (; scale, shift, power, resolution_scaling) = diffusion
+    (; scale, shift, power, power_div, resolution_scaling) = diffusion
     (; Δt, radius) = L
 
     # times 1/radius because time step Δt is scaled with 1/radius
@@ -294,7 +297,7 @@ function initialize!(
         for l in 0:trunc    # diffusion for every degree l, but indendent of order m
             # Explicit part for (tend + expl*var) * impl
             expl[l+1, k] =  -(1 + tanh(scale*(l - trunc - shift)))^power / time_scale
-            expl_div[l+1, k] =  -(1 + tanh(scale*(l - trunc - shift)))^power / time_scale_div
+            expl_div[l+1, k] =  -(1 + tanh(scale*(l - trunc - shift)))^power_div / time_scale_div
             
             # and implicit part of the diffusion
             impl[l+1, k] = 1/(1-2Δt*expl[l+1, k])

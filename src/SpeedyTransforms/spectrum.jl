@@ -9,7 +9,7 @@ function power_spectrum(
     lmax, mmax = size(spec, OneBased, as=Matrix)    # 1-based max degree l, order m
     trunc = min(lmax, mmax)                         # consider only the triangle
                                                     # ignore higher degrees if lmax > mmax
-    spectrum = zeros(NF, trunc)   
+    spectrum = zeros(real(eltype(spec)), trunc)   
 
     # zonal modes m = 0, *1 as not mirrored at -m
     @inbounds for l in 1:trunc
