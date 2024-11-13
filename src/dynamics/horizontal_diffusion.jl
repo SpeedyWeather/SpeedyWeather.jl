@@ -236,10 +236,10 @@ export SpectralFilter
     shift::NF = 0
 
     "[OPTION] Scale-selectiveness, steepness of the sigmoid, higher is more selective"
-    scale::NF = 0.06
+    scale::NF = 0.05
     
     "[OPTION] diffusion time scale"
-    time_scale::Second = Hour(1)
+    time_scale::Second = Hour(4)
 
     "[OPTION] resolution scaling to shorten time_scale with trunc"
     resolution_scaling::NF = 1
