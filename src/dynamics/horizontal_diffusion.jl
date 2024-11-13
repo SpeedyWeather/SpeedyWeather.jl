@@ -46,12 +46,12 @@ $(TYPEDFIELDS)"""
     tapering_σ::NF = 0.2
 
     # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
-    ∇²ⁿ::MatrixType = zeros(NF, trunc+2, nlayers)           # explicit part
-    ∇²ⁿ_implicit::MatrixType = ones(NF, trunc+2, nlayers)   # implicit part
+    expl::MatrixType = zeros(NF, trunc+2, nlayers)      # explicit part
+    impl::MatrixType = ones(NF, trunc+2, nlayers)       # implicit part
 
     # ARRAYS but no scaling or tapering and using time_scale_temp_humid
-    ∇²ⁿc::MatrixType = zeros(NF, trunc+2, nlayers)          # explicit part
-    ∇²ⁿc_implicit::MatrixType = ones(NF, trunc+2, nlayers)  # implicit part
+    expl_c::MatrixType = zeros(NF, trunc+2, nlayers)    # explicit part
+    impl_c::MatrixType = ones(NF, trunc+2, nlayers)     # implicit part
 end
 
 """$(TYPEDSIGNATURES)
@@ -81,7 +81,10 @@ function initialize!(
     L::AbstractTimeStepper,
 )
     (; trunc, nlayers, resolution_scaling) = diffusion
-    (; ∇²ⁿ, ∇²ⁿ_implicit, ∇²ⁿc, ∇²ⁿc_implicit) = diffusion
+    ∇²ⁿ = diffusion.expl
+    ∇²ⁿ_implicit = diffusion.impl
+    ∇²ⁿc = diffusion.expl_c
+    ∇²ⁿc_implicit = diffusion.impl_c
     (; power, power_stratosphere, tapering_σ) = diffusion
     (; Δt, radius) = L
 
@@ -126,29 +129,29 @@ function initialize!(
 end
 
 """$(TYPEDSIGNATURES)
-Apply horizontal diffusion to a 2D field `A` in spectral space by updating its tendency `tendency`
+Apply horizontal diffusion to a 2D field `var` in spectral space by updating its tendency `tendency`
 with an implicitly calculated diffusion term. The implicit diffusion of the next time step is split
-into an explicit part `∇²ⁿ_expl` and an implicit part `∇²ⁿ_impl`, such that both can be calculated
-in a single forward step by using `A` as well as its tendency `tendency`."""
+into an explicit part `expl` and an implicit part `impl`, such that both can be calculated
+in a single forward step by using `var` as well as its tendency `tendency`."""
 function horizontal_diffusion!( 
     tendency::LowerTriangularArray,     # tendency of a 
     var::LowerTriangularArray,          # spectral horizontal field to diffuse
-    ∇²ⁿ_expl::AbstractMatrix,           # explicit spectral damping (lmax x nlayers matrix)
-    ∇²ⁿ_impl::AbstractMatrix,           # implicit spectral damping (lmax x nlayers matrix)
+    expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
+    impl::AbstractMatrix,               # implicit spectral damping (lmax x nlayers matrix)
 )
     lmax, mmax = size(tendency, OneBased, as=Matrix)
     nlayers = size(var, 2)
 
     @boundscheck size(tendency) == size(var) || throw(BoundsError)
-    @boundscheck lmax <= size(∇²ⁿ_expl, 1) == size(∇²ⁿ_impl, 1) || throw(BoundsError)
-    @boundscheck nlayers <= size(∇²ⁿ_expl, 2) == size(∇²ⁿ_impl, 2) || throw(BoundsError)
+    @boundscheck lmax <= size(expl, 1) == size(impl, 1) || throw(BoundsError)
+    @boundscheck nlayers <= size(expl, 2) == size(impl, 2) || throw(BoundsError)
 
     @inbounds for k in eachmatrix(tendency, var)
         lm = 0                      # running index
         for m in 1:mmax             # loops over all columns/order m
             for l in m:lmax
                 lm += 1             # single index lm corresponding to harmonic l, m
-                tendency[lm, k] = (tendency[lm, k] + ∇²ⁿ_expl[l, k]*var[lm, k]) * ∇²ⁿ_impl[l, k]
+                tendency[lm, k] = (tendency[lm, k] + expl[l, k]*var[lm, k]) * impl[l, k]
             end
         end
     end
@@ -163,12 +166,12 @@ function horizontal_diffusion!(
     model::Barotropic,
     lf::Integer = 1,    # leapfrog index used (2 is unstable)
 )
-    (; ∇²ⁿ, ∇²ⁿ_implicit) = model.horizontal_diffusion
+    (; expl, impl) = model.horizontal_diffusion
 
     # Barotropic model diffuses vorticity (only variable)
     vor = progn.vor[lf]
     (; vor_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
+    horizontal_diffusion!(vor_tend, vor, expl, impl)
 end
 
 """$(TYPEDSIGNATURES)
@@ -180,14 +183,14 @@ function horizontal_diffusion!(
     model::ShallowWater,
     lf::Integer = 1,    # leapfrog index used (2 is unstable)
 )
-    (; ∇²ⁿ, ∇²ⁿ_implicit) = model.horizontal_diffusion
+    (; expl, impl) = model.horizontal_diffusion
 
     # ShallowWater model diffuses vorticity and divergence
     vor = progn.vor[lf]
     div = progn.div[lf]
     (; vor_tend, div_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
-    horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)
+    horizontal_diffusion!(vor_tend, vor, expl, impl)
+    horizontal_diffusion!(div_tend, div, expl, impl)
 end
 
 """$(TYPEDSIGNATURES)
@@ -201,10 +204,10 @@ function horizontal_diffusion!(
     lf::Integer = 1,    # leapfrog index used (2 is unstable)
 )
     # use weaker diffusion operators that don't taper or scale with resolution for temperature and humidity
-    (; ∇²ⁿc, ∇²ⁿc_implicit) = diffusion
+    (; expl_c, impl_c) = diffusion
 
     # and the ones that do for vorticity and divergence
-    (; ∇²ⁿ, ∇²ⁿ_implicit) = diffusion
+    (; expl, impl) = diffusion
 
     # Primitive equation models diffuse vor, divergence, temp (and humidity for wet core)
     vor = progn.vor[lf]
@@ -212,13 +215,15 @@ function horizontal_diffusion!(
     temp = progn.temp[lf]
     humid = progn.humid[lf]
     (; vor_tend, div_tend, temp_tend, humid_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
-    horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)
-    horizontal_diffusion!(temp_tend, temp, ∇²ⁿc, ∇²ⁿc_implicit)
-    model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, ∇²ⁿc, ∇²ⁿc_implicit)
+    horizontal_diffusion!(vor_tend, vor, expl, impl)
+    horizontal_diffusion!(div_tend, div, expl, impl)
+    horizontal_diffusion!(temp_tend, temp, expl_c, impl_c)
+    model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, expl_c, impl_c)
 end
 
 export SpectralFilter
+
+"""Spectral filter for horizontal diffusion. Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct SpectralFilter{
     NF,
     MatrixType,
@@ -248,8 +253,8 @@ export SpectralFilter
     power::NF = 4
 
     # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
-    ∇²ⁿ::MatrixType = zeros(NF, trunc+2, nlayers)           # explicit part
-    ∇²ⁿ_implicit::MatrixType = ones(NF, trunc+2, nlayers)   # implicit part
+    expl::MatrixType = zeros(NF, trunc+2, nlayers)  # explicit part
+    impl::MatrixType = ones(NF, trunc+2, nlayers)   # implicit part
 end
 
 """$(TYPEDSIGNATURES)
@@ -270,7 +275,7 @@ function initialize!(
     L::AbstractTimeStepper,
 )
     (; trunc, nlayers) = diffusion
-    (; ∇²ⁿ, ∇²ⁿ_implicit) = diffusion
+    (; expl, impl) = diffusion
     (; scale, shift, power, resolution_scaling) = diffusion
     (; Δt, radius) = L
 
@@ -279,17 +284,17 @@ function initialize!(
     
     for k in 1:nlayers
         for l in 0:trunc    # diffusion for every degree l, but indendent of order m
-            # Explicit part
-            ∇²ⁿ[l+1, k] =  -(1 + tanh(scale*(l - trunc - shift)))^power / time_scale
+            # Explicit part for (tend + expl*var) * impl
+            expl[l+1, k] =  -(1 + tanh(scale*(l - trunc - shift)))^power / time_scale
             
-            # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
-            ∇²ⁿ_implicit[l+1, k] = 1/(1-2Δt*∇²ⁿ[l+1, k])                    
+            # and implicit part of the diffusion
+            impl[l+1, k] = 1/(1-2Δt*expl[l+1, k])                    
         end
         
         # last degree is only used by vector quantities; set to zero for implicit and explicit
         # to set any tendency at lmax+1,1:mmax to zero (what it should be anyway)
-        ∇²ⁿ[trunc+2, k] = 0
-        ∇²ⁿ_implicit[trunc+2, k] = 0
+        expl[trunc+2, k] = 0
+        impl[trunc+2, k] = 0
     end
 end
 
@@ -303,7 +308,7 @@ function horizontal_diffusion!(
     model::PrimitiveEquation,
     lf::Integer = 1,    # leapfrog index used (2 is unstable)
 )
-    (; ∇²ⁿ, ∇²ⁿ_implicit) = diffusion
+    (; expl, impl) = diffusion
 
     # Primitive equation models diffuse vor, divergence, temp (and humidity for wet core)
     vor = progn.vor[lf]
@@ -311,8 +316,8 @@ function horizontal_diffusion!(
     temp = progn.temp[lf]
     humid = progn.humid[lf]
     (; vor_tend, div_tend, temp_tend, humid_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
-    horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)
-    horizontal_diffusion!(temp_tend, temp, ∇²ⁿ, ∇²ⁿ_implicit)
-    model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, ∇²ⁿ, ∇²ⁿ_implicit)
+    horizontal_diffusion!(vor_tend, vor, expl, impl)
+    horizontal_diffusion!(div_tend, div, expl, impl)
+    horizontal_diffusion!(temp_tend, temp, expl, impl)
+    model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, expl, impl)
 end
