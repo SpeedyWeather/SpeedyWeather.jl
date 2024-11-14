@@ -1,4 +1,5 @@
-# SpeedyWeather.jl
+# SpeedyWeather.jl <img src="https://github.com/user-attachments/assets/977f5f46-ccd3-49d8-950a-8b619df863c3" width="100" />
+
 
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml) 
 [![status](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a/status.svg)](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a)
@@ -6,7 +7,7 @@
 [![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/stable/)
 [![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/dev/)
 
-SpeedyWeather.jl is a global spectral atmospheric model with simple physics which is developed as a research playground
+SpeedyWeather.jl is a global atmospheric model with simple physics developed as a research playground
 with an everything-flexible attitude as long as it is speedy. It is easy to use and easy to extend, making 
 atmospheric modelling an interactive experience -- in the terminal, in a notebook or conventionally through scripts.
 With minimal code redundancies it supports
@@ -23,6 +24,7 @@ With minimal code redundancies it supports
 - a very fast and flexible spherical harmonics transform library SpeedyTransforms
 
 **User interface**
+- Data visualisation: 2D, 3D, interactive (you can zoom and rotate!) powered by Makie
 - Extensibility: New model components (incl. parameterizations) can be externally defined
 - Modularity: Models are constructed from its components, non-defaults are passed on as argument
 - Interactivity: SpeedyWeather.jl runs in a notebook or in the REPL as well as from scripts
@@ -140,6 +142,18 @@ T85 (150km) resolution and 8 vertical layers.
 
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a6192374-24d9-4065-9fcc-8b719190472f
 
+## Data visualisation
+
+Difficult to plot spherical data? SpeedyWeather also includes extensions for Makie and GeoMakie
+making it supereasy to create plots and interactively investigate a variables from a simulation.
+Two examples (screen recording those makes it a bit laggy, it's pretty smooth otherwise): Humidity plotted
+on a 50km HEALPix grid 
+
+https://github.com/user-attachments/assets/b02b31eb-e139-4193-89d1-7e277a2af5cc
+
+or the visualising cell centres and faces of the OctaminimalGaussianGrid 
+
+https://github.com/user-attachments/assets/6dfa212a-c5dc-4c54-b274-7755d5baf15c
 
 ## History
 
