@@ -39,6 +39,7 @@ $(TYPEDFIELDS)"""
     EV,     # <:AbstractSurfaceEvaporation,
     LSC,    # <:AbstractCondensation,
     CV,     # <:AbstractConvection,
+    OD,     # <:AbstractOpticalDepth,
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
     TS,     # <:AbstractTimeStepper,
@@ -88,6 +89,7 @@ $(TYPEDFIELDS)"""
     surface_evaporation::EV = SurfaceEvaporation(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
+    optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = NoShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     
@@ -142,6 +144,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.large_scale_condensation, model)
     initialize!(model.convection, model)
+    initialize!(model.optical_depth, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
     initialize!(model.surface_thermodynamics, model)

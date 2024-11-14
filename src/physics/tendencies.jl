@@ -47,7 +47,7 @@ function parameterization_tendencies!(
     vertical_diffusion!(column, model)
     convection!(column, model)
     large_scale_condensation!(column, model)
-    # clouds!(column, model)
+    optical_depth!(column, model)
     shortwave_radiation!(column, model)
     longwave_radiation!(column, model)
     surface_fluxes!(column, model)

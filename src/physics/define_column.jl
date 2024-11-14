@@ -78,8 +78,9 @@ $(TYPEDFIELDS)"""
     precip_large_scale::NF = 0              # precipitation due to large-scale condensation [m]
 
     # RADIATION
-    cos_zenith::NF = 0                      # cosine of solar zenith angle
-    albedo::NF = 0                          # surface albedo
+    cos_zenith::NF = 0                                      # cosine of solar zenith angle
+    albedo::NF = 0                                          # surface albedo
+    const optical_depth::Vector{NF} = zeros(NF, nlayers)    # optical depth of the atmosphere
 
     # WORK ARRAYS
     const a::Vector{NF} = zeros(NF, nlayers)
