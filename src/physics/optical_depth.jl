@@ -29,7 +29,7 @@ function optical_depth!(column::ColumnVariables, od::FriersonOpticalDepth, model
     (; τ₀_equator, τ₀_pole, fₗ) = od
 
     # coordinates 
-    σ = model.geometry.σ_levels_full
+    σ = model.geometry.σ_levels_half
     θ = column.latd
 
     # Frierson 2006, eq. (4), (5)

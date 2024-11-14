@@ -80,7 +80,7 @@ $(TYPEDFIELDS)"""
     # RADIATION
     cos_zenith::NF = 0                                      # cosine of solar zenith angle
     albedo::NF = 0                                          # surface albedo
-    const optical_depth::Vector{NF} = zeros(NF, nlayers)    # optical depth of the atmosphere
+    const optical_depth::Vector{NF} = zeros(NF, nlayers+1)  # optical depth of the atmosphere, on half levels
 
     # WORK ARRAYS
     const a::Vector{NF} = zeros(NF, nlayers)
