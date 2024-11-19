@@ -338,9 +338,11 @@ function initialize!(
     vor = progn.vor[1]  # 1 = first leapfrog timestep
     low_values = abs.(vor) .< c
     vor[low_values] .= 0
-    pres = progn.pres[1]
-    low_value = abs.(pres) .< c
-    pres[low_value] .= 0
+    if model isa ShallowWater
+        pres = progn.pres[1]
+        low_value = abs.(pres) .< c
+        pres[low_value] .= 0
+    end
 
     return nothing
 end
