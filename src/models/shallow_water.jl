@@ -4,7 +4,7 @@ export ShallowWaterModel
 The ShallowWaterModel contains all model components needed for the simulation of the
 shallow water equations. To be constructed like
 
-    model = ShallowWaterModel(; spectral_grid, kwargs...)
+    model = ShallowWaterModel(spectral_grid; kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing

@@ -595,7 +595,7 @@ $(TYPEDFIELDS)"""
     # random interface displacement field
     A::Float64 = 2000       # amplitude [m]
     lmin::Int64 = 10        # minimum wavenumber
-    lmax::Int64 = 20        # maximum wavenumber
+    lmax::Int64 = 30        # maximum wavenumber
 end
 
 RandomWaves(S::SpectralGrid; kwargs...) = RandomWaves(;kwargs...) 
@@ -612,11 +612,15 @@ function initialize!(   progn::PrognosticVariables{NF},
     (; A, lmin, lmax) = initial_conditions
     (; trunc) = progn
 
-    η = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+    # start with matrix to have matrix indexing
+    ηm = randn(Complex{NF}, trunc+2, trunc+1)
 
     # zero out other wavenumbers
-    η[1:min(lmin, trunc+2), :] .= 0
-    η[min(lmax+2, trunc+2):trunc+2, :] .= 0
+    ηm[1:min(lmin, trunc+2), :] .= 0
+    ηm[min(lmax+2, trunc+2):trunc+2, :] .= 0
+
+    # convert to LowerTriangularMatrix with vector indexing
+    η = LowerTriangularArray(ηm)
 
     # scale to amplitude
     η_grid = transform(η, model.spectral_transform)
