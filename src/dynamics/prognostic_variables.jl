@@ -372,7 +372,7 @@ function set!(
     s::Number, 
     geometry::Union{Geometry, Nothing}=nothing, 
     S::Union{Nothing, SpectralTransform}=nothing;
-    add::Bool::Bool=false,
+    add::Bool=false,
 ) where T
     kernel(a, b) = add ? a+b : b
     sT = T(s)
