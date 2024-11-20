@@ -337,7 +337,7 @@ end
 
 # set Grid <- Grid
 function set!(
-    ar::AbstractGridArray,
+    var::AbstractGridArray,
     grids::AbstractGridArray,
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
