@@ -268,36 +268,59 @@ function set!(
 end
 
 # set LTA <- LTA 
-function set!(var::LowerTriangularArray{T}, L::LowerTriangularArray, varargs...; add::Bool) where T
+function set!(
+    var::LowerTriangularArray,
+    L::LowerTriangularArray,
+    varargs...;
+    add::Bool=false,
+)
     if add 
         if size(var) == size(L)
-            var .+= T.(L) 
+            var .+= L
         else 
             L_var = spectral_truncation(L, size(var, 1, as=Matrix), size(var, 2, as=Matrix))
             var .+= L_var
         end 
     else 
-        size(var) != size(L) || fill!(var, zero(T)) # copyto! copies over the largest subset, when size(var) > size(L), the copyto! isn't enough by itself
+        size(var) != size(L) || fill!(var, 0) # copyto! copies over the largest subset, when size(var) > size(L), the copyto! isn't enough by itself
         copyto!(var, L)
     end 
     return var
 end 
 
 # set LTA <- Grid 
-function set!(var::LowerTriangularArray, grids::AbstractGridArray, geometry::Union{Geometry, Nothing}=nothing, S::Union{Nothing, SpectralTransform}=nothing; add)
+function set!(
+    var::LowerTriangularArray,
+    grids::AbstractGridArray,
+    geometry::Union{Geometry, Nothing}=nothing,
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add::Bool=false,
+)
     specs = isnothing(S) ? transform(grids) : transform(grids, S)
     set!(var, specs; add)
 end
 
 # set LTA <- func 
-function set!(var::LowerTriangularArray, f::Function, geometry::Geometry{NF, Grid}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where {NF, Grid}
+function set!(
+    var::LowerTriangularArray,
+    f::Function,
+    geometry::Geometry{NF, Grid},
+    S::Union{SpectralTransform, Nothing}=nothing;
+    add::Bool=false,
+) where {NF, Grid}
     grid = ndims(var) == 1 ? zeros(Grid{NF}, geometry.nlat_half) : zeros(Grid{NF}, geometry.nlat_half, geometry.nlayers)
     set!(grid, f, geometry, S; add=false)
     set!(var, grid, geometry, S; add)
 end
 
 # set LTA <- number
-function set!(var::LowerTriangularArray{T}, s::Number, geometry::Geometry{NF}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where {T, NF}
+function set!(
+    var::LowerTriangularArray{T},
+    s::Number,
+    geometry::Geometry{NF},
+    S::Union{SpectralTransform, Nothing}=nothing;
+    add::Bool=false,
+) where {T, NF}
     
     # appropiate normalization, assume standard 2√π normalisation if no transform is given 
     norm_sphere = isnothing(S) ? 2sqrt(π) : S.norm_sphere
@@ -313,7 +336,13 @@ function set!(var::LowerTriangularArray{T}, s::Number, geometry::Geometry{NF}, S
 end 
 
 # set Grid <- Grid
-function set!(var::AbstractGridArray, grids::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add)
+function set!(
+    var::AbstractGridArray,
+    grids::AbstractGridArray,
+    geometry::Geometry,
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add::Bool=false,
+)
     if add 
         if grids_match(var, grids)
             var .+= grids
@@ -327,7 +356,13 @@ function set!(var::AbstractGridArray, grids::AbstractGridArray, geometry::Geomet
 end 
 
 # set Grid <- LTA
-function set!(var::AbstractGridArray, specs::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add)
+function set!(
+    var::AbstractGridArray,
+    specs::LowerTriangularArray,
+    geometry::Geometry,
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add::Bool=false,
+)
     grids = isnothing(S) ? transform(specs) : transform(specs, S)
     set!(var, grids, geometry, S; add)
 end
