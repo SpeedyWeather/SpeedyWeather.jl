@@ -40,33 +40,33 @@ nothing # hide
 ```
 ![Land-sea mask](land-sea_mask.png)
 
-Now before you run a simulation you could manually change the land-sea mask by
+Now _after_ initialization (otherwise you reinitialize the mask, overwriting your
+changes) you could manually change the land-sea mask with the `set!` function
+which can take scalars as global constants or functions of two arguments
+longitude ``\lambda`` and ``\varphi``. You can use an anonymous function
+`(λ, φ) -> ...` but you do not have to, defining `function f(λ, φ)` and
+then using `land_sea_mask = f` works too. 
 
 ```@example landseamask
-# unpack, this is a flat copy, changing it will also change the mask inside model
-(; mask) = land_sea_mask
+set!(model, land_sea_mask=0)                    # aqua planet
+set!(model, land_sea_mask=1)                    # rocky planet
+set!(model, land_sea_mask=(λ, φ) -> rand()-1)   # random small islands
 
-# ocean everywhere, or
-mask .= 0    
+# snowball planet with ocean in the tropics between 10˚S and 10˚N
+set!(model, land_sea_mask=(λ, φ) -> abs(φ) < 10 ? 0 : 1)
 
-# random land-sea mask, or
-for i in eachindex(mask)
-    mask[i] = rand()     
-end
+# flood the northern hemisphere only, values are automatically clamped into [0, 1]
+initialize!(model.land_sea_mask, model)         # back to Earth's mask
+set!(model, land_sea_mask=(λ, φ) -> φ > 0 ? -1 : 0, add=true)
 
-# ocean only between 10˚S and 10˚N
-for (j, ring) in enumerate(RingGrids.eachring(mask))
-    for ij in ring
-        mask[ij] = abs(model.geometry.latd[j]) > 10 ? 1 : 0
-    end
-end
+# visualise
+heatmap(land_sea_mask.mask, title="Land-sea mask with Northern Hemisphere ocean")
+save("nh_ocean.png", ans) # hide
+nothing # hide
 ```
+![NH ocean](nh_ocean.png)
 
-And now you can run the simulation as usual with `run!(simulation)`. Most useful
-for the generation of custom land-sea masks in this manual way is probably the
-`model.geometry` component which has all sorts of coordinates like `latd`
-(latitudes in degrees on rings) or `latds, londs` (latitude, longitude in degrees
-for every grid point).
+And now you can run the simulation as usual with `run!(simulation)`.
 
 ## Earth's land-sea mask
 

@@ -67,7 +67,7 @@ end
 function set!(mask::AbstractLandSeaMask, args...; kwargs...)
     set!(mask.mask, args...; kwargs...)
     lo, hi = extrema(mask.mask)
-    (lo < 0 || hi > 1) && @warn "Land-sea mask values were not set to values in [0, 1] but in [$lo, $hi]. Clamping."
+    (lo < 0 || hi > 1) && @warn "Land-sea mask was not set to values in [0, 1] but in [$lo, $hi]. Clamping."
     clamp!(mask.mask, 0, 1)
     return nothing
 end
