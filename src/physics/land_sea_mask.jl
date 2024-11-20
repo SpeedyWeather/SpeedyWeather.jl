@@ -64,7 +64,12 @@ function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...
 end
 
 # set mask with grid, scalar, function; just define path `mask.mask` to grid here
-set!(mask::AbstractLandSeaMask, args...; kwargs...) = set!(mask.mask, args...; kwargs...)
+function set!(mask::AbstractLandSeaMask, args...; kwargs...)
+    set!(mask.mask, args...; kwargs...)
+    lo, hi = extrema(mask.mask)
+    (lo < 0 || hi > 1) && @warn "Land-sea mask values were not set in [0, 1] but in [$lo, $hi]. Clamping."
+    clamp!(mask.mask, 0, 1)
+end
 
 """
 $(TYPEDSIGNATURES)
