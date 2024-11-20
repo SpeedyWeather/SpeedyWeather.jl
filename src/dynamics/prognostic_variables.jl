@@ -333,7 +333,13 @@ function set!(var::AbstractGridArray, specs::LowerTriangularArray, geometry::Geo
 end
 
 # set Grid <- Func
-function set!(var::AbstractGridArray, f::Function, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add)
+function set!(
+    var::AbstractGridArray,
+    f::Function,
+    geometry::Geometry,
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add::Bool=false,
+)
     (; londs, latds, σ_levels_full) = geometry
     kernel(a, b) = add ? a+b : b
     for k in eachgrid(var)
@@ -350,7 +356,7 @@ function set!(
     f::Function,
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
-    add
+    add::Bool=false,
 ) where T
     (; londs, latds) = geometry
     kernel(a, b) = add ? a+b : b
@@ -366,7 +372,7 @@ function set!(
     s::Number, 
     geometry::Union{Geometry, Nothing}=nothing, 
     S::Union{Nothing, SpectralTransform}=nothing;
-    add::Bool,
+    add::Bool::Bool=false,
 ) where T
     kernel(a, b) = add ? a+b : b
     sT = T(s)
@@ -381,7 +387,7 @@ function set_vordiv!(
     v_func,
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
-    add::Bool,
+    add::Bool=false,
     coslat_scaling_included::Bool=false,
 )
     u_L = similar(vor) 
@@ -400,7 +406,7 @@ function set_vordiv!(
     v::AbstractGridArray,
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
-    add::Bool,
+    add::Bool=false,
     coslat_scaling_included::Bool=false,
 )
     u_ = coslat_scaling_included ? u : RingGrids.scale_coslat⁻¹(u)
@@ -420,7 +426,7 @@ function set_vordiv!(
     v::LowerTriangularArray,
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
-    add::Bool,
+    add::Bool=false,
     coslat_scaling_included::Bool=false,
 ) 
     S = isnothing(S) ? SpectralTransform(geometry.spectral_grid) : S
