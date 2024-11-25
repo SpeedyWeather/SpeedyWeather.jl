@@ -6,7 +6,7 @@ import SpeedyWeather.LowerTriangularMatrices: ij2k
 get_lm_range(m, lmax) = ij2k(m, m, lmax):ij2k(lmax, m, lmax)
 
 # (inverse) legendre transform kernel, called from _legendre!
-function phase_factor_kernel!(
+function inverse_legendre_kernel!(
     g_north,
     g_south,
     specs_data,
@@ -32,7 +32,7 @@ function phase_factor_kernel!(
         # is how the previous implementation was enacted
         lmax_range = length(lm_range)           # number of degrees at order m, lmax-m
         isoddlmax = isodd(lmax_range)
-        lmax_even = lmax_range - isodddlmax     # if odd do last odd element after the loop
+        lmax_even = lmax_range - isoddlmax     # if odd do last odd element after the loop
 
         # Got rid of bounds check, potentially unsafe?
         # @boundscheck size(north) == size(south) || throw(DimensionMismatch)
@@ -92,7 +92,7 @@ function SpeedyTransforms._legendre!(
     g_south .= 0
 
     # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m and layer k
-    kernel = CUDA.@cuda launch=false phase_factor_kernel!(
+    kernel = CUDA.@cuda launch=false inverse_legendre_kernel!(
         g_north,
         g_south,
         specs.data,
@@ -101,7 +101,7 @@ function SpeedyTransforms._legendre!(
         lon_offsets,
         kjm_indices
     )
-    config = CUDA.launch_configuration(k.fun)
+    config = CUDA.launch_configuration(kernel.fun)
     threads = min(length(kjm_indices), config.threads)
     blocks = cld(length(kjm_indices), threads)
 
