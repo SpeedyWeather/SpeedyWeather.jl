@@ -270,31 +270,18 @@ but vary in latitude following a coslat². To be created like
 Fields and options are
 $(TYPEDFIELDS)"""
 @kwdef struct AquaPlanet{NF} <: AbstractOcean
-    "Number of latitude rings"
-    nlat::Int
-
     "[OPTION] Temperature on the Equator [K]"
     temp_equator::NF = 302
 
     "[OPTION] Temperature at the poles [K]"
     temp_poles::NF = 273
-
-    "Latitudinal temperature profile [K]"
-    temp_lat::Vector{NF} = zeros(NF, nlat)
 end
 
 # generator function
-function AquaPlanet(SG::SpectralGrid; kwargs...)
-    (; NF, nlat) = SG
-    AquaPlanet{NF}(; nlat, kwargs...)
-end
+AquaPlanet(SG::SpectralGrid; kwargs...) = AquaPlanet{SG.NF}(; kwargs...)
 
-# nothing to initialize for model.ocean
-function initialize!(ocean_model::AquaPlanet, model::PrimitiveEquation)
-    (; coslat²) = model.geometry
-    (; temp_lat, temp_equator, temp_poles) = ocean_model
-    @. temp_lat = (temp_equator-temp_poles)*coslat² + temp_poles
-end
+# nothing to initialize for AquaPlanet
+initialize!(ocean_model::AquaPlanet, model::PrimitiveEquation) = nothing
 
 # initialize 
 function initialize!(   
@@ -304,11 +291,9 @@ function initialize!(
     model::PrimitiveEquation,
 )
     (; sea_surface_temperature) = ocean
-    for (j, ring) in enumerate(eachring(sea_surface_temperature))
-        for ij in ring  # set every ring of SST to latitude profile
-            sea_surface_temperature[ij] = ocean_model.temp_lat[j]
-        end
-    end
+    Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
+    sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
+    set!(sea_surface_temperature, sst, model.geometry)
 end
 
 function ocean_timestep!(
@@ -317,5 +302,53 @@ function ocean_timestep!(
     ocean_model::AquaPlanet,
     model::PrimitiveEquation,
 )
+    return nothing
+end
+
+@kwdef struct SlabOcean{NF} <: AbstractOcean
+    "[OPTION] Temperature on the Equator [K]"
+    temp_equator::NF = 302
+
+    "[OPTION] Temperature at the poles [K]"
+    temp_poles::NF = 273
+
+    "Heat capacity"
+    heat_capacity::NF = 1e6
+end
+
+# generator function
+SlabOcean(SG::SpectralGrid; kwargs...) = SlabOcean{SG.NF}(; kwargs...)
+
+# nothing to initialize for SlabOcean
+initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing
+
+# initialize 
+function initialize!(
+    ocean::PrognosticVariablesOcean,
+    time::DateTime,
+    ocean_model::SlabOcean,
+    model::PrimitiveEquation,
+)
+    # initialize like AquaPlanet
+    (; sea_surface_temperature) = ocean
+    Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
+    sst(λ,φ) = (Te - Tp)*cosd(φ)^2 + Tp
+    set!(sea_surface_temperature, sst, model.geometry)
+end
+
+function ocean_timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    ocean_model::SlabOcean,
+    model::PrimitiveEquation,
+)
+    sst = progn.ocean.sea_surface_temperature
+    flux = diagn.physics.surface_flux_heat
+    (; heat_capacity) = ocean_model
+    Δt = model.time_stepping.Δt_sec
+
+    # flux is defined as positive downward
+    @. sst += (Δt/heat_capacity)*flux
+
     return nothing
 end
