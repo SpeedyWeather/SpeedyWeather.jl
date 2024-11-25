@@ -8,7 +8,7 @@ to perform a spectral transform. Fields are
 $(TYPEDFIELDS)"""
 struct SpectralTransform{
     NF,
-    ArrayType,
+    ArrayType,                  # non-parametric array type
     VectorType,                 # <: ArrayType{NF, 1},
     VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
     MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
@@ -96,12 +96,13 @@ function SpectralTransform(
     mmax::Integer,                                  # Spectral truncation: orders
     nlat_half::Integer;                             # grid resolution, latitude rings on one hemisphere incl equator
     Grid::Type{<:AbstractGridArray} = DEFAULT_GRID, # type of spatial grid used
-    ArrayType::Type{<:AbstractArray} = Array,       # Array type used for spectral coefficients
+    ArrayType::Type{<:AbstractArray} = Array,       # Array type used for spectral coefficients (can be parametric)
     nlayers::Integer = DEFAULT_NLAYERS,             # number of layers in the vertical (for scratch memory size)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,   # shorten Legendre loop over order m
 ) where NF
 
-    Grid = RingGrids.nonparametric_type(Grid)   # always use nonparametric concrete type
+    Grid = RingGrids.nonparametric_type(Grid)               # always use nonparametric concrete type
+    ArrayType_ = RingGrids.nonparametric_type(ArrayType)    # drop parameters of ArrayType
 
     # RESOLUTION PARAMETERS
     nlat = get_nlat(Grid, nlat_half)            # 2nlat_half but one less if grids have odd # of lat rings
@@ -139,24 +140,24 @@ function SpectralTransform(
     end
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    # north is converted to array type now for help with making the FFT plans
-    scratch_memory_north = ArrayType(zeros(Complex{NF}, nfreq_max, nlayers, nlat_half))
-    scratch_memory_south = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
+    # convert all to the arraytype (e.g. moves array to GPU)
+    scratch_memory_north = ArrayType_(zeros(Complex{NF}, nfreq_max, nlayers, nlat_half))
+    scratch_memory_south = ArrayType_(zeros(Complex{NF}, nfreq_max, nlayers, nlat_half))
 
     # SCRATCH MEMORY TO 1-STRIDE DATA FOR FFTs
-    scratch_memory_grid  = zeros(NF, nlon_max*nlayers)
-    scratch_memory_spec  = zeros(Complex{NF}, nfreq_max*nlayers)
+    scratch_memory_grid  = ArrayType_(zeros(NF, nlon_max*nlayers))
+    scratch_memory_spec  = ArrayType_(zeros(Complex{NF}, nfreq_max*nlayers))
 
     # SCRATCH MEMORY COLUMNS FOR VERTICALLY BATCHED LEGENDRE TRANSFORM
-    scratch_memory_column_north = zeros(Complex{NF}, nlayers)
-    scratch_memory_column_south = zeros(Complex{NF}, nlayers)
+    scratch_memory_column_north = ArrayType_(zeros(Complex{NF}, nlayers))
+    scratch_memory_column_south = ArrayType_(zeros(Complex{NF}, nlayers))
 
     rfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
 
-    fake_grid_data = adapt(ArrayType, zeros(Grid{NF}, nlat_half, nlayers))
+    fake_grid_data = adapt(ArrayType_, zeros(Grid{NF}, nlat_half, nlayers))
 
     # PLAN THE FFTs
     plan_FFTs!(
@@ -219,8 +220,6 @@ function SpectralTransform(
     eigenvalues⁻¹ = inv.(eigenvalues)
     eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
 
-    # guarantee a nonparametric type to construct lower triangular types correctly
-    ArrayType_ = RingGrids.nonparametric_type(ArrayType)
     return SpectralTransform{
         NF,
         ArrayType_,
