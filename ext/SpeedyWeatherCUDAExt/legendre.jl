@@ -77,11 +77,11 @@ but called from transform! with CuArrays."""
 function SpeedyTransforms._legendre!(
     g_north::CuArray{<:Complex, 3},   # Legendre-transformed output, northern latitudes
     g_south::CuArray{<:Complex, 3},   # and southern latitudes
-    specs::LowerTriangularArray{NF, N, <:CuArray},            # input: spherical harmonic coefficients
+    specs::LowerTriangularArray,            # input: spherical harmonic coefficients
     S::SpectralTransform,                   # precomputed transform
     kjm_indices::CuArray;            # precomputed jm index map
     unscale_coslat::Bool = false,           # unscale by cosine of latitude on the fly?
-) where {NF<:AbstractFloat, N}
+)
     (; nlat_half) = S                       # dimensions    
     (; lmax, mmax ) = S                     # 0-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S            # precomputed Legendre polynomials    
