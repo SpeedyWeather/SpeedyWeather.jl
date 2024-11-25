@@ -32,5 +32,6 @@ Returns a `CuArray` when `device<:GPU` is used. Doesn't uses `adapt`, therefore 
 SpeedyWeather.DeviceArrayNotAdapt(::GPU, x) = CuArray(x)
 
 include("fourier.jl")
+include("legendre.jl")
 
 end # module
