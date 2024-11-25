@@ -46,18 +46,6 @@ function set!(
     return nothing
 end
 
-# convenient function barrier to use geometry, spectral_transform and gravity from model
-"""
-$(TYPEDSIGNATURES)
-Sets a new `orography` for the `model`. The input can be a function, `RingGrid`, `LowerTriangularMatrix`, 
-or scalar as for other `set!` functions. If the keyword `add==true` the input is added to the exisiting 
-orography instead.  
-"""
-function set!(model::AbstractModel; orography, kwargs...)
-    set!(model.orography, orography, model.geometry, model.spectral_transform;
-        gravity=model.planet.gravity, kwargs...)
-end
-
 export ZonalRidge
 
 """Zonal ridge orography after Jablonowski and Williamson, 2006.

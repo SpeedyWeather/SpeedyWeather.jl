@@ -58,7 +58,7 @@ and interpolate the orography which happens at the `initialize!`
 step. Visualised with
 
 ```@example orography
-model = PrimitiveDryModel(;spectral_grid, orography)
+model = PrimitiveDryModel(spectral_grid; orography)
 initialize!(orography, model)   # happens also in simulation = initialize!(model)
 
 using CairoMakie

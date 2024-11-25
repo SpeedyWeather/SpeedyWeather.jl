@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- ConstantLandTemperature implemented [#612](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/612)
+- set! for more boundary conditions [#611](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/611)
+- SpectralFilter for horizontal diffusion [#601](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/601)
+- GeoMakie weak dependency, globe function for 3D data visualisation [#600](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/600)
+- Zonal mean for AbstractGridArray [#603](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/603)
+
+## v0.12.0
+
+- OctaminimalGaussianArray/Grid to start with 4 points around the poles [#595](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/595)
+- Output both accumulated and precipitation rate as netCDF [#596](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/596)
+- Random processes for random pattern generation [#592](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/592)
 - Also allow SpectralGrid as positional argument to model constructors [#593](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/593)
 - De-interweave SpectralTransform [#587](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/587)
 - Rossby-Haurwitz wave initial conditions [#591](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/591)

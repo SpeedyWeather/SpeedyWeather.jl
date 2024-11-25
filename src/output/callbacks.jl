@@ -30,10 +30,10 @@ export NoCallback
 struct NoCallback <: AbstractCallback end
 initialize!(::NoCallback, args...) = nothing     # executed once before the main time loop
 callback!(::NoCallback, args...) = nothing       # executed after every time step
-finish!(::NoCallback, args...) = nothing         # executed after main time loop finishes
+finalize!(::NoCallback, args...) = nothing       # executed after main time loop finishes
 
 # simply loop over dict of callbacks
-for func in (:initialize!, :callback!, :finish!)
+for func in (:initialize!, :callback!, :finalize!)
     @eval begin
         function $func(callbacks::CALLBACK_DICT, args...)
             for key in keys(callbacks)
@@ -150,5 +150,5 @@ function callback!(
     callback.temp[i] = diagn.temp_average[diagn.nlayers]
 end
 
-# nothing to finish
-finish!(::GlobalSurfaceTemperatureCallback, args...) = nothing
+# nothing to finalize
+finalize!(::GlobalSurfaceTemperatureCallback, args...) = nothing

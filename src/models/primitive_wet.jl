@@ -4,7 +4,7 @@ export PrimitiveWetModel
 The PrimitiveWetModel contains all model components (themselves structs) needed for the
 simulation of the primitive equations with humidity. To be constructed like
 
-    model = PrimitiveWetModel(; spectral_grid, kwargs...)
+    model = PrimitiveWetModel(spectral_grid; kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
@@ -21,6 +21,7 @@ $(TYPEDFIELDS)"""
     AC,     # <:AbstractAdiabaticConversion,
     PA,     # <:AbstractParticleAdvection,
     IC,     # <:AbstractInitialConditions,
+    RP,     # <:AbstractRandomProcess,
     LS,     # <:AbstractLandSeaMask,
     OC,     # <:AbstractOcean,
     LA,     # <:AbstractLand,
@@ -63,6 +64,7 @@ $(TYPEDFIELDS)"""
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(PrimitiveWet)
+    random_process::RP = NoRandomProcess()
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
@@ -122,6 +124,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.coriolis, model)
     initialize!(model.geopotential, model)
     initialize!(model.adiabatic_conversion, model)
+    initialize!(model.random_process, model)
 
     # boundary conditions
     initialize!(model.orography, model)
@@ -159,7 +162,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
 
-    # initialize ocean and land and synchronize clocks
+    # initialize ocean and land
     initialize!(prognostic_variables.ocean, time, model)
     initialize!(prognostic_variables.land,  prognostic_variables, diagnostic_variables, model)
 

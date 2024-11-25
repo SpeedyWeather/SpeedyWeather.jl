@@ -6,6 +6,7 @@ import Random
     @testset for Grid in (   FullGaussianGrid,
                     OctahedralGaussianGrid,
                     OctahedralClenshawGrid,
+                    OctaminimalGaussianGrid,
                     HEALPixGrid,
                     OctaHEALPixGrid)
         
@@ -32,6 +33,7 @@ end
     @testset for Grid in (   FullGaussianGrid,
                     OctahedralGaussianGrid,
                     OctahedralClenshawGrid,
+                    OctaminimalGaussianGrid,
                     HEALPixGrid,
                     OctaHEALPixGrid)
         
@@ -69,6 +71,7 @@ end
     @testset for Grid in (  FullGaussianGrid,
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid,
+                            OctaminimalGaussianGrid,
                             HEALPixGrid,
                             OctaHEALPixGrid)
         
@@ -129,6 +132,7 @@ end
     @testset for Grid in (   FullGaussianGrid,
                     OctahedralGaussianGrid,
                     OctahedralClenshawGrid,
+                    OctaminimalGaussianGrid,
                     HEALPixGrid,
                     OctaHEALPixGrid)
 
@@ -160,6 +164,7 @@ end
                                 FullClenshawGrid,
                                 OctahedralGaussianGrid,
                                 OctahedralClenshawGrid,
+                                OctaminimalGaussianGrid,
                                 HEALPixGrid,
                                 OctaHEALPixGrid)
 

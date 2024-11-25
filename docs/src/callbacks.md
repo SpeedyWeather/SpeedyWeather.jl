@@ -3,7 +3,7 @@
 SpeedyWeather.jl implements a callback system to let users include a flexible piece of code
 into the time stepping. You can think about the main time loop *calling back* to check whether
 anything else should be done before continuing with the next time step. The callback system
-here is called *after* the time step only (plus one call at `initialize!` and one at `finish!`),
+here is called *after* the time step only (plus one call at `initialize!` and one at `finalize!`),
 we currently do not implement other callsites.
 
 Callbacks are mainly introduced for diagnostic purposes, meaning that they do not influence
@@ -59,7 +59,7 @@ Now every callback needs to extend three methods
 
 1. `initialize!`, called once before the main time loop starts
 2. `callback!`, called after every time step
-3. `finish!`, called once after the last time step
+3. `finalize!`, called once after the last time step
 
 And we'll go through them one by one.
 
@@ -138,18 +138,18 @@ callback this should be read-only. While you could change other model components
 land sea mask in `model.land_sea_mask` or orography etc. then you interfere with the
 simulation which is more advanced and will be discussed in Intrusive callbacks below.
 
-Lastly, we extend the `finish!` function which is called once after the last time step.
+Lastly, we extend the `finalize!` function which is called once after the last time step.
 This could be used, for example, to save the `maximum_surface_wind_speed` vector to
 file or in case you want to find the highest wind speed across all time steps.
 But in many cases you may not need to do anything, in which case you just just let
 it return `nothing`.
 
 ```@example callbacks
-SpeedyWeather.finish!(::StormChaser, args...) = nothing
+SpeedyWeather.finalize!(::StormChaser, args...) = nothing
 ```
 
-!!! note "Always extend `initialize!`, `callback!` and `finish!`"
-    For a custom callback you need to extend all three, `initialize!`, `callback!` and `finish!`,
+!!! note "Always extend `initialize!`, `callback!` and `finalize!`"
+    For a custom callback you need to extend all three, `initialize!`, `callback!` and `finalize!`,
     even if your callback doesn't need it. Just return `nothing` in that case. Otherwise a
     `MethodError` will occur. While we could have defined all callbacks by default to do nothing
     on each of these, this may give you the false impression that your callback is already defined
@@ -162,7 +162,7 @@ keyword can be used to create a model with a dictionary of callbacks. Callbacks 
 with a `Symbol` key inside such a dictionary. We have a convenient `CallbackDict` generator function
 which can be used like `Dict` but the key-value pairs have to be of type `Symbol`-`AbstractCallback`.
 Let us illustrate this with the dummy callback `NoCallback` (which is a callback that returns `nothing`
-on `initialize!`, `callback!` and `finish!`)
+on `initialize!`, `callback!` and `finalize!`)
 
 ```@example callbacks
 callbacks = CallbackDict()                                  # empty dictionary
@@ -189,7 +189,7 @@ Meaning that callbacks can be added before and after model construction
 ```@example callbacks
 spectral_grid = SpectralGrid()
 callbacks = CallbackDict(:callback_added_before => NoCallback())
-model = PrimitiveWetModel(; spectral_grid, callbacks)
+model = PrimitiveWetModel(spectral_grid; callbacks)
 add!(model.callbacks, :callback_added_afterwards => NoCallback())
 add!(model, :callback_added_afterwards2 => NoCallback())
 ```
@@ -332,8 +332,8 @@ function SpeedyWeather.callback!(
     @info "North pole has a temperature of $temp_at_north_pole on $time."
 end
 
-# nothing needs to be done when finishing
-SpeedyWeather.finish!(::MyScheduledCallback, args...) = nothing
+# nothing needs to be done after simulation is finished
+SpeedyWeather.finalize!(::MyScheduledCallback, args...) = nothing
 ```
 
 So in summary
@@ -353,7 +353,7 @@ for events that are scheduled. Now let's create a primitive equation model with 
 
 ```@example schedule
 spectral_grid = SpectralGrid(trunc=31, nlayers=5)
-model = PrimitiveWetModel(;spectral_grid)
+model = PrimitiveWetModel(spectral_grid)
 add!(model.callbacks, north_pole_temp_at_noon_jan9)
 
 # start simulation 7 days earlier

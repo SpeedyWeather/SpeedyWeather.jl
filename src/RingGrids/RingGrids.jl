@@ -5,7 +5,7 @@ using  DocStringExtensions
 import UnicodePlots
 
 # NUMERICS
-import Statistics: mean
+import Statistics: Statistics, mean
 import FastGaussQuadrature
 import LinearAlgebra
 
@@ -36,12 +36,14 @@ export  FullGaussianGrid,
 export  OctahedralGaussianArray,
         OctahedralClenshawArray,
         HEALPixArray,
-        OctaHEALPixArray
+        OctaHEALPixArray,
+        OctaminimalGaussianArray
 
 export  OctahedralGaussianGrid,
         OctahedralClenshawGrid,
         HEALPixGrid,
-        OctaHEALPixGrid
+        OctaHEALPixGrid,
+        OctaminimalGaussianGrid
 
 # SIZE
 export  grids_match,
@@ -93,6 +95,9 @@ export  interpolate,
         update_locator,
         update_locator!
 
+# STATISTICS
+export zonal_mean
+
 include("utility_functions.jl")
 
 # GENERAL
@@ -113,10 +118,13 @@ include("grids/octahedral_gaussian.jl")
 include("grids/octahedral_clenshaw.jl")
 include("grids/healpix.jl")
 include("grids/octahealpix.jl")
+include("grids/octaminimal_gaussian.jl")
 
 # INTEGRATION AND INTERPOLATION
 include("quadrature_weights.jl")
 include("interpolation.jl")
+include("vertices.jl")
+include("statistics.jl")
 
 # OUTPUT
 include("show.jl")

@@ -4,7 +4,7 @@ export ShallowWaterModel
 The ShallowWaterModel contains all model components needed for the simulation of the
 shallow water equations. To be constructed like
 
-    model = ShallowWaterModel(; spectral_grid, kwargs...)
+    model = ShallowWaterModel(spectral_grid; kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
@@ -21,6 +21,7 @@ $(TYPEDFIELDS)"""
     DR,     # <:AbstractDrag,
     PA,     # <:AbstractParticleAdvection,
     IC,     # <:AbstractInitialConditions,
+    RP,     # <:AbstractRandomProcess,
     TS,     # <:AbstractTimeStepper,
     ST,     # <:SpectralTransform{NF},
     IM,     # <:AbstractImplicit,
@@ -42,6 +43,7 @@ $(TYPEDFIELDS)"""
     drag::DR = NoDrag()
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(ShallowWater)
+    random_process::RP = NoRandomProcess()
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -77,6 +79,7 @@ function initialize!(model::ShallowWater; time::DateTime = DEFAULT_DATE)
     initialize!(model.drag, model)
     initialize!(model.horizontal_diffusion, model)
     # model.implicit is initialized in first_timesteps!
+    initialize!(model.random_process, model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)

@@ -69,7 +69,7 @@ or wavenumber 0, see [Spherical Harmonic Transform](@ref)) encodes the global av
 ```@example analysis
 using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=1)
-model = ShallowWaterModel(;spectral_grid)
+model = ShallowWaterModel(spectral_grid)
 simulation = initialize!(model)
 ```
 
@@ -453,7 +453,7 @@ end
 
 Then we define a new callback `GlobalDiagnostics` subtype of SpeedyWeather's
 `AbstractCallback` and define new methods of `initialize!`,
-`callback!` and `finish!` for it (see [Callbacks](@ref) for more
+`callback!` and `finalize!` for it (see [Callbacks](@ref) for more
 details)
 
 ```@example analysis
@@ -526,8 +526,8 @@ end
 
 using NCDatasets
 
-# define how to finish a GlobalDiagnostics callback after simulation finished
-function SpeedyWeather.finish!(
+# define how to finalize a GlobalDiagnostics callback after simulation finished
+function SpeedyWeather.finalize!(
     callback::GlobalDiagnostics,
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
@@ -556,7 +556,7 @@ end
 
 Note that `callback!` will execute _every_ time step. If
 execution is only desired periodically, you can use [Schedules](@ref).
-At `finish!` we decide to write the timeseries of our global
+At `finalize!` we decide to write the timeseries of our global
 diagnostics as netCDF file via NCDatasets.jl to the current
 path `pwd()`. We need to add `using NCDatasets` here, as SpeedyWeather
 does not re-export the functionality therein.

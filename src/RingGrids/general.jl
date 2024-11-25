@@ -294,6 +294,12 @@ function get_nlons(Grid::Type{<:AbstractGridArray}, nlat_half::Integer; both_hem
     return [get_nlon_per_ring(Grid, nlat_half, j) for j in 1:n]
 end
 
+"""$(TYPEDSIGNATURES)
+Number of longitude points per latitude ring `j`."""
+function get_nlon_per_ring(grid::AbstractGridArray, j::Integer)
+    return get_nlon_per_ring(typeof(grid), grid.nlat_half, j)
+end
+
 ## ITERATORS
 """
 $(TYPEDSIGNATURES)
@@ -399,7 +405,7 @@ end
 
 """$(TYPEDSIGNATURES) UnitRange to access data on grid `grid` on ring `j`."""
 function each_index_in_ring(grid::Grid, j::Integer) where {Grid<:AbstractGridArray}
-    return each_index_in_ring(Grid, j, grid.nlat_half)
+    return grid.rings[j]
 end
 
 """ $(TYPEDSIGNATURES) UnitRange to access each horizontal grid point on grid `grid`.

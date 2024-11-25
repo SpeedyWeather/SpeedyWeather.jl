@@ -4,7 +4,7 @@ export BarotropicModel, initialize!
 The BarotropicModel contains all model components needed for the simulation of the
 barotropic vorticity equations. To be constructed like
 
-    model = BarotropicModel(; spectral_grid, kwargs...)
+    model = BarotropicModel(spectral_grid; kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
@@ -20,6 +20,7 @@ $(TYPEDFIELDS)"""
     DR,     # <:AbstractDrag,
     PA,     # <:AbstractParticleAdvection,
     IC,     # <:AbstractInitialConditions,
+    RP,     # <:AbstractRandomProcess,
     TS,     # <:AbstractTimeStepper,
     ST,     # <:SpectralTransform{NF},
     IM,     # <:AbstractImplicit,
@@ -40,6 +41,7 @@ $(TYPEDFIELDS)"""
     drag::DR = NoDrag()
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(Barotropic)
+    random_process::RP = NoRandomProcess()
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -73,6 +75,7 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.forcing, model)
     initialize!(model.drag, model)
     initialize!(model.horizontal_diffusion, model)
+    initialize!(model.random_process, model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)

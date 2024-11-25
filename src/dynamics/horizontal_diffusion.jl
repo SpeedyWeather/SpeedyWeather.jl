@@ -13,7 +13,11 @@ above the `tapering_σ` sigma level to `power_stratosphere` (default 2).
 For the BarotropicModel and ShallowWaterModel no tapering or scaling is applied.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef mutable struct HyperDiffusion{NF} <: AbstractHorizontalDiffusion
+@kwdef mutable struct HyperDiffusion{
+    NF,
+    MatrixType,
+} <: AbstractHorizontalDiffusion
+
     # DIMENSIONS
     "spectral resolution"
     trunc::Int
@@ -23,68 +27,71 @@ $(TYPEDFIELDS)"""
     
     # PARAMETERS
     "[OPTION] power of Laplacian"
-    power::Float64 = 4.0
+    power::NF = 4
     
     "[OPTION] diffusion time scale"
-    time_scale::Second = Minute(60)
+    time_scale::Second = Hour(4)
 
     "[OPTION] diffusion time scale for temperature and humidity"
-    time_scale_temp_humid::Second = Minute(144)
+    time_scale_div::Second = Hour(1)
     
     "[OPTION] stronger diffusion with resolution? 0: constant with trunc, 1: (inverse) linear with trunc, etc"
-    resolution_scaling::Float64 = 0.5
+    resolution_scaling::NF = 1
 
     # incrased diffusion in stratosphere
     "[OPTION] different power for tropopause/stratosphere"
-    power_stratosphere::Float64 = 2.0
+    power_stratosphere::NF = 2
     
     "[OPTION] linearly scale towards power_stratosphere above this σ"
-    tapering_σ::Float64 = 0.2
+    tapering_σ::NF = 0.2
 
     # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
-    ∇²ⁿ::Vector{Vector{NF}} = [zeros(NF, trunc+2) for _ in 1:nlayers]           # explicit part
-    ∇²ⁿ_implicit::Vector{Vector{NF}} = [ones(NF, trunc+2) for _ in 1:nlayers]   # implicit part
+    expl::MatrixType = zeros(NF, trunc+2, nlayers)      # explicit part
+    impl::MatrixType = ones(NF, trunc+2, nlayers)       # implicit part
 
-    # ARRAYS but no scaling or tapering and using time_scale_temp_humid
-    ∇²ⁿc::Vector{Vector{NF}} = [zeros(NF, trunc+2) for _ in 1:nlayers]           # explicit part
-    ∇²ⁿc_implicit::Vector{Vector{NF}} = [ones(NF, trunc+2) for _ in 1:nlayers]   # implicit part
+    # ARRAYS using time_scale_div
+    expl_div::MatrixType = zeros(NF, trunc+2, nlayers)    # explicit part
+    impl_div::MatrixType = ones(NF, trunc+2, nlayers)     # implicit part
 end
 
 """$(TYPEDSIGNATURES)
 Generator function based on the resolutin in `spectral_grid`.
 Passes on keyword arguments."""
 function HyperDiffusion(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, trunc, nlayers) = spectral_grid        # take resolution parameters from spectral_grid
-    return HyperDiffusion{NF}(; trunc, nlayers, kwargs...)
+    (; NF, trunc, nlayers, ArrayType) = spectral_grid        # take resolution parameters from spectral_grid
+    MatrixType = ArrayType{NF, 2}
+    return HyperDiffusion{NF, MatrixType}(; trunc, nlayers, kwargs...)
 end
 
 """$(TYPEDSIGNATURES)
-Precomputes the hyper diffusion terms in `scheme` based on the
+Precomputes the hyper diffusion terms in `diffusion` based on the
 model time step, and possibly with a changing strength/power in
-the vertical.
-"""
-function initialize!(   scheme::HyperDiffusion,
+the vertical."""
+function initialize!(   diffusion::HyperDiffusion,
                         model::AbstractModel)
-    initialize!(scheme, model.geometry, model.time_stepping)
+    initialize!(diffusion, model.geometry, model.time_stepping)
 end
 
 """$(TYPEDSIGNATURES)
 Precomputes the hyper diffusion terms for all layers based on the
 model time step in `L`, the vertical level sigma level in `G`."""
 function initialize!(   
-    scheme::HyperDiffusion,
+    diffusion::HyperDiffusion,
     G::AbstractGeometry,
     L::AbstractTimeStepper,
 )
-    (; trunc, nlayers, resolution_scaling) = scheme
-    (; ∇²ⁿ, ∇²ⁿ_implicit, ∇²ⁿc, ∇²ⁿc_implicit) = scheme
-    (; power, power_stratosphere, tapering_σ) = scheme
+    (; trunc, nlayers, resolution_scaling) = diffusion
+    ∇²ⁿ = diffusion.expl
+    ∇²ⁿ_implicit = diffusion.impl
+    ∇²ⁿ_div = diffusion.expl_div
+    ∇²ⁿ_div_implicit = diffusion.impl_div
+    (; power, power_stratosphere, tapering_σ) = diffusion
     (; Δt, radius) = L
 
     # Reduce diffusion time scale (=increase diffusion, always in seconds) with resolution
     # times 1/radius because time step Δt is scaled with 1/radius
-    time_scale = scheme.time_scale.value/radius * (32/(trunc+1))^resolution_scaling
-    time_scale_constant = scheme.time_scale_temp_humid.value/radius
+    time_scale = Second(diffusion.time_scale).value/radius * (32/(trunc+1))^resolution_scaling
+    time_scale_div = Second(diffusion.time_scale_div).value/radius * (32/(trunc+1))^resolution_scaling
 
     # NORMALISATION
     # Diffusion is applied by multiplication of the eigenvalues of the Laplacian -l*(l+1)
@@ -104,47 +111,48 @@ function initialize!(
             eigenvalue_norm = -l*(l+1)/largest_eigenvalue   # normalised diffusion ∇², power=1
 
             # Explicit part (=-ν∇²ⁿ), time scales to damping frequencies [1/s] times norm. eigenvalue
-            ∇²ⁿ[k][l+1] = -eigenvalue_norm^p/time_scale
-            ∇²ⁿc[k][l+1] = -eigenvalue_norm^power/time_scale_constant
+            ∇²ⁿ[l+1, k] = -eigenvalue_norm^power/time_scale
+            ∇²ⁿ_div[l+1, k] = -eigenvalue_norm^p/time_scale_div
             
             # and implicit part of the diffusion (= 1/(1-2Δtν∇²ⁿ))
-            ∇²ⁿ_implicit[k][l+1] = 1/(1-2Δt*∇²ⁿ[k][l+1])           
-            ∇²ⁿc_implicit[k][l+1] = 1/(1-2Δt*∇²ⁿc[k][l+1])           
+            ∇²ⁿ_implicit[l+1, k] = 1/(1-2Δt*∇²ⁿ[l+1, k])           
+            ∇²ⁿ_div_implicit[l+1, k] = 1/(1-2Δt*∇²ⁿ_div[l+1, k])           
         end
         
         # last degree is only used by vector quantities; set to zero for implicit and explicit
         # to set any tendency at lmax+1,1:mmax to zero (what it should be anyway)
-        ∇²ⁿ[k][trunc+2] = 0
-        ∇²ⁿ_implicit[k][trunc+2] = 0
-        ∇²ⁿc[k][trunc+2] = 0
-        ∇²ⁿc_implicit[k][trunc+2] = 0
+        ∇²ⁿ[trunc+2, k] = 0
+        ∇²ⁿ_implicit[trunc+2, k] = 0
+        ∇²ⁿ_div[trunc+2, k] = 0
+        ∇²ⁿ_div_implicit[trunc+2, k] = 0
     end
 end
 
 """$(TYPEDSIGNATURES)
-Apply horizontal diffusion to a 2D field `A` in spectral space by updating its tendency `tendency`
+Apply horizontal diffusion to a 2D field `var` in spectral space by updating its tendency `tendency`
 with an implicitly calculated diffusion term. The implicit diffusion of the next time step is split
-into an explicit part `∇²ⁿ_expl` and an implicit part `∇²ⁿ_impl`, such that both can be calculated
-in a single forward step by using `A` as well as its tendency `tendency`."""
+into an explicit part `expl` and an implicit part `impl`, such that both can be calculated
+in a single forward step by using `var` as well as its tendency `tendency`."""
 function horizontal_diffusion!( 
     tendency::LowerTriangularArray,     # tendency of a 
-    A::LowerTriangularArray,            # spectral horizontal field
-    ∇²ⁿ_expl::AbstractVector,           # explicit spectral damping (vector of k vectors of lmax length)
-    ∇²ⁿ_impl::AbstractVector            # implicit spectral damping (vector of k vectors of lmax length)
+    var::LowerTriangularArray,          # spectral horizontal field to diffuse
+    expl::AbstractMatrix,               # explicit spectral damping (lmax x nlayers matrix)
+    impl::AbstractMatrix,               # implicit spectral damping (lmax x nlayers matrix)
 )
-    lmax, mmax = size(tendency; as=Matrix)      # 1-based
+    lmax, mmax = size(tendency, OneBased, as=Matrix)
+    nlayers = size(var, 2)
 
-    @boundscheck size(tendency) == size(A) || throw(BoundsError)
-    @boundscheck lmax <= length(∇²ⁿ_expl[1]) == length(∇²ⁿ_impl[1]) || throw(BoundsError)
+    @boundscheck size(tendency) == size(var) || throw(BoundsError)
+    @boundscheck lmax <= size(expl, 1) == size(impl, 1) || throw(BoundsError)
+    @boundscheck nlayers <= size(expl, 2) == size(impl, 2) || throw(BoundsError)
 
-    for k in eachmatrix(tendency, A)
-        lm = 0
+    @inbounds for k in eachmatrix(tendency, var)
+        lm = 0                      # running index
         for m in 1:mmax             # loops over all columns/order m
-            for l in m:lmax-1       # but skips the lmax+2 degree (1-based)
+            for l in m:lmax
                 lm += 1             # single index lm corresponding to harmonic l, m
-                tendency[lm, k] = (tendency[lm, k] + ∇²ⁿ_expl[k][l]*A[lm, k]) * ∇²ⁿ_impl[k][l]
+                tendency[lm, k] = (tendency[lm, k] + expl[l, k]*var[lm, k]) * impl[l, k]
             end
-            lm += 1                 # skip last row for scalar quantities
         end
     end
 end
@@ -154,15 +162,16 @@ Apply horizontal diffusion to vorticity in the BarotropicModel."""
 function horizontal_diffusion!( 
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
+    diffusion::AbstractHorizontalDiffusion,
     model::Barotropic,
     lf::Integer = 1,    # leapfrog index used (2 is unstable)
 )
-    (; ∇²ⁿ, ∇²ⁿ_implicit) = model.horizontal_diffusion
+    (; expl, impl) = diffusion
 
     # Barotropic model diffuses vorticity (only variable)
     vor = progn.vor[lf]
     (; vor_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
+    horizontal_diffusion!(vor_tend, vor, expl, impl)
 end
 
 """$(TYPEDSIGNATURES)
@@ -170,17 +179,18 @@ Apply horizontal diffusion to vorticity and divergence in the ShallowWaterModel.
 function horizontal_diffusion!( 
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
+    diffusion::AbstractHorizontalDiffusion,
     model::ShallowWater,
     lf::Integer = 1,    # leapfrog index used (2 is unstable)
 )
-    (; ∇²ⁿ, ∇²ⁿ_implicit) = model.horizontal_diffusion
+    (; expl, impl, expl_div, impl_div) = diffusion
 
     # ShallowWater model diffuses vorticity and divergence
     vor = progn.vor[lf]
     div = progn.div[lf]
     (; vor_tend, div_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
-    horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)
+    horizontal_diffusion!(vor_tend, vor, expl, impl)
+    horizontal_diffusion!(div_tend, div, expl_div, impl_div)
 end
 
 """$(TYPEDSIGNATURES)
@@ -189,14 +199,15 @@ humidity (PrimitiveWet only) in the PrimitiveEquation models."""
 function horizontal_diffusion!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
+    diffusion::AbstractHorizontalDiffusion,
     model::PrimitiveEquation,
     lf::Integer = 1,    # leapfrog index used (2 is unstable)
 )
-    # use weaker diffusion operators that don't taper or scale with resolution for temperature and humidity
-    (; ∇²ⁿc, ∇²ⁿc_implicit) = model.horizontal_diffusion
+    # use stronger diffusion operators that taper and change power with height for divergence
+    (; expl_div, impl_div) = diffusion
 
-    # and the ones that do for vorticity and divergence
-    (; ∇²ⁿ, ∇²ⁿ_implicit) = model.horizontal_diffusion
+    # and those for all other variables
+    (; expl, impl) = diffusion
 
     # Primitive equation models diffuse vor, divergence, temp (and humidity for wet core)
     vor = progn.vor[lf]
@@ -204,8 +215,100 @@ function horizontal_diffusion!(
     temp = progn.temp[lf]
     humid = progn.humid[lf]
     (; vor_tend, div_tend, temp_tend, humid_tend) = diagn.tendencies
-    horizontal_diffusion!(vor_tend, vor, ∇²ⁿ, ∇²ⁿ_implicit)
-    horizontal_diffusion!(div_tend, div, ∇²ⁿ, ∇²ⁿ_implicit)
-    horizontal_diffusion!(temp_tend, temp, ∇²ⁿc, ∇²ⁿc_implicit)
-    model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, ∇²ⁿc, ∇²ⁿc_implicit)
+    horizontal_diffusion!(vor_tend, vor, expl, impl)
+    horizontal_diffusion!(div_tend, div, expl_div, impl_div)
+    horizontal_diffusion!(temp_tend, temp, expl, impl)
+    model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, expl, impl)
+end
+
+export SpectralFilter
+
+"""Spectral filter for horizontal diffusion. Fields are $(TYPEDFIELDS)"""
+@kwdef mutable struct SpectralFilter{
+    NF,
+    MatrixType,
+} <: AbstractHorizontalDiffusion
+
+    # DIMENSIONS
+    "spectral resolution"
+    trunc::Int
+
+    "number of vertical levels"
+    nlayers::Int
+    
+    # PARAMETERS
+    "[OPTION] shift diffusion to higher (positive shift) or lower (neg) wavenumbers, relative to trunc"
+    shift::NF = 0
+
+    "[OPTION] Scale-selectiveness, steepness of the sigmoid, higher is more selective"
+    scale::NF = 0.05
+    
+    "[OPTION] diffusion time scale"
+    time_scale::Second = Hour(4)
+
+    "[OPTION] stronger diffusion time scale for divergence"
+    time_scale_div::Second = Minute(30)
+
+    "[OPTION] resolution scaling to shorten time_scale with trunc"
+    resolution_scaling::NF = 1
+
+    "[OPTION] power of the tanh function"
+    power::NF = 4
+
+    "[OPTION] power of the tanh function for divergence"
+    power_div::NF = 4
+
+    # ARRAYS, precalculated for each spherical harmonics degree and vertical layer
+    expl::MatrixType = zeros(NF, trunc+2, nlayers)  # explicit part
+    impl::MatrixType = ones(NF, trunc+2, nlayers)   # implicit part
+    
+    # ARRAYS using time_scale_div for divergence
+    expl_div::MatrixType = zeros(NF, trunc+2, nlayers)  # explicit part
+    impl_div::MatrixType = ones(NF, trunc+2, nlayers)   # implicit part
+end
+
+"""$(TYPEDSIGNATURES)
+Generator function based on the resolutin in `spectral_grid`.
+Passes on keyword arguments."""
+function SpectralFilter(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, trunc, nlayers, ArrayType) = spectral_grid        # take resolution parameters from spectral_grid
+    MatrixType = ArrayType{NF, 2}
+    return SpectralFilter{NF, MatrixType}(; trunc, nlayers, kwargs...)
+end
+
+function initialize!(diffusion::SpectralFilter, model::AbstractModel)
+    initialize!(diffusion, model.time_stepping)
+end
+
+function initialize!(   
+    diffusion::SpectralFilter,
+    L::AbstractTimeStepper,
+)
+    (; trunc, nlayers) = diffusion
+    (; expl, impl, expl_div, impl_div) = diffusion
+    (; scale, shift, power, power_div, resolution_scaling) = diffusion
+    (; Δt, radius) = L
+
+    # times 1/radius because time step Δt is scaled with 1/radius
+    time_scale = Second(diffusion.time_scale).value/radius * (32/(trunc+1))^resolution_scaling
+    time_scale_div = Second(diffusion.time_scale_div).value/radius * (32/(trunc+1))^resolution_scaling
+    
+    for k in 1:nlayers
+        for l in 0:trunc    # diffusion for every degree l, but indendent of order m
+            # Explicit part for (tend + expl*var) * impl
+            expl[l+1, k] =  -(1 + tanh(scale*(l - trunc - shift)))^power / time_scale
+            expl_div[l+1, k] =  -(1 + tanh(scale*(l - trunc - shift)))^power_div / time_scale_div
+            
+            # and implicit part of the diffusion
+            impl[l+1, k] = 1/(1-2Δt*expl[l+1, k])
+            impl_div[l+1, k] = 1/(1-2Δt*expl_div[l+1, k])
+        end
+        
+        # last degree is only used by vector quantities; set to zero for implicit and explicit
+        # to set any tendency at lmax+1,1:mmax to zero (what it should be anyway)
+        expl[trunc+2, k] = 0
+        impl[trunc+2, k] = 0
+        expl_div[trunc+2, k] = 0
+        impl_div[trunc+2, k] = 0
+    end
 end

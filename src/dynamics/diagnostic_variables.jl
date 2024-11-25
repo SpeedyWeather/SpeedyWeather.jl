@@ -119,7 +119,9 @@ $TYPEDFIELDS."""
     v_grid          ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
     "Logarithm of surface pressure [Pa]"
     pres_grid       ::GridVariable2D = zeros(GridVariable2D, nlat_half)
-    
+    "Random pattern controlled by random process [1]"
+    random_pattern  ::GridVariable2D = zeros(GridVariable3D, nlat_half)
+
     # PREVIOUS TIME STEP
     "Absolute temperature [K] at previous time step"
     temp_grid_prev  ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
@@ -248,10 +250,10 @@ $(TYPEDFIELDS)"""
 
     nlat_half::Int
 
-    "Accumualted large-scale precipitation [m]"
+    "Accumulated large-scale precipitation [m]"
     precip_large_scale::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
-    "Accumualted large-scale precipitation [m]"
+    "Accumulated large-scale precipitation [m]"
     precip_convection::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     "Cloud top [m]"
