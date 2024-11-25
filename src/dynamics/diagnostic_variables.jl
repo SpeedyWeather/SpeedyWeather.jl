@@ -262,6 +262,12 @@ $(TYPEDFIELDS)"""
     "Availability of soil moisture to evaporation [1]"
     soil_moisture_availability::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
+    "Surface flux of heat"
+    surface_flux_heat::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "Surface flux of humidity"
+    surface_flux_humid::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
     "Cosine of solar zenith angle [1]"
     cos_zenith::GridVariable2D = zeros(GridVariable2D, nlat_half)           
 end

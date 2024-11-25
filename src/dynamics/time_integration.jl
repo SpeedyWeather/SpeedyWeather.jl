@@ -303,13 +303,14 @@ function timestep!(
     fill!(diagn.tendencies, 0, PrimitiveWet)
 
     if model.physics                                # switch on/off all physics parameterizations
+        # calculate all parameterizations
+        parameterization_tendencies!(diagn, progn, time, model)
+        
         # time step ocean (temperature and TODO sea ice) and land (temperature and soil moisture)
+        # with fluxes from parameterizations
         ocean_timestep!(progn, diagn, model)
         land_timestep!(progn, diagn, model)
         soil_moisture_availability!(diagn, progn, model)
-
-        # calculate all parameterizations
-        parameterization_tendencies!(diagn, progn, time, model)
     end
 
     if model.dynamics                                           # switch on/off all dynamics
