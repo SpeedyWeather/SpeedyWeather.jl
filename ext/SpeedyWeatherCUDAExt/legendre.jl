@@ -1,5 +1,5 @@
 # convert i, j indices of a matrix (here 0-based l,m though...) to a single 1-based running index
-import LowerTriangularMatrices: ij2k
+import SpeedyWeather.LowerTriangularMatrices: ij2k
 
 # range of the running indices lm in a l-column (degrees of spherical harmonics)
 # given the column index m (order of harmonics) 
