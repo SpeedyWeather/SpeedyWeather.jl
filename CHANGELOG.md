@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- CUDA-ised spectral transform [#602](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/602)
 - ConstantLandTemperature implemented [#612](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/612)
 - set! for more boundary conditions [#611](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/611)
 - SpectralFilter for horizontal diffusion [#601](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/601)
