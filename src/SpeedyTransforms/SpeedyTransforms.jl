@@ -9,6 +9,7 @@ import FFTW
 import GenericFFT
 import LinearAlgebra
 import Primes
+import Adapt: adapt
 
 # SPEEDYWEATHER MODULES
 using ..LowerTriangularMatrices
@@ -38,6 +39,7 @@ export  spectral_truncation,
         spectral_interpolation,
         power_spectrum
 
+# include("../gpu.jl")
 include("aliasing.jl")
 include("legendrepolarray.jl")
 include("legendre_shortcuts.jl")
