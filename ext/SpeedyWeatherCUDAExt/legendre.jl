@@ -3,16 +3,16 @@ import SpeedyWeather.LowerTriangularMatrices: ij2k
 
 # range of the running indices lm in a l-column (degrees of spherical harmonics)
 # given the column index m (order of harmonics) 
-get_lm_range(m, lmax) = ij2k(m, m, lmax):ij2k(lmax, m, lmax)
+get_lm_range(m, lmax) = ij2k(2*m - 1, m, lmax):ij2k(lmax+m, m, lmax)
 
 # (inverse) legendre transform kernel, called from _legendre!
 function inverse_legendre_kernel!(
-    g_north,
-    g_south,
-    specs_data,
-    legendre_polynomials_data, 
-    lmax,
-    lon_offsets,
+    g_north,                        # Scratch storage for legendre coefficients
+    g_south,                        # before fft
+    specs_data,                     # Data passed from spectral grid
+    legendre_polynomials_data,      # Pre-calculated Legendre coefficients
+    lmax,                           # Max l-value, from SpectralTransform struct
+    lon_offsets,                    # Longitude 
     kjm_indices
 )
     tid = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
