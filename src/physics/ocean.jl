@@ -312,8 +312,8 @@ end
     "[OPTION] Temperature at the poles [K]"
     temp_poles::NF = 273
 
-    "Heat capacity"
-    heat_capacity::NF = 1e6
+    "Heat capacity of the mixed layer (Frierson et al 2006) [J/K/m²]"
+    heat_capacity::NF = 1e7
 end
 
 # generator function
@@ -332,7 +332,7 @@ function initialize!(
     # initialize like AquaPlanet
     (; sea_surface_temperature) = ocean
     Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
-    sst(λ,φ) = (Te - Tp)*cosd(φ)^2 + Tp
+    sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
     set!(sea_surface_temperature, sst, model.geometry)
 end
 
@@ -348,6 +348,7 @@ function ocean_timestep!(
     Δt = model.time_stepping.Δt_sec
 
     # flux is defined as positive downward
+    # Euler forward step
     @. sst += (Δt/heat_capacity)*flux
 
     return nothing
