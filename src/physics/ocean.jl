@@ -305,6 +305,8 @@ function ocean_timestep!(
     return nothing
 end
 
+export SlabOcean
+
 @kwdef struct SlabOcean{NF} <: AbstractOcean
     "[OPTION] Temperature on the Equator [K]"
     temp_equator::NF = 302
