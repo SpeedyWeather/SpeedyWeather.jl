@@ -123,16 +123,62 @@ scalars, like `set!(simulation, div=0)` (which is always the case in the
 variables in the spectral space. See `?set!`, the `set!` docstring for more
 details.
 
+## Rossby-Haurwitz wave in a ShallowWater model
+
+For the shallow water model Williamson et al. 1992[^Williamson92] also give 
+initial conditions for the height/geopotential, which are
+
+```math
+h(θ, λ) = h_0 + a^2 / g ( A(θ) + B(θ) \cos(Rλ) + C(θ) \cos(2Rλ),
+
+A(θ) = \frac{ω(2Ω + ω)}{2}\cos(θ)^2 + \frac{1}{4}K^2\cos(θ)^{2R}\left((R+1)\cos(θ)^2 + (2R^2 - R - 2) - \frac{2R^2}{\cos(θ)^2}\right),
+
+B(θ) = \frac{2(Ω + ω)K}{(R+1)(R+2)} \cos(θ)^R\left((R^2 + 2R + 2) - (R+1)^2\cos(θ)^2\right),
+
+C(θ) = \frac{1}{4}K^2 \cos(θ)^{2R}\left((R+1)\cos(θ)^2 - (R + 2)\right).
+```
+
+Where ``a`` is the circumference of the planet on which we consider the
+Rossby-Haurwitz wave, this value can be found in `model.spectral_grid.radius`
+and ``Ω`` and ``g`` are the rotation and the gravity constant of the planet,
+ which can be found in `model.planet.rotation` and `model.planet.gravity`.
+
+Here only the height anomaly is considered, so the first term ``h_0`` does not
+need to be considered. The height in the shallow water model is stored in the
+pressure variable in the simulation object and can be set using
+`set!(simulation, pres=h)` for an appropriate implementation of the above
+equations.
+
+With the following we can do a test run of the Rossby-Haurwitz wave in the
+shallow water model without any influences from orography.
+
+```@example haurwitz
+spectral_grid = SpectralGrid(trunc=63, nlayers=1)
+initial_condition = RossbyHaurwitzWave()
+orography = NoOrography(spectral_grid)
+model = ShallowWaterModel(; spectral_grid, initial_conditions, orography)
+simulation = initialize!(model)
+run!(simulation, period=Day(8))
+
+vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
+heatmap(vor, title="Relative vorticity [1/s], shallow water Rossby Haurwitz wave after 8 days")
+save("haurwitz_sw.png", ans) # hide
+nothing # hide
+```
+
+There is a noticable difference from the result in the barotropic model, where
+the wave moves around the globe keeping its shape. Here, it deforms around the
+poles and the vorticity patches develop an internal structure.
+
+![Rossby-Haurwitz wave in the shallow water model](haurwitz_sw.png)
+
 ## Rossby-Haurwitz wave in primitive equations
 
 We could apply the same to set the Rossby-Haurwitz for a primitive equation
 model, but we have also already defined `RossbyHaurwitzWave` as
 `<: AbstractInitialConditions` so you can use that directly, regardless
 the model. Note that this definition currently only includes vorticity
-not the initial conditions for other variables. Williamson et al. 1992
-define also initial conditions for height/geopotential to be used
-in the shallow water model (eq. 146-149) -- those are currently not included,
-so the wave may not be as stable as its supposed to be.
+not the initial conditions for other variables.
 
 The following shows that you can set the same `RossbyHaurwitzWave` initial
 conditions also in a `PrimitiveDryModel` (or `Wet`) but you probably
