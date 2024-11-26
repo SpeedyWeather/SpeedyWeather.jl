@@ -35,7 +35,10 @@ function shortwave_radiation!(
     (; cos_zenith, albedo) = column
     (; solar_constant) = planet
 
-    # reduce strength by 1/4 as this currently just hits the air temperature in lowermost
-    # layer directly and not through a skin temperature
-    column.flux_temp_upward[end] += ((1-albedo) * solar_constant * cos_zenith)/4
+    # transparent = optical thickness of zero, no vertical changes in flux
+    # this will sum up to zero in every layer (=transparent) but yields
+    # a non-zero net flux at the surface 
+    column.flux_temp_downward .+= solar_constant * cos_zenith
+    column.flux_temp_upward .+= albedo * solar_constant * cos_zenith
+    return nothing
 end
