@@ -15,7 +15,8 @@ the following functions
 
     function initialize!(   
         ocean::PrognosticVariablesOcean,
-        time::DateTime,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
         ocean_model::CustomOceanModel,
         model::PrimitiveEquation,
     )
@@ -25,12 +26,13 @@ the following functions
     end
 
     function ocean_timestep!(
-        ocean::PrognosticVariablesOcean,
-        time::DateTime,
+        progn::PrognosticVariables,
+        diagn::DiagnosticVariables,
         ocean_model::CustomOceanModel,
+        model::PrimitiveEquation,
     )
-        # your code here to change the ocean.sea_surface_temperature and/or
-        # ocean.sea_ice_concentration on any timestep
+        # your code here to change the progn.ocean.sea_surface_temperature and/or
+        # progn.ocean.sea_ice_concentration on any timestep
     end
 
 Temperatures in ocean.sea_surface_temperature have units of Kelvin,
@@ -51,9 +53,10 @@ end
 
 # function barrier for all oceans
 function initialize!(   ocean::PrognosticVariablesOcean,
-                        time::DateTime,
+                        progn::PrognosticVariables,
+                        diagn::DiagnosticVariables,
                         model::PrimitiveEquation)
-    initialize!(ocean, time, model.ocean, model)
+    initialize!(ocean, progn, diagn, model.ocean, model)
 end
 
 # function barrier for all oceans
@@ -78,9 +81,6 @@ $(TYPEDFIELDS)"""
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
 
-    "[OPTION] Time step used to update sea surface temperatures"
-    Δt::Dates.Day = Dates.Day(3)
-
     "[OPTION] Path to the folder containing the sea surface temperatures, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -94,7 +94,7 @@ $(TYPEDFIELDS)"""
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "[OPTION] The missing value in the data respresenting land"
-    missing_value::NF = NF(NaN)
+    missing_value::NF = NaN
 
     # to be filled from file
     "Monthly sea surface temperatures [K], interpolated onto Grid"
@@ -150,14 +150,14 @@ end
 
 function initialize!(   
     ocean::PrognosticVariablesOcean,
-    time::DateTime,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
     ocean_model::SeasonalOceanClimatology,
     model::PrimitiveEquation,
 )
-    # ocean.time = time   # set initial time
     interpolate_monthly!(   ocean.sea_surface_temperature,
                             ocean_model.monthly_temperature,
-                            time)
+                            progn.clock.time)
 end
     
 function ocean_timestep!(   progn::PrognosticVariables,
@@ -165,11 +165,6 @@ function ocean_timestep!(   progn::PrognosticVariables,
                             ocean_model::SeasonalOceanClimatology,
                             model::PrimitiveEquation)
 
-    # # escape immediately if Δt of ocean model hasn't passed yet
-    # (time - ocean.time) < ocean_model.Δt && return nothing
-
-    # # otherwise update ocean prognostic variables:
-    # ocean.time = time
     interpolate_monthly!(   progn.ocean.sea_surface_temperature,
                             ocean_model.monthly_temperature,
                             progn.clock.time)
@@ -238,7 +233,7 @@ initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
 # initialize 
 function initialize!(   
     ocean::PrognosticVariablesOcean,
-    time::DateTime,
+    progn::PrognosticVariables,
     ocean_model::ConstantOceanClimatology,
     model::PrimitiveEquation,
 )
@@ -246,7 +241,7 @@ function initialize!(
     (; nlat_half) = ocean.sea_surface_temperature
     monthly = [zeros(Grid, nlat_half) for _ in 1:12]
     load_monthly_climatology!(monthly, ocean_model)
-    interpolate_monthly!(ocean.sea_surface_temperature, monthly, time)
+    interpolate_monthly!(ocean.sea_surface_temperature, monthly, progn.clock.time)
 end
 
 function ocean_timestep!(
@@ -286,7 +281,8 @@ initialize!(ocean_model::AquaPlanet, model::PrimitiveEquation) = nothing
 # initialize 
 function initialize!(   
     ocean::PrognosticVariablesOcean,
-    time::DateTime,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
     ocean_model::AquaPlanet,
     model::PrimitiveEquation,
 )
@@ -308,14 +304,23 @@ end
 export SlabOcean
 
 @kwdef struct SlabOcean{NF} <: AbstractOcean
-    "[OPTION] Temperature on the Equator [K]"
+    "[OPTION] Initial temperature on the equator [K]"
     temp_equator::NF = 302
 
-    "[OPTION] Temperature at the poles [K]"
+    "[OPTION] Initial temperature at the poles [K]"
     temp_poles::NF = 273
 
-    "Heat capacity of the mixed layer (Frierson et al 2006) [J/K/m²]"
-    heat_capacity::NF = 1e7
+    "[OPTION] Specific heat capacity of water [J/kg/K]"
+    specific_heat_capacity::NF = 4184
+
+    "[OPTION] Average mixed-layer depth [m]"
+    mixed_layer_depth::NF = 40
+
+    "[OPTION] Density of water [kg/m³]"
+    density::NF = 1000
+
+    "[DERIVED] Effective mixed-layer heat capacity [J/K/m²]"
+    heat_capacity_mixed_layer::NF = specific_heat_capacity*mixed_layer_depth*density
 end
 
 # generator function
@@ -327,7 +332,8 @@ initialize!(ocean_model::SlabOcean, model::PrimitiveEquation) = nothing
 # initialize 
 function initialize!(
     ocean::PrognosticVariablesOcean,
-    time::DateTime,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
     ocean_model::SlabOcean,
     model::PrimitiveEquation,
 )
@@ -346,12 +352,12 @@ function ocean_timestep!(
 )
     sst = progn.ocean.sea_surface_temperature
     flux = diagn.physics.surface_flux_heat
-    (; heat_capacity) = ocean_model
+    C₀ = ocean_model.heat_capacity_mixed_layer
     Δt = model.time_stepping.Δt_sec
 
     # flux is defined as positive downward
     # Euler forward step
-    @. sst += (Δt/heat_capacity)*flux
+    @. sst += (Δt/C₀)*flux
 
     return nothing
 end
