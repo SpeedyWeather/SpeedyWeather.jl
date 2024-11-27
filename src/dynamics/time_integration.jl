@@ -300,7 +300,7 @@ function timestep!(
     (; time) = progn.clock                           # current time
 
     # set the tendencies back to zero for accumulation
-    fill!(diagn.tendencies, 0, PrimitiveWet)
+    fill!(diagn.tendencies, 0, typeof(model))
 
     if model.physics                                # switch on/off all physics parameterizations
         # calculate all parameterizations
