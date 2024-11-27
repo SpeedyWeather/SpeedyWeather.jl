@@ -334,7 +334,8 @@ struct DiagnosticVariables{
     GridVariable2D,         # <: AbstractGridArray
     GridVariable3D,         # <: AbstractGridArray
     ParticleVector,         # <: AbstractGridArray
-    VectorNF,               # Vector{NF} or CuVector{NF}
+    VectorType,             # <: AbstractVector
+    MatrixType,             # <: AbstractMatrix
 } <: AbstractDiagnosticVariables
 
     # DIMENSIONS
@@ -363,13 +364,13 @@ struct DiagnosticVariables{
     physics::PhysicsVariables{NF, ArrayType, GridVariable2D}
     
     "Intermediate variables for the particle advection"
-    particles::ParticleVariables{NF, ArrayType, ParticleVector, VectorNF, Grid}
+    particles::ParticleVariables{NF, ArrayType, ParticleVector, VectorType, Grid}
     
     "Vertical column for the physics parameterizations"
-    column::ColumnVariables{NF}
+    column::ColumnVariables{NF, VectorType, MatrixType}
 
     "Average temperature of every horizontal layer [K]"
-    temp_average::VectorNF
+    temp_average::VectorType
 
     "Scale applied to vorticity and divergence"
     scale::Base.RefValue{NF}
@@ -422,7 +423,7 @@ function Base.show(
     println(io, "├ dynamics::DynamicsVariables")
     println(io, "├ physics::PhysicsVariables")
     println(io, "├ particles::ParticleVariables")
-    println(io, "├ columns::Vector{ColumnVariables}")
+    println(io, "├ columns::ColumnVariables")
     println(io, "├ temp_average::$(typeof(diagn.temp_average))")
     print(io,   "└ scale: $(diagn.scale[])")
 end
