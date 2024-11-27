@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Include large-scale condensation tests [#615](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/615)
+- bugfix: large-scale condensation also at <100% [#609](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/609)
+
+## v0.12.1
+
 - ConstantLandTemperature implemented [#612](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/612)
 - set! for more boundary conditions [#611](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/611)
 - SpectralFilter for horizontal diffusion [#601](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/601)

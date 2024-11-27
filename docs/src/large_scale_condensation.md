@@ -105,6 +105,22 @@ This also means that at higher resolution condensation is more immediate than
 at low resolution, but the dispersive time integration of this term is in all
 cases similar (and not much higher at lower resolution).
 
+The above implied that condensation takes place at 100% relative humidity as
+we are directly comparing the specific humidity to the saturation specific humidity
+in ``q^\star - q_i``. However, in coarse-resolution models there is a good argument
+that condensation may already take place below a grid-cell average of 100% relative humidity.
+Given some subgrid-scale variability parts of the grid cells may condense even though
+the average humidity is below 100%. To change this threshold one can introduce
+a parameter ``r``, e.g. ``r=0.95`` for condensation to take place at 95% relative humidity,
+as follows
+
+```math
+\delta q = \frac{q_{i+1} - q_i}{\Delta t} &= \frac{rq^\star(T_i) - q_i}{ \Delta t_c
+\left( 1 + \frac{L_vr}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right)}
+```
+``r`` is linear scale and therefore taken out of the gradient ``\frac{\partial q^\star}{\partial T}``
+in the denominator.
+
 ## Large-scale precipitation
 
 The tendencies ``\delta q`` in units of  kg/kg/s are vertically
