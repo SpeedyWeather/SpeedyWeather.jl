@@ -11,7 +11,9 @@ $(TYPEDFIELDS)"""
 
     # DIMENSIONS
     const nlayers::Int = 0                  # number of vertical levels
-    
+    const nbands_shortwave::Int = 0         # number of spectral bands for shortwave radiation
+    const nbands_longwave::Int = 0          # number of spectral bands for longwave radiation
+
     # COORDINATES
     ij::Int = 0                             # grid-point index
     jring::Int = 0                          # latitude ring the column is on
@@ -80,7 +82,10 @@ $(TYPEDFIELDS)"""
     # RADIATION
     cos_zenith::NF = 0                                      # cosine of solar zenith angle
     albedo::NF = 0                                          # surface albedo
-    const optical_depth::Vector{NF} = zeros(NF, nlayers+1)  # optical depth of the atmosphere, on half levels
+    
+    # optical depth of the atmosphere, on half levels, for shortwave and longwave radiation
+    const optical_depth_shortwave::Vector{NF} = zeros(NF, nlayers+1, nbands_shortwave)
+    const optical_depth_longwave::Vector{NF} = zeros(NF, nlayers+1, nbands_longwave)
 
     # WORK ARRAYS
     const a::Vector{NF} = zeros(NF, nlayers)

@@ -159,7 +159,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid)
+    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
     
     # particle advection
     initialize!(model.particle_advection, model)

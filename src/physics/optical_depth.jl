@@ -10,7 +10,8 @@ struct ZeroOpticalDepth{NF} <: AbstractOpticalDepth end
 ZeroOpticalDepth(SG::SpectralGrid) = ZeroOpticalDepth{SG.NF}()
 initialize!(od::ZeroOpticalDepth, ::AbstractModel) = nothing
 function optical_depth!(column::ColumnVariables, od::ZeroOpticalDepth, model::AbstractModel)
-    column.optical_depth .= 0
+    column.optical_depth_longwave .= 0
+    column.optical_depth_shortwave .= 0
 end
 
 export FriersonOpticalDepth
@@ -24,8 +25,12 @@ FriersonOpticalDepth(SG::SpectralGrid; kwargs...) = FriersonOpticalDepth{SG.NF}(
 initialize!(od::FriersonOpticalDepth, model::AbstractModel) = nothing
 
 function optical_depth!(column::ColumnVariables, od::FriersonOpticalDepth, model::AbstractModel)
+    
+    # Frierson et al. 2006 uses a transparent atmosphere for shortwave radiation
+    column.optical_depth_shortwave .= 0
 
-    (; optical_depth) = column
+    # but the longwave optical depth follows some idealised humidity lat-vert distribution
+    optical_depth = column.optical_depth_longwave
     (; τ₀_equator, τ₀_pole, fₗ) = od
 
     # coordinates 

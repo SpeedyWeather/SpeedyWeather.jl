@@ -366,7 +366,7 @@ struct DiagnosticVariables{
     particles::ParticleVariables{NF, ArrayType, ParticleVector, VectorNF, Grid}
     
     "Vertical column for the physics parameterizations"
-    columns::Vector{ColumnVariables{NF}}
+    column::ColumnVariables{NF}
 
     "Average temperature of every horizontal layer [K]"
     temp_average::VectorNF
@@ -375,10 +375,20 @@ struct DiagnosticVariables{
     scale::Base.RefValue{NF}
 end
 
+# decide on spectral resolution `nbands` of radiation schemes
+function DiagnosticVariables(SG::SpectralGrid, model::PrimitiveEquation)
+    nbands_shortwave = get_nbands(model.shortwave_radiation)
+    nbands_longwave = get_nbands(model.longwave_radiation)
+    return DiagnosticVariables(SG; nbands_shortwave, nbands_longwave)
+end
+
 """$(TYPEDSIGNATURES)
 Generator function."""
-function DiagnosticVariables(SG::SpectralGrid)
-
+function DiagnosticVariables(
+    SG::SpectralGrid;
+    nbands_shortwave::Integer = 0,
+    nbands_longwave::Integer = 0,
+)
     (; trunc, nlat_half, nparticles, NF, nlayers) = SG
 
     tendencies = Tendencies(SG)
@@ -386,11 +396,7 @@ function DiagnosticVariables(SG::SpectralGrid)
     dynamics = DynamicsVariables(SG)
     physics = PhysicsVariables(SG)
     particles = ParticleVariables(SG)
-    
-    # create one column variable per thread to avoid race conditions
-    nthreads = Threads.nthreads()
-    columns = [ColumnVariables{NF}(; nlayers) for _ in 1:nthreads]
-
+    column = ColumnVariables{NF}(; nlayers, nbands_shortwave, nbands_longwave)
     temp_average = SG.ArrayType{NF, 1}(undef, nlayers)
 
     scale = Ref(one(NF))
@@ -398,7 +404,7 @@ function DiagnosticVariables(SG::SpectralGrid)
     return DiagnosticVariables(
         trunc, nlat_half, nlayers, nparticles,
         tendencies, grid, dynamics, physics, particles,
-        columns, temp_average, scale,
+        column, temp_average, scale,
     )
 end
 
