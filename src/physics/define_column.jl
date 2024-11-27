@@ -7,7 +7,11 @@ needed to evaluate the physical parametrizations. For now the struct is mutable 
 to iterate over horizontal grid points. Most column vectors have `nlayers` entries, from [1] at the top to
 [end] at the lowermost model level at the planetary boundary layer.
 $(TYPEDFIELDS)"""
-@kwdef mutable struct ColumnVariables{NF<:AbstractFloat} <: AbstractColumnVariables
+@kwdef mutable struct ColumnVariables{
+    NF,
+    VectorType,
+    MatrixType,
+    } <: AbstractColumnVariables
 
     # DIMENSIONS
     const nlayers::Int = 0                  # number of vertical levels
@@ -23,33 +27,33 @@ $(TYPEDFIELDS)"""
     orography::NF = 0                       # orography height [m]
 
     # PROGNOSTIC VARIABLES
-    const u::Vector{NF} = zeros(NF, nlayers)            # zonal velocity [m/s]
-    const v::Vector{NF} = zeros(NF, nlayers)            # meridional velocity [m/s]
-    const temp::Vector{NF} = zeros(NF, nlayers)         # absolute temperature [K]
-    const humid::Vector{NF} = zeros(NF, nlayers)        # specific humidity [kg/kg]
+    const u::VectorType = zeros(NF, nlayers)            # zonal velocity [m/s]
+    const v::VectorType = zeros(NF, nlayers)            # meridional velocity [m/s]
+    const temp::VectorType = zeros(NF, nlayers)         # absolute temperature [K]
+    const humid::VectorType = zeros(NF, nlayers)        # specific humidity [kg/kg]
 
     # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
-    const ln_pres::Vector{NF} = zeros(NF, nlayers+1)    # logarithm of pressure [log(Pa)]
-    const pres::Vector{NF} = zeros(NF, nlayers+1)       # pressure [Pa]
+    const ln_pres::VectorType = zeros(NF, nlayers+1)    # logarithm of pressure [log(Pa)]
+    const pres::VectorType = zeros(NF, nlayers+1)       # pressure [Pa]
 
     # TENDENCIES to accumulate the parametrizations into
-    const u_tend::Vector{NF} = zeros(NF, nlayers)       # zonal velocity [m/s²]
-    const v_tend::Vector{NF} = zeros(NF, nlayers)       # meridional velocity [m/s²]
-    const temp_tend::Vector{NF} = zeros(NF, nlayers)    # absolute temperature [K/s]
-    const humid_tend::Vector{NF} = zeros(NF, nlayers)   # specific humidity [kg/kg/s]
+    const u_tend::VectorType = zeros(NF, nlayers)       # zonal velocity [m/s²]
+    const v_tend::VectorType = zeros(NF, nlayers)       # meridional velocity [m/s²]
+    const temp_tend::VectorType = zeros(NF, nlayers)    # absolute temperature [K/s]
+    const humid_tend::VectorType = zeros(NF, nlayers)   # specific humidity [kg/kg/s]
 
     # FLUXES, arrays to be used for various parameterizations, on half levels incl top and bottom
-    const flux_u_upward::Vector{NF} = zeros(NF, nlayers+1)
-    const flux_u_downward::Vector{NF} = zeros(NF, nlayers+1)
+    const flux_u_upward::VectorType = zeros(NF, nlayers+1)
+    const flux_u_downward::VectorType = zeros(NF, nlayers+1)
 
-    const flux_v_upward::Vector{NF} = zeros(NF, nlayers+1)
-    const flux_v_downward::Vector{NF} = zeros(NF, nlayers+1)
+    const flux_v_upward::VectorType = zeros(NF, nlayers+1)
+    const flux_v_downward::VectorType = zeros(NF, nlayers+1)
 
-    const flux_temp_upward::Vector{NF} = zeros(NF, nlayers+1)
-    const flux_temp_downward::Vector{NF} = zeros(NF, nlayers+1)
+    const flux_temp_upward::VectorType = zeros(NF, nlayers+1)
+    const flux_temp_downward::VectorType = zeros(NF, nlayers+1)
     
-    const flux_humid_upward::Vector{NF} = zeros(NF, nlayers+1)
-    const flux_humid_downward::Vector{NF} = zeros(NF, nlayers+1)
+    const flux_humid_upward::VectorType = zeros(NF, nlayers+1)
+    const flux_humid_downward::VectorType = zeros(NF, nlayers+1)
 
     # random value (scalar) from random pattern controlled by model.random_process
     random_value::NF = 0
@@ -69,10 +73,10 @@ $(TYPEDFIELDS)"""
 
     # THERMODYNAMICS
     surface_air_density::NF = 0
-    const sat_humid::Vector{NF} = zeros(NF, nlayers)                # Saturation specific humidity [kg/kg]
-    const dry_static_energy::Vector{NF} = zeros(NF, nlayers)        # Dry static energy [J/kg]
-    const temp_virt::Vector{NF} = zeros(NF, nlayers)                # virtual temperature [K]
-    const geopot::Vector{NF} = zeros(NF, nlayers)                   # gepotential height [m]
+    const sat_humid::VectorType = zeros(NF, nlayers)                # Saturation specific humidity [kg/kg]
+    const dry_static_energy::VectorType = zeros(NF, nlayers)        # Dry static energy [J/kg]
+    const temp_virt::VectorType = zeros(NF, nlayers)                # virtual temperature [K]
+    const geopot::VectorType = zeros(NF, nlayers)                   # gepotential height [m]
 
     # CONVECTION AND PRECIPITATION
     cloud_top::Int = nlayers+1              # layer index k of top-most layer with clouds
@@ -84,12 +88,14 @@ $(TYPEDFIELDS)"""
     albedo::NF = 0                                          # surface albedo
     
     # optical depth of the atmosphere, on half levels, for shortwave and longwave radiation
-    const optical_depth_shortwave::Vector{NF} = zeros(NF, nlayers+1, nbands_shortwave)
-    const optical_depth_longwave::Vector{NF} = zeros(NF, nlayers+1, nbands_longwave)
+    const optical_depth_shortwave::MatrixType = zeros(NF, nlayers+1, nbands_shortwave)
+    const optical_depth_longwave::MatrixType = zeros(NF, nlayers+1, nbands_longwave)
 
     # WORK ARRAYS
-    const a::Vector{NF} = zeros(NF, nlayers)
-    const b::Vector{NF} = zeros(NF, nlayers)
-    const c::Vector{NF} = zeros(NF, nlayers)
-    const d::Vector{NF} = zeros(NF, nlayers)
+    const a::VectorType = zeros(NF, nlayers)
+    const b::VectorType = zeros(NF, nlayers)
+    const c::VectorType = zeros(NF, nlayers)
+    const d::VectorType = zeros(NF, nlayers)
 end
+
+ColumnVariables(SG::SpectralGrid; kwargs...) = ColumnVariables{SG.NF, SG.VectorType, SG.MatrixType}(; nlayers=SG.nlayers, kwargs...)

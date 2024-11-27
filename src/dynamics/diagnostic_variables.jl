@@ -396,8 +396,8 @@ function DiagnosticVariables(
     dynamics = DynamicsVariables(SG)
     physics = PhysicsVariables(SG)
     particles = ParticleVariables(SG)
-    column = ColumnVariables{NF}(; nlayers, nbands_shortwave, nbands_longwave)
-    temp_average = SG.ArrayType{NF, 1}(undef, nlayers)
+    column = ColumnVariables(SG; nbands_shortwave, nbands_longwave)
+    temp_average = SG.VectorType(undef, nlayers)
 
     scale = Ref(one(NF))
 
