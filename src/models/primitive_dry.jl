@@ -146,8 +146,9 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(prognostic_variables.particles, model)
 
     # initialize ocean and land
-    initialize!(prognostic_variables.ocean, time, model)
+    initialize!(prognostic_variables.ocean, prognostic_variables, diagnostic_variables, model)
     initialize!(prognostic_variables.land,  prognostic_variables, diagnostic_variables, model)
 
+    # pack prognostic, diagnostic variables and model into a simulation
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
