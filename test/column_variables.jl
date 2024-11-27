@@ -24,7 +24,7 @@ end
 
         nlayers = 8
         spectral_grid = SpectralGrid(; NF, nlayers)
-        model = PrimitiveDryModel(; spectral_grid)
+        model = PrimitiveDryModel(spectral_grid)
         simulation = initialize!(model)
         diagn = simulation.diagnostic_variables
         progn = simulation.prognostic_variables

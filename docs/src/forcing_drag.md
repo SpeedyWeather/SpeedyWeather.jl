@@ -312,7 +312,7 @@ and just put them together as you like, and as long as you follow some rules.
 spectral_grid = SpectralGrid(trunc=85, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
 initial_conditions = StartFromRest()
-model = BarotropicModel(; spectral_grid, initial_conditions, forcing=stochastic_stirring)
+model = BarotropicModel(spectral_grid; initial_conditions, forcing=stochastic_stirring)
 simulation = initialize!(model)
 run!(simulation)
 

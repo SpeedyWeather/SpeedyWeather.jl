@@ -4,7 +4,7 @@ export BarotropicModel, initialize!
 The BarotropicModel contains all model components needed for the simulation of the
 barotropic vorticity equations. To be constructed like
 
-    model = BarotropicModel(; spectral_grid, kwargs...)
+    model = BarotropicModel(spectral_grid; kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing

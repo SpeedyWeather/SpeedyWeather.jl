@@ -130,7 +130,7 @@ Just some ideas how to customize this even further.
 Now let's try this in a primitive dry model
 
 ```@example netcdf_custom
-model = PrimitiveDryModel(;spectral_grid, output)
+model = PrimitiveDryModel(spectral_grid; output)
 model.output.variables[:w]
 ```
 

@@ -21,7 +21,7 @@ end
 ## ALEBDO CLIMATOLOGY
 
 export AlbedoClimatology
-Base.@kwdef struct AlbedoClimatology{NF,Grid} <: AbstractAlbedo
+@kwdef struct AlbedoClimatology{NF, Grid} <: AbstractAlbedo
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
 
@@ -45,6 +45,9 @@ function AlbedoClimatology(SG::SpectralGrid; kwargs...)
     (; NF, Grid, nlat_half) = SG
     AlbedoClimatology{NF,Grid{NF}}(;nlat_half, kwargs...)
 end
+
+# set albedo with grid, scalar, function; just define path `albedo.albedo` to grid here
+set!(albedo::AbstractAlbedo, args...; kwargs...) = set!(albedo.albedo, args...; kwargs...)
 
 function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
     
