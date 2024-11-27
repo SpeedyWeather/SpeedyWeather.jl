@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Optical depth introduced [#606](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/606)
+- Optical depth introduced and array-agnostic ColumnVariables [#606](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/606)
+- Include large-scale condensation tests [#615](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/615)
 - bugfix: large-scale condensation also at <100% [#609](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/609)
 
 ## v0.12.1
