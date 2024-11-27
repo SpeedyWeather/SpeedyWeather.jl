@@ -149,7 +149,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
 
-    # initialize ocean and land and synchronize clocks
+    # initialize ocean and land
     initialize!(prognostic_variables.ocean, time, model)
     initialize!(prognostic_variables.land,  prognostic_variables, diagnostic_variables, model)
 

@@ -85,10 +85,10 @@ function large_scale_condensation!(
         if humid[k] > sat_humid[k]*relative_humidity_threshold
 
             # tendency for Implicit humid = sat_humid, divide by leapfrog time step below
-            δq = sat_humid[k] - humid[k]
+            δq = sat_humid[k] * relative_humidity_threshold - humid[k]
 
             # implicit correction, Frierson et al. 2006 eq. (21)
-            dqsat_dT = sat_humid[k] * Lᵥ_Rᵥ/temp[k]^2       # derivative of qsat wrt to temp
+            dqsat_dT = sat_humid[k] * relative_humidity_threshold * Lᵥ_Rᵥ/temp[k]^2       # derivative of qsat wrt to temp
             δq /= ((1 + Lᵥ_cₚ*dqsat_dT) * time_scale*Δt_sec) 
 
             # latent heat release for enthalpy conservation
