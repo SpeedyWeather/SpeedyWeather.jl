@@ -12,17 +12,13 @@ function parameterization_tendencies!(
     time::DateTime,
     model::PrimitiveEquation,
 )
-    # TODO move into shortwave radiation code?
     cos_zenith!(diagn, time, model)
 
-    G = model.geometry
-    rings = eachring(G.Grid, G.nlat_half)
+    rings = eachring(diagn.grid.vor_grid)       # indices on every latitude ring
+    for ij in eachgridpoint(diagn)              # loop over all horizontal grid points
 
-    for ij in eachgridpoint(diagn)       # loop over all horizontal grid points
-
-        thread_id = Threads.threadid()          # not two threads should use the same ColumnVariables
-        column = diagn.columns[thread_id]
-        jring = whichring(ij, rings)             # ring index gridpoint ij is on
+        (; column) = diagn
+        jring = whichring(ij, rings)            # ring index gridpoint ij is on
 
         # extract current column for contiguous memory access
         reset_column!(column)                   # set accumulators back to zero for next grid point
@@ -49,7 +45,7 @@ function parameterization_tendencies!(
     vertical_diffusion!(column, model)
     convection!(column, model)
     large_scale_condensation!(column, model)
-    # clouds!(column, model)
+    optical_depth!(column, model)
     shortwave_radiation!(column, model)
     longwave_radiation!(column, model)
     surface_fluxes!(column, model)

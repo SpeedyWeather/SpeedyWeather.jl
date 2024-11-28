@@ -63,6 +63,15 @@ function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...
     return L{NF, Grid{NF}}(; mask, kwargs...)
 end
 
+# set mask with grid, scalar, function; just define path `mask.mask` to grid here
+function set!(mask::AbstractLandSeaMask, args...; kwargs...)
+    set!(mask.mask, args...; kwargs...)
+    lo, hi = extrema(mask.mask)
+    (lo < 0 || hi > 1) && @warn "Land-sea mask was not set to values in [0, 1] but in [$lo, $hi]. Clamping."
+    clamp!(mask.mask, 0, 1)
+    return nothing
+end
+
 """
 $(TYPEDSIGNATURES)
 Reads a high-resolution land-sea mask from file and interpolates (grid-call average)

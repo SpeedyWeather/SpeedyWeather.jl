@@ -245,7 +245,7 @@ function timestep!(
 
     # TENDENCIES, DIFFUSION, LEAPFROGGING AND TRANSFORM SPECTRAL STATE TO GRID
     dynamics_tendencies!(diagn, progn, lf2, model)
-    horizontal_diffusion!(diagn, progn, model)
+    horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
     leapfrog!(progn, diagn.tendencies, dt, lf1, model)
     transform!(diagn, progn, lf2, model)
 
@@ -275,7 +275,7 @@ function timestep!(
     implicit_correction!(diagn, progn, model.implicit)
     
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
-    horizontal_diffusion!(diagn, progn, model)
+    horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
     leapfrog!(progn, diagn.tendencies, dt, lf1, model)
     transform!(diagn, progn, lf2, model)
     
@@ -320,7 +320,7 @@ function timestep!(
     end
 
     # APPLY DIFFUSION, STEP FORWARD IN TIME, AND TRANSFORM NEW TIME STEP TO GRID
-    horizontal_diffusion!(diagn, progn, model)
+    horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
     leapfrog!(progn, diagn.tendencies, dt, lf1, model)
     transform!(diagn, progn, lf2, model)
 
@@ -371,7 +371,7 @@ function time_stepping!(
         callback!(model.callbacks, progn, diagn, model)
     end
     
-    # UNSCALE, CLOSE, FINISH
+    # UNSCALE, CLOSE, FINALIZE
     finalize!(feedback)                     # finish the progress meter, do first for benchmark accuracy
     unscale!(progn)                         # undo radius-scaling for vor, div from the dynamical core
     unscale!(diagn)                         # undo radius-scaling for vor, div from the dynamical core

@@ -77,6 +77,10 @@ include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
 
+# to be defined in GeoMakie extension
+export globe
+function globe end
+
 # Utility for GPU / KernelAbstractions
 include("gpu.jl")                               
 
@@ -131,6 +135,7 @@ include("physics/large_scale_condensation.jl")
 include("physics/surface_fluxes.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
+include("physics/optical_depth.jl")
 include("physics/shortwave_radiation.jl")
 include("physics/longwave_radiation.jl")
 
@@ -154,4 +159,5 @@ include("models/shallow_water.jl")
 include("models/primitive_dry.jl")
 include("models/primitive_wet.jl")
 include("models/tree.jl")
+include("models/set.jl")
 end
