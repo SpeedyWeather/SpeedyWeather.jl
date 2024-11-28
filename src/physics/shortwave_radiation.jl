@@ -1,6 +1,11 @@
 abstract type AbstractRadiation <: AbstractParameterization end
 abstract type AbstractShortwave <: AbstractRadiation end
 
+function get_nbands(R::AbstractRadiation)
+    hasfield(typeof(R), :nbands) && return R.nbands
+    return 0
+end
+
 # function barrier for all AbstractShortwave
 function shortwave_radiation!(column::ColumnVariables, model::PrimitiveEquation)
     shortwave_radiation!(column, model.shortwave_radiation, model)
