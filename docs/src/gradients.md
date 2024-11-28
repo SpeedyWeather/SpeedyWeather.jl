@@ -112,7 +112,7 @@ Let us start by generating some data
 spectral_grid = SpectralGrid(trunc=31, nlayers=1)
 forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
 drag = QuadraticDrag(spectral_grid)
-model = ShallowWaterModel(; spectral_grid, forcing, drag)
+model = ShallowWaterModel(spectral_grid; forcing, drag)
 simulation = initialize!(model);
 run!(simulation, period=Day(30))
 nothing # hide

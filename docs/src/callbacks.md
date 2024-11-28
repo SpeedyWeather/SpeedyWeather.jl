@@ -189,7 +189,7 @@ Meaning that callbacks can be added before and after model construction
 ```@example callbacks
 spectral_grid = SpectralGrid()
 callbacks = CallbackDict(:callback_added_before => NoCallback())
-model = PrimitiveWetModel(; spectral_grid, callbacks)
+model = PrimitiveWetModel(spectral_grid; callbacks)
 add!(model.callbacks, :callback_added_afterwards => NoCallback())
 add!(model, :callback_added_afterwards2 => NoCallback())
 ```
@@ -353,7 +353,7 @@ for events that are scheduled. Now let's create a primitive equation model with 
 
 ```@example schedule
 spectral_grid = SpectralGrid(trunc=31, nlayers=5)
-model = PrimitiveWetModel(;spectral_grid)
+model = PrimitiveWetModel(spectral_grid)
 add!(model.callbacks, north_pole_temp_at_noon_jan9)
 
 # start simulation 7 days earlier

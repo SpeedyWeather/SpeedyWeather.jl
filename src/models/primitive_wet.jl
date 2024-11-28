@@ -4,7 +4,7 @@ export PrimitiveWetModel
 The PrimitiveWetModel contains all model components (themselves structs) needed for the
 simulation of the primitive equations with humidity. To be constructed like
 
-    model = PrimitiveWetModel(; spectral_grid, kwargs...)
+    model = PrimitiveWetModel(spectral_grid; kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
@@ -39,6 +39,7 @@ $(TYPEDFIELDS)"""
     EV,     # <:AbstractSurfaceEvaporation,
     LSC,    # <:AbstractCondensation,
     CV,     # <:AbstractConvection,
+    OD,     # <:AbstractOpticalDepth,
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
     TS,     # <:AbstractTimeStepper,
@@ -88,6 +89,7 @@ $(TYPEDFIELDS)"""
     surface_evaporation::EV = SurfaceEvaporation(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
+    optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = NoShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
     
@@ -142,6 +144,7 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.vertical_diffusion, model)
     initialize!(model.large_scale_condensation, model)
     initialize!(model.convection, model)
+    initialize!(model.optical_depth, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
     initialize!(model.surface_thermodynamics, model)
@@ -156,13 +159,13 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid)
+    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
     
     # particle advection
     initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
 
-    # initialize ocean and land and synchronize clocks
+    # initialize ocean and land
     initialize!(prognostic_variables.ocean, time, model)
     initialize!(prognostic_variables.land,  prognostic_variables, diagnostic_variables, model)
 

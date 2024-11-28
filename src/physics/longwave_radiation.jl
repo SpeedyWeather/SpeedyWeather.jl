@@ -129,3 +129,13 @@ function longwave_radiation!(
     # Relax the uppermost level towards prescribed "tropopause temperature"
     temp_tend[1] += (Tₜ - T[1])/time_scale.value
 end
+
+# dummy one band radiation for now
+export OneBandRadiation
+@kwdef struct OneBandRadiation <: AbstractLongwave
+    nbands::Int = 1
+end
+
+OneBandRadiation(SG::SpectralGrid; kwargs...) = OneBandRadiation(; kwargs...)
+initialize!(scheme::OneBandRadiation, model::PrimitiveEquation) = nothing
+longwave_radiation!(column::ColumnVariables, scheme::OneBandRadiation, model::PrimitiveEquation) = nothing

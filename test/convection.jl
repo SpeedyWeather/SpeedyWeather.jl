@@ -11,7 +11,7 @@
             # that combination is not defined
             if ~(Convection == SimplifiedBettsMiller && Model == PrimitiveDryModel)
                 convection = Convection(spectral_grid)
-                model = Model(;spectral_grid, convection)
+                model = Model(spectral_grid; convection)
                 model.feedback.verbose = false
                 simulation = initialize!(model)
                 run!(simulation, period=Day(1))

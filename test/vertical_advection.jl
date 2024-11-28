@@ -23,7 +23,7 @@ end
                         SpeedyWeather.UpwindVerticalAdvection)
 
     for Model in model_types, VerticalAdvection in advection_schems
-        model = Model(; spectral_grid,
+        model = Model(spectral_grid;
                         vertical_advection = VerticalAdvection(spectral_grid),
                         physics=false)
         simulation = initialize!(model)
