@@ -60,7 +60,7 @@ end
         # can't use Enzyme or ChainRule Test tools for tests for that
         for (i_grid, grid_type) in enumerate(grid_types)
 
-            spectral_grid = SpectralGrid(Grid=grid_type, trunc=15, nlayers=1, dealiasing=grid_dealiasing[i_grid])
+            spectral_grid = SpectralGrid(Grid=grid_type, trunc=10, nlayers=1, dealiasing=grid_dealiasing[i_grid])
 
             # forwards 
             S = SpectralTransform(spectral_grid, one_more_degree=true)
