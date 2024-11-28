@@ -115,11 +115,11 @@ a parameter ``r``, e.g. ``r=0.95`` for condensation to take place at 95% relativ
 as follows
 
 ```math
-\delta q = \frac{q_{i+1} - q_i}{\Delta t} &= \frac{rq^\star(T_i) - q_i}{ \Delta t_c
+\delta q = \frac{q_{i+1} - q_i}{\Delta t} = \frac{rq^\star(T_i) - q_i}{ \Delta t_c
 \left( 1 + \frac{L_vr}{c_p} \frac{\partial q^\star}{\partial T}(T_i) \right)}
 ```
-``r`` is linear scale and therefore taken out of the gradient ``\frac{\partial q^\star}{\partial T}``
-in the denominator.
+``r`` is a linear scale and therefore can be taken out of the gradient
+``\frac{\partial q^\star}{\partial T}`` in the denominator.
 
 ## Large-scale precipitation
 
