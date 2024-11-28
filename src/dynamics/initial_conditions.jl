@@ -316,7 +316,7 @@ function initialize!(
     (; m, ω, K, c) = initial_conditions
     (; geometry) = model
     Ω = model.planet.rotation
-    a = model.spectral_grid.radius
+    R = model.spectral_grid.radius
     g = model.planet.gravity
 
     # Rossby-Haurwitz wave defined through vorticity ζ as a function of
@@ -328,7 +328,7 @@ function initialize!(
     B(λ, θ) = (2(Ω+ω)*K)/((m+1)*(m+2))*cosd(θ)^m*( (m^2+2m+2) - (m+1)^2*cosd(θ)^2 )
     C(λ, θ) = K^2/4*cosd(θ)^(2m)*((m+1) * cosd(θ)^2 - (m + 2))
 
-    η(λ, θ) = a^2/g*(A(λ,θ) + B(λ,θ)*cosd(m*λ) + C(λ,θ)*cosd(2m*λ))
+    η(λ, θ) = R^2/g*(A(λ,θ) + B(λ,θ)*cosd(m*λ) + C(λ,θ)*cosd(2m*λ))
 
     set!(progn, geometry, vor = ζ)
     model isa ShallowWater && set!(progn, geometry, pres = η)
