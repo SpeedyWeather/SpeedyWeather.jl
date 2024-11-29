@@ -211,7 +211,6 @@ end
 
 # l,m sph "matrix-style"  indexing with integer + other indices
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, I::Vararg{Any, M}) where {T, N, M}
-    @boundscheck M == N+1 || throw(BoundsError(L, I))
     i, j = I[1:2]
     @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
     # to get a zero element in the correct shape, we just take the zero element of some valid element,
@@ -219,14 +218,6 @@ end
     @boundscheck j > i && return zero(getindex(L.data, 1, I[3:end]...)) 
     k = ij2k(i, j, L.m)
     return getindex(L.data, k, I[3:end]...)
-end
-
-@inline function Base.getindex(L::LowerTriangularArray{T, N}, i::Integer, j::Integer, c::CartesianIndex) where {T, N}
-    @boundscheck length(c)+1 == N || throw(BoundsError(L, I))
-    @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
-    @boundscheck j > i && return zero(T) 
-    k = ij2k(i, j, L.m)
-    return getindex(L.data, k, c)
 end
 
 @inline function Base.getindex(L::LowerTriangularMatrix{T}, col::Colon, i::Integer) where T
