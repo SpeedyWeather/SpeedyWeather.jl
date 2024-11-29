@@ -241,7 +241,7 @@ nothing # hide
 Now we transform into spectral space and call `power_spectrum(::LowerTriangularMatrix)`
 ```@example speedytransforms
 alms = transform(map)
-power = SpeedyTransforms.power_spectrum(alms)
+power = power_spectrum(alms)
 nothing # hide
 ```
 
@@ -332,6 +332,25 @@ grids = transform(alms)
 In this case we first randomly generated five (32x32) `LowerTriangularMatrix` that hold the
 coefficients and then transformed all five matrices batched to the grid space with the 
 transform command, yielding 5 `RingGrids` with each 48-rings. 
+
+## Batched power spectra
+
+SpeedyTransforms also supports power spectra calculated over any additional dimensions
+to the leading spherical harmonic dimension (it is unravelled as a vector so the first
+only, not the first two...). But the power spectrum is always calculated along that
+first spherical-harmonic dimension. For example
+
+```@example speedytransforms 
+alms = randn(LowerTriangularMatrix{Complex{Float32}}, 5, 5, 2) 
+power_spectrum(alms)
+```
+returns the power spectrum for `[..., 1]` in the first column and `[..., 2]` in the second.
+This avoids to loop over these additional dimensions, but the result would be the same:
+
+```@example speedyTransforms
+power_spectrum(alms[:, 1])
+```
+
 
 ## Functions and type index
 
