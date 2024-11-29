@@ -221,6 +221,14 @@ end
     return getindex(L.data, k, I[3:end]...)
 end
 
+@inline function Base.getindex(L::LowerTriangularArray{T, N}, i::Integer, j::Integer, c::CartesianIndex) where {T, N}
+    @boundscheck length(c)+1 == N || throw(BoundsError(L, I))
+    @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
+    @boundscheck j > i && return zero(T) 
+    k = ij2k(i, j, L.m)
+    return getindex(L.data, k, c)
+end
+
 @inline function Base.getindex(L::LowerTriangularMatrix{T}, col::Colon, i::Integer) where T
     if i==1
         return L.data[1:size(L, 1, as=Matrix)]
