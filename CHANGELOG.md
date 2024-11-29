@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Power spectrum for n-dim LowerTriangularArrays [#618](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/618)
+- Added custom EnzymeRules for the SpectralTransform and an extension for compatibility with FiniteDifferences.jl [#589](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589)
 - Optical depth introduced and array-agnostic ColumnVariables [#606](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/606)
 - Include large-scale condensation tests [#615](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/615)
 - bugfix: large-scale condensation also at <100% [#609](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/609)
