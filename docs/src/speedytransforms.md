@@ -347,7 +347,7 @@ power_spectrum(alms)
 returns the power spectrum for `[..., 1]` in the first column and `[..., 2]` in the second.
 This avoids to loop over these additional dimensions, but the result would be the same:
 
-```@example speedyTransforms
+```@example speedytransforms
 power_spectrum(alms[:, 1])
 ```
 
