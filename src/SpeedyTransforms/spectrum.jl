@@ -13,7 +13,7 @@ function power_spectrum(
                                                     # ignore higher degrees if lmax > mmax
     spectrum = zeros(real(eltype(spec)), trunc, size(spec)[2:end]...)   
 
-    for k in eachmatrix(spec)
+    @inbounds for k in eachmatrix(spec)
         # zonal modes m = 0, *1 as not mirrored at -m
         for l in 1:trunc    # use flat/vector indexing
             spectrum[l, k] = abs(spec[l, k])^2
@@ -29,7 +29,7 @@ function power_spectrum(
 
     # divide by number of orders m at l for normalization, "average power at l"
     if normalize
-        for k in eachmatrix(spec)
+        @inbounds for k in eachmatrix(spec)
             for l in 1:trunc            # 1-based degree, hence:
                 spectrum[l, k] /= 2l-1  # 1/(2l + 1) but l → l-1
             end
