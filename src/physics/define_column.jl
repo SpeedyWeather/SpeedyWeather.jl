@@ -103,4 +103,3 @@ ColumnVariables(SG::SpectralGrid; kwargs...) = ColumnVariables{SG.NF, SG.VectorT
 
 # generator assuming Julia Arrays
 ColumnVariables{NF}(; kwargs...) where NF = ColumnVariables{NF, Vector{NF}, Matrix{NF}}(; kwargs...)
-ColumnVariables(; kwargs...) = ColumnVariables{DEFAULT_NF, Vector{DEFAULT_NF}, Matrix{DEFAULT_NF}}(; kwargs...)

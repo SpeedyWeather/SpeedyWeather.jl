@@ -126,7 +126,7 @@ details.
 ## Rossby-Haurwitz wave in a ShallowWater model
 
 For the shallow water model Williamson et al., 1992[^Williamson92] also give 
-initial conditions for the prognostic variable height `h = h_0 + \eta` (equivalent to geopotential).
+initial conditions for the prognostic variable height ``h = h_0 + \eta`` (equivalent to geopotential).
 The layer thickness is ``h_0`` and ``\eta`` is the interface displacement
 of that layer. SpeedyWeather however, uses as prognostic variable ``\eta``
 for which the initial conditions are
@@ -153,10 +153,10 @@ The interface displacement ``\eta`` in SpeedyWeather's `ShallowWaterModel`
 is stored in the variable `pres` in analogy to the actual pressure in
 the `PrimitiveEquation` model. So we can set ``\eta`` using
 `set!(simulation, pres=η)` for an appropriate implementation of the above
-equations.
-
-With the following we can do a test run of the Rossby-Haurwitz wave in the
-shallow water model without any influences from orography.
+equations, similar to how `ζ(λ, θ, σ) =` is defined above.
+However, we also already defined `RossbyHaurwitzWave` to do
+exactly that. With the following we can do a test run of the
+Rossby-Haurwitz wave in the shallow water model without any influences from orography.
 
 ```@example haurwitz
 spectral_grid = SpectralGrid(trunc=63, nlayers=1)
@@ -180,14 +180,16 @@ poles and the vorticity patches develop an internal structure.
 
 ## Rossby-Haurwitz wave in primitive equations
 
-We could apply the same to set the Rossby-Haurwitz for a primitive equation
-model, but we have also already defined `RossbyHaurwitzWave` as
-`<: AbstractInitialConditions` so you can use that directly, regardless
-the model. Note that this definition currently only includes vorticity
-not the initial conditions for other variables.
+You can use `set!` or the predefined `RossbyHaurwitzWave` also in other
+models. For the `BarotropicModel` or the `PrimitiveDryModel` (or `Wet`)
+the definition for ``\eta`` is skipped. The barotropic model does not have
+a pressure variable, the primitive equation model uses the logarithm of surface
+pressure, which is incompatible with ``\eta`` being defined as an interface displacement.
+So here, the `RossbyHaurwitzWave` only includes relative vorticity
+in the initial conditions.
 
-The following shows that you can set the same `RossbyHaurwitzWave` initial
-conditions also in a `PrimitiveDryModel` (or `Wet`) but you probably
+The following shows how you can use `RossbyHaurwitzWave`
+in a `PrimitiveDryModel` (or `Wet`) but you probably
 also want to set initial conditions for temperature and pressure
 to not start at zero Kelvin and zero pressure. Also no orography,
 and let's switch off all physics parameterizations with `physics=false`.
