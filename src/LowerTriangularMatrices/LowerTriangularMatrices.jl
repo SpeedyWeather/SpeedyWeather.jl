@@ -7,7 +7,6 @@ using DocStringExtensions
 import Adapt
 import GPUArrays
 import KernelAbstractions
-import KernelAbstractions: get_backend
 
 # NUMERICS
 import LinearAlgebra: tril!
