@@ -234,6 +234,7 @@ initialize!(::ConstantOceanClimatology, ::PrimitiveEquation) = nothing
 function initialize!(   
     ocean::PrognosticVariablesOcean,
     progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
     ocean_model::ConstantOceanClimatology,
     model::PrimitiveEquation,
 )
@@ -276,7 +277,7 @@ end
 AquaPlanet(SG::SpectralGrid; kwargs...) = AquaPlanet{SG.NF}(; kwargs...)
 
 # nothing to initialize for AquaPlanet
-initialize!(ocean_model::AquaPlanet, model::PrimitiveEquation) = nothing
+initialize!(::AquaPlanet, ::PrimitiveEquation) = nothing
 
 # initialize 
 function initialize!(   
