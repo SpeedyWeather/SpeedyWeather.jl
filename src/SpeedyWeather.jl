@@ -72,6 +72,7 @@ export transform, transform!
 export spectral_truncation, spectral_truncation!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
+export power_spectrum
 
 include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
@@ -135,6 +136,7 @@ include("physics/large_scale_condensation.jl")
 include("physics/surface_fluxes.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
+include("physics/optical_depth.jl")
 include("physics/shortwave_radiation.jl")
 include("physics/longwave_radiation.jl")
 

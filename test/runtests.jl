@@ -16,6 +16,8 @@ include("kernelabstractions.jl")
 # SPECTRAL TRANSFORM
 include("spectral_transform.jl")
 include("spectral_gradients.jl")
+include("spectrum.jl")
+include("spectral_transform_ad_rules.jl") 
 
 # DYNAMICS
 include("diffusion.jl")
@@ -36,6 +38,7 @@ include("ocean.jl")
 # include("thermodynamics.jl")
 include("large_scale_condensation.jl")
 # include("convection.jl")
+include("optical_depth.jl")
 # include("longwave_radiation.jl")
 # include("shortwave_radiation.jl")
 include("random_process.jl")

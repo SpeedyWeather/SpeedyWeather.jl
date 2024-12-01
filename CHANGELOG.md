@@ -3,6 +3,9 @@
 ## Unreleased
 
 - Slab ocean and net surface fluxes [#613](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/613)
+- Power spectrum for n-dim LowerTriangularArrays [#618](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/618)
+- Added custom EnzymeRules for the SpectralTransform and an extension for compatibility with FiniteDifferences.jl [#589](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589)
+- Optical depth introduced and array-agnostic ColumnVariables [#606](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/606)
 - Include large-scale condensation tests [#615](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/615)
 - bugfix: large-scale condensation also at <100% [#609](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/609)
 
@@ -13,6 +16,7 @@
 - SpectralFilter for horizontal diffusion [#601](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/601)
 - GeoMakie weak dependency, globe function for 3D data visualisation [#600](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/600)
 - Zonal mean for AbstractGridArray [#603](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/603)
+- Rossby-Haurwitz wave with initial conditions for interface displacement for shallow water models[#604](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/604)
 
 ## v0.12.0
 

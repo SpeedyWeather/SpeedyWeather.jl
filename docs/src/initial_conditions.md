@@ -35,7 +35,7 @@ Now `simulation.prognostic_variables` contains already some
 initial conditions as defined by `model.initial_conditions` (that's method 3).
 Regardless of what those are, we can still mutate them
 before starting a simulation, but if you (re-)initialize the model,
-the initial conditions will be set back to what's defined in `model.initial_conditions.
+the initial conditions will be set back to what is defined in `model.initial_conditions`.
 We will illustrate the `set!` function now that conveniently lets you (re)set the
 current state of the prognostic variables:
 
@@ -47,7 +47,7 @@ barotropic vorticity model) as
 ζ(λ, θ) = 2ω*\sin(θ) - K*\sin(θ)*\cos(θ)^m*(m^2 + 3m + 2)*\cos(m*λ)
 ```
 with longitude ``\lambda`` and latitude ``\theta``. The parameters
-are order ``m = 4``, frequencies ``\omega = 7.848e-6s^{-1}, K = 7.848e-6s^{-1}``.
+are zonal wavenumber (order) ``m = 4``, frequencies ``\omega = 7.848e-6s^{-1}, K = 7.848e-6s^{-1}``.
 Now setting these initial conditions is as simple as
 
 ```@example haurwitz
@@ -66,7 +66,7 @@ and (2) To generalise to vertical coordinates, the function `ζ(λ, θ, σ)` tak
 This is important so that we can use the same definition of initial conditions
 for the 2D barotropic vorticity model also for the 3D primitive equations.
 
-Some authors filter out low values of spectral vorticity with some cut-off amplitude
+One may filter out low values of spectral vorticity with some cut-off amplitude
 ``c = 10^{-10}``, just to illustrate how you would do this (example for method 1)
 
 ```@example haurwitz
@@ -123,19 +123,73 @@ scalars, like `set!(simulation, div=0)` (which is always the case in the
 variables in the spectral space. See `?set!`, the `set!` docstring for more
 details.
 
+## Rossby-Haurwitz wave in a ShallowWater model
+
+For the shallow water model Williamson et al., 1992[^Williamson92] also give 
+initial conditions for the prognostic variable height ``h = h_0 + \eta`` (equivalent to geopotential).
+The layer thickness is ``h_0`` and ``\eta`` is the interface displacement
+of that layer. SpeedyWeather however, uses as prognostic variable ``\eta``
+for which the initial conditions are
+
+```math
+\begin{align}
+η(λ, θ) &= \frac{R^2}{g} \left( A(θ) + B(θ) \cos(mλ) + C(θ) \cos(2mλ) \right), \\
+
+A(θ) &= \frac{ω(2Ω + ω)}{2}\cos(θ)^2 + \frac{1}{4}K^2\cos(θ)^{2m}\left((m+1)\cos(θ)^2 + (2m^2 - m - 2) - \frac{2m^2}{\cos(θ)^2}\right), \\
+
+B(θ) &= \frac{2(Ω + ω)K}{(m+1)(m+2)} \cos(θ)^m\left((m^2 + 2m + 2) - (m+1)^2\cos(θ)^2\right), \\
+
+C(θ) &= \frac{1}{4}K^2 \cos(θ)^{2m}\left((m+1)\cos(θ)^2 - (m + 2)\right).
+
+\end{align}
+```
+
+Where ``R`` is the radius of the planet on which we consider the
+Rossby-Haurwitz wave, this value can be found in `model.spectral_grid.radius`
+and ``Ω`` and ``g`` are the rotation and the gravity constant of the planet,
+which can be found in `model.planet.rotation` and `model.planet.gravity`.
+
+The interface displacement ``\eta`` in SpeedyWeather's `ShallowWaterModel`
+is stored in the variable `pres` in analogy to the actual pressure in
+the `PrimitiveEquation` model. So we can set ``\eta`` using
+`set!(simulation, pres=η)` for an appropriate implementation of the above
+equations, similar to how `ζ(λ, θ, σ) =` is defined above.
+However, we also already defined `RossbyHaurwitzWave` to do
+exactly that. With the following we can do a test run of the
+Rossby-Haurwitz wave in the shallow water model without any influences from orography.
+
+```@example haurwitz
+spectral_grid = SpectralGrid(trunc=63, nlayers=1)
+initial_conditions = RossbyHaurwitzWave()
+orography = NoOrography(spectral_grid)
+model = ShallowWaterModel(; spectral_grid, initial_conditions, orography)
+simulation = initialize!(model)
+run!(simulation, period=Day(8))
+
+vor = simulation.diagnostic_variables.grid.vor_grid[:, 1]
+heatmap(vor, title="Relative vorticity [1/s], shallow water Rossby Haurwitz wave after 8 days")
+save("haurwitz_sw.png", ans) # hide
+nothing # hide
+```
+
+There is a noticable difference from the result in the barotropic model, where
+the wave moves around the globe keeping its shape. Here, it deforms around the
+poles and the vorticity patches develop an internal structure.
+
+![Rossby-Haurwitz wave in the shallow water model](haurwitz_sw.png)
+
 ## Rossby-Haurwitz wave in primitive equations
 
-We could apply the same to set the Rossby-Haurwitz for a primitive equation
-model, but we have also already defined `RossbyHaurwitzWave` as
-`<: AbstractInitialConditions` so you can use that directly, regardless
-the model. Note that this definition currently only includes vorticity
-not the initial conditions for other variables. Williamson et al. 1992
-define also initial conditions for height/geopotential to be used
-in the shallow water model (eq. 146-149) -- those are currently not included,
-so the wave may not be as stable as its supposed to be.
+You can use `set!` or the predefined `RossbyHaurwitzWave` also in other
+models. For the `BarotropicModel` or the `PrimitiveDryModel` (or `Wet`)
+the definition for ``\eta`` is skipped. The barotropic model does not have
+a pressure variable, the primitive equation model uses the logarithm of surface
+pressure, which is incompatible with ``\eta`` being defined as an interface displacement.
+So here, the `RossbyHaurwitzWave` only includes relative vorticity
+in the initial conditions.
 
-The following shows that you can set the same `RossbyHaurwitzWave` initial
-conditions also in a `PrimitiveDryModel` (or `Wet`) but you probably
+The following shows how you can use `RossbyHaurwitzWave`
+in a `PrimitiveDryModel` (or `Wet`) but you probably
 also want to set initial conditions for temperature and pressure
 to not start at zero Kelvin and zero pressure. Also no orography,
 and let's switch off all physics parameterizations with `physics=false`.
@@ -156,7 +210,7 @@ nothing # hide
 
 Note that we chose a lower resolution here (T42) as we are simulating
 8 vertical layers now too. Let us visualise the surface vorticity
-(`[:, 8]` is on layer )
+(`[:, 8]` is the lowermost layer)
 
 ```@example haurwitz
 vor = simulation.diagnostic_variables.grid.vor_grid[:, 8]
