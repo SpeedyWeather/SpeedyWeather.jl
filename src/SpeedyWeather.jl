@@ -72,6 +72,7 @@ export transform, transform!
 export spectral_truncation, spectral_truncation!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
+export power_spectrum
 
 include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
