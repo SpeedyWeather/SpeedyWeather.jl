@@ -12,6 +12,7 @@ import LinearAlgebra
 # GPU
 import Adapt
 import GPUArrays
+import KernelAbstractions
 
 # ABSTRACT GRIDS (2D) AND GRIDARRAYS (3D+)
 export  AbstractGridArray,
