@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- One-band longwave radiation [#624](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/624)
+- compat entry for FiniteDifferences.jl [#620](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/620)
 - Slab ocean and net surface fluxes [#613](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/613)
 - added compat entries for FiniteDifferences.jl and Enzyme.jl [#620](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/620) [#622](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/622)
 - update to GPUArrays v11, JLArrays v0.2 and remove CUDA from tests [#590](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/590)
