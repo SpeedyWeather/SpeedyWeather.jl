@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- compat entry for FiniteDifferences.jl [#620](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/620)
 - update to GPUArrays v11, JLArrays v0.2 and remove CUDA from tests [#590](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/590)
 - Power spectrum for n-dim LowerTriangularArrays [#618](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/618)
 - Added custom EnzymeRules for the SpectralTransform and an extension for compatibility with FiniteDifferences.jl [#589](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589) [#625](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/625)
