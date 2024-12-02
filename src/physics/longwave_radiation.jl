@@ -163,7 +163,7 @@ function longwave_radiation!(
         B[k] = σ*temp[k]^4
     end
 
-    # upward flux U
+    # UPWARD flux U
     local U::NF = σ*column.surface_temp^4       # boundary condition at surface U(τ=τ(z=0)) = σTₛ⁴
     column.flux_temp_upward[nlayers+1] += U     # accumulate fluxes
 
@@ -173,7 +173,7 @@ function longwave_radiation!(
         column.flux_temp_upward[k] += U         # accumulate that flux
     end
 
-    # downward flux D
+    # DOWNWARD flux D
     local D::NF = 0                             # top boundary condition of longwave flux
                                                 # non need to accumulate 0 at top downward flux
     @inbounds for k in 1:nlayers
