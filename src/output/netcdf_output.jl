@@ -985,9 +985,9 @@ function output!(
 )
     osr = output.grid2D
     (; outgoing_shortwave_radiation) = diagn.physics
-    RingGrids.interpolate!(olr, outgoing_shortwave_radiation, output.interpolator)
+    RingGrids.interpolate!(osr, outgoing_shortwave_radiation, output.interpolator)
 
-    round!(olr, variable.keepbits)
+    round!(osr, variable.keepbits)
     i = output.output_counter   # output time step to write
     output.netcdf_file[variable.name][:, :, i] = osr
     return nothing
