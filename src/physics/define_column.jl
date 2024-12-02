@@ -84,9 +84,12 @@ $(TYPEDFIELDS)"""
     precip_large_scale::NF = 0              # precipitation due to large-scale condensation [m]
 
     # RADIATION
-    cos_zenith::NF = 0                                      # cosine of solar zenith angle
-    albedo::NF = 0                                          # surface albedo
+    cos_zenith::NF = 0                      # cosine of solar zenith angle
+    albedo::NF = 0                          # surface albedo
     
+    outgoing_longwave_radiation::NF = 0     # OLR [W/m^2]
+    outgoing_shortwave_radiation::NF = 0    # same for shortwave reflection [W/m^2]
+
     # optical depth of the atmosphere, on half levels, for shortwave and longwave radiation
     const optical_depth_shortwave::MatrixType = zeros(NF, nlayers+1, nbands_shortwave)
     const optical_depth_longwave::MatrixType = zeros(NF, nlayers+1, nbands_longwave)

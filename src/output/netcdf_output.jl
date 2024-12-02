@@ -895,6 +895,136 @@ function output!(
     return nothing
 end
 
+## SURFACE FLUXES
+
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
+@kwdef mutable struct SurfaceFluxHeatOutput <: AbstractOutputVariable
+    name::String = "surface_flux_heat"
+    unit::String = "W/m^2"
+    long_name::String = "Surface heat fluxes (positive down)"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
+function output!(
+    output::NetCDFOutput,
+    variable::SurfaceFluxHeatOutput,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::AbstractModel,
+)
+    flux = output.grid2D
+    (; surface_flux_heat) = diagn.physics
+    RingGrids.interpolate!(flux, surface_flux_heat, output.interpolator)
+
+    round!(flux, variable.keepbits)
+    i = output.output_counter   # output time step to write
+    output.netcdf_file[variable.name][:, :, i] = flux
+    return nothing
+end
+
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
+@kwdef mutable struct OutgoingLongwaveRadiationOutput <: AbstractOutputVariable
+    name::String = "olr"
+    unit::String = "W/m^2"
+    long_name::String = "Outgoing longwave radiation"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
+function output!(
+    output::NetCDFOutput,
+    variable::OutgoingLongwaveRadiationOutput,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::AbstractModel,
+)
+    olr = output.grid2D
+    (; outgoing_longwave_radiation) = diagn.physics
+    RingGrids.interpolate!(olr, outgoing_longwave_radiation, output.interpolator)
+
+    round!(olr, variable.keepbits)
+    i = output.output_counter   # output time step to write
+    output.netcdf_file[variable.name][:, :, i] = olr
+    return nothing
+end
+
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
+@kwdef mutable struct OutgoingShortwaveRadiationOutput <: AbstractOutputVariable
+    name::String = "osr"
+    unit::String = "W/m^2"
+    long_name::String = "Outgoing shortwave radiation"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
+function output!(
+    output::NetCDFOutput,
+    variable::OutgoingShortwaveRadiationOutput,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::AbstractModel,
+)
+    osr = output.grid2D
+    (; outgoing_shortwave_radiation) = diagn.physics
+    RingGrids.interpolate!(osr, outgoing_shortwave_radiation, output.interpolator)
+
+    round!(osr, variable.keepbits)
+    i = output.output_counter   # output time step to write
+    output.netcdf_file[variable.name][:, :, i] = osr
+    return nothing
+end
+
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
+@kwdef mutable struct SurfaceFluxHumidOutput <: AbstractOutputVariable
+    name::String = "surface_flux_humid"
+    unit::String = "kg/s/m^2"
+    long_name::String = "Surface humidity fluxes (positive down)"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
+function output!(
+    output::NetCDFOutput,
+    variable::SurfaceFluxHumidOutput,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::AbstractModel,
+)
+    flux = output.grid2D
+    (; surface_flux_humid) = diagn.physics
+    RingGrids.interpolate!(flux, surface_flux_humid, output.interpolator)
+
+    round!(flux, variable.keepbits)
+    i = output.output_counter   # output time step to write
+    output.netcdf_file[variable.name][:, :, i] = flux
+    return nothing
+end
+
 ## RANDOM PATTERN
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
@@ -926,6 +1056,42 @@ function output!(
     round!(random_pattern, variable.keepbits)
     i = output.output_counter   # output time step to write
     output.netcdf_file[variable.name][:, :, i] = random_pattern
+    return nothing
+end
+
+## RANDOM PATTERN
+
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
+@kwdef mutable struct SeaSurfaceTemperatureOutput <: AbstractOutputVariable
+    name::String = "sst"
+    unit::String = "degC"
+    long_name::String = "sea surface temperature"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 10
+end
+
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
+function output!(
+    output::NetCDFOutput,
+    variable::SeaSurfaceTemperatureOutput,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::AbstractModel,
+)
+    sst = output.grid2D
+    sst_grid = progn.ocean.sea_surface_temperature
+    RingGrids.interpolate!(sst, sst_grid, output.interpolator)
+
+    sst .-= 273.15  # convert to ˚C
+
+    round!(sst, variable.keepbits)
+    i = output.output_counter   # output time step to write
+    output.netcdf_file[variable.name][:, :, i] = sst
     return nothing
 end
 
