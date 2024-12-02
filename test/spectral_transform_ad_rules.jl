@@ -7,6 +7,7 @@ import AbstractFFTs
 
 grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
 grid_dealiasing = [2, 3]
+fd_tests = [true, false] # to save CI time, only do FiniteDifferences test for one of the grids
 
 # currenlty there's an issue with EnzymeTestUtils not being able to work with structs with undefined fields like FFT plans
 # https://github.com/EnzymeAD/Enzyme.jl/issues/1992
@@ -37,7 +38,7 @@ end
                 # these tests don't pass for reduced grids 
                 # this is likely due to FiniteDifferences and not our EnzymeRules 
                 # see comments in https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/589
-                if !(grid_type <: AbstractReducedGridArray)
+                if !(grid_type <: AbstractReducedGridArray) & fd_tests[i_grid]
                     spectral_grid = SpectralGrid(Grid=grid_type, nlayers=1, trunc=5, dealiasing=grid_dealiasing[i_grid])
                     S = SpectralTransform(spectral_grid)
                     grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
@@ -61,44 +62,47 @@ end
         for (i_grid, grid_type) in enumerate(grid_types)
 
             spectral_grid = SpectralGrid(Grid=grid_type, trunc=10, nlayers=1, dealiasing=grid_dealiasing[i_grid])
-
-            # forwards 
             S = SpectralTransform(spectral_grid, one_more_degree=true)
-            dS = deepcopy(S)
-            grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
-            dgrid = zero(grid)
-            specs = zeros(LowerTriangularArray{Complex{spectral_grid.NF}}, spectral_grid.trunc+2, spectral_grid.trunc+1, spectral_grid.nlayers)
-            
-            # seed
-            dspecs = zero(specs)
-            fill!(dspecs, 1+1im)
 
-            autodiff(Reverse, transform!, Const, Duplicated(specs, dspecs), Duplicated(grid, dgrid), Duplicated(S, dS))
+            if fd_tests[i_grid]
+                # forwards 
 
-            # new seed
-            dspecs2 = zero(specs)
-            fill!(dspecs2, 1+1im)
+                dS = deepcopy(S)
+                grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+                dgrid = zero(grid)
+                specs = zeros(LowerTriangularArray{Complex{spectral_grid.NF}}, spectral_grid.trunc+2, spectral_grid.trunc+1, spectral_grid.nlayers)
+                
+                # seed
+                dspecs = zero(specs)
+                fill!(dspecs, 1+1im)
 
-            # finite difference comparision, seeded with a one adjoint to get the direct gradient
-            fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dspecs2, grid)
-            @test isapprox(dgrid, fd_jvp[1])
+                autodiff(Reverse, transform!, Const, Duplicated(specs, dspecs), Duplicated(grid, dgrid), Duplicated(S, dS))
 
-            ## now backwards, as the input for spec we use the output of the forward transform
+                # new seed
+                dspecs2 = zero(specs)
+                fill!(dspecs2, 1+1im)
 
-            fill!(dspecs,0)
-            grid = zeros(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
-            dgrid = similar(grid)
-            fill!(dgrid, 1)
+                # finite difference comparision, seeded with a one adjoint to get the direct gradient
+                fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dspecs2, grid)
+                @test isapprox(dgrid, fd_jvp[1])
 
-            autodiff(Reverse, transform!, Const, Duplicated(grid, dgrid), Duplicated(specs, dspecs), Duplicated(S, dS))
+                ## now backwards, as the input for spec we use the output of the forward transform
 
-            # new seed 
-            dgrid2 = similar(grid)
-            fill!(dgrid2, 1)
+                fill!(dspecs,0)
+                grid = zeros(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+                dgrid = similar(grid)
+                fill!(dgrid, 1)
 
-            fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dgrid2, specs)
+                autodiff(Reverse, transform!, Const, Duplicated(grid, dgrid), Duplicated(specs, dspecs), Duplicated(S, dS))
 
-            @test isapprox(dspecs, fd_jvp[1])
+                # new seed 
+                dgrid2 = similar(grid)
+                fill!(dgrid2, 1)
+
+                fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dgrid2, specs)
+
+                @test isapprox(dspecs, fd_jvp[1])
+            end 
 
             # test that d S^{-1}(S(x)) / dx = dx/dx = 1 (starting in both domains) 
             # this only holds for exact transforms, like Gaussian grids 
