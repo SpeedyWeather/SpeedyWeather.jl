@@ -154,30 +154,32 @@ end
             #fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_identity(x, S), dgrid2, grid)
             #@test isapprox(dgrid, fd_jvp[1], rtol=0.01)
 
-            # now start with spectral space 
+            # now start with spectral space, exclude for other grid because of https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/626
+            if fd_tests[i_grid]
 
-            function transform_identity!(x::LowerTriangularArray{Complex{T}}, S::SpectralTransform{T}) where T
-                x_grid = zeros(S.Grid{T}, S.nlat_half, S.nlayers)
-                transform!(x_grid, x, S)
-                transform!(x, x_grid, S)
-                return nothing
-            end 
+                function transform_identity!(x::LowerTriangularArray{Complex{T}}, S::SpectralTransform{T}) where T
+                    x_grid = zeros(S.Grid{T}, S.nlat_half, S.nlayers)
+                    transform!(x_grid, x, S)
+                    transform!(x, x_grid, S)
+                    return nothing
+                end 
 
-            spec = transform(grid, S)
-            spec_copy = deepcopy(spec)
-            transform_identity!(spec, S)
-            @test isapprox(spec, spec_copy)
+                spec = transform(grid, S)
+                spec_copy = deepcopy(spec)
+                transform_identity!(spec, S)
+                @test isapprox(spec, spec_copy)
 
-            dspec = similar(spec)
-            fill!(dspec, 1+im)
+                dspec = similar(spec)
+                fill!(dspec, 1+im)
 
-            autodiff(Reverse, transform_identity!, Const, Duplicated(spec, dspec), Duplicated(S, dS))
+                autodiff(Reverse, transform_identity!, Const, Duplicated(spec, dspec), Duplicated(S, dS))
 
-            @test all(all.([isapprox.(dspec[il,1,:], 1) for il in 1:S.lmax+1])) # m = 0 => Im = 0
+                @test all(all.([isapprox.(dspec[il,1,:], 1) for il in 1:S.lmax+1])) # m = 0 => Im = 0
 
-            for i in eachmatrix(dspec)
-                @test all(isapprox.(dspec[:,i][S.lmax+2:end], 1+im)) 
-            end 
+                for i in eachmatrix(dspec)
+                    @test all(isapprox.(dspec[:,i][S.lmax+2:end], 1+im)) 
+                end 
+            end
         end 
     end 
 
