@@ -63,11 +63,11 @@ end
 
             spectral_grid = SpectralGrid(Grid=grid_type, trunc=10, nlayers=1, dealiasing=grid_dealiasing[i_grid])
             S = SpectralTransform(spectral_grid, one_more_degree=true)
+            dS = deepcopy(S)
 
             if fd_tests[i_grid]
+                
                 # forwards 
-
-                dS = deepcopy(S)
                 grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
                 dgrid = zero(grid)
                 specs = zeros(LowerTriangularArray{Complex{spectral_grid.NF}}, spectral_grid.trunc+2, spectral_grid.trunc+1, spectral_grid.nlayers)
