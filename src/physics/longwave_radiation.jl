@@ -117,7 +117,29 @@ function longwave_radiation!(
     (; α, time_scale) = scheme
     Tₜ = scheme.temp_tropopause
     
-    Fₖ::NF = 0                      # flux into lowermost layer from below
+    (; skin_temperature_sea, skin_temperature_land, land_fraction) = column
+
+    # mix radiative fluxes for fractional land-sea mask if both available 
+    land_available = isfinite(skin_temperature_land)
+    sea_available = isfinite(skin_temperature_sea)
+
+    # land fraction-weighted average of surface temperatures from land/sea
+    local surface_temperature::NF = 0
+    
+    if land_available && sea_available
+        surface_temperature = land_fraction*skin_temperature_land + (1-land_fraction)*skin_temperature_sea
+    elseif land_available
+        surface_temperature = skin_temperature_land
+    elseif sea_available
+        surface_temperature = skin_temperature_sea
+    else    # fallback: use surface air temperature to have zero flux
+        surface_temperature = T[end]
+    end
+
+    # extension to Jeevanjee: Include temperature flux between surface and lowermost air temperature
+    local Fₖ::NF    # flux into lowermost layer from surface land/sea below
+    Fₖ = (T[end] - surface_temperature) * α * (Tₜ - surface_temperature)
+    F[end] += Fₖ
 
     # integrate from surface up, skipping surface (k=nlayers+1) and top-of-atmosphere flux (k=1)
     @inbounds for k in nlayers:-1:2
@@ -128,6 +150,10 @@ function longwave_radiation!(
 
     # Relax the uppermost level towards prescribed "tropopause temperature"
     temp_tend[1] += (Tₜ - T[1])/time_scale.value
+
+    # for diagnostic, use Fₖ as the outgoing longwave radiation although it's technically into the
+    # uppermost layer from below (not out of it)
+    column.outgoing_longwave_radiation = Fₖ
 end
 
 export OneBandRadiation

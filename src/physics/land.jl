@@ -20,7 +20,6 @@ function land_timestep!(
     diagn::DiagnosticVariables,
     model::PrimitiveEquation,
 )
-    # the time step is dictated by the land "model" 
     land_timestep!(progn, diagn, model.land, model)
     model isa PrimitiveWet && soil_timestep!(progn, diagn, model.soil, model)
 end
