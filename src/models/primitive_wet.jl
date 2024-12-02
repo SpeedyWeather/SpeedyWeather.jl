@@ -154,8 +154,8 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)
-    initialize!(prognostic_variables,model.initial_conditions, model)
-    (;clock) = prognostic_variables
+    initialize!(prognostic_variables, model.initial_conditions, model)
+    (; clock) = prognostic_variables
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
 
@@ -166,8 +166,9 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(prognostic_variables.particles, model)
 
     # initialize ocean and land
-    initialize!(prognostic_variables.ocean, time, model)
+    initialize!(prognostic_variables.ocean, prognostic_variables, diagnostic_variables, model)
     initialize!(prognostic_variables.land,  prognostic_variables, diagnostic_variables, model)
 
+    # pack prognostic, diagnostic variables and model into a simulation
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end
