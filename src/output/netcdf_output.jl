@@ -901,7 +901,7 @@ end
 Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct SurfaceFluxHeatOutput <: AbstractOutputVariable
     name::String = "surface_flux_heat"
-    unit::String = "?"
+    unit::String = "W/m^2"
     long_name::String = "Surface heat fluxes (positive down)"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
@@ -933,7 +933,7 @@ end
 Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct OutgoingLongwaveRadiationOutput <: AbstractOutputVariable
     name::String = "olr"
-    unit::String = "?"
+    unit::String = "W/m^2"
     long_name::String = "Outgoing longwave radiation"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
@@ -963,9 +963,41 @@ end
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
+@kwdef mutable struct OutgoingShortwaveRadiationOutput <: AbstractOutputVariable
+    name::String = "osr"
+    unit::String = "W/m^2"
+    long_name::String = "Outgoing shortwave radiation"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 7
+end
+
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
+function output!(
+    output::NetCDFOutput,
+    variable::OutgoingShortwaveRadiationOutput,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::AbstractModel,
+)
+    osr = output.grid2D
+    (; outgoing_shortwave_radiation) = diagn.physics
+    RingGrids.interpolate!(olr, outgoing_shortwave_radiation, output.interpolator)
+
+    round!(olr, variable.keepbits)
+    i = output.output_counter   # output time step to write
+    output.netcdf_file[variable.name][:, :, i] = osr
+    return nothing
+end
+
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct SurfaceFluxHumidOutput <: AbstractOutputVariable
     name::String = "surface_flux_humid"
-    unit::String = "?"
+    unit::String = "kg/s/m^2"
     long_name::String = "Surface humidity fluxes (positive down)"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN
@@ -1033,7 +1065,7 @@ end
 Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct SeaSurfaceTemperatureOutput <: AbstractOutputVariable
     name::String = "sst"
-    unit::String = "˚C"
+    unit::String = "degC"
     long_name::String = "sea surface temperature"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
     missing_value::Float64 = NaN

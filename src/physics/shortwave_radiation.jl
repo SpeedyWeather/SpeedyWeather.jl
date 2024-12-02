@@ -45,5 +45,9 @@ function shortwave_radiation!(
     # a non-zero net flux at the surface 
     column.flux_temp_downward .+= solar_constant * cos_zenith
     column.flux_temp_upward .+= albedo * solar_constant * cos_zenith
+
+    # diagnostic: outgoing shortwave radiation
+    column.outgoing_shortwave_radiation = albedo * solar_constant * cos_zenith
+
     return nothing
 end

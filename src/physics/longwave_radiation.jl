@@ -150,6 +150,10 @@ function longwave_radiation!(
 
     # Relax the uppermost level towards prescribed "tropopause temperature"
     temp_tend[1] += (Tₜ - T[1])/time_scale.value
+
+    # for diagnostic, use Fₖ as the outgoing longwave radiation although it's technically into the
+    # uppermost layer from below (not out of it)
+    column.outgoing_longwave_radiation = Fₖ
 end
 
 # dummy one band radiation for now
