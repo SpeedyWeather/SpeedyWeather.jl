@@ -130,12 +130,53 @@ function longwave_radiation!(
     temp_tend[1] += (Tₜ - T[1])/time_scale.value
 end
 
-# dummy one band radiation for now
 export OneBandRadiation
 @kwdef struct OneBandRadiation <: AbstractLongwave
     nbands::Int = 1
+    band::Int = 1
 end
 
 OneBandRadiation(SG::SpectralGrid; kwargs...) = OneBandRadiation(; kwargs...)
 initialize!(scheme::OneBandRadiation, model::PrimitiveEquation) = nothing
-longwave_radiation!(column::ColumnVariables, scheme::OneBandRadiation, model::PrimitiveEquation) = nothing
+
+function longwave_radiation!(
+    column::ColumnVariables{NF},
+    scheme::OneBandRadiation,
+    model::PrimitiveEquation,
+) where NF
+
+    (; nlayers) = column
+    (; band) = scheme                                   # which band is used?
+    τ = view(column.optical_depth_longwave, :, band)    # optical depth
+
+    # precompute differential optical depth dτ
+    dτ = column.a
+    @inbounds for k in eachindex(dτ)
+        dτ = τ[k+1] - τ[k]
+    end
+
+    # precompute Stefan-Boltzmann flux σT^4
+    σ = model.atmosphere.stefan_boltzmann
+    B = column.b
+    (; temp) = column
+    @inbounds for k in eachindex(B, temp)
+        B[k] = σ*temp[k]^4
+    end
+
+    # upward flux U
+    local U::NF = σ*column.surface_temp^4       # boundary condition at surface U(τ=τ(z=0)) = σTₛ⁴
+    column.flux_temp_upward[nlayers+1] += U     # accumulate fluxes
+
+    @inbounds for k in nlayers:-1:1
+        U -= dτ[k]*(U - B[k])                   # negative because we integrate from surface up in -τ direction
+        column.flux_temp_upward[k] += U         # accumulate that flux
+    end
+
+    # downward flux D
+    local D::NF = 0                             # top boundary condition of longwave flux
+                                                # non need to accumulate 0 at top downward flux
+    @inbounds for k in 1:nlayers
+        D += dτ[k]*(B[k] - D)
+        column.flux_temp_downward[k+1] += D
+    end
+end
