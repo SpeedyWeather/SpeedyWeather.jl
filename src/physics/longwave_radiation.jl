@@ -147,17 +147,17 @@ function longwave_radiation!(
 
     (; nlayers) = column
     (; band) = scheme                                   # which band is used?
-    τ = view(column.optical_depth_longwave, :, band)    # optical depth
+    τ = view(column.optical_depth_longwave, :, band)    # optical depth of that band
 
     # precompute differential optical depth dτ
-    dτ = column.a
+    dτ = column.a                               # reuse scratch vector a
     @inbounds for k in eachindex(dτ)
-        dτ = τ[k+1] - τ[k]
+        dτ[k] = τ[k+1] - τ[k]                   # τ defined on half-levels, dτ is depth across level
     end
 
     # precompute Stefan-Boltzmann flux σT^4
     σ = model.atmosphere.stefan_boltzmann
-    B = column.b
+    B = column.b                                # reuse scratch vector b
     (; temp) = column
     @inbounds for k in eachindex(B, temp)
         B[k] = σ*temp[k]^4
@@ -167,7 +167,8 @@ function longwave_radiation!(
     local U::NF = σ*column.surface_temp^4       # boundary condition at surface U(τ=τ(z=0)) = σTₛ⁴
     column.flux_temp_upward[nlayers+1] += U     # accumulate fluxes
 
-    @inbounds for k in nlayers:-1:1
+    @inbounds for k in nlayers:-1:1             # integrate from surface up
+        # Frierson et al. 2006, equation 6
         U -= dτ[k]*(U - B[k])                   # negative because we integrate from surface up in -τ direction
         column.flux_temp_upward[k] += U         # accumulate that flux
     end
@@ -176,6 +177,7 @@ function longwave_radiation!(
     local D::NF = 0                             # top boundary condition of longwave flux
                                                 # non need to accumulate 0 at top downward flux
     @inbounds for k in 1:nlayers
+        # Frierson et al. 2006, equation 7
         D += dτ[k]*(B[k] - D)
         column.flux_temp_downward[k+1] += D
     end
