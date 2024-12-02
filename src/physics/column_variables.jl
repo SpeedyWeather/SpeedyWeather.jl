@@ -149,6 +149,9 @@ function write_column_tendencies!(
     diagn.physics.surface_flux_humid[ij] = column.flux_humid_downward[nlayers+1] -
                                             column.flux_humid_upward[nlayers+1]
 
+    # outgoing longwave radiation
+    diagn.physics.outgoing_longwave_radiation[ij] = column.flux_temp_upward[1]
+
     return nothing
 end
 

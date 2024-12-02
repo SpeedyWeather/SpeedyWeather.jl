@@ -315,7 +315,7 @@ export SlabOcean
     specific_heat_capacity::NF = 4184
 
     "[OPTION] Average mixed-layer depth [m]"
-    mixed_layer_depth::NF = 40
+    mixed_layer_depth::NF = 10
 
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000
@@ -355,10 +355,11 @@ function ocean_timestep!(
     flux = diagn.physics.surface_flux_heat
     C₀ = ocean_model.heat_capacity_mixed_layer
     Δt = model.time_stepping.Δt_sec
+    (; mask) = model.land_sea_mask
 
     # flux is defined as positive downward
-    # Euler forward step
-    @. sst += (Δt/C₀)*flux
+    # Euler forward step, mask land fluxes
+    @. sst += (Δt/C₀)*flux*(1 - mask)
 
     return nothing
 end
