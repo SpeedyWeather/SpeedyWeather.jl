@@ -13,8 +13,8 @@ end
 export NoStochasticPhysics
 struct NoStochasticPhysics <: AbstractStochasticPhysics end
 initialize!(::NoStochasticPhysics, ::PrimitiveEquation) = nothing
-perturb_parameterization_inputs!(::NoStochasticPhysics, ::PrimitiveEquation) = nothing
-perturb_parameterization_tendencies!(::NoStochasticPhysics, ::PrimitiveEquation) = nothing
+perturb_parameterization_inputs!(::ColumnVariables, ::NoStochasticPhysics, ::PrimitiveEquation) = nothing
+perturb_parameterization_tendencies!(::ColumnVariables, ::NoStochasticPhysics, ::PrimitiveEquation) = nothing
 
 export StochasticallyPerturbedPhysicsTendencies
 @kwdef struct StochasticallyPerturbedPhysicsTendencies{NF, VectorType} <: AbstractStochasticPhysics
