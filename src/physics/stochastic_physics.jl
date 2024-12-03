@@ -23,7 +23,7 @@ export StochasticallyPerturbedPhysicsTendencies
     nlayers::Int
 
     "[OPTION] Vertical tapering function, reduce strength towards surface (σ=1)"
-    tapering::Function = σ -> σ < 0.8 ? 1 : 1 - (σ - 0.8)/0.2
+    tapering::Function = σ -> 1 # σ < 0.8 ? 1 : 1 - (σ - 0.8)/0.2
 
     "[DERIVED] Precalculate vertical tapering during initialization"
     taper::VectorType = zeros(NF, nlayers)
