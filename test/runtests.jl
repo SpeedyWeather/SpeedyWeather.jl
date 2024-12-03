@@ -1,6 +1,8 @@
 using SpeedyWeather
 using Test
 
+FLAG_EXTENDED_TESTS = "extended_tests" in ARGS ? true : false
+
 # GENERAL
 include("utility_functions.jl")
 include("dates.jl")

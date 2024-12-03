@@ -1,5 +1,5 @@
 name: JuliaNightly
-# Nightly Scheduled Julia Nightly Run
+# Nightly Scheduled Julia Nightly Run with extended tests
 on:
   schedule:
     - cron: '0 2 * * 0'  # Daily at 2 AM UTC every Sunday
@@ -28,3 +28,4 @@ jobs:
         uses: julia-actions/julia-runtest@v1
         with:
           coverage: false
+          test_args: 'extended_tests'
