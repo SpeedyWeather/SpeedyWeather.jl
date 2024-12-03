@@ -37,6 +37,7 @@ $(TYPEDFIELDS)"""
     OD,     # <:AbstractOpticalDepth,
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
+    SP,     # <:AbstractStochasticPhysics,
     TS,     # <:AbstractTimeStepper,
     ST,     # <:SpectralTransform{NF},
     IM,     # <:AbstractImplicit,
@@ -81,6 +82,7 @@ $(TYPEDFIELDS)"""
     optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = NoShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
+    stochastic_physics::SP = StochasticallyPerturbedPhysicsTendencies(spectral_grid)
     
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -135,6 +137,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.surface_thermodynamics, model)
     initialize!(model.surface_wind, model)
     initialize!(model.surface_heat_flux, model)
+    initialize!(model.stochastic_physics, model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)

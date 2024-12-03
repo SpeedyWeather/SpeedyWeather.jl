@@ -139,6 +139,7 @@ include("physics/zenith.jl")
 include("physics/optical_depth.jl")
 include("physics/shortwave_radiation.jl")
 include("physics/longwave_radiation.jl")
+include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND
 include("physics/ocean.jl")
