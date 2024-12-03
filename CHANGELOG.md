@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- AbstractStochasticPhysics and SPPT implemented [#629](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/629)
 - One-band longwave radiation [#624](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/624)
 - compat entry for FiniteDifferences.jl [#620](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/620)
 - Slab ocean and net surface fluxes [#613](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/613)
