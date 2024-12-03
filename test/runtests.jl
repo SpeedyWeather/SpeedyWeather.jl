@@ -3,6 +3,10 @@ using Test
 
 FLAG_EXTENDED_TESTS = "extended_tests" in ARGS ? true : false
 
+if FLAG_EXTENDED_TESTS 
+    @info "Running extended test suite"
+end 
+
 # GENERAL
 include("utility_functions.jl")
 include("dates.jl")
