@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- AbstractSurfacePerturbation introduced [#631](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/631)
 - Introduced seperate extended tests that are not run on every commit [#628](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/628)
 - One-band longwave radiation [#624](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/624)
 - compat entry for FiniteDifferences.jl [#620](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/620)
