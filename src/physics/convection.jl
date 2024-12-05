@@ -80,7 +80,7 @@ function convection!(
     planet::AbstractPlanet,
     atmosphere::AbstractAtmosphere,
     time_stepping::AbstractTimeStepper,
-    model::PrimitiveWetModel,
+    model::PrimitiveWet,
 ) where NF
 
     σ = geometry.σ_levels_full
@@ -292,7 +292,8 @@ function convection!(
     scheme::DryBettsMiller,
     model::PrimitiveEquation,
 )
-    convection!(column, scheme, model.geometry, model.atmosphere)
+    # TODO check whether unpacking makes a performance difference? (it shouldn't?)
+    convection!(column, scheme, model.geometry, model.atmosphere, model)
 end
 
 """
@@ -308,6 +309,7 @@ function convection!(
     DBM::DryBettsMiller,
     geometry::Geometry,
     atmosphere::AbstractAtmosphere,
+    model::PrimitiveEquation,
 ) where NF
 
     σ = geometry.σ_levels_full
