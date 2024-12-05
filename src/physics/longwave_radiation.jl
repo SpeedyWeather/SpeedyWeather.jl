@@ -199,9 +199,12 @@ function longwave_radiation!(
         column.flux_temp_upward[k] += U         # accumulate that flux
     end
 
+    # store outgoing longwave radiation (OLR) for diagnostics
+    column.outgoing_longwave_radiation = U
+
     # DOWNWARD flux D
     local D::NF = 0                             # top boundary condition of longwave flux
-                                                # non need to accumulate 0 at top downward flux
+                                                # no need to accumulate 0 at top downward flux
     @inbounds for k in 1:nlayers
         # Frierson et al. 2006, equation 7
         D += dτ[k]*(B[k] - D)
