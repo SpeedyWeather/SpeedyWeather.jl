@@ -16,8 +16,8 @@ initialize!(::NoStochasticPhysics, ::PrimitiveEquation) = nothing
 perturb_parameterization_inputs!(::ColumnVariables, ::NoStochasticPhysics, ::PrimitiveEquation) = nothing
 perturb_parameterization_tendencies!(::ColumnVariables, ::NoStochasticPhysics, ::PrimitiveEquation) = nothing
 
-export StochasticallyPerturbedPhysicsTendencies
-@kwdef struct StochasticallyPerturbedPhysicsTendencies{NF, VectorType} <: AbstractStochasticPhysics
+export StochasticallyPerturbedParameterizationTendencies
+@kwdef struct StochasticallyPerturbedParameterizationTendencies{NF, VectorType} <: AbstractStochasticPhysics
     
     "Number of vertical layers"
     nlayers::Int
@@ -30,12 +30,12 @@ export StochasticallyPerturbedPhysicsTendencies
 end
 
 # generator function
-function StochasticallyPerturbedPhysicsTendencies(SG::SpectralGrid; kwargs...)
+function StochasticallyPerturbedParameterizationTendencies(SG::SpectralGrid; kwargs...)
     (; nlayers, NF, VectorType) = SG
-    return StochasticallyPerturbedPhysicsTendencies{NF, VectorType}(; nlayers, kwargs...)
+    return StochasticallyPerturbedParameterizationTendencies{NF, VectorType}(; nlayers, kwargs...)
 end
 
-function initialize!(sppt::StochasticallyPerturbedPhysicsTendencies, model::PrimitiveEquation)
+function initialize!(sppt::StochasticallyPerturbedParameterizationTendencies, model::PrimitiveEquation)
     sppt.taper .= sppt.tapering.(model.geometry.σ_levels_full)
     return nothing
 end
@@ -43,14 +43,14 @@ end
 # only perturb tendencies (=outputs) not inputs
 function perturb_parameterization_inputs!(
     ::AbstractColumnVariables,
-    ::StochasticallyPerturbedPhysicsTendencies,
+    ::StochasticallyPerturbedParameterizationTendencies,
     ::PrimitiveEquation)
     return nothing
 end
 
 function perturb_parameterization_tendencies!(
     column::AbstractColumnVariables,
-    sppt::StochasticallyPerturbedPhysicsTendencies,
+    sppt::StochasticallyPerturbedParameterizationTendencies,
     model::PrimitiveEquation)
     
     r = column.random_value
