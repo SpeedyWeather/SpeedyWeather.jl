@@ -25,7 +25,7 @@ subtypes(SpeedyWeather.AbstractStochasticPhysics)
 ## Stochastically perturbed parameterization tendencies (SPPT)
 
 SPPT is based on the idea that the [dynamics](@ref primitive_equation_model) ``D`` have a higher certainty but that
-the [Parameterization](@ref) ``P`` are more uncertain and hence any stochasticity should scale
+the [Parameterizations](@ref) ``P`` are more uncertain and hence any stochasticity should scale
 with the size of the tendencies coming from the parameterizations. 
 Conceptually an atmospheric state ``\mathbf{x}`` is integrated in time ``t`` as
 
