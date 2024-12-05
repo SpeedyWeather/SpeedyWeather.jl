@@ -84,10 +84,11 @@ simulation = initialize!(model)
 run!(simulation, period=Day(10))
 
 # surface humidity, kg/kg -> g/kg
-humid = simulation.diagnostic_variables.grid.humid_grid[:, 8]*1000
+k = spectral_grid.nlayers   # surface layer
+humid = simulation.diagnostic_variables.grid.humid_grid[:, k]*1000
 
 using CairoMakie
-heatmap(model.orography.orography, title="Surface humidity [g/kg], with SPPT", colormap=:oslo)
+heatmap(humid, title="Surface humidity [g/kg], with SPPT", colormap=:oslo)
 save("humid_sppt.png", ans) # hide
 nothing # hide
 ```
@@ -101,9 +102,9 @@ simulation = initialize!(model)
 run!(simulation, period=Day(10))
 
 # surface humidity, kg/kg -> g/kg
-humid = simulation.diagnostic_variables.grid.humid_grid[:, 8]*1000
+humid = simulation.diagnostic_variables.grid.humid_grid[:, k]*1000
 
-heatmap(model.orography.orography, title="Surface humidity [g/kg], with SPPT, other seed", colormap=:oslo)
+heatmap(humid, title="Surface humidity [g/kg], with SPPT, other seed", colormap=:oslo)
 save("humid_sppt2.png", ans) # hide
 nothing # hide
 ```
