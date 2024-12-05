@@ -86,6 +86,7 @@ run!(simulation, period=Day(10))
 # surface humidity, kg/kg -> g/kg
 humid = simulation.diagnostic_variables.grid.humid_grid[:, 8]*1000
 
+using CairoMakie
 heatmap(model.orography.orography, title="Surface humidity [g/kg], with SPPT", colormap=:oslo)
 save("humid_sppt.png", ans) # hide
 nothing # hide
