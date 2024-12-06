@@ -42,7 +42,7 @@ using SpeedyWeather
     decorrelation_time::Second = Day(2)
 
     "Stirring strength A [1/s²]"
-    strength::NF = 5e-11
+    strength::NF = 2e-11
 
     "Stirring latitude [˚N]"
     latitude::NF = 45

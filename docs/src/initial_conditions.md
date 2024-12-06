@@ -202,7 +202,9 @@ initial_conditions = InitialConditions(
                         pres=PressureOnOrography())
 
 orography = NoOrography(spectral_grid)
-model = PrimitiveDryModel(spectral_grid; initial_conditions, orography, physics=false)
+time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Minute(30))   # 30min timestep scaled linearly
+
+model = PrimitiveDryModel(spectral_grid; time_stepping, initial_conditions, orography, physics=false)
 simulation = initialize!(model)
 run!(simulation, period=Day(5))
 nothing # hide
