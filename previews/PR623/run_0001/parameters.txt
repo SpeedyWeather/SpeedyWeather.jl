@@ -1,0 +1,312 @@
+model.spectral_grid
+SpectralGrid:
+├ Spectral:   T31 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
+├ Grid:       48-ring OctahedralGaussianGrid{Float32}, 3168 grid points
+├ Resolution: 401km (average)
+├ Vertical:   8-layer SigmaCoordinates
+└ Device:     CPU using Array
+
+model.device_setup
+SpeedyWeather.DeviceSetup{CPU, DataType}(CPU(), KernelAbstractions.CPU, 4)
+
+model.dynamics
+true
+
+model.geometry
+Geometry{Float32, OctahedralGaussianGrid} for SpectralGrid:
+├ Spectral:   T31 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
+├ Grid:       48-ring OctahedralGaussianGrid{Float32}, 3168 grid points
+├ Resolution: 401km (average)
+├ Vertical:   8-layer SigmaCoordinates
+└ Device:     CPU using Array
+
+model.planet
+Earth{Float32} <: SpeedyWeather.AbstractPlanet
+├ rotation::Float32 = 7.29e-5
+├ gravity::Float32 = 9.81
+├ daily_cycle::Bool = true
+├ length_of_day::Second = 86400 seconds
+├ seasonal_cycle::Bool = true
+├ length_of_year::Second = 31557600 seconds
+├ equinox::DateTime = 2000-03-20T00:00:00
+├ axial_tilt::Float32 = 23.4
+└ solar_constant::Float32 = 1365.0
+
+model.atmosphere
+EarthAtmosphere{Float32} <: SpeedyWeather.AbstractAtmosphere
+├ mol_mass_dry_air::Float32 = 28.9649
+├ mol_mass_vapour::Float32 = 18.0153
+├ heat_capacity::Float32 = 1004.0
+├ R_gas::Float32 = 8.3145
+├ R_dry::Float32 = 287.05432
+├ R_vapour::Float32 = 461.52438
+├ mol_ratio::Float32 = 0.62197006
+├ μ_virt_temp::Float32 = 0.60779446
+├ κ::Float32 = 0.2859107
+├ water_density::Float32 = 1000.0
+├ latent_heat_condensation::Float32 = 2.501e6
+├ latent_heat_sublimation::Float32 = 2.801e6
+├ stefan_boltzmann::Float32 = 5.67e-8
+├ pres_ref::Float32 = 100000.0
+├ temp_ref::Float32 = 288.0
+├ moist_lapse_rate::Float32 = 0.005
+├ dry_lapse_rate::Float32 = 0.0098
+└ layer_thickness::Float32 = 8500.0
+
+model.coriolis
+Coriolis{Float32} <: SpeedyWeather.AbstractCoriolis
+├ nlat::Int64 = 48
+└── arrays: f
+
+model.geopotential
+Geopotential{Float32} <: SpeedyWeather.AbstractGeopotential
+├ nlayers::Int64 = 8
+└── arrays: Δp_geopot_half, Δp_geopot_full
+
+model.adiabatic_conversion
+AdiabaticConversion{Float32} <: SpeedyWeather.AbstractAdiabaticConversion
+├ nlayers::Int64 = 8
+└── arrays: σ_lnp_A, σ_lnp_B
+
+model.particle_advection
+NoParticleAdvection <: SpeedyWeather.AbstractParticleAdvection
+
+
+model.initial_conditions
+InitialConditions{ZonalWind, PressureOnOrography, JablonowskiTemperature, ZeroInitially} <: SpeedyWeather.AbstractInitialConditions
+├ vordiv::ZonalWind = ZonalWind <: SpeedyWeather.AbstractInitialConditions
+├ η₀::Float64 = 0.252
+├ u₀::Float64 = 35.0
+├ perturb_lat::Float64 = 40.0
+├ perturb_lon::Float64 = 20.0
+├ perturb_uₚ::Float64 = 1.0
+└ perturb_radius::Float64 = 0.1
+├ pres::PressureOnOrography = PressureOnOrography <: SpeedyWeather.AbstractInitialConditions
+
+├ temp::JablonowskiTemperature = JablonowskiTemperature <: SpeedyWeather.AbstractInitialConditions
+├ η₀::Float64 = 0.252
+├ σ_tropopause::Float64 = 0.2
+├ u₀::Float64 = 35.0
+├ ΔT::Float64 = 0.0
+└ Tmin::Float64 = 200.0
+└ humid::ZeroInitially = ZeroInitially <: SpeedyWeather.AbstractInitialConditions
+
+
+model.random_process
+NoRandomProcess <: SpeedyWeather.AbstractRandomProcess
+
+
+model.orography
+EarthOrography{Float32, OctahedralGaussianGrid{Float32}} <: SpeedyWeather.AbstractOrography
+├ path::String = SpeedyWeather.jl/input_data
+├ file::String = orography.nc
+├ file_Grid::UnionAll = FullGaussianGrid
+├ scale::Float64 = 1.0
+├ smoothing::Bool = true
+├ smoothing_power::Float64 = 1.0
+├ smoothing_strength::Float64 = 0.1
+├ smoothing_fraction::Float64 = 0.05
+└── arrays: orography, geopot_surf
+
+model.land_sea_mask
+LandSeaMask{Float32, OctahedralGaussianGrid{Float32}} <: AbstractLandSeaMask
+├ path::String = SpeedyWeather.jl/input_data
+├ file::String = land-sea_mask.nc
+├ file_Grid::UnionAll = FullClenshawGrid
+└── arrays: mask
+
+model.ocean
+SeasonalOceanClimatology{Float32, OctahedralGaussianGrid{Float32}} <: AbstractOcean
+├ nlat_half::Int64 = 24
+├ path::String = SpeedyWeather.jl/input_data
+├ file::String = sea_surface_temperature.nc
+├ varname::String = sst
+├ file_Grid::UnionAll = FullGaussianGrid
+├ missing_value::Float32 = NaN
+└── arrays: monthly_temperature
+
+model.land
+SeasonalLandTemperature{Float32, OctahedralGaussianGrid{Float32}} <: AbstractLand
+├ nlat_half::Int64 = 24
+├ path::String = SpeedyWeather.jl/input_data
+├ file::String = land_surface_temperature.nc
+├ varname::String = lst
+├ file_Grid::UnionAll = FullGaussianGrid
+├ missing_value::Float32 = NaN
+└── arrays: monthly_temperature
+
+model.solar_zenith
+SolarZenith{Float32} <: AbstractZenith
+├ length_of_day::Second = 86400 seconds
+├ length_of_year::Second = 31557600 seconds
+├ equation_of_time::Bool = true
+├ seasonal_cycle::Bool = true
+├ solar_declination::SpeedyWeather.SinSolarDeclination{Float32} = SpeedyWeather.SinSolarDeclination{Float32} <: AbstractSolarDeclination
+├ axial_tilt::Float32 = 23.4
+├ equinox::DateTime = 2000-03-20T00:00:00
+├ length_of_year::Second = 31557600 seconds
+└ length_of_day::Second = 86400 seconds
+├ time_correction::SpeedyWeather.SolarTimeCorrection{Float32} = SpeedyWeather.SolarTimeCorrection{Float32} <: AbstractSolarTimeCorrection
+├ a::Float32 = 0.004297
+├ s1::Float32 = -1.837877
+├ c1::Float32 = 0.107029
+├ s2::Float32 = -2.340475
+└ c2::Float32 = -0.837378
+└ initial_time::Base.RefValue{DateTime} = Base.RefValue{DateTime}(DateTime("2000-01-01T00:00:00"))
+
+model.albedo
+AlbedoClimatology{Float32, OctahedralGaussianGrid{Float32}} <: SpeedyWeather.AbstractAlbedo
+├ nlat_half::Int64 = 24
+├ path::String = SpeedyWeather.jl/input_data
+├ file::String = albedo.nc
+├ varname::String = alb
+├ file_Grid::UnionAll = FullGaussianGrid
+└── arrays: albedo
+
+model.physics
+true
+
+model.boundary_layer_drag
+BulkRichardsonDrag{Float32} <: SpeedyWeather.AbstractBoundaryLayer
+├ κ::Float32 = 0.4
+├ z₀::Float32 = 3.21e-5
+├ Ri_c::Float32 = 10.0
+└ drag_max::Base.RefValue{Float32} = Base.RefValue{Float32}(0.0005774734f0)
+
+model.temperature_relaxation
+NoTemperatureRelaxation <: SpeedyWeather.AbstractTemperatureRelaxation
+
+
+model.vertical_diffusion
+BulkRichardsonDiffusion{Float32} <: SpeedyWeather.AbstractVerticalDiffusion
+├ nlayers::Int64 = 8
+├ κ::Float32 = 0.4
+├ z₀::Float32 = 3.21e-5
+├ Ri_c::Float32 = 10.0
+├ fb::Float32 = 0.1
+├ diffuse_static_energy::Bool = true
+├ diffuse_momentum::Bool = true
+├ diffuse_humidity::Bool = true
+├ logZ_z₀::Base.RefValue{Float32} = Base.RefValue{Float32}(16.645391f0)
+├ sqrtC_max::Base.RefValue{Float32} = Base.RefValue{Float32}(0.024030676f0)
+└── arrays: ∇²_above, ∇²_below
+
+model.surface_thermodynamics
+SurfaceThermodynamicsConstant <: SpeedyWeather.AbstractSurfaceThermodynamics
+
+
+model.surface_wind
+SurfaceWind{Float32} <: SpeedyWeather.AbstractSurfaceWind
+├ f_wind::Float32 = 0.95
+├ V_gust::Float32 = 5.0
+├ use_boundary_layer_drag::Bool = true
+├ drag_land::Float32 = 0.0024
+└ drag_sea::Float32 = 0.0018
+
+model.surface_heat_flux
+SurfaceHeatFlux{Float32} <: SpeedyWeather.AbstractSurfaceHeatFlux
+├ use_boundary_layer_drag::Bool = true
+├ heat_exchange_land::Float32 = 0.0012
+└ heat_exchange_sea::Float32 = 0.0009
+
+model.convection
+DryBettsMiller{Float32} <: SpeedyWeather.AbstractConvection
+├ nlayers::Int64 = 8
+└ time_scale::Second = 14400 seconds
+
+model.optical_depth
+ZeroOpticalDepth{Float32} <: SpeedyWeather.AbstractOpticalDepth
+
+
+model.shortwave_radiation
+NoShortwave <: SpeedyWeather.AbstractShortwave
+
+
+model.longwave_radiation
+JeevanjeeRadiation{Float32} <: SpeedyWeather.AbstractLongwave
+├ α::Float32 = 0.025
+├ temp_tropopause::Float32 = 200.0
+└ time_scale::Second = 86400 seconds
+
+model.stochastic_physics
+StochasticallyPerturbedParameterizationTendencies{Float32, Vector{Float32}} <: SpeedyWeather.AbstractStochasticPhysics
+├ nlayers::Int64 = 8
+├ tapering::SpeedyWeather.var"#269#273" = #269
+└── arrays: taper
+
+model.time_stepping
+Leapfrog{Float32} <: SpeedyWeather.AbstractTimeStepper
+├ trunc::Int64 = 31
+├ nsteps::Int64 = 2
+├ Δt_at_T31::Second = 2400 seconds
+├ radius::Float32 = 6.371e6
+├ adjust_with_output::Bool = true
+├ robert_filter::Float32 = 0.1
+├ williams_filter::Float32 = 0.53
+├ Δt_millisec::Dates.Millisecond = 2400000 milliseconds
+├ Δt_sec::Float32 = 2400.0
+└ Δt::Float32 = 0.00037670694
+
+model.spectral_transform
+SpectralTransform{Float32, Array}:
+├ Spectral:   T31, 33x32 LowerTriangularMatrix{Complex{Float32}}
+├ Grid:       48-ring OctahedralGaussianArray{Float32}
+├ Truncation: dealiasing = 2 (quadratic)
+├ Legendre:   Polynomials 53.83 KB, shortcut: linear
+└ Memory:     for 8 layers (182.53 KB)
+
+model.implicit
+ImplicitPrimitiveEquation{Float32} <: SpeedyWeather.AbstractImplicit
+├ trunc::Int64 = 31
+├ nlayers::Int64 = 8
+├ α::Float32 = 1.0
+├ ξ::Base.RefValue{Float32} = Base.RefValue{Float32}(0.0f0)
+└── arrays: temp_profile, R, U, L, W, L0, L1, L2, L3, L4, S, S⁻¹
+
+model.horizontal_diffusion
+HyperDiffusion{Float32, Matrix{Float32}} <: SpeedyWeather.AbstractHorizontalDiffusion
+├ trunc::Int64 = 31
+├ nlayers::Int64 = 8
+├ power::Float32 = 4.0
+├ time_scale::Second = 14400 seconds
+├ time_scale_div::Second = 3600 seconds
+├ resolution_scaling::Float32 = 1.0
+├ power_stratosphere::Float32 = 2.0
+├ tapering_σ::Float32 = 0.2
+└── arrays: expl, impl, expl_div, impl_div
+
+model.vertical_advection
+CenteredVerticalAdvection{Float32, 1}()
+
+model.output
+NetCDFOutput{FullGaussianGrid{Float32}}
+├ status: active
+├ write restart file: true (if active)
+├ interpolator: AnvilInterpolator{Float32, OctahedralGaussianGrid}
+├ path: /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/docs/build/run_0001/output.nc
+├ frequency: 21600 seconds
+└┐ variables:
+ ├ w: vertical velocity dσ/dt [s^-1]
+ ├ v: meridional wind [m/s]
+ ├ u: zonal wind [m/s]
+ └ vor: relative vorticity [s^-1]
+
+model.callbacks
+Dict{Symbol, SpeedyWeather.AbstractCallback}()
+
+model.feedback
+Feedback <: AbstractFeedback
+├ verbose::Bool = false
+├ debug::Bool = true
+├ output::Bool = true
+├ id::String = 0001
+├ run_path::String = /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/docs/build/run_0001
+├ progress_meter::ProgressMeter.Progress = ProgressMeter.Progress <: ProgressMeter.AbstractProgress
+├ n::Int64 = 1
+├ start::Int64 = 0
+├ barlen::Nothing = nothing
+├ barglyphs::ProgressMeter.BarGlyphs = ProgressMeter.BarGlyphs('|', '█', ['▏', '▎', '▍', '▌', '▋', '▊', '▉'], ' ', '|')
+└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0001 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (22, 5985, 1)), 0, 1, false, false, 1.733479320064449e9, 1.733479320064449e9, 1.733479320064449e9)
+├ progress_txt::Nothing = nothing
+└ nars_detected::Bool = false
+
