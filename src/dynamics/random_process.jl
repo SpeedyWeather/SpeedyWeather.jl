@@ -64,8 +64,8 @@ that is reseeded on every `initialize!`. Fields are $(TYPEDFIELDS)"""
     "[OPTION] Range to clamp values into after every transform into grid space"
     clamp::NTuple{2, NF} = (-1, 1)
 
-    "[OPTION] Random number generator seed"
-    seed::Int = 123
+    "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
+    seed::Int = 0
 
     "Independent random number generator for this random process"
     random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
@@ -108,8 +108,9 @@ function initialize!(
     # set mean of random pattern to zero
     process.noise_factors[1] = 0
 
-    # reseed the random number generator
-    Random.seed!(process.random_number_generator, process.seed)
+    # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
+    seed = process.seed == 0 ? rand(UInt) : process.seed
+    Random.seed!(process.random_number_generator, seed)
     return nothing
 end
 
