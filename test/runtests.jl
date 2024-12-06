@@ -48,6 +48,7 @@ include("optical_depth.jl")
 include("longwave_radiation.jl")
 # include("shortwave_radiation.jl")
 include("random_process.jl")
+include("stochastic_physics.jl")
 
 # INITIALIZATION AND INTEGRATION
 include("run_speedy.jl")
