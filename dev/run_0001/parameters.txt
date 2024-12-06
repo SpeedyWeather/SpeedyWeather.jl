@@ -210,9 +210,11 @@ SurfaceHeatFlux{Float32} <: SpeedyWeather.AbstractSurfaceHeatFlux
 └ heat_exchange_sea::Float32 = 0.0009
 
 model.convection
-DryBettsMiller{Float32} <: SpeedyWeather.AbstractConvection
+DryBettsMiller{Float32, NoSurfacePerturbation} <: SpeedyWeather.AbstractConvection
 ├ nlayers::Int64 = 8
-└ time_scale::Second = 14400 seconds
+├ time_scale::Second = 14400 seconds
+└ surface_temp::NoSurfacePerturbation = NoSurfacePerturbation <: SpeedyWeather.AbstractSurfacePerturbation
+
 
 model.optical_depth
 ZeroOpticalDepth{Float32} <: SpeedyWeather.AbstractOpticalDepth
@@ -306,7 +308,7 @@ Feedback <: AbstractFeedback
 ├ start::Int64 = 0
 ├ barlen::Nothing = nothing
 ├ barglyphs::ProgressMeter.BarGlyphs = ProgressMeter.BarGlyphs('|', '█', ['▏', '▎', '▍', '▌', '▋', '▊', '▉'], ' ', '|')
-└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0001 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (21, 5700, 1)), 0, 1, false, false, 1.733435099411863e9, 1.733435099411863e9, 1.733435099411863e9)
+└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0001 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (1, 36, 5)), 0, 1, false, false, 1.733494176921807e9, 1.733494176921807e9, 1.733494176921807e9)
 ├ progress_txt::Nothing = nothing
 └ nars_detected::Bool = false
 
