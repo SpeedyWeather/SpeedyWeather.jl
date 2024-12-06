@@ -23,9 +23,11 @@ function parameterization_tendencies!(
         # extract current column for contiguous memory access
         reset_column!(column)                   # set accumulators back to zero for next grid point
         get_column!(column, diagn, progn, ij, jring, model)  
-        
-        # execute all parameterizations
-        parameterization_tendencies!(column, model)
+
+        # calculate parameterizations
+        perturb_parameterization_inputs!(column, model)         # possibly perturb inputs to parameterizations?
+        parameterization_tendencies!(column, model)             # execute all parameterizations
+        perturb_parameterization_tendencies!(column, model)     # possibly perturb tendencies from parameterizations
 
         # write tendencies from parametrizations back into horizontal fields
         write_column_tendencies!(diagn, column, model.planet, ij)
