@@ -23,8 +23,7 @@ convection!(::ColumnVariables, ::NoConvection, ::PrimitiveEquation) = nothing
 
 export SimplifiedBettsMiller
 
-"""
-The simplified Betts-Miller convection scheme from Frierson, 2007,
+"""The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are
 $(TYPEDFIELDS)"""
@@ -39,10 +38,18 @@ $(TYPEDFIELDS)"""
     relative_humidity::NF = 0.7
 
     "[OPTION] Surface perturbation of temp, humid to calculate the moist pseudo adiabat"
-    surface_temp_humid::SP = NoSurfacePerturbation()
+    surface_temp_humid::SP  # don't specify default here but in generator below
 end
 
-SimplifiedBettsMiller(SG::SpectralGrid; kwargs...) = SimplifiedBettsMiller{SG.NF}(nlayers=SG.nlayers; kwargs...)
+# generator function 
+function SimplifiedBettsMiller(
+    SG::SpectralGrid;
+    surface_temp_humid = NoSurfacePerturbation(),
+    kwargs...)
+    # type inference happens here as @kwdef only defines no/all types specified
+    return SimplifiedBettsMiller{SG.NF, typeof(surface_temp_humid)}(
+        nlayers=SG.nlayers; surface_temp_humid, kwargs...)
+end
 
 # nothing to initialize but maybe the surface temp/humid functor?
 initialize!(SBM::SimplifiedBettsMiller, model::PrimitiveEquation) = initialize!(SBM.surface_temp_humid, model)
@@ -270,7 +277,7 @@ The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1 but with humidity set to zero.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct DryBettsMiller{NF, S} <: AbstractConvection
+@kwdef struct DryBettsMiller{NF, SP} <: AbstractConvection
     "number of vertical layers/levels"
     nlayers::Int
 
@@ -278,10 +285,17 @@ $(TYPEDFIELDS)"""
     time_scale::Second = Hour(4)
 
     "[OPTION] Surface perturbation of temp to calculate the dry adiabat"
-    surface_temp::S = NoSurfacePerturbation()
+    surface_temp::SP    # don't set default here but in generator below
 end
 
-DryBettsMiller(SG::SpectralGrid; kwargs...) = DryBettsMiller{SG.NF}(nlayers=SG.nlayers; kwargs...)
+# generator function
+function DryBettsMiller(
+    SG::SpectralGrid;
+    surface_temp = NoSurfacePerturbation(),
+    kwargs...)
+    # infer type here as @kwdef only defines constructors for no/all types specified
+    return DryBettsMiller{SG.NF, typeof(surface_temp)}(nlayers=SG.nlayers; surface_temp, kwargs...)
+end
 
 # nothing to initialize but maybe the surface temp functor?
 initialize!(DBM::DryBettsMiller, model::PrimitiveEquation) = initialize!(DBM.surface_temp, model)
