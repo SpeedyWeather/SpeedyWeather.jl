@@ -16,7 +16,7 @@ end
 export UniformCooling
 
 """
-Uniform cooling following Pauluis and Garner, 2006. JAS. https://doi.org/10.1175/JAS3705.1
+Uniform cooling following Paulius and Garner, 2006. JAS. https://doi.org/10.1175/JAS3705.1
 imposing a default temperature tendency of -1.5K/day (=1K/16hours for a `time_scale` of 16 hours)
 on every level except for the stratosphere (diagnosed as `temp < temp_min`) where a
 relaxation term with `time_scale_stratosphere` towards `temp_stratosphere` is applied.
@@ -199,9 +199,12 @@ function longwave_radiation!(
         column.flux_temp_upward[k] += U         # accumulate that flux
     end
 
+    # store outgoing longwave radiation (OLR) for diagnostics
+    column.outgoing_longwave_radiation = U
+
     # DOWNWARD flux D
     local D::NF = 0                             # top boundary condition of longwave flux
-                                                # non need to accumulate 0 at top downward flux
+                                                # no need to accumulate 0 at top downward flux
     @inbounds for k in 1:nlayers
         # Frierson et al. 2006, equation 7
         D += dτ[k]*(B[k] - D)
