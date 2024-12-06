@@ -1,10 +1,17 @@
 abstract type AbstractSurfacePerturbation <: AbstractParameterization end
 
-export NoSurfacePerturbation
-struct NoSurfacePerturbation <: AbstractSurfacePerturbation end
-initialize!(::NoSurfacePerturbation, ::PrimitiveEquation) = nothing
+# subtypes don't require an initialize! method defined by default
+initialize!(::AbstractSurfacePerturbation, ::PrimitiveEquation) = nothing
 
-# implement as functor
+export NoSurfacePerturbation
+
+"""Returns the surface temperature and humidity without
+perturbation from the lowermost layer."""
+struct NoSurfacePerturbation <: AbstractSurfacePerturbation end
+
+"""$(TYPEDSIGNATURES)
+Returns the surface temperature and humidity without
+perturbation from the lowermost layer. Used as a functor."""
 function (SP::NoSurfacePerturbation)(
     column::ColumnVariables,
     model::PrimitiveEquation,
@@ -16,6 +23,8 @@ end
 abstract type AbstractConvection <: AbstractParameterization end
 
 export NoConvection
+
+"""Dummy type to disable convection."""
 struct NoConvection <: AbstractConvection end
 NoConvection(::SpectralGrid) = NoConvection()
 initialize!(::NoConvection, ::PrimitiveEquation) = nothing
@@ -102,9 +111,8 @@ function convection!(
     humid_ref_profile = column.b    # specific humidity [kg/kg] profile to adjust to
     
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
-    temp_parcel = temp[nlayers]
-    humid_parcel = humid[nlayers]
-    temp_parcel, humid_parcel = SBM.surface_temp_humid(column, model)
+    # force conversion to NF here
+    temp_parcel, humid_parcel = convert.(NF, SBM.surface_temp_humid(column, model))
     level_zero_buoyancy = pseudo_adiabat!(temp_ref_profile,
                                             temp_parcel, humid_parcel,
                                             temp_virt, geopot, pₛ, σ,
@@ -335,7 +343,8 @@ function convection!(
     temp_ref_profile = column.a     # temperature [K] reference profile to adjust to
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
-    temp_parcel = DBM.surface_temp(column, model)
+    # force conversion to NF here
+    temp_parcel = convert.(NF, DBM.surface_temp(column, model))
     level_zero_buoyancy = dry_adiabat!(temp_ref_profile,
                                             temp, 
                                             temp_parcel,
