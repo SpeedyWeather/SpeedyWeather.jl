@@ -3,6 +3,10 @@
 ## Unreleased
 
 - Change default timestep to 40min at T31 [#623](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/623)
+
+## v0.13
+
+- AbstractSurfacePerturbation introduced [#631](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/631)
 - AbstractStochasticPhysics and SPPT implemented [#629](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/629)
 - Introduced seperate extended tests that are not run on every commit [#628](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/628)
 - One-band longwave radiation [#624](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/624)
