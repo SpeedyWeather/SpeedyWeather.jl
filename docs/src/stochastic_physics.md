@@ -3,9 +3,9 @@
 Stochastic physics introduces stochasticity into the parameterizations of physical process.
 There is conceptually several classes of how this can be done
 
-    - Stochastic perturbations of the tendencies
-    - Stochastic parameter perturbations
-    - Stochastic perturbations to the inputs of parameterizations
+- Stochastic perturbations of the tendencies
+- Stochastic parameter perturbations
+- Stochastic perturbations to the inputs of parameterizations
 
 all of these use random numbers created from some random processes
 (white noise or with some autocorrelation in space or time or sampled from some other distribution)
