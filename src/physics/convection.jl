@@ -20,6 +20,15 @@ function (SP::NoSurfacePerturbation)(
     return temp[nlayers], humid[nlayers]
 end
 
+# only return temperature for primitive dry model
+function (SP::NoSurfacePerturbation)(
+    column::ColumnVariables,
+    model::PrimitiveDry,
+)
+    (; temp, nlayers) = column
+    return temp[nlayers]
+end
+
 abstract type AbstractConvection <: AbstractParameterization end
 
 export NoConvection
@@ -343,8 +352,8 @@ function convection!(
     temp_ref_profile = column.a     # temperature [K] reference profile to adjust to
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
-    # force conversion to NF here
-    temp_parcel = convert.(NF, DBM.surface_temp(column, model))
+    # force conversion to NF here, add "," to ignore additional returns like humidity
+    temp_parcel, = convert.(NF, DBM.surface_temp(column, model))
     level_zero_buoyancy = dry_adiabat!(temp_ref_profile,
                                             temp, 
                                             temp_parcel,
