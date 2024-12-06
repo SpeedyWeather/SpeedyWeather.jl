@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.13
+
 - AbstractSurfacePerturbation introduced [#631](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/631)
 - AbstractStochasticPhysics and SPPT implemented [#629](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/629)
 - Introduced seperate extended tests that are not run on every commit [#628](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/628)
