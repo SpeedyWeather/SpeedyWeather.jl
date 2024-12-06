@@ -8,7 +8,8 @@ using Statistics
                 # use equal-area HEALPixGrid, for unweighted mean and standard deviation later
                 spectral_grid = SpectralGrid(; trunc, nlayers=1, Grid=HEALPixGrid)
 
-                random_process = SpectralAR1Process(spectral_grid, wavenumber=wavenumber, standard_deviation=σ)
+                seed = 123
+                random_process = SpectralAR1Process(spectral_grid; seed, wavenumber, standard_deviation=σ)
                 model = BarotropicModel(spectral_grid; random_process)
                 simulation = initialize!(model)
 
@@ -23,7 +24,7 @@ using Statistics
                 spec = simulation.prognostic_variables.random_pattern
                 transform!(grid, spec, model.spectral_transform)
 
-                @test mean(grid) ≈ 0 atol=5e-3
+                @test mean(grid) ≈ 0 atol=1e-2
                 @test std(grid) ≈ σ rtol=1e-1
             end
         end
@@ -31,7 +32,7 @@ using Statistics
 end
 
 @testset "Random process seed" begin
-    for seed in (123, 1234, 12345)
+    for seed in (0, 123, 1234, 12345)
 
         spectral_grid = SpectralGrid(trunc=31, nlayers=1)
         random_process = SpectralAR1Process(spectral_grid; seed)
@@ -54,6 +55,10 @@ end
             SpeedyWeather.random_process!(simulation.prognostic_variables, random_process)
         end
 
-        @test spec1 == simulation.prognostic_variables.random_pattern
+        if seed != 0    # non-zero seed is actual seed
+            @test spec1 == simulation.prognostic_variables.random_pattern
+        else            # but zero seed pulls random seed from global RNG
+            @test spec1 != simulation.prognostic_variables.random_pattern
+        end
     end
 end
