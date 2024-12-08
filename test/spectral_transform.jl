@@ -45,6 +45,7 @@ spectral_resolutions_inexact = (127, 255)
                             FullClenshawGrid,
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid,
+                            OctaminimalGaussianGrid,
                             HEALPixGrid,
                             OctaHEALPixGrid,
                             FullHEALPixGrid,
@@ -67,35 +68,36 @@ spectral_resolutions_inexact = (127, 255)
     end
 end
 
-@testset "Transform: Recompute, precompute identical results" begin
-    for trunc in spectral_resolutions
-        for NF in (Float32, Float64)
+# functionality deprecated
+# @testset "Transform: Recompute, precompute identical results" begin
+#     for trunc in spectral_resolutions
+#         for NF in (Float32, Float64)
 
-            SG = SpectralGrid(; NF, trunc)
-            S1 = SpectralTransform(SG, recompute_legendre=true)
-            S2 = SpectralTransform(SG, recompute_legendre=false)
+#             SG = SpectralGrid(; NF, trunc)
+#             S1 = SpectralTransform(SG, recompute_legendre=true)
+#             S2 = SpectralTransform(SG, recompute_legendre=false)
 
-            alms = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+#             alms = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
 
-            map1 = transform(alms, S1)
-            map2 = transform(alms, S2)
+#             map1 = transform(alms, S1)
+#             map2 = transform(alms, S2)
         
-            # is only approx as recompute_legendre may use a different precision
-            @test map1 ≈ map2
-        end
-    end
-end
+#             # is only approx as recompute_legendre may use a different precision
+#             @test map1 ≈ map2
+#         end
+#     end
+# end
 
 @testset "Transform: Individual Legendre polynomials" begin
     @testset for trunc in spectral_resolutions
-        for NF in (Float32, Float64)
-            for Grid in (   FullGaussianGrid,
+        @testset for NF in (Float32, Float64)
+            @testset for Grid in (   FullGaussianGrid,
                             FullClenshawGrid,
                             OctahedralGaussianGrid,
                             OctahedralClenshawGrid)
 
                 SG = SpectralGrid(; NF, trunc, Grid)
-                S = SpectralTransform(SG, recompute_legendre=true)
+                S = SpectralTransform(SG)
 
                 lmax = 3
                 for l in 1:lmax
@@ -122,10 +124,11 @@ end
             for Grid in (   FullGaussianGrid,
                             FullClenshawGrid,
                             OctahedralGaussianGrid,
-                            OctahedralClenshawGrid)
+                            OctahedralClenshawGrid,
+                            OctaminimalGaussianGrid)
 
                 SG = SpectralGrid(; NF, trunc, Grid)
-                S = SpectralTransform(SG, recompute_legendre=true)
+                S = SpectralTransform(SG)
 
                 lmax = 3
                 for l in 1:lmax
@@ -254,11 +257,12 @@ end
         @testset for NF in (Float32, Float64)
             @testset for Grid in (  HEALPixGrid,
                                     OctaHEALPixGrid,
+                                    OctaminimalGaussianGrid,
                                     FullHEALPixGrid,
                                     FullOctaHEALPixGrid)
                 
                 SG = SpectralGrid(; NF, trunc, Grid)
-                S = SpectralTransform(SG, recompute_legendre=true)
+                S = SpectralTransform(SG,)
 
                 lmax = 3
                 for l in 1:lmax
@@ -295,7 +299,7 @@ end
                 dealiasing = Grid in (FullGaussianGrid, OctahedralGaussianGrid) ? 2 : 3
 
                 SG = SpectralGrid(; NF, trunc, Grid, dealiasing)
-                S = SpectralTransform(SG, recompute_legendre=false)
+                S = SpectralTransform(SG)
                 O = EarthOrography(SG, smoothing=true)
                 E = Earth(SG)
                 initialize!(O, E, S)

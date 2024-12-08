@@ -1,6 +1,39 @@
+abstract type AbstractSurfacePerturbation <: AbstractParameterization end
+
+# subtypes don't require an initialize! method defined by default
+initialize!(::AbstractSurfacePerturbation, ::PrimitiveEquation) = nothing
+
+export NoSurfacePerturbation
+
+"""Returns the surface temperature and humidity without
+perturbation from the lowermost layer."""
+struct NoSurfacePerturbation <: AbstractSurfacePerturbation end
+
+"""$(TYPEDSIGNATURES)
+Returns the surface temperature and humidity without
+perturbation from the lowermost layer. Used as a functor."""
+function (SP::NoSurfacePerturbation)(
+    column::ColumnVariables,
+    model::PrimitiveEquation,
+)
+    (; temp, humid, nlayers) = column
+    return temp[nlayers], humid[nlayers]
+end
+
+# only return temperature for primitive dry model
+function (SP::NoSurfacePerturbation)(
+    column::ColumnVariables,
+    model::PrimitiveDry,
+)
+    (; temp, nlayers) = column
+    return temp[nlayers]
+end
+
 abstract type AbstractConvection <: AbstractParameterization end
 
 export NoConvection
+
+"""Dummy type to disable convection."""
 struct NoConvection <: AbstractConvection end
 NoConvection(::SpectralGrid) = NoConvection()
 initialize!(::NoConvection, ::PrimitiveEquation) = nothing
@@ -8,12 +41,11 @@ convection!(::ColumnVariables, ::NoConvection, ::PrimitiveEquation) = nothing
 
 export SimplifiedBettsMiller
 
-"""
-The simplified Betts-Miller convection scheme from Frierson, 2007,
+"""The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1. This implements the qref-formulation
 in their paper. Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct SimplifiedBettsMiller{NF} <: AbstractConvection
+@kwdef struct SimplifiedBettsMiller{NF, SP} <: AbstractConvection
     "number of vertical layers"
     nlayers::Int
 
@@ -22,10 +54,23 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Relative humidity for reference profile"
     relative_humidity::NF = 0.7
+
+    "[OPTION] Surface perturbation of temp, humid to calculate the moist pseudo adiabat"
+    surface_temp_humid::SP  # don't specify default here but in generator below
 end
 
-SimplifiedBettsMiller(SG::SpectralGrid; kwargs...) = SimplifiedBettsMiller{SG.NF}(nlayers=SG.nlayers; kwargs...)
-initialize!(::SimplifiedBettsMiller, ::PrimitiveEquation) = nothing
+# generator function 
+function SimplifiedBettsMiller(
+    SG::SpectralGrid;
+    surface_temp_humid = NoSurfacePerturbation(),
+    kwargs...)
+    # type inference happens here as @kwdef only defines no/all types specified
+    return SimplifiedBettsMiller{SG.NF, typeof(surface_temp_humid)}(
+        nlayers=SG.nlayers; surface_temp_humid, kwargs...)
+end
+
+# nothing to initialize but maybe the surface temp/humid functor?
+initialize!(SBM::SimplifiedBettsMiller, model::PrimitiveEquation) = initialize!(SBM.surface_temp_humid, model)
 
 # function barrier for all AbstractConvection
 function convection!(
@@ -42,7 +87,7 @@ function convection!(
     model::PrimitiveWet,
 )
     convection!(column, scheme, model.clausius_clapeyron,
-                    model.geometry, model.planet, model.atmosphere, model.time_stepping)
+                    model.geometry, model.planet, model.atmosphere, model.time_stepping, model)
 end
 
 """
@@ -60,6 +105,7 @@ function convection!(
     planet::AbstractPlanet,
     atmosphere::AbstractAtmosphere,
     time_stepping::AbstractTimeStepper,
+    model::PrimitiveWet,
 ) where NF
 
     σ = geometry.σ_levels_full
@@ -74,8 +120,8 @@ function convection!(
     humid_ref_profile = column.b    # specific humidity [kg/kg] profile to adjust to
     
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
-    temp_parcel = temp[nlayers]
-    humid_parcel = humid[nlayers]
+    # force conversion to NF here
+    temp_parcel, humid_parcel = convert.(NF, SBM.surface_temp_humid(column, model))
     level_zero_buoyancy = pseudo_adiabat!(temp_ref_profile,
                                             temp_parcel, humid_parcel,
                                             temp_virt, geopot, pₛ, σ,
@@ -248,16 +294,28 @@ The simplified Betts-Miller convection scheme from Frierson, 2007,
 https://doi.org/10.1175/JAS3935.1 but with humidity set to zero.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct DryBettsMiller{NF} <: AbstractConvection
+@kwdef struct DryBettsMiller{NF, SP} <: AbstractConvection
     "number of vertical layers/levels"
     nlayers::Int
 
     "[OPTION] Relaxation time for profile adjustment"
     time_scale::Second = Hour(4)
+
+    "[OPTION] Surface perturbation of temp to calculate the dry adiabat"
+    surface_temp::SP    # don't set default here but in generator below
 end
 
-DryBettsMiller(SG::SpectralGrid; kwargs...) = DryBettsMiller{SG.NF}(nlayers=SG.nlayers; kwargs...)
-initialize!(::DryBettsMiller, ::PrimitiveEquation) = nothing
+# generator function
+function DryBettsMiller(
+    SG::SpectralGrid;
+    surface_temp = NoSurfacePerturbation(),
+    kwargs...)
+    # infer type here as @kwdef only defines constructors for no/all types specified
+    return DryBettsMiller{SG.NF, typeof(surface_temp)}(nlayers=SG.nlayers; surface_temp, kwargs...)
+end
+
+# nothing to initialize but maybe the surface temp functor?
+initialize!(DBM::DryBettsMiller, model::PrimitiveEquation) = initialize!(DBM.surface_temp, model)
 
 # function barrier to unpack model
 function convection!(
@@ -265,7 +323,8 @@ function convection!(
     scheme::DryBettsMiller,
     model::PrimitiveEquation,
 )
-    convection!(column, scheme, model.geometry, model.atmosphere)
+    # TODO check whether unpacking makes a performance difference? (it shouldn't?)
+    convection!(column, scheme, model.geometry, model.atmosphere, model)
 end
 
 """
@@ -281,6 +340,7 @@ function convection!(
     DBM::DryBettsMiller,
     geometry::Geometry,
     atmosphere::AbstractAtmosphere,
+    model::PrimitiveEquation,
 ) where NF
 
     σ = geometry.σ_levels_full
@@ -292,8 +352,12 @@ function convection!(
     temp_ref_profile = column.a     # temperature [K] reference profile to adjust to
 
     # CONVECTIVE CRITERIA AND FIRST GUESS RELAXATION
+    # force conversion to NF here, add "," to ignore additional returns like humidity
+    temp_parcel, = convert.(NF, DBM.surface_temp(column, model))
     level_zero_buoyancy = dry_adiabat!(temp_ref_profile,
-                                            temp, σ,
+                                            temp, 
+                                            temp_parcel,
+                                            σ,
                                             atmosphere)
 
     local PT::NF = 0        # precipitation due to coolinga
@@ -331,6 +395,7 @@ set to NaN instead and should be skipped in the relaxation."""
 function dry_adiabat!(
     temp_ref_profile::AbstractVector,
     temp_environment::AbstractVector,
+    temp_parcel::Real,
     σ::AbstractVector,
     atmosphere::AbstractAtmosphere,
 )
@@ -342,7 +407,6 @@ function dry_adiabat!(
         length(σ) == length(temp_environment) || throw(BoundsError)
 
     nlayers = length(temp_ref_profile)      # number of vertical levels
-    temp_parcel = temp_environment[nlayers] # parcel is at lowermost layer temperature
     temp_ref_profile .= NaN                 # reset profile from any previous calculation
     temp_ref_profile[nlayers] = temp_parcel    # start profile with parcel temperature
 

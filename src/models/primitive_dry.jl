@@ -4,14 +4,13 @@ export PrimitiveDryModel
 The PrimitiveDryModel contains all model components (themselves structs) needed for the
 simulation of the primitive equations without humidity. To be constructed like
 
-    model = PrimitiveDryModel(; spectral_grid, kwargs...)
+    model = PrimitiveDryModel(spectral_grid; kwargs...)
 
 with `spectral_grid::SpectralGrid` used to initalize all non-default components
 passed on as keyword arguments, e.g. `planet=Earth(spectral_grid)`. Fields, representing
 model components, are
 $(TYPEDFIELDS)"""
 @kwdef mutable struct PrimitiveDryModel{
-    # TODO add constraints again when we stop supporting julia v1.9
     DS,     # <:DeviceSetup,
     GE,     # <:AbstractGeometry,
     PL,     # <:AbstractPlanet,
@@ -22,6 +21,7 @@ $(TYPEDFIELDS)"""
     AC,     # <:AbstractAdiabaticConversion,
     PA,     # <:AbstractParticleAdvection,
     IC,     # <:AbstractInitialConditions,
+    RP,     # <:AbstractRandomProcess,
     LS,     # <:AbstractLandSeaMask,
     OC,     # <:AbstractOcean,
     LA,     # <:AbstractLand,
@@ -34,8 +34,10 @@ $(TYPEDFIELDS)"""
     SUW,    # <:AbstractSurfaceWind,
     SH,     # <:AbstractSurfaceHeatFlux,
     CV,     # <:AbstractConvection,
+    OD,     # <:AbstractOpticalDepth,
     SW,     # <:AbstractShortwave,
     LW,     # <:AbstractLongwave,
+    SP,     # <:AbstractStochasticPhysics,
     TS,     # <:AbstractTimeStepper,
     ST,     # <:SpectralTransform{NF},
     IM,     # <:AbstractImplicit,
@@ -58,6 +60,7 @@ $(TYPEDFIELDS)"""
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(PrimitiveDry)
+    random_process::RP = NoRandomProcess()
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
@@ -76,8 +79,10 @@ $(TYPEDFIELDS)"""
     surface_wind::SUW = SurfaceWind(spectral_grid)
     surface_heat_flux::SH = SurfaceHeatFlux(spectral_grid)
     convection::CV = DryBettsMiller(spectral_grid)
+    optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = NoShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
+    stochastic_physics::SP = StochasticallyPerturbedParameterizationTendencies(spectral_grid)
     
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -111,6 +116,7 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.coriolis, model)
     initialize!(model.geopotential, model)
     initialize!(model.adiabatic_conversion, model)
+    initialize!(model.random_process, model)
 
     # boundary conditionss
     initialize!(model.orography, model)
@@ -124,11 +130,14 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     initialize!(model.boundary_layer_drag, model)
     initialize!(model.temperature_relaxation, model)
     initialize!(model.vertical_diffusion, model)
+    initialize!(model.convection, model)
+    initialize!(model.optical_depth, model)
     initialize!(model.shortwave_radiation, model)
     initialize!(model.longwave_radiation, model)
     initialize!(model.surface_thermodynamics, model)
     initialize!(model.surface_wind, model)
     initialize!(model.surface_heat_flux, model)
+    initialize!(model.stochastic_physics, model)
 
     # initial conditions
     prognostic_variables = PrognosticVariables(spectral_grid, model)
@@ -137,15 +146,16 @@ function initialize!(model::PrimitiveDry; time::DateTime = DEFAULT_DATE)
     clock.time = time       # set the current time
     clock.start = time      # and store the start time
     
-    diagnostic_variables = DiagnosticVariables(spectral_grid)
+    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
     
     # particle advection
     initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
 
-    # initialize ocean and land and synchronize clocks
-    initialize!(prognostic_variables.ocean, time, model)
+    # initialize ocean and land
+    initialize!(prognostic_variables.ocean, prognostic_variables, diagnostic_variables, model)
     initialize!(prognostic_variables.land,  prognostic_variables, diagnostic_variables, model)
 
+    # pack prognostic, diagnostic variables and model into a simulation
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end

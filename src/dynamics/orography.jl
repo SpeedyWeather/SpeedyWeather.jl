@@ -28,6 +28,24 @@ end
 # no further initialization needed
 initialize!(::NoOrography, ::AbstractModel) = nothing
 
+# set orography with grid, scalar, function
+function set!(
+    orography::AbstractOrography,
+    v,                                      # new orography, function, scalar, grid, ...
+    geometry::Geometry,
+    spectral_transform::SpectralTransform;
+    gravity = DEFAULT_GRAVITY,
+    add::Bool = false,
+)
+    set!(orography.orography, v, geometry, spectral_transform; add)
+
+    # now synchronize with geopotential in spectral space (used in primitive models)
+    transform!(orography.geopot_surf, orography.orography, spectral_transform)
+    orography.geopot_surf .*= gravity
+    spectral_truncation!(orography.geopot_surf)     # set the lmax+1 harmonics to zero
+    return nothing
+end
+
 export ZonalRidge
 
 """Zonal ridge orography after Jablonowski and Williamson, 2006.

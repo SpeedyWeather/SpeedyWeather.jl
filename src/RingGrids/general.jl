@@ -19,9 +19,8 @@ const AbstractGrid{T} = AbstractGridArray{T, 1, Vector{T}}
 (*Grid{T, N, ...} returns *Array) but without any parameters `{T, N, ArrayType}`"""
 nonparametric_type(grid::AbstractGridArray) = nonparametric_type(typeof(grid))
 
-# also needed for other array types
-nonparametric_type(::Type{Array}) = Array
-nonparametric_type(::Type{CUDA.CuArray}) = CuArray
+# also needed for other array types, defined in extensions
+nonparametric_type(::Type{<:Array}) = Array
 
 """$(TYPEDSIGNATURES) Full grid array type for `grid`. Always returns the N-dimensional `*Array`
 not the two-dimensional (`N=1`) `*Grid`. For reduced grids the corresponding full grid that
@@ -295,6 +294,12 @@ function get_nlons(Grid::Type{<:AbstractGridArray}, nlat_half::Integer; both_hem
     return [get_nlon_per_ring(Grid, nlat_half, j) for j in 1:n]
 end
 
+"""$(TYPEDSIGNATURES)
+Number of longitude points per latitude ring `j`."""
+function get_nlon_per_ring(grid::AbstractGridArray, j::Integer)
+    return get_nlon_per_ring(typeof(grid), grid.nlat_half, j)
+end
+
 ## ITERATORS
 """
 $(TYPEDSIGNATURES)
@@ -400,7 +405,7 @@ end
 
 """$(TYPEDSIGNATURES) UnitRange to access data on grid `grid` on ring `j`."""
 function each_index_in_ring(grid::Grid, j::Integer) where {Grid<:AbstractGridArray}
-    return each_index_in_ring(Grid, j, grid.nlat_half)
+    return grid.rings[j]
 end
 
 """ $(TYPEDSIGNATURES) UnitRange to access each horizontal grid point on grid `grid`.
@@ -477,10 +482,10 @@ AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{1}) where {ArrayType, Grid} 
 AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{4}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{4, ArrayType, Grid}()
 AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
     
-function GPUArrays.backend(
-    ::Type{Grid}
+function KernelAbstractions.get_backend(
+    g::Grid
 ) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
-    return GPUArrays.backend(ArrayType)
+    return KernelAbstractions.get_backend(g.data)
 end
 
 function Base.similar(

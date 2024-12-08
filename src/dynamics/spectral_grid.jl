@@ -67,6 +67,8 @@ $(TYPEDFIELDS)
     vertical_coordinates::VerticalCoordinates = SigmaCoordinates(; nlayers)
 
     # ARRAY TYPES (horizontal dimension in grid/spectral is flattened to 1D)
+    VectorType::Type{<:AbstractVector} = ArrayType{NF, 1}
+    MatrixType::Type{<:AbstractMatrix} = ArrayType{NF, 2}
     SpectralVariable2D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}}
     SpectralVariable3D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 2, ArrayType{Complex{NF}, 2}}
     SpectralVariable4D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 3, ArrayType{Complex{NF}, 3}}
@@ -82,29 +84,30 @@ function Base.show(io::IO, SG::SpectralGrid)
     (; ntracers, nparticles) = SG
 
     # resolution information
-    res_ave = sqrt(4π*radius^2/npoints)/1000  # in [km]
+    average_resolution = sqrt(4π*radius^2/npoints)/1000  # in [km]
     s(x) = x > 1000 ? @sprintf("%i", x) : @sprintf("%.3g", x)
 
     println(io, "$(typeof(SG)):")
     println(io, "├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
     println(io, "├ Grid:       $nlat-ring $Grid{$NF}, $npoints grid points")
-    println(io, "├ Resolution: $(s(res_ave))km (average)")
-    ntracers > 0 &&
-    println(io, "├ Tracers:    $ntracers")
+    println(io, "├ Resolution: $(s(average_resolution))km (average)")
     nparticles > 0 &&
     println(io, "├ Particles:  $nparticles")
+    ntracers > 0 &&
+    println(io, "├ Tracers:    $ntracers")
     println(io, "├ Vertical:   $nlayers-layer $(typeof(vertical_coordinates))")
       print(io, "└ Device:     $(typeof(device)) using $ArrayType")
 end
+
+# also allow spectral grid to be passed on as first an only positional argument to model constructors
+(M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(spectral_grid=SG; kwargs...)
 
 """
 $(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""
 function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
-                                            recompute_legendre::Bool = false,
                                             one_more_degree::Bool = true,
                                             kwargs...)
-    (; NF, Grid, trunc, dealiasing) = spectral_grid
-    return SpectralTransform(NF, Grid, trunc+one_more_degree, trunc; recompute_legendre, dealiasing, kwargs...)
+    (; NF, Grid, trunc, nlat_half, nlayers, ArrayType) = spectral_grid
+    return SpectralTransform(NF, trunc+one_more_degree, trunc, nlat_half; Grid, ArrayType, nlayers, kwargs...)
 end
-

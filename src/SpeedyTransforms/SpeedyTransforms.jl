@@ -14,8 +14,6 @@ import Primes
 using ..LowerTriangularMatrices
 using ..RingGrids
 
-const DEFAULT_GRID = FullGaussianGrid
-
 # TRANSFORM
 export  SpectralTransform,
         transform!,
@@ -37,12 +35,17 @@ export  curl,
 # TRUNCATION
 export  spectral_truncation,
         spectral_truncation!,
-        spectral_interpolation,
-        power_spectrum
+        spectral_interpolation
+
+# ANALYSIS
+export  power_spectrum
 
 include("aliasing.jl")
 include("legendrepolarray.jl")
+include("legendre_shortcuts.jl")
 include("spectral_transform.jl")
+include("fourier.jl")
+include("legendre.jl")
 include("spectral_gradients.jl")
 include("spectral_truncation.jl")
 include("spectrum.jl")

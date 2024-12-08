@@ -6,31 +6,32 @@ export Feedback
 Feedback struct that contains options and object for command-line feedback
 like the progress meter.
 $(TYPEDFIELDS)"""
-mutable struct Feedback <: AbstractFeedback
-    "print feedback to REPL?"
-    verbose::Bool            
+@kwdef mutable struct Feedback <: AbstractFeedback
+    "print feedback to REPL?, default is isinteractive(), true in interactive REPL mode"
+    verbose::Bool = isinteractive()
 
     "check for NaRs in the prognostic variables"
-    debug::Bool
+    debug::Bool = true
     
-    "write a progress.txt file? State synced with OutputWriter.output"
-    output::Bool
+    "write a progress.txt file? State synced with NetCDFOutput.output"
+    output::Bool = false
 
     "identification of run, taken from ::OutputWriter"
-    id::Union{String, Int}
+    id::String = ""
 
     "path to run folder, taken from ::OutputWriter"
-    run_path::String
+    run_path::String = ""
 
     # PROGRESS
     "struct containing everything progress related"
-    progress_meter::ProgressMeter.Progress
+    progress_meter::ProgressMeter.Progress =
+        ProgressMeter.Progress(1, enabled=verbose, showspeed=true; desc="Weather is speedy: ")
 
     "txt is a Nothing in case of no output"
-    progress_txt::Union{IOStream, Nothing}   
+    progress_txt::Union{IOStream, Nothing} = nothing
 
     "did Infs/NaNs occur in the simulation?"
-    nars_detected::Bool                     
+    nars_detected::Bool = false
 end
 
 function Base.show(io::IO, F::AbstractFeedback)
@@ -43,30 +44,6 @@ function Base.show(io::IO, P::ProgressMeter.Progress)
     println(io, "$(typeof(P)) <: ProgressMeter.AbstractProgress")
     keys = propertynames(P)
     print_fields(io, P, keys)
-end
-
-"""
-$(TYPEDSIGNATURES)
-Generator function for a Feedback struct."""
-function Feedback(verbose::Bool=true, debug::Bool=true)
-    
-    # the following are synced with OutputWriter in
-    # initialize!(::OutputWriter, ...) to avoid folder-race conditions
-    output = false
-    id = ""             
-    run_path = ""
-
-    # PROGRESSMETER     
-    # show progress meter via `enabled` through verbose parameter, initialize only for 1 time step
-    desc = "Weather is speedy: "
-    progress_meter = ProgressMeter.Progress(1, enabled=verbose, showspeed=true; desc)
-    progress_txt = nothing          # initialize with nothing, initialize in initialize!(::Feedback, ...)
-
-    nars_detected = false
-    return Feedback(verbose, debug,
-                    output, id, run_path,
-                    progress_meter, progress_txt,
-                    nars_detected)
 end
 
 """
@@ -85,7 +62,7 @@ function initialize!(feedback::Feedback, clock::Clock, model::AbstractModel)
         (; run_path, id) = feedback
         SG = model.spectral_grid
         L = model.time_stepping
-        days = clock.period.value/(3600*24)
+        days = Second(clock.period).value/(3600*24)
         
         # create progress.txt file in run_????/
         progress_txt = open(joinpath(run_path, "progress.txt"), "w")
@@ -142,7 +119,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Finalises the progress meter and the progress txt file."""
-function finish!(F::Feedback)
+function finalize!(F::Feedback)
     ProgressMeter.finish!(F.progress_meter)
     
     if F.output     # write final progress to txt file

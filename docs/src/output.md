@@ -17,7 +17,7 @@ which are explained in the following. By default, the `NetCDFOutput` is created 
 the model, i.e.
 
 ```@example netcdf
-model = ShallowWaterModel(;spectral_grid)
+model = ShallowWaterModel(spectral_grid)
 model.output
 ```
 
@@ -28,7 +28,7 @@ But any `NetCDFOutput` can be passed onto the model constructor with the `output
 
 ```@example netcdf
 output = NetCDFOutput(spectral_grid, Barotropic)
-model = ShallowWaterModel(; spectral_grid, output=output)
+model = ShallowWaterModel(spectral_grid, output=output)
 nothing # hide
 ```
 
@@ -43,7 +43,7 @@ trigger it as `output=false` is the default here.
 If we want to increase the frequency of the output we can choose `output_dt` (default `=Hour(6)`) like so
 ```@example netcdf
 output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
-model = ShallowWaterModel(; spectral_grid, output=output)
+model = ShallowWaterModel(spectral_grid, output=output)
 model.output
 ```
 which will now output every hour. It is important to pass on the new output writer `output` to the
@@ -60,7 +60,7 @@ seconds. Depending on the output frequency (we chose `output_dt = Hour(1)` above
 this will be slightly adjusted during model initialization:
 ```@example netcdf
 output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
-model = ShallowWaterModel(; spectral_grid, time_stepping, output)
+model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)
 model.time_stepping.Δt_sec
 ```
@@ -75,14 +75,13 @@ time_stepping.Δt_sec
 and a little info will be printed to explain that even though you wanted
 `output_dt = Hour(1)` you will not actually get this upon initialization:
 ```@example netcdf
-model = ShallowWaterModel(; spectral_grid, time_stepping, output)
+model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)
 ```
 
 The time axis of the NetCDF output will now look like
 ```@example netcdf
 using NCDatasets
-model.feedback.verbose = false # hide
 run!(simulation, period=Day(1), output=true)
 id = model.output.id
 ds = NCDataset("run_$id/output.nc")
@@ -92,7 +91,7 @@ which is a bit ugly, that's why `adjust_with_output=true` is the default. In tha
 ```@example netcdf
 time_stepping = Leapfrog(spectral_grid, adjust_with_output=true)
 output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
-model = ShallowWaterModel(; spectral_grid, time_stepping, output)
+model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)
 run!(simulation, period=Day(1), output=true)
 id = model.output.id

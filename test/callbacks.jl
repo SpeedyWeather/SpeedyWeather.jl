@@ -77,11 +77,11 @@ end
         callback.maximum_surface_wind_speed[i] = max_2norm(u_grid, v_grid)
     end
 
-    SpeedyWeather.finish!(::StormChaser, args...) = nothing
+    SpeedyWeather.finalize!(::StormChaser, args...) = nothing
 
     spectral_grid = SpectralGrid()
     callbacks = CallbackDict(NoCallback())
-    model = PrimitiveWetModel(; spectral_grid, callbacks)
+    model = PrimitiveWetModel(spectral_grid; callbacks)
     
     storm_chaser = StormChaser(spectral_grid)
     key = :storm_chaser

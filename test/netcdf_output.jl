@@ -7,7 +7,7 @@ using NCDatasets, Dates
     for Grid in (FullGaussianGrid, FullClenshawGrid, OctahedralGaussianGrid, OctahedralClenshawGrid, HEALPixGrid, OctaHEALPixGrid)
         spectral_grid = SpectralGrid(nlayers=1)
         output = NetCDFOutput(spectral_grid, path=tmp_output_path)
-        model = BarotropicModel(; spectral_grid, output)
+        model = BarotropicModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
         @test simulation.model.feedback.nars_detected == false
@@ -33,7 +33,7 @@ end
     for output_NF in (Float32, Float64)
         spectral_grid = SpectralGrid(nlayers=1)
         output = NetCDFOutput(spectral_grid, ShallowWater, path=tmp_output_path; output_NF)
-        model = ShallowWaterModel(; spectral_grid, output)
+        model = ShallowWaterModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
         @test simulation.model.feedback.nars_detected == false
@@ -80,7 +80,7 @@ end
     for nlat_half in (24, 32, 48, 64)
         spectral_grid = SpectralGrid(nlayers=8)
         output = NetCDFOutput(spectral_grid, ShallowWater, path=tmp_output_path; nlat_half)
-        model = PrimitiveDryModel(; spectral_grid, output)
+        model = PrimitiveDryModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
         @test simulation.model.feedback.nars_detected == false
@@ -105,7 +105,7 @@ end
     spectral_grid = SpectralGrid(nlayers=8)
     for output_dt in (Hour(1), Minute(120), Hour(3), Hour(6), Day(1))
         output = NetCDFOutput(spectral_grid, PrimitiveWet, path=tmp_output_path; output_dt)
-        model = PrimitiveWetModel(; spectral_grid, output)
+        model = PrimitiveWetModel(spectral_grid; output)
         simulation = initialize!(model)
         run!(simulation, output=true; period)
         @test simulation.model.feedback.nars_detected == false
@@ -123,7 +123,7 @@ end
 
     # test outputting other model defaults
     output = NetCDFOutput(spectral_grid, Barotropic, path=tmp_output_path)
-    model = PrimitiveWetModel(; spectral_grid, output)
+    model = PrimitiveWetModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output=true; period)
     @test simulation.model.feedback.nars_detected == false
@@ -138,12 +138,12 @@ end
 
     spectral_grid = SpectralGrid()
     output = NetCDFOutput(spectral_grid, PrimitiveDry, path=tmp_output_path, id="restart-test")
-    model = PrimitiveDryModel(; spectral_grid, output)
+    model = PrimitiveDryModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output=true; period=Day(1))
 
     initial_conditions = StartFromFile(path=tmp_output_path, id="restart-test")
-    model_new = PrimitiveDryModel(; spectral_grid, initial_conditions)
+    model_new = PrimitiveDryModel(spectral_grid; initial_conditions)
     simulation_new = initialize!(model_new)
 
     progn_old = simulation.prognostic_variables
@@ -170,7 +170,7 @@ end
     
     spectral_grid = SpectralGrid()
     output = NetCDFOutput(spectral_grid, PrimitiveDry, path=tmp_output_path, id="dense-output-test", output_dt=Hour(0))
-    model = PrimitiveDryModel(; spectral_grid, output)
+    model = PrimitiveDryModel(spectral_grid; output)
     simulation = initialize!(model)
     run!(simulation, output=true; period=Day(1))
     
@@ -182,7 +182,7 @@ end
     # do a simulation with the adjust_Δt_with_output turned on 
     output = NetCDFOutput(spectral_grid, PrimitiveDry, path=tmp_output_path, id="adjust_dt_with_output-test", output_dt=Minute(70))
     time_stepping = Leapfrog(spectral_grid, adjust_with_output=true)
-    model = PrimitiveDryModel(; spectral_grid, output, time_stepping)
+    model = PrimitiveDryModel(spectral_grid; output, time_stepping)
     simulation = initialize!(model)
     run!(simulation, output=true; period=Day(1))
     t = SpeedyWeather.load_trajectory("time", model)
@@ -196,7 +196,7 @@ end
     spectral_grid = SpectralGrid()
     time_stepping = Leapfrog(spectral_grid, Δt_at_T31=Day(3650))
     output = NetCDFOutput(spectral_grid, PrimitiveDry, path=tmp_output_path, id="long-output-test", output_dt=Day(3650))
-    model = PrimitiveDryModel(; spectral_grid, output, time_stepping)
+    model = PrimitiveDryModel(spectral_grid; output, time_stepping)
     simulation = initialize!(model)
     run!(simulation, output=true, period=Day(365000))
 

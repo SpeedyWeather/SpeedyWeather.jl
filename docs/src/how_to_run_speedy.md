@@ -93,7 +93,7 @@ however, a new user might first want to know which components there are,
 so let's flip the logic around and assume you know you want to run a `ShallowWaterModel`.
 You can create a default `ShallowWaterModel` like so and inspect its components
 ```@example howto
-model = ShallowWaterModel(; spectral_grid)
+model = ShallowWaterModel(spectral_grid)
 ```
 
 So by default the `ShallowWaterModel` uses a [Leapfrog `time_stepping`](@ref leapfrog),
@@ -124,7 +124,7 @@ on the components (they are keyword arguments so either use `; time_stepping`
 for which the naming must match, or `time_stepping=my_time_stepping` with
 any name)
 ```@example howto
-model = ShallowWaterModel(; spectral_grid, time_stepping)
+model = ShallowWaterModel(spectral_grid; time_stepping)
 ```
 This logic continues for all model components, see [Examples](@ref Examples).
 All model components are also subtype (i.e. `<:`) of some abstract supertype,
@@ -157,9 +157,9 @@ parameterizations. Conceptually you construct these different models with
 spectral_grid = SpectralGrid(trunc=..., ...)
 component1 = SomeComponent(spectral_grid, parameter1=..., ...)
 component2 = SomeOtherComponent(spectral_grid, parameter2=..., ...)
-model = BarotropicModel(; spectral_grid, all_other_components..., ...)
+model = BarotropicModel(spectral_grid; all_other_components..., ...)
 ```
-or `model = ShallowWaterModel(; spectral_grid, ...)`, etc.
+or `model = ShallowWaterModel(spectral_grid; ...)`, etc.
 
 ## [Model initialization](@id initialize)
 
@@ -215,8 +215,10 @@ is to run the simulation.
 ```@example howto
 run!(simulation)
 ```
-By default this runs for 10 days without output. These are the options left
-to change, so with
+By default this runs for 10 days without output and returns a
+[unicode plot](https://github.com/JuliaPlots/UnicodePlots.jl)
+of surface relative vorticity (see [Shallow water with mountains](@ref) for more
+on this). Now `period` and `output` are the only options to change, so with
 ```@example howto
 model.output.id = "test" # hide
 run!(simulation, period=Day(5), output=true)

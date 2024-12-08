@@ -112,8 +112,7 @@ Let us start by generating some data
 spectral_grid = SpectralGrid(trunc=31, nlayers=1)
 forcing = SpeedyWeather.JetStreamForcing(spectral_grid)
 drag = QuadraticDrag(spectral_grid)
-model = ShallowWaterModel(; spectral_grid, forcing, drag)
-model.feedback.verbose = false # hide
+model = ShallowWaterModel(spectral_grid; forcing, drag)
 simulation = initialize!(model);
 run!(simulation, period=Day(30))
 nothing # hide
@@ -122,7 +121,7 @@ nothing # hide
 Now pretend you only have `u, v` to get vorticity (which is actually the prognostic variable in the model,
 so calculated anyway...).
 ```@example gradient
-u = simulation.diagnostic_variables.grid.u_grid[:, 1]
+u = simulation.diagnostic_variables.grid.u_grid[:, 1]   # [:, 1] for 1st layer
 v = simulation.diagnostic_variables.grid.v_grid[:, 1]
 vor = curl(u, v, radius = spectral_grid.radius)
 nothing # hide
@@ -215,7 +214,8 @@ nothing # hide
 ![Ageostrophic eta](eta_ageostrophic.png)
 
 Strikingly similar! The remaining differences are the ageostrophic motions but
-also note that the mean is off. This is because geostrophy only use/defines the gradient
+also note that the mean can be off. This is because geostrophy only use/defines the gradient
 of ``\eta`` not the absolute values itself. Our geostrophic ``\eta_g`` has by construction
 a mean of zero (that is how we define the inverse Laplace operator) but the actual ``\eta``
-is some 1400m higher.
+can be higher or lower depending on the mass/volume in the shallow water system, see
+[Mass conservation](@ref).

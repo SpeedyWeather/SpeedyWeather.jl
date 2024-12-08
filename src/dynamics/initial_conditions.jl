@@ -293,6 +293,60 @@ function initialize!(   progn::PrognosticVariables{NF},
     return nothing
 end
 
+export RossbyHaurwitzWave
+
+"""Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
+with an additional cut-off amplitude `c` to filter out tiny harmonics in the vorticity field.
+Parameters are $(TYPEDFIELDS)"""
+@kwdef struct RossbyHaurwitzWave <: AbstractInitialConditions
+    m::Int = 4
+    ω::Float64 = 7.848e-6
+    K::Float64 = 7.848e-6
+    c::Float64 = 1e-10
+end
+
+"""$(TYPEDSIGNATURES)
+Rossby-Haurwitz wave initial conditions as in Williamson et al. 1992, J Computational Physics
+with an additional cut-off amplitude `c` to filter out tiny harmonics in the vorticity field."""
+function initialize!(
+    progn::PrognosticVariables,
+    initial_conditions::RossbyHaurwitzWave,
+    model::AbstractModel,
+)
+    (; m, ω, K, c) = initial_conditions
+    (; geometry) = model
+    Ω = model.planet.rotation
+    R = model.spectral_grid.radius
+    g = model.planet.gravity
+
+    # Rossby-Haurwitz wave defined through vorticity ζ as a function of
+    # longitude λ, latitude θ (in degrees), sigma level σ (vertically constant though)
+    # see Williamson et al. 1992, J Computational Physics, eq 145
+    ζ(λ, θ, σ) = 2ω*sind(θ) - K*sind(θ)*cosd(θ)^m*(m^2 + 3m + 2)*cosd(m*λ)
+    # see Williamson et al. 1992, J Computational Physics, eq 147 - 149, 146
+    A(λ, θ) = ω/2 * (2Ω+ω)*cosd(θ)^2 + K^2/4*cosd(θ)^(2m)*((m+1)*cosd(θ)^2 + (2m^2-m-2) - 2m^2/(cosd(θ)^2))
+    B(λ, θ) = (2(Ω+ω)*K)/((m+1)*(m+2))*cosd(θ)^m*( (m^2+2m+2) - (m+1)^2*cosd(θ)^2 )
+    C(λ, θ) = K^2/4*cosd(θ)^(2m)*((m+1) * cosd(θ)^2 - (m + 2))
+
+    η(λ, θ) = R^2/g*(A(λ,θ) + B(λ,θ)*cosd(m*λ) + C(λ,θ)*cosd(2m*λ))
+
+    set!(progn, geometry, vor = ζ)
+    model isa ShallowWater && set!(progn, geometry, pres = η)
+    set!(progn, geometry, div = 0)  # technically not needed, but set to zero for completeness
+
+    # filter low values below cutoff amplitude c
+    vor = progn.vor[1]  # 1 = first leapfrog timestep
+    low_values = abs.(vor) .< c
+    vor[low_values] .= 0
+    if model isa ShallowWater
+        pres = progn.pres[1]
+        low_value = abs.(pres) .< c
+        pres[low_value] .= 0
+    end
+
+    return nothing
+end
+
 export JablonowskiTemperature
 
 """
@@ -426,7 +480,7 @@ function homogeneous_temperature!(  progn::PrognosticVariables,
 
     # SURFACE TEMPERATURE (store in k = nlayers, but it's actually surface, i.e. k=nlayers+1/2)
     # overwrite with lowermost layer further down
-    temp_surf = progn.temp[1][:,end]     # spectral temperature at k=nlev+1/2
+    temp_surf = progn.temp[1][:,end]     # spectral temperature at k=nlayers+1/2
 
     temp_surf[1] = norm_sphere*temp_ref                 # set global mean surface temperature
     for lm in eachharmonic(geopot_surf, temp_surf)
@@ -543,7 +597,7 @@ $(TYPEDFIELDS)"""
     # random interface displacement field
     A::Float64 = 2000       # amplitude [m]
     lmin::Int64 = 10        # minimum wavenumber
-    lmax::Int64 = 20        # maximum wavenumber
+    lmax::Int64 = 30        # maximum wavenumber
 end
 
 RandomWaves(S::SpectralGrid; kwargs...) = RandomWaves(;kwargs...) 
@@ -560,11 +614,15 @@ function initialize!(   progn::PrognosticVariables{NF},
     (; A, lmin, lmax) = initial_conditions
     (; trunc) = progn
 
-    η = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+    # start with matrix to have matrix indexing
+    ηm = randn(Complex{NF}, trunc+2, trunc+1)
 
     # zero out other wavenumbers
-    η[1:min(lmin, trunc+2), :] .= 0
-    η[min(lmax+2, trunc+2):trunc+2, :] .= 0
+    ηm[1:min(lmin, trunc+2), :] .= 0
+    ηm[min(lmax+2, trunc+2):trunc+2, :] .= 0
+
+    # convert to LowerTriangularMatrix with vector indexing
+    η = LowerTriangularArray(ηm)
 
     # scale to amplitude
     η_grid = transform(η, model.spectral_transform)

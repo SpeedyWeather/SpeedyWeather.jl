@@ -58,7 +58,7 @@ and interpolate the orography which happens at the `initialize!`
 step. Visualised with
 
 ```@example orography
-model = PrimitiveDryModel(;spectral_grid, orography)
+model = PrimitiveDryModel(spectral_grid; orography)
 initialize!(orography, model)   # happens also in simulation = initialize!(model)
 
 using CairoMakie
@@ -98,7 +98,8 @@ the orography itself need to come on one of the full grids
 SpeedyWeather defines, i.e. `FullGaussianGrid` or `FullClenshawGrid`
 (a regular lat-lon grid, see [FullClenshawGrid](@ref FullClenshawGrid)),
 which you can specify. Best to inspect the correct orientation with
-`plot(mars_orography.orography)` (where the first is whatever name you chose here).
+`plot(mars_orography.orography)` (or `heatmap` after `using CairoMakie`;
+the scope `mars_orography.` is whatever name you chose here).
 You can use smoothing as above.
 
 ## Changing orography manually
@@ -106,36 +107,117 @@ You can use smoothing as above.
 You can also change orography manually, that means by mutating the elements
 in either `orography.orography` (to set it for the shallow-water model)
 or `orography.geopot_surf` (for the primitive equations, but this is in
-spectral space, advanced!). After the orography has been initialised
-(for testing to `initialize!(orography, model)` but in most cases when 
-you do `simulation = initialize!(model)`), for example you can do
+spectral space, advanced!). This should be done _after_ the orography has been
+initialised which will overwrite these arrays (again).
+You can just initialize orography with `initialize!(orography, model)`
+but that also automatically happens in `simulation = initialize!(model)`.
+Orography is just stored as an array, so you can do things like
+`sort!(orography.orography)` (sorting all mountains towards the south pole).
+But for most practical purposes, the `set!` function
+is more convenient, for example you can do
 
 ```@example orography
-sort!(orography.orography)
+set!(model, orography=(λ,φ) -> 2000*cosd(φ) + 300*sind(λ) + 100*randn())
+
+using CairoMakie
+heatmap(model.orography.orography, title="Zonal 2000m ridge [m] with noise")
+save("orography_set.png", ans) # hide
 nothing # hide
 ```
+![Orography with set!](orography_set.png)
 
-to move all mountains to the south pole, or
+passing on a function with arguments longitude (0 to 360˚E in that unit,
+so use `cosd`, `sind` etc.) and latitude (-90 to 90˚N).
+But note that while `model.orography` is still of type `EarthOrography`
+we have now muted the arrays within - so do not be confused that it is
+not the Earth's orography anymore.
+
+The `set!` function automatically propagates the grid array in
+`orography.orography` to spectral space in `orography.geopot_surf`
+to synchronize those two arrays that are supposed to hold essentially
+the same information just one in grid the other in spectral space.
+`set!` also allows for the `add` keyword, making it possible to
+add (or remove) mountains, e.g. imagine Hawaii would suddenly increase
+massively in size, covering a 5˚x5˚ area with a 4000m "peak"
+(given that horizontal extent it is probably more a mountain range...)
 
 ```@example orography
-orography.orography[1] = 100
-```
+model.orography = EarthOrography(spectral_grid)     # reset orography
+initialize!(model.orography, model)                 # initially that reset orography
 
-to set the grid point `1` (at 0˚E, on the first ring around the north pole)
-to a height of 100m. Whichever way you tweak the orography manually
-you want to reflect this in the surface geopotential `geopot_surf` which is
-used in the primitive equations by
+# blow up Hawaii by adding a 4000m peak on a 10˚x10˚ large island
+H, λ₀, φ₀, σ = 4000, 200, 20, 5         # height, lon, lat position, and width
+set!(model, orography=(λ,φ) -> H*exp((-(λ-λ₀)^2 - (φ-φ₀)^2)/2σ^2), add=true)
+heatmap(model.orography.orography, title="Super Hawaii orography [m]")
+save("orography_hawaii.png", ans) # hide
+nothing # hide
+```
+![Orography with super Hawaii](orography_hawaii.png)
+
+If you don't use `set!`, you want to reflect any changes to `orography.orography`
+in the surface geopotential `orography.geopot_surf`
+(which is used in the primitive equations) manually by
 
 ```@example orography
 transform!(orography.geopot_surf, orography.orography, model.spectral_transform)
 orography.geopot_surf .*= model.planet.gravity
 spectral_truncation!(orography.geopot_surf)
+nothing # hide
 ```
 
 In the first line, the surface geopotential is still missing the gravity,
 which is multiplied in the second line. The `spectral_truncation!`
-only removes the ``l_{max}+1`` degree of the spherical harmonics that
-scalar fields do not use, see [One more degree for spectral fields](@ref).
+removes the ``l_{max}+1`` degree of the spherical harmonics
+as illustrated in the spectral representation or the surface geopotential
+here. This is because scalar fields do not use that last degree,
+see [One more degree for spectral fields](@ref).
+
+## Spherical distance
+
+In the example above we have defined the "Super Hawaii orography" as
+
+```julia
+orography=(λ,φ) -> H*exp((-(λ-λ₀)^2 - (φ-φ₀)^2)/2σ^2)
+```
+
+note however, that this approximates the distance on the sphere with
+Cartesian coordinates which is here not too bad as we are not too far north
+(where longitudinal distances would become considerably shorter) and also as
+we are far away from the prime meridian. If ``\lambda_0 = 0`` in the example
+above then calculating ``\lambda - \lambda_0`` for ``\lambda = 359˚E``
+yields a really far distance even though ``\lambda`` is actually relatively close to
+the prime meridian. To avoid this problem, SpeedyWeather (actually RingGrids)
+defines a function called `spherical_distance` (inputs in degrees, output in meters) to actually
+calculate the [great-circle distance](https://en.wikipedia.org/wiki/Great-circle_distance)
+or spherical distance. Compare
+
+```@example orography
+λ₀ = 0         # move "Super Hawaii" mountain onto the prime meridian
+set!(model, orography=(λ,φ) -> H*exp((-(λ-λ₀)^2 - (φ-φ₀)^2)/2σ^2))
+heatmap(model.orography.orography, title="Mountain [m] on prime meridian, cartesian coordinates")
+save("mountain_cartesian.png", ans) # hide
+nothing # hide
+```
+![Mountain in cartesian coordinates](mountain_cartesian.png)
+
+which clearly shows that the mountain is only on the Eastern hemisphere
+-- probably not what you wanted. Note also that because we did not provide
+`add=true` the orography we set through `set!` overwrites the previous
+orography (`add=false` is the default). Rewrite this as
+
+```@example orography
+λ₀ = 0         # move "Super Hawaii" mountain onto the prime meridian
+set!(model, orography=(λ,φ) -> H*exp(-spherical_distance((λ,φ), (λ₀,φ₀), radius=360/2π)^2/2σ^2))
+heatmap(model.orography.orography, title="Mountain [m] on prime meridian, spherical distance")
+save("mountain_spherical.png", ans) # hide
+nothing # hide
+```
+![Mountain in spherical coordinates](mountain_spherical.png)
+
+And the mountain also shows up on the western hemisphere! Note that we could have defined
+the width ``\sigma`` of the mountain in meters, or we keep using degrees as before
+but then use `radius = 360/2π` to convert radians into degrees. If you set `radius=1`
+then radians are returned and so we could have defined ``\sigma`` in terms of radians too.
 
 ## Defining a new orography type
 
@@ -168,7 +250,7 @@ but then it cannot be used for primitive equations.
 
 ```@example orography
 function SpeedyWeather.initialize!(
-    orog::MyOrography,      # first argument as to be ::MyOrography, i.e. your new type
+    orog::MyOrography,         # first argument as to be ::MyOrography, i.e. your new type
     model::AbstractModel,      # second argument, use anything from model read-only
 )
     (; orography, geopot_surf) = orog   # unpack

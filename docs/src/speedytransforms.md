@@ -129,9 +129,7 @@ S = SpectralTransform(spectral_grid)
 Note that because we chose `dealiasing=3` (cubic truncation) we now match a T5 spectral field
 with a 12-ring octahedral Gaussian grid, instead of the 8 rings as above. So going from
 `dealiasing=2` (default) to `dealiasing=3` increased our resolution on the grid while the
-spectral resolution remains the same. The `SpectralTransform` also has options for the
-recomputation or pre-computation of the Legendre polynomials, fore more information see
-[(P)recompute Legendre polynomials](@ref).
+spectral resolution remains the same.
 
 Passing on `S` the `SpectralTransform` now allows us to transform directly on the grid
 defined therein. Note that we recreate `alms` to be of size 7x6 instead of 6x6 for T5
@@ -173,6 +171,43 @@ As you can see the `7x6 LowerTriangularMatrix` in the description above dropped 
 `6x6 LowerTriangularMatrix`, this is the size of the input that is expected (otherwise
 you will get a `BoundsError`).
 
+## `SpectralTransform` generators
+
+While you can always create a `SpectralTransform` from a `SpectralGrid` (which defines
+both spectral and grid space) there are other constructors/generators available:
+
+```@example speedytransforms
+SpectralTransform(alms)
+```
+
+Now we have defined the resolution of the spectral space through `alms` but create
+a `SpectralTransform` by making assumption about the grid space. E.g. `Grid=FullGaussianGrid`
+by default, `dealiasing=2` and `nlat_half` correspondingly. But you can also pass them
+on as keyword arguments, for example
+
+```@example speedytransforms
+SpectralTransform(alms, Grid=OctahedralClenshawGrid, nlat_half=24)
+```
+
+Only note that you don't want to specify both `nlat_half` and `dealiasing` as you would
+otherwise overspecify the grid resolution (`dealiasing` will be ignored in that case).
+This also works starting from the grid space
+
+```@example speedytransforms
+grid = rand(FullClenshawGrid, 12)
+SpectralTransform(grid)
+```
+
+where you can also provide spectral resolution `trunc` or `dealiasing`. You can also
+provide both a grid and a lower triangular matrix to describe both spaces
+
+```@example speedytransforms
+SpectralTransform(grid, alms)
+```
+
+and you will precompute the transform between them. For more generators see the
+docstrings at `?SpectralTransform`.
+
 ## Power spectrum
 
 How to take some data and compute a power spectrum with SpeedyTransforms you may ask.
@@ -206,7 +241,7 @@ nothing # hide
 Now we transform into spectral space and call `power_spectrum(::LowerTriangularMatrix)`
 ```@example speedytransforms
 alms = transform(map)
-power = SpeedyTransforms.power_spectrum(alms)
+power = power_spectrum(alms)
 nothing # hide
 ```
 
@@ -226,7 +261,6 @@ turn this around and use SpeedyTransforms to create random noise in spectral spa
 to be used in grid-point space!
 
 ## Example: Creating k^n-distributed noise
-
 
 How would we construct random noise in spectral space that follows a certain
 power law and transform it back into grid-point space? Define the wavenumber ``k``
@@ -260,37 +294,35 @@ nothing # hide
 You can always access the underlying data in `map` via `map.data` in case you
 need to get rid of the wrapping into a grid again!
 
-## (P)recompute Legendre polynomials
+## Precomputed polynomials and allocated memory
+
+!!! info "Reuse `SpectralTransform`s wherever possible"
+    Depending on horizontal and vertical resolution of spectral and grid space,
+    a `SpectralTransform` can be become very large in memory. Also the recomputation
+    of the polynomials and the planning of the FFTs are expensive compared to the
+    actual transform itself. Therefore reuse a `SpectralTransform` wherever possible.
 
 The spectral transform uses a Legendre transform in meridional direction. For this the
 Legendre polynomials are required, at each latitude ring this is a ``l_{max} \times m_{max}``
 lower triangular matrix. Storing precomputed Legendre polynomials therefore quickly
-increase in size with resolution. One can recompute them to save memory, but that 
-uses more arithmetic operations. There is therefore a memory-compute tradeoff.
+increase in size with resolution. It is therefore advised to reuse a precomputed
+`SpectralTransform` object wherever possible. This prevents transforms to allocate
+large memory which would otherwise be garbage collected again after the transform.
 
-For a single transform, there is no need to precompute the polynomials as the
-`SpectralTransform` object will be garbage collected again anyway. For low resolution
-simulations with many repeated small transforms it makes sense to precompute the
-polynomials and SpeedyWeather.jl does that automatically anyway. At very high resolution
-the polynomials may, however, become prohibitively large. An example at T127,
-about 100km resolution
+You get information about the size of that memory (both polynomials and required scratch memory)
+in the terminal "show" of a `SpectralTransform` object, e.g. at T127 resolution
+with 8 layers these are
 
 ```@example speedytransforms
-spectral_grid = SpectralGrid(trunc=127)
-SpectralTransform(spectral_grid, recompute_legendre=false)
-```
-the polynomials are about 3MB in size. Easy that is not much. But at T1023 on the
-O1536 octahedral Gaussian grid, this is already 1.5GB, cubically increasing with the
-spectral truncation T. `recompute_legendre=true` (default `false` when
-constructing a `SpectralTransform` object which may be reused) would lower this
-to kilobytes
-```@example speedytransforms
-SpectralTransform(spectral_grid, recompute_legendre=true)
+spectral_grid = SpectralGrid(trunc=127, nlayers=8)
+SpectralTransform(spectral_grid)
 ```
 
 ## Batched Transforms 
 
-SpeedyTransforms also supports batched transforms. With batched input data the `transform` is performed along the leading dimension, and all further dimensions are interpreted as batch dimensions. Take for example 
+SpeedyTransforms also supports batched transforms. With batched input data the `transform`
+is performed along the leading dimension, and all further dimensions are interpreted as
+batch dimensions. Take for example 
 
 ```@example speedytransforms 
 alms = randn(LowerTriangularMatrix{Complex{Float32}}, 32, 32, 5) 
@@ -300,6 +332,25 @@ grids = transform(alms)
 In this case we first randomly generated five (32x32) `LowerTriangularMatrix` that hold the
 coefficients and then transformed all five matrices batched to the grid space with the 
 transform command, yielding 5 `RingGrids` with each 48-rings. 
+
+## Batched power spectra
+
+SpeedyTransforms also supports power spectra calculated over any additional dimensions
+to the leading spherical harmonic dimension (it is unravelled as a vector so the first
+only, not the first two...). But the power spectrum is always calculated along that
+first spherical-harmonic dimension. For example
+
+```@example speedytransforms 
+alms = randn(LowerTriangularMatrix{Complex{Float32}}, 5, 5, 2) 
+power_spectrum(alms)
+```
+returns the power spectrum for `[..., 1]` in the first column and `[..., 2]` in the second.
+This avoids to loop over these additional dimensions, but the result would be the same:
+
+```@example speedytransforms
+power_spectrum(alms[:, 1])
+```
+
 
 ## Functions and type index
 

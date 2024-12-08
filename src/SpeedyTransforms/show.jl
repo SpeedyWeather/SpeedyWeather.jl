@@ -12,21 +12,27 @@ function prettymemory(b)
     return string(@sprintf("%.2f", value), " ", units)
 end
 
-function Base.show(io::IO, S::SpectralTransform{NF}) where NF
-    (; lmax, mmax, Grid, nlat_half) = S
+function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, ArrayType}
+    (; lmax, mmax, Grid, nlat_half, nlayers) = S
 
-    # add information about size of Legendre polynomials
-    s = S.recompute_legendre ? Base.summarysize(S.Λ) : Base.summarysize(S.Λs)
-    s_str = prettymemory(s)
+    # add information about size of Legendre polynomials and scratch memory
+    polysize_str = prettymemory(Base.summarysize(S.legendre_polynomials))
+    memorysize_str = prettymemory(
+                Base.summarysize(S.scratch_memory_north) +      # add all scratch_memories
+                Base.summarysize(S.scratch_memory_south) + 
+                Base.summarysize(S.scratch_memory_grid) + 
+                Base.summarysize(S.scratch_memory_spec)
+            )
 
     dealias = get_dealiasing(mmax, nlat_half)
     truncations = ["<linear", "linear", "quadratic", "cubic", ">cubic"]
     truncation = truncations[clamp(floor(Int, dealias)+1, 1, 5)]
     dealiasing = @sprintf("%.3g", dealias)
 
-    println(io, "$(typeof(S)):")
+    println(io, "SpectralTransform{$NF, $ArrayType}:")
     println(io, "├ Spectral:   T$mmax, $(lmax+1)x$(mmax+1) LowerTriangularMatrix{Complex{$NF}}")
     println(io, "├ Grid:       $(RingGrids.get_nlat(Grid, nlat_half))-ring $Grid{$NF}")
     println(io, "├ Truncation: dealiasing = $dealiasing ($truncation)")
-      print(io, "└ Legendre:   recompute polynomials $(S.recompute_legendre) ($s_str)")
+    println(io, "├ Legendre:   Polynomials $polysize_str, shortcut: $(short_name(S.LegendreShortcut))")
+      print(io, "└ Memory:     for $nlayers layers ($memorysize_str)")
 end

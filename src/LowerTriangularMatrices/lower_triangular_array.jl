@@ -16,14 +16,13 @@ struct LowerTriangularArray{T, N, ArrayType <: AbstractArray{T,N}} <: AbstractAr
         check_lta_input_array(data, m, n, N) ? 
         new(data, m, n)  :
         error(lta_error_message(data, m, n, T, N, ArrayType))
- 
 end
 
 check_lta_input_array(data, m, n, N) =
     (ndims(data) == N) & (length(data) == prod(size(data)[2:end]) * nonzeros(m, n)) 
 
 function lta_error_message(data, m, n, T, N, ArrayType) 
-    return "$(Base.dims2string(size(data)))-sized $(typeof(data)) cannot be used to create "*
+    return "$(Base.dims2string(size(data))) $(typeof(data)) cannot be used to create "*
             "a $(Base.dims2string(matrix_size(data, m, n))) LowerTriangularArray{$T, $N, $ArrayType}"
 end 
 
@@ -56,18 +55,31 @@ abstract type OneBased <: IndexBasis end
 # get matrix size of LTA from its data array and m, n (number of rows and columns)
 matrix_size(data::AbstractArray, m::Integer, n::Integer) = (m, n, size(data)[2:end]...)
 
+# extend to get the size of the i-th dimension, with 1 returned for any additional dimension
+# as it is also defined for Array
+function matrix_size(data::AbstractArray, m::Integer, n::Integer, i::Integer)
+    i == 1 && return m      # first dimension is the number of rows m
+    i == 2 && return n      # second dimension is the number of columns n
+    return size(data, i-1)  # -1 as m, n are collapsed into a vector in the data array
+end 
+
 """$(TYPEDSIGNATURES)
 Size of a `LowerTriangularArray` defined as size of the flattened array if `as <: AbstractVector`
 and as if it were a full matrix when `as <: AbstractMatrix`` ."""
 Base.size(L::LowerTriangularArray, base::Type{<:IndexBasis}=OneBased; as=Vector) = size(L, base, as)
-Base.size(L::LowerTriangularArray, i::Integer, base::Type{<:IndexBasis}=OneBased; as=Vector) = size(L, base; as=as)[i]
+Base.size(L::LowerTriangularArray, i::Integer, base::Type{<:IndexBasis}=OneBased; as=Vector) = size(L, i, base, as)
 
 # use multiple dispatch to chose the right options of basis and vector/flat vs matrix indexing
 # matrix indexing can be zero based (natural for spherical harmonics) or one-based,
-# vector/flat indexing has only one based indexing
+# vector/flat indexing has only one-based indexing
 Base.size(L::LowerTriangularArray, base::Type{OneBased}, as::Type{Matrix}) = matrix_size(L.data, L.m, L.n)
 Base.size(L::LowerTriangularArray, base::Type{ZeroBased}, as::Type{Matrix}) = matrix_size(L.data, L.m-1, L.n-1)
 Base.size(L::LowerTriangularArray, base::Type{OneBased}, as::Type{Vector}) = size(L.data)
+
+# size(L, i, ...) to get the size of the i-th dimension, with 1 returned for any additional dimension 
+Base.size(L::LowerTriangularArray, i::Integer, base::Type{OneBased}, as::Type{Matrix}) = matrix_size(L.data, L.m, L.n, i)
+Base.size(L::LowerTriangularArray, i::Integer, base::Type{ZeroBased}, as::Type{Matrix}) = matrix_size(L.data, L.m-1, L.n-1, i)
+Base.size(L::LowerTriangularArray, i::Integer, base::Type{OneBased}, as::Type{Vector}) = size(L.data, i)
 
 # sizeof the underlying data vector
 Base.sizeof(L::LowerTriangularArray) = sizeof(L.data)
@@ -199,7 +211,6 @@ end
 
 # l,m sph "matrix-style"  indexing with integer + other indices
 @inline function Base.getindex(L::LowerTriangularArray{T,N}, I::Vararg{Any, M}) where {T, N, M}
-    @boundscheck M == N+1 || throw(BoundsError(L, I))
     i, j = I[1:2]
     @boundscheck (0 < i <= L.m && 0 < j <= L.n) || throw(BoundsError(L, (i, j)))
     # to get a zero element in the correct shape, we just take the zero element of some valid element,
@@ -592,7 +603,6 @@ LowerTriangularGPUStyle{N, ArrayType}(::Val{M}) where {N, ArrayType, M} =
 
 # also needed for other array types
 nonparametric_type(::Type{<:Array}) = Array
-# nonparametric_type(::Type{<:CUDA.CuArray}) = CuArray
 
 "`L = find_L(Ls)` returns the first LowerTriangularArray among the arguments. 
 Adapted from Julia documentation of Broadcast interface"
@@ -620,10 +630,10 @@ function Base.similar(
     return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, size(L; as=Matrix))
 end
 
-function GPUArrays.backend(
-    ::Type{LowerTriangularArray{T, N, ArrayType}}
+function KernelAbstractions.get_backend(
+    a::LowerTriangularArray{T, N, ArrayType}
 ) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
-    return GPUArrays.backend(ArrayType)
+    return KernelAbstractions.get_backend(a.data)
 end
 
 Adapt.adapt_structure(to, L::LowerTriangularArray) =
