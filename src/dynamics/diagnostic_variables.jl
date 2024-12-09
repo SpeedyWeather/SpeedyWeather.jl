@@ -35,18 +35,16 @@ $(TYPEDFIELDS)"""
 @kwdef struct Tendencies{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
+    ntracers,               # number of tracers
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
-    SpectralVariable4D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractGridArray
     GridVariable3D,         # <: AbstractGridArray
-    GridVariable4D,         # <: AbstractGridArray
 } <: AbstractDiagnosticVariables
 
     trunc::Int              # spectral resolution: maximum degree and order of spherical harmonics
     nlat_half::Int          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
     nlayers::Int            # number of vertical layers
-    ntracers::Int           # number of tracers
 
     # SPECTRAL TENDENCIES
     "Vorticity of horizontal wind field [1/s]"
@@ -64,7 +62,8 @@ $(TYPEDFIELDS)"""
     "Logarithm of surface pressure [Pa]"
     pres_tend ::SpectralVariable2D = zeros(SpectralVariable2D, trunc+2, trunc+1)
     "Tracers [?]"
-    tracers_tend::SpectralVariable4D = zeros(SpectralVariable4D, trunc+2, trunc+1, nlayers, ntracers)
+    tracers_tend::NTuple{ntracers, SpectralVariable3D} =
+        ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), ntracers)
 
     "Zonal velocity [m/s], grid"
     u_tend_grid     ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
@@ -77,22 +76,23 @@ $(TYPEDFIELDS)"""
     "Logarith of surface pressure [Pa], grid"
     pres_tend_grid  ::GridVariable2D = zeros(GridVariable2D, nlat_half)
     "Tracers [?], grid"
-    tracers_tend_grid::GridVariable4D = zeros(GridVariable4D, nlat_half, nlayers, ntracers)
+    tracers_tend_grid::NTuple{ntracers, GridVariable3D} =
+        ntuple(i -> zeros(GridVariable3D, nlat_half, nlayers), ntracers)
 end
 
 """$(TYPEDSIGNATURES)
 Generator function."""
-function Tendencies(SG::SpectralGrid)
-    (; trunc, nlat_half, nlayers, ntracers, NF, ArrayType) = SG
-    (; SpectralVariable2D, SpectralVariable3D, SpectralVariable4D) = SG
-    (; GridVariable2D, GridVariable3D, GridVariable4D) = SG
+function Tendencies(SG::SpectralGrid; ntracers::Integer=0)
+    (; trunc, nlat_half, nlayers, NF, ArrayType) = SG
+    (; SpectralVariable2D, SpectralVariable3D) = SG
+    (; GridVariable2D, GridVariable3D) = SG
 
     return Tendencies{
-        NF, ArrayType,
-        SpectralVariable2D, SpectralVariable3D, SpectralVariable4D,
-        GridVariable2D, GridVariable3D, GridVariable4D,
+        NF, ArrayType, ntracers,
+        SpectralVariable2D, SpectralVariable3D,
+        GridVariable2D, GridVariable3D,
     }(;
-        trunc, nlat_half, nlayers, ntracers
+        trunc, nlat_half, nlayers
     )
 end
 
@@ -103,14 +103,13 @@ $TYPEDFIELDS."""
 @kwdef struct GridVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
+    ntracers,               # number of tracers
     GridVariable2D,         # <: AbstractGridArray
     GridVariable3D,         # <: AbstractGridArray
-    GridVariable4D,         # <: AbstractGridArray
 } <: AbstractDiagnosticVariables
 
     nlat_half::Int          # grid resolution: number of latitude rings on one hemisphere (Eq. incl.)
     nlayers::Int            # number of vertical layers
-    ntracers::Int           # number of tracers
 
     "Relative vorticity of the horizontal wind [1/s]"
     vor_grid        ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
@@ -129,7 +128,9 @@ $TYPEDFIELDS."""
     "Logarithm of surface pressure [Pa]"
     pres_grid       ::GridVariable2D = zeros(GridVariable2D, nlat_half)
     "Tracers [?]"
-    tracers_grid    ::GridVariable4D = zeros(GridVariable4D, nlat_half, nlayers, ntracers)
+    tracers_grid    ::NTuple{ntracers, GridVariable3D} =
+        ntuple(i -> zeros(GridVariable3D, nlat_half, nlayers), ntracers)
+
     "Random pattern controlled by random process [1]"
     random_pattern  ::GridVariable2D = zeros(GridVariable3D, nlat_half)
 
@@ -145,17 +146,18 @@ $TYPEDFIELDS."""
     "Logarithm of surface pressure [Pa] at previous time step"
     pres_grid_prev  ::GridVariable2D = zeros(GridVariable2D, nlat_half)
     "Tracers [?] at previous time step"
-    tracers_grid_prev::GridVariable4D = zeros(GridVariable4D, nlat_half, nlayers, ntracers)
+    tracers_grid_prev::NTuple{ntracers, GridVariable3D} =
+        ntuple(i -> zeros(GridVariable3D, nlat_half, nlayers), ntracers)
 end
 
 """$(TYPEDSIGNATURES)
 Generator function."""
-function GridVariables(SG::SpectralGrid)
-    (; nlat_half, nlayers, ntracers, NF, ArrayType) = SG
-    (; GridVariable2D, GridVariable3D, GridVariable4D) = SG
+function GridVariables(SG::SpectralGrid; ntracers::Integer=0)
+    (; nlat_half, nlayers, NF, ArrayType) = SG
+    (; GridVariable2D, GridVariable3D) = SG
 
-    return GridVariables{NF, ArrayType, GridVariable2D, GridVariable3D, GridVariable4D}(;
-            nlat_half, nlayers, ntracers,
+    return GridVariables{NF, ArrayType, ntracers, GridVariable2D, GridVariable3D}(;
+            nlat_half, nlayers,
         )
 end
 
@@ -350,12 +352,11 @@ struct DiagnosticVariables{
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
     Grid,                   # <:AbstractGridArray
+    ntracers,               # number of tracers
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
-    SpectralVariable4D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractGridArray
     GridVariable3D,         # <: AbstractGridArray
-    GridVariable4D,         # <: AbstractGridArray
     ParticleVector,         # <: AbstractGridArray
     VectorType,             # <: AbstractVector
     MatrixType,             # <: AbstractMatrix
@@ -371,17 +372,14 @@ struct DiagnosticVariables{
     "Number of vertical layers"
     nlayers::Int
 
-    "Number of tracers"
-    ntracers::Int
-
     "Number of particles for particle advection"
     nparticles::Int
 
     "Tendencies (spectral and grid) of the prognostic variables"
-    tendencies::Tendencies{NF, ArrayType, SpectralVariable2D, SpectralVariable3D, SpectralVariable4D, GridVariable2D, GridVariable3D, GridVariable4D}
+    tendencies::Tendencies{NF, ArrayType, ntracers, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D}
     
     "Gridded prognostic variables"
-    grid::GridVariables{NF, ArrayType, GridVariable2D, GridVariable3D, GridVariable4D}
+    grid::GridVariables{NF, ArrayType, ntracers, GridVariable2D, GridVariable3D}
     
     "Intermediate variables for the dynamical core"
     dynamics::DynamicsVariables{NF, ArrayType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D}
@@ -404,23 +402,24 @@ end
 
 # decide on spectral resolution `nbands` of radiation schemes
 function DiagnosticVariables(SG::SpectralGrid, model::PrimitiveEquation)
+    ntracers = length(model.tracers)
     nbands_shortwave = get_nbands(model.shortwave_radiation)
     nbands_longwave = get_nbands(model.longwave_radiation)
-    return DiagnosticVariables(SG; nbands_shortwave, nbands_longwave)
+    return DiagnosticVariables(SG; ntracers, nbands_shortwave, nbands_longwave)
 end
 
 """$(TYPEDSIGNATURES)
 Generator function."""
 function DiagnosticVariables(
     SG::SpectralGrid;
+    ntracers::Integer = 0,
     nbands_shortwave::Integer = 0,
     nbands_longwave::Integer = 0,
 )
     (; trunc, nlat_half, nparticles, NF, nlayers) = SG
-    (; nparticles, ntracers) = SG
 
-    tendencies = Tendencies(SG)
-    grid = GridVariables(SG)
+    tendencies = Tendencies(SG; ntracers)
+    grid = GridVariables(SG; ntracers)
     dynamics = DynamicsVariables(SG)
     physics = PhysicsVariables(SG)
     particles = ParticleVariables(SG)
@@ -430,7 +429,7 @@ function DiagnosticVariables(
     scale = Ref(one(NF))
 
     return DiagnosticVariables(
-        trunc, nlat_half, nlayers, ntracers, nparticles,
+        trunc, nlat_half, nlayers, nparticles,
         tendencies, grid, dynamics, physics, particles,
         column, temp_average, scale,
     )
@@ -438,11 +437,11 @@ end
 
 function Base.show(
     io::IO,
-    diagn::DiagnosticVariables{NF, ArrayType, Grid},
-) where {NF, ArrayType, Grid}
+    diagn::DiagnosticVariables{NF, ArrayType, Grid, ntracers},
+) where {NF, ArrayType, Grid, ntracers}
     println(io, "DiagnosticVariables{$NF, $ArrayType, $Grid}")
     
-    (; trunc, nlat_half, nlayers, ntracers, nparticles) = diagn
+    (; trunc, nlat_half, nlayers, nparticles) = diagn
     nlat = RingGrids.get_nlat(Grid, nlat_half)
     println(io, "├ resolution: T$trunc, $nlat rings, $nlayers layers, $ntracers tracers, $nparticles particles")
     println(io, "├ tendencies::Tendencies")

@@ -119,8 +119,8 @@ end
 
 """$(TYPEDSIGNATURES)
 Generator function."""
-function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
-    (; trunc, nlat_half, nlayers, ntracers, nparticles) = SG
+function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS, ntracers=0)
+    (; trunc, nlat_half, nlayers, nparticles) = SG
     (; NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector) = SG
 
@@ -133,7 +133,7 @@ end
 """$(TYPEDSIGNATURES)
 Generator function."""
 function PrognosticVariables(SG::SpectralGrid, model::AbstractModel)
-    PrognosticVariables(SG, nsteps = model.time_stepping.nsteps)
+    PrognosticVariables(SG, nsteps = model.time_stepping.nsteps, ntracers = length(model.tracers))
 end
 
 function Base.show(
