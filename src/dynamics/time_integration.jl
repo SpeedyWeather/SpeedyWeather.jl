@@ -16,7 +16,7 @@ $(TYPEDFIELDS)
 
     # OPTIONS
     "Time step in minutes for T31, scale linearly to `trunc`"
-    Δt_at_T31::Second = Minute(30)
+    Δt_at_T31::Second = Minute(40)
 
     "Radius of sphere [m], used for scaling"
     radius::NF = DEFAULT_RADIUS
