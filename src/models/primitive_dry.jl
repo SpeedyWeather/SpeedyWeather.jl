@@ -60,7 +60,10 @@ $(TYPEDFIELDS)"""
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(PrimitiveDry)
+    
+    # VARIABLES
     random_process::RP = NoRandomProcess()
+    tracers::TRACER_DICT = TRACER_DICT()
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
