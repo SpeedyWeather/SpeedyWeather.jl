@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Change default timestep to 40min at T31 [#623](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/623)
+
 ## v0.13
 
 - AbstractSurfacePerturbation introduced [#631](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/631)
