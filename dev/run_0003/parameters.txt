@@ -98,14 +98,14 @@ model.time_stepping
 Leapfrog{Float32} <: SpeedyWeather.AbstractTimeStepper
 ├ trunc::Int64 = 63
 ├ nsteps::Int64 = 2
-├ Δt_at_T31::Second = 1800 seconds
+├ Δt_at_T31::Second = 2400 seconds
 ├ radius::Float32 = 6.371e6
 ├ adjust_with_output::Bool = true
 ├ robert_filter::Float32 = 0.1
 ├ williams_filter::Float32 = 0.53
-├ Δt_millisec::Dates.Millisecond = 900000 milliseconds
-├ Δt_sec::Float32 = 900.0
-└ Δt::Float32 = 0.0001412651
+├ Δt_millisec::Dates.Millisecond = 1200000 milliseconds
+├ Δt_sec::Float32 = 1200.0
+└ Δt::Float32 = 0.00018835347
 
 model.spectral_transform
 SpectralTransform{Float32, Array}:
@@ -163,7 +163,7 @@ Feedback <: AbstractFeedback
 ├ start::Int64 = 0
 ├ barlen::Nothing = nothing
 ├ barglyphs::ProgressMeter.BarGlyphs = ProgressMeter.BarGlyphs('|', '█', ['▏', '▎', '▍', '▌', '▋', '▊', '▉'], ' ', '|')
-└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0003 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (4664, 1, 1)), 0, 1, false, false, 1.733510605193635e9, 1.733510605193635e9, 1.733510605193635e9)
+└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0003 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (23, 2310, 1)), 0, 1, false, false, 1.733704502324942e9, 1.733704502324942e9, 1.733704502324942e9)
 ├ progress_txt::Nothing = nothing
 └ nars_detected::Bool = false
 

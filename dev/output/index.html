@@ -36,11 +36,11 @@ model.output</code></pre><pre class="documenter-example-output"><code class="noh
  ├ u: zonal wind [m/s]
  └ vor: relative vorticity [s^-1]</code></pre><p>which will now output every hour. It is important to pass on the new output writer <code>output</code> to the model constructor, otherwise it will not be part of your model and the default is used instead. Note that the choice of <code>output_dt</code> can affect the actual time step that is used for the model integration, which is explained in the following. Example, we run the model at a resolution of T42 and the time step is going to be</p><pre><code class="language-julia hljs">spectral_grid = SpectralGrid(trunc=42, nlayers=1)
 time_stepping = Leapfrog(spectral_grid)
-time_stepping.Δt_sec</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1350.0f0</code></pre><p>seconds. Depending on the output frequency (we chose <code>output_dt = Hour(1)</code> above) this will be slightly adjusted during model initialization:</p><pre><code class="language-julia hljs">output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
+time_stepping.Δt_sec</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1800.0f0</code></pre><p>seconds. Depending on the output frequency (we chose <code>output_dt = Hour(1)</code> above) this will be slightly adjusted during model initialization:</p><pre><code class="language-julia hljs">output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
 model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)
-model.time_stepping.Δt_sec</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1200.0f0</code></pre><p>The shorter the output time step the more the model time step needs to be adjusted to match the desired output time step exactly. This is important so that for daily output at noon this does not slowly shift towards night over years of model integration. One can always disable this adjustment with</p><pre><code class="language-julia hljs">time_stepping = Leapfrog(spectral_grid, adjust_with_output=false)
-time_stepping.Δt_sec</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1339.535f0</code></pre><p>and a little info will be printed to explain that even though you wanted <code>output_dt = Hour(1)</code> you will not actually get this upon initialization:</p><pre><code class="language-julia hljs">model = ShallowWaterModel(spectral_grid; time_stepping, output)
+model.time_stepping.Δt_sec</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1800.0f0</code></pre><p>The shorter the output time step the more the model time step needs to be adjusted to match the desired output time step exactly. This is important so that for daily output at noon this does not slowly shift towards night over years of model integration. One can always disable this adjustment with</p><pre><code class="language-julia hljs">time_stepping = Leapfrog(spectral_grid, adjust_with_output=false)
+time_stepping.Δt_sec</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1786.047f0</code></pre><p>and a little info will be printed to explain that even though you wanted <code>output_dt = Hour(1)</code> you will not actually get this upon initialization:</p><pre><code class="language-julia hljs">model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{ShallowWaterModel}
 ├ prognostic_variables::PrognosticVariables{...}
 ├ diagnostic_variables::DiagnosticVariables{...}
@@ -48,27 +48,27 @@ simulation = initialize!(model)</code></pre><pre class="documenter-example-outpu
 run!(simulation, period=Day(1), output=true)
 id = model.output.id
 ds = NCDataset(&quot;run_$id/output.nc&quot;)
-ds[&quot;time&quot;][:]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">22-element Vector{DateTime}:
+ds[&quot;time&quot;][:]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">25-element Vector{DateTime}:
  2000-01-01T00:00:00
- 2000-01-01T01:06:58.605
- 2000-01-01T02:13:57.210
- 2000-01-01T03:20:55.815
- 2000-01-01T04:27:54.420
- 2000-01-01T05:34:53.025
- 2000-01-01T06:41:51.630
- 2000-01-01T07:48:50.235
- 2000-01-01T08:55:48.840
- 2000-01-01T10:02:47.445
+ 2000-01-01T00:59:32.094
+ 2000-01-01T01:59:04.188
+ 2000-01-01T02:58:36.282
+ 2000-01-01T03:58:08.376
+ 2000-01-01T04:57:40.470
+ 2000-01-01T05:57:12.564
+ 2000-01-01T06:56:44.658
+ 2000-01-01T07:56:16.752
+ 2000-01-01T08:55:48.846
  ⋮
- 2000-01-01T14:30:41.865
- 2000-01-01T15:37:40.470
- 2000-01-01T16:44:39.075
- 2000-01-01T17:51:37.680
- 2000-01-01T18:58:36.285
- 2000-01-01T20:05:34.890
- 2000-01-01T21:12:33.495
- 2000-01-01T22:19:32.100
- 2000-01-01T23:26:30.705</code></pre><p>which is a bit ugly, that&#39;s why <code>adjust_with_output=true</code> is the default. In that case we would have</p><pre><code class="language-julia hljs">time_stepping = Leapfrog(spectral_grid, adjust_with_output=true)
+ 2000-01-01T15:52:33.504
+ 2000-01-01T16:52:05.598
+ 2000-01-01T17:51:37.692
+ 2000-01-01T18:51:09.786
+ 2000-01-01T19:50:41.880
+ 2000-01-01T20:50:13.974
+ 2000-01-01T21:49:46.068
+ 2000-01-01T22:49:18.162
+ 2000-01-01T23:48:50.256</code></pre><p>which is a bit ugly, that&#39;s why <code>adjust_with_output=true</code> is the default. In that case we would have</p><pre><code class="language-julia hljs">time_stepping = Leapfrog(spectral_grid, adjust_with_output=true)
 output = NetCDFOutput(spectral_grid, ShallowWater, output_dt=Hour(1))
 model = ShallowWaterModel(spectral_grid; time_stepping, output)
 simulation = initialize!(model)
@@ -214,4 +214,4 @@ NetCDFOutput&#40;
 <p>Constructor for NetCDFOutput based on <code>S::SpectralGrid</code> and optionally the <code>Model</code> type &#40;e.g. <code>ShallowWater</code>, <code>PrimitiveWet</code>&#41; as second positional argument. The output grid is optionally determined by keyword arguments <code>output_Grid</code> &#40;its type, full grid required&#41;, <code>nlat_half</code> &#40;resolution&#41; and <code>output_NF</code> &#40;number format&#41;. By default, uses the full grid equivalent of the grid and resolution used in <code>SpectralGrid</code> <code>S</code>.</p>
 
 
-</div></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../particles/">« Particle advection</a><a class="docs-footer-nextpage" href="../extensions/">Extensions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Friday 6 December 2024 18:46">Friday 6 December 2024</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+</div></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../particles/">« Particle advection</a><a class="docs-footer-nextpage" href="../extensions/">Extensions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Monday 9 December 2024 00:38">Monday 9 December 2024</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

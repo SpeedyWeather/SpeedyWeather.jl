@@ -105,14 +105,14 @@ model.time_stepping
 Leapfrog{Float32} <: SpeedyWeather.AbstractTimeStepper
 ├ trunc::Int64 = 42
 ├ nsteps::Int64 = 2
-├ Δt_at_T31::Second = 1800 seconds
+├ Δt_at_T31::Second = 2400 seconds
 ├ radius::Float32 = 6.371e6
 ├ adjust_with_output::Bool = false
 ├ robert_filter::Float32 = 0.1
 ├ williams_filter::Float32 = 0.53
-├ Δt_millisec::Dates.Millisecond = 1339535 milliseconds
-├ Δt_sec::Float32 = 1339.535
-└ Δt::Float32 = 0.00021025506
+├ Δt_millisec::Dates.Millisecond = 1786047 milliseconds
+├ Δt_sec::Float32 = 1786.047
+└ Δt::Float32 = 0.00028034014
 
 model.spectral_transform
 SpectralTransform{Float32, Array}:
@@ -148,7 +148,7 @@ NetCDFOutput{FullGaussianGrid{Float32}}
 ├ write restart file: true (if active)
 ├ interpolator: AnvilInterpolator{Float32, OctahedralGaussianGrid}
 ├ path: /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/docs/build/run_0004/output.nc
-├ frequency: 4019 seconds
+├ frequency: 3572 seconds
 └┐ variables:
  ├ eta: interface displacement [m]
  ├ v: meridional wind [m/s]
@@ -170,7 +170,7 @@ Feedback <: AbstractFeedback
 ├ start::Int64 = 0
 ├ barlen::Nothing = nothing
 ├ barglyphs::ProgressMeter.BarGlyphs = ProgressMeter.BarGlyphs('|', '█', ['▏', '▎', '▍', '▌', '▋', '▊', '▉'], ' ', '|')
-└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0004 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (0, 0, 430372579858)), 0, 1, false, false, 1.733510758483178e9, 1.733510758483178e9, 1.733510758483178e9)
+└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0004 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (139694550563736, 139693852523904, 4607182418800017408)), 0, 1, false, false, 1.733704636749873e9, 1.733704636749873e9, 1.733704636749873e9)
 ├ progress_txt::Nothing = nothing
 └ nars_detected::Bool = false
 
