@@ -39,7 +39,6 @@ export  spectral_truncation,
         spectral_interpolation,
         power_spectrum
 
-# include("../gpu.jl")
 include("aliasing.jl")
 include("legendrepolarray.jl")
 include("legendre_shortcuts.jl")
