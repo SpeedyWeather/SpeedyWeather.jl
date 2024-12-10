@@ -3,7 +3,6 @@ module SpeedyWeatherCUDAExt
 using SpeedyWeather
 import CUDA: CUDA, CUDAKernels, CuArray, CUFFT
 import AbstractFFTs
-import LinearAlgebra
 using DocStringExtensions
 
 # for RingGrids and LowerTriangularMatrices:
