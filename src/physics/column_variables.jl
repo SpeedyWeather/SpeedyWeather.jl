@@ -132,17 +132,27 @@ function write_column_tendencies!(
         diagn.tendencies.humid_tend_grid[ij, k] = column.humid_tend[k]
     end
 
-    # accumulate (set back to zero when netcdf output)
+    # accumulate precipitation [m]
     diagn.physics.precip_large_scale[ij] += column.precip_large_scale
     diagn.physics.precip_convection[ij] += column.precip_convection
 
-    # Output cloud top in height [m] from geopotential height divided by gravity,
-    # but NaN for no clouds
+    # Cloud top in height [m] from geopotential height divided by gravity, 0 for no clouds
     diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.geopot[column.cloud_top]
     diagn.physics.cloud_top[ij] /= planet.gravity
     
     # just use layer index 1 (top) to nlayers (surface) for analysis, but 0 for no clouds
     # diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.cloud_top
+
+    # net surface fluxes of humidity and temperature, defined as positive downward (i.e. into ocean/land)
+    diagn.physics.surface_flux_heat[ij] = column.flux_temp_downward[nlayers+1] -
+                                            column.flux_temp_upward[nlayers+1]
+    diagn.physics.surface_flux_humid[ij] = column.flux_humid_downward[nlayers+1] -
+                                            column.flux_humid_upward[nlayers+1]
+
+    # outgoing radiation
+    diagn.physics.outgoing_longwave_radiation[ij] = column.outgoing_longwave_radiation
+    diagn.physics.outgoing_shortwave_radiation[ij] = column.outgoing_shortwave_radiation
+
     return nothing
 end
 

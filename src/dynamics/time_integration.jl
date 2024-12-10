@@ -16,7 +16,7 @@ $(TYPEDFIELDS)
 
     # OPTIONS
     "Time step in minutes for T31, scale linearly to `trunc`"
-    Δt_at_T31::Second = Minute(30)
+    Δt_at_T31::Second = Minute(40)
 
     "Radius of sphere [m], used for scaling"
     radius::NF = DEFAULT_RADIUS
@@ -300,16 +300,17 @@ function timestep!(
     (; time) = progn.clock                           # current time
 
     # set the tendencies back to zero for accumulation
-    fill!(diagn.tendencies, 0, PrimitiveWet)
+    fill!(diagn.tendencies, 0, typeof(model))
 
     if model.physics                                # switch on/off all physics parameterizations
+        # calculate all parameterizations
+        parameterization_tendencies!(diagn, progn, time, model)
+        
         # time step ocean (temperature and TODO sea ice) and land (temperature and soil moisture)
+        # with fluxes from parameterizations
         ocean_timestep!(progn, diagn, model)
         land_timestep!(progn, diagn, model)
         soil_moisture_availability!(diagn, progn, model)
-
-        # calculate all parameterizations
-        parameterization_tendencies!(diagn, progn, time, model)
     end
 
     if model.dynamics                                           # switch on/off all dynamics

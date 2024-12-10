@@ -151,28 +151,18 @@ function surface_heat_flux!(
                         (column.boundary_layer_drag, column.boundary_layer_drag) : 
                         (heat_exchange_sea, heat_exchange_land)
 
-    # SPEEDY documentation Eq. 54 and 56
-    flux_land = ρ*drag_land*V₀*cₚ*(T_skin_land - T)
-    flux_sea  = ρ*drag_sea*V₀*cₚ*(T_skin_sea  - T)
+    # SPEEDY documentation Eq. 54 and 56, land/sea fraction included
+    flux_land = ρ*drag_land*V₀*cₚ*(T_skin_land - T)*land_fraction
+    flux_sea  = ρ*drag_sea*V₀*cₚ*(T_skin_sea  - T)*(1-land_fraction)
 
     # mix fluxes for fractional land-sea mask
     land_available = isfinite(T_skin_land)
     sea_available = isfinite(T_skin_sea)
 
-    if land_available && sea_available
-        column.flux_temp_upward[end] += land_fraction*flux_land + (1-land_fraction)*flux_sea
+    # Only flux from land/sea if available (not NaN) otherwise zero flux
+    column.flux_temp_upward[end] += land_available ? flux_land : 0
+    column.flux_temp_upward[end] += sea_available ? flux_sea : 0
 
-    # but in case only land or sea are available use those ones only
-    elseif land_available
-        column.flux_temp_upward[end] += flux_land
-
-    elseif sea_available
-        column.flux_temp_upward[end] += flux_sea
-
-    # or no flux in case none is defined (shouldn't happen with default surface data)
-    # else   # doesn't have to be executed because fluxes are accumulated
-    #   column.flux_temp_upward[end] += 0
-    end
     return nothing
 end
 
@@ -226,25 +216,18 @@ function surface_evaporation!(  column::ColumnVariables,
                         (column.boundary_layer_drag, column.boundary_layer_drag) : 
                         (moisture_exchange_sea, moisture_exchange_land)
 
-    flux_sea = ρ*drag_sea*V₀*max(sat_humid_sea  - surface_humid, 0)
-    flux_land = ρ*drag_land*V₀*α*max(sat_humid_land  - surface_humid, 0)
+    # SPEEDY documentation eq. 55/57, include land/sea fraction
+    flux_land = ρ*drag_land*V₀*α*max(sat_humid_land  - surface_humid, 0)*land_fraction
+    flux_sea = ρ*drag_sea*V₀*max(sat_humid_sea  - surface_humid, 0)*(1-land_fraction)
 
-    # mix fluxes for fractional land-sea mask
+    # sea/land surface temperature is not always defined (NaN), filter those out
     land_available = isfinite(skin_temperature_land) && isfinite(α)
     sea_available = isfinite(skin_temperature_sea)
 
-    if land_available && sea_available
-        column.flux_humid_upward[end] += land_fraction*flux_land + (1-land_fraction)*flux_sea
+    # Only flux from land/sea if available (not NaN) otherwise zero flux
+    # mix fluxes for fractional land-sea mask
+    column.flux_humid_upward[end] += land_available ? flux_land : 0
+    column.flux_humid_upward[end] += sea_available ? flux_sea : 0
 
-    # but in case only land or sea are available use those ones only
-    elseif land_available
-        column.flux_humid_upward[end] += flux_land
-
-    elseif sea_available
-        column.flux_humid_upward[end] += flux_sea
-
-    # or no flux in case none is defined (shouldn't happen with default surface data)
-    # else   # doesn't have to be executed because fluxes are accumulated
-    #   column.flux_temp_upward[end] += 0
-    end
+    return nothing
 end

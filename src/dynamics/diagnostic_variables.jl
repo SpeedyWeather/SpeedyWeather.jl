@@ -262,6 +262,18 @@ $(TYPEDFIELDS)"""
     "Availability of soil moisture to evaporation [1]"
     soil_moisture_availability::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
+    "Surface flux of heat [W/m^2]"
+    surface_flux_heat::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "Surface flux of humidity [?]"
+    surface_flux_humid::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "Outgoing shortwave radiation [W/m^2]"
+    outgoing_shortwave_radiation::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "Outgoing longwave radiation [W/m^2]"
+    outgoing_longwave_radiation::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
     "Cosine of solar zenith angle [1]"
     cos_zenith::GridVariable2D = zeros(GridVariable2D, nlat_half)           
 end
@@ -334,7 +346,8 @@ struct DiagnosticVariables{
     GridVariable2D,         # <: AbstractGridArray
     GridVariable3D,         # <: AbstractGridArray
     ParticleVector,         # <: AbstractGridArray
-    VectorNF,               # Vector{NF} or CuVector{NF}
+    VectorType,             # <: AbstractVector
+    MatrixType,             # <: AbstractMatrix
 } <: AbstractDiagnosticVariables
 
     # DIMENSIONS
@@ -363,22 +376,32 @@ struct DiagnosticVariables{
     physics::PhysicsVariables{NF, ArrayType, GridVariable2D}
     
     "Intermediate variables for the particle advection"
-    particles::ParticleVariables{NF, ArrayType, ParticleVector, VectorNF, Grid}
+    particles::ParticleVariables{NF, ArrayType, ParticleVector, VectorType, Grid}
     
     "Vertical column for the physics parameterizations"
-    columns::Vector{ColumnVariables{NF}}
+    column::ColumnVariables{NF, VectorType, MatrixType}
 
     "Average temperature of every horizontal layer [K]"
-    temp_average::VectorNF
+    temp_average::VectorType
 
     "Scale applied to vorticity and divergence"
     scale::Base.RefValue{NF}
 end
 
+# decide on spectral resolution `nbands` of radiation schemes
+function DiagnosticVariables(SG::SpectralGrid, model::PrimitiveEquation)
+    nbands_shortwave = get_nbands(model.shortwave_radiation)
+    nbands_longwave = get_nbands(model.longwave_radiation)
+    return DiagnosticVariables(SG; nbands_shortwave, nbands_longwave)
+end
+
 """$(TYPEDSIGNATURES)
 Generator function."""
-function DiagnosticVariables(SG::SpectralGrid)
-
+function DiagnosticVariables(
+    SG::SpectralGrid;
+    nbands_shortwave::Integer = 0,
+    nbands_longwave::Integer = 0,
+)
     (; trunc, nlat_half, nparticles, NF, nlayers) = SG
 
     tendencies = Tendencies(SG)
@@ -386,19 +409,15 @@ function DiagnosticVariables(SG::SpectralGrid)
     dynamics = DynamicsVariables(SG)
     physics = PhysicsVariables(SG)
     particles = ParticleVariables(SG)
-    
-    # create one column variable per thread to avoid race conditions
-    nthreads = Threads.nthreads()
-    columns = [ColumnVariables{NF}(; nlayers) for _ in 1:nthreads]
-
-    temp_average = SG.ArrayType{NF, 1}(undef, nlayers)
+    column = ColumnVariables(SG; nbands_shortwave, nbands_longwave)
+    temp_average = SG.VectorType(undef, nlayers)
 
     scale = Ref(one(NF))
 
     return DiagnosticVariables(
         trunc, nlat_half, nlayers, nparticles,
         tendencies, grid, dynamics, physics, particles,
-        columns, temp_average, scale,
+        column, temp_average, scale,
     )
 end
 
@@ -416,7 +435,7 @@ function Base.show(
     println(io, "├ dynamics::DynamicsVariables")
     println(io, "├ physics::PhysicsVariables")
     println(io, "├ particles::ParticleVariables")
-    println(io, "├ columns::Vector{ColumnVariables}")
+    println(io, "├ columns::ColumnVariables")
     println(io, "├ temp_average::$(typeof(diagn.temp_average))")
     print(io,   "└ scale: $(diagn.scale[])")
 end

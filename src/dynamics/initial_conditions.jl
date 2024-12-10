@@ -315,18 +315,34 @@ function initialize!(
 )
     (; m, ω, K, c) = initial_conditions
     (; geometry) = model
+    Ω = model.planet.rotation
+    R = model.spectral_grid.radius
+    g = model.planet.gravity
 
     # Rossby-Haurwitz wave defined through vorticity ζ as a function of
     # longitude λ, latitude θ (in degrees), sigma level σ (vertically constant though)
     # see Williamson et al. 1992, J Computational Physics, eq 145
     ζ(λ, θ, σ) = 2ω*sind(θ) - K*sind(θ)*cosd(θ)^m*(m^2 + 3m + 2)*cosd(m*λ)
+    # see Williamson et al. 1992, J Computational Physics, eq 147 - 149, 146
+    A(λ, θ) = ω/2 * (2Ω+ω)*cosd(θ)^2 + K^2/4*cosd(θ)^(2m)*((m+1)*cosd(θ)^2 + (2m^2-m-2) - 2m^2/(cosd(θ)^2))
+    B(λ, θ) = (2(Ω+ω)*K)/((m+1)*(m+2))*cosd(θ)^m*( (m^2+2m+2) - (m+1)^2*cosd(θ)^2 )
+    C(λ, θ) = K^2/4*cosd(θ)^(2m)*((m+1) * cosd(θ)^2 - (m + 2))
+
+    η(λ, θ) = R^2/g*(A(λ,θ) + B(λ,θ)*cosd(m*λ) + C(λ,θ)*cosd(2m*λ))
+
     set!(progn, geometry, vor = ζ)
+    model isa ShallowWater && set!(progn, geometry, pres = η)
     set!(progn, geometry, div = 0)  # technically not needed, but set to zero for completeness
 
     # filter low values below cutoff amplitude c
     vor = progn.vor[1]  # 1 = first leapfrog timestep
     low_values = abs.(vor) .< c
     vor[low_values] .= 0
+    if model isa ShallowWater
+        pres = progn.pres[1]
+        low_value = abs.(pres) .< c
+        pres[low_value] .= 0
+    end
 
     return nothing
 end

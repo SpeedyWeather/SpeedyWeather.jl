@@ -36,8 +36,10 @@ export  curl,
 # TRUNCATION
 export  spectral_truncation,
         spectral_truncation!,
-        spectral_interpolation,
-        power_spectrum
+        spectral_interpolation
+
+# ANALYSIS
+export  power_spectrum
 
 include("aliasing.jl")
 include("legendrepolarray.jl")
