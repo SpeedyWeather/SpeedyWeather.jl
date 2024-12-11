@@ -26,9 +26,13 @@ function initialize!(
     σ_lnp_A[1] = 0  # the corresponding sum is 1:k-1 so 0 to replace log(0) from above
     
     # precompute the αₖ = 1 - p_k-1/2/Δpₖ*log(p_k+1/2/p_k-1/2) term in σ coordinates
-    σ_lnp_B .= 1 .- σ_levels_half[1:end-1]./σ_levels_thick .*
-                    log.(σ_levels_half[2:end]./σ_levels_half[1:end-1])
-    σ_lnp_B[1] = σ_levels_half[1] <= 0 ? log(2) : σ_lnp_B[1]    # set α₁ = log(2), eq. 3.19
+    if σ_levels_half[1] <= 0
+        σ_lnp_B[1] = log(2)   # set α₁ = log(2), eq. 3.19
+    else
+        σ_lnp_B[1] *= 1 - σ_levels_half[1] / σ_levels_thick[1] * log(σ_levels_half[2] / σ_levels_half[1])
+    end
+    σ_lnp_B[2:end] .= 1 .- σ_levels_half[2:end-1]./σ_levels_thick[2:end] .*
+                    log.(σ_levels_half[3:end]./σ_levels_half[2:end-1])
     σ_lnp_B .*= -1  # absorb sign from -1/Δσₖ only, eq. 3.12
     return nothing
 end
