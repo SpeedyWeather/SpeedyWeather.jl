@@ -33,7 +33,11 @@ end
 FriersonOpticalDepth(SG::SpectralGrid; kwargs...) = FriersonOpticalDepth{SG.NF}(; kwargs...)
 initialize!(od::FriersonOpticalDepth, model::AbstractModel) = nothing
 
-function optical_depth!(column::ColumnVariables, od::FriersonOpticalDepth, model::AbstractModel)
+function optical_depth!(
+    column::ColumnVariables{NF},
+    od::FriersonOpticalDepth,
+    model::AbstractModel,
+) where NF
 
     # escape immediately if fewer bands defined in longwave radiation scheme
     od.band > column.nbands_longwave && return nothing

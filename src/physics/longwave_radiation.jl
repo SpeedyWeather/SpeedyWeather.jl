@@ -1,3 +1,4 @@
+abstract type AbstractRadiation <: AbstractParameterization end
 abstract type AbstractLongwave <: AbstractRadiation end
 
 export NoLongwave
@@ -157,7 +158,7 @@ function longwave_radiation!(
 end
 
 export NBandRadiation
-@kwdef struct NBandRadiation <: AbstractLongwave
+@kwdef struct NBandRadiation <: AbstractRadiation
     nbands::Int = 1
 end
 
