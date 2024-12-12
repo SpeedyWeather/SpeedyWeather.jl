@@ -33,7 +33,11 @@ end
 FriersonOpticalDepth(SG::SpectralGrid; kwargs...) = FriersonOpticalDepth{SG.NF}(; kwargs...)
 initialize!(od::FriersonOpticalDepth, model::AbstractModel) = nothing
 
-function optical_depth!(column::ColumnVariables, od::FriersonOpticalDepth, model::AbstractModel)
+function optical_depth!(
+    column::ColumnVariables{NF},
+    od::FriersonOpticalDepth,
+    model::AbstractModel,
+) where NF
 
     # escape immediately if fewer bands defined in longwave radiation scheme
     od.band > column.nbands_longwave && return nothing
@@ -48,10 +52,18 @@ function optical_depth!(column::ColumnVariables, od::FriersonOpticalDepth, model
     # coordinates 
     σ = model.geometry.σ_levels_half
     θ = column.latd
+    (; nlayers) = column
 
-    # Frierson 2006, eq. (4), (5)
+    # Frierson 2006, eq. (4), (5) but in a differential form, computing dτ between half levels below and above
+    # --- τ(k=1/2)                  # half level above
+    # dt = τ(k=1+1/2) - τ(k=1/2)    # differential optical depth on layer k
+    # --- τ(k=1+1/2)                # half level below
+
+    local τ_above::NF = 0
     τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator)*sind(θ)^2
-    @inbounds for k in eachindex(σ)     # loop over half levels
-        optical_depth[k, band] = τ₀*(fₗ*σ[k] + (1 - fₗ)*σ[k]^4)
+    for k in 2:nlayers+1     # loop over half levels below
+        τ_below = τ₀*(fₗ*σ[k] + (1 - fₗ)*σ[k]^4)
+        optical_depth[k-1, band] = τ_below - τ_above
+        τ_above = τ_below
     end
 end

@@ -183,6 +183,10 @@ function reset_column!(column::ColumnVariables{NF}) where NF
     column.precip_convection = 0
     column.precip_large_scale = 0
 
+    # radiation
+    column.outgoing_longwave_radiation = 0
+    column.outgoing_shortwave_radiation = 0
+
     return nothing
 end
 
