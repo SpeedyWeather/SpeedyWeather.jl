@@ -1,4 +1,4 @@
-Starting SpeedyWeather.jl run 0003 on Wed, 11 Dec 2024 18:24:09
+Starting SpeedyWeather.jl run 0003 on Thu, 12 Dec 2024 01:29:32
 Integrating:
 SpectralGrid:
 ├ Spectral:   T63 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
@@ -23,7 +23,7 @@ All data will be stored in /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/d
  55%, ETA: 0:00:01,   Inf millenia/day
  60%, ETA: 0:00:01,   Inf millenia/day
  65%, ETA: 0:00:01,   Inf millenia/day
- 70%, ETA: 0:00:01,   Inf millenia/day
+ 70%, ETA: 0:00:00,   Inf millenia/day
  75%, ETA: 0:00:00,   Inf millenia/day
  80%, ETA: 0:00:00,   Inf millenia/day
  85%, ETA: 0:00:00,   Inf millenia/day
