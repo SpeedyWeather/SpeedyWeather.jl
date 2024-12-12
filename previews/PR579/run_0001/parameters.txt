@@ -96,6 +96,9 @@ model.random_process
 NoRandomProcess <: SpeedyWeather.AbstractRandomProcess
 
 
+model.tracers
+Dict{Symbol, SpeedyWeather.AbstractTracer}()
+
 model.orography
 EarthOrography{Float32, OctahedralGaussianGrid{Float32}} <: SpeedyWeather.AbstractOrography
 ├ path::String = SpeedyWeather.jl/input_data
@@ -231,23 +234,21 @@ JeevanjeeRadiation{Float32} <: SpeedyWeather.AbstractLongwave
 └ time_scale::Second = 86400 seconds
 
 model.stochastic_physics
-StochasticallyPerturbedParameterizationTendencies{Float32, Vector{Float32}} <: SpeedyWeather.AbstractStochasticPhysics
-├ nlayers::Int64 = 8
-├ tapering::SpeedyWeather.var"#285#289" = #285
-└── arrays: taper
+NoStochasticPhysics <: SpeedyWeather.AbstractStochasticPhysics
+
 
 model.time_stepping
 Leapfrog{Float32} <: SpeedyWeather.AbstractTimeStepper
 ├ trunc::Int64 = 31
 ├ nsteps::Int64 = 2
-├ Δt_at_T31::Second = 1800 seconds
+├ Δt_at_T31::Second = 2400 seconds
 ├ radius::Float32 = 6.371e6
 ├ adjust_with_output::Bool = true
 ├ robert_filter::Float32 = 0.1
 ├ williams_filter::Float32 = 0.53
-├ Δt_millisec::Dates.Millisecond = 1800000 milliseconds
-├ Δt_sec::Float32 = 1800.0
-└ Δt::Float32 = 0.0002825302
+├ Δt_millisec::Dates.Millisecond = 2400000 milliseconds
+├ Δt_sec::Float32 = 2400.0
+└ Δt::Float32 = 0.00037670694
 
 model.spectral_transform
 SpectralTransform{Float32, Array}:
@@ -308,7 +309,7 @@ Feedback <: AbstractFeedback
 ├ start::Int64 = 0
 ├ barlen::Nothing = nothing
 ├ barglyphs::ProgressMeter.BarGlyphs = ProgressMeter.BarGlyphs('|', '█', ['▏', '▎', '▍', '▌', '▋', '▊', '▉'], ' ', '|')
-└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0001 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (1, 48, 5)), 0, 1, false, false, 1.733700874600585e9, 1.733700874600585e9, 1.733700874600585e9)
+└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0001 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (24, 6555, 1)), 0, 1, false, false, 1.733973337469001e9, 1.733973337469001e9, 1.733973337469001e9)
 ├ progress_txt::Nothing = nothing
 └ nars_detected::Bool = false
 

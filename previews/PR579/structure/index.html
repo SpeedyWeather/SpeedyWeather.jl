@@ -41,17 +41,15 @@ simulation = initialize!(model)</code></pre><pre class="documenter-example-outpu
  ├ period
  ├ timestep_counter
  ├ n_timesteps
- └ Δt</code></pre><p>The prognostic variable struct can be mutated (e.g. to set new initial conditions) with the <a href="../functions/#SpeedyWeather.set!-Tuple{AbstractModel}"><code>SpeedyWeather.set!</code></a> function. </p><h2 id="Diagnostic-variables"><a class="docs-heading-anchor" href="#Diagnostic-variables">Diagnostic variables</a><a id="Diagnostic-variables-1"></a><a class="docs-heading-anchor-permalink" href="#Diagnostic-variables" title="Permalink"></a></h2><p>Similar for the diagnostic variables, regardless the model type, they contain the same fields but for the 2D models many will not be used for example.</p><pre><code class="language-julia hljs">tree(simulation.diagnostic_variables)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">DiagnosticVariables{Float32, Array, OctahedralGaussianGrid, LowerTriangularMatrix{ComplexF32}, LowerTriangularArray{ComplexF32, 2, Matrix{ComplexF32}}, LowerTriangularArray{ComplexF32, 3, Array{ComplexF32, 3}}, OctahedralGaussianGrid{Float32}, OctahedralGaussianArray{Float32, 2, Matrix{Float32}}, OctahedralGaussianArray{Float32, 3, Array{Float32, 3}}, Vector{Particle{Float32}}, Vector{Float32}, Matrix{Float32}}
+ └ Δt</code></pre><p>The prognostic variable struct can be mutated (e.g. to set new initial conditions) with the <a href="../functions/#SpeedyWeather.set!-Tuple{AbstractModel}"><code>SpeedyWeather.set!</code></a> function. </p><h2 id="Diagnostic-variables"><a class="docs-heading-anchor" href="#Diagnostic-variables">Diagnostic variables</a><a id="Diagnostic-variables-1"></a><a class="docs-heading-anchor-permalink" href="#Diagnostic-variables" title="Permalink"></a></h2><p>Similar for the diagnostic variables, regardless the model type, they contain the same fields but for the 2D models many will not be used for example.</p><pre><code class="language-julia hljs">tree(simulation.diagnostic_variables)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">DiagnosticVariables{Float32, Array, OctahedralGaussianGrid, 0, LowerTriangularMatrix{ComplexF32}, LowerTriangularArray{ComplexF32, 2, Matrix{ComplexF32}}, OctahedralGaussianGrid{Float32}, OctahedralGaussianArray{Float32, 2, Matrix{Float32}}, Vector{Particle{Float32}}, Vector{Float32}, Matrix{Float32}}
 ├ trunc
 ├ nlat_half
 ├ nlayers
-├ ntracers
 ├ nparticles
 ├┐tendencies
 │├ trunc
 │├ nlat_half
 │├ nlayers
-│├ ntracers
 │├ vor_tend
 │├ div_tend
 │├ temp_tend
@@ -69,7 +67,6 @@ simulation = initialize!(model)</code></pre><pre class="documenter-example-outpu
 ├┐grid
 │├ nlat_half
 │├ nlayers
-│├ ntracers
 │├ vor_grid
 │├ div_grid
 │├ temp_grid
@@ -198,7 +195,6 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ Grid
 │├ dealiasing
 │├ radius
-│├ ntracers
 │├ nparticles
 │├ nlat_half
 │├ nlat
@@ -229,7 +225,6 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 ││├ Grid
 ││├ dealiasing
 ││├ radius
-││├ ntracers
 ││├ nparticles
 ││├ nlat_half
 ││├ nlat
@@ -315,6 +310,7 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ temp
 │└ humid
 ├ random_process
+├ tracers
 ├┐time_stepping
 │├ trunc
 │├ nsteps
@@ -378,7 +374,6 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ Grid
 │├ dealiasing
 │├ radius
-│├ ntracers
 │├ nparticles
 │├ nlat_half
 │├ nlat
@@ -409,7 +404,6 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 ││├ Grid
 ││├ dealiasing
 ││├ radius
-││├ ntracers
 ││├ nparticles
 ││├ nlat_half
 ││├ nlat
@@ -512,6 +506,7 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ temp
 │└ humid
 ├ random_process
+├ tracers
 ├┐time_stepping
 │├ trunc
 │├ nsteps
@@ -583,7 +578,6 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ Grid
 │├ dealiasing
 │├ radius
-│├ ntracers
 │├ nparticles
 │├ nlat_half
 │├ nlat
@@ -615,7 +609,6 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 ││├ Grid
 ││├ dealiasing
 ││├ radius
-││├ ntracers
 ││├ nparticles
 ││├ nlat_half
 ││├ nlat
@@ -716,6 +709,7 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 ││└ Tmin
 │└ humid
 ├ random_process
+├ tracers
 ├┐orography
 │├ path
 │├ file
@@ -813,10 +807,7 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ α
 │├ temp_tropopause
 │└ time_scale
-├┐stochastic_physics
-│├ nlayers
-│├ tapering
-│└ taper
+├ stochastic_physics
 ├┐time_stepping
 │├ trunc
 │├ nsteps
@@ -897,7 +888,6 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ Grid
 │├ dealiasing
 │├ radius
-│├ ntracers
 │├ nparticles
 │├ nlat_half
 │├ nlat
@@ -929,7 +919,6 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 ││├ Grid
 ││├ dealiasing
 ││├ radius
-││├ ntracers
 ││├ nparticles
 ││├ nlat_half
 ││├ nlat
@@ -1031,6 +1020,7 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │└┐humid
 │ └ relhumid_ref
 ├ random_process
+├ tracers
 ├┐orography
 │├ path
 │├ file
@@ -1171,10 +1161,7 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ α
 │├ temp_tropopause
 │└ time_scale
-├┐stochastic_physics
-│├ nlayers
-│├ tapering
-│└ taper
+├ stochastic_physics
 ├┐time_stepping
 │├ trunc
 │├ nsteps
@@ -1246,13 +1233,13 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
  ├ run_path
  ├ progress_meter
  ├ progress_txt
- └ nars_detected</code></pre><h2 id="Size-of-a-Simulation"><a class="docs-heading-anchor" href="#Size-of-a-Simulation">Size of a Simulation</a><a id="Size-of-a-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Size-of-a-Simulation" title="Permalink"></a></h2><p>The <code>tree</code> function also allows for the <code>with_size::Bool</code> keyword (default <code>false</code>), which will also print the size of the respective branches to give you an idea of how much memory a SpeedyWeather simulation uses.</p><pre><code class="language-julia hljs">tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{BarotropicModel} (1.26 MB)
+ └ nars_detected</code></pre><h2 id="Size-of-a-Simulation"><a class="docs-heading-anchor" href="#Size-of-a-Simulation">Size of a Simulation</a><a id="Size-of-a-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Size-of-a-Simulation" title="Permalink"></a></h2><p>The <code>tree</code> function also allows for the <code>with_size::Bool</code> keyword (default <code>false</code>), which will also print the size of the respective branches to give you an idea of how much memory a SpeedyWeather simulation uses.</p><pre><code class="language-julia hljs">tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{BarotropicModel} (1.25 MB)
 ├┐prognostic_variables (131.48 KB)
-├┐diagnostic_variables (651.69 KB)
-└┐model (473.85 KB)</code></pre><p>And with <code>max_level</code> you can truncate the tree to go down at most that many levels. 1MB is a typical size for a one-level T31 resolution simulation. In comparison, a higher resolution <code>PrimitiveWetModel</code> would use</p><pre><code class="language-julia hljs">spectral_grid = SpectralGrid(trunc=127, nlayers=8)
+├┐diagnostic_variables (648.97 KB)
+└┐model (473.93 KB)</code></pre><p>And with <code>max_level</code> you can truncate the tree to go down at most that many levels. 1MB is a typical size for a one-level T31 resolution simulation. In comparison, a higher resolution <code>PrimitiveWetModel</code> would use</p><pre><code class="language-julia hljs">spectral_grid = SpectralGrid(trunc=127, nlayers=8)
 model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
-tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{PrimitiveWetModel} (64.32 MB)
+tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{PrimitiveWetModel} (64.31 MB)
 ├┐prognostic_variables (5.48 MB)
-├┐diagnostic_variables (36.43 MB)
-└┐model (22.41 MB)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../analysis/">« Analysis</a><a class="docs-footer-nextpage" href="../particles/">Particle advection »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Sunday 8 December 2024 23:38">Sunday 8 December 2024</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+├┐diagnostic_variables (36.42 MB)
+└┐model (22.41 MB)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../analysis/">« Analysis</a><a class="docs-footer-nextpage" href="../particles/">Particle advection »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Thursday 12 December 2024 03:18">Thursday 12 December 2024</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
