@@ -16,7 +16,7 @@
 
         for k in 2:nlayers
             # optical depth cannot be negative
-            @test τ[k] >= 0
+            @test dτ[k] >= 0
         end
     end
 end
