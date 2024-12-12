@@ -400,6 +400,9 @@ struct DiagnosticVariables{
     scale::Base.RefValue{NF}
 end
 
+DiagnosticVariables(SG::SpectralGrid, model::Barotropic) = DiagnosticVariables(SG)
+DiagnosticVariables(SG::SpectralGrid, model::ShallowWater) = DiagnosticVariables(SG)
+
 # decide on spectral resolution `nbands` of radiation schemes
 function DiagnosticVariables(SG::SpectralGrid, model::PrimitiveEquation)
     ntracers = length(model.tracers)
