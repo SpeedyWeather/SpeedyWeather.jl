@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Forcing/drag for primitive models [#635](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/635)
 - Change default timestep to 40min at T31 [#623](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/623)
 
 ## v0.13
