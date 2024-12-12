@@ -137,6 +137,7 @@ function forcing!(
     end
 end
 
+export StochasticStirring
 @kwdef struct StochasticStirring{NF, VectorType} <: AbstractForcing
         
     "Number of latitude rings, used for latitudinal mask"
