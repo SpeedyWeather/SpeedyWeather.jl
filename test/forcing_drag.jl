@@ -4,7 +4,7 @@
     forcing = StochasticStirring(spectral_grid)
     initial_conditions = StartFromRest()
 
-    for Model in (BarotropicModel, ShallowWaterModel, PrimitiveDryModel, PrimitiveWetModel)
+    @testset for Model in (BarotropicModel, ShallowWaterModel, PrimitiveDryModel, PrimitiveWetModel)
         model = Model(spectral_grid; initial_conditions, forcing, drag)
         simulation = initialize!(model)
 
