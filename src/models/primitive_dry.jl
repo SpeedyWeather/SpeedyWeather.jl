@@ -85,7 +85,7 @@ $(TYPEDFIELDS)"""
     optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = NoShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
-    stochastic_physics::SP = NoStochasticPhysics(spectral_grid)
+    stochastic_physics::SP = NoStochasticPhysics()
     
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
