@@ -296,7 +296,13 @@ function set!(
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
 )
-    specs = isnothing(S) ? transform(grids) : transform(grids, S)
+    if isnothing(S)
+        specs = transform(grids)
+    else
+        # convert to number format in S, needed for FFTW
+        grids = convert.(eltype(S), grids)
+        specs = transform(grids, S)
+    end
     set!(var, specs; add)
 end
 
