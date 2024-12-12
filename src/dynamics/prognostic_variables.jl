@@ -296,6 +296,7 @@ function set!(
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
 )
+    grids = convert.(eltype(S), grids)  #change in 2024.12.12 by roc
     specs = isnothing(S) ? transform(grids) : transform(grids, S)
     set!(var, specs; add)
 end

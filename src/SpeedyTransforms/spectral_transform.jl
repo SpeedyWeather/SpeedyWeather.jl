@@ -85,6 +85,9 @@ struct SpectralTransform{
     eigenvalues⁻¹::VectorType           # = -1/(l*(l+1))
 end
 
+# add eltype 2024.12.12 by roc
+Base.eltype(S::SpectralTransform{NF}) where NF = NF # 2024.12.12 by roc
+
 """
 $(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct. With `NF` the number format,
