@@ -88,9 +88,8 @@ function Base.show(io::IO, SG::SpectralGrid)
     println(io, "├ Spectral:   T$trunc LowerTriangularMatrix{Complex{$NF}}, radius = $radius m")
     println(io, "├ Grid:       $nlat-ring $Grid{$NF}, $npoints grid points")
     println(io, "├ Resolution: $(s(average_resolution))km (average)")
-    if nparticles > 0
+    nparticles > 0 &&
     println(io, "├ Particles:  $nparticles")
-    end
     println(io, "├ Vertical:   $nlayers-layer $(typeof(vertical_coordinates))")
       print(io, "└ Device:     $(typeof(device)) using $ArrayType")
 end

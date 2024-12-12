@@ -66,7 +66,10 @@ $(TYPEDFIELDS)"""
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(PrimitiveWet)
+    
+    # VARIABLES
     random_process::RP = NoRandomProcess()
+    tracers::TRACER_DICT = TRACER_DICT()
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
@@ -93,7 +96,7 @@ $(TYPEDFIELDS)"""
     optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = NoShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
-    stochastic_physics::SP = StochasticallyPerturbedParameterizationTendencies(spectral_grid)
+    stochastic_physics::SP = NoStochasticPhysics()
     
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
