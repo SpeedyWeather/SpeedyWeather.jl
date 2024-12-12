@@ -166,10 +166,10 @@ NBandRadiation(SG::SpectralGrid; kwargs...) = NBandRadiation(; kwargs...)
 initialize!(scheme::NBandRadiation, model::PrimitiveEquation) = nothing
 
 function longwave_radiation!(
-    column::ColumnVariables{NF},
+    column::ColumnVariables,
     scheme::NBandRadiation,
     model::PrimitiveEquation,
-) where NF
+)
 
     (; nlayers) = column
     nbands = column.nbands_longwave                 # number of spectral bands
@@ -183,10 +183,10 @@ function longwave_radiation!(
     end
 
     @inbounds for band in 1:nbands                  # loop over spectral bands
-        dτ = view(column.optical_depth_longwave, :, band)   # differential optical depth per layer of that band
+        dτ = view(column.optical_depth_longwave, :, band)   # differential optical depth per layer in that band
 
         # UPWARD flux U
-        local U::NF = σ*column.surface_temp^4       # boundary condition at surface U(τ=τ(z=0)) = σTₛ⁴
+        U = σ*column.surface_temp^4                 # boundary condition at surface U(τ=τ(z=0)) = σTₛ⁴
         column.flux_temp_upward[nlayers+1] += U     # accumulate fluxes
 
         for k in nlayers:-1:1                       # integrate from surface up
@@ -199,7 +199,7 @@ function longwave_radiation!(
         column.outgoing_longwave_radiation += U
 
         # DOWNWARD flux D
-        local D::NF = 0                             # top boundary condition of longwave flux
+        D = zero(U)                                 # top boundary condition of longwave flux
                                                     # no need to accumulate 0 at top downward flux
         for k in 1:nlayers
             # Radiative transfer, Frierson et al. 2006, equation 7
