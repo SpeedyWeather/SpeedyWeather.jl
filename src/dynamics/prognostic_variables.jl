@@ -446,15 +446,19 @@ function set_vordiv!(
     u::AbstractGridArray,
     v::AbstractGridArray,
     geometry::Geometry,
-    S::Union{Nothing, SpectralTransform}=nothing;
+    S::SpectralTransform = SpectralTransform(geometry.spectral_grid);
     add::Bool=false,
     coslat_scaling_included::Bool=false,
 )
     u_ = coslat_scaling_included ? u : RingGrids.scale_coslat⁻¹(u)
     v_ = coslat_scaling_included ? v : RingGrids.scale_coslat⁻¹(v)
 
-    u_spec = isnothing(S) ? transform(u_) : transform(u_, S)
-    v_spec = isnothing(S) ? transform(v_) : transform(v_, S)
+    # convert to number format of spectral transform, otherwise FFTW complains
+    u_ = eltype(S) == eltype(u_) ? u_ : convert.(eltype(S), u_)
+    v_ = eltype(S) == eltype(v_) ? v_ : convert.(eltype(S), v_)
+
+    u_spec = transform(u_, S)
+    v_spec = transform(v_, S)
 
     set_vordiv!(vor, div, u_spec, v_spec, geometry, S; add, coslat_scaling_included=true)
 end 
@@ -466,12 +470,10 @@ function set_vordiv!(
     u::LowerTriangularArray,
     v::LowerTriangularArray,
     geometry::Geometry,
-    S::Union{Nothing, SpectralTransform}=nothing;
+    S::SpectralTransform = SpectralTransform(geometry.spectral_grid);
     add::Bool=false,
     coslat_scaling_included::Bool=false,
 ) 
-    S = isnothing(S) ? SpectralTransform(geometry.spectral_grid) : S
-     
     u_ = coslat_scaling_included ? u : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
     v_ = coslat_scaling_included ? v : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
 
