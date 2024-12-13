@@ -76,7 +76,7 @@ Base.@propagate_inbounds Base.getindex(G::AbstractGridArray, ijk...) = getindex(
 @inline function Base.getindex(
     G::GridArray,
     col::Colon,
-    k::Integer...,
+    k...,
 ) where {GridArray<:AbstractGridArray}
     GridArray_ = nonparametric_type(GridArray)  # obtain parameters from G.data
     return GridArray_(getindex(G.data, col, k...), G.nlat_half, G.rings)
