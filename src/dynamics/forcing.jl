@@ -144,7 +144,7 @@ export StochasticStirring
     nlat::Int
 
     "[OPTION] Stirring strength A [1/s²]"
-    strength::NF = 1e-11
+    strength::NF = 1e-9
 
     "[OPTION] Stirring latitude [˚N]"
     latitude::NF = 45
@@ -165,6 +165,9 @@ function initialize!(
     forcing::StochasticStirring,
     model::AbstractModel)
     
+    model.random_process isa NoRandomProcess &&
+        @warn "StochasticStirring needs a random process. model.random_process is a NoRandomProcess."
+
     # precompute the latitudinal mask
     (; latd) = model.geometry
     for j in eachindex(forcing.lat_mask)
