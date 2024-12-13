@@ -569,6 +569,9 @@ function initialize!(   progn::PrognosticVariables,
     return nothing
 end
 
+# for shallow water constant pressure = 0 as pres=interface displacement here
+initialize!(::PrognosticVariables, ::ConstantPressure, ::ShallowWater) = nothing
+
 export ConstantRelativeHumidity
 @kwdef struct ConstantRelativeHumidity <: AbstractInitialConditions
     relhumid_ref::Float64 = 0.7
