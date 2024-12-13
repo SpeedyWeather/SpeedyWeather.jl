@@ -33,6 +33,7 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
     (; rfft_plans) = S                      # pre-planned transforms
     nlayers = size(grids, 2)                # number of vertical layers
 
+    @assert eltype(grids) == eltype(S) "Number format of grid $(eltype(grids)) and SpectralTransform $(eltype(S)) need too match."
     @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
     @boundscheck nlayers == S.nlayers || throw(DimensionMismatch(S, grids))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, grids))
@@ -82,6 +83,7 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
     rfft_plans = S.rfft_plans_1D            # pre-planned transforms
     nlayers = size(grids, 2)                # number of vertical layers
 
+    @assert eltype(grids) == eltype(S) "Number format of grid $(eltype(grids)) and SpectralTransform $(eltype(S)) need too match."
     @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, grids))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, grids))
