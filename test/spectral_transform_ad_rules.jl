@@ -184,6 +184,59 @@ end
                 end
             end 
         end
+
+        @testset "Spectral Gradient Enzyme" begin 
+            for (i_grid, grid_type) in enumerate(grid_types)
+
+                if fd_tests[i_grid]
+
+                    spectral_grid = SpectralGrid(Grid=grid_type, trunc=10, nlayers=1, dealiasing=grid_dealiasing[i_grid])
+                    S = SpectralTransform(spectral_grid, one_more_degree=true)
+                    dS = deepcopy(S)
+
+                    u_grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+                    v_grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+
+                    u = transform(u_grid, S)
+                    v = transform(v_grid, S)
+                    du = zero(u)
+                    dv = zero(v)
+
+                    cu = zero(u)
+                    dcu = zero(u)
+                    fill!(dcu, 1+1im)
+
+                    # curl test
+                    autodiff(Reverse, curl!, Const, Duplicated(cu, dcu), Duplicated(u, du), Duplicated(v, dv), Duplicated(S, dS))
+                    
+                    # new seed
+                    dcu2 = zero(dcu)
+                    fill!(dcu2, 1+1im)
+
+                    # finite difference comparision, seeded with a one adjoint to get the direct gradient
+                    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> curl(x[1],x[2], S), dcu2, (u, v))
+                    @test isapprox(du, fd_jvp[1][1])
+                    @test isapprox(dv, fd_jvp[1][2])
+
+                    # div test
+
+                    du = zero(u)
+                    dv = zero(v)
+                    div = zero(u)
+                    ddiv = zero(u)
+                    fill!(ddiv, 1+1im)
+
+                    autodiff(Reverse, divergence!, Const, Duplicated(div, ddiv), Duplicated(u, du), Duplicated(v, dv), Duplicated(S, dS))
+                    
+                    ddiv2 = zero(ddiv)
+                    fill!(ddiv, 1+1im)
+
+                    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> divergence(x[1],x[2], S), ddiv2, (u, v))
+                    @test isapprox(du, fd_jvp[1][1])
+                    @test isapprox(dv, fd_jvp[1][2])
+                end 
+            end 
+        end 
     end 
 
     @testset "Complete Transform ChainRules" begin 
