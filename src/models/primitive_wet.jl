@@ -22,6 +22,8 @@ $(TYPEDFIELDS)"""
     PA,     # <:AbstractParticleAdvection,
     IC,     # <:AbstractInitialConditions,
     RP,     # <:AbstractRandomProcess,
+    FR,     # <:AbstractForcing,
+    DR,     # <:AbstractDrag,
     LS,     # <:AbstractLandSeaMask,
     OC,     # <:AbstractOcean,
     LA,     # <:AbstractLand,
@@ -67,6 +69,8 @@ $(TYPEDFIELDS)"""
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(PrimitiveWet)
     random_process::RP = NoRandomProcess()
+    forcing::FR = NoForcing()
+    drag::DR = NoDrag()
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
@@ -129,6 +133,8 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.geopotential, model)
     initialize!(model.adiabatic_conversion, model)
     initialize!(model.random_process, model)
+    initialize!(model.forcing, model)
+    initialize!(model.drag, model)
 
     # boundary conditions
     initialize!(model.orography, model)
