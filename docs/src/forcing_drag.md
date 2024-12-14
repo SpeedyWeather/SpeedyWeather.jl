@@ -197,8 +197,8 @@ function SpeedyWeather.forcing!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     forcing::StochasticStirring,
-    model::AbstractModel,
     lf::Integer,
+    model::AbstractModel,
 )
     # function barrier only
     forcing!(diagn, forcing, model.spectral_transform)
