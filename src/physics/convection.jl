@@ -433,6 +433,10 @@ function dry_adiabat!(
 end
 
 export ConvectiveHeating
+
+"""Convective heating as defined by Lee and Kim, 2003, JAS
+implemented as convection parameterization. Fields are
+$(TYPEDFIELDS)"""
 @kwdef struct ConvectiveHeating{NF} <: AbstractConvection
     # DIMENSION
     nlat::Int
@@ -459,6 +463,7 @@ end
 # generator
 ConvectiveHeating(SG::SpectralGrid; kwargs...) = ConvectiveHeating{SG.NF}(nlat=SG.nlat; kwargs...)
 
+# precompute latitudinal mask
 function initialize!(C::ConvectiveHeating, model::PrimitiveEquation)
     
     (; latd) = model.geometry
@@ -476,7 +481,7 @@ function convection!(
     model::PrimitiveEquation,
 )
     # escape immediately if not in the tropics
-    abs(column.latd) > scheme.σθ && return nothing
+    abs(column.latd) >= scheme.σθ && return nothing
 
     p₀ = scheme.p₀*100      # hPa -> Pa
     σₚ = scheme.σₚ*100      # hPa -> Pa
@@ -486,7 +491,7 @@ function convection!(
     for k in eachindex(column)
         p = column.pres[k]      # Pressure in Pa
 
-        # Lee and Kim, 2003, eq. 2, 
+        # Lee and Kim, 2003, eq. 2
         column.temp_tend[k] += Qmax*exp(-((p-p₀)/σₚ)^2 / 2)*cos²θ_term
     end
 end
