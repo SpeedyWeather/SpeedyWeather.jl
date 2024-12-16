@@ -61,6 +61,9 @@ struct SpectralTransform{
     scratch_memory_column_north::VectorComplexType  # scratch memory for vertically batched Legendre transform
     scratch_memory_column_south::VectorComplexType  # scratch memory for vertically batched Legendre transform
 
+    jm_index_size::Int                              # number of indices per layer in kjm_indices
+    kjm_indices::ArrayType                          # precomputed kjm loop indices map
+
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
     # vector is pole to pole although only northern hemisphere required
@@ -168,6 +171,23 @@ function SpectralTransform(
         fake_grid_data, scratch_memory_north, rings, nlons
     )
     
+    # PRECOMPUTE KJM INDICES FOR LEGENDRE TRANSFORM (0-based)
+    # For GPU it's quicker to precompute the indices for the loops in the 
+    # legendre transform and store them in a 3D array rather than computing them 
+    # on the fly. We also store the jm_index_size for the loop so we can 
+    # truncate to fewer layers if needed. 
+    jm_index_size = sum(mmax_truncation .+ 1)
+    kjm_indices = zeros(Int, jm_index_size * nlayers, 3)
+    i = 0
+    for k in 1:nlayers
+        for (j, mmax_j) in enumerate(mmax_truncation) 
+            for m in 1:mmax_j+1
+                i += 1
+                kjm_indices[i, :] .= [k, j, m]
+            end
+        end
+    end
+
     # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
     # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
@@ -244,6 +264,7 @@ function SpectralTransform(
         scratch_memory_north, scratch_memory_south,
         scratch_memory_grid, scratch_memory_spec,
         scratch_memory_column_north, scratch_memory_column_south,
+        jm_index_size, kjm_indices,
         solid_angles, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,

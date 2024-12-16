@@ -17,8 +17,11 @@ function inverse_legendre_kernel!(
 )
     tid = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
 
-    if tid <= length(kjm_indices)
-        k, j, m  = kjm_indices[tid]
+    if tid <= size(kjm_indices, 1)
+        # Unpack indices from precomputed kjm_indices using single thread index
+        k = kjm_indices[tid, 1]
+        j = kjm_indices[tid, 2]
+        m = kjm_indices[tid, 3]
 
         # are m, lmax 0-based here or 1-based? 
         lm_range = get_lm_range(m, lmax)    # assumes 1-based
@@ -26,8 +29,7 @@ function inverse_legendre_kernel!(
         # view on lower triangular column, but batched in vertical
         spec_view = view(specs_data, lm_range, :)
         legendre_view = view(legendre_polynomials_data, lm_range, j)
-
-
+        
         # dot product but split into even and odd harmonics on the fly as this 
         # is how the previous implementation was enacted
         lmax_range = length(lm_range)           # number of degrees at order m, lmax-m
@@ -75,19 +77,21 @@ function SpeedyTransforms._legendre!(
     g_south::CuArray{<:Complex, 3},     # and southern latitudes
     specs::LowerTriangularArray,        # input: spherical harmonic coefficients
     S::SpectralTransform,               # precomputed transform
-    kjm_indices::CuArray;               # precomputed jm index map
     unscale_coslat::Bool = false,       # unscale by cosine of latitude on the fly?
 )
     (; nlat_half) = S                   # dimensions    
     (; lmax, mmax ) = S                 # 0-based max degree l, order m of spherical harmonics  
     (; legendre_polynomials) = S        # precomputed Legendre polynomials    
-    (; mmax_truncation) = S             # Legendre shortcut, shortens loop over m, 0-based  
+    (; jm_index_size, kjm_indices ) = S # kjm loop indices precomputed for threads  
     (; coslat⁻¹, lon_offsets ) = S
+    # NOTE: this comes out as a range, not an integer
     nlayers = axes(specs, 2)            # get number of layers of specs for fewer layers than precomputed in S
 
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
+    # reduced_kjm = kjm_indices[1:(nlayers.stop * jm_index_size), :]  # get the reduced kjm indices
 
+    # @show reduced_kjm
     g_north .= 0
     g_south .= 0
 
@@ -102,8 +106,8 @@ function SpeedyTransforms._legendre!(
         kjm_indices
     )
     config = CUDA.launch_configuration(kernel.fun)
-    threads = min(length(kjm_indices), config.threads)
-    blocks = cld(length(kjm_indices), threads)
+    threads = min(size(kjm_indices, 1), config.threads)
+    blocks = cld(size(kjm_indices, 1), threads)
 
     # actually launch kernel!
     kernel(
