@@ -84,6 +84,9 @@ struct SpectralTransform{
     eigenvalues⁻¹::VectorType           # = -1/(l*(l+1))
 end
 
+# eltype of a transform is the number format used within
+Base.eltype(S::SpectralTransform{NF}) where NF = NF
+
 """
 $(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct. With `NF` the number format,
