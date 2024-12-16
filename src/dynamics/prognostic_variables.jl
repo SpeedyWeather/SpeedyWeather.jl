@@ -51,7 +51,6 @@ export PrognosticVariables
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
     nsteps,                 # number of timesteps
-    ntracers,               # number of tracers
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractGridArray
@@ -104,8 +103,7 @@ export PrognosticVariables
         PrognosticVariablesLand{NF, ArrayType, GridVariable2D}(; nlat_half)
 
     "Tracers, last dimension is for n tracers [?]"
-    tracers::NTuple{ntracers, NTuple{nsteps, SpectralVariable3D}} =
-            ntuple(j -> ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), nsteps), ntracers)
+    tracers::Dict{Symbol, NTuple{nsteps, SpectralVariable3D}} = Dict{Symbol, NTuple{nsteps, SpectralVariable3D}}()
 
     "Particles for particle advection"
     particles::ParticleVector = zeros(ParticleVector, nparticles)
@@ -119,12 +117,12 @@ end
 
 """$(TYPEDSIGNATURES)
 Generator function."""
-function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS, ntracers=0)
+function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
     (; trunc, nlat_half, nlayers, nparticles) = SG
     (; NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector) = SG
 
-    return PrognosticVariables{NF, ArrayType, nsteps, ntracers,
+    return PrognosticVariables{NF, ArrayType, nsteps,
         SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}(;
             trunc, nlat_half, nlayers, nparticles,
         )
@@ -133,14 +131,19 @@ end
 """$(TYPEDSIGNATURES)
 Generator function."""
 function PrognosticVariables(SG::SpectralGrid, model::AbstractModel)
-    PrognosticVariables(SG, nsteps = model.time_stepping.nsteps, ntracers = length(model.tracers))
+    progn = PrognosticVariables(SG, nsteps = model.time_stepping.nsteps)
+    add!(progn, model.tracers)
+    return progn
 end
 
 function Base.show(
     io::IO,
-    progn::PrognosticVariables{NF, ArrayType, nsteps, ntracers},
-) where {NF, ArrayType, nsteps, ntracers}
+    progn::PrognosticVariables{NF, ArrayType, nsteps},
+) where {NF, ArrayType, nsteps}
+    
     Grid = typeof(progn.ocean.sea_surface_temperature)
+    tracer_names = [key for (key, value) in progn.tracers]
+    
     println(io, "PrognosticVariables{$NF, $ArrayType}")
     
     # variables
@@ -160,7 +163,7 @@ function Base.show(
     println(io, "│├ snow_depth: $nlat-ring $Grid")
     println(io, "│├ soil_moisture_layer1:     $nlat-ring $Grid")
     println(io, "│└ soil_moisture_layer2:     $nlat-ring $Grid")
-    println(io, "├ tracers: T$trunc, $nlayers-layer, $ntracers-tracer $nsteps-steps LowerTriangularArray{$NF}")
+    println(io, "├ tracers: $(length(tracer_names))T$trunc, $nlayers-layer, $ntracers-tracer $nsteps-steps LowerTriangularArray{$NF}")
     println(io, "├ particles: $nparticles-element $(typeof(progn.particles))")
     println(io, "├ scale: $(progn.scale[])")
     print(io,   "└ clock: $(progn.clock.time)")
@@ -208,6 +211,21 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
 
     return progn_new
 end
+
+function add!(progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D}, tracers::Tracer...
+    ) where {
+        NF,                     # number format
+        ArrayType,
+        nsteps,
+        SpectralVariable2D,
+        SpectralVariable3D,
+    }
+    (; trunc, nlayers) = progn
+    for tracer in tracers
+        progn.tracers[tracer.name] = ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), nsteps)
+    end
+end
+
 
 export set!
 

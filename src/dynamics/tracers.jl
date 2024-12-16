@@ -3,7 +3,6 @@ abstract type AbstractTracer <: AbstractModelComponent end
 export Tracer
 @kwdef mutable struct Tracer <: AbstractTracer
     name::Symbol
-    id::Int64 = 0
     active::Bool = true
 end
 
@@ -13,15 +12,20 @@ const TRACER_DICT = Dict{Symbol, AbstractTracer}
 
 function add!(dict::TRACER_DICT, tracers::Tracer...)
     for tracer in tracers
-        if tracer.name in keys(dict)
-            @warn "Tracer $(tracer.name) already exists. Skipping."
-        else
-            ntracers = length(dict)
-            tracer.id = ntracers+1
-            dict[tracer.name] = tracer
-            @info "Tracer $(tracer.name) added as tracer $(tracer.id)"
-        end
+        dict[tracer.name] = tracer
+        @info "Tracer $(tracer.name) added."
     end
 end
 
 add!(model::AbstractModel, tracers::Tracer...) = add!(model.tracers, tracers...)
+function add!(simulation::AbstractSimulation, tracers::Tracer...)
+    add!(simulation.model, tracers...)                                      # first add tracer to model
+    tracer_tuple = (tracer for (name, tracer) in simulation.model.tracers)  # get all tracers from there
+    add!(simulation.prognostic_variables, tracer_tuple...)                  # then add to ParticleVariables
+    add!(simulation.diagnostic_variables, tracer_tuple...)
+end
+
+function add!(vars::AbstractVariables, tracer_dict::TRACER_DICT)
+    tracers = (tracer for (name, tracer) in tracer_dict)
+    add!(vars, tracers...)
+end
