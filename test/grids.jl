@@ -380,6 +380,9 @@ end
         @test grid[1:2, 1:2, 1:2] == grid.data[1:2, 1:2, 1:2]
         @test grid[1, 1, :] == grid.data[1, 1, :]
 
+        @test SpeedyWeather.RingGrids.nonparametric_type(typeof(grid[:,1:2,1:2])) <: RingGrids.nonparametric_type(G)
+        @test grid[:, 1:2, 1:2].data == grid.data[:, 1:2, 1:2]
+
         idx = CartesianIndex((1, 2, 3))
         @test grid[idx] == grid.data[idx]
         
