@@ -9,6 +9,9 @@ grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduc
 grid_dealiasing = [2, 3]
 fd_tests = [true, true] 
 
+i_grid = 1 
+grid_type = grid_types[i_grid]
+
 # currenlty there's an issue with EnzymeTestUtils not being able to work with structs with undefined fields like FFT plans
 # https://github.com/EnzymeAD/Enzyme.jl/issues/1992
 # This is a very hacky workaround 
@@ -234,6 +237,43 @@ end
                     fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> divergence(x[1],x[2], S), ddiv2, (u, v))
                     @test isapprox(du, fd_jvp[1][1])
                     @test isapprox(dv, fd_jvp[1][2])
+
+                    # UV_from_vor! 
+
+                    u = zero(u)
+                    du = fill!(du, 1+1im)
+
+                    v = zero(v)
+                    dv = fill!(dv, 1+1im)
+
+                    vor_grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+                    vor = transform(vor_grid, S)
+                    dvor = zero(vor)
+
+                    autodiff(Reverse, SpeedyWeather.SpeedyTransforms.UV_from_vor!, Const, Duplicated(u, du), Duplicated(v, dv), Duplicated(vor, dvor), Duplicated(S, dS))
+
+                    dvor = zero(dvor)
+                    fill!(dvor, 1+1im)
+
+                    function uvfvor(vor, S)
+                        u = zero(vor)
+                        v = zero(vor)
+                        SpeedyWeather.SpeedyTransforms.UV_from_vor!(u, v, vor, S)
+                        return ()
+                    end 
+                    
+
+                    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> SpeedyWeather.SpeedyTransforms.UV_from_vor!(u, v, x, S), )
+                    @test isapprox(du, fd_jvp[1][1])
+
+                    # Δ
+
+
+
+                    # ∇ 
+
+
+
                 end 
             end 
         end 
