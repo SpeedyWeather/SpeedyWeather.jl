@@ -4,7 +4,8 @@
 
     for Convection in ( NoConvection,
                         SimplifiedBettsMiller,
-                        DryBettsMiller)
+                        DryBettsMiller,
+                        ConvectiveHeating)
         for Model in (  PrimitiveDryModel,
                         PrimitiveWetModel)
 

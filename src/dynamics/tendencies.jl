@@ -6,9 +6,9 @@ function dynamics_tendencies!(
     lf::Integer,                    # leapfrog index to evaluate tendencies at
     model::Barotropic,
 )
-    forcing!(diagn, progn, model.forcing, model, lf)    # = (Fᵤ, Fᵥ) forcing for u, v
-    drag!(diagn, progn, model.drag, model, lf)          # drag term for u, v
-    vorticity_flux!(diagn, model)                       # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
+    forcing!(diagn, progn, lf, model)   # = (Fᵤ, Fᵥ) forcing for u, v
+    drag!(diagn, progn, lf, model)      # drag term for u, v
+    vorticity_flux!(diagn, model)       # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
     tracer_advection!(diagn, model)
 end
 
@@ -21,12 +21,12 @@ function dynamics_tendencies!(
     lf::Integer,                    # leapfrog index to evaluate tendencies at
     model::ShallowWater,
 )
-    (; forcing, drag, planet, atmosphere, orography) = model
+    (; planet, atmosphere, orography) = model
     (; spectral_transform, geometry) = model
 
     # for compatibility with other AbstractModels pressure pres = interface displacement η here
-    forcing!(diagn, progn, forcing, model, lf)      # = (Fᵤ, Fᵥ, Fₙ) forcing for u, v, η
-    drag!(diagn, progn, drag, model, lf)            # drag term for u, v
+    forcing!(diagn, progn, lf, model)   # = (Fᵤ, Fᵥ, Fₙ) forcing for u, v, η
+    drag!(diagn, progn, lf, model)      # drag term for u, v
 
     # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for vorticity
     # = ∇⋅(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ), tendency for divergence

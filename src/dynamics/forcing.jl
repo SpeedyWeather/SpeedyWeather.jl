@@ -1,16 +1,27 @@
 abstract type AbstractForcing <: AbstractModelComponent end
 
+# function barrier for all forcings to unpack model.forcing
+function forcing!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    lf::Integer,
+    model::AbstractModel,
+)
+    forcing!(diagn, progn, model.forcing, lf, model)
+end
+
 ## NO FORCING = dummy forcing
 export NoForcing
 struct NoForcing <: AbstractForcing end
 NoForcing(SG::SpectralGrid) = NoForcing()
 initialize!(::NoForcing, ::AbstractModel) = nothing
 
-function forcing!(  diagn::DiagnosticVariables,
-                    progn::PrognosticVariables,
-                    forcing::NoForcing,
-                    model::AbstractModel,
-                    lf::Integer)
+function forcing!(  
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    forcing::NoForcing,
+    args...,
+)
     return nothing
 end
 
@@ -98,8 +109,8 @@ function forcing!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     forcing::JetStreamForcing,
-    model::AbstractModel,
     lf::Integer,
+    model::AbstractModel,
 )
     forcing!(diagn, forcing)
 end
@@ -119,8 +130,84 @@ function forcing!(
         for (j, ring) in enumerate(eachring(Fu))
             F = amplitude[j]
             for ij in ring
-                Fu[ij] = tapering[k]*F
+                # += to accumulate, not overwrite previous parameterizations/terms
+                Fu[ij] += tapering[k]*F
             end
         end
+    end
+end
+
+export StochasticStirring
+@kwdef struct StochasticStirring{NF, VectorType} <: AbstractForcing
+        
+    "Number of latitude rings, used for latitudinal mask"
+    nlat::Int
+
+    "[OPTION] Stirring strength A [1/s²]"
+    strength::NF = 1e-9
+
+    "[OPTION] Stirring latitude [˚N]"
+    latitude::NF = 45
+
+    "[OPTION] Stirring width [˚]"
+    width::NF = 24
+    
+    # TO BE INITIALISED        
+    "Latitudinal mask, confined to mid-latitude storm track by default [1]"
+    lat_mask::VectorType = zeros(NF, nlat)
+end
+
+function StochasticStirring(SG::SpectralGrid; kwargs...)
+    return StochasticStirring{SG.NF, SG.VectorType}(; nlat=SG.nlat, kwargs...)
+end
+
+function initialize!(
+    forcing::StochasticStirring,
+    model::AbstractModel)
+    
+    model.random_process isa NoRandomProcess &&
+        @warn "StochasticStirring needs a random process. model.random_process is a NoRandomProcess."
+
+    # precompute the latitudinal mask
+    (; latd) = model.geometry
+    for j in eachindex(forcing.lat_mask)
+        # Gaussian centred at forcing.latitude of width forcing.width
+        forcing.lat_mask[j] = exp(-(forcing.latitude-latd[j])^2/forcing.width^2*2)
+    end
+end
+
+function forcing!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    forcing::StochasticStirring,
+    lf::Integer,
+    model::AbstractModel,
+)
+    forcing!(diagn, forcing, model.spectral_transform)
+end
+
+function forcing!(
+    diagn::DiagnosticVariables,
+    forcing::StochasticStirring,
+    spectral_transform::SpectralTransform,
+)
+    # get random values from random process
+    S_grid = diagn.grid.random_pattern
+
+    # mask everything but mid-latitudes
+    RingGrids._scale_lat!(S_grid, forcing.lat_mask)
+    
+    # back to spectral space
+    S_masked = diagn.dynamics.a_2D
+    transform!(S_masked, S_grid, spectral_transform)
+
+    # scale by radius^2 as is the vorticity equation, and scale to forcing strength
+    S_masked .*= (diagn.scale[]^2 * forcing.strength)
+
+    # force every layer
+    (; vor_tend) = diagn.tendencies
+
+    for k in eachmatrix(vor_tend)
+        vor_tend[:, k] .+= S_masked
     end
 end
