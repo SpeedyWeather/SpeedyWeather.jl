@@ -7,8 +7,6 @@ steps:
     plugins:
       - JuliaCI/julia#v1:
           version: "{{matrix.version}}"
-      - JuliaCI/julia-coverage#v1:
-          codecov: true
     command: |
       julia -e 'println("---- :julia: Instantiating project")
                 using Pkg
