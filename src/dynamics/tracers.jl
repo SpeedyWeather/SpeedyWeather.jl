@@ -29,3 +29,23 @@ function add!(vars::AbstractVariables, tracer_dict::TRACER_DICT)
     tracers = (tracer for (name, tracer) in tracer_dict)
     add!(vars, tracers...)
 end
+
+export activate!
+activate!(model::AbstractModel, tracers::Tracer...) = activate!(model.tracers, tracers...)
+activate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers, value=true)
+function _activate!(dict::TRACER_DICT, tracers::Tracer...; value::Bool=true)
+    for tracer in tracers
+        dict[tracer.name].active = value
+    end
+end
+
+export deactivate!
+deactivate!(model::AbstractModel, tracers::Tracer...) = deactivate!(model.tracers, tracers...)
+deactivate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers, value=false)
+
+delete!(model::AbstractModel, tracers::Tracer...) = delete!(model.tracers, tracers...)
+function delete!(dict::TRACER_DICT, tracers::Tracer...)
+    for tracer in tracers
+        delete!(dict, tracer.name)
+    end
+end
