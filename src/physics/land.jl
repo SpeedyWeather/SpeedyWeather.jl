@@ -1,5 +1,5 @@
 ## LAND TEMPERATURE
-abstract type AbstractLand{NF, Grid} end
+abstract type AbstractLand end
 
 function Base.show(io::IO, L::AbstractLand)
     println(io, "$(typeof(L)) <: AbstractLand")
@@ -7,16 +7,30 @@ function Base.show(io::IO, L::AbstractLand)
     print_fields(io, L, keys)
 end
 
+function initialize!(   land::PrognosticVariablesLand,  # just for dispatch
+                        progn::PrognosticVariables,
+                        diagn::DiagnosticVariables,
+                        model::PrimitiveEquation)
+    initialize!(progn, diagn, model.land, model)
+    model isa PrimitiveWet && initialize!(progn, diagn, model.soil, model)
+end
+
+function land_timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation,
+)
+    land_timestep!(progn, diagn, model.land, model)
+    model isa PrimitiveWet && soil_timestep!(progn, diagn, model.soil, model)
+end
+
 export SeasonalLandTemperature
-@kwdef struct SeasonalLandTemperature{NF, Grid<:AbstractGrid{NF}} <: AbstractLand{NF, Grid}
+@kwdef struct SeasonalLandTemperature{NF, Grid} <: AbstractLand
 
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
 
     # OPTIONS
-    "Time step used to update land surface temperatures"
-    Δt::Dates.Day = Dates.Day(3)
-
     "path to the folder containing the land temperature file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -47,40 +61,28 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     load_monthly_climatology!(land.monthly_temperature, land)
 end
 
-function initialize!(   land::PrognosticVariablesLand,  # just for dispatch
-                        progn::PrognosticVariables,
-                        diagn::DiagnosticVariables,
-                        model::PrimitiveEquation)
-    land_timestep!(progn, diagn, model.land, model, initialize=true)
-    model isa PrimitiveWet && soil_timestep!(progn, diagn, model.soil, model)
-end
-
-# function barrier
-function land_timestep!(
+function initialize!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    model::PrimitiveEquation;
-    initialize::Bool = false,
+    land_model::SeasonalLandTemperature,
+    model::PrimitiveEquation,
 )
-    # the time step is dictated by the land "model" 
-    executed = land_timestep!(progn, diagn, model.land, model; initialize)
-    executed && model isa PrimitiveWet && soil_timestep!(progn, diagn, model.soil, model)
+    # initialize land temperature by "running" the step at the current time
+    land_timestep!(progn, diagn, land_model, model)
 end
 
 function land_timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     land_model::SeasonalLandTemperature,
-    model::PrimitiveEquation;
-    initialize::Bool = false
+    model::PrimitiveEquation,
 )
     (; time) = progn.clock
+
+    # TODO execute less often? E.g.
     # # escape immediately if Δt of land model hasn't passed yet
     # # unless the land hasn't been initialized yet
     # initialize || (time - land.time) < land_model.Δt && return false    # = executed
-
-    # # otherwise update land prognostic variables:
-    # land.time = time
     this_month = Dates.month(time)
     next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
 
@@ -93,7 +95,36 @@ function land_timestep!(
     @. progn.land.land_surface_temperature = (1-weight) * monthly_temperature[this_month] +
                                                 weight  * monthly_temperature[next_month]
 
-    return true # = executed
+    return nothing
+end
+
+## CONSTANT LAND CLIMATOLOGY
+export ConstantLandTemperature
+@kwdef struct ConstantLandTemperature{NF} <: AbstractLand
+    "[OPTION] Globally constant temperature"
+    temperature::NF = 285
+end
+
+# generator function
+ConstantLandTemperature(SG::SpectralGrid; kwargs...) = ConstantLandTemperature{SG.NF}(; kwargs...)
+
+initialize!(land::ConstantLandTemperature, model::PrimitiveEquation) = nothing
+function initialize!(   
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    land_model::ConstantLandTemperature,
+    model::PrimitiveEquation,
+)
+    set!(progn.land.land_surface_temperature, land_model.temperature)
+end
+
+function land_timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    land_model::ConstantLandTemperature,
+    model::PrimitiveEquation,
+)
+    return nothing
 end
 
 ## SOIL MOISTURE
@@ -158,6 +189,16 @@ end
 function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveWet)
     load_monthly_climatology!(soil.monthly_soil_moisture_layer1, soil, varname=soil.varname_layer1)
     load_monthly_climatology!(soil.monthly_soil_moisture_layer2, soil, varname=soil.varname_layer2)
+end
+
+function initialize!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    soil_model::SeasonalSoilMoisture,
+    model::PrimitiveEquation,
+)
+    # initialize land temperature by "running" the step at the current time
+    soil_timestep!(progn, diagn, soil_model, model)
 end
 
 function soil_timestep!(

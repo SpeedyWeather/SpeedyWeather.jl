@@ -8,7 +8,7 @@ to perform a spectral transform. Fields are
 $(TYPEDFIELDS)"""
 struct SpectralTransform{
     NF,
-    ArrayType,
+    ArrayType,                  # non-parametric array type
     VectorType,                 # <: ArrayType{NF, 1},
     VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
     MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
@@ -61,6 +61,9 @@ struct SpectralTransform{
     scratch_memory_column_north::VectorComplexType  # scratch memory for vertically batched Legendre transform
     scratch_memory_column_south::VectorComplexType  # scratch memory for vertically batched Legendre transform
 
+    jm_index_size::Int                              # number of indices per layer in kjm_indices
+    kjm_indices::ArrayType                          # precomputed kjm loop indices map
+
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
     # vector is pole to pole although only northern hemisphere required
@@ -84,6 +87,9 @@ struct SpectralTransform{
     eigenvalues⁻¹::VectorType           # = -1/(l*(l+1))
 end
 
+# eltype of a transform is the number format used within
+Base.eltype(S::SpectralTransform{NF}) where NF = NF
+
 """
 $(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct. With `NF` the number format,
@@ -96,12 +102,13 @@ function SpectralTransform(
     mmax::Integer,                                  # Spectral truncation: orders
     nlat_half::Integer;                             # grid resolution, latitude rings on one hemisphere incl equator
     Grid::Type{<:AbstractGridArray} = DEFAULT_GRID, # type of spatial grid used
-    ArrayType::Type{<:AbstractArray} = Array,       # Array type used for spectral coefficients
+    ArrayType::Type{<:AbstractArray} = Array,       # Array type used for spectral coefficients (can be parametric)
     nlayers::Integer = DEFAULT_NLAYERS,             # number of layers in the vertical (for scratch memory size)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,   # shorten Legendre loop over order m
 ) where NF
 
-    Grid = RingGrids.nonparametric_type(Grid)   # always use nonparametric concrete type
+    Grid = RingGrids.nonparametric_type(Grid)               # always use nonparametric concrete type
+    ArrayType_ = RingGrids.nonparametric_type(ArrayType)    # drop parameters of ArrayType
 
     # RESOLUTION PARAMETERS
     nlat = get_nlat(Grid, nlat_half)            # 2nlat_half but one less if grids have odd # of lat rings
@@ -139,24 +146,24 @@ function SpectralTransform(
     end
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    # north is converted to array type now for help with making the FFT plans
-    scratch_memory_north = ArrayType(zeros(Complex{NF}, nfreq_max, nlayers, nlat_half))
-    scratch_memory_south = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
+    # convert all to the arraytype (e.g. moves array to GPU)
+    scratch_memory_north = ArrayType_(zeros(Complex{NF}, nfreq_max, nlayers, nlat_half))
+    scratch_memory_south = ArrayType_(zeros(Complex{NF}, nfreq_max, nlayers, nlat_half))
 
     # SCRATCH MEMORY TO 1-STRIDE DATA FOR FFTs
-    scratch_memory_grid  = zeros(NF, nlon_max*nlayers)
-    scratch_memory_spec  = zeros(Complex{NF}, nfreq_max*nlayers)
+    scratch_memory_grid  = ArrayType_(zeros(NF, nlon_max*nlayers))
+    scratch_memory_spec  = ArrayType_(zeros(Complex{NF}, nfreq_max*nlayers))
 
     # SCRATCH MEMORY COLUMNS FOR VERTICALLY BATCHED LEGENDRE TRANSFORM
-    scratch_memory_column_north = zeros(Complex{NF}, nlayers)
-    scratch_memory_column_south = zeros(Complex{NF}, nlayers)
+    scratch_memory_column_north = ArrayType_(zeros(Complex{NF}, nlayers))
+    scratch_memory_column_south = ArrayType_(zeros(Complex{NF}, nlayers))
 
     rfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
 
-    fake_grid_data = adapt(ArrayType, zeros(Grid{NF}, nlat_half, nlayers))
+    fake_grid_data = adapt(ArrayType_, zeros(Grid{NF}, nlat_half, nlayers))
 
     # PLAN THE FFTs
     plan_FFTs!(
@@ -164,6 +171,23 @@ function SpectralTransform(
         fake_grid_data, scratch_memory_north, rings, nlons
     )
     
+    # PRECOMPUTE KJM INDICES FOR LEGENDRE TRANSFORM (0-based)
+    # For GPU it's quicker to precompute the indices for the loops in the 
+    # legendre transform and store them in a 3D array rather than computing them 
+    # on the fly. We also store the jm_index_size for the loop so we can 
+    # truncate to fewer layers if needed. 
+    jm_index_size = sum(mmax_truncation .+ 1)
+    kjm_indices = zeros(Int, jm_index_size * nlayers, 3)
+    i = 0
+    for k in 1:nlayers
+        for (j, mmax_j) in enumerate(mmax_truncation) 
+            for m in 1:mmax_j+1
+                i += 1
+                kjm_indices[i, :] .= [k, j, m]
+            end
+        end
+    end
+
     # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
     # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
@@ -219,8 +243,6 @@ function SpectralTransform(
     eigenvalues⁻¹ = inv.(eigenvalues)
     eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
 
-    # guarantee a nonparametric type to construct lower triangular types correctly
-    ArrayType_ = RingGrids.nonparametric_type(ArrayType)
     return SpectralTransform{
         NF,
         ArrayType_,
@@ -242,6 +264,7 @@ function SpectralTransform(
         scratch_memory_north, scratch_memory_south,
         scratch_memory_grid, scratch_memory_spec,
         scratch_memory_column_north, scratch_memory_column_south,
+        jm_index_size, kjm_indices,
         solid_angles, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,

@@ -1,7 +1,7 @@
 abstract type AbstractInitialConditions <: AbstractModelComponent end
 
 export InitialConditions
-@kwdef struct InitialConditions{V,P,T,H} <: AbstractInitialConditions
+@kwdef struct InitialConditions{V, P, T, H} <: AbstractInitialConditions
     vordiv::V = ZeroInitially()
     pres::P = ZeroInitially()
     temp::T = ZeroInitially()
@@ -19,13 +19,13 @@ function initialize!(
     has(model, :humid) && initialize!(progn, IC.humid,  model)
 end
 
-InitialConditions(::Type{<:Barotropic}) = InitialConditions(;vordiv = StartWithRandomVorticity())
-InitialConditions(::Type{<:ShallowWater}) = InitialConditions(;vordiv = ZonalJet())
+InitialConditions(::Type{<:Barotropic}) = InitialConditions(; vordiv = StartWithRandomVorticity())
+InitialConditions(::Type{<:ShallowWater}) = InitialConditions(; vordiv = ZonalJet())
 function InitialConditions(::Type{<:PrimitiveDry})
     vordiv = ZonalWind()
     pres = PressureOnOrography()
     temp = JablonowskiTemperature()
-    return InitialConditions(;vordiv,pres,temp)
+    return InitialConditions(;vordiv, pres, temp)
 end
 
 function InitialConditions(::Type{<:PrimitiveWet})
@@ -33,7 +33,7 @@ function InitialConditions(::Type{<:PrimitiveWet})
     pres = PressureOnOrography()
     temp = JablonowskiTemperature()
     humid = ConstantRelativeHumidity()
-    return InitialConditions(;vordiv,pres,temp,humid)
+    return InitialConditions(;vordiv, pres, temp, humid)
 end
 
 export ZeroInitially
@@ -42,8 +42,23 @@ initialize!(::PrognosticVariables,::ZeroInitially,::AbstractModel) = nothing
 
 # to avoid a breaking change, like ZeroInitially
 export StartFromRest
-struct StartFromRest <: AbstractInitialConditions end
-initialize!(::PrognosticVariables,::StartFromRest,::AbstractModel) = nothing
+@kwdef struct StartFromRest{P, T, H} <: AbstractInitialConditions
+    pres::P = ConstantPressure()
+    temp::T = JablonowskiTemperature()
+    humid::H = ZeroInitially()
+end
+
+initialize!(::PrognosticVariables, ::StartFromRest, ::Barotropic) = nothing
+
+function initialize!(
+    progn::PrognosticVariables,
+    IC::StartFromRest,
+    model::AbstractModel,
+)
+    has(model, :pres)  && initialize!(progn, IC.pres, model)
+    has(model, :temp)  && initialize!(progn, IC.temp, model)
+    has(model, :humid) && initialize!(progn, IC.humid, model)
+end
 
 export StartWithRandomVorticity
 
@@ -62,7 +77,7 @@ $(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::StartWithRandomVorticity,
-                        model::AbstractModel) where NF
+                        model::Barotropic) where NF
 
     lmax = progn.trunc + 1
     power = initial_conditions.power + 1    # +1 as power is summed of orders m
@@ -315,18 +330,34 @@ function initialize!(
 )
     (; m, ω, K, c) = initial_conditions
     (; geometry) = model
+    Ω = model.planet.rotation
+    R = model.spectral_grid.radius
+    g = model.planet.gravity
 
     # Rossby-Haurwitz wave defined through vorticity ζ as a function of
     # longitude λ, latitude θ (in degrees), sigma level σ (vertically constant though)
     # see Williamson et al. 1992, J Computational Physics, eq 145
     ζ(λ, θ, σ) = 2ω*sind(θ) - K*sind(θ)*cosd(θ)^m*(m^2 + 3m + 2)*cosd(m*λ)
+    # see Williamson et al. 1992, J Computational Physics, eq 147 - 149, 146
+    A(λ, θ) = ω/2 * (2Ω+ω)*cosd(θ)^2 + K^2/4*cosd(θ)^(2m)*((m+1)*cosd(θ)^2 + (2m^2-m-2) - 2m^2/(cosd(θ)^2))
+    B(λ, θ) = (2(Ω+ω)*K)/((m+1)*(m+2))*cosd(θ)^m*( (m^2+2m+2) - (m+1)^2*cosd(θ)^2 )
+    C(λ, θ) = K^2/4*cosd(θ)^(2m)*((m+1) * cosd(θ)^2 - (m + 2))
+
+    η(λ, θ) = R^2/g*(A(λ,θ) + B(λ,θ)*cosd(m*λ) + C(λ,θ)*cosd(2m*λ))
+
     set!(progn, geometry, vor = ζ)
+    model isa ShallowWater && set!(progn, geometry, pres = η)
     set!(progn, geometry, div = 0)  # technically not needed, but set to zero for completeness
 
     # filter low values below cutoff amplitude c
     vor = progn.vor[1]  # 1 = first leapfrog timestep
     low_values = abs.(vor) .< c
     vor[low_values] .= 0
+    if model isa ShallowWater
+        pres = progn.pres[1]
+        low_value = abs.(pres) .< c
+        pres[low_value] .= 0
+    end
 
     return nothing
 end
@@ -360,7 +391,7 @@ $(TYPEDSIGNATURES)
 Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::JablonowskiTemperature,
-                        model::AbstractModel) where NF
+                        model::PrimitiveEquation) where NF
 
     (;u₀, η₀, ΔT, Tmin) = initial_conditions
     (;σ_tropopause) = initial_conditions
@@ -538,6 +569,9 @@ function initialize!(   progn::PrognosticVariables,
     return nothing
 end
 
+# for shallow water constant pressure = 0 as pres=interface displacement here
+initialize!(::PrognosticVariables, ::ConstantPressure, ::ShallowWater) = nothing
+
 export ConstantRelativeHumidity
 @kwdef struct ConstantRelativeHumidity <: AbstractInitialConditions
     relhumid_ref::Float64 = 0.7
@@ -546,7 +580,7 @@ end
 function initialize!(  
     progn::PrognosticVariables,
     IC::ConstantRelativeHumidity,
-    model::AbstractModel,
+    model::PrimitiveEquation,
 )
     (; relhumid_ref) = IC
     (; nlayers, σ_levels_full) = model.geometry
@@ -581,7 +615,7 @@ $(TYPEDFIELDS)"""
     # random interface displacement field
     A::Float64 = 2000       # amplitude [m]
     lmin::Int64 = 10        # minimum wavenumber
-    lmax::Int64 = 20        # maximum wavenumber
+    lmax::Int64 = 30        # maximum wavenumber
 end
 
 RandomWaves(S::SpectralGrid; kwargs...) = RandomWaves(;kwargs...) 
@@ -598,11 +632,15 @@ function initialize!(   progn::PrognosticVariables{NF},
     (; A, lmin, lmax) = initial_conditions
     (; trunc) = progn
 
-    η = randn(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
+    # start with matrix to have matrix indexing
+    ηm = randn(Complex{NF}, trunc+2, trunc+1)
 
     # zero out other wavenumbers
-    η[1:min(lmin, trunc+2), :] .= 0
-    η[min(lmax+2, trunc+2):trunc+2, :] .= 0
+    ηm[1:min(lmin, trunc+2), :] .= 0
+    ηm[min(lmax+2, trunc+2):trunc+2, :] .= 0
+
+    # convert to LowerTriangularMatrix with vector indexing
+    η = LowerTriangularArray(ηm)
 
     # scale to amplitude
     η_grid = transform(η, model.spectral_transform)

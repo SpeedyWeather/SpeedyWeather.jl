@@ -88,6 +88,6 @@ The bibtex entry for the paper is:
 ## Funding
 
 MK received funding by the European Research Council under Horizon 2020 within the ITHACA project,
-grant agreement number 741112 from 2021-2022. From 2022-2024 this project is also funded by the
-National Science Foundation NSF. Since 2024, the main funding is from Schmidt Sciences through
-a Eric & Wendy Schmidt AI in Science Fellowship.
+grant agreement number 741112 from 2021-2022. From 2022-2024 this project was also funded by the
+National Science Foundation NSF. Since 2024, the main funding is from Schmidt Sciences LLC through
+MK's Eric & Wendy Schmidt AI in Science Fellowship.

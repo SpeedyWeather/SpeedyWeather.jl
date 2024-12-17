@@ -2,7 +2,7 @@
     @testset for NF in (Float32, Float64)
 
         spectral_grid = SpectralGrid(; NF, nlayers=1)
-        model = ShallowWaterModel(; spectral_grid)
+        model = ShallowWaterModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables
@@ -48,7 +48,7 @@ end
     @testset for NF in (Float32, Float64)
 
         spectral_grid = SpectralGrid(; NF, nlayers=1)
-        model = ShallowWaterModel(; spectral_grid)
+        model = ShallowWaterModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables
@@ -94,7 +94,6 @@ end
                         HEALPixGrid)
 
             SG = SpectralGrid(; NF, Grid, nlayers=1)
-            G = Geometry(SG)
 
             A = Grid(randn(NF, SG.npoints))
             B = copy(A)
@@ -170,7 +169,7 @@ end
     @testset for NF in (Float32, Float64)
 
         spectral_grid = SpectralGrid(; NF, nlayers=2)
-        model = PrimitiveDryModel(; spectral_grid)
+        model = PrimitiveDryModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables
@@ -281,7 +280,7 @@ end
 
             trunc = 31
             spectral_grid = SpectralGrid(; NF, trunc, Grid=FullGaussianGrid, nlayers)
-            model = PrimitiveDryModel(; spectral_grid)
+            model = PrimitiveDryModel(spectral_grid)
             simulation = initialize!(model)
             progn = simulation.prognostic_variables
             diagn = simulation.diagnostic_variables

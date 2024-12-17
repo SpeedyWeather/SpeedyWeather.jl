@@ -148,4 +148,4 @@ function callback!(
     NCDatasets.sync(callback.netcdf_file)
 end
 
-finish!(callback::ParticleTracker,args...) = NCDatasets.close(callback.netcdf_file)
+finalize!(callback::ParticleTracker,args...) = NCDatasets.close(callback.netcdf_file)

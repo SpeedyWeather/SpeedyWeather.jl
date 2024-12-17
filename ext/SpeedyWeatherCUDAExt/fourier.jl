@@ -36,14 +36,14 @@ function SpeedyTransforms.plan_FFTs!(
 end
 
 
-function SpeedyTransforms._fourier_batched!(                     # GRID TO SPECTRAL
+function SpeedyTransforms._fourier_batched!(    # GRID TO SPECTRAL
     f_north::CuArray{<:Complex, 3},             # Fourier-transformed output
     f_south::CuArray{<:Complex, 3},             # and for southern latitudes
     grids::AbstractGridArray{NF, N, <:CuArray}, # gridded input
     S::SpectralTransform,                       # precomputed transform
 ) where {NF<:AbstractFloat, N}
-    (; nlat, nlons, nlat_half) = S          # dimensions
-    (; rfft_plans) = S                      # pre-planned transforms
+    (; nlat, nlons, nlat_half) = S              # dimensions
+    (; rfft_plans) = S                          # pre-planned transforms
     nlayers = size(grids, 2)
 
     @boundscheck SpeedyTransforms.ismatching(S, grids) || throw(DimensionMismatch(S, grids))
@@ -79,15 +79,15 @@ function SpeedyTransforms._fourier_batched!(                     # GRID TO SPECT
 
 end
 
-function SpeedyTransforms._fourier_serial!(                      # GRID TO SPECTRAL
+function SpeedyTransforms._fourier_serial!(     # GRID TO SPECTRAL
     f_north::CuArray{<:Complex, 3},             # Fourier-transformed output
     f_south::CuArray{<:Complex, 3},             # and for southern latitudes
     grids::AbstractGridArray{NF, N, <:CuArray}, # gridded input
     S::SpectralTransform,                       # precomputed transform
 ) where {NF<:AbstractFloat, N}
-    (; nlat, nlons, nlat_half) = S          # dimensions
-    rfft_plans = S.rfft_plans_1D            # pre-planned transforms
-    nlayers = size(grids, 2)                # number of vertical layers
+    (; nlat, nlons, nlat_half) = S              # dimensions
+    rfft_plans = S.rfft_plans_1D                # pre-planned transforms
+    nlayers = size(grids, 2)                    # number of vertical layers
 
     @boundscheck SpeedyTransforms.ismatching(S, grids) || throw(DimensionMismatch(S, grids))
     @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, grids))
@@ -114,6 +114,89 @@ function SpeedyTransforms._fourier_serial!(                      # GRID TO SPECT
             else
                 fill!(view(f_south, 1:nfreq, k, j), 0)
             end
+        end
+    end
+end
+
+
+"""$(TYPEDSIGNATURES)
+Inverse fast Fourier transform (spectral to grid) of Legendre-transformed inputs `g_north` and `g_south`
+to be stored in `grids`. Not to be called directly, use `transform!` instead."""
+function SpeedyTransforms._fourier_batched!(    # SPECTRAL TO GRID
+    grids::AbstractGridArray{NF, N, <:CuArray}, # gridded output
+    g_north::CuArray{<:Complex, 3},             # Legendre-transformed input
+    g_south::CuArray{<:Complex, 3},             # and for southern latitudes
+    S::SpectralTransform,                       # precomputed transform
+) where {NF<:AbstractFloat, N}
+    (; nlat, nlons, nlat_half) = S              # dimensions
+    (; brfft_plans) = S                         # pre-planned transforms
+    nlayers = size(grids, 2)                    # number of vertical layers
+
+    @boundscheck SpeedyTransforms.ismatching(S, grids) || throw(DimensionMismatch(S, grids))
+    @boundscheck nlayers == S.nlayers || throw(DimensionMismatch(S, grids))     # otherwise FFTW complains
+    @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, grids))
+
+    rings = eachring(grids)                 # precomputed ring indices
+    @inbounds for j_north in 1:nlat_half    # symmetry: loop over northern latitudes only
+        j = j_north                         # symmetric index / ring-away from pole index
+        j_south = nlat - j_north + 1        # southern latitude index
+        nlon = nlons[j]                     # number of longitudes on this ring (north or south)
+        nfreq = nlon÷2 + 1                  # linear max Fourier frequency wrt to nlon
+        not_equator = j_north != j_south    # is the latitude ring not on equator?
+
+        brfft_plan = brfft_plans[j]         # FFT planned wrt nlon on ring
+        ilons = rings[j_north]              # in-ring indices northern ring
+
+        # PERFORM FFT, inverse complex to real, hence brfft
+        view(grids.data, ilons, :) .= brfft_plan * g_north[1:nfreq, 1:nlayers, j]
+
+        # southern latitude, don't call redundant 2nd FFT if ring is on equator 
+        ilons = rings[j_south]              # in-ring indices southern ring
+        if not_equator
+            view(grids.data, ilons, :) .= brfft_plan * g_south[1:nfreq, 1:nlayers, j]
+        end
+    end
+end
+
+"""$(TYPEDSIGNATURES)
+(Inverse) Fast Fourier transform (spectral to grid) of Legendre-transformed inputs `g_north` and `g_south`
+to be stored in `grids`. Serial version that does not require the number of vertical layers to be the same
+as precomputed in `S`. Not to be called directly, use `transform!` instead."""
+function SpeedyTransforms._fourier_serial!(         # SPECTRAL TO GRID
+    grids::AbstractGridArray{NF, N, <:CuArray},     # gridded output
+    g_north::CuArray{<:Complex, 3},                 # Legendre-transformed input
+    g_south::CuArray{<:Complex, 3},                 # and for southern latitudes
+    S::SpectralTransform,                           # precomputed transform
+) where {NF<:AbstractFloat, N}
+    (; nlat, nlons, nlat_half) = S                  # dimensions
+    brfft_plans = S.brfft_plans_1D                  # pre-planned transforms
+    nlayers = size(grids, 2)                        # number of vertical layers
+
+    @boundscheck SpeedyTransforms.ismatching(S, grids) || throw(DimensionMismatch(S, grids))
+    @boundscheck nlayers <= S.nlayers || throw(DimensionMismatch(S, grids))     # otherwise FFTW complains
+    @boundscheck size(g_north) == size(g_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, grids))
+
+    rings = eachring(grids)                     # precomputed ring indices
+    @inbounds for (k, k_grid) in zip(1:nlayers, eachgrid(grids))
+        for j_north in 1:nlat_half              # symmetry: loop over northern latitudes only
+            j = j_north                         # symmetric index / ring-away from pole index
+            j_south = nlat - j_north + 1        # southern latitude index
+            nlon = nlons[j]                     # number of longitudes on this ring (north or south)
+            nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
+            not_equator = j_north != j_south    # is the latitude ring not on equator?
+
+            brfft_plan = brfft_plans[j]         # FFT planned wrt nlon on ring
+            ilons = rings[j_north]              # in-ring indices northern ring
+            
+            gn = view(g_north, 1:nfreq, k, j)       # data on northern ring, vertical layer k
+            out = view(grids.data, ilons, k_grid)   # view on scratch memory to store transformed data
+            out .= brfft_plan * gn                  # perform FFT
+
+            # southern latitude, don't call redundant 2nd fft if ring is on equator
+            gs = view(g_south, 1:nfreq, k, j)       # data on southern ring, vertical layer k
+            ilons = rings[j_south]                  # in-ring indices southern ring
+            out = view(grids.data, ilons, k_grid)   # data on southern ring, vertical layer k
+            not_equator && out .= brfft_plan * gs
         end
     end
 end

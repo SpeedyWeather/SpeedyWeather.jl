@@ -42,7 +42,7 @@ using SpeedyWeather
     decorrelation_time::Second = Day(2)
 
     "Stirring strength A [1/s²]"
-    strength::NF = 5e-11
+    strength::NF = 2e-11
 
     "Stirring latitude [˚N]"
     latitude::NF = 45
@@ -197,8 +197,8 @@ function SpeedyWeather.forcing!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     forcing::StochasticStirring,
-    model::AbstractModel,
     lf::Integer,
+    model::AbstractModel,
 )
     # function barrier only
     forcing!(diagn, forcing, model.spectral_transform)
@@ -312,7 +312,7 @@ and just put them together as you like, and as long as you follow some rules.
 spectral_grid = SpectralGrid(trunc=85, nlayers=1)
 stochastic_stirring = StochasticStirring(spectral_grid, latitude=-45)
 initial_conditions = StartFromRest()
-model = BarotropicModel(; spectral_grid, initial_conditions, forcing=stochastic_stirring)
+model = BarotropicModel(spectral_grid; initial_conditions, forcing=stochastic_stirring)
 simulation = initialize!(model)
 run!(simulation)
 

@@ -1,4 +1,5 @@
-# SpeedyWeather.jl
+# SpeedyWeather.jl <img src="https://github.com/user-attachments/assets/977f5f46-ccd3-49d8-950a-8b619df863c3" width="100" />
+
 
 [![CI](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/SpeedyWeather/SpeedyWeather.jl/actions/workflows/CI.yml) 
 [![status](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a/status.svg)](https://joss.theoj.org/papers/515c81a4d6a69e31cc71ded65ac9c36a)
@@ -6,11 +7,13 @@
 [![docs](https://img.shields.io/badge/documentation-latest_release-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/stable/)
 [![docs](https://img.shields.io/badge/documentation-main-blue.svg)](https://speedyweather.github.io/SpeedyWeather.jl/dev/)
 
-SpeedyWeather.jl is a global spectral atmospheric model with simple physics which is developed as a research playground
-with an everything-flexible attitude as long as it is speedy. With minimal code redundancies it supports
+SpeedyWeather.jl is a global atmospheric model with simple physics developed as a research playground
+with an everything-flexible attitude as long as it is speedy. It is easy to use and easy to extend, making 
+atmospheric modelling an interactive experience -- in the terminal, in a notebook or conventionally through scripts.
+With minimal code redundancies it supports
 
 **Dynamics and physics**
-- Different physical equations (barotropic vorticity, shallow water, primitive equations)
+- Different physical equations (barotropic vorticity, shallow water, primitive equations, with and without humidity)
 - Particle advection in 2D for all equations
 - Physics parameterizations for convection, precipitation, boundary layer, etc.
 
@@ -18,9 +21,10 @@ with an everything-flexible attitude as long as it is speedy. With minimal code 
 - Different spatial grids (full and octahedral grids, Gaussian and Clenshaw-Curtis, HEALPix, OctaHEALPix)
 - Different resolutions (T31 to T1023 and higher, i.e. 400km to 10km using linear, quadratic or cubic truncation)
 - Different arithmetics: Float32 (default), Float64, and (experimental) BFloat16, stochastic rounding
-- multi-threading, layer-wise for dynamics, grid point-wise for physics
+- a very fast and flexible spherical harmonics transform library SpeedyTransforms
 
 **User interface**
+- Data visualisation: 2D, 3D, interactive (you can zoom and rotate!) powered by Makie
 - Extensibility: New model components (incl. parameterizations) can be externally defined
 - Modularity: Models are constructed from its components, non-defaults are passed on as argument
 - Interactivity: SpeedyWeather.jl runs in a notebook or in the REPL as well as from scripts
@@ -30,9 +34,9 @@ and Julia will compile to these choices just-in-time.
 
 For an overview of the functionality and explanation see the
 [documentation](https://speedyweather.github.io/SpeedyWeather.jl/dev).
-But as the documentation always lags behind our full functionality you are encouraged
-to [raise an issue](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues) describing
-what you'd like to use SpeedyWeather for.
+You are always encouraged to [raise an issue](https://github.com/SpeedyWeather/SpeedyWeather.jl/issues)
+(even it is not actually an issue but an idea, a suggestion or really anything)
+describing what you'd like to use SpeedyWeather for. We're keen to help!
 
 ## Vision and roadmap
 
@@ -74,21 +78,20 @@ about dos and don'ts. Just express your interest to contribute and we'll be happ
 
 For a more comprehensive tutorial with several examples, see
 [Examples](https://speedyweather.github.io/SpeedyWeather.jl/dev/examples_2D/) in the documentation.
-The interface to SpeedyWeather.jl consist of 5 steps: define the grid, create model components,
+The basic interface to SpeedyWeather.jl consist of 4 steps: define the grid,
 construct the model, initialize, run
 
 ```julia
-spectral_grid = SpectralGrid(trunc=31, nlayers=8)          # define resolution
-orography = EarthOrography(spectral_grid)               # create non-default components
-model = PrimitiveWetModel(; spectral_grid, orography)   # construct model
-simulation = initialize!(model)                         # initialize all model components
-run!(simulation, period=Day(10), output=true)           # aaaand action!
+spectral_grid = SpectralGrid(trunc=31, nlayers=8)   # define resolution
+model = PrimitiveWetModel(spectral_grid)            # construct model
+simulation = initialize!(model)                     # initialize all model components
+run!(simulation, period=Day(10), output=true)       # aaaand action!
 ```
 and you will see
 
 <img src="https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a04fbb10-1cc1-4f77-93f2-7bdf047f277d" width="450"><br>
 
-Hurray🥳 In 5 seconds we just simulated 10 days of the Earth's atmosphere at a speed of 440 years per day.
+Hurray🥳 In a few seconds seconds we just simulated 10 days of the Earth's atmosphere at a speed of 440 years per day.
 This simulation used a T31 spectral resolution on an
 [octahedral Gaussian grid](https://speedyweather.github.io/SpeedyWeather.jl/dev/grids/#Implemented-grids)
 (~400km resolution) solving the primitive equations on 8 vertical levels.
@@ -139,6 +142,18 @@ T85 (150km) resolution and 8 vertical layers.
 
 https://github.com/SpeedyWeather/SpeedyWeather.jl/assets/25530332/a6192374-24d9-4065-9fcc-8b719190472f
 
+## Data visualisation
+
+Difficult to plot spherical data? SpeedyWeather also includes extensions for Makie and GeoMakie
+making it supereasy to create plots and interactively investigate a variables from a simulation.
+Two examples (screen recording those makes it a bit laggy, it's pretty smooth otherwise): Humidity plotted
+on a 50km HEALPix grid 
+
+https://github.com/user-attachments/assets/b02b31eb-e139-4193-89d1-7e277a2af5cc
+
+or the visualising cell centres and faces of the OctaminimalGaussianGrid 
+
+https://github.com/user-attachments/assets/6dfa212a-c5dc-4c54-b274-7755d5baf15c
 
 ## History
 
@@ -189,9 +204,19 @@ compatibilities with older versions are not guaranteed.
 
 ## Benchmarks
 
-The primitive equations at 400km resolution with 8 vertical layers are simulated by
-SpeedyWeather.jl at about 500 simulated years per day, i.e. one year takes about
-3min single-threaded on a CPU. Multi-threading will increase the speed typically by 2-4x.
+The primitive equations at 400km resolution with 8 vertical layers can be simulated by
+SpeedyWeather.jl at 1800 simulated years per day (SYPD) on a single core of newer CPUs with arm architecture
+(M-series MacBooks for example). At that speed, simulating one year takes about 50 seconds
+without output. The complex fused-multiply adds of the spectral transform compile efficiently to
+the large vector extensions of the newer arm chips in single precision.
+Another considerable speed-up comes from the reduced grids minimizing the number of columns for
+which expensive parameterizations like convection have to be computed. The parameterizations
+take up 40-60% of the total simulation time, depending on the grid. Particularly the
+`OctaminimalGaussianGrid`, `OctaHEALPixGrid` and the `HEALPixGrid` are increasingly faster,
+at a small accuracy sacrifice of the then inexact spectral transforms. 
+
+On older CPUs, like the Intel CPU MacBooks, the 1800 SYPD drop to about 500-600 SYPD,
+which is still 2x faster than Fortran SPEEDY which is reported to reach 240 SYPD.
 
 For an overview of typical simulation speeds a user can expect under different model setups see
 [Benchmarks](https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/benchmark).

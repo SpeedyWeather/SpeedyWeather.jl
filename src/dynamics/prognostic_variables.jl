@@ -96,6 +96,9 @@ export PrognosticVariables
     pres::NTuple{NSTEPS, SpectralVariable2D} =
         ntuple(i -> zeros(SpectralVariable2D, trunc+2, trunc+1), NSTEPS)
 
+    "Random pattern following a random process [1]"
+    random_pattern::SpectralVariable2D = zeros(SpectralVariable2D, trunc+2, trunc+1)
+
     "Ocean variables, sea surface temperature and sea ice concentration"
     ocean::PrognosticVariablesOcean{NF, ArrayType, GridVariable2D} =
         PrognosticVariablesOcean{NF, ArrayType, GridVariable2D}(; nlat_half)
@@ -148,6 +151,7 @@ function Base.show(
     println(io, "├ temp:  T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
     println(io, "├ humid: T$trunc, $nlayers-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
     println(io, "├ pres:  T$trunc, 1-layer, $NSTEPS-steps LowerTriangularArray{$NF}")
+    println(io, "├ random_pattern: T$trunc, 1-layer LowerTriangularArray{$NF}")
     println(io, "├┐ocean: PrognosticVariablesOcean{$NF}")
     println(io, "│├ sea_surface_temperature:  $nlat-ring $Grid")
     println(io, "│└ sea_ice_concentration:    $nlat-ring $Grid")
@@ -264,36 +268,65 @@ function set!(
 end
 
 # set LTA <- LTA 
-function set!(var::LowerTriangularArray{T}, L::LowerTriangularArray, varargs...; add::Bool) where T
+function set!(
+    var::LowerTriangularArray,
+    L::LowerTriangularArray,
+    varargs...;
+    add::Bool=false,
+)
     if add 
         if size(var) == size(L)
-            var .+= T.(L) 
+            var .+= L
         else 
             L_var = spectral_truncation(L, size(var, 1, as=Matrix), size(var, 2, as=Matrix))
             var .+= L_var
         end 
     else 
-        size(var) != size(L) || fill!(var, zero(T)) # copyto! copies over the largest subset, when size(var) > size(L), the copyto! isn't enough by itself
+        size(var) != size(L) || fill!(var, 0) # copyto! copies over the largest subset, when size(var) > size(L), the copyto! isn't enough by itself
         copyto!(var, L)
     end 
     return var
 end 
 
 # set LTA <- Grid 
-function set!(var::LowerTriangularArray, grids::AbstractGridArray, geometry::Union{Geometry, Nothing}=nothing, S::Union{Nothing, SpectralTransform}=nothing; add)
-    specs = isnothing(S) ? transform(grids) : transform(grids, S)
+function set!(
+    var::LowerTriangularArray,
+    grids::AbstractGridArray,
+    geometry::Union{Geometry, Nothing}=nothing,
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add::Bool=false,
+)
+    if isnothing(S)
+        specs = transform(grids)
+    else
+        # convert to number format in S, needed for FFTW
+        grids = convert.(eltype(S), grids)
+        specs = transform(grids, S)
+    end
     set!(var, specs; add)
 end
 
 # set LTA <- func 
-function set!(var::LowerTriangularArray, f::Function, geometry::Geometry{NF}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where NF
-    grid = ndims(var) == 1 ? zeros(geometry.Grid{NF}, geometry.nlat_half) : zeros(geometry.Grid{NF}, geometry.nlat_half, geometry.nlayers)
+function set!(
+    var::LowerTriangularArray,
+    f::Function,
+    geometry::Geometry{NF, Grid},
+    S::Union{SpectralTransform, Nothing}=nothing;
+    add::Bool=false,
+) where {NF, Grid}
+    grid = ndims(var) == 1 ? zeros(Grid{NF}, geometry.nlat_half) : zeros(Grid{NF}, geometry.nlat_half, geometry.nlayers)
     set!(grid, f, geometry, S; add=false)
     set!(var, grid, geometry, S; add)
 end
 
 # set LTA <- number
-function set!(var::LowerTriangularArray{T}, s::Number, geometry::Geometry{NF}, S::Union{SpectralTransform, Nothing}=nothing; add::Bool) where {T, NF}
+function set!(
+    var::LowerTriangularArray{T},
+    s::Number,
+    geometry::Geometry{NF},
+    S::Union{SpectralTransform, Nothing}=nothing;
+    add::Bool=false,
+) where {T, NF}
     
     # appropiate normalization, assume standard 2√π normalisation if no transform is given 
     norm_sphere = isnothing(S) ? 2sqrt(π) : S.norm_sphere
@@ -309,7 +342,13 @@ function set!(var::LowerTriangularArray{T}, s::Number, geometry::Geometry{NF}, S
 end 
 
 # set Grid <- Grid
-function set!(var::AbstractGridArray, grids::AbstractGridArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add)
+function set!(
+    var::AbstractGridArray,
+    grids::AbstractGridArray,
+    geometry::Geometry,
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add::Bool=false,
+)
     if add 
         if grids_match(var, grids)
             var .+= grids
@@ -323,13 +362,25 @@ function set!(var::AbstractGridArray, grids::AbstractGridArray, geometry::Geomet
 end 
 
 # set Grid <- LTA
-function set!(var::AbstractGridArray, specs::LowerTriangularArray, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add)
+function set!(
+    var::AbstractGridArray,
+    specs::LowerTriangularArray,
+    geometry::Geometry,
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add::Bool=false,
+)
     grids = isnothing(S) ? transform(specs) : transform(specs, S)
     set!(var, grids, geometry, S; add)
 end
 
 # set Grid <- Func
-function set!(var::AbstractGridArray, f::Function, geometry::Geometry, S::Union{Nothing, SpectralTransform}=nothing; add)
+function set!(
+    var::AbstractGridArray,
+    f::Function,
+    geometry::Geometry,
+    S::Union{Nothing, SpectralTransform}=nothing;
+    add::Bool=false,
+)
     (; londs, latds, σ_levels_full) = geometry
     kernel(a, b) = add ? a+b : b
     for k in eachgrid(var)
@@ -346,7 +397,7 @@ function set!(
     f::Function,
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
-    add
+    add::Bool=false,
 ) where T
     (; londs, latds) = geometry
     kernel(a, b) = add ? a+b : b
@@ -362,7 +413,7 @@ function set!(
     s::Number, 
     geometry::Union{Geometry, Nothing}=nothing, 
     S::Union{Nothing, SpectralTransform}=nothing;
-    add::Bool,
+    add::Bool=false,
 ) where T
     kernel(a, b) = add ? a+b : b
     sT = T(s)
@@ -377,7 +428,7 @@ function set_vordiv!(
     v_func,
     geometry::Geometry,
     S::Union{Nothing, SpectralTransform}=nothing;
-    add::Bool,
+    add::Bool=false,
     coslat_scaling_included::Bool=false,
 )
     u_L = similar(vor) 
@@ -395,15 +446,19 @@ function set_vordiv!(
     u::AbstractGridArray,
     v::AbstractGridArray,
     geometry::Geometry,
-    S::Union{Nothing, SpectralTransform}=nothing;
-    add::Bool,
+    S::SpectralTransform = SpectralTransform(geometry.spectral_grid);
+    add::Bool=false,
     coslat_scaling_included::Bool=false,
 )
     u_ = coslat_scaling_included ? u : RingGrids.scale_coslat⁻¹(u)
     v_ = coslat_scaling_included ? v : RingGrids.scale_coslat⁻¹(v)
 
-    u_spec = isnothing(S) ? transform(u_) : transform(u_, S)
-    v_spec = isnothing(S) ? transform(v_) : transform(v_, S)
+    # convert to number format of spectral transform, otherwise FFTW complains
+    u_ = eltype(S) == eltype(u_) ? u_ : convert.(eltype(S), u_)
+    v_ = eltype(S) == eltype(v_) ? v_ : convert.(eltype(S), v_)
+
+    u_spec = transform(u_, S)
+    v_spec = transform(v_, S)
 
     set_vordiv!(vor, div, u_spec, v_spec, geometry, S; add, coslat_scaling_included=true)
 end 
@@ -415,12 +470,10 @@ function set_vordiv!(
     u::LowerTriangularArray,
     v::LowerTriangularArray,
     geometry::Geometry,
-    S::Union{Nothing, SpectralTransform}=nothing;
-    add::Bool,
+    S::SpectralTransform = SpectralTransform(geometry.spectral_grid);
+    add::Bool=false,
     coslat_scaling_included::Bool=false,
 ) 
-    S = isnothing(S) ? SpectralTransform(geometry.spectral_grid) : S
-     
     u_ = coslat_scaling_included ? u : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
     v_ = coslat_scaling_included ? v : transform(RingGrids.scale_coslat⁻¹(transform(u, S)), S)
 

@@ -119,7 +119,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Finalises the progress meter and the progress txt file."""
-function finish!(F::Feedback)
+function finalize!(F::Feedback)
     ProgressMeter.finish!(F.progress_meter)
     
     if F.output     # write final progress to txt file

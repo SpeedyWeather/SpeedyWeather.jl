@@ -20,7 +20,7 @@ initial_conditions = InitialConditions(
     temp = JablonowskiTemperature(),
     pres = ZeroInitially())
 
-model = PrimitiveDryModel(; spectral_grid, orography, initial_conditions, physics=false)
+model = PrimitiveDryModel(spectral_grid; orography, initial_conditions, physics=false)
 simulation = initialize!(model)
 run!(simulation, period=Day(9))
 nothing # hide
@@ -54,7 +54,7 @@ using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=31, nlayers=8)
 
 # construct model with only Held-Suarez forcing, no other physics
-model = PrimitiveDryModel(;
+model = PrimitiveDryModel(
     spectral_grid,
 
     # Held-Suarez forcing and drag
@@ -117,7 +117,7 @@ land_sea_mask = AquaPlanetMask(spectral_grid)
 orography = NoOrography(spectral_grid)
 
 # create model, initialize, run
-model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography)
+model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography)
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
 nothing # hide
@@ -171,7 +171,7 @@ and `orography` (because `spectral_grid` hasn't changed this is possible).
 convection = DryBettsMiller(spectral_grid, time_scale=Hour(4))
 
 # reuse other model components from before
-model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography, convection)
+model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convection)
 
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
@@ -191,7 +191,7 @@ don't require the `spectral_grid` to be passed on, but some do!)
 convection = NoConvection(spectral_grid)
 
 # reuse other model components from before
-model = PrimitiveWetModel(; spectral_grid, ocean, land_sea_mask, orography, convection)
+model = PrimitiveWetModel(spectral_grid; ocean, land_sea_mask, orography, convection)
 
 simulation = initialize!(model)
 run!(simulation, period=Day(20))
@@ -218,7 +218,7 @@ large_scale_condensation = ImplicitCondensation(spectral_grid)
 convection = SimplifiedBettsMiller(spectral_grid)
 
 # create model, initialize, run
-model = PrimitiveWetModel(; spectral_grid, large_scale_condensation, convection)
+model = PrimitiveWetModel(spectral_grid; large_scale_condensation, convection)
 simulation = initialize!(model)
 run!(simulation, period=Day(10))
 nothing # hide
@@ -244,12 +244,11 @@ nothing # hide
 ![Large-scale precipitation](large-scale_precipitation_acc.png)
 
 Precipitation (both large-scale and convective) are written into the
-`simulation.diagnostic_variables.surface` which, however, accumulate all precipitation
-until netCDF output is written. As we didn't specify `output=true` here, they accumulated
-precipitation over the last 10 days of the simulation which includes the initial
-adjustment of humidity in the tropics (the large band of precipitation here).
-So let us reset these accumulators and integrate for another 6 hours to get the
-precipitation only in the period.
+`simulation.diagnostic_variables.physics` which, however, accumulate all precipitation
+during simulation. In the NetCDF output, precipitation rate (in mm/hr) is calculated
+from accumulated precipitation as a post-processing step.
+More interactively, you can also reset these accumulators and integrate for another 6 hours
+to get the precipitation only in that period.
 
 ```@example precipitation
 # reset accumulators and simulate 6 hours
@@ -269,7 +268,7 @@ nothing # hide
 ![Convective precipitation](convective_precipitation.png)
 
 As the precipitation fields are accumulated meters over the integration period
-(in the case of no output) we divide by 6 hours to get a precipitation rate ``[m/s]``
+we divide by 6 hours to get a precipitation rate ``[m/s]``
 but then multiply with 1 hour and 1000 to get the typical precipitation unit of ``[mm/hr]``.
 
 ## References

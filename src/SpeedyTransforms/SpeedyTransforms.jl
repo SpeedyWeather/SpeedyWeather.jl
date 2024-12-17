@@ -15,10 +15,6 @@ import Adapt: adapt
 using ..LowerTriangularMatrices
 using ..RingGrids
 
-# import SpeedyWeatherCUDAExt
-using SpeedyWeather
-Base.get_extension(SpeedyWeather, :SpeedyWeatherCUDAExt)
-
 # TRANSFORM
 export  SpectralTransform,
         transform!,
@@ -40,10 +36,11 @@ export  curl,
 # TRUNCATION
 export  spectral_truncation,
         spectral_truncation!,
-        spectral_interpolation,
-        power_spectrum
+        spectral_interpolation
 
-# include("../gpu.jl")
+# ANALYSIS
+export  power_spectrum
+
 include("aliasing.jl")
 include("legendrepolarray.jl")
 include("legendre_shortcuts.jl")

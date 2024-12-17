@@ -192,7 +192,7 @@ spectral_grid = SpectralGrid(nparticles = 3)
 ```
 Then the particles live as `Vector{Particle}` inside the prognostic variables
 ```@example particle
-model = BarotropicModel(;spectral_grid)
+model = BarotropicModel(spectral_grid)
 simulation = initialize!(model)
 simulation.prognostic_variables.particles
 ```
@@ -222,7 +222,7 @@ we choose the first (=top-most) layer although this is the default anyway. Now w
 advect our three particles we have defined above
 
 ```@example particle
-model = BarotropicModel(;spectral_grid, particle_advection)
+model = BarotropicModel(spectral_grid; particle_advection)
 simulation = initialize!(model)
 simulation.prognostic_variables.particles
 ```
@@ -258,7 +258,7 @@ The callback is then added after the model is created
 
 ```@example particle_tracker
 particle_advection = ParticleAdvection2D(spectral_grid)
-model = ShallowWaterModel(;spectral_grid, particle_advection)
+model = ShallowWaterModel(spectral_grid; particle_advection)
 add!(model.callbacks, particle_tracker)
 ```
 

@@ -13,7 +13,7 @@
         spectral_grid = SpectralGrid(trunc=31, nlayers=nlayers, nparticles=100)
         particle_advection = ParticleAdvection2D(spectral_grid)
 
-        model = Model(;spectral_grid, particle_advection)
+        model = Model(spectral_grid; particle_advection)
         add!(model.callbacks, ParticleTracker(spectral_grid))
 
         simulation = initialize!(model)

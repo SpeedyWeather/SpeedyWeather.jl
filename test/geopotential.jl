@@ -2,7 +2,7 @@
     for NF in (Float32, Float64)
         nlayers = 8
         spectral_grid = SpectralGrid(; NF, nlayers, Grid=FullGaussianGrid)
-        model = PrimitiveWetModel(; spectral_grid)
+        model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables
@@ -33,7 +33,7 @@ end
 @testset "Add geopotential and kinetic energy, compute -∇²B term, no errors" begin
     for NF in (Float32, Float64)
         spectral_grid = SpectralGrid(; NF, nlayers=8, Grid=FullGaussianGrid)
-        model = PrimitiveWetModel(; spectral_grid)
+        model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables
@@ -56,7 +56,7 @@ end
 @testset "Virtual temperature calculation" begin
     for NF in (Float32, Float64)
         spectral_grid = SpectralGrid(; NF, nlayers=8, Grid=FullGaussianGrid)
-        model = PrimitiveWetModel(; spectral_grid)
+        model = PrimitiveWetModel(spectral_grid)
         simulation = initialize!(model)
         progn = simulation.prognostic_variables
         diagn = simulation.diagnostic_variables

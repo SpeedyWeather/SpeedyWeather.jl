@@ -29,7 +29,7 @@ import ProgressMeter
 export DateTime, Second, Minute, Hour, Day, Week
 
 # export functions that have many cross-component methods
-export initialize!, finish!
+export initialize!, finalize!
 
 include("utility_functions.jl")
 
@@ -57,9 +57,11 @@ export  FullClenshawGrid, FullClenshawArray,
         OctahedralClenshawGrid, OctahedralClenshawArray,
         HEALPixGrid, HEALPixArray,
         OctaHEALPixGrid, OctaHEALPixArray,
+        OctaminimalGaussianGrid, OctaminimalGaussianArray,
         eachring, eachgrid, plot
 export  AnvilInterpolator
 export  spherical_distance
+export  zonal_mean
 
 include("RingGrids/RingGrids.jl")
 using .RingGrids
@@ -70,10 +72,15 @@ export transform, transform!
 export spectral_truncation, spectral_truncation!
 export curl, divergence, curl!, divergence!
 export ∇, ∇², ∇⁻², ∇!, ∇²!, ∇⁻²!
+export power_spectrum
 
 include("SpeedyTransforms/SpeedyTransforms.jl")
 using .SpeedyTransforms
 import .SpeedyTransforms: prettymemory
+
+# to be defined in GeoMakie extension
+export globe
+function globe end
 
 # Utility for GPU / KernelAbstractions
 include("gpu.jl")                               
@@ -115,6 +122,7 @@ include("dynamics/scaling.jl")
 include("dynamics/tendencies.jl")
 include("dynamics/hole_filling.jl")
 include("dynamics/particle_advection.jl")
+include("dynamics/random_process.jl")
 
 # PARAMETERIZATIONS
 include("physics/albedo.jl")
@@ -128,8 +136,10 @@ include("physics/large_scale_condensation.jl")
 include("physics/surface_fluxes.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
+include("physics/optical_depth.jl")
 include("physics/shortwave_radiation.jl")
 include("physics/longwave_radiation.jl")
+include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND
 include("physics/ocean.jl")
@@ -151,4 +161,5 @@ include("models/shallow_water.jl")
 include("models/primitive_dry.jl")
 include("models/primitive_wet.jl")
 include("models/tree.jl")
+include("models/set.jl")
 end
