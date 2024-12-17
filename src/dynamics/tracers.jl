@@ -43,9 +43,4 @@ export deactivate!
 deactivate!(model::AbstractModel, tracers::Tracer...) = deactivate!(model.tracers, tracers...)
 deactivate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers, value=false)
 
-delete!(model::AbstractModel, tracers::Tracer...) = delete!(model.tracers, tracers...)
-function delete!(dict::TRACER_DICT, tracers::Tracer...)
-    for tracer in tracers
-        delete!(dict, tracer.name)
-    end
-end
+Base.delete!(model::AbstractModel, tracer::Tracer) = delete!(model.tracers, tracer.name)
