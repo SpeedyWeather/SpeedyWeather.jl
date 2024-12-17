@@ -1,0 +1,27 @@
+env:
+  SECRET_CODECOV_TOKEN: "..."
+
+steps:
+  - label: "Julia CUDA v1.11"
+    matrix:
+      setup:
+        version:
+          - "1.11"
+    plugins:
+      - JuliaCI/julia#v1:
+          version: "{{matrix.version}}"
+      - JuliaCI/julia-coverage#v1:
+          codecov: true
+    command: |
+      julia -e 'println("---- :julia: Instantiating project")
+                using Pkg
+                Pkg.develop(; path=pwd())
+                Pkg.add(["CUDA"])'
+
+      julia -e 'println("+++ :julia: Running GPU tests")
+                include("test/GPU/runtests.jl")'
+    agents:
+      queue: "juliagpu"
+      cuda: "*"
+    if: build.message !~ /\[skip tests\]/
+    timeout_in_minutes: 60
