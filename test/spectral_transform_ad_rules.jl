@@ -259,12 +259,14 @@ end
                         u = zero(vor)
                         v = zero(vor)
                         SpeedyWeather.SpeedyTransforms.UV_from_vor!(u, v, vor, S)
-                        return ()
+                        return cat(u, v, dims=2)
                     end 
                     
+                    uv_input = cat(u, v, dims=2)
+                    duv_input = zero(uv_input)
 
-                    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> SpeedyWeather.SpeedyTransforms.UV_from_vor!(u, v, x, S), )
-                    @test isapprox(du, fd_jvp[1][1])
+                    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> uvfvor(x, S), duv_input, vor)
+                    @test isapprox(du, fd_jvp[1])
 
                     # Δ
 
