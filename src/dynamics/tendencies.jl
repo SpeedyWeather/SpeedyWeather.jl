@@ -9,6 +9,7 @@ function dynamics_tendencies!(
     forcing!(diagn, progn, model.forcing, model, lf)    # = (Fᵤ, Fᵥ) forcing for u, v
     drag!(diagn, progn, model.drag, model, lf)          # drag term for u, v
     vorticity_flux!(diagn, model)                       # = ∇×(v(ζ+f) + Fᵤ, -u(ζ+f) + Fᵥ)
+    tracer_advection!(diagn, model)
 end
 
 """
@@ -36,6 +37,9 @@ function dynamics_tendencies!(
     
     # = -∇⋅(uh, vh), tendency for "pressure" η
     volume_flux_divergence!(diagn, orography, atmosphere, geometry, spectral_transform)
+    
+    # advect all tracers
+    tracer_advection!(diagn, model)
 end
 
 """$(TYPEDSIGNATURES)
@@ -454,6 +458,23 @@ end
 # no humidity tendency for dry core
 humidity_tendency!(::DiagnosticVariables, ::PrimitiveDry) = nothing
 
+function tracer_advection!(
+    diagn::DiagnosticVariables,
+    model::AbstractModel,
+)
+    G = model.geometry
+    S = model.spectral_transform
+
+    for (name, tracer) in model.tracers
+        tracer_tend = diagn.tendencies.tracers_tend[name]
+        tracer_tend_grid = diagn.tendencies.tracers_tend_grid[name]
+        tracer_grid = diagn.grid.tracers_grid[name]
+        
+        # add horizontal advection to parameterization + vertical advection + forcing/drag tendencies
+        tracer.active && horizontal_advection!(tracer_tend, tracer_tend_grid, tracer_grid, diagn, G, S, add=true)
+    end
+end
+
 function horizontal_advection!( 
     A_tend::LowerTriangularArray,       # Ouput: tendency to write into
     A_tend_grid::AbstractGridArray,     # Input: tendency incl prev terms
@@ -746,6 +767,10 @@ function SpeedyTransforms.transform!(
     transform!(u_grid, U, S, unscale_coslat=true)
     transform!(v_grid, V, S, unscale_coslat=true)
  
+    for (name, tracer) in model.tracers
+        tracer.active && transform!(diagn.grid.tracers_grid[name], progn.tracers[name][lf], S)
+    end
+
     # transform random pattern for random process unless NoRandomProcess
     transform!(diagn, progn, lf, model.random_process, S)
 
@@ -787,6 +812,10 @@ function SpeedyTransforms.transform!(
     transform!(u_grid, U, S, unscale_coslat=true)
     transform!(v_grid, V, S, unscale_coslat=true)
 
+    for (name, tracer) in model.tracers
+        tracer.active && transform!(diagn.grid.tracers_grid[name], progn.tracers[name][lf], S)
+    end
+
     # transform random pattern for random process unless NoRandomProcess
     transform!(diagn, progn, lf, model.random_process, S)
 
@@ -825,6 +854,12 @@ function SpeedyTransforms.transform!(
         @. humid_grid_prev = humid_grid
         @. u_grid_prev = u_grid
         @. v_grid_prev = v_grid
+
+        for (name, tracer) in model.tracers
+            if tracer.active
+                diagn.grid.tracers_grid_prev[name] .= diagn.grid.tracers_grid[name]
+            end
+        end
     end
 
     transform!(vor_grid,  vor,  S)  # get vorticity on grid from spectral vor
@@ -865,6 +900,16 @@ function SpeedyTransforms.transform!(
         @. humid_grid_prev = humid_grid
         @. u_grid_prev = u_grid
         @. v_grid_prev = v_grid
+
+        for (name, tracer) in model.tracers
+            if tracer.active
+                diagn.grid.tracers_grid_prev[name] .= diagn.grid.tracers_grid[name]
+            end
+        end
+    end
+
+    for (name, tracer) in model.tracers
+        tracer.active && transform!(diagn.grid.tracers_grid[name], progn.tracers[name][lf], S)
     end
 
     # transform random pattern for random process unless NoRandomProcess
