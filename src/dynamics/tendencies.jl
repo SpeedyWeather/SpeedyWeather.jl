@@ -97,6 +97,9 @@ function dynamics_tendencies!(
     # add -∇²(E+ϕ+RTₖlnpₛ) term to div tendency
     bernoulli_potential!(diagn, spectral_transform)
 
+    # advect all tracers
+    tracer_advection!(diagn, model)
+
     return nothing
 end
 

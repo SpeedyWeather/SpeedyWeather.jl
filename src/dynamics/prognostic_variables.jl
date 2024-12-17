@@ -212,6 +212,8 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     return progn_new
 end
 
+"""$(TYPEDSIGNATURES)
+Add `tracers` to the prognostic variables `progn` in `progn.tracers::Dict`."""
 function add!(progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D}, tracers::Tracer...
     ) where {
         NF,                     # number format
@@ -223,5 +225,13 @@ function add!(progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable
     (; trunc, nlayers) = progn
     for tracer in tracers
         progn.tracers[tracer.name] = ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), nsteps)
+    end
+end
+
+"""$(TYPEDSIGNATURES)
+Delete `tracers` in the prognostic variables `progn` in `progn.tracers::Dict`."""
+function Base.delete!(progn::PrognosticVariables, tracers::Tracer...)
+    for tracer in tracers
+        delete!(progn.tracers, tracer.name)
     end
 end

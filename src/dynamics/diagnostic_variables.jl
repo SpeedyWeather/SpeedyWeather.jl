@@ -482,6 +482,15 @@ function add!(diagn::DiagnosticVariables{
     end
 end
 
+function Base.delete!(diagn::DiagnosticVariables, tracers::Tracer...)
+    for tracer in tracers
+        delete!(diagn.tendencies.tracers_tend, tracer.name)
+        delete!(diagn.tendencies.tracers_tend_grid, tracer.name)
+        delete!(diagn.grid.tracers_grid, tracer.name)
+        delete!(diagn.grid.tracers_grid_prev, tracer.name)
+    end
+end
+
 """$(TYPEDSIGNATURES)
 Set the tendencies for the barotropic model to `x`."""
 function Base.fill!(tendencies::Tendencies, x, ::Type{<:Barotropic})
@@ -489,11 +498,11 @@ function Base.fill!(tendencies::Tendencies, x, ::Type{<:Barotropic})
     fill!(tendencies.v_tend_grid, x)
     fill!(tendencies.vor_tend, x)
 
-    for (name, tracer) in tendencies.tracers_tend
+    for tracer in values(tendencies.tracers_tend)
         fill!(tracer, x)
     end
 
-    for (name, tracer) in tendencies.tracers_tend_grid
+    for tracer in values(tendencies.tracers_tend_grid)
         fill!(tracer, x)
     end
 

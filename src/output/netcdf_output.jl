@@ -1118,7 +1118,7 @@ function output!(
     model::AbstractModel,
 )
     tracer = output.grid3D
-    tracer_grid = diagn.grid.tracers_grid[output.name]
+    tracer_grid = diagn.grid.tracers_grid[Symbol(variable.name)]
     RingGrids.interpolate!(tracer, tracer_grid, output.interpolator)
 
     round!(tracer, variable.keepbits)
