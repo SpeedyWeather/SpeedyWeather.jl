@@ -13,7 +13,7 @@ steps:
       julia -e 'println("---- :julia: Instantiating project")
                 using Pkg
                 Pkg.develop(; path=pwd())
-                Pkg.add(["CUDA"])'
+                Pkg.add(["CUDA","Adapt"])'
 
       julia -e 'println("+++ :julia: Running GPU tests")
                 include("test/GPU/runtests.jl")'
