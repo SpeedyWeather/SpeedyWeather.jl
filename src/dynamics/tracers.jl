@@ -29,8 +29,9 @@ end
 add!(vars::AbstractVariables, tracer_dict::TRACER_DICT) = add!(vars, values(tracer_dict)...)
 
 export activate!
+activate!(simulation::AbstractSimulation, tracers::Tracer...) = activate!(simulation.model, tracers...)
 activate!(model::AbstractModel, tracers::Tracer...) = activate!(model.tracers, tracers...)
-activate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers, value=true)
+activate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers..., value=true)
 function _activate!(dict::TRACER_DICT, tracers::Tracer...; value::Bool=true)
     for tracer in tracers
         dict[tracer.name].active = value
@@ -38,8 +39,9 @@ function _activate!(dict::TRACER_DICT, tracers::Tracer...; value::Bool=true)
 end
 
 export deactivate!
+deactivate!(simulation::AbstractSimulation, tracers::Tracer...) = deactivate!(simulation.model, tracers...)
 deactivate!(model::AbstractModel, tracers::Tracer...) = deactivate!(model.tracers, tracers...)
-deactivate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers, value=false)
+deactivate!(dict::TRACER_DICT, tracers::Tracer...) = _activate!(dict, tracers..., value=false)
 
 Base.delete!(model::AbstractModel, tracer::Tracer) = delete!(model.tracers, tracer.name)
 function Base.delete!(simulation::AbstractSimulation, tracer::Tracer)
