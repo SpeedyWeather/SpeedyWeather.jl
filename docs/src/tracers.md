@@ -9,7 +9,7 @@ without changes along that trajectory.
 ```
 
 If the tracer ``q`` does not impact the flow it is considered _passive_.
-Humidity, for example, is an _active_ tracer as it changes the [Geopotential](ref)
+Humidity, for example, is an _active_ tracer as it changes the [Geopotential](@ref)
 (and therefore the pressure gradient force) through the [Virtual temperature](@ref).
 A tracer is conserved in the absence of sources or sinks (the zero on the right-hand side above).
 Aerosols from wildfires might be considered to be a passive tracer, but the
@@ -133,7 +133,7 @@ the second to some random values on a grid (transforms automatically!),
 and the third sets the tracer to a Gaussian ridge that runs through
 the Pacific (see [Tracer visualisation](@ref) below).
 
-For more examples how to use `set!` see [Changing orography manually](ref),
+For more examples how to use `set!` see [Changing orography manually](@ref),
 [Manual land-sea mask](@ref), and
 [Rossby-Haurwitz wave in a BarotropicModel](@ref).
 But note that because we are setting a (in general) 3D variable here
