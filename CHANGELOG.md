@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- CUDA-ised spectral transform [#602](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/602)
 - ConvectiveHeating implemented [#639](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/639)
 - Number format flexibility with set! [#634](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/634)
 - Forcing/drag for primitive models [#635](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/635)
