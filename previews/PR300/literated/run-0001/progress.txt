@@ -1,0 +1,27 @@
+Starting SpeedyWeather.jl run 0001 on Wed, 24 May 2023 23:10:30
+Integrating 30.0 days at a spectral resolution of T63 on a 96-ring OctahedralGaussianGrid with 10944 grid points.
+Number format is Float32.
+All data will be stored in /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/docs/build/literated/run-0001.
+
+  5%, ETA: 0:00:18, 347.11 years/day
+ 10%, ETA: 0:00:12, 694.22 years/day
+ 15%, ETA: 0:00:09, 1041.33 years/day
+ 20%, ETA: 0:00:08, 1388.45 years/day
+ 25%, ETA: 0:00:07, 1735.56 years/day
+ 30%, ETA: 0:00:06,  2.08 millenia/day
+ 35%, ETA: 0:00:06, 803.82 years/day
+ 40%, ETA: 0:00:05, 832.10 years/day
+ 45%, ETA: 0:00:05, 859.52 years/day
+ 50%, ETA: 0:00:04, 860.69 years/day
+ 55%, ETA: 0:00:04, 881.50 years/day
+ 60%, ETA: 0:00:03, 880.58 years/day
+ 65%, ETA: 0:00:03, 898.05 years/day
+ 70%, ETA: 0:00:02, 912.76 years/day
+ 75%, ETA: 0:00:02, 910.24 years/day
+ 80%, ETA: 0:00:02, 911.20 years/day
+ 85%, ETA: 0:00:01, 908.94 years/day
+ 90%, ETA: 0:00:01, 919.83 years/day
+ 95%, ETA: 0:00:00, 930.03 years/day
+100%, ETA: 0:00:00, 927.08 years/day
+
+Integration done in 7 seconds, 660 milliseconds.

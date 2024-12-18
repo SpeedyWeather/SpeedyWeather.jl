@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Analysis · SpeedyWeather.jl</title><meta name="title" content="Analysis · SpeedyWeather.jl"/><meta property="og:title" content="Analysis · SpeedyWeather.jl"/><meta property="twitter:title" content="Analysis · SpeedyWeather.jl"/><meta name="description" content="Documentation for SpeedyWeather.jl."/><meta property="og:description" content="Documentation for SpeedyWeather.jl."/><meta property="twitter:description" content="Documentation for SpeedyWeather.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">SpeedyWeather.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../installation/">Installation</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Running SpeedyWeather</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../how_to_run_speedy/">How to run SpeedyWeather</a></li><li><a class="tocitem" href="../examples_2D/">Examples 2D</a></li><li><a class="tocitem" href="../examples_3D/">Examples 3D</a></li><li><a class="tocitem" href="../initial_conditions/">Initial conditions</a></li><li class="is-active"><a class="tocitem" href>Analysis</a><ul class="internal"><li><a class="tocitem" href="#Advantages-of-online-analysis"><span>Advantages of online analysis</span></a></li><li><a class="tocitem" href="#Mass-conservation"><span>Mass conservation</span></a></li><li><a class="tocitem" href="#Energy"><span>Energy</span></a></li><li><a class="tocitem" href="#Potential-vorticity"><span>Potential vorticity</span></a></li><li><a class="tocitem" href="#Absolute-angular-momentum"><span>Absolute angular momentum</span></a></li><li><a class="tocitem" href="#Circulation"><span>Circulation</span></a></li><li><a class="tocitem" href="#Potential-enstrophy"><span>Potential enstrophy</span></a></li><li><a class="tocitem" href="#Online-diagnostics"><span>Online diagnostics</span></a></li></ul></li><li><a class="tocitem" href="../structure/">Tree structure</a></li><li><a class="tocitem" href="../particles/">Particle advection</a></li><li><a class="tocitem" href="../output/">NetCDF output</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Extending SpeedyWeather</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../extensions/">Extensions</a></li><li><a class="tocitem" href="../forcing_drag/">Forcing and drag</a></li><li><a class="tocitem" href="../parameterizations/">Parameterizations</a></li><li><a class="tocitem" href="../orography/">Orography</a></li><li><a class="tocitem" href="../land_sea_mask/">Land-Sea Mask</a></li><li><a class="tocitem" href="../ocean/">Ocean</a></li><li><a class="tocitem" href="../custom_netcdf_output/">NetCDF output variables</a></li><li><a class="tocitem" href="../callbacks/">Callbacks</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">Dynamics</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../barotropic/">Barotropic model</a></li><li><a class="tocitem" href="../shallowwater/">Shallow water model</a></li><li><a class="tocitem" href="../primitiveequation/">Primitive equation model</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">Physics</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../large_scale_condensation/">Large-scale condensation</a></li><li><a class="tocitem" href="../convection/">Convection</a></li><li><a class="tocitem" href="../radiation/">Radiation</a></li><li><a class="tocitem" href="../vertical_diffusion/">Vertical diffusion</a></li><li><a class="tocitem" href="../surface_fluxes/">Surface fluxes</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-7" type="checkbox"/><label class="tocitem" for="menuitem-7"><span class="docs-label">Discretization</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../spectral_transform/">Spherical Harmonic Transform</a></li><li><a class="tocitem" href="../grids/">Grids</a></li></ul></li><li><a class="tocitem" href="../ringgrids/">RingGrids</a></li><li><a class="tocitem" href="../lowertriangularmatrices/">LowerTriangularMatrices</a></li><li><input class="collapse-toggle" id="menuitem-10" type="checkbox"/><label class="tocitem" for="menuitem-10"><span class="docs-label">SpeedyTransforms</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../speedytransforms/">Spectral transforms</a></li><li><a class="tocitem" href="../gradients/">Gradient operators</a></li></ul></li><li><a class="tocitem" href="../functions/">Function and type index</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Running SpeedyWeather</a></li><li class="is-active"><a href>Analysis</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Analysis</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/SpeedyWeather/SpeedyWeather.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/docs/src/analysis.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Analysing-a-simulation"><a class="docs-heading-anchor" href="#Analysing-a-simulation">Analysing a simulation</a><a id="Analysing-a-simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Analysing-a-simulation" title="Permalink"></a></h1><p>While you can analyze a SpeedyWeather simulation through its <a href="../output/#NetCDF-output">NetCDF output</a> (i.e., <em>offline</em> analysis), as most users will be used to with other models, you can also reuse a lot of functionality from SpeedyWeather interactively for analysis. This makes SpeedyWeather beyond being a model for the atmospheric general circulation also a library with many functions for the analysis of simulations. Often this also avoids the two-language problem that you will face if you run a simulation with a model in one language but then do the data analysis in another, treating the model as a blackbox although it likely has many of the functions you will need for analysis already defined. With SpeedyWeather we try to avoid this and are working towards a  more unified approach in atmospheric modelling where simulation and analysis are done interactively with the same library: SpeedyWeather.jl.</p><h2 id="Advantages-of-online-analysis"><a class="docs-heading-anchor" href="#Advantages-of-online-analysis">Advantages of online analysis</a><a id="Advantages-of-online-analysis-1"></a><a class="docs-heading-anchor-permalink" href="#Advantages-of-online-analysis" title="Permalink"></a></h2><p>Now you could run a SpeedyWeather simulation, and analyse the <a href="../output/#NetCDF-output">NetCDF output</a> but that comes with several issues related to accuracy</p><ul><li>If you use a reduced grid for the simulation, then the output will (by default) be interpolated on a full grid. This interpolation introduces an error.</li><li>Computing integrals over gridded data on the sphere by weighting every grid point according to its area is not the most accurate numerical integration.</li><li>Computing gradients over gridded data comes with similar issues. While our <a href="../ringgrids/#RingGrids">RingGrids</a> are always equidistant in longitude, they are not necessarily in latitude.</li></ul><p>The first point you can avoid by running a simulation on one of the full grids that are implemented, see <a href="../how_to_run_speedy/#SpectralGrid">SpectralGrid</a>. But that also impacts the simulation and for various reasons we don&#39;t run on full grids by default.</p><p>The second point you can address by defining a more advanced numerical integration scheme, but that likely requires you to depend on external libraries and then, well, you could also just depend on SpeedyWeather.jl directly, because we have to do these computations internally anyway. Similar for the third point, many gradients have to be computed on every time step and we do that with spectral transforms to reduce the discretization error.</p><p>The following contains a (hopefully growing) list of examples of how a simulation can be analysed interactively. We call this <em>online</em> analysis because you are directly using the functionality from the model as if it was a library.  For simplicity, we use the <a href="../shallowwater/#shallow_water_model">shallow water model</a> to demonstrate this.</p><h2 id="Mass-conservation"><a class="docs-heading-anchor" href="#Mass-conservation">Mass conservation</a><a id="Mass-conservation-1"></a><a class="docs-heading-anchor-permalink" href="#Mass-conservation" title="Permalink"></a></h2><p>In the absence of sources and sinks for the interface displacement <span>$\eta$</span> in the <a href="../shallowwater/#shallow_water_model">shallow water equations</a>, total mass (or equivalently volume as density is constant) is conserved. The total volume is defined as the integral of the dynamic layer thickness <span>$h = \eta + H - H_b$</span> (<span>$H$</span> is the layer thickness at rest, <span>$H_b$</span> is orography) over the surface <span>$A$</span> of the sphere</p><p class="math-container">\[M = \iint h dA = \iint \left(\eta + H - H_b\right) dA\]</p><p>to check for conservation we want to assess that</p><p class="math-container">\[\frac{\partial M}{\partial t} = 0\]</p><p>And because <span>$V = \iint H dA - \iint H_b dA$</span>, the total volume at rest, is a constant (<span>$H$</span> is a global constant, the orography <span>$H_b$</span> does not change with time) we can just check whether <span>$\iint \eta dA$</span> changes over time. Instead of computing this integral in grid-point space, we use the spectral <span>$\eta$</span> whereby the coefficient of the first spherical harmonic (the <span>$l = m = 0$</span> mode, or wavenumber 0, see <a href="../spectral_transform/#Spherical-Harmonic-Transform">Spherical Harmonic Transform</a>) encodes the global average.</p><pre><code class="language-julia hljs">using SpeedyWeather
+spectral_grid = SpectralGrid(trunc=31, nlayers=1)
+model = ShallowWaterModel(;spectral_grid)
+simulation = initialize!(model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{ShallowWaterModel}
+├ prognostic_variables::PrognosticVariables{...}
+├ diagnostic_variables::DiagnosticVariables{...}
+└ model::ShallowWaterModel{...}</code></pre><p>Now we check <span>$\eta_{0,0}$</span> the <span>$l = m = 0$</span> coefficent of the inital conditions of that simulation with</p><pre><code class="language-julia hljs">simulation.prognostic_variables.pres[1][1]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1.1815667f0 + 0.0f0im</code></pre><p><code>[1][1]</code> pulls the first Leapfrog time step and of that the first element of the underlying <a href="../lowertriangularmatrices/#lowertriangularmatrices">LowerTriangularMatrix</a> which is the coefficient of the <span>$l = m = 0$</span> harmonic. Its imaginary part is always zero (which is true for any zonal harmonic <span>$m=0$</span> as its imaginary part would just unnecessarily rotate something zonally constant in zonal direction), so you can <code>real</code> it. Also for spherical harmonic transforms there is a norm of the sphere by which you have to divide to get your mean value in the original units</p><pre><code class="language-julia hljs">a = model.spectral_transform.norm_sphere    # = 2√π = 3.5449078
+η_mean = real(simulation.prognostic_variables.pres[1][1]) / a</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.3333138f0</code></pre><p>So the initial conditions in this simulation are such that the global mean interface displacement is that value in meters. You would need to multiply by the area of the sphere <span>$4\pi R^2$</span> (radius <span>$R$</span>) to get the actual integral from above, but because that doesn&#39;t change with time either, we just want to check that <code>η_mean</code> doesn&#39;t change with time. Which is equivalent to <span>$\partial_t \iint \eta dA = 0$</span> and so volume conservation and because density is constant also mass conservation. Let&#39;s check what happens after the simulation ran for some days</p><pre><code class="language-julia hljs">run!(simulation, period=Day(10))
+
+# now we check η_mean again
+η_mean_later = real(simulation.prognostic_variables.pres[1][1]) / a</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.3333138f0</code></pre><p>which is <em>exactly</em> the same. So mass is conserved, woohoo. </p><p>Insight from a numerical perspective: The tendency of <span>$\eta$</span> is <span>$\partial_t \eta = -\nabla \cdot (\mathbf{u} h)$</span> which is a divergence of a flux. Calculating the divergence in spherical harmonics always sets the <span>$l=m=0$</span> mode to zero exactly (the gradient of a periodic variable has zero mean) so the time integration here is always with an exactly zero tendency.</p><h2 id="Energy"><a class="docs-heading-anchor" href="#Energy">Energy</a><a id="Energy-1"></a><a class="docs-heading-anchor-permalink" href="#Energy" title="Permalink"></a></h2><p>The total energy in the <a href="../shallowwater/#shallow_water_model">shallow water equations</a> is the sum of the kinetic energy density <span>$\frac{1}{2}(u^2 + v^2)$</span> and the potential energy density <span>$gz$</span> integrated over the total volume (times <span>$h=\eta+H-H_b$</span> for the vertical then integrated over the sphere <span>$\iint dA$</span>).</p><p class="math-container">\[\begin{align}
+E &amp; = \iint \left[ \int_{H_b}^{\eta}\frac{1}{2}\left(u^2 + v^2 + gz\right)dz \right]dA \\
+  &amp; = \iint \frac{1}{2}\left(u^2 + v^2 + gh\right)h dA
+\end{align}\]</p><p>In contrast to the <a href="#Mass-conservation">Mass conservation</a> which, with respect to the spectral transform, is a linear calculation, here we need to multiply variables, which has to be done in grid-point space. Then we can transform to spectral space for the global integral as before. Let us define a <code>total_energy</code> function as</p><pre><code class="language-julia hljs">using SpeedyWeather
+function total_energy(u, v, η, model)
+    H = model.atmosphere.layer_thickness
+    Hb = model.orography.orography
+    g = model.planet.gravity
+
+    h = @. η + H - Hb               # layer thickness between the bottom and free surface
+    E = @. h/2*(u^2 + v^2) + g*h^2  # vertically-integrated mechanical energy
+
+    # transform to spectral, take l=m=0 mode at [1] and normalize for mean
+    return E_mean = real(transform(E)[1]) / model.spectral_transform.norm_sphere
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">total_energy (generic function with 1 method)</code></pre><p>So at the current state of our simulation we have a total energy (per square meter as we haven&#39;t multiplied by the surface area of the planet).</p><pre><code class="language-julia hljs"># flat copies for convenience
+u = simulation.diagnostic_variables.grid.u_grid[:, 1]
+v = simulation.diagnostic_variables.grid.v_grid[:, 1]
+η = simulation.diagnostic_variables.grid.pres_grid
+
+TE = total_energy(u, v, η, model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">6.750372f8</code></pre><p>with units of <span>$m^3 s^{-2}$</span> (multiplying by surface area of the sphere and density of the fluid would turn it into joule = <span>$kg \, m^2 s^{-2}$</span>). To know in general where to find the respective variables <span>$u, v, \eta$</span> inside our simulation object see <a href="../structure/#Prognostic-variables">Prognostic variables</a> and <a href="../structure/#Diagnostic-variables">Diagnostic variables</a>. Now let us continue the simulation</p><pre><code class="language-julia hljs">run!(simulation, period=Day(10))
+
+# we don&#39;t need to reassign u, v, η as they were flat copies
+# pointing directly to the diagnostic variables inside the simulation
+# which got updated during run!
+TE_later = total_energy(u, v, η, model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">6.746546f8</code></pre><p>So the total energy has somewhat changed, it decreased to</p><pre><code class="language-julia hljs">TE_later/TE</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.9994332f0</code></pre><p>of its previous value over 10 days.</p><div class="admonition is-info"><header class="admonition-header">Energy conservation</header><div class="admonition-body"><p>While technically energy should be conserved in an unforced system, numerically this is rarely exactly the case. We need some <a href="../barotropic/#diffusion">Horizontal diffusion</a> for numerical stability and also the time integration is dissipative due to temporal filtering, see <a href="../barotropic/#leapfrog">Time integration</a>.  Note that the energy here is inversely cascading to larger scales, and this makes the dissipation of energy through <a href="../barotropic/#diffusion">Horizontal diffusion</a> really inefficient, because in spectral space, standard Laplacian diffusion is proportional to <span>$k^2$</span> where <span>$k$</span> is the wavenumber. By default, we use a 4th power Laplacian, so the diffusion here is proportional to <span>$k^8$</span>.</p></div></div><h2 id="Potential-vorticity"><a class="docs-heading-anchor" href="#Potential-vorticity">Potential vorticity</a><a id="Potential-vorticity-1"></a><a class="docs-heading-anchor-permalink" href="#Potential-vorticity" title="Permalink"></a></h2><p>Potential vorticity in the <a href="../shallowwater/#shallow_water_model">shallow water equations</a> is defined as</p><p class="math-container">\[q = \frac{f + \zeta}{h}\]</p><p>with <span>$f$</span> the Coriolis parameter, <span>$\zeta$</span> the relative vorticity,  and <span>$h$</span> the layer thickness as before. We can calculate this conveniently directly on the model grid (whichever you chose) as</p><pre><code class="language-julia hljs"># vorticity
+ζ = simulation.diagnostic_variables.grid.vor_grid[:,1]
+f = coriolis(ζ)     # create f on that grid
+
+# layer thickness
+η = simulation.diagnostic_variables.grid.pres_grid
+H = model.atmosphere.layer_thickness
+Hb = model.orography.orography
+h = @. η + H - Hb
+
+# potential vorticity
+q = @. (f + ζ) / h</code></pre><p>and we can compare the relative vorticity field to</p><pre><code class="language-julia hljs">using CairoMakie
+heatmap(ζ, title=&quot;Relative vorticity [1/s]&quot;)</code></pre><p><img src="../analysis_vor.png" alt="Relative vorticity"/></p><p>the potential vorticity</p><pre><code class="language-julia hljs">heatmap(q, title=&quot;Potential vorticity [1/m/s]&quot;)</code></pre><p><img src="../analysis_pv.png" alt="Potential vorticity"/></p><h2 id="Absolute-angular-momentum"><a class="docs-heading-anchor" href="#Absolute-angular-momentum">Absolute angular momentum</a><a id="Absolute-angular-momentum-1"></a><a class="docs-heading-anchor-permalink" href="#Absolute-angular-momentum" title="Permalink"></a></h2><p>Similar to the total mass, in the absence of sources and sinks for momentum, total absolute angular momentum (AAM) defined as</p><p class="math-container">\[\Lambda = \iint \left(ur + \Omega r^2\right)h dA\]</p><p>should be conserved (<span>$\partial_t\Lambda = 0$</span>).  Here <span>$u$</span> is the zonal velocity, <span>$\Omega$</span> the angular velocity of the Earth, <span>$r = R \cos\phi$</span> the momentum arm at latitude <span>$\phi$</span>, and <span>$R$</span> the radius of Earth.</p><p>Following previous examples, let us define a <code>total_angular_momentum</code> function as</p><pre><code class="language-julia hljs">using SpeedyWeather
+
+function total_angular_momentum(u, η, model)
+    H = model.atmosphere.layer_thickness
+    Hb = model.orography.orography
+    R = model.spectral_grid.radius
+    Ω = model.planet.rotation
+
+    r = R * cos.(model.geometry.lats)       # momentum arm for every grid point
+
+    h = @. η + H - Hb           # layer thickness between the bottom and free surface
+    Λ = @. (u*r + Ω*r^2) * h    # vertically-integrated AAM
+
+    # transform to spectral, take l=m=0 mode at [1] and normalize for mean
+    return Λ_mean = real(transform(Λ)[1]) / model.spectral_transform.norm_sphere
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">total_angular_momentum (generic function with 1 method)</code></pre><p>Anytime we stop the simulation, we can calculate <span>$\Lambda$</span> using this function (ignoring the multiplication by <span>$4\pi R^2$</span> to get total <span>$\Lambda$</span>).</p><pre><code class="language-julia hljs"># use u, η from current state of simulation
+Λ_current = total_angular_momentum(u, η, model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1.65041281411102e13</code></pre><p>So after some days of integration, we would get another <span>$\Lambda$</span> with</p><pre><code class="language-julia hljs">run!(simulation, period=Day(10))
+
+# u, η got updated during run!
+Λ_later = total_angular_momentum(u, η, model)
+Λ_later / Λ_current</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.9981800468569637</code></pre><p>and measure its relative change.  Similar to energy, in the numerical integration, Λ is not exactly conserved due to <a href="../barotropic/#diffusion">Horizontal diffusion</a>.</p><h2 id="Circulation"><a class="docs-heading-anchor" href="#Circulation">Circulation</a><a id="Circulation-1"></a><a class="docs-heading-anchor-permalink" href="#Circulation" title="Permalink"></a></h2><p>Total circulation is defined as the area-integrated absolute vorticity:</p><p class="math-container">\[C = \iint \left(\zeta + f\right) dA\]</p><p>Following previous fashion, we define a function <code>total_circulation</code> for this</p><pre><code class="language-julia hljs">function total_circulation(ζ, model)
+    f = coriolis(ζ)         # create f on the grid of ζ
+    C = ζ .+ f              # absolute vorticity
+    # transform to spectral, take l=m=0 mode at [1] and normalize for mean
+    return C_mean = real(transform(C)[1]) / model.spectral_transform.norm_sphere
+end
+
+total_circulation(ζ, model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4.321589f-13</code></pre><div class="admonition is-info"><header class="admonition-header">Global-integrated circulation</header><div class="admonition-body"><p>Note that the area integral of relative vorticity <span>$\zeta$</span> and planetary vorticity <span>$f$</span> over the whole surface of a sphere are analytically exactly zero. Numerically, <code>C_mean</code> should be a small number but may not be exactly zero due to numerical precision and errors in the spectral transform.</p></div></div><h2 id="Potential-enstrophy"><a class="docs-heading-anchor" href="#Potential-enstrophy">Potential enstrophy</a><a id="Potential-enstrophy-1"></a><a class="docs-heading-anchor-permalink" href="#Potential-enstrophy" title="Permalink"></a></h2><p>The total potential enstrophy is defined as the second-moment of potential vorticity <span>$q$</span></p><p class="math-container">\[Q = \iint \frac{1}{2}q^2 dA\]</p><p>In the absence of source and sink for potential vorticiy, this quantity should also conserve during the integration.</p><p>We define a function <span>$total_enstrophy$</span> for this</p><pre><code class="language-julia hljs">function total_enstrophy(ζ, η, model)
+    # constants from model
+    H = model.atmosphere.layer_thickness
+    Hb = model.orography.orography
+    f = coriolis(ζ)     # create f on the grid
+
+    h = @. η + H - Hb   # thickness
+    q = @. (ζ + f) / h  # Potential vorticity
+    Q = @. q^2 / 2      # Potential enstrophy
+
+    # transform to spectral, take l=m=0 mode at [1] and normalize for mean
+    return Q_mean = real(transform(Q)[1]) / model.spectral_transform.norm_sphere
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">total_enstrophy (generic function with 1 method)</code></pre><p>Then by evaluating <code>Q_mean</code> at different time steps, one can similarly check how <span>$Q$</span> is changing over time.</p><pre><code class="language-julia hljs">Q = total_enstrophy(ζ, η, model)
+run!(simulation, period=Day(10))
+Q_later = total_enstrophy(ζ, η, model)
+Q_later/Q</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">0.98658925f0</code></pre><div class="admonition is-info"><header class="admonition-header">Less conservative enstrophy</header><div class="admonition-body"><p>Note that the turbulent nature of the <a href="../shallowwater/#shallow_water_model">shallow water model</a> (or generally 2D turbulence) cascades enstrophy to smaller scales where it  is removed by <a href="../barotropic/#diffusion">Horizontal diffusion</a> for numerical stability. As a result, it is decreasing more quickly than energy.</p></div></div><h2 id="Online-diagnostics"><a class="docs-heading-anchor" href="#Online-diagnostics">Online diagnostics</a><a id="Online-diagnostics-1"></a><a class="docs-heading-anchor-permalink" href="#Online-diagnostics" title="Permalink"></a></h2><p>Now we want to calculate all the above global diagnostics periodically during a simulation. For that we will use <a href="../callbacks/#Callbacks">Callbacks</a>, which let us inject code into a simulation that is executed after every time step (or at any other scheduled time, see <a href="../callbacks/#Schedules">Schedules</a>).</p><p>So we define a function <code>global_diagnostics</code> to calculate the integrals together. We could reuse the functions like <code>total_enstrophy</code> from above but we also want to show how to global integral <span>$\iint dV$</span> can be written more efficiently</p><pre><code class="language-julia hljs"># define a global integral, reusing a precomputed SpectralTransform S
+# times surface area of sphere omitted
+function ∬dA(v, h, S::SpectralTransform)
+    return real(transform(v .* h, S)[1]) / S.norm_sphere
+end
+
+# use SpectralTransform from model
+∬dA(v, h, model::AbstractModel) = ∬dA(v, h, model.spectral_transform)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">∬dA (generic function with 2 methods)</code></pre><p>By reusing <code>model.spectral_transform</code> we do not have to re-precompute the spectral tranform on every call to <code>transform</code>. Providing the spectral transform from model as the 2nd argument simply reuses a previously precomputed spectral transform which is much faster and uses less memory.</p><p>Now the <code>global_diagnostics</code> function is defined as</p><pre><code class="language-julia hljs">function global_diagnostics(u, v, ζ, η, model)
+
+    # constants from model
+    NF = model.spectral_grid.NF     # number format used
+    H = model.atmosphere.layer_thickness
+    Hb = model.orography.orography
+    R = model.spectral_grid.radius
+    Ω = model.planet.rotation
+    g = model.planet.gravity
+
+    r = NF.(R * cos.(model.geometry.lats))  # create r on that grid
+    f = coriolis(u)                         # create f on that grid
+
+    h = @. η + H - Hb           # thickness
+    q = @. (ζ + f) / h          # potential vorticity
+    λ = @. u * r + Ω * r^2      # angular momentum (in the right number format NF)
+    k = @. (u^2 + v^2) / 2      # kinetic energy
+    p = @. g * h / 2            # potential energy
+    z = @. q^2 / 2              # potential enstrophy
+
+    M = ∬dA(1, h, model)        # mean mass
+    C = ∬dA(q, h, model)        # mean circulation
+    Λ = ∬dA(λ, h, model)        # mean angular momentum
+    K = ∬dA(k, h, model)        # mean kinetic energy
+    P = ∬dA(p, h, model)        # mean potential energy
+    Q = ∬dA(z, h, model)        # mean potential enstrophy
+
+    return M, C, Λ, K, P, Q
+end
+
+# unpack diagnostic variables and call global_diagnostics from above
+function global_diagnostics(diagn::DiagnosticVariables, model::AbstractModel)
+    u = diagn.grid.u_grid[:, 1]
+    v = diagn.grid.v_grid[:, 1]
+    ζR = diagn.grid.vor_grid[:, 1]
+    η = diagn.grid.pres_grid
+
+    # vorticity during simulation is scaled by radius R, unscale here
+    ζ = ζR ./ diagn.scale[]
+
+    return global_diagnostics(u, v, ζ, η, model)
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">global_diagnostics (generic function with 2 methods)</code></pre><div class="admonition is-info"><header class="admonition-header">Radius scaling of vorticity and divergence</header><div class="admonition-body"><p>The prognostic variables vorticity and divergence are scaled with the radius of the sphere during a simulation, see <a href="../barotropic/#scaling">Radius scaling</a>. This did not apply above because we only analyzed vorticity <em>before</em> or <em>after</em> the simulation, i.e. outside of the <code>run!(simulation)</code> call. The radius scaling is only applied just before the time integration and is undone directly after it. However, because now we are accessing the vorticity <em>during</em> the simulation we need to unscale the vorticity (and divergence) manually. General recommendation is to divide by <code>diagn.scale[]</code> (and not <code>radius</code>) as <code>diagn.scale[]</code> always reflects whether a vorticity and divergence are currently scaled (scale = radius) or not (scale = 1).</p></div></div><p>Then we define a new callback <code>GlobalDiagnostics</code> subtype of SpeedyWeather&#39;s <code>AbstractCallback</code> and define new methods of <code>initialize!</code>, <code>callback!</code> and <code>finalize!</code> for it (see <a href="../callbacks/#Callbacks">Callbacks</a> for more details)</p><pre><code class="language-julia hljs"># define a GlobalDiagnostics callback and the fields it needs
+Base.@kwdef mutable struct GlobalDiagnostics &lt;: SpeedyWeather.AbstractCallback
+    timestep_counter::Int = 0
+
+    time::Vector{DateTime} = []
+    M::Vector{Float64} = []  # mean mass per time step
+    C::Vector{Float64} = []  # mean circulation per time step
+    Λ::Vector{Float64} = []  # mean angular momentum per time step
+    K::Vector{Float64} = []  # mean kinetic energy per time step
+    P::Vector{Float64} = []  # mean potential energy per time step
+    Q::Vector{Float64} = []  # mean enstrophy per time step
+end
+
+# define how to initialize a GlobalDiagnostics callback
+function SpeedyWeather.initialize!(
+    callback::GlobalDiagnostics,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::AbstractModel,
+)
+    # replace with vector of correct length
+    n = progn.clock.n_timesteps + 1    # +1 for initial conditions
+    callback.time = zeros(DateTime, n)
+    callback.M = zeros(n)
+    callback.C = zeros(n)
+    callback.Λ = zeros(n)
+    callback.K = zeros(n)
+    callback.P = zeros(n)
+    callback.Q = zeros(n)
+
+    M, C, Λ, K, P, Q = global_diagnostics(diagn, model)
+
+    callback.time[1] = progn.clock.time
+    callback.M[1] = M  # set initial conditions
+    callback.C[1] = C  # set initial conditions
+    callback.Λ[1] = Λ  # set initial conditions
+    callback.K[1] = K  # set initial conditions
+    callback.P[1] = P  # set initial conditions
+    callback.Q[1] = Q  # set initial conditions
+
+    callback.timestep_counter = 1  # (re)set counter to 1
+
+    return nothing
+end
+
+# define what a GlobalDiagnostics callback does on every time step
+function SpeedyWeather.callback!(
+    callback::GlobalDiagnostics,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::AbstractModel,
+)
+    callback.timestep_counter += 1
+    i = callback.timestep_counter
+
+    M, C, Λ, K, P, Q = global_diagnostics(diagn, model)
+
+    # store current time and diagnostics for timestep i
+    callback.time[i] = progn.clock.time
+    callback.M[i] = M
+    callback.C[i] = C
+    callback.Λ[i] = Λ
+    callback.K[i] = K
+    callback.P[i] = P
+    callback.Q[i] = Q
+end
+
+using NCDatasets
+
+# define how to finalize a GlobalDiagnostics callback after simulation finished
+function SpeedyWeather.finalize!(
+    callback::GlobalDiagnostics,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::AbstractModel,
+)
+    n_timesteps = callback.timestep_counter
+
+    # create a netCDF file in current path
+    ds = NCDataset(joinpath(pwd(), &quot;global_diagnostics.nc&quot;), &quot;c&quot;)
+
+    # save diagnostics variables within
+    defDim(ds, &quot;time&quot;, n_timesteps)
+    defVar(ds, &quot;time&quot;,                  callback.time,  (&quot;time&quot;,))
+    defVar(ds, &quot;mass&quot;,                  callback.M,     (&quot;time&quot;,))
+    defVar(ds, &quot;circulation&quot;,           callback.C,     (&quot;time&quot;,))
+    defVar(ds, &quot;angular momentum&quot;,      callback.Λ,     (&quot;time&quot;,))
+    defVar(ds, &quot;kinetic energy&quot;,        callback.K,     (&quot;time&quot;,))
+    defVar(ds, &quot;potential energy&quot;,      callback.P,     (&quot;time&quot;,))
+    defVar(ds, &quot;potential enstrophy&quot;,   callback.Q,     (&quot;time&quot;,))
+
+    close(ds)
+
+    return nothing
+end</code></pre><p>Note that <code>callback!</code> will execute <em>every</em> time step. If execution is only desired periodically, you can use <a href="../callbacks/#Schedules">Schedules</a>. At <code>finalize!</code> we decide to write the timeseries of our global diagnostics as netCDF file via NCDatasets.jl to the current path <code>pwd()</code>. We need to add <code>using NCDatasets</code> here, as SpeedyWeather does not re-export the functionality therein.</p><p>Now we create a <code>GlobalDiagnostics</code> callback, add it to the model with key <code>:global_diagnostics</code> (you get a random key if not provided) and reinitialize the simulation to start from the initial conditions.</p><pre><code class="language-julia hljs"># don&#39;t name it global_diagnostics because that&#39;s a function already!
+diagnostics_recorder = GlobalDiagnostics()
+add!(model.callbacks, :diagnostics_recorder =&gt; diagnostics_recorder)
+simulation = initialize!(model)
+
+run!(simulation, period=Day(20))</code></pre><p>Then one could check the output file <code>global_diagnostics.nc</code>, or directly use the callback through its key <code>:diagnostics_recorder</code> as we do here</p><pre><code class="language-julia hljs">using CairoMakie
+
+# unpack callback
+(; M, C, Λ, K, P, Q)  = model.callbacks[:diagnostics_recorder]
+t = model.callbacks[:diagnostics_recorder].time
+days = [Second(ti - t[1]).value/3600/24 for ti in t]
+
+fig = Figure();
+axs = [Axis(fig[row, col]) for row in 1:3, col in 1:2]
+
+lines!(axs[1,1], days, M)
+axs[1,1].title = &quot;Mass&quot;
+hidexdecorations!(axs[1,1])
+
+lines!(axs[2,1], days, Λ)
+axs[2,1].title = &quot;Angular momentum&quot;
+hidexdecorations!(axs[2,1])
+
+lines!(axs[3,1], days, P)
+axs[3,1].title = &quot;Potential energy&quot;
+axs[3,1].xlabel = &quot;time [day]&quot;
+
+lines!(axs[1,2], days, C)
+axs[1,2].title = &quot;Circulation&quot;
+hidexdecorations!(axs[1,2])
+
+lines!(axs[2,2], days, K)
+axs[2,2].title = &quot;Kinetic energy&quot;
+hidexdecorations!(axs[2,2])
+
+lines!(axs[3,2], days, Q)
+axs[3,2].title = &quot;Potential enstrophy&quot;
+axs[3,2].xlabel = &quot;time [day]&quot;
+fig</code></pre><p><img src="../global_diagnostics.png" alt="Global diagnostics"/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../initial_conditions/">« Initial conditions</a><a class="docs-footer-nextpage" href="../structure/">Tree structure »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Monday 28 October 2024 18:02">Monday 28 October 2024</span>. Using Julia version 1.11.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
