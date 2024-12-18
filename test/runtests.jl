@@ -31,6 +31,7 @@ include("time_stepping.jl")
 include("vertical_advection.jl")
 include("particles.jl")
 include("particle_advection.jl")
+include("forcing_drag.jl")
 
 # VERTICAL LEVELS
 include("vertical_coordinates.jl")
@@ -54,7 +55,6 @@ include("stochastic_physics.jl")
 include("run_speedy.jl")
 
 # EXTENSION
-include("extending.jl")
 include("callbacks.jl")
 include("schedule.jl")
 

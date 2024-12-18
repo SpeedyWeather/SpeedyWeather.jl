@@ -3,6 +3,11 @@
 ## Unreleased
 
 - Buildkite CI with dummy pipeline [#646](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/646)
+- ConvectiveHeating implemented [#639](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/639)
+- Number format flexibility with set! [#634](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/634)
+- Forcing/drag for primitive models [#635](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/635)
+- RingGrids indexing with leading Colon should now always return another RingGrid instance [#637](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/637)
+- Roll back GPUArrays upgrade to ensure CUDA compatibility [#636](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/636)
 - Change default timestep to 40min at T31 [#623](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/623)
 
 ## v0.13
