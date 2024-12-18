@@ -176,6 +176,16 @@ function leapfrog!(
         leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
     end
 
+    # and time stepping for tracers if active
+    for (name, tracer) in model.tracers
+        if tracer.active
+            var_old, var_new = progn.tracers[name]
+            var_tend = tend.tracers_tend[name]
+            spectral_truncation!(var_tend)
+            leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
+        end
+    end
+
     # evolve the random pattern in time
     random_process!(progn, model.random_process)
     return nothing
@@ -337,9 +347,9 @@ $(TYPEDSIGNATURES)
 Main time loop that that initializes output and feedback, loops over all time steps
 and calls the output and feedback functions."""
 function time_stepping!(
-    progn::PrognosticVariables,     # all prognostic variables
-    diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
-    model::AbstractModel,              # all model components
+    progn::PrognosticVariables,         # all prognostic variables
+    diagn::DiagnosticVariables,         # all pre-allocated diagnostic variables
+    model::AbstractModel,               # all model components
 )          
     
     (; clock) = progn

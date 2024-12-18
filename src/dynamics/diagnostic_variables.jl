@@ -10,16 +10,13 @@ function Base.show(io::IO, A::AbstractDiagnosticVariables)
 
         if T <: AbstractGridArray
             NF = first_parameter(T)
-            nlayers = size(val, 2)
             nlat = RingGrids.get_nlat(val)
             Grid = RingGrids.nonparametric_type(T)
-            s = "$nlat-ring, $nlayers-layer $Grid{$NF}"
+            s = Base.dims2string(size(val))*", $nlat-ring $Grid{$NF}"
         elseif T <: LowerTriangularArray
             NF = first_parameter(T)
-            nlayers = size(val, 2)
             trunc = val.n - 1
-            nlayers = size(val, 3)
-            s = "T$trunc, $nlayers-layer LowerTriangularArray{$NF}"
+            s = Base.dims2string(size(val, as=Matrix))*", T$trunc LowerTriangularArray{$NF}"
         else
             s = "$T"
         end
@@ -63,6 +60,8 @@ $(TYPEDFIELDS)"""
     v_tend    ::SpectralVariable3D = zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers)
     "Logarithm of surface pressure [Pa]"
     pres_tend ::SpectralVariable2D = zeros(SpectralVariable2D, trunc+2, trunc+1)
+    "Tracers [?]"
+    tracers_tend::Dict{Symbol, SpectralVariable3D} = Dict{Symbol, SpectralVariable3D}()
 
     "Zonal velocity [m/s], grid"
     u_tend_grid     ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
@@ -74,6 +73,8 @@ $(TYPEDFIELDS)"""
     humid_tend_grid ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
     "Logarith of surface pressure [Pa], grid"
     pres_tend_grid  ::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    "Tracers [?], grid"
+    tracers_tend_grid::Dict{Symbol, GridVariable3D} = Dict{Symbol, GridVariable3D}()
 end
 
 """$(TYPEDSIGNATURES)
@@ -83,10 +84,13 @@ function Tendencies(SG::SpectralGrid)
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
-    return Tendencies{NF, ArrayType, SpectralVariable2D, SpectralVariable3D,
-        GridVariable2D, GridVariable3D}(;
-            trunc, nlat_half, nlayers,
-        )
+    return Tendencies{
+        NF, ArrayType,
+        SpectralVariable2D, SpectralVariable3D,
+        GridVariable2D, GridVariable3D,
+    }(;
+        trunc, nlat_half, nlayers
+    )
 end
 
 export GridVariables
@@ -119,6 +123,9 @@ $TYPEDFIELDS."""
     v_grid          ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
     "Logarithm of surface pressure [Pa]"
     pres_grid       ::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    "Tracers [?]"
+    tracers_grid    ::Dict{Symbol, GridVariable3D} = Dict{Symbol, GridVariable3D}()
+
     "Random pattern controlled by random process [1]"
     random_pattern  ::GridVariable2D = zeros(GridVariable3D, nlat_half)
 
@@ -133,6 +140,8 @@ $TYPEDFIELDS."""
     v_grid_prev     ::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
     "Logarithm of surface pressure [Pa] at previous time step"
     pres_grid_prev  ::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    "Tracers [?] at previous time step"
+    tracers_grid_prev::Dict{Symbol, GridVariable3D} = Dict{Symbol, GridVariable3D}()
 end
 
 """$(TYPEDSIGNATURES)
@@ -329,10 +338,6 @@ function ParticleVariables(SG::SpectralGrid)
     return ParticleVariables{NF, ArrayType, ParticleVector, VectorNF, Grid}(; nlat_half, nparticles)
 end
 
-# to be removed
-struct DiagnosticVariablesLayer{NF} end
-struct SurfaceVariables{NF} end
-
 export DiagnosticVariables
 
 """All diagnostic variables.
@@ -388,11 +393,19 @@ struct DiagnosticVariables{
     scale::Base.RefValue{NF}
 end
 
+function DiagnosticVariables(SG::SpectralGrid, model::Union{Barotropic, ShallowWater})
+    diagn = DiagnosticVariables(SG)
+    add!(diagn, model.tracers)
+    return diagn
+end
+
 # decide on spectral resolution `nbands` of radiation schemes
 function DiagnosticVariables(SG::SpectralGrid, model::PrimitiveEquation)
     nbands_shortwave = get_nbands(model.shortwave_radiation)
     nbands_longwave = get_nbands(model.longwave_radiation)
-    return DiagnosticVariables(SG; nbands_shortwave, nbands_longwave)
+    diagn =  DiagnosticVariables(SG; nbands_shortwave, nbands_longwave)
+    add!(diagn, model.tracers)
+    return diagn
 end
 
 """$(TYPEDSIGNATURES)
@@ -429,7 +442,8 @@ function Base.show(
     
     (; trunc, nlat_half, nlayers, nparticles) = diagn
     nlat = RingGrids.get_nlat(Grid, nlat_half)
-    println(io, "├ resolution: T$trunc, $nlat rings, $nlayers layers, $nparticles particles")
+    ntracers = length(diagn.grid.tracers_grid)
+    println(io, "├ resolution: T$trunc, $nlat rings, $nlayers layers, $ntracers tracers, $nparticles particles")
     println(io, "├ tendencies::Tendencies")
     println(io, "├ grid::GridVariables")
     println(io, "├ dynamics::DynamicsVariables")
@@ -440,12 +454,58 @@ function Base.show(
     print(io,   "└ scale: $(diagn.scale[])")
 end
 
+function add!(diagn::DiagnosticVariables{
+    NF,                     # <: AbstractFloat
+    ArrayType,              # Array, CuArray, ...
+    Grid,                   # <:AbstractGridArray
+    SpectralVariable2D,     # <: LowerTriangularArray
+    SpectralVariable3D,     # <: LowerTriangularArray
+    GridVariable2D,         # <: AbstractGridArray
+    GridVariable3D,         # <: AbstractGridArray
+},
+    tracers::Tracer...,
+    ) where {
+        NF,                     # <: AbstractFloat
+        ArrayType,              # Array, CuArray, ...
+        Grid,                   # <:AbstractGridArray
+        SpectralVariable2D,     # <: LowerTriangularArray
+        SpectralVariable3D,     # <: LowerTriangularArray
+        GridVariable2D,         # <: AbstractGridArray
+        GridVariable3D,         # <: AbstractGridArray
+    }
+    (; trunc, nlat_half, nlayers) = diagn
+    for tracer in tracers
+        diagn.tendencies.tracers_tend[tracer.name] = zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers)
+        diagn.tendencies.tracers_tend_grid[tracer.name] = zeros(GridVariable3D, nlat_half, nlayers)
+        diagn.grid.tracers_grid[tracer.name] = zeros(GridVariable3D, nlat_half, nlayers)
+        diagn.grid.tracers_grid_prev[tracer.name] = zeros(GridVariable3D, nlat_half, nlayers)
+    end
+end
+
+function Base.delete!(diagn::DiagnosticVariables, tracers::Tracer...)
+    for tracer in tracers
+        delete!(diagn.tendencies.tracers_tend, tracer.name)
+        delete!(diagn.tendencies.tracers_tend_grid, tracer.name)
+        delete!(diagn.grid.tracers_grid, tracer.name)
+        delete!(diagn.grid.tracers_grid_prev, tracer.name)
+    end
+end
+
 """$(TYPEDSIGNATURES)
 Set the tendencies for the barotropic model to `x`."""
 function Base.fill!(tendencies::Tendencies, x, ::Type{<:Barotropic})
     fill!(tendencies.u_tend_grid, x)
     fill!(tendencies.v_tend_grid, x)
     fill!(tendencies.vor_tend, x)
+
+    for tracer in values(tendencies.tracers_tend)
+        fill!(tracer, x)
+    end
+
+    for tracer in values(tendencies.tracers_tend_grid)
+        fill!(tracer, x)
+    end
+
     return tendencies
 end
 

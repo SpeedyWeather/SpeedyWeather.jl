@@ -45,6 +45,14 @@ function vertical_advection!(
         ξ      = retrieve_time_step(advection_scheme, diagn.grid, :humid)
         _vertical_advection!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
     end
+
+    for tracer in values(model.tracers)
+        if tracer.active
+            ξ_tend = diagn.tendencies.tracers_tend_grid[tracer.name]
+            ξ      = retrieve_time_step(advection_scheme, diagn.grid, :tracers)[tracer.name]
+            _vertical_advection!(ξ_tend, σ_tend, ξ, Δσ, advection_scheme)
+        end
+    end
 end
 
 function _vertical_advection!(

@@ -15,6 +15,7 @@ With minimal code redundancies it supports
 **Dynamics and physics**
 - Different physical equations (barotropic vorticity, shallow water, primitive equations, with and without humidity)
 - Particle advection in 2D for all equations
+- Tracer advection in 2D/3D that can be added, deleted, (de)activated anytime
 - Physics parameterizations for convection, precipitation, boundary layer, etc.
 
 **Numerics and computing**
