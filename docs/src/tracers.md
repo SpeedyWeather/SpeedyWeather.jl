@@ -47,8 +47,8 @@ model = ShallowWaterModel(spectral_grid)
 add!(model, Tracer(:abc))
 ```
 
-This returns `model.tracers` which will always give you an overview of which tracers
-are defined. Tracers are defined through a `key::Symbol`` for which we use `Symbol`
+This returns `model.tracers`, a dictionary, which will always give you an overview of which tracers
+are defined. Tracers are defined through a `key::Symbol` for which we use `Symbol`
 (not strings, because Symbols are immutable). We just wrap the `key` here in
 `Tracer` to define a tracer. You can add more tracers
 
@@ -63,9 +63,10 @@ delete!(model, Tracer(:co2))
 delete!(model, Tracer(:ch4))
 ```
 
-Tracers are just defined through their `key`, e.g. `:co2` so while you can do
+Tracers are just defined through their `key`, e.g. `:co2`, so while you can do
 `tracer1 = Tracer(:co2)` and `tracer2 = Tracer(:co2)`, they will be considered
-the same tracer -- and no two tracers with the same key can exist.
+the same tracer -- and no two tracers with the same key can exist inside `model`
+(and `simulation`).
 
 You can also add a tracer to a `simulation`, i.e. after the model is initialized.
 
@@ -74,9 +75,9 @@ simulation = initialize!(model)
 add!(simulation, Tracer(:xyz))
 ```
 
-which will add the tracer to `model.traceres` as above but also add
-it to the prognostic and diagnostic variables. What you should
-not do is add a tracer to the `model` _after_ it has been initialized.
+which will add the tracer to `model.tracers` as above but also add
+it to the prognostic and diagnostic variables (otherwise done at `initialize!`).
+What you should not do is add a tracer to the `model` _after_ it has been initialized.
 Then you end up with an additional tracer in `model` without there
 being variables for it, throwing an error. You can check that
 the tracers exists in the variables with
@@ -173,14 +174,14 @@ The `ShallowWaterModel` has by default a jet in the northern
 hemisphere which will advect that tracer, after some days:
 
 ```@example tracers
-run!(simulation, period=Day(5))
+run!(simulation, period=Day(3))
 
 abc1 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, 1]
-heatmap(abc1, title="Tracer abc, after 5 days")
+heatmap(abc1, title="Tracer abc, after 3 days")
 save("tracer2.png", ans) # hide
 nothing # hide
 ```
-![Tracer after 5 days](tracer2.png)
+![Tracer after 3 days](tracer2.png)
 
 
 ## Output tracers
