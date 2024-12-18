@@ -1,4 +1,4 @@
-Starting SpeedyWeather.jl run 0003 on Wed, 18 Dec 2024 14:32:01
+Starting SpeedyWeather.jl run 0003 on Wed, 18 Dec 2024 14:57:24
 Integrating:
 SpectralGrid:
 ├ Spectral:   T63 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
@@ -10,25 +10,25 @@ Time: 12.0 days at Δt = 1200.0s
 
 All data will be stored in /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/docs/build/run_0003
 
-  5%, ETA: 0:00:01, 148237.05 millenia/day
- 10%, ETA: 0:00:01, 296474.09 millenia/day
- 15%, ETA: 0:00:01, 444711.14 millenia/day
- 20%, ETA: 0:00:01, 592948.18 millenia/day
- 25%, ETA: 0:00:01, 741185.23 millenia/day
- 30%, ETA: 0:00:01, 889422.27 millenia/day
- 35%, ETA: 0:00:01, 1041106.69 millenia/day
- 40%, ETA: 0:00:01, 1189343.74 millenia/day
- 45%, ETA: 0:00:01, 1337580.78 millenia/day
- 50%, ETA: 0:00:01, 1485817.83 millenia/day
- 55%, ETA: 0:00:01, 1634054.87 millenia/day
- 60%, ETA: 0:00:01, 1782291.92 millenia/day
- 65%, ETA: 0:00:01, 1930528.96 millenia/day
- 70%, ETA: 0:00:00, 2082213.38 millenia/day
- 75%, ETA: 0:00:00, 2230450.43 millenia/day
- 80%, ETA: 0:00:00, 2378687.47 millenia/day
- 85%, ETA: 0:00:00, 2526924.52 millenia/day
- 90%, ETA: 0:00:00, 2675161.56 millenia/day
- 95%, ETA: 0:00:00, 2823398.61 millenia/day
-100%, ETA: 0:00:00, 2971635.66 millenia/day
+  5%, ETA: 0:00:01,   Inf millenia/day
+ 10%, ETA: 0:00:01,   Inf millenia/day
+ 15%, ETA: 0:00:01,   Inf millenia/day
+ 20%, ETA: 0:00:01,   Inf millenia/day
+ 25%, ETA: 0:00:01,   Inf millenia/day
+ 30%, ETA: 0:00:01,   Inf millenia/day
+ 35%, ETA: 0:00:01,   Inf millenia/day
+ 40%, ETA: 0:00:01,   Inf millenia/day
+ 45%, ETA: 0:00:01,   Inf millenia/day
+ 50%, ETA: 0:00:01,   Inf millenia/day
+ 55%, ETA: 0:00:01,   Inf millenia/day
+ 60%, ETA: 0:00:01,   Inf millenia/day
+ 65%, ETA: 0:00:01,   Inf millenia/day
+ 70%, ETA: 0:00:01,   Inf millenia/day
+ 75%, ETA: 0:00:00,   Inf millenia/day
+ 80%, ETA: 0:00:00,   Inf millenia/day
+ 85%, ETA: 0:00:00,   Inf millenia/day
+ 90%, ETA: 0:00:00,   Inf millenia/day
+ 95%, ETA: 0:00:00,   Inf millenia/day
+100%, ETA: 0:00:00,   Inf millenia/day
 
 Integration done in empty period.
