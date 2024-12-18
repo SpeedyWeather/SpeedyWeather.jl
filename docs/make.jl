@@ -15,10 +15,11 @@ makedocs(
                 "Examples 2D"=>"examples_2D.md",
                 "Examples 3D"=>"examples_3D.md",
                 "Initial conditions" => "initial_conditions.md",
+                "Tracer advection"=>"tracers.md",
+                "Particle advection"=>"particles.md",
                 "Stochastic physics" => "stochastic_physics.md",
                 "Analysis"=>"analysis.md",
                 "Tree structure"=>"structure.md",
-                "Particle advection"=>"particles.md",
                 "NetCDF output"=>"output.md",
             ],
             "Extending SpeedyWeather" => [
