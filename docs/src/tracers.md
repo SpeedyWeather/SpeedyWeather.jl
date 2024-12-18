@@ -122,12 +122,14 @@ e.g.
 
 ```@example tracers
 set!(simulation, abc=1)
-set!(simulation, abc=randn(FullGaussianGrid, 24, 1))
+
+(; GridVariable3D, nlat_half, nlayers) = spectral_grid
+set!(simulation, abc=randn(GridVariable3D, nlat_half, nlayers))
 set!(simulation, abc=(λ, φ, σ) -> exp(-(λ-180)^2/10^2))
 ```
 
 The first one sets `abc` to a global constant (not super exciting),
-the second to some random values on a grid (interpolates automatically!),
+the second to some random values on a grid (transforms automatically!),
 and the third sets the tracer to a Gaussian ridge that runs through
 the Pacific (see [Tracer visualisation](@ref) below).
 
@@ -135,7 +137,7 @@ For more examples how to use `set!` see [Changing orography manually](ref),
 [Manual land-sea mask](@ref), and
 [Rossby-Haurwitz wave in a BarotropicModel](@ref).
 But note that because we are setting a (in general) 3D variable here
-the vertical dimension must align: Hence `24, 1` for the grid,
+the vertical dimension must align: Hence `nlayers` for the grid,
 and the anonymous function must take three arguments, including
 the vertical coordinate `σ` even if it's independent of it.
 
