@@ -192,10 +192,10 @@ end
 # end
 
 @testset "legendre: compare forward transform to CPU" begin
-    @testset for trunc in spectral_resolutions
-        @testset for nlayers in nlayers_list
-            @testset for Grid in grid_list
-                @testset for NF in (Float32, Float64)
+    @testset for NF in (Float32, Float64)
+        @testset for trunc in spectral_resolutions
+            @testset for nlayers in nlayers_list
+                @testset for Grid in grid_list
                     # Generate test data
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
@@ -218,11 +218,11 @@ end
                     # scratch memory
                     result_gpu = adapt(Array, S_gpu.scratch_memory_north);
                     result_cpu = S_cpu.scratch_memory_north;
-                    @test result_cpu ≈ result_gpu
+                    @test result_cpu ≈ result_gpu rtol=sqrt(eps(Float32))   # GPU error tolerance always Float32
 
                     result_gpu = adapt(Array, S_gpu.scratch_memory_south);
                     result_cpu = S_cpu.scratch_memory_south;
-                    @test result_cpu ≈ result_gpu
+                    @test result_cpu ≈ result_gpu rtol=sqrt(eps(Float32))
                 end
             end
         end
