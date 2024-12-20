@@ -1,7 +1,7 @@
 abstract type AbstractInitialConditions <: AbstractModelComponent end
 
 export InitialConditions
-@kwdef struct InitialConditions{V,P,T,H} <: AbstractInitialConditions
+@kwdef struct InitialConditions{V, P, T, H} <: AbstractInitialConditions
     vordiv::V = ZeroInitially()
     pres::P = ZeroInitially()
     temp::T = ZeroInitially()
@@ -19,13 +19,13 @@ function initialize!(
     has(model, :humid) && initialize!(progn, IC.humid,  model)
 end
 
-InitialConditions(::Type{<:Barotropic}) = InitialConditions(;vordiv = StartWithRandomVorticity())
-InitialConditions(::Type{<:ShallowWater}) = InitialConditions(;vordiv = ZonalJet())
+InitialConditions(::Type{<:Barotropic}) = InitialConditions(; vordiv = StartWithRandomVorticity())
+InitialConditions(::Type{<:ShallowWater}) = InitialConditions(; vordiv = ZonalJet())
 function InitialConditions(::Type{<:PrimitiveDry})
     vordiv = ZonalWind()
     pres = PressureOnOrography()
     temp = JablonowskiTemperature()
-    return InitialConditions(;vordiv,pres,temp)
+    return InitialConditions(;vordiv, pres, temp)
 end
 
 function InitialConditions(::Type{<:PrimitiveWet})
@@ -33,7 +33,7 @@ function InitialConditions(::Type{<:PrimitiveWet})
     pres = PressureOnOrography()
     temp = JablonowskiTemperature()
     humid = ConstantRelativeHumidity()
-    return InitialConditions(;vordiv,pres,temp,humid)
+    return InitialConditions(;vordiv, pres, temp, humid)
 end
 
 export ZeroInitially
@@ -42,8 +42,23 @@ initialize!(::PrognosticVariables,::ZeroInitially,::AbstractModel) = nothing
 
 # to avoid a breaking change, like ZeroInitially
 export StartFromRest
-struct StartFromRest <: AbstractInitialConditions end
-initialize!(::PrognosticVariables,::StartFromRest,::AbstractModel) = nothing
+@kwdef struct StartFromRest{P, T, H} <: AbstractInitialConditions
+    pres::P = ConstantPressure()
+    temp::T = JablonowskiTemperature()
+    humid::H = ZeroInitially()
+end
+
+initialize!(::PrognosticVariables, ::StartFromRest, ::Barotropic) = nothing
+
+function initialize!(
+    progn::PrognosticVariables,
+    IC::StartFromRest,
+    model::AbstractModel,
+)
+    has(model, :pres)  && initialize!(progn, IC.pres, model)
+    has(model, :temp)  && initialize!(progn, IC.temp, model)
+    has(model, :humid) && initialize!(progn, IC.humid, model)
+end
 
 export StartWithRandomVorticity
 
@@ -62,7 +77,7 @@ $(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::StartWithRandomVorticity,
-                        model::AbstractModel) where NF
+                        model::Barotropic) where NF
 
     lmax = progn.trunc + 1
     power = initial_conditions.power + 1    # +1 as power is summed of orders m
@@ -376,7 +391,7 @@ $(TYPEDSIGNATURES)
 Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::JablonowskiTemperature,
-                        model::AbstractModel) where NF
+                        model::PrimitiveEquation) where NF
 
     (;u₀, η₀, ΔT, Tmin) = initial_conditions
     (;σ_tropopause) = initial_conditions
@@ -554,6 +569,9 @@ function initialize!(   progn::PrognosticVariables,
     return nothing
 end
 
+# for shallow water constant pressure = 0 as pres=interface displacement here
+initialize!(::PrognosticVariables, ::ConstantPressure, ::ShallowWater) = nothing
+
 export ConstantRelativeHumidity
 @kwdef struct ConstantRelativeHumidity <: AbstractInitialConditions
     relhumid_ref::Float64 = 0.7
@@ -562,7 +580,7 @@ end
 function initialize!(  
     progn::PrognosticVariables,
     IC::ConstantRelativeHumidity,
-    model::AbstractModel,
+    model::PrimitiveEquation,
 )
     (; relhumid_ref) = IC
     (; nlayers, σ_levels_full) = model.geometry
