@@ -286,9 +286,35 @@ end
                     @test isapprox(dvor, fd_jvp[1])
 
                     # UV_from_vordiv! 
+                    u = zero(u)
+                    du = fill!(du, 1+1im)
+
+                    v = zero(v)
+                    dv = fill!(dv, 1+1im)
+
+                    vor_grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+                    vor = transform(vor_grid, S)
+                    dvor = zero(vor)
+
+                    div_grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
+                    div = transform(vor_grid, S)
+                    ddiv = zero(vor)
+
+                    autodiff(Reverse, SpeedyWeather.SpeedyTransforms.UV_from_vordiv!, Const, Duplicated(u, du), Duplicated(v, dv), Duplicated(vor, dvor), Duplicated(div, ddiv), Duplicated(S, dS))
+
+                    function uvfromvordiv(vor, div, S)
+                        u = zero(vor)
+                        v = zero(vor)
+                        SpeedyWeather.SpeedyTransforms.UV_from_vordiv!(u, v, vor, div, S)
+                        return cat(u, v, dims=2)
+                    end 
                     
+                    uv_input = zero(uv_input)
+                    duv_input = fill!(duv_input, 1+im)
 
-
+                    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x-> uvfromvordiv(x[1], x[2], S), duv_input, (vor, div))
+                    @test isapprox(dvor, fd_jvp[1][1][:,1]) 
+                    @test isapprox(ddiv, fd_jvp[1][2][:,1])
 
                     # ∇ 
 
