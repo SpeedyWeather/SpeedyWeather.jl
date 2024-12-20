@@ -18,9 +18,9 @@ function curl!(
     add::Bool=false,
     kwargs...,
 )
-    # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
-    kernel(o, a, b, c) = flipsign ? (add ? o-(a+b-c) : -(a+b-c)) :
-                                    (add ? o+(a+b-c) :   a+b-c )    
+    # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl 
+    kernel = flipsign ? (add ? (o, a, b, c) -> o-(a+b-c) : (o, a, b, c) -> -(a+b-c)) :
+                        (add ? (o, a, b, c) -> o+(a+b-c) : (o, a, b, c) -> a+b-c)  
     _divergence!(kernel, curl, v, u, S; kwargs...)      # flip u, v -> v, u
 end
 
@@ -42,8 +42,8 @@ function divergence!(
     kwargs...,
 )
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    kernel(o, a, b, c) = flipsign ? (add ? o-(a-b+c) : -(a-b+c)) :
-                                    (add ? o+(a-b+c) :   a-b+c )                
+    kernel = flipsign ? (add ? (o, a, b, c) -> o-(a-b+c) : (o, a, b, c) -> -(a-b+c)) :
+                        (add ? (o, a, b, c) ->  o+(a-b+c) : (o, a, b, c) -> a-b+c)    
     _divergence!(kernel, div, u, v, S; kwargs...)
 end
 
