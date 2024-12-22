@@ -217,6 +217,8 @@ end
                     # See https://speedyweather.github.io/SpeedyWeather.jl/dev/spectral_transform/
                     # let's check it
                     # TO-DO: why the other sign? but it's the same for Finite Differences
+                    # It's because it's the adjoint (')? And this matters here for complex numbers (see e.g. FiniteDifferences.jl examples for j'vp)
+                    # To-Do: double check that
                     for i=1:dv.n
                         @test all(Array(dv[:,1])[i:dv.m-1,i] .≈ complex(0,-(i-1)))
                     end  
