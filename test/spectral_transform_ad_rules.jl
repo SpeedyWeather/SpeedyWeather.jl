@@ -246,6 +246,8 @@ end
                     # See https://speedyweather.github.io/SpeedyWeather.jl/dev/spectral_transform/
                     # let's check it 
                     # To-Do: why the minus sign? 
+                    # It's because it's the adjoint (')? And this matters here for complex numbers
+                    # To-Do: double check that
                     for i=1:du.n
                         @test all(Array(du[:,1])[i:du.m-1,i] .≈ complex(i-1,-(i-1)))
                     end 
