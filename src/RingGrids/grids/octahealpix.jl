@@ -55,22 +55,22 @@ end
 matrix_size(::Type{OctaHEALPixGrid}, nlat_half::Integer) = (2nlat_half, 2nlat_half)
 
 ## COORDINATES
-function get_colat(::Type{<:OctaHEALPixArray}, nlat_half::Integer)
+function get_latd(::Type{<:OctaHEALPixArray}, nlat_half::Integer)
     nlat_half == 0 && return Float64[]
-    colat = zeros(get_nlat(OctaHEALPixArray, nlat_half))
+    latd = zeros(get_nlat(OctaHEALPixArray, nlat_half))
     for j in 1:nlat_half
         # Górski et al. 2005 eq 4 but without the 1/3 and Nside=nlat_half
-        colat[j] = acos(1-(j/nlat_half)^2)  # northern hemisphere
-        colat[2nlat_half-j] = π - colat[j]  # southern hemisphere
+        latd[j] = 90 - acosd(1-(j/nlat_half)^2)  # northern hemisphere
+        latd[2nlat_half-j] = 180 - latd[j]  # southern hemisphere
     end
-    return colat
+    return latd
 end
 
-function get_lon_per_ring(Grid::Type{<:OctaHEALPixArray}, nlat_half::Integer, j::Integer)
+function get_lond_per_ring(Grid::Type{<:OctaHEALPixArray}, nlat_half::Integer, j::Integer)
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
     # equidistant longitudes with equal offsets from 0˚ and 360˚,
     # e.g. 45, 135, 225, 315 for nlon=4
-    return collect(π/nlon:2π/nlon:2π)
+    return collect(180/nlon:360/nlon:360)
 end
 
 ## INDEXING

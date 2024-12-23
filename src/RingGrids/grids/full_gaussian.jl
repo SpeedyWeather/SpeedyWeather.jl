@@ -37,14 +37,14 @@ get_nlat_half(::Type{<:FullGaussianArray}, npoints2D::Integer) = round(Int, sqrt
 get_nlon(::Type{<:FullGaussianArray}, nlat_half::Integer) = 4nlat_half
 
 ## COORDINATES
-function get_colat(::Type{<:FullGaussianArray}, nlat_half::Integer)
-    return π .- acos.(FastGaussQuadrature.gausslegendre(2nlat_half)[1])
+function get_latd(::Type{<:FullGaussianArray}, nlat_half::Integer)
+    return acosd.(FastGaussQuadrature.gausslegendre(2nlat_half)[1]) .- 90
 end
 
-function get_lon(::Type{<:FullGaussianArray}, nlat_half::Integer)
+function get_lond(::Type{<:FullGaussianArray}, nlat_half::Integer)
     nlat_half == 0 && return Float64[]
     nlon = get_nlon(FullGaussianArray, nlat_half)
-    return collect(range(0, 2π-π/nlon, step=2π/nlon))
+    return collect(range(0, 360 - 180/nlon, step=360/nlon))
 end
 
 # QUADRATURE
