@@ -49,11 +49,18 @@ end
     run!(simulation, period=Day(0))
 
     # initial conditions
-    abc0 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, 1]
+    abc0_spec = simulation.prognostic_variables.tracers[:abc][1]
+    abc0 = deepcopy(simulation.diagnostic_variables.grid.tracers_grid[:abc])
     
+    # set some grid in the same way and check that the tracer abc is correctly set
+    # but compare in spectral space due to transform errors
+    def = zero(abc0)
+    set!(def, (λ, φ, σ) -> exp(-(λ-180)^2/10^2), model.geometry, model.spectral_transform)
+    @test abc0_spec == transform(def, model.spectral_transform)
+
     # check that everything is different after 10 days
     run!(simulation, period=Day(10))
-    abc1 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, 1]
+    abc1 = simulation.diagnostic_variables.grid.tracers_grid[:abc]
 
     for ij in eachindex(abc0, abc1)
         @test abc0[ij] != abc1[ij]
@@ -62,7 +69,7 @@ end
     # check that everything is the same if tracer deactivated
     deactivate!(simulation, Tracer(:abc))
     run!(simulation, period=Day(10))
-    abc2 = simulation.diagnostic_variables.grid.tracers_grid[:abc][:, 1]
+    abc2 = simulation.diagnostic_variables.grid.tracers_grid[:abc]
 
     for ij in eachindex(abc1, abc2)
         @test abc1[ij] == abc2[ij]
