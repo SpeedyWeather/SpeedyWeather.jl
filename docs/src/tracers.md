@@ -15,9 +15,15 @@ A tracer is conserved in the absence of sources or sinks (the zero on the right-
 Aerosols from wildfires might be considered to be a passive tracer, but the
 source term should increase the aerosol concentration whereever and whenever there is 
 a wildfire. And also a sink term should be added representing aerosols being washed out
-in rainfall, or deposited on the ground. However, aersols should be considered
+in rainfall, or deposited on the ground. However, aerosols should be considered
 _active_ and not _passive_ if they influence the radiation and hence the temperature
 which couples the tracer equation above two-way with the other equations.
+Active or passive tracers are treated equally in SpeedyWeather. By default a
+tracer is passive, but if a forcing or parameterization is defined that depends
+on the tracer it becomes active, affecting the flow. A tracer definition
+in itself therefore does not make distinction between active or passive
+tracers but a forcing/parameterization definition can make existing tracers
+active. 
 
 # Eulerian advection
 
@@ -77,6 +83,13 @@ add!(simulation, Tracer(:xyz))
 
 which will add the tracer to `model.tracers` as above but also add
 it to the prognostic and diagnostic variables (otherwise done at `initialize!`).
+There is no difference between adding a tracer to model versus adding it
+to the simulation. Conceptually, the existence of a tracer should be
+defined in `model` in the same way as `PrimitiveWetModel` defines the existence
+of humidity as an (active) tracer. But for convenience and the ability
+to add (or remove) a tracer at any time it is also possible to add
+a tracer to `simulation` (which will add it to the `model`, and the variables, too).
+
 What you should not do is add a tracer to the `model` _after_ it has been initialized.
 Then you end up with an additional tracer in `model` without there
 being variables for it, throwing an error. You can check that
@@ -102,7 +115,12 @@ While a tracer is defined through its key, e.g.
 Tracer(:dust)
 ```
 it also has a field `active` which can be changed any time.
-An active tracer is advected, a deactivated tracer does not change in time
+Do not confuse this with the discussion of active vs passive,
+categorising whether a tracer impacts the flow or not.
+Active versus deactivated here is solely used to describe
+whether its time evolution is temporarily "deactivated.
+An activated tracer (the default) is advected,
+a deactivated tracer does not change in time
 (=frozen) but continues to exist and all its variables remain in place.
 You can (de)activate a tracer with
 
