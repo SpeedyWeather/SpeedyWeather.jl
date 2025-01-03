@@ -184,7 +184,7 @@ function set!(
     add::Bool=false,
 )
     (; londs, latds, σ_levels_full) = geometry
-    kernel(a, b) = add ? a+b : b
+    kernel = add ? (a,b) -> a+b : (a,b) -> b
     for k in eachgrid(var)
         for ij in eachgridpoint(var)
             var[ij, k] = kernel(var[ij, k], f(londs[ij], latds[ij], σ_levels_full[k]))
@@ -202,7 +202,7 @@ function set!(
     add::Bool=false,
 ) where T
     (; londs, latds) = geometry
-    kernel(a, b) = add ? a+b : b
+    kernel = add ? (a,b) -> a+b : (a,b) -> b
     for ij in eachgridpoint(var)
         var[ij] = kernel(var[ij], f(londs[ij], latds[ij]))
     end
@@ -217,7 +217,7 @@ function set!(
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
 ) where T
-    kernel(a, b) = add ? a+b : b
+    kernel = add ? (a,b) -> a+b : (a,b) -> b
     sT = T(s)
     var .= kernel.(var, sT)
 end 
