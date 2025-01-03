@@ -68,10 +68,10 @@ end
 # matrix_size(G::OctahedralGaussianGrid) = (2*(4+G.nlat_half), 2*(4+G.nlat_half+1))
 
 ## COORDINATES
-get_colat(::Type{<:OctahedralGaussianArray}, nlat_half::Integer) = get_colat(FullGaussianArray, nlat_half)
-function get_lon_per_ring(Grid::Type{<:OctahedralGaussianArray}, nlat_half::Integer, j::Integer)
+get_latd(::Type{<:OctahedralGaussianArray}, nlat_half::Integer) = get_latd(FullGaussianArray, nlat_half)
+function get_lond_per_ring(Grid::Type{<:OctahedralGaussianArray}, nlat_half::Integer, j::Integer)
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
-    return collect(0:2π/nlon:2π-π/nlon)
+    return collect(0:360/nlon:360-180/nlon)
 end
 
 ## QUADRATURE

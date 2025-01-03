@@ -154,7 +154,7 @@ function initialize!(   progn::PrognosticVariables,
     u_grid = zeros(Grid{NF}, nlat_half, 1)
     η_perturb_grid = zeros(Grid{NF}, nlat_half)
     lat = RingGrids.get_lat(Grid, nlat_half)
-    _, lons = RingGrids.get_colatlons(Grid, nlat_half)
+    lons, _ = RingGrids.get_lonlats(Grid, nlat_half)
 
     for (j, ring) in enumerate(eachring(u_grid))
         θ = lat[j]             # latitude in radians

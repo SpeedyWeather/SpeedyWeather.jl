@@ -68,30 +68,36 @@ function matrix_size(::Type{<:HEALPixArray}, nlat_half::Integer)
 end
 
 ## COORDINATES
-function get_colat(::Type{<:HEALPixArray}, nlat_half::Integer)
+
+"""$(TYPEDSIGNATURES)
+Latitudes [90˚N to -90˚N] for the `HEALPixGrid` with resolution parameter `nlat_half`."""
+function get_latd(::Type{<:HEALPixArray}, nlat_half::Integer)
     nlat_half == 0 && return Float64[]
     
     nlat = get_nlat(HEALPixArray, nlat_half)
     nside = nside_healpix(nlat_half)
-    colat = zeros(nlat)
+    latd = zeros(nlat)
     
     # Górski et al 2005 eq 4 and 8
-    for j in 1:nside        colat[j] = acos(1-j^2/3nside^2)                 end     # north polar cap
-    for j in nside+1:3nside colat[j] = acos(4/3 - 2j/3nside)                end     # equatorial belt
-    for j in 3nside+1:nlat  colat[j] = acos((2nlat_half-j)^2/3nside^2-1)    end     # south polar cap
+    for j in 1:nside        latd[j] = 90 - acosd(1-j^2/3nside^2)              end     # north polar cap
+    for j in nside+1:3nside latd[j] = 90 - acosd(4/3 - 2j/3nside)             end     # equatorial belt
+    for j in 3nside+1:nlat  latd[j] = 90 - acosd((2nlat_half-j)^2/3nside^2-1) end     # south polar cap
 
-    return colat
+    return latd
 end
 
-function get_lon_per_ring(Grid::Type{<:HEALPixArray}, nlat_half::Integer, j::Integer)
+"""$(TYPEDSIGNATURES)
+Longitudes [0˚E to 360˚E] for the `HEALPixGrid` with resolution parameter `nlat_half`
+on ring `j` (north to south)."""
+function get_lond_per_ring(Grid::Type{<:HEALPixArray}, nlat_half::Integer, j::Integer)
     nside = nside_healpix(nlat_half)
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
 
     # Górski et al 2005 eq 5 and 9
     # s = 1 for polar caps, s=2, 1, 2, 1, ... in the equatorial zone
     s = (j < nside) || (j >= 3nside) ? 1 : ((j - nside) % 2 + 1)
-    lon = [π/(nlon÷2)*(i - s/2) for i in 1:nlon]
-    return lon
+    lond = [180/(nlon÷2)*(i - s/2) for i in 1:nlon]
+    return lond
 end
 
 ## INDEXING

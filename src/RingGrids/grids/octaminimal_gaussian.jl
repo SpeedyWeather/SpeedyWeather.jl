@@ -69,10 +69,10 @@ end
 # matrix_size(G::OctaminimalGaussianGrid) = (2*(4+G.nlat_half), 2*(4+G.nlat_half+1))
 
 ## COORDINATES
-get_colat(::Type{<:OctaminimalGaussianArray}, nlat_half::Integer) = get_colat(FullGaussianArray, nlat_half)
-function get_lon_per_ring(Grid::Type{<:OctaminimalGaussianArray}, nlat_half::Integer, j::Integer)
+get_latd(::Type{<:OctaminimalGaussianArray}, nlat_half::Integer) = get_latd(FullGaussianArray, nlat_half)
+function get_lond_per_ring(Grid::Type{<:OctaminimalGaussianArray}, nlat_half::Integer, j::Integer)
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
-    return collect(π/nlon:2π/nlon:2π)
+    return collect(180/nlon:360/nlon:360)       # use HEALPix definition for longitudes
 end
 
 ## QUADRATURE

@@ -71,30 +71,30 @@ function each_index_in_ring!(
 end
 
 ## COORDINATES
-function get_lond(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
-    lon = get_lon(Grid, nlat_half)
-    lon .*= 360/2π      # convert to lond in-place
-    return lon          # = lond
+function get_lon(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
+    lon = get_lond(Grid, nlat_half) # in degrees
+    lon .*= 2π/360                  # convert to radians in-place
+    return lon
 end
 
-function get_colatlons(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
+function get_londlatds(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
 
-    colat = get_colat(Grid, nlat_half)      # vector of colats [0, π]
-    lon = get_lon(Grid, nlat_half)          # vector of longitudes [0, 2π)
+    lond = get_lond(Grid, nlat_half)        # vector of longitudes [0, 2π)
+    latd = get_latd(Grid, nlat_half)        # vector of latitudes [90, -90]
     nlon = get_nlon(Grid, nlat_half)        # number of longitudes
     nlat = get_nlat(Grid, nlat_half)        # number of latitudes
 
     npoints = get_npoints(Grid, nlat_half)  # total number of grid points
-    colats = zeros(npoints)                 # preallocate
-    lons = zeros(npoints)
+    londs = zeros(npoints)
+    latds = zeros(npoints)                  # preallocate
 
     for j in 1:nlat                         # populate preallocated colats, lons
         for i in 1:nlon
-            ij = i + (j-1)*nlon             # continuous index ij
-            colats[ij] = colat[j]
-            lons[ij] = lon[i]
+            ij = i + (j-1)*nlon             # continuous (running) index ij
+            londs[ij] = lond[i]
+            latds[ij] = latd[j]
         end
     end
 
-    return colats, lons
+    return londs, latds
 end

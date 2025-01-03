@@ -16,25 +16,29 @@ get_lond(::Type{<:AbstractReducedGridArray}, nlat_half::Integer) = Float64[]
 # all reduced grids have their maximum number of longitude points around the equator, i.e. j = nlat_half
 get_nlon_max(Grid::Type{<:AbstractReducedGridArray}, nlat_half::Integer) = get_nlon_per_ring(Grid, nlat_half, nlat_half)
 
-function get_colatlons(Grid::Type{<:AbstractReducedGridArray}, nlat_half::Integer)
+"""$(TYPEDSIGNATURES)
+Return vectors of `londs`, `latds`, of longitudes (degrees, 0-360˚E)
+and latitudes (degrees, -90˚ to 90˚N) for reduced grids for all
+grid points in order of the running index `ij`."""
+function get_londlatds(Grid::Type{<:AbstractReducedGridArray}, nlat_half::Integer)
     
-    colat = get_colat(Grid, nlat_half)
+    latd = get_latd(Grid, nlat_half)
     nlat = get_nlat(Grid, nlat_half)
     
     npoints = get_npoints(Grid, nlat_half)
-    colats = zeros(npoints)                 # preallocate arrays
-    lons = zeros(npoints)
+    latds = zeros(npoints)                 # preallocate arrays
+    londs = zeros(npoints)
 
-    ij = 1                                  # continuous index
+    ij = 1                                  # running index
     for j in 1:nlat                         # populate arrays ring by ring
-        lon = get_lon_per_ring(Grid, nlat_half, j)
-        nlon = length(lon)
+        lond = get_lond_per_ring(Grid, nlat_half, j)
+        nlon = length(lond)
 
-        colats[ij:ij+nlon-1] .= colat[j]
-        lons[ij:ij+nlon-1] .= lon
+        latds[ij:ij+nlon-1] .= latd[j]
+        londs[ij:ij+nlon-1] .= lond
 
         ij += nlon
     end
 
-    return colats, lons
+    return londs, latds
 end

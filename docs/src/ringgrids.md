@@ -88,7 +88,7 @@ All RingGrids have a single index `ij` which follows the ring order. While this 
 exciting here are some examples how to make better use of the information that the data sits on a grid.
 
 We obtain the latitudes of the rings of a grid by calling `get_latd` (`get_lond` is only defined for full
-grids, or use `get_latdlonds` for latitudes, longitudes per grid point not per ring)
+grids, or use `get_londlatds` for latitudes, longitudes per grid point not per ring)
 ```@example ringgrids
 grid = randn(OctahedralClenshawGrid, 5)
 latd = get_latd(grid)
