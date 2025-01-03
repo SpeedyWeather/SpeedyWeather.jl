@@ -1,4 +1,4 @@
-Starting SpeedyWeather.jl run 0003 on Thu, 02 Jan 2025 00:34:31
+Starting SpeedyWeather.jl run 0003 on Fri, 03 Jan 2025 12:24:23
 Integrating:
 SpectralGrid:
 ├ Spectral:   T63 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
@@ -10,25 +10,25 @@ Time: 12.0 days at Δt = 1200.0s
 
 All data will be stored in /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/docs/build/run_0003
 
-  5%, ETA: 0:00:01,   Inf millenia/day
- 10%, ETA: 0:00:01,   Inf millenia/day
- 15%, ETA: 0:00:01,   Inf millenia/day
- 20%, ETA: 0:00:01,   Inf millenia/day
- 25%, ETA: 0:00:01,   Inf millenia/day
- 30%, ETA: 0:00:01,   Inf millenia/day
- 35%, ETA: 0:00:01,   Inf millenia/day
- 40%, ETA: 0:00:01,   Inf millenia/day
- 45%, ETA: 0:00:01,   Inf millenia/day
- 50%, ETA: 0:00:01,   Inf millenia/day
- 55%, ETA: 0:00:01,   Inf millenia/day
- 60%, ETA: 0:00:01,   Inf millenia/day
- 65%, ETA: 0:00:01,   Inf millenia/day
- 70%, ETA: 0:00:00,   Inf millenia/day
- 75%, ETA: 0:00:00,   Inf millenia/day
- 80%, ETA: 0:00:00,   Inf millenia/day
- 85%, ETA: 0:00:00,   Inf millenia/day
- 90%, ETA: 0:00:00,   Inf millenia/day
- 95%, ETA: 0:00:00,   Inf millenia/day
-100%, ETA: 0:00:00,   Inf millenia/day
+  5%, ETA: 0:00:01, 118589.64 millenia/day
+ 10%, ETA: 0:00:01, 237179.27 millenia/day
+ 15%, ETA: 0:00:01, 355768.91 millenia/day
+ 20%, ETA: 0:00:01, 474358.55 millenia/day
+ 25%, ETA: 0:00:01, 592948.18 millenia/day
+ 30%, ETA: 0:00:01, 711537.82 millenia/day
+ 35%, ETA: 0:00:01, 832885.35 millenia/day
+ 40%, ETA: 0:00:01, 951474.99 millenia/day
+ 45%, ETA: 0:00:01, 1070064.63 millenia/day
+ 50%, ETA: 0:00:01, 1188654.26 millenia/day
+ 55%, ETA: 0:00:01, 1307243.90 millenia/day
+ 60%, ETA: 0:00:01, 1425833.54 millenia/day
+ 65%, ETA: 0:00:01, 1544423.17 millenia/day
+ 70%, ETA: 0:00:01, 1665770.71 millenia/day
+ 75%, ETA: 0:00:00, 1784360.34 millenia/day
+ 80%, ETA: 0:00:00, 1902949.98 millenia/day
+ 85%, ETA: 0:00:00, 2021539.62 millenia/day
+ 90%, ETA: 0:00:00, 2140129.25 millenia/day
+ 95%, ETA: 0:00:00, 2258718.89 millenia/day
+100%, ETA: 0:00:00, 2377308.52 millenia/day
 
 Integration done in empty period.

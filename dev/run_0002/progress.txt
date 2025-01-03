@@ -1,4 +1,4 @@
-Starting SpeedyWeather.jl run 0002 on Thu, 02 Jan 2025 00:34:28
+Starting SpeedyWeather.jl run 0002 on Fri, 03 Jan 2025 12:24:19
 Integrating:
 SpectralGrid:
 ├ Spectral:   T63 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
