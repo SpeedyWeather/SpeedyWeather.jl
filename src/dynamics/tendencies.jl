@@ -490,7 +490,7 @@ function horizontal_advection!(
 
     (; div_grid) = diagn.grid
     
-    @inline kernel(a, b, c) = add ? a+b*c : b*c
+    kernel = add ? (a,b,c) -> a+b*c : (a,b,c) -> b*c
 
     for k in eachgrid(A_tend_grid, A_grid, div_grid)
         # +A*div term of the advection operator
