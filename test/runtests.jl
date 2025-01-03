@@ -58,5 +58,10 @@ include("run_speedy.jl")
 include("callbacks.jl")
 include("schedule.jl")
 
+# DIFFERENTIABILITY 
+if FLAG_EXTENDED_TESTS
+    include("differentiability/runtests.jl")
+end
+
 # OUTPUT 
 include("netcdf_output.jl")
