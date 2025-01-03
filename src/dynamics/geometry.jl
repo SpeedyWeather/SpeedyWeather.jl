@@ -50,10 +50,10 @@ $(TYPEDFIELDS)
     lond::Vector{Float64} = get_lond(Grid, nlat_half)
 
     "longitude (0˚...360˚) for each grid point in ring order"
-    londs::Vector{NF} = get_latdlonds(Grid, nlat_half)[2]
+    londs::Vector{NF} = get_londlatds(Grid, nlat_half)[1]
     
     "latitude (-90˚...˚90) for each grid point in ring order"
-    latds::Vector{NF} = get_latdlonds(Grid, nlat_half)[1]
+    latds::Vector{NF} = get_londlatds(Grid, nlat_half)[2]
 
     "longitude (0...2π) for each grid point in ring order"
     lons::Vector{NF} = RingGrids.get_latlons(Grid, nlat_half)[2]

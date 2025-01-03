@@ -19,7 +19,7 @@ Returns 2xnpoints arrays for east, south, west, north each containing the longit
 function get_vertices(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
 
     npoints = get_npoints2D(Grid, nlat_half)
-    latds, londs = get_latdlonds(Grid, nlat_half)
+    londs, latds = get_londlatds(Grid, nlat_half)
 
     # use the locator to find the neighbouring grid points
     # to control the direction of "neighbouring" use a small offset Δ

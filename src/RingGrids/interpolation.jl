@@ -30,9 +30,7 @@ function GridGeometry(  Grid::Type{<:AbstractGrid}, # which grid to calculate th
     npoints = get_npoints(Grid, nlat_half)          # total number of grid points
 
     # LATITUDES
-    colat = get_colat(Grid, nlat_half)              # colatitude in radians
-    lat = π/2 .- colat                              # latitude in radians
-    latd = lat*360/2π                               # 90˚...-90˚, in degrees
+    latd = get_latd(Grid, nlat_half)                # latitudes in degrees 90˚N ... -90˚N
     latd_poles = cat(90, latd, -90, dims=1)         # latd, but poles incl
 
     # Hack: use -90.00...1˚N instead of exactly -90˚N for the <=, > comparison
@@ -42,7 +40,7 @@ function GridGeometry(  Grid::Type{<:AbstractGrid}, # which grid to calculate th
     latd_poles[end] = latd_poles[end] - eps(latd_poles[end])
 
     # COORDINATES for every grid point in ring order
-    _, londs = get_latdlonds(Grid, nlat_half)       # in degrees [0˚...360˚E]                         
+    londs, _ = get_londlatds(Grid, nlat_half)       # in degrees [0˚...360˚E]                         
 
     # RINGS and LONGITUDE OFFSETS
     rings = eachring(Grid, nlat_half)               # Vector{UnitRange} descr start/end index on ring
@@ -177,7 +175,7 @@ function interpolator(  ::Type{NF},
                         Interpolator::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR
                         ) where {NF<:AbstractFloat}
     
-    latds, londs = get_latdlonds(Aout)      # coordinates of new grid
+    londs, latds = get_londlatds(Aout)      # coordinates of new grid
     I = Interpolator(NF, typeof(A), A.nlat_half, get_npoints2D(Aout))
     update_locator!(I, latds, londs, unsafe=false)
     return I
