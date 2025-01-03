@@ -527,7 +527,7 @@ function grid_cell_average!(
     # output grid coordinates, append -π, 2π to have grid points
     # towards the poles definitely included
     colat_out = vcat(-π, get_colat(output), 2π)
-    _, lons_out = get_colatlons(output)
+    lons_out, _ = get_lonlats(output)
 
     rings = eachring(output)
 
