@@ -23,9 +23,6 @@ $(TYPEDFIELDS)
     "maximum number of longitudes (at/around Equator)"
     nlon_max::Int = get_nlon_max(Grid, nlat_half)
 
-    "=nlon_max, same (used for compatibility), TODO: still needed?"
-    nlon::Int = nlon_max
-
     "number of latitude rings"
     nlat::Int = spectral_grid.nlat
     
