@@ -56,10 +56,10 @@ $(TYPEDFIELDS)
     latds::Vector{NF} = get_londlatds(Grid, nlat_half)[2]
 
     "longitude (0...2π) for each grid point in ring order"
-    lons::Vector{NF} = RingGrids.get_latlons(Grid, nlat_half)[2]
+    lons::Vector{NF} = RingGrids.get_lonlats(Grid, nlat_half)[2]
     
     "latitude (-π/2...π/2) for each grid point in ring order"
-    lats::Vector{NF} = RingGrids.get_latlons(Grid, nlat_half)[1]
+    lats::Vector{NF} = RingGrids.get_lonlats(Grid, nlat_half)[1]
 
     "sin of latitudes"
     sinlat::Vector{NF} = sind.(latd)

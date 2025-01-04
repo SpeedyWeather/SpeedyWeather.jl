@@ -56,13 +56,13 @@ matrix_size(::Type{OctaHEALPixGrid}, nlat_half::Integer) = (2nlat_half, 2nlat_ha
 
 ## COORDINATES
 function get_latd(::Type{<:OctaHEALPixArray}, nlat_half::Integer)
-    nlat_half == 0 && return Float64[]
-    latd = zeros(get_nlat(OctaHEALPixArray, nlat_half))
-    for j in 1:nlat_half
-        # Górski et al. 2005 eq 4 but without the 1/3 and Nside=nlat_half
-        latd[j] = 90 - acosd(1-(j/nlat_half)^2)  # northern hemisphere
-        latd[2nlat_half-j] = 180 - latd[j]  # southern hemisphere
-    end
+    nlat = get_nlat(OctaHEALPixArray, nlat_half)
+    latd = zeros(nlat)
+
+    # Górski et al. 2005 eq 4 but without the 1/3 and Nside=nlat_half
+    for j in 1:nlat_half        latd[j] = 90 - acosd(1-(j/nlat_half)^2) end # north + Equator
+    for j in nlat_half+1:nlat   latd[j] = -latd[nlat-j+1]               end # southern hemisphere
+
     return latd
 end
 

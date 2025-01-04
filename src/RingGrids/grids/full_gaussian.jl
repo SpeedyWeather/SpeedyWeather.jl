@@ -42,7 +42,7 @@ function get_latd(::Type{<:FullGaussianArray}, nlat_half::Integer)
 end
 
 function get_lond(::Type{<:FullGaussianArray}, nlat_half::Integer)
-    nlat_half == 0 && return Float64[]
+    nlat_half == 0 && return Float64[]      # necessary to avoid error from /0 below
     nlon = get_nlon(FullGaussianArray, nlat_half)
     return collect(range(0, 360 - 180/nlon, step=360/nlon))
 end

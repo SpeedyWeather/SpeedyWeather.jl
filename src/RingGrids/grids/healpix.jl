@@ -56,7 +56,7 @@ The number of grid points on one side of each (square) face.
 While we use `nlat_half` across all ring grids, this function translates this to
 Nside. Even `nlat_half` only."""
 function nside_healpix(nlat_half::Integer)
-    iseven(nlat_half) || @error "Odd nlat_half=$nlat_half not supported for HEALPix."
+    iseven(nlat_half) || throw(DimensionMismatch("Only even nlat_half supported for HEAlPixGrid, nlat_half=$nlat_half provided."))
     return nlat_half÷2
 end
 
@@ -72,8 +72,6 @@ end
 """$(TYPEDSIGNATURES)
 Latitudes [90˚N to -90˚N] for the `HEALPixGrid` with resolution parameter `nlat_half`."""
 function get_latd(::Type{<:HEALPixArray}, nlat_half::Integer)
-    nlat_half == 0 && return Float64[]
-    
     nlat = get_nlat(HEALPixArray, nlat_half)
     nside = nside_healpix(nlat_half)
     latd = zeros(nlat)

@@ -245,7 +245,7 @@ get_loncolats(grid::Grid) where {Grid<:AbstractGridArray} = get_loncolats(Grid, 
 
 # radians
 function get_lonlats(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
-    londs, latds = get_londslatds(Grid, nlat_half)  # longitudes, latitudes in degrees
+    londs, latds = get_londlatds(Grid, nlat_half)  # longitudes, latitudes in degrees
     return londs * π/180, latds * π/180             # to radians
 end
 
