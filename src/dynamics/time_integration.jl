@@ -114,12 +114,27 @@ function initialize!(L::Leapfrog, model::AbstractModel)
         L.Δt = L.Δt_sec/L.radius
     end
 
-    # check how time stepping time step and output time step align
+    # check how time steps from time integration and output align
     n = round(Int, Millisecond(output_dt).value/L.Δt_millisec.value)
     nΔt = n*L.Δt_millisec
     if nΔt != output_dt
         @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms (=$(nΔt.value/1000)s), but output_dt = $(output_dt.value)s"
     end
+end
+
+"""$(TYPEDSIGNATURES)
+Change time step of timestepper `L` to `Δt`
+and disables adjustment to output frequency."""
+function set!(L::AbstractTimeStepper, Δt::Period)
+    L.Δt_millisec = Millisecond(Δt)
+    L.Δt_sec = L.Δt_millisec.value/1000
+    L.Δt = L.Δt_sec/L.radius
+
+    resolution_factor = (L.trunc+1)/(DEFAULT_TRUNC+1)
+    L.Δt_at_T31 = Second(round(Int, L.Δt_sec*resolution_factor))
+
+    L.adjust_with_output = false
+    return L
 end
 
 """
