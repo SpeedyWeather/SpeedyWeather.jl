@@ -254,8 +254,8 @@ function initialize!(
     latd = get_latd(Grid, nlat_half)
 
     # INTERPOLATION: PRECOMPUTE LOCATION INDICES
-    latds, londs = RingGrids.get_latdlonds(Grid, nlat_half)
-    RingGrids.update_locator!(output.interpolator, latds, londs)
+    londs, latds = RingGrids.get_londlatds(Grid, nlat_half)
+    RingGrids.update_locator!(output.interpolator, londs, latds)
         
     σ = model.geometry.σ_levels_full
     defVar(dataset, "lon", lond, ("lon",), attrib=Dict("units"=>"degrees_east", "long_name"=>"longitude"))
