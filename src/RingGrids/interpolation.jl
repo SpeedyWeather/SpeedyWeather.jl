@@ -187,7 +187,7 @@ function interpolate(
     Interpolator::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR,
 ) where NF                      # number format used for interpolation
     n = length(latds)
-    @assert n == length(londs) "New interpolation coordinates latds::Vector, londs::Vector have to be of same length.
+    @assert n == length(londs) "New interpolation coordinates londs::Vector, latds::Vector have to be of same length.
                                 $n and $(length(londs)) provided."
     
     I = Interpolator(NF, typeof(A), A.nlat_half, n)    # generate Interpolator, containing geometry and work arrays
