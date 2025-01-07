@@ -3,6 +3,7 @@
 ## Unreleased
 
 - set! for time step [#650](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/650)
+- Bug: ZonalWind had sqrt of negative for uncommon resolutions [#649](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/649)
 - Spectral Gradients are now differentiable, with correctness check in extended CI [#638](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/638)
 - Tracer advection [#579](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/579)
 - Buildkite CI with dummy pipeline [#646](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/646)
