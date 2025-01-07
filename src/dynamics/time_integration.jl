@@ -370,7 +370,7 @@ Initializes a `simulation`. Scales the variables, initializes
 the output, stores initial conditions, initializes the progress meter feedback,
 callbacks and performs the first two initial time steps to spin up the
 leapfrogging scheme."""
-function initialize!(simulaton::AbstractSimulation)
+function initialize!(simulation::AbstractSimulation)
     progn = simulation.prognostic_variables         # unpack stuff
     diagn = simulation.diagnostic_variables
     (; clock) = progn
@@ -419,6 +419,11 @@ end
 Finalize a `simulation`. Finishes the progress meter, unscales variables,
 finalizes the output, writes a restart file and finalizes callbacks."""
 function finalize!(simulation::AbstractSimulation)
+    progn = simulation.prognostic_variables         # unpack stuff
+    diagn = simulation.diagnostic_variables
+    (; model) = simulation
+    (; feedback, output) = model
+
     finalize!(feedback)                     # finish the progress meter, do first for benchmark accuracy
     unscale!(progn)                         # undo radius-scaling for vor, div from the dynamical core
     unscale!(diagn)                         # undo radius-scaling for vor, div from the dynamical core
