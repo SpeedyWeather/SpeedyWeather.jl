@@ -52,6 +52,7 @@ include("random_process.jl")
 include("stochastic_physics.jl")
 
 # INITIALIZATION AND INTEGRATION
+include("resolutions.jl")
 include("run_speedy.jl")
 
 # EXTENSION
