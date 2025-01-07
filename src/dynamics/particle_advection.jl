@@ -81,11 +81,11 @@ function initialize!(
         # modulo all particles here
         # i.e. one can start with a particle at -120˚E which moduloed to 240˚E here
         particles[i] = mod(particles[i])
-        lats[i] = particles[i].lat
         lons[i] = particles[i].lon
+        lats[i] = particles[i].lat
     end
 
-    RingGrids.update_locator!(interpolator, lats, lons)
+    RingGrids.update_locator!(interpolator, lons, lats)
     u0 = diagn.particles.u      # now reused arrays are actually u, v
     v0 = diagn.particles.v
     interpolate!(u0, u_grid, interpolator)
@@ -138,8 +138,8 @@ function particle_advection!(
     # as they're not needed anymore after new (predicted) location is found
     # same is true for the corrector step, interpolating velocities for the
     # next time step of the particle advection
-    lats = diagn.particles.u
-    lons = diagn.particles.v
+    lons = diagn.particles.u
+    lats = diagn.particles.v
 
     for i in eachindex(particles, u_old, v_old)
         # sum up Heun's first term in 1/2*Δt*(uv_old + uv_new) on the fly
@@ -151,8 +151,8 @@ function particle_advection!(
         diagn.particles.locations[i] = advect_2D(particles[i], u_old[i], v_old[i], Δt_half)
 
         # reuse work arrays on the fly for new (predicted) locations
-        lats[i] = diagn.particles.locations[i].lat
         lons[i] = diagn.particles.locations[i].lon
+        lats[i] = diagn.particles.locations[i].lat
     end
 
     # CORRECTOR STEP, use u, v at new location and new time step
@@ -160,7 +160,7 @@ function particle_advection!(
     u_grid = view(diagn.grid.u_grid, :, k)
     v_grid = view(diagn.grid.v_grid, :, k)
     (; interpolator) = diagn.particles
-    RingGrids.update_locator!(interpolator, lats, lons)
+    RingGrids.update_locator!(interpolator, lons, lats)
 
     # interpolate new velocity on predicted new locations
     u_new = diagn.particles.u
@@ -173,13 +173,13 @@ function particle_advection!(
         particles[i] = advect_2D(particles[i], u_new[i], v_new[i], Δt_half)
 
         # reuse work arrays on the fly for new (correct) locations
-        lats[i] = particles[i].lat
         lons[i] = particles[i].lon
+        lats[i] = particles[i].lat
     end
 
     # store new velocities at new (corrected locations) to be used on
     # next particle advection time step
-    RingGrids.update_locator!(interpolator, lats, lons)
+    RingGrids.update_locator!(interpolator, lons, lats)
     interpolate!(u_new, u_grid, interpolator)
     interpolate!(v_new, v_grid, interpolator)
     return nothing
