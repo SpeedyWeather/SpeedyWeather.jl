@@ -43,7 +43,7 @@ function GridGeometry(  Grid::Type{<:AbstractGrid}, # which grid to calculate th
     nlons = get_nlons(Grid, nlat_half)              # number of longitude points per ring, pole to pole
     lon_offsets = [londs[ring[1]] for ring in rings]# offset of the first point from 0˚E
 
-    return GridGeometry{Grid}(nlat_half, nlat, npoints, latd_poles, londs, rings, nlons, lon_offsets)
+    return GridGeometry{Grid}(nlat_half, nlat, npoints, londs, latd_poles, rings, nlons, lon_offsets)
 end
 
 function Base.show(io::IO,G::GridGeometry{T}) where T
