@@ -46,8 +46,10 @@
 
     autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(2Δt), Duplicated(model, d_model))
 
-    # differnetiate wrt initial conditions 
+    # differnetiate wrt initial conditions / previous state
+    # write this as functions (progn_old, diagn_old, 2\Delta t, model -> progn, diagn)
 
     # differnetiate wrt parameter 
+    # write this as function (model, progn, diagn, 2\Delta t) -> progn_new
 
 end
