@@ -123,19 +123,27 @@ function initialize!(L::Leapfrog, model::AbstractModel)
 end
 
 """$(TYPEDSIGNATURES)
-Change time step of timestepper `L` to `Δt`
+Change time step of timestepper `L` to `Δt` (unscaled)
 and disables adjustment to output frequency."""
-function set!(L::AbstractTimeStepper, Δt::Period)
-    L.Δt_millisec = Millisecond(Δt)
+function set!(
+    L::AbstractTimeStepper,
+    Δt::Period,                 # unscaled time step in Second, Minute, ...
+)
+    L.Δt_millisec = Millisecond(Δt)         # recalculate all Δt fields
     L.Δt_sec = L.Δt_millisec.value/1000
     L.Δt = L.Δt_sec/L.radius
 
+    # recalculate the default time step at resolution T31 to be consistent
     resolution_factor = (L.trunc+1)/(DEFAULT_TRUNC+1)
     L.Δt_at_T31 = Second(round(Int, L.Δt_sec*resolution_factor))
 
+    # given Δt was manually set disallow adjustment to output frequency
     L.adjust_with_output = false
     return L
 end
+
+# also allow for keyword arguments
+set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
 
 """
 $(TYPEDSIGNATURES)
