@@ -301,8 +301,8 @@ end
 
 function update_locator!(
     I::AbstractInterpolator{NF, Grid},  # GridGeometry and Locator
-    λs::Vector;                         # longitudes to interpolate onto
-    θs::Vector,                         # latitudes to interpolate onto
+    λs::Vector,                         # longitudes to interpolate onto
+    θs::Vector;                         # latitudes to interpolate onto
     unsafe::Bool=false,                 # true to disable safety checks
     ) where {NF<:AbstractFloat, Grid<:AbstractGrid}
 
