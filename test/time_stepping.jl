@@ -115,3 +115,15 @@ end
         @test M_Ronly <= M_RAW
     end
 end
+
+@testset "Set timestep manually" begin
+    @testset for trunc in (31, 63, 127)
+        spectral_grid = SpectralGrid(; trunc)
+        time_stepping = Leapfrog(spectral_grid)
+        set!(time_stepping, Minute(10))
+        @test time_stepping.Δt_sec == 10*60
+
+        set!(time_stepping, Δt=Minute(20))
+        @test time_stepping.Δt_sec == 20*60
+    end
+end

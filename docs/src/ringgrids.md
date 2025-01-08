@@ -88,7 +88,7 @@ All RingGrids have a single index `ij` which follows the ring order. While this 
 exciting here are some examples how to make better use of the information that the data sits on a grid.
 
 We obtain the latitudes of the rings of a grid by calling `get_latd` (`get_lond` is only defined for full
-grids, or use `get_latdlonds` for latitudes, longitudes per grid point not per ring)
+grids, or use `get_londlatds` for latitudes, longitudes per grid point not per ring)
 ```@example ringgrids
 grid = randn(OctahedralClenshawGrid, 5)
 latd = get_latd(grid)
@@ -223,13 +223,13 @@ its resolution in terms of `nlat_half` and then the number of points to interpol
 `interp` is not yet initialized as it does not know about the destination coordinates yet. Let's define
 them, but note that we already decided there's only 10 of them above.
 ```@example ringgrids
-latds = collect(0.0:5.0:45.0)
 londs = collect(-10.0:2.0:8.0)
+latds = collect(0.0:5.0:45.0)
 nothing # hide
 ```
 now we can update the locator inside our interpolator as follows
 ```@example ringgrids
-RingGrids.update_locator!(interp, latds, londs)
+RingGrids.update_locator!(interp, londs, latds)
 ```
 With data matching the input from above, a `nlat_half=24` HEALPixGrid, and allocate 10-element output vector
 ```@example ringgrids

@@ -17,11 +17,13 @@ $(TYPEDFIELDS)"""
     AT,     # <:AbstractAtmosphere,
     CO,     # <:AbstractCoriolis,
     GO,     # <:AbstractGeopotential,
-    OR,     # <:AbstractOrography,
     AC,     # <:AbstractAdiabaticConversion,
     PA,     # <:AbstractParticleAdvection,
     IC,     # <:AbstractInitialConditions,
+    FR,     # <:AbstractForcing,
+    DR,     # <:AbstractDrag,
     RP,     # <:AbstractRandomProcess,
+    OR,     # <:AbstractOrography,
     LS,     # <:AbstractLandSeaMask,
     OC,     # <:AbstractOcean,
     LA,     # <:AbstractLand,
@@ -66,7 +68,12 @@ $(TYPEDFIELDS)"""
     adiabatic_conversion::AC = AdiabaticConversion(spectral_grid)
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(PrimitiveWet)
+    forcing::FR = NoForcing()
+    drag::DR = NoDrag()  
+  
+    # VARIABLES
     random_process::RP = NoRandomProcess()
+    tracers::TRACER_DICT = TRACER_DICT()
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
@@ -93,7 +100,7 @@ $(TYPEDFIELDS)"""
     optical_depth::OD = ZeroOpticalDepth(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
     longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
-    stochastic_physics::SP = StochasticallyPerturbedParameterizationTendencies(spectral_grid)
+    stochastic_physics::SP = NoStochasticPhysics()
     
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -129,6 +136,8 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.geopotential, model)
     initialize!(model.adiabatic_conversion, model)
     initialize!(model.random_process, model)
+    initialize!(model.forcing, model)
+    initialize!(model.drag, model)
 
     # boundary conditions
     initialize!(model.orography, model)

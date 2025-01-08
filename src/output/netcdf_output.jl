@@ -254,8 +254,8 @@ function initialize!(
     latd = get_latd(Grid, nlat_half)
 
     # INTERPOLATION: PRECOMPUTE LOCATION INDICES
-    latds, londs = RingGrids.get_latdlonds(Grid, nlat_half)
-    RingGrids.update_locator!(output.interpolator, latds, londs)
+    londs, latds = RingGrids.get_londlatds(Grid, nlat_half)
+    RingGrids.update_locator!(output.interpolator, londs, latds)
         
     σ = model.geometry.σ_levels_full
     defVar(dataset, "lon", lond, ("lon",), attrib=Dict("units"=>"degrees_east", "long_name"=>"longitude"))
@@ -409,6 +409,39 @@ AllOutputVariables() = (
     SurfaceFluxesOutput()...,
     SeaSurfaceTemperatureOutput(),
 )
+
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
+@kwdef mutable struct TracerOutput <: AbstractOutputVariable
+    name::String = "tracer1"
+    unit::String = "?"
+    long_name::String = "tracer1"
+    dims_xyzt::NTuple{4, Bool} = (true, true, true, true)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 15
+end
+
+"""$(TYPEDSIGNATURES)
+`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
+function output!(
+    output::NetCDFOutput,
+    variable::TracerOutput,
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    model::AbstractModel,
+)
+    tracer = output.grid3D
+    tracer_grid = diagn.grid.tracers_grid[Symbol(variable.name)]
+    RingGrids.interpolate!(tracer, tracer_grid, output.interpolator)
+
+    round!(tracer, variable.keepbits)
+    i = output.output_counter   # output time step to write
+    output.netcdf_file[variable.name][:, :, :, i] = tracer
+    return nothing
+end
+
 
 """
 $(TYPEDSIGNATURES)

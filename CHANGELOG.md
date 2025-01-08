@@ -3,6 +3,19 @@
 ## Unreleased
 
 - Generalise OneBandRadiation to NBandRadiation [#633](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/633)
+- Group initialize!, timestep!, finalize! of main time loop [#652](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/652)
+- Coordinates defined in degrees lond, latd, not colat, lon [#647](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/647)
+- Spectral Gradients are now differentiable, with correctness check in extended CI [#638](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/638)
+- set! for time step [#650](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/650)
+- Bug: ZonalWind had sqrt of negative for uncommon resolutions [#649](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/649)
+- Spectral Gradients are now differentiable, with correctness check in extended CI [#638](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/638)[#651](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/651)
+- Tracer advection [#579](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/579)
+- Buildkite CI with dummy pipeline [#646](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/646)
+- ConvectiveHeating implemented [#639](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/639)
+- Number format flexibility with set! [#634](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/634)
+- Forcing/drag for primitive models [#635](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/635)
+- RingGrids indexing with leading Colon should now always return another RingGrid instance [#637](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/637)
+- Roll back GPUArrays upgrade to ensure CUDA compatibility [#636](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/636)
 - Change default timestep to 40min at T31 [#623](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/623)
 
 ## v0.13

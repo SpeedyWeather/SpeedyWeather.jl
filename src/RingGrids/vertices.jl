@@ -19,7 +19,7 @@ Returns 2xnpoints arrays for east, south, west, north each containing the longit
 function get_vertices(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
 
     npoints = get_npoints2D(Grid, nlat_half)
-    latds, londs = get_latdlonds(Grid, nlat_half)
+    londs, latds = get_londlatds(Grid, nlat_half)
 
     # use the locator to find the neighbouring grid points
     # to control the direction of "neighbouring" use a small offset Δ
@@ -27,7 +27,7 @@ function get_vertices(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
     Δ = 1e-4
     
     I = AnvilInterpolator(Grid, nlat_half, npoints)
-    update_locator!(I, latds .+ Δ, londs .+ Δ)
+    update_locator!(I, londs .+ Δ, latds .+ Δ)
 
     east = zeros(2, npoints)
     south = zeros(2, npoints)
@@ -54,7 +54,7 @@ function get_vertices(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
         east[2, ij] = (latds[c] + latds[d])/2
     end
 
-    update_locator!(I, latds .- Δ, londs .- Δ)
+    update_locator!(I, londs .- Δ, latds .- Δ)
 
     (; ij_as, ij_bs, ij_cs, ij_ds) = I.locator
     @inbounds for (ij, (a, b, c, d)) in enumerate(zip(ij_as, ij_bs, ij_cs, ij_ds))

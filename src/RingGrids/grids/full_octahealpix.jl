@@ -34,8 +34,8 @@ get_nlat_half(::Type{<:FullOctaHEALPixArray}, npoints2D::Integer) = round(Int, 1
 get_nlon(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = 4nlat_half
 
 ## COORDINATES
-get_colat(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = get_colat(OctaHEALPixGrid, nlat_half)
-get_lon(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = get_lon(FullGaussianArray, nlat_half)
+get_latd(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = get_latd(OctaHEALPixGrid, nlat_half)
+get_lond(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) = get_lond(FullGaussianArray, nlat_half)
 
 # QUADRATURE (use weights from reduced grids though!)
 get_quadrature_weights(::Type{<:FullOctaHEALPixArray}, nlat_half::Integer) =

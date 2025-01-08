@@ -114,13 +114,36 @@ function initialize!(L::Leapfrog, model::AbstractModel)
         L.Δt = L.Δt_sec/L.radius
     end
 
-    # check how time stepping time step and output time step align
+    # check how time steps from time integration and output align
     n = round(Int, Millisecond(output_dt).value/L.Δt_millisec.value)
     nΔt = n*L.Δt_millisec
     if nΔt != output_dt
         @warn "$n steps of Δt = $(L.Δt_millisec.value)ms yield output every $(nΔt.value)ms (=$(nΔt.value/1000)s), but output_dt = $(output_dt.value)s"
     end
 end
+
+"""$(TYPEDSIGNATURES)
+Change time step of timestepper `L` to `Δt` (unscaled)
+and disables adjustment to output frequency."""
+function set!(
+    L::AbstractTimeStepper,
+    Δt::Period,                 # unscaled time step in Second, Minute, ...
+)
+    L.Δt_millisec = Millisecond(Δt)         # recalculate all Δt fields
+    L.Δt_sec = L.Δt_millisec.value/1000
+    L.Δt = L.Δt_sec/L.radius
+
+    # recalculate the default time step at resolution T31 to be consistent
+    resolution_factor = (L.trunc+1)/(DEFAULT_TRUNC+1)
+    L.Δt_at_T31 = Second(round(Int, L.Δt_sec*resolution_factor))
+
+    # given Δt was manually set disallow adjustment to output frequency
+    L.adjust_with_output = false
+    return L
+end
+
+# also allow for keyword arguments
+set!(L::AbstractTimeStepper; Δt::Period) = set!(L, Δt)
 
 """
 $(TYPEDSIGNATURES)
@@ -174,6 +197,16 @@ function leapfrog!(
         var_tend = getfield(tend, tendname)
         spectral_truncation!(var_tend)
         leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
+    end
+
+    # and time stepping for tracers if active
+    for (name, tracer) in model.tracers
+        if tracer.active
+            var_old, var_new = progn.tracers[name]
+            var_tend = tend.tracers_tend[name]
+            spectral_truncation!(var_tend)
+            leapfrog!(var_old, var_new, var_tend, dt, lf, model.time_stepping)
+        end
     end
 
     # evolve the random pattern in time
@@ -314,6 +347,8 @@ function timestep!(
     end
 
     if model.dynamics                                           # switch on/off all dynamics
+        forcing!(diagn, progn, lf2, model)
+        drag!(diagn, progn, lf2, model)
         dynamics_tendencies!(diagn, progn, lf2, model)          # dynamical core
         implicit_correction!(diagn, model.implicit, progn)      # semi-implicit time stepping corrections
     else    # just transform physics tendencies to spectral space
@@ -330,25 +365,23 @@ function timestep!(
     not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
 end
 
-"""
-$(TYPEDSIGNATURES)
-Main time loop that that initializes output and feedback, loops over all time steps
-and calls the output and feedback functions."""
-function time_stepping!(
-    progn::PrognosticVariables,     # all prognostic variables
-    diagn::DiagnosticVariables,     # all pre-allocated diagnostic variables
-    model::AbstractModel,              # all model components
-)          
-    
+"""$(TYPEDSIGNATURES)
+Initializes a `simulation`. Scales the variables, initializes
+the output, stores initial conditions, initializes the progress meter feedback,
+callbacks and performs the first two initial time steps to spin up the
+leapfrogging scheme."""
+function initialize!(simulation::AbstractSimulation)
+    progn = simulation.prognostic_variables         # unpack stuff
+    diagn = simulation.diagnostic_variables
     (; clock) = progn
-    (; Δt, Δt_millisec) = model.time_stepping
+    (; model) = simulation
+    (; feedback, output) = model
 
     # SCALING: we use vorticity*radius, divergence*radius in the dynamical core
     scale!(progn, diagn, model.spectral_grid.radius)
 
     # OUTPUT INITIALISATION AND STORING INITIAL CONDITIONS + FEEDBACK
     # propagate spectral state to grid variables for initial condition output
-    (; output, feedback) = model
     lf = 1                                  # use first leapfrog index
     transform!(diagn, progn, lf, model, initialize=true)
     initialize!(progn.particles, progn, diagn, model.particle_advection)
@@ -361,26 +394,64 @@ function time_stepping!(
     
     # only now initialise feedback for benchmark accuracy
     initialize!(feedback, clock, model)
+end
 
-    # MAIN LOOP
-    for _ in 2:clock.n_timesteps            # start at 2 as first Δt in first_timesteps!
-        timestep!(progn, diagn, 2Δt, model) # calculate tendencies and leapfrog forward
-        timestep!(clock, Δt_millisec)       # time of lf=2 and diagn after timestep!
+"""$(TYPEDSIGNATURES)
+Perform one single time step of `simulation` including
+possibly output and callbacks."""
+function timestep!(simulation::AbstractSimulation)
+    progn = simulation.prognostic_variables         # unpack stuff
+    diagn = simulation.diagnostic_variables
+    (; clock) = progn
+    (; model) = simulation
+    (; feedback, output) = model
+    (; Δt, Δt_millisec) = model.time_stepping
 
-        progress!(feedback, progn)          # updates the progress meter bar
-        output!(output, progn, diagn, model)
-        callback!(model.callbacks, progn, diagn, model)
-    end
-    
-    # UNSCALE, CLOSE, FINALIZE
+    timestep!(progn, diagn, 2Δt, model)             # calculate tendencies and leapfrog forward
+    timestep!(clock, Δt_millisec)                   # time of lf=2 and diagn after timestep!
+
+    progress!(feedback, progn)                      # updates the progress meter bar
+    output!(output, progn, diagn, model)            # do output?
+    callback!(model.callbacks, progn, diagn, model) # any callbacks?
+end
+
+"""$(TYPEDSIGNATURES)
+Finalize a `simulation`. Finishes the progress meter, unscales variables,
+finalizes the output, writes a restart file and finalizes callbacks."""
+function finalize!(simulation::AbstractSimulation)
+    progn = simulation.prognostic_variables         # unpack stuff
+    diagn = simulation.diagnostic_variables
+    (; model) = simulation
+    (; feedback, output) = model
+
     finalize!(feedback)                     # finish the progress meter, do first for benchmark accuracy
     unscale!(progn)                         # undo radius-scaling for vor, div from the dynamical core
     unscale!(diagn)                         # undo radius-scaling for vor, div from the dynamical core
     finalize!(output, progn, diagn, model)  # possibly post-process output, then close netCDF file
     write_restart_file(output, progn)       # as JLD2 
-    finalize!(model.callbacks, progn, diagn, model)
+    finalize!(model.callbacks, progn, diagn, model) # any callbacks to finalize?
+end
+
+"""
+$(TYPEDSIGNATURES)
+Main time loop that that initializes output and feedback, loops over all time steps
+and calls the output and feedback functions."""
+function time_stepping!(simulation::AbstractSimulation)          
+
+    # SCALING, INITIALIZE OUTPUT, STORE INITIAL CONDITIONS
+    # AND DO FIRST TWO TIMESTEPS TO GET TO Δt
+    initialize!(simulation)
+    
+    # MAIN LOOP
+    (; clock) = simulation.prognostic_variables
+    for _ in 2:clock.n_timesteps            # start at 2 as first Δt in first_timesteps!
+        timestep!(simulation)
+    end
+    
+    # UNSCALE, CLOSE, FINALIZE
+    finalize!(simulation)                   
 
     # return a UnicodePlot of surface vorticity
-    surface_vorticity = diagn.grid.vor_grid[:, end]
+    surface_vorticity = simulation.diagnostic_variables.grid.vor_grid[:, end]
     return plot(surface_vorticity, title="Surface relative vorticity [1/s]")
 end 

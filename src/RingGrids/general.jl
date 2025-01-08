@@ -76,7 +76,7 @@ Base.@propagate_inbounds Base.getindex(G::AbstractGridArray, ijk...) = getindex(
 @inline function Base.getindex(
     G::GridArray,
     col::Colon,
-    k::Integer...,
+    k...,
 ) where {GridArray<:AbstractGridArray}
     GridArray_ = nonparametric_type(GridArray)  # obtain parameters from G.data
     return GridArray_(getindex(G.data, col, k...), G.nlat_half, G.rings)
@@ -231,29 +231,29 @@ end
 
 ## COORDINATES
 
-"""$(TYPEDSIGNATURES) Latitudes (in degrees, -90˚-90˚N) and longitudes (0-360˚E)  for
-every (horizontal) grid point in `grid`. Ordered 0-360˚E then north to south."""
-get_latdlonds(grid::Grid) where {Grid<:AbstractGridArray} = get_latdlonds(Grid, grid.nlat_half)
+"""$(TYPEDSIGNATURES) Longitudes (degrees, 0-360˚E), latitudes (degrees, 90˚N to -90˚N) for
+every (horizontal) grid point in `grid` in ring order (0-360˚E then north to south)."""
+get_londlatds(grid::Grid) where {Grid<:AbstractGridArray} = get_londlatds(Grid, grid.nlat_half)
 
-function get_latdlonds(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
-    colats, lons = get_colatlons(Grid, nlat_half)   # colatitudes, longitudes in radians
-    latds = colats                                  # flat copy rename before conversion
-    londs = lons
-    latds .= π/2 .- colats                          # colatiudes to latitudes in radians
-    latds .*= (360/2π)                              # now in degrees 90˚...-90˚
-    londs .*= (360/2π)
-    return latds, londs
+"""$(TYPEDSIGNATURES) Longitudes (radians, 0-2π), latitudes (degrees, π/2 to -π/2) for
+every (horizontal) grid point in `grid` in ring order (0-360˚E then north to south)."""
+get_lonlats(grid::Grid) where {Grid<:AbstractGridArray} = get_lonlats(Grid, grid.nlat_half)
+
+"""$(TYPEDSIGNATURES) Longitudes (radians, 0-2π), colatitudes (degrees, 0 to π) for
+every (horizontal) grid point in `grid` in ring order (0-360˚E then north to south)."""
+get_loncolats(grid::Grid) where {Grid<:AbstractGridArray} = get_loncolats(Grid, grid.nlat_half)
+
+# radians
+function get_lonlats(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
+    londs, latds = get_londlatds(Grid, nlat_half)  # longitudes, latitudes in degrees
+    return londs * π/180, latds * π/180             # to radians
 end
 
-"""$(TYPEDSIGNATURES) Latitudes (in radians, 0-2π) and longitudes (-π/2 - π/2) for
-every (horizontal) grid point in `grid`."""
-get_latlons(grid::Grid) where {Grid<:AbstractGridArray} = get_latlons(Grid, grid.nlat_half)
-
-function get_latlons(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
-    colats, lons = get_colatlons(Grid, nlat_half)   # colatitudes, longitudes in radians
-    lats = colats                                   # flat copy rename before conversion
-    lats .= π/2 .- colats                           # colatiudes to latitudes in radians
-    return lats, lons
+# radians and colatitudes
+function get_loncolats(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
+    lons, lats = get_lonlats(Grid, nlat_half)
+    colats = π/2 .- lats
+    return lons, colats
 end
 
 """$(TYPEDSIGNATURES) Latitude (radians) for each ring in `grid`, north to south."""
@@ -262,27 +262,19 @@ get_lat(grid::Grid) where {Grid<:AbstractGridArray} = get_lat(Grid, grid.nlat_ha
 """$(TYPEDSIGNATURES) Latitude (degrees) for each ring in `grid`, north to south."""
 get_latd(grid::Grid) where {Grid<:AbstractGridArray} = get_latd(Grid, grid.nlat_half)
 
-"""$(TYPEDSIGNATURES) Longitude (degrees) for meridional column (full grids only)."""
-get_lond(grid::Grid) where {Grid<:AbstractGridArray} = get_lond(Grid, grid.nlat_half)
-
-"""$(TYPEDSIGNATURES) Longitude (radians) for meridional column (full grids only)."""
-get_lon(grid::Grid) where {Grid<:AbstractGridArray} = get_lon(Grid, grid.nlat_half)
-
-"""$(TYPEDSIGNATURES) Colatitudes (radians) for meridional column (full grids only)."""
+"""$(TYPEDSIGNATURES) Colatitudes (radians) for each ring in `grid`, north to south."""
 get_colat(grid::Grid) where {Grid<:AbstractGridArray} = get_colat(Grid, grid.nlat_half)
 
-"""$(TYPEDSIGNATURES) Latitudes (in radians, 0-π) and longitudes (0 - 2π) for
-every (horizontal) grid point in `grid`."""
-get_colatlons(grid::Grid) where {Grid<:AbstractGridArray} = get_colatlons(Grid, grid.nlat_half)
+"""$(TYPEDSIGNATURES) Longitude (degrees). Full grids only."""
+get_lond(grid::Grid) where {Grid<:AbstractGridArray} = get_lond(Grid, grid.nlat_half)
+
+"""$(TYPEDSIGNATURES) Longitude (radians). Full grids only."""
+get_lon(grid::Grid) where {Grid<:AbstractGridArray} = get_lon(Grid, grid.nlat_half)
+
 get_nlon_max(grid::Grid) where {Grid<:AbstractGridArray} = get_nlon_max(Grid, grid.nlat_half)
 
-function get_lat(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
-    return π/2 .- get_colat(Grid, nlat_half)
-end
-
-function get_latd(Grid::Type{<:AbstractGridArray}, nlat_half::Integer)
-    return get_lat(Grid, nlat_half) * (360/2π)
-end
+get_lat(Grid::Type{<:AbstractGridArray}, nlat_half::Integer) = get_latd(Grid, nlat_half) * (π/180)
+get_colat(Grid::Type{<:AbstractGridArray}, nlat_half::Integer) = π/2 .- get_lat(Grid, nlat_half)
 
 """
 $(TYPEDSIGNATURES)
@@ -481,11 +473,11 @@ AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{3}) where {ArrayType, Grid} 
 AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{1}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{2, ArrayType, Grid}()
 AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{4}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{4, ArrayType, Grid}()
 AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
-    
-function KernelAbstractions.get_backend(
-    g::Grid
+
+function GPUArrays.backend(
+    ::Type{Grid}
 ) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
-    return KernelAbstractions.get_backend(g.data)
+    return GPUArrays.backend(ArrayType)
 end
 
 function Base.similar(
