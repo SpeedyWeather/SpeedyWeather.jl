@@ -33,16 +33,15 @@ function run!(
     period::Period = Day(10),
     output::Bool = false,
 )
-    (; prognostic_variables, diagnostic_variables, model) = simulation
-    (; clock) = prognostic_variables
+    (; clock) = simulation.prognostic_variables
 
     # CLOCK
-    set_period!(clock, period)              # set how long to integrate for
-    initialize!(clock, model.time_stepping) # store the start date, reset counter
+    set_period!(clock, period)                          # set how long to integrate for
+    initialize!(clock, simulation.model.time_stepping)  # store the start date, reset counter
 
     # OUTPUT
-    model.output.active = output            # enable/disable output
+    simulation.model.output.active = output             # enable/disable output
 
     # run it, yeah!
-    time_stepping!(prognostic_variables, diagnostic_variables, model)
+    time_stepping!(simulation)
 end
