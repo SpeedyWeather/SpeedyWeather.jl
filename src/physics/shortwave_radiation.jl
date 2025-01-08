@@ -42,11 +42,13 @@ function shortwave_radiation!(
     # transparent = optical thickness of zero, no vertical changes in flux
     # this will sum up to zero in every layer (=transparent) but yields
     # a non-zero net flux at the surface 
-    column.flux_temp_downward .+= solar_constant * cos_zenith
-    column.flux_temp_upward .+= albedo * solar_constant * cos_zenith
+    # column.flux_temp_downward .+= solar_constant * cos_zenith
+    # column.flux_temp_upward .+= albedo * solar_constant * cos_zenith
 
-    # diagnostic: outgoing shortwave radiation
-    column.outgoing_shortwave_radiation = albedo * solar_constant * cos_zenith
+    # diagnostics
+    column.surface_shortwave_down = (1 - albedo) * solar_constant * cos_zenith
+    column.surface_shortwave_up = albedo * solar_constant * cos_zenith
+    column.outgoing_shortwave_radiation = column.surface_shortwave_up
 
     return nothing
 end
