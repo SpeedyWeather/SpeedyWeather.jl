@@ -116,7 +116,7 @@ initialize!(::NoSurfaceHeatFlux, ::PrimitiveEquation) = nothing
 surface_heat_flux!(::ColumnVariables, ::NoSurfaceHeatFlux, ::PrimitiveEquation) = nothing
 
 export SurfaceHeatFlux
-Base.@kwdef struct SurfaceHeatFlux{NF<:AbstractFloat} <: AbstractSurfaceHeatFlux
+@kwdef struct SurfaceHeatFlux{NF<:AbstractFloat} <: AbstractSurfaceHeatFlux
     
     "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
@@ -160,8 +160,10 @@ function surface_heat_flux!(
     sea_available = isfinite(T_skin_sea)
 
     # Only flux from land/sea if available (not NaN) otherwise zero flux
-    column.flux_temp_upward[end] += land_available ? flux_land : 0
-    column.flux_temp_upward[end] += sea_available ? flux_sea : 0
+    flux = land_available ? flux_land : 0
+    flux += sea_available ? flux_sea  : 0
+    column.flux_temp_upward[end] += flux
+    column.sensible_heat_flux = flux
 
     return nothing
 end
@@ -178,7 +180,7 @@ export SurfaceEvaporation
 """
 Surface evaporation following a bulk formula with wind from model.surface_wind 
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SurfaceEvaporation{NF<:AbstractFloat} <: AbstractSurfaceEvaporation
+@kwdef struct SurfaceEvaporation{NF<:AbstractFloat} <: AbstractSurfaceEvaporation
     
     "Use column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
@@ -226,8 +228,10 @@ function surface_evaporation!(  column::ColumnVariables,
 
     # Only flux from land/sea if available (not NaN) otherwise zero flux
     # mix fluxes for fractional land-sea mask
-    column.flux_humid_upward[end] += land_available ? flux_land : 0
-    column.flux_humid_upward[end] += sea_available ? flux_sea : 0
+    flux = land_available ? flux_land : 0
+    flux += sea_available ? flux_sea  : 0
+    column.flux_humid_upward[end] += flux
+    column.evaporative_flux = flux
 
     return nothing
 end

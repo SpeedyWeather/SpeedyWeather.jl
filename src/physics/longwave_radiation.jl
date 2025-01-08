@@ -141,6 +141,7 @@ function longwave_radiation!(
     local Fₖ::NF    # flux into lowermost layer from surface land/sea below
     Fₖ = (T[end] - surface_temperature) * α * (Tₜ - surface_temperature)
     F[end] += Fₖ
+    column.surface_longwave_up = Fₖ
 
     # integrate from surface up, skipping surface (k=nlayers+1) and top-of-atmosphere flux (k=1)
     @inbounds for k in nlayers:-1:2
