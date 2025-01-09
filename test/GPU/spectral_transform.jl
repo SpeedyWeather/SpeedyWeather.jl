@@ -191,7 +191,7 @@ end
 #     end
 # end
 
-@testset "legendre: compare forward transform to CPU" begin
+@testset "legendre: compare inverse transform to CPU" begin
     @testset for NF in (Float32, Float64)
         @testset for trunc in spectral_resolutions
             @testset for nlayers in nlayers_list
@@ -201,13 +201,13 @@ end
                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
                     )
                     
-                    # CPU forward transform
+                    # CPU inverse transform
                     SpeedyTransforms._legendre!(
                         S_cpu.scratch_memory_north, 
                         S_cpu.scratch_memory_south, 
                         spec_cpu, S_cpu
                     )
-                    # GPU forward transform
+                    # GPU inverse transform
                     SpeedyTransforms._legendre!(
                         S_gpu.scratch_memory_north, 
                         S_gpu.scratch_memory_south, 
