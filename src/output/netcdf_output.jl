@@ -351,12 +351,17 @@ function output!(
         end
     end
 
-    # transform (e.g. scale, offset, exp, etc) if defined
-    if hasproperty(variable, :transform)
+    s = simulation.diagnostic_variables.scale[]
+    hasproperty(variables, :unscale) && variable.unscale && unscale!(var, s)
+
+    if hasproperty(variable, :transform)    # transform (e.g. scale, offset, exp, etc) if defined
         @. var = variable.transform(var)
     end
 
-    round!(var, variable.keepbits)          # round mantissabits for compression
+    if hasproperty(variable, :keepbits)     # round mantissabits for compression
+        round!(var, variable.keepbits)
+    end
+
     i = output.output_counter               # output time step i to write
     indices = get_indices(i, variable)      # returns (:, :, i) for example, depending on dims
     output.netcdf_file[variable.name][indices...] = var     # actually write to file
