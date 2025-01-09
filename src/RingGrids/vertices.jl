@@ -110,7 +110,7 @@ function get_vertices(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
 
         # average ring latitudes
         φ_north = j == 1 ? 90 : (latd[j] + latd[j-1])/2
-        φ_south = j == nlat ? 90 : (latd[j] + latd[j+1])/2
+        φ_south = j == nlat ? -90 : (latd[j] + latd[j+1])/2
         nwest[2, ring] .= φ_north
         swest[2, ring] .= φ_south
         neast[2, ring] .= φ_north
