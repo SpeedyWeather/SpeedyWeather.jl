@@ -266,7 +266,7 @@ function initialize!(
     output_NF = eltype(output.grid2D)
     for (key, var) in output.variables
         define_variable!(dataset, var, output_NF)
-        output!(output, var, progn, diagn, model)
+        output!(output, var, Simulation(progn, diagn, model))
     end
 
     # also export parameters into run????/parameters.txt
@@ -293,8 +293,8 @@ function define_variable!(
     dims = collect(dim for (dim, this_dim) in zip(all_dims, var.dims_xyzt) if this_dim)
 
     # pick defaults for compression if not defined
-    deflatelevel = hasfield(typeof(var), :compression_level) ? var.compression_level : DEFAULT_COMPRESSION_LEVEL
-    shuffle = hasfield(typeof(var), :shuffle) ? var.shuffle : DEFAULT_SHUFFLE
+    deflatelevel = hasproperty(var, :compression_level) ? var.compression_level : DEFAULT_COMPRESSION_LEVEL
+    shuffle = hasproperty(var, :shuffle) ? var.shuffle : DEFAULT_SHUFFLE
 
     defVar(dataset, var.name, output_NF, dims, attrib=attributes; deflatelevel, shuffle)
 end
@@ -305,19 +305,64 @@ Writes the variables from `progn` or `diagn` of time step `i` at time `time` int
 Simply escapes for no netcdf output or if output shouldn't be written on this time step.
 Interpolates onto output grid and resolution as specified in `output`, converts to output
 number format, truncates the mantissa for higher compression and applies lossless compression."""
+function output!(output::NetCDFOutput, simulation::AbstractSimulation)
+    output.timestep_counter += 1                                        # increase counter
+    (; active, output_every_n_steps, timestep_counter ) = output
+    active || return nothing                                            # escape immediately for no netcdf output
+    timestep_counter % output_every_n_steps == 0 || return nothing      # escape if output not written on this step
+
+    (; clock) = simulation.prognostic_variables
+    output!(output, clock.time)                                         # increase counter write time
+    output!(output, output.variables, simulation)                       # write variables
+end
+
+get_indices(i, variable::AbstractOutputVariable) = get_indices(i, Val.(variable.dims_xyzt)...)
+get_indices(i, x::Val{true}, y::Val{true}, z::Val{true}, t::Val{true}) = (:, :, :, i)   # 3D + time
+get_indices(i, x::Val{true}, y::Val{true}, z::Val{true}, t::Val{false}) = (:, :, :)     # 3D
+get_indices(i, x::Val{true}, y::Val{true}, z::Val{false}, t::Val{true}) = (:, :, i)     # 2D + time
+get_indices(i, x::Val{true}, y::Val{true}, z::Val{false}, t::Val{false}) = (:, :)       # 2D
+
+is3D(variable::AbstractOutputVariable) = variable.dims_xyzt[3]
+hastime(variable::AbstractOutputVariable) = variable.dims_xyzt[4]
+
+"""$(TYPEDSIGNATURES)
+Output a `variable` into the netCDF file `output.netcdf_file`.
+Interpolates onto the output grid and resolution as specified in `output`.
+Method used for all output variables `<: AbstractOutputVariable`
+with dispatch over the second argument. Interpolates, scales,
+custom transform, bitrounding and writes to file."""
 function output!(
     output::NetCDFOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
+    variable::AbstractOutputVariable,
+    simulation::AbstractSimulation,
 )
-    output.timestep_counter += 1                                    # increase counter
-    (; active, output_every_n_steps, timestep_counter ) = output
-    active || return nothing                                        # escape immediately for no netcdf output
-    timestep_counter % output_every_n_steps == 0 || return nothing  # escape if output not written on this step
+    # escape immediately after first call if variable doesn't have a time dimension
+    ~hastime(variable) && output.output_counter > 1 && return nothing
 
-    output!(output, progn.clock.time)                               # increase counter write time
-    output!(output, output.variables, progn, diagn, model)          # write variables
+    # interpolate 2D/3D variables
+    var = is3D(variable) ? output.grid3D : output.grid2D
+    raw = path(variable, simulation)
+    RingGrids.interpolate!(var, raw, output.interpolator)
+
+    # unscale if variable.unscale == true and exists
+    if hasproperty(variable, :unscale)
+        if variable.unscale
+            unscale!(var, simulation.diagnostic_variables.scale[])
+        end
+    end
+
+    if hasproperty(variable, :transform)    # transform (e.g. scale, offset, exp, etc) if defined
+        @. var = variable.transform(var)
+    end
+
+    if hasproperty(variable, :keepbits)     # round mantissabits for compression
+        round!(var, variable.keepbits)
+    end
+
+    i = output.output_counter               # output time step i to write
+    indices = get_indices(i, variable)      # returns (:, :, i) for example, depending on dims
+    output.netcdf_file[variable.name][indices...] = var     # actually write to file
+    return nothing
 end
 
 """
@@ -345,12 +390,10 @@ to write into the `output.netcdf_file`."""
 function output!(
     output::NetCDFOutput,
     output_variables::OUTPUT_VARIABLES_DICT,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
+    simulation::AbstractSimulation,
 )
-    for (key, var) in output_variables
-        output!(output, var, progn, diagn, model)
+    for var in values(output_variables)
+        output!(output, var, simulation)
     end
 end
 
@@ -364,16 +407,13 @@ end
 
 function finalize!(
     output::NetCDFOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
+    simulation::AbstractSimulation,
 )
     if output.active    # only finalize if active otherwise output.netcdf_file is nothing
-        for (key, var) in output.variables
-            finalize!(output, var, progn, diagn, model)
+        for var in values(output.variables)
+            finalize!(output, var, simulation)
         end
     end
-
     close(output)
 end
 
@@ -391,57 +431,7 @@ end
 struct NoOutputVariable <: AbstractOutputVariable end
 output!(output::NetCDFOutput, variable::NoOutputVariable, args...) = nothing
 
-# define all variables for output
-include("variables/dynamics.jl")
-include("variables/precipitation.jl")   # collected as PrecipitationOutput()
-include("variables/boundaries.jl")      # BoundaryOutput()
-include("variables/radiation.jl")       # RadiationOutput()
-include("variables/stochastic.jl")      # RandomPatternOutput()
-include("variables/surface_fluxes.jl")  # SurfaceFluxesOutput()
-include("variables/ocean.jl")           # SeaSurfaceTemperatureOutput()
-
-# collect all together for conveneince
-AllOutputVariables() = (
-    PrecipitationOutput()...,
-    BoundaryOutput()...,
-    RadiationOutput()...,
-    RandomPatternOutput(),
-    SurfaceFluxesOutput()...,
-    SeaSurfaceTemperatureOutput(),
-)
-
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
-@kwdef mutable struct TracerOutput <: AbstractOutputVariable
-    name::String = "tracer1"
-    unit::String = "?"
-    long_name::String = "tracer1"
-    dims_xyzt::NTuple{4, Bool} = (true, true, true, true)
-    missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 15
-end
-
-"""$(TYPEDSIGNATURES)
-`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
-function output!(
-    output::NetCDFOutput,
-    variable::TracerOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    tracer = output.grid3D
-    tracer_grid = diagn.grid.tracers_grid[Symbol(variable.name)]
-    RingGrids.interpolate!(tracer, tracer_grid, output.interpolator)
-
-    round!(tracer, variable.keepbits)
-    i = output.output_counter   # output time step to write
-    output.netcdf_file[variable.name][:, :, :, i] = tracer
-    return nothing
-end
-
+include("variables/output_variables.jl")
 
 """
 $(TYPEDSIGNATURES)

@@ -11,24 +11,8 @@ Fields are $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-"""$(TYPEDSIGNATURES)
-`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
-function output!(
-    output::NetCDFOutput,
-    variable::OutgoingLongwaveRadiationOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    olr = output.grid2D
-    (; outgoing_longwave_radiation) = diagn.physics
-    RingGrids.interpolate!(olr, outgoing_longwave_radiation, output.interpolator)
-
-    round!(olr, variable.keepbits)
-    i = output.output_counter   # output time step to write
-    output.netcdf_file[variable.name][:, :, i] = olr
-    return nothing
-end
+path(::OutgoingLongwaveRadiationOutput, simulation) =
+    simulation.diagnostic_variables.physics.outgoing_longwave_radiation
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
@@ -43,23 +27,7 @@ Fields are $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-"""$(TYPEDSIGNATURES)
-`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
-function output!(
-    output::NetCDFOutput,
-    variable::OutgoingShortwaveRadiationOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    osr = output.grid2D
-    (; outgoing_shortwave_radiation) = diagn.physics
-    RingGrids.interpolate!(osr, outgoing_shortwave_radiation, output.interpolator)
-
-    round!(osr, variable.keepbits)
-    i = output.output_counter   # output time step to write
-    output.netcdf_file[variable.name][:, :, i] = osr
-    return nothing
-end
+path(::OutgoingShortwaveRadiationOutput, simulation) =
+    simulation.diagnostic_variables.physics.outgoing_shortwave_radiation
 
 RadiationOutput() = (OutgoingLongwaveRadiationOutput(), OutgoingShortwaveRadiationOutput())

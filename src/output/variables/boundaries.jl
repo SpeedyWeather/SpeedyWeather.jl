@@ -11,26 +11,7 @@ Fields are $(TYPEDFIELDS)"""
     keepbits::Int = 15
 end
 
-"""$(TYPEDSIGNATURES)
-`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
-function output!(
-    output::NetCDFOutput,
-    variable::OrographyOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    # escape immediately when initialization counter > 1 to not write orography again
-    output.output_counter > 1 || return nothing
-
-    orog = output.grid2D
-    (; orography) = model.orography
-    RingGrids.interpolate!(orog, orography, output.interpolator)
-
-    round!(orog, variable.keepbits)
-    output.netcdf_file[variable.name][:, :] = orog
-    return nothing
-end
+path(::OrographyOutput, simulation) = simulation.model.orography.orography
 
 BoundaryOutput() = (
     OrographyOutput(),

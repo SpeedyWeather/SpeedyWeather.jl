@@ -1,12 +1,15 @@
-## VORTICITY -------------
-
 """Defines netCDF output of vorticity. Fields are
 $(TYPEDFIELDS)
 
 Custom variable output defined similarly with required fields marked,
 optional fields otherwise use variable-independent defaults. Initialize with `VorticityOutput()`
 and non-default fields can always be passed on as keyword arguments,
-e.g. `VorticityOutput(long_name="relative vorticity", compression_level=0)`."""
+e.g. `VorticityOutput(long_name="relative vorticity", compression_level=0)`.
+Custom variable output also requires the `path(::MyOutputVariable, simulation)`
+to be extended to return the AbstractGridArray to be output.
+Custom element-wise variable transforms, e.g. scale and/or offset to change
+units, or even exp(x)/100 to change from log surface pressure to hPa
+are passed on as `transform::Function = x -> exp(x)/100`."""
 @kwdef mutable struct VorticityOutput <: AbstractOutputVariable
 
     "[Required] short name of variable (unique) used in netCDF file and key for dictionary"
@@ -32,32 +35,14 @@ e.g. `VorticityOutput(long_name="relative vorticity", compression_level=0)`."""
 
     "[Optional] number of mantissa bits to keep for compression (default: 15)"
     keepbits::Int = 5
+
+    "[Optional] Unscale the variable for output? (default: true)"
+    unscale::Bool = true
 end
 
-"""$(TYPEDSIGNATURES)
-Output the vorticity field `vor` from `diagn.grid` into the netCDF file `output.netcdf_file`.
-Interpolates the vorticity field onto the output grid and resolution as specified in `output`.
-Method required for all output variables `<: AbstractOutputVariable` with dispatch over the
-second argument."""
-function output!(
-    output::NetCDFOutput,
-    variable::VorticityOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    vor = output.grid3D             # use output grid, vorticity is 3D
-    (; vor_grid) = diagn.grid       # unpack vorticity from gridded diagnostic variables
-    RingGrids.interpolate!(vor, vor_grid, output.interpolator)
-
-    unscale!(vor, diagn.scale[])    # was vor*radius, back to vor
-    round!(vor, variable.keepbits)  # bitrounding for compression
-    i = output.output_counter       # write into timestep i
-    output.netcdf_file[variable.name][:, :, :, i] = vor
-    return nothing
-end
-
-## U velocity -------------
+"""$TYPEDSIGNATURES To be extended for every output variable to define
+the path where in `simulation` to find that output variable `::AbstractGridArray`."""
+path(::VorticityOutput, simulation) = simulation.diagnostic_variables.grid.vor_grid
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
@@ -72,27 +57,7 @@ Fields are $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-"""$(TYPEDSIGNATURES)
-`output!` method for `ZonalVelocityOutput` to write the zonal velocity field `u` from `diagn.grid`,
-see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
-function output!(
-    output::NetCDFOutput,
-    variable::ZonalVelocityOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    u = output.grid3D
-    (; u_grid) = diagn.grid
-    RingGrids.interpolate!(u, u_grid, output.interpolator)
-
-    round!(u, variable.keepbits)
-    i = output.output_counter   # output time step to write
-    output.netcdf_file[variable.name][:, :, :, i] = u
-    return nothing
-end
-
-## V velocity -------------
+path(::ZonalVelocityOutput, simulation) = simulation.diagnostic_variables.grid.u_grid
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
@@ -107,26 +72,7 @@ Fields are $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-"""$(TYPEDSIGNATURES)
-`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
-function output!(
-    output::NetCDFOutput,
-    variable::MeridionalVelocityOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    v = output.grid3D
-    (; v_grid) = diagn.grid
-    RingGrids.interpolate!(v, v_grid, output.interpolator)
-
-    round!(v, variable.keepbits)
-    i = output.output_counter   # output time step to write
-    output.netcdf_file[variable.name][:, :, :, i] = v
-    return nothing
-end
-
-## DIVERGENCE -------------
+path(::MeridionalVelocityOutput, simulation) = simulation.diagnostic_variables.grid.v_grid
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
@@ -139,29 +85,10 @@ Fields are $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 5
+    unscale::Bool = true
 end
 
-"""$(TYPEDSIGNATURES)
-`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
-function output!(
-    output::NetCDFOutput,
-    variable::DivergenceOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    div = output.grid3D
-    (; div_grid) = diagn.grid
-    RingGrids.interpolate!(div, div_grid, output.interpolator)
-
-    unscale!(div, diagn.scale[])    # was vor*radius, back to vor
-    round!(div, variable.keepbits)
-    i = output.output_counter   # output time step to write
-    output.netcdf_file[variable.name][:, :, :, i] = div
-    return nothing
-end
-
-## INTERFACE DISPLACEMENT -------------
+path(::DivergenceOutput, simulation) = simulation.diagnostic_variables.grid.div_grid
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
@@ -176,30 +103,11 @@ Fields are $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-"""$(TYPEDSIGNATURES)
-`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
-function output!(
-    output::NetCDFOutput,
-    variable::InterfaceDisplacementOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    eta = output.grid2D
-    (; pres_grid) = diagn.grid
-    RingGrids.interpolate!(eta, pres_grid, output.interpolator)
-
-    round!(eta, variable.keepbits)
-    i = output.output_counter   # output time step to write
-    output.netcdf_file[variable.name][:, :, i] = eta
-    return nothing
-end
-
-## SURFACE PRESSURE -------------
+path(::InterfaceDisplacementOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
-@kwdef mutable struct SurfacePressureOutput <: AbstractOutputVariable
+@kwdef mutable struct SurfacePressureOutput{F} <: AbstractOutputVariable
     name::String = "pres"
     unit::String = "hPa"
     long_name::String = "surface pressure"
@@ -208,36 +116,14 @@ Fields are $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 12
+    transform::F = (x) -> exp(x)/100     # log(Pa) to hPa
 end
 
-"""$(TYPEDSIGNATURES)
-`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
-function output!(
-    output::NetCDFOutput,
-    variable::SurfacePressureOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    pres = output.grid2D
-    (; pres_grid) = diagn.grid
-    RingGrids.interpolate!(pres, pres_grid, output.interpolator)
-
-    @inbounds for ij in eachindex(pres)
-        pres[ij] = exp(pres[ij]) / 100    # from log(Pa) to hPa
-    end
-
-    round!(pres, variable.keepbits)
-    i = output.output_counter   # output time step to write
-    output.netcdf_file[variable.name][:, :, i] = pres
-    return nothing
-end
-
-## TEMPERATURE -------------
+path(::SurfacePressureOutput, simulation) = simulation.diagnostic_variables.grid.pres_grid
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
-@kwdef mutable struct TemperatureOutput <: AbstractOutputVariable
+@kwdef mutable struct TemperatureOutput{F} <: AbstractOutputVariable
     name::String = "temp"
     unit::String = "degC"
     long_name::String = "temperature"
@@ -246,29 +132,10 @@ Fields are $(TYPEDFIELDS)"""
     compression_level::Int = 3
     shuffle::Bool = true
     keepbits::Int = 10
+    transform::F = (x) -> x - 273.15     # K to ˚C
 end
 
-"""$(TYPEDSIGNATURES)
-`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
-function output!(
-    output::NetCDFOutput,
-    variable::TemperatureOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    temp = output.grid3D
-    (; temp_grid) = diagn.grid
-    RingGrids.interpolate!(temp, temp_grid, output.interpolator)
-    temp .-= 273.15             # convert from K to ˚C
-
-    round!(temp, variable.keepbits)
-    i = output.output_counter   # output time step to write
-    output.netcdf_file[variable.name][:, :, :, i] = temp
-    return nothing
-end
-
-## HUMIDITY -------------
+path(::TemperatureOutput, simulation) = simulation.diagnostic_variables.grid.temp_grid
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
@@ -283,21 +150,4 @@ Fields are $(TYPEDFIELDS)"""
     keepbits::Int = 7
 end
 
-"""$(TYPEDSIGNATURES)
-`output!` method for `variable`, see `output!(::NetCDFOutput, ::VorticityOutput, ...)` for details."""
-function output!(
-    output::NetCDFOutput,
-    variable::HumidityOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    humid = output.grid3D
-    (; humid_grid) = diagn.grid
-    RingGrids.interpolate!(humid, humid_grid, output.interpolator)
-
-    round!(humid, variable.keepbits)
-    i = output.output_counter   # output time step to write
-    output.netcdf_file[variable.name][:, :, :, i] = humid
-    return nothing
-end
+path(::HumidityOutput, simulation) = simulation.diagnostic_variables.grid.humid_grid
