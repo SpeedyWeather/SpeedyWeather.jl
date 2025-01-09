@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- New output variables definition simplified [#653](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/653)
 - Group initialize!, timestep!, finalize! of main time loop [#652](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/652)
 - Coordinates defined in degrees lond, latd, not colat, lon [#647](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/647)
 - Spectral Gradients are now differentiable, with correctness check in extended CI [#638](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/638)
