@@ -252,7 +252,7 @@ function first_timesteps!(
     timestep!(clock, Δt_millisec) 
     
     # do output and callbacks after the first proper (from i=0 to i=1) time step
-    output!(model.output, progn, diagn, model)
+    output!(model.output, Simulation(progn, diagn, model))
     callback!(model.callbacks, progn, diagn, model)
 
     # from now on precomputed implicit terms with 2Δt
@@ -411,7 +411,7 @@ function timestep!(simulation::AbstractSimulation)
     timestep!(clock, Δt_millisec)                   # time of lf=2 and diagn after timestep!
 
     progress!(feedback, progn)                      # updates the progress meter bar
-    output!(output, progn, diagn, model)            # do output?
+    output!(output, simulation)                     # do output?
     callback!(model.callbacks, progn, diagn, model) # any callbacks?
 end
 
@@ -427,7 +427,7 @@ function finalize!(simulation::AbstractSimulation)
     finalize!(feedback)                     # finish the progress meter, do first for benchmark accuracy
     unscale!(progn)                         # undo radius-scaling for vor, div from the dynamical core
     unscale!(diagn)                         # undo radius-scaling for vor, div from the dynamical core
-    finalize!(output, progn, diagn, model)  # possibly post-process output, then close netCDF file
+    finalize!(output, simulation)           # possibly post-process output, then close netCDF file
     write_restart_file(output, progn)       # as JLD2 
     finalize!(model.callbacks, progn, diagn, model) # any callbacks to finalize?
 end
