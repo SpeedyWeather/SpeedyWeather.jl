@@ -17,7 +17,7 @@ path(::ConvectivePrecipitationOutput, simulation) =
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
-@kwdef mutable struct ConvectivePrecipitationRateOutput{F} <: AbstractRainRateOutputVariable
+@kwdef mutable struct ConvectivePrecipitationRateOutput{F} <: AbstractOutputVariable
     name::String = "precip_conv_rate"
     unit::String = "mm/hr"
     long_name::String = "convective precipitation rate"
@@ -29,7 +29,7 @@ Fields are $(TYPEDFIELDS)"""
     transform::F = (x) -> 1000x     # [m] to [mm]
 end
 
-path(::ConvectivePrecipitationOutput, simulation) =
+path(::ConvectivePrecipitationRateOutput, simulation) =
     simulation.diagnostic_variables.physics.precip_rate_convection
 
 # function output!(
@@ -73,7 +73,7 @@ path(::LargeScalePrecipitationOutput, simulation) =
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
-@kwdef mutable struct LargeScalePrecipitationRateOutput{F} <: AbstractRainRateOutputVariable
+@kwdef mutable struct LargeScalePrecipitationRateOutput{F} <: AbstractOutputVariable
     name::String = "precip_cond_rate"
     unit::String = "mm/hr"
     long_name::String = "large-scale precipitation rate"

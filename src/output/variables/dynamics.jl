@@ -42,7 +42,7 @@ end
 
 """$TYPEDSIGNATURES To be extended for every output variable to define
 the path where in `simulation` to find that output variable `::AbstractGridArray`."""
-path(::VorticityOutput, simulation) = simulation.prognostic_variables.grid.vor_grid
+path(::VorticityOutput, simulation) = simulation.diagnostic_variables.grid.vor_grid
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""

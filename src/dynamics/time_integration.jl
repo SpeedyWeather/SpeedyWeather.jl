@@ -252,7 +252,7 @@ function first_timesteps!(
     timestep!(clock, Δt_millisec) 
     
     # do output and callbacks after the first proper (from i=0 to i=1) time step
-    output!(model.output, progn, diagn, model)
+    output!(model.output, Simulation(progn, diagn, model))
     callback!(model.callbacks, progn, diagn, model)
 
     # from now on precomputed implicit terms with 2Δt

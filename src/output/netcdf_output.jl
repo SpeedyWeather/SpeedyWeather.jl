@@ -345,15 +345,15 @@ function output!(
     RingGrids.interpolate!(var, raw, output.interpolator)
 
     # unscale if variable.unscale == true and exists
-    if hasproperty(variables, :unscale)
-        if variables.unscale
+    if hasproperty(variable, :unscale)
+        if variable.unscale
             unscale!(var, simulation.diagnostic_variables.scale[])
         end
     end
 
     # transform (e.g. scale, offset, exp, etc) if defined
-    if hasproperty(variables, :transform)
-        @. var = variables.transform(var)
+    if hasproperty(variable, :transform)
+        @. var = variable.transform(var)
     end
 
     round!(var, variable.keepbits)          # round mantissabits for compression
