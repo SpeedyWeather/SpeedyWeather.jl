@@ -200,6 +200,7 @@ Angeletti et al, 2019, https://hal.science/hal-02047514/document)
     return i, j
 end 
 k2ij(I::CartesianIndex, m::Int) = CartesianIndex(k2ij(I[1], m)...,I.I[2:end]...) 
+# ij2l(i::Int, j::Int, m::Int) = m*(m-1)÷2 - (m-j)*(m-j-1)÷2 + i - j
 
 # direct indexing, no. indices have to be equal to `N` for the correct dimensionality
 @inline Base.getindex(L::LowerTriangularArray{T, N}, I::Vararg{Any, N}) where {T, N} = getindex(L.data, I...) 
@@ -218,6 +219,10 @@ end
     @boundscheck j > i && return zero(getindex(L.data, 1, I[3:end]...)) 
     k = ij2k(i, j, L.m)
     return getindex(L.data, k, I[3:end]...)
+end
+
+Base.@propagate_inbounds function Base.getindex(L::LowerTriangularArray{T,N}, i::Integer, I::CartesianIndex{M}) where {T,N,M} 
+    return getindex(L, i, Tuple(I)...)
 end
 
 @inline function Base.getindex(L::LowerTriangularMatrix{T}, col::Colon, i::Integer) where T
