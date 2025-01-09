@@ -165,11 +165,11 @@ post-processing of a variable before it is written to disk
 you have to extend SpeedyWeather's `output!` function with
 the following function signature
 
-```@example netcdf_custom
+```julia
 function SpeedyWeather.output!(
     output::NetCDFOutput,
     variable::VerticalVelocityOutput,
-    simulation::AbstractSimulation,
+    simulation::SpeedyWeather.AbstractSimulation,
 )
     # INTERPOLATION
     w = output.grid3D               # scratch grid to interpolate into
