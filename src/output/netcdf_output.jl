@@ -351,9 +351,6 @@ function output!(
         end
     end
 
-    s = simulation.diagnostic_variables.scale[]
-    hasproperty(variables, :unscale) && variable.unscale && unscale!(var, s)
-
     if hasproperty(variable, :transform)    # transform (e.g. scale, offset, exp, etc) if defined
         @. var = variable.transform(var)
     end
