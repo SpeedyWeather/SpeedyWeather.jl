@@ -58,72 +58,20 @@ Note that here we skip the `SpeedyWeather.` prefix which would point to the
 SpeedyWeather scope but we have defined `VerticalVelocityOutput` in
 the global scope.
 
-## Extend the `output!` function
+## Define the output variable's path
 
-While we have defined a new output variable we have not actually
-defined how to output it. Because in the end we will need to
-write that variable into the netcdf file in `NetCDFOutput`,
-which we describe now. We have to extend extend
-SpeedyWeather's `output!` function with the following
-function signature
+To output a variable one also has to define its path where
+to find the `AbstractGridArray`. For our example we already
+said above that this is `simulation.diagnostic_variables.dynamics.σ_tend`.
+For this we need to extend the `path` function. Using multiple
+dispatch we need to constrain the first argument's type to
+`::VerticalVelocityOutput` but the second argument is just
+the simulation object.
 
 ```@example netcdf_custom
-function SpeedyWeather.output!(
-    output::NetCDFOutput,
-    variable::VerticalVelocityOutput,
-    progn::PrognosticVariables,
-    diagn::DiagnosticVariables,
-    model::AbstractModel,
-)
-    # INTERPOLATION
-    w = output.grid3D               # scratch grid to interpolate into
-    (; σ_tend) = diagn.dynamics     # point to data in diagnostic variables
-    RingGrids.interpolate!(w, σ_tend , output.interpolator)
-
-    # WRITE TO NETCDF
-    i = output.output_counter       # output time step to write
-    output.netcdf_file[variable.name][:, :, :, i] = w
-    return nothing
-end
+SpeedyWeather.path(::VerticalVelocityOutput, simulation) = 
+    simulation.diagnostic_variables.dynamics.σ_tend
 ```
-
-The first argument has to be `::NetCDFOutput` as this is
-the argument we write into (i.e. mutate). The second argument
-has to be `::VerticalVelocityOutput` so that Julia's multiple
-dispatch calls this `output!` method for our new variable.
-Then the prognostic, diagnostic variables and the model
-follows which allows us generally to read any data and use
-it to write into the netCDF file.
-
-In most cases you will need to interpolate any gridded variables
-inside the model (which can be on a reduced grd) onto the output grid
-(which has to be a full grid, see [Output grid](@ref)). For that
-the `NetCDFOutput` has two scratch arrays `grid3D` and `grid2D`
-which are of type and size as defined by the `output_Grid` and
-`nlat_half` arguments when creating the `NetCDFOutput`.
-So the three lines for interpolation are essentially those in
-which your definition of a new output variable is linked
-with where to find that variable in `diagnostic_variables`.
-You can, in principle, also do any kind of computation here,
-for example adding two variables, normalising data and so on.
-In the end it has to be on the `output_Grid` hence you
-probably do not want to skip the interpolation step but you
-are generally allowed to do much more here before or after
-the interpolation.
-
-The last two lines are then just about actually writing to
-netcdf. For any variable that is written on every output
-time step you can use the output counter `i` to point to the
-correct index `i` in the netcdf file as shown here.
-For 2D variables (horizontal+time) the indexing would be
-`[:, :, i]`. 2D variables without time you only want to write
-once (because they do not change) the indexing would change to
-`[:, :]` and you then probably want to add a line at the top
-like `output.output_counter > 1 || return nothing` to escape
-immediately after the first output time step. But you could
-also check for a specific condition (e.g. a new temperature
-record in a given location) and only then write to netcdf.
-Just some ideas how to customize this even further.
 
 ## Reading the new variable
 
@@ -173,3 +121,103 @@ of the atmosphere, which however is not explicitly stored.
 The vertical velocity is strongest on the wind and leeward side of
 mountains which is reassuring and all the analysis we want to
 do here for now.
+
+## Change units before output
+
+In the definition of the output variable you can add
+a field called `transform` (not a spectral transform...)
+in order to automatically apply some element-wise
+post-processing. For example, you can use this
+to change the unit, e.g.
+
+```julia
+@kwdef struct MyVariableOutput <: SpeedyWeather.AbstractOutputVariable
+    name::String = "a"
+    unit::String = "mm"
+    long_name::String = "my variable"
+    dims_xyzt::NTuple{4, Bool} = (true, true, true, true)
+    transform::Function = (x) -> 1000x
+end
+```
+
+would multiply every value by 1000 before writing to disk.
+If the variable inside SpeedyWeather has units of meters, this
+would convert to millimeters. You can also do
+`transform::Function = (x) -> x - 273.15` to remove
+an offset (Kelvin to Celsius), or even
+`transform::Function = (x) -> exp(x)/100` to
+convert from logarithm of Pascal to hecto Pascal (hPa).
+The `transform` function is applied element-wise to the
+array and is therefore implemented as an anonymous function
+of a single argument.
+
+## Advanced: Extend the `output!` function
+
+Defining the `path` as outlined in [Define the output variable's path](@ref)
+will infer from the definition of the output variable how to
+write it into the netCDF file. As also outlined above this
+will automatically interpolate to the output grid and allows
+you to post-process with, e.g. a scale and offset, to change
+units from K to ˚C or m to mm.
+
+If you want to have a lower level control about
+post-processing of a variable before it is written to disk
+you have to extend SpeedyWeather's `output!` function with
+the following function signature
+
+```@example netcdf_custom
+function SpeedyWeather.output!(
+    output::NetCDFOutput,
+    variable::VerticalVelocityOutput,
+    simulation::AbstractSimulation,
+)
+    # INTERPOLATION
+    w = output.grid3D               # scratch grid to interpolate into
+    (; σ_tend) = simulation.diagnostic_variables.dynamics     # point to data in diagnostic variables
+    RingGrids.interpolate!(w, σ_tend , output.interpolator)
+
+    # (do any changes to w here)
+
+    # WRITE TO NETCDF
+    i = output.output_counter       # output time step to write
+    output.netcdf_file[variable.name][:, :, :, i] = w
+    return nothing
+end
+```
+
+The first argument has to be `::NetCDFOutput` as this is
+the argument we write into (i.e. mutate). The second argument
+has to be `::VerticalVelocityOutput` so that Julia's multiple
+dispatch calls this `output!` method for our new variable.
+Then the simulation allows us generally to read any data and use
+it to write into the netCDF file.
+
+In most cases you will need to interpolate any gridded variables
+inside the model (which can be on a reduced grd) onto the output grid
+(which has to be a full grid, see [Output grid](@ref)). For that
+the `NetCDFOutput` has two scratch arrays `grid3D` and `grid2D`
+which are of type and size as defined by the `output_Grid` and
+`nlat_half` arguments when creating the `NetCDFOutput`.
+So the three lines for interpolation are essentially those in
+which your definition of a new output variable is linked
+with where to find that variable in `diagnostic_variables`.
+You can, in principle, also do any kind of computation here,
+for example adding two variables, normalising data and so on.
+In the end it has to be on the `output_Grid` hence you
+probably do not want to skip the interpolation step but you
+are generally allowed to do much more here before or after
+the interpolation.
+
+The last two lines are then just about actually writing to
+netcdf. For any variable that is written on every output
+time step you can use the output counter `i` to point to the
+correct index `i` in the netcdf file as shown here.
+For 2D variables (horizontal+time) the indexing would be
+`[:, :, i]`. 2D variables without time you only want to write
+once (because they do not change) the indexing would change to
+`[:, :]` and you then probably want to add a line at the top
+like `output.output_counter > 1 || return nothing` to escape
+immediately after the first output time step. But you could
+also check for a specific condition (e.g. a new temperature
+record in a given location) and only then write to netcdf.
+Just some ideas how to customize this even further.
