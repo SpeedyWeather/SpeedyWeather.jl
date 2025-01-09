@@ -11,4 +11,6 @@ grid_dealiasing = [2, 3]
 fd_tests = [true, true] 
 
 include("speedy_transforms.jl")
+
+include("timestep_utils.jl")
 include("barotropic.jl")
