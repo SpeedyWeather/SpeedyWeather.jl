@@ -221,7 +221,7 @@ prognostic variables with two time steps (t=0, Δt) that can then be used in the
 function first_timesteps!(  
     progn::PrognosticVariables,         # all prognostic variables
     diagn::DiagnosticVariables,         # all pre-allocated diagnostic variables
-    model::AbstractModel,                  # everything that is constant at runtime
+    model::AbstractModel,               # everything that is constant at runtime
 )
     (; clock) = progn
     clock.n_timesteps == 0 && return nothing    # exit immediately for no time steps
@@ -373,7 +373,6 @@ leapfrogging scheme."""
 function initialize!(simulation::AbstractSimulation)
     progn = simulation.prognostic_variables         # unpack stuff
     diagn = simulation.diagnostic_variables
-    (; clock) = progn
     (; model) = simulation
     (; feedback, output) = model
 
@@ -387,32 +386,31 @@ function initialize!(simulation::AbstractSimulation)
     initialize!(progn.particles, progn, diagn, model.particle_advection)
     initialize!(output, feedback, progn, diagn, model)
     initialize!(model.callbacks, progn, diagn, model)
-    
-    # FIRST TIMESTEPS: EULER FORWARD THEN 1x LEAPFROG
-    # considered part of the model initialisation
-    first_timesteps!(progn, diagn, model)
-    
-    # only now initialise feedback for benchmark accuracy
-    initialize!(feedback, clock, model)
 end
 
 """$(TYPEDSIGNATURES)
 Perform one single time step of `simulation` including
 possibly output and callbacks."""
 function timestep!(simulation::AbstractSimulation)
-    progn = simulation.prognostic_variables         # unpack stuff
+    progn = simulation.prognostic_variables             # unpack stuff
     diagn = simulation.diagnostic_variables
     (; clock) = progn
     (; model) = simulation
     (; feedback, output) = model
     (; Δt, Δt_millisec) = model.time_stepping
 
-    timestep!(progn, diagn, 2Δt, model)             # calculate tendencies and leapfrog forward
-    timestep!(clock, Δt_millisec)                   # time of lf=2 and diagn after timestep!
+    if clock.timestep_counter == 0
+        first_timesteps!(progn, diagn, model)           # Euler forward then 1x leapfrog of Δt
+        initialize!(feedback, clock, model)             # only now initialise feedback for benchmark accuracy
+    
+    else                                                # 3rd and further timesteps after Δt as normal
+        timestep!(progn, diagn, 2Δt, model)             # calculate tendencies and leapfrog forward
+        timestep!(clock, Δt_millisec)                   # time of lf=2 and diagn after timestep!
 
-    progress!(feedback, progn)                      # updates the progress meter bar
-    output!(output, simulation)                     # do output?
-    callback!(model.callbacks, progn, diagn, model) # any callbacks?
+        progress!(feedback, progn)                      # updates the progress meter bar
+        output!(output, simulation)                     # do output?
+        callback!(model.callbacks, progn, diagn, model) # any callbacks?
+    end
 end
 
 """$(TYPEDSIGNATURES)
@@ -437,19 +435,14 @@ $(TYPEDSIGNATURES)
 Main time loop that that initializes output and feedback, loops over all time steps
 and calls the output and feedback functions."""
 function time_stepping!(simulation::AbstractSimulation)          
-
-    # SCALING, INITIALIZE OUTPUT, STORE INITIAL CONDITIONS
-    # AND DO FIRST TWO TIMESTEPS TO GET TO Δt
-    initialize!(simulation)
+    initialize!(simulation)             # SCALING, INITIALIZE OUTPUT, STORE INITIAL CONDITIONS
     
-    # MAIN LOOP
     (; clock) = simulation.prognostic_variables
-    for _ in 2:clock.n_timesteps            # start at 2 as first Δt in first_timesteps!
+    for _ in 1:clock.n_timesteps        # MAIN LOOP
         timestep!(simulation)
     end
     
-    # UNSCALE, CLOSE, FINALIZE
-    finalize!(simulation)                   
+    finalize!(simulation)               # UNSCALE, CLOSE, FINALIZE                 
 
     # return a UnicodePlot of surface vorticity
     surface_vorticity = simulation.diagnostic_variables.grid.vor_grid[:, end]
