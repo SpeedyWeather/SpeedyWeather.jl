@@ -12,7 +12,7 @@ Fields are $(TYPEDFIELDS)"""
 end
 
 path(::SensibleHeatFluxOutput, simulation) =
-    simulation.diagnostic_variables.physics.surface_flux_heat
+    simulation.diagnostic_variables.physics.sensible_heat_flux
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
@@ -28,7 +28,7 @@ Fields are $(TYPEDFIELDS)"""
 end
 
 path(::EvaporativeFluxOutput, simulation) =
-    simulation.diagnostic_variables.physics.surface_flux_humid
+    simulation.diagnostic_variables.physics.evaporative_flux
 
 SurfaceFluxesOutput() = (
     SensibleHeatFluxOutput(),

@@ -280,16 +280,20 @@ $(TYPEDFIELDS)"""
     soil_moisture_availability::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     # SURFACE FLUXES
-    "Sensible heat flux [?]"
+    "Sensible heat flux [W/m²]"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
-    "Evaporative flux [?]"
+    "Evaporative flux [kg/s/m^2]"
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     # RADIATION
+    "Surface radiation: shortwave up [W/m²]"
     surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    "Surface radiation: shortwave down [W/m²]"
     surface_shortwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    "Surface radiation: longwave up [W/m²]"
     surface_longwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    "Surface radiation: longwave down [W/m²]"
     surface_longwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     "Outgoing shortwave radiation [W/m^2]"
