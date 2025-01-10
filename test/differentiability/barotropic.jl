@@ -36,6 +36,9 @@
     
 
     # write this as functions (progn_old, diagn_old, 2\Delta t, model -> progn, diagn)
+    vor = progn.vor[1]
+
+    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> step_vorticity(x, progn_copy, diagn_copy, 2Δt, model), dprogn_new_2, progn_copy )
 
 
     # differnetiate wrt parameter 
