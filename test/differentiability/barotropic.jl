@@ -11,15 +11,30 @@
     progn = prognostic_variables
     diagn = diagnostic_variables
 
-    d_progn = PrognosticVariables(spectral_grid)
-    d_diag = DiagnosticVariables(spectral_grid)
+    diagn_copy = deepcopy(diagn)
+    progn_copy = deepcopy(progn)
+
+    d_progn = zero(progn)
+    d_diag = DiagnosticVariables(spectral_grid, model)
     d_model = deepcopy(model)
 
+    
     #SpeedyWeather.timestep!(progn, diagn, 2Δt, model) # calculate tendencies and leapfrog forward
 
-    autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(2Δt), Duplicated(model, d_model))
+
+    progn_new = zero(progn)
+    dprogn_new = one(progn) # seed 
+
+    autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(2Δt), Duplicated(model, d_model))
 
     # differnetiate wrt initial conditions / previous state
+
+    # new seeed 
+    dprogn_new_2 = one(progn)
+
+    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> timestep_oop(x, diagn_copy, 2Δt, model), dprogn_new_2, progn_copy )
+    
+
     # write this as functions (progn_old, diagn_old, 2\Delta t, model -> progn, diagn)
 
 
