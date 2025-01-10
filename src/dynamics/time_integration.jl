@@ -400,7 +400,6 @@ function timestep!(simulation::AbstractSimulation)
     (; Δt, Δt_millisec) = model.time_stepping
 
     if clock.timestep_counter == 0
-        @info :first
         first_timesteps!(progn, diagn, model)           # Euler forward then 1x leapfrog of Δt
         initialize!(feedback, clock, model)             # only now initialise feedback for benchmark accuracy
     
