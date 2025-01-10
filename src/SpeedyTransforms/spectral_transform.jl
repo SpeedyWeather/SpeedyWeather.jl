@@ -85,6 +85,9 @@ struct SpectralTransform{
     eigenvalues⁻¹::VectorType           # = -1/(l*(l+1))
 end
 
+# eltype of a transform is the number format used within
+Base.eltype(S::SpectralTransform{NF}) where NF = NF
+
 """
 $(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct. With `NF` the number format,
@@ -126,7 +129,7 @@ function SpectralTransform(
     norm_sphere = 2sqrt(π)  # norm_sphere at l=0, m=0 translates to 1s everywhere in grid space
     
     # LONGITUDE OFFSETS OF FIRST GRID POINT PER RING (0 for full and octahedral grids)
-    _, lons = RingGrids.get_colatlons(Grid, nlat_half)
+    lons, _ = RingGrids.get_lonlats(Grid, nlat_half)
     rings = eachring(Grid, nlat_half)                       # compute ring indices
     lon1s = [lons[rings[j].start] for j in 1:nlat_half]     # pick lons at first index for each ring
     lon_offsets = [cispi(m*lon1/π) for m in 0:mmax, lon1 in lon1s]

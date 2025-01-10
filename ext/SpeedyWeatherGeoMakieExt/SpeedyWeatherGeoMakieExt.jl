@@ -44,7 +44,7 @@ function SpeedyWeather.globe(
 
     # cell centers, i.e. the grid points
     if centers
-        latds, londs = RingGrids.get_latdlonds(Grid, nlat_half)
+        londs, latds = RingGrids.get_londlatds(Grid, nlat_half)
         c = scatter!(ax, londs, latds, markersize=5; color)
         interactive && (c.transformation.transform_func[] = transf)
     end

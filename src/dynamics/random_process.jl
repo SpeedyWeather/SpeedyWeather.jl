@@ -49,7 +49,7 @@ independently. Transformed after every time step to grid space with a
 `clamp` applied to limit extrema. For reproducability `seed` can be
 provided and an independent `random_number_generator` is used
 that is reseeded on every `initialize!`. Fields are $(TYPEDFIELDS)"""
-@kwdef struct SpectralAR1Process{NF} <: AbstractRandomProcess
+@kwdef struct SpectralAR1Process{NF, VectorType} <: AbstractRandomProcess
     trunc::Int
     
     "[OPTION] Time scale of the AR1 process"
@@ -73,12 +73,12 @@ that is reseeded on every `initialize!`. Fields are $(TYPEDFIELDS)"""
     "Precomputed auto-regressive factor [1], function of time scale and model time step"
     autoregressive_factor::Base.RefValue{NF} = Ref(zero(NF))
 
-    "Precomputed noise factors [1] for evert total wavenumber l"
-    noise_factors::Vector{NF} = zeros(NF, trunc+2)
+    "Precomputed noise factors [1] for every total wavenumber l"
+    noise_factors::VectorType = zeros(NF, trunc+2)
 end
 
 # generator function
-SpectralAR1Process(SG::SpectralGrid; kwargs...) = SpectralAR1Process{SG.NF}(trunc=SG.trunc; kwargs...)
+SpectralAR1Process(SG::SpectralGrid; kwargs...) = SpectralAR1Process{SG.NF, SG.VectorType}(trunc=SG.trunc; kwargs...)
 
 function initialize!(
     process::SpectralAR1Process,

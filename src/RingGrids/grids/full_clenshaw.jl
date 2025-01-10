@@ -34,8 +34,8 @@ get_nlat_half(::Type{<:FullClenshawArray}, npoints2D::Integer) = round(Int, 1/4 
 get_nlon(::Type{<:FullClenshawArray}, nlat_half::Integer) = 4nlat_half
 
 ## COORDINATES
-get_colat(::Type{<:FullClenshawArray}, nlat_half::Integer) = [j/(2nlat_half)*π for j in 1:2nlat_half-1]
-get_lon(::Type{<:FullClenshawArray}, nlat_half::Integer) = get_lon(FullGaussianArray, nlat_half)
+get_latd(::Type{<:FullClenshawArray}, nlat_half::Integer) = [90 - 90j/nlat_half for j in 1:2nlat_half-1]
+get_lond(::Type{<:FullClenshawArray}, nlat_half::Integer) = get_lond(FullGaussianArray, nlat_half)
 
 # QUADRATURE
 get_quadrature_weights(::Type{<:FullClenshawArray}, nlat_half::Integer) = clenshaw_curtis_weights(nlat_half)

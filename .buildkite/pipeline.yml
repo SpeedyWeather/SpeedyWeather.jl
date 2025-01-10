@@ -1,0 +1,5 @@
+steps:
+  - label: "Empty Test"
+    command: echo "No GPU tests added yet."
+    agents:
+      queue: "juliagpu"
