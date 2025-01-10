@@ -364,8 +364,9 @@ function ocean_timestep!(
     Ev = diagn.physics.evaporative_flux
     S = diagn.physics.sensible_heat_flux
 
-    # flux is defined as positive downward
     # Euler forward step, mask land fluxes
+    # TODO mask shouldn't be applied for fractional cells
+    # maybe set sst for all land to NaN at the beginning?
     @. sst += (Δt/C₀)*(1 - mask)*(Rs - Rlu + Rld - Lᵥ*Ev - S)
 
     return nothing

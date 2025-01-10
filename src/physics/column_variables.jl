@@ -147,15 +147,11 @@ function write_column_tendencies!(
     # just use layer index 1 (top) to nlayers (surface) for analysis, but 0 for no clouds
     # diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.cloud_top
 
-    # net surface fluxes of humidity and temperature, defined as positive downward (i.e. into ocean/land)
-    # diagn.physics.surface_flux_heat[ij] = column.flux_temp_downward[nlayers+1] -
-    #                                         column.flux_temp_upward[nlayers+1]
-    # diagn.physics.surface_flux_humid[ij] = column.flux_humid_downward[nlayers+1] -
-    #                                         column.flux_humid_upward[nlayers+1]
+    # surface evaporative [kg/s/m²] and sensible heat flux [W/m²], positive up
     diagn.physics.evaporative_flux[ij] = column.evaporative_flux
     diagn.physics.sensible_heat_flux[ij] = column.sensible_heat_flux
 
-    # radiation
+    # radiation [W/m²], positive up for up, down for down, up for outgoing
     diagn.physics.surface_shortwave_down[ij] = column.surface_shortwave_down
     diagn.physics.surface_shortwave_up[ij] = column.surface_shortwave_up
     diagn.physics.surface_longwave_down[ij] = column.surface_longwave_down
