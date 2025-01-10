@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- zero, fill! and one for PrognosticVariables added [#656](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/656)
 - Differentiability tests for timestepping added [#656](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/656)
 - New output variables definition simplified [#653](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/653)
 - Bug: get_vertices for full grids had southpole at 90˚N [#654](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/654)
