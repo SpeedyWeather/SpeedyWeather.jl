@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Compat for GPUArrays v11, JLArrays 0.2, KernelAbstractions 0.9 [#658](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/658)
 - Generalise OneBandRadiation to NBandRadiation [#633](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/633)
 - New output variables definition simplified [#653](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/653)
 - Bug: get_vertices for full grids had southpole at 90˚N [#654](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/654)
