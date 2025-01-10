@@ -315,7 +315,7 @@ export SlabOcean
     specific_heat_capacity::NF = 4184
 
     "[OPTION] Average mixed-layer depth [m]"
-    mixed_layer_depth::NF = 10
+    mixed_layer_depth::NF = 40
 
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000
@@ -352,14 +352,22 @@ function ocean_timestep!(
     model::PrimitiveEquation,
 )
     sst = progn.ocean.sea_surface_temperature
-    flux = diagn.physics.surface_flux_heat
+    Lᵥ = model.atmosphere.latent_heat_condensation
     C₀ = ocean_model.heat_capacity_mixed_layer
     Δt = model.time_stepping.Δt_sec
     (; mask) = model.land_sea_mask
 
-    # flux is defined as positive downward
+    # Frierson et al. 2006, eq (1)
+    Rs = diagn.physics.surface_shortwave_down
+    Rld = diagn.physics.surface_longwave_down
+    Rlu = diagn.physics.surface_longwave_up
+    Ev = diagn.physics.evaporative_flux
+    S = diagn.physics.sensible_heat_flux
+
     # Euler forward step, mask land fluxes
-    @. sst += (Δt/C₀)*flux*(1 - mask)
+    # TODO mask shouldn't be applied for fractional cells
+    # maybe set sst for all land to NaN at the beginning?
+    @. sst += (Δt/C₀)*(1 - mask)*(Rs - Rlu + Rld - Lᵥ*Ev - S)
 
     return nothing
 end

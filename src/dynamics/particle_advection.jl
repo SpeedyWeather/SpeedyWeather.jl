@@ -11,7 +11,7 @@ particle_advection!(progn, diagn, ::NoParticleAdvection) = nothing
 export ParticleAdvection2D
 Base.@kwdef struct ParticleAdvection2D{NF} <: AbstractParticleAdvection
     "[OPTION] Execute particle advection every n timesteps"
-    every_n_timesteps::Int = 8
+    every_n_timesteps::Int = 6
 
     "[OPTION] Advect with velocities from this vertical layer index"
     layer::Int = 1
