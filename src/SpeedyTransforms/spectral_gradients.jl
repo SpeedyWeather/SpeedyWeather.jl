@@ -18,9 +18,9 @@ function curl!(
     add::Bool=false,
     kwargs...,
 )
-    # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl
-    kernel(o, a, b, c) = flipsign ? (add ? o-(a+b-c) : -(a+b-c)) :
-                                    (add ? o+(a+b-c) :   a+b-c )    
+    # = -(∂λ - ∂θ) or (∂λ - ∂θ), adding or overwriting the output curl 
+    kernel = flipsign ? (add ? (o, a, b, c) -> o-(a+b-c) : (o, a, b, c) -> -(a+b-c)) :
+                        (add ? (o, a, b, c) -> o+(a+b-c) : (o, a, b, c) -> a+b-c)  
     _divergence!(kernel, curl, v, u, S; kwargs...)      # flip u, v -> v, u
 end
 
@@ -42,8 +42,8 @@ function divergence!(
     kwargs...,
 )
     # = -(∂λ + ∂θ) or (∂λ + ∂θ), adding or overwriting the output div
-    kernel(o, a, b, c) = flipsign ? (add ? o-(a-b+c) : -(a-b+c)) :
-                                    (add ? o+(a-b+c) :   a-b+c )                
+    kernel = flipsign ? (add ? (o, a, b, c) -> o-(a-b+c) : (o, a, b, c) -> -(a-b+c)) :
+                        (add ? (o, a, b, c) ->  o+(a-b+c) : (o, a, b, c) -> a-b+c)    
     _divergence!(kernel, div, u, v, S; kwargs...)
 end
 
@@ -77,7 +77,7 @@ function _divergence!(
             ∂v∂θ1 = 0                # always above the diagonal
             ∂v∂θ2 = grad_y_vordiv2[lm] * v[lm+1, k]
             div[lm, k] = kernel(div[lm, k], ∂u∂λ, ∂v∂θ1, ∂v∂θ2)
-
+            
             # BELOW DIAGONAL (but skip last row)
             for l in m+1:lmax-1
                 lm += 1
@@ -405,9 +405,9 @@ function ∇²!(
 
     # use eigenvalues⁻¹/eigenvalues for ∇⁻²/∇² based but name both eigenvalues
     eigenvalues = inverse ? S.eigenvalues⁻¹ : S.eigenvalues
-    
-    @inline kernel(o, a) = flipsign ? (add ? (o-a) : -a) :
-                                      (add ? (o+a) :  a)
+
+    kernel = flipsign ? (add ? (o,a) -> (o-a) : (o, a) -> -a) : 
+                        (add ? (o,a) -> (o+a) : (o, a) -> a)
     
     # maximum degree l, order m of spherical harmonics (1-based)
     lmax, mmax = size(alms, OneBased, as=Matrix)
