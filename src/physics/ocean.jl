@@ -315,7 +315,7 @@ export SlabOcean
     specific_heat_capacity::NF = 4184
 
     "[OPTION] Average mixed-layer depth [m]"
-    mixed_layer_depth::NF = 10
+    mixed_layer_depth::NF = 40
 
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000
