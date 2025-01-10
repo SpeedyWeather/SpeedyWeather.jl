@@ -193,7 +193,10 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     progn_new.land.soil_moisture_layer1 .= progn_old.land.soil_moisture_layer1
     progn_new.land.soil_moisture_layer2 .= progn_old.land.soil_moisture_layer2
 
-    # TODO copy over tracers
+    # copy over tracers
+    for (key, value) in progn_old.tracers
+        progn_old.tracers[key] = value
+    end 
 
     # copy largest subset of particles
     if length(progn_new.particles) != length(progn_old.particles)
@@ -206,11 +209,72 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
         progn_new.particles .= progn_old.particles
     end
 
+    progn_new.random_pattern .= progn_old.random_pattern
+
     progn_new.clock.time = progn_old.clock.time
     progn_new.scale[] = progn_old.scale[]
 
     return progn_new
 end
+
+function Base.zero(progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}) where {NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}
+    (; trunc, nlat_half, nlayers, nparticles) = progn
+    
+    # initialize regular progn variables 
+    progn_new = PrognosticVariables{NF, ArrayType, nsteps,
+        SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}(;
+            trunc, nlat_half, nlayers, nparticles,
+        )
+
+    # add tracers with zero 
+    for (key, value) in progn.tracers 
+        progn_new.tracers[key] = ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), nsteps)
+    end 
+
+    # use the same scale 
+    progn_new.scale[] = progn.scale[]
+
+    return progn_new
+end 
+
+function Base.fill!(progn::PrognosticVariables{NF}, value::Number) where NF
+
+    value_NF = NF(value)
+
+    for i in eachindex(progn.vor)   # each leapfrog time step
+        progn.vor[i] .= value_NF
+        progn.div[i] .= value_NF
+        progn.temp[i] .= value_NF
+        progn.humid[i] .= value_NF
+        progn.pres[i] .= value_NF
+    end
+
+    # ocean
+    progn.ocean.sea_surface_temperature .= value_NF
+    progn.ocean.sea_ice_concentration .= value_NF
+    # land
+    progn.land.land_surface_temperature .= value_NF
+    progn.land.snow_depth .= value_NF
+    progn.land.soil_moisture_layer1 .= value_NF
+    progn.land.soil_moisture_layer2 .= value_NF
+
+    # fill tracers
+    for (key, value) in progn.tracers 
+        for value_i in value # istep of nsteps tuple 
+            value_i .= value_NF
+        end 
+    end 
+
+    # particles are ignored for the fill
+
+    return progn
+end 
+
+function Base.one(progn::PrognosticVariables)
+    zero_progn = zero(progn)
+    fill!(zero_progn, 1)
+    return zero_progn
+end 
 
 """$(TYPEDSIGNATURES)
 Add `tracers` to the prognostic variables `progn` in `progn.tracers::Dict`."""

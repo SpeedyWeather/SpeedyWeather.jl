@@ -14,6 +14,7 @@ include("lower_triangular_matrix.jl")
 include("grids.jl")
 include("geodesics.jl")
 include("interpolation.jl")
+include("prognostic_variables.jl")
 include("set.jl")
 
 # GPU/KERNELABSTRACTIONS
