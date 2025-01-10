@@ -3,6 +3,7 @@
 ## Unreleased
 
 - NetCDF output for tracers defined [#657](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/657)
+- Generalise OneBandRadiation to NBandRadiation [#633](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/633)
 - New output variables definition simplified [#653](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/653)
 - Bug: get_vertices for full grids had southpole at 90˚N [#654](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/654)
 - Group initialize!, timestep!, finalize! of main time loop [#652](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/652)
