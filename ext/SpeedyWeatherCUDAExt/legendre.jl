@@ -4,7 +4,8 @@ import SpeedyWeather.LowerTriangularMatrices: ij2k
 # range of the running indices lm in a l-column (degrees of spherical harmonics)
 # given the column index m (order of harmonics) 
 get_lm_range(m, lmax) = ij2k(2*m - 1, m, lmax):ij2k(lmax+m, m, lmax)
-
+get_2lm_range(m, lmax) = 2*ij2k(2*m - 1, m, lmax)-1:2*ij2k(lmax+m, m, lmax)
+ 
 # (inverse) legendre transform kernel, called from _legendre!
 function inverse_legendre_kernel!(
     g_north,                        # Scratch storage for legendre coefficients
@@ -134,12 +135,9 @@ end
 # (forward) Legendre kernel, called from _legendre!
 function forward_legendre_kernel!(
     specs_data,                 # output, accumulated spherical harmonic coefficients
-    scratch_memory,             # scratch memory
     legendre_polynomials_data,  # input, Legendre polynomials
     f_north,                    # input, Fourier-transformed northern latitudes
     f_south,                    # input, southern latitudes
-    # even,                       # input, even harmonics
-    # odd,                        # input, odd harmonics
     lmax,                       # Max l-value, from SpectralTransform struct
     lon_offsets,                # Longitude 
     solid_angles,               # Solid angles for each latitude
@@ -155,6 +153,9 @@ function forward_legendre_kernel!(
 
         # j = j_north                         # symmetric index / ring-away from pole index
         lm_range = get_lm_range(m, lmax) 
+        # This is the lm_range for the reinterpreted specs_data, taking into 
+        # account real and imaginary parts
+        lm2_range = get_2lm_range(m, lmax)
 
         # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
         ΔΩ = solid_angles[j]                # = sinθ Δθ Δϕ, solid angle for a grid point
@@ -165,6 +166,8 @@ function forward_legendre_kernel!(
         
         even_k = zero(eltype(f_north))
         odd_k = zero(eltype(f_north))
+        even_spec = zero(eltype(f_north))
+        odd_spec = zero(eltype(f_north))
 
         # CUDA.@cuprintln("reached 1, ($k, $j, $m)")
 
@@ -178,9 +181,11 @@ function forward_legendre_kernel!(
 
         # integration over l = m:lmax+1
         # lm_end = lm + lmax-m+1                      # last index in column m
-        spec_view = view(scratch_memory, lm_range, :, j)
+        # spec_view = view(scratch_memory, lm_range, :, j)
+        # legendre_view = view(legendre_polynomials_data, lm_range, j)
         legendre_view = view(legendre_polynomials_data, lm_range, j)
 
+        # spec_view_ = reinterpret(real(eltype(spec_view)), spec_view)
 
         lmax_range = length(lm_range)           # number of degrees at order m, lmax-m
         isoddlmax = isodd(lmax_range)
@@ -196,16 +201,33 @@ function forward_legendre_kernel!(
         l = 1
         # f_north[m, k, j] = 0
         # f_south[m, k, j] = 0
+        lm_index = Int(0)
         while l < lmax_even     # dot product in pairs for contiguous memory access
-            spec_view[l,   k] += legendre_view[l] * even_k
-            spec_view[l+1, k] += legendre_view[l+1] * odd_k
-            # spec_view[l, k] += 1
-            # spec_view[l+1, k] += 1
-            # f_north[m, k, j] += 1
-            # f_south[m, k, j] += 1
+            even_spec = legendre_view[l] * even_k
+            odd_spec = legendre_view[l+1] * odd_k
+            # precalculate the index for each of the 4 elements, the real and 
+            # imaginary parts of the even and odd harmonics
+            lm_index = lm2_range[2l - 1]
+            CUDA.@atomic specs_data[lm_index, k] += even_spec.re
+            lm_index = lm2_range[2l]
+            CUDA.@atomic specs_data[lm_index, k] += even_spec.im
+            lm_index = lm2_range[2l + 1]
+            CUDA.@atomic specs_data[lm_index, k] += odd_spec.re
+            lm_index = lm2_range[2l + 2]
+            CUDA.@atomic specs_data[lm_index, k] += odd_spec.im
+            
             l += 2
         end
-        spec_view[end, k] += legendre_view[end] * isoddlmax*even_k
+
+        if isoddlmax == 1
+            even_spec = legendre_view[end] * even_k
+            lm_index = lm2_range[end-1]
+            CUDA.@atomic specs_data[lm_index, k] += legendre_view[end] * even_k.re
+            lm_index = lm2_range[end]
+            CUDA.@atomic specs_data[lm_index, k] += legendre_view[end] * even_k.im
+            # CUDA.@atomic spec_view[end-1, k] += legendre_view[end] * even_k.re
+            # CUDA.@atomic spec_view[end,   k] += legendre_view[end] * even_k.im
+        end
         # spec_view[end, k] += 1 * isoddlmax
         # spec_view[end, k] += 1
 
@@ -237,12 +259,13 @@ function SpeedyTransforms._legendre!(                        # GRID TO SPECTRAL
     # even = S.scratch_memory_column_north    # use scratch memory for outer product
     # odd = S.scratch_memory_column_south
 
-    fill!(S.scratch_memory_legendre, 0)
+    # fill!(S.scratch_memory_legendre, 0)
     fill!(specs, 0)                         # reset as we accumulate into specs
+    specs_reinterpret = reinterpret(real(eltype(specs.data)), specs.data)
+
     # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m and layer k
     kernel = CUDA.@cuda launch=false forward_legendre_kernel!(
-        specs.data,
-        S.scratch_memory_legendre.data,
+        specs_reinterpret,
         legendre_polynomials.data, 
         f_north,
         f_south,
@@ -257,8 +280,7 @@ function SpeedyTransforms._legendre!(                        # GRID TO SPECTRAL
 
     # actually launch kernel!
     kernel(
-        specs.data,
-        S.scratch_memory_legendre.data,
+        specs_reinterpret,
         legendre_polynomials.data, 
         f_north,
         f_south,
@@ -272,7 +294,7 @@ function SpeedyTransforms._legendre!(                        # GRID TO SPECTRAL
     CUDA.synchronize()
 
     # Reduce across the extra dimension to get the final result
-    Base.mapreducedim!(identity, +, specs.data, S.scratch_memory_legendre);
+    # Base.mapreducedim!(identity, +, specs.data, S.scratch_memory_legendre);
 end
 
 function forward_legendre_kernel_alt!(
