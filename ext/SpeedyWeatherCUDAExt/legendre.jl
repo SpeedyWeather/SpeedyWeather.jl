@@ -169,69 +169,56 @@ function forward_legendre_kernel!(
         even_spec = zero(eltype(f_north))
         odd_spec = zero(eltype(f_north))
 
-        # CUDA.@cuprintln("reached 1, ($k, $j, $m)")
-
         # LEGENDRE TRANSFORM
         fn = f_north[m, k, j]
         fs = f_south[m, k, j]
         @fastmath even_k = ΔΩ_rotated*(fn + fs)
         @fastmath odd_k  = ΔΩ_rotated*(fn - fs)
 
-        # CUDA.@cuprintln("reached 2, ($k, $j, $m)")
-
-        # integration over l = m:lmax+1
-        # lm_end = lm + lmax-m+1                      # last index in column m
-        # spec_view = view(scratch_memory, lm_range, :, j)
-        # legendre_view = view(legendre_polynomials_data, lm_range, j)
+        # Create view of the legendre polynomials data for the lm range of interest. 
+        # We can't do the saem for the specs data as @atomic cannot be used on views
         legendre_view = view(legendre_polynomials_data, lm_range, j)
-
-        # spec_view_ = reinterpret(real(eltype(spec_view)), spec_view)
 
         lmax_range = length(lm_range)           # number of degrees at order m, lmax-m
         isoddlmax = isodd(lmax_range)
         lmax_even = lmax_range - isoddlmax
 
-        # CUDA.@cushow (lm_range.start, lm_range.stop, lmax_range, lmax_even)
-        # CUDA.@cuprintln("reached 3, ($k, $j, $m)")
-    
-        # @boundscheck size(spec_view, 1) == length(legendre_view) || throw(DimensionMismatch)
-    
-        # even_k, odd_k = even[k], odd[k]
-        # for l in 1:2:lmax_even
         l = 1
-        # f_north[m, k, j] = 0
-        # f_south[m, k, j] = 0
+        # Create 
         lm_index = Int(0)
         while l < lmax_even     # dot product in pairs for contiguous memory access
+            # Calculate the even and odd harmonics for this l value
             even_spec = legendre_view[l] * even_k
             odd_spec = legendre_view[l+1] * odd_k
-            # precalculate the index for each of the 4 elements, the real and 
-            # imaginary parts of the even and odd harmonics
+            # Precalculate the index for each of the 4 elements, the real and 
+            # imaginary parts of the even and odd harmonics, as it can't be done 
+            # on same line as the @atomic call
+            # Even real part
             lm_index = lm2_range[2l - 1]
             CUDA.@atomic specs_data[lm_index, k] += even_spec.re
+            # Even imaginary part
             lm_index = lm2_range[2l]
             CUDA.@atomic specs_data[lm_index, k] += even_spec.im
+            # Odd real part
             lm_index = lm2_range[2l + 1]
             CUDA.@atomic specs_data[lm_index, k] += odd_spec.re
+            # Odd imaginary part
             lm_index = lm2_range[2l + 2]
             CUDA.@atomic specs_data[lm_index, k] += odd_spec.im
             
+            # We still increment l by 2 as we are processing 2 elements at a time
             l += 2
         end
 
+        # now do the last row if lmax is odd
         if isoddlmax == 1
             even_spec = legendre_view[end] * even_k
             lm_index = lm2_range[end-1]
             CUDA.@atomic specs_data[lm_index, k] += legendre_view[end] * even_k.re
             lm_index = lm2_range[end]
             CUDA.@atomic specs_data[lm_index, k] += legendre_view[end] * even_k.im
-            # CUDA.@atomic spec_view[end-1, k] += legendre_view[end] * even_k.re
-            # CUDA.@atomic spec_view[end,   k] += legendre_view[end] * even_k.im
         end
-        # spec_view[end, k] += 1 * isoddlmax
-        # spec_view[end, k] += 1
 
-        # CUDA.@cuprintln("reached 4, ($k, $j, $m)")
     end
     return
 end    
@@ -256,11 +243,10 @@ function SpeedyTransforms._legendre!(                        # GRID TO SPECTRAL
     @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
     @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
 
-    # even = S.scratch_memory_column_north    # use scratch memory for outer product
-    # odd = S.scratch_memory_column_south
-
-    # fill!(S.scratch_memory_legendre, 0)
     fill!(specs, 0)                         # reset as we accumulate into specs
+
+    # Reinterpret the specs data as a real array for atomic operations (makes a 
+    # view into the original array with real and imaginary parts interleaved)
     specs_reinterpret = reinterpret(real(eltype(specs.data)), specs.data)
 
     # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m and layer k
@@ -292,11 +278,11 @@ function SpeedyTransforms._legendre!(                        # GRID TO SPECTRAL
         blocks
     )
     CUDA.synchronize()
-
-    # Reduce across the extra dimension to get the final result
-    # Base.mapreducedim!(identity, +, specs.data, S.scratch_memory_legendre);
 end
 
+# (forward) Legendre kernel, called from _legendre!
+# Uses an alternative algorithm to avoid atomic operations but is less efficient
+# due to multiple kernel launches
 function forward_legendre_kernel_alt!(
     specs_data,                 # output, accumulated spherical harmonic coefficients
     legendre_polynomials_data,  # input, Legendre polynomials
@@ -328,18 +314,12 @@ function forward_legendre_kernel_alt!(
         even_k = zero(eltype(f_north))
         odd_k = zero(eltype(f_north))
 
-        # CUDA.@cuprintln("reached 1, ($k, $j, $m)")
-
         # LEGENDRE TRANSFORM
         fn = f_north[m, k, j]
         fs = f_south[m, k, j]
         @fastmath even_k = ΔΩ_rotated*(fn + fs)
         @fastmath odd_k  = ΔΩ_rotated*(fn - fs)
 
-        # CUDA.@cuprintln("reached 2, ($k, $j, $m)")
-
-        # integration over l = m:lmax+1
-        # lm_end = lm + lmax-m+1                      # last index in column m
         spec_view = view(specs_data, lm_range, k)
         legendre_view = view(legendre_polynomials_data, lm_range, j)
 
