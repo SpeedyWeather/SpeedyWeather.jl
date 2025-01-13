@@ -15,7 +15,6 @@ struct SpectralTransform{
     ArrayComplexType,           # <: ArrayType{Complex{NF}, 3},
     LowerTriangularMatrixType,  # <: LowerTriangularArray{NF, 1, ArrayType{NF}},
     LowerTriangularArrayType,   # <: LowerTriangularArray{NF, 2, ArrayType{NF}},
-    # LowertriangularArray3Type   # <: LowerTriangularArray{Complex{NF}, 3, ArrayType{NF}}
 } <: AbstractSpectralTransform
     # GRID
     Grid::Type{<:AbstractGridArray} # grid type used
@@ -61,7 +60,6 @@ struct SpectralTransform{
     scratch_memory_spec::VectorComplexType
     scratch_memory_column_north::VectorComplexType  # scratch memory for vertically batched Legendre transform
     scratch_memory_column_south::VectorComplexType  # scratch memory for vertically batched Legendre transform
-    # scratch_memory_legendre::LowertriangularArray3Type  # scratch memory for forward Legendre transform on GPU
 
     jm_index_size::Int                              # number of indices per layer in kjm_indices
     kjm_indices::ArrayType                          # precomputed kjm loop indices map
@@ -160,10 +158,6 @@ function SpectralTransform(
     scratch_memory_column_north = ArrayType_(zeros(Complex{NF}, nlayers))
     scratch_memory_column_south = ArrayType_(zeros(Complex{NF}, nlayers))
 
-    # SCRATCH MEMORY FOR FORWARD LEGENDRE KERNEL, 1 spec per layer per lattitude
-    # that we can smoosh together in the kernel
-    # scratch_memory_legendre = adapt(ArrayType_, zeros(LowerTriangularMatrix{Complex{NF}}, lmax+1, mmax+1, nlayers, nlat_half))
-
     rfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
@@ -258,7 +252,6 @@ function SpectralTransform(
         ArrayType_{Complex{NF}, 3},
         LowerTriangularArray{NF, 1, ArrayType_{NF, 1}},
         LowerTriangularArray{NF, 2, ArrayType_{NF, 2}},
-        # LowerTriangularArray{Complex{NF}, 3, ArrayType_{Complex{NF}, 3}},
     }(
         Grid, nlat_half, nlayers,
         lmax, mmax, nfreq_max, 
@@ -271,7 +264,6 @@ function SpectralTransform(
         scratch_memory_north, scratch_memory_south,
         scratch_memory_grid, scratch_memory_spec,
         scratch_memory_column_north, scratch_memory_column_south,
-        # scratch_memory_legendre,
         jm_index_size, kjm_indices,
         solid_angles, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
