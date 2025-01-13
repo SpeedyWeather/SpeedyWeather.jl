@@ -15,9 +15,12 @@ end
 # Vectors. So, for the comparision we look at more limited problems. E.g. a single step and just 
 # looking at the vorticiity
 function step_vorticity!(vorticity_new::LowerTriangularArray, vorticity::LowerTriangularArray, progn, diagn, dt, model)
-    set!(progn, vor=vorticity, lf=1)
+    #set!(progn, model.geometry, vor=vorticity, lf=1)
+    progn.vor[1] .= vorticity
     SpeedyWeather.timestep!(progn, diagn, dt, model)
     copy!(vorticity_new, progn.vor[1])
+    #vorticity_new.data .= progn.vor[1].data
+    return nothing
 end 
 
 function step_vorticity(vorticity::LowerTriangularArray, progn, diagn, dt, model)
