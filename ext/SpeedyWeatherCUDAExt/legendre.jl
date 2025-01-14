@@ -4,7 +4,8 @@ import SpeedyWeather.LowerTriangularMatrices: ij2k
 # range of the running indices lm in a l-column (degrees of spherical harmonics)
 # given the column index m (order of harmonics) 
 get_lm_range(m, lmax) = ij2k(2*m - 1, m, lmax):ij2k(lmax+m, m, lmax)
-
+get_2lm_range(m, lmax) = 2*ij2k(2*m - 1, m, lmax)-1:2*ij2k(lmax+m, m, lmax)
+ 
 # (inverse) legendre transform kernel, called from _legendre!
 function inverse_legendre_kernel!(
     g_north,                        # Scratch storage for legendre coefficients
@@ -127,5 +128,277 @@ function SpeedyTransforms._legendre!(
             g_north[:, nlayers, j] .*= coslat⁻¹[j]        # scale in place
             g_south[:, nlayers, j] .*= coslat⁻¹[j]
         end
+    end
+end
+
+
+# (forward) Legendre kernel, called from _legendre!
+function forward_legendre_kernel!(
+    specs_data,                 # output, accumulated spherical harmonic coefficients
+    legendre_polynomials_data,  # input, Legendre polynomials
+    f_north,                    # input, Fourier-transformed northern latitudes
+    f_south,                    # input, southern latitudes
+    lmax,                       # Max l-value, from SpectralTransform struct
+    lon_offsets,                # Longitude 
+    solid_angles,               # Solid angles for each latitude
+    kjm_indices                 # precomputed indices for thread
+)
+    tid = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
+
+    if tid <= size(kjm_indices, 1)
+        # Unpack indices from precomputed kjm_indices using single thread index
+        k = kjm_indices[tid, 1]
+        j = kjm_indices[tid, 2]
+        m = kjm_indices[tid, 3]
+
+        # j = j_north                         # symmetric index / ring-away from pole index
+        lm_range = get_lm_range(m, lmax) 
+        # This is the lm_range for the reinterpreted specs_data, taking into 
+        # account real and imaginary parts
+        lm2_range = get_2lm_range(m, lmax)
+
+        # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
+        ΔΩ = solid_angles[j]                # = sinθ Δθ Δϕ, solid angle for a grid point
+
+        # SOLID ANGLE QUADRATURE WEIGHTS and LONGITUDE OFFSET
+        o = lon_offsets[m, j]           # longitude offset rotation by multiplication with complex unit vector
+        ΔΩ_rotated = ΔΩ*conj(o)         # complex conjugate for rotation back to prime meridian
+        
+        even_k = zero(eltype(f_north))
+        odd_k = zero(eltype(f_north))
+        even_spec = zero(eltype(f_north))
+        odd_spec = zero(eltype(f_north))
+
+        # LEGENDRE TRANSFORM
+        fn = f_north[m, k, j]
+        fs = f_south[m, k, j]
+        @fastmath even_k = ΔΩ_rotated*(fn + fs)
+        @fastmath odd_k  = ΔΩ_rotated*(fn - fs)
+
+        # Create view of the legendre polynomials data for the lm range of interest. 
+        # We can't do the saem for the specs data as @atomic cannot be used on views
+        legendre_view = view(legendre_polynomials_data, lm_range, j)
+
+        lmax_range = length(lm_range)           # number of degrees at order m, lmax-m
+        isoddlmax = isodd(lmax_range)
+        lmax_even = lmax_range - isoddlmax
+
+        l = 1
+        # Create 
+        lm_index = Int(0)
+        while l < lmax_even     # dot product in pairs for contiguous memory access
+            # Calculate the even and odd harmonics for this l value
+            even_spec = legendre_view[l] * even_k
+            odd_spec = legendre_view[l+1] * odd_k
+            # Precalculate the index for each of the 4 elements, the real and 
+            # imaginary parts of the even and odd harmonics, as it can't be done 
+            # on same line as the @atomic call
+            # Even real part
+            lm_index = lm2_range[2l - 1]
+            CUDA.@atomic specs_data[lm_index, k] += even_spec.re
+            # Even imaginary part
+            lm_index = lm2_range[2l]
+            CUDA.@atomic specs_data[lm_index, k] += even_spec.im
+            # Odd real part
+            lm_index = lm2_range[2l + 1]
+            CUDA.@atomic specs_data[lm_index, k] += odd_spec.re
+            # Odd imaginary part
+            lm_index = lm2_range[2l + 2]
+            CUDA.@atomic specs_data[lm_index, k] += odd_spec.im
+            
+            # We still increment l by 2 as we are processing 2 elements at a time
+            l += 2
+        end
+
+        # now do the last row if lmax is odd
+        if isoddlmax == 1
+            even_spec = legendre_view[end] * even_k
+            lm_index = lm2_range[end-1]
+            CUDA.@atomic specs_data[lm_index, k] += legendre_view[end] * even_k.re
+            lm_index = lm2_range[end]
+            CUDA.@atomic specs_data[lm_index, k] += legendre_view[end] * even_k.im
+        end
+
+    end
+    return
+end    
+
+
+"""$(TYPEDSIGNATURES)
+(Forward) Legendre transform, batched in the vertical. Not to be used
+directly, but called from transform!."""
+function SpeedyTransforms._legendre!(                        # GRID TO SPECTRAL
+    specs::LowerTriangularArray,            # Fourier and Legendre-transformed output
+    f_north::CuArray{<:Complex, 3},         # Fourier-transformed input, northern latitudes
+    f_south::CuArray{<:Complex, 3},         # and southern latitudes
+    S::SpectralTransform,                   # precomputed transform
+)
+    (; nlat_half) = S                       # dimensions
+    (; lmax) = S                            # 0-based max degree l, order m of spherical harmonics  
+    (; legendre_polynomials) = S            # precomputed Legendre polynomials    
+    (; kjm_indices, jm_index_size) = S      # Legendre shortcut, shortens loop over m, 0-based  
+    (; solid_angles, lon_offsets) = S
+    nlayers = axes(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
+
+    @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
+    @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
+
+    fill!(specs, 0)                         # reset as we accumulate into specs
+
+    # Reinterpret the specs data as a real array for atomic operations (makes a 
+    # view into the original array with real and imaginary parts interleaved)
+    specs_reinterpret = reinterpret(real(eltype(specs.data)), specs.data)
+
+    # INVERSE LEGENDRE TRANSFORM by looping over wavenumbers l, m and layer k
+    kernel = CUDA.@cuda launch=false forward_legendre_kernel!(
+        specs_reinterpret,
+        legendre_polynomials.data, 
+        f_north,
+        f_south,
+        lmax,
+        lon_offsets,
+        solid_angles,
+        kjm_indices
+    )
+    config = CUDA.launch_configuration(kernel.fun)
+    threads = min(size(kjm_indices, 1), config.threads)
+    blocks = cld(size(kjm_indices, 1), threads)
+
+    # actually launch kernel!
+    kernel(
+        specs_reinterpret,
+        legendre_polynomials.data, 
+        f_north,
+        f_south,
+        lmax,
+        lon_offsets,
+        solid_angles,
+        kjm_indices; 
+        threads, 
+        blocks
+    )
+    CUDA.synchronize()
+end
+
+# (forward) Legendre kernel, called from _legendre!
+# Uses an alternative algorithm to avoid atomic operations but is less efficient
+# due to multiple kernel launches
+function forward_legendre_kernel_alt!(
+    specs_data,                 # output, accumulated spherical harmonic coefficients
+    legendre_polynomials_data,  # input, Legendre polynomials
+    f_north,                    # input, Fourier-transformed northern latitudes
+    f_south,                    # input, southern latitudes
+    lmax,                       # Max l-value, from SpectralTransform struct
+    lon_offsets,                # Longitude 
+    solid_angles,               # Solid angles for each latitude
+    km_indices,                 # precomputed indices for thread
+    j                           # latitude index
+)
+    tid = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
+
+    if tid <= size(km_indices, 1)
+        # Unpack indices from precomputed kjm_indices using single thread index
+        k = km_indices[tid, 1]
+        m = km_indices[tid, 2]
+        
+        # j = j_north                         # symmetric index / ring-away from pole index
+        lm_range = get_lm_range(m, lmax) 
+
+        # SOLID ANGLES including quadrature weights (sinθ Δθ) and azimuth (Δϕ) on ring j
+        ΔΩ = solid_angles[m]                # = sinθ Δθ Δϕ, solid angle for a grid point
+
+        # SOLID ANGLE QUADRATURE WEIGHTS and LONGITUDE OFFSET
+        o = lon_offsets[m]           # longitude offset rotation by multiplication with complex unit vector
+        ΔΩ_rotated = ΔΩ*conj(o)         # complex conjugate for rotation back to prime meridian
+        
+        even_k = zero(eltype(f_north))
+        odd_k = zero(eltype(f_north))
+
+        # LEGENDRE TRANSFORM
+        fn = f_north[m, k, j]
+        fs = f_south[m, k, j]
+        @fastmath even_k = ΔΩ_rotated*(fn + fs)
+        @fastmath odd_k  = ΔΩ_rotated*(fn - fs)
+
+        spec_view = view(specs_data, lm_range, k)
+        legendre_view = view(legendre_polynomials_data, lm_range, j)
+
+        lmax_range = length(lm_range)           # number of degrees at order m, lmax-m
+        isoddlmax = isodd(lmax_range)
+        lmax_even = lmax_range - isoddlmax
+
+        l = 1
+        while l < lmax_even     # dot product in pairs for contiguous memory access
+            spec_view[l] += legendre_view[l] * even_k
+            spec_view[l+1] += legendre_view[l+1] * odd_k
+            l += 2
+        end
+        spec_view[end] += legendre_view[end] * isoddlmax*even_k
+    end
+    return
+end
+
+function SpeedyTransforms._legendre!(                        # GRID TO SPECTRAL
+    specs::LowerTriangularArray,            # Fourier and Legendre-transformed output
+    f_north::CuArray{<:Complex, 3},         # Fourier-transformed input, northern latitudes
+    f_south::CuArray{<:Complex, 3},         # and southern latitudes
+    S::SpectralTransform,                   # precomputed transform
+    alt_fl::Bool
+)
+    (; nlat_half) = S                       # dimensions
+    (; lmax) = S                            # 0-based max degree l, order m of spherical harmonics  
+    (; mmax_truncation) = S                 # precomputed mmax truncation
+    (; legendre_polynomials) = S            # precomputed Legendre polynomials    
+    (; solid_angles, lon_offsets) = S
+    nlayers = axes(specs, 2)                # get number of layers of specs for fewer layers than precomputed in S
+
+    @boundscheck SpeedyTransforms.ismatching(S, specs) || throw(DimensionMismatch(S, specs))
+    @boundscheck size(f_north) == size(f_south) == (S.nfreq_max, S.nlayers, nlat_half) || throw(DimensionMismatch(S, specs))
+
+    fill!(specs, 0)                         # reset as we accumulate into specs
+    # FORWARD LEGENDRE TRANSFORM by looping over wavenumbers l, m and layer k
+    # loop manually over j to avoid race condition
+    for j in 1:nlat_half  
+        # Construct our km_indices array for each j
+        km_indices = zeros(Int, length(nlayers) * (mmax_truncation[j]+1), 2)
+        i = 0
+        for k in nlayers
+            for m in 1:mmax_truncation[j]+1
+                i += 1
+                km_indices[i, :] .= [k, m]
+            end
+        end
+        
+        km_indices = CUDA.cu(km_indices)
+        kernel = CUDA.@cuda launch=false forward_legendre_kernel_alt!(
+            specs.data,
+            legendre_polynomials.data, 
+            f_north,
+            f_south,
+            lmax,
+            lon_offsets,
+            solid_angles,
+            km_indices,
+            j
+        )
+        config = CUDA.launch_configuration(kernel.fun)
+        threads = min(size(km_indices, 1), config.threads)
+        blocks = cld(size(km_indices, 1), threads)
+
+        # actually launch kernel!
+        kernel(
+            specs.data,
+            legendre_polynomials.data, 
+            f_north,
+            f_south,
+            lmax,
+            lon_offsets,
+            solid_angles,
+            km_indices,
+            j; 
+            threads, 
+            blocks
+        )
+        CUDA.synchronize()
     end
 end
