@@ -172,6 +172,11 @@ function horizontal_diffusion!(
     vor = progn.vor[lf]
     (; vor_tend) = diagn.tendencies
     horizontal_diffusion!(vor_tend, vor, expl, impl)
+
+    for (name, tracer) in model.tracers
+        tracer_tend = diagn.tendencies.tracers_tend[name]
+        tracer.active && horizontal_diffusion!(tracer_tend, progn.tracers[name][lf], expl, impl)
+    end
 end
 
 """$(TYPEDSIGNATURES)
@@ -191,6 +196,11 @@ function horizontal_diffusion!(
     (; vor_tend, div_tend) = diagn.tendencies
     horizontal_diffusion!(vor_tend, vor, expl, impl)
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
+
+    for (name, tracer) in model.tracers
+        tracer_tend = diagn.tendencies.tracers_tend[name]
+        tracer.active && horizontal_diffusion!(tracer_tend, progn.tracers[name][lf], expl, impl)
+    end
 end
 
 """$(TYPEDSIGNATURES)
@@ -219,6 +229,11 @@ function horizontal_diffusion!(
     horizontal_diffusion!(div_tend, div, expl_div, impl_div)
     horizontal_diffusion!(temp_tend, temp, expl, impl)
     model isa PrimitiveWet && horizontal_diffusion!(humid_tend, humid, expl, impl)
+
+    for (name, tracer) in model.tracers
+        tracer_tend = diagn.tendencies.tracers_tend[name]
+        tracer.active && horizontal_diffusion!(tracer_tend, progn.tracers[name][lf], expl, impl)
+    end
 end
 
 export SpectralFilter

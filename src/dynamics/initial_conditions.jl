@@ -154,7 +154,7 @@ function initialize!(   progn::PrognosticVariables,
     u_grid = zeros(Grid{NF}, nlat_half, 1)
     η_perturb_grid = zeros(Grid{NF}, nlat_half)
     lat = RingGrids.get_lat(Grid, nlat_half)
-    _, lons = RingGrids.get_colatlons(Grid, nlat_half)
+    lons, _ = RingGrids.get_lonlats(Grid, nlat_half)
 
     for (j, ring) in enumerate(eachring(u_grid))
         θ = lat[j]             # latitude in radians
@@ -289,7 +289,7 @@ function initialize!(   progn::PrognosticVariables{NF},
             R = radius*perturb_radius # spatial extent of perturbation
 
             # great circle distance to perturbation
-            X = sinφc*sinφ + cosφc*cosφ*cosd(λij-λc)
+            X = clamp(sinφc*sinφ + cosφc*cosφ*cosd(λij-λc), 0, 1)
             X_norm = 1/sqrt(1-X^2)
             r = radius*acos(X)
             exp_decay = exp(-(r/R)^2)

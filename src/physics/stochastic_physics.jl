@@ -12,6 +12,7 @@ end
 
 export NoStochasticPhysics
 struct NoStochasticPhysics <: AbstractStochasticPhysics end
+NoStochasticPhysics(::SpectralGrid) = NoStochasticPhysics()
 initialize!(::NoStochasticPhysics, ::PrimitiveEquation) = nothing
 perturb_parameterization_inputs!(::ColumnVariables, ::NoStochasticPhysics, ::PrimitiveEquation) = nothing
 perturb_parameterization_tendencies!(::ColumnVariables, ::NoStochasticPhysics, ::PrimitiveEquation) = nothing

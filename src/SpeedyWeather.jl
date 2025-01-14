@@ -102,9 +102,11 @@ include("dynamics/orography.jl")
 include("physics/land_sea_mask.jl")
 
 # VARIABLES
+include("dynamics/tracers.jl")
 include("dynamics/particles.jl")
 include("dynamics/clock.jl")
 include("dynamics/prognostic_variables.jl")
+include("dynamics/set.jl")
 include("physics/define_column.jl")
 include("dynamics/diagnostic_variables.jl")
 
@@ -137,8 +139,8 @@ include("physics/surface_fluxes.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
 include("physics/optical_depth.jl")
-include("physics/shortwave_radiation.jl")
 include("physics/longwave_radiation.jl")
+include("physics/shortwave_radiation.jl")
 include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND

@@ -41,7 +41,10 @@ $(TYPEDFIELDS)"""
     drag::DR = NoDrag()
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(Barotropic)
+    
+    # VARIABLES
     random_process::RP = NoRandomProcess()
+    tracers::TRACER_DICT = TRACER_DICT()
 
     # NUMERICS
     time_stepping::TS = Leapfrog(spectral_grid)
@@ -87,6 +90,6 @@ function initialize!(model::Barotropic; time::DateTime = DEFAULT_DATE)
     initialize!(model.particle_advection, model)
     initialize!(prognostic_variables.particles, model)
 
-    diagnostic_variables = DiagnosticVariables(spectral_grid)
+    diagnostic_variables = DiagnosticVariables(spectral_grid, model)
     return Simulation(prognostic_variables, diagnostic_variables, model)
 end

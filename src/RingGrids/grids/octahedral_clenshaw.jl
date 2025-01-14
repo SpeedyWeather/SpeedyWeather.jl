@@ -71,10 +71,10 @@ Base.Matrix(G::OctahedralClenshawGrid{T}; kwargs...) where T =
     Matrix!(zeros(T, matrix_size(G)...), G; kwargs...)
 
 ## COORDINATES
-get_colat(::Type{<:OctahedralClenshawArray}, nlat_half::Integer) = get_colat(FullClenshawArray, nlat_half)
-function get_lon_per_ring(Grid::Type{<:OctahedralClenshawArray}, nlat_half::Integer, j::Integer)
+get_latd(::Type{<:OctahedralClenshawArray}, nlat_half::Integer) = get_latd(FullClenshawArray, nlat_half)
+function get_lond_per_ring(Grid::Type{<:OctahedralClenshawArray}, nlat_half::Integer, j::Integer)
     nlon = get_nlon_per_ring(Grid, nlat_half, j)
-    return collect(0:2π/nlon:2π-π/nlon)
+    return collect(0:360/nlon:360-180/nlon)
 end
 
 ## QUADRATURE

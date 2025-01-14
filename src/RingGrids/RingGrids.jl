@@ -53,7 +53,9 @@ export  grids_match,
         get_npoints2D
 
 # COORDINATES
-export  get_latdlonds,
+export  get_londlatds,
+        get_lonlats,
+        get_loncolats,
         get_lat,
         get_colat,
         get_latd,
