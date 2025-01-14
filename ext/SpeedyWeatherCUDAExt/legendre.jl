@@ -77,7 +77,7 @@ function SpeedyTransforms._legendre!(
     g_north::CuArray{<:Complex, 3},     # Legendre-transformed output, northern latitudes
     g_south::CuArray{<:Complex, 3},     # and southern latitudes
     specs::LowerTriangularArray,        # input: spherical harmonic coefficients
-    S::SpectralTransform,               # precomputed transform
+    S::SpectralTransform;               # precomputed transform
     unscale_coslat::Bool = false,       # unscale by cosine of latitude on the fly?
 )
     (; nlat_half) = S                   # dimensions    

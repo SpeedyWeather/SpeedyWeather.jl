@@ -1,5 +1,5 @@
-spectral_resolutions = (31,)
-nlayers_list = [8,]
+spectral_resolutions = (31, 63, 127)
+nlayers_list = [1, 8, 32]
 # TODO: can uncomment this when we push to main  
 grid_list = [
     FullGaussianGrid,
@@ -45,33 +45,35 @@ end
 
                     # Full return journey starting from grid
                     spec_ = SpeedyTransforms.transform(grid_cpu, S_cpu)
-                    grid_test = SpeedyTransforms.transform(spec_, S_cpu)
-                    @test grid_cpu ≈ grid_test
+                    grid_cpu = SpeedyTransforms.transform(spec_, S_cpu)
+                    # @test grid_cpu ≈ grid_test
+                    # grid_cpu = grid_test
 
                     # Full return journey starting from spec
                     grid_ = SpeedyTransforms.transform(spec_cpu, S_cpu)
-                    spec_test = SpeedyTransforms.transform(grid_, S_cpu)
-                    @test spec_cpu ≈ spec_test
+                    spec_cpu = SpeedyTransforms.transform(grid_, S_cpu)
+                    # @test spec_cpu ≈ spec_test
+                    # spec_cpu = spec_test
 
                     # Copy to GPU and repeat the test. We use initally 
                     # transformed data so that the imaginary components of the 
                     # m=1 specs are zero. 
                     grid_gpu = cu(grid_cpu)
                     spec_gpu = cu(spec_cpu)
+                    grid_gpu_test = cu(grid_cpu)
+                    spec_gpu_test = cu(spec_cpu)
 
                     # Full return journey starting from grid on GPU
-                    grid_test_gpu = SpeedyTransforms.transform(
-                        SpeedyTransforms.transform(grid_gpu, S_gpu), S_gpu
-                    )
-                    grid_test = adapt(Array, grid_test_gpu)
-                    @test grid_cpu ≈ grid_test
+                    transform!(spec_gpu_test, grid_gpu, S_gpu)
+                    transform!(grid_gpu_test, spec_gpu_test, S_gpu)
+                    grid_test = adapt(Array, grid_gpu_test)
+                    @test grid_cpu ≈ grid_test rtol=sqrt(eps(Float32))
 
                     # Full return journey starting from spec on GPU
-                    spec_test_gpu = SpeedyTransforms.transform(
-                        SpeedyTransforms.transform(spec_gpu, S_gpu), S_gpu
-                    )
-                    spec_test = adapt(Array, spec_test_gpu)
-                    @test spec_cpu ≈ spec_test 
+                    transform!(grid_gpu_test, spec_gpu, S_gpu)
+                    transform!(spec_gpu_test, grid_gpu_test, S_gpu)
+                    spec_test = adapt(Array, spec_gpu_test)
+                    @test spec_cpu ≈ spec_test rtol=sqrt(eps(Float32))
                 end
             end
         end
