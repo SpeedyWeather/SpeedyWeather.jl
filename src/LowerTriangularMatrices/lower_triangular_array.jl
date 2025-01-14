@@ -221,10 +221,6 @@ end
     return getindex(L.data, k, I[3:end]...)
 end
 
-Base.@propagate_inbounds function Base.getindex(L::LowerTriangularArray{T,N}, i::Integer, I::CartesianIndex{M}) where {T,N,M} 
-    return getindex(L, i, Tuple(I)...)
-end
-
 @inline function Base.getindex(L::LowerTriangularMatrix{T}, col::Colon, i::Integer) where T
     if i==1
         return L.data[1:size(L, 1, as=Matrix)]
