@@ -8,7 +8,7 @@ surface_heat_flux!(c::ColumnVariables, f::AbstractSurfaceHeatFlux,
     d::DiagnosticVariables, m::PrimitiveEquation) = surface_heat_flux!(c, f, m)
 
 surface_evaporation!(c::ColumnVariables, f::AbstractSurfaceEvaporation,
-    d::DiagnosticVariables, m::PrimitiveEquation) = surface_heat_flux!(c, f, m)
+    d::DiagnosticVariables, m::PrimitiveEquation) = surface_evaporation!(c, f, m)
 
 # defines the order in which they are called und unpacks to dispatch
 function surface_fluxes!(
