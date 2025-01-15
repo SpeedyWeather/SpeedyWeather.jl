@@ -35,7 +35,7 @@ function run!(
     period::Period = Day(10),
     output::Bool = false,
 )
-    initialize!(simulation, period, output)     # scaling, initialize output, store initial conditions
+    initialize!(simulation; period, output)     # scaling, initialize output, store initial conditions
     time_stepping!(simulation)                  # run it, yeah!
     finalize!(simulation)                       # unscale, finalize output, write restart file, finalize callbacks             
 
