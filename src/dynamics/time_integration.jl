@@ -369,10 +369,8 @@ end
 Perform one single time step of `simulation` including
 possibly output and callbacks."""
 function timestep!(simulation::AbstractSimulation)
-    progn = simulation.prognostic_variables             # unpack stuff
-    diagn = simulation.diagnostic_variables
+    progn, diagn, model = unpack(simulation)            # unpack the simulation
     (; clock) = progn
-    (; model) = simulation
     (; feedback, output) = model
     (; Δt, Δt_millisec) = model.time_stepping
 
