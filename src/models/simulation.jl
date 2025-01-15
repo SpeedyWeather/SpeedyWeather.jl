@@ -23,6 +23,8 @@ function Base.show(io::IO, S::AbstractSimulation)
     print(io,   "└ model::$(model_type(S.model)){...}")
 end
 
+unpack(sim::AbstractSimulation) = (sim.prognostic_variables, sim.diagnostic_variables, sim.model)
+
 export run!
 
 """
@@ -52,9 +54,7 @@ function initialize!(
     period::Period = Day(10),
     output::Bool = false,
 )
-    progn = simulation.prognostic_variables                     # unpack stuff
-    diagn = simulation.diagnostic_variables
-    (; model) = simulation
+    progn, diagn, model = unpack(simulation)
 
     # SET THE CLOCK
     set_period!(progn.clock, period)                            # set how long to integrate for
@@ -79,9 +79,7 @@ end
 Finalize a `simulation`. Finishes the progress meter, unscales variables,
 finalizes the output, writes a restart file and finalizes callbacks."""
 function finalize!(simulation::AbstractSimulation)
-    progn = simulation.prognostic_variables         # unpack stuff
-    diagn = simulation.diagnostic_variables
-    (; model) = simulation
+    progn, diagn, model = unpack(simulation)
 
     finalize!(model.feedback)                       # finish the progress meter, do first for benchmark accuracy
     unscale!(progn)                                 # undo radius-scaling for vor, div from the dynamical core
