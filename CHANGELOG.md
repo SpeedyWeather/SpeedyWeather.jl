@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Prescribed ocean/land heat fluxes modular [#667](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/667)
 - First time steps in main time loop [#659](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/659)
 - Generalise OneBandRadiation to NBandRadiation [#633](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/633)
 - New output variables definition simplified [#653](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/653)
