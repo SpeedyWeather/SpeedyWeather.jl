@@ -125,73 +125,149 @@ NoSurfaceHeatFlux(::SpectralGrid) = NoSurfaceHeatFlux()
 initialize!(::NoSurfaceHeatFlux, ::PrimitiveEquation) = nothing
 surface_heat_flux!(::ColumnVariables, ::NoSurfaceHeatFlux, ::PrimitiveEquation) = nothing
 
-export SurfaceHeatFlux
-@kwdef struct SurfaceHeatFlux{NF<:AbstractFloat} <: AbstractSurfaceHeatFlux
-    
+export SurfaceOceanHeatFlux
+@kwdef struct SurfaceOceanHeatFlux{NF} <: AbstractSurfaceHeatFlux
     "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
-    
-    "Otherwise, use the following drag coefficient for heat fluxes over land"
-    heat_exchange_land::NF = 1.2e-3    # for neutral stability
 
-    "Otherwise, use the following drag coefficient for heat fluxes over sea"
-    heat_exchange_sea::NF = 0.9e-3
+    "Otherwise, use the following drag coefficient for heat fluxes over ocean"
+    heat_exchange::NF = 0.9e-3
 end
 
-SurfaceHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceHeatFlux{SG.NF}(; kwargs...)
-initialize!(::SurfaceHeatFlux, ::PrimitiveEquation) = nothing
+SurfaceOceanHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHeatFlux{SG.NF}(; kwargs...)
+initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
+
+export SurfaceLandHeatFlux
+@kwdef struct SurfaceLandHeatFlux{NF} <: AbstractSurfaceHeatFlux
+    "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
+    use_boundary_layer_drag::Bool = true
+
+    "Otherwise, use the following drag coefficient for heat fluxes over land"
+    heat_exchange::NF = 1.2e-3    # for neutral stability
+end
+
+SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; kwargs...)
+initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
+
+export SurfaceHeatFlux
+@kwdef struct SurfaceHeatFlux{Ocean, Land} <: AbstractSurfaceHeatFlux
+    ocean::Ocean = SurfaceOceanHeatFlux()
+    land::Land = SurfaceLandHeatFlux()
+end
+
+function SurfaceHeatFlux(
+    SG::SpectralGrid; 
+    ocean = SurfaceOceanHeatFlux(SG),
+    land = SurfaceLandHeatFlux(SG))
+    return SurfaceHeatFlux(; ocean, land)
+end
+
+function initialize!(S::SurfaceHeatFlux, model::PrimitiveEquation)
+    initialize!(S.ocean, model)
+    initialize!(S.land, model)
+end
 
 function surface_heat_flux!(   
     column::ColumnVariables,
     heat_flux::SurfaceHeatFlux,
+    diagn::DiagnosticVariables,
     model::PrimitiveEquation,
 )   
+    surface_heat_flux!(column, heat_flux.ocean, diagn, model)
+    surface_heat_flux!(column, heat_flux.land, diagn, model)
+end
+
+function surface_heat_flux!(
+    column::ColumnVariables,
+    heat_flux::SurfaceOceanHeatFlux,
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation,
+)
     cₚ = model.atmosphere.heat_capacity
-    (; heat_exchange_land, heat_exchange_sea) = heat_flux
+    (; heat_exchange) = heat_flux
 
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
-    T_skin_sea = column.skin_temperature_sea
+    T_skin_ocean = column.skin_temperature_sea
+    T = column.surface_temp
+    land_fraction = column.land_fraction
+
+    # drag coefficient
+    drag_ocean = heat_flux.use_boundary_layer_drag ? column.boundary_layer_drag : heat_exchange
+
+    # SPEEDY documentation Eq. 54/56, land/sea fraction included
+    # Only flux from sea if available (not NaN) otherwise zero flux
+    flux_ocean  = isfinite(T_skin_ocean) ? ρ*drag_ocean*V₀*cₚ*(T_skin_ocean  - T)*(1-land_fraction) : 0
+    column.flux_temp_upward[end] += flux_ocean
+    column.sensible_heat_flux = flux_ocean      # ocean sets the flux (=), land accumulates (+=)
+
+    return nothing
+end
+
+function surface_heat_flux!(
+    column::ColumnVariables,
+    heat_flux::SurfaceLandHeatFlux,
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation,
+)
+    cₚ = model.atmosphere.heat_capacity
+    (; heat_exchange) = heat_flux
+
+    ρ = column.surface_air_density
+    V₀ = column.surface_wind_speed
     T_skin_land = column.skin_temperature_land
     T = column.surface_temp
     land_fraction = column.land_fraction
 
     # drag coefficient
-    drag_sea, drag_land = heat_flux.use_boundary_layer_drag ?
-                        (column.boundary_layer_drag, column.boundary_layer_drag) : 
-                        (heat_exchange_sea, heat_exchange_land)
+    drag_land = heat_flux.use_boundary_layer_drag ? column.boundary_layer_drag : heat_exchange
 
-    # SPEEDY documentation Eq. 54 and 56, land/sea fraction included
-    flux_land = ρ*drag_land*V₀*cₚ*(T_skin_land - T)*land_fraction
-    flux_sea  = ρ*drag_sea*V₀*cₚ*(T_skin_sea  - T)*(1-land_fraction)
-
-    # mix fluxes for fractional land-sea mask
-    land_available = isfinite(T_skin_land)
-    sea_available = isfinite(T_skin_sea)
-
-    # Only flux from land/sea if available (not NaN) otherwise zero flux
-    flux = land_available ? flux_land : 0
-    flux += sea_available ? flux_sea  : 0
-    column.flux_temp_upward[end] += flux
-    column.sensible_heat_flux = flux
+    # SPEEDY documentation Eq. 54/56, land/sea fraction included
+    # Only flux from sea if available (not NaN) otherwise zero flux
+    flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*cₚ*(T_skin_land  - T)*land_fraction : 0
+    column.flux_temp_upward[end] += flux_land
+    column.sensible_heat_flux += flux_land      # ocean sets the flux (=), land accumulates (+=)
 
     return nothing
 end
 
-export PrescribedSurfaceHeatFlux
-struct PrescribedSurfaceHeatFlux <: AbstractSurfaceHeatFlux end
-PrescribedSurfaceHeatFlux(::SpectralGrid) = PrescribedSurfaceHeatFlux()
-initialize!(::PrescribedSurfaceHeatFlux, ::PrimitiveEquation) = nothing
+
+export PrescribedOceanSurfaceHeatFlux
+struct PrescribedOceanSurfaceHeatFlux <: AbstractSurfaceHeatFlux end
+PrescribedOceanSurfaceHeatFlux(::SpectralGrid) = PrescribedOceanSurfaceHeatFlux()
+initialize!(::PrescribedOceanSurfaceHeatFlux, ::PrimitiveEquation) = nothing
+
 function surface_heat_flux!(
     column::ColumnVariables,
-    ::PrescribedSurfaceHeatFlux,
+    fluxes::PrescribedOceanSurfaceHeatFlux,
     diagn::DiagnosticVariables,
-    model::PrimitiveEquation)
+    model::PrimitiveEquation,
+)
+    land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = diagn.physics.sensible_heat_flux[column.ij]
+    flux = diagn.physics.sensible_heat_flux[column.ij]*(1-land_fraction)
     column.flux_temp_upward[end] += flux
-    column.sensible_heat_flux = flux
+    column.sensible_heat_flux = flux        # ocean sets the flux (=), land accumulates (+=)
+end
+
+export PrescribedLandSurfaceHeatFlux
+struct PrescribedLandSurfaceHeatFlux <: AbstractSurfaceHeatFlux end
+PrescribedLandSurfaceHeatFlux(::SpectralGrid) = PrescribedLandSurfaceHeatFlux()
+initialize!(::PrescribedLandSurfaceHeatFlux, ::PrimitiveEquation) = nothing
+
+function surface_heat_flux!(
+    column::ColumnVariables,
+    fluxes::PrescribedLandSurfaceHeatFlux,
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation,
+)
+    land_fraction = column.land_fraction
+
+    # read in a prescribed flux
+    flux = diagn.physics.sensible_heat_flux[column.ij]*land_fraction
+    column.flux_temp_upward[end] += flux
+    column.sensible_heat_flux += flux        # ocean sets the flux (=), land accumulates (+=)
 end
 
 ## SURFACE EVAPORATION
