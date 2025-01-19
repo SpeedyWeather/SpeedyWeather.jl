@@ -182,7 +182,7 @@ end
             dv = zero(v)
             div = zero(u)
             ddiv = zero(u)
-            fill!(ddiv, 1)
+            fill!(ddiv, 1 + 1im)
 
             autodiff(Reverse, divergence!, Const, Duplicated(div, ddiv), Duplicated(u, du), Duplicated(v, dv), Duplicated(S, dS))
 
@@ -197,7 +197,7 @@ end
             end 
 
             ddiv2 = zero(ddiv)
-            fill!(ddiv2, 1)
+            fill!(ddiv2, 1 + 1im)
 
             fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> divergence(x[1],x[2], S), ddiv2, (u, v))
             @test isapprox(du, fd_jvp[1][1])
