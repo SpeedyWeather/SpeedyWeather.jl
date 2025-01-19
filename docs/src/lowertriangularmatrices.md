@@ -213,10 +213,16 @@ inv(L)
 And many other operations that require `L` to be a `AbstractMatrix` which it isn't. In contrast, typical
 vector operations like a scalar product between two "LowerTriangularMatrix" vectors does work
 
-
 ```@repl LowerTriangularMatrices
 L' * L
 ```
+
+Summation with `sum` follows the flat, single index logic
+```@repl 
+L = rand(LowerTriangularMatrix{Float32}, 3, 3, 5)
+sum(L, dims=2) 
+```
+sums along the second dimension of the underlying vector, not of the full matrix representation. 
 
 ## Broadcasting with `LowerTriangularArray`
 
