@@ -36,13 +36,15 @@
     # test that we can differentiate wrt an IC 
     autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
 
+    # nonzero gradient
     @test sum(to_vec(d_progn)[1]) != 0
 
+    # FD comparison 
     dprogn_2 = one(progn) # seed 
- 
+
     fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> timestep_oop(x, diagn_copy, dt, model), dprogn_2, progn_copy)
 
-    @test isapprox(to_vec(fd_jvp[1])[1], isapprox(to_vec(d_progn)[1]))
+    @test isapprox(to_vec(fd_jvp[1])[1], to_vec(d_progn)[1])
 
     # differnetiate wrt parameter 
     # write this as function (model, progn, diagn, 2\Delta t) -> progn_new

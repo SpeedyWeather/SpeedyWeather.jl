@@ -34,7 +34,7 @@ end
 function flatten(prog::PrognosticVariables{NF, ArrayType, NSTEPS, SpectralVariable2D, SpectralVariable3D, GridVariable2D}) where {NF,ArrayType, NSTEPS, SpectralVariable2D, SpectralVariable3D, GridVariable2D}
 
     (; trunc, nlayers, nlat_half) = prog
-    nvars = 5 + length(progn.tracers)
+    nvars = 5 + length(prog.tracers)
 
     # do it as a LTA 
     prog_array = zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers, NSTEPS, nvars)
