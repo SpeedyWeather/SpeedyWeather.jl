@@ -218,6 +218,13 @@ vector operations like a scalar product between two "LowerTriangularMatrix" vect
 L' * L
 ```
 
+Summation with `sum` follows the flat, single index logic
+```@repl 
+L = rand(LowerTriangularMatrix{Float32}, 3, 3, 5)
+sum(L, dims=2) 
+```
+sums along the second dimension of the underlying vector, not of the full matrix representation. 
+
 ## Broadcasting with `LowerTriangularArray`
 
 In contrast to linear algebra, many element-wise operations work as expected thanks to broadcasting,
