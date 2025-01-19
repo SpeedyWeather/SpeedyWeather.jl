@@ -6,11 +6,17 @@ import EnzymeTestUtils: test_approx
 import FiniteDifferences: j′vp, grad, central_fdm
 import AbstractFFTs
 
+FiniteDiffExt = Base.get_extension(SpeedyWeather, :SpeedyWeatherFiniteDifferencesExt)
+import .FiniteDiffExt: flatten
+
 grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
 grid_dealiasing = [2, 3]
 fd_tests = [true, true] 
 
-include("speedy_transforms.jl")
-
+# UTILITIES 
+#include("type_utils.jl")
 include("timestep_utils.jl")
+
+# TESTS 
+include("speedy_transforms.jl")
 include("barotropic.jl")
