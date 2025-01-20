@@ -2,6 +2,8 @@ module SpeedyWeatherEnzymeExt
 
 using SpeedyWeather
 using Enzyme
+using Enzyme.EnzymeCore
+using SpeedyWeather.ProgressMeter
 import .EnzymeRules: reverse, augmented_primal
 using .EnzymeRules
 
@@ -110,6 +112,19 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
 
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing)
+end
+
+###
+# implement make_zero where the default one fails
+
+# this lock is part of the ProgressMeter that's part of the Feedback of all models
+@inline function Enzyme.make_zero(
+    ::Type{ProgressMeter.ProgressCore}, 
+    seen::IdDict, 
+    prev::ProgressMeter.ProgressCore, 
+    ::Val{copy_if_inactive} = Val(false),
+)::ProgressMeter.ProgressCore where {copy_if_inactive} 
+    return prev
 end
 
 end
