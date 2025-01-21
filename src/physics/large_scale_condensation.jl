@@ -75,7 +75,7 @@ function large_scale_condensation!(
     pₛ = pres[end]                          # surface pressure
     (; Δt_sec) = time_stepping
     Δσ = geometry.σ_levels_thick
-    pₛ_gρ = pₛ/(planet.gravity * atmosphere.water_density)
+    pₛΔt_gρ = (pₛ * Δt_sec)/(planet.gravity * atmosphere.water_density)
 
     (; Lᵥ, cₚ, Lᵥ_Rᵥ) = clausius_clapeyron
     Lᵥ_cₚ = Lᵥ/cₚ                           # latent heat of vaporization over heat capacity
@@ -101,13 +101,16 @@ function large_scale_condensation!(
     
             # 2. Precipitation due to large-scale condensation [kg/m²/s] /ρ for [m/s]
             # += for vertical integral
-            precip_rate = Δσ[k] * pₛ_gρ * -δq                   # precipitation rate [m/s], Formula 4
-            column.precip_rate_large_scale = precip_rate        # store for output/coupling etc
-            column.precip_large_scale += precip_rate * Δt_sec   # Formula 25, unit [m]
+            precip = Δσ[k] * pₛΔt_gρ * -δq          # precipitation [m] on layer k, Formula 4
+            column.precip_large_scale += precip     # integrate vertically, Formula 25, unit [m]
 
             # only accumulate into humid_tend now to allow humid_tend != 0 before this scheme is called
             humid_tend[k] += δq
             temp_tend[k] += δT
         end
     end
+
+    # convert to rain rate [m/s]
+    column.precip_rate_large_scale = column.precip_large_scale / Δt_sec
+    return nothing
 end
