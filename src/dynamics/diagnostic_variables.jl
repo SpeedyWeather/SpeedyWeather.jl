@@ -266,10 +266,10 @@ $(TYPEDFIELDS)"""
     "Accumulated large-scale precipitation [m]"
     precip_convection::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
-    "Rate of large-scale precipitation [m], over time step"
+    "Rate of large-scale precipitation [m/s], instantaneous"
     precip_rate_large_scale::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
-    "Rate of large-scale precipitation [m], over time step"
+    "Rate of large-scale precipitation [m/s], instantaneous"
     precip_rate_convection::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     "Cloud top [m]"

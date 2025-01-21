@@ -136,9 +136,9 @@ function write_column_tendencies!(
     diagn.physics.precip_large_scale[ij] += column.precip_large_scale
     diagn.physics.precip_convection[ij] += column.precip_convection
 
-    # precipitation rate [m] over this time step (i.e. overwrite, do not accumulate)
-    diagn.physics.precip_rate_large_scale[ij] = column.precip_large_scale
-    diagn.physics.precip_rate_convection[ij] = column.precip_convection
+    # precipitation rate [m/s], instantaneous (i.e. overwrite, do not accumulate)
+    diagn.physics.precip_rate_large_scale[ij] = column.precip_rate_large_scale
+    diagn.physics.precip_rate_convection[ij] = column.precip_rate_convection
 
     # Cloud top in height [m] from geopotential height divided by gravity, 0 for no clouds
     diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.geopot[column.cloud_top]
