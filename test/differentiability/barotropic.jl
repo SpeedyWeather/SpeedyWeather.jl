@@ -17,8 +17,8 @@
     progn_copy = deepcopy(progn)
 
     d_progn = zero(progn)
-    d_diag = DiagnosticVariables(spectral_grid, model)
-    d_model = deepcopy(model)
+    d_diag = make_zero(diagn)
+    d_model = make_zero(model)
 
     progn_new = zero(progn)
     dprogn_new = one(progn) # seed 
@@ -45,6 +45,67 @@
     fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> timestep_oop(x, diagn_copy, dt, model), dprogn_2, progn_copy)
 
     @test isapprox(to_vec(fd_jvp[1])[1], to_vec(d_progn)[1])
+
+    lf1 = 2 
+    lf2 = 2 
+
+    # set the tendencies back to zero for accumulation
+    fill!(diagn.tendencies, 0, Barotropic)
+
+    # TENDENCIES, DIFFUSION, LEAPFROGGING AND TRANSFORM SPECTRAL STATE TO GRID
+    SpeedyWeather.dynamics_tendencies!(diagn, progn, lf2, model)
+    SpeedyWeather.horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
+
+ 
+    progn_copy = deepcopy(progn)
+    dprogn = one(progn_copy)
+    dprogn_copy = one(progn_copy)
+
+    tend = diagn.tendencies
+    tend_copy = deepcopy(tend)
+    dtend = make_zero(tend)
+    dmodel = make_zero(model)
+
+    #leapfrog!(progn, diagn.tendencies, dt, lf1, model)
+    autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(progn, dprogn), Duplicated(tend, dtend), Const(dt), Const(lf1), Const(model))
+
+    function leapfrog(progn, tend, dt, lf, model)
+        SpeedyWeather.leapfrog!(progn, tend, dt, lf, model)
+        return progn
+    end 
+
+    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> leapfrog(progn, x, dt, lf1, model), dprogn_copy, tend_copy)
+
+    # single variable leapfrog step 
+
+    A_old = progn.vor[1]
+    A_old_copy = copy(A_old)
+    dA_old = one(A_old)
+
+    A_new = progn.vor[2]
+    A_new_copy = copy(A_new)
+    dA_new = one(A_new)
+
+    tendency = diagn.tendencies.vor_tend
+    tendency_copy = copy(tendency)
+    dtendency = zero(tendency)
+
+    L = model.time_stepping
+
+    autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(A_old, dA_old), Duplicated(A_new, dA_new), Duplicated(tendency, dtendency), Const(dt), Const(lf1), Const(L))
+
+    # d tend needs to be: dt* ( 1 + w1 - w2) (for every coefficient)
+    # enzyme shows it is 
+    
+    function leapfrog_single(A_old, A_new, tendency, dt, lf, L)
+
+        A_old_new = copy(A_old)
+        A_new_new = copy(A_new)
+        SpeedyWeather.leapfrog!(A_old_new, A_new_new, tendency, dt, lf, L)
+        return A_new_new
+    end 
+
+    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> leapfrog_single(A_old_copy, A_new_copy, x, dt, lf1, L), one(A_new_copy), tendency_copy)
 
     # differnetiate wrt parameter 
     # write this as function (model, progn, diagn, 2\Delta t) -> progn_new
