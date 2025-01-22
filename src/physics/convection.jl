@@ -203,7 +203,9 @@ function convection!(
     (; Δt_sec) = time_stepping
     pₛΔt_gρ = (pₛ * Δt_sec / gravity / water_density) * deep_convection # enfore no precip for shallow conv 
     column.precip_convection *= pₛΔt_gρ                                 # convert to [m] of rain during Δt
+    column.precip_rate_convection = column.precip_convection / Δt_sec   # rate: convert to [m/s] of rain
     column.cloud_top = min(column.cloud_top, level_zero_buoyancy)       # clouds reach to top of convection
+    return nothing
 end
 
 """
