@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Prescribed ocean/land heat fluxes modular [#667](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/667)
+- Precipitation rate from large-scale condensation/convection for coupling [#669](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/669)
 - Fixed a bug, so that sum now works for LowerTraingularArrays [#668](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/668)
 - Require only AbstractVectors in the interpolation [#665](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/665)
 - Intitialize! simulation restructured [#666](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/666)
