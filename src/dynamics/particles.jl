@@ -48,6 +48,9 @@ function Base.zeros(ArrayType::Type{<:AbstractArray{P}}, n::Int...) where {P<:Pa
     fill!(z, zero(P))
 end
 
+Base.eltype(::Type{Particle{NF}}) where NF = NF
+Base.eltype(::Particle{NF}) where NF = NF
+
 Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle}) = rand(rng, Particle{DEFAULT_NF,true})
 Base.rand(rng::Random.AbstractRNG, ::Random.Sampler{Particle{NF}}) where NF = rand(rng, Particle{NF,true})
 
