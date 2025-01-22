@@ -436,6 +436,15 @@ end
     end
 end
 
+@testset "LowerTriangularArray: sum" begin 
+    @testset for idims = ((5,), (5,5))
+        L = randn(LowerTriangularArray{Float32}, 3, 3, idims...)
+    
+        @test sum(L, dims=1) == sum(L.data, dims=1)
+        @test sum(L, dims=2) == sum(L.data, dims=2)
+    end 
+end 
+
 @testset "LowerTriangularMatrix: copyto!" begin
     @testset for NF in (Float16, Float32, Float64)
         L1 = randn(LowerTriangularMatrix{NF}, 10, 10)
