@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed a bug, so that sum now works for LowerTraingularArrays [#668](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/668)
 - Require only AbstractVectors in the interpolation [#665](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/665)
 - Intitialize! simulation restructured [#666](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/666)
 - First time steps in main time loop [#659](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/659)
