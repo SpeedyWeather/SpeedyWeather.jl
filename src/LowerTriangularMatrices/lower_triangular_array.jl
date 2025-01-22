@@ -552,6 +552,7 @@ Base.similar(L::LowerTriangularArray{T, N, ArrayType}, ::Type{T}) where {T, N, A
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
+@inline Base.sum(L::LowerTriangularArray; dims=:, kw...) = sum(L.data; dims, kw...)
 
 """
 $(TYPEDSIGNATURES)
