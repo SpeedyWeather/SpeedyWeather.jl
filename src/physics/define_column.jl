@@ -71,6 +71,10 @@ $(TYPEDFIELDS)"""
     skin_temperature_land::NF = 0
     soil_moisture_availability::NF = 0
 
+    # surface fluxes
+    evaporative_flux::NF = 0
+    sensible_heat_flux::NF = 0
+
     # THERMODYNAMICS
     surface_air_density::NF = 0
     const sat_humid::VectorType = zeros(NF, nlayers)                # Saturation specific humidity [kg/kg]
@@ -82,17 +86,26 @@ $(TYPEDFIELDS)"""
     cloud_top::Int = nlayers+1              # layer index k of top-most layer with clouds
     precip_convection::NF = 0               # Precipitation due to convection [m]
     precip_large_scale::NF = 0              # precipitation due to large-scale condensation [m]
+    precip_rate_convection::NF = 0          # Precipitation rate due to convection [m/s]
+    precip_rate_large_scale::NF = 0         # precipitation rate due to large-scale condensation [m/s]
 
     # RADIATION
-    cos_zenith::NF = 0                      # cosine of solar zenith angle
-    albedo::NF = 0                          # surface albedo
+    cos_zenith::NF = 0                      # cosine of solar zenith angle [1]
+    albedo::NF = 0                          # surface albedo [1]
     
+    # surface fluxes, positive down
+    surface_shortwave_down::NF = 0          # surface shortwave radiation down (into land/sea)
+    surface_shortwave_up::NF = 0            # surface shortwave radiation up (reflected)
+    surface_longwave_down::NF = 0           # surface longwave radiation down (into land/sea)
+    surface_longwave_up::NF = 0             # surface longwave radiation up (into atmosphere)
+
+    # top-of-atmosphere fluxes, positive up (outgoing)
     outgoing_longwave_radiation::NF = 0     # OLR [W/m^2]
     outgoing_shortwave_radiation::NF = 0    # same for shortwave reflection [W/m^2]
 
     # optical depth of the atmosphere, on half levels, for shortwave and longwave radiation
-    const optical_depth_shortwave::MatrixType = zeros(NF, nlayers+1, nbands_shortwave)
-    const optical_depth_longwave::MatrixType = zeros(NF, nlayers+1, nbands_longwave)
+    const optical_depth_shortwave::MatrixType = zeros(NF, nlayers, nbands_shortwave)
+    const optical_depth_longwave::MatrixType = zeros(NF, nlayers, nbands_longwave)
 
     # WORK ARRAYS
     const a::VectorType = zeros(NF, nlayers)

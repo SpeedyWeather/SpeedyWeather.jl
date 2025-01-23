@@ -4,6 +4,13 @@
 
 - zero, fill! and one for PrognosticVariables added [#656](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/656)
 - Differentiability tests for timestepping added [#656](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/656)
+- NetCDF output for tracers defined, precipitation rate output at initialize! again [#657](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/657)
+- Precipitation rate from large-scale condensation/convection for coupling [#669](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/669)
+- Fixed a bug, so that sum now works for LowerTraingularArrays [#668](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/668)
+- Require only AbstractVectors in the interpolation [#665](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/665)
+- Intitialize! simulation restructured [#666](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/666)
+- First time steps in main time loop [#659](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/659)
+- Generalise OneBandRadiation to NBandRadiation [#633](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/633)
 - New output variables definition simplified [#653](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/653)
 - Bug: get_vertices for full grids had southpole at 90˚N [#654](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/654)
 - Group initialize!, timestep!, finalize! of main time loop [#652](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/652)

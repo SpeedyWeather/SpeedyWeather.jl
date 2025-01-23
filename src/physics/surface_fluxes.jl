@@ -3,8 +3,18 @@ abstract type AbstractSurfaceWind <: AbstractParameterization end
 abstract type AbstractSurfaceHeatFlux <: AbstractParameterization end
 abstract type AbstractSurfaceEvaporation <: AbstractParameterization end
 
+# skip the diagnostic variables if not defined (needed to read in prescribed fluxes)
+surface_heat_flux!(c::ColumnVariables, f::AbstractSurfaceHeatFlux,
+    d::DiagnosticVariables, m::PrimitiveEquation) = surface_heat_flux!(c, f, m)
+
+surface_evaporation!(c::ColumnVariables, f::AbstractSurfaceEvaporation,
+    d::DiagnosticVariables, m::PrimitiveEquation) = surface_evaporation!(c, f, m)
+
 # defines the order in which they are called und unpacks to dispatch
-function surface_fluxes!(column::ColumnVariables, model::PrimitiveEquation)
+function surface_fluxes!(
+    column::ColumnVariables,
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation)
 
     # get temperature, humidity and density at surface
     surface_thermodynamics!(column, model.surface_thermodynamics, model)
@@ -13,8 +23,8 @@ function surface_fluxes!(column::ColumnVariables, model::PrimitiveEquation)
     surface_wind_stress!(column, model.surface_wind, model)
 
     # now call other heat (wet and dry) and humidity fluxes (PrimitiveWet only)
-    surface_heat_flux!(column, model.surface_heat_flux, model)
-    model isa PrimitiveWet && surface_evaporation!(column, model.surface_evaporation, model)
+    surface_heat_flux!(column, model.surface_heat_flux, diagn, model)
+    model isa PrimitiveWet && surface_evaporation!(column, model.surface_evaporation, diagn, model)
 end
 
 ## SURFACE THERMODYNAMICS
@@ -116,7 +126,7 @@ initialize!(::NoSurfaceHeatFlux, ::PrimitiveEquation) = nothing
 surface_heat_flux!(::ColumnVariables, ::NoSurfaceHeatFlux, ::PrimitiveEquation) = nothing
 
 export SurfaceHeatFlux
-Base.@kwdef struct SurfaceHeatFlux{NF<:AbstractFloat} <: AbstractSurfaceHeatFlux
+@kwdef struct SurfaceHeatFlux{NF<:AbstractFloat} <: AbstractSurfaceHeatFlux
     
     "Use (possibly) flow-dependent column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
@@ -161,10 +171,28 @@ function surface_heat_flux!(
     sea_available = isfinite(T_skin_sea)
 
     # Only flux from land/sea if available (not NaN) otherwise zero flux
-    column.flux_temp_upward[end] += land_available ? flux_land : zero(NF)
-    column.flux_temp_upward[end] += sea_available ? flux_sea : zero(NF)
+    flux = land_available ? flux_land : zero(NF)
+    flux += sea_available ? flux_sea  : zero(NF)
+    column.flux_temp_upward[end] += flux
+    column.sensible_heat_flux = flux
 
     return nothing
+end
+
+export PrescribedSurfaceHeatFlux
+struct PrescribedSurfaceHeatFlux <: AbstractSurfaceHeatFlux end
+PrescribedSurfaceHeatFlux(::SpectralGrid) = PrescribedSurfaceHeatFlux()
+initialize!(::PrescribedSurfaceHeatFlux, ::PrimitiveEquation) = nothing
+function surface_heat_flux!(
+    column::ColumnVariables,
+    ::PrescribedSurfaceHeatFlux,
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation)
+
+    # read in a prescribed flux
+    flux = diagn.physics.sensible_heat_flux[column.ij]
+    column.flux_temp_upward[end] += flux
+    column.sensible_heat_flux = flux
 end
 
 ## SURFACE EVAPORATION
@@ -179,7 +207,7 @@ export SurfaceEvaporation
 """
 Surface evaporation following a bulk formula with wind from model.surface_wind 
 $(TYPEDFIELDS)"""
-Base.@kwdef struct SurfaceEvaporation{NF<:AbstractFloat} <: AbstractSurfaceEvaporation
+@kwdef struct SurfaceEvaporation{NF<:AbstractFloat} <: AbstractSurfaceEvaporation
     
     "Use column.boundary_layer_drag coefficient"
     use_boundary_layer_drag::Bool = true
@@ -227,8 +255,26 @@ function surface_evaporation!(  column::ColumnVariables{NF},
 
     # Only flux from land/sea if available (not NaN) otherwise zero flux
     # mix fluxes for fractional land-sea mask
-    column.flux_humid_upward[end] += land_available ? flux_land : zero(NF)
-    column.flux_humid_upward[end] += sea_available ? flux_sea : zero(NF)
+    flux = land_available ? flux_land : zero(NF)
+    flux += sea_available ? flux_sea  : zero(NF)
+    column.flux_humid_upward[end] += flux
+    column.evaporative_flux = flux
 
     return nothing
+end
+
+export PrescribedSurfaceEvaporation
+struct PrescribedSurfaceEvaporation <: AbstractSurfaceEvaporation end
+PrescribedSurfaceEvaporation(::SpectralGrid) = PrescribedSurfaceEvaporation()
+initialize!(::PrescribedSurfaceEvaporation, ::PrimitiveEquation) = nothing
+function surface_evaporation!(
+    column::ColumnVariables,
+    ::PrescribedSurfaceEvaporation,
+    diagn::DiagnosticVariables,
+    model::PrimitiveEquation)
+
+    # read in a prescribed flux
+    flux = diagn.physics.evaporative_flux[column.ij]
+    column.flux_humid_upward[end] += flux
+    column.evaporative_flux = flux
 end

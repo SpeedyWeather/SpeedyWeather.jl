@@ -37,7 +37,7 @@ Base.@kwdef mutable struct EarthAtmosphere{NF<:AbstractFloat} <: AbstractAtmosph
     "water density [kg/m³]"
     water_density::NF = 1000
 
-    "latent heat of condensation [J/kg] for consistency with specific humidity [kg/kg]"
+    "latent heat of condensation [J/kg]"
     latent_heat_condensation::NF = 2501e3
 
     "latent heat of sublimation [J/kg]"
@@ -64,3 +64,4 @@ end
 
 EarthAtmosphere(SG::SpectralGrid; kwargs...) = EarthAtmosphere{SG.NF}(; kwargs...)
 EarthAtmosphere(::Type{NF}; kwargs...) where NF = EarthAtmosphere{NF}(; kwargs...)
+Base.eltype(::EarthAtmosphere{NF}) where NF = NF

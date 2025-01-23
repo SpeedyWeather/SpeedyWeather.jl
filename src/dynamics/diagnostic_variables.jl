@@ -259,23 +259,45 @@ $(TYPEDFIELDS)"""
 
     nlat_half::Int
 
+    # PRECIPITATION
     "Accumulated large-scale precipitation [m]"
     precip_large_scale::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     "Accumulated large-scale precipitation [m]"
     precip_convection::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
+    "Rate of large-scale precipitation [m/s], instantaneous"
+    precip_rate_large_scale::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "Rate of large-scale precipitation [m/s], instantaneous"
+    precip_rate_convection::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
     "Cloud top [m]"
     cloud_top::GridVariable2D = zeros(GridVariable2D, nlat_half)            
     
+    # LAND
     "Availability of soil moisture to evaporation [1]"
     soil_moisture_availability::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
-    "Surface flux of heat [W/m^2]"
-    surface_flux_heat::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    # SURFACE FLUXES
+    "Sensible heat flux [W/m²], positive up"
+    sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
-    "Surface flux of humidity [?]"
-    surface_flux_humid::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    "Evaporative flux [kg/s/m^2], positive up"
+    evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    # RADIATION
+    "Surface radiation: shortwave up [W/m²]"
+    surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    
+    "Surface radiation: shortwave down [W/m²]"
+    surface_shortwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    
+    "Surface radiation: longwave up [W/m²]"
+    surface_longwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    
+    "Surface radiation: longwave down [W/m²]"
+    surface_longwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     "Outgoing shortwave radiation [W/m^2]"
     outgoing_shortwave_radiation::GridVariable2D = zeros(GridVariable2D, nlat_half)
