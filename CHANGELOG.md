@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- NetCDF output for tracers defined, precipitation rate output at initialize! again [#657](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/657)
 - Precipitation rate from large-scale condensation/convection for coupling [#669](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/669)
 - Fixed a bug, so that sum now works for LowerTraingularArrays [#668](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/668)
 - Require only AbstractVectors in the interpolation [#665](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/665)
