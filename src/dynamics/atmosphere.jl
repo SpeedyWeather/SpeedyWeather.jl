@@ -64,3 +64,4 @@ end
 
 EarthAtmosphere(SG::SpectralGrid; kwargs...) = EarthAtmosphere{SG.NF}(; kwargs...)
 EarthAtmosphere(::Type{NF}; kwargs...) where NF = EarthAtmosphere{NF}(; kwargs...)
+Base.eltype(::EarthAtmosphere{NF}) where NF = NF

@@ -6,6 +6,7 @@ include("radiation.jl")       # RadiationOutput()
 include("stochastic.jl")      # RandomPatternOutput()
 include("surface_fluxes.jl")  # SurfaceFluxesOutput()
 include("ocean.jl")           # SeaSurfaceTemperatureOutput()
+include("tracers.jl")         # TracerOutput()
 
 # collect all together for conveneince
 AllOutputVariables() = (
