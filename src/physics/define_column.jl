@@ -86,6 +86,8 @@ $(TYPEDFIELDS)"""
     cloud_top::Int = nlayers+1              # layer index k of top-most layer with clouds
     precip_convection::NF = 0               # Precipitation due to convection [m]
     precip_large_scale::NF = 0              # precipitation due to large-scale condensation [m]
+    precip_rate_convection::NF = 0          # Precipitation rate due to convection [m/s]
+    precip_rate_large_scale::NF = 0         # precipitation rate due to large-scale condensation [m/s]
 
     # RADIATION
     cos_zenith::NF = 0                      # cosine of solar zenith angle [1]
