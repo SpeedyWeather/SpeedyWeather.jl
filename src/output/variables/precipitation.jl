@@ -76,7 +76,7 @@ path(::LargeScalePrecipitationOutput, simulation) =
     simulation.diagnostic_variables.physics.precip_large_scale
 
 # at finalize step postprocess the convective precipitation to get the rate
-finalize!(output::NetCDFOutput, variable::ConvectivePrecipitationOutput, args...) = output!(output, variable.rate, variable)
+finalize!(output::NetCDFOutput, variable::LargeScalePrecipitationOutput, args...) = output!(output, variable.rate, variable)
 
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
