@@ -209,12 +209,12 @@ Initialize the implicit terms for the PrimitiveEquation models."""
 function initialize!(   
     implicit::ImplicitPrimitiveEquation,
     dt::Real,                                           # the scaled time step radius*dt
-    diagn::DiagnosticVariables,
+    diagn::DiagnosticVariables{NF},
     geometry::AbstractGeometry,
     geopotential::AbstractGeopotential,
     atmosphere::AbstractAtmosphere,
     adiabatic_conversion::AbstractAdiabaticConversion,
-)
+) where NF
 
     (; trunc, nlayers, α, temp_profile, S, S⁻¹, L, R, U, W, L0, L1, L2, L3, L4) = implicit
     (; σ_levels_full, σ_levels_thick) = geometry
@@ -267,10 +267,10 @@ function initialize!(
 
         for r in 1:nlayers
             L1[k, r] = ΔT_below*σ_levels_thick[r]*σₖ         # vert advection operator below
-            L1[k, r] -= k>=r ? σ_levels_thick[r] : 0
+            L1[k, r] -= k>=r ? σ_levels_thick[r] : zero(NF)
 
             L1[k, r] += ΔT_above*σ_levels_thick[r]*σₖ_above   # vert advection operator above
-            L1[k, r] -= (k-1)>=r ? σ_levels_thick[r] : 0
+            L1[k, r] -= (k-1)>=r ? σ_levels_thick[r] : zero(NF)
         end
 
         # _sum_above operator itself

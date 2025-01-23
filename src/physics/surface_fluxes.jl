@@ -132,10 +132,10 @@ SurfaceHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceHeatFlux{SG.NF}(; kwargs..
 initialize!(::SurfaceHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(   
-    column::ColumnVariables,
+    column::ColumnVariables{NF},
     heat_flux::SurfaceHeatFlux,
     model::PrimitiveEquation,
-)   
+) where NF
     cₚ = model.atmosphere.heat_capacity
     (; heat_exchange_land, heat_exchange_sea) = heat_flux
 
@@ -147,21 +147,22 @@ function surface_heat_flux!(
     land_fraction = column.land_fraction
 
     # drag coefficient
+    # the convert might seem redundant but without it Enzyme struggles with its type and activity 
     drag_sea, drag_land = heat_flux.use_boundary_layer_drag ?
                         (column.boundary_layer_drag, column.boundary_layer_drag) : 
                         (heat_exchange_sea, heat_exchange_land)
 
     # SPEEDY documentation Eq. 54 and 56, land/sea fraction included
     flux_land = ρ*drag_land*V₀*cₚ*(T_skin_land - T)*land_fraction
-    flux_sea  = ρ*drag_sea*V₀*cₚ*(T_skin_sea  - T)*(1-land_fraction)
+    flux_sea  = ρ*drag_sea*V₀*cₚ*(T_skin_sea  - T)*(one(NF)-land_fraction)
 
     # mix fluxes for fractional land-sea mask
     land_available = isfinite(T_skin_land)
     sea_available = isfinite(T_skin_sea)
 
     # Only flux from land/sea if available (not NaN) otherwise zero flux
-    column.flux_temp_upward[end] += land_available ? flux_land : 0
-    column.flux_temp_upward[end] += sea_available ? flux_sea : 0
+    column.flux_temp_upward[end] += land_available ? flux_land : zero(NF)
+    column.flux_temp_upward[end] += sea_available ? flux_sea : zero(NF)
 
     return nothing
 end
@@ -193,9 +194,9 @@ end
 SurfaceEvaporation(SG::SpectralGrid; kwargs...) = SurfaceEvaporation{SG.NF}(; kwargs...)
 initialize!(::SurfaceEvaporation, ::PrimitiveWet) = nothing
 
-function surface_evaporation!(  column::ColumnVariables,
+function surface_evaporation!(  column::ColumnVariables{NF},
                                 evaporation::SurfaceEvaporation,
-                                model::PrimitiveWet)
+                                model::PrimitiveWet) where NF
 
     (; skin_temperature_sea, skin_temperature_land, pres) = column
     (; moisture_exchange_land, moisture_exchange_sea) = evaporation
@@ -226,8 +227,8 @@ function surface_evaporation!(  column::ColumnVariables,
 
     # Only flux from land/sea if available (not NaN) otherwise zero flux
     # mix fluxes for fractional land-sea mask
-    column.flux_humid_upward[end] += land_available ? flux_land : 0
-    column.flux_humid_upward[end] += sea_available ? flux_sea : 0
+    column.flux_humid_upward[end] += land_available ? flux_land : zero(NF)
+    column.flux_humid_upward[end] += sea_available ? flux_sea : zero(NF)
 
     return nothing
 end
