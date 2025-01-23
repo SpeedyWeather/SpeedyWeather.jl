@@ -120,7 +120,7 @@ end
 
 export PrescribedOceanHeatFlux
 struct PrescribedOceanHeatFlux <: AbstractSurfaceHeatFlux end
-PrescribedOceanSurfaceHeatFlux(::SpectralGrid) = PrescribedOceanHeatFlux()
+PrescribedOceanHeatFlux(::SpectralGrid) = PrescribedOceanHeatFlux()
 initialize!(::PrescribedOceanHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(
@@ -141,7 +141,7 @@ end
 
 export PrescribedLandHeatFlux
 struct PrescribedLandHeatFlux <: AbstractSurfaceHeatFlux end
-PrescribedLandSurfaceHeatFlux(::SpectralGrid) = PrescribedLandHeatFlux()
+PrescribedLandHeatFlux(::SpectralGrid) = PrescribedLandHeatFlux()
 initialize!(::PrescribedLandHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(
