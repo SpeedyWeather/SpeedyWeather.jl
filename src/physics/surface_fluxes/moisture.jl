@@ -19,11 +19,11 @@ end
 function surface_evaporation!(   
     column::ColumnVariables,
     evaporation::SurfaceEvaporation,
-    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     model::PrimitiveWet,
 )   
-    surface_evaporation!(column, evaporation.ocean, diagn, model)
-    surface_evaporation!(column, evaporation.land, diagn, model)
+    surface_evaporation!(column, evaporation.ocean, progn, model)
+    surface_evaporation!(column, evaporation.land, progn, model)
 end
 
 ## ----
@@ -132,13 +132,13 @@ initialize!(::PrescribedOceanEvaporation, ::PrimitiveEquation) = nothing
 function surface_evaporation!(
     column::ColumnVariables,
     ::PrescribedOceanEvaporation,
-    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     model::PrimitiveEquation)
 
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = diagn.physics.evaporative_flux_ocean[column.ij]*(1-land_fraction)
+    flux = diagn.ocean.evaporative_flux[column.ij]*(1-land_fraction)
     column.flux_humid_upward[end] += flux   # end=lowermost layer
     column.evaporative_flux = flux          # ocean sets the flux (=), land accumulates (+=)
 end
@@ -152,13 +152,13 @@ initialize!(::PrescribedLandEvaporation, ::PrimitiveEquation) = nothing
 function surface_evaporation!(
     column::ColumnVariables,
     ::PrescribedLandEvaporation,
-    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     model::PrimitiveEquation)
 
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = diagn.physics.evaporative_flux_land[column.ij]*land_fraction
+    flux = progn.land.evaporative_flux[column.ij]*land_fraction
     column.flux_humid_upward[end] += flux   # end=lowermost layer
     column.evaporative_flux += flux         # ocean sets the flux (=), land accumulates (+=)
 end

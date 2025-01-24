@@ -3,17 +3,17 @@ abstract type AbstractSurfaceWind <: AbstractParameterization end
 abstract type AbstractSurfaceHeatFlux <: AbstractParameterization end
 abstract type AbstractSurfaceEvaporation <: AbstractParameterization end
 
-# skip the diagnostic variables if not defined (needed to read in prescribed fluxes)
+# skip the proggnostic variables if not defined (needed to read in prescribed fluxes)
 surface_heat_flux!(c::ColumnVariables, f::AbstractSurfaceHeatFlux,
-    d::DiagnosticVariables, m::PrimitiveEquation) = surface_heat_flux!(c, f, m)
+    p::PrognosticVariables, m::PrimitiveEquation) = surface_heat_flux!(c, f, m)
 
 surface_evaporation!(c::ColumnVariables, f::AbstractSurfaceEvaporation,
-    d::DiagnosticVariables, m::PrimitiveEquation) = surface_evaporation!(c, f, m)
+    p::PrognosticVariables, m::PrimitiveEquation) = surface_evaporation!(c, f, m)
 
 # defines the order in which they are called und unpacks to dispatch
 function surface_fluxes!(
     column::ColumnVariables,
-    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     model::PrimitiveEquation)
 
     # get temperature, humidity and density at surface
@@ -23,8 +23,8 @@ function surface_fluxes!(
     surface_wind_stress!(column, model.surface_wind, model)
 
     # now call other heat (wet and dry) and humidity fluxes (PrimitiveWet only)
-    surface_heat_flux!(column, model.surface_heat_flux, diagn, model)
-    model isa PrimitiveWet && surface_evaporation!(column, model.surface_evaporation, diagn, model)
+    surface_heat_flux!(column, model.surface_heat_flux, progn, model)
+    model isa PrimitiveWet && surface_evaporation!(column, model.surface_evaporation, progn, model)
 end
 
 ## SURFACE THERMODYNAMICS

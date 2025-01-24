@@ -51,7 +51,6 @@ initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
 function surface_heat_flux!(
     column::ColumnVariables,
     heat_flux::SurfaceOceanHeatFlux,
-    diagn::DiagnosticVariables,
     model::PrimitiveEquation,
 )
     cₚ = model.atmosphere.heat_capacity
@@ -59,7 +58,7 @@ function surface_heat_flux!(
 
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
-    T_skin_ocean = column.skin_temperature_sea
+    T_skin_ocean = column.skin_temperature_seax
     T = column.surface_temp
     land_fraction = column.land_fraction
 
@@ -92,7 +91,6 @@ initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 function surface_heat_flux!(
     column::ColumnVariables,
     heat_flux::SurfaceLandHeatFlux,
-    diagn::DiagnosticVariables,
     model::PrimitiveEquation,
 )
     cₚ = model.atmosphere.heat_capacity
@@ -126,13 +124,13 @@ initialize!(::PrescribedOceanHeatFlux, ::PrimitiveEquation) = nothing
 function surface_heat_flux!(
     column::ColumnVariables,
     fluxes::PrescribedOceanHeatFlux,
-    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     model::PrimitiveEquation,
 )
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = diagn.physics.sensible_heat_flux_ocean[column.ij]*(1-land_fraction)
+    flux = progn.ocean.sensible_heat_flux[column.ij]*(1-land_fraction)
     column.flux_temp_upward[end] += flux    # end=lowermost layer
     column.sensible_heat_flux = flux        # ocean sets the flux (=), land accumulates (+=)
 end
@@ -147,13 +145,13 @@ initialize!(::PrescribedLandHeatFlux, ::PrimitiveEquation) = nothing
 function surface_heat_flux!(
     column::ColumnVariables,
     fluxes::PrescribedLandHeatFlux,
-    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     model::PrimitiveEquation,
 )
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = diagn.physics.sensible_heat_flux_land[column.ij]*land_fraction
+    flux = progn.land.sensible_heat_flux[column.ij]*land_fraction
     column.flux_temp_upward[end] += flux    # end=lowermost layer
     column.sensible_heat_flux += flux        # ocean sets the flux (=), land accumulates (+=)
 end

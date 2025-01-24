@@ -20,6 +20,12 @@ export PrognosticVariablesOcean
 
     "Sea ice concentration [1]"
     sea_ice_concentration::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "Prescribed ocean sensible heat flux [W/m²]"
+    sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "Prescribed ocean evaporative flux [kg/s/m²]"
+    evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
 end
 
 export PrognosticVariablesLand
@@ -44,6 +50,12 @@ export PrognosticVariablesLand
 
     "Soil moisture layer 2, volume fraction [1]"
     soil_moisture_layer2::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "Prescribed land sensible heat flux [W/m²]"
+    sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "Prescribed land evaporative flux [kg/s/m²]"
+    evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
 end
 
 export PrognosticVariables
