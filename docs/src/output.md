@@ -178,6 +178,26 @@ delete!(output, :div)
 If you change the `name` of an output variable, i.e. `SpeedyWeather.DivergenceOutput(name="divergence")`
 the key would change accordingly to `:divergence`.
 
+## Grouped variables
+
+For convenience we have defined several output groups, for example `SpeedyWeather.PrecipitationOutput()`
+definces both accumulated large-scale and convective precipitation as well as their rates and the
+cloud top height. Groups are
+
+```julia
+SpeedyWeather.BoundaryOutput()
+SpeedyWeather.PrecipitationOutput()
+SpeedyWeather.RadiationOutput()
+SpeedyWeather.SurfacesFluxesOutput()
+SpeedyWeather.AllOutputVariabesl()
+```
+
+each of them has to be splatted by appending `...`, e.g.
+
+```@example netcdf
+add!(model, SpeedyWeather.SurfaceFluxesOutput()...)
+```
+
 ## Output path and identification
 
 That's easy by passing on `path="/my/favourite/path/"` and the folder `run_*` with `*` the identification
