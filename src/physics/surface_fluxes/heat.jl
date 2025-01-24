@@ -19,11 +19,11 @@ end
 function surface_heat_flux!(   
     column::ColumnVariables,
     heat_flux::SurfaceHeatFlux,
-    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     model::PrimitiveEquation,
 )   
-    surface_heat_flux!(column, heat_flux.ocean, diagn, model)
-    surface_heat_flux!(column, heat_flux.land, diagn, model)
+    surface_heat_flux!(column, heat_flux.ocean, progn, model)
+    surface_heat_flux!(column, heat_flux.land, progn, model)
 end
 
 ## ----
@@ -58,7 +58,7 @@ function surface_heat_flux!(
 
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
-    T_skin_ocean = column.skin_temperature_seax
+    T_skin_ocean = column.skin_temperature_sea
     T = column.surface_temp
     land_fraction = column.land_fraction
 

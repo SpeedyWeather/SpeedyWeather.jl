@@ -10,7 +10,7 @@
         add!(model, SpeedyWeather.SurfaceFluxesOutput()...)
 
         simulation = initialize!(model)
-        set!(simulation.diagnostic_variables.physics.sensible_heat_flux_ocean, (λ, ϕ) -> ϕ > 0 ? 10 : 0, model.geometry)
+        set!(simulation.prognostic_variables.ocean.sensible_heat_flux, (λ, ϕ) -> ϕ > 0 ? 10 : 0, model.geometry)
         run!(simulation, period=Day(1), output=true)
 
         # prescribe land
@@ -21,7 +21,7 @@
         add!(model, SpeedyWeather.SurfaceFluxesOutput()...)
 
         simulation = initialize!(model)
-        set!(simulation.diagnostic_variables.physics.sensible_heat_flux_land, (λ, ϕ) -> ϕ > 0 ? 100 : 0, model.geometry)
+        set!(simulation.prognostic_variables.land.sensible_heat_flux, (λ, ϕ) -> ϕ > 0 ? 100 : 0, model.geometry)
         run!(simulation, period=Day(1), output=true)
     end
 end
@@ -36,7 +36,7 @@ end
     model = PrimitiveWetModel(spectral_grid; surface_evaporation)
     
     simulation = initialize!(model)
-    set!(simulation.diagnostic_variables.physics.evaporative_flux_ocean, (λ, ϕ) -> ϕ > 0 ? 5e-5 : 0, model.geometry)
+    set!(simulation.prognostic_variables.ocean.evaporative_flux, (λ, ϕ) -> ϕ > 0 ? 5e-5 : 0, model.geometry)
     run!(simulation, period=Day(1))
 
     # prescribe land
@@ -46,6 +46,6 @@ end
     model = PrimitiveWetModel(spectral_grid; surface_evaporation)
 
     simulation = initialize!(model);
-    set!(simulation.diagnostic_variables.physics.evaporative_flux_land, (λ, ϕ) -> ϕ > 0 ? 5e-5 : 0, model.geometry)
+    set!(simulation.prognostic_variables.land.evaporative_flux, (λ, ϕ) -> ϕ > 0 ? 5e-5 : 0, model.geometry)
     run!(simulation, period=Day(1))
 end

@@ -31,8 +31,8 @@ end
 export NoSurfaceEvaporation
 struct NoSurfaceEvaporation <: AbstractSurfaceEvaporation end
 NoSurfaceEvaporation(::SpectralGrid) = NoSurfaceEvaporation()
-initialize!(::NoSurfaceEvaporation, ::PrimitiveEquation) = nothing
-surface_evaporation!(::ColumnVariables, ::NoSurfaceEvaporation, ::PrimitiveEquation) = nothing
+initialize!(::NoSurfaceEvaporation, ::PrimitiveWet) = nothing
+surface_evaporation!(::ColumnVariables, ::NoSurfaceEvaporation, ::PrimitiveWet) = nothing
 
 ## ----
 
@@ -51,7 +51,6 @@ initialize!(::SurfaceOceanEvaporation, ::PrimitiveWet) = nothing
 function surface_evaporation!(
     column::ColumnVariables,
     evaporation::SurfaceOceanEvaporation,
-    diagn::DiagnosticVariables,
     model::PrimitiveWet,
 )
 
@@ -95,7 +94,6 @@ initialize!(::SurfaceLandEvaporation, ::PrimitiveWet) = nothing
 function surface_evaporation!(
     column::ColumnVariables,
     evaporation::SurfaceLandEvaporation,
-    diagn::DiagnosticVariables,
     model::PrimitiveWet,
 )
 
@@ -128,17 +126,17 @@ end
 export PrescribedOceanEvaporation
 struct PrescribedOceanEvaporation <: AbstractSurfaceEvaporation end
 PrescribedOceanEvaporation(::SpectralGrid) = PrescribedOceanEvaporation()
-initialize!(::PrescribedOceanEvaporation, ::PrimitiveEquation) = nothing
+initialize!(::PrescribedOceanEvaporation, ::PrimitiveWet) = nothing
 function surface_evaporation!(
     column::ColumnVariables,
     ::PrescribedOceanEvaporation,
     progn::PrognosticVariables,
-    model::PrimitiveEquation)
+    model::PrimitiveWet)
 
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = diagn.ocean.evaporative_flux[column.ij]*(1-land_fraction)
+    flux = progn.ocean.evaporative_flux[column.ij]*(1-land_fraction)
     column.flux_humid_upward[end] += flux   # end=lowermost layer
     column.evaporative_flux = flux          # ocean sets the flux (=), land accumulates (+=)
 end
@@ -148,12 +146,12 @@ end
 export PrescribedLandEvaporation
 struct PrescribedLandEvaporation <: AbstractSurfaceEvaporation end
 PrescribedLandEvaporation(::SpectralGrid) = PrescribedLandEvaporation()
-initialize!(::PrescribedLandEvaporation, ::PrimitiveEquation) = nothing
+initialize!(::PrescribedLandEvaporation, ::PrimitiveWet) = nothing
 function surface_evaporation!(
     column::ColumnVariables,
     ::PrescribedLandEvaporation,
     progn::PrognosticVariables,
-    model::PrimitiveEquation)
+    model::PrimitiveWet)
 
     land_fraction = column.land_fraction
 
