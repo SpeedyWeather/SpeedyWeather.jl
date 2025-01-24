@@ -138,7 +138,7 @@ function surface_evaporation!(
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = diagn.physics.evaporative_flux[column.ij]*(1-land_fraction)
+    flux = diagn.physics.evaporative_flux_ocean[column.ij]*(1-land_fraction)
     column.flux_humid_upward[end] += flux   # end=lowermost layer
     column.evaporative_flux = flux          # ocean sets the flux (=), land accumulates (+=)
 end
@@ -158,7 +158,7 @@ function surface_evaporation!(
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = diagn.physics.evaporative_flux[column.ij]*land_fraction
+    flux = diagn.physics.evaporative_flux_land[column.ij]*land_fraction
     column.flux_humid_upward[end] += flux   # end=lowermost layer
     column.evaporative_flux += flux         # ocean sets the flux (=), land accumulates (+=)
 end

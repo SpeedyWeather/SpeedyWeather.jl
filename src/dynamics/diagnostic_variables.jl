@@ -283,8 +283,20 @@ $(TYPEDFIELDS)"""
     "Sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
+    "Sensible heat flux [W/m²], positive up, prescribed from ocean"
+    sensible_heat_flux_ocean::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    
+    "Sensible heat flux [W/m²], positive up, prescribed from land"
+    sensible_heat_flux_land::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    
     "Evaporative flux [kg/s/m^2], positive up"
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "Evaporative flux [kg/s/m^2], positive up, prescroibed from ocean"
+    evaporative_flux_ocean::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    
+    "Evaporative flux [kg/s/m^2], positive up, prescribed from land"
+    evaporative_flux_land::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     # RADIATION
     "Surface radiation: shortwave up [W/m²]"

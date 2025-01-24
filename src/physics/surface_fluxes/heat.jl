@@ -132,7 +132,7 @@ function surface_heat_flux!(
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = diagn.physics.sensible_heat_flux[column.ij]*(1-land_fraction)
+    flux = diagn.physics.sensible_heat_flux_ocean[column.ij]*(1-land_fraction)
     column.flux_temp_upward[end] += flux    # end=lowermost layer
     column.sensible_heat_flux = flux        # ocean sets the flux (=), land accumulates (+=)
 end
@@ -153,7 +153,7 @@ function surface_heat_flux!(
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = diagn.physics.sensible_heat_flux[column.ij]*land_fraction
+    flux = diagn.physics.sensible_heat_flux_land[column.ij]*land_fraction
     column.flux_temp_upward[end] += flux    # end=lowermost layer
     column.sensible_heat_flux += flux        # ocean sets the flux (=), land accumulates (+=)
 end
