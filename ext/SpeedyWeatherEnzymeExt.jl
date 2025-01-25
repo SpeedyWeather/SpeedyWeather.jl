@@ -33,9 +33,9 @@ end
 # Computes the scale for the adjoint/pullback of a real discrete fourier transform.
 function rfft_adjoint_scale(n_freq::Int, n_real::Int)
     if iseven(n_real)
-        return [1; [2 for i=2:(n_freq-1)]; 1]
+        return [1 < i < n_freq ? 2 : 1 for i=1:n_freq]
     else 
-        return [1; [2 for i=2:n_freq]]
+        return [1 < i ? 2 : 1 for i=1:n_freq]
     end 
 end 
 

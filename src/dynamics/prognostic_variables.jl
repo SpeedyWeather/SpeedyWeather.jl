@@ -211,7 +211,7 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
 
     progn_new.random_pattern .= progn_old.random_pattern
 
-    progn_new.clock.time = progn_old.clock.time
+    copy!(progn_new.clock, progn_old.clock)
     progn_new.scale[] = progn_old.scale[]
 
     return progn_new
