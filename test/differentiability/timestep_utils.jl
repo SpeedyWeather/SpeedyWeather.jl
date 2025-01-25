@@ -1,4 +1,4 @@
-function timestep_oop!(progn_new, progn_old, diagn, dt, model)
+function timestep_oop!(progn_new::PrognosticVariables, progn_old::PrognosticVariables, diagn, dt, model)
     copy!(progn_new, progn_old)
     SpeedyWeather.timestep!(progn_new, diagn, dt, model)
     return nothing

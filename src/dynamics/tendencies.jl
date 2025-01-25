@@ -838,8 +838,8 @@ function SpeedyTransforms.transform!(
     model::PrimitiveEquation;
     initialize::Bool = false,
 )   
-    (; vor_grid, div_grid, pres_grid, u_grid, v_grid, temp_grid, humid_grid) = diagn.grid
-    (; temp_grid_prev, humid_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid
+    (; vor_grid, div_grid, pres_grid, u_grid, v_grid, temp_grid, humid_grid, 
+    temp_grid_prev, humid_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid
 
     vor   = progn.vor[lf]           # relative vorticity at leapfrog step lf
     div   = progn.div[lf]           # divergence at leapfrog step lf
@@ -853,10 +853,10 @@ function SpeedyTransforms.transform!(
 
     # retain previous time step for vertical advection and some parameterizations
     if initialize == false              # only store prev after initial step
-        @. temp_grid_prev = temp_grid   # this is temperature anomaly wrt to implicit reference profile!
-        @. humid_grid_prev = humid_grid
-        @. u_grid_prev = u_grid
-        @. v_grid_prev = v_grid
+        @. temp_grid_prev.data = temp_grid.data   # this is temperature anomaly wrt to implicit reference profile!
+        @. humid_grid_prev.data = humid_grid.data
+        @. u_grid_prev.data = u_grid.data
+        @. v_grid_prev.data = v_grid.data
 
         for (name, tracer) in model.tracers
             if tracer.active
@@ -900,9 +900,9 @@ function SpeedyTransforms.transform!(
             end
         end
 
-        @. humid_grid_prev = humid_grid
-        @. u_grid_prev = u_grid
-        @. v_grid_prev = v_grid
+        @. humid_grid_prev.data = humid_grid.data
+        @. u_grid_prev.data = u_grid.data
+        @. v_grid_prev.data = v_grid.data
 
         for (name, tracer) in model.tracers
             if tracer.active
