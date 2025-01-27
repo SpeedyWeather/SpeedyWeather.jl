@@ -857,6 +857,7 @@ function SpeedyTransforms.transform!(
         @. humid_grid_prev.data = humid_grid.data
         @. u_grid_prev.data = u_grid.data
         @. v_grid_prev.data = v_grid.data
+        # TODO: above broadcastings are done with the .data because there's currently a problem with Enzyme and our RingGrids broadcasting
 
         for (name, tracer) in model.tracers
             if tracer.active
