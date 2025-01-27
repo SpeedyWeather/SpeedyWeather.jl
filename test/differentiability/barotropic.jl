@@ -116,12 +116,38 @@
     end 
 
     #fd_jvp = FiniteDifferences.jvp(central_fdm(5,1), (x) ->leapfrog(A_old_copy, A_new_copy, x, dt, lf1, L), (tendency_copy, one(tendency_copy)))
-    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), (x) ->leapfrog(A_old_copy, A_new_copy, x, dt, lf1, L), one(tendency_copy), tendency_copy)
+    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x ->leapfrog(A_old_copy, A_new_copy, x, dt, lf1, L), one(tendency_copy), tendency_copy)
     
     # in this case it need to be dt*(1 - w2) (no contributation from A_old in FD)
     @test all(isapprox.(fd_jvp[1], dt*(1-w2), rtol=1e-2))
 
+    #
+    # transform!(diagn, progn, lf2, model)
+    #
 
+    fill!(diagn.tendencies, 0, PrimitiveWetModel)
+    diag_copy = deepcopy(diagn)
+    
+    ddiag = deepcopy(diagn)
+    fill!(ddiag.tendencies, 1, PrimitiveWetModel)
+
+    # full one, also including grid data, temp_average, column 
+    ddiag_copy = deepcopy(ddiag)
+
+    progn_copy = deepcopy(progn)
+    dprogn = make_zero(progn)
+
+    autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
+
+    function transform_diagn(diag, progn, lf2, model)
+        diag_copy = deepcopy(diag)
+        transform!(diag_copy, progn, lf2, model)
+        return diag_copy
+    end 
+
+    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_diagn(diag_copy, x, lf2, model), ddiag_copy, progn_copy)
+
+ 
     # differnetiate wrt parameter 
     # write this as function (model, progn, diagn, 2\Delta t) -> progn_new
 end

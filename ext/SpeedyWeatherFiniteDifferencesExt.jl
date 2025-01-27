@@ -78,8 +78,8 @@ included_fields(::Type{<:PrognosticVariablesLand}) = (:land_surface_temperature,
 excluded_fields_pre(::Type{<:PrognosticVariablesLand}) = (:nlat_half, )
 excluded_fields_post(::Type{<:PrognosticVariablesLand}) = ()
 
-included_fields(::Type{<:DiagnosticVariables}) = (:tendencies, :grid, :dynamics, :physics, :column, :temp_average)
-excluded_fields_pre(::Type{<:DiagnosticVariables}) = (:trunc, :nlat_half, :nlayers, :nparticle)
+included_fields(::Type{<:DiagnosticVariables}) = (:tendencies, :grid, :dynamics, :physics, :particles, :column, :temp_average)
+excluded_fields_pre(::Type{<:DiagnosticVariables}) = (:trunc, :nlat_half, :nlayers, :nparticles)
 excluded_fields_post(::Type{<:DiagnosticVariables}) = (:scale,)
 
 included_fields(::Type{<:Tendencies}) = (:vor_tend, :div_tend, :temp_tend, :humid_tend, :u_tend, :v_tend, :pres_tend, :tracers_tend, :u_tend_grid, :v_tend_grid, :temp_tend_grid, :humid_tend_grid, :pres_tend_grid, :tracers_tend_grid)
@@ -94,7 +94,7 @@ included_fields(::Type{<:DynamicsVariables}) = (:a, :b, :a_grid, :b_grid, :a_2D,
 excluded_fields_pre(::Type{<:DynamicsVariables}) = (:trunc, :nlat_half, :nlayers)
 excluded_fields_post(::Type{<:DynamicsVariables}) = ()
 
-included_fields(::Type{<:PhysicsVariables}) = (:precip_large_scale, :precip_convection, :cloud_top, :soil_moisture_availability, :surface_flux_heat, :surface_flux_humid, :outgoing_shortwave_radiation, :outgoing_longwave_radiation, :cos_zenith)
+included_fields(::Type{<:PhysicsVariables}) = (:precip_large_scale, :precip_convection, :precip_rate_large_scale, :precip_rate_convection, :cloud_top, :soil_moisture_availability, :sensible_heat_flux, :evaporative_flux, :surface_shortwave_up, :surface_shortwave_down, :surface_longwave_up, :surface_longwave_down, :outgoing_shortwave_radiation, :outgoing_longwave_radiation, :cos_zenith)
 excluded_fields_pre(::Type{<:PhysicsVariables}) = (:nlat_half,)
 excluded_fields_post(::Type{<:PhysicsVariables}) = ()
 
