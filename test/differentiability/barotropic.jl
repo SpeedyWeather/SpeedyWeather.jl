@@ -46,7 +46,9 @@
 
     @test isapprox(to_vec(fd_jvp[1])[1], to_vec(d_progn)[1])
 
-    ### Test the leapfrog 
+    #
+    # Test the leapfrog 
+    # 
 
     lf1 = 2 
     lf2 = 2 
@@ -58,7 +60,6 @@
     SpeedyWeather.dynamics_tendencies!(diagn, progn, lf2, model)
     SpeedyWeather.horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
 
-
     progn_copy = deepcopy(progn)
     dprogn = one(progn_copy)
     dprogn_copy = one(progn_copy)
@@ -68,20 +69,23 @@
     dtend = make_zero(tend)
     dmodel = make_zero(model)
 
-    #leapfrog!(progn, diagn.tendencies, dt, lf1, model)
     autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(progn, dprogn), Duplicated(tend, dtend), Const(dt), Const(lf1), Const(model))
 
-    function leapfrog_step(progn::PrognosticVariables, tend, dt, lf, model)
-        SpeedyWeather.leapfrog!(progn, tend, dt, lf, model)
-        return progn
+    function leapfrog_step(progn_new::PrognosticVariables, progn::PrognosticVariables, tend, dt, lf, model)
+        copy!(progn_new, progn)
+        SpeedyWeather.leapfrog!(progn_new, tend, dt, lf, model)
+        return progn_new
     end 
 
-    tend_one = deepcopy(tend_copy)
-    fill!(tend_one, 1, Barotropic)
+    prog_new = zero(progn_copy)
 
-    fd_jvp = FiniteDifferences.j'vp(central_fdm(5,1), x -> leapfrog_step(progn, x, dt, lf1, model),(tend_copy, tend_one))
+    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> leapfrog_step(prog_new, progn_copy, x, dt, lf1, model), dprogn_copy, tend_copy)
 
+    @test all(isapprox.(to_vec(fd_jvp[1])[1], to_vec(dtend)[1],rtol=1e-2,atol=1e-2))
+
+    # 
     # single variable leapfrog step 
+    # 
 
     A_old = progn.vor[1]
     A_old_copy = copy(A_old)
@@ -101,10 +105,9 @@
 
     w1 = L.robert_filter*L.williams_filter/2   
     w2 = L.robert_filter*(1-L.williams_filter)/2   
-    @test all(dtendency .== dt*(1+w1-w2))
+    @test all(dtendency .≈ dt*(1+w1-w2))
     # d tend needs to be: dt* ( 1 + w1 - w2) (for every coefficient)
-    # enzyme shows it is 
-    
+
     function leapfrog(A_old, A_new, tendency, dt, lf, L)
         A_old_new = copy(A_old)
         A_new_new = copy(A_new)
@@ -112,10 +115,13 @@
         return A_new_new
     end 
 
-    fd_jvp = FiniteDifferences.jvp(central_fdm(5,1), (x) ->leapfrog(A_old_copy, A_old_copy, x, dt, lf1, L), (tendency_copy, one(A_new_copy)))
-    # in this case it need to be dt*(1 - w2) (no contributation from A_old in FD)
-
+    #fd_jvp = FiniteDifferences.jvp(central_fdm(5,1), (x) ->leapfrog(A_old_copy, A_new_copy, x, dt, lf1, L), (tendency_copy, one(tendency_copy)))
+    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), (x) ->leapfrog(A_old_copy, A_new_copy, x, dt, lf1, L), one(tendency_copy), tendency_copy)
     
+    # in this case it need to be dt*(1 - w2) (no contributation from A_old in FD)
+    @test all(isapprox.(fd_jvp[1], dt*(1-w2), rtol=1e-2))
+
+
     # differnetiate wrt parameter 
     # write this as function (model, progn, diagn, 2\Delta t) -> progn_new
 end
