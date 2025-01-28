@@ -30,3 +30,9 @@ function flatten(prog::PrognosticVariables{NF, ArrayType, NSTEPS, SpectralVariab
 
     return prog_array, land_ocean_array
 end 
+
+function Base.one(diag::DiagnosticVariables{NF}) where NF
+    vec, re = to_vec(diag)
+    vec .= NF(1)
+    return re(vec)
+end 
