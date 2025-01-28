@@ -27,8 +27,8 @@
             fill!(dspecs2, 1+1im)
 
             # finite difference comparision, seeded with a one adjoint to get the direct gradient
-            fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dspecs2, grid)
-            @test isapprox(dgrid, fd_jvp[1])
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dspecs2, grid)
+            @test isapprox(dgrid, fd_vjp[1])
 
             ## now backwards, as the input for spec we use the output of the forward transform
 
@@ -43,9 +43,9 @@
             dgrid2 = similar(grid)
             fill!(dgrid2, 1)
 
-            fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dgrid2, specs)
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform(x, S), dgrid2, specs)
 
-            @test isapprox(dspecs, fd_jvp[1])
+            @test isapprox(dspecs, fd_vjp[1])
         end 
 
         # test that d S^{-1}(S(x)) / dx = dx/dx = 1 (starting in both domains) 
@@ -95,8 +95,8 @@
         # The FD comparision passes, but it takes a long time to compute, so it's commented out. 
         #dgrid2 = similar(grid)
         #fill!(dgrid2, 1)
-        #fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_identity(x, S), dgrid2, grid)
-        #@test isapprox(dgrid, fd_jvp[1], rtol=0.01)
+        #fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_identity(x, S), dgrid2, grid)
+        #@test isapprox(dgrid, fd_vjp[1], rtol=0.01)
 
         # now start with spectral space, exclude for other grid because of https://github.com/SpeedyWeather/SpeedyWeather.jl/issues/626
         if fd_tests[i_grid]
@@ -171,9 +171,9 @@ end
             fill!(dcu2, 1)
 
             # finite difference comparision, seeded with a one adjoint to get the direct gradient
-            fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> curl(x[1],x[2], S), dcu2, (u, v))
-            @test isapprox(du, fd_jvp[1][1], rtol=1e-6)
-            @test isapprox(dv, fd_jvp[1][2], rtol=1e-6)
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> curl(x[1],x[2], S), dcu2, (u, v))
+            @test isapprox(du, fd_vjp[1][1], rtol=1e-6)
+            @test isapprox(dv, fd_vjp[1][2], rtol=1e-6)
 
             # div test
             u = transform(u_grid, S)
@@ -199,9 +199,9 @@ end
             ddiv2 = zero(ddiv)
             fill!(ddiv2, 1 + 1im)
 
-            fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> divergence(x[1],x[2], S), ddiv2, (u, v))
-            @test isapprox(du, fd_jvp[1][1])
-            @test isapprox(dv, fd_jvp[1][2])
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> divergence(x[1],x[2], S), ddiv2, (u, v))
+            @test isapprox(du, fd_vjp[1][1])
+            @test isapprox(dv, fd_vjp[1][2])
             @test sum(du) != 0 # nonzero gradient
             @test sum(dv) != 0 # nonzero gradient
 
@@ -230,8 +230,8 @@ end
             duv_input = zero(uv_input)
             duv_input = fill!(duv_input, 1+im)
 
-            fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> uvfvor(x, S), duv_input, vor)
-            @test isapprox(dvor, fd_jvp[1])
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> uvfvor(x, S), duv_input, vor)
+            @test isapprox(dvor, fd_vjp[1])
             @test sum(dvor) != 0 # nonzero gradient
 
             # UV_from_vordiv! 
@@ -261,9 +261,9 @@ end
             uv_input = zero(uv_input)
             duv_input = fill!(duv_input, 1+im)
 
-            fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x-> uvfromvordiv(x[1], x[2], S), duv_input, (vor, div))
-            @test isapprox(dvor, fd_jvp[1][1][:,1]) 
-            @test isapprox(ddiv, fd_jvp[1][2][:,1])
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x-> uvfromvordiv(x[1], x[2], S), duv_input, (vor, div))
+            @test isapprox(dvor, fd_vjp[1][1][:,1]) 
+            @test isapprox(ddiv, fd_vjp[1][2][:,1])
             @test sum(dvor) != 0 # nonzero gradient
             @test sum(ddiv) != 0 # nonzero gradient
 
@@ -278,9 +278,9 @@ end
             dres_∇2 = zero(res_∇)
             fill!(dres_∇2, 1+im)
 
-            fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x-> ∇²(x, S), dres_∇2, vor)
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x-> ∇²(x, S), dres_∇2, vor)
             @test sum(dvor) != 0 # non-zero 
-            @test isapprox(dvor, fd_jvp[1]) # and identical with FD
+            @test isapprox(dvor, fd_vjp[1]) # and identical with FD
 
             # test with the eigenvalues saved in S, result should just be seed * eigenvalues
             for i=1:(vor.m-1)
@@ -305,9 +305,9 @@ end
             dzonal_gradient2 = zero(dzonal_gradient)
             fill!(dzonal_gradient2, 1+im)
 
-            fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x-> ∇(x, S), (dmerid_gradient2, dzonal_gradient2), vor)
+            fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x-> ∇(x, S), (dmerid_gradient2, dzonal_gradient2), vor)
             @test sum(dvor) != # nonzero 
-            @test isapprox(dvor, fd_jvp[1]) # and identical with FD
+            @test isapprox(dvor, fd_vjp[1]) # and identical with FD
         end 
     end 
 end 
