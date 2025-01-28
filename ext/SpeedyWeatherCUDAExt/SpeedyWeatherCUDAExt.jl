@@ -30,6 +30,7 @@ SpeedyWeather.DeviceArray(::GPU, x) = Adapt.adapt(CuArray, x)
 Returns a `CuArray` when `device<:GPU` is used. Doesn't uses `adapt`, therefore always returns CuArray."""
 SpeedyWeather.DeviceArrayNotAdapt(::GPU, x) = CuArray(x)
 
+include("spectral_transform.jl")
 include("fourier.jl")
 include("legendre.jl")
 
