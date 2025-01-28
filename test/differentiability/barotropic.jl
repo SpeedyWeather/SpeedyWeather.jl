@@ -45,6 +45,48 @@
     fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> timestep_oop(x, diagn_copy, dt, model), dprogn_2, progn_copy)
 
     @test isapprox(to_vec(fd_jvp[1])[1], to_vec(d_progn)[1])
+    
+    #
+    # We go individually through all components of the time stepping and check 
+    # correctness
+    #
+
+    fill!(diagn.tendencies, 0, Barotropic)
+
+    #
+    # dynamics_tendencies!
+    #
+
+    lf2 = 
+    diagn_copy = deepcopy(diagn)
+    ddiag = one(diagn_copy)
+    ddiag_copy = deepcopy(ddiag)
+    progn_copy = deepcopy(progn)
+
+    #autodiff(Reverse, SpeedyWeather.dynamics_tendencies!(diagn, progn, lf2, model)
+
+    #
+    # horizontal_diffusion!
+    #
+    lf1 = 1
+    diagn_copy = deepcopy(diagn)
+    ddiag = one(diagn_copy)
+    ddiag_copy = deepcopy(ddiag)
+
+    progn_copy = deepcopy(progn)
+    dprogn = one(progn)
+
+    autodiff(Reverse, SpeedyWeather.horizontal_diffusion!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(model.horizontal_diffusion), Duplicated(model, make_zero(model)), Const(lf1))
+
+    function horizontal_diffusion(diagn, progn, diffusion, model, lf)
+        diagn_new = deepcopy(diagn)
+        SpeedyWeather.horizontal_diffusion!(diagn_new, progn, diffusion, model, lf)
+        return diagn_new
+    end 
+
+    fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> horizontal_diffusion(diag_copy, x, model.horizontal_diffusion, model, lf1), ddiag_copy, progn_copy)
+    # look closer here! 
+    @test all(isapprox.(to_vec(fd_jvp[1])[1], to_vec(dprogn)[1],rtol=1e-2,atol=1e-2))
 
     #
     # Test the leapfrog 
@@ -54,10 +96,8 @@
     lf2 = 2 
 
     # set the tendencies back to zero for accumulation
-    fill!(diagn.tendencies, 0, Barotropic)
 
     # TENDENCIES, DIFFUSION, LEAPFROGGING AND TRANSFORM SPECTRAL STATE TO GRID
-    SpeedyWeather.dynamics_tendencies!(diagn, progn, lf2, model)
     SpeedyWeather.horizontal_diffusion!(diagn, progn, model.horizontal_diffusion, model)
 
     progn_copy = deepcopy(progn)
@@ -115,7 +155,6 @@
         return A_new_new
     end 
 
-    #fd_jvp = FiniteDifferences.jvp(central_fdm(5,1), (x) ->leapfrog(A_old_copy, A_new_copy, x, dt, lf1, L), (tendency_copy, one(tendency_copy)))
     fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x ->leapfrog(A_old_copy, A_new_copy, x, dt, lf1, L), one(tendency_copy), tendency_copy)
     
     # in this case it need to be dt*(1 - w2) (no contributation from A_old in FD)
@@ -128,10 +167,7 @@
     fill!(diagn.tendencies, 0, PrimitiveWetModel)
     diag_copy = deepcopy(diagn)
     
-    ddiag = deepcopy(diagn)
-    fill!(ddiag.tendencies, 1, PrimitiveWetModel)
-
-    # full one, also including grid data, temp_average, column 
+    ddiag = one(diagn)
     ddiag_copy = deepcopy(ddiag)
 
     progn_copy = deepcopy(progn)
@@ -146,8 +182,9 @@
     end 
 
     fd_jvp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_diagn(diag_copy, x, lf2, model), ddiag_copy, progn_copy)
+    
+    @test all(isapprox.(to_vec(fd_jvp[1])[1], to_vec(dprogn)[1],rtol=1e-2,atol=1e-2))
 
- 
     # differnetiate wrt parameter 
     # write this as function (model, progn, diagn, 2\Delta t) -> progn_new
 end
