@@ -1,0 +1,8 @@
+# Differentiability and Adjoint Model
+
+SpeedyWeather.jl is written with differentiability in mind. This means that our model is differentiable by automatic differentiation (AD). If you are interested in machine learning (ML), this means that you can integrate our model directly into your ML models without the need to train your ANNs seperately first. For atmospheric modellers this means that you get an adjoint model for free which is always generated automatically, so that we don't need to maintain it seperatly. So, you can calibrate SpeedyWeather.jl in a fully automatic, data-driven way. 
+
+!!! Work in progress
+    The differentiability of SpeedyWeather.jl is still work in progress and some parts of this documentation might be not be always updated to the latest state. We will extend this documentation over time.  
+
+For the differentiability of our model we rely on [Enzyme.jl](https://github.com/EnzymeAD/Enzyme.jl). If you've used Enzyme before, just go ahead and try to differnentiate the model! It should work. We have checked the correctness of the gradients extensively against a finite differences differentiation with [FiniteDifferences.jl](https://github.com/JuliaDiff/FiniteDifferences.jl/). In the following we present a simple example how we can take the gradient of a single timestep of the primitive equation model with respect to one of the model parameter, so with ``\mathbf{P}_t = (\zeta, \mathcal{D}, p_s, T, q)`` as the state vector of all prognostic variables at time step
