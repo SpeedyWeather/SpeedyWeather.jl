@@ -12,26 +12,6 @@ nlayers_list = [1, 8, 32, 64]
 float_types = [Float32]
 grid_list = [FullGaussianGrid]
 
-# # Updated function to generate random inputs with device parameter
-# function generate_random_inputs(N, nlayers, T, device)
-#     spectral_grid = SpectralGrid(NF=T, trunc=N, nlayers=nlayers, device=device)
-#     S = SpectralTransform(spectral_grid)
-#     grids = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
-#     specs = rand(LowerTriangularArray{Complex{spectral_grid.NF}}, spectral_grid.trunc+2, spectral_grid.trunc+1, spectral_grid.nlayers)
-#     if device == SpeedyWeather.GPU()
-#         specs = cu(specs)
-#         grids = cu(grids)
-#     end
-#     return S, specs, grids
-# end
-
-function get_median_result(trial::BenchmarkTools.Trial)
-    t = median(trial)
-
-    return t.time
-end
-
-
 # Single run_benchmarks function with device parameter
 function run_benchmarks(trunc_list, nlayers_list, float_types, device)
     results = Dict{String, Dict{DataType, Matrix{Float64}}}()
