@@ -174,7 +174,7 @@ function Base.show(
     println(io, "│└ evaporative_flux:         $nlat-ring $Grid")
     println(io, "├┐land:  PrognosticVariablesLand{$NF}")
     println(io, "│├ land_surface_temperature: $nlat-ring $Grid")
-    println(io, "│├ snow_depth: $nlat-ring $Grid")
+    println(io, "│├ snow_depth:               $nlat-ring $Grid")
     println(io, "│├ soil_moisture_layer1:     $nlat-ring $Grid")
     println(io, "│├ soil_moisture_layer2:     $nlat-ring $Grid")
     println(io, "│├ sensible_heat_flux:       $nlat-ring $Grid")
@@ -190,6 +190,11 @@ end
 """$(TYPEDSIGNATURES)
 Copies entries of `progn_old` into `progn_new`."""
 function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariables)
+
+    progn_new.random_pattern .= progn_old.random_pattern
+
+    copy!(progn_new.clock, progn_old.clock)
+    progn_new.scale[] = progn_old.scale[]
 
     for i in eachindex(progn_new.vor)   # each leapfrog time step
         progn_new.vor[i] .= progn_old.vor[i]
@@ -228,11 +233,6 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     else
         progn_new.particles .= progn_old.particles
     end
-
-    progn_new.random_pattern .= progn_old.random_pattern
-
-    copy!(progn_new.clock, progn_old.clock)
-    progn_new.scale[] = progn_old.scale[]
 
     return progn_new
 end

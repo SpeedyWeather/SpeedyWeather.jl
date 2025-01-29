@@ -63,12 +63,6 @@ end
     # in a seperate test set. But we do want to ensure in the regular CI that 
     # we don't commit some kind of problem for the Enzyme differentiability
     # so, we test here if we get a non-zero gradient from the timestepping.  
-    function timestep_oop!(progn_new::PrognosticVariables, progn_old::PrognosticVariables, diagn, dt, model)
-        copy!(progn_new, progn_old)
-        SpeedyWeather.timestep!(progn_new, diagn, dt, model)
-        return nothing
-    end 
-
     spectral_grid = SpectralGrid(trunc=15, nlayers=3)          # define resolution
     model = PrimitiveWetModel(; spectral_grid)   # construct model
     simulation = initialize!(model)  
@@ -91,6 +85,6 @@ end
     progn_new = zero(progn)
     dprogn_new = one(progn) # seed 
 
-    autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
+    autodiff(Reverse, timestep!, Const, Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
     @test sum(to_vec(d_progn)[1]) != 0
 end 
