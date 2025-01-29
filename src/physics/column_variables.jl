@@ -70,7 +70,7 @@ function get_column!(
 
     # TODO skin = surface approximation for now
     C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
-    C.skin_temperature_land = P.land.land_surface_temperature[ij]
+    C.skin_temperature_land = P.land.soil_temperature[ij, 1]
     C.soil_moisture_availability = D.physics.soil_moisture_availability[ij]
 
     # RADIATION
@@ -96,7 +96,7 @@ function get_column(    S::AbstractSimulation,
                         verbose::Bool = true)
     (; prognostic_variables, diagnostic_variables, model) = S
 
-    column = deepcopy(S.diagnostic_variables.columns[1])
+    column = deepcopy(S.diagnostic_variables.column)
     reset_column!(column)
 
     get_column!(column,
@@ -106,7 +106,7 @@ function get_column(    S::AbstractSimulation,
                 model)
 
     # execute all parameterizations for this column to return a consistent state
-    parameterization_tendencies!(column, S.model)
+    parameterization_tendencies!(column, S.prognostic_variables, S.model)
 
     verbose && @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
     return column

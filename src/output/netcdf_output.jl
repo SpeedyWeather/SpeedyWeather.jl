@@ -62,6 +62,7 @@ $(TYPEDFIELDS)"""
     # SCRATCH GRIDS TO INTERPOLATE ONTO
     const grid2D::Grid2D
     const grid3D::Grid3D
+    const grid3Dland::Grid3D
 end
 
 """
@@ -88,7 +89,7 @@ function NetCDFOutput(
     nlon = RingGrids.get_nlon(output_Grid, nlat_half)
     nlat = RingGrids.get_nlat(output_Grid, nlat_half)
     npoints = nlon*nlat
-    (; nlayers) = S
+    (; nlayers, nlayers_soil) = S
 
     # CREATE INTERPOLATOR
     interpolator = DEFAULT_INTERPOLATOR(DEFAULT_OUTPUT_NF, input_Grid, input_nlat_half, npoints)
@@ -98,12 +99,14 @@ function NetCDFOutput(
     output_Grid3D = RingGrids.nonparametric_type(output_Grid){output_NF, 2}
     grid2D = output_Grid2D(undef, nlat_half)
     grid3D = output_Grid3D(undef, nlat_half, nlayers)
+    grid3Dland = output_Grid3D(undef, nlat_half, nlayers_soil)
 
     output = NetCDFOutput(;
         output_dt=Second(output_dt),    # convert to seconds for dispatch
         interpolator,
         grid2D,
         grid3D,
+        grid3Dland,
         kwargs...)
 
     add_default!(output.variables, Model)
@@ -146,7 +149,7 @@ end
 Add `outputvariables` to the dictionary in `output::NetCDFOutput` of `model`, i.e. at `model.output.variables`."""
 function add!(model::AbstractModel, outputvariables::AbstractOutputVariable...)
     add!(model.output, outputvariables...)
-    return nothing
+    return model.output
 end
 
 """$(TYPEDSIGNATURES)
@@ -252,15 +255,17 @@ function initialize!(
     nlat_half = output.grid2D.nlat_half
     lond = get_lond(Grid, nlat_half)
     latd = get_latd(Grid, nlat_half)
+    σ = model.geometry.σ_levels_full
+    soil_indices = collect(1:model.spectral_grid.nlayers_soil)
 
     # INTERPOLATION: PRECOMPUTE LOCATION INDICES
     londs, latds = RingGrids.get_londlatds(Grid, nlat_half)
     RingGrids.update_locator!(output.interpolator, londs, latds)
         
-    σ = model.geometry.σ_levels_full
     defVar(dataset, "lon", lond, ("lon",), attrib=Dict("units"=>"degrees_east", "long_name"=>"longitude"))
     defVar(dataset, "lat", latd, ("lat",), attrib=Dict("units"=>"degrees_north", "long_name"=>"latitude"))
     defVar(dataset, "layer", σ, ("layer",), attrib=Dict("units"=>"1", "long_name"=>"sigma layer"))
+    defVar(dataset, "soil_layer", soil_indices, ("soil_layer",), attrib=Dict("units"=>"1", "long_name"=>"soil layer index"))
 
     # VARIABLES, define every output variable in the netCDF file and write initial conditions
     output_NF = eltype(output.grid2D)
@@ -289,7 +294,8 @@ function define_variable!(
     missing_value = hasfield(typeof(var), :missing_value) ? var.missing_value : DEFAULT_MISSING_VALUE
     attributes = Dict("long_name"=>var.long_name, "units"=>var.unit, "_FillValue"=>output_NF(missing_value))
 
-    all_dims = ("lon", "lat", "layer", "time")
+    # land variables have a different vertical dimension
+    all_dims = is_land(var) ? ("lon", "lat", "soil_layer", "time") : ("lon", "lat", "layer", "time")
     dims = collect(dim for (dim, this_dim) in zip(all_dims, var.dims_xyzt) if this_dim)
 
     # pick defaults for compression if not defined
@@ -323,6 +329,7 @@ get_indices(i, x::Val{true}, y::Val{true}, z::Val{false}, t::Val{true}) = (:, :,
 get_indices(i, x::Val{true}, y::Val{true}, z::Val{false}, t::Val{false}) = (:, :)       # 2D
 
 is3D(variable::AbstractOutputVariable) = variable.dims_xyzt[3]
+is_land(variable::AbstractOutputVariable) = hasproperty(variable, :is_land) ? variable.is_land : false
 hastime(variable::AbstractOutputVariable) = variable.dims_xyzt[4]
 
 """$(TYPEDSIGNATURES)
@@ -340,7 +347,7 @@ function output!(
     ~hastime(variable) && output.output_counter > 1 && return nothing
 
     # interpolate 2D/3D variables
-    var = is3D(variable) ? output.grid3D : output.grid2D
+    var = is3D(variable) ? (is_land(variable) ? output.grid3Dland : output.grid3D) : output.grid2D
     raw = path(variable, simulation)
     RingGrids.interpolate!(var, raw, output.interpolator)
 

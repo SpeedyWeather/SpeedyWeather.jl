@@ -33,28 +33,30 @@ export PrognosticVariablesLand
     NF,                     # <: AbstractFloat
     ArrayType,              # Array, CuArray, ...
     GridVariable2D,         # <: AbstractGridArray
+    GridVariable3D,
 } <: AbstractPrognosticVariables
+
     # DIMENSION
     "Number of latitude rings on one hemisphere (Equator incl.), resolution parameter of grid"
     nlat_half::Int
 
-    # LAND VARIABLES
-    "Land surface temperature [K]"
-    land_surface_temperature::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    "Number of soil layers for temperature and humidity"
+    nlayers::Int
 
+    # LAND VARIABLES
+    "Soil temperature [K]"
+    soil_temperature::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
+
+    "Soil moisture, volume fraction [1]"
+    soil_moisture::GridVariable3D = zeros(GridVariable2D, nlat_half, nlayers)
+    
     "Snow depth [m]"
     snow_depth::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
-    "Soil moisture layer 1, volume fraction [1]"
-    soil_moisture_layer1::GridVariable2D = zeros(GridVariable2D, nlat_half)
-
-    "Soil moisture layer 2, volume fraction [1]"
-    soil_moisture_layer2::GridVariable2D = zeros(GridVariable2D, nlat_half)
-
-    "Prescribed land sensible heat flux [W/m²]"
+    "Prescribed land sensible heat flux [W/m²], zero if not used"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
-    "Prescribed land evaporative flux [kg/s/m²]"
+    "Prescribed land evaporative flux [kg/s/m²], zero if not used"
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
 end
 
@@ -66,6 +68,7 @@ export PrognosticVariables
     SpectralVariable2D,     # <: LowerTriangularArray
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractGridArray
+    GridVariable3D,         # <: AbstractGridArray
     ParticleVector,         # <: AbstractVector{Particle{NF}}
 } <: AbstractPrognosticVariables
 
@@ -76,8 +79,11 @@ export PrognosticVariables
     "Number of latitude rings on one hemisphere (Equator excl.), resolution parameter of grids"
     nlat_half::Int
 
-    "number of vertical layers"
+    "number of vertical layers in the atmosphere"
     nlayers::Int
+
+    "number of vertical layers in the soil"
+    nlayers_soil::Int
 
     "Number of particles for particle advection"
     nparticles::Int
@@ -110,9 +116,9 @@ export PrognosticVariables
     ocean::PrognosticVariablesOcean{NF, ArrayType, GridVariable2D} =
         PrognosticVariablesOcean{NF, ArrayType, GridVariable2D}(; nlat_half)
     
-    "Land variables, land surface temperature, snow and soil moisture"
-    land::PrognosticVariablesLand{NF, ArrayType, GridVariable2D} =
-        PrognosticVariablesLand{NF, ArrayType, GridVariable2D}(; nlat_half)
+    "Land variables, soil temperature, snow, and soil moisture"
+    land::PrognosticVariablesLand{NF, ArrayType, GridVariable2D, GridVariable3D} =
+        PrognosticVariablesLand{NF, ArrayType, GridVariable2D, GridVariable3D}(; nlat_half, nlayers=nlayers_soil)
 
     "Tracers, last dimension is for n tracers [?]"
     tracers::Dict{Symbol, NTuple{nsteps, SpectralVariable3D}} = Dict{Symbol, NTuple{nsteps, SpectralVariable3D}}()
@@ -130,13 +136,14 @@ end
 """$(TYPEDSIGNATURES)
 Generator function."""
 function PrognosticVariables(SG::SpectralGrid; nsteps=DEFAULT_NSTEPS)
-    (; trunc, nlat_half, nlayers, nparticles) = SG
+
+    (; trunc, nlat_half, nlayers, nlayers_soil, nparticles) = SG
     (; NF, ArrayType) = SG
-    (; SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector) = SG
+    (; SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector) = SG
 
     return PrognosticVariables{NF, ArrayType, nsteps,
-        SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}(;
-            trunc, nlat_half, nlayers, nparticles,
+        SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector}(;
+            trunc, nlat_half, nlayers, nlayers_soil, nparticles,
         )
 end
 
@@ -159,7 +166,7 @@ function Base.show(
     println(io, "PrognosticVariables{$NF, $ArrayType}")
     
     # variables
-    (; trunc, nlat_half, nlayers, nparticles) = progn
+    (; trunc, nlat_half, nlayers, nlayers_soil, nparticles) = progn
     nlat = RingGrids.get_nlat(Grid, nlat_half)
     println(io, "├ vor:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
     println(io, "├ div:   T$trunc, $nlayers-layer, $nsteps-steps LowerTriangularArray{$NF}")
@@ -171,10 +178,9 @@ function Base.show(
     println(io, "│├ sea_surface_temperature:  $nlat-ring $Grid")
     println(io, "│└ sea_ice_concentration:    $nlat-ring $Grid")
     println(io, "├┐land:  PrognosticVariablesLand{$NF}")
-    println(io, "│├ land_surface_temperature: $nlat-ring $Grid")
-    println(io, "│├ snow_depth: $nlat-ring $Grid")
-    println(io, "│├ soil_moisture_layer1:     $nlat-ring $Grid")
-    println(io, "│└ soil_moisture_layer2:     $nlat-ring $Grid")
+    println(io, "│├ soil_temperature: $nlayers_soil-layer, $nlat-ring $Grid")
+    println(io, "│├ soil_moisture:    $nlayers_soil-layer, $nlat-ring $Grid")
+    println(io, "│└ snow_depth: $nlat-ring $Grid")
     println(io, "├ tracers: $(length(tracer_names)), $tracer_names")
     println(io, "├ particles: $nparticles-element $(typeof(progn.particles))")
     println(io, "├ scale: $(progn.scale[])")
