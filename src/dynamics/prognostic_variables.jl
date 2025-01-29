@@ -206,10 +206,9 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     progn_new.ocean.sea_ice_concentration .= progn_old.ocean.sea_ice_concentration
     
     # land
-    progn_new.land.land_surface_temperature .= progn_old.land.land_surface_temperature
+    progn_new.land.soil_temperature .= progn_old.land.soil_temperature
     progn_new.land.snow_depth .= progn_old.land.snow_depth
-    progn_new.land.soil_moisture_layer1 .= progn_old.land.soil_moisture_layer1
-    progn_new.land.soil_moisture_layer2 .= progn_old.land.soil_moisture_layer2
+    progn_new.land.soil_moisture .= progn_old.land.soil_moisture
 
     # TODO copy over tracers
 
