@@ -202,16 +202,16 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     # ocean
     progn_new.ocean.sea_surface_temperature .= progn_old.ocean.sea_surface_temperature
     progn_new.ocean.sea_ice_concentration .= progn_old.ocean.sea_ice_concentration
-    progn_new.ocean.sensible_heat_flux = progn_old.ocean.sensible_heat_flux
-    progn_new.ocean.evaporative_flux = progn_old.ocean.evaporative_flux
+    progn_new.ocean.sensible_heat_flux .= progn_old.ocean.sensible_heat_flux
+    progn_new.ocean.evaporative_flux .= progn_old.ocean.evaporative_flux
 
     # land
     progn_new.land.land_surface_temperature .= progn_old.land.land_surface_temperature
     progn_new.land.snow_depth .= progn_old.land.snow_depth
     progn_new.land.soil_moisture_layer1 .= progn_old.land.soil_moisture_layer1
     progn_new.land.soil_moisture_layer2 .= progn_old.land.soil_moisture_layer2
-    progn_new.land.sensible_heat_flux = progn_old.land.sensible_heat_flux
-    progn_new.land.evaporative_flux = progn_old.land.evaporative_flux
+    progn_new.land.sensible_heat_flux .= progn_old.land.sensible_heat_flux
+    progn_new.land.evaporative_flux .= progn_old.land.evaporative_flux
 
     # copy over tracers
     for (key, value) in progn_old.tracers
