@@ -9,7 +9,6 @@
 
 - CompatHelper: Allow for Makie.jl v0.22 [#663](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/663)
 - Prescribed ocean/land heat fluxes modular [#667](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/667)
->>>>>>> origin/main
 - NetCDF output for tracers defined, precipitation rate output at initialize! again [#657](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/657)
 - Precipitation rate from large-scale condensation/convection for coupling [#669](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/669)
 - Fixed a bug, so that sum now works for LowerTraingularArrays [#668](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/668)
