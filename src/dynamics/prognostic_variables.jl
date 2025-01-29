@@ -169,12 +169,16 @@ function Base.show(
     println(io, "├ random_pattern: T$trunc, 1-layer LowerTriangularArray{$NF}")
     println(io, "├┐ocean: PrognosticVariablesOcean{$NF}")
     println(io, "│├ sea_surface_temperature:  $nlat-ring $Grid")
-    println(io, "│└ sea_ice_concentration:    $nlat-ring $Grid")
+    println(io, "│├ sea_ice_concentration:    $nlat-ring $Grid")
+    println(io, "│├ sensible_heat_flux:       $nlat-ring $Grid")
+    println(io, "│└ evaporative_flux:         $nlat-ring $Grid")
     println(io, "├┐land:  PrognosticVariablesLand{$NF}")
     println(io, "│├ land_surface_temperature: $nlat-ring $Grid")
     println(io, "│├ snow_depth: $nlat-ring $Grid")
     println(io, "│├ soil_moisture_layer1:     $nlat-ring $Grid")
-    println(io, "│└ soil_moisture_layer2:     $nlat-ring $Grid")
+    println(io, "│├ soil_moisture_layer2:     $nlat-ring $Grid")
+    println(io, "│├ sensible_heat_flux:       $nlat-ring $Grid")
+    println(io, "│└ evaporative_flux:         $nlat-ring $Grid")
     println(io, "├ tracers: $(length(tracer_names)), $tracer_names")
     println(io, "├ particles: $nparticles-element $(typeof(progn.particles))")
     println(io, "├ scale: $(progn.scale[])")
@@ -198,12 +202,16 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     # ocean
     progn_new.ocean.sea_surface_temperature .= progn_old.ocean.sea_surface_temperature
     progn_new.ocean.sea_ice_concentration .= progn_old.ocean.sea_ice_concentration
-    
+    progn_new.ocean.sensible_heat_flux = progn_old.ocean.sensible_heat_flux
+    progn_new.ocean.evaporative_flux = progn_old.ocean.evaporative_flux
+
     # land
     progn_new.land.land_surface_temperature .= progn_old.land.land_surface_temperature
     progn_new.land.snow_depth .= progn_old.land.snow_depth
     progn_new.land.soil_moisture_layer1 .= progn_old.land.soil_moisture_layer1
     progn_new.land.soil_moisture_layer2 .= progn_old.land.soil_moisture_layer2
+    progn_new.land.sensible_heat_flux = progn_old.land.sensible_heat_flux
+    progn_new.land.evaporative_flux = progn_old.land.evaporative_flux
 
     # copy over tracers
     for (key, value) in progn_old.tracers
@@ -264,11 +272,16 @@ function Base.fill!(progn::PrognosticVariables{NF}, value::Number) where NF
     # ocean
     progn.ocean.sea_surface_temperature .= value_NF
     progn.ocean.sea_ice_concentration .= value_NF
+    progn.ocean.sensible_heat_flux .= value_NF
+    progn.ocean.evaporative_flux .= value_NF
+
     # land
     progn.land.land_surface_temperature .= value_NF
     progn.land.snow_depth .= value_NF
     progn.land.soil_moisture_layer1 .= value_NF
     progn.land.soil_moisture_layer2 .= value_NF
+    progn.land.sensible_heat_flux .= value_NF
+    progn.land.evaporative_flux .= value_NF
 
     # fill tracers
     for (key, value) in progn.tracers 
