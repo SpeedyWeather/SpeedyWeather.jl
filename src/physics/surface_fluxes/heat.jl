@@ -49,10 +49,10 @@ SurfaceOceanHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHeatFlux{SG.NF}(
 initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(
-    column::ColumnVariables,
+    column::ColumnVariables{NF},
     heat_flux::SurfaceOceanHeatFlux,
     model::PrimitiveEquation,
-)
+) where NF
     cₚ = model.atmosphere.heat_capacity
     (; heat_exchange) = heat_flux
 
@@ -67,7 +67,7 @@ function surface_heat_flux!(
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # Only flux from sea if available (not NaN) otherwise zero flux
-    flux_ocean  = isfinite(T_skin_ocean) ? ρ*drag_ocean*V₀*cₚ*(T_skin_ocean  - T)*(1-land_fraction) : 0
+    flux_ocean  = isfinite(T_skin_ocean) ? ρ*drag_ocean*V₀*cₚ*(T_skin_ocean  - T)*(1-land_fraction) : zero(NF)
     column.flux_temp_upward[end] += flux_ocean
     column.sensible_heat_flux = flux_ocean      # ocean sets the flux (=), land accumulates (+=)
 
@@ -89,10 +89,10 @@ SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; 
 initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(
-    column::ColumnVariables,
+    column::ColumnVariables{NF},
     heat_flux::SurfaceLandHeatFlux,
     model::PrimitiveEquation,
-)
+) where NF
     cₚ = model.atmosphere.heat_capacity
     (; heat_exchange) = heat_flux
 
@@ -107,7 +107,7 @@ function surface_heat_flux!(
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # Only flux from sea if available (not NaN) otherwise zero flux
-    flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*cₚ*(T_skin_land  - T)*land_fraction : 0
+    flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*cₚ*(T_skin_land  - T)*land_fraction : zero(NF)
     column.flux_temp_upward[end] += flux_land
     column.sensible_heat_flux += flux_land      # ocean sets the flux (=), land accumulates (+=)
 
