@@ -1,7 +1,7 @@
 name = "SpeedyWeather"
 uuid = "9e226e20-d153-4fed-8a5b-493def4f21a9"
 authors = ["Milan Klöwer and SpeedyWeather contributors"]
-version = "0.13"
+version = "0.14"
 
 [deps]
 AbstractFFTs = "621f4979-c628-5d54-868e-fcf4e3e8185c"
@@ -63,7 +63,7 @@ JLArrays = "0.1"
 JLD2 = "0.4, 0.5"
 KernelAbstractions = "0.9.0 - 0.9.29"
 LinearAlgebra = "1.10"
-Makie = "0.20, 0.21"
+Makie = "0.20, 0.21, 0.22"
 NCDatasets = "0.12, 0.13, 0.14"
 Primes = "0.5"
 Printf = "1.10"

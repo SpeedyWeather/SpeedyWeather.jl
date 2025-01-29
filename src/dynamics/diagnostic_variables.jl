@@ -282,7 +282,7 @@ $(TYPEDFIELDS)"""
     # SURFACE FLUXES
     "Sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
-
+    
     "Evaporative flux [kg/s/m^2], positive up"
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
