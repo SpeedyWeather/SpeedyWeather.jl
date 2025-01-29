@@ -67,7 +67,8 @@ end
     model = PrimitiveWetModel(; spectral_grid)   # construct model
     simulation = initialize!(model)  
     initialize!(simulation)
-
+    run!(simulation, period=Day(1))
+    
     (; prognostic_variables, diagnostic_variables, model) = simulation
     (; Δt, Δt_millisec) = model.time_stepping
     dt = 2Δt
@@ -85,6 +86,6 @@ end
     progn_new = zero(progn)
     dprogn_new = one(progn) # seed 
 
-    autodiff(Reverse, timestep!, Const, Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
+    autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
     @test sum(to_vec(d_progn)[1]) != 0
 end 
