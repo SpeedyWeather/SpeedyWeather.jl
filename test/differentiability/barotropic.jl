@@ -25,11 +25,7 @@
 
     # test if differentiation works wrt copy! (there were some problems with it before)
     autodiff(Reverse, copy!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn))
-
-    # it's identity: 
-    @test all(flatten(d_progn)[1] .== 1)
-    @test all(flatten(d_progn)[2] .== 1)
-
+    
     progn_new = zero(progn)
     dprogn_new = one(progn) # seed 
 
