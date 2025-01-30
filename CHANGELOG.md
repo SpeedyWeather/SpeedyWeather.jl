@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Interfaces for interpolation of AbstractGridArray [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
+- Test folder sorted into subfolders [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
 - Land model modularised + land netCDF output [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
 
 ## v0.14
