@@ -65,11 +65,13 @@
     SpeedyWeather.RingGrids.interpolate!(C, B[:,1])
     @test prog_new.ocean.sea_ice_concentration ≈ (prog_old.ocean.sea_ice_concentration .+ C)
 
+    Di = deepcopy(prog_new.land.soil_temperature)
+    RingGrids.interpolate!(Di, D)
     set!(simulation, soil_temperature=D, lf=lf)
-    @test prog_new.land.soil_temperature ≈ L_grid[:,1]
+    @test prog_new.land.soil_temperature == Di
 
     set!(simulation, soil_moisture=D, lf=lf)   
-    @test prog_new.land.soil_moisture_layer2 ≈ L_grid[:,1]
+    @test prog_new.land.soil_moisture == Di
 
     # numbers
     set!(simulation, vor=Float32(3.), lf=lf)
