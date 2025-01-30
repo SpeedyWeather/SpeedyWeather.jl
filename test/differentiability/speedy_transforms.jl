@@ -1,5 +1,7 @@
 # Tests for SpeedyTransforms
-
+grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
+grid_dealiasing = [2, 3]
+fd_tests = [true, true] 
 @testset "Differentiability: Complete Transform Enzyme" begin
     # make a high level finite difference test of the whole transform
     # can't use Enzyme or ChainRule Test tools for tests for that
