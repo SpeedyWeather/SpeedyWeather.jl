@@ -217,11 +217,11 @@ function interpolate!(
     @boundscheck length(Aout) == length(ij_as) || throw(BoundsError)    
     @boundscheck length(A) == npoints || throw(BoundsError)
 
-    A_northpole, A_southpole = average_on_poles(A)
+    A_northpole, A_southpole = average_on_poles(A, interpolator.geometry.rings)
 
     #TODO ij_cs, ij_ds shouldn't be 0...
-    @boundscheck extrema_in(ij_as, 0, npoints) || throw(BoundsError)
-    @boundscheck extrema_in(ij_bs, 0, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_as,  0, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_bs,  0, npoints) || throw(BoundsError)
     @boundscheck extrema_in(ij_cs, -1, npoints) || throw(BoundsError)
     @boundscheck extrema_in(ij_ds, -1, npoints) || throw(BoundsError)
 
@@ -439,9 +439,9 @@ $(TYPEDSIGNATURES)
 Computes the average at the North and South pole from a given grid `A` and it's precomputed
 ring indices `rings`. The North pole average is an equally weighted average of all grid points
 on the northern-most ring. Similar for the South pole."""
-function average_on_poles(A::AbstractGridArray{NF, 1}) where {NF<:AbstractFloat}   
-    A_northpole = mean(view(A, A.rings[1]))     # average of all grid points around the north pole
-    A_southpole = mean(view(A, A.rings[end]))   # same for south pole
+function average_on_poles(A::AbstractVector{NF}, rings::AbstractVector) where {NF<:AbstractFloat}   
+    A_northpole = mean(view(A, rings[1]))     # average of all grid points around the north pole
+    A_southpole = mean(view(A, rings[end]))   # same for south pole
     return convert(NF, A_northpole), convert(NF, A_southpole)
 end
 
@@ -449,7 +449,7 @@ end
 $(TYPEDSIGNATURES)
 Method for `A::Abstract{T<:Integer}` which rounds the averaged values
 to return the same number format `NF`."""
-function average_on_poles(A::AbstractGridArray{NF, 1}) where {NF<:Integer}
+function average_on_poles(A::AbstractVector{NF}, rings::AbstractVector) where {NF<:Integer}
     A_northpole = mean(view(A, rings[1]))    # average of all grid points around the north pole
     A_southpole = mean(view(A, rings[end]))  # same for south pole
     return round(NF, A_northpole), round(NF, A_southpole)
