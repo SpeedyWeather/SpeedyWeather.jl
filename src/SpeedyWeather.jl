@@ -148,7 +148,7 @@ include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND
 include("physics/ocean.jl")
-include("physics/land.jl")
+include("physics/land/land.jl")
 
 # OUTPUT
 include("output/schedule.jl")

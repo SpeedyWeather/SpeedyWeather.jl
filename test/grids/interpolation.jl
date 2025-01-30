@@ -187,3 +187,27 @@ end
         end
     end
 end
+
+@testset "3/4D interpolation interfaces" begin
+    A = randn(OctahedralGaussianArray, 16, 2)
+    B = zeros(FullGaussianArray, 16, 2)
+    C = zeros(FullGaussianArray, 16, 2)
+
+    RingGrids.interpolate!(B, A)
+
+    interpolator = RingGrids.interpolator(C, A)
+    RingGrids.interpolate!(C, A, interpolator)
+
+    @test B == C
+
+    A = randn(OctahedralGaussianArray, 8, 3, 2)
+    B = zeros(FullGaussianArray, 8, 3, 2)
+    C = zeros(FullGaussianArray, 8, 3, 2)
+
+    RingGrids.interpolate!(B, A)
+
+    interpolator = RingGrids.interpolator(C, A)
+    RingGrids.interpolate!(C, A, interpolator)
+
+    @test B == C
+end
