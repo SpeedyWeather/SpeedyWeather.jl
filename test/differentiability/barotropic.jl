@@ -6,13 +6,17 @@
     simulation = initialize!(model)  
     initialize!(simulation)
     run!(simulation, period=Day(5)) # spin-up to get nonzero values for all fields
-
+    initialize!(simulation; period=Day(1))
+    
     (; prognostic_variables, diagnostic_variables, model) = simulation
     (; Δt, Δt_millisec) = model.time_stepping
     dt = 2Δt
 
     progn = prognostic_variables
     diagn = diagnostic_variables
+
+    # TO-DO: The first time we execute this, the gradient is different. Why?
+    timestep_oop!(make_zero(progn), progn, diagn, dt, model)
 
     diagn_copy = deepcopy(diagn)
     progn_copy = deepcopy(progn)
@@ -25,7 +29,7 @@
 
     # test if differentiation works wrt copy! (there were some problems with it before)
     autodiff(Reverse, copy!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn))
-    
+
     progn_new = zero(progn)
     dprogn_new = one(progn) # seed 
 
@@ -41,7 +45,8 @@
     # for the full timestep, we need a bit higher precision 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(15,1), x -> timestep_oop(x, diagn_copy, dt, model), dprogn_2, progn_copy)
 
-    @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=1e-1) # we have to go really quite low with the tolerances here
+    @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=0.05) # we have to go really quite low with the tolerances here
+    @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_progn)[1])) < 0.002
     
     #
     # We go individually through all components of the time stepping and check 
