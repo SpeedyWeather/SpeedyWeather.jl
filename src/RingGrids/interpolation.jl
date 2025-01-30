@@ -217,7 +217,7 @@ function interpolate!(
     @boundscheck length(Aout) == length(ij_as) || throw(BoundsError)    
     @boundscheck length(A) == npoints || throw(BoundsError)
 
-    A_northpole, A_southpole = average_on_poles(A, interpolator.geometry.rings)
+    A_northpole, A_southpole = average_on_poles(A)
 
     #TODO ij_cs, ij_ds shouldn't be 0...
     @boundscheck extrema_in(ij_as, 0, npoints) || throw(BoundsError)
