@@ -1,6 +1,7 @@
 @testset "Test PrognosticVariables set!" begin 
 
-    nlayers = 8 
+    nlayers = 8
+    nlayers_soil = 2
     trunc = 31
     NF = Float64
     complex_NF = Complex{NF}
@@ -24,7 +25,8 @@
     A = rand(spectral_grid.Grid{NF}, spectral_grid.nlat_half, nlayers)       # same grid 
     A_spec = transform(A, model.spectral_transform)
     B = rand(OctaHEALPixGrid{NF}, spectral_grid.nlat_half, nlayers)          # different grid 
-    
+    D = rand(spectral_grid.GridVariable3D, spectral_grid.nlat_half, nlayers_soil)   # 3D land data
+
     f(lon, lat, sig) = sind(lon)*cosd(lat)*(1 - sig)
 
     prog_new = simulation.prognostic_variables
@@ -63,10 +65,10 @@
     SpeedyWeather.RingGrids.interpolate!(C, B[:,1])
     @test prog_new.ocean.sea_ice_concentration ≈ (prog_old.ocean.sea_ice_concentration .+ C)
 
-    set!(simulation, soil_temperature=L[:,1], lf=lf)
+    set!(simulation, soil_temperature=D, lf=lf)
     @test prog_new.land.soil_temperature ≈ L_grid[:,1]
 
-    set!(simulation, soil_moisture_layer2=L[:,1], lf=lf)   
+    set!(simulation, soil_moisture=D, lf=lf)   
     @test prog_new.land.soil_moisture_layer2 ≈ L_grid[:,1]
 
     # numbers
