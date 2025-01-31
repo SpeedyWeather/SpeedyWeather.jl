@@ -47,6 +47,7 @@ end
 
 # A version of the generic fallback from FiniteDifferences that excludes some of the fields 
 # that we don't want to be varied for our big data structures 
+# also replaces NaNs that are expected in land and ocean variables
 function FiniteDifferences.to_vec(x::T) where {T <: Union{PrognosticVariables, PrognosticVariablesOcean, PrognosticVariablesLand, DiagnosticVariables, Tendencies, GridVariables, DynamicsVariables, PhysicsVariables, ParticleVariables}}
 
     excluded_fields_pre, included_fields, excluded_fields_post = determine_included_fields(T)
@@ -59,6 +60,8 @@ function FiniteDifferences.to_vec(x::T) where {T <: Union{PrognosticVariables, P
     vals_excluded_post = map(name -> getfield(x, name), excluded_fields_post)
 
     v, vals_from_vec = to_vec(vals)
+    v = replace_NaN(x, v)
+
     function structtype_from_vec(v::Vector{<:Real})
         val_vecs = vals_from_vec(v)
         values = map((b, v) -> b(v), backs, val_vecs)
@@ -93,5 +96,22 @@ function determine_included_fields(T::Type)
 
     return excluded_fields_pre, included_fields, excluded_fields_post
 end 
+
+# in the ocean and land variables we have NaNs, FiniteDifferences can't deal with those, so we replace them
+function replace_NaN(x_type::T, vec) where {T <: Union{PrognosticVariablesOcean, PrognosticVariablesLand, PhysicsVariables}}
+    nan_indices = isnan.(vec)
+    vec[nan_indices] .= 0 
+    return vec
+end 
+
+# fallback, we really only want to replace the NaNs in ocean and land variables 
+replace_NaN(type, vec) = vec
+
+# By default FiniteDifferences doesn't include this, even though Integers can't be varied. 
+# there's an old GitHub issue and PR about this 
+function FiniteDifferences.to_vec(x::Integer)
+    Integer_from_vec(v) = x
+    return Bool[], Integer_from_vec
+end
 
 end 
