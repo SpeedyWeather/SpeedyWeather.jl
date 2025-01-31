@@ -1,8 +1,12 @@
-### Experiments going a bit deeper into the timestepping of the barotropic model
+### Experiments going a bit deeper into the timestepping of the primtive wet model
+# this script / tests was mainly written for debugging, we might exclude it in future 
+# tests because it is quite maintanance heavy code 
 @testset "Differentiability: Primitive Wet Model Components" begin 
-    # T15 still yields somewhat sensible dynamics, that's why it's chosen here
-    spectral_grid = SpectralGrid(trunc=15, nlayers=3)          # define resolution
-    model = PrimitiveWetModel(; spectral_grid)   # construct model
+
+    spectral_grid = SpectralGrid(trunc=8, nlayers=1)          # define resolution
+
+    # FiniteDifferences struggles with the NaN when we have a land-sea mask, so we have to test on AquaPlanets 
+    model = PrimitiveWetModel(; spectral_grid)  # construct model
     simulation = initialize!(model)  
     initialize!(simulation)
     run!(simulation, period=Day(5)) # spin-up to get nonzero values for all fields
@@ -33,6 +37,7 @@
     dprogn = one(progn)
     ddiagn = one(diagn)
     ddiagn_copy = deepcopy(ddiagn)
+    diagn_copy = deepcopy(diagn)
 
     autodiff(Reverse, SpeedyWeather.parameterization_tendencies!, Const, Duplicated(diagn, ddiagn), Duplicated(progn, dprogn), Const(progn.clock.time), Duplicated(model, make_zero(model)))
 
@@ -42,8 +47,9 @@
         return diagn_new
     end 
 
-    # TODO: non-working at the moment -> NaN
     fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> parameterization_tendencies(diagn_copy, x, progn.clock.time, model), ddiagn_copy, progn_copy)
+    
+    # TO-DO this test is broken, they gradients don't line up
     #@test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
     
     #
@@ -65,12 +71,14 @@
     end 
 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> ocean_timestep(progn_copy, x, model), dprogn_copy, diagn_copy)
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
+
+    # also broken? 
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(ddiagn)[1],rtol=1e-4,atol=1e-1))
 
     #
     # land 
     # 
-    
+
     progn_copy = deepcopy(progn)
     dprogn = one(progn)
     ddiagn = make_zero(diagn)
@@ -86,7 +94,10 @@
     end 
 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> land_timestep(progn_copy, x, model), dprogn_copy, diagn_copy)
-    
+
+    # also broken currently
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(ddiagn)[1],rtol=1e-4,atol=1e-1))
+
     #####
     # DYNAMICS 
     lf2 = 2 
@@ -135,7 +146,7 @@
 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(9,1), x -> dynamics_tendencies(diagn_copy, x, lf2, model), ddiag_copy, progn_copy)
 
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
+    @test all(isapprox.(to_vec(fd_vjp)[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
 
     # in the default configuration without forcing or drag, the barotropic model's don't dependent on the previous prognostic state 
     @test sum(to_vec(dprogn)[1]) ≈ 0 
