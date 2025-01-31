@@ -48,7 +48,7 @@ export PrognosticVariablesLand
     soil_temperature::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
 
     "Soil moisture, volume fraction [1]"
-    soil_moisture::GridVariable3D = zeros(GridVariable2D, nlat_half, nlayers)
+    soil_moisture::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
     
     "Snow depth [m]"
     snow_depth::GridVariable2D = zeros(GridVariable2D, nlat_half)
@@ -244,12 +244,12 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
 end
 
 function Base.zero(progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}) where {NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}
-    (; trunc, nlat_half, nlayers, nparticles) = progn
+    (; trunc, nlat_half, nlayers, nlayers_soil, nparticles) = progn
     
     # initialize regular progn variables 
     progn_new = PrognosticVariables{NF, ArrayType, nsteps,
         SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}(;
-            trunc, nlat_half, nlayers, nparticles,
+            trunc, nlat_half, nlayers, nlayers_soil, nparticles,
         )
 
     # add tracers with zero 
@@ -282,10 +282,9 @@ function Base.fill!(progn::PrognosticVariables{NF}, value::Number) where NF
     progn.ocean.evaporative_flux .= value_NF
 
     # land
-    progn.land.land_surface_temperature .= value_NF
+    progn.land.soil_temperature .= value_NF
     progn.land.snow_depth .= value_NF
-    progn.land.soil_moisture_layer1 .= value_NF
-    progn.land.soil_moisture_layer2 .= value_NF
+    progn.land.soil_moisture .= value_NF
     progn.land.sensible_heat_flux .= value_NF
     progn.land.evaporative_flux .= value_NF
 
