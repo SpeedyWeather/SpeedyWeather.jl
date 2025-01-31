@@ -22,6 +22,9 @@ nonparametric_type(grid::AbstractGridArray) = nonparametric_type(typeof(grid))
 # also needed for other array types, defined in extensions
 nonparametric_type(::Type{<:Array}) = Array
 
+# needed for unalias 
+@inline Base.dataids(grid::AbstractGridArray) = Base.dataids(grid.data)
+
 """$(TYPEDSIGNATURES) Full grid array type for `grid`. Always returns the N-dimensional `*Array`
 not the two-dimensional (`N=1`) `*Grid`. For reduced grids the corresponding full grid that
 share the same latitudes."""

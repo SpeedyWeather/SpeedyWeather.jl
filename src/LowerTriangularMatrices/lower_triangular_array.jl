@@ -123,6 +123,8 @@ function Base.array_summary(io::IO, L::LowerTriangularMatrix{T}, inds::Tuple{Var
     print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T}")
 end
 
+@inline Base.dataids(L::LowerTriangularArray) = Base.dataids(L.data)
+
 # CREATE INSTANCES (ZEROS, ONES, UNDEF)
 for f in (:zeros, :ones, :rand, :randn)
     @eval begin

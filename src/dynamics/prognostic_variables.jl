@@ -205,19 +205,18 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
         progn_new.pres[i] .= progn_old.pres[i]
     end
 
-    # TO-DO: currently there are some problems with Enzyme and RingGrids broadcasting
     # ocean
-    progn_new.ocean.sea_surface_temperature.data .= progn_old.ocean.sea_surface_temperature.data
-    progn_new.ocean.sea_ice_concentration.data .= progn_old.ocean.sea_ice_concentration.data
-    progn_new.ocean.sensible_heat_flux.data .= progn_old.ocean.sensible_heat_flux.data
-    progn_new.ocean.evaporative_flux.data .= progn_old.ocean.evaporative_flux.data
+    progn_new.ocean.sea_surface_temperature .= progn_old.ocean.sea_surface_temperature
+    progn_new.ocean.sea_ice_concentration .= progn_old.ocean.sea_ice_concentration
+    progn_new.ocean.sensible_heat_flux .= progn_old.ocean.sensible_heat_flux
+    progn_new.ocean.evaporative_flux .= progn_old.ocean.evaporative_flux
  
     # land
-    progn_new.land.soil_temperature.data .= progn_old.land.soil_temperature.data
-    progn_new.land.snow_depth.data .= progn_old.land.snow_depth.data
-    progn_new.land.soil_moisture.data .= progn_old.land.soil_moisture.data
-    progn_new.land.sensible_heat_flux.data .= progn_old.land.sensible_heat_flux.data
-    progn_new.land.evaporative_flux.data .= progn_old.land.evaporative_flux.data
+    progn_new.land.soil_temperature .= progn_old.land.soil_temperature
+    progn_new.land.snow_depth .= progn_old.land.snow_depth
+    progn_new.land.soil_moisture .= progn_old.land.soil_moisture
+    progn_new.land.sensible_heat_flux .= progn_old.land.sensible_heat_flux
+    progn_new.land.evaporative_flux .= progn_old.land.evaporative_flux
 
     # copy over tracers
     for (key, value) in progn_old.tracers
@@ -235,7 +234,7 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
         progn_new.particles .= progn_old.particles
     end
 
-    progn_new.random_pattern.data .= progn_old.random_pattern.data
+    progn_new.random_pattern .= progn_old.random_pattern.data
 
     copy!(progn_new.clock, progn_old.clock)
     progn_new.scale[] = progn_old.scale[]
