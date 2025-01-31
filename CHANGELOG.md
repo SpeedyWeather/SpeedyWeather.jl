@@ -2,8 +2,10 @@
 
 ## Unreleased
 
-- zero, fill! and one for PrognosticVariables added [#656](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/656)
 - Differentiability tests for timestepping added [#656](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/656)
+- Interfaces for interpolation of AbstractGridArray [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
+- Test folder sorted into subfolders [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
+- Land model modularised + land netCDF output [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
 
 ## v0.14
 

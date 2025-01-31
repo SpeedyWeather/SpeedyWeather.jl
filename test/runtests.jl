@@ -9,62 +9,59 @@ end
 
 # GENERAL
 include("utility_functions.jl")
-include("dates.jl")
-include("lower_triangular_matrix.jl")
-include("grids.jl")
-include("geodesics.jl")
-include("interpolation.jl")
-include("prognostic_variables.jl")
-include("set.jl")
+
+# GRIDS
+include("grids/grids.jl")
+include("grids/geodesics.jl")
+include("grids/interpolation.jl")
 
 # GPU/KERNELABSTRACTIONS
-include("kernelabstractions.jl")
+include("gpu/kernelabstractions.jl")
 
 # SPECTRAL TRANSFORM
-include("spectral_transform.jl")
-include("spectral_gradients.jl")
-include("spectrum.jl")
-include("spectral_transform_ad_rules.jl") 
+include("transforms/lower_triangular_matrix.jl")
+include("transforms/spectral_transform.jl")
+include("transforms/spectral_gradients.jl")
+include("transforms/spectrum.jl")
+include("transforms/spectral_transform_ad_rules.jl") 
+include("transforms/resolutions.jl")
 
 # DYNAMICS
-include("diffusion.jl")
-include("time_stepping.jl")
-include("vertical_advection.jl")
-include("particles.jl")
-include("particle_advection.jl")
-include("forcing_drag.jl")
+include("dynamics/diffusion.jl")
+include("dynamics/time_stepping.jl")
+include("dynamics/vertical_advection.jl")
+include("dynamics/particles.jl")
+include("dynamics/particle_advection.jl")
+include("dynamics/forcing_drag.jl")
+include("dynamics/dates.jl")
+include("dynamics/set.jl")
+include("dynamics/orography.jl")
+include("dynamics/run_speedy.jl")
 
 # VERTICAL LEVELS
-include("vertical_coordinates.jl")
-include("geopotential.jl")
+include("dynamics/vertical_coordinates.jl")
+include("dynamics/geopotential.jl")
 
 # PHYSICS
-include("column_variables.jl")
-include("orography.jl")
-include("land_sea_mask.jl")
-include("ocean.jl")
+include("physics/column_variables.jl")
+include("physics/land_sea_mask.jl")
+include("physics/ocean.jl")
 # include("thermodynamics.jl")
-include("large_scale_condensation.jl")
-# include("convection.jl")
-include("optical_depth.jl")
-include("longwave_radiation.jl")
-# include("shortwave_radiation.jl")
-include("surface_fluxes.jl")
-include("random_process.jl")
-include("stochastic_physics.jl")
-
-# INITIALIZATION AND INTEGRATION
-include("resolutions.jl")
-include("run_speedy.jl")
-
-# EXTENSION
-include("callbacks.jl")
-include("schedule.jl")
+include("physics/large_scale_condensation.jl")
+include("physics/convection.jl")
+include("physics/optical_depth.jl")
+include("physics/longwave_radiation.jl")
+# include("physics/shortwave_radiation.jl")
+include("physics/surface_fluxes.jl")
+include("physics/random_process.jl")
+include("physics/stochastic_physics.jl")
 
 # DIFFERENTIABILITY 
 if FLAG_EXTENDED_TESTS
     include("differentiability/runtests.jl")
 end
 
-# OUTPUT 
-include("netcdf_output.jl")
+# OUTPUT/EXTENSION
+include("output/callbacks.jl")
+include("output/schedule.jl")
+include("output/netcdf_output.jl")
