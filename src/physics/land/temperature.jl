@@ -191,14 +191,11 @@ function timestep!(
     Ev = diagn.physics.evaporative_flux
     S = diagn.physics.sensible_heat_flux
 
-    # Euler forward step
-    @. sst += (Δt/C₀)*(1 - mask)*(Rs - Rlu + Rld - Lᵥ*Ev - S)
-    
     @boundscheck grids_match(soil_temperature, Rs, Rld, Rlu, Ev, S, horizontal_only=true) || throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
     (; z₁, z₂, λ, γ, Cw, Cs) = land
 
-    Δ =  2λ/(z₁ + z₂)
+    Δ =  2λ/(z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
 
     for ij in eachgridpoint(soil_moisture, soil_temperature)
 
