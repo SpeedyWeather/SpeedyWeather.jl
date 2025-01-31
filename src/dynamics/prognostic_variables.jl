@@ -243,7 +243,7 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     return nothing
 end
 
-function Base.zero(progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}) where {NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}
+function Base.zero(progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector}) where {NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector}
     (; trunc, nlat_half, nlayers, nlayers_soil, nparticles) = progn
     
     # initialize regular progn variables 
