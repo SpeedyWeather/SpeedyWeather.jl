@@ -248,7 +248,8 @@ function Base.zero(progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVar
     
     # initialize regular progn variables 
     progn_new = PrognosticVariables{NF, ArrayType, nsteps,
-        SpectralVariable2D, SpectralVariable3D, GridVariable2D, ParticleVector}(;
+        SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, 
+        ParticleVector}(;
             trunc, nlat_half, nlayers, nlayers_soil, nparticles,
         )
 
