@@ -86,6 +86,12 @@ end
     progn_new = zero(progn)
     dprogn_new = one(progn) # seed 
 
-    autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
+    function timestep_oop!(progn_new::PrognosticVariables, progn_old::PrognosticVariables, diagn, dt, model, lf1=2, lf2=2)
+        copy!(progn_new, progn_old)
+        SpeedyWeather.timestep!(progn_new, diagn, dt, model, lf1, lf2)
+        return nothing
+    end 
+
+    autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
     @test sum(to_vec(d_progn)[1]) != 0
 end 

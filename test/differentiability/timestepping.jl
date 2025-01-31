@@ -10,7 +10,7 @@
 
         # FiniteDifferences struggles with the NaN when we have a land-sea mask, so we have to test on AquaPlanets 
         spectral_grid = SpectralGrid(trunc=8, nlayers=nlayer)          # define resolution
-        model = model_type(; spectral_grid, land_sea_mask = AquaPlanetMask(spectral_grid))   # construct model
+        model = model_type(; spectral_grid)   # construct model
         simulation = initialize!(model)  
         initialize!(simulation)
         run!(simulation, period=Day(3))
