@@ -58,16 +58,17 @@
 
         # function wrapper for FiniteDifferences
         function timestep_wrt_gravity(g)
+            progn_fd = deepcopy(progn_copy_2)
+            diagn_fd = deepcopy(diagn_copy_2)
             model_new = deepcopy(model)
             model_new.planet.gravity = g 
-            println(g)
-            timestep_oop(progn_copy_2, diagn_copy_2, dt, model_new)
+            timestep_oop(progn_fd, diagn_fd, dt, model_new)
         end   
         
         dprogn_2 = one(progn) # seed
 
         fd_vjp = FiniteDifferences.j′vp(central_fdm(11,1), timestep_wrt_gravity, dprogn_2, model.planet.gravity)
-        # this doesn't line up, currently, what's wrong? 
 
+        @test isapprox(dmodel.planet.gravity, fd_vjp[1],rtol=1e-1)
     end 
 end 
