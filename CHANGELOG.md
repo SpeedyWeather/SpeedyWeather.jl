@@ -3,6 +3,19 @@
 ## Unreleased
 
 - Compat for GPUArrays v11, JLArrays 0.2, KernelAbstractions 0.9 [#658](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/658)
+- Interfaces for interpolation of AbstractGridArray [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
+- Test folder sorted into subfolders [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
+- Land model modularised + land netCDF output [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
+
+## v0.14
+
+- CompatHelper: Allow for Makie.jl v0.22 [#663](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/663)
+- Prescribed ocean/land heat fluxes modular [#667](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/667)
+- NetCDF output for tracers defined, precipitation rate output at initialize! again [#657](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/657)
+- Precipitation rate from large-scale condensation/convection for coupling [#669](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/669)
+- Fixed a bug, so that sum now works for LowerTraingularArrays [#668](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/668)
+- Require only AbstractVectors in the interpolation [#665](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/665)
+- Intitialize! simulation restructured [#666](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/666)
 - First time steps in main time loop [#659](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/659)
 - Generalise OneBandRadiation to NBandRadiation [#633](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/633)
 - New output variables definition simplified [#653](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/653)
@@ -12,7 +25,6 @@
 - Spectral Gradients are now differentiable, with correctness check in extended CI [#638](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/638)
 - set! for time step [#650](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/650)
 - Bug: ZonalWind had sqrt of negative for uncommon resolutions [#649](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/649)
-- Spectral Gradients are now differentiable, with correctness check in extended CI [#638](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/638)[#651](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/651)
 - Tracer advection [#579](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/579)
 - Buildkite CI with dummy pipeline [#646](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/646)
 - ConvectiveHeating implemented [#639](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/639)

@@ -266,10 +266,10 @@ $(TYPEDFIELDS)"""
     "Accumulated large-scale precipitation [m]"
     precip_convection::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
-    "Rate of large-scale precipitation [m], over time step"
+    "Rate of large-scale precipitation [m/s], instantaneous"
     precip_rate_large_scale::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
-    "Rate of large-scale precipitation [m], over time step"
+    "Rate of large-scale precipitation [m/s], instantaneous"
     precip_rate_convection::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     "Cloud top [m]"
@@ -282,7 +282,7 @@ $(TYPEDFIELDS)"""
     # SURFACE FLUXES
     "Sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
-
+    
     "Evaporative flux [kg/s/m^2], positive up"
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
 

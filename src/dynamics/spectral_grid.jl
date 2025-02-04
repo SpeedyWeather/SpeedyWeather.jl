@@ -10,6 +10,7 @@ const DEFAULT_GRID = OctahedralGaussianGrid
 const DEFAULT_RADIUS = 6.371e6
 const DEFAULT_TRUNC = 31
 const DEFAULT_NLAYERS = 8
+const DEFAULT_NLAYERS_SOIL = 2
 
 export SpectralGrid
 
@@ -57,8 +58,11 @@ $(TYPEDFIELDS)
     npoints::Int = RingGrids.get_npoints(Grid, nlat_half)
 
     # VERTICAL
-    "[OPTION] number of vertical levels"
+    "[OPTION] number of vertical layers in the atmosphere"
     nlayers::Int = DEFAULT_NLAYERS
+
+    "[OPTION] number of vertical layers in the soil/land"
+    nlayers_soil::Int = DEFAULT_NLAYERS_SOIL
 
     "[OPTION] coordinates used to discretize the vertical"
     vertical_coordinates::VerticalCoordinates = SigmaCoordinates(; nlayers)
@@ -76,7 +80,7 @@ $(TYPEDFIELDS)
 end
 
 function Base.show(io::IO, SG::SpectralGrid)
-    (; NF, trunc, Grid, radius, nlat, npoints, nlayers, vertical_coordinates) = SG
+    (; NF, trunc, Grid, radius, nlat, npoints, nlayers, nlayers_soil, vertical_coordinates) = SG
     (; device, ArrayType) = SG
     (; nparticles) = SG
 
@@ -90,7 +94,7 @@ function Base.show(io::IO, SG::SpectralGrid)
     println(io, "├ Resolution: $(s(average_resolution))km (average)")
     nparticles > 0 &&
     println(io, "├ Particles:  $nparticles")
-    println(io, "├ Vertical:   $nlayers-layer $(typeof(vertical_coordinates))")
+    println(io, "├ Vertical:   $nlayers-layer $(typeof(vertical_coordinates)), $nlayers_soil-layer land")
       print(io, "└ Device:     $(typeof(device)) using $ArrayType")
 end
 

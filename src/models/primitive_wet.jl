@@ -29,8 +29,6 @@ $(TYPEDFIELDS)"""
     LA,     # <:AbstractLand,
     ZE,     # <:AbstractZenith,
     AL,     # <:AbstractAlbedo,
-    SO,     # <:AbstractSoil,
-    VG,     # <:AbstractVegetation,
     CC,     # <:AbstractClausiusClapeyron,
     BL,     # <:AbstractBoundaryLayer,
     TR,     # <:AbstractTemperatureRelaxation,
@@ -79,11 +77,9 @@ $(TYPEDFIELDS)"""
     orography::OR = EarthOrography(spectral_grid)
     land_sea_mask::LS = LandSeaMask(spectral_grid)
     ocean::OC = SeasonalOceanClimatology(spectral_grid)
-    land::LA = SeasonalLandTemperature(spectral_grid)
+    land::LA = LandModel(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     albedo::AL = AlbedoClimatology(spectral_grid)
-    soil::SO = SeasonalSoilMoisture(spectral_grid)
-    vegetation::VG = VegetationClimatology(spectral_grid)
     
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true
@@ -144,8 +140,6 @@ function initialize!(model::PrimitiveWet; time::DateTime = DEFAULT_DATE)
     initialize!(model.land_sea_mask, model)
     initialize!(model.ocean, model)
     initialize!(model.land, model)
-    initialize!(model.soil, model)
-    initialize!(model.vegetation, model)
     initialize!(model.solar_zenith, time, model)
     initialize!(model.albedo, model)
 

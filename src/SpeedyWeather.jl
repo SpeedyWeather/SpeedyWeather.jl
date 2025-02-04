@@ -135,7 +135,10 @@ include("physics/boundary_layer.jl")
 include("physics/temperature_relaxation.jl")
 include("physics/vertical_diffusion.jl")
 include("physics/large_scale_condensation.jl")
-include("physics/surface_fluxes.jl")
+include("physics/surface_fluxes/surface_fluxes.jl")
+include("physics/surface_fluxes/momentum.jl")
+include("physics/surface_fluxes/heat.jl")
+include("physics/surface_fluxes/moisture.jl")
 include("physics/convection.jl")
 include("physics/zenith.jl")
 include("physics/optical_depth.jl")
@@ -145,7 +148,7 @@ include("physics/stochastic_physics.jl")
 
 # OCEAN AND LAND
 include("physics/ocean.jl")
-include("physics/land.jl")
+include("physics/land/land.jl")
 
 # OUTPUT
 include("output/schedule.jl")

@@ -26,7 +26,7 @@ function parameterization_tendencies!(
 
         # calculate parameterizations
         perturb_parameterization_inputs!(column, model)         # possibly perturb inputs to parameterizations?
-        parameterization_tendencies!(column, model)             # execute all parameterizations
+        parameterization_tendencies!(column, progn, model)      # execute all parameterizations
         perturb_parameterization_tendencies!(column, model)     # possibly perturb tendencies from parameterizations
 
         # write tendencies from parametrizations back into horizontal fields
@@ -39,6 +39,7 @@ Calls for `column` one physics parameterization after another
 and convert fluxes to tendencies."""
 function parameterization_tendencies!(
     column::ColumnVariables,
+    progn::PrognosticVariables,
     model::PrimitiveEquation,
 )
     get_thermodynamics!(column, model)
@@ -50,7 +51,7 @@ function parameterization_tendencies!(
     optical_depth!(column, model)
     shortwave_radiation!(column, model)
     longwave_radiation!(column, model)
-    surface_fluxes!(column, model)
+    surface_fluxes!(column, progn, model)   # pass on prognostic variables for prescribed fluxes
 
     # sum fluxes on half levels up and down for every layer
     fluxes_to_tendencies!(column, model.geometry, model.planet, model.atmosphere)

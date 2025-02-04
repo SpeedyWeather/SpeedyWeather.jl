@@ -220,8 +220,8 @@ function interpolate!(
     A_northpole, A_southpole = average_on_poles(A, interpolator.geometry.rings)
 
     #TODO ij_cs, ij_ds shouldn't be 0...
-    @boundscheck extrema_in(ij_as, 0, npoints) || throw(BoundsError)
-    @boundscheck extrema_in(ij_bs, 0, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_as,  0, npoints) || throw(BoundsError)
+    @boundscheck extrema_in(ij_bs,  0, npoints) || throw(BoundsError)
     @boundscheck extrema_in(ij_cs, -1, npoints) || throw(BoundsError)
     @boundscheck extrema_in(ij_ds, -1, npoints) || throw(BoundsError)
 
@@ -238,6 +238,7 @@ function interpolate!(
     return Aout
 end
 
+# version for 2D grids
 function interpolate!(
     Aout::AbstractGrid,     # Out: grid to interpolate onto
     A::AbstractGrid,        # In: gridded data to interpolate from
@@ -248,6 +249,7 @@ function interpolate!(
     interpolate!(Aout.data, A, interpolator)
 end
 
+# version for 3D grids
 function interpolate!(
     Aout::AbstractGridArray,    # Out: grid to interpolate onto
     A::AbstractGridArray,       # In: gridded data to interpolate from
@@ -262,64 +264,69 @@ function interpolate!(
 end
 
 function interpolate!(  ::Type{NF},
-                        Aout::AbstractGrid,
-                        A::AbstractGrid,
+                        Aout::AbstractGridArray,
+                        A::AbstractGridArray,
                         Interpolator::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR
                         ) where {NF<:AbstractFloat}
     
     # if grids match just copy data over (eltypes might differ)
     grids_match(Aout, A) && return copyto!(Aout.data, A.data)
-    I = interpolator(NF, Aout, A, Interpolator)    # create interpolator instance from grid A to Aout
-    interpolate!(Aout, A, I)                      # perform interpolation
+    I = interpolator(NF, Aout, A, Interpolator)     # create interpolator instance from grid A to Aout
+    interpolate!(Aout, A, I)                        # perform interpolation
 end
 
-function interpolate!(  Aout::AbstractGrid,     # Out: grid to interpolate onto
-                        A::AbstractGrid,        # In: gridded data to interpolate from
+function interpolate!(  Aout::AbstractGridArray,    # Out: grid to interpolate onto
+                        A::AbstractGridArray,       # In: gridded data to interpolate from
                         I::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR)
-    interpolate!(Float64, Aout, A, I)              # use Float64 as default
+    interpolate!(Float64, Aout, A, I)               # use Float64 as default
 end
 
 function interpolate(   ::Type{Grid},
                         nlat_half::Integer,
-                        A::AbstractGrid,
+                        A::AbstractGridArray,
                         I::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR
-                        ) where {Grid<:AbstractGrid}
+                        ) where {Grid<:AbstractGridArray}
 
-    Aout = Grid(undef, nlat_half)
-    interpolate!(Aout, A, I)  # returns a vector
-    return Aout             # returns the grid wrapped around that vector
+    Aout = Grid(undef, nlat_half, size(A)[2:end]...)
+    interpolate!(Aout, A, I)    # returns a vector
+    return Aout                 # returns the grid wrapped around that vector
 end
 
 # if nlat_half not provided use that from input grid
 function interpolate(   ::Type{Grid},
-                        A::AbstractGrid,
+                        A::AbstractGridArray,
                         I::Type{<:AbstractInterpolator}=DEFAULT_INTERPOLATOR
-                        ) where {Grid<:AbstractGrid}
+                        ) where {Grid<:AbstractGridArray}
 
     interpolate(Grid, A.nlat_half, A, I)
 end
 
 function update_locator!(
     I::AbstractInterpolator{NF, Grid},  # GridGeometry and Locator
-    λs::Vector,                         # longitudes to interpolate onto
-    θs::Vector;                         # latitudes to interpolate onto
+    λs::AbstractVector,                 # longitudes to interpolate onto
+    θs::AbstractVector;                 # latitudes to interpolate onto
     unsafe::Bool=false,                 # true to disable safety checks
     ) where {NF<:AbstractFloat, Grid<:AbstractGrid}
 
     # find latitude ring indices corresponding to interpolation points
-    (; latd ) = I.geometry              # latitudes of rings including north and south pole
-    (; js, Δys ) = I.locator            # to be updated: ring indices js, and meridional weights Δys
+    (; latd ) = I.geometry                  # latitudes of rings including north and south pole
+    (; js, Δys ) = I.locator                # to be updated: ring indices js, and meridional weights Δys
     find_rings!(js, Δys, θs, latd; unsafe)  # next ring at or north of θ
 
     # find grid incides ij for top, bottom and left, right grid points around (θ, λ)
     find_grid_indices!(I, λs)               # next points left and right of λ on rings north and south
 end
 
-function find_rings!(   js::Vector{<:Integer},  # Out: ring indices j
-                        Δys::Vector,            # Out: distance fractions to ring further south
-                        θs::Vector,             # latitudes to interpolate onto
-                        latd::Vector;           # latitudes of the rings on the original grid
-                        unsafe::Bool=false)     # skip safety checks when true
+function update_locator!(I::AbstractInterpolator, A::AbstractGridArray; kwargs...)
+    londs, latds = get_londlatds(A)
+    update_locator!(I, londs, latds; kwargs...)
+end
+
+function find_rings!(   js::AbstractVector{<:Integer},  # Out: ring indices j
+                        Δys::AbstractVector,            # Out: distance fractions to ring further south
+                        θs::AbstractVector,             # latitudes to interpolate onto
+                        latd::AbstractVector;           # latitudes of the rings on the original grid
+                        unsafe::Bool=false)             # skip safety checks when true
     
     if ~unsafe
         θmin, θmax = extrema(θs)
@@ -338,10 +345,10 @@ function find_rings!(   js::Vector{<:Integer},  # Out: ring indices j
     find_rings_unsafe!(js, Δys, θs, latd)
 end
 
-function find_rings_unsafe!(js::Vector{<:Integer},  # Out: vector of ring indices
-                            Δys::Vector,            # distance fractions to ring further south
-                            θs::Vector,             # latitudes of points to interpolate onto
-                            latd::Vector{NF},       # latitudes of rings (90˚ to -90˚, strictly decreasing)
+function find_rings_unsafe!(js::AbstractVector{<:Integer},  # Out: vector of ring indices
+                            Δys::AbstractVector,            # distance fractions to ring further south
+                            θs::AbstractVector,             # latitudes of points to interpolate onto
+                            latd::AbstractVector{NF},       # latitudes of rings (90˚ to -90˚, strictly decreasing)
                             ) where {NF<:AbstractFloat}
 
     @boundscheck length(js) == length(θs) || throw(BoundsError)
@@ -365,15 +372,15 @@ function find_rings_unsafe!(js::Vector{<:Integer},  # Out: vector of ring indice
 end
 
 # for testing only
-function find_rings(θs::Vector, latd::Vector{NF}) where NF
+function find_rings(θs::AbstractVector, latd::AbstractVector{NF}) where NF
     js = Vector{Int}(undef, length(θs))
     Δys = Vector{NF}(undef, length(θs))
     find_rings!(js, Δys, θs, latd)
     return js, Δys
 end
 
-function find_grid_indices!(I::AnvilInterpolator,   # update indices arrays
-                            λs::Vector)             # based on new longitudes λ
+function find_grid_indices!(I::AnvilInterpolator,       # update indices arrays
+                            λs::AbstractVector)         # based on new longitudes λ
 
     (; js, ij_as, ij_bs, ij_cs, ij_ds ) = I.locator
     (; Δabs, Δcds ) = I.locator
@@ -432,12 +439,9 @@ $(TYPEDSIGNATURES)
 Computes the average at the North and South pole from a given grid `A` and it's precomputed
 ring indices `rings`. The North pole average is an equally weighted average of all grid points
 on the northern-most ring. Similar for the South pole."""
-function average_on_poles(  A::AbstractVector{NF},
-                            rings::Vector{<:UnitRange{<:Integer}}
-                            ) where {NF<:AbstractFloat}
-    
-    A_northpole = mean(view(A, rings[1]))    # average of all grid points around the north pole
-    A_southpole = mean(view(A, rings[end]))  # same for south pole
+function average_on_poles(A::AbstractVector{NF}, rings::AbstractVector) where {NF<:AbstractFloat}   
+    A_northpole = mean(view(A, rings[1]))     # average of all grid points around the north pole
+    A_southpole = mean(view(A, rings[end]))   # same for south pole
     return convert(NF, A_northpole), convert(NF, A_southpole)
 end
 
@@ -445,10 +449,7 @@ end
 $(TYPEDSIGNATURES)
 Method for `A::Abstract{T<:Integer}` which rounds the averaged values
 to return the same number format `NF`."""
-function average_on_poles(  A::AbstractGrid{NF},
-                            rings::Vector{<:UnitRange{<:Integer}}
-                            ) where {NF<:Integer}
-    
+function average_on_poles(A::AbstractVector{NF}, rings::AbstractVector) where {NF<:Integer}
     A_northpole = mean(view(A, rings[1]))    # average of all grid points around the north pole
     A_southpole = mean(view(A, rings[end]))  # same for south pole
     return round(NF, A_northpole), round(NF, A_southpole)

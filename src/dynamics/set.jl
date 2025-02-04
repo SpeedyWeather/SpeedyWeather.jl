@@ -28,10 +28,9 @@ function set!(
     pres = nothing,
     sea_surface_temperature = nothing, 
     sea_ice_concentration = nothing, 
-    land_surface_temperature = nothing, 
+    soil_temperature = nothing, 
     snow_depth = nothing, 
-    soil_moisture_layer1 = nothing, 
-    soil_moisture_layer2 = nothing,
+    soil_moisture = nothing, 
     lf::Integer = 1,
     add::Bool = false,
     spectral_transform::Union{Nothing, SpectralTransform} = nothing,
@@ -53,10 +52,9 @@ function set!(
     isnothing(sea_ice_concentration)    || set!(progn.ocean.sea_ice_concentration, sea_ice_concentration, geometry, spectral_transform; add)
 
     # LAND
-    isnothing(land_surface_temperature) || set!(progn.land.land_surface_temperature, land_surface_temperature, geometry, spectral_transform; add)
+    isnothing(soil_temperature)         || set!(progn.land.soil_temperature, soil_temperature, geometry, spectral_transform; add)
     isnothing(snow_depth)               || set!(progn.land.snow_depth, snow_depth, geometry, spectral_transform; add)
-    isnothing(soil_moisture_layer1)     || set!(progn.land.soil_moisture_layer1, soil_moisture_layer1, geometry, spectral_transform; add)
-    isnothing(soil_moisture_layer2)     || set!(progn.land.soil_moisture_layer2, soil_moisture_layer2, geometry, spectral_transform; add)
+    isnothing(soil_moisture)            || set!(progn.land.soil_moisture, soil_moisture, geometry, spectral_transform; add)
     
     # TRACERS
     for varname in keys(kwargs)

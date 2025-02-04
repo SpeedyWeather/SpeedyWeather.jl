@@ -73,7 +73,7 @@ $(TYPEDFIELDS)"""
     orography::OR = EarthOrography(spectral_grid)
     land_sea_mask::LS = LandSeaMask(spectral_grid)
     ocean::OC = SeasonalOceanClimatology(spectral_grid)
-    land::LA = SeasonalLandTemperature(spectral_grid)
+    land::LA = DryLandModel(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     albedo::AL = AlbedoClimatology(spectral_grid)
     
