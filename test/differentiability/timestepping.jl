@@ -28,14 +28,19 @@
         diagn_copy = deepcopy(diagn)
         progn_copy = deepcopy(progn)
 
+        diagn_copy_2 = deepcopy(diagn) # for a later experiment a second copy
+        progn_copy_2 = deepcopy(progn)
+
         d_progn = zero(progn)
         d_diag = make_zero(diagn)
 
         progn_new = zero(progn)
         dprogn_new = one(progn) # seed 
 
+        dmodel = make_zero(model)
+
         # test that we can differentiate wrt an IC 
-        autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, make_zero(model)))
+        autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, dmodel))
 
         # nonzero gradient
         @test sum(to_vec(d_progn)[1]) != 0
@@ -48,5 +53,21 @@
         fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> timestep_oop(x, diagn_copy, dt, model), dprogn_2, progn_copy)
 
         @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1])
+
+        # wrt a system parameter. Let's check for example gravity 
+
+        # function wrapper for FiniteDifferences
+        function timestep_wrt_gravity(g)
+            model_new = deepcopy(model)
+            model_new.planet.gravity = g 
+            println(g)
+            timestep_oop(progn_copy_2, diagn_copy_2, dt, model_new)
+        end   
+        
+        dprogn_2 = one(progn) # seed
+
+        fd_vjp = FiniteDifferences.j′vp(central_fdm(11,1), timestep_wrt_gravity, dprogn_2, model.planet.gravity)
+        # this doesn't line up, currently, what's wrong? 
+
     end 
 end 
