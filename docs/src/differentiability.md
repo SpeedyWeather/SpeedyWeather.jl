@@ -12,7 +12,7 @@ For the differentiability of our model we rely on [Enzyme.jl](https://github.com
 
 First we initialize the model as usual: 
 
-```@example autodiff
+```julia
 using SpeedyWeather, Enzyme 
 
 spectral_grid = SpectralGrid(trunc=23, nlayers=3)           
@@ -24,7 +24,7 @@ run!(simulation, period=Day(10)) # spin-up the model a bit
 
 Then, we get all variables we need from our `simulation`
 
-```@example autodiff
+```julia
 (; prognostic_variables, diagnostic_variables, model) = simulation
 (; Δt, Δt_millisec) = model.time_stepping
 dt = 2Δt
@@ -35,7 +35,7 @@ diagn = diagnostic_variables
 
 Next, we will prepare to use Enzyme. Enzyme saves the gradient information in a shadow of the original input. For the inputs this shadow is initialized zero, whereas for the output the shadow is used as the seed of the AD. In other words, as we are doing reverse-mode AD, the shadow of the output is the value that is backpropageted by the reverse-mode AD. Ok, let's initialize everything: 
 
-```@example autodiff 
+```julia
 dprogn = one(progn) # shadow for the progn values 
 ddiagn = make_zero(diagn) # shadow for the diagn values 
 dmodel = make_zero(model) # here, we'll accumulate all parameter derivatives 
@@ -43,15 +43,14 @@ dmodel = make_zero(model) # here, we'll accumulate all parameter derivatives
 
 Then, we can already do the differentiation with Enzyme
 
-```@example autodiff 
+```julia
 autodiff(Reverse, SpeedyWeather.timestep!, Const, Duplicated(progn, dprogn), Duplicated(diagn, ddiagn), Const(dt), Duplicated(model, dmodel))
 ```
 
 The derivitaves are accumulated in the `dmodel` shadow. So, if we e.g. want to know the derivative with respect to the gravity constant, we just have to inspect: 
 
-```@example autodiff 
+```julia 
 dmodel.planet.gravity 
 ```
 
 Doing a full sensitivity analysis through a long integration is computationally much more demanding, and is something that we are currently working on. 
-
