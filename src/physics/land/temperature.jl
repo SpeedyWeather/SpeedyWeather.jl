@@ -159,11 +159,9 @@ end
 # generator function
 LandBucketTemperature(SG::SpectralGrid; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
 function initialize!(land::LandBucketTemperature, model::PrimitiveEquation)
-    @assert model.spectral_grid.nlayers_soil < 2 "LandBucketTemperature only works with 2 soil layers"*
-        "but spectral_grid.nlayers_soil = $(model.spectral_grid.nlayers_soil) given."
-    @assert model.spectral_grid.nlayers_soil > 2 "LandBucketTemperature defined for 2 soil layers but"*
-        "spectral_grid.nlayers_soil = $(model.spectral_grid.nlayers_soil) given. Ignoring additional layers."
-
+    (; nlayers_soil) = model.spectral_grid
+    @assert nlayers_soil == 2 "LandBucketTemperature only works with 2 soil layers "*
+        "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
     return nothing
 end
 
@@ -174,7 +172,7 @@ function initialize!(
     model::PrimitiveEquation,
 )
     set!(progn.land.soil_temperature, land.initial_temperature)
-    land.mask && mask!(progn.land.soil_temperature, model.land_sea_mask)
+    land.mask && mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean)
 end
 
 function timestep!(

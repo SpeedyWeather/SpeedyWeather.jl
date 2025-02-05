@@ -6,7 +6,8 @@ include("vegetation.jl")
 include("rivers.jl")
 
 # LandModel defined through its components
-struct LandModel{Temperature, SoilMoisture, Vegetation, Rivers} <: AbstractLand
+export LandModel
+@kwdef struct LandModel{Temperature, SoilMoisture, Vegetation, Rivers} <: AbstractLand
     temperature::Temperature
     soil_moisture::SoilMoisture
     vegetation::Vegetation
@@ -32,7 +33,8 @@ function initialize!(   land::LandModel,
     initialize!(model.land.rivers, model)
 end
 
-struct DryLandModel{Temperature} <: AbstractLand
+export DryLandModel
+@kwdef struct DryLandModel{Temperature} <: AbstractLand
     temperature::Temperature
 end
 
