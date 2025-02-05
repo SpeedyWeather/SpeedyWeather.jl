@@ -1,5 +1,5 @@
 ### Experiments going a bit deeper into the timestepping of the primtive wet model
-# this script / tests was mainly written for debugging, we might exclude it in future 
+# this script / these tests were mainly written for debugging, we might exclude it in future 
 # tests because it is quite maintanance heavy code 
 @testset "Differentiability: Primitive Wet Model Components" begin 
 
@@ -33,6 +33,7 @@
     #
     # model physics 
     # 
+
     progn_copy = deepcopy(progn)
     dprogn = one(progn)
     ddiagn = one(diagn)
@@ -43,7 +44,7 @@
 
     function parameterization_tendencies(diagn, progn, time, model)
         diagn_new = deepcopy(diagn)
-        SpeedyWeather.parameterization_tendencies!(diagn_new, progn, time, model)
+        SpeedyWeather.parameterization_tendencies!(diagn_new, deepcopy(progn), time, deepcopy(model))
         return diagn_new
     end 
 
