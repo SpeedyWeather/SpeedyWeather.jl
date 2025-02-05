@@ -151,6 +151,9 @@ $(TYPEDFIELDS)"""
 
     "[OPTION] Initial soil temperature"
     initial_temperature::NF = 285
+
+    "[OPTION] Apply land-sea mask to NaN ocean-only points?"
+    mask::Bool = true
 end
 
 # generator function
@@ -171,7 +174,7 @@ function initialize!(
     model::PrimitiveEquation,
 )
     set!(progn.land.soil_temperature, land.initial_temperature)
-    #TODO set masked values to NaN
+    land.mask && mask!(progn.land.soil_temperature, model.land_sea_mask)
 end
 
 function timestep!(
@@ -199,7 +202,7 @@ function timestep!(
 
     for ij in eachgridpoint(soil_moisture, soil_temperature)
 
-        # TODO if mask[ij] == at least partially land?
+        # TODO if mask[ij] == at least partially land? only to skip ocean points?
 
         # total surface downward heat flux
         F = Rs[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij]
