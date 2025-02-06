@@ -74,6 +74,8 @@ $(TYPEDFIELDS)"""
     # surface fluxes
     evaporative_flux::NF = 0
     sensible_heat_flux::NF = 0
+    sensible_heat_flux_ocean::NF = 0
+    sensible_heat_flux_land::NF = 0
 
     # THERMODYNAMICS
     surface_air_density::NF = 0

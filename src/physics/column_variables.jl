@@ -150,6 +150,8 @@ function write_column_tendencies!(
     # surface evaporative [kg/s/m²] and sensible heat flux [W/m²], positive up
     diagn.physics.evaporative_flux[ij] = column.evaporative_flux
     diagn.physics.sensible_heat_flux[ij] = column.sensible_heat_flux
+    diagn.physics.sensible_heat_flux_ocean[ij] = column.sensible_heat_flux_ocean
+    diagn.physics.sensible_heat_flux_land[ij] = column.sensible_heat_flux_land
 
     # radiation [W/m²], positive up for up, down for down, up for outgoing
     diagn.physics.surface_shortwave_down[ij] = column.surface_shortwave_down

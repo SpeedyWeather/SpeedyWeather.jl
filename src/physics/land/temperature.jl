@@ -190,7 +190,7 @@ function timestep!(
     Rld = diagn.physics.surface_longwave_down
     Rlu = diagn.physics.surface_longwave_up
     Ev = diagn.physics.evaporative_flux
-    S = diagn.physics.sensible_heat_flux
+    S = diagn.physics.sensible_heat_flux_land
 
     @boundscheck grids_match(soil_temperature, Rs, Rld, Rlu, Ev, S, horizontal_only=true) || throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
