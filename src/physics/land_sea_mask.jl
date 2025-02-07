@@ -61,7 +61,7 @@ mask!(grid::AbstractGridArray, mask::AbstractLandSeaMask, args...; kwargs...) =
     mask!(grid, mask.mask, args...; kwargs...)
 
 # make available when using SpeedyWeather
-export LandSeaMask, AquaPlanetMask
+export LandSeaMask
 
 """Land-sea mask, fractional, read from file.
 $(TYPEDFIELDS)"""
@@ -102,7 +102,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Reads a high-resolution land-sea mask from file and interpolates (grid-call average)
+Reads a high-resolution land-sea mask from file and interpolates (grid-cell average)
 onto the model grid for a fractional sea mask."""
 function initialize!(land_sea_mask::LandSeaMask, model::PrimitiveEquation)
 
@@ -126,6 +126,8 @@ function initialize!(land_sea_mask::LandSeaMask, model::PrimitiveEquation)
     clamp!(land_sea_mask.mask, 0, 1)
 end
 
+export AquaPlanetMask
+
 """Land-sea mask with zero = sea everywhere.
 $(TYPEDFIELDS)"""
 @kwdef struct AquaPlanetMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask
@@ -138,5 +140,22 @@ $(TYPEDSIGNATURES)
 Sets all grid points to 0 = sea."""
 function initialize!(land_sea_mask::AquaPlanetMask, model::PrimitiveEquation)
     land_sea_mask.mask .= 0    # set all to sea
+    return nothing
+end
+
+export RockyPlanetMask
+
+"""Land-sea mask with one = land everywhere.
+$(TYPEDFIELDS)"""
+@kwdef struct RockyPlanetMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask
+    "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
+    mask::Grid
+end
+
+"""
+$(TYPEDSIGNATURES)
+Sets all grid points to 1 = land."""
+function initialize!(land_sea_mask::RockyPlanetMask, model::PrimitiveEquation)
+    land_sea_mask.mask .= 1    # set all to land
     return nothing
 end

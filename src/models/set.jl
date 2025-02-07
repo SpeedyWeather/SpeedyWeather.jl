@@ -16,4 +16,5 @@ function set!(
 
     isnothing(land_sea_mask) || set!(model.land_sea_mask, land_sea_mask, model.geometry; kwargs...)
     isnothing(albedo) || set!(model.albedo, albedo, model.geometry; kwargs...)
+    return nothing
 end
