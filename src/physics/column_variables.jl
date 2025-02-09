@@ -147,8 +147,12 @@ function write_column_tendencies!(
     # just use layer index 1 (top) to nlayers (surface) for analysis, but 0 for no clouds
     # diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.cloud_top
 
-    # surface evaporative [kg/s/m²] and sensible heat flux [W/m²], positive up
+    # surface evaporative [kg/s/m²], positive up
     diagn.physics.evaporative_flux[ij] = column.evaporative_flux
+    diagn.physics.evaporative_flux_ocean[ij] = column.evaporative_flux_ocean
+    diagn.physics.evaporative_flux_land[ij] = column.evaporative_flux_land
+
+    # surface sensible heat flux [W/m²], positive up
     diagn.physics.sensible_heat_flux[ij] = column.sensible_heat_flux
     diagn.physics.sensible_heat_flux_ocean[ij] = column.sensible_heat_flux_ocean
     diagn.physics.sensible_heat_flux_land[ij] = column.sensible_heat_flux_land
@@ -157,7 +161,11 @@ function write_column_tendencies!(
     diagn.physics.surface_shortwave_down[ij] = column.surface_shortwave_down
     diagn.physics.surface_shortwave_up[ij] = column.surface_shortwave_up
     diagn.physics.surface_longwave_down[ij] = column.surface_longwave_down
+   
     diagn.physics.surface_longwave_up[ij] = column.surface_longwave_up
+    diagn.physics.surface_longwave_up_ocean[ij] = column.surface_longwave_up
+    diagn.physics.surface_longwave_up_land[ij] = column.surface_longwave_up
+
     diagn.physics.outgoing_longwave_radiation[ij] = column.outgoing_longwave_radiation
     diagn.physics.outgoing_shortwave_radiation[ij] = column.outgoing_shortwave_radiation
 

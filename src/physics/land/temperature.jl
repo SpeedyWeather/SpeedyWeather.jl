@@ -188,8 +188,8 @@ function timestep!(
     # Frierson et al. 2006, eq (1)
     Rs = diagn.physics.surface_shortwave_down
     Rld = diagn.physics.surface_longwave_down
-    Rlu = diagn.physics.surface_longwave_up
-    Ev = diagn.physics.evaporative_flux
+    Rlu = diagn.physics.surface_longwave_up_land    # these fluxes depend on the land state
+    Ev = diagn.physics.evaporative_flux_land        # use separate land fluxes (not ocean)
     S = diagn.physics.sensible_heat_flux_land
 
     @boundscheck grids_match(soil_temperature, Rs, Rld, Rlu, Ev, S, horizontal_only=true) || throw(DimensionMismatch(soil_temperature, Rs))

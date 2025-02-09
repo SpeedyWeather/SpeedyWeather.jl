@@ -120,28 +120,23 @@ function longwave_radiation!(
     
     (; skin_temperature_sea, skin_temperature_land, land_fraction) = column
 
-    # mix radiative fluxes for fractional land-sea mask if both available 
-    land_available = isfinite(skin_temperature_land)
-    sea_available = isfinite(skin_temperature_sea)
-
-    # land fraction-weighted average of surface temperatures from land/sea
-    local surface_temperature::NF = 0
-    
-    if land_available && sea_available
-        surface_temperature = land_fraction*skin_temperature_land + (1-land_fraction)*skin_temperature_sea
-    elseif land_available
-        surface_temperature = skin_temperature_land
-    elseif sea_available
-        surface_temperature = skin_temperature_sea
-    else    # fallback: use surface air temperature to have zero flux
-        surface_temperature = T[end]
-    end
-
     # extension to Jeevanjee: Include temperature flux between surface and lowermost air temperature
-    local Fₖ::NF    # flux into lowermost layer from surface land/sea below
-    Fₖ = (T[end] - surface_temperature) * α * (Tₜ - surface_temperature)
-    F[end] += Fₖ
-    column.surface_longwave_up = Fₖ
+    # but zero flux if land/sea not available
+    Fₖ_ocean = isfinite(skin_temperature_sea) ?
+        (T[end] - skin_temperature_sea) * α * (Tₜ - skin_temperature_sea) : 
+        zero(skin_temperature_sea)
+    column.surface_longwave_up_ocean = Fₖ_ocean
+
+    Fₖ_land = isfinite(skin_temperature_land) ?
+        (T[end] - skin_temperature_land) * α * (Tₜ - skin_temperature_land) : 
+        zero(skin_temperature_land)
+    column.surface_longwave_up_land = Fₖ_land
+
+    # land-sea mask weighted combined flux from land and ocean
+    local Fₖ::NF
+    Fₖ = (1-land_fraction)*Fₖ_ocean + land_fraction*Fₖ_land
+    F[end] += Fₖ                        # accumulate into total flux
+    column.surface_longwave_up = Fₖ     # store for output/diagnostics
 
     # integrate from surface up, skipping surface (k=nlayers+1) and top-of-atmosphere flux (k=1)
     @inbounds for k in nlayers:-1:2
