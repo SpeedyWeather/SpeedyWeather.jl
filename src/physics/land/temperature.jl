@@ -1,12 +1,18 @@
 abstract type AbstractLandTemperature <: AbstractParameterization end
 
 export SeasonalLandTemperature
-@kwdef struct SeasonalLandTemperature{NF, Grid} <: AbstractLand
+@kwdef struct SeasonalLandTemperature{NF, Grid} <: AbstractLandTemperature
 
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
 
     # OPTIONS
+    "[OPTION] Depth of top soil layer [m]"
+    z₁::NF = 0.07
+
+    "[OPTION] Depth of root layer [m]"
+    z₂::NF = 0.21
+
     "[OPTION] path to the folder containing the land temperature file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -105,7 +111,7 @@ end
 
 ## CONSTANT LAND CLIMATOLOGY
 export ConstantLandTemperature
-@kwdef struct ConstantLandTemperature{NF} <: AbstractLand
+@kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Globally constant temperature"
     temperature::NF = 285
 end
@@ -130,7 +136,7 @@ export LandBucketTemperature
 
 """MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html). Fields assert
 $(TYPEDFIELDS)"""
-@kwdef struct LandBucketTemperature{NF} <: AbstractLand
+@kwdef struct LandBucketTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Top layer depth [m]"
     z₁::NF = 0.1
 
@@ -140,7 +146,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] Thermal conductivity of the soil [W/(m K)]"
     λ::NF = 0.42
 
-    "[OPTION] Field capacity per meter soil"
+    "[OPTION] Field capacity per meter soil [1]"
     γ::NF = 0.24
 
     "[OPTION] Heat capacity of water [J/(m³ K)]"
@@ -149,7 +155,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] Heat capacity of dry soil [J/(m³ K)]"
     Cs::NF = 1.13e6 
 
-    "[OPTION] Initial soil temperature"
+    "[OPTION] Initial soil temperature [K]"
     initial_temperature::NF = 285
 
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
@@ -185,7 +191,7 @@ function timestep!(
     Lᵥ = model.atmosphere.latent_heat_condensation
     Δt = model.time_stepping.Δt_sec
 
-    # Frierson et al. 2006, eq (1)
+    # Sum up flux F following Frierson et al. 2006, eq (1)
     Rs = diagn.physics.surface_shortwave_down
     Rld = diagn.physics.surface_longwave_down
     Rlu = diagn.physics.surface_longwave_up_land    # these fluxes depend on the land state

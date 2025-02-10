@@ -24,6 +24,21 @@ function LandModel(SG::SpectralGrid)
     )
 end
 
+function LandModel(
+    SG::SpectralGrid;
+    temperature = SeasonalLandTemperature,
+    soil_moisture = SeasonalSoilMoisture,
+    vegetation = VegetationClimatology,
+    rivers = NoRivers,
+)
+    return LandModel(
+        temperature(SG),
+        soil_moisture(SG),
+        vegetation(SG),
+        rivers(SG),
+    )
+end
+
 # initializing the land model initializes its components
 function initialize!(   land::LandModel,
                         model::PrimitiveEquation)

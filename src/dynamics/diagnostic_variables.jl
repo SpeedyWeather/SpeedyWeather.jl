@@ -279,6 +279,9 @@ $(TYPEDFIELDS)"""
     "Availability of soil moisture to evaporation [1]"
     soil_moisture_availability::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
+    "River runoff [m/s], diagnostic overflow from soil moisture"
+    river_runoff::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
     # SURFACE FLUXES
     "Sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
