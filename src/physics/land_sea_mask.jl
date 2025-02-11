@@ -95,6 +95,8 @@ function initialize!(land_sea_mask::LandSeaMask, model::PrimitiveEquation)
     RingGrids.grid_cell_average!(land_sea_mask.mask, lsm_highres)
 
     # TODO this shoudln't be necessary, but at the moment grid_cell_average! can return values > 1
+    # lo, hi = extrema(land_sea_mask.mask)
+    # (lo < 0 || hi > 1) && @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
     clamp!(land_sea_mask.mask, 0, 1)
 end
 
