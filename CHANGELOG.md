@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix grid_cell_average! bugs for some grids and resolutions [#673](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/673)
 - Interfaces for interpolation of AbstractGridArray [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
 - Test folder sorted into subfolders [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
 - Land model modularised + land netCDF output [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
