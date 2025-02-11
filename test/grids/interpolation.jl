@@ -211,3 +211,22 @@ end
 
     @test B == C
 end
+
+@testset "Grid cell average" begin
+    for Grid in (   FullGaussianGrid,
+                    FullClenshawGrid,
+                    OctahedralGaussianGrid,
+                    OctahedralClenshawGrid,
+                    OctaminimalGaussianGrid,
+                    HEALPixGrid,
+                    OctaHEALPixGrid)
+                
+        for trunc in (31, 42, 63)
+
+            spectral_grid = SpectralGrid(; trunc, Grid)
+
+            land_sea_mask = LandSeaMask(spectral_grid)
+            initialize!(land_sea_mask, PrimitiveDryModel(spectral_grid))
+        end
+    end
+end
