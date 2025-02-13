@@ -328,12 +328,11 @@ function interpolate(   ::Type{Grid},
 end
 
 function update_locator!(
-    I::AbstractInterpolator{NF, Grid},  # GridGeometry and Locator
-    λs::AbstractVector,                 # longitudes to interpolate onto
-    θs::AbstractVector;                 # latitudes to interpolate onto
-    unsafe::Bool=false,                 # true to disable safety checks
-    ) where {NF<:AbstractFloat, Grid<:AbstractGrid}
-
+    I::AbstractInterpolator,    # GridGeometry and Locator
+    λs::AbstractVector,         # longitudes to interpolate onto
+    θs::AbstractVector;         # latitudes to interpolate onto
+    unsafe::Bool=false,         # true to disable safety checks
+)
     # find latitude ring indices corresponding to interpolation points
     (; latd ) = I.geometry                  # latitudes of rings including north and south pole
     (; js, Δys ) = I.locator                # to be updated: ring indices js, and meridional weights Δys
