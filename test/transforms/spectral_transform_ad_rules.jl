@@ -60,7 +60,7 @@ end
 
 # Enzyme and Julia 1.11 still has some problems, and the test below is broken
 # in Julia 1.11
-if VERSION >= v"1.11.0"
+if VERSION <= v"1.11.0"
     @testset "Complete Differentiability" begin 
         # We do extensive correctness checks and tests on the differentiability 
         # in a seperate test set. But we do want to ensure in the regular CI that 
