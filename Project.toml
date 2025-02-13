@@ -41,7 +41,6 @@ SpeedyWeatherEnzymeExt = "Enzyme"
 SpeedyWeatherFiniteDifferencesExt = "FiniteDifferences"
 SpeedyWeatherGeoMakieExt = "GeoMakie"
 SpeedyWeatherJLArraysExt = "JLArrays"
-SpeedyWeatherJLD2Ext = "JLD2"
 SpeedyWeatherMakieExt = "Makie"
 
 [compat]

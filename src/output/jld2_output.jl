@@ -1,7 +1,4 @@
-using JLD2
-using SpeedyWeather
-using SpeedyWeather.Dates, SpeedyWeather.DocStringExtensions
-import SpeedyWeather: Simulation, AbstractOutput, AbstractFeedback, AbstractSimulation, get_run_id, create_output_folder, DEFAULT_OUTPUT_DT
+export JLD2Output
 
 """Output writer for a JLD2 file that saves the PrognosticVariables
 and DiagnosticVariables structs directly to a JLD2 file. Fields are 
@@ -36,7 +33,7 @@ $(TYPEDFIELDS)"""
     timestep_counter::Int = 0               # time step counter
     output_counter::Int = 0                 # output step counter
 
-    jld2_file::Union{JLD2.JLDFile, Nothing} = nothing
+    jld2_file::Union{JLDFile, Nothing} = nothing
 end 
 
 function Base.show(io::IO, output::JLD2Output) 
@@ -97,11 +94,12 @@ end
 
 Base.close(output::JLD2Output) = close(output.jld2_file)
 
-function SpeedyWeather.output!(outputter, simulation::Simulation)
+function SpeedyWeather.output!(output::JLD2Output, simulation::AbstractSimulation)
     output.output_counter += 1      # output counter increases when writing time
     i = output.output_counter
 
-    (; jld2_file) = output 
+    (; active, jld2_file) = output 
+    active || return nothing    # escape immediately for no jld2 output
 
     jld2_file["$i"] = (simulation.prognostic_variables, simulation.diagnostic_variables)
 end 
