@@ -142,7 +142,7 @@ struct AnvilInterpolator{NF, Grid, Geometry, Locator} <: AbstractInterpolator
     locator::Locator
 end
 
-eltype(::AnvilInterpolator{NF}) where NF = NF
+Base.eltype(::AnvilInterpolator{NF}) where NF = NF
 gridtype(::AnvilInterpolator{NF, Grid}) where {NF, Grid} = Grid
 
 function Base.show(io::IO, L::AbstractInterpolator)
