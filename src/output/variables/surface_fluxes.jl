@@ -1,7 +1,7 @@
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct SensibleHeatFluxOutput <: AbstractOutputVariable
-    name::String = "sensible_heat_flux"
+    name::String = "shf"
     unit::String = "W/m^2"
     long_name::String = "Sensible heat fluxes (positive up)"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
@@ -17,7 +17,7 @@ path(::SensibleHeatFluxOutput, simulation) =
 """Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct EvaporativeFluxOutput <: AbstractOutputVariable
-    name::String = "evaporative_flux"
+    name::String = "ef"
     unit::String = "kg/s/m^2"
     long_name::String = "Surface humidity fluxes (positive up)"
     dims_xyzt::NTuple{4, Bool} = (true, true, false, true)

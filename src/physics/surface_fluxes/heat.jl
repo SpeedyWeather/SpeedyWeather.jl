@@ -67,9 +67,12 @@ function surface_heat_flux!(
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # Only flux from sea if available (not NaN) otherwise zero flux
-    flux_ocean  = isfinite(T_skin_ocean) ? ρ*drag_ocean*V₀*cₚ*(T_skin_ocean  - T)*(1-land_fraction) : 0
-    column.flux_temp_upward[end] += flux_ocean
-    column.sensible_heat_flux = flux_ocean      # ocean sets the flux (=), land accumulates (+=)
+    flux_ocean  = isfinite(T_skin_ocean) ? ρ*drag_ocean*V₀*cₚ*(T_skin_ocean  - T) : zero(T_skin_ocean)
+    column.sensible_heat_flux_ocean = flux_ocean    # to store ocean flux separately too
+    
+    flux_ocean *= (1-land_fraction)                 # weight by ocean fraction of land-sea mask
+    column.flux_temp_upward[end] += flux_ocean      # accumulate with += for sum of all fluxes
+    column.sensible_heat_flux = flux_ocean          # output/diagnostics: ocean sets the flux (=), land accumulates (+=)
 
     return nothing
 end
@@ -107,10 +110,12 @@ function surface_heat_flux!(
 
     # SPEEDY documentation Eq. 54/56, land/sea fraction included
     # Only flux from sea if available (not NaN) otherwise zero flux
-    flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*cₚ*(T_skin_land  - T)*land_fraction : 0
-    column.flux_temp_upward[end] += flux_land
-    column.sensible_heat_flux += flux_land      # ocean sets the flux (=), land accumulates (+=)
-
+    flux_land  = isfinite(T_skin_land) ? ρ*drag_land*V₀*cₚ*(T_skin_land  - T) : zero(T_skin_land)
+    column.sensible_heat_flux_land = flux_land  # store land flux separately too
+    flux_land *= land_fraction                  # weight by land fraction of land-sea mask
+    
+    column.flux_temp_upward[end] += flux_land   # accumulate with += for total flux
+    column.sensible_heat_flux += flux_land      # diagnose/output: ocean sets the flux (=), land accumulates (+=)
     return nothing
 end
 
@@ -130,9 +135,12 @@ function surface_heat_flux!(
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = progn.ocean.sensible_heat_flux[column.ij]*(1-land_fraction)
-    column.flux_temp_upward[end] += flux    # end=lowermost layer
-    column.sensible_heat_flux = flux        # ocean sets the flux (=), land accumulates (+=)
+    flux_ocean = progn.ocean.sensible_heat_flux[column.ij]
+    column.sensible_heat_flux_ocean = flux_ocean    # store ocean flux separately too
+    
+    flux_ocean *= (1-land_fraction)             # weight by ocean fraction of land-sea mask
+    column.flux_temp_upward[end] += flux_ocean  # end=lowermost layer, accumulate with += 
+    column.sensible_heat_flux = flux_ocean      # diagnose/output: ocean sets the flux (=), land accumulates (+=)
 end
 
 ## ----
@@ -151,7 +159,10 @@ function surface_heat_flux!(
     land_fraction = column.land_fraction
 
     # read in a prescribed flux
-    flux = progn.land.sensible_heat_flux[column.ij]*land_fraction
-    column.flux_temp_upward[end] += flux    # end=lowermost layer
-    column.sensible_heat_flux += flux        # ocean sets the flux (=), land accumulates (+=)
+    flux_land = progn.land.sensible_heat_flux[column.ij]
+    column.sensible_heat_flux_land = flux_land  # store land flux separately too
+    
+    flux_land *= land_fraction
+    column.flux_temp_upward[end] += flux_land   # end=lowermost layer, accumulate for total flux with +=
+    column.sensible_heat_flux += flux_land      # ocean sets the flux (=), land accumulates (+=)
 end

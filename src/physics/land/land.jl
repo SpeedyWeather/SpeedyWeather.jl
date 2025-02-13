@@ -6,7 +6,8 @@ include("vegetation.jl")
 include("rivers.jl")
 
 # LandModel defined through its components
-struct LandModel{Temperature, SoilMoisture, Vegetation, Rivers} <: AbstractLand
+export LandModel
+@kwdef struct LandModel{Temperature, SoilMoisture, Vegetation, Rivers} <: AbstractLand
     temperature::Temperature
     soil_moisture::SoilMoisture
     vegetation::Vegetation
@@ -23,6 +24,21 @@ function LandModel(SG::SpectralGrid)
     )
 end
 
+function LandModel(
+    SG::SpectralGrid;
+    temperature = SeasonalLandTemperature,
+    soil_moisture = SeasonalSoilMoisture,
+    vegetation = VegetationClimatology,
+    rivers = NoRivers,
+)
+    return LandModel(
+        temperature(SG),
+        soil_moisture(SG),
+        vegetation(SG),
+        rivers(SG),
+    )
+end
+
 # initializing the land model initializes its components
 function initialize!(   land::LandModel,
                         model::PrimitiveEquation)
@@ -32,7 +48,8 @@ function initialize!(   land::LandModel,
     initialize!(model.land.rivers, model)
 end
 
-struct DryLandModel{Temperature} <: AbstractLand
+export DryLandModel
+@kwdef struct DryLandModel{Temperature} <: AbstractLand
     temperature::Temperature
 end
 

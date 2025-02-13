@@ -1,12 +1,18 @@
 abstract type AbstractLandTemperature <: AbstractParameterization end
 
 export SeasonalLandTemperature
-@kwdef struct SeasonalLandTemperature{NF, Grid} <: AbstractLand
+@kwdef struct SeasonalLandTemperature{NF, Grid} <: AbstractLandTemperature
 
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
 
     # OPTIONS
+    "[OPTION] Depth of top soil layer [m]"
+    z₁::NF = 0.07
+
+    "[OPTION] Depth of root layer [m]"
+    z₂::NF = 0.21
+
     "[OPTION] path to the folder containing the land temperature file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -93,19 +99,19 @@ function timestep!(
                                                 weight  * monthly_temperature[ij, next_month]
     end
 
-    # set other layers to the same temperature
-    for k in eachgrid(soil_temperature)
-        if k != k0
-            soil_temperature[:, k] .= soil_temperature[:, k0]
-        end
-    end
+    # set other layers to the same temperature?
+    # for k in eachgrid(soil_temperature)
+    #     if k != k0
+    #         soil_temperature[:, k] .= soil_temperature[:, k0]
+    #     end
+    # end
 
     return nothing
 end
 
 ## CONSTANT LAND CLIMATOLOGY
 export ConstantLandTemperature
-@kwdef struct ConstantLandTemperature{NF} <: AbstractLand
+@kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Globally constant temperature"
     temperature::NF = 285
 end
@@ -125,3 +131,95 @@ end
 
 # temperature is constant so do nothing during land timestep
 timestep!(progn::PrognosticVariables, diagn::DiagnosticVariables, land::ConstantLandTemperature, args...) = nothing
+
+export LandBucketTemperature
+
+"""MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html). Fields assert
+$(TYPEDFIELDS)"""
+@kwdef struct LandBucketTemperature{NF} <: AbstractLandTemperature
+    "[OPTION] Top layer depth [m]"
+    z₁::NF = 0.1
+
+    "[OPTION] Second layer depth [m]"
+    z₂::NF = 4.0
+
+    "[OPTION] Thermal conductivity of the soil [W/(m K)]"
+    λ::NF = 0.42
+
+    "[OPTION] Field capacity per meter soil [1]"
+    γ::NF = 0.24
+
+    "[OPTION] Heat capacity of water [J/(m³ K)]"
+    Cw::NF = 4.2e6
+
+    "[OPTION] Heat capacity of dry soil [J/(m³ K)]"
+    Cs::NF = 1.13e6 
+
+    "[OPTION] Initial soil temperature [K]"
+    initial_temperature::NF = 285
+
+    "[OPTION] Apply land-sea mask to NaN ocean-only points?"
+    mask::Bool = true
+end
+
+# generator function
+LandBucketTemperature(SG::SpectralGrid; kwargs...) = LandBucketTemperature{SG.NF}(; kwargs...)
+function initialize!(land::LandBucketTemperature, model::PrimitiveEquation)
+    (; nlayers_soil) = model.spectral_grid
+    @assert nlayers_soil == 2 "LandBucketTemperature only works with 2 soil layers "*
+        "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
+    return nothing
+end
+
+function initialize!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    land::LandBucketTemperature,
+    model::PrimitiveEquation,
+)
+    set!(progn.land.soil_temperature, land.initial_temperature)
+    land.mask && mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean)
+end
+
+function timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    land::LandBucketTemperature,
+    model::PrimitiveEquation,
+)
+    (; soil_temperature, soil_moisture) = progn.land
+    Lᵥ = model.atmosphere.latent_heat_condensation
+    Δt = model.time_stepping.Δt_sec
+
+    # Sum up flux F following Frierson et al. 2006, eq (1)
+    Rs = diagn.physics.surface_shortwave_down
+    Rld = diagn.physics.surface_longwave_down
+    Rlu = diagn.physics.surface_longwave_up_land    # these fluxes depend on the land state
+    Ev = diagn.physics.evaporative_flux_land        # use separate land fluxes (not ocean)
+    S = diagn.physics.sensible_heat_flux_land
+
+    @boundscheck grids_match(soil_temperature, Rs, Rld, Rlu, Ev, S, horizontal_only=true) || throw(DimensionMismatch(soil_temperature, Rs))
+    @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
+    (; z₁, z₂, λ, γ, Cw, Cs) = land
+
+    Δ =  2λ/(z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
+
+    for ij in eachgridpoint(soil_moisture, soil_temperature)
+
+        # TODO if mask[ij] == at least partially land? only to skip ocean points?
+
+        # total surface downward heat flux
+        F = Rs[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij]
+
+        # heat capacity of the soil layers 1 and 2 [J/(m³ K)]
+        C₁ = Cw * soil_moisture[ij, 1] * γ + Cs
+        C₂ = Cw * soil_moisture[ij, 2] * γ + Cs
+
+        # vertical diffusion term between layers
+        D = Δ*(soil_temperature[ij, 1] - soil_temperature[ij, 2])
+
+        # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
+        soil_temperature[ij, 1] += Δt/(z₁*C₁)*(F - D)
+        soil_temperature[ij, 2] += Δt/(z₂*C₂)*D
+    end
+end

@@ -26,6 +26,22 @@ for name in names
     end
 end
 
+"""Defines netCDF output for a specific variable, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
+@kwdef mutable struct AlbedoOutput <: AbstractOutputVariable
+    name::String = "alb"
+    unit::String = "1"
+    long_name::String = "albedo"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, false)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 10
+end
+
+path(::AlbedoOutput, simulation) =
+    simulation.model.albedo.albedo
+
 RadiationOutput() = (
     OutgoingLongwaveRadiationOutput(),
     OutgoingShortwaveRadiationOutput(),
@@ -33,4 +49,5 @@ RadiationOutput() = (
     SurfaceShortwaveDownOutput(),
     SurfaceLongwaveUpOutput(),
     SurfaceLongwaveDownOutput(),
+    AlbedoOutput(),
 )

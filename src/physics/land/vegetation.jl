@@ -20,22 +20,27 @@ function timestep!(
     vegetation::NoVegetation,
     model::PrimitiveWet)
     # a "timestep" of no vegetation is just to calculate the soil moisture availability
-    soil_moisture_availability!(diagn, progn, vegetation, model.land.soil_moisture, model)
+    soil_moisture_availability!(diagn, progn, vegetation, model.land.temperature, model)
 end
 
 function soil_moisture_availability!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     vegetation::NoVegetation,
-    soil::AbstractSoil,
+    land::AbstractLandTemperature,
     model::PrimitiveWet,
 )
 
     (; soil_moisture) = progn.land
-    (; D_top, D_root, W_cap, W_wilt) = soil
+    (; W_cap, W_wilt) = vegetation
+    D_top = land.z₁
+    D_root = land.z₂
 
     r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))
-    soil_moisture_availability[ij] = r*D_top*soil_moisture[ij, 1]
+
+    for ij in eachgridpoint(soil_moisture_availability, high_cover, low_cover)
+        soil_moisture_availability[ij] = r*D_top*soil_moisture[ij, 1]
+    end
 
     return nothing
 end
@@ -49,6 +54,12 @@ export VegetationClimatology
     # OPTIONS
     "[OPTION] Combine high and low vegetation factor, a in high + a*low [1]"
     low_veg_factor::NF = 0.8
+
+    "[OPTION] Soil wetness at field capacity [volume fraction]"
+    W_cap::NF = 0.3
+
+    "[OPTION] Soil wetness at wilting point [volume fraction]"
+    W_wilt::NF = 0.17
 
     "[OPTION] path to the folder containing the soil moisture file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
@@ -120,20 +131,22 @@ function timestep!(
     model::PrimitiveWet)
 
     # a "timestep" of vegetation climatology is just to calculate the soil moisture availability
-    soil_moisture_availability!(diagn, progn, vegetation, model.land.soil_moisture, model)
+    soil_moisture_availability!(diagn, progn, vegetation, model.land.temperature, model)
 end
 
 function soil_moisture_availability!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     vegetation::AbstractVegetation,
-    soil::AbstractSoil,
+    land::AbstractLandTemperature,
     model::PrimitiveWet,
 )
     (; soil_moisture_availability) = diagn.physics
     (; soil_moisture) = progn.land
     (; high_cover, low_cover, low_veg_factor) = vegetation
-    (; D_top, D_root, W_cap, W_wilt) = soil
+    (; W_cap, W_wilt) = vegetation
+    D_top = land.z₁
+    D_root = land.z₂
 
     @boundscheck grids_match(high_cover, low_cover, soil_moisture_availability) || throws(BoundsError)
     @boundscheck grids_match(soil_moisture, soil_moisture_availability, horizontal_only=true) || throws(BoundsError)
