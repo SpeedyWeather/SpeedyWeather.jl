@@ -533,7 +533,7 @@ function grid_cell_average!(
         j1 = findlast( θ -> θ <  θ1, colat_in)
 
         for ij in ring
-            ϕ0 = mod(lons_out[ij] - Δϕ/2, 2π)        # western edge
+            ϕ0 = mod(lons_out[ij] - Δϕ/2, 2π)       # western edge
             ϕ1 = ϕ0 + Δϕ                            # eastern edge
             # the last line does not require a mod and in fact throws
             # an error if, as long as the offset from prime meridian
@@ -541,8 +541,12 @@ function grid_cell_average!(
             # Gaussian and Clenshaw grids)
 
             # matrix indices for input grid that lie in output grid cell
-            a = findfirst(ϕ -> ϕ >= ϕ0, lon_in)
-            b = findlast( ϕ -> ϕ <  ϕ1, lon_in)
+            a = findlast( ϕ -> ϕ <  ϕ0, lon_in)     # western edge
+            b = findfirst(ϕ -> ϕ >= ϕ1, lon_in)     # eastern edge
+
+            # map around prime meridian if coordinates outside of range
+            a = isnothing(a) ? nlon_in : a
+            b = isnothing(b) ? 1 : b
             
             # in most cases we will have 1 <= a < b <=n, then loop i in a:b (b:a isn't looping)
             # however at the edges we have a < 1 or n < b the mod turns this into
@@ -550,7 +554,7 @@ function grid_cell_average!(
             ab, ba = b < a ? (1:b, a:nlon_in) : (a:b, b:a)
 
             sum_of_weights = 0
-            @inbounds for j′ in j0:j1
+            for j′ in j0:j1
                     
                 for i in ab
                     w = coslat[j′]

@@ -49,8 +49,27 @@ end
 path(::SoilMoistureAvailabilityOutput, simulation) =
     simulation.diagnostic_variables.physics.soil_moisture_availability
 
+
+"""Defines netCDF output for a specific variable, see `VorticityOutput` for details.
+Fields are $(TYPEDFIELDS)"""
+@kwdef mutable struct LandSeaMaskOutput <: AbstractOutputVariable
+    name::String = "lsm"
+    unit::String = "1"
+    long_name::String = "land-sea mask (1=land, 0=sea)"
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, false)
+    missing_value::Float64 = NaN
+    compression_level::Int = 3
+    shuffle::Bool = true
+    keepbits::Int = 10
+end
+
+path(::LandSeaMaskOutput, simulation) =
+    simulation.model.land_sea_mask.mask
+
+    
 LandOutput() = (
     SoilTemperatureOutput(),
     SoilMoistureOutput(),
     SoilMoistureAvailabilityOutput(),
+    LandSeaMaskOutput(),
 )

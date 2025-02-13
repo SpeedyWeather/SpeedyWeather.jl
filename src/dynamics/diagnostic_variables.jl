@@ -279,12 +279,19 @@ $(TYPEDFIELDS)"""
     "Availability of soil moisture to evaporation [1]"
     soil_moisture_availability::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
+    "River runoff [m/s], diagnostic overflow from soil moisture"
+    river_runoff::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
     # SURFACE FLUXES
     "Sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    sensible_heat_flux_ocean::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    sensible_heat_flux_land::GridVariable2D = zeros(GridVariable2D, nlat_half)
     
     "Evaporative flux [kg/s/m^2], positive up"
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    evaporative_flux_ocean::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    evaporative_flux_land::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     # RADIATION
     "Surface radiation: shortwave up [W/m²]"
@@ -295,6 +302,8 @@ $(TYPEDFIELDS)"""
     
     "Surface radiation: longwave up [W/m²]"
     surface_longwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    surface_longwave_up_ocean::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    surface_longwave_up_land::GridVariable2D = zeros(GridVariable2D, nlat_half)
     
     "Surface radiation: longwave down [W/m²]"
     surface_longwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
