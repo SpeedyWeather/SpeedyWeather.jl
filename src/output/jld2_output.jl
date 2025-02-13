@@ -77,7 +77,7 @@ function SpeedyWeather.initialize!(
     output.timestep_counter = 0         # time step counter
     output.output_counter = 0           # output step counter
 
-    # CREATE NETCDF FILE, vector of NcVars for output
+    # CREATE JLD2 FILE
     (; run_path, filename) = output
 
     jld2_file = jldopen(joinpath(run_path, filename), "w") 
@@ -119,7 +119,7 @@ end
 $(TYPEDFIELDS)
 We can't directly push to arrays in a JLD2 file or have extendable 
 dimensions. This routine rewrites the file to a single vector. 
-Might be turned of if the file doesn't fit into the memory or speed 
+Might be turned off if the file doesn't fit into the memory or speed 
 is a concern. 
 """
 function vectorize_output(output::JLD2Output)
