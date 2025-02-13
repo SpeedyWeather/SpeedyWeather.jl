@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Type instabilities etc flagged by Reactant [#674](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/674)
 - MITgcm's 2-layer land bucket model [#672](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/672)
 - Fix grid_cell_average! bugs for some grids and resolutions [#673](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/673)
 - Interfaces for interpolation of AbstractGridArray [#671](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/671)
