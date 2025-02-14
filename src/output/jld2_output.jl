@@ -25,7 +25,7 @@ $(TYPEDFIELDS)"""
     "[OPTION] output frequency, time step"
     output_dt::Second = Second(DEFAULT_OUTPUT_DT)
 
-    "[OPTION] will reopen and resave the file to save everything in one big vector"
+    "[OPTION] will reopen and resave the file to save everything in one big vector. Turn off is file is too large for memory."
     vectorize_output::Bool = true
 
     # TIME STEPS AND COUNTERS (initialize later)
