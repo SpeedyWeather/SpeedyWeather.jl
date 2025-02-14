@@ -3,12 +3,12 @@ export NoOrography
 
 """Orography with zero height in `orography` and zero surface geopotential `geopot_surf`.
 $(TYPEDFIELDS)"""
-@kwdef struct NoOrography{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractOrography
+@kwdef struct NoOrography{GridVariable2D, SpectralVariable2D} <: AbstractOrography
     "height [m] on grid-point space."
-    orography::Grid
+    orography::GridVariable2D
     
     "surface geopotential, height*gravity [m²/s²]"
-    geopot_surf::LowerTriangularMatrix{Complex{NF}}
+    geopot_surf::SpectralVariable2D
 end
 
 """
@@ -17,12 +17,12 @@ Generator function pulling the resolution information from `spectral_grid` for
 all Orography <: AbstractOrography."""
 function (::Type{Orography})(
     spectral_grid::SpectralGrid;
-    kwargs...
+    kwargs...                       # passes on all other keyword arguments
 ) where Orography <: AbstractOrography
-    (; NF, Grid, nlat_half, trunc) = spectral_grid
-    orography   = zeros(Grid{NF}, nlat_half)
-    geopot_surf = zeros(LowerTriangularMatrix{Complex{NF}}, trunc+2, trunc+1)
-    return Orography{NF, Grid{NF}}(; orography, geopot_surf, kwargs...)
+    (; GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
+    orography   = zeros(GridVariable2D, nlat_half)
+    geopot_surf = zeros(SpectralVariable2D, trunc+2, trunc+1)
+    return Orography(; orography, geopot_surf, kwargs...)
 end
 
 # no further initialization needed
@@ -50,7 +50,7 @@ export ZonalRidge
 
 """Zonal ridge orography after Jablonowski and Williamson, 2006.
 $(TYPEDFIELDS)"""
-@kwdef struct ZonalRidge{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractOrography
+@kwdef struct ZonalRidge{GridVariable2D, SpectralVariable2D} <: AbstractOrography
     
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
@@ -60,11 +60,13 @@ $(TYPEDFIELDS)"""
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
-    orography::Grid
+    orography::GridVariable2D
     
     "surface geopotential, height*gravity [m²/s²]"
-    geopot_surf::LowerTriangularMatrix{Complex{NF}} 
+    geopot_surf::SpectralVariable2D
 end
+
+# no constructor defined as generally for <:AbstractOrography above
 
 # function barrier
 function initialize!(   orog::ZonalRidge,
@@ -75,8 +77,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Initialize the arrays `orography`, `geopot_surf` in `orog` following 
-Jablonowski and Williamson, 2006.
-"""
+Jablonowski and Williamson, 2006."""
 function initialize!(   orog::ZonalRidge,
                         P::AbstractPlanet,
                         S::SpectralTransform,
@@ -93,6 +94,7 @@ function initialize!(   orog::ZonalRidge,
     RΩ = radius*rotation                # [m/s]
     g⁻¹ = inv(gravity)                  # inverse gravity [s²/m]
 
+    # TODO use set! to write this
     for ij in eachindex(φ, orography)
         sinφ = sind(φ[ij])
         cosφ = cosd(φ[ij])
@@ -111,7 +113,7 @@ export EarthOrography
 
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
-@kwdef struct EarthOrography{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractOrography
+@kwdef struct EarthOrography{GridVariable2D, SpectralVariable2D} <: AbstractOrography
 
     # OPTIONS
     "path to the folder containing the orography file, pkg path default"
@@ -124,7 +126,7 @@ $(TYPEDFIELDS)"""
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "scale orography by a factor"
-    scale::Float64 = 1
+    scale::Float64 = 1.0
 
     "smooth the orography field?"
     smoothing::Bool = true
@@ -140,10 +142,10 @@ $(TYPEDFIELDS)"""
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
-    orography::Grid
+    orography::GridVariable2D
     
     "surface geopotential, height*gravity [m²/s²]"
-    geopot_surf::LowerTriangularMatrix{Complex{NF}} 
+    geopot_surf::SpectralVariable2D
 end
 
 # function barrier

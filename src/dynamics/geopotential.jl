@@ -1,13 +1,19 @@
 abstract type AbstractGeopotential <: AbstractModelComponent end
 
 export Geopotential
-Base.@kwdef struct Geopotential{NF} <: AbstractGeopotential
+@kwdef struct Geopotential{NF, VectorType} <: AbstractGeopotential
+
+    "Number of vertical layers"
     nlayers::Int
-    Δp_geopot_half::Vector{NF} = zeros(NF, nlayers)
-    Δp_geopot_full::Vector{NF} = zeros(NF, nlayers)
+
+    "Used to compute the geopotential on half layers"
+    Δp_geopot_half::VectorType = zeros(NF, nlayers)
+
+    "Used to compute the geopotential on full layers"
+    Δp_geopot_full::VectorType = zeros(NF, nlayers)
 end
 
-Geopotential(SG::SpectralGrid) = Geopotential{SG.NF}(; nlayers=SG.nlayers)
+Geopotential(SG::SpectralGrid) = Geopotential{SG.NF, SG.VectorType}(; nlayers=SG.nlayers)
 
 """
 $(TYPEDSIGNATURES)
@@ -59,12 +65,12 @@ function geopotential!(
     
     # BOTTOM FULL LAYER
     local k::Int = nlayers
-    for lm in eachharmonic(geopot, geopot_surf, temp_virt)
+    @inbounds for lm in eachharmonic(geopot, geopot_surf, temp_virt)
         geopot[lm, k] = geopot_surf[lm] + temp_virt[lm, k]*Δp_geopot_full[k]
     end
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
-    for k in nlayers-1:-1:1
+    @inbounds for k in nlayers-1:-1:1
         for lm in eachharmonic(geopot, temp_virt)
             geopot_k½ = geopot[lm, k+1] + temp_virt[lm, k+1]*Δp_geopot_half[k+1] # 1st half layer integration
             geopot[lm, k] = geopot_k½  + temp_virt[lm, k]*Δp_geopot_full[k]      # 2nd onto full layer
