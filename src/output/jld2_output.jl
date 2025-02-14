@@ -116,7 +116,7 @@ function SpeedyWeather.finalize!(
 end
 
 """
-$(TYPEDFIELDS)
+$(TYPEDSIGNATURES)
 We can't directly push to arrays in a JLD2 file or have extendable 
 dimensions. This routine rewrites the file to a single vector. 
 Might be turned off if the file doesn't fit into the memory or speed 
