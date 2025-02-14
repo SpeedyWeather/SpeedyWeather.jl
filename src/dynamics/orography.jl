@@ -56,7 +56,7 @@ $(TYPEDFIELDS)"""
     η₀::Float64 = 0.252
 
     "max amplitude of zonal wind [m/s] that scales orography height"
-    u₀::Float64 = 35
+    u₀::Float64 = 35.0
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
