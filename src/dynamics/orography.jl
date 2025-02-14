@@ -3,7 +3,7 @@ export NoOrography
 
 """Orography with zero height in `orography` and zero surface geopotential `geopot_surf`.
 $(TYPEDFIELDS)"""
-@kwdef struct NoOrography{GridVariable2D, SpectralVariable2D} <: AbstractOrography
+@kwdef struct NoOrography{NF, GridVariable2D, SpectralVariable2D} <: AbstractOrography
     "height [m] on grid-point space."
     orography::GridVariable2D
     
@@ -11,18 +11,12 @@ $(TYPEDFIELDS)"""
     geopot_surf::SpectralVariable2D
 end
 
-"""
-$(TYPEDSIGNATURES)
-Generator function pulling the resolution information from `spectral_grid` for
-all Orography <: AbstractOrography."""
-function (::Type{Orography})(
-    spectral_grid::SpectralGrid;
-    kwargs...                       # passes on all other keyword arguments
-) where Orography <: AbstractOrography
-    (; GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
+# constructor
+function NoOrography(spectral_grid::SpectralGrid)
+    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
     orography   = zeros(GridVariable2D, nlat_half)
     geopot_surf = zeros(SpectralVariable2D, trunc+2, trunc+1)
-    return Orography(; orography, geopot_surf, kwargs...)
+    return NoOrography{NF, GridVariable2D, SpectralVariable2D}(; orography, geopot_surf)
 end
 
 # no further initialization needed
@@ -50,13 +44,13 @@ export ZonalRidge
 
 """Zonal ridge orography after Jablonowski and Williamson, 2006.
 $(TYPEDFIELDS)"""
-@kwdef struct ZonalRidge{GridVariable2D, SpectralVariable2D} <: AbstractOrography
+@kwdef struct ZonalRidge{NF, GridVariable2D, SpectralVariable2D} <: AbstractOrography
     
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
-    η₀::Float64 = 0.252
+    η₀::NF = 0.252
 
     "max amplitude of zonal wind [m/s] that scales orography height"
-    u₀::Float64 = 35.0
+    u₀::NF = 35
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
@@ -66,7 +60,14 @@ $(TYPEDFIELDS)"""
     geopot_surf::SpectralVariable2D
 end
 
-# no constructor defined as generally for <:AbstractOrography above
+# constructor
+function ZonalRidge(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
+    orography   = zeros(GridVariable2D, nlat_half)
+    geopot_surf = zeros(SpectralVariable2D, trunc+2, trunc+1)
+    return ZonalRidge{NF, GridVariable2D, SpectralVariable2D}(;
+        orography, geopot_surf, kwargs...)
+end
 
 # function barrier
 function initialize!(   orog::ZonalRidge,
@@ -113,7 +114,7 @@ export EarthOrography
 
 """Earth's orography read from file, with smoothing.
 $(TYPEDFIELDS)"""
-@kwdef struct EarthOrography{GridVariable2D, SpectralVariable2D} <: AbstractOrography
+@kwdef struct EarthOrography{NF, GridVariable2D, SpectralVariable2D} <: AbstractOrography
 
     # OPTIONS
     "path to the folder containing the orography file, pkg path default"
@@ -126,19 +127,19 @@ $(TYPEDFIELDS)"""
     file_Grid::Type{<:AbstractGrid} = FullGaussianGrid
 
     "scale orography by a factor"
-    scale::Float64 = 1.0
+    scale::NF = 1.0
 
     "smooth the orography field?"
     smoothing::Bool = true
 
     "power of Laplacian for smoothing"
-    smoothing_power::Float64 = 1.0
+    smoothing_power::NF = 1.0
 
     "highest degree l is multiplied by"
-    smoothing_strength::Float64 = 0.1
+    smoothing_strength::NF = 0.1
 
     "fraction of highest wavenumbers to smooth"
-    smoothing_fraction::Float64 = 0.05
+    smoothing_fraction::NF = 0.05
 
     # FIELDS (to be initialized in initialize!)
     "height [m] on grid-point space."
@@ -146,6 +147,15 @@ $(TYPEDFIELDS)"""
     
     "surface geopotential, height*gravity [m²/s²]"
     geopot_surf::SpectralVariable2D
+end
+
+# constructor
+function EarthOrography(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
+    orography   = zeros(GridVariable2D, nlat_half)
+    geopot_surf = zeros(SpectralVariable2D, trunc+2, trunc+1)
+    return EarthOrography{NF, GridVariable2D, SpectralVariable2D}(;
+        orography, geopot_surf, kwargs...)
 end
 
 # function barrier
