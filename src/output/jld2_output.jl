@@ -16,7 +16,7 @@ $(TYPEDFIELDS)"""
     id::String = "0001"
     run_path::String = ""                   # will be determined in initalize!
     
-    "[OPTION] name of the output netcdf file"
+    "[OPTION] name of the output jld2 file"
     filename::String = "output.jld2"
     
     "[OPTION] also write restart file if output==true?"
@@ -48,11 +48,10 @@ function Base.show(io::IO, output::JLD2Output)
     println(io, "└ frequency: $(output.output_dt)")
 end
 
-
 """$(TYPEDSIGNATURES)
 Initialize JLD2 `output` by creating a JLD2 file. 
 To be called just before the first timesteps."""
-function SpeedyWeather.initialize!(   
+function initialize!(   
     output::JLD2Output,
     feedback::AbstractFeedback,
     progn::PrognosticVariables,
@@ -101,7 +100,7 @@ end
 
 Base.close(output::JLD2Output) = close(output.jld2_file)
 
-function SpeedyWeather.output!(output::JLD2Output, simulation::AbstractSimulation)
+function output!(output::JLD2Output, simulation::AbstractSimulation)
     output.output_counter += 1      # output counter increases when writing time
     i = output.output_counter
 
@@ -115,7 +114,7 @@ function SpeedyWeather.output!(output::JLD2Output, simulation::AbstractSimulatio
     end 
 end 
 
-function SpeedyWeather.finalize!(
+function finalize!(
     output::JLD2Output,
     simulation::AbstractSimulation,
 )   
