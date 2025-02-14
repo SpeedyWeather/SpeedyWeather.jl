@@ -26,7 +26,7 @@ using JLD2
         @test f["output_vector"][1][1].temp[i] == progn_ic.temp[i]
     end 
 
-    # the last output in the simuluation is unscaled, shifted and compressed by `write_restart_file` 
+    # the last output in the simuluation is unscaled, shifted and compressed by `write_restart_file!` 
     # for comparision we need to do that as well
     final_output = f["output_vector"][end][1] 
     SpeedyWeather.unscale!(final_output)
