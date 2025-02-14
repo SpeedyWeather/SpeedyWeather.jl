@@ -70,6 +70,7 @@ $(TYPEDFIELDS)
     # ARRAY TYPES (horizontal dimension in grid/spectral is flattened to 1D)
     VectorType::Type{<:AbstractVector} = ArrayType{NF, 1}
     MatrixType::Type{<:AbstractMatrix} = ArrayType{NF, 2}
+    TensorType::Type{<:AbstractArray} = ArrayType{NF, 3}
     SpectralVariable2D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}}
     SpectralVariable3D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 2, ArrayType{Complex{NF}, 2}}
     SpectralVariable4D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 3, ArrayType{Complex{NF}, 3}}
