@@ -26,17 +26,14 @@ using JLD2
         @test f["output_vector"][1][1].temp[i] == progn_ic.temp[i]
     end 
 
-    # final output is unscaled, for comparision we need to do that as well
+    # the last output in the simuluation is unscaled, shifted and compressed by `write_restart_file` 
+    # for comparision we need to do that as well
     final_output = f["output_vector"][end][1] 
     SpeedyWeather.unscale!(final_output)
-    #=
-    for i in eachindex(progn_ic.vor)
-        @test isapprox(final_output.vor[i], simulation.prognostic_variables.vor[i], atol=1e-4)
-        @test isapprox(final_output.div[i], simulation.prognostic_variables.div[i], atol=1e-4)
-        @test isapprox(final_output.humid[i], simulation.prognostic_variables.humid[i], atol=1e-3)
-        @test isapprox(final_output.pres[i], simulation.prognostic_variables.pres[i], atol=1e-2)
-        @test isapprox(final_output.temp[i], simulation.prognostic_variables.temp[i], atol=1e-2)
-    end 
-    =#
-
+    
+    @test isapprox(final_output.vor[2], simulation.prognostic_variables.vor[1], atol=1e-6)
+    @test isapprox(final_output.div[2], simulation.prognostic_variables.div[1], atol=1e-6)
+    @test isapprox(final_output.humid[2], simulation.prognostic_variables.humid[1], atol=1e-4)
+    @test isapprox(final_output.pres[2], simulation.prognostic_variables.pres[1], rtol=1e-4)
+    @test isapprox(final_output.temp[2], simulation.prognostic_variables.temp[1], rtol=1e-3)
 end 
