@@ -1,22 +1,32 @@
 abstract type AbstractAlbedo <: AbstractModelComponent end
 
+struct Albedo{Ocean, Land} <: AbstractAlbedo
+    ocean::Ocean
+    land::Land
+end
+
+function Albedo(SG::SpectralGrid;
+    ocean = GlobalConstantAlbedo(SG, α=0.06),
+    land = GlobalConstantAlbedo(SG, α=0.4))
+    return Albedo{typeof(ocean), typeof(land)}(ocean, land)
+end
+
+function initialize!(albedo::Albedo, model::PrimitiveEquation)
+    initialize!(albedo.ocean, model)
+    initialize!(albedo.land, model)
+end
+
+
+
 ## GLOBAL CONSTANT ALBEDO
-
 export GlobalConstantAlbedo
-Base.@kwdef struct GlobalConstantAlbedo{NF,Grid} <: AbstractAlbedo
-    nlat_half::Int
-    α::NF = 0.8
-    albedo::Grid = zeros(Grid, nlat_half)
+@kwdef struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
+    α::NF = 0.3
 end
 
-function GlobalConstantAlbedo(SG::SpectralGrid; kwargs...)
-    (;NF, Grid, nlat_half) = SG
-    GlobalConstantAlbedo{NF, Grid{NF}}(; nlat_half, kwargs...)
-end
+GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)
+initialize!(albedo::GlobalConstantAlbedo,::PrimitiveEquation) = nothing
 
-function initialize!(albedo::GlobalConstantAlbedo,::PrimitiveEquation)
-    albedo.albedo .= albedo.α
-end
 
 ## ALEBDO CLIMATOLOGY
 
