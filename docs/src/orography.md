@@ -226,14 +226,23 @@ The following explains what's necessary for this. The new `MyOrography` has to b
 (`mutable` or not, but always with `@kwdef`)
 
 ```@example orography
-@kwdef struct MyOrography{NF, Grid<:RingGrids.AbstractGrid{NF}} <: SpeedyWeather.AbstractOrography
+@kwdef struct MyOrography{NF, GridVariable2D, SpectralVariable2D} <: SpeedyWeather.AbstractOrography
     # optional, any parameters as fields here, e.g.
-    constant_height::Float64 = 100
+    constant_height::NF = 100
     # add some other parameters with default values
 
     # mandatory, every <:AbstractOrography needs those (same name, same type)
-    orography::Grid                                 # in grid-point space [m]
-    geopot_surf::LowerTriangularMatrix{Complex{NF}} # in spectral space *gravity [m^2/s^2]
+    orography::GridVariable2D           # in grid-point space [m]
+    geopot_surf::SpectralVariable2D     # in spectral space *gravity [m^2/s^2]
+end
+
+# constructor
+function MyOrography(spectral_grid::SpectralGrid; kwargs...)
+    (; NF, GridVariable2D, SpectralVariable2D, nlat_half, trunc) = spectral_grid
+    orography   = zeros(GridVariable2D, nlat_half)
+    geopot_surf = zeros(SpectralVariable2D, trunc+2, trunc+1)
+    return MyOrography{NF, GridVariable2D, SpectralVariable2D}(;
+        orography, geopot_surf, kwargs...)
 end
 ```
 
