@@ -1,7 +1,8 @@
 export JLD2Output
 
 """Output writer for a JLD2 file that saves the PrognosticVariables
-and DiagnosticVariables structs directly to a JLD2 file. Fields are 
+and DiagnosticVariables structs directly to a JLD2 file. All internal
+scalings and units are still applied to these outputs. Fields are 
 $(TYPEDFIELDS)"""
 @kwdef mutable struct JLD2Output <: AbstractOutput
 
@@ -25,8 +26,11 @@ $(TYPEDFIELDS)"""
     "[OPTION] output frequency, time step"
     output_dt::Second = Second(DEFAULT_OUTPUT_DT)
 
-    "[OPTION] will reopen and resave the file to save everything in one big vector. Turn off is file is too large for memory."
-    vectorize_output::Bool = true
+    "[OPTION] will reopen and resave the file to merge everything in one big vector. Turn off if the file is too large for memory."
+    merge_output::Bool = true
+
+    "[OPTION] output the DiagnosticVariables as well" 
+    output_diagnostic::Bool = true 
 
     # TIME STEPS AND COUNTERS (initialize later)
     output_every_n_steps::Int = 0           # output frequency
@@ -46,8 +50,8 @@ end
 
 
 """$(TYPEDSIGNATURES)
-Initialize NetCDF `output` by creating a netCDF file and storing the initial conditions
-of `diagn` (and `progn`). To be called just before the first timesteps."""
+Initialize JLD2 `output` by creating a JLD2 file. 
+To be called just before the first timesteps."""
 function SpeedyWeather.initialize!(   
     output::JLD2Output,
     feedback::AbstractFeedback,
@@ -83,6 +87,9 @@ function SpeedyWeather.initialize!(
     jld2_file = jldopen(joinpath(run_path, filename), "w") 
     output.jld2_file = jld2_file
 
+    # write iniital condition 
+    output!(output, Simulation(progn, diagn, model))
+
     # also export parameters into run????/parameters.txt
     parameters_txt = open(joinpath(output.run_path, "parameters.txt"), "w")
     for property in propertynames(model)
@@ -98,18 +105,22 @@ function SpeedyWeather.output!(output::JLD2Output, simulation::AbstractSimulatio
     output.output_counter += 1      # output counter increases when writing time
     i = output.output_counter
 
-    (; active, jld2_file) = output 
+    (; active, jld2_file, output_diagnostic) = output 
     active || return nothing    # escape immediately for no jld2 output
 
-    jld2_file["$i"] = (simulation.prognostic_variables, simulation.diagnostic_variables)
+    if output_diagnostic
+        jld2_file["$i"] = (simulation.prognostic_variables, simulation.diagnostic_variables)
+    else 
+        jld2_file["$i"] = simulation.prognostic_variables
+    end 
 end 
 
 function SpeedyWeather.finalize!(
     output::JLD2Output,
     simulation::AbstractSimulation,
 )   
-    if output.vectorize_output
-        vectorize_output(output)
+    if output.merge_output
+        merge_output(output)
     else  
         close(output)
     end 
@@ -122,7 +133,7 @@ dimensions. This routine rewrites the file to a single vector.
 Might be turned off if the file doesn't fit into the memory or speed 
 is a concern. 
 """
-function vectorize_output(output::JLD2Output)
+function merge_output(output::JLD2Output)
     (; output_counter, jld2_file, run_path, filename) = output
 
     output_vector = Vector{typeof(jld2_file["1"])}(undef, output_counter)
