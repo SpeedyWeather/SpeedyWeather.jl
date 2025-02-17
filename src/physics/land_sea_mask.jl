@@ -65,7 +65,7 @@ export LandSeaMask
 
 """Land-sea mask, fractional, read from file.
 $(TYPEDFIELDS)"""
-@kwdef struct LandSeaMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask
+@kwdef struct LandSeaMask{NF, GridVariable2D} <: AbstractLandSeaMask
 
     # OPTIONS
     "path to the folder containing the land-sea mask file, pkg path default"
@@ -79,16 +79,16 @@ $(TYPEDFIELDS)"""
 
     # FIELDS (to be initialized in initialize!)
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
-    mask::Grid
+    mask::GridVariable2D
 end
 
 """
 $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
 function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, Grid, nlat_half) = spectral_grid
-    mask = zeros(Grid{NF}, nlat_half)
-    return L{NF, Grid{NF}}(; mask, kwargs...)
+    (; NF, GridVariable2D, nlat_half) = spectral_grid
+    mask = zeros(GridVariable2D, nlat_half)
+    return L{NF, GridVariable2D}(; mask, kwargs...)
 end
 
 # set mask with grid, scalar, function; just define path `mask.mask` to grid here
@@ -132,9 +132,9 @@ export AquaPlanetMask
 
 """Land-sea mask with zero = sea everywhere.
 $(TYPEDFIELDS)"""
-@kwdef struct AquaPlanetMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask
+@kwdef struct AquaPlanetMask{NF, GridVariable2D} <: AbstractLandSeaMask
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
-    mask::Grid
+    mask::GridVariable2D
 end
 
 """
@@ -149,9 +149,9 @@ export RockyPlanetMask
 
 """Land-sea mask with one = land everywhere.
 $(TYPEDFIELDS)"""
-@kwdef struct RockyPlanetMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask
+@kwdef struct RockyPlanetMask{NF, GridVariable2D} <: AbstractLandSeaMask
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
-    mask::Grid
+    mask::GridVariable2D
 end
 
 """
