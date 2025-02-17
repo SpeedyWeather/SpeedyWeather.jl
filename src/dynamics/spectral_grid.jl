@@ -31,30 +31,63 @@ $(TYPEDFIELDS)
     "[OPTION] array type to use for all variables"
     ArrayType::Type{<:AbstractArray} = default_array_type(device)
 
-    # HORIZONTAL
+    "[DERIVED] Type of vector"
+    VectorType::Type{<:AbstractVector} = ArrayType{NF, 1}
+
+    "[DERIVED] Type of matrix"
+    MatrixType::Type{<:AbstractMatrix} = ArrayType{NF, 2}
+
+    "[DERIVED] Type of 3D array"
+    TensorType::Type{<:AbstractArray} = ArrayType{NF, 3}
+    
+    # HORIZONTAL SPECTRAL
     "[OPTION] horizontal resolution as the maximum degree of spherical harmonics"
     trunc::Int = DEFAULT_TRUNC
 
+    "[DERIVED] Type of spectral variable in 2D (horizontal only, flattened into 1D vector)"
+    SpectralVariable2D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}}
+
+    "[DERIVED] Type of spectral variable in 3D (horizontal only + e.g vertical, flattened into 2D matrix)"
+    SpectralVariable3D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 2, ArrayType{Complex{NF}, 2}}
+
+    "[DERIVED] Type of spectral variable in 4D (horizontal only + e.g. vertical and time, flattened into 3D array)"
+    SpectralVariable4D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 3, ArrayType{Complex{NF}, 3}}
+    
+    # HORIZONTAL GRID
     "[OPTION] horizontal grid used for calculations in grid-point space"
     Grid::Type{<:AbstractGrid} = DEFAULT_GRID
+
+    "[DERIVED] Type of grid variable in 2D (horizontal only, flattened into 1D vector)"
+    GridVariable2D::Type{<:AbstractArray} = RingGrids.nonparametric_type(Grid){NF, 1, ArrayType{NF, 1}}
+    
+    "[DERIVED] Type of grid variable in 3D (horizontal + e.g. vertical, flattened into 2D matrix)"
+    GridVariable3D::Type{<:AbstractArray} = RingGrids.nonparametric_type(Grid){NF, 2, ArrayType{NF, 2}}
+    
+    "[DERIVED] Type of grid variable in 4D (horizontal + e.g. vertical + time, flattened into 3D array)"
+    GridVariable4D::Type{<:AbstractArray} = RingGrids.nonparametric_type(Grid){NF, 3, ArrayType{NF, 3}}
 
     "[OPTION] how to match spectral with grid resolution: dealiasing factor, 1=linear, 2=quadratic, 3=cubic grid"
     dealiasing::Float64 = 2
 
+    # TODO move to planet?
     "[OPTION] radius of the sphere [m]"
     radius::Float64 = DEFAULT_RADIUS
 
+    # PARTICLES
     "[OPTION] number of particles for particle advection [1]"
     nparticles::Int = 0
 
+    "[DERIVED] ArrayType of particle vector"
+    ParticleVector::Type{<:AbstractArray} = ArrayType{Particle{NF}, 1}
+
     # SIZE OF GRID from trunc, Grid, dealiasing:
-    "number of latitude rings on one hemisphere (Equator incl)"
+    "[DERIVED] number of latitude rings on one hemisphere (Equator incl)"
     nlat_half::Int = SpeedyTransforms.get_nlat_half(trunc, dealiasing)
 
-    "number of latitude rings on both hemispheres"
+    "[DERIVED] number of latitude rings on both hemispheres"
     nlat::Int = RingGrids.get_nlat(Grid, nlat_half)
 
-    "total number of grid points in the horizontal"
+    "[DERIVED] total number of grid points in the horizontal"
     npoints::Int = RingGrids.get_npoints(Grid, nlat_half)
 
     # VERTICAL
@@ -63,25 +96,10 @@ $(TYPEDFIELDS)
 
     "[OPTION] number of vertical layers in the soil/land"
     nlayers_soil::Int = DEFAULT_NLAYERS_SOIL
-
-    "[OPTION] coordinates used to discretize the vertical"
-    vertical_coordinates::VerticalCoordinates = SigmaCoordinates(; nlayers)
-
-    # ARRAY TYPES (horizontal dimension in grid/spectral is flattened to 1D)
-    VectorType::Type{<:AbstractVector} = ArrayType{NF, 1}
-    MatrixType::Type{<:AbstractMatrix} = ArrayType{NF, 2}
-    TensorType::Type{<:AbstractArray} = ArrayType{NF, 3}
-    SpectralVariable2D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 1, ArrayType{Complex{NF}, 1}}
-    SpectralVariable3D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 2, ArrayType{Complex{NF}, 2}}
-    SpectralVariable4D::Type{<:AbstractArray} = LowerTriangularArray{Complex{NF}, 3, ArrayType{Complex{NF}, 3}}
-    GridVariable2D::Type{<:AbstractArray} = RingGrids.nonparametric_type(Grid){NF, 1, ArrayType{NF, 1}}
-    GridVariable3D::Type{<:AbstractArray} = RingGrids.nonparametric_type(Grid){NF, 2, ArrayType{NF, 2}}
-    GridVariable4D::Type{<:AbstractArray} = RingGrids.nonparametric_type(Grid){NF, 3, ArrayType{NF, 3}}
-    ParticleVector::Type{<:AbstractArray} = ArrayType{Particle{NF}, 1}
 end
 
 function Base.show(io::IO, SG::SpectralGrid)
-    (; NF, trunc, Grid, radius, nlat, npoints, nlayers, nlayers_soil, vertical_coordinates) = SG
+    (; NF, trunc, Grid, radius, nlat, npoints, nlayers, nlayers_soil) = SG
     (; device, ArrayType) = SG
     (; nparticles) = SG
 
@@ -95,15 +113,14 @@ function Base.show(io::IO, SG::SpectralGrid)
     println(io, "├ Resolution: $(s(average_resolution))km (average)")
     nparticles > 0 &&
     println(io, "├ Particles:  $nparticles")
-    println(io, "├ Vertical:   $nlayers-layer $(typeof(vertical_coordinates)), $nlayers_soil-layer land")
+    println(io, "├ Vertical:   $nlayers-layer atmosphere, $nlayers_soil-layer land")
       print(io, "└ Device:     $(typeof(device)) using $ArrayType")
 end
 
 # also allow spectral grid to be passed on as first an only positional argument to model constructors
 (M::Type{<:AbstractModel})(SG::SpectralGrid; kwargs...) = M(spectral_grid=SG; kwargs...)
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Generator function for a SpectralTransform struct pulling in parameters from a SpectralGrid struct."""
 function SpeedyTransforms.SpectralTransform(spectral_grid::SpectralGrid;
                                             one_more_degree::Bool = true,
