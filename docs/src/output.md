@@ -242,7 +242,7 @@ As an alternative to the NetCDF output, it is also possible to directly output t
 
 ```@example netcdf 
 spectral_grid = SpectralGrid()
-output = JLD2Output(dt=Hour(1))
+output = JLD2Output(output_dt=Hour(1))
 model = ShallowWaterModel(spectral_grid, output=output)
 model.output
 ```
