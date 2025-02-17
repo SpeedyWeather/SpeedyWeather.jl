@@ -235,3 +235,20 @@ The actual options are declared as `[OPTION]` in the following
 ```@example netcdf
 @doc NetCDFOutput
 ```
+
+# JLD2 Output 
+
+As an alternative to the NetCDF output, it is also possible to directly output the `PrognosticVariables` and `DiagnosticVariables` to a JLD2 file. This might be interesting if you are really interested in the model internals, or also for some machine learning tasks. However, this option doesn't feature any possibilites to regrid or select variables, and it comes with the usual limitations of serialized JLD2 data: SpeedyWeather.jl always has to be in the scope when loading the data and the saved files might only load properly with exactly the same version of SpeedyWeather.jl and Julia as used when saving the data. Its usage is similar to the NetCDF output above:
+
+```@example netcdf 
+spectral_grid = SpectralGrid()
+output = JLD2Output(dt=Hour(1))
+model = ShallowWaterModel(spectral_grid, output=output)
+model.output
+```
+
+With all options shown below 
+
+```@example netcdf 
+@doc JLD2Output
+```
