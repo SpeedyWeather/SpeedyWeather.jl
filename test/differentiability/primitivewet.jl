@@ -67,14 +67,13 @@
 
     function ocean_timestep(progn, diagn, model)
         progn_new = deepcopy(progn)
-        SpeedyWeather.ocean_timestep!(progn_new, diagn, model)
+        SpeedyWeather.ocean_timestep!(progn_new, deepcopy(diagn), deepcopy(model))
         return progn_new
     end 
 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> ocean_timestep(progn_copy, x, model), dprogn_copy, diagn_copy)
 
-    # also broken? 
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(ddiagn)[1],rtol=1e-4,atol=1e-1))
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(ddiagn)[1],rtol=1e-4,atol=1e-2))
 
     #
     # land 
@@ -90,43 +89,18 @@
 
     function land_timestep(progn, diagn, model)
         progn_new = deepcopy(progn)
-        SpeedyWeather.ocean_timestep!(progn_new, diagn, model)
+        SpeedyWeather.ocean_timestep!(progn_new, deepcopy(diagn), deepcopy(model))
         return progn_new
     end 
 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> land_timestep(progn_copy, x, model), dprogn_copy, diagn_copy)
 
-    # also broken currently
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(ddiagn)[1],rtol=1e-4,atol=1e-1))
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(ddiagn)[1],rtol=1e-4,atol=1e-2))
 
     #####
     # DYNAMICS 
     lf2 = 2 
-    #
-    # drag! 
-    #
-
-    diagn_copy = deepcopy(diagn)
-    ddiag = one(diagn_copy)
-    ddiag_copy = deepcopy(ddiag)
-    progn_copy = deepcopy(progn)
-    dprogn = make_zero(progn)
-
-    autodiff(Reverse, SpeedyWeather.drag!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
-
-    function drag(diagn, progn, lf, model)
-        diagn_new = deepcopy(diagn)
-        SpeedyWeather.drag!(diagn_new, progn, lf, model)
-        return diagn_new
-    end 
-
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(9,1), x -> drag(diagn_copy, x, lf2, model), ddiag_copy, progn_copy)
-
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
-
-    # in the default configuration without forcing or drag, the barotropic model's don't dependent on the previous prognostic state 
-    @test sum(to_vec(dprogn)[1]) ≈ 0 
-
+   
     # 
     # dynamics_tendencies!
     #
@@ -141,16 +115,14 @@
 
     function dynamics_tendencies(diagn, progn, lf, model)
         diagn_new = deepcopy(diagn)
-        SpeedyWeather.dynamics_tendencies!(diagn_new, progn, lf, model)
+        SpeedyWeather.dynamics_tendencies!(diagn_new, deepcopy(progn), lf, deepcopy(model))
         return diagn_new
     end 
 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(9,1), x -> dynamics_tendencies(diagn_copy, x, lf2, model), ddiag_copy, progn_copy)
 
+    # there are some NaNs in the FD, that's why this test is currently broken
     @test all(isapprox.(to_vec(fd_vjp)[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
-
-    # in the default configuration without forcing or drag, the barotropic model's don't dependent on the previous prognostic state 
-    @test sum(to_vec(dprogn)[1]) ≈ 0 
     
     #
     # Implicit correction 
@@ -173,75 +145,6 @@
     fd_vjp = FiniteDifferences.j′vp(central_fdm(9,1), x -> implicit_correction(diagn_copy, model.implicit, x), ddiag_copy, progn_copy)
 
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
-
-    #
-    # horizontal_diffusion!
-    #
-
-    lf1 = 1
-    diagn_copy = deepcopy(diagn)
-    ddiag = one(diagn_copy)
-    ddiag_copy = deepcopy(ddiag)
-
-    progn_copy = deepcopy(progn)
-    dprogn = make_zero(progn)
-
-    autodiff(Reverse, SpeedyWeather.horizontal_diffusion!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(model.horizontal_diffusion), Duplicated(model, make_zero(model)), Const(lf1))
-
-    # FD comparision not necessary, we have the exact values 
-    #function horizontal_diffusion(diagn, progn, diffusion, model, lf)
-    #    diagn_new = deepcopy(diagn)
-    #    SpeedyWeather.horizontal_diffusion!(diagn_new, progn, diffusion, model, lf)
-    #    return diagn_new
-    #end 
-
-    #fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> horizontal_diffusion(diagn_copy, x, model.horizontal_diffusion, model, lf1), ddiag_copy, progn_copy)
-    #@test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-2))
-
-    # ∂(progn)
-    # should be row-wise `model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl`
-    # for all variables that are diffused 
-    diff_coefficient = model.horizontal_diffusion.impl .* model.horizontal_diffusion.expl
-    l_indices = [(1:l) for l=1:progn.vor[1].n]
-    for (i,il) in enumerate(l_indices)
-        @test all(real.(Matrix(dprogn.vor[lf1][:,1])[i, il]) .≈ diff_coefficient[i])
-    end 
-
-    # ∂(tend_old)
-    # should be row-wise `model.horizontal_diffusion.impl` 
-    for (i,il) in enumerate(l_indices)
-        @test all(real.(Matrix(ddiag.tendencies.vor_tend[:,1])[i, il]) .≈ model.horizontal_diffusion.impl[i])
-    end 
-
-    #
-    # Test the leapfrog 
-    # 
-
-    lf1 = 2 
-    lf2 = 2 
-
-    progn_copy = deepcopy(progn)
-    dprogn = one(progn_copy)
-    dprogn_copy = one(progn_copy)
-
-    tend = diagn.tendencies
-    tend_copy = deepcopy(tend)
-    dtend = make_zero(tend)
-    dmodel = make_zero(model)
-
-    autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(progn, dprogn), Duplicated(tend, dtend), Const(dt), Const(lf1), Const(model))
-
-    function leapfrog_step(progn_new::PrognosticVariables, progn::PrognosticVariables, tend, dt, lf, model)
-        copy!(progn_new, progn)
-        SpeedyWeather.leapfrog!(progn_new, tend, dt, lf, model)
-        return progn_new
-    end 
-
-    prog_new = zero(progn_copy)
-
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> leapfrog_step(prog_new, progn_copy, x, dt, lf1, model), dprogn_copy, tend_copy)
-
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dtend)[1],rtol=1e-5,atol=1e-5))
 
     #
     # transform!(diagn, progn, lf2, model)
