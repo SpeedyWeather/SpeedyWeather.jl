@@ -15,14 +15,14 @@ export LandModel
 end
 
 # default constructor
-function LandModel(SG::SpectralGrid)
+#=function LandModel(SG::SpectralGrid)
     return LandModel(
         SeasonalLandTemperature(SG),
         SeasonalSoilMoisture(SG),
         VegetationClimatology(SG),
         NoRivers(SG),
     )
-end
+end =#
 
 function LandModel(
     SG::SpectralGrid;
