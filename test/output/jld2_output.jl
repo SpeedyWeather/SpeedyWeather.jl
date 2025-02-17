@@ -3,8 +3,10 @@ using JLD2
 @testset "JLD2 Output" begin 
     tmp_output_path = mktempdir(pwd(), prefix = "tmp_testruns_")  # Cleaned up when the process exits
 
-    spectral_grid = SpectralGrid()          
-    output = JLD2Output(path=tmp_output_path, id="jld2-test", output_diagnostic=true)
+    spectral_grid = SpectralGrid()   
+    
+    # write-restart false is important to not mutate the final state in the simulation object
+    output = JLD2Output(path=tmp_output_path, id="jld2-test", output_diagnostic=true, write_restart=false)
     model = PrimitiveWetModel(; spectral_grid, output) 
     simulation = initialize!(model)  
     initialize!(simulation)
@@ -31,9 +33,11 @@ using JLD2
     final_output = f["output_vector"][end][1] 
     SpeedyWeather.unscale!(final_output)
     
-    @test isapprox(final_output.vor[2], simulation.prognostic_variables.vor[1], atol=1e-6)
-    @test isapprox(final_output.div[2], simulation.prognostic_variables.div[1], atol=1e-6)
-    @test isapprox(final_output.humid[2], simulation.prognostic_variables.humid[1], atol=1e-4)
-    @test isapprox(final_output.pres[2], simulation.prognostic_variables.pres[1], rtol=1e-4)
-    @test isapprox(final_output.temp[2], simulation.prognostic_variables.temp[1], rtol=1e-3)
+    for i in eachindex(progn_ic.vor)
+        @test final_output.vor[i] == simulation.prognostic_variables.vor[i]
+        @test final_output.div[i] == simulation.prognostic_variables.div[i]
+        @test final_output.humid[i] == simulation.prognostic_variables.humid[i]
+        @test final_output.pres[i] == simulation.prognostic_variables.pres[i]
+        @test final_output.temp[i] == simulation.prognostic_variables.temp[i]
+    end
 end 

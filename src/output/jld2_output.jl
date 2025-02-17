@@ -29,6 +29,9 @@ $(TYPEDFIELDS)"""
     "[OPTION] will reopen and resave the file to merge everything in one big vector. Turn off if the file is too large for memory."
     merge_output::Bool = true
 
+    "[OPTION] output the PrognosticVariables" 
+    output_prognostic::Bool = true 
+
     "[OPTION] output the DiagnosticVariables as well" 
     output_diagnostic::Bool = true 
 
@@ -104,13 +107,15 @@ function output!(output::JLD2Output, simulation::AbstractSimulation)
     output.output_counter += 1      # output counter increases when writing time
     i = output.output_counter
 
-    (; active, jld2_file, output_diagnostic) = output 
+    (; active, jld2_file, output_diagnostic, output_prognostic) = output 
     active || return nothing    # escape immediately for no jld2 output
 
-    if output_diagnostic
+    if output_diagnostic & output_prognostic
         jld2_file["$i"] = (simulation.prognostic_variables, simulation.diagnostic_variables)
-    else 
+    elseif output_prognostic 
         jld2_file["$i"] = simulation.prognostic_variables
+    elseif output_diagnostic
+        jld2_file["$i"] = simulation.diagnostic_variables
     end 
 end 
 
