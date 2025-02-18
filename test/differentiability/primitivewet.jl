@@ -5,7 +5,6 @@
 
     spectral_grid = SpectralGrid(trunc=8, nlayers=1)          # define resolution
 
-    # FiniteDifferences struggles with the NaN when we have a land-sea mask, so we have to test on AquaPlanets 
     model = PrimitiveWetModel(; spectral_grid)  # construct model
     simulation = initialize!(model)  
     initialize!(simulation)
@@ -44,11 +43,11 @@
 
     function parameterization_tendencies(diagn, progn, time, model)
         diagn_new = deepcopy(diagn)
-        SpeedyWeather.parameterization_tendencies!(diagn_new, deepcopy(progn), time, deepcopy(model))
+        SpeedyWeather.parameterization_tendencies!(diagn_new, deepcopy(progn), deepcopy(time), deepcopy(model))
         return diagn_new
     end 
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> parameterization_tendencies(diagn_copy, x, progn.clock.time, model), ddiagn_copy, progn_copy)
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(11,1), x -> parameterization_tendencies(diagn_copy, x, progn.clock.time, model), ddiagn_copy, progn_copy)
     
     # TO-DO this test is broken, they gradients don't line up
     #@test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
@@ -73,6 +72,7 @@
 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> ocean_timestep(progn_copy, x, model), dprogn_copy, diagn_copy)
 
+    # pass
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(ddiagn)[1],rtol=1e-4,atol=1e-2))
 
     #
@@ -95,6 +95,7 @@
 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> land_timestep(progn_copy, x, model), dprogn_copy, diagn_copy)
 
+    # pass
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(ddiagn)[1],rtol=1e-4,atol=1e-2))
 
     #####
@@ -110,7 +111,7 @@
     ddiag_copy = deepcopy(ddiag)
     progn_copy = deepcopy(progn)
     dprogn = make_zero(progn)
-
+   
     autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
 
     function dynamics_tendencies(diagn, progn, lf, model)
@@ -119,15 +120,15 @@
         return diagn_new
     end 
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(9,1), x -> dynamics_tendencies(diagn_copy, x, lf2, model), ddiag_copy, progn_copy)
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> dynamics_tendencies(diagn_copy, x, lf2, model), ddiag_copy, progn_copy)
 
     # there are some NaNs in the FD, that's why this test is currently broken
-    @test all(isapprox.(to_vec(fd_vjp)[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
     
     #
     # Implicit correction 
     #
-
+    # continue here
     diagn_copy = deepcopy(diagn)
     ddiag = make_zero(diagn_copy)
     ddiag_copy = deepcopy(ddiag)
@@ -138,7 +139,7 @@
 
     function implicit_correction(diagn, implicit, progn)
         diagn_new = deepcopy(diagn)
-        SpeedyWeather.implicit_correction(diagn_new, implicit, progn)
+        SpeedyWeather.implicit_correction!(diagn_new, deepcopy(implicit), deepcopy(progn))
         return diagn_new
     end 
 
@@ -150,7 +151,6 @@
     # transform!(diagn, progn, lf2, model)
     #
 
-    fill!(diagn.tendencies, 0, PrimitiveWetModel)
     diag_copy = deepcopy(diagn)
     
     ddiag = one(diagn)
@@ -163,7 +163,7 @@
 
     function transform_diagn(diag, progn, lf2, model)
         diag_copy = deepcopy(diag)
-        transform!(diag_copy, progn, lf2, model)
+        transform!(diag_copy, deepcopy(progn), lf2, deepcopy(model))
         return diag_copy
     end 
 

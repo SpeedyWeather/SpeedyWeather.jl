@@ -98,4 +98,8 @@ if VERSION <= v"1.11.0"
         autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
         @test sum(to_vec(d_progn)[1]) != 0
     end 
+else 
+    @testset "Complete Differentiability" begin
+        @test_broken false # we report a broken test here on v1.11, just to indicate that this (properly) doens't work yet
+    end 
 end 
