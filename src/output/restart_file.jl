@@ -5,7 +5,7 @@ to the output folder (or current path) that can be used to restart the model.
 `restart.jld2` will then be used as initial conditions. The prognostic variables
 are bitrounded for compression and the 2nd leapfrog time step is discarded.
 Variables in restart file are unscaled."""
-function write_restart_file(
+function write_restart_file!(
     output::AbstractOutput,
     progn::PrognosticVariables{T},
 ) where T
