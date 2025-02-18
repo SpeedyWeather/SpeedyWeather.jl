@@ -139,15 +139,13 @@ function initialize!(
     ocean_model::SeasonalOceanClimatology,
     model::PrimitiveEquation,
 )
-    interpolate_monthly!(   ocean.sea_surface_temperature,
-                            ocean_model.monthly_temperature,
-                            progn.clock.time)
+    ocean_timestep!(progn, diagn, ocean_model, model)
 end
     
 function ocean_timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    ocean_model::SeasonalOceanClimatology,
+    ocean::SeasonalOceanClimatology,
     model::PrimitiveEquation,
 )
     (; time) = progn.clock
@@ -216,11 +214,13 @@ function initialize!(
     ocean_model::ConstantOceanClimatology,
     model::PrimitiveEquation,
 )
-    Grid = typeof(ocean.sea_surface_temperature)
-    (; nlat_half) = ocean.sea_surface_temperature
-    monthly = [zeros(Grid, nlat_half) for _ in 1:12]
-    load_monthly_climatology!(monthly, ocean_model)
-    interpolate_monthly!(ocean.sea_surface_temperature, monthly, progn.clock.time)
+    # create a seasonal model, initialize it and the variables
+    (; path, file, varname, file_Grid, missing_value) = ocean_model
+    (; NF, GridVariable3D, nlat_half) = model.spectral_grid
+    seasonal_model = SeasonalOceanClimatology{NF, GridVariable3D}(; nlat_half, path, file, varname, file_Grid, missing_value)
+    initialize!(seasonal_model, model)
+    initialize!(ocean, progn, diagn, seasonal_model, model)
+    # (seasonal model will be garbage collected hereafter)
 end
 
 function ocean_timestep!(
