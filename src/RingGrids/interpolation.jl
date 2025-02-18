@@ -1,7 +1,7 @@
 """Contains general precomputed arrays describing the grid of G.
 $(TYPEDFIELDS)"""
 struct GridGeometry{
-    G<:AbstractGrid,
+    Grid,
     VectorType,
     VectorIntType,
     VectorRangeType,
