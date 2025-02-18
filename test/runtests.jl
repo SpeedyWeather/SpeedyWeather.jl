@@ -65,3 +65,4 @@ end
 include("output/callbacks.jl")
 include("output/schedule.jl")
 include("output/netcdf_output.jl")
+include("output/jld2_output.jl")
