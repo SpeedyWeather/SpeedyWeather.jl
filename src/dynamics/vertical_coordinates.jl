@@ -16,7 +16,7 @@ end
 # obtain nlayers from length of predefined σ_half layers
 SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates{eltype(σ_half), typeof(σ_half)}(nlayers=length(σ_half)-1; σ_half)
 SigmaCoordinates(σ_half::AbstractRange) = SigmaCoordinates(collect(σ_half))
-SigmaCoordinates(nlayers::Integer = DEFAULT_NLAYERS) = SigmaCoordinates{Float64, Vector{Float64}}(; nlayers)
+SigmaCoordinates(nlayers::Integer) = SigmaCoordinates{Float64, Vector{Float64}}(; nlayers)
 
 function Base.show(io::IO, σ::SigmaCoordinates)
     println(io, "$(σ.nlayers)-layer SigmaCoordinates")
