@@ -1,21 +1,21 @@
 # function barrier for batched or serial transforms as FFTW plans cannot be reused for fewer vertical layers
-function _fourier!(f_north, f_south, grids::AbstractGridArray, S::SpectralTransform)
+function _fourier!(f_north, f_south, grids::AbstractGridArray, scratch, S::SpectralTransform)
     _fourier! = if size(grids, 2) == S.nlayers > 1
         _fourier_batched!
     else
         _fourier_serial!
     end
-    return _fourier!(f_north, f_south, grids, S)
+    return _fourier!(f_north, f_south, grids, scratch, S)
 end
 
 # function barrier for batched or serial transforms as FFTW plans cannot be reused for fewer vertical layers
-function _fourier!(grids::AbstractGridArray, f_north, f_south, S::SpectralTransform)
+function _fourier!(grids::AbstractGridArray, f_north, f_south, scratch, S::SpectralTransform)
     _fourier! = if size(grids, 2) == S.nlayers > 1
         _fourier_batched!
     else
         _fourier_serial!
     end
-    return _fourier!(grids, f_north, f_south, S)
+    return _fourier!(grids, f_north, f_south, scratch, S)
 end
 
 """$(TYPEDSIGNATURES)
@@ -27,6 +27,7 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
     f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed output
     f_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
     grids::AbstractGridArray,               # gridded input
+    scratch_memory::SpeedyTransformsScratchMemory,
     S::SpectralTransform,                   # precomputed transform
 )
     (; nlat, nlons, nlat_half) = S          # dimensions
@@ -52,7 +53,7 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
         # FOURIER TRANSFORM in zonal direction, northern latitude
         # views and copies necessary for stride-1 outputs required by FFTW
         ring_layers = view(grids.data, ilons, :)
-        out = reshape(view(S.scratch_memory.spec, 1:nfreq*nlayers), (nfreq, nlayers))
+        out = reshape(view(scratch_memory.spec, 1:nfreq*nlayers), (nfreq, nlayers))
         LinearAlgebra.mul!(out, rfft_plan, ring_layers)     # Northern latitude
         f_north[1:nfreq, 1:nlayers, j] .= out               # copy into correct stride
 
@@ -77,6 +78,7 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
     f_north::AbstractArray{<:Complex, 3},   # Fourier-transformed output
     f_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
     grids::AbstractGridArray,               # gridded input
+    scratch_memory::SpeedyTransformsScratchMemory,
     S::SpectralTransform,                   # precomputed transform
 )
     (; nlat, nlons, nlat_half) = S          # dimensions
@@ -101,7 +103,7 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
             ilons = rings[j_north]              # in-ring indices northern ring
             
             grid_jk = view(grids.data, ilons, k_grid)   # data on northern ring, vertical layer k
-            out = view(S.scratch_memory.spec, 1:nfreq)  # view on scratch memory to store transformed data
+            out = view(scratch_memory.spec, 1:nfreq)  # view on scratch memory to store transformed data
             LinearAlgebra.mul!(out, rfft_plan, grid_jk) # perform FFT
             f_north[1:nfreq, k, j] = out
 
@@ -125,6 +127,7 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
     grids::AbstractGridArray,               # gridded output
     g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed input
     g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
+    scratch_memory::SpeedyTransformsScratchMemory, 
     S::SpectralTransform,                   # precomputed transform
 )
     (; nlat, nlons, nlat_half) = S          # dimensions
@@ -149,7 +152,7 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
         # PERFORM FFT, inverse complex to real, hence brfft
         # FFTW is in-place writing into `out` via `mul`
         # FFTW requires stride-1 output, hence view on scratch memory
-        out = reshape(view(S.scratch_memory.grid, 1:nlon*nlayers), (nlon, nlayers))
+        out = reshape(view(scratch_memory.grid, 1:nlon*nlayers), (nlon, nlayers))
         LinearAlgebra.mul!(out, brfft_plan, view(g_north, 1:nfreq, 1:nlayers, j))
         grids[ilons, :] = out
 
@@ -170,6 +173,7 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
     grids::AbstractGridArray,               # gridded output
     g_north::AbstractArray{<:Complex, 3},   # Legendre-transformed input
     g_south::AbstractArray{<:Complex, 3},   # and for southern latitudes
+    scratch_memory::SpeedyTransformsScratchMemory,
     S::SpectralTransform,                   # precomputed transform
 )
     (; nlat, nlons, nlat_half) = S          # dimensions

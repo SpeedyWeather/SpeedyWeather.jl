@@ -396,10 +396,34 @@ function transform!(                    # SPECTRAL TO GRID
     g_south = S.scratch_memory.south    # phase factors for southern latitudes
 
     # INVERSE LEGENDRE TRANSFORM in meridional direction
-    _legendre!(g_north, g_south, specs, S; unscale_coslat)
+    _legendre!(g_north, g_south, specs, S.scratch_memory, S; unscale_coslat)
 
     # INVERSE FOURIER TRANSFORM in zonal direction
-    _fourier!(grids, g_north, g_south, S)
+    _fourier!(grids, g_north, g_south, S.scratch_memory, S)
+
+    return grids
+end
+
+function transform!(                                # SPECTRAL TO GRID
+    grids::AbstractGridArray,                       # gridded output
+    specs::LowerTriangularArray,                    # spectral coefficients input
+    scratch_memory::SpeedyTransformsScratchMemory,  # explicit scratch memory to use
+    S::SpectralTransform;                           # precomputed transform
+    unscale_coslat::Bool = false,                   # unscale with cos(lat) on the fly?
+)
+    # catch incorrect sizes early
+    @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
+    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
+
+    # use scratch memory for Legendre but not yet Fourier-transformed data
+    g_north = scratch_memory.north    # phase factors for northern latitudes
+    g_south = scratch_memory.south    # phase factors for southern latitudes
+
+    # INVERSE LEGENDRE TRANSFORM in meridional direction
+    _legendre!(g_north, g_south, specs, scratch_memory, S; unscale_coslat)
+
+    # INVERSE FOURIER TRANSFORM in zonal direction
+    _fourier!(grids, g_north, g_south, scratch_memory, S)
 
     return grids
 end
@@ -426,10 +450,33 @@ function transform!(                    # GRID TO SPECTRAL
     f_south = S.scratch_memory.south    # phase factors for southern latitudes
 
     # FOURIER TRANSFORM in zonal direction
-    _fourier!(f_north, f_south, grids, S)    
+    _fourier!(f_north, f_south, grids, S.scratch_memory, S)    
     
     # LEGENDRE TRANSFORM in meridional direction
-    _legendre!(specs, f_north, f_south, S)
+    _legendre!(specs, f_north, f_south, S.scratch_memory, S)
+
+    return specs
+end
+
+function transform!(                               # GRID TO SPECTRAL
+    specs::LowerTriangularArray,                   # output: spectral coefficients
+    grids::AbstractGridArray,                      # input: gridded values
+    scratch_memory::SpeedyTransformsScratchMemory, # explicit scratch memory to use
+    S::SpectralTransform,                          # precomputed spectral transform
+)
+    # catch incorrect sizes early
+    @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
+    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
+
+    # use scratch memory for Fourier but not yet Legendre-transformed data
+    f_north = S.scratch_memory.north    # phase factors for northern latitudes
+    f_south = S.scratch_memory.south    # phase factors for southern latitudes
+
+    # FOURIER TRANSFORM in zonal direction
+    _fourier!(f_north, f_south, grids, scratch_memory, S)    
+    
+    # LEGENDRE TRANSFORM in meridional direction
+    _legendre!(specs, f_north, f_south, scratch_memory, S)
 
     return specs
 end
