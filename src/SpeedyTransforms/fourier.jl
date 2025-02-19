@@ -52,7 +52,7 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
         # FOURIER TRANSFORM in zonal direction, northern latitude
         # views and copies necessary for stride-1 outputs required by FFTW
         ring_layers = view(grids.data, ilons, :)
-        out = reshape(view(S.scratch_memory_spec, 1:nfreq*nlayers), (nfreq, nlayers))
+        out = reshape(view(S.scratch_memory.spec, 1:nfreq*nlayers), (nfreq, nlayers))
         LinearAlgebra.mul!(out, rfft_plan, ring_layers)     # Northern latitude
         f_north[1:nfreq, 1:nlayers, j] .= out               # copy into correct stride
 
@@ -101,7 +101,7 @@ function _fourier_serial!(                  # GRID TO SPECTRAL
             ilons = rings[j_north]              # in-ring indices northern ring
             
             grid_jk = view(grids.data, ilons, k_grid)   # data on northern ring, vertical layer k
-            out = view(S.scratch_memory_spec, 1:nfreq)  # view on scratch memory to store transformed data
+            out = view(S.scratch_memory.spec, 1:nfreq)  # view on scratch memory to store transformed data
             LinearAlgebra.mul!(out, rfft_plan, grid_jk) # perform FFT
             f_north[1:nfreq, k, j] = out
 
@@ -149,7 +149,7 @@ function _fourier_batched!(                 # SPECTRAL TO GRID
         # PERFORM FFT, inverse complex to real, hence brfft
         # FFTW is in-place writing into `out` via `mul`
         # FFTW requires stride-1 output, hence view on scratch memory
-        out = reshape(view(S.scratch_memory_grid, 1:nlon*nlayers), (nlon, nlayers))
+        out = reshape(view(S.scratch_memory.grid, 1:nlon*nlayers), (nlon, nlayers))
         LinearAlgebra.mul!(out, brfft_plan, view(g_north, 1:nfreq, 1:nlayers, j))
         grids[ilons, :] = out
 

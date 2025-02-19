@@ -43,6 +43,7 @@ export  power_spectrum
 include("aliasing.jl")
 include("legendrepolarray.jl")
 include("legendre_shortcuts.jl")
+include("scratch_memory.jl")
 include("spectral_transform.jl")
 include("fourier.jl")
 include("legendre.jl")

@@ -55,12 +55,7 @@ struct SpectralTransform{
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
-    scratch_memory_north::ArrayComplexType
-    scratch_memory_south::ArrayComplexType
-    scratch_memory_grid::VectorType                 # scratch memory with 1-stride for FFT output
-    scratch_memory_spec::VectorComplexType
-    scratch_memory_column_north::VectorComplexType  # scratch memory for vertically batched Legendre transform
-    scratch_memory_column_south::VectorComplexType  # scratch memory for vertically batched Legendre transform
+    scratch_memory::SpeedyTransformsScratchMemory{NF, VectorType, VectorComplexType, ArrayComplexType}
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -107,6 +102,9 @@ function SpectralTransform(
 
     Grid = RingGrids.nonparametric_type(Grid)   # always use nonparametric concrete type
 
+    # guarantee a nonparametric type to construct lower triangular types correctly
+    ArrayType_ = RingGrids.nonparametric_type(ArrayType)
+
     # RESOLUTION PARAMETERS
     nlat = get_nlat(Grid, nlat_half)            # 2nlat_half but one less if grids have odd # of lat rings
     nlon_max = get_nlon_max(Grid, nlat_half)    # number of longitudes around the equator
@@ -142,17 +140,8 @@ function SpectralTransform(
         legendre_polynomials[:, j] = LowerTriangularArray(legendre_polynomials_j)  # store
     end
     
-    # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
-    scratch_memory_north = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
-    scratch_memory_south = zeros(Complex{NF}, nfreq_max, nlayers, nlat_half)
-
-    # SCRATCH MEMORY TO 1-STRIDE DATA FOR FFTs
-    scratch_memory_grid  = zeros(NF, nlon_max*nlayers)
-    scratch_memory_spec  = zeros(Complex{NF}, nfreq_max*nlayers)
-
-    # SCRATCH MEMORY COLUMNS FOR VERTICALLY BATCHED LEGENDRE TRANSFORM
-    scratch_memory_column_north = zeros(Complex{NF}, nlayers)
-    scratch_memory_column_south = zeros(Complex{NF}, nlayers)
+    # SCRATCH MEMORY 
+    scratch_memory = SpeedyTransformsScratchMemory(NF, ArrayType_, nfreq_max, nlayers, nlat_half, nlon_max)
 
     # PLAN THE FFTs
     FFT_package = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
@@ -165,9 +154,9 @@ function SpectralTransform(
 
     for (j, nlon) in enumerate(nlons)
         real_matrix_input = view(fake_grid_data.data, rings[j], :)
-        complex_matrix_input = view(scratch_memory_north, 1:nlon÷2 + 1, :, j)
+        complex_matrix_input = view(scratch_memory.north, 1:nlon÷2 + 1, :, j)
         real_vector_input = view(fake_grid_data.data, rings[j], 1)
-        complex_vector_input = view(scratch_memory_north, 1:nlon÷2 + 1, 1, j)
+        complex_vector_input = view(scratch_memory.north, 1:nlon÷2 + 1, 1, j)
 
         rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1)
         brfft_plans[j] = FFT_package.plan_brfft(complex_matrix_input, nlon, 1)
@@ -230,8 +219,6 @@ function SpectralTransform(
     eigenvalues⁻¹ = inv.(eigenvalues)
     eigenvalues⁻¹[1] = 0                    # set the integration constant to 0
 
-    # guarantee a nonparametric type to construct lower triangular types correctly
-    ArrayType_ = RingGrids.nonparametric_type(ArrayType)
     return SpectralTransform{
         NF,
         ArrayType_,
@@ -251,9 +238,7 @@ function SpectralTransform(
         norm_sphere,
         rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
         legendre_polynomials,
-        scratch_memory_north, scratch_memory_south,
-        scratch_memory_grid, scratch_memory_spec,
-        scratch_memory_column_north, scratch_memory_column_south,
+        scratch_memory,
         solid_angles, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,
@@ -407,8 +392,8 @@ function transform!(                    # SPECTRAL TO GRID
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
 
     # use scratch memory for Legendre but not yet Fourier-transformed data
-    g_north = S.scratch_memory_north    # phase factors for northern latitudes
-    g_south = S.scratch_memory_south    # phase factors for southern latitudes
+    g_north = S.scratch_memory.north    # phase factors for northern latitudes
+    g_south = S.scratch_memory.south    # phase factors for southern latitudes
 
     # INVERSE LEGENDRE TRANSFORM in meridional direction
     _legendre!(g_north, g_south, specs, S; unscale_coslat)
@@ -437,8 +422,8 @@ function transform!(                    # GRID TO SPECTRAL
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
 
     # use scratch memory for Fourier but not yet Legendre-transformed data
-    f_north = S.scratch_memory_north    # phase factors for northern latitudes
-    f_south = S.scratch_memory_south    # phase factors for southern latitudes
+    f_north = S.scratch_memory.north    # phase factors for northern latitudes
+    f_south = S.scratch_memory.south    # phase factors for southern latitudes
 
     # FOURIER TRANSFORM in zonal direction
     _fourier!(f_north, f_south, grids, S)    

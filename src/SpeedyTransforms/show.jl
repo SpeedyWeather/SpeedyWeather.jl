@@ -18,10 +18,10 @@ function Base.show(io::IO, S::SpectralTransform{NF, ArrayType}) where {NF, Array
     # add information about size of Legendre polynomials and scratch memory
     polysize_str = prettymemory(Base.summarysize(S.legendre_polynomials))
     memorysize_str = prettymemory(
-                Base.summarysize(S.scratch_memory_north) +      # add all scratch_memories
-                Base.summarysize(S.scratch_memory_south) + 
-                Base.summarysize(S.scratch_memory_grid) + 
-                Base.summarysize(S.scratch_memory_spec)
+                Base.summarysize(S.scratch_memory.north) +      # add all scratch_memories
+                Base.summarysize(S.scratch_memory.south) + 
+                Base.summarysize(S.scratch_memory.grid) + 
+                Base.summarysize(S.scratch_memory.spec)
             )
 
     dealias = get_dealiasing(mmax, nlat_half)

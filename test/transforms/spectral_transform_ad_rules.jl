@@ -40,8 +40,8 @@ end
                     spectral_grid = SpectralGrid(Grid=grid_type, nlayers=1, trunc=5, dealiasing=grid_dealiasing[i_grid])
                     S = SpectralTransform(spectral_grid)
                     grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
-                    f_north = S.scratch_memory_north
-                    f_south = S.scratch_memory_south
+                    f_north = S.scratch_memory.north
+                    f_south = S.scratch_memory.south
 
                     # forward transform 
                     test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(15, 1), rtol=1e-3, atol=1e-3)
