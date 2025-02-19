@@ -6,7 +6,7 @@ export SigmaCoordinates
 Sigma coordinates are currently hardcoded in Geometry.
 $(TYPEDFIELDS)."""
 @kwdef struct SigmaCoordinates{NF, VectorType} <: AbstractVerticalCoordinate
-    nlayers::Int = DEFAULT_NLAYERS
+    nlayers::Int
     σ_half::VectorType = default_sigma_coordinates(nlayers)
 
     SigmaCoordinates{T, V}(nlayers::Integer, σ_half::AbstractVector) where {T, V} = sigma_okay(nlayers, σ_half) ?
@@ -16,10 +16,11 @@ end
 # obtain nlayers from length of predefined σ_half layers
 SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates{eltype(σ_half), typeof(σ_half)}(nlayers=length(σ_half)-1; σ_half)
 SigmaCoordinates(σ_half::AbstractRange) = SigmaCoordinates(collect(σ_half))
-SigmaCoordinates(nlayers::Integer) = SigmaCoordinates{Float64, Vector{Float64}}(; nlayers)
+SigmaCoordinates(nlayers::Integer = DEFAULT_NLAYERS) = SigmaCoordinates{Float64, Vector{Float64}}(; nlayers)
+SigmaCoordinates(nlayers::Integer, σ_half::AbstractVector) = SigmaCoordinates{eltype(σ_half), typeof(σ_half)}(nlayers, σ_half)
 
 function Base.show(io::IO, σ::SigmaCoordinates)
-    println(io, "$(σ.nlayers)-layer SigmaCoordinates")
+    println(io, "$(σ.nlayers)-layer $(typeof(σ))")
     nchars = length(string(σ.nlayers))
     format = Printf.Format("%$(nchars)d")
     for k=1:σ.nlayers
