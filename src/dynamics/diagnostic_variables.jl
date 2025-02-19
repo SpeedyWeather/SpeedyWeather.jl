@@ -577,3 +577,9 @@ Base.fill!(tendencies::Tendencies, x) = Base.fill!(tendencies, x, PrimitiveWet)
 Base.fill!(tendencies::Tendencies, x, model::AbstractModel) = Base.fill!(tendencies, x, typeof(model))
 
 RingGrids.eachgridpoint(diagn::DiagnosticVariables) = eachgridpoint(diagn.grid.vor_grid)
+
+@inline SpeedyTransforms.transform!(specs, grids, dynamics::DynamicsVariables, S::SpectralTransform) = transform!(specs, grids, dynamics.scratch_memory, S)
+@inline SpeedyTransforms.transform!(specs, grids, diagn::DiagnosticVariables, S::SpectralTransform) = transform!(specs, grids, diagn.dynamics.scratch_memory, S)
+
+@inline SpeedyTransforms.transform!(grids, specs, dynamics::DynamicsVariables, S::SpectralTransform; kwargs...) = transform!(grids, specs, dynamics.scratch_memory, S; kwargs...)
+@inline SpeedyTransforms.transform!(grids, specs, diagn::DiagnosticVariables, S::SpectralTransform; kwargs...) = transform!(grids, specs, diagn.dynamics.scratch_memory, S; kwargs...)
