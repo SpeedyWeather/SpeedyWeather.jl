@@ -5,21 +5,27 @@ export SigmaCoordinates
 """Sigma coordinates for the vertical coordinates, defined by their half layers.
 Sigma coordinates are currently hardcoded in Geometry.
 $(TYPEDFIELDS)."""
-@kwdef struct SigmaCoordinates{NF, VectorType} <: AbstractVerticalCoordinate
-    nlayers::Int = DEFAULT_NLAYERS
-    σ_half::VectorType = default_sigma_coordinates(nlayers)
+struct SigmaCoordinates{NF, VectorType} <: AbstractVerticalCoordinate
+    nlayers::Int
+    σ_half::VectorType
 
     SigmaCoordinates{T, V}(nlayers::Integer, σ_half::AbstractVector) where {T, V} = sigma_okay(nlayers, σ_half) ?
     new{T, V}(nlayers, σ_half) : error("σ_half = $σ_half cannot be used for $nlayers-level SigmaCoordinates")
 end
 
-# obtain nlayers from length of predefined σ_half layers
-SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates{eltype(σ_half), typeof(σ_half)}(nlayers=length(σ_half)-1; σ_half)
-SigmaCoordinates(σ_half::AbstractRange) = SigmaCoordinates(collect(σ_half))
-SigmaCoordinates(nlayers::Integer = DEFAULT_NLAYERS) = SigmaCoordinates{Float64, Vector{Float64}}(; nlayers)
+# constructor using default sigma coordinates if only nlayers provided, also collect to allow for AbstractRange
+SigmaCoordinates(nlayers::Integer, σ_half::AbstractVector = default_sigma_coordinates(nlayers)) =
+    SigmaCoordinates{eltype(σ_half), typeof(collect(σ_half))}(nlayers, collect(σ_half))
+
+# constructor obtaining nlayers from σ_half
+SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(length(σ_half)-1, σ_half)
+
+# constructor using default nlayers if nothing provided
+SigmaCoordinates() = SigmaCoordinates(DEFAULT_NLAYERS)
+
 
 function Base.show(io::IO, σ::SigmaCoordinates)
-    println(io, "$(σ.nlayers)-layer SigmaCoordinates")
+    println(io, "$(σ.nlayers)-layer $(typeof(σ))")
     nchars = length(string(σ.nlayers))
     format = Printf.Format("%$(nchars)d")
     for k=1:σ.nlayers

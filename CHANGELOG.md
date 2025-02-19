@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Scratch memory for SpeedyTransforms now part of DiagnosticVariables 
+- Scratch memory for SpeedyTransforms now part of DiagnosticVariables [#680](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/680/)
+- SigmaCoordinates constructors [#679](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/679)
 - Full timestepping differentiable by Enzyme with Julia 1.10 [#656](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/656)
 - Type instabilities etc flagged by Reactant [#674](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/674)
 - Added JLD2 Output to directly output PrognosticVariables and DiagnosticVariables [#675](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/675)
