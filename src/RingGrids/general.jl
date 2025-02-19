@@ -22,6 +22,9 @@ nonparametric_type(grid::AbstractGridArray) = nonparametric_type(typeof(grid))
 # also needed for other array types, defined in extensions
 nonparametric_type(::Type{<:Array}) = Array
 
+# needed for unalias 
+@inline Base.dataids(grid::AbstractGridArray) = Base.dataids(grid.data)
+
 """$(TYPEDSIGNATURES) Full grid array type for `grid`. Always returns the N-dimensional `*Array`
 not the two-dimensional (`N=1`) `*Grid`. For reduced grids the corresponding full grid that
 share the same latitudes."""
@@ -427,7 +430,6 @@ end
 ## BROADCASTING
 # following https://docs.julialang.org/en/v1/manual/interfaces/#man-interfaces-broadcasting
 import Base.Broadcast: BroadcastStyle, Broadcasted, DefaultArrayStyle
-import LinearAlgebra: isstructurepreserving, fzeropreserving
 
 # {1} as grids are <:AbstractVector, Grid here is the non-parameteric Grid type!
 struct AbstractGridArrayStyle{N, Grid} <: Broadcast.AbstractArrayStyle{N} end
@@ -440,7 +442,7 @@ Base.BroadcastStyle(::Type{Grid}) where {Grid<:AbstractGridArray{T, N, ArrayType
 
 # allocation for broadcasting, create a new Grid with undef of type/number format T
 function Base.similar(bc::Broadcasted{AbstractGridArrayStyle{N, Grid}}, ::Type{T}) where {N, Grid, T}
-    return Grid(Array{T}(undef, size(bc)...))
+    return Grid(Array{T}(undef, size(bc)))
 end
 
 # ::Val{0} for broadcasting with 0-dimensional, ::Val{1} for broadcasting with vectors, etc
@@ -485,7 +487,7 @@ function Base.similar(
     ::Type{T},
 ) where {N, ArrayType, Grid, T}
     ArrayType_ = nonparametric_type(ArrayType)
-    return Grid(ArrayType_{T}(undef, size(bc)...))
+    return Grid(ArrayType_{T}(undef, size(bc)))
 end
 
 function Adapt.adapt_structure(to, grid::Grid) where {Grid <: AbstractGridArray}

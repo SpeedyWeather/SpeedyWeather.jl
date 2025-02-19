@@ -838,8 +838,8 @@ function SpeedyTransforms.transform!(
     model::PrimitiveEquation;
     initialize::Bool = false,
 )   
-    (; vor_grid, div_grid, pres_grid, u_grid, v_grid, temp_grid, humid_grid) = diagn.grid
-    (; temp_grid_prev, humid_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid
+    (; vor_grid, div_grid, pres_grid, u_grid, v_grid, temp_grid, humid_grid, 
+    temp_grid_prev, humid_grid_prev, u_grid_prev, v_grid_prev) = diagn.grid
 
     vor   = progn.vor[lf]           # relative vorticity at leapfrog step lf
     div   = progn.div[lf]           # divergence at leapfrog step lf

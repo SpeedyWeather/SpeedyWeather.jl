@@ -20,6 +20,7 @@ makedocs(
                 "Stochastic physics" => "stochastic_physics.md",
                 "Analysis"=>"analysis.md",
                 "Tree structure"=>"structure.md",
+                "Differentiability and Adjoint Model"=>"differentiability.md",
                 "NetCDF output"=>"output.md",
             ],
             "Extending SpeedyWeather" => [
