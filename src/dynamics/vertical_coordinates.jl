@@ -13,11 +13,14 @@ struct SigmaCoordinates{NF, VectorType} <: AbstractVerticalCoordinate
     new{T, V}(nlayers, σ_half) : error("σ_half = $σ_half cannot be used for $nlayers-level SigmaCoordinates")
 end
 
-# constructors using Float64/Vector or types from input vectors
+# constructor using default sigma coordinates if only nlayers provided, also collect to allow for AbstractRange
 SigmaCoordinates(nlayers::Integer, σ_half::AbstractVector = default_sigma_coordinates(nlayers)) =
     SigmaCoordinates{eltype(σ_half), typeof(collect(σ_half))}(nlayers, collect(σ_half))
 
+# constructor obtaining nlayers from σ_half
 SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(length(σ_half)-1, σ_half)
+
+# constructor using default nlayers if nothing provided
 SigmaCoordinates() = SigmaCoordinates(DEFAULT_NLAYERS)
 
 
