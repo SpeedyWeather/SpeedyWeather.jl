@@ -14,7 +14,7 @@ end
 # method to create a tracer from a positional symbol
 Tracer(name::Symbol; kwargs...) = Tracer(; name, kwargs...)
 
-const TRACER_DICT = Dict{Symbol, AbstractTracer}
+const TRACER_DICT = Dict{Symbol, Tracer}
 
 # low-level function to add tracers to the tracer dictionary
 function add!(dict::TRACER_DICT, tracers::Tracer...)
