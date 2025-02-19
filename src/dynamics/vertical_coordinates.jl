@@ -13,7 +13,7 @@ $(TYPEDFIELDS)."""
     new{T, V}(nlayers, σ_half) : error("σ_half = $σ_half cannot be used for $nlayers-level SigmaCoordinates")
 end
 
-# obtain nlayers from length of predefined σ_half layers
+# constructors using Float64/Vector or types from input vectors
 SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates{eltype(σ_half), typeof(σ_half)}(nlayers=length(σ_half)-1; σ_half)
 SigmaCoordinates(σ_half::AbstractRange) = SigmaCoordinates(collect(σ_half))
 SigmaCoordinates(nlayers::Integer = DEFAULT_NLAYERS) = SigmaCoordinates{Float64, Vector{Float64}}(; nlayers)

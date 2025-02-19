@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- SigmaCoordinates constructors [#679](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/679)
+- Full timestepping differentiable by Enzyme with Julia 1.10 [#656](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/656)
 - Type instabilities etc flagged by Reactant [#674](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/674)
 - Added JLD2 Output to directly output PrognosticVariables and DiagnosticVariables [#675](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/675)
 - Compat for GPUArrays v11, JLArrays 0.2, KernelAbstractions 0.9 [#658](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/658)

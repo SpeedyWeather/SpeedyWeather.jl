@@ -49,10 +49,10 @@ SurfaceOceanHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceOceanHeatFlux{SG.NF}(
 initialize!(::SurfaceOceanHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(
-    column::ColumnVariables,
+    column::ColumnVariables{NF},
     heat_flux::SurfaceOceanHeatFlux,
     model::PrimitiveEquation,
-)
+) where NF
     cₚ = model.atmosphere.heat_capacity
     (; heat_exchange) = heat_flux
 
@@ -92,10 +92,10 @@ SurfaceLandHeatFlux(SG::SpectralGrid; kwargs...) = SurfaceLandHeatFlux{SG.NF}(; 
 initialize!(::SurfaceLandHeatFlux, ::PrimitiveEquation) = nothing
 
 function surface_heat_flux!(
-    column::ColumnVariables,
+    column::ColumnVariables{NF},
     heat_flux::SurfaceLandHeatFlux,
     model::PrimitiveEquation,
-)
+) where NF
     cₚ = model.atmosphere.heat_capacity
     (; heat_exchange) = heat_flux
 
@@ -116,6 +116,7 @@ function surface_heat_flux!(
     
     column.flux_temp_upward[end] += flux_land   # accumulate with += for total flux
     column.sensible_heat_flux += flux_land      # diagnose/output: ocean sets the flux (=), land accumulates (+=)
+    
     return nothing
 end
 

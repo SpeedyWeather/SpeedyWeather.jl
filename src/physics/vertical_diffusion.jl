@@ -111,11 +111,11 @@ function vertical_diffusion!(
 end
 
 function get_diffusion_coefficients!(
-    column::ColumnVariables,
+    column::ColumnVariables{NF},
     scheme::BulkRichardsonDiffusion,
     atmosphere::AbstractAtmosphere,
     planet::AbstractPlanet,
-)
+) where NF
     K = column.b        # reuse work array for diffusion coefficients
     (; Ri_c, κ, z₀, fb) = scheme
     logZ_z₀ = scheme.logZ_z₀[]
@@ -149,11 +149,11 @@ function get_diffusion_coefficients!(
             K_k = K0 * zmin             # = κ*u_N*√Cz in eq. (19, 20)
 
             # multiply with z-dependent factor in eq. (18) ?
-            K_k *= z < fb*h ? 1 : zfac(z, h, fb)
+            K_k *= z < fb*h ? one(NF) : zfac(z, h, fb)
 
             # multiply with Ri-dependent factor in eq. (20) ?
             # TODO use Ri[kₕ] or Ri_N here? 
-            K_k *= Ri[kₕ] <= 0 ? 1 : Rifac(Ri[kₕ], Ri_c, logZ_z₀)
+            K_k *= Ri[kₕ] <= 0 ? one(NF) : Rifac(Ri[kₕ], Ri_c, logZ_z₀)
             K[k] = K_k                  # write diffusion coefficient into array
         end
     else

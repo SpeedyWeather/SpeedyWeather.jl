@@ -211,7 +211,7 @@ function cos_zenith!(
     g = year_angle(NF, time_of_year, length_of_day, length_of_year)
 
     # time correction [radians] due to the equation of time (sunrise/set oscillation)
-    tc = S.equation_of_time ? S.time_correction(g) : 0
+    tc = S.equation_of_time ? S.time_correction(g) : zero(NF)
     
     # solar hour angle at 0˚E (longtiude offset added later)
     λ = 0
@@ -284,7 +284,7 @@ function cos_zenith!(
         ϕ = lat[j]
         h₀ = abs(δ) + abs(ϕ) < π/2 ?        # polar day/night?
         acos(-tan(ϕ) * tan(δ)) :            # if not: calculate length of day
-        ϕ*δ > 0 ? π : 0                     # polar day if signs are equal, otherwise polar night
+        ϕ*δ > 0 ? π : zero(NF)              # polar day if signs are equal, otherwise polar night
         
         sinϕ, cosϕ = sinlat[j], coslat[j]
         cos_zenith_j = h₀*sinδ*sinϕ + cosδ*cosϕ*sin(h₀)

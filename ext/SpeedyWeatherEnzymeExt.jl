@@ -2,6 +2,8 @@ module SpeedyWeatherEnzymeExt
 
 using SpeedyWeather
 using Enzyme
+using Enzyme.EnzymeCore
+using SpeedyWeather.ProgressMeter
 import .EnzymeRules: reverse, augmented_primal
 using .EnzymeRules
 
@@ -17,23 +19,23 @@ function adjoint_scale(S::SpectralTransform)
     (; nlat_half, nlons, rfft_plans) = S
     nfreqs = [rfft_plan.osz[1] for rfft_plan in rfft_plans] # TODO: This works with FFTW, but does it with cuFFT as well?
 
-    scale = zeros(Int, maximum(nfreqs), nlat_half) 
+    scale = zeros(Int, maximum(nfreqs), 1, nlat_half) # the scratch memory is (Freq x lvl x lat), so we insert 
+                                                      # an additional dimension here for easier matrix multiply
 
     for i=1:nlat_half
-        scale[1:nfreqs[i],i] = rfft_adjoint_scale(nfreqs[i], nlons[i])
+        scale[1:nfreqs[i],1,i] = rfft_adjoint_scale(nfreqs[i], nlons[i])
     end 
 
-    # TODO: transfer array to GPU in case we are on GPU
-    return reshape(scale, maximum(nfreqs), 1, nlat_half) # the scratch memory is (Freq x lvl x lat), so we insert 
-                                                         # an additional dimension here for easier matrix multiply
+    # TODO: transfer array to GPU in case we are on GPU?
+    return scale
 end 
 
 # Computes the scale for the adjoint/pullback of a real discrete fourier transform.
 function rfft_adjoint_scale(n_freq::Int, n_real::Int)
     if iseven(n_real)
-        return [1; [2 for i=2:(n_freq-1)]; 1]
+        return [1 < i < n_freq ? 2 : 1 for i=1:n_freq]
     else 
-        return [1; [2 for i=2:n_freq]]
+        return [1 < i ? 2 : 1 for i=1:n_freq]
     end 
 end 
 
@@ -110,6 +112,19 @@ function reverse(config::EnzymeRules.RevConfigWidth{1}, func::Const{typeof(_four
 
     # the function has no return values, so we also return nothing here
     return (nothing, nothing, nothing, nothing)
+end
+
+###
+# implement make_zero where the default one fails
+
+# this lock is part of the ProgressMeter that's part of the Feedback of all models
+@inline function Enzyme.make_zero(
+    ::Type{ProgressMeter.ProgressCore}, 
+    seen::IdDict, 
+    prev::ProgressMeter.ProgressCore, 
+    ::Val{copy_if_inactive} = Val(false),
+)::ProgressMeter.ProgressCore where {copy_if_inactive} 
+    return prev
 end
 
 end
