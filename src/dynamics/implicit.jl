@@ -14,7 +14,7 @@ export ImplicitShallowWater
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the shallow water model.
 $(TYPEDFIELDS)"""
-@kwdef struct ImplicitShallowWater{NF<:AbstractFloat} <: AbstractImplicit
+@kwdef struct ImplicitShallowWater{NF, VectorType} <: AbstractImplicit
 
     # DIMENSIONS
     trunc::Int
@@ -25,17 +25,17 @@ $(TYPEDFIELDS)"""
     # PRECOMPUTED ARRAYS, to be initiliased with initialize!
     H::Base.RefValue{NF} = Ref(zero(NF))        # layer_thickness
     ξH::Base.RefValue{NF} = Ref(zero(NF))       # = 2αΔt*layer_thickness, store in RefValue for mutability
-    g∇²::Vector{NF} = zeros(NF, trunc+2)        # = gravity*eigenvalues
-    ξg∇²::Vector{NF} = zeros(NF, trunc+2)       # = 2αΔt*gravity*eigenvalues
-    S⁻¹::Vector{NF} = zeros(NF, trunc+2)        # = 1 / (1-ξH*ξg∇²), implicit operator
+    g∇²::VectorType = zeros(NF, trunc+2)        # = gravity*eigenvalues
+    ξg∇²::VectorType = zeros(NF, trunc+2)       # = 2αΔt*gravity*eigenvalues
+    S⁻¹::VectorType = zeros(NF, trunc+2)        # = 1 / (1-ξH*ξg∇²), implicit operator
 end
 
 """
 $(TYPEDSIGNATURES)
 Generator using the resolution from `spectral_grid`."""
 function ImplicitShallowWater(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, trunc) = spectral_grid
-    return ImplicitShallowWater{NF}(; trunc, kwargs...)
+    (; NF, VectorType, trunc) = spectral_grid
+    return ImplicitShallowWater{NF, VectorType}(; trunc, kwargs...)
 end
 
 # function barrier to unpack the constants struct for shallow water
@@ -132,7 +132,12 @@ export ImplicitPrimitiveEquation
 Struct that holds various precomputed arrays for the semi-implicit correction to
 prevent gravity waves from amplifying in the primitive equation model.
 $(TYPEDFIELDS)"""
-@kwdef struct ImplicitPrimitiveEquation{NF<:AbstractFloat} <: AbstractImplicit
+@kwdef struct ImplicitPrimitiveEquation{
+    NF,             # number format
+    VectorType,
+    MatrixType,
+    TensorType,
+} <: AbstractImplicit
     
     # DIMENSIONS
     "spectral resolution"
@@ -147,50 +152,51 @@ $(TYPEDFIELDS)"""
 
     # PRECOMPUTED ARRAYS, to be initiliased with initialize!
     "vertical temperature profile, obtained from diagn on first time step"
-    temp_profile::Vector{NF} = zeros(NF, nlayers)
+    temp_profile::VectorType = zeros(NF, nlayers)
 
     "time step 2α*Δt packed in RefValue for mutability"
     ξ::Base.RefValue{NF} = Ref{NF}(0)       
     
     "divergence: operator for the geopotential calculation"
-    R::Matrix{NF} = zeros(NF, nlayers, nlayers)     
+    R::MatrixType = zeros(NF, nlayers, nlayers)     
     
     "divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"
-    U::Vector{NF} = zeros(NF, nlayers)
+    U::VectorType = zeros(NF, nlayers)
     
     "temperature: operator for the TₖD + κTₖDlnps/Dt term"
-    L::Matrix{NF} = zeros(NF, nlayers, nlayers)
+    L::MatrixType = zeros(NF, nlayers, nlayers)
 
     "pressure: vertical averaging of the -D̄ term in the log surface pres equation"
-    W::Vector{NF} = zeros(NF, nlayers)
+    W::VectorType = zeros(NF, nlayers)
     
     "components to construct L, 1/ 2Δσ"
-    L0::Vector{NF} = zeros(NF, nlayers)
+    L0::VectorType = zeros(NF, nlayers)
 
     "vert advection term in the temperature equation (below+above)"
-    L1::Matrix{NF} = zeros(NF, nlayers, nlayers)
+    L1::MatrixType = zeros(NF, nlayers, nlayers)
 
     "factor in front of the div_sum_above term"
-    L2::Vector{NF} = zeros(NF, nlayers)
+    L2::VectorType = zeros(NF, nlayers)
 
     "_sum_above operator itself"
-    L3::Matrix{NF} = zeros(NF, nlayers, nlayers)
+    L3::MatrixType = zeros(NF, nlayers, nlayers)
 
     "factor in front of div term in Dlnps/Dt"
-    L4::Vector{NF} = zeros(NF, nlayers)
+    L4::VectorType = zeros(NF, nlayers)
 
     "for every l the matrix to be inverted"
-    S::Matrix{NF} = zeros(NF, nlayers, nlayers)
+    S::MatrixType = zeros(NF, nlayers, nlayers)
 
     "combined inverted operator: S = 1 - ξ²(RL + UW)"
-    S⁻¹::Array{NF, 3} = zeros(NF, trunc+1, nlayers, nlayers)   
+    S⁻¹::TensorType = zeros(NF, trunc+1, nlayers, nlayers)   
 end
 
 """$(TYPEDSIGNATURES)
 Generator using the resolution from SpectralGrid."""
 function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid, kwargs...) 
-    (; NF, trunc, nlayers) = spectral_grid
-    return ImplicitPrimitiveEquation{NF}(; trunc, nlayers, kwargs...)
+    (; NF, VectorType, MatrixType, TensorType, trunc, nlayers) = spectral_grid
+    return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType}(;
+        trunc, nlayers, kwargs...)
 end
 
 # function barrier to unpack the constants struct for primitive eq models

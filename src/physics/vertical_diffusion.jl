@@ -16,7 +16,7 @@ initialize!(::NoVerticalDiffusion,::PrimitiveEquation) = nothing
 vertical_diffusion!(::ColumnVariables, ::NoVerticalDiffusion, ::PrimitiveEquation) = nothing
 
 export BulkRichardsonDiffusion
-@kwdef struct BulkRichardsonDiffusion{NF} <: AbstractVerticalDiffusion
+@kwdef struct BulkRichardsonDiffusion{NF, VectorType} <: AbstractVerticalDiffusion
     nlayers::Int
 
     "[OPTION] von Kármán constant [1]"
@@ -45,11 +45,12 @@ export BulkRichardsonDiffusion
     sqrtC_max::Base.RefValue{NF} = Ref(zero(NF))
 
     # precomputed operators
-    ∇²_above::Vector{NF} = zeros(NF, nlayers)
-    ∇²_below::Vector{NF} = zeros(NF, nlayers)
+    ∇²_above::VectorType = zeros(NF, nlayers)
+    ∇²_below::VectorType = zeros(NF, nlayers)
 end
 
-BulkRichardsonDiffusion(SG::SpectralGrid; kwargs...) = BulkRichardsonDiffusion{SG.NF}(; nlayers=SG.nlayers, kwargs...)
+BulkRichardsonDiffusion(SG::SpectralGrid; kwargs...) =
+    BulkRichardsonDiffusion{SG.NF, SG.VectorType}(; nlayers=SG.nlayers, kwargs...)
 
 function initialize!(scheme::BulkRichardsonDiffusion, model::PrimitiveEquation)
     
