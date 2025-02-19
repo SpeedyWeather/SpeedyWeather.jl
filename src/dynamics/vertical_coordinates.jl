@@ -15,7 +15,7 @@ end
 
 # constructors using Float64/Vector or types from input vectors
 SigmaCoordinates(nlayers::Integer, σ_half::AbstractVector = default_sigma_coordinates(nlayers)) =
-    SigmaCoordinates{eltype(σ_half), typeof(σ_half)}(nlayers, collect(σ_half))
+    SigmaCoordinates{eltype(σ_half), typeof(collect(σ_half))}(nlayers, collect(σ_half))
 
 SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(length(σ_half)-1, σ_half)
 SigmaCoordinates() = SigmaCoordinates(DEFAULT_NLAYERS)
