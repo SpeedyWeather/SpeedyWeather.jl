@@ -55,7 +55,11 @@ struct SpectralTransform{
     
     # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     # state is undetermined, only read after writing to it
-    scratch_memory::SpeedyTransformsScratchMemory{NF, VectorType, VectorComplexType, ArrayComplexType}
+    scratch_memory::ScratchMemory{NF, ArrayComplexType} 
+    scratch_memory_grid::VectorType                 # scratch memory with 1-stride for FFT output
+    scratch_memory_spec::VectorComplexType
+    scratch_memory_column_north::VectorComplexType  # scratch memory for vertically batched Legendre transform
+    scratch_memory_column_south::VectorComplexType  # scratch memory for vertically batched Legendre transform
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -141,7 +145,15 @@ function SpectralTransform(
     end
     
     # SCRATCH MEMORY 
-    scratch_memory = SpeedyTransformsScratchMemory(NF, ArrayType_, nfreq_max, nlayers, nlat_half, nlon_max)
+    scratch_memory = ScratchMemory(NF, ArrayType_, nfreq_max, nlayers, nlat_half)
+
+    # SCRATCH MEMORY TO 1-STRIDE DATA FOR FFTs
+    scratch_memory_grid  = zeros(NF, nlon_max*nlayers)
+    scratch_memory_spec  = zeros(Complex{NF}, nfreq_max*nlayers)
+
+    # SCRATCH MEMORY COLUMNS FOR VERTICALLY BATCHED LEGENDRE TRANSFORM
+    scratch_memory_column_north = zeros(Complex{NF}, nlayers)
+    scratch_memory_column_south = zeros(Complex{NF}, nlayers)
 
     # PLAN THE FFTs
     FFT_package = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
@@ -238,7 +250,7 @@ function SpectralTransform(
         norm_sphere,
         rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
         legendre_polynomials,
-        scratch_memory,
+        scratch_memory, scratch_memory_grid, scratch_memory_spec, scratch_memory_column_north, scratch_memory_column_south,
         solid_angles, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,
@@ -381,33 +393,17 @@ number format-flexible but `grids` and the spectral transform `S` have to have t
 Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`.
 The spectral transform is grid-flexible as long as the `typeof(grids)<:AbstractGridArray` and `S.Grid`
 matches."""
-function transform!(                    # SPECTRAL TO GRID
+transform!(                             # SPECTRAL TO GRID
     grids::AbstractGridArray,           # gridded output
     specs::LowerTriangularArray,        # spectral coefficients input
     S::SpectralTransform;               # precomputed transform
     unscale_coslat::Bool = false,       # unscale with cos(lat) on the fly?
-)
-    # catch incorrect sizes early
-    @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
-    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-
-    # use scratch memory for Legendre but not yet Fourier-transformed data
-    g_north = S.scratch_memory.north    # phase factors for northern latitudes
-    g_south = S.scratch_memory.south    # phase factors for southern latitudes
-
-    # INVERSE LEGENDRE TRANSFORM in meridional direction
-    _legendre!(g_north, g_south, specs, S.scratch_memory, S; unscale_coslat)
-
-    # INVERSE FOURIER TRANSFORM in zonal direction
-    _fourier!(grids, g_north, g_south, S.scratch_memory, S)
-
-    return grids
-end
+) = transform!(grids, specs, S.scratch_memory, S; unscale_coslat)
 
 function transform!(                                # SPECTRAL TO GRID
     grids::AbstractGridArray,                       # gridded output
     specs::LowerTriangularArray,                    # spectral coefficients input
-    scratch_memory::SpeedyTransformsScratchMemory,  # explicit scratch memory to use
+    scratch_memory::ScratchMemory,                  # explicit scratch memory to use
     S::SpectralTransform;                           # precomputed transform
     unscale_coslat::Bool = false,                   # unscale with cos(lat) on the fly?
 )
@@ -420,10 +416,10 @@ function transform!(                                # SPECTRAL TO GRID
     g_south = scratch_memory.south    # phase factors for southern latitudes
 
     # INVERSE LEGENDRE TRANSFORM in meridional direction
-    _legendre!(g_north, g_south, specs, scratch_memory, S; unscale_coslat)
+    _legendre!(g_north, g_south, specs, S; unscale_coslat)
 
     # INVERSE FOURIER TRANSFORM in zonal direction
-    _fourier!(grids, g_north, g_south, scratch_memory, S)
+    _fourier!(grids, g_north, g_south, S)
 
     return grids
 end
@@ -436,32 +432,16 @@ number format-flexible but `grids` and the spectral transform `S` have to have t
 Uses the precalculated arrays, FFT plans and other constants in the SpectralTransform struct `S`.
 The spectral transform is grid-flexible as long as the `typeof(grids)<:AbstractGridArray` and `S.Grid`
 matches."""
-function transform!(                    # GRID TO SPECTRAL
+transform!(                             # GRID TO SPECTRAL
     specs::LowerTriangularArray,        # output: spectral coefficients
     grids::AbstractGridArray,           # input: gridded values
     S::SpectralTransform,               # precomputed spectral transform
-)
-    # catch incorrect sizes early
-    @boundscheck ismatching(S, grids) || throw(DimensionMismatch(S, grids))
-    @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
-
-    # use scratch memory for Fourier but not yet Legendre-transformed data
-    f_north = S.scratch_memory.north    # phase factors for northern latitudes
-    f_south = S.scratch_memory.south    # phase factors for southern latitudes
-
-    # FOURIER TRANSFORM in zonal direction
-    _fourier!(f_north, f_south, grids, S.scratch_memory, S)    
+) = transform!(specs, grids, S.scratch_memory, S)
     
-    # LEGENDRE TRANSFORM in meridional direction
-    _legendre!(specs, f_north, f_south, S.scratch_memory, S)
-
-    return specs
-end
-
 function transform!(                               # GRID TO SPECTRAL
     specs::LowerTriangularArray,                   # output: spectral coefficients
     grids::AbstractGridArray,                      # input: gridded values
-    scratch_memory::SpeedyTransformsScratchMemory, # explicit scratch memory to use
+    scratch_memory::ScratchMemory,                 # explicit scratch memory to use
     S::SpectralTransform,                          # precomputed spectral transform
 )
     # catch incorrect sizes early
@@ -469,14 +449,14 @@ function transform!(                               # GRID TO SPECTRAL
     @boundscheck ismatching(S, specs) || throw(DimensionMismatch(S, specs))
 
     # use scratch memory for Fourier but not yet Legendre-transformed data
-    f_north = S.scratch_memory.north    # phase factors for northern latitudes
-    f_south = S.scratch_memory.south    # phase factors for southern latitudes
+    f_north = scratch_memory.north    # phase factors for northern latitudes
+    f_south = scratch_memory.south    # phase factors for southern latitudes
 
     # FOURIER TRANSFORM in zonal direction
-    _fourier!(f_north, f_south, grids, scratch_memory, S)    
+    _fourier!(f_north, f_south, grids, S)    
     
     # LEGENDRE TRANSFORM in meridional direction
-    _legendre!(specs, f_north, f_south, scratch_memory, S)
+    _legendre!(specs, f_north, f_south, S)
 
     return specs
 end
