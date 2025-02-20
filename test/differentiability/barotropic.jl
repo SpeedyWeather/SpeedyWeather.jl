@@ -189,7 +189,8 @@
     progn_copy = deepcopy(progn)
     dprogn = make_zero(progn)
 
-    autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
+    #autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
+    autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
 
     function transform_diagn(diag, progn, lf2, model)
         diag_copy = deepcopy(diag)
