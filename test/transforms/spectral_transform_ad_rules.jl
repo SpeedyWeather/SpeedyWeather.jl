@@ -1,6 +1,5 @@
-using EnzymeTestUtils, Enzyme, FiniteDifferences
+using EnzymeTestUtils, Enzyme
 import EnzymeTestUtils: test_approx 
-import FiniteDifferences: j′vp, grad, central_fdm
 import AbstractFFTs
 
 grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
@@ -97,6 +96,10 @@ if VERSION <= v"1.11.0"
 
         autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
         @test sum(to_vec(d_progn)[1]) != 0
+
+
+        autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Const(model))
+
     end 
 else 
     @testset "Complete Differentiability" begin

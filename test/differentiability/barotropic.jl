@@ -67,7 +67,7 @@
     progn_copy = deepcopy(progn)
     dprogn = make_zero(progn)
 
-    autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
+    autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
 
     function dynamics_tendencies(diagn, progn, lf, model)
         diagn_new = deepcopy(diagn)
@@ -94,7 +94,7 @@
     progn_copy = deepcopy(progn)
     dprogn = make_zero(progn)
 
-    autodiff(Reverse, SpeedyWeather.horizontal_diffusion!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(model.horizontal_diffusion), Duplicated(model, make_zero(model)), Const(lf1))
+    autodiff(Reverse, SpeedyWeather.horizontal_diffusion!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(model.horizontal_diffusion), Const(model), Const(lf1))
 
     # FD comparision not necessary, we have the exact values 
     #function horizontal_diffusion(diagn, progn, diffusion, model, lf)
