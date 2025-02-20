@@ -578,8 +578,8 @@ Base.fill!(tendencies::Tendencies, x, model::AbstractModel) = Base.fill!(tendenc
 
 RingGrids.eachgridpoint(diagn::DiagnosticVariables) = eachgridpoint(diagn.grid.vor_grid)
 
-@inline SpeedyTransforms.transform!(specs::LowerTriangularArray, grids::AbstractGridArray, dynamics::DynamicsVariables, S::SpectralTransform) = transform!(specs, grids, dynamics.scratch_memory, S)
-@inline SpeedyTransforms.transform!(specs::LowerTriangularArray, grids::AbstractGridArray, diagn::DiagnosticVariables, S::SpectralTransform) = transform!(specs, grids, diagn.dynamics.scratch_memory, S)
+SpeedyTransforms.transform!(specs::LowerTriangularArray, grids::AbstractGridArray, dynamics::DynamicsVariables, S::SpectralTransform) = transform!(specs, grids, dynamics.scratch_memory, S)
+SpeedyTransforms.transform!(specs::LowerTriangularArray, grids::AbstractGridArray, diagn::DiagnosticVariables, S::SpectralTransform) = transform!(specs, grids, diagn.dynamics.scratch_memory, S)
 
-@inline SpeedyTransforms.transform!(grids::AbstractGridArray, specs::LowerTriangularArray, dynamics::DynamicsVariables, S::SpectralTransform; kwargs...) = transform!(grids, specs, dynamics.scratch_memory, S; kwargs...)
-@inline SpeedyTransforms.transform!(grids::AbstractGridArray, specs::LowerTriangularArray, diagn::DiagnosticVariables, S::SpectralTransform; kwargs...) = transform!(grids, specs, diagn.dynamics.scratch_memory, S; kwargs...)
+SpeedyTransforms.transform!(grids::AbstractGridArray, specs::LowerTriangularArray, dynamics::DynamicsVariables, S::SpectralTransform; kwargs...) = transform!(grids, specs, dynamics.scratch_memory, S; kwargs...)
+SpeedyTransforms.transform!(grids::AbstractGridArray, specs::LowerTriangularArray, diagn::DiagnosticVariables, S::SpectralTransform; kwargs...) = transform!(grids, specs, diagn.dynamics.scratch_memory, S; kwargs...)
