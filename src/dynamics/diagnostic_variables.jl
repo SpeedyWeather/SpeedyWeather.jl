@@ -233,7 +233,7 @@ $(TYPEDFIELDS)"""
     div_mean::SpectralVariable2D = zeros(SpectralVariable2D, trunc+2, trunc+1)
 
     "Scratch memory for the transforms"
-    scratch_memory = SpeedyTransforms.SpeedyTransforms.ScratchMemory(NF, ArrayType, nlat_half, GridVariable2D, nlayers)
+    scratch_memory = SpeedyTransforms.ScratchMemory(NF, ArrayType, nlat_half, GridVariable2D, nlayers)
 end
 
 """$(TYPEDSIGNATURES)
