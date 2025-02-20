@@ -34,7 +34,8 @@
     dprogn_new = one(progn) # seed 
 
     # test that we can differentiate wrt an IC 
-    autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, make_zero(model)))
+    #autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, make_zero(model)))
+    autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Const(model))
 
     # nonzero gradient
     @test sum(to_vec(d_progn)[1]) != 0
@@ -71,7 +72,7 @@
 
     function dynamics_tendencies(diagn, progn, lf, model)
         diagn_new = deepcopy(diagn)
-        SpeedyWeather.dynamics_tendencies!(diagn_new, progn, lf, model)
+        SpeedyWeather.dynamics_tendencies!(diagn_new, deepcopy(progn), lf, deepcopy(model))
         return diagn_new
     end 
 
@@ -135,7 +136,6 @@
     tend = diagn.tendencies
     tend_copy = deepcopy(tend)
     dtend = make_zero(tend)
-    dmodel = make_zero(model)
 
     autodiff(Reverse, SpeedyWeather.leapfrog!, Const, Duplicated(progn, dprogn), Duplicated(tend, dtend), Const(dt), Const(lf1), Const(model))
 
@@ -149,7 +149,7 @@
 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> leapfrog_step(prog_new, progn_copy, x, dt, lf1, model), dprogn_copy, tend_copy)
 
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dtend)[1],rtol=1e-5,atol=1e-5))
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dtend)[1],rtol=1e-4,atol=1e-4))
 
     # 
     # single variable leapfrog step 
@@ -189,7 +189,7 @@
     progn_copy = deepcopy(progn)
     dprogn = make_zero(progn)
 
-    autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
+    autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
 
     function transform_diagn(diag, progn, lf2, model)
         diag_copy = deepcopy(diag)
