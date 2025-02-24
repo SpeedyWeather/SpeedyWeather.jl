@@ -1,6 +1,7 @@
 using EnzymeTestUtils, Enzyme
 import EnzymeTestUtils: test_approx 
 import AbstractFFTs
+import FiniteDifferences
 
 grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
 grid_dealiasing = [2, 3]
@@ -41,13 +42,13 @@ end
                     grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
                     f_north = S.scratch_memory.north
                     f_south = S.scratch_memory.south
-
+                    scratch_memory = S.scratch_memory
                     # forward transform 
-                    test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(15, 1), rtol=1e-3, atol=1e-3)
+                    test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (scratch_memory, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(15, 1), rtol=1e-3, atol=1e-3)
 
                     # inverse transform
                     grid = zero(grid)
-                    test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (grid, Duplicated), (f_north, Duplicated), (f_south, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(15, 1), rtol=1e-3, atol=1e-3)
+                    test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (grid, Duplicated), (f_north, Duplicated), (f_south, Duplicated), (scratch_memory, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(15, 1), rtol=1e-3, atol=1e-3)
                 end 
             end
         end
