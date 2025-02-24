@@ -199,7 +199,7 @@ function forcing!(
     
     # back to spectral space
     S_masked = diagn.dynamics.a_2D
-    transform!(S_masked, S_grid, diagn, spectral_transform)
+    transform!(S_masked, S_grid, diagn.dynamics.scratch_memory, spectral_transform)
 
     # scale by radius^2 as is the vorticity equation, and scale to forcing strength
     S_masked .*= (diagn.scale[]^2 * forcing.strength)

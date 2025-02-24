@@ -13,7 +13,7 @@ function SpeedyTransforms.transform!(
 )
     grid = diagn.grid.random_pattern
     spec = progn.random_pattern
-    transform!(grid, spec, diagn, spectral_transform)
+    transform!(grid, spec, diagn.dynamics.scratch_memory, spectral_transform)
 
     if :clamp in fieldnames(typeof(random_process))
         clamp!(grid, random_process.clamp...)
