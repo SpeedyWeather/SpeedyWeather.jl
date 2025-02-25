@@ -1,24 +1,31 @@
-abstract type VerticalCoordinates end
-
-@kwdef struct NoVerticalCoordinates <: VerticalCoordinates
-    nlayers::Int = 1
-end
+abstract type AbstractVerticalCoordinate end
 
 export SigmaCoordinates
-@kwdef struct SigmaCoordinates <: VerticalCoordinates
-    nlayers::Int = 8
-    σ_half::Vector{Float64} = default_sigma_coordinates(nlayers)
 
-    SigmaCoordinates(nlayers::Integer, σ_half::AbstractVector) = sigma_okay(nlayers, σ_half) ?
-    new(nlayers, σ_half) : error("σ_half = $σ_half cannot be used for $nlayers-level SigmaCoordinates")
+"""Sigma coordinates for the vertical coordinates, defined by their half layers.
+Sigma coordinates are currently hardcoded in Geometry.
+$(TYPEDFIELDS)."""
+struct SigmaCoordinates{NF, VectorType} <: AbstractVerticalCoordinate
+    nlayers::Int
+    σ_half::VectorType
+
+    SigmaCoordinates{T, V}(nlayers::Integer, σ_half::AbstractVector) where {T, V} = sigma_okay(nlayers, σ_half) ?
+    new{T, V}(nlayers, σ_half) : error("σ_half = $σ_half cannot be used for $nlayers-level SigmaCoordinates")
 end
 
-# obtain nlayers from length of predefined σ_half levels
-SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(nlayers=length(σ_half)-1; σ_half)
-SigmaCoordinates(σ_half::AbstractRange) = SigmaCoordinates(collect(σ_half))
+# constructor using default sigma coordinates if only nlayers provided, also collect to allow for AbstractRange
+SigmaCoordinates(nlayers::Integer, σ_half::AbstractVector = default_sigma_coordinates(nlayers)) =
+    SigmaCoordinates{eltype(σ_half), typeof(collect(σ_half))}(nlayers, collect(σ_half))
+
+# constructor obtaining nlayers from σ_half
+SigmaCoordinates(σ_half::AbstractVector) = SigmaCoordinates(length(σ_half)-1, σ_half)
+
+# constructor using default nlayers if nothing provided
+SigmaCoordinates() = SigmaCoordinates(DEFAULT_NLAYERS)
+
 
 function Base.show(io::IO, σ::SigmaCoordinates)
-    println(io, "$(σ.nlayers)-layer SigmaCoordinates")
+    println(io, "$(σ.nlayers)-layer $(typeof(σ))")
     nchars = length(string(σ.nlayers))
     format = Printf.Format("%$(nchars)d")
     for k=1:σ.nlayers
@@ -56,12 +63,3 @@ function sigma_okay(nlayers::Integer, σ_half::AbstractVector)
     @assert isincreasing(σ_half) "Vertical sigma coordinates are not increasing."
     return true
 end
-
-# currently not used as the grid has to be defined first
-default_vertical_coordinates(::Type{<:Barotropic}) = NoVerticalCoordinates
-default_vertical_coordinates(::Type{<:ShallowWater}) = NoVerticalCoordinates
-default_vertical_coordinates(::Type{<:PrimitiveEquation}) = SigmaCoordinates
-
-default_nlayers(::Type{<:Barotropic}) = 1
-default_nlayers(::Type{<:ShallowWater}) = 1
-default_nlayers(::Type{<:PrimitiveEquation}) = 8

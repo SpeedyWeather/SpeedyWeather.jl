@@ -1,15 +1,15 @@
 abstract type AbstractCoriolis <: AbstractModelComponent end
 
 export Coriolis
-Base.@kwdef struct Coriolis{NF} <: AbstractCoriolis
+@kwdef struct Coriolis{NF, VectorType} <: AbstractCoriolis
     "number of latitude rings"
     nlat::Int
 
     "coriolis frequency [s^-1], scaled by radius as is vorticity = 2Ω*sin(lat)*radius"
-    f::Vector{NF} = zeros(NF, nlat)
+    f::VectorType = zeros(NF, nlat)
 end
 
-Coriolis(SG::SpectralGrid; kwargs...) = Coriolis{SG.NF}(nlat=SG.nlat; kwargs...)
+Coriolis(SG::SpectralGrid; kwargs...) = Coriolis{SG.NF, SG.VectorType}(nlat=SG.nlat; kwargs...)
 
 function initialize!(coriolis::Coriolis, model::AbstractModel)
     (; rotation) = model.planet

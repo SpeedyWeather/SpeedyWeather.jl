@@ -56,7 +56,13 @@ include("physics/surface_fluxes.jl")
 include("physics/random_process.jl")
 include("physics/stochastic_physics.jl")
 
+# DIFFERENTIABILITY 
+if FLAG_EXTENDED_TESTS
+    include("differentiability/runtests.jl")
+end
+
 # OUTPUT/EXTENSION
 include("output/callbacks.jl")
 include("output/schedule.jl")
 include("output/netcdf_output.jl")
+include("output/jld2_output.jl")

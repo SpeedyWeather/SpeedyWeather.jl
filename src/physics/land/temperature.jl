@@ -51,13 +51,12 @@ function initialize!(land::SeasonalLandTemperature, model::PrimitiveEquation)
     ncfile = NCDataset(path)
 
     # read out netCDF data
-    nx, ny, nt = ncfile.dim["lon"], ncfile.dim["lat"], ncfile.dim["time"]
-    npoints = nx*ny
     fill_value = ncfile[land.varname].attrib["_FillValue"]
     lst = land.file_Grid(ncfile[land.varname].var[:, :, :], input_as=Matrix)
     lst[lst .=== fill_value] .= land.missing_value      # === to include NaN
     
-    @boundscheck grids_match(monthly_temperature, lst, vertical_only=true) || throw(DimensionMismatch(monthly_temperature, lst))
+    @boundscheck grids_match(monthly_temperature, lst, vertical_only=true) ||
+        throw(DimensionMismatch(monthly_temperature, lst))
 
     # create interpolator from grid in file to grid used in model
     interp = RingGrids.interpolator(Float32, monthly_temperature, lst)

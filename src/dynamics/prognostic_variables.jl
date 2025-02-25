@@ -48,7 +48,7 @@ export PrognosticVariablesLand
     soil_temperature::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
 
     "Soil moisture, volume fraction [1]"
-    soil_moisture::GridVariable3D = zeros(GridVariable2D, nlat_half, nlayers)
+    soil_moisture::GridVariable3D = zeros(GridVariable3D, nlat_half, nlayers)
     
     "Snow depth [m]"
     snow_depth::GridVariable2D = zeros(GridVariable2D, nlat_half)
@@ -176,11 +176,15 @@ function Base.show(
     println(io, "├ random_pattern: T$trunc, 1-layer LowerTriangularArray{$NF}")
     println(io, "├┐ocean: PrognosticVariablesOcean{$NF}")
     println(io, "│├ sea_surface_temperature:  $nlat-ring $Grid")
-    println(io, "│└ sea_ice_concentration:    $nlat-ring $Grid")
+    println(io, "│├ sea_ice_concentration:    $nlat-ring $Grid")
+    println(io, "│├ sensible_heat_flux:       $nlat-ring $Grid")
+    println(io, "│└ evaporative_flux:         $nlat-ring $Grid")
     println(io, "├┐land:  PrognosticVariablesLand{$NF}")
-    println(io, "│├ soil_temperature: $nlayers_soil-layer, $nlat-ring $Grid")
-    println(io, "│├ soil_moisture:    $nlayers_soil-layer, $nlat-ring $Grid")
-    println(io, "│└ snow_depth: $nlat-ring $Grid")
+    println(io, "│├ soil_temperature:         $nlayers_soil-layer, $nlat-ring $Grid")
+    println(io, "│├ soil_moisture:            $nlayers_soil-layer, $nlat-ring $Grid")
+    println(io, "│├ snow_depth:               $nlat-ring $Grid")
+    println(io, "│├ sensible_heat_flux:       $nlat-ring $Grid")
+    println(io, "│└ evaporative_flux:         $nlat-ring $Grid")
     println(io, "├ tracers: $(length(tracer_names)), $tracer_names")
     println(io, "├ particles: $nparticles-element $(typeof(progn.particles))")
     println(io, "├ scale: $(progn.scale[])")
@@ -204,13 +208,20 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
     # ocean
     progn_new.ocean.sea_surface_temperature .= progn_old.ocean.sea_surface_temperature
     progn_new.ocean.sea_ice_concentration .= progn_old.ocean.sea_ice_concentration
-    
+    progn_new.ocean.sensible_heat_flux .= progn_old.ocean.sensible_heat_flux
+    progn_new.ocean.evaporative_flux .= progn_old.ocean.evaporative_flux
+ 
     # land
     progn_new.land.soil_temperature .= progn_old.land.soil_temperature
     progn_new.land.snow_depth .= progn_old.land.snow_depth
     progn_new.land.soil_moisture .= progn_old.land.soil_moisture
+    progn_new.land.sensible_heat_flux .= progn_old.land.sensible_heat_flux
+    progn_new.land.evaporative_flux .= progn_old.land.evaporative_flux
 
-    # TODO copy over tracers
+    # copy over tracers
+    for (key, value) in progn_old.tracers
+        progn_old.tracers[key] = value
+    end 
 
     # copy largest subset of particles
     if length(progn_new.particles) != length(progn_old.particles)
@@ -223,11 +234,77 @@ function Base.copy!(progn_new::PrognosticVariables, progn_old::PrognosticVariabl
         progn_new.particles .= progn_old.particles
     end
 
-    progn_new.clock.time = progn_old.clock.time
+    progn_new.random_pattern .= progn_old.random_pattern.data
+
+    copy!(progn_new.clock, progn_old.clock)
     progn_new.scale[] = progn_old.scale[]
 
-    return progn_new
+    return nothing
 end
+
+function Base.zero(progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector}) where {NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ParticleVector}
+    (; trunc, nlat_half, nlayers, nlayers_soil, nparticles) = progn
+    
+    # initialize regular progn variables 
+    progn_new = PrognosticVariables{NF, ArrayType, nsteps,
+        SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, 
+        ParticleVector}(;
+            trunc, nlat_half, nlayers, nlayers_soil, nparticles,
+        )
+
+    # add tracers with zero 
+    for (key, value) in progn.tracers 
+        progn_new.tracers[key] = ntuple(i -> zeros(SpectralVariable3D, trunc+2, trunc+1, nlayers), nsteps)
+    end 
+
+    # use the same scale 
+    progn_new.scale[] = progn.scale[]
+
+    return progn_new
+end 
+
+function Base.fill!(progn::PrognosticVariables{NF}, value::Number) where NF
+
+    value_NF = NF(value)
+
+    for i in eachindex(progn.vor)   # each leapfrog time step
+        progn.vor[i] .= value_NF
+        progn.div[i] .= value_NF
+        progn.temp[i] .= value_NF
+        progn.humid[i] .= value_NF
+        progn.pres[i] .= value_NF
+    end
+
+    # ocean
+    progn.ocean.sea_surface_temperature .= value_NF
+    progn.ocean.sea_ice_concentration .= value_NF
+    progn.ocean.sensible_heat_flux .= value_NF
+    progn.ocean.evaporative_flux .= value_NF
+
+    # land
+    progn.land.soil_temperature .= value_NF
+    progn.land.snow_depth .= value_NF
+    progn.land.soil_moisture .= value_NF
+    progn.land.sensible_heat_flux .= value_NF
+    progn.land.evaporative_flux .= value_NF
+
+    # fill tracers
+    for (key, value) in progn.tracers 
+        for value_i in value # istep of nsteps tuple 
+            value_i .= value_NF
+        end 
+    end 
+
+    # particles are ignored for the fill
+
+    return progn
+end 
+
+function Base.one(progn::PrognosticVariables)
+    zero_progn = zero(progn)
+    fill!(zero_progn, 1)
+    return zero_progn
+end 
 
 """$(TYPEDSIGNATURES)
 Add `tracers` to the prognostic variables `progn` in `progn.tracers::Dict`."""

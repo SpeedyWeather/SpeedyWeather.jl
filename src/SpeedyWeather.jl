@@ -19,7 +19,7 @@ import Dates: Dates, DateTime, Period, Millisecond, Second, Minute, Hour, Day, W
 import Printf: Printf, @sprintf
 import Random: randstring
 import NCDatasets: NCDatasets, NCDataset, defDim, defVar
-import JLD2: jldopen
+import JLD2: jldopen, jldsave, JLDFile 
 import CodecZlib
 import BitInformation: round, round!
 import UnicodePlots
@@ -158,6 +158,7 @@ include("output/restart_file.jl")
 include("output/plot.jl")
 include("output/callbacks.jl")
 include("output/particle_tracker.jl")
+include("output/jld2_output.jl")
 
 # MODELS
 include("models/simulation.jl")

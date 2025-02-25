@@ -49,10 +49,10 @@ SurfaceOceanEvaporation(SG::SpectralGrid; kwargs...) = SurfaceOceanEvaporation{S
 initialize!(::SurfaceOceanEvaporation, ::PrimitiveWet) = nothing
 
 function surface_evaporation!(
-    column::ColumnVariables,
+    column::ColumnVariables{NF},
     evaporation::SurfaceOceanEvaporation,
     model::PrimitiveWet,
-)
+) where NF
 
     (; skin_temperature_sea, pres) = column
     (; moisture_exchange) = evaporation
@@ -70,7 +70,7 @@ function surface_evaporation!(
     drag_sea = evaporation.use_boundary_layer_drag ? column.boundary_layer_drag : moisture_exchange
 
     # SPEEDY documentation eq. 55/57, zero flux if sea surface temperature not available
-    flux_sea = isfinite(skin_temperature_sea) ? ρ*drag_sea*V₀*max(sat_humid_sea  - surface_humid, 0) :
+    flux_sea = isfinite(skin_temperature_sea) ? ρ*drag_sea*V₀*max(sat_humid_sea  - surface_humid, zero(NF)) :
                                                     zero(skin_temperature_sea)
     column.evaporative_flux_ocean = flux_sea
 
@@ -95,10 +95,11 @@ SurfaceLandEvaporation(SG::SpectralGrid; kwargs...) = SurfaceLandEvaporation{SG.
 initialize!(::SurfaceLandEvaporation, ::PrimitiveWet) = nothing
 
 function surface_evaporation!(
-    column::ColumnVariables,
+    column::ColumnVariables{NF},
     evaporation::SurfaceLandEvaporation,
     model::PrimitiveWet,
-)
+) where NF
+
     (; skin_temperature_land, pres) = column
     (; moisture_exchange) = evaporation
     α = column.soil_moisture_availability
@@ -117,10 +118,9 @@ function surface_evaporation!(
 
     # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)
     flux_land = isfinite(skin_temperature_land) && isfinite(α) ?
-                ρ*drag_land*V₀*max(α*sat_humid_land  - surface_humid, 0)*land_fraction :
-                zero(surface_humid)
+                ρ*drag_land*V₀*max(α*sat_humid_land  - surface_humid, zero(NF))*land_fraction :
+                zero(NF)
     column.evaporative_flux_land = flux_land        # store flux separately for land
-
     flux_land *= land_fraction                      # weight by land fraction of land-sea mask
     column.flux_humid_upward[end] += flux_land      # end=lowermost layer, accumulate with (+=) to total flux
     column.evaporative_flux += flux_land            # ocean sets the flux (=), land accumulates (+=)

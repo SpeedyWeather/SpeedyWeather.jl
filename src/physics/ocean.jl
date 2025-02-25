@@ -76,7 +76,7 @@ fields from file, and interpolates them in time regularly
 (default every 3 days) to be stored in the prognostic variables.
 Fields and options are
 $(TYPEDFIELDS)"""
-@kwdef struct SeasonalOceanClimatology{NF, Grid<:AbstractGrid{NF}} <: AbstractOcean
+@kwdef struct SeasonalOceanClimatology{NF, GridVariable3D} <: AbstractOcean
 
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
@@ -98,53 +98,37 @@ $(TYPEDFIELDS)"""
 
     # to be filled from file
     "Monthly sea surface temperatures [K], interpolated onto Grid"
-    monthly_temperature::Vector{Grid} = [zeros(Grid, nlat_half) for _ in 1:12]
+    monthly_temperature::GridVariable3D = zeros(GridVariable3D, nlat_half, 12)
 end
 
 # generator function
 function SeasonalOceanClimatology(SG::SpectralGrid; kwargs...)
-    (; NF, Grid, nlat_half) = SG
-    return SeasonalOceanClimatology{NF, Grid{NF}}(; nlat_half, kwargs...)
+    (; NF, GridVariable3D, nlat_half) = SG
+    return SeasonalOceanClimatology{NF, GridVariable3D}(; nlat_half, kwargs...)
 end
 
 function initialize!(ocean::SeasonalOceanClimatology, model::PrimitiveEquation)
-    load_monthly_climatology!(ocean.monthly_temperature, ocean)
-end
-
-function load_monthly_climatology!( 
-    monthly::Vector{Grid},
-    scheme;
-    varname::String = scheme.varname
-) where {Grid<:AbstractGrid}
+    (; monthly_temperature) = ocean
 
     # LOAD NETCDF FILE
-    if scheme.path == "SpeedyWeather.jl/input_data"
-        path = joinpath(@__DIR__, "../../input_data", scheme.file)
+    if ocean.path == "SpeedyWeather.jl/input_data"
+        path = joinpath(@__DIR__, "../../input_data", ocean.file)
     else
-        path = joinpath(scheme.path, scheme.file)
+        path = joinpath(ocean.path, ocean.file)
     end
     ncfile = NCDataset(path)
 
     # create interpolator from grid in file to grid used in model
-    nx, ny = ncfile.dim["lon"], ncfile.dim["lat"]
-    npoints = nx*ny
-    NF_file = typeof(ncfile[varname].attrib["_FillValue"])
-    grid = scheme.file_Grid(zeros(NF_file, npoints))
-    interp = RingGrids.interpolator(Float32, monthly[1], grid)
+    fill_value = ncfile[ocean.varname].attrib["_FillValue"]
+    sst = ocean.file_Grid(ncfile[ocean.varname].var[:, :, :], input_as=Matrix)
+    sst[sst .=== fill_value] .= ocean.missing_value      # === to include NaN
 
-    # interpolate and store in monthly
-    for month in 1:12
-        this_month = ncfile[varname][:, :, month]
-        ij = 0
-        for j in 1:ny
-            for i in 1:nx
-                ij += 1
-                x = this_month[i, j]
-                grid[ij] = ismissing(x) ? scheme.missing_value : x
-            end
-        end
-        interpolate!(monthly[month], grid, interp)
-    end
+    @boundscheck grids_match(monthly_temperature, sst, vertical_only=true) ||
+        throw(DimensionMismatch(monthly_temperature, sst))
+
+    # create interpolator from grid in file to grid used in model
+    interp = RingGrids.interpolator(Float32, monthly_temperature, sst)
+    interpolate!(monthly_temperature, sst, interp)
     return nothing
 end
 
@@ -155,39 +139,31 @@ function initialize!(
     ocean_model::SeasonalOceanClimatology,
     model::PrimitiveEquation,
 )
-    interpolate_monthly!(   ocean.sea_surface_temperature,
-                            ocean_model.monthly_temperature,
-                            progn.clock.time)
+    ocean_timestep!(progn, diagn, ocean_model, model)
 end
     
-function ocean_timestep!(   progn::PrognosticVariables,
-                            diagn::DiagnosticVariables,
-                            ocean_model::SeasonalOceanClimatology,
-                            model::PrimitiveEquation)
-
-    interpolate_monthly!(   progn.ocean.sea_surface_temperature,
-                            ocean_model.monthly_temperature,
-                            progn.clock.time)
-    return nothing
-end
-
-function interpolate_monthly!(
-    grid::Grid,
-    monthly::Vector{Grid},
-    time::DateTime,
-) where Grid
+function ocean_timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    ocean::SeasonalOceanClimatology,
+    model::PrimitiveEquation,
+)
+    (; time) = progn.clock
 
     this_month = Dates.month(time)
     next_month = (this_month % 12) + 1      # mod for dec 12 -> jan 1
 
     # linear interpolation weight between the two months
     # TODO check whether this shifts the climatology by 1/2 a month
-    weight = convert(eltype(grid), Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
+    (; monthly_temperature) = ocean
+    (; sea_surface_temperature) = progn.ocean
+    NF = eltype(sea_surface_temperature)
+    weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
-    @. grid = (1-weight) * monthly[this_month] +
-                 weight  * monthly[next_month]
-
-    return nothing
+    @inbounds for ij in eachgridpoint(sea_surface_temperature)
+        sea_surface_temperature[ij] = (1-weight) * monthly_temperature[ij, this_month] +
+                                          weight  * monthly_temperature[ij, next_month]
+    end
 end
 
 ## CONSTANT OCEAN CLIMATOLOGY
@@ -238,11 +214,13 @@ function initialize!(
     ocean_model::ConstantOceanClimatology,
     model::PrimitiveEquation,
 )
-    Grid = typeof(ocean.sea_surface_temperature)
-    (; nlat_half) = ocean.sea_surface_temperature
-    monthly = [zeros(Grid, nlat_half) for _ in 1:12]
-    load_monthly_climatology!(monthly, ocean_model)
-    interpolate_monthly!(ocean.sea_surface_temperature, monthly, progn.clock.time)
+    # create a seasonal model, initialize it and the variables
+    (; path, file, varname, file_Grid, missing_value) = ocean_model
+    (; NF, GridVariable3D, nlat_half) = model.spectral_grid
+    seasonal_model = SeasonalOceanClimatology{NF, GridVariable3D}(; nlat_half, path, file, varname, file_Grid, missing_value)
+    initialize!(seasonal_model, model)
+    initialize!(ocean, progn, diagn, seasonal_model, model)
+    # (seasonal model will be garbage collected hereafter)
 end
 
 function ocean_timestep!(

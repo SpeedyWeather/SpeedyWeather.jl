@@ -80,6 +80,10 @@ vertical_coordinates = SigmaCoordinates(0:0.2:1)
 ```
 These are regularly spaced [Sigma coordinates](@ref), defined through their half levels.
 The cell centers or called full levels are marked with an ×.
+You have to provide this as an argument to `Geometry`,
+i.e. `Geometry(spectral_grid, vertical_coordinates=σ)` and pass this on to the
+model constructor if you want to use custom sigma coordinates. At the moment,
+other vertical coordinates are not supported.
 
 ## [Creating model components](@id create_model_components)
 

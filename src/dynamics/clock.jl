@@ -38,6 +38,18 @@ function Base.show(io::IO, C::Clock)
     print_fields(io, C, keys)
 end
 
+# copy! 
+function Base.copy!(clock::Clock, clock_old::Clock)
+    clock.time = clock_old.time 
+    clock.start = clock_old.start 
+    clock.period = clock_old.period 
+    clock.timestep_counter = clock_old.timestep_counter
+    clock.n_timesteps = clock_old.n_timesteps
+    clock.Δt = clock_old.Δt 
+    
+    return nothing 
+end 
+
 """
 $(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` in the `time_stepping`."""
