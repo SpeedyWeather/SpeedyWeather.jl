@@ -15,15 +15,6 @@ export LandModel
 end
 
 # default constructor
-function LandModel(SG::SpectralGrid)
-    return LandModel(
-        SeasonalLandTemperature(SG),
-        SeasonalSoilMoisture(SG),
-        VegetationClimatology(SG),
-        NoRivers(SG),
-    )
-end
-
 function LandModel(
     SG::SpectralGrid;
     temperature = SeasonalLandTemperature,

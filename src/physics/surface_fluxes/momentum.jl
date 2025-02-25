@@ -25,9 +25,9 @@ end
 SurfaceWind(SG::SpectralGrid; kwargs...) = SurfaceWind{SG.NF}(; kwargs...)
 initialize!(::SurfaceWind, ::PrimitiveEquation) = nothing
 
-function surface_wind_stress!(  column::ColumnVariables,
+function surface_wind_stress!(  column::ColumnVariables{NF},
                                 surface_wind::SurfaceWind,
-                                model::PrimitiveEquation)
+                                model::PrimitiveEquation) where NF
 
     (; land_fraction) = column
     (; f_wind, V_gust, drag_land, drag_sea) = surface_wind
@@ -48,7 +48,7 @@ function surface_wind_stress!(  column::ColumnVariables,
     # surface wind stress: quadratic drag, fractional land-sea mask
     ρ = column.surface_air_density
     V₀ = column.surface_wind_speed
-    drag = land_fraction*drag_land + (1-land_fraction)*drag_sea
+    drag = land_fraction*drag_land + (one(NF)-land_fraction)*drag_sea
 
     # SPEEDY documentation eq. 52, 53, accumulate fluxes with +=
     column.flux_u_upward[end] -= ρ*drag*V₀*surface_u

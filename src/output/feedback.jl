@@ -28,7 +28,7 @@ $(TYPEDFIELDS)"""
         ProgressMeter.Progress(1, enabled=verbose, showspeed=true; desc="Weather is speedy: ")
 
     "txt is a Nothing in case of no output"
-    progress_txt::Union{IOStream, Nothing} = nothing
+    progress_txt::IOStream = IOStream("")
 
     "did Infs/NaNs occur in the simulation?"
     nars_detected::Bool = false

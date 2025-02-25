@@ -1,17 +1,21 @@
 abstract type AbstractAdiabaticConversion <: AbstractModelComponent end
 
 export AdiabaticConversion
-Base.@kwdef struct AdiabaticConversion{NF} <: AbstractAdiabaticConversion
+
+"""Terms used to compute the adiabatic conversion term in the spectral model.
+Fields are $(TYPEDFIELDS)."""
+@kwdef struct AdiabaticConversion{NF, VectorType} <: AbstractAdiabaticConversion
     nlayers::Int
 
     "σ-related factor A needed for adiabatic conversion term"
-    σ_lnp_A::Vector{NF} = zeros(NF, nlayers)
+    σ_lnp_A::VectorType = zeros(NF, nlayers)
     
     "σ-related factor B needed for adiabatic conversion term"
-    σ_lnp_B::Vector{NF} = zeros(NF, nlayers)
+    σ_lnp_B::VectorType = zeros(NF, nlayers)
 end
 
-AdiabaticConversion(SG::SpectralGrid; kwargs...) = AdiabaticConversion{SG.NF}(; nlayers=SG.nlayers, kwargs...)
+AdiabaticConversion(SG::SpectralGrid; kwargs...) =
+    AdiabaticConversion{SG.NF, SG.VectorType}(; nlayers=SG.nlayers, kwargs...)
 
 function initialize!(
     adiabatic::AdiabaticConversion,
