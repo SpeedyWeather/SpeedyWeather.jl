@@ -1,10 +1,10 @@
-Starting SpeedyWeather.jl run 0001 on Fri, 14 Feb 2025 18:49:10
+Starting SpeedyWeather.jl run 0001 on Tue, 25 Feb 2025 18:14:54
 Integrating:
 SpectralGrid:
 ├ Spectral:   T31 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
 ├ Grid:       48-ring OctahedralGaussianGrid{Float32}, 3168 grid points
 ├ Resolution: 401km (average)
-├ Vertical:   8-layer SigmaCoordinates, 2-layer land
+├ Vertical:   8-layer atmosphere, 2-layer land
 └ Device:     CPU using Array
 Time: 5.0 days at Δt = 2400.0s
 
@@ -22,7 +22,7 @@ All data will be stored in /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/d
  40%, ETA: 0:00:01,   Inf millenia/day
  45%, ETA: 0:00:01,   Inf millenia/day
  50%, ETA: 0:00:01,   Inf millenia/day
- 55%, ETA: 0:00:01,   Inf millenia/day
+ 55%, ETA: 0:00:00,   Inf millenia/day
  60%, ETA: 0:00:00,   Inf millenia/day
  65%, ETA: 0:00:00,   Inf millenia/day
  70%, ETA: 0:00:00,   Inf millenia/day

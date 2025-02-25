@@ -3,18 +3,18 @@ SpectralGrid:
 ├ Spectral:   T63 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
 ├ Grid:       96-ring OctahedralGaussianGrid{Float32}, 10944 grid points
 ├ Resolution: 216km (average)
-├ Vertical:   1-layer SigmaCoordinates, 2-layer land
+├ Vertical:   1-layer atmosphere, 2-layer land
 └ Device:     CPU using Array
 
 model.device_setup
 SpeedyWeather.DeviceSetup{CPU, DataType}(CPU(), KernelAbstractions.CPU, 4)
 
 model.geometry
-Geometry{Float32, OctahedralGaussianGrid, Vector{Float32}, Vector{Float64}} for SpectralGrid:
+Geometry for SpectralGrid:
 ├ Spectral:   T63 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
 ├ Grid:       96-ring OctahedralGaussianGrid{Float32}, 10944 grid points
 ├ Resolution: 216km (average)
-├ Vertical:   1-layer SigmaCoordinates, 2-layer land
+├ Vertical:   1-layer atmosphere, 2-layer land
 └ Device:     CPU using Array
 
 model.planet
@@ -51,20 +51,20 @@ EarthAtmosphere{Float32} <: SpeedyWeather.AbstractAtmosphere
 └ layer_thickness::Float32 = 8500.0
 
 model.coriolis
-Coriolis{Float32} <: SpeedyWeather.AbstractCoriolis
+Coriolis{Float32, Vector{Float32}} <: SpeedyWeather.AbstractCoriolis
 ├ nlat::Int64 = 96
 └── arrays: f
 
 model.orography
-EarthOrography{Float32, OctahedralGaussianGrid{Float32}} <: SpeedyWeather.AbstractOrography
+EarthOrography{Float32, OctahedralGaussianGrid{Float32}, LowerTriangularMatrix{ComplexF32}} <: SpeedyWeather.AbstractOrography
 ├ path::String = SpeedyWeather.jl/input_data
 ├ file::String = orography.nc
 ├ file_Grid::UnionAll = FullGaussianGrid
-├ scale::Float64 = 1.0
+├ scale::Float32 = 1.0
 ├ smoothing::Bool = true
-├ smoothing_power::Float64 = 1.0
-├ smoothing_strength::Float64 = 0.1
-├ smoothing_fraction::Float64 = 0.05
+├ smoothing_power::Float32 = 1.0
+├ smoothing_strength::Float32 = 0.1
+├ smoothing_fraction::Float32 = 0.05
 └── arrays: orography, geopot_surf
 
 model.forcing
@@ -102,7 +102,7 @@ NoRandomProcess <: SpeedyWeather.AbstractRandomProcess
 
 
 model.tracers
-Dict{Symbol, SpeedyWeather.AbstractTracer}()
+Dict{Symbol, Tracer}()
 
 model.time_stepping
 Leapfrog{Float32} <: SpeedyWeather.AbstractTimeStepper
@@ -126,7 +126,7 @@ SpectralTransform{Float32, Array}:
 └ Memory:     for 1 layers (82.50 KB)
 
 model.implicit
-ImplicitShallowWater{Float32} <: SpeedyWeather.AbstractImplicit
+ImplicitShallowWater{Float32, Vector{Float32}} <: SpeedyWeather.AbstractImplicit
 ├ trunc::Int64 = 63
 ├ α::Float32 = 1.0
 ├ H::Base.RefValue{Float32} = Base.RefValue{Float32}(8500.0f0)
@@ -149,7 +149,7 @@ model.output
 NetCDFOutput{FullGaussianGrid{Float32}}
 ├ status: active
 ├ write restart file: true (if active)
-├ interpolator: AnvilInterpolator{Float32, OctahedralGaussianGrid}
+├ interpolator: AnvilInterpolator{Float32, OctahedralGaussianGrid, SpeedyWeather.RingGrids.GridGeometry{OctahedralGaussianGrid, Vector{Float64}, Vector{Int64}, Vector{UnitRange{Int64}}}, SpeedyWeather.RingGrids.AnvilLocator{Float32, Vector{Float32}, Vector{Int64}}}
 ├ path: /home/runner/work/SpeedyWeather.jl/SpeedyWeather.jl/docs/build/run_test/output.nc
 ├ frequency: 3600 seconds
 └┐ variables:
@@ -173,7 +173,7 @@ Feedback <: AbstractFeedback
 ├ start::Int64 = 0
 ├ barlen::Nothing = nothing
 ├ barglyphs::ProgressMeter.BarGlyphs = ProgressMeter.BarGlyphs('|', '█', ['▏', '▎', '▍', '▌', '▋', '▊', '▉'], ' ', '|')
-└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run test ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 1919, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (139894217226304, 139894217226304, 433072584202)), 0, 1, false, false, 1.73955909542366e9, 1.739559095423661e9, 1.739559095423661e9)
-├ progress_txt::Nothing = nothing
+└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run test ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 1919, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (0, 0, 432532674845)), 0, 1, false, false, 1.74050742142486e9, 1.74050742142486e9, 1.74050742142486e9)
+├ progress_txt::IOStream = IOStream()
 └ nars_detected::Bool = false
 
