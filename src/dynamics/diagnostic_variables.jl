@@ -246,6 +246,54 @@ function DynamicsVariables(SG::SpectralGrid)
         )
 end
 
+
+export DynamicsVariablesOcean
+@kwdef struct DynamicsVariablesOcean{
+    NF,
+    ArrayType,
+    GridVariable2D,
+} <: AbstractDiagnosticVariables
+
+    nlat_half::Int
+    sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    surface_shortwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    surface_longwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    surface_longwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    albedo::GridVariable2D = zeros(GridVariable2D, nlat_half)
+end
+
+DynamicsVariablesOcean(SG::SpectralGrid) =
+    DynamicsVariablesOcean{SG.NF, SG.ArrayType, SG.GridVariable2D}(nlat_half=SG.nlat_half)
+
+export DynamicsVariablesLand
+@kwdef struct DynamicsVariablesLand{
+    NF,
+    ArrayType,
+    GridVariable2D,
+} <: AbstractDiagnosticVariables
+
+    nlat_half::Int
+    sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    surface_shortwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    surface_longwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    surface_longwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
+    albedo::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "Availability of soil moisture to evaporation [1]"
+    soil_moisture_availability::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "River runoff [m/s], diagnostic overflow from soil moisture"
+    river_runoff::GridVariable2D = zeros(GridVariable2D, nlat_half)
+end
+
+DynamicsVariablesLand(SG::SpectralGrid) =
+    DynamicsVariablesLand{SG.NF, SG.ArrayType, SG.GridVariable2D}(nlat_half=SG.nlat_half)
+
+
 export PhysicsVariables
 
 """
@@ -257,7 +305,10 @@ $(TYPEDFIELDS)"""
     GridVariable2D,         # <: AbstractGridArray
 } <: AbstractDiagnosticVariables
 
-    nlat_half::Int
+    nlat_half::Int          # resolution of grid
+
+    ocean::DynamicsVariablesOcean{NF, ArrayType, GridVariable2D}
+    land::DynamicsVariablesLand{NF, ArrayType, GridVariable2D}
 
     # PRECIPITATION
     "Accumulated large-scale precipitation [m]"
@@ -275,23 +326,12 @@ $(TYPEDFIELDS)"""
     "Cloud top [m]"
     cloud_top::GridVariable2D = zeros(GridVariable2D, nlat_half)            
     
-    # LAND
-    "Availability of soil moisture to evaporation [1]"
-    soil_moisture_availability::GridVariable2D = zeros(GridVariable2D, nlat_half)
-
-    "River runoff [m/s], diagnostic overflow from soil moisture"
-    river_runoff::GridVariable2D = zeros(GridVariable2D, nlat_half)
-
     # SURFACE FLUXES
     "Sensible heat flux [W/m²], positive up"
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
-    sensible_heat_flux_ocean::GridVariable2D = zeros(GridVariable2D, nlat_half)
-    sensible_heat_flux_land::GridVariable2D = zeros(GridVariable2D, nlat_half)
     
     "Evaporative flux [kg/s/m^2], positive up"
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
-    evaporative_flux_ocean::GridVariable2D = zeros(GridVariable2D, nlat_half)
-    evaporative_flux_land::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     # RADIATION
     "Surface radiation: shortwave up [W/m²]"
@@ -302,8 +342,6 @@ $(TYPEDFIELDS)"""
     
     "Surface radiation: longwave up [W/m²]"
     surface_longwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
-    surface_longwave_up_ocean::GridVariable2D = zeros(GridVariable2D, nlat_half)
-    surface_longwave_up_land::GridVariable2D = zeros(GridVariable2D, nlat_half)
     
     "Surface radiation: longwave down [W/m²]"
     surface_longwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
@@ -313,6 +351,9 @@ $(TYPEDFIELDS)"""
 
     "Outgoing longwave radiation [W/m^2]"
     outgoing_longwave_radiation::GridVariable2D = zeros(GridVariable2D, nlat_half)
+
+    "Albedo [1]"
+    albedo::GridVariable2D = zeros(GridVariable2D, nlat_half)
 
     "Cosine of solar zenith angle [1]"
     cos_zenith::GridVariable2D = zeros(GridVariable2D, nlat_half)           
@@ -324,7 +365,10 @@ function PhysicsVariables(SG::SpectralGrid)
     (; nlat_half, NF, ArrayType) = SG
     (; GridVariable2D) = SG
 
-    return PhysicsVariables{NF, ArrayType, GridVariable2D}(; nlat_half)
+    ocean = DynamicsVariablesOcean(SG)
+    land = DynamicsVariablesLand(SG)
+
+    return PhysicsVariables{NF, ArrayType, GridVariable2D}(; nlat_half, ocean, land)
 end
 
 export ParticleVariables

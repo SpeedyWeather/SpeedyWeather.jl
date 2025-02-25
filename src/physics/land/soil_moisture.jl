@@ -172,8 +172,8 @@ function timestep!(
 
     Pconv = diagn.physics.precip_rate_convection    # precipitation in [m/s]
     Plsc = diagn.physics.precip_rate_large_scale
-    E = diagn.physics.evaporative_flux_land         # [kg/s/m²], divide by density for [m/s]
-    R = diagn.physics.river_runoff                  # diagnosed [m/s]
+    E = diagn.physics.land.evaporative_flux         # [kg/s/m²], divide by density for [m/s]
+    R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
     @boundscheck grids_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) || throw(DimensionMismatch(soil_moisture, Pconv))
     @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)

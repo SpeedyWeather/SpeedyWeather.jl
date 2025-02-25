@@ -1,14 +1,15 @@
 abstract type AbstractAlbedo <: AbstractModelComponent end
 
-struct Albedo{Ocean, Land} <: AbstractAlbedo
+export Albedo
+@kwdef struct Albedo{Ocean, Land} <: AbstractAlbedo
     ocean::Ocean
     land::Land
 end
 
-function Albedo(SG::SpectralGrid;
-    ocean = GlobalConstantAlbedo(SG, α=0.06),
-    land = GlobalConstantAlbedo(SG, α=0.4))
-    return Albedo{typeof(ocean), typeof(land)}(ocean, land)
+function DefaultAlbedo(SG::SpectralGrid;
+    ocean = GlobalConstantAlbedo(SG, albedo=0.06),
+    land = GlobalConstantAlbedo(SG, albedo=0.4))
+    return Albedo(ocean, land)
 end
 
 function initialize!(albedo::Albedo, model::PrimitiveEquation)
@@ -16,17 +17,36 @@ function initialize!(albedo::Albedo, model::PrimitiveEquation)
     initialize!(albedo.land, model)
 end
 
+# dispatch over model.albedo
+albedo!(diagn::DiagnosticVariables, progn::PrognosticVariables, model::PrimitiveEquation) =
+    albedo!(diagn, progn, model.albedo, model)
 
+function albedo!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    albedo::Albedo,
+    model::PrimitiveEquation,
+)
+    albedo!(diagn.physics.ocean, progn, albedo.ocean, model)
+    albedo!(diagn.physics.land, progn, albedo.land, model)
+end
 
 ## GLOBAL CONSTANT ALBEDO
 export GlobalConstantAlbedo
-@kwdef struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
-    α::NF = 0.3
+@kwdef mutable struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
+    albedo::NF = 0.3
 end
 
 GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)
-initialize!(albedo::GlobalConstantAlbedo,::PrimitiveEquation) = nothing
-
+initialize!(albedo::GlobalConstantAlbedo, ::PrimitiveEquation) = nothing
+function albedo!(
+    diagn::AbstractDiagnosticVariables,     # ocean or land!
+    progn::PrognosticVariables,
+    albedo::GlobalConstantAlbedo,
+    model::PrimitiveEquation,
+)
+    diagn.albedo .= albedo.albedo           # copy over the constant albedo
+end
 
 ## ALEBDO CLIMATOLOGY
 
@@ -71,4 +91,23 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
 
     a = albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as=Matrix)
     interpolate!(albedo.albedo, a)
+end
+
+function albedo!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    albedo::AlbedoClimatology,
+    model::PrimitiveEquation,
+)
+    albedo!(diagn.physics.ocean, progn, albedo, model)
+    albedo!(diagn.physics.land, progn, albedo, model)
+end
+
+function albedo!(
+    diagn::AbstractDiagnosticVariables,     # ocean or land!
+    progn::PrognosticVariables,
+    albedo::AlbedoClimatology,
+    model::PrimitiveEquation,
+)
+    diagn.albedo .= albedo.albedo           # copy over the albedo field
 end

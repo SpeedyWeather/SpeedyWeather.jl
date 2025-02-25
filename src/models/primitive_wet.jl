@@ -79,7 +79,7 @@ $(TYPEDFIELDS)"""
     ocean::OC = SeasonalOceanClimatology(spectral_grid)
     land::LA = LandModel(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
-    albedo::AL = AlbedoClimatology(spectral_grid)
+    albedo::AL = DefaultAlbedo(spectral_grid)
     
     # PHYSICS/PARAMETERIZATIONS
     physics::Bool = true

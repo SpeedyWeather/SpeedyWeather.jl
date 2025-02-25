@@ -291,6 +291,7 @@ function initialize!(
     Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
     sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
     set!(sea_surface_temperature, sst, model.geometry)
+    mask!(sea_surface_temperature, model.land_sea_mask, :land)
 end
 
 function ocean_timestep!(
@@ -343,6 +344,7 @@ function initialize!(
     Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
     sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
     set!(sea_surface_temperature, sst, model.geometry)
+    mask!(sea_surface_temperature, model.land_sea_mask, :land)
 end
 
 function ocean_timestep!(
@@ -355,19 +357,16 @@ function ocean_timestep!(
     Lᵥ = model.atmosphere.latent_heat_condensation
     C₀ = ocean_model.heat_capacity_mixed_layer
     Δt = model.time_stepping.Δt_sec
-    (; mask) = model.land_sea_mask
 
     # Frierson et al. 2006, eq (1)
-    Rs = diagn.physics.surface_shortwave_down
-    Rld = diagn.physics.surface_longwave_down
-    Rlu = diagn.physics.surface_longwave_up
-    Ev = diagn.physics.evaporative_flux
-    S = diagn.physics.sensible_heat_flux
+    Rs = diagn.physics.ocean.surface_shortwave_down
+    Rld = diagn.physics.ocean.surface_longwave_down
+    Rlu = diagn.physics.ocean.surface_longwave_up
+    Ev = diagn.physics.ocean.evaporative_flux
+    S = diagn.physics.ocean.sensible_heat_flux
 
-    # Euler forward step, mask land fluxes
-    # TODO mask shouldn't be applied for fractional cells
-    # maybe set sst for all land to NaN at the beginning?
-    @. sst += (Δt/C₀)*(1 - mask)*(Rs - Rlu + Rld - Lᵥ*Ev - S)
+    # Euler forward step
+    @. sst += (Δt/C₀)*(Rs - Rlu + Rld - Lᵥ*Ev - S)
 
     return nothing
 end

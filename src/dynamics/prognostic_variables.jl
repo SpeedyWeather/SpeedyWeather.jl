@@ -26,9 +26,6 @@ export PrognosticVariablesOcean
 
     "Prescribed ocean evaporative flux [kg/s/m²]"
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
-
-    "Albedo [1]"
-    albedo::GridVariable2D = zeros(GridVariable2D, nlat_half)
 end
 
 export PrognosticVariablesLand
@@ -61,9 +58,6 @@ export PrognosticVariablesLand
 
     "Prescribed land evaporative flux [kg/s/m²], zero if not used"
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
-
-    "Albedo [1]"
-    albedo::GridVariable2D = zeros(GridVariable2D, nlat_half)
 end
 
 export PrognosticVariables
@@ -237,8 +231,10 @@ end
 
 """$(TYPEDSIGNATURES)
 Add `tracers` to the prognostic variables `progn` in `progn.tracers::Dict`."""
-function add!(progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D}, tracers::Tracer...
-    ) where {
+function add!(
+    progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D},
+    tracers::Tracer...
+) where {
         NF,                     # number format
         ArrayType,
         nsteps,
