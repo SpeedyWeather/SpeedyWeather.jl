@@ -137,7 +137,7 @@ export LandBucketMoisture
 end
 
 LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
-function initialize!(soil::LandBucketMoisture, model::PrimitiveWet)
+function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     (; nlayers_soil) = model.spectral_grid
     @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers "*
         "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
@@ -147,6 +147,15 @@ function initialize!(soil::LandBucketMoisture, model::PrimitiveWet)
     soil.f₁[] = γ*z₁
     soil.f₂[] = γ*z₂
     
+    return nothing
+end
+
+function initialize!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    soil::LandBucketMoisture,
+    model::PrimitiveDry,
+)
     return nothing
 end
 
@@ -184,7 +193,7 @@ function timestep!(
     f₁_f₂ = f₁/f₂
     Δt_f₁ = Δt/f₁
 
-    for ij in eachgridpoint(soil_moisture)
+    @inbounds for ij in eachgridpoint(soil_moisture)
         if mask[ij] > 0                         # at least partially land
             # precipitation (convection + large-scale) minus evaporation
             # river runoff only diagnostic, i.e. R=0 here but drain excess water below
@@ -203,7 +212,7 @@ function timestep!(
             δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer
             soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
             soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
-            R[ij] += (1-p)*δW₁*f₁               # accumulate river runoff of top layer
+            R[ij] += Δt*(1-p)*δW₁*f₁            # accumulate river runoff [m] of top layer
         end
     end
 end
