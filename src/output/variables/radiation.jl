@@ -16,8 +16,8 @@ for name in names
             long_name::String = $longname
             dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
             missing_value::Float64 = NaN
-            compression_level::Int = 3
-            shuffle::Bool = true
+            compression_level::Int = DEFAULT_COMPRESSION_LEVEL
+            shuffle::Bool = DEFAULT_SHUFFLE
             keepbits::Int = 7
         end
 

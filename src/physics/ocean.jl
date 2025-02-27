@@ -338,16 +338,17 @@ function ocean_timestep!(
     (; mask) = model.land_sea_mask
 
     # Frierson et al. 2006, eq (1)
-    Rs = diagn.physics.ocean.surface_shortwave_down
-    Rld = diagn.physics.ocean.surface_longwave_down
+    Rsd = diagn.physics.surface_shortwave_down          # before albedo
+    Rsu = diagn.physics.ocean.surface_shortwave_up      # reflected from albedo
+    Rld = diagn.physics.surface_longwave_down
     Rlu = diagn.physics.ocean.surface_longwave_up
     Ev = diagn.physics.ocean.evaporative_flux
     S = diagn.physics.ocean.sensible_heat_flux
 
     # Euler forward step
-    for ij in eachgridpoint(sst)
+    @inbounds for ij in eachgridpoint(sst, mask, Rsd, Rsu, Rld, Rlu, Ev, S)
         if mask[ij] < 1     # at least partially ocean
-            sst[ij] += (Δt/C₀)*(Rs[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
+            sst[ij] += (Δt/C₀)*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
         end
     end
 

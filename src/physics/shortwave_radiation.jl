@@ -39,17 +39,18 @@ function shortwave_radiation!(
     (; cos_zenith, land_fraction, albedo_ocean, albedo_land) = column
     (; solar_constant) = planet
 
-    # ocean
-    column.surface_shortwave_down_ocean = (1 - albedo_ocean) * solar_constant * cos_zenith
-    column.surface_shortwave_up_ocean = albedo_ocean * solar_constant * cos_zenith
+    R = solar_constant * cos_zenith         # top of atmosphere downward radiation
+    column.surface_shortwave_down = R       # transparent atmosphere so same at surface (before albedo)
 
-    # land
-    column.surface_shortwave_down_land = (1 - albedo_land) * solar_constant * cos_zenith
-    column.surface_shortwave_up_land = albedo_land * solar_constant * cos_zenith
+    # shortwave up is after albedo reflection, separated by ocean/land
+    column.surface_shortwave_up_ocean = albedo_ocean * R
+    column.surface_shortwave_up_land = albedo_land * R
 
-    # land-sea mask-weighted OSR
-    column.outgoing_shortwave_radiation = (1 - land_fraction)*column.surface_shortwave_up_ocean +
+    # land-sea mask-weighted, transparent shortwave so surface = outgoing
+    column.surface_shortwave_up = (1 - land_fraction)*column.surface_shortwave_up_ocean +
                                             land_fraction*column.surface_shortwave_up_land
+    column.outgoing_shortwave_radiation = column.surface_shortwave_up
+
     return nothing
 end
 

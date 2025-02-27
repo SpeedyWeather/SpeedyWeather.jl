@@ -257,9 +257,7 @@ export DynamicsVariablesOcean
     nlat_half::Int
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
-    surface_shortwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
     surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
-    surface_longwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
     surface_longwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
     albedo::GridVariable2D = zeros(GridVariable2D, nlat_half)
 end
@@ -277,9 +275,7 @@ export DynamicsVariablesLand
     nlat_half::Int
     sensible_heat_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
     evaporative_flux::GridVariable2D = zeros(GridVariable2D, nlat_half)
-    surface_shortwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
     surface_shortwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
-    surface_longwave_down::GridVariable2D = zeros(GridVariable2D, nlat_half)
     surface_longwave_up::GridVariable2D = zeros(GridVariable2D, nlat_half)
     albedo::GridVariable2D = zeros(GridVariable2D, nlat_half)
 

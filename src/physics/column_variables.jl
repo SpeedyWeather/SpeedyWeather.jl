@@ -157,16 +157,19 @@ function write_column_tendencies!(
     diagn.physics.land.sensible_heat_flux[ij] = column.sensible_heat_flux_land
 
     # radiation [W/m²], positive up for up, down for down, up for outgoing
-    # shortwave
-    diagn.physics.ocean.surface_shortwave_down[ij] = column.surface_shortwave_down_ocean
+    # shortwave down is independent of ocean/land
+    diagn.physics.surface_shortwave_down[ij] = column.surface_shortwave_down
+
+    diagn.physics.surface_shortwave_up[ij] = column.surface_shortwave_up
     diagn.physics.ocean.surface_shortwave_up[ij] = column.surface_shortwave_up_ocean
-    diagn.physics.land.surface_shortwave_down[ij] = column.surface_shortwave_down_land
     diagn.physics.land.surface_shortwave_up[ij] = column.surface_shortwave_up_land
     
     # longwave
-    diagn.physics.ocean.surface_longwave_down[ij] = column.surface_longwave_down_ocean
+    # longwave down is indepedendent of ocean/land
+    diagn.physics.surface_longwave_down[ij] = column.surface_longwave_down
+    
+    diagn.physics.surface_longwave_up[ij] = column.surface_longwave_up
     diagn.physics.ocean.surface_longwave_up[ij] = column.surface_longwave_up_ocean
-    diagn.physics.land.surface_longwave_down[ij] = column.surface_longwave_down_land
     diagn.physics.land.surface_longwave_up[ij] = column.surface_longwave_up_land
 
     diagn.physics.outgoing_longwave_radiation[ij] = column.outgoing_longwave_radiation

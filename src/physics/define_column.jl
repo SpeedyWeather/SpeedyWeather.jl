@@ -102,17 +102,13 @@ $(TYPEDFIELDS)"""
     albedo_land::NF = 0                     # surface albedo over land [1]    
 
     # surface fluxes, positive down
+    # downward fluxes are independent of ocean vs land
     surface_shortwave_down::NF = 0          # surface shortwave radiation down (into land/sea)
-    surface_shortwave_down_ocean::NF = 0    # ocean only
-    surface_shortwave_down_land::NF = 0     # land only
+    surface_longwave_down::NF = 0           # surface longwave radiation down (into land/sea)
     
     surface_shortwave_up::NF = 0            # surface shortwave radiation up (reflected)
     surface_shortwave_up_ocean::NF = 0
     surface_shortwave_up_land::NF = 0
-    
-    surface_longwave_down::NF = 0           # surface longwave radiation down (into land/sea)
-    surface_longwave_down_ocean::NF = 0
-    surface_longwave_down_land::NF = 0
     
     # surface longwave radiation up (into atmosphere)
     surface_longwave_up::NF = 0             # land-sea mask weighted flux   
