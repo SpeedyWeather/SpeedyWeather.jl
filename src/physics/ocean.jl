@@ -294,7 +294,7 @@ export SlabOcean
     specific_heat_capacity::NF = 4184
 
     "[OPTION] Average mixed-layer depth [m]"
-    mixed_layer_depth::NF = 40
+    mixed_layer_depth::NF = 10
 
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000
@@ -335,6 +335,7 @@ function ocean_timestep!(
     Lᵥ = model.atmosphere.latent_heat_condensation
     C₀ = ocean_model.heat_capacity_mixed_layer
     Δt = model.time_stepping.Δt_sec
+    (; mask) = model.land_sea_mask
 
     # Frierson et al. 2006, eq (1)
     Rs = diagn.physics.ocean.surface_shortwave_down
@@ -344,7 +345,11 @@ function ocean_timestep!(
     S = diagn.physics.ocean.sensible_heat_flux
 
     # Euler forward step
-    @. sst += (Δt/C₀)*(Rs - Rlu + Rld - Lᵥ*Ev - S)
+    for ij in eachgridpoint(sst)
+        if mask[ij] < 1     # at least partially ocean
+            sst[ij] += (Δt/C₀)*(Rs[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
+        end
+    end
 
     return nothing
 end
