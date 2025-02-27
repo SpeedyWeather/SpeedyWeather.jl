@@ -169,6 +169,7 @@ function timestep!(
     (; soil_moisture) = progn.land
     Δt = model.time_stepping.Δt_sec
     ρ = model.atmosphere.water_density
+    (; mask) = model.land_sea_mask
 
     Pconv = diagn.physics.precip_rate_convection    # precipitation in [m/s]
     Plsc = diagn.physics.precip_rate_large_scale
@@ -184,26 +185,25 @@ function timestep!(
     Δt_f₁ = Δt/f₁
 
     for ij in eachgridpoint(soil_moisture)
+        if mask[ij] > 0                         # at least partially land
+            # precipitation (convection + large-scale) minus evaporation
+            # river runoff only diagnostic, i.e. R=0 here but drain excess water below
+            # convert to [m/s] by dividing by density
+            F = Pconv[ij] + Plsc[ij] - E[ij]/ρ    # - R[ij]
 
-        # TODO if mask[ij] == at least partially land? only to skip ocean points?
+            # vertical diffusion term between layers
+            D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])
 
-        # precipitation (convection + large-scale) minus evaporation
-        # river runoff only diagnostic, i.e. R=0 here but drain excess water below
-        # convert to [m/s] by dividing by density
-        F = Pconv[ij] + Plsc[ij] - E[ij]/ρ    # - R[ij]
+            # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
+            soil_moisture[ij, 1] += Δt_f₁*F - Δt*D
+            soil_moisture[ij, 2] += Δt*f₁_f₂*D
 
-        # vertical diffusion term between layers
-        D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])
-
-        # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-        soil_moisture[ij, 1] += Δt_f₁*F - Δt*D
-        soil_moisture[ij, 2] += Δt*f₁_f₂*D
-
-        # river runoff
-        W₁ = soil_moisture[ij, 1]
-        δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer
-        soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
-        soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
-        R[ij] += (1-p)*δW₁*f₁               # accumulate river runoff of top layer
+            # river runoff
+            W₁ = soil_moisture[ij, 1]
+            δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer
+            soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
+            soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
+            R[ij] += (1-p)*δW₁*f₁               # accumulate river runoff of top layer
+        end
     end
 end

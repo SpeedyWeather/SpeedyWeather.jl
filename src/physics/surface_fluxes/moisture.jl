@@ -70,9 +70,10 @@ function surface_evaporation!(
     drag_sea = evaporation.use_boundary_layer_drag ? column.boundary_layer_drag : moisture_exchange
 
     # SPEEDY documentation eq. 55/57, zero flux if sea surface temperature not available
-    flux_sea = isfinite(skin_temperature_sea) ? ρ*drag_sea*V₀*max(sat_humid_sea  - surface_humid, zero(NF)) :
+    # but remove the max( ,0) to allow for surface condensation
+    flux_sea = isfinite(skin_temperature_sea) ? ρ*drag_sea*V₀*(sat_humid_sea  - surface_humid) :
                                                     zero(skin_temperature_sea)
-    column.evaporative_flux_ocean = flux_sea
+    column.evaporative_flux_ocean = flux_sea    # store without weighting by land fraction for coupling
 
     flux_sea *= (1 - land_fraction)             # weight by ocean fraction of land-sea mask
     column.flux_humid_upward[end] += flux_sea   # accumulate with += into end=lowermost layer total flux
@@ -117,9 +118,9 @@ function surface_evaporation!(
     drag_land = evaporation.use_boundary_layer_drag ? column.boundary_layer_drag : moisture_exchange
 
     # SPEEDY documentation eq. 55/57, zero flux if land / soil moisture availability not available (=ocean)
+    # but remove the max( ,0) to allow for surface condensation
     flux_land = isfinite(skin_temperature_land) && isfinite(α) ?
-                ρ*drag_land*V₀*max(α*sat_humid_land  - surface_humid, zero(NF))*land_fraction :
-                zero(NF)
+                ρ*drag_land*V₀*(α*sat_humid_land  - surface_humid) : zero(NF)
     column.evaporative_flux_land = flux_land        # store flux separately for land
     flux_land *= land_fraction                      # weight by land fraction of land-sea mask
     column.flux_humid_upward[end] += flux_land      # end=lowermost layer, accumulate with (+=) to total flux
