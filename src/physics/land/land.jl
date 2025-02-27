@@ -44,7 +44,7 @@ export DryLandModel
     temperature::Temperature
 end
 
-DryLandModel(SG::SpectralGrid) = DryLandModel(SeasonalLandTemperature(SG))
+DryLandModel(SG::SpectralGrid; temperature=SeasonalLandTemperature) = DryLandModel(temperature(SG))
 initialize!(land::DryLandModel, model::PrimitiveEquation) = initialize!(land.temperature, model)
 
 land_timestep!(progn::PrognosticVariables, diagn::DiagnosticVariables, model::PrimitiveEquation) = land_timestep!(progn, diagn, model.land, model)
@@ -65,7 +65,7 @@ end
 function land_timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
-    land::DryLandModel,
+    land::AbstractLand,
     model::PrimitiveDry,
 )
     timestep!(progn, diagn, land.temperature, model)

@@ -141,7 +141,7 @@ function soil_moisture_availability!(
     land::AbstractLandTemperature,
     model::PrimitiveWet,
 )
-    (; soil_moisture_availability) = diagn.physics
+    (; soil_moisture_availability) = diagn.physics.land
     (; soil_moisture) = progn.land
     (; high_cover, low_cover, low_veg_factor) = vegetation
     (; W_cap, W_wilt) = vegetation

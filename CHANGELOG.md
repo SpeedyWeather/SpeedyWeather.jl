@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Diagnostic albedo separate for ocean/land [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)
 - SigmaCoordinates constructors [#679](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/679)
 - Full timestepping differentiable by Enzyme with Julia 1.10 [#656](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/656)
 - Type instabilities etc flagged by Reactant [#674](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/674)

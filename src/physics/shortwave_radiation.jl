@@ -36,25 +36,25 @@ function shortwave_radiation!(
     scheme::TransparentShortwave,
     planet::AbstractPlanet,
 )
-    (; cos_zenith, albedo) = column
+    (; cos_zenith, land_fraction, albedo_ocean, albedo_land) = column
     (; solar_constant) = planet
 
-    # transparent = optical thickness of zero, no vertical changes in flux
-    # this will sum up to zero in every layer (=transparent) but yields
-    # a non-zero net flux at the surface 
-    # column.flux_temp_downward .+= solar_constant * cos_zenith
-    # column.flux_temp_upward .+= albedo * solar_constant * cos_zenith
+    R = solar_constant * cos_zenith         # top of atmosphere downward radiation
+    column.surface_shortwave_down = R       # transparent atmosphere so same at surface (before albedo)
 
-    # diagnostics
-    column.surface_shortwave_down = (1 - albedo) * solar_constant * cos_zenith
-    column.surface_shortwave_up = albedo * solar_constant * cos_zenith
+    # shortwave up is after albedo reflection, separated by ocean/land
+    column.surface_shortwave_up_ocean = albedo_ocean * R
+    column.surface_shortwave_up_land = albedo_land * R
+
+    # land-sea mask-weighted, transparent shortwave so surface = outgoing
+    column.surface_shortwave_up = (1 - land_fraction)*column.surface_shortwave_up_ocean +
+                                            land_fraction*column.surface_shortwave_up_land
     column.outgoing_shortwave_radiation = column.surface_shortwave_up
 
     return nothing
 end
 
 # NBandRadiation is defined in longwave_radiation.jl
-
 function shortwave_radiation!(
     column::ColumnVariables,
     scheme::NBandRadiation,
