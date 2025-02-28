@@ -49,6 +49,8 @@ include("physics/ocean.jl")
 # include("thermodynamics.jl")
 include("physics/large_scale_condensation.jl")
 include("physics/convection.jl")
+
+include("physics/albedo.jl")
 include("physics/optical_depth.jl")
 include("physics/longwave_radiation.jl")
 # include("physics/shortwave_radiation.jl")
