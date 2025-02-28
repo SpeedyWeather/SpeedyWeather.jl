@@ -189,36 +189,38 @@ function timestep!(
     (; soil_temperature, soil_moisture) = progn.land
     Lᵥ = model.atmosphere.latent_heat_condensation
     Δt = model.time_stepping.Δt_sec
+    (; mask) = model.land_sea_mask
 
     # Sum up flux F following Frierson et al. 2006, eq (1)
-    Rs = diagn.physics.surface_shortwave_down
+    # use separate land fluxes (not ocean)
+    Rsd = diagn.physics.surface_shortwave_down          # before albedo reflection
+    Rsu = diagn.physics.land.surface_shortwave_up       # only albedo reflection
     Rld = diagn.physics.surface_longwave_down
-    Rlu = diagn.physics.surface_longwave_up_land    # these fluxes depend on the land state
-    Ev = diagn.physics.evaporative_flux_land        # use separate land fluxes (not ocean)
-    S = diagn.physics.sensible_heat_flux_land
+    Rlu = diagn.physics.land.surface_longwave_up
+    Ev = diagn.physics.land.evaporative_flux
+    S = diagn.physics.land.sensible_heat_flux
 
-    @boundscheck grids_match(soil_temperature, Rs, Rld, Rlu, Ev, S, horizontal_only=true) || throw(DimensionMismatch(soil_temperature, Rs))
+    @boundscheck grids_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only=true) || throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
     (; z₁, z₂, λ, γ, Cw, Cs) = land
 
     Δ =  2λ/(z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
 
-    for ij in eachgridpoint(soil_moisture, soil_temperature)
+    @inbounds for ij in eachgridpoint(soil_moisture, soil_temperature)
+        if mask[ij] > 0                         # at least partially land
+            # total surface downward heat flux
+            F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij]
 
-        # TODO if mask[ij] == at least partially land? only to skip ocean points?
+            # heat capacity of the soil layers 1 and 2 [J/(m³ K)]
+            C₁ = Cw * soil_moisture[ij, 1] * γ + Cs
+            C₂ = Cw * soil_moisture[ij, 2] * γ + Cs
 
-        # total surface downward heat flux
-        F = Rs[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij]
+            # vertical diffusion term between layers
+            D = Δ*(soil_temperature[ij, 1] - soil_temperature[ij, 2])
 
-        # heat capacity of the soil layers 1 and 2 [J/(m³ K)]
-        C₁ = Cw * soil_moisture[ij, 1] * γ + Cs
-        C₂ = Cw * soil_moisture[ij, 2] * γ + Cs
-
-        # vertical diffusion term between layers
-        D = Δ*(soil_temperature[ij, 1] - soil_temperature[ij, 2])
-
-        # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-        soil_temperature[ij, 1] += Δt/(z₁*C₁)*(F - D)
-        soil_temperature[ij, 2] += Δt/(z₂*C₂)*D
+            # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
+            soil_temperature[ij, 1] += Δt/(z₁*C₁)*(F - D)
+            soil_temperature[ij, 2] += Δt/(z₂*C₂)*D
+        end
     end
 end
