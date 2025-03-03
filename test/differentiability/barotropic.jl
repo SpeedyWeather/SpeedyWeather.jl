@@ -18,8 +18,11 @@
     # TO-DO: The first time we execute this, the gradient is different. Why?
     timestep_oop!(make_zero(progn), progn, diagn, dt, model)
 
-    diagn_copy = deepcopy(diagn)
+    diagn_copy = deepcopy(diagn) # first copy for FD comparison 
     progn_copy = deepcopy(progn)
+
+    diagn_copy_2 = deepcopy(diagn) # 2nd copy for Const activity test 
+    progn_copy_2 = deepcopy(progn)
 
     d_progn = zero(progn)
     d_diag = make_zero(diagn)
@@ -33,9 +36,8 @@
     progn_new = zero(progn)
     dprogn_new = one(progn) # seed 
 
-    # test that we can differentiate wrt an IC 
-    #autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, make_zero(model)))
-    autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Const(model))
+    # test that we can differentiate wrt to everything  
+    autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, make_zero(model)))
 
     # nonzero gradient
     @test sum(to_vec(d_progn)[1]) != 0
@@ -49,6 +51,22 @@
     @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=0.05) # we have to go really quite low with the tolerances here
     @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_progn)[1])) < 0.002 # so we check a few extra statistics
     @test maximum(to_vec(fd_vjp[1].vor)[1] - to_vec(d_progn.vor)[1]) < 0.05
+    
+    # test that we can differentiante with Const(Model) only wrt to the state
+    d_progn = zero(progn)
+    d_diag = make_zero(diagn)
+
+    progn_new = zero(progn)
+    dprogn_new = one(progn) # seed 
+
+    autodiff(set_runtime_activity(Reverse), timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn_copy_2, d_progn), Duplicated(diagn_copy_2, d_diag), Const(dt), Const(model))
+
+    # use the same FD comparision 
+
+    @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=0.05) # we have to go really quite low with the tolerances here
+    @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_progn)[1])) < 0.002 # so we check a few extra statistics
+    @test maximum(to_vec(fd_vjp[1].vor)[1] - to_vec(d_progn.vor)[1]) < 0.05
+    
     #
     # We go individually through all components of the time stepping and check 
     # correctness
@@ -189,7 +207,7 @@
     progn_copy = deepcopy(progn)
     dprogn = make_zero(progn)
 
-    #autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
+    autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
     autodiff(Reverse, SpeedyWeather.transform!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(model, make_zero(model)))
 
     function transform_diagn(diag, progn, lf2, model)
@@ -204,3 +222,68 @@
 end
 
 
+
+
+(; vor_grid, u_grid, v_grid ) = diagn.grid
+(; scratch_memory) = diagn.dynamics  
+U = diagn.dynamics.a            # reuse work arrays for velocities in spectral
+V = diagn.dynamics.b            # reuse work arrays for velocities in spectral
+   
+                            # U = u*coslat, V=v*coslat
+vor = progn.vor[2]             # relative vorticity at leapfrog step lf
+S = model.spectral_transform
+
+dvor_grid = similar(vor_grid)
+dvor_grid .= 1 
+
+
+
+autodiff(Reverse, transform!, Const, Duplicated(vor_grid, dvor_grid), Duplicated(vor, make_zero(vor)), Duplicated(scratch_memory, make_zero(scratch_memory)), Const(S))
+
+
+
+
+
+
+function transform_test(diagn, progn, lf, scratch_memory, model)
+
+    (; vor_grid, u_grid, v_grid ) = diagn.grid
+    #(; scratch_memory) = diagn.dynamics  
+    U = diagn.dynamics.a            # reuse work arrays for velocities in spectral
+    V = diagn.dynamics.b            # reuse work arrays for velocities in spectral
+    
+                                # U = u*coslat, V=v*coslat
+    vor = progn.vor[2]             # relative vorticity at leapfrog step lf
+    S = model.spectral_transform
+
+    transform!(vor_grid, vor, scratch_memory, S)    # get vorticity on grid from spectral vor
+
+    SpeedyWeather.UV_from_vor!(U, V, vor, S)
+
+    return nothing 
+end 
+    
+ddiag = one(diagn)
+dprogn = make_zero(progn)
+
+autodiff(Reverse, transform_test, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
+autodiff(Reverse, transform_test, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Duplicated(diagn.dynamics.scratch_memory, make_zero(diagn.dynamics.scratch_memory)),Const(model))
+
+U = diagn.dynamics.a 
+V = diagn.dynamics.b            # reuse work arrays for velocities in spectral
+
+dU = one(U)
+dV = one(V)
+
+vor = progn.vor[2]             # relative vorticity at leapfrog step lf
+dvor = similar(vor)
+dvor .= 1 
+S = model.spectral_transform
+
+
+autodiff(Reverse, SpeedyWeather.UV_from_vor!, Const, Duplicated(U, dU), Duplicated(V, dV), Duplicated(vor, dvor), Const(S))
+
+
+Base.@propagate_inbounds call_transform(diagn, progn, lf, model) = transform_test(diagn, progn, lf, diagn.dynamics.scratch_memory, model)
+
+autodiff(Reverse, call_transform, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
