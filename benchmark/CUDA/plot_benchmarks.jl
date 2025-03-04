@@ -1,3 +1,7 @@
+using Pkg
+Pkg.activate(".")
+Pkg.status()
+
 using CUDA 
 using SpeedyWeather
 using Adapt
@@ -37,19 +41,19 @@ function run_benchmarks(trunc_list, nlayers_list, float_types, device)
 
                 # Time forward legendre
                 b = @benchmark CUDA.@sync SpeedyTransforms._legendre!($specs, $S.scratch_memory_north, $S.scratch_memory_south, $S)
-                times_legendre_forward[i, j] = median(b).time
+                times_legendre_forward[i, j] = minimum(b).time
 
                 # Time inverse legendre
                 b = @benchmark CUDA.@sync SpeedyTransforms._legendre!($S.scratch_memory_north, $S.scratch_memory_south, $specs, $S)
-                times_legendre_backward[i, j] = median(b).time
+                times_legendre_backward[i, j] = minimum(b).time
 
                 # Time _fourier!(..., grids, S)
                 b = @benchmark CUDA.@sync SpeedyTransforms._fourier!($S.scratch_memory_north, $S.scratch_memory_south, $grids, $S)
-                times_fourier_backward[i, j] = median(b).time
+                times_fourier_backward[i, j] = minimum(b).time
                 
                 # Time _fourier!(grids, ..., S)
                 b = @benchmark CUDA.@sync SpeedyTransforms._fourier!($grids, $S.scratch_memory_north, $S.scratch_memory_south, $S)
-                times_fourier_forward[i, j] = median(b).time
+                times_fourier_forward[i, j] = minimum(b).time
             end
         end
 
@@ -149,8 +153,8 @@ function plot_times(cpu_results, gpu_results, figx=500, figy=1000)
 end
 
 # Run benchmarks for CPU and GPU
-@show cpu_results = run_benchmarks(array_sizes, nlayers_list, float_types, SpeedyWeather.CPU())
-@show gpu_results = run_benchmarks(array_sizes, nlayers_list, float_types, SpeedyWeather.GPU())
+@show cpu_results = run_benchmarks(trunc_list, nlayers_list, float_types, SpeedyWeather.CPU())
+@show gpu_results = run_benchmarks(trunc_list, nlayers_list, float_types, SpeedyWeather.GPU())
 
 # Plot the results
 plot_speedup(cpu_results, gpu_results)
