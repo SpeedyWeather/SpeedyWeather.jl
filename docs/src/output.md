@@ -178,6 +178,26 @@ delete!(output, :div)
 If you change the `name` of an output variable, i.e. `SpeedyWeather.DivergenceOutput(name="divergence")`
 the key would change accordingly to `:divergence`.
 
+## Grouped variables
+
+For convenience we have defined several output groups, for example `SpeedyWeather.PrecipitationOutput()`
+definces both accumulated large-scale and convective precipitation as well as their rates and the
+cloud top height. Groups are
+
+```julia
+SpeedyWeather.BoundaryOutput()
+SpeedyWeather.PrecipitationOutput()
+SpeedyWeather.RadiationOutput()
+SpeedyWeather.SurfacesFluxesOutput()
+SpeedyWeather.AllOutputVariabesl()
+```
+
+each of them has to be splatted by appending `...`, e.g.
+
+```@example netcdf
+add!(model, SpeedyWeather.SurfaceFluxesOutput()...)
+```
+
 ## Output path and identification
 
 That's easy by passing on `path="/my/favourite/path/"` and the folder `run_*` with `*` the identification
@@ -214,4 +234,21 @@ The actual options are declared as `[OPTION]` in the following
 
 ```@example netcdf
 @doc NetCDFOutput
+```
+
+# JLD2 Output 
+
+As an alternative to the NetCDF output, it is also possible to directly output the `PrognosticVariables` and `DiagnosticVariables` to a JLD2 file. This might be interesting if you are really interested in the model internals, or also for some machine learning tasks. However, this option doesn't feature any possibilites to regrid or select variables, and it comes with the usual limitations of serialized JLD2 data: SpeedyWeather.jl always has to be in the scope when loading the data and the saved files might only load properly with exactly the same version of SpeedyWeather.jl and Julia as used when saving the data. Its usage is similar to the NetCDF output above:
+
+```@example netcdf 
+spectral_grid = SpectralGrid()
+output = JLD2Output(output_dt=Hour(1))
+model = ShallowWaterModel(spectral_grid, output=output)
+model.output
+```
+
+With all options shown below 
+
+```@example netcdf 
+@doc JLD2Output
 ```

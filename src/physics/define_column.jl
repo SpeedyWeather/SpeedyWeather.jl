@@ -67,13 +67,20 @@ $(TYPEDFIELDS)"""
     surface_temp::NF = 0
     surface_humid::NF = 0
     surface_wind_speed::NF = 0
+
+    # land
     skin_temperature_sea::NF = 0
     skin_temperature_land::NF = 0
     soil_moisture_availability::NF = 0
 
     # surface fluxes
-    evaporative_flux::NF = 0
-    sensible_heat_flux::NF = 0
+    evaporative_flux::NF = 0            # land-sea mask fraction-weighted flux 
+    evaporative_flux_ocean::NF = 0      # flux from ocean only
+    evaporative_flux_land::NF = 0       # and from land
+
+    sensible_heat_flux::NF = 0          # land-sea mask fraction-weighted flux 
+    sensible_heat_flux_ocean::NF = 0    # flux from ocean only
+    sensible_heat_flux_land::NF = 0     # and from land
 
     # THERMODYNAMICS
     surface_air_density::NF = 0
@@ -86,6 +93,8 @@ $(TYPEDFIELDS)"""
     cloud_top::Int = nlayers+1              # layer index k of top-most layer with clouds
     precip_convection::NF = 0               # Precipitation due to convection [m]
     precip_large_scale::NF = 0              # precipitation due to large-scale condensation [m]
+    precip_rate_convection::NF = 0          # Precipitation rate due to convection [m/s]
+    precip_rate_large_scale::NF = 0         # precipitation rate due to large-scale condensation [m/s]
 
     # RADIATION
     cos_zenith::NF = 0                      # cosine of solar zenith angle [1]
@@ -95,7 +104,11 @@ $(TYPEDFIELDS)"""
     surface_shortwave_down::NF = 0          # surface shortwave radiation down (into land/sea)
     surface_shortwave_up::NF = 0            # surface shortwave radiation up (reflected)
     surface_longwave_down::NF = 0           # surface longwave radiation down (into land/sea)
-    surface_longwave_up::NF = 0             # surface longwave radiation up (into atmosphere)
+    
+    # surface longwave radiation up (into atmosphere)
+    surface_longwave_up::NF = 0             # land-sea mask weighted flux   
+    surface_longwave_up_ocean::NF = 0       # ocean only
+    surface_longwave_up_land::NF = 0        # land only
 
     # top-of-atmosphere fluxes, positive up (outgoing)
     outgoing_longwave_radiation::NF = 0     # OLR [W/m^2]

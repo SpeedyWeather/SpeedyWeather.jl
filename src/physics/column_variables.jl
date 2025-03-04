@@ -70,7 +70,7 @@ function get_column!(
 
     # TODO skin = surface approximation for now
     C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
-    C.skin_temperature_land = P.land.land_surface_temperature[ij]
+    C.skin_temperature_land = P.land.soil_temperature[ij, 1]
     C.soil_moisture_availability = D.physics.soil_moisture_availability[ij]
 
     # RADIATION
@@ -96,7 +96,7 @@ function get_column(    S::AbstractSimulation,
                         verbose::Bool = true)
     (; prognostic_variables, diagnostic_variables, model) = S
 
-    column = deepcopy(S.diagnostic_variables.columns[1])
+    column = deepcopy(S.diagnostic_variables.column)
     reset_column!(column)
 
     get_column!(column,
@@ -106,7 +106,7 @@ function get_column(    S::AbstractSimulation,
                 model)
 
     # execute all parameterizations for this column to return a consistent state
-    parameterization_tendencies!(column, S.model)
+    parameterization_tendencies!(column, S.prognostic_variables, S.model)
 
     verbose && @info "Receiving column at $(column.latd)˚N, $(column.lond)˚E."
     return column
@@ -136,9 +136,9 @@ function write_column_tendencies!(
     diagn.physics.precip_large_scale[ij] += column.precip_large_scale
     diagn.physics.precip_convection[ij] += column.precip_convection
 
-    # precipitation rate [m] over this time step (i.e. overwrite, do not accumulate)
-    diagn.physics.precip_rate_large_scale[ij] = column.precip_large_scale
-    diagn.physics.precip_rate_convection[ij] = column.precip_convection
+    # precipitation rate [m/s], instantaneous (i.e. overwrite, do not accumulate)
+    diagn.physics.precip_rate_large_scale[ij] = column.precip_rate_large_scale
+    diagn.physics.precip_rate_convection[ij] = column.precip_rate_convection
 
     # Cloud top in height [m] from geopotential height divided by gravity, 0 for no clouds
     diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.geopot[column.cloud_top]
@@ -147,15 +147,25 @@ function write_column_tendencies!(
     # just use layer index 1 (top) to nlayers (surface) for analysis, but 0 for no clouds
     # diagn.physics.cloud_top[ij] = column.cloud_top == nlayers+1 ? 0 : column.cloud_top
 
-    # surface evaporative [kg/s/m²] and sensible heat flux [W/m²], positive up
+    # surface evaporative [kg/s/m²], positive up
     diagn.physics.evaporative_flux[ij] = column.evaporative_flux
+    diagn.physics.evaporative_flux_ocean[ij] = column.evaporative_flux_ocean
+    diagn.physics.evaporative_flux_land[ij] = column.evaporative_flux_land
+
+    # surface sensible heat flux [W/m²], positive up
     diagn.physics.sensible_heat_flux[ij] = column.sensible_heat_flux
+    diagn.physics.sensible_heat_flux_ocean[ij] = column.sensible_heat_flux_ocean
+    diagn.physics.sensible_heat_flux_land[ij] = column.sensible_heat_flux_land
 
     # radiation [W/m²], positive up for up, down for down, up for outgoing
     diagn.physics.surface_shortwave_down[ij] = column.surface_shortwave_down
     diagn.physics.surface_shortwave_up[ij] = column.surface_shortwave_up
     diagn.physics.surface_longwave_down[ij] = column.surface_longwave_down
+   
     diagn.physics.surface_longwave_up[ij] = column.surface_longwave_up
+    diagn.physics.surface_longwave_up_ocean[ij] = column.surface_longwave_up
+    diagn.physics.surface_longwave_up_land[ij] = column.surface_longwave_up
+
     diagn.physics.outgoing_longwave_radiation[ij] = column.outgoing_longwave_radiation
     diagn.physics.outgoing_shortwave_radiation[ij] = column.outgoing_shortwave_radiation
 
@@ -186,8 +196,10 @@ function reset_column!(column::ColumnVariables{NF}) where NF
 
     # Convection and precipitation
     column.cloud_top = column.nlayers+1
-    column.precip_convection = 0
+    column.precip_convection = 0            # set back to zero to accumulate in the vertical
     column.precip_large_scale = 0
+    column.precip_rate_convection = 0       # instantaneously overwritten, but convection may escape early
+    column.precip_rate_large_scale = 0
 
     # radiation
     column.outgoing_longwave_radiation = 0

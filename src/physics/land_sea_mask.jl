@@ -1,7 +1,7 @@
 """
 Abstract super type for land-sea masks. Custom land-sea masks have to be defined as
 
-    CustomMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF, Grid}
+    CustomMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask
 
 and need to have at least a field called `mask::Grid` that uses a `Grid` as defined
 by the spectral grid object, so of correct size and with the number format `NF`.
@@ -24,7 +24,7 @@ with 0 (=sea) and 1 (=land). The surface fluxes will weight proportionally the f
 from sea and land surface temperatures. Note however, that the land-sea mask can declare
 grid points being (at least partially) ocean even though the sea surface temperatures
 aren't defined (=NaN) in that grid point. In that case, not flux is applied."""
-abstract type AbstractLandSeaMask{NF, Grid} end
+abstract type AbstractLandSeaMask end
 
 function Base.show(io::IO, L::AbstractLandSeaMask)
     println(io, "$(typeof(L)) <: AbstractLandSeaMask")
@@ -32,12 +32,40 @@ function Base.show(io::IO, L::AbstractLandSeaMask)
     print_fields(io, L, keys)
 end
 
+function mask!(
+    grid::AbstractGridArray{NF},
+    mask::AbstractGridArray,
+    land_or_sea::Symbol;
+    masked_value = NaN,
+) where NF
+
+    val = land_or_sea == :land ? 1 : 0
+    masked_val = convert(NF, masked_value)
+
+    @boundscheck grids_match(grid, mask, horizontal_only=true) || throw(DimensionMismatch(grid, mask))
+    @boundscheck ndims(mask) == 1 ||throw(DimensionMismatch(grid, mask))
+
+    for k in eachgrid(grid)
+        for ij in eachgridpoint(mask)
+            if mask[ij] == val
+                grid[ij, k] = masked_val
+            end
+        end
+    end
+
+    return grid
+end
+
+# also allow for land_sea_mask struct to be passed on, use .mask in that case
+mask!(grid::AbstractGridArray, mask::AbstractLandSeaMask, args...; kwargs...) =
+    mask!(grid, mask.mask, args...; kwargs...)
+
 # make available when using SpeedyWeather
-export LandSeaMask, AquaPlanetMask
+export LandSeaMask
 
 """Land-sea mask, fractional, read from file.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct LandSeaMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF, Grid}
+@kwdef struct LandSeaMask{NF, GridVariable2D} <: AbstractLandSeaMask
 
     # OPTIONS
     "path to the folder containing the land-sea mask file, pkg path default"
@@ -51,16 +79,16 @@ Base.@kwdef struct LandSeaMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: Abs
 
     # FIELDS (to be initialized in initialize!)
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
-    mask::Grid
+    mask::GridVariable2D
 end
 
 """
 $(TYPEDSIGNATURES)
 Generator function pulling the resolution information from `spectral_grid`."""
 function (L::Type{<:AbstractLandSeaMask})(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, Grid, nlat_half) = spectral_grid
-    mask = zeros(Grid{NF}, nlat_half)
-    return L{NF, Grid{NF}}(; mask, kwargs...)
+    (; NF, GridVariable2D, nlat_half) = spectral_grid
+    mask = zeros(GridVariable2D, nlat_half)
+    return L{NF, GridVariable2D}(; mask, kwargs...)
 end
 
 # set mask with grid, scalar, function; just define path `mask.mask` to grid here
@@ -74,7 +102,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Reads a high-resolution land-sea mask from file and interpolates (grid-call average)
+Reads a high-resolution land-sea mask from file and interpolates (grid-cell average)
 onto the model grid for a fractional sea mask."""
 function initialize!(land_sea_mask::LandSeaMask, model::PrimitiveEquation)
 
@@ -95,14 +123,18 @@ function initialize!(land_sea_mask::LandSeaMask, model::PrimitiveEquation)
     RingGrids.grid_cell_average!(land_sea_mask.mask, lsm_highres)
 
     # TODO this shoudln't be necessary, but at the moment grid_cell_average! can return values > 1
+    # lo, hi = extrema(land_sea_mask.mask)
+    # (lo < 0 || hi > 1) && @warn "Land-sea mask has values in [$lo, $hi], clamping to [0, 1]."
     clamp!(land_sea_mask.mask, 0, 1)
 end
 
+export AquaPlanetMask
+
 """Land-sea mask with zero = sea everywhere.
 $(TYPEDFIELDS)"""
-Base.@kwdef struct AquaPlanetMask{NF<:AbstractFloat, Grid<:AbstractGrid{NF}} <: AbstractLandSeaMask{NF, Grid}
+@kwdef struct AquaPlanetMask{NF, GridVariable2D} <: AbstractLandSeaMask
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
-    mask::Grid
+    mask::GridVariable2D
 end
 
 """
@@ -110,5 +142,22 @@ $(TYPEDSIGNATURES)
 Sets all grid points to 0 = sea."""
 function initialize!(land_sea_mask::AquaPlanetMask, model::PrimitiveEquation)
     land_sea_mask.mask .= 0    # set all to sea
+    return nothing
+end
+
+export RockyPlanetMask
+
+"""Land-sea mask with one = land everywhere.
+$(TYPEDFIELDS)"""
+@kwdef struct RockyPlanetMask{NF, GridVariable2D} <: AbstractLandSeaMask
+    "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
+    mask::GridVariable2D
+end
+
+"""
+$(TYPEDSIGNATURES)
+Sets all grid points to 1 = land."""
+function initialize!(land_sea_mask::RockyPlanetMask, model::PrimitiveEquation)
+    land_sea_mask.mask .= 1    # set all to land
     return nothing
 end

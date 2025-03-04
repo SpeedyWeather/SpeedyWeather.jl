@@ -11,7 +11,7 @@ $(TYPEDFIELDS)
     NF,
     Grid,
     VectorType,
-    VectorTypeFloat64,
+    VectorFloat64Type,
 } <: AbstractGeometry
 
     "SpectralGrid that defines spectral and grid resolution"
@@ -38,10 +38,10 @@ $(TYPEDFIELDS)
 
     # ARRAYS OF LANGITUDES/LONGITUDES
     "array of longitudes in degrees (0...360˚), empty for non-full grids"
-    lond::VectorTypeFloat64 = get_lond(Grid, nlat_half)
+    lond::VectorFloat64Type = get_lond(Grid, nlat_half)
     
     "array of latitudes in degrees (90˚...-90˚)"
-    latd::VectorTypeFloat64 = get_latd(Grid, nlat_half)
+    latd::VectorFloat64Type = get_latd(Grid, nlat_half)
     
     "array of latitudes in radians (π...-π)"
     lat::VectorType = get_lat(Grid, nlat_half)
@@ -78,7 +78,7 @@ $(TYPEDFIELDS)
 
     # VERTICAL SIGMA COORDINATE σ = p/p0 (fraction of surface pressure)
     "σ at half levels, σ_k+1/2"
-    σ_levels_half::VectorType = spectral_grid.vertical_coordinates.σ_half
+    σ_levels_half::VectorType = default_sigma_coordinates(nlayers)
 
     "σ at full levels, σₖ"
     σ_levels_full::VectorType = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])  
@@ -96,20 +96,22 @@ end
 """
 $(TYPEDSIGNATURES)
 Generator function for `Geometry` struct based on `spectral_grid`."""
-function Geometry(SG::SpectralGrid)
+function Geometry(SG::SpectralGrid; vertical_coordinates=SigmaCoordinates(SG.nlayers))
     
+    (; nlayers) = SG
     error_message = "nlayers=$(SG.nlayers) does not match length nlayers="*
-        "$(SG.vertical_coordinates.nlayers) in spectral_grid.vertical_coordinates."
-    @assert SG.nlayers == SG.vertical_coordinates.nlayers error_message
+        "$(vertical_coordinates.nlayers) in spectral_grid.vertical_coordinates."
+    @assert nlayers == vertical_coordinates.nlayers error_message
 
     (; NF, Grid, VectorType) = SG
     VectorTypeFloat64 = SG.ArrayType{Float64, 1}
 
-    return Geometry{NF, Grid, VectorType, VectorTypeFloat64}(; spectral_grid=SG)
+    (; σ_half) = vertical_coordinates
+    return Geometry{NF, Grid, VectorType, VectorTypeFloat64}(; spectral_grid=SG, σ_levels_half=σ_half)
 end
 
 function Base.show(io::IO, G::Geometry)
-    print(io, "$(typeof(G)) for $(G.spectral_grid)")
+    print(io, "Geometry for $(G.spectral_grid)")
 end
 
 """

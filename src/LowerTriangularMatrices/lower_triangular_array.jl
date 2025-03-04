@@ -123,6 +123,8 @@ function Base.array_summary(io::IO, L::LowerTriangularMatrix{T}, inds::Tuple{Var
     print(io, Base.dims2string(length.(inds)), ", $(mn[1])x$(mn[2]) LowerTriangularMatrix{$T}")
 end
 
+@inline Base.dataids(L::LowerTriangularArray) = Base.dataids(L.data)
+
 # CREATE INSTANCES (ZEROS, ONES, UNDEF)
 for f in (:zeros, :ones, :rand, :randn)
     @eval begin
@@ -553,6 +555,7 @@ Base.similar(L::LowerTriangularArray{T, N, ArrayType}, ::Type{T}) where {T, N, A
 Base.similar(L::LowerTriangularArray{T}) where T = similar(L, T)
  
 Base.prod(L::LowerTriangularArray{NF}) where NF = zero(NF)
+@inline Base.sum(L::LowerTriangularArray; dims=:, kw...) = sum(L.data; dims, kw...)
 
 """
 $(TYPEDSIGNATURES)
@@ -631,11 +634,11 @@ function Base.similar(
     return LowerTriangularArray{T, N, ArrayType{T,N}}(undef, size(L; as=Matrix))
 end
 
-function GPUArrays.backend(
-    ::Type{LowerTriangularArray{T, N, ArrayType}}
-) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
-    return GPUArrays.backend(ArrayType)
-end
+function KernelAbstractions.get_backend( 
+    a::LowerTriangularArray{T, N, ArrayType} 
+) where {T, N, ArrayType <: GPUArrays.AbstractGPUArray} 
+    return KernelAbstractions.get_backend(a.data) 
+end 
 
 Adapt.adapt_structure(to, L::LowerTriangularArray) =
     LowerTriangularArray(Adapt.adapt(to, L.data), L.m, L.n)
