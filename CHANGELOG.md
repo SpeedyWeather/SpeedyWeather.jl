@@ -2,7 +2,9 @@
 
 ## Unreleased
 
+- LandGeometry, LandThermodynamics as component of LandModel, DryLandModel [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)
 - Diagnostic albedo separate for ocean/land [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)
+- Restrict extended CI tests to Julia v1.10 (due to Enzyme) [#681](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/681)
 - SigmaCoordinates constructors [#679](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/679)
 - Full timestepping differentiable by Enzyme with Julia 1.10 [#656](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/656)
 - Type instabilities etc flagged by Reactant [#674](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/674)
