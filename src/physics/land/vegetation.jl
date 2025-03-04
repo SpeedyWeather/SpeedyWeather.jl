@@ -9,36 +9,46 @@ function initialize!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     vegetation::NoVegetation,
-    model::PrimitiveWet)
+    model::PrimitiveEquation)
     # initialize by running a "timestep"
-    timestep!(diagn, progn, vegetation, model.land.soil_moisture, model)
+    timestep!(progn, diagn, vegetation, model)
 end
 
 function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     vegetation::NoVegetation,
-    model::PrimitiveWet)
+    model::PrimitiveEquation)
     # a "timestep" of no vegetation is just to calculate the soil moisture availability
-    soil_moisture_availability!(diagn, progn, vegetation, model.land.temperature, model)
+    soil_moisture_availability!(diagn, progn, vegetation, model)
+end
+
+function soil_moisture_availability!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    vegetation::AbstractVegetation,
+    model::PrimitiveDry,
+)
+    return nothing
 end
 
 function soil_moisture_availability!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     vegetation::NoVegetation,
-    land::AbstractLandTemperature,
     model::PrimitiveWet,
 )
-
+    # set soil moisture availability to a constant value everywhere
     (; soil_moisture) = progn.land
-    (; W_cap, W_wilt) = vegetation
-    D_top = land.z₁
-    D_root = land.z₂
-
+    (; soil_moisture_availability) = diagn.physics.land
+    
+    # SPEEDY documentation eq. 51 with vegetation = 0
+    (; W_cap, W_wilt) = model.land.thermodynamics
+    D_top = model.land.geometry.layer_thickness[1]
+    D_root = model.land.geometry.layer_thickness[2]
     r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))
 
-    for ij in eachgridpoint(soil_moisture_availability, high_cover, low_cover)
+    @inbounds for ij in eachindex(soil_moisture_availability)
         soil_moisture_availability[ij] = r*D_top*soil_moisture[ij, 1]
     end
 
@@ -54,12 +64,6 @@ export VegetationClimatology
     # OPTIONS
     "[OPTION] Combine high and low vegetation factor, a in high + a*low [1]"
     low_veg_factor::NF = 0.8
-
-    "[OPTION] Soil wetness at field capacity [volume fraction]"
-    W_cap::NF = 0.3
-
-    "[OPTION] Soil wetness at wilting point [volume fraction]"
-    W_wilt::NF = 0.17
 
     "[OPTION] path to the folder containing the soil moisture file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
@@ -128,25 +132,33 @@ function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     vegetation::VegetationClimatology,
-    model::PrimitiveWet)
+    model::PrimitiveEquation)
 
     # a "timestep" of vegetation climatology is just to calculate the soil moisture availability
-    soil_moisture_availability!(diagn, progn, vegetation, model.land.temperature, model)
+    soil_moisture_availability!(diagn, progn, vegetation, model)
 end
 
 function soil_moisture_availability!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
-    vegetation::AbstractVegetation,
-    land::AbstractLandTemperature,
+    vegetation::VegetationClimatology,
+    model::PrimitiveDry,
+)
+    return nothing
+end
+
+function soil_moisture_availability!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    vegetation::VegetationClimatology,
     model::PrimitiveWet,
 )
     (; soil_moisture_availability) = diagn.physics.land
     (; soil_moisture) = progn.land
     (; high_cover, low_cover, low_veg_factor) = vegetation
-    (; W_cap, W_wilt) = vegetation
-    D_top = land.z₁
-    D_root = land.z₂
+    (; W_cap, W_wilt) = model.land.thermodynamics
+    D_top = model.land.geometry.layer_thickness[1]
+    D_root = model.land.geometry.layer_thickness[2]
 
     @boundscheck grids_match(high_cover, low_cover, soil_moisture_availability) || throws(BoundsError)
     @boundscheck grids_match(soil_moisture, soil_moisture_availability, horizontal_only=true) || throws(BoundsError)
@@ -162,6 +174,6 @@ function soil_moisture_availability!(
 
         # Fortran SPEEDY documentation eq. 51
         soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +
-            veg*D_root*max(soil_moisture[ij, 2]- W_wilt, 0))
+            veg*D_root*max(soil_moisture[ij, 2] - W_wilt, 0))
     end
 end

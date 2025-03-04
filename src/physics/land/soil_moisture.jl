@@ -1,5 +1,28 @@
 abstract type AbstractSoilMoisture <: AbstractParameterization end
 
+export NoSoilMoisture
+struct NoSoilMoisture <: AbstractSoilMoisture end
+NoSoilMoisture(SG::SpectralGrid) = NoSoilMoisture()
+initialize!(soil::NoSoilMoisture, model::PrimitiveEquation) = nothing
+
+function initialize!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    soil::NoSoilMoisture,
+    model::PrimitiveEquation,
+)
+    return nothing
+end
+
+function timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    soil::NoSoilMoisture,
+    model::PrimitiveEquation,
+)
+    return nothing
+end
+
 export SeasonalSoilMoisture
 @kwdef struct SeasonalSoilMoisture{NF, Grid} <: AbstractSoilMoisture
 
@@ -37,7 +60,10 @@ function SeasonalSoilMoisture(SG::SpectralGrid; kwargs...)
     return SeasonalSoilMoisture{NF, GridVariable4D}(; nlat_half, nlayers=nlayers_soil, kwargs...)
 end
 
-function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveWet)
+# don't both initializing for the dry model
+initialize!(soil::SeasonalSoilMoisture, model::PrimitiveDry) = nothing
+
+function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     (; monthly_soil_moisture) = soil
 
     # LOAD NETCDF FILE
@@ -83,6 +109,15 @@ function initialize!(
 )
     # initialize land temperature by "running" the step at the current time
     timestep!(progn, diagn, soil, model)
+end
+
+function timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    soil::SeasonalSoilMoisture,
+    model::PrimitiveDry,
+)
+    return nothing
 end
 
 function timestep!(
@@ -142,11 +177,13 @@ function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers "*
         "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
 
-    # set the field capacity given layer thickness in land.temperature
-    (; γ, z₁, z₂) = model.land.temperature
+    # set the field capacity given layer thickness and 
+    γ = model.land.thermodynamics.field_capacity
+    z₁ = model.land.geometry.layer_thickness[1]
+    z₂ = model.land.geometry.layer_thickness[2]
     soil.f₁[] = γ*z₁
     soil.f₂[] = γ*z₂
-    
+
     return nothing
 end
 
@@ -163,17 +200,26 @@ function initialize!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     soil::LandBucketMoisture,
-    model::PrimitiveWet,
+    model::PrimitiveEquation,
 )
     set!(progn.land.soil_moisture, soil.initial_moisture)
-    soil.mask && mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean)
+    soil.mask && mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean)
 end
 
 function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     soil::LandBucketMoisture,
-    model::PrimitiveWet,
+    model::PrimitiveDry,
+)
+    return nothing
+end
+
+function timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    soil::LandBucketMoisture,
+    model::PrimitiveEquation,
 )
     (; soil_moisture) = progn.land
     Δt = model.time_stepping.Δt_sec
