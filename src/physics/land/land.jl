@@ -8,8 +8,8 @@ model_class(::Type{<:AbstractDryLand}) = AbstractDryLand
 model_class(model::AbstractLand) = model_class(typeof(model))
 
 # model type is the parameter-free type of a model
-model_type(::Type{<:LandModel}) = LandModel
-model_type(::Type{<:DryLandModel}) = DryLandModel
+model_type(::Type{<:AbstractWetLand}) = LandModel
+model_type(::Type{<:AbstractDryLand}) = DryLandModel
 model_type(model::AbstractLand) = model_type(typeof(model))
 
 function Base.show(io::IO, M::AbstractLand)
