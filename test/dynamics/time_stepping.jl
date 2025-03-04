@@ -127,3 +127,15 @@ end
         @test time_stepping.Δt_sec == 20*60
     end
 end
+
+@testset "Set n_timesteps" begin
+    spectral_grid = SpectralGrid()
+    time_stepping = Leapfrog(spectral_grid)
+    Δt = time_stepping.Δt_at_T31
+
+    clock = Clock()
+    initialize!(clock, time_stepping, n_timesteps=100)
+    @test clock.n_timesteps == 100
+    @test clock.period == Second(100*Δt)
+end
+    
