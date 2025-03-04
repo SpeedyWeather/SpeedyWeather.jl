@@ -1,7 +1,7 @@
 using EnzymeTestUtils, Enzyme
 import EnzymeTestUtils: test_approx 
 import AbstractFFTs
-import FiniteDifferences
+using FiniteDifferences
 
 grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
 grid_dealiasing = [2, 3]
