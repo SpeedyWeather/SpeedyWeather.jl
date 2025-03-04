@@ -1,11 +1,13 @@
 const DEFAULT_DATE = DateTime(2000, 1, 1)
 
+abstract type AbstractClock end
+
 export Clock
 """
 Clock struct keeps track of the model time, how many days to integrate for
 and how many time steps this takes
 $(TYPEDFIELDS)."""
-Base.@kwdef mutable struct Clock
+Base.@kwdef mutable struct Clock <: AbstractClock
     "current model time"
     time::DateTime = DEFAULT_DATE
 
@@ -53,13 +55,29 @@ end
 """
 $(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` in the `time_stepping`."""
-function initialize!(clock::Clock, time_stepping::AbstractTimeStepper)
-    clock.n_timesteps = ceil(Int, clock.period.value/time_stepping.Δt_sec)
+function initialize!(
+    clock::Clock,
+    time_stepping::AbstractTimeStepper;
+    n_timesteps::Int = -1,
+)
+    # if >=0 use to set n_timesteps, otherwise calculate from period
+    if n_timesteps >= 0
+        clock.n_timesteps = n_timesteps
+        clock.period = Second(time_stepping.Δt_sec * n_timesteps)
+    else
+        clock.n_timesteps = ceil(Int, clock.period.value/time_stepping.Δt_sec)
+    end
+    
     clock.start = clock.time    # store the start time
     clock.timestep_counter = 0  # reset counter
     clock.Δt = time_stepping.Δt_millisec
     return clock
 end
+
+function set_period!(clock::Clock, steps::Integer)
+    clock.period = Second(period)
+end
+
 
 """
 $(TYPEDSIGNATURES)
