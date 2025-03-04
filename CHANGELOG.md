@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Allow steps to be specified for for run!(simulation, steps=n) [#684](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/684)
 - Restrict extended CI tests to Julia v1.10 (due to Enzyme) [#681](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/681)
 - SigmaCoordinates constructors [#679](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/679)
 - Full timestepping differentiable by Enzyme with Julia 1.10 [#656](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/656)
