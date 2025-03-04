@@ -774,10 +774,42 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ missing_value
 │└ monthly_temperature
 ├┐land
+│├┐spectral_grid
+││├ NF
+││├ device
+││├ ArrayType
+││├ VectorType
+││├ MatrixType
+││├ TensorType
+││├ trunc
+││├ SpectralVariable2D
+││├ SpectralVariable3D
+││├ SpectralVariable4D
+││├ Grid
+││├ GridVariable2D
+││├ GridVariable3D
+││├ GridVariable4D
+││├ dealiasing
+││├ radius
+││├ nparticles
+││├ ParticleVector
+││├ nlat_half
+││├ nlat
+││├ npoints
+││├ nlayers
+││└ nlayers_soil
+│├┐geometry
+││├ nlayers
+││└ layer_thickness
+│├┐thermodynamics
+││├ heat_conductivity
+││├ field_capacity
+││├ heat_capacity_water
+││├ heat_capacity_dry_soil
+││├ W_cap
+││└ W_wilt
 │└┐temperature
 │ ├ nlat_half
-│ ├ z₁
-│ ├ z₂
 │ ├ path
 │ ├ file
 │ ├ varname
@@ -1089,10 +1121,42 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ missing_value
 │└ monthly_temperature
 ├┐land
+│├┐spectral_grid
+││├ NF
+││├ device
+││├ ArrayType
+││├ VectorType
+││├ MatrixType
+││├ TensorType
+││├ trunc
+││├ SpectralVariable2D
+││├ SpectralVariable3D
+││├ SpectralVariable4D
+││├ Grid
+││├ GridVariable2D
+││├ GridVariable3D
+││├ GridVariable4D
+││├ dealiasing
+││├ radius
+││├ nparticles
+││├ ParticleVector
+││├ nlat_half
+││├ nlat
+││├ npoints
+││├ nlayers
+││└ nlayers_soil
+│├┐geometry
+││├ nlayers
+││└ layer_thickness
+│├┐thermodynamics
+││├ heat_conductivity
+││├ field_capacity
+││├ heat_capacity_water
+││├ heat_capacity_dry_soil
+││├ W_cap
+││└ W_wilt
 │├┐temperature
 ││├ nlat_half
-││├ z₁
-││├ z₂
 ││├ path
 ││├ file
 ││├ varname
@@ -1112,8 +1176,6 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├┐vegetation
 ││├ nlat_half
 ││├ low_veg_factor
-││├ W_cap
-││├ W_wilt
 ││├ path
 ││├ file
 ││├ varname_vegh
@@ -1292,4 +1354,4 @@ simulation = initialize!(model)
 tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{PrimitiveWetModel} (68.37 MB)
 ├┐prognostic_variables (6.30 MB)
 ├┐diagnostic_variables (39.38 MB)
-└┐model (22.70 MB)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../analysis/">« Analysis</a><a class="docs-footer-nextpage" href="../differentiability/">Differentiability and Adjoint Model »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.1 on <span class="colophon-date" title="Friday 28 February 2025 15:19">Friday 28 February 2025</span>. Using Julia version 1.11.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+└┐model (22.70 MB)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../analysis/">« Analysis</a><a class="docs-footer-nextpage" href="../differentiability/">Differentiability and Adjoint Model »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.1 on <span class="colophon-date" title="Tuesday 4 March 2025 17:22">Tuesday 4 March 2025</span>. Using Julia version 1.11.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
