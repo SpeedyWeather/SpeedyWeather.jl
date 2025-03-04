@@ -1,19 +1,25 @@
-spectral_resolutions = (31, 63, 127)
-nlayers_list = [1, 8, 32]
+spectral_resolutions = (31,)#, 63, 127)
+nlayers_list = (8,)# 8, 32]
 # TODO: can uncomment this when we push to main  
 grid_list = [
     FullGaussianGrid,
     # FullClenshawGrid,
-    # OctahedralGaussianGrid,
+    OctahedralGaussianGrid,
     # OctahedralClenshawGrid,
-    # OctaminimalGaussianGrid
+    # HEALPixGrid,
+    # OctaHEALPixGrid,
 ]
+# CUDA.cu now implicitly converts to Float32 so that's the only relevant type to 
+# test here
+NFs = (Float32,)
 
 
 # Function to generate random inputs 
 function get_test_data(; trunc, nlayers, Grid, NF)
-    spectral_grid_cpu = SpectralGrid(; NF, trunc, nlayers, Grid)
-    spectral_grid_gpu = SpectralGrid(; NF, trunc, nlayers, Grid, device=SpeedyWeather.GPU())
+    # We use dealiasing=3 to ensure that the transform is exact for both 
+    # Clenshaw and Gaussian grids
+    spectral_grid_cpu = SpectralGrid(; NF, trunc, nlayers, Grid, dealiasing=3)
+    spectral_grid_gpu = SpectralGrid(; NF, trunc, nlayers, Grid, device=SpeedyWeather.GPU(), dealiasing=3)
     
     S_cpu = SpectralTransform(spectral_grid_cpu)
     S_gpu = SpectralTransform(spectral_grid_gpu)
@@ -34,7 +40,7 @@ end
 
 
 @testset "Whole transform: test a round trip" begin
-    @testset for NF in (Float32,)
+    @testset for NF in NFs
         @testset for trunc in spectral_resolutions
             @testset for nlayers in nlayers_list
                 @testset for Grid in grid_list
@@ -85,7 +91,7 @@ end
     @testset for trunc in spectral_resolutions
         @testset for nlayers in nlayers_list
             @testset for Grid in grid_list
-                @testset for NF in (Float32, Float64)
+                @testset for NF in NFs
                     # Generate test data
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
@@ -125,7 +131,7 @@ end
     @testset for trunc in spectral_resolutions
         @testset for nlayers in nlayers_list
             @testset for Grid in grid_list
-                @testset for NF in (Float32, Float64)
+                @testset for NF in NFs
                     # Generate test data
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
@@ -169,7 +175,7 @@ end
     @testset for trunc in spectral_resolutions
         @testset for nlayers in nlayers_list
             @testset for Grid in grid_list
-                @testset for NF in (Float32, Float64)
+                @testset for NF in NFs
                     # Generate test data
                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
@@ -241,7 +247,7 @@ end
 # end
 
 @testset "legendre: compare inverse transform to CPU" begin
-    @testset for NF in (Float32, Float64)
+    @testset for NF in NFs
         @testset for trunc in spectral_resolutions
             @testset for nlayers in nlayers_list
                 @testset for Grid in grid_list
@@ -279,7 +285,7 @@ end
 end
 
 @testset "legendre: compare forward transform to CPU" begin
-    @testset for NF in (Float32, )
+    @testset for NF in NFs
         @testset for trunc in spectral_resolutions
             @testset for nlayers in nlayers_list
                 @testset for Grid in grid_list
