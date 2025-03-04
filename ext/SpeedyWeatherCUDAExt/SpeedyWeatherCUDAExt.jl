@@ -1,7 +1,8 @@
 module SpeedyWeatherCUDAExt
 
 using SpeedyWeather
-import CUDA: CUDA, CUDAKernels, CuArray
+import CUDA: CUDA, CUDAKernels, CuArray, CUFFT
+import AbstractFFTs
 using DocStringExtensions
 
 # for RingGrids and LowerTriangularMatrices:
@@ -10,7 +11,6 @@ RingGrids.nonparametric_type(::Type{<:CuArray}) = CuArray
 LowerTriangularMatrices.nonparametric_type(::Type{<:CuArray}) = CuArray
 
 SpeedyWeather.default_array_type(::Type{GPU}) = CuArray
-
 
 # DEVICE SETUP FOR CUDA
 
@@ -29,5 +29,9 @@ SpeedyWeather.DeviceArray(::GPU, x) = Adapt.adapt(CuArray, x)
 """$(TYPEDSIGNATURES)
 Returns a `CuArray` when `device<:GPU` is used. Doesn't uses `adapt`, therefore always returns CuArray."""
 SpeedyWeather.DeviceArrayNotAdapt(::GPU, x) = CuArray(x)
+
+include("spectral_transform.jl")
+include("fourier.jl")
+include("legendre.jl")
 
 end # module

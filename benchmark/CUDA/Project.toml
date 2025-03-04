@@ -1,0 +1,11 @@
+[deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+SpeedyWeather = "9e226e20-d153-4fed-8a5b-493def4f21a9"
+
+[compat]
+KernelAbstractions = "0.9.29"

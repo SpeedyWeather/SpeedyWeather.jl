@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+
+- CUDA-ised spectral transform [#602](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/602)
 - Restrict extended CI tests to Julia v1.10 (due to Enzyme) [#681](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/681)
 - SigmaCoordinates constructors [#679](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/679)
 - Full timestepping differentiable by Enzyme with Julia 1.10 [#656](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/656)
@@ -79,6 +81,7 @@
 - Move CUDA dependency into extension [#586](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/586)
 - Stop supporting Julia v1.9 [#585](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/585)
 - `feedback.verbose` (de/activate the progressbar) is now set to `isinteractive()` to disable automatically for documentation [#582](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/582)
+- CUDA CI added for the GPU version [#645](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/645)
 
 ## v0.11.0
 

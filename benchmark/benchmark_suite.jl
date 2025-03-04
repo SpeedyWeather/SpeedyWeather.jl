@@ -112,7 +112,9 @@ function write_results(md, suite::BenchmarkSuite)
     end
 end 
 
-@kwdef mutable struct BenchmarkSuiteDynamics <: AbstractBenchmarkSuite
+abstract type AbstractBenchmarkSuiteTimed <: AbstractBenchmarkSuite end 
+
+@kwdef mutable struct BenchmarkSuiteDynamics <: AbstractBenchmarkSuiteTimed
     title::String
     nruns::Int = 1
     model::Vector = fill(PrimitiveWetModel, nruns)
@@ -129,7 +131,7 @@ end
 
 default_function_names() = ["pressure_gradient_flux!", "linear_virtual_temperature!", "temperature_anomaly!", "geopotential!", "vertical_integration!", "surface_pressure_tendency!", "vertical_velocity!", "linear_pressure_gradient!", "vertical_advection!","vordiv_tendencies!", "temperature_tendency!", "humidity_tendency!", "bernoulli_potential!"]
 
-function add_results!(suite::BenchmarkSuiteDynamics, trial::BenchmarkTools.Trial, i_run::Integer, i_func::Integer)
+function add_results!(suite::AbstractBenchmarkSuiteTimed, trial::BenchmarkTools.Trial, i_run::Integer, i_func::Integer)
 
     t = minimum(trial)
 
@@ -205,7 +207,7 @@ function run_benchmark_suite!(suite::BenchmarkSuiteDynamics)
     return suite
 end 
 
-function write_results(md, suite::BenchmarkSuiteDynamics)
+function write_results(md, suite::AbstractBenchmarkSuiteTimed)
 
     write(md, "\n## $(suite.title)\n\n")
 
