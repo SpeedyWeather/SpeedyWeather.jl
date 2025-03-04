@@ -137,30 +137,11 @@ SeasonalOceanClimatology{Float32, OctahedralGaussianArray{Float32, 2, Matrix{Flo
 └── arrays: monthly_temperature
 
 model.land
-DryLandModel{LandGeometry{Float32, Vector{Float32}}, LandThermodynamics{Float32}, SeasonalLandTemperature{Float32, OctahedralGaussianArray{Float32, 2, Matrix{Float32}}}} <: SpeedyWeather.AbstractDryLand
-├ spectral_grid::SpectralGrid = SpectralGrid:
-├ Spectral:   T31 LowerTriangularMatrix{Complex{Float32}}, radius = 6.371e6 m
-├ Grid:       48-ring OctahedralGaussianGrid{Float32}, 3168 grid points
-├ Resolution: 401km (average)
-├ Vertical:   8-layer atmosphere, 2-layer land
-└ Device:     CPU using Array
-├ geometry::LandGeometry{Float32, Vector{Float32}} = 2-layer LandGeometry{Float32, Vector{Float32}}
-└ layer_thickness: Float32[0.1, 4.0]
-├ thermodynamics::LandThermodynamics{Float32} = LandThermodynamics{Float32} <: SpeedyWeather.AbstractLandThermodynamics
-├ heat_conductivity::Float32 = 0.42
-├ field_capacity::Float32 = 0.24
-├ heat_capacity_water::Float32 = 4.2e6
-├ heat_capacity_dry_soil::Float32 = 1.13e6
-├ W_cap::Float32 = 0.3
-└ W_wilt::Float32 = 0.17
-└ temperature::SeasonalLandTemperature{Float32, OctahedralGaussianArray{Float32, 2, Matrix{Float32}}} = SeasonalLandTemperature{Float32, OctahedralGaussianArray{Float32, 2, Matrix{Float32}}} <: SpeedyWeather.AbstractLandTemperature
-├ nlat_half::Int64 = 24
-├ path::String = SpeedyWeather.jl/input_data
-├ file::String = land_surface_temperature.nc
-├ varname::String = lst
-├ file_Grid::UnionAll = FullGaussianGrid
-├ missing_value::Float32 = NaN
-└── arrays: monthly_temperature
+DryLandModel <: SpeedyWeather.AbstractDryLand
+├ spectral_grid: SpectralGrid
+├ geometry: LandGeometry{Float32, Vector{Float32}}
+├ thermodynamics: LandThermodynamics{Float32}
+└ temperature: SeasonalLandTemperature{Float32, OctahedralGaussianArray{Float32, 2, Matrix{Float32}}}
 
 model.solar_zenith
 SolarZenith{Float32} <: AbstractZenith
@@ -334,7 +315,7 @@ Feedback <: AbstractFeedback
 ├ start::Int64 = 0
 ├ barlen::Nothing = nothing
 ├ barglyphs::ProgressMeter.BarGlyphs = ProgressMeter.BarGlyphs('|', '█', ['▏', '▎', '▍', '▌', '▋', '▊', '▉'], ' ', '|')
-└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0001 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (1, 15, 5)), 0, 1, false, false, 1.741108710405719e9, 1.741108710405719e9, 1.74110871040572e9)
+└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0001 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (0, 0, 5)), 0, 1, false, false, 1.74111268938257e9, 1.74111268938257e9, 1.74111268938257e9)
 ├ progress_txt::IOStream = IOStream()
 └ nars_detected::Bool = false
 
