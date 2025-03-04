@@ -25,6 +25,9 @@ end
 
 unpack(sim::AbstractSimulation) = (sim.prognostic_variables, sim.diagnostic_variables, sim.model)
 
+const DEFAULT_PERIOD = Day(10)
+const DEFAULT_TIMESTEPS = -1    # -1 means unspecified = use the period kwarg
+
 export run!
 
 """
@@ -32,12 +35,13 @@ $(TYPEDSIGNATURES)
 Run a SpeedyWeather.jl `simulation`. The `simulation.model` is assumed to be initialized."""
 function run!(
     simulation::AbstractSimulation;
-    period::Period = Day(10),
+    period::Period = DEFAULT_PERIOD,
+    steps::Int = DEFAULT_TIMESTEPS,
     output::Bool = false,
 )
-    initialize!(simulation; period, output)     # scaling, initialize output, store initial conditions
-    time_stepping!(simulation)                  # run it, yeah!
-    finalize!(simulation)                       # unscale, finalize output, write restart file, finalize callbacks             
+    initialize!(simulation; period, steps, output)      # scaling, initialize output, store initial conditions
+    time_stepping!(simulation)                          # run it, yeah!
+    finalize!(simulation)                               # unscale, finalize output, write restart file, finalize callbacks             
 
     # return a UnicodePlot of surface vorticity
     surface_vorticity = simulation.diagnostic_variables.grid.vor_grid[:, end]
@@ -51,14 +55,25 @@ callbacks and performs the first two initial time steps to spin up the
 leapfrogging scheme."""
 function initialize!(
     simulation::AbstractSimulation;
-    period::Period = Day(10),
+    period::Period = DEFAULT_PERIOD,
+    steps::Int = DEFAULT_TIMESTEPS,
     output::Bool = false,
 )
     progn, diagn, model = unpack(simulation)
 
     # SET THE CLOCK
-    set_period!(progn.clock, period)                            # set how long to integrate for
-    initialize!(progn.clock, simulation.model.time_stepping)    # store the start date, reset counter
+    (; clock) = progn
+    (; time_stepping) = model
+    if steps != DEFAULT_TIMESTEPS
+        @assert steps > 0 "steps must be positive, got $steps"
+        @assert period == DEFAULT_PERIOD "Period and steps cannot be set simultaneously"
+        
+        # sets the steps, calculate period from it, store the start date, reset counter
+        initialize!(clock, time_stepping, n_timesteps=steps)    
+    else
+        set_period!(clock, period)              # set how long to integrate for
+        initialize!(clock, time_stepping)       # store the start date, reset counter
+    end
 
     # OUTPUT
     simulation.model.output.active = output                     # enable/disable output
