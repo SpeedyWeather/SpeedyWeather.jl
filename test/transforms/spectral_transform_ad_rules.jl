@@ -1,7 +1,7 @@
-using EnzymeTestUtils, Enzyme, FiniteDifferences
+using EnzymeTestUtils, Enzyme
 import EnzymeTestUtils: test_approx 
-import FiniteDifferences: j′vp, grad, central_fdm
 import AbstractFFTs
+using FiniteDifferences
 
 grid_types = [FullGaussianGrid, OctahedralGaussianGrid] # one full and one reduced grid, both Gaussian to have exact transforms 
 grid_dealiasing = [2, 3]
@@ -40,9 +40,8 @@ end
                     spectral_grid = SpectralGrid(Grid=grid_type, nlayers=1, trunc=5, dealiasing=grid_dealiasing[i_grid])
                     S = SpectralTransform(spectral_grid)
                     grid = rand(spectral_grid.Grid{spectral_grid.NF}, spectral_grid.nlat_half, spectral_grid.nlayers)
-                    f_north = S.scratch_memory_north
-                    f_south = S.scratch_memory_south
-
+                    f_north = S.scratch_memory.north
+                    f_south = S.scratch_memory.south
                     # forward transform 
                     test_reverse(SpeedyWeather.SpeedyTransforms._fourier!, Const, (f_north, Duplicated), (f_south, Duplicated), (grid, Duplicated), (S, Const); fdm=FiniteDifferences.central_fdm(15, 1), rtol=1e-3, atol=1e-3)
 
@@ -97,6 +96,11 @@ if VERSION <= v"1.11.0"
 
         autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, d_model))
         @test sum(to_vec(d_progn)[1]) != 0
+
+        # with Const(model)
+        autodiff(set_runtime_activity(Reverse), timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Const(model))
+        @test sum(to_vec(d_progn)[1]) != 0
+        @test progn != d_progn
     end 
 else 
     @testset "Complete Differentiability" begin
