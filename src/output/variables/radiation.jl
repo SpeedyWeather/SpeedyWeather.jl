@@ -16,8 +16,8 @@ for name in names
             long_name::String = $longname
             dims_xyzt::NTuple{4, Bool} = (true, true, false, true)
             missing_value::Float64 = NaN
-            compression_level::Int = 3
-            shuffle::Bool = true
+            compression_level::Int = DEFAULT_COMPRESSION_LEVEL
+            shuffle::Bool = DEFAULT_SHUFFLE
             keepbits::Int = 7
         end
 
@@ -26,21 +26,20 @@ for name in names
     end
 end
 
-"""Defines netCDF output for a specific variable, see `VorticityOutput` for details.
+"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
 Fields are $(TYPEDFIELDS)"""
 @kwdef mutable struct AlbedoOutput <: AbstractOutputVariable
-    name::String = "alb"
+    name::String = "albedo"
     unit::String = "1"
     long_name::String = "albedo"
-    dims_xyzt::NTuple{4, Bool} = (true, true, false, false)
+    dims_xyzt::NTuple{4, Bool} = (true, true, false, true)  # albedo is diagnostic
     missing_value::Float64 = NaN
-    compression_level::Int = 3
-    shuffle::Bool = true
-    keepbits::Int = 10
+    compression_level::Int = DEFAULT_COMPRESSION_LEVEL
+    shuffle::Bool = DEFAULT_SHUFFLE
+    keepbits::Int = DEFAULT_KEEPBITS
 end
 
-path(::AlbedoOutput, simulation) =
-    simulation.model.albedo.albedo
+path(::AlbedoOutput, simulation) = simulation.diagnostic_variables.physics.albedo
 
 RadiationOutput() = (
     OutgoingLongwaveRadiationOutput(),
