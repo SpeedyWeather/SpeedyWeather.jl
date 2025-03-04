@@ -388,6 +388,7 @@ struct DiagnosticVariables{
     ParticleVector,         # <: AbstractGridArray
     VectorType,             # <: AbstractVector
     MatrixType,             # <: AbstractMatrix
+    ScratchMemoryType,      # <: ArrayType{Complex{NF}, 3}
 } <: AbstractDiagnosticVariables
 
     # DIMENSIONS
@@ -410,7 +411,7 @@ struct DiagnosticVariables{
     grid::GridVariables{NF, ArrayType, GridVariable2D, GridVariable3D}
     
     "Intermediate variables for the dynamical core"
-    dynamics::DynamicsVariables{NF, ArrayType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D}
+    dynamics::DynamicsVariables{NF, ArrayType, SpectralVariable2D, SpectralVariable3D, GridVariable2D, GridVariable3D, ScratchMemoryType}
     
     "Global fields returned from physics parameterizations"
     physics::PhysicsVariables{NF, ArrayType, GridVariable2D}
