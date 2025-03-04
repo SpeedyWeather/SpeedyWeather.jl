@@ -2,6 +2,28 @@ abstract type AbstractLand <: AbstractModelComponent end
 abstract type AbstractWetLand <: AbstractLand end
 abstract type AbstractDryLand <: AbstractLand end
 
+# model class is the abstract supertype
+model_class(::Type{<:AbstractWetLand}) = AbstractWetLand
+model_class(::Type{<:AbstractDryLand}) = AbstractDryLand
+model_class(model::AbstractLand) = model_class(typeof(model))
+
+# model type is the parameter-free type of a model
+model_type(::Type{<:LandModel}) = LandModel
+model_type(::Type{<:DryLandModel}) = DryLandModel
+model_type(model::AbstractLand) = model_type(typeof(model))
+
+function Base.show(io::IO, M::AbstractLand)
+    println(io, "$(model_type(M)) <: $(model_class(M))")
+    properties = propertynames(M)
+    n = length(properties)
+    for (i, key) in enumerate(properties)
+        val = getfield(M, key)
+        s = i == n ? "└" : "├"  # choose ending └ for last property
+        p = i == n ? print : println
+        p(io, "$s $key: $(typeof(val))")
+    end
+end
+
 include("geometry.jl")
 include("thermodynamics.jl")
 include("temperature.jl")
