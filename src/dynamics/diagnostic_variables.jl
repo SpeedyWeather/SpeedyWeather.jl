@@ -166,6 +166,7 @@ $(TYPEDFIELDS)"""
     SpectralVariable3D,     # <: LowerTriangularArray
     GridVariable2D,         # <: AbstractGridArray
     GridVariable3D,         # <: AbstractGridArray
+    ScratchMemoryType,      # <: ScratchMemory{NF, ArrayType{Complex{NF},3}}
 } <: AbstractDiagnosticVariables
     
     trunc::Int              # spectral resolution: maximum degree and order of spherical harmonics
@@ -233,7 +234,7 @@ $(TYPEDFIELDS)"""
     div_mean::SpectralVariable2D = zeros(SpectralVariable2D, trunc+2, trunc+1)
 
     "Scratch memory for the transforms"
-    scratch_memory = SpeedyTransforms.ScratchMemory(NF, ArrayType, nlat_half, GridVariable2D, nlayers)
+    scratch_memory::ScratchMemoryType = SpeedyTransforms.ScratchMemory(NF, ArrayType, nlat_half, GridVariable2D, nlayers)
 end
 
 """$(TYPEDSIGNATURES)
@@ -244,7 +245,7 @@ function DynamicsVariables(SG::SpectralGrid)
     (; GridVariable2D, GridVariable3D) = SG
 
     return DynamicsVariables{NF, ArrayType, SpectralVariable2D, SpectralVariable3D,
-        GridVariable2D, GridVariable3D}(;
+        GridVariable2D, GridVariable3D, SpeedyTransforms.ScratchMemory{NF, ArrayType{Complex{NF}, 3}}}(;
             trunc, nlat_half, nlayers,
         )
 end
