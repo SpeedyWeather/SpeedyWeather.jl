@@ -30,19 +30,40 @@
     SG2 = SpectralGrid(trunc=31, nlayers=1)
     L6 = Leapfrog(SG2, Δt_at_T31=Hour(1), adjust_with_output=false)
 
-    SpeedyWeather.set_period!(c1, Hour(10))
-    SpeedyWeather.initialize!(c1, L6)
-    @test c1.n_timesteps == 10 
-
-    SpeedyWeather.set_period!(c1, 10)   # assumed to be in days
-    SpeedyWeather.initialize!(c1, L6)
-    @test c1.n_timesteps == 24*10
-
-    SpeedyWeather.set_period!(c1, 10.0) # also assumed to be in days
-    SpeedyWeather.initialize!(c1, L6)
-    @test c1.n_timesteps == 24*10 
-
-    SpeedyWeather.set_period!(c1, Day(2))
-    SpeedyWeather.initialize!(c1, L6)
+    # set period
+    SpeedyWeather.initialize!(c1, L6, Hour(10))
+    @test c1.n_timesteps == 10
+    SpeedyWeather.initialize!(c1, L6, Day(2))
     @test c1.n_timesteps == 48
+    
+    # set n_timesteps
+    SpeedyWeather.initialize!(c1, L6, 10)
+    @test c1.n_timesteps == 10
 end
+
+@testset "Set clock" begin
+    spectral_grid = SpectralGrid(nlayers=1)
+    time_stepping = Leapfrog(spectral_grid)
+    Δt = time_stepping.Δt_at_T31
+
+    # set n_timesteps
+    clock = Clock()
+    n_timesteps = 100
+    initialize!(clock, time_stepping, n_timesteps)
+    @test clock.n_timesteps == 100
+    @test clock.period == Second(100*Δt)
+
+    # set period
+    clock = Clock()
+    period = Day(10)
+    initialize!(clock, time_stepping, period)
+    @test clock.period == period
+    @test clock.n_timesteps == ceil(Int, Millisecond(period).value/time_stepping.Δt_millisec.value)
+
+    model = BarotropicModel(spectral_grid)
+    simulation = initialize!(model)
+    run!(simulation, steps=1)
+    run!(simulation, period=Hour(1))
+    @test_throws AssertionError run!(simulation, steps=1, period=Day(1))
+end
+    
