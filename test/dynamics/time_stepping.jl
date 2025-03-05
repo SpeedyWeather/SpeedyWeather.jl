@@ -129,7 +129,7 @@ end
 end
 
 @testset "Set clock" begin
-    spectral_grid = SpectralGrid()
+    spectral_grid = SpectralGrid(nlayers=1)
     time_stepping = Leapfrog(spectral_grid)
     Δt = time_stepping.Δt_at_T31
 
@@ -146,5 +146,11 @@ end
     initialize!(clock, time_stepping, period)
     @test clock.period == period
     @test clock.n_timesteps == ceil(Int, Millisecond(period).value/time_stepping.Δt_millisec.value)
+
+    model = BarotropicModel(spectral_grid)
+    simulation = initialize!(model)
+    run!(simulation, steps=1)
+    run!(simulation, period=Hour(1))
+    @test_throws AssertionError run!(simulation, steps=1, period=Day(1))
 end
     
