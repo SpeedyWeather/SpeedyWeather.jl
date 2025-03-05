@@ -14,7 +14,7 @@ Base.@kwdef mutable struct Clock <: AbstractClock
     "start time of simulation"
     start::DateTime = DEFAULT_DATE
     
-    "period to integrate for, set in set_period!(::Clock, ::Dates.Period)"
+    "period to integrate for"
     period::Second = Second(0)
 
     "Counting all time steps during simulation"
