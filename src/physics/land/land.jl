@@ -37,8 +37,8 @@ export LandModel
     spectral_grid::SpectralGrid
     geometry::G = LandGeometry(spectral_grid)
     thermodynamics::TD = LandThermodynamics(spectral_grid)
-    temperature::T = LandBucketTemperature(spectral_grid)
-    soil_moisture::SM = LandBucketMoisture(spectral_grid)
+    temperature::T = SeasonalLandTemperature(spectral_grid)
+    soil_moisture::SM = SeasonalSoilMoisture(spectral_grid)
     vegetation::V = VegetationClimatology(spectral_grid)
     rivers::R = NoRivers(spectral_grid)
 end
@@ -62,7 +62,7 @@ export DryLandModel
     spectral_grid::SpectralGrid
     geometry::G = LandGeometry(spectral_grid)
     thermodynamics::TD = LandThermodynamics(spectral_grid)
-    temperature::T = LandBucketTemperature(spectral_grid)
+    temperature::T = SeasonalLandTemperature(spectral_grid)
 end
 
 function initialize!(land::DryLandModel, model::PrimitiveEquation)
