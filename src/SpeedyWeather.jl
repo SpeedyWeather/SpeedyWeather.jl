@@ -26,7 +26,7 @@ import UnicodePlots
 import ProgressMeter
 
 # to avoid a `using Dates` to pass on DateTime arguments
-export DateTime, Second, Minute, Hour, Day, Week
+export DateTime, Millisecond, Second, Minute, Hour, Day, Week
 
 # export functions that have many cross-component methods
 export initialize!, finalize!

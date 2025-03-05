@@ -15,7 +15,8 @@
                 model = Model(spectral_grid; convection)
                 model.feedback.verbose = false
                 simulation = initialize!(model)
-                run!(simulation, period=Day(1))
+
+                run!(simulation, steps=36)
             end
         end
     end
