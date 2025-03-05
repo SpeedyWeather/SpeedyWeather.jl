@@ -65,14 +65,12 @@ function initialize!(
     (; clock) = progn
     (; time_stepping) = model
     if steps != DEFAULT_TIMESTEPS
-        @assert steps > 0 "steps must be positive, got $steps"
-        @assert period == DEFAULT_PERIOD "Period and steps cannot be set simultaneously"
-        
         # sets the steps, calculate period from it, store the start date, reset counter
-        initialize!(clock, time_stepping, n_timesteps=steps)    
+        @assert period == DEFAULT_PERIOD "Period and steps cannot be set simultaneously"
+        initialize!(clock, time_stepping, steps)    
     else
-        set_period!(clock, period)              # set how long to integrate for
-        initialize!(clock, time_stepping)       # store the start date, reset counter
+        # set period = how long to integrate for, tore the start date, reset counter
+        initialize!(clock, time_stepping, period)
     end
 
     # OUTPUT

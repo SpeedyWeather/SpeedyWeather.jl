@@ -128,14 +128,23 @@ end
     end
 end
 
-@testset "Set n_timesteps" begin
+@testset "Set clock" begin
     spectral_grid = SpectralGrid()
     time_stepping = Leapfrog(spectral_grid)
     Δt = time_stepping.Δt_at_T31
 
+    # set n_timesteps
     clock = Clock()
-    initialize!(clock, time_stepping, n_timesteps=100)
+    n_timesteps = 100
+    initialize!(clock, time_stepping, n_timesteps)
     @test clock.n_timesteps == 100
     @test clock.period == Second(100*Δt)
+
+    # set period
+    clock = Clock()
+    period = Day(10)
+    initialize!(clock, time_stepping, period)
+    @test clock.period == Period
+    @test clock.n_timesteps == ceil(Int, Millisecond(period).value/time_stepping.Δt_millisec.value)
 end
     
