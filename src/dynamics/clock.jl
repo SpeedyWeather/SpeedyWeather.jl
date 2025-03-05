@@ -54,7 +54,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` from `time_stepping`."""
-initialize!(clock::Clock, time_stepping::Leapfrog, args...) =
+initialize!(clock::Clock, time_stepping::AbstractTimeStepper, args...) =
     initialize!(clock, time_stepping.Δt_millisec, args...)
 
 """$(TYPEDSIGNATURES)
