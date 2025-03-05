@@ -144,7 +144,7 @@ end
     clock = Clock()
     period = Day(10)
     initialize!(clock, time_stepping, period)
-    @test clock.period == Period
+    @test clock.period == period
     @test clock.n_timesteps == ceil(Int, Millisecond(period).value/time_stepping.Δt_millisec.value)
 end
     
