@@ -3,7 +3,7 @@
 @testset "Differentiability: Timestepping" begin 
     # T15 still yields somewhat sensible dynamics, that's why it's chosen here
     model_types = [ShallowWaterModel, PrimitiveDryModel, PrimitiveWetModel]
-
+    
     for model_type in model_types 
         
         nlayer = model_type == ShallowWaterModel ? 1 : 1
@@ -39,7 +39,7 @@
 
         dmodel = make_zero(model)
 
-        # test that we can differentiate wrt an IC 
+        # test that we can differentiate wrt to everything  
         autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, dmodel))
 
         # nonzero gradient
@@ -70,5 +70,18 @@
         fd_vjp = FiniteDifferences.j′vp(central_fdm(11,1), timestep_wrt_gravity, dprogn_2, model.planet.gravity)
 
         @test isapprox(dmodel.planet.gravity, fd_vjp[1],rtol=1e-1)
+
+        # test that we can differentiate wrt to the IC while keeping model activity const 
+
+        d_progn = zero(progn)
+        d_diag = make_zero(diagn)
+
+        progn_new = zero(progn)
+        dprogn_new = one(progn) # seed 
+    
+        autodiff(set_runtime_activity(Reverse), timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn_copy_2, d_progn), Duplicated(diagn_copy_2, d_diag), Const(dt), Const(model))
+
+        # can reuse the same FD comparision here 
+        @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1])
     end 
 end 

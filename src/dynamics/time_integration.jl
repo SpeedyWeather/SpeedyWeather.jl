@@ -285,6 +285,8 @@ function timestep!(
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
     not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+
+    return nothing 
 end
 
 """
@@ -315,6 +317,8 @@ function timestep!(
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
     not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+
+    return nothing
 end
 
 """
@@ -359,6 +363,8 @@ function timestep!(
     # PARTICLE ADVECTION (always skip 1st step of first_timesteps!)
     not_first_timestep = lf2 == 2
     not_first_timestep && particle_advection!(progn, diagn, model.particle_advection)
+
+    return nothing 
 end
 
 """$(TYPEDSIGNATURES)
