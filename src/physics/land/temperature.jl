@@ -137,7 +137,7 @@ $(TYPEDFIELDS)"""
     initial_temperature::NF = 285
 
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
-    mask::Bool = true
+    mask::Bool = false
 end
 
 # generator function

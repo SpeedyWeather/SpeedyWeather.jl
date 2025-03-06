@@ -299,6 +299,9 @@ export SlabOcean
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000
 
+    "[OPTION] Mask initial sea surface temperature with land-sea mask?"
+    mask::Bool = false
+
     "[DERIVED] Effective mixed-layer heat capacity [J/K/m²]"
     heat_capacity_mixed_layer::NF = specific_heat_capacity*mixed_layer_depth*density
 end
@@ -322,7 +325,7 @@ function initialize!(
     Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
     sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
     set!(sea_surface_temperature, sst, model.geometry)
-    mask!(sea_surface_temperature, model.land_sea_mask, :land)
+    ocean_model.mask && mask!(sea_surface_temperature, model.land_sea_mask, :land)
 end
 
 function ocean_timestep!(

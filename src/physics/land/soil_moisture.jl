@@ -162,7 +162,7 @@ export LandBucketMoisture
     initial_moisture::NF = 0
     
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
-    mask::Bool = true
+    mask::Bool = false
 
     "Field capacity per meter soil [m], top layer, f = γz, set by land.temperature"
     f₁::Base.RefValue{NF} = Ref(zero(NF))
