@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+-  Make StochasticStirring+JetDrag default for BarotropicModel [#687](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/687)
 - Increasing precision for accumulated precipitation output [#685](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/685)
 - Allow steps to be specified for for run!(simulation, steps=n) [#684](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/684)
 - Restrict extended CI tests to Julia v1.10 (due to Enzyme) [#681](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/681)
