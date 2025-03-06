@@ -19,7 +19,7 @@ function initialize!(
     has(model, :humid) && initialize!(progn, IC.humid,  model)
 end
 
-InitialConditions(::Type{<:Barotropic}) = InitialConditions(; vordiv = StartWithRandomVorticity())
+InitialConditions(::Type{<:Barotropic}) = InitialConditions(; vordiv = ZeroInitially())
 InitialConditions(::Type{<:ShallowWater}) = InitialConditions(; vordiv = ZonalJet())
 function InitialConditions(::Type{<:PrimitiveDry})
     vordiv = ZonalWind()
