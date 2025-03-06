@@ -173,7 +173,7 @@ Feedback <: AbstractFeedback
 ├ start::Int64 = 0
 ├ barlen::Nothing = nothing
 ├ barglyphs::ProgressMeter.BarGlyphs = ProgressMeter.BarGlyphs('|', '█', ['▏', '▎', '▍', '▌', '▋', '▊', '▉'], ' ', '|')
-└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run test ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 1919, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (4170713875, 0, 413403114176)), 0, 1, false, false, 1.741285190484269e9, 1.74128519048427e9, 1.74128519048427e9)
+└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run test ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 1919, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (140219059779520, 140219059779648, 433072584202)), 0, 1, false, false, 1.741285244843829e9, 1.741285244843829e9, 1.741285244843829e9)
 ├ progress_txt::IOStream = IOStream()
 └ nars_detected::Bool = false
 
