@@ -207,7 +207,7 @@ function forcing!(
     # force every layer
     (; vor_tend) = diagn.tendencies
 
-    for k in eachmatrix(vor_tend)
+    @inbounds for k in eachmatrix(vor_tend)
         vor_tend[:, k] .+= S_masked
     end
 end
