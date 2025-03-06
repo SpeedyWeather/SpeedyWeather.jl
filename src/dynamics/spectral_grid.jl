@@ -6,7 +6,7 @@ const DEFAULT_DEVICE = CPU()
 const DEFAULT_ARRAYTYPE = Array
 
 # numerics
-const DEFAULT_GRID = OctahedralGaussianGrid
+const DEFAULT_GRID = OctaminimalGaussianGrid
 const DEFAULT_RADIUS = 6.371e6
 const DEFAULT_TRUNC = 31
 const DEFAULT_NLAYERS = 8
