@@ -6,7 +6,6 @@ function set!(
     model::AbstractModel;
     orography = nothing,
     land_sea_mask = nothing,
-    albedo = nothing,
     #TODO add vegetation?
     kwargs...
 )
@@ -15,6 +14,5 @@ function set!(
         gravity=model.planet.gravity, kwargs...)
 
     isnothing(land_sea_mask) || set!(model.land_sea_mask, land_sea_mask, model.geometry; kwargs...)
-    isnothing(albedo) || set!(model.albedo, albedo, model.geometry; kwargs...)
     return nothing
 end
