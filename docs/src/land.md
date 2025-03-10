@@ -292,7 +292,7 @@ Alternatively you can also drop the separation into ocean/land albedo
 (e.g. idealised simulations or aqua planet, rocky planet). And just
 use
 
-```@example
+```@example land
 albedo = GlobalConstantAlbedo(spectral_grid)
 ```
 
@@ -309,4 +309,19 @@ model.albedo
 
 The albedo in the `model` is now the one defined just in the lines above,
 using a globally constant albedo of 0.1 for the ocean but a higher albedo
-over land which also increases to 0.5 towards the poles.
+over land which also increases to 0.5 towards the poles. 
+
+You can always output the land-sea mask weighted albedo with
+`add!(model, SpeedyWeather.AlbedoOutput())` or inspect it as follows
+
+```@example land
+simulation = initialize!(model)
+run!(simulation, steps=1)   # run for a step to "diagnose" albedo = ocean/land weighted
+
+using CairoMakie
+(; albedo) = simulation.diagnostic_variables.physics
+heatmap(albedo, title="Custom albedo, separately defined for ocean/land")
+save("ocean_land_albedo.png", ans) # hide
+nothing # hide
+```
+![Ocean-land albedo](ocean_land_albedo.png)
