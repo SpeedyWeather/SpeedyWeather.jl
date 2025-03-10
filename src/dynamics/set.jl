@@ -193,13 +193,19 @@ end
 
 # set Grid (surface/single level) <- Func
 function set!(
-    var::AbstractGridArray{T,1},
+    var::AbstractGridArray{T, 1},
     f::Function,
-    geometry::Geometry,
+    geometry::Union{Nothing, Geometry}=nothing,
     S::Union{Nothing, SpectralTransform}=nothing;
     add::Bool=false,
 ) where T
-    (; londs, latds) = geometry
+    
+    if isnothing(geometry)      # recompute the coordinates
+        londs, latds = RingGrids.get_londlatds(var)
+    else
+        (; londs, latds) = geometry
+    end
+    
     kernel = add ? (a,b) -> a+b : (a,b) -> b
     for ij in eachgridpoint(var)
         var[ij] = kernel(var[ij], f(londs[ij], latds[ij]))
