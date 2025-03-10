@@ -178,7 +178,7 @@ C_2 &= C_w W_2 \gamma + C_s
 \end{aligned}
 ```
 
-with ``\gamma`` being the field capacity per meter soil.
+with ``\gamma = 0.24`` being the field capacity per meter soil.
 
 # Land soil moisture
 
@@ -188,7 +188,49 @@ Currently implemented soil moistures are
 subtypes(SpeedyWeather.AbstractSoilMoisture)
 ```
 
+You can use them by passing them on to a
+`LandModel` (not the `DryLandModel` though which does not have moisture)
+model constructor
 
+```@example land
+soil_moisture = LandBucketMoisture(spectral_grid)
+land = LandModel(spectral_grid; soil_moisture)
+```
 
+# LandBucketMoisture
+
+`LandBucketMoisture` defines the prognostic equation for
+soil moisture in the land surface model. It is a bucket model
+in the sense that every grid cell can fill like a bucket with
+rainfall from above dry out by evaporation, can drain into layers below
+or into a river runoff. But there is generally no lateral
+transport, only through the atmosphere.
+
+The `LandBucketMoisture` here follows MITgcm's 2-layer model, as defined
+[here](https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html).
+As this is a 2-layer model, `SpectralGrid(nlayers_soil=2)` is required.
+The equations are
+
+```math
+\begin{aligned}
+\frac{dW_1}{dt} &= \frac{P - E - R}{f_1} + \frac{W_2 - W_1}{\tau} \\
+\frac{dW_2}{dt} &= -\frac{f_1}{f_2}\frac{W_2 - W_1}{\tau} \\
+\end{aligned}
+```
+
+for soil moistures ``W_1, W_2`` in the respective layers (1 top, 2 below)
+defined as ratio of available water to field capacity, ``f_i = \gamma \Delta z_i``
+with ``\gamma = 0.24`` the field capacity per meter soil and
+``\Delta z_1 = 0.1~m`` the top layer thickness by default, and 
+``\Delta z_2 = 4.0~m`` the layer below.
+
+At the moment (and generally if not coupled to an ocean model) the river runoff
+lets water disappear. ``W_1, W_2`` are bounded by ``[0, 1]`` so that if
+more precipitation ``P`` (or in combination with negative evaporation ``E``,
+meaning condensation) occurs than the land can hold we compute the excess water
+as ``\delta W_1 = W_1 - 1``, set the soil moisture ``W_1 = 1`` back to the
+maximum and add a fraction ``p = 0.5`` of that excess water to the layer below
+``W_2 = W_2 + p \delta W_1 \tfrac{f_1}{f_2}`` the other half of that excess
+water is put into the river runoff.
 
 # Albedo
