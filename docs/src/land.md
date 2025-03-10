@@ -3,7 +3,7 @@
 The land surface in SpeedyWeather is represented through several
 components each of which can be changed in a modular way.
 
-- The actual [`LandModel`](@ref) or [`DryLandModel`](@ref) describing the equations for soil temperature and soil moisture, and vegetation or rivers.
+- The actual [`LandModel`](@ref) or [`LandDryModel`](@ref) describing the equations for soil temperature and soil moisture, and vegetation or rivers.
 - [The land-sea mask](@ref)
 - The surface [Albedo](@ref)
 - The [Orography](@ref)
@@ -11,7 +11,8 @@ components each of which can be changed in a modular way.
 As these components are largely independent of another,
 it is possible to have a white (albedo high) ocean at the
 top of Mt Everest, or to paint the Sahara black and moving
-it below sea-level.
+it below sea-level. The first one of these is discussed below
+for the others see the respective sections.
 
 # Dry vs wet land
 
@@ -97,7 +98,7 @@ subtypes(SpeedyWeather.AbstractLandTemperature)
 You can use them by passing them on to a
 `LandModel`/`LandDryModel` model constructor
 
-```@example
+```@example land
 temperature = LandBucketTemperature(spectral_grid)
 land = LandModel(spectral_grid; temperature)
 land.temperature
@@ -105,7 +106,7 @@ land.temperature
 
 and similarly
 
-```@example
+```@example land
 land = LandDryModel(spectral_grid; temperature)
 ```
 
@@ -119,6 +120,13 @@ temperature. It can warm up through radiation and other surface heat fluxes,
 retain thermal energy and release this back to the atmosphere either
 in the form of longwave radiative fluxes or sensible heat fluxes
 (latent heat fluxes depend on soil moisture, see [Surface fluxes](@ref)).
+It is a bucket model such that interaction between neighbouring
+grid cells ("buckets") of the land surface only interact through the 
+atmosphere with another, there are no direct horizontal fluxes
+between cells. In the sense of soil moisture, you can fill a bucket
+from above with rainfall, it may leak/drain at the bottom but buckets
+are laterally isolated from another. A similar concept applies to the
+heat fluxes of the `LandBucketTemperature`.
 
 The `LandBucketTemperature` here follows MITgcm's 2-layer model, as defined
 [here](https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html).
