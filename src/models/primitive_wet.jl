@@ -75,7 +75,7 @@ $(TYPEDFIELDS)"""
     
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
-    land_sea_mask::LS = LandSeaMask(spectral_grid)
+    land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
     ocean::OC = SeasonalOceanClimatology(spectral_grid)
     land::LA = LandModel(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
