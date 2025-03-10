@@ -191,24 +191,24 @@ function set!(
     return var
 end
 
-# set Grid (surface/single level) <- Func
+# if geometry available
 function set!(
     var::AbstractGridArray{T, 1},
     f::Function,
-    geometry::Geometry,             # if geometry available
+    geometry::Geometry,             
     S::Union{Nothing, SpectralTransform}=nothing;
-    kwargs...)
+    kwargs...) where T
 
     (; londs, latds) = geometry     # use coordinates from geometry
     _set!(var, f, londs, latds; kwargs...)
 end
 
-# set Grid (surface/single level) <- Func
+# otherwise recompute longitude, latitude vectors
 function set!(
     var::AbstractGridArray{T, 1},
     f::Function,
     S::Union{Nothing, SpectralTransform}=nothing;
-    kwargs...)
+    kwargs...) where T
 
     # otherwise recompute longitude, latitude vectors
     londs, latds = RingGrids.get_londlatds(var)
