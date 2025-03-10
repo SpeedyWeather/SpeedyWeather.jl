@@ -259,6 +259,9 @@ function timestep!(
             soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
             soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
             R[ij] += Δt*(1-p)*δW₁*f₁            # accumulate river runoff [m] of top layer
+
+            # remove excess water from lower layer (this disappears)
+            soil_moisture[ij, 2] = min(soil_moisture[ij, 2], 1)
         end
     end
 end
