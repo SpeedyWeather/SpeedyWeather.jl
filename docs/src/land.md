@@ -111,6 +111,48 @@ land = LandDryModel(spectral_grid; temperature)
 
 if you do not want the land to hold any moisture.
 
+# LandBucketTemperature
+
+`LandBucketTemperature` is a prognostic model of the soil temperature
+in the land surface model, interacting two-way with the surface air
+temperature. It can warm up through radiation and other surface heat fluxes,
+retain thermal energy and release this back to the atmosphere either
+in the form of longwave radiative fluxes or sensible heat fluxes
+(latent heat fluxes depend on soil moisture, see [Surface fluxes](@ref)).
+
+The `LandBucketTemperature` here follows MITgcm's 2-layer model, as defined
+[here](https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html).
+As this is a 2-layer model, `SpectralGrid(nlayers_soil=2)` is required.
+The equations are
+
+```math
+\begin{aligned}
+\Delta z_1 C_1 \frac{dT_1}{dt} &= F - \lambda\frac{T_1 - T_2}{(\Delta z_1 + \Delta z_2)/2} \\
+\Delta z_2 C_2 \frac{dT_2}{dt} &= \lambda\frac{T_1 - T_2}{(\Delta z_1 + \Delta z_2)/2}
+\end{aligned}
+```
+
+for two layers of thicknesses ``\Delta z_1 = 0.1~m`` (top) and ``\Delta z_2 = 4.0~m`` (layer below)
+and respective temperatures ``T_1, T_2``. The total surface downward heat flux
+`F` (in ``W/m^2``) forces the surface layer 1, and diffusion scales with the heat conductivity
+``\lambda = 0.42 W/m/K`` in the opposite direction of the heat gradient between the layers.
+For the parameter choices here it is typical that the surface layer is dominated by the daily cycle,
+but the layer below by the seasonal cycle.
+
+The heat capacities ``C_1, C_2`` are diagnosed from the heat capacity of water
+``C_w = 4.2 \times 10^6 J/m^3/K`` and dry soil ``C_s = 1.13 \times 10^6 J/m^3/K``
+given the soil moistures ``W_1, W_2`` (ratio of available water to field capacity)
+of the respective layers.
+
+```math
+\begin{aligned}
+C_1 &= C_w W_1 \gamma + C_s \\
+C_2 &= C_w W_2 \gamma + C_s
+\end{aligned}
+```
+
+with ``\gamma`` being the field capacity per meter soil.
+
 # Land soil moisture
 
 Currently implemented soil moistures are
