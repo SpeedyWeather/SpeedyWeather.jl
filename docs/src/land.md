@@ -222,7 +222,10 @@ for soil moistures ``W_1, W_2`` in the respective layers (1 top, 2 below)
 defined as ratio of available water to field capacity, ``f_i = \gamma \Delta z_i``
 with ``\gamma = 0.24`` the field capacity per meter soil and
 ``\Delta z_1 = 0.1~m`` the top layer thickness by default, and 
-``\Delta z_2 = 4.0~m`` the layer below.
+``\Delta z_2 = 4.0~m`` the layer below. The top layer is forced by precipitation
+``P`` minus evaporation ``E`` minus river runoff ``R``. The second term is a
+diffusion term of soil moisture between the two layers, acting on a time scale
+of ``\tau = 2~``days.
 
 At the moment (and generally if not coupled to an ocean model) the river runoff
 lets water disappear. ``W_1, W_2`` are bounded by ``[0, 1]`` so that if
