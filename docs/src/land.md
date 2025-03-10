@@ -14,7 +14,7 @@ top of Mt Everest, or to paint the Sahara black and moving
 it below sea-level. The first one of these bullet points is
 discussed below for the others see the respective sections.
 
-# Dry vs wet land
+## Dry vs wet land
 
 The type hierarchy of theactual land surface model is defined as
 
@@ -31,7 +31,7 @@ with a `PrimitiveWetModel` will increase with precipitation for
 example. You can combine dry and wet land and dry and wet atmosphere
 freely.
 
-# LandModel
+### LandModel
 
 The default `LandModel` in SpeedyWeather contains
 (at the moment other than 2 soil layers are not supported or experimental)
@@ -87,7 +87,7 @@ model.land
 
 is now the land defined above used when integrating a SpeedyWeather `model`.
 
-# DryLandModel
+### DryLandModel
 
 Alternatively, one can use the `DryLandModel` to explicitly disable any
 functionality around soil moisture. By doing so, soil moisture will
@@ -101,7 +101,7 @@ land = DryLandModel(spectral_grid; thermodynamics)
 but it does not contain soil moisture, vegetation or rivers in contrast to the
 `LandModel`.
 
-# Land soil temperature
+## Land soil temperature
 
 Currently implemented soil temperatures are
 
@@ -131,7 +131,7 @@ land = DryLandModel(spectral_grid; temperature)
 
 if you do not want the land to hold any moisture, vegetation or rivers.
 
-# LandBucketTemperature
+### LandBucketTemperature
 
 `LandBucketTemperature` is a prognostic model of the soil temperature
 in the land surface model, interacting two-way with the surface air
@@ -180,7 +180,7 @@ C_2 &= C_w W_2 \gamma + C_s
 
 with ``\gamma = 0.24`` being the field capacity per meter soil.
 
-# Land soil moisture
+## Land soil moisture
 
 Currently implemented soil moistures are
 
@@ -197,7 +197,7 @@ soil_moisture = LandBucketMoisture(spectral_grid)
 land = LandModel(spectral_grid; soil_moisture)
 ```
 
-# LandBucketMoisture
+### LandBucketMoisture
 
 `LandBucketMoisture` defines the prognostic equation for
 soil moisture in the land surface model. It is a bucket model
@@ -233,7 +233,7 @@ maximum and add a fraction ``p = 0.5`` of that excess water to the layer below
 ``W_2 = W_2 + p \delta W_1 \tfrac{f_1}{f_2}`` the other half of that excess
 water is put into the river runoff.
 
-# Albedo
+## Albedo
 
 Albedo is the surface reflectivity to downward solar shortwave radiation.
 A value of 1 indicates that all of the radiative flux is reflected at 
