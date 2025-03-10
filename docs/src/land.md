@@ -3,7 +3,7 @@
 The land surface in SpeedyWeather is represented through several
 components each of which can be changed in a modular way.
 
-- The actual [`LandModel`](@ref) or [`DryLandModel`](@ref) describing the equations for soil temperature and soil moisture, and vegetation or rivers.
+- The actual [LandModel](@ref) or [DryLandModel](@ref) describing the equations for soil temperature and soil moisture, and vegetation or rivers.
 - [The land-sea mask](@ref)
 - The surface [Albedo](@ref)
 - The [Orography](@ref)
@@ -87,6 +87,20 @@ model.land
 
 is now the land defined above used when integrating a SpeedyWeather `model`.
 
+# DryLandModel
+
+Alternatively, one can use the `DryLandModel` to explicitly disable any
+functionality around soil moisture. By doing so, soil moisture will
+always be zero, or treated like zero skipping unnecessary computations.
+It is created in the same way (reusing some non-default `thermodynamics` from above)
+
+```@example land
+land = DryLandModel(spectral_grid; thermodynamics)
+```
+
+but it does not contain soil moisture, vegetation or rivers in contrast to the
+`LandModel`.
+
 # Land soil temperature
 
 Currently implemented soil temperatures are
@@ -101,16 +115,21 @@ You can use them by passing them on to a
 ```@example land
 temperature = LandBucketTemperature(spectral_grid)
 land = LandModel(spectral_grid; temperature)
+```
+
+such that
+
+```@example land
 land.temperature
 ```
 
-and similarly
+is the `LandBucketTemperature` just defined. Similarly
 
 ```@example land
 land = DryLandModel(spectral_grid; temperature)
 ```
 
-if you do not want the land to hold any moisture.
+if you do not want the land to hold any moisture, vegetation or rivers.
 
 # LandBucketTemperature
 
