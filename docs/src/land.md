@@ -3,7 +3,7 @@
 The land surface in SpeedyWeather is represented through several
 components each of which can be changed in a modular way.
 
-- The actual [`LandModel`](@ref) or [`LandDryModel`](@ref) describing the equations for soil temperature and soil moisture, and vegetation or rivers.
+- The actual [`LandModel`](@ref) or [`DryLandModel`](@ref) describing the equations for soil temperature and soil moisture, and vegetation or rivers.
 - [The land-sea mask](@ref)
 - The surface [Albedo](@ref)
 - The [Orography](@ref)
@@ -96,7 +96,7 @@ subtypes(SpeedyWeather.AbstractLandTemperature)
 ```
 
 You can use them by passing them on to a
-`LandModel`/`LandDryModel` model constructor
+`LandModel`/`DryLandModel` model constructor
 
 ```@example land
 temperature = LandBucketTemperature(spectral_grid)
@@ -107,7 +107,7 @@ land.temperature
 and similarly
 
 ```@example land
-land = LandDryModel(spectral_grid; temperature)
+land = DryLandModel(spectral_grid; temperature)
 ```
 
 if you do not want the land to hold any moisture.
@@ -168,6 +168,7 @@ Currently implemented soil moistures are
 ```@example land
 subtypes(SpeedyWeather.AbstractSoilMoisture)
 ```
+
 
 
 
