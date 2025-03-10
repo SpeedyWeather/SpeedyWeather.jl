@@ -41,25 +41,14 @@ Finding a good balance is difficult but we try our best.
 
 ## Developers and contributing
 
-The development of  SpeedyWeather.jl is lead by [Milan Klöwer](https://github.com/milankl) and
-[current and past contributors](https://github.com/SpeedyWeather/SpeedyWeather.jl/graphs/contributors) include
-
-- [Tom Kimpson](https://github.com/tomkimpson)
-- [Alistair White](https://github.com/white-alistair)
-- [Maximilian Gelbrecht](https://github.com/maximilian-gelbrecht)
-- [David Meyer](https://github.com/dmey)
-- [Daisuke Hotta](https://github.com/hottad)
-- [Navid Constantinou](https://github.com/navidcy)
-- [Simone Silvestri](https://github.com/simone-silvestri)
-
-(Apologies if you've recently started contributing but this isn't reflected here yet, create a pull request!)
-Any contributions are always welcome!
+The development of  SpeedyWeather.jl is lead by [Milan Klöwer](https://github.com/milankl) with
+[current and past contributors](https://github.com/SpeedyWeather/SpeedyWeather.jl/graphs/contributors).
 
 Open-source lives from large teams of (even occasional) contributors. If you are interested to
 fix something, implement something, or just use it and provide feedback you are always welcome.
 We are more than happy to guide you, especially when you don't know where to start.
 We can point you to the respective code, highlight how everything is connected and tell you
-about dos and don'ts. Just express your interest to contribute and we'll be happy to have you.
+about dos and don'ts. Just express your interest to contribute and we'll be happy to have you!
 
 ## Citing
 

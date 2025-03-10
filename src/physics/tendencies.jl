@@ -12,7 +12,9 @@ function parameterization_tendencies!(
     time::DateTime,
     model::PrimitiveEquation,
 )
+    # TODO call them elsewhere? these are non-column parameterizations (could be reformulated as column though)
     cos_zenith!(diagn, time, model)
+    albedo!(diagn, progn, model)
 
     rings = eachring(diagn.grid.vor_grid)       # indices on every latitude ring
     for ij in eachgridpoint(diagn)              # loop over all horizontal grid points

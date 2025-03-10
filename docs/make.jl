@@ -18,6 +18,7 @@ makedocs(
                 "Tracer advection"=>"tracers.md",
                 "Particle advection"=>"particles.md",
                 "Stochastic physics" => "stochastic_physics.md",
+                "Land surface model" => "land.md",
                 "Analysis"=>"analysis.md",
                 "Tree structure"=>"structure.md",
                 "Differentiability and Adjoint Model"=>"differentiability.md",
