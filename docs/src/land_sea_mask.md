@@ -89,7 +89,7 @@ Predefined is also the [`AquaPlanetMask`](@ref) which can be created as
 ```@example landseamask
 land_sea_mask = AquaPlanetMask(spectral_grid)
 ```
-and is equivalent to using Earth's [`LandSeaMask`](@ref) but setting
+and is equivalent to using [`EarthLandSeaMask`](@ref) but setting
 the entire mask to zero afterwards `land_sea_mask.mask .= 0`.
 
 ## Custom land-sea mask

@@ -11,8 +11,8 @@ components each of which can be changed in a modular way.
 As these components are largely independent of another,
 it is possible to have a white (albedo high) ocean at the
 top of Mt Everest, or to paint the Sahara black and moving
-it below sea-level. The first one of these is discussed below
-for the others see the respective sections.
+it below sea-level. The first one of these bullet points is
+discussed below for the others see the respective sections.
 
 # Dry vs wet land
 
@@ -234,3 +234,79 @@ maximum and add a fraction ``p = 0.5`` of that excess water to the layer below
 water is put into the river runoff.
 
 # Albedo
+
+Albedo is the surface reflectivity to downward solar shortwave radiation.
+A value of 1 indicates that all of the radiative flux is reflected at 
+the Earth's surface and sent back up through the atmospheric column.
+In contrast, a value of 0 means no reflection and all of that radiative
+flux is absorbed, typically heating ocean or land surface.
+The following albedo's are currently implemented
+
+```@example land
+subtypes(SpeedyWeather.AbstractAlbedo)
+```
+Albedo is generally a 2D global diagnostic variable for ocean and land separately.
+Meaning it is possible it define albedo as a constant in time but also
+to let it be diagnosed as a function of other variables on every time step
+(e.g. snow cover). However, this specifically is currently not implemented.
+In general you have to think of the albedo not as a boundary condition that
+is set once but reset on every time step. This is so that, e.g. snow cover
+can increase the albedo without losing the information of the underlying
+bare surface albedo. If you do want to set the albedo manually with
+`set!` then use `ManualAlbedo` which has it's own albedo 2D field
+that is copied into the diagnostic variables on every time step.
+See example below.
+`AlbedoClimatology` does the same but `ManualAlbedo` does not need
+to read an albedo from file at initialization.
+
+`Albedo` itself is a container for separate albedo's for ocean and land as
+averaging those in grid cells which are partially land, partially ocean will
+yield inaccurate results. Think 10% land having a lower heat capacity than
+land but being treated with an albedo that comes from 90% ocean.
+Not very realistic. The default albedo can be created with
+
+```@example land
+albedo = DefaultAlbedo(spectral_grid)
+```
+
+and inspected with
+
+```@example land
+albedo.ocean
+```
+
+etc. You can mix those albedos too, they are internally
+two independent fields that are applied to fluxes
+separately, e.g.
+
+```@example land
+albedo = Albedo(GlobalConstantAlbedo(spectral_grid), AlbedoClimatology(spectral_grid))
+```
+
+constructs an albedo that is a global constant (default 0.3) for the ocean
+but the `AlbedoClimatology` read from file used for the land.
+The first argument for `Albedo` is used for ocean the second for land
+but you can use keywords too.
+
+Alternatively you can also drop the separation into ocean/land albedo
+(e.g. idealised simulations or aqua planet, rocky planet). And just
+use
+
+```@example
+albedo = GlobalConstantAlbedo(spectral_grid)
+```
+
+and this definition of the albedo will be used for both ocean and land fluxes.
+In all cases you can then pass on the albedo to the model constructor, e.g.
+
+```@example land
+albedo = Albedo(GlobalConstantAlbedo(spectral_grid, albedo=0.1), ManualAlbedo(spectral_grid))
+set!(albedo.land, (λ, φ) -> 0.2 + 0.3*abs(φ)/90)
+
+model = PrimitiveWetModel(spectral_grid; albedo)
+model.albedo
+```
+
+The albedo in the `model` is now the one defined just in the lines above,
+using a globally constant albedo of 0.1 for the ocean but a higher albedo
+over land which also increases to 0.5 towards the poles.

@@ -6,6 +6,19 @@ export Albedo
     land::Land
 end
 
+function Base.show(io::IO, A::Albedo)
+    println(io, "Albedo <: SpeedyWeather.AbstractAlbedo")
+    properties = propertynames(A)
+    n = length(properties)
+    for (i, key) in enumerate(properties)
+        val = getfield(A, key)
+        s = i == n ? "└" : "├"  # choose ending └ for last property
+        p = i == n ? print : println
+        p(io, "$s $key: $(typeof(val))")
+    end
+end
+
+export DefaultAlbedo
 function DefaultAlbedo(SG::SpectralGrid;
     ocean = GlobalConstantAlbedo(SG, albedo=0.06),
     land = GlobalConstantAlbedo(SG, albedo=0.4))
@@ -46,6 +59,28 @@ function albedo!(
     model::PrimitiveEquation,
 )
     diagn.albedo .= albedo.albedo           # copy over the constant albedo
+end
+
+## MANUAL ALBEDO
+export ManualAlbedo
+
+"""Manual albedo field, to be used with set! and is copied into the diagnostic variables on every time step.
+Defined so that parameterizations can change the albedo at every time step (e.g. snow cover) without
+losing the information of the original surface albedo. Fields are
+$(TYPEDFIELDS)"""
+struct ManualAlbedo{NF, Grid} <: AbstractAlbedo
+    albedo::Grid
+end
+
+ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.NF, SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.nlat_half))
+initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
+function albedo!(
+    diagn::AbstractDiagnosticVariables,     # ocean or land!
+    progn::PrognosticVariables,
+    albedo::ManualAlbedo,
+    model::PrimitiveEquation,
+)
+    diagn.albedo .= albedo.albedo           # copy over the manual albedo
 end
 
 ## ALEBDO CLIMATOLOGY
@@ -91,16 +126,6 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
 
     a = albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as=Matrix)
     interpolate!(albedo.albedo, a)
-end
-
-function albedo!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    albedo::AlbedoClimatology,
-    model::PrimitiveEquation,
-)
-    albedo!(diagn.physics.ocean, progn, albedo, model)
-    albedo!(diagn.physics.land, progn, albedo, model)
 end
 
 function albedo!(
