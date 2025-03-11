@@ -34,6 +34,7 @@ end
 albedo!(diagn::DiagnosticVariables, progn::PrognosticVariables, model::PrimitiveEquation) =
     albedo!(diagn, progn, model.albedo, model)
 
+# composite albedos: call separately for ocean and land with .ocean and .land
 function albedo!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
@@ -44,6 +45,27 @@ function albedo!(
     albedo!(diagn.physics.land, progn, albedo.land, model)
 end
 
+# single albedo: call separately for ocean and land with the same albedo
+function albedo!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    albedo::AbstractAlbedo,
+    model::PrimitiveEquation,
+)
+    albedo!(diagn.physics.ocean, progn, albedo, model)
+    albedo!(diagn.physics.land, progn, albedo, model)
+end
+
+# single albedo, copy over the constant albedo
+function albedo!(
+    diagn::AbstractDiagnosticVariables,     # ocean or land!
+    progn::PrognosticVariables,
+    albedo::AbstractAlbedo,
+    model::PrimitiveEquation,
+)
+    diagn.albedo .= albedo.albedo           # copy over the constant albedo
+end
+
 ## GLOBAL CONSTANT ALBEDO
 export GlobalConstantAlbedo
 @kwdef mutable struct GlobalConstantAlbedo{NF} <: AbstractAlbedo
@@ -52,14 +74,6 @@ end
 
 GlobalConstantAlbedo(SG::SpectralGrid; kwargs...) = GlobalConstantAlbedo{SG.NF}(; kwargs...)
 initialize!(albedo::GlobalConstantAlbedo, ::PrimitiveEquation) = nothing
-function albedo!(
-    diagn::AbstractDiagnosticVariables,     # ocean or land!
-    progn::PrognosticVariables,
-    albedo::GlobalConstantAlbedo,
-    model::PrimitiveEquation,
-)
-    diagn.albedo .= albedo.albedo           # copy over the constant albedo
-end
 
 ## MANUAL ALBEDO
 export ManualAlbedo
@@ -74,14 +88,6 @@ end
 
 ManualAlbedo(SG::SpectralGrid) = ManualAlbedo{SG.NF, SG.GridVariable2D}(zeros(SG.GridVariable2D, SG.nlat_half))
 initialize!(albedo::ManualAlbedo, model::PrimitiveEquation) = nothing
-function albedo!(
-    diagn::AbstractDiagnosticVariables,     # ocean or land!
-    progn::PrognosticVariables,
-    albedo::ManualAlbedo,
-    model::PrimitiveEquation,
-)
-    diagn.albedo .= albedo.albedo           # copy over the manual albedo
-end
 
 ## ALEBDO CLIMATOLOGY
 
@@ -126,13 +132,4 @@ function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
 
     a = albedo.file_Grid(ncfile[albedo.varname].var[:, :], input_as=Matrix)
     interpolate!(albedo.albedo, a)
-end
-
-function albedo!(
-    diagn::AbstractDiagnosticVariables,     # ocean or land!
-    progn::PrognosticVariables,
-    albedo::AlbedoClimatology,
-    model::PrimitiveEquation,
-)
-    diagn.albedo .= albedo.albedo           # copy over the albedo field
 end
