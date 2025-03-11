@@ -269,6 +269,7 @@ function initialize!(
     Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
     sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
     set!(sea_surface_temperature, sst, model.geometry)
+    mask!(sea_surface_temperature, model.land_sea_mask, :land)
 end
 
 function ocean_timestep!(
@@ -293,10 +294,13 @@ export SlabOcean
     specific_heat_capacity::NF = 4184
 
     "[OPTION] Average mixed-layer depth [m]"
-    mixed_layer_depth::NF = 40
+    mixed_layer_depth::NF = 10
 
     "[OPTION] Density of water [kg/m³]"
     density::NF = 1000
+
+    "[OPTION] Mask initial sea surface temperature with land-sea mask?"
+    mask::Bool = false
 
     "[DERIVED] Effective mixed-layer heat capacity [J/K/m²]"
     heat_capacity_mixed_layer::NF = specific_heat_capacity*mixed_layer_depth*density
@@ -321,6 +325,7 @@ function initialize!(
     Te, Tp = ocean_model.temp_equator, ocean_model.temp_poles
     sst(λ, φ) = (Te - Tp)*cosd(φ)^2 + Tp
     set!(sea_surface_temperature, sst, model.geometry)
+    ocean_model.mask && mask!(sea_surface_temperature, model.land_sea_mask, :land)
 end
 
 function ocean_timestep!(
@@ -336,16 +341,19 @@ function ocean_timestep!(
     (; mask) = model.land_sea_mask
 
     # Frierson et al. 2006, eq (1)
-    Rs = diagn.physics.surface_shortwave_down
+    Rsd = diagn.physics.surface_shortwave_down          # before albedo
+    Rsu = diagn.physics.ocean.surface_shortwave_up      # reflected from albedo
     Rld = diagn.physics.surface_longwave_down
-    Rlu = diagn.physics.surface_longwave_up
-    Ev = diagn.physics.evaporative_flux
-    S = diagn.physics.sensible_heat_flux
+    Rlu = diagn.physics.ocean.surface_longwave_up
+    Ev = diagn.physics.ocean.evaporative_flux
+    S = diagn.physics.ocean.sensible_heat_flux
 
-    # Euler forward step, mask land fluxes
-    # TODO mask shouldn't be applied for fractional cells
-    # maybe set sst for all land to NaN at the beginning?
-    @. sst += (Δt/C₀)*(1 - mask)*(Rs - Rlu + Rld - Lᵥ*Ev - S)
+    # Euler forward step
+    @inbounds for ij in eachgridpoint(sst, mask, Rsd, Rsu, Rld, Rlu, Ev, S)
+        if mask[ij] < 1     # at least partially ocean
+            sst[ij] += (Δt/C₀)*(Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij])
+        end
+    end
 
     return nothing
 end
