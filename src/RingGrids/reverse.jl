@@ -6,7 +6,7 @@ function Base._reverse!(grid::AbstractGridArray, ::Val{:lat})
     nrings = length(rings)
     rings_north = view(rings, 1:nrings ÷ 2)
 
-    for k in eachgrid(grid)
+    @inbounds for k in eachgrid(grid)
         for (j_north, ring) in enumerate(rings_north)
             j_south = nrings - j_north + 1
             for (i, ij_north) in enumerate(ring)
