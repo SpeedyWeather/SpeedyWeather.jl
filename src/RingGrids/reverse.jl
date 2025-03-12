@@ -1,3 +1,4 @@
+Base._reverse!(grid::AbstractGridArray, sym::Symbol) = Base._reverse!(grid, Val(sym))
 Base._reverse!(grid::AbstractGridArray, ::Val{Colon()}) = reverse!(grid)
 
 function Base._reverse!(grid::AbstractGridArray, ::Val{:lat})
