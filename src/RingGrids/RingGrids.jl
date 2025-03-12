@@ -109,6 +109,7 @@ include("full_grids.jl")
 include("reduced_grids.jl")
 include("scaling.jl")
 include("geodesics.jl")
+include("reverse.jl")
 
 # FULL GRIDS
 include("grids/full_gaussian.jl")
