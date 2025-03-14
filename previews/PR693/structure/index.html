@@ -767,13 +767,13 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ file_Grid
 │└ mask
 ├┐ocean
-│├ nlat_half
-│├ path
-│├ file
-│├ varname
-│├ file_Grid
-│├ missing_value
-│└ monthly_temperature
+│├ temp_equator
+│├ temp_poles
+│├ specific_heat_capacity
+│├ mixed_layer_depth
+│├ density
+│├ mask
+│└ heat_capacity_mixed_layer
 ├┐land
 │├┐spectral_grid
 ││├ NF
@@ -810,13 +810,8 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 ││├ W_cap
 ││└ W_wilt
 │└┐temperature
-│ ├ nlat_half
-│ ├ path
-│ ├ file
-│ ├ varname
-│ ├ file_Grid
-│ ├ missing_value
-│ └ monthly_temperature
+│ ├ initial_temperature
+│ └ mask
 ├┐solar_zenith
 │├ length_of_day
 │├ length_of_year
@@ -877,12 +872,18 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ nlayers
 │├ time_scale
 │└ surface_temp
-├ optical_depth
+├┐optical_depth
+│├ band
+│├ nlat
+│├ nlayers
+│├ τ₀_equator
+│├ τ₀_pole
+│├ fₗ
+│└ transmittance
 ├ shortwave_radiation
 ├┐longwave_radiation
-│├ α
-│├ temp_tropopause
-│└ time_scale
+│├ nbands
+│└ surface_longwave_emissivity
 ├ stochastic_physics
 ├┐time_stepping
 │├ trunc
@@ -1114,13 +1115,13 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ file_Grid
 │└ mask
 ├┐ocean
-│├ nlat_half
-│├ path
-│├ file
-│├ varname
-│├ file_Grid
-│├ missing_value
-│└ monthly_temperature
+│├ temp_equator
+│├ temp_poles
+│├ specific_heat_capacity
+│├ mixed_layer_depth
+│├ density
+│├ mask
+│└ heat_capacity_mixed_layer
 ├┐land
 │├┐spectral_grid
 ││├ NF
@@ -1157,23 +1158,15 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 ││├ W_cap
 ││└ W_wilt
 │├┐temperature
-││├ nlat_half
-││├ path
-││├ file
-││├ varname
-││├ file_Grid
-││├ missing_value
-││└ monthly_temperature
+││├ initial_temperature
+││└ mask
 │├┐soil_moisture
-││├ nlat_half
-││├ nlayers
-││├ path
-││├ file
-││├ varname_layer1
-││├ varname_layer2
-││├ file_Grid
-││├ missing_value
-││└ monthly_soil_moisture
+││├ time_scale
+││├ runoff_fraction
+││├ initial_moisture
+││├ mask
+││├ f₁
+││└ f₂
 │├┐vegetation
 ││├ nlat_half
 ││├ low_veg_factor
@@ -1267,12 +1260,18 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 │├ time_scale
 │├ relative_humidity
 │└ surface_temp_humid
-├ optical_depth
+├┐optical_depth
+│├ band
+│├ nlat
+│├ nlayers
+│├ τ₀_equator
+│├ τ₀_pole
+│├ fₗ
+│└ transmittance
 ├ shortwave_radiation
 ├┐longwave_radiation
-│├ α
-│├ temp_tropopause
-│└ time_scale
+│├ nbands
+│└ surface_longwave_emissivity
 ├ stochastic_physics
 ├┐time_stepping
 │├ trunc
@@ -1352,7 +1351,7 @@ tree(model)</code></pre><pre class="documenter-example-output"><code class="nohi
 └┐model (511.77 KB)</code></pre><p>And with <code>max_level</code> you can truncate the tree to go down at most that many levels. 1MB is a typical size for a one-level T31 resolution simulation. In comparison, a higher resolution <code>PrimitiveWetModel</code> would use</p><pre><code class="language-julia hljs">spectral_grid = SpectralGrid(trunc=127, nlayers=8)
 model = PrimitiveWetModel(spectral_grid)
 simulation = initialize!(model)
-tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{PrimitiveWetModel} (68.37 MB)
+tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{PrimitiveWetModel} (60.63 MB)
 ├┐prognostic_variables (6.30 MB)
 ├┐diagnostic_variables (39.38 MB)
-└┐model (22.70 MB)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../analysis/">« Analysis</a><a class="docs-footer-nextpage" href="../differentiability/">Differentiability and Adjoint Model »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.1 on <span class="colophon-date" title="Friday 14 March 2025 16:11">Friday 14 March 2025</span>. Using Julia version 1.11.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+└┐model (14.95 MB)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../analysis/">« Analysis</a><a class="docs-footer-nextpage" href="../differentiability/">Differentiability and Adjoint Model »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.1 on <span class="colophon-date" title="Friday 14 March 2025 17:58">Friday 14 March 2025</span>. Using Julia version 1.11.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

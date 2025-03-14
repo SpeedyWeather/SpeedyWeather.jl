@@ -7,8 +7,8 @@ land = LandModel(spectral_grid)</code></pre><pre class="documenter-example-outpu
 ├ spectral_grid: SpectralGrid
 ├ geometry: LandGeometry{Float32, Vector{Float32}}
 ├ thermodynamics: LandThermodynamics{Float32}
-├ temperature: SeasonalLandTemperature{Float32, OctahedralGaussianArray{Float32, 2, Matrix{Float32}}}
-├ soil_moisture: SeasonalSoilMoisture{Float32, OctahedralGaussianArray{Float32, 3, Array{Float32, 3}}}
+├ temperature: LandBucketTemperature{Float32}
+├ soil_moisture: LandBucketMoisture{Float32}
 ├ vegetation: VegetationClimatology{Float32, OctahedralGaussianGrid{Float32}}
 └ rivers: NoRivers</code></pre><p>With <code>land.geometry</code> currently used to define the layer thickness</p><pre><code class="language-julia hljs">land.geometry</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-layer LandGeometry{Float32, Vector{Float32}}
 └ layer_thickness: Float32[0.1, 4.0]</code></pre><p>And <code>land.thermodynamics</code> used to define thermodynamics-relevant surface properties as conceptual &quot;constants&quot; used in the other components of the land surface model <code>land</code>.</p><pre><code class="language-julia hljs">land.thermodynamics</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LandThermodynamics{Float32} &lt;: SpeedyWeather.AbstractLandThermodynamics
@@ -30,14 +30,14 @@ model.land</code></pre><pre class="documenter-example-output"><code class="nohig
 ├ spectral_grid: SpectralGrid
 ├ geometry: LandGeometry{Float32, Vector{Float32}}
 ├ thermodynamics: LandThermodynamics{Float32}
-├ temperature: SeasonalLandTemperature{Float32, OctahedralGaussianArray{Float32, 2, Matrix{Float32}}}
-├ soil_moisture: SeasonalSoilMoisture{Float32, OctahedralGaussianArray{Float32, 3, Array{Float32, 3}}}
+├ temperature: LandBucketTemperature{Float32}
+├ soil_moisture: LandBucketMoisture{Float32}
 ├ vegetation: VegetationClimatology{Float32, OctahedralGaussianGrid{Float32}}
 └ rivers: NoRivers</code></pre><p>is now the land defined above used when integrating a SpeedyWeather <code>model</code>.</p><h3 id="DryLandModel"><a class="docs-heading-anchor" href="#DryLandModel">DryLandModel</a><a id="DryLandModel-1"></a><a class="docs-heading-anchor-permalink" href="#DryLandModel" title="Permalink"></a></h3><p>Alternatively, one can use the <code>DryLandModel</code> to explicitly disable any functionality around soil moisture. By doing so, soil moisture will always be zero, or treated like zero skipping unnecessary computations. It is created in the same way (reusing some non-default <code>thermodynamics</code> from above)</p><pre><code class="language-julia hljs">land = DryLandModel(spectral_grid; thermodynamics)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">DryLandModel &lt;: SpeedyWeather.AbstractDryLand
 ├ spectral_grid: SpectralGrid
 ├ geometry: LandGeometry{Float32, Vector{Float32}}
 ├ thermodynamics: LandThermodynamics{Float32}
-└ temperature: SeasonalLandTemperature{Float32, OctahedralGaussianArray{Float32, 2, Matrix{Float32}}}</code></pre><p>but it does not contain soil moisture, vegetation or rivers in contrast to the <code>LandModel</code>.</p><h2 id="Land-soil-temperature"><a class="docs-heading-anchor" href="#Land-soil-temperature">Land soil temperature</a><a id="Land-soil-temperature-1"></a><a class="docs-heading-anchor-permalink" href="#Land-soil-temperature" title="Permalink"></a></h2><p>Currently implemented soil temperatures are</p><pre><code class="language-julia hljs">subtypes(SpeedyWeather.AbstractLandTemperature)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3-element Vector{Any}:
+└ temperature: LandBucketTemperature{Float32}</code></pre><p>but it does not contain soil moisture, vegetation or rivers in contrast to the <code>LandModel</code>.</p><h2 id="Land-soil-temperature"><a class="docs-heading-anchor" href="#Land-soil-temperature">Land soil temperature</a><a id="Land-soil-temperature-1"></a><a class="docs-heading-anchor-permalink" href="#Land-soil-temperature" title="Permalink"></a></h2><p>Currently implemented soil temperatures are</p><pre><code class="language-julia hljs">subtypes(SpeedyWeather.AbstractLandTemperature)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3-element Vector{Any}:
  ConstantLandTemperature
  LandBucketTemperature
  SeasonalLandTemperature</code></pre><p>You can use them by passing them on to a <code>LandModel</code>/<code>DryLandModel</code> model constructor</p><pre><code class="language-julia hljs">temperature = LandBucketTemperature(spectral_grid)
@@ -46,7 +46,7 @@ land = LandModel(spectral_grid; temperature)</code></pre><pre class="documenter-
 ├ geometry: LandGeometry{Float32, Vector{Float32}}
 ├ thermodynamics: LandThermodynamics{Float32}
 ├ temperature: LandBucketTemperature{Float32}
-├ soil_moisture: SeasonalSoilMoisture{Float32, OctahedralGaussianArray{Float32, 3, Array{Float32, 3}}}
+├ soil_moisture: LandBucketMoisture{Float32}
 ├ vegetation: VegetationClimatology{Float32, OctahedralGaussianGrid{Float32}}
 └ rivers: NoRivers</code></pre><p>such that</p><pre><code class="language-julia hljs">land.temperature</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">LandBucketTemperature{Float32} &lt;: SpeedyWeather.AbstractLandTemperature
 ├ initial_temperature::Float32 = 285.0
@@ -68,7 +68,7 @@ land = LandModel(spectral_grid; soil_moisture)</code></pre><pre class="documente
 ├ spectral_grid: SpectralGrid
 ├ geometry: LandGeometry{Float32, Vector{Float32}}
 ├ thermodynamics: LandThermodynamics{Float32}
-├ temperature: SeasonalLandTemperature{Float32, OctahedralGaussianArray{Float32, 2, Matrix{Float32}}}
+├ temperature: LandBucketTemperature{Float32}
 ├ soil_moisture: LandBucketMoisture{Float32}
 ├ vegetation: VegetationClimatology{Float32, OctahedralGaussianGrid{Float32}}
 └ rivers: NoRivers</code></pre><h3 id="LandBucketMoisture"><a class="docs-heading-anchor" href="#LandBucketMoisture">LandBucketMoisture</a><a id="LandBucketMoisture-1"></a><a class="docs-heading-anchor-permalink" href="#LandBucketMoisture" title="Permalink"></a></h3><p><code>LandBucketMoisture</code> defines the prognostic equation for soil moisture in the land surface model. It is a bucket model in the sense that every grid cell can fill like a bucket with rainfall from above dry out by evaporation, can drain into layers below or into a river runoff. But there is generally no lateral transport, only through the atmosphere.</p><p>The <code>LandBucketMoisture</code> here follows MITgcm&#39;s 2-layer model, as defined <a href="https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html">here</a>. As this is a 2-layer model, <code>SpectralGrid(nlayers_soil=2)</code> is required. The equations are</p><p class="math-container">\[\begin{aligned}
@@ -95,4 +95,4 @@ run!(simulation, steps=1)   # run for a step to &quot;diagnose&quot; albedo = oc
 
 using CairoMakie
 (; albedo) = simulation.diagnostic_variables.physics
-heatmap(albedo, title=&quot;Custom albedo, separately defined for ocean/land&quot;)</code></pre><p><img src="../ocean_land_albedo.png" alt="Ocean-land albedo"/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stochastic_physics/">« Stochastic physics</a><a class="docs-footer-nextpage" href="../analysis/">Analysis »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.1 on <span class="colophon-date" title="Friday 14 March 2025 16:11">Friday 14 March 2025</span>. Using Julia version 1.11.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+heatmap(albedo, title=&quot;Custom albedo, separately defined for ocean/land&quot;)</code></pre><p><img src="../ocean_land_albedo.png" alt="Ocean-land albedo"/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../stochastic_physics/">« Stochastic physics</a><a class="docs-footer-nextpage" href="../analysis/">Analysis »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.1 on <span class="colophon-date" title="Friday 14 March 2025 17:58">Friday 14 March 2025</span>. Using Julia version 1.11.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

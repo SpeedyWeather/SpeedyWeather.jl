@@ -127,21 +127,21 @@ EarthLandSeaMask{Float32, OctahedralGaussianGrid{Float32}} <: AbstractLandSeaMas
 └── arrays: mask
 
 model.ocean
-SeasonalOceanClimatology{Float32, OctahedralGaussianArray{Float32, 2, Matrix{Float32}}} <: AbstractOcean
-├ nlat_half::Int64 = 24
-├ path::String = SpeedyWeather.jl/input_data
-├ file::String = sea_surface_temperature.nc
-├ varname::String = sst
-├ file_Grid::UnionAll = FullGaussianGrid
-├ missing_value::Float32 = NaN
-└── arrays: monthly_temperature
+SlabOcean{Float32} <: AbstractOcean
+├ temp_equator::Float32 = 302.0
+├ temp_poles::Float32 = 273.0
+├ specific_heat_capacity::Float32 = 4184.0
+├ mixed_layer_depth::Float32 = 10.0
+├ density::Float32 = 1000.0
+├ mask::Bool = false
+└ heat_capacity_mixed_layer::Float32 = 4.184e7
 
 model.land
 DryLandModel <: SpeedyWeather.AbstractDryLand
 ├ spectral_grid: SpectralGrid
 ├ geometry: LandGeometry{Float32, Vector{Float32}}
 ├ thermodynamics: LandThermodynamics{Float32}
-└ temperature: SeasonalLandTemperature{Float32, OctahedralGaussianArray{Float32, 2, Matrix{Float32}}}
+└ temperature: LandBucketTemperature{Float32}
 
 model.solar_zenith
 SolarZenith{Float32} <: AbstractZenith
@@ -224,18 +224,23 @@ DryBettsMiller{Float32, NoSurfacePerturbation} <: SpeedyWeather.AbstractConvecti
 
 
 model.optical_depth
-ZeroOpticalDepth{Float32} <: SpeedyWeather.AbstractOpticalDepth
-
+FriersonOpticalDepth{Float32, Matrix{Float32}} <: SpeedyWeather.AbstractOpticalDepth
+├ band::Int64 = 1
+├ nlat::Int64 = 48
+├ nlayers::Int64 = 8
+├ τ₀_equator::Float32 = 6.0
+├ τ₀_pole::Float32 = 1.5
+├ fₗ::Float32 = 0.1
+└── arrays: transmittance
 
 model.shortwave_radiation
 TransparentShortwave <: SpeedyWeather.AbstractShortwave
 
 
 model.longwave_radiation
-JeevanjeeRadiation{Float32} <: SpeedyWeather.AbstractLongwave
-├ α::Float32 = 0.025
-├ temp_tropopause::Float32 = 200.0
-└ time_scale::Second = 86400 seconds
+NBandRadiation{Float32} <: SpeedyWeather.AbstractRadiation
+├ nbands::Int64 = 1
+└ surface_longwave_emissivity::Float32 = 0.98
 
 model.stochastic_physics
 NoStochasticPhysics <: SpeedyWeather.AbstractStochasticPhysics
@@ -313,7 +318,7 @@ Feedback <: AbstractFeedback
 ├ start::Int64 = 0
 ├ barlen::Nothing = nothing
 ├ barglyphs::ProgressMeter.BarGlyphs = ProgressMeter.BarGlyphs('|', '█', ['▏', '▎', '▍', '▌', '▋', '▊', '▉'], ' ', '|')
-└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0001 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (1, 52, 5)), 0, 1, false, false, 1.741968458065109e9, 1.741968458065109e9, 1.741968458065109e9)
+└ core::ProgressMeter.ProgressCore = ProgressMeter.ProgressCore(:green, "Weather is speedy: run 0001 ", 0.1, false, 0, IOContext(Base.PipeEndpoint(RawFD(-1) closed, 0 bytes waiting)), true, 1, 0, ReentrantLock(nothing, 0x00000000, 0x00, Base.GenericCondition{Base.Threads.SpinLock}(Base.IntrusiveLinkedList{Task}(nothing, nothing), Base.Threads.SpinLock(0)), (1, 88, 5)), 0, 1, false, false, 1.741974877901137e9, 1.741974877901137e9, 1.741974877901138e9)
 ├ progress_txt::IOStream = IOStream()
 └ nars_detected::Bool = false
 
