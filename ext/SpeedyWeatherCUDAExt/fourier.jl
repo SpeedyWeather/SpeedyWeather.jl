@@ -119,13 +119,12 @@ function SpeedyTransforms._apply_serial_fft!(
     S::SpectralTransform,
     j::Int,
     k::Int,
-    nlon::Int,
+    nfreq::Int,
     ilons::UnitRange{Int};
     not_equator::Bool = true
 ) where {NF<:AbstractFloat, N}
     brfft_plan = S.brfft_plans_1D[j]   # FFT planned wrt nlon on ring
     k_grid = eachgrid(grids)[k]     # vertical layer index
-    nfreq = nlon÷2 + 1              # linear max Fourier frequency wrt to nlon
 
     if not_equator
         view(grids.data, ilons, k_grid) .= brfft_plan * view(g_in, 1:nfreq, k, j)
