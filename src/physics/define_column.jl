@@ -35,6 +35,7 @@ $(TYPEDFIELDS)"""
     # (log) pressure per layer, surface is prognostic, last element here, but precompute other layers too
     const ln_pres::VectorType = zeros(NF, nlayers+1)    # logarithm of pressure [log(Pa)]
     const pres::VectorType = zeros(NF, nlayers+1)       # pressure [Pa]
+    const layer_depth::VectorType = zeros(NF, nlayers)  # normalised layer depth in terms of pressure [1]
 
     # TENDENCIES to accumulate the parametrizations into
     const u_tend::VectorType = zeros(NF, nlayers)       # zonal velocity [m/s²]

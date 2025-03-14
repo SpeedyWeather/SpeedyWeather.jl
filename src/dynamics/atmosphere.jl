@@ -6,7 +6,7 @@ $(TYPEDSIGNATURES)
 Create a struct `EarthAtmosphere <: AbstractAtmosphere`, with the following physical/chemical
 characteristics. Keyword arguments are
 $(TYPEDFIELDS)"""
-Base.@kwdef mutable struct EarthAtmosphere{NF<:AbstractFloat} <: AbstractAtmosphere
+@kwdef mutable struct EarthAtmosphere{NF<:AbstractFloat} <: AbstractAtmosphere
     "molar mass of dry air [g/mol]"
     mol_mass_dry_air::NF = 28.9649
 

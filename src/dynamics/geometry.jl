@@ -83,7 +83,7 @@ $(TYPEDFIELDS)
     "σ at full levels, σₖ"
     σ_levels_full::VectorType = 0.5*(σ_levels_half[2:end] + σ_levels_half[1:end-1])  
     
-    "σ level thicknesses, σₖ₊₁ - σₖ"
+    "σ level thicknesses, σ_k+1/2 - σ_k-1/2"
     σ_levels_thick::VectorType = σ_levels_half[2:end] - σ_levels_half[1:end-1]      
 
     "log of σ at full levels, include surface (σ=1) as last element"

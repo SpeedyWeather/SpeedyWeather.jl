@@ -9,6 +9,7 @@ function get_column!(
 )
     get_column!(C, D, P, ij, jring, 
         model.geometry,
+        model.atmosphere,
         model.planet,
         model.orography,
         model.land_sea_mask,
@@ -25,6 +26,7 @@ function get_column!(
     P::PrognosticVariables,
     ij::Integer,        # grid point index
     jring::Integer,     # ring index 1 around North Pole to J around South Pole
+    atmosphere::AbstractAtmosphere,
     geometry::Geometry,
     planet::AbstractPlanet,
     orography::AbstractOrography,
@@ -32,7 +34,7 @@ function get_column!(
     implicit::AbstractImplicit,
 )
 
-    (; σ_levels_full, ln_σ_levels_full) = geometry
+    (; σ_levels_full, σ_levels_thick, ln_σ_levels_full) = geometry
     (; temp_profile) = implicit     # reference temperature
 
     @boundscheck C.nlayers == D.nlayers || throw(BoundsError)
@@ -51,6 +53,9 @@ function get_column!(
     C.ln_pres .= ln_σ_levels_full .+ lnpₛ   # log pressure on every level ln(p) = ln(σ) + ln(pₛ)
     C.pres[1:end-1] .= σ_levels_full.*pₛ    # pressure on every level p = σ*pₛ
     C.pres[end] = pₛ                        # last element is surface pressure pₛ
+
+    # normalised layer depth in terms of pressure [1]
+    C.layer_depth .= σ_levels_thick .* (pₛ/atmosphere.pres_ref)
 
     (; u_grid_prev, v_grid_prev, temp_grid_prev, humid_grid_prev) = D.grid
 
