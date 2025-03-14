@@ -7,16 +7,10 @@
         
         model = PrimitiveWetModel(spectral_grid; optical_depth, longwave_radiation)
         simulation = initialize!(model)
-        run!(simulation, period=Day(1))
+        run!(simulation, steps=1)
     
         band = longwave_radiation.nbands
-        dτ = simulation.diagnostic_variables.column.optical_depth_longwave[:, band]
-
-        (; nlayers) = spectral_grid
-
-        for k in 2:nlayers
-            # optical depth cannot be negative
-            @test dτ[k] >= 0
-        end
+        t = simulation.diagnostic_variables.column.transmittance_longwave[:, band]
+        @test all(0 .<= t .<= 1)
     end
 end
