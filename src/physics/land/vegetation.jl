@@ -49,7 +49,9 @@ function soil_moisture_availability!(
     r = 1/(D_top*W_cap + D_root*(W_cap - W_wilt))
 
     @inbounds for ij in eachindex(soil_moisture_availability)
-        soil_moisture_availability[ij] = r*D_top*soil_moisture[ij, 1]
+        if isfinite(soil_moisture_availability[ij])
+            soil_moisture_availability[ij] = r*D_top*soil_moisture[ij, 1]
+        end 
     end
 
     return nothing
@@ -169,11 +171,13 @@ function soil_moisture_availability!(
 
     for ij in eachgridpoint(soil_moisture_availability, high_cover, low_cover)
         
-        # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
-        veg = max(0, high_cover[ij] + low_veg_factor*low_cover[ij])
+        if isfinite(soil_moisture_availability[ij])
+            # Fortran SPEEDY source/land_model.f90 line 111 origin unclear
+            veg = max(0, high_cover[ij] + low_veg_factor*low_cover[ij])
 
-        # Fortran SPEEDY documentation eq. 51
-        soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +
-            veg*D_root*max(soil_moisture[ij, 2] - W_wilt, 0))
+            # Fortran SPEEDY documentation eq. 51
+            soil_moisture_availability[ij] = r*(D_top*soil_moisture[ij, 1] +
+                veg*D_root*max(soil_moisture[ij, 2] - W_wilt, 0))
+        end 
     end
 end
