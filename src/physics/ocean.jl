@@ -161,8 +161,10 @@ function ocean_timestep!(
     weight = convert(NF, Dates.days(time-Dates.firstdayofmonth(time))/Dates.daysinmonth(time))
 
     @inbounds for ij in eachgridpoint(sea_surface_temperature)
-        sea_surface_temperature[ij] = (1-weight) * monthly_temperature[ij, this_month] +
-                                          weight  * monthly_temperature[ij, next_month]
+        if isfinite(sea_surface_temperature[ij])
+            sea_surface_temperature[ij] = (1-weight) * monthly_temperature[ij, this_month] +
+                                            weight  * monthly_temperature[ij, next_month]
+        end 
     end
 end
 
