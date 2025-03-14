@@ -26,8 +26,8 @@ function get_column!(
     P::PrognosticVariables,
     ij::Integer,        # grid point index
     jring::Integer,     # ring index 1 around North Pole to J around South Pole
-    atmosphere::AbstractAtmosphere,
     geometry::Geometry,
+    atmosphere::AbstractAtmosphere,
     planet::AbstractPlanet,
     orography::AbstractOrography,
     land_sea_mask::AbstractLandSeaMask,

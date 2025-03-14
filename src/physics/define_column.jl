@@ -120,9 +120,10 @@ $(TYPEDFIELDS)"""
     outgoing_longwave_radiation::NF = 0     # OLR [W/m^2]
     outgoing_shortwave_radiation::NF = 0    # same for shortwave reflection [W/m^2]
 
-    # optical depth of the atmosphere, on half levels, for shortwave and longwave radiation
-    const optical_depth_shortwave::MatrixType = zeros(NF, nlayers, nbands_shortwave)
-    const optical_depth_longwave::MatrixType = zeros(NF, nlayers, nbands_longwave)
+    # transmittance of the atmosphere, on half levels, for shortwave and longwave radiation
+    # transmittance = exp(-optical_depth)
+    const transmittance_shortwave::MatrixType = zeros(NF, nlayers, nbands_shortwave)
+    const transmittance_longwave::MatrixType = zeros(NF, nlayers, nbands_longwave)
 
     # WORK ARRAYS
     const a::VectorType = zeros(NF, nlayers)
