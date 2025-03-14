@@ -9,8 +9,11 @@
         simulation = initialize!(model)
         run!(simulation, steps=1)
     
-        band = longwave_radiation.nbands
-        t = simulation.diagnostic_variables.column.transmittance_longwave[:, band]
+        t = simulation.diagnostic_variables.column.transmittance_longwave
+        @test all(0 .<= t .<= 1)
+        @test any(t .> 0)
+        
+        t = simulation.diagnostic_variables.column.transmittance_shortwave
         @test all(0 .<= t .<= 1)
     end
 end
