@@ -116,7 +116,9 @@ function _apply_serial_fft!(
 
     g = view(g_in, 1:nfreq, k, j)           # data on northern ring, vertical layer k
     out = view(grids.data, ilons, k_grid)   # view on scratch memory to store transformed data
-    LinearAlgebra.mul!(out, brfft_plan, g)  # perform FFT
+    if not_equator
+        LinearAlgebra.mul!(out, brfft_plan, g)  # perform FFT
+    end
 end
 
 
