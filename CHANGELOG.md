@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- NBandRadiation via FriersonOpticalDepth and transmittance [#693](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/693)
 - Reverse for AbstractGridArrays [#691](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/691)
 - LandGeometry, LandThermodynamics as component of LandModel, DryLandModel [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)
 - Diagnostic albedo separate for ocean/land [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)

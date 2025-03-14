@@ -154,53 +154,71 @@ function longwave_radiation!(
 end
 
 export NBandRadiation
-@kwdef struct NBandRadiation <: AbstractRadiation
+@kwdef struct NBandRadiation{NF} <: AbstractRadiation
     nbands::Int = 1
+    surface_longwave_emissivity::NF = 0.98
 end
 
-NBandRadiation(SG::SpectralGrid; kwargs...) = NBandRadiation(; kwargs...)
+NBandRadiation(SG::SpectralGrid; kwargs...) = NBandRadiation{SG.NF}(; kwargs...)
 initialize!(scheme::NBandRadiation, model::PrimitiveEquation) = nothing
 
 function longwave_radiation!(
     column::ColumnVariables,
-    scheme::NBandRadiation,
+    radiation::NBandRadiation,
     model::PrimitiveEquation,
 )
 
     (; nlayers) = column
     nbands = column.nbands_longwave                 # number of spectral bands
+    ϵₛ = radiation.surface_longwave_emissivity      # surface emissivity
+    NF = eltype(column)
 
     # precompute Stefan-Boltzmann emissions σT^4
     σ = model.atmosphere.stefan_boltzmann
     B = column.b                                    # reuse scratch vector b
     (; temp) = column
-    @inbounds for k in eachindex(B, temp)
-        B[k] = σ*temp[k]^4
-    end
+    @. B = σ*temp^4
 
     @inbounds for band in 1:nbands                  # loop over spectral bands
-        dτ = view(column.optical_depth_longwave, :, band)   # differential optical depth per layer in that band
+
+        # transmittance=exp(-optical_depth) of this band
+        t = view(column.transmittance_longwave, :, band)
+
+        # Dowward flux D
+        D = zero(NF)                                # top boundary condition of longwave flux downward (no LW from space)
+        for k in 1:nlayers
+            # Radiative transfer, Frierson et al. 2006, equation 7 but use transmittance t
+            # or Fortran SPEEDY documentation, eq. 44
+            D = D*t[k] + (1 - t[k])*B[k]
+            column.flux_temp_downward[k+1] += D
+        end
+        column.surface_longwave_down = D            # store for output/diagnostics
 
         # UPWARD flux U
-        U = σ*column.surface_temp^4                 # boundary condition at surface U(τ=τ(z=0)) = σTₛ⁴
-        column.flux_temp_upward[nlayers+1] += U     # accumulate fluxes
+        (; skin_temperature_sea, skin_temperature_land, land_fraction) = column
+
+        # Flux between surface and lowermost air temperature but zero flux if land/sea not available
+        R = (1 - ϵₛ)*D                              # surface longwave reflection
+        U_ocean = isfinite(skin_temperature_sea) ? ϵₛ*σ*skin_temperature_sea^4 : zero(skin_temperature_sea)
+        U_ocean += R
+        column.surface_longwave_up_ocean = U_ocean
+    
+        U_land = isfinite(skin_temperature_land) ? ϵₛ*σ*skin_temperature_land^4 : zero(skin_temperature_land)
+        U_land += R
+        column.surface_longwave_up_land = U_land
+    
+        # land-sea mask weighted combined flux from land and ocean
+        U = (1-land_fraction)*U_ocean + land_fraction*U_land
+        column.flux_temp_upward[end] += U           # accumulate into total flux
+        column.surface_longwave_up = U              # store for output/diagnostics
 
         for k in nlayers:-1:1                       # integrate from surface up
             # Radiative transfer, e.g. Frierson et al. 2006, equation 6
-            U -= dτ[k]*(U - B[k])                   # negative because we integrate from surface up in -τ direction
+            U = U*t[k] + (1-t[k])*B[k]
             column.flux_temp_upward[k] += U         # accumulate that flux
         end
 
         # store outgoing longwave radiation (OLR) for diagnostics, accumulate over bands (reset when column is reset)
         column.outgoing_longwave_radiation += U
-
-        # DOWNWARD flux D
-        D = zero(U)                                 # top boundary condition of longwave flux
-                                                    # no need to accumulate 0 at top downward flux
-        for k in 1:nlayers
-            # Radiative transfer, Frierson et al. 2006, equation 7
-            D += dτ[k]*(B[k] - D)
-            column.flux_temp_downward[k+1] += D
-        end
     end
 end
