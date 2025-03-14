@@ -76,7 +76,7 @@ $(TYPEDFIELDS)"""
     # BOUNDARY CONDITIONS
     orography::OR = EarthOrography(spectral_grid)
     land_sea_mask::LS = EarthLandSeaMask(spectral_grid)
-    ocean::OC = SeasonalOceanClimatology(spectral_grid)
+    ocean::OC = SlabOcean(spectral_grid)
     land::LA = LandModel(spectral_grid)
     solar_zenith::ZE = WhichZenith(spectral_grid, planet)
     albedo::AL = DefaultAlbedo(spectral_grid)
@@ -93,9 +93,9 @@ $(TYPEDFIELDS)"""
     surface_evaporation::EV = SurfaceEvaporation(spectral_grid)
     large_scale_condensation::LSC = ImplicitCondensation(spectral_grid)
     convection::CV = SimplifiedBettsMiller(spectral_grid)
-    optical_depth::OD = ZeroOpticalDepth(spectral_grid)
+    optical_depth::OD = FriersonOpticalDepth(spectral_grid)
     shortwave_radiation::SW = TransparentShortwave(spectral_grid)
-    longwave_radiation::LW = JeevanjeeRadiation(spectral_grid)
+    longwave_radiation::LW = NBandRadiation(spectral_grid)
     stochastic_physics::SP = NoStochasticPhysics()
     
     # NUMERICS
