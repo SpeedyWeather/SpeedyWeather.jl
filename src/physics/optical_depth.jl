@@ -36,7 +36,8 @@ export FriersonOpticalDepth
     transmittance::MatrixType = zeros(NF, nlayers, nlat)
 end
 
-FriersonOpticalDepth(SG::SpectralGrid; kwargs...) = FriersonOpticalDepth{SG.NF, SG.MatrixType}(nlat=SG.nlat, nlayers=SG.nlayers; kwargs...)
+FriersonOpticalDepth(SG::SpectralGrid; kwargs...) =
+    FriersonOpticalDepth{SG.NF, SG.MatrixType}(nlat=SG.nlat, nlayers=SG.nlayers; kwargs...)
 function initialize!(od::FriersonOpticalDepth, model::AbstractModel)
 
     (; τ₀_equator, τ₀_pole, fₗ, transmittance, nlayers) = od
@@ -52,14 +53,19 @@ function initialize!(od::FriersonOpticalDepth, model::AbstractModel)
     NF = eltype(transmittance)
     local τ_above::NF = 0
     for j in eachindex(sinφ)
+        # surface optical depth, higher (=lower transmittance) at the equator due to more water vapour
         τ₀ = τ₀_equator + (τ₀_pole - τ₀_equator)*sinφ[j]^2
-        for k in 2:nlayers+1     # loop over half levels below
+
+        # decrease optical depth with height, Frierson 2006 eq. (5)
+        for k in 2:nlayers+1        # loop over half levels below
             τ_below = τ₀*(fₗ*σ[k] + (1 - fₗ)*σ[k]^4)
+
+            # differential optical depth of layer k, to be formulated as transmittance
             dτ = τ_below - τ_above
             transmittance[k-1, j] = exp(-dτ)
-            τ_above = τ_below
+            τ_above = τ_below       # avoid recalculation for layer below
         end
-        τ_above = 0
+        τ_above = 0                 # reset for next latitude (optical depth is alwasy 0 at the top of the atmosphere)
     end
 end
 
