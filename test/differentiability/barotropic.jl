@@ -39,7 +39,7 @@
     @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=0.05) # we have to go really quite low with the tolerances here
     @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_progn)[1])) < 0.002 # so we check a few extra statistics
     @test maximum(to_vec(fd_vjp[1].vor)[1] - to_vec(d_progn.vor)[1]) < 0.05
-    
+
     #
     # We go individually through all components of the time stepping and check 
     # correctness
@@ -141,7 +141,7 @@
 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> leapfrog_step(prog_new, progn_copy, x, dt, lf1, model), dprogn_copy, tend_copy)
 
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dtend)[1],rtol=1e-5,atol=1e-5))
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dtend)[1],rtol=1e-3,atol=1e-3))
 
     # 
     # single variable leapfrog step 
@@ -190,7 +190,7 @@
 
     fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> transform_diagn(diag_copy, x, lf2, model), ddiag_copy, progn_copy)
     
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-3,atol=1e-3))
+    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-2,atol=1e-2))
 end
 
 

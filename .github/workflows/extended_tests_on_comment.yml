@@ -6,7 +6,7 @@ on:
 
 jobs:
   test:
-    if: github.event.issue.pull_request && contains(github.event.comment.body, '/extended-tests')
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '/extended-tests') && contains(github.event.comment.author_association,'OWNER')
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -17,7 +17,13 @@ jobs:
         arch:
           - x64
     steps:
-      - uses: actions/checkout@v4
+      - name: Get PR branch
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+      - name: Checkout PR branch 
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
