@@ -13,7 +13,15 @@ you must also define sea surface temperatures everywhere, otherwise the fluxes
 in those regions will be zero.
 
 For more details, see [Surface fluxes](@ref) and the [Land-sea mask](@ref)
-section therein.
+section therein. Predefined land-sea masks are
+
+```@example landseamask
+using InteractiveUtils # hide
+using SpeedyWeather
+subtypes(SpeedyWeather.AbstractLandSeaMask)
+```
+with `EarthLandSeaMask` being the default `LandSeaMask` using the land-sea mask of Earth.
+`LandSeaMask` simply points to this.
 
 ## Manual land-sea mask
 
@@ -70,10 +78,10 @@ And now you can run the simulation as usual with `run!(simulation)`.
 
 ## Earth's land-sea mask
 
-The Earth's [`LandSeaMask`](@ref) has itself the option to load another
+The [`EarthLandSeaMask`](@ref) has itself the option to load another
 land-sea mask from file, but you also have to specify the grid that mask
 from files comes on. It will then attempt to read it via `NCDatasets`
-and interpolate onto the model grid.
+and interpolate onto the model grid. 
 
 ## AquaPlanetMask
 
@@ -81,7 +89,7 @@ Predefined is also the [`AquaPlanetMask`](@ref) which can be created as
 ```@example landseamask
 land_sea_mask = AquaPlanetMask(spectral_grid)
 ```
-and is equivalent to using Earth's [`LandSeaMask`](@ref) but setting
+and is equivalent to using [`EarthLandSeaMask`](@ref) but setting
 the entire mask to zero afterwards `land_sea_mask.mask .= 0`.
 
 ## Custom land-sea mask
