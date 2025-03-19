@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Extended CI tests can be launched on comment in PRs [#695](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/695)
+- Extended CI tests can be launched on comment in PRs [#695](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/695)[#696](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/696)
 - Reverse for AbstractGridArrays [#691](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/691)
 - LandGeometry, LandThermodynamics as component of LandModel, DryLandModel [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)
 - Diagnostic albedo separate for ocean/land [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)
