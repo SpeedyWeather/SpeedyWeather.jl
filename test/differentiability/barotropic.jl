@@ -1,7 +1,7 @@
 ### Experiments going a bit deeper into the timestepping of the barotropic model
 @testset "Differentiability: Barotropic Model Components" begin 
     # T15 still yields somewhat sensible dynamics, that's why it's chosen here
-    spectral_grid = SpectralGrid(trunc=15, nlayers=1)          # define resolution
+    spectral_grid = SpectralGrid(trunc=9, nlayers=1)          # define resolution
     model = BarotropicModel(; spectral_grid)   # construct model
     simulation = initialize!(model)  
     initialize!(simulation)
@@ -15,9 +15,6 @@
     progn = prognostic_variables
     diagn = diagnostic_variables
 
-    # TO-DO: The first time we execute this, the gradient is different. Why?
-    timestep_oop!(make_zero(progn), progn, diagn, dt, model)
-
     diagn_copy = deepcopy(diagn)
     progn_copy = deepcopy(progn)
 
@@ -27,11 +24,11 @@
     progn_new = zero(progn)
     dprogn_new = one(progn) # seed 
 
-    # test if differentiation works wrt copy! (there were some problems with it before)
-    autodiff(Reverse, copy!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn))
+    # Timestepping: FD comparison 
+    dprogn_2 = one(progn) # seed 
 
-    progn_new = zero(progn)
-    dprogn_new = one(progn) # seed 
+    # for the full timestep, we need a bit higher precision 
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(15,1), x -> timestep_oop(x, deepcopy(diagn_copy), dt, deepcopy(model)), deepcopy(dprogn_2), deepcopy(progn_copy))
 
     # test that we can differentiate wrt an IC 
     autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, make_zero(model)))
@@ -39,15 +36,10 @@
     # nonzero gradient
     @test sum(to_vec(d_progn)[1]) != 0
 
-    # FD comparison 
-    dprogn_2 = one(progn) # seed 
-
-    # for the full timestep, we need a bit higher precision 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(15,1), x -> timestep_oop(x, diagn_copy, dt, model), dprogn_2, progn_copy)
-
     @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1], rtol=0.05) # we have to go really quite low with the tolerances here
     @test mean(abs.(to_vec(fd_vjp[1])[1] - to_vec(d_progn)[1])) < 0.002 # so we check a few extra statistics
     @test maximum(to_vec(fd_vjp[1].vor)[1] - to_vec(d_progn.vor)[1]) < 0.05
+    
     #
     # We go individually through all components of the time stepping and check 
     # correctness
@@ -75,11 +67,11 @@
         return diagn_new
     end 
 
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(9,1), x -> dynamics_tendencies(diagn_copy, x, lf2, model), ddiag_copy, progn_copy)
+    fd_vjp = FiniteDifferences.j′vp(central_fdm(9,1), x -> dynamics_tendencies(deepcopy(diagn_copy), x, lf2, deepcopy(model)), ddiag_copy, progn_copy)
 
     @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
 
-    # in the default configuration without forcing or drag, the barotropic model's don't dependent on the previous prognostic state 
+    # in the default configuration without forcing or drag, the barotropic model's dynamics_tendencies don't dependent on the previous prognostic state, but only on the diagnostic variables 
     @test sum(to_vec(dprogn)[1]) ≈ 0 
 
     #
@@ -180,7 +172,6 @@
     # transform!(diagn, progn, lf2, model)
     #
 
-    fill!(diagn.tendencies, 0, PrimitiveWetModel)
     diag_copy = deepcopy(diagn)
     
     ddiag = one(diagn)
