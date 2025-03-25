@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Tree structure · SpeedyWeather.jl</title><meta name="title" content="Tree structure · SpeedyWeather.jl"/><meta property="og:title" content="Tree structure · SpeedyWeather.jl"/><meta property="twitter:title" content="Tree structure · SpeedyWeather.jl"/><meta name="description" content="Documentation for SpeedyWeather.jl."/><meta property="og:description" content="Documentation for SpeedyWeather.jl."/><meta property="twitter:description" content="Documentation for SpeedyWeather.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">SpeedyWeather.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../installation/">Installation</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Running SpeedyWeather</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../how_to_run_speedy/">How to run SpeedyWeather</a></li><li><a class="tocitem" href="../examples_2D/">Examples 2D</a></li><li><a class="tocitem" href="../examples_3D/">Examples 3D</a></li><li><a class="tocitem" href="../analysis/">Analysis</a></li><li class="is-active"><a class="tocitem" href>Tree structure</a><ul class="internal"><li><a class="tocitem" href="#Simulation"><span>Simulation</span></a></li><li><a class="tocitem" href="#Prognostic-variables"><span>Prognostic variables</span></a></li><li><a class="tocitem" href="#Diagnostic-variables"><span>Diagnostic variables</span></a></li><li><a class="tocitem" href="#BarotropicModel"><span>BarotropicModel</span></a></li><li><a class="tocitem" href="#ShallowWaterModel"><span>ShallowWaterModel</span></a></li><li><a class="tocitem" href="#PrimitiveDryModel"><span>PrimitiveDryModel</span></a></li><li><a class="tocitem" href="#PrimitiveWetModel"><span>PrimitiveWetModel</span></a></li><li><a class="tocitem" href="#Size-of-a-Simulation"><span>Size of a Simulation</span></a></li></ul></li><li><a class="tocitem" href="../particles/">Particle advection</a></li><li><a class="tocitem" href="../output/">NetCDF output</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Extending SpeedyWeather</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../extensions/">Extensions</a></li><li><a class="tocitem" href="../forcing_drag/">Forcing and drag</a></li><li><a class="tocitem" href="../parameterizations/">Parameterizations</a></li><li><a class="tocitem" href="../orography/">Orography</a></li><li><a class="tocitem" href="../land_sea_mask/">Land-Sea Mask</a></li><li><a class="tocitem" href="../ocean/">Ocean</a></li><li><a class="tocitem" href="../callbacks/">Callbacks</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-5" type="checkbox"/><label class="tocitem" for="menuitem-5"><span class="docs-label">Dynamics</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../barotropic/">Barotropic model</a></li><li><a class="tocitem" href="../shallowwater/">Shallow water model</a></li><li><a class="tocitem" href="../primitiveequation/">Primitive equation model</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">Physics</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../large_scale_condensation/">Large-scale condensation</a></li><li><a class="tocitem" href="../convection/">Convection</a></li><li><a class="tocitem" href="../radiation/">Radiation</a></li><li><a class="tocitem" href="../vertical_diffusion/">Vertical diffusion</a></li><li><a class="tocitem" href="../surface_fluxes/">Surface fluxes</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-7" type="checkbox"/><label class="tocitem" for="menuitem-7"><span class="docs-label">Discretization</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../spectral_transform/">Spherical Harmonic Transform</a></li><li><a class="tocitem" href="../grids/">Grids</a></li></ul></li><li><a class="tocitem" href="../ringgrids/">RingGrids</a></li><li><a class="tocitem" href="../lowertriangularmatrices/">LowerTriangularMatrices</a></li><li><input class="collapse-toggle" id="menuitem-10" type="checkbox"/><label class="tocitem" for="menuitem-10"><span class="docs-label">SpeedyTransforms</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../speedytransforms/">Spectral transforms</a></li><li><a class="tocitem" href="../gradients/">Gradient operators</a></li></ul></li><li><a class="tocitem" href="../functions/">Function and type index</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Running SpeedyWeather</a></li><li class="is-active"><a href>Tree structure</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Tree structure</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/SpeedyWeather/SpeedyWeather.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/SpeedyWeather/SpeedyWeather.jl/blob/main/docs/src/structure.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Tree-structure"><a class="docs-heading-anchor" href="#Tree-structure">Tree structure</a><a id="Tree-structure-1"></a><a class="docs-heading-anchor-permalink" href="#Tree-structure" title="Permalink"></a></h1><p>At the top of SpeedyWeather&#39;s type tree sits the <code>Simulation</code>, containing variables and model, which in itself contains model components with their own fields and so on. (Note that we are talking about the structure of structs within structs not the type hierarchy as defined by subtyping abstract types.) This can quickly get complicated with a lot of nested structs. The following is to give users a better overview of how simulation, variables and model are structured within SpeedyWeather. Many types in SpeedyWeather have extended Julia&#39;s <code>show</code> function to give you an overview of its contents, e.g. a <code>clock::Clock</code> is printed as</p><pre><code class="language-julia hljs">using SpeedyWeather
+clock = Clock()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Clock
+├ time::DateTime = 2000-01-01T00:00:00
+├ start::DateTime = 2000-01-01T00:00:00
+├ period::Second = 0 seconds
+├ timestep_counter::Int64 = 0
+├ n_timesteps::Int64 = 0
+└ Δt::Dates.Millisecond = 0 milliseconds</code></pre><p>illustrating the fields within a clock, their types and (unless they are an array) also their values. For structs within structs however, this information, would not be printed by default. You could use Julia&#39;s autocomplete like <code>clock.&lt;tab&gt;</code> by hitting tab after the <code>.</code> to inspect the fields of an instance but that would require you to manually go down every branch of that tree. To better visualise this, we have defined a <code>tree(S)</code> function for any instance <code>S</code> defined in SpeedyWeather which will print every field, and also its containing fields if they are also defined within SpeedyWeather. The &quot;if defined in SpeedyWeather&quot; is important because otherwise the tree would also show you the contents of a complex number or other types defined in Julia Base itself that we aren&#39;t interested in here.  But let&#39;s start at the top.</p><h2 id="Simulation"><a class="docs-heading-anchor" href="#Simulation">Simulation</a><a id="Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Simulation" title="Permalink"></a></h2><p>When creating a <code>Simulation</code>, its fields are</p><pre><code class="language-julia hljs">spectral_grid = SpectralGrid(nlev = 1)
+model = BarotropicModel(; spectral_grid)
+simulation = initialize!(model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{BarotropicModel}
+├ PrognosticVariables{Float32, OctahedralGaussianGrid{Float32}, Barotropic}
+├ DiagnosticVariables{Float32, OctahedralGaussianGrid{Float32}, Barotropic}
+└ model::BarotropicModel</code></pre><p>the <code>prognostic_variables</code>, the <code>diagnostic_variables</code> and the <code>model</code> (that we just initialized). We could now do <code>tree(simulation)</code> but that gets very lengthy and so will split things into <code>tree(simulation.prognostic_variables)</code>, <code>tree(simulation.diagnostic_variables)</code> and <code>tree(simulation.model)</code> for more digestible chunks. You can also provide the <code>with_types=true</code> keyword to get also the types of these fields printed, but we&#39;ll skip that here.</p><h2 id="Prognostic-variables"><a class="docs-heading-anchor" href="#Prognostic-variables">Prognostic variables</a><a id="Prognostic-variables-1"></a><a class="docs-heading-anchor-permalink" href="#Prognostic-variables" title="Permalink"></a></h2><p>The prognostic variables struct is parametric on the model type, <code>model_type(model)</code> (which strips away its parameters), but this is only to dispatch over it. The fields are for all models the same, just the barotropic model would not use temperature for example (but you could use nevertheless). </p><pre><code class="language-julia hljs">tree(simulation.prognostic_variables)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">PrognosticVariables{Float32, OctahedralGaussianGrid{Float32}, Barotropic}
+├ trunc
+├ nlat_half
+├ nlev
+├ n_steps
+├┐layers
+│└┐timesteps
+│ ├ trunc
+│ ├ vor
+│ ├ div
+│ ├ temp
+│ └ humid
+├┐surface
+│└┐timesteps
+│ ├ trunc
+│ └ pres
+├┐ocean
+│├ nlat_half
+│├ time
+│├ sea_surface_temperature
+│└ sea_ice_concentration
+├┐land
+│├ nlat_half
+│├ time
+│├ land_surface_temperature
+│├ snow_depth
+│├ soil_moisture_layer1
+│└ soil_moisture_layer2
+├ particles
+├ scale
+└┐clock
+ ├ time
+ ├ start
+ ├ period
+ ├ timestep_counter
+ ├ n_timesteps
+ └ Δt</code></pre><h2 id="Diagnostic-variables"><a class="docs-heading-anchor" href="#Diagnostic-variables">Diagnostic variables</a><a id="Diagnostic-variables-1"></a><a class="docs-heading-anchor-permalink" href="#Diagnostic-variables" title="Permalink"></a></h2><p>Similar for the diagnostic variables, regardless the model type, they contain the same fields but for the 2D models many will not be used for example.</p><pre><code class="language-julia hljs">tree(simulation.diagnostic_variables)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">DiagnosticVariables{Float32, OctahedralGaussianGrid{Float32}, Barotropic}
+├┐layers
+│├ npoints
+│├ k
+│├┐tendencies
+││├ nlat_half
+││├ trunc
+││├ vor_tend
+││├ div_tend
+││├ temp_tend
+││├ humid_tend
+││├ u_tend
+││├ v_tend
+││├ u_tend_grid
+││├ v_tend_grid
+││├ temp_tend_grid
+││└ humid_tend_grid
+│├┐grid_variables
+││├ nlat_half
+││├ vor_grid
+││├ div_grid
+││├ temp_grid
+││├ temp_grid_prev
+││├ temp_virt_grid
+││├ humid_grid
+││├ humid_grid_prev
+││├ u_grid
+││├ v_grid
+││├ u_grid_prev
+││└ v_grid_prev
+│├┐dynamics_variables
+││├ nlat_half
+││├ trunc
+││├ a
+││├ b
+││├ a_grid
+││├ b_grid
+││├ uv∇lnp
+││├ uv∇lnp_sum_above
+││├ div_sum_above
+││├ temp_virt
+││├ geopot
+││└ σ_tend
+│└ temp_average
+├┐surface
+│├ nlat_half
+│├ trunc
+│├ npoints
+│├ pres_grid
+│├ pres_tend
+│├ pres_tend_grid
+│├ ∇lnp_x
+│├ ∇lnp_y
+│├ u_mean_grid
+│├ v_mean_grid
+│├ div_mean_grid
+│├ div_mean
+│├ precip_large_scale
+│├ precip_convection
+│├ cloud_top
+│├ soil_moisture_availability
+│└ cos_zenith
+├┐columns
+│├ nlev
+│├ ij
+│├ jring
+│├ lond
+│├ latd
+│├ land_fraction
+│├ orography
+│├ u
+│├ v
+│├ temp
+│├ humid
+│├ ln_pres
+│├ pres
+│├ u_tend
+│├ v_tend
+│├ temp_tend
+│├ humid_tend
+│├ flux_u_upward
+│├ flux_u_downward
+│├ flux_v_upward
+│├ flux_v_downward
+│├ flux_temp_upward
+│├ flux_temp_downward
+│├ flux_humid_upward
+│├ flux_humid_downward
+│├ boundary_layer_depth
+│├ boundary_layer_drag
+│├ surface_geopotential
+│├ surface_u
+│├ surface_v
+│├ surface_temp
+│├ surface_humid
+│├ surface_wind_speed
+│├ skin_temperature_sea
+│├ skin_temperature_land
+│├ soil_moisture_availability
+│├ surface_air_density
+│├ sat_humid
+│├ dry_static_energy
+│├ temp_virt
+│├ geopot
+│├ cloud_top
+│├ precip_convection
+│├ precip_large_scale
+│├ cos_zenith
+│├ albedo
+│├ a
+│├ b
+│├ c
+│└ d
+├┐particles
+│├ n_particles
+│├ nlat_half
+│├ locations
+│├ u
+│├ v
+│├ σ_tend
+│└ interpolator
+├ nlat_half
+├ nlev
+├ npoints
+└ scale</code></pre><h2 id="BarotropicModel"><a class="docs-heading-anchor" href="#BarotropicModel">BarotropicModel</a><a id="BarotropicModel-1"></a><a class="docs-heading-anchor-permalink" href="#BarotropicModel" title="Permalink"></a></h2><p>The <code>BarotropicModel</code> is the simplest model we have, which will not have many of the model components that are needed to define the primitive equations for example. Note that forcing or drag aren&#39;t further branched which is because the default <code>BarotropicModel</code> has <code>NoForcing</code> and <code>NoDrag</code> which don&#39;t have any fields.  If you create a model with non-default conponents they will show up here.  <code>tree</code> dynamicallt inspects the current contents of a (mutable) struct and that tree may look different depending on what model you have constructed!</p><pre><code class="language-julia hljs">model = BarotropicModel(; spectral_grid)
+tree(model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">BarotropicModel{...}
+├┐spectral_grid
+│├ NF
+│├ trunc
+│├ Grid
+│├ dealiasing
+│├ radius
+│├ n_particles
+│├ nlat_half
+│├ nlat
+│├ npoints
+│├ nlev
+│└┐vertical_coordinates
+│ ├ nlev
+│ └ σ_half
+├┐device_setup
+│├ device
+│├ device_KA
+│└ n
+├┐geometry
+│├┐spectral_grid
+││├ NF
+││├ trunc
+││├ Grid
+││├ dealiasing
+││├ radius
+││├ n_particles
+││├ nlat_half
+││├ nlat
+││├ npoints
+││├ nlev
+││└┐vertical_coordinates
+││ ├ nlev
+││ └ σ_half
+│├ Grid
+│├ nlat_half
+│├ nlon_max
+│├ nlon
+│├ nlat
+│├ nlev
+│├ npoints
+│├ radius
+│├ colat
+│├ lat
+│├ latd
+│├ lond
+│├ londs
+│├ latds
+│├ lons
+│├ lats
+│├ sinlat
+│├ coslat
+│├ coslat⁻¹
+│├ coslat²
+│├ coslat⁻²
+│├ σ_levels_half
+│├ σ_levels_full
+│├ σ_levels_thick
+│├ ln_σ_levels_full
+│└ full_to_half_interpolation
+├┐planet
+│├ rotation
+│├ gravity
+│├ daily_cycle
+│├ length_of_day
+│├ seasonal_cycle
+│├ length_of_year
+│├ equinox
+│├ axial_tilt
+│└ solar_constant
+├┐atmosphere
+│├ mol_mass_dry_air
+│├ mol_mass_vapour
+│├ heat_capacity
+│├ R_gas
+│├ R_dry
+│├ R_vapour
+│├ mol_ratio
+│├ μ_virt_temp
+│├ κ
+│├ water_density
+│├ latent_heat_condensation
+│├ latent_heat_sublimation
+│├ stefan_boltzmann
+│├ pres_ref
+│├ temp_ref
+│├ moist_lapse_rate
+│├ dry_lapse_rate
+│└ layer_thickness
+├┐coriolis
+│├ nlat
+│└ f
+├ forcing
+├ drag
+├ particle_advection
+├┐initial_conditions
+│├┐vordiv
+││├ power
+││└ amplitude
+│├ pres
+│├ temp
+│└ humid
+├┐time_stepping
+│├ trunc
+│├ Δt_at_T31
+│├ radius
+│├ adjust_with_output
+│├ robert_filter
+│├ williams_filter
+│├ Δt_millisec
+│├ Δt_sec
+│└ Δt
+├ spectral_transform
+├ implicit
+├┐horizontal_diffusion
+│├ trunc
+│├ nlev
+│├ power
+│├ time_scale
+│├ time_scale_temp_humid
+│├ resolution_scaling
+│├ power_stratosphere
+│├ tapering_σ
+│├ ∇²ⁿ
+│├ ∇²ⁿ_implicit
+│├ ∇²ⁿc
+│└ ∇²ⁿc_implicit
+├┐output
+│├┐spectral_grid
+││├ NF
+││├ trunc
+││├ Grid
+││├ dealiasing
+││├ radius
+││├ n_particles
+││├ nlat_half
+││├ nlat
+││├ npoints
+││├ nlev
+││└┐vertical_coordinates
+││ ├ nlev
+││ └ σ_half
+│├ output
+│├ path
+│├ id
+│├ run_path
+│├ filename
+│├ write_restart
+│├ pkg_version
+│├ startdate
+│├ output_dt
+│├ output_vars
+│├ missing_value
+│├ compression_level
+│├ shuffle
+│├┐keepbits
+││├ u
+││├ v
+││├ vor
+││├ div
+││├ temp
+││├ pres
+││├ humid
+││├ precip_cond
+││├ precip_conv
+││└ cloud
+│├ output_every_n_steps
+│├ timestep_counter
+│├ output_counter
+│├ netcdf_file
+│├ input_Grid
+│├ as_matrix
+│├ quadrant_rotation
+│├ matrix_quadrant
+│├ output_Grid
+│├ nlat_half
+│├ nlon
+│├ nlat
+│├ npoints
+│├ nlev
+│├ interpolator
+│├ u
+│├ v
+│├ vor
+│├ div
+│├ temp
+│├ pres
+│├ humid
+│├ precip_cond
+│├ precip_conv
+│└ cloud
+├ callbacks
+└┐feedback
+ ├ verbose
+ ├ debug
+ ├ output
+ ├ id
+ ├ run_path
+ ├ progress_meter
+ ├ progress_txt
+ └ nars_detected</code></pre><h2 id="ShallowWaterModel"><a class="docs-heading-anchor" href="#ShallowWaterModel">ShallowWaterModel</a><a id="ShallowWaterModel-1"></a><a class="docs-heading-anchor-permalink" href="#ShallowWaterModel" title="Permalink"></a></h2><p>The <code>ShallowWaterModel</code> is similar to the <code>BarotropicModel</code>, but it contains for example orography, that the <code>BarotropicModel</code> doesn&#39;t have.</p><pre><code class="language-julia hljs">model = ShallowWaterModel(; spectral_grid)
+tree(model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">ShallowWaterModel{...}
+├┐spectral_grid
+│├ NF
+│├ trunc
+│├ Grid
+│├ dealiasing
+│├ radius
+│├ n_particles
+│├ nlat_half
+│├ nlat
+│├ npoints
+│├ nlev
+│└┐vertical_coordinates
+│ ├ nlev
+│ └ σ_half
+├┐device_setup
+│├ device
+│├ device_KA
+│└ n
+├┐geometry
+│├┐spectral_grid
+││├ NF
+││├ trunc
+││├ Grid
+││├ dealiasing
+││├ radius
+││├ n_particles
+││├ nlat_half
+││├ nlat
+││├ npoints
+││├ nlev
+││└┐vertical_coordinates
+││ ├ nlev
+││ └ σ_half
+│├ Grid
+│├ nlat_half
+│├ nlon_max
+│├ nlon
+│├ nlat
+│├ nlev
+│├ npoints
+│├ radius
+│├ colat
+│├ lat
+│├ latd
+│├ lond
+│├ londs
+│├ latds
+│├ lons
+│├ lats
+│├ sinlat
+│├ coslat
+│├ coslat⁻¹
+│├ coslat²
+│├ coslat⁻²
+│├ σ_levels_half
+│├ σ_levels_full
+│├ σ_levels_thick
+│├ ln_σ_levels_full
+│└ full_to_half_interpolation
+├┐planet
+│├ rotation
+│├ gravity
+│├ daily_cycle
+│├ length_of_day
+│├ seasonal_cycle
+│├ length_of_year
+│├ equinox
+│├ axial_tilt
+│└ solar_constant
+├┐atmosphere
+│├ mol_mass_dry_air
+│├ mol_mass_vapour
+│├ heat_capacity
+│├ R_gas
+│├ R_dry
+│├ R_vapour
+│├ mol_ratio
+│├ μ_virt_temp
+│├ κ
+│├ water_density
+│├ latent_heat_condensation
+│├ latent_heat_sublimation
+│├ stefan_boltzmann
+│├ pres_ref
+│├ temp_ref
+│├ moist_lapse_rate
+│├ dry_lapse_rate
+│└ layer_thickness
+├┐coriolis
+│├ nlat
+│└ f
+├┐orography
+│├ path
+│├ file
+│├ file_Grid
+│├ scale
+│├ smoothing
+│├ smoothing_power
+│├ smoothing_strength
+│├ smoothing_fraction
+│├ orography
+│└ geopot_surf
+├ forcing
+├ drag
+├ particle_advection
+├┐initial_conditions
+│├┐vordiv
+││├ latitude
+││├ width
+││├ umax
+││├ perturb_lat
+││├ perturb_lon
+││├ perturb_xwidth
+││├ perturb_ywidth
+││└ perturb_height
+│├ pres
+│├ temp
+│└ humid
+├┐time_stepping
+│├ trunc
+│├ Δt_at_T31
+│├ radius
+│├ adjust_with_output
+│├ robert_filter
+│├ williams_filter
+│├ Δt_millisec
+│├ Δt_sec
+│└ Δt
+├ spectral_transform
+├┐implicit
+│├ trunc
+│├ α
+│├ H
+│├ ξH
+│├ g∇²
+│├ ξg∇²
+│└ S⁻¹
+├┐horizontal_diffusion
+│├ trunc
+│├ nlev
+│├ power
+│├ time_scale
+│├ time_scale_temp_humid
+│├ resolution_scaling
+│├ power_stratosphere
+│├ tapering_σ
+│├ ∇²ⁿ
+│├ ∇²ⁿ_implicit
+│├ ∇²ⁿc
+│└ ∇²ⁿc_implicit
+├┐output
+│├┐spectral_grid
+││├ NF
+││├ trunc
+││├ Grid
+││├ dealiasing
+││├ radius
+││├ n_particles
+││├ nlat_half
+││├ nlat
+││├ npoints
+││├ nlev
+││└┐vertical_coordinates
+││ ├ nlev
+││ └ σ_half
+│├ output
+│├ path
+│├ id
+│├ run_path
+│├ filename
+│├ write_restart
+│├ pkg_version
+│├ startdate
+│├ output_dt
+│├ output_vars
+│├ missing_value
+│├ compression_level
+│├ shuffle
+│├┐keepbits
+││├ u
+││├ v
+││├ vor
+││├ div
+││├ temp
+││├ pres
+││├ humid
+││├ precip_cond
+││├ precip_conv
+││└ cloud
+│├ output_every_n_steps
+│├ timestep_counter
+│├ output_counter
+│├ netcdf_file
+│├ input_Grid
+│├ as_matrix
+│├ quadrant_rotation
+│├ matrix_quadrant
+│├ output_Grid
+│├ nlat_half
+│├ nlon
+│├ nlat
+│├ npoints
+│├ nlev
+│├ interpolator
+│├ u
+│├ v
+│├ vor
+│├ div
+│├ temp
+│├ pres
+│├ humid
+│├ precip_cond
+│├ precip_conv
+│└ cloud
+├ callbacks
+└┐feedback
+ ├ verbose
+ ├ debug
+ ├ output
+ ├ id
+ ├ run_path
+ ├ progress_meter
+ ├ progress_txt
+ └ nars_detected</code></pre><h2 id="PrimitiveDryModel"><a class="docs-heading-anchor" href="#PrimitiveDryModel">PrimitiveDryModel</a><a id="PrimitiveDryModel-1"></a><a class="docs-heading-anchor-permalink" href="#PrimitiveDryModel" title="Permalink"></a></h2><p>The <code>PrimitiveDryModel</code> is a big jump in complexity compared to the 2D models, but because it doesn&#39;t contain humidity, several model components like evaporation aren&#39;t needed.</p><pre><code class="language-julia hljs">spectral_grid = SpectralGrid()
+model = PrimitiveDryModel(; spectral_grid)
+tree(model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">PrimitiveDryModel{...}
+├┐spectral_grid
+│├ NF
+│├ trunc
+│├ Grid
+│├ dealiasing
+│├ radius
+│├ n_particles
+│├ nlat_half
+│├ nlat
+│├ npoints
+│├ nlev
+│└┐vertical_coordinates
+│ ├ nlev
+│ └ σ_half
+├┐device_setup
+│├ device
+│├ device_KA
+│└ n
+├ dynamics
+├┐geometry
+│├┐spectral_grid
+││├ NF
+││├ trunc
+││├ Grid
+││├ dealiasing
+││├ radius
+││├ n_particles
+││├ nlat_half
+││├ nlat
+││├ npoints
+││├ nlev
+││└┐vertical_coordinates
+││ ├ nlev
+││ └ σ_half
+│├ Grid
+│├ nlat_half
+│├ nlon_max
+│├ nlon
+│├ nlat
+│├ nlev
+│├ npoints
+│├ radius
+│├ colat
+│├ lat
+│├ latd
+│├ lond
+│├ londs
+│├ latds
+│├ lons
+│├ lats
+│├ sinlat
+│├ coslat
+│├ coslat⁻¹
+│├ coslat²
+│├ coslat⁻²
+│├ σ_levels_half
+│├ σ_levels_full
+│├ σ_levels_thick
+│├ ln_σ_levels_full
+│└ full_to_half_interpolation
+├┐planet
+│├ rotation
+│├ gravity
+│├ daily_cycle
+│├ length_of_day
+│├ seasonal_cycle
+│├ length_of_year
+│├ equinox
+│├ axial_tilt
+│└ solar_constant
+├┐atmosphere
+│├ mol_mass_dry_air
+│├ mol_mass_vapour
+│├ heat_capacity
+│├ R_gas
+│├ R_dry
+│├ R_vapour
+│├ mol_ratio
+│├ μ_virt_temp
+│├ κ
+│├ water_density
+│├ latent_heat_condensation
+│├ latent_heat_sublimation
+│├ stefan_boltzmann
+│├ pres_ref
+│├ temp_ref
+│├ moist_lapse_rate
+│├ dry_lapse_rate
+│└ layer_thickness
+├┐coriolis
+│├ nlat
+│└ f
+├┐geopotential
+│├ nlev
+│├ Δp_geopot_half
+│└ Δp_geopot_full
+├┐adiabatic_conversion
+│├ nlev
+│├ σ_lnp_A
+│└ σ_lnp_B
+├ particle_advection
+├┐initial_conditions
+│├┐vordiv
+││├ η₀
+││├ u₀
+││├ perturb_lat
+││├ perturb_lon
+││├ perturb_uₚ
+││└ perturb_radius
+│├ pres
+│├┐temp
+││├ η₀
+││├ σ_tropopause
+││├ u₀
+││├ ΔT
+││└ Tmin
+│└ humid
+├┐orography
+│├ path
+│├ file
+│├ file_Grid
+│├ scale
+│├ smoothing
+│├ smoothing_power
+│├ smoothing_strength
+│├ smoothing_fraction
+│├ orography
+│└ geopot_surf
+├┐land_sea_mask
+│├ path
+│├ file
+│├ file_Grid
+│└ mask
+├┐ocean
+│├ nlat_half
+│├ Δt
+│├ path
+│├ file
+│├ varname
+│├ file_Grid
+│├ missing_value
+│└ monthly_temperature
+├┐land
+│├ nlat_half
+│├ Δt
+│├ path
+│├ file
+│├ varname
+│├ file_Grid
+│├ missing_value
+│└ monthly_temperature
+├┐solar_zenith
+│├ length_of_day
+│├ length_of_year
+│├ equation_of_time
+│├ seasonal_cycle
+│├┐solar_declination
+││├ axial_tilt
+││├ equinox
+││├ length_of_year
+││└ length_of_day
+│├┐time_correction
+││├ a
+││├ s1
+││├ c1
+││├ s2
+││└ c2
+│└ initial_time
+├┐albedo
+│├ nlat_half
+│├ path
+│├ file
+│├ varname
+│├ file_Grid
+│└ albedo
+├ physics
+├┐boundary_layer_drag
+│├ κ
+│├ z₀
+│├ Ri_c
+│└ drag_max
+├ temperature_relaxation
+├┐vertical_diffusion
+│├ nlev
+│├ κ
+│├ z₀
+│├ Ri_c
+│├ fb
+│├ diffuse_static_energy
+│├ diffuse_momentum
+│├ diffuse_humidity
+│├ logZ_z₀
+│├ sqrtC_max
+│├ ∇²_above
+│└ ∇²_below
+├ surface_thermodynamics
+├┐surface_wind
+│├ f_wind
+│├ V_gust
+│├ use_boundary_layer_drag
+│├ drag_land
+│└ drag_sea
+├┐surface_heat_flux
+│├ use_boundary_layer_drag
+│├ heat_exchange_land
+│└ heat_exchange_sea
+├┐convection
+│├ nlev
+│└ time_scale
+├ shortwave_radiation
+├┐longwave_radiation
+│├ α
+│├ temp_tropopause
+│└ time_scale
+├┐time_stepping
+│├ trunc
+│├ Δt_at_T31
+│├ radius
+│├ adjust_with_output
+│├ robert_filter
+│├ williams_filter
+│├ Δt_millisec
+│├ Δt_sec
+│└ Δt
+├ spectral_transform
+├┐implicit
+│├ trunc
+│├ nlev
+│├ α
+│├ temp_profile
+│├ ξ
+│├ R
+│├ U
+│├ L
+│├ W
+│├ L0
+│├ L1
+│├ L2
+│├ L3
+│├ L4
+│├ S
+│└ S⁻¹
+├┐horizontal_diffusion
+│├ trunc
+│├ nlev
+│├ power
+│├ time_scale
+│├ time_scale_temp_humid
+│├ resolution_scaling
+│├ power_stratosphere
+│├ tapering_σ
+│├ ∇²ⁿ
+│├ ∇²ⁿ_implicit
+│├ ∇²ⁿc
+│└ ∇²ⁿc_implicit
+├ vertical_advection
+├┐output
+│├┐spectral_grid
+││├ NF
+││├ trunc
+││├ Grid
+││├ dealiasing
+││├ radius
+││├ n_particles
+││├ nlat_half
+││├ nlat
+││├ npoints
+││├ nlev
+││└┐vertical_coordinates
+││ ├ nlev
+││ └ σ_half
+│├ output
+│├ path
+│├ id
+│├ run_path
+│├ filename
+│├ write_restart
+│├ pkg_version
+│├ startdate
+│├ output_dt
+│├ output_vars
+│├ missing_value
+│├ compression_level
+│├ shuffle
+│├┐keepbits
+││├ u
+││├ v
+││├ vor
+││├ div
+││├ temp
+││├ pres
+││├ humid
+││├ precip_cond
+││├ precip_conv
+││└ cloud
+│├ output_every_n_steps
+│├ timestep_counter
+│├ output_counter
+│├ netcdf_file
+│├ input_Grid
+│├ as_matrix
+│├ quadrant_rotation
+│├ matrix_quadrant
+│├ output_Grid
+│├ nlat_half
+│├ nlon
+│├ nlat
+│├ npoints
+│├ nlev
+│├ interpolator
+│├ u
+│├ v
+│├ vor
+│├ div
+│├ temp
+│├ pres
+│├ humid
+│├ precip_cond
+│├ precip_conv
+│└ cloud
+├ callbacks
+└┐feedback
+ ├ verbose
+ ├ debug
+ ├ output
+ ├ id
+ ├ run_path
+ ├ progress_meter
+ ├ progress_txt
+ └ nars_detected</code></pre><h2 id="PrimitiveWetModel"><a class="docs-heading-anchor" href="#PrimitiveWetModel">PrimitiveWetModel</a><a id="PrimitiveWetModel-1"></a><a class="docs-heading-anchor-permalink" href="#PrimitiveWetModel" title="Permalink"></a></h2><p>The <code>PrimitiveWetModel</code> is the most complex model we currently have, hence its field tree is the longest, defining many components for the physics parameterizations.</p><pre><code class="language-julia hljs">model = PrimitiveWetModel(; spectral_grid)
+tree(model)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">PrimitiveWetModel{...}
+├┐spectral_grid
+│├ NF
+│├ trunc
+│├ Grid
+│├ dealiasing
+│├ radius
+│├ n_particles
+│├ nlat_half
+│├ nlat
+│├ npoints
+│├ nlev
+│└┐vertical_coordinates
+│ ├ nlev
+│ └ σ_half
+├┐device_setup
+│├ device
+│├ device_KA
+│└ n
+├ dynamics
+├┐geometry
+│├┐spectral_grid
+││├ NF
+││├ trunc
+││├ Grid
+││├ dealiasing
+││├ radius
+││├ n_particles
+││├ nlat_half
+││├ nlat
+││├ npoints
+││├ nlev
+││└┐vertical_coordinates
+││ ├ nlev
+││ └ σ_half
+│├ Grid
+│├ nlat_half
+│├ nlon_max
+│├ nlon
+│├ nlat
+│├ nlev
+│├ npoints
+│├ radius
+│├ colat
+│├ lat
+│├ latd
+│├ lond
+│├ londs
+│├ latds
+│├ lons
+│├ lats
+│├ sinlat
+│├ coslat
+│├ coslat⁻¹
+│├ coslat²
+│├ coslat⁻²
+│├ σ_levels_half
+│├ σ_levels_full
+│├ σ_levels_thick
+│├ ln_σ_levels_full
+│└ full_to_half_interpolation
+├┐planet
+│├ rotation
+│├ gravity
+│├ daily_cycle
+│├ length_of_day
+│├ seasonal_cycle
+│├ length_of_year
+│├ equinox
+│├ axial_tilt
+│└ solar_constant
+├┐atmosphere
+│├ mol_mass_dry_air
+│├ mol_mass_vapour
+│├ heat_capacity
+│├ R_gas
+│├ R_dry
+│├ R_vapour
+│├ mol_ratio
+│├ μ_virt_temp
+│├ κ
+│├ water_density
+│├ latent_heat_condensation
+│├ latent_heat_sublimation
+│├ stefan_boltzmann
+│├ pres_ref
+│├ temp_ref
+│├ moist_lapse_rate
+│├ dry_lapse_rate
+│└ layer_thickness
+├┐coriolis
+│├ nlat
+│└ f
+├┐geopotential
+│├ nlev
+│├ Δp_geopot_half
+│└ Δp_geopot_full
+├┐adiabatic_conversion
+│├ nlev
+│├ σ_lnp_A
+│└ σ_lnp_B
+├ particle_advection
+├┐initial_conditions
+│├┐vordiv
+││├ η₀
+││├ u₀
+││├ perturb_lat
+││├ perturb_lon
+││├ perturb_uₚ
+││└ perturb_radius
+│├ pres
+│├┐temp
+││├ η₀
+││├ σ_tropopause
+││├ u₀
+││├ ΔT
+││└ Tmin
+│└┐humid
+│ └ relhumid_ref
+├┐orography
+│├ path
+│├ file
+│├ file_Grid
+│├ scale
+│├ smoothing
+│├ smoothing_power
+│├ smoothing_strength
+│├ smoothing_fraction
+│├ orography
+│└ geopot_surf
+├┐land_sea_mask
+│├ path
+│├ file
+│├ file_Grid
+│└ mask
+├┐ocean
+│├ nlat_half
+│├ Δt
+│├ path
+│├ file
+│├ varname
+│├ file_Grid
+│├ missing_value
+│└ monthly_temperature
+├┐land
+│├ nlat_half
+│├ Δt
+│├ path
+│├ file
+│├ varname
+│├ file_Grid
+│├ missing_value
+│└ monthly_temperature
+├┐solar_zenith
+│├ length_of_day
+│├ length_of_year
+│├ equation_of_time
+│├ seasonal_cycle
+│├┐solar_declination
+││├ axial_tilt
+││├ equinox
+││├ length_of_year
+││└ length_of_day
+│├┐time_correction
+││├ a
+││├ s1
+││├ c1
+││├ s2
+││└ c2
+│└ initial_time
+├┐albedo
+│├ nlat_half
+│├ path
+│├ file
+│├ varname
+│├ file_Grid
+│└ albedo
+├┐soil
+│├ nlat_half
+│├ D_top
+│├ D_root
+│├ W_cap
+│├ W_wilt
+│├ path
+│├ file
+│├ varname_layer1
+│├ varname_layer2
+│├ file_Grid
+│├ missing_value
+│├ monthly_soil_moisture_layer1
+│└ monthly_soil_moisture_layer2
+├┐vegetation
+│├ nlat_half
+│├ low_veg_factor
+│├ path
+│├ file
+│├ varname_vegh
+│├ varname_vegl
+│├ file_Grid
+│├ missing_value
+│├ high_cover
+│└ low_cover
+├ physics
+├┐clausius_clapeyron
+│├ e₀
+│├ T₀
+│├ Lᵥ
+│├ cₚ
+│├ R_vapour
+│├ R_dry
+│├ Lᵥ_Rᵥ
+│├ T₀⁻¹
+│└ mol_ratio
+├┐boundary_layer_drag
+│├ κ
+│├ z₀
+│├ Ri_c
+│└ drag_max
+├ temperature_relaxation
+├┐vertical_diffusion
+│├ nlev
+│├ κ
+│├ z₀
+│├ Ri_c
+│├ fb
+│├ diffuse_static_energy
+│├ diffuse_momentum
+│├ diffuse_humidity
+│├ logZ_z₀
+│├ sqrtC_max
+│├ ∇²_above
+│└ ∇²_below
+├ surface_thermodynamics
+├┐surface_wind
+│├ f_wind
+│├ V_gust
+│├ use_boundary_layer_drag
+│├ drag_land
+│└ drag_sea
+├┐surface_heat_flux
+│├ use_boundary_layer_drag
+│├ heat_exchange_land
+│└ heat_exchange_sea
+├┐surface_evaporation
+│├ use_boundary_layer_drag
+│├ moisture_exchange_land
+│└ moisture_exchange_sea
+├┐large_scale_condensation
+│├ relative_humidity_threshold
+│└ time_scale
+├┐convection
+│├ nlev
+│├ time_scale
+│└ relative_humidity
+├ shortwave_radiation
+├┐longwave_radiation
+│├ α
+│├ temp_tropopause
+│└ time_scale
+├┐time_stepping
+│├ trunc
+│├ Δt_at_T31
+│├ radius
+│├ adjust_with_output
+│├ robert_filter
+│├ williams_filter
+│├ Δt_millisec
+│├ Δt_sec
+│└ Δt
+├ spectral_transform
+├┐implicit
+│├ trunc
+│├ nlev
+│├ α
+│├ temp_profile
+│├ ξ
+│├ R
+│├ U
+│├ L
+│├ W
+│├ L0
+│├ L1
+│├ L2
+│├ L3
+│├ L4
+│├ S
+│└ S⁻¹
+├┐horizontal_diffusion
+│├ trunc
+│├ nlev
+│├ power
+│├ time_scale
+│├ time_scale_temp_humid
+│├ resolution_scaling
+│├ power_stratosphere
+│├ tapering_σ
+│├ ∇²ⁿ
+│├ ∇²ⁿ_implicit
+│├ ∇²ⁿc
+│└ ∇²ⁿc_implicit
+├ vertical_advection
+├ hole_filling
+├┐output
+│├┐spectral_grid
+││├ NF
+││├ trunc
+││├ Grid
+││├ dealiasing
+││├ radius
+││├ n_particles
+││├ nlat_half
+││├ nlat
+││├ npoints
+││├ nlev
+││└┐vertical_coordinates
+││ ├ nlev
+││ └ σ_half
+│├ output
+│├ path
+│├ id
+│├ run_path
+│├ filename
+│├ write_restart
+│├ pkg_version
+│├ startdate
+│├ output_dt
+│├ output_vars
+│├ missing_value
+│├ compression_level
+│├ shuffle
+│├┐keepbits
+││├ u
+││├ v
+││├ vor
+││├ div
+││├ temp
+││├ pres
+││├ humid
+││├ precip_cond
+││├ precip_conv
+││└ cloud
+│├ output_every_n_steps
+│├ timestep_counter
+│├ output_counter
+│├ netcdf_file
+│├ input_Grid
+│├ as_matrix
+│├ quadrant_rotation
+│├ matrix_quadrant
+│├ output_Grid
+│├ nlat_half
+│├ nlon
+│├ nlat
+│├ npoints
+│├ nlev
+│├ interpolator
+│├ u
+│├ v
+│├ vor
+│├ div
+│├ temp
+│├ pres
+│├ humid
+│├ precip_cond
+│├ precip_conv
+│└ cloud
+├ callbacks
+└┐feedback
+ ├ verbose
+ ├ debug
+ ├ output
+ ├ id
+ ├ run_path
+ ├ progress_meter
+ ├ progress_txt
+ └ nars_detected</code></pre><h2 id="Size-of-a-Simulation"><a class="docs-heading-anchor" href="#Size-of-a-Simulation">Size of a Simulation</a><a id="Size-of-a-Simulation-1"></a><a class="docs-heading-anchor-permalink" href="#Size-of-a-Simulation" title="Permalink"></a></h2><p>The <code>tree</code> function also allows for the <code>with_size::Bool</code> keyword (default <code>false</code>), which will also print the size of the respective branches to give you an idea of how much memory a SpeedyWeather simulation uses.</p><pre><code class="language-julia hljs">tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{BarotropicModel} (1.26 MB)
+├┐prognostic_variables (127.75 KB)
+├┐diagnostic_variables (534.68 KB)
+└┐model (600.52 KB)</code></pre><p>And with <code>max_level</code> you can truncate the tree to go down at most that many levels. 1MB is a typical size for a one-level T31 resolution simulation. In comparison, a higher resolution <code>PrimitiveWetModel</code> would use</p><pre><code class="language-julia hljs">spectral_grid = SpectralGrid(trunc=127, nlev=8)
+model = PrimitiveWetModel(;spectral_grid)
+simulation = initialize!(model)
+tree(simulation, max_level=1, with_size=true)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Simulation{PrimitiveWetModel} (61.15 MB)
+├┐prognostic_variables (5.42 MB)
+├┐diagnostic_variables (35.46 MB)
+└┐model (20.27 MB)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../analysis/">« Analysis</a><a class="docs-footer-nextpage" href="../particles/">Particle advection »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.5.0 on <span class="colophon-date" title="Monday 8 July 2024 08:39">Monday 8 July 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
