@@ -8,7 +8,7 @@ Fields are $(TYPEDFIELDS)"""
     missing_value::Float64 = NaN
     compression_level::Int = 3
     shuffle::Bool = true
-    keepbits::Int = 7
+    keepbits::Int = 20
     transform::F = (x) -> 1000x                     # [m] to [mm]
     rate::R = ConvectivePrecipitationRateOutput()   # include here to be called at finalize!
 end
@@ -67,7 +67,7 @@ Fields are $(TYPEDFIELDS)"""
     missing_value::Float64 = NaN
     compression_level::Int = 3
     shuffle::Bool = true
-    keepbits::Int = 7
+    keepbits::Int = 20
     transform::F = (x) -> 1000x                     # [m] to [mm]
     rate::R = LargeScalePrecipitationRateOutput()   # include here to be called at finalize!
 end

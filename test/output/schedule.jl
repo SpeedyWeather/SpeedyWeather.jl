@@ -7,8 +7,7 @@
 
         clock = Clock()
         period = Day(1)
-        SpeedyWeather.set_period!(clock, period)
-        initialize!(clock, time_stepping)
+        initialize!(clock, time_stepping, period)
 
         hour = Hour(2)
         schedule = Schedule(every=hour)

@@ -1,0 +1,37 @@
+name: "Extended Tests on Comment"
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  test:
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '/extended-tests') && contains(github.event.comment.author_association,'MEMBER')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        version:
+          - '1.10'
+        os:
+          - ubuntu-latest
+        arch:
+          - x64
+    steps:
+      - name: Get PR branch
+        uses: xt0rted/pull-request-comment-branch@v3
+        id: comment-branch
+      - name: Checkout PR branch 
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+        with:
+          test_args: 'extended_tests'
+        env:
+          GITHUB_AUTH: ${{ secrets.GITHUB_TOKEN }}

@@ -12,7 +12,6 @@ function get_column!(
         model.planet,
         model.orography,
         model.land_sea_mask,
-        model.albedo,
         model.implicit)
 end
 
@@ -30,7 +29,6 @@ function get_column!(
     planet::AbstractPlanet,
     orography::AbstractOrography,
     land_sea_mask::AbstractLandSeaMask,
-    albedo::AbstractAlbedo,
     implicit::AbstractImplicit,
 )
 
@@ -71,11 +69,12 @@ function get_column!(
     # TODO skin = surface approximation for now
     C.skin_temperature_sea = P.ocean.sea_surface_temperature[ij]
     C.skin_temperature_land = P.land.soil_temperature[ij, 1]
-    C.soil_moisture_availability = D.physics.soil_moisture_availability[ij]
+    C.soil_moisture_availability = D.physics.land.soil_moisture_availability[ij]
 
     # RADIATION
     C.cos_zenith = D.physics.cos_zenith[ij]
-    C.albedo = albedo.albedo[ij]
+    C.albedo_ocean = D.physics.ocean.albedo[ij]
+    C.albedo_land = D.physics.land.albedo[ij]
 end
 
 """Recalculate ring index if not provided."""
@@ -149,25 +148,36 @@ function write_column_tendencies!(
 
     # surface evaporative [kg/s/m²], positive up
     diagn.physics.evaporative_flux[ij] = column.evaporative_flux
-    diagn.physics.evaporative_flux_ocean[ij] = column.evaporative_flux_ocean
-    diagn.physics.evaporative_flux_land[ij] = column.evaporative_flux_land
+    diagn.physics.ocean.evaporative_flux[ij] = column.evaporative_flux_ocean
+    diagn.physics.land.evaporative_flux[ij] = column.evaporative_flux_land
 
     # surface sensible heat flux [W/m²], positive up
     diagn.physics.sensible_heat_flux[ij] = column.sensible_heat_flux
-    diagn.physics.sensible_heat_flux_ocean[ij] = column.sensible_heat_flux_ocean
-    diagn.physics.sensible_heat_flux_land[ij] = column.sensible_heat_flux_land
+    diagn.physics.ocean.sensible_heat_flux[ij] = column.sensible_heat_flux_ocean
+    diagn.physics.land.sensible_heat_flux[ij] = column.sensible_heat_flux_land
 
     # radiation [W/m²], positive up for up, down for down, up for outgoing
+    # shortwave down is independent of ocean/land
     diagn.physics.surface_shortwave_down[ij] = column.surface_shortwave_down
+
     diagn.physics.surface_shortwave_up[ij] = column.surface_shortwave_up
+    diagn.physics.ocean.surface_shortwave_up[ij] = column.surface_shortwave_up_ocean
+    diagn.physics.land.surface_shortwave_up[ij] = column.surface_shortwave_up_land
+    
+    # longwave
+    # longwave down is indepedendent of ocean/land
     diagn.physics.surface_longwave_down[ij] = column.surface_longwave_down
-   
+    
     diagn.physics.surface_longwave_up[ij] = column.surface_longwave_up
-    diagn.physics.surface_longwave_up_ocean[ij] = column.surface_longwave_up
-    diagn.physics.surface_longwave_up_land[ij] = column.surface_longwave_up
+    diagn.physics.ocean.surface_longwave_up[ij] = column.surface_longwave_up_ocean
+    diagn.physics.land.surface_longwave_up[ij] = column.surface_longwave_up_land
 
     diagn.physics.outgoing_longwave_radiation[ij] = column.outgoing_longwave_radiation
     diagn.physics.outgoing_shortwave_radiation[ij] = column.outgoing_shortwave_radiation
+
+    # store land-sea mask weighted albedo
+    (; land_fraction) = column
+    diagn.physics.albedo[ij] = (1 - land_fraction)*column.albedo_ocean + land_fraction*column.albedo_land
 
     return nothing
 end
