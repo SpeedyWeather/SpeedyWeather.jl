@@ -11,7 +11,7 @@ using CairoMakie
 include("benchmark_suite.jl")
 
 # Define the range of array sizes (N) to benchmark
-trunc_list = [15, 31, 63, 127, 255, 511]
+trunc_list = [15, 31, 63, 127, 255, 511, 1024]
 nlayers_list = [1, 8, 32, 64]
 float_types = [Float32]
 grid_list = [FullGaussianGrid]
@@ -153,8 +153,8 @@ function plot_times(cpu_results, gpu_results, figx=500, figy=1000)
 end
 
 # Run benchmarks for CPU and GPU
-@show cpu_results = run_benchmarks(trunc_list, nlayers_list, float_types, SpeedyWeather.CPU())
 @show gpu_results = run_benchmarks(trunc_list, nlayers_list, float_types, SpeedyWeather.GPU())
+@show cpu_results = run_benchmarks(trunc_list, nlayers_list, float_types, SpeedyWeather.CPU())
 
 # Plot the results
 plot_speedup(cpu_results, gpu_results)
