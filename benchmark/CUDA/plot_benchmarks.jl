@@ -11,7 +11,7 @@ using CairoMakie
 include("benchmark_suite.jl")
 
 # Define the range of array sizes (N) to benchmark
-trunc_list = [15, 31, 63, 127, 255, 511, 1024]
+trunc_list = [15, 31, 63, 127, 255, 511, 1023]
 nlayers_list = [1, 8, 32, 64]
 float_types = [Float32]
 grid_list = [FullGaussianGrid]
