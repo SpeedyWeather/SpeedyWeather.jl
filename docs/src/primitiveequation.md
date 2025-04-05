@@ -805,7 +805,7 @@ obtaining velocities is done as in the shallow water model
 
 Additionally we
 
-- Transform ``\zeta_{lm}``, ``D_{lm}``, ``T_{lm}, (\ln p_s)_{lm}`` to ``\zeta, D, \eta, T, \ln p_s`` in grid-point space
+- Transform ``\zeta_{lm}``, ``D_{lm}``, ``T_{lm}, (\ln p_s)_{lm}`` to ``\zeta, D, T, \ln p_s`` in grid-point space
 - Compute the (non-linearized) [Virtual temperature](@ref) in grid-point space.
 
 Now loop over
