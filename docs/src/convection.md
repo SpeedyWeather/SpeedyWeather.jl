@@ -170,6 +170,45 @@ T_{ref,2} &= T_{ref} - \Delta T
 \end{aligned}
 ```
 
+The reason why above correction is reasonable is illustrated below:
+
+Objective:
+```math
+P_q = -\int_{p_0}^{p_{LZB}} \frac{\delta q}{g} \, dp = 0
+```
+
+Which is equivalent to:
+```math
+\int_{p_0}^{p_{LZB}} \left( q - q_{\text{ref,2}} \right) dp = 0
+```
+
+Where:
+```math
+q_{\text{ref,2}} = \left(1 - \frac{\Delta q}{Q_{\text{ref}}} \right) q_{\text{ref}}
+```
+
+Substitute into the integral:
+```math
+\int_{p_0}^{p_{LZB}} \left[ q - \left(1 - \frac{\Delta q}{Q_{\text{ref}}} \right) q_{\text{ref}} \right] dp
+```
+
+Simplify:
+```math
+= \int_{p_0}^{p_{LZB}} \left( q - q_{\text{ref}} + \frac{\Delta q}{Q_{\text{ref}}} q_{\text{ref}} \right) dp
+```
+
+Further simplification:
+```math
+= \Delta q + \frac{\Delta q}{Q_{\text{ref}}} (- Q_{\text{ref}}) = 0
+```
+
+Hence, prove the reason why such correction can guarantee that $P_q = 0$.
+
+
+An illustration of corrected relaxation is below:
+![https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/adiabat_line.png](https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/second_corrected_relaxation.png)
+
+
 ## Corrected relaxation
 
 After the reference profiles have been corrected in [Deep convection](@ref)
@@ -196,10 +235,6 @@ P = -\int \frac{\Delta t}{g \rho} \delta q dp
 
 In the shallow convection case ``P=0`` due to the correction even though in
 the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0`` by definition.
-
-
-An illustration of corrected relaxation is below:
-![https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/adiabat_line.png](https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/second_corrected_relaxation.png)
 
 
 ## Dry convection
