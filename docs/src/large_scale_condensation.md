@@ -127,7 +127,7 @@ The tendencies ``\delta q`` in units of  kg/kg/s are vertically
 integrated to diagnose the large-scale precipitation ``P`` in units of meters
 
 ```math
-P = -\int \frac{\Delta t}{g \rho} \delta q dp
+P = - \int_{top}^{bottom} \frac{\Delta t}{g \rho} \delta q dp 
 ```
 
 with gravity ``g``, water density ``\rho`` and time step ``\Delta t``.
