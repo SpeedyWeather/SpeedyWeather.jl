@@ -139,6 +139,13 @@ It is then accumulated over several time steps, e.g. over the course of an
 hour to yield a typical rain rate of mm/h.
 The water density is taken as reference density of ``1000~kg/m^3``
 
+Overall, the flowchart of the large scale precipitation parameterization is illustrated below:
+![https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/second_corrected_relaxation.png](https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/flowchart_large_scale_precipitation.png)
+
+
+
+
+
 ## References
 
 [^Frierson2006]: Frierson, D. M. W., I. M. Held, and P. Zurita-Gotor, 2006: A Gray-Radiation Aquaplanet Moist GCM. Part I: Static Stability and Eddy Scale. J. Atmos. Sci., 63, 2548-2566, DOI:[10.1175/JAS3753.1](https://doi.org/10.1175/JAS3753.1).
