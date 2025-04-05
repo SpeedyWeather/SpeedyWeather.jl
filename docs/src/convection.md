@@ -85,6 +85,9 @@ profile ``T_{ref}`` that the Betts-Miller convective parameterization relaxes to
 of the scheme (Simplified Betts-Miller, SBM) that determines a constant relative humidity of
 the reference profile.
 
+An illustration of adiabat reference line is below:
+![https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/grids_comparison.png](https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/adiabat_line.png)
+
 ## First-guess relaxation
 
 With the [Reference profiles](@ref) ``T_{ref}, q_{ref}`` obtained, we relax the actual
@@ -119,6 +122,7 @@ the humidity tendency) and ``P_T`` is the precipitation in the same units due to
 between current profiles and the references profiles, so if ``P_q > 0`` this would mean
 that a convective adjustment to ``q_{ref}`` would release humidity from the column
 through condensation, but ``P_q`` can also be negative. Consequently similar for ``P_T``.
+
 
 ## Convective criteria
 
@@ -193,6 +197,11 @@ P = -\int \frac{\Delta t}{g \rho} \delta q dp
 In the shallow convection case ``P=0`` due to the correction even though in
 the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0`` by definition.
 
+
+An illustration of corrected relaxation is below:
+![https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/adiabat_line.png](https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/second_corrected_relaxation.png)
+
+
 ## Dry convection
 
 In the primitive equation model with humidity the [Betts-Miller convection scheme](@ref BettsMiller)
@@ -202,6 +211,12 @@ Frierson 2007[^Frierson2007], the "shallower" shallow convection scheme and the 
 (as implemented here in [Shallow convection](@ref)) in that case also reduce to
 the same formulation. The dry Betts-Miller convection scheme is the default
 in the primitive equation model without humidity.
+
+
+Overall, An illustration of simplied Betts-Miller convection scheme is below:
+![https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/second_corrected_relaxation.png](https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/flowchart_convection.png)
+
+
 
 ## References
 
