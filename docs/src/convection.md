@@ -86,7 +86,7 @@ of the scheme (Simplified Betts-Miller, SBM) that determines a constant relative
 the reference profile.
 
 An illustration of adiabat reference line is below:
-![https://raw.githubusercontent.com/SpeedyWeather/SpeedyWeather.jl/main/docs/img/grids_comparison.png](https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/adiabat_line.png)
+![https://github.com/sunmoumou1/Speedyweather_picture/blob/main/adiabat_line.png](https://github.com/sunmoumou1/Speedyweather_picture/blob/main/adiabat_line.png)
 
 ## First-guess relaxation
 
@@ -206,7 +206,7 @@ Hence, prove the reason why such correction can guarantee that $P_q = 0$.
 
 
 An illustration of corrected relaxation is below:
-![https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/adiabat_line.png](https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/second_corrected_relaxation.png)
+![https://github.com/sunmoumou1/Speedyweather_picture/blob/main/second_corrected_relaxation.png](https://github.com/sunmoumou1/Speedyweather_picture/blob/main/second_corrected_relaxation.png)
 
 
 ## Corrected relaxation
@@ -249,7 +249,7 @@ in the primitive equation model without humidity.
 
 
 Overall, An illustration of simplied Betts-Miller convection scheme is below:
-![https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/second_corrected_relaxation.png](https://github.com/sunmoumou1/SpeedyWeather.jl/blob/sunmoumou1-patch-1/docs/img/flowchart_convection.png)
+![https://github.com/sunmoumou1/Speedyweather_picture/blob/main/flowchart_convection.png](https://github.com/sunmoumou1/Speedyweather_picture/blob/main/flowchart_convection.png)
 
 
 
