@@ -1,7 +1,8 @@
 # Changelog
 
 ## Unreleased
-- Updated documentation to include four illustrative figures in the `large-scale-precipitation` and `convection` sections [#702](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/702)
+
+- Updated documentation to include four illustrative figures in the large-scale precipitation and convection sections [#702](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/702)
 - Revised extended CI tests for differentiability can be launched on comment in PRs [#695](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/695), [#696](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/696), [#697](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/697), [#698](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/698)
 - Reverse for AbstractGridArrays [#691](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/691)
 - LandGeometry, LandThermodynamics as component of LandModel, DryLandModel [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)
