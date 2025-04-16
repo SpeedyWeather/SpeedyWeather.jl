@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `get_gridcell_polygons` in RingGrids [#706](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/706)
 - Revised extended CI tests for differentiability can be launched on comment in PRs [#695](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/695), [#696](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/696), [#697](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/697), [#698](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/698)
 - Reverse for AbstractGridArrays [#691](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/691)
 - LandGeometry, LandThermodynamics as component of LandModel, DryLandModel [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)
