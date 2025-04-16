@@ -122,9 +122,6 @@ function get_vertices(Grid::Type{<:AbstractFullGridArray}, nlat_half::Integer)
     return seast, swest, nwest, neast
 end
 
-import GeoMakie: GeometryBasics
-
-
 """$(TYPEDSIGNATURES)
 Return a 5xN matrix `polygons` (or grid cells) of `NTuple{2, Float64}` where the first 4 rows
 are the vertices (E, S, W, N) of every grid points ij in 1:N, row 5 is duplicated north vertex
