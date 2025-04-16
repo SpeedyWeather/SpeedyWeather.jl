@@ -2,13 +2,11 @@ module SpeedyWeatherGeoMakieExt
 
 using SpeedyWeather
 using GeoMakie
-
 using DocStringExtensions
 
-include("faces.jl")
-
-SpeedyWeather.globe(SG::SpectralGrid) = globe(SG.Grid, SG.nlat_half)
-SpeedyWeather.globe(geometry::Geometry{NF, Grid}) where {NF, Grid} = globe(Grid, geometry.nlat_half)
+SpeedyWeather.globe(SG::SpectralGrid; kwargs...) = globe(SG.Grid, SG.nlat_half; kwargs...)
+SpeedyWeather.globe(geometry::Geometry{NF, Grid}; kwargs...) where {NF, Grid} =
+    globe(Grid, geometry.nlat_half; kwargs...)
 
 """($TYPEDSIGNATURES)
 Create a 3D interactive globe plot of the grid `Grid` at resolution `nlat_half` displaying
@@ -49,10 +47,10 @@ function SpeedyWeather.globe(
         interactive && (c.transformation.transform_func[] = transf)
     end
 
-    # cell faces, a vector of Point2, concatenated all vertices for each grid point
+    # cell faces, a vector of NTuple{2, T}, concatenated all vertices for each grid point
     if faces
         # add nan after every face to avoid lines linking grid cells
-        faces = get_faces(Grid, nlat_half, add_nan=true)
+        faces = RingGrids.get_gridcell_polygons(Grid, nlat_half, add_nan=true)
         f = lines!(ax, vec(faces); color)
         interactive && (f.transformation.transform_func[] = transf)
     end
@@ -100,7 +98,7 @@ function SpeedyWeather.globe(
             dest = "+proj=ortho +lon_0=30 +lat_0=45")
     end
 
-    faces = get_faces(grid)
+    faces = RingGrids.get_gridcell_polygons(grid)
     polygons = [Polygon(faces[:, ij]) for ij in axes(faces, 2)]
     p = poly!(ax, polygons, color=grid.data; colormap)
     interactive && (p.transformation.transform_func[] = transf)
