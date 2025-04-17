@@ -211,3 +211,32 @@ function forcing!(
         vor_tend[:, k] .+= S_masked
     end
 end
+
+export KolmogorovFlow
+
+"""Kolmogorov flow forcing. Fields are $(TYPEDFIELDS)."""
+@kwdef mutable struct KolmogorovFlow{NF} <: SpeedyWeather.AbstractForcing
+    "[OPTION] Strength of forcing [1/s²]"
+    strength::NF = 3e-12
+
+    "[OPTION] Wavenumber of forcing in meridional direction (pole to pole)"
+    wavenumber::NF = 8
+end
+
+KolmogorovFlow(SG::SpeedyWeather.SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
+SpeedyWeather.initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
+
+function SpeedyWeather.forcing!(
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    forcing::KolmogorovFlow,
+    lf::Integer,
+    model::AbstractModel,
+)
+    # scale by radius^2 as is the vorticity equation
+    s = forcing.strength * diagn.scale[]^2
+    k = forcing.wavenumber
+
+    Fu = diagn.tendencies.u_tend_grid
+    set!(Fu, (λ, θ, σ) -> s*sind(k*θ), model.geometry)
+end
