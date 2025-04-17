@@ -124,7 +124,7 @@ as follows
 ## Large-scale precipitation
 
 The tendencies ``\delta q`` in units of  kg/kg/s are vertically
-integrated to diagnose the large-scale precipitation ``P`` in units of meters
+integrated (top to bottom, the direction of pressure ``p``) to diagnose the large-scale precipitation ``P`` in units of meters
 
 ```math
 P = - \int_{top}^{bottom} \frac{\Delta t}{g \rho} \delta q dp 
@@ -139,8 +139,9 @@ It is then accumulated over several time steps, e.g. over the course of an
 hour to yield a typical rain rate of mm/h.
 The water density is taken as reference density of ``1000~kg/m^3``
 
-Overall, the flowchart of the large scale precipitation parameterization is illustrated below:
-![https://github.com/sunmoumou1/Speedyweather_picture/blob/main/flowchart_large_scale_precipitation.png](https://github.com/sunmoumou1/Speedyweather_picture/blob/main/flowchart_large_scale_precipitation.png)
+A schematic of the large scale precipitation parameterization is illustrated below:
+
+![image](https://github.com/user-attachments/assets/4422c0df-7a5d-40ba-9434-da6292bce489)
 
 
 
