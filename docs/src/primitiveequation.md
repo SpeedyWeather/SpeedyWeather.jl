@@ -302,31 +302,63 @@ are performed but in the latter, the vertical averaging is done in grid-point sp
     to avoid instabilities from gravity waves.
     For details see section [Semi-implicit time stepping](@ref implicit_primitive).
 
+
 ## Vertical advection
 
 The advection equation ``\tfrac{DT}{Dt} = 0`` for a tracer ``T`` is, in flux form,
-for layer ``k``
+for layer ``k``:
 ```math
 \frac{\partial (T_k \Delta p_k)}{\partial t} = - \nabla \cdot (\mathbf{u}_k T_k \Delta p_k)
 - (M_{k+\tfrac{1}{2}}T_{k+\tfrac{1}{2}} - M_{k-\tfrac{1}{2}}T_{k-\tfrac{1}{2}})
 ```
-which can be through the gradient product rule, and using the conservation of mass
-(see [Vertical velocity](@ref)) transformed into an advective form. In sigma coordinates this simplifies to
+
+Starting from this equation in pressure layer $k$, we can derive the advective form of the tracer transport. Dividing through by the layer thickness ``\Delta p_k`` gives:
+
+```math
+\frac{\partial T_k}{\partial t} = -\nabla \cdot (\mathbf{u}_k T_k) - \frac{1}{\Delta p_k} \left( M_{k+\frac{1}{2}} T_{k+\frac{1}{2}} - M_{k-\frac{1}{2}} T_{k-\frac{1}{2}} \right)
+```
+
+In sigma coordinates, the vertical mass flux can be expressed as ``M = \dot{\sigma} p_s``, where ``\dot{\sigma}`` is the vertical velocity in sigma coordinates and ``p_s`` is the surface pressure. Assuming ``p_s`` is constant in time within the layer, and switching to sigma coordinates, we rewrite the equation as:
+
+```math
+\frac{\partial T_k}{\partial t} = -\nabla \cdot (\mathbf{u}_k T_k) - \frac{1}{\Delta \sigma_k} \left( \dot{\sigma}_{k+\frac{1}{2}} T_{k+\frac{1}{2}} - \dot{\sigma}_{k-\frac{1}{2}} T_{k-\frac{1}{2}} \right)
+```
+
+We now expand the horizontal divergence term using the product rule, thus:
+
+```math
+\frac{\partial T_k}{\partial t} = - T_k \nabla \cdot \mathbf{u}_k - \mathbf{u}_k \cdot \nabla T_k - \frac{1}{\Delta \sigma_k} \left( \dot{\sigma}_{k+\frac{1}{2}} T_{k+\frac{1}{2}} - \dot{\sigma}_{k-\frac{1}{2}} T_{k-\frac{1}{2}} \right)
+```
+
+From the continuity equation in sigma coordinates (mass conservation):
+
+```math
+- \nabla \cdot \mathbf{u}_k = \frac{\dot{\sigma}_{k+\frac{1}{2}} - \dot{\sigma}_{k-\frac{1}{2}}}{\Delta \sigma_k}
+```
+
+Substituting this into the equation:
+
 ```math
 \frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
-- \frac{1}{\Delta \sigma_k}\left(\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+\tfrac{1}{2}} - T_k) - \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-\tfrac{1}{2}})\right)
++ T_k \frac{\dot{\sigma}_{k+\frac{1}{2}} - \dot{\sigma}_{k-\frac{1}{2}}}{\Delta \sigma_k}
+- \frac{1}{\Delta \sigma_k} \left( \dot{\sigma}_{k+\frac{1}{2}} T_{k+\frac{1}{2}} - \dot{\sigma}_{k-\frac{1}{2}} T_{k-\frac{1}{2}} \right)
 ```
-With the reconstruction at the faces, ``T_{k+\tfrac{1}{2}}``, and ``T_{k-\tfrac{1}{2}}`` depending on one's choice
-of the advection scheme. For a second order centered scheme, we choose ``T_{k+\tfrac{1}{2}} = \tfrac{1}{2}(T_k + T_{k+1})``
-and obtain
+
+Rearranging terms, we obtain:
+
+```math
+\frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
+- \frac{1}{\Delta \sigma_k}\left(\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+\tfrac{1}{2}} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-\tfrac{1}{2}})\right)
+```
+
+With the reconstruction at the faces, ``T_{k+\tfrac{1}{2}}`` and ``T_{k-\tfrac{1}{2}}`` depending on one's choice of the advection scheme. For a second-order centered scheme, we choose ``T_{k+\tfrac{1}{2}} = \tfrac{1}{2}(T_k + T_{k+1})`` and obtain:
+
 ```math
 \frac{\partial T_k}{\partial t} = - \mathbf{u}_k \cdot \nabla T_k
 - \frac{1}{2\Delta \sigma_k}\left(\dot{\sigma}_{k+\tfrac{1}{2}}(T_{k+1} - T_k) + \dot{\sigma}_{k-\tfrac{1}{2}}(T_k - T_{k-1})\right)
 ```
-However, note that this scheme is dispersive and easily leads to instabilities at higher resolution, where a
-more advanced vertical advection scheme becomes necessary. For convenience, we may write ``W(T)``
-to denote the vertical advection term ``\dot{\sigma}\partial_\sigma T``, without specifying which schemes is used.
-The vertical velocity ``\dot{\sigma}`` is calculated as described in the following.
+
+However, note that this scheme is dispersive and easily leads to instabilities at higher resolution, where a more advanced vertical advection scheme becomes necessary. For convenience, we may write ``W(T)`` to denote the vertical advection term ``\dot{\sigma}\partial_\sigma T``, without specifying which schemes is used.
 
 ### Vertical velocity
 
@@ -773,7 +805,7 @@ obtaining velocities is done as in the shallow water model
 
 Additionally we
 
-- Transform ``\zeta_{lm}``, ``D_{lm}``, ``T_{lm}, (\ln p_s)_{lm}`` to ``\zeta, D, \eta, T, \ln p_s`` in grid-point space
+- Transform ``\zeta_{lm}``, ``D_{lm}``, ``T_{lm}, (\ln p_s)_{lm}`` to ``\zeta, D, T, \ln p_s`` in grid-point space
 - Compute the (non-linearized) [Virtual temperature](@ref) in grid-point space.
 
 Now loop over
