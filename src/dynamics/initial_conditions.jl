@@ -19,7 +19,7 @@ function initialize!(
     has(model, :humid) && initialize!(progn, IC.humid,  model)
 end
 
-InitialConditions(::Type{<:Barotropic}) = InitialConditions(; vordiv = ZeroInitially())
+InitialConditions(::Type{<:Barotropic}) = InitialConditions(; vordiv = RandomVelocity())
 InitialConditions(::Type{<:ShallowWater}) = InitialConditions(; vordiv = ZonalJet())
 function InitialConditions(::Type{<:PrimitiveDry})
     vordiv = ZonalWind()
@@ -60,40 +60,105 @@ function initialize!(
     has(model, :humid) && initialize!(progn, IC.humid, model)
 end
 
-export StartWithRandomVorticity
+export RandomVorticity
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct StartWithRandomVorticity <: AbstractInitialConditions
-    "Power of the spectral distribution k^power"
+@kwdef mutable struct RandomVorticity <: AbstractInitialConditions
+    "[OPTION] Power of the spectral distribution k^power"
     power::Float64 = -3
 
-    "(approximate) amplitude in [1/s], used as standard deviation of spherical harmonic coefficients"
-    amplitude::Float64 = 1e-5
+    "[OPTION] (approximate) amplitude in [1/s], used as standard deviation of spherical harmonic coefficients"
+    amplitude::Float64 = 1e-4
+
+    "[OPTION] Maximum wavenumber"
+    max_wavenumber::Int = 20
+
+    "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
+    seed::Int = 123
+
+    "Independent random number generator for this random process"
+    random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
 function initialize!(   progn::PrognosticVariables{NF},
-                        initial_conditions::StartWithRandomVorticity,
+                        initial_conditions::RandomVorticity,
                         model::Barotropic) where NF
+
+    # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
+    seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
+    RNG = initial_conditions.random_number_generator
+    Random.seed!(RNG, seed)
 
     lmax = progn.trunc + 1
     power = initial_conditions.power + 1    # +1 as power is summed of orders m
                    
-    ξ = randn(LowerTriangularArray{Complex{NF}}, lmax, lmax, 1)*convert(NF, initial_conditions.amplitude)
-    ξ[1] = 0 # don't perturb l=m=0 mode to have zero mean
+    A = initial_conditions.amplitude
+    ξ = zeros(LowerTriangularArray{Complex{NF}}, lmax+1, lmax, model.spectral_grid.nlayers)
 
+    lm = 0
     for m in 1:lmax
         for l in m:lmax
-            ξ[l, m, 1] *= l^power
+            lm += 1
+            ξ[lm, :] .= A*l^power*(2rand(RNG, Complex{NF}) - (1 + 1im))
         end
     end
 
-    ξ = repeat(ξ, 1, model.spectral_grid.nlayers) # repeat for each level to have the same IC across all vertical layers
-    
+    spectral_truncation!(ξ, initial_conditions.max_wavenumber)
+    ξ[1:lmax, :] .= 0       # remove zonal modes and mean
     set!(progn, model; vor=ξ, lf=1)
+end
+
+export RandomVelocity
+
+"""Start with random vorticity as initial conditions
+$(TYPEDFIELDS)"""
+@kwdef mutable struct RandomVelocity <: AbstractInitialConditions
+    "[OPTION] maximum speed [m/s], approximate"
+    max_speed::Float64 = 60
+
+    "[OPTION] Maximum wavenumber after truncation"
+    truncation::Int = 15
+
+    "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
+    seed::Int = 0
+
+    "Independent random number generator for this random process"
+    random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
+end
+
+"""$(TYPEDSIGNATURES)
+Start with random vorticity as initial conditions"""
+function initialize!(   progn::PrognosticVariables{NF},
+                        initial_conditions::RandomVelocity,
+                        model::Barotropic) where NF
+
+    # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
+    seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
+    RNG = initial_conditions.random_number_generator
+    Random.seed!(RNG, seed)
+
+    (; GridVariable2D, nlat_half, radius, trunc, nlayers) = model.spectral_grid
+    A = convert(NF, initial_conditions.max_speed) * 2
+    u = 2A*rand(GridVariable2D, nlat_half) .- A
+    v = 2A*rand(GridVariable2D, nlat_half) .- A
+
+    u_spectral = transform(u, model.spectral_transform)
+    v_spectral = transform(v, model.spectral_transform)
+
+    spectral_truncation!(u_spectral, initial_conditions.truncation)
+    spectral_truncation!(v_spectral, initial_conditions.truncation)
+    
+    ξ = curl(u_spectral, v_spectral, model.spectral_transform; radius)
+    ξ[1] = 0        # remove mean
+
+    # repeat over vertical layers
+    ξks = repeat(ξ, 1, nlayers)
+    set!(progn, model; vor=ξks, lf=1)
+
+    return nothing
 end
 
 export ZonalJet
