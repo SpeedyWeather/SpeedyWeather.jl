@@ -239,7 +239,7 @@ using SpeedyWeather
 spectral_grid = SpectralGrid(trunc=63, nlayers=1)
 
 forcing = JetStreamForcing(spectral_grid, latitude=60)
-drag = QuadraticDrag(spectral_grid)
+drag = LinearVorticityDrag(spectral_grid)
 
 model = ShallowWaterModel(spectral_grid; drag, forcing)
 simulation = initialize!(model)
@@ -250,7 +250,7 @@ nothing # hide
 We want to simulate polar jet streams in the shallow water model. We add a `JetStreamForcing`
 that adds momentum at 60˚N and 60˚S an to inject kinetic energy into the model. This energy needs to be removed
 (the [diffusion](@ref diffusion) is likely not sufficient) through a drag, we have implemented
-a `QuadraticDrag` and use the default drag coefficient. Then visualize zonal wind after
+a `LinearVorticityDrag` and use the default drag coefficient. Then visualize zonal wind after
 40 days with
 
 ```@example jet_stream_setup

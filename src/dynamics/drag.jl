@@ -27,7 +27,7 @@ end
 export QuadraticDrag
 @kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
-    c_D::NF = 1e-5
+    c_D::NF = 1e-12         # TODO is this a good default?
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
