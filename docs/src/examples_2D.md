@@ -13,8 +13,10 @@ See also [Examples 3D](@ref) for examples with the primitive equation models.
     using SpeedyWeather
     spectral_grid = SpectralGrid(trunc=63, nlayers=1)
     still_earth = Earth(spectral_grid, rotation=0)
-    initial_conditions = StartWithRandomVorticity()
-    model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth)
+    initial_conditions = RandomVelocity()
+    forcing = NoForcing()
+    drag = NoDrag()
+    model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth, forcing, drag)
     simulation = initialize!(model)
     run!(simulation, period=Day(20))
     ```
@@ -36,19 +38,25 @@ still_earth = Earth(spectral_grid, rotation=0)
 ```
 There are other options to create a planet but they are irrelevant for the
 barotropic vorticity equations. We also want to specify the initial conditions,
-randomly distributed vorticity is already defined
+randomly distributed velocity is already defined
 ```@example barotropic_setup
-using Random # hide
-Random.seed!(1234) # hide
-initial_conditions = StartWithRandomVorticity()
+initial_conditions = RandomVelocity()
 ```
-By default, the power of vorticity is spectrally distributed with ``k^{-3}``, ``k`` being the
-horizontal wavenumber, and the amplitude is ``10^{-5}\text{s}^{-1}``.
+By default, the velocity has an approximate amplitude as given and also higher
+wavenumbers are truncated.
 
-Now we want to construct a `BarotropicModel`
-with these
+For free-decaying turbulence we switch off any forcing or drag with
+
 ```@example barotropic_setup
-model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth)
+forcing = NoForcing()
+drag = NoDrag()
+```
+
+Now we want to construct a `BarotropicModel` with these simply by passing
+them as keyword arguments either with `key=argument` or just `; key` which matches
+the argument name with the keyword
+```@example barotropic_setup
+model = BarotropicModel(spectral_grid; initial_conditions, planet=still_earth, forcing, drag)
 nothing # hide
 ```
 The `model` contains all the parameters, but isn't initialized yet, which we can do
