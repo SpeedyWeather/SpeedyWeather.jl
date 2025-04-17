@@ -78,11 +78,8 @@ initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
 
 """
 $(TYPEDSIGNATURES)
-Linear drag for the vorticity equations.
-
-    F = -cξ
-
-with c the non-dimensional drag coefficient as defined in `drag::QuadraticDrag`."""
+Linear drag for the vorticity equations of the form F = -cξ
+with c drag coefficient [1/s]."""
 function drag!(     
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,

@@ -214,8 +214,10 @@ end
 
 export KolmogorovFlow
 
-"""Kolmogorov flow forcing. Fields are $(TYPEDFIELDS)."""
-@kwdef mutable struct KolmogorovFlow{NF} <: SpeedyWeather.AbstractForcing
+"""Kolmogorov flow forcing. Fields are
+$(TYPEDFIELDS)
+"""
+@kwdef mutable struct KolmogorovFlow{NF} <: AbstractForcing
     "[OPTION] Strength of forcing [1/s²]"
     strength::NF = 3e-12
 
@@ -223,10 +225,10 @@ export KolmogorovFlow
     wavenumber::NF = 8
 end
 
-KolmogorovFlow(SG::SpeedyWeather.SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
-SpeedyWeather.initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
+KolmogorovFlow(SG::SpectralGrid; kwargs...) = KolmogorovFlow{SG.NF}(; kwargs...)
+initialize!(::KolmogorovFlow, ::AbstractModel) = nothing
 
-function SpeedyWeather.forcing!(
+function forcing!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     forcing::KolmogorovFlow,
