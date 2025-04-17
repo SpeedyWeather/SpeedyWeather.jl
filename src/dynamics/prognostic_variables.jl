@@ -308,8 +308,10 @@ end
 
 """$(TYPEDSIGNATURES)
 Add `tracers` to the prognostic variables `progn` in `progn.tracers::Dict`."""
-function add!(progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D}, tracers::Tracer...
-    ) where {
+function add!(
+    progn::PrognosticVariables{NF, ArrayType, nsteps, SpectralVariable2D, SpectralVariable3D},
+    tracers::Tracer...
+) where {
         NF,                     # number format
         ArrayType,
         nsteps,

@@ -1,5 +1,28 @@
 abstract type AbstractSoilMoisture <: AbstractParameterization end
 
+export NoSoilMoisture
+struct NoSoilMoisture <: AbstractSoilMoisture end
+NoSoilMoisture(SG::SpectralGrid) = NoSoilMoisture()
+initialize!(soil::NoSoilMoisture, model::PrimitiveEquation) = nothing
+
+function initialize!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    soil::NoSoilMoisture,
+    model::PrimitiveEquation,
+)
+    return nothing
+end
+
+function timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    soil::NoSoilMoisture,
+    model::PrimitiveEquation,
+)
+    return nothing
+end
+
 export SeasonalSoilMoisture
 @kwdef struct SeasonalSoilMoisture{NF, Grid} <: AbstractSoilMoisture
 
@@ -37,7 +60,10 @@ function SeasonalSoilMoisture(SG::SpectralGrid; kwargs...)
     return SeasonalSoilMoisture{NF, GridVariable4D}(; nlat_half, nlayers=nlayers_soil, kwargs...)
 end
 
-function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveWet)
+# don't both initializing for the dry model
+initialize!(soil::SeasonalSoilMoisture, model::PrimitiveDry) = nothing
+
+function initialize!(soil::SeasonalSoilMoisture, model::PrimitiveEquation)
     (; monthly_soil_moisture) = soil
 
     # LOAD NETCDF FILE
@@ -89,6 +115,15 @@ function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     soil::SeasonalSoilMoisture,
+    model::PrimitiveDry,
+)
+    return nothing
+end
+
+function timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    soil::SeasonalSoilMoisture,
     model::PrimitiveEquation,
 )
     (; time) = progn.clock
@@ -127,7 +162,7 @@ export LandBucketMoisture
     initial_moisture::NF = 0
     
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
-    mask::Bool = true
+    mask::Bool = false
 
     "Field capacity per meter soil [m], top layer, f = γz, set by land.temperature"
     f₁::Base.RefValue{NF} = Ref(zero(NF))
@@ -137,16 +172,18 @@ export LandBucketMoisture
 end
 
 LandBucketMoisture(SG::SpectralGrid; kwargs...) = LandBucketMoisture{SG.NF}(; kwargs...)
-function initialize!(soil::LandBucketMoisture, model::PrimitiveWet)
+function initialize!(soil::LandBucketMoisture, model::PrimitiveEquation)
     (; nlayers_soil) = model.spectral_grid
     @assert nlayers_soil == 2 "LandBucketMoisture only works with 2 soil layers "*
         "but spectral_grid.nlayers_soil = $nlayers_soil given. Ignoring additional layers."
 
-    # set the field capacity given layer thickness in land.temperature
-    (; γ, z₁, z₂) = model.land.temperature
+    # set the field capacity given layer thickness and 
+    γ = model.land.thermodynamics.field_capacity
+    z₁ = model.land.geometry.layer_thickness[1]
+    z₂ = model.land.geometry.layer_thickness[2]
     soil.f₁[] = γ*z₁
     soil.f₂[] = γ*z₂
-    
+
     return nothing
 end
 
@@ -154,26 +191,45 @@ function initialize!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     soil::LandBucketMoisture,
-    model::PrimitiveWet,
+    model::PrimitiveDry,
+)
+    return nothing
+end
+
+function initialize!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    soil::LandBucketMoisture,
+    model::PrimitiveEquation,
 )
     set!(progn.land.soil_moisture, soil.initial_moisture)
-    soil.mask && mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean)
+    soil.mask && mask!(progn.land.soil_moisture, model.land_sea_mask, :ocean)
 end
 
 function timestep!(
     progn::PrognosticVariables,
     diagn::DiagnosticVariables,
     soil::LandBucketMoisture,
-    model::PrimitiveWet,
+    model::PrimitiveDry,
+)
+    return nothing
+end
+
+function timestep!(
+    progn::PrognosticVariables,
+    diagn::DiagnosticVariables,
+    soil::LandBucketMoisture,
+    model::PrimitiveEquation,
 )
     (; soil_moisture) = progn.land
     Δt = model.time_stepping.Δt_sec
     ρ = model.atmosphere.water_density
+    (; mask) = model.land_sea_mask
 
     Pconv = diagn.physics.precip_rate_convection    # precipitation in [m/s]
     Plsc = diagn.physics.precip_rate_large_scale
-    E = diagn.physics.evaporative_flux_land         # [kg/s/m²], divide by density for [m/s]
-    R = diagn.physics.river_runoff                  # diagnosed [m/s]
+    E = diagn.physics.land.evaporative_flux         # [kg/s/m²], divide by density for [m/s]
+    R = diagn.physics.land.river_runoff             # diagnosed [m/s]
 
     @boundscheck grids_match(soil_moisture, Pconv, Plsc, E, R, horizontal_only=true) || throw(DimensionMismatch(soil_moisture, Pconv))
     @boundscheck size(soil_moisture, 2) == 2 || throw(DimensionMismatch)
@@ -183,27 +239,29 @@ function timestep!(
     f₁_f₂ = f₁/f₂
     Δt_f₁ = Δt/f₁
 
-    for ij in eachgridpoint(soil_moisture)
+    @inbounds for ij in eachgridpoint(soil_moisture)
+        if mask[ij] > 0                         # at least partially land
+            # precipitation (convection + large-scale) minus evaporation
+            # river runoff only diagnostic, i.e. R=0 here but drain excess water below
+            # convert to [m/s] by dividing by density
+            F = Pconv[ij] + Plsc[ij] - E[ij]/ρ    # - R[ij]
 
-        # TODO if mask[ij] == at least partially land? only to skip ocean points?
+            # vertical diffusion term between layers
+            D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])
 
-        # precipitation (convection + large-scale) minus evaporation
-        # river runoff only diagnostic, i.e. R=0 here but drain excess water below
-        # convert to [m/s] by dividing by density
-        F = Pconv[ij] + Plsc[ij] - E[ij]/ρ    # - R[ij]
+            # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
+            soil_moisture[ij, 1] += Δt_f₁*F - Δt*D
+            soil_moisture[ij, 2] += Δt*f₁_f₂*D
 
-        # vertical diffusion term between layers
-        D = τ⁻¹*(soil_moisture[ij, 1] - soil_moisture[ij, 2])
+            # river runoff
+            W₁ = soil_moisture[ij, 1]
+            δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer
+            soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
+            soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
+            R[ij] += Δt*(1-p)*δW₁*f₁            # accumulate river runoff [m] of top layer
 
-        # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-        soil_moisture[ij, 1] += Δt_f₁*F - Δt*D
-        soil_moisture[ij, 2] += Δt*f₁_f₂*D
-
-        # river runoff
-        W₁ = soil_moisture[ij, 1]
-        δW₁ = W₁ - min(W₁, 1)               # excess moisture in top layer
-        soil_moisture[ij, 1] -= δW₁         # remove excess from top layer
-        soil_moisture[ij, 2] += p*δW₁*f₁_f₂ # add fraction to lower layer
-        R[ij] += (1-p)*δW₁*f₁               # accumulate river runoff of top layer
+            # remove excess water from lower layer (this disappears)
+            soil_moisture[ij, 2] = min(soil_moisture[ij, 2], 1)
+        end
     end
 end
