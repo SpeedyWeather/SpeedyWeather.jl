@@ -41,7 +41,7 @@ end
 
 `dims_xyzt` defines the dimensions of the output variable. By default (using the `@kwdef` macro) we set the dimensions in `dims_xyzt`
 to 4D with `(true, true, true, true)` because the vertical velocity is a 3D variable that we want to output
-on every time step. So while `dims_xyzt` is a required field for every output variable you should only change it if you want to output something else than a 4D variable. For a surface variable for example, we would need to set it to `true, true, false, true)` to reflect the missing `z` dimension. 
+on every time step. So while `dims_xyzt` is a required field for every output variable you should only change it if you want to output something else than a 4D variable. For a time series of a surface variable for example, we would need to set it to `(true, true, false, true)` to reflect the missing `z` dimension or for a constant field like the orography to `(true, true, false, false)`.
 
 You can now add this variable to the `NetCDFOutput` as already described in
 [Output variables](@ref)
