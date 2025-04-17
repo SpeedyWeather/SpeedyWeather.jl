@@ -85,8 +85,9 @@ profile ``T_{ref}`` that the Betts-Miller convective parameterization relaxes to
 of the scheme (Simplified Betts-Miller, SBM) that determines a constant relative humidity of
 the reference profile.
 
-An illustration of adiabat reference line is below:
-![https://github.com/sunmoumou1/Speedyweather_picture/blob/main/adiabat_line.png](https://github.com/sunmoumou1/Speedyweather_picture/blob/main/adiabat_line.png)
+An illustration of adiabat reference line is below
+
+![image](https://github.com/user-attachments/assets/ea8d8a0b-20c5-47cc-88ff-47112eeeb200)
 
 ## First-guess relaxation
 
@@ -137,6 +138,10 @@ the first-guess relaxation, neither are the ``1/g`` and ``\tfrac{c_p}{g L_v}``
 necessary to multiply during the vertical integration as all are positive constants.
 While this changes the units of ``P_T, P_q`` they can be reused in the following.
 
+This is illustrated in the following
+
+![image](https://github.com/user-attachments/assets/ec5dd0b8-b350-4412-920d-80c4ea9dbb4c)
+
 ## Deep convection
 
 Following Frierson, 2007 [^Frierson2007] in order to conserve enthalpy we correct
@@ -170,44 +175,24 @@ T_{ref,2} &= T_{ref} - \Delta T
 \end{aligned}
 ```
 
-The reason why above correction is reasonable is illustrated below:
+This scheme is non-precipitating (``P_q = 0``) as derived below. ``P_q`` follows from the vertical integral of the moisture tendency ``\delta q``, which in this scheme is a relaxation towards ``q_{\text{ref,2}}`` (see [Corrected relaxation](@ref)). 
 
-Objective:
 ```math
-P_q = -\int_{p_0}^{p_{LZB}} \frac{\delta q}{g} \, dp = 0
+P_q = -\int_{p_0}^{p_{LZB}} \frac{\delta q}{g} \, dp = \int_{p_0}^{p_{LZB}} \frac{q - q_{\text{ref,2}}}{g \tau_{SBM}} dp
 ```
 
-Which is equivalent to:
+Inserting from above yields
+
 ```math
-\int_{p_0}^{p_{LZB}} \left( q - q_{\text{ref,2}} \right) dp = 0
+P_q = \int_{p_0}^{p_{LZB}} \frac{q - \left(1 - \frac{\Delta q}{Q_{\text{ref}}} \right) q_{\text{ref}} }{g \tau_{SBM}} dp = \frac{1}{g \tau_{SBM}} \int_{p_0}^{p_{LZB}} \left( q - q_{\text{ref}} + \frac{\Delta q}{Q_{\text{ref}}} q_{\text{ref}} \right) dp
 ```
 
-Where:
+The integral becomes 
 ```math
-q_{\text{ref,2}} = \left(1 - \frac{\Delta q}{Q_{\text{ref}}} \right) q_{\text{ref}}
+\Delta q + \frac{\Delta q}{Q_{\text{ref}}} \int_{p_0}^{p_{LZB}}q_{\text{ref}} dp = \Delta q + \frac{\Delta q}{Q_{\text{ref}}} (- Q_{\text{ref}}) = 0
 ```
 
-Substitute into the integral:
-```math
-\int_{p_0}^{p_{LZB}} \left[ q - \left(1 - \frac{\Delta q}{Q_{\text{ref}}} \right) q_{\text{ref}} \right] dp
-```
-
-Simplify:
-```math
-= \int_{p_0}^{p_{LZB}} \left( q - q_{\text{ref}} + \frac{\Delta q}{Q_{\text{ref}}} q_{\text{ref}} \right) dp
-```
-
-Further simplification:
-```math
-= \Delta q + \frac{\Delta q}{Q_{\text{ref}}} (- Q_{\text{ref}}) = 0
-```
-
-Hence, prove the reason why such correction can guarantee that $P_q = 0$.
-
-
-An illustration of corrected relaxation is below:
-![https://github.com/sunmoumou1/Speedyweather_picture/blob/main/second_corrected_relaxation.png](https://github.com/sunmoumou1/Speedyweather_picture/blob/main/second_corrected_relaxation.png)
-
+So this scheme is indeed non-precipitating, i.e. $P_q = 0$.
 
 ## Corrected relaxation
 
@@ -246,11 +231,6 @@ Frierson 2007[^Frierson2007], the "shallower" shallow convection scheme and the 
 (as implemented here in [Shallow convection](@ref)) in that case also reduce to
 the same formulation. The dry Betts-Miller convection scheme is the default
 in the primitive equation model without humidity.
-
-
-Overall, An illustration of simplied Betts-Miller convection scheme is below:
-![https://github.com/sunmoumou1/Speedyweather_picture/blob/main/flowchart_convection.png](https://github.com/sunmoumou1/Speedyweather_picture/blob/main/flowchart_convection.png)
-
 
 
 ## References
