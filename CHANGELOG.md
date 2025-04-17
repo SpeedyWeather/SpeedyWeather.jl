@@ -2,7 +2,13 @@
 
 ## Unreleased
 
--  Make StochasticStirring+JetDrag default for BarotropicModel [#687](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/687)
+- Make KolmogorovFlow forcing default for BarotropicModel [#687](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/687)
+- Added documentation to output surface variables [#708](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/708)
+- `get_gridcell_polygons` in RingGrids [#706](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/706)
+- Revised extended CI tests for differentiability can be launched on comment in PRs [#695](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/695), [#696](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/696), [#697](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/697), [#698](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/698)
+- Reverse for AbstractGridArrays [#691](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/691)
+- LandGeometry, LandThermodynamics as component of LandModel, DryLandModel [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)
+- Diagnostic albedo separate for ocean/land [#677](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/677)
 - Increasing precision for accumulated precipitation output [#685](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/685)
 - Allow steps to be specified for for run!(simulation, steps=n) [#684](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/684)
 - Restrict extended CI tests to Julia v1.10 (due to Enzyme) [#681](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/681)

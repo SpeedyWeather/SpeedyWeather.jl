@@ -39,19 +39,20 @@
 
         dmodel = make_zero(model)
 
+        # FD comparison 
+        dprogn_2 = one(progn) # seed 
+
+        # this takes a long time 
+        # with the FD comparision we have to go to quite low tolerences for the full time step 
+        fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> timestep_oop(x, diagn_copy, dt, deepcopy(model)), dprogn_2, progn_copy)
+  
         # test that we can differentiate wrt an IC 
         autodiff(Reverse, timestep_oop!, Const, Duplicated(progn_new, dprogn_new), Duplicated(progn, d_progn), Duplicated(diagn, d_diag), Const(dt), Duplicated(model, dmodel))
 
         # nonzero gradient
         @test sum(to_vec(d_progn)[1]) != 0
 
-        # FD comparison 
-        dprogn_2 = one(progn) # seed 
-
-        # this takes a long time 
-        # with the FD comparision we have to go to quite low tolerences for the full time step 
-        fd_vjp = FiniteDifferences.j′vp(central_fdm(5,1), x -> timestep_oop(x, diagn_copy, dt, model), dprogn_2, progn_copy)
-
+      
         @test isapprox(to_vec(fd_vjp[1])[1], to_vec(d_progn)[1])
 
         # wrt a system parameter. Let's check for example gravity 

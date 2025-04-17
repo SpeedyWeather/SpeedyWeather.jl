@@ -6,13 +6,6 @@ export SeasonalLandTemperature
     "number of latitudes on one hemisphere, Equator included"
     nlat_half::Int
 
-    # OPTIONS
-    "[OPTION] Depth of top soil layer [m]"
-    z₁::NF = 0.07
-
-    "[OPTION] Depth of root layer [m]"
-    z₂::NF = 0.21
-
     "[OPTION] path to the folder containing the land temperature file, pkg path default"
     path::String = "SpeedyWeather.jl/input_data"
 
@@ -113,6 +106,9 @@ export ConstantLandTemperature
 @kwdef struct ConstantLandTemperature{NF} <: AbstractLandTemperature
     "[OPTION] Globally constant temperature"
     temperature::NF = 285
+
+    "[OPTION] Apply land-sea mask to NaN ocean-only points?"
+    mask::Bool = true
 end
 
 # generator function
@@ -125,7 +121,8 @@ function initialize!(
     land::ConstantLandTemperature,
     model::PrimitiveEquation,
 )
-    set!(progn.land.surface_temperature, land.temperature)
+    set!(progn.land.soil_temperature, land.temperature)
+    land.mask && mask!(progn.land.soil_temperature, model.land_sea_mask, :ocean)
 end
 
 # temperature is constant so do nothing during land timestep
@@ -136,29 +133,11 @@ export LandBucketTemperature
 """MITgcm's two-layer soil model (https://mitgcm.readthedocs.io/en/latest/phys_pkgs/land.html). Fields assert
 $(TYPEDFIELDS)"""
 @kwdef struct LandBucketTemperature{NF} <: AbstractLandTemperature
-    "[OPTION] Top layer depth [m]"
-    z₁::NF = 0.1
-
-    "[OPTION] Second layer depth [m]"
-    z₂::NF = 4.0
-
-    "[OPTION] Thermal conductivity of the soil [W/(m K)]"
-    λ::NF = 0.42
-
-    "[OPTION] Field capacity per meter soil [1]"
-    γ::NF = 0.24
-
-    "[OPTION] Heat capacity of water [J/(m³ K)]"
-    Cw::NF = 4.2e6
-
-    "[OPTION] Heat capacity of dry soil [J/(m³ K)]"
-    Cs::NF = 1.13e6 
-
     "[OPTION] Initial soil temperature [K]"
     initial_temperature::NF = 285
 
     "[OPTION] Apply land-sea mask to NaN ocean-only points?"
-    mask::Bool = true
+    mask::Bool = false
 end
 
 # generator function
@@ -189,36 +168,44 @@ function timestep!(
     (; soil_temperature, soil_moisture) = progn.land
     Lᵥ = model.atmosphere.latent_heat_condensation
     Δt = model.time_stepping.Δt_sec
+    (; mask) = model.land_sea_mask
+    (; thermodynamics, geometry) = model.land
 
     # Sum up flux F following Frierson et al. 2006, eq (1)
-    Rs = diagn.physics.surface_shortwave_down
+    # use separate land fluxes (not ocean)
+    Rsd = diagn.physics.surface_shortwave_down          # before albedo reflection
+    Rsu = diagn.physics.land.surface_shortwave_up       # only albedo reflection
     Rld = diagn.physics.surface_longwave_down
-    Rlu = diagn.physics.surface_longwave_up_land    # these fluxes depend on the land state
-    Ev = diagn.physics.evaporative_flux_land        # use separate land fluxes (not ocean)
-    S = diagn.physics.sensible_heat_flux_land
+    Rlu = diagn.physics.land.surface_longwave_up
+    Ev = diagn.physics.land.evaporative_flux
+    S = diagn.physics.land.sensible_heat_flux
 
-    @boundscheck grids_match(soil_temperature, Rs, Rld, Rlu, Ev, S, horizontal_only=true) || throw(DimensionMismatch(soil_temperature, Rs))
+    @boundscheck grids_match(soil_temperature, Rsd, Rsu, Rld, Rlu, Ev, S, horizontal_only=true) || throw(DimensionMismatch(soil_temperature, Rs))
     @boundscheck size(soil_moisture, 2) == size(soil_temperature, 2) == 2 || throw(DimensionMismatch)
-    (; z₁, z₂, λ, γ, Cw, Cs) = land
+    λ = thermodynamics.heat_conductivity
+    γ = thermodynamics.field_capacity
+    Cw = thermodynamics.heat_capacity_water
+    Cs = thermodynamics.heat_capacity_dry_soil
+    z₁ = geometry.layer_thickness[1]
+    z₂ = geometry.layer_thickness[2]
 
     Δ =  2λ/(z₁ + z₂)   # thermal diffusion operator [W/(m² K)]
 
-    for ij in eachgridpoint(soil_moisture, soil_temperature)
+    @inbounds for ij in eachgridpoint(soil_moisture, soil_temperature)
+        if mask[ij] > 0                         # at least partially land
+            # total surface downward heat flux
+            F = Rsd[ij] - Rsu[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij]
 
-        # TODO if mask[ij] == at least partially land? only to skip ocean points?
+            # heat capacity of the (wet) soil layers 1 and 2 [J/(m³ K)]
+            C₁ = Cw * soil_moisture[ij, 1] * γ + Cs
+            C₂ = Cw * soil_moisture[ij, 2] * γ + Cs
 
-        # total surface downward heat flux
-        F = Rs[ij] - Rlu[ij] + Rld[ij] - Lᵥ*Ev[ij] - S[ij]
+            # vertical diffusion term between layers
+            D = Δ*(soil_temperature[ij, 1] - soil_temperature[ij, 2])
 
-        # heat capacity of the soil layers 1 and 2 [J/(m³ K)]
-        C₁ = Cw * soil_moisture[ij, 1] * γ + Cs
-        C₂ = Cw * soil_moisture[ij, 2] * γ + Cs
-
-        # vertical diffusion term between layers
-        D = Δ*(soil_temperature[ij, 1] - soil_temperature[ij, 2])
-
-        # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
-        soil_temperature[ij, 1] += Δt/(z₁*C₁)*(F - D)
-        soil_temperature[ij, 2] += Δt/(z₂*C₂)*D
+            # Equation in 8.5.2.2 of the MITgcm users guide (Land package)
+            soil_temperature[ij, 1] += Δt/(z₁*C₁)*(F - D)
+            soil_temperature[ij, 2] += Δt/(z₂*C₂)*D
+        end
     end
 end

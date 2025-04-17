@@ -61,11 +61,11 @@ mask!(grid::AbstractGridArray, mask::AbstractLandSeaMask, args...; kwargs...) =
     mask!(grid, mask.mask, args...; kwargs...)
 
 # make available when using SpeedyWeather
-export LandSeaMask
+export EarthLandSeaMask
 
 """Land-sea mask, fractional, read from file.
 $(TYPEDFIELDS)"""
-@kwdef struct LandSeaMask{NF, GridVariable2D} <: AbstractLandSeaMask
+@kwdef struct EarthLandSeaMask{NF, GridVariable2D} <: AbstractLandSeaMask
 
     # OPTIONS
     "path to the folder containing the land-sea mask file, pkg path default"
@@ -81,6 +81,9 @@ $(TYPEDFIELDS)"""
     "Land-sea mask [1] on grid-point space. Land=1, sea=0, land-area fraction in between."
     mask::GridVariable2D
 end
+
+export LandSeaMask
+const LandSeaMask = EarthLandSeaMask
 
 """
 $(TYPEDSIGNATURES)
@@ -104,7 +107,7 @@ end
 $(TYPEDSIGNATURES)
 Reads a high-resolution land-sea mask from file and interpolates (grid-cell average)
 onto the model grid for a fractional sea mask."""
-function initialize!(land_sea_mask::LandSeaMask, model::PrimitiveEquation)
+function initialize!(land_sea_mask::EarthLandSeaMask, model::PrimitiveEquation)
 
     (; file_Grid) = land_sea_mask
 

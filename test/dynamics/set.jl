@@ -134,3 +134,46 @@
     set!(simulation, vor=f; lf)
     @test prog_new.vor[lf] ≈ A_spec
 end
+
+@testset "Set! grids" begin
+    @testset for Grid in (FullGaussianGrid,
+                        OctahedralGaussianGrid,
+                        FullClenshawGrid,
+                        OctahedralClenshawGrid,
+                        OctaminimalGaussianGrid)
+        spectral_grid = SpectralGrid(; Grid)
+        (; GridVariable2D, nlat_half) = spectral_grid
+
+        grid = zeros(GridVariable2D, nlat_half)
+
+        @test all(set!(grid, 3) .== 3)
+        set!(grid, (λ, φ) -> cosd(φ))
+        @test all(0 .<= grid .<= 1)
+
+        # with geometry
+        geometry = Geometry(spectral_grid)
+        set!(grid, (λ, φ) -> cosd(φ), geometry)
+        @test all(0 .<= grid .<= 1)
+    end
+end
+
+@testset "Set! albedo" begin
+    @testset for Grid in (FullGaussianGrid,
+                        OctahedralGaussianGrid,
+                        FullClenshawGrid,
+                        OctahedralClenshawGrid,
+                        OctaminimalGaussianGrid)
+
+        spectral_grid = SpectralGrid(; Grid)
+        geometry = Geometry(spectral_grid)
+        albedo = ManualAlbedo(spectral_grid)
+
+        @test all(set!(albedo, 0.0625) .== 0.0625)
+        set!(albedo.albedo, (λ, φ) -> clamp(sind(λ)*cosd(φ), 0.1, 1))
+        @test all(0.1 .<= albedo.albedo .<= 1)
+
+        # with geometry
+        set!(albedo, (λ, φ) -> cosd(φ), geometry)
+        @test all(0 .<= albedo.albedo .<= 1)
+    end
+end

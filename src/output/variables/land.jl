@@ -47,7 +47,7 @@ Fields are $(TYPEDFIELDS)"""
 end
 
 path(::SoilMoistureAvailabilityOutput, simulation) =
-    simulation.diagnostic_variables.physics.soil_moisture_availability
+    simulation.diagnostic_variables.physics.land.soil_moisture_availability
 
 
 """Defines netCDF output for a specific variable, see `VorticityOutput` for details.
