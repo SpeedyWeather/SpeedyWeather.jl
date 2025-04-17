@@ -113,10 +113,10 @@ end
 
 export RandomVelocity
 
-"""Start with random vorticity as initial conditions
+"""Start with random velocity as initial conditions
 $(TYPEDFIELDS)"""
 @kwdef mutable struct RandomVelocity <: AbstractInitialConditions
-    "[OPTION] maximum speed [m/s], approximate"
+    "[OPTION] maximum speed [ms⁻¹]"
     max_speed::Float64 = 60
 
     "[OPTION] Maximum wavenumber after truncation"
