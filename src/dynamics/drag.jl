@@ -25,32 +25,13 @@ end
 
 # Quadratic drag
 export QuadraticDrag
-Base.@kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
+@kwdef mutable struct QuadraticDrag{NF} <: AbstractDrag
     "[OPTION] drag coefficient [1]"
-    c_D::NF = 1e-5
-
-    "drag coefficient divided by layer thickness H, scaled with radius R [1]"
-    c::Base.RefValue{NF} = Ref(zero(NF))
+    c_D::NF = 1e-12         # TODO is this a good default?
 end
 
 QuadraticDrag(SG::SpectralGrid; kwargs...) = QuadraticDrag{SG.NF}(; kwargs...)
-
-function initialize!(   drag::QuadraticDrag,
-                        model::AbstractModel)
-    # c = c_D / H * R
-    drag.c[] = drag.c_D / model.atmosphere.layer_thickness * model.geometry.radius
-end
-
-# function barrier
-function drag!(
-    diagn::DiagnosticVariables,
-    progn::PrognosticVariables,
-    drag::QuadraticDrag,
-    lf::Integer,
-    model::AbstractModel,
-)
-    drag!(diagn, drag)
-end
+initialize!(::QuadraticDrag, ::AbstractModel) = nothing
 
 """
 $(TYPEDSIGNATURES)
@@ -63,7 +44,10 @@ c_D and layer thickness `H` are precomputed in initialize!(::QuadraticDrag, ::Ab
 and scaled by the radius as are the momentum equations."""
 function drag!(     
     diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
     drag::QuadraticDrag,
+    lf::Integer,
+    model::AbstractModel,
 )
     u = diagn.grid.u_grid
     v = diagn.grid.v_grid
@@ -71,8 +55,9 @@ function drag!(
     Fu = diagn.tendencies.u_tend_grid
     Fv = diagn.tendencies.v_tend_grid
 
-    # total drag coefficient with radius scaling and /layer_thickness
-    c = drag.c[]
+    # total drag coefficient with radius scaling
+    c = drag.c_D / model.atmosphere.layer_thickness
+    c *= diagn.scale[]^2
 
     k = diagn.nlayers   # only apply to surface layer 
     @inbounds for ij in eachgridpoint(u, v, Fu, Fv)
@@ -80,6 +65,36 @@ function drag!(
         Fu[ij, k] -= c*speed*u[ij, k]     # -= as the tendencies already contain forcing
         Fv[ij, k] -= c*speed*v[ij, k]
     end
+end
+
+export LinearVorticityDrag
+@kwdef mutable struct LinearVorticityDrag{NF} <: AbstractDrag
+    "[OPTION] drag coefficient [1/s]"
+    c::NF = 1e-7
+end
+
+LinearVorticityDrag(SG::SpectralGrid; kwargs...) = LinearVorticityDrag{SG.NF}(; kwargs...)
+initialize!(::LinearVorticityDrag, ::AbstractModel) = nothing
+
+"""
+$(TYPEDSIGNATURES)
+Linear drag for the vorticity equations of the form F = -cξ
+with c drag coefficient [1/s]."""
+function drag!(     
+    diagn::DiagnosticVariables,
+    progn::PrognosticVariables,
+    drag::LinearVorticityDrag,
+    lf::Integer,
+    model::AbstractModel,
+)
+    (; vor_tend) = diagn.tendencies
+    vor = progn.vor[1]
+    
+    # scale by radius (but only once, the second radius is in vor)
+    c = drag.c * diagn.scale[]
+    vor_tend .-= c*vor
+
+    return nothing
 end
 
 export JetDrag
