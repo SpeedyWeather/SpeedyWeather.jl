@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Make KolmogorovFlow forcing default for BarotropicModel [#687](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/687)
 - Updated documentation to include four illustrative figures in the large-scale precipitation and convection sections [#702](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/702)
 - Added documentation to output surface variables [#708](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/708)
 - `get_gridcell_polygons` in RingGrids [#706](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/706)
