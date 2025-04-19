@@ -22,7 +22,7 @@ logarithm of surface pressure ``\ln p_s``, temperature ``T`` and specific humidi
 with velocity ``\mathbf{u} = (u, v)``, rotated velocity ``\mathbf{u}_\perp = (v, -u)``,
 Coriolis parameter ``f``, ``W`` the [Vertical advection](@ref) operator, dry air gas constant ``R_d``,
 [Virtual temperature](@ref) ``T_v``, [Geopotential](@ref) ``\Phi``, pressure ``p``
-and surface pressure ``p_s``, thermodynamic ``\kappa = R\_d/c_p``
+and surface pressure ``p_s``, thermodynamic ``\kappa = R_d/c_p``
 with ``c_p`` the heat capacity at constant pressure. Horizontal hyper diffusion of the
 form ``(-1)^{n+1}\nu\nabla^{2n}`` with coefficient ``\nu`` and power ``n``  is added for
 every variable that is advected, meaning ``\zeta, \mathcal{D}, T, q``, but left out
@@ -36,7 +36,7 @@ SpeedyWeather.jl implements a `PrimitiveWet` and a `PrimitiveDry` dynamical core
 For a dry atmosphere, we have ``q = 0`` and the virtual temperature ``T_v = T``
 equals the temperature (often called _absolute_ to distinguish from the virtual temperature).
 The terms in the primitive equations and their discretizations are discussed in
-the following sections. 
+the following sections.
 
 ## Virtual temperature
 
@@ -70,7 +70,7 @@ temperature with a virtual temperature that includes the effect of
 humidity on the density. So, wherever we use the ideal gas law
 to replace density with temperature, we would use the virtual temperature,
 which is a function of the absolute temperature and specific humidity,
-instead. A higher specific humidity in an air parcel lowers 
+instead. A higher specific humidity in an air parcel lowers
 the density as water vapour is lighter than dry air. Consequently,
 the virtual temperature of moist air is higher than its absolute temperature
 because warmer air is lighter too at constant pressure. We therefore
@@ -100,7 +100,7 @@ can therefore calculate the virtual temperature ``T_v`` as
 T_v = (1 + \mu q)T
 ```
 
-For completeness we want to mention here that the above product, because it is a 
+For completeness we want to mention here that the above product, because it is a
 product of two variables ``q, T`` has to be computed in grid-point space,
 see [Spherical Harmonic Transform](@ref).
 To obtain an approximation to the virtual temperature in spectral space without
@@ -137,7 +137,7 @@ But for derivatives with respect to ``x, y, t`` we have to apply the multi-varia
 chain-rule as both ``\Psi`` and ``\eta`` depend on it. So a derivative with respect to
 ``x`` on ``\eta`` levels (where ``\eta`` constant) becomes
 ```math
-\left. \frac{\partial \Psi}{\partial x}\right\vert_\eta = 
+\left. \frac{\partial \Psi}{\partial x}\right\vert_\eta =
 \left. \frac{\partial \Psi}{\partial x}\right\vert_z +
 \frac{\partial \Psi}{\partial z}
 \left. \frac{\partial z}{\partial x}\right\vert_\eta
@@ -155,7 +155,7 @@ A flow field on such a level is therefore not continuous and one would need to d
 boundaries. Especially with spherical harmonics we need a terrain-following vertical
 coordinate to transform between continuous fields in grid-point space and spectral space.
 
-SpeedyWeather.jl currently uses so-called sigma coordinates for the vertical. 
+SpeedyWeather.jl currently uses so-called sigma coordinates for the vertical.
 This coordinate system uses fraction of surface pressure in the vertical, i.e.
 ```math
 \sigma = \frac{p}{p_s}
@@ -183,7 +183,7 @@ The layer thickness in terms of pressure is
 ```math
 \Delta p_k = p_{k+\tfrac{1}{2}} - p_{k-\tfrac{1}{2}} =
 (\sigma_{k+\tfrac{1}{2}} - \sigma_{k-\tfrac{1}{2}}) p_s = \Delta \sigma_k p_s
-``` 
+```
 which can also be expressed with the layer thickness in sigma coordinates ``\Delta \sigma_k``
 times the surface pressure. In SpeedyWeather.jl one chooses the half levels
 ``\sigma_{k+\tfrac{1}{2}}`` first and then obtains the full levels through averaging
@@ -198,7 +198,7 @@ In the hydrostatic approximation the vertical momentum equation becomes
 ```math
 \frac{\partial p}{\partial z} = -\rho g,
 ```
-meaning that the (negative) vertical pressure gradient is given by the density in 
+meaning that the (negative) vertical pressure gradient is given by the density in
 that layer times the gravitational acceleration. The heavier the fluid the more
 the pressure will increase below. Inserting the ideal gas
 law
@@ -215,7 +215,7 @@ through the ideal gas law with temperature. Given a vertical temperature profile
 ``T_v`` and the (constant) surface geopotential ``\Phi_s = gz_s`` where ``z_s``
 is the orography, we can integrate this equation from the surface to the top
 to obtain ``\Phi_k`` on every layer ``k``.
-The surface is at ``k = N+\tfrac{1}{2}`` (see [Vertical coordinates](@ref)) 
+The surface is at ``k = N+\tfrac{1}{2}`` (see [Vertical coordinates](@ref))
 with ``N`` vertical levels. We can integrate the geopotential onto half levels as
 (``T_k^v`` is the virtual temperature at layer ``k``, the subscript ``v`` has been
 moved to be a superscript)
@@ -232,7 +232,7 @@ For the first half-level integration we use ``T_k`` for the second ``T_{k-1}``.
 
 !!! warning "Semi-implicit time integration: Geopotential"
     With the semi-implicit time integration in SpeedyWeather the
-    Geopotential is not calculated from the spectral temperature 
+    Geopotential is not calculated from the spectral temperature
     at the current, but at the previous time step.
     This is because this is a linear term that we solve implicitly
     to avoid instabilities from gravity waves.
@@ -259,7 +259,7 @@ this becomes
 ```
 Using the logarithm of pressure ``\ln p`` as the vertical coordinate this becomes
 ```math
-\frac{\partial \ln p_s}{\partial t} = 
+\frac{\partial \ln p_s}{\partial t} =
 -\sum_{k=1}^N \sigma_k (\mathbf{u}_k \cdot \nabla \ln p_s + \nabla \cdot \mathbf{u}_k)
 ```
 The second term is the divergence ``\mathcal{D}_k`` at layer ``k``.
@@ -267,14 +267,14 @@ We introduce ``\bar{a} = \sum_k \Delta \sigma_k a_k``, the ``\sigma``-weighted v
 applied to some variable ``a``. This is essentially an average as ``\sum_k \Delta \sigma_k = 1``.
 The surface pressure tendency can then be written as
 ```math
-\frac{\partial \ln p_s}{\partial t} = 
+\frac{\partial \ln p_s}{\partial t} =
 -\mathbf{\bar{u}} \cdot \nabla \ln p_s - \bar{\mathcal{D}}
 ```
 which is form used by SpeedyWeather.jl to calculate the tendency of (the logarithm of) surface pressure.
 
 As we will have ``\ln p_s`` available in spectral space at the beginning of a time step, the
 gradient can be easily computed (see [Derivatives in spherical coordinates](@ref)). However,
-we then need to transform both gradients to grid-point space for the scalar product with 
+we then need to transform both gradients to grid-point space for the scalar product with
 the (vertically ``\sigma``-averaged) velocity vector ``\mathbf{\bar{u}}`` before transforming it
 back to spectral space where the tendency is needed. In general, we can do the ``\sigma``-weighted
 average in spectral or in grid-point space, although it is computationally cheaper in spectral space.
@@ -282,12 +282,12 @@ We therefore compute ``- \bar{\mathcal{D}}`` entirely in spectral space. With ``
 spectral space and ``[]`` grid-point space (hence, ``([])`` and ``[()]`` are the transforms in the
 respective directions) we therefore do
 ```math
-\left(\frac{\partial \ln p_s}{\partial t}\right) = 
+\left(\frac{\partial \ln p_s}{\partial t}\right) =
 \left(-\mathbf{\overline{[u]}} \cdot [\nabla (\ln p_s)]\right) - \overline{(\mathcal{D})}
 ```
 But note that it would also be possible to do
 ```math
-\left(\frac{\partial \ln p_s}{\partial t}\right) = 
+\left(\frac{\partial \ln p_s}{\partial t}\right) =
 \left(-\mathbf{\overline{[u]}} \cdot [\nabla (\ln p_s)] - \overline{[\mathcal{D}]}\right)
 ```
 Meaning that we would compute the vertical average in grid-point space, subtract from the
@@ -387,19 +387,19 @@ In sigma coordinates we have ``M_{k+\tfrac{1}{2}} = p_s \dot{\sigma}_{k+\tfrac{1
 ``\dot{\sigma}`` being the vertical velocity in sigma coordinates, also defined at interfaces
 between layers. To calculate ``\dot{\sigma}`` we therefore compute
 ```math
-\dot{\sigma}_{k+\tfrac{1}{2}} = \frac{M_{k+\tfrac{1}{2}}}{p_s} = 
-- \sum_{r=1}^k \Delta \sigma_r (\mathbf{u}_k \cdot \nabla \ln p_s + \mathcal{D}_r) 
+\dot{\sigma}_{k+\tfrac{1}{2}} = \frac{M_{k+\tfrac{1}{2}}}{p_s} =
+- \sum_{r=1}^k \Delta \sigma_r (\mathbf{u}_k \cdot \nabla \ln p_s + \mathcal{D}_r)
 + \sigma_{k+\tfrac{1}{2}}(-\mathbf{\bar{u}} \cdot \nabla \ln p_s - \bar{\mathcal{D}})
 ```
 With ``\bar{A}`` denoting a sigma thickness-weighted vertical average as in section [Surface pressure tendency](@ref).
 Now let ``\bar{A_k}`` be that average from ``r=1`` to ``r=k`` only and not necessarily down to the surface, as required in the
 equation above, then we can also write
 ```math
-\dot{\sigma}_{k+\tfrac{1}{2}} = 
+\dot{\sigma}_{k+\tfrac{1}{2}} =
 - \overline{\mathbf{u}_k \cdot \nabla \ln p_s} - \bar{\mathcal{D}}_k
 + \sigma_{k+\tfrac{1}{2}}(-\mathbf{\bar{u}} \cdot \nabla \ln p_s - \bar{\mathcal{D}})
 ```
-See also Hoskins and Simmons, 1975[^HS75]. These vertical averages are the same as required by the 
+See also Hoskins and Simmons, 1975[^HS75]. These vertical averages are the same as required by the
 [Surface pressure tendency](@ref) and in the [Temperature equation](@ref), they are therefore all calculated
 at once, storing the partial averages ``\overline{\mathbf{u}_k \cdot \nabla \ln p_s}`` and ``\bar{\mathcal{D}}_k`` on the fly.
 
@@ -412,7 +412,7 @@ The pressure gradient term in the primitive equations is
 with density ``\rho`` and pressure ``p``. The gradient here is taken at constant ``z`` hence the
 subscript. If we move to a pressure-based vertical coordinate system we will need to evaluate
 gradients on constant levels of pressure though, i.e. ``\nabla_p``. There is, by definition,
-no gradient of pressure on constant levels of pressure, but we can use the chain rule (see 
+no gradient of pressure on constant levels of pressure, but we can use the chain rule (see
 [Vertical coordinates](@ref)) to rewrite this as (use only ``x`` but ``y`` is equivalent)
 ```math
 0 = \left. \frac{\partial p}{\partial x} \right\vert_p =
@@ -449,7 +449,7 @@ have
 - \frac{1}{\rho}\nabla_z p = -\nabla_p \Phi = -\nabla_\sigma \Phi - R_dT_v \nabla_\sigma \ln p_s
 ```
 From left to right: The pressure gradient force in ``z``-coordinates; in pressure coordinates;
-and in sigma coordinates. Each denoted with the respective subscript on gradients. 
+and in sigma coordinates. Each denoted with the respective subscript on gradients.
 SpeedyWeather.jl uses the latter.
 In sigma coordinates we may drop the ``\sigma`` subscript on gradients, but still meaning
 that the gradient is evaluated on a surface of our vertical coordinate.
@@ -544,7 +544,7 @@ as described in the following.
 
 The first law of thermodynamic states that the internal energy ``I`` is increased by
 the heat ``Q`` applied minus the work ``W`` done by the system. We neglect changes
-in chemical composition ([^Vallis], chapter 1.5). For an ideal gas, the internal 
+in chemical composition ([^Vallis], chapter 1.5). For an ideal gas, the internal
 energy is ``c_vT`` with ``c_v`` the heat capacity at constant volume and temperature
 ``T``. The work done is ``pV``, with pressure ``p`` and the specific volume ``V``
 ```math
@@ -673,7 +673,7 @@ the previous time step is generally not available in grid-point space (unless re
 or stored with additional memory requirements) so it is easier to follow 2 where the ``N_I`` is
 available in spectral space. For the adiabatic conversion term in the [Temperature equation](@ref)
 we follow 2 as one would otherwise need to split this term into a non-linear and linear term,
-evaluating it essentially twice in grid-point space. 
+evaluating it essentially twice in grid-point space.
 
 So what is ``G`` in the [Primitive equation model](@ref primitive_equation_model)?
 
@@ -705,7 +705,7 @@ For the temperature tendency, we evaluate all terms explicitly at the current ti
 but then move the linear term in the adiabatic conversion term with the operator ``\mathbf{L}``
 back to the previous time step. For details see [Semi-implicit temperature equation](@ref).
 
-The operators ``\mathbf{R, U, L, W}`` are all linear, meaning that we can apply them 
+The operators ``\mathbf{R, U, L, W}`` are all linear, meaning that we can apply them
 in spectral space to each spherical harmonic independently -- the vertical is coupled however.
 With ``N`` being the number of vertical levels and the prognostic variables like
 temperature for a given degree ``l`` and order ``m`` being a column vector in the vertical,
@@ -812,7 +812,7 @@ Now loop over
 
 1. Compute all tendencies of ``u, v, T, q`` due to physical parameterizations in grid-point space.
 2. Compute the gradient of the logarithm of surface pressure ``\nabla (\ln p_s)_{lm}`` in spectral space and convert the two fields to grid-point space. Unscale the ``\cos(\theta)`` on the fly.
-3. For every layer ``k`` compute the pressure flux ``\mathbf{u}_k \cdot \nabla \ln p_s`` in grid-point space. 
+3. For every layer ``k`` compute the pressure flux ``\mathbf{u}_k \cdot \nabla \ln p_s`` in grid-point space.
 4. For every layer ``k`` compute a linearized [Virtual temperature](@ref) in spectral space.
 5. For every layer ``k`` compute a temperature anomaly (virtual and absolute) relative to a vertical reference profile ``T_k`` in grid-point space.
 6. Compute the [Geopotential](@ref) ``\Phi`` by integrating the virtual temperature vertically in spectral space from surface to top.
