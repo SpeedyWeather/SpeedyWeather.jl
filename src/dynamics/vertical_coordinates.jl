@@ -4,7 +4,7 @@ export SigmaCoordinates
 
 """Sigma coordinates for the vertical coordinates, defined by their half layers.
 Sigma coordinates are currently hardcoded in Geometry.
-$(TYPEDFIELDS)."""
+$(TYPEDFIELDS)"""
 struct SigmaCoordinates{NF, VectorType} <: AbstractVerticalCoordinate
     nlayers::Int
     σ_half::VectorType
@@ -55,7 +55,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Check that nlayers and σ_half match."""    
+Check that nlayers and σ_half match."""
 function sigma_okay(nlayers::Integer, σ_half::AbstractVector)
     @assert σ_half[1] >= 0 "First manually specified σ_half has to be >0"
     @assert σ_half[end] == 1 "Last manually specified σ_half has to be 1."

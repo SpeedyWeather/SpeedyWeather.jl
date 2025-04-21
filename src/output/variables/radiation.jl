@@ -26,8 +26,8 @@ for name in names
     end
 end
 
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct AlbedoOutput <: AbstractOutputVariable
     name::String = "albedo"
     unit::String = "1"
