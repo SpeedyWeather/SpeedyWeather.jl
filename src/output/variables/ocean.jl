@@ -1,5 +1,5 @@
-"""Defines netCDF output for a specific variables, see `VorticityOutput` for details.
-Fields are $(TYPEDFIELDS)"""
+"""Defines netCDF output for a specific variables, see [`VorticityOutput`](@ref) for details.
+Fields are: $(TYPEDFIELDS)"""
 @kwdef mutable struct SeaSurfaceTemperatureOutput{F} <: AbstractOutputVariable
     name::String = "sst"
     unit::String = "degC"

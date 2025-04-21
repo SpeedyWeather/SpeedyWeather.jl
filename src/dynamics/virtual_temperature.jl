@@ -6,13 +6,13 @@ Calculates the virtual temperature Tᵥ as
 With absolute temperature T, specific humidity q and
 
     μ = (1-ξ)/ξ, ξ = R_dry/R_vapour.
-    
+
 in grid-point space."""
 function virtual_temperature!(
     diagn::DiagnosticVariables,
     model::PrimitiveWet,
     )
-    
+
     (; temp_grid, humid_grid, temp_virt_grid) = diagn.grid
     μ = model.atmosphere.μ_virt_temp
 
@@ -28,7 +28,7 @@ and virtual temperature are the same (humidity=0). Just copy over the arrays."""
 function virtual_temperature!(
     diagn::DiagnosticVariables,
     model::PrimitiveDry,
-)   
+)
     (; temp_grid, temp_virt_grid) = diagn.grid
     # Tᵥ = T(1 + μ*q) with humid=q=0
     temp_virt_grid .= temp_grid
@@ -60,7 +60,7 @@ $(TYPEDSIGNATURES)
 Linear virtual temperature for `model::PrimitiveDry`: Just copy over
 arrays from `temp` to `temp_virt` at timestep `lf` in spectral space
 as humidity is zero in this `model`."""
-function linear_virtual_temperature!(   
+function linear_virtual_temperature!(
     diagn::DiagnosticVariables,
     progn::PrognosticVariables,
     lf::Integer,
@@ -77,11 +77,11 @@ Calculates a linearised virtual temperature Tᵥ as
 
     Tᵥ = T + Tₖμq
 
-With absolute temperature T, layer-average temperarture Tₖ (computed in temperature_average!),
+With absolute temperature T, layer-average temperarture Tₖ (computed in `temperature_average!`),
 specific humidity q and
 
     μ = (1-ξ)/ξ, ξ = R_dry/R_vapour.
-    
+
 in spectral space."""
 function linear_virtual_temperature!(
     diagn::DiagnosticVariables,
