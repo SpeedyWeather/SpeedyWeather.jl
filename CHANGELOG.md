@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix isapprox for particles with longitude modulo [#714](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/714)
 - Fix docustring rendering [#712](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/712)
 - Make KolmogorovFlow forcing default for BarotropicModel [#687](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/687)
 - Updated documentation to include four illustrative figures in the large-scale precipitation and convection sections [#702](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/702)
