@@ -160,6 +160,7 @@ function _fourier_batched!(                 # GRID TO SPECTRAL
     end
 end
 
+
 """$(TYPEDSIGNATURES)
 (Forward) Fast Fourier transform (grid to spectral) in zonal direction of `grids`,
 stored in scratch memories `f_north`, `f_south` to be passed on to the Legendre transform.
@@ -261,14 +262,13 @@ function _fourier_serial!(                  # SPECTRAL TO GRID
             nfreq  = nlon÷2 + 1                 # linear max Fourier frequency wrt to nlon
             not_equator = j_north != j_south    # is the latitude ring not on equator?
 
-            ilons = rings[j_north]              # in-ring indices northern ring
-
             # Apply FFT in the northern latitudes
+            ilons = rings[j_north]              # in-ring indices northern ring
             _apply_serial_fft!(grids, g_north, S, j, k, nfreq, ilons)
 
             # southern latitude, don't call redundant 2nd fft if ring is on equator
+            ilons = rings[j_south]              # in-ring indices southern ring
             _apply_serial_fft!(grids, g_south, S, j, k, nfreq, ilons; not_equator=not_equator)
-
         end
     end
 end
