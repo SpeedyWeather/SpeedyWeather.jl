@@ -5,22 +5,22 @@ abstract type AbstractClock end
 export Clock
 """
 Clock struct keeps track of the model time, how many days to integrate for
-and how many time steps this takes
-$(TYPEDFIELDS)."""
+and how many time steps this takes.
+$(TYPEDFIELDS)"""
 Base.@kwdef mutable struct Clock <: AbstractClock
     "current model time"
     time::DateTime = DEFAULT_DATE
 
     "start time of simulation"
     start::DateTime = DEFAULT_DATE
-    
+
     "period to integrate for"
     period::Second = Second(0)
 
     "Counting all time steps during simulation"
     timestep_counter::Int = 0
 
-    "number of time steps to integrate for, set in initialize!(::Clock, ::AbstractTimeStepper)"
+    "number of time steps to integrate for, set in `initialize!(::Clock, ::AbstractTimeStepper)`"
     n_timesteps::Int = 0
 
     "Time step"
@@ -30,7 +30,7 @@ end
 function timestep!(clock::Clock, Δt; increase_counter::Bool=true)
     clock.time += Δt
     # the first timestep is a half-step and doesn't count
-    clock.timestep_counter += increase_counter  
+    clock.timestep_counter += increase_counter
 end
 
 # pretty printing
@@ -40,17 +40,17 @@ function Base.show(io::IO, C::Clock)
     print_fields(io, C, keys)
 end
 
-# copy! 
+# copy!
 function Base.copy!(clock::Clock, clock_old::Clock)
-    clock.time = clock_old.time 
-    clock.start = clock_old.start 
-    clock.period = clock_old.period 
+    clock.time = clock_old.time
+    clock.start = clock_old.start
+    clock.period = clock_old.period
     clock.timestep_counter = clock_old.timestep_counter
     clock.n_timesteps = clock_old.n_timesteps
-    clock.Δt = clock_old.Δt 
-    
-    return nothing 
-end 
+    clock.Δt = clock_old.Δt
+
+    return nothing
+end
 
 """$(TYPEDSIGNATURES)
 Initialize the clock with the time step `Δt` from `time_stepping`."""
@@ -85,7 +85,7 @@ end
 
 """
 $(TYPEDSIGNATURES)
-Create and initialize a clock from `time_stepping`"""
+Create and initialize a clock from `time_stepping`."""
 function Clock(time_stepping::AbstractTimeStepper; kwargs...)
     clock = Clock(; kwargs...)
     initialize!(clock, time_stepping, clock.period)

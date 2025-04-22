@@ -85,6 +85,10 @@ profile ``T_{ref}`` that the Betts-Miller convective parameterization relaxes to
 of the scheme (Simplified Betts-Miller, SBM) that determines a constant relative humidity of
 the reference profile.
 
+An illustration of adiabat reference line is below
+
+![image](https://github.com/user-attachments/assets/ea8d8a0b-20c5-47cc-88ff-47112eeeb200)
+
 ## First-guess relaxation
 
 With the [Reference profiles](@ref) ``T_{ref}, q_{ref}`` obtained, we relax the actual
@@ -120,6 +124,7 @@ between current profiles and the references profiles, so if ``P_q > 0`` this wou
 that a convective adjustment to ``q_{ref}`` would release humidity from the column
 through condensation, but ``P_q`` can also be negative. Consequently similar for ``P_T``.
 
+
 ## Convective criteria
 
 We now distinguish three cases
@@ -132,6 +137,10 @@ Note that to evaluate these cases it is not necessary to divide by ``\tau_{SBM}`
 the first-guess relaxation, neither are the ``1/g`` and ``\tfrac{c_p}{g L_v}``
 necessary to multiply during the vertical integration as all are positive constants.
 While this changes the units of ``P_T, P_q`` they can be reused in the following.
+
+This is illustrated in the following
+
+![image](https://github.com/user-attachments/assets/ec5dd0b8-b350-4412-920d-80c4ea9dbb4c)
 
 ## Deep convection
 
@@ -166,6 +175,25 @@ T_{ref,2} &= T_{ref} - \Delta T
 \end{aligned}
 ```
 
+This scheme is non-precipitating (``P_q = 0``) as derived below. ``P_q`` follows from the vertical integral of the moisture tendency ``\delta q``, which in this scheme is a relaxation towards ``q_{\text{ref,2}}`` (see [Corrected relaxation](@ref)). 
+
+```math
+P_q = -\int_{p_0}^{p_{LZB}} \frac{\delta q}{g} \, dp = \int_{p_0}^{p_{LZB}} \frac{q - q_{\text{ref,2}}}{g \tau_{SBM}} dp
+```
+
+Inserting from above yields
+
+```math
+P_q = \int_{p_0}^{p_{LZB}} \frac{q - \left(1 - \frac{\Delta q}{Q_{\text{ref}}} \right) q_{\text{ref}} }{g \tau_{SBM}} dp = \frac{1}{g \tau_{SBM}} \int_{p_0}^{p_{LZB}} \left( q - q_{\text{ref}} + \frac{\Delta q}{Q_{\text{ref}}} q_{\text{ref}} \right) dp
+```
+
+The integral becomes 
+```math
+\Delta q + \frac{\Delta q}{Q_{\text{ref}}} \int_{p_0}^{p_{LZB}}q_{\text{ref}} dp = \Delta q + \frac{\Delta q}{Q_{\text{ref}}} (- Q_{\text{ref}}) = 0
+```
+
+So this scheme is indeed non-precipitating, i.e. $P_q = 0$.
+
 ## Corrected relaxation
 
 After the reference profiles have been corrected in [Deep convection](@ref)
@@ -193,6 +221,7 @@ P = -\int \frac{\Delta t}{g \rho} \delta q dp
 In the shallow convection case ``P=0`` due to the correction even though in
 the first guess relaxation ``P<0`` was possible, but for deep convection ``P>0`` by definition.
 
+
 ## Dry convection
 
 In the primitive equation model with humidity the [Betts-Miller convection scheme](@ref BettsMiller)
@@ -202,6 +231,7 @@ Frierson 2007[^Frierson2007], the "shallower" shallow convection scheme and the 
 (as implemented here in [Shallow convection](@ref)) in that case also reduce to
 the same formulation. The dry Betts-Miller convection scheme is the default
 in the primitive equation model without humidity.
+
 
 ## References
 

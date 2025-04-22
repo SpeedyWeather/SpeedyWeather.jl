@@ -258,7 +258,7 @@ function UV_from_vor!(
 
             # LAST ROW (separated to avoid out-of-bounds access to l+2, m)
             lm += 1
-            U[lm, k] = -vordiv_to_uv1[lm] * vor[lm-1]       # meridional gradient again (but only 2nd term from above)
+            U[lm, k] = -vordiv_to_uv1[lm] * vor[lm-1, k]    # meridional gradient again (but only 2nd term from above)
             V[lm, k] = 0                                    # set explicitly to 0 as Ψ does not contribute to last row of V
         end
 

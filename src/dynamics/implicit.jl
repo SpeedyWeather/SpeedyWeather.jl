@@ -46,7 +46,7 @@ end
 """
 $(TYPEDSIGNATURES)
 Update the implicit terms in `implicit` for the shallow water model as they depend on the time step `dt`."""
-function initialize!(   
+function initialize!(
     implicit::ImplicitShallowWater,
     dt::Real,                   # time step used [s]
     planet::AbstractPlanet,
@@ -109,7 +109,7 @@ function implicit_correction!(  diagn::DiagnosticVariables,
         for m in 1:mmax+1
             for l in m:lmax+1
                 lm += 1     # single index lm corresponding to harmonic l, m with a LowerTriangularMatrix
-                
+
                 # calculate the G = N(Vⁱ) + NI(Vⁱ⁻¹ - Vⁱ) term.
                 # Vⁱ is a prognostic variable at time step i
                 # N is the right hand side of ∂V\∂t = N(V)
@@ -138,7 +138,7 @@ $(TYPEDFIELDS)"""
     MatrixType,
     TensorType,
 } <: AbstractImplicit
-    
+
     # DIMENSIONS
     "spectral resolution"
     trunc::Int
@@ -150,25 +150,25 @@ $(TYPEDFIELDS)"""
     "time-step coefficient: 0=explicit, 0.5=centred implicit, 1=backward implicit"
     α::NF = 1
 
-    # PRECOMPUTED ARRAYS, to be initiliased with initialize!
+    # PRECOMPUTED ARRAYS, to be initiliazed with initialize!
     "vertical temperature profile, obtained from diagn on first time step"
     temp_profile::VectorType = zeros(NF, nlayers)
 
     "time step 2α*Δt packed in RefValue for mutability"
-    ξ::Base.RefValue{NF} = Ref{NF}(0)       
-    
+    ξ::Base.RefValue{NF} = Ref{NF}(0)
+
     "divergence: operator for the geopotential calculation"
-    R::MatrixType = zeros(NF, nlayers, nlayers)     
-    
+    R::MatrixType = zeros(NF, nlayers, nlayers)
+
     "divergence: the -RdTₖ∇² term excl the eigenvalues from ∇² for divergence"
     U::VectorType = zeros(NF, nlayers)
-    
+
     "temperature: operator for the TₖD + κTₖDlnps/Dt term"
     L::MatrixType = zeros(NF, nlayers, nlayers)
 
     "pressure: vertical averaging of the -D̄ term in the log surface pres equation"
     W::VectorType = zeros(NF, nlayers)
-    
+
     "components to construct L, 1/ 2Δσ"
     L0::VectorType = zeros(NF, nlayers)
 
@@ -188,12 +188,12 @@ $(TYPEDFIELDS)"""
     S::MatrixType = zeros(NF, nlayers, nlayers)
 
     "combined inverted operator: S = 1 - ξ²(RL + UW)"
-    S⁻¹::TensorType = zeros(NF, trunc+1, nlayers, nlayers)   
+    S⁻¹::TensorType = zeros(NF, trunc+1, nlayers, nlayers)
 end
 
 """$(TYPEDSIGNATURES)
 Generator using the resolution from SpectralGrid."""
-function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid, kwargs...) 
+function ImplicitPrimitiveEquation(spectral_grid::SpectralGrid, kwargs...)
     (; NF, VectorType, MatrixType, TensorType, trunc, nlayers) = spectral_grid
     return ImplicitPrimitiveEquation{NF, VectorType, MatrixType, TensorType}(;
         trunc, nlayers, kwargs...)
@@ -212,7 +212,7 @@ end
 
 """$(TYPEDSIGNATURES)
 Initialize the implicit terms for the PrimitiveEquation models."""
-function initialize!(   
+function initialize!(
     implicit::ImplicitPrimitiveEquation,
     dt::Real,                                           # the scaled time step radius*dt
     diagn::DiagnosticVariables{NF},
@@ -228,9 +228,9 @@ function initialize!(
     (; Δp_geopot_half, Δp_geopot_full) = geopotential
     (; σ_lnp_A, σ_lnp_B) = adiabatic_conversion
 
-    # use current vertical temperature profile                                     
+    # use current vertical temperature profile
     temp_profile .= diagn.temp_average
-        
+
     # return immediately if temp_profile contains NaRs, model blew up in that case
     all(isfinite.(temp_profile)) || return nothing
 
@@ -249,17 +249,17 @@ function initialize!(
 
     ξ = α*dt                        # dt = 2Δt for leapfrog, but = Δt, Δ/2 in first_timesteps!
     implicit.ξ[] = ξ                # also store in Implicit struct
-    
+
     # DIVERGENCE OPERATORS (called g in Hoskins and Simmons 1975, eq 11 and Appendix 1)
     @inbounds for k in 1:nlayers                # vertical geopotential integration as matrix operator
         R[1:k, k] .= -Δp_geopot_full[k]         # otherwise equivalent to geopotential! with zero orography
-        R[1:k-1, k] .+= -Δp_geopot_half[k]      # incl the minus but excluding the eigenvalues as with U 
+        R[1:k-1, k] .+= -Δp_geopot_half[k]      # incl the minus but excluding the eigenvalues as with U
     end
     U .= -R_dry*temp_profile        # the R_d*Tₖ∇² term excl the eigenvalues from ∇² for divergence
-    
+
     # TEMPERATURE OPERATOR (called τ in Hoskins and Simmons 1975, eq 9 and Appendix 1)
     L0 .= 1 ./ 2σ_levels_thick
-    L2 .= κ*temp_profile.*σ_lnp_A    # factor in front of the div_sum_above term                       
+    L2 .= κ*temp_profile.*σ_lnp_A    # factor in front of the div_sum_above term
     L4 .= κ*temp_profile.*σ_lnp_B    # factor in front of div term in Dlnps/Dt
 
     @inbounds for k in 1:nlayers
@@ -308,18 +308,18 @@ end
 
 """$(TYPEDSIGNATURES)
 Apply the implicit corrections to dampen gravity waves in the primitive equation models."""
-function implicit_correction!(  
+function implicit_correction!(
     diagn::DiagnosticVariables,
     implicit::ImplicitPrimitiveEquation,
     progn::PrognosticVariables,
 )
     # escape immediately if explicit
-    implicit.α == 0 && return nothing   
+    implicit.α == 0 && return nothing
 
     (; nlayers, trunc) = implicit
     (; S⁻¹, R, U, L, W) = implicit
     ξ = implicit.ξ[]
-    
+
     # MOVE THE IMPLICIT TERMS OF THE TEMPERATURE EQUATION FROM TIME STEP i TO i-1
     # geopotential and linear pressure gradient (divergence equation) are already evaluated at i-1
     # so is the -D̄ term for surface pressure in tendencies!
@@ -336,7 +336,7 @@ function implicit_correction!(
             end
         end
     end
-    
+
     # SEMI IMPLICIT CORRECTIONS FOR DIVERGENCE
     # calculate the combined tendency G = G_D + ξRG_T + ξUG_lnps to solve for divergence δD
     (; pres_tend, div_tend) = diagn.tendencies
@@ -351,7 +351,7 @@ function implicit_correction!(
             end
         end
 
-        # 2. the G = G_D + ξRG_T + ξUG_lnps terms using geopot from above 
+        # 2. the G = G_D + ξRG_T + ξUG_lnps terms using geopot from above
         lm = 0
         for m in 1:trunc+1              # loops over all columns/order m
             for l in m:trunc+1          # but skips the lmax+2 degree (1-based)
