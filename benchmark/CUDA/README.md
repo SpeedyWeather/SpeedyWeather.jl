@@ -114,5 +114,5 @@ inside `the SpeedyWeather.jl/benchmark` folder. It will create this `README.md` 
 
 Times and speedup graphs for the benchmarks are shown below.
 
-![benchmark times](benchmark_times.png "Times") 
-![benchmark times](benchmark_speedup.png "Speedup") 
+![benchmark times](https://github.com/user-attachments/assets/f6ec4605-fd89-4e87-b4fb-dae0f50981e4 "Times") 
+![benchmark times](https://github.com/user-attachments/assets/7422a253-cc3e-4fc9-a259-e276223e7a93 "Speedup") 
