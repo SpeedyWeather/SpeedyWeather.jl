@@ -722,3 +722,34 @@ end
         end
     end
 end 
+
+@testset "Rotate LowerTriangularArray" begin
+    import SpeedyWeather.LowerTriangularMatrices: rotate!
+
+    @testset for NF in (Float16, Float32, Float64)
+        @testset for trunc in (5, 10, 15)
+            @testset for k in 0:3
+                if k == 0
+                    L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc)
+                else
+                    L = rand(LowerTriangularArray{Complex{NF}}, trunc, trunc, k)
+                end
+
+                L2 = deepcopy(L)
+                L3 = deepcopy(L)
+                @test rotate!(L2, 0) == L
+                @test rotate!(rotate!(rotate!(rotate!(L2, 90), 90), 90), 90) == L
+                @test rotate!(rotate!(L2, 180), 180) == L
+                @test rotate!(rotate!(L2, 270), 90) == L
+
+                @test rotate!(rotate!(L2, 90), -90) == L
+                @test rotate!(rotate!(L2, -90), 90) == L
+
+                # these tests include rounding errors, use isapprox
+                @test rotate!(rotate!(L2, 45), 45) ≈ rotate!(L3, 90)
+                @test rotate!(rotate!(L2, 30), 60) ≈ rotate!(L3, 90)
+                @test rotate!(rotate!(L2, 60), 30) ≈ rotate!(rotate!(L3, 80), 10)
+            end
+        end
+    end
+end
