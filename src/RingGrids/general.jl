@@ -11,7 +11,7 @@ abstract type AbstractGridArray{T, N, ArrayType <: AbstractArray{T, N}} <: Abstr
 
 """Abstract supertype for all ring grids, representing 2-dimensional data on the
 sphere unravelled into a Julia `Vector`. Subtype of `AbstractGridArray` with
-`N=1` and `ArrayType=Vector{T}` of `eltype T`.""" 
+`N=1` and `ArrayType=Vector{T}` of `eltype T`."""
 const AbstractGrid{T} = AbstractGridArray{T, 1, Vector{T}}
 
 ## TYPES
@@ -22,7 +22,7 @@ nonparametric_type(grid::AbstractGridArray) = nonparametric_type(typeof(grid))
 # also needed for other array types, defined in extensions
 nonparametric_type(::Type{<:Array}) = Array
 
-# needed for unalias 
+# needed for unalias
 @inline Base.dataids(grid::AbstractGridArray) = Base.dataids(grid.data)
 
 """$(TYPEDSIGNATURES) Full grid array type for `grid`. Always returns the N-dimensional `*Array`
@@ -129,7 +129,7 @@ end
 
 function (::Type{Grid})(data::AbstractArray, input_as::Type{Matrix})  where Grid<:AbstractGridArray
     error("Only full grids can be created from matrix input")
-end 
+end
 
 for f in (:zeros, :ones, :rand, :randn)
     @eval begin
@@ -282,7 +282,7 @@ get_colat(Grid::Type{<:AbstractGridArray}, nlat_half::Integer) = π/2 .- get_lat
 """
 $(TYPEDSIGNATURES)
 Returns a vector `nlons` for the number of longitude points per latitude ring, north to south.
-Provide grid `Grid` and its resolution parameter `nlat_half`. For keyword argument 
+Provide grid `Grid` and its resolution parameter `nlat_half`. For keyword argument
 `both_hemispheres=false` only the northern hemisphere (incl Equator) is returned."""
 function get_nlons(Grid::Type{<:AbstractGridArray}, nlat_half::Integer; both_hemispheres::Bool=true)
     n = both_hemispheres ? get_nlat(Grid, nlat_half) : nlat_half
@@ -322,7 +322,7 @@ and then each grid point per ring. To be used like
     for ring in rings
         for ij in ring
             grid[ij]
-            
+
 Accesses precomputed `grid.rings`."""
 @inline eachring(grid::AbstractGridArray) = grid.rings
 
@@ -476,11 +476,11 @@ AbstractGPUGridArrayStyle{2, ArrayType, Grid}(::Val{1}) where {ArrayType, Grid} 
 AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{4}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{4, ArrayType, Grid}()
 AbstractGPUGridArrayStyle{3, ArrayType, Grid}(::Val{2}) where {ArrayType, Grid} = AbstractGPUGridArrayStyle{3, ArrayType, Grid}()
 
-function KernelAbstractions.get_backend( 
-    g::Grid 
-) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray} 
-    return KernelAbstractions.get_backend(g.data) 
-end 
+function KernelAbstractions.get_backend(
+    g::Grid
+) where {Grid <: AbstractGridArray{T, N, ArrayType}} where {T, N, ArrayType <: GPUArrays.AbstractGPUArray}
+    return KernelAbstractions.get_backend(g.data)
+end
 
 function Base.similar(
     bc::Broadcasted{AbstractGPUGridArrayStyle{N, ArrayType, Grid}},

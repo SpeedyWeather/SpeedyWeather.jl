@@ -110,8 +110,8 @@ add!(model::AbstractModel, callbacks::AbstractCallback...) =
 export GlobalSurfaceTemperatureCallback
 
 """
-Callback that records the global mean surface temperature on every time step
-$(TYPEDFIELDS)."""
+Callback that records the global mean surface temperature on every time step.
+$(TYPEDFIELDS)"""
 Base.@kwdef mutable struct GlobalSurfaceTemperatureCallback{NF} <: AbstractCallback
     timestep_counter::Int = 0
     temp::Vector{NF} = zeros(DEFAULT_NF, 0)
@@ -145,7 +145,7 @@ function callback!(
     diagn::DiagnosticVariables,
     model::AbstractModel,
 )
-    callback.timestep_counter += 1  
+    callback.timestep_counter += 1
     i = callback.timestep_counter
     callback.temp[i] = diagn.temp_average[diagn.nlayers]
 end

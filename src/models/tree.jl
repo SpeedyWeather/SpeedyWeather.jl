@@ -5,7 +5,7 @@ $(TYPEDSIGNATURES)
 Create a tree of fields inside a Simulation instance and fields within these fields
 as long as they are defined within the modules argument (default SpeedyWeather).
 Other keyword arguments are `max_level::Integer=10`, `with_types::Bool=false`
-or `with_size::Bool=false."""
+or `with_size::Bool=false`."""
 function tree(
     S::Simulation{M};
     modules=SpeedyWeather,
@@ -23,7 +23,7 @@ $(TYPEDSIGNATURES)
 Create a tree of fields inside a model and fields within these fields
 as long as they are defined within the modules argument (default SpeedyWeather).
 Other keyword arguments are `max_level::Integer=10`, `with_types::Bool=false`
-or `with_size::Bool=false."""
+or `with_size::Bool=false`."""
 function tree(
     M::AbstractModel;
     modules=SpeedyWeather,
@@ -41,7 +41,7 @@ $(TYPEDSIGNATURES)
 Create a tree of fields inside S and fields within these fields
 as long as they are defined within the modules argument (default SpeedyWeather).
 Other keyword arguments are `max_level::Integer=10`, `with_types::Bool=false`
-or `with_size::Bool=false."""
+or `with_size::Bool=false`."""
 function tree(S; modules=SpeedyWeather, with_size::Bool = false, kwargs...)
     s = "$(typeof(S))"
     s = ~with_size ? s : s*" ($(prettymemory(Base.summarysize(S))))"
