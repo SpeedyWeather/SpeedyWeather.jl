@@ -10,33 +10,37 @@ implicit_correction!(::DiagnosticVariables, ::PrognosticVariables, ::NoImplicit)
 # SHALLOW WATER MODEL
 export ImplicitShallowWater
 
-"""
-Struct that holds various precomputed arrays for the semi-implicit correction to
-prevent gravity waves from amplifying in the shallow water model.
+"""Struct that holds various precomputed arrays for the semi-implicit correction to
+prevent gravity waves from amplifying in the shallow water model. The implicit time step
+between i-1 and i+1 is controlled by the parameter `α` in the range [0, 1]
+    
+    α = 0   means the gravity wave terms are evaluated at i-1 (forward)
+    α = 0.5 evaluates at i+1 and i-1 (centered implicit)
+    α = 1   evaluates at i+1 (backward implicit)
+    α ∈ [0.5, 1] are also possible which controls the strength of the gravity wave dampening.
+    α = 0.5 slows gravity waves and prevents them from amplifying
+    α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
+
+Fields are
 $(TYPEDFIELDS)"""
-@kwdef struct ImplicitShallowWater{NF, VectorType} <: AbstractImplicit
-
-    # DIMENSIONS
-    trunc::Int
-
+@kwdef struct ImplicitShallowWater{NF} <: AbstractImplicit
     "[OPTION] coefficient for semi-implicit computations to filter gravity waves, 0.5 <= α <= 1"
     α::NF = 1
 
-    # PRECOMPUTED ARRAYS, to be initiliased with initialize!
-    H::Base.RefValue{NF} = Ref(zero(NF))        # layer_thickness
-    ξH::Base.RefValue{NF} = Ref(zero(NF))       # = 2αΔt*layer_thickness, store in RefValue for mutability
-    g∇²::VectorType = zeros(NF, trunc+2)        # = gravity*eigenvalues
-    ξg∇²::VectorType = zeros(NF, trunc+2)       # = 2αΔt*gravity*eigenvalues
-    S⁻¹::VectorType = zeros(NF, trunc+2)        # = 1 / (1-ξH*ξg∇²), implicit operator
+    "Gravity [m/s²], taken from model.planet at initialize!"
+    gravity::Base.RefValue{NF} = Ref(zero(NF))
+    
+    "Layer thickness [m], taken from model.atmosphere at initialize!"
+    layer_thickness::Base.RefValue{NF} = Ref(zero(NF))
+    
+    "Time step [s], = αdt = 2αΔt (for leapfrog)"
+    time_step::Base.RefValue{NF} = Ref(zero(NF))
 end
 
 """
 $(TYPEDSIGNATURES)
 Generator using the resolution from `spectral_grid`."""
-function ImplicitShallowWater(spectral_grid::SpectralGrid; kwargs...)
-    (; NF, VectorType, trunc) = spectral_grid
-    return ImplicitShallowWater{NF, VectorType}(; trunc, kwargs...)
-end
+ImplicitShallowWater(SG::SpectralGrid; kwargs...) = ImplicitShallowWater{SG.NF}(; kwargs...)
 
 # function barrier to unpack the constants struct for shallow water
 function initialize!(I::ImplicitShallowWater, dt::Real, ::DiagnosticVariables, model::ShallowWater)
@@ -52,30 +56,9 @@ function initialize!(
     planet::AbstractPlanet,
     atmosphere::AbstractAtmosphere,
 )
-
-    (; α, H, ξH, g∇², ξg∇², S⁻¹) = implicit          # precomputed arrays to be updated
-    (; gravity) = planet                             # gravitational acceleration [m/s²]
-    (; layer_thickness) = atmosphere                 # shallow water layer thickness [m]
-
-    # implicit time step between i-1 and i+1
-    # α = 0   means the gravity wave terms are evaluated at i-1 (forward)
-    # α = 0.5 evaluates at i+1 and i-1 (centered implicit)
-    # α = 1   evaluates at i+1 (backward implicit)
-    # α ∈ [0.5, 1] are also possible which controls the strength of the gravity wave dampening.
-    # α = 0.5 slows gravity waves and prevents them from amplifying
-    # α > 0.5 will dampen the gravity waves within days to a few timesteps (α=1)
-
-    ξ = α*dt                   # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
-    H[] = layer_thickness      # update H the undisturbed layer thickness without mountains
-    ξH[] = ξ*layer_thickness   # update ξ*H with new ξ, in RefValue for mutability
-
-    # loop over degree l of the harmonics (implicit terms are independent of order m)
-    @inbounds for l in eachindex(g∇², ξg∇², S⁻¹)
-        eigenvalue = -l*(l-1)               # =∇², with without 1/radius², 1-based -l*(l+1) → -l*(l-1)
-        g∇²[l] = gravity*eigenvalue         # doesn't actually change with dt
-        ξg∇²[l] = ξ*g∇²[l]                  # update ξg∇² with new ξ
-        S⁻¹[l] = inv(1 - ξH[]*ξg∇²[l])      # update 1/(1-ξ²gH∇²) with new ξ
-    end
+    implicit.gravity[] = planet.gravity                     # gravitational acceleration [m/s²]
+    implicit.layer_thickness[] = atmosphere.layer_thickness # shallow water layer thickness [m], undisturbed, no mountains
+    implicit.time_step[] = implicit.α*dt                    # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog) from input dt
 end
 
 """
@@ -93,35 +76,32 @@ function implicit_correction!(  diagn::DiagnosticVariables,
     pres_old = progn.pres[1]    # pressure/η at t
     pres_new = progn.pres[2]    # pressure/η at t+dt
 
-    (; g∇², ξg∇², S⁻¹) = implicit
-    H = implicit.H[]              # unpack as it's stored in a RefValue for mutation
-    ξH = implicit.ξH[]            # unpack as it's stored in a RefValue for mutation
+    # unpack with [] as stored in a RefValue for mutation during initialization
+    H = implicit.layer_thickness[]      # layer thickness [m], undisturbed, no mountains
+    g = implicit.gravity[]              # gravitational acceleration [m/s²]
+    ξ = implicit.time_step[]            # new implicit timestep ξ = α*dt = 2αΔt (for leapfrog)
+    
+    lmax, mmax = size(div_tend, OneBased, as=Matrix)
 
-    lmax, mmax = size(div_tend, ZeroBased, as=Matrix)
-    lmax -= 1
-
-    @boundscheck length(S⁻¹) == lmax+2 || throw(BoundsError)
-    @boundscheck length(ξg∇²) == lmax+2 || throw(BoundsError)
-    @boundscheck length(g∇²) == lmax+2 || throw(BoundsError)
-
-    for k in eachmatrix(div_tend)
+    @inbounds for k in eachmatrix(div_tend)
         lm = 0
-        for m in 1:mmax+1
-            for l in m:lmax+1
-                lm += 1     # single index lm corresponding to harmonic l, m with a LowerTriangularMatrix
+        for m in 1:mmax
+            for l in m:lmax
+                lm += 1                     # single index lm corresponding to harmonic l, m with a LowerTriangularMatrix
+                ∇² = -l*(l-1)               # eigenvalue, with without 1/radius², 1-based -l*(l+1) → -l*(l-1)
 
                 # calculate the G = N(Vⁱ) + NI(Vⁱ⁻¹ - Vⁱ) term.
                 # Vⁱ is a prognostic variable at time step i
                 # N is the right hand side of ∂V\∂t = N(V)
                 # NI is the part of N that's calculated semi-implicitily: N = NE + NI
-                G_div = div_tend[lm, k] - g∇²[l]*(pres_old[lm] - pres_new[lm])
+                G_div = div_tend[lm, k] - g*∇²*(pres_old[lm] - pres_new[lm])
                 G_η   = pres_tend[lm] - H*(div_old[lm, k] - div_new[lm, k])
 
                 # using the Gs correct the tendencies for semi-implicit time stepping
-                div_tend[lm, k] = S⁻¹[l]*(G_div - ξg∇²[l]*G_η)
-                pres_tend[lm] = G_η - ξH*div_tend[lm, k]
+                S⁻¹ = inv(1 - ξ^2*H*g*∇²)                   # operator to invert
+                div_tend[lm, k] = S⁻¹*(G_div - ξ*g*∇²*G_η)
+                pres_tend[lm] = G_η - ξ*H*div_tend[lm, k]
             end
-            lm += 1     # loop skips last row
         end
     end
 end
