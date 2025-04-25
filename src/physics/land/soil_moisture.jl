@@ -152,10 +152,10 @@ end
 export LandBucketMoisture
 
 @kwdef struct LandBucketMoisture{NF} <: AbstractSoilMoisture
-    "Time scale of vertical diffusion [s]"
+    "[OPTION] Time scale of vertical diffusion [s]"
     time_scale::Second = Day(2)
 
-    "Fraction of top layer runoff that is put into layer below [1]"
+    "[OPTION] Fraction of top layer runoff that is put into layer below [1]"
     runoff_fraction::NF = 0.5
 
     "[OPTION] Initial soil moisture, volume fraction [1]"
