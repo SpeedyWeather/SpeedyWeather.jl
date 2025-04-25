@@ -240,12 +240,19 @@ M = rand(LowerTriangularMatrix{ComplexF32}, 3, 3)
 Now `rotate!(::LowerTriangularArray, degree)`
 
 ```@repl LowerTriangularMatrices
-import LowerTriangularMatrices: rotate!
 rotate!(M, 45)
 ```
 
 represents the same (up to rounding errors from the rotation when not rotating by ``\pm 90, \pm 180, ...``)
-field in grid space but rotated by 45˚ eastward. Rotating again by 315˚ yields the original array
+field in grid space but rotated by 45˚ eastward. Note how the zonal modes (the first column) aren't
+rotated because they are zonally constant anyway (in fact their imaginary part can be dropped,
+but isn't here as created by the `rand`) and for the other modes this amounts to a multiplication with
+
+```math
+\exp(-i\frac{2π}{360}\phi m)
+```
+With ``\phi`` the rotation angle in degrees (positive eastward) and ``m`` the zonal wavenumber (order of the
+spherical harmonic, the zero-based column index). Rotating again by 315˚ yields the original array
 
 ```@repl LowerTriangularMatrices
 rotate!(M, 315)

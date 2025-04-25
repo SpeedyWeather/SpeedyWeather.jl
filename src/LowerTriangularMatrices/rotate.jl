@@ -7,7 +7,7 @@ function rotate!(L::LowerTriangularArray, degree::Real)
     for k in eachmatrix(L)
         lm = 0
         for m in 1:mmax
-            # complex rotation, exp(im*2π*degree/360) but more accurate
+            # complex rotation, exp(-i*m*2π*degree/360) but more accurate
             o = convert(complex(eltype(L)), cispi(-(m-1)*degree/180))
             for l in m:lmax
                 lm += 1
