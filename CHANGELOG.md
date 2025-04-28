@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.15
+
 - ImplicitShallowWater without precomputed arrays [#717](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/717)
 - CUDA-ised spectral transform [#602](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/602)
 - Fix isapprox for particles with longitude modulo [#714](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/714)
