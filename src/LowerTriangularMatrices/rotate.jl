@@ -1,6 +1,10 @@
 import LinearAlgebra: rotate!
 export rotate!
 
+"""$(TYPEDSIGNATURES)
+Rotate the field(s) represented by a LowerTriangularArray zonally by `degree`
+by multiplication of the spherical harmonics by exp(-i*m*2π*degree/360),
+with `m` the order of the spherical harmonic."""
 function rotate!(L::LowerTriangularArray, degree::Real)
     lmax, mmax = size(L, OneBased, as=Matrix)
 
