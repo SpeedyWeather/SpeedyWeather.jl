@@ -225,6 +225,39 @@ sum(L, dims=2)
 ```
 sums along the second dimension of the underlying vector, not of the full matrix representation. 
 
+## Rotation of `LowerTriangularArray`
+
+`LowerTriangularArray`s are used to describe spherical harmonics. In that case each element
+represents the coefficient in fron of the respective harmonic describing a field on the sphere
+when transformed to grid space. We implement `rotate!` for `LowerTriangularArray` to
+rotate these coefficients in complex number space to represent a longitude rotation of
+the represented grid space field. For example start with
+
+```@repl LowerTriangularMatrices
+M = rand(LowerTriangularMatrix{ComplexF32}, 3, 3)
+```
+
+Now `rotate!(::LowerTriangularArray, degree)`
+
+```@repl LowerTriangularMatrices
+rotate!(M, 45)
+```
+
+represents the same (up to rounding errors from the rotation when not rotating by ``\pm 90, \pm 180, ...``)
+field in grid space but rotated by 45˚ eastward. Note how the zonal modes (the first column) aren't
+rotated because they are zonally constant anyway (in fact their imaginary part can be dropped,
+but isn't here as created by the `rand`) and for the other modes this amounts to a multiplication with
+
+```math
+\exp(-i\frac{2π}{360}\phi m)
+```
+With ``\phi`` the rotation angle in degrees (positive eastward) and ``m`` the zonal wavenumber (order of the
+spherical harmonic, the zero-based column index). Rotating again by 315˚ yields the original array
+
+```@repl LowerTriangularMatrices
+rotate!(M, 315)
+```
+
 ## Broadcasting with `LowerTriangularArray`
 
 In contrast to linear algebra, many element-wise operations work as expected thanks to broadcasting,

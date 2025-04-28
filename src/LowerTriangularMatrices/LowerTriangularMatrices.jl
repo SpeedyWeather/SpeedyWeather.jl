@@ -19,6 +19,7 @@ export eachharmonic, eachmatrix
 export OneBased, ZeroBased
 
 include("lower_triangular_array.jl")
+include("rotate.jl")
 include("plot.jl")
 
 end
