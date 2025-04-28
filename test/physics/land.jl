@@ -29,7 +29,13 @@ end
     
                     model = Model(spectral_grid; land)
                     simulation = initialize!(model)
-                    run!(simulation, period=Hour(2))
+                    
+                    progn = simulation.prognostic_variables
+                    diagn = simulation.diagnostic_variables
+                    land_timestep!(progn, diagn, model)
+
+                    # don't run full model as this recompiles for every iteration of the loop
+                    # run!(simulation, period=Hour(2))
                 end
             end
         end
