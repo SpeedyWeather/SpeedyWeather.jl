@@ -15,6 +15,7 @@ include("grids/grids.jl")
 include("grids/geodesics.jl")
 include("grids/interpolation.jl")
 include("grids/reverse.jl")
+include("grids/rotate.jl")
 
 # GPU/KERNELABSTRACTIONS
 include("gpu/kernelabstractions.jl")
