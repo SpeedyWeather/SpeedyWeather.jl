@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- reverse and reverse! for LowerTriangularArray, in longitude or latitude [#720](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/720)
+
 ## v0.15
 
 - RingGrid and LowerTriangularArray longitude rotation [#710](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/710)
