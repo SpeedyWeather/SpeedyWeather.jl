@@ -4,6 +4,7 @@
 
 - Speed up CI for land models [#719](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/719)
 - Move documentation to SpeedyWeatherDocumentation repository [#713](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/713) and [#722](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/722)
+- Ensure docs don't deploy with `.jld2` or `.nc` files [#724](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/724)
 
 ## v0.15
 
