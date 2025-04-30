@@ -62,6 +62,18 @@ makedocs(
             ]
 )
 
+"""
+    recursive_find(directory, pattern)
+
+Return list of filepaths within `directory` that contains the `pattern::Regex`.
+"""
+function recursive_find(directory, pattern)
+    mapreduce(vcat, walkdir(directory)) do (root, dirs, filenames)
+        matched_filenames = filter(contains(pattern), filenames)
+        map(filename -> joinpath(root, filename), matched_filenames)
+    end
+end
+
 # remove all .jld2 and .nc files in the docs folder from simulations
 for pattern in [r"\.jld2", r"\.nc"]
     filenames = recursive_find(@__DIR__, pattern)
