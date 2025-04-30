@@ -3,6 +3,9 @@
 ## Unreleased
 
 - Move documentation to SpeedyWeatherDocumentation repository [#713](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/713)
+
+## v0.15
+
 - RingGrid and LowerTriangularArray longitude rotation [#710](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/710)
 - ImplicitShallowWater without precomputed arrays [#717](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/717)
 - CUDA-ised spectral transform [#602](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/602)
