@@ -3,6 +3,14 @@
 ## Unreleased
 
 - Move documentation to SpeedyWeatherDocumentation repository [#713](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/713)
+
+## v0.15
+
+- RingGrid and LowerTriangularArray longitude rotation [#710](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/710)
+- ImplicitShallowWater without precomputed arrays [#717](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/717)
+- CUDA-ised spectral transform [#602](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/602)
+- Fix isapprox for particles with longitude modulo [#714](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/714)
+- Fix docstring rendering [#712](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/712)
 - Make KolmogorovFlow forcing default for BarotropicModel [#687](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/687)
 - Updated documentation to include four illustrative figures in the large-scale precipitation and convection sections [#702](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/702)
 - Added documentation to output surface variables [#708](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/708)
@@ -90,6 +98,7 @@
 - Move CUDA dependency into extension [#586](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/586)
 - Stop supporting Julia v1.9 [#585](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/585)
 - `feedback.verbose` (de/activate the progressbar) is now set to `isinteractive()` to disable automatically for documentation [#582](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/582)
+- CUDA CI added for the GPU version [#645](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/645)
 
 ## v0.11.0
 

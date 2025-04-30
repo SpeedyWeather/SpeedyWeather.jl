@@ -63,7 +63,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/SpeedyWeather/SpeedyWeatherDocumentation.git",
+    repo = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
     devbranch = "main",
     push_preview = true,
     versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"]

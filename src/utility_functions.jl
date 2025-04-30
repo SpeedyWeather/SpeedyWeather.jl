@@ -56,7 +56,7 @@ end
 """
     A = nans(T, dims...)
 
-Allocate array A with NaNs of type T. Similar to zeros(T, dims...)."""
+Allocate array A with NaNs of type T. Similar to `zeros(T, dims...)`."""
 function nans(::Type{T}, dims...) where T
     return fill(convert(T, NaN), dims...)
 end
@@ -64,7 +64,7 @@ end
 """
     A = nans(dims...)
 
-Allocate A::Array{Float64} with NaNs."""
+Allocate `A::Array{Float64}` with NaNs."""
 nans(dims...) = nans(Float64, dims...)
 
 """
@@ -92,7 +92,7 @@ function print_fields(io::IO, A, keys;arrays::Bool=false)
 
         # remove last ", "
         s_without_comma = s[1:prevind(s, findlast(==(','), s))]
-        print(io, s_without_comma)    
+        print(io, s_without_comma)
     end
 end
 
