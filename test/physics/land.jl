@@ -9,7 +9,10 @@
 
             model = Model(spectral_grid; land)
             simulation = initialize!(model)
-            run!(simulation, period=Hour(2))
+            
+            progn = simulation.prognostic_variables
+            diagn = simulation.diagnostic_variables
+            SpeedyWeather.land_timestep!(progn, diagn, model)
         end
     end
 end
