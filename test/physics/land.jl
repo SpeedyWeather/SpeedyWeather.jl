@@ -32,7 +32,7 @@ end
                     
                     progn = simulation.prognostic_variables
                     diagn = simulation.diagnostic_variables
-                    land_timestep!(progn, diagn, model)
+                    SpeedyWeather.land_timestep!(progn, diagn, model)
 
                     # don't run full model as this recompiles for every iteration of the loop
                     # run!(simulation, period=Hour(2))
