@@ -3,7 +3,9 @@ using SpeedyWeather
 
 makedocs(
     format = Documenter.HTML(prettyurls=get(ENV, "CI", nothing)=="true",
-                             ansicolor=true, collapselevel=1,
+                             ansicolor=true,
+                             collapselevel=1,
+                             canonical = "https://speedyweather.github.io/SpeedyWeatherDocumentation/stable/",
                              size_threshold = 600_000),      # in bytes
     sitename = "SpeedyWeather.jl",
     authors = "M Klöwer and SpeedyWeather contributors",
@@ -61,7 +63,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/SpeedyWeather/SpeedyWeather.jl.git",
+    repo = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
     devbranch = "main",
     push_preview = true,
     versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"]
