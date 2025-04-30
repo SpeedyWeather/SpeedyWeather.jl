@@ -62,6 +62,15 @@ makedocs(
             ]
 )
 
+# remove all .jld2 and .nc files in the docs folder from simulations
+for pattern in [r"\.jld2", r"\.nc"]
+    filenames = recursive_find(@__DIR__, pattern)
+
+    for filename in filenames
+        rm(filename)
+    end
+end
+
 deploydocs(
     repo = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
     devbranch = "main",
