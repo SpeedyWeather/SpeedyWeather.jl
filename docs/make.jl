@@ -80,6 +80,7 @@ if get(ENV, "GITHUB_EVENT_NAME", "") == "pull_request"
     deploydocs(repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
                repo_previews = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
                devbranch = "main",
+               forcepush = true,
                push_preview = true,
                versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"])
 else
@@ -87,6 +88,7 @@ else
     withenv("GITHUB_REPOSITORY" => repo) do
         deploydocs(repo = repo,
                    devbranch = "main",
+                   forcepush = true,
                    versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"])
     end
 end
