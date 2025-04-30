@@ -71,9 +71,22 @@ for pattern in [r"\.jld2", r"\.nc"]
     end
 end
 
-deploydocs(
-    repo = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
-    devbranch = "main",
-    push_preview = true,
-    versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"]
-)
+# Replace with below once https://github.com/JuliaDocs/Documenter.jl/pull/2692 is merged and available.
+#  deploydocs(repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
+#    deploy_repo = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
+#    devbranch = "main",
+#    push_preview = true)
+if get(ENV, "GITHUB_EVENT_NAME", "") == "pull_request"
+    deploydocs(repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
+               repo_previews = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
+               devbranch = "main",
+               push_preview = true,
+               versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"])
+else
+    repo = "github.com/SpeedyWeather/SpeedyWeatherDocumentation"
+    withenv("GITHUB_REPOSITORY" => repo) do
+        deploydocs(repo = repo,
+                   devbranch = "main",
+                   versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"])
+    end
+end
