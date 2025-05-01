@@ -62,6 +62,27 @@ makedocs(
             ]
 )
 
+"""
+    recursive_find(directory, pattern)
+
+Return list of filepaths within `directory` that contains the `pattern::Regex`.
+"""
+function recursive_find(directory, pattern)
+    mapreduce(vcat, walkdir(directory)) do (root, dirs, filenames)
+        matched_filenames = filter(contains(pattern), filenames)
+        map(filename -> joinpath(root, filename), matched_filenames)
+    end
+end
+
+# remove all .jld2 and .nc files in the docs folder from simulations
+for pattern in [r"\.jld2", r"\.nc"]
+    filenames = recursive_find(@__DIR__, pattern)
+
+    for filename in filenames
+        rm(filename)
+    end
+end
+
 # Replace with below once https://github.com/JuliaDocs/Documenter.jl/pull/2692 is merged and available.
 #  deploydocs(repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
 #    deploy_repo = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
@@ -71,6 +92,7 @@ if get(ENV, "GITHUB_EVENT_NAME", "") == "pull_request"
     deploydocs(repo = "github.com/SpeedyWeather/SpeedyWeather.jl",
                repo_previews = "github.com/SpeedyWeather/SpeedyWeatherDocumentation",
                devbranch = "main",
+               forcepush = true,
                push_preview = true,
                versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"])
 else
@@ -78,6 +100,7 @@ else
     withenv("GITHUB_REPOSITORY" => repo) do
         deploydocs(repo = repo,
                    devbranch = "main",
+                   forcepush = true,
                    versions = ["stable" => "v^", "v#.#.#", "dev" => "dev"])
     end
 end
