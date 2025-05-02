@@ -1,3 +1,5 @@
+using Dates
+
 """
 $(TYPEDSIGNATURES)
 Check whether elements of a vector `v` are strictly increasing."""

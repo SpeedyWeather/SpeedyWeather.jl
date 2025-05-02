@@ -31,7 +31,9 @@ export DateTime, Millisecond, Second, Minute, Hour, Day, Week
 # export functions that have many cross-component methods
 export initialize!, finalize!
 
-include("utility_functions.jl")
+# import utilities
+include("Utils/Utils.jl")
+using .Utils
 
 # LowerTriangularMatrices for spherical harmonics
 export  LowerTriangularMatrices, 
