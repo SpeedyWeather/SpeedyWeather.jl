@@ -238,16 +238,26 @@ $(TYPEDFIELDS)"""
 end
 
 """$(TYPEDSIGNATURES)
-Generator function."""
-function DynamicsVariables(SG::SpectralGrid)
+Generator function. If a `spectral_transform` is handed over, the same scratch memory is used."""
+function DynamicsVariables(SG::SpectralGrid; 
+                           spectral_transform::Union{Nothing,SpectralTransform}=nothing) 
     (; trunc, nlat_half, nlayers, NF, ArrayType) = SG
     (; SpectralVariable2D, SpectralVariable3D) = SG
     (; GridVariable2D, GridVariable3D) = SG
 
-    return DynamicsVariables{NF, ArrayType, SpectralVariable2D, SpectralVariable3D,
-        GridVariable2D, GridVariable3D, SpeedyTransforms.ScratchMemory{NF, ArrayType{Complex{NF}, 3}}}(;
-            trunc, nlat_half, nlayers,
+    if isnothing(spectral_transform)
+        return DynamicsVariables{NF, ArrayType, SpectralVariable2D, SpectralVariable3D,
+            GridVariable2D, GridVariable3D, SpeedyTransforms.ScratchMemory{NF, ArrayType{Complex{NF}, 3}}}(;
+                trunc, nlat_half, nlayers,
+            )
+    else 
+        scratch_memory = spectral_transform.scratch_memory 
+
+        return DynamicsVariables{NF, ArrayType, SpectralVariable2D, SpectralVariable3D,
+        GridVariable2D, GridVariable3D, typeof(scratch_memory)}(;
+            trunc, nlat_half, nlayers, scratch_memory,
         )
+    end 
 end
 
 
@@ -470,7 +480,7 @@ struct DiagnosticVariables{
 end
 
 function DiagnosticVariables(SG::SpectralGrid, model::Union{Barotropic, ShallowWater})
-    diagn = DiagnosticVariables(SG)
+    diagn = DiagnosticVariables(SG; spectral_transform=model.spectral_transform)
     add!(diagn, model.tracers)
     return diagn
 end
@@ -479,15 +489,16 @@ end
 function DiagnosticVariables(SG::SpectralGrid, model::PrimitiveEquation)
     nbands_shortwave = get_nbands(model.shortwave_radiation)
     nbands_longwave = get_nbands(model.longwave_radiation)
-    diagn =  DiagnosticVariables(SG; nbands_shortwave, nbands_longwave)
+    diagn =  DiagnosticVariables(SG; spectral_transform=model.spectral_transform, nbands_shortwave, nbands_longwave)
     add!(diagn, model.tracers)
     return diagn
 end
 
 """$(TYPEDSIGNATURES)
-Generator function."""
+Generator function. If a `transform` is handed over, the same scratch memory is used."""
 function DiagnosticVariables(
     SG::SpectralGrid;
+    spectral_transform::Union{Nothing, SpectralTransform} = nothing,
     nbands_shortwave::Integer = 0,
     nbands_longwave::Integer = 0,
 )
@@ -495,7 +506,7 @@ function DiagnosticVariables(
 
     tendencies = Tendencies(SG)
     grid = GridVariables(SG)
-    dynamics = DynamicsVariables(SG)
+    dynamics = DynamicsVariables(SG; spectral_transform)
     physics = PhysicsVariables(SG)
     particles = ParticleVariables(SG)
     column = ColumnVariables(SG; nbands_shortwave, nbands_longwave)
