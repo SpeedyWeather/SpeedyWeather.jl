@@ -78,7 +78,7 @@ initialize!(albedo::GlobalConstantAlbedo, ::PrimitiveEquation) = nothing
 ## MANUAL ALBEDO
 export ManualAlbedo
 
-"""Manual albedo field, to be used with set! and is copied into the diagnostic variables on every time step.
+"""Manual albedo field, to be used with `set!` and is copied into the diagnostic variables on every time step.
 Defined so that parameterizations can change the albedo at every time step (e.g. snow cover) without
 losing the information of the original surface albedo. Fields are
 $(TYPEDFIELDS)"""
@@ -121,7 +121,7 @@ end
 set!(albedo::AbstractAlbedo, args...; kwargs...) = set!(albedo.albedo, args...; kwargs...)
 
 function initialize!(albedo::AlbedoClimatology, model::PrimitiveEquation)
-    
+
     # LOAD NETCDF FILE
     if albedo.path == "SpeedyWeather.jl/input_data"
         path = joinpath(@__DIR__, "../../input_data", albedo.file)

@@ -37,13 +37,13 @@ $(TYPEDFIELDS)"""
     planet::PL = Earth(spectral_grid)
     atmosphere::AT = EarthAtmosphere(spectral_grid)
     coriolis::CO = Coriolis(spectral_grid)
-    forcing::FR = NoForcing()
-    drag::DR = NoDrag()
+    forcing::FR = KolmogorovFlow(spectral_grid)
+    drag::DR = LinearVorticityDrag(spectral_grid)
     particle_advection::PA = NoParticleAdvection()
     initial_conditions::IC = InitialConditions(Barotropic)
     
     # VARIABLES
-    random_process::RP = NoRandomProcess()
+    random_process::RP = NoRandomProcess(spectral_grid)
     tracers::TRACER_DICT = TRACER_DICT()
 
     # NUMERICS

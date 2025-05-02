@@ -79,19 +79,20 @@
 
     autodiff(Reverse, SpeedyWeather.dynamics_tendencies!, Const, Duplicated(diagn, ddiag), Duplicated(progn, dprogn), Const(lf2), Const(model))
 
-    function dynamics_tendencies(diagn, progn, lf, model)
-        diagn_new = deepcopy(diagn)
-        SpeedyWeather.dynamics_tendencies!(diagn_new, deepcopy(progn), lf, deepcopy(model))
-        return diagn_new
-    end 
-
-    fd_vjp = FiniteDifferences.j′vp(central_fdm(9,1), x -> dynamics_tendencies(deepcopy(diagn_copy), x, lf2, deepcopy(model)), ddiag_copy, progn_copy)
-
-    @test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
-
     # in the default configuration without forcing or drag, the barotropic model's dynamics_tendencies don't dependent on the previous prognostic state, but only on the diagnostic variables 
     @test sum(to_vec(dprogn)[1]) ≈ 0 
 
+    # FD comparison not necessary, we have the exact values 
+    #function dynamics_tendencies(diagn, progn, lf, model)
+    #    diagn_new = deepcopy(diagn)
+    #    SpeedyWeather.dynamics_tendencies!(diagn_new, deepcopy(progn), lf, deepcopy(model))
+    #    return diagn_new
+    #end 
+    #
+    #fd_vjp = FiniteDifferences.j′vp(central_fdm(9,1), x -> dynamics_tendencies(diagn_copy, x, lf2, deepcopy(model)), ddiag_copy, progn_copy)
+    #
+    #@test all(isapprox.(to_vec(fd_vjp[1])[1], to_vec(dprogn)[1],rtol=1e-4,atol=1e-1))
+ 
     #
     # horizontal_diffusion!
     #

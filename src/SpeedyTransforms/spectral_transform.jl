@@ -8,10 +8,9 @@ to perform a spectral transform. Fields are
 $(TYPEDFIELDS)"""
 struct SpectralTransform{
     NF,
-    ArrayType,
+    ArrayType,                  # non-parametric array type
     VectorType,                 # <: ArrayType{NF, 1},
     VectorComplexType,          # <: ArrayType{Complex{NF}, 1},
-    VectorIntType,              # <: ArrayType{Int, 1},
     MatrixComplexType,          # <: ArrayType{Complex{NF}, 2},
     ArrayComplexType,           # <: ArrayType{Complex{NF}, 3},
     LowerTriangularMatrixType,  # <: LowerTriangularArray{NF, 1, ArrayType{NF}},
@@ -27,12 +26,12 @@ struct SpectralTransform{
     mmax::Int                       # Maximum order m=[0, l] of spherical harmonics
     nfreq_max::Int                  # Maximum (at Equator) number of Fourier frequencies (real FFT)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} # Legendre shortcut for truncation of m loop
-    mmax_truncation::VectorIntType  # Maximum order m to retain per latitude ring
+    mmax_truncation::Vector{Int}   # Maximum order m to retain per latitude ring
 
     # CORRESPONDING GRID SIZE
-    nlon_max::Int           # Maximum number of longitude points (at Equator)
-    nlons::VectorIntType    # Number of longitude points per ring
-    nlat::Int               # Number of latitude rings
+    nlon_max::Int                   # Maximum number of longitude points (at Equator)
+    nlons::Vector{Int}              # Number of longitude points per ring
+    nlat::Int                       # Number of latitude rings
 
     # CORRESPONDING GRID VECTORS
     coslat::VectorType              # Cosine of latitudes, north to south
@@ -60,6 +59,9 @@ struct SpectralTransform{
     scratch_memory_spec::VectorComplexType
     scratch_memory_column_north::VectorComplexType  # scratch memory for vertically batched Legendre transform
     scratch_memory_column_south::VectorComplexType  # scratch memory for vertically batched Legendre transform
+
+    jm_index_size::Int                              # number of indices per layer in kjm_indices
+    kjm_indices::ArrayType                          # precomputed kjm loop indices map
 
     # SOLID ANGLES ΔΩ FOR QUADRATURE
     # (integration for the Legendre polynomials, extra normalisation of π/nlat included)
@@ -99,12 +101,13 @@ function SpectralTransform(
     mmax::Integer,                                  # Spectral truncation: orders
     nlat_half::Integer;                             # grid resolution, latitude rings on one hemisphere incl equator
     Grid::Type{<:AbstractGridArray} = DEFAULT_GRID, # type of spatial grid used
-    ArrayType::Type{<:AbstractArray} = Array,       # Array type used for spectral coefficients
+    ArrayType::Type{<:AbstractArray} = Array,       # Array type used for spectral coefficients (can be parametric)
     nlayers::Integer = DEFAULT_NLAYERS,             # number of layers in the vertical (for scratch memory size)
     LegendreShortcut::Type{<:AbstractLegendreShortcut} = LegendreShortcutLinear,   # shorten Legendre loop over order m
 ) where NF
 
-    Grid = RingGrids.nonparametric_type(Grid)   # always use nonparametric concrete type
+    Grid = RingGrids.nonparametric_type(Grid)               # always use nonparametric concrete type
+    ArrayType_ = RingGrids.nonparametric_type(ArrayType)    # drop parameters of ArrayType
 
     # guarantee a nonparametric type to construct lower triangular types correctly
     ArrayType_ = RingGrids.nonparametric_type(ArrayType)
@@ -144,38 +147,47 @@ function SpectralTransform(
         legendre_polynomials[:, j] = LowerTriangularArray(legendre_polynomials_j)  # store
     end
     
-    # SCRATCH MEMORY 
+    # SCRATCH MEMORY FOR FOURIER NOT YET LEGENDRE TRANSFORMED AND VICE VERSA
     scratch_memory = ScratchMemory(NF, ArrayType_, nfreq_max, nlayers, nlat_half)
 
     # SCRATCH MEMORY TO 1-STRIDE DATA FOR FFTs
-    scratch_memory_grid  = zeros(NF, nlon_max*nlayers)
-    scratch_memory_spec  = zeros(Complex{NF}, nfreq_max*nlayers)
+    scratch_memory_grid  = ArrayType_(zeros(NF, nlon_max*nlayers))
+    scratch_memory_spec  = ArrayType_(zeros(Complex{NF}, nfreq_max*nlayers))
 
     # SCRATCH MEMORY COLUMNS FOR VERTICALLY BATCHED LEGENDRE TRANSFORM
-    scratch_memory_column_north = zeros(Complex{NF}, nlayers)
-    scratch_memory_column_south = zeros(Complex{NF}, nlayers)
+    scratch_memory_column_north = ArrayType_(zeros(Complex{NF}, nlayers))
+    scratch_memory_column_south = ArrayType_(zeros(Complex{NF}, nlayers))
 
-    # PLAN THE FFTs
-    FFT_package = NF <: Union{Float32, Float64} ? FFTW : GenericFFT
     rfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     rfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
     brfft_plans_1D = Vector{AbstractFFTs.Plan}(undef, nlat_half)
 
-    fake_grid_data = zeros(Grid{NF}, nlat_half, nlayers)
+    fake_grid_data = adapt(ArrayType_, zeros(Grid{NF}, nlat_half, nlayers))
 
-    for (j, nlon) in enumerate(nlons)
-        real_matrix_input = view(fake_grid_data.data, rings[j], :)
-        complex_matrix_input = view(scratch_memory.north, 1:nlon÷2 + 1, :, j)
-        real_vector_input = view(fake_grid_data.data, rings[j], 1)
-        complex_vector_input = view(scratch_memory.north, 1:nlon÷2 + 1, 1, j)
-
-        rfft_plans[j] = FFT_package.plan_rfft(real_matrix_input, 1)
-        brfft_plans[j] = FFT_package.plan_brfft(complex_matrix_input, nlon, 1)
-        rfft_plans_1D[j] = FFT_package.plan_rfft(real_vector_input, 1)
-        brfft_plans_1D[j] = FFT_package.plan_brfft(complex_vector_input, nlon, 1)
-    end
+    # PLAN THE FFTs
+    plan_FFTs!(
+        rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
+        fake_grid_data, scratch_memory_north, rings, nlons
+    )
     
+    # PRECOMPUTE KJM INDICES FOR LEGENDRE TRANSFORM (0-based)
+    # For GPU it's quicker to precompute the indices for the loops in the 
+    # legendre transform and store them in a 3D array rather than computing them 
+    # on the fly. We also store the jm_index_size for the loop so we can 
+    # truncate to fewer layers if needed. 
+    jm_index_size = sum(mmax_truncation .+ 1)
+    kjm_indices = zeros(Int, jm_index_size * nlayers, 3)
+    i = 0
+    for k in 1:nlayers
+        for (j, mmax_j) in enumerate(mmax_truncation) 
+            for m in 1:mmax_j+1
+                i += 1
+                kjm_indices[i, :] .= [k, j, m]
+            end
+        end
+    end
+
     # SOLID ANGLES WITH QUADRATURE WEIGHTS (Gaussian, Clenshaw-Curtis, or Riemann depending on grid)
     # solid angles are ΔΩ = sinθ Δθ Δϕ for every grid point with
     # sin(θ)dθ are the quadrature weights approximate the integration over latitudes
@@ -236,7 +248,6 @@ function SpectralTransform(
         ArrayType_,
         ArrayType_{NF, 1},
         ArrayType_{Complex{NF}, 1},
-        ArrayType_{Int, 1},
         ArrayType_{Complex{NF}, 2},
         ArrayType_{Complex{NF}, 3},
         LowerTriangularArray{NF, 1, ArrayType_{NF, 1}},
@@ -250,7 +261,10 @@ function SpectralTransform(
         norm_sphere,
         rfft_plans, brfft_plans, rfft_plans_1D, brfft_plans_1D,
         legendre_polynomials,
-        scratch_memory, scratch_memory_grid, scratch_memory_spec, scratch_memory_column_north, scratch_memory_column_south,
+        scratch_memory, 
+        scratch_memory_grid, scratch_memory_spec,
+        scratch_memory_column_north, scratch_memory_column_south,
+        jm_index_size, kjm_indices,
         solid_angles, grad_y1, grad_y2,
         grad_y_vordiv1, grad_y_vordiv2, vordiv_to_uv_x,
         vordiv_to_uv1, vordiv_to_uv2,

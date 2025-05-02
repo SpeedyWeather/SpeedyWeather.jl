@@ -19,7 +19,7 @@ function initialize!(
     has(model, :humid) && initialize!(progn, IC.humid,  model)
 end
 
-InitialConditions(::Type{<:Barotropic}) = InitialConditions(; vordiv = StartWithRandomVorticity())
+InitialConditions(::Type{<:Barotropic}) = InitialConditions(; vordiv = RandomVelocity())
 InitialConditions(::Type{<:ShallowWater}) = InitialConditions(; vordiv = ZonalJet())
 function InitialConditions(::Type{<:PrimitiveDry})
     vordiv = ZonalWind()
@@ -60,40 +60,105 @@ function initialize!(
     has(model, :humid) && initialize!(progn, IC.humid, model)
 end
 
-export StartWithRandomVorticity
+export RandomVorticity
 
 """Start with random vorticity as initial conditions
 $(TYPEDFIELDS)"""
-@kwdef mutable struct StartWithRandomVorticity <: AbstractInitialConditions
-    "Power of the spectral distribution k^power"
+@kwdef mutable struct RandomVorticity <: AbstractInitialConditions
+    "[OPTION] Power of the spectral distribution k^power"
     power::Float64 = -3
 
-    "(approximate) amplitude in [1/s], used as standard deviation of spherical harmonic coefficients"
-    amplitude::Float64 = 1e-5
+    "[OPTION] the (approximate) amplitude in [1/s], used as standard deviation of spherical harmonic coefficients"
+    amplitude::Float64 = 1e-4
+
+    "[OPTION] Maximum wavenumber"
+    max_wavenumber::Int = 20
+
+    "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
+    seed::Int = 123
+
+    "Independent random number generator for this random process"
+    random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
 end
 
-"""
-$(TYPEDSIGNATURES)
+"""$(TYPEDSIGNATURES)
 Start with random vorticity as initial conditions"""
 function initialize!(   progn::PrognosticVariables{NF},
-                        initial_conditions::StartWithRandomVorticity,
+                        initial_conditions::RandomVorticity,
                         model::Barotropic) where NF
+
+    # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
+    seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
+    RNG = initial_conditions.random_number_generator
+    Random.seed!(RNG, seed)
 
     lmax = progn.trunc + 1
     power = initial_conditions.power + 1    # +1 as power is summed of orders m
-                   
-    ξ = randn(LowerTriangularArray{Complex{NF}}, lmax, lmax, 1)*convert(NF, initial_conditions.amplitude)
-    ξ[1] = 0 # don't perturb l=m=0 mode to have zero mean
 
+    A = initial_conditions.amplitude
+    ξ = zeros(LowerTriangularArray{Complex{NF}}, lmax+1, lmax, model.spectral_grid.nlayers)
+
+    lm = 0
     for m in 1:lmax
         for l in m:lmax
-            ξ[l, m, 1] *= l^power
+            lm += 1
+            ξ[lm, :] .= A*l^power*(2rand(RNG, Complex{NF}) - (1 + 1im))
         end
     end
 
-    ξ = repeat(ξ, 1, model.spectral_grid.nlayers) # repeat for each level to have the same IC across all vertical layers
-    
+    spectral_truncation!(ξ, initial_conditions.max_wavenumber)
+    ξ[1:lmax, :] .= 0       # remove zonal modes and mean
     set!(progn, model; vor=ξ, lf=1)
+end
+
+export RandomVelocity
+
+"""Start with random velocity as initial conditions
+$(TYPEDFIELDS)"""
+@kwdef mutable struct RandomVelocity <: AbstractInitialConditions
+    "[OPTION] maximum speed [ms⁻¹]"
+    max_speed::Float64 = 60
+
+    "[OPTION] Maximum wavenumber after truncation"
+    truncation::Int = 15
+
+    "[OPTION] Random number generator seed, 0=randomly seed from Julia's GLOBAL_RNG"
+    seed::Int = 0
+
+    "Independent random number generator for this random process"
+    random_number_generator::Random.Xoshiro = Random.Xoshiro(seed)
+end
+
+"""$(TYPEDSIGNATURES)
+Start with random vorticity as initial conditions"""
+function initialize!(   progn::PrognosticVariables{NF},
+                        initial_conditions::RandomVelocity,
+                        model::Barotropic) where NF
+
+    # reseed the random number generator, for seed=0 randomly seed from Julia's global RNG
+    seed = initial_conditions.seed == 0 ? rand(UInt) : initial_conditions.seed
+    RNG = initial_conditions.random_number_generator
+    Random.seed!(RNG, seed)
+
+    (; GridVariable2D, nlat_half, radius, trunc, nlayers) = model.spectral_grid
+    A = convert(NF, initial_conditions.max_speed) * 2
+    u = 2A*rand(GridVariable2D, nlat_half) .- A
+    v = 2A*rand(GridVariable2D, nlat_half) .- A
+
+    u_spectral = transform(u, model.spectral_transform)
+    v_spectral = transform(v, model.spectral_transform)
+
+    spectral_truncation!(u_spectral, initial_conditions.truncation)
+    spectral_truncation!(v_spectral, initial_conditions.truncation)
+
+    ξ = curl(u_spectral, v_spectral, model.spectral_transform; radius)
+    ξ[1] = 0        # remove mean
+
+    # repeat over vertical layers
+    ξks = repeat(ξ, 1, nlayers)
+    set!(progn, model; vor=ξks, lf=1)
+
+    return nothing
 end
 
 export ZonalJet
@@ -104,25 +169,25 @@ $(TYPEDFIELDS)"""
 @kwdef mutable struct ZonalJet <: AbstractInitialConditions
     "jet latitude [˚N]"
     latitude::Float64 = 45
-    
+
     "jet width [˚], default ≈ 19.29˚"
     width::Float64 = (1/4-1/7)*180
 
     "jet maximum velocity [m/s]"
     umax::Float64 = 80
-    
+
     "perturbation latitude [˚N], position in jet by default"
     perturb_lat::Float64 = latitude
-    
+
     "perturbation longitude [˚E]"
     perturb_lon::Float64 = 270
-    
+
     "perturbation zonal extent [˚], default ≈ 19.1˚"
     perturb_xwidth::Float64 = 1/3*360/2π
 
     "perturbation meridinoal extent [˚], default ≈ 3.8˚"
     perturb_ywidth::Float64 = 1/15*360/2π
-    
+
     "perturbation amplitude [m]"
     perturb_height::Float64 = 120
 end
@@ -141,7 +206,7 @@ function initialize!(   progn::PrognosticVariables,
     θ₀ = (latitude-width)/360*2π    # southern boundary of jet [radians]
     θ₁ = (latitude+width)/360*2π    # northern boundary of jet
     eₙ = exp(-4/(θ₁-θ₀)^2)          # normalisation
-    
+
     θ₂ = perturb_lat*2π/360         # perturbation latitude [radians]
     α = perturb_xwidth*2π/360       # zonal extent of interface perturbation [radians]
     β = perturb_ywidth*2π/360       # meridional extent of interface perturbation [radians]
@@ -158,7 +223,7 @@ function initialize!(   progn::PrognosticVariables,
 
     for (j, ring) in enumerate(eachring(u_grid))
         θ = lat[j]             # latitude in radians
-        
+
         # velocity per latitude
         if θ₀ < θ < θ₁
             u_θ = umax/eₙ*exp(1/(θ-θ₀)/(θ-θ₁))  # u as in Galewsky, 2004
@@ -172,7 +237,7 @@ function initialize!(   progn::PrognosticVariables,
         # store in all longitudes
         for ij in ring
             u_grid[ij] = u_θ/radius*coslat⁻¹[j]   # include scaling for curl!
-            
+
             # calculate perturbation (possibly shifted in lon compared to Galewsky 2004)
             ϕ = lons[ij] - λ
             η_perturb_grid[ij] = exp(-(ϕ/α)^2)*ηθ
@@ -184,7 +249,7 @@ function initialize!(   progn::PrognosticVariables,
     # invert the Laplacian for
     # ∇²(gη) = -∇⋅(0, (ζ+f)*u) - ∇²(u^2/2)
     u = transform(u_grid, model.spectral_transform)
-    
+
     # get vorticity initial conditions from curl of u, v
     v = zero(u)     # meridional velocity zero for these initial conditions
     vor = progn.vor[1]
@@ -229,7 +294,7 @@ $(TYPEDFIELDS)"""
 @kwdef struct ZonalWind <: AbstractInitialConditions
     "conversion from σ to Jablonowski's ηᵥ-coordinates"
     η₀::Float64 = 0.252
-    
+
     "max amplitude of zonal wind [m/s]"
     u₀::Float64 = 35
 
@@ -242,7 +307,7 @@ $(TYPEDFIELDS)"""
 
     "perturbation strength [m/s]"
     perturb_uₚ::Float64 = 1
-    
+
     "radius of Gaussian perturbation in units of Earth's radius [1]"
     perturb_radius::Float64 = 1/10
 end
@@ -253,7 +318,7 @@ Initial conditions from Jablonowski and Williamson, 2006, QJR Meteorol. Soc"""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::ZonalWind,
                         model::PrimitiveEquation) where NF
-  
+
     (; u₀, η₀) = initial_conditions
     (; perturb_lat, perturb_lon, perturb_uₚ, perturb_radius) = initial_conditions
     (; radius, Grid, nlat_half, nlayers) = model.spectral_grid
@@ -279,8 +344,8 @@ function initialize!(   progn::PrognosticVariables{NF},
             cosφ = cosd(φij)
             tanφ = tand(φij)
 
-            # Jablonowski and Williamson, eq. (3) 
-            vor_grid[ij, k] = -4u₀/radius*cos_ηᵥ*sinφ*cosφ*(2 - 5sinφ^2) 
+            # Jablonowski and Williamson, eq. (3)
+            vor_grid[ij, k] = -4u₀/radius*cos_ηᵥ*sinφ*cosφ*(2 - 5sinφ^2)
 
             # PERTURBATION
             sinφc = sind(perturb_lat)       # location of centre
@@ -294,11 +359,11 @@ function initialize!(   progn::PrognosticVariables{NF},
             r = radius*acos(X)
             exp_decay = exp(-(r/R)^2)
 
-            # Jablonowski and Williamson, eq. (12) 
+            # Jablonowski and Williamson, eq. (12)
             vor_grid[ij, k] += perturb_uₚ/radius*exp_decay*
                 (tanφ - 2*(radius/R)^2*acos(X)*X_norm*(sinφc*cosφ - cosφc*sinφ*cosd(λij-λc)))
-            
-            # Jablonowski and Williamson, eq. (13) 
+
+            # Jablonowski and Williamson, eq. (13)
             div_grid[ij, k] = -2perturb_uₚ*radius/R^2 * exp_decay * acos(X) * X_norm * cosφc*sind(λij-λc)
         end
     end
@@ -375,12 +440,12 @@ $(TYPEDFIELDS)"""
 
     "Sigma coordinates of the tropopause [1]"
     σ_tropopause::Float64 = 0.2
-    
+
     "max amplitude of zonal wind [m/s]"
     u₀::Float64 = 35
 
     "temperature difference used for stratospheric lapse rate [K], Jablonowski uses ΔT = 4.8e5 [K]"
-    ΔT::Float64 = 0                 
+    ΔT::Float64 = 0
 
     "minimum temperature [K] of profile"
     Tmin::Float64 = 200
@@ -402,7 +467,7 @@ function initialize!(   progn::PrognosticVariables{NF},
     (;σ_levels_full) = model.geometry
 
     φ, λ = model.geometry.latds, model.geometry.londs
-    S = model.spectral_transform  
+    S = model.spectral_transform
 
     # vertical profile
     Tη = zero(σ_levels_full)
@@ -431,7 +496,7 @@ function initialize!(   progn::PrognosticVariables{NF},
             sinφ = sind(φij)
             cosφ = cosd(φij)
 
-             # Jablonowski and Williamson, eq. (6) 
+             # Jablonowski and Williamson, eq. (6)
             temp_grid[ij, k] = Tη[k] + A1*((-2sinφ^6*(cosφ^2 + 1/3) + 10/63)*A2 + (8/5*cosφ^3*(sinφ^2 + 2/3) - π/4)*aΩ)
         end
     end
@@ -542,12 +607,12 @@ function initialize!(   progn::PrognosticVariables,
     lnp_grid = zero(orography)      # allocate log surface pressure on grid
 
     RΓg⁻¹ = R_dry*lapse_rate/gravity         # for convenience
-    ΓT⁻¹ = lapse_rate/temp_ref           
+    ΓT⁻¹ = lapse_rate/temp_ref
 
     for ij in eachgridpoint(lnp_grid, orography)
         lnp_grid[ij] = lnp₀ + log(1 - ΓT⁻¹*orography[ij])/RΓg⁻¹
     end
-    
+
     set!(progn, model; pres=lnp_grid, lf=1)
 
     return nothing
@@ -561,7 +626,7 @@ function initialize!(   progn::PrognosticVariables,
                         model::PrimitiveEquation)
     (;pres_ref) = model.atmosphere
     (;norm_sphere) = model.spectral_transform
-    
+
     # logarithm of reference surface pressure [log(Pa)]
     # set the l=m=0 mode, normalize correctly
     set!(progn, model; pres=log(pres_ref) * norm_sphere)
@@ -577,7 +642,7 @@ export ConstantRelativeHumidity
     relhumid_ref::Float64 = 0.7
 end
 
-function initialize!(  
+function initialize!(
     progn::PrognosticVariables,
     IC::ConstantRelativeHumidity,
     model::PrimitiveEquation,
@@ -600,7 +665,7 @@ function initialize!(
             humid_grid[ij, k] = relhumid_ref*q_sat
         end
     end
-    
+
     set!(progn, model; humid=humid_grid, lf=1)
 
     return nothing
@@ -611,14 +676,14 @@ export RandomWaves
 """Parameters for random initial conditions for the interface displacement η
 in the shallow water equations.
 $(TYPEDFIELDS)"""
-@kwdef struct RandomWaves <: AbstractInitialConditions  
+@kwdef struct RandomWaves <: AbstractInitialConditions
     # random interface displacement field
     A::Float64 = 2000       # amplitude [m]
     lmin::Int64 = 10        # minimum wavenumber
     lmax::Int64 = 30        # maximum wavenumber
 end
 
-RandomWaves(S::SpectralGrid; kwargs...) = RandomWaves(;kwargs...) 
+RandomWaves(S::SpectralGrid; kwargs...) = RandomWaves(;kwargs...)
 
 """
 $(TYPEDSIGNATURES)
@@ -628,7 +693,7 @@ This kicks off gravity waves that will interact with orography."""
 function initialize!(   progn::PrognosticVariables{NF},
                         initial_conditions::RandomWaves,
                         model::ShallowWater) where NF
-        
+
     (; A, lmin, lmax) = initial_conditions
     (; trunc) = progn
 
