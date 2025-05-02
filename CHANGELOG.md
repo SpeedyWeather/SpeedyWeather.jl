@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Isfinite checks in land and ocean to differentiate land and ocean parameters correctly [#692](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/692)
 - Speed up CI for land models [#719](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/719)
 - Move documentation to SpeedyWeatherDocumentation repository [#713](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/713), [#722](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/722) and [#723](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/723)
 - Ensure docs don't deploy with `.jld2` or `.nc` files [#724](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/724)
